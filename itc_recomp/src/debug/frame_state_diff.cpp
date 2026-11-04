@@ -642,7 +642,8 @@ extern "C" REX_FUNC(sub_820DAB58) {
 }
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820DBFF8, LoadPollSceneCockpitFinish)
 // SceneCockpit::Draw natively under --native_car_draw (src/car_draw/; its
-// native caller to come calls the plain C++), inside the same wrap.
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
 extern "C" REX_FUNC(sub_820DC498) {
   REX_FUNC_PROLOGUE();
   if (debug::IsHidden(0x820DC498)) {
@@ -676,7 +677,8 @@ extern "C" REX_FUNC(sub_820DDE58) {
 }
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E2E68, LoadPollScenePartsFinish)
 // SceneParts::Draw natively under --native_car_draw (src/car_draw/; its
-// native caller to come calls the plain C++), inside the same wrap.
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
 extern "C" REX_FUNC(sub_820E2EE8) {
   REX_FUNC_PROLOGUE();
   if (debug::IsHidden(0x820E2EE8)) {
@@ -692,7 +694,8 @@ extern "C" REX_FUNC(sub_820E2EE8) {
 }
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E4140, LoadPollSceneInteriorFinish)
 // SceneInterior::Draw natively under --native_car_draw (src/car_draw/; its
-// native caller to come calls the plain C++), inside the same wrap.
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
 extern "C" REX_FUNC(sub_820E53F0) {
   REX_FUNC_PROLOGUE();
   if (debug::IsHidden(0x820E53F0)) {
@@ -708,7 +711,8 @@ extern "C" REX_FUNC(sub_820E53F0) {
 }
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E5A68, LoadPollSceneTrafficFinish)
 // SceneTraffic::Draw natively under --native_car_draw (src/car_draw/; its
-// native caller to come calls the plain C++), inside the same wrap.
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
 extern "C" REX_FUNC(sub_820E6A40) {
   REX_FUNC_PROLOGUE();
   if (debug::IsHidden(0x820E6A40)) {
@@ -725,7 +729,8 @@ extern "C" REX_FUNC(sub_820E6A40) {
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E7328, LoadPollSceneWheelsFinish)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E8908, LoadPollSceneWheelsSetUpPoints)
 // SceneWheels::Draw natively under --native_car_draw (src/car_draw/; its
-// native caller to come calls the plain C++), inside the same wrap.
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
 extern "C" REX_FUNC(sub_820ECE28) {
   REX_FUNC_PROLOGUE();
   if (debug::IsHidden(0x820ECE28)) {
