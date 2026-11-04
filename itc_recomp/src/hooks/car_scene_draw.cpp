@@ -14,7 +14,12 @@ ITC_FLAG_BOOL(native_car_scene_draw, true, "ITC",
               "Box::FromPoints sub_82597210 with Box::Extend sub_82597150 and Vector16::Size "
               "sub_825971E8, and Vector16::PushBack sub_825986B8 with Insert sub_82598648, "
               "InsertN sub_82598288 and Allocate sub_82598158 (operator new and delete as plain "
-              "C++; _Xlen and bad_alloc's paths left to the originals), natively instead of "
+              "C++; _Xlen and bad_alloc's paths left to the originals), Matrix::LookAt "
+              "sub_82597378, Matrix::Perspective sub_825972A8, Projector::Build sub_82597610 and "
+              "BuildOrtho sub_82597518, ScenePass::SetLight sub_820C4EB8, SceneModel::BeamColor "
+              "sub_820DAA38, Beam sub_820DAAC8 and BeamShape sub_820DAB10 and "
+              "CarScene::PlayerModel sub_820C4FB8 (the wrapped ones inside their "
+              "--find_per_frame_state wraps), natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=car_scene_draw)");
 
@@ -91,6 +96,71 @@ void CarSceneDrawVector16Allocate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
+void CarSceneDrawLookAt(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  csd::LookAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+}
+
+void CarSceneDrawPerspective(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!csd::Perspective(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.f4.f64,
+                        ctx.r1.u32)) {
+    __imp__sub_825972A8(ctx, base);
+  }
+}
+
+void CarSceneDrawProjectorBuild(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!csd::ProjectorBuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64,
+                           ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.r1.u32)) {
+    __imp__sub_82597610(ctx, base);
+    return;
+  }
+  ctx.fpscr.enableFlushMode();
+}
+
+void CarSceneDrawProjectorBuildOrtho(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  csd::ProjectorBuildOrtho(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64,
+                           ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.r1.u32);
+  ctx.fpscr.enableFlushMode();
+}
+
+void CarSceneDrawSetLight(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto memcpy = [&](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
+                          uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = to;
+    ctx.r4.u64 = from;
+    ctx.r5.u64 = bytes;
+    __imp__sub_825A7410(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+  };
+  ctx.r3.u64 = csd::ScenePassSetLight(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32,
+                                      memcpy);
+}
+
+void CarSceneDrawBeamColor(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = csd::SceneModelBeamColor(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+void CarSceneDrawBeam(PPCContext& ctx, uint8_t* base) {
+  csd::SceneModelBeam(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void CarSceneDrawBeamShape(PPCContext& ctx, uint8_t* base) {
+  csd::SceneModelBeamShape(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void CarSceneDrawPlayerModel(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = csd::CarScenePlayerModel(base, ctx.r3.u32);
+}
+
 }  // namespace hooks
 
 // The adapters: TextureProjection::Fit (recompiled) calls them. None for
@@ -112,3 +182,8 @@ ITC_CAR_SCENE_DRAW_ADAPTER(82597878, CarSceneDrawFrustumFromMatrix)
 ITC_CAR_SCENE_DRAW_ADAPTER(82597E58, CarSceneDrawPlaneSegmentCrossing)
 ITC_CAR_SCENE_DRAW_ADAPTER(82597210, CarSceneDrawBoxFromPoints)
 ITC_CAR_SCENE_DRAW_ADAPTER(825986B8, CarSceneDrawVector16PushBack)
+// Part 2: Projector::Build's and BuildOrtho's (native) and
+// TextureProjection::Fit's (recompiled) callees. The wrapped ones are in
+// src/debug/frame_state_diff.cpp (ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW).
+ITC_CAR_SCENE_DRAW_ADAPTER(82597378, CarSceneDrawLookAt)
+ITC_CAR_SCENE_DRAW_ADAPTER(825972A8, CarSceneDrawPerspective)

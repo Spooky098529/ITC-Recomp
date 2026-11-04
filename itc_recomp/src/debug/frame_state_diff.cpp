@@ -5,6 +5,7 @@
 #include "cameras/cameras.h"
 #include "hooks/cameras.h"
 #include "hooks/car_draw.h"
+#include "hooks/car_scene_draw.h"
 #include "hooks/framework.h"
 #include "hooks/load_poll.h"
 #include "hooks/second_set.h"
@@ -33,6 +34,7 @@ ITC_FLAG_DECLARE(bool, native_models);
 ITC_FLAG_DECLARE(bool, native_second_set);
 ITC_FLAG_DECLARE(bool, native_load_poll);
 ITC_FLAG_DECLARE(bool, native_car_draw);
+ITC_FLAG_DECLARE(bool, native_car_scene_draw);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -516,11 +518,28 @@ extern "C" REX_FUNC(sub_820AB560) {
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820AB560);
 }
-ITC_FRAME_STATE_WRAP(820C4EB8)
-ITC_FRAME_STATE_WRAP(820C4FB8)
-ITC_FRAME_STATE_WRAP(820DAA38)
-ITC_FRAME_STATE_WRAP(820DAAC8)
-ITC_FRAME_STATE_WRAP(820DAB10)
+// The car scene's draw's leaves natively under --native_car_scene_draw
+// (src/car_scene_draw/; native callers call the plain C++, not these wraps),
+// inside the same wrap.
+#define ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(address, step)            \
+  extern "C" REX_FUNC(sub_##address) {                                \
+    REX_FUNC_PROLOGUE();                                              \
+    if (debug::IsHidden(0x##address)) {                               \
+      return;                                                         \
+    }                                                                 \
+    debug::FrameStateDiff_Before(base);                               \
+    if (ITC_FLAG(native_car_scene_draw)) {                            \
+      hooks::step(ctx, base);                                         \
+    } else {                                                          \
+      __imp__sub_##address(ctx, base);                                \
+    }                                                                 \
+    debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
+  }
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820C4EB8, CarSceneDrawSetLight)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820C4FB8, CarSceneDrawPlayerModel)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAA38, CarSceneDrawBeamColor)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAAC8, CarSceneDrawBeam)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAB10, CarSceneDrawBeamShape)
 // XPR::GetTexture: r3 = the XPR, r4 = the index; r3 the record's header.
 // Natively under --native_models (src/models/xpr.cpp), inside the same wrap.
 extern "C" REX_FUNC(sub_82597118) {

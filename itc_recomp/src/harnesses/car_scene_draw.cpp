@@ -647,6 +647,304 @@ void Vector(Context& h) {
   }
 }
 
+
+// --- Part 2: the projectors ---
+
+// A vector of `scale`: ordinary, or with special values.
+void WriteVector(Context& h, uint32_t at, float scale, bool special, float w = 1.0f) {
+  for (uint32_t i = 0; i < 12; i += 4) {
+    StoreFloat(h.base, at + i, special ? Value(h.random, scale) : Plain(h.random, scale));
+  }
+  StoreFloat(h.base, at + 12, w);
+}
+
+// Eye, target and up for a look-at: random, special values, the eye on the
+// target (no forward), up along the forward (no right), up's w random.
+void WriteView(Context& h, uint32_t eye, uint32_t target, uint32_t up, int k) {
+  const bool special = k % 4 == 3;
+  WriteVector(h, eye, 9000.0f, special);
+  WriteVector(h, target, 9000.0f, special);
+  WriteVector(h, up, 1.0f, special, Plain(h.random, 2.0f));
+  if (k % 8 == 0) {
+    // A target near the eye (a headlight's few meters).
+    for (uint32_t i = 0; i < 12; i += 4) {
+      StoreFloat(h.base, target + i,
+                 std::bit_cast<float>(Load(h.base, eye + i)) + Plain(h.random, 5.0f));
+    }
+    StoreFloat(h.base, up + 0, 0.0f);
+    StoreFloat(h.base, up + 4, 1.0f);
+    StoreFloat(h.base, up + 8, 0.0f);
+  } else if (k % 16 == 1) {
+    for (uint32_t i = 0; i < 16; i += 4) {
+      Store(h.base, target + i, Load(h.base, eye + i));
+    }
+  } else if (k % 16 == 5) {
+    const float scale = Plain(h.random, 3.0f);
+    for (uint32_t i = 0; i < 12; i += 4) {
+      StoreFloat(h.base, up + i,
+                 (std::bit_cast<float>(Load(h.base, target + i)) -
+                  std::bit_cast<float>(Load(h.base, eye + i))) *
+                     scale);
+    }
+  }
+}
+
+// f registers as doubles of floats (the callers pass lfs values and
+// single-precision results).
+double Single(float value) { return double(value); }
+
+void Projectors(Context& h) {
+  const uint32_t out = h.data;
+  const uint32_t eye = h.data + 64;
+  const uint32_t target = h.data + 96;
+  const uint32_t up = h.data + 128;
+  {
+    // Every tenth case the eye 4 bytes past its 16 (lfs reads it there, lvx
+    // the aligned 16 holding it).
+    Results results("Matrix::LookAt (sub_82597378)");
+    for (int k = 0; k < 400; k++) {
+      const bool shifted = k % 10 == 9;
+      Case(
+          h, results,
+          [&](Blocks&) {
+            WriteView(h, eye, target, up, k);
+            StoreFloat(h.base, eye + 16, Plain(h.random, 9000.0f));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = out;
+            t.r4.u64 = shifted ? eye + 4 : eye;
+            t.r5.u64 = target;
+            t.r6.u64 = up;
+          },
+          __imp__sub_82597378, hooks::CarSceneDrawLookAt,
+          [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
+            o.Floats(h.base, out, 16);
+            o.Floats(h.base, t.r1.u32 - 32, 8);
+            o.Word(t.r3.u32);
+            blocks.Out(o);
+          },
+          fmt::format("case {}", k));
+    }
+    results.Report();
+  }
+  {
+    // Fields of view of the projectors and the fit; special values (a NaN
+    // or infinity sends tan to its error path: the original runs), near =
+    // far, aspect 0. r3 isn't compared: the original leaves tan's _ctrlfp
+    // word, read by no caller.
+    Results results("Matrix::Perspective (sub_825972A8)");
+    for (int k = 0; k < 300; k++) {
+      double f[4];
+      Case(
+          h, results,
+          [&](Blocks&) {
+            const bool special = k % 4 == 3;
+            f[0] = Single(special ? Value(h.random, 3.0f) : Uniform(h.random, 0.05f, 3.1f));
+            f[1] = Single(special ? Value(h.random, 3.0f) : Uniform(h.random, 0.3f, 3.0f));
+            f[2] = Single(special ? Value(h.random, 5.0f) : Uniform(h.random, 0.01f, 5.0f));
+            f[3] = Single(special ? Value(h.random, 2000.0f) : float(f[2]) + Uniform(h.random, 1.0f, 2000.0f));
+            if (k % 16 == 1) {
+              f[3] = f[2];
+            } else if (k % 16 == 5) {
+              f[1] = 0.0;
+            } else if (k % 16 == 9) {
+              f[0] = 0.0;
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = out;
+            t.f1.f64 = f[0];
+            t.f2.f64 = f[1];
+            t.f3.f64 = f[2];
+            t.f4.f64 = f[3];
+          },
+          __imp__sub_825972A8, hooks::CarSceneDrawPerspective,
+          [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
+            o.Floats(h.base, out, 16);
+            o.Word(Load(h.base, t.r1.u32 - 128));  // the back chain
+            blocks.Out(o);
+          },
+          fmt::format("case {}", k));
+    }
+    results.Report();
+  }
+}
+
+// --- Part 2: the root's leaves ---
+
+// A guest word put back when the scope ends.
+struct SavedWord {
+  SavedWord(uint8_t* base, uint32_t address)
+      : base_(base), address_(address), value_(Load(base, address)) {}
+  ~SavedWord() { Store(base_, address_, value_); }
+  SavedWord(const SavedWord&) = delete;
+  SavedWord& operator=(const SavedWord&) = delete;
+
+ private:
+  uint8_t* base_;
+  uint32_t address_;
+  uint32_t value_;
+};
+
+constexpr uint32_t kSceneGlobal = 0x826C2E44;
+constexpr uint32_t kRaceDataGlobal = 0x826C5B2C;
+constexpr uint32_t kSecondHumanGlobal = 0x826C7824;
+
+void Leaves(Context& h) {
+  {
+    // The direction random, special, zero, tiny (its length's square
+    // denormal) or 4 bytes past its 16; the distance random or special.
+    Results results("ScenePass::SetLight (sub_820C4EB8)");
+    const uint32_t pass = h.data + 256;
+    const uint32_t direction = h.data + 64;
+    for (int k = 0; k < 300; k++) {
+      double distance = 0;
+      const bool shifted = k % 10 == 9;
+      Case(
+          h, results,
+          [&](Blocks&) {
+            const bool special = k % 4 == 3;
+            WriteVector(h, direction, 2.0f, special, Plain(h.random, 2.0f));
+            if (k % 16 == 1) {
+              for (uint32_t i = 0; i < 12; i += 4) {
+                StoreFloat(h.base, direction + i, 0.0f);
+              }
+            } else if (k % 16 == 5) {
+              for (uint32_t i = 0; i < 12; i += 4) {
+                StoreFloat(h.base, direction + i, Plain(h.random, 1e-20f));
+              }
+            }
+            for (uint32_t i = 0; i < 192; i += 4) {
+              StoreFloat(h.base, pass + i, Plain(h.random, 10.0f));
+            }
+            distance = Single(special ? Value(h.random, 500.0f) : Plain(h.random, 500.0f));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = pass;
+            t.r4.u64 = shifted ? direction + 4 : direction;
+            t.f1.f64 = distance;
+          },
+          __imp__sub_820C4EB8, hooks::CarSceneDrawSetLight,
+          [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
+            const uint32_t f = t.r1.u32 - 192;
+            o.Floats(h.base, pass, 48);
+            o.Word(Load(h.base, f));  // the back chain
+            o.Floats(h.base, f + 80, 20);
+            o.Word(t.r3.u32);
+            blocks.Out(o);
+          },
+          fmt::format("case {}", k));
+    }
+    results.Report();
+  }
+  // The scene models and the scene in a block of their own (the scene's
+  // beams at +5392 to +5487), the scene global pointed at it meanwhile.
+  const uint32_t world = memory::Alloc(0x4000, 0);
+  const uint32_t scene = world;
+  const uint32_t model = world + 0x2000;
+  const uint32_t out = h.data;
+  auto write_model = [&](int k) {
+    Store(h.base, model + 4288, uint32_t(h.random.Next()));
+    const uint32_t bits = uint32_t(h.random.Next());
+    Store(h.base, model + 4292, k % 2 == 0 ? bits | 0x40 : bits & ~0x40u);
+    Store(h.base, model + 3776, h.random.Below(4));
+    Store(h.base, model + 48, h.random.Below(16));
+    for (uint32_t i = 5392; i < 5488; i += 4) {
+      StoreFloat(h.base, scene + i, Plain(h.random, 10.0f));
+    }
+  };
+  {
+    Results results("SceneModel::BeamColor (sub_820DAA38)");
+    for (int k = 0; k < 200; k++) {
+      Case(
+          h, results, [&](Blocks&) { write_model(k); },
+          [&](PPCContext& t) {
+            t.r3.u64 = out;
+            t.r4.u64 = model;
+          },
+          __imp__sub_820DAA38, hooks::CarSceneDrawBeamColor,
+          [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
+            const uint32_t f = t.r1.u32 - 112;
+            if ((Load(h.base, model + 4292) & 0x40) != 0) {
+              o.Floats(h.base, out, 4);  // the color scaled (stfs)
+            } else {
+              o.Bytes(Read(h.base, out, 16));  // the table's words copied
+            }
+            o.Word(Load(h.base, f));  // the back chain
+            o.Bytes(Read(h.base, f + 80, 16));
+            o.Word(t.r3.u32);
+            blocks.Out(o);
+          },
+          fmt::format("case {}", k));
+    }
+    results.Report();
+  }
+  {
+    SavedWord saved(h.base, kSceneGlobal);
+    Store(h.base, kSceneGlobal, scene);
+    const struct {
+      const char* name;
+      GuestFunction recompiled;
+      GuestFunction native;
+    } beams[] = {
+        {"SceneModel::Beam (sub_820DAAC8)", __imp__sub_820DAAC8, hooks::CarSceneDrawBeam},
+        {"SceneModel::BeamShape (sub_820DAB10)", __imp__sub_820DAB10,
+         hooks::CarSceneDrawBeamShape},
+    };
+    for (const auto& beam : beams) {
+      Results results(beam.name);
+      for (int k = 0; k < 100; k++) {
+        Case(
+            h, results, [&](Blocks&) { write_model(k); },
+            [&](PPCContext& t) {
+              t.r3.u64 = out;
+              t.r4.u64 = model;
+            },
+            beam.recompiled, beam.native,
+            [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
+              o.Bytes(Read(h.base, out, 16));
+              o.Word(t.r3.u32);
+              blocks.Out(o);
+            },
+            fmt::format("case {}", k));
+      }
+      results.Report();
+    }
+  }
+  memory::Free(world);
+  {
+    // The race data in a block of its own (+0xA3AF0 the race kind, +0x59614),
+    // the race data global and [0x826C7824] set meanwhile.
+    const uint32_t race = memory::Alloc(0xA4000, 0);
+    SavedWord saved_race(h.base, kRaceDataGlobal);
+    SavedWord saved_human(h.base, kSecondHumanGlobal);
+    Store(h.base, kRaceDataGlobal, race);
+    Results results("CarScene::PlayerModel (sub_820C4FB8)");
+    for (int k = 0; k < 200; k++) {
+      uint32_t index = 0;
+      Case(
+          h, results,
+          [&](Blocks&) {
+            index = k % 4 == 3 ? uint32_t(h.random.Next()) : 0;
+            Store(h.base, race + 0xA3AF0, h.random.Below(3) != 0 ? 6 : h.random.Below(10));
+            Store(h.base, race + 0x59614, h.random.Below(3) != 0 ? 2 : h.random.Below(4));
+            Store(h.base, kSecondHumanGlobal,
+                  h.random.Below(2) != 0 ? 0 : uint32_t(h.random.Next()));
+          },
+          [&](PPCContext& t) { t.r3.u64 = index; }, __imp__sub_820C4FB8,
+          hooks::CarSceneDrawPlayerModel,
+          [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
+            o.Word(t.r3.u32);
+            o.Word(uint32_t(t.r3.u64 >> 32));
+            blocks.Out(o);
+          },
+          fmt::format("case {}", k));
+    }
+    results.Report();
+    memory::Free(race);
+  }
+}
+
 }  // namespace
 
 void CarSceneDraw(Context& h) {
@@ -654,6 +952,8 @@ void CarSceneDraw(Context& h) {
   Frustum(h);
   Box(h);
   Vector(h);
+  Projectors(h);
+  Leaves(h);
 }
 
 }  // namespace harness

@@ -37,4 +37,28 @@ void CarSceneDrawVector16Insert(PPCContext& ctx, uint8_t* base);
 void CarSceneDrawVector16InsertN(PPCContext& ctx, uint8_t* base);
 void CarSceneDrawVector16Allocate(PPCContext& ctx, uint8_t* base);
 
+// Part 2: the projectors and the root's leaves. Matrix::LookAt sub_82597378
+// (r3 = out, r4 = eye, r5 = target, r6 = up) and Matrix::Perspective
+// sub_825972A8 (r3 = out, f1 to f4 = field of view, aspect, near, far; r3
+// as it was: the original's is tan's _ctrlfp word, read by no caller).
+void CarSceneDrawLookAt(PPCContext& ctx, uint8_t* base);
+void CarSceneDrawPerspective(PPCContext& ctx, uint8_t* base);
+// The wrapped ones (their wraps in src/debug/frame_state_diff.cpp call
+// these under the flag): Projector::Build sub_82597610 (r3 = out, r4 = eye,
+// r5 = target, r6 = up, f1 to f4 = field of view, aspect, near, far) and
+// BuildOrtho sub_82597518 (f1 to f4 = width, height, near, far), r3 = out,
+// flush-to-zero left on (Matrix::Multiply's); ScenePass::SetLight
+// sub_820C4EB8 (r3 = the pass description, r4 = the direction, f1 = the
+// distance; r3 = memcpy's), SceneModel::BeamColor sub_820DAA38, Beam
+// sub_820DAAC8 and BeamShape sub_820DAB10 (r3 = out, r4 = the scene model;
+// r3 = out), CarScene::PlayerModel sub_820C4FB8 (r3 = the index, its high
+// word dropped: callers pass lwz's).
+void CarSceneDrawProjectorBuild(PPCContext& ctx, uint8_t* base);
+void CarSceneDrawProjectorBuildOrtho(PPCContext& ctx, uint8_t* base);
+void CarSceneDrawSetLight(PPCContext& ctx, uint8_t* base);
+void CarSceneDrawBeamColor(PPCContext& ctx, uint8_t* base);
+void CarSceneDrawBeam(PPCContext& ctx, uint8_t* base);
+void CarSceneDrawBeamShape(PPCContext& ctx, uint8_t* base);
+void CarSceneDrawPlayerModel(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

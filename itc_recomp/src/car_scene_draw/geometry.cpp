@@ -5,12 +5,10 @@
 
 #include "car_scene_draw/car_scene_draw.h"
 
+#include "car_scene_draw/ops.h"
 #include "guest.h"
 
 #include "base/log.h"
-
-#include <rex/platform/fpscr.h>
-#include <simde/x86/sse4.1.h>
 
 #include <bit>
 #include <cmath>
@@ -19,97 +17,14 @@ namespace car_scene_draw {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using namespace ops;
 
-constexpr uint32_t kOne = 0x82000A30;           // the game's float 1.0
-constexpr uint32_t kZero = 0x82000A34;          // 0.0
 constexpr uint32_t kBoxMin = 0x8206CE44;        // the box's starting min (probably FLT_MAX)
 constexpr uint32_t kBoxMax = 0x8206CE40;        // its starting max (probably -FLT_MAX)
 constexpr uint32_t kCrossingEpsilon = 0x8206CE48;  // SegmentCrossing's smallest |plane . dir|
 
 constexpr uint32_t kFrustumFrame = 336;
 constexpr uint32_t kBoxFrame = 128;
-
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-
-// lfs and stfs (through the double, as the translated code).
-double Lfs(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
-void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
-}
-double Fmuls(double a, double b) { return double(float(a * b)); }
-double Fadds(double a, double b) { return double(float(a + b)); }
-double Fsubs(double a, double b) { return double(float(a - b)); }
-double Fdivs(double a, double b) { return double(float(a / b)); }
-double Fmadds(double a, double b, double c) { return double(float(std::fma(a, b, c))); }
-double Fsqrts(double a) { return double(float(std::sqrt(a))); }
-double Fneg(double a) {
-  return std::bit_cast<double>(std::bit_cast<uint64_t>(a) ^ 0x8000000000000000ull);
-}
-double Fabs(double a) {
-  return std::bit_cast<double>(std::bit_cast<uint64_t>(a) & ~0x8000000000000000ull);
-}
-
-// 16 bytes as two ld and two std, both loads first (ld, ld, std, std).
-void Copy16(uint8_t* base, uint32_t to, uint32_t from) {
-  uint32_t w[4];
-  for (int i = 0; i < 4; i++) {
-    w[i] = Load(base, from + 4 * i);
-  }
-  for (int i = 0; i < 4; i++) {
-    Store(base, to + 4 * i, w[i]);
-  }
-}
-
-// --- The vector unit, as the translation does it ---
-
-// Vectors as the translated code holds them: word 0 in the top lane.
-simde__m128 VectorOf(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) {
-  return simde_mm_castsi128_ps(
-      simde_mm_set_epi32(int32_t(w0), int32_t(w1), int32_t(w2), int32_t(w3)));
-}
-// lvx128: the aligned 16 bytes holding `address`.
-simde__m128 Lvx(uint8_t* base, uint32_t address) {
-  const uint32_t at = address & ~0xFu;
-  return VectorOf(Load(base, at), Load(base, at + 4), Load(base, at + 8), Load(base, at + 12));
-}
-uint32_t WordOf(simde__m128 v, int i) {
-  alignas(16) uint32_t lanes[4];
-  simde_mm_store_si128(reinterpret_cast<simde__m128i*>(lanes), simde_mm_castps_si128(v));
-  return lanes[3 - i];
-}
-// stvx: to the aligned 16 bytes holding `address`.
-void Stvx(uint8_t* base, uint32_t address, simde__m128 v) {
-  const uint32_t at = address & ~0xFu;
-  for (int i = 0; i < 4; i++) {
-    Store(base, at + 4 * i, WordOf(v, i));
-  }
-}
-// vpermwi128 as the translation's shuffles.
-template <int kImmediate>
-simde__m128 Permute(simde__m128 v) {
-  return simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(v), kImmediate));
-}
-// vnmsubfp d = -(a b - c), unfused, as translated.
-simde__m128 Nmsub(simde__m128 a, simde__m128 b, simde__m128 c) {
-  return simde_mm_xor_ps(simde_mm_sub_ps(simde_mm_mul_ps(a, b), c),
-                         simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000))));
-}
-
-// Flush-to-zero on while alive (the vector unit's mode), put back after.
-class FlushToZero {
- public:
-  FlushToZero() : csr_(Fpscr::getcsr()) { Fpscr::setcsr(csr_ | uint32_t(Fpscr::FlushMask)); }
-  ~FlushToZero() { Fpscr::setcsr(csr_); }
-  FlushToZero(const FlushToZero&) = delete;
-  FlushToZero& operator=(const FlushToZero&) = delete;
-
- private:
-  uint32_t csr_;
-};
 
 }  // namespace
 

@@ -16,11 +16,16 @@
 //
 // Part 1: the geometry library under TextureProjection::Fit (sub_82598768,
 // still recompiled): the frustum, the planes' crossings, the box over a
-// std::vector of 16-byte points and the vector's growth.
+// std::vector of 16-byte points and the vector's growth. Part 2: the
+// projectors' matrices (look-at, perspective, Projector::Build and
+// BuildOrtho) and the root's small leaves (the pass's light, the scene
+// models' beams, the player's model). The float helpers they share:
+// ops.h.
 
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace car_scene_draw {
@@ -70,5 +75,67 @@ std::optional<uint32_t> Vector16Insert(uint8_t* base, uint32_t out, uint32_t vec
 // sub_825986B8 Vector16::PushBack.
 std::optional<uint32_t> Vector16PushBack(uint8_t* base, uint32_t vector, uint32_t value,
                                          uint32_t stack);
+
+// --- The projectors (projectors.cpp) ---
+// f-register arguments are the doubles the registers hold.
+
+// sub_82597378 Matrix::LookAt: out = the row-vector view matrix from eye
+// to target with `up`, eye and up read whole (lvx: their aligned 16 bytes)
+// as well as eye's x, y, z. Its temporaries below `stack` (- 32 to - 4).
+void LookAt(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target, uint32_t up,
+            uint32_t stack);
+// sub_825972A8 Matrix::Perspective: out = the perspective for the field of
+// view, aspect, near and far, its back chain at stack - 128. False, with
+// nothing written, where tan (sub_825A8A50) would go to its error paths or
+// the rounding mode isn't nearest (c_runtime::Tan can't stand in): the
+// original then runs. r3 isn't given (the original leaves tan's _ctrlfp
+// word, which no caller reads).
+bool Perspective(uint8_t* base, uint32_t out, double fov, double aspect, double near_plane,
+                 double far_plane, uint32_t stack);
+// Whether Perspective would decline for this field of view (checked by
+// callers before they write anything).
+bool PerspectiveDeclines(uint8_t* base, double fov);
+// sub_82597610 Projector::Build: out = LookAt (its frame's +144) x
+// Perspective (+80) x the bias matrix at 0x8265EED0, in its 256-byte frame
+// below `stack`, both multiplies noted for frame interpolation by their
+// return addresses. False, with nothing written, where Perspective would
+// decline.
+bool ProjectorBuild(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target, uint32_t up,
+                    double fov, double aspect, double near_plane, double far_plane,
+                    uint32_t stack);
+// sub_82597518 Projector::BuildOrtho: out = LookAt (its frame's +144) x an
+// orthographic matrix (+80) for the width, height, near and far x the bias
+// matrix, in its 272-byte frame below `stack`, noted as Build's.
+void ProjectorBuildOrtho(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target,
+                         uint32_t up, double width, double height, double near_plane,
+                         double far_plane, uint32_t stack);
+
+// --- The root's leaves (lights.cpp) ---
+
+// memcpy's original (sub_825A7410) from the frame at `sp` with `lr`, where
+// native::Buffers_Memcpy declines (--native_memcpy off).
+using MemcpyCall =
+    std::function<void(uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp, uint32_t lr)>;
+
+// sub_820C4EB8 ScenePass::SetLight: the pass description's +96 = the
+// direction (its aligned 16 bytes) scaled by 1 / its x, y, z length (0 for
+// a zero length), +112 = the identity (built in its 192-byte frame below
+// `stack`, copied with memcpy), its last row +160 = (-distance x the
+// scaled x, y, z, 1.0). Returns what memcpy leaves in r3 (pass + 112).
+uint32_t ScenePassSetLight(uint8_t* base, uint32_t pass, uint32_t direction, double distance,
+                           uint32_t stack, const MemcpyCall& memcpy);
+// sub_820DAA38 SceneModel::BeamColor: out = the headlights' color from the
+// table (sub_820D35D0's plain C++) by the model's +48 and +3776, with the
+// high beams (+4292 & 0x40) scaled by [0x820029D4] (w 1.0) through its
+// 112-byte frame below `stack`. Returns out.
+uint32_t SceneModelBeamColor(uint8_t* base, uint32_t out, uint32_t model, uint32_t stack);
+// sub_820DAAC8 SceneModel::Beam and sub_820DAB10 SceneModel::BeamShape:
+// out = the scene's (`[0x826C2E44]`) +5408 or +5392 (Beam) and +5472 or
+// +5456 (BeamShape), the first with the high beams.
+void SceneModelBeam(uint8_t* base, uint32_t out, uint32_t model);
+void SceneModelBeamShape(uint8_t* base, uint32_t out, uint32_t model);
+// sub_820C4FB8 CarScene::PlayerModel: the index, or for 0, 1 when the race
+// kind is 6 with its +0x59614 2 and [0x826C7824] 0, else 0.
+uint32_t CarScenePlayerModel(uint8_t* base, uint32_t index);
 
 }  // namespace car_scene_draw
