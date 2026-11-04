@@ -1,0 +1,448 @@
+// The front end's car draw (src/front_end_car_draw/,
+// docs/functions/front-end-car-draw.md) against the recompiled functions.
+// Each case fills a block of guest memory with random bytes, lays the
+// garage stage's world there (the holder, the stage with its garage camera
+// and animation list, the car scene's pool 7 with two scene models, the
+// parts, the camera presets) and points the car scene [0x826C2E44] at it,
+// then runs the original and the register step (hooks/front_end_car_draw.h)
+// from the same inputs, and compares the block, the stack below the call
+// (the frames' temporaries, the top function's saved registers left out:
+// the adapters don't save them) and r3. The callees (this subsystem's under
+// its flag, and ScenePools::GetB, SceneModel::PollLoad, tan and memcpy) run
+// as their adapters run them on both sides (their own cases check them), so
+// the original's callees' frames are the plain C++'s too. Floats are compared as
+// floats where the originals compute or copy them with float instructions,
+// everything else exactly. The globals are put back after each case.
+
+#include "harness.h"
+
+#include "hooks/front_end_car_draw.h"
+#include "memory/heap.h"
+
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <bit>
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace harness {
+
+namespace {
+
+constexpr uint32_t kBlockBytes = 0x10000;
+constexpr uint32_t kStackBytes = 2048;  // below the call's r1
+constexpr uint32_t kArgBytes = 64;      // above it
+constexpr uint32_t kScenePointer = 0x826C2E44;
+
+// The world's layout in the block.
+constexpr uint32_t kHolder = 0x0;
+constexpr uint32_t kStage = 0x100;     // 6,208 bytes
+constexpr uint32_t kScene = 0x2000;    // pool 7's list at +5028
+constexpr uint32_t kModel0 = 0x4000;   // 5,120 bytes each
+constexpr uint32_t kModel1 = 0x5800;
+constexpr uint32_t kParts = 0x7000;    // +176 + 4576
+constexpr uint32_t kTable = 0x9000;    // the presets' indexes (4 x 290 words)
+constexpr uint32_t kPresets = 0xA400;  // 8 presets of 64 bytes
+constexpr uint32_t kPresetCount = 8;
+
+// Absolute guest ranges compared as floats: (address, count).
+using FloatRanges = std::vector<std::pair<uint32_t, uint32_t>>;
+
+void RandomBytes(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    guest::StoreU32(base, address + i, uint32_t(r.Next()));
+  }
+}
+
+// Mostly a finite float a few hundred either way, now and then a NaN, an
+// infinity, a zero or a denormal.
+uint32_t RandomFloat(Random& r) {
+  switch (r.Below(12)) {
+    case 0: return 0x7FC00000u | (r.Below(2) << 31) | r.Below(0x400000);
+    case 1: return 0x7F800001u | (r.Below(2) << 31) | r.Below(0x3FFFFF);
+    case 2: return 0x7F800000u | (r.Below(2) << 31);
+    case 3: return r.Below(2) << 31;
+    case 4: return r.Below(0x800000) | (r.Below(2) << 31);
+    default: {
+      const float f = (float(r.Below(200000)) - 100000.0f) / 256.0f;
+      return std::bit_cast<uint32_t>(f);
+    }
+  }
+}
+// An angle near -π to π, now and then right at an end or beyond, or not a
+// finite number.
+uint32_t RandomAngle(Random& r) {
+  switch (r.Below(10)) {
+    case 0: return RandomFloat(r);
+    case 1: return std::bit_cast<uint32_t>(3.14159265f - float(r.Below(3)) * 0.004f);
+    case 2: return std::bit_cast<uint32_t>(-3.14159265f + float(r.Below(3)) * 0.004f);
+    case 3: return std::bit_cast<uint32_t>(0.0f);
+    default: return std::bit_cast<uint32_t>((float(r.Below(20001)) - 10000.0f) / 3000.0f);
+  }
+}
+
+void AddRanges(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
+               FloatRanges floats) {
+  std::sort(floats.begin(), floats.end());
+  uint32_t at = address;
+  const uint32_t end = address + bytes;
+  for (const auto& [start, count] : floats) {
+    if (start < at || start + 4 * count > end) {
+      continue;
+    }
+    if (start > at) {
+      out.Bytes(Read(base, at, start - at));
+    }
+    out.Floats(base, start, count);
+    at = start + 4 * count;
+  }
+  if (at < end) {
+    out.Bytes(Read(base, at, end - at));
+  }
+}
+
+struct Saved {
+  explicit Saved(uint8_t* base) : base(base), scene(guest::LoadU32(base, kScenePointer)) {}
+  void Restore() const { guest::StoreU32(base, kScenePointer, scene); }
+  uint8_t* base;
+  uint32_t scene;
+};
+
+// One case through both versions: the block filled at random, `setup(t)`
+// laying the world and the registers (its inputs written back for the
+// second run); the block and the stack compared (from `*floor` up when
+// given, set by `setup`), the top `saves` bytes of the top function's frame
+// left out, `floats` as floats, then r3.
+void Case(Context& h, Results& results, uint32_t block, Random& r,
+          const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
+          GuestFunction native, uint32_t saves, const FloatRanges& floats,
+          const std::string& what, const uint32_t* floor = nullptr) {
+  const Saved saved(h.base);
+  RandomBytes(h.base, block, kBlockBytes, r);
+  guest::StoreU32(h.base, kScenePointer, block + kScene);
+  PPCContext start = CallContext(h);
+  start.r1.u64 &= ~0xFull;
+  setup(start);
+  const std::vector<uint8_t> inputs = Read(h.base, block, kBlockBytes);
+  const uint32_t sp = start.r1.u32;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Write(h.base, block, inputs.data(), kBlockBytes);
+    guest::StoreU32(h.base, kScenePointer, block + kScene);
+    Fill(h.base, sp - kStackBytes, kStackBytes + kArgBytes);
+    PPCContext t = start;
+    t.fpscr.disableFlushModeUnconditional();
+    (v == 0 ? recompiled : native)(t, h.base);
+    AddRanges(out[v], h.base, block, kBlockBytes, floats);
+    const uint32_t low = floor != nullptr ? *floor : sp - kStackBytes;
+    AddRanges(out[v], h.base, low, sp - saves - low, floats);
+    out[v].Bytes(Read(h.base, sp, kArgBytes));
+    out[v].Word(t.r1.u32);
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+  }
+  saved.Restore();
+  results.Check(out[0], out[1], what);
+}
+
+// --- The world ---
+
+struct World {
+  uint32_t block;
+  uint32_t holder() const { return block + kHolder; }
+  uint32_t stage() const { return block + kStage; }
+  uint32_t model(int i) const { return block + (i == 0 ? kModel0 : kModel1); }
+  uint32_t parts() const { return block + kParts; }
+};
+
+// How SceneModel::PollLoad answers for a model: 0 (+5028 or +5040 set), or
+// 1 at once (traffic with no body or wheels; a car with no parts, interior,
+// cockpit, light kit or wheels,
+// unless `keep_parts`).
+void PollAnswer(uint8_t* base, uint32_t model, Random& r, bool keep_parts) {
+  for (const uint32_t at : {5028u, 5040u, 5092u, 5100u}) {
+    guest::StoreU32(base, model + at, 0);
+  }
+  switch (r.Below(keep_parts ? 3 : 4)) {
+    case 0:
+      guest::StoreU32(base, model + 5028, 1 + r.Below(5));
+      break;
+    case 1:
+      guest::StoreU32(base, model + 5040, uint32_t(r.Next()) | 1);
+      break;
+    case 2:
+      guest::StoreU32(base, model + 32, 3);
+      break;
+    default:
+      guest::StoreU32(base, model + 32, r.Below(3));
+      for (const uint32_t at : {5048u, 5060u, 5068u, 5076u, 5084u}) {
+        guest::StoreU32(base, model + at, 0);
+      }
+      break;
+  }
+}
+
+// The stage's holder, the stage, the car scene's pool 7 (two models in use;
+// the stage's index 0 to 2, 2 past the end giving the first), the parts.
+World Lay(uint8_t* base, uint32_t block, Random& r, bool keep_parts) {
+  World w{block};
+  guest::StoreU32(base, w.holder(), w.stage());
+  guest::StoreU32(base, w.stage() + 8, r.Below(3));
+  guest::StoreU32(base, w.stage() + 4, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(4));
+  const uint32_t scene = block + kScene;
+  guest::StoreU32(base, scene + 5028, w.model(0));
+  guest::StoreU32(base, w.model(0) + 8, w.model(1));
+  guest::StoreU32(base, w.model(1) + 8, 0);
+  for (int i = 0; i < 2; i++) {
+    guest::StoreU32(base, w.model(i) + 16, 3);
+    guest::StoreU32(base, w.model(i) + 48, r.Below(4));
+    guest::StoreU32(base, w.model(i) + 5060, w.parts());
+    PollAnswer(base, w.model(i), r, keep_parts);
+  }
+  const uint32_t choices[3] = {0, 1, uint32_t(r.Next())};
+  guest::StoreU32(base, w.stage() + 6092, choices[r.Below(3)]);
+  guest::StoreU32(base, w.parts() + 2816, choices[r.Below(3)]);
+  return w;
+}
+
+// The garage camera (stage + 112): set up or not, its preset table and
+// presets, the limit.
+void LayCamera(uint8_t* base, const World& w, Random& r) {
+  const uint32_t camera = w.stage() + 112;
+  guest::StoreU32(base, camera, r.Below(5) == 0 ? 0 : uint32_t(r.Next()) | 1);
+  guest::StoreU32(base, camera + 292, w.block + kTable);
+  // Every index below the limit: one at or past it gives the preset 0,
+  // which the original reads from guest address 4 on (unmapped; never seen
+  // in play).
+  guest::StoreU32(base, camera + 4392, kPresetCount);
+  for (uint32_t i = 0; i < 4 * 290; i++) {
+    guest::StoreU32(base, w.block + kTable + 4 * i, r.Below(kPresetCount));
+  }
+  for (uint32_t i = 0; i < kPresetCount; i++) {
+    const uint32_t preset = w.block + kPresets + 64 * i;
+    guest::StoreU32(base, camera + 296 + 4 * i, preset);
+    for (uint32_t k = 0; k < 16; k++) {
+      guest::StoreU32(base, preset + 4 * k, RandomFloat(r));
+    }
+    // The field of view, mostly a camera's (degrees).
+    if (r.Below(4) != 0) {
+      guest::StoreFloat(base, preset + 12, 20.0f + float(r.Below(800)) / 10.0f);
+    }
+  }
+}
+
+// The animation list (stage + 5600): `count` entries of random types 0 to 7
+// (now and then any word).
+void LayList(uint8_t* base, const World& w, Random& r, uint32_t count) {
+  const uint32_t list = w.stage() + 5600;
+  guest::StoreU32(base, list + 448, count);
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t e = list + 28 * i;
+    guest::StoreU32(base, e, r.Below(10) == 0 ? uint32_t(r.Next()) : r.Below(8));
+    guest::StoreU32(base, e + 4, RandomFloat(r));
+    guest::StoreU32(base, e + 24, RandomFloat(r));
+  }
+}
+
+FloatRanges StageFloats(const World& w) {
+  const uint32_t s = w.stage(), c = s + 112;
+  return {{s + 80, 3}, {c + 100, 3}, {c + 180, 1}, {c + 224, 1}};
+}
+
+// The list's entries' floats (+4 and +24) and the frame's entry at its +80
+// (Add's 656-byte frame below sp: +84 and +104).
+FloatRanges ListFloats(const World& w, uint32_t sp) {
+  FloatRanges floats;
+  const uint32_t list = w.stage() + 5600;
+  for (uint32_t i = 0; i < 16; i++) {
+    floats.push_back({list + 28 * i + 4, 1});
+    floats.push_back({list + 28 * i + 24, 1});
+  }
+  for (const uint32_t frame : {sp - 656, sp - 112 - 656}) {
+    floats.push_back({frame + 84, 1});
+    floats.push_back({frame + 104, 1});
+    for (uint32_t i = 0; i < 16; i++) {
+      floats.push_back({frame + 112 + 28 * i + 4, 1});
+      floats.push_back({frame + 112 + 28 * i + 24, 1});
+    }
+  }
+  return floats;
+}
+
+void Small(Context& h, uint32_t block, Random& r) {
+  {
+    Results results("Plates::Hide (sub_820DF190) and Show (sub_820DF180)");
+    for (int c = 0; c < 40; c++) {
+      const bool show = c % 2 == 1;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) { t.r3.u64 = block + kParts + 176 + 4 * r.Below(16); },
+          show ? __imp__sub_820DF180 : __imp__sub_820DF190,
+          show ? hooks::FrontEndCarDrawPlatesShow : hooks::FrontEndCarDrawPlatesHide, 0, {},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::IsBusy (sub_82179BE0)");
+    for (int c = 0; c < 80; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const World w = Lay(h.base, block, r, false);
+            t.r3.u64 = w.holder();
+          },
+          __imp__sub_82179BE0, hooks::FrontEndCarDrawIsBusy, 16, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::SyncPlates (sub_8217AFE8)");
+    for (int c = 0; c < 120; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const World w = Lay(h.base, block, r, true);
+            t.r3.u64 = w.holder();
+          },
+          __imp__sub_8217AFE8, hooks::FrontEndCarDrawSyncPlates, 24, {},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::SetDrawWord (sub_82178B40)");
+    for (int c = 0; c < 40; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const World w = Lay(h.base, block, r, true);
+            t.r3.u64 = w.holder();
+            t.r4.u64 = r.Next();
+          },
+          __imp__sub_82178B40, hooks::FrontEndCarDrawSetDrawWord, 24, {},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+void Commands(Context& h, uint32_t block, Random& r) {
+  {
+    Results results("GarageStage::StepAngles (sub_82179C88)");
+    for (int c = 0; c < 120; c++) {
+      World w{block};
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU32(h.base, w.stage() + 80 + 4 * k, RandomAngle(r));
+            }
+            t.r3.u64 = w.stage() + 5600;
+            t.r4.u64 = r.Below(8) == 0 ? r.Next() : 7 + r.Below(9);
+            t.r5.u64 = w.stage() + 32;
+          },
+          __imp__sub_82179C88, hooks::FrontEndCarDrawStepAngles, 0, StageFloats(w),
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageAnims::Add (sub_8217F9E0)");
+    for (int c = 0; c < 200; c++) {
+      World w{block};
+      const uint32_t sp = CallContext(h).r1.u32 & ~0xFu;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            LayList(h.base, w, r, r.Below(4) == 0 ? 0 : r.Below(14));
+            guest::StoreU32(h.base, w.stage() + 112 + 176, RandomFloat(r));
+            t.r3.u64 = w.stage() + 5600;
+            t.r4.u64 = r.Below(10) == 0 ? r.Next() : r.Below(8);
+            t.r5.u64 = r.Below(2) == 0 ? w.stage() + 112 : w.stage() + 32;
+            t.r6.u64 = r.Next();
+            t.r7.u64 = r.Next();
+            const float steps[] = {60.0f, 20.0f, 0.0f, -1.0f};
+            t.f1.f64 = r.Below(6) == 0 ? double(std::bit_cast<float>(RandomFloat(r)))
+                                       : double(steps[r.Below(4)]);
+          },
+          __imp__sub_8217F9E0, hooks::FrontEndCarDrawAnimsAdd, 88, ListFloats(w, sp),
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::ApplyPreset (sub_8217D2B0)");
+    // The stack from ApplyPreset's frame up: below it is tan's (where tan
+    // declines, a NaN, infinite or huge field of view, its original runs
+    // there on both sides, saving the callers' registers, which differ;
+    // where it doesn't, neither side writes it).
+    const uint32_t floor = (CallContext(h).r1.u32 & ~0xFu) - 128;
+    for (int c = 0; c < 150; c++) {
+      World w{block};
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            LayCamera(h.base, w, r);
+            t.r3.u64 = r.Next();
+            t.r4.u64 = (r.Next() << 32) | r.Below(51);
+            t.r5.u64 = w.stage();
+            t.r6.u64 = r.Below(3);
+          },
+          __imp__sub_8217D2B0, hooks::FrontEndCarDrawApplyPreset, 40, StageFloats(w),
+          fmt::format("case {}", c), &floor);
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::Command (sub_82180108)");
+    for (int c = 0; c < 250; c++) {
+      World w{block};
+      const uint32_t sp = CallContext(h).r1.u32 & ~0xFu;
+      uint32_t floor_of = 0;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            LayCamera(h.base, w, r);
+            LayList(h.base, w, r, r.Below(4) == 0 ? 0 : r.Below(14));
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU32(h.base, w.stage() + 80 + 4 * k, RandomAngle(r));
+            }
+            t.r3.u64 = (r.Next() << 32) | w.holder();
+            t.r4.u64 = r.Below(10) == 0 ? r.Next() : r.Below(68);
+            // The presets: from ApplyPreset's frame up (see its cases).
+            const bool preset = int32_t(t.r4.u32) >= 14 && int32_t(t.r4.u32) <= 64;
+            floor_of = preset ? sp - 112 - 128 : sp - kStackBytes;
+          },
+          __imp__sub_82180108, hooks::FrontEndCarDrawCommand, 32,
+          [&] {
+            FloatRanges floats = ListFloats(w, sp);
+            const FloatRanges stage = StageFloats(w);
+            floats.insert(floats.end(), stage.begin(), stage.end());
+            return floats;
+          }(),
+          fmt::format("case {}", c), &floor_of);
+    }
+    results.Report();
+  }
+}
+
+}  // namespace
+
+void FrontEndCarDraw(Context& h) {
+  Random r(0x66726f6e74656e64ull);  // "frontend"
+  const uint32_t allocation = memory::Alloc(kBlockBytes + 16, 0);
+  const uint32_t block = (allocation + 15) & ~15u;
+  Small(h, block, r);
+  Commands(h, block, r);
+  memory::Free(allocation);
+}
+
+}  // namespace harness

@@ -303,6 +303,8 @@ set(ITC_SOURCES
     src/car_scene_draw/lights.cpp
     src/car_scene_draw/texture_projection.cpp
     src/car_scene_draw/scene_draw.cpp
+    src/hooks/front_end_car_draw.cpp
+    src/front_end_car_draw/garage_stage.cpp
     src/hooks/race_screens.cpp
     src/race_screens/menu_list.cpp
     src/race_screens/screens.cpp
@@ -513,6 +515,7 @@ set(ITC_SOURCES
     src/harnesses/race_flow.cpp
     src/harnesses/car_scene_draw.cpp
     src/harnesses/car_scene_draw_root.cpp
+    src/harnesses/front_end_car_draw.cpp
     src/harnesses/race_screens.cpp
     src/harnesses/menu_sounds.cpp
     src/harnesses/accessories.cpp
@@ -649,7 +652,9 @@ set(ITC_SOURCES
 # (src/race_event/, docs/functions/race-event.md) and the camera modes
 # (src/camera_modes/, docs/functions/camera-modes.md) and the car draw
 # (src/car_draw/, docs/functions/car-draw.md) and the car scene's draw
-# (src/car_scene_draw/, docs/functions/car-scene-draw.md).
+# (src/car_scene_draw/, docs/functions/car-scene-draw.md) and the front
+# end's car draw (src/front_end_car_draw/,
+# docs/functions/front-end-car-draw.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
@@ -706,6 +711,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_scene_draw/geometry.cpp src/car_scene_draw/projectors.cpp
     src/car_scene_draw/lights.cpp src/car_scene_draw/texture_projection.cpp
     src/car_scene_draw/scene_draw.cpp
+    src/front_end_car_draw/garage_stage.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp

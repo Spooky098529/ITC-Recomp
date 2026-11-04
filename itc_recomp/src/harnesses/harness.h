@@ -270,5 +270,7 @@ void CarDraw(Context& h);
 void RaceFlow(Context& h);
 // The car scene's draw (src/harnesses/car_scene_draw.cpp).
 void CarSceneDraw(Context& h);
+// The front end's car draw (src/harnesses/front_end_car_draw.cpp).
+void FrontEndCarDraw(Context& h);
 
 }  // namespace harness
