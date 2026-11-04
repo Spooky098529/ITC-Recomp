@@ -19,6 +19,7 @@
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "second_set/morph.h"
 
 #include <initializer_list>
 
@@ -39,6 +40,8 @@ constexpr uint32_t kShift = 0x82002D0C;   // the second rear tire's step
 constexpr uint32_t kThree = 0x820021E4;   // 3.0
 constexpr uint32_t kMilli = 0x820029D8;   // 0.001
 constexpr uint32_t kOneBits = 0x3F800000;
+constexpr uint32_t kIndexTable = 0x820044B0;  // 44 bytes a car
+constexpr uint32_t kMorphShape = 0x82595110;
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -267,6 +270,99 @@ Left WheelsDrawTire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
   }
   return TireDepth(base, calls, frame, group, record, main, frame + 1824, block, second, vp,
                    r24, r28, {0x820E9294, 0x820E92C8, 0x820E92EC}, left);
+}
+
+Left WheelsDrawTireMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t camera, uint32_t block, uint64_t caller_r28) {
+  ITC_NATIVE_RUNNING("sub_820E9318 WheelPoints::DrawTireMorphed");
+  const uint32_t frame = Frame(base, stack, kWheelsTireMorphedFrame);
+  const uint32_t t = frame + 176, main = frame + 240, morph = frame + 1392;
+  FreshIdentity(base, frame + 80, t);
+  FreshIdentity(base, frame + 80, main);
+  // The weights again (not for traffic, kind 3), as WheelPoints::SetUpTire:
+  // the record's entry index (+44, or the rear's +56) with its float and
+  // value, else the car's table index plus the record's +72 (+76).
+  const uint32_t wheels = Load(base, group + 8);
+  if (int32_t(Load(base, wheels + 0)) != 3) {
+    const bool front = int32_t(Load(base, group + 300)) != 0;
+    const uint32_t own = front ? 44 : 56;
+    uint64_t index;
+    if (int32_t(Load(base, wheels + own)) != -1) {
+      const uint32_t record = Load(base, group + 8);
+      const double f1 = Lfs(base, record + own + 8);
+      second_set::TireFillEntries(base, group + 12, Load(base, record + own), record + own + 4,
+                                  f1, frame);
+      index = Load(base, Load(base, group + 8) + own);
+    } else {
+      const uint32_t add = Load(base, wheels + (front ? 72 : 76));
+      const uint32_t car = Load(base, Load(base, group + 4) + 0);
+      index = uint64_t(Load(base, uint32_t(uint64_t(car) * 44) + kIndexTable)) + uint64_t(add);
+    }
+    // sub_820E6F28 leaves r3 the entries.
+    second_set::TireReadEntry(base, uint32_t(index), group + 12, group + 328, group + 352,
+                              group + 356, frame);
+  }
+  // Record 0's shape toward records 1 to 5 by the five weights.
+  const uint32_t model = Load(base, group + 372);
+  second_set::MorphSetUp(base, model, morph, Load(base, group + 596), group + 304, group + 328,
+                         5);
+  const uint64_t shape = Load(base, group + 596);
+  if (!ModelMorphShape(base, calls, model, morph, shape, frame)) {
+    const uint64_t regs[3] = {model, morph, shape};
+    calls.call(kMorphShape, regs, 3, frame, 0x820E94E8);
+  }
+  Translate(base, block, t + 48, VectorOf(0, 0, 0, kOneBits), group + 1808);
+  const double one = Lfs(base, kOne);
+  const uint32_t world = block + 16;
+  if (int32_t(Load(base, group + 300)) != 0) {
+    static constexpr uint32_t kLrs[] = {0x820E9540, 0x820E9560, 0x820E9584};
+    const uint32_t outs[] = {frame + 1072, frame + 432, frame + 944};
+    NotedCopy(base, main, Chain(base, {block + 336, block + 80, t, world}, outs, kLrs, one),
+              0x820E95FC);
+  } else {
+    static constexpr uint32_t kLrs[] = {0x820E95AC, 0x820E95CC, 0x820E95F0};
+    const uint32_t outs[] = {frame + 560, frame + 1136, frame + 688};
+    NotedCopy(base, main, Chain(base, {block + 464, block + 208, t, world}, outs, kLrs, one),
+              0x820E95FC);
+  }
+  const uint32_t vp = camera + 144, record = group + 368;
+  // r24 the block's world from the matrices on; r28 the caller's at the
+  // first draw, then lis's sign-extended 0x82970000.
+  const uint64_t r24 = world;
+  Left left =
+      PartsDrawRecord(base, calls, frame, record, vp, main, 0, r24, caller_r28, 0x820E961C);
+  const uint64_t r28 = 0xFFFFFFFF82970000ull;
+  left = TireDepth(base, calls, frame, group, record, main, frame + 1328, 0, 0, vp, r24, r28,
+                   {0x820E96A8, 0x820E96DC, 0}, left);
+  // Side 2: turned by pi about y.
+  const uint32_t turned = frame + 1200;
+  FreshIdentity(base, frame + 80, turned);
+  Stfs(base, frame + 144, Lfs(base, kPi));
+  matrix_math::RotateY(base, turned, turned, frame + 144, frame - 80);
+  // T's row 3 back to (0, 0, 0, 1), through +160.
+  Stfs(base, frame + 172, one);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, frame + 160, zero);
+  Stfs(base, frame + 164, zero);
+  Stfs(base, frame + 168, zero);
+  CopyDoublewords(base, t + 48, frame + 160, 16);
+  Translate(base, block, t + 48, Lvx(base, frame + 160), group + 1824);
+  if (int32_t(Load(base, group + 300)) != 0) {
+    static constexpr uint32_t kLrs[] = {0x820E97E4, 0x820E9804, 0x820E9824, 0x820E9844};
+    const uint32_t outs[] = {frame + 304, frame + 816, frame + 1008, frame + 368};
+    NotedCopy(base, main,
+              Chain(base, {turned, block + 400, block + 144, t, world}, outs, kLrs, one),
+              0x820E98D4);
+  } else {
+    static constexpr uint32_t kLrs[] = {0x820E9868, 0x820E9888, 0x820E98A8, 0x820E98C8};
+    const uint32_t outs[] = {frame + 496, frame + 624, frame + 752, frame + 880};
+    NotedCopy(base, main,
+              Chain(base, {turned, block + 528, block + 272, t, world}, outs, kLrs, one),
+              0x820E98D4);
+  }
+  left = PartsDrawRecord(base, calls, frame, record, vp, main, 0, r24, r28, 0x820E98EC);
+  return TireDepth(base, calls, frame, group, record, main, frame + 1264, 0, 0, vp, r24, r28,
+                   {0x820E995C, 0x820E9990, 0}, left);
 }
 
 }  // namespace car_draw

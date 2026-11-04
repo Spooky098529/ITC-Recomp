@@ -781,6 +781,7 @@ Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
 // address where it declines). Each returns r3 as the original leaves it.
 
 constexpr uint32_t kWheelsTireFrame = 2032;
+constexpr uint32_t kWheelsTireMorphedFrame = 1648;
 
 // WheelPoints::DrawTire (sub_820E8AE8): r3 = a tire group (the point block's
 // +32 or +1872), r4 = the camera pass, r5 = the block. Side 1 (T from +1808):
@@ -799,5 +800,15 @@ constexpr uint32_t kWheelsTireFrame = 2032;
 // record and r28 = the block at every draw.
 Left WheelsDrawTire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block);
+// WheelPoints::DrawTireMorphed (sub_820E9318): as DrawTire with no second
+// matrix (+592 not read), the frame's own offsets, and the tire morphed
+// first: unless the wheels record's +0 is 3, its weights worked out again
+// (sub_820E6F28 and sub_820E7010's plain C++, as WheelPoints::SetUpTire);
+// Morph::SetUp([+372], the frame's +1392, [+596], +304, +328, 5) and
+// Model::MorphShape (its plain C++, else its original returning to
+// 0x820E94E8). r24 = the block's world (+16) at every draw, r28 `caller_r28`
+// at side 1's first, then 0xFFFFFFFF82970000.
+Left WheelsDrawTireMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t camera, uint32_t block, uint64_t caller_r28);
 
 }  // namespace car_draw

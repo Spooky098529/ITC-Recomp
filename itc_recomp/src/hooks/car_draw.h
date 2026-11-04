@@ -94,5 +94,9 @@ bool CarDrawWheelsCalleesNative();
 // WheelPoints::DrawTire (sub_820E8AE8; the wheels' callees native): r3 = the
 // tire group, r4 = the camera pass, r5 = the block.
 void CarDrawWheelsDrawTire(PPCContext& ctx, uint8_t* base);
+// WheelPoints::DrawTireMorphed (sub_820E9318; the wheels' callees native):
+// r3 = the tire group, r4 = the camera pass, r5 = the block (r28 its first
+// draw's).
+void CarDrawWheelsDrawTireMorphed(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

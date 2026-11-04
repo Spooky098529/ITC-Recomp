@@ -81,8 +81,9 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "TrafficPoints::Draw sub_820E6820, DrawBody sub_820E55A0, DrawWindow "
               "sub_820E5668, DrawTailLights sub_820E5B08 and DrawHeadlights sub_820E61D8 (no "
               "adapters: only it reaches them; their glows as the parts' lamps'), and the wheels' "
-              "tires WheelPoints::DrawTire sub_820E8AE8 (the matrix functions, memcpy and "
-              "CarPart::Draw as plain C++) "
+              "tires WheelPoints::DrawTire sub_820E8AE8 and DrawTireMorphed sub_820E9318 (the matrix "
+              "functions, memcpy, CarPart::Draw, the tire's weights, Morph::SetUp and "
+              "Model::MorphShape as plain C++) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
               "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
@@ -420,6 +421,21 @@ void CarDrawWheelsDrawTire(PPCContext& ctx, uint8_t* base) {
   LeaveLeft(ctx, left);
 }
 
+void CarDrawWheelsDrawTireMorphed(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawWheelsCalleesNative()) {
+    __imp__sub_820E9318(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const car_draw::Left left = car_draw::WheelsDrawTireMorphed(
+      base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r28.u64);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_DRAW(address, step)     \
@@ -458,4 +474,5 @@ void CarDrawWheelsDrawTire(PPCContext& ctx, uint8_t* base) {
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
 ITC_CAR_DRAW(82595110, CarDrawMorphShape)
 ITC_CAR_DRAW(820E8AE8, CarDrawWheelsDrawTire)
+ITC_CAR_DRAW(820E9318, CarDrawWheelsDrawTireMorphed)
 #undef ITC_CAR_DRAW

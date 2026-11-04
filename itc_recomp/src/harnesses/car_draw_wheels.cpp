@@ -1,13 +1,17 @@
 // The wheels (src/car_draw/wheels.cpp, docs/functions/car-draw.md: the
-// tires) against the recompiled functions, under the car_draw harness (its
+// tires, plain and morphed) against the recompiled functions, under the car_draw harness (its
 // Case and model draws' world, car_draw_shared.h), with a random generator
 // of its own (so its cases don't shift the other files' inputs; it runs
 // last). The wheels in an allocation of their own: the tire group at +0x100
 // (+4 the car record, +8 the wheels record, +300 the front's flag, record 0 at
 // +368: +4 the model, the block's +0x100, or 0, +228 the shape; the side
 // float4s at +1808 and +1824), the wheels record at +0xA00 (+0 the kind, +56
-// the second rear tire's count), the car record at +0xA80, the command list's
-// slots from +0x4000. The scene at the race block's +0x10000 ([0x826C2E44]:
+// the second rear tire's count; for the morphed tire +44 and +56 the entry
+// indices or -1, their floats, +72 and +76), the car record at +0xA80 (+0 the
+// car, below 45), the morph's stream headers at +0xC00 and +0xE10 (every
+// shape's +400 and +404), the pool maker at +0xB00 (its slot 1 the empty
+// function: the "job" is the maker) or none, the work memory at +0x1000, the
+// command list's slots from +0x4000. The scene at the race block's +0x10000 ([0x826C2E44]:
 // its +4 the set, the pass description at +5072: +4 the depth pass, +32 the
 // key, +60 the bits, +76 and +80 the keys saved), the camera passes 0 to 3,
 // the scene model's block at the block's +0xF380 (+16 the world, +80 to +527
@@ -43,6 +47,12 @@ constexpr uint32_t kSceneBytes = 0x2000;
 constexpr uint32_t kGroup = 0x100;
 constexpr uint32_t kWheels = 0xA00;
 constexpr uint32_t kCar = 0xA80;
+constexpr uint32_t kMaker = 0xB00;
+constexpr uint32_t kStream0 = 0xC00;
+constexpr uint32_t kStream1 = 0xE10;
+constexpr uint32_t kWork = 0x1000;
+// The empty function the fake vtables' slots point at.
+constexpr uint32_t kEmptyFunction = 0x82106540;
 constexpr uint32_t kRecordsEnd = 0x4000;
 constexpr uint32_t kSlots = 0x4000;
 constexpr uint32_t kSlotCount = 4000;
@@ -80,6 +90,62 @@ void RandomMatrix(uint8_t* base, uint32_t at, Random& r) {
 // A flag word: 0 or 1 mostly, now and then any word.
 uint32_t Flag(Random& r) {
   return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(2);
+}
+
+// The morphed tire's world: the weights' inputs, the targets, the shapes'
+// streams, the work memory and the pool maker. Returns whether there's a
+// maker.
+bool MorphWorld(Context& h, Random& r, uint32_t block, uint32_t top) {
+  uint8_t* base = h.base;
+  const uint32_t group = top + kGroup, wheels = top + kWheels;
+  guest::StoreU32(base, group + 368 + 4, block + 0x100);
+  guest::StoreU32(base, wheels + 0, r.Below(4) == 0 ? 3 : r.Below(3));
+  for (const uint32_t at : {44u, 56u}) {
+    guest::StoreU32(base, wheels + at, r.Below(2) == 0 ? 0xFFFFFFFFu : 12 + r.Below(12));
+    guest::StoreU32(base, wheels + at + 4, RandomFloat(r));
+    guest::StoreU32(base, wheels + at + 8, RandomFloat(r));
+  }
+  guest::StoreU32(base, wheels + 72, r.Below(3));
+  guest::StoreU32(base, wheels + 76, r.Below(3));
+  RandomFloats(base, group + 12, 288 / 4, r);
+  for (uint32_t k = 0; k < 5; k++) {
+    guest::StoreU32(base, group + 304 + 4 * k, r.Below(4));
+  }
+  RandomFloats(base, group + 328, 8, r);
+  // The streams: every shape's, shared (the same counts, no debug message).
+  const uint32_t s0 = top + kStream0, s1 = top + kStream1;
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t shape = block + 0x2000 + 544 * k;
+    guest::StoreU32(base, shape + 400, s0);
+    guest::StoreU32(base, shape + 404, s1);
+  }
+  const uint32_t vertices = 1 + r.Below(16);
+  guest::StoreU32(base, s0 + 0, vertices);
+  guest::StoreU32(base, s0 + 12, 16 * vertices + (r.Below(4) == 0 ? 16 * r.Below(4) : 0));
+  guest::StoreU32(base, s1 + 4, r.Below(3) == 0 ? 6 : 9);
+  guest::StoreU32(base, s1 + 12, r.Below(3) == 0 ? 0 : 16 * vertices);
+  for (uint32_t w = 0; w < 0x200 / 4; w++) {
+    guest::StoreFloat(base, s0 + 16 + 4 * w, Spread(r, 4.0f));
+    guest::StoreFloat(base, s1 + 16 + 4 * w, Spread(r, 4.0f));
+  }
+  // The work memory: buffer i current, its header count small (now and then
+  // at the 1,280 limit), the bytes used and the capacity (now and then not
+  // fitting).
+  const uint32_t i = r.Below(2);
+  guest::StoreU32(base, 0x8296B780, i);
+  for (uint32_t b = 0; b < 2; b++) {
+    guest::StoreU32(base, 0x8296B798 + 4 * b, r.Below(8) == 0 ? 1279 + r.Below(2) : r.Below(6));
+    guest::StoreU32(base, 0x8296B7A0 + 4 * b, 128 * r.Below(8));
+    guest::StoreU32(base, 0x8296B7A8 + 4 * b, top + kWork);
+  }
+  const uint32_t used = guest::LoadU32(base, 0x8296B7A0 + 4 * i);
+  guest::StoreU32(base, 0x8296B7B0, r.Below(8) == 0 ? used + 16 * vertices : used + 0x800);
+  // The pool maker.
+  const bool maker = r.Below(3) != 0;
+  guest::StoreU32(base, 0x8296B914, maker ? top + kMaker : 0);
+  guest::StoreU32(base, top + kMaker, top + kMaker + 0x10);
+  guest::StoreU32(base, top + kMaker + 0x10 + 4, kEmptyFunction);
+  return maker;
 }
 
 // The world; see the top. `set` the scene's +4.
@@ -156,6 +222,7 @@ struct Target {
   uint32_t frame;
   uint32_t temporaries_end;  // below the saved registers
   int cases;
+  bool morphed;
 };
 
 }  // namespace
@@ -168,11 +235,13 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"WheelPoints::DrawTire (sub_820E8AE8)", __imp__sub_820E8AE8,
-       hooks::CarDrawWheelsDrawTire, car_draw::kWheelsTireFrame, 1888, 384},
+       hooks::CarDrawWheelsDrawTire, car_draw::kWheelsTireFrame, 1888, 384, false},
+      {"WheelPoints::DrawTireMorphed (sub_820E9318)", __imp__sub_820E9318,
+       hooks::CarDrawWheelsDrawTireMorphed, car_draw::kWheelsTireMorphedFrame, 1520, 384, true},
   };
   for (const Target& target : targets) {
     Results results(target.name);
-    int queued = 0, depth = 0;
+    int queued = 0, depth = 0, weights = 0, makers = 0;
     std::vector<uint8_t> scene_bytes, records;
     const std::vector<uint8_t> zero(kSlotCount * 16, 0);
     uint32_t sp = 0;
@@ -183,6 +252,10 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
             SetFlushOnEntry(r.Below(2) != 0);
             const uint32_t set = r.Below(4) ? 1 : r.Below(2) ? 0 : 2 + r.Below(4);
             WheelsWorld(h, r, block, race, top, r.Below(4), set);
+            if (target.morphed) {
+              makers += MorphWorld(h, r, block, top);
+              weights += guest::LoadU32(h.base, top + kWheels) != 3;
+            }
             scene_bytes = Read(h.base, scene, kSceneBytes);
             records = Read(h.base, top, kRecordsEnd);
             sp = t.r1.u32;
@@ -229,6 +302,10 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
     ITC_LOG_INFO("harness: {}: {} of {} cases with a depth pass, {} ended handing an entry to "
                  "the render queue",
                  target.name, depth, target.cases, queued / 2);
+    if (target.morphed) {
+      ITC_LOG_INFO("harness: {}: {} of {} cases worked the weights out, {} with the pool maker",
+                   target.name, weights, target.cases, makers);
+    }
     results.Report();
   }
   memory::Free(allocation);
