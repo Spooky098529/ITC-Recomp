@@ -23,10 +23,17 @@ file's history. What's left to see in a drive, from every run:
   ours, 2 adapters removed; RaceReplay's four in the `race_world`
   harness; `itc_3484`/`itc_3486`: race 28 s (the harnesses' time), 0
   errors, every harness 0 differing; none runs in an attract race; no
-  subagents). Step: validation agent running.
+  subagents). Validated `itc_3487` (race 47 s, 0 errors, 26 of 26
+  harness lines, every harness 0 differing but the expected groups);
+  none ran in the race or the replay `itc_3488` (ok): 26 to drive.
+  Done.
 
 ## Done
 
+- The replay's snapshots: `replay-snapshots.md` (map dcfccb78,
+  migration e9389918..1a5be4a1, `--native_replay_snapshots`, 26 of 26
+  in play; validated `itc_3487`: race 47 s, 0 errors, 26 of 26 harness
+  lines, replay `itc_3488` ok, 26 to drive).
 ## Rows to review
 
 `review.md`, "Run 2026-11-04 19:51".
@@ -47,5 +54,6 @@ file's history. What's left to see in a drive, from every run:
   62, known 506, unknown 1741).
 - After its migration: ours 4125, work left 2283 (wrapped 62, known
   480, unknown 1741).
+- After its validation (`itc_3487`): ours 4125, work left 2283.
 
 ## Stopped

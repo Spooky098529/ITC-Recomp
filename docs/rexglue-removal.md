@@ -2728,6 +2728,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-04 | The race flow's set-up (`RaceFlow::Init` `sub_82160AE0`, from `RaceMode::Init`: the race flow's state and players, its 53 transitions registered through `StateMachine::Add`, the functors' stack leftovers replayed in the original's frame) | `race-flow.md` | 1 of 1 in play (one migration; the four handlers it registers that never ran stay recompiled) | `--native_race_flow` |
 | 2026-11-04 | The car scene's draw (`CarScene::Draw` `sub_820C5DE8`: the headlight projectors and their texture projections, the other cars' light slots, the pass loop over `Car::DrawUpdate`; the frustum, plane, box and `Vector16` helpers under `TextureProjection::Fit`) | `car-scene-draw.md` | 21 of 21 (four parts, one subagent each, one at a time; 12 Native, 9 Overridden for their recompiled callers and the frame-state wraps) | `--native_car_scene_draw` |
 | 2026-11-04 | The front end's car draw (the garage stage: `GarageStage::Command` and its setters, the animation list with the car's turn and the doors, the deferred camera preset, the scene lights, the car's and wheels' pose, the floor reflection's draw, with `SceneModel::ApplyLightKit` in `load-poll.md`) | `front-end-car-draw.md` | 17 of 18 in play (one migration, one subagent for `PoseCar`; the root `GarageStage::Draw` waits on `CarScene::Update`) | `--native_front_end_car_draw` |
+| 2026-11-04 | The replay's snapshots (`RaceReplay::SaveStart` at the countdown, `SaveEnd`, `RestoreStart`, `RestoreEnd` around the replay; the 5,232-byte per-vehicle records' save, restore and copy; `Replay::Keep`) | `replay-snapshots.md` | 26 of 26 in play (one migration; RaceReplay's four cased in the `race_world` harness; none runs in an attract race or the pad replay) | `--native_replay_snapshots` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4493,3 +4494,15 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 4,099, work left 2,309 (Wrapped 62, with a row 480, no row yet 1,767),
 from 2,324.
+
+**2026-11-04, the replay's snapshots (branch `b7-loop-03-11-26`):**
+the thirty-second run's first subsystem (`replay-snapshots.md`,
+`--native_replay_snapshots`, `src/replay_snapshots/`): two leads, the
+race data's record copies and the race code at `82104310`-`82104E00`,
+turned out to be the replay's start and end snapshots (blocks A and B
+of the input recordings `0x826C5B4C`), not a reset; 26 of 26 in play,
+2 adapters removed. Neither the attract race nor the pad replay takes
+them (to drive). The boundary: 449 functions (916 pairs): overridden
+108, Native 34, Dropped 26, never called 70, live 211. Imports: 186
+called, 56 with a live caller. B7 (`b7_status.py`): ours 4,125, work
+left 2,283 (Wrapped 62, with a row 480, no row yet 1,741), from 2,309.

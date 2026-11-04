@@ -16,6 +16,28 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-04 19:51 (`b7-loop-03-11-26`, continued)
+
+- The replay's snapshots (attract race `itc_3487`, replay `itc_3488`
+  ok, reached a race but no replay; `replay-snapshots.md`; they run at
+  a driven race's countdown and around its replay, which the attract
+  race and the recording don't take): `sub_821044D8`
+  Record5232::Restore, `sub_82104310` Record5232::RestoreTrack,
+  `sub_821031A0` BodyState::Restore, `sub_82102C60`
+  Member1136::Restore, `sub_82102B98` Member4080::Restore,
+  `sub_82102AA8` Part464::Restore, `sub_82104AB8` RaceSnapshot::Save,
+  `sub_82104538` Record5232::Save, `sub_82104380`
+  Record5232::SaveTrack, `sub_821039F0` BodyState::Save,
+  `sub_821034B8` Member1136::Save, `sub_821033F0` Member4080::Save,
+  `sub_82103300` Part464::Save, `sub_82104F68` Replay::Keep,
+  `sub_82104EA8` RaceSnapshot::Copy, `sub_82104BC0` Record5232::Copy,
+  `sub_821043F0` Record5232::CopyTrack, `sub_82103B50`
+  BodyState::Copy, `sub_82103CB8` Member1136::Copy, `sub_82104598`
+  Member4080::Copy, `sub_82104460` Member4080::CopyShapes,
+  `sub_821041C0` Part464::Copy, `sub_82104D40` RaceReplay::SaveStart,
+  `sub_82104E68` RaceReplay::SaveEnd, `sub_821046F8`
+  RaceReplay::RestoreStart, `sub_82104898` RaceReplay::RestoreEnd.
+
 ## Run 2026-11-04 08:44 (`b7-loop-03-11-26`)
 
 - The front end's car draw (attract race `itc_3478`, replay `itc_3479`
