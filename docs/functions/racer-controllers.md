@@ -16,7 +16,8 @@ or let go. Which of these each racer gets depends on the race flow's
 state: the functions at `8215F5E8`-`82160AE0` are handlers registered,
 one per state, by the race flow's set-up (`sub_82160AE0`, 1,661 lines,
 from `sub_82151D20`; a table of (state, event) entries through
-`sub_82106158`, both in `../loops/leads.md`), on an object whose +9604
+`sub_82106158`; `RaceFlow::Init` in `race-flow.md` since 2026-11-04,
+with the table, and `StateMachine::Add` in `game-modes.md`), on an object whose +9604
 is the state, +9608 flags and +9612, +9616 the player indexes of the
 two human cars (0 and 1; both 0 when the race data's +0xA3AF0 is 6). Which state is which
 isn't known (the states named in the rows are the table's numbers); the
@@ -45,6 +46,8 @@ Shared with other files, without rows here: `AiDriver::DriveCar`
 mappers' read slots (`action-mappers.md`, through the vtable); operator
 new and delete (`sub_825A6880`, `sub_825A70E8`, `heap.md`).
 
+Rows in `race-flow.md` since 2026-11-04 (not seen in play):
+`sub_8215F7B0`, `sub_821022B0`, `sub_8215FB08` and `sub_8215FC30`.
 Not seen in play, so without rows: `sub_8215F5F0` (every racer's input
 record cleared: one cleared record copied to all; from
 `sub_8215FB90`), `sub_8215F7B0` (every input record cleared,

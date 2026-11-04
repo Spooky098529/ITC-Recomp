@@ -505,6 +505,10 @@ Rows not yet moved stay in the table below. So far:
   wheels (morphed once or at every draw), the interior with its dials,
   the traffic body and the cockpit, through `CarPart::Draw` and
   `Model::Draw` (B7).
+- [`race-flow.md`](race-flow.md): the race flow: the race mode's state
+  machine at +97548 whose states pick how the racers' input records
+  are filled (the racer controllers' handlers), its set-up with the 53
+  transitions, and the handlers not seen in play (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
