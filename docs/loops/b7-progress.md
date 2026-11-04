@@ -58,7 +58,12 @@ file's history. What's left to see in a drive, from every run:
   machine (the loading screen's lead `sub_82247898`, `sub_82247A60`,
   `sub_82290B30`, `sub_822478D0`, with what's left of the race mode's
   set-ups lead: +848 `sub_821517D8` and the delegate's `0x82235C08`;
-  both lines deleted from `leads.md`). Step: mapping agent running.
+  both lines deleted from `leads.md`). Map checked (4ba4c0f4:
+  `race-loading.md`, one file: 17 rows, all new, 13 in play; 0
+  errors; 9 ready groups; `CourseSetup::` the +848 machine,
+  `RaceMode::NextMode`, the loading screen; blocked parts wait on
+  `Scenery::IsLoaded`, `CarScene::Update` and the `sub_82150E00` lead).
+  Step: migration agent running.
 
 ## Done
 
@@ -99,5 +104,7 @@ file's history. What's left to see in a drive, from every run:
 - After its second migration: ours 4157, work left 2253 (wrapped 62,
   known 479, unknown 1712).
 - After its validation (`itc_3502`): ours 4157, work left 2253.
+- After the race's loading's map: ours 4157, work left 2253 (wrapped
+  62, known 492, unknown 1699).
 
 ## Stopped
