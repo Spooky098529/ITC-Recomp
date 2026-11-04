@@ -125,6 +125,21 @@ void ClearFakeZone() {
   g_fake_zone.active = false;
 }
 
+// A made-up time GetLocalTime answers with while a harness asks (the race's
+// loading's: LoadingScreen::Show picks its tip by the milliseconds), in
+// 100 ns units since 1601 (UTC); 0 for the host's.
+namespace {
+uint64_t g_fake_now = 0;
+}  // namespace
+
+void SetFakeNow(uint64_t now) {
+  g_fake_now = now;
+}
+
+void ClearFakeNow() {
+  g_fake_now = 0;
+}
+
 // The console's time zone read (sub_8229B440) into the TIME_ZONE_INFORMATION
 // at `address`; returns whether it uses daylight saving. It never fails (the
 // original's error, from ExGetXConfigSetting, can't happen).
@@ -173,7 +188,8 @@ int64_t GetTimeZoneBias(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_822968B8) {
   REX_FUNC_PROLOGUE();
   const uint32_t out = ctx.r3.u32;
-  const uint64_t now = helpers::SystemTimeNow();
+  const uint64_t now = time_hooks::g_fake_now != 0 ? time_hooks::g_fake_now
+                                                    : helpers::SystemTimeNow();
   const int64_t bias = time_hooks::GetTimeZoneBias(ctx, base);
   StoreSystemTime(base, out, helpers::FileTimeToSystemTime(now - uint64_t(bias)));
 }

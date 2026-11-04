@@ -37,6 +37,32 @@ constexpr uint32_t kLayer0Alpha = 0x826A50D4;
 
 // The guest functions called.
 constexpr uint32_t kQueueLength = 0x8209D7B0;  // Archive::QueueLength
+// The UI movie calls, through their overrides (their --log_pause_movie
+// lines, Run's frame pacing and SetText's heap checks kept there, as the
+// in-race screens' calls, race_screens.h).
+constexpr uint32_t kResetPose = 0x8211ABA8;    // UiMovie::ResetPose
+constexpr uint32_t kShowNode = 0x8211AC00;     // UiMovie::ShowNode
+constexpr uint32_t kHideNode = 0x8211AC48;     // UiMovie::HideNode
+constexpr uint32_t kSetText = 0x8211C1F8;      // UiMovie::SetText
+constexpr uint32_t kFinishNamed = 0x8211DF20;  // UiMovie::FinishNamed
+constexpr uint32_t kPlayNamed = 0x8211DAC8;    // UiMovie::PlayNamed
+constexpr uint32_t kLoopLast = 0x8211DDE8;     // UiMovie::LoopLast
+constexpr uint32_t kRun = 0x8211E1B8;          // UiMovie::Run
+// GetLocalTime, through its override (src/hooks/time.cpp: its time zone
+// bias is worked out in a guest frame).
+constexpr uint32_t kGetLocalTime = 0x822968B8;
+// sub_82293460's callees (not seen in play; not read in detail).
+constexpr uint32_t kSystemRequestCheck = 0x82293358;
+constexpr uint32_t kSystemRequestRun = 0x82292828;
+
+// The loading screen's globals: shown (1 once Show ran), the current movie,
+// the three movies; the animation each plays (a word each, 0, 13 and 0 in
+// the image); the system request sub_82293460 tests.
+constexpr uint32_t kLoadingShown = 0x82815E60;
+constexpr uint32_t kLoadingCurrent = 0x82815E64;
+constexpr uint32_t kLoadingMovies = 0x82815E68;
+constexpr uint32_t kLoadingAnimations = 0x8263799C;
+constexpr uint32_t kSystemRequest = 0x82816E3C;
 
 // A guest function called from the frame at `r1`, with r3 to r10 (the first
 // `set` of them; the others left as they are) and the link register `lr`
@@ -88,5 +114,34 @@ void OnCourseReady(uint8_t* base, uint32_t machine);
 // print's) or the machine (`r3`, when message 4 is posted).
 uint64_t WaitDraw(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls);
+
+// --- The loading screen (race_loading.cpp) ---
+
+// sub_82290B30 UiMovie::SetFrames (probably; leaf): from the movie's live
+// scene ([movie + 16]) chunk by chunk (+4 the size) up to the TRM one, +72
+// of each TXT chunk = `text` and of each PRM and PIC chunk = `other`. No
+// adapter: only LoadingScreen::Show calls it in play.
+void SetFrames(uint8_t* base, uint32_t movie, uint32_t other, uint32_t text);
+// sub_822478D0 LoadingScreen::Show (144-byte frame): r3 `tip` (movie 0's
+// tip shown when not 0), r4 `which` (0 to 2, unsigned: 3 or more does
+// nothing, r3 left), r5 `frames` (-1 for none): the movie reset
+// (UiMovie::ResetPose), its frames set (SetFrames), its title text
+// (UiMovie::SetText, r7 to r10 passed as 0: the user's call for its unset
+// varargs, 2026-10-30), movie 0's tip (GetLocalTime's milliseconds % 14
+// picking strings 1201 + 2n and the next into nodes 9 and 10, shown) or
+// those nodes hidden, its animation finished, played and looped, and the
+// shown word = 1. Returns r3 as the original leaves it (LoopLast's).
+uint64_t Show(uint8_t* base, uint64_t tip, uint32_t which, uint32_t frames, uint32_t sp,
+              const Calls& calls);
+// sub_82247898 LoadingScreen::Run and sub_82247A60 LoadingScreen::Finish
+// (leaves but for their tail calls): r3 `which` (-1 for the current; 3 or
+// more, signed, does nothing, r3 left): UiMovie::Run(movie, 0) or
+// UiMovie::FinishNamed(movie, its animation), from the caller's frame `sp`
+// with the caller's return address `lr`. Return the callee's r3.
+uint64_t Run(uint8_t* base, uint64_t which, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t Finish(uint8_t* base, uint64_t which, uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_82293460 (96-byte frame): with [0x82816E3C] set and sub_82293358
+// answering nonzero, sub_82292828([0x82816E3C]) and 1; else 0.
+uint64_t CheckSystemRequest(uint8_t* base, uint32_t sp, const Calls& calls);
 
 }  // namespace race_loading
