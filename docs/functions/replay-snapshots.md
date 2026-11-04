@@ -61,7 +61,7 @@ by a script over their 101 direct loads and stores). The callers are in
 (`race-world.md`); `memcpy`, the array destructor iterator
 (`c-runtime.md`); `operator delete` (`heap.md`); the empty
 `sub_82106540` (`audio.md`); the records' constructors (`data-load.md`).
-Nothing in `itc_recomp/src` hooks these functions (checked 2026-11-04).
+Nothing in `itc_recomp/src` hooks these functions (checked 2026-11-04). Made native by the B7 loop the same day (`src/replay_snapshots/`, adapters in `src/hooks/replay_snapshots.cpp`, `--native_replay_snapshots`; harness `replay_snapshots`, with `RaceReplay`'s four in `race_world`'s start world): every function seen in play in the file, 26 of 30 (the four teardowns never ran). None of them runs in an attract race (a temporary counter, 2026-11-04): the countdown's `SaveStart` is skipped there (the replay flag 0x40, probably), so a driven race or the pad replay is what reaches them. The record copies were written from a symbolic reading of each original (its stores and calls in order), and the lfs and stfs pairs keep the words' bits (signaling NaNs too: the harnesses plant them and compare exactly).
 The kept replay's other readers (`sub_821A67E8` in the save screens'
 lead; `sub_8221D678`, `sub_82287220`, `sub_8228AAB0`, `sub_82293028`
 not seen in play) aren't mapped. Constant: `[0x82000A34]` 0.0. The word
