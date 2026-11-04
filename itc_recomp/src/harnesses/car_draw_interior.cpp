@@ -333,6 +333,15 @@ void NativeInteriorRace(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
+static_assert(kInteriorWorldInterior == kInterior && kInteriorWorldEnd == kEnd &&
+              kInteriorWorldSlots == kSlots && kInteriorWorldSlotCount == kSlotCount &&
+              kInteriorWorldBytes == kBytes);
+
+void SharedInteriorWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t top,
+                         uint32_t shape, uint32_t set) {
+  InteriorWorld(h, r, block, race, top, shape, set);
+}
+
 void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
   const uint32_t allocation = memory::Alloc(kBytes + 16, 0);
   const uint32_t top = (allocation + 15) & ~15u;

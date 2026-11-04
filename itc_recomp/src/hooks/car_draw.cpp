@@ -70,7 +70,12 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "diagnostics' wrap; Accessory::SetTexture and the accessories' set as plain C++ "
               "with --native_accessories and --native_scene_models, Accessory::Draw a guest "
               "call) with InteriorPoints::DrawFrontEnd sub_820E4078 and DrawRace sub_820E5220 "
-              "(no adapters: only it calls them; Dash::PoseDials a guest call)) "
+              "(no adapters: only it calls them; Dash::PoseDials a guest call)), and the cockpit's "
+              "top SceneCockpit::Draw sub_820DC498 (inside the diagnostics' wrap) with "
+              "SceneCockpit::DrawBody sub_820DC350 (CarLighting::Gather and SceneInterior::Draw "
+              "as plain C++), CockpitPoints::Draw sub_820DBD38, DrawFenders sub_820DB8C8, "
+              "DrawCabinWindow sub_820DB980, DrawDoorWindow sub_820DBA38 and DrawHeadlights "
+              "sub_820DBB88 (no adapters: only the cockpit's top reaches them) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
               "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
@@ -377,6 +382,28 @@ void CarDrawSceneInterior(PPCContext& ctx, uint8_t* base) {
   SceneryDrawGuest guest{ctx, base};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   const car_draw::Left left = car_draw::SceneInteriorDraw(
+      base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, ctx.r24.u32, ctx.r28.u32);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
+
+// --- The cockpit ---
+
+bool CarDrawCockpitCalleesNative() {
+  return CarDrawInteriorCalleesNative() && ITC_FLAG(native_accessories) &&
+         ITC_FLAG(native_scene_models) && CarDrawLightingCalleesNative();
+}
+
+void CarDrawSceneCockpit(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawCockpitCalleesNative()) {
+    __imp__sub_820DC498(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const car_draw::Left left = car_draw::SceneCockpitDraw(
       base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, ctx.r24.u32, ctx.r28.u32);
   ctx.lr = lr;
   LeaveLeft(ctx, left);

@@ -649,4 +649,54 @@ Left InteriorDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
 Left SceneInteriorDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t interior,
                        uint32_t block, uint32_t caller_r24, uint32_t caller_r28);
 
+// --- The cockpit (cockpit.cpp) ---
+//
+// Part 8: the cockpit view's model (pool 2 of the second set): its point
+// block's draws with camera pass 0 (0x826BAC00), CockpitPoints::Draw over
+// them, SceneCockpit::DrawBody (the per-object lights, the cockpit's own
+// interior through SceneInterior::Draw's plain C++, the point block) and
+// SceneCockpit::Draw. Records through CarPart::Draw's plain C++ (its
+// original from the same frame and return address where it declines), r24
+// the caller's and r28 the block's world (+16) at every draw, as
+// CockpitPoints::Draw sets it. Each returns r3 as the original leaves it.
+
+constexpr uint32_t kCockpitSmallFrame = 112;
+constexpr uint32_t kCockpitPointsFrame = 128;
+constexpr uint32_t kCockpitBodyFrame = 800;
+
+// CockpitPoints::DrawFenders (sub_820DB8C8, 112): r3 = the group (point
+// block +0), r4 = the block, r5 = the camera pass: records +240, +480, +0.
+Left CockpitDrawFenders(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                        uint32_t block, uint32_t pass, uint32_t caller_r24);
+// CockpitPoints::DrawCabinWindow (sub_820DB980, 112; the group point block
+// +720, its record +240) and DrawDoorWindow (sub_820DBA38, 112; the group
+// +1440, its record +0): nothing when the record's model is 0 (r3 0); else
+// SetPair1002Alpha(model, shape, the block's +628), the model's +440 = 1
+// around the record's draw.
+Left CockpitDrawCabinWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                            uint32_t block, uint32_t pass, uint32_t caller_r24);
+Left CockpitDrawDoorWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t caller_r24);
+// CockpitPoints::DrawHeadlights (sub_820DBB88, 112; the group +2160):
+// record +1200 with the block's bit 0x1, +1440 with 0x40, then +1680.
+Left CockpitDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t caller_r24);
+// CockpitPoints::Draw (sub_820DBD38, 128): r3 = the point block (cockpit +
+// 192), r4 = the block: +3120, +1200, the fenders, +720, +1680, +1920, the
+// headlights, the cabin's window, the door's window.
+Left CockpitPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                       uint32_t block, uint32_t caller_r24);
+// SceneCockpit::DrawBody (sub_820DC350, 800): r3 = the cockpit, r4 = the
+// block. In a race (its scene's, [+4316], +4 1) the record at the frame's
+// +80 (the ten matrices' w words 1.0) and CarLighting::Gather(it, the
+// block's +16, 0); then SceneInterior::Draw([+28], r4) and
+// CockpitPoints::Draw(+192, r4).
+Left SceneCockpitDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t cockpit,
+                          uint32_t block, uint32_t caller_r24, uint32_t caller_r28);
+// SceneCockpit::Draw (sub_820DC498, no frame: a tail call): r3 = the
+// cockpit (`cockpit`, all 64 bits), r4 = the block: nothing when its scene's
+// +4 is 2 or above (unsigned; r3 as it came), else DrawBody.
+Left SceneCockpitDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t cockpit,
+                      uint32_t block, uint32_t caller_r24, uint32_t caller_r28);
+
 }  // namespace car_draw

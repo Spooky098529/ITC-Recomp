@@ -82,4 +82,12 @@ bool CarDrawInteriorCalleesNative();
 // accessory): r3 = the interior, r4 = the block.
 void CarDrawSceneInterior(PPCContext& ctx, uint8_t* base);
 
+// The cockpit's callees' plain C++ native (the interior's with
+// --native_accessories and --native_scene_models, and the lighting's).
+bool CarDrawCockpitCalleesNative();
+// The cockpit's top, SceneCockpit::Draw (sub_820DC498; inside the
+// diagnostics' wrap, src/debug/frame_state_diff.cpp; the cockpit's callees
+// native): r3 = the cockpit, r4 = the block.
+void CarDrawSceneCockpit(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
