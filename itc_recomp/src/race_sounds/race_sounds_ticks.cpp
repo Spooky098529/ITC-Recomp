@@ -396,6 +396,15 @@ uint64_t OnNextStage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls
   return PickRivalMusic(base, machine, frame);
 }
 
+uint64_t OnAbort(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82175CA0 RaceSounds::OnAbort");
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t frame = Frame(base, sp, 96);
+  r3 = calls.Call(kCarSoundsStopAll, frame, 0x82175CB8, 1, r3);
+  FadeOut(base, machine, 0x4000);
+  return r3;
+}
+
 uint64_t OnRollingStart(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821770C0 RaceSounds::OnRollingStart");
   const uint32_t machine = uint32_t(r3);

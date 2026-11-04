@@ -38,5 +38,8 @@ void RaceSoundsPlayStartMusic(PPCContext& ctx, uint8_t* base);  // sub_82175DB0
 void RaceSoundsIdleTick(PPCContext& ctx, uint8_t* base);  // sub_821767A8
 void RaceSoundsBegin(PPCContext& ctx, uint8_t* base);  // sub_82176618
 void RaceSoundsInit(PPCContext& ctx, uint8_t* base);  // sub_82177378
+void RaceSoundsOnAbort(PPCContext& ctx, uint8_t* base);  // sub_82175CA0
+void RaceSoundsOnAbortDone(PPCContext& ctx, uint8_t* base);  // sub_82175CF8
+void RaceSoundsUnload(PPCContext& ctx, uint8_t* base);  // sub_821772D8
 
 }  // namespace hooks

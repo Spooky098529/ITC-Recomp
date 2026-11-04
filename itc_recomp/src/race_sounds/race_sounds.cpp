@@ -201,6 +201,31 @@ uint64_t OnRollingStartDone(uint8_t* base, uint64_t r3, uint32_t sp, const Calls
   return r3;
 }
 
+uint64_t OnAbortDone(uint8_t* base, uint64_t r3) {
+  ITC_NATIVE_RUNNING("sub_82175CF8 RaceSounds::OnAbortDone");
+  const uint32_t machine = uint32_t(r3);
+  Store(base, machine + kCarsStep, 1);
+  Store(base, machine + kFlags, Load(base, machine + kFlags) & ~0x4000u);
+  CopySingle(base, kEffectsVolume2, kEffectsVolume);
+  return r3;
+}
+
+uint64_t Unload(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821772D8 RaceSounds::Unload");
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t frame = Frame(base, sp, 144);
+  calls.Call(kCarSoundsRelease, frame, 0x821772EC, 1, r3);
+  for (uint32_t i = 0; i < kCarSoundCount; i++) {
+    calls.Call(kXPhysicalFree, frame, 0x82177318, 1, Load(base, kSlotBuffer1 + 4 * i));
+    calls.Call(kXPhysicalFree, frame, 0x82177320, 1, Load(base, kSlotBuffer0 + 4 * i));
+    calls.Call(kSoundHolderDelete, frame, 0x82177328, 1, kCarViews + 8 * i);
+    calls.Call(kSoundHolderDelete, frame, 0x82177330, 1, kCarViews + 8 * i + 4);
+  }
+  Store(base, frame + 80, 2);
+  CallSlot(base, calls, kReleaseBankSlot, frame, 0x82177364, 2, frame + 80);
+  return calls.Call(kXPhysicalFree, frame, 0x8217736C, 1, Load(base, machine + kEffectsBank));
+}
+
 void OnEffectsBankLoaded(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82175ED0 RaceSounds::OnEffectsBankLoaded");
   Store(base, kEffectsBankArrived, 1);

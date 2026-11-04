@@ -26,7 +26,7 @@ ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
               "RollingStartTick sub_82177130, AfterRaceTick sub_82176C10, OnCountdown "
               "sub_82176968, OnRaceEnd sub_82176BA0, OnLeaveAfterRace sub_82176E60, OnNextStage "
               "sub_82176EC8, OnRollingStart sub_821770C0, PlayStartMusic sub_82175DB0 (rand's plain "
-              "C++), IdleTick sub_821767A8, Begin sub_82176618, Init sub_82177378 (XPhysicalAlloc through the function table, CarSounds::Init's and StateMachine::Add's plain C++); the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
+              "C++), IdleTick sub_821767A8, Begin sub_82176618, Init sub_82177378 (XPhysicalAlloc through the function table, CarSounds::Init's and StateMachine::Add's plain C++), OnAbort sub_82175CA0, OnAbortDone sub_82175CF8 (both not seen in play), Unload sub_821772D8 (XPhysicalFree and the views' delete sub_82117B30 through the function table); the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
               "function table) natively instead of through the translated code (the same "
               "words; checked by --run_harnesses=race_sounds)");
 
@@ -277,6 +277,22 @@ void RaceSoundsBegin(PPCContext& ctx, uint8_t* base) {
   Step(ctx, base, [&](const rs::Calls& c) { return rs::Begin(base, r3, sp, c); });
 }
 
+void RaceSoundsOnAbort(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnAbort(base, r3, sp, c); });
+}
+
+void RaceSoundsOnAbortDone(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rs::OnAbortDone(base, ctx.r3.u64);
+}
+
+void RaceSoundsUnload(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::Unload(base, r3, sp, c); });
+}
+
 void RaceSoundsInit(PPCContext& ctx, uint8_t* base) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
@@ -325,3 +341,6 @@ ITC_RACE_SOUNDS(821770C0, RaceSoundsOnRollingStart)
 ITC_RACE_SOUNDS(821767A8, RaceSoundsIdleTick)
 ITC_RACE_SOUNDS(82176618, RaceSoundsBegin)
 ITC_RACE_SOUNDS(82177378, RaceSoundsInit)
+ITC_RACE_SOUNDS(82175CA0, RaceSoundsOnAbort)
+ITC_RACE_SOUNDS(82175CF8, RaceSoundsOnAbortDone)
+ITC_RACE_SOUNDS(821772D8, RaceSoundsUnload)

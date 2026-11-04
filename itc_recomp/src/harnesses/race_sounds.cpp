@@ -750,6 +750,110 @@ void InitCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// Unload: everything it frees real. The car sounds' array from operator
+// new[] (the count 7 and the block's seven car sounds copied in, their
+// holders fake voices; each sound's matrix (+176) from operator new[]) at
+// [0x826C5C3C], the submix [0x826C5C44] a fake voice (CarSounds::Release
+// frees the array and the matrices and releases the submix); the seven
+// slots' two buffers and the effects' bank (+9632) physical blocks; the
+// cars' views from operator new (some 0). Compared: r1, r3, the scratch
+// area, the block, the frame below its saved registers, the globals (with
+// the case's allocations as which one they are), the submix word.
+void UnloadCases(Context& h, uint32_t block) {
+  Results results("RaceSounds::Unload (sub_821772D8)");
+  constexpr uint32_t kSaves = 56;  // __savegprlr_26: r26 at -56, lr at -8
+  constexpr uint32_t kArrayBytes = 16 + 7 * rs::kCarSoundBytes;
+  uint8_t* base = h.base;
+  const std::vector<uint32_t> globals = Globals();
+  std::vector<uint32_t> saved;
+  for (const uint32_t at : globals) {
+    saved.push_back(guest::LoadU32(base, at));
+  }
+  const uint32_t saved_submix = guest::LoadU32(base, kSubmix);
+  const uint32_t machine = block + kMachineWords - 9600;
+  for (int c = 0; c < 30; c++) {
+    const Random start = h.random;
+    Random random = start;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      random = start;
+      Lay(h, block, Random(random.Next()), true);
+      // The case's allocations, in order (0 where none).
+      std::vector<uint32_t> given;
+      const uint32_t array = memory::crt::OperatorNewArray(base, kArrayBytes).value_or(0);
+      given.push_back(array);
+      if (array != 0) {
+        for (uint32_t i = 0; i < kArrayBytes; i += 4) {
+          Store(base, array + i, guest::LoadU32(base, block + i));
+        }
+        for (uint32_t k = 0; k < rs::kCarSoundCount; k++) {
+          const uint32_t matrix = memory::crt::OperatorNewArray(base, 24).value_or(0);
+          given.push_back(matrix);
+          Store(base, array + 16 + rs::kCarSoundBytes * k + 176, matrix);
+        }
+      }
+      Store(base, rs::kCarSounds, array == 0 ? 0 : array + 16);
+      Store(base, kSubmix, FakeVoice(block, random.Below(kVoiceCount)));
+      for (uint32_t i = 0; i < 7; i++) {
+        for (const uint32_t slot : {rs::kSlotBuffer0, rs::kSlotBuffer1}) {
+          const uint32_t buffer = memory::AllocPhysical(0x1000, 0, 0xFFFFFFFFu, 2048, 0x404);
+          given.push_back(buffer);
+          Store(base, slot + 4 * i, buffer);
+        }
+        for (uint32_t j = 0; j < 2; j++) {
+          uint32_t view = 0;
+          if (random.Below(5) != 0) {
+            view = memory::crt::OperatorNew(base, 24).value_or(0);
+            for (uint32_t k = 0; view != 0 && k < 24; k += 4) {
+              Store(base, view + k, uint32_t(random.Next()));
+            }
+          }
+          given.push_back(view);
+          Store(base, rs::kCarViews + 8 * i + 4 * j, view);
+        }
+      }
+      const uint32_t effects = memory::AllocPhysical(0x1000, 0, 0xFFFFFFFFu, 2048, 0x404);
+      given.push_back(effects);
+      Store(base, machine + rs::kEffectsBank, effects);
+      // A word as the case's allocation it is, else itself.
+      const auto which = [&](uint32_t word) {
+        for (size_t i = 0; i < given.size(); i++) {
+          if (word != 0 && word == given[i]) {
+            return 0xA1100000u + uint32_t(i);
+          }
+        }
+        return word;
+      };
+      const uint32_t fill = uint32_t(random.Next());
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      for (uint32_t k = 0; k < 0x400; k += 4) {
+        Store(base, sp - 0x400 + k, fill + k);
+      }
+      t.r3.u64 = machine;
+      (v == 0 ? __imp__sub_821772D8 : hooks::RaceSoundsUnload)(t, base);
+      out[v].Word(t.r1.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(which(t.r3.u32));
+      out[v].Bytes(Read(base, h.data, kCompared));
+      Store(base, machine + rs::kEffectsBank, which(guest::LoadU32(base, machine + rs::kEffectsBank)));
+      out[v].Bytes(Read(base, block, kBlockBytes));
+      out[v].Bytes(Read(base, sp - 144, 144 - kSaves));
+      for (size_t i = 0; i < globals.size(); i++) {
+        out[v].Word(which(guest::LoadU32(base, globals[i])));
+      }
+      out[v].Word(which(guest::LoadU32(base, kSubmix)));
+      for (size_t i = 0; i < globals.size(); i++) {
+        guest::StoreU32(base, globals[i], saved[i]);
+      }
+      Store(base, kSubmix, saved_submix);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
 void Keep(Random&, uint64_t*) {}
 
 }  // namespace
@@ -847,6 +951,10 @@ void RaceSounds(Context& h) {
         hooks::RaceSoundsOnCountdown, 96, 16, Keep);
   Group(h, block, "RaceSounds::OnNextStage (sub_82176EC8)", 60, __imp__sub_82176EC8,
         hooks::RaceSoundsOnNextStage, 96, 16, Keep);
+  Group(h, block, "RaceSounds::OnAbort (sub_82175CA0)", 60, __imp__sub_82175CA0,
+        hooks::RaceSoundsOnAbort, 96, 16, Keep);
+  Group(h, block, "RaceSounds::OnAbortDone (sub_82175CF8)", 40, __imp__sub_82175CF8,
+        hooks::RaceSoundsOnAbortDone, 64, 0, Keep);
   if (real) {
     const auto steps = [&](Random& r, uint64_t*) {
       Store(base, machine + rs::kCarsStep, Pick(r, {1u, 2u, 2u, 2u, 0u, 3u}));
@@ -919,6 +1027,11 @@ void RaceSounds(Context& h) {
     BeginCases(h, block);
   } else {
     ITC_LOG_ERROR("harness: race_sounds: no thread data or native heap: Begin's cases skipped");
+  }
+  if (hooks::NativeHeapActive()) {
+    UnloadCases(h, block);
+  } else {
+    ITC_LOG_ERROR("harness: race_sounds: no native heap: Unload's cases skipped");
   }
   if (real) {
     InitCases(h, block);

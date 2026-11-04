@@ -70,6 +70,8 @@ constexpr uint32_t kCarSoundUpdate = 0x82110048;
 constexpr uint32_t kMusicPlay = 0x821063B0;          // Music::Play (mode-tick.md)
 constexpr uint32_t kSoundPlay = 0x82175850;
 constexpr uint32_t kXPhysicalAlloc = 0x822964C8;
+constexpr uint32_t kXPhysicalFree = 0x822965C8;
+constexpr uint32_t kSoundHolderDelete = 0x82117B30;  // sound-cues.md
 constexpr uint32_t kArchiveLoad = 0x8209DE48;
 constexpr uint32_t kOperatorNew = 0x825A6880;
 constexpr uint32_t kXprConstruct = 0x82596E68;    // XPR::XPR (models.md)
@@ -196,6 +198,14 @@ uint64_t OnStageCountdown(uint8_t* base, uint64_t r3);
 // and 0x4000 clear, CarSounds::StopAll, 0x4000 set and 0x10000 cleared; the
 // cars' step 1 and 0x4000 cleared.
 uint64_t OnRollingStartDone(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82175CF8 RaceSounds::OnAbortDone (leaf; not seen in play): the cars'
+// step 1, flag 0x4000 cleared, the effects' volume back.
+uint64_t OnAbortDone(uint8_t* base, uint64_t r3);
+// sub_821772D8 RaceSounds::Unload (144 bytes): CarSounds::Release; each
+// slot's two buffers freed (XPhysicalFree, the pointers left) and the car's
+// two views deleted (sub_82117B30, the pointers cleared); slot 5
+// (ReleaseBank) on bank 2; the effects' bank freed (XPhysicalFree's r3).
+uint64_t Unload(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 // sub_82175ED0 RaceSounds::OnEffectsBankLoaded (leaf): the effects' bank
 // arrived (r3 left).
 void OnEffectsBankLoaded(uint8_t* base);
@@ -245,6 +255,10 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 uint64_t OnLeaveAfterRace(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 uint64_t OnNextStage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 uint64_t OnRollingStart(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82175CA0 RaceSounds::OnAbort (96 bytes; not seen in play):
+// CarSounds::StopAll and the fade with 0x4000 (as OnNextStage without
+// PickRivalMusic); StopAll's r3.
+uint64_t OnAbort(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 // sub_82175DB0 RaceSounds::PlayStartMusic (144 bytes): the start's music by
 // the race kind (entry 0, or one of entries 1 to 5 by rand() % 5 for kinds
 // 2 and 4 to 6; rand natively, c_runtime::Rand).
