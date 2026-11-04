@@ -581,4 +581,160 @@ Left WheelsDrawRimAMorphed(uint8_t* base, const Calls& calls, uint32_t stack, ui
   return RimASides(base, calls, frame, group, camera, block, caller_r24, kRimAMorphed);
 }
 
+// --- Set b's rim ---
+
+namespace {
+
+// The return addresses of a set b rim side's draws: the first (record 6) by
+// the look's word (anything else, 1, 2), with and without the second
+// matrix, then the rest of the second matrix's draws and the last.
+struct RimBSites {
+  uint32_t first_second[3], first_alone[3];
+  uint32_t look_main, record6_second, last;
+};
+
+// A set b side's draws: record 6 (+1472) and the look the block's word at
+// `look` picks (1 record 2 at +512, 2 record 4 at +992, else record 0 at
+// +32) at `main`, and with the block's +592 both again at the frame's +352.
+// r28 is `r28` at the first draw; with +592 the original keeps the look in
+// r28 for the rest when `look_in_r28` (side 1), else r28 stays.
+Left RimBDraws(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+               uint32_t camera, uint32_t block, uint32_t look, uint32_t main, uint64_t r24,
+               uint64_t r28, bool look_in_r28, const RimBSites& sites) {
+  const uint32_t which = Load(base, block + look);
+  const int site = which == 1 ? 1 : which == 2 ? 2 : 0;
+  const uint32_t chosen = group + (which == 1 ? 512 : which == 2 ? 992 : 32);
+  const uint32_t vp = camera + 144, record6 = group + 1472, second = frame + 352;
+  if (int32_t(Load(base, block + 592)) != 0) {
+    PartsDrawRecord(base, calls, frame, record6, vp, main, 0, r24, r28,
+                    sites.first_second[site]);
+    const uint64_t later = look_in_r28 ? uint64_t(chosen) : r28;
+    PartsDrawRecord(base, calls, frame, chosen, vp, main, 0, r24, later, sites.look_main);
+    PartsDrawRecord(base, calls, frame, record6, vp, second, 0, r24, later,
+                    sites.record6_second);
+    return PartsDrawRecord(base, calls, frame, chosen, vp, second, 0, r24, later, sites.last);
+  }
+  PartsDrawRecord(base, calls, frame, record6, vp, main, 0, r24, r28, sites.first_alone[site]);
+  return PartsDrawRecord(base, calls, frame, chosen, vp, main, 0, r24, r28, sites.last);
+}
+
+// T's row 3 (0, 0, 0, 1) through the frame's +80, copied into T (+272),
+// then the side's float4 added unless +732 is set.
+void RimBRow(uint8_t* base, uint32_t frame, uint32_t block, uint32_t side, double zero,
+             double one) {
+  Stfs(base, frame + 80, zero);
+  Stfs(base, frame + 84, zero);
+  Stfs(base, frame + 88, zero);
+  Stfs(base, frame + 92, one);
+  CopyDoublewords(base, frame + 272, frame + 80, 16);
+  Translate(base, block, frame + 272, Lvx(base, frame + 80), side);
+}
+
+}  // namespace
+
+Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                    uint32_t camera, uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820EA950 WheelPoints::DrawRimB");
+  const uint32_t frame = Frame(base, stack, kWheelsRimBFrame);
+  const uint32_t t = frame + 224, main = frame + 288, second = frame + 352;
+  const uint32_t world = block + 16;
+  // T, the side's world and the second matrix, all identities.
+  FreshIdentity(base, frame + 96, t);
+  FreshIdentity(base, frame + 96, main);
+  FreshIdentity(base, frame + 96, second);
+  const double zero = Lfs(base, kZero), one = Lfs(base, kOne);
+  RimBRow(base, frame, block, group + 1712, zero, one);
+  {
+    const double z = Lfs(base, t + 56), add = Lfs(base, group + 20);
+    Stfs(base, t + 56, Fadds(z, add));
+  }
+  const double milli = Lfs(base, kMilli), three = Lfs(base, kThree), shift = Lfs(base, kShift);
+  // r24: 0 for the front (+12 set), 1 for the rear, through both sides.
+  uint64_t r24;
+  if (int32_t(Load(base, group + 12)) != 0) {
+    r24 = 0;
+    static constexpr uint32_t kLrs[] = {0x820EAB3C, 0x820EAB5C, 0x820EAB80};
+    const uint32_t outs[] = {frame + 1248, frame + 1888, frame + 608};
+    NotedCopy(base, main, Chain(base, {block + 336, block + 80, t, world}, outs, kLrs, one),
+              0x820EACAC);
+  } else {
+    r24 = 1;
+    static constexpr uint32_t kLrs[] = {0x820EABB8, 0x820EABD8, 0x820EABFC};
+    const uint32_t outs[] = {frame + 1504, frame + 736, frame + 2144};
+    NotedCopy(base, main, Chain(base, {block + 464, block + 208, t, world}, outs, kLrs, one),
+              0x820EAC08);
+    if (int32_t(Load(base, block + 592)) != 0) {
+      ShiftX(base, frame, group, t + 48, shift, three, milli);
+      static constexpr uint32_t kSecondLrs[] = {0x820EAC60, 0x820EAC80, 0x820EACA0};
+      const uint32_t second_outs[] = {frame + 864, frame + 1632, frame + 992};
+      NotedCopy(base, second,
+                Chain(base, {block + 464, block + 208, t, world}, second_outs, kSecondLrs, one),
+                0x820EACAC);
+    }
+  }
+  // r28 the camera at side 1's first draw.
+  static constexpr RimBSites kSide1 = {{0x820EACF4, 0x820EAD44, 0x820EAD38},
+                                       {0x820EAD60, 0x820EAD78, 0x820EAD6C},
+                                       0x820EAD10,
+                                       0x820EAD28,
+                                       0x820EAD90};
+  RimBDraws(base, calls, frame, group, camera, block, 596 + 8 * uint32_t(r24), main, r24, camera,
+            true, kSide1);
+  // Side 2: the turned world (+96), the mirror (+2336, z scaled by
+  // [0x82001BE0]) and the turn by pi about y (+1696).
+  const uint32_t turned_world = frame + 96, mirror = frame + 2336, turned = frame + 1696;
+  FreshIdentity(base, frame + 160, turned_world);
+  FreshIdentity(base, frame + 160, mirror);
+  Stfs(base, mirror + 40, Lfs(base, kMirrorZ));
+  FreshIdentity(base, frame + 160, turned);
+  Stfs(base, frame + 80, Lfs(base, kPi));
+  matrix_math::RotateY(base, turned, turned, frame + 80, frame - 80);
+  RimBRow(base, frame, block, group + 1728, zero, one);
+  {
+    const double z = Lfs(base, t + 56), add = Lfs(base, group + 20);
+    Stfs(base, t + 56, Fsubs(z, add));
+  }
+  // The mirrored product goes into side 1's world (+288), never drawn.
+  uint32_t s;
+  if (int32_t(Load(base, group + 12)) != 0) {
+    s = block + 400;
+    const uint32_t r = block + 144;
+    static constexpr uint32_t kMirrorLrs[] = {0x820EAF50, 0x820EAF74, 0x820EAF94, 0x820EAFB4};
+    const uint32_t mirror_outs[] = {frame + 2016, frame + 1120, frame + 1760, frame + 416};
+    NotedCopy(base, main, Chain(base, {mirror, s, r, t, world}, mirror_outs, kMirrorLrs, one),
+              0x820EAFC0);
+    static constexpr uint32_t kTurnedLrs[] = {0x820EAFE0, 0x820EB000, 0x820EB020, 0x820EB040};
+    const uint32_t turned_outs[] = {frame + 2272, frame + 1376, frame + 480, frame + 544};
+    NotedCopy(base, turned_world,
+              Chain(base, {turned, s, r, t, world}, turned_outs, kTurnedLrs, one), 0x820EB22C);
+  } else {
+    s = block + 528;
+    const uint32_t r = block + 272;
+    static constexpr uint32_t kMirrorLrs[] = {0x820EB06C, 0x820EB090, 0x820EB0B0, 0x820EB0D0};
+    const uint32_t mirror_outs[] = {frame + 672, frame + 800, frame + 928, frame + 1056};
+    NotedCopy(base, main, Chain(base, {mirror, s, r, t, world}, mirror_outs, kMirrorLrs, one),
+              0x820EB0DC);
+    static constexpr uint32_t kTurnedLrs[] = {0x820EB0FC, 0x820EB11C, 0x820EB13C, 0x820EB15C};
+    const uint32_t turned_outs[] = {frame + 1184, frame + 1312, frame + 1440, frame + 1568};
+    NotedCopy(base, turned_world,
+              Chain(base, {turned, s, r, t, world}, turned_outs, kTurnedLrs, one), 0x820EB168);
+    if (int32_t(Load(base, block + 592)) != 0) {
+      ShiftX(base, frame, group, t + 48, shift, three, milli);
+      static constexpr uint32_t kSecondLrs[] = {0x820EB1C0, 0x820EB1E0, 0x820EB200, 0x820EB220};
+      const uint32_t second_outs[] = {frame + 1824, frame + 1952, frame + 2080, frame + 2208};
+      NotedCopy(base, second,
+                Chain(base, {turned, s, r, t, world}, second_outs, kSecondLrs, one),
+                0x820EB22C);
+    }
+  }
+  // r28 the side's S at every side 2 draw.
+  static constexpr RimBSites kSide2 = {{0x820EB26C, 0x820EB2BC, 0x820EB2B0},
+                                       {0x820EB2D8, 0x820EB2F0, 0x820EB2E4},
+                                       0x820EB288,
+                                       0x820EB2A0,
+                                       0x820EB308};
+  return RimBDraws(base, calls, frame, group, camera, block, 600 + 8 * uint32_t(r24),
+                   turned_world, r24, s, false, kSide2);
+}
+
 }  // namespace car_draw

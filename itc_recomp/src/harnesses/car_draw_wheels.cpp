@@ -1,5 +1,6 @@
 // The wheels (src/car_draw/wheels.cpp, docs/functions/car-draw.md: the
-// tires and set a's rims, plain and morphed; the rims' world in RimAWorld) against the recompiled functions, under the car_draw harness (its
+// tires, set a's rims, plain and morphed, and set b's rim; the rims' world in
+// RimAWorld) against the recompiled functions, under the car_draw harness (its
 // Case and model draws' world, car_draw_shared.h), with a random generator
 // of its own (so its cases don't shift the other files' inputs; it runs
 // last). The wheels in an allocation of their own: the tire group at +0x100
@@ -270,7 +271,7 @@ void RimAWorld(Context& h, Random& r, uint32_t block, uint32_t top, uint32_t sha
   }
 }
 
-enum class Kind { kTire, kTireMorphed, kRimA, kRimAMorphed };
+enum class Kind { kTire, kTireMorphed, kRimA, kRimAMorphed, kRimB };
 
 struct Target {
   const char* name;
@@ -300,10 +301,12 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
       {"WheelPoints::DrawRimAMorphed (sub_820EA148)", __imp__sub_820EA148,
        hooks::CarDrawWheelsDrawRimAMorphed, car_draw::kWheelsRimAMorphedFrame, 2128, 256,
        Kind::kRimAMorphed},
+      {"WheelPoints::DrawRimB (sub_820EA950)", __imp__sub_820EA950,
+       hooks::CarDrawWheelsDrawRimB, car_draw::kWheelsRimBFrame, 2400, 256, Kind::kRimB},
   };
   for (const Target& target : targets) {
     Results results(target.name);
-    int queued = 0, depth = 0, weights = 0, makers = 0, flips = 0;
+    int queued = 0, depth = 0, weights = 0, makers = 0, flips = 0, seconds = 0;
     std::vector<uint8_t> scene_bytes, records;
     const std::vector<uint8_t> zero(kSlotCount * 16, 0);
     uint32_t sp = 0;
@@ -324,6 +327,16 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
             if (target.kind == Kind::kRimA || target.kind == Kind::kRimAMorphed) {
               RimAWorld(h, r, block, top, shape, morphed);
               flips += guest::LoadU32(h.base, top + kGroup + 36) != 0;
+            }
+            if (target.kind == Kind::kRimB) {
+              // Set b's records are set a's layout; the looks by the
+              // block's +596 to +608 (1, 2 or another word).
+              RimAWorld(h, r, block, top, shape, false);
+              for (uint32_t at = 596; at <= 608; at += 4) {
+                guest::StoreU32(h.base, source + at,
+                                r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(4));
+              }
+              seconds += guest::LoadU32(h.base, source + 592) != 0;
             }
             scene_bytes = Read(h.base, scene, kSceneBytes);
             records = Read(h.base, top, kRecordsEnd);
@@ -373,6 +386,10 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
       ITC_LOG_INFO("harness: {}: {} of {} cases with a depth pass, {} ended handing an entry to "
                    "the render queue",
                    target.name, depth, target.cases, queued / 2);
+    } else if (target.kind == Kind::kRimB) {
+      ITC_LOG_INFO("harness: {}: {} of {} cases with the second matrix, {} ended handing an "
+                   "entry to the render queue",
+                   target.name, seconds, target.cases, queued / 2);
     } else {
       ITC_LOG_INFO("harness: {}: {} of {} cases with a rim model to flip, {} ended handing an "
                    "entry to the render queue",

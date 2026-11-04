@@ -784,6 +784,7 @@ constexpr uint32_t kWheelsTireFrame = 2032;
 constexpr uint32_t kWheelsTireMorphedFrame = 1648;
 constexpr uint32_t kWheelsRimAFrame = 2032;
 constexpr uint32_t kWheelsRimAMorphedFrame = 2256;
+constexpr uint32_t kWheelsRimBFrame = 2528;
 
 // WheelPoints::DrawTire (sub_820E8AE8): r3 = a tire group (the point block's
 // +32 or +1872), r4 = the camera pass, r5 = the block. Side 1 (T from +1808):
@@ -837,5 +838,22 @@ Left WheelsDrawRimA(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
 // isn't 0, record 2 (+740) toward record 3 (+980) regardless.
 Left WheelsDrawRimAMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t camera, uint32_t block, uint64_t caller_r24);
+
+// WheelPoints::DrawRimB (sub_820EA950): r3 = a set b rim group (the point
+// block's +7200 or +8944), r4 = the camera pass, r5 = the block; the race's
+// rims. Side 1: T (+224) from +1712 with its z + the group's +20; front (+12
+// set) S_0 x R_0 x T x world into +288; rear S_2 x R_2 x T x world and, with
+// the block's +592, the second matrix (+352) as DrawTire's (T's x shifted);
+// record 6 (+1472) and the look by the block's +596 (front) or +604 (rear)
+// (1 record 2 at +512, 2 record 4 at +992, else record 0 at +32) drawn with
+// it, and with +592 both again with +352 (the identity for the front). Side
+// 2: T from +1728, z - +20; Mz x S_1 x R_1 x T x world into +288 (never
+// drawn), RotY x S_1 x R_1 x T x world (the rear's S_3, R_3, and its second
+// matrix with RotY) into +96; the same draws by +600 or +608. r24 0 (front)
+// or 1 (rear) at every draw; r28 the camera at side 1's first, then with
+// +592 the look's record (else the camera), the side's S at side 2's. No
+// flips, no morph, no depth pass.
+Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                    uint32_t camera, uint32_t block);
 
 }  // namespace car_draw
