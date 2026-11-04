@@ -25,5 +25,14 @@ void RaceSoundsSetUpCars(PPCContext& ctx, uint8_t* base);            // sub_8217
 void RaceSoundsUpdateCars(PPCContext& ctx, uint8_t* base);           // sub_82175F20
 void RaceSoundsPickRivalMusic(PPCContext& ctx, uint8_t* base);       // sub_821764F0
 void RaceSoundsPlayRivalMusic(PPCContext& ctx, uint8_t* base);       // sub_821762F8
+void RaceSoundsRaceTick(PPCContext& ctx, uint8_t* base);  // sub_821769D0
+void RaceSoundsStageTick(PPCContext& ctx, uint8_t* base);  // sub_82176F28
+void RaceSoundsRollingStartTick(PPCContext& ctx, uint8_t* base);  // sub_82177130
+void RaceSoundsAfterRaceTick(PPCContext& ctx, uint8_t* base);  // sub_82176C10
+void RaceSoundsOnCountdown(PPCContext& ctx, uint8_t* base);  // sub_82176968
+void RaceSoundsOnRaceEnd(PPCContext& ctx, uint8_t* base);  // sub_82176BA0
+void RaceSoundsOnLeaveAfterRace(PPCContext& ctx, uint8_t* base);  // sub_82176E60
+void RaceSoundsOnNextStage(PPCContext& ctx, uint8_t* base);  // sub_82176EC8
+void RaceSoundsOnRollingStart(PPCContext& ctx, uint8_t* base);  // sub_821770C0
 
 }  // namespace hooks

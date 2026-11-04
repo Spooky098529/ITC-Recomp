@@ -8,13 +8,13 @@
 // allocation layer, their holders' voices fake ones there with recorder
 // vtables (as the car sounds' harness builds them), so the car sounds'
 // plain C++ (called by both versions) walks them without XAudio's engine;
-// the machine's words, the scene models' slots' buffers (wave banks with no
-// waves), the cars' views, the racers,
+// the machine's words, the scene models' slots' buffers and the effects'
+// bank (one wave bank with PCM waves), the cars' views, the racers,
 // the race's progress, the race data, the sound parameters' lists
 // (0x82616318) and the item table ([0x826C5CA0]) in that block too, with no
 // vehicles ([0x826C2E34] 0, so CarSound::Update does nothing). The globals
 // are put back after each side. CarSound::Start (SetUpCars, UpdateCars)
-// makes XAudio's own voices over the empty banks: as the car sounds'
+// makes XAudio's own voices over that bank: as the car sounds'
 // harness's real cases, the submix word [0x826C5C44] 0 while a case runs,
 // the mixer held out by its lock, and every voice made (a holder's slot
 // that isn't a fake voice) stopped, taken back out of the engine's source
@@ -62,7 +62,7 @@ constexpr uint32_t kBlockBytes = 0x4000;
 constexpr uint32_t kVoices = 0x2300, kVoiceBytes = 0x100, kVoiceCount = 10;  // the fake voices
 constexpr uint32_t kVoiceVtable = 0x2D00;
 constexpr uint32_t kMachineWords = 0x2E00;  // the machine at this - 9600
-constexpr uint32_t kBanks = 0x2F00;         // 15 empty wave banks, 0x40 bytes each
+constexpr uint32_t kBanks = 0x2F00;         // the wave bank (0x300 bytes)
 constexpr uint32_t kViews = 0x3300;         // 14 views, 0x20 bytes each
 constexpr uint32_t kRaceAt = 0x3500;        // the race's +2308 (its +2364 the count)
 constexpr uint32_t kRacers = 0x3540;        // the racers' records, 0x20 bytes each
@@ -75,6 +75,11 @@ constexpr uint32_t kSoundHolders[] = {408 + 44, 408 + 128, 952, 584, 676, 736,
                                       840,      792,       888, 1016, 1072, 1136};
 
 constexpr uint32_t kVehicles = 0x826C2E34;
+constexpr uint32_t kSaveData = 0x826C5B58;  // player 0's save data
+constexpr uint32_t kSaveAt = 0x3FC0;        // its +6100 in the block
+// For AfterRaceTick, a bigger block holding the race data's racer records
+// (+0x59AE8: the count at +0x49FE0, 3,936 bytes each) and its +0xA3AF4.
+constexpr uint32_t kBigBytes = 0x4B000;
 constexpr uint32_t kTables = 0x826C5CA0;
 constexpr uint32_t kSoundParameters = 0x82616318;
 
@@ -101,7 +106,8 @@ std::vector<uint32_t> Globals() {
   std::vector<uint32_t> g = {rs::kMusicVolume, rs::kKeptMusicVolume, rs::kEffectsVolume,
                              rs::kEffectsVolume2, rs::kSoundManager, rs::kCarSounds,
                              rs::kEffectsBankArrived, rs::kRace, rs::kProgress, rs::kRaceData,
-                             rs::kSystemUi0, rs::kSystemUi1, kVehicles, kTables};
+                             rs::kSystemUi0, rs::kSystemUi1, kVehicles, kTables,
+                             kSaveData, rs::kAfterRaceWord};
   for (uint32_t i = 0; i < 7; i++) {
     for (const uint32_t at : {rs::kSlotBuffer0, rs::kSlotBuffer1, rs::kSlotAsked,
                               rs::kSlotArrived, rs::kBankIndexI, rs::kBankIndexJ}) {
@@ -227,10 +233,18 @@ uint32_t Volume(Random& r) {
   }
 }
 
+// A PCM format: 8 or 16 bits, 1 or 2 channels, 22,050 to 48,000 Hz.
+uint32_t PcmFormat(Random& random) {
+  static constexpr uint32_t kRates[] = {22050, 24000, 32000, 44100, 48000};
+  const uint32_t channels = 1 + random.Below(2);
+  const uint32_t rate = kRates[random.Below(5)];
+  return (random.Below(2) == 0 ? 0x80000000u : 0) | (rate << 5) | (channels << 2);
+}
+
 uint32_t FakeVoice(uint32_t block, uint32_t k) { return block + kVoices + kVoiceBytes * k; }
 
 // The world, laid out the same for both versions from `r` (a copy).
-void Lay(Context& h, uint32_t block, Random r) {
+void Lay(Context& h, uint32_t block, Random r, bool fake_voices) {
   uint8_t* base = h.base;
   // The fake manager: random words, its vtable's slots recorders, +60 the
   // getter's answer (0, 1 or any word).
@@ -248,8 +262,9 @@ void Lay(Context& h, uint32_t block, Random r) {
     Store(base, h.data + kVtable + slot, Pick(r, {kRecordR4R6, kRecordR4, kGet60}));
   }
   // The block: random words, the voices and their vtable, the car sounds'
-  // holders (each slot a fake voice or 0, their +24 words 0 or random), no
-  // vehicle (+400).
+  // holders (each slot a fake voice or 0, their +24 words 0 or random; no
+  // fake voice where real ones are made: XAudio would take them into its
+  // lists), no vehicle (+400).
   for (uint32_t i = 0; i < kBlockBytes; i += 4) {
     Store(base, block + i, uint32_t(r.Next()));
   }
@@ -268,8 +283,8 @@ void Lay(Context& h, uint32_t block, Random r) {
     const uint32_t sound = block + 16 + rs::kCarSoundBytes * k;
     for (const uint32_t offset : kSoundHolders) {
       for (uint32_t i = 0; i < 4; i++) {
-        Store(base, sound + offset + 4 + 4 * i,
-              r.Below(3) == 0 ? 0 : FakeVoice(block, r.Below(kVoiceCount)));
+        const uint32_t voice = r.Below(3) == 0 ? 0 : FakeVoice(block, r.Below(kVoiceCount));
+        Store(base, sound + offset + 4 + 4 * i, fake_voices ? voice : 0);
         Store(base, sound + offset + 24 + 4 * i, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
       }
     }
@@ -282,14 +297,32 @@ void Lay(Context& h, uint32_t block, Random r) {
         r.Below(4) == 0 ? uint32_t(r.Next()) : (uint32_t(r.Next()) & 0x3FFF4));
   Store(base, machine + rs::kSetUpWait, Pick(r, {0u, 0u, 0u, 1u, 10u, 0xFFFFFFFFu}));
   Store(base, machine + rs::kCarsPaused, r.Below(2));
-  Store(base, machine + rs::kEffectsBank, block + kBanks + 14 * 0x40);
-  // The empty banks and the views.
-  for (uint32_t i = 0; i < 15 * 0x40; i += 4) {
-    Store(base, block + kBanks + i, 0);
+  // One wave bank for every slot and the effects (offsets at +8, +16 and
+  // +40: the header at +0x40, the entries at +0x100, the wave data at
+  // +0x200), 4 to 6 waves with PCM formats XAudio takes (as the car
+  // sounds' harness's real cases), and the views.
+  const uint32_t bank = block + kBanks;
+  for (uint32_t i = 0; i < 0x300; i += 4) {
+    Store(base, bank + i, 0);
   }
+  Store(base, bank + 8, 0x40);
+  Store(base, bank + 16, 0x100);
+  Store(base, bank + 40, 0x200);
+  Store(base, bank + 0x40, r.Below(2) == 0 ? 0 : 0x20000);
+  Store(base, bank + 0x44, 4 + r.Below(3));
+  Store(base, bank + 0x40 + 84, PcmFormat(r));
+  for (uint32_t i = 0; i < 8; i++) {
+    const uint32_t entry = bank + 0x100 + 24 * i;
+    Store(base, entry + 4, PcmFormat(r));
+    Store(base, entry + 8, 4 * r.Below(32));
+    Store(base, entry + 12, 4 * (1 + r.Below(32)));
+    Store(base, entry + 16, r.Below(32));
+    Store(base, entry + 20, r.Below(32));
+  }
+  Store(base, machine + rs::kEffectsBank, bank);
   for (uint32_t i = 0; i < 7; i++) {
-    Store(base, rs::kSlotBuffer0 + 4 * i, block + kBanks + 0x40 * i);
-    Store(base, rs::kSlotBuffer1 + 4 * i, block + kBanks + 0x40 * (7 + i));
+    Store(base, rs::kSlotBuffer0 + 4 * i, bank);
+    Store(base, rs::kSlotBuffer1 + 4 * i, bank);
     Store(base, rs::kSlotAsked + 4 * i, r.Below(2));
     Store(base, rs::kSlotArrived + 4 * i, r.Below(4) == 0 ? 0 : 1 + r.Below(2));
     Store(base, rs::kBankIndexI + 4 * i, r.Below(4));
@@ -303,6 +336,17 @@ void Lay(Context& h, uint32_t block, Random r) {
   for (uint32_t n = 0; n < 7; n++) {
     Store(base, block + kRaceAt + 4 * n, block + kRacers + 0x20 * n);
     Store(base, block + kRacers + 0x20 * n + 20, r.Below(7));
+  }
+  // The race's progress: one or two results, the last's item, the item
+  // table's entries landing on the block's kItem (its class byte at +35).
+  {
+    const uint32_t count = 1 + r.Below(2);
+    const uint32_t item = Pick(r, {0xFFFFFFFFu, 383u, 391u, 395u, 398u, 5u});
+    Store(base, block + kResults, count);
+    Store(base, block + kResults + 972 * count - 964, item);
+    Store(base, kTables, block + kItem - 16);
+    Store(base, block + kItem, block + kItem - 3008 * item);
+    guest::StoreU8(base, block + kItem + 35, uint8_t(r.Below(7)));
   }
   // The sound parameters' lists: entry i a list of pointers into the block.
   for (uint32_t i = 0; i < 4; i++) {
@@ -355,7 +399,7 @@ void Group(Context& h, uint32_t block, const std::string& name, int count,
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
       random = start;
-      Lay(h, block, Random(random.Next()));
+      Lay(h, block, Random(random.Next()), !real);
       uint64_t regs[4] = {machine, random.Next(), random.Next(), random.Next()};
       setup(random, regs);
       const uint32_t fill = uint32_t(random.Next());
@@ -519,6 +563,57 @@ void RaceSounds(Context& h) {
                 r.Below(4) == 0 ? (uint32_t(r.Next()) & 0x3FC0) : one);
           Store(base, block + kRaceDataAt, Pick(r, {0u, 1u, 2u, 3u, uint32_t(r.Next())}));
         });
+  // The handlers above them.
+  Group(h, block, "RaceSounds::StageTick (sub_82176F28)", 200, __imp__sub_82176F28,
+        hooks::RaceSoundsStageTick, 160, 40, Keep);
+  Group(h, block, "RaceSounds::RollingStartTick (sub_82177130)", 200, __imp__sub_82177130,
+        hooks::RaceSoundsRollingStartTick, 160, 40, Keep);
+  Group(h, block, "RaceSounds::OnCountdown (sub_82176968)", 60, __imp__sub_82176968,
+        hooks::RaceSoundsOnCountdown, 96, 16, Keep);
+  Group(h, block, "RaceSounds::OnNextStage (sub_82176EC8)", 60, __imp__sub_82176EC8,
+        hooks::RaceSoundsOnNextStage, 96, 16, Keep);
+  if (real) {
+    const auto steps = [&](Random& r, uint64_t*) {
+      Store(base, machine + rs::kCarsStep, Pick(r, {1u, 2u, 2u, 2u, 0u, 3u}));
+      if (r.Below(4) != 0) {
+        Store(base, machine + rs::kSetUpWait, 0);
+        Store(base, machine + rs::kFlags,
+              (guest::LoadU32(base, machine + rs::kFlags) | 0x20000) & ~0x4000u);
+      }
+    };
+    Group(h, block, "RaceSounds::RaceTick (sub_821769D0)", 200, __imp__sub_821769D0,
+          hooks::RaceSoundsRaceTick, 160, 40, steps, true);
+    Group(h, block, "RaceSounds::OnRaceEnd (sub_82176BA0)", 60, __imp__sub_82176BA0,
+          hooks::RaceSoundsOnRaceEnd, 96, 16, steps, true);
+    Group(h, block, "RaceSounds::OnLeaveAfterRace (sub_82176E60)", 60, __imp__sub_82176E60,
+          hooks::RaceSoundsOnLeaveAfterRace, 96, 16, steps, true);
+    Group(h, block, "RaceSounds::OnRollingStart (sub_821770C0)", 60, __imp__sub_821770C0,
+          hooks::RaceSoundsOnRollingStart, 96, 16, steps, true);
+    const uint32_t big = memory::Alloc(kBigBytes, 0);
+    if (big == 0) {
+      ITC_LOG_ERROR("harness: race_sounds: no big block: AfterRaceTick's cases skipped");
+    } else {
+      Group(h, block, "RaceSounds::AfterRaceTick (sub_82176C10)", 200, __imp__sub_82176C10,
+            hooks::RaceSoundsAfterRaceTick, 176, 48,
+            [&](Random& r, uint64_t* regs) {
+              steps(r, regs);
+              // The race data's records at `big`: one or two, the last's
+              // result; the race mode; the kind; the after-race word; player
+              // 0's save data's +6100.
+              const uint32_t count = 1 + r.Below(2);
+              Store(base, rs::kRaceData, big - 0x59AE8);
+              Store(base, big + 0x49FE0, count);
+              Store(base, big + 3936 * (count - 1) + 3924, Pick(r, {1u, 2u, 0u, uint32_t(r.Next())}));
+              Store(base, big + 0x4A00C, Pick(r, {7u, 7u, 0u, uint32_t(r.Next())}));
+              Store(base, machine + rs::kKind, Pick(r, {6u, 6u, 0u, 1u, 2u, 5u}));
+              Store(base, rs::kAfterRaceWord, r.Below(2));
+              Store(base, kSaveData, block + kSaveAt - 6100);
+              Store(base, block + kSaveAt, Pick(r, {1u, 1u, 0u, 999u, 1000u, uint32_t(r.Next())}));
+            },
+            true);
+      memory::Free(big);
+    }
+  }
 }
 
 }  // namespace harness

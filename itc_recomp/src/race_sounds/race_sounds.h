@@ -68,6 +68,7 @@ constexpr uint32_t kCarSoundStop = 0x8210E218;
 constexpr uint32_t kCarSoundStart = 0x8210E030;
 constexpr uint32_t kCarSoundUpdate = 0x82110048;
 constexpr uint32_t kMusicPlay = 0x821063B0;          // Music::Play (mode-tick.md)
+constexpr uint32_t kSoundPlay = 0x82175850;          // Sound::Play (menu-sounds.md)
 constexpr uint32_t kRaceSoundsPauseCars = 0x82175C00;
 constexpr uint32_t kRaceSoundsResumeCars = 0x82175C58;
 
@@ -94,11 +95,16 @@ constexpr uint32_t kMusicNames = 0x826193D4;
 constexpr uint32_t kSystemUi0 = 0x826C7960;
 constexpr uint32_t kSystemUi1 = 0x826C7964;
 constexpr uint32_t kOne = 0x82000A30;
+// The byte cleared with each fade (not read here), the word the after-race
+// music reads with race kind 6 (known-data.md).
+constexpr uint32_t kMusicStarted = 0x826C5C84;
+constexpr uint32_t kAfterRaceWord = 0x826C7824;
 
 // More of the machine's words.
 constexpr uint32_t kEffectsView = 9608;
 constexpr uint32_t kEffectsBank = 9632;
 constexpr uint32_t kCarsPaused = 9640;
+constexpr uint32_t kKind = 9652;
 constexpr uint32_t kSetUpWait = 9656;
 
 // A guest function called from the frame at `r1`, with the first `set` of
@@ -115,6 +121,9 @@ struct Calls {
   mutable bool left = false;
   mutable uint64_t left_r4 = 0, left_r5 = 0;
 
+  // At a native function's end: what it left isn't passed on (its
+  // adapter's calls object ends there too).
+  void Forget() const { left = false; }
   void Leave(uint64_t r4, uint64_t r5) const {
     left = true;
     left_r4 = r4;
@@ -194,5 +203,33 @@ uint64_t PickRivalMusic(uint8_t* base, uint64_t r3, uint32_t sp);
 // sub_821762F8 RaceSounds::PlayRivalMusic (144 bytes): each music flag set
 // played (Music::Play) and cleared.
 uint64_t PlayRivalMusic(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// --- The music's ticks and the events that fade it (race_sounds_ticks.cpp) ---
+
+// sub_821769D0 RaceSounds::RaceTick (160 bytes): the cars' step 1 SetUpCars,
+// 2 UpdateCars and the music steps (the effects' volume put back, the next
+// music PlayRivalMusic's).
+uint64_t RaceTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82176F28 RaceSounds::StageTick and sub_82177130 RollingStartTick (160
+// bytes): the music steps only (RollingStartTick's putting the effects'
+// volume back).
+uint64_t StageTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t RollingStartTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82176C10 RaceSounds::AfterRaceTick (176 bytes): UpdateCars and the
+// music steps, the next music by the race's result, cue 0 not played while
+// player 0's save data's +6100 is 1.
+uint64_t AfterRaceTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// The events (96 bytes): sub_82176968 OnCountdown (CarSound::Update on the
+// first car sound, the fade, PickRivalMusic), sub_82176BA0 OnRaceEnd (the
+// effects' volume times 0.0, UpdateCars, the fade), sub_82176E60
+// OnLeaveAfterRace (UpdateCars, the fade, the effects' volume back),
+// sub_82176EC8 OnNextStage (CarSounds::StopAll, the fade with 0x4000,
+// PickRivalMusic), sub_821770C0 OnRollingStart (SetUpCars with the cars'
+// step 1, the fade, PickRivalMusic).
+uint64_t OnCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t OnLeaveAfterRace(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t OnNextStage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t OnRollingStart(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
 }  // namespace race_sounds

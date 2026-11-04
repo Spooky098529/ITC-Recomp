@@ -70,6 +70,12 @@ uint64_t SetUpCar(uint8_t* base, uint32_t machine, uint32_t v, uint32_t frame, b
   return vehicle;
 }
 
+// Forgets the calls' leftovers when the function ends.
+struct ForgetAtEnd {
+  const Calls& calls;
+  ~ForgetAtEnd() { calls.Forget(); }
+};
+
 // The racer n's vehicle index.
 uint32_t RacerVehicle(uint8_t* base, uint32_t n) {
   return Load(base, Load(base, Load(base, kRace) + 2308 + 4 * n) + 20);
@@ -79,6 +85,7 @@ uint32_t RacerVehicle(uint8_t* base, uint32_t n) {
 
 uint64_t SetUpCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82176188 RaceSounds::SetUpCars");
+  const ForgetAtEnd forget{calls};
   const uint32_t machine = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 224);
   Store(base, machine + kSetUpWait, 10);
@@ -95,6 +102,7 @@ uint64_t SetUpCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) 
 
 uint64_t UpdateCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82175F20 RaceSounds::UpdateCars");
+  const ForgetAtEnd forget{calls};
   const uint32_t machine = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 240);
   const int32_t wait = int32_t(Load(base, machine + kSetUpWait));

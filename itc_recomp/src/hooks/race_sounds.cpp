@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "hooks/car_sounds.h"
+#include "hooks/menu_sounds.h"
 #include "hooks/mode_tick.h"
 #include "race_sounds/race_sounds.h"
 
@@ -18,7 +19,10 @@ ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
               "sub_82175B80, PauseCars sub_82175C00, ResumeCars sub_82175C58, OnStageCountdown "
               "sub_82175D20, OnRollingStartDone sub_82175D48, OnEffectsBankLoaded sub_82175ED0, "
               "SetUpCars sub_82176188, UpdateCars sub_82175F20, PickRivalMusic sub_821764F0, "
-              "PlayRivalMusic sub_821762F8; the car sounds and Music::Play through their plain C++, the sound manager's slots through the "
+              "PlayRivalMusic sub_821762F8, RaceTick sub_821769D0, StageTick sub_82176F28, "
+              "RollingStartTick sub_82177130, AfterRaceTick sub_82176C10, OnCountdown "
+              "sub_82176968, OnRaceEnd sub_82176BA0, OnLeaveAfterRace sub_82176E60, OnNextStage "
+              "sub_82176EC8, OnRollingStart sub_821770C0; the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
               "function table) natively instead of through the translated code (the same "
               "words; checked by --run_harnesses=race_sounds)");
 
@@ -78,6 +82,9 @@ class GuestCalls {
         break;
       case rs::kMusicPlay:
         ModeTickMusicPlay(ctx, base);
+        break;
+      case rs::kSoundPlay:
+        SoundPlay(ctx, base);
         break;
       default:
         ctx.ctr.u64 = function;
@@ -185,6 +192,60 @@ void RaceSoundsPlayRivalMusic(PPCContext& ctx, uint8_t* base) {
   Step(ctx, base, [&](const rs::Calls& c) { return rs::PlayRivalMusic(base, r3, sp, c); });
 }
 
+void RaceSoundsRaceTick(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::RaceTick(base, r3, sp, c); });
+}
+
+void RaceSoundsStageTick(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::StageTick(base, r3, sp, c); });
+}
+
+void RaceSoundsRollingStartTick(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::RollingStartTick(base, r3, sp, c); });
+}
+
+void RaceSoundsAfterRaceTick(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::AfterRaceTick(base, r3, sp, c); });
+}
+
+void RaceSoundsOnCountdown(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnCountdown(base, r3, sp, c); });
+}
+
+void RaceSoundsOnRaceEnd(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnRaceEnd(base, r3, sp, c); });
+}
+
+void RaceSoundsOnLeaveAfterRace(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnLeaveAfterRace(base, r3, sp, c); });
+}
+
+void RaceSoundsOnNextStage(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnNextStage(base, r3, sp, c); });
+}
+
+void RaceSoundsOnRollingStart(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnRollingStart(base, r3, sp, c); });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -213,3 +274,12 @@ ITC_RACE_SOUNDS(82176188, RaceSoundsSetUpCars)
 ITC_RACE_SOUNDS(82175F20, RaceSoundsUpdateCars)
 ITC_RACE_SOUNDS(821764F0, RaceSoundsPickRivalMusic)
 ITC_RACE_SOUNDS(821762F8, RaceSoundsPlayRivalMusic)
+ITC_RACE_SOUNDS(821769D0, RaceSoundsRaceTick)
+ITC_RACE_SOUNDS(82176F28, RaceSoundsStageTick)
+ITC_RACE_SOUNDS(82177130, RaceSoundsRollingStartTick)
+ITC_RACE_SOUNDS(82176C10, RaceSoundsAfterRaceTick)
+ITC_RACE_SOUNDS(82176968, RaceSoundsOnCountdown)
+ITC_RACE_SOUNDS(82176BA0, RaceSoundsOnRaceEnd)
+ITC_RACE_SOUNDS(82176E60, RaceSoundsOnLeaveAfterRace)
+ITC_RACE_SOUNDS(82176EC8, RaceSoundsOnNextStage)
+ITC_RACE_SOUNDS(821770C0, RaceSoundsOnRollingStart)
