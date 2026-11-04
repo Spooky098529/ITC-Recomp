@@ -132,11 +132,13 @@ struct Saved {
 // laying the world and the registers (its inputs written back for the
 // second run); the block and the stack compared (from `*floor` up when
 // given, set by `setup`), the top `saves` bytes of the top function's frame
-// left out, `floats` as floats, then r3.
+// and the `skips` ranges (address, bytes) left out, `floats` as floats, then
+// r3.
 void Case(Context& h, Results& results, uint32_t block, Random& r,
           const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
           GuestFunction native, uint32_t saves, const FloatRanges& floats,
-          const std::string& what, const uint32_t* floor = nullptr) {
+          const std::string& what, const uint32_t* floor = nullptr,
+          const FloatRanges& skips = {}) {
   const Saved saved(h.base);
   RandomBytes(h.base, block, kBlockBytes, r);
   guest::StoreU32(h.base, kScenePointer, block + kScene);
@@ -156,6 +158,9 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     PPCContext t = start;
     t.fpscr.disableFlushModeUnconditional();
     (v == 0 ? recompiled : native)(t, h.base);
+    for (const auto& [address, bytes] : skips) {
+      Fill(h.base, address, bytes, 0);
+    }
     AddRanges(out[v], h.base, block, kBlockBytes, floats);
     const uint32_t low = floor != nullptr ? *floor : sp - kStackBytes;
     AddRanges(out[v], h.base, low, sp - saves - low, floats);
@@ -448,7 +453,10 @@ void Commands(Context& h, uint32_t block, Random& r) {
             floats.insert(floats.end(), stage.begin(), stage.end());
             return floats;
           }(),
-          fmt::format("case {}", c), &floor_of);
+          fmt::format("case {}", c), &floor_of,
+          // GarageAnims::Add's saved registers: its original (no adapter
+          // since its caller is native) saves them on the recompiled side.
+          {{sp - 112 - 88, 88}});
     }
     results.Report();
   }
@@ -576,7 +584,10 @@ void Anims(Context& h, uint32_t block, Random& r) {
             }
             return floats;
           }(),
-          fmt::format("case {}", c), &floor_of);
+          fmt::format("case {}", c), &floor_of,
+          // GarageAnims::Open's and Close's saved registers (their
+          // originals run on the recompiled side: no adapters).
+          {{sp - 624 - 40, 40}});
     }
     results.Report();
   }

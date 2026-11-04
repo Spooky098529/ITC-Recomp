@@ -214,19 +214,19 @@ void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                      \
   }
 
-ITC_FRONT_END_CAR_DRAW(820DF190, FrontEndCarDrawPlatesHide)
-ITC_FRONT_END_CAR_DRAW(820DF180, FrontEndCarDrawPlatesShow)
 ITC_FRONT_END_CAR_DRAW(82179BE0, FrontEndCarDrawIsBusy)
 ITC_FRONT_END_CAR_DRAW(8217AFE8, FrontEndCarDrawSyncPlates)
 ITC_FRONT_END_CAR_DRAW(82178B40, FrontEndCarDrawSetDrawWord)
-ITC_FRONT_END_CAR_DRAW(82179C88, FrontEndCarDrawStepAngles)
-ITC_FRONT_END_CAR_DRAW(8217F9E0, FrontEndCarDrawAnimsAdd)
 ITC_FRONT_END_CAR_DRAW(8217D2B0, FrontEndCarDrawApplyPreset)
 ITC_FRONT_END_CAR_DRAW(82180108, FrontEndCarDrawCommand)
-ITC_FRONT_END_CAR_DRAW(82179D78, FrontEndCarDrawAnimsTurn)
-ITC_FRONT_END_CAR_DRAW(82179DF0, FrontEndCarDrawAnimsOpen)
-ITC_FRONT_END_CAR_DRAW(82179EA8, FrontEndCarDrawAnimsClose)
 ITC_FRONT_END_CAR_DRAW(8217D120, FrontEndCarDrawAnimsRun)
 ITC_FRONT_END_CAR_DRAW(820D9D10, FrontEndCarDrawApplyLightKit)
 ITC_FRONT_END_CAR_DRAW(82179678, FrontEndCarDrawSetLightKit)
 ITC_FRONT_END_CAR_DRAW(820C8480, FrontEndCarDrawFloorDraw)
+
+// No adapters (2026-11-04: their callers in play are native, which call
+// their plain C++; the steps above are the harness's): Plates::Hide
+// sub_820DF190 and Show sub_820DF180 (GarageStage::SyncPlates),
+// GarageStage::StepAngles sub_82179C88 and GarageAnims::Add sub_8217F9E0
+// (GarageStage::Command), GarageAnims::Turn sub_82179D78, Open sub_82179DF0
+// and Close sub_82179EA8 (GarageAnims::Run).
