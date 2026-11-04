@@ -182,8 +182,9 @@ ITC_CAR_SCENE_DRAW_ADAPTER(82597878, CarSceneDrawFrustumFromMatrix)
 ITC_CAR_SCENE_DRAW_ADAPTER(82597E58, CarSceneDrawPlaneSegmentCrossing)
 ITC_CAR_SCENE_DRAW_ADAPTER(82597210, CarSceneDrawBoxFromPoints)
 ITC_CAR_SCENE_DRAW_ADAPTER(825986B8, CarSceneDrawVector16PushBack)
-// Part 2: Projector::Build's and BuildOrtho's (native) and
-// TextureProjection::Fit's (recompiled) callees. The wrapped ones are in
+// Part 2: Matrix::Perspective's (TextureProjection::Fit, recompiled, calls
+// it). None for Matrix::LookAt (removed 2026-11-04: its callers in play,
+// Projector::Build and BuildOrtho, call its plain C++; its register step
+// above stays for the harness). The wrapped ones are in
 // src/debug/frame_state_diff.cpp (ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW).
-ITC_CAR_SCENE_DRAW_ADAPTER(82597378, CarSceneDrawLookAt)
 ITC_CAR_SCENE_DRAW_ADAPTER(825972A8, CarSceneDrawPerspective)

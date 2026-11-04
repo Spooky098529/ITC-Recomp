@@ -38,7 +38,8 @@ void CarSceneDrawVector16InsertN(PPCContext& ctx, uint8_t* base);
 void CarSceneDrawVector16Allocate(PPCContext& ctx, uint8_t* base);
 
 // Part 2: the projectors and the root's leaves. Matrix::LookAt sub_82597378
-// (r3 = out, r4 = eye, r5 = target, r6 = up) and Matrix::Perspective
+// (r3 = out, r4 = eye, r5 = target, r6 = up; no adapter: its callers are
+// native, the harness's step) and Matrix::Perspective
 // sub_825972A8 (r3 = out, f1 to f4 = field of view, aspect, near, far; r3
 // as it was: the original's is tan's _ctrlfp word, read by no caller).
 void CarSceneDrawLookAt(PPCContext& ctx, uint8_t* base);
