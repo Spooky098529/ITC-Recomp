@@ -13,6 +13,7 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-04 19:51 (`b7-loop-03-11-26`, continued)
 
+- `replay-snapshots.md` (new, dcfccb78): 30 rows, 4 not seen in play (destructors): the two leads were the replay's snapshots, not a reset: `RaceReplay::SaveStart` `sub_82104D40` (the countdown, block A at the input recordings' +0x20F590), `SaveEnd` `sub_82104E68` (block B, +0x218DA0), `RestoreStart` `sub_821046F8`, `RestoreEnd` `sub_82104898` (players' cars kept unless in contact, the others re-placed with `Vehicle::PlaceOnRoute`), each vehicle's 5,232-byte record (`Record5232`). The input recordings' lead (`sub_82104F68`, `sub_82104E68`) taken with it and deleted. Correction to an earlier map: `sub_82104E68` saves the race's end, not a rewind (`RaceStates::ReplaySetUpTick`'s row in `race-states.md`). Pointers in `race-states.md`, `race-world.md`, `vehicle.md`, `data-load.md`; `known-data.md`: `0x826C5B4C`'s blocks, `0x826C5B50`.
 ## Run 2026-11-04 08:44 (`b7-loop-03-11-26`)
 
 - Leads deleted as covered: the containers (`sub_82093400` and the rest, all in `framework.md`, `screen-objects.md`, `app-states.md`, `models.md`, `input.md`) and the route's users in the race states (`sub_82162330` and the rest, all in `race-states.md`).
