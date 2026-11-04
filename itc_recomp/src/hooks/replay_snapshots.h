@@ -19,5 +19,13 @@ void RaceSnapshotSave(PPCContext& ctx, uint8_t* base);
 // the recordings, r6 = the save data or 0, r7 = the stage flag; r3 as the
 // original leaves it.
 void ReplayKeep(PPCContext& ctx, uint8_t* base);
+// RaceReplay::SaveStart sub_82104D40, SaveEnd sub_82104E68, RestoreStart
+// sub_821046F8, RestoreEnd sub_82104898: no arguments; r3 as the original
+// leaves it. The three with the world's reset run the original unless
+// --native_heap routes the game's heap to the allocation layer.
+void RaceReplaySaveStart(PPCContext& ctx, uint8_t* base);
+void RaceReplaySaveEnd(PPCContext& ctx, uint8_t* base);
+void RaceReplayRestoreStart(PPCContext& ctx, uint8_t* base);
+void RaceReplayRestoreEnd(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

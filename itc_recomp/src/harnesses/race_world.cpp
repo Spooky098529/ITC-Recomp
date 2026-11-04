@@ -22,6 +22,7 @@
 #include "hooks/heap.h"
 #include "hooks/race_states.h"
 #include "hooks/race_world.h"
+#include "hooks/replay_snapshots.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "race_world/race_world.h"
@@ -42,6 +43,7 @@
 ITC_FLAG_DECLARE(bool, native_race_world);
 ITC_FLAG_DECLARE(bool, native_collision_world);
 ITC_FLAG_DECLARE(bool, native_race_states);
+ITC_FLAG_DECLARE(bool, native_replay_snapshots);
 
 namespace harness {
 
@@ -3666,6 +3668,124 @@ void StartCases(Context& h) {
     ITC_LOG_INFO("harness: race_world: StandingStartTick: {} cases before 900 ticks; steps 0 to "
                  "5 from 900: {} {} {} {} {} {}",
                  before, steps[0], steps[1], steps[2], steps[3], steps[4], steps[5]);
+  }
+  {
+    // RaceReplay::SaveStart, SaveEnd, RestoreStart and RestoreEnd
+    // (src/replay_snapshots/, their record functions' cases in
+    // harnesses/replay_snapshots.cpp) on the same world as PlaceRolling's
+    // cases, the game's input recordings ([0x826C5B4C]) at a block of
+    // random words (put back by globals()): SaveStart on the loaded world;
+    // SaveEnd and RestoreStart after SaveStart's original and vary's
+    // changes; RestoreEnd after SaveStart's and SaveEnd's originals with
+    // vary's changes between (block B's records flagged 0x81 or not, with
+    // contact bits or none; the vehicles' +6224 either side of 0.0). The originals with
+    // --native_replay_snapshots off; their callees' adapters on both sides.
+    // Compared as Place's, with the recordings block and r3.
+    constexpr uint32_t kRecordings = 0x826C5B4C;
+    constexpr uint32_t kRecordingsBytes = 0x2225B4;
+    const Block recordings(kRecordingsBytes);
+    const char* names[] = {"RaceReplay::SaveStart (sub_82104D40)",
+                           "RaceReplay::SaveEnd (sub_82104E68)",
+                           "RaceReplay::RestoreStart (sub_821046F8)",
+                           "RaceReplay::RestoreEnd (sub_82104898)"};
+    const GuestFunction originals[] = {__imp__sub_82104D40, __imp__sub_82104E68,
+                                       __imp__sub_821046F8, __imp__sub_82104898};
+    const GuestFunction natives[] = {hooks::RaceReplaySaveStart, hooks::RaceReplaySaveEnd,
+                                     hooks::RaceReplayRestoreStart,
+                                     hooks::RaceReplayRestoreEnd};
+    const auto run = [&](GuestFunction f) {
+      PPCContext t = CallContext(h);
+      t.fpscr.disableFlushModeUnconditional();
+      ITC_FLAG(native_replay_snapshots) = false;
+      f(t, h.base);
+      ITC_FLAG(native_replay_snapshots) = true;
+    };
+    for (uint32_t kind = 0; kind < 4 && recordings.address; kind++) {
+      Results results(names[kind]);
+      uint32_t restored = 0, placed = 0;
+      for (uint64_t seed = 0; seed < 40; seed++) {
+        Outputs out[2];
+        bool skip = false;
+        uint32_t count = 0;
+        for (int v = -1; v < 2 && !skip; v++) {
+          Random r(seed * 197 + 137 + 1000 * kind);
+          auto saved = globals();
+          StartStandIns stand_ins;
+          if (!build(r, seed + 5000 + 100 * kind, v < 0, &count)) {
+            skip = true;
+            continue;
+          }
+          if (v < 0) {
+            continue;
+          }
+          loaded();
+          WriteRandom(h.base, recordings.address, recordings.bytes, r);
+          guest::StoreU32(h.base, kRecordings, recordings.address);
+          if (kind != 0) {
+            run(__imp__sub_82104D40);
+            vary(r, count);
+          }
+          if (kind == 3) {
+            run(__imp__sub_82104E68);
+            vary(r, count);
+          }
+          // What RestoreEnd reads after a record's restore: the flags and
+          // contact bits (block B's records' +0 and +4, the flags' 0x81
+          // flipped in those in use now and then) and +6224 (the vehicle's,
+          // which the record doesn't hold).
+          const uint32_t vehicles = guest::LoadU32(h.base, kVehicles);
+          for (uint32_t i = 0; i < 7 && vehicles != 0; i++) {
+            const uint32_t record = recordings.address + 0x2196A0 + 5232 * i;
+            const uint32_t flags = guest::LoadU32(h.base, record);
+            if (kind == 3 && flags != 0 && (flags ^ 0x81) != 0 && r.Below(2) == 0) {
+              guest::StoreU32(h.base, record, flags ^ 0x81);
+            }
+            if (kind == 3 && flags != 0) {
+              guest::StoreU32(h.base, record + 4, r.Below(3) == 0 ? r.Below(8) : 0);
+            }
+            guest::StoreFloat(h.base, vehicles + 6272 * i + 6224,
+                              float(int32_t(r.Below(5)) - 2));
+          }
+          StartStandIns::Reset();
+          WriteRandom(h.base, sp - 512, 512, r);
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          if (v == 0) {
+            ITC_FLAG(native_replay_snapshots) = false;
+            originals[kind](t, h.base);
+            ITC_FLAG(native_replay_snapshots) = true;
+          } else {
+            // The records in use the restores put back, and those
+            // RestoreEnd places on the route.
+            const uint32_t block = recordings.address + (kind == 3 ? 0x2196A0 : 0x20FE90);
+            for (uint32_t i = 0; i < 7 && vehicles != 0 && kind >= 2; i++) {
+              if (guest::LoadU32(h.base, block + 5232 * i) == 0) {
+                continue;
+              }
+              restored++;
+              const uint32_t flags = guest::LoadU32(h.base, block + 5232 * i);
+              const uint32_t contact = guest::LoadU32(h.base, block + 5232 * i + 4);
+              placed += kind == 3 && ((flags & 0x81) == 0 || contact != 0) ? 1 : 0;
+            }
+            natives[kind](t, h.base);
+          }
+          // No frame temporaries (their frames hold only register saves).
+          outputs(out[v], count, sp, 0);
+          out[v].Bytes(Read(h.base, recordings.address, recordings.bytes));
+          out[v].Word(t.r3.u32);
+          out[v].Word(uint32_t(t.r3.u64 >> 32));
+          teardown();
+        }
+        if (!skip) {
+          results.Check(out[0], out[1], fmt::format("seed {}", seed));
+        }
+      }
+      results.Report();
+      if (kind >= 2) {
+        ITC_LOG_INFO("harness: race_world: {}: {} records put back, {} placed on the route",
+                     names[kind], restored, placed);
+      }
+    }
   }
   // RaceManager::StreamOpponents on the loaded world, where
   // RaceManager::GiveVehicle's original (never seen in play) can give a

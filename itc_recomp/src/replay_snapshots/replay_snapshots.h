@@ -25,6 +25,9 @@
 #include <cstdint>
 #include <functional>
 
+#include "race_world/race_world.h"
+#include "vehicle/vehicle.h"
+
 namespace replay_snapshots {
 
 // The input recordings' pointer (docs/known-data.md) and its blocks.
@@ -126,5 +129,47 @@ using StagesCopyOriginal =
 uint32_t ReplayKeep(uint8_t* base, uint32_t replay, uint32_t race, uint32_t recordings,
                     uint32_t save, uint32_t from_stage, uint32_t frame,
                     const StagesCopyOriginal& stages_copy);
+
+// --- The race saved and put back (src/replay_snapshots/race_replay.cpp;
+// only while --native_heap routes the game's heap to the allocation layer,
+// as RaceManager::ResetWorld's and ResetVehicles' plain C++: the adapters
+// check) ---
+
+// The guest calls their callees make where the plain C++ refuses, as the
+// callees' adapters make them.
+struct ReplayCalls {
+  // RaceManager::ListRacers' callees' originals (ResetWorld's are the same).
+  race_world::OriginalR3 list;
+  // RaceManager::ResetVehicles' Vehicle::SetUp callees' originals.
+  vehicle::CalleeOriginal setup;
+  // Vehicle::LinkTrackPositions' (0x820C1D08) and CollisionObject::
+  // ResetTransform's (0x820B7998) originals, run with r1 = `sp`.
+  std::function<void(uint32_t address, uint32_t sp, uint32_t r3)> callee;
+  // Vehicle::PlaceOnRoute's calls (ResetTransform's original, memcpy), and
+  // its original where it refuses (r1 = `sp`).
+  vehicle::GuestCall place;
+  std::function<void(uint32_t sp, uint32_t vehicle, uint32_t position, double speed,
+                     double offset, uint32_t lane, uint32_t direction)>
+      place_original;
+};
+// RaceReplay::SaveStart (sub_82104D40): both counts 0, both blocks' records'
+// words 0, RaceSnapshot::Save into block A, then the cars put back from it
+// (ResetWorld, ResetVehicles(0), each record in use restored and relinked,
+// ListRacers). `frame`: the original's 144 bytes. Returns r3 (ListRacers').
+uint64_t RaceReplaySaveStart(uint8_t* base, uint32_t frame, const ReplayCalls& calls);
+// RaceReplay::SaveEnd (sub_82104E68): block B's records' words 0, then
+// RaceSnapshot::Save into it (a tail call: its r3).
+uint32_t RaceReplaySaveEnd(uint8_t* base);
+// RaceReplay::RestoreStart (sub_821046F8): both counts 0, ResetWorld, the
+// manager's entries and counts from block A's head, ResetVehicles(1), each
+// record in use restored and relinked, ListRacers, recordings + 0x2225B0 =
+// 1. `frame`: the original's 144 bytes. Returns r3 (ListRacers').
+uint64_t RaceReplayRestoreStart(uint8_t* base, uint32_t frame, const ReplayCalls& calls);
+// RaceReplay::RestoreEnd (sub_82104898): as RestoreStart with block B, each
+// vehicle placed on the route after its restore (Vehicle::PlaceOnRoute at
+// its route position, its speed, offset 0.0, lane 1 when +6224 is above
+// 0.0, direction 1) unless flagged 0x81 with no contact bits. `frame`: the
+// original's 160 bytes.
+uint64_t RaceReplayRestoreEnd(uint8_t* base, uint32_t frame, const ReplayCalls& calls);
 
 }  // namespace replay_snapshots

@@ -309,6 +309,7 @@ set(ITC_SOURCES
     src/front_end_car_draw/pose.cpp
     src/hooks/replay_snapshots.cpp
     src/replay_snapshots/records.cpp
+    src/replay_snapshots/race_replay.cpp
     src/hooks/race_screens.cpp
     src/race_screens/menu_list.cpp
     src/race_screens/screens.cpp
