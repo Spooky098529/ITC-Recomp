@@ -2,9 +2,10 @@
 // (docs/functions/race-sounds.md), with the register steps the harness
 // shares (hooks/race_sounds.h). The handlers are reached through the race
 // mode's state machine (functors) and the callbacks through function
-// pointers, so the adapters stay; PickRivalMusic's and PlayRivalMusic's
-// are gone (their callers are all native: their register steps stay for
-// the harness).
+// pointers, so the adapters stay; the helpers' are gone
+// where every caller is native (SetListener, FadeMusic, RestoreMusicVolume,
+// SetUpCars, UpdateCars, PickRivalMusic, PlayRivalMusic, PlayStartMusic:
+// their register steps stay for the harness).
 
 #include "hooks/race_sounds.h"
 
@@ -286,9 +287,6 @@ void RaceSoundsBegin(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);              \
   }
 
-ITC_RACE_SOUNDS(821758A0, RaceSoundsSetListener)
-ITC_RACE_SOUNDS(82175908, RaceSoundsFadeMusic)
-ITC_RACE_SOUNDS(821759C8, RaceSoundsRestoreMusicVolume)
 ITC_RACE_SOUNDS(82175A40, RaceSoundsEndTick)
 ITC_RACE_SOUNDS(82175AE8, RaceSoundsPause)
 ITC_RACE_SOUNDS(82175B80, RaceSoundsResume)
@@ -297,8 +295,6 @@ ITC_RACE_SOUNDS(82175C58, RaceSoundsResumeCars)
 ITC_RACE_SOUNDS(82175D20, RaceSoundsOnStageCountdown)
 ITC_RACE_SOUNDS(82175D48, RaceSoundsOnRollingStartDone)
 ITC_RACE_SOUNDS(82175ED0, RaceSoundsOnEffectsBankLoaded)
-ITC_RACE_SOUNDS(82176188, RaceSoundsSetUpCars)
-ITC_RACE_SOUNDS(82175F20, RaceSoundsUpdateCars)
 ITC_RACE_SOUNDS(821769D0, RaceSoundsRaceTick)
 ITC_RACE_SOUNDS(82176F28, RaceSoundsStageTick)
 ITC_RACE_SOUNDS(82177130, RaceSoundsRollingStartTick)
@@ -308,6 +304,5 @@ ITC_RACE_SOUNDS(82176BA0, RaceSoundsOnRaceEnd)
 ITC_RACE_SOUNDS(82176E60, RaceSoundsOnLeaveAfterRace)
 ITC_RACE_SOUNDS(82176EC8, RaceSoundsOnNextStage)
 ITC_RACE_SOUNDS(821770C0, RaceSoundsOnRollingStart)
-ITC_RACE_SOUNDS(82175DB0, RaceSoundsPlayStartMusic)
 ITC_RACE_SOUNDS(821767A8, RaceSoundsIdleTick)
 ITC_RACE_SOUNDS(82176618, RaceSoundsBegin)
