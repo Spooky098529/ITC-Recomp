@@ -95,7 +95,7 @@ Shared with other files, without rows here: `Archive::Load`
 (`cameras.md`); `Vehicle::Get`, `List::At` (`vehicle-accessors.md`);
 the command list's chunk calls (`command-list.md`); `Projector::Build`
 (`sub_82597610`) and the car draw step's `sub_820DAA38`, `sub_820DAAC8`,
-`sub_820DAB10` (`functions.md`); `Minimap::Draw` (`sub_820F5740`,
+`sub_820DAB10` (`car-scene-draw.md` since 2026-11-04); `Minimap::Draw` (`sub_820F5740`,
 `minimap.md`);
 the light billboards (`sub_82148658`, `sprites.md`). Without rows
 anywhere, in `../loops/leads.md`: the archive's queue length

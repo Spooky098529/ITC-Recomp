@@ -74,7 +74,7 @@ and `SceneModel::Build` in `scene-models.md`; `cos` in `c-runtime.md`;
 `VirtualAlloc`, `VirtualFree` and `operator delete` in `heap.md`; the
 empty `sub_82106540` in `audio.md`. Not here: the scene's draw
 (`sub_820C5DE8`, with `sub_820C4EB8` and `sub_820C4FB8`, rows in
-`functions.md`), the second set's objects' makers under `sub_820C8DE8`
+`car-scene-draw.md` since 2026-11-04), the second set's objects' makers under `sub_820C8DE8`
 and the point records they use (`second-set.md` since 2026-11-01), the
 parts' finishers
 `CarScene::LoadsDone` calls (`load-poll.md` since 2026-11-01), and

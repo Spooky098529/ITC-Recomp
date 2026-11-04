@@ -80,7 +80,7 @@ matrix math (`Matrix::Multiply`, `RotateX`, `RotateY`, `RotateZ`,
 `ui-movies.md`), `ScreenFades::FadeIn`, `FadeOut` (`mode-tick.md`),
 `XPR::XPR`, `Create` (`models.md`), `XPR::Release`
 (`strings-and-font.md`), `XPR::GetTexture` and the render orchestrator
-`sub_820C5DE8` (`functions.md`), `Texture::GetLevelDesc`
+`sub_820C5DE8` (`car-scene-draw.md` since 2026-11-04), `Texture::GetLevelDesc`
 (`graphics-resources.md`), `Archive::AssetSize`, `Archive::Load`
 (`files-and-saves.md`), `Archive::CancelQueued` (`archive.md`),
 `VirtualAlloc`, `VirtualFree`, `operator new`, `operator delete`

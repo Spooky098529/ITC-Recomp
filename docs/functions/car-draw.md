@@ -2,8 +2,8 @@
 
 The car scene's per-pass draw of one scene model (pool 7 of the second
 set, `second-set.md`; the scene in `scene.md`): `Car::DrawUpdate`
-(`sub_820DAC68`), which the scene's draw (`sub_820C5DE8`, `functions.md`,
-a lead) calls for each scene model on each of its passes, with the
+(`sub_820DAC68`), which the scene's draw (`sub_820C5DE8`, `car-scene-draw.md`
+since 2026-11-04) calls for each scene model on each of its passes, with the
 scene's current pass description at scene + 5072 (the camera pass, the
 render queue's sort keys, a mask of what the pass draws). Before drawing
 it lowers the boost (block +704) by 1.0, culls the car against the
@@ -56,7 +56,7 @@ matrix math (`matrix-math.md`), `memcpy` and `cos` (`c-runtime.md`),
 `Dash::PoseDials` (`functions.md`, native under
 `--native_cockpit_dials`, which call `CarPart::Draw` from inside the
 interior's race draw). Not here: the scene's draw `sub_820C5DE8` and the
-pass description's set-up `sub_820C4EB8` (leads), the morph's worker job
+pass description's set-up `sub_820C4EB8` (`car-scene-draw.md` since 2026-11-04), the morph's worker job
 (`sub_820AC7F0`, the second pool maker's slot 1, and the job's methods
 at `820AC998`-`820ACC08`; a lead). Fields: `../known-data.md` ("scene
 model", "scene model block", "scene pass description", "second set
