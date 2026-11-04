@@ -336,12 +336,12 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
 
 // CarPart::Draw(part, view_projection, world, 0, depth) from `frame`
 // returning to `lr`: its plain C++, else its original from that frame (r24 =
-// `r24` and r28 = `r28` during it, for its Model::Draw's and the depth
-// pass's recorder contexts). What it leaves in r3. The parts' draws share
-// it.
+// `r24` and r28 = `r28` during it, all 64 bits, for its Model::Draw's and the
+// depth pass's recorder contexts; the plain C++ takes their low words). What
+// it leaves in r3. The parts' draws share it.
 Left PartsDrawRecord(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part,
-                     uint32_t view_projection, uint32_t world, uint32_t depth, uint32_t r24,
-                     uint32_t r28, uint32_t lr);
+                     uint32_t view_projection, uint32_t world, uint32_t depth, uint64_t r24,
+                     uint64_t r28, uint32_t lr);
 
 // The frames.
 constexpr uint32_t kPartsSmallFrame = 112;
@@ -767,5 +767,37 @@ Left TrafficPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32
 // the pass description's keys as PartsPoints::DrawShadows.
 Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t traffic,
                       uint32_t block, uint32_t caller_r24);
+
+// --- The wheels (wheels.cpp) ---
+//
+// Part 10 on: the wheels (pool 5 of the second set): the tires, rims and
+// brakes of both sides, each side's world built in the original's frame at
+// its offsets (fresh identities as stvx stores them, copied doubleword by
+// doubleword; T the identity with its row 3 = (0, 0, 0, 1) + the group's
+// side float4 unless the block's +732 is set; the 1.0 w's of each product
+// written before its multiply; matrix_math's multiplies and copies noted for
+// interpolation with the original's return addresses), the records through
+// CarPart::Draw's plain C++ (its original from the same frame and return
+// address where it declines). Each returns r3 as the original leaves it.
+
+constexpr uint32_t kWheelsTireFrame = 2032;
+
+// WheelPoints::DrawTire (sub_820E8AE8): r3 = a tire group (the point block's
+// +32 or +1872), r4 = the camera pass, r5 = the block. Side 1 (T from +1808):
+// the front (+300 set) S_0 x R_0 x T x world (the block's +336, +80, +16),
+// the rear S_2 x R_2 x T x world (+464, +208) and with the block's +592 a
+// second matrix (+288; T's x + float(the wheels record's (+8) +56) x
+// [0x82002D0C] x 3.0, fused with x 0.001); record 0 (+368) drawn with it, and
+// with +592 again at +288 (the identity for the front). Side 2 the same with
+// RotY (the identity turned by [0x82002240] about y) on the left (S_1, R_1 at
+// +400, +144; the rear's S_3, R_3 at +528, +272; T from +1824). After each
+// side, unless the wheels record's +0 is 2: with the pass at the description's
+// ([0x826C2E44] + 5072) +4 enabled and its +60 bit 0x4, its view-projection
+// memcpy'd into the frame, the keys [0x8296B8FC] and [0x8296B8F8] saved to its
+// +76 and +80 and set to its +32, record 0 drawn depth-only with it (and with
+// +592 the second matrix with the camera's), the keys put back. r24 = the
+// record and r28 = the block at every draw.
+Left WheelsDrawTire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                    uint32_t camera, uint32_t block);
 
 }  // namespace car_draw

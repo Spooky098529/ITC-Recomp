@@ -88,10 +88,10 @@ constexpr uint32_t Record(uint32_t index) {
 }  // namespace
 
 Left PartsDrawRecord(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part,
-                     uint32_t view_projection, uint32_t world, uint32_t depth, uint32_t r24,
-                     uint32_t r28, uint32_t lr) {
-  const auto draw =
-      CarPartDraw(base, calls, frame, part, view_projection, world, 0, depth, r24, r28);
+                     uint32_t view_projection, uint32_t world, uint32_t depth, uint64_t r24,
+                     uint64_t r28, uint32_t lr) {
+  const auto draw = CarPartDraw(base, calls, frame, part, view_projection, world, 0, depth,
+                                uint32_t(r24), uint32_t(r28));
   Left left;
   if (!draw) {
     const uint64_t regs[5] = {part, view_projection, world, 0, depth};

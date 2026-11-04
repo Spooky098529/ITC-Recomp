@@ -89,4 +89,10 @@ void CarDrawSceneCockpit(PPCContext& ctx, uint8_t* base);
 // native): r3 = the traffic body, r4 = the block.
 void CarDrawSceneTraffic(PPCContext& ctx, uint8_t* base);
 
+// The wheels' callees' plain C++ native (the parts' and the morph's).
+bool CarDrawWheelsCalleesNative();
+// WheelPoints::DrawTire (sub_820E8AE8; the wheels' callees native): r3 = the
+// tire group, r4 = the camera pass, r5 = the block.
+void CarDrawWheelsDrawTire(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

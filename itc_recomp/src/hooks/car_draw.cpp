@@ -80,7 +80,9 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "CarLighting::Gather and Model::DrawShapeDepth as plain C++) with "
               "TrafficPoints::Draw sub_820E6820, DrawBody sub_820E55A0, DrawWindow "
               "sub_820E5668, DrawTailLights sub_820E5B08 and DrawHeadlights sub_820E61D8 (no "
-              "adapters: only it reaches them; their glows as the parts' lamps') "
+              "adapters: only it reaches them; their glows as the parts' lamps'), and the wheels' "
+              "tires WheelPoints::DrawTire sub_820E8AE8 (the matrix functions, memcpy and "
+              "CarPart::Draw as plain C++) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
               "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
@@ -397,6 +399,27 @@ void CarDrawSceneTraffic(PPCContext& ctx, uint8_t* base) {
   LeaveLeft(ctx, left);
 }
 
+// --- The wheels ---
+
+bool CarDrawWheelsCalleesNative() {
+  return CarDrawPartsCalleesNative() && CarDrawMorphCalleesNative();
+}
+
+void CarDrawWheelsDrawTire(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawWheelsCalleesNative()) {
+    __imp__sub_820E8AE8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const car_draw::Left left =
+      car_draw::WheelsDrawTire(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_DRAW(address, step)     \
@@ -434,4 +457,5 @@ void CarDrawSceneTraffic(PPCContext& ctx, uint8_t* base) {
 // cockpit's body and SceneTraffic::Draw, are plain C++).
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
 ITC_CAR_DRAW(82595110, CarDrawMorphShape)
+ITC_CAR_DRAW(820E8AE8, CarDrawWheelsDrawTire)
 #undef ITC_CAR_DRAW
