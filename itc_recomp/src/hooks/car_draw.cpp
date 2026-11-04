@@ -230,25 +230,6 @@ void LeaveDraw(PPCContext& ctx, const car_draw::Draw& draw) {
 
 }  // namespace
 
-void CarDrawModelDraw(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawModelCalleesNative()) {
-    __imp__sub_820D04E8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const auto draw = car_draw::ModelDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                        ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r24.u32);
-  if (!draw) {
-    __imp__sub_820D04E8(ctx, base);
-    return;
-  }
-  ctx.lr = lr;
-  LeaveDraw(ctx, *draw);
-}
-
 void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base) {
   if (!CarDrawModelCalleesNative()) {
     __imp__sub_820D06F0(ctx, base);
@@ -267,21 +248,6 @@ void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base) {
   }
   ctx.lr = lr;
   LeaveDraw(ctx, *draw);
-}
-
-void CarDrawCarLightingGather(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawLightingCalleesNative()) {
-    __imp__sub_820C9170(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  ctx.r3.u64 = car_draw::CarLightingGather(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32,
-                                           ctx.r5.u32);
-  ctx.lr = lr;
-  ctx.fpscr.disableFlushMode();
 }
 
 void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base) {
@@ -462,9 +428,10 @@ void CarDrawSceneTraffic(PPCContext& ctx, uint8_t* base) {
 // traffic body's TrafficPoints::DrawBody sub_820E55A0, DrawWindow
 // sub_820E5668, DrawTailLights sub_820E5B08 and DrawHeadlights sub_820E61D8
 // and TrafficPoints::Draw sub_820E6820 (2026-11-04; their callers,
-// TrafficPoints::Draw and SceneTraffic::Draw, are plain C++).
-ITC_CAR_DRAW(820D04E8, CarDrawModelDraw)
+// TrafficPoints::Draw and SceneTraffic::Draw, are plain C++), Model::Draw
+// sub_820D04E8 and CarLighting::Gather sub_820C9170 (2026-11-04; their
+// callers in play, CarPart::Draw, the lamps, the seats, the shadows, the
+// cockpit's body and SceneTraffic::Draw, are plain C++).
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
-ITC_CAR_DRAW(820C9170, CarDrawCarLightingGather)
 ITC_CAR_DRAW(82595110, CarDrawMorphShape)
 #undef ITC_CAR_DRAW

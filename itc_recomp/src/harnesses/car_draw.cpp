@@ -387,6 +387,24 @@ void LightSets(uint8_t* base, uint32_t owner, uint32_t count, float px, float py
   }
 }
 
+// CarLighting::Gather's register steps (its adapter is gone: its callers in
+// play are plain C++): r3 = the record, r4 = the world matrix, r5 = the
+// flag.
+void NativeGather(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::CarDrawLightingCalleesNative()) {
+    __imp__sub_820C9170(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  ctx.r3.u64 = car_draw::CarLightingGather(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32,
+                                           ctx.r5.u32);
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
 void Gathers(Context& h, Random& r, uint32_t block) {
   Results results("CarLighting::Gather (sub_820C9170)");
   const uint32_t scene = block + 0x2000, owner = block + 0x4000, record = block + 0x5000,
@@ -424,7 +442,7 @@ void Gathers(Context& h, Random& r, uint32_t block) {
           t.r4.u64 = world;
           t.r5.u64 = r.Below(3) == 0 ? 0 : r.Below(8) == 0 ? r.Next() : 1;
         },
-        __imp__sub_820C9170, hooks::CarDrawCarLightingGather,
+        __imp__sub_820C9170, NativeGather,
         {{0x5000 + 48, 160}}, fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& o) {
           const uint32_t frame = t.r1.u32 - car_draw::kGatherFrame;
@@ -705,6 +723,33 @@ void DrawOutputs(Context& h, uint32_t block, const PPCContext& t, Outputs& o, ui
   }
 }
 
+// Model::Draw's register steps (its adapter is gone: its callers in play
+// are plain C++): r3 = the model, r4 = the view-projection, r5 = the world
+// matrix, r6 = the shape, r7 = the depth entry too; the original where the
+// plain C++ declines. r3 the last queue call's (left in ctx by the guest
+// call), else the draw's.
+void NativeModelDraw(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::CarDrawModelCalleesNative()) {
+    __imp__sub_820D04E8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const auto draw = car_draw::ModelDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                        ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r24.u32);
+  if (!draw) {
+    __imp__sub_820D04E8(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  if (!draw->queued && draw->r3 != ctx.r3.u32) {
+    ctx.r3.u64 = draw->r3;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
 void ModelDraws(Context& h, Random& r, uint32_t block) {
   const uint32_t model = block + 0x100;
   {
@@ -726,7 +771,7 @@ void ModelDraws(Context& h, Random& r, uint32_t block) {
             t.r7.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
             t.r24.u64 = r.Next();
           },
-          __imp__sub_820D04E8, hooks::CarDrawModelDraw, {}, fmt::format("case {}", c),
+          __imp__sub_820D04E8, NativeModelDraw, {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) { DrawOutputs(h, block, t, o, used, true, queued); });
     }
     ITC_LOG_INFO("harness: Model::Draw: {} of 768 cases ended handing an entry to the render "

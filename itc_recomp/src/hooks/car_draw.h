@@ -45,14 +45,8 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest);
 // does.
 bool CarDrawBlinkTimersHeld();
 
-// Model::Draw (sub_820D04E8): r3 = the model, r4 = the view-projection, r5 =
-// the world matrix, r6 = the shape, r7 = the depth entry too.
-void CarDrawModelDraw(PPCContext& ctx, uint8_t* base);
 // CarPart::Draw (sub_820D06F0): r3 = the point record, r4, r5, r6, r7.
 void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base);
-// CarLighting::Gather (sub_820C9170): r3 = the record, r4 = the world
-// matrix, r5 = the flag.
-void CarDrawCarLightingGather(PPCContext& ctx, uint8_t* base);
 // BlinkTimers::Advance (sub_820DC958): r3 = the point block (no skip here).
 void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base);
 // SceneModel::IsNearPlayerHeight (sub_820DAB58): r3 = the pass
