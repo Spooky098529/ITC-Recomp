@@ -12,7 +12,9 @@
 namespace hooks {
 
 // Part 1: TextureProjection::Fit's geometry library (its only caller, Fit
-// sub_82598768, still recompiled).
+// sub_82598768, still recompiled). Intersect3's, Extend's, Size's, Insert's,
+// InsertN's and Allocate's steps have no adapter (their callers in play are
+// native): the harness's.
 // Frustum::FromMatrix sub_82597878: r3 = the frustum, r4 = the matrix.
 void CarSceneDrawFrustumFromMatrix(PPCContext& ctx, uint8_t* base);
 // Plane::Intersect3 sub_825976C8: r3 = out, r4, r5, r6 = the planes.

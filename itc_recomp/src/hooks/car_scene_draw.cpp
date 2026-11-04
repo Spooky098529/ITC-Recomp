@@ -93,7 +93,11 @@ void CarSceneDrawVector16Allocate(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
-// The adapters: TextureProjection::Fit (recompiled) calls them.
+// The adapters: TextureProjection::Fit (recompiled) calls them. None for
+// Plane::Intersect3, Box::Extend, Vector16::Size, Vector16::Insert, InsertN
+// and Allocate (removed 2026-11-04: in play only Frustum::FromMatrix's,
+// Box::FromPoints', PushBack's and their callees' plain C++ call them; their
+// register steps above stay for the harness).
 #define ITC_CAR_SCENE_DRAW_ADAPTER(address, step) \
   extern "C" REX_FUNC(sub_##address) {            \
     REX_FUNC_PROLOGUE();                          \
@@ -105,12 +109,6 @@ void CarSceneDrawVector16Allocate(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_CAR_SCENE_DRAW_ADAPTER(82597878, CarSceneDrawFrustumFromMatrix)
-ITC_CAR_SCENE_DRAW_ADAPTER(825976C8, CarSceneDrawPlaneIntersect3)
 ITC_CAR_SCENE_DRAW_ADAPTER(82597E58, CarSceneDrawPlaneSegmentCrossing)
 ITC_CAR_SCENE_DRAW_ADAPTER(82597210, CarSceneDrawBoxFromPoints)
-ITC_CAR_SCENE_DRAW_ADAPTER(82597150, CarSceneDrawBoxExtend)
-ITC_CAR_SCENE_DRAW_ADAPTER(825971E8, CarSceneDrawVector16Size)
 ITC_CAR_SCENE_DRAW_ADAPTER(825986B8, CarSceneDrawVector16PushBack)
-ITC_CAR_SCENE_DRAW_ADAPTER(82598648, CarSceneDrawVector16Insert)
-ITC_CAR_SCENE_DRAW_ADAPTER(82598288, CarSceneDrawVector16InsertN)
-ITC_CAR_SCENE_DRAW_ADAPTER(82598158, CarSceneDrawVector16Allocate)
