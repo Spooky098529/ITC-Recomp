@@ -294,6 +294,8 @@ set(ITC_SOURCES
     src/hooks/race_hud_machine.cpp
     src/race_hud_machine/handlers.cpp
     src/race_hud_machine/race_hud_machine_init.cpp
+    src/hooks/race_flow.cpp
+    src/race_flow/race_flow_init.cpp
     src/hooks/race_screens.cpp
     src/race_screens/menu_list.cpp
     src/race_screens/screens.cpp
@@ -501,6 +503,7 @@ set(ITC_SOURCES
     src/harnesses/alt_hud.cpp
     src/harnesses/race_scene.cpp
     src/harnesses/race_hud_machine.cpp
+    src/harnesses/race_flow.cpp
     src/harnesses/race_screens.cpp
     src/harnesses/menu_sounds.cpp
     src/harnesses/accessories.cpp

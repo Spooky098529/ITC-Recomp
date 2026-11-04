@@ -69,14 +69,16 @@ while `StateMachine::Handle` calls them through their guest addresses
 (`src/hooks/racer_controllers.cpp`). Fields: `../known-data.md` ("race
 flow", "transition", `0x826C5B30`).
 
-When `RaceFlow::Init` is made native, the precedent is
+`RaceFlow::Init` is native (2026-11-04, `--native_race_flow`), as
 `RaceStates::Init` and `RaceHudMachine::Init` (the user's call that B7
 changes no behavior: stack leftovers are copied as the original leaves
 them): each functor is six words copied from a stack slot of the
 function's 3,600-byte frame where only the vtable (and for member
 functors the object and the function) were written, so the table keeps
-five (or three) of the stack's words a transition; replay the stores
-and copies in the original's frame.
+five (or three) of the stack's words a transition; the plain C++
+replays the stores and copies in the original's frame (562 steps,
+decoded from the generated code by following its registers), its back
+chain and saved registers (`__savegprlr_19`, 112 bytes) not written.
 
 Status:
 
@@ -125,7 +127,7 @@ run it after changing either, on any branch.
 
 | Address | Name | Status | Notes |
 |---|---|---|---|
-| `sub_82160AE0` | `RaceFlow::Init` | | r3 = the race flow (race mode + 97548): +9604 = 1, +9608 = 0; +9612 = 0 and +9616 = 1, or both 0 when the race data's (`[0x826C5B2C]`) +0xA3AF0 is 6; then the 53 transitions in the intro, each through `StateMachine::Add` (a key of (state, message, 0, 0) at the frame's +80, r5 = a frame slot pointing at the functor's six words copied from another slot, the next state at r5 + 28). 1,661 lines, a 3,600-byte frame; no other calls. Returns `StateMachine::Add`'s last r3. From `RaceMode::Init` only (once a race set-up). Seen in play. Read in full (2026-11-04). |
+| `sub_82160AE0` | `RaceFlow::Init` | Overridden | Native in `src/race_flow/race_flow_init.cpp` (`--native_race_flow`, adapter `src/hooks/race_flow.cpp`; harness `race_flow`): the stores and copies replayed in the original's frame from a table decoded from the generated code, so the transitions keep the stack's leftovers as the original leaves them (the precedent of `RaceHudMachine::Init`, B7 changes no behavior), `StateMachine::Add`'s plain C++; the adapter stays while `RaceMode::Init` is recompiled. r3 = the race flow (race mode + 97548): +9604 = 1, +9608 = 0; +9612 = 0 and +9616 = 1, or both 0 when the race data's (`[0x826C5B2C]`) +0xA3AF0 is 6; then the 53 transitions in the intro, each through `StateMachine::Add` (a key of (state, message, 0, 0) at the frame's +80, r5 = a frame slot pointing at the functor's six words copied from another slot, the next state at r5 + 28). 1,661 lines, a 3,600-byte frame; no other calls. Returns `StateMachine::Add`'s last r3. From `RaceMode::Init` only (once a race set-up). Seen in play. Read in full (2026-11-04). |
 | `sub_8215F7B0` | `RaceFlow::OnAbort` | | r3 = the race flow: `CarInputs::ClearAll`, then +9604 (the state) = 3. Leaf otherwise. No direct callers: registered by `RaceFlow::Init` as state 32's handler (event 0), reached by message 44 from states 25 and 30 (probably an abort or a restart from the pause, back to waiting for a stage). Not seen in play. Read in full. |
 | `sub_821022B0` | `CarInputs::ClearAll` | | The seven car input records (`[0x826C5B30 + 4i]`, i 0 to 6) cleared, each by `CarInput::Clear`. From `RaceFlow::OnAbort` only. Not seen in play. Read in full. |
 | `sub_8215FC30` | `RaceFlow::OnState14` | | A jump to `RaceFlow::AiUnlessFlagged`. No direct callers: registered by `RaceFlow::Init` as state 14's handler (event 0), reached by message 22 from state 23. Not seen in play. Read in full. |
