@@ -1,25 +1,31 @@
 // The interior's draws (src/car_draw/interior.cpp, docs/functions/car-draw.md:
 // InteriorDials::DrawFaces, DrawDigitalSpeed and DrawReadouts,
-// InteriorMeters::DrawFaces, InteriorPoints::DrawSeats and DrawRollCage)
-// against the recompiled functions, under the car_draw harness (its Case and
-// model draws' world, car_draw_shared.h). The interior (pool 3 of the second
-// set) in an allocation of its own: its point block at +160 with every group
-// the draws read (records of 240 bytes from each group's +16: +4 the model,
-// the block's +0x100, or 0, +228 the shape, +16 to +144 finite matrices, the
+// InteriorMeters::DrawFaces, InteriorPoints::DrawSeats, DrawRollCage,
+// DrawFrontEnd and DrawRace, SceneInterior::Draw) against the recompiled
+// functions, under the car_draw harness (its Case and model draws' world,
+// car_draw_shared.h). The interior (pool 3 of the second set) in an
+// allocation of its own: its point block at +160 with every group the draws
+// read (records of 240 bytes from each group's +16: +4 the model, the
+// block's +0x100, or 0, +228 the shape, +16 to +144 finite matrices, the
 // cockpit dials' locals among them; the body's record at the point block's
-// +0), the interior record every group's +0 points at (+0 the speedometer's
-// kind, +4 the tachometer's, the gauges' entries +8 + 12i with their kinds,
-// +92 the steering wheel, +96 and +100 the seats, +104 and +108 the roll
-// cage), the providers (the model's own, block + 0x700, or a second one at +0x720), the seats'
-// positions and part model, the dials' table and the meters' ranges; the
-// camera passes 0 to 3, the block's world, gauges (+696 to +720) and +12,
-// and the command list's slots in the allocation. The cockpit dials'
-// needles (Dash::PoseTachometer, Dash::PoseDials) run their adapter
-// (src/hooks/cockpit_dials.cpp) on both sides, from the same frames. The
-// allocation and the scene are put back before each version and compared
-// after it, with the frame's back chain, the seats' worlds (+144 to +527),
-// the digits' integer (+80), r3, r24, r28 and what went to the render
-// queue. The recompiled side runs with --native_car_draw off.
+// +0), the interior record every group's +0 points at (+0 the
+// speedometer's kind, +4 the tachometer's, the gauges' entries +8 + 12i
+// with their kinds, +92 the steering wheel, +96 and +100 the seats, +104
+// and +108 the roll cage), the providers (the model's own, block + 0x700,
+// or a second one at +0x720), the seats' positions and part model, the
+// dials' table and the meters' ranges; the camera passes 0 to 3, the
+// block's world, gauges (+696 to +720) and +12, and the command list's
+// slots in the allocation; for SceneInterior::Draw the accessory: the
+// accessories' set, an entry, the accessory's texture provider and shapes
+// (Accessory::SetTexture) and a world that Accessory::Draw, a guest call,
+// builds without drawing (its skeleton's job idle, not visible). The
+// cockpit dials' needles (Dash::PoseTachometer, Dash::PoseDials) run their
+// adapter (src/hooks/cockpit_dials.cpp) on both sides, from the same
+// frames. The allocation and the scene are put back before each version
+// and compared after it, with the frame's back chain, the seats' worlds
+// (+144 to +527), the digits' integer (+80), Accessory::Draw's world (its
+// frame's +80), r3, r24, r28 and what went to the render queue. The
+// recompiled side runs with --native_car_draw off.
 
 #include "harness.h"
 #include "harnesses/car_draw_shared.h"
@@ -50,8 +56,21 @@ constexpr uint32_t kRecord = 0x3000;
 constexpr uint32_t kSeatPositions = 0x3100;
 constexpr uint32_t kTable = 0x3200;
 constexpr uint32_t kRanges = 0x3300;
-constexpr uint32_t kEnd = 0x3400;
-constexpr uint32_t kSlots = 0x4000;
+// The accessories' set ([0x826C5510]), an entry (its accessory at +48), the
+// accessory's texture provider (vtable +12 the getter sub_82090770: r3 =
+// the provider's +60, the accessory's +140, a texture set whose +20 is its
+// count), its shapes and their materials.
+constexpr uint32_t kAccessorySet = 0x3400;
+constexpr uint32_t kAccessoryEntry = 0x3500;
+constexpr uint32_t kAccessory = kAccessoryEntry + 48;
+constexpr uint32_t kProviderVtable = 0x3A00;
+constexpr uint32_t kTextureSet = 0x3A20;
+constexpr uint32_t kAccessoryShapes = 0x3B00;
+constexpr uint32_t kAccessoryMaterials = 0x4200;
+constexpr uint32_t kEnd = 0x5A00;
+constexpr uint32_t kSlots = 0x8000;
+constexpr uint32_t kGet60 = 0x82090770;
+constexpr uint32_t kAccessories = 0x826C5510;
 constexpr uint32_t kSlotCount = 8000;
 constexpr uint32_t kBytes = kSlots + kSlotCount * 16;
 constexpr uint32_t kDeepStackBytes = 8192;
@@ -226,17 +245,68 @@ void InteriorWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_
       guest::StoreFloat(base, source + at, Spread(r, 2.0f) + 1.0f);
     }
   }
+  // The accessory (SceneInterior::Draw's): the interior's word, the set's
+  // entries, the accessory's texture and provider, the skeleton's job not
+  // pending (byte +778: Accessory::Draw's wait returns at once), the
+  // angles, anchor and scale, and not visible (+1044 bit 0 clear: no skin
+  // or shapes, not seen in play).
+  guest::StoreU32(base, interior + 11616, r.Below(3) == 0 ? 0 : 1);
+  guest::StoreU32(base, interior + 152, r.Below(4) == 0 ? 3 : r.Below(3));
+  guest::StoreU32(base, interior + 156, r.Below(6));
+  const uint32_t set_block = top + kAccessorySet, accessory = top + kAccessory;
+  guest::StoreU32(base, kAccessories, set_block);
+  for (uint32_t i = 0; i < 3; i++) {
+    guest::StoreU32(base, set_block + 4 + 4 * i, r.Below(4) == 0 ? 0 : top + kAccessoryEntry);
+  }
+  guest::StoreU32(base, accessory + 1040, r.Below(2) ? guest::LoadU32(base, interior + 156)
+                                                      : r.Below(6));
+  guest::StoreU32(base, accessory + 1048, r.Below(4) == 0 ? 0 : 1);
+  guest::StoreU32(base, accessory + 80, top + kProviderVtable);
+  guest::StoreU32(base, top + kProviderVtable + 12, kGet60);
+  guest::StoreU32(base, accessory + 140, top + kTextureSet);
+  guest::StoreU32(base, top + kTextureSet + 20, r.Below(8));
+  const uint32_t shapes = r.Below(4);
+  guest::StoreU32(base, accessory + 412, shapes);
+  guest::StoreU32(base, accessory + 40, top + kAccessoryShapes);
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t list = top + kAccessoryMaterials + 0x800 * k;
+    guest::StoreU32(base, top + kAccessoryShapes + 544 * k + 396, list);
+    guest::StoreU32(base, list + 8, r.Below(3));
+    guest::StoreU32(base, list + 12, r.Below(3));
+  }
+  guest::StoreU8(base, accessory + 778, 0);
+  FiniteFloats(base, accessory + 992, 12, r);
+  guest::StoreFloat(base, accessory + 1004, 1.0f);
+  guest::StoreU32(base, accessory + 1036, 0x3F800000u);
+  guest::StoreU32(base, accessory + 1044, uint32_t(r.Next()) & ~1u);
 }
 
-// What to run: the function, its register steps, the group's offset in the
-// point block (r3), its frame.
+// What to run: the function, its register steps, r3 (the group's offset in
+// the point block, or the point block or the interior itself), its frame.
+enum class Takes { kGroup, kPoints, kInterior };
 struct Target {
   const char* name;
   GuestFunction recompiled, native;
+  Takes takes;
   uint32_t group;
   uint32_t frame;
   int cases;
 };
+
+// The lists' register steps (no adapters: only SceneInterior::Draw calls
+// them): r3 = the point block, r4 = the block.
+void NativeInteriorFrontEnd(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r1 = ctx.r1.u32, r24 = ctx.r24.u32;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::InteriorDrawFrontEnd(base, calls, r1, r3, r4, r24);
+  });
+}
+void NativeInteriorRace(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r1 = ctx.r1.u32, r24 = ctx.r24.u32;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::InteriorDrawRace(base, calls, r1, r3, r4, r24);
+  });
+}
 
 }  // namespace
 
@@ -247,24 +317,32 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"InteriorDials::DrawFaces (sub_820E3170)", __imp__sub_820E3170,
-       hooks::CarDrawInteriorDialFaces, kDials, car_draw::kInteriorSmallFrame, 192},
+       hooks::CarDrawInteriorDialFaces, Takes::kGroup, kDials, car_draw::kInteriorSmallFrame, 192},
       {"InteriorPoints::DrawRollCage (sub_820E3548)", __imp__sub_820E3548,
-       hooks::CarDrawInteriorRollCage, kRollCage, car_draw::kInteriorSmallFrame, 192},
+       hooks::CarDrawInteriorRollCage, Takes::kGroup, kRollCage, car_draw::kInteriorSmallFrame, 192},
       {"InteriorDials::DrawDigitalSpeed (sub_820E39F8)", __imp__sub_820E39F8,
-       hooks::CarDrawInteriorDigitalSpeed, kDials, car_draw::kInteriorDigitsFrame, 192},
+       hooks::CarDrawInteriorDigitalSpeed, Takes::kGroup, kDials, car_draw::kInteriorDigitsFrame, 192},
       {"InteriorDials::DrawReadouts (sub_820E51D0)", __imp__sub_820E51D0,
-       hooks::CarDrawInteriorReadouts, kDials, car_draw::kInteriorSmallFrame, 192},
+       hooks::CarDrawInteriorReadouts, Takes::kGroup, kDials, car_draw::kInteriorSmallFrame, 192},
       {"InteriorMeters::DrawFaces (sub_820E3AD8)", __imp__sub_820E3AD8,
-       hooks::CarDrawInteriorMeterFaces, kMeters, car_draw::kInteriorMetersFrame, 256},
+       hooks::CarDrawInteriorMeterFaces, Takes::kGroup, kMeters, car_draw::kInteriorMetersFrame, 256},
       {"InteriorPoints::DrawSeats (sub_820E3CF0)", __imp__sub_820E3CF0,
-       hooks::CarDrawInteriorSeats, kSeats, car_draw::kInteriorSeatsFrame, 256},
+       hooks::CarDrawInteriorSeats, Takes::kGroup, kSeats, car_draw::kInteriorSeatsFrame, 256},
+      {"InteriorPoints::DrawFrontEnd (sub_820E4078)", __imp__sub_820E4078,
+       NativeInteriorFrontEnd, Takes::kPoints, 0, car_draw::kInteriorFrontEndFrame, 256},
+      {"InteriorPoints::DrawRace (sub_820E5220)", __imp__sub_820E5220, NativeInteriorRace,
+       Takes::kPoints, 0, car_draw::kInteriorRaceFrame, 256},
+      {"SceneInterior::Draw (sub_820E53F0)", __imp__sub_820E53F0, hooks::CarDrawSceneInterior,
+       Takes::kInterior, 0, car_draw::kInteriorSmallFrame, 384},
   };
   std::vector<uint8_t> scene_bytes, records;
   const std::vector<uint8_t> zero(kSlotCount * 16, 0);
   for (const Target& target : targets) {
     Results results(target.name);
     uint32_t sp = 0;
-    int queued = 0;
+    int queued = 0, accessories = 0;
+    uint32_t set = 0;
+    bool drawn_accessory = false;
     const bool seats = target.native == hooks::CarDrawInteriorSeats;
     const bool digits = target.native == hooks::CarDrawInteriorDigitalSpeed;
     for (int c = 0; c < target.cases; c++) {
@@ -272,7 +350,26 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
           h, results, block, r,
           [&](PPCContext& t) {
             SetFlushOnEntry(r.Below(2) != 0);
-            InteriorWorld(h, r, block, race, top, r.Below(4), r.Below(2));
+            // The scene's set: the front end's (0) or the race's (1), as
+            // the lists' callers pick them; SceneInterior::Draw now and then
+            // above 1 (nothing drawn).
+            if (target.takes == Takes::kInterior) {
+              set = r.Below(16) == 0 ? 2 + r.Below(4) : r.Below(2);
+            } else if (target.native == NativeInteriorRace) {
+              set = 1;
+            } else if (target.native == NativeInteriorFrontEnd) {
+              set = 0;
+            } else {
+              set = r.Below(2);
+            }
+            InteriorWorld(h, r, block, race, top, r.Below(4), set);
+            const uint32_t accessory_entry =
+                guest::LoadU32(h.base, top + kAccessorySet + 4 +
+                                           4 * guest::LoadU32(h.base, top + kInterior + 152));
+            drawn_accessory = target.takes == Takes::kInterior && set <= 1 &&
+                              guest::LoadU32(h.base, top + kInterior + 11616) != 0 &&
+                              guest::LoadU32(h.base, top + kInterior + 152) != 3 &&
+                              accessory_entry != 0;
             if (digits || target.native == hooks::CarDrawInteriorReadouts) {
               // The readouts' two models: each set or not (the digits' always
               // set for DrawDigitalSpeed itself, as its only caller checks).
@@ -283,7 +380,9 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
             scene_bytes = Read(h.base, scene, kSceneBytes);
             records = Read(h.base, top, kEnd);
             sp = t.r1.u32;
-            t.r3.u64 = top + kPoints + target.group;
+            t.r3.u64 = target.takes == Takes::kInterior ? top + kInterior
+                       : target.takes == Takes::kPoints   ? top + kPoints
+                                                          : top + kPoints + target.group;
             t.r4.u64 = source;
             t.r5.u64 = kPasses + 592 * r.Below(4);
             t.r6.u64 = r.Next();
@@ -299,6 +398,10 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
             }
             if (digits) {
               o.Word(guest::LoadU32(h.base, frame + 80));
+            }
+            if (drawn_accessory) {
+              accessories++;
+              o.Floats(h.base, frame - 176 + 80, 16);  // Accessory::Draw's world
             }
             o.Bytes(Read(h.base, top, kEnd));
             o.Bytes(Read(h.base, scene, kSceneBytes));
@@ -323,8 +426,14 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
           },
           true);
     }
-    ITC_LOG_INFO("harness: {}: {} of {} cases ended handing an entry to the render queue",
-                 target.name, queued / 2, target.cases);
+    if (target.takes == Takes::kInterior) {
+      ITC_LOG_INFO("harness: {}: {} of {} cases drew the accessory, {} ended handing an entry "
+                   "to the render queue",
+                   target.name, accessories / 2, target.cases, queued / 2);
+    } else {
+      ITC_LOG_INFO("harness: {}: {} of {} cases ended handing an entry to the render queue",
+                   target.name, queued / 2, target.cases);
+    }
     results.Report();
   }
   memory::Free(allocation);

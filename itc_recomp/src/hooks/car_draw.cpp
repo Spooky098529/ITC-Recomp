@@ -22,6 +22,8 @@ ITC_FLAG_DECLARE(bool, per_tick_blink_timers);
 ITC_FLAG_DECLARE(bool, native_second_set);
 ITC_FLAG_DECLARE(bool, native_c_runtime);
 ITC_FLAG_DECLARE(bool, native_material_passes);
+ITC_FLAG_DECLARE(bool, native_accessories);
+ITC_FLAG_DECLARE(bool, native_scene_models);
 
 ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "Run the car draw (docs/functions/car-draw.md: Model::Draw sub_820D04E8 and "
@@ -64,7 +66,11 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "sub_820E51D0 (the cockpit dials' Dash::PoseTachometer a guest call), "
               "InteriorMeters::DrawFaces sub_820E3AD8 and InteriorPoints::DrawSeats "
               "sub_820E3CF0 (PartModel::SetTexture, Model::Draw and the matrix functions as "
-              "plain C++)) "
+              "plain C++), and the interior's top SceneInterior::Draw sub_820E53F0 (inside the "
+              "diagnostics' wrap; Accessory::SetTexture and the accessories' set as plain C++ "
+              "with --native_accessories and --native_scene_models, Accessory::Draw a guest "
+              "call) with InteriorPoints::DrawFrontEnd sub_820E4078 and DrawRace sub_820E5220 "
+              "(no adapters: only it calls them; Dash::PoseDials a guest call)) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
               "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
@@ -406,6 +412,22 @@ ITC_CAR_DRAW_INTERIOR(MeterFaces, 820E3AD8,
 ITC_CAR_DRAW_INTERIOR(Seats, 820E3CF0,
                       InteriorDrawSeats(base, calls, r1, uint32_t(r3), r4, r5, r24, r28))
 #undef ITC_CAR_DRAW_INTERIOR
+
+void CarDrawSceneInterior(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawInteriorCalleesNative() || !ITC_FLAG(native_accessories) ||
+      !ITC_FLAG(native_scene_models)) {
+    __imp__sub_820E53F0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const car_draw::Left left = car_draw::SceneInteriorDraw(
+      base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, ctx.r24.u32, ctx.r28.u32);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
 
 }  // namespace hooks
 

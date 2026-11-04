@@ -84,5 +84,10 @@ void CarDrawInteriorDigitalSpeed(PPCContext& ctx, uint8_t* base);
 void CarDrawInteriorReadouts(PPCContext& ctx, uint8_t* base);
 void CarDrawInteriorMeterFaces(PPCContext& ctx, uint8_t* base);
 void CarDrawInteriorSeats(PPCContext& ctx, uint8_t* base);
+// The interior's top, SceneInterior::Draw (sub_820E53F0; inside the
+// diagnostics' wrap, src/debug/frame_state_diff.cpp; the interior's callees
+// native, with --native_accessories and --native_scene_models for the
+// accessory): r3 = the interior, r4 = the block.
+void CarDrawSceneInterior(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

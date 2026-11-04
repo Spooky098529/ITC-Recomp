@@ -622,4 +622,31 @@ Left InteriorDrawMeterFaces(uint8_t* base, const Calls& calls, uint32_t stack, u
 Left InteriorDrawSeats(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                        uint32_t block, uint32_t pass, uint32_t caller_r24, uint32_t caller_r28);
 
+// InteriorPoints::DrawFrontEnd (sub_820E4078, 128): with camera pass 0
+// (0x826BAC00) and the block's world (r28 from entry on): the body (the
+// point block's record at +0; r6 the block's +12 when the scene's pass mask
+// +5132 has bit 0x2, else 0), the dial and meter faces, the steering wheel
+// (+8512 + 16 + 240 x the interior record's +92), the seats and the roll
+// cage. r3 the roll cage's.
+Left InteriorDrawFrontEnd(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                          uint32_t block, uint32_t caller_r24);
+// InteriorPoints::DrawRace (sub_820E5220, 144): as DrawFrontEnd with the
+// scene's current camera pass ([[0x826C2E44] + 5072], 0 when disabled), the
+// readouts (DrawReadouts) and Dash::PoseDials (sub_820E45A8, a guest call
+// returning to 0x820E52E0) after the faces, and no steering wheel when the
+// point block's +11452 is set.
+Left InteriorDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                      uint32_t block, uint32_t caller_r24);
+// SceneInterior::Draw (sub_820E53F0, 112): r3 = the interior (`interior`,
+// all 64 bits), r4 = the block. With +11616 set, the accessory: the
+// accessories' set's (sub_820F0E50) entry +4 + 4 x the record's +152 (not
+// 3), its +48 (0 for an entry of 0). By the scene's (+11668) +4: 0 the
+// front end's list (+160), then with an accessory Accessory::SetTexture(it,
+// +156, -1) when its +1040 isn't +156; 1 the race's; then with an accessory
+// Accessory::Draw (a guest call returning to 0x820E54DC) with the scene's
+// current camera pass; above 1 nothing (r3 the set with +11616, else as it
+// came).
+Left SceneInteriorDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t interior,
+                       uint32_t block, uint32_t caller_r24, uint32_t caller_r28);
+
 }  // namespace car_draw

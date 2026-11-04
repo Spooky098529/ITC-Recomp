@@ -13,8 +13,10 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
+#include "accessories/accessories.h"
 #include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
+#include "scene_models/scene_models.h"
 
 namespace car_draw {
 
@@ -27,6 +29,10 @@ constexpr uint32_t kOneBits = 0x3F800000;
 constexpr uint32_t kCarPartDraw = 0x820D06F0;
 constexpr uint32_t kModelDraw = 0x820D04E8;
 constexpr uint32_t kPoseTachometer = 0x820E42E8;
+constexpr uint32_t kPoseDials = 0x820E45A8;
+constexpr uint32_t kAccessoryDraw = 0x820EFA78;
+constexpr uint32_t kScene = 0x826C2E44;
+constexpr uint32_t kCameraPasses = 0x826BAC00;
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -296,6 +302,143 @@ Left InteriorDrawSeats(uint8_t* base, const Calls& calls, uint32_t stack, uint32
     left = draw(frame + 144, uint32_t(shape), 0x820E4020);
   }
   return left;
+}
+
+
+// --- The interior's lists and SceneInterior::Draw ---
+
+namespace {
+
+// The point block's groups.
+constexpr uint32_t kDials = 240, kMeters = 3152, kSteering = 8512, kSeats = 9488;
+constexpr uint32_t kRollCage = 10464;
+
+// The body (the point block's record at +0) through CarPart::Draw with r6
+// (the block's +12 when the scene's pass mask has bit 0x2, else 0), from
+// `frame` returning to `lr`: its plain C++, else its original.
+Left Body(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t points, uint32_t scene,
+          uint32_t block, uint32_t pass, uint32_t r24, uint32_t lr) {
+  const uint32_t world = block + 16, vp = pass + 144;
+  const uint32_t r6 = (Load(base, scene + 5132) & 0x2) != 0 ? Load(base, block + 12) : 0;
+  const auto draw = CarPartDraw(base, calls, frame, points, vp, world, r6, 0, r24, world);
+  if (!draw) {
+    const uint64_t regs[5] = {points, vp, world, r6, 0};
+    calls.call_r24_r28(kCarPartDraw, regs, 5, frame, lr, r24, world);
+    return Left{true, 0};
+  }
+  if (draw->queued) {
+    return Left{true, 0};
+  }
+  return Left{false, draw->r3};
+}
+
+// The steering wheel: record [[+8512] + 92] of the steering group.
+Left Steering(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t points, uint32_t block,
+              uint32_t pass, uint32_t r24, uint32_t lr) {
+  const uint32_t group = points + kSteering;
+  const uint32_t record = group + Load(base, Load(base, group) + 92) * 240 + 16;
+  return Part(base, calls, frame, record, pass + 144, block + 16, r24, block + 16, lr);
+}
+
+// The scene's current camera pass: 0x826BAC00 + 592 x [scene + 5072], or 0
+// when it's 0 or disabled (its +588).
+uint32_t CurrentPass(uint8_t* base, uint32_t scene) {
+  const uint32_t pass = kCameraPasses + Load(base, scene + 5072) * 592;
+  if (int32_t(pass) == 0 || int32_t(Load(base, pass + 588)) == 0) {
+    return 0;
+  }
+  return pass;
+}
+
+}  // namespace
+
+Left InteriorDrawFrontEnd(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                          uint32_t block, uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E4078 InteriorPoints::DrawFrontEnd");
+  const uint32_t frame = Frame(base, stack, kInteriorFrontEndFrame);
+  // Camera pass 0, whatever the scene's pass; r28 the block's world.
+  const uint32_t pass = kCameraPasses, world = block + 16;
+  const uint32_t r24 = caller_r24;
+  Body(base, calls, frame, points, Load(base, kScene), block, pass, r24, 0x820E40C8);
+  InteriorDrawDialFaces(base, calls, frame, points + kDials, block, pass, r24, world);
+  InteriorDrawMeterFaces(base, calls, frame, points + kMeters, block, pass, r24);
+  Steering(base, calls, frame, points, block, pass, r24, 0x820E4114);
+  InteriorDrawSeats(base, calls, frame, points + kSeats, block, pass, r24, world);
+  return InteriorDrawRollCage(base, calls, frame, points + kRollCage, block, pass, r24, world);
+}
+
+Left InteriorDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                      uint32_t block, uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E5220 InteriorPoints::DrawRace");
+  const uint32_t frame = Frame(base, stack, kInteriorRaceFrame);
+  // The scene's current camera pass (0 when disabled: its view-projection
+  // read from address 144, as the original); r28 the block's world.
+  const uint32_t scene = Load(base, kScene);
+  const uint32_t pass = CurrentPass(base, scene), world = block + 16;
+  const uint32_t r24 = caller_r24;
+  Body(base, calls, frame, points, scene, block, pass, r24, 0x820E5298);
+  InteriorDrawDialFaces(base, calls, frame, points + kDials, block, pass, r24, world);
+  InteriorDrawMeterFaces(base, calls, frame, points + kMeters, block, pass, r24);
+  InteriorDrawReadouts(base, calls, frame, points + kDials, block, pass, r24, world);
+  // Dash::PoseDials (src/hooks/cockpit_dials.cpp: the meters' needles).
+  const uint64_t regs[3] = {points + kMeters, block, pass};
+  calls.call_r24_r28(kPoseDials, regs, 3, frame, 0x820E52E0, r24, world);
+  if (int32_t(Load(base, points + 11452)) == 0) {
+    Steering(base, calls, frame, points, block, pass, r24, 0x820E5318);
+  }
+  InteriorDrawSeats(base, calls, frame, points + kSeats, block, pass, r24, world);
+  return InteriorDrawRollCage(base, calls, frame, points + kRollCage, block, pass, r24, world);
+}
+
+Left SceneInteriorDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t interior64,
+                       uint32_t block, uint32_t caller_r24, uint32_t caller_r28) {
+  ITC_NATIVE_RUNNING("sub_820E53F0 SceneInterior::Draw");
+  const uint32_t frame = Frame(base, stack, kInteriorSmallFrame);
+  const uint32_t interior = uint32_t(interior64);
+  Left left{false, interior64};
+  uint32_t accessory = 0;
+  if (int32_t(Load(base, interior + 11616)) != 0) {
+    const uint32_t set = scene_models::Accessories(base);
+    left = Left{false, set};
+    const int32_t which = int32_t(Load(base, interior + 152));
+    if (which != 3) {
+      const uint32_t entry = Load(base, set + ((uint32_t(which) + 1) << 2));
+      if (entry != 0) {
+        accessory = entry + 48;
+      }
+    }
+  }
+  const uint32_t set = Load(base, Load(base, interior + 11668) + 4);
+  if (set == 0) {
+    left = InteriorDrawFrontEnd(base, calls, frame, interior + 160, block, caller_r24);
+    if (accessory == 0) {
+      return left;
+    }
+    const uint32_t texture = Load(base, interior + 156);
+    if (int32_t(Load(base, accessory + 1040)) != int32_t(texture)) {
+      // Accessory::SetTexture's plain C++; the texture provider's slot a
+      // guest call from its frame.
+      left.in_ctx = false;
+      left.r3 = accessories::AccessorySetTexture(
+          base, accessory, texture, -1, frame,
+          [&](uint32_t provider, uint32_t provider_frame) {
+            const uint32_t function = Load(base, Load(base, provider) + 12);
+            const uint64_t regs[2] = {provider, 0};
+            return calls.call(function, regs, 2, provider_frame, 0x820EF5A8);
+          });
+    }
+  } else if (set == 1) {
+    left = InteriorDrawRace(base, calls, frame, interior + 160, block, caller_r24);
+    if (accessory == 0) {
+      return left;
+    }
+  } else {
+    return left;
+  }
+  // Accessory::Draw (not seen in play) with the scene's current camera pass.
+  const uint64_t regs[2] = {accessory, CurrentPass(base, Load(base, kScene))};
+  calls.call_r24_r28(kAccessoryDraw, regs, 2, frame, 0x820E54DC, caller_r24, caller_r28);
+  return Left{true, 0};
 }
 
 }  // namespace car_draw
