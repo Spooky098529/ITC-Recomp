@@ -72,7 +72,7 @@ the director's state machine (its handlers, through
 front-end menus' and the course scenery's owners' leads in
 `../loops/leads.md`) and `sub_82227A50`, `sub_82228548` (the same
 leads). Not here: `sub_82150DD0` and `sub_82150DE0`, in this range but
-handlers of the race mode's machine at +848 (`sub_821517D8`'s lead), and
+handlers of the race mode's machine at +848 (`race-loading.md`), and
 `sub_822116A0` (under the logo's XPR load callback, never run).
 
 Frame interpolation (`../frame-interpolation.md`): the director's update
