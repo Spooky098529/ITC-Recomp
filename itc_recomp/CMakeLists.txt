@@ -307,6 +307,8 @@ set(ITC_SOURCES
     src/front_end_car_draw/garage_stage.cpp
     src/front_end_car_draw/lights.cpp
     src/front_end_car_draw/pose.cpp
+    src/hooks/replay_snapshots.cpp
+    src/replay_snapshots/records.cpp
     src/hooks/race_screens.cpp
     src/race_screens/menu_list.cpp
     src/race_screens/screens.cpp
@@ -518,6 +520,7 @@ set(ITC_SOURCES
     src/harnesses/car_scene_draw.cpp
     src/harnesses/car_scene_draw_root.cpp
     src/harnesses/front_end_car_draw.cpp
+    src/harnesses/replay_snapshots.cpp
     src/harnesses/race_screens.cpp
     src/harnesses/menu_sounds.cpp
     src/harnesses/accessories.cpp

@@ -272,5 +272,7 @@ void RaceFlow(Context& h);
 void CarSceneDraw(Context& h);
 // The front end's car draw (src/harnesses/front_end_car_draw.cpp).
 void FrontEndCarDraw(Context& h);
+// The replay's snapshots (src/harnesses/replay_snapshots.cpp).
+void ReplaySnapshots(Context& h);
 
 }  // namespace harness
