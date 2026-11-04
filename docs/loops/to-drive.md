@@ -18,6 +18,15 @@ here loses its heading.
 
 ## Run 2026-11-04 19:51 (`b7-loop-03-11-26`, continued)
 
+- The race's sounds, first migration (attract race `itc_3498`, replay
+  `itc_3499` ok; `race-sounds.md`): `sub_82176E60`
+  RaceSounds::OnLeaveAfterRace, `sub_821770C0`
+  RaceSounds::OnRollingStart, `sub_82177130`
+  RaceSounds::RollingStartTick, `sub_82175D48`
+  RaceSounds::OnRollingStartDone, `sub_82175AE8` RaceSounds::Pause,
+  `sub_82175B80` RaceSounds::Resume, `sub_82175C58`
+  RaceSounds::ResumeCars.
+
 - The replay's snapshots (attract race `itc_3487`, replay `itc_3488`
   ok, reached a race but no replay; `replay-snapshots.md`; they run at
   a driven race's countdown and around its replay, which the attract

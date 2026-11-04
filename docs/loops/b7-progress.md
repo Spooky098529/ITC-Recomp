@@ -45,8 +45,10 @@ file's history. What's left to see in a drive, from every run:
   8 adapters removed, with `rand` under `--native_c_runtime`; one
   subagent for `RaceSounds::Init`; `itc_3496`/`itc_3497`: race 38 s,
   0 errors, every harness 0 differing; `Unload` `sub_821772D8` left,
-  ready, at the batch limit). Step: validation agent running; another
-  migration agent for `Unload` after it.
+  ready, at the batch limit). Validated `itc_3498` (race 46 s, 0
+  errors, 29 of 29 harness lines, every harness 0 differing but the
+  expected groups; 9 ran in the race, 13 more in the replay `itc_3499`
+  (ok), 7 to drive). Step: second migration agent running (`Unload`).
 
 ## Done
 
