@@ -121,7 +121,9 @@ void MakeList(uint8_t* base, uint32_t list, uint32_t slots, uint32_t used, uint3
   guest::StoreU32(base, list + 32, slots);
   guest::StoreU32(base, list + 44, slots + 16 * (kind == 1 ? 1 : 0));
   guest::StoreU8(base, list + 52, kind == 1 ? 1 : 0);
-  if (kind == 2) {
+  // An open chunk counts in the global, as in the game (else a list's
+  // CloseChunk would take the count below 0).
+  if (kind != 0) {
     guest::StoreU32(base, command_list::kOpenChunks, 1);
   }
 }
@@ -331,6 +333,80 @@ void TexturedRectCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// RecordPasses's slots on the scene's list for a mode, and its rectangles.
+void PassSlots(uint32_t mode, uint32_t* slots, uint32_t* rects) {
+  const uint32_t bits = mode == 0 ? 7 : mode == 1 ? 4 : mode == 3 ? 1 : mode == 4 ? 8 : 0;
+  *slots = ((bits & 8) ? 36 : 0) + ((bits & 1) ? 23 : 0) +
+           ((bits & 6) ? ((bits & 2) ? 36 : 30) : 0) + ((bits & 4) ? 12 : 0);
+  *rects = ((bits & 8) ? 1 : 0) + ((bits & 2) ? 1 : 0) + ((bits & 4) ? 1 : 0);
+}
+
+void RecordPassesCases(Context& h, uint32_t block) {
+  Results results("SceneTarget::RecordPasses (sub_8209B3D0)");
+  for (int c = 0; c < 400; c++) {
+    uint32_t buckets[3] = {150, 602, 121};
+    Case(
+        h, results, block,
+        [&](Random& r) {
+          // The mode: each of 0 to 5 (the passes' kinds), or any word.
+          const uint32_t mode = c % 8 < 6 ? uint32_t(c % 8) : c % 8 == 6 ? 5 + r.Below(4)
+                                                                        : uint32_t(r.Next());
+          guest::StoreU32(h.base, block + kScene + 28, mode);
+          guest::StoreU32(h.base, block + kTiles + 12, r.Below(2) ? r.Below(8) : uint32_t(r.Next()));
+          uint32_t slots = 0, rects = 0;
+          PassSlots(mode, &slots, &rects);
+          const uint32_t used = r.Below(4) == 0 ? uint32_t(r.Below(300)) : r.Below(20);
+          // The rectangles on the scene's list now and then (then the room
+          // for both), else on their own; room just enough now and then; a
+          // chunk open on either list or another (the originals then).
+          const bool same = r.Below(4) == 0;
+          const uint32_t need = slots + (same ? 24 * rects : 0);
+          const uint32_t room = r.Below(4) == 0 ? need : need + r.Below(100);
+          const uint32_t kind = r.Below(10) == 0 ? 1 + r.Below(2) : 0;
+          MakeList(h.base, block + kList, block + kSlots, used, room, kind);
+          if (same) {
+            guest::StoreU32(h.base, st::kRectLists + 4, block + kList);
+          } else {
+            const uint32_t rect_kind = r.Below(10) == 0 ? 1 : 0;
+            MakeList(h.base, block + kRectList, block + kRectSlots, r.Below(50),
+                     24 * rects + r.Below(4) * 24, rect_kind);
+          }
+          for (uint32_t& b : buckets) {
+            const uint32_t pick = r.Below(6);
+            b = pick < 3 ? b : pick < 5 ? r.Below(700) : 700 + r.Below(2000);
+          }
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = block + kScene;
+          t.r4.u64 = block + kList;
+          t.r5.u64 = buckets[0];
+          t.r6.u64 = buckets[1];
+          t.r7.u64 = buckets[2];
+          buckets[0] = 150;
+          buckets[1] = 602;
+          buckets[2] = 121;
+        },
+        __imp__sub_8209B3D0, hooks::SceneTargetRecordPasses, fmt::format("case {}", c),
+        [&](const PPCContext& t, Outputs& out) {
+          // Its frame's words (the passes' bits at +80, the rectangles at
+          // +96, +224 and +352), the last rectangle's RecordFlat words below
+          // it, and r5 and r6 in the caller's frame.
+          const uint32_t frame = t.r1.u32 - st::kRecordPassesFrame;
+          out.Bytes(Read(h.base, frame + 80, 400));
+          // RecordFlat's words only: the rest of its frame holds the
+          // original RecordTargets' frame (its back chain and saved
+          // registers), which the native one doesn't make.
+          const uint32_t flat = frame - st::kRecordFlatFrame;
+          out.Bytes(Read(h.base, flat + 80, 32));
+          for (uint32_t i = 0; i < 4; i++) {
+            out.Word(guest::LoadU32(h.base, flat + 124 + 16 * i));
+          }
+          out.Bytes(Read(h.base, t.r1.u32 + 32, 16));
+        });
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SceneTarget(Context& h) {
@@ -343,6 +419,7 @@ void SceneTarget(Context& h) {
   }
   TargetCases(h, block);
   TexturedRectCases(h, block);
+  RecordPassesCases(h, block);
   memory::Free(block);
 }
 

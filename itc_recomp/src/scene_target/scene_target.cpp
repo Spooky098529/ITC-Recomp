@@ -183,4 +183,204 @@ std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect, uin
   return chunk;
 }
 
+namespace {
+
+// The clear (command 26 and its 280 bytes, no header): +0 = +4 = 0, +8 = 49
+// (render target 0, Z and stencil), +268 = 0xFF000000, +272 = 0.0, +276 = 0;
+// the rest left as it was.
+void Clear(uint8_t* base, uint32_t list, uint32_t zero) {
+  Slot3(base, list, 26, 1, 0);
+  const uint32_t s = command_list::AllocateBytes(base, list, 280, false);
+  Store(base, s + 272, zero);
+  Store(base, s + 8, 49);
+  Store(base, s + 268, 0xFF000000u);
+  Store(base, s + 276, 0);
+  Store(base, s + 4, 0);
+  Store(base, s + 0, 0);
+}
+
+// The render targets and depth back from the saved set (command 29, mask
+// 143).
+void RestoreTargets(uint8_t* base, uint32_t list) {
+  Slot3(base, list, 29, 1, 0);
+  Slot1(base, list, 143);
+}
+
+// Command 1 with render state 40 (Z enable) off.
+void ZOff(uint8_t* base, uint32_t list) {
+  Slot3(base, list, 1, 1, 0);
+  Slot2(base, list, 40, 0);
+}
+
+// The resolve item (AllocateResolve, no header) into the texture `texture`:
+// +0 = `what` (2 a destination only, 3 a rectangle too), +4 = 0, +24 the
+// texture, +36 = +40 = 0, the bytes +44 to +47 0, 0, 0, 255, +48 = 0.0, +52
+// = 0, +56 and +64 the destination's words, +60 = 0; with a rectangle, +8
+// = +12 = 0, +16 = 1024, +20 = 576.
+void Resolve(uint8_t* base, uint32_t list, uint32_t what, uint32_t texture, uint32_t zero) {
+  Slot3(base, list, 25, 1, 0);
+  const uint32_t s = command_list::AllocateResolve(base, list, false);
+  if (what == 2) {
+    Store(base, s + 0, 2);
+    Store(base, s + 4, 0);
+  } else {
+    Store(base, s + 4, 0);
+    Store(base, s + 0, 3);
+  }
+  Store(base, s + 48, zero);
+  Store(base, s + 36, 0);
+  Store(base, s + 40, 0);
+  Store(base, s + 52, 0);
+  Store(base, s + 24, texture);
+  guest::StoreU8(base, s + 44, 0);
+  guest::StoreU8(base, s + 45, 0);
+  guest::StoreU8(base, s + 46, 0);
+  guest::StoreU8(base, s + 47, 255);
+  Store(base, s + 56, 0x18280186u);
+  Store(base, s + 60, 0);
+  Store(base, s + 64, 0x1A220197u);
+  if (what == 3) {
+    Store(base, s + 8, 0);
+    Store(base, s + 16, 1024);
+    Store(base, s + 12, 0);
+    Store(base, s + 20, 576);
+  }
+}
+
+// A screen rectangle in the frame at `rect`, as the original builds it: an
+// identity matrix at +0 (from its vector unit; the 1.0s it stores first at
+// +12, +28, +44 and +60 overwritten by it), +64 = +68 = 0, +72 = 2, the
+// position 0, 0 and the size, the texture coordinates 0.0, 0.0 to `u1`,
+// `v1` (words), the texture, +116 = 0 (blending off); +76 not written.
+void ScreenRect(uint8_t* base, uint32_t rect, uint32_t width, uint32_t height, uint32_t u1,
+                uint32_t v1, uint32_t texture, uint32_t zero) {
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t column = 0; column < 4; column++) {
+      Store(base, rect + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
+    }
+  }
+  Store(base, rect + 64, 0);
+  Store(base, rect + 68, 0);
+  Store(base, rect + 72, 2);
+  Store(base, rect + 80, 0);
+  Store(base, rect + 84, 0);
+  Store(base, rect + 88, width);
+  Store(base, rect + 92, height);
+  Store(base, rect + 96, zero);
+  Store(base, rect + 100, zero);
+  Store(base, rect + 104, u1);
+  Store(base, rect + 108, v1);
+  Store(base, rect + 112, texture);
+  Store(base, rect + 116, 0);
+}
+
+}  // namespace
+
+bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene, uint32_t list, uint32_t bucket5,
+                  uint32_t bucket6, uint32_t bucket7, const PassCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8209B3D0 SceneTarget::RecordPasses");
+  // The mode's passes.
+  const uint32_t mode = Load(base, scene + 28);
+  const uint32_t bits = mode == 0 ? 7 : mode == 1 ? 4 : mode == 3 ? 1 : mode == 4 ? 8 : 0;
+  // Every slot the scene's list takes, and the rectangles' (24 each, which
+  // may be on the same list): declined when they wouldn't all fit.
+  uint64_t slots = 0, rects = 0;
+  if (bits & 8) {
+    slots += 36;
+    rects++;
+  }
+  if (bits & 1) {
+    slots += 23;
+  }
+  if (bits & 6) {
+    slots += (bits & 2) ? 36 : 30;
+    rects += (bits & 2) ? 1 : 0;
+  }
+  if (bits & 4) {
+    slots += 12;
+    rects++;
+  }
+  if (!Ready(base, list, slots + 24 * rects)) {
+    return false;
+  }
+  // r5 and r6 in the caller's frame, the bits at +80.
+  Store(base, frame + kRecordPassesFrame + 36, bucket5);
+  Store(base, frame + kRecordPassesFrame + 44, bucket6);
+  Store(base, frame + 80, bits);
+  const uint32_t one = Load(base, kOne), zero = Load(base, kZero);
+
+  if (bits & 8) {
+    // The menus' predicated tiling.
+    command_list::OpenChunk(base, list);
+    const uint32_t chunk = Header(base, list);
+    RecordTileTargets(base, scene, list);  // room checked above
+    Slot3(base, list, 32, 1, 0);  // BeginTiling
+    {
+      const uint32_t s = Slot(base, list);
+      Store(base, s + 0, 0);
+      Store(base, s + 4, Load(base, Load(base, 0x8260034C) + 12));
+      Store(base, s + 8, Load(base, 0x8260034C) + 16);
+    }
+    Clear(base, list, zero);
+    Slot3(base, list, 36, 0, 0);
+    const uint32_t second = Header(base, list);
+    Slot3(base, list, 33, 1, 0);  // EndTiling into the texture
+    Slot2(base, list, 771, Load(base, scene + 24));
+    RestoreTargets(base, list);
+    Slot3(base, list, 36, 0, 0);
+    command_list::CloseChunk(base, list);
+    calls.submit(chunk, 108, 0x8209B634, 0x8209B644, 0x8209B660);
+    calls.submit(second, 594, 0x8209B674, 0x8209B684, 0x8209B6A0);
+    const uint32_t rect = frame + 96;
+    ScreenRect(base, rect, 1280, 720, one, one, Load(base, scene + 24), zero);
+    calls.rect(rect, 594, 0x8209B738);
+  }
+  if (bits & 1) {
+    command_list::OpenChunk(base, list);
+    const uint32_t chunk = Header(base, list);
+    RestoreTargets(base, list);
+    Clear(base, list, zero);
+    Slot3(base, list, 36, 0, 0);
+    command_list::CloseChunk(base, list);
+    calls.submit(chunk, bucket7, 0x8209B810, 0x8209B820, 0x8209B83C);
+  }
+  if (bits & 6) {
+    // The race: the frame drawn so far resolved into the texture, the
+    // 1024 x 576 targets bound and cleared, the texture drawn into them.
+    command_list::OpenChunk(base, list);
+    const uint32_t chunk = Header(base, list);
+    if (bits & 2) {
+      Resolve(base, list, 2, Load(base, scene + 24), zero);
+    }
+    RecordTargets(base, scene, list);  // room checked above
+    Clear(base, list, zero);
+    ZOff(base, list);
+    Slot3(base, list, 36, 0, 0);
+    command_list::CloseChunk(base, list);
+    calls.submit(chunk, bucket5, 0x8209B9B0, 0x8209B9C0, 0x8209B9E0);
+    if (bits & 2) {
+      const uint32_t rect = frame + 224;
+      ScreenRect(base, rect, 1024, 576, one, one, Load(base, scene + 24), zero);
+      calls.rect(rect, bucket5, 0x8209BA80);
+    }
+  }
+  if (bits & 4) {
+    // The upscale draw: the race's 1024 x 576 view resolved and drawn over
+    // the screen.
+    command_list::OpenChunk(base, list);
+    const uint32_t chunk = Header(base, list);
+    Resolve(base, list, 3, Load(base, scene + 24), zero);
+    RestoreTargets(base, list);
+    ZOff(base, list);
+    Slot3(base, list, 36, 0, 0);
+    command_list::CloseChunk(base, list);
+    calls.submit(chunk, bucket6, 0x8209BBD4, 0x8209BBE4, 0x8209BC04);
+    const uint32_t rect = frame + 352;
+    const uint32_t scale = Load(base, 0x82001070);  // 0.8
+    ScreenRect(base, rect, 1280, 720, scale, scale, Load(base, scene + 24), zero);
+    calls.rect(rect, bucket6, 0x8209BCA4);
+  }
+  return true;
+}
+
 }  // namespace scene_target
