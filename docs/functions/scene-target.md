@@ -13,8 +13,8 @@ that bind those surfaces, clear them, resolve them into +24 and draw +24
 back over the screen (the race's 1024 × 576 view scaled up to 1280 × 720,
 the "upscale draw" in `../conventional-renderer.md`), and the textured
 screen rectangle that last draw goes through. `SceneTarget::RecordPasses`
-runs once a frame from `sub_82096418` (the 44-byte frame passes object's
-vtable slot, a lead in `../loops/leads.md`, which stays there); `Glow::Record`
+runs once a frame from `sub_82096418` (`FramePasses::Record`, the 44-byte
+frame passes object's vtable slot 1, in [`frame-passes.md`](frame-passes.md)); `Glow::Record`
 (`post-effects.md`, shared) puts the scene target's surfaces back after the
 glow's passes through `SceneTarget::RecordBoundTargets`. Mapped by the B7
 loop (`../loops/b7-loop.md`) from its lead in `../loops/leads.md`
