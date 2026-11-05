@@ -42,10 +42,24 @@ file's history. What's left to see in a drive, from every run:
   982ea51b..5edff580 (`--native_scene_target`, 6 of 6 ours, with
   `Glow::Record` as a cleanup in `post-effects.md`, now 58 of 58; 5
   adapters removed; `itc_3575`: race 38 s, 0 errors, every harness 0
-  differing; no subagents). Step: validation, agent running.
+  differing; no subagents). Validated `itc_3576` (race 46 s, 0
+  errors, 7 of 7 harness lines, 6 ran in the race,
+  `RecordTileTargets` in the replay `itc_3577` (ok); none to drive).
+  Done.
+- Subsystem 3 of 3: the frame passes object at framework +108 (lead
+  picked: `sub_82098630`, `sub_82096218`, `sub_82096360`,
+  `sub_82096030`, with its vtable's `sub_82096418` and
+  `sub_820962B8`, the callers keeping `RecordPasses`' and
+  `PostEffects::InitBoot`'s adapters; once a frame; all but the
+  constructor ready; its line deleted from `leads.md`). Step: mapping,
+  agent running.
 
 ## Done
 
+- The scene target's passes: `scene-target.md` (map a0cac8ac,
+  migration 982ea51b..5edff580, `--native_scene_target`, 6 of 6, with
+  `Glow::Record` finishing `post-effects.md`; validated `itc_3576`: 0
+  errors, every harness line, replay `itc_3577` ok, none to drive).
 - The post effects' rest: `post-effects.md` (map b86338cf, migrations
   106192bc..b1df9d00 and 95c86284..6bfc02d0, `--native_post_effects`,
   57 of 58; validated `itc_3540` and `itc_3554`: 0 errors, every
@@ -79,3 +93,4 @@ file's history. What's left to see in a drive, from every run:
   62, known 475, unknown 1693).
 - After its migration: ours 4187, work left 2223 (wrapped 61, known
   469, unknown 1693).
+- After its validation (`itc_3576`): ours 4187, work left 2223.
