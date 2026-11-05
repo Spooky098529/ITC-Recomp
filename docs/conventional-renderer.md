@@ -150,8 +150,9 @@ recorders read in `generated/`, and `src/native/passes.cpp`. Command
   `sub_820A1CA8`, its type-3 chunk;
 - `PostEffect::RecordResolve` (native,
   `src/post_effects/post_effects.cpp:346`);
-- `sub_8209B3D0` (recompiled, no row; calls at `0x8209B8AC` and
-  `0x8209BAD8` checked);
+- `SceneTarget::RecordPasses` `sub_8209B3D0` (recompiled,
+  `functions/scene-target.md`; calls at `0x8209B8AC` and `0x8209BAD8`
+  checked);
 - `ScreenObject::Record` (not reached in play).
 
 Two resolves go around command 25 and call `Device::Resolve` directly:
@@ -212,7 +213,7 @@ samples it.
 | 10 | The motion blur's chunk (`sub_821363F0`'s; probably through `RecordResolve`) | 16_16, pitch 560, + depth, cleared to `0x80808000` | 16_16 512x288 (`1B053000`) | Copy | The motion blur's combine (`7EB16456AAD56CBA`) | The pass draws into the texture | **c100**, the previous view-projection (`--motion_blur_by_tick`) |
 | 11-12 | `PostEffect::RecordResolve`, flags `0xF4000000`, rect 1024x576, twice (the glow's and the color filter's, probably) | **Main view**: 7e3 HDR, pitch 1040, 2x MSAA | 16_16_16_16 1024x576, twice | MSAA average, exponent bias −3; the second after ~350 more draws | The glow's bright pass, the color filter, and (the second) transparent draws, probably | MSAA resolve per the option; the first copy as the scene texture, the second a grab-pass copy; the bias as above (open) | — |
 | 13-23 | `Glow::Record`, `RecordStar`, `RecordStarPass` (flags `0xF4000100`) | 2_10_10_10_FLOAT, pitch 320, one target for every step | Six 16_16_16_16 256x144 textures, plus the glow history (`*(+8408)`) | Exponent bias −3; clear after | The bloom chain, the star streaks, the history cross-fade (`E0D070FB58A4EA03`), the combine (`9750599DF5ED3B39`) | Each step into its own texture; the bias as above | **The glow history** (`glow.cpp`): forced on render-only passes, its weight scaled. It must stay a per-frame pass, in order |
-| 24 | `sub_8209B3D0` (probably; not read) | The main view | Format 54 1280x720 (`1ECB9000`), rect 1024x576 at 0,0 | MSAA average, partial rect | The game's upscale draw; the menus resolve their own frame to the same address | The frame composed natively, or the 3D view drawn into that region | None |
+| 24 | `SceneTarget::RecordPasses` `sub_8209B3D0` (read 2026-11-05, `functions/scene-target.md`: bit 4's resolve) | The main view | Format 54 1280x720 (`1ECB9000`), rect 1024x576 at 0,0 | MSAA average, partial rect | The game's upscale draw; the menus resolve their own frame to the same address | The frame composed natively, or the 3D view drawn into that region | None |
 | 25 | `sub_8258D998` → `Device::Resolve`, outside the list | 8_8_8_8, pitch 1280, no MSAA, EDRAM base 0 | The front buffer, 1280x720 | Scan-out copy | The window | Already present from the target | None |
 | menus | EndTiling (command 33), one per tile | 1280x720, 4x MSAA, 32-bit + depth (one full target already) | The menu's 3D view texture | MSAA average per tile | The Free Run car, the Course In picture | MSAA resolve per the option, once | No render-only passes in menus |
 

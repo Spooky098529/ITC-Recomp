@@ -541,6 +541,11 @@ Rows not yet moved stay in the table below. So far:
   end; the race mode's tick (`RaceMode::NextMode`) and its +32 slots;
   and the loading screen's three UI movies (`LoadingScreen::Show`, `Run`,
   `Finish`) (B7).
+- [`scene-target.md`](scene-target.md): the scene target's passes:
+  the chunks that bind the 1024 × 576 surfaces (and the menus' tile-sized
+  ones), clear them, resolve them into the 1280 × 720 texture and draw it
+  back over the screen (the race's upscale draw), and the textured screen
+  rectangle they draw with (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -722,7 +727,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822AED18` | `Device::LoadShaders` (probably) | | Not read in detail (from `native-renderer.md`, "The indexed draw without its packets"): the draw's shader load, called from `DrawIndexedVertices` and `DrawPackets_IndexedDraw` (`src/native/draw_packets.cpp`) when shader state is dirty. Writes SQ_PROGRAM_CNTL and +10404 at +10400, and +10408, +10432, +10452, +12440; patches the vertex shader for the bound declaration (`sub_822AE340`); sets the shaders' fences (+8); writes the microcode's load packets; returns more dirty bits. |
 | `sub_822A04F8` | `Device::Clear` | | Not read. From `Command::*` 26 (`sub_82590620`): the rect count and rects, flags (bits 0-3 render targets, `0x10` Z, `0x20` stencil), color (a D3DCOLOR), Z, stencil (`native-renderer.md`, "Progress on milestone 4"). |
 | `sub_825BF200` | `Device::EndTiling` | | Not read in detail (from `gpu-functions.md`, "Predicated tiling"): r4 flags (`0x303` seen), then the destination texture. Resolves each tile through `Device::Resolve` (calls at `0x825BF348`, and `0x825BF378` for the last), adding `0x100` and `0x200` on every tile but the last; ends with `sub_822B6BF8`. From `Command::*` 33 (`sub_825909E8`); menus only. |
-| `sub_8209B3D0` | | | Not read. Records a resolve (`CommandList::AllocateResolve`, calls at `0x8209B8AC` and `0x8209BAD8`, checked) into the scene target's 1280x720 texture (`SceneTarget` + 24, `src/app_start_up/start_up.h`); probably the main view's resolve into `1ECB9000` that the upscale draw samples. Turns the scene target's mode into pass bits (`mode-tick.md`). |
 | `sub_821BE5A8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8258FBD0` | `Command::*` (1) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
 | `sub_8258FC30` | `Command::*` (2) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
