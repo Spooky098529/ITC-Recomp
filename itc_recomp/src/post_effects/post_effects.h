@@ -149,6 +149,48 @@ std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uin
 constexpr uint32_t kEdramBase = 0x826C5DC0;
 uint32_t InitEdramBase(uint8_t* base);
 
+// --- Making the effects (create.cpp) ---
+//
+// Each takes `stack`, the guest r1 at its entry: its frame is where the
+// original's is, and the words the original writes there are written there.
+// They need the allocation layer (--native_heap).
+
+// RenderTexture::Create (sub_821330D0): the key stored in the entry (+0
+// format, +4, +8 the size, +12, +16 the key's words, +32 the id), a 52-byte
+// texture header (operator new, +24) set by XGSetTextureHeader, its memory
+// (XPhysicalAlloc(size, -1, 0, 0x404), +28) and the header relocated to it.
+// Returns 1, or 0 when the memory wasn't made.
+uint32_t RenderTextureCreate(uint8_t* base, uint32_t stack, uint32_t entry, uint32_t format,
+                             uint32_t width, uint32_t height, uint32_t id, uint32_t key0,
+                             uint32_t key1);
+// RenderTextures::Acquire (sub_82133190): the render texture for `id` from
+// the 20 entries at 0x826C5DC8, made when not in use, shared when the key
+// matches; id 20, or one in use with another key, a new entry of its own
+// (id 20). Its users +1.
+uint32_t RenderTexturesAcquire(uint8_t* base, uint32_t stack, uint32_t id, uint32_t format,
+                               uint32_t width, uint32_t height, uint32_t key0, uint32_t key1);
+// The constructors from a table entry (r3 the object, r4 the entry):
+// Glow::Glow (sub_82138610), ColorFilter::ColorFilter (sub_82135008) and
+// MotionBlur::MotionBlur (sub_82136130). Return the object.
+uint32_t GlowConstruct(uint8_t* base, uint32_t stack, uint32_t glow, uint32_t entry);
+uint32_t ColorFilterConstruct(uint8_t* base, uint32_t stack, uint32_t filter, uint32_t entry);
+uint32_t MotionBlurConstruct(uint8_t* base, uint32_t stack, uint32_t blur, uint32_t entry);
+
+// The guest calls PostEffects::Create makes: the video output (as
+// SurfaceCalls', `at` 0 before and 1 after) and the recompiled constructors
+// of kinds 1 and 4 (never made in play: `construct(function, object, entry,
+// device)`, returning r3).
+struct CreateCalls {
+  std::function<uint32_t(int at)> video_output;
+  std::function<uint32_t(uint32_t, uint32_t, uint32_t, uint32_t)> construct;
+};
+// PostEffects::Create (sub_82138A18): with the device locked when `device`
+// is 0, the effect `index` made from its table entry when it isn't there.
+// The device word is kept at `stack` + 20 (the caller's frame), as the
+// original. Returns r3 as the original leaves it.
+uint32_t Create(uint8_t* base, uint32_t stack, uint32_t device, uint32_t index,
+                const CreateCalls& calls);
+
 // --- The destructors ---
 
 // The calls the destructors make, each returning r3 as it leaves it:

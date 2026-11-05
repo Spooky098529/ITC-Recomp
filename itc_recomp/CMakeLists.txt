@@ -381,6 +381,7 @@ set(ITC_SOURCES
     src/graphics/render_queue.cpp
     src/hooks/post_effects.cpp
     src/post_effects/post_effects.cpp
+    src/post_effects/create.cpp
     src/hooks/framework.cpp
     src/framework/framework.cpp
     src/framework/run_loop.cpp

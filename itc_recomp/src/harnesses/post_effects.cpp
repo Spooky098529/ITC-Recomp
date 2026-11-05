@@ -21,6 +21,8 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
+#include <array>
 #include <bit>
 #include <cstring>
 #include <initializer_list>
@@ -801,6 +803,469 @@ void InitEdramBaseCases(Context& h) {
   results.Report();
 }
 
+// --- Making the effects ---
+
+// The removed adapters' register steps, without the flag (r1 = the stack):
+// RenderTexture::Create, RenderTextures::Acquire and the constructors.
+void NativeTextureCreate(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = pe::RenderTextureCreate(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                       ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32);
+}
+void NativeAcquire(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = pe::RenderTexturesAcquire(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                         ctx.r6.u32, ctx.r7.u32, ctx.r8.u32);
+}
+template <uint32_t (*Construct)(uint8_t*, uint32_t, uint32_t, uint32_t)>
+void NativeConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = Construct(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+
+constexpr uint32_t kPool = 0x826C5DC8;  // the render textures: 20 of 36 bytes
+constexpr uint32_t kPoolWords = 20 * 9;
+
+// The stack below a call's r1 (and the 32 bytes above it, the caller's
+// parameter words) filled with the same bytes for both versions.
+void FillStack(uint8_t* base, uint32_t sp, const std::vector<uint32_t>& words) {
+  const uint32_t from = sp - 4 * uint32_t(words.size() - 8);
+  for (uint32_t i = 0; i < words.size(); i++) {
+    guest::StoreU32(base, from + 4 * i, words[i]);
+  }
+}
+
+std::vector<uint32_t> StackWords(Random& r) {
+  std::vector<uint32_t> words(0x800 / 4 + 8);
+  for (uint32_t& w : words) {
+    w = uint32_t(r.Next());
+  }
+  return words;
+}
+
+// A texture header the case made (52 bytes, relocated to `memory`): its
+// words, the two address words relative to `memory`'s page.
+void HeaderOutputs(Outputs& out, uint8_t* base, uint32_t header, uint32_t memory) {
+  for (uint32_t i = 0; i < 52; i += 4) {
+    uint32_t w = guest::LoadU32(base, header + i);
+    if ((i == 32 || i == 48) && (w & 0xFFFFF000u) != 0) {
+      w = (w & 0xFFFu) | ((w & 0xFFFFF000u) - (memory & 0xFFFFF000u));
+    }
+    out.Word(w);
+  }
+}
+
+// What a pool entry made in a case holds (users 0 before, 1 after): its
+// header (+24) and memory (+28), freed after.
+struct Made {
+  std::vector<uint32_t> addresses;  // mapped in the outputs
+  std::vector<std::pair<uint32_t, uint32_t>> textures;  // header, memory
+  std::vector<uint32_t> entries;  // own (id 20) entries
+  void Texture(uint8_t* base, uint32_t entry, bool own) {
+    const uint32_t header = guest::LoadU32(base, entry + 24);
+    const uint32_t memory = guest::LoadU32(base, entry + 28);
+    if (own) {
+      entries.push_back(entry);
+      addresses.push_back(entry);
+    }
+    textures.push_back({header, memory});
+    addresses.push_back(header);
+    addresses.push_back(memory);
+  }
+  void Free() {
+    for (const auto& [header, memory] : textures) {
+      if (memory::IsHeapBlock(header)) {
+        memory::crt::OperatorDelete(header);
+      }
+      if (memory != 0) {
+        memory::FreePhysical(memory);
+      }
+    }
+    for (uint32_t entry : entries) {
+      if (memory::IsHeapBlock(entry)) {
+        memory::crt::OperatorDelete(entry);
+      }
+    }
+  }
+};
+
+// The pool's states for a case: each entry unused (users 0, the rest
+// random), or with `used_ok` in use (users 2 to 4) with the key `key(id)`
+// gives (shared) or, with `other_ok`, now and then another (then an own
+// entry is made).
+std::vector<uint32_t> PoolWords(Random& r,
+                                const std::function<std::array<uint32_t, 5>(uint32_t)>& key,
+                                bool used_ok, bool other_ok) {
+  std::vector<uint32_t> words(kPoolWords);
+  for (uint32_t& w : words) {
+    w = uint32_t(r.Next());
+  }
+  for (uint32_t id = 0; id < 20; id++) {
+    uint32_t* e = &words[9 * id];
+    e[8] = id;
+    if (!used_ok || r.Below(3) != 0) {
+      e[5] = 0;
+      continue;
+    }
+    e[5] = 2 + r.Below(3);
+    const auto k = key(id);
+    for (int i = 0; i < 5; i++) {
+      e[i] = k[i];
+    }
+    if (other_ok && r.Below(4) == 0) {
+      e[1 + r.Below(4)] ^= 1u << r.Below(32);
+    }
+  }
+  return words;
+}
+
+// RenderTexture::Create on an entry in the block (random bytes) with random
+// sizes and formats (the effects' and others); RenderTextures::Acquire on
+// the pool (unused, shared, or in use with another key: an own entry) for
+// ids 0 to 20, the stack's word at the original's frame + 80 (read on no
+// path) pointing at a stand-in entry. Compared: the entry or the pool, the
+// stand-in entry, the own entry, the made header's words (its addresses
+// relative), r3, made addresses mapped.
+void RenderTextureMakeCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  static constexpr uint32_t kFormats[] = {0x1A20015A, 0x2DA2ABA4, 0x2D200199, 0x1A2201BF,
+                                          0x18280186};
+  constexpr uint32_t kEntry = 0x100, kStray = 0x200;
+  {
+    Results results("sub_821330D0 RenderTexture::Create");
+    for (int c = 0; c < 40; c++) {
+      std::vector<uint32_t> words(0x400 / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      const std::vector<uint32_t> stack = StackWords(r);
+      const uint32_t format = kFormats[r.Below(std::size(kFormats))];
+      const uint32_t width = c < 4 ? 1024u >> c : 1 + r.Below(1024);
+      const uint32_t height = c < 4 ? 576u >> c : 1 + r.Below(1024);
+      const uint32_t id = r.Below(21), key0 = uint32_t(r.Next()), key1 = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (uint32_t i = 0; i < words.size(); i++) {
+          guest::StoreU32(h.base, block + 4 * i, words[i]);
+        }
+        PPCContext t = CallContext(h);
+        FillStack(h.base, t.r1.u32, stack);
+        t.r3.u64 = block + kEntry;
+        t.r4.u64 = format;
+        t.r5.u64 = width;
+        t.r6.u64 = height;
+        t.r7.u64 = id;
+        t.r8.u64 = key0;
+        t.r9.u64 = key1;
+        Run(v, __imp__sub_821330D0, NativeTextureCreate, t, h.base);
+        Made made;
+        made.Texture(h.base, block + kEntry, false);
+        for (uint32_t i = 0; i < 36; i += 4) {
+          out[v].Word(MappedIn(guest::LoadU32(h.base, block + kEntry + i), made.addresses));
+        }
+        HeaderOutputs(out[v], h.base, made.textures[0].first, made.textures[0].second);
+        out[v].Word(t.r3.u32);
+        made.Free();
+      }
+      results.Check(out[0], out[1], fmt::format("case {} {}x{} format {:08X}", c, width, height,
+                                                format));
+    }
+    results.Report();
+  }
+  Results results("sub_82133190 RenderTextures::Acquire");
+  Saved pool(h.base, kPool, kPoolWords);
+  for (int c = 0; c < 80; c++) {
+    std::vector<uint32_t> words(0x400 / 4);
+    for (uint32_t& w : words) {
+      w = uint32_t(r.Next());
+    }
+    words[(kStray + 20) / 4] = 2;
+    words[(kStray + 32) / 4] = 0;
+    std::vector<uint32_t> stack = StackWords(r);
+    const uint32_t id = c < 21 ? uint32_t(c) : r.Below(21);
+    const uint32_t format = kFormats[r.Below(std::size(kFormats))];
+    const uint32_t width = 1 + r.Below(1024), height = 1 + r.Below(1024);
+    const uint32_t key0 = r.Below(2) == 0 ? 0 : r.Below(1024);
+    const uint32_t key1 = r.Below(2) == 0 ? 0 : r.Below(1024);
+    const std::vector<uint32_t> pool_words =
+        PoolWords(r, [&](uint32_t) { return std::array<uint32_t, 5>{format, width, height, key0, key1}; },
+                  true, true);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < words.size(); i++) {
+        guest::StoreU32(h.base, block + 4 * i, words[i]);
+      }
+      guest::StoreU32s(h.base, kPool, pool_words.data(), kPoolWords);
+      PPCContext t = CallContext(h);
+      // Acquire's frame's +80: the stand-in entry.
+      stack[stack.size() - 8 - 160 / 4 + 80 / 4] = block + kStray;
+      FillStack(h.base, t.r1.u32, stack);
+      t.r3.u64 = id;
+      t.r4.u64 = format;
+      t.r5.u64 = width;
+      t.r6.u64 = height;
+      t.r7.u64 = key0;
+      t.r8.u64 = key1;
+      Run(v, __imp__sub_82133190, NativeAcquire, t, h.base);
+      Made made;
+      const bool own = t.r3.u32 < kPool || t.r3.u32 >= kPool + 20 * 36;
+      if (own) {
+        made.Texture(h.base, t.r3.u32, true);
+      } else if (pool_words[9 * id + 5] == 0) {
+        made.Texture(h.base, kPool + 36 * id, false);
+      }
+      for (uint32_t i = 0; i < kPoolWords; i++) {
+        out[v].Word(MappedIn(guest::LoadU32(h.base, kPool + 4 * i), made.addresses));
+      }
+      out[v].Bytes(Read(h.base, block + kStray, 36));
+      if (own) {
+        for (uint32_t i = 0; i < 36; i += 4) {
+          out[v].Word(MappedIn(guest::LoadU32(h.base, t.r3.u32 + i), made.addresses));
+        }
+      }
+      if (!made.textures.empty()) {
+        HeaderOutputs(out[v], h.base, made.textures[0].first, made.textures[0].second);
+      }
+      out[v].Word(MappedIn(t.r3.u32, made.addresses));
+      made.Free();
+    }
+    results.Check(out[0], out[1], fmt::format("case {} id {} users {}", c, id,
+                                              id < 20 ? pool_words[9 * id + 5] : 0));
+  }
+  results.Report();
+}
+
+// The pool's entries a made effect holds that the case made (users 0
+// before), and its own entries (id 20), in the effect's field order.
+void EffectTextures(Made& made, uint8_t* base, uint32_t effect, const std::vector<uint32_t>& fields,
+                    const std::vector<uint32_t>& pool_before) {
+  for (uint32_t at : fields) {
+    const uint32_t entry = guest::LoadU32(base, effect + at);
+    if (entry >= kPool && entry < kPool + 20 * 36) {
+      const uint32_t id = (entry - kPool) / 36;
+      if (pool_before[9 * id + 5] == 0 &&
+          std::find(made.addresses.begin(), made.addresses.end(),
+                    guest::LoadU32(base, entry + 24)) == made.addresses.end()) {
+        made.Texture(base, entry, false);
+      }
+    } else if (memory::IsHeapBlock(entry) && guest::LoadU32(base, entry + 32) == 20) {
+      made.Texture(base, entry, true);
+    }
+  }
+}
+
+struct EffectKind {
+  const char* name;
+  GuestFunction recompiled, native;
+  uint32_t size;
+  std::vector<uint32_t> textures, surfaces;
+  uint32_t index;  // the game's table entry
+};
+
+const std::vector<EffectKind>& EffectKinds() {
+  static const std::vector<EffectKind> kinds = [] {
+    std::vector<uint32_t> glow_textures;
+    for (uint32_t at = 8352; at <= 8408; at += 4) {
+      glow_textures.push_back(at);
+    }
+    return std::vector<EffectKind>{
+        {"sub_82138610 Glow::Glow", __imp__sub_82138610, NativeConstruct<pe::GlowConstruct>,
+         8480, glow_textures, {8412, 8416, 8420, 8424, 8428, 8432}, 1},
+        {"sub_82135008 ColorFilter::ColorFilter", __imp__sub_82135008,
+         NativeConstruct<pe::ColorFilterConstruct>, 8128, {8064}, {}, 2},
+        {"sub_82136130 MotionBlur::MotionBlur", __imp__sub_82136130,
+         NativeConstruct<pe::MotionBlurConstruct>, 8224, {8064, 8068}, {8072, 8076}, 3},
+    };
+  }();
+  return kinds;
+}
+
+// The key a constructor asks the pool for an id with (to share it).
+std::array<uint32_t, 5> ConstructorKey(uint8_t* base, uint32_t id, uint32_t entry) {
+  const uint32_t w = guest::LoadU32(base, entry + 12), hgt = guest::LoadU32(base, entry + 16);
+  switch (id) {
+    case 1: return {0x1A20015A, w, hgt, 0, 0};
+    case 6: return {0x1A20015A, w >> 3, hgt >> 3, 0, 0};
+    case 14: return {0x2DA2ABA4, 64, 64, 0, 0};
+    case 15: return {0x2DA2ABA4, 16, 16, 0, 0};
+    case 16: return {0x2DA2ABA4, 4, 4, 0, 0};
+    case 17:
+    case 18: return {0x2DA2ABA4, 1, 1, 0, 0};
+    default: return {0x1A20015A, w >> 2, hgt >> 2, 0, 0};
+  }
+}
+
+// Outputs of a made effect: its bytes and the pool's, made addresses
+// mapped, the made headers, its surfaces' 48-byte headers (made with
+// parameters: no EDRAM). Frees what the case made (surfaces with XMemFree).
+void EffectOutputs(Outputs& out, uint8_t* base, const EffectKind& k, uint32_t effect,
+                   const std::vector<uint32_t>& pool_before, uint32_t r3, uint32_t stray) {
+  Made made;
+  made.addresses.push_back(effect);
+  std::vector<uint32_t> surfaces;
+  for (uint32_t at : k.surfaces) {
+    surfaces.push_back(guest::LoadU32(base, effect + at));
+    made.addresses.push_back(surfaces.back());
+  }
+  EffectTextures(made, base, effect, k.textures, pool_before);
+  for (uint32_t i = 0; i < k.size; i += 4) {
+    const bool single = i >= 8436 && i <= 8476 && k.size == 8480;
+    const uint32_t w = guest::LoadU32(base, effect + i);
+    if (single) {
+      out.Float(w);
+    } else {
+      out.Word(MappedIn(w, made.addresses));
+    }
+  }
+  for (uint32_t i = 0; i < kPoolWords; i++) {
+    out.Word(MappedIn(guest::LoadU32(base, kPool + 4 * i), made.addresses));
+  }
+  out.Bytes(Read(base, stray, 36));
+  for (const auto& [header, memory] : made.textures) {
+    HeaderOutputs(out, base, header, memory);
+  }
+  for (uint32_t surface : surfaces) {
+    out.Word(surface != 0);
+    if (surface != 0) {
+      out.Bytes(Read(base, surface, 48));
+    }
+  }
+  out.Word(MappedIn(r3, made.addresses));
+  for (uint32_t surface : surfaces) {
+    if (surface != 0) {
+      memory::crt::XMemFree(surface, 0x24800000);
+    }
+  }
+  made.Free();
+}
+
+// The constructors on an object from operator new (random bytes), from the
+// game's table entry (its sizes) or a random one in the block (its sizes,
+// position and camera pass), the pool unused or with entries in use with
+// the key asked (shared) or another (an own entry made).
+void ConstructorCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  constexpr uint32_t kEntry = 0x100, kStray = 0x200;
+  Saved pool(h.base, kPool, kPoolWords);
+  for (const EffectKind& k : EffectKinds()) {
+    Results results(k.name);
+    for (int c = 0; c < 20; c++) {
+      std::vector<uint32_t> words(0x400 / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      words[(kStray + 20) / 4] = 2;
+      words[(kStray + 32) / 4] = 0;
+      const bool game = c % 2 == 0;
+      words[kEntry / 4 + 3] = 1 + r.Below(1280);
+      words[kEntry / 4 + 4] = 1 + r.Below(720);
+      words[kEntry / 4 + 8] = r.Below(2) == 0 ? 0 : uint32_t(r.Next());
+      for (uint32_t i : {5u, 6u}) {
+        words[kEntry / 4 + i] = r.Below(2) == 0 ? 0 : r.Below(600);
+      }
+      const uint32_t entry = game ? 0x826174A8u + 36 * k.index : block + kEntry;
+      std::vector<uint32_t> object(k.size / 4);
+      for (uint32_t& w : object) {
+        w = uint32_t(r.Next());
+      }
+      const std::vector<uint32_t> stack = StackWords(r);
+      const uint64_t r5 = r.Next();
+      Outputs out[2];
+      std::vector<uint32_t> pool_words;
+      for (int v = 0; v < 2; v++) {
+        for (uint32_t i = 0; i < words.size(); i++) {
+          guest::StoreU32(h.base, block + 4 * i, words[i]);
+        }
+        if (v == 0) {
+          pool_words = PoolWords(
+              r, [&](uint32_t id) { return ConstructorKey(h.base, id, entry); }, c >= 4, true);
+        }
+        guest::StoreU32s(h.base, kPool, pool_words.data(), kPoolWords);
+        const uint32_t effect = *memory::crt::OperatorNew(h.base, k.size);
+        guest::StoreU32s(h.base, effect, object.data(), uint32_t(object.size()));
+        PPCContext t = CallContext(h);
+        FillStack(h.base, t.r1.u32, stack);
+        t.r3.u64 = effect;
+        t.r4.u64 = entry;
+        t.r5.u64 = r5;
+        Run(v, k.recompiled, k.native, t, h.base);
+        EffectOutputs(out[v], h.base, k, effect, pool_words, t.r3.u32, block + kStray);
+        memory::crt::OperatorDelete(effect);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} entry {:08X}", c, entry));
+    }
+    results.Report();
+  }
+}
+
+// PostEffects::Create for each of the game's 15 entries but kinds 1 and 4
+// (0, 4, 8 and 12: their recompiled constructors make what this harness
+// can't free), the effect's pointer empty or not, the device given or 0
+// (the device lock taken, with the game's video output), the pool
+// unused. Compared: the 15 pointers, the made effect (as the constructors'
+// cases), the device word, r3. Kinds 1 and 4's skip path (pointer set) is
+// covered too.
+void CreateCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  Results results("sub_82138A18 PostEffects::Create");
+  Saved effects(h.base, pe::kEffects, pe::kCount);
+  Saved pool(h.base, kPool, kPoolWords);
+  constexpr uint32_t kStray = 0x200;
+  for (int c = 0; c < 45; c++) {
+    const uint32_t index = uint32_t(c % 15);
+    const uint32_t kind = guest::LoadU32(h.base, 0x826174A8u + 36 * index);
+    const bool present = kind == 1 || kind == 4 || r.Below(4) == 0;
+    const uint32_t device = r.Below(2) == 0 ? 0 : uint32_t(r.Next()) | 1;
+    std::vector<uint32_t> pointers(pe::kCount);
+    for (uint32_t& p : pointers) {
+      p = r.Below(2) == 0 ? 0 : block + 0x300;
+    }
+    pointers[index] = present ? block + 0x300 : 0;
+    const std::vector<uint32_t> pool_words = PoolWords(r, nullptr, false, false);
+    std::vector<uint32_t> stack = StackWords(r);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, block, 0x400, 0x5A);
+      guest::StoreU32(h.base, block + kStray + 20, 2);
+      guest::StoreU32(h.base, block + kStray + 32, 0);
+      guest::StoreU32s(h.base, pe::kEffects, pointers.data(), pe::kCount);
+      guest::StoreU32s(h.base, kPool, pool_words.data(), kPoolWords);
+      PPCContext t = CallContext(h);
+      FillStack(h.base, t.r1.u32, stack);
+      t.r3.u64 = device;
+      t.r4.u64 = index;
+      Run(v, __imp__sub_82138A18, sub_82138A18, t, h.base);
+      const uint32_t made = present ? 0 : guest::LoadU32(h.base, pe::kEffects + 4 * index);
+      for (uint32_t i = 0; i < pe::kCount; i++) {
+        out[v].Word(i == index && made != 0 ? 1 : guest::LoadU32(h.base, pe::kEffects + 4 * i));
+      }
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 + 20));
+      uint32_t r3 = t.r3.u32;
+      if (made != 0 && r3 == made) {
+        r3 = 1;
+      }
+      out[v].Word(r3);
+      if (made != 0) {
+        const auto& kinds = EffectKinds();
+        if (kind == 5) {
+          out[v].Bytes(Read(h.base, made, 8064));
+          const uint32_t surface = guest::LoadU32(h.base, made + 8064);
+          out[v].Word(surface != 0);
+          if (surface != 0) {
+            out[v].Bytes(Read(h.base, surface, 48));
+            memory::crt::XMemFree(surface, 0x24800000);
+          }
+        } else {
+          const EffectKind& k = kinds[kind == 0 ? 0 : kind == 2 ? 1 : 2];
+          EffectOutputs(out[v], h.base, k, made, pool_words, 0, block + kStray);
+        }
+        memory::crt::OperatorDelete(made);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {} index {} device {:08X} present {}", c,
+                                              index, device, present));
+  }
+  results.Report();
+}
+
 // --- The destructors ---
 
 // The destructors and the deleting ones (r4 0 or 1, or any) on an effect of
@@ -962,6 +1427,9 @@ void PostEffects(Context& h) {
   ReleaseSurfaceCases(h, block);
   TargetFilterCases(h, block);
   InitEdramBaseCases(h);
+  RenderTextureMakeCases(h, block);
+  ConstructorCases(h, block);
+  CreateCases(h, block);
   DestroyCases(h, block);
   memory::Free(block);
 }

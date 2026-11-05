@@ -58,7 +58,11 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "the deleting destructors' and the destructors' plain C++ call them, and the flag "
               "switches those) and their deleting ones sub_821389C8, sub_82138570 and sub_821385C0 "
               "(operator delete with --native_c_runtime_heap); PostEffects::InitEdramBase "
-              "sub_825D99D0) natively instead of through the "
+              "sub_825D99D0; PostEffects::Create sub_82138A18 (with --native_heap) with the "
+              "constructors Glow::Glow sub_82138610, ColorFilter::ColorFilter sub_82135008 and "
+              "MotionBlur::MotionBlur sub_82136130 and the render textures' "
+              "RenderTextures::Acquire sub_82133190 and RenderTexture::Create sub_821330D0 (no "
+              "adapters: only Create's plain C++ calls them, and the flag switches that)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
@@ -308,6 +312,45 @@ extern "C" REX_FUNC(sub_82135AA8) {
 // PostEffects::InitEdramBase: no arguments (a static initializer, through
 // _cinit's table).
 ITC_POST_EFFECTS(825D99D0, ctx.r3.u64 = InitEdramBase(base))
+
+// PostEffects::Create: r3 = the device or 0, r4 = the effect's index. The
+// guest calls from a frame like the original's (128 bytes); with the
+// allocation layer only.
+extern "C" REX_FUNC(sub_82138A18) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
+    __imp__sub_82138A18(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint32_t device = ctx.r3.u32;
+  const uint32_t index = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, base, 128, 0x82138A54, [&](uint32_t) {
+    const CreateCalls calls{
+        [&](int which) {
+          return which == 0 ? VideoOutputCall(ctx, base, 0x82138A54, 0x82138A64)
+                            : VideoOutputCall(ctx, base, 0x82138C18, 0x82138C28);
+        },
+        [&](uint32_t function, uint32_t object, uint32_t entry, uint32_t device_word) {
+          ctx.r3.u64 = object;
+          ctx.r4.u64 = entry;
+          ctx.r5.u64 = device_word;
+          ctx.lr = function == 0x82134410 ? 0x82138BB8 : 0x82138B10;
+          if (function == 0x82134410) {
+            sub_82134410(ctx, base);
+          } else {
+            sub_82133B10(ctx, base);
+          }
+          return ctx.r3.u32;
+        }};
+    r3 = Create(base, stack, device, index, calls);
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
 
 // --- The destructors ---
 
