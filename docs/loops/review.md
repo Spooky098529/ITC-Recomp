@@ -13,7 +13,7 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-05 20:21 (`b7-loop-05-11-26`)
 
-(Nothing yet.)
+- The top lead (the graphics resources' other makers) was stale: `sub_820ED6D0` is `CarModel::MakePlate` (`car-models.md`, ours), `sub_82135AA8`, `sub_82136130`, `sub_821330D0` already in `post-effects.md`. One row added to `post-effects.md` (b86338cf): `sub_825D99D0` `PostEffects::InitEdramBase` (probably a `_cinit` initializer; `[0x826C5DC0]` = `Surface::EdramTiles(1024, 576, 0x1A2201BF, 1)`, 936), `known-data.md`'s `0x826C5DC0` updated. The agent's note: `c-runtime.md`'s `sub_825A6E48` row names `_cinit`'s tables at `0x82630284` and `0x82630010`, where the code gives `0x82600284` and `0x82600010` (probably a typo, not changed). The rest of `post-effects.md` (13 recompiled) is all ready, so the migration takes it.
 
 ## Run 2026-11-04 19:51 (`b7-loop-03-11-26`, continued)
 
