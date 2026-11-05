@@ -3,10 +3,11 @@
 // Flush-to-zero is left off, as the translated code leaves it. The setters
 // are vtable slots (the glow's 2-12 and 24, the color filter's 4 and 6-8),
 // so their adapters stay. Glow::Record (sub_821379D8) is frame
-// interpolation's wrap (src/interpolation/glow.cpp), MotionBlur::Record
-// (sub_821363F0) is recompiled with interpolation's notes at its return
-// 8213653C, and PostEffects::RecordAll (sub_82133960) is the diagnostics'
-// rewrite (src/debug/frame_state_diff.cpp): none of them is here.
+// interpolation's wrap (src/interpolation/glow.cpp), and
+// PostEffects::RecordAll (sub_82133960) is the diagnostics' rewrite
+// (src/debug/frame_state_diff.cpp): neither is here. MotionBlur::Record's
+// plain C++ notes its copy as Matrix::Copy's wrapper does at its return
+// 8213653C (interpolation::BlendState_MotionBlurCopy).
 // PostEffects::ToggleNoHistory (sub_82133A38) and ScreenObject::ToggleHidden
 // (sub_8212EDE0) have no adapters: only Race::ToggleEffects' plain C++ calls
 // them, and the flag switches it. StarDef::Init (sub_8212EA98) has none
@@ -65,7 +66,8 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "adapters: only Create's plain C++ calls them, and the flag switches that), and "
               "PostEffects::InitBoot sub_82138C38 (with --native_heap, over "
               "CreateVertexDeclaration's plain C++); the records ColorFilter::Record "
-              "sub_821351F0 and TargetFilter::Record sub_82135B50, without the command list's "
+              "sub_821351F0, TargetFilter::Record sub_82135B50 and MotionBlur::Record sub_821363F0 "
+              "(frame interpolation's note of its copy kept), without the command list's "
               "diagnostics) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
@@ -471,6 +473,7 @@ RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
 
 ITC_POST_EFFECT_RECORD(821351F0, ColorFilterRecord)
 ITC_POST_EFFECT_RECORD(82135B50, TargetFilterRecord)
+ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
 
 // --- The destructors ---
 

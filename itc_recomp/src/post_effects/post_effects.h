@@ -242,6 +242,19 @@ std::optional<uint32_t> ColorFilterRecord(uint8_t* base, uint32_t stack, uint32_
 std::optional<uint32_t> TargetFilterRecord(uint8_t* base, uint32_t stack, uint32_t filter,
                                            const RecordCalls& calls);
 
+// MotionBlur::Record (sub_821363F0, the motion blur's vtable slot 0): its
+// vertex c100 x4 upload chunk
+// (its previous view-projection, the copy frame interpolation notes:
+// interpolation::BlendState_MotionBlurCopy), the pair moved on (+8144 =
+// +8080, +8080 = its camera pass's +144) on logic passes, then the blur's
+// chunk (velocities into +8072 with shader pair 32, resolved into +8064's
+// texture, the frame into +8068's, shader pair 33 over the view with c40
+// and c41); its four chunks handed on; +40 = 0. Returns r3 (the last
+// queue call's), or nothing (the first getters called) when the list
+// hasn't room for its 131 slots or a chunk is open.
+std::optional<uint32_t> MotionBlurRecord(uint8_t* base, uint32_t stack, uint32_t blur,
+                                         const RecordCalls& calls);
+
 // --- The destructors ---
 
 // The calls the destructors make, each returning r3 as it leaves it:

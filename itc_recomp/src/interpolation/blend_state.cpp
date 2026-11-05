@@ -3965,6 +3965,15 @@ uint32_t BlendState_MotionBlurNotedSource(uint8_t* base, uint32_t view, uint32_t
   return it != logic_copies.end() && it->second.value == value ? it->second.src : src;
 }
 
+void BlendState_MotionBlurCopy(uint8_t* base, uint32_t view, uint32_t dst, uint32_t src) {
+  if (ITC_FLAG(log_motion_blur_velocity)) {
+    BlendState_LogMotionBlurCopy(base, view, src);
+  }
+  const uint32_t noted = BlendState_MotionBlurNotedSource(base, view, src);
+  matrix_math::Copy(base, dst, src);
+  GetDrawState().OnCopy(base, dst, noted, 0x8213653C);
+}
+
 void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
                                 const std::function<void()>& upload) {
   uint32_t stage = packed >> 24, count = packed & 0xFF;

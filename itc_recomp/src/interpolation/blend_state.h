@@ -32,6 +32,12 @@ void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
 // (caller 0x8213653C), which the wrapper notes under another source.
 void BlendState_OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller);
 
+// The motion blur's copy of its previous view-projection (Matrix::Copy at
+// return 0x8213653C in MotionBlur::Record, `view` the motion blur) done by
+// native code: logged and noted as the copy's wrapper does it for that
+// caller, the copy made natively (matrix_math::Copy).
+void BlendState_MotionBlurCopy(uint8_t* base, uint32_t view, uint32_t dst, uint32_t src);
+
 // Main thread: the message handler being run (its target), 0 after it.
 // Diagnostics (--log_overlay_uploads): after the race overlays recorded on a
 // logic pass, logs every slot they allocated, every 3 s.

@@ -16,6 +16,8 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "command_list/command_list.h"
+#include "interpolation/blend_state.h"
+#include "matrix_math/matrix_math.h"
 #include "models/model.h"
 
 #include <bit>
@@ -94,7 +96,7 @@ class Recorder {
   }
   // The chunk handed to the render queue (its slot 4: r4 = the chunk, r5 =
   // the key, f1); its r3.
-  uint32_t Submit(uint32_t chunk, uint32_t key, double f1, uint32_t lr1, uint32_t lr2,
+  uint32_t Submit(uint32_t chunk, uint64_t key, double f1, uint32_t lr1, uint32_t lr2,
                   uint32_t lr3) {
     const uint32_t queue = Get(8, lr1, lr2);
     return VtableCall(queue, 16, lr3, {chunk, key}, f1, true);
@@ -312,6 +314,147 @@ std::optional<uint32_t> TargetFilterRecord(uint8_t* base, uint32_t stack, uint32
       r.Submit(header, Load(base, filter + 8), Lfs(base, kZero), 0x821360EC, 0x821360FC,
                0x8213611C);
   Store(base, filter + 40, 0);
+  return r3;
+}
+
+std::optional<uint32_t> MotionBlurRecord(uint8_t* base, uint32_t stack, uint32_t blur,
+                                         const RecordCalls& calls) {
+  const uint32_t frame = stack - 288;
+  Store(base, frame, stack);  // the back chain, as stwu
+  Recorder r(base, calls, frame);
+  // The list before every step, as the original fetches it.
+  uint32_t list = r.Get(4, 0x82136420, 0x82136430);
+  if (!r.Ready(list, 131)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_821363F0 MotionBlur::Record");
+  // --- The upload chunk: vertex c100 x4, the previous view-projection ---
+  const uint32_t upload = Slot(base, list);  // its header, before the chunk opens
+  list = r.Get(4, 0x82136454, 0x82136464);
+  command_list::OpenChunk(base, list);
+  list = r.Get(4, 0x8213647C, 0x8213648C);
+  Header(base, list);
+  list = r.Get(4, 0x821364B8, 0x821364C8);
+  Slot3(base, list, 7, 4, 0x16404);
+  list = r.Get(4, 0x82136500, 0x82136510);
+  const uint32_t matrix = command_list::AllocateSlots(base, list, 4);
+  // This tick's view-projection on a logic pass (+48 set) with history
+  // (+44 clear), else the previous tick's (frame interpolation notes the
+  // copy).
+  const bool logic = Load(base, blur + 48) != 0 && Load(base, blur + 44) == 0;
+  interpolation::BlendState_MotionBlurCopy(base, blur, matrix, blur + (logic ? 8080 : 8144));
+  list = r.Get(4, 0x82136550, 0x82136560);
+  Slot3(base, list, 36, 0, 0);
+  list = r.Get(4, 0x8213658C, 0x8213659C);
+  command_list::CloseChunk(base, list);
+  // On a logic pass with its camera pass active: the pair moved on (+8144 =
+  // +8080, +8080 = the pass's view-projection at +144).
+  if (logic) {
+    const uint32_t pass = kCameraPasses + Load(base, blur + 36) * 592;
+    if (Load(base, pass + 588) != 0) {
+      matrix_math::Copy(base, blur + 8144, blur + 8080);
+      interpolation::BlendState_OnCopy(base, blur + 8144, blur + 8080, 0x821365E8);
+      matrix_math::Copy(base, blur + 8080, pass + 144);
+      interpolation::BlendState_OnCopy(base, blur + 8080, pass + 144, 0x821365F4);
+    }
+  }
+  // --- The blur's chunk ---
+  list = r.Get(4, 0x82136608, 0x82136618);
+  command_list::OpenChunk(base, list);
+  const uint32_t draw = Header(base, list);
+  // The velocities drawn into +8072 (with +8076's depth): shader pair 32
+  // and 280 bytes of constants.
+  RecordTargets(base, list, Load(base, blur + 8072), Load(base, blur + 8076));
+  Slot3(base, list, 1, 3, 0);
+  Slot2(base, list, 40, 1);
+  Slot2(base, list, 48, 1);
+  Slot2(base, list, 44, 6);
+  Slot3(base, list, 26, 1, 0);
+  const uint32_t bytes = command_list::AllocateBytes(base, list, 280, false);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, bytes + 272, zero);
+  Store(base, bytes + 276, 0);
+  Store(base, bytes + 268, 0x80808000);
+  Store(base, bytes + 4, 0);
+  Store(base, bytes + 8, 49);
+  Store(base, bytes + 0, 0);
+  ShaderPair(base, list, 32);
+  Slot3(base, list, 36, 0, 0);
+  // Resolved into +8064's texture; the frame into +8068's.
+  const uint32_t velocities = Header(base, list);
+  RecordResolve(base, blur, list, Load(base, Load(base, blur + 8064) + 24), 0, 0, false);
+  Slot3(base, list, 36, 0, 0);
+  const uint32_t scene = Header(base, list);
+  RecordResolve(base, blur, list, Load(base, Load(base, blur + 8068) + 24), 0, 0xFFFFFFFDu,
+                true);
+  // The blur over the view: shader pair 33 with the two textures.
+  Declaration(base, list);
+  RecordBeginStates(base, list);
+  Slot3(base, list, 1, 5, 0);
+  Slot2(base, list, 60, 1);
+  Slot2(base, list, 308, 1);
+  Slot2(base, list, 312, 1);
+  Slot2(base, list, 316, 1);
+  Slot2(base, list, 320, 1);
+  Slot3(base, list, 4, 2, 0);
+  Slot2(base, list, 0, Load(base, Load(base, blur + 8068) + 24));
+  Slot2(base, list, 1, Load(base, Load(base, blur + 8064) + 24));
+  Slot3(base, list, 2, 8, 0);
+  Slot3(base, list, 0, 0, 2);
+  Slot3(base, list, 0, 4, 2);
+  Slot3(base, list, 0, 20, 1);
+  Slot3(base, list, 0, 16, 1);
+  Slot3(base, list, 0, 24, 2);
+  Slot3(base, list, 1, 20, 1);
+  Slot3(base, list, 1, 16, 1);
+  Slot3(base, list, 1, 24, 2);
+  // c40: +8208 to +8216 and the constant at 0x82008828.
+  const uint32_t c = frame + 80;
+  Stfs(base, c + 12, Lfs(base, 0x82008828));
+  Stfs(base, c + 0, Lfs(base, blur + 8208));
+  Stfs(base, c + 4, Lfs(base, blur + 8212));
+  Stfs(base, c + 8, Lfs(base, blur + 8216));
+  RecordPixelConstants(base, list, c, 40, 1);
+  // c41: ((1 / width)^2 x +8220) x +8220, 0, 0, 0.
+  const double scale = Lfs(base, blur + 8220);
+  const uint32_t width = Load(base, blur + 16);
+  Stfs(base, frame + 100, zero);
+  Stfs(base, frame + 104, zero);
+  Stfs(base, frame + 108, zero);
+  StoreDoubleword(base, frame + 80, width);
+  const double one = Lfs(base, kOne);
+  const double w = double(float(double(int64_t(width))));
+  const double a = double(float(one / w));
+  const double b = double(float(one / w));
+  double v = double(float(a * b));
+  v = double(float(v * scale));
+  v = double(float(v * scale));
+  Stfs(base, frame + 96, v);
+  RecordPixelConstants(base, list, frame + 96, 41, 1);
+  // The texel size (the frame's +80 the height, then the width).
+  const uint32_t height = Load(base, blur + 20);
+  StoreDoubleword(base, frame + 80, height);
+  StoreDoubleword(base, frame + 80, width);
+  RecordTexelSize(base, list, double(float(double(int64_t(width)))),
+                  double(float(double(int64_t(height)))));
+  Slot3(base, list, 3, 1, 0);
+  Slot2(base, list, 0, 0x10706);
+  ShaderPair(base, list, 33);
+  Quad(base, list, blur, one, true);
+  RecordEndStates(base, list);
+  Slot3(base, list, 36, 0, 0);
+  command_list::CloseChunk(base, list);
+  // The four chunks to the render queue: the upload and the velocities
+  // with the key +12 - 2, the velocities' resolve with +12, the blur with
+  // +8.
+  // (+12 - 2 as the original's 64-bit subtraction from the word.)
+  r.Submit(upload, uint64_t(Load(base, blur + 12)) - 2, zero, 0x82136CC0, 0x82136CD0,
+           0x82136CF0);
+  r.Submit(draw, uint64_t(Load(base, blur + 12)) - 2, zero, 0x82136D04, 0x82136D14, 0x82136D34);
+  r.Submit(velocities, Load(base, blur + 12), zero, 0x82136D48, 0x82136D58, 0x82136D74);
+  const uint32_t r3 =
+      r.Submit(scene, Load(base, blur + 8), zero, 0x82136D88, 0x82136D98, 0x82136DB4);
+  Store(base, blur + 40, 0);
   return r3;
 }
 
