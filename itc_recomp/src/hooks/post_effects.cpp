@@ -74,7 +74,7 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "MotionBlur::MotionBlur sub_82136130 and the render textures' "
               "RenderTextures::Acquire sub_82133190 and RenderTexture::Create sub_821330D0 (no "
               "adapters: only Create's plain C++ calls them, and the flag switches that), and "
-              "PostEffects::InitBoot sub_82138C38 (with --native_heap, over "
+              "PostEffects::InitBoot sub_82138C38 (no adapter: only FramePasses::Boot's adapter calls its work; with --native_heap, over "
               "CreateVertexDeclaration's plain C++); the records ColorFilter::Record "
               "sub_821351F0, TargetFilter::Record sub_82135B50 and MotionBlur::Record sub_821363F0 "
               "(frame interpolation's note of its copy kept), and the glow's star streaks "
@@ -385,11 +385,6 @@ void hooks::PostEffectsInitBoot(PPCContext& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
-}
-
-extern "C" REX_FUNC(sub_82138C38) {
-  REX_FUNC_PROLOGUE();
-  hooks::PostEffectsInitBoot(ctx, base);
 }
 
 // --- The records (vtable slot 0: PostEffects::RecordAll's guest calls) ---

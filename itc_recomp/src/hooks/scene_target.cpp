@@ -25,7 +25,7 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 
 ITC_FLAG_BOOL(native_scene_target, true, "ITC",
               "Run the scene target's passes (docs/functions/scene-target.md: "
-              "SceneTarget::RecordPasses sub_8209B3D0 (the render manager's getters and the "
+              "SceneTarget::RecordPasses sub_8209B3D0 (no adapter: only FramePasses::Record's adapter calls its work; the render manager's getters and the "
               "render queue's Add guest calls) with RecordTargets sub_8209AE48, RecordTileTargets "
               "sub_8209AF40, TexturedRect::Record sub_8217C368 and RecordFlat sub_8217AA98 (no "
               "adapters: only RecordPasses calls them; the rectangle's render queue Add a guest "
@@ -118,9 +118,9 @@ void hooks::SceneTargetRecordPasses(PPCContext& ctx, uint8_t* base) {
 
 // SceneTarget::RecordPasses: r3 = the scene target, r4 = the command list,
 // r5, r6, r7 = the buckets; r3 as the last guest call leaves it (the scene
-// target when no pass is recorded).
-extern "C" REX_FUNC(sub_8209B3D0) {
-  REX_FUNC_PROLOGUE();
+// target when no pass is recorded). No adapter: only FramePasses::Record's
+// adapter calls this.
+void hooks::SceneTargetRecordPassesOrOriginal(PPCContext& ctx, uint8_t* base) {
   if (!Native()) {
     __imp__sub_8209B3D0(ctx, base);
     return;

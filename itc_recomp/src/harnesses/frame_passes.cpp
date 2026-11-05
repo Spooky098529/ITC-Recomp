@@ -222,7 +222,7 @@ void PrimitiveResetCases(Context& h, uint32_t block) {
           // then).
           ListWithRoom(h, block, r, 5, r.Below(8) == 0 ? 1 + r.Below(2) : 0);
         },
-        [&](PPCContext&) {}, __imp__sub_82589990, sub_82589990, fmt::format("case {}", c));
+        [&](PPCContext&) {}, __imp__sub_82589990, hooks::FramePassesRecordPrimitiveReset, fmt::format("case {}", c));
   }
   results.Report();
 }

@@ -1341,7 +1341,7 @@ void InitBootCases(Context& h, uint32_t block) {
       PPCContext t = CallContext(h);
       FillStack(h.base, t.r1.u32, stack);
       t.r3.u64 = device;
-      Run(v, __imp__sub_82138C38, sub_82138C38, t, h.base);
+      Run(v, __imp__sub_82138C38, hooks::PostEffectsInitBoot, t, h.base);
       const uint32_t decl = guest::LoadU32(h.base, pe::kVertexDeclaration);
       out[v].Word(decl != 0 && decl != before);
       if (decl != 0 && decl != before) {

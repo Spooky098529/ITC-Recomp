@@ -1,7 +1,9 @@
 // The frame passes natively: adapters in front of src/frame_passes/
 // (docs/functions/frame-passes.md). Each leaves r3 as the original does.
 // WorkMem::Flip (sub_82589A78) has no adapter: only FramePasses::FlipWorkMem
-// calls it. With the command list's diagnostics on, the recorders'
+// calls it; nor RecordPrimitiveReset (sub_82589990): only Record's adapter
+// calls its work (hooks::FramePassesRecordPrimitiveReset), and the flag
+// switches that. With the command list's diagnostics on, the recorders'
 // originals run.
 
 #include "guest.h"
@@ -23,7 +25,7 @@ ITC_FLAG_BOOL(native_frame_passes, true, "ITC",
               "FramePasses::FlipWorkMem sub_82096218 with WorkMem::Flip sub_82589A78 (no adapter: "
               "only FlipWorkMem calls it), the delegate thunk sub_82096350 (its target a tail "
               "call), FramePasses::RecordConstants sub_82096360, RecordSamplers sub_82096030 and "
-              "RecordPrimitiveReset sub_82589990 (the render queue's Add a guest call), Job::Wait "
+              "RecordPrimitiveReset sub_82589990 (no adapter: only Record's adapter calls its work; the render queue's Add a guest call), Job::Wait "
               "sub_82094B10 (inside --find_menu_selection's wrap; the job's object a guest call) "
               "FramePasses::Boot sub_820962B8 (with --native_video_output; the getters and "
               "PostEffects::InitBoot guest calls) and FramePasses::FramePasses sub_82098630 (the "
@@ -115,12 +117,6 @@ void hooks::FramePassesRecordPrimitiveReset(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-// FramePasses::RecordPrimitiveReset: no arguments; r3 as the render queue's
-// Add leaves it.
-extern "C" REX_FUNC(sub_82589990) {
-  ITC_FRAME_PASSES_FALLBACK(82589990)
-  hooks::FramePassesRecordPrimitiveReset(ctx, base);
-}
 
 void hooks::FramePassesJobWait(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_frame_passes)) {
@@ -281,11 +277,11 @@ void hooks::FramePassesRecord(PPCContext& ctx, uint8_t* base) {
           ctx.r4.u64 = list;
           ctx.r3.u64 = guest::LoadU32(base, 0x8266D08C);
           ctx.lr = 0x82098620;
-          sub_8209B3D0(ctx, base);
+          hooks::SceneTargetRecordPassesOrOriginal(ctx, base);
         },
         [&]() {
           ctx.lr = 0x82098624;
-          sub_82589990(ctx, base);
+          hooks::FramePassesRecordPrimitiveReset(ctx, base);
         }};
     done = fp::Record(base, passes, frame, calls);
   });

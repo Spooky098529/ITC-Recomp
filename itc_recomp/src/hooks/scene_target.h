@@ -22,5 +22,9 @@ void SceneTargetTexturedRect(PPCContext& ctx, uint8_t* base);
 // the rectangles through SceneTargetTexturedRect; r3 as the last call
 // leaves it. The original where the plain C++ declines.
 void SceneTargetRecordPasses(PPCContext& ctx, uint8_t* base);
+// The same with --native_scene_target (without the command list's
+// diagnostics), else the original: FramePasses::Record's adapter calls it
+// (RecordPasses has no adapter of its own).
+void SceneTargetRecordPassesOrOriginal(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
