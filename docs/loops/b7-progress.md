@@ -8,87 +8,20 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-11-04 19:51 on `b7-loop-03-11-26` (the user's call,
-  2026-11-04: keep going on this branch, no new one), from a65d2472;
-  summary `b7-loop-2026-11-04-1951.md`. Limit: 3 subsystems.
-- Subsystem 1 of 3: the cars put back on the road (the top lead, the
-  race data's record copies `sub_82102B98`, `sub_82102AA8`, with the
-  lead that calls them, the race code at `82104310`-`82104E00`:
-  `sub_821044D8` and the rest; both lines deleted from `leads.md`).
-  Map checked (dcfccb78: `replay-snapshots.md`, 30 rows, all new, 26
-  in play; 0 errors; 3 ready groups, `sub_821044D8`, `sub_82104AB8`,
-  `sub_82104F68`; not resets: the replay's start and end snapshots;
-  the input recordings' lead taken with it). Migration
-  e9389918..1a5be4a1 (`--native_replay_snapshots`, 26 of 26 in play
-  ours, 2 adapters removed; RaceReplay's four in the `race_world`
-  harness; `itc_3484`/`itc_3486`: race 28 s (the harnesses' time), 0
-  errors, every harness 0 differing; none runs in an attract race; no
-  subagents). Validated `itc_3487` (race 47 s, 0 errors, 26 of 26
-  harness lines, every harness 0 differing but the expected groups);
-  none ran in the race or the replay `itc_3488` (ok): 26 to drive.
-  Done.
-- Subsystem 2 of 3: the race's sounds (lead picked: the race's sound
-  handlers `sub_82175908` and the rest, 8 of 8 ready, all in play,
-  with the readers of the scene models' sound slots `sub_82175F20`,
-  `sub_82176188` beside them, 2 of 2 ready; both lines deleted from
-  `leads.md`). Map checked (53aa7a89: `race-sounds.md`, 31 rows, all
-  new, 29 in play; 0 errors; 15 ready groups; the race mode's machine
-  at +138284; `RaceSounds::Init` 1,680 lines, split the migration).
-  `rand` `sub_825A9BB8` (per-thread seed over `_getptd`, left for the
-  core 2026-10-25) blocks `PlayStartMusic` `sub_82175DB0`, `Begin`
-  `sub_82176618` and `IdleTick` `sub_821767A8`: raised with the user
-  (the call's own condition). The user's call (2026-11-04): `rand`
-  native, over the thread's guest seed (+20 of `_getptd`'s block, found
-  as the original does), `_getptd` and `_mtinit` left for the core;
-  given to the migration agent for after the ready groups. Migration
-  508c7be5..d4d1905e (`--native_race_sounds`, 28 of 29 in play ours,
-  8 adapters removed, with `rand` under `--native_c_runtime`; one
-  subagent for `RaceSounds::Init`; `itc_3496`/`itc_3497`: race 38 s,
-  0 errors, every harness 0 differing; `Unload` `sub_821772D8` left,
-  ready, at the batch limit). Validated `itc_3498` (race 46 s, 0
-  errors, 29 of 29 harness lines, every harness 0 differing but the
-  expected groups; 9 ran in the race, 13 more in the replay `itc_3499`
-  (ok), 7 to drive). Second migration 4d319832..7a28543f (`Unload`,
-  `OnAbort`, `OnAbortDone`; `CarSounds::Release`'s adapter removed;
-  31 of 31 ours; `itc_3500`/`itc_3501`: race 38 s, 0 errors, every
-  harness 0 differing). Validated `itc_3502` (race 46 s, 0 errors, 4
-  of 4 harness lines; `Unload` and `CarSounds::Release` ran in the
-  replay `itc_3503` (ok), 2 to drive). Done.
-- Subsystem 3 of 3: the loading screen and the race mode's +848
-  machine (the loading screen's lead `sub_82247898`, `sub_82247A60`,
-  `sub_82290B30`, `sub_822478D0`, with what's left of the race mode's
-  set-ups lead: +848 `sub_821517D8` and the delegate's `0x82235C08`;
-  both lines deleted from `leads.md`). Map checked (4ba4c0f4:
-  `race-loading.md`, one file: 17 rows, all new, 13 in play; 0
-  errors; 9 ready groups; `CourseSetup::` the +848 machine,
-  `RaceMode::NextMode`, the loading screen; blocked parts wait on
-  `Scenery::IsLoaded`, `CarScene::Update` and the `sub_82150E00` lead).
-  Migration e3e7b130..f6bb8df4 (`--native_race_loading`, 10 of 13 in
-  play ours, no adapters removed; `itc_3506`: race 38 s, 0 errors,
-  every harness 0 differing, all ran in the race; loading screen dumps
-  on and off the same but the animation's phase; no subagents).
-  Validated `itc_3519` (race 46 s, 0 errors, 10 of 10 harness lines;
-  9 ran in the race, `LoadingScreen::Finish` in the replay `itc_3520`
-  (ok); none to drive). Done.
+- Run started 2026-11-05 20:21 on `b7-loop-05-11-26`, from 7b039c95;
+  summary `b7-loop-2026-11-05-2021.md`. Limit: 3 subsystems.
+- Subsystem 1 of 3: the other makers and users of the graphics
+  resources (the top lead: `sub_82135AA8`, `sub_82136130`,
+  `sub_821330D0`, `sub_820ED6D0`, `sub_825D99D0` left of it; its line
+  deleted from `leads.md`). Step: mapping, agent running.
 
 ## Done
 
-- The race's loading: `race-loading.md` (map 4ba4c0f4, migration
-  e3e7b130..f6bb8df4, `--native_race_loading`, 10 of 13 in play;
-  validated `itc_3519`: race 46 s, 0 errors, 10 of 10 harness lines,
-  replay `itc_3520` ok, none to drive).
-- The race's sounds: `race-sounds.md` (map 53aa7a89, migrations
-  508c7be5..d4d1905e and 4d319832..7a28543f, `--native_race_sounds`,
-  31 of 31, with `rand` under `--native_c_runtime` by the user's call;
-  validated `itc_3498` and `itc_3502`: 0 errors, every harness line,
-  replays `itc_3499`, `itc_3503` ok, 9 to drive).
-- The replay's snapshots: `replay-snapshots.md` (map dcfccb78,
-  migration e9389918..1a5be4a1, `--native_replay_snapshots`, 26 of 26
-  in play; validated `itc_3487`: race 47 s, 0 errors, 26 of 26 harness
-  lines, replay `itc_3488` ok, 26 to drive).
+(None yet.)
+
 ## Rows to review
 
-`review.md`, "Run 2026-11-04 19:51".
+`review.md`, "Run 2026-11-05 20:21".
 
 ## Expected to differ
 
@@ -100,28 +33,5 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
-- At the start: ours 4099, work left 2309 (wrapped 62, known 480,
-  unknown 1767).
-- After the replay snapshots' map: ours 4099, work left 2309 (wrapped
-  62, known 506, unknown 1741).
-- After its migration: ours 4125, work left 2283 (wrapped 62, known
-  480, unknown 1741).
-- After its validation (`itc_3487`): ours 4125, work left 2283.
-- After the race's sounds' map: ours 4125, work left 2283 (wrapped
-  62, known 509, unknown 1712).
-- After its first migration: ours 4154, work left 2254 (wrapped 62,
-  known 480, unknown 1712).
-- After its second migration: ours 4157, work left 2253 (wrapped 62,
-  known 479, unknown 1712).
-- After its validation (`itc_3502`): ours 4157, work left 2253.
-- After the race's loading's map: ours 4157, work left 2253 (wrapped
-  62, known 492, unknown 1699).
-- After its migration: ours 4167, work left 2243 (wrapped 62, known
-  482, unknown 1699).
-- After its validation (`itc_3519`): ours 4167, work left 2243.
-
-## Stopped
-
-2026-11-04, at the run's limit (3 subsystems), after the race's
-loading's validation. No halts in the run; one question to the user
-(`rand`, answered). Nothing uncommitted. The user reviews and merges.
+- At the start: ours 4167, work left 2243 (wrapped 62, known 482,
+  unknown 1699).
