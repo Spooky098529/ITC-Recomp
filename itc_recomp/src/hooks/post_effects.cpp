@@ -11,7 +11,10 @@
 // PostEffects::ToggleNoHistory (sub_82133A38) and ScreenObject::ToggleHidden
 // (sub_8212EDE0) have no adapters: only Race::ToggleEffects' plain C++ calls
 // them, and the flag switches it. StarDef::Init (sub_8212EA98) has none
-// either: only GlareDef::Init's plain C++ calls it; nor RenderTexture::Release
+// either: only GlareDef::Init's plain C++ calls it; nor GlareDef::GlareDef
+// (sub_8212ED78) and GlareDef::Init (sub_8212EC90): only Glow::Glow's plain
+// C++ calls them; nor TargetFilter::TargetFilter (sub_82135AA8): only
+// PostEffects::Create's plain C++ calls it; nor RenderTexture::Release
 // (sub_82133070): only RenderTextures::Release's plain C++ calls it; nor
 // RenderTextures::Release (sub_821332F0), PostEffect::ReleaseSurface
 // (sub_82133C60) and the destructors Glow::~Glow (sub_82136E30),
@@ -32,7 +35,6 @@
 #include <optional>
 
 ITC_FLAG_DECLARE(bool, native_video_output);
-ITC_FLAG_DECLARE(bool, native_graphics_resources);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
 ITC_FLAG_BOOL(native_post_effects, true, "ITC",
@@ -47,13 +49,15 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "RecordTargets sub_82133790, RecordPixelConstants sub_82133D00, RecordPixelBool "
               "sub_82133D70, RecordTexelSize sub_82133DD8, AddQuad sub_82133E30 and RecordResolve "
               "sub_82133F58, without the command list's diagnostics; the glare's GlareDef::GlareDef "
-              "sub_8212ED78, GlareDef::Init sub_8212EC90 and StarDef::Init sub_8212EA98 (no adapter: only "
+              "sub_8212ED78 and GlareDef::Init sub_8212EC90 (no adapters: only Glow::Glow's plain C++ "
+              "calls them, and the flag switches that) and StarDef::Init sub_8212EA98 (no adapter: only "
               "GlareDef::Init's plain C++ calls it, and the flag switches that); "
               "RenderTexture::Release sub_82133070 (no adapter: only RenderTextures::Release's "
               "plain C++ calls it, and the flag switches that) and RenderTextures::Release sub_821332F0 (with "
               "--native_heap and --native_c_runtime_heap), PostEffect::ReleaseSurface sub_82133C60 "
-              "(with --native_video_output) and TargetFilter::TargetFilter sub_82135AA8 (with "
-              "--native_graphics_resources and --native_heap); the destructors Glow::~Glow "
+              "(with --native_video_output) and TargetFilter::TargetFilter sub_82135AA8 (no adapter: "
+              "only PostEffects::Create's plain C++ calls it, and the flag switches that); the "
+              "destructors Glow::~Glow "
               "sub_82136E30, ColorFilter::~ColorFilter sub_821351A8 and MotionBlur::~MotionBlur "
               "sub_82136390 (no adapters, nor for RenderTextures::Release and ReleaseSurface: only "
               "the deleting destructors' and the destructors' plain C++ call them, and the flag "
@@ -200,14 +204,6 @@ ITC_POST_EFFECTS(82133E30, ctx.fpscr.disableFlushMode();
                  ctx.r3.u64 = AddQuad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
                                       ctx.r7.u32 != 0))
 
-// --- The glare's definition ---
-
-// r3 = the glare definition.
-ITC_POST_EFFECTS(8212ED78, ctx.fpscr.disableFlushMode(); GlareDefConstruct(base, ctx.r3.u32))
-// r4 = the glare type.
-ITC_POST_EFFECTS(8212EC90, ctx.fpscr.disableFlushMode();
-                 ctx.r3.u64 = GlareDefInit(base, ctx.r3.u32, ctx.r4.u32))
-
 // --- The render textures and surfaces ---
 
 namespace {
@@ -294,28 +290,6 @@ DestroyCalls PostEffectsDestroyCalls(PPCContext& ctx, uint8_t* base) {
 }
 
 }  // namespace hooks
-
-// TargetFilter::TargetFilter: r3 = the object, r4 = the table entry. The
-// surface's parameters in a frame like the original's (112 bytes).
-extern "C" REX_FUNC(sub_82135AA8) {
-  REX_FUNC_PROLOGUE();
-  std::optional<uint32_t> r3;
-  if (ITC_FLAG(native_post_effects) && ITC_FLAG(native_graphics_resources) &&
-      hooks::NativeHeapActive()) {
-    const uint32_t filter = ctx.r3.u32;
-    const uint32_t entry = ctx.r4.u32;
-    const uint64_t lr = ctx.lr;
-    guest_call::InFrame(ctx, base, 112, 0x82135AD4, [&](uint32_t frame) {
-      r3 = TargetFilterConstruct(base, frame, filter, entry);
-    });
-    ctx.lr = lr;
-  }
-  if (!r3) {
-    __imp__sub_82135AA8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = *r3;
-}
 
 // PostEffects::InitEdramBase: no arguments (a static initializer, through
 // _cinit's table).

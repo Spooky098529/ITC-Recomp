@@ -85,6 +85,35 @@ void NativeDestroy(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+// The removed adapters' steps, without the flag: GlareDef::GlareDef (r3 =
+// the glare definition), GlareDef::Init (r4 = the glare type) and
+// TargetFilter::TargetFilter (r3 = the object, r4 = the table entry; the
+// surface's parameters in a 112-byte frame like the original's, the
+// original where the copy isn't native).
+void NativeGlareDefConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  pe::GlareDefConstruct(base, ctx.r3.u32);
+}
+void NativeGlareDefInit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = pe::GlareDefInit(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeTargetFilterConstruct(PPCContext& ctx, uint8_t* base) {
+  std::optional<uint32_t> r3;
+  const uint32_t filter = ctx.r3.u32;
+  const uint32_t entry = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x82135AD4, [&](uint32_t frame) {
+    r3 = pe::TargetFilterConstruct(base, frame, filter, entry);
+  });
+  ctx.lr = lr;
+  if (!r3) {
+    __imp__sub_82135AA8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
 constexpr uint32_t kBlockBytes = 0x4000;
 constexpr uint32_t kGlowVtable = 0x820088B0;  // the game's (slots 2, 6, 8 the setters)
 
@@ -592,9 +621,9 @@ void GlareCases(Context& h, uint32_t block) {
         t.f4.f64 = f4;
         t.r10.u64 = r10;
         if (f == 0) {
-          Run(v, __imp__sub_8212ED78, sub_8212ED78, t, h.base);
+          Run(v, __imp__sub_8212ED78, NativeGlareDefConstruct, t, h.base);
         } else if (f == 1) {
-          Run(v, __imp__sub_8212EC90, sub_8212EC90, t, h.base);
+          Run(v, __imp__sub_8212EC90, NativeGlareDefInit, t, h.base);
         } else {
           Run(v, __imp__sub_8212EA98, NativeStarDefInit, t, h.base);
         }
@@ -765,7 +794,7 @@ void TargetFilterCases(Context& h, uint32_t block) {
       t.r3.u64 = block;
       t.r4.u64 = entry;
       guest::StoreU32(h.base, kHiZTaken, uint32_t(c & 1));
-      Run(v, __imp__sub_82135AA8, sub_82135AA8, t, h.base);
+      Run(v, __imp__sub_82135AA8, NativeTargetFilterConstruct, t, h.base);
       const uint32_t surface = guest::LoadU32(h.base, block + 8064);
       out[v].Bytes(Read(h.base, block, 8064));
       out[v].Bytes(Read(h.base, block + 8068, kBlockBytes - 8068));
