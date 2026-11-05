@@ -1,6 +1,9 @@
 // The post effects' records natively (post_effects.h,
-// docs/functions/post-effects.md): ColorFilter::Record and
-// TargetFilter::Record. Step for step as the recompiled functions: their
+// docs/functions/post-effects.md): ColorFilter::Record,
+// TargetFilter::Record, MotionBlur::Record and the glow's star streaks
+// (Glow::RecordStar and RecordStarPass; their math, the vector unit's
+// steps included, as the translated code does it: this file builds with
+// -ffp-model=strict and -ffp-contract=off). Step for step as the recompiled functions: their
 // frames where the originals' are (with the words they write there), the
 // render manager's getters, CameraPasses::RenderTarget (its diagnostics'
 // wrap) and the render queue as guest calls with the originals' return
@@ -15,10 +18,12 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "car_scene_draw/ops.h"
 #include "command_list/command_list.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "models/model.h"
+#include "native/buffers.h"
 
 #include <bit>
 #include <initializer_list>
@@ -94,6 +99,12 @@ class Recorder {
            Load(base_, command_list::kOpenChunks) == 0 && used + slots >= used &&
            used + slots < Load(base_, list + 8);
   }
+  // Whether the list has room for `slots` (a record inside a chunk already
+  // open: only the room).
+  bool Room(uint32_t list, uint64_t slots) const {
+    const uint64_t used = Load(base_, list + 12);
+    return used + slots < Load(base_, list + 8);
+  }
   // The chunk handed to the render queue (its slot 4: r4 = the chunk, r5 =
   // the key, f1); its r3.
   uint32_t Submit(uint32_t chunk, uint64_t key, double f1, uint32_t lr1, uint32_t lr2,
@@ -168,6 +179,18 @@ void Quad(uint8_t* base, uint32_t list, uint32_t effect, double value, bool at_v
   guest::StoreU16(base, s + 6, 40);
   Store(base, s + 8,
         AddQuad(base, effect, Load(base, effect + 16), Load(base, effect + 20), value, at_view));
+}
+// Command 19 and a quad at a quarter of the effect's size (+16 >> 2, +20
+// >> 2), not at the view.
+void QuarterQuad(uint8_t* base, uint32_t list, uint32_t effect, double value) {
+  Slot3(base, list, 19, 1, 0);
+  const uint32_t s = Slot(base, list);
+  Store(base, s + 0, 8);
+  guest::StoreU16(base, s + 4, 3);
+  guest::StoreU16(base, s + 6, 40);
+  Store(base, s + 8,
+        AddQuad(base, effect, Load(base, effect + 16) >> 2, Load(base, effect + 20) >> 2, value,
+                false));
 }
 // The texel size from the effect's size, its words as the original's
 // frame keeps them (width at `width_at`, height at `height_at`).
@@ -456,6 +479,307 @@ std::optional<uint32_t> MotionBlurRecord(uint8_t* base, uint32_t stack, uint32_t
       r.Submit(scene, Load(base, blur + 8), zero, 0x82136D88, 0x82136D98, 0x82136DB4);
   Store(base, blur + 40, 0);
   return r3;
+}
+
+// --- The glow's star streaks ---
+
+namespace {
+
+namespace ops = car_scene_draw::ops;
+
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kStarLines = 64;  // the scan's bound (the game's star: 4)
+
+double Fmuls(double a, double b) { return double(float(a * b)); }
+double Fadds(double a, double b) { return double(float(a + b)); }
+double Fsubs(double a, double b) { return double(float(a - b)); }
+double Fdivs(double a, double b) { return double(float(a / b)); }
+double Fmadds(double a, double b, double c) { return double(float(std::fma(a, b, c))); }
+double Frsp(double a) { return double(float(a)); }
+double Fabs(double a) {
+  return std::bit_cast<double>(std::bit_cast<uint64_t>(a) & ~0x8000000000000000ull);
+}
+// fcfid of a zero-extended word, rounded to single.
+double WordToSingle(uint32_t value) { return Frsp(double(int64_t(value))); }
+double Lfd(uint8_t* base, uint32_t address) {
+  return std::bit_cast<double>(uint64_t(Load(base, address)) << 32 | Load(base, address + 4));
+}
+
+// memcpy (sub_825A7410) of `bytes` from `from` to `to`, natively where its
+// override copies (else the original from `sp` with `lr`).
+void Memcpy(uint8_t* base, const RecordCalls& calls, uint32_t to, uint32_t from, uint32_t bytes,
+            uint32_t sp, uint32_t lr) {
+  if (!native::Buffers_Memcpy(base, to, from, bytes, lr)) {
+    const uint64_t regs[3] = {to, from, bytes};
+    calls.call(kMemcpy, regs, 3, nullptr, 0, sp, lr);
+  }
+}
+
+}  // namespace
+
+uint32_t GlowRecordStarPass(uint8_t* base, uint32_t stack, uint32_t glow, uint32_t texture,
+                            uint32_t samples, double attenuation, double step, double dx,
+                            double dy, uint32_t colors, uint32_t pass, uint32_t dest,
+                            const RecordCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82134060 Glow::RecordStarPass");
+  const uint32_t frame = stack - 768;
+  Store(base, frame, stack);  // the back chain, as stwu
+  Recorder r(base, calls, frame);
+  const uint32_t list = r.Get(4, 0x821340B0, 0x821340C0);
+  // The two blocks' w words 1.0: the offsets at +112, the weights at +368.
+  const double one = Lfs(base, kOne);
+  for (uint32_t i = 0; i < 16; i++) {
+    Stfs(base, frame + 124 + 16 * i, one);
+  }
+  for (uint32_t i = 0; i < 16; i++) {
+    Stfs(base, frame + 380 + 16 * i, one);
+  }
+  if (samples != 0) {
+    const double scale = Lfs(base, 0x82008834);
+    Stfs(base, frame + 108, one);
+    StoreDoubleword(base, frame + 80, pass);
+    const double zero = Lfs(base, kZero);
+    const double limit = Lfs(base, 0x82002A2C);
+    const double passes = Fadds(WordToSingle(pass), one);
+    for (uint32_t i = 0; i < samples; i++) {
+      StoreDoubleword(base, frame + 80, i);
+      const double index = WordToSingle(i);
+      const double weight = Frsp(c_runtime::Pow(attenuation, Fmuls(index, step)));
+      const uint32_t color = colors + 16 * i;
+      const double cr = Lfs(base, color + 0);
+      const double cg = Lfs(base, color + 4);
+      const double x = Fmuls(index, dx);
+      const double cb = Lfs(base, color + 8);
+      const double y = Fmuls(index, dy);
+      const uint32_t offset = frame + 112 + 16 * i;
+      const uint32_t at = frame + 368 + 16 * i;
+      Stfs(base, offset + 0, x);
+      double wr = Fmuls(cr, weight);
+      Stfs(base, offset + 4, y);
+      double wg = Fmuls(cg, weight);
+      double wb = Fmuls(cb, weight);
+      wr = Fmuls(wr, passes);
+      wg = Fmuls(wg, passes);
+      wb = Fmuls(wb, passes);
+      Stfs(base, frame + 96, Fmuls(wr, scale));
+      Stfs(base, frame + 100, Fmuls(wg, scale));
+      Stfs(base, frame + 104, Fmuls(wb, scale));
+      ops::Copy16(base, at, frame + 96);
+      // Past the limit: the sample's offset and weight zeroed (times 0.0).
+      if (!(Fabs(x) < limit) || !(Fabs(y) < limit)) {
+        Stfs(base, at + 0, Fmuls(Lfs(base, at + 0), zero));
+        Stfs(base, offset + 0, zero);
+        Stfs(base, offset + 4, zero);
+        Stfs(base, at + 8, Fmuls(Lfs(base, at + 8), zero));
+        Stfs(base, at + 4, Fmuls(Lfs(base, at + 4), zero));
+      }
+    }
+  }
+  // c0 and c16 (pixel floats, 16 registers each), copied from the frame.
+  Slot3(base, list, 7, 16, 0x01010010);
+  Memcpy(base, calls, command_list::AllocateSlots(base, list, 16), frame + 112, 256, frame,
+         0x82134280);
+  Slot3(base, list, 7, 16, 0x01011010);
+  Memcpy(base, calls, command_list::AllocateSlots(base, list, 16), frame + 368, 256, frame,
+         0x821342BC);
+  Texture(base, list, texture);
+  ShaderPair(base, list, 17);
+  QuarterQuad(base, list, glow, Lfs(base, 0x82008828));
+  return RecordResolve(base, glow, list, dest, 256, 0xFFFFFFFDu, false).value_or(0);
+}
+
+std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t glow,
+                                       const RecordCalls& calls) {
+  const uint32_t frame = stack - 672;
+  Store(base, frame, stack);  // the back chain, as stwu
+  Recorder r(base, calls, frame);
+  const uint32_t list = r.Get(4, 0x82136FD8, 0x82136FE8);
+  // The slots: 80, and 48 for each line's pass.
+  const uint32_t star = glow + 8112;
+  const uint32_t lines = Load(base, star);
+  if (lines > kStarLines) {
+    return std::nullopt;
+  }
+  uint64_t slots = 80;
+  for (uint32_t d = 0; d < lines; d++) {
+    const uint32_t passes = Load(base, star + 4 + 16 * d);
+    if (passes > 2) {
+      return std::nullopt;
+    }
+    slots += 48 * uint64_t(passes);
+  }
+  if (!r.Room(list, slots)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82136FA8 Glow::RecordStar");
+  Slot3(base, list, 1, 1, 0);
+  Slot2(base, list, 60, 0);
+  Slot3(base, list, 26, 1, 0);
+  const uint32_t bytes = command_list::AllocateBytes(base, list, 280, false);
+  Store(base, bytes + 8, 1);
+  Store(base, bytes + 276, 0);
+  Store(base, bytes + 4, 0);
+  Store(base, bytes + 0, 0);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, bytes + 272, zero);
+  Store(base, bytes + 268, 0xFF000000u);
+  const double turn = Frsp(c_runtime::Atan(Lfd(base, 0x82008920)));
+  const double one = Lfs(base, kOne);
+  // --- The 16 colors at +208: two passes of the star's eight ---
+  for (uint32_t i = 0; i < 16; i++) {
+    Stfs(base, frame + 220 + 16 * i, one);
+  }
+  const uint32_t width = Load(base, glow + 16);
+  const double aberration = Lfs(base, glow + 8088);
+  const uint32_t height = Load(base, glow + 20);
+  const double fraction = Lfs(base, 0x82008834);
+  StoreDoubleword(base, frame + 112, width);
+  StoreDoubleword(base, frame + 96, height);
+  const double w = WordToSingle(width);
+  const double toward = Lfs(base, 0x82008918);
+  const double h = WordToSingle(height);
+  uint32_t at = frame + 216;
+  for (uint32_t p = 1; p <= 2; p++) {
+    StoreDoubleword(base, frame + 96, p);
+    const double t = Fmuls(WordToSingle(p), fraction);
+    for (uint32_t k = 0; k < 8; k++) {
+      Stfs(base, at + 4, one);
+      ops::Copy16(base, frame + 112, star + 112 + 16 * k);
+      double cr = Lfs(base, frame + 112);
+      double cg = Lfs(base, frame + 116);
+      const double dr = Fsubs(toward, cr);
+      double cb = Lfs(base, frame + 120);
+      const double dg = Fsubs(toward, cg);
+      const double db = Fsubs(toward, cb);
+      cr = Fmadds(dr, t, cr);
+      Stfs(base, frame + 112, cr);
+      cg = Fmadds(dg, t, cg);
+      Stfs(base, frame + 116, cg);
+      cb = Fmadds(db, t, cb);
+      Stfs(base, frame + 120, cb);
+      cr = Fsubs(cr, toward);
+      cg = Fsubs(cg, toward);
+      cb = Fsubs(cb, toward);
+      Stfs(base, at - 8, Fmadds(cr, aberration, toward));
+      Stfs(base, at - 4, Fmadds(cg, aberration, toward));
+      Stfs(base, at + 0, Fmadds(cb, aberration, toward));
+      at += 16;
+    }
+  }
+  // --- The turn: the view's z axis (the camera pass's inverse view times
+  // (0, 0, 1, 0)) with y 0, normalized, its angle to x by acos (from 2 pi
+  // when its z is negative) ---
+  const uint32_t camera = kCameraPasses + Load(base, glow + 36) * 592;
+  double angle = zero;
+  if (Load(base, camera + 588) != 0) {
+    Stfs(base, frame + 156, one);
+    Stfs(base, frame + 172, one);
+    Stfs(base, frame + 188, one);
+    Stfs(base, frame + 204, one);
+    Stfs(base, frame + 128, zero);
+    Stfs(base, frame + 132, zero);
+    Stfs(base, frame + 136, one);
+    Stfs(base, frame + 140, zero);
+    matrix_math::Inverse(base, frame + 144, camera + 16);
+    matrix_math::Vec4Transform(base, frame + 128, frame + 144, frame + 128);
+    Stfs(base, frame + 132, zero);
+    Stfs(base, frame + 96, one);
+    Stfs(base, frame + 100, zero);
+    Stfs(base, frame + 104, zero);
+    Stfs(base, frame + 108, zero);
+    const simde__m128 v = ops::Lvx(base, frame + 128);
+    const simde__m128 x_axis = ops::Lvx(base, frame + 96);
+    Stfs(base, frame + 96, zero);
+    Stfs(base, frame + 100, zero);
+    Stfs(base, frame + 104, one);
+    Stfs(base, frame + 108, zero);
+    const simde__m128 z_axis = ops::Lvx(base, frame + 96);
+    {
+      ops::FlushToZero ftz;
+      const simde__m128 dot = ops::Dot3(v, v);
+      const simde__m128 n = ops::Normalized(v, dot);
+      const simde__m128 x = ops::Dot3(n, x_axis);
+      ops::Stvx(base, frame + 128, n);
+      const simde__m128 z = ops::Dot3(n, z_axis);
+      ops::Stvx(base, frame + 96, x);
+      ops::Stvx(base, frame + 112, z);
+    }
+    const double cosine = Lfs(base, frame + 96);
+    const double arc = c_runtime::Acos(cosine);
+    const double z = Lfs(base, frame + 112);
+    angle = Frsp(arc);
+    if (z < zero) {
+      angle = Fsubs(Lfs(base, 0x82001FA8), angle);
+    }
+  }
+  // --- The lines' passes ---
+  const double rotation = Fadds(Fadds(Lfs(base, glow + 8084), Lfs(base, star + 100)), angle);
+  if (Load(base, star) > 0) {
+    const double size = Fadds(h, w);
+    const double texel_x = Fdivs(one, w);
+    const double texel_y = Fdivs(one, h);
+    const double first_step =
+        Fmuls(Fdivs(Fmuls(Fadds(turn, Lfs(base, 0x82001FBC)), Lfs(base, 0x82008914)), size),
+              Lfs(base, 0x820029D4));
+    uint32_t line = star + 4;
+    uint32_t target = glow + 8360;
+    for (uint32_t d = 0; d < Load(base, star); d++, line += 16, target += 4) {
+      ops::Copy16(base, frame + 96, line);
+      const double length = Lfs(base, glow + 8468);
+      const double attenuation = Lfs(base, glow + 8472);
+      const double a = Fadds(Lfs(base, frame + 108), rotation);
+      double dx = Fmuls(Fmuls(Frsp(c_runtime::Sin(a)), texel_x), length);
+      const double cosine = c_runtime::Cos(a);
+      const uint32_t passes = Load(base, frame + 96);
+      double step = first_step;
+      double dy = Fmuls(Fmuls(Frsp(cosine), texel_y), length);
+      for (uint32_t p = 0; p < passes; p++) {
+        const uint32_t source = p == 0 ? Load(base, glow + 8408) : Load(base, target);
+        const uint32_t texture = Load(base, source + 24);
+        const uint32_t dest = Load(base, Load(base, target) + 24);
+        Store(base, frame + 92, dest);
+        GlowRecordStarPass(base, frame, glow, texture, 8, attenuation, step, dx, dy,
+                           frame + 208 + ((passes - p - 1) << 7), p, dest, calls);
+        const double k = Lfs(base, 0x82008828);
+        dx = Fmuls(dx, k);
+        dy = Fmuls(dy, k);
+        step = Fmuls(step, k);
+      }
+    }
+  }
+  // --- The lines merged: shader pair 18 over the four line textures into
+  // +8384's, then pairs 23 and 22 over it ---
+  Slot3(base, list, 2, 5, 0);
+  for (uint32_t s = 0; s < 5; s++) {
+    Slot3(base, list, s, 16, 1);
+  }
+  Slot3(base, list, 4, 4, 0);
+  for (uint32_t s = 0; s < 4; s++) {
+    Slot2(base, list, s, Load(base, Load(base, glow + 8360 + 4 * s) + 24));
+  }
+  ShaderPair(base, list, 18);
+  QuarterQuad(base, list, glow, Lfs(base, 0x82008828));
+  RecordResolve(base, glow, list, Load(base, Load(base, glow + 8384) + 24), 0, 0, false);
+  Texture(base, list, Load(base, Load(base, glow + 8384) + 24));
+  Slot3(base, list, 2, 3, 0);
+  Slot3(base, list, 0, 20, 1);
+  Slot3(base, list, 0, 16, 1);
+  Slot3(base, list, 0, 24, 2);
+  ShaderPair(base, list, 23);
+  const uint32_t quarter_h = Load(base, glow + 20) >> 2;
+  const uint32_t quarter_w = Load(base, glow + 16) >> 2;
+  StoreDoubleword(base, frame + 96, quarter_h);
+  StoreDoubleword(base, frame + 112, quarter_w);
+  RecordTexelSize(base, list, WordToSingle(quarter_w), WordToSingle(quarter_h));
+  QuarterQuad(base, list, glow, one);
+  RecordResolve(base, glow, list, Load(base, Load(base, glow + 8384) + 24), 0, 0, false);
+  ShaderPair(base, list, 22);
+  QuarterQuad(base, list, glow, one);
+  RecordResolve(base, glow, list, Load(base, Load(base, glow + 8384) + 24), 0, 0, false);
+  Slot3(base, list, 1, 1, 0);
+  Slot2(base, list, 60, 1);
+  Slot3(base, list, 3, 1, 0);
+  return Slot2(base, list, 0, 0x10101);
 }
 
 }  // namespace post_effects

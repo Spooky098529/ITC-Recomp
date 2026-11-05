@@ -255,6 +255,34 @@ std::optional<uint32_t> TargetFilterRecord(uint8_t* base, uint32_t stack, uint32
 std::optional<uint32_t> MotionBlurRecord(uint8_t* base, uint32_t stack, uint32_t blur,
                                          const RecordCalls& calls);
 
+// Glow::RecordStarPass (sub_82134060): one pass of a star line, into the
+// glow's chunk already open: `samples` (8 from Glow::RecordStar) offsets
+// i x (dx, dy) and weights color_i x attenuation^(i x step) x (pass + 1) x
+// the constant at 0x82008834 (zeroed with the offsets where an offset is
+// past the constant at 0x82002A2C) in two 16-register blocks built in its
+// frame (`stack` - 768, the words it doesn't write left as they were) and
+// copied as c0 and c16, `texture` as sampler 0, shader pair 17 over a
+// quarter-size quad, resolved into `dest` (flags 256, -3). `colors` holds
+// the samples' colors (16 bytes each). The caller has made sure the list
+// has room for its 48 slots. Returns r3 (RecordResolve's).
+uint32_t GlowRecordStarPass(uint8_t* base, uint32_t stack, uint32_t glow, uint32_t texture,
+                            uint32_t samples, double attenuation, double step, double dx,
+                            double dy, uint32_t colors, uint32_t pass, uint32_t dest,
+                            const RecordCalls& calls);
+// Glow::RecordStar (sub_82136FA8, from Glow::Record inside its chunk): 280
+// bytes of constants, the 16 samples' colors (the star's eight, two passes'
+// chromatic aberration) in its frame (`stack` - 672), the star's turn from
+// the camera pass's view when it's active (Matrix::Inverse,
+// Vec4::Transform, the normalize sequence, acos), each line's passes
+// (Glow::RecordStarPass), then the lines merged into +8384's texture with
+// shader pairs 18, 23 and 22. Returns r3 (its last slot), or nothing (only
+// the list's getters called) when the list hasn't room for its 80 + 48 per
+// pass slots, a line has more than 2 passes (the original reads its colors
+// past the 16 it builds, from its register save area) or the star has more
+// than 64 lines (never in the game: 4 lines of 2 passes).
+std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t glow,
+                                       const RecordCalls& calls);
+
 // --- The destructors ---
 
 // The calls the destructors make, each returning r3 as it leaves it:

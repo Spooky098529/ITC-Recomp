@@ -67,8 +67,10 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "PostEffects::InitBoot sub_82138C38 (with --native_heap, over "
               "CreateVertexDeclaration's plain C++); the records ColorFilter::Record "
               "sub_821351F0, TargetFilter::Record sub_82135B50 and MotionBlur::Record sub_821363F0 "
-              "(frame interpolation's note of its copy kept), without the command list's "
-              "diagnostics) natively instead of through the "
+              "(frame interpolation's note of its copy kept), and the glow's star streaks "
+              "Glow::RecordStar sub_82136FA8 with Glow::RecordStarPass sub_82134060 (no adapter: "
+              "only RecordStar's plain C++ calls it, and the flag switches that), without the "
+              "command list's diagnostics) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
@@ -474,6 +476,10 @@ RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
 ITC_POST_EFFECT_RECORD(821351F0, ColorFilterRecord)
 ITC_POST_EFFECT_RECORD(82135B50, TargetFilterRecord)
 ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
+// Glow::RecordStar (from Glow::Record, still translated inside frame
+// interpolation's wrap); Glow::RecordStarPass has no adapter: only its plain
+// C++ calls that one's.
+ITC_POST_EFFECT_RECORD(82136FA8, GlowRecordStar)
 
 // --- The destructors ---
 

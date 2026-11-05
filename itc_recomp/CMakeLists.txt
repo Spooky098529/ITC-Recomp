@@ -736,6 +736,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_scene_draw/scene_draw.cpp
     src/front_end_car_draw/garage_stage.cpp src/front_end_car_draw/lights.cpp
     src/front_end_car_draw/pose.cpp
+    src/post_effects/record.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp
