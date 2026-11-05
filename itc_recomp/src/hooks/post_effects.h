@@ -21,5 +21,7 @@ void PostEffectsReleaseTexture(PPCContext& ctx, uint8_t* base);
 void PostEffectsReleaseSurface(PPCContext& ctx, uint8_t* base);
 // The destructors' calls: the two above on a field's address.
 post_effects::DestroyCalls PostEffectsDestroyCalls(PPCContext& ctx, uint8_t* base);
+// The records' guest calls (ctx's registers, from the frame given).
+post_effects::RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

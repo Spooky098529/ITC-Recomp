@@ -209,6 +209,39 @@ struct InitBootCalls {
 constexpr uint32_t kVertexDeclaration = 0x826C5DBC;
 uint32_t InitBoot(uint8_t* base, uint32_t stack, uint32_t device, const InitBootCalls& calls);
 
+// --- The records (record.cpp) ---
+
+// A record's guest calls: any guest function `function` from the frame at
+// `sp` with `lr`, r3 on from `regs` (`count`, all 64 bits), f1 on from
+// `fregs` (`fcount`), returning its r3 (the render manager's getters, the
+// render queue, CameraPasses::RenderTarget through its diagnostics' wrap);
+// tan's original (f1 = x) where c_runtime::Tan can't stand in, returning
+// its f1. Both leave flush-to-zero off.
+struct RecordCalls {
+  std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, const double* fregs,
+                         int fcount, uint32_t sp, uint32_t lr)>
+      call;
+  std::function<double(double x, uint32_t sp, uint32_t lr)> tan;
+};
+// ColorFilter::Record (sub_821351F0, the color filter's vtable slot 0): its
+// chunk on the scene's list (the frame resolved into its texture, c37 to
+// c39, b0 and b1, shader pair 31 over the view), handed to the render queue
+// with its key (+8); +40 = 0. Returns r3 (the queue's call's), or nothing
+// (only the list's getters called) when the list hasn't room for its 75
+// slots or a chunk is open.
+std::optional<uint32_t> ColorFilterRecord(uint8_t* base, uint32_t stack, uint32_t filter,
+                                          const RecordCalls& calls);
+// TargetFilter::Record (sub_82135B50, the target filter's vtable slot 0):
+// by its flags (+32) render target 4 (bit 0, camera pass 12 active) or 3
+// (bit 1, pass 11 active), drawn into +8064 and resolved back twice (shader
+// pairs 24 and 25, or 28 and 29), handed on with its key; +40 = 0. Returns
+// r3 (the filter when nothing's recorded, 0 without a target, else the
+// queue's call's), or nothing (CameraPasses::RenderTarget and the list's
+// getters called) when the list hasn't room for its 91 slots or a chunk is
+// open.
+std::optional<uint32_t> TargetFilterRecord(uint8_t* base, uint32_t stack, uint32_t filter,
+                                           const RecordCalls& calls);
+
 // --- The destructors ---
 
 // The calls the destructors make, each returning r3 as it leaves it:

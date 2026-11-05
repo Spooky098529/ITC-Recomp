@@ -1327,6 +1327,121 @@ void InitBootCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// --- The records ---
+
+// A made-up scene for the records in the block from +0x2000, as
+// mode_tick's harness makes it: the scene's vtable slot 8 and the
+// manager's slots 1 and 2 are getters of the game's (sub_8248CA78 returns
+// [r3 + 284], sub_82379320 [r3 + 124]), and the queue's slot 4 is
+// BillboardMaterial::SetLights (sub_8209F5C8: +32 = r4, +36 = r5 unless r4
+// is 0), which keeps the chunk and key it's handed. `kind`: 0 room, 1 a
+// chunk already open on the list, 2 another open (nested); a full list
+// isn't made (the original then writes at guest address 0).
+constexpr uint32_t kRecWorld = 0x2000, kRecScene = kRecWorld, kRecSceneVtable = kRecWorld + 0x140,
+                   kRecManager = kRecWorld + 0x180, kRecManagerVtable = kRecWorld + 0x2C0,
+                   kRecQueue = kRecWorld + 0x300, kRecQueueVtable = kRecWorld + 0x340,
+                   kRecList = kRecWorld + 0x380, kRecSlots = kRecWorld + 0x400, kRecWorldEnd = kRecWorld + 0xA00;
+
+void SetRecordScene(uint8_t* base, uint32_t block, uint32_t kind, uint32_t used) {
+  const uint32_t d = block;
+  guest::StoreU32(base, d + kRecScene, d + kRecSceneVtable);
+  guest::StoreU32(base, d + kRecSceneVtable + 32, 0x8248CA78);
+  guest::StoreU32(base, d + kRecScene + 284, d + kRecManager);
+  guest::StoreU32(base, d + kRecManager, d + kRecManagerVtable);
+  guest::StoreU32(base, d + kRecManagerVtable + 4, 0x8248CA78);
+  guest::StoreU32(base, d + kRecManagerVtable + 8, 0x82379320);
+  guest::StoreU32(base, d + kRecManager + 284, d + kRecList);
+  guest::StoreU32(base, d + kRecManager + 124, d + kRecQueue);
+  guest::StoreU32(base, d + kRecQueue, d + kRecQueueVtable);
+  guest::StoreU32(base, d + kRecQueueVtable + 16, 0x8209F5C8);
+  const uint32_t list = d + kRecList;
+  guest::StoreU32(base, list + 8, used + 1000);
+  guest::StoreU32(base, list + 12, used);
+  guest::StoreU32(base, list + 32, d + kRecSlots);
+  guest::StoreU32(base, list + 44, d + kRecSlots);
+  guest::StoreU8(base, list + 52, kind == 1 ? 1 : 0);
+  if (kind == 1) {
+    guest::StoreU32(base, list + 44, d + kRecSlots + 16);
+  }
+  guest::StoreU32(base, 0x8296BD28, kind == 2 ? 1 : 0);  // the open chunks
+  guest::StoreU32(base, 0x826BABA0, d + kRecScene);
+}
+
+// ColorFilter::Record and TargetFilter::Record on an effect at the block's
+// start (random bytes; its vertex buffer's place small, its texture entry
+// in the block, its size up to 1,280 x 720, its floats random with NaNs and
+// infinities, its flags any of the four), the made-up scene (now and then a
+// chunk open), camera passes 11 and 12 active or not and render targets 3
+// and 4 set or 0. Compared: the block (the effect, the scene, the list and
+// its slots), the open chunks' count, r3.
+void EffectRecordCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  Saved scene(h.base, 0x826BABA0, 1);
+  Saved open_chunks(h.base, 0x8296BD28, 1);
+  Saved pass11(h.base, 0x826BAC00 + 11 * 592 + 588, 1);
+  Saved pass12(h.base, 0x826BAC00 + 12 * 592 + 588, 1);
+  Saved target3(h.base, 0x826BABC8, 1);
+  Saved target4(h.base, 0x826BABD4, 1);
+  constexpr uint32_t kTextureEntry = 0x3000;
+  struct Record {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t size;
+  };
+  const Record records[] = {
+      {"sub_821351F0 ColorFilter::Record", __imp__sub_821351F0, sub_821351F0, 8128},
+      {"sub_82135B50 TargetFilter::Record", __imp__sub_82135B50, sub_82135B50, 8068},
+  };
+  for (const Record& k : records) {
+    Results results(k.name);
+    for (int c = 0; c < 100; c++) {
+      std::vector<uint32_t> words(kBlockBytes / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      words[8056 / 4] = r.Below(98);
+      words[8060 / 4] = r.Below(2);
+      words[16 / 4] = 1 + r.Below(1280);
+      words[20 / 4] = 1 + r.Below(720);
+      words[24 / 4] = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(640);
+      words[28 / 4] = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(360);
+      words[32 / 4] = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(4);
+      if (k.size == 8128) {
+        words[8064 / 4] = block + kTextureEntry;
+        for (uint32_t at = 8080; at <= 8120; at += 4) {
+          words[at / 4] = std::bit_cast<uint32_t>(float(RandomDouble(r, 2.0)));
+        }
+        words[8068 / 4] = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+        words[8072 / 4] = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+      }
+      const uint32_t kind = r.Below(8) == 0 ? 1 + r.Below(2) : 0;
+      const uint32_t used = r.Below(100);
+      const uint32_t passes[2] = {r.Below(3) == 0 ? 0u : 1u + r.Below(2),
+                                  r.Below(3) == 0 ? 0u : 1u + r.Below(2)};
+      const uint32_t targets[2] = {r.Below(4) == 0 ? 0u : block + 0x3100 + 16 * r.Below(8),
+                                   r.Below(4) == 0 ? 0u : block + 0x3100 + 16 * r.Below(8)};
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32s(h.base, block, words.data(), uint32_t(words.size()));
+        SetRecordScene(h.base, block, kind, used);
+        guest::StoreU32(h.base, 0x826BAC00 + 11 * 592 + 588, passes[0]);
+        guest::StoreU32(h.base, 0x826BAC00 + 12 * 592 + 588, passes[1]);
+        guest::StoreU32(h.base, 0x826BABC8, targets[0]);
+        guest::StoreU32(h.base, 0x826BABD4, targets[1]);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = block;
+        Run(v, k.recompiled, k.native, t, h.base);
+        out[v].Bytes(Read(h.base, block, kBlockBytes));
+        out[v].Word(guest::LoadU32(h.base, 0x8296BD28));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} kind {} used {} flags {:X}", c, kind,
+                                                used, words[32 / 4]));
+    }
+    results.Report();
+  }
+}
+
 // --- The destructors ---
 
 // The destructors and the deleting ones (r4 0 or 1, or any) on an effect of
@@ -1492,6 +1607,7 @@ void PostEffects(Context& h) {
   ConstructorCases(h, block);
   CreateCases(h, block);
   InitBootCases(h, block);
+  EffectRecordCases(h, block);
   DestroyCases(h, block);
   memory::Free(block);
 }

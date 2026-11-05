@@ -64,7 +64,9 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "RenderTextures::Acquire sub_82133190 and RenderTexture::Create sub_821330D0 (no "
               "adapters: only Create's plain C++ calls them, and the flag switches that), and "
               "PostEffects::InitBoot sub_82138C38 (with --native_heap, over "
-              "CreateVertexDeclaration's plain C++)) natively instead of through the "
+              "CreateVertexDeclaration's plain C++); the records ColorFilter::Record "
+              "sub_821351F0 and TargetFilter::Record sub_82135B50, without the command list's "
+              "diagnostics) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
@@ -403,6 +405,72 @@ extern "C" REX_FUNC(sub_82138C38) {
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
+
+// --- The records (vtable slot 0: PostEffects::RecordAll's guest calls) ---
+
+namespace hooks {
+
+RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
+  RecordCalls calls;
+  calls.call = [&ctx, base](uint32_t function, const uint64_t* regs, int count,
+                            const double* fregs, int fcount, uint32_t sp,
+                            uint32_t lr) -> uint64_t {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    PPCRegister* gprs[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+                            &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
+    for (int i = 0; i < count; i++) {
+      gprs[i]->u64 = regs[i];
+    }
+    PPCRegister* fprs[4] = {&ctx.f1, &ctx.f2, &ctx.f3, &ctx.f4};
+    for (int i = 0; i < fcount; i++) {
+      fprs[i]->f64 = fregs[i];
+    }
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  calls.tan = [&ctx, base](double x, uint32_t sp, uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.f1.f64 = x;
+    sub_825A8A50(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.f1.f64;
+  };
+  return calls;
+}
+
+}  // namespace hooks
+
+// r3 = the effect. The original where the plain C++ declines (a full list,
+// an open chunk), with r3 the effect again.
+#define ITC_POST_EFFECT_RECORD(address, Record)                                         \
+  extern "C" REX_FUNC(sub_##address) {                                                 \
+    REX_FUNC_PROLOGUE();                                                               \
+    std::optional<uint32_t> r3;                                                        \
+    if (ITC_FLAG(native_post_effects)) {                                               \
+      ctx.fpscr.disableFlushMode();                                                    \
+      const uint64_t lr = ctx.lr;                                                      \
+      const uint64_t effect = ctx.r3.u64;                                              \
+      r3 = Record(base, ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx, base)); \
+      ctx.lr = lr;                                                                     \
+      ctx.r3.u64 = effect;                                                             \
+    }                                                                                  \
+    if (!r3) {                                                                         \
+      __imp__sub_##address(ctx, base);                                                 \
+      return;                                                                          \
+    }                                                                                  \
+    ctx.r3.u64 = *r3;                                                                  \
+  }
+
+ITC_POST_EFFECT_RECORD(821351F0, ColorFilterRecord)
+ITC_POST_EFFECT_RECORD(82135B50, TargetFilterRecord)
 
 // --- The destructors ---
 
