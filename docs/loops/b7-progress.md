@@ -23,7 +23,9 @@ file's history. What's left to see in a drive, from every run:
   38 s, 0 errors, every harness 0 differing but `matrix_math`'s
   expected groups; no subagents); left: `Glow::RecordStar`
   `sub_82136FA8` with `sub_82134060` (ready, the batch limit). Step:
-  validation, agent running; then a second migration.
+  Validated `itc_3540` (race 47 s, 0 errors, 11 of 11 harness lines,
+  all 11 ran in the race; no replay needed; none to drive). Step:
+  second migration (the glow's star records), agent running.
 
 ## Done
 
@@ -49,3 +51,4 @@ file's history. What's left to see in a drive, from every run:
   62, known 483, unknown 1698).
 - After its first migration: ours 4178, work left 2232 (wrapped 62,
   known 472, unknown 1698).
+- After its validation (`itc_3540`): ours 4178, work left 2232.
