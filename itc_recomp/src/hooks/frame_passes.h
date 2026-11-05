@@ -32,4 +32,9 @@ void FramePassesBoot(PPCContext& ctx, uint8_t* base);
 // natively with --native_frame_passes, else the original.
 void FramePassesConstruct(PPCContext& ctx, uint8_t* base);
 
+// FramePasses::Record (sub_82096418; r3 = it): natively with
+// --native_frame_passes (and without the command list's diagnostics), else
+// the original (also where the plain C++ declines).
+void FramePassesRecord(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

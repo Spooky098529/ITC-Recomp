@@ -11,6 +11,7 @@
 #include "hooks/frame_passes.h"
 #include "hooks/guest_call.h"
 #include "hooks/post_effects.h"
+#include "hooks/scene_target.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
@@ -26,7 +27,9 @@ ITC_FLAG_BOOL(native_frame_passes, true, "ITC",
               "sub_82094B10 (inside --find_menu_selection's wrap; the job's object a guest call) "
               "FramePasses::Boot sub_820962B8 (with --native_video_output; the getters and "
               "PostEffects::InitBoot guest calls) and FramePasses::FramePasses sub_82098630 (the "
-              "pool's post, Job::Wait's wrap and the run loop's adds guest calls)) natively "
+              "pool's post, Job::Wait's wrap and the run loop's adds guest calls) and "
+              "FramePasses::Record sub_82096418 (the getters and the render queue's adds guest "
+              "calls; SceneTarget::RecordPasses and RecordPrimitiveReset through their adapters)) natively "
               "instead of through the translated code (the same writes; the recorders' originals "
               "with the command list's diagnostics on; checked by "
               "--run_harnesses=frame_passes)");
@@ -236,4 +239,71 @@ void hooks::FramePassesConstruct(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_82098630) {
   REX_FUNC_PROLOGUE();
   hooks::FramePassesConstruct(ctx, base);
+}
+
+// FramePasses::Record: r3 = it; the guest calls from a 320-byte frame like
+// the original's (the getters, the render queue's adds with f1 = 0.0, the
+// original's f31); SceneTarget::RecordPasses and RecordPrimitiveReset
+// through their adapters' work. r3 as the last leaves it. The original
+// where the plain C++ declines (the getters then called again) or with the
+// command list's diagnostics on.
+void hooks::FramePassesRecord(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeFramePasses()) {
+    __imp__sub_82096418(ctx, base);
+    return;
+  }
+  const uint32_t passes = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  bool done = false;
+  guest_call::InFrame(ctx, base, fp::kRecordFrame, 0x82096440, [&](uint32_t frame) {
+    auto vcall = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
+      ctx.r3.u64 = object;
+      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      ctx.r11.u64 = function;
+      ctx.ctr.u64 = function;
+      ctx.lr = return_address;
+      REX_CALL_INDIRECT_FUNC(function);
+      return ctx.r3.u32;
+    };
+    const fp::RecordCalls calls{
+        vcall,
+        [&](uint32_t queue, uint32_t chunk, uint32_t bucket, uint32_t return_address) {
+          ctx.fpscr.disableFlushMode();
+          ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+          ctx.r5.u64 = bucket;
+          ctx.r4.u64 = chunk;
+          vcall(queue, 16, return_address);
+        },
+        [&](uint32_t list) {
+          ctx.r7.u64 = 121;
+          ctx.r6.u64 = 602;
+          ctx.r5.u64 = 150;
+          ctx.r4.u64 = list;
+          ctx.r3.u64 = guest::LoadU32(base, 0x8266D08C);
+          ctx.lr = 0x82098620;
+          sub_8209B3D0(ctx, base);
+        },
+        [&]() {
+          ctx.lr = 0x82098624;
+          sub_82589990(ctx, base);
+        }};
+    done = fp::Record(base, passes, frame, calls);
+  });
+  ctx.lr = lr;
+  if (!done) {
+    __imp__sub_82096418(ctx, base);
+  }
+}
+
+// TEMPORARY: the game keeps the original until the three parts are written
+// (the harness calls FramePassesRecord directly).
+constexpr bool kRecordPartsWritten = false;
+
+extern "C" REX_FUNC(sub_82096418) {
+  REX_FUNC_PROLOGUE();
+  if (!kRecordPartsWritten) {
+    __imp__sub_82096418(ctx, base);
+    return;
+  }
+  hooks::FramePassesRecord(ctx, base);
 }

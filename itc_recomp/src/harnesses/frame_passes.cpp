@@ -16,6 +16,7 @@
 #include "base/flags.h"
 #include "command_list/command_list.h"
 #include "frame_passes/frame_passes.h"
+#include "frame_passes/record.h"
 #include "graphics/render_queue.h"
 #include "hooks/frame_passes.h"
 #include "hooks/heap.h"
@@ -346,6 +347,147 @@ void ConstructCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// FramePasses::Record's world, in its own block: FramePasses (its vtable a
+// copy of the game's 0x82000F20 but for slots 5 and 6, which are the
+// game's recorders or now and then another word: the original then), the
+// interface (slot 3 [+60] the scene), the scene (slot 1 [+284] the list,
+// slot 2 [+124] the queue: the game's getters sub_8248CA78 and
+// sub_82379320), the list and its slots, the render queue, the scene target
+// (mode 2: no passes, or 3: the clear, through the render manager
+// [0x826BABA0], whose slot 8 [+284] gives the scene). Globals: the scene
+// target [0x8266D08C], the render manager, [0x8296B918] and [0x8296B91C],
+// the open chunk count, the sort keys 0x8296B900 to 0x8296B90F.
+namespace rec {
+constexpr uint32_t kBytes = 0x9000;
+constexpr uint32_t kPasses = 0x0000;     // 44 bytes
+constexpr uint32_t kVtable = 0x0040;     // 7 slots
+constexpr uint32_t kInterface = 0x0080;  // its vtable at +0x40
+constexpr uint32_t kScene = 0x0100;      // +124 the queue, +284 the list; vtable at +0x180
+constexpr uint32_t kManager = 0x0300;    // +284 the scene; vtable at +0x380
+constexpr uint32_t kSceneTarget = 0x0500;  // 32 bytes
+constexpr uint32_t kList = 0x0540;
+constexpr uint32_t kQueue = 0x0A00;
+constexpr uint32_t kState = 0x0A40;
+constexpr uint32_t kPassListA = 0x0AA0;
+constexpr uint32_t kPassListB = 0x0AD0;
+constexpr uint32_t kItems = 0x0B00;  // 96 items of 20 bytes
+constexpr uint32_t kBuckets = 0x1400;  // 700 buckets of 16 bytes
+constexpr uint32_t kSlots = 0x5000;  // 1024 slots
+constexpr uint32_t kSlotCount = 1024;
+constexpr Global kGlobals[] = {
+    {0x8266D08C, 4}, {0x826BABA0, 4}, {fp::kCommandList, 8},
+    {command_list::kOpenChunks, 4}, {0x8296B900, 16},
+};
+}  // namespace rec
+
+void RecordCases(Context& h) {
+  Results results("FramePasses::Record (sub_82096418) with RecordPrimitiveReset");
+  const uint32_t block = memory::Alloc(rec::kBytes, memory::kHeapZeroMemory);
+  if (block == 0) {
+    return;
+  }
+  std::vector<std::vector<uint8_t>> saved;
+  for (const Global& g : rec::kGlobals) {
+    saved.push_back(Read(h.base, g.address, g.bytes));
+  }
+  for (int c = 0; c < 60; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    uint32_t written[2] = {0, 0};
+    for (int v = 0; v < 2; v++) {
+      Random r = start;
+      for (uint32_t at = 0; at < rec::kBytes; at += 4) {
+        guest::StoreU32(h.base, block + at, uint32_t(r.Next()));
+      }
+      auto store = [&](uint32_t offset, uint32_t value) {
+        guest::StoreU32(h.base, block + offset, value);
+      };
+      // FramePasses and its vtable.
+      store(rec::kPasses + 0, block + rec::kVtable);
+      store(rec::kPasses + 4, block + rec::kInterface);
+      for (uint32_t slot = 0; slot < 7; slot++) {
+        store(rec::kVtable + 4 * slot, guest::LoadU32(h.base, 0x82000F20 + 4 * slot));
+      }
+      if (r.Below(12) == 0) {
+        store(rec::kVtable + 20 + 4 * r.Below(2), kWord60);
+      }
+      store(rec::kInterface, block + rec::kInterface + 0x40);
+      store(rec::kInterface + 0x40 + 12, kWord60);
+      store(rec::kInterface + 60, block + rec::kScene);
+      store(rec::kScene, block + rec::kScene + 0x180);
+      store(rec::kScene + 0x180 + 4, 0x8248CA78);  // [+284]
+      store(rec::kScene + 0x180 + 8, 0x82379320);  // [+124]
+      store(rec::kScene + 284, block + rec::kList);
+      store(rec::kScene + 124, block + rec::kQueue);
+      store(rec::kManager, block + rec::kManager + 0x80);
+      store(rec::kManager + 0x80 + 32, 0x8248CA78);
+      store(rec::kManager + 284, block + rec::kScene);
+      // The scene target: no passes (mode 2), or the clear (3).
+      store(rec::kSceneTarget + 28, r.Below(3) == 0 ? 3 : 2);
+      // The queue.
+      store(rec::kQueue + 0, graphics::render_queue::kVtable);
+      store(rec::kQueue + 4, block + rec::kState);
+      store(rec::kQueue + 8, block + rec::kPassListA);
+      store(rec::kQueue + 12, block + rec::kPassListB);
+      store(rec::kState + 0, r.Below(2));
+      store(rec::kState + 84, std::bit_cast<uint32_t>(float(r.Below(1000)) / 10.0f));
+      for (const uint32_t pass_list : {rec::kPassListA, rec::kPassListB}) {
+        store(pass_list + 8, 96);
+        store(pass_list + 12, kBucketCount);
+        store(pass_list + 16, r.Below(4));
+        store(pass_list + 20, block + rec::kItems);
+        store(pass_list + 24, block + rec::kBuckets);
+      }
+      for (uint32_t at = 0; at < 16 * kBucketCount; at += 4) {
+        store(rec::kBuckets + at, 0);
+      }
+      guest::StoreU32(h.base, 0x8266D08C, block + rec::kSceneTarget);
+      guest::StoreU32(h.base, 0x826BABA0, block + rec::kManager);
+      guest::StoreU32(h.base, fp::kCommandList, block + rec::kList);
+      guest::StoreU32(h.base, fp::kRenderQueue, block + rec::kQueue);
+      guest::StoreU32(h.base, command_list::kOpenChunks, 0);
+      // The list: room for all (just, now and then); now and then a chunk
+      // open on it or another (the original then).
+      const uint32_t need = fp::record::kSlots + 5 + 23;
+      const uint32_t used = r.Below(4) == 0 ? uint32_t(r.Below(300)) : r.Below(20);
+      const uint32_t room = r.Below(4) == 0 ? need : need + r.Below(100);
+      MakeList(h.base, block + rec::kList, block + rec::kSlots, used, room,
+               r.Below(10) == 0 ? 1 + r.Below(2) : 0);
+      after = r;
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 4096, 4096, 0xA5);
+      t.r3.u64 = block + rec::kPasses;
+      ITC_FLAG(native_frame_passes) = v == 1;
+      (v == 0 ? __imp__sub_82096418 : hooks::FramePassesRecord)(t, h.base);
+      ITC_FLAG(native_frame_passes) = true;
+      // Each slot an entry of its own first (a difference names the first
+      // wrong slot: entry k is slot k from the chunk's first), then the
+      // rest of the block, the globals, Record's frame words, r3.
+      for (uint32_t slot = 0; slot < 400; slot++) {
+        out[v].Bytes(Read(h.base, block + rec::kSlots + 16 * slot, 16));
+      }
+      out[v].Bytes(Read(h.base, block, rec::kSlots));
+      out[v].Bytes(Read(h.base, block + rec::kSlots + 16 * 400,
+                        rec::kBytes - rec::kSlots - 16 * 400));
+      for (const Global& g : rec::kGlobals) {
+        out[v].Bytes(Read(h.base, g.address, g.bytes));
+      }
+      out[v].Bytes(Read(h.base, t.r1.u32 - fp::kRecordFrame + 80, 72));
+      out[v].Word(t.r3.u32);
+      written[v] = guest::LoadU32(h.base, block + rec::kList + 12);
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {} (slots used {} and {})", c, written[0],
+                                              written[1]));
+  }
+  for (size_t i = 0; i < saved.size(); i++) {
+    Write(h.base, rec::kGlobals[i].address, saved[i].data(), rec::kGlobals[i].bytes);
+  }
+  memory::Free(block);
+  results.Report();
+}
+
 // The game's video output: [0x8266D088]'s slot 7, then that one's slot 3
 // (as the post effects' callers find it).
 uint32_t GameVideoOutput(Context& h) {
@@ -438,6 +580,7 @@ void FramePasses(Context& h) {
   BootCases(h, block);
   ConstructCases(h, block);
   memory::Free(block);
+  RecordCases(h);
 }
 
 }  // namespace harness

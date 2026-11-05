@@ -112,4 +112,33 @@ struct ConstructCalls {
 uint32_t Construct(uint8_t* base, uint32_t passes, uint32_t block, uint32_t frame,
                    uint32_t stack_word, const ConstructCalls& calls);
 
+// Record's frame (its r1 less this, below its caller's).
+constexpr uint32_t kRecordFrame = 320;
+
+// FramePasses::Record's guest calls, made by the adapter from its frame.
+struct RecordCalls {
+  // `object`'s vtable slot at `byte` (r3 = the object), returning to `lr`;
+  // its r3.
+  std::function<uint32_t(uint32_t object, uint32_t byte, uint32_t lr)> vcall;
+  // The render queue's slot 4 (r3 = `queue`, r4 = `chunk`, r5 = `bucket`,
+  // f1 = 0.0), returning to `lr`.
+  std::function<void(uint32_t queue, uint32_t chunk, uint32_t bucket, uint32_t lr)> add;
+  // SceneTarget::RecordPasses (r3 = [0x8266D08C], r4 = `list`, r5 to r7 150,
+  // 602, 121), returning to 0x82098620.
+  std::function<void(uint32_t list)> record_passes;
+  // FramePasses::RecordPrimitiveReset, returning to 0x82098624.
+  std::function<void()> primitive_reset;
+};
+
+// sub_82096418 FramePasses::Record (slot 1, tick handler 3): r3 = it, its
+// frame at `frame`. The +4 interface's slot 3 (the scene), the scene's
+// slots 1 (its command list) and 2 (its render queue); the render queue's
+// sort keys [0x8296B90C] = 168, [0x8296B900] = 270, [0x8296B908] = 163;
+// one chunk opened on the list with the frame's 18 pass chunks (record.h),
+// closed; 58 render queue adds; the scene target's passes and the
+// primitive reset. False (nothing done but the three getters: the original
+// runs then) where a chunk is open, the list hasn't room for its 359
+// slots, or this's slots 5 and 6 aren't RecordConstants and RecordSamplers.
+bool Record(uint8_t* base, uint32_t passes, uint32_t frame, const RecordCalls& calls);
+
 }  // namespace frame_passes

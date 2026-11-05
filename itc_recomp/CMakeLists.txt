@@ -387,6 +387,10 @@ set(ITC_SOURCES
     src/scene_target/scene_target.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
+    src/frame_passes/record.cpp
+    src/frame_passes/record_part1.cpp
+    src/frame_passes/record_part2.cpp
+    src/frame_passes/record_part3.cpp
     src/hooks/framework.cpp
     src/framework/framework.cpp
     src/framework/run_loop.cpp
@@ -744,6 +748,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/front_end_car_draw/pose.cpp
     src/post_effects/record.cpp
     src/scene_target/scene_target.cpp
+    src/frame_passes/record_part1.cpp src/frame_passes/record_part2.cpp
+    src/frame_passes/record_part3.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp
