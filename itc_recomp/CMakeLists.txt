@@ -385,6 +385,8 @@ set(ITC_SOURCES
     src/post_effects/record.cpp
     src/hooks/scene_target.cpp
     src/scene_target/scene_target.cpp
+    src/hooks/frame_passes.cpp
+    src/frame_passes/frame_passes.cpp
     src/hooks/framework.cpp
     src/framework/framework.cpp
     src/framework/run_loop.cpp
@@ -564,6 +566,7 @@ set(ITC_SOURCES
     src/harnesses/course_scenery.cpp
     src/harnesses/post_effects.cpp
     src/harnesses/scene_target.cpp
+    src/harnesses/frame_passes.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp
