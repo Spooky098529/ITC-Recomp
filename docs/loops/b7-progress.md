@@ -56,7 +56,11 @@ file's history. What's left to see in a drive, from every run:
   (`Job::Wait`), 10 in play; 0 errors; ready: `sub_82096418` (with
   `sub_82589990`, split the migration), `sub_82096218`, `sub_82096360`,
   `sub_82096030`, `sub_820962B8`, `sub_82094B10`, `sub_82096350`).
-  Step: migration, agent running.
+  Migration 261c0970..85292a33 (`--native_frame_passes`, 10 of 10 in
+  play ours; `RecordPasses`', `InitBoot`'s and `RecordPrimitiveReset`'s
+  adapters removed; `Record` split in three parts, done by three
+  subagents one after another; `itc_3594`: race 38 s, 0 errors, 72
+  harness lines 0 differing). Step: validation, agent running.
 
 ## Done
 
@@ -100,3 +104,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3576`): ours 4187, work left 2223.
 - After the frame passes' map: ours 4187, work left 2223 (wrapped 61,
   known 478, unknown 1684).
+- After its migration: ours 4197, work left 2213 (wrapped 60, known
+  469, unknown 1684).
