@@ -383,6 +383,8 @@ set(ITC_SOURCES
     src/post_effects/post_effects.cpp
     src/post_effects/create.cpp
     src/post_effects/record.cpp
+    src/hooks/scene_target.cpp
+    src/scene_target/scene_target.cpp
     src/hooks/framework.cpp
     src/framework/framework.cpp
     src/framework/run_loop.cpp
@@ -561,6 +563,7 @@ set(ITC_SOURCES
     src/harnesses/render_queue.cpp
     src/harnesses/course_scenery.cpp
     src/harnesses/post_effects.cpp
+    src/harnesses/scene_target.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp
@@ -737,6 +740,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/front_end_car_draw/garage_stage.cpp src/front_end_car_draw/lights.cpp
     src/front_end_car_draw/pose.cpp
     src/post_effects/record.cpp
+    src/scene_target/scene_target.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp

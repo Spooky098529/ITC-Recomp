@@ -278,5 +278,6 @@ void FrontEndCarDraw(Context& h);
 void ReplaySnapshots(Context& h);
 // The race's loading (src/harnesses/race_loading.cpp).
 void RaceLoading(Context& h);
+void SceneTarget(Context& h);
 
 }  // namespace harness
