@@ -20,7 +20,7 @@ namespace {
 // the original's f31), 1.0 (the viewport's far Z) and the LOD bias.
 constexpr uint32_t kZero = 0x82000A34;
 constexpr uint32_t kOne = 0x82000A30;
-constexpr uint32_t kLodBias = 0x8295B8F4;
+constexpr uint32_t kLodBias = 0x8296B8F4;
 
 // A float as the original moves it: loaded to a double, stored as a float
 // (the host conversion quiets signaling NaNs as the recompiled code does).
@@ -88,7 +88,7 @@ void RecordPart1(Recorder& r) {
   r.StoreFrame(104, r.Head());
   StateResets(r, 0, 0, 0);
   r.Slot3(2, 21, 0);
-  r.StoreFrame(88, 0x82960000u);
+  r.StoreFrame(88, 0x82970000u);
   for (uint32_t sampler = 0; sampler < 4; sampler++) {
     // The LOD bias (28) through the frame's +84.
     const uint32_t s = r.Slot2(sampler, 28);

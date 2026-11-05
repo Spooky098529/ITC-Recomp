@@ -296,15 +296,7 @@ void hooks::FramePassesRecord(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-// TEMPORARY: the game keeps the original until the three parts are written
-// (the harness calls FramePassesRecord directly).
-constexpr bool kRecordPartsWritten = false;
-
 extern "C" REX_FUNC(sub_82096418) {
   REX_FUNC_PROLOGUE();
-  if (!kRecordPartsWritten) {
-    __imp__sub_82096418(ctx, base);
-    return;
-  }
   hooks::FramePassesRecord(ctx, base);
 }
