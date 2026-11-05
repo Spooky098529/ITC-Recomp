@@ -51,8 +51,12 @@ file's history. What's left to see in a drive, from every run:
   `sub_82096030`, with its vtable's `sub_82096418` and
   `sub_820962B8`, the callers keeping `RecordPasses`' and
   `PostEffects::InitBoot`'s adapters; once a frame; all but the
-  constructor ready; its line deleted from `leads.md`). Step: mapping,
-  agent running.
+  constructor ready; its line deleted from `leads.md`). Map checked
+  (19f643f1: `frame-passes.md`, 13 rows, 1 moved from `functions.md`
+  (`Job::Wait`), 10 in play; 0 errors; ready: `sub_82096418` (with
+  `sub_82589990`, split the migration), `sub_82096218`, `sub_82096360`,
+  `sub_82096030`, `sub_820962B8`, `sub_82094B10`, `sub_82096350`).
+  Step: migration, agent running.
 
 ## Done
 
@@ -94,3 +98,5 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4187, work left 2223 (wrapped 61, known
   469, unknown 1693).
 - After its validation (`itc_3576`): ours 4187, work left 2223.
+- After the frame passes' map: ours 4187, work left 2223 (wrapped 61,
+  known 478, unknown 1684).
