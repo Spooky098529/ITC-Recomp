@@ -1,7 +1,10 @@
 // The scene target's passes natively: adapters in front of
 // src/scene_target/ (docs/functions/scene-target.md). Each leaves r3 as the
-// original does. TexturedRect::RecordFlat (sub_8217AA98) has no adapter:
-// only TexturedRect::Record calls it, and the flag switches that. With the
+// original does. SceneTarget::RecordTargets (sub_8209AE48) and
+// RecordTileTargets (sub_8209AF40) have no adapters: only RecordPasses' and
+// RecordBoundTargets' plain C++ call them; nor TexturedRect::Record
+// (sub_8217C368, its work hooks::SceneTargetTexturedRect, which
+// RecordPasses' adapter calls) and RecordFlat (sub_8217AA98). With the
 // command list's diagnostics on (they name who allocates slots by the
 // return address), the originals run.
 
@@ -21,10 +24,10 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 ITC_FLAG_BOOL(native_scene_target, true, "ITC",
               "Run the scene target's passes (docs/functions/scene-target.md: "
               "SceneTarget::RecordPasses sub_8209B3D0 (the render manager's getters and the "
-              "render queue's Add guest calls), RecordTargets sub_8209AE48, RecordTileTargets sub_8209AF40, "
-              "RecordBoundTargets sub_8209B058, TexturedRect::Record sub_8217C368 with "
-              "TexturedRect::RecordFlat sub_8217AA98 (no adapter: only Record calls it; the "
-              "render queue's Add a guest call)) natively instead of through the translated "
+              "render queue's Add guest calls) with RecordTargets sub_8209AE48, RecordTileTargets "
+              "sub_8209AF40, TexturedRect::Record sub_8217C368 and RecordFlat sub_8217AA98 (no "
+              "adapters: only RecordPasses calls them; the rectangle's render queue Add a guest "
+              "call), and RecordBoundTargets sub_8209B058) natively instead of through the translated "
               "code (the same writes; the originals with the command list's diagnostics on; "
               "checked by --run_harnesses=scene_target)");
 
@@ -52,9 +55,6 @@ bool Native() {
     ctx.r3.u64 = *r3;                         \
   }
 
-// r3 = the scene target, r4 = the command list (r5 not read).
-ITC_SCENE_TARGET_RECORD(8209AE48, scene_target::RecordTargets(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SCENE_TARGET_RECORD(8209AF40, scene_target::RecordTileTargets(base, ctx.r3.u32, ctx.r4.u32))
 // r3 = the command list (r4 passed on as r5, not read).
 ITC_SCENE_TARGET_RECORD(8209B058, scene_target::RecordBoundTargets(base, ctx.r3.u32))
 
@@ -140,14 +140,4 @@ extern "C" REX_FUNC(sub_8209B3D0) {
     return;
   }
   hooks::SceneTargetRecordPasses(ctx, base);
-}
-
-// TexturedRect::Record: r3 = the rectangle, r4 not read, r5 = the bucket.
-extern "C" REX_FUNC(sub_8217C368) {
-  REX_FUNC_PROLOGUE();
-  if (!Native()) {
-    __imp__sub_8217C368(ctx, base);
-    return;
-  }
-  hooks::SceneTargetTexturedRect(ctx, base);
 }
