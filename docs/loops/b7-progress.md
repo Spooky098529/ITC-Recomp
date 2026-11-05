@@ -38,8 +38,11 @@ file's history. What's left to see in a drive, from every run:
   deleted from `leads.md`). Map checked (a0cac8ac:
   `scene-target.md`, 6 rows, 1 moved from `functions.md`, all in
   play; 0 errors; 3 ready groups, `sub_8209AE48`, `sub_8209AF40`,
-  `sub_8217C368`; `[0x8266D08C]` is the scene target). Step:
-  migration, agent running.
+  `sub_8217C368`; `[0x8266D08C]` is the scene target). Migration
+  982ea51b..5edff580 (`--native_scene_target`, 6 of 6 ours, with
+  `Glow::Record` as a cleanup in `post-effects.md`, now 58 of 58; 5
+  adapters removed; `itc_3575`: race 38 s, 0 errors, every harness 0
+  differing; no subagents). Step: validation, agent running.
 
 ## Done
 
@@ -74,3 +77,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3554`): ours 4180, work left 2230.
 - After the scene target's map: ours 4180, work left 2230 (wrapped
   62, known 475, unknown 1693).
+- After its migration: ours 4187, work left 2223 (wrapped 61, known
+  469, unknown 1693).
