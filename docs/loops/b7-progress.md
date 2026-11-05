@@ -29,11 +29,20 @@ file's history. What's left to see in a drive, from every run:
   `RecordStarPass`; 5 adapters removed; `itc_3553`: race 38 s, 0
   errors, 64 of 64 harness lines 0 differing; no subagents); nothing
   ready left (`Glow::Record` waits on `sub_8209AE48`, in `leads.md`).
-  Step: its validation, agent running.
+  Validated `itc_3554` (race 47 s, 0 errors, 7 of 7 harness lines,
+  6 ran in the race, `Race::ToggleEffects` in the replay `itc_3555`
+  (ok); none to drive). Done.
+- Subsystem 2 of 3: the command list's render-target records (lead
+  picked: `sub_8209B058`, `sub_8209AE48`, `sub_8209B3D0`; runs every
+  frame, `sub_8209AE48` ready, `Glow::Record` waits on it; its line
+  deleted from `leads.md`). Step: mapping, agent running.
 
 ## Done
 
-(None yet.)
+- The post effects' rest: `post-effects.md` (map b86338cf, migrations
+  106192bc..b1df9d00 and 95c86284..6bfc02d0, `--native_post_effects`,
+  57 of 58; validated `itc_3540` and `itc_3554`: 0 errors, every
+  harness line, replay `itc_3555` ok, none to drive).
 
 ## Rows to review
 
@@ -58,3 +67,4 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3540`): ours 4178, work left 2232.
 - After its second migration: ours 4180, work left 2230 (wrapped 62,
   known 470, unknown 1698).
+- After its validation (`itc_3554`): ours 4180, work left 2230.

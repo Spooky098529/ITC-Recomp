@@ -2737,6 +2737,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-04 | The replay's snapshots (`RaceReplay::SaveStart` at the countdown, `SaveEnd`, `RestoreStart`, `RestoreEnd` around the replay; the 5,232-byte per-vehicle records' save, restore and copy; `Replay::Keep`) | `replay-snapshots.md` | 26 of 26 in play (one migration; RaceReplay's four cased in the `race_world` harness; none runs in an attract race or the pad replay) | `--native_replay_snapshots` |
 | 2026-11-04 | The race's sounds (the race mode's sound machine at +138284: `RaceSounds::Init` and its transitions, the cars' wave banks and sound updates, the pause and resume of the cars and the music, the start and rival music picked and faded, the unload; with `rand`) | `race-sounds.md` | 31 of 31 (two migrations, one subagent for `Init`) | `--native_race_sounds` (`rand` under `--native_c_runtime`) |
 | 2026-11-04 | The race's loading (the race mode's +848 machine `CourseSetup::`: its `Init` and handlers up to the course and draw waits; the loading screen's `Show`, `Run`, `Finish` with `UiMovie::SetFrames`; `sub_82293460`) | `race-loading.md` | 10 of 13 in play (one migration; `WaitCourse`, `EndTick`, `RaceMode::NextMode` wait on `Scenery::IsLoaded`, `CarScene::Update` and `sub_82150E00`) | `--native_race_loading` |
+| 2026-11-05 | The post effects, the rest (a stale lead, the graphics resources' other makers, whose functions were already here: `PostEffects::InitEdramBase` (new row), `Create` with the glow's, color filter's and motion blur's constructors and the render textures' `Acquire` and `Create`, `InitBoot`, the color filter's, target filter's and motion blur's records, `Glow::RecordStar` with `RecordStarPass`; five adapters removed) | `post-effects.md` | 57 of 58 (two migrations; `Glow::Record` `sub_821379D8`, Wrapped by frame interpolation, waits on `sub_8209AE48`) | `--native_post_effects` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4542,3 +4543,17 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 4,167, work left 2,243 (Wrapped 62, with a row 482, no row yet 1,699),
 from 2,253.
+
+**2026-11-05, the post effects' rest (branch `b7-loop-05-11-26`):**
+the thirty-third run's first subsystem (`post-effects.md`,
+`--native_post_effects`, `src/post_effects/`): the top lead (the
+graphics resources' other makers) was stale, its functions already
+mapped, so the run took the rest of the post effects, all ready since
+their 2026-10-24 blockers went: the effects' creation at boot, the
+render textures, the three records and the glow's star; 57 of 58,
+`Glow::Record` waiting on `sub_8209AE48` (the command list's lead).
+`src/post_effects/record.cpp` is built with strict floats. The
+boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 4,180, work left 2,230 (Wrapped
+62, with a row 470, no row yet 1,698), from 2,243.
