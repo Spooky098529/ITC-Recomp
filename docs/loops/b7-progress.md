@@ -18,7 +18,12 @@ file's history. What's left to see in a drive, from every run:
   `car-models.md`; one new row, `sub_825D99D0`
   `PostEffects::InitEdramBase`, in `post-effects.md`; 0 errors; 7
   ready groups: the rest of the post effects, 13 recompiled, all
-  ready). Step: migration of `post-effects.md`, agent running.
+  ready). Migration 106192bc..b1df9d00 (12 of 13 ours under
+  `--native_post_effects`, 5 Native with no adapter; `itc_3535`: race
+  38 s, 0 errors, every harness 0 differing but `matrix_math`'s
+  expected groups; no subagents); left: `Glow::RecordStar`
+  `sub_82136FA8` with `sub_82134060` (ready, the batch limit). Step:
+  validation, agent running; then a second migration.
 
 ## Done
 
@@ -42,3 +47,5 @@ file's history. What's left to see in a drive, from every run:
   unknown 1699).
 - After the post effects' map: ours 4167, work left 2243 (wrapped
   62, known 483, unknown 1698).
+- After its first migration: ours 4178, work left 2232 (wrapped 62,
+  known 472, unknown 1698).
