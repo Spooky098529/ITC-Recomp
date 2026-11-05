@@ -131,9 +131,12 @@ void MakeWorld(Context& h, uint32_t block, Random& r) {
 // copy of the same generator state both times), `args(t)` sets the
 // registers; the stack below the call (2 KiB) is filled with one pattern.
 // The block, the globals, r3 and r4 are compared.
-template <typename Setup, typename Args>
+void NoExtra(const PPCContext&, Outputs&) {}
+
+template <typename Setup, typename Args, typename Extra = decltype(&NoExtra)>
 void Case(Context& h, Results& results, uint32_t block, Setup setup, Args args,
-          GuestFunction recompiled, GuestFunction native, const std::string& what) {
+          GuestFunction recompiled, GuestFunction native, const std::string& what,
+          Extra extra = &NoExtra) {
   std::vector<std::vector<uint8_t>> saved;
   for (const Global& g : kGlobals) {
     saved.push_back(Read(h.base, g.address, g.bytes));
@@ -160,6 +163,7 @@ void Case(Context& h, Results& results, uint32_t block, Setup setup, Args args,
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
     out[v].Word(t.r4.u32);
+    extra(t, out[v]);
   }
   for (size_t i = 0; i < saved.size(); i++) {
     Write(h.base, kGlobals[i].address, saved[i].data(), kGlobals[i].bytes);
@@ -296,6 +300,52 @@ void JobWaitCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// FramePasses::FramePasses: the object at 0x2E00, the block at 0x2E40 (+0
+// the run loop, +4 the interface), the interface's slot 1 [+60] the pool,
+// the pool's slot 1 and the loop's slots 1 and 2 small functions (storing
+// r4, or reading words); the word at its frame's +164 random. Compared: the
+// block, the frame's words +80 to +131, r3.
+void ConstructCases(Context& h, uint32_t block) {
+  Results results("FramePasses::FramePasses (sub_82098630)");
+  uint32_t stack_word = 0;
+  for (int c = 0; c < 60; c++) {
+    Case(
+        h, results, block,
+        [&](Random& r) {
+          const uint32_t passes = block + 0x2E00;
+          const uint32_t args = block + 0x2E40;
+          const uint32_t interface = block + kObject;
+          const uint32_t pool = block + kObject + 0x100;
+          const uint32_t loop = block + kObject + 0x200;
+          auto store = [&](uint32_t address, uint32_t value) {
+            guest::StoreU32(h.base, address, value);
+          };
+          store(args + 0, loop);
+          store(args + 4, interface);
+          store(interface, interface + 0x80);
+          store(interface + 0x80 + 4, kWord60);
+          store(interface + 60, pool);
+          const uint32_t pick[] = {kStoreR4At4, kByte133, kWord60};
+          store(pool, pool + 0x80);
+          store(pool + 0x80 + 4, pick[r.Below(3)]);
+          store(loop, loop + 0x80);
+          store(loop + 0x80 + 4, pick[r.Below(3)]);
+          store(loop + 0x80 + 8, pick[r.Below(3)]);
+          stack_word = uint32_t(r.Next());
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = block + 0x2E00;
+          t.r4.u64 = block + 0x2E40;
+          guest::StoreU32(h.base, t.r1.u32 - fp::kConstructFrame + 164, stack_word);
+        },
+        __imp__sub_82098630, hooks::FramePassesConstruct, fmt::format("case {}", c),
+        [&](const PPCContext& t, Outputs& out) {
+          out.Bytes(Read(h.base, t.r1.u32 - fp::kConstructFrame + 80, 52));
+        });
+  }
+  results.Report();
+}
+
 // The game's video output: [0x8266D088]'s slot 7, then that one's slot 3
 // (as the post effects' callers find it).
 uint32_t GameVideoOutput(Context& h) {
@@ -386,6 +436,7 @@ void FramePasses(Context& h) {
   ThunkCases(h, block);
   JobWaitCases(h, block);
   BootCases(h, block);
+  ConstructCases(h, block);
   memory::Free(block);
 }
 

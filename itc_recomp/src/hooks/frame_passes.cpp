@@ -24,8 +24,9 @@ ITC_FLAG_BOOL(native_frame_passes, true, "ITC",
               "call), FramePasses::RecordConstants sub_82096360, RecordSamplers sub_82096030 and "
               "RecordPrimitiveReset sub_82589990 (the render queue's Add a guest call), Job::Wait "
               "sub_82094B10 (inside --find_menu_selection's wrap; the job's object a guest call) "
-              "and FramePasses::Boot sub_820962B8 (with --native_video_output; the getters and "
-              "PostEffects::InitBoot guest calls)) natively "
+              "FramePasses::Boot sub_820962B8 (with --native_video_output; the getters and "
+              "PostEffects::InitBoot guest calls) and FramePasses::FramePasses sub_82098630 (the "
+              "pool's post, Job::Wait's wrap and the run loop's adds guest calls)) natively "
               "instead of through the translated code (the same writes; the recorders' originals "
               "with the command list's diagnostics on; checked by "
               "--run_harnesses=frame_passes)");
@@ -186,4 +187,53 @@ void hooks::FramePassesBoot(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_820962B8) {
   REX_FUNC_PROLOGUE();
   hooks::FramePassesBoot(ctx, base);
+}
+
+// FramePasses::FramePasses: r3 = it, r4 = the block; the guest calls from a
+// 224-byte frame like the original's (the delegates and the key there, the
+// word it reads at its +164 read there); r3 it.
+void hooks::FramePassesConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_frame_passes)) {
+    __imp__sub_82098630(ctx, base);
+    return;
+  }
+  const uint32_t passes = ctx.r3.u32;
+  const uint32_t block = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, fp::kConstructFrame, 0x820986F0, [&](uint32_t frame) {
+    auto vtable_call = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
+      ctx.r3.u64 = object;
+      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      ctx.r11.u64 = function;
+      ctx.ctr.u64 = function;
+      ctx.lr = return_address;
+      REX_CALL_INDIRECT_FUNC(function);
+      return ctx.r3.u32;
+    };
+    const fp::ConstructCalls calls{
+        [&](uint32_t interface, uint32_t job) {
+          const uint32_t pool = vtable_call(interface, 4, 0x820986F0);
+          ctx.r5.u64 = 1;
+          ctx.r4.u64 = job;
+          vtable_call(pool, 4, 0x82098708);
+        },
+        [&](uint32_t job) {
+          ctx.r3.u64 = job;
+          ctx.lr = 0x82098710;
+          sub_82094B10(ctx, base);  // --find_menu_selection's wrap
+        },
+        [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate, uint32_t lr) {
+          ctx.r5.u64 = delegate;
+          ctx.r4.u64 = key;
+          vtable_call(loop, offset, lr);
+        }};
+    fp::Construct(base, passes, block, frame, guest::LoadU32(base, frame + 164), calls);
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = passes;
+}
+
+extern "C" REX_FUNC(sub_82098630) {
+  REX_FUNC_PROLOGUE();
+  hooks::FramePassesConstruct(ctx, base);
 }

@@ -84,4 +84,32 @@ struct BootCalls {
 // native UnlockDevice leaves it).
 uint32_t Boot(uint8_t* base, uint32_t passes, uint32_t frame, const BootCalls& calls);
 
+// The constructor's frame (its r1 less this, below its caller's).
+constexpr uint32_t kConstructFrame = 224;
+
+// FramePasses::FramePasses's guest calls, made by the adapter from its
+// frame.
+struct ConstructCalls {
+  // The interface's slot 1 (the first worker pool), that pool's slot 1
+  // with r4 = `job`, r5 = 1 (the post, probably).
+  std::function<void(uint32_t interface, uint32_t job)> post;
+  // Job::Wait on `job` (through --find_menu_selection's wrap).
+  std::function<void(uint32_t job)> wait;
+  // The run loop's slot at `offset` (8 AddTickHandler, 4 AddListener) with
+  // r4 = `key`, r5 = `delegate`, returning to `lr`.
+  std::function<void(uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate, uint32_t lr)>
+      add;
+};
+
+// sub_82098630 FramePasses::FramePasses: `passes` (44 bytes), `block` (+0
+// the run loop, +4 the framework's +52 interface), its frame at `frame`;
+// `stack_word` the word the original reads from its own frame at +164,
+// never set there (the boot job's +20). The vtable, the interface, the boot
+// job (posted and waited for), then tick handlers 3 and 20 and the listener
+// for event 8, each a member delegate built in the frame as the original
+// builds them (+80 the key, +88, +104 and +120 the delegates). Returns
+// `passes`.
+uint32_t Construct(uint8_t* base, uint32_t passes, uint32_t block, uint32_t frame,
+                   uint32_t stack_word, const ConstructCalls& calls);
+
 }  // namespace frame_passes

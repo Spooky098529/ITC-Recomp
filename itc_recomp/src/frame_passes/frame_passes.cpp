@@ -154,4 +154,55 @@ uint32_t Boot(uint8_t* base, uint32_t passes, uint32_t frame, const BootCalls& c
   return video_output;
 }
 
+uint32_t Construct(uint8_t* base, uint32_t passes, uint32_t block, uint32_t frame,
+                   uint32_t stack_word, const ConstructCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82098630 FramePasses::FramePasses");
+  constexpr uint32_t kDelegateVtable = 0x82002850;
+  constexpr uint32_t kFunctorBase = 0x82000ABC;
+  const uint32_t job = passes + 8;
+  Store(base, passes + 0, 0x82000F20);
+  const uint32_t interface = Load(base, block + 4);
+  Store(base, passes + 4, interface);
+  // The job, as the original leaves it (its +4 0x82000AB4, then the job's
+  // vtable 0x82002908; the fields stored twice once).
+  Store(base, job + 0, 0x820066DC);
+  Store(base, job + 4, 0x82002908);
+  Store(base, job + 8, 0);
+  Store(base, job + 12, 0);
+  guest::StoreU8(base, job + 16, 0);
+  guest::StoreU8(base, job + 17, 1);
+  guest::StoreU8(base, job + 18, 0);
+  Store(base, job + 20, stack_word);
+  Store(base, job + 24, kDelegateVtable);
+  Store(base, job + 28, passes);
+  Store(base, job + 32, 0x82096330);  // slot 0, FramePasses::Boot
+  calls.post(Load(base, passes + 4), job);
+  calls.wait(job);
+
+  const uint32_t key = frame + 80;
+  // Tick handler 3: slot 1 (FramePasses::Record) through sub_82096340.
+  Store(base, frame + 92, passes);
+  Store(base, frame + 88, kDelegateVtable);
+  Store(base, frame + 96, 0x82096340);
+  Store(base, key, 3);
+  calls.add(Load(base, block + 0), 8, key, frame + 88, 0x82098750);
+  // Tick handler 20: slot 2 (FramePasses::FlipWorkMem) through sub_82096350;
+  // the first delegate destroyed.
+  Store(base, frame + 104, kDelegateVtable);
+  Store(base, frame + 108, passes);
+  Store(base, frame + 88, kFunctorBase);
+  Store(base, frame + 112, 0x82096350);
+  Store(base, key, 20);
+  calls.add(Load(base, block + 0), 8, key, frame + 104, 0x82098794);
+  // The listener for event 8: slot 3 (FramePasses::OnEvent) through
+  // sub_82096320; the second delegate destroyed (the third isn't).
+  Store(base, frame + 104, kFunctorBase);
+  Store(base, frame + 124, passes);
+  Store(base, frame + 120, kDelegateVtable);
+  Store(base, frame + 128, 0x82096320);
+  Store(base, key, 8);
+  calls.add(Load(base, block + 0), 4, key, frame + 120, 0x820987D8);
+  return passes;
+}
+
 }  // namespace frame_passes

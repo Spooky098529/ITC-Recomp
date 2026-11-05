@@ -28,4 +28,8 @@ void FramePassesJobWait(PPCContext& ctx, uint8_t* base);
 // --native_frame_passes and --native_video_output, else the original.
 void FramePassesBoot(PPCContext& ctx, uint8_t* base);
 
+// FramePasses::FramePasses (sub_82098630; r3 = it, r4 = the block):
+// natively with --native_frame_passes, else the original.
+void FramePassesConstruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
