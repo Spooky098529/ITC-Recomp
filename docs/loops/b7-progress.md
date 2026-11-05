@@ -35,7 +35,11 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the command list's render-target records (lead
   picked: `sub_8209B058`, `sub_8209AE48`, `sub_8209B3D0`; runs every
   frame, `sub_8209AE48` ready, `Glow::Record` waits on it; its line
-  deleted from `leads.md`). Step: mapping, agent running.
+  deleted from `leads.md`). Map checked (a0cac8ac:
+  `scene-target.md`, 6 rows, 1 moved from `functions.md`, all in
+  play; 0 errors; 3 ready groups, `sub_8209AE48`, `sub_8209AF40`,
+  `sub_8217C368`; `[0x8266D08C]` is the scene target). Step:
+  migration, agent running.
 
 ## Done
 
@@ -68,3 +72,5 @@ file's history. What's left to see in a drive, from every run:
 - After its second migration: ours 4180, work left 2230 (wrapped 62,
   known 470, unknown 1698).
 - After its validation (`itc_3554`): ours 4180, work left 2230.
+- After the scene target's map: ours 4180, work left 2230 (wrapped
+  62, known 475, unknown 1693).
