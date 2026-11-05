@@ -1266,6 +1266,67 @@ void CreateCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// PostEffects::InitBoot: the device given or 0 (the lock taken), effect 14
+// there or not. Compared: the vertex declaration (its 56-byte head and
+// elements; freed after), the 15 pointers (the made one as 1), the made
+// target filter (its bytes, its surface's header; freed after), the device
+// word, r3 (the made effect as 1).
+void InitBootCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  Results results("sub_82138C38 PostEffects::InitBoot");
+  Saved effects(h.base, pe::kEffects, pe::kCount);
+  Saved declaration(h.base, pe::kVertexDeclaration, 1);
+  uint32_t elements = 0;
+  while (guest::LoadU16(h.base, 0x826176C4 + 12 * elements) != 255) {
+    elements++;
+  }
+  for (int c = 0; c < 12; c++) {
+    const uint32_t device = c % 2 == 0 ? 0 : uint32_t(r.Next()) | 1;
+    const bool present = c % 4 >= 2;
+    std::vector<uint32_t> pointers(pe::kCount);
+    for (uint32_t& p : pointers) {
+      p = r.Below(2) == 0 ? 0 : block + 0x300;
+    }
+    pointers[14] = present ? block + 0x300 : 0;
+    const std::vector<uint32_t> stack = StackWords(r);
+    const uint32_t before = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32s(h.base, pe::kEffects, pointers.data(), pe::kCount);
+      guest::StoreU32(h.base, pe::kVertexDeclaration, before);
+      PPCContext t = CallContext(h);
+      FillStack(h.base, t.r1.u32, stack);
+      t.r3.u64 = device;
+      Run(v, __imp__sub_82138C38, sub_82138C38, t, h.base);
+      const uint32_t decl = guest::LoadU32(h.base, pe::kVertexDeclaration);
+      out[v].Word(decl != 0 && decl != before);
+      if (decl != 0 && decl != before) {
+        out[v].Bytes(Read(h.base, decl, 56 + 12 * (elements + 1)));
+        memory::crt::XMemFree(decl, 0x24800000);
+      }
+      const uint32_t made = present ? 0 : guest::LoadU32(h.base, pe::kEffects + 4 * 14);
+      for (uint32_t i = 0; i < pe::kCount; i++) {
+        out[v].Word(i == 14 && made != 0 ? 1 : guest::LoadU32(h.base, pe::kEffects + 4 * i));
+      }
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 + 20));
+      out[v].Word(made != 0 && t.r3.u32 == made ? 1 : t.r3.u32);
+      if (made != 0) {
+        out[v].Bytes(Read(h.base, made, 8064));
+        const uint32_t surface = guest::LoadU32(h.base, made + 8064);
+        out[v].Word(surface != 0);
+        if (surface != 0) {
+          out[v].Bytes(Read(h.base, surface, 48));
+          memory::crt::XMemFree(surface, 0x24800000);
+        }
+        memory::crt::OperatorDelete(made);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {} device {:08X} present {}", c, device,
+                                              present));
+  }
+  results.Report();
+}
+
 // --- The destructors ---
 
 // The destructors and the deleting ones (r4 0 or 1, or any) on an effect of
@@ -1430,6 +1491,7 @@ void PostEffects(Context& h) {
   RenderTextureMakeCases(h, block);
   ConstructorCases(h, block);
   CreateCases(h, block);
+  InitBootCases(h, block);
   DestroyCases(h, block);
   memory::Free(block);
 }

@@ -191,6 +191,24 @@ struct CreateCalls {
 uint32_t Create(uint8_t* base, uint32_t stack, uint32_t device, uint32_t index,
                 const CreateCalls& calls);
 
+// The guest calls PostEffects::InitBoot makes: the video output (as
+// SurfaceCalls', `at` 0 before and 1 after), memcpy where
+// CreateVertexDeclaration's plain C++ hands it back, and a frame for
+// PostEffects::Create (`in_create_frame(create)` runs `create` with the
+// guest calls Create makes, from a frame like the original's, returning its
+// r3).
+struct InitBootCalls {
+  std::function<uint32_t(int at)> video_output;
+  std::function<void(uint32_t to, uint32_t from, uint32_t size)> memcpy_call;
+  std::function<uint32_t(const std::function<uint32_t(const CreateCalls&)>&)> in_create_frame;
+};
+// PostEffects::InitBoot (sub_82138C38): with the device locked when
+// `device` is 0 (kept at `stack` + 20), the effects' vertex declaration
+// [0x826C5DBC] = CreateVertexDeclaration(0x826176C4), then
+// PostEffects::Create(device, 14). Returns r3 as the original leaves it.
+constexpr uint32_t kVertexDeclaration = 0x826C5DBC;
+uint32_t InitBoot(uint8_t* base, uint32_t stack, uint32_t device, const InitBootCalls& calls);
+
 // --- The destructors ---
 
 // The calls the destructors make, each returning r3 as it leaves it:

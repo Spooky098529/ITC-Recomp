@@ -10,6 +10,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "app_start_up/start_up.h"
 #include "c_runtime/strings.h"
 #include "graphics/resources.h"
 #include "graphics/video_output.h"
@@ -28,6 +29,7 @@ constexpr uint32_t kBaseVtable = 0x82008838;
 
 // The frames of the originals.
 constexpr uint32_t kCreateFrame = 128;
+constexpr uint32_t kInitBootFrame = 112;
 constexpr uint32_t kAcquireFrame = 160;
 constexpr uint32_t kTextureCreateFrame = 144;
 constexpr uint32_t kGlowFrame = 144;
@@ -329,6 +331,30 @@ uint32_t Create(uint8_t* base, uint32_t stack, uint32_t device, uint32_t index,
       Store(base, at, r3);
     }
   }
+  if (lock) {
+    r3 = calls.video_output(1);
+    vo::UnlockDevice(base, r3, local);
+  }
+  return r3;
+}
+
+uint32_t InitBoot(uint8_t* base, uint32_t stack, uint32_t device, const InitBootCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82138C38 PostEffects::InitBoot");
+  namespace vo = graphics::video_output;
+  const uint32_t frame = stack - kInitBootFrame;
+  const uint32_t local = stack + 20;  // the device word, in the caller's frame
+  Store(base, local, device);
+  const bool lock = device == 0;
+  if (lock) {
+    Store(base, local, vo::LockDevice(base, calls.video_output(0)));
+  }
+  const auto declaration =
+      app_start_up::CreateVertexDeclaration(base, 0x826176C4, calls.memcpy_call);
+  Require(declaration.has_value(), "CreateVertexDeclaration");
+  Store(base, kVertexDeclaration, *declaration);
+  const uint32_t effect_device = Load(base, local);
+  uint32_t r3 = calls.in_create_frame(
+      [&](const CreateCalls& create) { return Create(base, frame, effect_device, 14, create); });
   if (lock) {
     r3 = calls.video_output(1);
     vo::UnlockDevice(base, r3, local);
