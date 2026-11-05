@@ -291,6 +291,7 @@ void hooks::FramePassesRecord(PPCContext& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   if (!done) {
+    ctx.r3.u64 = passes;  // the getters left their answers
     __imp__sub_82096418(ctx, base);
   }
 }
