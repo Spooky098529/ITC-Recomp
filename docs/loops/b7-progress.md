@@ -60,10 +60,15 @@ file's history. What's left to see in a drive, from every run:
   play ours; `RecordPasses`', `InitBoot`'s and `RecordPrimitiveReset`'s
   adapters removed; `Record` split in three parts, done by three
   subagents one after another; `itc_3594`: race 38 s, 0 errors, 72
-  harness lines 0 differing). Step: validation, agent running.
+  harness lines 0 differing). Validated `itc_3595` (race 46 s, 0
+  errors, 12 of 12 harness lines, all ran in the race; no replay
+  needed; none to drive). Done.
 
 ## Done
 
+- The frame passes: `frame-passes.md` (map 19f643f1, migration
+  261c0970..85292a33, `--native_frame_passes`, 10 of 10 in play;
+  validated `itc_3595`: 0 errors, every harness line, none to drive).
 - The scene target's passes: `scene-target.md` (map a0cac8ac,
   migration 982ea51b..5edff580, `--native_scene_target`, 6 of 6, with
   `Glow::Record` finishing `post-effects.md`; validated `itc_3576`: 0
@@ -106,3 +111,10 @@ file's history. What's left to see in a drive, from every run:
   known 478, unknown 1684).
 - After its migration: ours 4197, work left 2213 (wrapped 60, known
   469, unknown 1684).
+- After its validation (`itc_3595`): ours 4197, work left 2213.
+
+## Stopped
+
+2026-11-05, at the run's limit (3 subsystems), after the frame passes'
+validation. No halts, no questions to the user. Nothing uncommitted.
+The user reviews and merges.

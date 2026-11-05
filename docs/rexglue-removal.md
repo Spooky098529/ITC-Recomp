@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-04):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-05):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -216,7 +216,12 @@ goes in `src/` as overrides), American English.
   sounds (`race-sounds.md`, 31 of 31, with `rand` by the user's call)
   and the race's loading (`race-loading.md`, 10 of 13 in play: the
   race mode's +848 machine and the loading screen) native (ours 4,099
-  -> 4,167) and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  -> 4,167) and stopped at its limit; its thirty-third run (branch
+  `b7-loop-05-11-26`, 2026-11-05, 3 subsystems) finished the post
+  effects (`post-effects.md`, 58 of 58), made the scene target's passes
+  (`scene-target.md`, 6 of 6) and the frame passes object
+  (`frame-passes.md`, 10 of 10 in play) native (ours 4,167 -> 4,197)
+  and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2739,6 +2744,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-04 | The race's loading (the race mode's +848 machine `CourseSetup::`: its `Init` and handlers up to the course and draw waits; the loading screen's `Show`, `Run`, `Finish` with `UiMovie::SetFrames`; `sub_82293460`) | `race-loading.md` | 10 of 13 in play (one migration; `WaitCourse`, `EndTick`, `RaceMode::NextMode` wait on `Scenery::IsLoaded`, `CarScene::Update` and `sub_82150E00`) | `--native_race_loading` |
 | 2026-11-05 | The post effects, the rest (a stale lead, the graphics resources' other makers, whose functions were already here: `PostEffects::InitEdramBase` (new row), `Create` with the glow's, color filter's and motion blur's constructors and the render textures' `Acquire` and `Create`, `InitBoot`, the color filter's, target filter's and motion blur's records, `Glow::RecordStar` with `RecordStarPass`; five adapters removed) | `post-effects.md` | 57 of 58 (two migrations; `Glow::Record` `sub_821379D8`, Wrapped by frame interpolation, waits on `sub_8209AE48`) | `--native_post_effects` |
 | 2026-11-05 | The scene target's passes (`SceneTarget::RecordPasses` `sub_8209B3D0` once a frame: the menus' predicated tiling, the race's 1024×576 pair, the upscale draw to 1280×720; `RecordTargets`, `RecordTileTargets`, `RecordBoundTargets`, `TexturedRect::Record` and `RecordFlat`; with `Glow::Record` as a cleanup in `post-effects.md`) | `scene-target.md` | 6 of 6 (one migration; `RecordPasses`' adapter kept for its recompiled caller `sub_82096418`) | `--native_scene_target` |
+| 2026-11-05 | The frame passes object (framework +108, vtable `0x82000F20`: `FramePasses::Boot` with `PostEffects::InitBoot` at boot, `Record` once a frame, its ~20 shared pass chunks at 58 buckets, then the scene target's passes and the primitive reset states; `FlipWorkMem`, `RecordConstants`, `RecordSamplers`, the constructor, `Job::Wait`) | `frame-passes.md` | 10 of 10 in play (one migration, `Record` in three parts; `RecordPasses`' and `InitBoot`'s adapters removed) | `--native_frame_passes` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4572,3 +4578,16 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 4,187, work left 2,223 (Wrapped 61, with a row 469, no row yet
 1,693), from 2,230.
+
+**2026-11-05, the frame passes (branch `b7-loop-05-11-26`):** the
+thirty-third run's third and last subsystem (`frame-passes.md`,
+`--native_frame_passes`, `src/frame_passes/`): the 44-byte object at
+framework +108, its boot job and its once-a-frame record of the
+shared pass chunks, 10 of the 10 seen in play; `SceneTarget::RecordPasses`
+and `PostEffects::InitBoot` lost their adapters with it. Its constructor's
+and `Job::Wait`'s adapters wait on `Framework::Init` and the movie and
+audio managers' callers. The run stopped at its limit. The boundary:
+449 functions (916 pairs): overridden 108, Native 34, Dropped 26,
+never called 70, live 211. Imports: 186 called, 56 with a live caller.
+B7 (`b7_status.py`): ours 4,197, work left 2,213 (Wrapped 60, with a
+row 469, no row yet 1,684), from 2,223.

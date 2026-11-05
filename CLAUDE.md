@@ -503,6 +503,19 @@ the race's loading (`race-loading.md`, `--native_race_loading`, 10 of
 over the calling thread's guest seed (`--native_c_runtime`), `_getptd`
 and `_mtinit` left for the core. The rest waits on `Scenery::IsLoaded`,
 `CarScene::Update` and the leads in `docs/loops/leads.md`.
+Its thirty-third run (`b7-loop-05-11-26`, 2026-11-05, not yet merged;
+summary `docs/loops/b7-loop-2026-11-05-2021.md`; 3 subsystems)
+finished the post effects (`post-effects.md`, 58 of 58: their creation
+at boot, the render textures, the records, the glow's star, with
+`Glow::Record` inside frame interpolation's wrap; the top lead was
+stale), made the scene target's passes (`scene-target.md`,
+`--native_scene_target`, 6 of 6: the menus' tiling, the race's
+1024×576 pair, the upscale draw) and the frame passes object
+(`frame-passes.md`, `--native_frame_passes`, 10 of 10 in play: the
+boot job and the once-a-frame pass chunks at framework +108) native
+(ours 4,167 -> 4,197); the rest waits on `Framework::Init`,
+`CarScene::Update` `sub_820C9608`, `Scenery::IsLoaded` and the leads
+in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
