@@ -24,6 +24,7 @@
 #include "matrix_math/matrix_math.h"
 #include "models/model.h"
 #include "native/buffers.h"
+#include "scene_target/scene_target.h"
 
 #include <bit>
 #include <initializer_list>
@@ -588,13 +589,12 @@ uint32_t GlowRecordStarPass(uint8_t* base, uint32_t stack, uint32_t glow, uint32
   return RecordResolve(base, glow, list, dest, 256, 0xFFFFFFFDu, false).value_or(0);
 }
 
-std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t glow,
-                                       const RecordCalls& calls) {
-  const uint32_t frame = stack - 672;
-  Store(base, frame, stack);  // the back chain, as stwu
-  Recorder r(base, calls, frame);
-  const uint32_t list = r.Get(4, 0x82136FD8, 0x82136FE8);
-  // The slots: 80, and 48 for each line's pass.
+namespace {
+
+// Glow::RecordStar's slots: 80, and 48 for each line's pass; nothing where
+// it leaves the star to the original (more than kStarLines lines, a line of
+// more than 2 passes).
+std::optional<uint64_t> StarSlots(uint8_t* base, uint32_t glow) {
   const uint32_t star = glow + 8112;
   const uint32_t lines = Load(base, star);
   if (lines > kStarLines) {
@@ -608,9 +608,23 @@ std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t g
     }
     slots += 48 * uint64_t(passes);
   }
-  if (!r.Room(list, slots)) {
+  return slots;
+}
+
+}  // namespace
+
+std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t glow,
+                                       const RecordCalls& calls) {
+  const uint32_t frame = stack - 672;
+  Store(base, frame, stack);  // the back chain, as stwu
+  Recorder r(base, calls, frame);
+  const uint32_t list = r.Get(4, 0x82136FD8, 0x82136FE8);
+  const std::optional<uint64_t> slots = StarSlots(base, glow);
+  if (!slots || !r.Room(list, *slots)) {
     return std::nullopt;
   }
+  const uint32_t star = glow + 8112;
+  const uint32_t lines = Load(base, star);
   ITC_NATIVE_RUNNING("sub_82136FA8 Glow::RecordStar");
   Slot3(base, list, 1, 1, 0);
   Slot2(base, list, 60, 0);
@@ -780,6 +794,132 @@ std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t g
   Slot2(base, list, 60, 1);
   Slot3(base, list, 3, 1, 0);
   return Slot2(base, list, 0, 0x10101);
+}
+
+std::optional<uint32_t> GlowRecord(uint8_t* base, uint32_t stack, uint32_t glow,
+                                   const RecordCalls& calls) {
+  const uint32_t frame = stack - 272;
+  Store(base, frame, stack);  // the back chain, as stwu
+  Recorder r(base, calls, frame);
+  const uint32_t list = r.Get(4, 0x82137A04, 0x82137A14);
+  // 142 slots of its own (with the history's resolve), and the star's.
+  const std::optional<uint64_t> star = StarSlots(base, glow);
+  if (!star || !r.Ready(list, 142 + *star)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_821379D8 Glow::Record");
+  command_list::OpenChunk(base, list);
+  const uint32_t header = Header(base, list);
+  RecordBeginStates(base, list);
+  // The frame resolved into +8352's texture (by the view).
+  RecordResolve(base, glow, list, Load(base, Load(base, glow + 8352) + 24), 0, 0xFFFFFFFDu, true);
+  Slot3(base, list, 1, 1, 0);
+  Slot2(base, list, 60, 0);
+  Slot3(base, list, 3, 1, 0);
+  Slot2(base, list, 0, 0x10001);
+  // c34: +8444, +8448, 0, 0 (the bright pass).
+  const double zero = Lfs(base, kZero);
+  const uint32_t c = frame + 96;
+  Stfs(base, c + 8, zero);
+  Stfs(base, c + 12, zero);
+  Stfs(base, c + 0, Lfs(base, glow + 8444));
+  Stfs(base, c + 4, Lfs(base, glow + 8448));
+  RecordPixelConstants(base, list, c, 34, 1);
+  // Drawn into +8412 with shader pair 10 twice, c33 from +8440, then
+  // +8436, with +8452, +8456 and +8476.
+  RecordTargets(base, list, Load(base, glow + 8412), 0);
+  Declaration(base, list);
+  Texture(base, list, Load(base, Load(base, glow + 8352) + 24));
+  Slot3(base, list, 2, 6, 0);
+  for (uint32_t sampler = 0; sampler < 2; sampler++) {
+    Slot3(base, list, sampler, 20, 1);
+    Slot3(base, list, sampler, 16, 1);
+    Slot3(base, list, sampler, 24, 2);
+  }
+  const double quarter = Lfs(base, 0x82008828);
+  for (uint32_t pass = 0; pass < 2; pass++) {
+    if (pass == 1) {
+      Texture(base, list, Load(base, Load(base, glow + 8352) + 24));
+    }
+    ShaderPair(base, list, 10);
+    if (pass == 0) {
+      TexelSize(base, list, glow, frame + 96, frame + 80);
+    } else {
+      TexelSize(base, list, glow, frame + 80, frame + 96);
+    }
+    Stfs(base, c + 0, Lfs(base, glow + (pass == 0 ? 8440 : 8436)));
+    Stfs(base, c + 4, Lfs(base, glow + 8452));
+    Stfs(base, c + 8, Lfs(base, glow + 8456));
+    Stfs(base, c + 12, Lfs(base, glow + 8476));
+    RecordPixelConstants(base, list, c, 33, 1);
+    QuarterQuad(base, list, glow, quarter);
+  }
+  // The history (+8408) blended over it with shader pair 7, weighted by
+  // +8460 (or 1 - 0 when +40, the reset, is set).
+  Texture(base, list, Load(base, Load(base, glow + 8408) + 24));
+  Slot3(base, list, 1, 5, 0);
+  for (const uint32_t state : {60u, 308u, 312u, 316u, 320u}) {
+    Slot2(base, list, state, 1);
+  }
+  Slot3(base, list, 3, 1, 0);
+  Slot2(base, list, 0, 0x10706);
+  ShaderPair(base, list, 7);
+  const uint32_t vertices = AddQuad(base, glow, Load(base, glow + 16) >> 2,
+                                    Load(base, glow + 20) >> 2, Lfs(base, kOne), false);
+  const bool reset = Load(base, glow + 40) != 0;
+  for (const uint32_t at : {16u, 20u, 24u, 56u, 60u, 64u}) {
+    Stfs(base, vertices + at, quarter);
+  }
+  for (const uint32_t at : {28u, 68u, 108u}) {
+    Stfs(base, vertices + at, reset ? zero : Lfs(base, glow + 8460));
+  }
+  for (const uint32_t at : {104u, 100u, 96u}) {
+    Stfs(base, vertices + at, quarter);
+  }
+  Slot3(base, list, 19, 1, 0);
+  {
+    const uint32_t s = Slot(base, list);
+    Store(base, s + 0, 8);
+    guest::StoreU16(base, s + 4, 3);
+    guest::StoreU16(base, s + 6, 40);
+    Store(base, s + 8, vertices);
+  }
+  Slot3(base, list, 1, 5, 0);
+  for (const uint32_t state : {60u, 308u, 312u, 316u, 320u}) {
+    Slot2(base, list, state, 0);
+  }
+  Slot3(base, list, 3, 1, 0);
+  Slot2(base, list, 0, 0x10001);
+  // The history resolved when +48 is set and +44 isn't.
+  if (Load(base, glow + 48) != 0 && Load(base, glow + 44) == 0) {
+    RecordResolve(base, glow, list, Load(base, Load(base, glow + 8408) + 24), 0, 0xFFFFFFFDu,
+                  false);
+  }
+  // The star streaks (room checked above), then the scene target's
+  // surfaces bound again.
+  if (!GlowRecordStar(base, frame, glow, calls)) {
+    r.Call(0x82136FA8, {glow}, 0x821382D4);
+  }
+  scene_target::RecordBoundTargets(base, list);
+  Slot3(base, list, 3, 1, 0);
+  Slot2(base, list, 0, 0x10001);
+  Slot3(base, list, 2, 1, 0);
+  Slot3(base, list, 2, 16, 1);
+  // Shader pair 21 over the frame with +8352's, +8404's and +8384's
+  // textures.
+  Slot3(base, list, 4, 3, 0);
+  Slot2(base, list, 0, Load(base, Load(base, glow + 8352) + 24));
+  Slot2(base, list, 1, Load(base, Load(base, glow + 8404) + 24));
+  Slot2(base, list, 2, Load(base, Load(base, glow + 8384) + 24));
+  ShaderPair(base, list, 21);
+  Quad(base, list, glow, quarter, true);
+  RecordEndStates(base, list);
+  Slot3(base, list, 36, 0, 0);
+  command_list::CloseChunk(base, list);
+  const uint32_t r3 =
+      r.Submit(header, Load(base, glow + 8), zero, 0x821384E0, 0x821384F0, 0x8213850C);
+  Store(base, glow + 40, 0);
+  return r3;
 }
 
 }  // namespace post_effects

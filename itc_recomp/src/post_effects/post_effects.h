@@ -282,6 +282,21 @@ uint32_t GlowRecordStarPass(uint8_t* base, uint32_t stack, uint32_t glow, uint32
 // than 64 lines (never in the game: 4 lines of 2 passes).
 std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t glow,
                                        const RecordCalls& calls);
+// Glow::Record (sub_821379D8, the glow's vtable slot 0; frame interpolation's
+// wrap around it, src/interpolation/glow.cpp): its chunk on the scene's
+// list: the frame resolved into +8352's texture, c34 (+8444, +8448), drawn
+// into +8412 with shader pair 10 twice (c33 from +8440, then +8436, with
+// +8452, +8456, +8476), the history (+8408) blended over it with pair 7
+// (weighted by +8460, or 0.0 when +40 is set), the history resolved when
+// +48 is set and +44 isn't, the star streaks (GlowRecordStar), the scene
+// target's surfaces bound again (SceneTarget::RecordBoundTargets) and pair
+// 21 over the frame with +8352's, +8404's and +8384's textures; handed to
+// the render queue with its key (+8); +40 = 0. Returns r3 (the queue's
+// call's), or nothing (only the list's getters called) when the list
+// hasn't room for its 142 slots and the star's or a chunk is open, or the
+// star is left to the original (GlowRecordStar's).
+std::optional<uint32_t> GlowRecord(uint8_t* base, uint32_t stack, uint32_t glow,
+                                   const RecordCalls& calls);
 
 // --- The destructors ---
 

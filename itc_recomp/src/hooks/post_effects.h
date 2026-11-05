@@ -24,4 +24,10 @@ post_effects::DestroyCalls PostEffectsDestroyCalls(PPCContext& ctx, uint8_t* bas
 // The records' guest calls (ctx's registers, from the frame given).
 post_effects::RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base);
 
+// Glow::Record (sub_821379D8) natively with --native_post_effects (r3 =
+// the glow; r3 as the render queue's call leaves it), or the original
+// (also where the plain C++ declines). Frame interpolation's wrap
+// (src/interpolation/glow.cpp) calls it around its own work.
+void PostEffectsGlowRecord(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

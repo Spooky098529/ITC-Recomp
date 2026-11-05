@@ -20,6 +20,7 @@
 #include "frame_pacing/frame_pacer.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "hooks/post_effects.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -90,7 +91,7 @@ extern "C" REX_FUNC(sub_821379D8) {
   REX_FUNC_PROLOGUE();
   bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
   if (!ITC_FLAG(interpolate_draw_state) || !frame_pacing::GameMessages_InRace()) {
-    __imp__sub_821379D8(ctx, base);
+    hooks::PostEffectsGlowRecord(ctx, base);
     return;
   }
   uint32_t object = ctx.r3.u32;
@@ -166,7 +167,7 @@ extern "C" REX_FUNC(sub_821379D8) {
     LogGlow();
   }
 
-  __imp__sub_821379D8(ctx, base);
+  hooks::PostEffectsGlowRecord(ctx, base);
 
   for (auto it = saved.rbegin(); it != saved.rend(); ++it) {
     guest::StoreU32(base, object + it->first, it->second);

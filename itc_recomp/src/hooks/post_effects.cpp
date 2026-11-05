@@ -3,7 +3,8 @@
 // Flush-to-zero is left off, as the translated code leaves it. The setters
 // are vtable slots (the glow's 2-12 and 24, the color filter's 4 and 6-8),
 // so their adapters stay. Glow::Record (sub_821379D8) is frame
-// interpolation's wrap (src/interpolation/glow.cpp), and
+// interpolation's wrap (src/interpolation/glow.cpp), which calls
+// hooks::PostEffectsGlowRecord (here) for the work, and
 // PostEffects::RecordAll (sub_82133960) is the diagnostics' rewrite
 // (src/debug/frame_state_diff.cpp): neither is here. MotionBlur::Record's
 // plain C++ notes its copy as Matrix::Copy's wrapper does at its return
@@ -78,7 +79,9 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "sub_821351F0, TargetFilter::Record sub_82135B50 and MotionBlur::Record sub_821363F0 "
               "(frame interpolation's note of its copy kept), and the glow's star streaks "
               "Glow::RecordStar sub_82136FA8 with Glow::RecordStarPass sub_82134060 (no adapter: "
-              "only RecordStar's plain C++ calls it, and the flag switches that), without the "
+              "only RecordStar's plain C++ calls it, and the flag switches that), and Glow::Record "
+              "sub_821379D8 inside frame interpolation's wrap (with --native_scene_target's "
+              "RecordBoundTargets), without the "
               "command list's diagnostics) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
@@ -446,6 +449,23 @@ RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
     }                                                                                  \
     ctx.r3.u64 = *r3;                                                                  \
   }
+
+void hooks::PostEffectsGlowRecord(PPCContext& ctx, uint8_t* base) {
+  std::optional<uint32_t> r3;
+  if (ITC_FLAG(native_post_effects)) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    const uint64_t glow = ctx.r3.u64;
+    r3 = GlowRecord(base, ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx, base));
+    ctx.lr = lr;
+    ctx.r3.u64 = glow;
+  }
+  if (!r3) {
+    __imp__sub_821379D8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
 
 ITC_POST_EFFECT_RECORD(821351F0, ColorFilterRecord)
 ITC_POST_EFFECT_RECORD(82135B50, TargetFilterRecord)

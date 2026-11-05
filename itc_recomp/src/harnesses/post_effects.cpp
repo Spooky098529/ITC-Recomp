@@ -1737,21 +1737,30 @@ std::vector<uint32_t> StarGlowWords(Context& h, uint32_t star_block, bool game) 
 // (shader constants: floats) through Floats and every other word exactly
 // (a command the walk doesn't know ends it: the rest exactly), the rest of
 // the block exactly.
-void StarBlockOutputs(Outputs& out, uint8_t* base, uint32_t star_block) {
+// With `header`, the stream starts with a chunk's header slot (Glow::Record),
+// compared exactly and stepped over.
+void StarBlockOutputs(Outputs& out, uint8_t* base, uint32_t star_block, bool header = false) {
   const uint32_t from = star_block + kStarScene + kRecSlots;
   const uint32_t to = guest::LoadU32(base, star_block + kStarScene + kRecList + 44);
   out.Bytes(Read(base, star_block, from - star_block));
   uint32_t at = from;
+  if (header && at + 16 <= to) {
+    out.Bytes(Read(base, at, 16));
+    at += 16;
+  }
   while (at + 16 <= to) {
     const uint32_t command = guest::LoadU32(base, at);
     const uint32_t count = guest::LoadU32(base, at + 4);
     uint64_t payload;
     switch (command) {
-      case 1: case 2: case 3: case 4: case 7:
+      case 1: case 2: case 3: case 4: case 7: case 23: case 24: case 34: case 35:
         payload = count;
         break;
       case 8: case 9: case 10: case 19:
         payload = 1;
+        break;
+      case 36:
+        payload = 0;  // a chain's end (Glow::Record's)
         break;
       case 25:
         payload = 5;  // the resolve's 68-byte item
@@ -1916,6 +1925,80 @@ void StarCases(Context& h, uint32_t star_block) {
   results.Report();
 }
 
+// Glow::Record (its work, without frame interpolation's wrap) on the glow
+// of the star cases (StarGlowWords), with its other textures' entries in
+// the block (+8352, +8404), +8412 any word, +40, +44 and +48 0 or 1 (or
+// any), the constants it reads (+8436 to +8476) random floats with NaNs
+// and infinities, the scene target ([0x8266D08C], for
+// SceneTarget::RecordBoundTargets) random words in the block, the
+// made-up scene (now and then a chunk open), the star's camera pass as
+// StarCases make it, the stack below r1 the same random words for both
+// versions. Compared: the block (StarBlockOutputs), the frame's +80 to
+// +111 (the texel size's doubleword, c33's floats), the open chunk count,
+// r3.
+void NativeGlowRecord(PPCContext& ctx, uint8_t* base) { hooks::PostEffectsGlowRecord(ctx, base); }
+
+void GlowRecordCases(Context& h, uint32_t star_block) {
+  Random& r = h.random;
+  Results results("sub_821379D8 Glow::Record");
+  Saved scene(h.base, 0x826BABA0, 1);
+  Saved open_chunks(h.base, 0x8296BD28, 1);
+  Saved scene_target(h.base, 0x8266D08C, 1);
+  std::vector<Saved> passes;
+  passes.reserve(13);
+  for (uint32_t pass = 0; pass < 13; pass++) {
+    passes.emplace_back(h.base, 0x826BAC00 + pass * 592, 148);
+  }
+  constexpr uint32_t kSceneTarget = 0x7400;
+  for (int c = 0; c < 80; c++) {
+    std::vector<uint32_t> words = StarGlowWords(h, star_block, r.Below(3) == 0);
+    words[8352 / 4] = star_block + kStarEntries + 32 * 8;
+    words[8404 / 4] = star_block + kStarEntries + 32 * 9;
+    for (const uint32_t at : {40u, 44u, 48u}) {
+      words[at / 4] = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2);
+    }
+    for (uint32_t at = 8436; at <= 8476; at += 4) {
+      words[at / 4] = RandomFloatBits(r, 2.0);
+    }
+    const uint32_t kind = r.Below(8) == 0 ? 1 + r.Below(2) : 0;
+    const uint32_t used = r.Below(100);
+    const uint32_t camera = words[36 / 4];
+    const uint32_t active = r.Below(4) == 0 ? 0u : 1u;
+    uint32_t matrix[16];
+    for (uint32_t i = 0; i < 16; i++) {
+      matrix[i] = std::bit_cast<uint32_t>(float(RandomDouble(r, 1.0)));
+    }
+    std::vector<uint32_t> stack(0x1000 / 4 + 8);
+    for (uint32_t& w : stack) {
+      w = uint32_t(r.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32s(h.base, star_block, words.data(), uint32_t(words.size()));
+      SetRecordScene(h.base, star_block + kStarScene, kind, used);
+      guest::StoreU32(h.base, 0x8266D08C, star_block + kSceneTarget);
+      const uint32_t pass = 0x826BAC00 + camera * 592;
+      guest::StoreU32s(h.base, pass + 16, matrix, 16);
+      guest::StoreU32(h.base, pass + 588, active);
+      PPCContext t = CallContext(h);
+      FillStack(h.base, t.r1.u32, stack);
+      t.r3.u64 = star_block;
+      const uint32_t frame = t.r1.u32 - 272;
+      Run(v, __imp__sub_821379D8, NativeGlowRecord, t, h.base);
+      StarBlockOutputs(out[v], h.base, star_block, true);
+      out[v].Bytes(Read(h.base, frame + 80, 16));
+      out[v].Floats(h.base, frame + 96, 4);
+      out[v].Word(guest::LoadU32(h.base, 0x8296BD28));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} kind {} used {} lines {} flags {:X} {:X} {:X}", c, kind,
+                              used, words[8112 / 4], words[40 / 4], words[44 / 4],
+                              words[48 / 4]));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void PostEffects(Context& h) {
@@ -1948,6 +2031,7 @@ void PostEffects(Context& h) {
   if (star_block != 0) {
     StarPassCases(h, star_block);
     StarCases(h, star_block);
+    GlowRecordCases(h, star_block);
     memory::Free(star_block);
   }
 }
