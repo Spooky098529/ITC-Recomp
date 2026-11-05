@@ -27,6 +27,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -1858,6 +1859,23 @@ void StarPassCases(Context& h, uint32_t star_block) {
 // (not its register save area; the star pass's frame below it is dead
 // stack by then, written over by the merge's helpers' frames in the
 // original), the camera pass's matrix untouched, the open chunks, r3.
+// The removed adapter's register steps for Glow::RecordStar (r3 = the
+// glow), without the flag: the original where the plain C++ declines.
+void NativeGlowRecordStar(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint64_t glow = ctx.r3.u64;
+  const std::optional<uint32_t> r3 =
+      pe::GlowRecordStar(base, ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx, base));
+  ctx.lr = lr;
+  ctx.r3.u64 = glow;
+  if (!r3) {
+    __imp__sub_82136FA8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
 void StarCases(Context& h, uint32_t star_block) {
   Random& r = h.random;
   Results results("sub_82136FA8 Glow::RecordStar");
@@ -1905,7 +1923,7 @@ void StarCases(Context& h, uint32_t star_block) {
       FillStack(h.base, t.r1.u32, stack);
       t.r3.u64 = star_block;
       const uint32_t frame = t.r1.u32 - 672;
-      Run(v, __imp__sub_82136FA8, sub_82136FA8, t, h.base);
+      Run(v, __imp__sub_82136FA8, NativeGlowRecordStar, t, h.base);
       StarBlockOutputs(out[v], h.base, star_block);
       // The frame: +92 the last destination, +96 and +112 the quarter
       // size's doublewords, the rest floats (the lines' words, the turn's

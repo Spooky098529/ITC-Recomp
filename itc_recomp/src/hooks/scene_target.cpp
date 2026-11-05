@@ -2,7 +2,9 @@
 // src/scene_target/ (docs/functions/scene-target.md). Each leaves r3 as the
 // original does. SceneTarget::RecordTargets (sub_8209AE48) and
 // RecordTileTargets (sub_8209AF40) have no adapters: only RecordPasses' and
-// RecordBoundTargets' plain C++ call them; nor TexturedRect::Record
+// RecordBoundTargets' plain C++ call them; nor RecordBoundTargets
+// (sub_8209B058): only Glow::Record's plain C++ (--native_post_effects)
+// calls it; nor TexturedRect::Record
 // (sub_8217C368, its work hooks::SceneTargetTexturedRect, which
 // RecordPasses' adapter calls) and RecordFlat (sub_8217AA98). With the
 // command list's diagnostics on (they name who allocates slots by the
@@ -27,7 +29,8 @@ ITC_FLAG_BOOL(native_scene_target, true, "ITC",
               "render queue's Add guest calls) with RecordTargets sub_8209AE48, RecordTileTargets "
               "sub_8209AF40, TexturedRect::Record sub_8217C368 and RecordFlat sub_8217AA98 (no "
               "adapters: only RecordPasses calls them; the rectangle's render queue Add a guest "
-              "call), and RecordBoundTargets sub_8209B058) natively instead of through the translated "
+              "call); RecordBoundTargets sub_8209B058 with no adapter: only Glow::Record's plain "
+              "C++ calls it) natively instead of through the translated "
               "code (the same writes; the originals with the command list's diagnostics on; "
               "checked by --run_harnesses=scene_target)");
 
@@ -40,23 +43,6 @@ bool Native() {
 
 }  // namespace
 
-// Runs the original when the plain C++ has no answer (the list full).
-#define ITC_SCENE_TARGET_RECORD(address, ...) \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    std::optional<uint32_t> r3;               \
-    if (Native()) {                           \
-      r3 = __VA_ARGS__;                       \
-    }                                         \
-    if (!r3) {                                \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
-    ctx.r3.u64 = *r3;                         \
-  }
-
-// r3 = the command list (r4 passed on as r5, not read).
-ITC_SCENE_TARGET_RECORD(8209B058, scene_target::RecordBoundTargets(base, ctx.r3.u32))
 
 void hooks::SceneTargetTexturedRect(PPCContext& ctx, uint8_t* base) {
   const uint32_t rect = ctx.r3.u32;
