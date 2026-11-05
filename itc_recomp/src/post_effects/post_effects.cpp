@@ -556,6 +556,13 @@ std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uin
   return filter;
 }
 
+uint32_t InitEdramBase(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825D99D0 PostEffects::InitEdramBase");
+  const uint32_t tiles = graphics::SurfaceEdramTiles(1024, 576, 0x1A2201BF, 1);
+  guest::StoreU32(base, kEdramBase, tiles);
+  return tiles;
+}
+
 // --- The destructors ---
 
 namespace {

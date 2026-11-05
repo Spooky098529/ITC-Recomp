@@ -57,7 +57,8 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "sub_82136390 (no adapters, nor for RenderTextures::Release and ReleaseSurface: only "
               "the deleting destructors' and the destructors' plain C++ call them, and the flag "
               "switches those) and their deleting ones sub_821389C8, sub_82138570 and sub_821385C0 "
-              "(operator delete with --native_c_runtime_heap)) natively instead of through the "
+              "(operator delete with --native_c_runtime_heap); PostEffects::InitEdramBase "
+              "sub_825D99D0) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
@@ -303,6 +304,10 @@ extern "C" REX_FUNC(sub_82135AA8) {
   }
   ctx.r3.u64 = *r3;
 }
+
+// PostEffects::InitEdramBase: no arguments (a static initializer, through
+// _cinit's table).
+ITC_POST_EFFECTS(825D99D0, ctx.r3.u64 = InitEdramBase(base))
 
 // --- The destructors ---
 

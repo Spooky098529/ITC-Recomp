@@ -780,6 +780,27 @@ void TargetFilterCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// PostEffects::InitEdramBase: the EDRAM base word (random before, put back
+// after) and r3.
+void InitEdramBaseCases(Context& h) {
+  Results results("sub_825D99D0 PostEffects::InitEdramBase");
+  Saved saved(h.base, pe::kEdramBase, 1);
+  for (int c = 0; c < 4; c++) {
+    const uint32_t before = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, pe::kEdramBase, before);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.random.Next();
+      Run(v, __imp__sub_825D99D0, sub_825D99D0, t, h.base);
+      out[v].Word(guest::LoadU32(h.base, pe::kEdramBase));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 // --- The destructors ---
 
 // The destructors and the deleting ones (r4 0 or 1, or any) on an effect of
@@ -940,6 +961,7 @@ void PostEffects(Context& h) {
   RenderTextureCases(h, block);
   ReleaseSurfaceCases(h, block);
   TargetFilterCases(h, block);
+  InitEdramBaseCases(h);
   DestroyCases(h, block);
   memory::Free(block);
 }

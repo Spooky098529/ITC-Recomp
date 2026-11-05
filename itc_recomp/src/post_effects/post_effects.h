@@ -142,6 +142,13 @@ uint32_t ReleaseSurface(uint8_t* base, uint32_t frame, uint32_t at, const Surfac
 std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uint32_t filter,
                                               uint32_t entry);
 
+// PostEffects::InitEdramBase (sub_825D99D0, probably a static
+// initializer): [0x826C5DC0] = Surface::EdramTiles(1024, 576, 0x1A2201BF,
+// 1), the EDRAM base the effects' surfaces are given. Returns r3 (the
+// tiles).
+constexpr uint32_t kEdramBase = 0x826C5DC0;
+uint32_t InitEdramBase(uint8_t* base);
+
 // --- The destructors ---
 
 // The calls the destructors make, each returning r3 as it leaves it:
