@@ -10,7 +10,10 @@
 // 8213653C (interpolation::BlendState_MotionBlurCopy).
 // PostEffects::ToggleNoHistory (sub_82133A38) and ScreenObject::ToggleHidden
 // (sub_8212EDE0) have no adapters: only Race::ToggleEffects' plain C++ calls
-// them, and the flag switches it. StarDef::Init (sub_8212EA98) has none
+// them, and the flag switches it; nor Race::ToggleEffects (sub_8215B690):
+// only the race scene machine's plain C++ calls it (race_scene); nor
+// PostEffect::RecordPixelBool (sub_82133D70): only ColorFilter::Record's
+// plain C++ calls it. StarDef::Init (sub_8212EA98) has none
 // either: only GlareDef::Init's plain C++ calls it; nor GlareDef::GlareDef
 // (sub_8212ED78) and GlareDef::Init (sub_8212EC90): only Glow::Glow's plain
 // C++ calls them; nor TargetFilter::TargetFilter (sub_82135AA8): only
@@ -41,13 +44,15 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "Run the post effects (docs/functions/post-effects.md: PostEffects::Get "
               "sub_82133AE8, MarkUpdated sub_82133A08, ToggleNoHistory sub_82133A38 (no adapter: only "
               "Race::ToggleEffects' plain C++ calls it, and the flag switches that), DestroyRace "
-              "sub_82133A70, Race::ToggleEffects sub_8215B690 with ScreenObject::ToggleHidden "
+              "sub_82133A70, Race::ToggleEffects sub_8215B690 (no adapter: only the race scene "
+              "machine's plain C++ calls it, and --native_race_scene switches that) with ScreenObject::ToggleHidden "
               "sub_8212EDE0 (no adapter, the same), the glow's setters sub_82136EF8 to sub_82136F48 and "
               "Glow::SetFromSpeed sub_82133878, the color filter's setters sub_821350F8, "
               "sub_82135138, sub_82135140 and sub_82135148; the recording helpers "
               "PostEffect::RecordBeginStates sub_82133340, RecordEndStates sub_82133608, "
               "RecordTargets sub_82133790, RecordPixelConstants sub_82133D00, RecordPixelBool "
-              "sub_82133D70, RecordTexelSize sub_82133DD8, AddQuad sub_82133E30 and RecordResolve "
+              "sub_82133D70 (no adapter: only ColorFilter::Record's plain C++ calls it, and the flag "
+              "switches that), RecordTexelSize sub_82133DD8, AddQuad sub_82133E30 and RecordResolve "
               "sub_82133F58, without the command list's diagnostics; the glare's GlareDef::GlareDef "
               "sub_8212ED78 and GlareDef::Init sub_8212EC90 (no adapters: only Glow::Glow's plain C++ "
               "calls them, and the flag switches that) and StarDef::Init sub_8212EA98 (no adapter: only "
@@ -107,9 +112,6 @@ ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0; const uint64_t lr = ctx.lr;
                    });
                  });
                  ctx.lr = lr; ctx.r3.u64 = r3)
-
-// r3 = the race object.
-ITC_POST_EFFECTS(8215B690, ctx.r3.u64 = ToggleRaceEffects(base, ctx.r3.u32))
 
 // --- The glow's setters: r3 = the glow, f1 = the value ---
 
@@ -189,8 +191,6 @@ ITC_POST_EFFECTS_RECORD(82133790, RecordTargets(base, ctx.r4.u32, ctx.r5.u32, ct
 // r5 = the 16 bytes, r6 = the register, r7 = the count.
 ITC_POST_EFFECTS_RECORD(82133D00,
                         RecordPixelConstants(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
-// r5 = the value, r6 = the register.
-ITC_POST_EFFECTS_RECORD(82133D70, RecordPixelBool(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 // f1 = width, f2 = height.
 ITC_POST_EFFECTS_RECORD(82133DD8, (ctx.fpscr.disableFlushMode(),
                                    RecordTexelSize(base, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64)))

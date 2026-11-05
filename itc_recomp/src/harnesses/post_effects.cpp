@@ -90,6 +90,20 @@ void NativeDestroy(PPCContext& ctx, uint8_t* base) {
 // TargetFilter::TargetFilter (r3 = the object, r4 = the table entry; the
 // surface's parameters in a 112-byte frame like the original's, the
 // original where the copy isn't native).
+// Race::ToggleEffects (r3 = the race object) and PostEffect::RecordPixelBool
+// (r4 = the list, r5 = the value, r6 = the register; the original where the
+// list hasn't room).
+void NativeToggleRaceEffects(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = pe::ToggleRaceEffects(base, ctx.r3.u32);
+}
+void NativeRecordPixelBool(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = pe::RecordPixelBool(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  if (!r3) {
+    __imp__sub_82133D70(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
 void NativeGlareDefConstruct(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   pe::GlareDefConstruct(base, ctx.r3.u32);
@@ -289,7 +303,7 @@ void ToggleCases(Context& h, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r3.u64 = race ? race_object : object;
         if (race) {
-          Run(v, __imp__sub_8215B690, sub_8215B690, t, h.base);
+          Run(v, __imp__sub_8215B690, NativeToggleRaceEffects, t, h.base);
         } else {
           Run(v, __imp__sub_8212EDE0, NativeToggleHidden, t, h.base);
         }
@@ -474,7 +488,7 @@ void RecordCases(Context& h, uint32_t block) {
       {"sub_82133608 PostEffect::RecordEndStates", __imp__sub_82133608, sub_82133608, 13},
       {"sub_82133790 PostEffect::RecordTargets", __imp__sub_82133790, sub_82133790, 7},
       {"sub_82133D00 PostEffect::RecordPixelConstants", __imp__sub_82133D00, sub_82133D00, 2},
-      {"sub_82133D70 PostEffect::RecordPixelBool", __imp__sub_82133D70, sub_82133D70, 2},
+      {"sub_82133D70 PostEffect::RecordPixelBool", __imp__sub_82133D70, NativeRecordPixelBool, 2},
       {"sub_82133DD8 PostEffect::RecordTexelSize", __imp__sub_82133DD8, sub_82133DD8, 2},
       {"sub_82133F58 PostEffect::RecordResolve", __imp__sub_82133F58, sub_82133F58, 6},
   };
