@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "graphics/video_output.h"
 
 namespace frame_passes {
 
@@ -129,6 +130,28 @@ std::optional<uint32_t> RecordPrimitiveReset(uint8_t* base) {
   Slot3(base, list, 36, 0, 0);
   command_list::CloseChunk(base, list);
   return chunk;
+}
+
+bool JobWait(uint8_t* base, uint32_t job, const std::function<void(uint32_t object)>& wait) {
+  ITC_NATIVE_RUNNING("sub_82094B10 Job::Wait");
+  if (guest::LoadU8(base, job + 18) == 0) {
+    return false;
+  }
+  wait(Load(base, job + 20));
+  guest::StoreU8(base, job + 18, 0);
+  return true;
+}
+
+uint32_t Boot(uint8_t* base, uint32_t passes, uint32_t frame, const BootCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820962B8 FramePasses::Boot");
+  namespace vo = graphics::video_output;
+  const uint32_t video_output = calls.video_output(Load(base, passes + 4));
+  const uint32_t device = vo::LockDevice(base, video_output);
+  const uint32_t local = frame + 80;
+  Store(base, local, device);
+  calls.init_boot(device);
+  vo::UnlockDevice(base, video_output, local);
+  return video_output;
 }
 
 }  // namespace frame_passes

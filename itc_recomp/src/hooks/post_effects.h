@@ -30,4 +30,9 @@ post_effects::RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base)
 // (src/interpolation/glow.cpp) calls it around its own work.
 void PostEffectsGlowRecord(PPCContext& ctx, uint8_t* base);
 
+// PostEffects::InitBoot (sub_82138C38; r3 = the device or 0) natively with
+// --native_post_effects and the allocation layer, else the original; r3 as
+// the original leaves it. FramePasses::Boot's plain C++ calls it.
+void PostEffectsInitBoot(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

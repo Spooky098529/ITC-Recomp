@@ -351,8 +351,7 @@ extern "C" REX_FUNC(sub_82138A18) {
 // frame like the original's (112 bytes; PostEffects::Create's below it, 128
 // bytes, and memcpy's, where CreateVertexDeclaration's plain C++ hands it
 // back, below CreateVertexDeclaration's, 160 bytes).
-extern "C" REX_FUNC(sub_82138C38) {
-  REX_FUNC_PROLOGUE();
+void hooks::PostEffectsInitBoot(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
     __imp__sub_82138C38(ctx, base);
     return;
@@ -386,6 +385,11 @@ extern "C" REX_FUNC(sub_82138C38) {
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
+}
+
+extern "C" REX_FUNC(sub_82138C38) {
+  REX_FUNC_PROLOGUE();
+  hooks::PostEffectsInitBoot(ctx, base);
 }
 
 // --- The records (vtable slot 0: PostEffects::RecordAll's guest calls) ---

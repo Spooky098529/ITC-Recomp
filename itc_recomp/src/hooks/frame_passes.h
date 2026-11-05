@@ -18,4 +18,14 @@ bool NativeFramePasses();
 // leaves it. The original where the plain C++ declines.
 void FramePassesRecordPrimitiveReset(PPCContext& ctx, uint8_t* base);
 
+// Job::Wait (sub_82094B10; r3 = the job): natively with
+// --native_frame_passes (the object's slot 1 a guest call from a 96-byte
+// frame), else the original. --find_menu_selection's wrap
+// (src/debug/menu_selection_scan.cpp) calls it.
+void FramePassesJobWait(PPCContext& ctx, uint8_t* base);
+
+// FramePasses::Boot (sub_820962B8; r3 = it): natively with
+// --native_frame_passes and --native_video_output, else the original.
+void FramePassesBoot(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -59,4 +59,29 @@ constexpr uint32_t kRecordPrimitiveResetFrame = 128;
 // with nothing done, where a chunk is open or the list hasn't room.
 std::optional<uint32_t> RecordPrimitiveReset(uint8_t* base);
 
+// sub_82094B10 Job::Wait: when the job's byte +18 is set (posted,
+// probably), `wait(object)` with the object at its +20 (the original calls
+// that object's slot 1 with r4 = the job: the pool's wait, probably), then
+// +18 = 0. Whether it waited.
+bool JobWait(uint8_t* base, uint32_t job, const std::function<void(uint32_t object)>& wait);
+
+// Boot's frame (its r1 less this, below its caller's).
+constexpr uint32_t kBootFrame = 112;
+
+// FramePasses::Boot's guest calls, made by the adapter from its frame.
+struct BootCalls {
+  // The interface's slot 2 (the renderer), that one's slot 3 (the video
+  // output), with the original's return addresses.
+  std::function<uint32_t(uint32_t interface)> video_output;
+  // PostEffects::InitBoot with r3 = `device`.
+  std::function<void(uint32_t device)> init_boot;
+};
+
+// sub_820962B8 FramePasses::Boot (slot 0, the boot job): the +4
+// interface's video output, its device locked (VideoOutput::LockDevice,
+// into the frame's +80), PostEffects::InitBoot with the device, the device
+// unlocked with the frame's word. Returns the video output (r3 as the
+// native UnlockDevice leaves it).
+uint32_t Boot(uint8_t* base, uint32_t passes, uint32_t frame, const BootCalls& calls);
+
 }  // namespace frame_passes

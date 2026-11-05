@@ -19,7 +19,9 @@
 #include "graphics/render_queue.h"
 #include "hooks/frame_passes.h"
 #include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "post_effects/post_effects.h"
 
 #include <fmt/format.h>
 
@@ -266,6 +268,108 @@ void ThunkCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+void JobWaitCases(Context& h, uint32_t block) {
+  Results results("Job::Wait (sub_82094B10)");
+  uint32_t r4 = 0;
+  for (int c = 0; c < 100; c++) {
+    Case(
+        h, results, block,
+        [&](Random& r) {
+          // The job at kObject: +18 0, 1 or any byte; +20 an object whose
+          // slot 1 is one of three small functions.
+          const uint32_t job = block + kObject;
+          const uint32_t object = block + kObject + 0x40;
+          const uint32_t pick = r.Below(4);
+          guest::StoreU8(h.base, job + 18, pick == 0 ? 0 : pick == 1 ? 1 : uint8_t(r.Next()));
+          guest::StoreU32(h.base, job + 20, object);
+          guest::StoreU32(h.base, object, object + 0x80);
+          const uint32_t targets[] = {kStoreR4At4, kByte133, kWord60};
+          guest::StoreU32(h.base, object + 0x80 + 4, targets[r.Below(3)]);
+          r4 = uint32_t(r.Next());
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = block + kObject;
+          t.r4.u64 = r4;
+        },
+        __imp__sub_82094B10, hooks::FramePassesJobWait, fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// The game's video output: [0x8266D088]'s slot 7, then that one's slot 3
+// (as the post effects' callers find it).
+uint32_t GameVideoOutput(Context& h) {
+  PPCContext ctx = CallContext(h);
+  uint8_t* base = h.base;
+  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  for (const uint32_t byte : {28u, 12u}) {
+    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + byte);
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+  }
+  return ctx.r3.u32;
+}
+
+// FramePasses::Boot: the interface at kObject (slot 2 [+60], the renderer
+// at kObject + 0x100, whose slot 3 [+60] is the game's video output), the
+// device locked and unlocked (the game's lock), PostEffects::InitBoot with
+// effect 14 there (so nothing is made but the vertex declaration, freed
+// after). Compared: the frame's device word, the device's thread word, the
+// declaration (its 56-byte head; whether made), the effects' pointers, r3.
+void BootCases(Context& h, uint32_t block) {
+  namespace pe = post_effects;
+  Results results("FramePasses::Boot (sub_820962B8)");
+  const uint32_t video_output = GameVideoOutput(h);
+  std::vector<uint8_t> effects = Read(h.base, pe::kEffects, 4 * pe::kCount);
+  const uint32_t declaration = guest::LoadU32(h.base, pe::kVertexDeclaration);
+  Random& r = h.random;
+  for (int c = 0; c < 8; c++) {
+    std::vector<uint32_t> pointers(pe::kCount);
+    for (uint32_t& p : pointers) {
+      p = r.Below(2) == 0 ? 0 : block + 0x3000;
+    }
+    pointers[14] = block + 0x3000;
+    const uint32_t before = uint32_t(r.Next());
+    const uint32_t passes = block + 0x2E00;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, block, 0x100);
+      const uint32_t interface = block + kObject;
+      const uint32_t renderer = block + kObject + 0x100;
+      guest::StoreU32(h.base, passes + 4, interface);
+      guest::StoreU32(h.base, interface, interface + 0x80);
+      guest::StoreU32(h.base, interface + 0x80 + 8, kWord60);
+      guest::StoreU32(h.base, interface + 60, renderer);
+      guest::StoreU32(h.base, renderer, renderer + 0x80);
+      guest::StoreU32(h.base, renderer + 0x80 + 12, kWord60);
+      guest::StoreU32(h.base, renderer + 60, video_output);
+      guest::StoreU32s(h.base, pe::kEffects, pointers.data(), pe::kCount);
+      guest::StoreU32(h.base, pe::kVertexDeclaration, before);
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 2048, 2048, 0xA5);
+      t.r3.u64 = passes;
+      ITC_FLAG(native_frame_passes) = v == 1;
+      (v == 0 ? __imp__sub_820962B8 : hooks::FramePassesBoot)(t, h.base);
+      ITC_FLAG(native_frame_passes) = true;
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 - fp::kBootFrame + 80));
+      const uint32_t device = guest::LoadU32(h.base, video_output + 140);
+      out[v].Word(guest::LoadU32(h.base, device + 10760));
+      const uint32_t made = guest::LoadU32(h.base, pe::kVertexDeclaration);
+      out[v].Word(made != before);
+      if (made != before && made != 0) {
+        out[v].Bytes(Read(h.base, made, 56));
+        memory::crt::XMemFree(made, 0x24800000);
+      }
+      out[v].Bytes(Read(h.base, pe::kEffects, 4 * pe::kCount));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  Write(h.base, pe::kEffects, effects.data(), 4 * pe::kCount);
+  guest::StoreU32(h.base, pe::kVertexDeclaration, declaration);
+  results.Report();
+}
+
 }  // namespace
 
 void FramePasses(Context& h) {
@@ -280,6 +384,8 @@ void FramePasses(Context& h) {
   PrimitiveResetCases(h, block);
   WorkMemCases(h, block);
   ThunkCases(h, block);
+  JobWaitCases(h, block);
+  BootCases(h, block);
   memory::Free(block);
 }
 

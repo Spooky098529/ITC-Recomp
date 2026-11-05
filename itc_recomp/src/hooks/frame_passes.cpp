@@ -10,17 +10,22 @@
 #include "frame_passes/frame_passes.h"
 #include "hooks/frame_passes.h"
 #include "hooks/guest_call.h"
+#include "hooks/post_effects.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
 ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+ITC_FLAG_DECLARE(bool, native_video_output);
 
 ITC_FLAG_BOOL(native_frame_passes, true, "ITC",
               "Run the frame passes object (docs/functions/frame-passes.md: "
               "FramePasses::FlipWorkMem sub_82096218 with WorkMem::Flip sub_82589A78 (no adapter: "
               "only FlipWorkMem calls it), the delegate thunk sub_82096350 (its target a tail "
               "call), FramePasses::RecordConstants sub_82096360, RecordSamplers sub_82096030 and "
-              "RecordPrimitiveReset sub_82589990 (the render queue's Add a guest call)) natively "
+              "RecordPrimitiveReset sub_82589990 (the render queue's Add a guest call), Job::Wait "
+              "sub_82094B10 (inside --find_menu_selection's wrap; the job's object a guest call) "
+              "and FramePasses::Boot sub_820962B8 (with --native_video_output; the getters and "
+              "PostEffects::InitBoot guest calls)) natively "
               "instead of through the translated code (the same writes; the recorders' originals "
               "with the command list's diagnostics on; checked by "
               "--run_harnesses=frame_passes)");
@@ -111,4 +116,74 @@ void hooks::FramePassesRecordPrimitiveReset(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_82589990) {
   ITC_FRAME_PASSES_FALLBACK(82589990)
   hooks::FramePassesRecordPrimitiveReset(ctx, base);
+}
+
+void hooks::FramePassesJobWait(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_frame_passes)) {
+    __imp__sub_82094B10(ctx, base);
+    return;
+  }
+  const uint32_t job = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 96, 0x82094B48, [&](uint32_t) {
+    const bool waited = fp::JobWait(base, job, [&](uint32_t object) {
+      // The object's slot 1 with r4 = the job.
+      ctx.r3.u64 = object;
+      ctx.r4.u64 = job;
+      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + 4);
+      ctx.r11.u64 = function;
+      ctx.ctr.u64 = function;
+      ctx.lr = 0x82094B48;
+      REX_CALL_INDIRECT_FUNC(function);
+    });
+    // r11 as the original leaves it: 0 after the wait, else the byte (0).
+    ctx.r11.u64 = 0;
+    if (!waited) {
+      ctx.r3.u64 = job;
+    }
+  });
+  ctx.lr = lr;
+}
+
+// FramePasses::Boot: r3 = it; the guest calls from a 112-byte frame like the
+// original's (the interface's and the renderer's getters, PostEffects::InitBoot
+// through its adapter's work); the device lock over the native video output
+// (the original without --native_video_output). r3 the video output.
+void hooks::FramePassesBoot(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_frame_passes) || !ITC_FLAG(native_video_output)) {
+    __imp__sub_820962B8(ctx, base);
+    return;
+  }
+  const uint32_t passes = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, base, fp::kBootFrame, 0x820962DC, [&](uint32_t frame) {
+    auto vtable_call = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
+      ctx.r3.u64 = object;
+      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      ctx.r11.u64 = function;
+      ctx.ctr.u64 = function;
+      ctx.lr = return_address;
+      REX_CALL_INDIRECT_FUNC(function);
+      return ctx.r3.u32;
+    };
+    const fp::BootCalls calls{
+        [&](uint32_t interface) {
+          const uint32_t renderer = vtable_call(interface, 8, 0x820962DC);
+          return vtable_call(renderer, 12, 0x820962EC);
+        },
+        [&](uint32_t device) {
+          ctx.r3.u64 = device;
+          ctx.lr = 0x820962FC;
+          hooks::PostEffectsInitBoot(ctx, base);
+        }};
+    r3 = fp::Boot(base, passes, frame, calls);
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+extern "C" REX_FUNC(sub_820962B8) {
+  REX_FUNC_PROLOGUE();
+  hooks::FramePassesBoot(ctx, base);
 }

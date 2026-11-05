@@ -4,6 +4,7 @@
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "hooks/frame_passes.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -236,11 +237,19 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
 // The callees of component update 82119118 (component 40066EE0 in the
 // user's race), which posts the events the pause screen's Update consumes.
 ITC_MENU_SCAN_WRAP(8259D1A8)
-ITC_MENU_SCAN_WRAP(82094B10)
 ITC_MENU_SCAN_WRAP(821184E8)
 ITC_MENU_SCAN_WRAP(82118FB0)
 ITC_MENU_SCAN_WRAP(82118C18)
 #undef ITC_MENU_SCAN_WRAP
+
+// Job::Wait: its native body (src/hooks/frame_passes.cpp, --native_frame_passes)
+// inside the wrap.
+extern "C" REX_FUNC(sub_82094B10) {
+  REX_FUNC_PROLOGUE();
+  debug::MenuSelectionScan_Before(base);
+  hooks::FramePassesJobWait(ctx, base);
+  debug::MenuSelectionScan_After(base, "call", 0x82094B10);
+}
 
 // The app's update (tick handler 82093DC0) runs its component lists through
 // App::RunHandler (sub_82092968), wrapped for this scan in its adapter in
