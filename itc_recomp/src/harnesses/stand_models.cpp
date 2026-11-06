@@ -306,6 +306,72 @@ void MakeModels(Context& h, uint32_t b) {
   results.Report();
 }
 
+// The setters that re-apply the record: the stage's world, the model
+// still loading (+5028 set: SceneModel::PollLoad answers 0, so ApplyRecord
+// stops there; its own cases, load_poll's, take it further), its scene the
+// front end's (+4 0, ApplyRecord's plain C++ path); ReloadDecals' model not
+// ready (+5036 0) or traffic (its own cases, car_models', take it further).
+// The slots, kinds, values and choices small, at the edges, or any word
+// where the original checks them.
+void Reapplies(Context& h, uint32_t b) {
+  struct Setter {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::function<void(PPCContext&, Random&)> args;
+  };
+  const Setter setters[] = {
+      {"GarageStage::SetPart (sub_82178F00)", __imp__sub_82178F00, hooks::StandModelsSetPart, 112,
+       24,
+       [](PPCContext& t, Random& r) {
+         t.r4.u64 = r.Below(4) == 0 ? RandomValue(r) : r.Below(18);
+         t.r5.u64 = uint32_t(r.Next());
+       }},
+      {"GarageStage::SetInteriorWord (sub_82179050)", __imp__sub_82179050,
+       hooks::StandModelsSetInteriorWord, 112, 24,
+       [](PPCContext& t, Random& r) {
+         t.r4.u64 = r.Below(4) == 0 ? RandomValue(r) : r.Below(7);
+         t.r5.u64 = uint32_t(r.Next());
+       }},
+      {"GarageStage::SetInteriorLevel (sub_821791C0)", __imp__sub_821791C0,
+       hooks::StandModelsSetInteriorLevel, 96, 16,
+       [](PPCContext& t, Random& r) { t.r4.u64 = RandomValue(r); }},
+      {"GarageStage::SetInteriorPair (sub_82179250)", __imp__sub_82179250,
+       hooks::StandModelsSetInteriorPair, 112, 24,
+       [](PPCContext& t, Random& r) {
+         t.r4.u64 = uint32_t(r.Next());
+         t.r5.u64 = uint32_t(r.Next());
+       }},
+      {"GarageStage::ClearChoice (sub_82179378)", __imp__sub_82179378,
+       hooks::StandModelsClearChoice, 96, 16,
+       [](PPCContext& t, Random& r) { t.r4.u64 = r.Below(4) == 0 ? r.Below(40) : r.Below(6); }},
+      {"GarageStage::SetAero (sub_82179548)", __imp__sub_82179548, hooks::StandModelsSetAero, 96,
+       16, [](PPCContext& t, Random& r) { t.r4.u64 = uint32_t(r.Next()); }},
+      {"GarageStage::ReloadDecals (sub_82178EC0)", __imp__sub_82178EC0,
+       hooks::StandModelsReloadDecals, 96, 16, [](PPCContext&, Random&) {}},
+  };
+  for (const Setter& s : setters) {
+    Results results(s.name);
+    for (int c = 0; c < 48; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             for (const uint32_t m : {kModel, kModel2}) {
+               Put(h.base, b + m + 5028, 1);
+               Put(h.base, b + m + 5116, b + kScene);
+               const bool traffic = r.Below(3) == 0;
+               Put(h.base, b + m + 32, traffic ? 3 : r.Below(3));
+               Put(h.base, b + m + 5036, traffic ? r.Below(2) : 0);
+             }
+             t.r3.u64 = b + kHolderAt;
+             s.args(t, r);
+           },
+           s.recompiled, s.native, s.frame, s.saves, false, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void StandModels(Context& h) {
@@ -319,6 +385,7 @@ void StandModels(Context& h) {
     const Saved saved(h.base);
     Setters(h, b);
     MakeModels(h, b);
+    Reapplies(h, b);
   }
   memory::Free(allocation);
 }

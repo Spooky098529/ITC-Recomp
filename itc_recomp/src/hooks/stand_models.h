@@ -33,6 +33,20 @@ void StandModelsSetWheelWord(PPCContext& ctx, uint8_t* base);
 void StandModelsSetLightsOn(PPCContext& ctx, uint8_t* base);
 void StandModelsSetDecalA(PPCContext& ctx, uint8_t* base);
 void StandModelsSetDecalB(PPCContext& ctx, uint8_t* base);
+// The setters that re-apply the record (with --native_vehicle_accessors and
+// --native_scene_models): GarageStage::SetPart sub_82178F00 (r3 the holder,
+// r4 a slot, r5 a word), SetInteriorWord sub_82179050 (r4 a kind, r5 a
+// word), SetInteriorLevel sub_821791C0 (r4 a value), SetInteriorPair
+// sub_82179250 (r4, r5 two words), ClearChoice sub_82179378 (r4 a choice),
+// SetAero sub_82179548 (r4 a word) and ReloadDecals sub_82178EC0; lr put
+// back.
+void StandModelsSetPart(PPCContext& ctx, uint8_t* base);
+void StandModelsSetInteriorWord(PPCContext& ctx, uint8_t* base);
+void StandModelsSetInteriorLevel(PPCContext& ctx, uint8_t* base);
+void StandModelsSetInteriorPair(PPCContext& ctx, uint8_t* base);
+void StandModelsClearChoice(PPCContext& ctx, uint8_t* base);
+void StandModelsSetAero(PPCContext& ctx, uint8_t* base);
+void StandModelsReloadDecals(PPCContext& ctx, uint8_t* base);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 

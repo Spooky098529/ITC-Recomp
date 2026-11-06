@@ -74,4 +74,39 @@ uint32_t SetDecal(uint8_t* base, uint32_t holder, uint32_t entry, uint32_t a, ui
                   double f1, double f2, double f3, double f4, uint32_t stack, uint32_t at);
 inline constexpr uint32_t kDecalA = 224, kDecalB = 416;
 
+// --- The setters that re-apply the record (src/stand_models/setters.cpp):
+// a word or two of the stage's model's record, then SceneModel::ApplyRecord
+// (its plain C++ from the frame; where it declines, the race's path, its
+// adapter through `call`), whose r3 they return; or ReloadDecals ---
+
+// sub_82178F00 GarageStage::SetPart (its case 0 the split piece
+// sub_82178F68, merged): the parts record's word for `slot` (0 +3744, 1 to
+// 5 +3748 to +3764, 6 and 7 +3768, 8 and 9 +3772, 10 to 12 +3776 to +3784,
+// 13 none, 14 +3788, 15 +3792; none above 15, unsigned) = `word`. 112-byte
+// frame.
+uint64_t SetPart(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t slot,
+                 uint32_t word, uint32_t stack);
+// sub_82179050 GarageStage::SetInteriorWord: `kind` 1 +3908, 4 +3900, 5
+// +3896 (signed; none for the others) = `word`. 112-byte frame.
+uint64_t SetInteriorWord(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t kind,
+                         uint32_t word, uint32_t stack);
+// sub_821791C0 GarageStage::SetInteriorLevel: +3908 = 0 below 3, 1 below 6,
+// else 2; +3912 = 0 below 1, else 1 (signed). 96-byte frame.
+uint64_t SetInteriorLevel(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t value,
+                          uint32_t stack);
+// sub_82179250 GarageStage::SetInteriorPair: +3904 = `a`, +3900 = `b`.
+// 112-byte frame.
+uint64_t SetInteriorPair(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t a,
+                         uint32_t b, uint32_t stack);
+// sub_82179378 GarageStage::ClearChoice: +3812 + 12 `choice` = 0 (wrapping,
+// unchecked). 96-byte frame.
+uint64_t ClearChoice(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t choice,
+                     uint32_t stack);
+// sub_82179548 GarageStage::SetAero: +3728 = `word`. 96-byte frame.
+uint64_t SetAero(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                 uint32_t stack);
+// sub_82178EC0 GarageStage::ReloadDecals: SceneModel::ReloadDecals' plain
+// C++ on the stage's model from its 96-byte frame; its r3.
+uint64_t ReloadDecals(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack);
+
 }  // namespace stand_models

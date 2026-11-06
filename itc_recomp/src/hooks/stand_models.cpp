@@ -16,8 +16,12 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "GarageStage::SetInteriorClass sub_82178FE8, SetWord5016 sub_82179598, "
               "SetWheelWord sub_82179A18, SetLightsOn sub_82179420 (with SceneParts::LightValue "
               "sub_820DF1A0, no adapter: only it calls it), SetDecalA sub_82179818 and SetDecalB "
-              "sub_821798D8 (with --native_vehicle_accessors) natively instead of through the "
-              "translated code (the same writes; checked by --run_harnesses=stand_models)");
+              "sub_821798D8 (with --native_vehicle_accessors); the setters that re-apply the record, "
+              "SetPart sub_82178F00 (its case 0 sub_82178F68 merged), SetInteriorWord sub_82179050, "
+              "SetInteriorLevel sub_821791C0, SetInteriorPair sub_82179250, ClearChoice "
+              "sub_82179378, SetAero sub_82179548 and ReloadDecals sub_82178EC0 (with "
+              "--native_vehicle_accessors and --native_scene_models; SceneModel::ApplyRecord's "
+              "and ReloadDecals' plain C++) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
 
 namespace hooks {
 
@@ -103,6 +107,73 @@ void StandModelsSetDecalB(PPCContext& ctx, uint8_t* base) {
                             ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.r1.u32, sm::kDecalB);
 }
 
+// A setter that re-applies the record: `body` with the guest calls, lr put
+// back; the original without its callees' flags.
+template <typename Body>
+void Reapplying(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*),
+                Body body) {
+  if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
+    original(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const sm::GuestCall call = StandModelsGuestCall(ctx, base);
+  const uint32_t holder = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
+  const uint64_t r3 = body(call, holder, r4, r5, stack);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+void StandModelsSetPart(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_82178F00, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t r5, uint32_t stack) {
+    return sm::SetPart(base, call, holder, r4, r5, stack);
+  });
+}
+
+void StandModelsSetInteriorWord(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_82179050, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t r5, uint32_t stack) {
+    return sm::SetInteriorWord(base, call, holder, r4, r5, stack);
+  });
+}
+
+void StandModelsSetInteriorLevel(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_821791C0, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t, uint32_t stack) {
+    return sm::SetInteriorLevel(base, call, holder, r4, stack);
+  });
+}
+
+void StandModelsSetInteriorPair(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_82179250, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t r5, uint32_t stack) {
+    return sm::SetInteriorPair(base, call, holder, r4, r5, stack);
+  });
+}
+
+void StandModelsClearChoice(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_82179378, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t, uint32_t stack) {
+    return sm::ClearChoice(base, call, holder, r4, stack);
+  });
+}
+
+void StandModelsSetAero(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_82179548, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t, uint32_t stack) {
+    return sm::SetAero(base, call, holder, r4, stack);
+  });
+}
+
+void StandModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_82178EC0, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t, uint32_t, uint32_t stack) {
+    return sm::ReloadDecals(base, call, holder, stack);
+  });
+}
+
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
@@ -128,6 +199,15 @@ ITC_STAND_MODELS(82179A18, StandModelsSetWheelWord)
 ITC_STAND_MODELS(82179420, StandModelsSetLightsOn)
 ITC_STAND_MODELS(82179818, StandModelsSetDecalA)
 ITC_STAND_MODELS(821798D8, StandModelsSetDecalB)
+ITC_STAND_MODELS(82178F00, StandModelsSetPart)
+ITC_STAND_MODELS(82179050, StandModelsSetInteriorWord)
+ITC_STAND_MODELS(821791C0, StandModelsSetInteriorLevel)
+ITC_STAND_MODELS(82179250, StandModelsSetInteriorPair)
+ITC_STAND_MODELS(82179378, StandModelsClearChoice)
+ITC_STAND_MODELS(82179548, StandModelsSetAero)
+ITC_STAND_MODELS(82178EC0, StandModelsReloadDecals)
+// sub_82178F68 (SetPart's case 0, split off by the recompiler) needs no
+// adapter: only the original SetPart reaches it, as a tail call.
 // SceneParts::LightValue sub_820DF1A0 has none: only SetLightsOn calls it,
 // and its plain C++ calls LightValue's (its register step above is the
 // harness's).

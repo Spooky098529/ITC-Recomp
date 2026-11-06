@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "car_scene_draw/ops.h"
 #include "guest.h"
+#include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -16,12 +17,23 @@ namespace {
 using namespace car_scene_draw::ops;
 
 constexpr uint32_t kSetUpB = 0x820C5B28;
+constexpr uint32_t kApplyRecord = 0x820DA758;
 constexpr uint32_t kDecalScale = 0x82001BE0;
 
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
   Store(base, frame, stack);
   return frame;
+}
+
+// SceneModel::ApplyRecord from `frame`: its plain C++, or where it declines
+// (the race's path) its adapter, which runs the original.
+uint64_t ApplyRecord(uint8_t* base, const GuestCall& call, uint32_t model, uint32_t frame,
+                     uint32_t lr) {
+  if (const auto r3 = scene_models::SceneModelApplyRecord(base, call, model, frame)) {
+    return *r3;
+  }
+  return call(kApplyRecord, {model}, frame, lr);
 }
 
 }  // namespace
@@ -128,6 +140,82 @@ uint32_t SetDecal(uint8_t* base, uint32_t holder, uint32_t entry, uint32_t a, ui
   Stfs(base, e + at + 52, f4);
   Stfs(base, e + at + 48, b != 0 ? Fmuls(f4, Lfs(base, kDecalScale)) : f4);
   return model;
+}
+
+uint64_t SetPart(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t slot,
+                 uint32_t word, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82178F00 GarageStage::SetPart");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t model = StageModel(base, holder);
+  // The jump table (case 0 the split piece sub_82178F68): the parts
+  // record's words, none for 13.
+  static constexpr uint32_t kAt[16] = {3744, 3748, 3752, 3756, 3760, 3764, 3768, 3768,
+                                       3772, 3772, 3776, 3780, 3784, 0,    3788, 3792};
+  if (slot <= 15 && kAt[slot] != 0) {
+    Store(base, model + kAt[slot], word);
+  }
+  return ApplyRecord(base, call, model, frame, 0x82178FD0);
+}
+
+uint64_t SetInteriorWord(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t kind,
+                         uint32_t word, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179050 GarageStage::SetInteriorWord");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t model = StageModel(base, holder);
+  const int32_t k = int32_t(kind);
+  if (k == 1) {
+    Store(base, model + 3908, word);
+  } else if (k == 4) {
+    Store(base, model + 3900, word);
+  } else if (k == 5) {
+    Store(base, model + 3896, word);
+  }
+  return ApplyRecord(base, call, model, frame, 0x821790B8);
+}
+
+uint64_t SetInteriorLevel(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t value,
+                          uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821791C0 GarageStage::SetInteriorLevel");
+  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t model = StageModel(base, holder);
+  const int32_t v = int32_t(value);
+  Store(base, model + 3908, v < 3 ? 0 : v < 6 ? 1 : 2);
+  Store(base, model + 3912, v < 1 ? 0 : 1);
+  return ApplyRecord(base, call, model, frame, 0x82179238);
+}
+
+uint64_t SetInteriorPair(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t a,
+                         uint32_t b, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179250 GarageStage::SetInteriorPair");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, model + 3904, a);
+  Store(base, model + 3900, b);
+  return ApplyRecord(base, call, model, frame, 0x82179294);
+}
+
+uint64_t ClearChoice(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t choice,
+                     uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179378 GarageStage::ClearChoice");
+  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, choice * 12 + model + 3812, 0);
+  return ApplyRecord(base, call, model, frame, 0x821793BC);
+}
+
+uint64_t SetAero(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                 uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179548 GarageStage::SetAero");
+  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, model + 3728, word);
+  return ApplyRecord(base, call, model, frame, 0x82179580);
+}
+
+uint64_t ReloadDecals(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82178EC0 GarageStage::ReloadDecals");
+  const uint32_t frame = Frame(base, stack, 96);
+  return scene_models::SceneModelReloadDecals(base, call, StageModel(base, holder), frame);
 }
 
 }  // namespace stand_models
