@@ -32,7 +32,9 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "sub_821A08D8, BackToGroups sub_821A0A38 and ChangeCategory sub_8219FC60) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=build_screen). RestoreGroupList, InsertNode, SetMode, PowI, DrawGroupRow, InitBuildList, "
-              "CopyBuilds, ListBuilds, DrawBuildRow and DrawBuildRows have no adapters: only native callers reach them, and the flag switches those");
+              "CopyBuilds, ListBuilds, DrawBuildRow, DrawBuildRows, SetUpGroups, FilterGroups, "
+              "MarkGroups, InitGroupLists, DrawGroupRows, ShowGroup, ShowNumber and GroupArrows "
+              "have no adapters: only native callers reach them, and the flag switches those");
 
 namespace hooks {
 
@@ -282,21 +284,15 @@ ITC_BUILD_SCREEN(8219BB20, BuildScreenKeepBuildList)
 ITC_BUILD_SCREEN(8219BBF0, BuildScreenKeepStandList)
 ITC_BUILD_SCREEN(8219BB80, BuildScreenRestoreBuildList)
 ITC_BUILD_SCREEN(8219BC50, BuildScreenRestoreStandList)
-ITC_BUILD_SCREEN(8219BF08, BuildScreenInitGroupLists)
 ITC_BUILD_SCREEN(8219C078, BuildScreenInitStandList)
-ITC_BUILD_SCREEN(8219EC50, BuildScreenMarkGroups)
-ITC_BUILD_SCREEN(8219CC70, BuildScreenFilterGroups)
 ITC_BUILD_SCREEN(8219BCC0, BuildScreenValueText)
 ITC_BUILD_SCREEN(8219C230, BuildListInsert)
 ITC_BUILD_SCREEN(8217D0C8, GarageStageSetDark)
-ITC_BUILD_SCREEN(8219D1B0, BuildScreenGroupArrows)
 ITC_BUILD_SCREEN(8219D4B8, BuildScreenBuildArrows)
 ITC_BUILD_SCREEN(8219D7B0, BuildScreenStandArrows)
 ITC_BUILD_SCREEN(8219D440, BuildScreenShowBuildMark)
 ITC_BUILD_SCREEN(8219DA58, BuildScreenSetPrompts)
 ITC_BUILD_SCREEN(8219DB50, BuildScreenSetHelp)
-ITC_BUILD_SCREEN(8219D090, BuildScreenShowNumber)
-ITC_BUILD_SCREEN(8219FA28, BuildScreenDrawGroupRows)
 ITC_BUILD_SCREEN(8219C528, BuildScreenHighlightGroupsA)
 ITC_BUILD_SCREEN(8219C6D0, BuildScreenHighlightGroupsB)
 ITC_BUILD_SCREEN(8219C850, BuildScreenFadeOut)
@@ -305,9 +301,7 @@ ITC_BUILD_SCREEN(8219CA08, BuildScreenHighlightStand)
 ITC_BUILD_SCREEN(8219CB18, BuildScreenHighlightStand2)
 ITC_BUILD_SCREEN(8219CBD8, BuildScreenHighlightDetails)
 ITC_BUILD_SCREEN(8219D550, BuildScreenDrawStandRow)
-ITC_BUILD_SCREEN(8219CF08, BuildScreenShowGroup)
 ITC_BUILD_SCREEN(821A1008, BuildScreenSetUpBuilds)
-ITC_BUILD_SCREEN(821A0060, BuildScreenSetUpGroups)
 ITC_BUILD_SCREEN(821A08D8, BuildScreenOpen)
 ITC_BUILD_SCREEN(821A0A38, BuildScreenBackToGroups)
 ITC_BUILD_SCREEN(8219FC60, BuildScreenChangeCategory)

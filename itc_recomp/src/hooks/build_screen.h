@@ -1,7 +1,11 @@
 // The build screen's register steps (src/build_screen/,
 // docs/functions/build-screen.md), shared by the adapters
 // (src/hooks/build_screen.cpp, behind --native_build_screen) and the
-// harness (without the flag). Each leaves r3 as the original does.
+// harness (without the flag). Each leaves r3 as the original does. Steps
+// whose functions have no adapter (only native callers reach them) are the
+// harness's alone: InitBuildList, CopyBuilds, ListBuilds, DrawBuildRows,
+// SetUpGroups, FilterGroups, MarkGroups, InitGroupLists, DrawGroupRows,
+// ShowGroup, ShowNumber and GroupArrows.
 
 #pragma once
 
