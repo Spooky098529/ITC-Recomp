@@ -94,6 +94,11 @@ file's history. What's left to see in a drive, from every run:
   Validated `itc_3786` (race 35 s, 0 errors, every harness 0 differing,
   8 of 8 harness lines; `ApplyWheelPaint` in the race, three in the
   replay `itc_3787` (ok), four to drive). Recorded.
+- Subsystem 3 of 5: the garage screen's transitions (lead picked:
+  `sub_8219C528` and the 20 other transitions of the screen whose update
+  is `sub_821A1380`; the most ready groups in `leads.md`, 67, and next
+  to the garage stage work just done; its line deleted from
+  `leads.md`). Mapping agent running.
 
 ## Done
 
