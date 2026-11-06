@@ -5,7 +5,8 @@
 // for the command buffer's words and one for the progress block. Each case
 // writes the same random inputs (from a seed of its own) before each
 // version; compared: the device, the blocks, the scratch area and r3, all
-// exactly (no floats here).
+// exactly (no floats here). The originals run with --native_command_buffer
+// off (their callees' adapters then run the originals too).
 
 #include "harness.h"
 
@@ -73,6 +74,9 @@ void Run(Context& h, const Blocks& b, const char* name, GuestFunction recompiled
       RandomWords(h.base, b.progress, kProgressBytes, r);
       PPCContext t = CallContext(h);
       setup(r, t, c);
+      // The original with the flag off, so its callees' adapters run the
+      // originals too (sub_8229E308's sub_8229E100).
+      ITC_FLAG(native_command_buffer) = v != 0;
       if (v == 0) {
         recompiled(t, h.base);
       } else {
@@ -100,6 +104,65 @@ uint32_t ProgressAddress(const Blocks& b, Random& r, bool written) {
   }
 }
 
+// NextSpace's adapter's steps (src/hooks/command_buffer.cpp).
+void NativeNextSpace(PPCContext& t, uint8_t* base) {
+  uint32_t size = guest::LoadU32(base, t.r5.u32);
+  const uint32_t space = cb::NextSpace(base, t.r3.u32, t.r4.u32, size, t.r6.u32);
+  if (!(t.r4.u32 & 1)) {
+    guest::StoreU32(base, t.r5.u32, size);  // unchanged when it failed
+  }
+  t.r3.u64 = space;
+}
+
+// The command buffer's fields in a window of 256 KB (so the cursors, the
+// ends and the segment's start fall on either side of each other), now and
+// then 0 or random, the generation and predicated tiling's, and the progress
+// block's read position at the end of the address space with the
+// generation's low bits, so the original's wait for the GPU (sub_8229DC28,
+// left out of the native version) passes at once, as in play: same
+// generation, or one ahead with the space before it.
+void BufferFields(Context& h, const Blocks& b, Random& r) {
+  const uint32_t d = b.device;
+  const uint32_t window = (uint32_t(r.Next()) & 0x7FFF0000u) + 0x10000000u;
+  auto in_window = [&] {
+    switch (r.Below(16)) {
+      case 0: return 0u;
+      case 1: return uint32_t(r.Next());
+      default: return window + 4 * r.Below(0x10000);
+    }
+  };
+  for (uint32_t field : {cb::kWritePosition, cb::kSegmentEnd, cb::kBufferStart, cb::kBufferEnd,
+                         cb::kDataCursor, cb::kWrapCursor, cb::kSegmentStart}) {
+    guest::StoreU32(h.base, d + field, in_window());
+  }
+  if (r.Below(4) == 0) {
+    guest::StoreU32(h.base, d + cb::kDataCursor, 0);
+  }
+  if (r.Below(4) == 0) {
+    guest::StoreU32(h.base, d + cb::kWrapCursor, guest::LoadU32(h.base, d + cb::kBufferStart));
+  }
+  const uint32_t sizes[] = {0, 4096, 0x10000, 0x40000, 54 * 4};
+  guest::StoreU32(h.base, d + cb::kSegmentSize,
+                  r.Below(8) == 0 ? uint32_t(r.Next()) : sizes[r.Below(5)]);
+  const uint32_t generation = r.Below(4) == 0 ? 0xFFFFFFFFu : uint32_t(r.Next());
+  guest::StoreU32(h.base, d + cb::kGeneration, generation);
+  if (r.Below(2) == 0) {
+    guest::StoreU32(h.base, d + cb::kTilingEnd, 0);
+  } else {
+    guest::StoreU32(h.base, d + cb::kTilingEnd, in_window());
+    const uint32_t apart[] = {0, 0, 1, 0xFFFFFFFFu, 2, uint32_t(r.Next())};
+    guest::StoreU32(h.base, d + cb::kTilingGeneration, generation + apart[r.Below(6)]);
+  }
+  guest::StoreU32(h.base, d + cb::kProgressBlock, b.progress);
+  guest::StoreU32(h.base, b.progress + 4, 0xFFFFFFFCu | (generation & 3));
+}
+
+// An alignment: a power of two mostly, 0 or random now and then.
+uint32_t Alignment(Random& r) {
+  const uint32_t pick = r.Below(8);
+  return pick == 0 ? 0 : pick == 1 ? uint32_t(r.Next()) : 1u << r.Below(13);
+}
+
 }  // namespace
 
 void CommandBuffer(Context& h) {
@@ -115,7 +178,6 @@ void CommandBuffer(Context& h) {
     return;
   }
   const bool saved = ITC_FLAG(native_command_buffer);
-  ITC_FLAG(native_command_buffer) = true;
 
   // WriteSegmentTail: the hung bit and +19980 over their four cases, the
   // generation and fence random (their edges now and then).
@@ -180,47 +242,11 @@ void CommandBuffer(Context& h) {
         t.r3.u64 = cb::WriteCallback(h.base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32, t.r7.u32);
       });
 
-  // NextSpace: the buffer's fields in a window of 256 KB (so the cursors,
-  // the ends and the segment's start fall on either side of each other), now
-  // and then 0 or random; the kind data, a segment or random; the alignment
-  // a power of two, 0 or random; the size asked in the scratch area. The
-  // progress block's read position is at the end of the address space with
-  // the generation's low bits, so the original's wait for the GPU
-  // (sub_8229DC28, left out of the native version) passes at once, as in
-  // play: same generation, or one ahead with the space before it.
+  // NextSpace: the kind data, a segment or random; the size asked in the
+  // scratch area.
   Run(h, b, "Device::NextSpace (sub_8229E100)", __imp__sub_8229E100, 1500,
       [&](Random& r, PPCContext& t, int c) {
-        const uint32_t d = b.device;
-        const uint32_t window = (uint32_t(r.Next()) & 0x7FFF0000u) + 0x10000000u;
-        auto in_window = [&] {
-          switch (r.Below(16)) {
-            case 0: return 0u;
-            case 1: return uint32_t(r.Next());
-            default: return window + 4 * r.Below(0x10000);
-          }
-        };
-        for (uint32_t field : {cb::kWritePosition, cb::kSegmentEnd, cb::kBufferStart,
-                               cb::kBufferEnd, cb::kDataCursor, cb::kWrapCursor,
-                               cb::kSegmentStart}) {
-          guest::StoreU32(h.base, d + field, in_window());
-        }
-        if (r.Below(4) == 0) {
-          guest::StoreU32(h.base, d + cb::kDataCursor, 0);
-        }
-        const uint32_t sizes[] = {0, 4096, 0x10000, 0x40000, 54 * 4};
-        guest::StoreU32(h.base, d + cb::kSegmentSize,
-                        r.Below(8) == 0 ? uint32_t(r.Next()) : sizes[r.Below(5)]);
-        const uint32_t generation = r.Below(4) == 0 ? 0xFFFFFFFFu : uint32_t(r.Next());
-        guest::StoreU32(h.base, d + cb::kGeneration, generation);
-        if (r.Below(2) == 0) {
-          guest::StoreU32(h.base, d + cb::kTilingEnd, 0);
-        } else {
-          guest::StoreU32(h.base, d + cb::kTilingEnd, in_window());
-          const uint32_t apart[] = {0, 0, 1, 0xFFFFFFFFu, 2, uint32_t(r.Next())};
-          guest::StoreU32(h.base, d + cb::kTilingGeneration, generation + apart[r.Below(6)]);
-        }
-        guest::StoreU32(h.base, d + cb::kProgressBlock, b.progress);
-        guest::StoreU32(h.base, b.progress + 4, 0xFFFFFFFCu | (generation & 3));
+        BufferFields(h, b, r);
         const uint32_t kind = c % 3;
         t.r4.u64 = kind == 0 ? 1 : kind == 1 ? 2 : uint32_t(r.Next());
         const uint32_t size_pick = r.Below(8);
@@ -229,16 +255,33 @@ void CommandBuffer(Context& h) {
                               : size_pick == 2 ? 3 + 4 * r.Below(64)
                                                : 4 * r.Below(0x8000);
         guest::StoreU32(h.base, h.data + 64, size);
-        const uint32_t alignment_pick = r.Below(8);
-        t.r6.u64 = alignment_pick == 0   ? 0
-                   : alignment_pick == 1 ? uint32_t(r.Next())
-                                         : 1u << r.Below(13);
-        t.r3.u64 = d;
+        t.r6.u64 = Alignment(r);
+        t.r3.u64 = b.device;
         t.r5.u64 = h.data + 64;
       },
-      [&](PPCContext& t) {
-        t.r3.u64 = cb::NextSpace(h.base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32);
-      });
+      [&](PPCContext& t) { NativeNextSpace(t, h.base); });
+
+  // Reserve: out of space now and then; no recording command buffer (its
+  // path is the original's); the segment's data and its budget near each
+  // other; the words asked as BeginVertices asks (count x stride / 4) or
+  // random.
+  Run(h, b, "Device::AllocateFromCommandBuffer (sub_8229E308)", __imp__sub_8229E308, 1500,
+      [&](Random& r, PPCContext& t, int c) {
+        const uint32_t d = b.device;
+        BufferFields(h, b, r);
+        uint8_t flags = uint8_t(r.Next());
+        flags = c % 8 == 0 ? (flags | 0x40) : (flags & ~0x40);
+        guest::StoreU8(h.base, d + cb::kFlags, flags);
+        guest::StoreU32(h.base, d + cb::kRecorder, 0);
+        const uint32_t budget = r.Below(4) == 0 ? uint32_t(r.Next()) : 0x10000 + r.Below(0x10000);
+        guest::StoreU32(h.base, d + cb::kSegmentDataBudget, budget);
+        guest::StoreU32(h.base, d + cb::kSegmentData,
+                        r.Below(4) == 0 ? uint32_t(r.Next()) : budget - 0x8000 + r.Below(0x10000));
+        t.r3.u64 = d;
+        t.r4.u64 = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(0x2000);
+        t.r5.u64 = c % 3 == 0 ? 16 : Alignment(r);
+      },
+      [&](PPCContext& t) { t.r3.u64 = cb::Reserve(h.base, t.r3.u32, t.r4.u32, t.r5.u32); });
 
   ITC_FLAG(native_command_buffer) = saved;
   memory::Free(b.progress);

@@ -15,6 +15,7 @@ namespace graphics::command_buffer {
 // The device's fields used here.
 constexpr uint32_t kWritePosition = 40;    // the last word written (pre-increment)
 constexpr uint32_t kSegmentEnd = 44;
+constexpr uint32_t kSoftEnd = 48;           // the end less 160: writers end the segment past it
 constexpr uint32_t kProgressBlock = 10768;  // the fences and read position
 constexpr uint32_t kCallbackBlock = 10772;
 constexpr uint32_t kFence = 10780;          // the open segment's fence
@@ -32,6 +33,9 @@ constexpr uint32_t kDataCursor = 13516;
 constexpr uint32_t kGeneration = 13520;
 constexpr uint32_t kWrapCursor = 13524;
 constexpr uint32_t kSegmentStart = 13528;
+constexpr uint32_t kRecorder = 13160;      // a recording command buffer (never in play)
+constexpr uint32_t kSegmentData = 13532;    // the data reserved for the open segment
+constexpr uint32_t kSegmentDataBudget = 13536;
 constexpr uint32_t kTailsDirect = 19980;    // set: the hung GPU's progress not written
 
 // The address the GPU sees for a CPU address (the physical address, the
@@ -69,18 +73,28 @@ uint32_t WriteCallback(uint8_t* base, uint32_t device, uint32_t position, uint32
                        uint32_t function, uint32_t argument);
 
 // The next space in the command buffer (sub_8229E100): `kind` bit 0 set,
-// data (`*size` bytes at `alignment`, from the data cursor +13516, or from
+// data (`size` bytes at `alignment`, from the data cursor +13516, or from
 // the wrap cursor +13524 past the buffer's end, never past the open segment);
 // clear, a segment (32-byte aligned, at least the segment size +13512 or
 // the words asked, 54 when none; wrapping to the buffer's start, the
 // generation + 1 and +10810 bit 3 set, when the end is too close; its size
-// written back to `*size`). Under predicated tiling (+12960) it fails rather
+// written back to `size` on success). Under predicated tiling (+12960) it fails rather
 // than pass the tiled frame's segments. Returns the address, or 0. The
 // original's wait for the GPU to have read past the space (sub_8229DC28) is
 // left out: a wait (Dropped, the user's call on fence waits, 2026-10-24),
 // which passes at once in play (our kick writes the read position as it
 // kicks; its wait helpers never ran).
-uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t size,
+uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t& size,
                    uint32_t alignment);
+
+// Device::AllocateFromCommandBuffer (sub_8229E308): `words` words of data
+// space at `alignment` (NextSpace), or 0 at once when out of space (+10809
+// bit 6; set when this fails). Counted in the segment's data +13532; past
+// its budget +13536 outside tiling, the segment is cut short (the soft end
+// +48 the write position, the end 160 bytes on) and the data cursor moved
+// to the buffer's end unless the wrap cursor is at its start. With a
+// recording command buffer (+13160, never in play) its adapter runs the
+// original. The inline vertices' space (BeginVertices) comes from here.
+uint32_t Reserve(uint8_t* base, uint32_t device, uint32_t words, uint32_t alignment);
 
 }  // namespace graphics::command_buffer

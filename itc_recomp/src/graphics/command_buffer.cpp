@@ -110,12 +110,12 @@ uint32_t WriteCallback(uint8_t* base, uint32_t device, uint32_t position, uint32
   return at;
 }
 
-uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t size,
+uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t& size,
                    uint32_t alignment) {
   ITC_NATIVE_RUNNING("sub_8229E100 Device::NextSpace");
   auto load = [&](uint32_t field) { return guest::LoadU32(base, device + field); };
   auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(base, device + field, value); };
-  const uint32_t words = guest::LoadU32(base, size) >> 2;
+  const uint32_t words = size >> 2;
   uint32_t cursor = load(kDataCursor);
   if (kind & 1) {
     // Data.
@@ -190,8 +190,35 @@ uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t size,
       }
     }
   }
-  guest::StoreU32(base, size, (end - start) & ~3u);
+  size = (end - start) & ~3u;
   return start;
+}
+
+uint32_t Reserve(uint8_t* base, uint32_t device, uint32_t words, uint32_t alignment) {
+  ITC_NATIVE_RUNNING("sub_8229E308 Device::AllocateFromCommandBuffer");
+  if (guest::LoadU8(base, device + kFlags) & 0x40) {
+    return 0;
+  }
+  uint32_t size = words << 2;
+  const uint32_t space = NextSpace(base, device, 1, size, alignment);
+  const uint32_t data = guest::LoadU32(base, device + kSegmentData) + size;
+  guest::StoreU32(base, device + kSegmentData, data);
+  if (data > guest::LoadU32(base, device + kSegmentDataBudget) &&
+      guest::LoadU32(base, device + kTilingEnd) == 0) {
+    // The segment cut short: the next writer ends it.
+    const uint32_t wrap_cursor = guest::LoadU32(base, device + kWrapCursor);
+    const uint32_t buffer_start = guest::LoadU32(base, device + kBufferStart);
+    const uint32_t write = guest::LoadU32(base, device + kWritePosition);
+    guest::StoreU32(base, device + kSoftEnd, write);
+    guest::StoreU32(base, device + kSegmentEnd, write + 160);
+    if (wrap_cursor != buffer_start) {
+      guest::StoreU32(base, device + kDataCursor, guest::LoadU32(base, device + kBufferEnd));
+    }
+  }
+  if (space == 0) {
+    guest::StoreU8(base, device + kFlags, guest::LoadU8(base, device + kFlags) | 0x40);
+  }
+  return space;
 }
 
 }  // namespace graphics::command_buffer
