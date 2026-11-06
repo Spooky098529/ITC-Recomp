@@ -87,6 +87,22 @@ list and count) and loads the car data twice (`Car::SetupVehicle`, then
 reads block 2's +232 twice in a row where the second test can't pass.
 Nothing here needs a call the user hasn't made.
 
+Native (B7 loop, 2026-11-06, `--native_car_makers`, `src/car_makers/`,
+harness `car_makers`): every ready group above, with
+`SceneModelRecord::FromCar`, `GarageCars::StaticInit` and
+`TuningScreen::SetUpCarData` they unblocked; `SetPaint`, `SetWheels`,
+`SetChoice` and `CarRecord::SetBytes` without adapters (only `FromCar`
+calls them). Learned on the way: the translated code's lfs then stfs of a
+word folds to a copy (a signaling NaN kept), so the plain C++ copies those
+words' bits; `SceneModelRecord::FromCar` also runs in attract races (the
+race's remake). The front end's functions are checked by the harness alone
+(attract races don't reach the stand, the tuning screen or the car list):
+`GarageCar::Reset` and `StaticInit` run at boot, `FromCar` and `BlockOf` in
+the race. Left: the re-applies and the stand's screens (blocked outside the
+file, above); `CarList::DrawEntryPowerGraph` (`power-graph.md`) is ready
+now (its callees all ours), but `PowerGraph::Draw`'s adapter would stay (its
+work makes guest calls through the render manager's vtables).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
