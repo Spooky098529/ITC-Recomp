@@ -9,6 +9,7 @@
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "cameras/cameras.h"
 #include "game_data/data_file.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
@@ -24,6 +25,12 @@ namespace {
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
+}
+
+// A doubleword as std stores it.
+void StoreDoubleword(uint8_t* base, uint32_t address, uint64_t value) {
+  guest::StoreU32(base, address, uint32_t(value >> 32));
+  guest::StoreU32(base, address + 4, uint32_t(value));
 }
 
 // A float as lfs loads it.
@@ -175,6 +182,135 @@ uint32_t CollectModels(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t
       }
       r3 = ListAdd(base, manager + 144, nearest, area, number, mask, manager);
     }
+  }
+  return r3;
+}
+
+uint32_t Update(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                const UpdateRegisters& registers, bool native_queue) {
+  ITC_NATIVE_RUNNING("sub_820F4558 Scenery::Update");
+  constexpr uint32_t kCameraPassUpdate = 0x820A3978;
+  const uint32_t frame = stack - 208;
+  guest::StoreU32(base, frame, stack);
+  const uint32_t list_a = manager + 116, list_b = manager + 144;
+  const double far = Lfs(base, Load(base, Load(base, cameras::kViewports)) + 72);
+  // The camera passes the table names, set from their viewports when enabled.
+  for (uint32_t i = 0; i < 14; i++) {
+    const uint32_t record = kViewMasks + 16 * i;
+    const uint32_t pass = Load(base, record + 8) * 592u + kCameraPasses;
+    if (Load(base, pass + 588) == 0) {
+      continue;
+    }
+    cameras::FromViewport(base, pass, Load(base, record + 0), Load(base, record + 4));
+    const uint32_t from_viewport = frame - 112;
+    guest::StoreU32(base, from_viewport, frame);
+    const uint32_t args[1] = {pass};
+    calls.call(calls.user, kCameraPassUpdate, args, 1, from_viewport, 0x820AA534);
+  }
+  ListClear(base, list_a);
+  ListClear(base, list_b);
+  // A list sorted and cut to its cap when above 1 item; `limit` before the
+  // cut (list B's LimitLargeModels).
+  auto sort_and_cut = [&](uint32_t list, uint32_t cap_at, const auto& limit) {
+    const uint32_t count = Load(base, list + 8);
+    if (count <= 1) {
+      return;
+    }
+    ListSort(base, list, 0, int32_t(count - 1));
+    limit();
+    const uint32_t sorted = Load(base, list + 8);
+    const uint32_t cap = Load(base, manager + cap_at);
+    guest::StoreU32(base, list + 8, sorted > cap ? cap : sorted);
+  };
+  for (int32_t view = 0; view < int32_t(Load(base, manager + 12) + 1); view++) {
+    CollectAreas(base, frame, manager, uint32_t(view),
+                 Load(base, Load(base, cameras::kViewports) + 4 * uint32_t(view)), manager);
+  }
+  sort_and_cut(list_a, 96, [] {});
+  uint32_t views = 0;
+  for (; int32_t(views) < int32_t(Load(base, manager + 12) + 1); views++) {
+    CollectModels(base, frame, manager, views,
+                  Load(base, Load(base, cameras::kViewports) + 4 * views), manager);
+  }
+  sort_and_cut(list_b, 104, [&] {
+    // What the original's stack holds where LimitLargeModels' table reads
+    // past its five words: CollectModels' saves of r25 and r26, then
+    // LimitLargeModels' own __savegprlr_27 (r27 to r31, the link register).
+    StoreDoubleword(base, frame - 64, registers.r25);
+    StoreDoubleword(base, frame - 56, registers.r26);
+    StoreDoubleword(base, frame - 48, 0xFFFFFFFF826C0000ull);
+    StoreDoubleword(base, frame - 40, 0xFFFFFFFF826BAC00ull);
+    StoreDoubleword(base, frame - 32, uint64_t(4) * views);
+    StoreDoubleword(base, frame - 24, views);
+    StoreDoubleword(base, frame - 16, registers.r3);
+    guest::StoreU32(base, frame - 8, 0x820F46D0);
+    LimitLargeModels(base, manager, frame);
+  });
+  uint32_t r3;
+  if (Load(base, manager + 8) == 0) {
+    ListLoadAll(base, calls, frame, manager, list_a, native_queue);
+    r3 = ListLoadAll(base, calls, frame, manager, list_b, native_queue);
+  } else {
+    ListStream(base, calls, frame, manager, list_a, native_queue);
+    r3 = ListStream(base, calls, frame, manager, list_b, native_queue);
+  }
+  // The visible areas: list A's loaded items with a mask, with list B's
+  // loaded models of the same area within the far distance.
+  const uint32_t visible = manager + 216;
+  guest::StoreU32(base, visible, 0);
+  for (uint32_t i = 0; i < Load(base, list_a + 8); i++) {
+    const uint32_t item = Load(base, Load(base, list_a + 16) + 4 * i);
+    const uint32_t entry = Load(base, visible) * 272u + Load(base, visible + 8);
+    r3 = Load(base, item + 12);
+    if (r3 == 0) {
+      continue;
+    }
+    r3 = IsLoaded(base, r3);
+    if (r3 == 0) {
+      continue;
+    }
+    const uint32_t mask = Load(base, item + 4);
+    if (mask == 0) {
+      continue;
+    }
+    guest::StoreU32(base, entry + 0, mask);
+    guest::StoreU32(base, entry + 4, 0);
+    guest::StoreU32(base, entry + 12, Load(base, item + 12));
+    const uint32_t models = Load(base, list_b + 8);
+    for (uint32_t n = 0; n < models; n++) {
+      const uint32_t model = Load(base, Load(base, list_b + 16) + 4 * n);
+      if (Load(base, model + 4) == 0) {
+        continue;
+      }
+      if (far < Lfs(base, model + 0)) {
+        break;
+      }
+      if (guest::LoadU16(base, model + 8) != guest::LoadU16(base, item + 8)) {
+        continue;
+      }
+      r3 = Load(base, model + 12);
+      if (r3 == 0) {
+        continue;
+      }
+      r3 = IsLoaded(base, r3);
+      if (r3 == 0) {
+        continue;
+      }
+      r3 = Load(base, model + 12);
+      SetVisible(base, r3, 1);
+      const uint32_t count = Load(base, entry + 4);
+      guest::StoreU32(base, ((count + 4) << 2) + entry, Load(base, model + 12));
+      guest::StoreU32(base, entry + 4, Load(base, entry + 4) + 1);
+    }
+    if (Load(base, entry + 4) != 0) {
+      r3 = Load(base, item + 12);
+      SetVisible(base, r3, 1);
+      guest::StoreU32(base, visible, Load(base, visible) + 1);
+    }
+  }
+  if (Load(base, manager + 8) != 0) {
+    ReleaseUnused(base, calls, frame, manager, list_a);
+    r3 = ReleaseUnused(base, calls, frame, manager, list_b);
   }
   return r3;
 }

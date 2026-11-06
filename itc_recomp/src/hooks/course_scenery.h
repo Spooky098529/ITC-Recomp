@@ -17,6 +17,11 @@ namespace hooks {
 // where their plain C++ declines), then put back.
 void CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base);
 
+// Scenery::Update (sub_820F4558): r3 = the manager; the original's register
+// saves made, then the plain C++ (its guest calls putting flush-to-zero back
+// off); r3 as the original leaves it, lr put back.
+void CourseSceneryUpdate(PPCContext& ctx, uint8_t* base);
+
 // The calls the course scenery's plain C++ makes into code that takes the
 // context, as its adapters make them (for native callers elsewhere: the
 // race's scenery load, src/hooks/race_update.cpp). `guest` outlives them.

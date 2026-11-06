@@ -299,6 +299,36 @@ uint32_t CollectAreas(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t 
 uint32_t CollectModels(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t view,
                        uint32_t viewport, uint32_t r3);
 
+// What Scenery::Update's original leaves in its caller's registers that its
+// callee LimitLargeModels can read below its frame (the 64-bit words its
+// callees' register saves write there): the caller's r25 and r26 (saved by
+// CollectAreas and CollectModels, which don't change them) and r3 (the
+// manager, its r31).
+struct UpdateRegisters {
+  uint64_t r25, r26, r3;
+};
+
+// Scenery::Update (sub_820F4558): `stack` is its caller's r1 (its frame is
+// the 208 bytes below, its back chain written; the adapter makes its
+// register saves, __savegprlr_18 and f31 at `stack` - 128). The far
+// distance (viewport 0's +72) read once; the 14 camera passes of the table
+// at 0x82602F80 that are enabled (+588) set from their viewports
+// (cameras::FromViewport, then CameraPass::Update through `calls` from
+// FromViewport's 112-byte frame with its return address, as FromViewport's
+// adapter); both lists emptied; CollectAreas for each view (0 to +12, the
+// viewports' pointer read again each time), list A sorted and cut to +96
+// when above 1 item; CollectModels the same, list B sorted, LimitLargeModels
+// (with the register saves its table's reads past the 5th area read: the
+// words its own __savegprlr_27 writes, and CollectModels' r25 and r26 below
+// them), cut to +104. Mode 0 (+8): LoadAll on both lists, else Stream; the
+// visible areas (+216, 272-byte entries at +224) from list A's loaded items
+// with a mask and list B's loaded models of their area within the far
+// distance (each marked seen); not in mode 0, ReleaseUnused on both. Returns
+// the r3 the original leaves (its last call's, or the last word loaded
+// into r3).
+uint32_t Update(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                const UpdateRegisters& registers, bool native_queue);
+
 // Scenery::DrawSetLists (sub_820F52A8): r4's pass description (+20 its
 // camera pass, +24 and +28 the draw keys): the texture provider at the
 // manager's +228 gets the course set's XPR (+64) in slot 1 (its vtable's

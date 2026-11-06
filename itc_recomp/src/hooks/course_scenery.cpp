@@ -47,6 +47,8 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820F16C0 (Archive::QueueLength's plain C++ with the archive's native queue), "
               "Scenery::StartLoad sub_820F1E00, "
               "Scenery::CollectAreas sub_820F3098, Scenery::CollectModels sub_820F32D0, "
+              "Scenery::Update sub_820F4558 (CameraPass::FromViewport's plain C++, CameraPass::Update "
+              "a guest call), "
               "Scenery::DrawSetLists sub_820F52A8 (the scenery lists' draws' plain C++ called "
               "directly, their adapters where it declines), "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
@@ -292,6 +294,32 @@ ITC_COURSE_SCENERY(820F3098, ctx.fpscr.disableFlushMode();
 ITC_COURSE_SCENERY(820F32D0, ctx.fpscr.disableFlushMode();
                    ctx.r3.u64 = CollectModels(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                               ctx.r5.u32, ctx.r3.u32))
+
+// Scenery::Update: r3 = the manager; from RaceScene::Update and the front
+// end's camera (recompiled). The original's register saves made first
+// (__savegprlr_18, f31 at r1 - 128: its LimitLargeModels' reads past its
+// table can reach them), then the plain C++; its guest calls (CameraPass::
+// Update) put flush-to-zero back off after, as the originals' next float
+// instruction does. r3 as the original leaves it; lr put back.
+void hooks::CourseSceneryUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  ctx.r12.u64 = ctx.lr;
+  __savegprlr_18(ctx, base);
+  guest::StoreU32(base, ctx.r1.u32 - 128, uint32_t(ctx.f31.u64 >> 32));
+  guest::StoreU32(base, ctx.r1.u32 - 124, uint32_t(ctx.f31.u64));
+  GuestCalls call{&ctx, base};
+  const Calls calls{&call, [](void* user, uint32_t function, const uint32_t* args, int count,
+                              uint32_t frame, uint32_t back) {
+                      const uint32_t r3 = CallGuest(user, function, args, count, frame, back);
+                      static_cast<GuestCalls*>(user)->ctx->fpscr.disableFlushMode();
+                      return r3;
+                    }};
+  ctx.r3.u64 = Update(base, calls, ctx.r1.u32, ctx.r3.u32,
+                      {ctx.r25.u64, ctx.r26.u64, ctx.r3.u64}, hooks::NativeArchiveQueue());
+  ctx.lr = lr;
+}
+ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
 
 // --- The course set's draws ---
 
