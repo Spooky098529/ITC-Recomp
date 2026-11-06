@@ -34,8 +34,13 @@ file's history. What's left to see in a drive, from every run:
   The user's call (2026-11-06): `XPhysicalSize` answers a physical
   block's size from our allocation layer (`AllocPhysical` recording each
   block's size), for recompiled and native callers. Second migration
-  agent running (`XPhysicalSize` and what it unblocks, `Scenery::Update`,
-  the second set's set-ups).
+  7efd9cff..01089192 (`XPhysicalSize` from `memory::PhysicalSize`, its
+  adapter removed; `Scenery::AllocPhysical`, `FreePhysical`, `Create`,
+  `Setup`, `SetupPools`, `RaceScene::LoadScenery`; the second set's
+  set-ups and `SceneInterior::SetUp`; races 38 and 36 s, 0 errors, all
+  harnesses 0 differing; no subagents); left: `Scenery::Update` (ready,
+  its harness needs enabled camera passes: its row) and `sub_820C5B98`
+  (SetUpB's pool 0 case). Validation agent running.
 
 ## Done
 
@@ -60,3 +65,5 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4264, work left 2147 (wrapped 57, known
   460, unknown 1630).
 - After its validation (`itc_3702`): ours 4264, work left 2147.
+- After its second migration: ours 4277, work left 2134 (wrapped 57,
+  known 447, unknown 1630).
