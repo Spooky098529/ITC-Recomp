@@ -78,9 +78,20 @@ file's history. What's left to see in a drive, from every run:
   `ApplyPaint`'s wrap removed; races 33 and 28 s, 0 errors, all
   harnesses 0 differing; no subagents); left: `GarageStage::SetCar`
   `sub_8217FD58` and `SetCarClass` `sub_8217FDC8` now ready, and the
-  `ApplyWheelPaint` wrap. Validation agent running.
+  `ApplyWheelPaint` wrap. Validated `itc_3768` (race 36 s, 0 errors,
+  every harness 0 differing, 6 of 6 harness lines from the plain C++;
+  `ApplyPaint` in the race, four in the replay `itc_3769` (ok),
+  `ReapplyRecordNoDecals` to drive). Recorded.
+- Cleanup lead (no mapping, not counted): `GarageStage::SetCar`
+  `sub_8217FD58` and `SetCarClass` `sub_8217FDC8` in `car-makers.md`,
+  ready since the `ReapplyRecord` lead, with the makers by id above them
+  and `SceneModel::ApplyWheelPaint`'s wrap. Migration agent running.
 
 ## Done
+
+- Cleanup: `GarageStage::ReapplyRecord`, `ReapplyRecordNoDecals` native
+  (`car-makers.md`); `SceneModel::ApplyRecord`, `ReloadDecals`,
+  `ApplyLightKit`, `ApplyPaint` Native; cea27e18, 6fbff1bb.
 
 - `stand-models.md`: 28 of 28 in play native (the garage stage's
   holders and setters, the wheels' setters, the tuning screen's
@@ -126,3 +137,5 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4319, work left 2092 (wrapped 57, known
   433, unknown 1602).
 - After its validation (`itc_3761`): ours 4319, work left 2092.
+- After the `ReapplyRecord` cleanup lead (`itc_3768`): ours 4321, work
+  left 2090 (wrapped 57, known 431, unknown 1602).

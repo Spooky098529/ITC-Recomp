@@ -19,7 +19,24 @@ here loses its heading.
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
 - The stand models (attract race `itc_3761`, replay `itc_3762` ok;
-  `stand-models.md`, `scene-models.md`): `sub_82179818` GarageStage::SetDecalA, `sub_821798D8` GarageStage::SetDecalB, `sub_82179050` GarageStage::SetInteriorWord, `sub_821791C0` GarageStage::SetInteriorLevel, `sub_82179250` GarageStage::SetInteriorPair, `sub_82179378` GarageStage::ClearChoice, `sub_82179548` GarageStage::SetAero, `sub_82178EC0` GarageStage::ReloadDecals, `sub_82179130` GarageStage::SetTireGrade, `sub_821CCA38` TuningScreen::SetTireGrade, `sub_821DFA78` TuningScreen::PreviewWheel, `sub_820E7470` SceneWheels::SetTireGrades, `sub_820D8F18` Wheels::SetTireTextures, `sub_82179998` GarageStage::AddSecondWheels, `sub_821799D8` GarageStage::ApplyWheelPaint, `sub_820D9E00` SceneModel::AddSecondWheels, `sub_82178B98` GarageStage::FitAxles, `sub_820E7380` SceneWheels::SetSizes, `sub_8217DD38` GarageStage::SetWheel.
+  `stand-models.md`, `scene-models.md`): `sub_82179818`
+  GarageStage::SetDecalA, `sub_821798D8` GarageStage::SetDecalB,
+  `sub_82179050` GarageStage::SetInteriorWord, `sub_821791C0`
+  GarageStage::SetInteriorLevel, `sub_82179250`
+  GarageStage::SetInteriorPair, `sub_82179378` GarageStage::ClearChoice,
+  `sub_82179548` GarageStage::SetAero, `sub_82178EC0`
+  GarageStage::ReloadDecals, `sub_82179130` GarageStage::SetTireGrade,
+  `sub_821CCA38` TuningScreen::SetTireGrade, `sub_821DFA78`
+  TuningScreen::PreviewWheel, `sub_820E7470` SceneWheels::SetTireGrades,
+  `sub_820D8F18` Wheels::SetTireTextures, `sub_82179998`
+  GarageStage::AddSecondWheels, `sub_821799D8`
+  GarageStage::ApplyWheelPaint, `sub_820D9E00`
+  SceneModel::AddSecondWheels, `sub_82178B98` GarageStage::FitAxles,
+  `sub_820E7380` SceneWheels::SetSizes, `sub_8217DD38`
+  GarageStage::SetWheel.
+- The `ReapplyRecord` cleanup lead (attract race `itc_3768`, replay
+  `itc_3769` ok; `car-makers.md`): `sub_82178E60`
+  GarageStage::ReapplyRecordNoDecals.
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 
