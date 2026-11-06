@@ -41,8 +41,10 @@ namespace cb = graphics::command_buffer;
     __VA_ARGS__;                              \
   }
 
-ITC_COMMAND_BUFFER(8229DBF0, cb::SaveSegment(base, ctx.r3.u32))
-ITC_COMMAND_BUFFER(8229DFB8, cb::CloseChain(base, ctx.r3.u32))
+// The adapters of sub_8229DBF0, sub_8229DFB8 and sub_8229ED60 are gone
+// (2026-11-06): their only callers, predicated tiling's start and end, are
+// native (src/graphics/predicated_tiling.cpp), and --native_predicated_tiling
+// switches only those callers.
 ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(base, ctx.r3.u32, ctx.r4.u32,
                                                           ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
 // Reserve: the recording command buffer's path (never in play) is the
@@ -63,13 +65,6 @@ ITC_COMMAND_BUFFER(8229EB10, {
     return;
   }
   ctx.r3.u64 = cb::NewBlock(base, ctx.r3.u32);
-})
-ITC_COMMAND_BUFFER(8229ED60, {
-  if (guest::LoadU32(base, ctx.r4.u32 + cb::kRecorder) != 0) {
-    __imp__sub_8229ED60(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = cb::InitChain(base, ctx.r3.u32, ctx.r4.u32);
 })
 // The segment flow: with a recording command buffer (never in play), the
 // originals whole. The adapters of sub_8229E768, sub_8229E100, sub_8229EDA8,
