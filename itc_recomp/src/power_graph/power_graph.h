@@ -14,6 +14,10 @@
 #include <functional>
 #include <utility>
 
+namespace front_end_car_draw {
+struct Calls;
+}
+
 namespace power_graph {
 
 // The line recorder's render queue (+0) and command list (+4), stored by
@@ -120,5 +124,31 @@ bool TuningScreenShowsGraph(uint8_t* base, uint32_t screen, uint32_t frame, uint
                             uint32_t* movie);
 // The draw's arguments for `screen`.
 TuningDraw TuningScreenDraw(uint8_t* base, uint32_t screen);
+
+// CarList::DrawEntryPowerGraph's frame (its r1 less this, below its
+// caller's), where its car object (+1936) and car data (+80) live.
+constexpr uint32_t kEntryFrame = 3920;
+constexpr uint32_t kEntryCar = 1936;
+constexpr uint32_t kEntryCarData = 80;
+// Where its PowerGraph::Draw returns, and the r31 it holds there (lis r31,
+// 0x826E: PowerGraph::Draw saves it in its frame).
+constexpr uint32_t kEntryDrawReturn = 0x822506E8;
+constexpr uint32_t kEntryR31 = 0x826E0000;
+// The word that says whether the car list's graph is shown.
+constexpr uint32_t kEntryShown = 0x82815EC0;
+// sub_82250670 CarList::DrawEntryPowerGraph's set-up, r3 = `entry` (an entry
+// of the car list screen's list), its frame at `frame`: false (nothing done)
+// when [kEntryShown] is 0; else the car object at frame + 1936
+// (GarageCar::Reset, then Car::SetModelAndClass with the entry's +8432) and
+// the car data at frame + 80 (CarData::CarData, then CarData::FromGarageCar
+// from the car), each callee's frame below `frame` as the original's (the
+// car makers' callees through `calls` where their plain C++ declines);
+// true: PowerGraph::Draw is then called with CarListEntryDraw's arguments.
+bool CarListEntrySetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t entry,
+                       uint32_t frame);
+// The draw's arguments: r3 = the front end's car holder's first word
+// ([[0x826D83E0]]), f1 = 1042.0 (0x8200AD98), f2 = 500.0 (0x82001FC0), r6 =
+// the car data at `frame` + 80.
+TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame);
 
 }  // namespace power_graph

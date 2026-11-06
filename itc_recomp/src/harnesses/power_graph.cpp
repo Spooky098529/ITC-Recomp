@@ -19,6 +19,20 @@
 // and its animation lists, the screen, the front end's car holder, with
 // [0x826C5CCC] and [0x826D83E0] pointed into it), the original with
 // --native_power_graph off (so its PowerGraph::Draw is the original too).
+// CarList::DrawEntryPowerGraph (sub_82250670) runs on a third block: a
+// garage car Car::SetModelAndClass, Car::Refresh and Vehicle::SetupFromCar
+// can take (a car spec made of car_physics' Vehicle::SetupFromCar cases'
+// car, WriteSetupFromCarCase, as the car makers' harness lays it, with the
+// tuning words and tires Car::SetModel copies from the spec in range), the
+// entry naming it and the race data AddRacer adds to; the original with
+// --native_power_graph off (its PowerGraph::Draw the original too; its other
+// callees through their adapters, as the car makers' harness runs them, so
+// both sides' callees leave the same stack words under Draw's sprites).
+// Compared: the render block and Draw's frame as
+// above, its own frame (the car data as floats), its saves in its caller's
+// frame, the globals, the garage block, the race data, rand's seed, r1, r3
+// and r31; not the 64 bytes under its r1 (PowerGraph::Draw's register saves
+// over its callees' saves, which the native ones don't write).
 
 #include "harness.h"
 
@@ -26,10 +40,12 @@
 
 #include "command_list/command_list.h"
 #include "graphics/render_queue.h"
+#include "car_specs/car_specs.h"
 #include "hooks/heap.h"
 #include "hooks/power_graph.h"
 #include "memory/heap.h"
 #include "power_graph/power_graph.h"
+#include "race_setup/race_setup.h"
 
 #include <fmt/format.h>
 
@@ -40,6 +56,10 @@
 ITC_FLAG_DECLARE(bool, native_power_graph);
 
 namespace harness {
+
+// Vehicle::SetupFromCar's cases' writer (src/harnesses/car_physics.cpp).
+void WriteSetupFromCarCase(uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                           uint32_t stack_end, uint64_t seed, int group);
 
 namespace {
 
@@ -427,6 +447,156 @@ void TuningCases(Context& h, uint32_t block, uint32_t tuning) {
   results.Report();
 }
 
+// The car list's entry's world, in a third block: the template car (a
+// Vehicle::SetupFromCar case's), the case writer's data and stack, the
+// parameters and the one car spec, the entry and the front end's car
+// holder; the race data in a block of its own.
+constexpr uint32_t kGarageBytes = 0x10000;
+constexpr uint32_t kTemplateCar = 0x4000;  // 4,096 bytes
+constexpr uint32_t kWriterData = 0x5000;   // the writer's car data (1,856 bytes)
+constexpr uint32_t kWriterStack = 0x9000;  // the writer's r1 (its stack below)
+constexpr uint32_t kGarageParams = 0x9100; // 468 bytes
+constexpr uint32_t kSpec = 0xA000;         // 8,432 bytes
+constexpr uint32_t kEntry = 0xC400;        // to +8436
+constexpr uint32_t kEntryHolder = 0xE600;
+constexpr uint32_t kCarId = 5;
+constexpr uint32_t kSpecBytes = 8432;
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kRaceDataBytes = 0x5A000;
+constexpr uint32_t kCarDataBytes = 1856;
+constexpr Global kEntryGlobals[] = {{pg::kEntryShown, 4},
+                                    {kFrontEndCars, 4},
+                                    {car_specs::kParams, 4},
+                                    {kRaceData, 4},
+                                    {race_setup::kRandSeed, 4}};
+
+// The template car and its spec: a SetupFromCar case's car (group 0
+// numbers, 1 one NaN), its engine's +20 giving the graph -1 to 33 points
+// (or a NaN: none), the words Car::SetModel copies from the spec (+788,
+// +792: the car's +1700 and +1704; +884 to +896: its tires' types and
+// grades) in the ranges the case writer gives them; the spec made of the
+// car's blocks for stage 0 and those tires.
+void LayEntryGarage(uint8_t* base, uint32_t garage, Random& r, int c) {
+  const uint32_t car = garage + kTemplateCar, spec = garage + kSpec;
+  WriteSetupFromCarCase(base, garage + kWriterData, car, garage + kWriterStack,
+                        garage + kWriterStack, uint64_t(c) * 11 + 5, c % 2);
+  const uint32_t engine = car + 2880;
+  if (r.Below(10) == 0) {
+    guest::StoreU32(base, engine + 20, 0x7FC00000u);
+  } else {
+    const int32_t points = int32_t(r.Below(35)) - 1;
+    const double scale = double(guest::LoadFloat(base, 0x82002CE8));
+    guest::StoreU32(base, engine + 20,
+                    std::bit_cast<uint32_t>(float((double(points) + 0.5) / scale)));
+  }
+  const uint32_t block2 = car + 1888;
+  const uint32_t picks_1704[] = {0, uint32_t(-1 - int32_t(r.Below(4))), 1, 2, 3};
+  guest::StoreU32(base, block2 + 148, r.Below(3));
+  guest::StoreU32(base, block2 + 152, picks_1704[r.Below(5)]);
+  uint32_t tire[2];
+  for (uint32_t k = 0; k < 2; k++) {
+    const uint32_t type = r.Below(5), grade = 1 + r.Below(5);
+    guest::StoreU32(base, block2 + 244 + 8 * k, type);
+    guest::StoreU32(base, block2 + 248 + 8 * k, grade);
+    tire[k] = (type == 0 ? 0 : type * 5 + grade - 5) * 92 + spec + (k == 0 ? 4244 : 6176);
+  }
+  auto copy = [&](uint32_t to, uint32_t from, uint32_t bytes) {
+    Write(base, to, Read(base, from, bytes).data(), bytes);
+  };
+  copy(spec, car + 2240, 640);
+  copy(spec + 640, car + 1888, 340);
+  copy(spec + 980, car + 2880, 204);
+  copy(spec + 8108, car + 3364, 272);
+  copy(tire[0], car + 3084, 92);
+  copy(tire[1], car + 3176, 92);
+  copy(spec + 8380, car + 3268, 48);
+  const uint32_t params = garage + kGarageParams;
+  guest::StoreU32(base, params + 12, spec - kSpecBytes * kCarId);
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, params + 16 + 4 * i, spec);
+  }
+  guest::StoreU32(base, garage + kEntry + 8432, kCarId);
+}
+
+void EntryCases(Context& h, uint32_t block, uint32_t garage, uint32_t race) {
+  Results results("CarList::DrawEntryPowerGraph (sub_82250670)");
+  for (int c = 0; c < 48; c++) {
+    std::vector<std::vector<uint8_t>> saved;
+    for (const Global& g : kGlobals) {
+      saved.push_back(Read(h.base, g.address, g.bytes));
+    }
+    for (const Global& g : kEntryGlobals) {
+      saved.push_back(Read(h.base, g.address, g.bytes));
+    }
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random r = start;
+      Fill(h.base, h.data, kScratchBytes);
+      MakeWorld(h, block, r);
+      for (uint32_t at = 0; at < kGarageBytes; at += 4) {
+        guest::StoreU32(h.base, garage + at, uint32_t(r.Next()));
+      }
+      LayEntryGarage(h.base, garage, r, c);
+      const int32_t count =
+          pg::SegmentCount(h.base, garage + kTemplateCar + 2880 + 20 - 1280);
+      const bool shown = r.Below(8) != 0;
+      uint32_t lines = 0;
+      const bool float_slots = MakeLists(h, block, r, shown ? count : 0, &lines);
+      guest::StoreU32(h.base, pg::kEntryShown, shown ? 1 + r.Below(3) : 0);
+      guest::StoreU32(h.base, kFrontEndCars, garage + kEntryHolder);
+      guest::StoreU32(h.base, car_specs::kParams, garage + kGarageParams);
+      Fill(h.base, race, kRaceDataBytes, 0);
+      guest::StoreU32(h.base, race + 48 + 0x595E0, r.Below(6));
+      guest::StoreU32(h.base, race + 48 + 0x595E4, r.Below(3));
+      guest::StoreU32(h.base, kRaceData, race);
+      guest::StoreU32(h.base, race_setup::kRandSeed, uint32_t(r.Next()));
+      const uint64_t r31 = r.Next();
+      after = r;
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      const uint32_t sp = t.r1.u32;
+      Fill(h.base, sp - 16384, 16384 + 64, 0xA5);
+      t.r3.u64 = garage + kEntry;
+      t.r31.u64 = r31;
+      t.fpscr.disableFlushModeUnconditional();
+      ITC_FLAG(native_power_graph) = v == 1;
+      (v == 0 ? __imp__sub_82250670 : hooks::CarListDrawEntryPowerGraph)(t, h.base);
+      ITC_FLAG(native_power_graph) = true;
+      const uint32_t frame = sp - pg::kEntryFrame;
+      Collect(h, block, frame - pg::kDrawFrame, lines, float_slots, out[v]);
+      out[v].Bytes(Read(h.base, frame, pg::kEntryCarData));
+      out[v].Floats(h.base, frame + pg::kEntryCarData, kCarDataBytes / 4);
+      out[v].Bytes(Read(h.base, frame + pg::kEntryCar, pg::kEntryFrame - pg::kEntryCar));
+      out[v].Bytes(Read(h.base, sp - 16, 80));
+      out[v].Bytes(Read(h.base, garage, kGarageBytes));
+      out[v].Bytes(Read(h.base, race, kRaceDataBytes));
+      for (const Global& g : kGlobals) {
+        out[v].Bytes(Read(h.base, g.address, g.bytes));
+      }
+      for (const Global& g : kEntryGlobals) {
+        out[v].Bytes(Read(h.base, g.address, g.bytes));
+      }
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(uint32_t(t.r31.u64));
+      out[v].Word(uint32_t(t.r31.u64 >> 32));
+    }
+    size_t k = 0;
+    for (const Global& g : kGlobals) {
+      Write(h.base, g.address, saved[k++].data(), g.bytes);
+    }
+    for (const Global& g : kEntryGlobals) {
+      Write(h.base, g.address, saved[k++].data(), g.bytes);
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void PowerGraph(Context& h) {
@@ -442,6 +612,17 @@ void PowerGraph(Context& h) {
   if (tuning != 0) {
     TuningCases(h, block, tuning);
     memory::Free(tuning);
+  }
+  const uint32_t garage = memory::Alloc(kGarageBytes, memory::kHeapZeroMemory);
+  const uint32_t race = memory::Alloc(kRaceDataBytes, memory::kHeapZeroMemory);
+  if (garage != 0 && race != 0) {
+    EntryCases(h, block, garage, race);
+  }
+  if (race != 0) {
+    memory::Free(race);
+  }
+  if (garage != 0) {
+    memory::Free(garage);
   }
   memory::Free(block);
 }

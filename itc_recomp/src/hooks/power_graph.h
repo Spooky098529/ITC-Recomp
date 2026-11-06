@@ -20,5 +20,13 @@ void PowerGraphDraw(PPCContext& ctx, uint8_t* base);
 // PowerGraph::Draw through its adapter (sub_8217C708, so the flag and the
 // diagnostics still pick its version); r3 as the original leaves it.
 void TuningScreenDrawPowerGraph(PPCContext& ctx, uint8_t* base);
+// CarList::DrawEntryPowerGraph (sub_82250670): r3 = an entry of the car
+// list screen's list. Its set-up's plain C++ in a frame made as the
+// original's (its lr and r31 saved in its caller's frame), then, when it
+// draws, PowerGraph::Draw through its adapter (sub_8217C708) with r31 as
+// the original holds it; r3 as the original leaves it. The original unless
+// its callees run natively (CarListDrawEntryCalleesNative).
+bool CarListDrawEntryCalleesNative();
+void CarListDrawEntryPowerGraph(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -7,17 +7,22 @@
 #include "hooks/power_graph.h"
 
 #include "base/flags.h"
+#include "hooks/car_makers.h"
+#include "hooks/front_end_car_draw.h"
 #include "hooks/guest_call.h"
 #include "power_graph/power_graph.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
 ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+ITC_FLAG_DECLARE(bool, native_car_makers);
+ITC_FLAG_DECLARE(bool, native_career);
 
 ITC_FLAG_BOOL(native_power_graph, true, "ITC",
               "Run the front end's power and torque graph (docs/functions/power-graph.md: "
-              "TuningScreen::DrawPowerGraph sub_821DF350 (PowerGraph::Draw through its "
-              "adapter), PowerGraph::Draw sub_8217C708 with Line::RecordFlat sub_8217B508, no adapter: "
+              "TuningScreen::DrawPowerGraph sub_821DF350 and CarList::DrawEntryPowerGraph "
+              "sub_82250670 (PowerGraph::Draw through its adapter; the latter with "
+              "--native_car_makers and its callees' flags and --native_career), PowerGraph::Draw sub_8217C708 with Line::RecordFlat sub_8217B508, no adapter: "
               "only it calls it; the render manager's getters, the render queue's Add and the "
               "original Line::RecordFlat where its plain C++ declines are guest calls) natively "
               "instead of through the translated code (the same writes; the original with the "
@@ -147,6 +152,44 @@ void hooks::TuningScreenDrawPowerGraph(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
+bool hooks::CarListDrawEntryCalleesNative() {
+  return ITC_FLAG(native_car_makers) && hooks::CarMakersGarageCalleesNative() &&
+         ITC_FLAG(native_career);
+}
+
+void hooks::CarListDrawEntryPowerGraph(PPCContext& ctx, uint8_t* base) {
+  if (!CarListDrawEntryCalleesNative()) {
+    __imp__sub_82250670(ctx, base);
+    return;
+  }
+  const uint32_t entry = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  const uint64_t r31 = ctx.r31.u64;
+  // The original's saves in its caller's frame.
+  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
+  StoreDoubleword(base, ctx.r1.u32 - 16, r31);
+  ctx.fpscr.disableFlushMode();
+  guest_call::InFrame(ctx, base, pg::kEntryFrame, pg::kEntryDrawReturn, [&](uint32_t frame) {
+    const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+    const bool draws = pg::CarListEntrySetUp(base, calls, entry, frame);
+    ctx.fpscr.disableFlushMode();
+    if (!draws) {
+      return;
+    }
+    const pg::TuningDraw draw = pg::CarListEntryDraw(base, frame);
+    ctx.r3.u64 = draw.r3;
+    ctx.r6.u64 = draw.car;
+    ctx.f1.f64 = draw.x;
+    ctx.f2.f64 = draw.y;
+    // r31 as the original holds it (PowerGraph::Draw saves it in its frame).
+    ctx.r31.u64 = pg::kEntryR31;
+    ctx.lr = pg::kEntryDrawReturn;
+    sub_8217C708(ctx, base);
+  });
+  ctx.r31.u64 = r31;
+  ctx.lr = lr;
+}
+
 extern "C" REX_FUNC(sub_8217C708) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_power_graph) || ITC_FLAG(log_overlay_uploads) ||
@@ -164,4 +207,13 @@ extern "C" REX_FUNC(sub_821DF350) {
     return;
   }
   hooks::TuningScreenDrawPowerGraph(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_82250670) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_power_graph)) {
+    __imp__sub_82250670(ctx, base);
+    return;
+  }
+  hooks::CarListDrawEntryPowerGraph(ctx, base);
 }

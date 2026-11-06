@@ -7,6 +7,9 @@
 
 #include "base/log.h"
 #include "c_runtime/arrays.h"
+#include "car_makers/car_makers.h"
+#include "car_physics/car_physics.h"
+#include "career/career.h"
 #include "command_list/command_list.h"
 #include "guest.h"
 #include "minimap/minimap.h"
@@ -264,6 +267,38 @@ TuningDraw TuningScreenDraw(uint8_t* base, uint32_t screen) {
   draw.x = Lfs(base, kTuningX);
   draw.y = Lfs(base, kTuningY);
   draw.car = screen + 18912;
+  return draw;
+}
+
+namespace {
+constexpr uint32_t kEntryX = 0x8200AD98;  // 1042.0
+constexpr uint32_t kEntryY = 0x82001FC0;  // 500.0
+// CarData::CarData's frame (below the caller's r1).
+constexpr uint32_t kCarDataFrame = 96;
+}  // namespace
+
+bool CarListEntrySetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t entry,
+                       uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82250670 CarList::DrawEntryPowerGraph");
+  if (guest::LoadU32(base, kEntryShown) == 0) {
+    return false;
+  }
+  const uint32_t car = frame + kEntryCar;
+  const uint32_t data = frame + kEntryCarData;
+  car_makers::GarageCarReset(base, calls, car, frame);
+  career::CarSetModelAndClass(base, car, guest::LoadU32(base, entry + 8432), frame);
+  car_physics::CarDataConstruct(base, data, frame - kCarDataFrame);
+  double f1 = 0.0;
+  car_makers::FromGarageCar(base, calls, car, data, frame, &f1);
+  return true;
+}
+
+TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame) {
+  TuningDraw draw;
+  draw.r3 = guest::LoadU32(base, guest::LoadU32(base, kFrontEndCars));
+  draw.x = Lfs(base, kEntryX);
+  draw.y = Lfs(base, kEntryY);
+  draw.car = frame + kEntryCarData;
   return draw;
 }
 
