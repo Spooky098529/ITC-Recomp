@@ -18,6 +18,9 @@
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <initializer_list>
+#include <vector>
+
 namespace car_makers {
 
 namespace {
@@ -278,6 +281,59 @@ uint64_t HideBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, u
   Named(calls, kFinishNamed, movie, 87, frame, 0x8219EDF4, 2);
   Named(calls, kFinishNamed, movie, 85, frame, 0x8219EE00, 2);
   return Named(calls, kPlayNamed, movie, 87, frame, 0x8219EE1C, 6);
+}
+
+
+uint64_t GarageStageReloadModel(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                uint32_t holder, uint32_t block, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217F880 GarageStage::ReloadModel");
+  constexpr uint32_t kReloads = 0x826D83E4;
+  constexpr uint32_t kPollLoad = 0x820DA318, kReleaseB = 0x820C5C88;
+  constexpr uint32_t kCarSceneUpdate = 0x820C9608, kSetUpB = 0x820C5B28;
+  const uint32_t frame = Frame(base, stack, 4400);
+  const uint32_t scene = Load(base, kScene);
+  const uint32_t model =
+      vehicle_accessors::ScenePoolsGetB(base, scene, 7, Load(base, Load(base, holder) + 8));
+  const auto call = [&](uint32_t function, std::initializer_list<uint64_t> args, uint32_t lr) {
+    const std::vector<uint64_t> regs(args);
+    const uint64_t r3 =
+        calls.call(function, regs.data(), int(regs.size()), nullptr, 0, frame, lr, nullptr);
+    FlushOff();
+    return r3;
+  };
+  const uint32_t count = Load(base, kReloads) + 1;
+  Store(base, model + 4296, 0);
+  Store(base, kReloads, count);
+  if (int32_t(block) != -1) {
+    Store(base, Load(base, holder) + 4, block);
+  }
+  if (count < 4 || int32_t(call(kPollLoad, {model}, 0x8217F8F4)) == 0) {
+    call(kCarSceneUpdate, {}, 0x8217F900);
+  }
+  if (Load(base, kReloads) < 4) {
+    return 0;
+  }
+  Store(base, kReloads, 4);
+  if (int32_t(call(kPollLoad, {model}, 0x8217F924)) == 0) {
+    return 0;
+  }
+  if (Load(base, Load(base, holder) + 16) != 0) {
+    call(kReleaseB, {scene, 7, Load(base, Load(base, holder) + 8)}, 0x8217F94C);
+    Store(base, Load(base, holder) + 16, 0);
+  }
+  call(kCarSceneUpdate, {}, 0x8217F958);
+  const uint32_t record = frame + 80;
+  scene_models::SceneModelRecordConstruct(base, record);
+  scene_models::SceneModelRecordReset(base, record);
+  Store(base, frame + 96, Load(base, Load(base, holder) + 4));
+  Store(base, Load(base, holder) + 8, uint32_t(vehicle_accessors::ScenePoolsClaimB(base, scene, 7)));
+  call(kSetUpB, {scene, 7, Load(base, Load(base, holder) + 8), record}, 0x8217F9A8);
+  Store(base, model + 4296, 1);
+  Store(base, kReloads, 0);
+  Store(base, Load(base, holder) + 6056, 1);
+  Store(base, Load(base, holder) + 16, 1);
+  Store(base, Load(base, holder) + 4, 0xFFFFFFFFu);
+  return 1;
 }
 
 }  // namespace car_makers

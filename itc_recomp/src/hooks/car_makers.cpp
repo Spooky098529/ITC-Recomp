@@ -36,7 +36,9 @@ ITC_FLAG_BOOL(native_car_makers, true, "ITC",
               "--native_car_physics and --native_math), GarageStage::CopyRecord sub_8217FC60 "
               "(with --native_vehicle_accessors and --native_scene_models; "
               "SceneModelRecord::Copy's adapter for the copy onto itself; no adapter: SetCar's "
-              "and SetCarClass' plain C++ call it), and the stand's busy "
+              "and SetCarClass' plain C++ call it), GarageStage::ReloadModel sub_8217F880 (with --native_vehicle_accessors and "
+              "--native_scene_models; SceneModel::PollLoad, ScenePools::ReleaseB and SetUpB and "
+              "CarScene::Update through their adapters), and the stand's busy "
               "marker sub_8219ED10 and sub_8219EDB0 (with --native_ui_movies_game; the named "
               "animations through their overrides), GarageStage::ReapplyRecord sub_82178DF8 and "
               "ReapplyRecordNoDecals sub_82178E60 (with --native_scene_models, "
@@ -308,6 +310,21 @@ void CarMakersHideBusyMarker(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cm::HideBusyMarker(base, calls, ctx.r1.u32);
 }
 
+
+void CarMakersReloadModel(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
+    __imp__sub_8217F880(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  const uint64_t r3 = cm::GarageStageReloadModel(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -333,6 +350,7 @@ ITC_CAR_MAKERS(82182C90, CarMakersShowCarById)
 ITC_CAR_MAKERS(82182D30, CarMakersShowCarByIdWithClass)
 ITC_CAR_MAKERS(8219ED10, CarMakersShowBusyMarker)
 ITC_CAR_MAKERS(8219EDB0, CarMakersHideBusyMarker)
+ITC_CAR_MAKERS(8217F880, CarMakersReloadModel)
 // sub_8215AB04 (BlockOf's case for id 1, the jump table's base) needs no
 // adapter: only the original BlockOf reaches it. SceneModelRecord::SetPaint
 // sub_8215AC70, SetWheels sub_8215B238, SetChoice sub_8215B1A0 and

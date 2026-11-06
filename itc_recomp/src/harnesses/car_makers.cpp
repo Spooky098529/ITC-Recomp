@@ -944,6 +944,80 @@ void Wheels(Context& h, Random& r) {
   memory::Free(allocation);
 }
 
+
+// --- GarageStage::ReloadModel: a block holding the car scene ([0x826C2E44]
+// pointed at it; its +4 0: no sound loads; a teardown counting down or
+// running, its accessory skipped (+5048 1)), its pool 7 list one scene model
+// in use (a car with no parts: SceneModel::PollLoad 1 unless +5028 or +5040
+// is set; its build deferred (+5044 3 to 5) so SetUpB's SceneModel::SetUp
+// only copies the record and the scene's updates never build), the stage
+// (its index 0, +16 set or not) and the holder; the reload count 0 to 5, r4
+// -1 or a block. As RaceScene::RemakeCarModel's cases (race_update.cpp).
+// Both sides call the callees through their adapters; the block, the count
+// and r3 compared, the stack below the call filled the same for both. ---
+
+void Reloads(Context& h) {
+  constexpr uint32_t kBytes = 0x8000;
+  constexpr uint32_t kScene = 0x100, kModel = 0x2000, kStageAt = 0x4000, kHolderAt = 0x6000;
+  constexpr uint32_t kSceneSet = 0x826C2E44, kFirstSet = 0x826C2E40, kReloads = 0x826D83E4;
+  const uint32_t allocation = memory::Alloc(kBytes + 16, 0);
+  const uint32_t b = (allocation + 15) & ~15u;
+  const std::vector<uint8_t> saved[3] = {Read(h.base, kSceneSet, 4), Read(h.base, kFirstSet, 4),
+                                         Read(h.base, kReloads, 4)};
+  Random random(0x52454C4F4144ull);  // "RELOAD"
+  Results results("GarageStage::ReloadModel (sub_8217F880)");
+  for (int c = 0; c < 40; c++) {
+    const uint64_t seed = random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, b, kBytes, r);
+      PPCContext t = CallContext(h);
+      RandomBytes(h.base, t.r1.u32 - 8192, 8192, r);
+      const uint32_t scene = b + kScene, model = b + kModel, stage = b + kStageAt;
+      guest::StoreU32(h.base, kSceneSet, scene);
+      guest::StoreU32(h.base, kFirstSet, 0);
+      guest::StoreU32(h.base, kReloads, r.Below(6));
+      const bool teardown = r.Below(2) == 0;
+      guest::StoreU32(h.base, scene + 0, teardown ? 4 : r.Below(4));
+      guest::StoreU32(h.base, scene + 48, 3 + r.Below(4));
+      guest::StoreU32(h.base, scene + 4, 0);
+      guest::StoreU32(h.base, scene + 5048, 1);
+      guest::StoreU32(h.base, scene + 5028, model);
+      guest::StoreU32(h.base, scene + 5036, 1);
+      guest::StoreU32(h.base, model + 8, 0);
+      guest::StoreU32(h.base, model + 16, 3);
+      guest::StoreU32(h.base, model + 20, r.Below(6));
+      guest::StoreU32(h.base, model + 32, 1);
+      guest::StoreU32(h.base, model + 5028, r.Below(4) == 0 ? 1 : 0);
+      guest::StoreU32(h.base, model + 5040, r.Below(4) == 0 ? 1 : 0);
+      guest::StoreU32(h.base, model + 5044, 3 + r.Below(3));
+      for (const uint32_t at : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+        guest::StoreU32(h.base, model + at, 0);
+      }
+      guest::StoreU32(h.base, model + 5116, scene);
+      guest::StoreU32(h.base, stage + 8, 0);
+      guest::StoreU32(h.base, stage + 16, r.Below(2));
+      guest::StoreU32(h.base, b + kHolderAt, stage);
+      t.r3.u64 = b + kHolderAt;
+      t.r4.u64 = r.Below(3) == 0 ? 0xFFFFFFFFull : r.Below(72);
+      t.fpscr.disableFlushModeUnconditional();
+      (v == 0 ? __imp__sub_8217F880 : hooks::CarMakersReloadModel)(t, h.base);
+      out[v].Bytes(Read(h.base, b, kBytes));
+      out[v].Word(guest::LoadU32(h.base, kReloads));
+      out[v].Word(guest::LoadU32(h.base, kSceneSet));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  Write(h.base, kSceneSet, saved[0].data(), 4);
+  Write(h.base, kFirstSet, saved[1].data(), 4);
+  Write(h.base, kReloads, saved[2].data(), 4);
+  memory::Free(allocation);
+  results.Report();
+}
+
 }  // namespace
 
 void CarMakers(Context& h) {
@@ -960,6 +1034,7 @@ void CarMakers(Context& h) {
   Garage(h, r);
   Stand(h, r);
   Wheels(h, r);
+  Reloads(h);
 }
 
 }  // namespace harness

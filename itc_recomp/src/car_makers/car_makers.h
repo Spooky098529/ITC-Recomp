@@ -181,4 +181,19 @@ uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& 
 uint64_t ShowBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack);
 uint64_t HideBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack);
 
+// GarageStage::ReloadModel (sub_8217F880): r3 = the holder, r4 = a model
+// block or -1. Its 4,400-byte frame below `stack`: the stage's scene model m
+// (ScenePools::GetB, pool 7, s +8, on the scene read at entry); m +4296 = 0,
+// the reload count [0x826D83E4] + 1, s +4 = r4 unless -1; below 4, or while
+// SceneModel::PollLoad(m) is 0, CarScene::Update; below 4 returns 0; else
+// the count = 4 and, while PollLoad(m) is 0, returns 0; then with s +16 set
+// ScenePools::ReleaseB(scene, 7, s +8) and s +16 = 0, CarScene::Update, a
+// record at frame + 80 (SceneModelRecord::SceneModelRecord and Reset, their
+// plain C++; +16 = s +4), s +8 = ScenePools::ClaimB(scene, 7),
+// ScenePools::SetUpB(scene, 7, s +8, the record), m +4296 = 1, the count 0,
+// s +6056, s +16 = 1, s +4 = -1; returns 1. PollLoad, ReleaseB, CarScene::
+// Update and SetUpB through `calls` (their adapters).
+uint64_t GarageStageReloadModel(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                uint32_t holder, uint32_t block, uint32_t stack);
+
 }  // namespace car_makers
