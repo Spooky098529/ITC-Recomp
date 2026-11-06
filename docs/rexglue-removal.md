@@ -221,7 +221,12 @@ goes in `src/` as overrides), American English.
   effects (`post-effects.md`, 58 of 58), made the scene target's passes
   (`scene-target.md`, 6 of 6) and the frame passes object
   (`frame-passes.md`, 10 of 10 in play) native (ours 4,167 -> 4,197)
-  and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  and stopped at its limit; its thirty-fourth run (branch
+  `b7-loop-06-11-26`, 2026-11-06, 3 subsystems) made the graphics
+  library's command buffer (`command-buffer.md`, 24 of 24 in play), the
+  render replay's single commands (`single-commands.md`, 5 of 5 in
+  play) and predicated tiling (`predicated-tiling.md`) native (ours
+  4,197 -> 4,230) and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2747,6 +2752,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-05 | The frame passes object (framework +108, vtable `0x82000F20`: `FramePasses::Boot` with `PostEffects::InitBoot` at boot, `Record` once a frame, its ~20 shared pass chunks at 58 buckets, then the scene target's passes and the primitive reset states; `FlipWorkMem`, `RecordConstants`, `RecordSamplers`, the constructor, `Job::Wait`) | `frame-passes.md` | 10 of 10 in play (one migration, `Record` in three parts; `RecordPasses`' and `InitBoot`'s adapters removed) | `--native_frame_passes` |
 | 2026-11-06 | The graphics library's command buffer (`8229DBF0`-`8229F228`, `sub_822AF978`, `sub_822AC470`: the segments' tail, end, kick and next, the chain blocks, the data space `BeginVertices` writes inline vertices into, the reserved words, the callback packets, the fence wait; waits on the GPU, the coherency and data cache flushes and the WAIT_UNTIL packets Dropped by the graphics rule) | `command-buffer.md` | 24 of 24 in play (two migrations; 5 adapters removed) | `--native_command_buffer` |
 | 2026-11-06 | The render command replay's single commands (the table `0x8265ED48`, ids 0-36: in play the inline vertices (5), the shader constants (7), the drawer's set-up (13/14), its draw (15) and the movie frame's callback (28), run from `ChunkChain::RunSingles`' native dispatch) | `single-commands.md` | 5 of 5 in play (one migration) | `--native_single_commands` |
+| 2026-11-06 | Predicated tiling (the menus' tiled segments: `SetPredication`, `BeginTiledSegments`, `EndTiledSegments` with `RestoreSegment`, the library's worker threads' creation and loop; the bin mask packet, the chain header's words and the workers' event packets Dropped; the device lock +13548 a host mutex) | `predicated-tiling.md` | 5 of 8 in play (one migration; `CreateWorkers`' adapter and three of the command buffer's removed) | `--native_predicated_tiling` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4623,3 +4629,19 @@ The boundary: 449 functions (916 pairs): overridden 108, Native 34,
 Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
 live caller. B7 (`b7_status.py`): ours 4,224, work left 2,186
 (Wrapped 58, with a row 460, no row yet 1,668), from 2,191.
+
+**2026-11-06, predicated tiling (branch `b7-loop-06-11-26`):** the
+thirty-fourth run's third and last subsystem (`predicated-tiling.md`,
+`--native_predicated_tiling`, `src/graphics/predicated_tiling.*`): the
+menus' tiled segments' start and end, the predication select, and the
+graphics library's worker threads (made, waited and reset through the
+kernel imports, as XAudio's; their device lock +13548 a host
+`std::mutex`); the tiling limit, the chains and the kicks kept, so the
+segment flow takes the same path; the packets and header nothing reads
+Dropped. `Device::BeginTiling` waits on `Device::Clear`'s worker
+`sub_8229FC40`, `Device::EndTiling` on `Device::Resolve` `sub_822AFA58`
+(both leads). The run stopped at its limit. The boundary: 449
+functions (916 pairs): overridden 108, Native 34, Dropped 26, never
+called 70, live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 4,230, work left 2,181 (Wrapped 57, with a row
+458, no row yet 1,666), from 2,186.

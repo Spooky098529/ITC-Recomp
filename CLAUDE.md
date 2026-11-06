@@ -516,6 +516,19 @@ boot job and the once-a-frame pass chunks at framework +108) native
 (ours 4,167 -> 4,197); the rest waits on `Framework::Init`,
 `CarScene::Update` `sub_820C9608`, `Scenery::IsLoaded` and the leads
 in `docs/loops/leads.md`.
+Its thirty-fourth run (`b7-loop-06-11-26`, 2026-11-06, not yet merged;
+summary `docs/loops/b7-loop-2026-11-06-0102.md`; 3 subsystems) made
+the graphics library's command buffer (`command-buffer.md`,
+`--native_command_buffer`, 24 of 24 in play: the segment flow, the
+chain blocks, the data space inline draws are copied from; waits,
+flushes and packets nothing reads Dropped), the render replay's single
+commands (`single-commands.md`, `--native_single_commands`, 5 of 5 in
+play) and predicated tiling (`predicated-tiling.md`,
+`--native_predicated_tiling`: the menus' tiled segments and the
+library's worker threads, made through the kernel imports; the device
+lock +13548 a host mutex) native (ours 4,197 -> 4,230); the rest waits
+on `Device::Clear`'s worker `sub_8229FC40`, `Device::Resolve`
+`sub_822AFA58` and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

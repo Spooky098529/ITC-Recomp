@@ -16,6 +16,11 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-06 01:02 (`b7-loop-06-11-26`)
+
+- Predicated tiling (attract race `itc_3654`, replay `itc_3655` ok;
+  `command-buffer.md`): `sub_8229E0C0` Device::RestoreSegment.
+
 ## Run 2026-11-04 19:51 (`b7-loop-03-11-26`, continued)
 
 - The race's sounds, first migration (attract race `itc_3498`, replay

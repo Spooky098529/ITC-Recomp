@@ -74,9 +74,17 @@ file's history. What's left to see in a drive, from every run:
   `itc_3651`: race 32 s, 0 errors, every harness 0 differing but the
   expected groups; menu replays ok; no subagents); nothing ready left
   (`BeginTiling` waits on `Device::Clear`'s worker, `EndTiling` on
-  `Device::Resolve`). Step: validation agent running.
+  `Device::Resolve`). Validated `itc_3654` (race 38 s, 0 errors, 9
+  of 9 harness lines, `CreateWorkers` and `WorkerThread` ran in the
+  race, six in the replay `itc_3655` (ok); `sub_8229E0C0` to drive).
+  Done.
 
 ## Done
+
+- Predicated tiling: `predicated-tiling.md` (map b402e0cb, migration
+  bf30ab01..a047b852, `--native_predicated_tiling`; validated
+  `itc_3654`: 0 errors, every harness line, replay `itc_3655` ok, one
+  to drive).
 
 - The single commands: `single-commands.md` (map 53cddb27, migration
   8d39fd7e..15c1659b, `--native_single_commands`, 5 of 5 in play;
@@ -121,5 +129,10 @@ file's history. What's left to see in a drive, from every run:
   58, known 462, unknown 1666).
 - After its migration: ours 4230, work left 2181 (wrapped 57, known
   458, unknown 1666).
+- After its validation (`itc_3654`): ours 4230, work left 2181.
 
 ## Stopped
+
+2026-11-06, at the run's limit (3 subsystems), after predicated
+tiling's validation. No halts, no questions to the user. Nothing
+uncommitted. The user reviews and merges.
