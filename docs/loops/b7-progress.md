@@ -52,6 +52,8 @@ file's history. What's left to see in a drive, from every run:
   its setters, the garage cars, `FromGarageCar`, the tuning screen's
   set-up, `FitCar`, `CopyRecord`, the busy marker),
   `--native_car_makers`; aca0ef24, 9d2ce651..1276cd9a.
+- Cleanup: `CarList::DrawEntryPowerGraph` native (`power-graph.md`, 4 of
+  4 in play now), `FromGarageCar`'s adapter removed; b7a44553, 141471cc.
 - `power-graph.md`: 3 of 4 in play native (`PowerGraph::Draw`,
   `Line::RecordFlat`, `TuningScreen::DrawPowerGraph`),
   `--native_power_graph`; 64372b27, f97f2857.
@@ -82,5 +84,7 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4249, work left 2162 (wrapped 57, known
   467, unknown 1638).
 - After its validation (`itc_3677`): ours 4249, work left 2162.
+- After the cleanup lead (`DrawEntryPowerGraph`, `itc_3686`): ours
+  4250, work left 2161 (wrapped 57, known 466, unknown 1638).
 
 ## Stopped
