@@ -25,6 +25,11 @@ file's history. What's left to see in a drive, from every run:
   errors, every harness 0 differing, 3 of 3 harness lines; none in the
   attract race, all three in the replay `itc_3665` (ok); none to
   drive). Recorded.
+- Subsystem 2 of 3: the car objects' makers (lead picked: `sub_82179A60`,
+  `sub_82182C90`, `sub_82182D30`, `sub_821A1380`, `sub_82110448`; ready
+  groups under all five roots, and it unblocks the power graph's
+  `sub_82250670`; its line deleted from `leads.md`). Mapping agent
+  running.
 
 ## Done
 
