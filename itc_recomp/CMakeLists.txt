@@ -395,6 +395,7 @@ set(ITC_SOURCES
     src/power_graph/power_graph.cpp
     src/hooks/car_makers.cpp
     src/car_makers/record.cpp
+    src/car_makers/garage.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp

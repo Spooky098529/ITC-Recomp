@@ -27,6 +27,11 @@
 
 namespace harness {
 
+// Vehicle::SetupFromCar's cases' writer (src/harnesses/car_physics.cpp).
+bool SetupFromCarFits(uint8_t* base, uint32_t car, uint32_t r1);
+void WriteSetupFromCarCase(uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                           uint32_t stack_end, uint64_t seed, int group);
+
 namespace {
 
 constexpr uint32_t kBlockBytes = 0x10000;
@@ -94,29 +99,40 @@ void AddRanges(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
 // compared, `floats` as floats, then r3; `skip` bytes of the stack below
 // `skip_at` bytes under the call's r1 left out (the recompiled callees'
 // saved registers).
+// `before` runs before each version (state outside the block put back),
+// `extra` adds outputs after it; `stack_bytes` of the stack are compared.
 void Case(Context& h, Results& results, uint32_t block, Random& r,
           const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
           GuestFunction native, uint32_t saves, const FloatRanges& floats,
-          const std::string& what, uint32_t skip_at = 0, uint32_t skip = 0) {
-  RandomBytes(h.base, block, kBlockBytes, r);
+          const std::string& what, uint32_t skip_at = 0, uint32_t skip = 0,
+          const std::function<void()>& before = {},
+          const std::function<void(Outputs&, const PPCContext&)>& extra = {},
+          uint32_t stack_bytes = kStackBytes, uint32_t block_bytes = kBlockBytes) {
+  RandomBytes(h.base, block, block_bytes, r);
   PPCContext start = CallContext(h);
   start.r1.u64 &= ~0xFull;
   setup(start);
-  const std::vector<uint8_t> inputs = Read(h.base, block, kBlockBytes);
+  const std::vector<uint8_t> inputs = Read(h.base, block, block_bytes);
   const uint32_t sp = start.r1.u32;
   Outputs out[2];
   for (int v = 0; v < 2; v++) {
-    Write(h.base, block, inputs.data(), kBlockBytes);
-    Fill(h.base, sp - kStackBytes, kStackBytes + kArgBytes);
+    Write(h.base, block, inputs.data(), block_bytes);
+    Fill(h.base, sp - stack_bytes, stack_bytes + kArgBytes);
+    if (before) {
+      before();
+    }
     PPCContext t = start;
     t.fpscr.disableFlushModeUnconditional();
     (v == 0 ? recompiled : native)(t, h.base);
     if (skip != 0) {
       Fill(h.base, sp - skip_at - skip, skip, 0);
     }
-    AddRanges(out[v], h.base, block, kBlockBytes, floats);
-    out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes - saves));
+    AddRanges(out[v], h.base, block, block_bytes, floats);
+    out[v].Bytes(Read(h.base, sp - stack_bytes, stack_bytes - saves));
     out[v].Bytes(Read(h.base, sp, kArgBytes));
+    if (extra) {
+      extra(out[v], t);
+    }
     out[v].Word(t.r1.u32);
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -309,6 +325,192 @@ void FromCar(Context& h, uint32_t block, Random& r) {
   results.Report();
 }
 
+// --- The garage cars ---
+
+constexpr uint32_t kGarageBytes = 0x30000;
+constexpr uint32_t kGarageCar = 0x4000;    // the template car (4,096 bytes; the garage car)
+constexpr uint32_t kCarData = 0x5000;      // the car data (1,856 bytes)
+constexpr uint32_t kWriterStack = 0x9000;  // the case writer's r1 (its stack below)
+constexpr uint32_t kGarageParams = 0x9100; // the stand-in parameters (468 bytes)
+constexpr uint32_t kSpec = 0xA000;         // one car spec (8,432 bytes)
+constexpr uint32_t kHolder = 0xC400;       // the stand's holder
+constexpr uint32_t kSaveData = 0xD000;     // a save data's garage (to +0x19924)
+constexpr uint32_t kCarId = 5;
+constexpr uint32_t kSpecBytes = 8432;
+constexpr uint32_t kRaceDataPointer = 0x826C5B2C;
+constexpr uint32_t kRaceDataBytes = 0x5A000;
+constexpr uint32_t kHolderPointer = 0x826D83E0;
+
+// (The case writer's seed is the number of steps its generator is wound on:
+// kept small.)
+// A garage car Car::Refresh and Vehicle::SetupFromCar can take: the
+// SetupFromCar cases' car object (and car data) at kGarageCar, its id
+// kCarId, the engine stage 0 to 3, the tires' types 0 to 4 and grades 1 to
+// 5, no aero parts or wheels of their own; the car spec Car::Refresh copies
+// from made of that car's blocks (so the refreshed car is the case's), the
+// parameters [0x826C2E48] pointing at it.
+void LayGarage(uint8_t* base, uint32_t block, Random& r, int c) {
+  const uint32_t car = block + kGarageCar, spec = block + kSpec;
+  WriteSetupFromCarCase(base, block + kCarData, car, block + kWriterStack,
+                        block + kWriterStack, uint64_t(c) * 7 + 3, c % 2);
+  guest::StoreU32(base, car + 12, kCarId);
+  const uint32_t stage = r.Below(4);
+  guest::StoreU32(base, car + 1656, stage);
+  uint32_t tire[2];
+  for (uint32_t k = 0; k < 2; k++) {
+    const uint32_t type = r.Below(5), grade = 1 + r.Below(5);
+    guest::StoreU32(base, car + 1712 + 8 * k, type);
+    guest::StoreU32(base, car + 1716 + 8 * k, grade);
+    tire[k] = (type == 0 ? 0 : type * 5 + grade - 5) * 92 + spec + (k == 0 ? 4244 : 6176);
+  }
+  for (uint32_t at : {1744u, 1748u, 1752u, 1756u, 1760u, 1764u, 1768u, 1780u, 1784u, 1728u,
+                      1736u}) {
+    guest::StoreU32(base, car + at, 0);
+  }
+  auto copy = [&](uint32_t to, uint32_t from, uint32_t bytes) {
+    Write(base, to, Read(base, from, bytes).data(), bytes);
+  };
+  copy(spec, car + 2240, 640);
+  copy(spec + 640, car + 1888, 340);
+  copy(spec + 980 + 204 * stage, car + 2880, 204);
+  copy(spec + 8108, car + 3364, 272);
+  copy(tire[0], car + 3084, 92);
+  copy(tire[1], car + 3176, 92);
+  copy(spec + 8380, car + 3268, 48);
+  const uint32_t params = block + kGarageParams;
+  guest::StoreU32(base, params + 12, spec - kSpecBytes * kCarId);
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, params + 16 + 4 * i, spec);
+  }
+}
+
+// The race data (its own block): zeroed, a few racers already added.
+struct RaceData {
+  explicit RaceData(uint8_t* base)
+      : base(base),
+        global(guest::LoadU32(base, kRaceDataPointer)),
+        params(guest::LoadU32(base, kParamsPointer)),
+        holder(guest::LoadU32(base, kHolderPointer)),
+        allocation(memory::Alloc(kRaceDataBytes, 0)) {}
+  ~RaceData() {
+    guest::StoreU32(base, kRaceDataPointer, global);
+    guest::StoreU32(base, kParamsPointer, params);
+    guest::StoreU32(base, kHolderPointer, holder);
+    memory::Free(allocation);
+  }
+  void Reset(uint32_t count, uint32_t added) const {
+    Fill(base, allocation, kRaceDataBytes, 0);
+    guest::StoreU32(base, allocation + 48 + 0x595E0, count);
+    guest::StoreU32(base, allocation + 48 + 0x595E4, added);
+    guest::StoreU32(base, kRaceDataPointer, allocation);
+  }
+  uint8_t* base;
+  uint32_t global, params, holder, allocation;
+};
+
+void Garage(Context& h, Random& r) {
+  const uint32_t allocation = memory::Alloc(kGarageBytes + 16, 0);
+  const uint32_t block = (allocation + 15) & ~15u;
+  const RaceData race(h.base);
+  {
+    Results results("GarageCar::Reset (sub_82110448)");
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) { t.r3.u64 = block + kGarageCar + 4 * r.Below(4); },
+          __imp__sub_82110448, hooks::CarMakersGarageCarReset, 16, {},
+          fmt::format("case {}", c), 0, 0, {}, {}, kStackBytes, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // The two static garage cars, put back afterwards.
+    constexpr uint32_t kStatic = 0x82814EB8, kStaticBytes = 2 * 1972;
+    const std::vector<uint8_t> saved = Read(h.base, kStatic, kStaticBytes);
+    Results results("GarageCars::StaticInit (sub_825D9EF0)");
+    for (int c = 0; c < 8; c++) {
+      std::vector<uint8_t> inputs(kStaticBytes);
+      for (uint8_t& b : inputs) {
+        b = uint8_t(r.Next());
+      }
+      Case(
+          h, results, block, r, [](PPCContext&) {}, __imp__sub_825D9EF0,
+          hooks::CarMakersStaticInit, 24, {}, fmt::format("case {}", c), 0, 0,
+          [&] { Write(h.base, kStatic, inputs.data(), kStaticBytes); },
+          [&](Outputs& out, const PPCContext&) { out.Bytes(Read(h.base, kStatic, kStaticBytes)); },
+          kStackBytes, kGarageBytes);
+    }
+    Write(h.base, kStatic, saved.data(), kStaticBytes);
+    results.Report();
+  }
+  auto race_outputs = [&](Outputs& out, const PPCContext& t) {
+    out.Bytes(Read(h.base, race.allocation, kRaceDataBytes));
+    out.Double(t.f1.u64);
+  };
+  {
+    Results results("CarData::FromGarageCar (sub_82179A60)");
+    for (int c = 0; c < 40; c++) {
+      uint32_t count = 0, added = 0;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            LayGarage(h.base, block, r, c);
+            guest::StoreU32(h.base, kParamsPointer, block + kGarageParams);
+            count = r.Below(6);
+            added = r.Below(3);
+            t.r3.u64 = r.Next();
+            t.r4.u64 = block + kGarageCar;
+            t.r5.u64 = block + kCarData;
+          },
+          __imp__sub_82179A60, hooks::CarMakersFromGarageCar, 24, {},
+          fmt::format("case {}", c), 0, 0, [&] { race.Reset(count, added); }, race_outputs,
+          0x2000, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    Results results("TuningScreen::SetUpCarData (sub_821DF2F8)");
+    for (int c = 0; c < 40; c++) {
+      uint32_t count = 0, added = 0;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            LayGarage(h.base, block, r, c);
+            guest::StoreU32(h.base, kParamsPointer, block + kGarageParams);
+            guest::StoreU32(h.base, kHolderPointer, block + kHolder);
+            count = r.Below(6);
+            added = r.Below(3);
+            // The screen where its +18912 is the case's car data: its save
+            // data's garage list (nodes at +6120: halfwords next, slot), the
+            // walk's length.
+            const uint32_t screen = block + kCarData - 18912, save = block + kSaveData, nodes = save + 6120;
+            guest::StoreU32(h.base, screen + 18904, save);
+            const uint32_t steps = r.Below(4);
+            guest::StoreU32(h.base, save + 0x19920, steps);
+            uint16_t at = uint16_t(r.Below(40));
+            guest::StoreU16(h.base, nodes + 204, at);
+            for (uint32_t i = 0; i <= steps; i++) {
+              const uint16_t next = uint16_t(r.Below(40));
+              guest::StoreU16(h.base, nodes + 4 * at, next);
+              if (i == steps) {
+                const uint32_t slot = r.Below(3);
+                guest::StoreU16(h.base, nodes + 4 * at + 2, uint16_t(slot));
+                const uint32_t car = nodes + 212 + 1968 * slot;
+                Write(h.base, car, Read(h.base, block + kGarageCar, 1884).data(), 1884);
+              }
+              at = next;
+            }
+            t.r3.u64 = screen;
+          },
+          __imp__sub_821DF2F8, hooks::CarMakersSetUpCarData, 0, {},
+          fmt::format("case {}", c), 0, 0, [&] { race.Reset(count, added); }, race_outputs,
+          0x2000, kGarageBytes);
+    }
+    results.Report();
+  }
+  memory::Free(allocation);
+}
+
 }  // namespace
 
 void CarMakers(Context& h) {
@@ -322,6 +524,7 @@ void CarMakers(Context& h) {
   SetBytes(h, block, r);
   FromCar(h, block, r);
   memory::Free(allocation);
+  Garage(h, r);
 }
 
 }  // namespace harness

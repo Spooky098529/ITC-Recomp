@@ -26,5 +26,16 @@ void CarMakersSetBytes(PPCContext& ctx, uint8_t* base);
 // the paint pick); the original unless --native_scene_models and
 // --native_car_specs.
 void CarMakersFromCar(PPCContext& ctx, uint8_t* base);
+// The garage cars' makers, the originals unless --native_race_setup,
+// --native_save_data, --native_car_specs and --native_car_physics:
+// GarageCar::Reset sub_82110448 (r3 a garage car), GarageCars::StaticInit
+// sub_825D9EF0, CarData::FromGarageCar sub_82179A60 (r4 a garage car, r5 a
+// car data; f1 as it leaves it) and TuningScreen::SetUpCarData sub_821DF2F8
+// (r3 the tuning screen).
+bool CarMakersGarageCalleesNative();
+void CarMakersGarageCarReset(PPCContext& ctx, uint8_t* base);
+void CarMakersStaticInit(PPCContext& ctx, uint8_t* base);
+void CarMakersFromGarageCar(PPCContext& ctx, uint8_t* base);
+void CarMakersSetUpCarData(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

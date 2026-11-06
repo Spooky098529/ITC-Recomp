@@ -82,4 +82,34 @@ uint32_t SetBytes(uint8_t* base, uint32_t record, uint32_t bytes, uint32_t stack
 uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t record,
                  uint32_t car, uint64_t pick, uint32_t stack);
 
+// --- The garage cars (src/car_makers/garage.cpp) ---
+
+// GarageCar::Reset (sub_82110448): r3 = a 1,968-byte garage car:
+// Car::Clear; +1888, +1892 = [0x82000A34] (0.0), +1884, +1896, +1900 = 0,
+// +1964 = 1; memcpy(+1904, Defaults::Table3044(), 60) (a guest call where
+// memcpy's plain C++ declines). Its 96-byte frame below `stack`. Returns
+// memcpy's r3.
+uint64_t GarageCarReset(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t car,
+                        uint32_t stack);
+// GarageCars::StaticInit (sub_825D9EF0): the two 1,972-byte entries at
+// 0x82814EB8, each GarageCar::Reset and its +1968 = 0. Its 112-byte frame
+// below `stack` (Reset's below it). Returns the last Reset's r3.
+uint64_t GarageCarsStaticInit(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack);
+// CarData::FromGarageCar (sub_82179A60): r4 = a garage car, r5 = a car
+// data (r3 not read). Its 4,016-byte frame below `stack`: a car object at
+// frame + 80 (Car::Init, memcpy of the garage car's 1,884 bytes,
+// Car::Refresh, Race::AddRacer(car, 0, 0.0, 0), Car::SetupVehicle(car,
+// data)), then Vehicle::SetupFromCar(data, car) again; each callee's
+// original through `calls` (from the frame) where its plain C++ declines.
+// Returns the last's r3; `f1` gets what it leaves.
+uint64_t FromGarageCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t garage,
+                       uint32_t data, uint32_t stack, double* f1);
+// TuningScreen::SetUpCarData (sub_821DF2F8): r3 = the tuning screen: its
+// selected garage car (the save data [+18904]'s list at +6120 walked
+// [+0x19920] steps from the head halfword +204), then a tail call
+// CarData::FromGarageCar([[0x826D83E0]], the car, the screen + 18912) from
+// the same `stack`. Returns its r3; `f1` as it leaves it.
+uint64_t TuningScreenSetUpCarData(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                  uint32_t screen, uint32_t stack, double* f1);
+
 }  // namespace car_makers
