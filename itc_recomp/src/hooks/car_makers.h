@@ -55,5 +55,13 @@ bool CarMakersReapplyCalleesNative();
 void CarMakersReapplyRecord(PPCContext& ctx, uint8_t* base);
 void CarMakersReapplyRecordNoDecals(PPCContext& ctx, uint8_t* base);
 void CarMakersHideBusyMarker(PPCContext& ctx, uint8_t* base);
+// GarageStage::SetCar sub_8217FD58 and SetCarClass sub_8217FDC8 (r3 the
+// holder, r4 a car object, r5 the paint pick; SetCar's f1 FitCar's), the
+// originals unless their callees' flags are on (FromCar's, CopyRecord's,
+// the re-applies' and, for SetCar, FitCar's).
+bool CarMakersSetCarCalleesNative();
+bool CarMakersSetCarClassCalleesNative();
+void CarMakersSetCar(PPCContext& ctx, uint8_t* base);
+void CarMakersSetCarClass(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

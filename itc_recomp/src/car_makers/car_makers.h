@@ -144,6 +144,23 @@ uint64_t GarageStageCopyRecord(uint8_t* base, const front_end_car_draw::Calls& c
 uint64_t GarageStageReapplyRecord(uint8_t* base, const front_end_car_draw::Calls& calls,
                                   const scene_models::ApplyCall& apply, uint32_t holder,
                                   uint32_t stack, bool decals);
+// GarageStage::SetCar (sub_8217FD58): r3 = the holder, r4 = a car object,
+// r5 = the paint pick (all 64 bits, for FromCar). Its 112-byte frame below
+// `stack`: the stage's scene model m (ScenePools::GetB, pool 7, s +8), then
+// SceneModelRecord::FromCar(m + 32, car, pick), GarageStage::CopyRecord(r3,
+// m + 32), GarageStage::FitCar(r3, car) (`f1` gets what it leaves) and
+// GarageStage::ReapplyRecord(r3), their plain C++ from the frame. Returns
+// ReapplyRecord's r3.
+uint64_t GarageStageSetCar(uint8_t* base, const front_end_car_draw::Calls& calls,
+                           const scene_models::ApplyCall& apply, uint32_t holder, uint32_t car,
+                           uint64_t pick, uint32_t stack, double* f1);
+// GarageStage::SetCarClass (sub_8217FDC8): as SetCar from a 128-byte frame,
+// without FitCar: FromCar, then the record's +3768 = 1 when r5's low word
+// is 1, 2 or 4, else 0, CopyRecord and ReapplyRecordNoDecals. Returns its
+// r3.
+uint64_t GarageStageSetCarClass(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                const scene_models::ApplyCall& apply, uint32_t holder,
+                                uint32_t car, uint64_t pick, uint32_t stack);
 // sub_8219ED10 and sub_8219EDB0 (the stand's busy marker shown and hidden,
 // probably): movie 6 (UiMovies::Find with the id at frame + 80, the
 // 112-byte frame below `stack`), then its named animations through their

@@ -407,6 +407,48 @@ void LayGarage(uint8_t* base, uint32_t block, Random& r, int c) {
   }
 }
 
+}  // namespace
+
+// For load_poll's GarageStage::SetCar and SetCarClass cases: LayGarage's car
+// in a block of its own (`block`, 0x10000 bytes: the car at +0x4000, the
+// writer's stack and its parameters, the spec), which FitCar's
+// Vehicle::SetupFromCar takes, given what SceneModelRecord::FromCar writes
+// into the record the re-applies then read, as their world has it: its
+// flags (a player's, an opponent's or, for `traffic`, none: kind 3), the
+// parts' words small (+1756 -1 now and then: 13), the interior's +100 (car
+// +1800) small and its gauges clear (the choices' c 0), the selected
+// texture's index (+1812) below 6, the decals' ids (E +24 of the six
+// entries at +96 and the forty at +288) small or none, as the re-applies'
+// cases make them. LayGarage leaves +1764 0 (the car record's +3692 never
+// 1) and no aero kit. Returns the car.
+uint32_t LayStandCar(uint8_t* base, uint32_t block, Random& r, int c, bool traffic) {
+  LayGarage(base, block, r, c);
+  const uint32_t car = block + kGarageCar;
+  const uint32_t flags[4] = {0x1, 0x80, 0x2, 0x81};
+  guest::StoreU32(base, car + 3888, traffic ? 0 : flags[r.Below(4)]);
+  for (uint32_t at : {1664u, 1668u, 1744u, 1748u, 1752u, 1760u, 1768u, 1772u, 1776u, 1780u}) {
+    guest::StoreU32(base, car + at, r.Below(3));
+  }
+  guest::StoreU32(base, car + 1756, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(3));
+  guest::StoreU32(base, car + 1800, r.Below(2) == 0 ? 0 : r.Below(4));
+  guest::StoreU32(base, car + 1812, r.Below(6));
+  for (uint32_t at : {1824u, 1836u, 1848u, 1860u, 1872u}) {
+    guest::StoreU32(base, car + at + 8, 0);
+  }
+  auto id = [&r](uint32_t below) {
+    return r.Below(3) == 0 ? uint32_t(-1 - int32_t(r.Below(4))) : r.Below(below);
+  };
+  for (uint32_t e = 0; e < 6; e++) {
+    guest::StoreU32(base, car + 96 + 32 * e + 24, id(26));
+  }
+  for (uint32_t e = 0; e < 40; e++) {
+    guest::StoreU32(base, car + 288 + 32 * e + 24, id(300));
+  }
+  return car;
+}
+
+namespace {
+
 // The race data (its own block): zeroed, a few racers already added.
 struct RaceData {
   explicit RaceData(uint8_t* base)

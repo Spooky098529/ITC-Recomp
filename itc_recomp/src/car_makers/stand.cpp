@@ -179,6 +179,48 @@ uint64_t GarageStageReapplyRecord(uint8_t* base, const front_end_car_draw::Calls
   return scene_models::SceneModelReloadDecals(base, apply, model, frame);
 }
 
+uint64_t GarageStageSetCar(uint8_t* base, const front_end_car_draw::Calls& calls,
+                           const scene_models::ApplyCall& apply, uint32_t holder, uint32_t car,
+                           uint64_t pick, uint32_t stack, double* f1) {
+  ITC_NATIVE_RUNNING("sub_8217FD58 GarageStage::SetCar");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t stage = Load(base, holder);
+  const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7,
+                                                           Load(base, stage + 8));
+  const uint32_t record = model + 32;
+  FromCar(base, calls, record, car, pick, frame);
+  FlushOff();
+  GarageStageCopyRecord(base, calls, holder, record, frame);
+  FlushOff();
+  GarageStageFitCar(base, calls, holder, car, frame, f1);
+  FlushOff();
+  const uint64_t r3 = GarageStageReapplyRecord(base, calls, apply, holder, frame, true);
+  FlushOff();
+  return r3;
+}
+
+uint64_t GarageStageSetCarClass(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                const scene_models::ApplyCall& apply, uint32_t holder,
+                                uint32_t car, uint64_t pick, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217FDC8 GarageStage::SetCarClass");
+  const uint32_t frame = Frame(base, stack, 128);
+  const uint32_t stage = Load(base, holder);
+  const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7,
+                                                           Load(base, stage + 8));
+  const uint32_t record = model + 32;
+  FromCar(base, calls, record, car, pick, frame);
+  FlushOff();
+  // The original's compares of r5's low word: 1, 2 and 4 give 1; 3, 5 and
+  // the rest 0.
+  const int32_t which = int32_t(uint32_t(pick));
+  Store(base, record + 3768, which == 1 || which == 2 || which == 4 ? 1u : 0u);
+  GarageStageCopyRecord(base, calls, holder, record, frame);
+  FlushOff();
+  const uint64_t r3 = GarageStageReapplyRecord(base, calls, apply, holder, frame, false);
+  FlushOff();
+  return r3;
+}
+
 uint64_t ShowBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8219ED10 GarageScreen::ShowBusyMarker");
   const uint32_t frame = Frame(base, stack, 112);
