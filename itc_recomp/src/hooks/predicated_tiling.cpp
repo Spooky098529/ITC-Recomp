@@ -104,4 +104,7 @@ void hooks::NativeCreateWorkers(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-ITC_PREDICATED_TILING(822B6D70, hooks::NativeCreateWorkers(ctx, base))
+// No adapter for sub_822B6D70 (removed 2026-11-06): its only caller,
+// Device::Init's override (src/hooks/graphics_device.cpp), calls
+// NativeCreateWorkers itself with the flag on. (A recording command buffer
+// can't exist yet at Device::Init.)

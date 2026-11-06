@@ -13,12 +13,14 @@
 #include "graphics/device_state.h"
 #include "hooks/command_buffer.h"
 #include "hooks/device_state_calls.h"
+#include "hooks/predicated_tiling.h"
 #include "helpers/clock.h"
 #include "helpers/console_settings.h"
 
 using guest_call::InFrame;
 
 ITC_FLAG_DECLARE(bool, native_device_state);
+ITC_FLAG_DECLARE(bool, native_predicated_tiling);
 
 namespace {
 
@@ -218,7 +220,13 @@ extern "C" REX_FUNC(sub_822AD298) {
     }
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD348;
-    sub_822B6D70(ctx, base);  // the worker threads
+    // The worker threads: Device::CreateWorkers' plain C++ with
+    // --native_predicated_tiling (src/hooks/predicated_tiling.cpp).
+    if (ITC_FLAG(native_predicated_tiling)) {
+      hooks::NativeCreateWorkers(ctx, base);
+    } else {
+      sub_822B6D70(ctx, base);
+    }
     if (!ctx.r3.u32) {
       return;
     }
