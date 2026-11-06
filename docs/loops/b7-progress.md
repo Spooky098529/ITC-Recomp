@@ -91,9 +91,16 @@ file's history. What's left to see in a drive, from every run:
   `ReapplyRecordNoDecals` adapters and `ApplyWheelPaint`'s wrap removed;
   races 37, 37, 33 s, 0 errors, all harnesses 0 differing; no
   subagents); left: none in `car-makers.md` and `stand-models.md`.
-  Validation agent running.
+  Validated `itc_3786` (race 35 s, 0 errors, every harness 0 differing,
+  8 of 8 harness lines; `ApplyWheelPaint` in the race, three in the
+  replay `itc_3787` (ok), four to drive). Recorded.
 
 ## Done
+
+- Cleanup: `GarageStage::SetCar`, `SetCarClass`, `ShowCarById`,
+  `ShowCarByIdWithClass` native (`car-makers.md`); `CopyRecord`,
+  `ReapplyRecord`, `ReapplyRecordNoDecals`, `SceneModel::ApplyWheelPaint`
+  Native; 17174c73..c5e36a97.
 
 - Cleanup: `GarageStage::ReapplyRecord`, `ReapplyRecordNoDecals` native
   (`car-makers.md`); `SceneModel::ApplyRecord`, `ReloadDecals`,
@@ -145,3 +152,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3761`): ours 4319, work left 2092.
 - After the `ReapplyRecord` cleanup lead (`itc_3768`): ours 4321, work
   left 2090 (wrapped 57, known 431, unknown 1602).
+- After the `SetCar` cleanup lead (`itc_3786`): ours 4325, work left
+  2086 (wrapped 57, known 427, unknown 1602).

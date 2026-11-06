@@ -37,6 +37,10 @@ here loses its heading.
 - The `ReapplyRecord` cleanup lead (attract race `itc_3768`, replay
   `itc_3769` ok; `car-makers.md`): `sub_82178E60`
   GarageStage::ReapplyRecordNoDecals.
+- The `SetCar` cleanup lead (attract race `itc_3786`, replay `itc_3787`
+  ok; `car-makers.md`): `sub_8217FDC8` GarageStage::SetCarClass,
+  `sub_82182C90` GarageStage::ShowCarById, `sub_82182D30`
+  GarageStage::ShowCarByIdWithClass (and `sub_82178E60` above).
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 
