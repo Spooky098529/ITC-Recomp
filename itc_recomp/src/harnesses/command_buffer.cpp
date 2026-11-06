@@ -111,7 +111,8 @@ uint32_t ProgressAddress(const Blocks& b, Random& r, bool written) {
   }
 }
 
-// NextSpace's adapter's steps (src/hooks/command_buffer.cpp).
+// NextSpace's register steps (as its adapter had them before it was removed:
+// the size in and out through r5).
 void NativeNextSpace(PPCContext& t, uint8_t* base) {
   uint32_t size = guest::LoadU32(base, t.r5.u32);
   const uint32_t space = cb::NextSpace(base, t.r3.u32, t.r4.u32, size, t.r6.u32);

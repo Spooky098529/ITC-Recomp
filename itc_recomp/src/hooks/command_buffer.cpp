@@ -41,22 +41,10 @@ namespace cb = graphics::command_buffer;
     __VA_ARGS__;                              \
   }
 
-ITC_COMMAND_BUFFER(8229E768, ctx.r3.u64 = cb::WriteSegmentTail(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COMMAND_BUFFER(8229DBF0, cb::SaveSegment(base, ctx.r3.u32))
 ITC_COMMAND_BUFFER(8229DFB8, cb::CloseChain(base, ctx.r3.u32))
 ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(base, ctx.r3.u32, ctx.r4.u32,
                                                           ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
-// NextSpace: the size in and out through r5 (a segment's written back, as
-// the original does when it's had; when not, the word is unchanged; a
-// segment at address 0 is had).
-ITC_COMMAND_BUFFER(8229E100, {
-  uint32_t size = guest::LoadU32(base, ctx.r5.u32);
-  const uint32_t space = cb::NextSpace(base, ctx.r3.u32, ctx.r4.u32, size, ctx.r6.u32);
-  if (!(ctx.r4.u32 & 1)) {
-    guest::StoreU32(base, ctx.r5.u32, size);  // unchanged when it failed
-  }
-  ctx.r3.u64 = space;
-})
 // Reserve: the recording command buffer's path (never in play) is the
 // original's.
 ITC_COMMAND_BUFFER(8229E308, {
@@ -84,7 +72,10 @@ ITC_COMMAND_BUFFER(8229ED60, {
   ctx.r3.u64 = cb::InitChain(base, ctx.r3.u32, ctx.r4.u32);
 })
 // The segment flow: with a recording command buffer (never in play), the
-// originals whole.
+// originals whole. The adapters of sub_8229E768, sub_8229E100, sub_8229EDA8,
+// sub_8229EC00 and sub_8229E908 are gone (2026-11-06): their callers in play
+// are native (Device::Swap's call to sub_8229EC00 through
+// hooks::NextCommandSegment), and the flag switches only those callers.
 graphics::command_buffer::Kick hooks::CommandBufferKick(PPCContext& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t device, uint32_t result, uint32_t address, uint32_t words,
                       uint32_t interrupts, uint32_t list) {
@@ -112,6 +103,15 @@ void hooks::EndCommandSegment(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cb::EndSegment(base, device, CommandBufferKick(ctx, base));
 }
 
+void hooks::NextCommandSegment(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {
+    __imp__sub_8229EC00(ctx, base);
+    return;
+  }
+  const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
+  ctx.r3.u64 = cb::NextSegment(base, device, words, CommandBufferKick(ctx, base));
+}
+
 #define ITC_SEGMENT_FLOW(address, ...)                                             \
   extern "C" REX_FUNC(sub_##address) {                                           \
     REX_FUNC_PROLOGUE();                                                         \
@@ -122,19 +122,6 @@ void hooks::EndCommandSegment(PPCContext& ctx, uint8_t* base) {
     const cb::Kick kick = hooks::CommandBufferKick(ctx, base);                   \
     __VA_ARGS__;                                                                 \
   }
-
-ITC_SEGMENT_FLOW(8229EDA8, {
-  const uint32_t device = ctx.r3.u32;
-  ctx.r3.u64 = cb::KickSegment(base, device, kick);
-})
-ITC_SEGMENT_FLOW(8229EC00, {
-  const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
-  ctx.r3.u64 = cb::NextSegment(base, device, words, kick);
-})
-ITC_SEGMENT_FLOW(8229E908, {
-  const uint32_t device = ctx.r3.u32, fence = ctx.r4.u32, code = ctx.r5.u32;
-  ctx.r3.u64 = cb::WaitForFence(base, device, fence, code, kick);
-})
 
 ITC_SEGMENT_FLOW(8229F148, {
   const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;

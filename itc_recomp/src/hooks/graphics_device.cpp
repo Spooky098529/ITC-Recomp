@@ -11,6 +11,7 @@
 #include "base/flags.h"
 #include "display/display.h"
 #include "graphics/device_state.h"
+#include "hooks/command_buffer.h"
 #include "hooks/device_state_calls.h"
 #include "helpers/clock.h"
 #include "helpers/console_settings.h"
@@ -564,7 +565,8 @@ extern "C" REX_FUNC(sub_822A08A0) {
     ctx.r3.u64 = device;
     ctx.r4.u64 = field(kDeviceSegmentBytes) >> 2;
     ctx.lr = 0x822A0E1C;
-    sub_8229EC00(ctx, base);  // the next segment, and waits for the last Swap's fence
+    // The next segment, and waits for the last Swap's fence (sub_8229EC00).
+    hooks::NextCommandSegment(ctx, base);
     clear_bits(kDeviceFlags, 0x20);
     set(kDeviceFenceBefore, field(kDeviceFence));
     set(kDeviceFence, position);
