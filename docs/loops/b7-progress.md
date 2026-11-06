@@ -39,10 +39,19 @@ file's history. What's left to see in a drive, from every run:
   `sub_8229F0E0` without their packets; 5 adapters removed;
   `itc_3622`: race 36 s, 0 errors, every harness 0 differing but the
   expected groups; no subagents); nothing ready left (the rest's
-  callers are recompiled packet writers and the tiling worker). Step:
-  validation agent running.
+  callers are recompiled packet writers and the tiling worker).
+  Validated `itc_3623` (race 44 s, 0 errors, 12 of 12 harness lines,
+  8 ran in the race, `NewBlock`, `Init`, `ReserveWords`,
+  `InsertCallback` in the replay `itc_3624` (ok); none to drive).
+  Done.
 
 ## Done
+
+- The command buffer: `command-buffer.md` (map aa4b202c, migrations
+  e041aa4a..abca2df1 and 8d43620c..632f2b7d, `--native_command_buffer`,
+  24 of 24 in play; validated `itc_3607` and `itc_3623`: 0 errors,
+  every harness line, replays `itc_3608` and `itc_3624` ok, none to
+  drive).
 
 ## Rows to review
 
@@ -67,5 +76,6 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3607`): ours 4209, work left 2201.
 - After its second migration: ours 4219, work left 2191 (wrapped 59,
   known 460, unknown 1672).
+- After its validation (`itc_3623`): ours 4219, work left 2191.
 
 ## Stopped
