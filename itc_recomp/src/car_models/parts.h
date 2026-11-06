@@ -165,4 +165,62 @@ uint32_t ScenePoolsSetUp(uint8_t* base, uint32_t pools, uint32_t pool, uint32_t 
                          const archive::LoadCall& load, const PoolSetUps& native,
                          const SetUpCall& call);
 
+// --- The second set's set-ups (ScenePools::SetUpB's cases with rows in
+// scene-models.md): each copies its record into the second set's object,
+// claims the first set's pool of the same number ([0x826C2E40]: ClaimA,
+// GetA), and sets that up with ScenePools::SetUp's plain C++ (`setup`'s
+// fields as its adapter passes them), from the original's frame (`stack`
+// its r1). nullopt, with nothing done but the stores before the copy (which
+// the original makes the same again), where the copy can't be native (the
+// original runs). Each returns its r3 as the original leaves it. ---
+
+// A guest call with r3 to r5 from frame r1 and return address lr; returns r3.
+using GuestCall = std::function<uint32_t(uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
+                                         uint32_t r1, uint32_t lr)>;
+
+// What the set-ups pass ScenePools::SetUp.
+struct SecondSetUps {
+  uint32_t pcr;
+  const archive::LoadCall& load;
+  PoolSetUps native;
+  const GuestCall& guest;
+};
+
+// The first set's pools.
+constexpr uint32_t kFirstSet = 0x826C2E40;
+
+// SceneCarModel::SetUp (sub_820DB818): +3728 = the scene ([0x826C2E44]),
+// the car record copied to +32 (CarRecord::Copy), pool 0 claimed and set up
+// with +32; +24 = the set-up's object. 112-byte frame.
+std::optional<uint32_t> SceneCarModelSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                           uint32_t stack, const SecondSetUps& setups);
+// SceneParts::SetUp (sub_820DF1D0): the 60-byte record copied to +108
+// (memcpy), pool 1 claimed (ClaimA, GetA) into +104, its +24 = the car
+// model's ([[+24] + 24]), set up with +108; +104 = the set-up's object.
+// 128-byte frame.
+std::optional<uint32_t> ScenePartsSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                        uint32_t stack, const SecondSetUps& setups);
+// Pool 4's set-up (sub_820DCAA0): as SceneParts' with 52 bytes to +32,
+// pool 4, the object at +28.
+std::optional<uint32_t> ScenePool4SetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                        uint32_t stack, const SecondSetUps& setups);
+// SceneTraffic::SetUp (sub_820E5998): +9796 = the scene, the 3,696-byte
+// record copied to +32 (memcpy), pool 6 claimed into +9760 and set up with
+// `record` (the caller's); the set-up's object not stored. 128-byte frame.
+std::optional<uint32_t> SceneTrafficSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                          uint32_t stack, const SecondSetUps& setups);
+// The wheels' set-up (sub_820E70C0): the 156-byte record copied to +32
+// (memcpy); +112 to +152 from the table at 0x820044B0 (44-byte entries) by
+// the car's block ([[+24] + 24] + 32), or for traffic (+32 = 3, with +100
+// 0) 45 + [[+16776]] (+120 only with +100 0; +132 and +136 through float
+// loads and stores; +148 and +152 the same word); the 156 bytes copied
+// back over `record` (memcpy); with both wheel numbers (+48, +64) -1, a car
+// model and a block from 18, sub_820D39D8(block, +48, +64) (never seen in
+// play: through `guest`); +148 (+152) = whether the front (rear) number,
+// when not negative, isn't 190; pool 5 claimed into +28, its +24 = the car
+// model's, or with none its +3264 = +16776; set up with +32. 160-byte frame.
+std::optional<uint32_t> SceneWheelsSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                         uint32_t stack, const SecondSetUps& setups);
+
 }  // namespace car_models
+

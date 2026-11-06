@@ -366,7 +366,60 @@ void ScenePoolsSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+// The second set's set-ups (scene-models.md): r3 = the object, r4 = the
+// record; r3 as the original leaves it, or the original where the plain C++
+// declines.
+void SecondSetUp(PPCContext& ctx, uint8_t* base,
+                 std::optional<uint32_t> (*setup)(uint8_t*, uint32_t, uint32_t, uint32_t,
+                                                  const cm::SecondSetUps&),
+                 void (*original)(PPCContext&, uint8_t*)) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t stack = ctx.r1.u64;
+  const cm::GuestCall guest = [&ctx, base, stack](uint32_t function, uint32_t r3, uint32_t r4,
+                                                  uint32_t r5, uint32_t r1, uint32_t lr) {
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.lr = lr;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  };
+  const cm::SecondSetUps setups{
+      ctx.r13.u32, hooks::NativeArchiveLoad(base),
+      {ITC_FLAG(native_car_models), ITC_FLAG(native_scene_models), hooks::NativeHeapActive()},
+      guest};
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = setup(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, setups);
+  ctx.lr = lr;
+  if (!r3) {
+    original(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
 }  // namespace hooks
+
+// The second set's set-ups behind --native_scene_models (scene-models.md),
+// from ScenePools::SetUpB (recompiled); SceneCarModel::SetUp's caller is
+// SetUpB's split-off case sub_820C5B98.
+#define ITC_SECOND_SET_UP(address, setup)                       \
+  extern "C" REX_FUNC(sub_##address) {                          \
+    REX_FUNC_PROLOGUE();                                        \
+    if (!ITC_FLAG(native_scene_models)) {                       \
+      __imp__sub_##address(ctx, base);                          \
+      return;                                                   \
+    }                                                           \
+    hooks::SecondSetUp(ctx, base, car_models::setup, __imp__sub_##address); \
+  }
+
+ITC_SECOND_SET_UP(820DB818, SceneCarModelSetUp)
+ITC_SECOND_SET_UP(820DF1D0, ScenePartsSetUp)
+ITC_SECOND_SET_UP(820DCAA0, ScenePool4SetUp)
+ITC_SECOND_SET_UP(820E5998, SceneTrafficSetUp)
+ITC_SECOND_SET_UP(820E70C0, SceneWheelsSetUp)
 
 // The adapters: the register steps above, or the originals with the flag
 // off.
