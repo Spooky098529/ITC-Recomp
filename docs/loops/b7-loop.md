@@ -552,6 +552,11 @@ Calls so far for decisions the loop meets often:
   set (only dead frame words differ), and the harness cases use strings
   without argument codes for those calls (the parking area, 2026-10-30).
   Memory leftovers are still copied as the original leaves them.
+- A register leftover a function stores into live state (read later by
+  the game, so it can change behavior), which native code can't
+  reproduce: the function stays recompiled, its row says why
+  (`BuildScreen::BackToBuilds` `sub_821A1258` storing the r7
+  `UiMovie::Run` leaves into its machine's +24, 2026-11-06).
 - Harness run times: migration agents `attract_race.sh 40` with their
   own harnesses; the validation agent `attract_race.sh 120
   --run_harnesses=all` (60 s on 2026-10-30, when all of them outgrew

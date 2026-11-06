@@ -119,7 +119,15 @@ file's history. What's left to see in a drive, from every run:
   to stay in their world; no subagents); held: `BackToBuilds`
   `sub_821A1258` (a register leftover in live state: asked the user);
   left: `sub_820C5A60` with `SceneModel::Update` (`vehicle-accessors.md`).
-  Validation agent running.
+  Validated `itc_3820` (race 34 s, the harnesses ~84.5 s of the 120; 0
+  errors, every harness 0 differing, 24 of 24 harness lines;
+  `CarScene::LoadsDone` in the replay `itc_3821` (ok), the 23 build
+  screen functions to drive). The user's call (2026-11-06):
+  `BackToBuilds` stays recompiled (a register leftover in live state;
+  added to "Precedent first"). Third migration agent running
+  (`CarScene::Update` `sub_820C9608`, now ready, with `sub_820C59B0`,
+  `sub_820C5A60`, `SceneModel::Update`; then `GarageStage::ReloadModel`,
+  `PutOnStand`, `SetUpStand`, `OpenStand`).
 
 ## Done
 
@@ -185,3 +193,5 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4371, work left 2040 (wrapped 57, known
   441, unknown 1542).
 - After its validation (`itc_3795`): ours 4371, work left 2040.
+- After its second migration and validation (`itc_3820`): ours 4382,
+  work left 2029 (wrapped 57, known 430, unknown 1542).

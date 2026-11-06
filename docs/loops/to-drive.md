@@ -56,6 +56,15 @@ here loses its heading.
   `sub_8219CA08`, `sub_8219CB18`, `sub_8219CBD8`, `sub_8219BFE8`,
   `sub_821A0128`, `sub_821A0D38`, `sub_8219D3E8`, `sub_8219D248`,
   `sub_8219D550`, `sub_8219CF08`, `sub_821A1008`.
+- The build screen, second migration (attract race `itc_3820`, replay
+  `itc_3821` ok, neither reaches the screen; `build-screen.md`; some
+  also in the first migration's line above, their adapters since
+  removed): `sub_821A0060`, `sub_821A08D8`, `sub_821A0A38`,
+  `sub_8219FC60`, `sub_821A1138`, `sub_8219FF78`, `sub_8219F868`,
+  `sub_8219FEC8`, `sub_8219F8E0`, `sub_8219D820`, `sub_8219CC70`,
+  `sub_8219EC50`, `sub_8219BF08`, `sub_8219FA28`, `sub_8219CF08`,
+  `sub_8219D090`, `sub_8219D1B0`, `sub_8219BA50`, `sub_8219BCC0`,
+  `sub_8219D4B8`, `sub_8219D440`, `sub_8219BC50`, `sub_8219BBF0`.
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 
