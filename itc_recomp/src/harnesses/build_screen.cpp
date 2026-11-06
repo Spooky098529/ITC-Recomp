@@ -731,7 +731,23 @@ void Groups(Context& h, const World& w) {
   // without their saves.
   Run(h, w, {"BuildScreen::OpenBuilds (sub_821A1138)", 50, __imp__sub_821A1138,
              hooks::BuildScreenOpenBuilds, {{-128, -32}, {-128 - 128, -128 - 40}}, step});
+  // BackToStand: its frame and RestoreStand's (lr saved) under it; the
+  // build count one MenuList::Init can make a block for (InitStandList's).
+  auto stand = [step](PPCContext& t, Random& r, const World& w) {
+    step(t, r, w);
+    guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, uint16_t(r.Below(13)));
+    if (r.Below(3) == 0) {
+      guest::StoreU32(w.base, w.at(kMachineAt) + 0, 2);
+    }
+  };
+  Run(h, w, {"BuildScreen::BackToStand (sub_8219FF78; sub_8219F868)", 50, __imp__sub_8219FF78,
+             hooks::BuildScreenBackToStand, {{-112, -24}, {-112 - 96, -112 - 8}}, stand});
   ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  Run(h, w, {"BuildScreen::RestoreStand (sub_8219F868)", 60, __imp__sub_8219F868,
+             hooks::BuildScreenRestoreStand, {{-96, -8}},
+             [](PPCContext&, Random& r, const World& w) {
+               guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, uint16_t(r.Below(13)));
+             }});
 }
 
 }  // namespace

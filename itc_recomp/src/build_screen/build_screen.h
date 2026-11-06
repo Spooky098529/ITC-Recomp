@@ -46,6 +46,7 @@ constexpr uint32_t kBuildSelection = 0x32640, kBuildScroll = 0x32644;
 constexpr uint32_t kStandSelection = 0x32648, kStandScroll = 0x3264C;
 constexpr uint32_t kNumber = 0x32654;       // ShowNumber's (probably a percentage)
 constexpr uint32_t kOpened = 0x32658;       // BuildScreen::Open plays 81 when 0
+constexpr uint32_t kCarShown = 0x3265C;     // 1 on the stand's level
 
 // A build list's fields (16-bit links: +0 a node's next, +2 its slot).
 constexpr uint32_t kListFree = 1600, kListHead = 1604, kListCount = 1608, kListSlots = 1612;
@@ -180,6 +181,12 @@ uint64_t SetUpBuilds(uint8_t* base, uint32_t sp, const Calls& calls);
 // prompts, the help line 564, the arrows). r3 GroupArrows'.
 uint64_t SetUpGroups(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// sub_8219F868 BuildScreen::RestoreStand: level 2's set-up back from the
+// details (InitStandList, RestoreStandList, DrawStandRow(0, the scroll),
+// the prompts (0, 5, 1, 1), SetHelp 566, StandArrows, +0x3265C 1; the car
+// not put on the stand again). r3 StandArrows'.
+uint64_t RestoreStand(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The transitions (transitions.cpp) ---
 //
 // Each takes `step`, its word at the machine's +24 (r3): the set-up on the
@@ -221,5 +228,9 @@ uint64_t ChangeCategory(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
 // the builds' kept selection and scroll 0, SetUpBuilds. r3 1 when Run
 // answers 0.
 uint64_t OpenBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219FF78 BuildScreen::BackToStand: FinishNamed 74, PlayNamed 107,
+// RestoreStand; once Run answers 0, the machine back to level 2 with
+// HighlightStand2 (13) queued. r3 0.
+uint64_t BackToStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace build_screen

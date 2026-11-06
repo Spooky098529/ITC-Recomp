@@ -246,7 +246,7 @@ uint64_t SetUpBuilds(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetHelp(base, frame, 565, calls);
   const uint32_t r3 =
       BuildArrows(base, frame, scroll, uint32_t(Half(base, Screen(base) + kBuildCount)));
-  Store(base, Screen(base) + 0x3265C, 0);
+  Store(base, Screen(base) + kCarShown, 0);
   return r3;
 }
 
@@ -266,6 +266,20 @@ uint64_t SetUpGroups(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetHelp(base, frame, 564, calls);
   const uint32_t scroll = Load(base, Load(base, kList) + 4);
   return GroupArrows(base, frame, scroll, Load(base, Screen(base) + kShownCount));
+}
+
+uint64_t RestoreStand(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8219F868 BuildScreen::RestoreStand");
+  const uint32_t frame = Frame(base, sp, 96);
+  InitStandList(base, frame, calls);
+  RestoreStandList(base, frame);
+  DrawStandRow(base, frame, 0, Load(base, Load(base, kList) + 4), calls);
+  static constexpr uint32_t kPrompts[6] = {0, 5, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
+  SetPrompts(base, frame, kPrompts);
+  SetHelp(base, frame, 566, calls);
+  const uint32_t r3 = StandArrows(base, frame);
+  Store(base, Screen(base) + kCarShown, 1);
+  return r3;
 }
 
 }  // namespace build_screen

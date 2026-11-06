@@ -30,7 +30,8 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "sub_8219CF08 and SetUpBuilds sub_821A1008 (SetText and SetNodeText through their "
               "overrides); the groups level's SetUpGroups sub_821A0060 and the transitions Open "
               "sub_821A08D8, BackToGroups sub_821A0A38 and ChangeCategory sub_8219FC60; the "
-              "transition OpenBuilds sub_821A1138) "
+              "transition OpenBuilds sub_821A1138; the stand's RestoreStand sub_8219F868 and the "
+              "transition BackToStand sub_8219FF78) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=build_screen). RestoreGroupList, InsertNode, SetMode, PowI, DrawGroupRow, InitBuildList, "
               "CopyBuilds, ListBuilds, DrawBuildRow, DrawBuildRows, SetUpGroups, FilterGroups, "
@@ -267,6 +268,16 @@ void BuildScreenOpenBuilds(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = bs::OpenBuilds(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void BuildScreenRestoreStand(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::RestoreStand(base, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenBackToStand(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::BackToStand(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 void BuildScreenChangeCategory(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = bs::ChangeCategory(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
@@ -312,3 +323,5 @@ ITC_BUILD_SCREEN(821A08D8, BuildScreenOpen)
 ITC_BUILD_SCREEN(821A0A38, BuildScreenBackToGroups)
 ITC_BUILD_SCREEN(8219FC60, BuildScreenChangeCategory)
 ITC_BUILD_SCREEN(821A1138, BuildScreenOpenBuilds)
+ITC_BUILD_SCREEN(8219F868, BuildScreenRestoreStand)
+ITC_BUILD_SCREEN(8219FF78, BuildScreenBackToStand)
