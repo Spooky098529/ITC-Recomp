@@ -5,10 +5,13 @@
 
 #include "base/log.h"
 #include "c_runtime/format.h"
+#include "car_models/car_model.h"
 #include "car_models/load_slots.h"
+#include "car_models/vinyl.h"
 #include "guest.h"
 #include "native/buffers.h"
 #include "scene_models/scene_models.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace car_models {
 
@@ -179,6 +182,165 @@ std::optional<uint32_t> InteriorLoad(uint8_t* base, uint32_t object, uint32_t se
     }
   }
   return r3;
+}
+
+// --- The first set's pools' set-ups ---
+
+void CarPartsLoadSetA(uint8_t* base, uint32_t object, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820D7090 CarParts::LoadSetA");
+  uint32_t id = Load(base, Load(base, object + 24) + 32) * 226 + 894;
+  uint32_t slot = object + 96;
+  for (uint32_t i = 0; i < 216; i++, slot += 24, id++) {
+    Store(base, slot, id);
+    LoadSlotLoadShared(base, slot, id, object, kOnPartsLoadedA, load);
+  }
+}
+
+void CarPartsLoadSetB(uint8_t* base, uint32_t object, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820D70F0 CarParts::LoadSetB");
+  const uint32_t first = Load(base, Load(base, object + 24) + 32) * 197 + 11061;
+  const auto field = [&](uint32_t offset) { return Load(base, object + offset); };
+  for (uint32_t j = 0; j < 17; j++) {
+    uint32_t id;
+    switch (j) {
+      case 0: id = field(28) + first + 3; break;
+      case 1: id = field(28) * 7 + field(32) + first + 16; break;
+      case 2: id = field(36) + first + 107; break;
+      case 3: id = field(40) + first + 120; break;
+      case 4: {
+        const uint32_t value = field(44);
+        if (int32_t(value) == 13) {
+          continue;
+        }
+        id = value + first + 133;
+        break;
+      }
+      case 5: id = field(48) + first + 146; break;
+      case 6: id = field(52) + first + 154; break;
+      case 8: id = field(56) + first + 157; break;
+      case 10: id = field(60) + first + 169; break;
+      case 11: id = field(64) + first + 173; break;
+      case 12: id = field(68) + first + 178; break;
+      case 13: id = first + 177; break;
+      case 15: id = field(76) + first + 184; break;
+      case 16: id = first + 189; break;
+      default: continue;  // 7, 9 and 14
+    }
+    LoadSlotLoadShared(base, object + 96 + 24 * j, id, object, kOnPartsLoadedB, load);
+  }
+}
+
+bool CarPartsLoad(uint8_t* base, uint32_t object, uint32_t setup, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820D7510 CarParts::Load");
+  if (!native::Buffers_Memcpy(base, object + 28, setup, 60, 0x820D7530)) {
+    return false;
+  }
+  const uint32_t set = Load(base, Load(base, object + 106000) + 8);
+  if (set == 0) {
+    CarPartsLoadSetA(base, object, load);
+  } else if (set == 1) {
+    CarPartsLoadSetB(base, object, load);
+  }
+  return true;
+}
+
+bool Pool4Load(uint8_t* base, uint32_t object, uint32_t record, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820D6B48 Pool4Object::Load");
+  if (!native::Buffers_Memcpy(base, object + 28, record, 52, 0x820D6B68)) {
+    return false;
+  }
+  const uint32_t scene_set = Load(base, object + 576);
+  const uint32_t car = Load(base, object + 24);
+  const uint32_t set = Load(base, scene_set + 8);
+  const uint32_t block = Load(base, car + 32);
+  const uint32_t id = set == 0 ? block * 226 + 1116 : block * 197 + 11257;
+  LoadSlotLoadShared(base, object + 80, id, object, kOnPool4Loaded, load);
+  return true;
+}
+
+bool TrafficCarLoad(uint8_t* base, uint32_t object, uint32_t record, uint32_t stack, uint32_t pcr,
+                    const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820D8A08 TrafficCar::Load");
+  if (!scene_models::CarRecordCopy(base, object + 32, record)) {
+    return false;
+  }
+  const uint32_t frame = stack - 1136;
+  const uint32_t number = Load(base, object + 32);
+  Store(base, object + 7392, Load(base, 0x826C2E40));
+  if (LoadSlotLoad(base, object + 3744, number + 22529, object, kOnTrafficLoaded, pcr, load) ==
+      0) {
+    // sprintf's call from the original's frame: the number spilled into the
+    // frame's parameter area as sprintf spills r5 (r6 to r10, which the
+    // call doesn't set, as 0: only dead frame words differ), its own frames
+    // below. Its text, in the frame, is read by nothing.
+    for (uint32_t i = 0; i < 6; i++) {
+      Store(base, frame + 32 + 8 * i, 0);
+      Store(base, frame + 36 + 8 * i, i == 0 ? number : 0);
+    }
+    int32_t written;
+    c_runtime::Sprintf(base, frame + 80, kTrafficFormat, frame + 32, frame - 144 - 1328,
+                       &written);
+  }
+  TextureCreate(base, 0x18280086, 16, 16, object + 3728, object + 3732, frame);
+  return true;
+}
+
+uint32_t ScenePoolsSetUp(uint8_t* base, uint32_t pools, uint32_t pool, uint32_t index,
+                         uint32_t record, uint32_t stack, uint32_t pcr,
+                         const archive::LoadCall& load, const PoolSetUps& native,
+                         const SetUpCall& call) {
+  ITC_NATIVE_RUNNING("sub_820C4338 ScenePools::SetUp");
+  const uint32_t object = vehicle_accessors::ListAt(base, pool * 12 + pools + 56, index);
+  if (int32_t(Load(base, object + 16)) != 3) {
+    return 0;
+  }
+  const uint32_t frame = stack - 112;
+  // The set-up through the guest, from the frame (its back chain written).
+  const auto guest = [&](uint32_t function, uint32_t lr) {
+    Store(base, frame, stack);
+    call(function, object, record, frame, lr);
+  };
+  switch (pool) {
+    case 0:
+      if (!(native.car_models && native.heap &&
+            CarModelLoadExterior(base, object, record, frame, pcr, load))) {
+        guest(0x820D5EC8, 0x820C4410);
+      }
+      break;
+    case 1:
+      if (!(native.loaders && native.car_models && CarPartsLoad(base, object, record, load))) {
+        guest(0x820D7510, 0x820C4400);
+      }
+      break;
+    case 2:
+      if (!(native.car_models && native.heap &&
+            CockpitLoadSetC(base, object, record, frame, pcr, load))) {
+        guest(0x820D67E8, 0x820C43F0);
+      }
+      break;
+    case 3:
+      guest(0x820D79B0, 0x820C43E0);
+      break;
+    case 4:
+      if (!(native.loaders && native.car_models && Pool4Load(base, object, record, load))) {
+        guest(0x820D6B48, 0x820C43D0);
+      }
+      break;
+    case 5:
+      if (!(native.car_models && WheelsSetUp(base, object, record, load))) {
+        guest(0x820D9110, 0x820C43C0);
+      }
+      break;
+    case 6:
+      if (!(native.loaders && native.car_models && native.heap &&
+            TrafficCarLoad(base, object, record, frame, pcr, load))) {
+        guest(0x820D8A08, 0x820C43B0);
+      }
+      break;
+    default:
+      break;
+  }
+  return object;
 }
 
 }  // namespace car_models

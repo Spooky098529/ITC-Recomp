@@ -2182,6 +2182,121 @@ void Vinyls(Context& h, uint32_t block) {
 
 }  // namespace
 
+// ScenePools::SetUp with its loaders (CarParts::Load with LoadSetA and
+// LoadSetB, pool 4's sub_820D6B48, TrafficCar::Load) and the wheels'
+// set-up: a 112 KB block of random bytes holding the first set of pools
+// (one node in each pool's list, the index 0 to 2: past the end gives the
+// node), the object (in use, or now and then not), its car ([+24], block 0
+// to 44), its scene set ([+106000] and [+576], +8 0, 1 or 2), the record
+// (small words; 13 for CarParts' slot 4 now and then; the traffic car's
+// number now and then one whose asset is empty, for sprintf's path), the
+// scene's shared load buffer ([0x826C2E44], its size random); pools 0 to 3
+// only not in use (their set-ups have their own cases), pools 1, 4, 5, 6
+// and 7 also in use. Archive::Load's calls recorded; the allocations
+// (LoadSlot::Load's pages, Texture::Create's header and data) compared as
+// which allocation, their contents and then freed; the block, the sprintf
+// text and Texture::Create's frame words, r3 compared. A random generator
+// of its own.
+void ScenePoolsSetUps(Context& h) {
+  namespace cm = car_models;
+  constexpr uint32_t kBytes = 0x1C000;
+  const uint32_t allocation = memory::Alloc(kBytes + 16, 0);
+  if (allocation == 0) {
+    ITC_LOG_WARN("harness: car_models: no block for ScenePools::SetUp");
+    return;
+  }
+  const uint32_t block = (allocation + 15) & ~15u;
+  SavedWord scene(h.base, cm::kSceneSet);
+  const uint32_t pools = block + 0x100, car = block + 0x200, sets = block + 0x300;
+  const uint32_t object = block + 0x1000, record = block + 0x8000;
+  const uint32_t shared = block + 0x18000 - cm::kSharedBuffer;
+  uint32_t empty_number = 0xFFFFFFFFu;
+  for (uint32_t n = 0; n < 2000 && empty_number == 0xFFFFFFFFu; n++) {
+    if (archive::AssetSize(h.base, 22529 + n) == 0) {
+      empty_number = n;
+    }
+  }
+  Random random(0x53455455);
+  Results results(
+      "ScenePools::SetUp (sub_820C4338) with CarParts::Load (sub_820D7510, LoadSetA "
+      "sub_820D7090, LoadSetB sub_820D70F0), sub_820D6B48 and TrafficCar::Load (sub_820D8A08)");
+  for (int c = 0; c < 160; c++) {
+    const uint64_t seed = random.Next();
+    const uint32_t pool = random.Below(8);
+    const bool in_use = pool == 1 || pool >= 4 ? random.Below(6) != 0 : false;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBytes, r);
+      PPCContext t = CallContext(h);
+      const uint32_t traffic_frame = t.r1.u32 - 112 - 1136;
+      const uint32_t texture_frame = traffic_frame - cm::kTextureCreateFrameBytes;
+      RandomBytes(h.base, traffic_frame + 80, 128, r);
+      RandomBytes(h.base, texture_frame, cm::kTextureCreateFrameBytes, r);
+      Put(h.base, cm::kSceneSet, shared);
+      Put(h.base, shared + cm::kSharedBufferSize,
+          r.Below(4) == 0 ? r.Below(0x10000) : 0x200000);
+      for (uint32_t p = 0; p < 8; p++) {
+        Put(h.base, pools + 56 + 12 * p, object);
+      }
+      Put(h.base, object + 8, 0);
+      Put(h.base, object + 16, in_use ? 3 : r.Below(3));
+      Put(h.base, object + 24, car);
+      Put(h.base, car + 32, r.Below(45));
+      Put(h.base, object + 106000, sets);
+      Put(h.base, object + 576, sets);
+      Put(h.base, sets + 8, r.Below(3));
+      for (uint32_t i = 0; i < 15; i++) {
+        Put(h.base, record + 4 * i, r.Below(4));
+      }
+      if (r.Below(3) == 0) {
+        Put(h.base, record + 16, 13);
+      }
+      if (empty_number != 0xFFFFFFFFu && r.Below(3) == 0) {
+        Put(h.base, record, empty_number);
+      }
+      if (pool == 5) {
+        WheelFields(h.base, object, record, block + 0x3E00, block + 0x3D00, r);
+        Put(h.base, object + 3268, block + 0x3F00);
+        Put(h.base, block + 0x3F08, r.Below(2) ? 0 : 1 + r.Below(3));
+      }
+      t.r3.u64 = pools;
+      t.r4.u64 = pool;
+      t.r5.u64 = r.Below(3);
+      t.r6.u64 = record;
+      std::optional<ArchiveLoads> loads;
+      loads.emplace(Serials(r));
+      (v == 0 ? __imp__sub_820C4338 : hooks::ScenePoolsSetUp)(t, h.base);
+      // The traffic car's allocations.
+      const uint32_t header = guest::LoadU32(h.base, object + 3728);
+      const uint32_t data = guest::LoadU32(h.base, object + 3732);
+      const bool textured = pool == 6 && in_use;
+      const std::vector<Known> known = {{textured ? header : 0, 52},
+                                        {textured ? data : 0, 1024}};
+      if (textured) {
+        Address(out[v], header, known);
+        Address(out[v], data, known);
+        Addresses(out[v], h.base, header, 52, known);
+        out[v].Bytes(Read(h.base, data, 1024));
+        Addresses(out[v], h.base, texture_frame + 84, 28, known);
+        Put(h.base, object + 3728, kMarker);
+        Put(h.base, object + 3732, kMarker);
+        memory::FreePages(header);
+        memory::FreePhysical(data);
+      }
+      TakePages(h.base, {object + 3744 + 16}, *loads, out[v]);
+      out[v].Bytes(Read(h.base, block, kBytes));
+      out[v].Bytes(Read(h.base, traffic_frame + 80, 128));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} pool {}{}", c, pool,
+                                              in_use ? "" : " (not in use)"));
+  }
+  results.Report();
+  memory::Free(allocation);
+}
+
 void CarModels(Context& h) {
   const uint32_t allocation = memory::Alloc(kBlockBytes + 16, 0);
   const uint32_t block = (allocation + 15) & ~15u;
@@ -2196,6 +2311,9 @@ void CarModels(Context& h) {
   Releases(h, block);
   Vinyls(h, block);
   memory::Free(allocation);
+  if (hooks::NativeHeapActive()) {
+    ScenePoolsSetUps(h);
+  }
 }
 
 }  // namespace harness

@@ -9,7 +9,9 @@
 #include "vehicle_accessors/vehicle_accessors.h"
 
 ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
-              "Run the vehicle accessors (docs/functions/vehicle-accessors.md: Vehicle::Get, "
+              "Run the vehicle accessors (docs/functions/vehicle-accessors.md: ScenePools::SetUp "
+              "sub_820C4338, its adapter in src/hooks/car_models.cpp, with its loaders' plain C++ "
+              "under --native_scene_models; Vehicle::Get, "
               "sub_820C0468, and the wheels' contact records, sub_820C0170; the rigid body's "
               "position and matrix, sub_820B67D8 and sub_820B6930; the contacts' object, "
               "position and strength, sub_820B8CC0 to sub_820B8D08; Racers::IndexOf and "

@@ -100,4 +100,11 @@ uint32_t CarModelsVinylCompressAt(PPCContext& ctx, uint8_t* base, uint32_t width
 // car_models::DecalsNative agrees.
 void CarModelsOnDecalLoaded(PPCContext& ctx, uint8_t* base);
 
+// ScenePools::SetUp sub_820C4338: r3 = the first set of pools, r4 = a pool,
+// r5 = an index, r6 = a record; r3 = the object, or 0 when it isn't in use.
+// The set-ups' plain C++ with --native_car_models, --native_scene_models and
+// --native_heap as each needs, else their adapters or originals through the
+// guest from its 112-byte frame.
+void ScenePoolsSetUp(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

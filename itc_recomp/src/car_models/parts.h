@@ -89,4 +89,80 @@ std::optional<uint32_t> InteriorLoad(uint8_t* base, uint32_t object, uint32_t se
                                      const archive::LoadCall& load,
                                      const AccessoryLoadCall& accessory_load);
 
+// --- The first set's pools' set-ups (ScenePools::SetUp and the loaders it
+// reaches with rows in scene-models.md) ---
+
+// The callbacks the loaders hand Archive::Load: CarParts::LoadSetA's
+// (sub_820D6C10) and LoadSetB's (sub_820D6C88), pool 4's (sub_820D69B8) and
+// TrafficCar::Load's (sub_820D8430).
+constexpr uint32_t kOnPartsLoadedA = 0x820D6C10;
+constexpr uint32_t kOnPartsLoadedB = 0x820D6C88;
+constexpr uint32_t kOnPool4Loaded = 0x820D69B8;
+constexpr uint32_t kOnTrafficLoaded = 0x820D8430;
+// The format TrafficCar::Load prints the car's number with when its load
+// gives nothing.
+constexpr uint32_t kTrafficFormat = 0x820050BC;
+
+// CarParts::LoadSetA (sub_820D7090): 216 slots from +96 (24 bytes each),
+// each with +0 = the asset 894 + 226 b + i (b the car's block, [[+24] +
+// 32]) and through LoadSlot::LoadShared with the object and
+// kOnPartsLoadedA.
+void CarPartsLoadSetA(uint8_t* base, uint32_t object, const archive::LoadCall& load);
+// CarParts::LoadSetB (sub_820D70F0): 17 slots from +96 through
+// LoadSlot::LoadShared with kOnPartsLoadedB: the asset 11061 + 197 b plus,
+// by the slot, 0 [+28] + 3, 1 7 [+28] + [+32] + 16, 2 [+36] + 107, 3 [+40]
+// + 120, 4 [+44] + 133 (none when [+44] is 13), 5 [+48] + 146, 6 [+52] +
+// 154, 8 [+56] + 157, 10 [+60] + 169, 11 [+64] + 173, 12 [+68] + 178, 13
+// 177, 15 [+76] + 184, 16 189; slots 7, 9 and 14 none.
+void CarPartsLoadSetB(uint8_t* base, uint32_t object, const archive::LoadCall& load);
+// CarParts::Load (sub_820D7510): the 60-byte set-up copied to +28 (memcpy,
+// native::Buffers_Memcpy), then by the scene's set [[+106000] + 8] 0
+// LoadSetA, 1 LoadSetB, else nothing. False, with nothing done, where the
+// copy can't be native (the original runs).
+bool CarPartsLoad(uint8_t* base, uint32_t object, uint32_t setup, const archive::LoadCall& load);
+// Pool 4's set-up (sub_820D6B48): the 52-byte record copied to +28
+// (memcpy), then one asset by the scene's set ([[+576] + 8]): 0 1116 + 226
+// b, else 11257 + 197 b, into the slot at +80 through LoadSlot::LoadShared
+// with the object and kOnPool4Loaded. False, with nothing done, where the
+// copy can't be native.
+bool Pool4Load(uint8_t* base, uint32_t object, uint32_t record, const archive::LoadCall& load);
+// TrafficCar::Load (sub_820D8A08): the car record copied to +32
+// (CarRecord::Copy), +7392 = [0x826C2E40], LoadSlot::Load of 22529 + the
+// record's +0 into +3744 with the object and kOnTrafficLoaded; when that
+// gives 0, sprintf of the number with kTrafficFormat into a buffer in its
+// frame (stack - 1136 + 80; nothing reads it; the varargs' other words 0);
+// then Texture::Create (0x18280086, 16 x 16) into +3728 and +3732, from its
+// frame. `stack` is its r1 at entry, `pcr` r13. False, with nothing done,
+// where CarRecord::Copy's plain C++ declines (the original runs). Only while
+// --native_heap routes the game's heap to the layer.
+bool TrafficCarLoad(uint8_t* base, uint32_t object, uint32_t record, uint32_t stack, uint32_t pcr,
+                    const archive::LoadCall& load);
+
+// A set-up called through the guest (its adapter, or its original): r3, r4,
+// the call's r1 and return address; returns r3.
+using SetUpCall =
+    std::function<uint32_t(uint32_t function, uint32_t r3, uint32_t r4, uint32_t r1, uint32_t lr)>;
+
+// What ScenePools::SetUp may run natively: the car models' set-ups'
+// plain C++ (--native_car_models), the loaders above (--native_scene_models)
+// and what needs the allocation layer (--native_heap).
+struct PoolSetUps {
+  bool car_models;
+  bool loaders;
+  bool heap;
+};
+
+// ScenePools::SetUp (sub_820C4338): the pool's object `index` (List::At on
+// the first set's +56 + 12 pool); 0 unless it's in use (+16 = 3), else the
+// object, after its set-up with `record` by the pool: 0
+// CarModel::LoadExterior, 1 CarParts::Load, 2 CarInterior::LoadSetCBody, 3
+// CarInterior::Load, 4 Pool4Load, 5 the wheels' set-up, 6 TrafficCar::Load,
+// above none. Their plain C++ where `native` allows it and they agree, else
+// through `call` from its 112-byte frame (stack - 112) with the original's
+// return addresses (CarInterior::Load always: its own calls need the guest).
+uint32_t ScenePoolsSetUp(uint8_t* base, uint32_t pools, uint32_t pool, uint32_t index,
+                         uint32_t record, uint32_t stack, uint32_t pcr,
+                         const archive::LoadCall& load, const PoolSetUps& native,
+                         const SetUpCall& call);
+
 }  // namespace car_models

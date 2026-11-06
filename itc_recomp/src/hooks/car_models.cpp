@@ -51,6 +51,9 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=car_models)");
 
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+ITC_FLAG_DECLARE(bool, native_scene_models);
+
 namespace hooks {
 
 namespace cm = car_models;
@@ -342,10 +345,46 @@ void CarModelsDrawDecal(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *cm::DrawDecal(base, arguments, ctx.r1.u32);
 }
 
+void ScenePoolsSetUp(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t stack = ctx.r1.u64;
+  const cm::PoolSetUps native{ITC_FLAG(native_car_models), ITC_FLAG(native_scene_models),
+                              hooks::NativeHeapActive()};
+  const uint32_t r3 = cm::ScenePoolsSetUp(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32, ctx.r13.u32,
+      hooks::NativeArchiveLoad(base), native,
+      [&ctx, base, stack](uint32_t function, uint32_t r3, uint32_t r4, uint32_t r1, uint32_t lr) {
+        ctx.r1.u64 = r1;
+        ctx.r3.u64 = r3;
+        ctx.r4.u64 = r4;
+        ctx.lr = lr;
+        REX_CALL_INDIRECT_FUNC(function);
+        ctx.r1.u64 = stack;
+        return ctx.r3.u32;
+      });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
 // off.
+
+// ScenePools::SetUp (vehicle-accessors.md) behind --native_vehicle_accessors;
+// its loaders CarParts::Load sub_820D7510 (with LoadSetA sub_820D7090 and
+// LoadSetB sub_820D70F0), pool 4's sub_820D6B48 and TrafficCar::Load
+// sub_820D8A08 (scene-models.md) have no adapters: only it calls them, their
+// plain C++ with --native_scene_models (and --native_car_models), else their
+// originals.
+extern "C" REX_FUNC(sub_820C4338) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_vehicle_accessors)) {
+    __imp__sub_820C4338(ctx, base);
+    return;
+  }
+  hooks::ScenePoolsSetUp(ctx, base);
+}
 
 #define ITC_CAR_MODELS(address, step)    \
   extern "C" REX_FUNC(sub_##address) {   \
