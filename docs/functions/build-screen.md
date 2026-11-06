@@ -1,0 +1,219 @@
+# Known functions: the build screen's transitions
+
+The front-end screen whose update is `sub_821A1380` (its row stays in
+`car-makers.md`; reached through a vtable) and the 21 transitions that
+update runs, from a table it builds on its stack, with the transition
+machine `[0x826D843C]` + 24 (`../known-data.md`): a screen over the
+screen data `[0x826D8448]` and UI movie 6 that picks a car build in three
+steps and shows it on the front end's stand (the "garage stage",
+`front-end-car-draw.md`). Probably a car shop (a guess from its
+structure: no text was read). Its levels are the machine's states: 0 the
+groups (56 entries of 3,252 bytes at the screen's +36, each with its own
+list of builds, filtered by a category 0 to 4 that left and right step
+through; 11 rows shown), 1 the chosen group's builds (6 rows), 2 one
+build at a time with its car on the stand (`GarageStage::ReloadModel`
+with the build's car model, the stand's lights dark for some builds),
+3 the build's details (a scrolling text); 4 leaving. Each level has a
+transition that opens it (animations started, the menu lists set up,
+the rows, the texts, the button prompts and the help line written), one
+that highlights it (its animations looped), ones for a move within it
+(never seen in play), and one back; a transition does its set-up on its
+first call (its word at the machine's +24 is 0) and then runs the movie
+(`UiMovie::Run`) each call; its answer, nonzero, lets `sub_821A1380`
+move to the queued transition. The back transitions answer 0 and, once
+the movie's animations end, set the machine themselves: the state left
+(+0) kept at +8, +4 the level returned to, +0 and +16 -1, +12 that
+level's highlight transition with its word +24 0.
+
+The handler table's order (index: function): 0 `sub_821A08D8`, 1
+`sub_8219C528`, 2 `sub_8219C6D0`, 3 `sub_8219FB08`, 4 `sub_8219FC60`, 5
+`sub_8219C850`, 6 `sub_821A1138`, 7 `sub_8219C8F8`, 8 `sub_8219F3A0`, 9
+`sub_821A0E50`, 10 `sub_821A0A38`, 11 `sub_8219FE10`, 12 `sub_8219CA08`,
+13 `sub_8219CB18`, 14 `sub_8219F520`, 15 `sub_821A0B38`, 16
+`sub_821A1258`, 17 `sub_8219FEC8`, 18 `sub_8219CBD8`, 19 `sub_8219F690`,
+20 `sub_8219FF78`. Who queues them (the machine's +16) isn't read: the
+screen's input, through its vtable. The screen's entry `sub_821A0860`
+(the screen data filled by `sub_821A0228`, transition 0 started with 1
+queued, the fade in) and its exit `sub_8219C3A8` are a lead
+(`../loops/leads.md`).
+
+The menu lists are `[0x826D8440]` (the level's list: the groups, the
+builds, one build, or the details' lines) and `[0x826D8444]` (the groups
+again, stepped by left and right on levels 1 and 2, in the transitions
+never seen in play); their layout is `../known-data.md`'s "menu list".
+The builds' lists (the screen's at +0x319A8 and each group's at +40) are
+a 1,612-byte list of 400 pointers with 16-bit links ("build list" in
+`../known-data.md`). Fields and globals: `../known-data.md`
+(`0x826D843C`, `0x826D8440`, `0x826D8448`, "build list"); the screen
+fades `0x826A50AC`-`0x826A50EB`; the string table `0x826C5C34`; the
+garage stage's lights (+4512).
+
+Shared, with rows elsewhere: `UiMovies::Find`, `UiMovie::Run`,
+`PlayNamed`, `LoopNamed`, `FinishNamed`, `FindNode`, `SetText`,
+`SetNodeText`, `ClearText`, `GetText`, `TextString`, `sub_8211B770`
+(the text's page), `TextMap::Set` (`sub_8211B3F0`, `sub_8211E1B8`,
+`sub_8211DAC8`, `sub_8211DDE0`, `sub_8211DF20`, `sub_8211A578`,
+`sub_8211C1F8`, `sub_8211C7E8`, `sub_8211C470`, `sub_8211B660`,
+`sub_8211B720`, `sub_8211B770`, `sub_8211B370`, `ui-movies-game.md`);
+`UiMovie::Child` (`sub_8259D658`, `ui-movies.md`); `MenuList::Selection`,
+`SetSelection`, `Fit`, `sub_8220BC28` (`sub_8220BC20`, `sub_8220BC30`,
+`sub_8220BC40`, `race-screens.md`); `MenuList::Init` (`sub_8220BAC0`,
+`save-data.md`); `ScreenFades::FadeOut` (`sub_8209D0C8`,
+`mode-tick.md`); `Strings::CopyPage` (`sub_8210A5E8`,
+`strings-and-font.md`); `memset` (`sub_825A71D0`, `c-runtime.md`);
+`CarModels::BlockOf` and `GarageStage::ReloadModel` (`sub_8215AAD0`,
+`sub_8217F880`, `car-makers.md`); the screen's update `sub_821A1380`
+(`car-makers.md`), which also shows the build's car on the stand
+(`GarageStage::SetCar`, `Command`, `Draw`, `IsBusy`, and the busy marker
+`sub_8219ED10`, `sub_8219EDB0`, `sub_8219EE30` there and in
+`front-end-car-draw.md`). The garage stage's lights mode
+(`GarageStage::SetDark`, `GarageLights::SetMode`) and six UI movie text
+helpers given a node (`sub_8211C370`, `sub_8211C3F8`, `sub_8211C680`,
+`sub_821087D8`, `sub_8211CCC0`, `sub_8211CD28`) have their rows here, as
+nothing else maps them yet. Nothing in `itc_recomp/src` overrides or
+wraps any function here (checked 2026-11-06).
+
+Read by the B7 loop's mapping agent (2026-11-06) from the lead of the
+21 transitions, with no subagents: every function here in full (the six
+transitions never seen in play too; their callees are all here or
+shared). Constants: `[0x82000A30]` 1.0, `[0x82000A34]` 0.0,
+`[0x82001FD8]` 10.0, `[0x820021F8]` the text scroll speed (as
+`UiMovie::ScrollText`), `[0x82002A1C]` a float not read,
+`[0x82001BF0]` the fade's passes. Notes for the migration: the
+transitions take no register leftovers (every stored word is set by the
+code); the build lists' links are signed halfwords, and their counts
+are read signed by most functions and unsigned by a few
+(`BuildScreen::StandArrows`, `ListBuilds`' last test), as the original
+does; `BuildScreen::ChangeCategory` loops until a category has groups
+(forever if none has).
+
+Ready (by `b7_groups.py`, 2026-11-06), from the bottom: the transitions
+`sub_8219C528`, `sub_8219C6D0`, `sub_8219C850`, `sub_8219C8F8`,
+`sub_8219CA08`, `sub_8219CB18`, `sub_8219CBD8` (UI movie calls only) and
+the helpers `sub_8211C370`, `sub_8211C3F8`, `sub_8211C680` (with
+`sub_821087D8`), `sub_8217D0C8` (with `sub_8217B7C8`), `sub_8219BA50`,
+`sub_8219BB20`, `sub_8219BB80`, `sub_8219BBF0`, `sub_8219BC50`,
+`sub_8219BCC0`, `sub_8219BF08` (with `sub_8219BAB0`), `sub_8219C078`,
+`sub_8219C230` (with `sub_8219C1C8`), `sub_8219CC70`, `sub_8219D090`
+(with `sub_8219BD30`), `sub_8219D1B0`, `sub_8219D440`, `sub_8219D4B8`,
+`sub_8219D7B0`, `sub_8219DA58`, `sub_8219DB50` (with `sub_8211CCC0`,
+`sub_8211CD28`), `sub_8219EC50`, `sub_8219FA28` (with `sub_8219CE08`);
+then the rest in the file above them. Blocked outside the file:
+`BuildScreen::PutOnStand` (`sub_8219D6F0`) on `GarageStage::ReloadModel`
+(`sub_8217F880`, `car-makers.md`), which waits on `CarScene::Update`
+(`sub_820C9608`, `scene.md`) and `sub_820C5798`, `sub_820C5A60` there;
+so `BuildScreen::SetUpStand` and the transition `sub_8219FE10` (and the
+unseen `sub_8219F520`, `sub_821A0B38`) wait with it. Outside callers:
+`sub_8219C230` is also called by the screen's fill `sub_821A0228`, and
+`sub_8217D0C8` by its exit `sub_8219C3A8` (the lead), so both keep
+adapters until those are ours. Nothing here needs a call the user
+hasn't made.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_821A08D8` | `BuildScreen::Open` (probably) | | Transition 0 (queued by the screen's entry `sub_821A0860`, a lead). r3 = the machine + 24 (its word: 0 until set up). Movie 6 (`UiMovies::Find`). Set-up: `PlayNamed` 101 (chained), 100, 1 and 83 each with `LoopNamed` after (100, 1, 83); when the screen's +0x32658 is 0, `PlayNamed` 81 (chained); the category +0x32634 and the groups' kept selection and scroll (+0x32638, +0x3263C) = 0; `BuildScreen::SetUpGroups`; the word = 1. Then `UiMovie::Run(movie, 0)`; answers 1 when it answers 0 (the animations done). A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219C528` | `BuildScreen::HighlightGroups` (probably) | | Transition 1 (queued with 0 by `sub_821A0860`). Set-up: s = `MenuList::Selection([0x826D8440])`; `PlayNamed` then `LoopNamed` 44, 42, 43, 80, 84 and 29 + s (the row highlighted); `FinishNamed` 76 to 79; `PlayNamed(76 + the category +0x32634, chained)`; the word = 1. Then `UiMovie::Run(movie, 0)`; answers 1. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219C6D0` | `BuildScreen::HighlightGroups2` (probably) | | Transition 2: the same code as `sub_8219C528` (set by `BuildScreen::BackToGroups` when the groups come back). Seen in play. Read in full. |
+| `sub_8219FB08` | `BuildScreen::MoveGroup` (probably) | | Transition 3. Set-up: s = the list's selection, p = its selection before (`sub_8220BC28`), d = the scroll (+4) less the scroll before (+8); `FinishNamed(29 + p)`, `PlayNamed` and `LoopNamed(29 + s)`; `BuildScreen::ShowGroup(the shown group at scroll + s)`; d not 0: `BuildScreen::DrawGroupRows`, `FinishNamed` 40 and 41, `BuildScreen::DrawGroupRow(11, scroll + 11)` and `PlayNamed` 41 when d < 0, else `DrawGroupRow(11, scroll - 1)` and `PlayNamed` 40 (the row scrolling in), then `BuildScreen::GroupArrows(scroll, the shown count +0x319A4)`; the word = 1. Then `UiMovie::Run`; answers 1. A 144-byte frame. Not seen in play. Read in full. |
+| `sub_8219FC60` | `BuildScreen::ChangeCategory` (probably) | | Transition 4 (left or right on the groups). Set-up: until `BuildScreen::FilterGroups` answers nonzero, the category +0x32634 += the list's +28 (left or right, -1 or 1), below 0 to 4 and above 4 to 0; `FinishNamed` 76 to 79, `PlayNamed(76 + category, chained)`; `FinishNamed(29 + the selection)`; the kept selection and scroll (+0x32638, +0x3263C) = 0; `BuildScreen::InitGroupLists`; `PlayNamed` and `LoopNamed(29 + the new selection)`; `BuildScreen::DrawGroupRows`; `BuildScreen::ShowGroup(the shown group at the selection)`; `BuildScreen::GroupArrows(the scroll, +0x319A4)`; the word = 1. Then `UiMovie::Run`; answers 1. A 160-byte frame. Seen in play. Read in full. |
+| `sub_8219C850` | `BuildScreen::FadeOut` (probably) | | Transition 5. Set-up: `ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, layer 0)`; the word = 1. Then `UiMovie::Run`; answers 1 once layer 0's out and in counts (`0x826A50E4`, `0x826A50DC`) are both 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_821A1138` | `BuildScreen::OpenBuilds` (probably) | | Transition 6 (the groups to the builds). Set-up: `FinishNamed` 44, 42, 43, 80 and 29 + the selection; `PlayNamed` 28, then `FinishNamed` 28; `PlayNamed` 102; `BuildScreen::KeepGroupList`; the builds' kept selection and scroll (+0x32640, +0x32644) = 0; `BuildScreen::SetUpBuilds`; the word = 1. Then `UiMovie::Run`; answers 1 when it answers 0. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219C8F8` | `BuildScreen::HighlightBuilds` (probably) | | Transition 7 (set by `BuildScreen::BackToBuilds`). Set-up: `PlayNamed` then `LoopNamed` 71, 70, 69 and 61 + the selection; the word = 1. Then `UiMovie::Run`; answers 1. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219F3A0` | `BuildScreen::MoveBuild` (probably) | | Transition 8. As `BuildScreen::MoveGroup` on the builds: `FinishNamed(61 + the selection before)`, `PlayNamed` and `LoopNamed(61 + s)`; d not 0: `BuildScreen::DrawBuildRows`, `FinishNamed` 67 and 68, `BuildScreen::DrawBuildRow(6, scroll + 6)` and `PlayNamed` 68 when d < 0, else `DrawBuildRow(6, scroll - 1)` and 67, `BuildScreen::BuildArrows(scroll, the count +0x31FF0)`; then `BuildScreen::ShowBuildMark(the build at scroll + s)`; the word = 1. Then `UiMovie::Run`; answers 1. A 144-byte frame. Not seen in play. Read in full. |
+| `sub_821A0E50` | `BuildScreen::ChangeGroupInBuilds` (probably) | | Transition 9 (another group from the builds, by `[0x826D8444]`). Set-up: g = the shown group at `[0x826D8444]`'s scroll + selection; `FinishNamed(61 + [0x826D8440]'s selection)`; `BuildScreen::ListBuilds(g +0)`; the builds' kept selection and scroll = 0; `BuildScreen::InitBuildList`, `DrawBuildRows`; `BuildScreen::ShowGroup(g)`; `PlayNamed` and `LoopNamed(61 + the selection)`; `[0x826D8444]`'s selection and scroll kept at +0x32638, +0x3263C; `BuildScreen::ShowBuildMark(the build at scroll + selection)`; `BuildScreen::BuildArrows(scroll, +0x31FF0)`; the word = 1. Then `UiMovie::Run`; answers 1. A 160-byte frame. Not seen in play. Read in full. |
+| `sub_821A0A38` | `BuildScreen::BackToGroups` (probably) | | Transition 10. Set-up: `FinishNamed` 71, 70, 69 and 61 + the selection; `PlayNamed` 103; `BuildScreen::SetUpGroups`; the word = 1. Then `UiMovie::Run`; once it answers 0, the machine `[0x826D843C]`: +8 = +0 unless +0 is 0, +16 = -1, +4 = 0, +12 = 2 (`BuildScreen::HighlightGroups2`), +0 = -1, +24 = 0. Answers 0. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219FE10` | `BuildScreen::OpenStand` (probably) | | Transition 11 (a build put on the stand). Set-up: `FinishNamed` 71, 70, 69 and 61 + the selection; `PlayNamed` 104; `BuildScreen::SetUpStand`; the word = 1. Then `UiMovie::Run`; answers 1. A 128-byte frame. Seen in play. Read in full. Waits on `BuildScreen::PutOnStand` (under `SetUpStand`). |
+| `sub_8219CA08` | `BuildScreen::HighlightStand` (probably) | | Transition 12. Set-up: `PlayNamed` then `LoopNamed` 96, 97, 108, 93; the word = 1. Then `UiMovie::Run`; answers 1. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219CB18` | `BuildScreen::HighlightStand2` (probably) | | Transition 13 (set by `BuildScreen::BackToStand`): as `sub_8219CA08` with 108 and 93 only. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219F520` | `BuildScreen::MoveStand` (probably) | | Transition 14 (the next build on the stand). Set-up: d = the scroll less the scroll before; `FinishNamed`, `PlayNamed`, `LoopNamed` 93; d not 0: `BuildScreen::DrawStandRow(0, scroll)`, `FinishNamed` 94 and 95, `DrawStandRow(1, scroll + 1)` and `PlayNamed` 95 when d < 0, else `DrawStandRow(1, scroll - 1)` and 94; b = the build at scroll + selection: `BuildScreen::ShowBuildMark(b)`, `BuildScreen::PutOnStand(b +0, b +32 & 2)`; the word = 1. Then `UiMovie::Run`; answers 1. A 144-byte frame. Not seen in play. Read in full. |
+| `sub_821A0B38` | `BuildScreen::ChangeGroupOnStand` (probably) | | Transition 15 (another group from the stand, by `[0x826D8444]`). Set-up: g = the shown group at `[0x826D8444]`'s scroll + selection; `FinishNamed`, `PlayNamed`, `LoopNamed` 93; `BuildScreen::CopyBuilds(g +0)`; the builds' kept selection and scroll = 0; `BuildScreen::InitStandList`; `BuildScreen::DrawStandRow(0, the scroll)`; `BuildScreen::ShowGroup(g)`; `[0x826D8444]`'s selection and scroll kept at +0x32638, +0x3263C; `BuildScreen::ShowBuildMark(the build at scroll + selection)` twice, the second followed by `BuildScreen::PutOnStand(b +0, b +32 & 2)`; `BuildScreen::StandArrows`; the word = 1. Then `UiMovie::Run`; answers 1. A 144-byte frame. Not seen in play. Read in full. |
+| `sub_821A1258` | `BuildScreen::BackToBuilds` (probably) | | Transition 16. Set-up: `FinishNamed` 96, 97, 108, 93; `PlayNamed` 105; the builds' kept selection +0x32640 = the scroll less the kept scroll +0x32644 plus the selection; `BuildScreen::SetUpBuilds`; the word = 1. Then `UiMovie::Run`; once it answers 0, the machine: +8 = +0 unless +0 is 1, +4 = 1, +16 = -1, +12 = 7 (`BuildScreen::HighlightBuilds`), +0 = -1, +24 = 0. Answers 0. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219FEC8` | `BuildScreen::OpenDetails` (probably) | | Transition 17. Set-up: `FinishNamed` 108 and 93; `PlayNamed` 106; `BuildScreen::KeepStandList`; `BuildScreen::SetUpDetails`; the word = 1. Then `UiMovie::Run`; answers 1 when it answers 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219CBD8` | `BuildScreen::HighlightDetails` (probably) | | Transition 18. Set-up: `PlayNamed` then `LoopNamed` 74; the word = 1. Then `UiMovie::Run`; answers 1. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219F690` | `BuildScreen::ScrollDetails` (probably) | | Transition 19. Set-up: `UiMovie::SetFirstLine(movie, 9, 13, the list's selection)`; `BuildScreen::ShowDetails(the build at the kept +0x3264C + +0x32648)`; the word = 1. Then `UiMovie::Run`; answers 1. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8219FF78` | `BuildScreen::BackToStand` (probably) | | Transition 20. Set-up: `FinishNamed` 74; `PlayNamed` 107; `BuildScreen::RestoreStand`; the word = 1. Then `UiMovie::Run`; once it answers 0, the machine: +8 = +0 unless +0 is 2, +16 = -1, +12 = 13 (`BuildScreen::HighlightStand2`), +4 = 2, +0 = -1, +24 = 0. Answers 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_821A0060` | `BuildScreen::SetUpGroups` (probably) | | Level 0's set-up: `BuildScreen::MarkGroups`, `FilterGroups`, `InitGroupLists`, `DrawGroupRows`; `BuildScreen::ShowGroup(the shown group at [0x826D8440]'s scroll + selection)`; `BuildScreen::ShowNumber(the screen's +0x32654)`; `BuildScreen::SetPrompts(0, 0, 1, 1, -1, -1)`; `BuildScreen::SetHelp(564)`; `BuildScreen::GroupArrows(the scroll, +0x319A4)`. A 112-byte frame. From `BuildScreen::Open` and `BackToGroups`. Seen in play. Read in full. |
+| `sub_8219CC70` | `BuildScreen::FilterGroups` (probably) | | The shown groups' count (+0x319A4) = 0; each of the 56 groups (screen +36 + 3,252i) whose +4 is the category (+0x32634) and whose build count (+1648, a halfword) isn't 0 is appended to the shown list (+0x318C4 + 4 × count). None: answers 0. Else the 11 rows of movie 6's node (7, 4): children 40 + r, 16 + r, 28 + r and 4 + r shown (+80 = 1) when r is below the count, else hidden; node (7, 3) shown when the count is above 11; answers 1. A 192-byte frame. From `BuildScreen::ChangeCategory` and `SetUpGroups`. Seen in play. Read in full. |
+| `sub_8219EC50` | `BuildScreen::MarkGroups` (probably) | | For each of the 56 groups: +32 = 1 when any of its builds (its list at +40, walked from the head) has +32 not equal to +36, else 0 (0 too when it has none). Leaf. From `BuildScreen::SetUpGroups`. Seen in play. Read in full. |
+| `sub_8219BF08` | `BuildScreen::InitGroupLists` (probably) | | n = the shown groups' count (+0x319A4): `MenuList::Init([0x826D8440], n, min(n, 11), wraps 1, actions 154, 153, 155, 156, accept 159, back 158)` and `MenuList::Init([0x826D8444], n, min(n, 11), 1, 156, 155, 153, 154, 159, 158)` (left and right step it); then `BuildScreen::RestoreGroupList`. A 128-byte frame. From `BuildScreen::ChangeCategory` and `SetUpGroups`. Seen in play. Read in full. |
+| `sub_8219BAB0` | `BuildScreen::RestoreGroupList` (probably) | | `MenuList::SetSelection([0x826D8440], +0x32638)`, its +4 (the scroll) = +0x3263C, `MenuList::Fit(list, 1)`. A 112-byte frame. Only caller `BuildScreen::InitGroupLists`. Seen in play. Read in full. |
+| `sub_8219BA50` | `BuildScreen::KeepGroupList` (probably) | | +0x32638 = `MenuList::Selection([0x826D8440])`, +0x3263C = its scroll (+4). A 96-byte frame. Only caller `BuildScreen::OpenBuilds`. Seen in play. Read in full. |
+| `sub_8219FA28` | `BuildScreen::DrawGroupRows` (probably) | | `BuildScreen::DrawGroupRow(r, scroll + r)` for the 11 rows (the scroll `[0x826D8440]` +4). A 112-byte frame. From `BuildScreen::MoveGroup`, `ChangeCategory`, `SetUpGroups`. Seen in play. Read in full. |
+| `sub_8219CE08` | `BuildScreen::DrawGroupRow` (probably) | | r3 = a row, r4 = a shown group's index. Node (7, 4)'s children 40 + r (its child 0 the text), 16 + r and 4 + r (`UiMovie::Child`); when r4 is below the count (+0x319A4), with g the shown group: `UiMovie::SetNodeText(movie, the text, g +0 + 5299)`, child 4 + r shown when g +32 isn't 0, child 16 + r when g +28 isn't 0 (else hidden); past the count nothing is written. A 144-byte frame. From `BuildScreen::DrawGroupRows` and `MoveGroup`. Seen in play. Read in full. |
+| `sub_8219CF08` | `BuildScreen::ShowGroup` (probably) | | r3 = a group g. `UiMovie::SetText`: (7, 0) string g +0 + 5355; (-1, 20) g +4 + 341 (the category's); (-1, 22) `BuildScreen::ValueText(g +12)`; (-1, 30) g +0 + 5299; (-1, 28) string 444 with g +24 and g +20 (r7, r8). By g +36: 0 node 16 shown with +108 (the frame) = g +0, node 18's +108 = g +0; 1 node 16 hidden, node 18's +108 = 48; 2 the same with 49; 3 or more nothing. A 112-byte frame. From the groups' transitions, `SetUpGroups` and the unseen ones. Seen in play. Read in full. |
+| `sub_8219D1B0` | `BuildScreen::GroupArrows` (probably) | | r3 = the scroll, r4 = the count: node (7, 10) hidden and (7, 11) shown when the scroll is 0; else (7, 10) shown and (7, 11) shown unless scroll + 11 is the count. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219D090` | `BuildScreen::ShowNumber` (probably) | | r3 = a number n (the screen's +0x32654). Node (12, 0) shown when n is 100. The digits node d = (12, 3): for each position k from d +104 - 1 (its count) down to 0, the child (12, d +100 + k) and the digit n % 10: a 0 digit, before the last position, while n is below 10^(count - k - 1) (`BuildScreen::PowI(10.0, ..)` truncated) is hidden (n not divided); else shown with +108 = the digit (0 at position 0), and n /= 10. Probably a percentage. A 176-byte frame. Only caller `BuildScreen::SetUpGroups`. Seen in play. Read in full. |
+| `sub_8219BD30` | `BuildScreen::PowI` (probably) | | f1 = a float, r4 = an integer exponent: f1 to the power |r4| by squaring (from `[0x82000A30]`, 1.0; single-precision products), its reciprocal for a negative r4. Leaf. Only caller `BuildScreen::ShowNumber`. Seen in play. Read in full. |
+| `sub_8219BCC0` | `BuildScreen::ValueText` (probably) | | r3 = a value: 0 to 9 the string ids 407, 408, 405, 406, 369, 370, 371, 372, 373, 374 (a table on its stack), else 533. Leaf. From `BuildScreen::ShowGroup`, `DrawBuildRow`, `DrawStandRow`. Seen in play. Read in full. |
+| `sub_821A1008` | `BuildScreen::SetUpBuilds` (probably) | | Level 1's set-up: `BuildScreen::ListBuilds(the shown group at the kept +0x3263C + +0x32638's +0)`; `BuildScreen::InitBuildList`, `DrawBuildRows`; `BuildScreen::ShowBuildMark(the build at [0x826D8440]'s scroll + selection)`; `MenuList::SetSelection([0x826D8444], +0x32638)`, its scroll = +0x3263C, `MenuList::Fit(.., 1)`; `BuildScreen::SetPrompts(0, 0, 1, 1, -1, -1)`; `BuildScreen::SetHelp(565)`; `BuildScreen::BuildArrows(the scroll, +0x31FF0)`; +0x3265C (the car on the stand) = 0. A 128-byte frame. From `BuildScreen::OpenBuilds` and `BackToBuilds`. Seen in play. Read in full. |
+| `sub_821A0D38` | `BuildScreen::ListBuilds` (probably) | | r3 = a group's index: `BuildScreen::CopyBuilds(r3)`; the 6 rows of node (8, 1): children 11 + r, 25 + r, 18 + r and 4 + r shown when r is below the count (+0x31FF0, signed), else hidden; node (8, 0) shown when the count (unsigned) is above 6. A 192-byte frame. From `BuildScreen::SetUpBuilds` and `ChangeGroupInBuilds`. Seen in play. Read in full. |
+| `sub_821A0128` | `BuildScreen::CopyBuilds` (probably) | | r3 = a group's index g: the screen's build list (+0x319A8) reset (node i: next i + 1, slot i, for 400; +1596 (node 399's next), +1602, +1604 (the head), +1606 = -1; +1600 (the free head) and +1608 (the count) = 0), then each build of group g (its list at +36 + 3,252g + 40, walked from the head, for its count +1648) appended at the count (`BuildList::Insert`). A 144-byte frame. From `BuildScreen::ListBuilds` and `ChangeGroupOnStand`. Seen in play. Read in full. |
+| `sub_8219C230` | `BuildList::Insert` (probably) | | r3 = a build list, r4 = a pointer's address, r5 = a position (a halfword): `BuildList::InsertNode(list, position)`, then the node at that position's slot (+1612 + 4 × its +2) = the pointer. A 112-byte frame. From `BuildScreen::CopyBuilds` and the screen's fill `sub_821A0228` (a lead). Seen in play. Read in full. |
+| `sub_8219C1C8` | `BuildList::InsertNode` (probably) | | r3 = a build list, r4 = a position: takes the free head's node (+1600; the free head becomes its next) and links it after the node at position - 1 (at the head, +1604, for 0); the count (+1608) + 1. Leaf. Only caller `BuildList::Insert`. Seen in play. Read in full. |
+| `sub_8219BFE8` | `BuildScreen::InitBuildList` (probably) | | n = the build count (+0x31FF0, a halfword): `MenuList::Init([0x826D8440], n, min(n, 6), 1, 154, 153, 155, 156, 159, 158)`; then `BuildScreen::RestoreBuildList`. A 112-byte frame. From `BuildScreen::SetUpBuilds` and `ChangeGroupInBuilds`. Seen in play. Read in full. |
+| `sub_8219BB80` | `BuildScreen::RestoreBuildList` (probably) | | As `BuildScreen::RestoreGroupList` from +0x32640 and +0x32644. A 112-byte frame. From `BuildScreen::InitBuildList` and `SetUpStand`. Seen in play. Read in full. |
+| `sub_8219BB20` | `BuildScreen::KeepBuildList` (probably) | | As `BuildScreen::KeepGroupList` into +0x32640 and +0x32644. A 96-byte frame. Only caller `BuildScreen::SetUpStand`. Seen in play. Read in full. |
+| `sub_8219D3E8` | `BuildScreen::DrawBuildRows` (probably) | | `BuildScreen::DrawBuildRow(r, scroll + r)` for the 6 rows. A 112-byte frame. From `BuildScreen::SetUpBuilds` and the unseen `MoveBuild`, `ChangeGroupInBuilds`. Seen in play. Read in full. |
+| `sub_8219D248` | `BuildScreen::DrawBuildRow` (probably) | | r3 = a row, r4 = a build's position. Node (8, 1)'s children 25 + r (its children 0, 1, 2 the texts), 11 + r, 4 + r, 18 + r; when r4 is below the count (+0x31FF0), with b the build there: `UiMovie::SetNodeText` string 445 with b +0, b +0 + 4650, `BuildScreen::ValueText(b +20)`; child 4 + r shown when b +32 isn't b +36; child 11 + r hidden for b +8 below 2, shown for 2 (left for more); child 18 + r's +108 = b +8. A 160-byte frame. From `BuildScreen::DrawBuildRows` and `MoveBuild`. Seen in play. Read in full. |
+| `sub_8219D4B8` | `BuildScreen::BuildArrows` (probably) | | As `BuildScreen::GroupArrows` with nodes (8, 2) and (8, 3) and 6 rows. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219D440` | `BuildScreen::ShowBuildMark` (probably) | | r3 = a build b: node (17, 0) hidden when b +16 is 0, else shown with +108 = b +0 - 310. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219F780` | `BuildScreen::SetUpStand` (probably) | | Level 2's set-up: `BuildScreen::KeepBuildList`, `InitStandList`, `RestoreBuildList` (the one-row list at the build chosen); `BuildScreen::DrawStandRow(0, the scroll)`; `BuildScreen::SetPrompts(0, 5, 1, 1, -1, -1)`; `BuildScreen::SetHelp(566)`; `BuildScreen::StandArrows`; +0x3265C = 1 (the car shown); `BuildScreen::PutOnStand(b +0, b +32 & 2)` for the build b at scroll + selection. A 112-byte frame. Only caller `BuildScreen::OpenStand`. Seen in play. Read in full. Waits on `PutOnStand`. |
+| `sub_8219F868` | `BuildScreen::RestoreStand` (probably) | | As `BuildScreen::SetUpStand` back from the details: `BuildScreen::InitStandList`, `RestoreStandList`, `DrawStandRow(0, scroll)`, the prompts (0, 5, 1, 1), `SetHelp(566)`, `StandArrows`, +0x3265C = 1; the car isn't put on the stand again. A 96-byte frame. Only caller `BuildScreen::BackToStand`. Seen in play. Read in full. |
+| `sub_8219C078` | `BuildScreen::InitStandList` (probably) | | n = the build count: `MenuList::Init([0x826D8440], n, min(n, 1), 1, 154, 153, 155, 156, 159, 158)`. A 112-byte frame. From `BuildScreen::SetUpStand`, `RestoreStand`, `ChangeGroupOnStand`. Seen in play. Read in full. |
+| `sub_8219BC50` | `BuildScreen::RestoreStandList` (probably) | | As `BuildScreen::RestoreGroupList` from +0x32648 and +0x3264C. A 112-byte frame. Only caller `BuildScreen::RestoreStand`. Seen in play. Read in full. |
+| `sub_8219BBF0` | `BuildScreen::KeepStandList` (probably) | | As `BuildScreen::KeepGroupList` into +0x32648 and +0x3264C. A 96-byte frame. Only caller `BuildScreen::OpenDetails`. Seen in play. Read in full. |
+| `sub_8219D550` | `BuildScreen::DrawStandRow` (probably) | | As `BuildScreen::DrawBuildRow` on node (-1, 24)'s children 10 + r (the texts), 6 + r (the b +8 node), 4 + r (the +32 / +36 node), 8 + r (the frame). A 160-byte frame. From `BuildScreen::SetUpStand`, `RestoreStand` and the unseen `MoveStand`, `ChangeGroupOnStand`. Seen in play. Read in full. |
+| `sub_8219D7B0` | `BuildScreen::StandArrows` (probably) | | Node (-1, 23) hidden when the build count (+0x31FF0, unsigned) is 1, else shown. A 96-byte frame. Seen in play. Read in full. |
+| `sub_8219D6F0` | `BuildScreen::PutOnStand` (probably) | | r3 = a build's index i, r4 = its +32 & 2. The screen's +0x32664 = i, +0x32660 = 0 (`sub_821A1380` then sets the car up once the model is made); `GarageStage::ReloadModel([0x826D83E0]'s +0 holder, CarModels::BlockOf(the build +0x2C784 + 52i's +48 car build's +2788, the car model))`; `GarageStage::SetDark(holder, r4 == 0)`; node (-1, 11) shown when r4 is 0 (probably the build not yet available: the stand dark). A 128-byte frame. From `BuildScreen::SetUpStand` and the unseen `MoveStand`, `ChangeGroupOnStand`. Moved here from the stand makers' callers' lead (2026-11-06). Seen in play. Read in full. Waits on `GarageStage::ReloadModel`. |
+| `sub_8219F8E0` | `BuildScreen::SetUpDetails` (probably) | | Level 3's set-up: `UiMovie::SetFirstLine(movie, 9, 13, 0)`; `BuildScreen::ShowDetails(the build at the kept +0x3264C + +0x32648)`; l = `UiMovie::LineCount(movie, 9, 13)`; n = l - 3 when l is above 4, else 1: `MenuList::Init([0x826D8440], n, n, wraps 0, 154, 153, 155, 156, 159, 158)` (one item a line scrolled); `BuildScreen::SetPrompts(1, 4, -1, -1, -1, -1)`; `BuildScreen::SetHelp(567)`; +0x3265C = 0. A 128-byte frame. Only caller `BuildScreen::OpenDetails`. Seen in play. Read in full. |
+| `sub_8219D820` | `BuildScreen::ShowDetails` (probably) | | r3 = a build b; m = b +48's +2788 (the car model). `UiMovie::SetText` on sub-scene 9: b +8 is 2: child 13 b +0 + 4001, 5 b +0 + 2703, 4 b +0 + 2054; else all three 535. Child 17: 535 when b +8 isn't 2 and b +40 is 0, else b +0 + 3352. b +8 is 1 or 2: children 6, 7, 8 = m + 1646, m + 1718, m + 1790; else 6 = 535 and 7, 8 cleared (`UiMovie::ClearText`). Then l = `UiMovie::LineCount(9, 13)`, f = `UiMovie::FirstLine(9, 13)`: l above 4 and b +8 is 2: node (9, 27) shown when f > 0, (9, 28) when l - f > 4; else both hidden. A 144-byte frame. From `BuildScreen::SetUpDetails` and the unseen `ScrollDetails`. Seen in play. Read in full. |
+| `sub_8219DA58` | `BuildScreen::SetPrompts` (probably) | | r3 to r8 = three (icon, label) pairs, (r3, r4), (r5, r6), (r7, r8), -1 for none: for slot k 0 to 2, n = node (2, k) and its nodes (2, n +100) and (2, n +100 + 1): both shown with +108 = the pair when neither is -1, else both hidden. Probably the button prompts. A 176-byte frame. From the levels' set-ups. Seen in play. Read in full. |
+| `sub_8219DB50` | `BuildScreen::SetHelp` (probably) | | r3 = a string id: node (1, 0): `UiMovie::ResetNodeTextScroll`, `UiMovie::SetNodeText(r3)`, `UiMovie::ScrollNodeText(1)`. Probably the help line (564 to 567 by level). A 128-byte frame. From the levels' set-ups. Seen in play. Read in full. |
+| `sub_8211C370` | `UiMovie::SetFirstLine` (probably) | | r3 = movie, r4 = a sub-scene's index or -1, r5 = a child, r6 = a line: the node (as `UiMovie::FindNode`) must be a `TXT` (else it loops forever); its text (`UiMovie::GetText`) +24 (the lines `Strings::CopyPage` skips) = r6; the text stored back (`TextMap::Set` on movie + 0x9BCC). A 128-byte frame. From `BuildScreen::SetUpDetails` and `ScrollDetails`. Seen in play. Read in full. |
+| `sub_8211C3F8` | `UiMovie::FirstLine` (probably) | | The same lookup and check: returns the text's +24. A 112-byte frame. Only caller `BuildScreen::ShowDetails`. Seen in play. Read in full. |
+| `sub_8211C680` | `UiMovie::LineCount` (probably) | | r3 = movie, r4, r5 the node as `UiMovie::FindNode` (no `TXT` check): 0 when the node's text id (+108) is 0; else its shown page copied into a 4 KB buffer on its stack (cleared with `memset`; `Strings::CopyPage([0x826C5C34], buffer, UiMovie::TextString(id), the page sub_8211B770(id), 0)`) and `Strings::CountLines` of it, as a halfword. A 4,208-byte frame. From `BuildScreen::ShowDetails` and `SetUpDetails`. Seen in play. Read in full. |
+| `sub_821087D8` | `Strings::CountLines` (probably) | | r3 unused (`[0x826C5C00]`, the font, passed), r4 = a wide string: 1 plus the `\n` before the end or a page break (`0xFFD1`), as a halfword count. Leaf. Only caller `UiMovie::LineCount`. Seen in play. Read in full. |
+| `sub_8211CCC0` | `UiMovie::ScrollNodeText` (probably) | | As `UiMovie::ScrollText` (`sub_8211C570`, `ui-movies-game.md`) with the node given (r4): the text's +4 = r5, +12 = 45, +16 = `[0x820021F8]`, stored back. A 128-byte frame. Only caller `BuildScreen::SetHelp`. Seen in play. Read in full. |
+| `sub_8211CD28` | `UiMovie::ResetNodeTextScroll` (probably) | | As `sub_8211C5F8` (`ui-movies-game.md`) with the node given: the text's +8 = 0, stored back. A 112-byte frame. Only caller `BuildScreen::SetHelp`. Seen in play. Read in full. |
+| `sub_8217D0C8` | `GarageStage::SetDark` (probably) | | r3 = a garage stage's holder (its +0 the stage), r4 = dark (1): `GarageLights::SetMode(stage + 4512, r4)`, stage +6060 = (r4 is 1) (`GarageStage::Draw` then switches the light kit off, `front-end-car-draw.md`). A 112-byte frame. From `BuildScreen::PutOnStand` and the screen's exit `sub_8219C3A8` (r4 = 0; a lead). Seen in play. Read in full. |
+| `sub_8217B7C8` | `GarageLights::SetMode` (probably) | | r3 = the stage's lights (stage + 4512), r4 = a mode: 0 the 11 records of 96 bytes from +16 copied from the table at `0x82635950` (1,056 bytes), +1072 = (`[0x82002A1C]` × 3, 1.0); 1 every 16 bytes of them = (0.0, 0.0, 0.0, 1.0) and +1072 the same; other modes nothing. Copied eight bytes at a time. Leaf. Only caller `GarageStage::SetDark`. Seen in play. Read in full. |
