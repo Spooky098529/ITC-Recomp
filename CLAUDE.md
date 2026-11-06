@@ -529,6 +529,19 @@ library's worker threads, made through the kernel imports; the device
 lock +13548 a host mutex) native (ours 4,197 -> 4,230); the rest waits
 on `Device::Clear`'s worker `sub_8229FC40`, `Device::Resolve`
 `sub_822AFA58` and the leads in `docs/loops/leads.md`.
+Its thirty-fifth run (`b7-loop-06-11-26` again, 2026-11-06, not yet
+merged; summary `docs/loops/b7-loop-2026-11-06-1115.md`; 3 subsystems)
+made the front end's power graph (`power-graph.md`,
+`--native_power_graph`, 4 of 4 in play: the tuning and car list
+screens' torque and power lines), the car objects' makers
+(`car-makers.md`, `--native_car_makers`, 16 of 24 in play: the stand
+car's scene model record from a car, the garage cars, the car data
+from a garage car) and the menu helpers (`menu-helpers.md`,
+`--native_menu_helpers`, 2 of 2: `Menu::Step`, `Menu::Pressed`)
+native (ours 4,230 -> 4,252); the rest waits on
+`SceneModel::ApplyRecord`, `ReloadDecals`, `ScenePools::SetUpB`,
+`CarScene::Update`, `GarageStage::Draw` and the leads in
+`docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

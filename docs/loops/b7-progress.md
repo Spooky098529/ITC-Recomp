@@ -48,6 +48,8 @@ file's history. What's left to see in a drive, from every run:
 
 ## Done
 
+- `menu-helpers.md`: 2 of 2 native (`Menu::Step`, `Menu::Pressed`),
+  `--native_menu_helpers`; 9f6a0387, 44a04c9f.
 - `car-makers.md`: 16 of 24 in play native (the record from a car and
   its setters, the garage cars, `FromGarageCar`, the tuning screen's
   set-up, `FitCar`, `CopyRecord`, the busy marker),
@@ -88,5 +90,12 @@ file's history. What's left to see in a drive, from every run:
   4250, work left 2161 (wrapped 57, known 466, unknown 1638).
 - After the menu helpers' map: ours 4250, work left 2161 (wrapped 57,
   known 468, unknown 1636).
+- After its migration: ours 4252, work left 2159 (wrapped 57, known
+  466, unknown 1636).
+- After its validation (`itc_3689`): ours 4252, work left 2159.
 
 ## Stopped
+
+2026-11-06, at the run's limit (3 subsystems), after the menu helpers'
+validation. No halts, no questions to the user. Nothing uncommitted.
+The user reviews and merges.

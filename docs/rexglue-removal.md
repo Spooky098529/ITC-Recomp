@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-05):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-06):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -226,7 +226,12 @@ goes in `src/` as overrides), American English.
   library's command buffer (`command-buffer.md`, 24 of 24 in play), the
   render replay's single commands (`single-commands.md`, 5 of 5 in
   play) and predicated tiling (`predicated-tiling.md`) native (ours
-  4,197 -> 4,230) and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  4,197 -> 4,230) and stopped at its limit; its thirty-fifth run (the
+  same branch, 2026-11-06, 3 subsystems) made the power graph
+  (`power-graph.md`, 4 of 4 in play), the car objects' makers
+  (`car-makers.md`, 16 of 24 in play) and the front end's menu helpers
+  (`menu-helpers.md`, 2 of 2) native (ours 4,230 -> 4,252) and stopped
+  at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2755,6 +2760,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | Predicated tiling (the menus' tiled segments: `SetPredication`, `BeginTiledSegments`, `EndTiledSegments` with `RestoreSegment`, the library's worker threads' creation and loop; the bin mask packet, the chain header's words and the workers' event packets Dropped; the device lock +13548 a host mutex) | `predicated-tiling.md` | 5 of 7 in play (one migration; `CreateWorkers`' adapter and three of the command buffer's removed) | `--native_predicated_tiling` |
 | 2026-11-06 | The power graph (the front end's power and torque graph on the tuning and car list screens: `PowerGraph::Draw` `sub_8217C708`, two sets of 32 stack sprites drawn as lines through `Line::RecordFlat` `sub_8217B508`; `TuningScreen::DrawPowerGraph` `sub_821DF350`) | `power-graph.md` | 3 of 4 in play (one migration; `CarList::DrawEntryPowerGraph` `sub_82250670` waits on the car objects' makers) | `--native_power_graph` |
 | 2026-11-06 | The car objects' makers outside the race's set-up (the scene model record built from a car, `SceneModelRecord::FromCar` with its paint, wheels, choices and bytes setters and `CarModels::BlockOf`; the garage cars' reset and static set-up; `CarData::FromGarageCar` with the tuning screen's set-up; the front-end stand's `FitCar` and `CopyRecord`; the garage screen's busy marker) | `car-makers.md` | 16 of 24 in play (one migration; 4 adapters removed) | `--native_car_makers` |
+| 2026-11-06 | The front end's shared menu helpers (`Menu::Step` `sub_82186568`, the cursor moved by the pad through the action mappers' vtable; `Menu::Pressed` `sub_821864C8`; about 113 screens call them, each filling its 68-byte menu inline) | `menu-helpers.md` | 2 of 2 (one migration; adapters kept for the recompiled screens) | `--native_menu_helpers` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4680,3 +4686,17 @@ functions (916 pairs): overridden 109, Native 35, Dropped 26, never
 called 70, live 209. Imports: 186 called, 55 with a live caller. B7
 (`b7_status.py`): ours 4,249, work left 2,162 (Wrapped 57, with a row
 467, no row yet 1,638), from 2,178.
+
+**2026-11-06, the menu helpers (branch `b7-loop-06-11-26`):** the
+thirty-fifth run's third and last subsystem (`menu-helpers.md`,
+`--native_menu_helpers`, `src/menu_helpers/`): the front end's shared
+menu helpers, `Menu::Step` (the cursor moved by the pad) and
+`Menu::Pressed`, calling the action mappers' slots through the
+mapper's vtable (plain C++ where the slot is native, else a guest
+call); their adapters stay for the ~113 recompiled screens that call
+them. Seen in the pad replay, which reached its race through the menus
+as before. The run stopped at its limit. The boundary: 449 functions
+(916 pairs): overridden 109, Native 35, Dropped 26, never called 70,
+live 209. Imports: 186 called, 55 with a live caller. B7
+(`b7_status.py`): ours 4,252, work left 2,159 (Wrapped 57, with a row
+466, no row yet 1,636), from 2,161.
