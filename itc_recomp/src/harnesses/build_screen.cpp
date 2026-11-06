@@ -668,6 +668,67 @@ void Builds(Context& h, const World& w) {
              hooks::BuildScreenSetUpBuilds, {{-128, -40}}, Counts});
 }
 
+
+// The groups level: SetUpGroups and the transitions over it. The
+// transitions' movie as AnimationWorld lays it, with its live scene the
+// node pool again (the named animations don't read it; the setters' nodes
+// do); Counts' kept selection and scroll.
+void Groups(Context& h, const World& w) {
+  // ShowNumber's number 0 to 999 or 100 (a negative one's digits, stored at
+  // the digit nodes' +108, would make their children's walks leave the
+  // pool). The groups' +12 (ShowGroup's ValueText) -1 to 9: past 9
+  // ValueText reads the stack above its table, which here holds the
+  // register saves of the calls before it (the original's, which native
+  // callees don't write; ValueText's and ShowGroup's own cases cover it).
+  auto counts = [](PPCContext& t, Random& r, const World& w) {
+    Counts(t, r, w);
+    for (uint32_t g = 0; g < bs::kGroupCount; g++) {
+      guest::StoreU32(w.base, w.at(kScreenAt) + bs::kGroups + bs::kGroupBytes * g + 12,
+                      r.Below(11) - 1);
+    }
+    guest::StoreU32(w.base, w.at(kScreenAt) + bs::kNumber, r.Below(4) == 0 ? 100 : r.Below(1000));
+  };
+  Run(h, w, {"BuildScreen::SetUpGroups (sub_821A0060)", 80, __imp__sub_821A0060,
+             hooks::BuildScreenSetUpGroups, {{-112, -24}}, counts});
+  auto step = [counts](PPCContext& t, Random& r, const World& w) {
+    counts(t, r, w);
+    AnimationWorld(w.base, w, r);
+    guest::StoreU32(w.base, w.at(kMovieAt) + 16, w.at(kNodesAt));
+    guest::StoreU32(w.base, w.at(kMachineAt) + 24, r.Below(3) == 0 ? 1 : 0);
+    guest::StoreU32(w.base, w.at(kListAt) + 16, r.Below(11));
+    t.r3.u64 = w.at(kMachineAt) + 24;
+  };
+  ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
+  Run(h, w, {"BuildScreen::Open (sub_821A08D8)", 50, __imp__sub_821A08D8, hooks::BuildScreenOpen,
+             {{-128, -32}, {-128 - 112, -128 - 24}},
+             [step](PPCContext& t, Random& r, const World& w) {
+               step(t, r, w);
+               if (r.Below(2) == 0) {
+                 guest::StoreU32(w.base, w.at(kScreenAt) + bs::kOpened, 0);
+               }
+             }});
+  Run(h, w, {"BuildScreen::BackToGroups (sub_821A0A38)", 50, __imp__sub_821A0A38,
+             hooks::BuildScreenBackToGroups, {{-128, -32}, {-128 - 112, -128 - 24}},
+             [step](PPCContext& t, Random& r, const World& w) {
+               step(t, r, w);
+               if (r.Below(3) == 0) {
+                 guest::StoreU32(w.base, w.at(kMachineAt) + 0, 0);
+               }
+             }});
+  // ChangeCategory: the list's step -1 or 1, group 0 of a category 0 to 4
+  // with builds (so the walk ends: it loops until a category has groups).
+  Run(h, w, {"BuildScreen::ChangeCategory (sub_8219FC60)", 50, __imp__sub_8219FC60,
+             hooks::BuildScreenChangeCategory, {{-160, -64}},
+             [step](PPCContext& t, Random& r, const World& w) {
+               step(t, r, w);
+               guest::StoreU32(w.base, w.at(kListAt) + 28, r.Below(2) == 0 ? 1 : 0xFFFFFFFFu);
+               const uint32_t group = w.at(kScreenAt) + bs::kGroups;
+               guest::StoreU32(w.base, group + bs::kGroupCategory, r.Below(5));
+               guest::StoreU16(w.base, group + bs::kGroupBuildCount, uint16_t(1 + r.Below(8)));
+             }});
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+}
+
 }  // namespace
 
 void BuildScreen(Context& h) {
@@ -682,6 +743,7 @@ void BuildScreen(Context& h) {
   Rows(h, w);
   Transitions(h, w);
   Builds(h, w);
+  Groups(h, w);
 }
 
 }  // namespace harness

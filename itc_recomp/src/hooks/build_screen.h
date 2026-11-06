@@ -71,4 +71,12 @@ void BuildScreenDrawStandRow(PPCContext& ctx, uint8_t* base);
 void BuildScreenShowGroup(PPCContext& ctx, uint8_t* base);
 void BuildScreenSetUpBuilds(PPCContext& ctx, uint8_t* base);
 
+// The groups level: SetUpGroups sub_821A0060; the transitions (r3 = the
+// step word) Open sub_821A08D8, BackToGroups sub_821A0A38, ChangeCategory
+// sub_8219FC60.
+void BuildScreenSetUpGroups(PPCContext& ctx, uint8_t* base);
+void BuildScreenOpen(PPCContext& ctx, uint8_t* base);
+void BuildScreenBackToGroups(PPCContext& ctx, uint8_t* base);
+void BuildScreenChangeCategory(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

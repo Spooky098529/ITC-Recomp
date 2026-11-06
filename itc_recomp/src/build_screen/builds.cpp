@@ -250,4 +250,22 @@ uint64_t SetUpBuilds(uint8_t* base, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
+uint64_t SetUpGroups(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821A0060 BuildScreen::SetUpGroups");
+  const uint32_t frame = Frame(base, sp, 112);
+  MarkGroups(base);
+  FilterGroups(base, frame);
+  InitGroupLists(base, frame, calls);
+  DrawGroupRows(base, frame, calls);
+  const uint32_t selection = race_screens::ListSelection(base, Load(base, kList));
+  const uint32_t shown = Load(base, Load(base, kList) + 4) + selection;
+  ShowGroup(base, frame, Load(base, Screen(base) + ((shown + 0x10000 - 14799) << 2)), calls);
+  ShowNumber(base, frame, Load(base, Screen(base) + kNumber));
+  static constexpr uint32_t kPrompts[6] = {0, 0, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
+  SetPrompts(base, frame, kPrompts);
+  SetHelp(base, frame, 564, calls);
+  const uint32_t scroll = Load(base, Load(base, kList) + 4);
+  return GroupArrows(base, frame, scroll, Load(base, Screen(base) + kShownCount));
+}
+
 }  // namespace build_screen

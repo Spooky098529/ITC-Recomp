@@ -44,6 +44,8 @@ constexpr uint32_t kCategory = 0x32634;
 constexpr uint32_t kGroupSelection = 0x32638, kGroupScroll = 0x3263C;
 constexpr uint32_t kBuildSelection = 0x32640, kBuildScroll = 0x32644;
 constexpr uint32_t kStandSelection = 0x32648, kStandScroll = 0x3264C;
+constexpr uint32_t kNumber = 0x32654;       // ShowNumber's (probably a percentage)
+constexpr uint32_t kOpened = 0x32658;       // BuildScreen::Open plays 81 when 0
 
 // A build list's fields (16-bit links: +0 a node's next, +2 its slot).
 constexpr uint32_t kListFree = 1600, kListHead = 1604, kListCount = 1608, kListSlots = 1612;
@@ -173,6 +175,11 @@ uint64_t ShowGroup(uint8_t* base, uint32_t sp, uint32_t group, const Calls& call
 // BuildArrows'.
 uint64_t SetUpBuilds(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// sub_821A0060 BuildScreen::SetUpGroups: level 0's set-up (the groups
+// marked, filtered, listed and drawn, the one shown, the number, the
+// prompts, the help line 564, the arrows). r3 GroupArrows'.
+uint64_t SetUpGroups(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The transitions (transitions.cpp) ---
 //
 // Each takes `step`, its word at the machine's +24 (r3): the set-up on the
@@ -196,5 +203,18 @@ uint64_t HighlightBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls&
 uint64_t HighlightStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t HighlightStand2(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t HighlightDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821A08D8 BuildScreen::Open: PlayNamed 101 (chained), PlayNamed and
+// LoopNamed 100, 1, 83, PlayNamed 81 (chained) when the screen's +0x32658 is
+// 0, the category and the groups' kept selection and scroll 0,
+// SetUpGroups. r3 1 when Run answers 0.
+uint64_t Open(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821A0A38 BuildScreen::BackToGroups: FinishNamed 71, 70, 69, 61 + the
+// selection, PlayNamed 103, SetUpGroups; once Run answers 0, the machine
+// back to level 0 with HighlightGroups2 (2) queued. r3 0.
+uint64_t BackToGroups(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219FC60 BuildScreen::ChangeCategory: the category stepped by the
+// list's +28 (wrapping 0 to 4) until FilterGroups finds groups, the tabs,
+// the lists and rows again from the first group. r3 1.
+uint64_t ChangeCategory(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace build_screen

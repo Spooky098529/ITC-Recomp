@@ -70,6 +70,22 @@ uint64_t Transition(uint8_t* base, uint32_t step, uint32_t sp, uint32_t bytes, u
 
 uint32_t Selection(uint8_t* base) { return race_screens::ListSelection(base, Load(base, kList)); }
 
+// A back transition's end, once the movie's animations are done: the state
+// left (+0) kept at +8 unless it is `level`, +4 `level`, +0 and +16 -1, +12
+// `highlight` (that level's highlight transition) with its word +24 0.
+void Back(uint8_t* base, uint32_t level, uint32_t highlight) {
+  const uint32_t machine = Load(base, kMachine);
+  const uint32_t left = Load(base, machine + 0);
+  if (left != level) {
+    Store(base, machine + 8, left);
+  }
+  Store(base, machine + 16, 0xFFFFFFFFu);
+  Store(base, machine + 4, level);
+  Store(base, machine + 12, highlight);
+  Store(base, machine + 0, 0xFFFFFFFFu);
+  Store(base, Load(base, kMachine) + 24, 0);
+}
+
 // HighlightGroups and HighlightGroups2: the groups' animations looped (the
 // first also 84), the row's, the category's tab played.
 void HighlightGroups(uint8_t* base, const Movie6& m, const uint32_t* lrs, int loops,
@@ -151,6 +167,77 @@ uint64_t HighlightDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls
   ITC_NATIVE_RUNNING("sub_8219CBD8 BuildScreen::HighlightDetails");
   Transition(base, step, sp, 112, 0x8219CC54, calls,
              [&](const Movie6& m) { m.PlayLoop(0x8219CC34, 74); });
+  return 1;
+}
+
+uint64_t Open(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821A08D8 BuildScreen::Open");
+  const uint64_t done = Transition(base, step, sp, 128, 0x821A0A28, calls, [&](const Movie6& m) {
+    m.Play(0x821A092C, 101, 1);
+    m.PlayLoop(0x821A0948, 100);
+    m.PlayLoop(0x821A0970, 1);
+    m.PlayLoop(0x821A0998, 83);
+    if (Load(base, Screen(base) + kOpened) == 0) {
+      m.Play(0x821A09DC, 81, 1);
+    }
+    Store(base, Screen(base) + kCategory, 0);
+    Store(base, Screen(base) + kGroupSelection, 0);
+    Store(base, Screen(base) + kGroupScroll, 0);
+    SetUpGroups(base, m.frame, calls);
+  });
+  return uint32_t(done) == 0 ? 1 : 0;
+}
+
+uint64_t BackToGroups(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821A0A38 BuildScreen::BackToGroups");
+  const uint64_t done = Transition(base, step, sp, 128, 0x821A0AE4, calls, [&](const Movie6& m) {
+    const uint32_t s = Selection(base);
+    m.Finish(0x821A0A8C, 71);
+    m.Finish(0x821A0A98, 70);
+    m.Finish(0x821A0AA4, 69);
+    m.Finish(0x821A0AB0, uint64_t(s) + 61);
+    m.Play(0x821A0ACC, 103);
+    SetUpGroups(base, m.frame, calls);
+  });
+  if (uint32_t(done) == 0) {
+    Back(base, 0, 2);
+  }
+  return 0;
+}
+
+uint64_t ChangeCategory(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8219FC60 BuildScreen::ChangeCategory");
+  Transition(base, step, sp, 160, 0x8219FE00, calls, [&](const Movie6& m) {
+    const uint32_t delta = Load(base, Load(base, kList) + 28);
+    do {
+      const uint32_t at = Screen(base) + kCategory;
+      Store(base, at, Load(base, at) + delta);
+      const uint32_t category = Load(base, Screen(base) + kCategory);
+      if (int32_t(category) < 0) {
+        Store(base, Screen(base) + kCategory, 4);
+      } else if (int32_t(category) > 4) {
+        Store(base, Screen(base) + kCategory, 0);
+      } else {
+        Store(base, Screen(base) + kCategory, category);
+      }
+    } while (FilterGroups(base, m.frame) == 0);
+    for (uint32_t k = 0; k < 4; k++) {
+      m.Finish(0x8219FD10, 76 + k);
+    }
+    m.Play(0x8219FD40, uint64_t(Load(base, Screen(base) + kCategory)) + 76, 1);
+    m.Finish(0x8219FD58, uint64_t(Selection(base)) + 29);
+    Store(base, Screen(base) + kGroupSelection, 0);
+    Store(base, Screen(base) + kGroupScroll, 0);
+    InitGroupLists(base, m.frame, calls);
+    const uint32_t s = Selection(base);
+    const uint64_t row = uint64_t(s) + 29;
+    m.Play(0x8219FDA8, row);
+    m.Loop(0x8219FDB4, row);
+    DrawGroupRows(base, m.frame, calls);
+    ShowGroup(base, m.frame, Load(base, Screen(base) + ((s + 0x10000 - 14799) << 2)), calls);
+    GroupArrows(base, m.frame, Load(base, Load(base, kList) + 4),
+                Load(base, Screen(base) + kShownCount));
+  });
   return 1;
 }
 

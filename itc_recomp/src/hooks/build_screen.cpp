@@ -28,7 +28,8 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "sub_8219BFE8, CopyBuilds sub_821A0128, ListBuilds sub_821A0D38, DrawBuildRow "
               "sub_8219D248, DrawBuildRows sub_8219D3E8, DrawStandRow sub_8219D550, ShowGroup "
               "sub_8219CF08 and SetUpBuilds sub_821A1008 (SetText and SetNodeText through their "
-              "overrides)) "
+              "overrides); the groups level's SetUpGroups sub_821A0060 and the transitions Open "
+              "sub_821A08D8, BackToGroups sub_821A0A38 and ChangeCategory sub_8219FC60) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=build_screen). RestoreGroupList, InsertNode, SetMode, PowI, DrawGroupRow, InitBuildList, "
               "CopyBuilds, ListBuilds, DrawBuildRow and DrawBuildRows have no adapters: only native callers reach them, and the flag switches those");
@@ -240,6 +241,29 @@ void BuildScreenSetUpBuilds(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = bs::SetUpBuilds(base, ctx.r1.u32, guest.calls());
 }
 
+void BuildScreenSetUpGroups(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::SetUpGroups(base, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenOpen(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::Open(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenBackToGroups(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::BackToGroups(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenChangeCategory(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::ChangeCategory(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -283,3 +307,7 @@ ITC_BUILD_SCREEN(8219CBD8, BuildScreenHighlightDetails)
 ITC_BUILD_SCREEN(8219D550, BuildScreenDrawStandRow)
 ITC_BUILD_SCREEN(8219CF08, BuildScreenShowGroup)
 ITC_BUILD_SCREEN(821A1008, BuildScreenSetUpBuilds)
+ITC_BUILD_SCREEN(821A0060, BuildScreenSetUpGroups)
+ITC_BUILD_SCREEN(821A08D8, BuildScreenOpen)
+ITC_BUILD_SCREEN(821A0A38, BuildScreenBackToGroups)
+ITC_BUILD_SCREEN(8219FC60, BuildScreenChangeCategory)
