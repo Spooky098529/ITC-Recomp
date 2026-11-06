@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-06 01:02 (`b7-loop-06-11-26`)
+
+- Two leads deleted as covered (as the run of 2026-11-04 did): the device lock's callers (`sub_820962B8` in `frame-passes.md`, `sub_8209BE88` in `app-start-up.md`, `sub_820AE528` `Movie::Release` in `movies.md`, `sub_8212F0B8` in `screen-objects.md`, `sub_82133C60` and `sub_82138C38` in `post-effects.md`) and the other `ScopedLock` users (`sub_8258DFF0`, `sub_8258E098`, `sub_8258E1D8`, `sub_8258E410`, `sub_8258E498` in `shader-objects.md` and `models.md`, ours; `sub_82593E78` `MovieWrapper::Open` in `movies.md`, over the replaced movie library).
+
 ## Run 2026-11-05 20:21 (`b7-loop-05-11-26`)
 
 - The top lead (the graphics resources' other makers) was stale: `sub_820ED6D0` is `CarModel::MakePlate` (`car-models.md`, ours), `sub_82135AA8`, `sub_82136130`, `sub_821330D0` already in `post-effects.md`. One row added to `post-effects.md` (b86338cf): `sub_825D99D0` `PostEffects::InitEdramBase` (probably a `_cinit` initializer; `[0x826C5DC0]` = `Surface::EdramTiles(1024, 576, 0x1A2201BF, 1)`, 936), `known-data.md`'s `0x826C5DC0` updated. The agent's note: `c-runtime.md`'s `sub_825A6E48` row names `_cinit`'s tables at `0x82630284` and `0x82630010`, where the code gives `0x82600284` and `0x82600010` (probably a typo, not changed). The rest of `post-effects.md` (13 recompiled) is all ready, so the migration takes it.

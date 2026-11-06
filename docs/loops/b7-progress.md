@@ -8,79 +8,24 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-11-05 20:21 on `b7-loop-05-11-26`, from 7b039c95;
-  summary `b7-loop-2026-11-05-2021.md`. Limit: 3 subsystems.
-- Subsystem 1 of 3: the other makers and users of the graphics
-  resources (the top lead: `sub_82135AA8`, `sub_82136130`,
-  `sub_821330D0`, `sub_820ED6D0`, `sub_825D99D0` left of it; its line
-  deleted from `leads.md`). Map checked (b86338cf: the lead was
-  stale, its functions already in `post-effects.md` and
-  `car-models.md`; one new row, `sub_825D99D0`
-  `PostEffects::InitEdramBase`, in `post-effects.md`; 0 errors; 7
-  ready groups: the rest of the post effects, 13 recompiled, all
-  ready). Migration 106192bc..b1df9d00 (12 of 13 ours under
-  `--native_post_effects`, 5 Native with no adapter; `itc_3535`: race
-  38 s, 0 errors, every harness 0 differing but `matrix_math`'s
-  expected groups; no subagents); left: `Glow::RecordStar`
-  `sub_82136FA8` with `sub_82134060` (ready, the batch limit). Step:
-  Validated `itc_3540` (race 47 s, 0 errors, 11 of 11 harness lines,
-  all 11 ran in the race; no replay needed; none to drive). Step:
-  Second migration 95c86284..6bfc02d0 (`Glow::RecordStar` with
-  `RecordStarPass`; 5 adapters removed; `itc_3553`: race 38 s, 0
-  errors, 64 of 64 harness lines 0 differing; no subagents); nothing
-  ready left (`Glow::Record` waits on `sub_8209AE48`, in `leads.md`).
-  Validated `itc_3554` (race 47 s, 0 errors, 7 of 7 harness lines,
-  6 ran in the race, `Race::ToggleEffects` in the replay `itc_3555`
-  (ok); none to drive). Done.
-- Subsystem 2 of 3: the command list's render-target records (lead
-  picked: `sub_8209B058`, `sub_8209AE48`, `sub_8209B3D0`; runs every
-  frame, `sub_8209AE48` ready, `Glow::Record` waits on it; its line
-  deleted from `leads.md`). Map checked (a0cac8ac:
-  `scene-target.md`, 6 rows, 1 moved from `functions.md`, all in
-  play; 0 errors; 3 ready groups, `sub_8209AE48`, `sub_8209AF40`,
-  `sub_8217C368`; `[0x8266D08C]` is the scene target). Migration
-  982ea51b..5edff580 (`--native_scene_target`, 6 of 6 ours, with
-  `Glow::Record` as a cleanup in `post-effects.md`, now 58 of 58; 5
-  adapters removed; `itc_3575`: race 38 s, 0 errors, every harness 0
-  differing; no subagents). Validated `itc_3576` (race 46 s, 0
-  errors, 7 of 7 harness lines, 6 ran in the race,
-  `RecordTileTargets` in the replay `itc_3577` (ok); none to drive).
-  Done.
-- Subsystem 3 of 3: the frame passes object at framework +108 (lead
-  picked: `sub_82098630`, `sub_82096218`, `sub_82096360`,
-  `sub_82096030`, with its vtable's `sub_82096418` and
-  `sub_820962B8`, the callers keeping `RecordPasses`' and
-  `PostEffects::InitBoot`'s adapters; once a frame; all but the
-  constructor ready; its line deleted from `leads.md`). Map checked
-  (19f643f1: `frame-passes.md`, 13 rows, 1 moved from `functions.md`
-  (`Job::Wait`), 10 in play; 0 errors; ready: `sub_82096418` (with
-  `sub_82589990`, split the migration), `sub_82096218`, `sub_82096360`,
-  `sub_82096030`, `sub_820962B8`, `sub_82094B10`, `sub_82096350`).
-  Migration 261c0970..85292a33 (`--native_frame_passes`, 10 of 10 in
-  play ours; `RecordPasses`', `InitBoot`'s and `RecordPrimitiveReset`'s
-  adapters removed; `Record` split in three parts, done by three
-  subagents one after another; `itc_3594`: race 38 s, 0 errors, 72
-  harness lines 0 differing). Validated `itc_3595` (race 46 s, 0
-  errors, 12 of 12 harness lines, all ran in the race; no replay
-  needed; none to drive). Done.
+- Run started 2026-11-06 01:02 on `b7-loop-06-11-26`, from 8f0dd3af;
+  summary `b7-loop-2026-11-06-0102.md`. Limit: 3 subsystems.
+- Two leads deleted as covered: the device lock's callers (all six
+  mapped: `frame-passes.md`, `app-start-up.md`, `movies.md`,
+  `screen-objects.md`, `post-effects.md`) and the other `ScopedLock`
+  users (five in `shader-objects.md` and `models.md`, ours;
+  `sub_82593E78` is `MovieWrapper::Open` in `movies.md`).
+- Subsystem 1 of 3: the graphics library's command buffer (lead
+  picked: `sub_8229E308`, `sub_8229EB10`, `sub_8229E5D0`,
+  `sub_8229E768`, `sub_8229DE48`, `sub_8229EDA8`, `sub_8229DC28`,
+  `sub_822AF978`; its line deleted from `leads.md`). Step: mapping
+  agent running.
 
 ## Done
 
-- The frame passes: `frame-passes.md` (map 19f643f1, migration
-  261c0970..85292a33, `--native_frame_passes`, 10 of 10 in play;
-  validated `itc_3595`: 0 errors, every harness line, none to drive).
-- The scene target's passes: `scene-target.md` (map a0cac8ac,
-  migration 982ea51b..5edff580, `--native_scene_target`, 6 of 6, with
-  `Glow::Record` finishing `post-effects.md`; validated `itc_3576`: 0
-  errors, every harness line, replay `itc_3577` ok, none to drive).
-- The post effects' rest: `post-effects.md` (map b86338cf, migrations
-  106192bc..b1df9d00 and 95c86284..6bfc02d0, `--native_post_effects`,
-  57 of 58; validated `itc_3540` and `itc_3554`: 0 errors, every
-  harness line, replay `itc_3555` ok, none to drive).
-
 ## Rows to review
 
-`review.md`, "Run 2026-11-05 20:21".
+`review.md`, "Run 2026-11-06 01:02".
 
 ## Expected to differ
 
@@ -92,29 +37,7 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
-- At the start: ours 4167, work left 2243 (wrapped 62, known 482,
-  unknown 1699).
-- After the post effects' map: ours 4167, work left 2243 (wrapped
-  62, known 483, unknown 1698).
-- After its first migration: ours 4178, work left 2232 (wrapped 62,
-  known 472, unknown 1698).
-- After its validation (`itc_3540`): ours 4178, work left 2232.
-- After its second migration: ours 4180, work left 2230 (wrapped 62,
-  known 470, unknown 1698).
-- After its validation (`itc_3554`): ours 4180, work left 2230.
-- After the scene target's map: ours 4180, work left 2230 (wrapped
-  62, known 475, unknown 1693).
-- After its migration: ours 4187, work left 2223 (wrapped 61, known
-  469, unknown 1693).
-- After its validation (`itc_3576`): ours 4187, work left 2223.
-- After the frame passes' map: ours 4187, work left 2223 (wrapped 61,
-  known 478, unknown 1684).
-- After its migration: ours 4197, work left 2213 (wrapped 60, known
-  469, unknown 1684).
-- After its validation (`itc_3595`): ours 4197, work left 2213.
+- At the start: ours 4197, work left 2213 (wrapped 60, known 469,
+  unknown 1684).
 
 ## Stopped
-
-2026-11-05, at the run's limit (3 subsystems), after the frame passes'
-validation. No halts, no questions to the user. Nothing uncommitted.
-The user reviews and merges.
