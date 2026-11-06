@@ -391,6 +391,8 @@ set(ITC_SOURCES
     src/post_effects/record.cpp
     src/hooks/scene_target.cpp
     src/scene_target/scene_target.cpp
+    src/hooks/power_graph.cpp
+    src/power_graph/power_graph.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp
@@ -580,6 +582,7 @@ set(ITC_SOURCES
     src/harnesses/command_buffer.cpp
     src/harnesses/single_commands.cpp
     src/harnesses/predicated_tiling.cpp
+    src/harnesses/power_graph.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp
@@ -757,6 +760,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/front_end_car_draw/pose.cpp
     src/post_effects/record.cpp
     src/scene_target/scene_target.cpp
+    src/power_graph/power_graph.cpp
     src/frame_passes/record_part1.cpp src/frame_passes/record_part2.cpp
     src/frame_passes/record_part3.cpp
     src/car_sounds/x3daudio.cpp

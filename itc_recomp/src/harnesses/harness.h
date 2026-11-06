@@ -284,5 +284,7 @@ void CommandBuffer(Context& h);
 // The render command replay's single commands (src/harnesses/single_commands.cpp).
 void SingleCommands(Context& h);
 void PredicatedTiling(Context& h);
+// The front end's power graph (src/harnesses/power_graph.cpp).
+void PowerGraph(Context& h);
 
 }  // namespace harness
