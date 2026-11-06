@@ -40,6 +40,8 @@ constexpr uint32_t kDrawerVtable = 64;   // 8 slots
 constexpr uint32_t kToggle = 96;         // Flip's state: its +0 toggled
 constexpr uint32_t kState = 128;         // the drawer's state, 32 bytes
 constexpr uint32_t kSlots = 512;         // the slot and its data
+constexpr uint32_t kObjects = 2048;      // 8 buffers or textures, 64 bytes each
+constexpr uint32_t kFenceList = 3072;    // the device's fence list, 8 bytes an entry
 
 constexpr uint32_t kDeviceBytes = 13312;
 
@@ -194,6 +196,42 @@ void SetShaderConstants(Context& h, Runner& run) {
   results.Report();
 }
 
+// Command 15: the device's stream and texture slots null or one of the
+// objects, its command position and fence mask, and its fence list in the
+// scratch area, never full (as the device_state harness's bound objects,
+// with room for two: SetStreamSource and SetTexture each fence the object
+// they unset; a full list's flush, sub_822AD790, isn't seen in play); the drawer's
+// state with a vertex count of 0 now and then and +4 of 1 half the time.
+void DrawerDraw(Context& h, Runner& run) {
+  Random& r = h.random;
+  Results results("Single::DrawerDraw (sub_8258F5C0)");
+  for (int i = 0; i < 128; i++) {
+    Case c = MakeCase(h, r);
+    auto object = [&] { return h.data + kObjects + 64 * r.Below(8); };
+    for (uint32_t at = 12180; at < 12288 + 4 * 32; at += 4) {  // indices, streams, textures
+      c.device[at / 4] = r.Below(3) == 0 ? 0 : object();
+    }
+    c.device[10780 / 4] = r.Below(2) == 0 ? 0 : uint32_t(r.Next());
+    const uint32_t pick = r.Below(3);
+    c.device[10784 / 4] = pick == 0 ? 0 : pick == 1 ? 0xFFFFFFFFu : uint32_t(r.Next());
+    const uint32_t list = h.data + kFenceList + 8 * r.Below(32);
+    c.device[13168 / 4] = list;
+    c.device[13172 / 4] = list + 8 * (2 + r.Below(3));  // room for both fences
+    auto at = [&](uint32_t offset) -> uint32_t& { return c.scratch[offset / 4]; };
+    at(kState + 16) = r.Below(6) == 0 ? 0 : r.Below(2) ? 3 : uint32_t(r.Next());
+    at(kState + 4) = r.Below(2) ? 1 : EdgeOrRandom(r);
+    if (i == 0) {  // the minimap's triangle: a triangle list of 3, shaders 0 and 0
+      at(kState + 0) = 4;
+      at(kState + 4) = 0;
+      at(kState + 16) = 3;
+    }
+    run.Run(results, c, h.data + kSlots, __imp__sub_8258F5C0, hooks::NativeSingleDrawerDraw,
+            fmt::format("case {}: count {:08X}, vertex shader {:08X}, draw {:08X}", i,
+                        at(kState + 16), at(kState + 4), at(kDrawerVtable + 12)));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SingleCommands(Context& h) {
@@ -214,6 +252,7 @@ void SingleCommands(Context& h) {
   InlineVertices(h, run);
   SetUpDrawer(h, run);
   SetShaderConstants(h, run);
+  DrawerDraw(h, run);
 
   Write(h.base, kDeviceGlobal, saved_device.data(), 4);
   Write(h.base, kDrawerGlobal, saved_drawer.data(), 8);

@@ -129,4 +129,45 @@ uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const Gue
   return guest::LoadU8(base, slot + 13);
 }
 
+uint32_t DrawerDraw(uint8_t* base, uint32_t sp, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8258F5C0 Single::DrawerDraw");
+  const uint32_t frame = Frame(base, sp, 112);
+  if (guest::LoadU32(base, guest::LoadU32(base, kDrawerState) + 16) == 0) {
+    return 0;
+  }
+  const uint32_t viewport = device_state::GetViewportEnable(base, guest::LoadU32(base, kDevice));
+  {
+    const uint32_t state = guest::LoadU32(base, kDrawerState);
+    const uint32_t device = guest::LoadU32(base, kDevice);
+    const uint32_t on = int32_t(guest::LoadU32(base, state + 4)) == 1 ? 0 : 1;
+    device_state::SetViewportEnable(base, device, on);
+  }
+  {
+    const uint32_t drawer = guest::LoadU32(base, kDrawer);
+    const uint32_t state = guest::LoadU32(base, kDrawerState);
+    const uint32_t device = guest::LoadU32(base, kDevice);
+    const uint32_t vtable = guest::LoadU32(base, drawer);
+    const uint32_t count = guest::LoadU32(base, state + 16);
+    const uint32_t vertices = guest::LoadU32(base, state + 12);
+    const uint32_t type = guest::LoadU32(base, state + 0);
+    const uint32_t draw = guest::LoadU32(base, vtable + 12);
+    call(draw, frame, 0x8258F640, {drawer, device, type, vertices, count});
+  }
+  {
+    const uint32_t device = guest::LoadU32(base, kDevice);
+    if (!device_state::SetStreamSource(base, device, 0, 0, 0, 0, 4096)) {
+      call(0x822A3758, frame, 0x8258F65C, {device, 0, 0, 0, 0, 4096});
+    }
+  }
+  {
+    const uint32_t device = guest::LoadU32(base, kDevice);
+    constexpr uint64_t kStage0 = 1ull << 43;
+    if (!device_state::SetTexture(base, device, 0, 0, kStage0)) {
+      call(0x822A6008, frame, 0x8258F674, {device, 0, 0, kStage0});
+    }
+  }
+  device_state::SetViewportEnable(base, guest::LoadU32(base, kDevice), viewport);
+  return 0;
+}
+
 }  // namespace graphics::single_commands

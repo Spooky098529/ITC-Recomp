@@ -55,4 +55,16 @@ uint32_t SetUpDrawer(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall&
 // play) guest calls. Returns byte +13.
 uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call);
 
+// Single::DrawerDraw (sub_8258F5C0, 15), in its 112-byte frame: nothing
+// when the drawer's state +16 (the vertex count) is 0. Else the viewport
+// setting kept, set to 0 when the state's +4 is 1 (else 1), the drawer's
+// vtable slot 3 (PrimitiveDrawer::Draw) with r4 = the device, r5 = the
+// state's +0, r6 = +12, r7 = +16; then stream 0 and texture 0 unset and the
+// viewport setting put back (the device's setters as their plain C++; the
+// originals, through their adapters, where SetStreamSource or SetTexture
+// would fence on a full fence list). Returns 0. Its callers mark it as
+// command 15 (native::g_current_command) around it, for the renderer's
+// inline draw (src/native/replay_hooks.cpp).
+uint32_t DrawerDraw(uint8_t* base, uint32_t sp, const GuestCall& call);
+
 }  // namespace graphics::single_commands

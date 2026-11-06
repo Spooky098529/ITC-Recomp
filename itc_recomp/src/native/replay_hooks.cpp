@@ -7,10 +7,14 @@
 #include "renderer.h"
 #include "state.h"
 
+#include "base/flags.h"
 #include "base/log.h"
+#include "hooks/single_commands.h"
 
 #include <set>
 #include <utility>
+
+ITC_FLAG_DECLARE(bool, native_single_commands);
 
 // Command handlers, wrapped so the stats logger and the native renderer
 // see every command. Command 7 (sub_8258FD48) is wrapped in blend_state.cpp.
@@ -155,9 +159,15 @@ REPLAY_COUNTED_HANDLER(82590AD0, 35)
 // come this way (a few a frame: the minimap's player triangle). Its 15,
 // the helper object's draw, is marked as command 15 so the native renderer
 // draws its inline vertices; the others reach the device's shadow, which
-// the renderer reads anyway.
+// the renderer reads anyway. Its body is native with
+// --native_single_commands (src/graphics/single_commands.h; RunSingles'
+// plain C++ calls it directly, marked the same way: hooks::SingleCommands).
 extern "C" REX_FUNC(sub_8258F5C0) {
   REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_single_commands)) {
+    hooks::NativeSingleDrawerDraw(ctx, base);
+    return;
+  }
   uint32_t outer_command = native::g_current_command;
   native::g_current_command = 15;
   __imp__sub_8258F5C0(ctx, base);
