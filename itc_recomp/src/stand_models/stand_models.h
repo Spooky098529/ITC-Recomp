@@ -24,6 +24,10 @@
 #include <initializer_list>
 #include <optional>
 
+namespace load_poll {
+struct Calls;
+}
+
 namespace stand_models {
 
 // A guest function `function` (through the function table: its override
@@ -144,14 +148,20 @@ uint32_t SecondWheelsPending(uint8_t* base, uint32_t holder, uint32_t stack);
 // plain C++ on the model (its r3). 96-byte frame.
 uint64_t AddSecondWheels(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack);
 // sub_821799D8 GarageStage::ApplyWheelPaint: SceneModel::ApplyWheelPaint on
-// the model through `call` (its r3). 96-byte frame.
-uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack);
+// the model (its r3): with `poll` (the load poll's flags on), its plain C++
+// inside its diagnostics' wrap (--debug_hide, --find_per_frame_state, as
+// src/debug/frame_state_diff.cpp wrapped it); else through `call`. 96-byte
+// frame.
+uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                         uint32_t holder, uint32_t stack);
 // sub_821CC890 TuningScreen::StepSecondWheels: with the holder [[kHolder]]
 // (loaded again for each call): not pending and the screen's +25244 1:
 // AddSecondWheels, +25244 = 2 (its r3); else (Pending asked again) not
 // pending and +25244 2: ApplyWheelPaint, +25244 = 0 (its r3); else r3 the
 // second Pending's answer. 112-byte frame.
-uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t stack);
+// `poll` as ApplyWheelPaint's.
+uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                          uint32_t screen, uint32_t stack);
 
 // --- The wheel fitting (src/stand_models/wheels.cpp) ---
 

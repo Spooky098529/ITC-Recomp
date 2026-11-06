@@ -5,7 +5,9 @@
 
 #include "base/log.h"
 #include "car_scene_draw/ops.h"
+#include "debug/frame_state_diff.h"
 #include "guest.h"
+#include "load_poll/load_poll.h"
 #include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -22,6 +24,11 @@ constexpr uint32_t kWheelsSetRecord = 0x820D8EC0;
 constexpr uint32_t kSetTexture = 0x820D17D8;
 constexpr uint32_t kApplyWheelPaint = 0x820D9C50;
 constexpr uint32_t kDecalScale = 0x82001BE0;
+
+// Flush-to-zero off, as the callees' plain C++ expects at entry.
+void FlushOff() {
+  Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+}
 
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
@@ -288,13 +295,29 @@ uint64_t AddSecondWheels(uint8_t* base, const GuestCall& call, uint32_t holder, 
   return scene_models::SceneModelAddSecondWheels(base, call, StageModel(base, holder), frame);
 }
 
-uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack) {
+uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                         uint32_t holder, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_821799D8 GarageStage::ApplyWheelPaint");
   const uint32_t frame = Frame(base, stack, 96);
-  return call(kApplyWheelPaint, {StageModel(base, holder)}, frame, 0x82179A04);
+  const uint32_t model = StageModel(base, holder);
+  if (poll == nullptr) {
+    return call(kApplyWheelPaint, {model}, frame, 0x82179A04);
+  }
+  // The wrap: nothing when --debug_hide names it (r3 the model, as set for
+  // the call), else the plain C++ between FrameStateDiff_Before and After.
+  if (debug::IsHidden(kApplyWheelPaint)) {
+    return model;
+  }
+  debug::FrameStateDiff_Before(base);
+  FlushOff();
+  const uint64_t r3 = load_poll::SceneModelApplyWheelPaint(base, model, model, frame, *poll);
+  FlushOff();
+  debug::FrameStateDiff_After(base, "draw step part", kApplyWheelPaint);
+  return r3;
 }
 
-uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t stack) {
+uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                          uint32_t screen, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_821CC890 TuningScreen::StepSecondWheels");
   const uint32_t frame = Frame(base, stack, 112);
   const auto holder = [&] { return Load(base, Load(base, kHolder)); };
@@ -308,7 +331,7 @@ uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, uint32_t screen,
   if (pending != 0 || int32_t(Load(base, screen + 25244)) != 2) {
     return pending;
   }
-  const uint64_t r3 = ApplyWheelPaint(base, call, holder(), frame);
+  const uint64_t r3 = ApplyWheelPaint(base, call, poll, holder(), frame);
   Store(base, screen + 25244, 0);
   return r3;
 }

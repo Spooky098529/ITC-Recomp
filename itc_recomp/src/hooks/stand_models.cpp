@@ -5,9 +5,12 @@
 #include "hooks/stand_models.h"
 
 #include "base/flags.h"
+#include "hooks/load_poll.h"
+#include "load_poll/load_poll.h"
 #include "scene_models/apply.h"
 
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+ITC_FLAG_DECLARE(bool, native_load_poll);
 ITC_FLAG_DECLARE(bool, native_scene_models);
 ITC_FLAG_DECLARE(bool, native_car_physics);
 ITC_FLAG_DECLARE(bool, native_math);
@@ -35,8 +38,8 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "GarageStage::SecondWheelsPending sub_82179C48, AddSecondWheels sub_82179998, "
               "ApplyWheelPaint sub_821799D8 and SceneModel::AddSecondWheels sub_820D9E00 (no "
               "adapters: only it reaches them; with --native_vehicle_accessors and "
-              "--native_scene_models; ScenePools::SetUpB and SceneModel::ApplyWheelPaint through "
-              "their adapters); the wheels picked, TuningScreen::PreviewWheel sub_821DFA78 with "
+              "--native_scene_models; ScenePools::SetUpB through its adapter, "
+              "SceneModel::ApplyWheelPaint's plain C++ with the load poll's flags); the wheels picked, TuningScreen::PreviewWheel sub_821DFA78 with "
               "GarageStage::SetWheel sub_8217DD38, GarageStage::FitAxles sub_82178B98 and "
               "SceneWheels::SetSizes sub_820E7380 (no adapters: only it reaches them; with "
               "--native_vehicle_accessors, --native_car_specs, --native_car_physics, --native_math "
@@ -195,6 +198,12 @@ void StandModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
 }
 
 // A step with the guest calls and lr put back: `body`'s r3.
+// SceneModel::ApplyWheelPaint's plain C++ (the load poll's flags, as its
+// old wrap in src/debug/frame_state_diff.cpp ran it); else its original.
+bool ApplyWheelPaintNative() {
+  return ITC_FLAG(native_load_poll) && LoadPollCalleesNative();
+}
+
 template <typename Body>
 void WithCalls(PPCContext& ctx, uint8_t* base, Body body) {
   const uint64_t lr = ctx.lr;
@@ -248,8 +257,10 @@ void StandModelsStepSecondWheels(PPCContext& ctx, uint8_t* base) {
     return;
   }
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  load_poll::Calls* native_poll = ApplyWheelPaintNative() ? &poll : nullptr;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
-    return sm::StepSecondWheels(base, call, r3, stack);
+    return sm::StepSecondWheels(base, call, native_poll, r3, stack);
   });
 }
 
@@ -266,8 +277,10 @@ void StandModelsAddSecondWheels(PPCContext& ctx, uint8_t* base) {
 
 void StandModelsApplyWheelPaint(PPCContext& ctx, uint8_t* base) {
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  load_poll::Calls* native_poll = ApplyWheelPaintNative() ? &poll : nullptr;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
-    return sm::ApplyWheelPaint(base, call, r3, stack);
+    return sm::ApplyWheelPaint(base, call, native_poll, r3, stack);
   });
 }
 
