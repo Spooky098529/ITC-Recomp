@@ -274,4 +274,16 @@ uint64_t BackToStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   return 0;
 }
 
+uint64_t OpenDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8219FEC8 BuildScreen::OpenDetails");
+  const uint64_t done = Transition(base, step, sp, 112, 0x8219FF58, calls, [&](const Movie6& m) {
+    m.Finish(0x8219FF14, 108);
+    m.Finish(0x8219FF20, 93);
+    m.Play(0x8219FF3C, 106);
+    KeepStandList(base, m.frame);
+    SetUpDetails(base, m.frame, calls);
+  });
+  return uint32_t(done) == 0 ? 1 : 0;
+}
+
 }  // namespace build_screen

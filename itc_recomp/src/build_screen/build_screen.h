@@ -187,6 +187,17 @@ uint64_t SetUpGroups(uint8_t* base, uint32_t sp, const Calls& calls);
 // not put on the stand again). r3 StandArrows'.
 uint64_t RestoreStand(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// sub_8219D820 BuildScreen::ShowDetails: build `build`'s texts on
+// sub-scene 9 (its names, or 535, by its +8; its car model's three lines,
+// or 535 and two cleared), then the scroll arrows (9, 27) and (9, 28) by
+// the text's line count and first line. r3 node (9, 28).
+uint32_t ShowDetails(uint8_t* base, uint32_t sp, uint32_t build, const Calls& calls);
+// sub_8219F8E0 BuildScreen::SetUpDetails: level 3's set-up (the text from
+// its first line, ShowDetails of the stand's build, [0x826D8440] one item
+// a line past the first 3, the prompts (1, 4), SetHelp 567, +0x3265C 0).
+// r3 SetHelp's.
+uint64_t SetUpDetails(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The transitions (transitions.cpp) ---
 //
 // Each takes `step`, its word at the machine's +24 (r3): the set-up on the
@@ -232,5 +243,8 @@ uint64_t OpenBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& call
 // RestoreStand; once Run answers 0, the machine back to level 2 with
 // HighlightStand2 (13) queued. r3 0.
 uint64_t BackToStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219FEC8 BuildScreen::OpenDetails: FinishNamed 108 and 93, PlayNamed
+// 106, KeepStandList, SetUpDetails. r3 1 when Run answers 0.
+uint64_t OpenDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace build_screen

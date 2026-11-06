@@ -19,6 +19,10 @@ namespace {
 constexpr uint32_t kSetText = 0x8211C1F8;
 constexpr uint32_t kSetNodeText = 0x8211C7E8;
 constexpr uint32_t kMenuListInit = 0x8220BAC0;
+constexpr uint32_t kClearText = 0x8211C470;
+constexpr uint32_t kSetFirstLine = 0x8211C370;
+constexpr uint32_t kFirstLine = 0x8211C3F8;
+constexpr uint32_t kLineCount = 0x8211C680;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -279,6 +283,76 @@ uint64_t RestoreStand(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetHelp(base, frame, 566, calls);
   const uint32_t r3 = StandArrows(base, frame);
   Store(base, Screen(base) + kCarShown, 1);
+  return r3;
+}
+
+uint32_t ShowDetails(uint8_t* base, uint32_t sp, uint32_t build, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8219D820 BuildScreen::ShowDetails");
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t movie = Movie(base, frame);
+  const uint32_t model = Load(base, Load(base, build + 48) + 2788);
+  auto text = [&](uint32_t lr, uint32_t child, uint64_t id) {
+    SetText(calls, frame, lr, movie, 9, child, id);
+  };
+  if (Load(base, build + 8) == 2) {
+    text(0x8219D878, 13, uint64_t(Load(base, build + 0)) + 4001);
+    text(0x8219D890, 5, uint64_t(Load(base, build + 0)) + 2703);
+    text(0x8219D8CC, 4, uint64_t(Load(base, build + 0)) + 2054);
+  } else {
+    text(0x8219D8A4, 13, 535);
+    text(0x8219D8B8, 5, 535);
+    text(0x8219D8CC, 4, 535);
+  }
+  if (Load(base, build + 8) != 2 && Load(base, build + 40) == 0) {
+    text(0x8219D904, 17, 535);
+  } else {
+    text(0x8219D904, 17, uint64_t(Load(base, build + 0)) + 3352);
+  }
+  const uint32_t kind = Load(base, build + 8);
+  if (kind == 2 || kind == 1) {
+    text(0x8219D964, 6, uint64_t(model) + 1646);
+    text(0x8219D978, 7, uint64_t(model) + 1718);
+    text(0x8219D98C, 8, uint64_t(model) + 1790);
+  } else {
+    text(0x8219D92C, 6, 535);
+    calls.Call(kClearText, frame, 0x8219D93C, movie, 9, 7);
+    calls.Call(kClearText, frame, 0x8219D94C, movie, 9, 8);
+  }
+  const int32_t lines = int32_t(uint32_t(calls.Call(kLineCount, frame, 0x8219D99C, movie, 9, 13)));
+  const int32_t first = int32_t(uint32_t(calls.Call(kFirstLine, frame, 0x8219D9B0, movie, 9, 13)));
+  const uint32_t up = Node(base, movie, 9, 27);
+  if (lines > 4 && Load(base, build + 8) == 2) {
+    Store(base, up + 80, first > 0 ? 1 : 0);
+    const uint32_t down = Node(base, movie, 9, 28);
+    Store(base, down + 80, int32_t(uint32_t(lines) - uint32_t(first)) > 4 ? 1 : 0);
+    return down;
+  }
+  Store(base, up + 80, 0);
+  const uint32_t down = Node(base, movie, 9, 28);
+  Store(base, down + 80, 0);
+  return down;
+}
+
+uint64_t SetUpDetails(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8219F8E0 BuildScreen::SetUpDetails");
+  const uint32_t frame = Frame(base, sp, 128);
+  Store(base, frame + 96, kMovieId);
+  const uint32_t movie = Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 96));
+  calls.Call(kSetFirstLine, frame, 0x8219F924, movie, 9, 13, 0);
+  const uint32_t screen = Screen(base);
+  const uint32_t position = Load(base, screen + kStandScroll) + Load(base, screen + kStandSelection);
+  ShowDetails(base, frame, BuildAt(base, screen + kBuilds, position), calls);
+  const uint64_t lines = calls.Call(kLineCount, frame, 0x8219F990, movie, 9, 13);
+  const uint64_t n = int32_t(uint32_t(lines)) > 4 ? lines - 3 : 1;
+  Store(base, frame + 92, 158);
+  Store(base, frame + 84, 159);
+  const uint64_t args[8] = {Load(base, kList), n, n, 0, 154, 153, 155, 156};
+  calls.CallArgs(kMenuListInit, frame, 0x8219F9D4, args);
+  static constexpr uint32_t kPrompts[6] = {1, 4, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu,
+                                           0xFFFFFFFFu};
+  SetPrompts(base, frame, kPrompts);
+  const uint64_t r3 = SetHelp(base, frame, 567, calls);
+  Store(base, Screen(base) + kCarShown, 0);
   return r3;
 }
 

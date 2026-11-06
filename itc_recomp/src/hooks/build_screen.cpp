@@ -31,11 +31,13 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "overrides); the groups level's SetUpGroups sub_821A0060 and the transitions Open "
               "sub_821A08D8, BackToGroups sub_821A0A38 and ChangeCategory sub_8219FC60; the "
               "transition OpenBuilds sub_821A1138; the stand's RestoreStand sub_8219F868 and the "
-              "transition BackToStand sub_8219FF78) "
+              "transition BackToStand sub_8219FF78; the details level's transition OpenDetails "
+              "sub_8219FEC8 with SetUpDetails sub_8219F8E0 and ShowDetails sub_8219D820) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=build_screen). RestoreGroupList, InsertNode, SetMode, PowI, DrawGroupRow, InitBuildList, "
               "CopyBuilds, ListBuilds, DrawBuildRow, DrawBuildRows, SetUpGroups, FilterGroups, "
-              "MarkGroups, InitGroupLists, DrawGroupRows, ShowGroup, ShowNumber and GroupArrows "
+              "MarkGroups, InitGroupLists, DrawGroupRows, ShowGroup, ShowNumber, GroupArrows, "
+              "SetUpDetails and ShowDetails "
               "have no adapters: only native callers reach them, and the flag switches those");
 
 namespace hooks {
@@ -278,6 +280,21 @@ void BuildScreenBackToStand(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = bs::BackToStand(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void BuildScreenOpenDetails(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::OpenDetails(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenSetUpDetails(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::SetUpDetails(base, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenShowDetails(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::ShowDetails(base, ctx.r1.u32, ctx.r3.u32, guest.calls());
+}
+
 void BuildScreenChangeCategory(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = bs::ChangeCategory(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
@@ -325,3 +342,4 @@ ITC_BUILD_SCREEN(8219FC60, BuildScreenChangeCategory)
 ITC_BUILD_SCREEN(821A1138, BuildScreenOpenBuilds)
 ITC_BUILD_SCREEN(8219F868, BuildScreenRestoreStand)
 ITC_BUILD_SCREEN(8219FF78, BuildScreenBackToStand)
+ITC_BUILD_SCREEN(8219FEC8, BuildScreenOpenDetails)

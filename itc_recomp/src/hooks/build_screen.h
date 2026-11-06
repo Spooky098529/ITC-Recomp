@@ -5,7 +5,7 @@
 // whose functions have no adapter (only native callers reach them) are the
 // harness's alone: InitBuildList, CopyBuilds, ListBuilds, DrawBuildRows,
 // SetUpGroups, FilterGroups, MarkGroups, InitGroupLists, DrawGroupRows,
-// ShowGroup, ShowNumber and GroupArrows.
+// ShowGroup, ShowNumber, GroupArrows, SetUpDetails and ShowDetails.
 
 #pragma once
 
@@ -88,5 +88,11 @@ void BuildScreenOpenBuilds(PPCContext& ctx, uint8_t* base);
 // sub_8219FF78 (r3 = the step word).
 void BuildScreenRestoreStand(PPCContext& ctx, uint8_t* base);
 void BuildScreenBackToStand(PPCContext& ctx, uint8_t* base);
+// The details: the transition OpenDetails sub_8219FEC8 (r3 = the step
+// word), SetUpDetails sub_8219F8E0 and ShowDetails sub_8219D820 (r3 = a
+// build; neither has an adapter: only OpenDetails' plain C++ reaches them).
+void BuildScreenOpenDetails(PPCContext& ctx, uint8_t* base);
+void BuildScreenSetUpDetails(PPCContext& ctx, uint8_t* base);
+void BuildScreenShowDetails(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

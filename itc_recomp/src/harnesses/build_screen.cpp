@@ -60,6 +60,7 @@ constexpr uint32_t kNodeBytes = 0x400;
 constexpr uint32_t kNodeCount = 40;
 constexpr uint32_t kAnimRootAt = 0x49000;    // the transitions' scene root (0x400)
 constexpr uint32_t kAnimationsAt = 0x49400;  // 8 animations of no tracks (64 bytes)
+constexpr uint32_t kModelsAt = 0x49600;      // 8 car model words (the details' lines)
 constexpr uint32_t kBlockBytes = 0x49800;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
@@ -558,6 +559,12 @@ void AnimationWorld(uint8_t* base, const World& w, Random& r) {
     guest::StoreU32(base, named + 28, root);
     guest::StoreU32(base, named + 32, w.at(kAnimationsAt) + 64 * r.Below(8));
   }
+  // The words past the last animation 0 (UiMovie::ApplyAnimation, when
+  // FinishNamed finishes one just played, walks the scene's children, the
+  // animations here, and reads the last one's child count there).
+  for (uint32_t i = kModelsAt; i < kBlockBytes; i += 4) {
+    guest::StoreU32(base, w.at(i), 0);
+  }
   for (uint32_t k = 0; k < 8; k++) {
     const uint32_t animation = w.at(kAnimationsAt) + 64 * k;
     for (uint32_t i = 0; i < 64; i += 4) {
@@ -629,6 +636,24 @@ void Counts(PPCContext&, Random& r, const World& w) {
   }
   guest::StoreU32(w.base, w.at(kScreenAt) + bs::kGroupSelection, r.Below(6));
   guest::StoreU32(w.base, w.at(kScreenAt) + bs::kGroupScroll, r.Below(6));
+}
+
+// The details: each build's +48 a car build whose +2788 (the car model,
+// added to string ids) is one of 8 small words; +40 0 now and then; the
+// stand's kept selection and scroll small (the build walked to).
+void Details(PPCContext&, Random& r, const World& w) {
+  for (uint32_t k = 0; k < 8; k++) {
+    guest::StoreU32(w.base, w.at(kModelsAt) + 4 * k, r.Below(3000));
+  }
+  for (uint32_t i = 0; i < kBuildCount; i++) {
+    const uint32_t build = w.at(kBuildsAt) + 52 * i;
+    guest::StoreU32(w.base, build + 48, w.at(kModelsAt) + 4 * r.Below(8) - 2788);
+    if (r.Below(3) == 0) {
+      guest::StoreU32(w.base, build + 40, 0);
+    }
+  }
+  guest::StoreU32(w.base, w.at(kScreenAt) + bs::kStandSelection, r.Below(6));
+  guest::StoreU32(w.base, w.at(kScreenAt) + bs::kStandScroll, r.Below(6));
 }
 
 void Builds(Context& h, const World& w) {
@@ -726,11 +751,22 @@ void Groups(Context& h, const World& w) {
                guest::StoreU32(w.base, group + bs::kGroupCategory, r.Below(5));
                guest::StoreU16(w.base, group + bs::kGroupBuildCount, uint16_t(1 + r.Below(8)));
              }});
-  // OpenBuilds: SetUpBuilds' shown group from the kept selection and
-  // scroll (Counts'); its frame and SetUpBuilds' (over KeepGroupList's)
-  // without their saves.
+  // OpenBuilds: SetUpBuilds' shown group from the selection and scroll
+  // KeepGroupList keeps, both kept 0 to 5 (a negative sum would read below
+  // the shown groups); the builds' +0 310 to 349, so ShowBuildMark's +108
+  // (+0 - 310: the node's first child's index) keeps the node's children in
+  // the pool for the nodes found through it after; its frame and
+  // SetUpBuilds' (over KeepGroupList's) without their saves.
   Run(h, w, {"BuildScreen::OpenBuilds (sub_821A1138)", 50, __imp__sub_821A1138,
-             hooks::BuildScreenOpenBuilds, {{-128, -32}, {-128 - 128, -128 - 40}}, step});
+             hooks::BuildScreenOpenBuilds, {{-128, -32}, {-128 - 128, -128 - 40}},
+             [step](PPCContext& t, Random& r, const World& w) {
+               step(t, r, w);
+               guest::StoreU32(w.base, w.at(kListAt) + 4, r.Below(6));
+               guest::StoreU32(w.base, w.at(kListAt) + 16, r.Below(6));
+               for (uint32_t i = 0; i < kBuildCount; i++) {
+                 guest::StoreU32(w.base, w.at(kBuildsAt) + 52 * i, 310 + r.Below(40));
+               }
+             }});
   // BackToStand: its frame and RestoreStand's (lr saved) under it; the
   // build count one MenuList::Init can make a block for (InitStandList's).
   auto stand = [step](PPCContext& t, Random& r, const World& w) {
@@ -742,7 +778,26 @@ void Groups(Context& h, const World& w) {
   };
   Run(h, w, {"BuildScreen::BackToStand (sub_8219FF78; sub_8219F868)", 50, __imp__sub_8219FF78,
              hooks::BuildScreenBackToStand, {{-112, -24}, {-112 - 96, -112 - 8}}, stand});
+  // OpenDetails: its frame and SetUpDetails' (over KeepStandList's), without
+  // their saves (below them LineCount's 4 KB frame and SetHelp's, whose
+  // parameter area holds SetNodeText's register leftovers, cover
+  // ShowDetails'; its own cases compare it).
+  Run(h, w, {"BuildScreen::OpenDetails (sub_8219FEC8; sub_8219F8E0, sub_8219D820)", 40,
+             __imp__sub_8219FEC8, hooks::BuildScreenOpenDetails,
+             {{-112, -24}, {-112 - 128, -112 - 24}},
+             [step](PPCContext& t, Random& r, const World& w) {
+               step(t, r, w);
+               Details(t, r, w);
+             }});
   ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  Run(h, w, {"BuildScreen::SetUpDetails (sub_8219F8E0; sub_8219D820)", 60, __imp__sub_8219F8E0,
+             hooks::BuildScreenSetUpDetails, {{-128, -24}}, Details});
+  Run(h, w, {"BuildScreen::ShowDetails (sub_8219D820)", 80, __imp__sub_8219D820,
+             hooks::BuildScreenShowDetails, {{-144, -96}, {-64, -48}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Details(t, r, w);
+               t.r3.u64 = w.at(kBuildsAt) + 52 * r.Below(kBuildCount);
+             }});
   Run(h, w, {"BuildScreen::RestoreStand (sub_8219F868)", 60, __imp__sub_8219F868,
              hooks::BuildScreenRestoreStand, {{-96, -8}},
              [](PPCContext&, Random& r, const World& w) {
