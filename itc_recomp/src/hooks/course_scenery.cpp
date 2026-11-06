@@ -13,7 +13,11 @@
 // native, SceneryList::Add (sub_820F1888, from Scenery::StartLoad,
 // CollectAreas and CollectModels), PoolObject::PoolObject (sub_820FBB20,
 // from the pools' objects' constructors) and ModelList::Init (sub_820F1A20,
-// from CourseSet::CourseSet and InitParts).
+// from CourseSet::CourseSet and InitParts); and, since Scenery::Update
+// became native, SceneryList::Clear (sub_820F1588), Sort (sub_820F1930),
+// Stream (sub_820F16C0), ReleaseUnused (sub_820F17C0), Scenery::
+// LimitLargeModels (sub_820F2B80), CollectAreas (sub_820F3098),
+// CollectModels (sub_820F32D0) and PoolObject::SetVisible (sub_820FB938).
 
 #include "guest.h"
 
@@ -29,7 +33,7 @@
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "Run the course scenery (docs/functions/course-scenery.md: PoolObject::AllocData "
               "sub_820FB8B8, InUse sub_820FB8E0, IsLoaded sub_820FB8F0, IsVisible sub_820FB908, "
-              "IsExpiring sub_820FB920, SetVisible sub_820FB938, SetExpiring sub_820FB968, "
+              "IsExpiring sub_820FB920, SetVisible sub_820FB938 (no adapter), SetExpiring sub_820FB968, "
               "ClearLoadFlags sub_820FB998, MarkLoaded sub_820FB9A8, Reset sub_820FB9D8, Key "
               "sub_820FB9F0, PoolObject sub_820FBB20 (no adapter), SetKey sub_820FBA00, KeyEquals "
               "sub_820FBA60, AreaLights::Key sub_820F1C20, AreaModel::Key sub_820F1CD8, "
@@ -37,16 +41,16 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FBE80, Load sub_820FBFD0, Release sub_820FC038, Init sub_820FBBE8, "
               "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530, Scenery::PoolSizes "
               "sub_820F2030 (Archive::AssetSize's plain C++), SceneryList::Clear "
-              "sub_820F1588, Add sub_820F1888 (no adapter), Sort sub_820F1930, Scenery::LimitLargeModels "
-              "sub_820F2B80, ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, "
+              "sub_820F1588 (no adapter), Add sub_820F1888 (no adapter), Sort sub_820F1930 (no adapter), "
+              "Scenery::LimitLargeModels sub_820F2B80 (no adapter), ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, "
               "Scenery::AllocPhysical sub_820F1490 and FreePhysical sub_820F14E8 (with the native "
               "heap; XPhysicalSize answered by the layer), Scenery::Create sub_820F2F88 and Setup "
               "sub_820F3020 with SetupPools sub_820F2720 (no adapter: only Setup calls it; with "
               "--native_models' lifetime and memcpy native), Scenery::Init sub_820F1360, "
-              "SceneryList::ReleaseUnused sub_820F17C0, SceneryList::LoadAll sub_820F1598 and Stream "
-              "sub_820F16C0 (Archive::QueueLength's plain C++ with the archive's native queue), "
+              "SceneryList::ReleaseUnused sub_820F17C0 (no adapter), SceneryList::LoadAll sub_820F1598 and Stream "
+              "sub_820F16C0 (no adapter) (Archive::QueueLength's plain C++ with the archive's native queue), "
               "Scenery::StartLoad sub_820F1E00, "
-              "Scenery::CollectAreas sub_820F3098, Scenery::CollectModels sub_820F32D0, "
+              "Scenery::CollectAreas sub_820F3098 (no adapter), Scenery::CollectModels sub_820F32D0 (no adapter), "
               "Scenery::Update sub_820F4558 (CameraPass::FromViewport's plain C++, CameraPass::Update "
               "a guest call), "
               "Scenery::DrawSetLists sub_820F52A8 (the scenery lists' draws' plain C++ called "
@@ -65,7 +69,8 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "--run_harnesses=course_scenery). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: sub_82146B20, sub_82146AC0, "
               "sub_820FBA00, sub_820FBA60, sub_820FB908, sub_820FB920, sub_820FBB10, "
-              "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20");
+              "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20, sub_820F1588, sub_820F1930, "
+              "sub_820F16C0, sub_820F17C0, sub_820F2B80, sub_820F3098, sub_820F32D0, sub_820FB938");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -142,7 +147,6 @@ bool hooks::CourseScenerySetUpNative() {
 ITC_COURSE_SCENERY(820FB8B8, ctx.r3.u64 = AllocData(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COURSE_SCENERY(820FB8E0, ctx.r3.u64 = InUse(base, ctx.r3.u32))
 ITC_COURSE_SCENERY(820FB8F0, ctx.r3.u64 = IsLoaded(base, ctx.r3.u32))
-ITC_COURSE_SCENERY(820FB938, SetVisible(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COURSE_SCENERY(820FB968, SetExpiring(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COURSE_SCENERY(820FB998, ClearLoadFlags(base, ctx.r3.u32))
 ITC_COURSE_SCENERY(820FB9A8, MarkLoaded(base, ctx.r3.u32))
@@ -209,20 +213,10 @@ extern "C" REX_FUNC(sub_820FBDC8) {
 
 // r3 = the configuration, r4 = an area, r5 = a model.
 ITC_COURSE_SCENERY(820F1530, SetIndex(ctx, ModelAsset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)))
-// r3 = the manager (not read), r4 = a list.
-ITC_COURSE_SCENERY(820F1588, ListClear(base, ctx.r4.u32))
 // Scenery::PoolSizes: r3 = the area counts, r4 = the model counts, r5 = out,
 // r6 = the configuration; from Scenery::SetupPools (recompiled).
 ITC_COURSE_SCENERY(820F2030, ctx.r3.u64 = PoolSizes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                    ctx.r6.u32))
-// r5, r6 = the first and last item.
-ITC_COURSE_SCENERY(820F1930, ListSort(base, ctx.r4.u32, ctx.r5.s32, ctx.r6.s32))
-// r3 = the manager; leaves r3 = the manager + 100. The original's register
-// save (r27 to r31 and the link register below r1) is made first, as its
-// table's reads past the 5th area read those.
-ITC_COURSE_SCENERY(820F2B80, ctx.r12.u64 = ctx.lr; __savegprlr_27(ctx, base);
-                   LimitLargeModels(base, ctx.r3.u32, ctx.r1.u32);
-                   ctx.r3.u64 = ctx.r3.u64 + 100)
 ITC_COURSE_SCENERY(820F1480, ClearGlobal(base))
 // Scenery::AllocPhysical: r3 = a size; returns the block. Scenery::
 // FreePhysical: r3 = a block; r3 = 0, as XPhysicalFree leaves it. The
@@ -270,30 +264,17 @@ extern "C" REX_FUNC(sub_820F14E8) {
 // call (XMemSet) leaves it: its destination, [0x826C5514] + 144.
 ITC_COURSE_SCENERY(820F1360, Init(base, ctx.r3.u32);
                    ctx.r3.u64 = guest::LoadU32(base, kManager) + 144u)
-// r3 = the manager, r4 = a list.
-ITC_COURSE_SCENERY(820F17C0, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = ReleaseUnused(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32))
-// SceneryList::LoadAll and Stream: r3 = the manager, r4 = a list; from
-// Scenery::IsLoaded and Update (recompiled). The queue length's plain C++
-// with the archive's native queue, else its original through `ctx`.
+// SceneryList::LoadAll: r3 = the manager, r4 = a list; from Scenery::
+// IsLoaded (recompiled). The queue length's plain C++ with the archive's
+// native queue, else its original through `ctx`.
 ITC_COURSE_SCENERY(820F1598, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = ListLoadAll(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                             hooks::NativeArchiveQueue()))
-ITC_COURSE_SCENERY(820F16C0, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = ListStream(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                           hooks::NativeArchiveQueue()))
 // r3 = the manager.
 ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))
 
-// --- What a view sees: r3 = the manager, r4 = the view, r5 = its viewport
-// (flush-to-zero off, as the originals' float instructions set it) ---
-ITC_COURSE_SCENERY(820F3098, ctx.fpscr.disableFlushMode();
-                   ctx.r3.u64 = CollectAreas(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                             ctx.r5.u32, ctx.r3.u32))
-ITC_COURSE_SCENERY(820F32D0, ctx.fpscr.disableFlushMode();
-                   ctx.r3.u64 = CollectModels(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                              ctx.r5.u32, ctx.r3.u32))
+// --- What a view sees ---
 
 // Scenery::Update: r3 = the manager; from RaceScene::Update and the front
 // end's camera (recompiled). The original's register saves made first
