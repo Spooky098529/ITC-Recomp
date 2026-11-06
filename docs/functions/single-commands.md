@@ -78,6 +78,25 @@ needs it, else Dropped", `../loops/b7-loop.md`'s "Precedent first"):
   set. 21 skips data; 22 the release list's push (as command 22's
   `sub_82591798`).
 
+**Native** (B7 loop, 2026-11-06, `--native_single_commands`): the five
+handlers seen in play (5, 7, 13 and 14, 15, 28) are plain C++ in
+`src/graphics/single_commands.cpp`, with adapters in
+`src/hooks/single_commands.cpp` and, for 15, its wrap in
+`src/native/replay_hooks.cpp` (the adapters stay: the table reaches them).
+`ChunkChain::RunSingles`' plain C++ (`device-shaders.md`) calls them
+directly through `hooks::SingleCommands`, which the replay's adapter
+passes down (`graphics::render_queue::SingleCommand`), marking 15 as
+command 15 around it as the wrap does, so the renderer's inline draw and
+everything the map lists above sees the same as before; the others'
+handlers stay guest calls. The device's setters they call
+(`device-state.md`) are called as their plain C++ whatever
+`--native_device_state` says (as `RenderQueue::Init` calls
+`GetRenderTarget`), their originals only where `SetStreamSource` or
+`SetTexture` would fence on a full fence list. The drawer's vtable slots
+(`PrimitiveDrawer::SetShaders` and `Draw`, recompiled) and the movie's
+slot 0 stay guest calls. Harness `single_commands` (under the device lock,
+the globals pointed at made-up ones and put back).
+
 Shared, in other files: `ChunkChain::RunSingles` and `PtrVector::PushBack`
 (`device-shaders.md`); the device's setters (the render and sampler state setters reached
 through the device's tables at +56 and +440, `SetBlendControl`, `SetTexture`, `SetStreamSource`, `SetIndices`,
