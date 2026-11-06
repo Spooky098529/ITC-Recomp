@@ -63,7 +63,10 @@ file's history. What's left to see in a drive, from every run:
   `sub_822B6780`, `sub_822B69A8`, `sub_822B6A78`, `sub_825BF200`; the
   menus' every frame; `sub_822B6AD8` and `sub_822B6BF8` ready, the
   command buffer's remaining callers; its line deleted from
-  `leads.md`). Step: mapping agent running.
+  `leads.md`). Map checked (b402e0cb: `predicated-tiling.md`, 17
+  rows, 8 moved from `functions.md`, 8 in play; 0 errors; 5 ready
+  groups; blocked by `Device::Clear`'s worker and `Device::Resolve`
+  (a lead added); no subagents). Step: migration agent running.
 
 ## Done
 
@@ -106,5 +109,7 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4224, work left 2186 (wrapped 58, known
   460, unknown 1668).
 - After its validation (`itc_3639`): ours 4224, work left 2186.
+- After predicated tiling's map: ours 4224, work left 2186 (wrapped
+  58, known 462, unknown 1666).
 
 ## Stopped
