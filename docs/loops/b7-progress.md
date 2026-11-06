@@ -127,7 +127,13 @@ file's history. What's left to see in a drive, from every run:
   added to "Precedent first"). Third migration agent running
   (`CarScene::Update` `sub_820C9608`, now ready, with `sub_820C59B0`,
   `sub_820C5A60`, `SceneModel::Update`; then `GarageStage::ReloadModel`,
-  `PutOnStand`, `SetUpStand`, `OpenStand`).
+  `PutOnStand`, `SetUpStand`, `OpenStand`). Third migration
+  12c133b8..8b626097 (`CarScene::Update` with `ScenePools::DestroyB`,
+  `CarScene::UpdateModels`, `SceneModel::Update` (its accessory branch,
+  never seen, on the originals); `GarageStage::ReloadModel`; `OpenStand`
+  with `SetUpStand`, `PutOnStand`; 14 adapters removed; races 34-38 s,
+  0 errors, all harnesses 0 differing; no subagents); left: none
+  (`BackToBuilds` kept, the user's call). Validation agent running.
 
 ## Done
 
