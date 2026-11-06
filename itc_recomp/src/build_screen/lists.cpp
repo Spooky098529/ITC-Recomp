@@ -14,7 +14,6 @@ namespace build_screen {
 namespace {
 
 constexpr uint32_t kMenuListInit = 0x8220BAC0;
-constexpr uint32_t kMovieId = 6;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -204,9 +203,7 @@ uint32_t MarkGroups(uint8_t* base) {
 
 uint32_t FilterGroups(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8219CC70 BuildScreen::FilterGroups");
-  const uint32_t frame = Frame(base, sp, 192);
-  Store(base, frame + 80, kMovieId);
-  const uint32_t movie = Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  const uint32_t movie = Movie(base, Frame(base, sp, 192));
   Store(base, Screen(base) + kShownCount, 0);
   for (uint32_t at = 0; at < kGroupCount * kGroupBytes; at += kGroupBytes) {
     const uint32_t screen = Screen(base);

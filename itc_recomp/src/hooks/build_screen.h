@@ -31,4 +31,18 @@ void BuildListInsert(PPCContext& ctx, uint8_t* base);
 // GarageStage::SetDark sub_8217D0C8: r3 = the stage's holder, r4 = dark.
 void GarageStageSetDark(PPCContext& ctx, uint8_t* base);
 
+// BuildScreen::GroupArrows sub_8219D1B0 and BuildArrows sub_8219D4B8 (r3 =
+// the scroll, r4 = the count), StandArrows sub_8219D7B0, ShowBuildMark
+// sub_8219D440 (r3 = a build), SetPrompts sub_8219DA58 (r3 to r8),
+// SetHelp sub_8219DB50 (r3 = a string id), ShowNumber sub_8219D090 (r3 =
+// the number), DrawGroupRows sub_8219FA28.
+void BuildScreenGroupArrows(PPCContext& ctx, uint8_t* base);
+void BuildScreenBuildArrows(PPCContext& ctx, uint8_t* base);
+void BuildScreenStandArrows(PPCContext& ctx, uint8_t* base);
+void BuildScreenShowBuildMark(PPCContext& ctx, uint8_t* base);
+void BuildScreenSetPrompts(PPCContext& ctx, uint8_t* base);
+void BuildScreenSetHelp(PPCContext& ctx, uint8_t* base);
+void BuildScreenShowNumber(PPCContext& ctx, uint8_t* base);
+void BuildScreenDrawGroupRows(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

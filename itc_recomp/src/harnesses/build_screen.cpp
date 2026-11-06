@@ -23,6 +23,7 @@
 #include "base/log.h"
 #include "build_screen/build_screen.h"
 #include "hooks/build_screen.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
 
@@ -61,6 +62,9 @@ constexpr uint32_t kBlockBytes = 0x49000;
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
 constexpr uint32_t kMissingMovie = 0x826C5CDC;
+constexpr uint32_t kMissingText = 0x826C5CD8;  // a text id not in the map: its record
+constexpr uint32_t kStringTable = 0x826C5C34;
+constexpr uint32_t kTxtTag = 0x54585400;  // "TXT\0"
 
 struct Global {
   uint32_t address;
@@ -70,6 +74,8 @@ constexpr Global kGlobals[] = {
     {bs::kMachine, 16},  // the machine, the lists and the screen
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
+    {kMissingText, 4},
+    {kStringTable, 4},
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -81,16 +87,59 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
 struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
-        block((allocation + 15) & ~15u) {}
-  ~World() { memory::Free(allocation); }
+        block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)) {
+    if (strings != 0) {
+      MakeStrings();
+    }
+  }
+  ~World() {
+    memory::Free(allocation);
+    memory::Free(strings);
+  }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0; }
+  bool ok() const { return allocation != 0 && strings != 0; }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint8_t* base;
   uint32_t allocation;
   uint32_t block;
+  // A string table of our own (for the text setters, [0x826C5C34] pointed
+  // at it): its 18 files all one container of 8,192 entries over 16
+  // strings of letters, newlines and page breaks, so any id below 8,192
+  // has a string; no argument codes (the varargs the native callers pass
+  // as 0 aren't read).
+  static constexpr uint32_t kStringsBytes = 0x9000;
+  uint32_t strings;
+
+ private:
+  void MakeStrings() {
+    Random r(0x4275696C64ull);  // "Build"
+    const uint32_t container = strings + 128, text = strings + 128 + 4 + 4 * 8192;
+    for (uint32_t k = 0; k < 18; k++) {
+      guest::StoreU32(base, strings + 4 * k, container);
+    }
+    guest::StoreU32(base, container, __builtin_bswap32(8192));
+    for (uint32_t k = 0; k < 8192; k++) {
+      const uint32_t at = text + 64 * (k % 16);
+      guest::StoreU32(base, container + 4 + 4 * k, __builtin_bswap32(at - container));
+    }
+    for (uint32_t k = 0; k < 16; k++) {
+      const uint32_t at = text + 64 * k;
+      const uint32_t length = r.Below(30);
+      for (uint32_t c = 0; c < length; c++) {
+        uint16_t unit = uint16_t('a' + r.Below(26));
+        if (r.Below(10) == 0) {
+          unit = r.Below(2) == 0 ? 10 : 0xFFD1;
+        }
+        guest::StoreU16(base, at + 2 * c, unit);
+      }
+      guest::StoreU16(base, at + 2 * length, 0);
+    }
+  }
 };
+
+// A string id below 8,192 (every one has a string in our table).
+uint32_t StringId(Random& r) { return r.Below(8192); }
 
 // A small count: mostly 0 to `hi`, now and then negative or any halfword.
 uint16_t SmallCount(Random& r, uint32_t hi) {
@@ -131,6 +180,7 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   const uint32_t screen = w.at(kScreenAt);
   for (uint32_t g = 0; g < bs::kGroupCount; g++) {
     const uint32_t group = screen + bs::kGroups + bs::kGroupBytes * g;
+    guest::StoreU32(base, group + 0, r.Below(40));
     guest::StoreU32(base, group + bs::kGroupCategory, r.Below(8) == 0 ? r.Below(8) : r.Below(5));
     MakeBuildList(base, w, group + bs::kGroupList_, r, SmallCount(r, 8));
   }
@@ -158,11 +208,20 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, movie + 16, w.at(kNodesAt));
   for (uint32_t n = 0; n < kNodeCount; n++) {
     const uint32_t node = w.at(kNodesAt) + kNodeBytes * n;
+    guest::StoreU32(base, node + 0, kTxtTag);
+    // +100 and +104 (the prompts' and digits' children) in the pool's range
+    // too, as nodes other than the ones a case shapes are reached once a
+    // function has stored into +108 (each node's first child's index).
+    guest::StoreU32(base, node + 100, r.Below(60));
+    guest::StoreU32(base, node + 104, r.Below(8));
     guest::StoreU32(base, node + 108, r.Below(4));
     for (uint32_t e = 0; e < (kNodeBytes - 128) / 8; e++) {
       guest::StoreU32(base, node + 128 + 8 * e, w.at(kNodesAt) + kNodeBytes * r.Below(kNodeCount));
     }
   }
+  // The texts' map empty, the text count small.
+  guest::StoreU32(base, movie + ui_movies::kMovieTexts + 1024, 0);
+  guest::StoreU32(base, movie + 0x9FCC, r.Below(7));
   guest::StoreU32(base, w.at(kPairsAt), 6);
   guest::StoreU32(base, w.at(kPairsAt) + 4, movie);
   guest::StoreU32(base, w.at(kHolderAt), w.at(kStageAt));
@@ -180,6 +239,30 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
   // movie, the same movie).
   guest::StoreU32(base, ui_movies::kMovieTable + 8, r.Below(8) == 0 ? 0 : 1);
   guest::StoreU32(base, kMissingMovie, w.at(kMovieAt));
+  guest::StoreU32(base, kMissingText, 0);
+  guest::StoreU32(base, kStringTable, w.strings);
+}
+
+// The text records GetText made (stored in the movie's map by the
+// setters): their words and buffers compared, freed, their map words 0.
+void TextRecords(uint8_t* base, const World& w, Outputs& out) {
+  const uint32_t map = w.at(kMovieAt) + ui_movies::kMovieTexts;
+  const uint32_t pairs = guest::LoadU32(base, map + 1024);
+  for (uint32_t k = 0; k < pairs && k < 128; k++) {
+    const uint32_t value = guest::LoadU32(base, map + 8 * k + 4);
+    if (value != 0 && memory::IsHeapBlock(value)) {
+      const uint32_t buffer = guest::LoadU32(base, value);
+      out.Word(k);
+      out.Bytes(Read(base, value + 4, 24));
+      out.Word(memory::IsPages(buffer) ? 1 : 0);
+      if (memory::IsPages(buffer)) {
+        out.Bytes(Read(base, buffer, 4096));
+        memory::FreePages(buffer);
+      }
+      memory::crt::OperatorDelete(value);
+      guest::StoreU32(base, map + 8 * k + 4, 0);
+    }
+  }
 }
 
 // The menu lists' flags blocks MenuList::Init made: their words compared,
@@ -240,6 +323,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
         spec.native(t, h.base);
       }
       ListBlocks(h.base, w, out[v]);
+      TextRecords(h.base, w, out[v]);
       out[v].Bytes(Read(h.base, w.block, kBlockBytes));
       for (const Range& range : spec.stack) {
         out[v].Bytes(Read(h.base, sp + range.from, uint32_t(range.to - range.from)));
@@ -335,6 +419,83 @@ void Stage(Context& h, const World& w) {
              }});
 }
 
+void Rows(Context& h, const World& w) {
+  auto arrows = [](uint32_t rows) {
+    return [rows](PPCContext& t, Random& r, const World&) {
+      t.r3.u64 = r.Below(3) == 0 ? 0 : r.Below(20);
+      t.r4.u64 = r.Below(2) == 0 ? t.r3.u64 + rows : r.Below(30);
+      if (r.Below(6) == 0) {
+        t.r3.u64 |= r.Next() << 32;
+      }
+    };
+  };
+  Run(h, w, {"BuildScreen::GroupArrows (sub_8219D1B0)", 100, __imp__sub_8219D1B0,
+             hooks::BuildScreenGroupArrows, {{-128, -40}}, arrows(11)});
+  Run(h, w, {"BuildScreen::BuildArrows (sub_8219D4B8)", 100, __imp__sub_8219D4B8,
+             hooks::BuildScreenBuildArrows, {{-128, -40}}, arrows(6)});
+  Run(h, w, {"BuildScreen::StandArrows (sub_8219D7B0)", 100, __imp__sub_8219D7B0,
+             hooks::BuildScreenStandArrows, {{-96, -8}},
+             [](PPCContext&, Random& r, const World& w) {
+               if (r.Below(2) == 0) {
+                 guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, 1);
+               }
+             }});
+  Run(h, w, {"BuildScreen::ShowBuildMark (sub_8219D440)", 100, __imp__sub_8219D440,
+             hooks::BuildScreenShowBuildMark, {{-112, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               const uint32_t build = w.at(kBuildsAt) + 52 * r.Below(kBuildCount);
+               if (r.Below(2) == 0) {
+                 guest::StoreU32(w.base, build + 16, 0);
+               }
+               t.r3.u64 = build;
+             }});
+  // SetPrompts: each of r3 to r8 -1 now and then; the slots' +100 (the
+  // icon's and label's children) in the pool's range.
+  Run(h, w, {"BuildScreen::SetPrompts (sub_8219DA58)", 150, __imp__sub_8219DA58,
+             hooks::BuildScreenSetPrompts, {{-176, -56}},
+             [](PPCContext& t, Random& r, const World& w) {
+               const uint32_t movie = w.at(kMovieAt);
+               for (uint32_t k = 0; k < 3; k++) {
+                 guest::StoreU32(w.base, ui_movies::FindNode(w.base, movie, 2, k) + 100,
+                                 r.Below(60));
+               }
+               PPCRegister* regs[6] = {&t.r3, &t.r4, &t.r5, &t.r6, &t.r7, &t.r8};
+               for (PPCRegister* reg : regs) {
+                 reg->u64 = r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(12);
+                 if (r.Below(8) == 0) {
+                   reg->u64 |= r.Next() << 32;
+                 }
+               }
+             }});
+  // SetHelp: a string id. SetNodeText's parameter area in its frame
+  // (+40 to +79: the original's register leftovers, 0 natively, the user's
+  // call, 2026-10-30) left out, and its register saves.
+  Run(h, w, {"BuildScreen::SetHelp (sub_8219DB50)", 100, __imp__sub_8219DB50,
+             hooks::BuildScreenSetHelp, {{-128, -88}, {-48, -32}},
+             [](PPCContext& t, Random& r, const World&) { t.r3.u64 = StringId(r); }});
+  // ShowNumber: 100 now and then, mostly 0 to 999, else any word; the
+  // digits node's first child and count in the pool's range.
+  Run(h, w, {"BuildScreen::ShowNumber (sub_8219D090; sub_8219BD30)", 200, __imp__sub_8219D090,
+             hooks::BuildScreenShowNumber, {{-176, -88}},
+             [](PPCContext& t, Random& r, const World& w) {
+               const uint32_t digits = ui_movies::FindNode(w.base, w.at(kMovieAt), 12, 3);
+               guest::StoreU32(w.base, digits + 100, r.Below(40));
+               guest::StoreU32(w.base, digits + 104, r.Below(8) == 0 ? 0 : r.Below(8));
+               switch (r.Below(6)) {
+                 case 0: t.r3.u64 = 100; break;
+                 case 1: t.r3.u64 = r.Next(); break;
+                 case 2: t.r3.u64 = r.Below(10); break;
+                 default: t.r3.u64 = r.Below(1000);
+               }
+             }});
+  // DrawGroupRows: the rows from the list's scroll over the shown groups;
+  // each row's frame below (SetNodeText's parameter area and the saves left
+  // out).
+  Run(h, w, {"BuildScreen::DrawGroupRows (sub_8219FA28; sub_8219CE08)", 100,
+             __imp__sub_8219FA28, hooks::BuildScreenDrawGroupRows,
+             {{-112, -24}, {-256, -216}, {-176, -168}}, None});
+}
+
 }  // namespace
 
 void BuildScreen(Context& h) {
@@ -346,6 +507,7 @@ void BuildScreen(Context& h) {
   Lists(h, w);
   BuildLists(h, w);
   Stage(h, w);
+  Rows(h, w);
 }
 
 }  // namespace harness

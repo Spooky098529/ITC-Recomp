@@ -50,6 +50,10 @@ constexpr uint32_t kListFree = 1600, kListHead = 1604, kListCount = 1608, kListS
 // A group's fields.
 constexpr uint32_t kGroupCategory = 4, kGroupMark = 32, kGroupList_ = 40, kGroupBuildCount = 1648;
 
+// Movie 6: its id at `frame` + 80, then UiMovies::Find (rows.cpp).
+constexpr uint32_t kMovieId = 6;
+uint32_t Movie(uint8_t* base, uint32_t frame);
+
 // --- The menu lists (lists.cpp) ---
 
 // sub_8219BA50 BuildScreen::KeepGroupList, sub_8219BB20 KeepBuildList,
@@ -104,5 +108,41 @@ void LightsSetMode(uint8_t* base, uint32_t sp, uint32_t lights, uint32_t mode);
 // sub_8217D0C8 GarageStage::SetDark: SetMode(stage + 4512, dark), stage
 // +6060 = dark is 1. r3 stage + 4512.
 uint32_t SetDark(uint8_t* base, uint32_t sp, uint32_t holder, uint32_t dark);
+
+// --- The rows, arrows, marks, prompts and help (rows.cpp) ---
+
+// sub_8219D1B0 BuildScreen::GroupArrows and sub_8219D4B8 BuildArrows: the
+// up arrow (7, 10) or (8, 2) hidden at scroll 0, the down one (7, 11) or
+// (8, 3) hidden when scroll + the rows (11 or 6) is `count`. r3 the down
+// arrow.
+uint32_t GroupArrows(uint8_t* base, uint32_t sp, uint32_t scroll, uint32_t count);
+uint32_t BuildArrows(uint8_t* base, uint32_t sp, uint32_t scroll, uint32_t count);
+// sub_8219D7B0 BuildScreen::StandArrows: node (-1, 23) hidden when the
+// build count is 1. r3 the node.
+uint32_t StandArrows(uint8_t* base, uint32_t sp);
+// sub_8219D440 BuildScreen::ShowBuildMark: node (17, 0) hidden when the
+// build's +16 is 0, else shown with +108 = the build's +0 - 310. r3 the
+// node.
+uint32_t ShowBuildMark(uint8_t* base, uint32_t sp, uint32_t build);
+// sub_8219DA58 BuildScreen::SetPrompts: `pairs` r3 to r8 (three icon and
+// label pairs, -1 for none). r3 the last label node.
+uint32_t SetPrompts(uint8_t* base, uint32_t sp, const uint32_t pairs[6]);
+// sub_8219DB50 BuildScreen::SetHelp: node (1, 0)'s text reset, set to
+// string `id` and scrolled. ScrollNodeText's r3.
+uint64_t SetHelp(uint8_t* base, uint32_t sp, uint32_t id, const Calls& calls);
+// sub_8219BD30 BuildScreen::PowI: `x` to the `n` (signed) by squaring with
+// single-precision products, its reciprocal for n below 0. f1.
+double PowI(uint8_t* base, double x, uint32_t n);
+// sub_8219D090 BuildScreen::ShowNumber: `number`'s digits on node (12, 3)'s
+// children, the leading zeros hidden; node (12, 0) shown at 100. r3 the
+// last node found.
+uint32_t ShowNumber(uint8_t* base, uint32_t sp, uint32_t number);
+// sub_8219CE08 BuildScreen::DrawGroupRow: row `row`'s nodes for the shown
+// group `index` (its name, mark and new mark), nothing written past the
+// count. r3 SetNodeText's, else the text node.
+uint64_t DrawGroupRow(uint8_t* base, uint32_t sp, uint32_t row, uint32_t index,
+                      const Calls& calls);
+// sub_8219FA28 BuildScreen::DrawGroupRows: the 11 rows from the scroll.
+uint64_t DrawGroupRows(uint8_t* base, uint32_t sp, const Calls& calls);
 
 }  // namespace build_screen

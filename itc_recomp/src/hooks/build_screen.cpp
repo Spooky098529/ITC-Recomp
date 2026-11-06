@@ -15,10 +15,15 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "InitStandList sub_8219C078 (MenuList::Init through its override), ValueText "
               "sub_8219BCC0; the build lists' BuildList::Insert sub_8219C230 and InsertNode "
               "sub_8219C1C8, MarkGroups sub_8219EC50, FilterGroups sub_8219CC70; the garage "
-              "stage's GarageStage::SetDark sub_8217D0C8 with GarageLights::SetMode sub_8217B7C8) "
+              "stage's GarageStage::SetDark sub_8217D0C8 with GarageLights::SetMode sub_8217B7C8; "
+              "the rows' and nodes' GroupArrows sub_8219D1B0, BuildArrows sub_8219D4B8, "
+              "StandArrows sub_8219D7B0, ShowBuildMark sub_8219D440, SetPrompts sub_8219DA58, "
+              "SetHelp sub_8219DB50 (the text setters through their overrides), ShowNumber "
+              "sub_8219D090 with PowI sub_8219BD30, DrawGroupRows sub_8219FA28 with DrawGroupRow "
+              "sub_8219CE08 (SetNodeText through its override)) "
               "natively instead of through the translated code (the same writes; checked by "
-              "--run_harnesses=build_screen). RestoreGroupList, InsertNode and SetMode have no "
-              "adapters: only native callers reach them, and the flag switches those");
+              "--run_harnesses=build_screen). RestoreGroupList, InsertNode, SetMode, PowI and DrawGroupRow have "
+              "no adapters: only native callers reach them, and the flag switches those");
 
 namespace hooks {
 
@@ -121,6 +126,43 @@ void GarageStageSetDark(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = bs::SetDark(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
 
+void BuildScreenGroupArrows(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = bs::GroupArrows(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+
+void BuildScreenBuildArrows(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = bs::BuildArrows(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+
+void BuildScreenStandArrows(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = bs::StandArrows(base, ctx.r1.u32);
+}
+
+void BuildScreenShowBuildMark(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = bs::ShowBuildMark(base, ctx.r1.u32, ctx.r3.u32);
+}
+
+void BuildScreenSetPrompts(PPCContext& ctx, uint8_t* base) {
+  const uint32_t pairs[6] = {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                             ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};
+  ctx.r3.u64 = bs::SetPrompts(base, ctx.r1.u32, pairs);
+}
+
+void BuildScreenSetHelp(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::SetHelp(base, ctx.r1.u32, ctx.r3.u32, guest.calls());
+}
+
+void BuildScreenShowNumber(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = bs::ShowNumber(base, ctx.r1.u32, ctx.r3.u32);
+}
+
+void BuildScreenDrawGroupRows(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::DrawGroupRows(base, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -146,3 +188,11 @@ ITC_BUILD_SCREEN(8219CC70, BuildScreenFilterGroups)
 ITC_BUILD_SCREEN(8219BCC0, BuildScreenValueText)
 ITC_BUILD_SCREEN(8219C230, BuildListInsert)
 ITC_BUILD_SCREEN(8217D0C8, GarageStageSetDark)
+ITC_BUILD_SCREEN(8219D1B0, BuildScreenGroupArrows)
+ITC_BUILD_SCREEN(8219D4B8, BuildScreenBuildArrows)
+ITC_BUILD_SCREEN(8219D7B0, BuildScreenStandArrows)
+ITC_BUILD_SCREEN(8219D440, BuildScreenShowBuildMark)
+ITC_BUILD_SCREEN(8219DA58, BuildScreenSetPrompts)
+ITC_BUILD_SCREEN(8219DB50, BuildScreenSetHelp)
+ITC_BUILD_SCREEN(8219D090, BuildScreenShowNumber)
+ITC_BUILD_SCREEN(8219FA28, BuildScreenDrawGroupRows)
