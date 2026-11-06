@@ -21,7 +21,16 @@ file's history. What's left to see in a drive, from every run:
   `sub_822AF978`; its line deleted from `leads.md`). Map checked
   (aa4b202c: `command-buffer.md`, 36 rows, 16 moved from
   `functions.md`, 24 in play; 0 errors; 9 ready groups; 2 leads
-  added; no subagents). Step: migration agent running.
+  added; no subagents). Migration e041aa4a..abca2df1
+  (`--native_command_buffer`: the segment tail, save, chain close,
+  callback packets, next space, data space, the default draw
+  registers' marks without their packets; `sub_8229DC28`,
+  `sub_8229E5D0`, `sub_8229DE48`, `sub_8229DDD8`, `sub_822AC470`
+  Dropped; `itc_3604`: race 38 s, 0 errors, every harness 0 differing
+  but `sub_822AF978`'s expected group; no subagents); left:
+  `sub_8229EB10` (ready), then the segment flow's cycle
+  (`sub_8229EF48`, `EDA8`, `EC00`, `E908`). Step: validation agent
+  running.
 
 ## Done
 
@@ -43,5 +52,7 @@ file's history. What's left to see in a drive, from every run:
   unknown 1684).
 - After the command buffer's map: ours 4197, work left 2213 (wrapped
   60, known 481, unknown 1672).
+- After its migration: ours 4209, work left 2201 (wrapped 60, known
+  469, unknown 1672).
 
 ## Stopped

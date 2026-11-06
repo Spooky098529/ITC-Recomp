@@ -277,3 +277,9 @@ were at 0.
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_82173050` RaceManager::AddRacers | random traffic numbers | 5 of 200 | Stack leftovers (a negative car number from random +16 words makes `Traffic::PickModel` read below its tables, into earlier calls' register saves; +16 is 0 from `RaceManager::Create` in play) | for review (08:36 run) |
+
+### `command-buffer.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822AF978` Device::WriteDefaultDrawRegisters | its packets and r3 | 100 of 100 | Packets nothing reads (its 15 packet words left out, so the command words and r3, the position after them, differ; the dirty marks match in the main group) | for review (2026-11-06 01:02 run) |
