@@ -39,10 +39,16 @@ file's history. What's left to see in a drive, from every run:
   waits on `SceneModel::ApplyRecord`/`ReloadDecals`, `ScenePools::SetUpB`,
   `CarScene::Update`, `GarageStage::Draw` and `sub_821A1380`'s handlers;
   `CarList::DrawEntryPowerGraph` `sub_82250670` now ready (a cleanup
-  lead). Validation agent running.
+  lead). Validated `itc_3677` (race 38 s, 0 errors, every harness 0
+  differing, 15 of 15 harness lines; 9 ran in the race, 4 in the
+  replay `itc_3678` (ok); the busy marker's two to drive). Recorded.
 
 ## Done
 
+- `car-makers.md`: 16 of 24 in play native (the record from a car and
+  its setters, the garage cars, `FromGarageCar`, the tuning screen's
+  set-up, `FitCar`, `CopyRecord`, the busy marker),
+  `--native_car_makers`; aca0ef24, 9d2ce651..1276cd9a.
 - `power-graph.md`: 3 of 4 in play native (`PowerGraph::Draw`,
   `Line::RecordFlat`, `TuningScreen::DrawPowerGraph`),
   `--native_power_graph`; 64372b27, f97f2857.
@@ -72,5 +78,6 @@ file's history. What's left to see in a drive, from every run:
   known 483, unknown 1638).
 - After its migration: ours 4249, work left 2162 (wrapped 57, known
   467, unknown 1638).
+- After its validation (`itc_3677`): ours 4249, work left 2162.
 
 ## Stopped

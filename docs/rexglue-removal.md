@@ -2754,6 +2754,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | The render command replay's single commands (the table `0x8265ED48`, ids 0-36: in play the inline vertices (5), the shader constants (7), the drawer's set-up (13/14), its draw (15) and the movie frame's callback (28), run from `ChunkChain::RunSingles`' native dispatch) | `single-commands.md` | 5 of 5 in play (one migration) | `--native_single_commands` |
 | 2026-11-06 | Predicated tiling (the menus' tiled segments: `SetPredication`, `BeginTiledSegments`, `EndTiledSegments` with `RestoreSegment`, the library's worker threads' creation and loop; the bin mask packet, the chain header's words and the workers' event packets Dropped; the device lock +13548 a host mutex) | `predicated-tiling.md` | 5 of 7 in play (one migration; `CreateWorkers`' adapter and three of the command buffer's removed) | `--native_predicated_tiling` |
 | 2026-11-06 | The power graph (the front end's power and torque graph on the tuning and car list screens: `PowerGraph::Draw` `sub_8217C708`, two sets of 32 stack sprites drawn as lines through `Line::RecordFlat` `sub_8217B508`; `TuningScreen::DrawPowerGraph` `sub_821DF350`) | `power-graph.md` | 3 of 4 in play (one migration; `CarList::DrawEntryPowerGraph` `sub_82250670` waits on the car objects' makers) | `--native_power_graph` |
+| 2026-11-06 | The car objects' makers outside the race's set-up (the scene model record built from a car, `SceneModelRecord::FromCar` with its paint, wheels, choices and bytes setters and `CarModels::BlockOf`; the garage cars' reset and static set-up; `CarData::FromGarageCar` with the tuning screen's set-up; the front-end stand's `FitCar` and `CopyRecord`; the garage screen's busy marker) | `car-makers.md` | 16 of 24 in play (one migration; 4 adapters removed) | `--native_car_makers` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4660,3 +4661,22 @@ pairs): overridden 109, Native 35, Dropped 26, never called 70, live
 209. Imports: 186 called, 55 with a live caller. B7 (`b7_status.py`):
 ours 4,233, work left 2,178 (Wrapped 57, with a row 459, no row yet
 1,662), from 2,181.
+
+**2026-11-06, the car makers (branch `b7-loop-06-11-26`):** the
+thirty-fifth run's second subsystem (`car-makers.md`,
+`--native_car_makers`, `src/car_makers/`): the car objects' makers
+outside the race's set-up, as far as they were ready: the stand car's
+scene model record built from a car (also in attract races), the
+garage cars at boot, the car data made from a garage car (the tuning
+screen's, which adds a racer from the front end), the stand's fit and
+record copy. Float words the original copies with `lfs`/`stfs` are
+copied as bits (the translated code keeps a signaling NaN). The rest
+(the stand's makers by id, its re-applies and reload, a front-end
+screen's update `sub_821A1380`) waits on `SceneModel::ApplyRecord`
+`sub_820DA758`, `ReloadDecals` `sub_820D9D48`, `ScenePools::SetUpB`
+`sub_820C5B28`, `CarScene::Update` `sub_820C9608`, `GarageStage::Draw`
+`sub_8217FE60` and the screen's 21 handlers (a lead). The boundary: 449
+functions (916 pairs): overridden 109, Native 35, Dropped 26, never
+called 70, live 209. Imports: 186 called, 55 with a live caller. B7
+(`b7_status.py`): ours 4,249, work left 2,162 (Wrapped 57, with a row
+467, no row yet 1,638), from 2,178.

@@ -16,6 +16,12 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
+
+- The car makers (attract race `itc_3677`, replay `itc_3678` ok;
+  `car-makers.md`): `sub_8219ED10` GarageScreen::ShowBusyMarker,
+  `sub_8219EDB0` GarageScreen::HideBusyMarker.
+
 ## Run 2026-11-06 01:02 (`b7-loop-06-11-26`)
 
 - Predicated tiling (attract race `itc_3654`, replay `itc_3655` ok;
