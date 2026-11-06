@@ -86,5 +86,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3677`): ours 4249, work left 2162.
 - After the cleanup lead (`DrawEntryPowerGraph`, `itc_3686`): ours
   4250, work left 2161 (wrapped 57, known 466, unknown 1638).
+- After the menu helpers' map: ours 4250, work left 2161 (wrapped 57,
+  known 468, unknown 1636).
 
 ## Stopped
