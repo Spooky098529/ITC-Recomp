@@ -1,7 +1,9 @@
 // The car objects' makers' register steps (src/car_makers/,
 // docs/functions/car-makers.md), shared by the adapters
 // (src/hooks/car_makers.cpp, behind --native_car_makers) and the harness
-// (without the flag). Each leaves r3 as the original does and flush-to-zero
+// (without the flag); those of the functions without adapters (SetPaint,
+// SetWheels, SetChoice, SetBytes: only FromCar's plain C++ reaches them) are
+// the harness's alone. Each leaves r3 as the original does and flush-to-zero
 // off.
 
 #pragma once

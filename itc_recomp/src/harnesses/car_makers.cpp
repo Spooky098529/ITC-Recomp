@@ -91,11 +91,13 @@ void AddRanges(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
 // laying the inputs and the registers (its inputs written back for the
 // second run); the block, the stack below the call (the top `saves` bytes
 // of the top function's frame left out) and the argument area above it
-// compared, `floats` as floats, then r3.
+// compared, `floats` as floats, then r3; `skip` bytes of the stack below
+// `skip_at` bytes under the call's r1 left out (the recompiled callees'
+// saved registers).
 void Case(Context& h, Results& results, uint32_t block, Random& r,
           const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
           GuestFunction native, uint32_t saves, const FloatRanges& floats,
-          const std::string& what) {
+          const std::string& what, uint32_t skip_at = 0, uint32_t skip = 0) {
   RandomBytes(h.base, block, kBlockBytes, r);
   PPCContext start = CallContext(h);
   start.r1.u64 &= ~0xFull;
@@ -109,6 +111,9 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     PPCContext t = start;
     t.fpscr.disableFlushModeUnconditional();
     (v == 0 ? recompiled : native)(t, h.base);
+    if (skip != 0) {
+      Fill(h.base, sp - skip_at - skip, skip, 0);
+    }
     AddRanges(out[v], h.base, block, kBlockBytes, floats);
     out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes - saves));
     out[v].Bytes(Read(h.base, sp, kArgBytes));
@@ -223,6 +228,10 @@ void SetBytes(Context& h, uint32_t block, Random& r) {
   results.Report();
 }
 
+// FromCar: the original calls the original setters (no adapters), whose
+// saved registers (SetWheels' and SetBytes', the 32 bytes under its
+// 256-byte frame, over SetPaint's scratch there) the plain C++ doesn't
+// write: those 32 bytes are left out.
 // The record's floats FromCar writes: SetPaint's and SetWheels', the
 // decals' (+16, +20, +32, +48, +52 of each 64-byte entry) and pool 4's.
 FloatRanges RecordFloats(uint32_t record) {
@@ -294,7 +303,7 @@ void FromCar(Context& h, uint32_t block, Random& r) {
           t.r5.u64 = picks[r.Below(4)];
         },
         __imp__sub_8215B878, hooks::CarMakersFromCar, 80, RecordFloats(block + kRecord),
-        fmt::format("case {}", c));
+        fmt::format("case {}", c), 256, 32);
   }
   guest::StoreU32(h.base, kParamsPointer, params_global);
   results.Report();

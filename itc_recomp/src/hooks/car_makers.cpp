@@ -13,10 +13,10 @@ ITC_FLAG_DECLARE(bool, native_car_specs);
 
 ITC_FLAG_BOOL(native_car_makers, true, "ITC",
               "Run the car objects' makers (docs/functions/car-makers.md): CarModels::BlockOf "
-              "sub_8215AAD0 (its case sub_8215AB04 merged), SceneModelRecord::SetPaint "
-              "sub_8215AC70, SetWheels sub_8215B238, SetChoice sub_8215B1A0 and "
-              "CarRecord::SetBytes sub_8215B0E0 (with CarRecord::ResetBytes sub_820D0900, no "
-              "adapter: only SetBytes calls it), SceneModelRecord::FromCar sub_8215B878 (with "
+              "sub_8215AAD0 (its case sub_8215AB04 merged), SceneModelRecord::FromCar "
+              "sub_8215B878 with SetPaint sub_8215AC70, SetWheels sub_8215B238, SetChoice "
+              "sub_8215B1A0 and CarRecord::SetBytes sub_8215B0E0 (with CarRecord::ResetBytes "
+              "sub_820D0900; these five without adapters: only FromCar reaches them) (with "
               "--native_scene_models and --native_car_specs; memcpy and AeroParts::Get82 its "
               "originals where theirs decline) natively instead of through the translated code "
               "(the same writes; checked by --run_harnesses=car_makers)");
@@ -72,11 +72,10 @@ void CarMakersFromCar(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_CAR_MAKERS(8215AAD0, CarMakersBlockOf)
-ITC_CAR_MAKERS(8215AC70, CarMakersSetPaint)
-ITC_CAR_MAKERS(8215B238, CarMakersSetWheels)
-ITC_CAR_MAKERS(8215B1A0, CarMakersSetChoice)
-ITC_CAR_MAKERS(8215B0E0, CarMakersSetBytes)
 ITC_CAR_MAKERS(8215B878, CarMakersFromCar)
 // sub_8215AB04 (BlockOf's case for id 1, the jump table's base) needs no
-// adapter: only the original BlockOf reaches it. sub_820D0900 has none:
-// only SetBytes calls it.
+// adapter: only the original BlockOf reaches it. SceneModelRecord::SetPaint
+// sub_8215AC70, SetWheels sub_8215B238, SetChoice sub_8215B1A0 and
+// CarRecord::SetBytes sub_8215B0E0 (with sub_820D0900) have none: only
+// SceneModelRecord::FromCar calls them, and its plain C++ calls theirs (their
+// register steps above are the harness's).
