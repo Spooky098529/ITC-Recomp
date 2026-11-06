@@ -285,3 +285,10 @@ were at 0.
 | `sub_822AF978` Device::WriteDefaultDrawRegisters | its packets and r3 | 100 of 100 | Packets nothing reads (its 15 packet words left out, so the command words and r3, the position after them, differ; the dirty marks match in the main group) | for review (2026-11-06 01:02 run) |
 | `sub_8229F0E0` | against the original with its packets | 300 of 300 | Packets nothing reads (its WAIT_UNTIL and register 0xD04 packets left out: the write position, the kicked tail and the progress block's read position 16 bytes short; its group without the packets matches) | for review (2026-11-06 01:02 run) |
 | `sub_8229F1B0` Device::WaitForIdle | against the original with its packets | 300 of 300 | Packets nothing reads (its WAIT_UNTIL packet left out: 8 bytes short, the same knock-on; its group without the packets matches) | for review (2026-11-06 01:02 run) |
+
+### `predicated-tiling.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_825BEB80` Device::SetPredication | against the original as it is | 600 of 600 | Packets nothing reads (the SET_BIN_MASK packet's two words left out: the write position and r3 8 bytes earlier; its group without the packet matches) | for review (2026-11-06 01:02 run) |
+| `sub_822B6AD8` Device::BeginTiledSegments | against the original as it is | 600 of 600 | Packets nothing reads (the segment chain's 256-byte header not written, its space still reserved; only the worker's job reads it, which never runs; its group without the header matches) | for review (2026-11-06 01:02 run) |

@@ -66,7 +66,15 @@ file's history. What's left to see in a drive, from every run:
   `leads.md`). Map checked (b402e0cb: `predicated-tiling.md`, 17
   rows, 8 moved from `functions.md`, 8 in play; 0 errors; 5 ready
   groups; blocked by `Device::Clear`'s worker and `Device::Resolve`
-  (a lead added); no subagents). Step: migration agent running.
+  (a lead added); no subagents). Migration bf30ab01..a047b852
+  (`--native_predicated_tiling`: `SetPredication`,
+  `BeginTiledSegments`, `EndTiledSegments` with `sub_8229E0C0`,
+  `CreateWorkers`, `WorkerThread`; 3 command buffer adapters and
+  `CreateWorkers`' removed; the device lock +13548 a host mutex;
+  `itc_3651`: race 32 s, 0 errors, every harness 0 differing but the
+  expected groups; menu replays ok; no subagents); nothing ready left
+  (`BeginTiling` waits on `Device::Clear`'s worker, `EndTiling` on
+  `Device::Resolve`). Step: validation agent running.
 
 ## Done
 
@@ -111,5 +119,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3639`): ours 4224, work left 2186.
 - After predicated tiling's map: ours 4224, work left 2186 (wrapped
   58, known 462, unknown 1666).
+- After its migration: ours 4230, work left 2181 (wrapped 57, known
+  458, unknown 1666).
 
 ## Stopped
