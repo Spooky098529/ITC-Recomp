@@ -241,4 +241,24 @@ uint64_t ChangeCategory(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
   return 1;
 }
 
+uint64_t OpenBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821A1138 BuildScreen::OpenBuilds");
+  const uint64_t done = Transition(base, step, sp, 128, 0x821A1244, calls, [&](const Movie6& m) {
+    const uint32_t s = Selection(base);
+    m.Finish(0x821A118C, 44);
+    m.Finish(0x821A1198, 42);
+    m.Finish(0x821A11A4, 43);
+    m.Finish(0x821A11B0, 80);
+    m.Finish(0x821A11BC, uint64_t(s) + 29);
+    m.Play(0x821A11D8, 28);
+    m.Finish(0x821A11E4, 28);
+    m.Play(0x821A1200, 102);
+    KeepGroupList(base, m.frame);
+    Store(base, Screen(base) + kBuildSelection, 0);
+    Store(base, Screen(base) + kBuildScroll, 0);
+    SetUpBuilds(base, m.frame, calls);
+  });
+  return uint32_t(done) == 0 ? 1 : 0;
+}
+
 }  // namespace build_screen

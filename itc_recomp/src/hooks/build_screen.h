@@ -82,5 +82,7 @@ void BuildScreenSetUpGroups(PPCContext& ctx, uint8_t* base);
 void BuildScreenOpen(PPCContext& ctx, uint8_t* base);
 void BuildScreenBackToGroups(PPCContext& ctx, uint8_t* base);
 void BuildScreenChangeCategory(PPCContext& ctx, uint8_t* base);
+// The transition OpenBuilds sub_821A1138 (r3 = the step word).
+void BuildScreenOpenBuilds(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

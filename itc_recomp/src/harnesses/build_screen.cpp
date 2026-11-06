@@ -726,6 +726,11 @@ void Groups(Context& h, const World& w) {
                guest::StoreU32(w.base, group + bs::kGroupCategory, r.Below(5));
                guest::StoreU16(w.base, group + bs::kGroupBuildCount, uint16_t(1 + r.Below(8)));
              }});
+  // OpenBuilds: SetUpBuilds' shown group from the kept selection and
+  // scroll (Counts'); its frame and SetUpBuilds' (over KeepGroupList's)
+  // without their saves.
+  Run(h, w, {"BuildScreen::OpenBuilds (sub_821A1138)", 50, __imp__sub_821A1138,
+             hooks::BuildScreenOpenBuilds, {{-128, -32}, {-128 - 128, -128 - 40}}, step});
   ui_movies_hooks::g_update_callee_stand_in = nullptr;
 }
 

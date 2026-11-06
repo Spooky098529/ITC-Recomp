@@ -216,5 +216,10 @@ uint64_t BackToGroups(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
 // list's +28 (wrapping 0 to 4) until FilterGroups finds groups, the tabs,
 // the lists and rows again from the first group. r3 1.
 uint64_t ChangeCategory(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821A1138 BuildScreen::OpenBuilds: FinishNamed 44, 42, 43, 80, 29 + the
+// selection, PlayNamed then FinishNamed 28, PlayNamed 102, KeepGroupList,
+// the builds' kept selection and scroll 0, SetUpBuilds. r3 1 when Run
+// answers 0.
+uint64_t OpenBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace build_screen
