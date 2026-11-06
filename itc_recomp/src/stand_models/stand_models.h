@@ -109,4 +109,29 @@ uint64_t SetAero(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t
 // C++ on the stage's model from its 96-byte frame; its r3.
 uint64_t ReloadDecals(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack);
 
+// --- The tire grades (src/stand_models/setters.cpp) ---
+
+// sub_820D8F18 Wheels::SetTireTextures: PartModel::SetTexture (through
+// `call`) on the first set's wheels' tires, +240 with +40 and +704 with +56,
+// every shape (r5 -1). 96-byte frame; the last call's r3.
+uint64_t WheelsSetTireTextures(uint8_t* base, const GuestCall& call, uint32_t wheels,
+                               uint32_t stack);
+// sub_820E7470 SceneWheels::SetTireGrades: a pool 5 wheels object: +44 =
+// `front`, +60 = `rear`, Wheels::SetRecord([+28], +32) through `call` (+28
+// loaded before the stores), then SetTireTextures([+28]) (its r3). 96-byte
+// frame.
+uint64_t SceneWheelsSetTireGrades(uint8_t* base, const GuestCall& call, uint32_t wheels,
+                                  uint32_t front, uint32_t rear, uint32_t stack);
+// sub_82179130 GarageStage::SetTireGrade: `which` 0 the model's +4080 and
+// +4096, 1 +4080, 2 +4096 (signed; neither for others) = `grade`; then
+// SetTireGrades(+5100, +4080, +4096) (its r3). 112-byte frame.
+uint64_t SetTireGrade(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t which,
+                      uint32_t grade, uint32_t stack);
+// sub_821CCA38 TuningScreen::SetTireGrade: the table {0, 1, 1, 2, 2} at frame
+// + 80 (its 112-byte frame below `stack`); for `which` 0 to 2,
+// GarageStage::SetTireGrade([[kHolder]], which, the table's word `index`,
+// read unchecked) (its r3); else `r3` (r3 at entry) left.
+uint64_t TuningScreenSetTireGrade(uint8_t* base, const GuestCall& call, uint64_t r3,
+                                  uint32_t which, uint32_t index, uint32_t stack);
+
 }  // namespace stand_models

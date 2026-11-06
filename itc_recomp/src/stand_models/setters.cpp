@@ -18,6 +18,8 @@ using namespace car_scene_draw::ops;
 
 constexpr uint32_t kSetUpB = 0x820C5B28;
 constexpr uint32_t kApplyRecord = 0x820DA758;
+constexpr uint32_t kWheelsSetRecord = 0x820D8EC0;
+constexpr uint32_t kSetTexture = 0x820D17D8;
 constexpr uint32_t kDecalScale = 0x82001BE0;
 
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
@@ -216,6 +218,61 @@ uint64_t ReloadDecals(uint8_t* base, const GuestCall& call, uint32_t holder, uin
   ITC_NATIVE_RUNNING("sub_82178EC0 GarageStage::ReloadDecals");
   const uint32_t frame = Frame(base, stack, 96);
   return scene_models::SceneModelReloadDecals(base, call, StageModel(base, holder), frame);
+}
+
+uint64_t WheelsSetTireTextures(uint8_t* base, const GuestCall& call, uint32_t wheels,
+                               uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D8F18 Wheels::SetTireTextures");
+  const uint32_t frame = Frame(base, stack, 96);
+  constexpr uint64_t kEveryShape = ~0ull;
+  call(kSetTexture, {wheels + 240, Load(base, wheels + 40), kEveryShape}, frame, 0x820D8F3C);
+  return call(kSetTexture, {wheels + 704, Load(base, wheels + 56), kEveryShape}, frame,
+              0x820D8F4C);
+}
+
+uint64_t SceneWheelsSetTireGrades(uint8_t* base, const GuestCall& call, uint32_t wheels,
+                                  uint32_t front, uint32_t rear, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E7470 SceneWheels::SetTireGrades");
+  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t first = Load(base, wheels + 28);
+  Store(base, wheels + 44, front);
+  Store(base, wheels + 60, rear);
+  call(kWheelsSetRecord, {first, wheels + 32}, frame, 0x820E749C);
+  return WheelsSetTireTextures(base, call, Load(base, wheels + 28), frame);
+}
+
+uint64_t SetTireGrade(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t which,
+                      uint32_t grade, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179130 GarageStage::SetTireGrade");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t model = StageModel(base, holder);
+  const int32_t w = int32_t(which);
+  if (w == 0 || w == 1) {
+    Store(base, model + 4080, grade);
+  }
+  if (w == 0 || w == 2) {
+    Store(base, model + 4096, grade);
+  }
+  return SceneWheelsSetTireGrades(base, call, Load(base, model + 5100), Load(base, model + 4080),
+                                  Load(base, model + 4096), frame);
+}
+
+uint64_t TuningScreenSetTireGrade(uint8_t* base, const GuestCall& call, uint64_t r3,
+                                  uint32_t which, uint32_t index, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821CCA38 TuningScreen::SetTireGrade");
+  const uint32_t frame = Frame(base, stack, 112);
+  static constexpr uint32_t kGrades[5] = {0, 1, 1, 2, 2};
+  for (uint32_t i = 0; i < 5; i++) {
+    Store(base, frame + 80 + 4 * i, kGrades[i]);
+  }
+  const int32_t w = int32_t(which);
+  if (w != 0 && w != 1 && w != 2) {
+    return r3;
+  }
+  // The table read unchecked, as the original (the index's low 30 bits
+  // times 4, wrapping).
+  const uint32_t grade = Load(base, frame + 80 + (index << 2));
+  return SetTireGrade(base, call, Load(base, Load(base, kHolder)), which, grade, frame);
 }
 
 }  // namespace stand_models

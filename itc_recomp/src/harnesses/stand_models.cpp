@@ -35,7 +35,7 @@ namespace {
 
 namespace sm = stand_models;
 
-constexpr uint32_t kBytes = 0x10000;
+constexpr uint32_t kBytes = 0x14000;
 
 // The block's layout.
 constexpr uint32_t kHolderAt = 0x40;   // the holder (its +0 the stage)
@@ -45,6 +45,9 @@ constexpr uint32_t kModel = 0x1600;    // the stage's scene model (5,120 bytes)
 constexpr uint32_t kModel2 = 0x2A00;   // a second pool 7 object
 constexpr uint32_t kStage = 0x4000;    // the stage (6,208 bytes)
 constexpr uint32_t kParts = 0x6000;    // a parts object (its point block at +176)
+constexpr uint32_t kWheels = 0xD000;   // a pool 5 wheels object (its +28 the next)
+constexpr uint32_t kFirstWheels = 0xD100;  // the first set's wheels (tires at +240, +704)
+constexpr uint32_t kShapes = 0x10000;  // 4 shape areas of 0x1000
 
 void Put(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -372,6 +375,114 @@ void Reapplies(Context& h, uint32_t b) {
   }
 }
 
+// A part model at `model` as the load poll's cases make them: no nodes
+// (+408), zero to two shapes (+412) in shape area `area`, each with a
+// material block of up to one material a group.
+void PartModel(uint8_t* base, uint32_t b, uint32_t model, uint32_t area, Random& r) {
+  const uint32_t shapes = b + kShapes + 0x1000 * (area % 4);
+  Put(base, model + 408, 0);
+  Put(base, model + 412, r.Below(3));
+  Put(base, model + 40, shapes);
+  for (uint32_t s = 0; s < 2; s++) {
+    const uint32_t materials = shapes + 0x480 + 0x600 * s;
+    Put(base, shapes + 544 * s + 396, materials);
+    const uint32_t first = r.Below(2), second = r.Below(2);
+    Put(base, materials + 0, first + second);
+    Put(base, materials + 8, first);
+    Put(base, materials + 12, second);
+  }
+}
+
+// The wheels: the model's +5100 the pool 5 object, its +28 the first set's
+// wheels with their two tire models (+240, +704) and textures (+40, +56).
+void LayWheels(uint8_t* base, uint32_t b, Random& r) {
+  for (const uint32_t m : {kModel, kModel2}) {
+    Put(base, b + m + 5100, b + kWheels);
+  }
+  Put(base, b + kWheels + 28, b + kFirstWheels);
+  PartModel(base, b, b + kFirstWheels + 240, 0, r);
+  PartModel(base, b, b + kFirstWheels + 704, 1, r);
+  Put(base, b + kFirstWheels + 40, r.Below(3));
+  Put(base, b + kFirstWheels + 56, r.Below(3));
+}
+
+// The tire grades: the wheels as LayWheels lays them; the grades 0 to 2 (or
+// any word now and then), `which` -1 to 3 or any word; TuningScreen's
+// index 0 to 4, or 5 (the frame's word past the table).
+void TireGrades(Context& h, uint32_t b) {
+  {
+    Results results("Wheels::SetTireTextures (sub_820D8F18)");
+    for (int c = 0; c < 32; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayWheels(h.base, b, r);
+             t.r3.u64 = b + kFirstWheels;
+           },
+           __imp__sub_820D8F18, hooks::StandModelsSetTireTextures, 96, 16, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("SceneWheels::SetTireGrades (sub_820E7470)");
+    for (int c = 0; c < 32; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayWheels(h.base, b, r);
+             t.r3.u64 = b + kWheels;
+             t.r4.u64 = r.Below(3);
+             t.r5.u64 = r.Below(3);
+           },
+           __imp__sub_820E7470, hooks::StandModelsSetTireGrades, 96, 16, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::SetTireGrade (sub_82179130)");
+    for (int c = 0; c < 48; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             LayWheels(h.base, b, r);
+             for (const uint32_t m : {kModel, kModel2}) {
+               Put(h.base, b + m + 4080, r.Below(3));
+               Put(h.base, b + m + 4096, r.Below(3));
+             }
+             t.r3.u64 = b + kHolderAt;
+             t.r4.u64 = r.Below(6) == 0 ? RandomValue(r) : uint32_t(int32_t(r.Below(5)) - 1);
+             t.r5.u64 = r.Below(3);
+           },
+           __imp__sub_82179130, hooks::StandModelsSetTireGrade, 112, 24, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("TuningScreen::SetTireGrade (sub_821CCA38)");
+    for (int c = 0; c < 48; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             LayWheels(h.base, b, r);
+             Put(h.base, b + kHolderWord, b + kHolderAt);
+             for (const uint32_t m : {kModel, kModel2}) {
+               Put(h.base, b + m + 4080, r.Below(3));
+               Put(h.base, b + m + 4096, r.Below(3));
+             }
+             // The frame's word past the table: a grade.
+             Put(h.base, t.r1.u32 - 112 + 100, r.Below(3));
+             t.r3.u64 = r.Next();
+             t.r4.u64 = r.Below(6) == 0 ? RandomValue(r) : uint32_t(int32_t(r.Below(5)) - 1);
+             t.r5.u64 = r.Below(8) == 0 ? 5 : r.Below(5);
+           },
+           __imp__sub_821CCA38, hooks::StandModelsTuningSetTireGrade, 112, 8, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void StandModels(Context& h) {
@@ -386,6 +497,7 @@ void StandModels(Context& h) {
     Setters(h, b);
     MakeModels(h, b);
     Reapplies(h, b);
+    TireGrades(h, b);
   }
   memory::Free(allocation);
 }

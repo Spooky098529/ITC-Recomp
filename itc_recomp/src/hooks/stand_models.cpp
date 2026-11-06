@@ -21,7 +21,11 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "SetInteriorLevel sub_821791C0, SetInteriorPair sub_82179250, ClearChoice "
               "sub_82179378, SetAero sub_82179548 and ReloadDecals sub_82178EC0 (with "
               "--native_vehicle_accessors and --native_scene_models; SceneModel::ApplyRecord's "
-              "and ReloadDecals' plain C++) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
+              "and ReloadDecals' plain C++); the tire grades, GarageStage::SetTireGrade "
+              "sub_82179130 with SceneWheels::SetTireGrades sub_820E7470 and "
+              "Wheels::SetTireTextures sub_820D8F18 (no adapters: only it reaches them) and "
+              "TuningScreen::SetTireGrade sub_821CCA38 (with --native_vehicle_accessors; "
+              "Wheels::SetRecord and PartModel::SetTexture through their adapters) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
 
 namespace hooks {
 
@@ -174,6 +178,54 @@ void StandModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+// A step with the guest calls and lr put back: `body`'s r3.
+template <typename Body>
+void WithCalls(PPCContext& ctx, uint8_t* base, Body body) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const sm::GuestCall call = StandModelsGuestCall(ctx, base);
+  const uint64_t r3 = body(call);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+void StandModelsSetTireGrade(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_vehicle_accessors)) {
+    __imp__sub_82179130(ctx, base);
+    return;
+  }
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SetTireGrade(base, call, r3, r4, r5, stack);
+  });
+}
+
+void StandModelsTuningSetTireGrade(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_vehicle_accessors)) {
+    __imp__sub_821CCA38(ctx, base);
+    return;
+  }
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::TuningScreenSetTireGrade(base, call, r3, r4, r5, stack);
+  });
+}
+
+void StandModelsSetTireGrades(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SceneWheelsSetTireGrades(base, call, r3, r4, r5, stack);
+  });
+}
+
+void StandModelsSetTireTextures(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::WheelsSetTireTextures(base, call, r3, stack);
+  });
+}
+
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
@@ -206,6 +258,11 @@ ITC_STAND_MODELS(82179250, StandModelsSetInteriorPair)
 ITC_STAND_MODELS(82179378, StandModelsClearChoice)
 ITC_STAND_MODELS(82179548, StandModelsSetAero)
 ITC_STAND_MODELS(82178EC0, StandModelsReloadDecals)
+ITC_STAND_MODELS(82179130, StandModelsSetTireGrade)
+ITC_STAND_MODELS(821CCA38, StandModelsTuningSetTireGrade)
+// SceneWheels::SetTireGrades sub_820E7470 and Wheels::SetTireTextures
+// sub_820D8F18 have none: only GarageStage::SetTireGrade reaches them, and
+// its plain C++ calls theirs (their register steps above are the harness's).
 // sub_82178F68 (SetPart's case 0, split off by the recompiler) needs no
 // adapter: only the original SetPart reaches it, as a tail call.
 // SceneParts::LightValue sub_820DF1A0 has none: only SetLightsOn calls it,

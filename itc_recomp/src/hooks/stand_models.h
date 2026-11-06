@@ -47,6 +47,16 @@ void StandModelsSetInteriorPair(PPCContext& ctx, uint8_t* base);
 void StandModelsClearChoice(PPCContext& ctx, uint8_t* base);
 void StandModelsSetAero(PPCContext& ctx, uint8_t* base);
 void StandModelsReloadDecals(PPCContext& ctx, uint8_t* base);
+// The tire grades (with --native_vehicle_accessors; lr put back):
+// GarageStage::SetTireGrade sub_82179130 (r3 the holder, r4 which, r5 a
+// grade), TuningScreen::SetTireGrade sub_821CCA38 (r4 which, r5 an index),
+// and, without adapters (the harness's), SceneWheels::SetTireGrades
+// sub_820E7470 (r3 a wheels object, r4, r5 the grades) and
+// Wheels::SetTireTextures sub_820D8F18 (r3 the first set's wheels).
+void StandModelsSetTireGrade(PPCContext& ctx, uint8_t* base);
+void StandModelsTuningSetTireGrade(PPCContext& ctx, uint8_t* base);
+void StandModelsSetTireGrades(PPCContext& ctx, uint8_t* base);
+void StandModelsSetTireTextures(PPCContext& ctx, uint8_t* base);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 
