@@ -469,43 +469,19 @@ extern "C" REX_FUNC(sub_820D9870) {
   hooks::SceneModelBuild(ctx, base);
 }
 
-// The second set's set-ups behind --native_scene_models (scene-models.md),
-// from ScenePools::SetUpB (recompiled); SceneCarModel::SetUp's caller is
-// SetUpB's split-off case sub_820C5B98.
-#define ITC_SECOND_SET_UP(address, setup)                       \
-  extern "C" REX_FUNC(sub_##address) {                          \
-    REX_FUNC_PROLOGUE();                                        \
-    if (!ITC_FLAG(native_scene_models)) {                       \
-      __imp__sub_##address(ctx, base);                          \
-      return;                                                   \
-    }                                                           \
-    hooks::SecondSetUp(ctx, base, car_models::setup, __imp__sub_##address); \
-  }
-
-ITC_SECOND_SET_UP(820DB818, SceneCarModelSetUp)
-ITC_SECOND_SET_UP(820DF1D0, ScenePartsSetUp)
-ITC_SECOND_SET_UP(820DCAA0, ScenePool4SetUp)
-ITC_SECOND_SET_UP(820E37F0, SceneInteriorSetUp)
-ITC_SECOND_SET_UP(820E5998, SceneTrafficSetUp)
-ITC_SECOND_SET_UP(820E70C0, SceneWheelsSetUp)
-
-// The adapters: the register steps above, or the originals with the flag
-// off.
-
-// ScenePools::SetUp (vehicle-accessors.md) behind --native_vehicle_accessors;
-// its loaders CarParts::Load sub_820D7510 (with LoadSetA sub_820D7090 and
-// LoadSetB sub_820D70F0), pool 4's sub_820D6B48 and TrafficCar::Load
-// sub_820D8A08 (scene-models.md) have no adapters: only it calls them, their
-// plain C++ with --native_scene_models (and --native_car_models), else their
-// originals.
-extern "C" REX_FUNC(sub_820C4338) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_vehicle_accessors)) {
-    __imp__sub_820C4338(ctx, base);
-    return;
-  }
-  hooks::ScenePoolsSetUp(ctx, base);
-}
+// The second set's set-ups (SceneCarModel::SetUp sub_820DB818, SceneParts::
+// SetUp sub_820DF1D0, pool 4's sub_820DCAA0, SceneInterior::SetUp
+// sub_820E37F0, SceneTraffic::SetUp sub_820E5998, the wheels' sub_820E70C0)
+// and ScenePools::SetUp (sub_820C4338, vehicle-accessors.md) have no
+// adapters since ScenePools::SetUpB, their only caller in play, became
+// native: it calls their plain C++ (hooks::SecondSetUp and ScenePoolsSetUp
+// are their register steps, for the harness), and --native_scene_models
+// (--native_vehicle_accessors for ScenePools::SetUp) switches only their
+// callers. ScenePools::SetUp's loaders CarParts::Load sub_820D7510 (with
+// LoadSetA sub_820D7090 and LoadSetB sub_820D70F0), pool 4's sub_820D6B48
+// and TrafficCar::Load sub_820D8A08 (scene-models.md) have none either:
+// their plain C++ with --native_scene_models (and --native_car_models), else
+// their originals.
 
 #define ITC_CAR_MODELS(address, step)    \
   extern "C" REX_FUNC(sub_##address) {   \

@@ -10,9 +10,9 @@
 
 ITC_FLAG_BOOL(native_scene_models, true, "ITC",
               "Run the scene models' parts (docs/functions/scene-models.md: sub_820F0E50 (the "
-              "accessories' set), the sound loads' callback sub_82175EE0, sub_820E7378, "
+              "accessories' set), the sound loads' callback sub_82175EE0, sub_820E7378 (no adapter), "
               "sub_820E70B8, SceneParts::Link sub_820DF1A8, sub_820DF1C0, SceneInterior::Link "
-              "sub_820E37D0, sub_820E3658, CarModel::SetRecord sub_820D3C70, CarRecord::Copy "
+              "sub_820E37D0, sub_820E3658 (no adapter), CarModel::SetRecord sub_820D3C70, CarRecord::Copy "
               "sub_820D7EE8, the records' defaults sub_820D45B0, sub_820D3B38, CarRecord::Reset "
               "sub_820D0A98 with sub_820D0A20 (no adapter: only CarRecord::Reset calls it), sub_820D3558, sub_820D3840, sub_820D3900 and "
               "sub_820D34E0, SceneModel::Accessory sub_820D97B8, SceneModelRecord::Copy sub_820DB290, "
@@ -163,12 +163,10 @@ void SceneModelsAllocPages(PPCContext& ctx, uint8_t* base) {
 
 ITC_SCENE_MODELS(820F0E50, SceneModelsAccessories)
 ITC_SCENE_MODELS(82175EE0, SceneModelsOnSoundLoaded)
-ITC_SCENE_MODELS(820E7378, SceneModelsWheelsSetRecord)
 ITC_SCENE_MODELS(820E70B8, SceneModelsSetCarModel)
 ITC_SCENE_MODELS(820DF1A8, SceneModelsPartsLink)
 ITC_SCENE_MODELS(820DF1C0, SceneModelsPartsSetRecord)
 ITC_SCENE_MODELS(820E37D0, SceneModelsInteriorLink)
-ITC_SCENE_MODELS(820E3658, SceneModelsSetWord11452)
 ITC_SCENE_MODELS(820D3C70, SceneModelsCarModelSetRecord)
 ITC_SCENE_MODELS(820D7EE8, SceneModelsCarRecordCopy)
 ITC_SCENE_MODELS(820D45B0, SceneModelsCarRecordSetW)
