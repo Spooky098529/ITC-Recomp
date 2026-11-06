@@ -45,4 +45,16 @@ void BuildScreenSetHelp(PPCContext& ctx, uint8_t* base);
 void BuildScreenShowNumber(PPCContext& ctx, uint8_t* base);
 void BuildScreenDrawGroupRows(PPCContext& ctx, uint8_t* base);
 
+// The transitions (r3 = the step word): HighlightGroups sub_8219C528,
+// HighlightGroups2 sub_8219C6D0, FadeOut sub_8219C850, HighlightBuilds
+// sub_8219C8F8, HighlightStand sub_8219CA08, HighlightStand2 sub_8219CB18,
+// HighlightDetails sub_8219CBD8.
+void BuildScreenHighlightGroupsA(PPCContext& ctx, uint8_t* base);
+void BuildScreenHighlightGroupsB(PPCContext& ctx, uint8_t* base);
+void BuildScreenFadeOut(PPCContext& ctx, uint8_t* base);
+void BuildScreenHighlightBuilds(PPCContext& ctx, uint8_t* base);
+void BuildScreenHighlightStand(PPCContext& ctx, uint8_t* base);
+void BuildScreenHighlightStand2(PPCContext& ctx, uint8_t* base);
+void BuildScreenHighlightDetails(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

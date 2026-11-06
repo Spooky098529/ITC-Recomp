@@ -23,6 +23,7 @@
 #include "base/log.h"
 #include "build_screen/build_screen.h"
 #include "hooks/build_screen.h"
+#include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
@@ -57,7 +58,9 @@ constexpr uint32_t kMovieAt = 0x35000;       // movie 6 (0xA000 bytes)
 constexpr uint32_t kNodesAt = 0x3F000;       // 40 nodes of 0x400
 constexpr uint32_t kNodeBytes = 0x400;
 constexpr uint32_t kNodeCount = 40;
-constexpr uint32_t kBlockBytes = 0x49000;
+constexpr uint32_t kAnimRootAt = 0x49000;    // the transitions' scene root (0x400)
+constexpr uint32_t kAnimationsAt = 0x49400;  // 8 animations of no tracks (64 bytes)
+constexpr uint32_t kBlockBytes = 0x49800;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -76,6 +79,7 @@ constexpr Global kGlobals[] = {
     {kMissingMovie, 4},
     {kMissingText, 4},
     {kStringTable, 4},
+    {0x826A50AC, 64},  // the screen fades
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -280,6 +284,27 @@ void ListBlocks(uint8_t* base, const World& w, Outputs& out) {
   }
 }
 
+// UiMovie::Run's update (sub_8211D2F8, its jump), stood in for while the
+// transitions' cases run: each call's return address, stack pointer (from
+// the case's), r3 and r4 kept and answered 0 or 1 from the case's
+// generator (the update would draw the movie's scene).
+struct UpdateCall {
+  uint32_t lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<UpdateCall> g_updates;
+Random g_answers;
+uint32_t g_case_sp = 0;
+
+bool UpdateStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (function != 0x8211D2F8) {
+    return false;
+  }
+  g_updates.push_back({uint32_t(ctx.lr), g_case_sp - ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = g_answers.Below(2);
+  return true;
+}
+
 // A stack range compared, relative to the call's r1: [from, to).
 struct Range {
   int32_t from;
@@ -314,6 +339,9 @@ void Run(Context& h, const World& w, const Spec& spec) {
       WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
       spec.setup(t, r, w);
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      g_updates.clear();
+      g_answers = Random(r.Next());
+      g_case_sp = sp;
       if (v == 0) {
         const bool native = ITC_FLAG(native_build_screen);
         ITC_FLAG(native_build_screen) = false;
@@ -322,8 +350,20 @@ void Run(Context& h, const World& w, const Spec& spec) {
       } else {
         spec.native(t, h.base);
       }
+      out[v].Word(uint32_t(g_updates.size()));
+      for (const UpdateCall& call : g_updates) {
+        out[v].Word(call.lr);
+        out[v].Word(call.r1);
+        out[v].Word(uint32_t(call.r3 >> 32));
+        out[v].Word(uint32_t(call.r3));
+        out[v].Word(uint32_t(call.r4 >> 32));
+        out[v].Word(uint32_t(call.r4));
+      }
       ListBlocks(h.base, w, out[v]);
       TextRecords(h.base, w, out[v]);
+      for (const Global& g : kGlobals) {
+        out[v].Bytes(Read(h.base, g.address, g.bytes));
+      }
       out[v].Bytes(Read(h.base, w.block, kBlockBytes));
       for (const Range& range : spec.stack) {
         out[v].Bytes(Read(h.base, sp + range.from, uint32_t(range.to - range.from)));
@@ -496,6 +536,80 @@ void Rows(Context& h, const World& w) {
              {{-112, -24}, {-256, -216}, {-176, -168}}, None});
 }
 
+// Movie 6 for the transitions (as the car makers' harness lays it for the
+// busy marker): its animation lists set up, its live scene a root of its
+// own, its first 128 named animations over that root and one of 8
+// animations of no tracks.
+void AnimationWorld(uint8_t* base, const World& w, Random& r) {
+  const uint32_t movie = w.at(kMovieAt), root = w.at(kAnimRootAt);
+  ui_movies::InitAnimationLists(base, movie);
+  guest::StoreU32(base, movie + 16, root);
+  guest::StoreU32(base, movie + 20, root);
+  guest::StoreU32(base, movie + 24, root);
+  for (uint32_t k = 0; k < 128; k++) {
+    const uint32_t named = movie + 176 + 36 * k;
+    guest::StoreU32(base, named + 28, root);
+    guest::StoreU32(base, named + 32, w.at(kAnimationsAt) + 64 * r.Below(8));
+  }
+  for (uint32_t k = 0; k < 8; k++) {
+    const uint32_t animation = w.at(kAnimationsAt) + 64 * k;
+    for (uint32_t i = 0; i < 64; i += 4) {
+      guest::StoreU32(base, animation + i, 0);
+    }
+    guest::StoreFloat(base, animation + 12, float(r.Below(100)) / 4.0f);
+  }
+  guest::StoreU32(base, root + 100, 0);
+  guest::StoreU32(base, root + 104, 4);
+  guest::StoreU32(base, root + 108, r.Below(4));
+  guest::StoreU32(base, root + 116, 70);
+  for (uint32_t i = 0; i < 94; i++) {
+    guest::StoreU32(base, root + 128 + 8 * i, w.at(kAnimationsAt) + 64 * r.Below(8));
+  }
+}
+
+void Transitions(Context& h, const World& w) {
+  // r3 the machine's +24: 0 (the set-up runs) or 1; the selection small.
+  auto step = [](PPCContext& t, Random& r, const World& w) {
+    AnimationWorld(w.base, w, r);
+    guest::StoreU32(w.base, w.at(kMachineAt) + 24, r.Below(3) == 0 ? 1 : 0);
+    guest::StoreU32(w.base, w.at(kListAt) + 16, r.Below(11));
+    t.r3.u64 = w.at(kMachineAt) + 24;
+  };
+  struct T {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    std::vector<Range> stack;
+  };
+  const T transitions[] = {
+      {"BuildScreen::HighlightGroups (sub_8219C528)", __imp__sub_8219C528,
+       hooks::BuildScreenHighlightGroupsA, {{-128, -32}}},
+      {"BuildScreen::HighlightGroups2 (sub_8219C6D0)", __imp__sub_8219C6D0,
+       hooks::BuildScreenHighlightGroupsB, {{-128, -32}}},
+      {"BuildScreen::HighlightBuilds (sub_8219C8F8)", __imp__sub_8219C8F8,
+       hooks::BuildScreenHighlightBuilds, {{-128, -32}}},
+      {"BuildScreen::HighlightStand (sub_8219CA08)", __imp__sub_8219CA08,
+       hooks::BuildScreenHighlightStand, {{-112, -24}}},
+      {"BuildScreen::HighlightStand2 (sub_8219CB18)", __imp__sub_8219CB18,
+       hooks::BuildScreenHighlightStand2, {{-112, -24}}},
+      {"BuildScreen::HighlightDetails (sub_8219CBD8)", __imp__sub_8219CBD8,
+       hooks::BuildScreenHighlightDetails, {{-112, -24}}},
+  };
+  ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
+  for (const T& t : transitions) {
+    Run(h, w, {t.name, 60, t.recompiled, t.native, t.stack, step});
+  }
+  // FadeOut: the fades' counts set or not before.
+  Run(h, w, {"BuildScreen::FadeOut (sub_8219C850)", 60, __imp__sub_8219C850,
+             hooks::BuildScreenFadeOut, {{-112, -24}},
+             [step](PPCContext& t, Random& r, const World& w) {
+               step(t, r, w);
+               guest::StoreU32(w.base, 0x826A50E4, r.Below(2));
+               guest::StoreU32(w.base, 0x826A50DC, r.Below(2));
+             }});
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+}
+
 }  // namespace
 
 void BuildScreen(Context& h) {
@@ -508,6 +622,7 @@ void BuildScreen(Context& h) {
   BuildLists(h, w);
   Stage(h, w);
   Rows(h, w);
+  Transitions(h, w);
 }
 
 }  // namespace harness

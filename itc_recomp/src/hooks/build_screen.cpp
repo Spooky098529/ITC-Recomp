@@ -20,7 +20,11 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "StandArrows sub_8219D7B0, ShowBuildMark sub_8219D440, SetPrompts sub_8219DA58, "
               "SetHelp sub_8219DB50 (the text setters through their overrides), ShowNumber "
               "sub_8219D090 with PowI sub_8219BD30, DrawGroupRows sub_8219FA28 with DrawGroupRow "
-              "sub_8219CE08 (SetNodeText through its override)) "
+              "sub_8219CE08 (SetNodeText through its override); the transitions HighlightGroups "
+              "sub_8219C528, HighlightGroups2 sub_8219C6D0, FadeOut sub_8219C850 "
+              "(ScreenFades::FadeOut's plain C++), HighlightBuilds sub_8219C8F8, HighlightStand "
+              "sub_8219CA08, HighlightStand2 sub_8219CB18, HighlightDetails sub_8219CBD8 (the UI "
+              "movie animation calls through their overrides)) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=build_screen). RestoreGroupList, InsertNode, SetMode, PowI and DrawGroupRow have "
               "no adapters: only native callers reach them, and the flag switches those");
@@ -163,6 +167,41 @@ void BuildScreenDrawGroupRows(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = bs::DrawGroupRows(base, ctx.r1.u32, guest.calls());
 }
 
+void BuildScreenHighlightGroupsA(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::HighlightGroupsA(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenHighlightGroupsB(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::HighlightGroupsB(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenFadeOut(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::FadeOut(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenHighlightBuilds(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::HighlightBuilds(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenHighlightStand(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::HighlightStand(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenHighlightStand2(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::HighlightStand2(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void BuildScreenHighlightDetails(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = bs::HighlightDetails(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -196,3 +235,10 @@ ITC_BUILD_SCREEN(8219DA58, BuildScreenSetPrompts)
 ITC_BUILD_SCREEN(8219DB50, BuildScreenSetHelp)
 ITC_BUILD_SCREEN(8219D090, BuildScreenShowNumber)
 ITC_BUILD_SCREEN(8219FA28, BuildScreenDrawGroupRows)
+ITC_BUILD_SCREEN(8219C528, BuildScreenHighlightGroupsA)
+ITC_BUILD_SCREEN(8219C6D0, BuildScreenHighlightGroupsB)
+ITC_BUILD_SCREEN(8219C850, BuildScreenFadeOut)
+ITC_BUILD_SCREEN(8219C8F8, BuildScreenHighlightBuilds)
+ITC_BUILD_SCREEN(8219CA08, BuildScreenHighlightStand)
+ITC_BUILD_SCREEN(8219CB18, BuildScreenHighlightStand2)
+ITC_BUILD_SCREEN(8219CBD8, BuildScreenHighlightDetails)

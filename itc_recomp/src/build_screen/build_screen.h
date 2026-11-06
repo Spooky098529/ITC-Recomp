@@ -145,4 +145,28 @@ uint64_t DrawGroupRow(uint8_t* base, uint32_t sp, uint32_t row, uint32_t index,
 // sub_8219FA28 BuildScreen::DrawGroupRows: the 11 rows from the scroll.
 uint64_t DrawGroupRows(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The transitions (transitions.cpp) ---
+//
+// Each takes `step`, its word at the machine's +24 (r3): the set-up on the
+// first call (the word 0, then 1), then UiMovie::Run(movie 6, 0). r3 1 but
+// for FadeOut.
+//
+// sub_8219C528 BuildScreen::HighlightGroups: PlayNamed and LoopNamed 44, 42,
+// 43, 80, 84 and 29 + the selection, FinishNamed 76 to 79, PlayNamed(76 +
+// the category, chained). sub_8219C6D0 HighlightGroups2: the same without
+// 84.
+uint64_t HighlightGroupsA(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HighlightGroupsB(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219C850 BuildScreen::FadeOut: ScreenFades::FadeOut([0x82001BF0], 0,
+// 0, 0, layer 0) first; 1 once both fade counts words are 0, else 0.
+uint64_t FadeOut(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219C8F8 BuildScreen::HighlightBuilds (71, 70, 69, 61 + the
+// selection), sub_8219CA08 HighlightStand (96, 97, 108, 93), sub_8219CB18
+// HighlightStand2 (108, 93), sub_8219CBD8 HighlightDetails (74): PlayNamed
+// then LoopNamed of each.
+uint64_t HighlightBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HighlightStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HighlightStand2(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HighlightDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
 }  // namespace build_screen
