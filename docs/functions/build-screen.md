@@ -129,6 +129,25 @@ details level (`sub_8219FEC8` with `ShowDetails`, `SetUpDetails`),
 `OpenBuilds`, `BackToBuilds`, and `scene.md`'s `sub_820C5798`,
 `sub_820C5A60`; still blocked: `PutOnStand` and what's above it.
 
+The second migration (2026-11-06, five batches, no subagents) made the
+groups level (`SetUpGroups`, `Open`, `BackToGroups`, `ChangeCategory`),
+`OpenBuilds`, `RestoreStand` with `BackToStand` and the details level
+(`OpenDetails`, `SetUpDetails`, `ShowDetails`) native, and `scene.md`'s
+`CarScene::LoadsDone` (`sub_820C5798`, under `--native_scene`); fifteen
+adapters went (their callers in play native). The harness's transitions
+over a level's set-up keep the movie's live scene the node pool (the
+named animations don't read it) and shape what would walk out of the
+world (ShowNumber's number, the builds' +0 under ShowBuildMark, the kept
+selections; the groups' +12, as past 9 `ValueText` reads the register
+saves earlier calls left). Left: `BackToBuilds` (`sub_821A1258`), which
+stores r7 as `UiMovie::Run` leaves it into the machine's +24 (a register
+leftover in live state, a new case for the user), and `vehicle-accessors.md`'s
+`sub_820C5A60` with `SceneModel::Update` (`sub_820DA180`, its accessory
+branch never seen in play, through `AccessorySkeleton::Step`, which needs a
+world of its own in the harness); still blocked: `PutOnStand`,
+`SetUpStand`, `OpenStand` on `GarageStage::ReloadModel` (`sub_8217F880`),
+which waits on `CarScene::Update` (`sub_820C9608`).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
