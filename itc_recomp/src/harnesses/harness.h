@@ -281,5 +281,7 @@ void RaceLoading(Context& h);
 void SceneTarget(Context& h);
 void FramePasses(Context& h);
 void CommandBuffer(Context& h);
+// The render command replay's single commands (src/harnesses/single_commands.cpp).
+void SingleCommands(Context& h);
 
 }  // namespace harness

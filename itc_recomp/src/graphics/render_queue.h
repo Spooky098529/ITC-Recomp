@@ -29,6 +29,12 @@ struct CallResult {
 // the first `count` of r3, r4, r5 set (the others as they are).
 using GuestCall = std::function<CallResult(uint32_t function, uint32_t sp, uint32_t return_address,
                                            int count, uint64_t r3, uint64_t r4, uint64_t r5)>;
+// A single command's handler (from the table 0x8265ED48) run natively, with
+// r3 = `slot` and r1 = `sp`: its answer, or nullopt where the guest call runs
+// (a handler that isn't ours, or its flag off). The single commands' plain
+// C++: src/graphics/single_commands.h.
+using SingleCommand =
+    std::function<std::optional<uint32_t>(uint32_t handler, uint32_t slot, uint32_t sp)>;
 
 // RenderQueue::Flip (sub_8258E5E0, slot 6): the state's +0 (the replay
 // index) = 1 when it was 0, else 0.
@@ -119,11 +125,12 @@ void QuickSort(uint8_t* base, uint32_t array, int32_t lo, int32_t hi, uint32_t g
 // 4 the commands at +4 then the end (sub_8258E7E8), 5 the commands inline
 // from item + 16 then the end (sub_8258E868), 6 the end; another kind loops
 // on the same item, as the original. The commands go to the tables
-// 0x8265ED48 (single: r3 = the slot) and 0x8265EDE0 (r3 = the payload, r4
-// and r5 the slot's +4 and +8; until id 36) as guest calls, where the
-// native renderer's and the stats' wrappers see them.
+// 0x8265ED48 (single: r3 = the slot; through `single` first, a guest call
+// where it answers nullopt) and 0x8265EDE0 (r3 = the payload, r4 and r5 the
+// slot's +4 and +8; until id 36) as guest calls, where the native
+// renderer's and the stats' wrappers see them.
 void ChunkChainRun(uint8_t* base, uint32_t queue, uint32_t item, uint32_t sp,
-                   const GuestCall& call);
+                   const GuestCall& call, const SingleCommand& single);
 // RenderQueue::Replay (sub_82591238, slot 5): r3 = the queue, r4 = the
 // device, r5 = the video output, in its 192-byte frame: the globals the
 // command handlers read ([0x8296BD90] the device, [0x82970BB8] the drawer,
@@ -137,6 +144,6 @@ void ChunkChainRun(uint8_t* base, uint32_t queue, uint32_t item, uint32_t sp,
 // r4 = 1, each element then 0; [0x8296BD90] = 0. r3 isn't returned (its
 // caller, Scene::Draw, doesn't read it).
 void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_output, uint32_t sp,
-            const GuestCall& call);
+            const GuestCall& call, const SingleCommand& single);
 
 }  // namespace graphics::render_queue

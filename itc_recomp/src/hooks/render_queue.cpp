@@ -12,6 +12,7 @@
 #include "debug/menu_selection_scan.h"
 #include "graphics/render_queue.h"
 #include "hooks/models.h"
+#include "hooks/single_commands.h"
 
 ITC_FLAG_BOOL(native_render_queue, true, "ITC",
               "Run the render queue's methods (docs/functions/device-shaders.md: "
@@ -88,7 +89,8 @@ extern "C" REX_FUNC(sub_82591540) {
 }
 
 void hooks::NativeRenderQueueReplay(PPCContext& ctx, uint8_t* base) {
-  rq::Replay(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, RenderQueueCall(ctx, base));
+  rq::Replay(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, RenderQueueCall(ctx, base),
+             SingleCommands(ctx, base));
 }
 
 // Replay: r3 = the queue, r4 = the device, r5 = the video output. Its

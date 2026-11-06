@@ -1,0 +1,47 @@
+// The render command replay's single commands as plain C++
+// (docs/functions/single-commands.md): the handlers of the table 0x8265ED48
+// that run in play, each called with the slot ([id, arguments], 16 bytes,
+// its data in the slots after) and returning how many of the following
+// slots it used. They find the device at [0x8296BD90], the primitive drawer
+// at [0x82970BB8] and its state at [0x82970BBC] (RenderQueue::Replay's
+// globals). Every read and write is the original's, in its order. Calls to
+// code still recompiled (the drawer's and the object's vtable slots, the
+// shader constant setters not seen in play) are guest calls through `call`,
+// from frames made where the originals make theirs; the device's setters
+// that are native (src/graphics/device_state.h) are called as plain C++.
+// Adapters: src/hooks/single_commands.cpp (--native_single_commands), and
+// command 15's in src/native/replay_hooks.cpp, inside its wrap.
+
+#pragma once
+
+#include <cstdint>
+#include <functional>
+#include <initializer_list>
+
+namespace graphics::single_commands {
+
+// A guest call to `function` with r1 = `sp`, lr = `return_address` and r3,
+// r4, ... set from `args` (the others as they are). Returns r3.
+using GuestCall = std::function<uint64_t(uint32_t function, uint32_t sp, uint32_t return_address,
+                                         std::initializer_list<uint64_t> args)>;
+
+// The handlers' addresses.
+constexpr uint32_t kInlineVertices = 0x8258E8E8;      // 5
+constexpr uint32_t kSetShaderConstants = 0x8258F0F0;  // 7
+constexpr uint32_t kSetUpDrawer = 0x8258E958;         // 13, 14
+constexpr uint32_t kDrawerDraw = 0x8258F5C0;          // 15
+constexpr uint32_t kCallback = 0x8258E9B8;            // 28
+
+// Single::InlineVertices (sub_8258E8E8, 5): the drawer's state +12 = the
+// slot + 16 (the vertices), +16 = the slot's +4 (their count). Returns the
+// slots the vertices take, (count x 24 + 15) >> 4 (in 32 bits).
+uint32_t InlineVertices(uint8_t* base, uint32_t slot);
+
+// Single::SetUpDrawer (sub_8258E958, 13 and 14), in its 96-byte frame below
+// `sp`: the drawer's state +0, +4, +8 = the slot's +4 (the primitive type),
+// +8 and +12 (the shaders' indices); then the drawer's vtable slot 2
+// (PrimitiveDrawer::SetShaders) with r4 = the device, r5 and r6 the indices.
+// Returns 0.
+uint32_t SetUpDrawer(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call);
+
+}  // namespace graphics::single_commands

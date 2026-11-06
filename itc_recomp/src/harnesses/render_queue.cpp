@@ -14,6 +14,7 @@
 #include "graphics/render_queue.h"
 #include "hooks/models.h"
 #include "hooks/render_queue.h"
+#include "hooks/single_commands.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
@@ -664,7 +665,8 @@ void NativeQuickSort(PPCContext& ctx, uint8_t* base) {
 }
 void NativeChunkChainRun(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
-  rq::ChunkChainRun(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, hooks::RenderQueueCall(ctx, base));
+  rq::ChunkChainRun(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, hooks::RenderQueueCall(ctx, base),
+                    hooks::SingleCommands(ctx, base));
 }
 void NativeReplay(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();

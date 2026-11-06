@@ -259,7 +259,8 @@ void RunCommands(uint8_t* base, uint32_t command, uint32_t frame, uint32_t retur
 }
 
 // ChunkChain::RunSingles (sub_8258E630, kind 0), in its 128-byte frame.
-uint32_t RunSingles(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& call) {
+uint32_t RunSingles(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& call,
+                    const SingleCommand& single) {
   ITC_NATIVE_RUNNING("sub_8258E630 ChunkChain::RunSingles");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t count = guest::LoadU32(base, item + 8);
@@ -269,7 +270,8 @@ uint32_t RunSingles(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& 
       const uint32_t slot = ((i + 1) << 4) + item;
       const uint32_t handler =
           guest::LoadU32(base, (guest::LoadU32(base, slot) << 2) + kSingleCommands);
-      const uint64_t r3 = call(handler, frame, 0x8258E678, 1, slot, 0, 0).r3;
+      const std::optional<uint32_t> native = single(handler, slot, frame);
+      const uint64_t r3 = native ? *native : call(handler, frame, 0x8258E678, 1, slot, 0, 0).r3;
       i = uint32_t(r3 + i) + 1;
     } while (i < count);
   }
@@ -347,14 +349,14 @@ void QuickSort(uint8_t* base, uint32_t array, int32_t lo, int32_t hi, uint32_t g
 }
 
 void ChunkChainRun(uint8_t* base, uint32_t queue, uint32_t item, uint32_t sp,
-                   const GuestCall& call) {
+                   const GuestCall& call, const SingleCommand& single) {
   ITC_NATIVE_RUNNING("sub_8258EE98 ChunkChain::Run");
   const uint32_t frame = Frame(base, sp, 96);
   while (item != 0) {
     const uint32_t kind = uint32_t(int32_t(int16_t(guest::LoadU32(base, item) & 0xFFFF)));
     switch (kind) {
       case 0:
-        item = RunSingles(base, item, frame, call);
+        item = RunSingles(base, item, frame, call, single);
         break;
       case 1:  // ChunkChain::RunInline, never seen in play
         item = uint32_t(call(0x8258E698, frame, 0x8258EF0C, 2, queue, item, 0).r3);
@@ -380,7 +382,7 @@ void ChunkChainRun(uint8_t* base, uint32_t queue, uint32_t item, uint32_t sp,
 }
 
 void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_output, uint32_t sp,
-            const GuestCall& call) {
+            const GuestCall& call, const SingleCommand& single) {
   ITC_NATIVE_RUNNING("sub_82591238 RenderQueue::Replay");
   const uint32_t frame = Frame(base, sp, 192);
   guest::StoreU32(base, kDevice, device);
@@ -457,7 +459,7 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
           uint32_t left = n, at_entry = kEntries;
           do {
             const uint32_t entry = guest::LoadU32(base, at_entry);
-            ChunkChainRun(base, queue, guest::LoadU32(base, entry + 0), frame, call);
+            ChunkChainRun(base, queue, guest::LoadU32(base, entry + 0), frame, call, single);
             left--;
             at_entry += 4;
           } while (left != 0);

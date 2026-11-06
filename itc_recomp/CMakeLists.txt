@@ -381,6 +381,8 @@ set(ITC_SOURCES
     src/graphics/device_shaders.cpp
     src/hooks/render_queue.cpp
     src/graphics/render_queue.cpp
+    src/hooks/single_commands.cpp
+    src/graphics/single_commands.cpp
     src/hooks/post_effects.cpp
     src/post_effects/post_effects.cpp
     src/post_effects/create.cpp
@@ -574,6 +576,7 @@ set(ITC_SOURCES
     src/harnesses/scene_target.cpp
     src/harnesses/frame_passes.cpp
     src/harnesses/command_buffer.cpp
+    src/harnesses/single_commands.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp
