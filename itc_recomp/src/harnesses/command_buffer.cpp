@@ -31,10 +31,15 @@ constexpr uint32_t kDeviceBytes = 20480;   // through +20440
 constexpr uint32_t kCommandBytes = 8192;   // the command buffer's words
 constexpr uint32_t kProgressBytes = 64;
 
+constexpr uint32_t kRingBytes = 0x20000;  // a command buffer of its own (physical memory)
+constexpr uint32_t kRingProgress = kRingBytes;  // its progress block, after it
+constexpr uint32_t kRingAllocation = kRingBytes + 4096;
+
 struct Blocks {
   uint32_t device = 0;
   uint32_t commands = 0;
   uint32_t progress = 0;
+  uint32_t ring = 0;
 };
 
 // Every word of `bytes` at `address` random.
@@ -163,6 +168,97 @@ uint32_t Alignment(Random& r) {
   return pick == 0 ? 0 : pick == 1 ? uint32_t(r.Next()) : 1u << r.Below(13);
 }
 
+
+// The command buffer's fields over the harness's ring (physical memory, so
+// a kick reads the words written through the CPU's view): the buffer the
+// whole ring (or its first 96 KB now and then), the open segment in its
+// middle with the write position after its start, the data cursor after it
+// (0 now and then: the segment's end + 60), the wrap cursor near the start
+// (or at it), the segment size small, the generation random and the
+// progress block's read position at the end of the address space with its
+// low bits, so the original's waits for the GPU (sub_8229DC28) pass at once,
+// as in play: everything new stays below the old segment's end. Predicated
+// tiling off, or its end in the ring with its generation near. The rest of
+// the device random.
+void RingFields(Context& h, const Blocks& b, Random& r) {
+  const uint32_t d = b.device;
+  const uint32_t ring = b.ring;
+  auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(h.base, d + field, value); };
+  store(cb::kBufferStart, ring);
+  store(cb::kBufferEnd, ring + (r.Below(4) == 0 ? 0x18000 : kRingBytes));
+  const uint32_t start = ring + 0x10000 + 32 * r.Below(256);
+  const uint32_t write = start - 4 + 4 * r.Below(1024);
+  store(cb::kSegmentStart, start);
+  store(cb::kWritePosition, write);
+  const uint32_t end = write + 4 + 4 * r.Below(1024);
+  store(cb::kSegmentEnd, end);
+  store(cb::kSoftEnd, r.Below(4) == 0 ? uint32_t(r.Next()) : end - 160);
+  store(cb::kDataCursor, r.Below(4) == 0 ? 0 : end + 64 + 4 * r.Below(0x1000));
+  store(cb::kWrapCursor, r.Below(4) == 0 ? ring : ring + 4 * r.Below(0x400));
+  const uint32_t sizes[] = {0, 4096, 0x2000, 54 * 4, 4 * r.Below(0x800)};
+  store(cb::kSegmentSize, sizes[r.Below(5)]);
+  const uint32_t generation = r.Below(4) == 0 ? 0xFFFFFFFFu : uint32_t(r.Next());
+  store(cb::kGeneration, generation);
+  if (r.Below(3) != 0) {
+    store(cb::kTilingEnd, 0);
+  } else {
+    store(cb::kTilingEnd, ring + 4 * r.Below(kRingBytes / 4));
+    const uint32_t apart[] = {0, 0, 1, 0xFFFFFFFFu, 2};
+    store(cb::kTilingGeneration, generation + apart[r.Below(5)]);
+  }
+  const uint32_t budget = r.Below(4) == 0 ? uint32_t(r.Next()) : 0x8000 + r.Below(0x8000);
+  store(cb::kSegmentDataBudget, budget);
+  store(cb::kSegmentData, r.Below(4) == 0 ? uint32_t(r.Next()) : budget - 0x4000 + r.Below(0x8000));
+  store(cb::kRecorder, 0);
+  store(cb::kDummySegment, ring + 4 * r.Below(0x400));
+  store(cb::kProgressBlock, ring + kRingProgress);
+  guest::StoreU32(h.base, ring + kRingProgress + 4, 0xFFFFFFFCu | (generation & 3));
+}
+
+// A chain at `chain` over the ring: its block and cursor in the ring's
+// first 8 KB (now and then 0, or the same word), its device the harness's.
+void RingChain(Context& h, const Blocks& b, Random& r, uint32_t chain) {
+  auto in_ring = [&] { return r.Below(6) == 0 ? 0u : b.ring + 4 * r.Below(0x800); };
+  const uint32_t block = in_ring();
+  guest::StoreU32(h.base, chain + cb::kChainFirst, uint32_t(r.Next()));
+  guest::StoreU32(h.base, chain + cb::kChainBlock, block);
+  guest::StoreU32(h.base, chain + cb::kChainCursor, r.Below(8) == 0 ? block : in_ring());
+  guest::StoreU32(h.base, chain + cb::kChainEnd, uint32_t(r.Next()));
+  guest::StoreU32(h.base, chain + cb::kChainDevice, b.device);
+}
+
+// Runs `cases` cases over the ring: as Run, the ring and its progress block
+// random too and compared.
+template <typename Setup, typename Native>
+void RunRing(Context& h, const Blocks& b, const char* name, GuestFunction recompiled, int cases,
+             Setup setup, Native native) {
+  Results results(name);
+  for (int c = 0; c < cases; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      Fill(h.base, h.data, kScratchBytes);
+      RandomWords(h.base, b.device, kDeviceBytes, r);
+      RandomWords(h.base, b.ring, kRingProgress + kProgressBytes, r);
+      PPCContext t = CallContext(h);
+      setup(r, t, c);
+      ITC_FLAG(native_command_buffer) = v != 0;
+      if (v == 0) {
+        recompiled(t, h.base);
+      } else {
+        native(t);
+      }
+      out[v].Bytes(Read(h.base, b.device, kDeviceBytes));
+      out[v].Bytes(Read(h.base, b.ring, kRingProgress + kProgressBytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CommandBuffer(Context& h) {
@@ -170,11 +266,15 @@ void CommandBuffer(Context& h) {
   b.device = memory::Alloc(kDeviceBytes, 0);
   b.commands = memory::Alloc(kCommandBytes, 0);
   b.progress = memory::Alloc(kProgressBytes, 0);
-  if (b.device == 0 || b.commands == 0 || b.progress == 0) {
+  b.ring = memory::AllocPhysical(kRingAllocation, 0, 0xFFFFFFFFu, 4096, 4);
+  if (b.device == 0 || b.commands == 0 || b.progress == 0 || b.ring == 0) {
     ITC_LOG_INFO("harness: command_buffer: no blocks");
     memory::Free(b.device);
     memory::Free(b.commands);
     memory::Free(b.progress);
+    if (b.ring != 0) {
+      memory::FreePhysical(b.ring);
+    }
     return;
   }
   const bool saved = ITC_FLAG(native_command_buffer);
@@ -337,7 +437,33 @@ void CommandBuffer(Context& h) {
       },
       [&](PPCContext&) {});
 
+  // NewBlock: the chain in the scratch area over the ring, out of space now
+  // and then (+10809 bit 6), the data space at the ring's end or wrapped.
+  RunRing(h, b, "CommandChain::NewBlock (sub_8229EB10)", __imp__sub_8229EB10, 600,
+          [&](Random& r, PPCContext& t, int c) {
+            RingFields(h, b, r);
+            uint8_t flags = uint8_t(r.Next());
+            flags = c % 8 == 0 ? (flags | 0x40) : (flags & ~0x40);
+            guest::StoreU8(h.base, b.device + cb::kFlags, flags);
+            RingChain(h, b, r, h.data + 128);
+            t.r3.u64 = h.data + 128;
+          },
+          [&](PPCContext& t) { t.r3.u64 = cb::NewBlock(h.base, t.r3.u32); });
+
+  RunRing(h, b, "CommandChain::Init (sub_8229ED60)", __imp__sub_8229ED60, 200,
+          [&](Random& r, PPCContext& t, int c) {
+            RingFields(h, b, r);
+            uint8_t flags = uint8_t(r.Next());
+            flags = c % 8 == 0 ? (flags | 0x40) : (flags & ~0x40);
+            guest::StoreU8(h.base, b.device + cb::kFlags, flags);
+            RingChain(h, b, r, h.data + 128);
+            t.r3.u64 = h.data + 128;
+            t.r4.u64 = b.device;
+          },
+          [&](PPCContext& t) { t.r3.u64 = cb::InitChain(h.base, t.r3.u32, t.r4.u32); });
+
   ITC_FLAG(native_command_buffer) = saved;
+  memory::FreePhysical(b.ring);
   memory::Free(b.progress);
   memory::Free(b.commands);
   memory::Free(b.device);

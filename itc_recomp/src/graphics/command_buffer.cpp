@@ -233,4 +233,42 @@ uint32_t WriteDefaultDrawRegisters(uint8_t* base, uint32_t device, uint32_t posi
   return position;
 }
 
+uint32_t NewBlock(uint8_t* base, uint32_t chain) {
+  ITC_NATIVE_RUNNING("sub_8229EB10 CommandChain::NewBlock");
+  // 0xC0000000 + the physical address (the original subtracts 0x40000000).
+  auto gpu = [](uint32_t address) { return PhysicalAddress(address) - 0x40000000u; };
+  const uint32_t old_block = guest::LoadU32(base, chain + kChainBlock);
+  if (old_block != 0) {
+    guest::StoreU32(base, old_block, gpu(guest::LoadU32(base, chain + kChainCursor)));
+  }
+  const uint32_t device = guest::LoadU32(base, chain + kChainDevice);
+  uint32_t block = Reserve(base, device, 4224, 128);
+  if (block == 0) {
+    block = guest::LoadU32(base, device + kDummySegment);
+    guest::StoreU32(base, chain + kChainFirst, 0);
+  } else {
+    guest::StoreU32(base, block, gpu(block + 4));
+    const uint32_t cursor = guest::LoadU32(base, chain + kChainCursor);
+    if (cursor != 0) {
+      guest::StoreU32(base, cursor, gpu(block));
+    }
+    // The data cache flush of the block (sub_822AC470): Dropped.
+  }
+  guest::StoreU32(base, chain + kChainBlock, block);
+  guest::StoreU32(base, chain + kChainCursor, block + 4);
+  guest::StoreU32(base, chain + kChainEnd, block + 4220);
+  return block + 4;
+}
+
+uint32_t InitChain(uint8_t* base, uint32_t chain, uint32_t device) {
+  ITC_NATIVE_RUNNING("sub_8229ED60 CommandChain::Init");
+  guest::StoreU32(base, chain + kChainDevice, device);
+  guest::StoreU32(base, chain + kChainCursor, 0);
+  guest::StoreU32(base, chain + kChainEnd, 0);
+  guest::StoreU32(base, chain + kChainBlock, 0);
+  const uint32_t cursor = NewBlock(base, chain);
+  guest::StoreU32(base, chain + kChainFirst, guest::LoadU32(base, chain + kChainBlock));
+  return cursor;
+}
+
 }  // namespace graphics::command_buffer

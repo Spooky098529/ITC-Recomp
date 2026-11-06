@@ -37,6 +37,16 @@ constexpr uint32_t kRecorder = 13160;      // a recording command buffer (never 
 constexpr uint32_t kSegmentData = 13532;    // the data reserved for the open segment
 constexpr uint32_t kSegmentDataBudget = 13536;
 constexpr uint32_t kTailsDirect = 19980;    // set: the hung GPU's progress not written
+constexpr uint32_t kDummySegment = 15176;   // the 4,800-byte segment writers get when out of space
+
+// A chain of 4 KB blocks (predicated tiling's segments and draws, at device
+// +13016, +12976 and +12996): +0 its first block, +4 the current block, +8
+// the write cursor, +12 the block's end, +16 the device.
+constexpr uint32_t kChainFirst = 0;
+constexpr uint32_t kChainBlock = 4;
+constexpr uint32_t kChainCursor = 8;
+constexpr uint32_t kChainEnd = 12;
+constexpr uint32_t kChainDevice = 16;
 
 // The address the GPU sees for a CPU address (the physical address, the
 // 0xE0000000 view's 4 KB offset added).
@@ -106,5 +116,22 @@ uint32_t Reserve(uint8_t* base, uint32_t device, uint32_t words, uint32_t alignm
 // 0x400000, 0x200000 and 0x2000000, +16 0xE0, +32 0x80000), so the next
 // draw writes them from the shadow. Returns `position` (no words written).
 uint32_t WriteDefaultDrawRegisters(uint8_t* base, uint32_t device, uint32_t position);
+
+// CommandChain::NewBlock (sub_8229EB10): a 4,224-byte block for `chain`
+// from the command buffer's data space (Reserve, 4,224 words asked at
+// 128-byte alignment, as the original asks). The old block's first word
+// gets where its content ends (the cursor) and the old cursor the new
+// block's address, both as 0xC0000000 + the physical address; the new
+// block's first word its own start + 4 for now. On no space, the block is
+// the word at the device's +15176 and the chain's first block cleared. The
+// chain's block, cursor (block + 4) and end (block + 4,220) set; returns
+// the cursor. The original's data cache flush of the new block
+// (sub_822AC470) is left out (Dropped: no data cache to flush on PC).
+uint32_t NewBlock(uint8_t* base, uint32_t chain);
+
+// CommandChain::Init (sub_8229ED60): the chain's device set, its block,
+// cursor and end cleared, a first block started (NewBlock) and kept at +0.
+// Returns NewBlock's cursor.
+uint32_t InitChain(uint8_t* base, uint32_t chain, uint32_t device);
 
 }  // namespace graphics::command_buffer

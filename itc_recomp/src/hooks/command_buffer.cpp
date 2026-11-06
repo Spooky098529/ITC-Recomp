@@ -14,7 +14,8 @@ ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "CommandChain::Close sub_8229DFB8, Device::WriteCallback sub_8229E9D0, "
               "Device::NextSpace sub_8229E100 (its wait for the GPU, sub_8229DC28, dropped), "
               "Device::AllocateFromCommandBuffer sub_8229E308, "
-              "Device::WriteDefaultDrawRegisters sub_822AF978 without its packets; the "
+              "Device::WriteDefaultDrawRegisters sub_822AF978 without its packets, "
+              "CommandChain::NewBlock sub_8229EB10, CommandChain::Init sub_8229ED60; the "
               "coherency flush packets sub_8229E5D0 and the data cache flush sub_822AC470 "
               "dropped) "
               "natively instead of through the translated code (the same results; checked by "
@@ -56,6 +57,23 @@ ITC_COMMAND_BUFFER(8229E308, {
     return;
   }
   ctx.r3.u64 = cb::Reserve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+})
+// The chains: a recording command buffer (+13160, never in play) makes
+// Reserve the original's, so they run the original whole.
+ITC_COMMAND_BUFFER(8229EB10, {
+  if (guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32 + cb::kChainDevice) + cb::kRecorder) !=
+      0) {
+    __imp__sub_8229EB10(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = cb::NewBlock(base, ctx.r3.u32);
+})
+ITC_COMMAND_BUFFER(8229ED60, {
+  if (guest::LoadU32(base, ctx.r4.u32 + cb::kRecorder) != 0) {
+    __imp__sub_8229ED60(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = cb::InitChain(base, ctx.r3.u32, ctx.r4.u32);
 })
 ITC_COMMAND_BUFFER(822AF978,
                    ctx.r3.u64 = cb::WriteDefaultDrawRegisters(base, ctx.r3.u32, ctx.r4.u32))
