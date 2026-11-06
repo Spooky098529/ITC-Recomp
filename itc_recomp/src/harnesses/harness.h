@@ -280,5 +280,6 @@ void ReplaySnapshots(Context& h);
 void RaceLoading(Context& h);
 void SceneTarget(Context& h);
 void FramePasses(Context& h);
+void CommandBuffer(Context& h);
 
 }  // namespace harness

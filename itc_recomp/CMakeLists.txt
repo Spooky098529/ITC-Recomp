@@ -373,6 +373,8 @@ set(ITC_SOURCES
     src/graphics/edram.cpp
     src/hooks/video_output.cpp
     src/graphics/video_output.cpp
+    src/hooks/command_buffer.cpp
+    src/graphics/command_buffer.cpp
     src/hooks/device_state.cpp
     src/graphics/device_state.cpp
     src/hooks/device_shaders.cpp
@@ -571,6 +573,7 @@ set(ITC_SOURCES
     src/harnesses/post_effects.cpp
     src/harnesses/scene_target.cpp
     src/harnesses/frame_passes.cpp
+    src/harnesses/command_buffer.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp
