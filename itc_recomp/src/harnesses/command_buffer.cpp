@@ -13,7 +13,9 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "graphics/command_buffer.h"
+#include "hooks/command_buffer.h"
 #include "memory/heap.h"
+#include "native/state.h"
 
 #include <fmt/format.h>
 
@@ -180,12 +182,12 @@ uint32_t Alignment(Random& r) {
 // as in play: everything new stays below the old segment's end. Predicated
 // tiling off, or its end in the ring with its generation near. The rest of
 // the device random.
-void RingFields(Context& h, const Blocks& b, Random& r) {
+void RingFields(Context& h, const Blocks& b, Random& r, bool full = false) {
   const uint32_t d = b.device;
   const uint32_t ring = b.ring;
   auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(h.base, d + field, value); };
   store(cb::kBufferStart, ring);
-  store(cb::kBufferEnd, ring + (r.Below(4) == 0 ? 0x18000 : kRingBytes));
+  store(cb::kBufferEnd, ring + (r.Below(4) == 0 && !full ? 0x18000 : kRingBytes));
   const uint32_t start = ring + 0x10000 + 32 * r.Below(256);
   const uint32_t write = start - 4 + 4 * r.Below(1024);
   store(cb::kSegmentStart, start);
@@ -257,6 +259,79 @@ void RunRing(Context& h, const Blocks& b, const char* name, GuestFunction recomp
     results.Check(out[0], out[1], fmt::format("case {}", c));
   }
   results.Report();
+}
+
+
+// The segment flow's inputs over the ring (RingFields): out of space
+// (+10809 bit 6) in 1 case of 8; no recording command buffer; nothing in
+// the pending flush range and the wrap bit (+10810 bit 3) clear, as in play
+// since Resource::Lock is native (the original's sub_8229E5D0 then writes no
+// block, as the dropped one); the open segment's words type-2 NOPs, so the
+// kick (sub_8229E848, the same for both) applies only the tail's fence and
+// read position, into the ring's progress block; the open fence random with
+// the GPU done up to 0-3 fences before it; the segment chain at +13016 in
+// the ring's first 8 KB, full now and then. The fences waited for (the
+// frame throttle's) are 0, done, or the open one, which ends the segment
+// first (only where its kick then completes it, so the original's wait
+// never spins: as in play). `full`: no wrap of the buffer (a wrap sets
+// +10810 bit 3, which a second segment end's original sub_8229E5D0 would
+// flush). Returns the open fence.
+uint32_t FlowFields(Context& h, const Blocks& b, Random& r, int c, bool full) {
+  const uint32_t d = b.device;
+  auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(h.base, d + field, value); };
+  RingFields(h, b, r, full);
+  uint8_t flags = uint8_t(r.Next());
+  flags = c % 8 == 0 ? (flags | 0x40) : (flags & ~0x40);
+  guest::StoreU8(h.base, d + cb::kFlags, flags);
+  guest::StoreU8(h.base, d + cb::kRecording, guest::LoadU8(h.base, d + cb::kRecording) & 0x7F);
+  guest::StoreU8(h.base, d + cb::kFlags2, guest::LoadU8(h.base, d + cb::kFlags2) & ~0x8);
+  store(11560, 0);
+  store(11564, 0xFFFFFFFFu);
+  store(cb::kTailsDirect, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  const uint32_t fence = r.Below(8) == 0 ? 0xFFFFFFFFu - 2 * r.Below(4) : uint32_t(r.Next());
+  store(cb::kFence, fence);
+  guest::StoreU32(h.base, b.ring + kRingProgress, fence - 2 * r.Below(4));
+  const uint32_t start = guest::LoadU32(h.base, d + cb::kSegmentStart);
+  const uint32_t write = guest::LoadU32(h.base, d + cb::kWritePosition);
+  for (uint32_t at = start; at < write + 4; at += 4) {
+    guest::StoreU32(h.base, at, 0x80000000u);
+  }
+  const uint32_t chain = d + cb::kSegmentChain;
+  const uint32_t block = b.ring + 4 * r.Below(0x700);
+  const uint32_t cursor = block + 4 + 4 * r.Below(0x100);
+  guest::StoreU32(h.base, chain + cb::kChainBlock, block);
+  guest::StoreU32(h.base, chain + cb::kChainCursor, cursor);
+  guest::StoreU32(h.base, chain + cb::kChainEnd,
+                  r.Below(3) == 0 ? cursor + 4 * r.Below(2) : cursor + 8 + 4 * r.Below(64));
+  guest::StoreU32(h.base, chain + cb::kChainDevice, d);
+  return fence;
+}
+
+// A fence the GPU is done with (0 now and then), or `open` when `may_open`.
+uint32_t WaitedFence(Context& h, const Blocks& b, Random& r, uint32_t open, bool may_open) {
+  switch (r.Below(may_open ? 4 : 3)) {
+    case 0: return 0;
+    case 3: return open;
+    default: return guest::LoadU32(h.base, b.ring + kRingProgress) - 2 * r.Below(3);
+  }
+}
+
+// The throttle's fences (+13540, +13544; +20440 bit 0 picks one).
+void ThrottleFences(Context& h, const Blocks& b, Random& r, uint32_t open, bool may_open) {
+  guest::StoreU32(h.base, b.device + cb::kThrottleSelect, uint32_t(r.Next()));
+  guest::StoreU32(h.base, b.device + cb::kThrottleFence, WaitedFence(h, b, r, open, may_open));
+  guest::StoreU32(h.base, b.device + cb::kThrottleFence2, WaitedFence(h, b, r, open, may_open));
+}
+
+// The "training failed" global (0x829537BC, never set in play) set in some
+// cases where the segment end's fence wait then passes: its kick completes
+// the fence (no predicated tiling, not out of space) and the GPU done up to
+// the fence before it.
+void TrainingFailed(Context& h, const Blocks& b, Random& r, uint32_t open) {
+  const bool safe = guest::LoadU32(h.base, b.device + cb::kTilingEnd) == 0 &&
+                    !(guest::LoadU8(h.base, b.device + cb::kFlags) & 0x40) &&
+                    open - guest::LoadU32(h.base, b.ring + kRingProgress) <= 2;
+  guest::StoreU32(h.base, cb::kTrainingFailed, safe && r.Below(3) == 0 ? 1 : 0);
 }
 
 }  // namespace
@@ -461,6 +536,86 @@ void CommandBuffer(Context& h) {
             t.r4.u64 = b.device;
           },
           [&](PPCContext& t) { t.r3.u64 = cb::InitChain(h.base, t.r3.u32, t.r4.u32); });
+
+  // The segment flow (sub_8229EF48 -> sub_8229EDA8 -> sub_8229EC00 ->
+  // sub_8229E908 -> sub_8229EF48), each an entry: the kick the same guest
+  // call for both (the native side's through hooks::CommandBufferKick, as
+  // its adapters). The ring must be guest physical memory seen through the
+  // CPU's view, as the kick writes the tail's fence through it.
+  {
+    const uint32_t probe = b.ring + kRingProgress + 32;
+    guest::StoreU32(h.base, probe, 0x12345678u);
+    const uint8_t* physical =
+        native::PhysicalHostAddress(h.base, cb::PhysicalAddress(probe));
+    const bool aliased = physical[0] == 0x12 && physical[3] == 0x78;
+    const uint32_t training_failed = guest::LoadU32(h.base, cb::kTrainingFailed);
+    if (!aliased) {
+      ITC_LOG_INFO("harness: command_buffer: the ring at {:08X} isn't seen at its physical "
+                   "address; the segment flow's cases skipped",
+                   b.ring);
+    } else {
+      RunRing(h, b, "Device::EndSegment (sub_8229EF48)", __imp__sub_8229EF48, 800,
+              [&](Random& r, PPCContext& t, int c) {
+                const uint32_t open = FlowFields(h, b, r, c, false);
+                ThrottleFences(h, b, r, open, true);
+                TrainingFailed(h, b, r, open);
+                t.r3.u64 = b.device;
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = cb::EndSegment(h.base, t.r3.u32, hooks::CommandBufferKick(t, h.base));
+              });
+      RunRing(h, b, "Device::KickSegment (sub_8229EDA8)", __imp__sub_8229EDA8, 600,
+              [&](Random& r, PPCContext& t, int c) {
+                const uint32_t open = FlowFields(h, b, r, c, false);
+                ThrottleFences(h, b, r, open, true);
+                guest::StoreU32(h.base, cb::kTrainingFailed, 0);
+                t.r3.u64 = b.device;
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = cb::KickSegment(h.base, t.r3.u32, hooks::CommandBufferKick(t, h.base));
+              });
+      // NextSegment: the words asked 0 (the segment end's), the segment size's
+      // (Swap's) or a few; the throttle's fence the open one only without a
+      // wrap.
+      RunRing(h, b, "Device::NextSegment (sub_8229EC00)", __imp__sub_8229EC00, 800,
+              [&](Random& r, PPCContext& t, int c) {
+                const bool may_open = c % 2 == 0;
+                const uint32_t open = FlowFields(h, b, r, c, may_open);
+                ThrottleFences(h, b, r, open, may_open);
+                TrainingFailed(h, b, r, open);
+                t.r3.u64 = b.device;
+                switch (r.Below(3)) {
+                  case 0: t.r4.u64 = 0; break;
+                  case 1:
+                    t.r4.u64 = guest::LoadU32(h.base, b.device + cb::kSegmentSize) >> 2;
+                    break;
+                  default: t.r4.u64 = r.Below(0x400); break;
+                }
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = cb::NextSegment(h.base, t.r3.u32, t.r4.u32,
+                                           hooks::CommandBufferKick(t, h.base));
+              });
+      // WaitForFence: 0, done, or the open fence (not when out of space: no
+      // kick would complete it, and the original would spin).
+      RunRing(h, b, "Device::WaitForFence (sub_8229E908)", __imp__sub_8229E908, 600,
+              [&](Random& r, PPCContext& t, int c) {
+                const uint32_t open = FlowFields(h, b, r, c, false);
+                ThrottleFences(h, b, r, open, true);
+                TrainingFailed(h, b, r, open);
+                const bool out_of_space = guest::LoadU8(h.base, b.device + cb::kFlags) & 0x40;
+                t.r3.u64 = b.device;
+                t.r4.u64 = WaitedFence(h, b, r, open, !out_of_space);
+                t.r5.u64 = r.Below(7);
+                t.r6.u64 = uint32_t(r.Next());
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = cb::WaitForFence(h.base, t.r3.u32, t.r4.u32, t.r5.u32,
+                                            hooks::CommandBufferKick(t, h.base));
+              });
+    }
+    guest::StoreU32(h.base, cb::kTrainingFailed, training_failed);
+  }
 
   ITC_FLAG(native_command_buffer) = saved;
   memory::FreePhysical(b.ring);

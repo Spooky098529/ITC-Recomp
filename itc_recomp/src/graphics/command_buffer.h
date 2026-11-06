@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace graphics::command_buffer {
 
@@ -38,6 +39,12 @@ constexpr uint32_t kSegmentData = 13532;    // the data reserved for the open se
 constexpr uint32_t kSegmentDataBudget = 13536;
 constexpr uint32_t kTailsDirect = 19980;    // set: the hung GPU's progress not written
 constexpr uint32_t kDummySegment = 15176;   // the 4,800-byte segment writers get when out of space
+constexpr uint32_t kRecording = 10808;      // bit 7 (0x80): a recording command buffer
+constexpr uint32_t kSegmentChain = 13016;   // predicated tiling's chain of segments; the kick's list
+constexpr uint32_t kThrottleFence = 13540;  // the last Swap's fence (+13544 with +20440 bit 0)
+constexpr uint32_t kThrottleFence2 = 13544;
+constexpr uint32_t kThrottleSelect = 20440;
+constexpr uint32_t kTrainingFailed = 0x829537BCu;  // a global, never set (Device::Init leaves it 0)
 
 // A chain of 4 KB blocks (predicated tiling's segments and draws, at device
 // +13016, +12976 and +12996): +0 its first block, +4 the current block, +8
@@ -133,5 +140,63 @@ uint32_t NewBlock(uint8_t* base, uint32_t chain);
 // cursor and end cleared, a first block started (NewBlock) and kept at +0.
 // Returns NewBlock's cursor.
 uint32_t InitChain(uint8_t* base, uint32_t chain, uint32_t device);
+
+// Whether `device` has a recording command buffer (+10808 bit 7, or the
+// object at +13160; never in play): the segment flow's adapters run the
+// originals whole then.
+bool Recording(uint8_t* base, uint32_t device);
+
+// The kick a segment's end hands its words to: Device::DeferredKick
+// (sub_8229E848, overridden in src/native/gpu_link.cpp), a guest call, as
+// the kick runs the segment's callbacks (guest functions). Its arguments are
+// the original call's registers r3-r8: the device, a word returned as is
+// (the tail's end), the segment's physical address, its word count, the
+// interrupts it raises (0) and the list (+13016); returns r3.
+using Kick = std::function<uint32_t(uint32_t device, uint32_t result, uint32_t address,
+                                    uint32_t words, uint32_t interrupts, uint32_t list)>;
+
+// The segment flow, mutually recursive as the originals are (the end kicks
+// the segment and starts the next, whose throttle wait may end the segment
+// again). Each returns r3 as the original leaves it.
+//
+// The segment's end (sub_8229EF48), called by every packet writer past the
+// soft end +48: the segment kicked and the next started (KickSegment); with
+// the "training failed" global 0x829537BC set (never) and the GPU not hung
+// (+10809 bit 1), the segment's fence waited for and bit 1 set. Returns the
+// write position +40. The original's pending coherency flush block
+// (sub_8229E5D0, Dropped, answers none) is left out.
+uint32_t EndSegment(uint8_t* base, uint32_t device, const Kick& kick);
+
+// Device::KickSegment (sub_8229EDA8): the open segment (from +13528 to the
+// write position + 4) ended, unless out of space (+10809 bit 6): under
+// predicated tiling (+12960) appended to the segment chain at +13016
+// (0x81000000 | its word count, its physical address; a new block when the
+// chain's is full); else its tail written (WriteSegmentTail) and kicked.
+// Then the next segment: at the next 32-byte boundary when it's before the
+// soft end +48 (with +19980 set, the data cursor rounded up to 4 KB), else
+// a new one (NextSegment).
+uint32_t KickSegment(uint8_t* base, uint32_t device, const Kick& kick);
+
+// The next segment (sub_8229EC00) of at least `words` + 14 words (0: the
+// default), from NextSpace (32-byte aligned): its start +13528, the data
+// cursor and count cleared, the write position, end (14 words left for the
+// tail) and soft end set; when none can be had (or already out of space),
+// +10809 bit 6 set and the writers pointed at the dummy segment ([+15176],
+// 4,800 bytes). Then, unless it was already out of space, the frame
+// throttle: the last Swap's fence (+13540, or +13544 with +20440 bit 0)
+// waited for (WaitForFence, code 3) and cleared. Returns the segment, or 0.
+uint32_t NextSegment(uint8_t* base, uint32_t device, uint32_t words, const Kick& kick);
+
+// The fence wait (sub_8229E908): nothing for fence 0 or one the GPU is done
+// with (the progress block's +0 against the open fence +10780); a wait on
+// the open fence ends the segment first (EndSegment) outside predicated
+// tiling, which kicks it and so completes it. The original then spins with
+// the wait helpers (sub_8229D6F0, sub_8229D8A0, sub_8229D720) while it's
+// still pending: left out, a wait on the GPU (Dropped, the user's call on
+// fence waits, 2026-10-24), which never spins in play (our kick completes
+// every fence as it kicks; the helpers never ran). `code` only named the
+// wait for the helpers' time totals.
+uint32_t WaitForFence(uint8_t* base, uint32_t device, uint32_t fence, uint32_t code,
+                      const Kick& kick);
 
 }  // namespace graphics::command_buffer

@@ -23,6 +23,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/command_buffer.h"
 
 #include <array>
 #include <chrono>
@@ -159,11 +160,12 @@ NATIVE_CHECKED_HELPER(822AE070, native::kFetchConstants,
 NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, native::MarkRegistersDirty(0x2203, 1ull << 63))
 
 // Ends the command segment when the buffer is full (kicking it); counted
-// so the check can leave those calls out.
+// so the check can leave those calls out. The work is the command buffer's
+// (native with --native_command_buffer, src/hooks/command_buffer.cpp).
 extern "C" REX_FUNC(sub_8229EF48) {
   REX_FUNC_PROLOGUE();
   native::t_segment_ends++;
-  __imp__sub_8229EF48(ctx, base);
+  hooks::EndCommandSegment(ctx, base);
 }
 
 // DrawIndexedVertices (sub_825BE708, wrapped in replay_hooks.cpp): r3

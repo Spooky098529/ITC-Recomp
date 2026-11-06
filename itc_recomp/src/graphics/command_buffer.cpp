@@ -271,4 +271,132 @@ uint32_t InitChain(uint8_t* base, uint32_t chain, uint32_t device) {
   return cursor;
 }
 
+bool Recording(uint8_t* base, uint32_t device) {
+  return (guest::LoadU8(base, device + kRecording) & 0x80) != 0 ||
+         guest::LoadU32(base, device + kRecorder) != 0;
+}
+
+uint32_t EndSegment(uint8_t* base, uint32_t device, const Kick& kick) {
+  ITC_NATIVE_RUNNING("sub_8229EF48 Device::EndSegment");
+  // The pending coherency flush block (sub_8229E5D0): Dropped, none.
+  KickSegment(base, device, kick);
+  if (guest::LoadU32(base, kTrainingFailed) != 0 &&
+      !(guest::LoadU8(base, device + kFlags) & 0x2)) {
+    WaitForFence(base, device, guest::LoadU32(base, device + kFence) - 2, 0, kick);
+    guest::StoreU8(base, device + kFlags, guest::LoadU8(base, device + kFlags) | 0x2);
+  }
+  return guest::LoadU32(base, device + kWritePosition);
+}
+
+uint32_t KickSegment(uint8_t* base, uint32_t device, const Kick& kick) {
+  ITC_NATIVE_RUNNING("sub_8229EDA8 Device::KickSegment");
+  auto load = [&](uint32_t field) { return guest::LoadU32(base, device + field); };
+  auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(base, device + field, value); };
+  uint32_t r3 = device;
+  const uint32_t start = load(kSegmentStart);
+  uint32_t end = load(kWritePosition) + 4;
+  if (!(guest::LoadU8(base, device + kFlags) & 0x40)) {
+    if (load(kTilingEnd) != 0) {
+      // Predicated tiling: the segment appended to the chain, kicked per
+      // tile by the tiling worker.
+      const uint32_t words = uint32_t(int32_t(end - start) >> 2);
+      if (words != 0) {
+        const uint32_t chain = device + kSegmentChain;
+        r3 = chain;
+        uint32_t cursor = guest::LoadU32(base, chain + kChainCursor);
+        if (cursor + 8 > guest::LoadU32(base, chain + kChainEnd)) {
+          cursor = NewBlock(base, chain);
+          r3 = cursor;
+        }
+        guest::StoreU32(base, cursor + 4, PhysicalAddress(start));
+        guest::StoreU32(base, cursor, words | 0x81000000u);
+        store(kSegmentChain + kChainCursor, cursor + 8);
+      }
+    } else {
+      const uint32_t tail = WriteSegmentTail(base, device, end);
+      end = kick(device, tail, PhysicalAddress(start), uint32_t(int32_t(tail - start) >> 2), 0,
+                 device + kSegmentChain);
+      r3 = end;
+    }
+  }
+  const uint32_t next = (end + 31) & ~31u;
+  if (next > load(kSoftEnd)) {
+    store(kWritePosition, end - 4);
+    return NextSegment(base, device, 0, kick);
+  }
+  store(kSegmentStart, next);
+  store(kWritePosition, next - 4);
+  if (load(kTailsDirect) != 0) {
+    const uint32_t cursor = load(kDataCursor);
+    if (cursor != 0) {
+      store(kDataCursor, (cursor + 4095) & ~4095u);
+    }
+  }
+  return r3;
+}
+
+uint32_t NextSegment(uint8_t* base, uint32_t device, uint32_t words, const Kick& kick) {
+  ITC_NATIVE_RUNNING("sub_8229EC00 Device::NextSegment");
+  auto load = [&](uint32_t field) { return guest::LoadU32(base, device + field); };
+  auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(base, device + field, value); };
+  auto out_of_space = [&] {
+    guest::StoreU8(base, device + kFlags, guest::LoadU8(base, device + kFlags) | 0x40);
+  };
+  uint32_t write;
+  uint32_t end;
+  if (guest::LoadU8(base, device + kFlags) & 0x40) {
+    out_of_space();
+    write = load(kDummySegment);
+    end = write + 4800;
+    store(kWritePosition, write);
+    store(kSegmentEnd, end);
+    store(kSoftEnd, end - 160);
+    return 0;
+  }
+  uint32_t size = words != 0 ? (words + 14) << 2 : 0;
+  const uint32_t segment = NextSpace(base, device, 2, size, 32);
+  if (segment == 0) {
+    out_of_space();
+    write = load(kDummySegment);
+    end = write + 4800;
+  } else {
+    write = segment - 4;
+    store(kSegmentStart, segment);
+    store(kDataCursor, 0);
+    store(kSegmentData, 0);
+    end = (((size >> 2) - 14) << 2) + write;
+  }
+  store(kWritePosition, write);
+  store(kSegmentEnd, end);
+  store(kSoftEnd, end - 160);
+  // The frame throttle: the last Swap's fence.
+  const uint32_t fence = (load(kThrottleSelect) & 1) ? kThrottleFence2 : kThrottleFence;
+  WaitForFence(base, device, load(fence), 3, kick);
+  store(fence, 0);
+  return segment;
+}
+
+uint32_t WaitForFence(uint8_t* base, uint32_t device, uint32_t fence, uint32_t code,
+                      const Kick& kick) {
+  ITC_NATIVE_RUNNING("sub_8229E908 Device::WaitForFence");
+  (void)code;
+  if (fence == 0) {
+    return device;
+  }
+  const uint32_t open = guest::LoadU32(base, device + kFence);
+  const uint32_t done = guest::LoadU32(base, guest::LoadU32(base, device + kProgressBlock));
+  if (open - fence >= open - done) {
+    return device;
+  }
+  uint32_t r3 = device;
+  if (fence == open) {
+    if (guest::LoadU32(base, device + kTilingEnd) != 0) {
+      return device;
+    }
+    r3 = EndSegment(base, device, kick);
+  }
+  // Still pending: the original waits for the GPU here (Dropped).
+  return r3;
+}
+
 }  // namespace graphics::command_buffer

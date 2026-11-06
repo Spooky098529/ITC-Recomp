@@ -5,8 +5,11 @@
 
 #include "guest.h"
 
+#include "hooks/command_buffer.h"
+
 #include "base/flags.h"
 #include "graphics/command_buffer.h"
+#include "hooks/guest_call.h"
 
 ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "Run the graphics library's command buffer (docs/functions/command-buffer.md: "
@@ -15,7 +18,10 @@ ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "Device::NextSpace sub_8229E100 (its wait for the GPU, sub_8229DC28, dropped), "
               "Device::AllocateFromCommandBuffer sub_8229E308, "
               "Device::WriteDefaultDrawRegisters sub_822AF978 without its packets, "
-              "CommandChain::NewBlock sub_8229EB10, CommandChain::Init sub_8229ED60; the "
+              "CommandChain::NewBlock sub_8229EB10, CommandChain::Init sub_8229ED60, the segment "
+              "flow (Device::EndSegment sub_8229EF48, Device::KickSegment sub_8229EDA8, "
+              "Device::NextSegment sub_8229EC00, Device::WaitForFence sub_8229E908, its waits "
+              "for the GPU dropped); the "
               "coherency flush packets sub_8229E5D0 and the data cache flush sub_822AC470 "
               "dropped) "
               "natively instead of through the translated code (the same results; checked by "
@@ -75,6 +81,59 @@ ITC_COMMAND_BUFFER(8229ED60, {
   }
   ctx.r3.u64 = cb::InitChain(base, ctx.r3.u32, ctx.r4.u32);
 })
+// The segment flow: with a recording command buffer (never in play), the
+// originals whole.
+graphics::command_buffer::Kick hooks::CommandBufferKick(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t device, uint32_t result, uint32_t address, uint32_t words,
+                      uint32_t interrupts, uint32_t list) {
+    uint32_t r3 = 0;
+    guest_call::InFrame(ctx, base, 128, 0x8229EEE0, [&](uint32_t) {
+      ctx.r3.u64 = device;
+      ctx.r4.u64 = result;
+      ctx.r5.u64 = address;
+      ctx.r6.u64 = words;
+      ctx.r7.u64 = interrupts;
+      ctx.r8.u64 = list;
+      sub_8229E848(ctx, base);
+      r3 = ctx.r3.u32;
+    });
+    return r3;
+  };
+}
+
+void hooks::EndCommandSegment(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {
+    __imp__sub_8229EF48(ctx, base);
+    return;
+  }
+  const uint32_t device = ctx.r3.u32;
+  ctx.r3.u64 = cb::EndSegment(base, device, CommandBufferKick(ctx, base));
+}
+
+#define ITC_SEGMENT_FLOW(address, ...)                                             \
+  extern "C" REX_FUNC(sub_##address) {                                           \
+    REX_FUNC_PROLOGUE();                                                         \
+    if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {   \
+      __imp__sub_##address(ctx, base);                                           \
+      return;                                                                    \
+    }                                                                            \
+    const cb::Kick kick = hooks::CommandBufferKick(ctx, base);                   \
+    __VA_ARGS__;                                                                 \
+  }
+
+ITC_SEGMENT_FLOW(8229EDA8, {
+  const uint32_t device = ctx.r3.u32;
+  ctx.r3.u64 = cb::KickSegment(base, device, kick);
+})
+ITC_SEGMENT_FLOW(8229EC00, {
+  const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
+  ctx.r3.u64 = cb::NextSegment(base, device, words, kick);
+})
+ITC_SEGMENT_FLOW(8229E908, {
+  const uint32_t device = ctx.r3.u32, fence = ctx.r4.u32, code = ctx.r5.u32;
+  ctx.r3.u64 = cb::WaitForFence(base, device, fence, code, kick);
+})
+
 ITC_COMMAND_BUFFER(822AF978,
                    ctx.r3.u64 = cb::WriteDefaultDrawRegisters(base, ctx.r3.u32, ctx.r4.u32))
 
