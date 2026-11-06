@@ -2761,6 +2761,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | The power graph (the front end's power and torque graph on the tuning and car list screens: `PowerGraph::Draw` `sub_8217C708`, two sets of 32 stack sprites drawn as lines through `Line::RecordFlat` `sub_8217B508`; `TuningScreen::DrawPowerGraph` `sub_821DF350`) | `power-graph.md` | 3 of 4 in play (one migration; `CarList::DrawEntryPowerGraph` `sub_82250670` waits on the car objects' makers) | `--native_power_graph` |
 | 2026-11-06 | The car objects' makers outside the race's set-up (the scene model record built from a car, `SceneModelRecord::FromCar` with its paint, wheels, choices and bytes setters and `CarModels::BlockOf`; the garage cars' reset and static set-up; `CarData::FromGarageCar` with the tuning screen's set-up; the front-end stand's `FitCar` and `CopyRecord`; the garage screen's busy marker) | `car-makers.md` | 16 of 24 in play (one migration; 4 adapters removed) | `--native_car_makers` |
 | 2026-11-06 | The front end's shared menu helpers (`Menu::Step` `sub_82186568`, the cursor moved by the pad through the action mappers' vtable; `Menu::Pressed` `sub_821864C8`; about 113 screens call them, each filling its 68-byte menu inline) | `menu-helpers.md` | 2 of 2 (one migration; adapters kept for the recompiled screens) | `--native_menu_helpers` |
+| 2026-11-06 | The race's update (`RaceScene::LoadScenery` `sub_8215B790` with the scenery's physical allocation (`XPhysicalSize` answered from our allocation layer, the user's call), `Create`, `Setup`, `SetupPools`; `RaceScene::Update` `sub_8215D2B0` once a tick with `Scenery::Update`, the race lights and `Car::TickUpdate`; `RaceScene::RemakeCarModel` with `ScenePools::SetUpB`, the second set's set-ups and `SceneModel::Build`; `RaceScene::VaryCar`) | `race-update.md` (and rows in `course-scenery.md`, `heap.md`, `scene-models.md`, `car-models.md`, `vehicle-accessors.md`, `post-effects.md`, `screen-objects.md`) | 7 of 7 (three migrations; ours 4,252 -> 4,286 with the other files' rows) | `--native_race_update` (and `--native_course_scenery`, `--native_scene_models`, `--native_vehicle_accessors`, `--native_heap`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4700,3 +4701,24 @@ as before. The run stopped at its limit. The boundary: 449 functions
 live 209. Imports: 186 called, 55 with a live caller. B7
 (`b7_status.py`): ours 4,252, work left 2,159 (Wrapped 57, with a row
 466, no row yet 1,636), from 2,161.
+
+**2026-11-06, the race's update (branch `b7-loop-06-11-26`):** the
+thirty-sixth run's first subsystem (`race-update.md`,
+`--native_race_update`, `src/race_update/`), in three migrations: the
+race scene's scenery load (`RaceScene::LoadScenery` with `Scenery::Create`,
+`Setup`, `SetupPools` and the physical allocation; `XPhysicalSize`
+`sub_822965C0` answered from our allocation layer, which now records each
+physical block's size rounded to its page, a size-0 block one page, by
+the user's call of 2026-11-06), the per-tick update (`RaceScene::Update`,
+`Scenery::Update` with `LimitLargeModels`' reads below its frame written
+as the original leaves them, the race lights, `Car::TickUpdate`), the car
+model remake (`RaceScene::RemakeCarModel` with `ScenePools::SetUpB`, the
+second set's set-ups and `SceneModel::Build`) and `RaceScene::VaryCar`;
+25 adapters removed. Adapters kept for recompiled callers:
+`RaceScene::Update` (`RaceSceneMachine::OnUpdate` `sub_8215D538`),
+`RemakeCarModel` (`RaceScene::SetUpCars` `sub_8215C248`) and
+`SceneModel::Build` (`SceneModel::Update` `sub_820DA180`). The boundary:
+449 functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 4,286, work left 2,125 (Wrapped 57, with a row
+438, no row yet 1,630), from 2,159.

@@ -48,9 +48,24 @@ file's history. What's left to see in a drive, from every run:
   `SceneModel::Build`; `RaceScene::RemakeCarModel`; `RaceScene::Update`
   with `Car::TickUpdate` (one subagent, alone); 25 adapters removed;
   races 38 and 34 s, 0 errors, all harnesses 0 differing); left: none
-  in `race-update.md` (7 of 7 ours). Validation agent running.
+  in `race-update.md` (7 of 7 ours). Validated `itc_3747` (race 36 s,
+  0 errors, every harness 0 differing, 32 of 32 harness lines, all ran
+  in the race; none to drive). Recorded.
+- Subsystem 2 of 3: the scene models' holders (two leads taken together:
+  what's left of the scene models' owners, `sub_8217FCB0`, `sub_82179998`,
+  and the front end's re-applies of a scene model's record,
+  `sub_82178DF8`, `sub_82178E60`, `sub_821799D8`, `sub_820E7380`,
+  `sub_820E7470`, `sub_820D8F18`; ready groups under every root, next to
+  the scene model work just done; both lines deleted from `leads.md`).
+  Mapping agent running.
 
 ## Done
+
+- `race-update.md`: 7 of 7 native (`RaceScene::LoadScenery`, `Update`,
+  `RemakeCarModel`, `VaryCar`, the lights, `Car::TickUpdate`; with
+  `XPhysicalSize`, the scenery's set-up and update, `ScenePools::SetUpB`
+  and `SceneModel::Build` in their files; 25 adapters removed),
+  `--native_race_update`; db8e723a, b30ad3c0..3aae586e.
 
 ## Rows to review
 
@@ -78,3 +93,4 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3722`): ours 4277, work left 2134.
 - After its third migration: ours 4286, work left 2125 (wrapped 57,
   known 438, unknown 1630).
+- After its validation (`itc_3747`): ours 4286, work left 2125.
