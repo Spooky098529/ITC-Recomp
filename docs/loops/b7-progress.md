@@ -111,7 +111,15 @@ file's history. What's left to see in a drive, from every run:
   (race 30 s, the harnesses ~90 s of the 120; 0 errors, every harness
   0 differing, 46 of 46 harness lines; none in the race or the replay
   `itc_3796` (ok): the screen isn't reached; all 46 to drive). Second
-  migration agent running.
+  migration 04cdbd4b..06ba6b96 (`SetUpGroups`, `Open`, `BackToGroups`,
+  `ChangeCategory`, `OpenBuilds`, `BackToStand` with `RestoreStand`,
+  `OpenDetails` with `SetUpDetails`, `ShowDetails`; `CarScene::LoadsDone`
+  `sub_820C5798` under `--native_scene`; 15 adapters removed; races 36
+  and 38 s, 0 errors, all harnesses 0 differing; harness inputs shaped
+  to stay in their world; no subagents); held: `BackToBuilds`
+  `sub_821A1258` (a register leftover in live state: asked the user);
+  left: `sub_820C5A60` with `SceneModel::Update` (`vehicle-accessors.md`).
+  Validation agent running.
 
 ## Done
 
