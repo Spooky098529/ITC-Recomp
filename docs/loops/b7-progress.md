@@ -50,8 +50,13 @@ file's history. What's left to see in a drive, from every run:
   `leads.md`). Map checked (53cddb27: `single-commands.md`, 27 rows
   (the table's ids 0-36), 1 moved from `functions.md`
   (`sub_8258F5C0`, Wrapped), 5 in play; 0 errors; 5 ready groups;
-  nothing Dropped-kind; no leads added; no subagents). Step:
-  migration agent running.
+  nothing Dropped-kind; no leads added; no subagents). Migration
+  8d39fd7e..15c1659b (`--native_single_commands`, 5 of 5 in play, run
+  from `ChunkChain::RunSingles`' native dispatch; `sub_8258F5C0`
+  native inside its `replay_hooks.cpp` wrap; adapters kept, the table
+  reaches them; `itc_3636`: race 38 s, 0 errors, every harness 0
+  differing; no subagents); nothing ready left. Step: validation agent
+  running.
 
 ## Done
 
@@ -87,5 +92,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3623`): ours 4219, work left 2191.
 - After the single commands' map: ours 4219, work left 2191 (wrapped
   59, known 464, unknown 1668).
+- After its migration: ours 4224, work left 2186 (wrapped 58, known
+  460, unknown 1668).
 
 ## Stopped
