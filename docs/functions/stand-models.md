@@ -1,0 +1,156 @@
+# Known functions: the stand's scene model holders
+
+The front end's small functions over the car stand's scene model (the
+"garage stage", `../known-data.md`; its holder is `[0x826D83E0]`'s +0
+word, its +0 the stage, the stage's +8 the model's index in pool 7 of the
+car scene `[0x826C2E44]`, `scene.md`): making the stand's model from a
+default record (`GarageStage::MakeModel`), the wheels picked on the tuning
+screen (`GarageStage::SetWheel`: the wheels' numbers, colors and sizes in
+the model's record, from the wheel table `Params::GetWheel` or the car
+spec's stock wheel, and the stand's axles refitted), the tire grades
+(`GarageStage::SetTireGrade`), the second wheels made and painted
+(`TuningScreen::StepSecondWheels`), and the stand's other record setters,
+each a word or two of the model's 4,244-byte record (`scene-models.md`,
+the record at the model's +32) followed by `SceneModel::ApplyRecord`,
+`ReloadDecals` or `ApplyLightKit` or nothing: the parts, the interior's
+words and choices, the decal placements, the lights. Below them, the
+wheels' re-applies on the second set's pool 5 object (`SceneWheels::`,
+`second-set.md`) and the first set's wheels (`Wheels::`, `load-poll.md`).
+Above them are the front-end screens (the tuning screen `sub_821E6C50`
+and its handlers, the stand's screens; leads in `../loops/leads.md`).
+The race's own scene model remake is `RaceScene::RemakeCarModel` in
+`race-update.md`; the stand's model remake for a new block, the cars put
+on the stand and the record re-applies are in `car-makers.md`. Names are
+ours. The fields worked out are in `../known-data.md` ("scene model
+record", "scene model", "garage stage", "tuning screen").
+
+Shared, with rows elsewhere: `SceneModel::ApplyRecord`,
+`SceneModel::ReloadDecals`, the second wheels' claim `sub_820D9E00`,
+`SceneParts::Apply`, `SceneInterior::Apply` (`sub_820DA758`,
+`sub_820D9D48`, `sub_820D9E00`, `sub_820E08B0`, `sub_820E4258`,
+`scene-models.md`); `SceneModelRecord::SceneModelRecord`, `Reset`,
+`ScenePools::SetUpB` (`sub_820DB240`, `sub_820D9810`, `sub_820C5B28`,
+`scene-models.md`); `ScenePools::GetB`, `ClaimB`, `SaveData::Of`
+(`sub_820C5C20`, `sub_820C5AB0`, `sub_82105620`,
+`vehicle-accessors.md`); `SceneModel::ApplyWheelPaint`,
+`ApplyLightKit`, `Wheels::SetRecord`, `Wheels::SetCaliperTexture`
+(`sub_820D9C50`, `sub_820D9D10`, `sub_820D8EC0`, `sub_820D8ED0`,
+`load-poll.md`); `PartModel::SetTexture` (`sub_820D17D8`,
+`material-passes.md`); `Params::GetCarSpec`, `Params::GetWheel`,
+`Car::Refresh` (`sub_820C9E98`, `sub_820C9EB0`, `sub_820C4998`,
+`car-specs.md`); `Car::Init`, `Car::SetupVehicle` (`sub_820CD5D8`,
+`sub_820CD5C8`, `race-setup.md`); `CarData::CarData` (`sub_820AEF80`,
+`car-physics.md`); `memcpy` (`sub_825A7410`, `c-runtime.md`);
+`GarageStage::ReapplyRecord`, `ReapplyRecordNoDecals`, `FitCar`
+(`sub_82178DF8`, `sub_82178E60`, `sub_82178C40`, `car-makers.md`).
+
+Not here: the screens that call these (the tuning screen's handlers
+`sub_821E0E00`, `sub_821E07B0`, `sub_821E0FB0`, `sub_821D9F10`,
+`sub_821E3AD0`, `sub_821CCC50`, `sub_821D99A0`; the stand's screens
+`sub_8218E368`, `sub_822338E8`, `sub_82243E80`, `sub_822042D8`; leads in
+`../loops/leads.md`); the interior's set-up `sub_820E38E0` under
+`SceneModel::ApplyInterior` (not seen in play, not read).
+
+Ready (by `b7_groups.py`, 2026-11-06): `GarageStage::MakeModel`;
+`TuningScreen::StepSecondWheels` (with `GarageStage::SecondWheelsPending`,
+`AddSecondWheels`, `ApplyWheelPaint` and the shared `sub_820D9E00`);
+`TuningScreen::PreviewWheel` (with `GarageStage::SetWheel`, `FitAxles`
+and `SceneWheels::SetSizes`; 2,171 lines, most of them `SetWheel`'s
+179-entry table built on its frame and its 44 `Params::GetWheel` reads:
+split the migration); `GarageStage::SetTireGrade` (with
+`SceneWheels::SetTireGrades` and `Wheels::SetTireTextures`);
+`GarageStage::SetInteriorClass`, `SetLightsOn` (with
+`SceneParts::LightValue`), `SetWord5016`, `SetDecalA`, `SetDecalB`,
+`SetWheelWord`; and the shared `SceneModel::ApplyRecord` (with
+`SceneParts::Apply`, `SceneInterior::Apply`) and
+`SceneModel::ReloadDecals` (`scene-models.md`). Then, once those are:
+`TuningScreen::SetTireGrade` (on `SetTireGrade`), `GarageStage::ReloadDecals`
+(on `ReloadDecals`), `SetPart`, `SetInteriorWord`, `SetInteriorLevel`,
+`SetInteriorPair`, `ClearChoice`, `SetAero` (on `ApplyRecord`), and in
+`car-makers.md` `GarageStage::ReapplyRecord`, `ReapplyRecordNoDecals`
+and what waits on them. Blocked outside the file: none. Notes for the
+migration: `SceneWheels::SetSizes` takes two 12-byte values in r6 to r9
+(r6 and r8 two words each, r7 and r9 the high word) and stores r6 to r9
+into its caller's parameter area (the caller's r1 + 48 to + 79) before
+reading them back, as the ABI's home slots; `TuningScreen::SetTireGrade`
+indexes a five-word table on its frame by r5 unchecked;
+`TuningScreen::StepSecondWheels` may call `SecondWheelsPending` twice in
+one call. Nothing here needs a call the user hasn't made.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8217FCB0` | `GarageStage::MakeModel` (probably) | | r3 = the holder (its +0 the stage s), r4 = a model block (the car record's +0), r5 = a draw word. A 4,384-byte frame. Nothing unless s +16 is 0 (no model claimed). Else a record at r1 + 80 (`SceneModelRecord::SceneModelRecord`, `Reset`), its +16 (the car record's block) = r4; s +8 = `ScenePools::ClaimB([0x826C2E44], 7, 0)`; `ScenePools::SetUpB(scene, 7, s +8, the record)`; the new model's +4296 (the draw word, `GarageStage::SetDrawWord` in `front-end-car-draw.md`) and s +6056 = r5; s +16 = 1; `[0x826D83E0]`'s +20 = 1. 7 callers (3 seen: `sub_8218E368`, no direct callers; `sub_822338E8`, `sub_82243E80`, the stand's screens' lead; not seen: `sub_8223D5D8` in `race-loading.md`'s notes, `sub_8225EBC0`, `sub_82267CD0`, `sub_82275278`). As `GarageStage::ReloadModel` (`car-makers.md`) without its release, poll and count. Read in full. |
+| `sub_821CC890` | `TuningScreen::StepSecondWheels` (probably) | | r3 = the tuning screen (`../known-data.md`): its +25244 a small machine. When `GarageStage::SecondWheelsPending` (on the stand's holder, `[0x826D83E0]`'s +0 word) is 0 and +25244 is 1: `GarageStage::AddSecondWheels`, +25244 = 2. Else when it's 0 (asked again) and +25244 is 2: `GarageStage::ApplyWheelPaint`, +25244 = 0. A 112-byte frame. Only caller `sub_821D9F10` (the tuning screen's per-update call, the stand's screens' lead). Read in full. |
+| `sub_82179C48` | `GarageStage::SecondWheelsPending` (probably) | | r3 = the holder: the stage's scene model's (`ScenePools::GetB(scene, 7, [+0] + 8)`) +5032 (set by `sub_820D9E00` when it claims the second wheels; cleared elsewhere, not checked). A 96-byte frame. Only caller `TuningScreen::StepSecondWheels`. Read in full. |
+| `sub_82179998` | `GarageStage::AddSecondWheels` (probably) | | r3 = the holder: `sub_820D9E00` (`scene-models.md`: the second wheels claimed once, set up with the record's wheels) on the stage's scene model (`ScenePools::GetB`, pool 7, `[+0] + 8`). A 96-byte frame. Returns what `sub_820D9E00` returns. Only caller `TuningScreen::StepSecondWheels`. Read in full. |
+| `sub_821799D8` | `GarageStage::ApplyWheelPaint` (probably) | | r3 = the holder: `SceneModel::ApplyWheelPaint` (`load-poll.md`) on the stage's scene model. A 96-byte frame. Only caller `TuningScreen::StepSecondWheels`. Read in full. |
+| `sub_821DFA78` | `TuningScreen::PreviewWheel` (probably) | | r3 = the tuning screen, r4 = a wheel number (0 stock), r5 = which wheels (0 both, 1 front, else rear). A 4,016-byte frame: a car object at r1 + 80 (`Car::Init`), `memcpy` of the selected garage car's first 1,884 bytes over it (the car found as `TuningScreen::SetUpCarData` does, `car-makers.md`: g = `[+18904]` + 6120, the halfword link list from g +204 walked `[[+18904] + 0x19920]` steps, the car g + 212 + 1,968 × the last link's +2), its flags +3888 \|= 1, `Car::Refresh` (`car-specs.md`), then `GarageStage::SetWheel(the stand's holder, r4, r5, the car)`. Callers `sub_821E0E00` and `sub_821E0FB0` (the tuning screen's handlers; leads). Read in full. |
+| `sub_8217DD38` | `GarageStage::SetWheel` (probably) | | r3 = the holder, r4 = a wheel number (clamped to 178; 0 the stock wheel), r5 = which (0 both, 1 front, else rear), r6 = a car object. A 3,120-byte frame: first a 179-entry table of 16-byte entries built on the frame (r1 + 96) each call, of which only the word +8 of entry r4 is read (entry 0's -1: stock; probably the wheel number − 1). m = the stage's scene model, rec = m + 32 (its record); the car spec of `SaveData::Of(0)`'s selected garage car (the same walk as `TuningScreen::PreviewWheel`, the car's +12 id, `Params::GetCarSpec`). The wheel w = `Params::GetWheel(r4)` (the table 73 record, called once a field: 44 calls), or for 0 the spec's +8380 record. Front (r5 0 or 1): rec +4052 = the table word; rec +80 to +120 the wheel's three colors (w +8 halfword, +10 and +11 bytes × `[0x82002200]`; +20, +22, +23; +24, +26, +27; as float triples 16 bytes apart: hue, saturation and value, probably, as `SceneModelRecord::SetPaint`'s); rec +4060 = w +16, +4056 = w +28; rec +4080 = (int) car +3164, +4084 = car +3132 × `[0x82001BDC]`, +4088 = car +3168 × `[0x82002A0C]`. Rear (r5 0 or not 1): rec +4068, +128 to +168, +4076, +4072 the same way, +4092 = (int) car +3256, +4096 = car +3224 × `[0x82001BDC]`, +4100 = car +3260 × `[0x82002A0C]` (the car's tire copies, `SceneModelRecord::SetWheels`'s). Then `GarageStage::FitAxles(r3, r6)` and `SceneWheels::SetSizes(m +5100, rec +4108, rec +4112, the 12 bytes at rec +4080, the 12 at rec +4092)`. No `ApplyRecord`. Only caller `TuningScreen::PreviewWheel`. Read in detail (the table's other words not read). |
+| `sub_82178B98` | `GarageStage::FitAxles` (probably) | | r3 = the holder (its +0 the stage s), r4 = a car object. A 1,968-byte frame: a car data at r1 + 80 (`CarData::CarData`), `Car::SetupVehicle(r4, data)` (`race-setup.md`); s +6176 to +6184 = data +336 to +344, +6188 = `[0x82000A30]` (1.0), +6192 to +6200 = data +608 to +616, +6204 = 1.0 (the axle records' +0 to +8: the last part of `GarageStage::FitCar`, `car-makers.md`). Callers `GarageStage::SetWheel`, `sub_821DF9D0` (not seen in play). Read in full. |
+| `sub_820E7380` | `SceneWheels::SetSizes` (probably) | | r3 = a wheels object (pool 5 of the second set, `second-set.md`; w +32 its 156-byte record), r4, r5 = two words, r6 to r9 = two 12-byte values (r6 two words and r7's high word; r8 two words and r9's high word). A 112-byte frame. Stores r6 to r9 into its caller's parameter area (r1 + 160 to + 191 of its own frame, the caller's r1 + 48 to + 79) and reads them back; w +104 = r4, +108 = r5 (the record's +72, +76), w +76 to +84 = the first value, +88 to +96 = the second (the record's +44 to +64: the front and rear sizes, probably); then `Wheels::SetRecord(w +28, w +32)` (`load-poll.md`, a tail call). Only caller `GarageStage::SetWheel`. Read in full. |
+| `sub_821CCA38` | `TuningScreen::SetTireGrade` (probably) | | r3 not read, r4 = which (0 both, 1 front, 2 rear; else nothing), r5 = an index into five words on its frame (0, 1, 1, 2, 2; not checked): `GarageStage::SetTireGrade(the stand's holder, r4, the word)`. A 112-byte frame. Only caller `sub_821E07B0` (the tuning screen; a lead). Read in full. |
+| `sub_82179130` | `GarageStage::SetTireGrade` (probably) | | r3 = the holder, r4 = which (0 both, 1 front, 2 rear; else neither), r5 = a tire grade (0 to 2): the stage's scene model m +4080 (the record's +4048, the wheels' +12) and or +4096 (+4064, the wheels' +28) = r5; then `SceneWheels::SetTireGrades(m +5100, m +4080, m +4096)`. A 112-byte frame. Callers `TuningScreen::SetTireGrade`, `sub_821E0FB0` (the tuning screen; a lead). Read in full. |
+| `sub_820E7470` | `SceneWheels::SetTireGrades` (probably) | | r3 = a wheels object (pool 5), r4, r5 = the front and rear tire grades: +44 = r4, +60 = r5 (the record's +12, +28); `Wheels::SetRecord(+28, +32)` (`load-poll.md`), `Wheels::SetTireTextures(+28)`. A 96-byte frame. Only caller `GarageStage::SetTireGrade`. Read in full. |
+| `sub_820D8F18` | `Wheels::SetTireTextures` (probably) | | r3 = the first set's wheels: `PartModel::SetTexture` (`material-passes.md`) on the tires +240 with the record's +12 (+40) and +704 with +28 (+56), every shape (r5 = -1), as `Wheels::BindTextures` does (`load-poll.md`). A 96-byte frame. Only caller `SceneWheels::SetTireGrades`. Read in full. |
+| `sub_82178EC0` | `GarageStage::ReloadDecals` (probably) | | r3 = the holder: `SceneModel::ReloadDecals` (`scene-models.md`) on the stage's scene model. A 96-byte frame. Only caller `sub_822042D8` (a stand's screen, `car-makers.md`'s notes). Read in full. |
+| `sub_82178F00` | `GarageStage::SetPart` (probably) | | r3 = the holder, r4 = a part slot (0 to 15; above 15 nothing is set), r5 = a word: the stage's scene model m's parts record word (the record's +3712, m +3744): slot 0 +3744, 1 to 5 +3748 to +3764, 6 and 7 +3768, 8 and 9 +3772, 10 to 12 +3776 to +3784, 13 none, 14 +3788, 15 +3792 (a jump table); then `SceneModel::ApplyRecord(m)` (a tail call). Case 0 is the recompiler's split piece `sub_82178F68`. Callers `sub_821E07B0`, `sub_821E0FB0` (the tuning screen; leads). Read in full. |
+| `sub_82178F68` | | | The recompiler's split of `GarageStage::SetPart`'s case 0 (reached as a tail call with r3 the model, r31 the word): m +3744 = r31, `SceneModel::ApplyRecord(m)`. Read in full. |
+| `sub_82178FE8` | `GarageStage::SetInteriorClass` (probably) | | r3 = the holder, r4 = a value: the stage's scene model +3808 (the interior record's +4) = 0 below 3, 1 for 3 to 6, 2 from 7. No apply. A 96-byte frame. Callers `sub_821E07B0`, `sub_821E0FB0`. Read in full. |
+| `sub_82179050` | `GarageStage::SetInteriorWord` (probably) | | r3 = the holder, r4 = a kind, r5 = a word: the stage's scene model +3908 (the interior record's +104) for kind 1, +3900 (+96) for 4, +3896 (+92) for 5, nothing for the others; then `SceneModel::ApplyRecord`. Callers `sub_821E07B0`, `sub_821E0FB0`. Read in full. |
+| `sub_821791C0` | `GarageStage::SetInteriorLevel` (probably) | | r3 = the holder, r4 = a value: the stage's scene model +3908 (the interior record's +104) = 0 below 3, 1 for 3 to 5, 2 from 6; +3912 (+108) = 0 below 1, else 1; then `SceneModel::ApplyRecord`. Callers `sub_821E07B0`, `sub_821E0FB0`. Read in full. |
+| `sub_82179250` | `GarageStage::SetInteriorPair` (probably) | | r3 = the holder, r4, r5 = two words: the stage's scene model +3904 = r4 (the interior record's +100, a scene part model's index, `SceneInterior::Apply`), +3900 = r5 (+96); then `SceneModel::ApplyRecord`. Only caller `sub_821CCC50` (the tuning screen; a lead). Read in full. |
+| `sub_82179378` | `GarageStage::ClearChoice` (probably) | | r3 = the holder, r4 = a choice (0 to 5): the stage's scene model's +3812 + 12 × r4 (the record's six 12-byte choices at +3780, `SceneModelRecord::SetChoice` in `car-makers.md`; its +0) = 0; then `SceneModel::ApplyRecord`. Callers `sub_821E07B0` (7 calls), `sub_821E0FB0`. Read in full. |
+| `sub_82179420` | `GarageStage::SetLightsOn` (probably) | | r3 = the holder, r4 = a flag: the stage's scene model m. r4 set: m +4976 = 1, +4980 = `[0x82000A34]` (0.0). r4 0: m +4976 = 0, +4980 = `SceneParts::LightValue([m +5060] + 176)` (the parts' point block). No apply. Only caller `sub_821E3AD0` (the tuning screen's check, the stand's screens' lead). Read in full; the fields' meaning not known. |
+| `sub_820DF1A0` | `SceneParts::LightValue` (probably) | | r3 = a parts object's point block (the parts' +176): f1 = its float +27664 (in the headlights' group, before the tail lights at +27680). Leaf. Only caller `GarageStage::SetLightsOn`. Read in full. |
+| `sub_82179548` | `GarageStage::SetAero` (probably) | | r3 = the holder, r4 = a word: the stage's scene model +3728 (the record's +3696, the parts and aero words) = r4; then `SceneModel::ApplyRecord`. Callers `sub_821E07B0`, `sub_821E0FB0`. Read in full. |
+| `sub_82179598` | `GarageStage::SetWord5016` (probably) | | r3 = the holder, r4 = a word: the stage's scene model +5016 = r4 (not known). No apply. A 96-byte frame. Only caller `sub_821D99A0` (the stand's screens' lead). Read in full. |
+| `sub_82179818` | `GarageStage::SetDecalA` (probably) | | r3 = the holder, r4 = an entry (0 to 2), r5, r6 = two words, f1 to f4 = four floats: e = the stage's scene model + 64 × (2, 1, 0 for r4 = 0, 1, 2; a table on its frame) + 224 (the record's 64-byte entries at +192, +256, +320, probably decal placements): e +0 = r5, +4 = r6, +16 = f1, +20 = f2, +32 = f3, +52 = f4, +48 = f4 × `[0x82001BE0]` when r6 is set, else f4. No apply. Only caller `sub_822042D8`. Read in full. |
+| `sub_821798D8` | `GarageStage::SetDecalB` (probably) | | As `GarageStage::SetDecalA` on the entries 192 bytes further (the model's +416 + 64k, the record's +384, +448, +512). Only caller `sub_822042D8`. Read in full. |
+| `sub_82179A18` | `GarageStage::SetWheelWord` (probably) | | r3 = the holder, r4 = a word: the stage's scene model +4076 (the record's +4044, the wheels' +8) = r4. No apply. A 96-byte frame. Only caller `sub_821D9F10` (the tuning screen's per-update call). Read in full. |
+| `sub_821790D0` | `GarageStage::SetWheelExtras` (probably) | | Not seen in play. r3 = the holder, r4, r5 = two words: the stage's scene model +4136 = r4 (the wheels' +68), +4156 = r5 (the wheels' +88, the calipers' texture); `SceneWheels::SetWord68(m +5100, r4)`, `SceneWheels::SetCaliperTexture(m +5100, +4156)`. Read in full. |
+| `sub_820E7410` | `SceneWheels::SetWord68` (probably) | | Not seen in play. r3 = a wheels object (pool 5), r4 = a word: +100 = r4 (the record's +68); `Wheels::SetRecord(+28, +32)` (a tail call). Only caller `GarageStage::SetWheelExtras`. Read in full. |
+| `sub_820E7428` | `SceneWheels::SetCaliperTexture` (probably) | | Not seen in play. r3 = a wheels object (pool 5), r4 = a texture index: +120 = r4 (the record's +88); `Wheels::SetRecord(+28, +32)`, `Wheels::SetCaliperTexture(+28)` (`load-poll.md`). Only caller `GarageStage::SetWheelExtras`. Read in full. |
+| `sub_821792B0` | `GarageStage::SetAccessory` (probably) | | Not seen in play. r3 = the holder, r4, r5 = two words: the stage's scene model +3916 = r4 (the interior record's +112, the accessory, 3 none), +3920 = r5 (+116); `SceneModel::ApplyInterior` (a tail call). Read in full. |
+| `sub_820D9F40` | `SceneModel::ApplyInterior` (probably) | | Not seen in play. r3 = a scene model: `sub_820E38E0([+5068], r3 + 3804)` (the interior, its record; not read; a tail call). Only caller `GarageStage::SetAccessory`. Read in full. |
+| `sub_82179310` | `GarageStage::SetChoice` (probably) | | Not seen in play. r3 = the holder, r4 = a choice (0 to 5), r5, r6 = two words: the record's choice r4 (+3780 + 12 × r4) = (1, r5, r6); then `SceneModel::ApplyRecord`. Callers `sub_821E07B0` (3 calls), `sub_821E0FB0` (both seen; this call's path not taken). Read in full. |
+| `sub_821793D0` | `GarageStage::SetDecalWord` (probably) | | Not seen in play. r3 = the holder, r4 = a word: the stage's scene model +3740 (the record's +3708) = r4; `SceneModel::ReloadDecals` on the model (fetched again). Read in full. |
+| `sub_821794A8` | `GarageStage::SetAero2` (probably) | | Not seen in play. As `GarageStage::SetAero` on the model's +3732 (the record's +3700). Callers `sub_821E07B0`, `sub_821E0FB0`. Read in full. |
+| `sub_821794F8` | `GarageStage::SetDoorKind` (probably) | | Not seen in play. As `GarageStage::SetAero` on the model's +3736 (the record's +3704; picks the door animations, `../known-data.md`'s "scene model"). Callers `sub_821E07B0`, `sub_821E0FB0`. Read in full. |
+| `sub_821795E0` | `GarageStage::ClearLightKit` (probably) | | Not seen in play. r3 = the holder, r4 = a group: the stage's scene model's pool 4 record words (`GarageStage::SetLightKit`, `front-end-car-draw.md`) = 0: 0 +4228, 1 +4244, 2 +4260, 3 all three; then `SceneModel::ApplyLightKit` (a tail call; also for other r4). Only caller `sub_821E0FB0`. Read in full. |
+| `sub_821797A8` | `GarageStage::SetParts` (probably) | | Not seen in play. r3 = the holder, r4 to r9 = six words: the stage's scene model's parts record +3744 = r4, +3752 = r5, +3756 = r6, +3784 = r7, +3764 = r8, +3760 = r9, +3768 = 0; then `SceneModel::ApplyRecord`. Read in full. |

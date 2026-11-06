@@ -56,10 +56,11 @@ leave it out, as `_init_pointers` and the others do).
 Not here: the front-end screens that call these makers (leads in
 `../loops/leads.md`: the stand's screens, the garage cars' copies, the
 screen `sub_821A1380` updates and its 21 transitions); the race's own
-scene model remake `sub_8215C0D8` and `sub_8217FCB0`, `sub_82179998`
-(still the scene models' owners' lead); the other front-end re-applies
-`sub_821799D8`, `sub_820E7380`, `sub_820E7470`, `sub_820D8F18` (still
-their lead).
+scene model remake `sub_8215C0D8` (`race-update.md`); the stand's
+model made from a default record `sub_8217FCB0`, the second wheels
+`sub_82179998`, the other front-end re-applies `sub_821799D8`,
+`sub_820E7380`, `sub_820E7470`, `sub_820D8F18` and the stand's other
+record setters (`stand-models.md`, 2026-11-06).
 
 Ready (by `b7_groups.py`, 2026-11-06): `GarageCar::Reset`,
 `CarData::FromGarageCar`, `CarModels::BlockOf` (with `sub_8215AB04`, its

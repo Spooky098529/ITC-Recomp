@@ -586,6 +586,12 @@ Rows not yet moved stay in the table below. So far:
   directional lights' constants, the cars' tick update (their scene
   models remade and their draw blocks filled from the vehicles) and the
   screen objects driven by the followed cars (B7).
+- [`stand-models.md`](stand-models.md): the front end's small
+  functions over the car stand's scene model: its making from a default
+  record, the wheels and tire grades the tuning screen picks (their
+  numbers, colors and sizes in the record, the axles refitted, the second
+  wheels), and the record setters for the parts, the interior, the decal
+  placements and the lights, each followed by the model's re-apply (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
