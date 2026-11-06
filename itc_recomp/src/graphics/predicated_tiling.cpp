@@ -16,10 +16,11 @@ namespace {
 
 // Ends the segment when the write position has passed its soft end, as
 // every packet writer does before writing.
-void EndSegmentIfFull(uint8_t* base, uint32_t device, const GuestCalls& calls) {
+void EndSegmentIfFull(uint8_t* base, uint32_t device,
+                      const std::function<void(uint32_t)>& end_segment) {
   if (guest::LoadU32(base, device + cb::kWritePosition) >
       guest::LoadU32(base, device + cb::kSoftEnd)) {
-    calls.end_segment(device);
+    end_segment(device);
   }
 }
 
@@ -41,7 +42,7 @@ uint32_t SetPredication(uint8_t* base, uint32_t device, uint32_t select,
   guest::StoreU32(base, device + kBinMaskHigh, 0);
   guest::StoreU32(base, device + kPredicationSelect, select);
   guest::StoreU32(base, device + kPredicationHigh, 0);
-  EndSegmentIfFull(base, device, calls);
+  EndSegmentIfFull(base, device, calls.end_segment);
   return guest::LoadU32(base, device + cb::kWritePosition);
 }
 
@@ -102,6 +103,59 @@ uint32_t EndTiledSegments(uint8_t* base, uint32_t device, uint32_t tiles, uint32
                device + kSegmentChainCopy);
   }
   return 0;
+}
+
+namespace {
+
+// A notification event's header written in place: type 0, not signaled, its
+// wait list empty (pointing at itself).
+void EventHeader(uint8_t* base, uint32_t event) {
+  guest::StoreU8(base, event, 0);
+  guest::StoreU32(base, event + 4, 0);
+  guest::StoreU32(base, event + 8, event + 8);
+  guest::StoreU32(base, event + 12, event + 8);
+}
+
+}  // namespace
+
+uint32_t CreateWorkers(uint8_t* base, uint32_t device, const WorkerCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_822B6D70 Device::CreateWorkers");
+  if (guest::LoadU32(base, device + kDeviceOptions) & 0x100) {
+    return 1;
+  }
+  const uint32_t state = device + kWorkerState;
+  guest::StoreU32(base, device + 10816, guest::LoadU32(base, device + 13496));
+  guest::StoreU32(base, device + 10824, guest::LoadU32(base, device + 13500));
+  guest::StoreU32(base, device + 10872, 0);
+  guest::StoreU32(base, device + 10904, 0xC0000000u);
+  guest::StoreU32(base, device + 10920, kL2Area);
+  EventHeader(base, device + 10876);
+  uint32_t slices = 0;
+  for (uint32_t cpu = 0; cpu < 6; cpu++) {
+    if (!(guest::LoadU32(base, device + kDeviceOptions) & (0x01000000u << cpu))) {
+      continue;
+    }
+    const uint32_t block = device + kWorkers + kWorkerBytes * cpu;
+    const uint32_t signal = kWorkerSignals + 128 * cpu;
+    guest::StoreU32(base, device + kLastWorkerCpu, cpu);
+    guest::StoreU32(base, block + 4, cpu);
+    guest::StoreU32(base, block, state);
+    guest::StoreU32(base, block + 16, guest::LoadU32(base, device + 10920) + slices);
+    slices += kWorkerSlice;
+    guest::StoreU32(base, block + 24, (signal + 0x41000000u) | 2);
+    guest::StoreU32(base, block + 28, signal);
+    guest::StoreU32(base, block + 8, guest::LoadU32(base, block + 16));
+    guest::StoreU32(base, block + 20, guest::LoadU32(base, device + 10920) + slices);
+    EndSegmentIfFull(base, device, calls.end_segment);
+    EventHeader(base, block + 32);
+    const uint32_t made = calls.create_thread(block + 48, kWorkerSlice, block + 52, 0,
+                                              kWorkerThread, block, 0x80u | ((1u << cpu) << 24));
+    if (int32_t(made) < 0) {
+      return 0;
+    }
+    calls.set_priority(guest::LoadU32(base, block + 48), 17);
+  }
+  return 1;
 }
 
 }  // namespace graphics::predicated_tiling

@@ -301,6 +301,22 @@ void PredicatedTiling(Context& h) {
         });
   }
 
+  // CreateWorkers: +20440 with bit 8 (no workers) or without CPU bits, so no
+  // thread is made (a real one would outlive the case, polling its block):
+  // the shared state alone. The threads and their blocks are checked by the
+  // boot (the blocks after Device::Init the same with the flag on and off,
+  // the write position 16 bytes short by the EVENT_WRITE_SHD left out).
+  Run(
+      h, b, "Device::CreateWorkers (sub_822B6D70), no threads", __imp__sub_822B6D70, 100,
+      [&](Random& r, PPCContext& t, int c) {
+        Flow(h, b, r, c);
+        uint32_t options = uint32_t(r.Next()) & ~0x3F000000u;
+        options = c % 2 == 0 ? (options | 0x100) : (options & ~0x100u);
+        guest::StoreU32(h.base, b.device + pt::kDeviceOptions, options);
+        t.r3.u64 = b.device;
+      },
+      [&](PPCContext& t) { hooks::NativeCreateWorkers(t, h.base); });
+
   guest::StoreU32(h.base, cb::kTrainingFailed, training_failed);
   ITC_FLAG(native_command_buffer) = saved;
   free_blocks();

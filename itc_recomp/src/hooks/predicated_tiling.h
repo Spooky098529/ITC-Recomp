@@ -19,4 +19,11 @@ graphics::predicated_tiling::GuestCalls PredicatedTilingCalls(PPCContext& ctx, u
 // command buffer). For its wrap in src/native/gpu_link.cpp, which logs.
 void EndTiledSegments(PPCContext& ctx, uint8_t* base);
 
+// The worker threads' guest calls through `ctx` (the kernel's imports).
+graphics::predicated_tiling::WorkerCalls PredicatedTilingWorkerCalls(PPCContext& ctx,
+                                                                     uint8_t* base);
+
+// Device::CreateWorkers (sub_822B6D70) without the flag: r3 as the original's.
+void NativeCreateWorkers(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

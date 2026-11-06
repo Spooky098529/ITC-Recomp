@@ -90,4 +90,51 @@ uint32_t BeginTiledSegments(uint8_t* base, uint32_t device, const GuestCalls& ca
 uint32_t EndTiledSegments(uint8_t* base, uint32_t device, uint32_t tiles, uint32_t cpus,
                           const GuestCalls& calls);
 
+// --- The library's worker threads ---
+//
+// One a CPU, made at Device::Init; each waits on its event for the tiling's
+// callback (sub_822B6A78, which our kick skips), the one on the CPU at +11208
+// with a 30 ms timeout. Their threads, events and waits go through the
+// kernel's imports as the original's (the user's call for XAudio's,
+// 2026-10-29: host objects once every user is native).
+
+constexpr uint32_t kWorkerState = 10812;   // the workers' shared state
+constexpr uint32_t kLastWorkerCpu = 11208;  // the CPU of the last worker made
+constexpr uint32_t kWorkers = 11212;        // 56 bytes a CPU
+constexpr uint32_t kWorkerBytes = 56;
+constexpr uint32_t kDeviceOptions = 20440;  // bit 8: no workers; bits 24-29 their CPUs
+constexpr uint32_t kWorkerThread = 0x822B69A8;
+constexpr uint32_t kL2Area = 0x7F100000;    // the L2-locked area the workers' slices are in
+constexpr uint32_t kWorkerSlice = 0x8000;
+constexpr uint32_t kWorkerSignals = 0x7F000000;  // 128 bytes a CPU
+
+struct WorkerCalls {
+  std::function<void(uint32_t device)> end_segment;  // sub_8229EF48, as GuestCalls'
+  // ExCreateThread(handle out, stack size, id out, XAPI start-up, entry,
+  // parameter, flags): its r3.
+  std::function<uint32_t(uint32_t handle, uint32_t stack, uint32_t id, uint32_t startup,
+                         uint32_t entry, uint32_t parameter, uint32_t flags)>
+      create_thread;
+  // KeSetBasePriorityThread(thread, priority).
+  std::function<void(uint32_t thread, uint32_t priority)> set_priority;
+};
+
+// Device::CreateWorkers (sub_822B6D70): nothing with +20440 bit 8. Else the
+// shared state at +10812: +10816 and +10824 from the primary ring's +13496
+// and +13500, +10872 0, +10904 0xC0000000, +10920 kL2Area, a notification
+// event's header at +10876 (type 0, not signaled, its wait list empty);
+// then for each CPU 0-5 with its bit (0x01000000 << CPU) in +20440: +11208
+// the CPU, its block at +11212 + 56 x CPU (+0 the shared state, +4 the CPU,
+// +16 and +8 its 32 KB slice of the L2 area (a slice for each worker made
+// before it), +20 the slice's end, +24 0xC0000002 + 128 x CPU, +28
+// kWorkerSignals + 128 x CPU, +32 its event's header, as the shared one's),
+// the segment ended when past its soft end, ExCreateThread (+48 the
+// handle, a 32 KB stack, +52 the id, kWorkerThread with the block, on the
+// CPU: flags 0x80 | the CPU's bit << 24) and KeSetBasePriorityThread(17).
+// The original's EVENT_WRITE_SHD for each (event 3, writing the block's +8
+// with +12's low bits to +24's address, which only WaitForWorkers
+// sub_822B64A0 reads, never run) isn't written: the graphics rule. Returns
+// 1, or 0 when a thread wasn't made (ExCreateThread's r3 negative).
+uint32_t CreateWorkers(uint8_t* base, uint32_t device, const WorkerCalls& calls);
+
 }  // namespace graphics::predicated_tiling
