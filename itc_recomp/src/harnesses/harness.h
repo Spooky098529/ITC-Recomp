@@ -300,5 +300,6 @@ void RaceUpdate(Context& h);
 void CarMakers(Context& h);
 // The stand's scene model holders (src/harnesses/stand_models.cpp).
 void StandModels(Context& h);
+void BuildScreen(Context& h);
 
 }  // namespace harness
