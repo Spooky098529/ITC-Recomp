@@ -5,7 +5,9 @@
 // whose functions have no adapter (only native callers reach them) are the
 // harness's alone: InitBuildList, CopyBuilds, ListBuilds, DrawBuildRows,
 // SetUpGroups, FilterGroups, MarkGroups, InitGroupLists, DrawGroupRows,
-// ShowGroup, ShowNumber, GroupArrows, SetUpDetails and ShowDetails.
+// ShowGroup, ShowNumber, GroupArrows, SetUpDetails, ShowDetails,
+// KeepGroupList, KeepStandList, RestoreStandList, ValueText, BuildArrows,
+// ShowBuildMark and RestoreStand.
 
 #pragma once
 

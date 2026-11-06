@@ -37,7 +37,8 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "--run_harnesses=build_screen). RestoreGroupList, InsertNode, SetMode, PowI, DrawGroupRow, InitBuildList, "
               "CopyBuilds, ListBuilds, DrawBuildRow, DrawBuildRows, SetUpGroups, FilterGroups, "
               "MarkGroups, InitGroupLists, DrawGroupRows, ShowGroup, ShowNumber, GroupArrows, "
-              "SetUpDetails and ShowDetails "
+              "SetUpDetails, ShowDetails, KeepGroupList, KeepStandList, RestoreStandList, ValueText, "
+              "BuildArrows, ShowBuildMark and RestoreStand "
               "have no adapters: only native callers reach them, and the flag switches those");
 
 namespace hooks {
@@ -313,18 +314,12 @@ void BuildScreenChangeCategory(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-ITC_BUILD_SCREEN(8219BA50, BuildScreenKeepGroupList)
 ITC_BUILD_SCREEN(8219BB20, BuildScreenKeepBuildList)
-ITC_BUILD_SCREEN(8219BBF0, BuildScreenKeepStandList)
 ITC_BUILD_SCREEN(8219BB80, BuildScreenRestoreBuildList)
-ITC_BUILD_SCREEN(8219BC50, BuildScreenRestoreStandList)
 ITC_BUILD_SCREEN(8219C078, BuildScreenInitStandList)
-ITC_BUILD_SCREEN(8219BCC0, BuildScreenValueText)
 ITC_BUILD_SCREEN(8219C230, BuildListInsert)
 ITC_BUILD_SCREEN(8217D0C8, GarageStageSetDark)
-ITC_BUILD_SCREEN(8219D4B8, BuildScreenBuildArrows)
 ITC_BUILD_SCREEN(8219D7B0, BuildScreenStandArrows)
-ITC_BUILD_SCREEN(8219D440, BuildScreenShowBuildMark)
 ITC_BUILD_SCREEN(8219DA58, BuildScreenSetPrompts)
 ITC_BUILD_SCREEN(8219DB50, BuildScreenSetHelp)
 ITC_BUILD_SCREEN(8219C528, BuildScreenHighlightGroupsA)
@@ -340,6 +335,5 @@ ITC_BUILD_SCREEN(821A08D8, BuildScreenOpen)
 ITC_BUILD_SCREEN(821A0A38, BuildScreenBackToGroups)
 ITC_BUILD_SCREEN(8219FC60, BuildScreenChangeCategory)
 ITC_BUILD_SCREEN(821A1138, BuildScreenOpenBuilds)
-ITC_BUILD_SCREEN(8219F868, BuildScreenRestoreStand)
 ITC_BUILD_SCREEN(8219FF78, BuildScreenBackToStand)
 ITC_BUILD_SCREEN(8219FEC8, BuildScreenOpenDetails)
