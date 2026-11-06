@@ -176,4 +176,30 @@ uint64_t SceneWheelsSetSizes(uint8_t* base, const GuestCall& call, uint32_t whee
                              uint32_t b, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9,
                              uint32_t stack);
 
+// sub_8217DD38 GarageStage::SetWheel: r3 = the holder, r4 = a wheel number
+// (all 64 bits: the frame's +80 doubleword before the conversions; clamped
+// to 178, signed; 0 the stock wheel), r5 = which (0 both, 1 front, else
+// rear), r6 = a car object. Its 3,120-byte frame below `stack`: r3, r5, r6
+// into the caller's parameter area (`stack` + 20, + 36, + 44); the 179-entry
+// table at frame + 96 (kWheelTable); m = the stage's model, rec = m + 32;
+// the car spec of SaveData::Of(0)'s selected garage car (Params::GetCarSpec);
+// the table entry's +8 into rec +4052 (front) and or +4068 (rear); the
+// wheel's colors (Params::GetWheel once a field, or the spec's +8380 stock
+// record) into rec +80 to +120 and or +128 to +168, its +16 and +28 into
+// +4060, +4056 and or +4076, +4072; the car's tire copies into +4080 to
+// +4088 and or +4092 to +4100; then FitAxles(r3, the car) and
+// SceneWheels::SetSizes(m +5100, rec +4108, +4112, rec +4080's 12 bytes,
+// rec +4092's) (its r3). `*f1` as FitAxles leaves it.
+uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_t r4,
+                  uint32_t which, uint32_t car, uint32_t stack, std::optional<double>* f1);
+// sub_821DFA78 TuningScreen::PreviewWheel: r3 = the tuning screen, r4 (all
+// 64 bits) and r5 SetWheel's. Its 4,016-byte frame below `stack`: a car
+// object at frame + 80 (Car::Init, memcpy of the screen's selected garage
+// car's 1,884 bytes, as TuningScreen::SetUpCarData finds it, the flags +3888
+// |= 1, Car::Refresh; memcpy and Refresh through `call` where their plain
+// C++ declines), then SetWheel([[kHolder]], r4, r5, the car) (its r3; `*f1`
+// its).
+uint64_t PreviewWheel(uint8_t* base, const GuestCall& call, uint32_t screen, uint64_t r4,
+                      uint32_t which, uint32_t stack, std::optional<double>* f1);
+
 }  // namespace stand_models

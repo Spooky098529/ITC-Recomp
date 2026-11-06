@@ -101,6 +101,7 @@ void AddRanges(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
 // compared, `floats` as floats, then r3; `skip` bytes of the stack below
 // `skip_at` bytes under the call's r1 left out (the recompiled callees'
 // saved registers).
+// `more_skips` are more such (bytes under r1, size) pairs.
 // `before` runs before each version (state outside the block put back),
 // `extra` adds outputs after it; `stack_bytes` of the stack are compared.
 void Case(Context& h, Results& results, uint32_t block, Random& r,
@@ -109,7 +110,8 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
           const std::string& what, uint32_t skip_at = 0, uint32_t skip = 0,
           const std::function<void()>& before = {},
           const std::function<void(Outputs&, const PPCContext&)>& extra = {},
-          uint32_t stack_bytes = kStackBytes, uint32_t block_bytes = kBlockBytes) {
+          uint32_t stack_bytes = kStackBytes, uint32_t block_bytes = kBlockBytes,
+          const std::vector<std::pair<uint32_t, uint32_t>>& more_skips = {}) {
   RandomBytes(h.base, block, block_bytes, r);
   PPCContext start = CallContext(h);
   start.r1.u64 &= ~0xFull;
@@ -128,6 +130,9 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     (v == 0 ? recompiled : native)(t, h.base);
     if (skip != 0) {
       Fill(h.base, sp - skip_at - skip, skip, 0);
+    }
+    for (const auto& [at, bytes] : more_skips) {
+      Fill(h.base, sp - at - bytes, bytes, 0);
     }
     AddRanges(out[v], h.base, block, block_bytes, floats);
     out[v].Bytes(Read(h.base, sp - stack_bytes, stack_bytes - saves));
@@ -676,6 +681,179 @@ void Stand(Context& h, Random& r) {
   memory::Free(allocation);
 }
 
+
+// --- The wheels picked (stand_models/wheels.cpp, stand-models.md) ---
+
+constexpr uint32_t kScreenSave = 0x2000;      // the tuning screen's +18904
+constexpr uint32_t kHolderWord = 0xC480;      // [0x826D83E0] points here
+constexpr uint32_t kSceneWheels = 0x16000;    // a pool 5 wheels object (its +28 the next)
+constexpr uint32_t kFirstWheels = 0x16400;    // the first set's wheels (+28 to +184)
+constexpr uint32_t kWheelRecords = 0x18000;   // table 73: 178 48-byte wheel records
+constexpr uint32_t kSaveDataPointer = 0x826C5B58;  // SaveData::Of(0)
+
+// The save data's garage list (nodes at +6120: halfwords next, slot) walked
+// [+0x19920] steps to a slot 0 to 2, the template garage car copied there.
+void LayGarageList(uint8_t* base, uint32_t block, Random& r) {
+  const uint32_t save = block + kSaveData, nodes = save + 6120;
+  const uint32_t steps = r.Below(4);
+  guest::StoreU32(base, save + 0x19920, steps);
+  uint16_t at = uint16_t(r.Below(40));
+  guest::StoreU16(base, nodes + 204, at);
+  for (uint32_t i = 0; i <= steps; i++) {
+    const uint16_t next = uint16_t(r.Below(40));
+    guest::StoreU16(base, nodes + 4 * at, next);
+    if (i == steps) {
+      const uint32_t slot = r.Below(3);
+      guest::StoreU16(base, nodes + 4 * at + 2, uint16_t(slot));
+      Write(base, nodes + 212 + 1968 * slot, Read(base, block + kGarageCar, 1884).data(), 1884);
+    }
+    at = next;
+  }
+}
+
+// SetWheel's world on LayGarage's: the holder (its +0 the stage, its +8
+// the model's index 0 or 1 in the car scene's pool 7, both in use), each
+// model's +5100 the pool 5 wheels object (its +28 the first set's wheels),
+// table 73 at the parameters' +8 (its records' +16 and +28 floats, NaNs and
+// infinities among them), the spec's stock record's too, SaveData::Of(0)'s
+// garage list ending at the template car (the car spec's id kCarId).
+void LayWheelWorld(uint8_t* base, uint32_t block, Random& r, int c, bool tires) {
+  LayGarage(base, block, r, c);
+  const uint32_t car = block + kGarageCar, spec = block + kSpec;
+  if (tires) {
+    for (uint32_t at : {3132u, 3164u, 3168u, 3224u, 3256u, 3260u}) {
+      guest::StoreU32(base, car + at, RandomFloat(r));
+    }
+  }
+  for (uint32_t at : {16u, 28u}) {
+    const uint32_t f = RandomFloat(r);
+    guest::StoreU32(base, spec + 8380 + at, f);
+    guest::StoreU32(base, car + 3268 + at, f);
+  }
+  for (uint32_t i = 0; i < 178; i++) {
+    for (uint32_t at : {16u, 28u}) {
+      guest::StoreU32(base, block + kWheelRecords + 48 * i + at, RandomFloat(r));
+    }
+  }
+  guest::StoreU32(base, block + kGarageParams + 8, block + kWheelRecords);
+  guest::StoreU32(base, kParamsPointer, block + kGarageParams);
+  const uint32_t scene = block + kCarScene, stage = block + kStage;
+  guest::StoreU32(base, scene + 5028, block + kModels);
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t model = block + kModels + 0x1400 * i;
+    guest::StoreU32(base, model + 8, i == 0 ? model + 0x1400 : 0);
+    guest::StoreU32(base, model + 16, 3);
+    guest::StoreU32(base, model + 5100, block + kSceneWheels);
+  }
+  guest::StoreU32(base, block + kSceneWheels + 28, block + kFirstWheels);
+  guest::StoreU32(base, stage + 8, r.Below(2));
+  guest::StoreU32(base, block + kHolder, stage);
+  guest::StoreU32(base, block + kHolderWord, block + kHolder);
+  LayGarageList(base, block, r);
+  guest::StoreU32(base, block + kScreenSave, block + kSaveData);
+}
+
+// A wheel number: 0 (the stock wheel), 1 to 178, above 178 (clamped), now
+// and then with any high word.
+uint64_t RandomWheelNumber(Random& r) {
+  uint64_t n;
+  switch (r.Below(6)) {
+    case 0: n = 0; break;
+    case 1: {
+      constexpr uint32_t kAbove[] = {179, 180, 255, 1000, 0x7FFFFFFFu};
+      n = kAbove[r.Below(5)];
+      break;
+    }
+    case 2: n = r.Below(2) == 0 ? 1 : 178; break;
+    default: n = 1 + r.Below(178); break;
+  }
+  if (r.Below(4) == 0) {
+    n |= r.Next() << 32;
+  }
+  return n;
+}
+
+// Which: 0, 1, 2 mostly, other values now and then.
+uint64_t RandomWhich(Random& r) {
+  constexpr uint32_t kOthers[] = {3, 7, 0xFFFFFFFFu, 0x80000000u};
+  return r.Below(5) == 0 ? kOthers[r.Below(4)] : r.Below(3);
+}
+
+FloatRanges WheelFloats(uint32_t block) {
+  FloatRanges floats = {{block + kStage + 6176, 8}};
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t rec = block + kModels + 0x1400 * i + 32;
+    for (uint32_t at : {80u, 96u, 112u, 128u, 144u, 160u}) {
+      floats.push_back({rec + at, 3});
+    }
+    for (uint32_t at : {4056u, 4072u, 4084u, 4096u}) {
+      floats.push_back({rec + at, 2});
+    }
+  }
+  return floats;
+}
+
+void Wheels(Context& h, Random& r) {
+  const uint32_t allocation = memory::Alloc(kGarageBytes + 16, 0);
+  const uint32_t block = (allocation + 15) & ~15u;
+  const uint32_t globals[4] = {kScenePointer, kParamsPointer, kHolderPointer, kSaveDataPointer};
+  uint32_t saved[4];
+  for (int i = 0; i < 4; i++) {
+    saved[i] = guest::LoadU32(h.base, globals[i]);
+  }
+  const auto before = [&] {
+    guest::StoreU32(h.base, kScenePointer, block + kCarScene);
+    guest::StoreU32(h.base, kHolderPointer, block + kHolderWord);
+    guest::StoreU32(h.base, kSaveDataPointer, block + kSaveData);
+  };
+  const auto f1 = [](Outputs& out, const PPCContext& t) { out.Double(t.f1.u64); };
+  {
+    // The top 160 bytes: SetWheel's saved registers (f31, r14 to r31, lr);
+    // the 24 under its frame: the original FitAxles' and SetSizes' (r30,
+    // r31, lr), which the plain C++ doesn't write (register saves aren't
+    // reproduced). Its whole frame (the table at +96) and FitAxles' below
+    // it compared.
+    Results results("GarageStage::SetWheel (sub_8217DD38)");
+    for (int c = 0; c < 80; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            LayWheelWorld(h.base, block, r, c, r.Below(4) != 0);
+            t.r3.u64 = block + kHolder;
+            t.r4.u64 = RandomWheelNumber(r);
+            t.r5.u64 = RandomWhich(r);
+            t.r6.u64 = block + kGarageCar;
+          },
+          __imp__sub_8217DD38, hooks::StandModelsSetWheel, 160, WheelFloats(block),
+          fmt::format("case {}", c), 3120, 24, before, f1, 0x2000, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // PreviewWheel's saved registers (the top 32: r29 to r31, lr), and
+    // SetWheel's (160) and FitAxles' (24) under it, left out.
+    Results results("TuningScreen::PreviewWheel (sub_821DFA78)");
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            LayWheelWorld(h.base, block, r, c, false);
+            t.r3.u64 = block + kScreenSave - 18904;
+            t.r4.u64 = RandomWheelNumber(r);
+            t.r5.u64 = RandomWhich(r);
+          },
+          __imp__sub_821DFA78, hooks::StandModelsPreviewWheel, 32, WheelFloats(block),
+          fmt::format("case {}", c), 4016, 160, before, f1, 0x4000, kGarageBytes,
+          {{4016 + 3120, 24}});
+    }
+    results.Report();
+  }
+  for (int i = 0; i < 4; i++) {
+    guest::StoreU32(h.base, globals[i], saved[i]);
+  }
+  memory::Free(allocation);
+}
+
 }  // namespace
 
 void CarMakers(Context& h) {
@@ -691,6 +869,7 @@ void CarMakers(Context& h) {
   memory::Free(allocation);
   Garage(h, r);
   Stand(h, r);
+  Wheels(h, r);
 }
 
 }  // namespace harness

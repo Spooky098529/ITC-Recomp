@@ -11,6 +11,8 @@ ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_scene_models);
 ITC_FLAG_DECLARE(bool, native_car_physics);
 ITC_FLAG_DECLARE(bool, native_math);
+ITC_FLAG_DECLARE(bool, native_car_specs);
+ITC_FLAG_DECLARE(bool, native_race_setup);
 
 ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "Run the stand's scene model holders (docs/functions/stand-models.md): "
@@ -34,7 +36,12 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "ApplyWheelPaint sub_821799D8 and SceneModel::AddSecondWheels sub_820D9E00 (no "
               "adapters: only it reaches them; with --native_vehicle_accessors and "
               "--native_scene_models; ScenePools::SetUpB and SceneModel::ApplyWheelPaint through "
-              "their adapters) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
+              "their adapters); the wheels picked, TuningScreen::PreviewWheel sub_821DFA78 with "
+              "GarageStage::SetWheel sub_8217DD38, GarageStage::FitAxles sub_82178B98 and "
+              "SceneWheels::SetSizes sub_820E7380 (no adapters: only it reaches them; with "
+              "--native_vehicle_accessors, --native_car_specs, --native_car_physics, --native_math "
+              "and --native_race_setup; Car::Refresh, memcpy, Car::SetupVehicle and "
+              "Wheels::SetRecord through their adapters where their plain C++ declines) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
 
 namespace hooks {
 
@@ -294,6 +301,43 @@ void StandModelsSetSizes(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+bool WheelCalleesNative() {
+  return ITC_FLAG(native_vehicle_accessors) && ITC_FLAG(native_car_specs) &&
+         ITC_FLAG(native_car_physics) && ITC_FLAG(native_math);
+}
+
+void StandModelsSetWheel(PPCContext& ctx, uint8_t* base) {
+  if (!WheelCalleesNative()) {
+    __imp__sub_8217DD38(ctx, base);
+    return;
+  }
+  const uint32_t r3 = ctx.r3.u32, r5 = ctx.r5.u32, r6 = ctx.r6.u32, stack = ctx.r1.u32;
+  const uint64_t r4 = ctx.r4.u64;
+  std::optional<double> f1;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SetWheel(base, call, r3, r4, r5, r6, stack, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+}
+
+void StandModelsPreviewWheel(PPCContext& ctx, uint8_t* base) {
+  if (!WheelCalleesNative() || !ITC_FLAG(native_race_setup)) {
+    __imp__sub_821DFA78(ctx, base);
+    return;
+  }
+  const uint32_t r3 = ctx.r3.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
+  const uint64_t r4 = ctx.r4.u64;
+  std::optional<double> f1;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::PreviewWheel(base, call, r3, r4, r5, stack, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+}
+
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
@@ -329,6 +373,11 @@ ITC_STAND_MODELS(82178EC0, StandModelsReloadDecals)
 ITC_STAND_MODELS(82179130, StandModelsSetTireGrade)
 ITC_STAND_MODELS(821CCA38, StandModelsTuningSetTireGrade)
 ITC_STAND_MODELS(821CC890, StandModelsStepSecondWheels)
+ITC_STAND_MODELS(821DFA78, StandModelsPreviewWheel)
+// GarageStage::SetWheel sub_8217DD38 has none: only TuningScreen::PreviewWheel
+// calls it, and its plain C++ calls SetWheel's, which calls FitAxles' and
+// SceneWheels::SetSizes' (none either; their register steps above are the
+// harness's).
 // GarageStage::SecondWheelsPending sub_82179C48, AddSecondWheels
 // sub_82179998, ApplyWheelPaint sub_821799D8 and SceneModel::AddSecondWheels
 // sub_820D9E00 have none: only TuningScreen::StepSecondWheels reaches them,

@@ -76,6 +76,15 @@ void StandModelsSceneAddSecondWheels(PPCContext& ctx, uint8_t* base);
 // r6 to r9 the two values).
 void StandModelsFitAxles(PPCContext& ctx, uint8_t* base);
 void StandModelsSetSizes(PPCContext& ctx, uint8_t* base);
+// TuningScreen::PreviewWheel sub_821DFA78 (r3 the tuning screen, r4 a wheel
+// number, r5 which; with --native_race_setup too) and, without an adapter
+// (only PreviewWheel's plain C++ calls it; the harness's),
+// GarageStage::SetWheel sub_8217DD38 (r3 the holder, r4, r5, r6 a car
+// object); with --native_vehicle_accessors, --native_car_specs,
+// --native_car_physics and --native_math, else the originals; f1 as
+// FitAxles leaves it.
+void StandModelsPreviewWheel(PPCContext& ctx, uint8_t* base);
+void StandModelsSetWheel(PPCContext& ctx, uint8_t* base);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 
