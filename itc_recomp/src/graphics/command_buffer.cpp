@@ -110,4 +110,88 @@ uint32_t WriteCallback(uint8_t* base, uint32_t device, uint32_t position, uint32
   return at;
 }
 
+uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t size,
+                   uint32_t alignment) {
+  ITC_NATIVE_RUNNING("sub_8229E100 Device::NextSpace");
+  auto load = [&](uint32_t field) { return guest::LoadU32(base, device + field); };
+  auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(base, device + field, value); };
+  const uint32_t words = guest::LoadU32(base, size) >> 2;
+  uint32_t cursor = load(kDataCursor);
+  if (kind & 1) {
+    // Data.
+    if (cursor == 0) {
+      cursor = load(kSegmentEnd) + 60;
+    }
+    const uint32_t mask = ~(alignment - 1);
+    const uint32_t bytes = words << 2;
+    const uint32_t generation = load(kGeneration);
+    uint32_t start = (cursor + alignment - 1) & mask;
+    uint32_t end = bytes + start;
+    if (end <= load(kBufferEnd)) {
+      const uint32_t tiling = load(kTilingEnd);
+      if (tiling != 0) {
+        const int32_t apart = int32_t(load(kTilingGeneration) - generation);
+        if (apart == -1 || (apart == 0 && tiling < end)) {
+          return 0;
+        }
+      }
+      store(kDataCursor, end);
+      return start;
+    }
+    start = (load(kWrapCursor) + alignment - 1) & mask;
+    end = bytes + start;
+    const uint32_t tiling = load(kTilingEnd);
+    if (tiling != 0) {
+      const int32_t apart = int32_t(load(kTilingGeneration) - generation - 1);
+      if (apart == -1 || (apart == 0 && tiling < end)) {
+        return 0;
+      }
+    }
+    if (end > load(kSegmentStart)) {
+      return 0;
+    }
+    store(kWrapCursor, end);
+    return start;
+  }
+  // A segment.
+  if (cursor == 0) {
+    cursor = load(kWritePosition) + 4;
+  }
+  uint32_t start = (cursor + 31) & ~31u;
+  const uint32_t wanted = words != 0 ? words : 54;
+  uint32_t segment_words = load(kSegmentSize) >> 2;
+  if (wanted > segment_words) {
+    segment_words = wanted;
+  }
+  const uint32_t bytes = segment_words << 2;
+  uint32_t end = bytes + start;
+  if (end > load(kBufferEnd)) {
+    end = load(kBufferEnd);
+  }
+  auto room = [&] { return int32_t(end - start) >> 2; };
+  if (room() < int32_t(wanted)) {
+    // Wrapped to the buffer's start.
+    const uint32_t generation = load(kGeneration);
+    start = (load(kWrapCursor) + 31) & ~31u;
+    end = bytes + start;
+    store(kWrapCursor, load(kBufferStart));
+    store(kGeneration, generation + 1);
+    guest::StoreU8(base, device + kFlags2, guest::LoadU8(base, device + kFlags2) | 8);
+  }
+  const uint32_t tiling = load(kTilingEnd);
+  if (tiling != 0) {
+    const uint32_t tiling_generation = load(kTilingGeneration);
+    const uint32_t generation = load(kGeneration);
+    const int32_t apart = int32_t(tiling_generation - generation);
+    if (apart == -1 || (apart == 0 && tiling < end)) {
+      end = tiling;
+      if (generation != tiling_generation || room() < int32_t(wanted)) {
+        return 0;
+      }
+    }
+  }
+  guest::StoreU32(base, size, (end - start) & ~3u);
+  return start;
+}
+
 }  // namespace graphics::command_buffer

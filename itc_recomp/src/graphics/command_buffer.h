@@ -19,9 +19,15 @@ constexpr uint32_t kProgressBlock = 10768;  // the fences and read position
 constexpr uint32_t kCallbackBlock = 10772;
 constexpr uint32_t kFence = 10780;          // the open segment's fence
 constexpr uint32_t kFlags = 10809;          // bit 1 the GPU hung, bit 6 out of space
+constexpr uint32_t kFlags2 = 10810;         // bit 3 the buffer wrapped
+constexpr uint32_t kTilingEnd = 12960;      // predicated tiling: how far its segments reach
+constexpr uint32_t kTilingGeneration = 12964;
 constexpr uint32_t kTailPosition = 12968;   // the last tail's position and generation
 constexpr uint32_t kTailGeneration = 12972;
 constexpr uint32_t kSavedSegment = 13056;   // SaveSegment's six words
+constexpr uint32_t kBufferStart = 13504;
+constexpr uint32_t kBufferEnd = 13508;
+constexpr uint32_t kSegmentSize = 13512;
 constexpr uint32_t kDataCursor = 13516;
 constexpr uint32_t kGeneration = 13520;
 constexpr uint32_t kWrapCursor = 13524;
@@ -61,5 +67,20 @@ void CloseChain(uint8_t* base, uint32_t chain);
 // Returns the last word written.
 uint32_t WriteCallback(uint8_t* base, uint32_t device, uint32_t position, uint32_t flags,
                        uint32_t function, uint32_t argument);
+
+// The next space in the command buffer (sub_8229E100): `kind` bit 0 set,
+// data (`*size` bytes at `alignment`, from the data cursor +13516, or from
+// the wrap cursor +13524 past the buffer's end, never past the open segment);
+// clear, a segment (32-byte aligned, at least the segment size +13512 or
+// the words asked, 54 when none; wrapping to the buffer's start, the
+// generation + 1 and +10810 bit 3 set, when the end is too close; its size
+// written back to `*size`). Under predicated tiling (+12960) it fails rather
+// than pass the tiled frame's segments. Returns the address, or 0. The
+// original's wait for the GPU to have read past the space (sub_8229DC28) is
+// left out: a wait (Dropped, the user's call on fence waits, 2026-10-24),
+// which passes at once in play (our kick writes the read position as it
+// kicks; its wait helpers never ran).
+uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t size,
+                   uint32_t alignment);
 
 }  // namespace graphics::command_buffer

@@ -11,8 +11,9 @@
 ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "Run the graphics library's command buffer (docs/functions/command-buffer.md: "
               "Device::WriteSegmentTail sub_8229E768, Device::SaveSegment sub_8229DBF0, "
-              "CommandChain::Close sub_8229DFB8, Device::WriteCallback sub_8229E9D0) natively "
-              "instead of through the translated code (the same results; checked by "
+              "CommandChain::Close sub_8229DFB8, Device::WriteCallback sub_8229E9D0, "
+              "Device::NextSpace sub_8229E100 (its wait for the GPU, sub_8229DC28, dropped)) "
+              "natively instead of through the translated code (the same results; checked by "
               "--run_harnesses=command_buffer).");
 
 namespace cb = graphics::command_buffer;
@@ -32,3 +33,5 @@ ITC_COMMAND_BUFFER(8229DBF0, cb::SaveSegment(base, ctx.r3.u32))
 ITC_COMMAND_BUFFER(8229DFB8, cb::CloseChain(base, ctx.r3.u32))
 ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(base, ctx.r3.u32, ctx.r4.u32,
                                                           ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
+ITC_COMMAND_BUFFER(8229E100, ctx.r3.u64 = cb::NextSpace(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r6.u32))
