@@ -18,8 +18,10 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3: the graphics library's command buffer (lead
   picked: `sub_8229E308`, `sub_8229EB10`, `sub_8229E5D0`,
   `sub_8229E768`, `sub_8229DE48`, `sub_8229EDA8`, `sub_8229DC28`,
-  `sub_822AF978`; its line deleted from `leads.md`). Step: mapping
-  agent running.
+  `sub_822AF978`; its line deleted from `leads.md`). Map checked
+  (aa4b202c: `command-buffer.md`, 36 rows, 16 moved from
+  `functions.md`, 24 in play; 0 errors; 9 ready groups; 2 leads
+  added; no subagents). Step: migration agent running.
 
 ## Done
 
@@ -39,5 +41,7 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 4197, work left 2213 (wrapped 60, known 469,
   unknown 1684).
+- After the command buffer's map: ours 4197, work left 2213 (wrapped
+  60, known 481, unknown 1672).
 
 ## Stopped
