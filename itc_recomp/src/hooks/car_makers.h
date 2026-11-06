@@ -46,6 +46,14 @@ void CarMakersSetUpCarData(PPCContext& ctx, uint8_t* base);
 void CarMakersFitCar(PPCContext& ctx, uint8_t* base);
 void CarMakersCopyRecord(PPCContext& ctx, uint8_t* base);
 void CarMakersShowBusyMarker(PPCContext& ctx, uint8_t* base);
+// GarageStage::ReapplyRecord sub_82178DF8 and ReapplyRecordNoDecals
+// sub_82178E60 (r3 the holder), the originals unless
+// CarMakersReapplyCalleesNative (--native_scene_models,
+// --native_front_end_car_draw and FrontEndCarDrawCalleesNative, with the
+// load poll's flags).
+bool CarMakersReapplyCalleesNative();
+void CarMakersReapplyRecord(PPCContext& ctx, uint8_t* base);
+void CarMakersReapplyRecordNoDecals(PPCContext& ctx, uint8_t* base);
 void CarMakersHideBusyMarker(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

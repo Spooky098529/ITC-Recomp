@@ -19,6 +19,8 @@
 
 #include <cstdint>
 
+#include "scene_models/apply.h"
+
 namespace front_end_car_draw {
 struct Calls;
 }
@@ -130,6 +132,18 @@ uint64_t GarageStageFitCar(uint8_t* base, const front_end_car_draw::Calls& calls
 // frame below `stack`). Returns the copy's r3.
 uint64_t GarageStageCopyRecord(uint8_t* base, const front_end_car_draw::Calls& calls,
                                uint32_t holder, uint32_t record, uint32_t stack);
+// GarageStage::ReapplyRecord (sub_82178DF8; `decals`) and
+// ReapplyRecordNoDecals (sub_82178E60): r3 = the holder. Its 96-byte frame
+// below `stack`: the stage's scene model m (ScenePools::GetB, pool 7, s +8),
+// then SceneModel::ApplyPaint(m) and ApplyWheelPaint(m) (their plain C++
+// inside their diagnostics' wraps, `calls.poll` the load poll's calls),
+// SceneModel::ApplyRecord(m) (its plain C++, its adapter through `apply`
+// where it declines: the race's path), SceneModel::ApplyLightKit(m) and, for
+// ReapplyRecord, SceneModel::ReloadDecals(m) (their plain C++). Returns the
+// last call's r3.
+uint64_t GarageStageReapplyRecord(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                  const scene_models::ApplyCall& apply, uint32_t holder,
+                                  uint32_t stack, bool decals);
 // sub_8219ED10 and sub_8219EDB0 (the stand's busy marker shown and hidden,
 // probably): movie 6 (UiMovies::Find with the id at frame + 80, the
 // 112-byte frame below `stack`), then its named animations through their

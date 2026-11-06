@@ -7,8 +7,11 @@
 #include "c_runtime/math.h"
 #include "car_physics/car_physics.h"
 #include "car_scene_draw/ops.h"
+#include "debug/frame_state_diff.h"
 #include "front_end_car_draw/front_end_car_draw.h"
 #include "guest.h"
+#include "load_poll/load_poll.h"
+#include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -27,6 +30,30 @@ constexpr uint32_t kPlayNamed = 0x8211DAC8;
 constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kStandMovie = 6;
+constexpr uint32_t kApplyPaint = 0x820D9B68;
+constexpr uint32_t kApplyWheelPaint = 0x820D9C50;
+constexpr uint32_t kApplyRecord = 0x820DA758;
+
+// Flush-to-zero off, as the callees' plain C++ expects at entry.
+void FlushOff() {
+  Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+}
+
+// A callee inside its diagnostics' wrap (src/debug/frame_state_diff.cpp):
+// nothing when --debug_hide names it (r3 then `r3`, as the original set it),
+// else `body` between FrameStateDiff_Before and After.
+template <typename Body>
+uint64_t Wrapped(uint8_t* base, uint32_t function, uint64_t r3, Body body) {
+  if (debug::IsHidden(function)) {
+    return r3;
+  }
+  debug::FrameStateDiff_Before(base);
+  FlushOff();
+  const uint64_t left = body();
+  FlushOff();
+  debug::FrameStateDiff_After(base, "draw step part", function);
+  return left;
+}
 
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
@@ -121,6 +148,35 @@ uint64_t GarageStageCopyRecord(uint8_t* base, const front_end_car_draw::Calls& c
   }
   const uint64_t regs[2] = {to, record};
   return calls.call(kRecordCopy, regs, 2, nullptr, 0, frame, 0x8217FC9C, nullptr);
+}
+
+uint64_t GarageStageReapplyRecord(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                  const scene_models::ApplyCall& apply, uint32_t holder,
+                                  uint32_t stack, bool decals) {
+  if (decals) {
+    ITC_NATIVE_RUNNING("sub_82178DF8 GarageStage::ReapplyRecord");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82178E60 GarageStage::ReapplyRecordNoDecals");
+  }
+  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t stage = Load(base, holder);
+  const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7,
+                                                           Load(base, stage + 8));
+  Wrapped(base, kApplyPaint, model,
+          [&] { return load_poll::SceneModelApplyPaint(base, model, model, frame); });
+  Wrapped(base, kApplyWheelPaint, model, [&] {
+    return load_poll::SceneModelApplyWheelPaint(base, model, model, frame, *calls.poll);
+  });
+  if (!scene_models::SceneModelApplyRecord(base, apply, model, frame)) {
+    apply(kApplyRecord, {model}, frame, decals ? 0x82178E3C : 0x82178EA4);
+  }
+  FlushOff();
+  const uint64_t r3 = front_end_car_draw::SceneModelApplyLightKit(base, calls, model, frame);
+  if (!decals) {
+    return r3;
+  }
+  FlushOff();
+  return scene_models::SceneModelReloadDecals(base, apply, model, frame);
 }
 
 uint64_t ShowBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack) {

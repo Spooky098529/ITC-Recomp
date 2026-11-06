@@ -7,6 +7,8 @@
 #include "base/flags.h"
 #include "car_makers/car_makers.h"
 #include "hooks/front_end_car_draw.h"
+#include "hooks/load_poll.h"
+#include "hooks/stand_models.h"
 
 ITC_FLAG_DECLARE(bool, native_scene_models);
 ITC_FLAG_DECLARE(bool, native_car_specs);
@@ -16,6 +18,7 @@ ITC_FLAG_DECLARE(bool, native_car_physics);
 ITC_FLAG_DECLARE(bool, native_math);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
+ITC_FLAG_DECLARE(bool, native_front_end_car_draw);
 
 ITC_FLAG_BOOL(native_car_makers, true, "ITC",
               "Run the car objects' makers (docs/functions/car-makers.md): CarModels::BlockOf "
@@ -34,7 +37,10 @@ ITC_FLAG_BOOL(native_car_makers, true, "ITC",
               "(with --native_vehicle_accessors and --native_scene_models; "
               "SceneModelRecord::Copy's adapter for the copy onto itself), and the stand's busy "
               "marker sub_8219ED10 and sub_8219EDB0 (with --native_ui_movies_game; the named "
-              "animations through their overrides) natively instead of through the translated code "
+              "animations through their overrides), GarageStage::ReapplyRecord sub_82178DF8 and "
+              "ReapplyRecordNoDecals sub_82178E60 (with --native_scene_models, "
+              "--native_front_end_car_draw and the load poll's flags; SceneModel::ApplyRecord's "
+              "adapter for the race's path) natively instead of through the translated code "
               "(the same writes; checked by --run_harnesses=car_makers)");
 
 namespace hooks {
@@ -151,6 +157,45 @@ void CarMakersCopyRecord(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+bool CarMakersReapplyCalleesNative() {
+  return ITC_FLAG(native_scene_models) && ITC_FLAG(native_front_end_car_draw) &&
+         FrontEndCarDrawCalleesNative();
+}
+
+namespace {
+
+void Reapply(PPCContext& ctx, uint8_t* base, bool decals) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  const stand_models::GuestCall apply = StandModelsGuestCall(ctx, base);
+  const uint64_t r3 =
+      cm::GarageStageReapplyRecord(base, calls, apply, ctx.r3.u32, ctx.r1.u32, decals);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
+}
+
+}  // namespace
+
+void CarMakersReapplyRecord(PPCContext& ctx, uint8_t* base) {
+  if (!CarMakersReapplyCalleesNative()) {
+    __imp__sub_82178DF8(ctx, base);
+    return;
+  }
+  Reapply(ctx, base, true);
+}
+
+void CarMakersReapplyRecordNoDecals(PPCContext& ctx, uint8_t* base) {
+  if (!CarMakersReapplyCalleesNative()) {
+    __imp__sub_82178E60(ctx, base);
+    return;
+  }
+  Reapply(ctx, base, false);
+}
+
 void CarMakersShowBusyMarker(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_ui_movies_game)) {
     __imp__sub_8219ED10(ctx, base);
@@ -189,6 +234,8 @@ ITC_CAR_MAKERS(825D9EF0, CarMakersStaticInit)
 ITC_CAR_MAKERS(821DF2F8, CarMakersSetUpCarData)
 ITC_CAR_MAKERS(82178C40, CarMakersFitCar)
 ITC_CAR_MAKERS(8217FC60, CarMakersCopyRecord)
+ITC_CAR_MAKERS(82178DF8, CarMakersReapplyRecord)
+ITC_CAR_MAKERS(82178E60, CarMakersReapplyRecordNoDecals)
 ITC_CAR_MAKERS(8219ED10, CarMakersShowBusyMarker)
 ITC_CAR_MAKERS(8219EDB0, CarMakersHideBusyMarker)
 // sub_8215AB04 (BlockOf's case for id 1, the jump table's base) needs no

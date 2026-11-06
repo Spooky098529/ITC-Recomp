@@ -16,6 +16,8 @@
 #include "harness.h"
 
 #include "base/log.h"
+#include "hooks/car_makers.h"
+#include "graphics/resources.h"
 #include "hooks/load_poll.h"
 #include "hooks/scene_models.h"
 #include "memory/heap.h"
@@ -24,6 +26,7 @@
 
 #include <bit>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -1088,6 +1091,211 @@ void Applies(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// The garage stage's re-applies (car_makers/stand.cpp, car-makers.md), in
+// ApplyRecord's world above (the poll's world: its paints' and light kit's
+// objects; the parts and interior given what the applies read), with the
+// stage's holder and stage (its +8 the model's index, 0), pool 7's list of
+// one node in the case's scene ([0x826C2E44]), the scene model at kObject
+// in use (+16 3), ready (+5036) or not, traffic now and then. For
+// ReloadDecals' tail, the car model (kCar) as SceneModel::ReloadDecals'
+// cases lay it (car_models.cpp): the record's decals (+176, +560: ids small
+// or none, copied over the car model's +208 and +592), its +3692 (the car's
+// +3724) never 1, the car's first pool set (+7256) with a record list,
+// [0x826C2E44]'s shared buffer, and Archive::Load's calls recorded
+// (harness::ArchiveLoads). The block (the new vinyl sheet's header and data
+// by their offsets in them), the sheet's header and data, the loads asked
+// for and r3. Only in the front end: the harness is their check.
+void DecalIds(uint8_t* base, uint32_t records, Random& r) {
+  for (uint32_t i = 0; i < 6; i++) {
+    Put(base, records + 64 * i, r.Below(3) == 0 ? uint32_t(-1 - int32_t(r.Below(4))) : r.Below(26));
+  }
+  for (uint32_t k = 0; k < 48; k++) {
+    const uint32_t record = records + 384 + 64 * k;
+    Put(base, record, r.Below(2) == 0 ? uint32_t(-1 - int32_t(r.Below(4))) : r.Below(300));
+    if (r.Below(3) == 0) {
+      Put(base, record + 8, 9);
+    }
+  }
+}
+
+struct Known {
+  uint32_t address, bytes;
+};
+
+void Address(Outputs& out, uint32_t value, const std::vector<Known>& known) {
+  for (uint32_t i = 0; i < known.size(); i++) {
+    if (value - known[i].address < known[i].bytes) {
+      out.Word(1 + i);
+      out.Word(value - known[i].address);
+      return;
+    }
+  }
+  out.Word(0);
+  out.Word(value);
+}
+
+void Addresses(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
+               const std::vector<Known>& known) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    Address(out, guest::LoadU32(base, address + i), known);
+  }
+}
+
+void Reapplies(Context& h, Random& r, uint32_t block) {
+  constexpr uint32_t kHolder = 0x1A000, kStage = 0x1A040;
+  constexpr uint32_t kSharedBuffer = 5056, kSharedBufferSize = 5060;  // car_models/load_slots.h
+  constexpr uint32_t kSheetFormat = 0x18280086;                      // car_models/vinyl.h
+  constexpr uint32_t kSheetWidth = 0x82602570;                       // car_models/raster.h
+  struct Reapply {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Reapply reapplies[] = {
+      {"GarageStage::ReapplyRecord (sub_82178DF8)", __imp__sub_82178DF8,
+       hooks::CarMakersReapplyRecord},
+      {"GarageStage::ReapplyRecordNoDecals (sub_82178E60)", __imp__sub_82178E60,
+       hooks::CarMakersReapplyRecordNoDecals},
+  };
+  const uint32_t model = block + kObject, car = block + kCar;
+  for (const Reapply& reapply : reapplies) {
+    Results results(reapply.name);
+    int ready = 0, sheets = 0;
+    for (int c = 0; c < 32; c++) {
+      PPCContext start = CallContext(h);
+      start.r1.u64 &= ~0xFull;
+      const uint32_t stack = start.r1.u32 - kStackBytes;
+      RandomBytes(h.base, block, kBlockBytes, r);
+      RandomBytes(h.base, stack, kStackBytes + kArgBytes, r);
+      for (uint32_t m = 0; m < 8; m++) {
+        MakeModel(h.base, block, block + kModels + 0x200 * m, m, r);
+      }
+      Put(h.base, block + kScene + 4, r.Below(2));
+      const uint32_t accessories = block + kSmall + 0x780;
+      for (uint32_t i = 0; i < 3; i++) {
+        Put(h.base, accessories + 4 + 4 * i, 0);
+      }
+      if (r.Below(3) == 0) {
+        Put(h.base, accessories + 4, block + kSmall + 0x7C0 - 1096);
+        Put(h.base, block + kSmall + 0x7C0, r.Below(2));
+      }
+      const bool traffic = c % 8 == 7;
+      PollWorld(h.base, block, model, r, traffic);
+      if (traffic) {
+        Put(h.base, model + 5092, model + 0x16400);  // the traffic body, always there
+      }
+      const uint32_t parts = model + 0x1400, interior = model + 0xA800;
+      if (r.Below(4) != 0) {
+        Put(h.base, model + 5028, 0);
+        Put(h.base, model + 5040, 0);
+        Put(h.base, block + kSmall + 0x500 + 8, r.Below(2));
+        for (uint32_t i = 0; i < 2; i++) {
+          Put(h.base, car + 3972 + 24 * i, 3);
+        }
+        Put(h.base, car + 3748, 3);
+        Put(h.base, car + 4088, 3);
+        for (const uint32_t at : {0x1400u + 100, 0xA800u + 11660, 0xD800u + 4312,
+                                  0xEA00u + 13156, 0x12000u + 16768}) {
+          Put(h.base, model + at, 1);
+        }
+      }
+      Put(h.base, model + 5048, block + kSubs);
+      Put(h.base, model + 5060, parts);
+      Put(h.base, model + 5068, interior);
+      Put(h.base, block + kSmall + 0x7E0 + 4, 0);
+      Put(h.base, parts + 24, block + kSubs);
+      Put(h.base, parts + 37284, block + kScene);
+      Put(h.base, interior + 24, block + kSubs);
+      InteriorParts(h.base, block, interior);
+      Put(h.base, model + 48, r.Below(3) == 0 ? 5 : r.Below(40));
+      DecalIds(h.base, model + 48 + 176, r);
+      DecalIds(h.base, model + 48 + 560, r);
+      Put(h.base, model + 48 + 3692, r.Below(2) == 0 ? 0 : 2 + r.Below(4));
+      Put(h.base, model + 48 + 3680, r.Below(6));
+      PartsRecord(h.base, model + 3744, r);
+      InteriorRecord(h.base, model + 3804, r);
+      // Ready at entry in half the cases; the poll readies others.
+      if (c % 2 == 0) {
+        Put(h.base, model + 5036, 0);
+      } else {
+        Put(h.base, model + 5036, 1);
+      }
+      // The car's first pool set and the shared buffer (ReloadDecals').
+      const uint32_t first_set = block + kSmall + 0x500, records = block + kSmall + 0x300;
+      Put(h.base, car + 7256, first_set);
+      Put(h.base, first_set + 40, 1);
+      Put(h.base, first_set + 12, r.Below(3));
+      Put(h.base, first_set + 52, records);
+      for (uint32_t i = 0; i < 12; i++) {
+        Put(h.base, records + 20 * i + 16, r.Below(3) == 0 ? 0 : 2);
+      }
+      Put(h.base, block + kScene + kSharedBuffer, uint32_t(r.Next()));
+      Put(h.base, block + kScene + kSharedBufferSize, 0x200000);
+      // The holder, the stage and pool 7's list.
+      Put(h.base, block + kHolder, block + kStage);
+      Put(h.base, block + kStage + 8, 0);
+      const uint32_t list = block + kScene + 12 * (7 + 412);
+      Put(h.base, list + 0, model);
+      Put(h.base, list + 8, 1);
+      Put(h.base, model + 8, 0);
+      Put(h.base, model + 16, 3);
+      start.r3.u64 = block + kHolder;
+
+      const std::vector<uint8_t> inputs = Read(h.base, block, kBlockBytes);
+      const std::vector<uint8_t> frames = Read(h.base, stack, kStackBytes + kArgBytes);
+      const uint32_t saved_scene = guest::LoadU32(h.base, kSceneGlobal);
+      const uint32_t saved_accessories = guest::LoadU32(h.base, kAccessoriesGlobal);
+      const uint32_t old_header = guest::LoadU32(h.base, car + 6684);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, block, inputs.data(), kBlockBytes);
+        Write(h.base, stack, frames.data(), kStackBytes + kArgBytes);
+        Put(h.base, kSceneGlobal, block + kScene);
+        Put(h.base, kAccessoriesGlobal, accessories);
+        std::optional<ArchiveLoads> loads;
+        loads.emplace(std::vector<int64_t>{1, 2, -1, 4});
+        PPCContext t = start;
+        (v == 0 ? reapply.recompiled : reapply.native)(t, h.base);
+        Put(h.base, kSceneGlobal, saved_scene);
+        Put(h.base, kAccessoriesGlobal, saved_accessories);
+        const uint32_t header = guest::LoadU32(h.base, car + 6684);
+        const bool made = header != old_header;
+        const uint32_t data = guest::LoadU32(h.base, car + 6688);
+        const uint32_t bytes = graphics::XGSetTextureHeader(
+            h.base, guest::LoadU32(h.base, kSheetWidth), guest::LoadU32(h.base, kSheetWidth + 4),
+            1, 2, kSheetFormat, 0, 0, 0, 0, 0, 0);
+        std::vector<Known> known;
+        if (made) {
+          known = {{header, 52}, {data, bytes}};
+        }
+        if (v == 0) {
+          ready += guest::LoadU32(h.base, model + 5036) != 0 || made ? 1 : 0;
+          sheets += made ? 1 : 0;
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        Addresses(out[v], h.base, block, kBlockBytes, known);
+        if (made) {
+          Addresses(out[v], h.base, header, 52, known);
+          out[v].Bytes(Read(h.base, data, bytes));
+        }
+        out[v].Word(uint32_t(loads->calls().size()));
+        for (const uint32_t word : loads->calls()) {
+          Address(out[v], word, known);
+        }
+        loads.reset();
+        if (made) {
+          memory::FreePages(header);
+          memory::FreePhysical(data);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    ITC_LOG_INFO("harness: load_poll: {}: ready in {} of 32 cases, a new sheet in {}",
+                 reapply.name, ready, sheets);
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void LoadPoll(Context& h) {
@@ -1106,6 +1314,12 @@ void LoadPoll(Context& h) {
   Finishers(h, h.random, block);
   Poll(h, h.random, block);
   Applies(h, h.random, block);
+  if (hooks::CarMakersReapplyCalleesNative()) {
+    Reapplies(h, h.random, block);
+  } else {
+    ITC_LOG_WARN("harness: load_poll: the garage stage's re-applies skipped (their callees' "
+                 "plain C++ isn't native)");
+  }
   memory::Free(allocation);
 }
 
