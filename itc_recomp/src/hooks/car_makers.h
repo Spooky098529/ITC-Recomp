@@ -20,5 +20,9 @@ void CarMakersSetWheels(PPCContext& ctx, uint8_t* base);
 void CarMakersSetChoice(PPCContext& ctx, uint8_t* base);
 // CarRecord::SetBytes sub_8215B0E0 (r3 a car record, r4 the car's +1568).
 void CarMakersSetBytes(PPCContext& ctx, uint8_t* base);
+// SceneModelRecord::FromCar sub_8215B878 (r3 a record, r4 a car object, r5
+// the paint pick); the original unless --native_scene_models and
+// --native_car_specs.
+void CarMakersFromCar(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

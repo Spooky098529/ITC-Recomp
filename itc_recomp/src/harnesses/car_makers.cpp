@@ -37,6 +37,9 @@ constexpr uint32_t kArgBytes = 64;      // above it
 constexpr uint32_t kRecord = 0x0;     // a scene model record (4,244 bytes)
 constexpr uint32_t kCar = 0x2000;     // a car object (3,936 bytes, block 2 at +1888)
 constexpr uint32_t kBytes = 0x6000;   // the car's 20 bytes, or the choice's out
+constexpr uint32_t kParams = 0x7000;  // a stand-in car parameters object
+constexpr uint32_t kTables = 0x8000;  // its parts tables (to 0xCE00)
+constexpr uint32_t kParamsPointer = 0x826C2E48;
 
 // Absolute guest ranges compared as floats: (address, count).
 using FloatRanges = std::vector<std::pair<uint32_t, uint32_t>>;
@@ -220,6 +223,83 @@ void SetBytes(Context& h, uint32_t block, Random& r) {
   results.Report();
 }
 
+// The record's floats FromCar writes: SetPaint's and SetWheels', the
+// decals' (+16, +20, +32, +48, +52 of each 64-byte entry) and pool 4's.
+FloatRanges RecordFloats(uint32_t record) {
+  FloatRanges floats = {{record + 32, 36},  {record + 4056, 2}, {record + 4072, 2},
+                        {record + 4084, 2}, {record + 4096, 2}, {record + 4200, 3},
+                        {record + 4216, 3}, {record + 4232, 3}};
+  for (uint32_t e = 0; e < 46; e++) {
+    const uint32_t r = record + 192 + 64 * e;
+    floats.push_back({r + 16, 2});
+    floats.push_back({r + 32, 1});
+    floats.push_back({r + 48, 2});
+  }
+  return floats;
+}
+
+// A car object for FromCar: its flags (a player's, an opponent's, traffic's
+// or any), a car id 1 to 71, the parts' and cockpit's words at their edges,
+// the aero kit 0 to 2, block 2's +232, the tire grades 0 to 7, the doors.
+void LayCar(uint8_t* base, uint32_t car, Random& r) {
+  const uint32_t flags[6] = {0x1, 0x80, 0x2, 0x0, 0x81, uint32_t(r.Next())};
+  guest::StoreU32(base, car + 3888, flags[r.Below(6)]);
+  guest::StoreU32(base, car + 12, 1 + r.Below(71));
+  const uint32_t stages[5] = {0, 2, 3, 7, uint32_t(r.Next())};
+  guest::StoreU32(base, car + 1656, stages[r.Below(5)]);
+  guest::StoreU32(base, car + 1708, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(9) - 1);
+  guest::StoreU32(base, car + 1888 + 232, r.Below(3) == 0 ? 1 : r.Below(2) == 0 ? 0 : 2);
+  guest::StoreU32(base, car + 1756, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(20));
+  guest::StoreU32(base, car + 1764, r.Below(3));
+  guest::StoreU32(base, car + 1784, r.Below(3));
+  guest::StoreU32(base, car + 1816, r.Below(3) == 0 ? 3 : uint32_t(r.Next()));
+  guest::StoreU32(base, car + 1716, r.Below(8));
+  guest::StoreU32(base, car + 1724, r.Below(8));
+  guest::StoreU16(base, car + 4, r.Below(4) == 0 ? uint16_t(r.Next()) : uint16_t(r.Below(7)));
+  // The interior's choices: {a, b, c} with a and b small, c 0 or not.
+  for (uint32_t at : {1824u, 1836u, 1848u, 1860u, 1872u}) {
+    guest::StoreU32(base, car + at, r.Below(4));
+    guest::StoreU32(base, car + at + 4, r.Below(4));
+    guest::StoreU32(base, car + at + 8, r.Below(2) == 0 ? 0 : 1 + r.Below(4));
+  }
+  // SetPaint's picks and SetWheels' floats.
+  guest::StoreU16(base, car + 0, r.Below(4) == 0 ? 0xFFFE : uint16_t(r.Below(20)));
+  guest::StoreU16(base, car + 6, uint16_t(r.Below(3)));
+  for (uint32_t at : {3132u, 3164u, 3168u, 3224u, 3256u, 3260u}) {
+    guest::StoreU32(base, car + at, RandomFloat(r));
+  }
+}
+
+void FromCar(Context& h, uint32_t block, Random& r) {
+  Results results("SceneModelRecord::FromCar (sub_8215B878)");
+  // The car parameters [0x826C2E48] (not loaded yet when the harnesses
+  // run): a stand-in in the block whose nine parts tables (+16 to +48) all
+  // start at kTables, random bytes (car ids 1 to 71 and kits 1 and 2 stay
+  // inside the block).
+  const uint32_t params_global = guest::LoadU32(h.base, kParamsPointer);
+  guest::StoreU32(h.base, kParamsPointer, block + kParams);
+  for (int c = 0; c < 300; c++) {
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          const uint32_t car = block + kCar;
+          for (uint32_t i = 0; i < 9; i++) {
+            guest::StoreU32(h.base, block + kParams + 16 + 4 * i, block + kTables);
+          }
+          LayCar(h.base, car, r);
+          const uint64_t picks[4] = {0xFFFFFFFFFFFFFFFFull, 0xFFFFFFFFFFFFFFFEull,
+                                     r.Below(20), (r.Next() << 32) | r.Below(20)};
+          t.r3.u64 = block + kRecord;
+          t.r4.u64 = car;
+          t.r5.u64 = picks[r.Below(4)];
+        },
+        __imp__sub_8215B878, hooks::CarMakersFromCar, 80, RecordFloats(block + kRecord),
+        fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, kParamsPointer, params_global);
+  results.Report();
+}
+
 }  // namespace
 
 void CarMakers(Context& h) {
@@ -231,6 +311,7 @@ void CarMakers(Context& h) {
   SetWheels(h, block, r);
   SetChoice(h, block, r);
   SetBytes(h, block, r);
+  FromCar(h, block, r);
   memory::Free(allocation);
 }
 

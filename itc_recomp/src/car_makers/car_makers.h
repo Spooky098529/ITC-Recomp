@@ -19,6 +19,10 @@
 
 #include <cstdint>
 
+namespace front_end_car_draw {
+struct Calls;
+}
+
 namespace car_makers {
 
 // --- The scene model record's setters (src/car_makers/record.cpp) ---
@@ -56,5 +60,26 @@ void ResetBytes(uint8_t* base, uint32_t at);
 // the signed bytes r4 +1 to +11, +3684 = the signed byte r4 +0. Its
 // 112-byte frame below `stack`. Returns the record + 3632 (r3).
 uint32_t SetBytes(uint8_t* base, uint32_t record, uint32_t bytes, uint32_t stack);
+
+// SceneModelRecord::FromCar (sub_8215B878): r3 = a 4,244-byte record, r4 =
+// a car object, r5 = the paint pick (all 64 bits, for SetPaint). Its
+// 256-byte frame below `stack`: SceneModelRecord::Reset; the kind (+0) by
+// the car's flags +3888 (0x81: 2, 0x2: 1, else 3, traffic, which skips the
+// parts, the decals and pool 4's record); +16 = CarModels::BlockOf(car
+// +12); SetWheels, SetPaint; kind 2 the cockpit (sub_820D34B8 and the car's
+// words, +3876 and +3880 by car +1708 and block 2's +232, read twice, the
+// six SetChoice calls from the frame, +3884 and +3888); cars the parts
+// (with an aero kit, Params::GetCarParts into frame + 128, copied to frame
+// + 80 (memcpy), AeroParts::Get82 into frame + 128 and the kit's 24-byte
+// entry at 0x820093E0 copied to frame + 80 (memcpy)); +3704; cars the
+// decals (the six entries at +96 and the forty at +288, in their eight
+// runs); +3768 by the car's halfword +4; cars pool 4's record and the tire
+// grades through the table {0, 1, 1, 2, 2} at frame + 80; then
+// CarRecord::SetBytes(+16, car +1568). The empty destructor the original
+// calls on the car is left out. Callees already ours run as plain C++
+// (memcpy and AeroParts::Get82 through `calls` where theirs refuse).
+// Returns SetBytes' r3 (the record + 3648).
+uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t record,
+                 uint32_t car, uint64_t pick, uint32_t stack);
 
 }  // namespace car_makers
