@@ -9,6 +9,8 @@
 
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_scene_models);
+ITC_FLAG_DECLARE(bool, native_car_physics);
+ITC_FLAG_DECLARE(bool, native_math);
 
 ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "Run the stand's scene model holders (docs/functions/stand-models.md): "
@@ -266,6 +268,29 @@ void StandModelsSceneAddSecondWheels(PPCContext& ctx, uint8_t* base) {
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return scene_models::SceneModelAddSecondWheels(base, call, r3, stack);
+  });
+}
+
+void StandModelsFitAxles(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_car_physics) || !ITC_FLAG(native_math)) {
+    __imp__sub_82178B98(ctx, base);
+    return;
+  }
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
+  std::optional<double> f1;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::FitAxles(base, call, r3, r4, stack, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+}
+
+void StandModelsSetSizes(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
+  const uint64_t r6 = ctx.r6.u64, r7 = ctx.r7.u64, r8 = ctx.r8.u64, r9 = ctx.r9.u64;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SceneWheelsSetSizes(base, call, r3, r4, r5, r6, r7, r8, r9, stack);
   });
 }
 

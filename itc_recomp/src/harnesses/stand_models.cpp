@@ -36,6 +36,7 @@ namespace {
 namespace sm = stand_models;
 
 constexpr uint32_t kBytes = 0x14000;
+constexpr uint32_t kArgBytes = 128;  // above the call's r1
 
 // The block's layout.
 constexpr uint32_t kHolderAt = 0x40;   // the holder (its +0 the stage)
@@ -165,13 +166,14 @@ void Case(Context& h, Results& results, uint32_t b, uint64_t seed,
     PPCContext t = CallContext(h);
     t.r1.u64 &= ~0xFull;
     const uint32_t sp = t.r1.u32;
-    RandomBytes(h.base, sp - 8192, 8192, r);
+    RandomBytes(h.base, sp - 8192, 8192 + kArgBytes, r);
     std::vector<uint32_t> floats;
     setup(t, r, floats);
     t.fpscr.disableFlushModeUnconditional();
     (v == 0 ? recompiled : native)(t, h.base);
     AddBlock(out[v], h.base, b, floats);
     out[v].Bytes(Read(h.base, sp - frame, frame - saves));
+    out[v].Bytes(Read(h.base, sp, kArgBytes));  // the caller's parameter area
     out[v].Word(t.r1.u32);
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -522,6 +524,31 @@ void SecondWheels(Context& h, uint32_t b) {
   }
 }
 
+// SceneWheels::SetSizes: the wheels as LayWheels lays them; r4, r5 any
+// words; r6 and r8 any doublewords, r7 and r9 as GarageStage::SetWheel
+// passes them (a word in the high half, 0 below), or any doubleword now and
+// then. The caller's parameter area compared.
+void Sizes(Context& h, uint32_t b) {
+  Results results("SceneWheels::SetSizes (sub_820E7380)");
+  for (int c = 0; c < 48; c++) {
+    Case(h, results, b, h.random.Next(),
+         [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+           LayWheels(h.base, b, r);
+           t.r3.u64 = b + kWheels;
+           t.r4.u64 = uint32_t(r.Next());
+           t.r5.u64 = uint32_t(r.Next());
+           t.r6.u64 = r.Next();
+           t.r8.u64 = r.Next();
+           const bool any = r.Below(4) == 0;
+           t.r7.u64 = any ? r.Next() : uint64_t(RandomFloat(r)) << 32;
+           t.r9.u64 = any ? r.Next() : uint64_t(RandomFloat(r)) << 32;
+         },
+         __imp__sub_820E7380, hooks::StandModelsSetSizes, 112, 24, false,
+         fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void StandModels(Context& h) {
@@ -538,6 +565,7 @@ void StandModels(Context& h) {
     Reapplies(h, b);
     TireGrades(h, b);
     SecondWheels(h, b);
+    Sizes(h, b);
   }
   memory::Free(allocation);
 }

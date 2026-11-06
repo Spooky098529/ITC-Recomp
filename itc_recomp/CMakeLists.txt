@@ -403,6 +403,7 @@ set(ITC_SOURCES
     src/race_update/race_update.cpp
     src/hooks/stand_models.cpp
     src/stand_models/setters.cpp
+    src/stand_models/wheels.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
@@ -747,6 +748,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_scene/race_scene.cpp
     src/race_update/race_update.cpp
     src/stand_models/setters.cpp
+    src/stand_models/wheels.cpp
     src/menu_sounds/menu_sounds.cpp
     src/race_sounds/race_sounds.cpp
     src/race_sounds/race_sounds_cars.cpp

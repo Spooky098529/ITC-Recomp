@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <optional>
 
 namespace stand_models {
 
@@ -151,5 +152,28 @@ uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, uint32_t holder, 
 // pending and +25244 2: ApplyWheelPaint, +25244 = 0 (its r3); else r3 the
 // second Pending's answer. 112-byte frame.
 uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t stack);
+
+// --- The wheel fitting (src/stand_models/wheels.cpp) ---
+
+// sub_82178B98 GarageStage::FitAxles: r3 = the holder, r4 = a car object.
+// Its 1,968-byte frame below `stack`: a car data at frame + 80
+// (CarData::CarData, then Car::SetupVehicle's tail call
+// Vehicle::SetupFromCar(data, car), its plain C++ from right below the
+// frame, else Car::SetupVehicle through `call`); the stage's axle records
+// +6176 to +6184 = data +336 to +344, +6188 = 1.0, +6192 to +6200 = data
+// +608 to +616, +6204 = 1.0 (the stage loaded again for each). Returns
+// SetupFromCar's r3; `*f1` its f1 when native, nullopt (as the guest call
+// left it) otherwise.
+uint64_t FitAxles(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t car,
+                  uint32_t stack, std::optional<double>* f1);
+// sub_820E7380 SceneWheels::SetSizes: a pool 5 wheels object, `a` and `b`
+// to +104 and +108, r6 to r9 (all 64 bits) stored into the caller's
+// parameter area (`stack` + 48 to + 79) and read back as two 12-byte values
+// (r6's two words and r7's high word; r8's and r9's) into +76 to +84 and +88
+// to +96; then Wheels::SetRecord([+28], +32) through `call` (its r3).
+// 112-byte frame.
+uint64_t SceneWheelsSetSizes(uint8_t* base, const GuestCall& call, uint32_t wheels, uint32_t a,
+                             uint32_t b, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9,
+                             uint32_t stack);
 
 }  // namespace stand_models

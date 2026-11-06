@@ -14,6 +14,7 @@
 #include "harness.h"
 
 #include "hooks/car_makers.h"
+#include "hooks/stand_models.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
 
@@ -556,6 +557,27 @@ void Stand(Context& h, Random& r) {
             t.r4.u64 = block + kGarageCar;
           },
           __imp__sub_82178C40, hooks::CarMakersFitCar, 32, {{stage + 6096, 28}},
+          fmt::format("case {}", c), 0, 0, {},
+          [](Outputs& out, const PPCContext& t) { out.Double(t.f1.u64); }, 0x2000,
+          kGarageBytes);
+    }
+    results.Report();
+  }
+  // GarageStage::FitAxles (stand_models/wheels.cpp, stand-models.md): FitCar's
+  // world; the stage's axle records (+6176 to +6204) as floats, f1.
+  {
+    Results results("GarageStage::FitAxles (sub_82178B98)");
+    const uint32_t stage = block + kStage;
+    for (int c = 0; c < 40; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            LayGarage(h.base, block, r, c);
+            guest::StoreU32(h.base, block + kHolder, stage);
+            t.r3.u64 = block + kHolder;
+            t.r4.u64 = block + kGarageCar;
+          },
+          __imp__sub_82178B98, hooks::StandModelsFitAxles, 24, {{stage + 6176, 8}},
           fmt::format("case {}", c), 0, 0, {},
           [](Outputs& out, const PPCContext& t) { out.Double(t.f1.u64); }, 0x2000,
           kGarageBytes);

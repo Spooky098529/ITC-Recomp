@@ -68,6 +68,14 @@ void StandModelsSecondWheelsPending(PPCContext& ctx, uint8_t* base);
 void StandModelsAddSecondWheels(PPCContext& ctx, uint8_t* base);
 void StandModelsApplyWheelPaint(PPCContext& ctx, uint8_t* base);
 void StandModelsSceneAddSecondWheels(PPCContext& ctx, uint8_t* base);
+// The wheel fitting, without adapters (only GarageStage::SetWheel's plain
+// C++ calls them; the harness's): GarageStage::FitAxles sub_82178B98 (r3
+// the holder, r4 a car object; f1 as it leaves it; with
+// --native_car_physics and --native_math, else the original) and
+// SceneWheels::SetSizes sub_820E7380 (r3 a wheels object, r4, r5 two words,
+// r6 to r9 the two values).
+void StandModelsFitAxles(PPCContext& ctx, uint8_t* base);
+void StandModelsSetSizes(PPCContext& ctx, uint8_t* base);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 
