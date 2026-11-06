@@ -628,6 +628,64 @@ void PoolsShutdown(Context& h) {
   results.Report();
 }
 
+// Scenery::AllocPhysical and FreePhysical: the recompiled versions with the
+// game's own XPhysicalAlloc, XPhysicalSize and XPhysicalFree (the kernel's
+// imports, under hooks::RecompiledHeapScope), the native ones over the layer
+// (XPhysicalSize from its recorded sizes: the user's call, 2026-11-06).
+// Compared: the bytes held ([0x826C5518], from a random start) after each,
+// the block's alignment and r3 (the block as 0 or 1, then the free's r3).
+void PhysicalCases(Context& h) {
+  Random& r = h.random;
+  Results results("Scenery::AllocPhysical, FreePhysical (sub_820F1490, sub_820F14E8)");
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: Scenery::AllocPhysical: the native heap is off, no cases");
+    results.Report();
+    return;
+  }
+  const uint32_t saved = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  std::vector<uint32_t> sizes = {1, 248, 272, 4095, 4096, 4097, 65536, 100000, 0x1D8000};
+  for (int i = 0; i < 24; i++) {
+    sizes.push_back(1 + r.Below(i < 16 ? 0x20000 : 0x400000));
+  }
+  for (uint32_t size : sizes) {
+    const uint32_t held = r.Next() & 0x0FFFFFFF;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, cs::kPhysicalHeld, held);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = size;
+      uint32_t block = 0;
+      if (v == 0) {
+        hooks::RecompiledHeapScope recompiled;
+        __imp__sub_820F1490(t, h.base);
+        block = t.r3.u32;
+      } else {
+        block = cs::AllocPhysical(h.base, size);
+      }
+      out[v].Word(block != 0);
+      out[v].Word(block % 4096);
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      if (block == 0) {
+        continue;
+      }
+      PPCContext f = CallContext(h);
+      f.r3.u64 = block;
+      if (v == 0) {
+        hooks::RecompiledHeapScope recompiled;
+        __imp__sub_820F14E8(f, h.base);
+      } else {
+        cs::FreePhysical(h.base, block);
+        f.r3.u64 = 0;
+      }
+      out[v].Word(f.r3.u32);
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+    }
+    results.Check(out[0], out[1], fmt::format("size {} held {:#x}", size, held));
+  }
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved);
+  results.Report();
+}
+
 // --- The scenery's lists ---
 
 void ModelAssets(Context& h) {
@@ -2016,6 +2074,7 @@ void CourseScenery(Context& h) {
   Parses(h);
   PoolSizesCases(h);
   ListLoadCases(h);
+  PhysicalCases(h);
 }
 
 }  // namespace harness

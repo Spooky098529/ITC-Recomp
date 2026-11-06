@@ -680,6 +680,23 @@ void ClearGlobal(uint8_t* base) {
   Store(base, kManager, 0);
 }
 
+uint32_t AllocPhysical(uint8_t* base, uint32_t size) {
+  ITC_NATIVE_RUNNING("sub_820F1490 Scenery::AllocPhysical");
+  // XPhysicalAlloc(size, -1, 0, 4): any physical address, no alignment;
+  // PAGE_READWRITE has no X_MEM_LARGE_PAGES for its check to clear.
+  const uint32_t block = memory::AllocPhysical(size, 0, 0xFFFFFFFFu, 0, 4);
+  const uint32_t held = memory::PhysicalSize(block);
+  Store(base, kPhysicalHeld, held + Load(base, kPhysicalHeld));
+  return block;
+}
+
+void FreePhysical(uint8_t* base, uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820F14E8 Scenery::FreePhysical");
+  const uint32_t held = memory::PhysicalSize(block);
+  Store(base, kPhysicalHeld, Load(base, kPhysicalHeld) - held);
+  memory::FreePhysical(block);
+}
+
 void Init(uint8_t* base, uint32_t manager) {
   ITC_NATIVE_RUNNING("sub_820F1360 Scenery::Init");
   Store(base, kManager, manager);

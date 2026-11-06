@@ -1,7 +1,8 @@
 // The game's allocators routed to the native allocation layer
 // (src/memory/heap.h): the process heap's HeapAlloc, HeapFree, HeapReAlloc
 // and HeapSize, VirtualAlloc and VirtualFree, and XPhysicalAlloc,
-// XPhysicalAllocEx and XPhysicalFree. Below them, every allocation that runs
+// XPhysicalAllocEx and XPhysicalFree, and XPhysicalSize (the user's call,
+// 2026-11-06). Below them, every allocation that runs
 // in play (new, malloc, calloc, realloc, LocalAlloc, XMemAlloc, the shader
 // compiler, the game's ~150 VirtualAlloc callers, physical memory). See
 // docs/native-memory.md.
@@ -22,7 +23,8 @@ ITC_FLAG_BOOL(native_heap, true, "ITC",
               "heap's HeapAlloc, HeapFree, HeapReAlloc and HeapSize (sub_82299D60, "
               "sub_8229A648, sub_8229A930, sub_82298FF8), VirtualAlloc and VirtualFree "
               "(sub_82295398, sub_82295330), XPhysicalAlloc, XPhysicalAllocEx and "
-              "XPhysicalFree (sub_822964C8, sub_82296550, sub_822965C8).");
+              "XPhysicalFree (sub_822964C8, sub_82296550, sub_822965C8), and XPhysicalSize "
+              "(sub_822965C0, MmQueryAllocationSize's wrapper) answered from the layer.");
 
 namespace hooks {
 
@@ -212,4 +214,16 @@ extern "C" REX_FUNC(sub_822965C8) {
     return;
   }
   memory::FreePhysical(ctx.r3.u32);
+}
+
+// XPhysicalSize: r3 = a physical block; returns its allocated size, from the
+// layer (the user's call, 2026-11-06: one answer for recompiled and native
+// callers).
+extern "C" REX_FUNC(sub_822965C0) {
+  REX_FUNC_PROLOGUE();
+  if (!hooks::Native()) {
+    __imp__sub_822965C0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = memory::PhysicalSize(ctx.r3.u32);
 }

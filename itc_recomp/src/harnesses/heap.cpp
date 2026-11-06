@@ -198,6 +198,37 @@ void PhysicalCases(Context& h) {
   results.Report();
 }
 
+// XPhysicalSize (sub_822965C0): blocks from the layer (XPhysicalAlloc's and
+// XPhysicalAllocEx's adapters), their size asked of the SDK's import through
+// the original and of the layer through the adapter.
+void PhysicalSizeCases(Context& h) {
+  Results results("heap: XPhysicalSize");
+  Random random(0x5851A3E7u);
+  std::vector<uint32_t> sizes = {1, 4095, 4096, 4097, 0x10000, 0x10001, 100000, 248, 272 * 7,
+                                 0x1D8000};
+  for (int i = 0; i < 30; i++) {
+    sizes.push_back(1 + random.Below(i < 20 ? 0x40000 : 0x400000));
+  }
+  for (uint32_t size : sizes) {
+    for (uint32_t protection : {0x4u, 0x20000004u, 0x404u}) {
+      for (uint32_t alignment : {0u, 64u, 0x10000u}) {
+        const uint32_t p = Call(h, sub_822964C8, {size, 0xFFFFFFFF, alignment, protection});
+        if (p == 0) {
+          continue;
+        }
+        Outputs out[2];
+        out[0].Word(Call(h, __imp__sub_822965C0, {p}));
+        out[1].Word(Call(h, sub_822965C0, {p}));
+        results.Check(out[0], out[1],
+                      fmt::format("XPhysicalSize size {} alignment {:#x} protection {:#x}", size,
+                                  alignment, protection));
+        Call(h, sub_822965C8, {p});
+      }
+    }
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Heap(Context& h) {
@@ -205,6 +236,7 @@ void Heap(Context& h) {
   ReallocCases(h);
   PageCases(h);
   PhysicalCases(h);
+  PhysicalSizeCases(h);
 }
 
 }  // namespace harness

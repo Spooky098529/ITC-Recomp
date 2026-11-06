@@ -61,5 +61,10 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
                        uint32_t protection);
 // XPhysicalFree (sub_822965C8): MmFreePhysicalMemory's release.
 void FreePhysical(uint32_t address);
+// XPhysicalSize (sub_822965C0, MmQueryAllocationSize's wrapper): the block's
+// allocated size, as the SDK's import answers it (the size AllocPhysical
+// asked for rounded up to its page size), recorded by AllocPhysical; 0
+// (logged once) for an address it didn't give. The user's call, 2026-11-06.
+uint32_t PhysicalSize(uint32_t address);
 
 }  // namespace memory

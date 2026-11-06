@@ -38,6 +38,9 @@ std::atomic<uint32_t> range_start{0};
 uint32_t range_end = 0;
 std::map<uint32_t, uint32_t> free_ranges;  // start -> bytes, sorted by address
 std::unordered_map<uint32_t, Block> blocks;
+// Physical blocks' allocated sizes (the size rounded to their page size), by
+// address: what MmQueryAllocationSize answers for them.
+std::unordered_map<uint32_t, uint32_t> physical_sizes;
 std::set<uint64_t> seen;  // what's been logged once: kind << 32 | value
 
 enum Seen : uint64_t {
@@ -48,6 +51,7 @@ enum Seen : uint64_t {
   kUnknownSize,
   kUnknownFreePages,
   kPhysicalProtection,
+  kUnknownPhysicalSize,
 };
 
 // Under the mutex.
@@ -344,12 +348,34 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
                         HostProtection(protection), true, &address)) {
     OutOfMemory("physical memory", size);
   }
+  {
+    std::lock_guard lock(mutex);
+    physical_sizes[address] = rounded_size;
+  }
   return address;
 }
 
 void FreePhysical(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_822965C8 XPhysicalFree");
+  {
+    std::lock_guard lock(mutex);
+    physical_sizes.erase(address);
+  }
   REX_KERNEL_MEMORY()->LookupHeap(address)->Release(address);
+}
+
+uint32_t PhysicalSize(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_822965C0 XPhysicalSize");
+  std::lock_guard lock(mutex);
+  const auto it = physical_sizes.find(address);
+  if (it == physical_sizes.end()) {
+    if (FirstTime(kUnknownPhysicalSize, 0)) {
+      ITC_LOG_ERROR("native heap: XPhysicalSize of {:#x}, not a physical block the layer gave",
+                    address);
+    }
+    return 0;
+  }
+  return it->second;
 }
 
 }  // namespace memory

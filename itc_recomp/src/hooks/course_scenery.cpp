@@ -20,6 +20,7 @@
 #include "base/flags.h"
 #include "hooks/archive.h"
 #include "hooks/course_scenery.h"
+#include "hooks/heap.h"
 #include "hooks/models.h"
 #include "hooks/scenery_lists.h"
 #include "course_scenery/course_scenery.h"
@@ -36,7 +37,9 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530, Scenery::PoolSizes "
               "sub_820F2030 (Archive::AssetSize's plain C++), SceneryList::Clear "
               "sub_820F1588, Add sub_820F1888 (no adapter), Sort sub_820F1930, Scenery::LimitLargeModels "
-              "sub_820F2B80, ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, Scenery::Init sub_820F1360, "
+              "sub_820F2B80, ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, "
+              "Scenery::AllocPhysical sub_820F1490 and FreePhysical sub_820F14E8 (with the native "
+              "heap; XPhysicalSize answered by the layer), Scenery::Init sub_820F1360, "
               "SceneryList::ReleaseUnused sub_820F17C0, SceneryList::LoadAll sub_820F1598 and Stream "
               "sub_820F16C0 (Archive::QueueLength's plain C++ with the archive's native queue), "
               "Scenery::StartLoad sub_820F1E00, "
@@ -202,6 +205,27 @@ ITC_COURSE_SCENERY(820F2B80, ctx.r12.u64 = ctx.lr; __savegprlr_27(ctx, base);
                    LimitLargeModels(base, ctx.r3.u32, ctx.r1.u32);
                    ctx.r3.u64 = ctx.r3.u64 + 100)
 ITC_COURSE_SCENERY(820F1480, ClearGlobal(base))
+// Scenery::AllocPhysical: r3 = a size; returns the block. Scenery::
+// FreePhysical: r3 = a block; r3 = 0, as XPhysicalFree leaves it. The
+// originals run when the native heap isn't active (the layer answers the
+// blocks' sizes only for blocks it gave).
+extern "C" REX_FUNC(sub_820F1490) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive()) {
+    __imp__sub_820F1490(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = AllocPhysical(base, ctx.r3.u32);
+}
+extern "C" REX_FUNC(sub_820F14E8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive()) {
+    __imp__sub_820F14E8(ctx, base);
+    return;
+  }
+  FreePhysical(base, ctx.r3.u32);
+  ctx.r3.u64 = 0;
+}
 // Scenery::Init: r3 = the manager; r3 comes back as the original's last
 // call (XMemSet) leaves it: its destination, [0x826C5514] + 144.
 ITC_COURSE_SCENERY(820F1360, Init(base, ctx.r3.u32);

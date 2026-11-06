@@ -182,6 +182,19 @@ void LimitLargeModels(uint8_t* base, uint32_t manager, uint32_t stack);
 void ModelListInit(uint8_t* base, uint32_t list);
 // Scenery::ClearGlobal (sub_820F1480): [0x826C5514] = 0.
 void ClearGlobal(uint8_t* base);
+
+// The physical bytes the scenery holds, kept by AllocPhysical and
+// FreePhysical.
+constexpr uint32_t kPhysicalHeld = 0x826C5518;
+// Scenery::AllocPhysical (sub_820F1490): XPhysicalAlloc(size, -1, 0, 4)
+// (the layer's AllocPhysical), its allocated size (XPhysicalSize, the
+// layer's PhysicalSize: the user's call, 2026-11-06) added to
+// [0x826C5518]; returns the block. Only while hooks::NativeHeapActive().
+uint32_t AllocPhysical(uint8_t* base, uint32_t size);
+// Scenery::FreePhysical (sub_820F14E8): the block's allocated size taken
+// off [0x826C5518], then XPhysicalFree. Only while
+// hooks::NativeHeapActive().
+void FreePhysical(uint8_t* base, uint32_t block);
 // Scenery::Init (sub_820F1360): [0x826C5514] = `manager`, then through that
 // global (read again before each store, as the original): +52, +56 = 0;
 // +60 to +107 cleared in six 8-byte pieces (XMemSet, sub_822962B0); +108,
