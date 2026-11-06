@@ -572,6 +572,12 @@ Rows not yet moved stay in the table below. So far:
   torque graph (the tuning screen's and the car list's): two sets of
   stack sprites as line segments from a car data's torque curve, and
   the line recorder that puts each on the command list (B7).
+- [`car-makers.md`](car-makers.md): the car objects' makers outside
+  the race's set-up: the garage cars' reset and their car data, the
+  cars put on the front end's stand (by id or from a build) and turned
+  into the stand's scene model record, the stand's fit to the car and
+  its model's remake, and one front-end screen's update around them
+  (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

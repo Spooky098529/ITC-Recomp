@@ -1,0 +1,152 @@
+# Known functions: the car objects' makers
+
+The front end's makers of car objects outside the race's set-up (`Car::Init`,
+`Car::Clear`, `Car::SetModel`, `Car::FromBuild` and `Car::Refresh` are in
+`race-setup.md` and `car-specs.md`): a garage car (the 1,968-byte head of a
+car object the players' garages and a few screens keep, `../known-data.md`'s
+"garage car") reset (`GarageCar::Reset`) or turned into a car data on the
+stack (`CarData::FromGarageCar`: a full car object made from it, added as a
+racer and loaded into the car data, for the power graph, `power-graph.md`),
+and the cars put on the front end's stand (the "garage stage",
+`front-end-car-draw.md`): a car object made on the stack by its id or from a
+build, then `GarageStage::SetCar` (or `SetCarClass`) turns it into the
+stand's scene model record (`SceneModelRecord::FromCar`: the kind, the
+model's block, the paint, the wheels, the parts, the cockpit, the decals and
+the light kit's words from the car object; `scene-models.md`'s 4,244-byte
+record), copies it into the stand's scene model (pool 7 of the car scene
+`[0x826C2E44]`, `scene.md`), fits the stand to the car's sizes
+(`GarageStage::FitCar`, from a car data on the stack) and has the model
+apply the record again (`SceneModel::ApplyRecord` and the paints, the
+front end's re-applies). `GarageStage::ReloadModel` remakes the stand's
+scene model for a new car model's block (polled: it waits four calls and
+the model's load). One front-end screen's update (`sub_821A1380`, reached
+through a vtable) uses both, with its movie's named animations. The fields
+and globals are in `../known-data.md` ("garage car", "garage stage",
+"scene model record", `0x826D83E4`, `0x826D843C`, `0x826D8448`,
+`0x82814EB8`, `0x820093E0`).
+
+Shared, with rows elsewhere: `Car::Init`, `Car::Clear`, `Car::SetModel`,
+`Car::FromBuild`, `Car::SetupVehicle`, `Race::AddRacer` (`sub_820CD5D8`,
+`sub_820CD7F0`, `sub_820CD8A8`, `sub_820CDCE0`, `sub_820CD5C8`,
+`sub_821017C0`, `race-setup.md`); `Car::Refresh`, `Params::GetCarParts`,
+`AeroParts::Get82` (`sub_820C4998`, `sub_820C9E00`, `sub_820CBC90`,
+`car-specs.md`); `Vehicle::SetupFromCar`, `CarData::CarData`
+(`sub_820C27E8`, `sub_820AEF80`, `car-physics.md`); `Car::SetModelAndClass`
+(`sub_821104D8`, `career.md`); `Defaults::Table3044` (`sub_820CCCD0`,
+`save-data.md`); the car object's block 2 (`sub_820C4550`) and
+`ScenePools::GetB`, `ClaimB` (`sub_820C5C20`, `sub_820C5AB0`,
+`vehicle-accessors.md`); `ScenePools::ReleaseB` (`sub_820C5C88`,
+`functions.md`); `ScenePools::SetUpB`, `SceneModelRecord::SceneModelRecord`,
+`Reset`, `Copy`, the cockpit record's reset `sub_820D34B8`,
+`SceneModel::ApplyRecord`, `SceneModel::ReloadDecals` (`sub_820C5B28`,
+`sub_820DB240`, `sub_820D9810`, `sub_820DB290`, `sub_820DA758`,
+`sub_820D9D48`, `scene-models.md`); `SceneModel::PollLoad`,
+`ApplyPaint`, `ApplyWheelPaint`, `ApplyLightKit` (`sub_820DA318`,
+`sub_820D9B68`, `sub_820D9C50`, `sub_820D9D10`, `load-poll.md`);
+`CarScene::Update` (`sub_820C9608`, `scene.md`); `GarageStage::IsBusy`,
+`Draw`, `Command` (`sub_82179BE0`, `sub_8217FE60`, `sub_82180108`,
+`front-end-car-draw.md`); `UiMovies::Find`, `UiMovie::Run`,
+`PlayNamed`, `FinishNamed`, `LoopNamed` (`sub_8211B3F0`, `sub_8211E1B8`,
+`sub_8211DAC8`, `sub_8211DF20`, `sub_8211DDE0`, `ui-movies-game.md`);
+`memcpy`, `sin` (`sub_825A7410`, `sub_825A88A0`, `c-runtime.md`); the empty
+destructor `sub_82106540` (`audio.md`), which `SceneModelRecord::FromCar`
+and `SetWheels` call on the car object before reading it (native callers
+leave it out, as `_init_pointers` and the others do).
+
+Not here: the front-end screens that call these makers (leads in
+`../loops/leads.md`: the stand's screens, the garage cars' copies, the
+screen `sub_821A1380` updates and its 21 transitions); the race's own
+scene model remake `sub_8215C0D8` and `sub_8217FCB0`, `sub_82179998`
+(still the scene models' owners' lead); the other front-end re-applies
+`sub_821799D8`, `sub_820E7380`, `sub_820E7470`, `sub_820D8F18` (still
+their lead).
+
+Ready (by `b7_groups.py`, 2026-11-06): `GarageCar::Reset`,
+`CarData::FromGarageCar`, `CarModels::BlockOf` (with `sub_8215AB04`, its
+first case split out by the recompiler), `SceneModelRecord::SetPaint`,
+`SetWheels`, `SetChoice`, `CarRecord::SetBytes` (with
+`CarRecord::ResetBytes`), `GarageStage::FitCar`, `GarageStage::CopyRecord`
+and the screen's two movie helpers `sub_8219ED10`, `sub_8219EDB0`. Then,
+in the file: `SceneModelRecord::FromCar` (once `CarModels::BlockOf` is),
+`TuningScreen::SetUpCarData` and `sub_825D9EF0` (once the makers above
+are), `CarList::DrawEntryPowerGraph` in `power-graph.md` (it waits on
+`GarageCar::Reset` and `CarData::FromGarageCar`). Blocked outside the
+file: `SceneModel::ApplyRecord` (`sub_820DA758`) and
+`SceneModel::ReloadDecals` (`sub_820D9D48`, ready itself) under the
+re-applies and so `GarageStage::SetCar`, `SetCarClass` and the two makers
+by id; `ScenePools::SetUpB` (`sub_820C5B28`) and `CarScene::Update`
+(`sub_820C9608`) under `GarageStage::ReloadModel`; `GarageStage::Draw`
+(`sub_8217FE60`) and the 21 transitions reached through registers under
+`sub_821A1380`. Notes for the migration: `GarageStage::CopyRecord` copies
+the scene model's record onto itself (`SetCar` passes the model's own
++32), so `SceneModelRecord::Copy`'s native path refuses the overlap and
+runs the original there (`scene-models.md`); `CarData::FromGarageCar`
+adds its stack car as a racer (`Race::AddRacer`, the race data's racers
+list and count) and loads the car data twice (`Car::SetupVehicle`, then
+`Vehicle::SetupFromCar` again), as the original does; `SceneModelRecord::FromCar`
+reads block 2's +232 twice in a row where the second test can't pass.
+Nothing here needs a call the user hasn't made.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82110448` | `GarageCar::Reset` (probably) | | r3 = a garage car (1,968 bytes, `../known-data.md`): `Car::Clear(r3)` (`race-setup.md`; the car object's head, up to +1884); +1888 and +1892 = `[0x82000A34]` (0.0); +1884, +1896, +1900 = 0; +1964 = 1; `memcpy(+1904, Defaults::Table3044(), 60)` (`save-data.md`). A 96-byte frame. Returns memcpy's r3. 14 callers (8 seen: `sub_82182E68`, `sub_82233C80`, `sub_82233E80`, `sub_822405F8`, `sub_822441D8`, `sub_822443E0`, `sub_82272030`, `sub_825D9EF0`; `CarList::DrawEntryPowerGraph` `sub_82250670`, `power-graph.md`, not seen), mostly before `Car::SetModelAndClass` (`career.md`). Read in full. Ready (2026-11-06). |
+| `sub_825D9EF0` | `GarageCars::StaticInit` (probably) | | No arguments: the two 1,972-byte entries at `0x82814EB8` (`../known-data.md`), each `GarageCar::Reset` and its +1968 = 0. A 112-byte frame. No direct caller: probably one of the C runtime's static initializers (`_cinit`'s table, `c-runtime.md`; not checked). Seen in play. Read in full. |
+| `sub_82179A60` | `CarData::FromGarageCar` (probably) | | r3 not read (callers pass `[0x826D83E0]`'s +0 word, the stand's holder), r4 = a garage car, r5 = a car data. A 4,016-byte frame: a car object at r1 + 80 made by `Car::Init`, `memcpy` of the garage car's first 1,884 bytes over it, `Car::Refresh` (`car-specs.md`), `Race::AddRacer(car, 0, f1 = [0x82000A34] 0.0, 0)` (`race-setup.md`: sets the car's flags +3888 by the race data's +0x59614 and adds it to the race data's racers, as the original does from the front end), `Car::SetupVehicle(car, r5)` (`Vehicle::SetupFromCar(r5, car)`), then `Vehicle::SetupFromCar(r5, car)` again (`car-physics.md`). Returns what the last returns. 7 callers (2 seen: `TuningScreen::SetUpCarData` `sub_821DF2F8`, `CarList::DrawEntryPowerGraph` `sub_82250670`; not seen: `CarList::DrawCarPowerGraph` `sub_82250700`, `sub_821810E0`, `sub_8218119C`, `sub_822724C0`, `sub_82274B60`). Read in full. Ready (2026-11-06). |
+| `sub_821DF2F8` | `TuningScreen::SetUpCarData` (probably) | | r3 = the tuning screen (`../known-data.md`'s "tuning screen"): the selected garage car: g = `[+18904]` + 6120 (a save data's garage, probably), the halfword link list from g +204 walked `[[+18904] + 0x19920]` steps (each step the halfword at 4 × link + g), the slot the halfword +2 of the last link's entry, the car g + 212 + 1,968 × slot; tail call `CarData::FromGarageCar([0x826D83E0]'s +0 word, the car, the screen + 18912)`. Leaf until the tail call. Callers `sub_821DF788`, `sub_821E7368` (the tuning screen's power curve, a lead). Read in full. Waits on `CarData::FromGarageCar`. |
+| `sub_82182C90` | `GarageStage::ShowCarById` (probably) | | r3 = the paint pick (passed on as `SceneModelRecord::FromCar`'s r5). A 4,016-byte frame. `ScenePools::GetB([0x826C2E44], 7, [[0x826D83E0]] + 8)` (its answer not used), then the car id: `[0x826D83F4]`: its +1136 array of pointers, index +48 + +52, the entry's +8432 (`../known-data.md`); a car object at r1 + 80: `Car::Init`, `Car::SetModel(car, id)`, its +3888 \|= 1, `Car::Refresh`; then `GarageStage::SetCar([0x826D83E0]'s +0 word, car, r3)`. Callers `sub_821847A0` (a lead), `sub_82185600` (the stand's screens' lead). Read in full. Waits on `GarageStage::SetCar`. |
+| `sub_82182D30` | `GarageStage::ShowCarByIdWithClass` (probably) | | As `GarageStage::ShowCarById`, ending with `GarageStage::SetCarClass` (r5 = r3) instead of `SetCar`. Only caller `sub_82184018` (seen; a lead). Read in full. Waits on `GarageStage::SetCarClass`. |
+| `sub_8217FD58` | `GarageStage::SetCar` (probably) | | r3 = the stand's holder (its +0 the stage s), r4 = a car object, r5 = the paint pick. A 112-byte frame. The scene model m (`ScenePools::GetB([0x826C2E44], 7, s +8)`); `SceneModelRecord::FromCar(m + 32, r4, r5)` (m's own record), `GarageStage::CopyRecord(r3, m + 32)`, `GarageStage::FitCar(r3, r4)`, `GarageStage::ReapplyRecord(r3)`. 16 callers (8 seen: `ShowCarById`, `sub_821A1380`, `sub_8218DB60`, `sub_822042D8`, `sub_82234F08`, `sub_82245200`, `sub_8224C008` twice, and others; mostly the stand's screens' lead). Read in full. Waits on `ReapplyRecord` (`SceneModel::ApplyRecord`, `ReloadDecals`). |
+| `sub_8217FDC8` | `GarageStage::SetCarClass` (probably) | | As `GarageStage::SetCar` (r3 holder, r4 car, r5), without `FitCar`: `SceneModelRecord::FromCar(m + 32, r4, r5)`, then the record's +3768 (m +3800) = 1 when r5 is 1, 2 or 4, else 0 (the original's test for 5 falls through to 0), `GarageStage::CopyRecord(r3, m + 32)`, `GarageStage::ReapplyRecordNoDecals(r3)`. A 128-byte frame. Callers `ShowCarByIdWithClass`, `sub_8224A490` (seen), `sub_82274FF0` (not seen). Read in full. Waits on `ReapplyRecordNoDecals` (`SceneModel::ApplyRecord`). |
+| `sub_8217FC60` | `GarageStage::CopyRecord` (probably) | | r3 = the holder, r4 = a 4,244-byte record: `SceneModelRecord::Copy(m + 32, r4)` on the stage's scene model m (`ScenePools::GetB`, pool 7, s +8). A 96-byte frame. Both callers (`SetCar`, `SetCarClass`) pass m + 32 itself: the copy is onto itself, which `SceneModelRecord::Copy`'s native path refuses as an overlap and runs the original for (`scene-models.md`). Read in full. Ready (2026-11-06). |
+| `sub_82178C40` | `GarageStage::FitCar` (probably) | | r3 = the holder (its +0 the stage s), r4 = a car object. A 1,968-byte frame: a car data at r1 + 80 (`CarData::CarData`, `Vehicle::SetupFromCar(data, r4)`, `car-physics.md`), then the stage's car sizes: s +6096, +6100 = data +1736, +1756 (the axles' heights); +6104, +6108 = the front and rear axle records' +52 (data +388, +660); +6136 = +6104 − +6096, +6140 = +6108 − +6100; +6152, +6156, +6160 = data +4, +8, +12 (the wheelbase, the tracks); +6112, +6120 = data +544, +548 and +6116, +6124 = +816, +820 (the axle records' +208, +212); +6128 = `sin`(data +544 × `[0x82002948]`) × data +388, +6132 = `sin`(data +816 × the same) × data +660; +6176 to +6184 = data +336 to +344 and +6192 to +6200 = data +608 to +616 (the axle records' +0 to +8), +6188 and +6204 = `[0x82000A30]` (values not read). Callers `SetCar`, `sub_8217DAC0` (seen; a lead), `sub_821AEF48` (not seen). Read in full. Ready (2026-11-06). |
+| `sub_82178DF8` | `GarageStage::ReapplyRecord` (probably) | | r3 = the holder: the stage's scene model m (`ScenePools::GetB`, pool 7, s +8), then `SceneModel::ApplyPaint(m)`, `ApplyWheelPaint(m)` (`load-poll.md`), `SceneModel::ApplyRecord(m)` (`scene-models.md`), `ApplyLightKit(m)`, `SceneModel::ReloadDecals(m)`. A 96-byte frame. Only caller `GarageStage::SetCar`. Moved here from the front end's re-applies' lead (2026-11-06). Read in full. Waits on `SceneModel::ApplyRecord` and `ReloadDecals`. |
+| `sub_82178E60` | `GarageStage::ReapplyRecordNoDecals` (probably) | | As `GarageStage::ReapplyRecord` without `SceneModel::ReloadDecals`. Only caller `GarageStage::SetCarClass`. Moved here from the front end's re-applies' lead (2026-11-06). Read in full. Waits on `SceneModel::ApplyRecord`. |
+| `sub_8217F880` | `GarageStage::ReloadModel` (probably) | | r3 = the holder (its +0 the stage s), r4 = a model block (`CarModels::BlockOf`'s answer) or -1. A 4,400-byte frame. m = the stage's scene model (`ScenePools::GetB`, pool 7, s +8); m +4296 (the block's +8, the draw word) = 0; `[0x826D83E4]` + 1; r4 not -1: s +4 = r4. Unless the count is 4 or more and `SceneModel::PollLoad(m)` answers nonzero, `CarScene::Update` (`scene.md`). Below 4: returns 0. Else the count = 4 and, while `PollLoad(m)` is 0, returns 0; then: s +16 set: `ScenePools::ReleaseB([0x826C2E44], 7, s +8)`, s +16 = 0; `CarScene::Update`; a record at r1 + 80 (`SceneModelRecord::SceneModelRecord`, `Reset`), its +16 (the car record's block) = s +4; s +8 = `ScenePools::ClaimB(scene, 7, 0)`; `ScenePools::SetUpB(scene, 7, s +8, the record)`; the old model's +4296 = 1, the count = 0, s +6056 = 1, s +16 = 1, s +4 = -1; returns 1. 16 callers (10 seen: `sub_821A1380`, `sub_82181330`, `sub_82185600`, `sub_821907F8`, `sub_82196230`, `sub_8219D6F0`, `sub_82234F08`, `sub_82245200`, `sub_8224C008` twice; the stand's screens). Moved here from the scene models' owners' lead (2026-11-06). Read in full. Waits on `ScenePools::SetUpB` and `CarScene::Update`. |
+| `sub_8215B878` | `SceneModelRecord::FromCar` (probably) | | r3 = a 4,244-byte record (`scene-models.md`), r4 = a car object, r5 = the paint pick (for `SetPaint`). A 256-byte frame. `SceneModelRecord::Reset`; the kind (+0): 2 when the car's flags +3888 have 0x81 (the players, `Race::AddRacer`), 1 when 0x2, else 3 (traffic, which skips the car parts below); +16 (the car record's block) = `CarModels::BlockOf(car +12)`; `SetWheels(r3, car)`; `SetPaint(r3, car, r5)`. Kind 2: the cockpit's 144 bytes reset (`sub_820D34B8`) and +3892, +3896 = car +1760, +3900 = +1768, +3904 = +1772, +3908 = +1780, +3872, +3868, +3864 = +1800, +1804, +1808, +3696 = +1812; +3880 and +3876 by car +1708 (1 or 2: 1, 0; 3 to 5: 1, 1; 6: 1, 2; else 0, 0), then block 2's +232 (`sub_820C4550`) 1: +3876 = 1; with +3876 set the choices `SetChoice(+3804, car +1860)`, `(+3816, +1872)`, else `(+3780, +1860)`, `(+3792, +1872)`; then `(+3852, +1824)`, `(+3840, +1836)`, `(+3828, +1848)`; car +1816 not 3: +3884, +3888 = car +1816, +1820. Cars (kinds 1, 2): the parts: +3756 = car +1656 (the engine stage), +3776 = 2 from stage 7, 1 from 3, else 0; +3716, +3760 = +1664, +1668; +3740, +3744, +3748 = +1768, +1772, +1776; the aero (car +1784 = k): 0: +3712, +3720, +3724 = +1744, +1752, +1748, +3728 = +1756 (-1 gives 13), +3732 = +1760, +3708 = (+1764 is 1), +3736 = 0, +3752 = +1780; else the kit's flags word +24 (`Params::GetCarParts(car +12)`, 36 bytes copied, `AeroParts::Get82(.., k)`) and the 24-byte entry `0x820093E0` + 24 × (block × 2 + k − 1) (six words, -1 keeps a field): +3712, +3720, +3724 from words 0 to 2; flag 0x2: +3728 = car +1756 (-1 gives 13), else word 5; flag 0x1: +3732 = +1760 and +3708 = (+1764 is 1), else word 4; flag 0x8: +3736 = k, else 0; word 3 to +3752. Always +3704 = car +1792. Cars: the decals: the car's six 32-byte entries at +96 (entries 2, 1, 0 and 5, 4, 3) and its forty at +288 (in eight runs of five) into the record's 64-byte entries at +192 (entries 2, 1, 0), +384 (5, 4, 3) and the runs at +576, +1344, +960, +1728, +2112, +2496, +3264, +2880 (fields +0 = E +24, +4 = E +28, +16 = E +8, +20 = E +12, +32 = E +16, +48 = E +0, +52 = E +4, E the car's entry); not read in detail. +3768 = 1 when the car's halfword +4 is 1, 2 or 4, else 0. Cars: pool 4's record from car +1588 (+4192 = +1592, +4196 = +1588, +4200 to +4208, +4212, +4216 to +4224, +4228, +4232 to +4240 = +1596 to +1644 without +1612, +1632), +4048, +4064 = {0, 1, 1, 2, 2}[car +1716], [car +1724] (the tire grades). Last `CarRecord::SetBytes(+16, car +1568)`. Callers `SetCar`, `SetCarClass`, the race's remake `sub_8215C0D8` and `sub_8222C300` (`LocationScreen::SetUp`, `location-screen.md`). Moved here from the scene models' owners' lead (2026-11-06). Read in full. Waits on `CarModels::BlockOf`. |
+| `sub_8215AAD0` | `CarModels::BlockOf` (probably) | | r3 = a car id: a model block (the car record's +0) through a byte-indexed jump table (the recompiler's switch resolves it): ids 1 to 22 give 1, 18, 19, 2, 4, 3, 10, 9, 21, 5, 8, 7, 6, 12, 11, 13, 14, 20, 15, 22, 17, 16; 23 to 35 themselves; 36 to 46 give 35; 47 to 54 give 41, 42, 43, 44, 36, 37, 38, 39; 55 to 71 give 11, 12, 15, 13, 10, 5, 4, 6, 9, 1, 2, 3, 0, 14, 8, 7, 40; others 0. Leaf. 25 call sites (`SceneModelRecord::FromCar` twice and the stand's screens, which pass it to `GarageStage::ReloadModel`). Read in full. Ready (2026-11-06), with `sub_8215AB04`. |
+| `sub_8215AB04` | | | `CarModels::BlockOf`'s case for id 1 (returns 1), which the recompiler made a function of its own (the jump table's base address); only `CarModels::BlockOf` reaches it. Read in full. Ready with it. |
+| `sub_8215AC70` | `SceneModelRecord::SetPaint` (probably) | | r3 = a record, r4 = a car object, r5 = the paint pick (-1: the car's halfword +0). Leaf. f0 = `[0x82002200]` (1/255). Traffic (kind 3): +176 = the pick. Else three hue, saturation, value triples (a halfword as a float, two bytes × f0) at +32, +48, +64: with -2 from car +3376, +3380, +3384 (the paint copy's first entry), then +32 to +40 and +48 to +56 overwritten from the car's halfword +8 and bytes +10, +11, and by the car's halfword +6: 0 gives +64, +68 = `[0x82000A34]` (0.0) and +72 = `[0x82009788]`, 1 gives +64 = halfword +8, +68 = byte +10 × `[0x82002A14]` × f0, +72 = `[0x82001070]`; with another pick from car +3376 + 20 × it. Then +4040 = 1 and the wheels' colors: +80, +96, +112 from the front wheel copy (car +3276, +3288, +3292), +128, +144, +160 from the rear (+3324, +3336, +3340), each a halfword and two bytes × f0; +4060, +4056 = car +3284, +3296 and +4076, +4072 = +3332, +3344 (floats). Only caller `SceneModelRecord::FromCar`. Read in full; the constants' values not read but 1/255. Ready (2026-11-06). |
+| `sub_8215B238` | `SceneModelRecord::SetWheels` (probably) | | r3 = a record, r4 = a car object. A 112-byte frame. The wheels' record: +4052 = car +3308 − 1, +4068 = +3356 − 1 (the front and rear wheel numbers, -1 stock); +4104 = car +1696; +4124 = car +1692, or block 2's +236 (`sub_820C4550`) when that isn't 0; +4080 = (int) car +3164, +4084 = +3132 × `[0x82001BDC]`, +4088 = +3168 × `[0x82002A0C]` (the front tire copy's +80, +48, +84); +4092 = (int) +3256, +4096 = +3224 × `[0x82001BDC]`, +4100 = +3260 × `[0x82002A0C]` (the rear's). Calls the empty `sub_82106540` twice on the car first (left out by native callers). Only caller `SceneModelRecord::FromCar`. Read in full. Ready (2026-11-06). |
+| `sub_8215B1A0` | `SceneModelRecord::SetChoice` (probably) | | r3 = a 12-byte out, r4:r5 = a 12-byte value {a, b, c} passed in registers. Leaf. c 0: out +0 = 0. Else out +0 = 1, +4 = c − 1, +8 = 3a − 3 + k, k 1 for (a 1, b 0), 2 for (a 1, b 1), 1 for (a 2, b 1), else 0 (b compared unsigned). Six calls from `SceneModelRecord::FromCar` (the car's 12-byte entries +1824 to +1872, probably the interior's choices). Read in full. Ready (2026-11-06). |
+| `sub_8215B0E0` | `CarRecord::SetBytes` (probably) | | r3 = a car record (a record's +16), r4 = the car's 20 bytes at +1568: `CarRecord::ResetBytes(+3632)`, +3632 = 0, +3636 to +3676 = the signed bytes r4 +1 to +11, +3684 = the signed byte r4 +0. A 112-byte frame. Only caller `SceneModelRecord::FromCar`. Read in full. Ready (2026-11-06), with `CarRecord::ResetBytes`. |
+| `sub_820D0900` | `CarRecord::ResetBytes` (probably) | | r3 = a car record's +3632: twelve words +0 to +44 = 0, 0, 1, 2, 3, 29, 36, 31, 32, 37, 34, 35. Leaf. Only caller `CarRecord::SetBytes`. Read in full. Ready with it. |
+| `sub_821A1380` | | | A front-end screen's update (no direct caller: through a vtable, not looked for). A 4,224-byte frame. `sub_82106540` (empty) with 100, 30, 0, `0x8200A428`; movie 6 (`UiMovies::Find`); the transition machine `[0x826D843C]` (`../known-data.md`): its +12 the running transition, -1 none (then `UiMovie::Run(movie, 0)` unless +0 is 4), else one of 21 handlers from a table built on the stack (`0x8219C528` to `0x821A1258`, listed in the lead; called with the machine + 24): a nonzero answer moves to the queued one (+16, or back to +4 when none, -1). Then with the screen `[0x826D8448]`'s +0x3265C set: `GarageStage::IsBusy([0x826D83E0]'s +0 word)` gives +0x32668 (0 to 1: `sub_8219ED10`; 1 to 0: `sub_8219EDB0`); +0x32660 0: it = `GarageStage::ReloadModel(holder, -1)`; once set (the same call): a car object at r1 + 192 from the build at the entry `[0x826D8448]` + 0x2C784 + 52 × +0x32664's +48 (`Car::Init`, `Car::FromBuild`, +3888 \|= 1, `Car::Refresh`), `GarageStage::SetCar(holder, car, -1)`, `GarageStage::Command(holder, 54)`; +0x32660 set before: `GarageStage::Draw(holder, 0, 1)`. +0x3265C 0 and +0x32668 set: `sub_8219EE30`, +0x32668 = 0. Seen in play. Read in full; the handlers not read (a lead). Waits on the handlers, `GarageStage::Draw` and `ReloadModel`. |
+| `sub_8219ED10` | | | Movie 6 (`UiMovies::Find`): `UiMovie::FinishNamed` 86 and 87, `PlayNamed` 86 and 85 (0, 0, 0, 0), `LoopNamed` 85 (probably the stand's busy marker shown). A 112-byte frame. Only caller `sub_821A1380`. Read in full. Ready (2026-11-06). |
+| `sub_8219EDB0` | | | Movie 6: `UiMovie::FinishNamed` 86, 87, 85, `PlayNamed` 87 (probably the marker hidden). A 112-byte frame. Only caller `sub_821A1380`. Read in full. Ready (2026-11-06). |
+| `sub_8219EE30` | | | As `sub_8219EDB0`, then `FinishNamed` 87 again. Only caller `sub_821A1380`. Not seen in play. Read in full. |
