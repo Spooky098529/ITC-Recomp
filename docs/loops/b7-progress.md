@@ -32,9 +32,15 @@ file's history. What's left to see in a drive, from every run:
   (`sub_8229EF48`, `EDA8`, `EC00`, `E908`). Validated `itc_3607`
   (race 46 s, 0 errors, 7 of 7 harness lines, 4 ran in the race,
   `SaveSegment`, `CommandChain::Close`, `WriteCallback` in the replay
-  `itc_3608` (ok); none to drive). Step: second migration agent
-  running (`sub_8229EB10`, then the segment flow's cycle as one
-  group).
+  `itc_3608` (ok); none to drive). Second migration
+  8d43620c..632f2b7d (`CommandChain::NewBlock` with `Init`, the
+  segment flow's cycle as one group with `EndSegment`'s counter wrap
+  kept, `ReserveWords` with `InsertCallback`, `WaitForIdle` and
+  `sub_8229F0E0` without their packets; 5 adapters removed;
+  `itc_3622`: race 36 s, 0 errors, every harness 0 differing but the
+  expected groups; no subagents); nothing ready left (the rest's
+  callers are recompiled packet writers and the tiling worker). Step:
+  validation agent running.
 
 ## Done
 
@@ -59,5 +65,7 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4209, work left 2201 (wrapped 60, known
   469, unknown 1672).
 - After its validation (`itc_3607`): ours 4209, work left 2201.
+- After its second migration: ours 4219, work left 2191 (wrapped 59,
+  known 460, unknown 1672).
 
 ## Stopped
