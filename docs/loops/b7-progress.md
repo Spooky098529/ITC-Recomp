@@ -47,7 +47,11 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the render command replay's single commands (lead
   picked: `sub_8258E8E8`, `sub_8258F0F0`, `sub_8258E958`,
   `sub_8258E9B8`; every frame, all four ready; its line deleted from
-  `leads.md`). Step: mapping agent running.
+  `leads.md`). Map checked (53cddb27: `single-commands.md`, 27 rows
+  (the table's ids 0-36), 1 moved from `functions.md`
+  (`sub_8258F5C0`, Wrapped), 5 in play; 0 errors; 5 ready groups;
+  nothing Dropped-kind; no leads added; no subagents). Step:
+  migration agent running.
 
 ## Done
 
@@ -81,5 +85,7 @@ file's history. What's left to see in a drive, from every run:
 - After its second migration: ours 4219, work left 2191 (wrapped 59,
   known 460, unknown 1672).
 - After its validation (`itc_3623`): ours 4219, work left 2191.
+- After the single commands' map: ours 4219, work left 2191 (wrapped
+  59, known 464, unknown 1668).
 
 ## Stopped
