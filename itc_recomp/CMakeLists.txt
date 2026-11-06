@@ -403,6 +403,7 @@ set(ITC_SOURCES
     src/race_update/race_update.cpp
     src/hooks/stand_models.cpp
     src/stand_models/setters.cpp
+    src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp

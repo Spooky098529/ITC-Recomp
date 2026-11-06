@@ -17,6 +17,7 @@
 
 #include "base/log.h"
 #include "hooks/load_poll.h"
+#include "hooks/scene_models.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -91,7 +92,8 @@ uint32_t ModelWord(uint8_t* base, uint32_t block, Random& r, bool maybe_none) {
 // back for the second run).
 void Case(Context& h, Results& results, uint32_t block, Random& r,
           const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
-          GuestFunction native, const std::string& what) {
+          GuestFunction native, const std::string& what,
+          const std::function<void(const PPCContext&)>& after = {}) {
   PPCContext start = CallContext(h);
   start.r1.u64 &= ~0xFull;
   const uint32_t stack = start.r1.u32 - kStackBytes;
@@ -126,6 +128,9 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     (v == 0 ? recompiled : native)(t, h.base);
     Put(h.base, kSceneGlobal, saved_scene);
     Put(h.base, kAccessoriesGlobal, saved_accessories);
+    if (after && v == 0) {
+      after(t);
+    }
     out[v].Bytes(Read(h.base, block, kBlockBytes));
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -954,6 +959,135 @@ void Poll(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The record re-applies (scene_models/apply.cpp, the stand's setters'
+// callees: scene-models.md) ---
+
+// A 60-byte parts record of small slot numbers (+16 13 now and then), as
+// SceneParts::Build's cases make them.
+void PartsRecord(uint8_t* base, uint32_t record, Random& r) {
+  for (uint32_t at = 0; at < 60; at += 4) {
+    Put(base, record + at, r.Below(3));
+  }
+  if (r.Below(3) == 0) {
+    Put(base, record + 16, 13);
+  }
+}
+
+// A 120-byte interior record: its gauges' entries clear (SetGauges' callee
+// never ran in play), its +100 (the scene's part model) 0 or small.
+void InteriorRecord(uint8_t* base, uint32_t record, Random& r) {
+  for (uint32_t i = 0; i < 7; i++) {
+    Put(base, record + 8 + 12 * i, 0);
+  }
+  Put(base, record + 100, r.Below(2) == 0 ? 0 : r.Below(4));
+}
+
+// An interior's extras for SceneInterior::Apply: the scene (+11668) and its
+// six parts (+11632, 0x200 apart beside the cockpit body).
+void InteriorParts(uint8_t* base, uint32_t block, uint32_t interior) {
+  Put(base, interior + 11668, block + kScene);
+  for (uint32_t i = 0; i < 6; i++) {
+    Put(base, interior + 11632 + 4 * i, block + kOther2 + 0x1000 + 0x200 * i);
+  }
+}
+
+void Applies(Context& h, Random& r, uint32_t block) {
+  {
+    Results results("SceneParts::Apply (sub_820E08B0)");
+    for (int c = 0; c < 16; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t object = block + kObject;
+             const uint32_t scene_car = block + kSmall + 0x200;
+             MakeCar(h.base, block, r);
+             Put(h.base, object + 24, scene_car);
+             Put(h.base, scene_car + 24, block + kCar);
+             Put(h.base, object + 104, block + kParts);
+             const uint32_t set = block + kSmall + 0x400;
+             Put(h.base, block + kParts + 106000, set);
+             Put(h.base, set + 8, r.Below(4) == 0 ? 2 : r.Below(2));
+             MakeModels(h.base, block, block + kParts + 5280, block + kParts + 116, 216, r);
+             // The parts' scene: the case's (its +4 0 or 1: the race's skips).
+             Put(h.base, object + 37284, block + kScene);
+             const uint32_t record = block + kSmall + 0x100;
+             PartsRecord(h.base, record, r);
+             t.r3.u64 = object;
+             t.r4.u64 = record;
+           },
+           __imp__sub_820E08B0, hooks::SceneModelsPartsApply, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("SceneInterior::Apply (sub_820E4258)");
+    for (int c = 0; c < 16; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t object = block + kObject;
+             SceneInteriorWorld(h.base, block, object, r);
+             InteriorParts(h.base, block, object);
+             const uint32_t record = block + kSmall + 0x100;
+             InteriorRecord(h.base, record, r);
+             t.r3.u64 = object;
+             t.r4.u64 = record;
+           },
+           __imp__sub_820E4258, hooks::SceneModelsInteriorApply, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // SceneModel::ApplyRecord: the poll's world (a car, its car model, parts
+  // and interior present), the scene's +4 0 (the front end's: the race's
+  // path is the original's on both sides), the parts and interior given
+  // what the applies read (as their cases above), the scene model's car
+  // record (+48: its block, 5 now and then, and its +3680 the selected
+  // texture's index, both copied into the car model), parts record (+3744)
+  // and interior record (+3804).
+  {
+    Results results("SceneModel::ApplyRecord (sub_820DA758)");
+    int applied = 0;
+    for (int c = 0; c < 48; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t model = block + kObject;
+             PollWorld(h.base, block, model, r, false);
+             const uint32_t parts = model + 0x1400, interior = model + 0xA800;
+             if (r.Below(4) != 0) {
+               // Mostly loaded: nothing pending, every part finished.
+               Put(h.base, model + 5028, 0);
+               Put(h.base, model + 5040, 0);
+               Put(h.base, block + kSmall + 0x500 + 8, r.Below(2));
+               for (uint32_t i = 0; i < 2; i++) {
+                 Put(h.base, block + kCar + 3972 + 24 * i, 3);
+               }
+               Put(h.base, block + kCar + 3748, 3);
+               Put(h.base, block + kCar + 4088, 3);
+               for (const uint32_t at : {0x1400u + 100, 0xA800u + 11660, 0xD800u + 4312,
+                                         0xEA00u + 13156, 0x12000u + 16768}) {
+                 Put(h.base, model + at, 1);
+               }
+             }
+             Put(h.base, model + 5048, block + kSubs);
+             Put(h.base, model + 5060, parts);
+             Put(h.base, model + 5068, interior);
+             Put(h.base, block + kSmall + 0x7E0 + 4, 0);
+             Put(h.base, parts + 24, block + kSubs);
+             Put(h.base, parts + 37284, block + kScene);
+             Put(h.base, interior + 24, block + kSubs);
+             InteriorParts(h.base, block, interior);
+             Put(h.base, model + 48, r.Below(3) == 0 ? 5 : r.Below(40));
+             Put(h.base, model + 48 + 3680, r.Below(6));
+             PartsRecord(h.base, model + 3744, r);
+             InteriorRecord(h.base, model + 3804, r);
+             t.r3.u64 = model;
+           },
+           __imp__sub_820DA758, hooks::SceneModelsApplyRecord, fmt::format("case {}", c),
+           [&](const PPCContext& t) { applied += t.r3.u32 != 0 ? 1 : 0; });
+    }
+    ITC_LOG_INFO("harness: load_poll: ApplyRecord got past the poll in {} of 48 cases", applied);
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void LoadPoll(Context& h) {
@@ -971,6 +1105,7 @@ void LoadPoll(Context& h) {
   Builds(h, h.random, block);
   Finishers(h, h.random, block);
   Poll(h, h.random, block);
+  Applies(h, h.random, block);
   memory::Free(allocation);
 }
 

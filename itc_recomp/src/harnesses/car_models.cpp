@@ -23,6 +23,7 @@
 #include "graphics/resources.h"
 #include "hooks/archive.h"
 #include "hooks/car_models.h"
+#include "hooks/scene_models.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
@@ -2164,6 +2165,93 @@ void ReloadDecalCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// SceneModel::ReloadDecals (scene_models/apply.cpp): a scene model in a
+// block of its own, ready (+5036) or not, traffic (+32 3) now and then, its
+// car model (+5048, its +24 the car model above, laid as ReloadDecalCases
+// lays it but through the scene model's car record at +48, which
+// CarModel::SetRecord copies over the car model's +32). The block, the
+// scene model, the sheet's header and data, the loads asked for and r3.
+void SceneReloadDecalCases(Context& h, uint32_t block) {
+  namespace cm = car_models;
+  const uint32_t allocation = memory::Alloc(0x1400 + 16, 0);
+  if (allocation == 0) {
+    ITC_LOG_WARN("harness: car_models: no block for SceneModel::ReloadDecals");
+    return;
+  }
+  const uint32_t model = (allocation + 15) & ~15u;
+  const uint32_t scene_car = model + 0x13C0;
+  SavedWord scene(h.base, cm::kSceneSet);
+  const uint32_t set = block + 0x2000 - cm::kSharedBuffer;
+  const uint32_t car = block + 0x100;
+  const uint32_t first_set = block + 0x3F00;
+  const uint32_t records = block + 0x3E00;
+  Results results("SceneModel::ReloadDecals (sub_820D9D48)");
+  for (int c = 0; c < 24; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      RandomBytes(h.base, model, 0x1400, r);
+      guest::StoreU32(h.base, cm::kSceneSet, set);
+      guest::StoreU32(h.base, set + cm::kSharedBuffer, uint32_t(r.Next()));
+      guest::StoreU32(h.base, set + cm::kSharedBufferSize, 0x200000);
+      const uint32_t record = model + 48;  // copied to car + 32
+      Put(h.base, record + 0, r.Below(6) == 0 ? 45 + r.Below(100) : r.Below(45));
+      Put(h.base, record + 3724 - 32, r.Below(2) == 0 ? 0 : 2 + r.Below(4));
+      DecalRecords(h.base, record + 592 - 32, r, c == 3);
+      DecalRecords(h.base, record + 208 - 32, r, c == 3);
+      Put(h.base, car + 7256, first_set);
+      Put(h.base, first_set + 40, 1);
+      Put(h.base, first_set + 12, r.Below(3));
+      Put(h.base, first_set + 52, records);
+      for (uint32_t i = 0; i < 12; i++) {
+        Put(h.base, records + 20 * i + 16, r.Below(3) == 0 ? 0 : 2);
+      }
+      Put(h.base, model + 5036, r.Below(4) == 0 ? 0 : 1);
+      Put(h.base, model + 32, r.Below(5) == 0 ? 3 : r.Below(3));
+      Put(h.base, model + 5048, scene_car);
+      Put(h.base, scene_car + 24, car);
+      const uint32_t old_header = guest::LoadU32(h.base, car + 6684);
+      PPCContext t = CallContext(h);
+      std::optional<ArchiveLoads> loads;
+      loads.emplace(std::vector<int64_t>{1, 2, -1, 4});
+      t.r3.u64 = model;
+      (v == 0 ? __imp__sub_820D9D48 : hooks::SceneModelsReloadDecals)(t, h.base);
+      const uint32_t header = guest::LoadU32(h.base, car + 6684);
+      const bool made = header != old_header;
+      const uint32_t data = guest::LoadU32(h.base, car + 6688);
+      const uint32_t bytes =
+          TextureBytes(h.base, cm::kSheetFormat, guest::LoadU32(h.base, cm::kVinylSheetWidth),
+                       guest::LoadU32(h.base, cm::kVinylSheetWidth + 4));
+      std::vector<Known> known;
+      if (made) {
+        known = {{header, 52}, {data, bytes}};
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      Addresses(out[v], h.base, block, kBlockBytes, known);
+      Addresses(out[v], h.base, model, 0x1400, known);
+      if (made) {
+        Addresses(out[v], h.base, header, 52, known);
+        out[v].Bytes(Read(h.base, data, bytes));
+      }
+      out[v].Word(uint32_t(loads->calls().size()));
+      for (const uint32_t word : loads->calls()) {
+        Address(out[v], word, known);
+      }
+      loads.reset();
+      if (made) {
+        memory::FreePages(header);
+        memory::FreePhysical(data);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  memory::Free(allocation);
+}
+
 void Vinyls(Context& h, uint32_t block) {
   TgaHeaderClears(h, block);
   Rasterizer(h, block);
@@ -2702,6 +2790,7 @@ void CarModels(Context& h) {
   if (hooks::NativeHeapActive()) {
     Exteriors(h, block);
     ReloadDecalCases(h, block);
+    SceneReloadDecalCases(h, block);
   }
   DeferReleases(h, block);
   Releases(h, block);

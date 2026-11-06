@@ -54,5 +54,17 @@ void SceneModelsPool4RecordReset(PPCContext& ctx, uint8_t* base);
 void SceneModelsSceneModelRecordReset(PPCContext& ctx, uint8_t* base);
 // sub_820C3CA0: r4 = out, r5 = the size; r3 = the pages (VirtualAlloc's).
 void SceneModelsAllocPages(PPCContext& ctx, uint8_t* base);
+// The record re-applies (src/scene_models/apply.cpp), their callees through
+// the guest (hooks::StandModelsGuestCall): SceneModel::ApplyRecord
+// sub_820DA758 (r3 a scene model; the original for the race's path, the
+// scene's +4 set), SceneModel::ReloadDecals sub_820D9D48 (r3 a scene model),
+// and, without adapters (only ApplyRecord calls them; the harness's steps),
+// SceneParts::Apply sub_820E08B0 (r3 the parts, r4 a record) and
+// SceneInterior::Apply sub_820E4258 (r3 an interior, r4 a record). Each
+// leaves r3 as the original does and lr put back.
+void SceneModelsApplyRecord(PPCContext& ctx, uint8_t* base);
+void SceneModelsReloadDecals(PPCContext& ctx, uint8_t* base);
+void SceneModelsPartsApply(PPCContext& ctx, uint8_t* base);
+void SceneModelsInteriorApply(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

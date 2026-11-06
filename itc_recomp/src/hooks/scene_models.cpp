@@ -6,6 +6,8 @@
 
 #include "base/flags.h"
 #include "hooks/heap.h"
+#include "hooks/stand_models.h"
+#include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
 
 ITC_FLAG_BOOL(native_scene_models, true, "ITC",
@@ -16,7 +18,7 @@ ITC_FLAG_BOOL(native_scene_models, true, "ITC",
               "sub_820D7EE8, the records' defaults sub_820D45B0, sub_820D3B38, CarRecord::Reset "
               "sub_820D0A98 with sub_820D0A20 (no adapter: only CarRecord::Reset calls it), sub_820D3558, sub_820D3840, sub_820D3900 and "
               "sub_820D34E0, SceneModel::Accessory sub_820D97B8, SceneModelRecord::Copy sub_820DB290, "
-              "SceneModelRecord::SceneModelRecord sub_820DB240, sub_820D34B8, SceneModelRecord::Reset sub_820D9810, and with "
+              "SceneModelRecord::SceneModelRecord sub_820DB240, sub_820D34B8, SceneModelRecord::Reset sub_820D9810, SceneModel::ApplyRecord sub_820DA758 (the original for the race's path) with SceneParts::Apply sub_820E08B0 and SceneInterior::Apply sub_820E4258 (no adapters: only it calls them), SceneModel::ReloadDecals sub_820D9D48 (their callees through their adapters; checked by --run_harnesses=load_poll and car_models), and with "
               "--native_heap the car model's pages sub_820C3CA0; in src/hooks/car_models.cpp, the second "
               "set's set-ups and ScenePools::SetUpB sub_820C5B28 (its pool 0 case sub_820C5B98 "
               "merged) with SceneCockpit::SetUp sub_820DBE80 and SceneModel::SetUp sub_820DB458 (no "
@@ -148,6 +150,46 @@ void SceneModelsAllocPages(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = sm::AllocPages(base, ctx.r4.u32, ctx.r5.u32);
 }
 
+void SceneModelsApplyRecord(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
+  const auto r3 = sm::SceneModelApplyRecord(base, call, ctx.r3.u32, ctx.r1.u32);
+  ctx.lr = lr;
+  if (!r3) {
+    __imp__sub_820DA758(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void SceneModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
+  const uint64_t r3 = sm::SceneModelReloadDecals(base, call, ctx.r3.u32, ctx.r1.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+void SceneModelsPartsApply(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
+  const uint64_t r3 = sm::ScenePartsApply(base, call, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+void SceneModelsInteriorApply(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
+  const uint64_t r3 = sm::SceneInteriorApply(base, call, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -184,6 +226,11 @@ ITC_SCENE_MODELS(820D34B8, SceneModelsCockpitRecordReset)
 ITC_SCENE_MODELS(820D9810, SceneModelsSceneModelRecordReset)
 ITC_SCENE_MODELS(820D3900, SceneModelsWheelsRecordReset)
 ITC_SCENE_MODELS(820D34E0, SceneModelsPool4RecordReset)
+ITC_SCENE_MODELS(820DA758, SceneModelsApplyRecord)
+ITC_SCENE_MODELS(820D9D48, SceneModelsReloadDecals)
+// SceneParts::Apply sub_820E08B0 and SceneInterior::Apply sub_820E4258 have
+// no adapters: only SceneModel::ApplyRecord calls them, and its plain C++
+// calls theirs (their register steps above are the harness's).
 
 // The car model's pages: only while --native_heap routes VirtualAlloc to the
 // allocation layer.
