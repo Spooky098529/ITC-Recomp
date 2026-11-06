@@ -14,6 +14,8 @@ namespace {
 constexpr uint32_t kInvalidateState = 0xC0003B00u;  // INVALIDATE_STATE, one word
 constexpr uint32_t kEventWriteShd = 0xC0025800u;    // EVENT_WRITE_SHD, three words
 constexpr uint32_t kEndMarker = 0xC0000000u;
+constexpr uint32_t kWaitRegMem = 0xC0043C01u;  // WAIT_REG_MEM, five words
+constexpr uint32_t kInterrupt = 0xC0005401u;   // INTERRUPT, one word
 
 }  // namespace
 
@@ -64,6 +66,48 @@ void CloseChain(uint8_t* base, uint32_t chain) {
   guest::StoreU32(base, block, PhysicalAddress(cursor) + kEndMarker);
   guest::StoreU32(base, guest::LoadU32(base, chain + 8), kEndMarker);
   guest::StoreU32(base, chain + 12, 0);
+}
+
+uint32_t WriteCallback(uint8_t* base, uint32_t device, uint32_t position, uint32_t flags,
+                       uint32_t function, uint32_t argument) {
+  ITC_NATIVE_RUNNING("sub_8229E9D0 Device::WriteCallback");
+  uint32_t at = position;
+  auto put = [&](uint32_t word) {
+    at += 4;
+    guest::StoreU32(base, at, word);
+  };
+  uint32_t cpus = (flags >> 24) & 0x3F;
+  if ((flags & 0xC0FFFFFFu) == 0) {
+    put(0x5C8);  // WAIT_UNTIL
+    put(0x20000);
+  }
+  put(0x1057C);  // CALLBACK_ADDRESS, CALLBACK_CONTEXT
+  put(function);
+  put(argument);
+  if (cpus == 0) {
+    cpus = 4;
+  }
+  put(0x578);  // SCRATCH_REG0
+  put(cpus);
+  put(kWaitRegMem);
+  put(19);
+  put(PhysicalAddress(guest::LoadU32(base, device + kCallbackBlock)) | 2);
+  put(cpus);
+  put(0xFFFFFFFFu);
+  put(256);
+  put(kInterrupt);
+  put(cpus);
+  put(0x45E);  // CALLBACK_ACK
+  put(cpus);
+  put(kWaitRegMem);
+  put(19);
+  put(PhysicalAddress(guest::LoadU32(base, device + kCallbackBlock)) | 2);
+  put(0);
+  put(0xFFFFFFFFu);
+  put(256);
+  put(0x57C);  // CALLBACK_ADDRESS
+  put(0x0BADF00Du);
+  return at;
 }
 
 }  // namespace graphics::command_buffer

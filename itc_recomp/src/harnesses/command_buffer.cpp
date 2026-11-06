@@ -160,6 +160,26 @@ void CommandBuffer(Context& h) {
       },
       [&](PPCContext& t) { cb::CloseChain(h.base, t.r3.u32); });
 
+  // WriteCallback: the flags the CPUs only (0 among them), with other bits,
+  // or random; the callback block anywhere (only its physical address used).
+  Run(h, b, "Device::WriteCallback (sub_8229E9D0)", __imp__sub_8229E9D0, 200,
+      [&](Random& r, PPCContext& t, int c) {
+        guest::StoreU32(h.base, b.device + cb::kCallbackBlock, ProgressAddress(b, r, false));
+        const uint32_t cpus = (c % 8 == 0) ? 0 : (uint32_t(r.Next()) & 0x3F000000u);
+        switch (c % 4) {
+          case 0: case 1: t.r5.u64 = cpus; break;
+          case 2: t.r5.u64 = cpus | (1u << r.Below(32)); break;
+          default: t.r5.u64 = uint32_t(r.Next()); break;
+        }
+        t.r3.u64 = b.device;
+        t.r4.u64 = InCommands(b, r, 4 * 32);
+        t.r6.u64 = c == 1 ? 0x822A0688u : uint32_t(r.Next());
+        t.r7.u64 = uint32_t(r.Next());
+      },
+      [&](PPCContext& t) {
+        t.r3.u64 = cb::WriteCallback(h.base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32, t.r7.u32);
+      });
+
   ITC_FLAG(native_command_buffer) = saved;
   memory::Free(b.progress);
   memory::Free(b.commands);

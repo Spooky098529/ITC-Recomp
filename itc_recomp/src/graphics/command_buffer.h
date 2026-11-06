@@ -52,4 +52,14 @@ void SaveSegment(uint8_t* base, uint32_t device);
 // the cursor the end marker 0xC0000000, and the block's end +12 is cleared.
 void CloseChain(uint8_t* base, uint32_t chain);
 
+// The callback packets (sub_8229E9D0) at `position` (pre-increment): a
+// WAIT_UNTIL first unless `flags` has bits outside the CPUs (24-29); then
+// CALLBACK_ADDRESS and CALLBACK_CONTEXT = `function`, `argument`, the CPUs
+// (0: 4) into SCRATCH_REG0, a WAIT_REG_MEM on the callback block, the
+// INTERRUPT our kick runs (src/native/gpu_link.cpp), CALLBACK_ACK, a
+// WAIT_REG_MEM for the callbacks done and CALLBACK_ADDRESS = 0BADF00D.
+// Returns the last word written.
+uint32_t WriteCallback(uint8_t* base, uint32_t device, uint32_t position, uint32_t flags,
+                       uint32_t function, uint32_t argument);
+
 }  // namespace graphics::command_buffer
