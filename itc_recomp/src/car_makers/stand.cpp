@@ -7,10 +7,12 @@
 #include "c_runtime/math.h"
 #include "car_physics/car_physics.h"
 #include "car_scene_draw/ops.h"
+#include "car_specs/car_specs.h"
 #include "debug/frame_state_diff.h"
 #include "front_end_car_draw/front_end_car_draw.h"
 #include "guest.h"
 #include "load_poll/load_poll.h"
+#include "race_setup/race_setup.h"
 #include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
 #include "ui_movies/game.h"
@@ -33,6 +35,9 @@ constexpr uint32_t kStandMovie = 6;
 constexpr uint32_t kApplyPaint = 0x820D9B68;
 constexpr uint32_t kApplyWheelPaint = 0x820D9C50;
 constexpr uint32_t kApplyRecord = 0x820DA758;
+constexpr uint32_t kStandHolder = 0x826D83E0;  // a pointer to the holder's word
+constexpr uint32_t kCarList = 0x826D83F4;      // the stand's car list (+1136, +48, +52)
+constexpr uint32_t kRefresh = 0x820C4998;
 
 // Flush-to-zero off, as the callees' plain C++ expects at entry.
 void FlushOff() {
@@ -219,6 +224,39 @@ uint64_t GarageStageSetCarClass(uint8_t* base, const front_end_car_draw::Calls& 
   const uint64_t r3 = GarageStageReapplyRecord(base, calls, apply, holder, frame, false);
   FlushOff();
   return r3;
+}
+
+uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                const scene_models::ApplyCall& apply, uint64_t pick,
+                                uint32_t stack, bool with_class, double* f1) {
+  if (with_class) {
+    ITC_NATIVE_RUNNING("sub_82182D30 GarageStage::ShowCarByIdWithClass");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82182C90 GarageStage::ShowCarById");
+  }
+  const uint32_t frame = Frame(base, stack, 4016);
+  // The stage's scene model (its answer not used).
+  const uint32_t stage = Load(base, Load(base, Load(base, kStandHolder)));
+  vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7, Load(base, stage + 8));
+  const uint32_t list = Load(base, kCarList);
+  const uint32_t index = (Load(base, list + 52) + Load(base, list + 48)) << 2;
+  const uint32_t id = Load(base, Load(base, index + Load(base, list + 1136)) + 8432);
+  const uint32_t car = frame + 80;
+  race_setup::CarInit(base, car);
+  race_setup::SetModel(base, car, id);
+  Store(base, car + 3888, Load(base, car + 3888) | 1);
+  uint32_t refreshed = 0;
+  if (!car_specs::CarRefresh(base, car, &refreshed)) {
+    const uint64_t regs[1] = {car};
+    calls.call(kRefresh, regs, 1, nullptr, 0, frame, with_class ? 0x82182DB0 : 0x82182D10,
+               nullptr);
+  }
+  FlushOff();
+  const uint32_t holder = Load(base, Load(base, kStandHolder));
+  if (with_class) {
+    return GarageStageSetCarClass(base, calls, apply, holder, car, pick, frame);
+  }
+  return GarageStageSetCar(base, calls, apply, holder, car, pick, frame, f1);
 }
 
 uint64_t ShowBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack) {

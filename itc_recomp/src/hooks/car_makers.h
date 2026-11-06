@@ -63,5 +63,11 @@ bool CarMakersSetCarCalleesNative();
 bool CarMakersSetCarClassCalleesNative();
 void CarMakersSetCar(PPCContext& ctx, uint8_t* base);
 void CarMakersSetCarClass(PPCContext& ctx, uint8_t* base);
+// GarageStage::ShowCarById sub_82182C90 and ShowCarByIdWithClass
+// sub_82182D30 (r3 the paint pick; f1 SetCar's), the originals unless
+// --native_race_setup and SetCar's (or SetCarClass') callees' flags are on.
+bool CarMakersShowCarByIdCalleesNative(bool with_class);
+void CarMakersShowCarById(PPCContext& ctx, uint8_t* base);
+void CarMakersShowCarByIdWithClass(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

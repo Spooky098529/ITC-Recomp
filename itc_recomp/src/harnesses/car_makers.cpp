@@ -447,6 +447,54 @@ uint32_t LayStandCar(uint8_t* base, uint32_t block, Random& r, int c, bool traff
   return car;
 }
 
+// For load_poll's GarageStage::ShowCarById and ShowCarByIdWithClass cases:
+// LayGarage's spec and parameters in `block` (as LayStandCar's), which
+// Car::SetModel and Car::Refresh build the frame's car from (its id kCarId),
+// the spec's block 2 words SetModel copies into the car given what
+// Vehicle::SetupFromCar and the re-applies take: the case's engine as stage
+// 0's (+980; SetModel's CarTuning::Reset leaves the stage 0), the tuning
+// words (+772 to
+// +792) 0, the tires (+884 to +896) LayGarage's types and grades (their
+// copies in the spec), the five choices' c (+900 + 8k) 0 (the interior's
+// gauges clear); the stand's car list (`list`: its +1136 array, the entry
+// +48 + +52 one whose +8432 is kCarId) and the holder's word (`holder_word`
+// holding `holder`). The caller points [0x826C2E48] at `params`,
+// [0x826D83E0] at `holder_word` and [0x826D83F4] at `list`.
+// (The same definition is in load_poll.cpp.)
+struct StandWorld {
+  uint32_t params, holder_word, list;
+};
+StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint32_t holder) {
+  LayGarage(base, block, r, c);
+  const uint32_t car = block + kGarageCar, spec = block + kSpec;
+  // The engine stage SetModel leaves (0): the case's engine there too.
+  Write(base, spec + 980, Read(base, car + 2880, 204).data(), 204);
+  for (uint32_t at = 772; at <= 792; at += 4) {
+    guest::StoreU32(base, spec + at, 0);
+  }
+  guest::StoreU32(base, spec + 884, guest::LoadU32(base, car + 1712));
+  guest::StoreU32(base, spec + 888, guest::LoadU32(base, car + 1716));
+  guest::StoreU32(base, spec + 892, guest::LoadU32(base, car + 1720));
+  guest::StoreU32(base, spec + 896, guest::LoadU32(base, car + 1724));
+  for (uint32_t k = 0; k < 5; k++) {
+    guest::StoreU32(base, spec + 900 + 8 * k, 0);
+    guest::StoreU32(base, spec + 904 + 8 * k, r.Below(9));
+  }
+  StandWorld world;
+  world.params = block + kGarageParams;
+  world.holder_word = block + 0xCF00;
+  world.list = block + 0xD000;
+  guest::StoreU32(base, world.holder_word, holder);
+  const uint32_t array = block + 0xD800, entry = block + 0xC400;
+  const uint32_t a = r.Below(4), b = r.Below(4);
+  guest::StoreU32(base, world.list + 48, a);
+  guest::StoreU32(base, world.list + 52, b);
+  guest::StoreU32(base, world.list + 1136, array);
+  guest::StoreU32(base, array + 4 * (a + b), entry);
+  guest::StoreU32(base, entry + 8432, kCarId);
+  return world;
+}
+
 namespace {
 
 // The race data (its own block): zeroed, a few racers already added.

@@ -1105,6 +1105,16 @@ void Applies(Context& h, Random& r, uint32_t block) {
 // (harness::ArchiveLoads). The block (the new vinyl sheet's header and data
 // by their offsets in them), the sheet's header and data, the loads asked
 // for and r3. Only in the front end: the harness is their check.
+// GarageStage::SetCar and SetCarClass, their callers in the same world: a
+// car object for SceneModelRecord::FromCar first (car_makers.cpp's
+// LayStandCar, in a block of its own, compared too) and the paint pick;
+// SetCar's stage sizes (FitCar's) as floats. GarageStage::ShowCarById and
+// ShowCarByIdWithClass, theirs: the car made in the frame from its id
+// (car_makers.cpp's LayShowCarWorld: the spec Car::SetModel and
+// Car::Refresh read, the stand's car list [0x826D83F4], the holder's word
+// [0x826D83E0], the parameters [0x826C2E48], all put back after), the rand
+// seed (SetModel's) and the frame's car (but the original's register
+// saves at its end) compared.
 void DecalIds(uint8_t* base, uint32_t records, Random& r) {
   for (uint32_t i = 0; i < 6; i++) {
     Put(base, records + 64 * i, r.Below(3) == 0 ? uint32_t(-1 - int32_t(r.Below(4))) : r.Below(26));
@@ -1144,6 +1154,11 @@ void Addresses(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
 }  // namespace
 
 uint32_t LayStandCar(uint8_t* base, uint32_t block, Random& r, int c, bool traffic);
+// (The same definition is in car_makers.cpp.)
+struct StandWorld {
+  uint32_t params, holder_word, list;
+};
+StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint32_t holder);
 
 namespace {
 
@@ -1156,6 +1171,8 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
     const char* name;
     GuestFunction recompiled, native;
     bool set_car;  // SetCar or SetCarClass: a car object for FromCar first
+    bool show_car = false;  // ShowCarById or WithClass: the car made from its id
+    bool with_class = false;
   };
   const Reapply reapplies[] = {
       {"GarageStage::ReapplyRecord (sub_82178DF8)", __imp__sub_82178DF8,
@@ -1164,25 +1181,39 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
        hooks::CarMakersReapplyRecordNoDecals, false},
       {"GarageStage::SetCar (sub_8217FD58)", __imp__sub_8217FD58, hooks::CarMakersSetCar, true},
       {"GarageStage::SetCarClass (sub_8217FDC8)", __imp__sub_8217FDC8,
-       hooks::CarMakersSetCarClass, true},
+       hooks::CarMakersSetCarClass, true, false, true},
+      {"GarageStage::ShowCarById (sub_82182C90)", __imp__sub_82182C90,
+       hooks::CarMakersShowCarById, false, true, false},
+      {"GarageStage::ShowCarByIdWithClass (sub_82182D30)", __imp__sub_82182D30,
+       hooks::CarMakersShowCarByIdWithClass, false, true, true},
   };
+  constexpr uint32_t kParamsGlobal = 0x826C2E48, kHolderGlobal = 0x826D83E0,
+                     kCarListGlobal = 0x826D83F4, kRandSeed = 0x82638188;
   const uint32_t model = block + kObject, car = block + kCar;
   // SetCar's and SetCarClass' car object, in a block of its own
   // (car_makers.cpp's LayStandCar), and FitCar's deeper frames.
   constexpr uint32_t kCarBlockBytes = 0x10000, kSetCarStackBytes = 0x3000;
+  constexpr uint32_t kShowCarStackBytes = 0x4000;
   const uint32_t car_allocation = memory::Alloc(kCarBlockBytes + 16, 0);
   const uint32_t car_block = (car_allocation + 15) & ~15u;
   for (const Reapply& reapply : reapplies) {
-    if (reapply.set_car && (reapply.native == hooks::CarMakersSetCar
-                                ? !hooks::CarMakersSetCarCalleesNative()
-                                : !hooks::CarMakersSetCarClassCalleesNative())) {
+    const bool callees =
+        reapply.show_car ? hooks::CarMakersShowCarByIdCalleesNative(reapply.with_class)
+        : reapply.set_car
+            ? (reapply.with_class ? hooks::CarMakersSetCarClassCalleesNative()
+                                  : hooks::CarMakersSetCarCalleesNative())
+            : true;
+    if (!callees) {
       ITC_LOG_WARN("harness: load_poll: {} skipped (its callees' plain C++ isn't native)",
                    reapply.name);
       continue;
     }
     Results results(reapply.name);
     int ready = 0, sheets = 0;
-    const uint32_t stack_bytes = reapply.set_car ? kSetCarStackBytes : kStackBytes;
+    const bool car_world = reapply.set_car || reapply.show_car;
+    const uint32_t stack_bytes = reapply.show_car ? kShowCarStackBytes
+                                 : reapply.set_car ? kSetCarStackBytes
+                                                   : kStackBytes;
     for (int c = 0; c < 32; c++) {
       PPCContext start = CallContext(h);
       start.r1.u64 &= ~0xFull;
@@ -1263,14 +1294,24 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
       Put(h.base, model + 16, 3);
       start.r3.u64 = block + kHolder;
       std::vector<uint8_t> car_inputs;
-      if (reapply.set_car) {
+      StandWorld show{};
+      if (car_world) {
         RandomBytes(h.base, car_block, kCarBlockBytes, r);
-        start.r4.u64 = LayStandCar(h.base, car_block, r, c, traffic);
         const uint64_t picks[] = {0xFFFFFFFFFFFFFFFFull, 0xFFFFFFFFFFFFFFFEull, r.Below(6),
                                   r.Below(6), (r.Next() << 32) | r.Below(6)};
-        start.r5.u64 = picks[r.Below(5)];
+        if (reapply.show_car) {
+          show = LayShowCarWorld(h.base, car_block, r, c, block + kHolder);
+          start.r3.u64 = picks[r.Below(5)];
+        } else {
+          start.r4.u64 = LayStandCar(h.base, car_block, r, c, traffic);
+          start.r5.u64 = picks[r.Below(5)];
+        }
         car_inputs = Read(h.base, car_block, kCarBlockBytes);
       }
+      const uint32_t saved_params = guest::LoadU32(h.base, kParamsGlobal);
+      const uint32_t saved_holder = guest::LoadU32(h.base, kHolderGlobal);
+      const uint32_t saved_list = guest::LoadU32(h.base, kCarListGlobal);
+      const uint32_t saved_seed = guest::LoadU32(h.base, kRandSeed);
 
       const std::vector<uint8_t> inputs = Read(h.base, block, kBlockBytes);
       const std::vector<uint8_t> frames = Read(h.base, stack, stack_bytes + kArgBytes);
@@ -1281,8 +1322,14 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
       for (int v = 0; v < 2; v++) {
         Write(h.base, block, inputs.data(), kBlockBytes);
         Write(h.base, stack, frames.data(), stack_bytes + kArgBytes);
-        if (reapply.set_car) {
+        if (car_world) {
           Write(h.base, car_block, car_inputs.data(), kCarBlockBytes);
+        }
+        if (reapply.show_car) {
+          Put(h.base, kParamsGlobal, show.params);
+          Put(h.base, kHolderGlobal, show.holder_word);
+          Put(h.base, kCarListGlobal, show.list);
+          Put(h.base, kRandSeed, saved_seed);
         }
         Put(h.base, kSceneGlobal, block + kScene);
         Put(h.base, kAccessoriesGlobal, accessories);
@@ -1292,6 +1339,13 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
         (v == 0 ? reapply.recompiled : reapply.native)(t, h.base);
         Put(h.base, kSceneGlobal, saved_scene);
         Put(h.base, kAccessoriesGlobal, saved_accessories);
+        const uint32_t seed_left = guest::LoadU32(h.base, kRandSeed);
+        if (reapply.show_car) {
+          Put(h.base, kParamsGlobal, saved_params);
+          Put(h.base, kHolderGlobal, saved_holder);
+          Put(h.base, kCarListGlobal, saved_list);
+          Put(h.base, kRandSeed, saved_seed);
+        }
         const uint32_t header = guest::LoadU32(h.base, car + 6684);
         const bool made = header != old_header;
         const uint32_t data = guest::LoadU32(h.base, car + 6688);
@@ -1308,7 +1362,7 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
         }
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
-        if (reapply.set_car) {
+        if (reapply.set_car || (reapply.show_car && !reapply.with_class)) {
           // FitCar's stage sizes (+6096 to +6204) as floats.
           const uint32_t sizes = block + kStage + 6096;
           Addresses(out[v], h.base, block, sizes - block, known);
@@ -1317,9 +1371,20 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
         } else {
           Addresses(out[v], h.base, block, kBlockBytes, known);
         }
-        if (reapply.set_car) {
+        if (car_world) {
           // The car object's block (FitCar's SetupFromCar may write the car).
           out[v].Bytes(Read(h.base, car_block, kCarBlockBytes));
+        }
+        if (reapply.show_car) {
+          // The rand seed Car::SetModel moves; the frame's car (frame + 80)
+          // up to the original's register saves (its last 32 bytes, r1 - 32
+          // to r1, which the native version doesn't write), its float blocks
+          // (+1888 to +3884) as floats, the rest exactly.
+          out[v].Word(seed_left);
+          const uint32_t frame_car = start.r1.u32 - 4016 + 80;
+          out[v].Bytes(Read(h.base, frame_car, 1888));
+          out[v].Floats(h.base, frame_car + 1888, (3884 - 1888) / 4);
+          out[v].Bytes(Read(h.base, frame_car + 3884, 4016 - 80 - 32 - 3884));
         }
         if (made) {
           Addresses(out[v], h.base, header, 52, known);

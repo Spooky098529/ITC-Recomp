@@ -161,6 +161,18 @@ uint64_t GarageStageSetCar(uint8_t* base, const front_end_car_draw::Calls& calls
 uint64_t GarageStageSetCarClass(uint8_t* base, const front_end_car_draw::Calls& calls,
                                 const scene_models::ApplyCall& apply, uint32_t holder,
                                 uint32_t car, uint64_t pick, uint32_t stack);
+// GarageStage::ShowCarById (sub_82182C90) and ShowCarByIdWithClass
+// (sub_82182D30, `with_class`): r3 = the paint pick (all 64 bits). Their
+// 4,016-byte frame below `stack`: ScenePools::GetB on the stage's index
+// (its answer not used), the car id from the stand's car list [0x826D83F4]
+// (its +1136 array's entry +48 + +52, that entry's +8432), a car object at
+// frame + 80 (Car::Init, Car::SetModel(car, id), its +3888 |= 1,
+// Car::Refresh, its original through `calls` where it declines), then
+// GarageStage::SetCar([[0x826D83E0]], car, pick) (`f1` gets what it leaves)
+// or SetCarClass. Returns its r3.
+uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& calls,
+                                const scene_models::ApplyCall& apply, uint64_t pick,
+                                uint32_t stack, bool with_class, double* f1);
 // sub_8219ED10 and sub_8219EDB0 (the stand's busy marker shown and hidden,
 // probably): movie 6 (UiMovies::Find with the id at frame + 80, the
 // 112-byte frame below `stack`), then its named animations through their
