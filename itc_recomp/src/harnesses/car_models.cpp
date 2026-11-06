@@ -2298,7 +2298,8 @@ void ScenePoolsSetUps(Context& h) {
 }
 
 // The second set's set-ups (SceneCarModel::SetUp, SceneParts::SetUp, pool
-// 4's, SceneTraffic::SetUp and the wheels'): a 192 KB block of random bytes
+// 4's, SceneInterior::SetUp (with CarInterior::Load's world as its own
+// cases make it), SceneTraffic::SetUp and the wheels'): a 192 KB block of random bytes
 // holding the first set of pools ([0x826C2E40] pointed at it: each pool's
 // list one node, the first-set object, free (claimed, then set up) or in
 // use (the claim fails, GetA answers it anyway: List::At's past-the-end
@@ -2321,6 +2322,7 @@ void SecondSetUps(Context& h) {
   const uint32_t block = (allocation + 15) & ~15u;
   SavedWord scene(h.base, cm::kSceneSet);
   SavedWord first_set(h.base, cm::kFirstSet);
+  SavedWord accessories(h.base, scene_models::kAccessories);
   const uint32_t pools = block + 0x100, car = block + 0x200, sets = block + 0x300;
   const uint32_t first = block + 0x1000, shared = block + 0x1B000 - cm::kSharedBuffer;
   const uint32_t object = block + 0x1C000, record = block + 0x22000;
@@ -2336,6 +2338,7 @@ void SecondSetUps(Context& h) {
       {"SceneCarModel::SetUp (sub_820DB818)", 0, __imp__sub_820DB818, cm::SceneCarModelSetUp},
       {"SceneParts::SetUp (sub_820DF1D0)", 1, __imp__sub_820DF1D0, cm::ScenePartsSetUp},
       {"ScenePool4::SetUp (sub_820DCAA0)", 4, __imp__sub_820DCAA0, cm::ScenePool4SetUp},
+      {"SceneInterior::SetUp (sub_820E37F0)", 3, __imp__sub_820E37F0, cm::SceneInteriorSetUp},
       {"SceneTraffic::SetUp (sub_820E5998)", 6, __imp__sub_820E5998, cm::SceneTrafficSetUp},
       {"SceneWheels::SetUp (sub_820E70C0)", 5, __imp__sub_820E70C0, cm::SceneWheelsSetUp},
   };
@@ -2402,6 +2405,20 @@ void SecondSetUps(Context& h) {
         const bool traffic_wheels = setup.pool == 5 && guest::LoadU32(h.base, record) == 3 &&
                                     guest::LoadU32(h.base, record + 68) == 0;
         Put(h.base, object + 24, traffic_wheels && r.Below(2) == 0 ? 0 : car_model);
+        if (setup.pool == 3) {
+          // CarInterior::Load's world as its own cases make it: the
+          // accessories' set a stand-in whose slot +4 is sub_822A8C18, the
+          // model set 0, 1 or another, the cockpit flags.
+          const uint32_t stand_in = block + 0x24200;
+          guest::StoreU32(h.base, scene_models::kAccessories, stand_in);
+          Put(h.base, stand_in, block + 0x24600);
+          Put(h.base, block + 0x24604, 0x822A8C18);
+          Put(h.base, first + 3092, block + 0x24700);
+          const uint32_t k = r.Below(4);
+          Put(h.base, block + 0x24708, k < 2 ? k : k == 2 ? 2 + r.Below(4) : uint32_t(r.Next()));
+          Put(h.base, first + 3088, r.Below(2) == 0 ? 0 : 1);
+          Put(h.base, object + 11656, r.Below(2) == 0 ? 0 : 1 + r.Below(3));
+        }
         Put(h.base, car_model + 24, car);
         t.r3.u64 = object;
         t.r4.u64 = record;

@@ -418,6 +418,7 @@ void SecondSetUp(PPCContext& ctx, uint8_t* base,
 ITC_SECOND_SET_UP(820DB818, SceneCarModelSetUp)
 ITC_SECOND_SET_UP(820DF1D0, ScenePartsSetUp)
 ITC_SECOND_SET_UP(820DCAA0, ScenePool4SetUp)
+ITC_SECOND_SET_UP(820E37F0, SceneInteriorSetUp)
 ITC_SECOND_SET_UP(820E5998, SceneTrafficSetUp)
 ITC_SECOND_SET_UP(820E70C0, SceneWheelsSetUp)
 

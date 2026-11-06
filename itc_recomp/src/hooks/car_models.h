@@ -112,7 +112,7 @@ void CarModelsOnDecalLoaded(PPCContext& ctx, uint8_t* base);
 void ScenePoolsSetUp(PPCContext& ctx, uint8_t* base);
 
 // The second set's set-ups (sub_820DB818, sub_820DF1D0, sub_820DCAA0,
-// sub_820E5998, sub_820E70C0): r3 = the object, r4 = the record; `setup`'s
+// sub_820E37F0, sub_820E5998, sub_820E70C0): r3 = the object, r4 = the record; `setup`'s
 // plain C++ (ScenePools::SetUp's fields as its adapter passes them, guest
 // calls from the frames below ctx.r1), or `original` where it declines.
 void SecondSetUp(PPCContext& ctx, uint8_t* base,

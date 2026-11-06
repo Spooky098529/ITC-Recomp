@@ -416,6 +416,29 @@ std::optional<uint32_t> ScenePool4SetUp(uint8_t* base, uint32_t object, uint32_t
   return ClaimLinkSetUp(base, object, 4, 28, object + 32, frame, setups);
 }
 
+std::optional<uint32_t> SceneInteriorSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                           uint32_t stack, const SecondSetUps& setups) {
+  ITC_NATIVE_RUNNING("sub_820E37F0 SceneInterior::SetUp");
+  namespace va = vehicle_accessors;
+  const uint32_t pools = Load(base, kFirstSet);
+  Store(base, object + 11668, Load(base, kSceneSet));
+  if (!native::Buffers_Memcpy(base, object + 40, record, 120, 0x820E3824)) {
+    return std::nullopt;
+  }
+  const uint32_t frame = stack - 128;
+  Store(base, frame, stack);
+  const uint32_t index = uint32_t(va::ScenePoolsClaimA(base, pools, 3));
+  const uint32_t first = va::ScenePoolsGetA(base, pools, 3, index);
+  Store(base, object + 36, first);
+  if (Load(base, object + 11656) != 0) {
+    Store(base, first + 3088, 1);
+  }
+  Store(base, Load(base, object + 36) + 24, Load(base, Load(base, object + 24) + 24));
+  const uint32_t r3 = SetUpFirst(base, pools, 3, index, object + 40, frame, setups);
+  Store(base, object + 36, r3);
+  return r3;
+}
+
 std::optional<uint32_t> SceneTrafficSetUp(uint8_t* base, uint32_t object, uint32_t record,
                                           uint32_t stack, const SecondSetUps& setups) {
   ITC_NATIVE_RUNNING("sub_820E5998 SceneTraffic::SetUp");

@@ -204,6 +204,13 @@ std::optional<uint32_t> ScenePartsSetUp(uint8_t* base, uint32_t object, uint32_t
 // pool 4, the object at +28.
 std::optional<uint32_t> ScenePool4SetUp(uint8_t* base, uint32_t object, uint32_t record,
                                         uint32_t stack, const SecondSetUps& setups);
+// SceneInterior::SetUp (sub_820E37F0): +11668 = the scene, the 120-byte
+// record copied to +40 (memcpy), pool 3 claimed into +36, its +3088 = 1 when
+// +11656 isn't 0 (the cockpit), its +24 = the car model's, set up with +40
+// (CarInterior::Load, through the guest as ScenePools::SetUp always calls
+// it); +36 = the set-up's object. 128-byte frame.
+std::optional<uint32_t> SceneInteriorSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                           uint32_t stack, const SecondSetUps& setups);
 // SceneTraffic::SetUp (sub_820E5998): +9796 = the scene, the 3,696-byte
 // record copied to +32 (memcpy), pool 6 claimed into +9760 and set up with
 // `record` (the caller's); the set-up's object not stored. 128-byte frame.
