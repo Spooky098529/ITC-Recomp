@@ -645,7 +645,7 @@ void PhysicalCases(Context& h) {
     return;
   }
   const uint32_t saved = guest::LoadU32(h.base, cs::kPhysicalHeld);
-  std::vector<uint32_t> sizes = {1, 248, 272, 4095, 4096, 4097, 65536, 100000, 0x1D8000};
+  std::vector<uint32_t> sizes = {0, 1, 248, 272, 4095, 4096, 4097, 65536, 100000, 0x1D8000};
   for (int i = 0; i < 24; i++) {
     sizes.push_back(1 + r.Below(i < 16 ? 0x20000 : 0x400000));
   }

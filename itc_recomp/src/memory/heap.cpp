@@ -349,8 +349,10 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
     OutOfMemory("physical memory", size);
   }
   {
+    // The region's size as the SDK's heap made it (rex::round_up gives a
+    // size of 0 one page): what MmQueryAllocationSize answers.
     std::lock_guard lock(mutex);
-    physical_sizes[address] = rounded_size;
+    physical_sizes[address] = std::max(rounded_size, page_size);
   }
   return address;
 }

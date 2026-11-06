@@ -9,6 +9,7 @@
 #include "harness.h"
 
 #include "hooks/heap.h"
+#include "memory/heap.h"
 
 #include <algorithm>
 #include <initializer_list>
@@ -198,13 +199,13 @@ void PhysicalCases(Context& h) {
   results.Report();
 }
 
-// XPhysicalSize (sub_822965C0): blocks from the layer (XPhysicalAlloc's and
-// XPhysicalAllocEx's adapters), their size asked of the SDK's import through
-// the original and of the layer through the adapter.
+// XPhysicalSize (sub_822965C0): blocks from the layer (XPhysicalAlloc's
+// adapter), their size asked of the SDK's import through the original and of
+// the layer (memory::PhysicalSize).
 void PhysicalSizeCases(Context& h) {
   Results results("heap: XPhysicalSize");
   Random random(0x5851A3E7u);
-  std::vector<uint32_t> sizes = {1, 4095, 4096, 4097, 0x10000, 0x10001, 100000, 248, 272 * 7,
+  std::vector<uint32_t> sizes = {0, 1, 4095, 4096, 4097, 0x10000, 0x10001, 100000, 248, 272 * 7,
                                  0x1D8000};
   for (int i = 0; i < 30; i++) {
     sizes.push_back(1 + random.Below(i < 20 ? 0x40000 : 0x400000));
@@ -218,7 +219,7 @@ void PhysicalSizeCases(Context& h) {
         }
         Outputs out[2];
         out[0].Word(Call(h, __imp__sub_822965C0, {p}));
-        out[1].Word(Call(h, sub_822965C0, {p}));
+        out[1].Word(memory::PhysicalSize(p));
         results.Check(out[0], out[1],
                       fmt::format("XPhysicalSize size {} alignment {:#x} protection {:#x}", size,
                                   alignment, protection));
