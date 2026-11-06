@@ -40,7 +40,10 @@ file's history. What's left to see in a drive, from every run:
   set-ups and `SceneInterior::SetUp`; races 38 and 36 s, 0 errors, all
   harnesses 0 differing; no subagents); left: `Scenery::Update` (ready,
   its harness needs enabled camera passes: its row) and `sub_820C5B98`
-  (SetUpB's pool 0 case). Validation agent running.
+  (SetUpB's pool 0 case). Validated `itc_3722` (race 39 s, the
+  harnesses ~80 s of the 120; 0 errors, every harness 0 differing, 13 of
+  13 harness lines, all 13 ran in the race; none to drive). Third
+  migration agent running (`Scenery::Update`, `sub_820C5B98`).
 
 ## Done
 
@@ -67,3 +70,4 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3702`): ours 4264, work left 2147.
 - After its second migration: ours 4277, work left 2134 (wrapped 57,
   known 447, unknown 1630).
+- After its validation (`itc_3722`): ours 4277, work left 2134.
