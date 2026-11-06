@@ -298,5 +298,7 @@ void MenuHelpers(Context& h);
 void RaceUpdate(Context& h);
 // The car objects' makers (src/harnesses/car_makers.cpp).
 void CarMakers(Context& h);
+// The stand's scene model holders (src/harnesses/stand_models.cpp).
+void StandModels(Context& h);
 
 }  // namespace harness

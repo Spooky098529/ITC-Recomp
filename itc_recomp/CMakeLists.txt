@@ -401,6 +401,8 @@ set(ITC_SOURCES
     src/menu_helpers/menu_helpers.cpp
     src/hooks/race_update.cpp
     src/race_update/race_update.cpp
+    src/hooks/stand_models.cpp
+    src/stand_models/setters.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp
@@ -593,6 +595,7 @@ set(ITC_SOURCES
     src/harnesses/power_graph.cpp
     src/harnesses/menu_helpers.cpp
     src/harnesses/race_update.cpp
+    src/harnesses/stand_models.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
@@ -742,6 +745,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_states/route_distance.cpp
     src/race_scene/race_scene.cpp
     src/race_update/race_update.cpp
+    src/stand_models/setters.cpp
     src/menu_sounds/menu_sounds.cpp
     src/race_sounds/race_sounds.cpp
     src/race_sounds/race_sounds_cars.cpp
