@@ -286,6 +286,8 @@ void SingleCommands(Context& h);
 void PredicatedTiling(Context& h);
 // The front end's power graph (src/harnesses/power_graph.cpp).
 void PowerGraph(Context& h);
+// The front end's menu helpers (src/harnesses/menu_helpers.cpp).
+void MenuHelpers(Context& h);
 // The car objects' makers (src/harnesses/car_makers.cpp).
 void CarMakers(Context& h);
 

@@ -397,6 +397,8 @@ set(ITC_SOURCES
     src/car_makers/record.cpp
     src/car_makers/garage.cpp
     src/car_makers/stand.cpp
+    src/hooks/menu_helpers.cpp
+    src/menu_helpers/menu_helpers.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp
@@ -587,6 +589,7 @@ set(ITC_SOURCES
     src/harnesses/single_commands.cpp
     src/harnesses/predicated_tiling.cpp
     src/harnesses/power_graph.cpp
+    src/harnesses/menu_helpers.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
