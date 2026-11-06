@@ -283,6 +283,60 @@ void CommandBuffer(Context& h) {
       },
       [&](PPCContext& t) { t.r3.u64 = cb::Reserve(h.base, t.r3.u32, t.r4.u32, t.r5.u32); });
 
+  // WriteDefaultDrawRegisters without its packets: the device (the dirty
+  // marks), the progress block and the scratch area must match; the
+  // command words and r3 (the position after them) are their own group,
+  // expected to differ: the 15 words nothing reads aren't written (the
+  // graphics rule, as Device::SetDefaultState's packets in device_state).
+  {
+    Results results("Device::WriteDefaultDrawRegisters (sub_822AF978)");
+    Results packets("Device::WriteDefaultDrawRegisters (sub_822AF978): its packets and r3 "
+                    "(expected to differ)");
+    for (int c = 0; c < 100; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      Outputs words[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        Fill(h.base, h.data, kScratchBytes);
+        RandomWords(h.base, b.device, kDeviceBytes, r);
+        RandomWords(h.base, b.commands, kCommandBytes, r);
+        RandomWords(h.base, b.progress, kProgressBytes, r);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = b.device;
+        t.r4.u64 = InCommands(b, r, 64);
+        ITC_FLAG(native_command_buffer) = v != 0;
+        if (v == 0) {
+          __imp__sub_822AF978(t, h.base);
+        } else {
+          t.r3.u64 = cb::WriteDefaultDrawRegisters(h.base, t.r3.u32, t.r4.u32);
+        }
+        out[v].Bytes(Read(h.base, b.device, kDeviceBytes));
+        out[v].Bytes(Read(h.base, b.progress, kProgressBytes));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        words[v].Bytes(Read(h.base, b.commands, kCommandBytes));
+        words[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+      packets.Check(words[0], words[1], fmt::format("case {}", c));
+    }
+    results.Report();
+    packets.Report();
+  }
+
+  // The data cache flush, dropped: the original leaves r3 and writes only
+  // below its stack pointer (the call's stack, not compared), so the
+  // scratch area, the blocks and r3 match a call that does nothing. r3 the
+  // start, r4 the end; the ranges small (the original steps through every
+  // 128-byte line), and the
+  // addresses it returns at once for (0x7F100000-0x86FFFFFF) among them.
+  Run(h, b, "Data cache flush (sub_822AC470), dropped", __imp__sub_822AC470, 100,
+      [&](Random& r, PPCContext& t, int c) {
+        t.r3.u64 = c % 4 == 0 ? 0x7F100000u + r.Below(0x7F00000) : uint32_t(r.Next());
+        t.r4.u64 = t.r3.u32 + r.Below(0x10000);  // the range's end
+      },
+      [&](PPCContext&) {});
+
   ITC_FLAG(native_command_buffer) = saved;
   memory::Free(b.progress);
   memory::Free(b.commands);

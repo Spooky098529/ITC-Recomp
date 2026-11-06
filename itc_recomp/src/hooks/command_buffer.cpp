@@ -13,7 +13,10 @@ ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "Device::WriteSegmentTail sub_8229E768, Device::SaveSegment sub_8229DBF0, "
               "CommandChain::Close sub_8229DFB8, Device::WriteCallback sub_8229E9D0, "
               "Device::NextSpace sub_8229E100 (its wait for the GPU, sub_8229DC28, dropped), "
-              "Device::AllocateFromCommandBuffer sub_8229E308) "
+              "Device::AllocateFromCommandBuffer sub_8229E308, "
+              "Device::WriteDefaultDrawRegisters sub_822AF978 without its packets; the "
+              "coherency flush packets sub_8229E5D0 and the data cache flush sub_822AC470 "
+              "dropped) "
               "natively instead of through the translated code (the same results; checked by "
               "--run_harnesses=command_buffer).");
 
@@ -54,3 +57,34 @@ ITC_COMMAND_BUFFER(8229E308, {
   }
   ctx.r3.u64 = cb::Reserve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 })
+ITC_COMMAND_BUFFER(822AF978,
+                   ctx.r3.u64 = cb::WriteDefaultDrawRegisters(base, ctx.r3.u32, ctx.r4.u32))
+
+// Device::WriteFlushPackets (sub_8229E5D0): Dropped. Its block only made the
+// GPU flush caches for memory the CPU wrote (COHER_* registers and a
+// WAIT_REG_MEM on them), which our kick doesn't act on
+// (src/native/gpu_link.cpp: waits have no effect, and those registers are
+// read by nothing); the graphics rule on cache flushes (2026-10-24,
+// graphics-resources.md). Answers "no block" (r5's word 0, r4's left
+// alone), as the original does when there's nothing to flush, so its callers
+// (sub_8229EF48, the tiling worker sub_822B6BF8) kick none. The pending
+// range it took (sub_8229DE48) has had no writer in play since
+// Resource::Lock is native.
+extern "C" REX_FUNC(sub_8229E5D0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_command_buffer)) {
+    __imp__sub_8229E5D0(ctx, base);
+    return;
+  }
+  guest::StoreU32(base, ctx.r5.u32, 0);
+}
+
+// The data cache flush (sub_822AC470): Dropped (no data cache to flush on
+// PC, the user's call, 2026-10-24, as Resource::Unlock leaves it out). Its
+// translation writes only its own stack and leaves r3; so does this.
+extern "C" REX_FUNC(sub_822AC470) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_command_buffer)) {
+    __imp__sub_822AC470(ctx, base);
+  }
+}

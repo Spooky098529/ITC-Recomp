@@ -97,4 +97,14 @@ uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t& size
 // original. The inline vertices' space (BeginVertices) comes from here.
 uint32_t Reserve(uint8_t* base, uint32_t device, uint32_t words, uint32_t alignment);
 
+// Device::WriteDefaultDrawRegisters (sub_822AF978) without its packets
+// (the default vertex index range, clip, scissor-mode and viewport
+// transform controls, the AA mask and the bin mask: 15 words nothing reads,
+// as our renderer takes the registers from the shadow, not the command
+// buffer; the graphics rule, as Device::SetDefaultState's, 2026-10-24): the
+// registers they overwrote marked dirty as the original does (+24
+// 0x400000, 0x200000 and 0x2000000, +16 0xE0, +32 0x80000), so the next
+// draw writes them from the shadow. Returns `position` (no words written).
+uint32_t WriteDefaultDrawRegisters(uint8_t* base, uint32_t device, uint32_t position);
+
 }  // namespace graphics::command_buffer

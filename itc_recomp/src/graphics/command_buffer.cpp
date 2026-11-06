@@ -221,4 +221,16 @@ uint32_t Reserve(uint8_t* base, uint32_t device, uint32_t words, uint32_t alignm
   return space;
 }
 
+uint32_t WriteDefaultDrawRegisters(uint8_t* base, uint32_t device, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_822AF978 Device::WriteDefaultDrawRegisters");
+  auto mark = [&](uint32_t field, uint64_t bits) {
+    REX_STORE_U64(device + field, REX_LOAD_U64(device + field) | bits);
+  };
+  mark(24, 0x400000 | 0x200000);
+  mark(16, 0x80 | 0x40 | 0x20);
+  mark(32, 0x80000);
+  mark(24, 0x2000000);
+  return position;
+}
+
 }  // namespace graphics::command_buffer
