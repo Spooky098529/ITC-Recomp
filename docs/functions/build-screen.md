@@ -70,8 +70,9 @@ Shared, with rows elsewhere: `UiMovies::Find`, `UiMovie::Run`,
 (`GarageStage::SetDark`, `GarageLights::SetMode`) and six UI movie text
 helpers given a node (`sub_8211C370`, `sub_8211C3F8`, `sub_8211C680`,
 `sub_821087D8`, `sub_8211CCC0`, `sub_8211CD28`) have their rows here, as
-nothing else maps them yet. Nothing in `itc_recomp/src` overrides or
-wraps any function here (checked 2026-11-06).
+nothing else maps them yet. Before the migration nothing in
+`itc_recomp/src` overrode or wrapped any function here (checked
+2026-11-06).
 
 Read by the B7 loop's mapping agent (2026-11-06) from the lead of the
 21 transitions, with no subagents: every function here in full (the six
@@ -108,6 +109,25 @@ unseen `sub_8219F520`, `sub_821A0B38`) wait with it. Outside callers:
 `sub_8217D0C8` by its exit `sub_8219C3A8` (the lead), so both keep
 adapters until those are ours. Nothing here needs a call the user
 hasn't made.
+
+Migrated by the B7 loop's migration agent (2026-11-06, five batches, no
+subagents): plain C++ in `itc_recomp/src/build_screen/` (`lists.cpp`,
+`rows.cpp`, `builds.cpp`, `transitions.cpp`) behind `--native_build_screen`
+(adapters `src/hooks/build_screen.cpp`), the six UI movie text helpers in
+`src/ui_movies/objects.cpp` behind `--native_ui_movies_game`; harnesses
+`build_screen` (a world of its own: the screen data with every build
+list's links and slots in range, the menu lists, 64 build records, movie 6
+over a pool of 40 `TXT` nodes, a string table of our own whose 8,192 ids
+all have strings without argument codes, the text records GetText makes
+compared and freed, UiMovie::Run's update stood in for) and
+`ui_movie_objects`. MenuList::Init, the UI movie animation calls and the
+text setters run through their overrides; SetText's and SetNodeText's
+unset varargs pass 0 (the user's call, 2026-10-30), their parameter areas
+left out of the comparison. Left after the fifth batch, ready: the
+details level (`sub_8219FEC8` with `ShowDetails`, `SetUpDetails`),
+`RestoreStand` and `BackToStand`, `ChangeCategory`, `SetUpGroups`,
+`OpenBuilds`, `BackToBuilds`, and `scene.md`'s `sub_820C5798`,
+`sub_820C5A60`; still blocked: `PutOnStand` and what's above it.
 
 Status:
 
