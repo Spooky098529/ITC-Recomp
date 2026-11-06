@@ -10,7 +10,10 @@ course's shared set and `Scenery::IsLoaded` is polled until it's in. It's
 made, set up, loaded and freed by the race's code (`sub_8215B790`,
 `sub_8215AA88`, `sub_821514A0`, `sub_821516F0`) and by the front end's
 (`sub_82227A50`, `sub_8222C300`, `sub_82228548`, `sub_82229678`,
-`sub_82229238`), all in `../loops/leads.md`; `Scenery::Update` runs from
+`sub_82229238`), all in `../loops/leads.md` (since mapped: the race's
+`sub_8215B790` and `sub_8215D2B0` in `race-update.md`, `sub_8215AA88`
+in `race-scene.md`, `sub_821514A0` and `sub_821516F0` in
+`race-loading.md`, the front end's in `location-screen.md`); `Scenery::Update` runs from
 the race's `sub_8215D2B0` and the front end's camera `sub_822282E8`, and
 `Scenery::Draw` (the race draw step's part `sub_820F6068`) from
 `sub_8215B4F8` (`Race::DrawStep`, `functions.md`) and `sub_822282E8`.

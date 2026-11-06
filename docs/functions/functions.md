@@ -581,6 +581,11 @@ Rows not yet moved stay in the table below. So far:
 - [`menu-helpers.md`](menu-helpers.md): the front end's menu helpers:
   the 68-byte menus about a hundred front-end screens step by the pad
   (`Menu::Step`) and read accept and back on (`Menu::Pressed`) (B7).
+- [`race-update.md`](race-update.md): the race's update on the race
+  scene's side: the course scenery made and loaded for the race, the
+  directional lights' constants, the cars' tick update (their scene
+  models remade and their draw blocks filled from the vehicles) and the
+  screen objects driven by the followed cars (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -648,7 +653,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8229B7B0` | | | Copies four words of the device's presentation parameters (+13188 width, +13192 height, +13236, +13196) to r5. r3 device, r4 unused (0). From `sub_82482B18`. |
 | `sub_822221A0` | `TitleScreen::Update` | Wrapped | Counts idle ticks and starts the attract race at 600 (see "The title screen" in `../title-screen.md`). `--attract_after_s` shortens the wait. |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
-| `sub_8215C780` | `Car::TickUpdate` | | The tick's car record update (logic passes; r31 = the car record, r26 = the vehicle): copies the car's world matrix into car + 16 and stores the gauge values at car + 696 (`sub_820C0128`, the speed in km/h), + 700 (`sub_820C0140`, the revs), + 704 (`[r26 + 2944]`, the boost) and + 712 (`[r26 + 6260]`). |
 | `sub_820E42E8` | `Dash::PoseTachometer` | Overridden | `src/hooks/cockpit_dials.cpp` (`--native_cockpit_dials`; `docs/cockpit-dial-interpolation.md`). r3 = the dash, r4 = the car, r5 = the camera passes. Gets two angles from `sub_820D3740([dash + 2896], car, [dash])`: `a` the speedometer, `b` the tachometer. Each needle's world matrix is `(B * RotZ(angle)) * A * car + 16`, with A, B at dash + 32/+96 for `a` and + 272/+336 for `b`; drawn with `sub_820D06F0(dash + 496 / + 736, r5 + 144, world, 0, 0)`, both part `...06A0`. |
 | `sub_820E45A8` | `Dash::PoseDials` | Overridden | Same file. r3 = the dash, r4 = the car, r5 = the camera passes. Seven needle slots k = 0-6, each drawn if `[[dash] + 8 + 12k]` and its model (`[dash + 1700]`, `1940`, `2660`, `2900`, `3620`, `3860`, `4100`) are set: stores `[dash + 5296 + 4k]` into the model + 48, angle `sub_820D3688([dash + 5328 + 4k], [[dash] + 12 + 12k], car)`, world `(B * RotZ(angle)) * A * car + 16` with A at dash + 32 + 240k and B 64 bytes on, drawn with `sub_820D06F0` (dash + 2176, 2416, 3136, 3376, 4336, 4576, 4816). In mode 5 (`[dash + 4]`) slot 1 is the turbo gauge: `[dash + 5324]` into the model, angle from car + 704: above 0, `[0x820062E0]` times it, capped at `[0x820062E0]` above 1; below the double at `0x820062D8`, `[0x820062D0]`; else value * `[0x820062CC]` * `[0x820062D0]`. |
 | `sub_820D3688` | `Dial::Angle` | Native | `DialAngle` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E45A8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = range, r4 = gauge (0-3: car + 704, 712, 716, 720), r5 = the car; returns f1, no state. `[0x82000A34]` with no range. Else from = range + 0, to = + 4, angles + 8, + 12: below from the first angle, above to the second, between `(v - from) / (to - from) * (a1 - a0)` (without `+ a0`, the game's own), all times `[0x82002948]`. |
