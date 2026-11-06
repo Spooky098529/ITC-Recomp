@@ -14,7 +14,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3: the course scenery's race-side owners (lead picked:
   `sub_8215B790`, `sub_8215D2B0`, `sub_821514A0`, `sub_821516F0`, the top
   of `leads.md`; ready groups under all four; its line deleted from
-  `leads.md`). Mapping agent running.
+  `leads.md`). Map checked (db8e723a: `race-update.md`, 9 rows, 1
+  moved from `functions.md`, 8 new, 7 in play; 0 errors; 8 ready groups,
+  2 in the new file (`sub_8215B330`; `sub_8215D008` with `sub_8215C698`),
+  6 in other files (`course-scenery.md`, `heap.md`, `vehicle-accessors.md`,
+  `scene-models.md`, `scene.md`); no leads added; no subagents).
+  Migration agent running.
 
 ## Done
 
@@ -34,3 +39,5 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 4252, work left 2159 (wrapped 57, known 466,
   unknown 1636).
+- After the race update's map: ours 4252, work left 2159 (wrapped 57,
+  known 472, unknown 1630).

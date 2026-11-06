@@ -13,6 +13,8 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
+- `race-update.md` (new, db8e723a): 9 rows (`Car::TickUpdate` `sub_8215C780` moved from `functions.md`, 8 new; 7 in play; `ScreenObject::Start` `sub_8212EDF8` and `Stop` `sub_8212EED0` not seen): `RaceScene::LoadScenery` `sub_8215B790` (the 44-byte configuration from `0x82602EA0`, its +32 an unwritten stack word read only in mode 2), `RaceScene::Update` `sub_8215D2B0`, `RaceLights::Update` `sub_8215D008` and `UploadDirectional` `sub_8215C698`, `RaceScene::RemakeCarModel` `sub_8215C0D8` (taken from the scene models' owners' lead), `RaceScene::VaryCar` `sub_8215B330`. Corrections: the race light entry's +16 is a direction, not a color (`RaceLights::InitEntry`'s row); `Car::TickUpdate`'s "car record" is the scene model's draw block (+4288). `known-data.md`, `race-scene.md`, `course-scenery.md` and the scene models' lead updated.
+
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 
 - `power-graph.md` (new, 64372b27): 6 rows, all new, 4 in play: the front end's power and torque graph (`PowerGraph::Draw` `sub_8217C708`, `Line::RecordFlat` `sub_8217B508`; callers `sub_821DF350` (tuning screen), `sub_82250670`/`sub_82250700` (car list screen), `sub_821B8F60` (vtable, not seen)); `known-data.md`: `0x826D83D8`/`0x826D83DC`, the tuning screen, `0x82815EC0`. The lead line's "`sub_82250670` never seen" was wrong: it is in the coverage list. Two leads added (the tuning screen's update `sub_821E6C50`; the car list screen `sub_8224BDC0`).
