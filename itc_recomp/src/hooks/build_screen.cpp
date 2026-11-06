@@ -48,7 +48,9 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "CopyBuilds, ListBuilds, DrawBuildRow, DrawBuildRows, SetUpGroups, FilterGroups, "
               "MarkGroups, InitGroupLists, DrawGroupRows, ShowGroup, ShowNumber, GroupArrows, "
               "SetUpDetails, ShowDetails, KeepGroupList, KeepStandList, RestoreStandList, ValueText, "
-              "BuildArrows, ShowBuildMark and RestoreStand "
+              "BuildArrows, ShowBuildMark, RestoreStand, KeepBuildList, RestoreBuildList, "
+              "InitStandList, DrawStandRow, StandArrows, SetPrompts, SetHelp, SetUpStand and "
+              "PutOnStand "
               "have no adapters: only native callers reach them, and the flag switches those");
 
 namespace hooks {
@@ -362,14 +364,8 @@ void BuildScreenChangeCategory(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-ITC_BUILD_SCREEN(8219BB20, BuildScreenKeepBuildList)
-ITC_BUILD_SCREEN(8219BB80, BuildScreenRestoreBuildList)
-ITC_BUILD_SCREEN(8219C078, BuildScreenInitStandList)
 ITC_BUILD_SCREEN(8219C230, BuildListInsert)
 ITC_BUILD_SCREEN(8217D0C8, GarageStageSetDark)
-ITC_BUILD_SCREEN(8219D7B0, BuildScreenStandArrows)
-ITC_BUILD_SCREEN(8219DA58, BuildScreenSetPrompts)
-ITC_BUILD_SCREEN(8219DB50, BuildScreenSetHelp)
 ITC_BUILD_SCREEN(8219C528, BuildScreenHighlightGroupsA)
 ITC_BUILD_SCREEN(8219C6D0, BuildScreenHighlightGroupsB)
 ITC_BUILD_SCREEN(8219C850, BuildScreenFadeOut)
@@ -377,7 +373,6 @@ ITC_BUILD_SCREEN(8219C8F8, BuildScreenHighlightBuilds)
 ITC_BUILD_SCREEN(8219CA08, BuildScreenHighlightStand)
 ITC_BUILD_SCREEN(8219CB18, BuildScreenHighlightStand2)
 ITC_BUILD_SCREEN(8219CBD8, BuildScreenHighlightDetails)
-ITC_BUILD_SCREEN(8219D550, BuildScreenDrawStandRow)
 ITC_BUILD_SCREEN(821A1008, BuildScreenSetUpBuilds)
 ITC_BUILD_SCREEN(821A08D8, BuildScreenOpen)
 ITC_BUILD_SCREEN(821A0A38, BuildScreenBackToGroups)
@@ -386,6 +381,10 @@ ITC_BUILD_SCREEN(821A1138, BuildScreenOpenBuilds)
 ITC_BUILD_SCREEN(8219FF78, BuildScreenBackToStand)
 ITC_BUILD_SCREEN(8219FEC8, BuildScreenOpenDetails)
 ITC_BUILD_SCREEN(8219FE10, BuildScreenOpenStand)
+// Removed (B7 loop, 2026-11-06, with SetUpStand native): KeepBuildList
+// sub_8219BB20, RestoreBuildList sub_8219BB80, InitStandList sub_8219C078,
+// DrawStandRow sub_8219D550, StandArrows sub_8219D7B0, SetPrompts
+// sub_8219DA58 and SetHelp sub_8219DB50: their callers in play are native.
 // BuildScreen::SetUpStand sub_8219F780 and PutOnStand sub_8219D6F0 have no
 // adapters: only OpenStand calls SetUpStand, and PutOnStand's callers in
 // play are SetUpStand (MoveStand and ChangeGroupOnStand never ran); their
