@@ -29,8 +29,12 @@ file's history. What's left to see in a drive, from every run:
   Dropped; `itc_3604`: race 38 s, 0 errors, every harness 0 differing
   but `sub_822AF978`'s expected group; no subagents); left:
   `sub_8229EB10` (ready), then the segment flow's cycle
-  (`sub_8229EF48`, `EDA8`, `EC00`, `E908`). Step: validation agent
-  running.
+  (`sub_8229EF48`, `EDA8`, `EC00`, `E908`). Validated `itc_3607`
+  (race 46 s, 0 errors, 7 of 7 harness lines, 4 ran in the race,
+  `SaveSegment`, `CommandChain::Close`, `WriteCallback` in the replay
+  `itc_3608` (ok); none to drive). Step: second migration agent
+  running (`sub_8229EB10`, then the segment flow's cycle as one
+  group).
 
 ## Done
 
@@ -54,5 +58,6 @@ file's history. What's left to see in a drive, from every run:
   60, known 481, unknown 1672).
 - After its migration: ours 4209, work left 2201 (wrapped 60, known
   469, unknown 1672).
+- After its validation (`itc_3607`): ours 4209, work left 2201.
 
 ## Stopped
