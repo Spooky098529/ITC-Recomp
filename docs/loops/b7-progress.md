@@ -85,7 +85,13 @@ file's history. What's left to see in a drive, from every run:
 - Cleanup lead (no mapping, not counted): `GarageStage::SetCar`
   `sub_8217FD58` and `SetCarClass` `sub_8217FDC8` in `car-makers.md`,
   ready since the `ReapplyRecord` lead, with the makers by id above them
-  and `SceneModel::ApplyWheelPaint`'s wrap. Migration agent running.
+  and `SceneModel::ApplyWheelPaint`'s wrap. Migration 17174c73..c5e36a97
+  (`SetCar`, `SetCarClass`, `ShowCarById`, `ShowCarByIdWithClass` under
+  `--native_car_makers`; `CopyRecord`, `ReapplyRecord`,
+  `ReapplyRecordNoDecals` adapters and `ApplyWheelPaint`'s wrap removed;
+  races 37, 37, 33 s, 0 errors, all harnesses 0 differing; no
+  subagents); left: none in `car-makers.md` and `stand-models.md`.
+  Validation agent running.
 
 ## Done
 
