@@ -60,7 +60,14 @@ file's history. What's left to see in a drive, from every run:
   the scene model work just done; both lines deleted from `leads.md`).
   Map checked (d33966e3: `stand-models.md`, 39 rows, all new, 28 in
   play; 0 errors; 12 ready groups, `TuningScreen::PreviewWheel`'s 2,171
-  lines to split; 2 leads added; no subagents). Migration agent running.
+  lines to split; 2 leads added; no subagents). Migration
+  e8b7c8b2..ed0605b9 (`--native_stand_models`: all 12 ready groups, with
+  `SceneModel::ApplyRecord` and `ReloadDecals` under
+  `--native_scene_models`; races 34-38 s, 0 errors, all harnesses 0
+  differing; one subagent, alone, for `SetWheel`/`PreviewWheel`); left:
+  none in the file; `GarageStage::ReapplyRecord` `sub_82178DF8` and
+  `ReapplyRecordNoDecals` `sub_82178E60` (`car-makers.md`) now ready (a
+  cleanup lead). Validation agent running.
 
 ## Done
 
@@ -99,3 +106,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3747`): ours 4286, work left 2125.
 - After the stand models' map: ours 4286, work left 2125 (wrapped 57,
   known 466, unknown 1602).
+- After its migration: ours 4319, work left 2092 (wrapped 57, known
+  433, unknown 1602).
