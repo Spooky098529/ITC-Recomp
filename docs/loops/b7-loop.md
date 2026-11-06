@@ -498,6 +498,10 @@ call, <date>"). Say in the report or the row which call was followed.
 Calls so far for decisions the loop meets often:
 
 - Allocating guest memory: through `src/memory/heap.h` (2026-10-22).
+- An allocation's size the kernel answers (`MmQueryAllocationSize`
+  under `XPhysicalSize` `sub_822965C0`): answered from our allocation
+  layer, which records each physical block's size, one answer for
+  recompiled and native callers (2026-11-06).
 - A kernel critical section a subsystem's code locks: a host
   `std::mutex` for that lock, taken by every user of it, native and
   recompiled (`Edram::Alloc`, 2026-10-24; the memory blocks' lock

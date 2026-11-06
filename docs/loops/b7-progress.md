@@ -28,7 +28,14 @@ file's history. What's left to see in a drive, from every run:
   stack reads noted in its row) and the second set's set-ups; held:
   `XPhysicalSize` `sub_822965C0` (`MmQueryAllocationSize`, no
   precedent: asked the user) with `Scenery::AllocPhysical`/`FreePhysical`
-  and their callers. Validation agent running.
+  and their callers. Validated `itc_3702` (race 38 s, 0 errors, every
+  harness 0 differing, 12 of 12 harness lines; 11 ran in the race,
+  `CarParts::LoadSetA` in the replay `itc_3703` (ok); none to drive).
+  The user's call (2026-11-06): `XPhysicalSize` answers a physical
+  block's size from our allocation layer (`AllocPhysical` recording each
+  block's size), for recompiled and native callers. Second migration
+  agent running (`XPhysicalSize` and what it unblocks, `Scenery::Update`,
+  the second set's set-ups).
 
 ## Done
 
@@ -52,3 +59,4 @@ file's history. What's left to see in a drive, from every run:
   known 472, unknown 1630).
 - After its migration: ours 4264, work left 2147 (wrapped 57, known
   460, unknown 1630).
+- After its validation (`itc_3702`): ours 4264, work left 2147.
