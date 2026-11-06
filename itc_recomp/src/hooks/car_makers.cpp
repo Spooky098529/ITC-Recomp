@@ -25,8 +25,9 @@ ITC_FLAG_BOOL(native_car_makers, true, "ITC",
               "sub_820D0900; these five without adapters: only FromCar reaches them) (with "
               "--native_scene_models and --native_car_specs; memcpy and AeroParts::Get82 its "
               "originals where theirs decline); GarageCar::Reset sub_82110448, "
-              "GarageCars::StaticInit sub_825D9EF0, CarData::FromGarageCar sub_82179A60 and "
-              "TuningScreen::SetUpCarData sub_821DF2F8 (with --native_race_setup, "
+              "GarageCars::StaticInit sub_825D9EF0, CarData::FromGarageCar sub_82179A60 (no "
+              "adapter: its native callers call it) and TuningScreen::SetUpCarData "
+              "sub_821DF2F8 (with --native_race_setup, "
               "--native_save_data, --native_car_specs and --native_car_physics; their callees' "
               "originals where theirs decline); GarageStage::FitCar sub_82178C40 (with "
               "--native_car_physics and --native_math), GarageStage::CopyRecord sub_8217FC60 "
@@ -185,7 +186,6 @@ ITC_CAR_MAKERS(8215AAD0, CarMakersBlockOf)
 ITC_CAR_MAKERS(8215B878, CarMakersFromCar)
 ITC_CAR_MAKERS(82110448, CarMakersGarageCarReset)
 ITC_CAR_MAKERS(825D9EF0, CarMakersStaticInit)
-ITC_CAR_MAKERS(82179A60, CarMakersFromGarageCar)
 ITC_CAR_MAKERS(821DF2F8, CarMakersSetUpCarData)
 ITC_CAR_MAKERS(82178C40, CarMakersFitCar)
 ITC_CAR_MAKERS(8217FC60, CarMakersCopyRecord)
@@ -196,4 +196,7 @@ ITC_CAR_MAKERS(8219EDB0, CarMakersHideBusyMarker)
 // sub_8215AC70, SetWheels sub_8215B238, SetChoice sub_8215B1A0 and
 // CarRecord::SetBytes sub_8215B0E0 (with sub_820D0900) have none: only
 // SceneModelRecord::FromCar calls them, and its plain C++ calls theirs (their
-// register steps above are the harness's).
+// register steps above are the harness's). CarData::FromGarageCar
+// sub_82179A60's adapter is removed: its callers in play,
+// TuningScreen::SetUpCarData and CarList::DrawEntryPowerGraph, are native
+// and call its plain C++ (its register step above is the harness's).

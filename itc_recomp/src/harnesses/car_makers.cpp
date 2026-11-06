@@ -503,7 +503,11 @@ void Garage(Context& h, Random& r) {
             }
             t.r3.u64 = screen;
           },
-          __imp__sub_821DF2F8, hooks::CarMakersSetUpCarData, 0, {},
+          // The top 24 bytes: the original CarData::FromGarageCar's register
+          // saves (its tail call's; its adapter is gone, so the original
+          // runs under the original SetUpCarData), which the native one
+          // doesn't write.
+          __imp__sub_821DF2F8, hooks::CarMakersSetUpCarData, 24, {},
           fmt::format("case {}", c), 0, 0, [&] { race.Reset(count, added); }, race_outputs,
           0x2000, kGarageBytes);
     }
