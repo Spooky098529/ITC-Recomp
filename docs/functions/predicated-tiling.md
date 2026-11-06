@@ -102,7 +102,32 @@ and `Device::Swap` (`functions.md`, called by the worker only with
 +10810 bit 2). Not mapped: `sub_822B7540`, the only caller of
 `sub_822B6AA8` (not seen in play, not read).
 
-**Ready groups** (`b7_groups.py`): `sub_822B6AD8`, `sub_825BEB80`,
+**Native code** (the B7 loop, 2026-11-06): plain C++ in
+`src/graphics/predicated_tiling.cpp` over the device in guest memory,
+behind adapters in `src/hooks/predicated_tiling.cpp`
+(`--native_predicated_tiling`, falling back to the originals); harness
+`predicated_tiling` (over the command buffer harness's set-up, shared
+through `src/harnesses/command_buffer_setup.h`). `Device::SetPredication`
+keeps its fields and segment end without the `SET_BIN_MASK` packet;
+`BeginTiledSegments` keeps the limit +12960 and the three chains (so the
+segment flow takes the same path as before) and the header's 256 bytes in
+the segment chain without writing them; `EndTiledSegments` keeps the
+callback, the chains' close and the kicks, without the coherency flush
+(Dropped before). Their harness groups "against the original as it is
+(expected to differ)" differ only by the words left out. The library's
+worker threads: `CreateWorkers` (Native, called by `Device::Init`'s
+override) makes them through the kernel's imports without its
+EVENT_WRITE_SHD packets (the worker blocks after the boot the same with
+the flag on and off), and `WorkerThread` (Overridden: the threads' entry
+point) waits through the imports, with the device's lock +13548 a host
+`std::mutex` (only the workers take it). Frame dumps of the tuning shop's
+tiled car with the flag on and off match (itc_3643/3644); a menu replay
+ran all of them as native (itc_3653). The start and end themselves
+(`Device::BeginTiling`, `EndTiling`) stay recompiled until `Device::Clear`'s
+worker and `Device::Resolve` are ours; the worker's job and what's under it
+never run.
+
+**Ready groups** (`b7_groups.py`, before the migration): `sub_822B6AD8`, `sub_825BEB80`,
 `sub_822B6BF8` (with `Device::RestoreSegment`, `sub_8229E0C0`, not seen
 in play), `sub_822B6D70` and `sub_822B69A8` (the tool counts the present
 callback `sub_822A0718` in its group, as its other callers in play are

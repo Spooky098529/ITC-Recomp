@@ -125,7 +125,11 @@ originals' calls without the packets, and, in groups expected to differ,
 with the originals. The adapters of `sub_8229E768`, `sub_8229E100`, `sub_8229EDA8`,
 `sub_8229EC00` and `sub_8229E908` were then removed (Native): their
 callers in play are native, `Device::Swap`'s override reaching
-`sub_8229EC00` through `hooks::NextCommandSegment`.
+`sub_8229EC00` through `hooks::NextCommandSegment`. Predicated tiling's
+migration (2026-11-06, `predicated-tiling.md`) added
+`Device::RestoreSegment` (`sub_8229E0C0`, no adapter) and removed the
+adapters of `sub_8229DBF0`, `sub_8229ED60` and `sub_8229DFB8` (Native):
+their only callers, the tiling's start and end, are native.
 
 Callers in other files: `BeginVertices` (`sub_825BD8F0`),
 `DrawIndexedVertices` (`sub_825BE708`), `Device::Resolve`
