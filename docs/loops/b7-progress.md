@@ -100,7 +100,15 @@ file's history. What's left to see in a drive, from every run:
   to the garage stage work just done; its line deleted from
   `leads.md`). Map checked (51812e30: `build-screen.md`, 66 rows, all
   new, 60 in play; 0 errors; 30 ready groups in the file, 2 more in
-  `scene.md`; 1 lead added; no subagents). Migration agent running.
+  `scene.md`; 1 lead added; no subagents). Migration 475f728c..3d2f5c6d
+  (`--native_build_screen`: the lists, groups, rows, arrows, prompts,
+  highlight and fade transitions, the builds level, `GarageStage::SetDark`;
+  the six UI movie text helpers under `--native_ui_movies_game`; races
+  36-38 s, 0 errors, all harnesses 0 differing; no subagents); left: the
+  stand and details levels' groups (`sub_8219FEC8`, `sub_8219FF78`,
+  `sub_8219FC60`, `sub_821A0060`, `sub_821A1138`, `sub_821A1258`) and
+  `scene.md`'s `sub_820C5798`, `sub_820C5A60`. Validation agent
+  running.
 
 ## Done
 
@@ -163,3 +171,5 @@ file's history. What's left to see in a drive, from every run:
   2086 (wrapped 57, known 427, unknown 1602).
 - After the build screen's map: ours 4325, work left 2086 (wrapped 57,
   known 487, unknown 1542).
+- After its migration: ours 4371, work left 2040 (wrapped 57, known
+  441, unknown 1542).
