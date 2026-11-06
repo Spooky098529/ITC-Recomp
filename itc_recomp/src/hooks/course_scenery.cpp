@@ -18,6 +18,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/archive.h"
 #include "hooks/course_scenery.h"
 #include "hooks/models.h"
 #include "hooks/scenery_lists.h"
@@ -36,7 +37,9 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820F2030 (Archive::AssetSize's plain C++), SceneryList::Clear "
               "sub_820F1588, Add sub_820F1888 (no adapter), Sort sub_820F1930, Scenery::LimitLargeModels "
               "sub_820F2B80, ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, Scenery::Init sub_820F1360, "
-              "SceneryList::ReleaseUnused sub_820F17C0, Scenery::StartLoad sub_820F1E00, "
+              "SceneryList::ReleaseUnused sub_820F17C0, SceneryList::LoadAll sub_820F1598 and Stream "
+              "sub_820F16C0 (Archive::QueueLength's plain C++ with the archive's native queue), "
+              "Scenery::StartLoad sub_820F1E00, "
               "Scenery::CollectAreas sub_820F3098, Scenery::CollectModels sub_820F32D0, "
               "Scenery::DrawSetLists sub_820F52A8 (the scenery lists' draws' plain C++ called "
               "directly, their adapters where it declines), "
@@ -206,6 +209,15 @@ ITC_COURSE_SCENERY(820F1360, Init(base, ctx.r3.u32);
 // r3 = the manager, r4 = a list.
 ITC_COURSE_SCENERY(820F17C0, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = ReleaseUnused(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32))
+// SceneryList::LoadAll and Stream: r3 = the manager, r4 = a list; from
+// Scenery::IsLoaded and Update (recompiled). The queue length's plain C++
+// with the archive's native queue, else its original through `ctx`.
+ITC_COURSE_SCENERY(820F1598, ITC_SCENERY_CALLS;
+                   ctx.r3.u64 = ListLoadAll(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                            hooks::NativeArchiveQueue()))
+ITC_COURSE_SCENERY(820F16C0, ITC_SCENERY_CALLS;
+                   ctx.r3.u64 = ListStream(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                           hooks::NativeArchiveQueue()))
 // r3 = the manager.
 ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))

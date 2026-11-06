@@ -1902,6 +1902,105 @@ void PoolSizesCases(Context& h) {
   results.Report();
 }
 
+// --- SceneryList::LoadAll and Stream: the manager at +0 is the pool set
+// (three pools of up to 6 objects, records at +2048), whose vtable is a
+// scratch one (at kKeyVtable): AreaLights::Key in slot 0 (a 4-byte key at
+// +84, so items find their objects by key) and PoolObject::Reset for the
+// load; a list at +2200 on one of the pools (its pointers at +2240, up to 8
+// items at +2280 with keys of areas and models below 4, its table at +2420
+// of up to 8 entries with such keys and their objects 0 or one of the
+// pool's); the done count from 0 to the count. LoadAll's cases whose pool
+// has fewer free objects than items are left out (the original loads object
+// -1 then). Both with the archive's queue length native and through the
+// guest (the queue as the game has it while the harnesses run: the full
+// queue's branches aren't reached). The scratch area and r3 compared. A
+// random generator of its own. ---
+
+constexpr uint32_t kKeyVtable = 4064;
+
+void ListLoadCases(Context& h) {
+  Random r(0x4C4F4144);
+  constexpr uint32_t kPoolRecords = 2048, kList = 2200, kPointers = 2240, kItems = 2280,
+                     kTable = 2420;
+  for (int stream = 0; stream < 2; stream++) {
+    Results results(stream != 0 ? "SceneryList::Stream (sub_820F16C0)"
+                                : "SceneryList::LoadAll (sub_820F1598)");
+    int done = 0;
+    for (int c = 0; c < 400 && done < 160; c++) {
+      const uint64_t seed = r.Next();
+      const bool native_queue = r.Below(2) != 0;
+      Outputs out[2];
+      bool skip = false;
+      for (int v = 0; v < 2 && !skip; v++) {
+        Random probe(seed);
+        Fill(h.base, h.data, kScratchBytes);
+        guest::StoreU32(h.base, h.data + kKeyVtable + 0, 0x820F1C20);
+        guest::StoreU32(h.base, h.data + kKeyVtable + 4, 0x820FB9D8);
+        guest::StoreU32(h.base, h.data + kKeyVtable + 8, 0x820FB9D8);
+        uint32_t counts[3];
+        RandomPools(h, probe, counts, true, 3, kPoolRecords, 6, kKeyVtable);
+        const uint32_t manager = h.data + kSet;
+        const uint32_t pool = probe.Below(3);
+        const uint32_t list = h.data + kList;
+        const uint32_t items = probe.Below(9);
+        const uint32_t entries = probe.Below(9);
+        const uint32_t first = h.data + kObjects + pool * 6 * kStride;
+        guest::StoreU32(h.base, list + 0, pool);
+        guest::StoreU32(h.base, list + 4, items == 0 ? 0 : probe.Below(items + 1));
+        guest::StoreU32(h.base, list + 8, items);
+        guest::StoreU32(h.base, list + 12, entries);
+        guest::StoreU32(h.base, list + 16, h.data + kPointers);
+        guest::StoreU32(h.base, list + 24, h.data + kTable);
+        for (uint32_t i = 0; i < 8; i++) {
+          const uint32_t item = h.data + kItems + 16 * i;
+          guest::StoreU32(h.base, h.data + kPointers + 4 * i, item);
+          guest::StoreU32(h.base, item + 8, probe.Below(4) << 16 | probe.Below(4));
+          const uint32_t entry = h.data + kTable + 12 * i;
+          guest::StoreU32(h.base, entry + 0, probe.Below(4) << 16 | probe.Below(4));
+          guest::StoreU32(h.base, entry + 8,
+                          probe.Below(2) == 0 || counts[pool] == 0
+                              ? 0
+                              : first + kStride * probe.Below(counts[pool]));
+        }
+        if (stream == 0) {
+          uint32_t free = 0;
+          for (uint32_t o = guest::LoadU32(h.base, h.data + kPoolRecords + 24 * pool + 16);
+               o != 0 && free < 16; o = guest::LoadU32(h.base, o + 24)) {
+            free++;
+          }
+          if (free < items) {
+            skip = true;
+            break;
+          }
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager;
+        t.r4.u64 = list;
+        With(v, [&] {
+          if (v == 0) {
+            (stream != 0 ? __imp__sub_820F16C0 : __imp__sub_820F1598)(t, h.base);
+          } else {
+            WithCalls(t, h.base, [&](const cs::Calls& calls) {
+              t.r3.u64 = stream != 0 ? cs::ListStream(h.base, calls, t.r1.u32, t.r3.u32,
+                                                      t.r4.u32, native_queue)
+                                     : cs::ListLoadAll(h.base, calls, t.r1.u32, t.r3.u32,
+                                                       t.r4.u32, native_queue);
+            });
+          }
+        });
+        ScratchAndR3(h, out[v], t);
+      }
+      if (skip) {
+        continue;
+      }
+      done++;
+      results.Check(out[0], out[1],
+                    fmt::format("case {} queue {}", c, native_queue ? "native" : "guest"));
+    }
+    results.Report();
+  }
+}
+
 void CourseScenery(Context& h) {
   ObjectLeaves(h);
   Keys(h);
@@ -1916,6 +2015,7 @@ void CourseScenery(Context& h) {
   TextureAnimationCases(h);
   Parses(h);
   PoolSizesCases(h);
+  ListLoadCases(h);
 }
 
 }  // namespace harness

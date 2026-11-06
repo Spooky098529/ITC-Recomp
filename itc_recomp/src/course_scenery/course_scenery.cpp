@@ -737,6 +737,98 @@ uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32
   return r3;
 }
 
+namespace {
+
+constexpr uint32_t kQueueLength = 0x8209D7B0;  // Archive::QueueLength
+
+uint32_t QueueLength(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t lr,
+                     bool native_queue) {
+  return native_queue ? archive::QueueLength(base)
+                      : CallGuest(base, calls, stack, 160, lr, kQueueLength, {});
+}
+
+}  // namespace
+
+uint32_t ListLoadAll(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                     uint32_t list, bool native_queue) {
+  ITC_NATIVE_RUNNING("sub_820F1598 SceneryList::LoadAll");
+  const uint32_t frame = stack - 160;
+  const uint32_t pool = Load(base, list + 0);
+  const uint32_t queued = QueueLength(base, calls, stack, 0x820F15B4, native_queue);
+  for (uint32_t i = Load(base, list + 4); i < Load(base, list + 8); i++) {
+    const uint32_t item = Load(base, Load(base, list + 16) + 4 * i);
+    Store(base, item + 12, 0);
+    if (Load(base, list + 12) == 0) {
+      continue;
+    }
+    const uint32_t key = Load(base, item + 8);
+    uint32_t entry = Load(base, list + 24);
+    bool found = false;
+    for (uint32_t n = 0;;) {
+      if (Load(base, entry) == key) {
+        found = true;
+        break;
+      }
+      n++;
+      entry += 12;
+      if (n >= Load(base, list + 12)) {
+        break;
+      }
+    }
+    if (!found) {
+      continue;
+    }
+    if (Load(base, entry + 8) == 0 && queued < 480) {
+      const uint32_t index = Acquire(base, calls, frame, manager, pool, item + 8);
+      Store(base, entry + 8, LoadObject(base, calls, frame, manager, pool, index));
+      Store(base, manager + 172, pool);
+      Store(base, manager + 176, index);
+    }
+    const uint32_t object = Load(base, entry + 8);
+    if (object == 0) {
+      continue;
+    }
+    Store(base, item + 12, object);
+    SetExpiring(base, object, 0);
+    SetVisible(base, Load(base, item + 12), 0);
+    Store(base, list + 4, Load(base, list + 4) + 1);
+  }
+  return Load(base, list + 8) == Load(base, list + 4) ? 1 : 0;
+}
+
+uint32_t ListStream(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                    uint32_t list, bool native_queue) {
+  ITC_NATIVE_RUNNING("sub_820F16C0 SceneryList::Stream");
+  const uint32_t frame = stack - 160;
+  const uint32_t pool = Load(base, list + 0);
+  const uint32_t queued = QueueLength(base, calls, stack, 0x820F16DC, native_queue);
+  for (uint32_t i = 0; i < Load(base, list + 8); i++) {
+    const uint32_t item = Load(base, Load(base, list + 16) + 4 * i);
+    const uint32_t key = item + 8;
+    uint32_t index = Find(base, calls, frame, manager, pool, key);
+    if (int32_t(index) < 0) {
+      if (queued < 960) {
+        index = Acquire(base, calls, frame, manager, pool, key);
+        if (int32_t(index) < 0) {
+          Store(base, item + 12, 0);
+          continue;
+        }
+        LoadObject(base, calls, frame, manager, pool, index);
+        Store(base, manager + 172, pool);
+        Store(base, manager + 176, index);
+      }
+      if (int32_t(index) < 0) {
+        Store(base, item + 12, 0);
+        continue;
+      }
+    }
+    Store(base, item + 12, PoolObjectAt(base, manager, pool, index));
+    SetExpiring(base, Load(base, item + 12), 0);
+    SetVisible(base, Load(base, item + 12), 0);
+  }
+  return Load(base, list + 8) == Load(base, list + 4) ? 1 : 0;
+}
+
 uint32_t StartLoad(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager) {
   ITC_NATIVE_RUNNING("sub_820F1E00 Scenery::StartLoad");
   const uint32_t frame = stack - 128;

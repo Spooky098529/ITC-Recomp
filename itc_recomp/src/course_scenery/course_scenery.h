@@ -196,6 +196,27 @@ void Init(uint8_t* base, uint32_t manager);
 // last call's).
 uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
                        uint32_t list);
+// SceneryList::LoadAll (sub_820F1598): the archive's queue length first
+// (Archive::QueueLength's plain C++ with `native_queue`, else through
+// `calls`); from the list's done count (+4) to its count (+8), each item's
+// object (+12) = 0, then its key (+8) looked up in the list's table (+24,
+// +12 entries of 12 bytes: the key, the asset, +8 the object); with a
+// match whose object is 0 while the queue is below 480, one taken from the
+// list's pool (+0) by the key's address and loaded (ObjectPools::Acquire
+// and Load, the index not checked) into the entry's +8, the manager's +172
+// and +176 = the pool and the index; with an object then, the item's +12 =
+// it, SetExpiring and SetVisible with 0 on it, +4 up by 1. Returns 1 when
+// +4 reached +8, else 0.
+uint32_t ListLoadAll(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                     uint32_t list, bool native_queue);
+// SceneryList::Stream (sub_820F16C0): the queue length as LoadAll; for each
+// item: its object in the list's pool by its key's address (ObjectPools::
+// Find), else, when the queue is below 960, one taken (Acquire) and, when
+// it's there, loaded (+172, +176 = the pool and the index); with one, the
+// item's +12 = it (ObjectPools::Object), SetExpiring and SetVisible with 0;
+// without, +12 = 0. Returns 1 when +4 equals +8, else 0.
+uint32_t ListStream(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                    uint32_t list, bool native_queue);
 // Scenery::StartLoad (sub_820F1E00): the course set taken from pool 2 and
 // loaded (+112, +172 = 2, +176 its index); in mode 0 (the configuration's
 // +0, the manager's +8) both lists emptied and filled with every entry of
