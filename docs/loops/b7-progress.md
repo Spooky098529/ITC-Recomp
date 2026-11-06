@@ -67,9 +67,21 @@ file's history. What's left to see in a drive, from every run:
   differing; one subagent, alone, for `SetWheel`/`PreviewWheel`); left:
   none in the file; `GarageStage::ReapplyRecord` `sub_82178DF8` and
   `ReapplyRecordNoDecals` `sub_82178E60` (`car-makers.md`) now ready (a
-  cleanup lead). Validation agent running.
+  cleanup lead). Validated `itc_3761` (race 36 s, 0 errors, every
+  harness 0 differing, 32 of 32 harness lines; none in the attract race,
+  13 in the replay `itc_3762` (ok), 19 to drive). Recorded.
+- Cleanup lead (no mapping, not counted): `GarageStage::ReapplyRecord`
+  `sub_82178DF8` and `ReapplyRecordNoDecals` `sub_82178E60` in
+  `car-makers.md`; its line deleted from `leads.md`. Migration agent
+  running.
 
 ## Done
+
+- `stand-models.md`: 28 of 28 in play native (the garage stage's
+  holders and setters, the wheels' setters, the tuning screen's
+  helpers; with `SceneModel::ApplyRecord`, `ReloadDecals` in
+  `scene-models.md`), `--native_stand_models`; d33966e3,
+  e8b7c8b2..ed0605b9.
 
 - `race-update.md`: 7 of 7 native (`RaceScene::LoadScenery`, `Update`,
   `RemakeCarModel`, `VaryCar`, the lights, `Car::TickUpdate`; with
@@ -108,3 +120,4 @@ file's history. What's left to see in a drive, from every run:
   known 466, unknown 1602).
 - After its migration: ours 4319, work left 2092 (wrapped 57, known
   433, unknown 1602).
+- After its validation (`itc_3761`): ours 4319, work left 2092.

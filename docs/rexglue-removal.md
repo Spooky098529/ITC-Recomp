@@ -2762,6 +2762,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | The car objects' makers outside the race's set-up (the scene model record built from a car, `SceneModelRecord::FromCar` with its paint, wheels, choices and bytes setters and `CarModels::BlockOf`; the garage cars' reset and static set-up; `CarData::FromGarageCar` with the tuning screen's set-up; the front-end stand's `FitCar` and `CopyRecord`; the garage screen's busy marker) | `car-makers.md` | 16 of 24 in play (one migration; 4 adapters removed) | `--native_car_makers` |
 | 2026-11-06 | The front end's shared menu helpers (`Menu::Step` `sub_82186568`, the cursor moved by the pad through the action mappers' vtable; `Menu::Pressed` `sub_821864C8`; about 113 screens call them, each filling its 68-byte menu inline) | `menu-helpers.md` | 2 of 2 (one migration; adapters kept for the recompiled screens) | `--native_menu_helpers` |
 | 2026-11-06 | The race's update (`RaceScene::LoadScenery` `sub_8215B790` with the scenery's physical allocation (`XPhysicalSize` answered from our allocation layer, the user's call), `Create`, `Setup`, `SetupPools`; `RaceScene::Update` `sub_8215D2B0` once a tick with `Scenery::Update`, the race lights and `Car::TickUpdate`; `RaceScene::RemakeCarModel` with `ScenePools::SetUpB`, the second set's set-ups and `SceneModel::Build`; `RaceScene::VaryCar`) | `race-update.md` (and rows in `course-scenery.md`, `heap.md`, `scene-models.md`, `car-models.md`, `vehicle-accessors.md`, `post-effects.md`, `screen-objects.md`) | 7 of 7 (three migrations; ours 4,252 -> 4,286 with the other files' rows) | `--native_race_update` (and `--native_course_scenery`, `--native_scene_models`, `--native_vehicle_accessors`, `--native_heap`) |
+| 2026-11-06 | The garage stage's scene model holders (`GarageStage::MakeModel` `sub_8217FCB0`, the stand's record setters at `82178EC0`-`82179A18`, `SetWheel` `sub_8217DD38` with its 179-entry table, `FitAxles`, `SetTireGrade`, the second wheels; the wheels' setters `SceneWheels::SetSizes`, `SetTireGrades`, `Wheels::SetTireTextures`; the tuning screen's `PreviewWheel`, `StepSecondWheels`, `SetTireGrade`; with `SceneModel::ApplyRecord` `sub_820DA758` and `ReloadDecals` `sub_820D9D48`) | `stand-models.md` (and rows in `scene-models.md`) | 28 of 28 in play (one migration) | `--native_stand_models` (and `--native_scene_models`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4722,3 +4723,20 @@ second set's set-ups and `SceneModel::Build`) and `RaceScene::VaryCar`;
 called 70, live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 4,286, work left 2,125 (Wrapped 57, with a row
 438, no row yet 1,630), from 2,159.
+
+**2026-11-06, the stand models (branch `b7-loop-06-11-26`):** the
+thirty-sixth run's second subsystem (`stand-models.md`,
+`--native_stand_models`, `src/stand_models/`): the garage stage's scene
+model holders in the front end (the stand's record setters, the
+wheels' setters, the tuning screen's wheel and tire helpers), with
+`SceneModel::ApplyRecord` and `ReloadDecals` (`scene-models.md`,
+`src/scene_models/apply.cpp`); `ApplyRecord`'s race-side path (the
+scene's +4 set) still runs the original, never taken in play. Every
+adapter stays (recompiled front-end callers); 19 of the functions wait
+for a drive (`docs/loops/to-drive.md`). It unblocked
+`GarageStage::ReapplyRecord` and `ReapplyRecordNoDecals`
+(`car-makers.md`, a cleanup lead). The boundary: 449 functions (916
+pairs): overridden 109, Native 36, Dropped 26, never called 70, live
+208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
+ours 4,319, work left 2,092 (Wrapped 57, with a row 433, no row yet
+1,602), from 2,125.
