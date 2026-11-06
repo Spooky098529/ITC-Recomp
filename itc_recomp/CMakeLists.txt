@@ -396,6 +396,7 @@ set(ITC_SOURCES
     src/hooks/car_makers.cpp
     src/car_makers/record.cpp
     src/car_makers/garage.cpp
+    src/car_makers/stand.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp
@@ -765,7 +766,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/post_effects/record.cpp
     src/scene_target/scene_target.cpp
     src/power_graph/power_graph.cpp
-    src/car_makers/record.cpp
+    src/car_makers/record.cpp src/car_makers/stand.cpp
     src/frame_passes/record_part1.cpp src/frame_passes/record_part2.cpp
     src/frame_passes/record_part3.cpp
     src/car_sounds/x3daudio.cpp

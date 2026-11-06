@@ -13,6 +13,9 @@ ITC_FLAG_DECLARE(bool, native_car_specs);
 ITC_FLAG_DECLARE(bool, native_race_setup);
 ITC_FLAG_DECLARE(bool, native_save_data);
 ITC_FLAG_DECLARE(bool, native_car_physics);
+ITC_FLAG_DECLARE(bool, native_math);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+ITC_FLAG_DECLARE(bool, native_ui_movies_game);
 
 ITC_FLAG_BOOL(native_car_makers, true, "ITC",
               "Run the car objects' makers (docs/functions/car-makers.md): CarModels::BlockOf "
@@ -25,7 +28,12 @@ ITC_FLAG_BOOL(native_car_makers, true, "ITC",
               "GarageCars::StaticInit sub_825D9EF0, CarData::FromGarageCar sub_82179A60 and "
               "TuningScreen::SetUpCarData sub_821DF2F8 (with --native_race_setup, "
               "--native_save_data, --native_car_specs and --native_car_physics; their callees' "
-              "originals where theirs decline) natively instead of through the translated code "
+              "originals where theirs decline); GarageStage::FitCar sub_82178C40 (with "
+              "--native_car_physics and --native_math), GarageStage::CopyRecord sub_8217FC60 "
+              "(with --native_vehicle_accessors and --native_scene_models; "
+              "SceneModelRecord::Copy's adapter for the copy onto itself), and the stand's busy "
+              "marker sub_8219ED10 and sub_8219EDB0 (with --native_ui_movies_game; the named "
+              "animations through their overrides) natively instead of through the translated code "
               "(the same writes; checked by --run_harnesses=car_makers)");
 
 namespace hooks {
@@ -118,6 +126,48 @@ void CarMakersSetUpCarData(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void CarMakersFitCar(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_car_physics) || !ITC_FLAG(native_math)) {
+    __imp__sub_82178C40(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  double f1 = 0.0;
+  ctx.r3.u64 = cm::GarageStageFitCar(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &f1);
+  ctx.f1.f64 = f1;
+  ctx.fpscr.disableFlushMode();
+}
+
+void CarMakersCopyRecord(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
+    __imp__sub_8217FC60(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  ctx.r3.u64 = cm::GarageStageCopyRecord(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
+void CarMakersShowBusyMarker(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies_game)) {
+    __imp__sub_8219ED10(ctx, base);
+    return;
+  }
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  ctx.r3.u64 = cm::ShowBusyMarker(base, calls, ctx.r1.u32);
+}
+
+void CarMakersHideBusyMarker(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies_game)) {
+    __imp__sub_8219EDB0(ctx, base);
+    return;
+  }
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  ctx.r3.u64 = cm::HideBusyMarker(base, calls, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -137,6 +187,10 @@ ITC_CAR_MAKERS(82110448, CarMakersGarageCarReset)
 ITC_CAR_MAKERS(825D9EF0, CarMakersStaticInit)
 ITC_CAR_MAKERS(82179A60, CarMakersFromGarageCar)
 ITC_CAR_MAKERS(821DF2F8, CarMakersSetUpCarData)
+ITC_CAR_MAKERS(82178C40, CarMakersFitCar)
+ITC_CAR_MAKERS(8217FC60, CarMakersCopyRecord)
+ITC_CAR_MAKERS(8219ED10, CarMakersShowBusyMarker)
+ITC_CAR_MAKERS(8219EDB0, CarMakersHideBusyMarker)
 // sub_8215AB04 (BlockOf's case for id 1, the jump table's base) needs no
 // adapter: only the original BlockOf reaches it. SceneModelRecord::SetPaint
 // sub_8215AC70, SetWheels sub_8215B238, SetChoice sub_8215B1A0 and

@@ -37,5 +37,15 @@ void CarMakersGarageCarReset(PPCContext& ctx, uint8_t* base);
 void CarMakersStaticInit(PPCContext& ctx, uint8_t* base);
 void CarMakersFromGarageCar(PPCContext& ctx, uint8_t* base);
 void CarMakersSetUpCarData(PPCContext& ctx, uint8_t* base);
+// GarageStage::FitCar sub_82178C40 (r3 the holder, r4 a car object; f1 as
+// it leaves it; with --native_car_physics and --native_math),
+// GarageStage::CopyRecord sub_8217FC60 (r3 the holder, r4 a record; with
+// --native_vehicle_accessors and --native_scene_models) and the stand's busy
+// marker shown and hidden, sub_8219ED10 and sub_8219EDB0 (with
+// --native_ui_movies_game).
+void CarMakersFitCar(PPCContext& ctx, uint8_t* base);
+void CarMakersCopyRecord(PPCContext& ctx, uint8_t* base);
+void CarMakersShowBusyMarker(PPCContext& ctx, uint8_t* base);
+void CarMakersHideBusyMarker(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

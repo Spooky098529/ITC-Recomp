@@ -112,4 +112,30 @@ uint64_t FromGarageCar(uint8_t* base, const front_end_car_draw::Calls& calls, ui
 uint64_t TuningScreenSetUpCarData(uint8_t* base, const front_end_car_draw::Calls& calls,
                                   uint32_t screen, uint32_t stack, double* f1);
 
+// --- The garage stage's makers (src/car_makers/stand.cpp) ---
+
+// GarageStage::FitCar (sub_82178C40): r3 = the stand's holder (its +0 the
+// stage s), r4 = a car object. Its 1,968-byte frame below `stack`: a car
+// data at frame + 80 (CarData::CarData, Vehicle::SetupFromCar(data, car),
+// its original through `calls` where its plain C++ declines), then the
+// stage's car sizes from it (s +6096 to +6204, the stage reloaded from the
+// holder for each, as the original; sin of the axles' angles x
+// [0x82002948]). Returns SetupFromCar's r3; `f1` gets the second sin's.
+uint64_t GarageStageFitCar(uint8_t* base, const front_end_car_draw::Calls& calls,
+                           uint32_t holder, uint32_t car, uint32_t stack, double* f1);
+// GarageStage::CopyRecord (sub_8217FC60): r3 = the holder, r4 = a record:
+// SceneModelRecord::Copy(m + 32, r4) on the stage's scene model m
+// (ScenePools::GetB, pool 7, s +8); where its plain C++ declines (the
+// callers' copy onto itself), its adapter through `calls` (from the 96-byte
+// frame below `stack`). Returns the copy's r3.
+uint64_t GarageStageCopyRecord(uint8_t* base, const front_end_car_draw::Calls& calls,
+                               uint32_t holder, uint32_t record, uint32_t stack);
+// sub_8219ED10 and sub_8219EDB0 (the stand's busy marker shown and hidden,
+// probably): movie 6 (UiMovies::Find with the id at frame + 80, the
+// 112-byte frame below `stack`), then its named animations through their
+// overrides (`calls`): FinishNamed 86, 87, PlayNamed 86, 85, LoopNamed 85;
+// or FinishNamed 86, 87, 85, PlayNamed 87. Return the last call's r3.
+uint64_t ShowBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack);
+uint64_t HideBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack);
+
 }  // namespace car_makers

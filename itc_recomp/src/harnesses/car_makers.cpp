@@ -15,6 +15,7 @@
 
 #include "hooks/car_makers.h"
 #include "memory/heap.h"
+#include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
@@ -511,6 +512,128 @@ void Garage(Context& h, Random& r) {
   memory::Free(allocation);
 }
 
+// --- The garage stage's makers ---
+
+constexpr uint32_t kStage = 0x9800;      // the stage (6,208 bytes; to 0xB040)
+constexpr uint32_t kCarScene = 0x10000;  // the car scene (pool 7's list at +5028)
+constexpr uint32_t kModels = 0x12000;    // two scene models, 0x1400 apart
+constexpr uint32_t kOtherRecord = 0x15000;  // a record to copy from
+constexpr uint32_t kScenePointer = 0x826C2E44;
+
+void Stand(Context& h, Random& r) {
+  const uint32_t allocation = memory::Alloc(kGarageBytes + 16, 0);
+  const uint32_t block = (allocation + 15) & ~15u;
+  {
+    Results results("GarageStage::FitCar (sub_82178C40)");
+    const uint32_t stage = block + kStage;
+    for (int c = 0; c < 40; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            LayGarage(h.base, block, r, c);
+            guest::StoreU32(h.base, block + kHolder, stage);
+            t.r3.u64 = block + kHolder;
+            t.r4.u64 = block + kGarageCar;
+          },
+          __imp__sub_82178C40, hooks::CarMakersFitCar, 32, {{stage + 6096, 28}},
+          fmt::format("case {}", c), 0, 0, {},
+          [](Outputs& out, const PPCContext& t) { out.Double(t.f1.u64); }, 0x2000,
+          kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // The car scene's pool 7 (two models in use), the stage's index 0 or 1;
+    // the record the stage's model's own +32 (as SetCar and SetCarClass pass
+    // it: the copy onto itself) or another. Where SceneModelRecord::Copy's
+    // original runs (the copy onto itself), it saves r31, which the original
+    // CopyRecord holds the record in and the plain C++ doesn't (register
+    // saves aren't reproduced): those 8 bytes (r1 - 112) are left out.
+    const uint32_t scene_global = guest::LoadU32(h.base, kScenePointer);
+    Results results("GarageStage::CopyRecord (sub_8217FC60)");
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const uint32_t scene = block + kCarScene, stage = block + kStage;
+            guest::StoreU32(h.base, scene + 5028, block + kModels);
+            for (uint32_t i = 0; i < 2; i++) {
+              const uint32_t model = block + kModels + 0x1400 * i;
+              guest::StoreU32(h.base, model + 8, i == 0 ? model + 0x1400 : 0);
+              guest::StoreU32(h.base, model + 16, 3);
+            }
+            const uint32_t index = r.Below(2);
+            guest::StoreU32(h.base, stage + 8, index);
+            guest::StoreU32(h.base, block + kHolder, stage);
+            t.r3.u64 = block + kHolder;
+            t.r4.u64 = r.Below(2) == 0 ? block + kModels + 0x1400 * index + 32
+                                       : block + kOtherRecord;
+          },
+          __imp__sub_8217FC60, hooks::CarMakersCopyRecord, 16, {}, fmt::format("case {}", c),
+          104, 8, [&] { guest::StoreU32(h.base, kScenePointer, block + kCarScene); }, {},
+          kStackBytes, kGarageBytes);
+    }
+    guest::StoreU32(h.base, kScenePointer, scene_global);
+    results.Report();
+  }
+  {
+    // Movie 6 in the block: its lists set up, its first 128 named
+    // animations over a root scene and one of 8 animations of no tracks;
+    // the movie table at the one pair {6, the movie} (put back after).
+    constexpr uint32_t kMovie = 0x0, kRoot = 0xA000, kAnimations = 0xB000, kPairs = 0xB400;
+    const std::vector<uint8_t> table = Read(h.base, ui_movies::kMovieTable, 12);
+    for (int which = 0; which < 2; which++) {
+      Results results(which == 0 ? "sub_8219ED10 (the busy marker shown)"
+                                 : "sub_8219EDB0 (the busy marker hidden)");
+      for (int c = 0; c < 30; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext&) {
+              const uint32_t movie = block + kMovie, root = block + kRoot;
+              ui_movies::InitAnimationLists(h.base, movie);
+              guest::StoreU32(h.base, movie + 16, root);
+              guest::StoreU32(h.base, movie + 20, root);
+              guest::StoreU32(h.base, movie + 24, root);
+              for (uint32_t k = 0; k < 128; k++) {
+                const uint32_t named = movie + 176 + 36 * k;
+                guest::StoreU32(h.base, named + 28, root);
+                guest::StoreU32(h.base, named + 32, block + kAnimations + 64 * r.Below(8));
+              }
+              for (uint32_t k = 0; k < 8; k++) {
+                const uint32_t animation = block + kAnimations + 64 * k;
+                for (uint32_t i = 0; i < 64; i += 4) {
+                  guest::StoreU32(h.base, animation + i, 0);
+                }
+                guest::StoreFloat(h.base, animation + 12, float(r.Below(100)) / 4.0f);
+              }
+              guest::StoreU32(h.base, root + 100, 0);
+              guest::StoreU32(h.base, root + 104, 4);
+              guest::StoreU32(h.base, root + 108, r.Below(4));
+              guest::StoreU32(h.base, root + 116, 70);
+              for (uint32_t i = 0; i < 94; i++) {
+                guest::StoreU32(h.base, root + 128 + 8 * i, block + kAnimations + 64 * r.Below(8));
+              }
+              // Some calls before: the marker already shown or hidden.
+              guest::StoreU32(h.base, block + kPairs, 6);
+              guest::StoreU32(h.base, block + kPairs + 4, movie);
+            },
+            which == 0 ? __imp__sub_8219ED10 : __imp__sub_8219EDB0,
+            which == 0 ? hooks::CarMakersShowBusyMarker : hooks::CarMakersHideBusyMarker, 16,
+            {}, fmt::format("case {}", c), 0, 0,
+            [&] {
+              guest::StoreU32(h.base, ui_movies::kMovieTable, block + kPairs);
+              guest::StoreU32(h.base, ui_movies::kMovieTable + 4, 8);
+              guest::StoreU32(h.base, ui_movies::kMovieTable + 8, 1);
+            },
+            {}, kStackBytes, kGarageBytes);
+      }
+      results.Report();
+    }
+    Write(h.base, ui_movies::kMovieTable, table.data(), 12);
+  }
+  memory::Free(allocation);
+}
+
 }  // namespace
 
 void CarMakers(Context& h) {
@@ -525,6 +648,7 @@ void CarMakers(Context& h) {
   FromCar(h, block, r);
   memory::Free(allocation);
   Garage(h, r);
+  Stand(h, r);
 }
 
 }  // namespace harness
