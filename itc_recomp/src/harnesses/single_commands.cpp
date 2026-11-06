@@ -40,6 +40,8 @@ constexpr uint32_t kDrawerVtable = 64;   // 8 slots
 constexpr uint32_t kToggle = 96;         // Flip's state: its +0 toggled
 constexpr uint32_t kState = 128;         // the drawer's state, 32 bytes
 constexpr uint32_t kSlots = 512;         // the slot and its data
+constexpr uint32_t kCallbackObject = 384;  // command 28's: +0 its vtable, +4 Flip's word pointer
+constexpr uint32_t kCallbackVtable = 448;
 constexpr uint32_t kObjects = 2048;      // 8 buffers or textures, 64 bytes each
 constexpr uint32_t kFenceList = 3072;    // the device's fence list, 8 bytes an entry
 
@@ -232,6 +234,26 @@ void DrawerDraw(Context& h, Runner& run) {
   results.Report();
 }
 
+// Command 28: the slot's +4 an object whose vtable slot 0 is the recorder or
+// Flip.
+void Callback(Context& h, Runner& run) {
+  Random& r = h.random;
+  Results results("Single::Callback (sub_8258E9B8)");
+  for (int i = 0; i < 64; i++) {
+    Case c = MakeCase(h, r);
+    auto at = [&](uint32_t offset) -> uint32_t& { return c.scratch[offset / 4]; };
+    const uint32_t slot = kSlots + 16 * r.Below(8);
+    at(slot) = 28;
+    at(slot + 4) = h.data + kCallbackObject;
+    at(kCallbackObject + 0) = h.data + kCallbackVtable;
+    at(kCallbackObject + 4) = h.data + kToggle;
+    at(kCallbackVtable) = r.Below(2) == 0 ? kRecorder : kFlip;
+    run.Run(results, c, h.data + slot, __imp__sub_8258E9B8, hooks::NativeSingleCallback,
+            fmt::format("case {}: slot +{}, slot 0 {:08X}", i, slot, at(kCallbackVtable)));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SingleCommands(Context& h) {
@@ -253,6 +275,7 @@ void SingleCommands(Context& h) {
   SetUpDrawer(h, run);
   SetShaderConstants(h, run);
   DrawerDraw(h, run);
+  Callback(h, run);
 
   Write(h.base, kDeviceGlobal, saved_device.data(), 4);
   Write(h.base, kDrawerGlobal, saved_drawer.data(), 8);

@@ -170,4 +170,14 @@ uint32_t DrawerDraw(uint8_t* base, uint32_t sp, const GuestCall& call) {
   return 0;
 }
 
+uint32_t Callback(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8258E9B8 Single::Callback");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t object = guest::LoadU32(base, slot + 4);
+  const uint32_t device = guest::LoadU32(base, kDevice);
+  const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object));
+  call(function, frame, 0x8258E9E0, {object, device});
+  return 0;
+}
+
 }  // namespace graphics::single_commands

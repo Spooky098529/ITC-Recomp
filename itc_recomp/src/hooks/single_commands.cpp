@@ -16,9 +16,11 @@ ITC_FLAG_BOOL(native_single_commands, true, "ITC",
               "Run the render command replay's single commands "
               "(docs/functions/single-commands.md: Single::InlineVertices sub_8258E8E8, "
               "Single::SetUpDrawer sub_8258E958, Single::SetShaderConstants sub_8258F0F0, "
-              "Single::DrawerDraw sub_8258F5C0 inside its command 15 wrap) "
+              "Single::DrawerDraw sub_8258F5C0 inside its command 15 wrap, Single::Callback "
+              "sub_8258E9B8) "
               "natively instead of through the translated code (the same writes; guest calls "
-              "for the drawer's vtable slots and the shader constant setters not seen in play; "
+              "for the drawer's and the callback object's vtable slots and the shader constant "
+              "setters not seen in play; "
               "checked by --run_harnesses=single_commands)");
 
 namespace sc = graphics::single_commands;
@@ -74,6 +76,10 @@ void hooks::NativeSingleDrawerDraw(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = DrawerDrawMarked(ctx, base, ctx.r1.u32);
 }
 
+void hooks::NativeSingleCallback(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = sc::Callback(base, ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx, base));
+}
+
 graphics::render_queue::SingleCommand hooks::SingleCommands(PPCContext& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t handler, uint32_t slot, uint32_t sp) -> std::optional<uint32_t> {
     if (!ITC_FLAG(native_single_commands)) {
@@ -88,6 +94,8 @@ graphics::render_queue::SingleCommand hooks::SingleCommands(PPCContext& ctx, uin
         return sc::SetShaderConstants(base, slot, sp, SingleCommandsCall(ctx, base));
       case sc::kDrawerDraw:
         return DrawerDrawMarked(ctx, base, sp);
+      case sc::kCallback:
+        return sc::Callback(base, slot, sp, SingleCommandsCall(ctx, base));
       default:
         return std::nullopt;
     }
@@ -122,4 +130,14 @@ extern "C" REX_FUNC(sub_8258F0F0) {
     return;
   }
   hooks::NativeSingleSetShaderConstants(ctx, base);
+}
+
+// Single::Callback (28): r3 = the slot.
+extern "C" REX_FUNC(sub_8258E9B8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_single_commands)) {
+    __imp__sub_8258E9B8(ctx, base);
+    return;
+  }
+  hooks::NativeSingleCallback(ctx, base);
 }

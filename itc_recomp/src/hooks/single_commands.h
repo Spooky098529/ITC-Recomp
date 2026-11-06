@@ -28,5 +28,6 @@ void NativeSingleSetShaderConstants(PPCContext& ctx, uint8_t* base);
 // Command 15 marked as command 15 (native::g_current_command) around it, as
 // its wrap in src/native/replay_hooks.cpp does.
 void NativeSingleDrawerDraw(PPCContext& ctx, uint8_t* base);
+void NativeSingleCallback(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

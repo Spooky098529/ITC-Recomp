@@ -67,4 +67,10 @@ uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const Gue
 // inline draw (src/native/replay_hooks.cpp).
 uint32_t DrawerDraw(uint8_t* base, uint32_t sp, const GuestCall& call);
 
+// Single::Callback (sub_8258E9B8, 28), in its 96-byte frame: the slot's +4
+// an object, whose vtable slot 0 is called (a guest call) with r4 = the
+// device. In play the movie (Movie::RenderFrame, overridden: our renderer
+// draws the movie's frame there). Returns 0.
+uint32_t Callback(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call);
+
 }  // namespace graphics::single_commands
