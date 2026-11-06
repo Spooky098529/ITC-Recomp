@@ -393,6 +393,8 @@ set(ITC_SOURCES
     src/scene_target/scene_target.cpp
     src/hooks/power_graph.cpp
     src/power_graph/power_graph.cpp
+    src/hooks/car_makers.cpp
+    src/car_makers/record.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp
@@ -583,6 +585,7 @@ set(ITC_SOURCES
     src/harnesses/single_commands.cpp
     src/harnesses/predicated_tiling.cpp
     src/harnesses/power_graph.cpp
+    src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp
@@ -761,6 +764,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/post_effects/record.cpp
     src/scene_target/scene_target.cpp
     src/power_graph/power_graph.cpp
+    src/car_makers/record.cpp
     src/frame_passes/record_part1.cpp src/frame_passes/record_part2.cpp
     src/frame_passes/record_part3.cpp
     src/car_sounds/x3daudio.cpp
