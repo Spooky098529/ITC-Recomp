@@ -8,6 +8,8 @@
 #include "car_scene_draw/ops.h"
 #include "course_scenery/course_scenery.h"
 #include "guest.h"
+#include "native/buffers.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 #include "track_collision/track_collision.h"
 
 namespace race_update {
@@ -119,6 +121,56 @@ uint32_t LoadScenery(uint8_t* base, const course_scenery::Calls& calls, uint32_t
   guest::StoreU32(base, config + 28, guest::LoadU32(base, entry + 4));
   cs::Setup(base, calls, frame, guest::LoadU32(base, cs::kCreated), config);
   return cs::StartLoad(base, calls, frame, guest::LoadU32(base, cs::kCreated));
+}
+
+uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, uint32_t scene,
+                        uint32_t slot, uint32_t car, uint64_t pick) {
+  ITC_NATIVE_RUNNING("sub_8215C0D8 RaceScene::RemakeCarModel");
+  constexpr uint32_t kPollLoad = 0x820DA318, kReleaseB = 0x820C5C88, kFromCar = 0x8215B878;
+  constexpr uint32_t kSetUpB = 0x820C5B28, kMemcpy = 0x825A7410;
+  const uint32_t frame = stack - 208;
+  guest::StoreU32(base, frame, stack);
+  const uint32_t model_now = guest::LoadU32(base, slot + 0);
+  if (model_now != 0 &&
+      int32_t(call(kPollLoad, {model_now}, frame, 0x8215C10C)) == 0) {
+    return 0;
+  }
+  const uint32_t held = guest::LoadU32(base, slot + 4272);
+  if (int32_t(held) != -1) {
+    call(kReleaseB, {scene, 7, held}, frame, 0x8215C12C);
+    guest::StoreU32(base, slot + 4272, 0xFFFFFFFFu);
+  }
+  guest::StoreU32(base, slot + 4272,
+                  uint32_t(vehicle_accessors::ScenePoolsClaimB(base, scene, 7)));
+  const uint32_t record = slot + 16;
+  call(kFromCar, {record, car, pick}, frame, 0x8215C15C);
+  const uint32_t model = uint32_t(
+      call(kSetUpB, {scene, 7, guest::LoadU32(base, slot + 4272), record}, frame, 0x8215C170));
+  const uint32_t block = model + 4288;
+  // The identity as the original builds it in its frame (+80), copied to
+  // the block's +16 and +336.
+  const auto identity = [&] {
+    for (uint32_t i = 0; i < 16; i++) {
+      guest::StoreFloat(base, frame + 80 + 4 * i, i % 5 == 0 ? 1.0f : 0.0f);
+    }
+  };
+  guest::StoreU32(base, slot + 0, model);
+  guest::StoreU32(base, block + 8, 1);
+  identity();
+  if (!native::Buffers_Memcpy(base, block + 16, frame + 80, 64, 0x8215C1CC)) {
+    call(kMemcpy, {block + 16, frame + 80, 64}, frame, 0x8215C1CC);
+  }
+  identity();
+  if (!native::Buffers_Memcpy(base, block + 336, frame + 80, 64, 0x8215C210)) {
+    call(kMemcpy, {block + 336, frame + 80, 64}, frame, 0x8215C210);
+  }
+  if (int32_t(guest::LoadU32(base, record)) == 3) {
+    const int32_t kind = int32_t(guest::LoadU32(base, slot + 32));
+    if (kind == 0 || kind == 7) {
+      guest::StoreU32(base, block + 592, 1);
+    }
+  }
+  return 1;
 }
 
 }  // namespace race_update

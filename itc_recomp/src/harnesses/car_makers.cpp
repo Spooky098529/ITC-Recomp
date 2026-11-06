@@ -296,6 +296,22 @@ void LayCar(uint8_t* base, uint32_t car, Random& r) {
   }
 }
 
+}  // namespace
+
+// For other harnesses' worlds (race_update's RaceScene::RemakeCarModel): a
+// car object FromCar can take at `car` (LayCar's), and the stand-in car
+// parameters at `params` whose nine parts tables all start at `tables`
+// (the caller fills 0x4E00 bytes there and points [0x826C2E48] at
+// `params`).
+void LayFromCarWorld(uint8_t* base, uint32_t car, uint32_t params, uint32_t tables, Random& r) {
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, params + 16 + 4 * i, tables);
+  }
+  LayCar(base, car, r);
+}
+
+namespace {
+
 void FromCar(Context& h, uint32_t block, Random& r) {
   Results results("SceneModelRecord::FromCar (sub_8215B878)");
   // The car parameters [0x826C2E48] (not loaded yet when the harnesses

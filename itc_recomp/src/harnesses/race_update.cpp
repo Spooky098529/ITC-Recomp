@@ -296,12 +296,97 @@ void LoadSceneryCases(Context& h) {
   results.Report();
 }
 
+// --- RaceScene::RemakeCarModel: a block holding the second set ([0x826C2E44]
+// pointed at it; its pool
+// 7 list one scene model, in use or free, its build deferred (+5044 1 to 3)
+// so SetUpB's SceneModel::SetUp only copies the record, the scene's +4 0:
+// no sound loads), a car slot (its model none, that model loading (+5028
+// or +5040 set) or loaded (a car with no parts: SceneModel::PollLoad 1),
+// its pool index -1 or the model's, released then), a car object as
+// SceneModelRecord::FromCar's cases make it (car_makers.cpp) with the
+// stand-in car parameters, and the paint picks they use. Both sides call
+// the callees through their adapters; the block and r3 compared, the stack
+// below the call filled the same for both ---
+
+}  // namespace
+
+void LayFromCarWorld(uint8_t* base, uint32_t car, uint32_t params, uint32_t tables, Random& r);
+
+namespace {
+
+void RemakeCarModels(Context& h) {
+  constexpr uint32_t kBytes = 0x10000;
+  constexpr uint32_t kScene = 0x100, kModel = 0x2000, kSlot = 0x4000, kCar = 0x6000;
+  constexpr uint32_t kParams = 0x7000, kTables = 0x8000;
+  constexpr uint32_t kParamsPointer = 0x826C2E48;
+  const Block block(kBytes);
+  if (block.address == 0) {
+    ITC_LOG_WARN("harness: race_update: no block for RaceScene::RemakeCarModel");
+    return;
+  }
+  constexpr uint32_t kSceneSet = 0x826C2E44;  // the second set (SceneModel::Release's)
+  const SavedBytes saved(h.base, {{kParamsPointer, 4}, {kSceneSet, 4}});
+  const uint32_t b = block.address;
+  Random random(0x52454D414B45ull);
+  Results results("RaceScene::RemakeCarModel (sub_8215C0D8)");
+  for (int c = 0; c < 200; c++) {
+    const uint64_t seed = random.Next();
+    Outputs out[2];
+    uint32_t r3[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, b, kBytes, r);
+      PPCContext t = CallContext(h);
+      WriteRandom(h.base, t.r1.u32 - 4096, 4096, r);
+      const uint32_t scene = b + kScene, model = b + kModel, slot = b + kSlot, car = b + kCar;
+      guest::StoreU32(h.base, kSceneSet, scene);
+      guest::StoreU32(h.base, scene + 4, 0);
+      guest::StoreU32(h.base, scene + 4944 + 12 * 7, model);
+      guest::StoreU32(h.base, scene + 4944 + 12 * 7 + 8, 1);
+      guest::StoreU32(h.base, model + 8, 0);
+      guest::StoreU32(h.base, model + 16, r.Below(2) == 0 ? 3 : 0);
+      guest::StoreU32(h.base, model + 20, r.Below(6));
+      guest::StoreU32(h.base, model + 32, 1);
+      guest::StoreU32(h.base, model + 5028, r.Below(4) == 0 ? 1 : 0);
+      guest::StoreU32(h.base, model + 5040, r.Below(4) == 0 ? 1 : 0);
+      guest::StoreU32(h.base, model + 5044, 1 + r.Below(3));
+      for (const uint32_t at : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+        guest::StoreU32(h.base, model + at, 0);
+      }
+      guest::StoreU32(h.base, model + 5116, scene);
+      guest::StoreU32(h.base, slot + 0, r.Below(4) == 0 ? 0 : model);
+      guest::StoreU32(h.base, slot + 4272, r.Below(2) == 0 ? 0xFFFFFFFFu : 0);
+      guest::StoreU32(h.base, kParamsPointer, b + kParams);
+      LayFromCarWorld(h.base, car, b + kParams, b + kTables, r);
+      const uint64_t picks[4] = {0xFFFFFFFFFFFFFFFFull, 0xFFFFFFFFFFFFFFFEull, r.Below(20),
+                                 (r.Next() << 32) | r.Below(20)};
+      t.r3.u64 = b;
+      t.r4.u64 = scene;
+      t.r5.u64 = slot;
+      t.r6.u64 = car;
+      t.r7.u64 = picks[r.Below(4)];
+      if (v == 0) {
+        Original<__imp__sub_8215C0D8>(t, h.base);
+      } else {
+        hooks::RaceUpdateRemakeCarModel(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, b, kBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      r3[v] = t.r3.u32;
+    }
+    results.Check(out[0], out[1], fmt::format("case {} r3 {}", c, r3[0]));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceUpdate(Context& h) {
   VaryCars(h);
   Lights(h);
   LoadSceneryCases(h);
+  RemakeCarModels(h);
 }
 
 }  // namespace harness

@@ -8,6 +8,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <initializer_list>
 
 namespace course_scenery {
 struct Calls;
@@ -60,5 +62,27 @@ constexpr uint32_t kSceneryConfigs = 0x82602EA0;
 // StartLoad's r3. Only where hooks::CourseScenerySetUpNative.
 uint32_t LoadScenery(uint8_t* base, const course_scenery::Calls& calls, uint32_t stack,
                      uint32_t scene);
+
+// A guest call the plain C++ makes: `function` with r3 up set to `args` (64
+// bits each), r1 = `frame` and the link register `lr` (the original's
+// return address); its r3. Flush-to-zero off after it.
+using GuestCall = std::function<uint64_t(uint32_t function, std::initializer_list<uint64_t> args,
+                                         uint32_t frame, uint32_t lr)>;
+
+// sub_8215C0D8 RaceScene::RemakeCarModel: `slot` a car slot (+0 its scene
+// model, +16 its 4,244-byte record, +4272 its pool index), `scene` the
+// second set ([0x826C2E44]), `car` a racer record, `pick` the paint pick
+// (64 bits, for SetPaint). 0 at once while the slot's model is loading
+// (SceneModel::PollLoad 0); else the old one released (ScenePools::ReleaseB
+// (scene, 7, +4272), +4272 = -1) when there, +4272 = ClaimB(scene, 7), the
+// record from the car (SceneModelRecord::FromCar), +0 = ScenePools::SetUpB
+// (scene, 7, +4272, +16); on its block (model + 4288) +8 = 1, +16 and +336
+// the identity (memcpy from the frame's +80, where it's written as the
+// original builds it); a traffic record (+16 3) whose +16 (slot +32) is 0
+// or 7 gets +592 = 1. Returns 1. PollLoad, ReleaseB, FromCar and SetUpB
+// through `call` (their adapters, inside their diagnostics' wraps) from its
+// 208-byte frame below `stack` (its back chain written).
+uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, uint32_t scene,
+                        uint32_t slot, uint32_t car, uint64_t pick);
 
 }  // namespace race_update

@@ -12,7 +12,8 @@ ITC_FLAG_BOOL(native_race_update, true, "ITC",
               "Run the race's update (docs/functions/race-update.md: RaceScene::VaryCar "
               "sub_8215B330; RaceLights::Update sub_8215D008 with RaceLights::UploadDirectional "
               "sub_8215C698, no adapter: only Update's plain C++ calls it; RaceScene::LoadScenery "
-              "sub_8215B790, over the course scenery's plain C++ where it may run) natively instead of "
+              "sub_8215B790, over the course scenery's plain C++ where it may run; RaceScene::RemakeCarModel "
+              "sub_8215C0D8, its callees through their adapters) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_update)");
 
@@ -41,6 +42,34 @@ void RaceUpdateLoadScenery(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+race_update::GuestCall RaceUpdateGuestCall(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t function, std::initializer_list<uint64_t> args, uint32_t frame,
+                      uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64;
+    PPCRegister* registers[5] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7};
+    int i = 0;
+    for (const uint64_t arg : args) {
+      registers[i++]->u64 = arg;
+    }
+    ctx.r1.u64 = frame;
+    ctx.lr = lr;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+}
+
+void RaceUpdateRemakeCarModel(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const race_update::GuestCall call = RaceUpdateGuestCall(ctx, base);
+  const uint32_t r3 = race_update::RemakeCarModel(base, call, ctx.r1.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r6.u32, ctx.r7.u64);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -57,6 +86,10 @@ void RaceUpdateLoadScenery(PPCContext& ctx, uint8_t* base) {
 // Their callers, Car::TickUpdate and RaceScene::Update, are recompiled.
 ITC_RACE_UPDATE(8215B330, RaceUpdateVaryCar)
 ITC_RACE_UPDATE(8215D008, RaceUpdateLights)
+// RaceScene::RemakeCarModel: r3 = the car slots (not read), r4 = the scene,
+// r5 = a slot, r6 = a car, r7 = the paint pick; r3 = 0 or 1. Also from
+// RaceScene::SetUpCars (recompiled).
+ITC_RACE_UPDATE(8215C0D8, RaceUpdateRemakeCarModel)
 // RaceLights::UploadDirectional (sub_8215C698) has no adapter: its only
 // caller, RaceLights::Update, is native; --native_race_update switches it.
 

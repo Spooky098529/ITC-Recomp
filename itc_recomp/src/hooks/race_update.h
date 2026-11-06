@@ -8,6 +8,8 @@
 
 #include "guest.h"
 
+#include "race_update/race_update.h"
+
 namespace hooks {
 
 // RaceScene::VaryCar sub_8215B330: r3 = the car, r4 = the racer index, r5 =
@@ -20,5 +22,11 @@ void RaceUpdateLights(PPCContext& ctx, uint8_t* base);
 // RaceScene::LoadScenery sub_8215B790: r3 = the race scene; r3 as
 // Scenery::StartLoad leaves it. Only where hooks::CourseScenerySetUpNative.
 void RaceUpdateLoadScenery(PPCContext& ctx, uint8_t* base);
+// The guest calls the race update's plain C++ makes through `ctx` (the
+// callee by its address, so overridden ones run their adapters).
+race_update::GuestCall RaceUpdateGuestCall(PPCContext& ctx, uint8_t* base);
+// RaceScene::RemakeCarModel sub_8215C0D8: r4 = the scene, r5 = a car slot,
+// r6 = a car, r7 = the paint pick; r3 = 0 or 1, lr put back.
+void RaceUpdateRemakeCarModel(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
