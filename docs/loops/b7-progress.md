@@ -72,8 +72,13 @@ file's history. What's left to see in a drive, from every run:
   13 in the replay `itc_3762` (ok), 19 to drive). Recorded.
 - Cleanup lead (no mapping, not counted): `GarageStage::ReapplyRecord`
   `sub_82178DF8` and `ReapplyRecordNoDecals` `sub_82178E60` in
-  `car-makers.md`; its line deleted from `leads.md`. Migration agent
-  running.
+  `car-makers.md`; its line deleted from `leads.md`. Migration cea27e18,
+  6fbff1bb (both native under `--native_car_makers`; the adapters of
+  `SceneModel::ApplyRecord`, `ReloadDecals`, `ApplyLightKit` and
+  `ApplyPaint`'s wrap removed; races 33 and 28 s, 0 errors, all
+  harnesses 0 differing; no subagents); left: `GarageStage::SetCar`
+  `sub_8217FD58` and `SetCarClass` `sub_8217FDC8` now ready, and the
+  `ApplyWheelPaint` wrap. Validation agent running.
 
 ## Done
 
