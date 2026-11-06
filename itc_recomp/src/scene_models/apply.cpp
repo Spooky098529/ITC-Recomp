@@ -6,6 +6,8 @@
 #include "base/log.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "scene_models/scene_models.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace scene_models {
 
@@ -18,6 +20,7 @@ constexpr uint32_t kPartsBuild = 0x820E05E0;
 constexpr uint32_t kSelectedTexture = 0x820D4588;
 constexpr uint32_t kSetGauges = 0x820E3938;
 constexpr uint32_t kReloadDecals = 0x820D5D20;
+constexpr uint32_t kSetUpB = 0x820C5B28;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -107,6 +110,25 @@ uint64_t SceneModelReloadDecals(uint8_t* base, const ApplyCall& call, uint32_t m
   Store(base, model + 5056, 0);
   call(kSetRecord, {Load(base, Load(base, model + 5048) + 24), model + 48}, frame, 0x820D9D90);
   return call(kReloadDecals, {Load(base, Load(base, model + 5048) + 24)}, frame, 0x820D9D9C);
+}
+
+uint64_t SceneModelAddSecondWheels(uint8_t* base, const ApplyCall& call, uint32_t model,
+                                   uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D9E00 SceneModel::AddSecondWheels");
+  const uint32_t frame = Frame(base, stack, 112);
+  if (Load(base, model + 5032) != 0) {
+    return 0;
+  }
+  Store(base, model + 5032, 1);
+  Store(base, model + 5112, 0);
+  const int32_t index = vehicle_accessors::ScenePoolsClaimB(base, Load(base, model + 5116), 5);
+  const uint32_t wheels =
+      vehicle_accessors::ScenePoolsGetB(base, Load(base, model + 5116), 5, uint32_t(index));
+  Store(base, model + 5108, wheels);
+  SetCarModel(base, wheels, Load(base, model + 5048));
+  call(kSetUpB, {Load(base, model + 5116), 5, uint64_t(int64_t(index)), model + 4068}, frame,
+       0x820D9E80);
+  return 1;
 }
 
 }  // namespace scene_models

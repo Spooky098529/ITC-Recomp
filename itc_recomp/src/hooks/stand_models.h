@@ -57,6 +57,17 @@ void StandModelsSetTireGrade(PPCContext& ctx, uint8_t* base);
 void StandModelsTuningSetTireGrade(PPCContext& ctx, uint8_t* base);
 void StandModelsSetTireGrades(PPCContext& ctx, uint8_t* base);
 void StandModelsSetTireTextures(PPCContext& ctx, uint8_t* base);
+// The second wheels (with --native_vehicle_accessors and
+// --native_scene_models; lr put back): TuningScreen::StepSecondWheels
+// sub_821CC890 (r3 the tuning screen), and, without adapters (the
+// harness's), GarageStage::SecondWheelsPending sub_82179C48,
+// AddSecondWheels sub_82179998, ApplyWheelPaint sub_821799D8 (r3 the
+// holder) and SceneModel::AddSecondWheels sub_820D9E00 (r3 a scene model).
+void StandModelsStepSecondWheels(PPCContext& ctx, uint8_t* base);
+void StandModelsSecondWheelsPending(PPCContext& ctx, uint8_t* base);
+void StandModelsAddSecondWheels(PPCContext& ctx, uint8_t* base);
+void StandModelsApplyWheelPaint(PPCContext& ctx, uint8_t* base);
+void StandModelsSceneAddSecondWheels(PPCContext& ctx, uint8_t* base);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 

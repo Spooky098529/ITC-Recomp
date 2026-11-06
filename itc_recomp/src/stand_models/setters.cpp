@@ -20,6 +20,7 @@ constexpr uint32_t kSetUpB = 0x820C5B28;
 constexpr uint32_t kApplyRecord = 0x820DA758;
 constexpr uint32_t kWheelsSetRecord = 0x820D8EC0;
 constexpr uint32_t kSetTexture = 0x820D17D8;
+constexpr uint32_t kApplyWheelPaint = 0x820D9C50;
 constexpr uint32_t kDecalScale = 0x82001BE0;
 
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
@@ -273,6 +274,43 @@ uint64_t TuningScreenSetTireGrade(uint8_t* base, const GuestCall& call, uint64_t
   // times 4, wrapping).
   const uint32_t grade = Load(base, frame + 80 + (index << 2));
   return SetTireGrade(base, call, Load(base, Load(base, kHolder)), which, grade, frame);
+}
+
+uint32_t SecondWheelsPending(uint8_t* base, uint32_t holder, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179C48 GarageStage::SecondWheelsPending");
+  Frame(base, stack, 96);
+  return Load(base, StageModel(base, holder) + 5032);
+}
+
+uint64_t AddSecondWheels(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179998 GarageStage::AddSecondWheels");
+  const uint32_t frame = Frame(base, stack, 96);
+  return scene_models::SceneModelAddSecondWheels(base, call, StageModel(base, holder), frame);
+}
+
+uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821799D8 GarageStage::ApplyWheelPaint");
+  const uint32_t frame = Frame(base, stack, 96);
+  return call(kApplyWheelPaint, {StageModel(base, holder)}, frame, 0x82179A04);
+}
+
+uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821CC890 TuningScreen::StepSecondWheels");
+  const uint32_t frame = Frame(base, stack, 112);
+  const auto holder = [&] { return Load(base, Load(base, kHolder)); };
+  if (SecondWheelsPending(base, holder(), frame) == 0 &&
+      int32_t(Load(base, screen + 25244)) == 1) {
+    const uint64_t r3 = AddSecondWheels(base, call, holder(), frame);
+    Store(base, screen + 25244, 2);
+    return r3;
+  }
+  const uint32_t pending = SecondWheelsPending(base, holder(), frame);
+  if (pending != 0 || int32_t(Load(base, screen + 25244)) != 2) {
+    return pending;
+  }
+  const uint64_t r3 = ApplyWheelPaint(base, call, holder(), frame);
+  Store(base, screen + 25244, 0);
+  return r3;
 }
 
 }  // namespace stand_models

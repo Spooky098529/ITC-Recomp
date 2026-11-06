@@ -483,6 +483,45 @@ void TireGrades(Context& h, uint32_t b) {
   }
 }
 
+// The second wheels' light steps: Pending (the model's +5032 any word) and
+// GarageStage::ApplyWheelPaint (the model not ready, +5036 0, or traffic:
+// SceneModel::ApplyWheelPaint does nothing; load_poll's cases take it
+// further). AddSecondWheels and StepSecondWheels are in car_models'
+// SetUpB world (they set up a pool 5 object).
+void SecondWheels(Context& h, uint32_t b) {
+  {
+    Results results("GarageStage::SecondWheelsPending (sub_82179C48)");
+    for (int c = 0; c < 32; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             t.r3.u64 = b + kHolderAt;
+           },
+           __imp__sub_82179C48, hooks::StandModelsSecondWheelsPending, 96, 16, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::ApplyWheelPaint (sub_821799D8)");
+    for (int c = 0; c < 32; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             for (const uint32_t m : {kModel, kModel2}) {
+               const bool traffic = r.Below(3) == 0;
+               Put(h.base, b + m + 32, traffic ? 3 : r.Below(3));
+               Put(h.base, b + m + 5036, traffic ? r.Below(2) : 0);
+             }
+             t.r3.u64 = b + kHolderAt;
+           },
+           __imp__sub_821799D8, hooks::StandModelsApplyWheelPaint, 96, 16, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void StandModels(Context& h) {
@@ -498,6 +537,7 @@ void StandModels(Context& h) {
     MakeModels(h, b);
     Reapplies(h, b);
     TireGrades(h, b);
+    SecondWheels(h, b);
   }
   memory::Free(allocation);
 }

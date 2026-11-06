@@ -52,4 +52,12 @@ std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& ca
 uint64_t SceneModelReloadDecals(uint8_t* base, const ApplyCall& call, uint32_t model,
                                 uint32_t stack);
 
+// sub_820D9E00 SceneModel::AddSecondWheels (probably): once (+5032 clear,
+// else 0): +5032 = 1, +5112 = 0, a pool 5 object (ScenePools::ClaimB and
+// GetB on the scene +5116) into +5108, its +24 = the car model (+5048), set
+// up with the wheels record (+4068: ScenePools::SetUpB through `call`);
+// returns 1. Its 112-byte frame below `stack`.
+uint64_t SceneModelAddSecondWheels(uint8_t* base, const ApplyCall& call, uint32_t model,
+                                   uint32_t stack);
+
 }  // namespace scene_models

@@ -134,4 +134,22 @@ uint64_t SetTireGrade(uint8_t* base, const GuestCall& call, uint32_t holder, uin
 uint64_t TuningScreenSetTireGrade(uint8_t* base, const GuestCall& call, uint64_t r3,
                                   uint32_t which, uint32_t index, uint32_t stack);
 
+// --- The second wheels (src/stand_models/setters.cpp) ---
+
+// sub_82179C48 GarageStage::SecondWheelsPending: the model's +5032 (r3).
+// 96-byte frame.
+uint32_t SecondWheelsPending(uint8_t* base, uint32_t holder, uint32_t stack);
+// sub_82179998 GarageStage::AddSecondWheels: SceneModel::AddSecondWheels'
+// plain C++ on the model (its r3). 96-byte frame.
+uint64_t AddSecondWheels(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack);
+// sub_821799D8 GarageStage::ApplyWheelPaint: SceneModel::ApplyWheelPaint on
+// the model through `call` (its r3). 96-byte frame.
+uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack);
+// sub_821CC890 TuningScreen::StepSecondWheels: with the holder [[kHolder]]
+// (loaded again for each call): not pending and the screen's +25244 1:
+// AddSecondWheels, +25244 = 2 (its r3); else (Pending asked again) not
+// pending and +25244 2: ApplyWheelPaint, +25244 = 0 (its r3); else r3 the
+// second Pending's answer. 112-byte frame.
+uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t stack);
+
 }  // namespace stand_models

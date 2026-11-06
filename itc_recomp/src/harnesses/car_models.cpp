@@ -24,6 +24,7 @@
 #include "hooks/archive.h"
 #include "hooks/car_models.h"
 #include "hooks/scene_models.h"
+#include "hooks/stand_models.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
@@ -2600,11 +2601,28 @@ void SetUpBCases(Context& h) {
   // Each pool's record within the scene model record.
   static constexpr uint32_t kRecordOf[8] = {16, 3712, 3892, 3772, 4192, 4036, 16, 0};
   Random random(0x5345545550420000ull);
-  for (int which = 0; which < 2; which++) {
-    Results results(which == 0 ? "ScenePools::SetUpB (sub_820C5B28) with SceneCockpit::SetUp "
-                                 "(sub_820DBE80) and SceneModel::SetUp (sub_820DB458)"
-                               : "SceneModel::Build (sub_820D9870)");
-    for (int c = 0; c < (which == 0 ? 300 : 120); c++) {
+  // Besides SetUpB and Build (which 0 and 1), the second wheels' claim in
+  // this world (stand_models.cpp's plain C++, stand-models.md): which 2
+  // SceneModel::AddSecondWheels on the scene model, 3
+  // GarageStage::AddSecondWheels on a stand whose stage holds it (pool 7's
+  // object, in use), 4 TuningScreen::StepSecondWheels (the holder through
+  // [0x826D83E0], the screen's +25244 0 to 3; the model not ready, +5036
+  // 0, so SceneModel::ApplyWheelPaint, whose cases are load_poll's, does
+  // nothing); the model's +5032 clear or set, its car record (+48) copied
+  // in, its car model (+5048) pool 0's (none for traffic).
+  constexpr uint32_t kHolderGlobal = 0x826D83E0;
+  SavedWord holder_global(h.base, kHolderGlobal);
+  const uint32_t holder = block + 0x4E000, holder_word = block + 0x4E040;
+  const uint32_t stage = block + 0x4E100, screen = block + 0x4E800 - 25244;
+  static const char* const kNames[5] = {
+      "ScenePools::SetUpB (sub_820C5B28) with SceneCockpit::SetUp (sub_820DBE80) and "
+      "SceneModel::SetUp (sub_820DB458)",
+      "SceneModel::Build (sub_820D9870)", "SceneModel::AddSecondWheels (sub_820D9E00)",
+      "GarageStage::AddSecondWheels (sub_82179998)",
+      "TuningScreen::StepSecondWheels (sub_821CC890)"};
+  for (int which = 0; which < 5; which++) {
+    Results results(kNames[which]);
+    for (int c = 0; c < (which == 0 ? 300 : which == 1 ? 120 : 48); c++) {
       const uint64_t seed = random.Next();
       Outputs out[2];
       std::string what;
@@ -2612,7 +2630,8 @@ void SetUpBCases(Context& h) {
         Random r(seed);
         RandomBytes(h.base, block, kBytes, r);
         // Pool 7 (SceneModel::SetUp, the set-up in play) a third of the time.
-        const uint32_t pool = which == 1             ? 7
+        const uint32_t pool = which >= 2             ? 5
+                              : which == 1           ? 7
                               : r.Below(12) == 0     ? 8 + r.Below(3)
                               : r.Below(3) == 0      ? 7
                                                      : r.Below(7);
@@ -2696,6 +2715,18 @@ void SetUpBCases(Context& h) {
           // A traffic car's wheels have no car model.
           Put(h.base, block + kSecond[5] + 24, kind == 3 ? 0 : block + kSecond[0]);
         }
+        if (which >= 2) {
+          Write(h.base, model + 32, Read(h.base, record, 4244).data(), 4244);
+          Put(h.base, model + 5048, kind == 3 ? 0 : block + kSecond[0]);
+          Put(h.base, model + 5032, r.Below(4) == 0 ? 1 : 0);
+          Put(h.base, model + 5036, 0);
+          Put(h.base, model + 16, 3);
+          Put(h.base, holder, stage);
+          Put(h.base, holder_word, holder);
+          Put(h.base, kHolderGlobal, holder_word);
+          Put(h.base, stage + 8, 0);
+          Put(h.base, screen + 25244, r.Below(4));
+        }
         // The sound globals and buffers.
         for (uint32_t i = 0; i < 8; i++) {
           Put(h.base, 0x826D8374 + 4 * i, buffer_a);
@@ -2717,9 +2748,18 @@ void SetUpBCases(Context& h) {
           t.r5.u64 = r.Below(4) == 0 ? 1 : 0;
           t.r6.u64 = pool > 7 ? record : record + kRecordOf[pool];
           (v == 0 ? __imp__sub_820C5B28 : hooks::ScenePoolsSetUpB)(t, h.base);
-        } else {
+        } else if (which == 1) {
           t.r3.u64 = model;
           (v == 0 ? __imp__sub_820D9870 : hooks::SceneModelBuild)(t, h.base);
+        } else if (which == 2) {
+          t.r3.u64 = model;
+          (v == 0 ? __imp__sub_820D9E00 : hooks::StandModelsSceneAddSecondWheels)(t, h.base);
+        } else if (which == 3) {
+          t.r3.u64 = holder;
+          (v == 0 ? __imp__sub_82179998 : hooks::StandModelsAddSecondWheels)(t, h.base);
+        } else {
+          t.r3.u64 = screen;
+          (v == 0 ? __imp__sub_821CC890 : hooks::StandModelsStepSecondWheels)(t, h.base);
         }
         what = fmt::format("case {} pool {} kind {} scene +4 {}", c, pool, kind,
                            guest::LoadU32(h.base, scene + 4));

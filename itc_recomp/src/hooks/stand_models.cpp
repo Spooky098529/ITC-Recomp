@@ -5,6 +5,7 @@
 #include "hooks/stand_models.h"
 
 #include "base/flags.h"
+#include "scene_models/apply.h"
 
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_scene_models);
@@ -25,7 +26,13 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "sub_82179130 with SceneWheels::SetTireGrades sub_820E7470 and "
               "Wheels::SetTireTextures sub_820D8F18 (no adapters: only it reaches them) and "
               "TuningScreen::SetTireGrade sub_821CCA38 (with --native_vehicle_accessors; "
-              "Wheels::SetRecord and PartModel::SetTexture through their adapters) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
+              "Wheels::SetRecord and PartModel::SetTexture through their adapters); the second "
+              "wheels, TuningScreen::StepSecondWheels sub_821CC890 with "
+              "GarageStage::SecondWheelsPending sub_82179C48, AddSecondWheels sub_82179998, "
+              "ApplyWheelPaint sub_821799D8 and SceneModel::AddSecondWheels sub_820D9E00 (no "
+              "adapters: only it reaches them; with --native_vehicle_accessors and "
+              "--native_scene_models; ScenePools::SetUpB and SceneModel::ApplyWheelPaint through "
+              "their adapters) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
 
 namespace hooks {
 
@@ -226,6 +233,42 @@ void StandModelsSetTireTextures(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void StandModelsStepSecondWheels(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
+    __imp__sub_821CC890(ctx, base);
+    return;
+  }
+  const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::StepSecondWheels(base, call, r3, stack);
+  });
+}
+
+void StandModelsSecondWheelsPending(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = sm::SecondWheelsPending(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void StandModelsAddSecondWheels(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::AddSecondWheels(base, call, r3, stack);
+  });
+}
+
+void StandModelsApplyWheelPaint(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::ApplyWheelPaint(base, call, r3, stack);
+  });
+}
+
+void StandModelsSceneAddSecondWheels(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return scene_models::SceneModelAddSecondWheels(base, call, r3, stack);
+  });
+}
+
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
@@ -260,6 +303,12 @@ ITC_STAND_MODELS(82179548, StandModelsSetAero)
 ITC_STAND_MODELS(82178EC0, StandModelsReloadDecals)
 ITC_STAND_MODELS(82179130, StandModelsSetTireGrade)
 ITC_STAND_MODELS(821CCA38, StandModelsTuningSetTireGrade)
+ITC_STAND_MODELS(821CC890, StandModelsStepSecondWheels)
+// GarageStage::SecondWheelsPending sub_82179C48, AddSecondWheels
+// sub_82179998, ApplyWheelPaint sub_821799D8 and SceneModel::AddSecondWheels
+// sub_820D9E00 have none: only TuningScreen::StepSecondWheels reaches them,
+// and its plain C++ calls theirs (their register steps above are the
+// harness's).
 // SceneWheels::SetTireGrades sub_820E7470 and Wheels::SetTireTextures
 // sub_820D8F18 have none: only GarageStage::SetTireGrade reaches them, and
 // its plain C++ calls theirs (their register steps above are the harness's).
