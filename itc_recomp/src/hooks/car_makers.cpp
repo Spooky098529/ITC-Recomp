@@ -35,12 +35,14 @@ ITC_FLAG_BOOL(native_car_makers, true, "ITC",
               "originals where theirs decline); GarageStage::FitCar sub_82178C40 (with "
               "--native_car_physics and --native_math), GarageStage::CopyRecord sub_8217FC60 "
               "(with --native_vehicle_accessors and --native_scene_models; "
-              "SceneModelRecord::Copy's adapter for the copy onto itself), and the stand's busy "
+              "SceneModelRecord::Copy's adapter for the copy onto itself; no adapter: SetCar's "
+              "and SetCarClass' plain C++ call it), and the stand's busy "
               "marker sub_8219ED10 and sub_8219EDB0 (with --native_ui_movies_game; the named "
               "animations through their overrides), GarageStage::ReapplyRecord sub_82178DF8 and "
               "ReapplyRecordNoDecals sub_82178E60 (with --native_scene_models, "
               "--native_front_end_car_draw and the load poll's flags; SceneModel::ApplyRecord's "
-              "adapter for the race's path), GarageStage::SetCar sub_8217FD58 and SetCarClass "
+              "adapter for the race's path; no adapters: SetCar's and SetCarClass' plain C++ call "
+              "them), GarageStage::SetCar sub_8217FD58 and SetCarClass "
               "sub_8217FDC8 (with all of these makers' flags), and the makers by id above them, "
               "GarageStage::ShowCarById sub_82182C90 and ShowCarByIdWithClass sub_82182D30 "
               "(with --native_race_setup too) natively instead of through the translated code "
@@ -325,9 +327,6 @@ ITC_CAR_MAKERS(82110448, CarMakersGarageCarReset)
 ITC_CAR_MAKERS(825D9EF0, CarMakersStaticInit)
 ITC_CAR_MAKERS(821DF2F8, CarMakersSetUpCarData)
 ITC_CAR_MAKERS(82178C40, CarMakersFitCar)
-ITC_CAR_MAKERS(8217FC60, CarMakersCopyRecord)
-ITC_CAR_MAKERS(82178DF8, CarMakersReapplyRecord)
-ITC_CAR_MAKERS(82178E60, CarMakersReapplyRecordNoDecals)
 ITC_CAR_MAKERS(8217FD58, CarMakersSetCar)
 ITC_CAR_MAKERS(8217FDC8, CarMakersSetCarClass)
 ITC_CAR_MAKERS(82182C90, CarMakersShowCarById)
@@ -343,3 +342,7 @@ ITC_CAR_MAKERS(8219EDB0, CarMakersHideBusyMarker)
 // sub_82179A60's adapter is removed: its callers in play,
 // TuningScreen::SetUpCarData and CarList::DrawEntryPowerGraph, are native
 // and call its plain C++ (its register step above is the harness's).
+// GarageStage::CopyRecord sub_8217FC60, ReapplyRecord sub_82178DF8 and
+// ReapplyRecordNoDecals sub_82178E60 have none since their callers,
+// GarageStage::SetCar and SetCarClass, are native and call their plain C++
+// (their register steps above are the harness's).
