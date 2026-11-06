@@ -28,8 +28,10 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the car objects' makers (lead picked: `sub_82179A60`,
   `sub_82182C90`, `sub_82182D30`, `sub_821A1380`, `sub_82110448`; ready
   groups under all five roots, and it unblocks the power graph's
-  `sub_82250670`; its line deleted from `leads.md`). Mapping agent
-  running.
+  `sub_82250670`; its line deleted from `leads.md`). Map checked
+  (aca0ef24: `car-makers.md`, 25 rows, all new, 24 in play; 0 errors;
+  11 ready groups; 3 leads added, two lead lines trimmed; no
+  subagents). Migration agent running.
 
 ## Done
 
@@ -58,5 +60,7 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4233, work left 2178 (wrapped 57, known
   459, unknown 1662).
 - After its validation (`itc_3663`): ours 4233, work left 2178.
+- After the car makers' map: ours 4233, work left 2178 (wrapped 57,
+  known 483, unknown 1638).
 
 ## Stopped
