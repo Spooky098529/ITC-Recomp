@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
+
+(Nothing yet.)
+
 ## Run 2026-11-06 01:02 (`b7-loop-06-11-26`)
 
 - Two leads deleted as covered (as the run of 2026-11-04 did): the device lock's callers (`sub_820962B8` in `frame-passes.md`, `sub_8209BE88` in `app-start-up.md`, `sub_820AE528` `Movie::Release` in `movies.md`, `sub_8212F0B8` in `screen-objects.md`, `sub_82133C60` and `sub_82138C38` in `post-effects.md`) and the other `ScopedLock` users (`sub_8258DFF0`, `sub_8258E098`, `sub_8258E1D8`, `sub_8258E410`, `sub_8258E498` in `shader-objects.md` and `models.md`, ours; `sub_82593E78` `MovieWrapper::Open` in `movies.md`, over the replaced movie library).
