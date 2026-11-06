@@ -31,7 +31,15 @@ file's history. What's left to see in a drive, from every run:
   `sub_82250670`; its line deleted from `leads.md`). Map checked
   (aca0ef24: `car-makers.md`, 25 rows, all new, 24 in play; 0 errors;
   11 ready groups; 3 leads added, two lead lines trimmed; no
-  subagents). Migration agent running.
+  subagents). Migration 9d2ce651..1276cd9a (`--native_car_makers`:
+  the record's setters and `FromCar`, the garage cars, `FromGarageCar`
+  with the tuning screen's set-up, `FitCar`, `CopyRecord`, the busy
+  marker; 4 adapters removed; `itc_3674`: race 38 s, 0 errors, 14
+  harnesses 0 differing; no subagents); left: none ready, the rest
+  waits on `SceneModel::ApplyRecord`/`ReloadDecals`, `ScenePools::SetUpB`,
+  `CarScene::Update`, `GarageStage::Draw` and `sub_821A1380`'s handlers;
+  `CarList::DrawEntryPowerGraph` `sub_82250670` now ready (a cleanup
+  lead). Validation agent running.
 
 ## Done
 
@@ -62,5 +70,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3663`): ours 4233, work left 2178.
 - After the car makers' map: ours 4233, work left 2178 (wrapped 57,
   known 483, unknown 1638).
+- After its migration: ours 4249, work left 2162 (wrapped 57, known
+  467, unknown 1638).
 
 ## Stopped
