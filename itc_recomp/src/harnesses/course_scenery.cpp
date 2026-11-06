@@ -1830,6 +1830,78 @@ void Parses(Context& h) {
 
 }  // namespace
 
+// --- Scenery::PoolSizes: a configuration in the scratch area (mode 0 or
+// not), its first asset, an area table of up to 8 areas (light assets
+// ending with a negative one, at the count or never; model ranges empty,
+// reversed or up to 12, some negative); the asset ids below 20,000 (the
+// TOC's sizes read by both); the scratch area (the counts and the five
+// sizes in it) and r3 compared. A random generator of its own. ---
+
+void PoolSizesCases(Context& h) {
+  Random r(0x5051534C);
+  Results results("Scenery::PoolSizes (sub_820F2030)");
+  constexpr uint32_t kConfig = 0, kTable = 64, kAsset = 512, kAreaCounts = 768,
+                     kModelCounts = 784, kOut = 800;
+  for (int c = 0; c < 160; c++) {
+    const uint32_t mode = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+    const uint32_t first_asset = r.Below(20000);
+    const uint32_t second_asset = r.Below(4) == 0 ? 0x80000000u | uint32_t(r.Next())
+                                                  : r.Below(20000);
+    const uint32_t areas = r.Below(9);
+    const uint32_t end = r.Below(3) == 0 ? r.Below(9) : 99;  // a negative light asset
+    uint32_t entries[8][3];
+    for (uint32_t i = 0; i < 8; i++) {
+      entries[i][0] = i == end ? 0x80000000u | uint32_t(r.Next()) : r.Below(20000);
+      switch (r.Below(6)) {
+        case 0:
+          entries[i][1] = r.Below(20000);
+          entries[i][2] = entries[i][1] - 1 - r.Below(3);  // reversed
+          break;
+        case 1:
+          entries[i][1] = 0xFFFFFFF0u + r.Below(8);  // negative assets
+          entries[i][2] = entries[i][1] + r.Below(6);
+          break;
+        default:
+          entries[i][1] = r.Below(20000);
+          entries[i][2] = entries[i][1] + r.Below(12);
+          break;
+      }
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t config = h.data + kConfig, table = h.data + kTable;
+      guest::StoreU32(h.base, config, mode);
+      guest::StoreU32(h.base, config + 24, h.data + kAsset);
+      guest::StoreU32(h.base, config + 28, table);
+      guest::StoreU32(h.base, h.data + kAsset, first_asset);
+      guest::StoreU32(h.base, table + 8, second_asset);
+      guest::StoreU32(h.base, table + 16, areas);
+      for (uint32_t i = 0; i < 8; i++) {
+        for (uint32_t k = 0; k < 3; k++) {
+          guest::StoreU32(h.base, table + 20 + 12 * i + 4 * k, entries[i][k]);
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.data + kAreaCounts;
+      t.r4.u64 = h.data + kModelCounts;
+      t.r5.u64 = h.data + kOut;
+      t.r6.u64 = config;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F2030(t, h.base);
+        } else {
+          t.r3.u64 = cs::PoolSizes(h.base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32);
+        }
+      });
+      ScratchAndR3(h, out[v], t);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} mode {} areas {}", c, mode, areas));
+  }
+  results.Report();
+}
+
 void CourseScenery(Context& h) {
   ObjectLeaves(h);
   Keys(h);
@@ -1843,6 +1915,7 @@ void CourseScenery(Context& h) {
   CollectCases(h);
   TextureAnimationCases(h);
   Parses(h);
+  PoolSizesCases(h);
 }
 
 }  // namespace harness

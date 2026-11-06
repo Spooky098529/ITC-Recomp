@@ -4,6 +4,7 @@
 
 #include "guest.h"
 
+#include "archive/archive.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "game_data/data_file.h"
@@ -448,6 +449,81 @@ uint32_t ModelAsset(uint8_t* base, uint32_t config, uint32_t area, uint32_t mode
     return first + model;
   }
   return 0xFFFFFFFFu;
+}
+
+uint64_t PoolSizes(uint8_t* base, uint32_t area_counts, uint32_t model_counts, uint32_t out,
+                   uint32_t config) {
+  ITC_NATIVE_RUNNING("sub_820F2030 Scenery::PoolSizes");
+  uint64_t r3 = 0;
+  // Summed in mode 0, else the largest (signed).
+  auto add = [&](int32_t& total, uint32_t size) {
+    if (int32_t(Load(base, config)) == 0) {
+      total = int32_t(uint32_t(total) + size);
+    } else if (total < int32_t(size)) {
+      total = int32_t(size);
+    }
+  };
+  for (uint32_t pool = 0; pool < 5; pool++) {
+    int32_t total = 0;
+    if (pool == 0) {
+      const uint32_t size = archive::AssetSize(base, Load(base, Load(base, config + 24)));
+      r3 = size;
+      total = int32_t(size);
+    } else if (pool == 2) {
+      const uint32_t asset = Load(base, Load(base, config + 28) + 8);
+      r3 = asset;
+      if (int32_t(asset) >= 0) {
+        const uint32_t size = archive::AssetSize(base, asset);
+        r3 = size;
+        total = int32_t(uint32_t(total) + size);
+      }
+    } else if (pool == 3) {
+      uint32_t area = 0;
+      for (;; area++) {
+        const uint32_t table = Load(base, config + 28);
+        if (area < Load(base, table + 16)) {
+          r3 = Load(base, area * 12 + table + 20);
+        } else {
+          r3 = ~0ull;  // li r3,-1
+        }
+        if (int32_t(uint32_t(r3)) < 0) {
+          break;
+        }
+        const uint32_t size = archive::AssetSize(base, uint32_t(r3));
+        r3 = size;
+        add(total, size);
+      }
+      Store(base, area_counts, area);
+      Store(base, area_counts + 4, area);
+    } else if (pool == 4) {
+      uint32_t models = 0;
+      for (uint32_t area = 0;; area++) {
+        const uint32_t table = Load(base, config + 28);
+        const uint32_t count = Load(base, table + 16);
+        const uint32_t entry = area * 12 + table;
+        if (area >= count || int32_t(Load(base, entry + 20)) < 0) {
+          break;
+        }
+        const int32_t n = int32_t(Load(base, entry + 28) - Load(base, entry + 24) + 1);
+        for (int32_t model = 0; model < n; model++) {
+          const uint32_t asset = ModelAsset(base, config, area, uint32_t(model));
+          r3 = asset == 0xFFFFFFFFu ? ~0ull : asset;
+          if (int32_t(asset) < 0) {
+            continue;
+          }
+          const uint32_t size = archive::AssetSize(base, asset);
+          r3 = size;
+          add(total, size);
+          models++;
+        }
+      }
+      Store(base, model_counts, models);
+      Store(base, model_counts + 4, 16);
+      Store(base, model_counts + 4, models < 16 ? models : 16);
+    }
+    Store(base, out + 4 * pool, uint32_t(total));
+  }
+  return r3;
 }
 
 void ListClear(uint8_t* base, uint32_t list) {

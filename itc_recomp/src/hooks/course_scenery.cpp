@@ -32,7 +32,8 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FBA60, AreaLights::Key sub_820F1C20, AreaModel::Key sub_820F1CD8, "
               "ObjectPools::Pool sub_820FBB10, Object sub_820FC0E8, Acquire sub_820FBF08, Find "
               "sub_820FBE80, Load sub_820FBFD0, Release sub_820FC038, Init sub_820FBBE8, "
-              "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530, SceneryList::Clear "
+              "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530, Scenery::PoolSizes "
+              "sub_820F2030 (Archive::AssetSize's plain C++), SceneryList::Clear "
               "sub_820F1588, Add sub_820F1888 (no adapter), Sort sub_820F1930, Scenery::LimitLargeModels "
               "sub_820F2B80, ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, Scenery::Init sub_820F1360, "
               "SceneryList::ReleaseUnused sub_820F17C0, Scenery::StartLoad sub_820F1E00, "
@@ -185,6 +186,10 @@ extern "C" REX_FUNC(sub_820FBDC8) {
 ITC_COURSE_SCENERY(820F1530, SetIndex(ctx, ModelAsset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)))
 // r3 = the manager (not read), r4 = a list.
 ITC_COURSE_SCENERY(820F1588, ListClear(base, ctx.r4.u32))
+// Scenery::PoolSizes: r3 = the area counts, r4 = the model counts, r5 = out,
+// r6 = the configuration; from Scenery::SetupPools (recompiled).
+ITC_COURSE_SCENERY(820F2030, ctx.r3.u64 = PoolSizes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32))
 // r5, r6 = the first and last item.
 ITC_COURSE_SCENERY(820F1930, ListSort(base, ctx.r4.u32, ctx.r5.s32, ctx.r6.s32))
 // r3 = the manager; leaves r3 = the manager + 100. The original's register

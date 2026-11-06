@@ -145,6 +145,19 @@ bool Shutdown(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set, u
 // -1 when `area` isn't below its count (+16); else the area's first model
 // asset + `model` when that's within its last, else -1.
 uint32_t ModelAsset(uint8_t* base, uint32_t config, uint32_t area, uint32_t model);
+// Scenery::PoolSizes (sub_820F2030): each of the five pools' data size into
+// `out` (five words) for the configuration `config`: 0 the size of
+// [[config + 24]]'s asset; 1 0; 2 the size of the area table's +8 asset
+// (when not negative); 3 the areas' light assets (+20 of each 12-byte entry,
+// up to the first negative or the count), summed in mode 0 ([config] 0)
+// else the largest, `area_counts` +0 and +4 = the areas; 4 the areas' model
+// assets (ModelAsset), summed or the largest the same way, `model_counts`
+// +0 = their count and +4 = it capped at 16 (16 stored there first). The
+// assets' sizes by Archive::AssetSize's plain C++. Returns r3 as the
+// original leaves it: its last ModelAsset's or AssetSize's answer, or the
+// light entry (zero-extended) or -1 that ended the areas.
+uint64_t PoolSizes(uint8_t* base, uint32_t area_counts, uint32_t model_counts, uint32_t out,
+                   uint32_t config);
 // SceneryList::Clear (sub_820F1588): the items done and the count = 0.
 void ListClear(uint8_t* base, uint32_t list);
 // SceneryList::Add (sub_820F1888): the item with this area and model (the
