@@ -26,4 +26,11 @@ graphics::predicated_tiling::WorkerCalls PredicatedTilingWorkerCalls(PPCContext&
 // Device::CreateWorkers (sub_822B6D70) without the flag: r3 as the original's.
 void NativeCreateWorkers(PPCContext& ctx, uint8_t* base);
 
+// The worker thread's guest calls through `ctx`.
+graphics::predicated_tiling::WorkerLoopCalls PredicatedTilingWorkerLoopCalls(PPCContext& ctx,
+                                                                             uint8_t* base);
+
+// Device::WorkerThread (sub_822B69A8) without the flag: r3 as the original's.
+void NativeWorkerThread(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

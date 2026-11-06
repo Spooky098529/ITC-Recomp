@@ -26,6 +26,8 @@
 #include "memory/heap.h"
 #include "native/state.h"
 
+#include <rex/system/xobject.h>
+
 #include <fmt/format.h>
 
 #include <cstring>
@@ -316,6 +318,55 @@ void PredicatedTiling(Context& h) {
         t.r3.u64 = b.device;
       },
       [&](PPCContext& t) { hooks::NativeCreateWorkers(t, h.base); });
+
+  // WorkerThread: a worker's block in the device (its CPU 0-5) with its
+  // event's header signaled, so the wait returns at once (with the 30 ms
+  // timeout or without: the block's CPU the shared state's +396 or not),
+  // and the shared state's +4 0, so the woken thread ends. (A timeout, the
+  // device's lock and the present, and the job, would wait for a wake no
+  // case can give: the boot runs the timeout every 30 ms; the job and the
+  // present never run in play.) The kernel's object for the event is closed
+  // after each version, its stashed handle compared as 0.
+  {
+    Results results("Device::WorkerThread (sub_822B69A8), woken to end");
+    for (int c = 0; c < 100; c++) {
+      const uint64_t seed = h.random.Next();
+      State state[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        Fill(h.base, h.data, kScratchBytes);
+        RandomWords(h.base, b.device, kDeviceBytes, r);
+        const uint32_t cpu = r.Below(6);
+        const uint32_t block = b.device + pt::kWorkers + pt::kWorkerBytes * cpu;
+        const uint32_t shared = b.device + pt::kWorkerState;
+        guest::StoreU32(h.base, block, shared);
+        guest::StoreU32(h.base, block + 4, cpu);
+        guest::StoreU32(h.base, shared + 396, r.Below(2) == 0 ? cpu : uint32_t(r.Next()));
+        guest::StoreU32(h.base, shared + 4, 0);
+        const uint32_t event = block + 32;
+        guest::StoreU32(h.base, event, 0);  // type 0 (notification)
+        guest::StoreU32(h.base, event + 4, 1);  // signaled
+        guest::StoreU32(h.base, event + 8, event + 8);
+        guest::StoreU32(h.base, event + 12, event + 8);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = block;
+        if (v == 0) {
+          __imp__sub_822B69A8(t, h.base);
+        } else {
+          hooks::NativeWorkerThread(t, h.base);
+        }
+        if (guest::LoadU32(h.base, event + 8) == uint32_t(rex::system::kXObjSignature)) {
+          PPCContext close = CallContext(h);
+          close.r3.u64 = guest::LoadU32(h.base, event + 12);
+          __imp__NtClose(close, h.base);
+          guest::StoreU32(h.base, event + 12, 0);
+        }
+        state[v] = Take(h, b, t);
+      }
+      results.Check(ToOutputs(state[0]), ToOutputs(state[1]), fmt::format("case {}", c));
+    }
+    results.Report();
+  }
 
   guest::StoreU32(h.base, cb::kTrainingFailed, training_failed);
   ITC_FLAG(native_command_buffer) = saved;

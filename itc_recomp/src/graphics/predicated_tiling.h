@@ -137,4 +137,35 @@ struct WorkerCalls {
 // 1, or 0 when a thread wasn't made (ExCreateThread's r3 negative).
 uint32_t CreateWorkers(uint8_t* base, uint32_t device, const WorkerCalls& calls);
 
+constexpr uint32_t kVdGlobalDeviceImport = 0x820007B0;  // [[it]]: the device
+
+struct WorkerLoopCalls {
+  // KeWaitForSingleObject(object, reason, mode, alertable, timeout address
+  // or 0): its r3 (258 on a timeout).
+  std::function<uint32_t(uint32_t object, uint32_t reason, uint32_t mode, uint32_t alertable,
+                         uint32_t timeout)>
+      wait;
+  // KeResetEvent(event): its r3.
+  std::function<uint32_t(uint32_t event)> reset_event;
+  // The worker's job (sub_822B6780, Wrapped in src/native/gpu_link.cpp).
+  std::function<void(uint32_t block)> job;
+  // The present callback (sub_822A0718) and Device::Swap's present
+  // (sub_822A08A0, overridden) with the header at +13444: the last frame
+  // shown again.
+  std::function<void(uint32_t device)> present;
+};
+
+// Device::WorkerThread (sub_822B69A8), r3 its block (CreateWorkers'):
+// waits on its event (block +32; reason 3, mode 1, not alertable; a 30 ms
+// timeout, -300,000 as 8 bytes written at `timeout`, only for the worker of the CPU at the
+// shared state's +396, +11208). On a timeout: under the device's lock (the
+// original's critical section at [VdGlobalDevice] +13548, which no other
+// code takes after Device::Init makes it: a host std::mutex, the user's call
+// for Edram::Alloc's lock, 2026-10-24), when +10810 bit 2 is set (no code
+// sets it) the present; then the wait again. Woken: KeResetEvent; the
+// shared state's +4 (+10816) 0 ends the thread, else the job and the wait
+// again. Returns the last KeResetEvent's r3 (the original's r3 at its end).
+uint32_t WorkerThread(uint8_t* base, uint32_t block, uint32_t timeout,
+                      const WorkerLoopCalls& calls);
+
 }  // namespace graphics::predicated_tiling

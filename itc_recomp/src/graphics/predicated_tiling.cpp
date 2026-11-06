@@ -8,6 +8,8 @@
 #include "base/log.h"
 #include "graphics/device_state.h"
 
+#include <mutex>
+
 namespace graphics::predicated_tiling {
 
 namespace cb = command_buffer;
@@ -156,6 +158,38 @@ uint32_t CreateWorkers(uint8_t* base, uint32_t device, const WorkerCalls& calls)
     calls.set_priority(guest::LoadU32(base, block + 48), 17);
   }
   return 1;
+}
+
+namespace {
+
+// The device's lock (+13548): only the workers take it.
+std::mutex g_device_lock;
+
+}  // namespace
+
+uint32_t WorkerThread(uint8_t* base, uint32_t block, uint32_t timeout,
+                      const WorkerLoopCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_822B69A8 Device::WorkerThread");
+  const uint32_t event = block + 32;
+  for (;;) {
+    const uint32_t state = guest::LoadU32(base, block);
+    guest::StoreU32(base, timeout, 0xFFFFFFFFu);
+    guest::StoreU32(base, timeout + 4, uint32_t(int32_t(-300000)));
+    const uint32_t wait_timeout =
+        guest::LoadU32(base, block + 4) == guest::LoadU32(base, state + 396) ? timeout : 0;
+    while (calls.wait(event, 3, 1, 0, wait_timeout) == 258) {
+      const uint32_t device = guest::LoadU32(base, guest::LoadU32(base, kVdGlobalDeviceImport));
+      std::lock_guard lock(g_device_lock);
+      if (guest::LoadU8(base, device + 10810) & 0x4) {
+        calls.present(device);
+      }
+    }
+    const uint32_t r3 = calls.reset_event(event);
+    if (guest::LoadU32(base, state + 4) == 0) {
+      return r3;
+    }
+    calls.job(block);
+  }
 }
 
 }  // namespace graphics::predicated_tiling

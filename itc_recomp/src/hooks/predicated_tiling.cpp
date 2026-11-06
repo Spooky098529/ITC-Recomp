@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_predicated_tiling, true, "ITC",
               "without its SET_BIN_MASK packet, Device::BeginTiledSegments sub_822B6AD8 "
               "without the segment chain's header, Device::EndTiledSegments sub_822B6BF8 "
               "with Device::RestoreSegment sub_8229E0C0, Device::CreateWorkers sub_822B6D70 "
-              "without its EVENT_WRITE_SHD packets, its threads made through the kernel) natively instead of through the "
+              "without its EVENT_WRITE_SHD packets, its threads made through the kernel, "
+              "Device::WorkerThread sub_822B69A8 with the device's lock a host mutex) natively instead of through the "
               "translated code (the same device fields, chains and kicks; checked by "
               "--run_harnesses=predicated_tiling).");
 
@@ -108,3 +109,62 @@ void hooks::NativeCreateWorkers(PPCContext& ctx, uint8_t* base) {
 // Device::Init's override (src/hooks/graphics_device.cpp), calls
 // NativeCreateWorkers itself with the flag on. (A recording command buffer
 // can't exist yet at Device::Init.)
+
+// Device::WorkerThread: the kernel's waits and the event's reset through
+// their imports, as the original; the job and the present as guest calls;
+// from a frame like the original's (160 bytes; the timeout at its +80).
+pt::WorkerLoopCalls hooks::PredicatedTilingWorkerLoopCalls(PPCContext& ctx, uint8_t* base) {
+  pt::WorkerLoopCalls calls;
+  calls.wait = [&ctx, base](uint32_t object, uint32_t reason, uint32_t mode, uint32_t alertable,
+                            uint32_t timeout) {
+    ctx.r3.u64 = object;
+    ctx.r4.u64 = reason;
+    ctx.r5.u64 = mode;
+    ctx.r6.u64 = alertable;
+    ctx.r7.u64 = timeout;
+    ctx.lr = 0x822B6A44;
+    __imp__KeWaitForSingleObject(ctx, base);
+    return ctx.r3.u32;
+  };
+  calls.reset_event = [&ctx, base](uint32_t event) {
+    ctx.r3.u64 = event;
+    ctx.lr = 0x822B6A54;
+    __imp__KeResetEvent(ctx, base);
+    return ctx.r3.u32;
+  };
+  calls.job = [&ctx, base](uint32_t block) {
+    ctx.r3.u64 = block;
+    ctx.lr = 0x822B6A68;
+    sub_822B6780(ctx, base);
+  };
+  calls.present = [&ctx, base](uint32_t device) {
+    ctx.r3.u64 = device;
+    ctx.lr = 0x822B6A14;
+    sub_822A0718(ctx, base);
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = device + 13444;
+    ctx.r5.u64 = 0;
+    ctx.lr = 0x822B6A24;
+    sub_822A08A0(ctx, base);
+  };
+  return calls;
+}
+
+void hooks::NativeWorkerThread(PPCContext& ctx, uint8_t* base) {
+  const uint32_t block = ctx.r3.u32;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, base, 160, 0x822B6A44, [&](uint32_t frame) {
+    r3 = pt::WorkerThread(base, block, frame + 80, PredicatedTilingWorkerLoopCalls(ctx, base));
+  });
+  ctx.r3.u64 = r3;
+}
+
+// The thread's entry point (ExCreateThread's, CreateWorkers').
+extern "C" REX_FUNC(sub_822B69A8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_predicated_tiling)) {
+    __imp__sub_822B69A8(ctx, base);
+    return;
+  }
+  hooks::NativeWorkerThread(ctx, base);
+}
