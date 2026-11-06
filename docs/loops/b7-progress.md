@@ -55,10 +55,21 @@ file's history. What's left to see in a drive, from every run:
   from `ChunkChain::RunSingles`' native dispatch; `sub_8258F5C0`
   native inside its `replay_hooks.cpp` wrap; adapters kept, the table
   reaches them; `itc_3636`: race 38 s, 0 errors, every harness 0
-  differing; no subagents); nothing ready left. Step: validation agent
-  running.
+  differing; no subagents); nothing ready left. Validated `itc_3639`
+  (race 44 s, 0 errors, 5 of 5 harness lines, all 5 ran in the race;
+  no replay needed; none to drive). Done.
+- Subsystem 3 of 3: predicated tiling's start and its worker (lead
+  picked: `sub_822B6AD8`, `sub_825BED08`, `sub_822B6BF8`,
+  `sub_822B6780`, `sub_822B69A8`, `sub_822B6A78`, `sub_825BF200`; the
+  menus' every frame; `sub_822B6AD8` and `sub_822B6BF8` ready, the
+  command buffer's remaining callers; its line deleted from
+  `leads.md`). Step: mapping agent running.
 
 ## Done
+
+- The single commands: `single-commands.md` (map 53cddb27, migration
+  8d39fd7e..15c1659b, `--native_single_commands`, 5 of 5 in play;
+  validated `itc_3639`: 0 errors, every harness line, none to drive).
 
 - The command buffer: `command-buffer.md` (map aa4b202c, migrations
   e041aa4a..abca2df1 and 8d43620c..632f2b7d, `--native_command_buffer`,
@@ -94,5 +105,6 @@ file's history. What's left to see in a drive, from every run:
   59, known 464, unknown 1668).
 - After its migration: ours 4224, work left 2186 (wrapped 58, known
   460, unknown 1668).
+- After its validation (`itc_3639`): ours 4224, work left 2186.
 
 ## Stopped

@@ -2746,6 +2746,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-05 | The scene target's passes (`SceneTarget::RecordPasses` `sub_8209B3D0` once a frame: the menus' predicated tiling, the race's 1024×576 pair, the upscale draw to 1280×720; `RecordTargets`, `RecordTileTargets`, `RecordBoundTargets`, `TexturedRect::Record` and `RecordFlat`; with `Glow::Record` as a cleanup in `post-effects.md`) | `scene-target.md` | 6 of 6 (one migration; `RecordPasses`' adapter kept for its recompiled caller `sub_82096418`) | `--native_scene_target` |
 | 2026-11-05 | The frame passes object (framework +108, vtable `0x82000F20`: `FramePasses::Boot` with `PostEffects::InitBoot` at boot, `Record` once a frame, its ~20 shared pass chunks at 58 buckets, then the scene target's passes and the primitive reset states; `FlipWorkMem`, `RecordConstants`, `RecordSamplers`, the constructor, `Job::Wait`) | `frame-passes.md` | 10 of 10 in play (one migration, `Record` in three parts; `RecordPasses`' and `InitBoot`'s adapters removed) | `--native_frame_passes` |
 | 2026-11-06 | The graphics library's command buffer (`8229DBF0`-`8229F228`, `sub_822AF978`, `sub_822AC470`: the segments' tail, end, kick and next, the chain blocks, the data space `BeginVertices` writes inline vertices into, the reserved words, the callback packets, the fence wait; waits on the GPU, the coherency and data cache flushes and the WAIT_UNTIL packets Dropped by the graphics rule) | `command-buffer.md` | 24 of 24 in play (two migrations; 5 adapters removed) | `--native_command_buffer` |
+| 2026-11-06 | The render command replay's single commands (the table `0x8265ED48`, ids 0-36: in play the inline vertices (5), the shader constants (7), the drawer's set-up (13/14), its draw (15) and the movie frame's callback (28), run from `ChunkChain::RunSingles`' native dispatch) | `single-commands.md` | 5 of 5 in play (one migration) | `--native_single_commands` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4609,3 +4610,16 @@ writers, the tiling worker, `BeginVertices`, `Device::Resolve` and
 live 211. Imports: 186 called, 56 with a live caller. B7
 (`b7_status.py`): ours 4,219, work left 2,191 (Wrapped 59, with a row
 460, no row yet 1,672), from 2,213.
+
+**2026-11-06, the single commands (branch `b7-loop-06-11-26`):** the
+thirty-fourth run's second subsystem (`single-commands.md`,
+`--native_single_commands`, `src/graphics/single_commands.*`): the
+render command replay's single-command table, the five handlers seen
+in play, run from `ChunkChain::RunSingles`' native dispatch through a
+callback (the guest call with the flag off), id 15 inside its
+renderer wrap; they call the device setters' plain C++. Their
+adapters stay (the table reaches them); the other 22 ids never ran.
+The boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 4,224, work left 2,186
+(Wrapped 58, with a row 460, no row yet 1,668), from 2,191.
