@@ -75,6 +75,13 @@ uint32_t WriteSegmentTail(uint8_t* base, uint32_t device, uint32_t position);
 // copied to +13056..+13076.
 void SaveSegment(uint8_t* base, uint32_t device);
 
+// Device::RestoreSegment (sub_8229E0C0): what SaveSegment saved put back
+// (the write position, the end, the segment's start, the wrap cursor, the
+// data cursor and the generation), the soft end +48 the end less 160. Only
+// from predicated tiling's end (src/graphics/predicated_tiling.h), when out
+// of space (never in play); no adapter.
+void RestoreSegment(uint8_t* base, uint32_t device);
+
 // CommandChain::Close (sub_8229DFB8): the current block's first word gets
 // where its content ends (the cursor, 0xC0000000 + its physical address),
 // the cursor the end marker 0xC0000000, and the block's end +12 is cleared.

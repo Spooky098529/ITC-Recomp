@@ -285,6 +285,15 @@ struct DeviceCalls {
 // 0xF01 packets left out.
 void SetRegisterF01Bits(uint8_t* base, uint32_t device, uint32_t bits);
 
+// The predicated tiling bit (+10808 bit 1) worked out again, as
+// SetRenderTarget and SetDepthStencilSurface do (inline in each, and in
+// predicated tiling's SetPredication, src/graphics/predicated_tiling.h):
+// with no tiling under way (+12456 0), the bound set held by the tiling
+// (+10808 bit 4, or bit 5 with each bound surface the one saved at
+// +12468..+12484 or none), +10808 bit 3 clear, and +10811 bit 6 or neither
+// +11865 nor +11931 set.
+void UpdatePredicatedTiling(uint8_t* base, uint32_t device);
+
 // sub_822A3B90 Device::DirtyAllState: with `mode` 0, sub_8229B7D8 with the
 // bits +10788 holds (its binning packets left out); every dirty mask
 // (+0..+39) set, so the next draw writes every register block again (the

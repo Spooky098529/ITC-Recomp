@@ -9,6 +9,7 @@
 // off (their callees' adapters then run the originals too).
 
 #include "harness.h"
+#include "command_buffer_setup.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -25,24 +26,10 @@ ITC_FLAG_DECLARE(bool, native_command_buffer);
 
 namespace harness {
 
-namespace {
+// Shared with the predicated tiling's harness (command_buffer_setup.h).
+namespace command_buffer_setup {
 
 namespace cb = graphics::command_buffer;
-
-constexpr uint32_t kDeviceBytes = 20480;   // through +20440
-constexpr uint32_t kCommandBytes = 8192;   // the command buffer's words
-constexpr uint32_t kProgressBytes = 64;
-
-constexpr uint32_t kRingBytes = 0x20000;  // a command buffer of its own (physical memory)
-constexpr uint32_t kRingProgress = kRingBytes;  // its progress block, after it
-constexpr uint32_t kRingAllocation = kRingBytes + 4096;
-
-struct Blocks {
-  uint32_t device = 0;
-  uint32_t commands = 0;
-  uint32_t progress = 0;
-  uint32_t ring = 0;
-};
 
 // Every word of `bytes` at `address` random.
 void RandomWords(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -379,7 +366,9 @@ void RunWithoutPackets(Context& h, const Blocks& b, const char* name, GuestFunct
   whole.Report();
 }
 
-}  // namespace
+}  // namespace command_buffer_setup
+
+using namespace command_buffer_setup;
 
 void CommandBuffer(Context& h) {
   Blocks b;

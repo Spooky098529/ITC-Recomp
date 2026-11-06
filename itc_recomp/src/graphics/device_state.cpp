@@ -1422,10 +1422,8 @@ bool TilingHoldsBoundSet(uint8_t* base, uint32_t device, uint8_t flags) {
   return true;
 }
 
-// The predicated tiling bit (+10808 bit 1) worked out again, as
-// SetRenderTarget and SetDepthStencilSurface do: with no tiling under way
-// (+12456 0), the bound set held by the tiling, +10808 bit 3 clear, and
-// +10811 bit 6 or neither +11865 nor +11931 set.
+}  // namespace
+
 void UpdatePredicatedTiling(uint8_t* base, uint32_t device) {
   bool on = false;
   if (Load(base, device + 12456) == 0) {
@@ -1438,8 +1436,6 @@ void UpdatePredicatedTiling(uint8_t* base, uint32_t device) {
   const uint8_t flags = guest::LoadU8(base, device + 10808);
   guest::StoreU8(base, device + 10808, uint8_t((flags & ~0x2) | (on ? 0x2 : 0)));
 }
-
-}  // namespace
 
 void SetRenderTarget(uint8_t* base, uint32_t device, uint32_t index, uint32_t surface) {
   ITC_NATIVE_RUNNING("sub_822A3D30 Device::SetRenderTarget");

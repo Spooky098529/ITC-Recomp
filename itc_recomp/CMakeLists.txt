@@ -383,6 +383,8 @@ set(ITC_SOURCES
     src/graphics/render_queue.cpp
     src/hooks/single_commands.cpp
     src/graphics/single_commands.cpp
+    src/hooks/predicated_tiling.cpp
+    src/graphics/predicated_tiling.cpp
     src/hooks/post_effects.cpp
     src/post_effects/post_effects.cpp
     src/post_effects/create.cpp
@@ -577,6 +579,7 @@ set(ITC_SOURCES
     src/harnesses/frame_passes.cpp
     src/harnesses/command_buffer.cpp
     src/harnesses/single_commands.cpp
+    src/harnesses/predicated_tiling.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp

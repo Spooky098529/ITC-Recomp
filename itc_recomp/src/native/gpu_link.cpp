@@ -21,6 +21,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/predicated_tiling.h"
 
 #include <array>
 #include <atomic>
@@ -572,7 +573,8 @@ extern "C" REX_FUNC(sub_822B6BF8) {
                  "r5 {:08X}, lr {:08X}",
                  native::Cpu(ctx, base), ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
   }
-  __imp__sub_822B6BF8(ctx, base);
+  // Native with --native_predicated_tiling (src/hooks/predicated_tiling.cpp).
+  hooks::EndTiledSegments(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_822B6A78) {

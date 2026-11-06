@@ -59,6 +59,18 @@ void SaveSegment(uint8_t* base, uint32_t device) {
   }
 }
 
+void RestoreSegment(uint8_t* base, uint32_t device) {
+  ITC_NATIVE_RUNNING("sub_8229E0C0 Device::RestoreSegment");
+  const uint32_t end = guest::LoadU32(base, device + kSavedSegment + 4);
+  guest::StoreU32(base, device + kWritePosition, guest::LoadU32(base, device + kSavedSegment));
+  guest::StoreU32(base, device + kSegmentStart, guest::LoadU32(base, device + kSavedSegment + 8));
+  guest::StoreU32(base, device + kWrapCursor, guest::LoadU32(base, device + kSavedSegment + 12));
+  guest::StoreU32(base, device + kDataCursor, guest::LoadU32(base, device + kSavedSegment + 16));
+  guest::StoreU32(base, device + kSegmentEnd, end);
+  guest::StoreU32(base, device + kGeneration, guest::LoadU32(base, device + kSavedSegment + 20));
+  guest::StoreU32(base, device + kSoftEnd, end - 160);
+}
+
 void CloseChain(uint8_t* base, uint32_t chain) {
   ITC_NATIVE_RUNNING("sub_8229DFB8 CommandChain::Close");
   const uint32_t cursor = guest::LoadU32(base, chain + 8);
