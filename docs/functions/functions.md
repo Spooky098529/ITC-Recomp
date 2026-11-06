@@ -568,6 +568,10 @@ Rows not yet moved stay in the table below. So far:
   `BeginTiling`, `EndTiling` and the predication select, the tiled
   segments' chains and header, and the library's tiling worker threads
   and their job (B7).
+- [`power-graph.md`](power-graph.md): the front end's power and
+  torque graph (the tuning screen's and the car list's): two sets of
+  stack sprites as line segments from a car data's torque curve, and
+  the line recorder that puts each on the command list (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
