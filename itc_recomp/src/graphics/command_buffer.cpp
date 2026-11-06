@@ -427,4 +427,24 @@ uint32_t InsertCallback(uint8_t* base, uint32_t device, uint32_t flags, uint32_t
   return position;
 }
 
+uint32_t WriteIdlePackets(uint8_t* base, uint32_t device, const Kick& kick) {
+  ITC_NATIVE_RUNNING("sub_8229F0E0 Device::WriteIdlePackets");
+  if (guest::LoadU32(base, device + kWritePosition) > guest::LoadU32(base, device + kSoftEnd)) {
+    EndSegment(base, device, kick);
+  }
+  // The WAIT_UNTIL and register 0xD04's packets: Dropped.
+  return guest::LoadU32(base, device + kWritePosition);
+}
+
+uint32_t WaitForIdle(uint8_t* base, uint32_t device, const Kick& kick) {
+  ITC_NATIVE_RUNNING("sub_8229F1B0 Device::WaitForIdle");
+  if (guest::LoadU32(base, device + kWritePosition) > guest::LoadU32(base, device + kSoftEnd)) {
+    EndSegment(base, device, kick);
+  }
+  // The WAIT_UNTIL packet: Dropped.
+  const uint32_t r3 = WaitForFence(base, device, guest::LoadU32(base, device + kFence), 4, kick);
+  // The spin until no kick is pending (+10868, always 0): Dropped.
+  return r3;
+}
+
 }  // namespace graphics::command_buffer

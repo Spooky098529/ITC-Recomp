@@ -334,6 +334,50 @@ void TrainingFailed(Context& h, const Blocks& b, Random& r, uint32_t open) {
   guest::StoreU32(h.base, cb::kTrainingFailed, safe && r.Below(3) == 0 ? 1 : 0);
 }
 
+
+// A function made native without its packets (sub_8229F0E0, sub_8229F1B0):
+// each case runs the original, `reference` (the original's calls without
+// its packet words: what the native version is to do) and the native
+// version. Two groups: against the reference, which must match; against
+// the original, expected to differ (the packet words, the write position
+// short of them, and what follows from it: the kicked tail's position, the
+// read position in the progress block, the next segment's start).
+template <typename Setup, typename Reference, typename Native>
+void RunWithoutPackets(Context& h, const Blocks& b, const char* name, GuestFunction recompiled,
+                       int cases, Setup setup, Reference reference, Native native) {
+  Results results(fmt::format("{}: without its packets", name));
+  Results whole(fmt::format("{}: against the original with its packets (expected to differ)",
+                            name));
+  for (int c = 0; c < cases; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[3];
+    for (int v = 0; v < 3; v++) {
+      Random r(seed);
+      Fill(h.base, h.data, kScratchBytes);
+      RandomWords(h.base, b.device, kDeviceBytes, r);
+      RandomWords(h.base, b.ring, kRingProgress + kProgressBytes, r);
+      PPCContext t = CallContext(h);
+      setup(r, t, c);
+      ITC_FLAG(native_command_buffer) = v == 2;
+      if (v == 0) {
+        recompiled(t, h.base);
+      } else if (v == 1) {
+        reference(t);
+      } else {
+        native(t);
+      }
+      out[v].Bytes(Read(h.base, b.device, kDeviceBytes));
+      out[v].Bytes(Read(h.base, b.ring, kRingProgress + kProgressBytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[1], out[2], fmt::format("case {}", c));
+    whole.Check(out[0], out[2], fmt::format("case {}", c));
+  }
+  results.Report();
+  whole.Report();
+}
+
 }  // namespace
 
 void CommandBuffer(Context& h) {
@@ -647,6 +691,57 @@ void CommandBuffer(Context& h) {
                 t.r3.u64 = cb::InsertCallback(h.base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32,
                                               hooks::CommandBufferKick(t, h.base));
               });
+      // sub_8229F0E0 and the full GPU wait without their packets: the
+      // reference ends the segment when past its soft end (the original
+      // segment end) and, for the wait, waits for the open fence (the
+      // original wait, code 4). Not out of space for the wait (its kick then
+      // completes nothing and the original would spin), and the pending
+      // kick count 0, as in play.
+      RunWithoutPackets(
+          h, b, "sub_8229F0E0", __imp__sub_8229F0E0, 300,
+          [&](Random& r, PPCContext& t, int c) {
+            const uint32_t open = FlowFields(h, b, r, c, false);
+            ThrottleFences(h, b, r, open, true);
+            TrainingFailed(h, b, r, open);
+            t.r3.u64 = b.device;
+          },
+          [&](PPCContext& t) {
+            const uint32_t device = t.r3.u32;
+            if (guest::LoadU32(h.base, device + cb::kWritePosition) >
+                guest::LoadU32(h.base, device + cb::kSoftEnd)) {
+              __imp__sub_8229EF48(t, h.base);
+            }
+            t.r3.u64 = guest::LoadU32(h.base, device + cb::kWritePosition);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = cb::WriteIdlePackets(h.base, t.r3.u32, hooks::CommandBufferKick(t, h.base));
+          });
+      RunWithoutPackets(
+          h, b, "Device::WaitForIdle (sub_8229F1B0)", __imp__sub_8229F1B0, 300,
+          [&](Random& r, PPCContext& t, int c) {
+            const uint32_t open = FlowFields(h, b, r, c, false);
+            guest::StoreU8(h.base, b.device + cb::kFlags,
+                           guest::LoadU8(h.base, b.device + cb::kFlags) & ~0x40);
+            guest::StoreU32(h.base, b.device + cb::kPendingKicks, 0);
+            ThrottleFences(h, b, r, open, true);
+            TrainingFailed(h, b, r, open);
+            t.r3.u64 = b.device;
+          },
+          [&](PPCContext& t) {
+            const uint32_t device = t.r3.u32;
+            if (guest::LoadU32(h.base, device + cb::kWritePosition) >
+                guest::LoadU32(h.base, device + cb::kSoftEnd)) {
+              __imp__sub_8229EF48(t, h.base);
+            }
+            t.r3.u64 = device;
+            t.r4.u64 = guest::LoadU32(h.base, device + cb::kFence);
+            t.r5.u64 = 4;
+            t.r6.u64 = 0;
+            __imp__sub_8229E908(t, h.base);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = cb::WaitForIdle(h.base, t.r3.u32, hooks::CommandBufferKick(t, h.base));
+          });
     }
     guest::StoreU32(h.base, cb::kTrainingFailed, training_failed);
   }

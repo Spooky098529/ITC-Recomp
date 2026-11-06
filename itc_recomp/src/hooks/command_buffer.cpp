@@ -22,7 +22,8 @@ ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "flow (Device::EndSegment sub_8229EF48, Device::KickSegment sub_8229EDA8, "
               "Device::NextSegment sub_8229EC00, Device::WaitForFence sub_8229E908, its waits "
               "for the GPU dropped), Device::ReserveWords sub_8229F148, "
-              "Device::InsertCallback sub_8229F228; the "
+              "Device::InsertCallback sub_8229F228, sub_8229F0E0 and the full GPU wait sub_8229F1B0 "
+              "without their packets (and its spin); the "
               "coherency flush packets sub_8229E5D0 and the data cache flush sub_822AC470 "
               "dropped) "
               "natively instead of through the translated code (the same results; checked by "
@@ -143,6 +144,16 @@ ITC_SEGMENT_FLOW(8229F228, {
   const uint32_t device = ctx.r3.u32, flags = ctx.r4.u32, function = ctx.r5.u32,
                  argument = ctx.r6.u32;
   ctx.r3.u64 = cb::InsertCallback(base, device, flags, function, argument, kick);
+})
+// Without their packets (and the full wait without its spin on the pending
+// kicks): see command_buffer.h.
+ITC_SEGMENT_FLOW(8229F0E0, {
+  const uint32_t device = ctx.r3.u32;
+  ctx.r3.u64 = cb::WriteIdlePackets(base, device, kick);
+})
+ITC_SEGMENT_FLOW(8229F1B0, {
+  const uint32_t device = ctx.r3.u32;
+  ctx.r3.u64 = cb::WaitForIdle(base, device, kick);
 })
 
 ITC_COMMAND_BUFFER(822AF978,

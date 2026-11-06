@@ -44,6 +44,7 @@ constexpr uint32_t kSegmentChain = 13016;   // predicated tiling's chain of segm
 constexpr uint32_t kThrottleFence = 13540;  // the last Swap's fence (+13544 with +20440 bit 0)
 constexpr uint32_t kThrottleFence2 = 13544;
 constexpr uint32_t kThrottleSelect = 20440;
+constexpr uint32_t kPendingKicks = 10868;   // kicks deferred until the GPU's interrupts (always 0)
 constexpr uint32_t kTrainingFailed = 0x829537BCu;  // a global, never set (Device::Init leaves it 0)
 
 // A chain of 4 KB blocks (predicated tiling's segments and draws, at device
@@ -213,5 +214,23 @@ uint32_t ReserveWords(uint8_t* base, uint32_t device, uint32_t words, const Kick
 // past them. Returns the new write position.
 uint32_t InsertCallback(uint8_t* base, uint32_t device, uint32_t flags, uint32_t function,
                         uint32_t argument, const Kick& kick);
+
+// sub_8229F0E0 (only from Device::SetUpRing) without its packets: the
+// segment ended when past its soft end (EndSegment), as the original does
+// before writing them. Its WAIT_UNTIL (register 0x5C8 = 0x20000) and
+// register 0xD04 = 0 aren't written: packets nothing reads (our kick keeps
+// only the scratch registers' effects; the graphics rule, as
+// WriteDefaultDrawRegisters'). Returns the write position +40 (unmoved).
+uint32_t WriteIdlePackets(uint8_t* base, uint32_t device, const Kick& kick);
+
+// The full GPU wait (sub_8229F1B0) without its waits: the segment ended
+// when past its soft end, then the open fence waited for (WaitForFence,
+// code 4), which ends the segment and so kicks the frame's last packets,
+// fences and callbacks. Its WAIT_UNTIL packet (register 0x5C8 = 0x20000,
+// nothing reads it) and its spin until the pending kick count +10868 is 0
+// (always 0: the deferred kick's override never raises it; a wait on the
+// GPU, the user's call on fence waits, 2026-10-24) are left out. Returns
+// WaitForFence's r3.
+uint32_t WaitForIdle(uint8_t* base, uint32_t device, const Kick& kick);
 
 }  // namespace graphics::command_buffer
