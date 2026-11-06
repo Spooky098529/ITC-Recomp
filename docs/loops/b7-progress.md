@@ -98,7 +98,9 @@ file's history. What's left to see in a drive, from every run:
   `sub_8219C528` and the 20 other transitions of the screen whose update
   is `sub_821A1380`; the most ready groups in `leads.md`, 67, and next
   to the garage stage work just done; its line deleted from
-  `leads.md`). Mapping agent running.
+  `leads.md`). Map checked (51812e30: `build-screen.md`, 66 rows, all
+  new, 60 in play; 0 errors; 30 ready groups in the file, 2 more in
+  `scene.md`; 1 lead added; no subagents). Migration agent running.
 
 ## Done
 
@@ -159,3 +161,5 @@ file's history. What's left to see in a drive, from every run:
   left 2090 (wrapped 57, known 431, unknown 1602).
 - After the `SetCar` cleanup lead (`itc_3786`): ours 4325, work left
   2086 (wrapped 57, known 427, unknown 1602).
+- After the build screen's map: ours 4325, work left 2086 (wrapped 57,
+  known 487, unknown 1542).
