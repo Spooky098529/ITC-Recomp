@@ -155,6 +155,45 @@ void SetUpDrawer(Context& h, Runner& run) {
   results.Report();
 }
 
+// Command 7's slot: the shader (0, 1, now and then another), the type (0 to
+// 4, now and then above), the first register and the count (kept inside the
+// device block: the pixel shader's float constants at +5888; at least 1
+// where the setters' do-while loops would run 2^32 times), the data random.
+void SetShaderConstants(Context& h, Runner& run) {
+  Random& r = h.random;
+  Results results("Single::SetShaderConstants (sub_8258F0F0)");
+  for (int i = 0; i < 240; i++) {
+    Case c = MakeCase(h, r);
+    const uint32_t slot = kSlots + 16 * r.Below(8);
+    auto at = [&](uint32_t offset) -> uint32_t& { return c.scratch[offset / 4]; };
+    uint32_t shader = r.Below(2);
+    uint32_t type = r.Below(5);
+    if (r.Below(12) == 0) shader = r.Below(2) ? 2 + r.Below(4) : uint32_t(r.Next());
+    if (r.Below(12) == 0) type = r.Below(2) ? 5 + r.Below(4) : uint32_t(r.Next());
+    uint32_t first = r.Below(256);
+    uint32_t count = r.Below(4) == 0 ? r.Below(200) : 1 + r.Below(16);
+    if (type == 1 && shader == 1 && first + count > 450) first = 450 - count;
+    if (count == 0 && (type == 0 || type == 2)) count = 1;
+    if (i == 0) {  // the minimap's triangle: the vertex shader's c0 to c3
+      shader = 0;
+      type = 1;
+      first = 0;
+      count = 4;
+    }
+    at(slot + 4) = shader;
+    at(slot + 8) = type;
+    at(slot + 12) = (first << 24) | (count << 16) | (at(slot + 12) & 0xFFFF);
+    if (type == 4) {
+      at(slot + 16) = r.Below(4) == 0 ? EdgeOrRandom(r) : uint32_t(r.Next());
+      at(slot + 20) = 1 + r.Below(36);
+    }
+    run.Run(results, c, h.data + slot, __imp__sub_8258F0F0, hooks::NativeSingleSetShaderConstants,
+            fmt::format("case {}: shader {}, type {}, first {}, count {}", i, shader, type,
+                        first, count));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SingleCommands(Context& h) {
@@ -174,6 +213,7 @@ void SingleCommands(Context& h) {
   Runner run(h, device);
   InlineVertices(h, run);
   SetUpDrawer(h, run);
+  SetShaderConstants(h, run);
 
   Write(h.base, kDeviceGlobal, saved_device.data(), 4);
   Write(h.base, kDrawerGlobal, saved_drawer.data(), 8);

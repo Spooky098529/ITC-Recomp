@@ -44,4 +44,15 @@ uint32_t InlineVertices(uint8_t* base, uint32_t slot);
 // Returns 0.
 uint32_t SetUpDrawer(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call);
 
+// Single::SetShaderConstants (sub_8258F0F0, 7), in its 224-byte frame: the
+// slot's +4 the shader (0 vertex, 1 pixel; another returns 0), +8 the type
+// (0 the loop constants, 1 the floats, 2 the bools, 3 the debug string, 4 a
+// bit mask expanded into words at the frame's +80; above 4 nothing), byte
+// +12 the first register, byte +13 the count, the data from the slot + 16.
+// The float setters and the pixel shader's bool setter are their plain C++
+// (src/graphics/device_state.h), OutputDebugStringA helpers::DebugOutput;
+// the loop constant setters and the vertex shader's bool setter (not seen in
+// play) guest calls. Returns byte +13.
+uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call);
+
 }  // namespace graphics::single_commands

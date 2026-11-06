@@ -24,5 +24,6 @@ graphics::render_queue::SingleCommand SingleCommands(PPCContext& ctx, uint8_t* b
 // The adapters' native paths, without the flag: r3 as the original's.
 void NativeSingleInlineVertices(PPCContext& ctx, uint8_t* base);
 void NativeSingleSetUpDrawer(PPCContext& ctx, uint8_t* base);
+void NativeSingleSetShaderConstants(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
