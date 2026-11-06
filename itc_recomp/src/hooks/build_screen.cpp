@@ -6,6 +6,13 @@
 
 #include "base/flags.h"
 #include "build_screen/build_screen.h"
+#include "car_makers/car_makers.h"
+#include "front_end_car_draw/front_end_car_draw.h"
+#include "hooks/front_end_car_draw.h"
+
+ITC_FLAG_DECLARE(bool, native_car_makers);
+ITC_FLAG_DECLARE(bool, native_scene_models);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 
 ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "Run the build screen's functions (docs/functions/build-screen.md: the menu "
@@ -32,7 +39,10 @@ ITC_FLAG_BOOL(native_build_screen, true, "ITC",
               "sub_821A08D8, BackToGroups sub_821A0A38 and ChangeCategory sub_8219FC60; the "
               "transition OpenBuilds sub_821A1138; the stand's RestoreStand sub_8219F868 and the "
               "transition BackToStand sub_8219FF78; the details level's transition OpenDetails "
-              "sub_8219FEC8 with SetUpDetails sub_8219F8E0 and ShowDetails sub_8219D820) "
+              "sub_8219FEC8 with SetUpDetails sub_8219F8E0 and ShowDetails sub_8219D820; the "
+              "transition OpenStand sub_8219FE10 with SetUpStand sub_8219F780 and PutOnStand "
+              "sub_8219D6F0 (GarageStage::ReloadModel's plain C++ with --native_car_makers, "
+              "--native_vehicle_accessors and --native_scene_models, else its adapter)) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=build_screen). RestoreGroupList, InsertNode, SetMode, PowI, DrawGroupRow, InitBuildList, "
               "CopyBuilds, ListBuilds, DrawBuildRow, DrawBuildRows, SetUpGroups, FilterGroups, "
@@ -90,7 +100,45 @@ class GuestCalls {
   uint64_t lr_;
 };
 
+// GarageStage::ReloadModel for the stand: its plain C++ where its adapter
+// would run it (--native_car_makers, --native_vehicle_accessors,
+// --native_scene_models), else the function through `calls`.
+bs::ReloadCall Reloader(PPCContext& ctx, uint8_t* base, const bs::Calls& calls) {
+  return [&ctx, base, calls](uint32_t holder, uint32_t block, uint32_t frame,
+                             uint32_t lr) -> uint64_t {
+    if (ITC_FLAG(native_car_makers) && ITC_FLAG(native_vehicle_accessors) &&
+        ITC_FLAG(native_scene_models)) {
+      const uint64_t link = ctx.lr;
+      ctx.fpscr.disableFlushMode();
+      const front_end_car_draw::Calls fe = FrontEndCarDrawCalls(ctx, base);
+      const uint64_t r3 = car_makers::GarageStageReloadModel(base, fe, holder, block, frame);
+      ctx.fpscr.disableFlushMode();
+      ctx.lr = link;
+      return r3;
+    }
+    return calls.Call(0x8217F880, frame, lr, holder, block);
+  };
+}
+
 }  // namespace
+
+void BuildScreenPutOnStand(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  const bs::Calls calls = guest.calls();
+  ctx.r3.u64 = bs::PutOnStand(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, Reloader(ctx, base, calls));
+}
+
+void BuildScreenSetUpStand(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  const bs::Calls calls = guest.calls();
+  ctx.r3.u64 = bs::SetUpStand(base, ctx.r1.u32, calls, Reloader(ctx, base, calls));
+}
+
+void BuildScreenOpenStand(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  const bs::Calls calls = guest.calls();
+  ctx.r3.u64 = bs::OpenStand(base, ctx.r3.u32, ctx.r1.u32, calls, Reloader(ctx, base, calls));
+}
 
 void BuildScreenKeepGroupList(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = bs::KeepGroupList(base, ctx.r1.u32);
@@ -337,3 +385,8 @@ ITC_BUILD_SCREEN(8219FC60, BuildScreenChangeCategory)
 ITC_BUILD_SCREEN(821A1138, BuildScreenOpenBuilds)
 ITC_BUILD_SCREEN(8219FF78, BuildScreenBackToStand)
 ITC_BUILD_SCREEN(8219FEC8, BuildScreenOpenDetails)
+ITC_BUILD_SCREEN(8219FE10, BuildScreenOpenStand)
+// BuildScreen::SetUpStand sub_8219F780 and PutOnStand sub_8219D6F0 have no
+// adapters: only OpenStand calls SetUpStand, and PutOnStand's callers in
+// play are SetUpStand (MoveStand and ChangeGroupOnStand never ran); their
+// register steps above are the harness's.

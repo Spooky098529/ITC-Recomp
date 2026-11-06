@@ -18,6 +18,7 @@
 #include "race_hud_object/race_hud_object.h"
 
 #include <cstdint>
+#include <functional>
 
 namespace build_screen {
 
@@ -246,5 +247,33 @@ uint64_t BackToStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
 // sub_8219FEC8 BuildScreen::OpenDetails: FinishNamed 108 and 93, PlayNamed
 // 106, KeepStandList, SetUpDetails. r3 1 when Run answers 0.
 uint64_t OpenDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
+
+// --- The stand (builds.cpp, transitions.cpp) ---
+
+// GarageStage::ReloadModel (sub_8217F880, car-makers.md) as the stand's
+// callers call it: `reload(holder, block, frame, lr)`, its plain C++ where
+// its adapter would run it, else a guest call. Its r3.
+using ReloadCall =
+    std::function<uint64_t(uint32_t holder, uint32_t block, uint32_t frame, uint32_t lr)>;
+constexpr uint32_t kStandHolder = 0x826D83E0;  // [[it]] the stand's holder
+constexpr uint32_t kStandBuild = 0x32664, kStandMade = 0x32660;
+constexpr uint32_t kCarBuilds = 0x2C7B4;       // 52-byte entries: +0 a car build
+// sub_8219D6F0 BuildScreen::PutOnStand: the screen's +0x32664 = `index`,
+// +0x32660 = 0, GarageStage::ReloadModel(holder, CarModels::BlockOf(the
+// car build's +2788)), GarageStage::SetDark(holder, `flag` 0), node (-1,
+// 11)'s +80 = `flag` 0. Its 128-byte frame below `sp`. r3 the node.
+uint32_t PutOnStand(uint8_t* base, uint32_t sp, uint32_t index, uint32_t flag,
+                    const ReloadCall& reload);
+// sub_8219F780 BuildScreen::SetUpStand: level 2's set-up (KeepBuildList,
+// InitStandList, RestoreBuildList, DrawStandRow(0, the scroll), the prompts
+// (0, 5, 1, 1), SetHelp 566, StandArrows, +0x3265C 1), then PutOnStand(the
+// build at the scroll + the selection: its +0, its +32 & 2). r3
+// PutOnStand's.
+uint64_t SetUpStand(uint8_t* base, uint32_t sp, const Calls& calls, const ReloadCall& reload);
+// sub_8219FE10 BuildScreen::OpenStand (transition 11): FinishNamed 71, 70,
+// 69, 61 + the selection, PlayNamed 104, SetUpStand. r3 1.
+uint64_t OpenStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
+                   const ReloadCall& reload);
 
 }  // namespace build_screen

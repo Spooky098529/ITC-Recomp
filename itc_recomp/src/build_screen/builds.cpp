@@ -7,6 +7,7 @@
 #include "build_screen/build_screen.h"
 
 #include "base/log.h"
+#include "car_makers/car_makers.h"
 #include "guest.h"
 #include "race_screens/race_screens.h"
 #include "ui_movies/game.h"
@@ -354,6 +355,45 @@ uint64_t SetUpDetails(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint64_t r3 = SetHelp(base, frame, 567, calls);
   Store(base, Screen(base) + kCarShown, 0);
   return r3;
+}
+
+
+uint32_t PutOnStand(uint8_t* base, uint32_t sp, uint32_t index, uint32_t flag,
+                    const ReloadCall& reload) {
+  ITC_NATIVE_RUNNING("sub_8219D6F0 BuildScreen::PutOnStand");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = Movie(base, frame);
+  Store(base, Screen(base) + kStandBuild, index);
+  const uint32_t screen = Screen(base);
+  const uint32_t car_build = Load(base, index * 52 + screen + kCarBuilds);
+  const uint32_t id = Load(base, car_build + 2788);
+  Store(base, screen + kStandMade, 0);
+  const uint32_t block = car_makers::BlockOf(id);
+  reload(Load(base, Load(base, kStandHolder)), block, frame, 0x8219D778);
+  const uint32_t dark = flag == 0 ? 1 : 0;
+  SetDark(base, frame, Load(base, Load(base, kStandHolder)), dark);
+  const uint32_t node = Node(base, movie, 0xFFFFFFFFu, 11);
+  Store(base, node + 80, dark);
+  return node;
+}
+
+uint64_t SetUpStand(uint8_t* base, uint32_t sp, const Calls& calls, const ReloadCall& reload) {
+  ITC_NATIVE_RUNNING("sub_8219F780 BuildScreen::SetUpStand");
+  const uint32_t frame = Frame(base, sp, 112);
+  KeepBuildList(base, frame);
+  InitStandList(base, frame, calls);
+  RestoreBuildList(base, frame);
+  DrawStandRow(base, frame, 0, Load(base, Load(base, kList) + 4), calls);
+  static constexpr uint32_t kPrompts[6] = {0, 5, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
+  SetPrompts(base, frame, kPrompts);
+  SetHelp(base, frame, 566, calls);
+  StandArrows(base, frame);
+  Store(base, Screen(base) + kCarShown, 1);
+  const uint32_t list = Load(base, kList);
+  const uint32_t scroll = Load(base, list + 4);
+  const uint32_t position = race_screens::ListSelection(base, list) + scroll;
+  const uint32_t build = BuildAt(base, Screen(base) + kBuilds, position);
+  return PutOnStand(base, frame, Load(base, build + 0), Load(base, build + 32) & 2, reload);
 }
 
 }  // namespace build_screen

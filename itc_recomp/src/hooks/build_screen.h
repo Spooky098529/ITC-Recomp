@@ -97,4 +97,12 @@ void BuildScreenOpenDetails(PPCContext& ctx, uint8_t* base);
 void BuildScreenSetUpDetails(PPCContext& ctx, uint8_t* base);
 void BuildScreenShowDetails(PPCContext& ctx, uint8_t* base);
 
+// BuildScreen::PutOnStand sub_8219D6F0 (r3 the build's index, r4 its +32 &
+// 2), SetUpStand sub_8219F780 and OpenStand sub_8219FE10 (r3 the step
+// word): GarageStage::ReloadModel's plain C++ where its adapter would run
+// it, else its adapter.
+void BuildScreenPutOnStand(PPCContext& ctx, uint8_t* base);
+void BuildScreenSetUpStand(PPCContext& ctx, uint8_t* base);
+void BuildScreenOpenStand(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

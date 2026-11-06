@@ -61,7 +61,10 @@ constexpr uint32_t kNodeCount = 40;
 constexpr uint32_t kAnimRootAt = 0x49000;    // the transitions' scene root (0x400)
 constexpr uint32_t kAnimationsAt = 0x49400;  // 8 animations of no tracks (64 bytes)
 constexpr uint32_t kModelsAt = 0x49600;      // 8 car model words (the details' lines)
-constexpr uint32_t kBlockBytes = 0x49800;
+constexpr uint32_t kSceneAt = 0x49800;      // the car scene for the stand (5,536 bytes)
+constexpr uint32_t kSceneModelAt = 0x4AE00; // its one pool 7 scene model (0x1400)
+constexpr uint32_t kHolderWordAt = 0x4C200; // [0x826D83E0] points here (the holder's address)
+constexpr uint32_t kBlockBytes = 0x4C400;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -81,6 +84,8 @@ constexpr Global kGlobals[] = {
     {kMissingText, 4},
     {kStringTable, 4},
     {0x826A50AC, 64},  // the screen fades
+    {0x826D83E0, 8},   // the stand's holder word and GarageStage::ReloadModel's count
+    {0x826C2E40, 8},   // the first pool set and the car scene
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -656,6 +661,55 @@ void Details(PPCContext&, Random& r, const World& w) {
   guest::StoreU32(w.base, w.at(kScreenAt) + bs::kStandScroll, r.Below(6));
 }
 
+// The stand's world for GarageStage::ReloadModel (as RaceScene::
+// RemakeCarModel's and ReloadModel's own cases lay it): the car scene
+// ([0x826C2E44]; +4 0, no sound loads; a teardown counting down or its
+// models updating, the accessory skipped) with one pool 7 scene model in use
+// (a car with no parts, its build deferred), the first set none, the reload
+// count 0 to 5, [0x826D83E0] pointing at the holder's address, the stage's
+// index 0 and +16 set or not; the car builds of the builds' +0 (0 to 399)
+// one of 8 small car model ids (CarModels::BlockOf's table and past it).
+void StandWorld(PPCContext&, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t scene = w.at(kSceneAt), model = w.at(kSceneModelAt);
+  const uint32_t stage = w.at(kStageAt), screen = w.at(kScreenAt);
+  guest::StoreU32(base, 0x826C2E44, scene);
+  guest::StoreU32(base, 0x826C2E40, 0);
+  guest::StoreU32(base, 0x826D83E4, r.Below(6));
+  guest::StoreU32(base, w.at(kHolderWordAt), w.at(kHolderAt));
+  guest::StoreU32(base, 0x826D83E0, w.at(kHolderWordAt));
+  guest::StoreU32(base, scene + 0, r.Below(2) == 0 ? 4 : r.Below(4));
+  guest::StoreU32(base, scene + 48, 3 + r.Below(4));
+  guest::StoreU32(base, scene + 4, 0);
+  guest::StoreU32(base, scene + 5048, 1);
+  guest::StoreU32(base, scene + 5028, model);
+  guest::StoreU32(base, scene + 5036, 1);
+  guest::StoreU32(base, model + 8, 0);
+  guest::StoreU32(base, model + 16, 3);
+  guest::StoreU32(base, model + 20, r.Below(6));
+  guest::StoreU32(base, model + 32, 1);
+  guest::StoreU32(base, model + 5028, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5040, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5044, 3 + r.Below(3));
+  for (const uint32_t at : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+    guest::StoreU32(base, model + at, 0);
+  }
+  guest::StoreU32(base, model + 5116, scene);
+  guest::StoreU32(base, stage + 8, 0);
+  guest::StoreU32(base, stage + 16, r.Below(2));
+  for (uint32_t k = 0; k < 8; k++) {
+    guest::StoreU32(base, w.at(kModelsAt) + 4 * k, r.Below(80));
+  }
+  for (uint32_t i = 0; i < kBuildCount; i++) {
+    const uint32_t build = w.at(kBuildsAt) + 52 * i;
+    const uint32_t index = r.Below(400);
+    guest::StoreU32(base, build + 0, index);
+    guest::StoreU32(base, screen + bs::kCarBuilds + 52 * index,
+                    w.at(kModelsAt) + 4 * r.Below(8) - 2788);
+  }
+}
+
+
 void Builds(Context& h, const World& w) {
   Run(h, w, {"BuildScreen::InitBuildList (sub_8219BFE8)", 100, __imp__sub_8219BFE8,
              hooks::BuildScreenInitBuildList, {{-112, -8}, {-224, -136}},
@@ -778,6 +832,14 @@ void Groups(Context& h, const World& w) {
   };
   Run(h, w, {"BuildScreen::BackToStand (sub_8219FF78; sub_8219F868)", 50, __imp__sub_8219FF78,
              hooks::BuildScreenBackToStand, {{-112, -24}, {-112 - 96, -112 - 8}}, stand});
+  // OpenStand: its frame (SetUpStand's and PutOnStand's below it compared
+  // in their own cases); BackToStand's world with the stand's.
+  Run(h, w, {"BuildScreen::OpenStand (sub_8219FE10; sub_8219F780, sub_8219D6F0)", 30,
+             __imp__sub_8219FE10, hooks::BuildScreenOpenStand, {{-128, -32}},
+             [stand](PPCContext& t, Random& r, const World& w) {
+               stand(t, r, w);
+               StandWorld(t, r, w);
+             }});
   // OpenDetails: its frame and SetUpDetails' (over KeepStandList's), without
   // their saves (below them LineCount's 4 KB frame and SetHelp's, whose
   // parameter area holds SetNodeText's register leftovers, cover
@@ -797,6 +859,21 @@ void Groups(Context& h, const World& w) {
              [](PPCContext& t, Random& r, const World& w) {
                Details(t, r, w);
                t.r3.u64 = w.at(kBuildsAt) + 52 * r.Below(kBuildCount);
+             }});
+  Run(h, w, {"BuildScreen::SetUpStand (sub_8219F780; sub_8219D6F0)", 30, __imp__sub_8219F780,
+             hooks::BuildScreenSetUpStand, {{-112, -24}},
+             [](PPCContext& t, Random& r, const World& w) {
+               guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, uint16_t(r.Below(13)));
+               StandWorld(t, r, w);
+             }});
+  Run(h, w, {"BuildScreen::PutOnStand (sub_8219D6F0)", 30, __imp__sub_8219D6F0,
+             hooks::BuildScreenPutOnStand, {{-128, -32}},
+             [](PPCContext& t, Random& r, const World& w) {
+               StandWorld(t, r, w);
+               t.r3.u64 = r.Below(400);
+               guest::StoreU32(w.base, w.at(kScreenAt) + bs::kCarBuilds + 52 * t.r3.u32,
+                               w.at(kModelsAt) + 4 * r.Below(8) - 2788);
+               t.r4.u64 = r.Below(2) == 0 ? 0 : 2;
              }});
   Run(h, w, {"BuildScreen::RestoreStand (sub_8219F868)", 60, __imp__sub_8219F868,
              hooks::BuildScreenRestoreStand, {{-96, -8}},
