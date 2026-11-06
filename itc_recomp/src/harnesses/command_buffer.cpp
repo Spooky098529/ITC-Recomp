@@ -613,6 +613,40 @@ void CommandBuffer(Context& h) {
                 t.r3.u64 = cb::WaitForFence(h.base, t.r3.u32, t.r4.u32, t.r5.u32,
                                             hooks::CommandBufferKick(t, h.base));
               });
+      // ReserveWords: a few words (or more than a segment holds), the write
+      // position anywhere before the segment's end.
+      RunRing(h, b, "Device::ReserveWords (sub_8229F148)", __imp__sub_8229F148, 600,
+              [&](Random& r, PPCContext& t, int c) {
+                const uint32_t open = FlowFields(h, b, r, c, false);
+                ThrottleFences(h, b, r, open, true);
+                TrainingFailed(h, b, r, open);
+                t.r3.u64 = b.device;
+                t.r4.u64 = r.Below(4) == 0 ? r.Below(0x1000) : r.Below(1100);
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = cb::ReserveWords(h.base, t.r3.u32, t.r4.u32,
+                                            hooks::CommandBufferKick(t, h.base));
+              });
+      // InsertCallback: the flags as WriteCallback's cases.
+      RunRing(h, b, "Device::InsertCallback (sub_8229F228)", __imp__sub_8229F228, 400,
+              [&](Random& r, PPCContext& t, int c) {
+                const uint32_t open = FlowFields(h, b, r, c, false);
+                ThrottleFences(h, b, r, open, true);
+                TrainingFailed(h, b, r, open);
+                const uint32_t cpus = (c % 8 == 1) ? 0 : (uint32_t(r.Next()) & 0x3F000000u);
+                switch (c % 3) {
+                  case 0: t.r4.u64 = cpus; break;
+                  case 1: t.r4.u64 = cpus | (1u << r.Below(32)); break;
+                  default: t.r4.u64 = uint32_t(r.Next()); break;
+                }
+                t.r3.u64 = b.device;
+                t.r5.u64 = c == 2 ? 0x822B6A78u : uint32_t(r.Next());
+                t.r6.u64 = uint32_t(r.Next());
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = cb::InsertCallback(h.base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32,
+                                              hooks::CommandBufferKick(t, h.base));
+              });
     }
     guest::StoreU32(h.base, cb::kTrainingFailed, training_failed);
   }

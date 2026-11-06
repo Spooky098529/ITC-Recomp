@@ -399,4 +399,32 @@ uint32_t WaitForFence(uint8_t* base, uint32_t device, uint32_t fence, uint32_t c
   return r3;
 }
 
+uint32_t ReserveWords(uint8_t* base, uint32_t device, uint32_t words, const Kick& kick) {
+  ITC_NATIVE_RUNNING("sub_8229F148 Device::ReserveWords");
+  const uint32_t bytes = words << 2;
+  auto short_of_room = [&] {
+    return guest::LoadU32(base, device + kWritePosition) + bytes >
+           guest::LoadU32(base, device + kSegmentEnd);
+  };
+  if (short_of_room()) {
+    EndSegment(base, device, kick);
+    if (short_of_room() && NextSegment(base, device, words, kick) == 0) {
+      return 0;
+    }
+  }
+  return guest::LoadU32(base, device + kWritePosition);
+}
+
+uint32_t InsertCallback(uint8_t* base, uint32_t device, uint32_t flags, uint32_t function,
+                        uint32_t argument, const Kick& kick) {
+  ITC_NATIVE_RUNNING("sub_8229F228 Device::InsertCallback");
+  uint32_t position = guest::LoadU32(base, device + kWritePosition);
+  if (position > guest::LoadU32(base, device + kSoftEnd)) {
+    position = EndSegment(base, device, kick);
+  }
+  position = WriteCallback(base, device, position, flags, function, argument);
+  guest::StoreU32(base, device + kWritePosition, position);
+  return position;
+}
+
 }  // namespace graphics::command_buffer

@@ -199,4 +199,19 @@ uint32_t NextSegment(uint8_t* base, uint32_t device, uint32_t words, const Kick&
 uint32_t WaitForFence(uint8_t* base, uint32_t device, uint32_t fence, uint32_t code,
                       const Kick& kick);
 
+// Reserves `words` words at the write position (sub_8229F148): when they
+// don't fit before the segment's end +44, the segment is ended
+// (EndSegment) and, still short, a new one of at least those words started
+// (NextSegment; 0 returned when none can be had). Returns the write
+// position +40 (the words go after it), or 0. The vertex shader patch's copy
+// (sub_822AEBF0) is made there.
+uint32_t ReserveWords(uint8_t* base, uint32_t device, uint32_t words, const Kick& kick);
+
+// Device::InsertCallback (sub_8229F228): the segment ended when past its
+// soft end (EndSegment), the callback's packets (WriteCallback: `flags`'
+// CPUs, `function`, `argument`) written at the write position, which moves
+// past them. Returns the new write position.
+uint32_t InsertCallback(uint8_t* base, uint32_t device, uint32_t flags, uint32_t function,
+                        uint32_t argument, const Kick& kick);
+
 }  // namespace graphics::command_buffer

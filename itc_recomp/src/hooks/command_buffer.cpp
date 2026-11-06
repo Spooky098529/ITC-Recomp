@@ -21,7 +21,8 @@ ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "CommandChain::NewBlock sub_8229EB10, CommandChain::Init sub_8229ED60, the segment "
               "flow (Device::EndSegment sub_8229EF48, Device::KickSegment sub_8229EDA8, "
               "Device::NextSegment sub_8229EC00, Device::WaitForFence sub_8229E908, its waits "
-              "for the GPU dropped); the "
+              "for the GPU dropped), Device::ReserveWords sub_8229F148, "
+              "Device::InsertCallback sub_8229F228; the "
               "coherency flush packets sub_8229E5D0 and the data cache flush sub_822AC470 "
               "dropped) "
               "natively instead of through the translated code (the same results; checked by "
@@ -132,6 +133,16 @@ ITC_SEGMENT_FLOW(8229EC00, {
 ITC_SEGMENT_FLOW(8229E908, {
   const uint32_t device = ctx.r3.u32, fence = ctx.r4.u32, code = ctx.r5.u32;
   ctx.r3.u64 = cb::WaitForFence(base, device, fence, code, kick);
+})
+
+ITC_SEGMENT_FLOW(8229F148, {
+  const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
+  ctx.r3.u64 = cb::ReserveWords(base, device, words, kick);
+})
+ITC_SEGMENT_FLOW(8229F228, {
+  const uint32_t device = ctx.r3.u32, flags = ctx.r4.u32, function = ctx.r5.u32,
+                 argument = ctx.r6.u32;
+  ctx.r3.u64 = cb::InsertCallback(base, device, flags, function, argument, kick);
 })
 
 ITC_COMMAND_BUFFER(822AF978,
