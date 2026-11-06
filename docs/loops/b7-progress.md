@@ -58,7 +58,9 @@ file's history. What's left to see in a drive, from every run:
   `sub_82178DF8`, `sub_82178E60`, `sub_821799D8`, `sub_820E7380`,
   `sub_820E7470`, `sub_820D8F18`; ready groups under every root, next to
   the scene model work just done; both lines deleted from `leads.md`).
-  Mapping agent running.
+  Map checked (d33966e3: `stand-models.md`, 39 rows, all new, 28 in
+  play; 0 errors; 12 ready groups, `TuningScreen::PreviewWheel`'s 2,171
+  lines to split; 2 leads added; no subagents). Migration agent running.
 
 ## Done
 
@@ -95,3 +97,5 @@ file's history. What's left to see in a drive, from every run:
 - After its third migration: ours 4286, work left 2125 (wrapped 57,
   known 438, unknown 1630).
 - After its validation (`itc_3747`): ours 4286, work left 2125.
+- After the stand models' map: ours 4286, work left 2125 (wrapped 57,
+  known 466, unknown 1602).
