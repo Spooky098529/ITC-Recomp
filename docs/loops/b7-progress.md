@@ -107,8 +107,11 @@ file's history. What's left to see in a drive, from every run:
   36-38 s, 0 errors, all harnesses 0 differing; no subagents); left: the
   stand and details levels' groups (`sub_8219FEC8`, `sub_8219FF78`,
   `sub_8219FC60`, `sub_821A0060`, `sub_821A1138`, `sub_821A1258`) and
-  `scene.md`'s `sub_820C5798`, `sub_820C5A60`. Validation agent
-  running.
+  `scene.md`'s `sub_820C5798`, `sub_820C5A60`. Validated `itc_3795`
+  (race 30 s, the harnesses ~90 s of the 120; 0 errors, every harness
+  0 differing, 46 of 46 harness lines; none in the race or the replay
+  `itc_3796` (ok): the screen isn't reached; all 46 to drive). Second
+  migration agent running.
 
 ## Done
 
@@ -173,3 +176,4 @@ file's history. What's left to see in a drive, from every run:
   known 487, unknown 1542).
 - After its migration: ours 4371, work left 2040 (wrapped 57, known
   441, unknown 1542).
+- After its validation (`itc_3795`): ours 4371, work left 2040.

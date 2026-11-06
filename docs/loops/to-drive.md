@@ -41,6 +41,21 @@ here loses its heading.
   ok; `car-makers.md`): `sub_8217FDC8` GarageStage::SetCarClass,
   `sub_82182C90` GarageStage::ShowCarById, `sub_82182D30`
   GarageStage::ShowCarByIdWithClass (and `sub_82178E60` above).
+- The build screen, first migration (attract race `itc_3795`, replay
+  `itc_3796` ok, neither reaches the screen; `build-screen.md`, names in
+  its rows; the six UI movie helpers in `ui-movies-game.md`'s area of
+  `build-screen.md`): `sub_8211C370`, `sub_8211C3F8`, `sub_8211C680`,
+  `sub_821087D8`, `sub_8211CCC0`, `sub_8211CD28`, `sub_8219DB50`,
+  `sub_8219BA50`, `sub_8219BB20`, `sub_8219BBF0`, `sub_8219BB80`,
+  `sub_8219BC50`, `sub_8219BF08`, `sub_8219BAB0`, `sub_8219C078`,
+  `sub_8219BCC0`, `sub_8219C230`, `sub_8219C1C8`, `sub_8219EC50`,
+  `sub_8219CC70`, `sub_8217D0C8`, `sub_8217B7C8`, `sub_8219D1B0`,
+  `sub_8219D4B8`, `sub_8219D7B0`, `sub_8219D440`, `sub_8219DA58`,
+  `sub_8219D090`, `sub_8219BD30`, `sub_8219FA28`, `sub_8219CE08`,
+  `sub_8219C528`, `sub_8219C6D0`, `sub_8219C850`, `sub_8219C8F8`,
+  `sub_8219CA08`, `sub_8219CB18`, `sub_8219CBD8`, `sub_8219BFE8`,
+  `sub_821A0128`, `sub_821A0D38`, `sub_8219D3E8`, `sub_8219D248`,
+  `sub_8219D550`, `sub_8219CF08`, `sub_821A1008`.
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 
