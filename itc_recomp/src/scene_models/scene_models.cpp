@@ -391,4 +391,53 @@ uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size) {
   return pages;
 }
 
+
+std::optional<uint64_t> ModelUpdate(uint8_t* base, uint32_t model, uint32_t sp,
+                                    const ModelUpdateCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DA180 SceneModel::Update");
+  const uint32_t frame = sp - 240;
+  std::optional<uint64_t> r3;
+  const int32_t count = int32_t(guest::LoadU32(base, model + 5044));
+  if (count > 0) {
+    const uint32_t pending = guest::LoadU32(base, model + 5040);
+    guest::StoreU32(base, model + 5044, uint32_t(count - 1));
+    if (pending != 0 && count - 1 == 0) {
+      guest::StoreU32(base, frame, sp);  // the back chain, for Build's guest call
+      r3 = calls.build(model, frame);
+      guest::StoreU32(base, model + 5040, 0);
+    }
+  }
+  const uint32_t scene = guest::LoadU32(base, model + 5116);
+  if (guest::LoadU32(base, scene + 5048) != 0) {
+    return r3;
+  }
+  const bool cockpit = guest::LoadU32(base, scene + 4) != 0;
+  if (guest::LoadU32(base, model + 5072) == 0 || guest::LoadU32(base, model + 5048) == 0 ||
+      guest::LoadU32(base, model + (cockpit ? 5076 : 4296)) == 0) {
+    return r3;
+  }
+  const uint32_t accessory =
+      Accessory(base, guest::LoadU32(base, guest::LoadU32(base, model + 5068) + 36));
+  if (accessory == 0) {
+    return 0;
+  }
+  // Never seen in play: the identity built at +80 and copied to +144 (the
+  // vupkd3d128 and vpermwi128 rows), row 3 the node's position.
+  guest::StoreU32(base, frame, sp);
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t column = 0; column < 4; column++) {
+      const uint32_t value = row == column ? 0x3F800000u : 0;
+      guest::StoreU32(base, frame + 80 + 16 * row + 4 * column, value);
+      guest::StoreU32(base, frame + 144 + 16 * row + 4 * column, value);
+    }
+  }
+  const uint32_t node = guest::LoadU32(base, guest::LoadU32(base, model + 5048) + 24) + 7216;
+  for (uint32_t w = 0; w < 4; w++) {
+    guest::StoreU32(base, frame + 192 + 4 * w, guest::LoadU32(base, node + 4 * w));
+  }
+  calls.multiply(frame + 144, frame + 144, model + 4304, frame);
+  calls.set_anchor(accessory, frame + 144, frame);
+  return calls.step(accessory, frame);
+}
+
 }  // namespace scene_models

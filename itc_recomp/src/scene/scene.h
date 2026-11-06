@@ -248,4 +248,44 @@ std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& d
 // set the allocation layer's pages.
 bool UpdateANative(uint8_t* base);
 
+
+// --- The scene's update ---
+
+// ScenePools::DestroyB (sub_820C59B0): LoadsDone(scene) from its 128-byte
+// frame below `sp` (the answer not read), then for each of the second set's
+// eight pools (+4944 + 12 x pool), while List::At(list, 0) finds an object:
+// `destroy(object, frame)` (its vtable slot 0 with r4 = 0, a guest call),
+// then `free(object, frame)` (VirtualFree(object, 0, MEM_RELEASE)). r3 is
+// left 0 (the last List::At's).
+using FreeCall = std::function<uint64_t(uint32_t pages, uint32_t frame)>;
+void DestroyB(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& finish,
+              const std::function<void(uint32_t object, uint32_t frame)>& destroy,
+              const FreeCall& free);
+
+// sub_820C5A60 (CarScene::UpdateModels, probably; vehicle-accessors.md):
+// for each in-use (+16 = 3) object of the second set's pool 7 (+5028, its
+// count +5036 read once; List::At), `model_update(model, frame)`
+// (SceneModel::Update) from its 112-byte frame below `sp`. Returns the r3
+// it leaves (the last call's), or nullopt (r3 as given) for a count of 0
+// or below.
+std::optional<uint64_t> UpdateModels(
+    uint8_t* base, uint32_t scene, uint32_t sp,
+    const std::function<uint64_t(uint32_t model, uint32_t frame)>& model_update);
+
+// CarScene::Update (sub_820C9608): no arguments (scene.md's row). The calls
+// from its 96-byte frame below `sp`, each answering the r3 it leaves.
+struct UpdateCalls {
+  FinishCall finish;                                                // DestroyB's LoadsDone
+  std::function<void(uint32_t object, uint32_t frame)> destroy;    // DestroyB's destructors
+  FreeCall free_object;                                             // DestroyB's VirtualFree
+  FreeCall free_scene;                                              // the scene's VirtualFree
+  std::function<uint64_t(uint32_t assets, uint32_t frame)> release;  // SceneAssets::Release
+  std::function<uint64_t(uint32_t scene, uint32_t frame)> destruct;  // ~CarScene (r4 = 0)
+  std::function<uint64_t(uint32_t scene, uint32_t frame)> update_models;
+  std::function<uint64_t(uint64_t r3, uint32_t frame)> update_a;   // ScenePools::UpdateA
+  std::function<uint64_t(uint32_t frame)> accessories_destroy;      // Accessories::Destroy
+};
+// Returns the r3 it leaves (`r3` the r3 at entry).
+uint64_t Update(uint8_t* base, uint32_t sp, uint64_t r3, const UpdateCalls& calls);
+
 }  // namespace scene

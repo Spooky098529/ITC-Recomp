@@ -390,6 +390,45 @@ void Pages(Context& h, Random& r, uint32_t block) {
   results.Report();
 }
 
+
+// SceneModel::Update: the model at the block's start, its scene at +0x1800,
+// its interior at +0x3000 and the interior's loading object at +0x3100, the
+// accessories' set at +0x3800 with empty entries (the accessory always none:
+// its branch never ran in play). The deferred build's count from -1 to 3,
+// +5040 0 where the count reaches 0 (SceneModel::Build has its own cases in
+// car_models); the accessory's conditions each set or not.
+void ModelUpdates(Context& h, Random& r, uint32_t block) {
+  Results results("SceneModel::Update (sub_820DA180)");
+  for (int c = 0; c < 24; c++) {
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          const uint32_t model = block, scene = block + 0x1800;
+          const uint32_t interior = block + 0x3000, loading = block + 0x3100;
+          const uint32_t set = block + 0x3800;
+          guest::StoreU32(h.base, sm::kAccessories, set);
+          for (uint32_t i = 0; i < 3; i++) {
+            guest::StoreU32(h.base, set + 4 + 4 * i, 0);
+          }
+          const int32_t count = int32_t(r.Below(5)) - 1;
+          guest::StoreU32(h.base, model + 5044, uint32_t(count));
+          guest::StoreU32(h.base, model + 5040, count == 1 ? 0 : r.Below(2));
+          guest::StoreU32(h.base, model + 5116, scene);
+          guest::StoreU32(h.base, scene + 5048, r.Below(4) == 0 ? 1 : 0);
+          guest::StoreU32(h.base, scene + 4, r.Below(2));
+          for (const uint32_t at : {5072u, 5048u, 5076u, 4296u}) {
+            guest::StoreU32(h.base, model + at, r.Below(5) == 0 ? 0 : uint32_t(r.Next()) | 1);
+          }
+          guest::StoreU32(h.base, model + 5068, interior);
+          guest::StoreU32(h.base, interior + 36, loading);
+          guest::StoreU32(h.base, loading + 140, r.Below(4));
+          t.r3.u64 = model;
+        },
+        __imp__sub_820DA180, hooks::SceneModelUpdate, {}, fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SceneModels(Context& h) {
@@ -400,6 +439,7 @@ void SceneModels(Context& h) {
   Copies(h, r, block);
   Defaults(h, r, block);
   Pages(h, r, block);
+  ModelUpdates(h, r, block);
   memory::Free(allocation);
 }
 

@@ -5,6 +5,7 @@
 #include "hooks/scene_models.h"
 
 #include "base/flags.h"
+#include "hooks/car_models.h"
 #include "hooks/heap.h"
 #include "hooks/stand_models.h"
 #include "scene_models/apply.h"
@@ -17,7 +18,8 @@ ITC_FLAG_BOOL(native_scene_models, true, "ITC",
               "sub_820E37D0, sub_820E3658 (no adapter), CarModel::SetRecord sub_820D3C70, CarRecord::Copy "
               "sub_820D7EE8, the records' defaults sub_820D45B0, sub_820D3B38, CarRecord::Reset "
               "sub_820D0A98 with sub_820D0A20 (no adapter: only CarRecord::Reset calls it), sub_820D3558, sub_820D3840, sub_820D3900 and "
-              "sub_820D34E0, SceneModel::Accessory sub_820D97B8, SceneModelRecord::Copy sub_820DB290, "
+              "sub_820D34E0, SceneModel::Accessory sub_820D97B8, SceneModel::Update sub_820DA180 (no adapter: from "
+              "CarScene::Update's plain C++ under --native_scene; Build's step, the accessory's branch, never seen in play, guest calls), SceneModelRecord::Copy sub_820DB290, "
               "SceneModelRecord::SceneModelRecord sub_820DB240, sub_820D34B8, SceneModelRecord::Reset sub_820D9810, SceneModel::ApplyRecord sub_820DA758 (the original for the race's path) with SceneParts::Apply sub_820E08B0 and SceneInterior::Apply sub_820E4258, SceneModel::ReloadDecals sub_820D9D48 (these four without adapters: their native callers call them; their callees through their adapters; checked by --run_harnesses=load_poll and car_models), and with "
               "--native_heap the car model's pages sub_820C3CA0; in src/hooks/car_models.cpp, the second "
               "set's set-ups and ScenePools::SetUpB sub_820C5B28 (its pool 0 case sub_820C5B98 "
@@ -190,6 +192,43 @@ void SceneModelsInteriorApply(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+
+void SceneModelUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  const auto call = StandModelsGuestCall(ctx, base);
+  sm::ModelUpdateCalls calls;
+  calls.build = [&](uint32_t model, uint32_t frame) -> uint64_t {
+    // SceneModel::Build's register step (its own fallbacks), from the frame.
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = model;
+    ctx.lr = 0x820DA1C4;
+    if (ITC_FLAG(native_scene_models)) {
+      SceneModelBuild(ctx, base);
+    } else {
+      __imp__sub_820D9870(ctx, base);
+    }
+    ctx.r1.u64 = stack;
+    return ctx.r3.u64;
+  };
+  // The accessory's branch, never seen in play: guest calls, Matrix::Multiply
+  // through its override (frame interpolation's note), SetAnchor and Step
+  // the originals.
+  calls.multiply = [&](uint32_t out, uint32_t a, uint32_t b, uint32_t frame) {
+    call(0x8209BD50, {out, a, b}, frame, 0x820DA2E8);
+  };
+  calls.set_anchor = [&](uint32_t accessory, uint32_t matrix, uint32_t frame) {
+    call(0x820EF418, {accessory, matrix}, frame, 0x820DA2F4);
+  };
+  calls.step = [&](uint32_t accessory, uint32_t frame) {
+    return call(0x820EF250, {accessory, 0}, frame, 0x820DA300);
+  };
+  const uint64_t r3_in = ctx.r3.u64;
+  const auto r3 = sm::ModelUpdate(base, ctx.r3.u32, ctx.r1.u32, calls);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3.value_or(r3_in);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -231,6 +270,9 @@ ITC_SCENE_MODELS(820D34E0, SceneModelsPool4RecordReset)
 // garage stage's re-applies and setters, car_makers and stand_models) are
 // native and call their plain C++, the race's path of ApplyRecord the
 // original; their register steps above are the harness's.
+// SceneModel::Update sub_820DA180 has no adapter: only sub_820C5A60 calls
+// it, whose plain C++ (src/scene/scene.cpp, under CarScene::Update's) calls
+// its register step above.
 // SceneParts::Apply sub_820E08B0 and SceneInterior::Apply sub_820E4258 have
 // no adapters: only SceneModel::ApplyRecord calls them, and its plain C++
 // calls theirs (their register steps above are the harness's).

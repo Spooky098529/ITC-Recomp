@@ -971,6 +971,204 @@ void LoadsDoneCases(Context& h) {
         });
 }
 
+
+// --- The scene's update ---
+
+// Accessories::Free's fake destructor for the set (a leaf storing r4 and r5
+// at +444 and +448; the accessories harness's).
+constexpr uint32_t kRecordR4R5 = 0x820CE9F8;
+// The word CarScene::Update sets to 3 (Modes::Tick counts it down).
+constexpr uint32_t kSceneCountdown = 0x8260185C;
+
+// Pool nodes (the case's pages, not in use) in some of the second set's
+// lists, their slot 0 ~PoolNode.
+std::vector<uint32_t> AddPoolObjects(uint8_t* base, uint32_t scene, uint32_t vtable, Random& r) {
+  std::vector<uint32_t> objects;
+  Store(base, vtable, kPoolNodeDestruct);
+  for (uint32_t pool = 0; pool < 8; pool++) {
+    const uint32_t count = r.Below(3);
+    for (uint32_t k = 0; k < count; k++) {
+      const uint32_t object = memory::AllocPages(4096, 4096);
+      scene_loaders::PoolNodeConstruct(base, object, scene + 4944 + 12 * pool);
+      Store(base, object, vtable);
+      objects.push_back(object);
+    }
+  }
+  return objects;
+}
+
+void TakeFreed(uint8_t* base, const std::vector<uint32_t>& pages, Outputs& out) {
+  for (const uint32_t p : pages) {
+    const bool freed = !memory::IsPages(p);
+    out.Word(freed);
+    if (!freed) {
+      memory::FreePages(p);
+    }
+  }
+}
+
+// Pool 7's scene models for CarScene::UpdateModels: 0 to 4 in the block at
+// +0x4000 + 0x1400 i (in use or not), the count -1 to 5 (past the nodes
+// List::At answers the first again), each one's update as the scene models'
+// harness builds it (no build due, the accessory none: the accessories'
+// set at +0x3F00, its entries 0).
+void AddSceneModels(uint8_t* base, uint32_t scene, uint32_t block, Random& r) {
+  const uint32_t list = scene + 5028;
+  const uint32_t set = block + 0x3F00;
+  Store(base, accessories::kSet, set);
+  for (uint32_t i = 0; i < 3; i++) {
+    Store(base, set + 4 + 4 * i, 0);
+  }
+  const uint32_t nodes = r.Below(5);
+  Store(base, list + 0, 0);
+  uint32_t previous = 0;
+  for (uint32_t k = 0; k < nodes; k++) {
+    const uint32_t model = block + 0x4000 + 0x1400 * k;
+    Store(base, previous == 0 ? list : previous + 8, model);
+    Store(base, model + 8, 0);
+    previous = model;
+    Store(base, model + 16, r.Below(4) == 0 ? r.Below(3) : 3);
+    const int32_t count = int32_t(r.Below(5)) - 1;
+    Store(base, model + 5044, uint32_t(count));
+    Store(base, model + 5040, count == 1 ? 0 : r.Below(2));
+    Store(base, model + 5116, scene);
+    for (const uint32_t at : {5072u, 5048u, 5076u, 4296u}) {
+      Store(base, model + at, r.Below(5) == 0 ? 0 : uint32_t(r.Next()) | 1);
+    }
+    const uint32_t interior = block + 0x3E00;
+    Store(base, model + 5068, interior);
+    Store(base, interior + 36, interior + 0x40);
+    Store(base, interior + 0x40 + 140, r.Below(4));
+  }
+  Store(base, scene + 5048, r.Below(4) == 0 ? 1 : 0);
+  Store(base, scene + 4, r.Below(2));
+  Store(base, scene + 5036, nodes == 0 ? uint32_t(int32_t(r.Below(2)) - 1)
+                                       : nodes + (r.Below(6) == 0 ? 1 : 0));
+}
+
+// ScenePools::DestroyB: the scene in the block, its shared assets' slots
+// loading or not, pool nodes (pages, not in use: LoadsDone's finishers not
+// called) in its lists; compared: which were freed, the block, r3.
+void DestroyBCases(Context& h, const Block& block) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  const uint32_t scene = block.address + 0x100;
+  const uint32_t vtable = block.address + 0x40;
+  std::vector<uint32_t> objects;
+  Cases(
+      h, block, "ScenePools::DestroyB (sub_820C59B0)", 12, Original<__imp__sub_820C59B0>,
+      hooks::SceneDestroyB,
+      [&](PPCContext& t, Random& r) {
+        static constexpr uint32_t kSlots[8] = {84, 132, 156, 268, 472, 964, 4156, 4764};
+        for (const uint32_t slot : kSlots) {
+          Store(h.base, scene + slot, r.Below(3));
+        }
+        for (uint32_t pool = 0; pool < 8; pool++) {
+          for (uint32_t w = 0; w < 3; w++) {
+            Store(h.base, scene + 4944 + 12 * pool + 4 * w, 0);
+          }
+        }
+        objects = AddPoolObjects(h.base, scene, vtable, r);
+        t.r3.u64 = scene;
+      },
+      [&](const PPCContext&, Outputs& out) { TakeFreed(h.base, objects, out); });
+}
+
+// sub_820C5A60 (CarScene::UpdateModels): AddSceneModels' models; compared:
+// the block (the models and their scene), the globals, r3.
+void UpdateModelsCases(Context& h, const Block& block) {
+  const uint32_t scene = block.address + 0x100;
+  Cases(h, block, "CarScene::UpdateModels (sub_820C5A60)", 12, __imp__sub_820C5A60,
+        hooks::SceneUpdateModels, [&](PPCContext& t, Random& r) {
+          AddSceneModels(h.base, scene, block.address, r);
+          t.r3.u64 = scene;
+        });
+}
+
+// CarScene::Update: no scene; a teardown counting down; the scene's models
+// updated (AddSceneModels) with the first set none or counting down no
+// releases; or, with the models' lifetime native, a teardown due: the scene
+// the case's pages, made by CarScene::CarScene's register step, pool nodes
+// in its lists, +40 0 or not, then the accessories' set none or the case's
+// pages (its slot 0 the leaf recorder). Compared: the block, which pages
+// were freed, the pending frees, the globals and kSceneCountdown, r3.
+void UpdateCases(Context& h, const Block& block) {
+  const bool due_ok = hooks::NativeHeapActive() && hooks::ModelsNativeLifetime() &&
+                      hooks::ModelsHostLock();
+  std::unique_lock<std::recursive_mutex> lock(models::MemoryBlocksMutex(), std::defer_lock);
+  if (due_ok) {
+    lock.lock();
+  }
+  Results results("CarScene::Update (sub_820C9608)");
+  const uint32_t vtable = block.address + 0x40, set_vtable = block.address + 0x60;
+  const uint32_t first_set = block.address + 0x3C00;
+  const uint32_t saved_countdown = Load(h.base, kSceneCountdown);
+  for (int c = 0; c < 24; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Globals globals(h.base);
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      Store(h.base, kSceneCountdown, uint32_t(r.Next()));
+      PPCContext t = CallContext(h);
+      const uint32_t kind = c < 2 ? 0 : (due_ok ? 1 + r.Below(3) : 1 + r.Below(2));
+      std::vector<uint32_t> pages;
+      uint32_t scene = 0;
+      Store(h.base, scene::kFirstSet, 0);
+      Store(h.base, accessories::kSet, 0);
+      if (kind == 1) {
+        scene = block.address + 0x100;
+        Store(h.base, scene + 0, 4);
+        Store(h.base, scene + 48, 1 + r.Below(3));
+      } else if (kind == 2) {
+        scene = block.address + 0x100;
+        Store(h.base, scene + 0, r.Below(4) == 0 ? 4 + 1 + r.Below(3) : r.Below(4));
+        AddSceneModels(h.base, scene, block.address, r);
+        if (r.Below(2) == 0) {
+          // A first set with no releases and no teardown.
+          Store(h.base, scene::kFirstSet, first_set);
+          Store(h.base, first_set + 4, r.Below(4));
+          Store(h.base, first_set + 40, 0);
+          Store(h.base, first_set + 12, 0);
+        }
+      } else if (kind == 3) {
+        scene = memory::AllocPages(scene::kSceneBytes, 4096);
+        pages.push_back(scene);
+        t.r3.u64 = scene;
+        hooks::SceneCarSceneConstruct(t, h.base);
+        Store(h.base, scene + 0, 4);
+        Store(h.base, scene + 48, 0);
+        Store(h.base, scene + 40, r.Below(2) == 0 ? 0 : uint32_t(r.Next()) | 1);
+        const std::vector<uint32_t> objects = AddPoolObjects(h.base, scene, vtable, r);
+        pages.insert(pages.end(), objects.begin(), objects.end());
+        if (r.Below(2) == 0) {
+          const uint32_t set = memory::AllocPages(accessories::kSetBytes, 4096);
+          Store(h.base, set_vtable, kRecordR4R5);
+          Store(h.base, set, set_vtable);
+          Store(h.base, accessories::kSet, set);
+          pages.push_back(set);
+        }
+      }
+      Store(h.base, scene::kScene, scene);
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      t.r3.u64 = r.Next();
+      (v == 0 ? Original<__imp__sub_820C9608> : hooks::SceneUpdate)(t, h.base);
+      pending_frees::TakeAddedNodes(h.base, was, out[v]);
+      out[v].Word(Load(h.base, scene::kScene) == scene);
+      out[v].Word(Load(h.base, kSceneCountdown));
+      TakeFreed(h.base, pages, out[v]);
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  Store(h.base, kSceneCountdown, saved_countdown);
+  results.Report();
+}
+
 }  // namespace
 
 void Scene(Context& h) {
@@ -988,6 +1186,9 @@ void Scene(Context& h) {
   LoadAssetsCases(h, block);
   FileLoadedCases(h, block);
   LoadsDoneCases(h);
+  DestroyBCases(h, block);
+  UpdateModelsCases(h, block);
+  UpdateCases(h, block);
 }
 
 }  // namespace harness

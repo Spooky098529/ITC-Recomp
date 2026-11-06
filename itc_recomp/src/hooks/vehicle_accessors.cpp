@@ -22,7 +22,8 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
               "collision world's, sub_820B7BF0 to sub_820B8D10; the +344 object's, "
               "sub_820B9658 to sub_820B99C8; the race data's setters, stages and racer records, "
               "sub_820FF918 to sub_820FFF10; the scene's pools and List::Init and At, "
-              "sub_820C42C8 to sub_820C5D70, sub_82593FB0 and sub_82593FC0; the switch "
+              "sub_820C42C8 to sub_820C5D70 (sub_820C5A60, no adapter, from CarScene::Update's "
+              "plain C++ under --native_scene), sub_82593FB0 and sub_82593FC0; the switch "
               "sub_825C8390) natively instead of through the translated code (same "
               "results; checked by --run_harnesses=vehicle_accessors)");
 

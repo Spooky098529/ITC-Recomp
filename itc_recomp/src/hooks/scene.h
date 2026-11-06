@@ -61,4 +61,15 @@ void SceneLoadAssets(PPCContext& ctx, uint8_t* base);
 // = the scene; its guest calls from the original's 128-byte frame.
 void SceneOnFileLoaded(PPCContext& ctx, uint8_t* base);
 
+// ScenePools::DestroyB sub_820C59B0 (r3 the scene; LoadsDone's finishers
+// and the destructors guest calls, VirtualFree's adapter's work or the
+// original), sub_820C5A60 (CarScene::UpdateModels, r3 the scene: SceneModel::
+// Update's step with --native_scene_models, else the original) and
+// CarScene::Update sub_820C9608 (its callees' register steps, or their
+// originals with their flags off). No adapters for the first two: only
+// CarScene::Update calls them.
+void SceneDestroyB(PPCContext& ctx, uint8_t* base);
+void SceneUpdateModels(PPCContext& ctx, uint8_t* base);
+void SceneUpdate(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

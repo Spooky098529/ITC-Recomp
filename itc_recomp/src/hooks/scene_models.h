@@ -67,4 +67,10 @@ void SceneModelsReloadDecals(PPCContext& ctx, uint8_t* base);
 void SceneModelsPartsApply(PPCContext& ctx, uint8_t* base);
 void SceneModelsInteriorApply(PPCContext& ctx, uint8_t* base);
 
+// SceneModel::Update sub_820DA180 (no adapter: CarScene::UpdateModels' plain
+// C++ calls this step): r3 a scene model; Build's register step
+// (with --native_scene_models) from its 240-byte frame, the accessory's
+// branch (never seen in play) guest calls. r3 as the original leaves it.
+void SceneModelUpdate(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

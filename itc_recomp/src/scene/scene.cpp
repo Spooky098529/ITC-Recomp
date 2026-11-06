@@ -860,4 +860,85 @@ std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t dat
   return r3;
 }
 
+
+// --- The scene's update ---
+
+void DestroyB(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& finish,
+              const std::function<void(uint32_t object, uint32_t frame)>& destroy,
+              const FreeCall& free) {
+  ITC_NATIVE_RUNNING("sub_820C59B0 ScenePools::DestroyB");
+  const uint32_t frame = sp - 128;
+  Store(base, frame, sp);  // the back chain, for the guest calls
+  LoadsDone(base, scene, frame, finish);
+  for (uint32_t pool = 0; pool < 8; pool++) {
+    const uint32_t list = (pool + 412) * 12 + scene;
+    for (;;) {
+      const uint32_t object = vehicle_accessors::ListAt(base, list, 0);
+      if (object == 0) {
+        break;
+      }
+      // A jump table on the pool whose eight cases all take this path.
+      destroy(object, frame);
+      free(object, frame);
+    }
+  }
+}
+
+std::optional<uint64_t> UpdateModels(
+    uint8_t* base, uint32_t scene, uint32_t sp,
+    const std::function<uint64_t(uint32_t model, uint32_t frame)>& model_update) {
+  ITC_NATIVE_RUNNING("sub_820C5A60 CarScene::UpdateModels");
+  const int32_t count = int32_t(Load(base, scene + 5036));
+  if (count <= 0) {
+    return std::nullopt;
+  }
+  const uint32_t frame = sp - 112;
+  Store(base, frame, sp);
+  uint64_t r3 = 0;
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t model = vehicle_accessors::ListAt(base, scene + 5028, uint32_t(i));
+    r3 = model;
+    if (int32_t(Load(base, model + 16)) == 3) {
+      r3 = model_update(model, frame);
+    }
+  }
+  return r3;
+}
+
+uint64_t Update(uint8_t* base, uint32_t sp, uint64_t r3, const UpdateCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820C9608 CarScene::Update");
+  const uint32_t frame = sp - 96;
+  Store(base, frame, sp);  // the back chain, for the guest calls
+  const uint32_t scene = Load(base, kScene);
+  r3 = scene;
+  if (scene != 0) {
+    if (int32_t(Load(base, scene + 0)) != 4) {
+      r3 = calls.update_models(scene, frame);
+      Store(base, 0x8260185C, 3);
+    } else if (Load(base, scene + 48) != 0) {
+      Store(base, scene + 48, Load(base, scene + 48) - 1);
+    } else {
+      DestroyB(base, scene, frame, calls.finish, calls.destroy, calls.free_object);
+      uint32_t current = Load(base, kScene);
+      if (Load(base, current + 40) == 0) {
+        Store(base, current + 5056, 0);
+        current = Load(base, kScene);
+      }
+      calls.release(current + kAssets, frame);
+      calls.destruct(Load(base, kScene), frame);
+      r3 = calls.free_scene(Load(base, kScene), frame);
+      Store(base, kScene, 0);
+    }
+  }
+  r3 = calls.update_a(r3, frame);
+  if (Load(base, kScene) == 0) {
+    const uint32_t set = Load(base, 0x826C5510);  // sub_820F0E50: the accessories' set
+    r3 = set;
+    if (set != 0) {
+      r3 = calls.accessories_destroy(frame);
+    }
+  }
+  return r3;
+}
+
 }  // namespace scene

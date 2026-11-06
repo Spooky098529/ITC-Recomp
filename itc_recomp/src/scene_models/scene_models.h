@@ -11,6 +11,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 
 namespace scene_models {
 
@@ -126,5 +128,28 @@ uint32_t SceneModelRecordReset(uint8_t* base, uint32_t record);
 // sub_820C3CA0: VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) (the
 // allocation layer's AllocPages) into [out]. Returns the pages.
 uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size);
+
+
+// SceneModel::Update (sub_820DA180): r3 = a scene model (pool 7). The
+// deferred build: when +5044 is above 0 it counts down by one, and when it
+// reaches 0 with +5040 set, `build(model, frame)` (SceneModel::Build) and
+// +5040 = 0. Then, when the scene's (+5116) +5048 is 0, the interior ready
+// (+5072) with its car model (+5048) and, on the scene's +4 = 0, +4296 set,
+// else the cockpit (+5076): Accessory([[+5068] + 36]). When that gives one
+// (never in play), identity with row 3 the car model's accessory node
+// ([[+5048] + 24] + 7216) in its 240-byte frame's +144, `multiply(out, a,
+// b, frame)` (Matrix::Multiply(+144, +144, the model's +4304)),
+// `set_anchor(accessory, matrix, frame)` and `step(accessory, frame)`
+// (Accessory::SetAnchor and Step, guest calls to the originals: never seen
+// in play). `sp` the guest r1 at entry. Returns the r3 it leaves: the last
+// call's, or nullopt (r3 as given) where nothing was called.
+struct ModelUpdateCalls {
+  std::function<uint64_t(uint32_t model, uint32_t frame)> build;
+  std::function<void(uint32_t out, uint32_t a, uint32_t b, uint32_t frame)> multiply;
+  std::function<void(uint32_t accessory, uint32_t matrix, uint32_t frame)> set_anchor;
+  std::function<uint64_t(uint32_t accessory, uint32_t frame)> step;
+};
+std::optional<uint64_t> ModelUpdate(uint8_t* base, uint32_t model, uint32_t sp,
+                                    const ModelUpdateCalls& calls);
 
 }  // namespace scene_models
