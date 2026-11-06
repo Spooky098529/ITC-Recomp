@@ -15,8 +15,13 @@ file's history. What's left to see in a drive, from every run:
   `sub_821DF350`, the "sprite UI element"; its line deleted from
   `leads.md`). Map checked (64372b27: `power-graph.md`, 6 rows, all
   new, 4 in play; 0 errors; 1 ready group, `sub_8217C708` with
-  `sub_8217B508`; 2 leads added; no subagents). Migration agent
-  running.
+  `sub_8217B508`; 2 leads added; no subagents). Migration f97f2857
+  (`--native_power_graph`: `PowerGraph::Draw`, `Line::RecordFlat`,
+  `TuningScreen::DrawPowerGraph`; `itc_3662`: race 38 s, 0 errors,
+  both harnesses 300 cases, 0 differ; front end only, the replay
+  `race_test.jsonl` didn't reach the tuning screen; no subagents);
+  left: none, `CarList::DrawEntryPowerGraph` `sub_82250670` blocked by
+  the car object makers' lead. Validation agent running.
 
 ## Done
 
@@ -40,5 +45,7 @@ file's history. What's left to see in a drive, from every run:
   unknown 1666).
 - After the power graph's map: ours 4230, work left 2181 (wrapped 57,
   known 462, unknown 1662).
+- After its migration: ours 4233, work left 2178 (wrapped 57, known
+  459, unknown 1662).
 
 ## Stopped
