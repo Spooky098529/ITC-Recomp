@@ -42,6 +42,9 @@ file's history. What's left to see in a drive, from every run:
   lead). Validated `itc_3677` (race 38 s, 0 errors, every harness 0
   differing, 15 of 15 harness lines; 9 ran in the race, 4 in the
   replay `itc_3678` (ok); the busy marker's two to drive). Recorded.
+- Cleanup lead (no mapping, not counted): `CarList::DrawEntryPowerGraph`
+  `sub_82250670` in `power-graph.md`, ready since the car makers; its
+  line deleted from `leads.md`. Migration agent running.
 
 ## Done
 
