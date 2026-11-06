@@ -2753,6 +2753,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | The graphics library's command buffer (`8229DBF0`-`8229F228`, `sub_822AF978`, `sub_822AC470`: the segments' tail, end, kick and next, the chain blocks, the data space `BeginVertices` writes inline vertices into, the reserved words, the callback packets, the fence wait; waits on the GPU, the coherency and data cache flushes and the WAIT_UNTIL packets Dropped by the graphics rule) | `command-buffer.md` | 24 of 24 in play (two migrations; 5 adapters removed) | `--native_command_buffer` |
 | 2026-11-06 | The render command replay's single commands (the table `0x8265ED48`, ids 0-36: in play the inline vertices (5), the shader constants (7), the drawer's set-up (13/14), its draw (15) and the movie frame's callback (28), run from `ChunkChain::RunSingles`' native dispatch) | `single-commands.md` | 5 of 5 in play (one migration) | `--native_single_commands` |
 | 2026-11-06 | Predicated tiling (the menus' tiled segments: `SetPredication`, `BeginTiledSegments`, `EndTiledSegments` with `RestoreSegment`, the library's worker threads' creation and loop; the bin mask packet, the chain header's words and the workers' event packets Dropped; the device lock +13548 a host mutex) | `predicated-tiling.md` | 5 of 7 in play (one migration; `CreateWorkers`' adapter and three of the command buffer's removed) | `--native_predicated_tiling` |
+| 2026-11-06 | The power graph (the front end's power and torque graph on the tuning and car list screens: `PowerGraph::Draw` `sub_8217C708`, two sets of 32 stack sprites drawn as lines through `Line::RecordFlat` `sub_8217B508`; `TuningScreen::DrawPowerGraph` `sub_821DF350`) | `power-graph.md` | 3 of 4 in play (one migration; `CarList::DrawEntryPowerGraph` `sub_82250670` waits on the car objects' makers) | `--native_power_graph` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4645,3 +4646,17 @@ functions (916 pairs): overridden 108, Native 34, Dropped 26, never
 called 70, live 211. Imports: 186 called, 56 with a live caller. B7
 (`b7_status.py`): ours 4,230, work left 2,181 (Wrapped 57, with a row
 458, no row yet 1,666), from 2,186.
+
+**2026-11-06, the power graph (branch `b7-loop-06-11-26`):** the
+thirty-fifth run's first subsystem (`power-graph.md`,
+`--native_power_graph`, `src/power_graph/`): the front end's power and
+torque graph, drawn as line segments from the car data's torque curve
+by `PowerGraph::Draw` through `Line::RecordFlat`, and the tuning
+screen's call; past 32 segments (never in play) the original reads its
+caller's frame, so the draw falls back there. The car list screen's
+call `sub_82250670` waits on the car objects' makers (a lead). Seen in
+the pad replay only (front end). The boundary: 449 functions (916
+pairs): overridden 109, Native 35, Dropped 26, never called 70, live
+209. Imports: 186 called, 55 with a live caller. B7 (`b7_status.py`):
+ours 4,233, work left 2,178 (Wrapped 57, with a row 459, no row yet
+1,662), from 2,181.

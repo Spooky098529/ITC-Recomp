@@ -21,11 +21,16 @@ file's history. What's left to see in a drive, from every run:
   both harnesses 300 cases, 0 differ; front end only, the replay
   `race_test.jsonl` didn't reach the tuning screen; no subagents);
   left: none, `CarList::DrawEntryPowerGraph` `sub_82250670` blocked by
-  the car object makers' lead. Validation agent running.
+  the car object makers' lead. Validated `itc_3663` (race 39 s, 0
+  errors, every harness 0 differing, 3 of 3 harness lines; none in the
+  attract race, all three in the replay `itc_3665` (ok); none to
+  drive). Recorded.
 
 ## Done
 
-(none yet)
+- `power-graph.md`: 3 of 4 in play native (`PowerGraph::Draw`,
+  `Line::RecordFlat`, `TuningScreen::DrawPowerGraph`),
+  `--native_power_graph`; 64372b27, f97f2857.
 
 ## Rows to review
 
@@ -47,5 +52,6 @@ file's history. What's left to see in a drive, from every run:
   known 462, unknown 1662).
 - After its migration: ours 4233, work left 2178 (wrapped 57, known
   459, unknown 1662).
+- After its validation (`itc_3663`): ours 4233, work left 2178.
 
 ## Stopped
