@@ -557,6 +557,12 @@ Rows not yet moved stay in the table below. So far:
   its segments, their tails (fences and the read position) and kicks,
   the waits on them, the callbacks, the coherency flush packets, and
   the predicated tiling's block chains (B7).
+- [`single-commands.md`](single-commands.md): the render command
+  replay's single commands (the table `0x8265ED48`, walked by
+  `ChunkChain::RunSingles`): the state, bind and draw commands in their
+  single-slot forms, the primitive drawer's set-up and draws (the
+  minimap's player triangle) and the callback the movie draws through
+  (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -717,7 +723,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822AE340` | | Wrapped | `src/native/replay_hooks.cpp`: keeps the patched copy of a vertex shader's microcode (made when the GPU may still use the original) for the native renderer. |
 | `sub_825BD8F0` | `BeginVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
 | `sub_825BDDA0` | `EndVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
-| `sub_8258F5C0` | | Wrapped | Same file: the single-command items' command 15 (the helper object's draw), marked as command 15 so the native renderer draws its inline vertices. |
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
 | `sub_822AED18` | `Device::LoadShaders` (probably) | | Not read in detail (from `native-renderer.md`, "The indexed draw without its packets"): the draw's shader load, called from `DrawIndexedVertices` and `DrawPackets_IndexedDraw` (`src/native/draw_packets.cpp`) when shader state is dirty. Writes SQ_PROGRAM_CNTL and +10404 at +10400, and +10408, +10432, +10452, +12440; patches the vertex shader for the bound declaration (`sub_822AE340`); sets the shaders' fences (+8); writes the microcode's load packets; returns more dirty bits. |
 | `sub_822A04F8` | `Device::Clear` | | Not read. From `Command::*` 26 (`sub_82590620`): the rect count and rects, flags (bits 0-3 render targets, `0x10` Z, `0x20` stencil), color (a D3DCOLOR), Z, stencil (`native-renderer.md`, "Progress on milestone 4"). |

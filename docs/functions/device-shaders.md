@@ -32,7 +32,7 @@ already named these three), `VideoOutput::UnbindAll` (`sub_8258D9F8`,
 `video-output.md`, both shaders set to 0) and the primitive drawer
 (`model-animation.md`). Not seen in play: `sub_8229DA28` (calls all
 three), `sub_8258F3E0`, `sub_8258F438`, `sub_8258F490` (one each,
-probably the single commands' versions of 8, 9 and 10), the drawer's
+the single commands' versions of 8, 9 and 10, `single-commands.md`), the drawer's
 `sub_825A1708` and `sub_825A1810`; the movie library's
 (`sub_824829A0`, `sub_82483FB8`, `sub_824840C8`, `sub_824842C8`) no
 longer run since the FFmpeg movies (`movies.md`, "Rules that still hold"
@@ -59,9 +59,11 @@ constructor `sub_82098A98` (a lead in `../loops/leads.md`). The game's
 own name for it, in `RenderQueue::Add`'s warning, is `OT` (an ordering
 table: `warning!!! : call OT::Add( %x, %u, %f )`). +0 the vtable
 `0x8206CB8C` (ten slots, below), +4 its 88-byte state (+0 the replay
-index, +4 the primitive drawer, +12 a field whose address the replay
-publishes at `0x82970BBC` (probably the drawer's state, as
-`../gpu-functions.md` calls it; not read further), +24 to
+index, +4 the primitive drawer, +12 the drawer's state, 32 bytes, whose address the replay
+publishes at `0x82970BBC` (the primitive type, the shader pair's
+indices, the vertices and their count, the indices, their count and
+size, written by commands 5, 6, 13 and 14 and read by 15 and 16;
+`../known-data.md`, `single-commands.md`), +24 to
 +36 four words the replay zeroes, +44 the video output the replay was
 given, +48 to +60 render targets 0-3 and +64 the depth surface
 (`RenderQueue::Init`), +68 the release list, a `std::vector` of object

@@ -93,8 +93,7 @@ list (`DeviceCalls` in `device_state.h`); `b7_groups.py` still counts their
 dropped callees (the command buffer's functions) as calls.
 
 Callers in other files: the command replay's handlers (`Command::*` 1-4,
-7, 11, 12, 15, 23, 24, 29-31, 34, 35, `sub_8258F5C0` and `sub_8258F0F0` (no row, probably the single commands' constants),
-`functions.md`), `Device::Init`, `Device::SetUpDisplay`,
+7, 11, 12, 15, 23, 24, 29-31, 34, 35, `functions.md`; the single commands' 15 and 7, `sub_8258F5C0` and `sub_8258F0F0`, and the rest of that table in `single-commands.md`), `Device::Init`, `Device::SetUpDisplay`,
 `Device::SetDisplayMode` and `Device::Swap` (`functions.md`, overridden:
 they call the setters through `ctx`), `VideoOutput::SetUpDisplay`,
 `VideoOutput::UnbindAll`, `VideoOutput::Present` and `sub_8258D958`

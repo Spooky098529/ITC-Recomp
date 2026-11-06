@@ -127,7 +127,12 @@ lists above), kind 0 `sub_8258E630`, which walks single commands, a
 `sub_8258F828` (inline: type +4, count +8, stride +10, data +12), 25
 `sub_8258F9A0`, 26 `sub_8258FAC8`, 27 `sub_8258FB20`; 0 and 29-36 are
 `sub_825C8388`. Counted in a race: only 5, 7, 13 and 15, several a frame,
-for the minimap's player triangle. Kinds 2-5 (`sub_8258E718`,
+for the minimap's player triangle; 28 also runs on the boot movies (the
+movie's draw). The whole table (ids 0-36, then a 0 word), each handler's
+slot layout and what our renderer reads from each:
+`functions/single-commands.md` (2026-11-06): the state and bind commands
+take a count at +4 and that many 16-byte entries in the slots after, and
+each handler returns how many slots after its own it used. Kinds 2-5 (`sub_8258E718`,
 `sub_8258E780`, `sub_8258E7E8`, `sub_8258E868`) aren't looked at yet.
 
 ### Inline vertex draws
