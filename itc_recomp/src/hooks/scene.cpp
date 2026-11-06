@@ -37,7 +37,8 @@ ITC_FLAG_BOOL(native_scene, true, "ITC",
               "plain C++), with --native_heap and the archive's queue CarScene::LoadAssets sub_820C8B40, with the models' lifetime CarScene::OnFileLoaded "
               "sub_820C52A0 (Model::Load's, XPR::Create's and TGA::CreateImage's originals "
               "where their plain C++ declines, the providers' slot +16 through their vtables "
-              "unless it's TextureProvider::Set)) natively instead of through the "
+              "unless it's TextureProvider::Set), CarScene::LoadsDone sub_820C5798 (the second set's "
+              "finishers through their overrides)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene)");
 
 namespace hooks {
@@ -111,6 +112,17 @@ void SceneSetInteriorWord(PPCContext& ctx, uint8_t* base) {
   if (const auto r3 = scene::SetInteriorWord(base, ctx.r3.u32, ctx.r4.u32)) {
     ctx.r3.u64 = *r3;
   }
+}
+
+void SceneLoadsDone(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = scene::LoadsDone(
+      base, ctx.r3.u32, ctx.r1.u32,
+      [&](uint32_t function, uint32_t frame, uint32_t return_address, uint32_t r3, uint32_t r4) {
+        GuestCall(ctx, base, function, frame, return_address, r3, r4);
+        return ctx.r3.u64;
+      });
+  ctx.lr = lr;
 }
 
 void SceneDestroyA(PPCContext& ctx, uint8_t* base) {
@@ -324,6 +336,7 @@ ITC_SCENE(820C4C80, SceneAssetsRelease)
 ITC_SCENE(820C8A50, SceneCreate)
 ITC_SCENE(820C8B40, SceneLoadAssets)
 ITC_SCENE(820C52A0, SceneOnFileLoaded)
+ITC_SCENE(820C5798, SceneLoadsDone)
 // No adapters (their callers in play are native; the register steps above
 // are the harness's): ScenePools::StartTeardownA sub_820C3C80, DestroyA
 // sub_820C3CF8, SceneAssets::SceneAssets sub_820C5008 and ~SceneAssets

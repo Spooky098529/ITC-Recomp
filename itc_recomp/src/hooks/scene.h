@@ -25,6 +25,8 @@ void SceneSetInteriorWord(PPCContext& ctx, uint8_t* base);
 // ScenePools::DestroyA sub_820C3CF8: r3 = the first set; the destructors
 // guest calls. Natively only over the layer where DestroyAFreeable.
 void SceneDestroyA(PPCContext& ctx, uint8_t* base);
+// CarScene::LoadsDone sub_820C5798: r3 = the scene; r3 = 0 or 1.
+void SceneLoadsDone(PPCContext& ctx, uint8_t* base);
 
 // SceneAssets::SceneAssets sub_820C5008 (r3 the assets, left) and
 // CarScene::CarScene sub_820C89A8 (r3 the scene, left): natively where the

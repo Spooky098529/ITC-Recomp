@@ -100,6 +100,51 @@ std::optional<uint32_t> SetInteriorWord(uint8_t* base, uint32_t scene, uint32_t 
   return r3;
 }
 
+uint32_t LoadsDone(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& finish) {
+  ITC_NATIVE_RUNNING("sub_820C5798 CarScene::LoadsDone");
+  const uint32_t frame = sp - 128;
+  Store(base, frame, sp);  // the back chain, for the finishers' guest calls
+  static constexpr uint32_t kSlots[8] = {84, 132, 156, 268, 472, 964, 4156, 4764};
+  for (const uint32_t slot : kSlots) {
+    if (int32_t(Load(base, scene + slot)) == 2) {
+      return 0;
+    }
+  }
+  // Pools 1 to 6: the finisher and the return address after its call.
+  struct Finisher {
+    uint32_t function, lr;
+  };
+  static constexpr Finisher kFinishers[8] = {
+      {0x820D4048, 0x820C5880}, {0x820E2E68, 0x820C58B8}, {0x820DBFF8, 0x820C5900},
+      {0x820E4140, 0x820C58E0}, {0x820DDA60, 0x820C5920}, {0x820E7328, 0x820C5940},
+      {0x820E5A68, 0x820C5960}, {0, 0}};
+  for (uint32_t pool = 0; pool < 8; pool++) {
+    const uint32_t list = scene + 4944 + 12 * pool;
+    for (int32_t i = 0; i < int32_t(Load(base, list + 8)); i++) {
+      const uint32_t object = vehicle_accessors::ListAt(base, list, uint32_t(i));
+      if (int32_t(Load(base, object + 16)) != 3) {
+        continue;
+      }
+      if (pool == 0) {
+        if (int32_t(finish(kFinishers[0].function, frame, kFinishers[0].lr,
+                           Load(base, object + 24), uint32_t(i))) == 0 ||
+            int32_t(Load(base, Load(base, object + 24) + 4088)) == 2) {
+          return 0;
+        }
+      } else if (pool == 7) {
+        if (Load(base, object + 5040) != 0) {
+          return 0;
+        }
+      } else if (int32_t(finish(kFinishers[pool].function, frame, kFinishers[pool].lr, object,
+                                uint32_t(i))) ==
+                 0) {
+        return 0;
+      }
+    }
+  }
+  return 1;
+}
+
 // --- The first set's teardown ---
 
 bool DestroyAFreeable(uint8_t* base, uint32_t set) {

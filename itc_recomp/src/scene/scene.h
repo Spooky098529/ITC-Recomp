@@ -55,6 +55,23 @@ std::optional<uint64_t> StartTeardown(uint8_t* base,
 // List::At's, or nullopt (r3 as given) for an empty count.
 std::optional<uint32_t> SetInteriorWord(uint8_t* base, uint32_t scene, uint32_t word);
 
+// CarScene::LoadsDone (sub_820C5798): 0 while any of the shared assets'
+// eight slots (+84, +132, +156, +268, +472, +964, +4156, +4764) is loading
+// (2); then for each of the second set's eight pools (+4944 + 12 x pool,
+// its count +8 read again each step; List::At) and each object in use (+16
+// = 3), 0 unless it's finished: pool 0 CarModel::IsReady(+24) nonzero and
+// the car model's decals (+4088) not 2, pools 1 to 6 their finishers
+// nonzero (SceneParts, SceneCockpit, SceneInterior, SceneLights,
+// SceneWheels, SceneTraffic ::Finish), pool 7 the deferred build (+5040)
+// 0; 1 when all are. The finishers are `finish(function, frame, lr, r3,
+// r4)` (r4 the object's index, as List::At leaves it),
+// guest calls through their overrides (their diagnostics' wraps) from its
+// 128-byte frame below `sp`.
+using FinishCall =
+    std::function<uint64_t(uint32_t function, uint32_t frame, uint32_t lr, uint32_t r3,
+                           uint32_t r4)>;
+uint32_t LoadsDone(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& finish);
+
 // ScenePools::DestroyA (sub_820C3CF8): for each of the first set's seven
 // pools (+56 + 12 x pool), while List::At(list, 0) finds an object:
 // `destroy(object, frame)` (its vtable slot 0 with r4 = 0, a guest call

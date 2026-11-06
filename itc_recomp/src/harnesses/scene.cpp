@@ -916,6 +916,61 @@ void FileLoadedCases(Context& h, const Block& block) {
   results.Report();
 }
 
+// CarScene::LoadsDone: a scene in a block of its own, its eight asset slots
+// loading (2) now and then, its eight pools' lists of up to 3 objects
+// (0x800 apart, so the fields each pool reads don't overlap), each in use
+// (+16 = 3) or not, with their finishers' finished words set (so each
+// answers 1 at once: the finishers are the load poll harness's) and the
+// answers of 0 from pool 0's car models (CarModel::IsReady over a model
+// set word of 0 to 2 and slots loading or not, the decals' state) and pool
+// 7's deferred build.
+void LoadsDoneCases(Context& h) {
+  Block block(0x19000);
+  const uint32_t scene = block.address;
+  Cases(h, block, "CarScene::LoadsDone (sub_820C5798)", 60, Original<__imp__sub_820C5798>,
+        hooks::SceneLoadsDone, [&](PPCContext& t, Random& r) {
+          static constexpr uint32_t kSlots[8] = {84, 132, 156, 268, 472, 964, 4156, 4764};
+          for (const uint32_t slot : kSlots) {
+            Store(h.base, scene + slot, r.Below(24) == 0 ? 2 : r.Below(2));
+          }
+          for (uint32_t m = 0; m < 2; m++) {
+            const uint32_t model = block.address + 0x14000 + 0x2000 * m;
+            Store(h.base, model + 7256, block.address + 0x18000 + 16 * r.Below(4) - 8);
+            Store(h.base, model + 3748, r.Below(6) == 0 ? 2 : 1);
+            Store(h.base, model + 3972, r.Below(6) == 0 ? 2 : 0);
+            Store(h.base, model + 3996, r.Below(6) == 0 ? 2 : 3);
+            Store(h.base, model + 4088, r.Below(6) == 0 ? 2 : 1);
+          }
+          for (uint32_t j = 0; j < 4; j++) {
+            Store(h.base, block.address + 0x18000 + 16 * j, r.Below(4) == 0 ? 2 : r.Below(2));
+          }
+          static constexpr uint32_t kFinished[8] = {0, 100, 4312, 11660, 13156, 16768, 9792, 0};
+          for (uint32_t pool = 0; pool < 8; pool++) {
+            const uint32_t list = scene + 4944 + 12 * pool;
+            const uint32_t count = r.Below(4);
+            // Now and then a count past the nodes (List::At answers the
+            // first node again; not for an empty list, where it answers 0).
+            Store(h.base, list + 8, count != 0 && r.Below(10) == 0 ? count + 1 : count);
+            uint32_t previous = list;  // the list's first-node word at +0
+            for (uint32_t k = 0; k < count; k++) {
+              const uint32_t object = block.address + 0x2000 + 0x800 * (3 * pool + k);
+              Store(h.base, previous == list ? previous : previous + 8, object);
+              previous = object;
+              Store(h.base, object + 16, r.Below(4) == 0 ? r.Below(3) : 3);
+              if (pool == 0) {
+                Store(h.base, object + 24, block.address + 0x14000 + 0x2000 * r.Below(2));
+              } else if (pool == 7) {
+                Store(h.base, object + 5040, r.Below(4) == 0 ? 1 : 0);
+              } else {
+                Store(h.base, object + kFinished[pool], 1 + r.Below(3));
+              }
+            }
+            Store(h.base, previous == list ? list : previous + 8, 0);
+          }
+          t.r3.u64 = scene;
+        });
+}
+
 }  // namespace
 
 void Scene(Context& h) {
@@ -932,6 +987,7 @@ void Scene(Context& h) {
   Creates(h, block);
   LoadAssetsCases(h, block);
   FileLoadedCases(h, block);
+  LoadsDoneCases(h);
 }
 
 }  // namespace harness
