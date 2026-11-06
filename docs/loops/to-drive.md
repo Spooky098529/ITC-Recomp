@@ -65,6 +65,15 @@ here loses its heading.
   `sub_8219EC50`, `sub_8219BF08`, `sub_8219FA28`, `sub_8219CF08`,
   `sub_8219D090`, `sub_8219D1B0`, `sub_8219BA50`, `sub_8219BCC0`,
   `sub_8219D4B8`, `sub_8219D440`, `sub_8219BC50`, `sub_8219BBF0`.
+- The build screen, third migration (attract race `itc_3831`, replay
+  `itc_3832` ok, neither reaches the screen; `build-screen.md`):
+  `sub_8219FE10` BuildScreen::OpenStand, `sub_8219F780`
+  BuildScreen::SetUpStand, `sub_8219D6F0` BuildScreen::PutOnStand,
+  `sub_8219BB20` BuildScreen::KeepBuildList, `sub_8219BB80`
+  BuildScreen::RestoreBuildList, `sub_8219C078`
+  BuildScreen::InitStandList, `sub_8219D550` BuildScreen::DrawStandRow,
+  `sub_8219D7B0` BuildScreen::StandArrows, `sub_8219DA58`
+  BuildScreen::SetPrompts, `sub_8219DB50` BuildScreen::SetHelp.
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 

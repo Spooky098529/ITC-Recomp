@@ -133,9 +133,24 @@ file's history. What's left to see in a drive, from every run:
   never seen, on the originals); `GarageStage::ReloadModel`; `OpenStand`
   with `SetUpStand`, `PutOnStand`; 14 adapters removed; races 34-38 s,
   0 errors, all harnesses 0 differing; no subagents); left: none
-  (`BackToBuilds` kept, the user's call). Validation agent running.
+  (`BackToBuilds` kept, the user's call). Validated `itc_3831` (race
+  33 s, the harnesses ~85 s of the 120; 0 errors, every harness 0
+  differing, 22 of 22 harness lines; 7 in the race, 5 in the replay
+  `itc_3832` (ok), the 10 build screen functions to drive). Recorded.
+- Subsystem 4 of 5: the tuning screen (two leads taken together: its
+  update `sub_821E6C50` with its state handlers, and its part, interior
+  and wheel handlers `sub_821E07B0`, `sub_821E0E00`, `sub_821CCC50`,
+  `sub_821CDB18`, `sub_821CDED8`; the second-most ready groups in
+  `leads.md`, beside the stand models' tuning screen helpers; both lines
+  deleted from `leads.md`). Mapping agent running.
 
 ## Done
+
+- `build-screen.md`: 59 of 60 native (the screen's four levels, its 20
+  transitions but `BackToBuilds`, kept recompiled by the user's call;
+  with `CarScene::Update`, `SceneModel::Update`, `GarageStage::ReloadModel`
+  in their files; 36 adapters removed), `--native_build_screen`;
+  51812e30, 475f728c..8b626097.
 
 - Cleanup: `GarageStage::SetCar`, `SetCarClass`, `ShowCarById`,
   `ShowCarByIdWithClass` native (`car-makers.md`); `CopyRecord`,
@@ -201,3 +216,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3795`): ours 4371, work left 2040.
 - After its second migration and validation (`itc_3820`): ours 4382,
   work left 2029 (wrapped 57, known 430, unknown 1542).
+- After its third migration and validation (`itc_3831`): ours 4390,
+  work left 2021 (wrapped 57, known 422, unknown 1542).

@@ -2763,6 +2763,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | The front end's shared menu helpers (`Menu::Step` `sub_82186568`, the cursor moved by the pad through the action mappers' vtable; `Menu::Pressed` `sub_821864C8`; about 113 screens call them, each filling its 68-byte menu inline) | `menu-helpers.md` | 2 of 2 (one migration; adapters kept for the recompiled screens) | `--native_menu_helpers` |
 | 2026-11-06 | The race's update (`RaceScene::LoadScenery` `sub_8215B790` with the scenery's physical allocation (`XPhysicalSize` answered from our allocation layer, the user's call), `Create`, `Setup`, `SetupPools`; `RaceScene::Update` `sub_8215D2B0` once a tick with `Scenery::Update`, the race lights and `Car::TickUpdate`; `RaceScene::RemakeCarModel` with `ScenePools::SetUpB`, the second set's set-ups and `SceneModel::Build`; `RaceScene::VaryCar`) | `race-update.md` (and rows in `course-scenery.md`, `heap.md`, `scene-models.md`, `car-models.md`, `vehicle-accessors.md`, `post-effects.md`, `screen-objects.md`) | 7 of 7 (three migrations; ours 4,252 -> 4,286 with the other files' rows) | `--native_race_update` (and `--native_course_scenery`, `--native_scene_models`, `--native_vehicle_accessors`, `--native_heap`) |
 | 2026-11-06 | The garage stage's scene model holders (`GarageStage::MakeModel` `sub_8217FCB0`, the stand's record setters at `82178EC0`-`82179A18`, `SetWheel` `sub_8217DD38` with its 179-entry table, `FitAxles`, `SetTireGrade`, the second wheels; the wheels' setters `SceneWheels::SetSizes`, `SetTireGrades`, `Wheels::SetTireTextures`; the tuning screen's `PreviewWheel`, `StepSecondWheels`, `SetTireGrade`; with `SceneModel::ApplyRecord` `sub_820DA758` and `ReloadDecals` `sub_820D9D48`) | `stand-models.md` (and rows in `scene-models.md`) | 28 of 28 in play (one migration) | `--native_stand_models` (and `--native_scene_models`) |
+| 2026-11-06 | The build screen (the front-end screen over `[0x826D8448]`, four levels as the states of `[0x826D843C]`: groups by category, a group's builds, one build on the stand, its details; its 21 transitions, lists, rows and prompts; with `CarScene::Update` `sub_820C9608`, `SceneModel::Update`, `GarageStage::ReloadModel`; and the cleanup leads before it, `GarageStage::ReapplyRecord`, `SetCar`, `ShowCarById` and their pairs) | `build-screen.md` (and rows in `scene.md`, `scene-models.md`, `vehicle-accessors.md`, `accessories.md`, `car-makers.md`) | 59 of 60 (three migrations; `BackToBuilds` kept recompiled, the user's call) | `--native_build_screen` (and `--native_scene`, `--native_car_makers`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4740,3 +4741,26 @@ pairs): overridden 109, Native 36, Dropped 26, never called 70, live
 208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
 ours 4,319, work left 2,092 (Wrapped 57, with a row 433, no row yet
 1,602), from 2,125.
+
+**2026-11-06, the build screen (branch `b7-loop-06-11-26`):** the
+thirty-sixth run's third subsystem (`build-screen.md`,
+`--native_build_screen`, `src/build_screen/`), after two cleanup leads
+in `car-makers.md` (`GarageStage::ReapplyRecord`, `ReapplyRecordNoDecals`,
+`SetCar`, `SetCarClass`, `ShowCarById`, `ShowCarByIdWithClass`; the
+adapters of `SceneModel::ApplyRecord`, `ReloadDecals`, `ApplyLightKit`,
+`CopyRecord` and the wraps of `ApplyPaint` and `ApplyWheelPaint`
+removed, their native callers running them inside the same diagnostics'
+checks). The build screen, a front-end screen with four levels (groups
+by category, a group's builds, one build on the stand, its details),
+in three migrations, the last taking `CarScene::Update` `sub_820C9608`,
+a blocker for many runs, with `SceneModel::Update` (its accessory
+branch, never seen in play, on the originals) and
+`GarageStage::ReloadModel`. `BuildScreen::BackToBuilds` stays
+recompiled by the user's call (2026-11-06): it stores the r7
+`UiMovie::Run` leaves into live state. Neither the attract race nor the
+pad replay reaches the screen: its functions wait for a drive
+(`docs/loops/to-drive.md`). The validation's harnesses now take ~85 s of
+its 120. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 4,390, work left 2,021
+(Wrapped 57, with a row 422, no row yet 1,542), from 2,092.
