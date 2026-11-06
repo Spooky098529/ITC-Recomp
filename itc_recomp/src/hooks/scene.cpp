@@ -452,9 +452,6 @@ ITC_SCENE(820D0D50, SceneSetUpConstruct)
 ITC_SCENE(820D09A0, SceneFreePagesIn)
 ITC_SCENE(820C4D88, SceneStartTeardown)
 ITC_SCENE(820C8950, SceneSetInteriorWord)
-ITC_SCENE(820C3DA0, SceneUpdateA)
-ITC_SCENE(820C9110, SceneCarSceneDestruct)
-ITC_SCENE(820C4C80, SceneAssetsRelease)
 ITC_SCENE(820C8A50, SceneCreate)
 ITC_SCENE(820C8B40, SceneLoadAssets)
 ITC_SCENE(820C52A0, SceneOnFileLoaded)
@@ -467,4 +464,7 @@ ITC_SCENE(820C9608, SceneUpdate)
 // CarScene::InitLighting sub_820C8528, CarScene::CarScene sub_820C89A8 and
 // SceneAssets::Reset sub_820C4A70; ScenePools::DestroyB sub_820C59B0 (only
 // CarScene::Update calls it), sub_820C5A60 (CarScene::UpdateModels,
-// --native_vehicle_accessors; only CarScene::Update calls it).
+// --native_vehicle_accessors; only CarScene::Update calls it); removed (B7
+// loop, 2026-11-06), their callers in play native: ScenePools::UpdateA
+// sub_820C3DA0, CarScene::~CarScene sub_820C9110 and SceneAssets::Release
+// sub_820C4C80 (CarScene::Update's plain C++ calls their steps).

@@ -460,14 +460,9 @@ extern "C" REX_FUNC(sub_820C5B28) {
   }
   hooks::ScenePoolsSetUpB(ctx, base);
 }
-extern "C" REX_FUNC(sub_820D9870) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_scene_models)) {
-    __imp__sub_820D9870(ctx, base);
-    return;
-  }
-  hooks::SceneModelBuild(ctx, base);
-}
+// SceneModel::Build sub_820D9870 has no adapter (removed, B7 loop,
+// 2026-11-06): its callers in play, SceneModel::SetUp's and SceneModel::
+// Update's plain C++, call it (Update through hooks::SceneModelBuild).
 
 // The second set's set-ups (SceneCarModel::SetUp sub_820DB818, SceneParts::
 // SetUp sub_820DF1D0, pool 4's sub_820DCAA0, SceneInterior::SetUp

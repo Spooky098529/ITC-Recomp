@@ -242,7 +242,6 @@ void SceneModelUpdate(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                 \
   }
 
-ITC_SCENE_MODELS(820F0E50, SceneModelsAccessories)
 ITC_SCENE_MODELS(82175EE0, SceneModelsOnSoundLoaded)
 ITC_SCENE_MODELS(820E70B8, SceneModelsSetCarModel)
 ITC_SCENE_MODELS(820DF1A8, SceneModelsPartsLink)
@@ -258,7 +257,6 @@ ITC_SCENE_MODELS(820D0A98, SceneModelsCarRecordReset)
 // steps).
 ITC_SCENE_MODELS(820D3558, SceneModelsPartsRecordReset)
 ITC_SCENE_MODELS(820D3840, SceneModelsInteriorRecordReset)
-ITC_SCENE_MODELS(820D97B8, SceneModelsAccessory)
 ITC_SCENE_MODELS(820DB290, SceneModelsSceneModelRecordCopy)
 ITC_SCENE_MODELS(820DB240, SceneModelsSceneModelRecordConstruct)
 ITC_SCENE_MODELS(820D34B8, SceneModelsCockpitRecordReset)
@@ -270,6 +268,9 @@ ITC_SCENE_MODELS(820D34E0, SceneModelsPool4RecordReset)
 // garage stage's re-applies and setters, car_makers and stand_models) are
 // native and call their plain C++, the race's path of ApplyRecord the
 // original; their register steps above are the harness's.
+// sub_820F0E50 (the accessories' set) and SceneModel::Accessory sub_820D97B8
+// have no adapters (removed, B7 loop, 2026-11-06): their callers in play are
+// native and call their plain C++.
 // SceneModel::Update sub_820DA180 has no adapter: only sub_820C5A60 calls
 // it, whose plain C++ (src/scene/scene.cpp, under CarScene::Update's) calls
 // its register step above.

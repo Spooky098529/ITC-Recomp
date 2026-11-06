@@ -324,7 +324,9 @@ void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
 ITC_ACCESSORIES(820F0C20, AccessoryFileOnArchiveDone)
 ITC_ACCESSORIES(820F1038, AccessoriesCreate)
 ITC_ACCESSORIES(820F0F00, AccessoriesSetScale)
-ITC_ACCESSORIES(820F1078, AccessoriesDestroy)
+// Accessories::Destroy sub_820F1078: no adapter (removed, B7 loop,
+// 2026-11-06): its caller in play, CarScene::Update's plain C++, calls its
+// step.
 ITC_ACCESSORIES(820F0AD8, AccessoriesReleaseAll)
 ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
 ITC_ACCESSORIES(820EF568, AccessorySetTexture)
