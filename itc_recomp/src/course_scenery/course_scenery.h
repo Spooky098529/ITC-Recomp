@@ -195,6 +195,41 @@ uint32_t AllocPhysical(uint8_t* base, uint32_t size);
 // off [0x826C5518], then XPhysicalFree. Only while
 // hooks::NativeHeapActive().
 void FreePhysical(uint8_t* base, uint32_t block);
+
+// The manager's pointer Scenery::Create sets (the same object as kManager's).
+constexpr uint32_t kCreated = 0x826C551C;
+// Scenery::Create (sub_820F2F88): the 248-byte manager from physical memory
+// (AllocPhysical) into [0x826C551C]; +200, +196 = 0x38435, +204, +208, +212
+// (the floats at 0x820067B8, 0x820067B4, 0x82001FAC, 0x820067B0, their bits
+// copied), +224 = 0; the texture provider at +228 made (TextureProvider::
+// TextureProvider's plain C++, 64 slots) unless +228 is 0; then Init.
+// Returns what Init leaves in r3 ([0x826C5514] + 144). Only where the
+// models' lifetime is native (hooks::ModelsNativeLifetime: the native heap
+// and the texture provider's allocation).
+uint32_t Create(uint8_t* base);
+// Scenery::Setup (sub_820F3020): SetupPools, then the visible areas: +216
+// = 0, +220 = the area count (+92), +224 = 272 x that (AllocPhysical), each
+// entry's +4 = 0 and +8 = the model count (+100, read before). `stack` is
+// its r1. Returns the visible areas' block (its r3). Only while the native
+// heap is active and memcpy is native (native::Buffers_NativeMemcpy).
+uint32_t Setup(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+               uint32_t config);
+// Scenery::SetupPools (sub_820F2720): [0x826C5518], +180, +184 = 0; the
+// 44-byte configuration copied to +8 (memcpy: the library's for native
+// callers, its original through `calls` where that declines); mode 2 with
+// +12 = 0 becomes [[+40]]. PoolSizes into its frame's +80; list A (+116:
+// pool 3, the area count, its pointer array, 16-byte items and 12-byte
+// table from AllocPhysical, the last two cleared with XMemSet) and list B
+// (+144: pool 4, the model count) the same; the tables filled from the
+// configuration's areas (A: the area, 0, its light asset, for each whose
+// asset isn't negative; B: the area, the model, its asset by ModelAsset,
+// for each not negative); the five pools' 24-byte descriptors in its frame's
+// +112 (pool 0 with +36: a block of pool 0's size from AllocPhysical at
+// +184, its size at +180; pool 4's +188 = [0x826A5134] unless
+// [0x826A5130] is below its size, which is then 0), ObjectPools::Init, +192
+// = 0. `stack` is its r1. Returns Init's r3.
+uint32_t SetupPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                    uint32_t config);
 // Scenery::Init (sub_820F1360): [0x826C5514] = `manager`, then through that
 // global (read again before each store, as the original): +52, +56 = 0;
 // +60 to +107 cleared in six 8-byte pieces (XMemSet, sub_822962B0); +108,

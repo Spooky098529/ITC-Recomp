@@ -5,12 +5,14 @@
 #include "hooks/race_update.h"
 
 #include "base/flags.h"
+#include "hooks/course_scenery.h"
 #include "race_update/race_update.h"
 
 ITC_FLAG_BOOL(native_race_update, true, "ITC",
               "Run the race's update (docs/functions/race-update.md: RaceScene::VaryCar "
               "sub_8215B330; RaceLights::Update sub_8215D008 with RaceLights::UploadDirectional "
-              "sub_8215C698, no adapter: only Update's plain C++ calls it) natively instead of "
+              "sub_8215C698, no adapter: only Update's plain C++ calls it; RaceScene::LoadScenery "
+              "sub_8215B790, over the course scenery's plain C++ where it may run) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_update)");
 
@@ -27,6 +29,16 @@ void RaceUpdateLights(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r4.u64 = ru::LightsUpdate(base, ctx.r3.u32, ctx.r1.u32 - ru::kLightsFrame);
   ctx.r3.u64 = ctx.r3.u64 + 16 + 96 * 11;
+}
+
+void RaceUpdateLoadScenery(PPCContext& ctx, uint8_t* base) {
+  CourseSceneryGuest guest{&ctx, base};
+  const course_scenery::Calls calls = CourseSceneryCalls(&guest);
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const uint32_t r3 = race_update::LoadScenery(base, calls, ctx.r1.u32, ctx.r3.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
 }
 
 }  // namespace hooks
@@ -47,3 +59,15 @@ ITC_RACE_UPDATE(8215B330, RaceUpdateVaryCar)
 ITC_RACE_UPDATE(8215D008, RaceUpdateLights)
 // RaceLights::UploadDirectional (sub_8215C698) has no adapter: its only
 // caller, RaceLights::Update, is native; --native_race_update switches it.
+
+// RaceScene::LoadScenery: r3 = the race scene; from RaceSceneMachine::OnStart
+// (recompiled). The original where the course scenery's set-up can't run
+// natively.
+extern "C" REX_FUNC(sub_8215B790) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_update) || !hooks::CourseScenerySetUpNative()) {
+    __imp__sub_8215B790(ctx, base);
+    return;
+  }
+  hooks::RaceUpdateLoadScenery(ctx, base);
+}

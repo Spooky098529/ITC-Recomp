@@ -13,9 +13,12 @@
 #include "memory/heap.h"
 #include "models/model.h"
 #include "models/model_load.h"
+#include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "native/buffers.h"
 #include "scenery_lists/scenery_lists.h"
 
+#include <cstdlib>
 #include <initializer_list>
 
 namespace course_scenery {
@@ -103,6 +106,13 @@ void ResetThroughVtable(uint8_t* base, const Calls& calls, uint32_t stack, uint3
     return;
   }
   CallGuest(base, calls, stack, frame_bytes, lr, slot, {object});
+}
+
+void Require(bool done, const char* what) {
+  if (!done) {
+    ITC_LOG_ERROR("Course scenery: {} refused after its checks", what);
+    std::abort();
+  }
 }
 
 }  // namespace
@@ -695,6 +705,179 @@ void FreePhysical(uint8_t* base, uint32_t block) {
   const uint32_t held = memory::PhysicalSize(block);
   Store(base, kPhysicalHeld, Load(base, kPhysicalHeld) - held);
   memory::FreePhysical(block);
+}
+
+uint32_t Create(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820F2F88 Scenery::Create");
+  const uint32_t manager = AllocPhysical(base, 248);
+  Store(base, kCreated, manager);
+  // lfs and stfs: the constants' bits (none is a NaN).
+  Store(base, manager + 200, Load(base, 0x820067B8));
+  Store(base, manager + 196, 0x38435);
+  Store(base, manager + 204, Load(base, 0x820067B4));
+  Store(base, manager + 208, Load(base, 0x82001FAC));
+  Store(base, manager + 212, Load(base, 0x820067B0));
+  Store(base, manager + 224, 0);
+  if (manager + 228 != 0) {
+    Require(models::TextureProviderConstruct(base, manager + 228, -1).has_value(),
+            "Scenery::Create's TextureProvider");
+  }
+  Init(base, manager);
+  return Load(base, kManager) + 144;
+}
+
+uint32_t Setup(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+               uint32_t config) {
+  ITC_NATIVE_RUNNING("sub_820F3020 Scenery::Setup");
+  const uint32_t frame = stack - 112;
+  Store(base, frame, stack);
+  SetupPools(base, calls, frame, manager, config);
+  const uint32_t areas = Load(base, manager + 92);
+  const uint32_t models = Load(base, manager + 100);
+  Store(base, manager + 216, 0);
+  Store(base, manager + 220, areas);
+  const uint32_t block = AllocPhysical(base, areas * 272);
+  Store(base, manager + 224, block);
+  for (uint32_t i = 0; i < Load(base, manager + 220); i++) {
+    const uint32_t entry = Load(base, manager + 224) + 272 * i;
+    Store(base, entry + 4, 0);
+    Store(base, entry + 8, models);
+  }
+  return block;
+}
+
+uint32_t SetupPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                    uint32_t config) {
+  ITC_NATIVE_RUNNING("sub_820F2720 Scenery::SetupPools");
+  const uint32_t frame = stack - 336;
+  Store(base, frame, stack);
+  const uint32_t copy = manager + 8;  // the configuration's copy
+  Store(base, kPhysicalHeld, 0);
+  Store(base, manager + 180, 0);
+  Store(base, manager + 184, 0);
+  if (!native::Buffers_Memcpy(base, copy, config, 44, 0x820F2758)) {
+    CallGuest(base, calls, frame, 0, 0x820F2758, kMemcpy, {copy, config, 44});
+  }
+  if (int32_t(Load(base, copy)) == 2 && Load(base, manager + 12) == 0) {
+    Store(base, copy, Load(base, Load(base, manager + 40)));
+  }
+  const uint32_t sizes = frame + 80;  // PoolSizes' five words
+  PoolSizes(base, manager + 92, manager + 100, sizes, copy);
+  // List A: the areas (pool 3).
+  const uint32_t area_count = Load(base, manager + 92);
+  Store(base, manager + 120, 0);
+  Store(base, manager + 124, 0);
+  Store(base, manager + 128, area_count);
+  Store(base, manager + 116, 3);
+  Store(base, manager + 132, AllocPhysical(base, area_count * 4));
+  Store(base, manager + 136, AllocPhysical(base, Load(base, manager + 128) * 16));
+  Store(base, manager + 140, AllocPhysical(base, Load(base, manager + 128) * 12));
+  c_runtime::XMemSet(base, Load(base, manager + 136), 0, Load(base, manager + 128) * 16);
+  c_runtime::XMemSet(base, Load(base, manager + 140), 0, Load(base, manager + 128) * 12);
+  // List B: the models (pool 4).
+  const uint32_t model_count = Load(base, manager + 100);
+  Store(base, manager + 148, 0);
+  Store(base, manager + 152, 0);
+  Store(base, manager + 156, model_count);
+  Store(base, manager + 144, 4);
+  Store(base, manager + 160, AllocPhysical(base, model_count * 4));
+  Store(base, manager + 164, AllocPhysical(base, Load(base, manager + 156) * 16));
+  Store(base, manager + 168, AllocPhysical(base, Load(base, manager + 156) * 12));
+  c_runtime::XMemSet(base, Load(base, manager + 164), 0, Load(base, manager + 156) * 16);
+  c_runtime::XMemSet(base, Load(base, manager + 168), 0, Load(base, manager + 156) * 12);
+  // The tables, from the configuration's areas (its +28: +16 the count,
+  // 12-byte entries from +20: the light asset, the first and last model).
+  uint32_t written_a = 0, written_b = 0;
+  for (uint32_t area = 0; written_a < Load(base, manager + 128); area++) {
+    uint32_t table = Load(base, copy + 28);
+    const int32_t light =
+        area < Load(base, table + 16) ? int32_t(Load(base, table + 12 * area + 20)) : -1;
+    if (light < 0) {
+      continue;
+    }
+    const uint32_t a = Load(base, manager + 140) + 12 * written_a;
+    written_a++;
+    const uint32_t key = area & 0xFFFF;
+    guest::StoreU16(base, a + 2, 0);
+    Store(base, a + 4, uint32_t(light));
+    guest::StoreU16(base, a + 0, uint16_t(key));
+    table = Load(base, copy + 28);
+    int32_t models = -1;
+    if (key < Load(base, table + 16)) {
+      const uint32_t e = table + 12 * key;
+      models = int32_t(Load(base, e + 28) - Load(base, e + 24) + 1);
+    }
+    for (int32_t model = 0; model < models; model++) {
+      const uint32_t asset = ModelAsset(base, copy, area, uint32_t(model));
+      if (int32_t(asset) < 0) {
+        continue;
+      }
+      const uint32_t b = Load(base, manager + 168) + 12 * written_b;
+      written_b++;
+      guest::StoreU16(base, b + 0, uint16_t(key));
+      guest::StoreU16(base, b + 2, uint16_t(model));
+      Store(base, b + 4, asset);
+    }
+  }
+  // The five pools' descriptors: +0 the pool, +4 the object size, +8 the
+  // data size, +12 and +16 the counts, +20 the factory (MakePoolObject).
+  constexpr uint32_t kMakePoolObject = 0x820F2638;
+  const uint32_t descriptors = frame + 112;
+  const uint32_t first_size = Load(base, sizes + 0);
+  uint32_t object_size = 0, count = 0, data_count = 0;
+  for (uint32_t pool = 0; pool < 5; pool++) {
+    const uint32_t mode = Load(base, copy);
+    switch (pool) {
+      case 0:
+        if (Load(base, manager + 44) != 0) {
+          Store(base, manager + 180, first_size);
+          object_size = 60;
+          count = 1;
+          data_count = 0;
+          Store(base, manager + 184, AllocPhysical(base, first_size));
+          Store(base, sizes + 0, 0);
+        }
+        break;
+      case 1:
+        if (Load(base, manager + 48) != 0) {
+          object_size = 60;
+          count = 0;
+          data_count = 0;
+        }
+        break;
+      case 2:
+        object_size = 3824;
+        count = 1;
+        data_count = 1;
+        break;
+      case 3:
+        object_size = 88;
+        count = mode == 0 ? Load(base, manager + 92) : Load(base, manager + 96);
+        data_count = mode == 0 ? 1 : count;
+        break;
+      case 4: {
+        object_size = 560;
+        count = mode == 0 ? Load(base, manager + 100) : Load(base, manager + 104);
+        data_count = mode == 0 ? 1 : count;
+        const uint32_t limit = Load(base, 0x826A5130);
+        const uint32_t extra = limit < Load(base, sizes + 16) ? 0 : Load(base, 0x826A5134);
+        Store(base, sizes + 16, 0);
+        Store(base, manager + 188, extra);
+        break;
+      }
+    }
+    const uint32_t d = descriptors + 24 * pool;
+    Store(base, d + 0, pool);
+    Store(base, d + 4, object_size);
+    Store(base, d + 12, count);
+    Store(base, d + 16, data_count);
+    Store(base, d + 8, Load(base, sizes + 4 * pool));
+    Store(base, d + 20, kMakePoolObject);
+  }
+  uint32_t r3 = 0;
+  Require(Init(base, calls, frame, manager, 5, descriptors, &r3), "Scenery::SetupPools' Init");
+  Store(base, manager + 192, 0);
+  return r3;
 }
 
 void Init(uint8_t* base, uint32_t manager) {

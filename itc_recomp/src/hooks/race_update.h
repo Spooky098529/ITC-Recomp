@@ -17,5 +17,8 @@ void RaceUpdateVaryCar(PPCContext& ctx, uint8_t* base);
 // r3 = the set + 1072 (past the last entry) and r4 the count, as the
 // original leaves them.
 void RaceUpdateLights(PPCContext& ctx, uint8_t* base);
+// RaceScene::LoadScenery sub_8215B790: r3 = the race scene; r3 as
+// Scenery::StartLoad leaves it. Only where hooks::CourseScenerySetUpNative.
+void RaceUpdateLoadScenery(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

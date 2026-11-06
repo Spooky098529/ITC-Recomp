@@ -204,6 +204,13 @@ void RenderQueue(Context& h);
 void VideoOutput(Context& h);
 void DeviceState(Context& h);
 void CourseScenery(Context& h);
+// The course scenery's manager after Scenery::Setup (or Create and Setup):
+// what can be seen of it without its blocks' addresses (the manager's and
+// its pool records' words with the blocks' addresses as tags and offsets,
+// the tables, the visible areas, the bytes held), and its blocks freed
+// (src/harnesses/course_scenery.cpp; also used by the race's update).
+void SceneryOutputs(Context& h, Outputs& out, uint32_t manager, bool created);
+void SceneryFree(Context& h, uint32_t manager, bool created);
 void PostEffects(Context& h);
 void Input(Context& h);
 void ActionMappersBinding(Context& h);

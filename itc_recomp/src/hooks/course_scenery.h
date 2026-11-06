@@ -6,6 +6,8 @@
 
 #include "guest.h"
 
+#include "course_scenery/course_scenery.h"
+
 namespace hooks {
 
 // Scenery::DrawSetLists (sub_820F52A8): r3 = the manager, r4 = the pass
@@ -14,5 +16,17 @@ namespace hooks {
 // view-projection's address while it runs (the draws' adapters read it
 // where their plain C++ declines), then put back.
 void CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base);
+
+// The calls the course scenery's plain C++ makes into code that takes the
+// context, as its adapters make them (for native callers elsewhere: the
+// race's scenery load, src/hooks/race_update.cpp). `guest` outlives them.
+struct CourseSceneryGuest {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+course_scenery::Calls CourseSceneryCalls(CourseSceneryGuest* guest);
+// Whether Scenery::Create's and Setup's plain C++ may run (the models'
+// native lifetime with the native heap, and memcpy native).
+bool CourseScenerySetUpNative();
 
 }  // namespace hooks

@@ -23,6 +23,7 @@
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "hooks/scenery_lists.h"
+#include "native/buffers.h"
 #include "course_scenery/course_scenery.h"
 
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
@@ -39,7 +40,9 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820F1588, Add sub_820F1888 (no adapter), Sort sub_820F1930, Scenery::LimitLargeModels "
               "sub_820F2B80, ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, "
               "Scenery::AllocPhysical sub_820F1490 and FreePhysical sub_820F14E8 (with the native "
-              "heap; XPhysicalSize answered by the layer), Scenery::Init sub_820F1360, "
+              "heap; XPhysicalSize answered by the layer), Scenery::Create sub_820F2F88 and Setup "
+              "sub_820F3020 with SetupPools sub_820F2720 (no adapter: only Setup calls it; with "
+              "--native_models' lifetime and memcpy native), Scenery::Init sub_820F1360, "
               "SceneryList::ReleaseUnused sub_820F17C0, SceneryList::LoadAll sub_820F1598 and Stream "
               "sub_820F16C0 (Archive::QueueLength's plain C++ with the archive's native queue), "
               "Scenery::StartLoad sub_820F1E00, "
@@ -111,6 +114,20 @@ void SetIndex(PPCContext& ctx, uint32_t index) {
 }
 
 }  // namespace
+
+course_scenery::Calls hooks::CourseSceneryCalls(CourseSceneryGuest* guest) {
+  static_assert(sizeof(CourseSceneryGuest) == sizeof(GuestCalls));
+  return {guest, [](void* user, uint32_t function, const uint32_t* args, int count,
+                    uint32_t frame, uint32_t lr) {
+            auto* g = static_cast<CourseSceneryGuest*>(user);
+            GuestCalls call{g->ctx, g->base};
+            return CallGuest(&call, function, args, count, frame, lr);
+          }};
+}
+
+bool hooks::CourseScenerySetUpNative() {
+  return hooks::ModelsNativeLifetime() && native::Buffers_NativeMemcpy();
+}
 
 // The calls the plain C++ makes into code that takes the context.
 #define ITC_SCENERY_CALLS        \
@@ -216,6 +233,27 @@ extern "C" REX_FUNC(sub_820F1490) {
     return;
   }
   ctx.r3.u64 = AllocPhysical(base, ctx.r3.u32);
+}
+// Scenery::Create: no arguments; r3 as Init leaves it. Scenery::Setup: r3 =
+// the manager, r4 = the configuration; r3 = the visible areas' block. The
+// originals run where their plain C++ may not (CourseScenerySetUpNative).
+extern "C" REX_FUNC(sub_820F2F88) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_course_scenery) || !hooks::CourseScenerySetUpNative()) {
+    __imp__sub_820F2F88(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = Create(base);
+}
+extern "C" REX_FUNC(sub_820F3020) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_course_scenery) || !hooks::CourseScenerySetUpNative()) {
+    __imp__sub_820F3020(ctx, base);
+    return;
+  }
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = Setup(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
 extern "C" REX_FUNC(sub_820F14E8) {
   REX_FUNC_PROLOGUE();

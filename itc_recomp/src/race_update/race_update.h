@@ -9,6 +9,10 @@
 
 #include <cstdint>
 
+namespace course_scenery {
+struct Calls;
+}  // namespace course_scenery
+
 namespace race_update {
 
 // The scene lights' arrays RaceLights::UploadDirectional fills (16 bytes a
@@ -39,5 +43,22 @@ void UploadDirectional(uint8_t* base, uint32_t entry, uint32_t n, uint32_t stack
 // 1 through UploadDirectional with n counting them. `frame` is its r1 less
 // kLightsFrame. Returns n.
 uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame);
+
+// The race data ([0x826C5B2C]: +4 the course, +32 the mode, +0xA3AF0 4 in
+// split screen) and the scenery configurations' two words by index.
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kSceneryConfigs = 0x82602EA0;
+
+// sub_8215B790 RaceScene::LoadScenery: Scenery::Create, the scene's +0 =
+// the manager ([0x826C551C]); the 44-byte configuration at its frame's +80
+// (`stack` its r1, the frame 160 bytes below): +0 = 1, +4 = 1 in split
+// screen else 0, +8 to +20 = 0, +24 and +28 kSceneryConfigs' words at 8 x
+// TimesThreePlus(1, 0) for courses 8 to 10, else TimesThreePlus(0, the
+// mode), +36 and +40 = 0; +32 not written (the stack's word as the
+// original leaves it: the B7 call of no behavior change). Then
+// Scenery::Setup and StartLoad (their plain C++ with `calls`). Returns
+// StartLoad's r3. Only where hooks::CourseScenerySetUpNative.
+uint32_t LoadScenery(uint8_t* base, const course_scenery::Calls& calls, uint32_t stack,
+                     uint32_t scene);
 
 }  // namespace race_update

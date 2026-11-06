@@ -6,7 +6,9 @@
 
 #include "base/log.h"
 #include "car_scene_draw/ops.h"
+#include "course_scenery/course_scenery.h"
 #include "guest.h"
+#include "track_collision/track_collision.h"
 
 namespace race_update {
 
@@ -87,6 +89,36 @@ uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame) {
     }
   }
   return n;
+}
+
+uint32_t LoadScenery(uint8_t* base, const course_scenery::Calls& calls, uint32_t stack,
+                     uint32_t scene) {
+  ITC_NATIVE_RUNNING("sub_8215B790 RaceScene::LoadScenery");
+  namespace cs = course_scenery;
+  const uint32_t frame = stack - 160;
+  guest::StoreU32(base, frame, stack);
+  cs::Create(base);
+  guest::StoreU32(base, scene + 0, guest::LoadU32(base, cs::kCreated));
+  const uint32_t data = guest::LoadU32(base, kRaceData);
+  const int32_t course = int32_t(guest::LoadU32(base, data + 4));
+  const uint32_t index = course == 8 || course == 9 || course == 10
+                             ? track_collision::TimesThreePlus(1, 0)
+                             : track_collision::TimesThreePlus(0, guest::LoadU32(base, data + 32));
+  const uint32_t entry = kSceneryConfigs + (index << 3);
+  const uint32_t config = frame + 80;
+  const uint32_t split = guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 0xA3AF0);
+  guest::StoreU32(base, config + 0, 1);
+  guest::StoreU32(base, config + 8, 0);
+  guest::StoreU32(base, config + 12, 0);
+  guest::StoreU32(base, config + 16, 0);
+  guest::StoreU32(base, config + 20, 0);
+  guest::StoreU32(base, config + 24, guest::LoadU32(base, entry));
+  guest::StoreU32(base, config + 36, 0);
+  guest::StoreU32(base, config + 40, 0);
+  guest::StoreU32(base, config + 4, split == 4 ? 1 : 0);
+  guest::StoreU32(base, config + 28, guest::LoadU32(base, entry + 4));
+  cs::Setup(base, calls, frame, guest::LoadU32(base, cs::kCreated), config);
+  return cs::StartLoad(base, calls, frame, guest::LoadU32(base, cs::kCreated));
 }
 
 }  // namespace race_update

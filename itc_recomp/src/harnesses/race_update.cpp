@@ -13,9 +13,13 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "course_scenery/course_scenery.h"
+#include "hooks/course_scenery.h"
 #include "hooks/race_update.h"
 #include "memory/heap.h"
 #include "race_update/race_update.h"
+
+#include <rex/memory/utils.h>
 
 #include <fmt/format.h>
 
@@ -24,6 +28,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_race_update);
+ITC_FLAG_DECLARE(bool, native_course_scenery);
 
 namespace harness {
 
@@ -210,11 +215,93 @@ void Lights(Context& h) {
   results.Report();
 }
 
+// --- RaceScene::LoadScenery: the real configurations (0x82602EA0) from a
+// race data block of our own ([0x826C5B2C] pointed at it: the course +4,
+// the mode +32, +0xA3AF0 4 or not for split screen); the course set's load
+// slot (CourseSet::Load, slot 1 of 0x82006784, in the image's read-only
+// data: its page made writable through the SDK's memory utilities, as the
+// framework harness's main cases do, then given its access back) pointed at
+// PoolObject::Reset while the cases run, so no file is read; the stack below the call filled
+// alike on both sides (the configuration's +32 is its leftover). The
+// recompiled side with --native_race_update and --native_course_scenery
+// off. Compared: r3 against the course set, the scene's +0 against the
+// manager, the configuration's 44 bytes, and the manager (SceneryOutputs,
+// with Create's provider). ---
+
+void LoadSceneryCases(Context& h) {
+  namespace cs = course_scenery;
+  Random r(0x4C4F4144u);
+  Results results("RaceScene::LoadScenery (sub_8215B790)");
+  constexpr uint32_t kCourseSetLoad = 0x82006788, kCourseSetLoadOriginal = 0x820F2520,
+                     kPoolObjectReset = 0x820FB9D8;
+  if (!hooks::CourseScenerySetUpNative() ||
+      guest::LoadU32(h.base, kCourseSetLoad) != kCourseSetLoadOriginal) {
+    ITC_LOG_INFO("harness: RaceScene::LoadScenery: can't run here, no cases");
+    results.Report();
+    return;
+  }
+  const size_t page_size = rex::memory::page_size();
+  uint8_t* const page = reinterpret_cast<uint8_t*>(
+      reinterpret_cast<uintptr_t>(h.base + kCourseSetLoad) & ~uintptr_t(page_size - 1));
+  rex::memory::PageAccess access = rex::memory::PageAccess::kReadOnly;
+  if (!rex::memory::Protect(page, page_size, rex::memory::PageAccess::kReadWrite, &access)) {
+    ITC_LOG_ERROR("harness: RaceScene::LoadScenery: the course set's vtable can't be made "
+                  "writable");
+    results.Report();
+    return;
+  }
+  {
+    const SavedBytes saved(h.base,
+                           {{ru::kRaceData, 4}, {cs::kManager, 12}, {kCourseSetLoad, 4}});
+    guest::StoreU32(h.base, kCourseSetLoad, kPoolObjectReset);
+    const uint32_t data = memory::AllocPages(0xA4000, 4096);
+    const Block scene(16);
+    for (int c = 0; c < 12; c++) {
+      const uint32_t course = c < 3 ? 8 + uint32_t(c) : r.Below(13);
+      const uint32_t mode = r.Below(3);
+      const uint32_t split = r.Below(2) == 0 ? 4 : r.Below(6);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32(h.base, ru::kRaceData, data);
+        guest::StoreU32(h.base, data + 4, course);
+        guest::StoreU32(h.base, data + 32, mode);
+        guest::StoreU32(h.base, data + 0xA3AF0, split);
+        guest::StoreU32(h.base, scene.address, 0xCDCDCDCD);
+        PPCContext t = CallContext(h);
+        Fill(h.base, t.r1.u32 - 2048, 2048, uint8_t(0x40 + c));
+        t.r3.u64 = scene.address;
+        if (v == 0) {
+          ITC_FLAG(native_race_update) = false;
+          ITC_FLAG(native_course_scenery) = false;
+          __imp__sub_8215B790(t, h.base);
+          ITC_FLAG(native_course_scenery) = true;
+          ITC_FLAG(native_race_update) = true;
+        } else {
+          hooks::RaceUpdateLoadScenery(t, h.base);
+        }
+        const uint32_t manager = guest::LoadU32(h.base, cs::kCreated);
+        out[v].Word(manager != 0);
+        out[v].Word(t.r3.u32 - guest::LoadU32(h.base, manager + 112));
+        out[v].Word(guest::LoadU32(h.base, scene.address) - manager);
+        out[v].Bytes(Read(h.base, t.r1.u32 - 160 + 80, 44));
+        SceneryOutputs(h, out[v], manager, true);
+        SceneryFree(h, manager, true);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("course {} mode {} split {:#x}", course, mode, split));
+    }
+    memory::FreePages(data);
+  }
+  rex::memory::Protect(page, page_size, access);
+  results.Report();
+}
+
 }  // namespace
 
 void RaceUpdate(Context& h) {
   VaryCars(h);
   Lights(h);
+  LoadSceneryCases(h);
 }
 
 }  // namespace harness
