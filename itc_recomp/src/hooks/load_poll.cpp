@@ -22,7 +22,7 @@ ITC_FLAG_BOOL(native_load_poll, true, "ITC",
               "no adapters), SceneLights::Finish sub_820DDA60 and ApplyRecord sub_820DCBC0 "
               "(inside the wraps; with SetRecord sub_820DCB70, no adapter) and "
               "SceneTraffic::Finish sub_820E5A68 (inside the wrap), SceneModel::ApplyPaint "
-              "sub_820D9B68 and ApplyWheelPaint sub_820D9C50 (inside the wraps; with "
+              "sub_820D9B68 (no wrap: its native callers call it) and ApplyWheelPaint sub_820D9C50 (inside the wrap; with "
               "SceneParts::ApplyPaint sub_820E0908, SceneInterior::ApplyPaint sub_820E4250, "
               "SceneCockpit::ApplyPaint sub_820DC138, SceneWheels::ApplyPaint sub_820E8A00 and "
               "Wheels::ApplyPaint sub_820D91E0, and SceneTraffic::ApplyPaint sub_820E61D0 and "

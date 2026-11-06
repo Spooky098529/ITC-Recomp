@@ -26,7 +26,7 @@ ITC_FLAG_BOOL(native_front_end_car_draw, true, "ITC",
               "GarageAnims::Add sub_8217F9E0, Run sub_8217D120, Turn sub_82179D78, Open "
               "sub_82179DF0 and Close sub_82179EA8 (the doors' runners left to their "
               "originals), GarageStage::SetLightKit sub_82179678 with "
-              "SceneModel::ApplyLightKit sub_820D9D10, and Floor::Draw sub_820C8480 (with "
+              "SceneModel::ApplyLightKit sub_820D9D10 (no adapter: its native callers call it), and Floor::Draw sub_820C8480 (with "
               "--native_scenery_lists and the command list's diagnostics off), "
               "GarageStage::SetLights sub_8217BA20, and GarageStage::PoseCar sub_8217CAB8 (with "
               "--native_matrix_math, --native_accessories and --native_memcpy), natively instead "
@@ -247,12 +247,15 @@ ITC_FRONT_END_CAR_DRAW(82178B40, FrontEndCarDrawSetDrawWord)
 ITC_FRONT_END_CAR_DRAW(8217D2B0, FrontEndCarDrawApplyPreset)
 ITC_FRONT_END_CAR_DRAW(82180108, FrontEndCarDrawCommand)
 ITC_FRONT_END_CAR_DRAW(8217D120, FrontEndCarDrawAnimsRun)
-ITC_FRONT_END_CAR_DRAW(820D9D10, FrontEndCarDrawApplyLightKit)
 ITC_FRONT_END_CAR_DRAW(82179678, FrontEndCarDrawSetLightKit)
 ITC_FRONT_END_CAR_DRAW(820C8480, FrontEndCarDrawFloorDraw)
 ITC_FRONT_END_CAR_DRAW(8217BA20, FrontEndCarDrawSetLights)
 ITC_FRONT_END_CAR_DRAW(8217CAB8, FrontEndCarDrawPoseCar)
 
+// SceneModel::ApplyLightKit sub_820D9D10 has no adapter (removed, B7 loop,
+// 2026-11-06): its callers in play, GarageStage::SetLightKit and the
+// garage stage's re-applies (car_makers), are native and call its plain C++
+// (its register step above is the harness's).
 // No adapters (2026-11-04: their callers in play are native, which call
 // their plain C++; the steps above are the harness's): Plates::Hide
 // sub_820DF190 and Show sub_820DF180 (GarageStage::SyncPlates),

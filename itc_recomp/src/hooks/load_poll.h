@@ -48,8 +48,9 @@ void LoadPollSceneLightsApplyRecord(PPCContext& ctx, uint8_t* base);
 void LoadPollSceneTrafficFinish(PPCContext& ctx, uint8_t* base);
 
 // The paint (r4 to r9 the colors; the wheels' r4 to r10 and the caller's
-// frame): SceneModel::ApplyPaint sub_820D9B68 and ApplyWheelPaint
-// sub_820D9C50 (r3 the scene model; the wraps'); no adapters, only native
+// frame): SceneModel::ApplyPaint sub_820D9B68 (r3 the scene model; no wrap
+// left: its native callers call it) and ApplyWheelPaint sub_820D9C50 (r3
+// the scene model; the wrap's); no adapters, only native
 // callers call them (the harness's): SceneParts::ApplyPaint sub_820E0908,
 // SceneInterior::ApplyPaint sub_820E4250, SceneCockpit::ApplyPaint
 // sub_820DC138, SceneTraffic::ApplyPaint sub_820E61D0, TrafficCar::SetPaint

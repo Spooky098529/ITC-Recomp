@@ -642,7 +642,10 @@ extern "C" REX_FUNC(sub_820C5C88) {
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820D4048, LoadPollCarModelIsReady)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820D72D8, LoadPollCarPartsSetVinylTextures)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820D92A0, LoadPollWheelsApplyPalette)
-ITC_FRAME_STATE_WRAP_LOAD_POLL(820D9B68, LoadPollSceneModelApplyPaint)
+// (SceneModel::ApplyPaint sub_820D9B68's wrap is removed, B7 loop,
+// 2026-11-06: its callers in play, SceneModel::PollLoad, Car::DrawUpdate
+// and the garage stage's re-applies, are native and call its plain C++,
+// the last two inside the same wrap.)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820D9C50, LoadPollSceneModelApplyWheelPaint)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820D9EA0, LoadPollSceneModelApplyPalettes)
 // SceneModel::IsNearPlayerHeight natively under --native_car_draw
