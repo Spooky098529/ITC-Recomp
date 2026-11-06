@@ -578,6 +578,9 @@ Rows not yet moved stay in the table below. So far:
   into the stand's scene model record, the stand's fit to the car and
   its model's remake, and one front-end screen's update around them
   (B7).
+- [`menu-helpers.md`](menu-helpers.md): the front end's menu helpers:
+  the 68-byte menus about a hundred front-end screens step by the pad
+  (`Menu::Step`) and read accept and back on (`Menu::Pressed`) (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

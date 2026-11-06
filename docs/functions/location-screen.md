@@ -31,7 +31,8 @@ itself is a 912-byte object at `[0x82814E50]` with a page object
 handler run by `LocationScreen::Update` until it reports done) and four
 menus (`[0x82814E4C]`, `[0x82814E54]`, `[0x82814E58]`,
 `[0x82814E5C]`, 68 bytes each, stepped by the front end's shared menu
-helpers `sub_82186568` and `sub_821864C8`, a lead). Page 0 is the
+helpers `sub_82186568` and `sub_821864C8`, `Menu::Step` and
+`Menu::Pressed` in `menu-helpers.md` since 2026-11-06). Page 0 is the
 location's menu; pages 1 and 2 the location's list (the save data's
 location record) and its text; 3 to 6 the opponents, an opponent's
 text, the confirm menu (race, the rival's card, back) and the card;
@@ -86,8 +87,9 @@ matrix math (`Matrix::Multiply`, `RotateX`, `RotateY`, `RotateZ`,
 `VirtualAlloc`, `VirtualFree`, `operator new`, `operator delete`
 (`heap.md`), `memcpy`, `sin`, `XMemSet` (`c-runtime.md`) and the empty
 `sub_82106540` (`audio.md`: page 10, and a sound call's stand-in at the
-draw's start). Not here, in leads (`../loops/leads.md`): the menus'
-input helpers `sub_82186568` and `sub_821864C8`, the scene's update, constructor and teardown
+draw's start). The menus' input helpers `sub_82186568` and
+`sub_821864C8` are in `menu-helpers.md` (2026-11-06). Not here, in
+leads (`../loops/leads.md`): the scene's update, constructor and teardown
 (`sub_820C9608`, `sub_820C8A50`, `sub_820C5798`, `sub_820C4D88`,
 `sub_820D0D50`), the scene models' load poll `sub_820DA318` and record
 builder `sub_8215B878`, and the mode's set-up `sub_8222FD68` with the
