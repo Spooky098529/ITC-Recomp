@@ -97,7 +97,7 @@ Callers in other files: the command replay's handlers (`Command::*` 1-4,
 `Device::SetDisplayMode` and `Device::Swap` (`functions.md`, overridden:
 they call the setters through `ctx`), `VideoOutput::SetUpDisplay`,
 `VideoOutput::UnbindAll`, `VideoOutput::Present` and `sub_8258D958`
-(`video-output.md`), predicated tiling (`sub_825BED08`, `functions.md`;
+(`video-output.md`), predicated tiling (`sub_825BED08`, `predicated-tiling.md`;
 `EndTiling`, `sub_825BF200`), and the boot movie player's draw
 (`sub_82482CA8`, `sub_824829A0`, `sub_82483FB8`, `sub_824840C8`,
 `sub_824842C8`, a lead). Shared: `sub_82106540` (empty) in `audio.md`;
