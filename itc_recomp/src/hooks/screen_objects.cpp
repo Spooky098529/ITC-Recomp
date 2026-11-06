@@ -27,7 +27,8 @@ ITC_FLAG_DECLARE(bool, native_video_output);
 ITC_FLAG_BOOL(native_screen_objects, true, "ITC",
               "Run the race's screen objects (docs/functions/screen-objects.md): "
               "ScreenObject::BuildRings sub_821329B8 with AddRingPoint sub_82132778 (no adapter: only "
-              "BuildRings' plain C++ calls it), SetSpeed sub_8212FCC8, ~ScreenObject sub_82132FC8 "
+              "BuildRings' plain C++ calls it), SetSpeed sub_8212FCC8 (no adapter: only "
+              "RaceScene::Update's plain C++ calls it, and --native_race_update switches that), ~ScreenObject sub_82132FC8 "
               "with Release sub_8212F0B8 (no adapter: only ~ScreenObject's plain C++ calls it; with "
               "--native_video_output); their two maps "
               "(the C++ library's red-black trees: UvMap::UvMap sub_82130198, and without "
@@ -89,15 +90,9 @@ extern "C" REX_FUNC(sub_821329B8) {
   ctx.r3.u64 = *r3;
 }
 
-// SetSpeed: r3 = the object, f1 = the strength (allocates nothing, so not
-// tied to --native_heap); r3 and f1 left as they came.
-extern "C" REX_FUNC(sub_8212FCC8) {
-  REX_FUNC_PROLOGUE();
-  ctx.fpscr.disableFlushMode();
-  if (!ITC_FLAG(native_screen_objects) || !so::SetSpeed(base, ctx.r3.u32, ctx.f1.f64)) {
-    __imp__sub_8212FCC8(ctx, base);
-  }
-}
+// SetSpeed (sub_8212FCC8) has no adapter: its only caller in play,
+// RaceScene::Update, calls its plain C++ (the original where it refuses: the
+// object running); --native_race_update switches that.
 
 namespace {
 

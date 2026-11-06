@@ -39,9 +39,11 @@ namespace {
 
 namespace pe = post_effects;
 
-// The removed adapters' register steps (ToggleNoHistory, ToggleHidden),
+// The removed adapters' register steps (ToggleNoHistory, ToggleHidden,
+// MarkUpdated),
 // without the flag.
 void NativeToggleNoHistory(PPCContext&, uint8_t* base) { pe::ToggleNoHistory(base); }
+void NativeMarkUpdated(PPCContext&, uint8_t* base) { pe::MarkUpdated(base); }
 void NativeToggleHidden(PPCContext& ctx, uint8_t* base) {
   pe::ToggleScreenObjectHidden(base, ctx.r3.u32);
 }
@@ -200,7 +202,7 @@ void EffectsCases(Context& h, uint32_t block) {
   };
   const Function functions[] = {
       {"sub_82133AE8 PostEffects::Get", __imp__sub_82133AE8, sub_82133AE8},
-      {"sub_82133A08 PostEffects::MarkUpdated", __imp__sub_82133A08, sub_82133A08},
+      {"sub_82133A08 PostEffects::MarkUpdated", __imp__sub_82133A08, NativeMarkUpdated},
       {"sub_82133A38 PostEffects::ToggleNoHistory", __imp__sub_82133A38, NativeToggleNoHistory},
       {"sub_82133A70 PostEffects::DestroyRace", __imp__sub_82133A70, sub_82133A70},
   };

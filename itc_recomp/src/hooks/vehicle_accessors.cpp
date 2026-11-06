@@ -134,7 +134,8 @@ ITC_ACCESSOR_WORD(820C0168, VehicleIdentity(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820C0450, VehicleSetObjectHalf114(base, ctx.r3.u32, ctx.r4.u32))
 // Quaternion::ToMatrix3 (sub_820C0490) has no adapter: its only caller is
 // ToMatrix, native.
-ITC_ACCESSOR_VOID(820C0550, QuaternionToMatrix(base, ctx.r3.u32, ctx.r4.u32))
+// Quaternion::ToMatrix (sub_820C0550) has no adapter: its only caller in
+// play, Car::TickUpdate, calls its plain C++ (--native_race_update switches it).
 ITC_ACCESSOR_VOID(820C0590, VehicleSpeedRecord(base, ctx.r3.u32, ctx.r4.u32))
 
 // The collision object (r3) and the collision world. CollisionObject::Link

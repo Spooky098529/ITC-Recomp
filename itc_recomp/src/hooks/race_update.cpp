@@ -10,11 +10,11 @@
 
 ITC_FLAG_BOOL(native_race_update, true, "ITC",
               "Run the race's update (docs/functions/race-update.md: RaceScene::VaryCar "
-              "sub_8215B330; RaceLights::Update sub_8215D008 with RaceLights::UploadDirectional "
-              "sub_8215C698, no adapter: only Update's plain C++ calls it; RaceScene::LoadScenery "
+              "sub_8215B330 and RaceLights::Update sub_8215D008 with RaceLights::UploadDirectional "
+              "sub_8215C698, no adapters: only the plain C++ below calls them; RaceScene::LoadScenery "
               "sub_8215B790, over the course scenery's plain C++ where it may run; RaceScene::RemakeCarModel "
               "sub_8215C0D8, its callees through their adapters; RaceScene::Update sub_8215D2B0 with "
-              "Car::TickUpdate sub_8215C780, Scenery::Update, the glows' slot 24, ScreenObject::Start "
+              "Car::TickUpdate sub_8215C780 (no adapter: only Update's plain C++ calls it), Scenery::Update, the glows' slot 24, ScreenObject::Start "
               "and Stop through the guest) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_update)");
@@ -130,15 +130,15 @@ void RaceUpdateUpdate(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-// Their callers, Car::TickUpdate and RaceScene::Update, call their plain C++.
-ITC_RACE_UPDATE(8215B330, RaceUpdateVaryCar)
-ITC_RACE_UPDATE(8215D008, RaceUpdateLights)
+// RaceScene::VaryCar (sub_8215B330), RaceLights::Update (sub_8215D008) and
+// Car::TickUpdate (sub_8215C780) have no adapters: their only callers in
+// play, Car::TickUpdate's and RaceScene::Update's plain C++, call theirs;
+// --native_race_update switches those (the register steps above stay for
+// the harness).
 // RaceScene::RemakeCarModel: r3 = the car slots (not read), r4 = the scene,
 // r5 = a slot, r6 = a car, r7 = the paint pick; r3 = 0 or 1. Also from
 // RaceScene::SetUpCars (recompiled).
 ITC_RACE_UPDATE(8215C0D8, RaceUpdateRemakeCarModel)
-// Car::TickUpdate: r3 = the car slots; from RaceScene::Update only.
-ITC_RACE_UPDATE(8215C780, RaceUpdateTickUpdate)
 // RaceScene::Update: r3 = the race scene; from RaceSceneMachine::OnUpdate
 // (recompiled, a tail call).
 ITC_RACE_UPDATE(8215D2B0, RaceUpdateUpdate)

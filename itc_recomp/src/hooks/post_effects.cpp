@@ -43,7 +43,8 @@ ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
 ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "Run the post effects (docs/functions/post-effects.md: PostEffects::Get "
-              "sub_82133AE8, MarkUpdated sub_82133A08, ToggleNoHistory sub_82133A38 (no adapter: only "
+              "sub_82133AE8, MarkUpdated sub_82133A08 (no adapter: only RaceScene::Update's plain C++ "
+              "calls it, and --native_race_update switches that), ToggleNoHistory sub_82133A38 (no adapter: only "
               "Race::ToggleEffects' plain C++ calls it, and the flag switches that), DestroyRace "
               "sub_82133A70, Race::ToggleEffects sub_8215B690 (no adapter: only the race scene "
               "machine's plain C++ calls it, and --native_race_scene switches that) with ScreenObject::ToggleHidden "
@@ -101,7 +102,8 @@ using namespace post_effects;
 // --- The effects: no arguments but Get's r3 = the index ---
 
 ITC_POST_EFFECTS(82133AE8, ctx.r3.u64 = Get(base, ctx.r3.u32))
-ITC_POST_EFFECTS(82133A08, MarkUpdated(base))
+// MarkUpdated (sub_82133A08) has no adapter: its only caller in play,
+// RaceScene::Update, calls its plain C++ (--native_race_update switches it).
 // The deleting destructors through the effects' slot 1 (r4 = 1), from the
 // original's 112-byte frame.
 ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0; const uint64_t lr = ctx.lr;
