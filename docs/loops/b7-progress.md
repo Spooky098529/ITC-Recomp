@@ -44,6 +44,10 @@ file's history. What's left to see in a drive, from every run:
   8 ran in the race, `NewBlock`, `Init`, `ReserveWords`,
   `InsertCallback` in the replay `itc_3624` (ok); none to drive).
   Done.
+- Subsystem 2 of 3: the render command replay's single commands (lead
+  picked: `sub_8258E8E8`, `sub_8258F0F0`, `sub_8258E958`,
+  `sub_8258E9B8`; every frame, all four ready; its line deleted from
+  `leads.md`). Step: mapping agent running.
 
 ## Done
 
