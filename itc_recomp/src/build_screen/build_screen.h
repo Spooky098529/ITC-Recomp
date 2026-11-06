@@ -145,6 +145,34 @@ uint64_t DrawGroupRow(uint8_t* base, uint32_t sp, uint32_t row, uint32_t index,
 // sub_8219FA28 BuildScreen::DrawGroupRows: the 11 rows from the scroll.
 uint64_t DrawGroupRows(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The builds level (builds.cpp) ---
+
+// sub_8219BFE8 BuildScreen::InitBuildList: [0x826D8440] over the build
+// count (MenuList::Init, up to 6 rows), then RestoreBuildList. r3 the list.
+uint64_t InitBuildList(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821A0128 BuildScreen::CopyBuilds: the screen's build list reset and
+// group `group`'s builds appended (BuildList::Insert). r3 the screen's list,
+// or `group` when it has none.
+uint64_t CopyBuilds(uint8_t* base, uint32_t sp, uint64_t group);
+// sub_821A0D38 BuildScreen::ListBuilds: CopyBuilds, then the 6 rows' nodes
+// shown or hidden and (8, 0) by the count. r3 node (8, 0).
+uint32_t ListBuilds(uint8_t* base, uint32_t sp, uint64_t group, const Calls& calls);
+// sub_8219D248 BuildScreen::DrawBuildRow and sub_8219D550 DrawStandRow: row
+// `row`'s texts and nodes for the build at `position` (nothing past the
+// count). r3 the last SetNodeText's, else the third text node.
+uint64_t DrawBuildRow(uint8_t* base, uint32_t sp, uint32_t row, uint32_t position,
+                      const Calls& calls);
+uint64_t DrawStandRow(uint8_t* base, uint32_t sp, uint32_t row, uint32_t position,
+                      const Calls& calls);
+// sub_8219D3E8 BuildScreen::DrawBuildRows: the 6 rows from the scroll.
+uint64_t DrawBuildRows(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219CF08 BuildScreen::ShowGroup: group `group`'s texts and picture.
+// r3 the last SetText's or node (18, 0).
+uint64_t ShowGroup(uint8_t* base, uint32_t sp, uint32_t group, const Calls& calls);
+// sub_821A1008 BuildScreen::SetUpBuilds: level 1's set-up. r3
+// BuildArrows'.
+uint64_t SetUpBuilds(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The transitions (transitions.cpp) ---
 //
 // Each takes `step`, its word at the machine's +24 (r3): the set-up on the

@@ -57,4 +57,18 @@ void BuildScreenHighlightStand(PPCContext& ctx, uint8_t* base);
 void BuildScreenHighlightStand2(PPCContext& ctx, uint8_t* base);
 void BuildScreenHighlightDetails(PPCContext& ctx, uint8_t* base);
 
+// The builds level: InitBuildList sub_8219BFE8, CopyBuilds sub_821A0128 (r3
+// = a group's index), ListBuilds sub_821A0D38 (r3 = a group's index),
+// DrawBuildRows sub_8219D3E8, DrawStandRow sub_8219D550 (r3 = a row, r4 = a
+// position), ShowGroup sub_8219CF08 (r3 = a group), SetUpBuilds
+// sub_821A1008. InitBuildList, CopyBuilds, ListBuilds and DrawBuildRows
+// have no adapters (the harness's steps).
+void BuildScreenInitBuildList(PPCContext& ctx, uint8_t* base);
+void BuildScreenCopyBuilds(PPCContext& ctx, uint8_t* base);
+void BuildScreenListBuilds(PPCContext& ctx, uint8_t* base);
+void BuildScreenDrawBuildRows(PPCContext& ctx, uint8_t* base);
+void BuildScreenDrawStandRow(PPCContext& ctx, uint8_t* base);
+void BuildScreenShowGroup(PPCContext& ctx, uint8_t* base);
+void BuildScreenSetUpBuilds(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

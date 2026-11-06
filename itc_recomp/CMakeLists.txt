@@ -408,6 +408,7 @@ set(ITC_SOURCES
     src/build_screen/lists.cpp
     src/build_screen/rows.cpp
     src/build_screen/transitions.cpp
+    src/build_screen/builds.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

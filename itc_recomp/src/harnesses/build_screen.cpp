@@ -185,6 +185,8 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t g = 0; g < bs::kGroupCount; g++) {
     const uint32_t group = screen + bs::kGroups + bs::kGroupBytes * g;
     guest::StoreU32(base, group + 0, r.Below(40));
+    guest::StoreU32(base, group + 12, r.Below(14) - 1);
+    guest::StoreU32(base, group + 36, r.Below(5));
     guest::StoreU32(base, group + bs::kGroupCategory, r.Below(8) == 0 ? r.Below(8) : r.Below(5));
     MakeBuildList(base, w, group + bs::kGroupList_, r, SmallCount(r, 8));
   }
@@ -201,6 +203,11 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   }
   for (uint32_t i = 0; i < kBuildCount; i++) {
     const uint32_t build = w.at(kBuildsAt) + 52 * i;
+    // Its +0 a string's index (+4650 and the like in our table), +8 a kind
+    // 0 to 3, +20 ValueText's value (now and then below 0 or past 9).
+    guest::StoreU32(base, build + 0, r.Below(3000));
+    guest::StoreU32(base, build + 8, r.Below(4));
+    guest::StoreU32(base, build + 20, r.Below(14) - 1);
     if (r.Below(2) == 0) {
       guest::StoreU32(base, build + 36, guest::LoadU32(base, build + 32));
     }
@@ -610,6 +617,57 @@ void Transitions(Context& h, const World& w) {
   ui_movies_hooks::g_update_callee_stand_in = nullptr;
 }
 
+// The groups' build counts not negative (CopyBuilds walks an unsigned
+// count), the kept selection and scroll small (SetUpBuilds' shown group).
+void Counts(PPCContext&, Random& r, const World& w) {
+  for (uint32_t g = 0; g < bs::kGroupCount; g++) {
+    const uint32_t count =
+        w.at(kScreenAt) + bs::kGroups + bs::kGroupBytes * g + bs::kGroupBuildCount;
+    if ((guest::LoadU16(w.base, count) & 0x8000) != 0) {
+      guest::StoreU16(w.base, count, uint16_t(r.Below(9)));
+    }
+  }
+  guest::StoreU32(w.base, w.at(kScreenAt) + bs::kGroupSelection, r.Below(6));
+  guest::StoreU32(w.base, w.at(kScreenAt) + bs::kGroupScroll, r.Below(6));
+}
+
+void Builds(Context& h, const World& w) {
+  Run(h, w, {"BuildScreen::InitBuildList (sub_8219BFE8)", 100, __imp__sub_8219BFE8,
+             hooks::BuildScreenInitBuildList, {{-112, -8}, {-224, -136}},
+             [](PPCContext&, Random& r, const World& w) {
+               guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, uint16_t(r.Below(13)));
+             }});
+  auto group_index = [](PPCContext& t, Random& r, const World& w) {
+    Counts(t, r, w);
+    t.r3.u64 = r.Below(bs::kGroupCount);
+  };
+  Run(h, w, {"BuildScreen::CopyBuilds (sub_821A0128; BuildList::Insert)", 100,
+             __imp__sub_821A0128, hooks::BuildScreenCopyBuilds, {{-144, -48}, {-256, -176}},
+             group_index});
+  Run(h, w, {"BuildScreen::ListBuilds (sub_821A0D38)", 100, __imp__sub_821A0D38,
+             hooks::BuildScreenListBuilds, {{-192, -96}, {-336, -240}, {-448, -368}},
+             group_index});
+  // The rows: SetNodeText's parameter area (+40 to +79: the first call's
+  // r6 is set, but the later calls store their register leftovers over it,
+  // 0 natively) left out.
+  Run(h, w, {"BuildScreen::DrawBuildRows (sub_8219D3E8; sub_8219D248)", 100, __imp__sub_8219D3E8,
+             hooks::BuildScreenDrawBuildRows, {{-112, -24}, {-272, -232}, {-192, -184}}, None});
+  Run(h, w, {"BuildScreen::DrawStandRow (sub_8219D550)", 150, __imp__sub_8219D550,
+             hooks::BuildScreenDrawStandRow, {{-160, -120}, {-80, -72}},
+             [](PPCContext& t, Random& r, const World&) {
+               t.r3.u64 = r.Below(2);
+               t.r4.u64 = r.Below(16);
+             }});
+  // ShowGroup: SetText's parameter area (+48 to +79) left out.
+  Run(h, w, {"BuildScreen::ShowGroup (sub_8219CF08)", 150, __imp__sub_8219CF08,
+             hooks::BuildScreenShowGroup, {{-112, -64}, {-32, -24}},
+             [](PPCContext& t, Random& r, const World& w) {
+               t.r3.u64 = w.at(kScreenAt) + bs::kGroups + bs::kGroupBytes * r.Below(bs::kGroupCount);
+             }});
+  Run(h, w, {"BuildScreen::SetUpBuilds (sub_821A1008)", 100, __imp__sub_821A1008,
+             hooks::BuildScreenSetUpBuilds, {{-128, -40}}, Counts});
+}
+
 }  // namespace
 
 void BuildScreen(Context& h) {
@@ -623,6 +681,7 @@ void BuildScreen(Context& h) {
   Stage(h, w);
   Rows(h, w);
   Transitions(h, w);
+  Builds(h, w);
 }
 
 }  // namespace harness
