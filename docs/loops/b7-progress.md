@@ -19,7 +19,16 @@ file's history. What's left to see in a drive, from every run:
   2 in the new file (`sub_8215B330`; `sub_8215D008` with `sub_8215C698`),
   6 in other files (`course-scenery.md`, `heap.md`, `vehicle-accessors.md`,
   `scene-models.md`, `scene.md`); no leads added; no subagents).
-  Migration agent running.
+  Migration b30ad3c0..4a42fcc8 (`--native_race_update`: `VaryCar`, the
+  race lights; under `--native_course_scenery`: `Scenery::PoolSizes`,
+  `SceneryList::LoadAll`, `Stream`; under `--native_vehicle_accessors`
+  and `--native_scene_models`: `ScenePools::SetUp` with its loaders;
+  races 38, 38, 38, 36 s, 0 errors, all harnesses 0 differing; no
+  subagents); left: `Scenery::Update` `sub_820F4558` (ready, read, its
+  stack reads noted in its row) and the second set's set-ups; held:
+  `XPhysicalSize` `sub_822965C0` (`MmQueryAllocationSize`, no
+  precedent: asked the user) with `Scenery::AllocPhysical`/`FreePhysical`
+  and their callers. Validation agent running.
 
 ## Done
 
@@ -41,3 +50,5 @@ file's history. What's left to see in a drive, from every run:
   unknown 1636).
 - After the race update's map: ours 4252, work left 2159 (wrapped 57,
   known 472, unknown 1630).
+- After its migration: ours 4264, work left 2147 (wrapped 57, known
+  460, unknown 1630).
