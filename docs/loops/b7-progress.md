@@ -10,8 +10,9 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-11-06 14:33 on `b7-loop-06-11-26` (the previous
   run's branch, checked out by the user for this run), from 105ba4b9;
-  summary `b7-loop-2026-11-06-1433.md`. Limit: 3 subsystems.
-- Subsystem 1 of 3: the course scenery's race-side owners (lead picked:
+  summary `b7-loop-2026-11-06-1433.md`. Limit: 5 subsystems (the
+  user's call, 2026-11-06, raised from 3 during the run).
+- Subsystem 1 of 5: the course scenery's race-side owners (lead picked:
   `sub_8215B790`, `sub_8215D2B0`, `sub_821514A0`, `sub_821516F0`, the top
   of `leads.md`; ready groups under all four; its line deleted from
   `leads.md`). Map checked (db8e723a: `race-update.md`, 9 rows, 1
@@ -51,7 +52,7 @@ file's history. What's left to see in a drive, from every run:
   in `race-update.md` (7 of 7 ours). Validated `itc_3747` (race 36 s,
   0 errors, every harness 0 differing, 32 of 32 harness lines, all ran
   in the race; none to drive). Recorded.
-- Subsystem 2 of 3: the scene models' holders (two leads taken together:
+- Subsystem 2 of 5: the scene models' holders (two leads taken together:
   what's left of the scene models' owners, `sub_8217FCB0`, `sub_82179998`,
   and the front end's re-applies of a scene model's record,
   `sub_82178DF8`, `sub_82178E60`, `sub_821799D8`, `sub_820E7380`,
