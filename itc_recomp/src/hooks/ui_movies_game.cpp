@@ -59,7 +59,10 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "added sub_8211E378 (sub_8211E318; its strings through std::string's plain C++), "
               "the text setters UiMovie::ClearText sub_8211C470, sub_8211C4F0, "
               "UiMovie::ScrollText sub_8211C570, sub_8211C5F8, UiMovie::RevealText sub_8211D880 "
-              "(sub_8211C930) and sub_8211D8D8 (sub_8211C9C0), UiMovie::SetText sub_8211C1F8 (its "
+              "(sub_8211C930) and sub_8211D8D8 (sub_8211C9C0), the build screen's text helpers "
+              "UiMovie::SetFirstLine sub_8211C370, FirstLine sub_8211C3F8, LineCount "
+              "sub_8211C680 (Strings::CountLines sub_821087D8), ScrollNodeText sub_8211CCC0 and "
+              "ResetNodeTextScroll sub_8211CD28, UiMovie::SetText sub_8211C1F8 (its "
               "Strings::FormatV through the plain C++) and UiMovie::SetNodeText sub_8211C7E8 (the "
               "same, from its override in src/debug/pause_movie_log.cpp); "
               "the full-frame effect sub_8211BEE8 (CameraPasses::RenderTarget and sub_8259EBE8 "
@@ -804,6 +807,41 @@ extern "C" REX_FUNC(sub_8211C5F8) {
   REX_FUNC_PROLOGUE();
   NATIVE_HEAP_OR_ORIGINAL(8211C5F8,
                           ui_movies::ResetTextScroll(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+// The text helpers given a node (docs/functions/build-screen.md):
+// UiMovie::SetFirstLine (r6 = the line), FirstLine and LineCount (r3 =
+// movie, r4 = a sub-scene's index or -1, r5 = a child's index);
+// UiMovie::ScrollNodeText (r4 = the node, r5 = scrolling) and
+// ResetNodeTextScroll (r4 = the node).
+extern "C" REX_FUNC(sub_8211C370) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C370, ui_movies::SetFirstLine(base, ctx.r3.u32, ctx.r4.u32,
+                                                            ctx.r5.u32, ctx.r6.u32));
+}
+
+extern "C" REX_FUNC(sub_8211C3F8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C3F8,
+                          ui_movies::FirstLine(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+extern "C" REX_FUNC(sub_8211C680) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C680, ui_movies::LineCount(base, ctx.r1.u32, ctx.r3.u32,
+                                                         ctx.r4.u32, ctx.r5.u32));
+}
+
+extern "C" REX_FUNC(sub_8211CCC0) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211CCC0,
+                          ui_movies::ScrollNodeText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+extern "C" REX_FUNC(sub_8211CD28) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211CD28,
+                          ui_movies::ResetNodeTextScroll(base, ctx.r3.u32, ctx.r4.u32));
 }
 
 // UiMovie::SetText: r3 = movie, r4 = a sub-scene's index or -1, r5 = a

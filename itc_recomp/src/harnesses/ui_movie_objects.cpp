@@ -700,6 +700,11 @@ struct SetterFunction {
 
 constexpr const char* kSetText = "UiMovie::SetText (sub_8211C1F8)";
 constexpr const char* kSetNodeText = "UiMovie::SetNodeText (sub_8211C7E8)";
+constexpr const char* kSetFirstLine = "UiMovie::SetFirstLine (sub_8211C370)";
+constexpr const char* kFirstLine = "UiMovie::FirstLine (sub_8211C3F8)";
+constexpr const char* kLineCount = "UiMovie::LineCount (sub_8211C680; sub_821087D8)";
+constexpr const char* kScrollNodeText = "UiMovie::ScrollNodeText (sub_8211CCC0)";
+constexpr const char* kResetNodeTextScroll = "UiMovie::ResetNodeTextScroll (sub_8211CD28)";
 
 void SetterCases(Context& h, uint32_t movie) {
   const SetterFunction functions[] = {
@@ -717,6 +722,16 @@ void SetterCases(Context& h, uint32_t movie) {
       // The same with the node in r4 (one of the 8, a TXT), the string id in
       // r5 and r6 to r10 its arguments; also compared: r1 + 40 to + 79.
       {kSetNodeText, __imp__sub_8211C7E8, sub_8211C7E8},
+      // The build screen's text helpers (docs/functions/build-screen.md):
+      // SetFirstLine (r6 the line) and FirstLine on TXT nodes only (the
+      // originals loop forever on others); LineCount (also compared: its
+      // 4 KB buffer below r1); ScrollNodeText (r4 one of the 8 nodes, r5
+      // scrolling) and ResetNodeTextScroll (r4 a node).
+      {kSetFirstLine, __imp__sub_8211C370, sub_8211C370},
+      {kFirstLine, __imp__sub_8211C3F8, sub_8211C3F8},
+      {kLineCount, __imp__sub_8211C680, sub_8211C680},
+      {kScrollNodeText, __imp__sub_8211CCC0, sub_8211CCC0},
+      {kResetNodeTextScroll, __imp__sub_8211CD28, sub_8211CD28},
   };
   constexpr uint32_t kMissing = 0x826C5CD8;
   constexpr uint32_t kOdd[] = {0x7FC00000, 0xFF800001, 0x7F800000, 0x80000000, 0x00000001};
@@ -784,7 +799,8 @@ void SetterCases(Context& h, uint32_t movie) {
         Store(h.base, scene + 108, 0);
         Store(h.base, scene + 128, sub);
         Store(h.base, sub + 108, 0);
-        const bool texts = f.name == kSetText || f.name == kSetNodeText;
+        const bool texts = f.name == kSetText || f.name == kSetNodeText ||
+                           f.name == kSetFirstLine || f.name == kFirstLine;
         if (texts) {
           Store(h.base, sub, 0x54585400);  // child 0 of the scene: a TXT too
         }
@@ -850,10 +866,34 @@ void SetterCases(Context& h, uint32_t movie) {
           t.r10.u64 = r.Below(100);
           Fill(h.base, t.r1.u32 + 40, 40);
         }
+        if (f.name == kSetFirstLine) {
+          t.r6.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);
+        }
+        if (f.name == kScrollNodeText || f.name == kResetNodeTextScroll) {
+          t.r4.u64 = nodes + 128 * r.Below(8);
+          t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
+        }
+        if (f.name == kLineCount) {
+          Fill(h.base, t.r1.u32 - 4128, 4096);
+          // Now and then newlines in the buffers (Strings::CountLines).
+          for (uint32_t k = 0; k < 8; k++) {
+            if (r.Below(2) == 0) {
+              for (uint32_t c = 0; c < 6; c++) {
+                const uint32_t at = buffers + 4096 * k + 2 * r.Below(40);
+                if (guest::LoadU16(h.base, at) != 0) {
+                  guest::StoreU16(h.base, at, 10);
+                }
+              }
+            }
+          }
+        }
         if (v == 0) {
           RunRecompiled(f.recompiled, t, h.base);
         } else {
           f.native(t, h.base);
+        }
+        if (f.name == kLineCount) {
+          out[v].Bytes(Read(h.base, t.r1.u32 - 4128, 4096));
         }
         Store(h.base, kMissing, missing);
         Store(h.base, kStringTable, string_table);

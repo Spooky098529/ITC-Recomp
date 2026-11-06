@@ -413,6 +413,22 @@ std::optional<uint32_t> ChangeText(uint8_t* base, uint32_t movie, uint32_t sub_s
   return movie + kMovieTexts;
 }
 
+// The same with the node given.
+template <typename Change>
+std::optional<uint32_t> ChangeNodeText(uint8_t* base, uint32_t movie, uint32_t node,
+                                       Change change) {
+  const uint32_t id_address = node + 108;
+  const auto record = GetText(base, movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  change(*record);
+  TextMapSetKey(base, movie + kMovieTexts, Load(base, id_address), *record);
+  return movie + kMovieTexts;
+}
+
+constexpr uint32_t kTxtTag = 0x54585400;  // "TXT\0"
+
 // Whether the record's next page is there: its page (+20) + 1 against its
 // buffer's page count, signed.
 bool HasNextPage(uint8_t* base, uint32_t record) {
@@ -510,6 +526,83 @@ std::optional<uint32_t> ResetTextScroll(uint8_t* base, uint32_t movie, uint32_t 
                                         uint32_t child) {
   return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
     ITC_NATIVE_RUNNING("sub_8211C5F8 (a text's scroll counter reset)");
+    Store(base, record + 8, 0);
+  });
+}
+
+std::optional<uint32_t> SetFirstLine(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                     uint32_t child, uint32_t line) {
+  if (Load(base, FindNode(base, movie, sub_scene, child)) != kTxtTag) {
+    return std::nullopt;
+  }
+  return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C370 UiMovie::SetFirstLine");
+    Store(base, record + 24, line);
+  });
+}
+
+std::optional<uint32_t> FirstLine(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                  uint32_t child) {
+  const uint32_t node = FindNode(base, movie, sub_scene, child);
+  if (Load(base, node) != kTxtTag) {
+    return std::nullopt;
+  }
+  const auto record = GetText(base, movie, node + 108);
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C3F8 UiMovie::FirstLine");
+  return Load(base, *record + 24);
+}
+
+uint32_t CountLines(uint8_t* base, uint32_t text) {
+  ITC_NATIVE_RUNNING("sub_821087D8 Strings::CountLines");
+  uint32_t lines = 1;
+  for (;; text += 2) {
+    const uint16_t c = guest::LoadU16(base, text);
+    if (c == 0 || c == 0xFFD1) {
+      return lines;
+    }
+    if (c == 10) {
+      lines = (lines + 1) & 0xFFFF;
+    }
+  }
+}
+
+std::optional<uint32_t> LineCount(uint8_t* base, uint32_t stack, uint32_t movie,
+                                  uint32_t sub_scene, uint32_t child) {
+  const uint32_t id_address = FindNode(base, movie, sub_scene, child) + 108;
+  if (Load(base, id_address) == 0) {
+    ITC_NATIVE_RUNNING("sub_8211C680 UiMovie::LineCount");
+    return 0;
+  }
+  const uint32_t buffer = stack - 4208 + 80;
+  Zero(base, buffer, 4096);
+  if (!GetText(base, movie, id_address)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C680 UiMovie::LineCount");
+  const uint32_t id = Load(base, id_address);
+  const uint32_t page = TextField(base, movie, id, 20);
+  const uint32_t text = TextString(base, movie, id);
+  strings_and_font::StringsCopyPage(base, buffer, text, int32_t(page), 0);
+  return CountLines(base, buffer) & 0xFFFF;
+}
+
+std::optional<uint32_t> ScrollNodeText(uint8_t* base, uint32_t movie, uint32_t node,
+                                       uint32_t scrolling) {
+  return ChangeNodeText(base, movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CCC0 UiMovie::ScrollNodeText");
+    const uint32_t speed = Load(base, 0x820021F8);
+    Store(base, record + 4, scrolling);
+    Store(base, record + 12, 45);
+    Store(base, record + 16, speed);
+  });
+}
+
+std::optional<uint32_t> ResetNodeTextScroll(uint8_t* base, uint32_t movie, uint32_t node) {
+  return ChangeNodeText(base, movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CD28 UiMovie::ResetNodeTextScroll");
     Store(base, record + 8, 0);
   });
 }

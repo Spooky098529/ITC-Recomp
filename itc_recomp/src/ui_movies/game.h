@@ -477,6 +477,34 @@ std::optional<uint32_t> RevealText(uint8_t* base, uint32_t movie, uint32_t sub_s
 std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                     uint32_t child);
 
+// The text helpers given a node (docs/functions/build-screen.md, where
+// their rows are). sub_8211C370 UiMovie::SetFirstLine: the node
+// (FindNode) must be a TXT (else nullopt: the original loops forever
+// there); its text record's (GetText) +24 = `line`, the record stored for
+// the node's id. Returns as ClearText. sub_8211C3F8 UiMovie::FirstLine:
+// the same lookup and check; the record's +24.
+std::optional<uint32_t> SetFirstLine(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                     uint32_t child, uint32_t line);
+std::optional<uint32_t> FirstLine(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                  uint32_t child);
+// sub_8211C680 UiMovie::LineCount: 0 when the node's text id (+108) is 0;
+// else the 4 KB buffer at `stack` - 4128 (its 4,208-byte frame's +80)
+// cleared, GetText (its record unused), the text's shown page (+20) copied
+// there (Strings::CopyPage) and its lines counted (sub_821087D8
+// Strings::CountLines), as a halfword. nullopt where GetText would run the
+// original (the buffer's clearing done again by it).
+std::optional<uint32_t> LineCount(uint8_t* base, uint32_t stack, uint32_t movie,
+                                  uint32_t sub_scene, uint32_t child);
+// sub_821087D8 Strings::CountLines: 1 plus the newlines before the end or
+// a page break (0xFFD1) of the UTF-16 string at `text`, a halfword.
+uint32_t CountLines(uint8_t* base, uint32_t text);
+// sub_8211CCC0 UiMovie::ScrollNodeText and sub_8211CD28
+// UiMovie::ResetNodeTextScroll: ScrollText and sub_8211C5F8 with the node
+// given (no TXT check).
+std::optional<uint32_t> ScrollNodeText(uint8_t* base, uint32_t movie, uint32_t node,
+                                       uint32_t scrolling);
+std::optional<uint32_t> ResetNodeTextScroll(uint8_t* base, uint32_t movie, uint32_t node);
+
 // sub_8211C1F8 UiMovie::SetText: the node (FindNode) must be a TXT (else
 // nullopt: the original loops forever there, an assert); `varargs` (its r7
 // to r10) stored in the caller's parameter area (`stack` + 48 to + 79) and
