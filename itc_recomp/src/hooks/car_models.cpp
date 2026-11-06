@@ -400,7 +400,74 @@ void SecondSetUp(PPCContext& ctx, uint8_t* base,
   ctx.r3.u64 = *r3;
 }
 
+// ScenePools::SetUpB: r3 = the scene, r4 = a pool, r5 = an index, r6 = a
+// record; r3 = the object, or 0 when it isn't in use. SceneModel::Build:
+// r3 = a scene model; r3 = the last SetUpB's answer. Their set-ups' plain
+// C++ as SecondSetUp's, the guest calls from the frames below ctx.r1.
+template <typename Body>
+static uint32_t WithSecondSetUps(PPCContext& ctx, uint8_t* base, Body body) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t stack = ctx.r1.u64;
+  const cm::GuestCall guest = [&ctx, base, stack](uint32_t function, uint32_t r3, uint32_t r4,
+                                                  uint32_t r5, uint32_t r1, uint32_t lr) {
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.lr = lr;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u32;
+  };
+  const cm::SecondSetUps setups{
+      ctx.r13.u32, hooks::NativeArchiveLoad(base),
+      {ITC_FLAG(native_car_models), ITC_FLAG(native_scene_models), hooks::NativeHeapActive()},
+      guest};
+  ctx.fpscr.disableFlushMode();
+  const uint32_t r3 = body(setups);
+  ctx.lr = lr;
+  return r3;
+}
+
+void ScenePoolsSetUpB(PPCContext& ctx, uint8_t* base) {
+  const uint32_t scene = ctx.r3.u32, pool = ctx.r4.u32, index = ctx.r5.u32, record = ctx.r6.u32;
+  const uint32_t stack = ctx.r1.u32;
+  ctx.r3.u64 = WithSecondSetUps(ctx, base, [&](const cm::SecondSetUps& setups) {
+    return cm::ScenePoolsSetUpB(base, scene, pool, index, record, stack, setups);
+  });
+}
+
+void SceneModelBuild(PPCContext& ctx, uint8_t* base) {
+  const uint32_t model = ctx.r3.u32;
+  const uint32_t stack = ctx.r1.u32;
+  ctx.r3.u64 = WithSecondSetUps(ctx, base, [&](const cm::SecondSetUps& setups) {
+    return cm::SceneModelBuild(base, model, stack, setups);
+  });
+}
+
 }  // namespace hooks
+
+// ScenePools::SetUpB (with its pool 0 case sub_820C5B98 merged,
+// SceneCockpit::SetUp sub_820DBE80 and SceneModel::SetUp sub_820DB458, no
+// adapters: only it calls them) and SceneModel::Build (from SceneModel::
+// Update, recompiled) behind --native_scene_models.
+extern "C" REX_FUNC(sub_820C5B28) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_scene_models)) {
+    __imp__sub_820C5B28(ctx, base);
+    return;
+  }
+  hooks::ScenePoolsSetUpB(ctx, base);
+}
+extern "C" REX_FUNC(sub_820D9870) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_scene_models)) {
+    __imp__sub_820D9870(ctx, base);
+    return;
+  }
+  hooks::SceneModelBuild(ctx, base);
+}
 
 // The second set's set-ups behind --native_scene_models (scene-models.md),
 // from ScenePools::SetUpB (recompiled); SceneCarModel::SetUp's caller is

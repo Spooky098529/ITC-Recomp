@@ -120,4 +120,12 @@ void SecondSetUp(PPCContext& ctx, uint8_t* base,
                                                   const car_models::SecondSetUps&),
                  void (*original)(PPCContext&, uint8_t*));
 
+// ScenePools::SetUpB sub_820C5B28: r3 = the scene, r4 = a pool, r5 = an
+// index, r6 = a record; r3 = the object, or 0 when it isn't in use.
+// SceneModel::Build sub_820D9870: r3 = a scene model; r3 = the last SetUpB's
+// answer. Their plain C++ (with SceneCockpit::SetUp and SceneModel::SetUp),
+// the set-ups' as SecondSetUp's, guest calls from the frames below ctx.r1.
+void ScenePoolsSetUpB(PPCContext& ctx, uint8_t* base);
+void SceneModelBuild(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

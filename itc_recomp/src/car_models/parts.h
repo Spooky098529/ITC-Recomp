@@ -229,5 +229,60 @@ std::optional<uint32_t> SceneTrafficSetUp(uint8_t* base, uint32_t object, uint32
 std::optional<uint32_t> SceneWheelsSetUp(uint8_t* base, uint32_t object, uint32_t record,
                                          uint32_t stack, const SecondSetUps& setups);
 
+// --- ScenePools::SetUpB and the set-ups above the others (each calls it
+// again for its parts: SceneCockpit::SetUp for pool 3, SceneModel::Build
+// for pools 0 to 6) ---
+
+// ScenePools::SetUpB (sub_820C5B28): the second set's (`scene`, [0x826C2E44])
+// pool object `index` (List::At on +4944 + 12 pool); 0 unless it's in use
+// (+16 = 3), else the object, after its set-up with `record` by the pool
+// (pool 0's split-off case sub_820C5B98 merged): 0 SceneCarModel::SetUp, 1
+// SceneParts::SetUp, 2 SceneCockpit::SetUp, 3 SceneInterior::SetUp, 4 pool
+// 4's, 5 the wheels', 6 SceneTraffic::SetUp, 7 SceneModel::SetUp, above
+// none; their plain C++ from its 112-byte frame below `stack`, or, where one
+// declines, the function through `setups.guest` (the adapter, or the
+// original for those without one) with the original's return address.
+uint32_t ScenePoolsSetUpB(uint8_t* base, uint32_t scene, uint32_t pool, uint32_t index,
+                          uint32_t record, uint32_t stack, const SecondSetUps& setups);
+// SceneCockpit::SetUp (sub_820DBE80): +4316 = the scene; the 144-byte record
+// copied to +36 (memcpy); pool 2 of the first set claimed (ClaimA, GetA)
+// into +32, its +24 = the car model's ([[+24] + 24]), set up with +36 (its
+// result not stored); pool 3 of the second set claimed (ClaimB, GetB) into
+// +28, its +11656 = 1 and +11612 = 1 (sub_820E3658 on +160), linked to the
+// car model (SceneInterior::Link), its +28 = [+32] + 208 and +32 = [+32] +
+// 496; returns ScenePools::SetUpB(scene, 3, that index, +60). nullopt with
+// only +4316 written where the copy can't be native. 128-byte frame.
+std::optional<uint32_t> SceneCockpitSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                          uint32_t stack, const SecondSetUps& setups);
+// SceneModel::SetUp (sub_820DB458): pool 7, `record` a 4,244-byte scene
+// model record: +5024 = 1, the record copied to +32 (SceneModelRecord::Copy;
+// its original through `setups.guest` where the plain C++ declines), +4068
+// = its kind, block 5's +3824 = 1 and +3828 = 0, +4916 = 0x8200296C's float
+// (the scene's +4 0) or 0x82001FBC's; with the scene's +4 1 and the game
+// mode ([0x826032DC]) not 5, the two sound assets of the model's slot i
+// (+20) asked for (the slot's globals at 0x826D8350, 0x826D8390, 0x826D83AC,
+// 0x826C5C48, 0x826C5C64 set, its two buffers cleared, Archive::Load of the
+// ids of 0x82616318's entry with the callback sub_82175EE0); then +5040 = 1
+// with +5044 set (built later), else SceneModel::Build. Returns its r3
+// (Build's, or the last word it loaded). nullopt, with nothing done, where
+// the record overlaps the copy or the parts record's +44 would take the
+// tail sub_820DB53C (3 or 4 for kinds 1 and 2 below block 18, never seen in
+// play): the original runs. 144-byte frame.
+std::optional<uint32_t> SceneModelSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                        uint32_t stack, const SecondSetUps& setups);
+// SceneModel::Build (sub_820D9870): the model's parts claimed in the second
+// set (+5116) and set up (ClaimB, GetB, SetUpB), each result stored back:
+// kind 3 (traffic, +32): +5048 = -1, +5080 = 1, pool 6 into +5092 with +48,
+// pool 5 into +5100 (its +16776 = +48) with +4068; other kinds pool 0 into
+// +5048 (+48), pool 1 into +5060 (linked, +37248 = +32; +3744), pool 3 into
+// +5068 (linked; +3804), pool 4 into +5084 (+24 the car model; +4224), pool
+// 5 into +5100 (the same; +4068); then for kind 2 with the scene's +4 1 the
+// cockpit's record at +3924 from the interior's (+3764, + 5 from 6; +3768;
+// +3772; +3784, + 7 from 4; +3776; +3728; its 120 bytes from +3804 to +3948
+// by memcpy) and pool 2 into +5076 (its +24 the car model), else +5080 = 1.
+// Returns the last SetUpB's answer (the original's r3). 128-byte frame.
+uint32_t SceneModelBuild(uint8_t* base, uint32_t model, uint32_t stack,
+                         const SecondSetUps& setups);
+
 }  // namespace car_models
 

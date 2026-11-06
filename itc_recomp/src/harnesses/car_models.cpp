@@ -2457,6 +2457,242 @@ void SecondSetUps(Context& h) {
   memory::Free(allocation);
 }
 
+// ScenePools::SetUpB (with SceneCockpit::SetUp and SceneModel::SetUp, which
+// only it calls) and SceneModel::Build: a 320 KB block of random bytes
+// holding the second set (the scene, [0x826C2E44] pointed at it: its +4 0 or
+// 1, each pool's list one node, its own object, free or in use), the first
+// set ([0x826C2E40]: each pool's list one node, its own object free or in
+// use, 12 KB apart, with the worlds the set-ups' own cases give them: pool
+// 0's car model loads its exterior (its kind, the car record's decal
+// records), pool 3's CarInterior::Load with the accessories' stand-in, pool
+// 5's wheel fields), a 4,244-byte scene model record (the kind 0 to 3, the
+// car's block, the parts record's +44 0 to 9: 3 and 4 run the original
+// both ways, the seats, the wheels' numbers), the scene model (its slot 0
+// to 5, +5044 0 or not, the record copied in for Build's cases), the slots'
+// sound globals pointed at two buffers of the case's and the game mode 5 or
+// not. Archive::Load's calls recorded. The block, the buffers' ends, the
+// sound globals, the loads and r3 compared, the allocations the first set's
+// loads make (the exterior's sheet, the traffic car's texture, the load
+// slots' pages) as which allocation and the offset into it, then freed. A
+// random generator of its own.
+void SetUpBCases(Context& h) {
+  namespace cm = car_models;
+  constexpr uint32_t kBytes = 0x50000;
+  constexpr uint32_t kBufferA = 0x6B080, kBufferB = 0x5D2D0;
+  const uint32_t allocation = memory::Alloc(kBytes + 16, 0);
+  const uint32_t sounds = memory::Alloc(kBufferA + kBufferB + 16, 0);
+  if (allocation == 0 || sounds == 0) {
+    ITC_LOG_WARN("harness: car_models: no block for ScenePools::SetUpB");
+    return;
+  }
+  const uint32_t block = (allocation + 15) & ~15u;
+  const uint32_t buffer_a = (sounds + 15) & ~15u, buffer_b = buffer_a + kBufferA;
+  SavedWord scene_word(h.base, cm::kSceneSet);
+  SavedWord first_word(h.base, cm::kFirstSet);
+  SavedWord accessories(h.base, scene_models::kAccessories);
+  constexpr uint32_t kGameMode = 0x826032DC;
+  SavedWord game_mode(h.base, kGameMode);
+  // The sound globals of slots 0 to 7.
+  struct Global {
+    uint32_t address, bytes;
+  };
+  static constexpr Global kGlobals[] = {{0x826D8350, 8},  {0x826D8390, 32}, {0x826D83AC, 32},
+                                        {0x826D8374, 32}, {0x826D8358, 32}, {0x826C5C48, 32},
+                                        {0x826C5C64, 32}};
+  std::vector<std::vector<uint8_t>> kept;
+  for (const Global& g : kGlobals) kept.push_back(Read(h.base, g.address, g.bytes));
+  const uint32_t scene = block + 0x100, first_set = block + 0x1800, car = block + 0x1900;
+  const uint32_t sets = block + 0x1A00, kind_at = block + 0x1C00, interior_k = block + 0x1D00;
+  const uint32_t stand_in = block + 0x1E00, wheel_fields = block + 0x1F00;
+  const uint32_t traffic_word = block + 0x1F80;
+  const uint32_t first0 = block + 0x2000;  // first-set objects, 0x3000 apart
+  static constexpr uint32_t kSecond[8] = {0x30000, 0x32000, 0x3C000, 0x3E000,
+                                          0x41000, 0x42000, 0x47000, 0x4A000};
+  const uint32_t record = block + 0x4C000;
+  // Each pool's record within the scene model record.
+  static constexpr uint32_t kRecordOf[8] = {16, 3712, 3892, 3772, 4192, 4036, 16, 0};
+  Random random(0x5345545550420000ull);
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "ScenePools::SetUpB (sub_820C5B28) with SceneCockpit::SetUp "
+                                 "(sub_820DBE80) and SceneModel::SetUp (sub_820DB458)"
+                               : "SceneModel::Build (sub_820D9870)");
+    for (int c = 0; c < (which == 0 ? 300 : 120); c++) {
+      const uint64_t seed = random.Next();
+      Outputs out[2];
+      std::string what;
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        RandomBytes(h.base, block, kBytes, r);
+        // Pool 7 (SceneModel::SetUp, the set-up in play) a third of the time.
+        const uint32_t pool = which == 1             ? 7
+                              : r.Below(12) == 0     ? 8 + r.Below(3)
+                              : r.Below(3) == 0      ? 7
+                                                     : r.Below(7);
+        const uint32_t second = block + kSecond[std::min(pool, 7u)];
+        // The second set.
+        Put(h.base, cm::kSceneSet, scene);
+        Put(h.base, cm::kFirstSet, first_set);
+        Put(h.base, scene + 4, r.Below(2));
+        Put(h.base, scene + cm::kSharedBuffer, uint32_t(r.Next()));
+        Put(h.base, scene + cm::kSharedBufferSize, 0x200000);
+        for (uint32_t p = 0; p < 8; p++) {
+          const uint32_t object = block + kSecond[p];
+          Put(h.base, scene + 4944 + 12 * p, object);
+          Put(h.base, scene + 4944 + 12 * p + 8, 1);
+          Put(h.base, object + 8, 0);
+          Put(h.base, object + 16, r.Below(3) == 0 ? 3 : 0);
+          Put(h.base, object + 24, p == 0 ? first0 : block + kSecond[0]);
+        }
+        if (which == 0 && r.Below(8) != 0) {
+          Put(h.base, second + 16, 3);  // the pool's object in use: set up
+        }
+        Put(h.base, block + kSecond[3] + 11656, r.Below(2) == 0 ? 0 : 1 + r.Below(3));
+        Put(h.base, block + kSecond[5] + 16776, traffic_word);
+        Put(h.base, traffic_word, r.Below(5));
+        // The first set.
+        for (uint32_t p = 0; p < 8; p++) {
+          const uint32_t object = first0 + 0x3000 * std::min(p, 6u);
+          Put(h.base, first_set + 56 + 12 * p, object);
+          Put(h.base, first_set + 56 + 12 * p + 8, 1);
+          if (p > 6) continue;
+          Put(h.base, object + 8, 0);
+          Put(h.base, object + 16, r.Below(4) == 0 ? 3 : 0);
+          Put(h.base, object + 24, car);
+          Put(h.base, object + 106000, sets);
+          Put(h.base, object + 576, sets);
+        }
+        Put(h.base, car + 32, r.Below(45));
+        Put(h.base, first0 + 32, r.Below(45));  // the car model's block until it loads
+        Put(h.base, sets + 8, r.Below(3));
+        Put(h.base, first0 + 7256, kind_at);
+        Put(h.base, kind_at + 8, r.Below(6));
+        guest::StoreU32(h.base, scene_models::kAccessories, stand_in);
+        Put(h.base, stand_in, stand_in + 0x80);
+        Put(h.base, stand_in + 0x84, 0x822A8C18);
+        const uint32_t first3 = first0 + 0x3000 * 3, first5 = first0 + 0x3000 * 5;
+        Put(h.base, first3 + 3092, interior_k);
+        const uint32_t k = r.Below(4);
+        Put(h.base, interior_k + 8, k < 2 ? k : k == 2 ? 2 + r.Below(4) : uint32_t(r.Next()));
+        Put(h.base, first3 + 3088, r.Below(2));
+        Put(h.base, first5 + 3268, wheel_fields);
+        Put(h.base, wheel_fields + 8, r.Below(2) ? 0 : 1 + r.Below(3));
+        // The scene model record.
+        const uint32_t kind = r.Below(8) == 0 ? r.Below(6) : r.Below(4);
+        Put(h.base, record, kind);
+        const uint32_t car_record = record + 16;
+        Put(h.base, car_record, kind == 3 ? r.Below(5) : r.Below(45));
+        DecalRecords(h.base, car_record + 176 + 384, r, false);
+        DecalRecords(h.base, car_record + 176, r, false);
+        for (uint32_t i = 3712; i < 4244; i += 4) Put(h.base, record + i, r.Below(4));
+        Put(h.base, record + 3756, r.Below(10));  // the parts record's +44
+        Put(h.base, record + 3732, r.Below(9));   // the seats (+3764 in the model)
+        Put(h.base, record + 3752, r.Below(7));   // the model's +3784
+        Put(h.base, record + 4036, r.Below(4) == 0 ? 3 : r.Below(5));
+        const uint32_t wheels[3] = {0xFFFFFFFFu, 190, r.Below(41)};
+        Put(h.base, record + 4052, wheels[r.Below(3)]);
+        Put(h.base, record + 4068, wheels[r.Below(3)]);
+        Put(h.base, record + 4104, r.Below(3) == 0 ? 1 : 0);
+        if (kind == 3) {
+          // A traffic car's wheels: type 3, the copy's +100 0 (their table
+          // entry by the traffic index, no car model read).
+          Put(h.base, record + 4036, 3);
+          Put(h.base, record + 4104, 0);
+        }
+        // The scene model.
+        const uint32_t model = block + kSecond[7];
+        Put(h.base, model + 5116, scene);
+        Put(h.base, model + 20, r.Below(6));
+        Put(h.base, model + 5044, r.Below(3) == 0 ? 1 + r.Below(3) : 0);
+        if (which == 1) {
+          Write(h.base, model + 32, Read(h.base, record, 4244).data(), 4244);
+          // A traffic car's wheels have no car model.
+          Put(h.base, block + kSecond[5] + 24, kind == 3 ? 0 : block + kSecond[0]);
+        }
+        // The sound globals and buffers.
+        for (uint32_t i = 0; i < 8; i++) {
+          Put(h.base, 0x826D8374 + 4 * i, buffer_a);
+          Put(h.base, 0x826D8358 + 4 * i, buffer_b);
+        }
+        RandomBytes(h.base, buffer_a, 256, r);
+        RandomBytes(h.base, buffer_a + kBufferA - 256, 256, r);
+        RandomBytes(h.base, buffer_b, 256, r);
+        RandomBytes(h.base, buffer_b + kBufferB - 256, 256, r);
+        Put(h.base, kGameMode, r.Below(4) == 0 ? 5 : r.Below(8));
+        std::vector<int64_t> serials;
+        for (int i = 0; i < 32; i++) serials.push_back(int64_t(r.Below(0x7FFFFFFF)));
+        std::optional<ArchiveLoads> loads;
+        loads.emplace(serials);
+        PPCContext t = CallContext(h);
+        if (which == 0) {
+          t.r3.u64 = scene;
+          t.r4.u64 = pool;
+          t.r5.u64 = r.Below(4) == 0 ? 1 : 0;
+          t.r6.u64 = pool > 7 ? record : record + kRecordOf[pool];
+          (v == 0 ? __imp__sub_820C5B28 : hooks::ScenePoolsSetUpB)(t, h.base);
+        } else {
+          t.r3.u64 = model;
+          (v == 0 ? __imp__sub_820D9870 : hooks::SceneModelBuild)(t, h.base);
+        }
+        what = fmt::format("case {} pool {} kind {} scene +4 {}", c, pool, kind,
+                           guest::LoadU32(h.base, scene + 4));
+        // The first set's allocations: the exterior's sheet, the traffic
+        // car's texture, the load slots' pages.
+        std::vector<Known> known;
+        std::vector<uint32_t> pages, physical;
+        const auto texture = [&](uint32_t header_at, uint32_t data_bytes) {
+          const uint32_t header = guest::LoadU32(h.base, header_at);
+          if (header == 0 || !memory::IsPages(header)) return;
+          known.push_back({header, 52});
+          pages.push_back(header);
+          const uint32_t data = guest::LoadU32(h.base, header_at + 4);
+          known.push_back({data, data_bytes});
+          physical.push_back(data);
+        };
+        texture(first0 + 6684,
+                TextureBytes(h.base, cm::kSheetFormat, guest::LoadU32(h.base, cm::kVinylSheetWidth),
+                             guest::LoadU32(h.base, cm::kVinylSheetWidth + 4)));
+        texture(first0 + 0x3000 * 6 + 3728, 1024);
+        for (uint32_t p = 0; p < 7; p++) {
+          for (uint32_t at : {192u, 3744u, 3760u, 3968u}) {
+            const uint32_t word = guest::LoadU32(h.base, first0 + 0x3000 * p + at);
+            if (word != 0 && memory::IsPages(word) &&
+                std::find(pages.begin(), pages.end(), word) == pages.end()) {
+              known.push_back({word, 1});
+              pages.push_back(word);
+            }
+          }
+        }
+        Addresses(out[v], h.base, block, kBytes, known);
+        for (size_t i = 0; i + 1 < known.size(); i++) {
+          if (known[i].bytes == 52) {
+            Addresses(out[v], h.base, known[i].address, 52, known);
+            out[v].Bytes(Read(h.base, known[i + 1].address, known[i + 1].bytes));
+          }
+        }
+        out[v].Word(uint32_t(loads->calls().size()));
+        for (const uint32_t word : loads->calls()) Address(out[v], word, known);
+        loads.reset();
+        for (const uint32_t at : {buffer_a, buffer_a + kBufferA - 256, buffer_b,
+                                  buffer_b + kBufferB - 256}) {
+          out[v].Bytes(Read(h.base, at, 256));
+        }
+        for (const Global& g : kGlobals) out[v].Bytes(Read(h.base, g.address, g.bytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        for (const uint32_t a : pages) memory::FreePages(a);
+        for (const uint32_t a : physical) memory::FreePhysical(a);
+        for (size_t i = 0; i < std::size(kGlobals); i++) {
+          Write(h.base, kGlobals[i].address, kept[i].data(), kGlobals[i].bytes);
+        }
+      }
+      results.Check(out[0], out[1], what);
+    }
+    results.Report();
+  }
+  memory::Free(sounds);
+  memory::Free(allocation);
+}
+
 void CarModels(Context& h) {
   const uint32_t allocation = memory::Alloc(kBlockBytes + 16, 0);
   const uint32_t block = (allocation + 15) & ~15u;
@@ -2474,6 +2710,7 @@ void CarModels(Context& h) {
   if (hooks::NativeHeapActive()) {
     ScenePoolsSetUps(h);
     SecondSetUps(h);
+    SetUpBCases(h);
   }
 }
 

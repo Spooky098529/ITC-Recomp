@@ -14,6 +14,7 @@
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
+#include <cstring>
 
 namespace car_models {
 
@@ -522,6 +523,248 @@ std::optional<uint32_t> SceneWheelsSetUp(uint8_t* base, uint32_t object, uint32_
     Store(base, wheels + 3264, Load(base, object + 16776));
   }
   return SetUpFirst(base, pools, 5, claimed, copy, frame, setups);
+}
+
+// --- ScenePools::SetUpB and the set-ups above the others ---
+
+uint32_t ScenePoolsSetUpB(uint8_t* base, uint32_t scene, uint32_t pool, uint32_t index,
+                          uint32_t record, uint32_t stack, const SecondSetUps& setups) {
+  ITC_NATIVE_RUNNING("sub_820C5B28 ScenePools::SetUpB");
+  const uint32_t object = vehicle_accessors::ListAt(base, (pool + 412) * 12 + scene, index);
+  if (int32_t(Load(base, object + 16)) != 3) {
+    return 0;
+  }
+  if (pool > 7) {
+    return object;
+  }
+  const uint32_t frame = stack - 112;
+  Store(base, frame, stack);
+  using SetUp = std::optional<uint32_t> (*)(uint8_t*, uint32_t, uint32_t, uint32_t,
+                                            const SecondSetUps&);
+  struct Case {
+    SetUp setup;
+    uint32_t function, lr;
+  };
+  // Pool 0's case is sub_820C5B98's call (merged), with its return address.
+  static constexpr Case kCases[8] = {
+      {SceneCarModelSetUp, 0x820DB818, 0x820C5BA4}, {ScenePartsSetUp, 0x820DF1D0, 0x820C5BB4},
+      {SceneCockpitSetUp, 0x820DBE80, 0x820C5BD4},  {SceneInteriorSetUp, 0x820E37F0, 0x820C5BC4},
+      {ScenePool4SetUp, 0x820DCAA0, 0x820C5BE4},    {SceneWheelsSetUp, 0x820E70C0, 0x820C5BF4},
+      {SceneTrafficSetUp, 0x820E5998, 0x820C5C04},  {SceneModelSetUp, 0x820DB458, 0x820C5C14},
+  };
+  const Case& c = kCases[pool];
+  if (!c.setup(base, object, record, frame, setups)) {
+    setups.guest(c.function, object, record, 0, frame, c.lr);
+  }
+  return object;
+}
+
+std::optional<uint32_t> SceneCockpitSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                          uint32_t stack, const SecondSetUps& setups) {
+  ITC_NATIVE_RUNNING("sub_820DBE80 SceneCockpit::SetUp");
+  namespace va = vehicle_accessors;
+  const uint32_t pools = Load(base, kFirstSet);
+  Store(base, object + 4316, Load(base, kSceneSet));
+  if (!native::Buffers_Memcpy(base, object + 36, record, 144, 0x820DBEB4)) {
+    return std::nullopt;
+  }
+  const uint32_t frame = stack - 128;
+  Store(base, frame, stack);
+  const uint32_t index = uint32_t(va::ScenePoolsClaimA(base, pools, 2));
+  const uint32_t first = va::ScenePoolsGetA(base, pools, 2, index);
+  const uint32_t car_model = Load(base, object + 24);
+  Store(base, object + 32, first);
+  Store(base, first + 24, Load(base, car_model + 24));
+  SetUpFirst(base, pools, 2, index, object + 36, frame, setups);
+  const uint32_t claimed = uint32_t(va::ScenePoolsClaimB(base, Load(base, object + 4316), 3));
+  const uint32_t interior = va::ScenePoolsGetB(base, Load(base, object + 4316), 3, claimed);
+  Store(base, object + 28, interior);
+  Store(base, interior + 11656, 1);
+  scene_models::SetWord11452(base, interior + 160, 1);
+  scene_models::InteriorLink(base, Load(base, object + 28), Load(base, object + 24));
+  Store(base, Load(base, object + 28) + 28, Load(base, object + 32) + 208);
+  Store(base, Load(base, object + 28) + 32, Load(base, object + 32) + 496);
+  return ScenePoolsSetUpB(base, Load(base, object + 4316), 3, claimed, object + 60, frame,
+                          setups);
+}
+
+std::optional<uint32_t> SceneModelSetUp(uint8_t* base, uint32_t object, uint32_t record,
+                                        uint32_t stack, const SecondSetUps& setups) {
+  constexpr uint32_t kGameMode = 0x826032DC;
+  constexpr uint32_t kSoundEntries = 0x82616318;  // 16-byte entries: +8, +12 the ids' arrays
+  constexpr uint32_t kSoundBuffersA = 0x826D8374, kSoundBuffersB = 0x826D8358;
+  constexpr uint32_t kSoundState = 0x826D8390, kSoundContexts = 0x826D8334;
+  constexpr uint32_t kSoundEntry = 0x826C5C48, kSoundIndex = 0x826C5C64;
+  constexpr uint32_t kOnSoundLoaded = 0x82175EE0;
+  constexpr uint32_t kRecordBytes = scene_models::kSceneModelRecordBytes;
+  // The original where the record overlaps the copy, or where the tail
+  // sub_820DB53C would run (read from the record before its copy: its +0,
+  // the car's block at +16, the parts record's +44 at +3756).
+  const uint32_t to = object + 32;
+  if (record < to + kRecordBytes && to < record + kRecordBytes) {
+    return std::nullopt;
+  }
+  const uint32_t scene_now = Load(base, object + 5116);
+  const int32_t kind_now = int32_t(Load(base, record));
+  const uint32_t parts44 = Load(base, record + 3756);
+  if (int32_t(Load(base, scene_now + 4)) == 1 && int32_t(Load(base, kGameMode)) != 5 &&
+      (kind_now == 1 || kind_now == 2) && int32_t(Load(base, record + 16)) < 18 &&
+      (parts44 == 3 || parts44 == 4)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_820DB458 SceneModel::SetUp");
+  const uint32_t frame = stack - 144;
+  Store(base, frame, stack);
+  Store(base, object + 5024, 1);
+  uint32_t r3 = to;
+  if (!scene_models::SceneModelRecordCopy(base, to, record)) {
+    r3 = setups.guest(0x820DB290, to, record, 0, frame, 0x820DB47C);
+  }
+  const int32_t kind = int32_t(Load(base, to));
+  const int32_t block = int32_t(Load(base, object + 48));
+  Store(base, object + 4068, uint32_t(kind));
+  if (block == 5) {
+    Store(base, object + 3824, 1);
+    Store(base, object + 3828, 0);
+  }
+  const uint32_t scene = Load(base, object + 5116);
+  guest::StoreFloat(base, object + 4916,
+                    guest::LoadFloat(base, int32_t(Load(base, scene + 4)) == 0 ? 0x8200296C
+                                                                              : 0x82001FBC));
+  if (int32_t(Load(base, scene + 4)) == 1 && int32_t(Load(base, kGameMode)) != 5) {
+    // The entry (r30) and the index into its arrays (r27).
+    uint32_t entry = 0, at = 0;
+    if (kind > 0) {
+      if (kind <= 2) {
+        entry = uint32_t(block);
+        if (block < 18) {
+          switch (Load(base, object + 3788)) {
+            case 5:
+            case 6:
+              at = 2;
+              break;
+            case 7:
+            case 8:
+              at = 3;
+              break;
+            case 9:
+              at = 4;
+              break;
+            default:
+              break;
+          }
+        }
+      } else if (kind == 3) {
+        entry = 47;
+      }
+    }
+    const auto slot = [&] { return Load(base, object + 20) << 2; };
+    Store(base, slot() + 0x826D83AC, 0);
+    Store(base, slot() + kSoundState, 1);
+    guest::StoreU8(base, Load(base, object + 20) + 0x826D8350, 0);
+    const auto clear = [&](uint32_t address, uint32_t bytes) {
+      guest::ForEachHostPart(base, address, bytes, [](uint8_t* host, uint32_t, uint32_t n) {
+        std::memset(host, 0, n);
+      });
+    };
+    clear(Load(base, slot() + kSoundBuffersA), 0x6B080);
+    clear(Load(base, slot() + kSoundBuffersB), 0x5D2D0);
+    const uint32_t ids_b = Load(base, (entry << 4) + kSoundEntries + 8);
+    const uint32_t ids_a = Load(base, (entry << 4) + kSoundEntries + 12);
+    const uint32_t id_b = Load(base, ids_b + (at << 2));
+    const uint32_t id_a =
+        Load(base, ids_a + (int32_t(Load(base, object + 48)) < 18 ? at << 2 : 0));
+    Store(base, slot() + kSoundEntry, entry);
+    Store(base, slot() + kSoundIndex, at);
+    setups.load(id_a, Load(base, slot() + kSoundBuffersA), kOnSoundLoaded,
+                slot() + kSoundContexts);
+    const int64_t serial = setups.load(id_b, Load(base, slot() + kSoundBuffersB),
+                                       kOnSoundLoaded, slot() + kSoundContexts);
+    r3 = uint32_t(serial);
+  }
+  if (Load(base, object + 5044) != 0) {
+    Store(base, object + 5040, 1);
+    return r3;
+  }
+  return SceneModelBuild(base, object, frame, setups);
+}
+
+uint32_t SceneModelBuild(uint8_t* base, uint32_t model, uint32_t stack,
+                         const SecondSetUps& setups) {
+  ITC_NATIVE_RUNNING("sub_820D9870 SceneModel::Build");
+  namespace va = vehicle_accessors;
+  namespace sm = scene_models;
+  const uint32_t frame = stack - 128;
+  Store(base, frame, stack);
+  const auto scene = [&] { return Load(base, model + 5116); };
+  // A part: claimed in pool `pool`, its object into `at` and `link` called
+  // with it, then set up with `record` and the result stored into `at`.
+  const auto part = [&](uint32_t pool, uint32_t at, uint32_t record, const auto& link) {
+    const uint32_t index = uint32_t(va::ScenePoolsClaimB(base, scene(), pool));
+    const uint32_t object = va::ScenePoolsGetB(base, scene(), pool, index);
+    Store(base, model + at, object);
+    link(object);
+    const uint32_t r3 = ScenePoolsSetUpB(base, scene(), pool, index, record, frame, setups);
+    Store(base, model + at, r3);
+    return r3;
+  };
+  const auto none = [](uint32_t) {};
+  const auto car_model = [&] { return Load(base, model + 5048); };
+  if (int32_t(Load(base, model + 32)) == 3) {
+    Store(base, model + 5048, 0xFFFFFFFFu);
+    Store(base, model + 5080, 1);
+    part(6, 5092, model + 48, none);
+    return part(5, 5100, model + 4068,
+                [&](uint32_t wheels) { sm::WheelsSetRecord(base, wheels, model + 48); });
+  }
+  {
+    const uint32_t index = uint32_t(va::ScenePoolsClaimB(base, scene(), 0));
+    Store(base, model + 5048, ScenePoolsSetUpB(base, scene(), 0, index, model + 48, frame, setups));
+  }
+  const uint32_t parts = part(1, 5060, model + 3744,
+                              [&](uint32_t object) { sm::PartsLink(base, object, car_model()); });
+  sm::PartsSetRecord(base, parts, model + 32);
+  part(3, 5068, model + 3804,
+       [&](uint32_t object) { sm::InteriorLink(base, object, car_model()); });
+  part(4, 5084, model + 4224,
+       [&](uint32_t object) { sm::SetCarModel(base, object, car_model()); });
+  uint32_t r3 = part(5, 5100, model + 4068,
+                     [&](uint32_t object) { sm::SetCarModel(base, object, car_model()); });
+  if (int32_t(Load(base, model + 32)) != 2 || int32_t(Load(base, scene() + 4)) != 1) {
+    Store(base, model + 5080, 1);
+    return r3;
+  }
+  // The cockpit's record from the interior's.
+  const uint32_t pools = scene();
+  int32_t seats = int32_t(Load(base, model + 3764));
+  const uint32_t w3768 = Load(base, model + 3768);
+  const uint32_t w3772 = Load(base, model + 3772);
+  if (seats >= 6) {
+    seats += 5;
+  }
+  Store(base, model + 3924, uint32_t(seats));
+  int32_t w3784 = int32_t(Load(base, model + 3784));
+  Store(base, model + 3928, w3768);
+  Store(base, model + 3932, w3772);
+  if (w3784 >= 4) {
+    w3784 += 7;
+  }
+  Store(base, model + 3940, uint32_t(w3784));
+  const uint32_t w3776 = Load(base, model + 3776);
+  const uint32_t w3728 = Load(base, model + 3728);
+  Store(base, model + 3936, w3776);
+  Store(base, model + 3944, w3728);
+  if (!native::Buffers_Memcpy(base, model + 3948, model + 3804, 120, 0x820D9B08)) {
+    setups.guest(0x825A7410, model + 3948, model + 3804, 120, frame, 0x820D9B08);
+  }
+  const uint32_t index = uint32_t(va::ScenePoolsClaimB(base, pools, 2));
+  const uint32_t cockpit = va::ScenePoolsGetB(base, scene(), 2, index);
+  const uint32_t linked = car_model();
+  Store(base, model + 5076, cockpit);
+  Store(base, cockpit + 24, linked);
+  r3 = ScenePoolsSetUpB(base, scene(), 2, index, model + 3924, frame, setups);
+  Store(base, model + 5076, r3);
+  return r3;
 }
 
 }  // namespace car_models
