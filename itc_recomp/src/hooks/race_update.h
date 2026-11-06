@@ -28,5 +28,11 @@ race_update::GuestCall RaceUpdateGuestCall(PPCContext& ctx, uint8_t* base);
 // RaceScene::RemakeCarModel sub_8215C0D8: r4 = the scene, r5 = a car slot,
 // r6 = a car, r7 = the paint pick; r3 = 0 or 1, lr put back.
 void RaceUpdateRemakeCarModel(PPCContext& ctx, uint8_t* base);
+// Car::TickUpdate sub_8215C780: r3 = the car slots; r3 as the original
+// leaves it, lr put back.
+void RaceUpdateTickUpdate(PPCContext& ctx, uint8_t* base);
+// RaceScene::Update sub_8215D2B0: r3 = the race scene; r3 as the original
+// leaves it, lr put back.
+void RaceUpdateUpdate(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

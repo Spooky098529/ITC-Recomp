@@ -23,6 +23,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <cstring>
 #include <utility>
 #include <vector>
@@ -380,6 +381,322 @@ void RemakeCarModels(Context& h) {
   results.Report();
 }
 
+
+// --- Car::TickUpdate and RaceScene::Update: a world of their own in a block
+// from the allocation layer, the race data in pages of its own, the game's
+// globals they read pointed at them (and put back after): the race scene
+// (its car slots at +16, 1 to 4 of them, each with a scene model or none and
+// a pool index -1 or 0; its light set at +30064 as the Lights cases make
+// it; its three screen objects at +31152 or none), up to 4 vehicles
+// ([0x826C2E34]; their bodies, data and wheels' floats ordinary or special,
+// the light and view flags, the gear, the nitrous byte), 1 to 4 racers
+// ([0x826D82F4]: flags with 0x40 (followed), 0x2 and now and then 0x200 for
+// one racer, which then remakes its car's scene model in RemakeCarModels'
+// world: the second set with one pool 7 scene model, the car laid as
+// FromCar's cases make it), the input records ([0x826C5B30]: the brake and
+// high-beam flags), the viewports ([0x826C2CE8]: split or not, each view's
+// mode 0, 1, 2 or any), the race data (the split mode 4, 6 or other, two
+// humans or not, the stage's +0 1 or not, the last racer record's +3924),
+// [0x826C7824] 0 or 1, the camera passes (pass 0's light points random, the
+// passes Scenery::Update's table names disabled, another one, the screen
+// objects', enabled or not), the post effects (1, 5 and 9 glows of the
+// game's glow vtable with random floats, the rest none), and for Update a
+// course scenery manager that does little (no views, empty lists, mode 0).
+// Compared: the block (the scene models' blocks' matrices, wheel loads and
+// gauges, the glows' settings and the screen objects' floats as floats),
+// the race data's cars, the scene lights' arrays (floats) and origin, and
+// r3; the stack below the call filled the same for both (the frames' dead
+// temporaries not compared). The recompiled side with --native_race_update
+// off. ---
+
+struct TickWorld {
+  // The block's layout.
+  static constexpr uint32_t kBytes = 0x26000;
+  static constexpr uint32_t kSecond = 0x100, kModel0 = 0x2000, kModels = 0x3800;
+  static constexpr uint32_t kModelBytes = 0x1400;
+  static constexpr uint32_t kParams = 0x7800, kTables = 0x8000;
+  static constexpr uint32_t kRaceScene = 0xD000, kVehicles = 0x15000, kBodies = 0x1B400;
+  static constexpr uint32_t kVehicleData = 0x1BC00, kRacers = 0x1D000, kRacerList = 0x1D200;
+  static constexpr uint32_t kInputs = 0x1DC00, kViewportBlock = 0x1DD00, kViewports = 0x1DE00;
+  static constexpr uint32_t kManager = 0x1EE00, kGlows = 0x1F000, kGlowBytes = 8480;
+  static constexpr uint32_t kObjects = 0x25400;
+  static constexpr uint32_t kDataBytes = 0xA4000;
+  // The globals.
+  static constexpr uint32_t kSceneSet = 0x826C2E44, kParamsPointer = 0x826C2E48;
+  static constexpr uint32_t kVehicleArray = 0x826C2E34, kInputRecords = 0x826C5B30;
+  static constexpr uint32_t kFollowed = 0x826C7824, kRacerManager = 0x826D82F4;
+  static constexpr uint32_t kViewportsPointer = 0x826C2CE8, kEffects = 0x826C5D80;
+  static constexpr uint32_t kPasses = 0x826BAC00, kPassBytes = 592, kViewMasks = 0x82602F80;
+  static constexpr uint32_t kGlowVtable = 0x820088B0;
+};
+
+// A float word: ordinary mostly, else zero, denormal, infinite, NaN or any.
+uint32_t SomeFloat(Random& r) {
+  if (r.Below(6) == 0) return Lane(r);
+  if (r.Below(40) == 0) return uint32_t(r.Next());
+  const float f = (float(r.Below(20001)) - 10000.0f) / float(1 + r.Below(1000));
+  uint32_t bits;
+  std::memcpy(&bits, &f, 4);
+  return bits;
+}
+
+// The float ranges of the block's outputs: each scene model block's
+// matrices (+80 to +591), wheel loads (+612) and gauges (+696), the glows'
+// settings and the screen objects' floats.
+std::vector<std::pair<uint32_t, uint32_t>> TickFloatRanges() {
+  using W = TickWorld;
+  std::vector<std::pair<uint32_t, uint32_t>> ranges;
+  auto model = [&](uint32_t m) {
+    ranges.push_back({m + 4288 + 80, 128});
+    ranges.push_back({m + 4288 + 612, 4});
+    ranges.push_back({m + 4288 + 696, 7});
+  };
+  model(W::kModel0);
+  for (uint32_t i = 0; i < 3; i++) model(W::kModels + W::kModelBytes * i);
+  for (uint32_t i = 0; i < 3; i++) ranges.push_back({W::kGlows + W::kGlowBytes * i + 8436, 11});
+  for (uint32_t i = 0; i < 3; i++) {
+    ranges.push_back({W::kObjects + 128 * i + 28, 9});
+    ranges.push_back({W::kObjects + 128 * i + 76, 1});
+  }
+  std::sort(ranges.begin(), ranges.end());
+  return ranges;
+}
+
+void TickUpdates(Context& h, bool whole) {
+  using W = TickWorld;
+  const Block block(W::kBytes);
+  const uint32_t data = memory::AllocPages(W::kDataBytes, 4096);
+  if (block.address == 0 || data == 0) {
+    ITC_LOG_WARN("harness: race_update: no block for Car::TickUpdate");
+    if (data != 0) memory::FreePages(data);
+    return;
+  }
+  const uint32_t b = block.address;
+  // The passes Scenery::Update's table names (disabled while the cases run)
+  // and one it doesn't, for ScreenObject::Start.
+  std::vector<uint32_t> named;
+  for (uint32_t i = 0; i < 14; i++) {
+    named.push_back(guest::LoadU32(h.base, W::kViewMasks + 16 * i + 8));
+  }
+  uint32_t free_pass = 0xFFFFFFFFu;
+  for (uint32_t p = 20; int32_t(p) >= 0 && free_pass == 0xFFFFFFFFu; p--) {
+    if (std::find(named.begin(), named.end(), p) == named.end()) free_pass = p;
+  }
+  // None free: the objects' pass is a disabled one (Start does nothing).
+  const uint32_t objects_pass = free_pass != 0xFFFFFFFFu ? free_pass : named[0];
+  const uint32_t glow_vtable = W::kGlowVtable;
+  const SavedBytes saved(
+      h.base, {{W::kSceneSet, 8}, {W::kVehicleArray, 4}, {ru::kRaceData, 4},
+               {W::kInputRecords, 32}, {W::kFollowed, 4}, {W::kRacerManager, 4},
+               {W::kViewportsPointer, 4}, {W::kEffects, 60}, {W::kPasses, 21 * W::kPassBytes},
+               {ru::kDirections, ru::kThird + 16 * 11 - ru::kDirections}, {ru::kOrigin, 16}});
+  const auto floats = TickFloatRanges();
+  Random random(whole ? 0x5550444154455343ull : 0x5449434B55504454ull);
+  Results results(whole ? "RaceScene::Update (sub_8215D2B0) with Car::TickUpdate"
+                        : "Car::TickUpdate (sub_8215C780)");
+  const int cases = whole ? 300 : 400;
+  for (int c = 0; c < cases; c++) {
+    const uint64_t seed = random.Next();
+    Outputs out[2];
+    std::string what;
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, b, W::kBytes, r);
+      WriteRandom(h.base, data, 0x6000, r);
+      WriteRandom(h.base, data + 0x59600, 0x3200, r);
+      PPCContext t = CallContext(h);
+      WriteRandom(h.base, t.r1.u32 - 16384, 16384, r);
+      const uint32_t scene = b + W::kRaceScene, slots = scene + 16;
+      // The globals.
+      guest::StoreU32(h.base, W::kSceneSet, b + W::kSecond);
+      guest::StoreU32(h.base, W::kParamsPointer, b + W::kParams);
+      guest::StoreU32(h.base, W::kVehicleArray, b + W::kVehicles);
+      guest::StoreU32(h.base, ru::kRaceData, data);
+      guest::StoreU32(h.base, W::kFollowed, r.Below(2));
+      guest::StoreU32(h.base, W::kRacerManager, b + W::kRacerList);
+      guest::StoreU32(h.base, W::kViewportsPointer, b + W::kViewportBlock);
+      // The second set and its pool 7 scene model (RemakeCarModels' world).
+      const uint32_t second = b + W::kSecond, model0 = b + W::kModel0;
+      guest::StoreU32(h.base, second + 4, 0);
+      guest::StoreU32(h.base, second + 4944 + 12 * 7, model0);
+      guest::StoreU32(h.base, second + 4944 + 12 * 7 + 8, 1);
+      guest::StoreU32(h.base, model0 + 8, 0);
+      guest::StoreU32(h.base, model0 + 16, r.Below(2) == 0 ? 3 : 0);
+      guest::StoreU32(h.base, model0 + 20, r.Below(6));
+      guest::StoreU32(h.base, model0 + 5044, 1 + r.Below(3));
+      guest::StoreU32(h.base, model0 + 5116, second);
+      // Every scene model: a car (+32 1), loading now and then, no parts.
+      uint32_t models[4] = {model0};
+      for (uint32_t i = 0; i < 3; i++) models[i + 1] = b + W::kModels + W::kModelBytes * i;
+      for (const uint32_t m : models) {
+        guest::StoreU32(h.base, m + 32, 1);
+        guest::StoreU32(h.base, m + 5028, r.Below(6) == 0 ? 1 : 0);
+        guest::StoreU32(h.base, m + 5040, r.Below(6) == 0 ? 1 : 0);
+        for (const uint32_t at : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+          guest::StoreU32(h.base, m + at, 0);
+        }
+      }
+      // The car slots.
+      const uint32_t slot_count = 1 + r.Below(4);
+      guest::StoreU32(h.base, slots, r.Below(10) == 0 ? 0 : slot_count);
+      for (uint32_t s = 0; s < 4; s++) {
+        const uint32_t slot = slots + 16 + 4288 * s;
+        const uint32_t pick = r.Below(4);
+        guest::StoreU32(h.base, slot + 0, pick == 0 ? 0 : models[r.Below(4)]);
+        guest::StoreU32(h.base, slot + 4272, r.Below(2) == 0 ? 0xFFFFFFFFu : 0);
+      }
+      // The vehicles: their body, data and wheels.
+      for (uint32_t i = 0; i < 4; i++) {
+        const uint32_t vehicle = b + W::kVehicles + 6272 * i;
+        for (uint32_t at = 0; at < 6272; at += 4) {
+          guest::StoreU32(h.base, vehicle + at, SomeFloat(r));
+        }
+        guest::StoreU32(h.base, vehicle + 336, b + W::kBodies + 352 * i);
+        guest::StoreU32(h.base, vehicle + 272, b + W::kVehicleData + 1280 * i);
+        constexpr uint32_t kViewFlags[4] = {0x1, 0x80, 0x81, 0x0};
+        guest::StoreU32(h.base, vehicle + 6148,
+                        kViewFlags[r.Below(4)] | (r.Below(4) == 0 ? uint32_t(r.Next()) : 0));
+        guest::StoreU32(h.base, vehicle + 2252, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(7));
+        guest::StoreU8(h.base, vehicle + 2424, r.Below(2) == 0 ? 0 : uint8_t(1 + r.Below(255)));
+        const float speed = float(r.Below(4000)) / 10.0f - 20.0f;
+        guest::StoreFloat(h.base, vehicle + 48, speed);
+        const uint32_t vdata = b + W::kVehicleData + 1280 * i;
+        for (uint32_t at = 0; at < 1280; at += 4) {
+          guest::StoreU32(h.base, vdata + at, SomeFloat(r));
+        }
+        const uint32_t body = b + W::kBodies + 352 * i;
+        for (uint32_t at = 0; at < 352; at += 4) {
+          guest::StoreU32(h.base, body + at, SomeFloat(r));
+        }
+      }
+      // The input records.
+      for (uint32_t i = 0; i < 8; i++) {
+        const uint32_t record = b + W::kInputs + 16 * i;
+        guest::StoreU32(h.base, W::kInputRecords + 4 * i, record);
+        guest::StoreU32(h.base, record, (r.Below(2) == 0 ? 0x8 : 0) |
+                                            (r.Below(2) == 0 ? 0x100 : 0) |
+                                            (r.Below(4) == 0 ? uint32_t(r.Next()) : 0));
+      }
+      // The viewports.
+      const uint32_t vp = b + W::kViewportBlock;
+      guest::StoreU32(h.base, vp + 0, b + W::kViewports);
+      guest::StoreU32(h.base, vp + 4, b + W::kViewports + 1872);
+      guest::StoreU32(h.base, vp + 8, r.Below(5) == 0 ? 1 : 0);
+      for (uint32_t i = 0; i < 2; i++) {
+        const uint32_t viewport = b + W::kViewports + 1872 * i;
+        guest::StoreU32(h.base, viewport + 1860,
+                        r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(3));
+        guest::StoreU32(h.base, viewport + 72, SomeFloat(r));
+      }
+      // The race data: the split mode, the humans, the stage, the records.
+      constexpr uint32_t kModes[4] = {4, 6, 0, 3};
+      const uint32_t mode = kModes[r.Below(4)];
+      guest::StoreU32(h.base, data + 0xA3AF0, mode);
+      guest::StoreU32(h.base, data + 0x59614, r.Below(2) == 0 ? 2 : r.Below(4));
+      const uint32_t stage = r.Below(10);
+      guest::StoreU32(h.base, data + 0x59620 + 804, stage);
+      guest::StoreU32(h.base, data + 0x59620 + 80 * stage, r.Below(2) == 0 ? 1 : r.Below(4));
+      const uint32_t records = 1 + r.Below(3);
+      guest::StoreU32(h.base, data + 0x59AE8 + 0x49FE0, records);
+      guest::StoreU32(h.base, data + 0x59AE8 + 3936 * (records - 1) + 3924, r.Below(3));
+      // The racers: one now and then remaking its car's model.
+      const uint32_t racers = 1 + r.Below(4);
+      const uint32_t list = b + W::kRacerList;
+      guest::StoreU32(h.base, list + 2364, racers);
+      const uint32_t remaker = r.Below(3) == 0 ? r.Below(racers) : 0xFFFFFFFFu;
+      for (uint32_t j = 0; j < 4; j++) {
+        const uint32_t racer = b + W::kRacers + 64 * j;
+        guest::StoreU32(h.base, list + 2308 + 4 * j, racer);
+        const uint32_t vehicle_index = r.Below(4) == 0 ? r.Below(4) : j;
+        uint32_t flags = uint32_t(r.Next()) & ~0x200u;
+        if (r.Below(4) != 0) flags |= 0x40;
+        if (j == remaker && vehicle_index != 0) flags |= 0x200;
+        guest::StoreU32(h.base, racer + 0, flags);
+        guest::StoreU32(h.base, racer + 16, uint32_t(Argument(r)));
+        guest::StoreU32(h.base, racer + 20, vehicle_index);
+        const uint32_t car_index = r.Below(6);
+        guest::StoreU32(h.base, racer + 24, car_index);
+        if ((flags & 0x200) != 0) {
+          LayFromCarWorld(h.base, data + 48 + 3936 * car_index, b + W::kParams, b + W::kTables, r);
+        }
+      }
+      // The camera passes: pass 0's points, the named ones disabled, the
+      // screen objects' enabled or not.
+      for (uint32_t at = 400; at < 432; at += 4) {
+        guest::StoreU32(h.base, W::kPasses + at, SomeFloat(r));
+      }
+      for (const uint32_t p : named) {
+        guest::StoreU32(h.base, W::kPasses + W::kPassBytes * p + 588, 0);
+      }
+      if (free_pass != 0xFFFFFFFFu) {
+        guest::StoreU32(h.base, W::kPasses + W::kPassBytes * free_pass + 588, r.Below(3) == 0 ? 0 : 1);
+      }
+      // The post effects: three glows, the rest none.
+      for (uint32_t i = 0; i < 15; i++) guest::StoreU32(h.base, W::kEffects + 4 * i, 0);
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t glow = b + W::kGlows + W::kGlowBytes * i;
+        for (uint32_t at = 4; at < W::kGlowBytes; at += 4) {
+          guest::StoreU32(h.base, glow + at, SomeFloat(r));
+        }
+        guest::StoreU32(h.base, glow, glow_vtable);
+        guest::StoreU32(h.base, W::kEffects + 4 * (1 + 4 * i), glow);
+      }
+      // The race scene's manager (Update's cases), light set and screen
+      // objects.
+      const uint32_t manager = b + W::kManager;
+      guest::StoreU32(h.base, scene + 0, manager);
+      guest::StoreU32(h.base, manager + 8, 0);
+      guest::StoreU32(h.base, manager + 12, 0xFFFFFFFFu);
+      for (const uint32_t l : {116u, 144u}) {
+        guest::StoreU32(h.base, manager + l + 4, 0);
+        guest::StoreU32(h.base, manager + l + 8, 0);
+        guest::StoreU32(h.base, manager + l + 12, 0);
+      }
+      for (uint32_t i = 0; i < 11; i++) {
+        const uint32_t entry = scene + 30064 + 16 + 96 * i;
+        guest::StoreU32(h.base, entry, i < 3 ? 1 : r.Below(3));
+        for (uint32_t k = 0; k < 4; k++) guest::StoreU32(h.base, entry + 16 + 4 * k, Lane(r));
+      }
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t object = b + W::kObjects + 128 * i;
+        guest::StoreU32(h.base, scene + 31152 + 4 * i, r.Below(6) == 0 ? 0 : object);
+        guest::StoreU8(h.base, object + 24, r.Below(2));
+        guest::StoreU8(h.base, object + 26, r.Below(2));
+        guest::StoreU32(h.base, object + 80, objects_pass);
+        guest::StoreU32(h.base, object + 88, b + W::kGlows + W::kGlowBytes * r.Below(3));
+        guest::StoreU32(h.base, object + 92, 0);
+      }
+      what = fmt::format("case {} mode {} racers {} slots {} remaker {}", c, mode, racers,
+                         guest::LoadU32(h.base, slots), int32_t(remaker));
+      if (whole) {
+        t.r3.u64 = scene;
+        (v == 0 ? Original<__imp__sub_8215D2B0> : hooks::RaceUpdateUpdate)(t, h.base);
+      } else {
+        t.r3.u64 = slots;
+        (v == 0 ? Original<__imp__sub_8215C780> : hooks::RaceUpdateTickUpdate)(t, h.base);
+      }
+      // The block in order, its float ranges as floats.
+      uint32_t at = 0;
+      for (const auto& [start, count] : floats) {
+        out[v].Bytes(Read(h.base, b + at, start - at));
+        out[v].Floats(h.base, b + start, count);
+        at = start + 4 * count;
+      }
+      out[v].Bytes(Read(h.base, b + at, W::kBytes - at));
+      out[v].Bytes(Read(h.base, data, 0x6000));
+      out[v].Floats(h.base, ru::kDirections, (ru::kThird + 16 * 11 - ru::kDirections) / 4);
+      out[v].Bytes(Read(h.base, ru::kOrigin, 16));
+      for (uint32_t i = 0; i < 15; i++) out[v].Word(guest::LoadU32(h.base, W::kEffects + 4 * i));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r1.u32);
+    }
+    results.Check(out[0], out[1], what);
+  }
+  results.Report();
+  memory::FreePages(data);
+}
+
 }  // namespace
 
 void RaceUpdate(Context& h) {
@@ -387,6 +704,8 @@ void RaceUpdate(Context& h) {
   Lights(h);
   LoadSceneryCases(h);
   RemakeCarModels(h);
+  TickUpdates(h, false);
+  TickUpdates(h, true);
 }
 
 }  // namespace harness

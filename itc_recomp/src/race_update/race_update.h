@@ -85,4 +85,52 @@ using GuestCall = std::function<uint64_t(uint32_t function, std::initializer_lis
 uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, uint32_t scene,
                         uint32_t slot, uint32_t car, uint64_t pick);
 
+// sub_8215C780 Car::TickUpdate: `slots` the race scene's car slots (scene +
+// 16: +0 the count, slot v at +16 + 4,288 v: +0 its scene model, +16 its
+// record, +4272 its pool index). Pass 0's light direction into its frame's
+// +96 (never read); each slot's seen flag (frame +592 + 4 v) and its model's
+// block +8 and +12 cleared; for each racer (Race::RacerCount, the racers at
+// [0x826D82F4] + 2308): its slot seen, its scene model remade
+// (RemakeCarModel, after VaryCar for flag 0x2) when its flags have 0x200
+// (cleared when it answers 1), then with a model its draw block (model +
+// 4288) filled from the vehicle: hidden (the view's mode 2: the body's
+// matrix and the light flags only) or drawn (+12 1 in the cockpit view; the
+// light flags, the gauges, the body's matrix and the four wheels'
+// matrices, +732 = 1). Last, each slot not seen whose model is 0 or done
+// loading (SceneModel::PollLoad) has its pool index released
+// (ScenePools::ReleaseB(scene, 7, index), index -1). Its 976-byte frame
+// below `stack` (its back chain written; its register saves not), the
+// identities and the matrices built there as the original. The callees'
+// plain C++ directly; SceneModel::PollLoad, ScenePools::ReleaseB (inside
+// their diagnostics' wraps), Stages::Copy and memcpy where they refuse
+// through `call`; RemakeCarModel's callees as it makes them. Returns r3 as
+// the original leaves it.
+uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32_t slots);
+
+// The guest calls RaceScene::Update makes besides `call`'s: a call with r3
+// and f1 (the post effect's vtable slot 24, Glow::SetFromSpeed, and
+// ScreenObject::SetSpeed's original where its plain C++ refuses), returning
+// r3; and Scenery::Update (sub_820F4558) on `manager` from `frame` with the
+// original's return address and r28 = `scene`, as the original has it then
+// (Scenery::Update's register saves store it).
+struct UpdateCalls {
+  GuestCall call;
+  std::function<uint64_t(uint32_t function, uint32_t r3, double f1, uint32_t frame,
+                         uint32_t lr)>
+      call_f1;
+  std::function<uint64_t(uint32_t manager, uint32_t scene, uint32_t frame)> scenery_update;
+};
+
+// sub_8215D2B0 RaceScene::Update: `scene` the race scene ([0x826D82D4]).
+// RaceLights::Update(+30064), Scenery::Update(+0) through `calls`,
+// TickUpdate(+16), PostEffects::MarkUpdated; then the followed cars'
+// (Racers::Vehicle) glows (post effect 1, or 5 and 9 in split screen: its
+// vtable slot 24 with the speed) and screen objects (+31152, or +31156 and
+// +31160: ScreenObject::Start or Stop by the vehicle's byte +2424 and the
+// object's +24, through `calls.call`, then ScreenObject::SetSpeed with the
+// speed / 300). Its 144-byte frame below `stack` (its back chain written;
+// its register and f30/f31 saves not). Returns r3 as the original leaves
+// it.
+uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint32_t stack, uint32_t scene);
+
 }  // namespace race_update
