@@ -362,7 +362,7 @@ ticks (`sub_822ACAA8`). It's called in loops from:
 | Loop in | Callers | What it waits for |
 |---|---|---|
 | `sub_8229E908` (at `0x8229E98C`) | 10 | The GPU's read pointer (device +10768) to pass a position relative to +10780: **space in the ring buffer**. |
-| `sub_8229DC28` (at `0x8229DC78`) | 2 | Unknown. |
+| `sub_8229DC28` (at `0x8229DC78`) | 2 | The GPU's read position (progress block +4) to pass a reservation's end: **space in the command buffer** (`functions/command-buffer.md`). |
 | `sub_8229DCC0` (at `0x8229DD1C`) | 2 | Unknown. |
 | `sub_822B64A0` (at `0x822B64E8`) | 1 | Unknown. |
 
