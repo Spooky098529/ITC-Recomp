@@ -85,9 +85,11 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "HidePartMarks, ShowPartMarks and the UI movies' FindNode and Child by their plain "
               "C++; MenuSound::Play, SetText and the named animations through their overrides, "
               "the varargs SetText calls leave unset passed as 0); "
-              "state 5's movie side MoveLevel sub_821D1A18 (IsItemAvailable, GetCurrentChoice "
-              "and the UI movies' FindNode and Child by their plain C++, the UI movie calls "
-              "through their overrides)) "
+              "state 5's page InputLevels sub_821D6E20 with its movie side MoveLevel "
+              "sub_821D1A18 (Menu::StepList, IsItemAvailable, IsPickOwned, GetPrice, "
+              "PageItemCount, PageCursor, GetCurrentChoice and the UI movies' FindNode and Child "
+              "by their plain C++; Menu::Step, MenuSound::Play and the UI movie calls through "
+              "their overrides)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -417,6 +419,14 @@ void TuningPagesMoveLevel(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesInputLevels(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputLevels(base, call, screen, sp, flags);
+  });
+}
+
 void TuningPagesInputWheels(PPCContext& ctx, uint8_t* base) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -523,6 +533,7 @@ ITC_TUNING_PAGES(821D8160, TuningPagesInputOptions)
 ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
 ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
 ITC_TUNING_PAGES(821D1A18, TuningPagesMoveLevel)
+ITC_TUNING_PAGES(821D6E20, TuningPagesInputLevels)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above

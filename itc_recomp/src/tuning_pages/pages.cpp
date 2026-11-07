@@ -1910,6 +1910,165 @@ uint64_t MoveLevel(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t
   return tuning_screen::PlayNamed(call, frame, 0x821D2A78, movie, back, 0);
 }
 
+uint64_t InputLevels(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                     uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821D6E20 TuningScreen::InputLevels");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t entry = PlayerEntry(base);
+  {
+    // The 10-level lists scroll.
+    const int32_t category = int32_t(Load(base, s + 9656));
+    const uint32_t menu = Load(base, s + 10040);
+    if ((category == 0 && Byte(base, s + 9660) == 0) ||
+        (category == 1 && Byte(base, s + 9660) == 4)) {
+      StepList(base, call, menu, frame, flags.native_slots);
+    } else {
+      call(kMenuStep, {menu}, frame, 0x821D6E90);
+    }
+  }
+  const int32_t step = int32_t(Load(base, Load(base, s + 10040) + 8));
+  uint64_t r3 = 0;
+  auto asked = [&](uint64_t action, uint32_t lr) {
+    return Asked(base, call, entry, 40, action, frame, lr, flags.native_slots, &r3);
+  };
+  if (step == -1 || step == 1) {
+    // (1) The cursor moved: the level picked, the long list's rows (the one
+    // before and now).
+    call(kMenuSoundPlay, {4}, frame, 0x821D7454);
+    const uint32_t menu = Load(base, s + 10040);
+    const uint32_t now = Load(base, s + 25100);
+    Store(base, s + 9708, 1);
+    const uint32_t cursor = Load(base, menu + 0);
+    Store(base, s + 25104, now);
+    Store(base, s + 9744, cursor);
+    guest::StoreU8(base, s + 9661, uint8_t(cursor));
+    Store(base, s + 25100, Load(base, menu + 48));
+  } else if (asked(159, 0x821D6ECC)) {
+    // (2) A: nothing but the refusal when the level isn't available; else
+    // the type list, the LSD's types, the tire's options or the confirm
+    // dialog (equip when owned, else the money short or buy); then Push(5).
+    if (int32_t(tuning_screen::IsItemAvailable(base, s, Byte(base, s + 9661))) == 0) {
+      call(kMenuSoundPlay, {3}, frame, 0x821D731C);
+      return MoveLevel(base, call, s, frame, flags.native_slots);
+    }
+    call(kMenuSoundPlay, {0}, frame, 0x821D6EF0);
+    const int32_t category = int32_t(Load(base, s + 9656));
+    if (category == 0 && Byte(base, s + 9660) == 2) {
+      // The type list (Go(6, 4), ShowTypes).
+      const uint32_t cursor = Load(base, Load(base, s + 10040) + 0);
+      const uint32_t queue = Load(base, s + 10036);
+      Store(base, s + 9652, 6);
+      guest::StoreU8(base, s + 9662, 0);
+      guest::StoreU8(base, s + 9678, 5);
+      Store(base, s + 9744, cursor);
+      guest::StoreU8(base, s + 9661, uint8_t(cursor));
+      Store(base, s + 9708, 1);
+      Store(base, s + 9716, 1);
+      GoFirstHalf(base, queue, 6);
+      const uint32_t last = Byte(base, s + 9678) - 1;
+      const uint32_t pick = Byte(base, s + 9662);
+      StoreMenu(base, Load(base, s + 10040),
+                {{12, 0}, {20, 1}, {8, 0}, {44, 0}, {0, pick}, {16, last}, {4, pick},
+                 {56, 0}, {60, 8}, {36, 0}, {64, 0}, {24, 0}, {28, 0}});
+      GoTail(base, s, 4);
+    } else if ((category == 1 && Byte(base, s + 9660) == 3 && Byte(base, s + 9661) >= 1) ||
+               (category == 3 && Byte(base, s + 9661) != 0)) {
+      // The LSD's types (Go(7, 5)) or the tire's options (Go(8, 6),
+      // ShowOptions).
+      const bool lsd = category == 1;
+      const uint32_t cursor = Load(base, Load(base, s + 10040) + 0);
+      const uint32_t queue = Load(base, s + 10036);
+      const uint32_t state = lsd ? 7 : 8;
+      Store(base, s + 9652, state);
+      if (lsd) {
+        guest::StoreU8(base, s + 9663, 0);
+        guest::StoreU8(base, s + 9679, 5);
+      } else {
+        guest::StoreU8(base, s + 9680, 3);
+        guest::StoreU8(base, s + 9664, 0);
+      }
+      Store(base, s + 9708, 1);
+      Store(base, s + 9716, 1);
+      Store(base, s + 9744, cursor);
+      guest::StoreU8(base, s + 9661, uint8_t(cursor));
+      GoFirstHalf(base, queue, state);
+      const uint32_t last = Byte(base, s + (lsd ? 9679 : 9680)) - 1;
+      StoreMenu(base, Load(base, s + 10040),
+                {{12, 0}, {20, 1}, {0, 0}, {4, 0}, {8, 0}, {40, 0}, {16, last}, {48, 0},
+                 {52, 0}, {36, 0}, {64, 0}, {24, 0}, {28, 0}, {32, 0}});
+      GoTail(base, s, lsd ? 5 : 6);
+    } else {
+      // The confirm dialog (command 63).
+      uint32_t menu;
+      if (int32_t(IsPickOwned(base, s)) != 0) {
+        const uint32_t cursor = Load(base, Load(base, s + 10040) + 0);
+        const uint32_t queue = Load(base, s + 10036);
+        guest::StoreU8(base, s + 9665, 0);
+        Store(base, s + 9652, 11);
+        Store(base, s + 9744, cursor);
+        guest::StoreU8(base, s + 9661, uint8_t(cursor));
+        GoFirstHalf(base, queue, 11);
+        menu = Load(base, s + 10040);
+        StoreMenu(base, menu,
+                  {{0, 0}, {4, 0}, {40, 0}, {48, 0}, {52, 0}, {32, 0}, {12, 0}, {16, 1}});
+      } else {
+        const int32_t price = int32_t(tuning_screen::GetPrice(base, s));
+        const int32_t money = int32_t(Load(base, s + 25116));
+        const uint32_t cursor = Load(base, Load(base, s + 10040) + 0);
+        const uint32_t queue = Load(base, s + 10036);
+        Store(base, s + 9744, cursor);
+        guest::StoreU8(base, s + 9661, uint8_t(cursor));
+        if (money < price) {
+          Store(base, s + 9652, 10);
+          GoFirstHalf(base, queue, 10);
+          menu = Load(base, s + 10040);
+          StoreMenu(base, menu,
+                    {{12, 0}, {16, 0}, {0, 0}, {4, 0}, {40, 0}, {48, 0}, {52, 0}, {32, 0}});
+        } else {
+          guest::StoreU8(base, s + 9665, 0);
+          Store(base, s + 9652, 9);
+          GoFirstHalf(base, queue, 9);
+          const uint32_t pick = Byte(base, s + 9665);
+          menu = Load(base, s + 10040);
+          StoreMenu(base, menu,
+                    {{0, pick}, {4, pick}, {44, 0}, {56, 0}, {60, 8}, {12, 0}, {16, 1}});
+        }
+      }
+      StoreMenu(base, menu, {{20, 1}, {8, 0}, {36, 0}, {64, 0}, {24, 0}, {28, 0}});
+      GoTail(base, s, 63);
+    }
+    Store(base, s + 9708, 1);
+    PushWord(base, s, 5);
+    guest::StoreU8(base, s + 10008, uint8_t(Byte(base, s + 10008) + 1));
+  } else if (asked(158, 0x821D7344)) {
+    // (3) B: Pop (the stand and garage car rewritten: +9732), the menu reset
+    // to the page's count and cursor, PlayIntro for category 2, else
+    // OpenItems.
+    call(kMenuSoundPlay, {2}, frame, 0x821D7354);
+    const uint32_t depth = (Byte(base, s + 10008) + 255) & 0xFF;
+    const uint32_t queue = Load(base, s + 10036);
+    Store(base, s + 9732, 1);
+    Store(base, s + 9708, 1);
+    guest::StoreU8(base, s + 10008, uint8_t(depth));
+    const uint32_t popped = Load(base, ((depth + 2439) << 2) + s);
+    Store(base, s + 9652, popped);
+    Store(base, queue + 20, 0xFFFFFFFFu);
+    Store(base, queue + 12, 0xFFFFFFFFu);
+    Store(base, queue + 24, 0);
+    Store(base, queue + 4, popped);
+    Store(base, queue + 0, popped);
+    Store(base, queue + 8, popped);
+    const uint32_t count = PageItemCount(base, s);
+    const uint32_t cursor = PageCursor(base, s);
+    StoreMenu(base, Load(base, s + 10040),
+              {{12, 0}, {16, count - 1}, {20, 1}, {8, 0}, {0, cursor}, {4, cursor}, {44, 0},
+               {56, 0}, {60, 8}, {36, 0}, {64, 0}, {24, 0}, {28, 0}});
+    GoTail(base, s, int32_t(Load(base, s + 9656)) == 2 ? 0 : 2);
+  }
+  return MoveLevel(base, call, s, frame, flags.native_slots);
+}
+
 
 namespace {
 

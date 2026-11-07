@@ -960,6 +960,73 @@ void LevelFields(PPCContext& t, Random& world_random, const World& w) {
   HighWord(t, r);
 }
 
+// State 5's page's fields (InputLevels): LevelFields' (above), then, from a
+// generator of its own (the save block's next two words mixed as ItemFields
+// mixes its first two), the pick's owned word (IsPickOwned's, by category,
+// item, part set, level and option +9664 0 to 2) 0 half the time, so A goes
+// to the price check; the money small half the time (the money short or the
+// buy); the state history's word below its depth one of the pages' states
+// most of the time (B's Pop, PageItemCount and PageCursor); with A or B
+// answered (the entry not blocked), the menu staying most of the time (its
+// player 0, its range 0 to 0..9 with the cursor in it, nothing fired) so A
+// and B run.
+void LevelInputFields(PPCContext& t, Random& world_random, const World& w) {
+  LevelFields(t, world_random, w);
+  uint64_t z = (uint64_t(guest::LoadU32(w.base, w.save + 8)) << 32 |
+                guest::LoadU32(w.base, w.save + 12)) +
+               0x9E3779B97F4A7C15ull;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  Random r(z ^ (z >> 31));
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU8(base, s + 9664, uint8_t(r.Below(3)));
+  if (r.Below(2) == 0) {
+    const int32_t category = int32_t(guest::LoadU32(base, s + 9656));
+    const uint32_t item = guest::LoadU8(base, s + 9660);
+    const uint32_t level = guest::LoadU8(base, s + 9661);
+    const uint32_t parts = guest::LoadU32(base, s + 33900);
+    uint32_t owned = 0;
+    if (category == 0 && item < 4) {
+      static constexpr uint32_t kOwned[] = {34324, 34824, 35028, 35144};
+      owned = kOwned[item] + (item == 0 ? 40 : item == 1 ? 28 : 0) * parts + 4 * level;
+    } else if (category == 1 && item < 5) {
+      static constexpr uint32_t kOwned[] = {35232, 35320, 35408, 35500, 35612};
+      owned = kOwned[item] + 4 * level;
+    } else if (category == 2) {
+      owned = 35712 + 4 * level;
+    } else if (category == 3 && item < 3) {
+      static constexpr uint32_t kOwned[] = {35828, 35956, 36084};
+      owned = kOwned[item] + 12 * level + 4 * guest::LoadU8(base, s + 9664);
+    }
+    if (owned != 0) {
+      guest::StoreU32(base, s + owned, 0);
+    }
+  }
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, s + 25116, r.Below(5000));
+  }
+  const uint32_t depth = guest::LoadU8(base, s + 10008);
+  if (depth != 0 && r.Below(5) != 0) {
+    static constexpr uint32_t kStates[] = {3, 4, 5, 6, 7, 8};
+    guest::StoreU32(base, s + (depth - 1 + 2439) * 4, kStates[r.Below(6)]);
+  }
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  const uint32_t pressed = guest::LoadU32(base, mapper + 456);
+  const bool a_or_b = (pressed & ((1u << (159 - 151)) | (1u << (158 - 151)))) != 0;
+  if (a_or_b && r.Below(5) != 0) {
+    const uint32_t menu = w.menu();
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, 0);
+    guest::StoreU32(base, mapper + 464, 0);
+    guest::StoreU32(base, menu + 64, 0);
+    const uint32_t last = r.Below(10);
+    guest::StoreU32(base, menu + 12, 0);
+    guest::StoreU32(base, menu + 16, last);
+    guest::StoreU32(base, menu + 0, r.Below(last + 1));
+  }
+}
+
 // State 59's fields (Leave and StoreOwnedParts): the owned words each 0
 // half the time (else as laid: any word), the tires' words 0, 1 or any, the
 // part set [+33900] 0 to 7 (5 to 7 now and then: none of the power items'
@@ -1268,6 +1335,11 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::MoveLevel", 800, __imp__sub_821D1A18, hooks::TuningPagesMoveLevel, 40, {},
        LevelFields});
+  // InputLevels: its r30, r31 and lr (24 bytes); StepList's and MoveLevel's
+  // saves (112 to 160 below: their plain C++ doesn't write them).
+  Run(h, w,
+      {"TuningScreen::InputLevels", 800, __imp__sub_821D6E20, hooks::TuningPagesInputLevels, 24,
+       {{112, 160}}, LevelInputFields});
   // StoreOwnedParts: state 59's fields (above); its r30, r31 and lr (24
   // bytes).
   Run(h, w,

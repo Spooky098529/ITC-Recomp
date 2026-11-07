@@ -388,6 +388,15 @@ uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint3
 // movie's entry, the slot's r3 or IsItemAvailable's 0.
 uint64_t MoveLevel(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                    uint32_t sp, bool native_slots);
+// sub_821D6E20 TuningScreen::InputLevels: state 5's page (its row):
+// Menu::StepList for the 10-level lists, else Menu::Step; moved (the level
+// and the long list's rows), A (refused when IsItemAvailable says the level
+// isn't; else the type list Go(6, 4), the LSD's types Go(7, 5), the tire's
+// options Go(8, 6) or the confirm dialog: equip, money short or buy; then
+// Push(5)) or B (Pop, +9732, the menu reset, PlayIntro for category 2, else
+// OpenItems); then MoveLevel. 112-byte frame; MoveLevel's r3.
+uint64_t InputLevels(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                     uint32_t sp, const PageFlags& flags);
 
 // sub_821DD408 TuningScreen::StoreOwnedParts: the screen's owned flags
 // packed into the selected garage car's bitset (c+1904) and the save data's
