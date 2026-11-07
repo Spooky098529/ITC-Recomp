@@ -20,7 +20,7 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "TuningScreen::LevelCount sub_821CC728, TypeCount sub_821CC7B8, PageCursor "
               "sub_821CCD38 (its piece sub_821CCD70 merged), PageItemCount sub_821CCDB0 (its piece "
               "sub_821CCDE8 merged), IsPickOwned sub_821CCE30, MarkOwned sub_821CD498 (its piece "
-              "sub_821CD6C8 merged), TestAndSetWheelFlag sub_821CDF98, SetWheelListEnd "
+              "sub_821CD6C8 merged; no adapter: only OnDialogYes calls it), TestAndSetWheelFlag sub_821CDF98, SetWheelListEnd "
               "sub_821E7DB0 (its piece sub_821E7DE4 merged), InchListEnd sub_821EF288 (its piece "
               "sub_821EF2FC merged); the vinyl editor's set-up SetUpVinylBusyIcon sub_821FE560, "
               "DecalImages::AllLoaded sub_821FE5D8, KeepListTextures sub_821FE7D8 (these three "
@@ -43,7 +43,8 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "movies' plain C++; Color::HsvToRgb sub_8224AB50; the current choices "
               "SetAeroAvailability sub_821DE160 and SetCurrentChoice sub_821E1DB0 (its piece "
               "sub_821E203C merged; Params::GetCarParts and AeroParts::Get82 by their plain C++ "
-              "with --native_car_specs); the decal images' loads LoadDecalImages sub_821FEE10 with "
+              "with --native_car_specs; no adapter: only OnDialogYes calls it in play); the decal "
+              "images' loads LoadDecalImages sub_821FEE10 with "
               "DecalImages::Request sub_821FE830 and Load sub_821F6D40 under it (these two with "
               "no adapters: only LoadDecalImages calls them; VirtualAlloc and Archive::Load through "
               "their overrides); the input pages Menu::StepList sub_821CE1D0, LeaveEditor "
@@ -396,7 +397,6 @@ ITC_TUNING_PAGES(821CC7B8, TuningPagesTypeCount)
 ITC_TUNING_PAGES(821CCD38, TuningPagesPageCursor)
 ITC_TUNING_PAGES(821CCDB0, TuningPagesPageItemCount)
 ITC_TUNING_PAGES(821CCE30, TuningPagesIsPickOwned)
-ITC_TUNING_PAGES(821CD498, TuningPagesMarkOwned)
 ITC_TUNING_PAGES(821CDF98, TuningPagesTestAndSetWheelFlag)
 ITC_TUNING_PAGES(821E7DB0, TuningPagesSetWheelListEnd)
 ITC_TUNING_PAGES(821EF288, TuningPagesInchListEnd)
@@ -418,7 +418,6 @@ ITC_TUNING_PAGES(821FE628, TuningPagesUpdateImages)
 ITC_TUNING_PAGES(82208738, TuningPagesUnloadAll)
 
 ITC_TUNING_PAGES(821DE160, TuningPagesSetAeroAvailability)
-ITC_TUNING_PAGES(821E1DB0, TuningPagesSetCurrentChoice)
 
 ITC_TUNING_PAGES(821FEE10, TuningPagesLoadDecalImages)
 ITC_TUNING_PAGES(821CE1D0, TuningPagesStepList)
@@ -450,3 +449,8 @@ ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
 // harness's): OnStickerDialogYes sub_821FA230, and under it SaveAreaDecals
 // sub_821F6CE8, StoreStickers sub_821F8598 with GarageDecal sub_821F84C8; under
 // OnDialogYes DecalImages::SwapKept sub_821FE798.
+
+// No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
+// OnDialogYes, is native and calls their plain C++; the register steps above
+// are the harness's): MarkOwned sub_821CD498, SetCurrentChoice sub_821E1DB0
+// (sub_821F1780, recompiled and not seen in play, calls the original).
