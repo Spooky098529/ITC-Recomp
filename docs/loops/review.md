@@ -13,6 +13,8 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
+- Third `tuning-screen.md` migration (437e52fa..a28478a4): 23 more, `SetInteriorPair` `sub_821CCC50` Native. The functions calling into the stand have their cases in the `car_makers` harness (`TuningStand`). For review: inputs shaped as in play (the garage car's paint pick -2 to 5, the last camera pick +25072 a preset 14 to 64 or -1, the garage list walked through distinct nodes); callees never seen in play through the guest (`HighlightItem`, `HighlightSelected`, `SetCaliper`, `GarageStage::SetChoice`, `PreviewParts`, `RefitAxles`, `SetAero2`, `SetDoorKind`, `SetAccessory`, `SetColor`, `ClearLightKit`). Corrections: `PreviewItem`'s reads from frame +120 on land on the original's register saves (the harness keeps those indexes in range); `SetNodeText` is varargs too (stores r6-r10 into the caller's +40 to +79, left out of `SetStateTexts`' comparison).
+
 - Second `tuning-screen.md` migration (e2ef9640..03d785be, harness file `src/harnesses/tuning_screen_pages.cpp` laying movies 2 and 13 with their animations, nodes and a string table): 24 more, `HideTireMarks` `sub_821DFB20` and `PlaceStateNodes` `sub_82202C08` Native. UI movie calls go through their overrides from each original's frame; SetText's unset varargs pass 0, their parameter area left out of the comparison; the int-to-float doublewords at frame +80 (`PlaceStateNodes`, `LayOutItems`, `Command7`, `Command15`, `Command18`) copied as the originals leave them.
 
 - The user's calls (2026-11-07): the run's limit raised to 8 subsystems; the validation agent's race is `attract_race.sh 180` (the harnesses took ~85 s of the 120).

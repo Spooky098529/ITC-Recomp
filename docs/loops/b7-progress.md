@@ -162,7 +162,13 @@ file's history. What's left to see in a drive, from every run:
   `FillPartRows` and the rest). Validated `itc_3849` (race 92 s at
   180, the harnesses ~85.5 s; 0 errors, every harness 0 differing, 24 of
   24 harness lines; 7 in the replay `itc_3850` (ok), 17 to drive). Third
-  migration agent running.
+  migration 437e52fa..a28478a4 (23 more: the stand's calls, the category
+  bar and pages, the items, part rows, texts, `SetCarStats`,
+  `DecalCommand`, `Command8`, `PreviewItem`, `RestoreStand`;
+  `SetInteriorPair`'s adapter removed; 1,450 cases, the stand's in the
+  `car_makers` harness; races 37-38 s, 0 errors, all harnesses 0
+  differing; subagents for batches 2-5, one at a time); left:
+  `RefreshMenu` `sub_821D8978` (1,319 lines). Validation agent running.
 
 ## Done
 
