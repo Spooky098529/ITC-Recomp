@@ -231,7 +231,16 @@ goes in `src/` as overrides), American English.
   (`power-graph.md`, 4 of 4 in play), the car objects' makers
   (`car-makers.md`, 16 of 24 in play) and the front end's menu helpers
   (`menu-helpers.md`, 2 of 2) native (ours 4,230 -> 4,252) and stopped
-  at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  at its limit; its thirty-sixth run (the same branch, 2026-11-06 to
+  07, limit raised to 8 by the user) made the race's update
+  (`race-update.md`, 7 of 7, with the scenery's set-up and
+  `XPhysicalSize` from our allocation layer), the stand models
+  (`stand-models.md`, 28 of 28 in play), the build screen
+  (`build-screen.md`, 59 of 60, with `CarScene::Update`) and the tuning
+  screen (`tuning-screen.md`, 82 of 82 in play, with
+  `GarageStage::Draw`) native (ours 4,252 -> 4,476) and halted at the
+  tuning screen's fifth validation (an existing `car_makers` harness
+  case crashing in the all-harnesses run). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the

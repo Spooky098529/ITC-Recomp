@@ -184,7 +184,14 @@ file's history. What's left to see in a drive, from every run:
   replay); `UpdateStand`; `RefreshMovie13`; 4 adapters removed; 190
   cases; race 37 s, 0 errors, all harnesses 0 differing; no subagents);
   left: none in the file; 7 removable adapters in
-  `front-end-car-draw.md` (a cleanup lead). Validation agent running.
+  `front-end-car-draw.md` (a cleanup lead, not started). Validation
+  `itc_4236` halted: the all-harnesses run crashed in `car_makers`'
+  `TuningScreen::SetUpCarData` `sub_821DF2F8` group (a guest read of
+  `0x00000004` 12 ms after its harness print, looping until the hard
+  exit; no race); 4 of 10 harness lines, the other six's harnesses
+  never ran. Alone (`car_makers,tuning_screen`, `itc_4237`) both pass
+  at 0 differing with all their lines; the replay `itc_4238` ran 5 of
+  the 10 (ok).
 
 ## Done
 
@@ -268,3 +275,21 @@ file's history. What's left to see in a drive, from every run:
   work left 1966 (wrapped 57, known 447, unknown 1462).
 - After its third migration and validation (`itc_4197`): ours 4469,
   work left 1944 (wrapped 57, known 425, unknown 1462).
+- After its fourth and fifth migrations: ours 4476, work left 1937
+  (wrapped 57, known 418, unknown 1462).
+
+## Stopped
+
+2026-11-07, at the tuning screen's fifth validation (`itc_4236`): the
+all-harnesses run crashed in `car_makers`' `TuningScreen::SetUpCarData`
+(`sub_821DF2F8`) group, an existing case, after 83 s of harnesses (a
+guest read of `0x00000004` on thread `0xF800001C`, repeated until the
+hard exit). Six of the ten functions validated (`UpdateStand`,
+`RefreshMovie13` and the four adapters removed) had no harness line in
+that run. `car_makers` and `tuning_screen` alone pass, so the crash
+depends on the state earlier harness groups leave (seed-shift
+fragilities like those the fifth migration met in `RestoreStand` and
+`FillPartRows`); to debug with logs. Not done: the tuning screen's
+recording as finished, the cleanup lead (7 removable adapters in
+`front-end-car-draw.md`). 4 subsystems of the 8 started. Nothing
+uncommitted. The user reviews and merges.
