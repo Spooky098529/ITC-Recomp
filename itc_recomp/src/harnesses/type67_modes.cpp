@@ -24,23 +24,33 @@
 // compared with Floats (two NaNs match).
 
 #include "harness.h"
+#include "exit_table.h"
+#include "scene_pools_take.h"
 
 #include "base/flags.h"
+#include "accessories/accessories.h"
 #include "archive/archive.h"
+#include "c_runtime/exit.h"
+#include "car_models/scene_fill.h"
 #include "base/log.h"
 #include "cameras/cameras.h"
 #include "car_specs/car_specs.h"
 #include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
 #include "hooks/archive.h"
+#include "hooks/car_models.h"
 #include "hooks/heap.h"
 #include "hooks/type67_modes.h"
 #include "hooks/ui_movies.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
+#include "models/model.h"
 #include "mode_tick/mode_tick.h"
 #include "race_setup/race_setup.h"
+#include "scene/scene.h"
+#include "scene_loaders/pools.h"
 #include "type67_modes/type67_modes.h"
 #include "ui_movies/game.h"
 
@@ -49,6 +59,8 @@
 #include <bit>
 #include <functional>
 #include <limits>
+#include <mutex>
+#include <optional>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_type67_modes);
@@ -2569,6 +2581,228 @@ void TearDowns(Context& h, const Block& world) {
 
 }  // namespace
 
+// --- StandScene::Create: the whole of it, its callees' worlds as the game
+// has them: the viewports, the scene, the first set and the accessories'
+// set none (made), the stand's holder none (made, with its slots, stages
+// and the second set's fill) or, now and then, one in a block (only the
+// viewports and the scene made), the cars 0 to 3. Archive::Load's calls
+// recorded. Compared: the calls (the presets' blocks by content, then
+// freed), every block made with the pointers into the case's blocks made
+// offsets (the viewports, the scene, the sets, the second and first sets'
+// objects and records, the holder, its slots and stages), the providers
+// (scene_pools_take::TakeProvider), the part files' pages, the globals,
+// the palette and its two words, the viewports' vectors and near plane,
+// the stages' constants, the exit table's additions and r3; then all freed
+// and the globals put back. ---
+
+void StandSceneCreates(Context& h) {
+  namespace pt = scene_pools_take;
+  namespace sl = scene_loaders;
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
+      !hooks::CarModelsSceneSetUpNative()) {
+    ITC_LOG_WARN("harness: type67_modes: the allocation layer, the archive's queue, the models' "
+                 "lifetime or memcpy isn't native: StandScene::Create's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> exits(c_runtime::ExitMutex());
+  std::lock_guard<std::recursive_mutex> blocks(models::MemoryBlocksMutex());
+  constexpr uint32_t kPalette = 0x826C5110, kPaletteBytes = 1024, kWords = 0x82601854;
+  constexpr uint32_t kVectors = 0x826C2CF0, kVectorBytes = 0x34, kNear = 0x826BAC00 + 384;
+  constexpr uint32_t kConstants = 0x8296B950, kConstantBytes = 0x350, kAmbient = 0x8265ED00;
+  constexpr uint32_t kOwn[] = {452, 4112, 1152, 1176, 1200, 1224};
+  constexpr uint32_t kMarker = 0x50414745;
+  const uint32_t globals[] = {t67::kStandHolder, cameras::kViewports, scene::kScene,
+                              scene::kFirstSet, accessories::kSet};
+  struct Saved {
+    uint32_t address, bytes;
+    std::vector<uint8_t> data;
+  };
+  std::vector<Saved> saved;
+  for (const uint32_t g : globals) saved.push_back({g, 4, Read(base, g, 4)});
+  for (const auto& [at, bytes] : std::vector<std::pair<uint32_t, uint32_t>>{
+           {kPalette, kPaletteBytes}, {kWords, 8}, {kVectors, kVectorBytes}, {kNear, 4},
+           {kConstants, kConstantBytes}, {kAmbient, 16}}) {
+    saved.push_back({at, bytes, Read(base, at, bytes)});
+  }
+  auto restore = [&] {
+    for (const Saved& s : saved) Write(base, s.address, s.data.data(), s.bytes);
+  };
+  const Block world(0x1000);
+  if (!world.address) return;
+  Random random(0x82180B00);
+  Results results("StandScene::Create (sub_82180B00)");
+  for (int c = 0; c < 12; c++) {
+    const uint64_t seed = random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      restore();
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      WriteRandom(base, world.address, world.bytes, r);
+      WriteRandom(base, t.r1.u32 - 0x1000, 0x1000, r);
+      const bool held = c % 4 == 3;
+      guest::StoreU32(base, t67::kStandHolder, held ? world.address : 0);
+      guest::StoreU32(base, scene::kScene, 0);
+      guest::StoreU32(base, scene::kFirstSet, 0);
+      guest::StoreU32(base, accessories::kSet, 0);
+      const uint32_t mark = exit_table::Mark(base);
+      std::optional<ArchiveLoads> loads;
+      loads.emplace(std::vector<int64_t>(64, 7));
+      const uint32_t cars[] = {1, 3, 1, 0, 2, 3};
+      t.r3.u64 = cars[r.Below(6)];
+      if (v == 0) {
+        ITC_FLAG(native_type67_modes) = false;
+        __imp__sub_82180B00(t, base);
+        ITC_FLAG(native_type67_modes) = true;
+      } else {
+        hooks::StandSceneCreate(t, base);
+      }
+      std::vector<uint32_t> calls = loads->calls();
+      loads.reset();
+      // The blocks made, as regions.
+      std::vector<pt::PageRegion> regions;
+      std::vector<std::pair<uint32_t, uint32_t>> made;  // freed after
+      auto add = [&](uint32_t at, uint32_t bytes) {
+        if (at != 0 && memory::IsPages(at)) {
+          regions.push_back({at, bytes});
+          made.push_back({at, bytes});
+        }
+      };
+      const uint32_t viewports = guest::LoadU32(base, cameras::kViewports);
+      add(viewports, 12);
+      if (memory::IsPages(viewports)) {
+        add(guest::LoadU32(base, viewports + 0), 1872);
+        add(guest::LoadU32(base, viewports + 4), 1872);
+      }
+      const uint32_t the_scene = guest::LoadU32(base, scene::kScene);
+      const uint32_t first = guest::LoadU32(base, scene::kFirstSet);
+      add(the_scene, scene::kSceneBytes);
+      add(first, 140);
+      add(guest::LoadU32(base, accessories::kSet), 32);
+      const uint32_t holder = guest::LoadU32(base, t67::kStandHolder);
+      if (!held) {
+        add(holder, 24);
+        for (uint32_t i = 0; memory::IsPages(holder) && i < 3; i++) {
+          const uint32_t slot = guest::LoadU32(base, holder + 4 * i);
+          add(slot, 4);
+          if (memory::IsPages(slot)) {
+            const uint32_t stage = guest::LoadU32(base, slot);
+            add(stage, t67::kGarageStageBytes);
+          }
+        }
+      }
+      std::vector<std::pair<int, uint32_t>> objects;  // first-set pool (-1 second), object
+      uint32_t records = 0;
+      if (memory::IsPages(the_scene)) {
+        for (uint32_t pool = 0; pool < 8; pool++) {
+          for (uint32_t node = guest::LoadU32(base, the_scene + 4944 + 12 * pool), n = 0;
+               node != 0 && n < 16; node = guest::LoadU32(base, node + 8), n++) {
+            if (memory::IsPages(node)) {
+              add(node, car_models::kSecondSetBytes[pool]);
+              objects.push_back({-1, node});
+            }
+          }
+        }
+      }
+      if (memory::IsPages(first)) {
+        records = guest::LoadU32(base, first + 52);
+        add(records, 80 * (guest::LoadU32(base, first + 12) + guest::LoadU32(base, first + 40)));
+        for (uint32_t pool = 0; pool < 7; pool++) {
+          for (uint32_t node = guest::LoadU32(base, first + 56 + 12 * pool), n = 0;
+               node != 0 && n < 16; node = guest::LoadU32(base, node + 8), n++) {
+            if (memory::IsPages(node)) {
+              add(node, sl::kPoolObjectBytes[pool]);
+              objects.push_back({int(pool), node});
+            }
+          }
+        }
+      }
+      // The loads: the presets' blocks by content (then freed), the part
+      // files' pages as markers (freed from their slots below).
+      out[v].Word(uint32_t(calls.size()));
+      std::vector<uint32_t> presets;
+      for (size_t k = 0; k + 6 <= calls.size(); k += 6) {
+        if (calls[k + 2] == t67::kOnPresetsLoaded && memory::IsPages(calls[k + 1])) {
+          out[v].Bytes(Read(base, calls[k + 1], 0x400));
+          presets.push_back(calls[k + 1]);
+          calls[k + 1] = kMarker;
+        }
+      }
+      for (uint32_t& w : calls) {
+        bool in_region = false;
+        for (size_t k = 0; k < regions.size(); k++) {
+          if (w >= regions[k].start && w - regions[k].start < regions[k].bytes + 16) {
+            w = 0xB0000000u + (uint32_t(k) << 20) + (w - regions[k].start);
+            in_region = true;
+            break;
+          }
+        }
+        if (!in_region && w != 0 && memory::IsPages(w)) w = kMarker;
+      }
+      for (const uint32_t w : calls) out[v].Word(w);
+      if (memory::IsPages(the_scene)) {
+        for (const uint32_t at : kOwn) {
+          const uint32_t pages = guest::LoadU32(base, the_scene + at + 16);
+          if (pages != 0 && memory::IsPages(pages)) {
+            out[v].Word(kMarker);
+            memory::FreePages(pages);
+            guest::StoreU32(base, the_scene + at + 16, kMarker);
+          } else {
+            out[v].Word(pages);
+          }
+        }
+        for (const uint32_t provider : scene::kAssetsProviders) {
+          pt::TakeProvider(base, the_scene + scene::kAssets + provider, out[v]);
+        }
+        for (const uint32_t model : scene::kAssetsModels) {
+          pt::TakeProvider(base, the_scene + scene::kAssets + model + models::kModelTextures,
+                           out[v]);
+        }
+      }
+      for (const auto& [pool, object] : objects) {
+        if (pool >= 0) {
+          for (const uint32_t offset : pt::PoolProviders(uint32_t(pool))) {
+            pt::TakeProvider(base, object + offset, out[v]);
+          }
+        }
+      }
+      out[v].Word(uint32_t(made.size()));
+      for (const auto& [at, bytes] : made) {
+        out[v].Bytes(pt::Normalized(base, regions, at, bytes));
+      }
+      out[v].Bytes(pt::Normalized(base, regions, world.address, world.bytes));
+      for (const uint32_t g : globals) {
+        out[v].Bytes(pt::Normalized(base, regions, g, 4));
+      }
+      out[v].Bytes(pt::Normalized(base, regions, t.r1.u32 - 176 + 80, 48));
+      out[v].Bytes(Read(base, kPalette, kPaletteBytes));
+      out[v].Bytes(Read(base, kWords, 8));
+      out[v].Bytes(Read(base, kVectors, kVectorBytes));
+      out[v].Word(guest::LoadU32(base, kNear));
+      out[v].Bytes(Read(base, kConstants, kConstantBytes));
+      out[v].Bytes(Read(base, kAmbient, 16));
+      exit_table::Take(base, mark, out[v]);
+      // r3: a block made (its region and offset), else its offset from r1.
+      uint32_t r3 = t.r3.u32 - t.r1.u32;
+      for (size_t k = 0; k < regions.size(); k++) {
+        if (t.r3.u32 >= regions[k].start && t.r3.u32 - regions[k].start < regions[k].bytes) {
+          r3 = 0xB0000000u + (uint32_t(k) << 20) + (t.r3.u32 - regions[k].start);
+          break;
+        }
+      }
+      out[v].Word(r3);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (const auto& [at, bytes] : made) memory::FreePages(at);
+      for (const uint32_t p : presets) memory::FreePages(p);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  restore();
+  results.Report();
+}
+
 void Type67Modes(Context& h) {
   const Block object(kObjectBytes);
   const Block world(kWorldBytes);
@@ -2593,6 +2827,7 @@ void Type67Modes(Context& h) {
   ControllerUpdate(h, world);
   PollTeardown(h);
   TearDowns(h, world);
+  StandSceneCreates(h);
 }
 
 }  // namespace harness

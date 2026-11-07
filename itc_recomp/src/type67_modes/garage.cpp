@@ -127,6 +127,40 @@ bool StandSlotInit(uint8_t* base, uint32_t slot, uint32_t index, uint32_t sp,
   return true;
 }
 
+uint64_t StandSceneCreate(uint8_t* base, uint32_t cars, uint32_t sp, const LoadCall& load,
+                          const StandSceneCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82180B00 StandScene::Create");
+  const uint32_t frame = sp - kStandSceneCreateFrame;
+  StoreU32(base, frame, sp);
+  calls.viewports_init(frame);
+  const uint64_t created = calls.scene_create(frame);
+  if (LoadU32(base, kStandHolder) != 0) {
+    return created;
+  }
+  const uint32_t holder = memory::AllocPages(24, 4096);
+  StoreU32(base, kStandHolder, holder);
+  StoreU32(base, holder + 12, 0);
+  StoreU32(base, LoadU32(base, kStandHolder) + 16, 0);
+  StoreU32(base, LoadU32(base, kStandHolder) + 20, 0);
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t slot = memory::AllocPages(4, 4096);
+    StoreU32(base, 4 * i + LoadU32(base, kStandHolder), slot);
+    StandSlotInit(base, LoadU32(base, 4 * i + LoadU32(base, kStandHolder)), i, frame, load);
+  }
+  const uint32_t record = frame + 80;
+  scene::SetUpConstruct(base, record);
+  for (uint32_t offset = 0; offset < 40; offset += 4) {
+    StoreU32(base, record + offset, 0);
+  }
+  StoreU32(base, record + 40, 0);
+  for (const uint32_t offset : {4u, 8u, 12u, 20u, 24u, 28u}) {
+    StoreU32(base, record + offset, cars);
+  }
+  StoreU32(base, record + 32, 0);
+  calls.scene_set_up(LoadU32(base, scene::kScene), record, frame);
+  return record;
+}
+
 std::optional<uint64_t> StandSceneRelease(uint8_t* base) {
   const uint32_t holder = LoadU32(base, kStandHolder);
   if (!memory::IsPages(holder)) {

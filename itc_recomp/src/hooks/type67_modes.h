@@ -96,6 +96,12 @@ void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base);
 // sub_82180738 (false where a block isn't the layer's pages).
 void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base);
 bool StandSceneRelease(PPCContext& ctx, uint8_t* base);
+// StandScene::Create sub_82180B00 (r3 the cars; r3 as the original leaves
+// it): over the layer with the archive's native queue only (the adapter
+// checks); Viewports::Init and CarScene::Create guest calls to their
+// overrides, CarScene::SetUp through its register step (its plain C++ where
+// its checks hold).
+void StandSceneCreate(PPCContext& ctx, uint8_t* base);
 
 // The dialogs' confirm (r3 the dialog): Type6Dialog::OpenConfirm
 // sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, Dialog::DrawWaiting

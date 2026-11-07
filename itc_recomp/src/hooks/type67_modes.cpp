@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "hooks/archive.h"
+#include "hooks/car_models.h"
 #include "hooks/heap.h"
 #include "hooks/strings_and_font.h"
 #include "memory/c_runtime_heap.h"
@@ -58,7 +59,9 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "GarageCamera::LoadPresets sub_821802D8 (Archive::Load through its plain C++) and "
               "StandScene::Release sub_82180738; Quaternion::FromAngles sub_8217C120 and "
               "GarageCamera::Reset sub_8217D888 and GarageLights::Init sub_8217D3C8 with the "
-              "translated code's float steps; StandSlot::Init sub_82180AA0 with "
+              "translated code's float steps; StandScene::Create sub_82180B00 (Viewports::Init "
+              "and CarScene::Create guest calls, CarScene::SetUp's register step); "
+              "StandSlot::Init sub_82180AA0 with "
               "GarageStage::Init sub_82180968 and GarageCamera::Init sub_82180918; the dialogs' "
               "Type6Dialog::OpenConfirm sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, "
               "Dialog::DrawWaiting sub_82241C18, Dialog::OpenConfirmStep sub_822325E0, "
@@ -376,6 +379,33 @@ void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base) {
 void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base) {
   SetArchiveSerial(ctx, t67::GarageCameraLoadPresets(base, ctx.r3.u32, NativeArchiveLoad(base)));
 }
+void StandSceneCreate(PPCContext& ctx, uint8_t* base) {
+  const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+  auto guest = [&](uint32_t frame, uint32_t link, void (*target)(PPCContext&, uint8_t*)) {
+    ctx.r1.u64 = frame;
+    ctx.lr = link;
+    target(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  t67::StandSceneCalls calls;
+  calls.viewports_init = [&](uint32_t frame) { return guest(frame, 0x82180B14, sub_820AB358); };
+  calls.scene_create = [&](uint32_t frame) { return guest(frame, 0x82180B18, sub_820C8A50); };
+  calls.scene_set_up = [&](uint32_t scene, uint32_t record, uint32_t frame) {
+    ctx.r3.u64 = scene;
+    ctx.r4.u64 = record;
+    ctx.r5.u64 = 0;
+    return guest(frame, 0x82180BF4, CarModelsSceneSetUp);
+  };
+  ctx.fpscr.disableFlushMode();
+  const uint64_t r3 = t67::StandSceneCreate(base, ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad(base),
+                                            calls);
+  ctx.r1.u64 = stack;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
 bool StandSceneRelease(PPCContext& ctx, uint8_t* base) {
   return Set(ctx, t67::StandSceneRelease(base));
 }
@@ -829,6 +859,17 @@ ITC_TYPE67_MODES(8217D888, GarageCameraReset)
 // the archive's native queue only. GarageStage::Init sub_82180968 and
 // GarageCamera::Init sub_82180918 have no adapters (only StandSlot::Init
 // and GarageStage::Init reach them; the flag switches those).
+// StandScene::Create (from the modes' slot 0, recompiled): over the layer
+// and the archive's native queue only.
+extern "C" REX_FUNC(sub_82180B00) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||
+      !hooks::NativeArchiveQueue()) {
+    __imp__sub_82180B00(ctx, base);
+    return;
+  }
+  hooks::StandSceneCreate(ctx, base);
+}
 extern "C" REX_FUNC(sub_82180AA0) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||

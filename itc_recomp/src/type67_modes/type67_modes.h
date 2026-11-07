@@ -349,6 +349,30 @@ uint64_t StandScenePollTeardown(uint8_t* base, uint32_t sp, const Calls& calls);
 // original). r3 the holder's free's.
 std::optional<uint64_t> StandSceneRelease(uint8_t* base);
 
+// sub_82180B00 StandScene::Create's callees that aren't called as plain C++
+// here: Viewports::Init and CarScene::Create (guest calls to their
+// overrides from the frame at `frame`; their r3), and CarScene::SetUp on
+// (the scene, the record) from the frame at `frame` (its plain C++ where
+// its adapter would run it; its r3).
+struct StandSceneCalls {
+  std::function<uint64_t(uint32_t frame)> viewports_init;
+  std::function<uint64_t(uint32_t frame)> scene_create;
+  std::function<uint64_t(uint32_t scene, uint32_t record, uint32_t frame)> scene_set_up;
+};
+constexpr uint32_t kStandSceneCreateFrame = 176;
+// sub_82180B00 StandScene::Create (r3 `cars`, the pools' count): its frame
+// at `sp` - 176 (the back chain written); Viewports::Init, CarScene::Create;
+// when the holder [0x826D83E0] is 0: a 24-byte holder (the layer's pages,
+// as VirtualAlloc's) there, its +12, +16, +20 = 0, then three 4-byte slots
+// (the layer's pages) at its +0, +4, +8, each StandSlot::Init'ed (its plain
+// C++, `load` the presets' Archive::Load); the 48-byte set-up record at the
+// frame's +80 (SceneSetUp::SceneSetUp's plain C++, +0 to +43 zeroed; +4,
+// +8, +12, +20, +24, +28 = `cars`), CarScene::SetUp([0x826C2E44], the
+// record) and the empty sub_82106540 (not called). r3 as the original leaves
+// it: the record's address, or CarScene::Create's r3 with the holder made.
+uint64_t StandSceneCreate(uint8_t* base, uint32_t cars, uint32_t sp, const LoadCall& load,
+                          const StandSceneCalls& calls);
+
 // --- The dialogs' confirm (dialogs.cpp): r3 = the dialog; `sp` the
 // caller's stack pointer; each returns r3 as the original leaves it. ---
 
