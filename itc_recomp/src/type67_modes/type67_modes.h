@@ -294,5 +294,14 @@ void QuaternionFromAngles(uint8_t* base, uint32_t out, double f1, double f2, dou
 // built in its frame at `frame` (its r1 after its stwu) first.
 void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame);
 constexpr uint32_t kGarageCameraResetFrame = 304;
+// sub_8217D3C8 GarageLights::Init: the 11 light records (96 bytes each)
+// copied from the table at 0x82635950 to +16, the ambient (0.08 three
+// times, 1.0) to +1072 and 0x8265ED00, and the scene light constants
+// (0x8296B950 to 0x8296BC9F: three lights, four spots with their normalized
+// directions and cone cosines) written as GarageStage::SetLights does,
+// through its frame at `frame` (its r1 after its stwu).
+void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame);
+constexpr uint32_t kGarageLightsFrame = 320;
+constexpr uint32_t kGarageLightsTable = 0x82635950;
 
 }  // namespace type67_modes

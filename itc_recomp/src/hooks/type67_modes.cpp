@@ -51,7 +51,8 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "ControllerOptions::Draw sub_821C7F28 (the pages' handlers guest calls); "
               "GarageCamera::LoadPresets sub_821802D8 (Archive::Load through its plain C++) and "
               "StandScene::Release sub_82180738; Quaternion::FromAngles sub_8217C120 and "
-              "GarageCamera::Reset sub_8217D888 with the translated code's float steps) "
+              "GarageCamera::Reset sub_8217D888 and GarageLights::Init sub_8217D3C8 with the "
+              "translated code's float steps) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -336,6 +337,12 @@ void GarageCameraReset(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = camera + 192;
   ctx.fpscr.disableFlushMode();
 }
+void GarageLightsInit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t frame = ctx.r1.u32 - t67::kGarageLightsFrame;
+  t67::GarageLightsInit(base, ctx.r3.u32, frame);
+  ctx.r3.u64 = ((ctx.r1.u64 & 0xFFFFFFFF00000000ull) | frame) + 96;
+  ctx.fpscr.disableFlushMode();
+}
 
 }  // namespace hooks
 
@@ -465,3 +472,5 @@ ITC_TYPE67_FREES(82180738, StandSceneRelease)
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).
 ITC_TYPE67_MODES(8217C120, QuaternionFromAngles)
 ITC_TYPE67_MODES(8217D888, GarageCameraReset)
+// GarageLights::Init (from GarageStage::Init, recompiled).
+ITC_TYPE67_MODES(8217D3C8, GarageLightsInit)

@@ -102,5 +102,8 @@ bool StandSceneRelease(PPCContext& ctx, uint8_t* base);
 // after the camera + 192, as its FromAngles call leaves it).
 void QuaternionFromAngles(PPCContext& ctx, uint8_t* base);
 void GarageCameraReset(PPCContext& ctx, uint8_t* base);
+// GarageLights::Init sub_8217D3C8 (r3 the lights; r3 left as the original
+// leaves it: its frame + 96).
+void GarageLightsInit(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

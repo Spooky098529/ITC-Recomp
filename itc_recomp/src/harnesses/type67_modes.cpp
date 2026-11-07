@@ -986,6 +986,75 @@ void GarageCamera(Context& h, const Block& world) {
   }
 }
 
+// GarageLights::Init: the lights (random words) at the world's +0x1000, the
+// globals it writes (0x8265ED00 and the scene light constants) random words
+// first; the table it copies (0x82635950) the game's in some cases, else
+// random floats with zero, NaN and infinite spot directions (put back
+// after). The lights, the globals, the frame's +80 to +127 and r3 compared.
+void GarageLights(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  Results results("GarageLights::Init (sub_8217D3C8)");
+  constexpr uint32_t kTable = t67::kGarageLightsTable, kTableBytes = 11 * 96;
+  constexpr uint32_t kConstants = 0x8296B950, kConstantBytes = 0x350;
+  std::vector<uint8_t> table = Read(base, kTable, kTableBytes);
+  std::vector<uint8_t> constants = Read(base, kConstants, kConstantBytes);
+  std::vector<uint8_t> ambient = Read(base, 0x8265ED00, 16);
+  const uint32_t frame = CallContext(h).r1.u32 - t67::kGarageLightsFrame;
+  const uint32_t lights = world.address + 0x1000;
+  for (int c = 0; c < 16; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(uint64_t(c) * 271 + 0x8217D3C8);
+      WriteRandom(base, lights, 1088, r);
+      WriteRandom(base, kConstants, kConstantBytes, r);
+      WriteRandom(base, 0x8265ED00, 16, r);
+      WriteRandom(base, frame, t67::kGarageLightsFrame, r);
+      Write(base, kTable, table.data(), kTableBytes);
+      if (c >= 2) {
+        for (uint32_t i = 0; i < kTableBytes; i += 4) {
+          guest::StoreFloat(base, kTable + i, float(AngleOf(r)));
+        }
+        // A spot's direction (q + 16, the table's +288 + 96i): zero, tiny,
+        // NaN or infinite in some.
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t d = kTable + 288 + 16 + 96 * i;
+          switch (r.Below(4)) {
+            case 0:
+              for (uint32_t k = 0; k < 3; k++) guest::StoreU32(base, d + 4 * k, 0);
+              break;
+            case 1:
+              for (uint32_t k = 0; k < 3; k++) guest::StoreU32(base, d + 4 * k, r.Below(0x800000));
+              break;
+            default:
+              break;
+          }
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = lights;
+      if (v == 0) {
+        ITC_FLAG(native_type67_modes) = false;
+        __imp__sub_8217D3C8(t, base);
+        ITC_FLAG(native_type67_modes) = true;
+      } else {
+        hooks::GarageLightsInit(t, base);
+      }
+      out[v].Bytes(Read(base, lights, 16));
+      out[v].Floats(base, lights + 16, (1088 - 16) / 4);
+      out[v].Floats(base, kConstants, kConstantBytes / 4);
+      out[v].Floats(base, 0x8265ED00, 4);
+      out[v].Floats(base, frame + 80, 12);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  Write(base, kTable, table.data(), kTableBytes);
+  Write(base, kConstants, constants.data(), kConstantBytes);
+  Write(base, 0x8265ED00, ambient.data(), 16);
+  results.Report();
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -1003,6 +1072,7 @@ void Type67Modes(Context& h) {
   GuestCallHandlers(h, world);
   Garage(h);
   GarageCamera(h, world);
+  GarageLights(h, world);
 }
 
 }  // namespace harness

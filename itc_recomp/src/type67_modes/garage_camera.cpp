@@ -263,4 +263,99 @@ void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
   QuaternionFromAngles(base, camera + 192, zero, zero, zero, f);
 }
 
+void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8217D3C8 GarageLights::Init");
+  pf::Mode mode;
+  const uint32_t f = frame;
+  // The 11 records (96 bytes each) from the table, a doubleword at a time.
+  for (uint32_t i = 0; i < 11 * 96; i += 8) {
+    StoreU64(base, lights + 16 + i, LoadU64(base, kGarageLightsTable + i));
+  }
+  // The ambient (0.08, 0.08, 0.08, 1.0) through the frame to +1072 and
+  // 0x8265ED00.
+  mode.Scalar();
+  const double ambient = Lfs(base, 0x82002A1C);
+  const double one = Lfs(base, 0x82000A30);
+  Stfs(base, f + 80, ambient);
+  Stfs(base, f + 84, ambient);
+  Stfs(base, f + 88, ambient);
+  Stfs(base, f + 92, one);
+  for (uint32_t i = 0; i < 16; i += 8) {
+    StoreU64(base, lights + 1072 + i, LoadU64(base, f + 80 + i));
+  }
+  for (uint32_t i = 0; i < 16; i += 8) {
+    StoreU64(base, 0x8265ED00 + i, LoadU64(base, lights + 1072 + i));
+  }
+  // The three lights' constants.
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t light = lights + 32 + 96 * i;
+    for (uint32_t w = 0; w < 16; w += 8) {
+      StoreU64(base, 0x8296B950 + 16 * i + w, LoadU64(base, light + w));
+      StoreU64(base, 0x8296B980 + 16 * i + w, LoadU64(base, light + 16 + w));
+      StoreU64(base, 0x8296B9B0 + 16 * i + w, LoadU64(base, light + 32 + w));
+    }
+  }
+  // The four spots (q = +304 + 96i).
+  mode.Vector();
+  const Vec half = pf::I(simde_mm_mul_ps(simde_mm_cvtepi32_ps(simde_mm_set1_epi32(1)),
+                                         simde_mm_castsi128_ps(simde_mm_set1_epi32(0x3F000000))));
+  const Vec zeros = simde_mm_setzero_si128();
+  mode.Scalar();
+  Stfs(base, f + 108, Lfs(base, 0x82009EB4));
+  const double radians = Lfs(base, 0x82002948), scale = Lfs(base, 0x82001BE4);
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t q = lights + 304 + 96 * i, at = 16 * i;
+    mode.Scalar();
+    Stfs(base, f + 124, one);
+    Stfs(base, f + 92, one);
+    auto cosine = [&](uint32_t address) {
+      mode.Scalar();
+      const double angle = double(float(double(float(Lfs(base, address) * scale)) * radians));
+      const double c = c_runtime::Cos(angle);
+      mode.Scalar();
+      return c;
+    };
+    const double c0 = double(float(cosine(q + 64)));
+    const double c1 = double(float(cosine(q + 68)));
+    const double c2 = cosine(q + 68);
+    const double c3 = cosine(q + 64);
+    const double difference = double(float(c0 - c1));
+    Stfs(base, f + 100, double(float(c2)));
+    const Vec v12 = pf::Lvx(base, q + 16);
+    mode.Vector();
+    const Vec v0 = pf::I(simde_mm_dp_ps(pf::F(v12), pf::F(v12), 0xEF));
+    const uint64_t p0 = LoadU64(base, q + 80), p1 = LoadU64(base, q + 88);
+    StoreU64(base, f + 112, p0);
+    StoreU64(base, f + 120, p1);
+    mode.Scalar();
+    Stfs(base, f + 104, double(float(one / difference)));
+    Stfs(base, f + 96, double(float(c3)));
+    StoreU64(base, 0x8296B9E0 + at, LoadU64(base, q));
+    mode.Vector();
+    Vec v13 = pf::I(simde_mm_div_ps(simde_mm_set1_ps(1), simde_mm_sqrt_ps(pf::F(v0))));
+    const Vec v9 = pf::Mul(v0, half);
+    const Vec equal = pf::I(simde_mm_cmpeq_ps(pf::F(v0), pf::F(zeros)));
+    StoreU64(base, 0x8296B9E0 + at + 8, LoadU64(base, q + 8));
+    const Vec v8 = pf::Mul(v13, v13);
+    // vnmsubfp: -(v9 v8 - 0.5), one Newton step.
+    const Vec v10 = pf::I(simde_mm_xor_ps(pf::F(pf::Sub(pf::Mul(v9, v8), half)),
+                                          simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000)))));
+    v13 = pf::Madd(v13, v10, v13);
+    v13 = pf::Mul(v12, v13);
+    const Vec v11 = simde_mm_or_si128(simde_mm_andnot_si128(equal, v13), simde_mm_and_si128(equal, v0));
+    pf::Stvx(base, f + 80, v11);
+    mode.Scalar();
+    StoreU64(base, 0x8296BBE0 + at, LoadU64(base, f + 80));
+    StoreU64(base, 0x8296BBE0 + at + 8, LoadU64(base, f + 88));
+    StoreU64(base, 0x8296BAE0 + at, LoadU64(base, q + 32));
+    StoreU64(base, 0x8296BAE0 + at + 8, LoadU64(base, q + 40));
+    StoreU64(base, 0x8296BB60 + at, LoadU64(base, q + 48));
+    StoreU64(base, 0x8296BB60 + at + 8, LoadU64(base, q + 56));
+    StoreU64(base, 0x8296BC60 + at, LoadU64(base, f + 96));
+    StoreU64(base, 0x8296BA60 + at, LoadU64(base, f + 112));
+    StoreU64(base, 0x8296BC60 + at + 8, LoadU64(base, f + 104));
+    StoreU64(base, 0x8296BA60 + at + 8, LoadU64(base, f + 120));
+  }
+}
+
 }  // namespace type67_modes
