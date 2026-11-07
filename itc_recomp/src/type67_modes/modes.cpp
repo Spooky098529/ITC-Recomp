@@ -238,4 +238,57 @@ void ModeLeaving(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint3
   SetDelegate(base, mode, frame);
 }
 
+uint64_t ModeTearDown(uint8_t* base, bool type7, uint64_t r3, uint32_t mode, uint32_t sp,
+                      const Calls& calls) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_82246098 Type7Mode::TearDown");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82235C18 Type6Mode::TearDown");
+  }
+  const ModeLayout& layout = type7 ? kType7Layout : kType6Layout;
+  const uint32_t frame = sp - kTearDownFrame;
+  const uint32_t answer = uint32_t(r3);
+  ClearAnswer(base, answer);
+  if (int32_t(LoadU32(base, LoadU32(base, mode + kBlock) + layout.phase)) == 5 &&
+      StandScenePollTeardown(base, frame, calls) != 0) {
+    StoreU32(base, LoadU32(base, mode + kBlock) + layout.phase, 6);
+    // Bank 1's cues 0 and 2: when playing (the sound manager's slot 14),
+    // stopped (slot 13); the indexes built in the frame.
+    const uint32_t lr = type7 ? 0x82246114 : 0x82235C94;  // the first slot call's return
+    struct Cue {
+      uint32_t cue, playing, stop, playing_lr, stop_lr;
+    };
+    const Cue cues[2] = {{0, 80, 88, lr, lr + 0x2C}, {2, 96, 104, lr + 0x54, lr + 0x80}};
+    for (const Cue& c : cues) {
+      const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
+      StoreU32(base, frame + c.playing, c.cue);
+      StoreU32(base, frame + c.playing + 4, 1);
+      const uint64_t ask[4] = {manager, frame + c.playing + 4, frame + c.playing, 0};
+      const uint64_t playing = calls.call_set(LoadU32(base, LoadU32(base, manager) + 56), ask, 3,
+                                              frame, c.playing_lr);
+      if ((playing & 0xFF) == 0) {
+        if (c.cue == 0) continue;
+        break;
+      }
+      const uint32_t now = LoadU32(base, menu_sounds::kSoundManager);
+      StoreU32(base, frame + c.stop, 0 + c.cue);
+      StoreU32(base, frame + c.stop + 4, 1);
+      const uint64_t stop[4] = {now, frame + c.stop + 4, frame + c.stop, 0};
+      calls.call_set(LoadU32(base, LoadU32(base, now) + 52), stop, 3, frame, c.stop_lr);
+    }
+  }
+  const uint32_t block = LoadU32(base, mode + kBlock);
+  if (int32_t(LoadU32(base, block + layout.phase)) == 6 &&
+      LoadU32(base, block + layout.phase + 4) == 0) {
+    const uint32_t from = block + layout.answer;
+    const uint32_t high = LoadU32(base, from), low = LoadU32(base, from + 4);
+    StoreU32(base, answer + 0, high);
+    StoreU32(base, answer + 4, low);
+  }
+  if (type7) {
+    Queue(base, mode, 1);  // queued without a dispatch
+  }
+  return r3;
+}
+
 }  // namespace type67_modes

@@ -1948,15 +1948,63 @@ void ControllerUpdate(Context& h, const Block& world) {
 // does nothing). Compared: the block, the frame (its back chain and body,
 // not the saved registers), the globals and r3. ---
 
+constexpr uint32_t kStandBytes = 0x8000;
+constexpr uint32_t kSceneGlobal = 0x826C2E44, kFirstSet = 0x826C2E40, kAccessorySet = 0x826C5510;
+constexpr uint32_t kStandGlobals[4] = {t67::kStandHolder, kSceneGlobal, kFirstSet, kAccessorySet};
+
+// The stand's world in the block at `b` (kStandBytes), as above.
+void LayStand(uint8_t* base, uint32_t b, Random& r) {
+  constexpr uint32_t kScene = 0x1000, kModels = 0x3000, kModelBytes = 0x1400;
+  WriteRandom(base, b, kStandBytes, r);
+  const uint32_t holder = b, scene = b + kScene;
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t slot = b + 0x40 + 4 * i, stage = b + 0x100 + 0x100 * i;
+    guest::StoreU32(base, holder + 4 * i, slot);
+    guest::StoreU32(base, slot, stage);
+    guest::StoreU32(base, stage + 8, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(3));
+  }
+  const uint32_t under_way = r.Below(2), made = r.Below(3) == 0 ? 0 : 1 + r.Below(5);
+  guest::StoreU32(base, holder + 12, under_way);
+  guest::StoreU32(base, holder + 16, uint32_t(int32_t(r.Below(5)) - 1));
+  guest::StoreU32(base, holder + 20, made);
+  bool loading = false;
+  guest::StoreU32(base, scene + 0, 4);
+  guest::StoreU32(base, scene + 48, 4 + r.Below(8));  // above the three Updates
+  for (const uint32_t slot : {84u, 132u, 156u, 268u, 472u, 964u, 4156u, 4764u}) {
+    const uint32_t state = r.Below(12) == 0 ? 2 : r.Below(2);
+    loading |= state == 2;
+    guest::StoreU32(base, scene + slot, state);
+  }
+  for (uint32_t pool = 0; pool < 7; pool++) {
+    guest::StoreU32(base, scene + 4944 + 12 * pool + 8, 0);
+  }
+  guest::StoreU32(base, scene + 5028, b + kModels);
+  guest::StoreU32(base, scene + 5036, 3);
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t model = b + kModels + kModelBytes * k;
+    guest::StoreU32(base, model + 8, k < 2 ? model + kModelBytes : 0);
+    guest::StoreU32(base, model + 16, 3);
+    const uint32_t deferred = r.Below(3) == 0 ? 1 : 0;
+    loading |= deferred != 0;
+    guest::StoreU32(base, model + 5040, deferred);
+  }
+  const uint32_t set = b + 0x7000;
+  for (uint32_t i = 0; i < 4; i++) guest::StoreU32(base, set + 4 * i, 0);
+  guest::StoreU32(base, t67::kStandHolder, holder);
+  guest::StoreU32(base, kSceneGlobal, scene);
+  // The first set only where StartTeardown runs (its StartTeardownA writes
+  // it unchecked; Update's UpdateA then has nothing to do).
+  const bool tear_down = under_way == 0 && (made == 0 || !loading);
+  guest::StoreU32(base, kFirstSet, tear_down ? b + 0x7800 : 0);
+  guest::StoreU32(base, kAccessorySet, set);
+}
+
 void PollTeardown(Context& h) {
   uint8_t* const base = h.base;
-  constexpr uint32_t kBytes = 0x8000, kScene = 0x1000, kModels = 0x3000, kModelBytes = 0x1400;
-  constexpr uint32_t kSceneGlobal = 0x826C2E44, kFirstSet = 0x826C2E40, kSet = 0x826C5510;
-  const Block block(kBytes);
+  const Block block(kStandBytes);
   if (!block.address) return;
-  const uint32_t globals[4] = {t67::kStandHolder, kSceneGlobal, kFirstSet, kSet};
   uint32_t saved[4];
-  for (int i = 0; i < 4; i++) saved[i] = guest::LoadU32(base, globals[i]);
+  for (int i = 0; i < 4; i++) saved[i] = guest::LoadU32(base, kStandGlobals[i]);
   const uint32_t sp = CallContext(h).r1.u32;
   Results results("StandScene::PollTeardown (sub_82179AE8)");
   for (int c = 0; c < 48; c++) {
@@ -1964,49 +2012,8 @@ void PollTeardown(Context& h) {
     for (int v = 0; v < 2; v++) {
       Random r(uint64_t(c) * 4241 + 0x82179AE8);
       const uint32_t b = block.address;
-      WriteRandom(base, b, kBytes, r);
       WriteRandom(base, sp - 1024, 1024, r);
-      const uint32_t holder = b, scene = b + kScene;
-      for (uint32_t i = 0; i < 3; i++) {
-        const uint32_t slot = b + 0x40 + 4 * i, stage = b + 0x100 + 0x100 * i;
-        guest::StoreU32(base, holder + 4 * i, slot);
-        guest::StoreU32(base, slot, stage);
-        guest::StoreU32(base, stage + 8, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(3));
-      }
-      const uint32_t under_way = r.Below(2), made = r.Below(3) == 0 ? 0 : 1 + r.Below(5);
-      guest::StoreU32(base, holder + 12, under_way);
-      guest::StoreU32(base, holder + 16, uint32_t(int32_t(r.Below(5)) - 1));
-      guest::StoreU32(base, holder + 20, made);
-      bool loading = false;
-      guest::StoreU32(base, scene + 0, 4);
-      guest::StoreU32(base, scene + 48, 4 + r.Below(8));  // above the three Updates
-      for (const uint32_t slot : {84u, 132u, 156u, 268u, 472u, 964u, 4156u, 4764u}) {
-        const uint32_t state = r.Below(12) == 0 ? 2 : r.Below(2);
-        loading |= state == 2;
-        guest::StoreU32(base, scene + slot, state);
-      }
-      for (uint32_t pool = 0; pool < 7; pool++) {
-        guest::StoreU32(base, scene + 4944 + 12 * pool + 8, 0);
-      }
-      guest::StoreU32(base, scene + 5028, b + kModels);
-      guest::StoreU32(base, scene + 5036, 3);
-      for (uint32_t k = 0; k < 3; k++) {
-        const uint32_t model = b + kModels + kModelBytes * k;
-        guest::StoreU32(base, model + 8, k < 2 ? model + kModelBytes : 0);
-        guest::StoreU32(base, model + 16, 3);
-        const uint32_t deferred = r.Below(3) == 0 ? 1 : 0;
-        loading |= deferred != 0;
-        guest::StoreU32(base, model + 5040, deferred);
-      }
-      const uint32_t set = b + 0x7000;
-      for (uint32_t i = 0; i < 4; i++) guest::StoreU32(base, set + 4 * i, 0);
-      guest::StoreU32(base, t67::kStandHolder, holder);
-      guest::StoreU32(base, kSceneGlobal, scene);
-      // The first set only where StartTeardown runs (its StartTeardownA
-      // writes it unchecked; Update's UpdateA then has nothing to do).
-      const bool tear_down = under_way == 0 && (made == 0 || !loading);
-      guest::StoreU32(base, kFirstSet, tear_down ? b + 0x7800 : 0);
-      guest::StoreU32(base, kSet, set);
+      LayStand(base, b, r);
       PPCContext t = CallContext(h);
       t.r3.u64 = r.Next();
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
@@ -2017,16 +2024,106 @@ void PollTeardown(Context& h) {
       } else {
         hooks::StandScenePollTeardown(t, base);
       }
-      out[v].Bytes(Read(base, b, kBytes));
+      out[v].Bytes(Read(base, b, kStandBytes));
       out[v].Bytes(Read(base, sp - t67::kPollTeardownFrame, t67::kPollTeardownFrame - 48));
-      for (const uint32_t g : globals) out[v].Word(guest::LoadU32(base, g));
+      for (const uint32_t g : kStandGlobals) out[v].Word(guest::LoadU32(base, g));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
     }
     results.Check(out[0], out[1], fmt::format("case {}", c));
   }
   results.Report();
-  for (int i = 0; i < 4; i++) guest::StoreU32(base, globals[i], saved[i]);
+  for (int i = 0; i < 4; i++) guest::StoreU32(base, kStandGlobals[i], saved[i]);
+}
+
+// --- The modes' TearDown: the mode (its ring's count and start small) and
+// its screen block (the phase 4 to 7, mostly 5 or 6, the hold 0 or 1) in
+// blocks of their own, the answer in the world, the stand as
+// PollTeardown's cases lay it (the teardown under way with its count 1
+// half the time, so it answers 1); the sound manager a fake (its slot 14
+// the getter of its +60, 0, 1 or 0x100 (a nonzero word whose low byte is
+// 0), slot 13 the recorder of r4 and r5 at +444). Compared: the mode, the
+// block, the answer, the stand's block, the manager, the frame's +80 to
+// +111, the globals and r3. ---
+
+void TearDowns(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  const Block mode(kModeBytes);
+  const Block block(kScreenBlockBytes);
+  const Block stand(kStandBytes);
+  const Block extra(0x400);
+  if (!mode.address || !block.address || !stand.address || !extra.address) return;
+  uint32_t saved[5];
+  for (int i = 0; i < 4; i++) saved[i] = guest::LoadU32(base, kStandGlobals[i]);
+  saved[4] = guest::LoadU32(base, menu_sounds::kSoundManager);
+  struct Function {
+    const char* name;
+    uint32_t address;
+    bool type7;
+    GuestFunction recompiled;
+  };
+  const Function functions[] = {
+      {"Type6Mode::TearDown", 0x82235C18, false, __imp__sub_82235C18},
+      {"Type7Mode::TearDown", 0x82246098, true, __imp__sub_82246098},
+  };
+  const uint32_t sp = CallContext(h).r1.u32;
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    const t67::ModeLayout& layout = f.type7 ? t67::kType7Layout : t67::kType6Layout;
+    for (int c = 0; c < 48; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 6151 + f.address);
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, mode.address, mode.bytes, r);
+        WriteRandom(base, block.address + layout.answer, 16, r);
+        WriteRandom(base, sp - 1024, 1024, r);
+        LayStand(base, stand.address, r);
+        if (r.Below(2) == 0) {
+          guest::StoreU32(base, stand.address + 12, 1);
+          guest::StoreU32(base, stand.address + 16, 1);
+        }
+        guest::StoreU32(base, mode.address + 840, r.Below(4));
+        guest::StoreU32(base, mode.address + 844, r.Below(200));
+        guest::StoreU32(base, mode.address + 848, block.address);
+        static constexpr uint32_t kPhases[] = {5, 5, 5, 6, 6, 4, 7};
+        guest::StoreU32(base, block.address + layout.phase, kPhases[r.Below(7)]);
+        guest::StoreU32(base, block.address + layout.phase + 4, r.Below(3) == 0 ? 1 : 0);
+        const uint32_t manager = extra.address, vtable = extra.address + 0x100;
+        WriteRandom(base, manager, 0x400, r);
+        guest::StoreU32(base, manager, vtable);
+        guest::StoreU32(base, vtable + 56, 0x82090770);  // r3 = [r3 + 60]
+        guest::StoreU32(base, vtable + 52, 0x820CE9F8);  // r4, r5 to +444, +448
+        static constexpr uint32_t kPlaying[] = {0, 1, 0x100};
+        guest::StoreU32(base, manager + 60, kPlaying[r.Below(3)]);
+        guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = (world.address + 0x100) | (uint64_t(r.Below(2)) << 32);
+        t.r4.u64 = mode.address;
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          (f.type7 ? hooks::Type7ModeTearDown : hooks::Type6ModeTearDown)(t, base);
+        }
+        out[v].Bytes(Read(base, mode.address, mode.bytes));
+        out[v].Bytes(Read(base, block.address + layout.answer, 16));
+        out[v].Bytes(Read(base, world.address + 0x100, 8));
+        out[v].Bytes(Read(base, stand.address, kStandBytes));
+        out[v].Bytes(Read(base, extra.address, 0x400));
+        out[v].Bytes(Read(base, sp - t67::kTearDownFrame + 80, 32));
+        for (const uint32_t g : kStandGlobals) out[v].Word(guest::LoadU32(base, g));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  for (int i = 0; i < 4; i++) guest::StoreU32(base, kStandGlobals[i], saved[i]);
+  guest::StoreU32(base, menu_sounds::kSoundManager, saved[4]);
 }
 
 }  // namespace
@@ -2053,6 +2150,7 @@ void Type67Modes(Context& h) {
   Cars(h, world);
   ControllerUpdate(h, world);
   PollTeardown(h);
+  TearDowns(h, world);
 }
 
 }  // namespace harness

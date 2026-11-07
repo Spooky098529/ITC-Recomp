@@ -239,6 +239,17 @@ void ModeLeaving(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint3
 uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, uint32_t sp,
                           const Calls& calls);
 
+// sub_82235C18 Type6Mode::TearDown and sub_82246098 Type7Mode::TearDown
+// (r3 the answer, r4 the mode): the answer cleared; in phase 5, once
+// StandScene::PollTeardown (its plain C++) answers nonzero, phase 6 and bank
+// 1's cues 0 and 2 stopped where playing (the sound manager's slots 14 and
+// 13, guest calls, their indexes in the frame); in phase 6 without a hold
+// (the phase's next word), the answer = the block's 8 bytes. Type 7 then
+// queues Draw (1) without dispatching. r3 the answer.
+constexpr uint32_t kTearDownFrame = 176;
+uint64_t ModeTearDown(uint8_t* base, bool type7, uint64_t r3, uint32_t mode, uint32_t sp,
+                      const Calls& calls);
+
 // --- The handlers with guest calls (screens.cpp). `sp` is the caller's
 // stack pointer (the original's r1 at entry); each returns r3 as the
 // original leaves it. ---
