@@ -169,10 +169,11 @@ struct Calls {
   // run them natively, else their adapters); their r3.
   std::function<uint64_t(uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr)> open;
   std::function<uint64_t(uint32_t id, uint32_t sp, uint32_t lr)> remove;
-  // A guest call with the first `set` of r3 to r6 from `args` (the others
-  // left), from the frame at `r1` returning to `lr` (MenuSound::Play's slot
-  // call, as menu_sounds::Calls makes it); its r3.
-  std::function<uint64_t(uint32_t function, const uint64_t args[4], int set, uint32_t r1,
+  // A guest call with the first `set` of r3 to r8 from `args` (the others
+  // left; MenuSound::Play's slot call, as menu_sounds::Calls makes it, sets
+  // at most 4 from an array of 4), from the frame at `r1` returning to `lr`;
+  // its r3.
+  std::function<uint64_t(uint32_t function, const uint64_t args[6], int set, uint32_t r1,
                          uint32_t lr)>
       call_set;
   // --native_action_mappers: Menu::Step's and Pressed's plain C++ answer
@@ -492,6 +493,25 @@ uint64_t Screen0ShowCarInfo(uint8_t* base, bool type7, uint32_t sp, const Calls&
 constexpr uint32_t kShowFrame = 128;
 uint64_t Screen0Show(uint8_t* base, bool type7, uint64_t r3, uint32_t sp, const Calls& calls,
                      const strings_and_font::FormatCalls& format);
+// sub_82234F08 Type6Screen0::Update and sub_82245200 Type7Screen0::Update
+// (r3 the screen): movie 22 (UiMovies::Find); the page state's (+9644,
+// type 7 +9648) step from its table (type 6 the image's at 0x826367C8, r4
+// the frame's +80; type 7 the member pointers at 0x82815E3C, built once
+// from the frame under its guard bit 0 at 0x82815E5C, r4 the step) as a
+// guest call, the page state moved on when it answers nonzero, else
+// UiMovie::Run(movie, 0); then unless the mode's car's +1972 is -1, the
+// stand (`[[0x826D83E0]]`): GarageStage::IsBusy and the loading animation
+// (named 44 to 46: UiMovie::FinishNamed, PlayNamed, LoopNamed) by the
+// loading word (+9640's, type 7 +9644's +0), then while the car's +1968 is
+// 0, +1968 = GarageStage::ReloadModel(CarModels::BlockOf(the car's +12)),
+// with 1 a car object in the frame (Car::Init, the car copied, its +3888
+// |= 1, Car::Refresh), GarageStage::SetCar(-1) and SetPlates; once it's
+// set, GarageStage::Draw(0, 1). Guest calls to the callees' overrides, but
+// BlockOf's, SetPlates', the car's and the memcpy's plain C++. `sp` is the
+// caller's r1 (64-bit). r3 as the original leaves it.
+constexpr uint32_t kType6UpdateFrame = 4064;
+constexpr uint32_t kType7UpdateFrame = 4080;
+uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, const Calls& calls);
 // sub_82234768 Type6Screen0::OnDialogClosed (r4 the dispatcher): by the
 // confirm asked (+9664: 4, 5) and the pick (+9640's +72): page 0 and
 // ShowPage 0; the second confirm (Type6Screen0::ConfirmAgain, a guest call

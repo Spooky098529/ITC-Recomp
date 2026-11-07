@@ -181,6 +181,10 @@ void Type6Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base);
 void Type7Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base);
 // Type7Screen0::MenuPage sub_82244BF8 (r3 the screen, r4 the dispatcher).
 void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base);
+// The first screens' Update (Type6 sub_82234F08, Type7 sub_82245200; r3 the
+// screen).
+void Type6Screen0Update(PPCContext& ctx, uint8_t* base);
+void Type7Screen0Update(PPCContext& ctx, uint8_t* base);
 void GarageStageInit(PPCContext& ctx, uint8_t* base);
 void StandSlotInit(PPCContext& ctx, uint8_t* base);
 

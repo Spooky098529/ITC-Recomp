@@ -23,6 +23,7 @@
 #include "xaudio/ppc_float.h"
 
 #include <cstdlib>
+#include <utility>
 
 namespace type67_modes {
 
@@ -118,6 +119,7 @@ constexpr uint32_t kMakeModel = 0x8217FCB0;    // GarageStage::MakeModel
 constexpr uint32_t kCommand = 0x82180108;      // GarageStage::Command
 constexpr uint32_t kGarageCarReset = 0x82110448;
 constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kMinusOne = 0xFFFFFFFF;
 
 // Flush-to-zero off, as the car's plain C++ expects at entry.
 void FlushOff() {
@@ -693,6 +695,152 @@ uint64_t Screen0Show(uint8_t* base, bool type7, uint64_t r3, uint32_t sp, const 
   StoreU32(base, p + 16, 0xFFFFFFFF);
   StoreU32(base, p + 0, 0xFFFFFFFF);
   return answer;
+}
+
+
+uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, const Calls& calls) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_82245200 Type7Screen0::Update");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82234F08 Type6Screen0::Update");
+  }
+  constexpr uint32_t kFinishNamed = 0x8211DF20, kPlayNamed = 0x8211DAC8, kLoopNamed = 0x8211DDE0;
+  constexpr uint32_t kIsBusy = 0x82179BE0, kReloadModel = 0x8217F880, kSetCar = 0x8217FD58;
+  constexpr uint32_t kDraw = 0x8217FE60, kRefresh = 0x820C4998;
+  constexpr uint32_t kType6Steps = 0x826367C8;
+  constexpr uint32_t kType7Steps = 0x82815E3C, kType7Guard = 0x82815E5C;
+  // The return addresses: type 6's, type 7's.
+  struct Lrs {
+    uint32_t step, run, busy, finish45, play45, finish44, play44, loop44, finish44b, finish46,
+        play46, reload, memcpy, refresh, set_car, draw;
+  };
+  static constexpr Lrs kLrs[2] = {
+      {0x82234F64, 0x82234FB0, 0x82234FD8, 0x82235004, 0x82235020, 0x8223502C, 0x82235048,
+       0x82235054, 0x82235070, 0x8223507C, 0x82235098, 0x822350BC, 0x822350E0, 0x822350F4,
+       0x82235104, 0x82235130},
+      {0x822452DC, 0x82245328, 0x82245350, 0x82245374, 0x82245390, 0x8224539C, 0x822453B8,
+       0x822453C4, 0x822453E8, 0x822453F4, 0x82245410, 0x8224543C, 0x82245460, 0x82245474,
+       0x82245484, 0x822454B0}};
+  const Lrs& lr = kLrs[type7 ? 1 : 0];
+  const uint32_t screen = uint32_t(r3);
+  const uint32_t d = type7 ? 4 : 0;
+  const uint32_t frame = uint32_t(sp) - (type7 ? kType7UpdateFrame : kType6UpdateFrame);
+  const uint64_t high = sp & 0xFFFFFFFF00000000ull;  // r1's upper word, in addi's results
+  StoreU32(base, frame, uint32_t(sp));  // the back chain, for the guest calls
+  const uint32_t movie = MovieAt(base, frame, 22);
+  uint64_t answer;
+  uint32_t step;
+  if (type7) {
+    // The step table, built on the first call from words in the frame.
+    const uint32_t guard = LoadU32(base, kType7Guard);
+    step = LoadU32(base, LoadU32(base, screen + 9648) + 12);
+    if ((guard & 1) == 0) {
+      StoreU32(base, frame + 84, 0);
+      StoreU32(base, frame + 108, 0);
+      StoreU32(base, frame + 92, 0);
+      StoreU32(base, frame + 100, 0);
+      StoreU32(base, kType7Guard, guard | 1);
+      StoreU32(base, frame + 80, 0x82244E70);   // the opening
+      StoreU32(base, frame + 104, 0x822450A8);  // back pressed
+      StoreU32(base, frame + 88, 0x82244FC0);   // the cursor moved
+      StoreU32(base, frame + 96, 0x82244760);   // the fade out
+      for (const auto [to, from] : {std::pair{0u, 80u}, {8u, 104u}, {16u, 88u}, {24u, 96u}}) {
+        StoreU32(base, kType7Steps + to, LoadU32(base, frame + from));
+        StoreU32(base, kType7Steps + to + 4, LoadU32(base, frame + from + 4));
+      }
+    }
+  } else {
+    step = LoadU32(base, LoadU32(base, screen + 9644) + 12);
+  }
+  if (step != kMinusOne) {
+    if (type7) {
+      const uint32_t target = LoadU32(base, kType7Steps + (step << 3));
+      const uint32_t adjustment = LoadU32(base, kType7Steps + 4 + (step << 3));
+      answer = calls.call(target, frame, lr.step, uint64_t(adjustment) + r3, step);
+    } else {
+      answer = calls.call(LoadU32(base, kType6Steps + (step << 2)), frame, lr.step, r3,
+                          (high | frame) + 80);
+    }
+    const uint32_t p = LoadU32(base, screen + 9644 + d);
+    if (int32_t(uint32_t(answer)) != 0) {
+      const uint32_t next = LoadU32(base, p + 16);
+      if (next == kMinusOne) {
+        const uint32_t after = LoadU32(base, p + 4);
+        StoreU32(base, p + 12, kMinusOne);
+        StoreU32(base, p + 0, after);
+      } else {
+        StoreU32(base, p + 20, 0);
+        StoreU32(base, p + 12, next);
+        StoreU32(base, p + 16, kMinusOne);
+      }
+      StoreU32(base, p + 24, 0);
+    }
+  } else {
+    answer = calls.call(kRun, frame, lr.run, movie, 0);
+  }
+  const uint32_t car = type7 ? kType7Car : kType6Car;
+  if (LoadU32(base, car + 1972) == kMinusOne) {
+    return answer;
+  }
+  const uint32_t holder = LoadU32(base, LoadU32(base, kStandHolder));
+  const uint64_t busy = calls.call(kIsBusy, frame, lr.busy, holder, 0);
+  auto named = [&](uint32_t function, uint32_t id, uint32_t at) {
+    calls.call(function, frame, at, movie, id);
+  };
+  auto play = [&](uint32_t id, uint32_t at) {
+    const uint64_t args[6] = {movie, id, 1, 0, 0, 0};
+    calls.call_set(kPlayNamed, args, 6, frame, at);
+  };
+  const uint32_t loading = LoadU32(base, screen + 9640 + d);
+  const uint32_t shown = LoadU32(base, loading);
+  if (int32_t(uint32_t(busy)) != 0) {
+    if (shown == 0) {
+      if (!type7) StoreU32(base, loading, 1);
+      named(kFinishNamed, 45, lr.finish45);
+      play(45, lr.play45);
+      named(kFinishNamed, 44, lr.finish44);
+      play(44, lr.play44);
+      named(kLoopNamed, 44, lr.loop44);
+      if (type7) StoreU32(base, LoadU32(base, screen + 9644), 1);
+    }
+  } else if (shown == 1) {
+    if (!type7) StoreU32(base, loading, 0);
+    named(kFinishNamed, 44, lr.finish44b);
+    named(kFinishNamed, 46, lr.finish46);
+    play(46, lr.play46);
+    if (type7) StoreU32(base, LoadU32(base, screen + 9644), 0);
+  }
+  if (LoadU32(base, car + 1968) != 0) {
+    const uint64_t args[6] = {holder, 0, 1, 0, 0, 0};
+    return calls.call_set(kDraw, args, 3, frame, lr.draw);
+  }
+  const uint32_t block = car_makers::BlockOf(LoadU32(base, car + 12));
+  const uint64_t reloaded =
+      calls.call(kReloadModel, frame, lr.reload, LoadU32(base, LoadU32(base, kStandHolder)),
+                 uint64_t(int64_t(int32_t(block))));
+  StoreU32(base, car + 1968, uint32_t(reloaded));
+  if (int32_t(uint32_t(reloaded)) != 1) {
+    return reloaded;
+  }
+  // The car object in the frame, the mode's car copied into it.
+  const uint32_t object = frame + (type7 ? 112 : 96);
+  FlushOff();
+  race_setup::CarInit(base, object);
+  if (!c_runtime::Memcpy(base, object, car, 1884)) {
+    const uint64_t args[6] = {(high | frame) + (object - frame), car, 1884, 0, 0, 0};
+    calls.call_set(kMemcpy, args, 3, frame, lr.memcpy);
+  }
+  StoreU32(base, object + 3888, LoadU32(base, object + 3888) | 1);
+  FlushOff();
+  uint32_t refreshed = 0;
+  if (!car_specs::CarRefresh(base, object, &refreshed)) {
+    calls.call(kRefresh, frame, lr.refresh, (high | frame) + (object - frame), 0);
+  }
+  FlushOff();
+  const uint64_t args[6] = {holder, (high | frame) + (object - frame), ~0ull, 0, 0, 0};
+  calls.call_set(kSetCar, args, 3, frame, lr.set_car);
+  // cntlzw and rlwinm: 1 for a car from the garage (+1972 2).
+  return GarageStageSetPlates(base, holder, LoadU32(base, car + 1972) == 2 ? 1 : 0);
 }
 
 }  // namespace type67_modes

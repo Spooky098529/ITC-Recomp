@@ -87,7 +87,10 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "graph's set-up sub_82250488 and Type7Screen0::Confirm guest calls); the first "
               "screens' Show sub_82233C80 and sub_822441D8 with their ShowCarInfo sub_82233B70 "
               "and sub_822440D8 (with the text setters native; Car::Init, SetModel, Refresh and "
-              "SetModelAndClass's plain C++, GarageCar::Reset a guest call)) "
+              "SetModelAndClass's plain C++, GarageCar::Reset a guest call); the first screens' "
+              "Update sub_82234F08 and sub_82245200 (their steps, UiMovie::Run, FinishNamed, "
+              "PlayNamed, LoopNamed, GarageStage::IsBusy, ReloadModel, SetCar and Draw guest "
+              "calls; CarModels::BlockOf, SetPlates, Car::Init and Refresh's plain C++)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -271,11 +274,11 @@ t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
     ctx.lr = link;
     return ctx.r3.u64;
   };
-  calls.call_set = [&ctx, base](uint32_t function, const uint64_t args[4], int set, uint32_t r1,
+  calls.call_set = [&ctx, base](uint32_t function, const uint64_t args[6], int set, uint32_t r1,
                                 uint32_t lr) -> uint64_t {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = r1;
-    PPCRegister* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    PPCRegister* registers[6] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7, &ctx.r8};
     for (int i = 0; i < set; i++) {
       registers[i]->u64 = args[i];
     }
@@ -605,6 +608,20 @@ void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
                                          Type67Calls(ctx, base));
   ctx.lr = lr;
 }
+namespace {
+
+void Screen0Update(PPCContext& ctx, uint8_t* base, bool type7) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr, r3 = ctx.r3.u64, sp = ctx.r1.u64;
+  ctx.r3.u64 = t67::Screen0Update(base, type7, r3, sp, Type67Calls(ctx, base));
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
+}  // namespace
+
+void Type6Screen0Update(PPCContext& ctx, uint8_t* base) { Screen0Update(ctx, base, false); }
+void Type7Screen0Update(PPCContext& ctx, uint8_t* base) { Screen0Update(ctx, base, true); }
 void GarageStageInit(PPCContext& ctx, uint8_t* base) {
   t67::GarageStageInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad(base));
   ctx.r3.u64 = LightsR3(ctx, ctx.r1.u32 - t67::kGarageStageInitFrame);
@@ -798,6 +815,9 @@ ITC_TYPE67_MODES(82246098, Type7ModeTearDown)
 // their ShowCarInfo sub_82233B70 and sub_822440D8 (only Show calls them).
 // Type7Screen0::MenuPage (from the Draw's table, a guest call).
 ITC_TYPE67_MODES(82244BF8, Type7Screen0MenuPage)
+// The first screens' Update (through the machines' transitions).
+ITC_TYPE67_MODES(82234F08, Type6Screen0Update)
+ITC_TYPE67_MODES(82245200, Type7Screen0Update)
 
 // The garage camera: Quaternion::FromAngles (from GarageCamera::Command,
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).

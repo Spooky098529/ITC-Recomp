@@ -2097,6 +2097,256 @@ void Cars(Context& h, const Block& world) {
   Write(base, kFades, saved_fades.data(), kFadesBytes);
 }
 
+// --- The first screens' Update: one harness movie as 22 in a harness movie
+// table (its lists, named animations 0 to 47 over a live scene, slots
+// queued and looping, some named 44 to 46), the UI movies' update and
+// ApplyAnimation recorded through the dialogs' stand-in (UiMovie::Run,
+// FinishNamed, PlayNamed and LoopNamed run for real through their
+// overrides on both sides); the page state (+9644, type 7 +9648) and the
+// loading word's block (+9640, type 7 +9644) in the world, the step none or
+// 0 to 3, the queued step none or small. The steps: type 6's table
+// (0x826367C8) and type 7's (0x82815E3C, its guard bit set) pointed at the
+// leaf 0x82090770 (r3 = [r3 + 60], type 7's adjustment 0, 4 or 8), so the
+// step answers the screen's word there (0 or not); type 7's guard clear
+// where the step is none (the table built from the frame, no step called).
+// The stand (the mode's car's +1972 -1, 0, 2 or another): [0x826D83E0]
+// pointing at the holder's word, a stage whose garage camera isn't set up
+// (GarageStage::Draw does nothing), +4 -1 or not and +8 0 (the car scene's
+// one pool 7 model, its +5028 and +5040 0 or not: GarageStage::IsBusy
+// answers either way), the car scene as build_screen's StandWorld lays it
+// for GarageStage::ReloadModel with the reload count 0 to 2, so it answers
+// 0 (the reload's later branch, which answers 1 and leads to the car object
+// and GarageStage::SetCar, isn't laid: SetCar's scene model world, the
+// load_poll harness's, is too large to lay beside this one; its Car::Init,
+// memcpy and Car::Refresh are ShowCarInfo's, covered above); the car's
+// +1968 0 (the reload) or not (Draw), its +12 a car model id below 80.
+// Compared: the world, the movie, its nodes and animations, the stand's
+// block, both modes' cars, the step tables and guard, the globals, the
+// recorded calls, the stack below the call but the original's register
+// saves (and its back chain's word), and r3 (both halves). ---
+
+void Screen0Updates(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  constexpr uint32_t kMovieBlockBytes = 0xA100, kNodeBytes = 0x800, kNodes = 8;
+  constexpr uint32_t kNamedCount = 48, kCarBytes = 1984;
+  constexpr uint32_t kType6Steps = 0x826367C8, kType7Steps = 0x82815E3C;
+  constexpr uint32_t kType7Guard = 0x82815E5C, kLeaf = 0x82090770;
+  constexpr uint32_t kScene = 0x826C2E44, kFirst = 0x826C2E40, kReloads = 0x826D83E4;
+  constexpr uint32_t kStackBytes = 0x6000;
+  // The stand's block: the holder's word, the holder, the stage, the car
+  // scene and its pool 7 model.
+  constexpr uint32_t kHolderWord = 0x0, kHolder = 0x40, kStage = 0x100, kSceneAt = 0x2000,
+                     kModel = 0x3800, kStandBlockBytes = 0x5000;
+  const Block movie_block(kMovieBlockBytes);
+  const Block nodes(kNodeBytes * kNodes + 8 * 64);
+  const Block misc(0x100);  // the movie table's pairs
+  const Block stand(kStandBlockBytes);
+  if (!movie_block.address || !nodes.address || !misc.address || !stand.address) return;
+  const uint32_t movie = movie_block.address;
+  auto node = [&](uint32_t i) { return nodes.address + kNodeBytes * i; };
+  const uint32_t animations = nodes.address + kNodeBytes * kNodes;
+  const uint32_t sp = CallContext(h).r1.u32;
+  const std::vector<uint8_t> table = Read(base, ui_movies::kMovieTable, 12);
+  const std::vector<uint8_t> saved_cars[2] = {Read(base, t67::kType6Car, kCarBytes),
+                                              Read(base, t67::kType7Car, kCarBytes)};
+  const std::vector<uint8_t> saved_steps6 = Read(base, kType6Steps, 16);
+  const std::vector<uint8_t> saved_steps7 = Read(base, kType7Steps, 36);  // and the guard
+  const uint32_t globals[4] = {t67::kStandHolder, kReloads, kScene, kFirst};
+  uint32_t saved_globals[4];
+  for (int i = 0; i < 4; i++) saved_globals[i] = guest::LoadU32(base, globals[i]);
+  struct Function {
+    const char* name;
+    uint32_t address, frame;
+    GuestFunction recompiled, native;
+    bool type7;
+  };
+  const Function functions[] = {
+      {"Type6Screen0::Update", 0x82234F08, t67::kType6UpdateFrame, __imp__sub_82234F08,
+       hooks::Type6Screen0Update, false},
+      {"Type7Screen0::Update", 0x82245200, t67::kType7UpdateFrame, __imp__sub_82245200,
+       hooks::Type7Screen0Update, true},
+  };
+  constexpr uint32_t kSaves = 56;  // r26 to r31 and lr
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    const uint32_t d = f.type7 ? 4 : 0;
+    for (int c = 0; c < 64; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 7919 + f.address);
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, movie, kMovieBlockBytes, r);
+        WriteRandom(base, nodes.address, nodes.bytes, r);
+        WriteRandom(base, misc.address, misc.bytes, r);
+        WriteRandom(base, stand.address, kStandBlockBytes, r);
+        WriteRandom(base, sp - kStackBytes, kStackBytes + 256, r);
+        // The movie: its lists, scenes and named animations.
+        ui_movies::InitAnimationLists(base, movie);
+        guest::StoreU32(base, movie + ui_movies::kMovieLive, node(0));
+        guest::StoreU32(base, movie + ui_movies::kMovieSaved, node(1));
+        guest::StoreU32(base, movie + ui_movies::kMovieFile, node(2));
+        static constexpr uint32_t kTags[] = {0x54464D00, 0x50494300, 0x54585400, 0x12345678};
+        for (uint32_t i = 0; i < kNodes; i++) {
+          guest::StoreU32(base, node(i), kTags[r.Below(4)]);
+          guest::StoreU32(base, node(i) + 100, r.Below(4));
+          guest::StoreU32(base, node(i) + 104, i < 3 ? r.Below(4) : 0);
+          guest::StoreU32(base, node(i) + 108, r.Below(4));
+          guest::StoreU32(base, node(i) + 116, 0);
+          for (uint32_t k = 128; k < 128 + 8 * 12; k += 8) {
+            guest::StoreU32(base, node(i) + k, node(3 + r.Below(kNodes - 3)));
+          }
+        }
+        for (uint32_t k = 0; k < 8; k++) {
+          for (uint32_t i = 0; i < 64; i += 4) guest::StoreU32(base, animations + 64 * k + i, 0);
+          guest::StoreFloat(base, animations + 64 * k + 12, float(r.Below(40)) / 4.0f);
+        }
+        for (uint32_t k = 0; k < kNamedCount; k++) {
+          guest::StoreU32(base, movie + 176 + 36 * k + 28, node(0));
+          guest::StoreU32(base, movie + 176 + 36 * k + 32, animations + 64 * r.Below(8));
+        }
+        guest::StoreU32(base, node(0) + 116, r.Below(4));
+        for (uint32_t k = r.Below(4); k > 0; k--) {
+          ui_movies::Slot slot{};
+          slot[0] = r.Below(2);
+          slot[1] = 0xFFFFFFFFu;
+          static constexpr uint32_t kNamed[] = {44, 45, 46, 2, 0xFFFFFFFFu};
+          slot[2] = kNamed[r.Below(5)];
+          slot[3] = node(0);
+          slot[4] = animations + 64 * r.Below(8);
+          slot[5] = std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f);
+          slot[6] = r.Below(2);
+          slot[7] = r.Below(2);
+          ui_movies::Append(base, movie + (r.Below(2) ? ui_movies::kMovieQueue
+                                                      : ui_movies::kMovieLooping),
+                            slot);
+        }
+        // The movie table: 22 the movie, among a few others.
+        const uint32_t pairs = misc.address;
+        const uint32_t count = 1 + r.Below(4);
+        const uint32_t at = r.Below(count);
+        for (uint32_t i = 0; i < count; i++) {
+          guest::StoreU32(base, pairs + 8 * i, i == at ? 22 : 30 + i);
+          guest::StoreU32(base, pairs + 8 * i + 4, i == at ? movie : uint32_t(r.Next()));
+        }
+        guest::StoreU32(base, ui_movies::kMovieTable, pairs);
+        guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+        guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+        // The screen: the loading word's block and the page state.
+        const uint32_t screen = world.address;
+        const uint32_t loading = world.address + 0x3800, page = world.address + 0x3A00;
+        guest::StoreU32(base, screen + 9640 + d, loading);
+        guest::StoreU32(base, screen + 9644 + d, page);
+        guest::StoreU32(base, loading, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+        static constexpr uint32_t kSteps[] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0, 1, 2, 3};
+        const uint32_t step = kSteps[r.Below(6)];
+        guest::StoreU32(base, page + 12, step);
+        guest::StoreU32(base, page + 16, r.Below(2) ? 0xFFFFFFFFu : r.Below(4));
+        // The steps' leaf and its answers.
+        for (uint32_t i = 0; i < 4; i++) guest::StoreU32(base, kType6Steps + 4 * i, kLeaf);
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(base, kType7Steps + 8 * i, kLeaf);
+          guest::StoreU32(base, kType7Steps + 8 * i + 4, 4 * r.Below(3));
+        }
+        const uint32_t guard = uint32_t(r.Next());
+        guest::StoreU32(base, kType7Guard,
+                        step == 0xFFFFFFFFu && r.Below(2) == 0 ? guard & ~1u : guard | 1u);
+        for (uint32_t k = 0; k < 3; k++) {
+          guest::StoreU32(base, screen + 60 + 4 * k, r.Below(2) ? 0 : uint32_t(r.Next()));
+        }
+        // The mode's car.
+        const uint32_t car = f.type7 ? t67::kType7Car : t67::kType6Car;
+        WriteRandom(base, car, kCarBytes, r);
+        static constexpr uint32_t kFrom[] = {0xFFFFFFFFu, 0, 2, 5};
+        guest::StoreU32(base, car + 1972, kFrom[r.Below(4)]);
+        guest::StoreU32(base, car + 1968, r.Below(2) ? 0 : 1 + r.Below(3));
+        guest::StoreU32(base, car + 12, r.Below(80));
+        // The stand.
+        const uint32_t b = stand.address;
+        const uint32_t stage = b + kStage, scene = b + kSceneAt, model = b + kModel;
+        guest::StoreU32(base, b + kHolderWord, b + kHolder);
+        guest::StoreU32(base, b + kHolder, stage);
+        guest::StoreU32(base, t67::kStandHolder, b + kHolderWord);
+        guest::StoreU32(base, stage + 4, r.Below(2) ? 0xFFFFFFFFu : uint32_t(r.Next()));
+        guest::StoreU32(base, stage + 8, 0);
+        guest::StoreU32(base, stage + 16, r.Below(2));
+        guest::StoreU32(base, stage + 112, 0);
+        guest::StoreU32(base, kScene, scene);
+        guest::StoreU32(base, kFirst, 0);
+        guest::StoreU32(base, kReloads, r.Below(3));
+        guest::StoreU32(base, scene + 0, r.Below(2) == 0 ? 4 : r.Below(4));
+        guest::StoreU32(base, scene + 48, 3 + r.Below(4));
+        guest::StoreU32(base, scene + 4, 0);
+        guest::StoreU32(base, scene + 5048, 1);
+        guest::StoreU32(base, scene + 5028, model);
+        guest::StoreU32(base, scene + 5036, 1);
+        guest::StoreU32(base, model + 8, 0);
+        guest::StoreU32(base, model + 16, 3);
+        guest::StoreU32(base, model + 20, r.Below(6));
+        guest::StoreU32(base, model + 32, 1);
+        guest::StoreU32(base, model + 5028, r.Below(4) == 0 ? 1 : 0);
+        guest::StoreU32(base, model + 5040, r.Below(4) == 0 ? 1 : 0);
+        guest::StoreU32(base, model + 5044, 3 + r.Below(3));
+        for (const uint32_t word : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+          guest::StoreU32(base, model + word, 0);
+        }
+        guest::StoreU32(base, model + 5116, scene);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = screen | (uint64_t(r.Below(2)) << 32);
+        t.r4.u64 = r.Next();
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        g_dialog_answers = Random(r.Next());
+        std::vector<DialogCall> calls;
+        g_dialog_calls = &calls;
+        const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+            ui_movies_hooks::g_update_callee_stand_in;
+        ui_movies_hooks::g_update_callee_stand_in = DialogStandIn;
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          f.native(t, base);
+        }
+        ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
+        g_dialog_calls = nullptr;
+        out[v].Word(uint32_t(calls.size()));
+        for (const DialogCall& call : calls) {
+          for (const uint32_t w : {call.function, call.lr, call.r1, uint32_t(call.r3),
+                                   uint32_t(call.r3 >> 32), uint32_t(call.r4),
+                                   uint32_t(call.r4 >> 32)}) {
+            out[v].Word(w);
+          }
+        }
+        out[v].Bytes(Read(base, world.address, world.bytes));
+        out[v].Bytes(Read(base, movie, kMovieBlockBytes));
+        out[v].Bytes(Read(base, nodes.address, nodes.bytes));
+        out[v].Bytes(Read(base, misc.address, misc.bytes));
+        out[v].Bytes(Read(base, stand.address, kStandBlockBytes));
+        out[v].Bytes(Read(base, t67::kType6Car, kCarBytes));
+        out[v].Bytes(Read(base, t67::kType7Car, kCarBytes));
+        out[v].Bytes(Read(base, kType6Steps, 16));
+        out[v].Bytes(Read(base, kType7Steps, 36));
+        for (const uint32_t g : globals) out[v].Word(guest::LoadU32(base, g));
+        const uint32_t frame = sp - f.frame;
+        out[v].Bytes(Read(base, sp - kStackBytes, frame - (sp - kStackBytes)));
+        out[v].Bytes(Read(base, frame, f.frame - kSaves));
+        out[v].Bytes(Read(base, sp, 256));
+        out[v].Word(uint32_t(t.lr));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Write(base, ui_movies::kMovieTable, table.data(), 12);
+  Write(base, t67::kType6Car, saved_cars[0].data(), kCarBytes);
+  Write(base, t67::kType7Car, saved_cars[1].data(), kCarBytes);
+  Write(base, kType6Steps, saved_steps6.data(), 16);
+  Write(base, kType7Steps, saved_steps7.data(), 36);
+  for (int i = 0; i < 4; i++) guest::StoreU32(base, globals[i], saved_globals[i]);
+}
+
 // --- ControllerOptions::Update: the page object (the global 0x826D848C)
 // in the world at +0x3000, its step none (-1), another negative (-2), or
 // steps 0 and 3 (never seen in play; recompiled on both sides) with their
@@ -2339,6 +2589,7 @@ void Type67Modes(Context& h) {
   Dialogs(h, world);
   Screen0Helpers(h, world);
   Cars(h, world);
+  Screen0Updates(h, world);
   ControllerUpdate(h, world);
   PollTeardown(h);
   TearDowns(h, world);
