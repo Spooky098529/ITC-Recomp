@@ -168,7 +168,10 @@ file's history. What's left to see in a drive, from every run:
   `SetInteriorPair`'s adapter removed; 1,450 cases, the stand's in the
   `car_makers` harness; races 37-38 s, 0 errors, all harnesses 0
   differing; subagents for batches 2-5, one at a time); left:
-  `RefreshMenu` `sub_821D8978` (1,319 lines). Validation agent running.
+  `RefreshMenu` `sub_821D8978` (1,319 lines). Validated `itc_4197`
+  (race 92 s at 180, the harnesses ~86 s; 0 errors, every harness 0
+  differing, 20 of 20 harness lines; 10 in the replay `itc_4198` (ok),
+  10 to drive). Fourth migration agent running (`RefreshMenu`).
 
 ## Done
 
@@ -250,3 +253,5 @@ file's history. What's left to see in a drive, from every run:
   1991 (wrapped 57, known 472, unknown 1462).
 - After its second migration and validation (`itc_3849`): ours 4446,
   work left 1966 (wrapped 57, known 447, unknown 1462).
+- After its third migration and validation (`itc_4197`): ours 4469,
+  work left 1944 (wrapped 57, known 425, unknown 1462).

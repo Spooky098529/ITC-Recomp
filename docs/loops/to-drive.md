@@ -87,6 +87,15 @@ here loses its heading.
   `sub_82202F30`, `sub_82202C08`, `sub_82203110`, `sub_82203B00`,
   `sub_821D6230`, `sub_82202750`, `sub_821E8B68`, `sub_82202368`,
   `sub_82200600`, `sub_82204888`, `sub_821FF1D0`, `sub_82202090`.
+- The tuning screen, third migration (attract race `itc_4197`, replay
+  `itc_4198` ok; `tuning-screen.md`): `sub_821CCC50`
+  TuningScreen::SetInteriorPair, `sub_821E0E00`
+  TuningScreen::PreviewWheels, `sub_822042D8` TuningScreen::ApplyDecals,
+  `sub_821D6420` TuningScreen::MarkPick, `sub_821FF6F0`
+  TuningScreen::Command16, `sub_821D5028` TuningScreen::ShowOptions,
+  `sub_821F1DE0` TuningScreen::SetStateTexts, `sub_821F4BF8`
+  TuningScreen::FillPartRows, `sub_822019D0` TuningScreen::DecalCommand,
+  `sub_821F5F70` TuningScreen::Command8.
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 
