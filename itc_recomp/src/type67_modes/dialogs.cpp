@@ -11,6 +11,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
 #include "ui_movies/game.h"
 
@@ -39,6 +40,41 @@ uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int s
 
 menu_sounds::Calls Sounds(const Calls& calls) {
   return {const_cast<Calls*>(&calls), &SoundThunk};
+}
+
+uint64_t MenuThunk(void* user, uint32_t function, uint64_t r3, uint64_t r4, uint32_t r1,
+                   uint32_t lr) {
+  return static_cast<const Calls*>(user)->call(function, r1, lr, r3, r4);
+}
+
+menu_helpers::Calls Menus(const Calls& calls) {
+  return {const_cast<Calls*>(&calls), &MenuThunk};
+}
+
+// A message (`message`, 0, 0) queued in a dispatcher's ring (+204), as the
+// pages do it inline.
+void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
+  const uint32_t ring = dispatcher + 204;
+  const uint32_t count = LoadU32(base, ring + 600) + 1;
+  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
+  StoreU32(base, ring + 600, count);
+  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
+  StoreU32(base, slot + 4, 0);
+  StoreU32(base, slot + 8, 0);
+  StoreU32(base, slot + 0, message);
+}
+
+// The page left for a step: the previous page (+9648) kept unless the page
+// (+9640) is 0, the next page 0, no step queued, `step` started, page -1.
+void ToStep(uint8_t* base, uint32_t dialog, uint32_t step) {
+  const uint32_t page = LoadU32(base, dialog + 9640);
+  if (page != 0) {
+    StoreU32(base, dialog + 9648, page);
+  }
+  StoreU32(base, dialog + 9652, step);
+  StoreU32(base, dialog + 9644, 0);
+  StoreU32(base, dialog + 9656, 0xFFFFFFFF);
+  StoreU32(base, dialog + 9640, 0xFFFFFFFF);
 }
 
 // The reopen both opens share after ResetPose: the cursors, the pages, and
@@ -163,6 +199,119 @@ uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const
   }
   calls.call(kRun, frame, 0x8223ABF0, movie, 0);
   return 1;
+}
+
+uint64_t DialogConfirmPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type7,
+                           uint32_t sp, const Calls& calls) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_82241EF8 Type7Dialog::ConfirmPage");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82232328 Type6Dialog::ConfirmPage");
+  }
+  const uint32_t dialog = uint32_t(r3);
+  const uint32_t shown = type7 ? 9760 : 9756;
+  const uint32_t frame = sp - 128;
+  StoreU32(base, dialog + 9752, 0);
+  if (LoadU32(base, dialog + shown) == 4) {
+    StoreU32(base, dialog + shown, 1);
+    return r3;
+  }
+  StoreU32(base, dialog + shown, 1);
+  const uint32_t menu = dialog + 9668;
+  menu_helpers::Step(base, menu, frame, calls.native_action_slots, Menus(calls));
+  uint64_t answer =
+      menu_helpers::Pressed(base, menu, 159, frame, calls.native_action_slots, Menus(calls));
+  if (int32_t(answer) != 0) {
+    answer = menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
+    ToStep(base, dialog, 1);
+    const bool yes = LoadU32(base, menu) == 0;
+    Post(base, dispatcher, type7 ? (yes ? 8 : 9) : (yes ? 9 : 10));
+    if (type7) {
+      StoreU32(base, dialog + 9760, 2);
+    }
+    return answer;
+  }
+  answer = menu_helpers::Pressed(base, menu, 158, frame, calls.native_action_slots, Menus(calls));
+  if (int32_t(answer) != 0) {
+    answer = menu_sounds::PlayMenuSound(base, 2, frame, Sounds(calls));
+    ToStep(base, dialog, 1);
+    Post(base, dispatcher, type7 ? 11 : 12);
+    if (type7) {
+      StoreU32(base, dialog + 9760, 2);
+    }
+    return answer;
+  }
+  if (LoadU32(base, dialog + 9676) == 0) {
+    return answer;
+  }
+  answer = menu_sounds::PlayMenuSound(base, 4, frame, Sounds(calls));
+  ToStep(base, dialog, 4);
+  return answer;
+}
+
+uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type7, uint32_t sp,
+                      const Calls& calls) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_82242218 Type7Dialog::Update");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82232798 Type6Dialog::Update");
+  }
+  const uint32_t dialog = uint32_t(r3);
+  const uint32_t frame = sp - 160;
+  StoreU32(base, frame + 80, LoadU32(base, dialog + 9744));
+  const uint32_t movie =
+      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  const uint32_t step = LoadU32(base, dialog + 9652);
+  // The steps' table: OpenConfirmStep, CloseConfirmStep, OpenNoticeStep,
+  // CloseNoticeStep, MoveCursorStep.
+  static constexpr uint32_t kSteps[5] = {0x822325E0, 0x8223AA10, 0x822326A8, 0x8223AAA8,
+                                         0x8223AB50};
+  for (uint32_t i = 0; i < 5; i++) {
+    StoreU32(base, frame + 96 + 4 * i, kSteps[i]);
+  }
+  uint64_t answer = movie;
+  if (step == 0xFFFFFFFF) {
+    answer = calls.call(kRun, frame, type7 ? 0x82242304 : 0x82232884, movie, 0);
+  } else {
+    bool done = true;
+    if (int32_t(step) >= 0) {
+      const uint32_t target = LoadU32(base, frame + 96 + (step << 2));
+      answer = calls.call(target, frame, type7 ? 0x822422B4 : 0x82232834, r3, frame + 80);
+      done = int32_t(answer) != 0;
+    }
+    if (done) {
+      const uint32_t p = dialog + 9640;
+      const uint32_t next = LoadU32(base, p + 16);
+      if (next == 0xFFFFFFFF) {
+        StoreU32(base, p + 0, LoadU32(base, p + 4));
+        StoreU32(base, p + 12, 0xFFFFFFFF);
+      } else {
+        StoreU32(base, p + 20, 0);
+        StoreU32(base, p + 12, next);
+        StoreU32(base, p + 16, 0xFFFFFFFF);
+      }
+      StoreU32(base, p + 24, 0);
+    }
+  }
+  const uint32_t state = LoadU32(base, dialog + 9740);
+  if (state == 21) {
+    return answer;
+  }
+  if (state == 9) {
+    Post(base, dispatcher, type7 ? 12 : 13);
+  }
+  StoreU32(base, dialog + 9604, LoadU32(base, dialog + 9740));
+  if (type7) {
+    StoreU32(base, dialog + 9740, 21);
+    StoreU32(base, dialog + 9760, 3);
+  } else {
+    const uint32_t shown = LoadU32(base, dialog + 9756);
+    StoreU32(base, dialog + 9740, 21);
+    if (shown != 5) {
+      StoreU32(base, dialog + 9756, 3);
+    }
+  }
+  return answer;
 }
 
 }  // namespace type67_modes

@@ -35,6 +35,7 @@
 #include "hooks/heap.h"
 #include "hooks/type67_modes.h"
 #include "hooks/ui_movies.h"
+#include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
 #include "memory/heap.h"
 #include "type67_modes/type67_modes.h"
@@ -1183,9 +1184,14 @@ void StandSlots(Context& h, const Block& world) {
 // 10 records (as the race HUD object's harness has it). UiMovie::Update
 // (UiMovie::Run's jump) and ApplyAnimation (FinishAll's and FinishNamed's)
 // recorded through the UI movies' stand-in, answered from the case's
-// generator. The world, the movie, the nodes, the fake manager, the calls,
-// the stack below the call (but the original's back chain and saved
-// registers) and r3 compared. ---
+// generator. The pages (ConfirmPage) and Updates add the players' mappers
+// (menu_helpers' harness's shape: the vtables' slots 10 and 12 Pressed and
+// Fired), the dialog's menu at +9668, the dispatcher at the world's +0x3200
+// and the step, queued step and queued state words; the Updates run the
+// steps from their table recompiled on both sides. The world, the movie, the
+// nodes, the fake manager, the mappers, the calls, the stack below the call
+// (but the original's back chain and saved registers, and the step's saves
+// below an Update's frame) and r3 compared. ---
 
 struct DialogCall {
   uint32_t function, lr, r1;
@@ -1214,12 +1220,27 @@ void Dialogs(Context& h, const Block& world) {
   auto node = [&](uint32_t i) { return nodes.address + kNodeBytes * i; };
   const uint32_t animations = nodes.address + kNodeBytes * kNodes;
   const uint32_t sp = CallContext(h).r1.u32;
+  // The pages' and Updates' worlds: the players' mappers (their vtables at
+  // +0x100, the mappers at +0x200) and the dispatcher at the world's +0x3200.
+  const Block mappers(0x1000);
+  if (!mappers.address) return;
+  const uint32_t dispatcher = world.address + 0x3200;
+  enum Kind { kStep, kPage, kUpdate };
   struct Function {
     const char* name;
     uint32_t address, frame, saves;
     GuestFunction recompiled, native;
+    Kind kind = kStep;
   };
   const Function functions[] = {
+      {"Type6Dialog::ConfirmPage", 0x82232328, 128, 48, __imp__sub_82232328,
+       hooks::Type6DialogConfirmPage, kPage},
+      {"Type7Dialog::ConfirmPage", 0x82241EF8, 128, 48, __imp__sub_82241EF8,
+       hooks::Type7DialogConfirmPage, kPage},
+      {"Type6Dialog::Update", 0x82232798, 160, 32, __imp__sub_82232798,
+       hooks::Type6DialogUpdate, kUpdate},
+      {"Type7Dialog::Update", 0x82242218, 160, 32, __imp__sub_82242218,
+       hooks::Type7DialogUpdate, kUpdate},
       {"Type6Dialog::OpenConfirm", 0x822320D8, 112, 24, __imp__sub_822320D8,
        hooks::Type6DialogOpenConfirm},
       {"Type7Dialog::OpenConfirm", 0x82241B40, 112, 24, __imp__sub_82241B40,
@@ -1234,9 +1255,11 @@ void Dialogs(Context& h, const Block& world) {
   };
   const std::vector<uint8_t> table = Read(base, ui_movies::kMovieTable, 12);
   const uint32_t saved_manager = guest::LoadU32(base, menu_sounds::kSoundManager);
+  const std::vector<uint8_t> saved_mappers = Read(base, menu_helpers::kMapperEntries, 32);
+  const std::vector<uint8_t> saved_controllers = Read(base, menu_helpers::kControllerEntries, 16);
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
-    for (int c = 0; c < 24; c++) {
+    for (int c = 0; c < (f.kind == kStep ? 24 : 48); c++) {
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
         Random r(uint64_t(c) * 811 + f.address);
@@ -1309,8 +1332,56 @@ void Dialogs(Context& h, const Block& world) {
         guest::StoreU32(base, manager, vtable);
         guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
         guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+        // The pages: the menu at +9668 (as menu_helpers' harness shapes
+        // it), the players' mappers, the moved word +9676 and the shown
+        // word. The Updates: the step +9652 (none, the three seen, another
+        // negative), the queued step +9656, the queued state +9740 and the
+        // shown word; movie 16 at +9744.
+        WriteRandom(base, mappers.address, mappers.bytes, r);
+        for (uint32_t k = 0; k < 4; k++) {
+          const uint32_t vt = mappers.address + 0x100 + 0x40 * k;
+          const uint32_t mapper = mappers.address + 0x200 + 0x200 * k;
+          guest::StoreU32(base, menu_helpers::kControllerEntries + 4 * k, r.Below(4));
+          guest::StoreU32(base, menu_helpers::kMapperEntries + 8 * k, mapper);
+          guest::StoreU32(base, menu_helpers::kMapperEntries + 8 * k + 4,
+                          r.Below(5) == 0 ? 1 : 0);
+          guest::StoreU32(base, mapper, vt);
+          guest::StoreU32(base, vt + menu_helpers::kPressedOffset, menu_helpers::kPressedSlot);
+          guest::StoreU32(base, vt + menu_helpers::kFiredOffset, menu_helpers::kFiredSlot);
+          for (uint32_t i = 0; i < 6; i++) {
+            const uint32_t bits = r.Below(3) == 0 ? 0 : uint32_t(r.Next() & r.Next());
+            guest::StoreU32(base, mapper + 448 + 4 * i, bits);
+          }
+        }
+        const uint32_t menu = dialog + 9668;
+        guest::StoreU32(base, menu + menu_helpers::kPlayer, r.Below(4));
+        guest::StoreU32(base, menu + menu_helpers::kFirst, 0);
+        guest::StoreU32(base, menu + menu_helpers::kLast, 1);
+        guest::StoreU32(base, menu + menu_helpers::kCursor, r.Below(2));
+        for (const uint32_t o : {menu_helpers::kWraps, menu_helpers::kUpDownLocked,
+                                 menu_helpers::kSidesStep, menu_helpers::kShouldersStep}) {
+          guest::StoreU32(base, menu + o, r.Below(2));
+        }
+        guest::StoreU32(base, menu + menu_helpers::kMoved, 0);
+        guest::StoreU32(base, menu + menu_helpers::kSide, 0);
+        guest::StoreU32(base, dialog + 9676, r.Below(2));
+        static constexpr uint32_t kShown[] = {4, 1, 5, 3};
+        guest::StoreU32(base, dialog + 9756, kShown[r.Below(4)]);
+        guest::StoreU32(base, dialog + 9760, kShown[r.Below(4)]);
+        if (f.kind == kUpdate) {
+          static constexpr uint32_t kStepsSeen[] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0, 1, 4,
+                                                    0xFFFFFFFEu};
+          guest::StoreU32(base, dialog + 9652, kStepsSeen[r.Below(6)]);
+          guest::StoreU32(base, dialog + 9656, r.Below(2) ? 0xFFFFFFFFu : r.Below(5));
+          static constexpr uint32_t kStates[] = {21, 21, 9, 4, 5, 6};
+          guest::StoreU32(base, dialog + 9740, kStates[r.Below(6)]);
+          guest::StoreU32(base, dialog + 9744, 16);
+        }
+        guest::StoreU32(base, dispatcher + 204 + 600, r.Below(50));
+        guest::StoreU32(base, dispatcher + 204 + 604, r.Below(60));
         PPCContext t = CallContext(h);
         t.r3.u64 = dialog | (uint64_t(r.Below(2)) << 32);
+        t.r4.u64 = dispatcher;
         t.lr = 0x82000000 | (r.Below(0x10000) << 2);
         g_dialog_answers = Random(r.Next());
         std::vector<DialogCall> calls;
@@ -1321,6 +1392,12 @@ void Dialogs(Context& h, const Block& world) {
         if (v == 0) {
           ITC_FLAG(native_type67_modes) = false;
           f.recompiled(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else if (f.kind == kUpdate) {
+          // The steps the Update calls through its table recompiled on both
+          // sides (their own cases are above).
+          ITC_FLAG(native_type67_modes) = false;
+          f.native(t, base);
           ITC_FLAG(native_type67_modes) = true;
         } else {
           f.native(t, base);
@@ -1339,7 +1416,16 @@ void Dialogs(Context& h, const Block& world) {
         out[v].Bytes(Read(base, movie, kMovieBlockBytes));
         out[v].Bytes(Read(base, nodes.address, nodes.bytes));
         out[v].Bytes(Read(base, misc.address, misc.bytes));
-        out[v].Bytes(Read(base, sp - 1024, 1024 - f.frame));
+        out[v].Bytes(Read(base, mappers.address, mappers.bytes));
+        out[v].Bytes(Read(base, menu_helpers::kMapperEntries, 32));
+        out[v].Bytes(Read(base, menu_helpers::kControllerEntries, 16));
+        if (f.kind == kUpdate) {
+          // But the step's register saves (40 bytes below the Update's
+          // frame): the Update's registers there, the native one's not.
+          out[v].Bytes(Read(base, sp - 1024, 1024 - f.frame - 40));
+        } else {
+          out[v].Bytes(Read(base, sp - 1024, 1024 - f.frame));
+        }
         out[v].Bytes(Read(base, sp - f.frame + 4, f.frame - 4 - f.saves));
         out[v].Bytes(Read(base, sp, 256));
         out[v].Word(t.r3.u32);
@@ -1351,6 +1437,8 @@ void Dialogs(Context& h, const Block& world) {
   }
   Write(base, ui_movies::kMovieTable, table.data(), 12);
   guest::StoreU32(base, menu_sounds::kSoundManager, saved_manager);
+  Write(base, menu_helpers::kMapperEntries, saved_mappers.data(), 32);
+  Write(base, menu_helpers::kControllerEntries, saved_controllers.data(), 16);
 }
 
 // --- The first screens' confirms and Type6Screen0::ShowPage: one harness

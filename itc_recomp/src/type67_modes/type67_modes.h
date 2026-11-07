@@ -175,6 +175,9 @@ struct Calls {
   std::function<uint64_t(uint32_t function, const uint64_t args[4], int set, uint32_t r1,
                          uint32_t lr)>
       call_set;
+  // --native_action_mappers: Menu::Step's and Pressed's plain C++ answer
+  // the mapper's read slots with ActionMapper::Pressed's and Fired's.
+  bool native_action_slots = false;
 };
 
 // A machine whose state a mode checks: the block's +`test` tested for 0
@@ -336,6 +339,22 @@ uint64_t DialogCloseConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, con
 // highlight finished (UiMovie::FinishNamed), the cursor's played and looped,
 // +9664 = 1; UiMovie::Run. Returns 1.
 uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls);
+// sub_82232328 Type6Dialog::ConfirmPage and sub_82241EF8
+// Type7Dialog::ConfirmPage (r3 the dialog, `dispatcher` r4): with the shown
+// word (+9756, +9760) 4, it = 1 and nothing else; else it = 1, Menu::Step
+// and Menu::Pressed (their plain C++) on the menu at +9668: accept (159) or
+// back (158) play MenuSound 0 or 2, start the close step (1) and post 9 or
+// 10 for the cursor, or 12 (type 7: 8, 9, 11; then the shown word 2); the
+// cursor moved (+9676) MenuSound 4 and step 4. r3 as the original leaves it.
+uint64_t DialogConfirmPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type7,
+                           uint32_t sp, const Calls& calls);
+// sub_82232798 Type6Dialog::Update and sub_82242218 Type7Dialog::Update:
+// the movie at +9744; with no step (+9652 -1) UiMovie::Run, else the step
+// from the five-entry table in its frame (a guest call) and, when it's done
+// (or the step is another negative value), the page state moved on; then a
+// queued state (+9740 not 21) applied (9: message 13 (type 7: 12) posted).
+uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type7, uint32_t sp,
+                      const Calls& calls);
 
 // --- The first screens' helpers (screen0.cpp) ---
 

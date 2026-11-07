@@ -107,6 +107,14 @@ void DialogDrawWaiting(PPCContext& ctx, uint8_t* base);
 void DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base);
 void DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base);
 void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base);
+// The dialogs' page 0 and Update (r3 the dialog, r4 the dispatcher):
+// Type6Dialog::ConfirmPage sub_82232328, Type7Dialog::ConfirmPage
+// sub_82241EF8, Type6Dialog::Update sub_82232798 and Type7Dialog::Update
+// sub_82242218.
+void Type6DialogConfirmPage(PPCContext& ctx, uint8_t* base);
+void Type7DialogConfirmPage(PPCContext& ctx, uint8_t* base);
+void Type6DialogUpdate(PPCContext& ctx, uint8_t* base);
+void Type7DialogUpdate(PPCContext& ctx, uint8_t* base);
 
 // The first screens' confirms (r4 the dispatcher): Type6Screen0::Confirm
 // sub_82233FC8, ConfirmAgain sub_822340B0 and Type7Screen0::Confirm

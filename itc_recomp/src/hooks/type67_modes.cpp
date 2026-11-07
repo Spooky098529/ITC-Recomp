@@ -17,6 +17,7 @@
 
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
+ITC_FLAG_DECLARE(bool, native_action_mappers);
 
 ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "Run the type 6 and 7 modes (docs/functions/type6-type7-modes.md: the state "
@@ -62,7 +63,11 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "Type6Dialog::OpenConfirm sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, "
               "Dialog::DrawWaiting sub_82241C18, Dialog::OpenConfirmStep sub_822325E0, "
               "CloseConfirmStep sub_8223AA10 and MoveCursorStep sub_8223AB50, UiMovie::Run, "
-              "FinishAll and FinishNamed guest calls; the first screens' Type6Screen0::Confirm "
+              "FinishAll and FinishNamed guest calls; the dialogs' pages "
+              "Type6Dialog::ConfirmPage sub_82232328 and Type7Dialog::ConfirmPage sub_82241EF8 "
+              "(Menu::Step, Menu::Pressed and MenuSound::Play's plain C++) and their Updates "
+              "Type6Dialog::Update sub_82232798 and Type7Dialog::Update sub_82242218 (the steps "
+              "guest calls); the first screens' Type6Screen0::Confirm "
               "sub_82233FC8, ConfirmAgain sub_822340B0, Type7Screen0::Confirm sub_82244528 (with "
               "the UI movies' text setters native) and Type6Screen0::ShowPage sub_822344A8) "
               "natively instead of "
@@ -206,6 +211,7 @@ void Type6Screen0GoOn(PPCContext& ctx, uint8_t* base) {
 
 t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
   t67::Calls calls;
+  calls.native_action_slots = ITC_FLAG(native_action_mappers);
   calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3,
                             uint64_t r4) -> uint64_t {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
@@ -375,6 +381,32 @@ void DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base) {
 void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::DialogMoveCursorStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
 }
+
+namespace {
+
+// The pages' and Updates' steps: the adapter's lr put back (their guest
+// calls set it).
+void ConfirmPage(PPCContext& ctx, uint8_t* base, bool type7) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::DialogConfirmPage(base, ctx.r3.u64, ctx.r4.u32, type7, ctx.r1.u32,
+                                      Type67Calls(ctx, base));
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
+void Update(PPCContext& ctx, uint8_t* base, bool type7) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::DialogUpdate(base, ctx.r3.u64, ctx.r4.u32, type7, ctx.r1.u32,
+                                 Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+
+}  // namespace
+
+void Type6DialogConfirmPage(PPCContext& ctx, uint8_t* base) { ConfirmPage(ctx, base, false); }
+void Type7DialogConfirmPage(PPCContext& ctx, uint8_t* base) { ConfirmPage(ctx, base, true); }
+void Type6DialogUpdate(PPCContext& ctx, uint8_t* base) { Update(ctx, base, false); }
+void Type7DialogUpdate(PPCContext& ctx, uint8_t* base) { Update(ctx, base, true); }
 
 // --- The first screens' helpers ---
 
@@ -582,6 +614,12 @@ ITC_TYPE67_MODES(82241C18, DialogDrawWaiting)
 ITC_TYPE67_MODES(822325E0, DialogOpenConfirmStep)
 ITC_TYPE67_MODES(8223AA10, DialogCloseConfirmStep)
 ITC_TYPE67_MODES(8223AB50, DialogMoveCursorStep)
+// The dialogs' page 0 (from their Draw's table, a guest call) and Update
+// (through the machines' transitions).
+ITC_TYPE67_MODES(82232328, Type6DialogConfirmPage)
+ITC_TYPE67_MODES(82241EF8, Type7DialogConfirmPage)
+ITC_TYPE67_MODES(82232798, Type6DialogUpdate)
+ITC_TYPE67_MODES(82242218, Type7DialogUpdate)
 
 // The first screens' confirms (from their recompiled callers): natively
 // while the UI movies' text setters are. Type6Screen0::ShowPage (from
