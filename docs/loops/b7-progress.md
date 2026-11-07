@@ -17,7 +17,13 @@ file's history. What's left to see in a drive, from every run:
   in `leads.md`, 45, beside the tuning screen just finished; the top two
   leads skipped: `sub_82562FF0` inside the movie library's range, the
   worker pools blocked only by the core's event and critical section
-  wrappers; its line deleted from `leads.md`). Mapping agent running.
+  wrappers; its line deleted from `leads.md`). Map checked (92fea740:
+  `tuning-pages.md`, 106 rows, all new, 67 in play: `TuningScreen::HandleInput`
+  `sub_821E6950` and its pages for states 0, 3-8, 15-22, 53-62; 0
+  errors; 48 ready groups; 4 leads added (the vinyl and sticker editors'
+  pages, the screen's other helper callers, `sub_8224B248`), the menu
+  helpers' lead trimmed; three subagents, one at a time). Migration
+  agent running.
 
 ## Done
 
@@ -37,5 +43,7 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 4476, work left 1937 (wrapped 57, known 418,
   unknown 1462).
+- After the tuning pages' map: ours 4476, work left 1937 (wrapped 57,
+  known 485, unknown 1395).
 
 ## Stopped

@@ -13,7 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 10:56 (`b7-loop-07-11-26`)
 
-Nothing yet.
+- `functions/tuning-pages.md` (new, 106 rows, 67 in play; 92fea740):
+  the tuning screen's input handler `sub_821E6950` and its pages; rows
+  in `known-data.md` (tuning screen, garage car, front-end menu). Noted
+  in its intro for the migration, by earlier calls: register leftovers
+  callers read (`MoveLevel`, `MoveType` reading `IsItemAvailable`'s r4;
+  `StoreStickers` relying on `GarageDecal` leaving r4-r8, f0, f12, f13),
+  `Texture::FromTga` storing r3 into its caller's frame, writes below
+  the stack pointer (`StoreVinyls`, `HsvToRgb`), varargs `SetText`
+  calls, unbounded state history pops; keeping a sticker area calls
+  `Career::PickNext` (the game's own).
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
