@@ -689,6 +689,45 @@ void RefreshMenuWorld(const World& w, Random& r) {
   }
 }
 
+// RefreshMovie13's world: its states mostly (23 to 28 and 34, now and
+// then another below 60), the sets +30724 and the picks +30740 and +30748
+// small (now and then any word), the name record at +20792 one that names
+// strings two times in three (kinds 0, 1, 4 or 5 and 2 or 3, indexes in
+// range), the movie's +28 table pointing into the block (state 24's
+// pointers), the floats +30840 and +30844 mostly ordinary.
+void Movie13World(const World& w, Random& r) {
+  const uint32_t s = w.screen();
+  static constexpr uint32_t kStates[] = {23, 24, 25, 26, 27, 28, 34, 28};
+  guest::StoreU32(w.base, s + ts::kState, r.Below(8) == 0 ? r.Below(60) : kStates[r.Below(8)]);
+  guest::StoreU32(w.base, s + 30724, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  guest::StoreU32(w.base, s + 30740, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(5));
+  guest::StoreU32(w.base, s + 30748,
+                  r.Below(6) == 0 ? uint32_t(-int32_t(r.Below(3))) : r.Below(8));
+  guest::StoreU32(w.base, s + 30764, r.Below(6));
+  guest::StoreU32(w.base, s + 30768, r.Below(6));
+  guest::StoreU32(w.base, s + 30848, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  for (const uint32_t at : {30840u, 30844u}) {
+    guest::StoreFloat(w.base, s + at, (float(r.Below(200000)) - 100000.0f) / 64.0f);
+  }
+  if (r.Below(8) == 0) {
+    guest::StoreU32(w.base, s + 30840, uint32_t(r.Next()));  // any word: NaNs, the ends
+  }
+  if (r.Below(3) != 0) {
+    const uint32_t name = s + 20792;
+    const uint32_t firsts[] = {0, 1, 4, 5};
+    guest::StoreU32(w.base, name + 4, firsts[r.Below(4)]);
+    guest::StoreU16(w.base, name + 8, uint16_t(r.Below(4)));
+    guest::StoreU8(w.base, name + 10, uint8_t(r.Below(2)));
+    guest::StoreU32(w.base, name + 12, 2 + r.Below(2));
+    guest::StoreU16(w.base, name + 16, uint16_t(r.Below(6)));
+    guest::StoreU8(w.base, name + 18, uint8_t(r.Below(2)));
+  }
+  guest::StoreU32(w.base, w.at(kMovieAt) + 28, w.at(kTableAt));
+  for (const uint32_t slot : {700u, 708u, 712u, 724u, 732u, 736u}) {
+    guest::StoreU32(w.base, w.at(kTableAt) + slot, w.at(kTargetsAt) + 4 * r.Below(64));
+  }
+}
+
 constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
 constexpr uint32_t kCommand30States[] = {35, 36, 37};
 
@@ -931,6 +970,12 @@ void TuningScreenPages(Context& h) {
                  t.r3.u64 |= r.Next() << 32;
                }
              }});
+  // RefreshMovie13 (last, so the groups before keep their seeds): its world
+  // (above); r29 to r31 saved (32 bytes); SetNodeText's and SetText's
+  // parameter area (+40 to +79) left out; f1 compared.
+  Run(h, w, {"TuningScreen::RefreshMovie13", 40, __imp__sub_822076E8,
+             hooks::TuningRefreshMovie13, {{-128, -128 + 40}, {-128 + 80, -32}},
+             [](PPCContext&, Random& r, const World& w) { Movie13World(w, r); }, true});
 }
 
 }  // namespace harness

@@ -350,6 +350,20 @@ uint64_t SetStateTexts(uint8_t* base, const GuestCall& call, uint32_t screen, ui
 // NamedAnimationTime's (the caller applies it before each later guest call).
 uint64_t RefreshMenu(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
                      std::optional<double>* f1);
+
+// sub_822076E8 TuningScreen::RefreshMovie13 (refresh_movie13.cpp): movie
+// 13's common texts, textures and nodes (the name record +20792 and the
+// money +25116 through SetChildNameText and SetNumberText; +30840 as an int
+// through the frame's +80, +30844 a double in r7 through the frame's +48 and
+// in f1; LayOutItems outside state 28, ShowOptionMarks 0), then by the state
+// (23 the top menu, 24 the layer lists with the movie's +28 table's
+// pointers, 25 the kinds and 26 the edit menu with their help texts
+// scrolled, 27 the option marks, 28 a layer's settings, 34 the view; its
+// row). 128-byte frame; r3 the last call's (a node, a list's or a text
+// call's); `*f1` the double the 37th text's call is made with (the caller
+// applies it before the next guest call).
+uint64_t RefreshMovie13(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+                        std::optional<double>* f1);
 // sub_821F4BF8 TuningScreen::FillPartRows (its case 0 the split piece
 // sub_821F4CF0, merged): r3 = the screen (all 64 bits). HidePartMarks, then
 // by n = +25224 rows 1 (0; the group 0's the car's picture), 1 and 2 (1), 0

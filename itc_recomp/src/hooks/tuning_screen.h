@@ -102,6 +102,8 @@ void TuningCommand8(PPCContext& ctx, uint8_t* base);
 // AnimationTime's or NamedAnimationTime's put in f1 before the next guest
 // call and at the end).
 void TuningRefreshMenu(PPCContext& ctx, uint8_t* base);
+// RefreshMovie13 sub_822076E8 (r3 the screen; f1 as the original leaves it).
+void TuningRefreshMovie13(PPCContext& ctx, uint8_t* base);
 
 // The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
 // with TuningStandCalleesNative: --native_stand_models, --native_race_setup

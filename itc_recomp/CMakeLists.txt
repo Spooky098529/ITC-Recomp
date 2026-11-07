@@ -423,6 +423,7 @@ set(ITC_SOURCES
     src/tuning_screen/menus.cpp
     src/tuning_screen/rows.cpp
     src/tuning_screen/refresh_menu.cpp
+    src/tuning_screen/refresh_movie13.cpp
     src/tuning_screen/stats.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
