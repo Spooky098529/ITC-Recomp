@@ -81,6 +81,12 @@ here loses its heading.
   `sub_821E8068`, `sub_821E8128`, `sub_821E8298`, `sub_821FD710`,
   `sub_821FD880`, `sub_821FDCB8`, `sub_821FE080`, `sub_821FE100`,
   `sub_821FE178`, `sub_821FE190`, `sub_821EE6D0`, `sub_821EE760`.
+- The tuning screen, second migration (attract race `itc_3849`, replay
+  `itc_3850` ok; `tuning-screen.md`, names in its rows): `sub_821DA3F8`,
+  `sub_821F2068`, `sub_821EE880`, `sub_82202880`, `sub_821E9050`,
+  `sub_82202F30`, `sub_82202C08`, `sub_82203110`, `sub_82203B00`,
+  `sub_821D6230`, `sub_82202750`, `sub_821E8B68`, `sub_82202368`,
+  `sub_82200600`, `sub_82204888`, `sub_821FF1D0`, `sub_82202090`.
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 

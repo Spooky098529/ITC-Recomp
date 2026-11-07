@@ -159,7 +159,10 @@ file's history. What's left to see in a drive, from every run:
   2 adapters removed; 505 cases; race 38 s, 0 errors, all harnesses 0
   differing; subagents for batches 3-5, one at a time); left: 18 ready
   (the stand and car calls, `MoveCategory`, `UpdateItems`, `RefreshMenu`,
-  `FillPartRows` and the rest). Validation agent running (180 s).
+  `FillPartRows` and the rest). Validated `itc_3849` (race 92 s at
+  180, the harnesses ~85.5 s; 0 errors, every harness 0 differing, 24 of
+  24 harness lines; 7 in the replay `itc_3850` (ok), 17 to drive). Third
+  migration agent running.
 
 ## Done
 
@@ -239,3 +242,5 @@ file's history. What's left to see in a drive, from every run:
   known 502, unknown 1462).
 - After its migration and validation (`itc_3839`): ours 4421, work left
   1991 (wrapped 57, known 472, unknown 1462).
+- After its second migration and validation (`itc_3849`): ours 4446,
+  work left 1966 (wrapped 57, known 447, unknown 1462).
