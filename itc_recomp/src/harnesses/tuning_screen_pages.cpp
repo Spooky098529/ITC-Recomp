@@ -7,8 +7,9 @@
 // root and 8 animations of no tracks (the named animations over them, the
 // animation lists set up), the screen and its command queue (and for
 // MoveCategory a front-end menu and four action mappers with their vtables,
-// the mapper entries' globals pointed at them); the save data
-// in a block of its own; a string table of our own (letters, newlines and
+// the mapper entries' globals pointed at them, used by UpdateItems too; for
+// ShowTypes the car parameters [0x826C2E48] and their part tables); the save
+// data (its garage list for ShowTypes and FillPartRows) in a block of its own; a string table of our own (letters, newlines and
 // page breaks, no argument codes: the varargs native callers pass as 0
 // aren't read). Each case fills it with random words from its seed, lays
 // it, points the globals into it (put back after), runs the original (with
@@ -60,7 +61,9 @@ constexpr uint32_t kDispatcherAt = 0x1F800;  // the dialogs' dispatcher (its rin
 constexpr uint32_t kVtablesAt = 0x1FC00;    // MoveCategory's 4 mappers' vtables (0x40 each)
 constexpr uint32_t kMappersAt = 0x1FD00;    // the 4 mappers (0x200 each)
 constexpr uint32_t kMenuAt = 0x20500;       // the front-end menu [+10040] (0x100)
-constexpr uint32_t kBlockBytes = 0x20600;
+constexpr uint32_t kParamsAt = 0x20600;     // ShowTypes' car parameters [0x826C2E48] (0x100)
+constexpr uint32_t kPartTablesAt = 0x20700;  // their part tables (0x900)
+constexpr uint32_t kBlockBytes = 0x21000;
 constexpr uint32_t kSaveBytes = 0x1A000;
 
 constexpr uint32_t kStackBytes = 2048;
@@ -81,6 +84,7 @@ constexpr Global kGlobals[] = {
     {kStringTable, 4},
     {0x826BAB80, 32},  // the players' action mapper entries
     {0x826BABA4, 16},  // their entries' indices
+    {0x826C2E48, 4},   // the car parameters (ShowTypes)
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -446,6 +450,128 @@ void MoveCategoryWorld(const World& w, Random& r) {
   }
 }
 
+// UpdateItems' world: the four players' mappers as MoveCategory's, their
+// slot 8 mostly ActionMapper::Held (else Pressed or Fired) and slot 11 mostly
+// sub_8210BFA8 (else Pressed); states 27 and 28 mostly, the set +30724 0 or
+// 1 mostly, the item +30732 and +30756 0 to 2.
+void UpdateItemsWorld(const World& w, Random& r) {
+  MoveCategoryWorld(w, r);
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t vtable = w.at(kVtablesAt) + 0x40 * c;
+    static constexpr uint32_t kSlots[] = {0x8210C010, 0x8210BF40};  // Fired, Pressed
+    guest::StoreU32(w.base, vtable + 32, r.Below(4) == 0 ? kSlots[r.Below(2)] : 0x8210BE70);
+    guest::StoreU32(w.base, vtable + 44, r.Below(4) == 0 ? 0x8210BF40 : 0x8210BFA8);
+  }
+  const uint32_t s = w.screen();
+  static constexpr uint32_t kItemStates[] = {27, 28, 28, 27, 28, 26, 29, 5};
+  guest::StoreU32(w.base, s + ts::kState, kItemStates[r.Below(8)]);
+  guest::StoreU32(w.base, s + 30724, r.Below(5) == 0 ? r.Below(4) : r.Below(2));
+  guest::StoreU32(w.base, s + 30732, r.Below(3));
+  guest::StoreU32(w.base, s + 30756, r.Below(3));
+}
+
+// The save data's garage list (at +6120: the head +204, links of 4 bytes,
+// +0 the next and +2 the slot, 0 to 7 and 0 to 3), walked 0 to 3 steps
+// ([save + 0x19920]); each slot's car id (+224 of its 1,968-byte record)
+// below `ids`.
+void GarageList(const World& w, Random& r, uint32_t ids) {
+  const uint32_t list = w.save + 6120;
+  guest::StoreU32(w.base, w.save + 0x19920, r.Below(4));
+  guest::StoreU16(w.base, list + 204, uint16_t(r.Below(8)));
+  for (uint32_t k = 0; k < 8; k++) {
+    guest::StoreU16(w.base, list + 4 * k, uint16_t(r.Below(8)));
+    guest::StoreU16(w.base, list + 4 * k + 2, uint16_t(r.Below(4)));
+  }
+  for (uint32_t slot = 0; slot < 4; slot++) {
+    guest::StoreU32(w.base, list + 1968 * slot + 224, r.Below(ids));
+  }
+}
+
+// ShowTypes' world: the lists' pages (above), power, aero, exterior and
+// interior mostly with the items their pages show half the time, aero's
+// items 0 to 10, the byte +9678 0 to 12, [+36368] and [+36588] small; the
+// garage list (car ids 0 to 3) and the car parameters [0x826C2E48] in the
+// block, their 9 tables' pointers at one table area of random words.
+void ShowTypesWorld(const World& w, Random& r) {
+  ListPage(w, r);
+  const uint32_t s = w.screen();
+  static constexpr uint32_t kCategories[] = {0, 4, 4, 5, 6, 0, 4, 5, 6, 1, 3};
+  const uint32_t category = kCategories[r.Below(11)];
+  guest::StoreU32(w.base, s + ts::kCategory, category);
+  uint32_t item = r.Below(5);
+  if (category == 4) {
+    item = r.Below(2) == 0 ? 3 : r.Below(11);
+  } else if (r.Below(2) == 0) {
+    static constexpr uint32_t kItems[] = {2, 2, 3, 0, 1};
+    item = category == 0 ? 2 : category == 5 ? kItems[r.Below(3)] : kItems[2 + r.Below(3)];
+  }
+  guest::StoreU8(w.base, s + ts::kItem, uint8_t(item));
+  guest::StoreU8(w.base, s + 9678, uint8_t(r.Below(13)));
+  guest::StoreU32(w.base, s + 36368, Small(r, 8));
+  guest::StoreU32(w.base, s + 36588, r.Below(3) == 0 ? 0 : Small(r, 4));
+  GarageList(w, r, 4);
+  const uint32_t params = w.at(kParamsAt);
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(w.base, params + 16 + 4 * i, w.at(kPartTablesAt));
+  }
+  guest::StoreU32(w.base, 0x826C2E48, params);
+}
+
+// SetStateTexts' world: states 15 to 17 mostly, +25228 0 to 7, the group
+// +25204 0 or 16 now and then, else 1 to 15, +25212 so the tabs' table
+// index (+25204 - +25212 + j) stays -3 to 16; the looping list given slots
+// naming 1007 and 62 (time -1.0 or another) now and then.
+void StateTextsWorld(const World& w, Random& r) {
+  NamedAnimations(w, r);
+  const uint32_t s = w.screen();
+  static constexpr uint32_t kTextStates[] = {15, 16, 17, 16, 15, 17, 16, 4};
+  guest::StoreU32(w.base, s + ts::kState, kTextStates[r.Below(8)]);
+  guest::StoreU32(w.base, s + 25228, r.Below(8));
+  const uint32_t group = r.Below(3) == 0 ? (r.Below(2) == 0 ? 0 : 16) : 1 + r.Below(15);
+  guest::StoreU32(w.base, s + 25204, group);
+  guest::StoreU32(w.base, s + 25212, uint32_t(int32_t(group) - int32_t(r.Below(17)) + 3));
+  // State 15's textures: nodes (3, 1) and (3, 2) given PIC or PRM tags
+  // (now and then left TXT) when they aren't the help text's node (10, 0)
+  // or the tabs' and arrows' (sub-scene 1's), which SetText and SetNodeText
+  // need as TXT.
+  const uint32_t movie = w.at(kMovieAt);
+  if (guest::LoadU32(w.base, s + ts::kState) == 15) {
+    std::vector<uint32_t> texts = {ui_movies::FindNode(w.base, movie, 10, 0)};
+    for (const uint32_t child : {1u, 2u}) {
+      const uint32_t node = ui_movies::FindNode(w.base, movie, 3, child);
+      bool text = false;
+      for (const uint32_t t : texts) {
+        text = text || t == node;
+      }
+      if (!text && r.Below(4) != 0) {
+        guest::StoreU32(w.base, node, r.Below(2) == 0 ? 0x50494300u : 0x50524D00u);
+      }
+    }
+  }
+  const uint32_t looping = movie + ui_movies::kMovieLooping;
+  for (const uint32_t named : {1007u, 62u}) {
+    if (r.Below(3) == 0) {
+      ui_movies::Slot slot{};
+      slot[2] = named;
+      slot[5] = r.Below(2) == 0 ? 0xBF800000u : uint32_t(r.Next());
+      ui_movies::Append(w.base, looping, slot);
+    }
+  }
+}
+
+// FillPartRows' world: n = +25224 -1 to 8, the cursor +25220 0 to n, the
+// group +25204 0 a third of the time, else 1 to 16; the wheel side +25196 0
+// to 3; the garage list (car ids 0 to 25, for the group 0's picture).
+void PartRowsWorld(const World& w, Random& r) {
+  const uint32_t s = w.screen();
+  const int32_t last = int32_t(r.Below(10)) - 1;
+  guest::StoreU32(w.base, s + 25224, uint32_t(last));
+  guest::StoreU32(w.base, s + 25220, last <= 0 ? 0 : r.Below(uint32_t(last) + 1));
+  guest::StoreU32(w.base, s + 25204, r.Below(3) == 0 ? 0 : 1 + r.Below(16));
+  guest::StoreU32(w.base, s + 25196, r.Below(4));
+  GarageList(w, r, 26);
+}
+
 constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
 constexpr uint32_t kCommand30States[] = {35, 36, 37};
 
@@ -615,6 +741,35 @@ void TuningScreenPages(Context& h) {
                guest::StoreU8(w.base, s + 9677, uint8_t(r.Below(13)));
                guest::StoreU32(w.base, s + 25100, Small(r, 8));
                TirePairs(w, r, 35948, 36076, 35952, 36080);
+             }});
+  // UpdateItems: the mappers' slots 8 and 11, the states and the set
+  // (above); r29 to r31 saved (32 bytes).
+  Run(h, w, {"TuningScreen::UpdateItems", 25, __imp__sub_822036E8, hooks::TuningUpdateItems,
+             {{-128, -32}}, [](PPCContext& t, Random& r, const World& w) {
+               UpdateItemsWorld(w, r);
+               if (r.Below(4) == 0) {
+                 t.r3.u64 |= r.Next() << 32;
+               }
+             }});
+  // ShowTypes: the pages and the aero parts (above); r27 to r31 and f31
+  // saved (56 bytes), SetText's parameter area left out.
+  Run(h, w, {"TuningScreen::ShowTypes", 25, __imp__sub_821D2A80, hooks::TuningShowTypes,
+             {{-320, -320 + 48}, {-320 + 80, -56}}, [](PPCContext&, Random& r, const World& w) {
+               ShowTypesWorld(w, r);
+             }});
+  // SetStateTexts: r27 to r31 and f31 saved (56 bytes); SetNodeText's and
+  // SetText's parameter area (+40 to +79) left out.
+  Run(h, w, {"TuningScreen::SetStateTexts", 25, __imp__sub_821F1DE0,
+             hooks::TuningSetStateTexts, {{-224, -224 + 40}, {-224 + 80, -56}},
+             [](PPCContext&, Random& r, const World& w) { StateTextsWorld(w, r); }});
+  // FillPartRows: r23 to r31 saved (80 bytes); r3's high word now and then
+  // set.
+  Run(h, w, {"TuningScreen::FillPartRows", 25, __imp__sub_821F4BF8, hooks::TuningFillPartRows,
+             {{-176, -80}}, [](PPCContext& t, Random& r, const World& w) {
+               PartRowsWorld(w, r);
+               if (r.Below(4) == 0) {
+                 t.r3.u64 |= r.Next() << 32;
+               }
              }});
 }
 

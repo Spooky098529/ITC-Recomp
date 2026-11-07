@@ -88,6 +88,14 @@ void TuningMarkPick(PPCContext& ctx, uint8_t* base);
 void TuningCommand16(PPCContext& ctx, uint8_t* base);
 void TuningShowOptions(PPCContext& ctx, uint8_t* base);
 void TuningShowLevels(PPCContext& ctx, uint8_t* base);
+// UpdateItems sub_822036E8 (the mapper's slot 8 by ActionMapper::Held's
+// plain C++ with --native_action_mappers), ShowTypes sub_821D2A80 (the aero
+// parts by their plain C++ with --native_car_specs), SetStateTexts
+// sub_821F1DE0 (f1 as the original leaves it) and FillPartRows sub_821F4BF8.
+void TuningUpdateItems(PPCContext& ctx, uint8_t* base);
+void TuningShowTypes(PPCContext& ctx, uint8_t* base);
+void TuningSetStateTexts(PPCContext& ctx, uint8_t* base);
+void TuningFillPartRows(PPCContext& ctx, uint8_t* base);
 
 // The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
 // with TuningStandCalleesNative: --native_stand_models, --native_race_setup

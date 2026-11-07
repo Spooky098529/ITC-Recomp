@@ -304,6 +304,46 @@ uint64_t ShowOptions(uint8_t* base, const GuestCall& call, uint32_t screen, uint
 // with +9724. 160-byte frame; the last LoopNamed's r3, else the entry.
 uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
+// sub_822036E8 TuningScreen::UpdateItems: r3 = the screen (all 64 bits).
+// Movie 13's items by the state (its row): 27 TuningScreen::HighlightItem
+// and 28 HighlightSelected (both recompiled, through `call`) by the player's
+// mapper's slots 8 (ActionMapper::Held's plain C++ when the vtable holds it
+// and `native_slots`, else the slot) and 11 (through `call`) on action 164;
+// in 28 LayOutItems, and unless 163 is held the selected item's node put
+// back at the origin. 128-byte frame (the last conversion's doubleword at
+// frame + 80); r3 the node, LayOutItems', the last call's, else the entry.
+uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp,
+                     bool native_slots);
+// sub_821D2A80 TuningScreen::ShowTypes (its case 0 the split piece
+// sub_821D2DFC, merged): power item 2, aero, exterior and interior's type
+// page (its row): with +9716 the scene's animations and the current choice's
+// picture; the type's mark and animations; aero's help text by the item
+// (item 3's by the selected garage car's aero parts 77 and 82: their plain
+// C++ with `native_specs`, else the originals); the queue's step with +9724.
+// 320-byte frame (the parts at frame + 96 to + 259); the last call's r3,
+// else the entry.
+uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+                   bool native_specs);
+
+// --- The help texts and the part list's rows (rows.cpp) ---
+
+// sub_821F1DE0 TuningScreen::SetStateTexts: by the state, 17 the wheel
+// inch's text (785 + +25228) and node (-1, 17) by the group; 16 the group
+// tabs (unless 1007 or 62 plays, or +9716; the table at frame + 96), the
+// arrows (1, 26) and (1, 27), text 784; 15 the textures (3, 1) and (3, 2)
+// with +9716, text 637 (its row). 224-byte frame; r3 the node, the last
+// ScrollText's, else the entry; `*f1` the last NamedAnimationTime's (state
+// 16).
+uint64_t SetStateTexts(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+                       std::optional<double>* f1);
+// sub_821F4BF8 TuningScreen::FillPartRows (its case 0 the split piece
+// sub_821F4CF0, merged): r3 = the screen (all 64 bits). HidePartMarks, then
+// by n = +25224 rows 1 (0; the group 0's the car's picture), 1 and 2 (1), 0
+// to 2 wrapped over 3 (2), nothing (3, negative), 0 to 4 wrapped over n + 1
+// (4 and above), each with WheelNumber, the owned mark and ShowPartMarks
+// (its row). 176-byte frame; r3 ShowPartMarks', else the entry.
+uint64_t FillPartRows(uint8_t* base, uint64_t r3, uint32_t sp);
+
 // --- The calls onto the stand (stand.cpp) ---
 // Each with the original's frame below `sp` (its back chain and the words it
 // stores there; its callees' frames below it as their plain C++ writes them)

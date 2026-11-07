@@ -20,6 +20,7 @@
 ITC_FLAG_DECLARE(bool, native_stand_models);
 ITC_FLAG_DECLARE(bool, native_race_setup);
 ITC_FLAG_DECLARE(bool, native_action_mappers);
+ITC_FLAG_DECLARE(bool, native_car_specs);
 
 ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Run the tuning screen's functions (docs/functions/tuning-screen.md: the part "
@@ -46,8 +47,12 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Command22 sub_82202090, MoveCategory sub_821D07D8 (the player's action mapper's "
               "slot 10 by ActionMapper::Pressed's plain C++ with --native_action_mappers, else "
               "through the vtable), MarkPick sub_821D6420, Command16 sub_821FF6F0, ShowOptions "
-              "sub_821D5028 and ShowLevels sub_821D12C0, UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
-              "LoopNamed, SetText, ScrollText and sub_8211C5F8 "
+              "sub_821D5028, ShowLevels sub_821D12C0, UpdateItems sub_822036E8 (the mapper's slot 8 by "
+              "ActionMapper::Held's plain C++ with --native_action_mappers; HighlightItem and "
+              "HighlightSelected through the guest), ShowTypes sub_821D2A80 (its piece sub_821D2DFC "
+              "merged; the aero parts by their plain C++ with --native_car_specs), SetStateTexts "
+              "sub_821F1DE0 and FillPartRows sub_821F4BF8 (its piece sub_821F4CF0 merged), UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
+              "LoopNamed, SetText, SetNodeText, ScrollText and sub_8211C5F8 "
               "through their overrides; the lists' "
               "UpdateListDots sub_821EE9B0, ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, "
               "LayOutItems sub_82203110 and ShowItems sub_82203B00, movies 2's and 13's nodes; the calls onto the "
@@ -263,6 +268,41 @@ void TuningMoveCategory(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningUpdateItems(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
+    return ts::UpdateItems(base, call, r3, sp, native_slots);
+  });
+  ctx.fpscr.disableFlushMode();
+}
+
+void TuningShowTypes(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_specs = ITC_FLAG(native_car_specs);
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
+    return ts::ShowTypes(base, call, screen, sp, native_specs);
+  });
+  ctx.fpscr.disableFlushMode();
+}
+
+void TuningSetStateTexts(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  std::optional<double> f1;
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
+    return ts::SetStateTexts(base, call, screen, sp, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
+void TuningFillPartRows(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::FillPartRows(base, ctx.r3.u64, ctx.r1.u32);
+}
+
 // The same with r3 all 64 bits and r4 the update's dispatcher.
 #define ITC_TUNING_DISPATCH_STEP(Name)                                                \
   void Tuning##Name(PPCContext& ctx, uint8_t* base) {                                \
@@ -419,6 +459,10 @@ ITC_TUNING_SCREEN(821D6420, TuningMarkPick)
 ITC_TUNING_SCREEN(821FF6F0, TuningCommand16)
 ITC_TUNING_SCREEN(821D5028, TuningShowOptions)
 ITC_TUNING_SCREEN(821D12C0, TuningShowLevels)
+ITC_TUNING_SCREEN(822036E8, TuningUpdateItems)
+ITC_TUNING_SCREEN(821D2A80, TuningShowTypes)
+ITC_TUNING_SCREEN(821F1DE0, TuningSetStateTexts)
+ITC_TUNING_SCREEN(821F4BF8, TuningFillPartRows)
 
 // The calls onto the stand: also the original unless their callees are
 // native.

@@ -11,8 +11,10 @@
 #include "action_mappers/action_mappers.h"
 #include "base/log.h"
 #include "camera_modes/steps.h"
+#include "car_specs/car_specs.h"
 #include "debug/pause_menu_log.h"
 #include "guest.h"
+#include "native/buffers.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -81,6 +83,28 @@ uint64_t PressedSlot(uint8_t* base, const GuestCall& call, uint32_t mapper, uint
     return r3;
   }
   return call(function, {mapper, action}, frame, lr);
+}
+
+constexpr uint32_t kHeldSlot = 0x8210BE70;  // ActionMapper::Held
+
+// The mapper's slot 8 (+32, ActionMapper::Held's plain C++ when the vtable
+// holds it and `native_slots`, logged as its adapter does) or 11 (+44,
+// sub_8210BFA8: through `call`) on `action`, from `frame` returning to
+// `lr`. Its r3.
+uint64_t HeldSlot(uint8_t* base, const GuestCall& call, uint32_t mapper, uint64_t action,
+                  uint32_t frame, uint32_t lr, bool native_slots) {
+  const uint32_t function = Load(base, Load(base, mapper) + 32);
+  if (native_slots && function == kHeldSlot) {
+    const uint32_t id = uint32_t(action);
+    const uint32_t r3 = action_mappers::Held(base, mapper, id);
+    debug::PauseMenuLog_NoteSlotRead(8, mapper, id, lr, double(r3));
+    return r3;
+  }
+  return call(function, {mapper, action}, frame, lr);
+}
+uint64_t Slot11(uint8_t* base, const GuestCall& call, uint32_t mapper, uint64_t action,
+                uint32_t frame, uint32_t lr) {
+  return call(Load(base, Load(base, mapper) + 44), {mapper, action}, frame, lr);
 }
 
 }  // namespace
@@ -470,6 +494,290 @@ uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint3
     FinishNamed(call, frame, 0x821D199C, movie, 1013);
     PlayNamed(call, frame, 0x821D19B8, movie, 1013, 1);
     r3 = LoopNamed(call, frame, 0x821D19C4, movie, 1013);
+  }
+  StepWith9724(base, screen);
+  return r3;
+}
+
+uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint32_t sp,
+                     bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_822036E8 TuningScreen::UpdateItems");
+  const uint32_t screen = uint32_t(r3_in);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t mappers = Load(base, kControllerEntries) * 8 + kMapperEntries;
+  const uint32_t entry = MovieEntry(base, frame, 13);
+  const int32_t state = int32_t(Load(base, screen + kState));
+  const uint32_t movie = Load(base, entry);
+  uint64_t r3 = entry;
+  auto asks = [&] { return int32_t(Load(base, mappers + 4)) != 1; };
+  auto mapper = [&] { return Load(base, mappers); };
+  if (state == 27) {
+    // HighlightItem (sub_82203400, recompiled: not seen in play) on +30756,
+    // r4 0 with 164 held, 1 with slot 11's 164.
+    std::optional<uint64_t> all;
+    if (asks()) {
+      r3 = HeldSlot(base, call, mapper(), 164, frame, 0x822039DC, native_slots);
+      if ((r3 & 0xFF) != 0) {
+        all = 0;
+      }
+    }
+    if (!all) {
+      if (!asks()) {
+        return r3;
+      }
+      r3 = Slot11(base, call, mapper(), 164, frame, 0x82203A10);
+      if ((r3 & 0xFF) == 0) {
+        return r3;
+      }
+      all = 1;
+    }
+    return call(0x82203400, {r3_in, *all, Load(base, screen + 30756)}, frame, 0x82203A28);
+  }
+  if (state != 28) {
+    return r3;
+  }
+  // HighlightSelected (sub_82203570, recompiled: not seen in play), r4 0
+  // with 164 held, 1 with slot 11's 164.
+  std::optional<uint64_t> all;
+  if (asks()) {
+    r3 = HeldSlot(base, call, mapper(), 164, frame, 0x82203764, native_slots);
+    if ((r3 & 0xFF) != 0) {
+      all = 0;
+    }
+  }
+  if (!all && asks()) {
+    r3 = Slot11(base, call, mapper(), 164, frame, 0x82203798);
+    if ((r3 & 0xFF) != 0) {
+      all = 1;
+    }
+  }
+  if (all) {
+    r3 = call(0x82203570, {r3_in, *all}, frame, 0x822037AC);
+  }
+  if (asks()) {
+    r3 = HeldSlot(base, call, mapper(), 163, frame, 0x822037D0, native_slots);
+    if ((r3 & 0xFF) != 0) {
+      return LayOutItems(base, screen, frame);
+    }
+  }
+  r3 = LayOutItems(base, screen, frame);
+  const int32_t variant = int32_t(Load(base, screen + 30724));
+  if (variant != 0 && variant != 1) {
+    return r3;
+  }
+  // The selected item's node put back at the origin (+12, +16 through the
+  // frame's doubleword at +80), its size halved (+20, +24 from the first
+  // lookup), +36 = 0.0, +28 = +32 = the size, +132 = 0 (the first lookup).
+  const bool second = variant == 1;
+  const uint32_t first = second ? 22 : 19;
+  const uint32_t origin_x = screen + (second ? 30816 : 30800);
+  const uint32_t origin_y = screen + (second ? 30820 : 30804);
+  const uint32_t scale = screen + (second ? 30828 : 30812);
+  const uint32_t size = screen + (second ? 30824 : 30808);
+  const uint32_t looked = ui_movies::FindNode(base, movie, uint32_t(kAllScenes),
+                                              Load(base, screen + 30732) + first);
+  const uint32_t node = ui_movies::FindNode(base, movie, uint32_t(kAllScenes),
+                                            Load(base, screen + 30732) + first);
+  auto through_frame = [&](uint32_t at) {
+    const int64_t x = int32_t(Load(base, at));
+    Store(base, frame + 80, uint32_t(uint64_t(x) >> 32));
+    Store(base, frame + 84, uint32_t(x));
+    return steps::Single(double(x));
+  };
+  const double zero = steps::Lfs(base, 0x82000A34);
+  {
+    const double s = steps::Lfs(base, scale);
+    const double x = through_frame(origin_x);
+    steps::Stfs(base, node + 12, steps::Fadds(steps::Fmadds(s, zero, x),
+                                              steps::Lfs(base, second ? 0x8200CAECu : 0x8200CAF4u)));
+  }
+  {
+    const int64_t y_word = int32_t(Load(base, origin_y));
+    const double s = steps::Lfs(base, scale);
+    Store(base, frame + 80, uint32_t(uint64_t(y_word) >> 32));
+    Store(base, frame + 84, uint32_t(y_word));
+    const double y = steps::Single(double(y_word));
+    steps::Stfs(base, node + 16, steps::Fadds(steps::Fmadds(s, zero, y),
+                                              steps::Lfs(base, second ? 0x8200CAE8u : 0x8200CAF0u)));
+  }
+  const double half = steps::Lfs(base, 0x82001BE4);
+  Store(base, node + 20,
+        uint32_t(steps::Fctiwz(steps::Fmuls(steps::Lfs(base, looked + 100), half))));
+  const double height = steps::Fmuls(steps::Lfs(base, looked + 104), half);
+  steps::Stfs(base, node + 36, zero);
+  Store(base, node + 24, uint32_t(steps::Fctiwz(height)));
+  steps::Stfs(base, node + 28, steps::Lfs(base, size));
+  steps::Stfs(base, node + 32, steps::Lfs(base, size));
+  Store(base, looked + 132, 0);
+  return node;
+}
+
+namespace {
+
+constexpr uint32_t kGetCarParts = 0x820C9E00;  // Params::GetCarParts(out, car)
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kGet77 = 0x820CB9E0;  // AeroParts::Get77(out, parts, level)
+constexpr uint32_t kGet82 = 0x820CBC90;  // AeroParts::Get82(out, parts, level)
+
+// ShowTypes' item 3 text (629 or 630): the selected garage car's parts
+// (Params::GetCarParts into frame + 176, copied to frame + 96), its aero
+// parts 77 at the type (frame + 144) and 82 at [+36588] (frame + 224): their
+// plain C++ with `native_specs` (the original's where the plain C++
+// declines), else the originals; memcpy native where Buffers_Memcpy takes
+// it.
+uint64_t AeroText(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t frame,
+                  bool native_specs) {
+  const uint32_t save = Load(base, screen + kSaveData);
+  const uint32_t list = save + 6120;
+  uint32_t count = Load(base, save + 0x19920);
+  uint32_t at = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 204)))) * 4 + list;
+  while (count != 0) {
+    at = uint32_t(int32_t(int16_t(guest::LoadU16(base, at)))) * 4 + list;
+    count--;
+  }
+  const int32_t slot = int16_t(guest::LoadU16(base, at + 2));
+  const uint32_t car = Load(base, uint32_t(slot * 1968) + list + 224);
+  const uint32_t parts_out = frame + 176, parts = frame + 96;
+  uint32_t parts_at = parts_out;
+  if (native_specs) {
+    uint32_t words[9];
+    car_specs::GetCarParts(base, car, words);
+    for (uint32_t i = 0; i < 9; i++) {
+      Store(base, parts_out + 4 * i, words[i]);
+    }
+  } else {
+    parts_at = uint32_t(call(kGetCarParts, {parts_out, car}, frame, 0x821D2E60));
+  }
+  if (!native::Buffers_Memcpy(base, parts, parts_at, 36, 0x821D2E70)) {
+    call(kMemcpy, {parts, parts_at, 36}, frame, 0x821D2E70);
+  }
+  auto get = [&](uint32_t function, uint32_t out, uint64_t level, uint32_t lr,
+                 bool (*plain)(uint8_t*, uint32_t, const uint32_t[9], int32_t)) {
+    if (native_specs) {
+      uint32_t words[9];
+      for (uint32_t i = 0; i < 9; i++) {
+        words[i] = Load(base, parts + 4 * i);
+      }
+      if (plain(base, out, words, int32_t(level))) {
+        return out;
+      }
+    }
+    return uint32_t(call(function, {out, parts, level}, frame, lr));
+  };
+  const uint32_t kit77 = get(kGet77, frame + 144, Byte(base, screen + kType), 0x821D2E80,
+                             car_specs::AeroPart77);
+  const uint32_t a = Load(base, kit77 + 24);
+  const uint32_t kit82 = get(kGet82, frame + 224, Load(base, screen + 36588), 0x821D2EA0,
+                             car_specs::AeroPart82);
+  const bool none = Load(base, screen + 36588) == 0;
+  const uint32_t b = Load(base, kit82 + 24);
+  if (none || (b & 2) != 0) {
+    return (a & 1) != 0 ? 629 : 630;
+  }
+  return (b & 4) != 0 ? 629 : 630;
+}
+
+}  // namespace
+
+uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+                   bool native_specs) {
+  ITC_NATIVE_RUNNING("sub_821D2A80 TuningScreen::ShowTypes");
+  const uint32_t frame = Frame(base, sp, 320);
+  const uint32_t entry = MovieEntry(base, frame, kMovieId);
+  const int32_t category = int32_t(Load(base, screen + kCategory));
+  const uint32_t movie = Load(base, entry);
+  uint64_t r3 = entry;
+  auto type = [&] { return uint64_t(Byte(base, screen + kType)); };
+  auto item = [&] { return Byte(base, screen + kItem); };
+  auto scene = [&](uint64_t index, uint32_t chained, uint32_t finish_lr, uint32_t play_lr) {
+    call(kFinish, {movie, kAllScenes, index}, frame, finish_lr);
+    call(kPlay, {movie, kAllScenes, index, chained, 0, 0, 0}, frame, play_lr);
+  };
+  // The current choice's picture: node (28, 0)'s child 2 shown, its +16 =
+  // float(x) × 40.0; the flags cleared.
+  auto picture = [&](auto x) {
+    const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 0), 2);
+    Store(base, node + 80, 1);
+    Store(base, node + 16, Scaled(base, frame, x(node)));
+    ClearFlags(base, screen);
+  };
+  auto choice = [&](uint32_t) { return int64_t(int32_t(GetCurrentChoice(base, screen))); };
+  // The type's mark: node (28, 1)'s child 0 +16 = float(type) × 40.0.
+  auto mark = [&] {
+    const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 1), 0);
+    Store(base, node + 16, Scaled(base, frame, Unsigned8(base, screen + kType)));
+  };
+  if (category == 0 && item() == 2) {
+    if (Load(base, screen + 9716) != 0) {
+      FinishNamed(call, frame, 0x821D2AE4, movie, 989);
+      PlayNamed(call, frame, 0x821D2B00, movie, 989, 0);
+      ClearFlags(base, screen);
+    }
+    const uint32_t node = ui_movies::FindNode(base, movie, 29, 0);
+    Store(base, node + 16, Scaled(base, frame, Unsigned8(base, screen + kType)));
+    FinishNamed(call, frame, 0x821D2B5C, movie, type() + 532);
+    PlayNamed(call, frame, 0x821D2B7C, movie, type() + 532, 1);
+    r3 = LoopNamed(call, frame, 0x821D3278, movie, type() + 532);
+  } else if (category == 4) {
+    if (Load(base, screen + 9716) != 0) {
+      if (item() == 4) {
+        scene(8, 1, 0x821D2BC0, 0x821D2BF0);
+      } else {
+        scene(6, 1, 0x821D2BD0, 0x821D2BF0);
+      }
+      FinishNamed(call, frame, 0x821D2BFC, movie, 1011);
+      PlayNamed(call, frame, 0x821D2C18, movie, 1011, 0);
+      picture([&](uint32_t) {
+        return item() == 4 ? int64_t(int32_t(Load(base, screen + 36368)))
+                           : int64_t(int32_t(GetCurrentChoice(base, screen)));
+      });
+    }
+    mark();
+    Restarted(call, frame, movie, type() + 428, 1, {0x821D2CE0, 0x821D2D00, 0x821D2D10});
+    Restarted(call, frame, movie, type() + 489, 0, {0x821D2D20, 0x821D2D40, 0x821D2D50});
+    if (Byte(base, screen + 9678) > 8) {
+      FinishNamed(call, frame, 0x821D2D68, movie, 976);
+      PlayNamed(call, frame, 0x821D2D84, movie, 976, 1);
+      Restarted(call, frame, movie, 1013, 1, {0x821D2D90, 0x821D2DAC, 0x821D2DB8});
+    }
+    call(kResetTextScroll, {movie, 10, 0}, frame, 0x821D2DC8);
+    const uint32_t which = item();
+    if (which <= 9) {
+      // The item's text (item 0 the split piece sub_821D2DFC, merged).
+      static constexpr uint32_t kTexts[10] = {626, 627, 628, 0, 631, 632, 633, 634, 635, 636};
+      const uint64_t id = which == 3 ? AeroText(base, call, screen, frame, native_specs)
+                                     : kTexts[which];
+      SetText(call, frame, 0x821D2F20, movie, 10, 0, uint32_t(id), 0);
+    }
+    r3 = call(kScrollText, {movie, 10, 0, 1}, frame, 0x821D2F34);
+  } else if ((category == 5 || category == 6) && item() == 2) {
+    if (Load(base, screen + 9716) != 0) {
+      scene(8, 0, 0x821D2F84, 0x821D2FA4);
+      picture(choice);
+    }
+    mark();
+    FinishNamed(call, frame, 0x821D3048, movie, type() + 489);
+    PlayNamed(call, frame, 0x821D3268, movie, type() + 489, 1);
+    r3 = LoopNamed(call, frame, 0x821D3278, movie, type() + 489);
+  } else if ((category == 5 && item() == 3) || (category == 6 && item() <= 1)) {
+    const uint32_t which = item();
+    if (Load(base, screen + 9716) != 0) {
+      if (category == 6 && which == 0) {
+        scene(6, 1, 0x821D30C0, 0x821D30E0);
+        FinishNamed(call, frame, 0x821D30EC, movie, 1011);
+        PlayNamed(call, frame, 0x821D3108, movie, 1011, 0);
+        FinishNamed(call, frame, 0x821D3114, movie, 0);
+        PlayNamed(call, frame, 0x821D3130, movie, 0, 0);
+      } else {
+        scene(6, 0, 0x821D3144, 0x821D3164);
+      }
+      picture(choice);
+    }
+    mark();
+    Restarted(call, frame, movie, type() + 428, 1, {0x821D3208, 0x821D3228, 0x821D3238});
+    FinishNamed(call, frame, 0x821D3248, movie, type() + 489);
+    PlayNamed(call, frame, 0x821D3268, movie, type() + 489, 0);
+    r3 = LoopNamed(call, frame, 0x821D3278, movie, type() + 489);
   }
   StepWith9724(base, screen);
   return r3;
