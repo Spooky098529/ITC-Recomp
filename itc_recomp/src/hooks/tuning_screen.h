@@ -102,7 +102,7 @@ void TuningCommand8(PPCContext& ctx, uint8_t* base);
 // The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
 // with TuningStandCalleesNative: --native_stand_models, --native_race_setup
 // and CarMakersSetCarCalleesNative): SetInteriorPair sub_821CCC50 (r4 a
-// choice, r5 a level), GarageStage::FitSelectedCar sub_8217DAC0 (r3 the
+// choice, r5 a level; no adapter, the harness's step), GarageStage::FitSelectedCar sub_8217DAC0 (r3 the
 // holder, r4, r5 two bytes; f1 FitCar's), PickCameraPreset sub_821D99A0,
 // UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00 (f1 as
 // PreviewWheel leaves it) and ApplyDecals sub_822042D8 (r3 the screen).

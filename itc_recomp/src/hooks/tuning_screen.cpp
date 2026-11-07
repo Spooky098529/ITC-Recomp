@@ -524,15 +524,19 @@ ITC_TUNING_SCREEN(821F5F70, TuningCommand8)
     hooks::step(ctx, base);                                                  \
   }
 
-ITC_TUNING_STAND(821CCC50, TuningSetInteriorPair)
 ITC_TUNING_STAND(8217DAC0, TuningFitSelectedCar)
 ITC_TUNING_STAND(821D99A0, TuningPickCameraPreset)
 ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
 ITC_TUNING_STAND(821E0E00, TuningPreviewWheels)
 ITC_TUNING_STAND(822042D8, TuningApplyDecals)
 ITC_TUNING_STAND(822019D0, TuningDecalCommand)
+
 ITC_TUNING_STAND(821E07B0, TuningPreviewItem)
 ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
+
+// SetInteriorPair sub_821CCC50 has no adapter (removed, B7 loop, 2026-11-07):
+// its callers in play, PreviewItem and RestoreStand, are native and call its
+// plain C++ (its register step above is the harness's).
 
 // SetCarStats: the original unless the car data's and the power curve's
 // callees are native.
