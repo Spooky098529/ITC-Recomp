@@ -16,6 +16,21 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
+
+- The cleanup lead `sub_820C8DE8` (attract race `itc_4432`, replay
+  `itc_4433` ok; `type6-type7-modes.md`, `screen-constructors.md`):
+  `sub_82236880` Type6Mode::Init, `sub_82246C90` Type7Mode::Init,
+  `sub_82235138` Type6Screen0::Init, `sub_822454B8` Type7Screen0::Init,
+  `sub_822329A8` Type6Dialog::Init, `sub_82242420` Type7Dialog::Init,
+  `sub_821C9918` Type6ControllerOptions::Init, `sub_821C9430`
+  Type7ControllerOptions::Init, `sub_821CB6E8` Type6Options::Init,
+  `sub_821CB090` Type7Options::Init, `sub_821A8210`
+  Type6SaveScreen::Init, `sub_822515A0` ListScreen::Init,
+  `sub_82248E10` PanelScreen::Init, `sub_82259128` NodeScreen::Init,
+  `sub_822366F0` Type6Screens::Type6Screens, `sub_82246B28`
+  Type7Screens::Type7Screens.
+
 ## Run 2026-11-07 10:56 (`b7-loop-07-11-26`)
 
 - The tuning pages' first migration (attract race `itc_4251`, replay

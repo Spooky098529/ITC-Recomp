@@ -20,9 +20,17 @@ file's history. What's left to see in a drive, from every run:
   `Type7Mode::Init`; 15 adapters removed; race 33 s, 0 errors, its
   harnesses 0 differing outside one new expected group,
   `Type6Mode::Init`'s transitions' stack leftovers; no subagents);
-  left: none. Validation agent running.
+  left: none. Validated `itc_4432` (race 78 s at 180, the harnesses
+  ~88.6 s; 0 errors, every harness 0 differing outside the expected
+  group, 19 of 19 harness lines; the two modes' Inits' shared print
+  split, 4ec19e07; 1 in the race, 2 in the replay `itc_4433` (ok), 16
+  to drive). Recorded.
 
 ## Done
+
+- Cleanup: `CarScene::SetUp` (`car-models.md`), `StandScene::Create`
+  and the type 6 and 7 modes' slot 0 (`type6-type7-modes.md`, now 113
+  of 117 in play); 15 adapters removed; c709d9ed..4ec19e07.
 
 ## Rows to review
 
