@@ -50,7 +50,8 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "Type7Dialog::Draw sub_822421C0, Type7Screen0::Draw sub_82245148 and "
               "ControllerOptions::Draw sub_821C7F28 (the pages' handlers guest calls); "
               "GarageCamera::LoadPresets sub_821802D8 (Archive::Load through its plain C++) and "
-              "StandScene::Release sub_82180738) "
+              "StandScene::Release sub_82180738; Quaternion::FromAngles sub_8217C120 and "
+              "GarageCamera::Reset sub_8217D888 with the translated code's float steps) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -323,6 +324,19 @@ bool StandSceneRelease(PPCContext& ctx, uint8_t* base) {
   return Set(ctx, t67::StandSceneRelease(base));
 }
 
+// --- The garage camera's reset ---
+
+void QuaternionFromAngles(PPCContext& ctx, uint8_t* base) {
+  t67::QuaternionFromAngles(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+void GarageCameraReset(PPCContext& ctx, uint8_t* base) {
+  const uint64_t camera = ctx.r3.u64;
+  t67::GarageCameraReset(base, ctx.r3.u32, ctx.r1.u32 - t67::kGarageCameraResetFrame);
+  ctx.r3.u64 = camera + 192;
+  ctx.fpscr.disableFlushMode();
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -446,3 +460,8 @@ extern "C" REX_FUNC(sub_821802D8) {
 }
 // StandScene::Release (from StandMode::Release, recompiled).
 ITC_TYPE67_FREES(82180738, StandSceneRelease)
+
+// The garage camera: Quaternion::FromAngles (from GarageCamera::Command,
+// recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).
+ITC_TYPE67_MODES(8217C120, QuaternionFromAngles)
+ITC_TYPE67_MODES(8217D888, GarageCameraReset)

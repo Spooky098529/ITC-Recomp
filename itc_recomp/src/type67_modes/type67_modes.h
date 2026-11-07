@@ -279,4 +279,20 @@ int64_t GarageCameraLoadPresets(uint8_t* base, uint32_t camera,
 // original). r3 the holder's free's.
 std::optional<uint64_t> StandSceneRelease(uint8_t* base);
 
+// --- The garage camera's reset (garage_camera.cpp) ---
+
+// sub_8217C120 Quaternion::FromAngles: the quaternion of the three angles
+// (radians; DirectXMath's roll-pitch-yaw math, the game's sine and cosine
+// polynomials) stored at `out` (aligned down to 16). The angles go below
+// `sp` first (sp - 32 to sp - 20: f3, f1, 0.0, f2) and are read back with
+// lvlx, as the original's leaf does.
+void QuaternionFromAngles(uint8_t* base, uint32_t out, double f1, double f2, double f3,
+                          uint32_t sp);
+// sub_8217D888 GarageCamera::Reset: the camera's eye, target, rotation,
+// translation row, angles, field of view, zoom (640 / tan(pi / 3)), its
+// identity matrix and its quaternion (FromAngles(0, 0, 0)) set, the vectors
+// built in its frame at `frame` (its r1 after its stwu) first.
+void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame);
+constexpr uint32_t kGarageCameraResetFrame = 304;
+
 }  // namespace type67_modes

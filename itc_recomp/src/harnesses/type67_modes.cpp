@@ -40,7 +40,9 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <functional>
+#include <limits>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_type67_modes);
@@ -894,6 +896,96 @@ void Garage(Context& h) {
   }
 }
 
+// --- The garage camera: Quaternion::FromAngles on angles of every kind
+// (zeros, small, large, NaN, infinities, denormals, random bits), the
+// quaternion and the scratch below the stack pointer compared as floats;
+// GarageCamera::Reset on a camera of random words, the camera, its frame's
+// vectors (+80 to +255) and r3 compared. ---
+
+double AngleOf(Random& r) {
+  switch (r.Below(10)) {
+    case 0: return 0.0;
+    case 1: return -0.0;
+    case 2: return double(float(int32_t(r.Below(2000)) - 1000) / 100.0f);
+    case 3: return double(float(int32_t(r.Below(200000)) - 100000) * 1.7f);
+    case 4: return std::numeric_limits<double>::quiet_NaN();
+    case 5: return r.Below(2) ? std::numeric_limits<double>::infinity()
+                              : -std::numeric_limits<double>::infinity();
+    case 6: return double(std::bit_cast<float>(uint32_t(r.Below(0x800000)) | (r.Below(2) << 31)));
+    case 7: return double(std::bit_cast<float>(uint32_t(r.Next())));
+    default: return double(float(int32_t(r.Below(1 << 20)) - (1 << 19)) / 65536.0f);
+  }
+}
+
+void GarageCamera(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  {
+    Results results("Quaternion::FromAngles (sub_8217C120)");
+    for (int c = 0; c < 64; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 613 + 0x8217C120);
+        PPCContext t = CallContext(h);
+        // A stack pointer off 16-byte alignment in some cases (lvlx reads
+        // from where the words land).
+        t.r1.u64 = t.r1.u32 - 4 * r.Below(4) * (c % 4 == 3);
+        WriteRandom(base, t.r1.u32 - 64, 64, r);
+        WriteRandom(base, world.address, 64, r);
+        t.f1.f64 = AngleOf(r);
+        t.f2.f64 = AngleOf(r);
+        t.f3.f64 = AngleOf(r);
+        t.r3.u64 = world.address + 16 * r.Below(3) + (c % 5 == 4 ? 4 : 0);
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          __imp__sub_8217C120(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          hooks::QuaternionFromAngles(t, base);
+        }
+        out[v].Floats(base, world.address, 16);
+        out[v].Floats(base, t.r1.u32 - 32, 4);
+        out[v].Bytes(Read(base, t.r1.u32 - 64, 32));
+        out[v].Bytes(Read(base, t.r1.u32 - 16, 16));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageCamera::Reset (sub_8217D888)");
+    const uint32_t frame = CallContext(h).r1.u32 - t67::kGarageCameraResetFrame;
+    for (int c = 0; c < 8; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 389 + 0x8217D888);
+        WriteRandom(base, world.address, 4400, r);
+        WriteRandom(base, frame - 64, t67::kGarageCameraResetFrame + 64, r);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = world.address + 16 * r.Below(4) + (uint64_t(r.Below(2)) << 32);
+        const uint32_t camera = t.r3.u32;
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          __imp__sub_8217D888(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          hooks::GarageCameraReset(t, base);
+        }
+        out[v].Bytes(Read(base, camera, 16));
+        out[v].Floats(base, camera + 16, (272 - 16) / 4);
+        out[v].Bytes(Read(base, camera + 272, 4400 - 272 - 64));
+        out[v].Floats(base, frame + 80, (256 - 80) / 4);
+        out[v].Floats(base, frame - 32, 4);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -910,6 +1002,7 @@ void Type67Modes(Context& h) {
   Modes(h, world);
   GuestCallHandlers(h, world);
   Garage(h);
+  GarageCamera(h, world);
 }
 
 }  // namespace harness
