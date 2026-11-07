@@ -20,7 +20,8 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_821CD6C8 merged), TestAndSetWheelFlag sub_821CDF98, SetWheelListEnd "
               "sub_821E7DB0 (its piece sub_821E7DE4 merged), InchListEnd sub_821EF288 (its piece "
               "sub_821EF2FC merged); the vinyl editor's set-up SetUpVinylBusyIcon sub_821FE560, "
-              "DecalImages::AllLoaded sub_821FE5D8, KeepListTextures sub_821FE7D8, "
+              "DecalImages::AllLoaded sub_821FE5D8, KeepListTextures sub_821FE7D8 (these three "
+              "and BindVinylTextures with no adapters: only EnterEditor calls them), "
               "SetEditorLimits sub_821FE420 and LoadPageLayouts sub_822045F8; the decal images' "
               "textures DecalImages::FreeTexture sub_821FE6A0 (Texture::Free by its plain C++ with "
               "--native_car_models and the native heap), RestoreVinylTexture sub_82204698, "
@@ -144,14 +145,15 @@ ITC_TUNING_PAGES(821CD498, TuningPagesMarkOwned)
 ITC_TUNING_PAGES(821CDF98, TuningPagesTestAndSetWheelFlag)
 ITC_TUNING_PAGES(821E7DB0, TuningPagesSetWheelListEnd)
 ITC_TUNING_PAGES(821EF288, TuningPagesInchListEnd)
-ITC_TUNING_PAGES(821FE560, TuningPagesSetUpVinylBusyIcon)
-ITC_TUNING_PAGES(821FE5D8, TuningPagesAllLoaded)
-ITC_TUNING_PAGES(821FE7D8, TuningPagesKeepListTextures)
 ITC_TUNING_PAGES(821FE420, TuningPagesSetEditorLimits)
 ITC_TUNING_PAGES(822045F8, TuningPagesLoadPageLayouts)
 ITC_TUNING_PAGES(821FE6A0, TuningPagesFreeTexture)
 ITC_TUNING_PAGES(82204698, TuningPagesRestoreVinylTexture)
 ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
 ITC_TUNING_PAGES(82204730, TuningPagesBindVinylTexture)
-ITC_TUNING_PAGES(82203D40, TuningPagesBindVinylTextures)
 ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
+
+// No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
+// EnterEditor, is native and calls their plain C++; the register steps above
+// are the harness's): SetUpVinylBusyIcon sub_821FE560, DecalImages::AllLoaded
+// sub_821FE5D8, KeepListTextures sub_821FE7D8, BindVinylTextures sub_82203D40.
