@@ -83,7 +83,12 @@ file's history. What's left to see in a drive, from every run:
   state machines (lead picked: `sub_822366F0`, `sub_82246B28`,
   `sub_8225A3D8`, `sub_82252290`, `sub_82235BD8`, `sub_82245FF8`,
   `sub_8224CF58`; the most ready groups in `leads.md`, 29; its line
-  deleted from `leads.md`). Mapping agent running.
+  deleted from `leads.md`). Map checked (fbb76124:
+  `screen-constructors.md`, 41 rows, all new, all in play: the type 6
+  and 7 modes' screen blocks' constructors, `ListScreen`, `NodeScreen`,
+  `MachineScreen`, the panel sets; 0 errors; 13 ready groups; 2 leads
+  added (the type 6 and 7 modes' slot 0 with their Inits); no
+  subagents). Migration agent running.
 
 ## Done
 
@@ -122,5 +127,7 @@ file's history. What's left to see in a drive, from every run:
   known 420, unknown 1395).
 - After the cleanup leads (`itc_4356`): ours 4548, work left 1872 (15
   Overridden -> Native).
+- After the screen constructors' map: ours 4548, work left 1872
+  (wrapped 57, known 461, unknown 1354).
 
 ## Stopped

@@ -66,6 +66,14 @@ When the user has reviewed a run's section, its heading gets
   the second `SetPartName`'s `SetText` r7-r10 area; `InputWheels` the
   same 128 bytes deeper), following the earlier `GarageAnims::Add` and
   `Open`/`Close` cases in the same harness file.
+- `functions/screen-constructors.md` (new, 41 rows, all in play;
+  fbb76124): the type 6 and 7 modes' screen blocks (91,272 and 71,292
+  bytes) and their members' constructors, all names ours; rows in
+  `known-data.md` (type 6 and 7 screens, `0x82805EAC`, `0x826370A0`);
+  `boot-mode.md`'s `ScreenMachine::ScreenMachine` note pointed here.
+  Leftovers for the migration: `NodeScreen::NodeScreen` storing r3 into
+  its caller's frame, `PanelSetBase::PanelSetBase` zeroing and reading
+  words below its stack pointer.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
