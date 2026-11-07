@@ -1137,6 +1137,120 @@ void TypeFields(PPCContext& t, Random& world_random, const World& w) {
   HighWord(t, r);
 }
 
+// State 6's page's fields (InputTypes): TypeFields' (above), then, from a
+// generator of its own (the save block's words +16 and +20 mixed as
+// ItemFields mixes its first two), the list half the time one of the
+// A path's (the bonnet's types, category 4 item 4; the interior's, category
+// 6 item 0; state 14's, category 4 items 3 and 9; the horn, category 5
+// item 3; their types half the time) or B's; the bonnet's list byte +9663 0 to 2; +25172 1 half the
+// time; the menu's cursor 0 to 5 most of the time (the interior's new type
+// 1 to 4 or not); the pick's owned word (IsPickOwned's, by category, item
+// and type) 0 half the time, so A goes to the price check; the money small
+// half the time; the state history's word below its depth one of the
+// pages' states most of the time (B's Pop, PageItemCount and PageCursor);
+// action 157 pressed now and then (with A or B or alone; half of those on
+// the horn's list, types 0 to 5); with A, B or 157
+// answered (the entry not blocked), the menu staying most of the time.
+void TypeInputFields(PPCContext& t, Random& world_random, const World& w) {
+  TypeFields(t, world_random, w);
+  uint64_t z = (uint64_t(guest::LoadU32(w.base, w.save + 16)) << 32 |
+                guest::LoadU32(w.base, w.save + 20)) +
+               0x9E3779B97F4A7C15ull;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  Random r(z ^ (z >> 31));
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  struct Pick {
+    int32_t category;
+    uint8_t item;
+  };
+  static constexpr Pick kPicks[] = {{4, 4}, {4, 4}, {6, 0}, {6, 0}, {4, 3}, {4, 3}, {4, 3},
+                                    {4, 3}, {4, 9}, {4, 9}, {5, 3}, {5, 3}, {5, 2}, {6, 1},
+                                    {6, 2}, {0, 2}, {4, 0}, {4, 7}, {0, 1}, {1, 3}, {6, 3},
+                                    {5, 4}};
+  if (r.Below(2) == 0) {
+    const Pick pick = kPicks[r.Below(22)];
+    guest::StoreU32(base, s + 9656, uint32_t(pick.category));
+    guest::StoreU8(base, s + 9660, pick.item);
+    // The types the A paths branch on half the time: state 14's (category
+    // 4 item 3 type 1, item 9 type 0), the interior's 1 to 4.
+    if (r.Below(2) == 0) {
+      if (pick.category == 4 && pick.item == 3) {
+        guest::StoreU8(base, s + 9662, 1);
+      } else if (pick.category == 4 && pick.item == 9) {
+        guest::StoreU8(base, s + 9662, 0);
+      } else if (pick.category == 6 && pick.item == 0) {
+        guest::StoreU8(base, s + 9662, uint8_t(1 + r.Below(4)));
+      }
+    }
+  }
+  guest::StoreU8(base, s + 9663, uint8_t(r.Below(3)));
+  guest::StoreU32(base, s + 25172, r.Below(2) == 0 ? 1 : r.Below(3));
+  const uint32_t menu = w.menu();
+  if (r.Below(5) != 0) {
+    guest::StoreU32(base, menu + 0, r.Below(6));
+  }
+  if (r.Below(2) == 0) {
+    const int32_t category = int32_t(guest::LoadU32(base, s + 9656));
+    const uint32_t item = guest::LoadU8(base, s + 9660);
+    const uint32_t type = guest::LoadU8(base, s + 9662);
+    const uint32_t level = guest::LoadU8(base, s + 9661);
+    uint32_t owned = 0;
+    if (category == 0 && item == 2) {
+      owned = 35028 + 4 * level;
+    } else if (category == 4 && item == 4) {
+      owned = 36380 + 8 * type + 4 * guest::LoadU8(base, s + 9663);
+    } else if (category == 4 && item <= 9) {
+      static constexpr uint32_t kOwned[] = {36168, 36212, 36256, 36304, 0,
+                                            36440, 36476, 36512, 36548, 36592};
+      owned = kOwned[item] + 4 * type;
+    } else if (category == 5 && (item == 2 || item == 3)) {
+      owned = (item == 2 ? 36640 : 36672) + 4 * type;
+    } else if (category == 6 && item <= 2) {
+      static constexpr uint32_t kOwned[] = {36716, 36756, 36800};
+      owned = kOwned[item] + 4 * type;
+    }
+    if (owned != 0) {
+      guest::StoreU32(base, s + owned, 0);
+    }
+  }
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, s + 25116, r.Below(5000));
+  }
+  const uint32_t depth = guest::LoadU8(base, s + 10008);
+  if (depth != 0 && r.Below(5) != 0) {
+    static constexpr uint32_t kStates[] = {3, 4, 5, 6, 7, 8};
+    guest::StoreU32(base, s + (depth - 1 + 2439) * 4, kStates[r.Below(6)]);
+  }
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  uint32_t pressed = guest::LoadU32(base, mapper + 456);
+  if (r.Below(4) == 0) {
+    pressed = (r.Below(2) == 0 ? pressed : 0) | (1u << (157 - 151));
+    guest::StoreU32(base, mapper + 456, pressed);
+    if (r.Below(2) == 0) {
+      // The horn's list, its types 0 to 5.
+      guest::StoreU32(base, s + 9656, 5);
+      guest::StoreU8(base, s + 9660, 3);
+      guest::StoreU8(base, s + 9662, uint8_t(r.Below(6)));
+    }
+  }
+  const uint32_t asked = (1u << (159 - 151)) | (1u << (158 - 151)) | (1u << (157 - 151));
+  if ((pressed & asked) != 0 && r.Below(5) != 0) {
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, 0);
+    guest::StoreU32(base, mapper + 464, 0);
+    guest::StoreU32(base, menu + 64, 0);
+    guest::StoreU32(base, menu + 8, 0);
+    const uint32_t last = r.Below(10);
+    guest::StoreU32(base, menu + 12, 0);
+    guest::StoreU32(base, menu + 16, last);
+    if (r.Below(3) == 0) {
+      guest::StoreU32(base, menu + 0, r.Below(last + 1));
+    }
+  }
+}
+
 // State 59's fields (Leave and StoreOwnedParts): the owned words each 0
 // half the time (else as laid: any word), the tires' words 0, 1 or any, the
 // part set [+33900] 0 to 7 (5 to 7 now and then: none of the power items'
@@ -1454,6 +1568,11 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputLevels", 800, __imp__sub_821D6E20, hooks::TuningPagesInputLevels, 24,
        {{112, 160}}, LevelInputFields});
+  // InputTypes: its r30, r31 and lr (24 bytes); MoveType's saves (112 to
+  // 160 below: its plain C++ doesn't write them).
+  Run(h, w,
+      {"TuningScreen::InputTypes", 800, __imp__sub_821D74A0, hooks::TuningPagesInputTypes, 24,
+       {{112, 160}}, TypeInputFields});
   // StoreOwnedParts: state 59's fields (above); its r30, r31 and lr (24
   // bytes).
   Run(h, w,

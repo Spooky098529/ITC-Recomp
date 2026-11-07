@@ -121,6 +121,8 @@ void TuningPagesInputLevels(PPCContext& ctx, uint8_t* base);
 // MoveType sub_821D32C8 (r3 the screen), state 6's movie side (its caller,
 // InputTypes, is recompiled).
 void TuningPagesMoveType(PPCContext& ctx, uint8_t* base);
+// InputTypes sub_821D74A0 (r3 the screen), state 6's page.
+void TuningPagesInputTypes(PPCContext& ctx, uint8_t* base);
 // Leave sub_821E25B0 (r3 the screen, r4 the object with the message ring)
 // and StoreOwnedParts sub_821DD408 (no adapter: only Leave calls it; this
 // step is the harness's).

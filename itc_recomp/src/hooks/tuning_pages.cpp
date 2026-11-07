@@ -91,9 +91,10 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "PageItemCount, PageCursor, GetCurrentChoice and the UI movies' FindNode and Child "
               "by their plain C++; Menu::Step, MenuSound::Play and the UI movie calls through "
               "their overrides); "
-              "state 6's movie side MoveType sub_821D32C8 (IsItemAvailable, GetCurrentChoice "
-              "and the UI movies' FindNode and Child by their plain C++, the UI movie calls "
-              "through their overrides)) "
+              "state 6's page InputTypes sub_821D74A0 with its movie side MoveType "
+              "sub_821D32C8 (IsItemAvailable, IsPickOwned, GetPrice, PageItemCount, PageCursor, "
+              "GetCurrentChoice and the UI movies' FindNode and Child by their plain C++; "
+              "Menu::Step, MenuSound::Play and the UI movie calls through their overrides)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -439,6 +440,14 @@ void TuningPagesInputLevels(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesInputTypes(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputTypes(base, call, screen, sp, flags);
+  });
+}
+
 void TuningPagesInputWheels(PPCContext& ctx, uint8_t* base) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -545,6 +554,7 @@ ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
 ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
 ITC_TUNING_PAGES(821D6E20, TuningPagesInputLevels)
 ITC_TUNING_PAGES(821D32C8, TuningPagesMoveType)
+ITC_TUNING_PAGES(821D74A0, TuningPagesInputTypes)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
