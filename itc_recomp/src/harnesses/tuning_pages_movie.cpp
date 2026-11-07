@@ -15,7 +15,12 @@
 // recording leaf (MenuSound::Play), the screen fades' globals (the counts
 // 0 most of the time); the save data (its garage list) in a block of its
 // own; a string table of our own (letters, newlines and page breaks, no
-// argument codes: the varargs native callers pass as 0 aren't read). Each
+// argument codes: the varargs native callers pass as 0 aren't read); the
+// car scene [0x826C2E44] with pool 7's two models in use (their +32 the
+// 4,244-byte records SceneModelRecord::Copy takes) and the stand holder
+// [0x826D83E0] picking one of them; for the pages that load the decal
+// images, Archive::Load recorded (harness::ArchiveLoads) and the pages
+// VirtualAlloc gives compared as tokens and freed. Each
 // case fills it with random words from its seed, lays it, points the
 // globals into it (put back after), runs the original (with
 // --native_tuning_pages off) or the register steps (hooks/tuning_pages.h),
@@ -36,6 +41,7 @@
 #include <fmt/format.h>
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -64,7 +70,11 @@ constexpr uint32_t kTexturesAt = 0x20600;    // the movie's +28 table (200 words
 constexpr uint32_t kSlotsAt = 0x20A00;       // the textures' entries (200 of 8 bytes)
 constexpr uint32_t kManagerAt = 0x21100;     // the sound manager (0x180)
 constexpr uint32_t kManagerVtableAt = 0x21280;  // its vtable (0x40)
-constexpr uint32_t kBlockBytes = 0x21400;
+constexpr uint32_t kSceneAt = 0x21400;       // the car scene (pool 7's list at +5028)
+constexpr uint32_t kModelsAt = 0x22800;      // pool 7's two models (0x1200 each)
+constexpr uint32_t kModelBytes = 0x1200;
+constexpr uint32_t kHolderAt = 0x24C00;      // [0x826D83E0]'s word, the holder, the stage
+constexpr uint32_t kBlockBytes = 0x24C80;
 constexpr uint32_t kSaveBytes = 0x1A000;
 
 constexpr uint32_t kStackBytes = 2048;
@@ -78,6 +88,8 @@ constexpr uint32_t kFades = 0x826A50AC;  // the screen fades' words (to 0x826A50
 constexpr uint32_t kFadeIn = 0x826A50DC;
 constexpr uint32_t kFadeOut = 0x826A50E4;
 constexpr uint32_t kSoundManager = 0x826C5C80;
+constexpr uint32_t kCarScene = 0x826C2E44;
+constexpr uint32_t kStandHolder = 0x826D83E0;
 // A leaf that stores r4's low byte, r5 and r6 at r3 + 320, 332 and 336 (the
 // menu sounds' harness's recorder): the sound manager's slot 10, PlayCue2D.
 constexpr uint32_t kRecordR4R6 = 0x820A8420;
@@ -101,6 +113,8 @@ constexpr Global kGlobals[] = {
     {kControllerEntries, 16},  // their entries' indices
     {kFades, 0x3C},
     {kSoundManager, 4},
+    {kCarScene, 4},
+    {kStandHolder, 4},
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -291,6 +305,19 @@ void MakeWorld(const World& w, Random& r) {
   LayMovie(w, r);
   LayMappers(w, r);
   LayMenu(w, r);
+  // The car scene's pool 7: two models in use, the stand holder's index
+  // (the stage's +8) 0 to 2 (2 past the list: its first).
+  const uint32_t scene = w.at(kSceneAt);
+  guest::StoreU32(base, scene + 5028, w.at(kModelsAt));
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t model = w.at(kModelsAt) + kModelBytes * i;
+    guest::StoreU32(base, model + 8, i == 0 ? model + kModelBytes : 0);
+    guest::StoreU32(base, model + 16, 3);
+  }
+  const uint32_t holder = w.at(kHolderAt);
+  guest::StoreU32(base, holder + 0, holder + 0x10);
+  guest::StoreU32(base, holder + 0x10, holder + 0x20);
+  guest::StoreU32(base, holder + 0x28, r.Below(3));
   // The sound manager: its vtable's slot 10 the recording leaf.
   guest::StoreU32(base, w.at(kManagerAt), w.at(kManagerVtableAt));
   guest::StoreU32(base, w.at(kManagerVtableAt) + 40, kRecordR4R6);
@@ -330,6 +357,8 @@ void PointGlobals(const World& w, Random& r) {
   guest::StoreU32(base, kMissingText, 0);
   guest::StoreU32(base, kStringTable, w.strings);
   guest::StoreU32(base, kSoundManager, w.at(kManagerAt));
+  guest::StoreU32(base, kCarScene, w.at(kSceneAt));
+  guest::StoreU32(base, kStandHolder, w.at(kHolderAt));
   // The fades' words random, the counts 0 most of the time.
   for (uint32_t i = 0; i < 0x3C; i += 4) {
     guest::StoreU32(base, kFades + i, r.Below(4) == 0 ? uint32_t(r.Next()) : 0);
@@ -374,6 +403,9 @@ struct Spec {
   // doesn't write.
   std::vector<std::pair<uint32_t, uint32_t>> holes = {};
   Setup setup = {};  // after the world, the globals and the stack
+  // Archive::Load recorded (random serials or -1) and the decal images'
+  // pages compared as tokens, then freed.
+  bool loads = false;
 };
 
 void Run(Context& h, const World& w, const Spec& spec) {
@@ -397,6 +429,14 @@ void Run(Context& h, const World& w, const Spec& spec) {
       if (spec.setup) {
         spec.setup(t, r, w);
       }
+      std::optional<ArchiveLoads> loads;
+      if (spec.loads) {
+        std::vector<int64_t> serials;
+        for (int k = 0; k < 260; k++) {
+          serials.push_back(r.Below(5) == 0 ? -1 : int64_t(r.Below(1000)));
+        }
+        loads.emplace(serials);
+      }
       if (v == 0) {
         const bool native = ITC_FLAG(native_tuning_pages);
         ITC_FLAG(native_tuning_pages) = false;
@@ -410,6 +450,29 @@ void Run(Context& h, const World& w, const Spec& spec) {
           guest::StoreU8(h.base, a, 0);
         }
       }
+      // The pages, in the order the loads and the entries name them.
+      std::vector<uint32_t> pages;
+      if (loads) {
+        auto token = [&](uint32_t word) -> uint32_t {
+          if (word == 0 || !memory::IsPages(word)) return word;
+          for (uint32_t k = 0; k < pages.size(); k++) {
+            if (pages[k] == word) return 0xA110C000u + k;
+          }
+          pages.push_back(word);
+          return 0xA110C000u + uint32_t(pages.size() - 1);
+        };
+        const std::vector<uint32_t>& calls = loads->calls();
+        out[v].Word(uint32_t(calls.size()));
+        for (size_t k = 0; k < calls.size(); k++) {
+          out[v].Word(k % 6 == 1 ? token(calls[k]) : calls[k]);
+        }
+        const uint32_t images = w.screen() + 10048;
+        for (uint32_t i = 0; i < 200; i++) {
+          guest::StoreU32(h.base, images + 36 * i + 12,
+                          token(guest::LoadU32(h.base, images + 36 * i + 12)));
+        }
+        loads.reset();
+      }
       MovieTextRecords(h.base, w.at(kMovieAt), out[v]);
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
@@ -422,6 +485,11 @@ void Run(Context& h, const World& w, const Spec& spec) {
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(uint32_t(t.lr));
+      out[v].Word(uint32_t(pages.size()));
+      for (const uint32_t a : pages) {
+        out[v].Bytes(Read(h.base, a, 64));
+        memory::FreePages(a);
+      }
       for (size_t i = 0; i < saved.size(); i++) {
         Write(h.base, kGlobals[i].address, saved[i].data(), kGlobals[i].bytes);
       }
@@ -498,6 +566,146 @@ void WheelFields(PPCContext&, Random& r, const World& w, bool any_row) {
     guest::StoreU32(base, mapper + 456, pick >= 4 ? bit : 0);
     guest::StoreU32(base, mapper + 464, pick < 4 ? bit : 0);
   }
+}
+
+// A word with a signaling NaN made quiet (the originals' lfs and stfs quiet
+// it, the host's float copies may not; not the game's data: the kVinyls
+// precedent in tuning_pages.cpp).
+void QuietRange(uint8_t* base, uint32_t address, uint32_t bytes) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    uint32_t word = guest::LoadU32(base, address + i);
+    if ((word & 0x7F800000u) == 0x7F800000u && (word & 0x007FFFFFu) != 0) {
+      word |= 0x00400000u;
+    }
+    guest::StoreU32(base, address + i, word);
+  }
+}
+
+// State 4's fields (InputItems and MoveItem): the category and item picked
+// from the pages InputItems' A goes to three times in four (the levels,
+// types, door, wheels, paint, light kits, vinyl and sticker editors,
+// accessory, and items that go nowhere), else any; the aero list's rows
+// +25100 and +25104 -1 to 8 (now and then the wraps' pairs 7, 0 and 0, 7),
+// the aero items' availability, +9708, the item count +9676, the items'
+// bits +9688 mostly all set; the editors' world: the save data's garage
+// list as tuning_pages.cpp's ShapeScreen lays it (the cars' ids below 26,
+// their decal ids -1 to 29), the part set, the sticker numbers, the vinyl
+// layers' kinds and mirror index small (StoreToGarageCar's tables), the
+// vinyl records without signaling NaNs; a few named animations playing;
+// the menu's player 0 now and then; most cases one action answered on the
+// player's mapper (up, down, A three times as often, B).
+void ItemFields(PPCContext& t, Random& world_random, const World& w) {
+  // The cases' generators are seeded with consecutive outputs of the
+  // harness's xorshift, so their streams are one draw apart, and the
+  // world's draws of varying counts often bring two cases' streams back in
+  // step: this one is seeded from the save block's first word (drawn before
+  // any of those) mixed by splitmix64's finalizer.
+  uint64_t z = (uint64_t(guest::LoadU32(w.base, w.save)) << 32 |
+                guest::LoadU32(w.base, w.save + 4)) +
+               0x9E3779B97F4A7C15ull;
+  world_random.Next();
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  Random r(z ^ (z >> 31));
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  struct Pick {
+    int32_t category;
+    uint8_t item;
+  };
+  static constexpr Pick kPicks[] = {{0, 0}, {0, 2}, {1, 4}, {1, 1}, {3, 1}, {4, 4}, {4, 2},
+                                    {5, 0}, {5, 1}, {5, 2}, {5, 3}, {5, 4}, {5, 5}, {5, 6},
+                                    {5, 6}, {5, 7}, {5, 7}, {6, 0}, {6, 2}, {6, 3}, {6, 4},
+                                    {2, 0}, {7, 1}, {5, 8}, {4, 0}, {4, 9}};
+  if (r.Below(4) != 0) {
+    const Pick pick = kPicks[r.Below(sizeof(kPicks) / sizeof(kPicks[0]))];
+    guest::StoreU32(base, s + 9656, uint32_t(pick.category));
+    guest::StoreU8(base, s + 9660, pick.item);
+  }
+  int32_t before = int32_t(r.Below(10)) - 1, now = int32_t(r.Below(10)) - 1;
+  if (r.Below(4) == 0) {
+    const bool down = r.Below(2) == 0;
+    before = down ? 0 : 7;
+    now = down ? 7 : 0;
+  }
+  guest::StoreU32(base, s + 25104, uint32_t(before));
+  guest::StoreU32(base, s + 25100, uint32_t(now));
+  for (uint32_t k = 0; k < 10; k++) {
+    guest::StoreU32(base, s + 25128 + 4 * k,
+                    r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(3) == 0 ? 0 : 1);
+  }
+  guest::StoreU32(base, s + 9708, r.Below(3) == 0 ? 0 : r.Below(4) == 0 ? uint32_t(r.Next()) : 1);
+  guest::StoreU8(base, s + 9676, uint8_t(r.Below(11)));
+  guest::StoreU32(base, s + 9688, r.Below(5) == 0 ? uint32_t(r.Next()) : 0xFFFFFFFFu);
+  // The garage list: 51 nodes, each link and the head a node, each slot 0
+  // to 3, the walk 0 to 5 steps; the cars' ids and decal ids small.
+  const uint32_t save = w.save, nodes = save + 6120;
+  for (uint32_t k = 0; k < 51; k++) {
+    guest::StoreU16(base, nodes + 4 * k, uint16_t(r.Below(51)));
+    guest::StoreU16(base, nodes + 4 * k + 2, uint16_t(r.Below(4)));
+  }
+  guest::StoreU16(base, nodes + 204, uint16_t(r.Below(51)));
+  guest::StoreU32(base, save + 0x19920, r.Below(6));
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t c = nodes + 1968 * k + 212;
+    guest::StoreU32(base, c + 12, r.Below(26));
+    QuietRange(base, c + 96, 192);
+    for (uint32_t n = 0; n < 6; n++) {
+      guest::StoreU32(base, c + 96 + 32 * n + 24, uint32_t(int32_t(r.Below(31)) - 1));
+    }
+  }
+  QuietRange(base, s + 30880, 31220 - 30880);
+  guest::StoreU32(base, s + 33900, r.Below(4));
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(base, s + 33800 + 4 * i,
+                    r.Below(4) == 0 ? 0xFFFFFFFFu : uint32_t(int32_t(r.Below(260)) - 100));
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t layer = s + 30580 + 4 * i;
+    guest::StoreU32(base, layer + 0, r.Below(3));
+    guest::StoreU32(base, layer + 80, r.Below(3));
+    guest::StoreU32(base, layer + 64, r.Below(8));
+  }
+  // A few of the items' animations playing (now and then moved to the
+  // looping list).
+  const uint32_t movie = w.at(kMovieAt);
+  for (uint32_t k = r.Below(8); k > 0; k--) {
+    const uint32_t pick = r.Below(13);
+    const uint32_t named = pick < 10 ? 401 + pick : pick == 10 ? 966 : pick == 11 ? 967 : 1013;
+    ui_movies::PlayNamed(base, movie, named, r.Below(2), 0, 0, 0);
+    if (r.Below(3) == 0) {
+      ui_movies::MoveNamedAnimation(base, movie, named, true);
+    }
+  }
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, w.menu() + 64, 0);
+  }
+  // The movie's file scene (+24) the live one: the editors' UiMovie::ResetPose
+  // (movies 13 and 14 are this movie) then copies the live nodes over
+  // themselves (the root's animations would overwrite their child entries).
+  guest::StoreU32(base, movie + 24, w.node(0));
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 159, 159, 159, 158};
+  const uint32_t pick = r.Below(10);
+  if (pick < 8) {
+    const uint32_t c = guest::LoadU32(base, kControllerEntries);
+    const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+    const uint32_t bit = 1u << (kActions[pick] - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, pick >= 4 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, pick < 4 ? bit : 0);
+  }
+  // With A, B or nothing asked, most of the time the menu stays (its
+  // player 0, the cursor inside its range, nothing fired on the mapper), so
+  // InputItems' A and B run.
+  if (pick >= 4 && r.Below(5) != 0) {
+    const uint32_t menu = w.menu();
+    const uint32_t c = guest::LoadU32(base, kControllerEntries);
+    guest::StoreU32(base, guest::LoadU32(base, kMapperEntries + 8 * c) + 464, 0);
+    guest::StoreU32(base, menu + 64, 0);
+    const uint32_t first = guest::LoadU32(base, menu + 12), last = guest::LoadU32(base, menu + 16);
+    guest::StoreU32(base, menu + 0, first + r.Below(last - first + 1));
+  }
+  HighWord(t, r);
 }
 
 }  // namespace
@@ -580,6 +788,17 @@ void TuningPagesMovie(Context& h) {
       {"TuningScreen::InputInches", 100, __imp__sub_821EEEA8, hooks::TuningPagesInputInches, 24,
        {{112, 144}},
        [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, false); }});
+  // MoveItem: state 4's fields (above); __savegprlr_29: 32 bytes.
+  Run(h, w,
+      {"TuningScreen::MoveItem", 300, __imp__sub_821D0CC0, hooks::TuningPagesMoveItem, 32, {},
+       ItemFields});
+  // InputItems: its saves (__savegprlr_28: 40 bytes); StepList's,
+  // MoveItem's and LoadVinyls' (128 to 176 below: their plain C++ doesn't
+  // write them, LoadDecalImages' too) and LoadDecalImages' Request's or
+  // Load's (r31 and lr, 256 to 272 below); Archive::Load recorded.
+  Run(h, w,
+      {"TuningScreen::InputItems", 500, __imp__sub_821DFD48, hooks::TuningPagesInputItems, 40,
+       {{128, 176}, {256, 272}}, ItemFields, true});
 }
 
 }  // namespace harness

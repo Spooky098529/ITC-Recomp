@@ -309,6 +309,27 @@ uint64_t InputInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32
 uint64_t AnimateInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                        uint32_t sp, bool native_slots);
 
+// sub_821D0CC0 TuningScreen::MoveItem: state 4's movie side (its row): by
+// the front-end menu's step (+8) and wrap (+40), sub-scene 27's bar slid or
+// snapped (node (27, 0)'s +16 = float(item) x 40.0) and the item's
+// animation restarted and looped, the aero list's rows (+25100 now, +25104
+// before) by their availability; with no step A (the rows finished, 1013,
+// category 3's 401 + item) or B (966, or for aero 1013, 15 and 967) asked
+// again. 128-byte frame; the last call's r3, else the movie's entry or the
+// slot's r3.
+uint64_t MoveItem(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                  uint32_t sp, bool native_slots);
+// sub_821DFD48 TuningScreen::InputItems: state 4's page (its row): Menu::Step
+// (StepList for aero); moved, A (the stand car's record copied into the
+// screen, SceneModelRecord::Copy through its override; then by the item's
+// bit in +9688 the levels, types, door, wheels, paint, light kits, vinyl or
+// sticker editor or accessory page) or B (Pop, PlayIntro); then MoveItem.
+// The sticker editor's ResetStickerEditor sub_821F8440 and LoadStickers
+// sub_821F86C0 (not seen in play) through the guest. r3 = the screen (all
+// 64 bits: the editors' callees get it). 128-byte frame; MoveItem's r3.
+uint64_t InputItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                    uint32_t sp, const PageFlags& flags);
+
 // --- The confirm dialogs' yes answers (dialogs.cpp; flush-to-zero off) ---
 // Guest calls through `call` from the originals' frames with their return
 // addresses: memcpy where Buffers_Memcpy declines, Career::PickNext and

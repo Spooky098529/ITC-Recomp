@@ -62,7 +62,13 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_821F8598 and GarageDecal sub_821F84C8 (no adapters: only OnDialogYes and "
               "OnStickerDialogYes call them in play; MarkOwned, SetCurrentChoice, PageItemCount, "
               "PageCursor, StoreVinyls, BindVinylTexture and SaveData::Of by their plain C++, "
-              "Career::PickNext and GarageStage::FitSelectedCar through their overrides)) "
+              "Career::PickNext and GarageStage::FitSelectedCar through their overrides); state 4's "
+              "page InputItems sub_821DFD48 with its movie side MoveItem sub_821D0CC0 (no adapter: "
+              "only InputItems calls it; Menu::StepList, LevelCount, TypeCount, PageItemCount, "
+              "PageCursor, SetEditorLimits, LoadVinyls, LoadPageLayouts, LoadDecalImages, "
+              "StoreToGarageCar, ScenePools::GetB, FadeOut and the UI movies' FindNode by their "
+              "plain C++; SceneModelRecord::Copy, UiMovie::ResetPose and, not seen in play, "
+              "ResetStickerEditor sub_821F8440 and LoadStickers sub_821F86C0 through the guest)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -351,6 +357,23 @@ void TuningPagesAnimateInches(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesInputItems(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputItems(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesMoveItem(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveItem(base, call, screen, sp, native_slots);
+  });
+}
+
 void TuningPagesOnDialogYes(PPCContext& ctx, uint8_t* base) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -427,6 +450,7 @@ ITC_TUNING_PAGES(821D87C0, TuningPagesBackToItems)
 ITC_TUNING_PAGES(821EE390, TuningPagesInputWheelParts)
 ITC_TUNING_PAGES(821EEEA8, TuningPagesInputInches)
 ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
+ITC_TUNING_PAGES(821DFD48, TuningPagesInputItems)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
@@ -449,6 +473,10 @@ ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
 // harness's): OnStickerDialogYes sub_821FA230, and under it SaveAreaDecals
 // sub_821F6CE8, StoreStickers sub_821F8598 with GarageDecal sub_821F84C8; under
 // OnDialogYes DecalImages::SwapKept sub_821FE798.
+
+// No adapter (B7 loop, 2026-11-07: its only caller, InputItems, is native and
+// calls its plain C++; the register step above is the harness's): MoveItem
+// sub_821D0CC0.
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // OnDialogYes, is native and calls their plain C++; the register steps above
