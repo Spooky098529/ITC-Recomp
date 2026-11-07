@@ -597,6 +597,11 @@ Rows not yet moved stay in the table below. So far:
   its groups by category, a group's builds, one build put on the stand
   and its details, with their menu lists, rows, texts, prompts and the
   builds' lists (B7).
+- [`tuning-screen.md`](tuning-screen.md): the tuning shop's screen
+  below its update and refresh: the parts' tables and prices, the
+  choices stored into the garage car, the stand car's previews (parts,
+  wheels, decals), the command runners and node helpers over its UI
+  movies, and the debug menus' empty state handlers (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
