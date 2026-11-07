@@ -175,8 +175,11 @@ file's history. What's left to see in a drive, from every run:
   generated lines; f1 compared as a double; race 37 s, 0 errors, all
   harnesses 0 differing; no subagents); left in the file: none; ready
   under its roots in other files: `GarageStage::Draw` `sub_8217FE60`,
-  `sub_8211D930` with `sub_8211CAA0`, `sub_8211C740`. Validation agent
-  running.
+  `sub_8211D930` with `sub_8211CAA0`, `sub_8211C740`. Validated
+  `itc_4204` (race 79 s at 180, the harnesses ~86 s; 0 errors, every
+  harness 0 differing, 1 of 1; in the replay `itc_4205` (ok)). Fifth
+  migration agent running (`GarageStage::Draw`, the UI movie calls,
+  then `UpdateStand`, `RefreshMovie13` and what they unblock).
 
 ## Done
 
