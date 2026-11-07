@@ -343,6 +343,12 @@ uint64_t SetStateTexts(uint8_t* base, const GuestCall& call, uint32_t screen, ui
 // (4 and above), each with WheelNumber, the owned mark and ShowPartMarks
 // (its row). 176-byte frame; r3 ShowPartMarks', else the entry.
 uint64_t FillPartRows(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_821F5F70 TuningScreen::Command8: r3 = the screen (all 64 bits). Movie
+// 2; with +9716, 1007 and 1011 restarted, +9720 = 0 when set, +9716 = 0;
+// 70 and 69 restarted and looped; PlayGroupAnimation, SetPartName,
+// FillPartRows; with +9724 the queue's step and +9724 = 0. 128-byte frame;
+// FillPartRows' r3.
+uint64_t Command8(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp);
 
 // --- The calls onto the stand (stand.cpp) ---
 // Each with the original's frame below `sp` (its back chain and the words it
@@ -395,6 +401,22 @@ uint64_t PreviewWheels(uint8_t* base, const GuestCall& call, uint64_t r3, uint32
 // GarageStage::ReloadDecals after 5, 7 and 8; then +10012 = -1. 4,112-byte
 // frame.
 uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_822019D0 TuningScreen::DecalCommand: movie 13; with +9716 the queue's
+// step (+9720 set, then 0) or 240 restarted and GarageStage::Command(holder,
+// 58), +9716 = 0; then +10012 = 7, FitSelectedCar(holder, the selected
+// garage car's bytes +300 and +301), text (2, 0)'s scroll reset, string 824,
+// scrolled. 128-byte frame; ScrollText's r3, `*f1` its f1 (the text calls
+// made with f1 as FitSelectedCar leaves it).
+uint64_t DecalCommand(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
+                      double* f1);
+// sub_821DF788 TuningScreen::SetCarStats: SetUpCarData (car_makers), a power
+// curve on the frame (+96: PowerCurve::FromEngine on +20180, ShiftPeak 0),
+// the stats +20768 to +20780 from the car data and the curve, the texts of
+// movie 2's sub-scene 18 (children 5 to 14; child 12's argument a double in
+// r7 and f1, through the frame's +48). 1,200-byte frame; the last SetText's
+// r3, `*f1` its f1.
+uint64_t SetCarStats(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t screen,
+                     uint32_t sp, double* f1);
 
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:

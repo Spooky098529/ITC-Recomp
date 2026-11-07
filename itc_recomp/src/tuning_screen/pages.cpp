@@ -378,6 +378,37 @@ uint64_t Command25(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   return call(kScrollText, {movie, 2, 0, 1}, frame, 0x82204978);
 }
 
+uint64_t Command8(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F5F70 TuningScreen::Command8");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t screen = uint32_t(r3);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
+  if (Load(base, screen + 9716) != 0) {
+    FinishNamed(call, frame, 0x821F5FB8, movie, 1007);
+    PlayNamed(call, frame, 0x821F5FD4, movie, 1007, 1);
+    FinishNamed(call, frame, 0x821F5FE0, movie, 1011);
+    PlayNamed(call, frame, 0x821F5FFC, movie, 1011, 1);
+    if (Load(base, screen + 9720) != 0) {
+      Store(base, screen + 9720, 0);
+    }
+    Store(base, screen + 9716, 0);
+  }
+  FinishNamed(call, frame, 0x821F601C, movie, 70);
+  PlayNamed(call, frame, 0x821F6038, movie, 70, 1);
+  LoopNamed(call, frame, 0x821F6044, movie, 70);
+  FinishNamed(call, frame, 0x821F6050, movie, 69);
+  PlayNamed(call, frame, 0x821F606C, movie, 69, 1);
+  LoopNamed(call, frame, 0x821F6078, movie, 69);
+  PlayGroupAnimation(base, call, screen, frame);
+  SetPartName(base, call, screen, frame);
+  const uint64_t rows = FillPartRows(base, r3, frame);
+  if (Load(base, screen + 9724) != 0) {
+    Advance(base, screen);
+    Store(base, screen + 9724, 0);
+  }
+  return rows;
+}
+
 uint64_t PlayIntro(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821D06B0 TuningScreen::PlayIntro");
   const uint32_t frame = Frame(base, sp, 128);

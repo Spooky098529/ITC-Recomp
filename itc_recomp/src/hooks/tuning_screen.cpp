@@ -21,6 +21,7 @@ ITC_FLAG_DECLARE(bool, native_stand_models);
 ITC_FLAG_DECLARE(bool, native_race_setup);
 ITC_FLAG_DECLARE(bool, native_action_mappers);
 ITC_FLAG_DECLARE(bool, native_car_specs);
+ITC_FLAG_DECLARE(bool, native_vehicle);
 
 ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Run the tuning screen's functions (docs/functions/tuning-screen.md: the part "
@@ -51,7 +52,7 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "ActionMapper::Held's plain C++ with --native_action_mappers; HighlightItem and "
               "HighlightSelected through the guest), ShowTypes sub_821D2A80 (its piece sub_821D2DFC "
               "merged; the aero parts by their plain C++ with --native_car_specs), SetStateTexts "
-              "sub_821F1DE0 and FillPartRows sub_821F4BF8 (its piece sub_821F4CF0 merged), UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
+              "sub_821F1DE0, FillPartRows sub_821F4BF8 (its piece sub_821F4CF0 merged) and Command8 sub_821F5F70, UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
               "LoopNamed, SetText, SetNodeText, ScrollText and sub_8211C5F8 "
               "through their overrides; the lists' "
               "UpdateListDots sub_821EE9B0, ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, "
@@ -59,8 +60,9 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "stand, with the stand's, the car makers' and the front end's car draw's flags "
               "(else the originals): SetInteriorPair sub_821CCC50, GarageStage::FitSelectedCar "
               "sub_8217DAC0, PickCameraPreset sub_821D99A0 (its piece sub_821D9B60 merged), "
-              "UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00 and ApplyDecals "
-              "sub_822042D8) natively instead of through the "
+              "UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00, ApplyDecals "
+              "sub_822042D8 and DecalCommand sub_822019D0; SetCarStats sub_821DF788 with the "
+              "car makers' and --native_vehicle) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
 
@@ -303,6 +305,12 @@ void TuningFillPartRows(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::FillPartRows(base, ctx.r3.u64, ctx.r1.u32);
 }
 
+void TuningCommand8(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) { return ts::Command8(base, call, r3, sp); });
+}
+
 // The same with r3 all 64 bits and r4 the update's dispatcher.
 #define ITC_TUNING_DISPATCH_STEP(Name)                                                \
   void Tuning##Name(PPCContext& ctx, uint8_t* base) {                                \
@@ -375,6 +383,31 @@ ITC_TUNING_STAND_STEP(UpdateBusyIcon)
 ITC_TUNING_STAND_STEP(ApplyDecals)
 
 #undef ITC_TUNING_STAND_STEP
+
+void TuningDecalCommand(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  double f1 = 0.0;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::DecalCommand(base, stand, screen, sp, &f1);
+  });
+  ctx.f1.f64 = f1;
+}
+
+bool TuningCarStatsCalleesNative() {
+  return CarMakersGarageCalleesNative() && ITC_FLAG(native_vehicle);
+}
+
+void TuningSetCarStats(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  double f1 = 0.0;
+  const uint64_t r3 = ts::SetCarStats(base, calls, ctx.r3.u32, ctx.r1.u32, &f1);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.f1.f64 = f1;
+  ctx.fpscr.disableFlushMode();
+}
 
 void TuningPreviewWheels(PPCContext& ctx, uint8_t* base) {
   const uint64_t r3 = ctx.r3.u64;
@@ -463,6 +496,7 @@ ITC_TUNING_SCREEN(822036E8, TuningUpdateItems)
 ITC_TUNING_SCREEN(821D2A80, TuningShowTypes)
 ITC_TUNING_SCREEN(821F1DE0, TuningSetStateTexts)
 ITC_TUNING_SCREEN(821F4BF8, TuningFillPartRows)
+ITC_TUNING_SCREEN(821F5F70, TuningCommand8)
 
 // The calls onto the stand: also the original unless their callees are
 // native.
@@ -482,3 +516,15 @@ ITC_TUNING_STAND(821D99A0, TuningPickCameraPreset)
 ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
 ITC_TUNING_STAND(821E0E00, TuningPreviewWheels)
 ITC_TUNING_STAND(822042D8, TuningApplyDecals)
+ITC_TUNING_STAND(822019D0, TuningDecalCommand)
+
+// SetCarStats: the original unless the car data's and the power curve's
+// callees are native.
+extern "C" REX_FUNC(sub_821DF788) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningCarStatsCalleesNative()) {
+    __imp__sub_821DF788(ctx, base);
+    return;
+  }
+  hooks::TuningSetCarStats(ctx, base);
+}

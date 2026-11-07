@@ -37,6 +37,21 @@ bool SetupFromCarFits(uint8_t* base, uint32_t car, uint32_t r1);
 void WriteSetupFromCarCase(uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
                            uint32_t stack_end, uint64_t seed, int group);
 
+// The tuning screen pages' text world (src/harnesses/tuning_screen_pages.cpp),
+// for TuningScreen::DecalCommand's and SetCarStats' cases: a movie in a block
+// of its own (kTextMovieBytes: its words random, 40 TXT nodes, the named
+// animations 0 to 1,023, the pairs naming it movie 2 and 13; returns the
+// movie), the string table (kTextStringsBytes), the globals they're pointed
+// at (saved and put back by the caller) and the text records SetText made
+// (compared and freed).
+constexpr uint32_t kTextMovieBytes = 0x16000;
+constexpr uint32_t kTextStringsBytes = 0x9000;
+uint32_t LayTextMovie(uint8_t* base, uint32_t block, Random& r);
+void MakeTextStrings(uint8_t* base, uint32_t strings);
+const std::vector<std::pair<uint32_t, uint32_t>>& TextMovieGlobals();
+void PointTextMovieGlobals(uint8_t* base, uint32_t block, uint32_t strings);
+void TextMovieRecords(uint8_t* base, uint32_t movie, Outputs& out);
+
 namespace {
 
 constexpr uint32_t kBlockBytes = 0x10000;
@@ -500,6 +515,50 @@ StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint
 
 namespace {
 
+// The text world (above) for one harness's cases: laid by a case's setup,
+// written back and pointed at before each version, its block and records
+// compared after; the globals put back at the end.
+struct TextWorld {
+  explicit TextWorld(uint8_t* base)
+      : base(base), allocation(memory::Alloc(kTextMovieBytes + 16, 0)),
+        block((allocation + 15) & ~15u), strings(memory::Alloc(kTextStringsBytes, 0)) {
+    for (const auto& [address, bytes] : TextMovieGlobals()) {
+      saved.push_back(Read(base, address, bytes));
+    }
+    if (strings != 0) {
+      MakeTextStrings(base, strings);
+    }
+  }
+  ~TextWorld() {
+    size_t i = 0;
+    for (const auto& [address, bytes] : TextMovieGlobals()) {
+      Write(base, address, saved[i++].data(), bytes);
+    }
+    memory::Free(allocation);
+    memory::Free(strings);
+  }
+  TextWorld(const TextWorld&) = delete;
+  TextWorld& operator=(const TextWorld&) = delete;
+  bool ok() const { return allocation != 0 && strings != 0; }
+  void Lay(Random& r) {
+    movie = LayTextMovie(base, block, r);
+    inputs = Read(base, block, kTextMovieBytes);
+  }
+  void Before() const {
+    Write(base, block, inputs.data(), kTextMovieBytes);
+    PointTextMovieGlobals(base, block, strings);
+  }
+  void Add(Outputs& out) const {
+    TextMovieRecords(base, movie, out);
+    out.Bytes(Read(base, block, kTextMovieBytes));
+  }
+  uint8_t* base;
+  uint32_t allocation, block, strings;
+  uint32_t movie = 0;
+  std::vector<uint8_t> inputs;
+  std::vector<std::vector<uint8_t>> saved;
+};
+
 // The race data (its own block): zeroed, a few racers already added.
 struct RaceData {
   explicit RaceData(uint8_t* base)
@@ -625,6 +684,59 @@ void Garage(Context& h, Random& r) {
           __imp__sub_821DF2F8, hooks::CarMakersSetUpCarData, 24, {},
           fmt::format("case {}", c), 0, 0, [&] { race.Reset(count, added); }, race_outputs,
           0x2000, kGarageBytes);
+    }
+    results.Report();
+  }
+  if (hooks::TuningCarStatsCalleesNative()) {
+    // SetUpCarData's world (above) with the text world's movie 2 (sub-scene
+    // 18's texts), the screen's drive type +20788 0 to 5 and aspiration
+    // +20784 0 to 2 mostly. The top 24 bytes: r30, r31 and lr's saves; the
+    // frame's +48 to +79 (SetText's parameter area: r7 to r10, unset ones
+    // passed 0 natively, the user's call of 2026-10-30) left out.
+    TextWorld text(h.base);
+    Results results("TuningScreen::SetCarStats (sub_821DF788)");
+    for (int c = 0; c < 20 && text.ok(); c++) {
+      uint32_t count = 0, added = 0;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            LayGarage(h.base, block, r, c);
+            guest::StoreU32(h.base, kParamsPointer, block + kGarageParams);
+            guest::StoreU32(h.base, kHolderPointer, block + kHolder);
+            count = r.Below(6);
+            added = r.Below(3);
+            const uint32_t screen = block + kCarData - 18912, save = block + kSaveData,
+                           nodes = save + 6120;
+            guest::StoreU32(h.base, screen + 18904, save);
+            const uint32_t steps = r.Below(4);
+            guest::StoreU32(h.base, save + 0x19920, steps);
+            uint16_t at = uint16_t(r.Below(10));
+            guest::StoreU16(h.base, nodes + 204, at);
+            for (uint32_t i = 0; i < steps; i++) {
+              const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
+              guest::StoreU16(h.base, nodes + 4 * at, next);
+              at = next;
+            }
+            const uint32_t slot = r.Below(3);
+            guest::StoreU16(h.base, nodes + 4 * at + 2, uint16_t(slot));
+            Write(h.base, nodes + 212 + 1968 * slot, Read(h.base, block + kGarageCar, 1884).data(),
+                  1884);
+            guest::StoreU32(h.base, screen + 20788, r.Below(6) == 0 ? r.Next() : r.Below(6));
+            guest::StoreU32(h.base, screen + 20784, r.Below(6) == 0 ? r.Next() : r.Below(3));
+            text.Lay(r);
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821DF788, hooks::TuningSetCarStats, 24, {}, fmt::format("case {}", c), 1120,
+          32,
+          [&] {
+            race.Reset(count, added);
+            text.Before();
+          },
+          [&](Outputs& out, const PPCContext& t) {
+            text.Add(out);
+            race_outputs(out, t);
+          },
+          0x3000, kGarageBytes);
     }
     results.Report();
   }
@@ -1246,6 +1358,41 @@ void TuningStand(Context& h, Random& r) {
           },
           __imp__sub_822042D8, hooks::TuningApplyDecals, 56, floats,
           fmt::format("case {}", c), 0, 0, before, blocks, 0x5000, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // +9716 and +9720 set or not, the command queue in the screen (its next
+    // -1 or small); movie 13 the text world's. The top 40 bytes: r28 to r31
+    // and lr's saves; the frame's +48 to +79 (SetText's parameter area: r7
+    // to r10, unset, passed 0 natively, the user's call of 2026-10-30) left
+    // out.
+    TextWorld text(h.base);
+    Results results("TuningScreen::DecalCommand (sub_822019D0)");
+    constexpr uint32_t kQueue = 0x9380;
+    for (int c = 0; c < 20 && text.ok(); c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            text.Lay(r);
+            field(9716, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+            field(9720, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+            field(10036, screen + kQueue);
+            field(kQueue + 16, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(65));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_822019D0, hooks::TuningDecalCommand, 40, floats,
+          fmt::format("case {}", c), 48, 32,
+          [&] {
+            before();
+            text.Before();
+          },
+          [&](Outputs& out, const PPCContext& t) {
+            with_f1(out, t);
+            text.Add(out);
+          },
+          0x4000, kGarageBytes);
     }
     results.Report();
   }

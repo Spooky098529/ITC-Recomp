@@ -461,4 +461,37 @@ uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
   return r3;
 }
 
+uint64_t DecalCommand(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
+                      double* f1) {
+  ITC_NATIVE_RUNNING("sub_822019D0 TuningScreen::DecalCommand");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t s = screen;
+  const uint32_t movie = Load(base, MovieEntry(base, frame, 13));
+  if (Load(base, s + 9716) != 0) {
+    if (Load(base, s + 9720) != 0) {
+      Advance(base, s);
+      Store(base, s + 9720, 0);
+    } else {
+      FinishNamed(stand.call, frame, 0x82201A64, movie, 240);
+      PlayNamed(stand.call, frame, 0x82201A80, movie, 240, 1);
+      front_end_car_draw::GarageStageCommand(base, stand.calls, Holder(base), 58, frame);
+    }
+    Store(base, s + 9716, 0);
+  }
+  Store(base, s + 10012, 7);
+  const uint32_t c = GarageCarOf(base, Load(base, s + kSaveData));
+  const int64_t a = int8_t(guest::LoadU8(base, c + 300));
+  const int64_t b = int8_t(guest::LoadU8(base, c + 301));
+  double fit = 0.0;
+  FitSelectedCar(base, stand.calls, Holder(base), uint64_t(a), uint64_t(b), frame, &fit);
+  // The text calls with f1 as FitSelectedCar leaves it, their last f1 the
+  // function's.
+  const uint64_t reset[3] = {movie, 2, 0};
+  stand.calls.call(kResetTextScroll, reset, 3, &fit, 1, frame, 0x82201B0C, nullptr);
+  const uint64_t text[8] = {movie, 2, 0, 824, 0, 0, 0, 0};
+  stand.calls.call(kSetText, text, 8, nullptr, 0, frame, 0x82201B20, nullptr);
+  const uint64_t scroll[4] = {movie, 2, 0, 1};
+  return stand.calls.call(kScrollText, scroll, 4, nullptr, 0, frame, 0x82201B34, f1);
+}
+
 }  // namespace tuning_screen

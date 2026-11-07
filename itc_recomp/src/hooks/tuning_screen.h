@@ -96,6 +96,8 @@ void TuningUpdateItems(PPCContext& ctx, uint8_t* base);
 void TuningShowTypes(PPCContext& ctx, uint8_t* base);
 void TuningSetStateTexts(PPCContext& ctx, uint8_t* base);
 void TuningFillPartRows(PPCContext& ctx, uint8_t* base);
+// Command8 sub_821F5F70 (r3 all 64 bits).
+void TuningCommand8(PPCContext& ctx, uint8_t* base);
 
 // The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
 // with TuningStandCalleesNative: --native_stand_models, --native_race_setup
@@ -111,6 +113,14 @@ void TuningPickCameraPreset(PPCContext& ctx, uint8_t* base);
 void TuningUpdateBusyIcon(PPCContext& ctx, uint8_t* base);
 void TuningPreviewWheels(PPCContext& ctx, uint8_t* base);
 void TuningApplyDecals(PPCContext& ctx, uint8_t* base);
+// DecalCommand sub_822019D0 (r3 the screen; f1 as its last text call leaves
+// it), with TuningStandCalleesNative.
+void TuningDecalCommand(PPCContext& ctx, uint8_t* base);
+// SetCarStats sub_821DF788 (r3 the screen; f1 its last SetText's), only with
+// TuningCarStatsCalleesNative: CarMakersGarageCalleesNative and
+// --native_vehicle.
+bool TuningCarStatsCalleesNative();
+void TuningSetCarStats(PPCContext& ctx, uint8_t* base);
 
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,

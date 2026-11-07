@@ -17,7 +17,9 @@
 // and compares the text records SetText made (their words and buffers,
 // freed), the globals, the blocks, the stack below r1 (without the
 // original's register saves and the parameter areas the varargs callees
-// store into), the caller's area, r1 and all of r3, exactly.
+// store into), the caller's area, r1 and all of r3, exactly. Its movie
+// and string table are also laid for car_makers.cpp's DecalCommand and
+// SetCarStats cases (LayTextMovie and the functions after it).
 
 #include "harness.h"
 
@@ -64,6 +66,7 @@ constexpr uint32_t kMenuAt = 0x20500;       // the front-end menu [+10040] (0x10
 constexpr uint32_t kParamsAt = 0x20600;     // ShowTypes' car parameters [0x826C2E48] (0x100)
 constexpr uint32_t kPartTablesAt = 0x20700;  // their part tables (0x900)
 constexpr uint32_t kBlockBytes = 0x21000;
+constexpr uint32_t kTextMovieBytes = kScreenAt;  // LayTextMovie's block: the movie to the zeros
 constexpr uint32_t kSaveBytes = 0x1A000;
 
 constexpr uint32_t kStackBytes = 2048;
@@ -93,13 +96,40 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
   }
 }
 
+// The string table at `strings`: its 18 files one container of 8,192
+// entries over 16 strings, so any id below 8,192 has a string.
+void Strings(uint8_t* base, uint32_t strings) {
+  Random r(0x54756E65ull);  // "Tune"
+  const uint32_t container = strings + 128, text = strings + 128 + 4 + 4 * 8192;
+  for (uint32_t k = 0; k < 18; k++) {
+    guest::StoreU32(base, strings + 4 * k, container);
+  }
+  guest::StoreU32(base, container, __builtin_bswap32(8192));
+  for (uint32_t k = 0; k < 8192; k++) {
+    const uint32_t at = text + 64 * (k % 16);
+    guest::StoreU32(base, container + 4 + 4 * k, __builtin_bswap32(at - container));
+  }
+  for (uint32_t k = 0; k < 16; k++) {
+    const uint32_t at = text + 64 * k;
+    const uint32_t length = r.Below(30);
+    for (uint32_t c = 0; c < length; c++) {
+      uint16_t unit = uint16_t('a' + r.Below(26));
+      if (r.Below(10) == 0) {
+        unit = r.Below(2) == 0 ? 10 : 0xFFD1;
+      }
+      guest::StoreU16(base, at + 2 * c, unit);
+    }
+    guest::StoreU16(base, at + 2 * length, 0);
+  }
+}
+
 struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
         block((allocation + 15) & ~15u), save(memory::Alloc(kSaveBytes, 0)),
         strings(memory::Alloc(kStringsBytes, 0)) {
     if (strings != 0) {
-      MakeStrings();
+      Strings(base, strings);
     }
   }
   ~World() {
@@ -121,67 +151,44 @@ struct World {
   // strings, so any id below 8,192 has a string.
   static constexpr uint32_t kStringsBytes = 0x9000;
   uint32_t strings;
-
- private:
-  void MakeStrings() {
-    Random r(0x54756E65ull);  // "Tune"
-    const uint32_t container = strings + 128, text = strings + 128 + 4 + 4 * 8192;
-    for (uint32_t k = 0; k < 18; k++) {
-      guest::StoreU32(base, strings + 4 * k, container);
-    }
-    guest::StoreU32(base, container, __builtin_bswap32(8192));
-    for (uint32_t k = 0; k < 8192; k++) {
-      const uint32_t at = text + 64 * (k % 16);
-      guest::StoreU32(base, container + 4 + 4 * k, __builtin_bswap32(at - container));
-    }
-    for (uint32_t k = 0; k < 16; k++) {
-      const uint32_t at = text + 64 * k;
-      const uint32_t length = r.Below(30);
-      for (uint32_t c = 0; c < length; c++) {
-        uint16_t unit = uint16_t('a' + r.Below(26));
-        if (r.Below(10) == 0) {
-          unit = r.Below(2) == 0 ? 10 : 0xFFD1;
-        }
-        guest::StoreU16(base, at + 2 * c, unit);
-      }
-      guest::StoreU16(base, at + 2 * length, 0);
-    }
-  }
 };
 
-void MakeWorld(uint8_t* base, const World& w, Random& r) {
-  WriteRandom(base, w.block, kBlockBytes, r);
-  WriteRandom(base, w.save, kSaveBytes, r);
-  const uint32_t movie = w.at(kMovieAt);
+uint32_t At(uint32_t block, uint32_t offset) { return block + offset; }
+uint32_t NodeAt(uint32_t block, uint32_t n) { return block + kNodesAt + kNodeBytes * n; }
+
+// The movie in `block` (the block's words random already): its node pool,
+// the named animations' root and animations, both ids' pairs.
+void LayMovie(uint8_t* base, uint32_t block, Random& r) {
+  const uint32_t movie = At(block, kMovieAt);
   // The nodes: TXT tags, their first child's index small, their children
   // the pool's.
   for (uint32_t n = 0; n < kNodeCount; n++) {
-    const uint32_t node = w.node(n);
+    const uint32_t node = NodeAt(block, n);
     guest::StoreU32(base, node + 0, kTxtTag);
     guest::StoreU32(base, node + 100, r.Below(60));
     guest::StoreU32(base, node + 104, r.Below(8));
     guest::StoreU32(base, node + 108, r.Below(20));
     for (uint32_t e = 0; e < (kNodeBytes - 128) / 8; e++) {
-      guest::StoreU32(base, node + 128 + 8 * e, w.node(r.Below(kNodeCount)));
+      guest::StoreU32(base, node + 128 + 8 * e, NodeAt(block, r.Below(kNodeCount)));
     }
   }
   // The movie: its animation lists set up, its scenes the root, its 128
   // named animations over the root and one of the 8 animations.
-  const uint32_t root = w.at(kRootAt);
+  const uint32_t root = At(block, kRootAt);
   ui_movies::InitAnimationLists(base, movie);
-  guest::StoreU32(base, movie + 16, w.node(0));
+  guest::StoreU32(base, movie + 16, NodeAt(block, 0));
   guest::StoreU32(base, movie + 20, root);
   guest::StoreU32(base, movie + 24, root);
   for (uint32_t k = 0; k < 128; k++) {
     const uint32_t named = movie + 176 + 36 * k;
     guest::StoreU32(base, named + 28, root);
-    guest::StoreU32(base, named + 32, w.at(kAnimationsAt) + 64 * r.Below(8));
+    guest::StoreU32(base, named + 32, At(block, kAnimationsAt) + 64 * r.Below(8));
   }
   for (uint32_t i = kZeroAt; i < kScreenAt; i += 4) {
-    guest::StoreU32(base, w.at(i), 0);
+    guest::StoreU32(base, At(block, i), 0);
   }
   for (uint32_t k = 0; k < 8; k++) {
-    const uint32_t animation = w.at(kAnimationsAt) + 64 * k;
+    const uint32_t animation = At(block, kAnimationsAt) + 64 * k;
     for (uint32_t i = 0; i < 64; i += 4) {
       guest::StoreU32(base, animation + i, 0);
     }
@@ -192,16 +199,22 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, root + 108, r.Below(4));
   guest::StoreU32(base, root + 116, 70);
   for (uint32_t i = 0; i < 94; i++) {
-    guest::StoreU32(base, root + 128 + 8 * i, w.at(kAnimationsAt) + 64 * r.Below(8));
+    guest::StoreU32(base, root + 128 + 8 * i, At(block, kAnimationsAt) + 64 * r.Below(8));
   }
   // The texts' map empty, the text count small.
   guest::StoreU32(base, movie + ui_movies::kMovieTexts + 1024, 0);
   guest::StoreU32(base, movie + 0x9FCC, r.Below(7));
   // Both ids' pairs.
-  guest::StoreU32(base, w.at(kPairsAt), 2);
-  guest::StoreU32(base, w.at(kPairsAt) + 4, movie);
-  guest::StoreU32(base, w.at(kPairsAt) + 8, 13);
-  guest::StoreU32(base, w.at(kPairsAt) + 12, movie);
+  guest::StoreU32(base, At(block, kPairsAt), 2);
+  guest::StoreU32(base, At(block, kPairsAt) + 4, movie);
+  guest::StoreU32(base, At(block, kPairsAt) + 8, 13);
+  guest::StoreU32(base, At(block, kPairsAt) + 12, movie);
+}
+
+void MakeWorld(uint8_t* base, const World& w, Random& r) {
+  WriteRandom(base, w.block, kBlockBytes, r);
+  WriteRandom(base, w.save, kSaveBytes, r);
+  LayMovie(base, w.block, r);
   // The screen: its save data, its queue, the fields the cases test small.
   const uint32_t s = w.screen();
   guest::StoreU32(base, s + ts::kSaveData, w.save);
@@ -231,8 +244,8 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
 
 // The text records GetText made: their words and buffers compared, freed,
 // their map words 0.
-void TextRecords(uint8_t* base, const World& w, Outputs& out) {
-  const uint32_t map = w.at(kMovieAt) + ui_movies::kMovieTexts;
+void MovieTextRecords(uint8_t* base, uint32_t movie, Outputs& out) {
+  const uint32_t map = movie + ui_movies::kMovieTexts;
   const uint32_t pairs = guest::LoadU32(base, map + 1024);
   for (uint32_t k = 0; k < pairs && k < 128; k++) {
     const uint32_t value = guest::LoadU32(base, map + 8 * k + 4);
@@ -297,7 +310,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
       } else {
         spec.native(t, h.base);
       }
-      TextRecords(h.base, w, out[v]);
+      MovieTextRecords(h.base, w.at(kMovieAt), out[v]);
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
       }
@@ -323,14 +336,15 @@ void Run(Context& h, const World& w, const Spec& spec) {
 // The named animations past the first 128 (to 1,023, the last below the
 // animation lists at +0x90B4) over the root and the 8 animations, as
 // MakeWorld lays the first.
-void NamedAnimations(const World& w, Random& r) {
-  const uint32_t movie = w.at(kMovieAt);
+void BlockNamedAnimations(uint8_t* base, uint32_t block, Random& r) {
+  const uint32_t movie = At(block, kMovieAt);
   for (uint32_t k = 128; k < 1024; k++) {
     const uint32_t named = movie + 176 + 36 * k;
-    guest::StoreU32(w.base, named + 28, w.at(kRootAt));
-    guest::StoreU32(w.base, named + 32, w.at(kAnimationsAt) + 64 * r.Below(8));
+    guest::StoreU32(base, named + 28, At(block, kRootAt));
+    guest::StoreU32(base, named + 32, At(block, kAnimationsAt) + 64 * r.Below(8));
   }
 }
+void NamedAnimations(const World& w, Random& r) { BlockNamedAnimations(w.base, w.block, r); }
 
 // Movies 16 and 19 (the dialogs') named by the pairs too, when they're there.
 void DialogPairs(const World& w) {
@@ -572,10 +586,44 @@ void PartRowsWorld(const World& w, Random& r) {
   GarageList(w, r, 26);
 }
 
+// Command8's world: FillPartRows' (above) and the named 1007 and 1011.
+void Command8World(const World& w, Random& r) {
+  NamedAnimations(w, r);
+  PartRowsWorld(w, r);
+}
+
 constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
 constexpr uint32_t kCommand30States[] = {35, 36, 37};
 
 }  // namespace
+
+uint32_t LayTextMovie(uint8_t* base, uint32_t block, Random& r) {
+  WriteRandom(base, block, kTextMovieBytes, r);
+  LayMovie(base, block, r);
+  BlockNamedAnimations(base, block, r);
+  return At(block, kMovieAt);
+}
+
+void MakeTextStrings(uint8_t* base, uint32_t strings) { Strings(base, strings); }
+
+const std::vector<std::pair<uint32_t, uint32_t>>& TextMovieGlobals() {
+  static const std::vector<std::pair<uint32_t, uint32_t>> globals = {
+      {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4}};
+  return globals;
+}
+
+void PointTextMovieGlobals(uint8_t* base, uint32_t block, uint32_t strings) {
+  guest::StoreU32(base, ui_movies::kMovieTable, At(block, kPairsAt));
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 16);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, 2);
+  guest::StoreU32(base, kMissingMovie, At(block, kMovieAt));
+  guest::StoreU32(base, kMissingText, 0);
+  guest::StoreU32(base, kStringTable, strings);
+}
+
+void TextMovieRecords(uint8_t* base, uint32_t movie, Outputs& out) {
+  MovieTextRecords(base, movie, out);
+}
 
 void TuningScreenPages(Context& h) {
   World w(h.base);
@@ -762,6 +810,15 @@ void TuningScreenPages(Context& h) {
   Run(h, w, {"TuningScreen::SetStateTexts", 25, __imp__sub_821F1DE0,
              hooks::TuningSetStateTexts, {{-224, -224 + 40}, {-224 + 80, -56}},
              [](PPCContext&, Random& r, const World& w) { StateTextsWorld(w, r); }});
+  // Command8: FillPartRows' world and the named 1007 and 1011; r29 to r31
+  // saved (32 bytes); r3's high word now and then set.
+  Run(h, w, {"TuningScreen::Command8", 25, __imp__sub_821F5F70, hooks::TuningCommand8,
+             {{-128, -32}}, [](PPCContext& t, Random& r, const World& w) {
+               Command8World(w, r);
+               if (r.Below(4) == 0) {
+                 t.r3.u64 |= r.Next() << 32;
+               }
+             }});
   // FillPartRows: r23 to r31 saved (80 bytes); r3's high word now and then
   // set.
   Run(h, w, {"TuningScreen::FillPartRows", 25, __imp__sub_821F4BF8, hooks::TuningFillPartRows,
