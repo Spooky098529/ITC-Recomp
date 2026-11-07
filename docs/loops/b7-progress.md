@@ -142,7 +142,10 @@ file's history. What's left to see in a drive, from every run:
   and wheel handlers `sub_821E07B0`, `sub_821E0E00`, `sub_821CCC50`,
   `sub_821CDB18`, `sub_821CDED8`; the second-most ready groups in
   `leads.md`, beside the stand models' tuning screen helpers; both lines
-  deleted from `leads.md`). Mapping agent running.
+  deleted from `leads.md`). Map checked (9cc3556f: `tuning-screen.md`,
+  91 rows, all new, 80 in play; 0 errors; 60 ready groups; 4 leads added,
+  two trimmed; five subagents, one at a time, for the reading). Migration
+  agent running.
 
 ## Done
 
@@ -218,3 +221,5 @@ file's history. What's left to see in a drive, from every run:
   work left 2029 (wrapped 57, known 430, unknown 1542).
 - After its third migration and validation (`itc_3831`): ours 4390,
   work left 2021 (wrapped 57, known 422, unknown 1542).
+- After the tuning screen's map: ours 4390, work left 2021 (wrapped 57,
+  known 502, unknown 1462).
