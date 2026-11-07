@@ -66,7 +66,14 @@ uint32_t Texture(uint8_t* base, uint32_t movie, uint32_t child, uint32_t texture
 
 uint64_t Screen0Confirm(uint8_t* base, const ConfirmKind& kind, uint32_t dispatcher, uint32_t sp,
                         const strings_and_font::FormatCalls& calls) {
-  ITC_NATIVE_RUNNING(kind.name);
+  // One print per function: the macro's flag is per call site.
+  if (&kind == &kType6Confirm) {
+    ITC_NATIVE_RUNNING("sub_82233FC8 Type6Screen0::Confirm");
+  } else if (&kind == &kType6ConfirmAgain) {
+    ITC_NATIVE_RUNNING("sub_822340B0 Type6Screen0::ConfirmAgain");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82244528 Type7Screen0::Confirm");
+  }
   const uint32_t frame = sp - 112;
   const uint32_t movie = MovieAt(base, frame, 16);
   SetText(base, calls, frame, movie, 0xFFFFFFFF, 0, kind.text);
