@@ -171,7 +171,12 @@ file's history. What's left to see in a drive, from every run:
   `RefreshMenu` `sub_821D8978` (1,319 lines). Validated `itc_4197`
   (race 92 s at 180, the harnesses ~86 s; 0 errors, every harness 0
   differing, 20 of 20 harness lines; 10 in the replay `itc_4198` (ok),
-  10 to drive). Fourth migration agent running (`RefreshMenu`).
+  10 to drive). Fourth migration 5186aacf (`RefreshMenu`, 2,353
+  generated lines; f1 compared as a double; race 37 s, 0 errors, all
+  harnesses 0 differing; no subagents); left in the file: none; ready
+  under its roots in other files: `GarageStage::Draw` `sub_8217FE60`,
+  `sub_8211D930` with `sub_8211CAA0`, `sub_8211C740`. Validation agent
+  running.
 
 ## Done
 
