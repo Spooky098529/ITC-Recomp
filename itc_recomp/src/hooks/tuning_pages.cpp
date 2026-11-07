@@ -67,7 +67,8 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "only InputItems calls it; Menu::StepList, LevelCount, TypeCount, PageItemCount, "
               "PageCursor, SetEditorLimits, LoadVinyls, LoadPageLayouts, LoadDecalImages, "
               "StoreToGarageCar, ScenePools::GetB, FadeOut and the UI movies' FindNode by their "
-              "plain C++; SceneModelRecord::Copy, UiMovie::ResetPose and, not seen in play, "
+              "plain C++ (LevelCount, TypeCount, SetEditorLimits, LoadVinyls, LoadPageLayouts and "
+              "LoadDecalImages with no adapters: only InputItems calls them in play); SceneModelRecord::Copy, UiMovie::ResetPose and, not seen in play, "
               "ResetStickerEditor sub_821F8440 and LoadStickers sub_821F86C0 through the guest)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
@@ -415,23 +416,18 @@ void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-ITC_TUNING_PAGES(821CC728, TuningPagesLevelCount)
-ITC_TUNING_PAGES(821CC7B8, TuningPagesTypeCount)
 ITC_TUNING_PAGES(821CCD38, TuningPagesPageCursor)
 ITC_TUNING_PAGES(821CCDB0, TuningPagesPageItemCount)
 ITC_TUNING_PAGES(821CCE30, TuningPagesIsPickOwned)
 ITC_TUNING_PAGES(821CDF98, TuningPagesTestAndSetWheelFlag)
 ITC_TUNING_PAGES(821E7DB0, TuningPagesSetWheelListEnd)
 ITC_TUNING_PAGES(821EF288, TuningPagesInchListEnd)
-ITC_TUNING_PAGES(821FE420, TuningPagesSetEditorLimits)
-ITC_TUNING_PAGES(822045F8, TuningPagesLoadPageLayouts)
 ITC_TUNING_PAGES(821FE6A0, TuningPagesFreeTexture)
 ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
 ITC_TUNING_PAGES(82204730, TuningPagesBindVinylTexture)
 ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
 
 ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
-ITC_TUNING_PAGES(822040A8, TuningPagesLoadVinyls)
 
 ITC_TUNING_PAGES(821D9E68, TuningPagesShowPricePanel)
 ITC_TUNING_PAGES(821EED98, TuningPagesSetBrandLogo)
@@ -442,7 +438,6 @@ ITC_TUNING_PAGES(82208738, TuningPagesUnloadAll)
 
 ITC_TUNING_PAGES(821DE160, TuningPagesSetAeroAvailability)
 
-ITC_TUNING_PAGES(821FEE10, TuningPagesLoadDecalImages)
 ITC_TUNING_PAGES(821CE1D0, TuningPagesStepList)
 ITC_TUNING_PAGES(821D8670, TuningPagesLeaveEditor)
 ITC_TUNING_PAGES(821D6AD0, TuningPagesInputCategories)
@@ -477,6 +472,12 @@ ITC_TUNING_PAGES(821DFD48, TuningPagesInputItems)
 // No adapter (B7 loop, 2026-11-07: its only caller, InputItems, is native and
 // calls its plain C++; the register step above is the harness's): MoveItem
 // sub_821D0CC0.
+
+// No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
+// InputItems, is native and calls their plain C++; the register steps above
+// are the harness's): LevelCount sub_821CC728, TypeCount sub_821CC7B8,
+// SetEditorLimits sub_821FE420, LoadVinyls sub_822040A8, LoadPageLayouts
+// sub_822045F8, LoadDecalImages sub_821FEE10.
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // OnDialogYes, is native and calls their plain C++; the register steps above
