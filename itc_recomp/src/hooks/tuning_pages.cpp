@@ -76,7 +76,15 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "by their plain C++; Menu::Step, MenuSound::Play and the UI movie calls through "
               "their overrides); state 59's page Leave sub_821E25B0 with StoreOwnedParts "
               "sub_821DD408 (no adapter: only Leave calls it; StoreToGarageCar and "
-              "TestAndSetWheelFlag by their plain C++)) "
+              "TestAndSetWheelFlag by their plain C++); "
+              "state 16's page InputWheels sub_821F6688 with its movie side AnimateWheels "
+              "sub_821F60E0 and the list's rows FillPartRowsRight sub_821F40B8 and "
+              "FillPartRowsLeft sub_821F4768 (no adapters: only InputWheels and AnimateWheels "
+              "call them; SetWheelListEnd, InchListEnd, PreviewWheels, ShowPricePanel, "
+              "SetBrandLogo, GetPrice, SetPartName, PlayGroupAnimation, FillPartRows, "
+              "HidePartMarks, ShowPartMarks and the UI movies' FindNode and Child by their plain "
+              "C++; MenuSound::Play, SetText and the named animations through their overrides, "
+              "the varargs SetText calls leave unset passed as 0)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -398,6 +406,32 @@ void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesInputWheels(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputWheels(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesAnimateWheels(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::AnimateWheels(base, call, screen, sp, native_slots);
+  });
+}
+
+void TuningPagesFillPartRowsRight(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::FillPartRowsRight(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void TuningPagesFillPartRowsLeft(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::FillPartRowsLeft(base, ctx.r3.u64, ctx.r1.u32);
+}
+
 void TuningPagesStoreOwnedParts(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = tp::StoreOwnedParts(base, ctx.r3.u32, ctx.r1.u32);
 }
@@ -480,6 +514,7 @@ ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
 ITC_TUNING_PAGES(821DFD48, TuningPagesInputItems)
 ITC_TUNING_PAGES(821D8160, TuningPagesInputOptions)
 ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
+ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
@@ -510,6 +545,11 @@ ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
 // No adapter (B7 loop, 2026-11-07: its only caller, InputOptions, is native
 // and calls its plain C++; the register step above is the harness's):
 // MoveOption sub_821D5610.
+
+// No adapters (B7 loop, 2026-11-07: their only callers, InputWheels and
+// AnimateWheels, are native and call their plain C++; the register steps
+// above are the harness's): AnimateWheels sub_821F60E0, FillPartRowsRight
+// sub_821F40B8 and FillPartRowsLeft sub_821F4768 (not seen in play).
 
 // No adapter (B7 loop, 2026-11-07: its only caller, Leave, is native and
 // calls its plain C++; the register step above is the harness's):

@@ -175,6 +175,11 @@ uint32_t CarId(uint8_t* base, const CarSlot& car) {
 
 }  // namespace
 
+uint64_t FillPartRow(uint8_t* base, uint64_t r3, uint32_t frame, uint32_t movie, uint32_t node,
+                     const std::function<uint64_t()>& index) {
+  return FillRow(base, r3, frame, movie, node, index);
+}
+
 uint64_t FillPartRows(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821F4BF8 TuningScreen::FillPartRows");
   const uint32_t screen = uint32_t(r3);

@@ -117,6 +117,14 @@ void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base);
 // step is the harness's).
 void TuningPagesLeave(PPCContext& ctx, uint8_t* base);
 void TuningPagesStoreOwnedParts(PPCContext& ctx, uint8_t* base);
+// InputWheels sub_821F6688 (r3 the screen), its movie side AnimateWheels
+// sub_821F60E0 and the list's rows FillPartRowsRight sub_821F40B8 and
+// FillPartRowsLeft sub_821F4768 under it (no adapters: only InputWheels and
+// AnimateWheels call them; these steps are the harness's).
+void TuningPagesInputWheels(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateWheels(PPCContext& ctx, uint8_t* base);
+void TuningPagesFillPartRowsRight(PPCContext& ctx, uint8_t* base);
+void TuningPagesFillPartRowsLeft(PPCContext& ctx, uint8_t* base);
 // The confirm dialogs' yes answers (r3 the screen): OnDialogYes sub_821E2660
 // (SetCurrentChoice's Params::GetCarParts and AeroParts::Get82 by their plain
 // C++ with --native_car_specs), OnStickerDialogYes sub_821FA230 (no adapter:

@@ -308,6 +308,34 @@ uint64_t InputInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32
 // after a wrap. 128-byte frame; the last call's r3, else the movie's entry.
 uint64_t AnimateInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                        uint32_t sp, bool native_slots);
+// sub_821F40B8 TuningScreen::FillPartRowsRight and sub_821F4768
+// FillPartRowsLeft: the wheel list's rows after a step right or left (their
+// rows), each row as FillPartRows lays it (tuning_screen::FillPartRow), after
+// HidePartMarks; n = +25224 1, 2 or 4 and above (0, 3 or negative nothing).
+// r3 = the screen (all 64 bits). 176-byte frame; the last ShowPartMarks' r3,
+// else the movie's entry.
+uint64_t FillPartRowsRight(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t FillPartRowsLeft(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_821F60E0 TuningScreen::AnimateWheels: state 16's movie side (its row):
+// by the same actions asked again, the list's slides (58, 59, 63, 64) with
+// SetPartName and FillPartRowsRight or Left, the tabs' bars (30, 31; the bar
+// Child(node (1, 9), 0)'s +16 after a wrap) with SetPartName,
+// PlayGroupAnimation, FillPartRows and the tabs' highlights (20 to 23), A's
+// and B's finishes (B: the part pick 415 + row, 1008, 1012 played). r3 = the
+// screen (all 64 bits). 128-byte frame; the last call's r3, else the movie's
+// entry or the slot's r3.
+uint64_t AnimateWheels(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                       uint32_t sp, bool native_slots);
+// sub_821F6688 TuningScreen::InputWheels: state 16's page (its row): left
+// and right on the model cursor +25220, up and down on the brand +25204 and
+// the tabs' row +25212 (SetWheelListEnd), A (brand 0 the confirm dialog,
+// else the inch list with InchListEnd; Push(16)), B (Pop, command 7);
+// PreviewWheels and ShowPricePanel after the steps and A; then the price
+// panel's three SetText calls (the varargs they leave unset passed as 0),
+// the brand logo node (SetBrandLogo) and AnimateWheels. r3 = the screen (all
+// 64 bits). 128-byte frame; AnimateWheels' r3.
+uint64_t InputWheels(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                     uint32_t sp, const PageFlags& flags);
 
 // sub_821D0CC0 TuningScreen::MoveItem: state 4's movie side (its row): by
 // the front-end menu's step (+8) and wrap (+40), sub-scene 27's bar slid or

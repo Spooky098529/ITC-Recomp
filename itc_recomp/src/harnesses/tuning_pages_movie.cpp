@@ -913,6 +913,127 @@ void OwnedFields(PPCContext& t, Random& world_random, const World& w) {
   HighWord(t, r);
 }
 
+// State 16's fields (InputWheels, AnimateWheels and the list's rows), seeded
+// as ItemFields (its comment): WheelFields' (the part row +25196 any for the
+// movie side and the rows; outside 0 to 2 for the page, so PreviewWheels
+// writes no garage car and calls no PreviewWheel), then the list's last
+// index +25224 -1 to 8 (1, 2 and 4 and above most), the cursor +25220 -1 to
+// n + 1, the brand +25204 0 to 16 (0 and 16 more often, now and then -1 or
+// 17), the tabs' row +25212 -1 to 4 and the old row +25216 0 to 3 (the
+// wraps' pairs 3, 0 and 0, 3 often), +9716 any, the front and rear wheels
+// +27836 and +27840 now and then a wheel the rows show; the state 16 most
+// of the time; the state history's word below its depth 15 most of the
+// time; the garage list as ItemFields lays it (InchListEnd, PreviewWheels'
+// reads); a few of the page's named animations playing; most cases one
+// action answered on the player's mapper (left, right, up, down, A, B), the
+// entry not blocked mostly.
+void WheelsFields(PPCContext& t, Random& world_random, const World& w, bool page) {
+  uint64_t z = (uint64_t(guest::LoadU32(w.base, w.save)) << 32 |
+                guest::LoadU32(w.base, w.save + 4)) +
+               0x9E3779B97F4A7C15ull;
+  world_random.Next();
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  Random r(z ^ (z >> 31));
+  WheelFields(t, r, w, !page);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  static constexpr int32_t kLasts[] = {-1, 0, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8};
+  const int32_t last = kLasts[r.Below(12)];
+  guest::StoreU32(base, s + 25224, uint32_t(last));
+  const int32_t top = last < 0 ? 1 : last + 2;
+  guest::StoreU32(base, s + 25220, uint32_t(int32_t(r.Below(uint32_t(top) + 1)) - 1));
+  static constexpr int32_t kBrands[] = {-1, 0, 0, 16, 16, 17};
+  const uint32_t brand_pick = r.Below(12);
+  guest::StoreU32(base, s + 25204,
+                  brand_pick < 6 ? uint32_t(kBrands[brand_pick]) : 1 + r.Below(15));
+  uint32_t row = uint32_t(int32_t(r.Below(6)) - 1), old = r.Below(4);
+  if (r.Below(3) == 0) {
+    const bool down = r.Below(2) == 0;
+    row = down ? 0 : 3;
+    old = down ? 3 : 0;
+  }
+  guest::StoreU32(base, s + 25212, row);
+  guest::StoreU32(base, s + 25216, old);
+  guest::StoreU32(base, s + 9716, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  for (const uint32_t wheel : {27836u, 27840u}) {
+    if (r.Below(2) == 0) {
+      guest::StoreU32(base, s + wheel, r.Below(60));
+    }
+  }
+  if (r.Below(4) != 0) {
+    guest::StoreU32(base, s + 9652, 16);
+  }
+  const uint32_t depth = guest::LoadU8(base, s + 10008);
+  if (depth != 0 && r.Below(5) != 0) {
+    guest::StoreU32(base, s + (depth - 1 + 2439) * 4, 15);
+  }
+  // The scene's lookups pinned: the rows write a wheel's number into each
+  // picture's +108 and SetText the text's id into its node's +108 (both a
+  // node's child index), so the scene (node 0), sub-scene 1 (node 1), the
+  // rows (1, 14 to 19: nodes 2 to 7), the brand logo and the tabs' bar (-1,
+  // 17 and 1, 9: node 38) and the price panel (-1, 19: node 39) keep their
+  // children's indices at 0, and the nodes those two write into are leaves,
+  // looked up from no node: the rows' children 1 to 5 (nodes 8 to 37), the
+  // logo's and bar's child 0 (node 12), the price texts (19, 2 to 4: nodes
+  // 13 to 15) and the part name (1, 20: node 16).
+  auto child = [&](uint32_t node, uint32_t i, uint32_t to) {
+    guest::StoreU32(base, w.node(node) + 108, 0);
+    guest::StoreU32(base, w.node(node) + 128 + 8 * i, w.node(to));
+  };
+  child(0, 1, 1);
+  child(0, 17, 38);
+  child(0, 19, 39);
+  child(1, 9, 38);
+  child(1, 20, 16);
+  child(38, 0, 12);
+  for (uint32_t i = 2; i <= 4; i++) {
+    child(39, i, 11 + i);
+  }
+  for (uint32_t k = 0; k < 6; k++) {
+    child(1, 14 + k, 2 + k);
+    for (uint32_t i = 1; i <= 5; i++) {
+      child(2 + k, i, 8 + 5 * k + (i - 1));
+    }
+  }
+  // The garage list (ItemFields').
+  const uint32_t save = w.save, nodes = save + 6120;
+  for (uint32_t k = 0; k < 51; k++) {
+    guest::StoreU16(base, nodes + 4 * k, uint16_t(r.Below(51)));
+    guest::StoreU16(base, nodes + 4 * k + 2, uint16_t(r.Below(4)));
+  }
+  guest::StoreU16(base, nodes + 204, uint16_t(r.Below(51)));
+  guest::StoreU32(base, save + 0x19920, r.Below(6));
+  for (uint32_t k = 0; k < 4; k++) {
+    guest::StoreU32(base, nodes + 1968 * k + 212 + 12, r.Below(26));
+  }
+  // A few of the page's named animations playing (now and then moved to
+  // the looping list): the tabs' highlights 20 to 23, the bars 30 and 31,
+  // the slides 58, 59, 63 and 64, 69, 70, the part picks 415 to 417, 1008,
+  // 1012.
+  const uint32_t movie = w.at(kMovieAt);
+  static constexpr uint32_t kNamed[] = {20, 21, 22, 23, 30, 31, 58,  59,  63,   64,
+                                        69, 70, 415, 416, 417, 1008, 1012};
+  for (uint32_t k = r.Below(10); k > 0; k--) {
+    const uint32_t named = kNamed[r.Below(sizeof(kNamed) / sizeof(kNamed[0]))];
+    ui_movies::PlayNamed(base, movie, named, r.Below(2), 0, 0, 0);
+    if (r.Below(3) == 0) {
+      ui_movies::MoveNamedAnimation(base, movie, named, true);
+    }
+  }
+  static constexpr uint32_t kActions[] = {155, 169, 156, 170, 153, 167, 154, 168, 159, 158};
+  const uint32_t pick = r.Below(12);
+  if (pick < 10) {
+    const uint32_t c = guest::LoadU32(base, kControllerEntries);
+    const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+    const uint32_t bit = 1u << (kActions[pick] - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, pick >= 8 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, pick < 8 ? bit : 0);
+  }
+  HighWord(t, r);
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -1024,6 +1145,30 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::Leave", 400, __imp__sub_821E25B0, hooks::TuningPagesLeave, 24,
        {{112, 144}, {160, 176}}, OwnedFields});
+  // The wheel list's rows after a step right or left: r23 to r31 and lr
+  // saved (80 bytes).
+  Run(h, w,
+      {"TuningScreen::FillPartRowsRight", 150, __imp__sub_821F40B8,
+       hooks::TuningPagesFillPartRowsRight, 80, {},
+       [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
+  Run(h, w,
+      {"TuningScreen::FillPartRowsLeft", 150, __imp__sub_821F4768,
+       hooks::TuningPagesFillPartRowsLeft, 80, {},
+       [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
+  // AnimateWheels: __savegprlr_29 (32 bytes); FillPartRowsRight's and
+  // Left's saves (128 to 208 below), which their plain C++ doesn't write.
+  Run(h, w,
+      {"TuningScreen::AnimateWheels", 300, __imp__sub_821F60E0, hooks::TuningPagesAnimateWheels,
+       32, {{128, 208}},
+       [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
+  // InputWheels: __savegprlr_29 (32 bytes); its frame's +48 to +79
+  // (SetText's parameter area: the r7 to r10 the calls leave unset, passed
+  // as 0 natively, the user's call of 2026-10-30), AnimateWheels' saves (128
+  // to 160 below) and FillPartRowsRight's and Left's (256 to 336).
+  Run(h, w,
+      {"TuningScreen::InputWheels", 600, __imp__sub_821F6688, hooks::TuningPagesInputWheels, 32,
+       {{48, 80}, {128, 160}, {256, 336}},
+       [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, true); }});
 }
 
 }  // namespace harness

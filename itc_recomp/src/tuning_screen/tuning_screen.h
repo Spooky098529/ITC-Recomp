@@ -371,6 +371,15 @@ uint64_t RefreshMovie13(uint8_t* base, const GuestCall& call, uint32_t screen, u
 // (4 and above), each with WheelNumber, the owned mark and ShowPartMarks
 // (its row). 176-byte frame; r3 ShowPartMarks', else the entry.
 uint64_t FillPartRows(uint8_t* base, uint64_t r3, uint32_t sp);
+// One of FillPartRows' rows (no frame of its own; the wheel list's slides,
+// tuning_pages::FillPartRowsRight and Left, share it): node (1, `node`) of
+// `movie` filled with the item `index()` (all 64 bits; called again for
+// each of its three uses, as the original recomputes it): the picture
+// (child 2) +108 = WheelNumber(+25204, i) - 1, the owned mark (child 1) +80
+// by the word at screen + 27856 + 152 G + 4 i, ShowPartMarks from `frame`,
+// the picture clamped to 0..206. ShowPartMarks' r3.
+uint64_t FillPartRow(uint8_t* base, uint64_t r3, uint32_t frame, uint32_t movie, uint32_t node,
+                     const std::function<uint64_t()>& index);
 // sub_821F5F70 TuningScreen::Command8: r3 = the screen (all 64 bits). Movie
 // 2; with +9716, 1007 and 1011 restarted, +9720 = 0 when set, +9716 = 0;
 // 70 and 69 restarted and looped; PlayGroupAnimation, SetPartName,
