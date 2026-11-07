@@ -5,7 +5,9 @@
 // block holding the movie (both ids' pairs naming it), a pool of 40 TXT
 // nodes (each child of a node another of the pool), the transitions' scene
 // root and 8 animations of no tracks (the named animations over them, the
-// animation lists set up), the screen and its command queue; the save data
+// animation lists set up), the screen and its command queue (and for
+// MoveCategory a front-end menu and four action mappers with their vtables,
+// the mapper entries' globals pointed at them); the save data
 // in a block of its own; a string table of our own (letters, newlines and
 // page breaks, no argument codes: the varargs native callers pass as 0
 // aren't read). Each case fills it with random words from its seed, lays
@@ -55,7 +57,10 @@ constexpr uint32_t kQueueAt = kScreenAt + 0x9380;  // the command queue [+10036]
 constexpr uint32_t kTableAt = 0x1F400;       // Command23's movie +28 table (0x300)
 constexpr uint32_t kTargetsAt = 0x1F700;     // its pointers' words (0x100)
 constexpr uint32_t kDispatcherAt = 0x1F800;  // the dialogs' dispatcher (its ring at +204)
-constexpr uint32_t kBlockBytes = 0x1FC00;
+constexpr uint32_t kVtablesAt = 0x1FC00;    // MoveCategory's 4 mappers' vtables (0x40 each)
+constexpr uint32_t kMappersAt = 0x1FD00;    // the 4 mappers (0x200 each)
+constexpr uint32_t kMenuAt = 0x20500;       // the front-end menu [+10040] (0x100)
+constexpr uint32_t kBlockBytes = 0x20600;
 constexpr uint32_t kSaveBytes = 0x1A000;
 
 constexpr uint32_t kStackBytes = 2048;
@@ -74,6 +79,8 @@ constexpr Global kGlobals[] = {
     {kMissingMovie, 4},
     {kMissingText, 4},
     {kStringTable, 4},
+    {0x826BAB80, 32},  // the players' action mapper entries
+    {0x826BABA4, 16},  // their entries' indices
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -361,6 +368,84 @@ void SceneAnimations(const World& w, Random& r) {
   }
 }
 
+// The scene's animations for the lists' pages (UiMovie::Play and Finish by
+// index up to 34 on the scene, 13 on sub-scene 27): each node's animation
+// index +116 60 to 63, its entries 60 to 111 (past the children the cases
+// reach) the 8 animations.
+void ListAnimations(const World& w, Random& r) {
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    const uint32_t node = w.node(n);
+    guest::StoreU32(w.base, node + 116, 60 + r.Below(4));
+    for (uint32_t e = 60; e < (kNodeBytes - 128) / 8; e++) {
+      guest::StoreU32(w.base, node + 128 + 8 * e, w.at(kAnimationsAt) + 64 * r.Below(8));
+    }
+  }
+}
+
+// A small word: 0 to `below` - 1.
+uint32_t Small(Random& r, uint32_t below) { return r.Below(below); }
+
+// The lists' pages: their animations, the category 0 to 6 (now and then 7),
+// the item 0 to 4, the level, type and option bytes 0 to 7.
+void ListPage(const World& w, Random& r) {
+  ListAnimations(w, r);
+  NamedAnimations(w, r);
+  const uint32_t s = w.screen();
+  guest::StoreU32(w.base, s + ts::kCategory, r.Below(8) == 0 ? 7 : r.Below(7));
+  guest::StoreU8(w.base, s + ts::kItem, uint8_t(Small(r, 5)));
+  guest::StoreU8(w.base, s + ts::kLevel, uint8_t(Small(r, 8)));
+  guest::StoreU8(w.base, s + ts::kType, uint8_t(Small(r, 8)));
+  guest::StoreU8(w.base, s + ts::kOption, uint8_t(Small(r, 8)));
+}
+
+// The tire's two pairs of words (`a` and `b`, `c` and `d`) small, equal half
+// the time each.
+void TirePairs(const World& w, Random& r, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+  const uint32_t s = w.screen();
+  const uint32_t first = Small(r, 6), second = Small(r, 6);
+  guest::StoreU32(w.base, s + a, first);
+  guest::StoreU32(w.base, s + b, r.Below(2) == 0 ? first : Small(r, 6));
+  guest::StoreU32(w.base, s + c, second);
+  guest::StoreU32(w.base, s + d, r.Below(2) == 0 ? second : Small(r, 6));
+}
+
+// MoveCategory's world: the menu at [+10040] (its step -1, 0, 1 or another
+// word, its wrap 0, 1 or any word), the four players' mappers with their
+// vtables (slot 10 mostly ActionMapper::Pressed, else Fired or Held), their
+// words +448 to +471 with none, few or many bits, the entries' +4 1 now and
+// then, the player's entry index 0 to 3.
+void MoveCategoryWorld(const World& w, Random& r) {
+  ListAnimations(w, r);
+  const uint32_t s = w.screen();
+  guest::StoreU32(w.base, s + ts::kCategory, r.Below(8));
+  const uint32_t menu = w.at(kMenuAt);
+  guest::StoreU32(w.base, s + 10040, menu);
+  static constexpr uint32_t kSteps[] = {0xFFFFFFFFu, 0, 1};
+  guest::StoreU32(w.base, menu + 8, r.Below(6) == 0 ? uint32_t(r.Next()) : kSteps[r.Below(3)]);
+  const uint32_t wrapped = r.Below(2);
+  guest::StoreU32(w.base, menu + 40, wrapped == 0 ? 0 : (r.Below(2) == 0 ? 1 : uint32_t(r.Next())));
+  guest::StoreU32(w.base, 0x826BABA4, r.Below(4));
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t vtable = w.at(kVtablesAt) + 0x40 * c, mapper = w.at(kMappersAt) + 0x200 * c;
+    guest::StoreU32(w.base, 0x826BAB80 + 8 * c, mapper);
+    guest::StoreU32(w.base, 0x826BAB80 + 8 * c + 4, r.Below(5) == 0 ? 1 : r.Below(3));
+    guest::StoreU32(w.base, mapper, vtable);
+    static constexpr uint32_t kSlots[] = {0x8210C010, 0x8210BE70};  // Fired, Held
+    guest::StoreU32(w.base, vtable + 40, r.Below(5) == 0 ? kSlots[r.Below(2)] : 0x8210BF40);
+    const uint32_t density = r.Below(4);
+    for (uint32_t k = 0; k < 6; k++) {
+      uint32_t bits = 0;
+      if (density != 0) {
+        bits = uint32_t(r.Next());
+        for (uint32_t d = 1; d < density + 1; d++) {
+          bits &= uint32_t(r.Next());
+        }
+      }
+      guest::StoreU32(w.base, mapper + 448 + 4 * k, bits);
+    }
+  }
+}
+
 constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
 constexpr uint32_t kCommand30States[] = {35, 36, 37};
 
@@ -476,6 +561,60 @@ void TuningScreenPages(Context& h) {
                if (r.Below(2) == 0) {
                  guest::StoreU32(w.base, s + 31192 + 4 * (3 * set + pick), 0xFFFFFFFFu);
                }
+             }});
+  // MoveCategory: the menu's step and wrap, the player's mapper (above).
+  Run(h, w, {"TuningScreen::MoveCategory", 25, __imp__sub_821D07D8, hooks::TuningMoveCategory,
+             {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
+               MoveCategoryWorld(w, r);
+             }});
+  // MarkPick: states 4 and 53 mostly, [+33548] 0 to 4 (3 the far marks);
+  // r28 to r31, f30 and f31 saved (56 bytes).
+  Run(h, w, {"TuningScreen::MarkPick", 25, __imp__sub_821D6420, hooks::TuningMarkPick,
+             {{-144, -56}}, [](PPCContext&, Random& r, const World& w) {
+               ListPage(w, r);
+               const uint32_t s = w.screen();
+               static constexpr uint32_t kMarkStates[] = {4, 4, 53, 5};
+               guest::StoreU32(w.base, s + ts::kState, kMarkStates[r.Below(4)]);
+               guest::StoreU32(w.base, s + 33548, r.Below(3) == 0 ? 3 : Small(r, 5));
+             }});
+  // Command16: +30732 0 to 6, the set 0 half the time.
+  Run(h, w, {"TuningScreen::Command16", 20, __imp__sub_821FF6F0, hooks::TuningCommand16,
+             {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
+               NamedAnimations(w, r);
+               const uint32_t s = w.screen();
+               guest::StoreU32(w.base, s + 30732, r.Below(7));
+               guest::StoreU32(w.base, s + 30724, r.Below(2) == 0 ? 0 : r.Below(3));
+             }});
+  // ShowOptions: tire, aero and exterior mostly (items 4 and 1 half the
+  // time), the tire's pairs, [+36612] small; r26 to r31 and f31 saved (64
+  // bytes).
+  Run(h, w, {"TuningScreen::ShowOptions", 25, __imp__sub_821D5028, hooks::TuningShowOptions,
+             {{-160, -64}}, [](PPCContext&, Random& r, const World& w) {
+               ListPage(w, r);
+               const uint32_t s = w.screen();
+               const uint32_t category = r.Below(4) == 0 ? r.Below(8) : 3 + r.Below(3);
+               guest::StoreU32(w.base, s + ts::kCategory, category);
+               if (r.Below(2) == 0) {
+                 guest::StoreU8(w.base, s + ts::kItem, category == 4 ? 4 : category == 5 ? 1 : 0);
+               }
+               TirePairs(w, r, 35952, 36080, 35948, 36076);
+               guest::StoreU32(w.base, s + 36612, Small(r, 8));
+             }});
+  // ShowLevels: power, power train, body and tire mostly (the extended
+  // levels' items half the time), the byte +9677 0 to 12, +25100 0 to 7, the
+  // tire's pair.
+  Run(h, w, {"TuningScreen::ShowLevels", 25, __imp__sub_821D12C0, hooks::TuningShowLevels,
+             {{-160, -64}}, [](PPCContext&, Random& r, const World& w) {
+               ListPage(w, r);
+               const uint32_t s = w.screen();
+               const uint32_t category = r.Below(4) == 0 ? r.Below(8) : r.Below(4);
+               guest::StoreU32(w.base, s + ts::kCategory, category);
+               if (r.Below(2) == 0) {
+                 guest::StoreU8(w.base, s + ts::kItem, category == 1 || category == 2 ? 4 : 0);
+               }
+               guest::StoreU8(w.base, s + 9677, uint8_t(r.Below(13)));
+               guest::StoreU32(w.base, s + 25100, Small(r, 8));
+               TirePairs(w, r, 35948, 36076, 35952, 36080);
              }});
 }
 

@@ -266,6 +266,44 @@ uint64_t Command15(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // string 811, scrolled. 128-byte frame; ScrollText's r3.
 uint64_t Command22(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
+// --- The category bar and the level, type and option lists (menus.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the
+// doubleword at frame + 80 the ints are made floats through) and r3 as the
+// original leaves it.
+
+// sub_821D07D8 TuningScreen::MoveCategory: by the front-end menu [+10040]'s
+// step (+8) and wrap (+40), sub-scene 27's bar slid or snapped (node (27,
+// 0)'s +16 = float(+9656) × 40.0) and the category's animation (+9656 + 2)
+// restarted and looped; with no step, action 159 pressed (the player's
+// mapper's slot 10: ActionMapper::Pressed's plain C++ when the vtable holds
+// it and `native_slots`, else the slot) finishes animations 2 to 13, else
+// action 158 is asked. 128-byte frame; the last call's r3, else the entry.
+uint64_t MoveCategory(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+                      bool native_slots);
+// sub_821D6420 TuningScreen::MarkPick: +9720 = 1; by the state (4, 53), the
+// category and the item, the picked row's marks on sub-scene 28 or 30 at
+// float(pick) × 40.0 (80.0 for state 53's pick 3), then 486, 629 or 981 and
+// 1010 restarted (its row); the queue's step. 144-byte frame; the last
+// PlayNamed's r3, else the entry.
+uint64_t MarkPick(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821FF6F0 TuningScreen::Command16: movie 13's 219 snapped (with the
+// queue's step) or restarted by +9716 and +9720; by +30732 the set's
+// animations (its row); text (2, 0)'s scroll reset, string 805, scrolled.
+// 128-byte frame; ScrollText's r3.
+uint64_t Command16(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D5028 TuningScreen::ShowOptions: tire, aero item 4 and exterior
+// item 1's option page (its row): with +9716 the scene's animation 30, 34 or
+// 6 played and the tire's pictures placed; the option +9664's mark and
+// animations; the queue's step with +9724. 160-byte frame; the last
+// LoopNamed's r3, else the entry.
+uint64_t ShowOptions(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D12C0 TuningScreen::ShowLevels: power, power train, body and tire's
+// level page (its row): with +9716 the scene's animation 5, 6 or 7 played and
+// the current level's picture placed (GetCurrentChoice); the level's mark
+// and animations; 976 and 1013 with the byte +9677 above 8; the queue's step
+// with +9724. 160-byte frame; the last LoopNamed's r3, else the entry.
+uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+
 // --- The calls onto the stand (stand.cpp) ---
 // Each with the original's frame below `sp` (its back chain and the words it
 // stores there; its callees' frames below it as their plain C++ writes them)

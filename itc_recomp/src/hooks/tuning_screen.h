@@ -78,6 +78,17 @@ void TuningOpenItems(PPCContext& ctx, uint8_t* base);
 void TuningCommand15(PPCContext& ctx, uint8_t* base);
 void TuningCommand22(PPCContext& ctx, uint8_t* base);
 
+// The category bar and the lists (src/tuning_screen/menus.cpp; r3 = the
+// screen): MoveCategory sub_821D07D8 (the player's mapper's slot 10 by
+// ActionMapper::Pressed's plain C++ with --native_action_mappers), MarkPick
+// sub_821D6420, Command16 sub_821FF6F0, ShowOptions sub_821D5028,
+// ShowLevels sub_821D12C0.
+void TuningMoveCategory(PPCContext& ctx, uint8_t* base);
+void TuningMarkPick(PPCContext& ctx, uint8_t* base);
+void TuningCommand16(PPCContext& ctx, uint8_t* base);
+void TuningShowOptions(PPCContext& ctx, uint8_t* base);
+void TuningShowLevels(PPCContext& ctx, uint8_t* base);
+
 // The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
 // with TuningStandCalleesNative: --native_stand_models, --native_race_setup
 // and CarMakersSetCarCalleesNative): SetInteriorPair sub_821CCC50 (r4 a

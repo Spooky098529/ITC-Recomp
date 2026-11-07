@@ -19,6 +19,7 @@
 
 ITC_FLAG_DECLARE(bool, native_stand_models);
 ITC_FLAG_DECLARE(bool, native_race_setup);
+ITC_FLAG_DECLARE(bool, native_action_mappers);
 
 ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Run the tuning screen's functions (docs/functions/tuning-screen.md: the part "
@@ -42,7 +43,10 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821E9050, ShowDialog sub_821D6230, Command30 sub_82202750, Command7 sub_821E8B68, "
               "Command23 sub_82202368, Command18 sub_82200600, Command25 sub_82204888, "
               "PlayIntro sub_821D06B0, OpenItems sub_821D0A48, Command15 sub_821FF1D0 and "
-              "Command22 sub_82202090, UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
+              "Command22 sub_82202090, MoveCategory sub_821D07D8 (the player's action mapper's "
+              "slot 10 by ActionMapper::Pressed's plain C++ with --native_action_mappers, else "
+              "through the vtable), MarkPick sub_821D6420, Command16 sub_821FF6F0, ShowOptions "
+              "sub_821D5028 and ShowLevels sub_821D12C0, UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
               "LoopNamed, SetText, ScrollText and sub_8211C5F8 "
               "through their overrides; the lists' "
               "UpdateListDots sub_821EE9B0, ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, "
@@ -244,8 +248,20 @@ ITC_TUNING_CALLS_STEP(PlayIntro)
 ITC_TUNING_CALLS_STEP(OpenItems)
 ITC_TUNING_CALLS_STEP(Command15)
 ITC_TUNING_CALLS_STEP(Command22)
+ITC_TUNING_CALLS_STEP(MarkPick)
+ITC_TUNING_CALLS_STEP(Command16)
+ITC_TUNING_CALLS_STEP(ShowOptions)
+ITC_TUNING_CALLS_STEP(ShowLevels)
 
 #undef ITC_TUNING_CALLS_STEP
+
+void TuningMoveCategory(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
+    return ts::MoveCategory(base, call, screen, sp, native_slots);
+  });
+}
 
 // The same with r3 all 64 bits and r4 the update's dispatcher.
 #define ITC_TUNING_DISPATCH_STEP(Name)                                                \
@@ -398,6 +414,11 @@ ITC_TUNING_SCREEN(821D06B0, TuningPlayIntro)
 ITC_TUNING_SCREEN(821D0A48, TuningOpenItems)
 ITC_TUNING_SCREEN(821FF1D0, TuningCommand15)
 ITC_TUNING_SCREEN(82202090, TuningCommand22)
+ITC_TUNING_SCREEN(821D07D8, TuningMoveCategory)
+ITC_TUNING_SCREEN(821D6420, TuningMarkPick)
+ITC_TUNING_SCREEN(821FF6F0, TuningCommand16)
+ITC_TUNING_SCREEN(821D5028, TuningShowOptions)
+ITC_TUNING_SCREEN(821D12C0, TuningShowLevels)
 
 // The calls onto the stand: also the original unless their callees are
 // native.
