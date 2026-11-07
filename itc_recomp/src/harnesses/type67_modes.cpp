@@ -1638,6 +1638,12 @@ void Screen0Helpers(Context& h, const Block& world) {
     // ShowPage and ConfirmAgain, native on both sides; their own cases are
     // above).
     int closed = 0;  // 6 or 7
+    // Type7Screen0::MenuPage: the menu (+9652, menu_helpers' harness's
+    // shape) and page (+9648) blocks, the players' mappers (action 163's
+    // pressed bit clear: its branch's callee, the power graph's set-up, is
+    // never seen in play and not laid here), the fake sound manager; the
+    // original run with the flag on as the closes are.
+    bool menu = false;
   };
   const Function functions[] = {
       {"Type6Screen0::Confirm", 0x82233FC8, true, __imp__sub_82233FC8,
@@ -1659,12 +1665,20 @@ void Screen0Helpers(Context& h, const Block& world) {
       // A leaf; its tail call's (ShowPage's) frame compared.
       {"Type7Screen0::OnDialogClosed", 0x82244B60, false, __imp__sub_82244B60,
        hooks::Type7Screen0OnDialogClosed, 112, 24, 7},
+      {"Type7Screen0::MenuPage", 0x82244BF8, true, __imp__sub_82244BF8,
+       hooks::Type7Screen0MenuPage, 112, 24, 0, true},
   };
+  const Block mappers(0x1000);
+  const Block manager_block(0x1000);  // the fake manager (+0), its vtable (+0x800)
+  if (!mappers.address || !manager_block.address) return;
+  const uint32_t saved_manager = guest::LoadU32(base, menu_sounds::kSoundManager);
+  const std::vector<uint8_t> saved_mappers = Read(base, menu_helpers::kMapperEntries, 32);
+  const std::vector<uint8_t> saved_controllers = Read(base, menu_helpers::kControllerEntries, 16);
   constexpr uint32_t kTagTxt = 0x54585400;
   static constexpr uint32_t kTags[] = {0x50494300, 0x50524D00, kTagTxt, 0x12345678};
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
-    for (int c = 0; c < (f.closed != 0 ? 48 : 16); c++) {
+    for (int c = 0; c < (f.menu ? 96 : f.closed != 0 ? 48 : 16); c++) {
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
         Random r(uint64_t(c) * 977 + f.address);
@@ -1740,14 +1754,68 @@ void Screen0Helpers(Context& h, const Block& world) {
           static constexpr uint32_t kAsked[] = {4, 4, 5, 5, 0xFFFFFFFFu};
           guest::StoreU32(base, world.address + 9664, kAsked[r.Below(5)]);
         }
+        if (f.menu) {
+          const uint32_t menu = world.address + 0x3900, page = world.address + 0x3A00;
+          guest::StoreU32(base, world.address + 9648, page);
+          guest::StoreU32(base, world.address + 9652, menu);
+          static constexpr uint32_t kPages[] = {0, 1, 2, 3, 0xFFFFFFFFu};
+          guest::StoreU32(base, page, kPages[r.Below(5)]);
+          WriteRandom(base, mappers.address, mappers.bytes, r);
+          // Random reads, or no move and accept (159), back (158) or neither.
+          const uint32_t press = r.Below(4);
+          for (uint32_t k = 0; k < 4; k++) {
+            const uint32_t vt = mappers.address + 0x100 + 0x40 * k;
+            const uint32_t mapper = mappers.address + 0x200 + 0x200 * k;
+            guest::StoreU32(base, menu_helpers::kControllerEntries + 4 * k, r.Below(4));
+            guest::StoreU32(base, menu_helpers::kMapperEntries + 8 * k, mapper);
+            guest::StoreU32(base, menu_helpers::kMapperEntries + 8 * k + 4,
+                            r.Below(5) == 0 ? 1 : 0);
+            guest::StoreU32(base, mapper, vt);
+            guest::StoreU32(base, vt + menu_helpers::kPressedOffset, menu_helpers::kPressedSlot);
+            guest::StoreU32(base, vt + menu_helpers::kFiredOffset, menu_helpers::kFiredSlot);
+            for (uint32_t i = 0; i < 6; i++) {
+              const uint32_t bits = r.Below(3) == 0 ? 0 : uint32_t(r.Next() & r.Next());
+              guest::StoreU32(base, mapper + 448 + 4 * i, bits);
+            }
+            // No move (Menu::Step's actions 153 to 156, 161, 162 and 167 to
+            // 170 neither pressed nor fired), then 159 (index 8) and 158
+            // (index 7) as picked.
+            if (press != 0) {
+              constexpr uint32_t kMoves = 0xF003C | (3u << 10);
+              for (const uint32_t word : {456u, 464u}) {
+                guest::StoreU32(base, mapper + word, guest::LoadU32(base, mapper + word) & ~kMoves);
+              }
+              const uint32_t pressed = guest::LoadU32(base, mapper + 456) & ~(3u << 7);
+              guest::StoreU32(base, mapper + 456,
+                              pressed | (press == 1 ? 1u << 8 : press == 2 ? 1u << 7 : 0));
+            }
+            // Action 163 (index 12) never pressed.
+            guest::StoreU32(base, mapper + 456, guest::LoadU32(base, mapper + 456) & ~(1u << 12));
+          }
+          guest::StoreU32(base, menu + menu_helpers::kPlayer, r.Below(4));
+          guest::StoreU32(base, menu + menu_helpers::kFirst, 0);
+          guest::StoreU32(base, menu + menu_helpers::kLast, 3);
+          guest::StoreU32(base, menu + menu_helpers::kCursor, r.Below(2) ? 3 : r.Below(5));
+          for (const uint32_t o : {menu_helpers::kWraps, menu_helpers::kUpDownLocked,
+                                   menu_helpers::kSidesStep, menu_helpers::kShouldersStep}) {
+            guest::StoreU32(base, menu + o, r.Below(2));
+          }
+          guest::StoreU32(base, menu + menu_helpers::kMoved, 0);
+          guest::StoreU32(base, menu + menu_helpers::kSide, 0);
+          WriteRandom(base, manager_block.address, manager_block.bytes, r);
+          const uint32_t manager = manager_block.address, vtable = manager + 0x800;
+          guest::StoreU32(base, manager, vtable);
+          guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
+          guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+        }
         PPCContext t = CallContext(h);
-        t.r3.u64 = f.closed != 0 ? world.address | (uint64_t(r.Below(2)) << 32)
-                                 : uint32_t(r.Next());
+        t.r3.u64 = f.closed != 0 || f.menu ? world.address | (uint64_t(r.Below(2)) << 32)
+                                           : uint32_t(r.Next());
         t.r4.u64 = f.confirm ? world.address + 0x3200
                              : (r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(5));
         t.lr = 0x82000000 | (r.Below(0x10000) << 2);
         if (v == 0) {
-          ITC_FLAG(native_type67_modes) = f.closed != 0;
+          ITC_FLAG(native_type67_modes) = f.closed != 0 || f.menu;
           f.recompiled(t, base);
           ITC_FLAG(native_type67_modes) = true;
         } else {
@@ -1757,6 +1825,12 @@ void Screen0Helpers(Context& h, const Block& world) {
         out[v].Bytes(Read(base, movie, kMovieBlockBytes));
         out[v].Bytes(Read(base, nodes.address, nodes.bytes));
         out[v].Bytes(Read(base, texts.address, kTextsBytes));
+        if (f.menu) {
+          out[v].Bytes(Read(base, mappers.address, mappers.bytes));
+          out[v].Bytes(Read(base, manager_block.address, manager_block.bytes));
+          out[v].Bytes(Read(base, menu_helpers::kMapperEntries, 32));
+          out[v].Bytes(Read(base, menu_helpers::kControllerEntries, 16));
+        }
         const uint32_t frame = sp - f.frame;
         out[v].Bytes(Read(base, sp - 1024, frame - (sp - 1024)));
         out[v].Bytes(Read(base, frame + 4, 44));
@@ -1773,6 +1847,9 @@ void Screen0Helpers(Context& h, const Block& world) {
   Write(base, ui_movies::kMovieTable, table.data(), 12);
   guest::StoreU32(base, kStringTable, saved_strings);
   guest::StoreU32(base, kMissingText, saved_missing);
+  guest::StoreU32(base, menu_sounds::kSoundManager, saved_manager);
+  Write(base, menu_helpers::kMapperEntries, saved_mappers.data(), 32);
+  Write(base, menu_helpers::kControllerEntries, saved_controllers.data(), 16);
 }
 
 // --- The first screens' OpenMovie and SetUpCar: the stand's holder

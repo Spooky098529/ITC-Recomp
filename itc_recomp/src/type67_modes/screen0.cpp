@@ -11,6 +11,7 @@
 #include "c_runtime/strings.h"
 #include "car_makers/car_makers.h"
 #include "guest.h"
+#include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
 #include "mode_tick/mode_tick.h"
 #include "ui_movies/game.h"
@@ -92,6 +93,19 @@ uint32_t Required(const std::optional<uint32_t>& r3, const char* what) {
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
                     uint32_t lr) {
   return static_cast<const Calls*>(user)->call_set(function, args, set, r1, lr);
+}
+
+uint64_t MenuThunk(void* user, uint32_t function, uint64_t r3, uint64_t r4, uint32_t r1,
+                   uint32_t lr) {
+  return static_cast<const Calls*>(user)->call(function, r1, lr, r3, r4);
+}
+
+menu_helpers::Calls Menus(const Calls& calls) {
+  return {const_cast<Calls*>(&calls), &MenuThunk};
+}
+
+menu_sounds::Calls Sounds(const Calls& calls) {
+  return {const_cast<Calls*>(&calls), &SoundThunk};
 }
 
 constexpr uint32_t kRun = 0x8211E1B8;
@@ -478,6 +492,84 @@ uint64_t ControllerOptionsUpdate(uint8_t* base, uint32_t sp, const Calls& calls)
   }
   StoreU32(base, p + 24, 0);
   return r3;
+}
+
+uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82244BF8 Type7Screen0::MenuPage");
+  constexpr uint32_t kPowerGraphSetUp = 0x82250488;  // never seen in play: recompiled
+  constexpr uint32_t kConfirm = 0x82244528;          // Type7Screen0::Confirm's override
+  const uint32_t screen = uint32_t(r3), dispatcher = uint32_t(r4);
+  const uint32_t frame = sp - 112;
+  const bool slots = calls.native_action_slots;
+  menu_helpers::Step(base, LoadU32(base, screen + 9652), frame, slots, Menus(calls));
+  // The page state's step: +8 = +0 unless +0 is `keep`, +0 = -1, +4 =
+  // `after`, +16 = -1, +12 = `step` (the originals' shared tail).
+  auto to_step = [&](uint32_t keep, uint32_t step, uint32_t after) {
+    const uint32_t p = LoadU32(base, screen + 9648);
+    const uint32_t page = LoadU32(base, p);
+    if (page != keep) StoreU32(base, p + 8, page);
+    StoreU32(base, p + 0, 0xFFFFFFFF);
+    StoreU32(base, p + 4, after);
+    StoreU32(base, p + 16, 0xFFFFFFFF);
+    StoreU32(base, p + 12, step);
+  };
+  // The page state shown at once: +12 = +16 = -1, then ShowPage.
+  auto show = [&](uint32_t page) {
+    const uint32_t p = LoadU32(base, screen + 9648);
+    StoreU32(base, p + 12, 0xFFFFFFFF);
+    StoreU32(base, p + 16, 0xFFFFFFFF);
+    return Type7Screen0ShowPage(base, page, frame);
+  };
+  if (LoadU32(base, LoadU32(base, screen + 9652) + 8) != 0) {
+    const uint64_t answer = menu_sounds::PlayMenuSound(base, 4, frame, Sounds(calls));
+    to_step(0, 2, 0);
+    return answer;
+  }
+  if (int32_t(menu_helpers::Pressed(base, LoadU32(base, screen + 9652), 163, frame, slots,
+                                    Menus(calls))) != 0) {
+    menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
+    calls.call(kPowerGraphSetUp, frame, 0x82244C7C, kType7Car,
+               uint64_t(LoadU32(base, kType7Car + 1972)) + 3);  // lwz, then addi
+    Post(base, dispatcher, 18);
+    const uint32_t p = LoadU32(base, screen + 9648);
+    const uint32_t page = LoadU32(base, p);
+    if (int32_t(page) != 1) StoreU32(base, p + 8, page);
+    StoreU32(base, p + 0, 1);
+    return show(1);
+  }
+  if (int32_t(menu_helpers::Pressed(base, LoadU32(base, screen + 9652), 159, frame, slots,
+                                    Menus(calls))) != 0) {
+    const uint64_t answer = menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
+    const uint32_t menu = LoadU32(base, screen + 9652);
+    StoreU32(base, screen + 9656, LoadU32(base, menu));
+    const uint32_t item = LoadU32(base, menu);
+    if (item < 3) {
+      to_step(2, 3, 2);
+      return answer;
+    }
+    if (item != 3) {
+      return answer;
+    }
+    calls.call(kConfirm, frame, 0x82244D44, r3, r4);
+    const uint32_t p = LoadU32(base, screen + 9648);
+    const uint32_t page = LoadU32(base, p);
+    if (int32_t(page) != -1) StoreU32(base, p + 8, page);
+    StoreU32(base, p + 0, 0xFFFFFFFF);
+    return show(2);
+  }
+  const uint64_t answer = menu_helpers::Pressed(base, LoadU32(base, screen + 9652), 158, frame,
+                                                slots, Menus(calls));
+  if (int32_t(answer) == 0) {
+    return answer;
+  }
+  const uint64_t played = menu_sounds::PlayMenuSound(base, 2, frame, Sounds(calls));
+  const uint32_t menu = LoadU32(base, screen + 9652);
+  const uint32_t item = LoadU32(base, menu);
+  StoreU32(base, menu + 0, 3);
+  StoreU32(base, menu + 4, item);
+  to_step(0, 1, 0);
+  return played;
 }
 
 }  // namespace type67_modes

@@ -82,7 +82,9 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "guest calls); StandScene::PollTeardown sub_82179AE8 (CarScene::LoadsDone's and "
               "ScenePools::GetB's plain C++, CarScene::Update, Draw and StartTeardown guest "
               "calls); the modes' Type6Mode::TearDown sub_82235C18 and Type7Mode::TearDown "
-              "sub_82246098 (the sound manager's slots guest calls)) "
+              "sub_82246098 (the sound manager's slots guest calls); Type7Screen0::MenuPage "
+              "sub_82244BF8 (Menu::Step, Pressed and MenuSound::Play's plain C++; the power "
+              "graph's set-up sub_82250488 and Type7Screen0::Confirm guest calls)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -573,6 +575,12 @@ void Type7ModeTearDown(PPCContext& ctx, uint8_t* base) {
                                  Type67Calls(ctx, base));
   ctx.lr = lr;
 }
+void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Type7Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                         Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
 void GarageStageInit(PPCContext& ctx, uint8_t* base) {
   t67::GarageStageInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad(base));
   ctx.r3.u64 = LightsR3(ctx, ctx.r1.u32 - t67::kGarageStageInitFrame);
@@ -759,6 +767,8 @@ ITC_TYPE67_MODES(82179AE8, StandScenePollTeardown)
 // The modes' TearDown (held by the delegate, no direct callers).
 ITC_TYPE67_MODES(82235C18, Type6ModeTearDown)
 ITC_TYPE67_MODES(82246098, Type7ModeTearDown)
+// Type7Screen0::MenuPage (from the Draw's table, a guest call).
+ITC_TYPE67_MODES(82244BF8, Type7Screen0MenuPage)
 
 // The garage camera: Quaternion::FromAngles (from GarageCamera::Command,
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).

@@ -171,6 +171,8 @@ void StandScenePollTeardown(PPCContext& ctx, uint8_t* base);
 // Type7Mode sub_82246098.
 void Type6ModeTearDown(PPCContext& ctx, uint8_t* base);
 void Type7ModeTearDown(PPCContext& ctx, uint8_t* base);
+// Type7Screen0::MenuPage sub_82244BF8 (r3 the screen, r4 the dispatcher).
+void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base);
 void GarageStageInit(PPCContext& ctx, uint8_t* base);
 void StandSlotInit(PPCContext& ctx, uint8_t* base);
 

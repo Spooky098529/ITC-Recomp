@@ -439,6 +439,19 @@ uint64_t Type7Screen0FadeOutStep(uint8_t* base, uint32_t screen, uint32_t sp, co
 uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                 const Calls& calls);
 
+// sub_82244BF8 Type7Screen0::MenuPage (r3 the screen, r4 the dispatcher):
+// Menu::Step and Menu::Pressed's plain C++ on the menu (+9652), then by
+// what happened: the cursor moved (MenuSound 4, the cursor step 2); 163
+// (MenuSound 0, the power graph's set-up sub_82250488, never seen in play,
+// a guest call to the recompiled original, message 18, page 1 shown);
+// accept 159 (MenuSound 0, the item to +9656: items 0 to 2 the fade out
+// step 3 to page 2, item 3 Type7Screen0::Confirm (a guest call to its
+// override) and page 2 shown); back 158 (MenuSound 2, the cursor on the
+// quit item, the back step 1). MenuSound::Play's plain C++. r3 as the
+// original leaves it.
+uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
+
 // The two modes' cars (1,968-byte garage cars, then +1968 the model made,
 // +1972 where from (-1 none, 0 stock, 2 the garage), +1976 the garage index,
 // +1980 the car's halfword +0).
