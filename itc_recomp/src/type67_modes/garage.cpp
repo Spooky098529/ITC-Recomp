@@ -11,6 +11,8 @@
 #include "cameras/cameras.h"
 #include "guest.h"
 #include "memory/heap.h"
+#include "scene/scene.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
 
@@ -154,6 +156,52 @@ std::optional<uint64_t> StandSceneRelease(uint8_t* base) {
   const uint64_t freed = memory::FreePages(r3) ? 1 : 0;
   StoreU32(base, kStandHolder, 0);
   return freed;
+}
+
+uint64_t StandScenePollTeardown(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82179AE8 StandScene::PollTeardown");
+  constexpr uint32_t kCarSceneUpdate = 0x820C9608, kCarSceneDraw = 0x820C5DE8;
+  constexpr uint32_t kStartTeardown = 0x820C4D88;
+  const uint32_t frame = sp - kPollTeardownFrame;
+  StoreU32(base, frame, sp);  // the back chain, for the guest calls
+  uint32_t h = LoadU32(base, kStandHolder);
+  const uint32_t scene = LoadU32(base, scene::kScene);
+  if (LoadU32(base, h + 12) != 0) {
+    StoreU32(base, h + 16, LoadU32(base, h + 16) - 1);
+    h = LoadU32(base, kStandHolder);
+    if (int32_t(LoadU32(base, h + 16)) > 0) {
+      calls.call(kCarSceneUpdate, frame, 0x82179BC4, scene, 0);
+      return 0;
+    }
+    StoreU32(base, h + 12, 0);
+    return 1;
+  }
+  const uint32_t done = scene::LoadsDone(
+      base, scene, frame,
+      [&](uint32_t function, uint32_t at, uint32_t lr, uint32_t r3, uint32_t r4) {
+        return calls.call(function, at, lr, r3, r4);
+      });
+  h = LoadU32(base, kStandHolder);
+  if (done == 0 && LoadU32(base, h + 20) != 0) {
+    for (uint32_t offset = 0; offset < 12; offset += 4) {
+      const uint32_t stage = LoadU32(base, LoadU32(base, h + offset));
+      const uint32_t index = LoadU32(base, stage + 8);
+      if (int32_t(index) == -1) {
+        continue;
+      }
+      const uint32_t current = LoadU32(base, scene::kScene);
+      const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, current, 7, index);
+      StoreU32(base, model + 4296, 0);
+      calls.call(kCarSceneUpdate, frame, 0x82179B64, model, 0);
+      calls.call(kCarSceneDraw, frame, 0x82179B70, current, 0);
+      h = LoadU32(base, kStandHolder);
+    }
+    return 0;
+  }
+  StoreU32(base, h + 12, 1);
+  StoreU32(base, LoadU32(base, kStandHolder) + 16, 10);
+  calls.call(kStartTeardown, frame, 0x82179BA0, done, 0);  // r3 as LoadsDone left it
+  return 0;
 }
 
 }  // namespace type67_modes

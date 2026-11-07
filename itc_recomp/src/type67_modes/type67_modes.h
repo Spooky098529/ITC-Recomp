@@ -318,6 +318,18 @@ void GarageStageInit(uint8_t* base, uint32_t stage, uint32_t index, uint32_t sp,
 bool StandSlotInit(uint8_t* base, uint32_t slot, uint32_t index, uint32_t sp,
                    const LoadCall& load);
 
+// sub_82179AE8 StandScene::PollTeardown (no arguments): 1 once the car
+// scene is torn down, else 0. With no teardown under way (the holder's
+// +12 0): CarScene::LoadsDone (its plain C++, the finishers guest calls);
+// not done with a stand model made (+20), each stage's scene model (pool 7
+// of the second set, ScenePools::GetB's plain C++) hidden (+4296 = 0) and
+// CarScene::Update and Draw (guest calls to their overrides); else +12 = 1,
+// +16 = 10 and CarScene::StartTeardown (a guest call). Under way: +16 down
+// by one, CarScene::Update while above 0, else +12 = 0 and 1. `sp` is the
+// caller's stack pointer (its frame 128 bytes below).
+constexpr uint32_t kPollTeardownFrame = 128;
+uint64_t StandScenePollTeardown(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // sub_82180738 StandScene::Release: Viewports::Release, then each of the
 // holder's three slots (StandSlot::Free, the slot freed, its word 0), the
 // holder freed and [0x826D83E0] = 0. nullopt, with nothing done, where a

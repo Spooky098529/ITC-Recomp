@@ -165,6 +165,8 @@ void GarageLightsInit(PPCContext& ctx, uint8_t* base);
 // as GarageLights::Init leaves it where they reach it. They need the
 // native heap and the archive's native queue (the adapter checks).
 void GarageCameraInit(PPCContext& ctx, uint8_t* base);
+// StandScene::PollTeardown sub_82179AE8 (no arguments; r3 0 or 1).
+void StandScenePollTeardown(PPCContext& ctx, uint8_t* base);
 void GarageStageInit(PPCContext& ctx, uint8_t* base);
 void StandSlotInit(PPCContext& ctx, uint8_t* base);
 
