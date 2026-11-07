@@ -277,4 +277,36 @@ uint64_t LeaveEditor(uint8_t* base, const tuning_screen::GuestCall& call, uint64
 uint64_t InputCategories(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                          uint32_t sp, const PageFlags& flags);
 
+// sub_821D87C0 TuningScreen::BackToItems: state 62's page (its row): with
+// layer 0's fade counts 0, DecalImages::UnloadAll (its plain C++ with the
+// native heap), +9708 = +9716 = +9720 = 1, the history popped until state 4
+// (no bound), the queue to state 4 with command 2 (OpenItems). 96-byte
+// frame; r3 UnloadAll's, else the screen (all 64 bits).
+uint64_t BackToItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                     uint32_t sp, const PageFlags& flags);
+// sub_821EE390 TuningScreen::InputWheelParts: state 15's page (its row): up
+// and down on +25196 (0 to 2, wrapped: +25200), A (brand 0, SetWheelListEnd,
+// Push(15), Go(16, 8), PreviewWheels and ShowPricePanel by their plain C++),
+// B (Pop, the menu reset by PageItemCount and PageCursor, command 2); then
+// AnimateWheelParts. 128-byte frame; r3 AnimateWheelParts'.
+uint64_t InputWheelParts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                         uint32_t sp, const PageFlags& flags);
+// sub_821E8CE0 TuningScreen::AnimateWheelParts: state 15's movie side (its
+// row): movie 2's named animations 389 to 401, 966 by the same actions asked
+// again; the bar node (27, 0)'s +16 after a wrap. 128-byte frame; the last
+// call's r3, else the movie's entry.
+uint64_t AnimateWheelParts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                           uint32_t sp, bool native_slots);
+// sub_821EEEA8 TuningScreen::InputInches: state 17's page (its row): up and
+// down on +25228 (0 to +25232, wrapped: +25236), A (the confirm dialog by
+// IsPickOwned and GetPrice, Push(17)), B (Pop, command 8); PreviewWheels
+// after any of them; then AnimateInches. 112-byte frame; r3 AnimateInches'.
+uint64_t InputInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                     uint32_t sp, const PageFlags& flags);
+// sub_821E9110 TuningScreen::AnimateInches: state 17's movie side (its row):
+// named animations 20 to 31 and 62; the bar Child(node (1, 9), 0)'s +16
+// after a wrap. 128-byte frame; the last call's r3, else the movie's entry.
+uint64_t AnimateInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                       uint32_t sp, bool native_slots);
+
 }  // namespace tuning_pages

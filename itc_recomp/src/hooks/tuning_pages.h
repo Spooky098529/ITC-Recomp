@@ -93,5 +93,14 @@ void TuningPagesLoadImage(PPCContext& ctx, uint8_t* base);
 void TuningPagesStepList(PPCContext& ctx, uint8_t* base);
 void TuningPagesLeaveEditor(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base);
+// BackToItems sub_821D87C0, InputWheelParts sub_821EE390 and InputInches
+// sub_821EEEA8 (r3 the screen), their movie sides AnimateWheelParts
+// sub_821E8CE0 and AnimateInches sub_821E9110 (no adapters: only their pages
+// call them; these steps are the harness's).
+void TuningPagesBackToItems(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputWheelParts(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateWheelParts(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputInches(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateInches(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

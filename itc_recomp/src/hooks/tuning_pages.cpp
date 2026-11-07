@@ -50,7 +50,12 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_821D8670 and InputCategories sub_821D6AD0 (the mappers' slots by their plain C++ "
               "with --native_action_mappers; Menu::Step, MenuSound::Play and the UI movie calls "
               "through their overrides; FadeIn, FadeOut, CategoryItemCount, MoveCategory and, with "
-              "the native heap, DecalImages::UnloadAll by their plain C++)) "
+              "the native heap, DecalImages::UnloadAll by their plain C++); BackToItems "
+              "sub_821D87C0, InputWheelParts sub_821EE390 with AnimateWheelParts sub_821E8CE0 and "
+              "InputInches sub_821EEEA8 with AnimateInches sub_821E9110 (these two with no "
+              "adapters: only their pages call them; SetWheelListEnd, ShowPricePanel, "
+              "PageItemCount, PageCursor, IsPickOwned, GetPrice, PreviewWheels and the UI movies' "
+              "FindNode and Child by their plain C++)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -286,6 +291,59 @@ void TuningPagesLeaveEditor(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+namespace {
+
+tp::PageFlags Flags() {
+  tp::PageFlags flags;
+  flags.native_slots = ITC_FLAG(native_action_mappers);
+  flags.native_heap = NativeHeapActive();
+  flags.native_free = ITC_FLAG(native_car_models);
+  return flags;
+}
+
+}  // namespace
+
+void TuningPagesBackToItems(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::BackToItems(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesInputWheelParts(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputWheelParts(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesAnimateWheelParts(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::AnimateWheelParts(base, call, screen, sp, native_slots);
+  });
+}
+
+void TuningPagesInputInches(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputInches(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesAnimateInches(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::AnimateInches(base, call, screen, sp, native_slots);
+  });
+}
+
 void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   tp::PageFlags flags;
@@ -343,6 +401,9 @@ ITC_TUNING_PAGES(821FEE10, TuningPagesLoadDecalImages)
 ITC_TUNING_PAGES(821CE1D0, TuningPagesStepList)
 ITC_TUNING_PAGES(821D8670, TuningPagesLeaveEditor)
 ITC_TUNING_PAGES(821D6AD0, TuningPagesInputCategories)
+ITC_TUNING_PAGES(821D87C0, TuningPagesBackToItems)
+ITC_TUNING_PAGES(821EE390, TuningPagesInputWheelParts)
+ITC_TUNING_PAGES(821EEEA8, TuningPagesInputInches)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above

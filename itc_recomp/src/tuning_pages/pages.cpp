@@ -9,7 +9,11 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "tuning_screen/tuning_screen.h"
+#include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
 
+#include <bit>
+#include <optional>
 #include <utility>
 
 namespace tuning_pages {
@@ -353,6 +357,440 @@ uint64_t InputCategories(uint8_t* base, const tuning_screen::GuestCall& call, ui
     mode_tick::ScreenFadesFadeOut(base, Load(base, kFadeOutPasses), 0, 0, 0, 0);
   }
   return tuning_screen::MoveCategory(base, call, s, frame, flags.native_slots);
+}
+
+namespace {
+
+// The page's read of the player's mapper entry `entry` (skipped while its
+// +4 is 1): slot `offset` on `action`, its r3 into `*r3`. Whether its low
+// byte is set.
+bool Asked(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t entry, uint32_t offset,
+           uint64_t action, uint32_t frame, uint32_t lr, bool native_slots, uint64_t* r3) {
+  if (int32_t(Load(base, entry + 4)) == 1) {
+    return false;
+  }
+  *r3 = ReadSlot(base, call, Load(base, entry), offset, action, frame, lr, native_slots);
+  return (*r3 & 0xFF) != 0;
+}
+
+// The bar's position on the wheel lists: the word times 40 (mulli, the
+// product's low word sign-extended) stored as a doubleword at frame + 80,
+// loaded, converted (fcfid) and rounded to a single (frsp); its bits.
+uint32_t BarPosition(uint8_t* base, uint32_t frame, uint32_t word) {
+  const int64_t x = int32_t(word * 40u);
+  Store(base, frame + 80, uint32_t(uint64_t(x) >> 32));
+  Store(base, frame + 84, uint32_t(x));
+  return std::bit_cast<uint32_t>(float(double(x)));
+}
+
+// The player's mapper entry (0x826BAB80 + 8 × [0x826BABA4]).
+uint32_t PlayerEntry(uint8_t* base) {
+  return (Load(base, kControllerEntries) << 3) + kMapperEntries;
+}
+
+}  // namespace
+
+uint64_t BackToItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                     uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821D87C0 TuningScreen::BackToItems");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 96);
+  if ((Load(base, kFadeOut) | Load(base, kFadeIn)) != 0) {
+    return screen;
+  }
+  uint64_t r3;
+  if (flags.native_heap) {
+    r3 = UnloadAll(base, call, screen + 10048, frame, flags.native_free);
+  } else {
+    r3 = call(kUnloadAll, {screen + 10048}, frame, 0x821D87F4);
+  }
+  Store(base, s + 9708, 1);
+  Store(base, s + 9716, 1);
+  Store(base, s + 9720, 1);
+  // Pop until state 4 (no bound: the byte wraps).
+  uint32_t depth = Byte(base, s + 10008);
+  uint32_t state;
+  do {
+    depth = (depth + 255) & 0xFF;
+    const uint32_t at = ((depth + 2439) << 2) + s;
+    guest::StoreU8(base, s + 10008, uint8_t(depth));
+    state = Load(base, at);
+    Store(base, s + 9652, state);
+  } while (int32_t(state) != 4);
+  uint32_t queue = Load(base, s + 10036);
+  GoFirstHalf(base, queue, state);
+  queue = QueueCurrent(base, s, &state);
+  Store(base, queue + 16, 0xFFFFFFFFu);
+  Store(base, queue + 4, state);
+  Store(base, queue + 0, 0xFFFFFFFFu);
+  Store(base, queue + 12, 2);
+  return r3;
+}
+
+uint64_t AnimateWheelParts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                           uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_821E8CE0 TuningScreen::AnimateWheelParts");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, tuning_screen::kMovieId);
+  const uint32_t movie = Load(base, found);
+  auto row = [&] { return uint64_t(Load(base, s + 25196)); };
+  auto finish = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::FinishNamed(call, frame, lr, movie, named);
+  };
+  auto play = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::PlayNamed(call, frame, lr, movie, named, 1);
+  };
+  // The bar snapped to the row: node (27, 0)'s +16.
+  auto snap = [&] {
+    const uint32_t node = ui_movies::FindNode(base, movie, 27, 0);
+    Store(base, node + 16, BarPosition(base, frame, Load(base, s + 25196)));
+  };
+  uint64_t r3 = found;
+  auto asked = [&](uint32_t offset, uint64_t action, uint32_t lr) {
+    return Asked(base, call, entry, offset, action, frame, lr, native_slots, &r3);
+  };
+  uint64_t old_row;
+  if (asked(48, 153, 0x821E8D48) || asked(48, 167, 0x821E8D74)) {
+    // Up.
+    if (Load(base, s + 9708) == 0) {
+      return r3;
+    }
+    if (Load(base, s + 25200) != 0) {
+      finish(399, 0x821E8F9C);
+      finish(400, 0x821E8FA8);
+      snap();
+      old_row = 389;
+    } else {
+      finish(399, 0x821E8FD8);
+      play(399, 0x821E8FF4);
+      old_row = row() + 390;
+    }
+  } else if (asked(48, 154, 0x821E8DA0) || asked(48, 168, 0x821E8DCC)) {
+    // Down.
+    if (Load(base, s + 9708) == 0) {
+      return r3;
+    }
+    if (Load(base, s + 25200) != 0) {
+      finish(399, 0x821E8F00);
+      finish(400, 0x821E8F0C);
+      snap();
+      old_row = 391;
+    } else {
+      finish(400, 0x821E8F50);
+      play(400, 0x821E8F6C);
+      old_row = row() + 388;
+    }
+  } else if (asked(40, 159, 0x821E8DF8)) {
+    // A: the rows' highlights and the bar finished, the row's pick played.
+    for (uint64_t k = 0; k < 10; k++) {
+      finish(k + 389, 0x821E8E10);
+    }
+    finish(399, 0x821E8E28);
+    finish(400, 0x821E8E34);
+    finish(row() + 401, 0x821E8E44);
+    return play(row() + 401, 0x821E8ED8);
+  } else if (asked(40, 158, 0x821E8E74)) {
+    // B: the same, then 966.
+    for (uint64_t k = 0; k < 10; k++) {
+      finish(k + 389, 0x821E8E8C);
+    }
+    finish(399, 0x821E8EA4);
+    finish(400, 0x821E8EB0);
+    finish(966, 0x821E8EBC);
+    return play(966, 0x821E8ED8);
+  } else {
+    return r3;
+  }
+  // The old row finished, the new one restarted and looped.
+  finish(old_row, 0x821E9004);
+  finish(row() + 389, 0x821E9014);
+  play(row() + 389, 0x821E9034);
+  return tuning_screen::LoopNamed(call, frame, 0x821E9044, movie, row() + 389);
+}
+
+uint64_t InputWheelParts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                         uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821EE390 TuningScreen::InputWheelParts");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  uint64_t r3 = 0;
+  auto asked = [&](uint32_t offset, uint64_t action, uint32_t lr) {
+    return Asked(base, call, entry, offset, action, frame, lr, flags.native_slots, &r3);
+  };
+  if (asked(48, 153, 0x821EE3DC) || asked(48, 167, 0x821EE408)) {
+    // Up (wrapping to 2).
+    call(kMenuSoundPlay, {4}, frame, 0x821EE68C);
+    const int32_t row = int32_t(Load(base, s + 25196) - 1);
+    Store(base, s + 9708, 1);
+    Store(base, s + 25196, uint32_t(row));
+    if (row < 0) {
+      Store(base, s + 25196, 2);
+      Store(base, s + 25200, 1);
+    } else {
+      Store(base, s + 25200, 0);
+    }
+  } else if (asked(48, 154, 0x821EE434) || asked(48, 168, 0x821EE460)) {
+    // Down (wrapping to 0).
+    call(kMenuSoundPlay, {4}, frame, 0x821EE660);
+    const int32_t row = int32_t(Load(base, s + 25196) + 1);
+    Store(base, s + 9708, 1);
+    Store(base, s + 25196, uint32_t(row));
+    if (row > 2) {
+      Store(base, s + 25196, 0);
+      Store(base, s + 25200, 1);
+    } else {
+      Store(base, s + 25200, 0);
+    }
+  } else if (asked(40, 159, 0x821EE48C)) {
+    // A: brand 0 first, Push(15), Go(16, 8), the wheels previewed.
+    call(kMenuSoundPlay, {0}, frame, 0x821EE49C);
+    Store(base, s + 25204, 0);
+    Store(base, s + 9708, 1);
+    Store(base, s + 9716, 1);
+    Store(base, s + 25208, 0);
+    Store(base, s + 25212, 0);
+    Store(base, s + 25216, 0);
+    Store(base, s + 25220, 0);
+    SetWheelListEnd(base, s);
+    PushWord(base, s, 15);
+    const uint8_t depth = uint8_t(Byte(base, s + 10008) + 1);
+    uint32_t queue = Load(base, s + 10036);
+    Store(base, s + 9652, 16);
+    guest::StoreU8(base, s + 10008, depth);
+    GoFirstHalf(base, queue, 16);
+    uint32_t state = 0;
+    queue = QueueCurrent(base, s, &state);
+    Store(base, queue + 16, 0xFFFFFFFFu);
+    Store(base, queue + 4, state);
+    Store(base, queue + 0, 0xFFFFFFFFu);
+    Store(base, queue + 12, 8);
+    std::optional<double> f1;  // PreviewWheel's f1, not read after
+    tuning_screen::PreviewWheels(base, call, s, frame, &f1);
+    ShowPricePanel(base, s, frame);
+  } else if (asked(40, 158, 0x821EE574)) {
+    // B: Pop, the menu reset to the page's count and cursor, OpenItems.
+    call(kMenuSoundPlay, {2}, frame, 0x821EE584);
+    const uint32_t depth = (Byte(base, s + 10008) + 255) & 0xFF;
+    uint32_t queue = Load(base, s + 10036);
+    Store(base, s + 9708, 1);
+    guest::StoreU8(base, s + 10008, uint8_t(depth));
+    const uint32_t popped = Load(base, ((depth + 2439) << 2) + s);
+    Store(base, s + 9652, popped);
+    GoFirstHalf(base, queue, popped);
+    const uint32_t count = PageItemCount(base, s);
+    const uint32_t cursor = PageCursor(base, s);
+    const uint32_t menu = Load(base, s + 10040);
+    for (const auto& [field, value] :
+         {std::pair<uint32_t, uint32_t>{12, 0}, {16, count - 1}, {20, 1}, {8, 0}, {0, cursor},
+          {4, cursor}, {44, 0}, {56, 0}, {60, 8}, {36, 0}, {64, 0}, {24, 0}, {28, 0}}) {
+      Store(base, menu + field, value);
+    }
+    uint32_t state = 0;
+    queue = QueueCurrent(base, s, &state);
+    Store(base, queue + 16, 0xFFFFFFFFu);
+    Store(base, queue + 4, state);
+    Store(base, queue + 0, 0xFFFFFFFFu);
+    Store(base, queue + 12, 2);
+  }
+  return AnimateWheelParts(base, call, s, frame, flags.native_slots);
+}
+
+uint64_t AnimateInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                       uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_821E9110 TuningScreen::AnimateInches");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, tuning_screen::kMovieId);
+  const uint32_t movie = Load(base, found);
+  auto row = [&] { return uint64_t(Load(base, s + 25228)); };
+  auto finish = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::FinishNamed(call, frame, lr, movie, named);
+  };
+  auto play = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::PlayNamed(call, frame, lr, movie, named, 1);
+  };
+  // The bar snapped to the row: Child(node (1, 9), 0)'s +16.
+  auto snap = [&] {
+    const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, 1, 9), 0);
+    Store(base, node + 16, BarPosition(base, frame, Load(base, s + 25228)));
+  };
+  uint64_t r3 = found;
+  auto asked = [&](uint32_t offset, uint64_t action, uint32_t lr) {
+    return Asked(base, call, entry, offset, action, frame, lr, native_slots, &r3);
+  };
+  uint64_t old_row;
+  if (asked(48, 153, 0x821E9178) || asked(48, 167, 0x821E91A4)) {
+    // Up.
+    if (Load(base, s + 9708) == 0) {
+      return r3;
+    }
+    if (Load(base, s + 25236) != 0) {
+      finish(30, 0x821E93C0);
+      finish(31, 0x821E93CC);
+      snap();
+      old_row = 20;
+    } else {
+      finish(30, 0x821E9414);
+      play(30, 0x821E9430);
+      old_row = row() + 21;
+    }
+  } else if (asked(48, 154, 0x821E91D0) || asked(48, 168, 0x821E91FC)) {
+    // Down.
+    if (Load(base, s + 9708) == 0) {
+      return r3;
+    }
+    if (Load(base, s + 25236) != 0) {
+      finish(30, 0x821E9318);
+      finish(31, 0x821E9324);
+      snap();
+      old_row = uint64_t(Load(base, s + 25232)) + 20;
+    } else {
+      finish(31, 0x821E9374);
+      play(31, 0x821E9390);
+      old_row = row() + 19;
+    }
+  } else if (asked(40, 159, 0x821E9228)) {
+    // A: the rows and the bar finished.
+    for (uint64_t k = 0; k < 10; k++) {
+      finish(k + 20, 0x821E9240);
+    }
+    finish(30, 0x821E9258);
+    return finish(31, 0x821E9264);
+  } else if (asked(40, 158, 0x821E928C)) {
+    // B: the same, then 62 restarted.
+    for (uint64_t k = 0; k < 10; k++) {
+      finish(k + 20, 0x821E92A4);
+    }
+    finish(30, 0x821E92BC);
+    finish(31, 0x821E92C8);
+    finish(62, 0x821E92D4);
+    return play(62, 0x821E92F0);
+  } else {
+    return r3;
+  }
+  // The old row finished, the new one restarted and looped.
+  finish(old_row, 0x821E9440);
+  finish(row() + 20, 0x821E9450);
+  play(row() + 20, 0x821E9470);
+  return tuning_screen::LoopNamed(call, frame, 0x821E9480, movie, row() + 20);
+}
+
+uint64_t InputInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                     uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821EEEA8 TuningScreen::InputInches");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t entry = PlayerEntry(base);
+  uint64_t r3 = 0;
+  auto asked = [&](uint32_t offset, uint64_t action, uint32_t lr) {
+    return Asked(base, call, entry, offset, action, frame, lr, flags.native_slots, &r3);
+  };
+  if (asked(48, 153, 0x821EEEFC) || asked(48, 167, 0x821EEF28)) {
+    // Up (wrapping to the list's end +25232).
+    call(kMenuSoundPlay, {4}, frame, 0x821EF230);
+    const int32_t row = int32_t(Load(base, s + 25228) - 1);
+    Store(base, s + 9708, 1);
+    Store(base, s + 25228, uint32_t(row));
+    if (row < 0) {
+      Store(base, s + 25228, Load(base, s + 25232));
+      Store(base, s + 25236, 1);
+    } else {
+      Store(base, s + 25236, 0);
+    }
+  } else if (asked(48, 154, 0x821EEF54) || asked(48, 168, 0x821EEF80)) {
+    // Down (wrapping to 0).
+    call(kMenuSoundPlay, {4}, frame, 0x821EF200);
+    const int32_t row = int32_t(Load(base, s + 25228) + 1);
+    const int32_t last = int32_t(Load(base, s + 25232));
+    Store(base, s + 9708, 1);
+    Store(base, s + 25228, uint32_t(row));
+    if (last < row) {
+      Store(base, s + 25228, 0);
+      Store(base, s + 25236, 1);
+    } else {
+      Store(base, s + 25236, 0);
+    }
+  } else if (asked(40, 159, 0x821EEFAC)) {
+    // A: the confirm dialog (command 63): equip when owned, else the money
+    // short or buy; then Push(17).
+    call(kMenuSoundPlay, {0}, frame, 0x821EEFBC);
+    uint32_t menu;
+    if (int32_t(IsPickOwned(base, s)) != 0) {
+      const uint32_t queue = Load(base, s + 10036);
+      guest::StoreU8(base, s + 9665, 0);
+      Store(base, s + 9652, 11);
+      GoFirstHalf(base, queue, 11);
+      menu = Load(base, s + 10040);
+      for (const uint32_t field : {0u, 4u, 40u, 48u, 52u, 32u}) {
+        Store(base, menu + field, 0);
+      }
+      Store(base, menu + 12, 0);
+      Store(base, menu + 16, 1);
+    } else {
+      const int32_t price = int32_t(tuning_screen::GetPrice(base, s));
+      const int32_t money = int32_t(Load(base, s + 25116));
+      const uint32_t queue = Load(base, s + 10036);
+      if (money < price) {
+        Store(base, s + 9652, 10);
+        GoFirstHalf(base, queue, 10);
+        menu = Load(base, s + 10040);
+        for (const uint32_t field : {12u, 16u, 0u, 4u, 40u, 48u, 52u, 32u}) {
+          Store(base, menu + field, 0);
+        }
+      } else {
+        guest::StoreU8(base, s + 9665, 0);
+        Store(base, s + 9652, 9);
+        GoFirstHalf(base, queue, 9);
+        const uint32_t pick = Byte(base, s + 9665);
+        menu = Load(base, s + 10040);
+        Store(base, menu + 0, pick);
+        Store(base, menu + 4, pick);
+        Store(base, menu + 44, 0);
+        Store(base, menu + 56, 0);
+        Store(base, menu + 60, 8);
+        Store(base, menu + 12, 0);
+        Store(base, menu + 16, 1);
+      }
+    }
+    for (const auto& [field, value] : {std::pair<uint32_t, uint32_t>{20, 1}, {8, 0}, {36, 0},
+                                       {64, 0}, {24, 0}, {28, 0}}) {
+      Store(base, menu + field, value);
+    }
+    uint32_t state = 0;
+    const uint32_t queue = QueueCurrent(base, s, &state);
+    Store(base, queue + 0, 0xFFFFFFFFu);
+    Store(base, queue + 4, state);
+    Store(base, queue + 16, 0xFFFFFFFFu);
+    Store(base, queue + 12, 63);
+    Store(base, s + 9708, 1);
+    PushWord(base, s, 17);
+    guest::StoreU8(base, s + 10008, uint8_t(Byte(base, s + 10008) + 1));
+  } else if (asked(40, 158, 0x821EF168)) {
+    // B: Pop, the wheel list's set-up (command 8).
+    call(kMenuSoundPlay, {2}, frame, 0x821EF178);
+    Store(base, s + 9708, 1);
+    const uint32_t depth = (Byte(base, s + 10008) + 255) & 0xFF;
+    uint32_t queue = Load(base, s + 10036);
+    guest::StoreU8(base, s + 10008, uint8_t(depth));
+    const uint32_t popped = Load(base, ((depth + 2439) << 2) + s);
+    Store(base, s + 9652, popped);
+    GoFirstHalf(base, queue, popped);
+    uint32_t state = 0;
+    queue = QueueCurrent(base, s, &state);
+    Store(base, queue + 16, 0xFFFFFFFFu);
+    Store(base, queue + 4, state);
+    Store(base, queue + 0, 0xFFFFFFFFu);
+    Store(base, queue + 12, 8);
+  } else {
+    return AnimateInches(base, call, s, frame, flags.native_slots);
+  }
+  std::optional<double> f1;  // PreviewWheel's f1, not read after
+  tuning_screen::PreviewWheels(base, call, s, frame, &f1);
+  return AnimateInches(base, call, s, frame, flags.native_slots);
 }
 
 }  // namespace tuning_pages
