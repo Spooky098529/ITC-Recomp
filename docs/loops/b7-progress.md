@@ -88,7 +88,12 @@ file's history. What's left to see in a drive, from every run:
   and 7 modes' screen blocks' constructors, `ListScreen`, `NodeScreen`,
   `MachineScreen`, the panel sets; 0 errors; 13 ready groups; 2 leads
   added (the type 6 and 7 modes' slot 0 with their Inits); no
-  subagents). Migration agent running.
+  subagents). Migration c0ce0aec..bc2f1e67 (`--native_screen_constructors`,
+  harness `screen_constructors`: all 41, the two blocks' constructors
+  Overridden (their callers, the modes' slot 0, recompiled), 39 Native,
+  24 adapters removed; the stack leftovers copied; races 38 s, 0
+  errors, its harnesses 0 differing; no subagents); left: none.
+  Validation agent running.
 
 ## Done
 

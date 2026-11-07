@@ -74,6 +74,14 @@ When the user has reviewed a run's section, its heading gets
   Leftovers for the migration: `NodeScreen::NodeScreen` storing r3 into
   its caller's frame, `PanelSetBase::PanelSetBase` zeroing and reading
   words below its stack pointer.
+- Its migration (c0ce0aec..bc2f1e67, `--native_screen_constructors`):
+  the panel word corrected to `0x82815EAC` (the car list screen's);
+  4 cases a constructor (they only store constants and arguments);
+  in the `Type6Screens` case `NodeScreen`'s frame +80 (the original's
+  back chain of `Type6PanelScreen`) is left out of the comparison, as
+  plain C++ writes no back chains; the panels' `operator new` falls
+  back to the original's guest call (new handler, `bad_alloc`) on
+  failure.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
