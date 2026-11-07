@@ -52,6 +52,10 @@ When the user has reviewed a run's section, its heading gets
   (consecutive xorshift streams fell into step); `WheelsFields` pins the
   scene's child lookups; `MoveLevel`'s r4 found to be its own load (the
   map's leftover note corrected).
+- Its fourth migration (85a8c44b..43d9b8ec): `IsPickOwned`'s callers not
+  seen in play (`sub_821D7C90`, `sub_821F0D38`, `sub_821F1130`) stay
+  recompiled and now run the original; nothing to reproduce in the
+  registers both pages keep live across leaf calls.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

@@ -57,7 +57,11 @@ file's history. What's left to see in a drive, from every run:
   Validated `itc_4330` (race 90 s at 180, the harnesses ~88 s; 0
   errors, every harness 0 differing, 23 of 23 harness lines; none in
   the race, 9 in the replay `itc_4331` (ok), 14 to drive). Fourth
-  migration agent running (`InputTypes` with `MoveType`).
+  migration 85a8c44b..43d9b8ec (`MoveType`, `InputTypes`; the adapters
+  of `PageItemCount`, `PageCursor`, `IsPickOwned` and `MoveType`
+  removed; races 35-36 s, 0 errors, its harnesses 0 differing; two
+  subagents, one at a time); left: none in the file (72 of 74 ours;
+  `HandleInput` waits on the editors' leads). Validation agent running.
 
 ## Done
 
@@ -85,5 +89,7 @@ file's history. What's left to see in a drive, from every run:
   known 433, unknown 1395).
 - After its third migration: ours 4546, work left 1874 (wrapped 57,
   known 422, unknown 1395).
+- After its fourth migration: ours 4548, work left 1872 (wrapped 57,
+  known 420, unknown 1395).
 
 ## Stopped
