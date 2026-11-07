@@ -330,6 +330,23 @@ uint64_t MoveItem(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t 
 uint64_t InputItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                     uint32_t sp, const PageFlags& flags);
 
+// sub_821D5610 TuningScreen::MoveOption: state 8's movie side (its row): by
+// the front-end menu's step (+8) and wrap (+40), the option list's bars
+// slid or snapped (the list's node +16 = float(byte +9664) x 40.0) and the
+// option's rows restarted and looped, for the tire (category 3), the
+// bonnet (category 4, item 4) and the door (category 5, item 1); with no
+// step A (the rows and bars finished) or B (the same, then the page before
+// played) asked again. 128-byte frame; the last call's r3, else the movie's
+// entry or the slot's r3.
+uint64_t MoveOption(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                    uint32_t sp, bool native_slots);
+// sub_821D8160 TuningScreen::InputOptions: state 8's page (its row):
+// Menu::Step; moved, A (the confirm dialog: equip, money short or buy, then
+// Push(8)) or B (Pop, the menu reset, ShowLevels for the tire); then
+// MoveOption. 112-byte frame; MoveOption's r3.
+uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                      uint32_t sp, const PageFlags& flags);
+
 // --- The confirm dialogs' yes answers (dialogs.cpp; flush-to-zero off) ---
 // Guest calls through `call` from the originals' frames with their return
 // addresses: memcpy where Buffers_Memcpy declines, Career::PickNext and

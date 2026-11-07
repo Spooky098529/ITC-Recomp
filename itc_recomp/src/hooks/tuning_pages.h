@@ -107,6 +107,11 @@ void TuningPagesAnimateInches(PPCContext& ctx, uint8_t* base);
 // harness's).
 void TuningPagesInputItems(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveItem(PPCContext& ctx, uint8_t* base);
+// InputOptions sub_821D8160 (r3 the screen) and its movie side MoveOption
+// sub_821D5610 (no adapter: only InputOptions calls it; this step is the
+// harness's).
+void TuningPagesInputOptions(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base);
 // The confirm dialogs' yes answers (r3 the screen): OnDialogYes sub_821E2660
 // (SetCurrentChoice's Params::GetCarParts and AeroParts::Get82 by their plain
 // C++ with --native_car_specs), OnStickerDialogYes sub_821FA230 (no adapter:

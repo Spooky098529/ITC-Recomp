@@ -1276,4 +1276,321 @@ uint64_t InputItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
   return MoveItem(base, call, s, frame, flags.native_slots);
 }
 
+namespace {
+
+// MoveOption's lists (its row): the bars (up, down), the rows' first named
+// animations (the second set 0 for the bonnet), the list's node (FindNode
+// of sub-scene `sub` and child `index`, then Child 0 when `child`), and
+// the return addresses of each step's calls: [path] for the paths up
+// wrapped, up, down wrapped, down; the bars' two calls, the first rows'
+// four (F of the row before or after, F, P, L) and the second rows' four
+// (the same on every path).
+struct OptionList {
+  uint64_t bar_up, bar_down, rows_a, rows_b;
+  uint32_t sub, index;
+  bool child;
+  uint32_t bars[4][2];
+  uint32_t first[4][4];
+  uint32_t second[4];
+};
+
+constexpr OptionList kTireOptions = {
+    854, 855, 844, 783, 33, 1, true,
+    {{0x821D5688, 0x821D5694}, {0x821D5774, 0x821D5790}, {0x821D5A4C, 0x821D5A58},
+     {0x821D5AF4, 0x821D5B10}},
+    {{0x821D56E4, 0x821D56F4, 0x821D5714, 0x821D5724},
+     {0x821D57A0, 0x821D57B0, 0x821D57D0, 0x821D57E0},
+     {0x821D5AA4, 0x821D5AB4, 0x821D5AD4, 0x821D5AE4},
+     {0x821D5B20, 0x821D5B30, 0x821D5B50, 0x821D5B60}},
+    {0x821D5734, 0x821D5744, 0x821D5764, 0x821D5D9C}};
+constexpr OptionList kBonnetOptions = {
+    685, 686, 675, 0, 31, 0, false,
+    {{0x821D5818, 0x821D5824}, {0x821D58AC, 0x821D58C8}, {0x821D5B94, 0x821D5BA0},
+     {0x821D5BE8, 0x821D5C04}},
+    {{0x821D586C, 0x821D587C, 0x821D589C, 0x821D5D9C},
+     {0x821D586C, 0x821D587C, 0x821D589C, 0x821D5D9C},
+     {0x821D586C, 0x821D587C, 0x821D589C, 0x821D5D9C},
+     {0x821D586C, 0x821D587C, 0x821D589C, 0x821D5D9C}},
+    {}};
+constexpr OptionList kDoorOptions = {
+    499, 500, 489, 428, 28, 1, true,
+    {{0x821D5900, 0x821D590C}, {0x821D59A8, 0x821D59C4}, {0x821D5C38, 0x821D5C44},
+     {0x821D5CE0, 0x821D5CFC}},
+    {{0x821D595C, 0x821D596C, 0x821D598C, 0x821D599C},
+     {0x821D59D4, 0x821D59E4, 0x821D5A04, 0x821D5A14},
+     {0x821D5C90, 0x821D5CA0, 0x821D5CC0, 0x821D5CD0},
+     {0x821D5D0C, 0x821D5D1C, 0x821D5D3C, 0x821D5D4C}},
+    {0x821D5D5C, 0x821D5D6C, 0x821D5D8C, 0x821D5D9C}};
+
+// The option page's list: the tire (category 3), the bonnet (category 4,
+// item 4), the door (category 5, item 1), else none.
+const OptionList* OptionListOf(uint8_t* base, uint32_t screen) {
+  const int32_t category = int32_t(Load(base, screen + 9656));
+  if (category == 3) {
+    return &kTireOptions;
+  }
+  if (category == 4 && Byte(base, screen + 9660) == 4) {
+    return &kBonnetOptions;
+  }
+  if (category == 5 && Byte(base, screen + 9660) == 1) {
+    return &kDoorOptions;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+uint64_t MoveOption(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                    uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_821D5610 TuningScreen::MoveOption");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, tuning_screen::kMovieId);
+  const uint32_t menu = Load(base, s + 10040);
+  const uint32_t movie = Load(base, found);
+  const int32_t step = int32_t(Load(base, menu + 8));
+  auto option = [&] { return uint64_t(Byte(base, s + 9664)); };
+  auto count = [&] { return uint64_t(Byte(base, s + 9680)); };
+  auto finish = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::FinishNamed(call, frame, lr, movie, named);
+  };
+  auto play = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::PlayNamed(call, frame, lr, movie, named, 1);
+  };
+  auto loop = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::LoopNamed(call, frame, lr, movie, named);
+  };
+  if (step == -1 || step == 1) {
+    const OptionList* list = OptionListOf(base, s);
+    if (list == nullptr) {
+      return found;
+    }
+    const bool up = step == -1;
+    const bool wrapped = int32_t(Load(base, menu + 40)) != 0;
+    const int path = (up ? 0 : 2) + (wrapped ? 0 : 1);
+    const uint32_t* bars = list->bars[path];
+    if (wrapped) {
+      // The bars finished, the bar snapped to the option.
+      finish(list->bar_up, bars[0]);
+      finish(list->bar_down, bars[1]);
+      uint32_t node = ui_movies::FindNode(base, movie, list->sub, list->index);
+      if (list->child) {
+        node = ui_movies::Child(base, node, 0);
+      }
+      Store(base, node + 16, ItemPosition(base, frame, int64_t(option())));
+    } else {
+      // The bar slid one way: up or down restarted.
+      const uint64_t bar = up ? list->bar_up : list->bar_down;
+      finish(bar, bars[0]);
+      play(bar, bars[1]);
+    }
+    // The row before (wrapped up: the last; wrapped down: the first; else the
+    // neighbor) finished, the option's restarted and looped.
+    auto rows = [&](uint64_t first, const uint32_t* lr) {
+      const uint64_t before = wrapped ? (up ? count() + first - 1 : first)
+                                      : option() + (up ? first + 1 : first - 1);
+      finish(before, lr[0]);
+      finish(option() + first, lr[1]);
+      play(option() + first, lr[2]);
+      return loop(option() + first, lr[3]);
+    };
+    uint64_t r3 = rows(list->rows_a, list->first[path]);
+    if (list->rows_b != 0) {
+      r3 = rows(list->rows_b, list->second);
+    }
+    return r3;
+  }
+  // No step: A (the rows and bars finished) or B (the same, then the page
+  // before played).
+  uint64_t r3 = found;
+  auto asked = [&](uint64_t action, uint32_t lr) {
+    return Asked(base, call, entry, 40, action, frame, lr, native_slots, &r3);
+  };
+  if (asked(159, 0x821D5DC4)) {
+    const OptionList* list = OptionListOf(base, s);
+    if (list == &kTireOptions) {
+      for (uint64_t k = 0; k < 10; k++) {
+        finish(k + 844, 0x821D5DEC);
+        finish(k + 783, 0x821D5DF8);
+      }
+      finish(854, 0x821D5E10);
+      return finish(855, 0x821D5EB4);
+    }
+    if (list == &kBonnetOptions) {
+      for (uint64_t k = 0; k < 10; k++) {
+        finish(k + 675, 0x821D5E3C);
+      }
+      finish(685, 0x821D5E54);
+      return finish(686, 0x821D5EB4);
+    }
+    if (list == &kDoorOptions) {
+      for (uint64_t k = 0; k < 10; k++) {
+        finish(k + 489, 0x821D5E84);
+        finish(k + 428, 0x821D5E90);
+      }
+      finish(499, 0x821D5EA8);
+      return finish(500, 0x821D5EB4);
+    }
+    return r3;
+  }
+  if (!asked(158, 0x821D5EDC)) {
+    return r3;
+  }
+  const OptionList* list = OptionListOf(base, s);
+  if (list == &kTireOptions) {
+    // Back to the tire's levels: the level's rows and its picture (the
+    // current choice's, else 629) played, then sub-scene 31 restarted.
+    for (uint64_t k = 0; k < 10; k++) {
+      finish(k + 844, 0x821D5F04);
+      finish(k + 783, 0x821D5F10);
+    }
+    finish(854, 0x821D5F28);
+    finish(855, 0x821D5F34);
+    auto level = [&] { return uint64_t(Byte(base, s + 9661)); };
+    finish(level() + 658, 0x821D5F44);
+    play(level() + 658, 0x821D5F64);
+    finish(level() + 609, 0x821D5F74);
+    play(level() + 609, 0x821D5F94);
+    const int32_t choice = int32_t(tuning_screen::GetCurrentChoice(base, s));
+    uint64_t picture;
+    if (choice == int32_t(level())) {
+      finish(level() + 619, 0x821D5FB4);
+      picture = level() + 619;
+    } else {
+      finish(629, 0x821D5FC8);
+      picture = 629;
+    }
+    play(picture, 0x821D5FE4);
+    call(tuning_screen::kFinish, {movie, tuning_screen::kAllScenes, 31}, frame, 0x821D5FF4);
+    return call(tuning_screen::kPlay, {movie, tuning_screen::kAllScenes, 31, 0, 0, 0, 0}, frame,
+                0x821D6074);
+  }
+  if (list == &kBonnetOptions) {
+    for (uint64_t k = 0; k < 10; k++) {
+      finish(k + 675, 0x821D6020);
+    }
+    finish(685, 0x821D6038);
+    finish(686, 0x821D6044);
+    call(tuning_screen::kFinish, {movie, tuning_screen::kAllScenes, 35}, frame, 0x821D6054);
+    return call(tuning_screen::kPlay, {movie, tuning_screen::kAllScenes, 35, 0, 0, 0, 0}, frame,
+                0x821D6074);
+  }
+  if (list == &kDoorOptions) {
+    for (uint64_t k = 0; k < 10; k++) {
+      finish(k + 489, 0x821D60A0);
+      finish(k + 428, 0x821D60AC);
+    }
+    finish(499, 0x821D60C4);
+    finish(500, 0x821D60D0);
+    finish(973, 0x821D60DC);
+    return tuning_screen::PlayNamed(call, frame, 0x821D60F8, movie, 973, 0);
+  }
+  return r3;
+}
+
+uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                      uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821D8160 TuningScreen::InputOptions");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t entry = PlayerEntry(base);
+  call(kMenuStep, {Load(base, s + 10040)}, frame, 0x821D8198);
+  const int32_t step = int32_t(Load(base, Load(base, s + 10040) + 8));
+  uint64_t r3 = 0;
+  auto asked = [&](uint64_t action, uint32_t lr) {
+    return Asked(base, call, entry, 40, action, frame, lr, flags.native_slots, &r3);
+  };
+  if (step == -1 || step == 1) {
+    // (1) The cursor moved: the option picked.
+    call(kMenuSoundPlay, {4}, frame, 0x821D84C0);
+    const uint32_t menu = Load(base, s + 10040);
+    Store(base, s + 9708, 1);
+    const uint32_t cursor = Load(base, menu + 0);
+    Store(base, s + 9744, cursor);
+    guest::StoreU8(base, s + 9664, uint8_t(cursor));
+  } else if (asked(159, 0x821D81D4)) {
+    // (2) A: the confirm dialog (command 63): equip when owned, else the
+    // money short or buy; then Push(8).
+    call(kMenuSoundPlay, {0}, frame, 0x821D81E4);
+    uint32_t menu;
+    if (int32_t(IsPickOwned(base, s)) != 0) {
+      const uint32_t cursor = Load(base, Load(base, s + 10040) + 0);
+      const uint32_t queue = Load(base, s + 10036);
+      guest::StoreU8(base, s + 9665, 0);
+      Store(base, s + 9652, 11);
+      Store(base, s + 9744, cursor);
+      guest::StoreU8(base, s + 9664, uint8_t(cursor));
+      GoFirstHalf(base, queue, 11);
+      menu = Load(base, s + 10040);
+      StoreMenu(base, menu, {{0, 0}, {4, 0}, {40, 0}, {48, 0}, {52, 0}, {32, 0}, {12, 0}, {16, 1}});
+    } else {
+      const int32_t price = int32_t(tuning_screen::GetPrice(base, s));
+      const int32_t money = int32_t(Load(base, s + 25116));
+      const uint32_t cursor = Load(base, Load(base, s + 10040) + 0);
+      const uint32_t queue = Load(base, s + 10036);
+      Store(base, s + 9744, cursor);
+      guest::StoreU8(base, s + 9664, uint8_t(cursor));
+      if (money < price) {
+        Store(base, s + 9652, 10);
+        GoFirstHalf(base, queue, 10);
+        menu = Load(base, s + 10040);
+        StoreMenu(base, menu,
+                  {{12, 0}, {16, 0}, {0, 0}, {4, 0}, {40, 0}, {48, 0}, {52, 0}, {32, 0}});
+      } else {
+        guest::StoreU8(base, s + 9665, 0);
+        Store(base, s + 9652, 9);
+        GoFirstHalf(base, queue, 9);
+        const uint32_t pick = Byte(base, s + 9665);
+        menu = Load(base, s + 10040);
+        StoreMenu(base, menu,
+                  {{0, pick}, {4, pick}, {44, 0}, {56, 0}, {60, 8}, {12, 0}, {16, 1}});
+      }
+    }
+    StoreMenu(base, menu, {{20, 1}, {8, 0}, {36, 0}, {64, 0}, {24, 0}, {28, 0}});
+    uint32_t state = 0;
+    const uint32_t queue = QueueCurrent(base, s, &state);
+    Store(base, queue + 0, 0xFFFFFFFFu);
+    Store(base, queue + 4, state);
+    Store(base, queue + 16, 0xFFFFFFFFu);
+    Store(base, queue + 12, 63);
+    Store(base, s + 9708, 1);
+    PushWord(base, s, 8);
+    guest::StoreU8(base, s + 10008, uint8_t(Byte(base, s + 10008) + 1));
+  } else if (asked(158, 0x821D83AC)) {
+    // (3) B: Pop (the door marked at +9732), the menu reset to the page's
+    // count and cursor; the tire's levels set up again (ShowLevels).
+    call(kMenuSoundPlay, {2}, frame, 0x821D83BC);
+    if (int32_t(Load(base, s + 9656)) == 5 && Byte(base, s + 9660) == 1) {
+      Store(base, s + 9732, 1);
+    }
+    const uint32_t depth = (Byte(base, s + 10008) + 255) & 0xFF;
+    Store(base, s + 9708, 1);
+    const uint32_t queue = Load(base, s + 10036);
+    guest::StoreU8(base, s + 10008, uint8_t(depth));
+    const uint32_t popped = Load(base, ((depth + 2439) << 2) + s);
+    Store(base, s + 9652, popped);
+    Store(base, queue + 20, 0xFFFFFFFFu);
+    Store(base, queue + 12, 0xFFFFFFFFu);
+    Store(base, queue + 24, 0);
+    Store(base, queue + 4, popped);
+    Store(base, queue + 0, popped);
+    Store(base, queue + 8, popped);
+    const uint32_t count = PageItemCount(base, s);
+    const uint32_t cursor = PageCursor(base, s);
+    StoreMenu(base, Load(base, s + 10040),
+              {{12, 0}, {16, count - 1}, {20, 1}, {8, 0}, {0, cursor}, {4, cursor}, {44, 0},
+               {56, 0}, {60, 8}, {36, 0}, {64, 0}, {24, 0}, {28, 0}});
+    if (int32_t(Load(base, s + 9656)) == 3) {
+      uint32_t state = 0;
+      const uint32_t current = QueueCurrent(base, s, &state);
+      Store(base, current + 16, 0xFFFFFFFFu);
+      Store(base, current + 4, state);
+      Store(base, current + 0, 0xFFFFFFFFu);
+      Store(base, current + 12, 3);
+    }
+  }
+  return MoveOption(base, call, s, frame, flags.native_slots);
+}
+
 }  // namespace tuning_pages
