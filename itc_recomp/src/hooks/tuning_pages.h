@@ -85,7 +85,8 @@ void TuningPagesLoadDecalImages(PPCContext& ctx, uint8_t* base);
 void TuningPagesRequestImage(PPCContext& ctx, uint8_t* base);
 void TuningPagesLoadImage(PPCContext& ctx, uint8_t* base);
 
-// The input pages: Menu::StepList sub_821CE1D0 (r3 the menu),
+// The input pages: Menu::StepList sub_821CE1D0 (r3 the menu; no adapter:
+// only InputItems and InputLevels call it in play, this step is the harness's),
 // TuningScreen::LeaveEditor sub_821D8670 and InputCategories sub_821D6AD0
 // (r3 the screen; the mappers' slots by their plain C++ with
 // --native_action_mappers, DecalImages::UnloadAll by its plain C++ with the
@@ -112,8 +113,8 @@ void TuningPagesMoveItem(PPCContext& ctx, uint8_t* base);
 // harness's).
 void TuningPagesInputOptions(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base);
-// MoveLevel sub_821D1A18 (r3 the screen), state 5's movie side (its caller,
-// InputLevels, is recompiled).
+// MoveLevel sub_821D1A18 (r3 the screen), state 5's movie side (no adapter:
+// only InputLevels calls it; this step is the harness's).
 void TuningPagesMoveLevel(PPCContext& ctx, uint8_t* base);
 // InputLevels sub_821D6E20 (r3 the screen), state 5's page.
 void TuningPagesInputLevels(PPCContext& ctx, uint8_t* base);

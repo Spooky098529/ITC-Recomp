@@ -86,7 +86,8 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "C++; MenuSound::Play, SetText and the named animations through their overrides, "
               "the varargs SetText calls leave unset passed as 0); "
               "state 5's page InputLevels sub_821D6E20 with its movie side MoveLevel "
-              "sub_821D1A18 (Menu::StepList, IsItemAvailable, IsPickOwned, GetPrice, "
+              "sub_821D1A18 (no adapter: only InputLevels calls it; Menu::StepList (no adapter: "
+              "only InputItems and InputLevels call it in play), IsItemAvailable, IsPickOwned, GetPrice, "
               "PageItemCount, PageCursor, GetCurrentChoice and the UI movies' FindNode and Child "
               "by their plain C++; Menu::Step, MenuSound::Play and the UI movie calls through "
               "their overrides)) "
@@ -521,7 +522,6 @@ ITC_TUNING_PAGES(82208738, TuningPagesUnloadAll)
 
 ITC_TUNING_PAGES(821DE160, TuningPagesSetAeroAvailability)
 
-ITC_TUNING_PAGES(821CE1D0, TuningPagesStepList)
 ITC_TUNING_PAGES(821D8670, TuningPagesLeaveEditor)
 ITC_TUNING_PAGES(821D6AD0, TuningPagesInputCategories)
 ITC_TUNING_PAGES(821D87C0, TuningPagesBackToItems)
@@ -532,7 +532,6 @@ ITC_TUNING_PAGES(821DFD48, TuningPagesInputItems)
 ITC_TUNING_PAGES(821D8160, TuningPagesInputOptions)
 ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
 ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
-ITC_TUNING_PAGES(821D1A18, TuningPagesMoveLevel)
 ITC_TUNING_PAGES(821D6E20, TuningPagesInputLevels)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
@@ -564,6 +563,11 @@ ITC_TUNING_PAGES(821D6E20, TuningPagesInputLevels)
 // No adapter (B7 loop, 2026-11-07: its only caller, InputOptions, is native
 // and calls its plain C++; the register step above is the harness's):
 // MoveOption sub_821D5610.
+
+// No adapters (removed, B7 loop, 2026-11-07: their only callers in play,
+// InputItems and InputLevels, are native and call their plain C++; the
+// register steps above are the harness's): Menu::StepList sub_821CE1D0
+// (InputItems, InputLevels) and MoveLevel sub_821D1A18 (InputLevels).
 
 // No adapters (removed, B7 loop, 2026-11-07: their only callers in play,
 // InputWheelParts and InputWheels, are native and call their plain C++; the
