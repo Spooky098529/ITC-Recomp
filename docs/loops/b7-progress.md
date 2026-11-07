@@ -140,7 +140,12 @@ file's history. What's left to see in a drive, from every run:
   `Type7Screen0::MenuPage`). Validated `itc_4395` (race 90 s at 180,
   the harnesses ~88.5 s; 0 errors, every harness 0 differing, 20 of 20
   harness lines; 3 in the replay `itc_4396` (ok), 17 to drive). Fourth
-  migration agent running.
+  migration 30ecc181..f65f43a4 (`StandScene::PollTeardown`, both modes'
+  `TearDown`, `Type7Screen0::MenuPage`, the first screens' `Show`,
+  `ShowCarInfo` and `Update`; 10 functions; races 38 s, 0 errors, its
+  harnesses 0 differing; one subagent, alone, for the Updates); left:
+  none ready in the file (the modes' slot 0 wait on `sub_820C8DE8` in
+  `car-models.md`, itself ready). Validation agent running.
 
 ## Done
 

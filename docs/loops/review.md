@@ -115,6 +115,14 @@ When the user has reviewed a run's section, its heading gets
   live state (reproducible here, so not kept recompiled);
   `ConfirmAgain` `sub_822340B0` keeps its adapter (its native caller
   reaches it by a guest call for the format calls).
+- Its fourth migration (30ecc181..f65f43a4): harness gaps said in the
+  rows: `MenuPage`'s button-163 branch is ported but its callee
+  `sub_82250488` (not seen) stays a guest call and no case presses 163;
+  the Updates' branch where `ReloadModel` answers 1 isn't reached (its
+  car object steps are covered by `ShowCarInfo`'s cases);
+  `Type7Screen0::Confirm` `sub_82244528` keeps its adapter like
+  `ConfirmAgain` (a guest call from native `MenuPage`); the harness
+  helper `Calls::call_set` now sets r3-r8.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
