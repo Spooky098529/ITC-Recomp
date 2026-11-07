@@ -69,7 +69,10 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "Type6Dialog::Update sub_82232798 and Type7Dialog::Update sub_82242218 (the steps "
               "guest calls); the first screens' Type6Screen0::Confirm "
               "sub_82233FC8, ConfirmAgain sub_822340B0, Type7Screen0::Confirm sub_82244528 (with "
-              "the UI movies' text setters native) and Type6Screen0::ShowPage sub_822344A8) "
+              "the UI movies' text setters native) and Type6Screen0::ShowPage sub_822344A8; "
+              "the type 7 first screen's ShowPage sub_82244930, PlaceCursor sub_822448B0, "
+              "ShowHelp sub_82244AB8 (with the text setters native), FadeOutStep sub_82244760 "
+              "and ChosenPage sub_82244610) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -436,6 +439,33 @@ void Type7Screen0Confirm(PPCContext& ctx, uint8_t* base) { Confirm(ctx, base, t6
 void Type6Screen0ShowPage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::Type6Screen0ShowPage(base, ctx.r4.u32, ctx.r1.u32);
 }
+void Type7Screen0ShowPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Type7Screen0ShowPage(base, ctx.r4.u32, ctx.r1.u32);
+}
+void Type7Screen0PlaceCursor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Type7Screen0PlaceCursor(base, ctx.r4.u64, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+void Type7Screen0ShowHelp(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32, item = ctx.r4.u32;
+  FormatGuestCalls format(ctx, base);
+  ctx.r3.u64 = t67::Type7Screen0ShowHelp(base, item, sp, format.get());
+  ctx.lr = lr;
+}
+void Type7Screen0FadeOutStep(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 =
+      t67::Type7Screen0FadeOutStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+void Type7Screen0ChosenPage(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Type7Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
+                                           Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
 
 // --- The garage camera's reset ---
 
@@ -637,6 +667,13 @@ ITC_TYPE67_TEXTS(82233FC8, Type6Screen0Confirm)
 ITC_TYPE67_TEXTS(822340B0, Type6Screen0ConfirmAgain)
 ITC_TYPE67_TEXTS(82244528, Type7Screen0Confirm)
 ITC_TYPE67_MODES(822344A8, Type6Screen0ShowPage)
+// The type 7 first screen's helpers (from recompiled steps and pages, and
+// the Draw's table): ShowHelp while the UI movies' text setters are native.
+ITC_TYPE67_MODES(82244930, Type7Screen0ShowPage)
+ITC_TYPE67_MODES(822448B0, Type7Screen0PlaceCursor)
+ITC_TYPE67_TEXTS(82244AB8, Type7Screen0ShowHelp)
+ITC_TYPE67_MODES(82244760, Type7Screen0FadeOutStep)
+ITC_TYPE67_MODES(82244610, Type7Screen0ChosenPage)
 
 // The garage camera: Quaternion::FromAngles (from GarageCamera::Command,
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).

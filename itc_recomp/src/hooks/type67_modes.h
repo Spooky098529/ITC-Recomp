@@ -125,6 +125,15 @@ void Type6Screen0Confirm(PPCContext& ctx, uint8_t* base);
 void Type6Screen0ConfirmAgain(PPCContext& ctx, uint8_t* base);
 void Type7Screen0Confirm(PPCContext& ctx, uint8_t* base);
 void Type6Screen0ShowPage(PPCContext& ctx, uint8_t* base);
+// The type 7 first screen's helpers: ShowPage sub_82244930 and PlaceCursor
+// sub_822448B0 (r4 the page or item), ShowHelp sub_82244AB8 (r4 the item;
+// needs Type67TextsNative), FadeOutStep sub_82244760 (r3 the screen) and
+// ChosenPage sub_82244610 (r3 the screen, r4 the dispatcher).
+void Type7Screen0ShowPage(PPCContext& ctx, uint8_t* base);
+void Type7Screen0PlaceCursor(PPCContext& ctx, uint8_t* base);
+void Type7Screen0ShowHelp(PPCContext& ctx, uint8_t* base);
+void Type7Screen0FadeOutStep(PPCContext& ctx, uint8_t* base);
+void Type7Screen0ChosenPage(PPCContext& ctx, uint8_t* base);
 
 // Quaternion::FromAngles sub_8217C120 (r3 the destination, f1 to f3 the
 // angles; r3 left) and GarageCamera::Reset sub_8217D888 (r3 the camera; r3

@@ -379,6 +379,30 @@ uint64_t Screen0Confirm(uint8_t* base, const ConfirmKind& kind, uint32_t dispatc
 // shown, 6 to 9, 13 and 14 hidden, then by `page` (0 to 3) nodes shown and
 // their textures set (else 4 and 5 hidden). r3 the last node.
 uint64_t Type6Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp);
+// sub_82244930 Type7Screen0::ShowPage: movie 22's sub-scene 2 nodes 4 to 7
+// shown, 8 and 9 hidden, then by `page` (0, 1, else) their textures set
+// (page 1 hides 6 and 7). r3 the last node.
+uint64_t Type7Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp);
+// sub_822448B0 Type7Screen0::PlaceCursor: movie 22's node (-1, 3)'s child
+// 0's +16 = float(40 * item) (the doubleword through the frame's +80). r3
+// the child.
+uint64_t Type7Screen0PlaceCursor(uint8_t* base, uint64_t item, uint32_t sp);
+// sub_82244AB8 Type7Screen0::ShowHelp: movie 22's text (1, 0) scrolled back
+// (sub_8211C5F8), set to string 916 to 919 by `item` (UiMovie::SetText,
+// r7 to r10 0) and scrolled (UiMovie::ScrollText). r3 ScrollText's.
+uint64_t Type7Screen0ShowHelp(uint8_t* base, uint32_t item, uint32_t sp,
+                              const strings_and_font::FormatCalls& calls);
+// sub_82244760 Type7Screen0::FadeOutStep: the screen fades' fade out on the
+// step's first frame (the page state's +24), UiMovie::Run on movie 22 (a
+// guest call); done (1, after UiMovie::FinishAll) when both fades' counts
+// are 0, else 0.
+uint64_t Type7Screen0FadeOutStep(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+// sub_82244610 Type7Screen0::ChosenPage (r4 the dispatcher): by the menu's
+// item, state 9 and message 13 (with the music changed: the sound
+// manager's slot 13 on bank 1's cue 2, Sound::Play's plain C++ on bank 1's
+// cue 0), 15 or 23 posted; 3: state 10. r3 as the original leaves it.
+uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+                                const Calls& calls);
 
 // --- The garage camera's reset (garage_camera.cpp) ---
 

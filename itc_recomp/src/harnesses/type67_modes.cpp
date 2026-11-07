@@ -38,6 +38,7 @@
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
 #include "memory/heap.h"
+#include "mode_tick/mode_tick.h"
 #include "type67_modes/type67_modes.h"
 #include "ui_movies/game.h"
 
@@ -1184,7 +1185,11 @@ void StandSlots(Context& h, const Block& world) {
 // 10 records (as the race HUD object's harness has it). UiMovie::Update
 // (UiMovie::Run's jump) and ApplyAnimation (FinishAll's and FinishNamed's)
 // recorded through the UI movies' stand-in, answered from the case's
-// generator. The pages (ConfirmPage) and Updates add the players' mappers
+// generator. Movie 22 is the same movie (Type7Screen0::FadeOutStep and
+// ChosenPage: the screen's page state and menu blocks at the world's +0x3800
+// and +0x3900, the fake manager's slot 13 a recorder, the screen fades'
+// words random with their counts mostly 0, compared and put back after).
+// The pages (ConfirmPage) and Updates add the players' mappers
 // (menu_helpers' harness's shape: the vtables' slots 10 and 12 Pressed and
 // Fired), the dialog's menu at +9668, the dispatcher at the world's +0x3200
 // and the step, queued step and queued state words; the Updates run the
@@ -1225,7 +1230,7 @@ void Dialogs(Context& h, const Block& world) {
   const Block mappers(0x1000);
   if (!mappers.address) return;
   const uint32_t dispatcher = world.address + 0x3200;
-  enum Kind { kStep, kPage, kUpdate };
+  enum Kind { kStep, kPage, kUpdate, kScreen7 };
   struct Function {
     const char* name;
     uint32_t address, frame, saves;
@@ -1241,6 +1246,10 @@ void Dialogs(Context& h, const Block& world) {
        hooks::Type6DialogUpdate, kUpdate},
       {"Type7Dialog::Update", 0x82242218, 160, 32, __imp__sub_82242218,
        hooks::Type7DialogUpdate, kUpdate},
+      {"Type7Screen0::FadeOutStep", 0x82244760, 112, 24, __imp__sub_82244760,
+       hooks::Type7Screen0FadeOutStep, kScreen7},
+      {"Type7Screen0::ChosenPage", 0x82244610, 112, 16, __imp__sub_82244610,
+       hooks::Type7Screen0ChosenPage, kScreen7},
       {"Type6Dialog::OpenConfirm", 0x822320D8, 112, 24, __imp__sub_822320D8,
        hooks::Type6DialogOpenConfirm},
       {"Type7Dialog::OpenConfirm", 0x82241B40, 112, 24, __imp__sub_82241B40,
@@ -1257,6 +1266,8 @@ void Dialogs(Context& h, const Block& world) {
   const uint32_t saved_manager = guest::LoadU32(base, menu_sounds::kSoundManager);
   const std::vector<uint8_t> saved_mappers = Read(base, menu_helpers::kMapperEntries, 32);
   const std::vector<uint8_t> saved_controllers = Read(base, menu_helpers::kControllerEntries, 16);
+  constexpr uint32_t kFades = mode_tick::kFadeOutDurations, kFadesBytes = 64;
+  const std::vector<uint8_t> saved_fades = Read(base, kFades, kFadesBytes);
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
     for (int c = 0; c < (f.kind == kStep ? 24 : 48); c++) {
@@ -1316,13 +1327,15 @@ void Dialogs(Context& h, const Block& world) {
                                                       : ui_movies::kMovieLooping),
                             slot);
         }
-        // The movie table: movie 16 among a few others, in a random place.
+        // The movie table: movies 16 and 22 (the type 7 first screen's)
+        // the movie, among a few others, in a random place.
         const uint32_t pairs = misc.address;
-        const uint32_t count = 1 + r.Below(5);
-        const uint32_t at = r.Below(count);
+        const uint32_t count = 2 + r.Below(4);
+        const uint32_t at = r.Below(count - 1);
         for (uint32_t i = 0; i < count; i++) {
-          guest::StoreU32(base, pairs + 8 * i, i == at ? 16 : 20 + i);
-          guest::StoreU32(base, pairs + 8 * i + 4, i == at ? movie : uint32_t(r.Next()));
+          const bool ours = i == at || i == at + 1;
+          guest::StoreU32(base, pairs + 8 * i, i == at ? 16 : i == at + 1 ? 22 : 30 + i);
+          guest::StoreU32(base, pairs + 8 * i + 4, ours ? movie : uint32_t(r.Next()));
         }
         guest::StoreU32(base, ui_movies::kMovieTable, pairs);
         guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
@@ -1331,6 +1344,7 @@ void Dialogs(Context& h, const Block& world) {
         const uint32_t manager = misc.address + 0x400, vtable = misc.address + 0x800;
         guest::StoreU32(base, manager, vtable);
         guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
+        guest::StoreU32(base, vtable + 52, 0x820CE9F8);  // slot 13: r4, r5 to +444, +448
         guest::StoreU32(base, menu_sounds::kSoundManager, manager);
         // The pages: the menu at +9668 (as menu_helpers' harness shapes
         // it), the players' mappers, the moved word +9676 and the shown
@@ -1377,6 +1391,19 @@ void Dialogs(Context& h, const Block& world) {
           guest::StoreU32(base, dialog + 9740, kStates[r.Below(6)]);
           guest::StoreU32(base, dialog + 9744, 16);
         }
+        // The type 7 first screen's: its page state (+9648) and menu
+        // (+9652) blocks, the step's started word and the item; the screen
+        // fades' words (their counts mostly 0).
+        if (f.kind == kScreen7) {
+          const uint32_t page = world.address + 0x3800, menu7 = world.address + 0x3900;
+          guest::StoreU32(base, dialog + 9648, page);
+          guest::StoreU32(base, dialog + 9652, menu7);
+          guest::StoreU32(base, page + 24, r.Below(2));
+          guest::StoreU32(base, menu7, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(5));
+        }
+        WriteRandom(base, kFades, kFadesBytes, r);
+        guest::StoreU32(base, mode_tick::kFadeOutCounts, r.Below(3) == 0 ? r.Below(40) : 0);
+        guest::StoreU32(base, mode_tick::kFadeInCounts, r.Below(3) == 0 ? r.Below(40) : 0);
         guest::StoreU32(base, dispatcher + 204 + 600, r.Below(50));
         guest::StoreU32(base, dispatcher + 204 + 604, r.Below(60));
         PPCContext t = CallContext(h);
@@ -1419,6 +1446,7 @@ void Dialogs(Context& h, const Block& world) {
         out[v].Bytes(Read(base, mappers.address, mappers.bytes));
         out[v].Bytes(Read(base, menu_helpers::kMapperEntries, 32));
         out[v].Bytes(Read(base, menu_helpers::kControllerEntries, 16));
+        out[v].Bytes(Read(base, kFades, kFadesBytes));
         if (f.kind == kUpdate) {
           // But the step's register saves (40 bytes below the Update's
           // frame): the Update's registers there, the native one's not.
@@ -1439,13 +1467,15 @@ void Dialogs(Context& h, const Block& world) {
   guest::StoreU32(base, menu_sounds::kSoundManager, saved_manager);
   Write(base, menu_helpers::kMapperEntries, saved_mappers.data(), 32);
   Write(base, menu_helpers::kControllerEntries, saved_controllers.data(), 16);
+  Write(base, kFades, saved_fades.data(), kFadesBytes);
 }
 
-// --- The first screens' confirms and Type6Screen0::ShowPage: one harness
-// movie as both 16 and 22 in a harness movie table; its live scene a node
-// whose child 0 is a TXT node, child 1 a sub-scene with TXT children 3 and
-// 4, child 3 a sub-scene whose children 4 to 14 are tagged PIC, PRM, TXT or
-// nothing; the TXT nodes' text ids 0 to 14 (0: the movie's +0x9FCC plus
+// --- The first screens' confirms, Type6Screen0::ShowPage and the type 7
+// first screen's ShowPage, PlaceCursor and ShowHelp: one harness movie as
+// both 16 and 22 in a harness movie table; its live scene a node whose
+// child 0 is a TXT node, child 1 a sub-scene with TXT children 0, 3 and 4,
+// children 2 and 3 a sub-scene whose child 0 is a node and children 4 to 14
+// are tagged PIC, PRM, TXT or nothing; the TXT nodes' text ids 0 to 14 (0: the movie's +0x9FCC plus
 // one), ids 1 to 14 in the movie's texts' map with records of a texts
 // block (and the word at 0x826C5CD8 another, so none is made); the string
 // table (0x826C5C34) one container of strings of letters only (no argument
@@ -1513,6 +1543,7 @@ void Screen0Helpers(Context& h, const Block& world) {
     uint32_t address;
     bool confirm;
     GuestFunction recompiled, native;
+    uint32_t frame = 112, saves = 24;
   };
   const Function functions[] = {
       {"Type6Screen0::Confirm", 0x82233FC8, true, __imp__sub_82233FC8,
@@ -1523,6 +1554,12 @@ void Screen0Helpers(Context& h, const Block& world) {
        hooks::Type7Screen0Confirm},
       {"Type6Screen0::ShowPage", 0x822344A8, false, __imp__sub_822344A8,
        hooks::Type6Screen0ShowPage},
+      {"Type7Screen0::ShowPage", 0x82244930, false, __imp__sub_82244930,
+       hooks::Type7Screen0ShowPage},
+      {"Type7Screen0::PlaceCursor", 0x822448B0, false, __imp__sub_822448B0,
+       hooks::Type7Screen0PlaceCursor},
+      {"Type7Screen0::ShowHelp", 0x82244AB8, false, __imp__sub_82244AB8,
+       hooks::Type7Screen0ShowHelp, 128, 32},
   };
   constexpr uint32_t kTagTxt = 0x54585400;
   static constexpr uint32_t kTags[] = {0x50494300, 0x50524D00, kTagTxt, 0x12345678};
@@ -1551,9 +1588,12 @@ void Screen0Helpers(Context& h, const Block& world) {
         };
         child(node(0), 0, node(1));
         child(node(0), 1, node(2));
+        child(node(0), 2, node(5));
         child(node(0), 3, node(5));
+        child(node(2), 0, node(1));
         child(node(2), 3, node(3));
         child(node(2), 4, node(4));
+        child(node(5), 0, node(14));
         for (uint32_t i = 4; i <= 14; i++) child(node(5), i, i == 14 ? node(3) : node(2 + i));
         for (uint32_t i = 6; i < kNodes; i++) guest::StoreU32(base, node(i), kTags[r.Below(4)]);
         for (const uint32_t t : {1u, 3u, 4u}) {
@@ -1603,10 +1643,10 @@ void Screen0Helpers(Context& h, const Block& world) {
         out[v].Bytes(Read(base, movie, kMovieBlockBytes));
         out[v].Bytes(Read(base, nodes.address, nodes.bytes));
         out[v].Bytes(Read(base, texts.address, kTextsBytes));
-        const uint32_t frame = sp - 112;
+        const uint32_t frame = sp - f.frame;
         out[v].Bytes(Read(base, sp - 1024, frame - (sp - 1024)));
         out[v].Bytes(Read(base, frame + 4, 44));
-        out[v].Bytes(Read(base, frame + 80, 112 - 80 - 24));
+        out[v].Bytes(Read(base, frame + 80, f.frame - 80 - f.saves));
         out[v].Bytes(Read(base, sp, 256));
         out[v].Word(uint32_t(t.lr));
         out[v].Word(t.r3.u32);
