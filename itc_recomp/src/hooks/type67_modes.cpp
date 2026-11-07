@@ -499,8 +499,8 @@ ITC_TYPE67_FREES(82180738, StandSceneRelease)
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).
 ITC_TYPE67_MODES(8217C120, QuaternionFromAngles)
 ITC_TYPE67_MODES(8217D888, GarageCameraReset)
-// GarageLights::Init (from GarageStage::Init, recompiled).
-ITC_TYPE67_MODES(8217D3C8, GarageLightsInit)
+// No adapter for GarageLights::Init sub_8217D3C8: only GarageStage::Init
+// (native) calls it; its step above is the harness's.
 // StandSlot::Init (from StandScene::Create, recompiled): over the layer and
 // the archive's native queue only. GarageStage::Init sub_82180968 and
 // GarageCamera::Init sub_82180918 have no adapters (only StandSlot::Init
