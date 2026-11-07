@@ -79,7 +79,11 @@ file's history. What's left to see in a drive, from every run:
   subagents); left: none removable. Validated `itc_4356` (race 90 s at
   180, the harnesses ~88.5 s; 0 errors, every harness 0 differing, 15
   of 15 harness lines; 7 in the replay `itc_4357` (ok), 8 to drive).
-- Picking subsystem 2.
+- Subsystem 2 of 3: the front-end screens' constructors that make
+  state machines (lead picked: `sub_822366F0`, `sub_82246B28`,
+  `sub_8225A3D8`, `sub_82252290`, `sub_82235BD8`, `sub_82245FF8`,
+  `sub_8224CF58`; the most ready groups in `leads.md`, 29; its line
+  deleted from `leads.md`). Mapping agent running.
 
 ## Done
 
