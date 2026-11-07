@@ -229,6 +229,21 @@ void FrontEndCarDrawPoseCar(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+bool FrontEndCarDrawDrawNative() {
+  return ITC_FLAG(native_front_end_car_draw) && FrontEndCarDrawCalleesNative();
+}
+
+fe::DrawCallees FrontEndCarDrawDrawCallees(PPCContext& ctx) {
+  fe::DrawCallees callees;
+  // PoseCar's and Floor::Draw's plain C++ where their adapters would run
+  // them.
+  callees.pose_native = ITC_FLAG(native_matrix_math) && ITC_FLAG(native_accessories) &&
+                        native::Buffers_NativeMemcpy();
+  callees.floor_native = ITC_FLAG(native_scenery_lists) && !SceneryListsSlotDiagnostics();
+  callees.caller_r24 = ctx.r24.u32;
+  return callees;
+}
+
 void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base) {
   ITC_FRONT_END_ORIGINAL(8217FE60)
   const uint64_t lr = ctx.lr;
@@ -237,13 +252,7 @@ void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base) {
   fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
   calls.poll = &poll;
   calls.draw = SceneryListsDrawCalls(&guest);
-  fe::DrawCallees callees;
-  // PoseCar's and Floor::Draw's plain C++ where their adapters would run
-  // them.
-  callees.pose_native = ITC_FLAG(native_matrix_math) && ITC_FLAG(native_accessories) &&
-                        native::Buffers_NativeMemcpy();
-  callees.floor_native = ITC_FLAG(native_scenery_lists) && !SceneryListsSlotDiagnostics();
-  callees.caller_r24 = ctx.r24.u32;
+  const fe::DrawCallees callees = FrontEndCarDrawDrawCallees(ctx);
   ctx.r3.u64 = fe::GarageStageDraw(base, calls, ctx.r3.u64, ctx.r5.u32, callees, ctx.r1.u32);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();

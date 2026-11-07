@@ -1029,4 +1029,109 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
   return r3;
 }
 
+uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
+                     const front_end_car_draw::DrawCallees& draw, load_poll::Calls* paint_poll,
+                     uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821D9F10 TuningScreen::UpdateStand");
+  constexpr uint32_t kBonnetOpen = 0x826D84A0;   // the three stand animations' open states
+  constexpr uint32_t kRoofOpen = 0x826D849C;
+  constexpr uint32_t kDoorsOpen = 0x826D8498;
+  constexpr uint32_t kApplyAreaDecals = 0x821F7B90;  // TuningScreen::ApplyAreaDecals
+  constexpr uint32_t kApplyDecalWord = 0x821FE4E0;   // TuningScreen::ApplyDecalWord
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t s = screen;
+  auto at = [&](uint32_t offset) { return Load(base, s + offset); };
+  const uint32_t c = GarageCarOf(base, at(kSaveData));
+  // An animation's open state `flag`: opened with `open` while `wanted`,
+  // closed with `open` + 1 otherwise (GarageStage::Command).
+  auto toggle = [&](bool wanted, uint32_t flag, uint32_t open) {
+    const uint32_t now = Load(base, flag);
+    if (wanted ? int32_t(now) != 0 : int32_t(now) == 0) {
+      return;
+    }
+    Store(base, flag, wanted ? 1 : 0);
+    front_end_car_draw::GarageStageCommand(base, stand.calls, Holder(base), wanted ? open : open + 1,
+                                           frame);
+  };
+  auto in = [&](std::initializer_list<int32_t> states) {
+    const int32_t state = int32_t(at(kState));
+    for (const int32_t x : states) {
+      if (state == x) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const auto item = [&]() { return guest::LoadU8(base, s + kItem); };
+  // (1) The bonnet: power, item 0, states 5, 9 to 11.
+  toggle(int32_t(at(kCategory)) == 0 && item() == 0 && in({5, 9, 10, 11}), kBonnetOpen, 2);
+  // (2) The same for item 1 on cars 14 and 15 (the flag left alone on others).
+  {
+    const bool page = int32_t(at(kCategory)) == 0 && item() == 1 && in({5, 9, 10, 11});
+    const int32_t id = int32_t(Load(base, c + 224));
+    if (id == 14 || id == 15) {
+      toggle(page, kRoofOpen, 2);
+    }
+  }
+  // (3) The doors: exterior, item 1, states 8 to 11.
+  toggle(int32_t(at(kCategory)) == 5 && item() == 1 && in({8, 9, 10, 11}), kDoorsOpen, 4);
+  // (4) The paint: exterior, item 4, state 18.
+  if (int32_t(at(kCategory)) == 5 && item() == 4 && int32_t(at(kState)) == 18) {
+    auto set_color = [&](uint64_t color, const double floats[3], uint32_t lr) {
+      const uint64_t regs[2] = {Holder(base), color};
+      stand.calls.call(kSetColor, regs, 2, floats, 3, frame, lr, nullptr);
+    };
+    const double scale = Lfs(base, 0x82002200);  // 1/255
+    {
+      const int64_t g = int32_t(at(30448)), hue = int32_t(at(30444));
+      Store64(base, frame + 88, uint64_t(g));
+      Store64(base, frame + 96, uint64_t(hue));
+      const int64_t b = int32_t(at(30452));
+      Store64(base, frame + 80, uint64_t(b));
+      const double floats[3] = {ToSingle(hue), double(float(ToSingle(g) * scale)),
+                                double(float(ToSingle(b) * scale))};
+      set_color(0, floats, 0x821DA1A8);
+    }
+    {
+      const int64_t b = int32_t(at(30452)), g = int32_t(at(30448)), hue = int32_t(at(30444));
+      Store64(base, frame + 96, uint64_t(b));
+      Store64(base, frame + 88, uint64_t(g));
+      Store64(base, frame + 80, uint64_t(hue));
+      const double floats[3] = {ToSingle(hue), double(float(ToSingle(g) * scale)),
+                                double(float(ToSingle(b) * scale))};
+      set_color(1, floats, 0x821DA200);
+    }
+    const int32_t x = int32_t(at(30456));
+    if (x == 0) {
+      const double zero = Lfs(base, kZero);
+      const double floats[3] = {zero, zero, Lfs(base, 0x82001FBC)};
+      set_color(2, floats, 0x821DA280);
+    } else if (x == 1) {
+      const int64_t g = int32_t(at(30448)), hue = int32_t(at(30444));
+      Store64(base, frame + 96, uint64_t(g));
+      Store64(base, frame + 88, uint64_t(hue));
+      const double floats[3] = {ToSingle(hue),
+                                double(float(ToSingle(g) * Lfs(base, 0x8200AD48))),
+                                Lfs(base, 0x82001070)};
+      set_color(2, floats, 0x821DA280);
+    }
+  }
+  // (5) The decals waiting (+10012), once the stand isn't busy.
+  if (int32_t(at(10012)) != -1 &&
+      int32_t(front_end_car_draw::GarageStageIsBusy(base, stand.calls, Holder(base), frame)) == 0) {
+    const int32_t v = int32_t(at(10012));
+    if (v >= 1 && v < 5) {
+      stand.call(kApplyAreaDecals, {s}, frame, 0x821DA2BC);
+    } else if (v >= 5 && v < 9) {
+      ApplyDecals(base, stand, s, frame);
+    } else if (v >= 9 && v < 11) {
+      stand.call(kApplyDecalWord, {s}, frame, 0x821DA2F4);
+    }
+  }
+  // (6) The second wheels, the wheel word, the stand drawn.
+  stand_models::StepSecondWheels(base, stand.call, paint_poll, s, frame);
+  stand_models::SetWheelWord(base, Holder(base), 1, frame);
+  return front_end_car_draw::GarageStageDraw(base, stand.calls, Holder(base), 0, draw, frame);
+}
+
 }  // namespace tuning_screen

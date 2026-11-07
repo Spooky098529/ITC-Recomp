@@ -18,6 +18,10 @@
 
 namespace front_end_car_draw {
 struct Calls;
+struct DrawCallees;
+}
+namespace load_poll {
+struct Calls;
 }
 
 namespace tuning_screen {
@@ -450,6 +454,22 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
 // r3, `*f1` its f1.
 uint64_t SetCarStats(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t screen,
                      uint32_t sp, double* f1);
+
+// sub_821D9F10 TuningScreen::UpdateStand: the screen's per-update calls
+// onto the stand (its row): the bonnet's, the roof's (cars 14 and 15) and
+// the doors' animations opened or closed by the page (the open states at
+// 0x826D84A0, 0x826D849C, 0x826D8498; GarageStage::Command's plain C++), the
+// paint's three colors in state 18 (GarageStage::SetColor through the guest
+// with f1 to f3; the conversions' doublewords at frame + 80 to + 103 as the
+// original leaves them), the decals waiting at +10012 once the stand isn't
+// busy (ApplyDecals' plain C++; ApplyAreaDecals and ApplyDecalWord, never
+// seen in play, through the guest), StepSecondWheels and SetWheelWord's
+// plain C++ (`paint_poll` as StepSecondWheels' adapter gives it), then
+// GarageStage::Draw's (`draw` as its adapter decides). 144-byte frame (its
+// saved registers and f31 not written); GarageStage::Draw's r3.
+uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
+                     const front_end_car_draw::DrawCallees& draw, load_poll::Calls* paint_poll,
+                     uint32_t screen, uint32_t sp);
 
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:

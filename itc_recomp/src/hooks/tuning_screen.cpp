@@ -11,6 +11,7 @@
 #include "hooks/car_makers.h"
 #include "hooks/front_end_car_draw.h"
 #include "hooks/load_poll.h"
+#include "hooks/scenery_lists.h"
 #include "hooks/stand_models.h"
 #include "load_poll/load_poll.h"
 #include "tuning_screen/tuning_screen.h"
@@ -22,6 +23,9 @@ ITC_FLAG_DECLARE(bool, native_race_setup);
 ITC_FLAG_DECLARE(bool, native_action_mappers);
 ITC_FLAG_DECLARE(bool, native_car_specs);
 ITC_FLAG_DECLARE(bool, native_vehicle);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+ITC_FLAG_DECLARE(bool, native_scene_models);
+ITC_FLAG_DECLARE(bool, native_load_poll);
 
 ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Run the tuning screen's functions (docs/functions/tuning-screen.md: the part "
@@ -62,7 +66,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_8217DAC0, PickCameraPreset sub_821D99A0 (its piece sub_821D9B60 merged), "
               "UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00, ApplyDecals "
               "sub_822042D8, DecalCommand sub_822019D0, PreviewItem sub_821E07B0 and RestoreStand "
-              "sub_821E0FB0 (their callees never seen in play through the guest); SetCarStats sub_821DF788 with the "
+              "sub_821E0FB0 (their callees never seen in play through the guest), UpdateStand "
+              "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag); SetCarStats sub_821DF788 with the "
               "car makers' and --native_vehicle) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
@@ -427,6 +432,35 @@ void TuningRestoreStand(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+// UpdateStand: its callees' plain C++ where their adapters would run it
+// (GarageStage::Draw's and Command's, the stand's setters', ApplyDecals'),
+// else the original.
+bool TuningUpdateStandCalleesNative() {
+  return TuningStandCalleesNative() && FrontEndCarDrawDrawNative() &&
+         ITC_FLAG(native_vehicle_accessors) && ITC_FLAG(native_scene_models);
+}
+
+void TuningUpdateStand(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  SceneryDrawGuest guest{ctx, base};
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  calls.draw = SceneryListsDrawCalls(&guest);
+  const ts::GuestCall call = StandModelsGuestCall(ctx, base);
+  const ts::StandCalls stand{call, calls};
+  const front_end_car_draw::DrawCallees draw = FrontEndCarDrawDrawCallees(ctx);
+  // SceneModel::ApplyWheelPaint's plain C++ under StepSecondWheels with the
+  // load poll's flags (as its adapter).
+  load_poll::Calls* paint_poll =
+      ITC_FLAG(native_load_poll) && LoadPollCalleesNative() ? &poll : nullptr;
+  const uint64_t r3 = ts::UpdateStand(base, stand, draw, paint_poll, ctx.r3.u32, ctx.r1.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
+}
+
 bool TuningCarStatsCalleesNative() {
   return CarMakersGarageCalleesNative() && ITC_FLAG(native_vehicle);
 }
@@ -558,6 +592,16 @@ ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 // SetInteriorPair sub_821CCC50 has no adapter (removed, B7 loop, 2026-11-07):
 // its callers in play, PreviewItem and RestoreStand, are native and call its
 // plain C++ (its register step above is the harness's).
+
+// UpdateStand: the original unless its callees are native.
+extern "C" REX_FUNC(sub_821D9F10) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningUpdateStandCalleesNative()) {
+    __imp__sub_821D9F10(ctx, base);
+    return;
+  }
+  hooks::TuningUpdateStand(ctx, base);
+}
 
 // SetCarStats: the original unless the car data's and the power curve's
 // callees are native.

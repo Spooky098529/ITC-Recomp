@@ -130,6 +130,12 @@ void TuningRestoreStand(PPCContext& ctx, uint8_t* base);
 // --native_vehicle.
 bool TuningCarStatsCalleesNative();
 void TuningSetCarStats(PPCContext& ctx, uint8_t* base);
+// UpdateStand sub_821D9F10 (r3 the screen; r3 GarageStage::Draw's), only
+// with TuningUpdateStandCalleesNative: TuningStandCalleesNative,
+// FrontEndCarDrawDrawNative, --native_vehicle_accessors and
+// --native_scene_models.
+bool TuningUpdateStandCalleesNative();
+void TuningUpdateStand(PPCContext& ctx, uint8_t* base);
 
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,

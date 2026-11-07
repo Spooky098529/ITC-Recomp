@@ -58,5 +58,10 @@ void FrontEndCarDrawPoseCar(PPCContext& ctx, uint8_t* base);
 // GarageStage::Draw sub_8217FE60 (r3 the holder, r5 turn the car); r3 as
 // CarScene::Draw leaves it.
 void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base);
+// Whether GarageStage::Draw's adapter runs its plain C++ (its flag and
+// FrontEndCarDrawCalleesNative()), and the callees' choices it makes
+// (PoseCar's and Floor::Draw's adapters' checks, r24), for native callers.
+bool FrontEndCarDrawDrawNative();
+front_end_car_draw::DrawCallees FrontEndCarDrawDrawCallees(PPCContext& ctx);
 
 }  // namespace hooks

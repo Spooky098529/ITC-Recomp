@@ -1362,6 +1362,87 @@ void TuningStand(Context& h, Random& r) {
     results.Report();
   }
   {
+    // UpdateStand: the pages that open or close the stand's animations
+    // (categories 0 and 5, items 0, 1 and 4, states 5 and 8 to 11, 18 the
+    // paint) mostly, their open states (0x826D84A0, 0x826D849C,
+    // 0x826D8498) 0 or 1 (put back after, compared), the garage car's id 14
+    // or 15 now and then, +10012 -1, 0, 5 to 8 (ApplyDecals) or 11 (never
+    // 1 to 4 or 9 and 10: ApplyAreaDecals and ApplyDecalWord, never seen in
+    // play, run their originals deep into the screen's random words), the
+    // second wheels' step +25244 0 to 2, the paint's values small. The
+    // garage camera isn't set up (+112 0), so GarageStage::Draw returns at
+    // once (its own cases draw). The top 40 bytes: r29 to r31, lr and f31's
+    // saves; in the paint's cases (GarageStage::SetColor, never seen in
+    // play, runs its original on both sides, saving UpdateStand's registers,
+    // which differ) only the stack from UpdateStand's frame up.
+    // The generator put back after, so the groups after it keep their
+    // cases.
+    const Random kept = r;
+    constexpr uint32_t kOpen[3] = {0x826D84A0, 0x826D849C, 0x826D8498};
+    uint32_t saved_open[3];
+    for (int i = 0; i < 3; i++) {
+      saved_open[i] = guest::LoadU32(h.base, kOpen[i]);
+    }
+    uint32_t open[3] = {};
+    Results results("TuningScreen::UpdateStand (sub_821D9F10)");
+    for (int c = 0; c < 30; c++) {
+      const bool paint = r.Below(5) == 0;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const uint32_t pick = r.Below(10);
+            const uint32_t decals = pick < 4 ? 0xFFFFFFFFu : pick < 8 ? 5 + r.Below(4)
+                                                                      : pick == 8 ? 0 : 11;
+            lay(c, decals == 6);
+            constexpr uint32_t kStates[] = {5, 8, 9, 10, 11, 3};
+            if (paint) {
+              field(tuning_screen::kState, 18);
+              field(tuning_screen::kCategory, 5);
+              byte(tuning_screen::kItem, 4);
+            } else {
+              field(tuning_screen::kState, r.Below(6) == 0 ? r.Below(64) : kStates[r.Below(6)]);
+              field(tuning_screen::kCategory, r.Below(4) == 0 ? r.Below(7) : 5 * r.Below(2));
+              byte(tuning_screen::kItem, r.Below(4) == 0 ? r.Below(8) : r.Below(2));
+            }
+            for (const uint32_t at : {30444u, 30448u, 30452u}) {
+              field(at, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(256));
+            }
+            field(30456, r.Below(4) == 0 ? r.Next() : r.Below(2));
+            field(10012, decals);
+            field(25244, r.Below(3));
+            for (uint32_t& o : open) {
+              o = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2);
+            }
+            if (r.Below(2) == 0) {
+              Write(h.base, screen, screen_inputs.data(), kTuningScreenBytes);
+              const uint32_t c_at = tuning_screen::SelectedGarageCar(h.base, screen);
+              guest::StoreU32(h.base, c_at + 224, 14 + r.Below(2));
+            }
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821D9F10, hooks::TuningUpdateStand, 40, floats,
+          fmt::format("case {}", c), 0, 0,
+          [&] {
+            before();
+            for (int i = 0; i < 3; i++) {
+              guest::StoreU32(h.base, kOpen[i], open[i]);
+            }
+          },
+          [&](Outputs& out, const PPCContext& t) {
+            blocks(out, t);
+            for (int i = 0; i < 3; i++) {
+              out.Word(guest::LoadU32(h.base, kOpen[i]));
+            }
+          },
+          paint ? 144 : 0x5000, kGarageBytes);
+    }
+    for (int i = 0; i < 3; i++) {
+      guest::StoreU32(h.base, kOpen[i], saved_open[i]);
+    }
+    r = kept;
+    results.Report();
+  }
+  {
     // +9716 and +9720 set or not, the command queue in the screen (its next
     // -1 or small); movie 13 the text world's. The top 40 bytes: r28 to r31
     // and lr's saves; the frame's +48 to +79 (SetText's parameter area: r7
