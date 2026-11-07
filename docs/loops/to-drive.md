@@ -78,6 +78,22 @@ here loses its heading.
   `sub_8224D6D0`, `sub_82231E40`, `sub_822418B8`, `sub_8224CFA0`,
   `sub_82230800`, `sub_8224EF78`, `sub_822308E8`, `sub_82240268`,
   `sub_8224FA88`, `sub_8224B660`, `sub_8224AD28`, `sub_82249C08`.
+- The type 6 and 7 modes' first migration (attract race `itc_4374`,
+  replay `itc_4375` ok; `type6-type7-modes.md`): `sub_8217D760`,
+  `sub_821A8210`, `sub_821C9430`, `sub_821C9918`, `sub_821CB090`,
+  `sub_821CB6E8`, `sub_82230740`, `sub_82230F80`, `sub_82231F48`,
+  `sub_82231F98`, `sub_82232740`, `sub_82232910`, `sub_822329A8`,
+  `sub_82233870`, `sub_82233990`, `sub_822339A0`, `sub_822339C0`,
+  `sub_822339F0`, `sub_82233B18`, `sub_82233DF8`, `sub_82234ED8`,
+  `sub_82235138`, `sub_82236100`, `sub_822363B8`, `sub_82237320`,
+  `sub_82237B78`, `sub_8223B740`, `sub_8223F9A8`, `sub_82240998`,
+  `sub_822419C0`, `sub_82241A08`, `sub_82241E58`, `sub_822421C0`,
+  `sub_82242388`, `sub_82242420`, `sub_822436A0`, `sub_82243E08`,
+  `sub_82243F28`, `sub_82243F58`, `sub_82244080`, `sub_82244350`,
+  `sub_82245148`, `sub_822454B8`, `sub_82246590`, `sub_82246800`,
+  `sub_822470A8`, `sub_82248E10`, `sub_822515A0`, `sub_82259128` (the
+  modes' own screens: the replay reaches only the stand, the garage
+  camera, the controller options and the dialog movies).
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

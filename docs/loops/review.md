@@ -100,7 +100,9 @@ When the user has reviewed a run's section, its heading gets
   one harness-only run (`itc_4366`, ~700 MB, left in place) logged
   guest access violations from the harness's own cases
   (`UiMovies::IsLoaded` on an id not in the table), fixed by giving
-  those cases a movie block of their own.
+  those cases a movie block of their own. `StandSlot::Free`'s prints
+  sit on its two native paths, after its check that hands back to the
+  recompiled code (not its first statement).
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

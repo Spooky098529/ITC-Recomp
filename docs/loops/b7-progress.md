@@ -116,7 +116,11 @@ file's history. What's left to see in a drive, from every run:
   garage camera's presets, `StandScene::Release`; 66 Overridden, 4
   adapters removed; races 38 s, 0 errors, its harnesses 0 differing;
   no subagents); left: 37 ready groups (most over the UI movie helpers
-  and `GarageStage::MakeModel`/`Command`). Validation agent running.
+  and `GarageStage::MakeModel`/`Command`). Validated `itc_4374` (race
+  89 s at 180, the harnesses ~88.6 s; 0 errors, every harness 0
+  differing, 66 of 66 harness lines (66 functions: the report's 70
+  miscounted); 3 in the race, 14 in the replay `itc_4375` (ok), 49 to
+  drive). Second migration agent running.
 
 ## Done
 
