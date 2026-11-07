@@ -1544,6 +1544,11 @@ void Screen0Helpers(Context& h, const Block& world) {
     bool confirm;
     GuestFunction recompiled, native;
     uint32_t frame = 112, saves = 24;
+    // The dialogs' closes: the asked word, the pick and page blocks shaped,
+    // r4 the dispatcher; the original run with the flag on (its callees,
+    // ShowPage and ConfirmAgain, native on both sides; their own cases are
+    // above).
+    int closed = 0;  // 6 or 7
   };
   const Function functions[] = {
       {"Type6Screen0::Confirm", 0x82233FC8, true, __imp__sub_82233FC8,
@@ -1560,12 +1565,17 @@ void Screen0Helpers(Context& h, const Block& world) {
        hooks::Type7Screen0PlaceCursor},
       {"Type7Screen0::ShowHelp", 0x82244AB8, false, __imp__sub_82244AB8,
        hooks::Type7Screen0ShowHelp, 128, 32},
+      {"Type6Screen0::OnDialogClosed", 0x82234768, true, __imp__sub_82234768,
+       hooks::Type6Screen0OnDialogClosed, 96, 16, 6},
+      // A leaf; its tail call's (ShowPage's) frame compared.
+      {"Type7Screen0::OnDialogClosed", 0x82244B60, false, __imp__sub_82244B60,
+       hooks::Type7Screen0OnDialogClosed, 112, 24, 7},
   };
   constexpr uint32_t kTagTxt = 0x54585400;
   static constexpr uint32_t kTags[] = {0x50494300, 0x50524D00, kTagTxt, 0x12345678};
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
-    for (int c = 0; c < 16; c++) {
+    for (int c = 0; c < (f.closed != 0 ? 48 : 16); c++) {
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
         Random r(uint64_t(c) * 977 + f.address);
@@ -1627,13 +1637,28 @@ void Screen0Helpers(Context& h, const Block& world) {
         guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
         guest::StoreU32(base, world.address + 0x3200 + 204 + 600, r.Below(50));
         guest::StoreU32(base, world.address + 0x3200 + 204 + 604, r.Below(60));
+        if (f.closed != 0) {
+          // The pick's block (+72) and the page block, at +9640 and +9644
+          // (type 7: +9644 and +9648); type 6's asked word 4, 5 or another.
+          const uint32_t d = f.closed == 7 ? 4 : 0;
+          const uint32_t picks = world.address + 0x3900, page = world.address + 0x3A00;
+          guest::StoreU32(base, world.address + 9640 + d, picks);
+          guest::StoreU32(base, world.address + 9644 + d, page);
+          static constexpr uint32_t kPicks[] = {0, 1, 2, 3, 0xFFFFFFFFu};
+          guest::StoreU32(base, picks + 72, kPicks[r.Below(5)]);
+          static constexpr uint32_t kPages[] = {0, 1, 2, 3, 0xFFFFFFFFu};
+          guest::StoreU32(base, page, kPages[r.Below(5)]);
+          static constexpr uint32_t kAsked[] = {4, 4, 5, 5, 0xFFFFFFFFu};
+          guest::StoreU32(base, world.address + 9664, kAsked[r.Below(5)]);
+        }
         PPCContext t = CallContext(h);
-        t.r3.u64 = uint32_t(r.Next());
+        t.r3.u64 = f.closed != 0 ? world.address | (uint64_t(r.Below(2)) << 32)
+                                 : uint32_t(r.Next());
         t.r4.u64 = f.confirm ? world.address + 0x3200
                              : (r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(5));
         t.lr = 0x82000000 | (r.Below(0x10000) << 2);
         if (v == 0) {
-          ITC_FLAG(native_type67_modes) = false;
+          ITC_FLAG(native_type67_modes) = f.closed != 0;
           f.recompiled(t, base);
           ITC_FLAG(native_type67_modes) = true;
         } else {
@@ -1792,6 +1817,34 @@ void Cars(Context& h, const Block& world) {
   Write(base, kFades, saved_fades.data(), kFadesBytes);
 }
 
+// --- ControllerOptions::Update: the page object (the global 0x826D848C)
+// in the world at +0x3000, its step none (-1), another negative (-2), or
+// steps 0 and 3 (never seen in play; recompiled on both sides) with their
+// started word set (they find movie 7, do nothing else and answer 1), its
+// queued step none or small. The world, the globals, r3 and the frame's
+// table compared. ---
+
+void ControllerUpdate(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  const uint32_t sp = CallContext(h).r1.u32;
+  g_plant_movie = true;
+  Handler(
+      h, world, "ControllerOptions::Update", 0x821C7F98, 24,
+      [base](Random& r, uint32_t w) {
+        const uint32_t page = w + 0x3000;
+        guest::StoreU32(base, t67::kControllerPage, page);
+        static constexpr uint32_t kSteps[] = {0xFFFFFFFFu, 0xFFFFFFFEu, 0, 3};
+        const uint32_t step = kSteps[r.Below(4)];
+        guest::StoreU32(base, page + 12, step);
+        guest::StoreU32(base, page + 16, r.Below(2) ? 0xFFFFFFFFu : r.Below(12));
+        if (int32_t(step) >= 0) guest::StoreU32(base, page + 24, 1);
+      },
+      [](PPCContext&, uint32_t) {}, __imp__sub_821C7F98, hooks::ControllerOptionsUpdate,
+      [base, sp](Side& side, PPCContext&, uint32_t) {
+        side.out.Bytes(Read(base, sp - 176 + 80, 48));
+      });
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -1814,6 +1867,7 @@ void Type67Modes(Context& h) {
   Dialogs(h, world);
   Screen0Helpers(h, world);
   Cars(h, world);
+  ControllerUpdate(h, world);
 }
 
 }  // namespace harness

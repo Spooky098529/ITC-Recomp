@@ -74,7 +74,9 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "ShowHelp sub_82244AB8 (with the text setters native), FadeOutStep sub_82244760 "
               "and ChosenPage sub_82244610; the first screens' OpenMovie sub_822338E8 and "
               "sub_82243E80 and SetUpCar sub_82233E80 and sub_822443E0 (GarageStage::MakeModel, "
-              "Command and GarageCar::Reset guest calls)) "
+              "Command and GarageCar::Reset guest calls), the first screens' "
+              "OnDialogClosed sub_82234768 and sub_82244B60 (ConfirmAgain a guest call) and "
+              "ControllerOptions::Update sub_821C7F98 (its steps guest calls)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -482,6 +484,20 @@ void Type7Screen0SetUpCar(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::Screen0SetUpCar(base, true, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
+void Type6Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Type6Screen0OnDialogClosed(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                               Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+void Type7Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Type7Screen0OnDialogClosed(base, ctx.r3.u64, ctx.r1.u32);
+}
+void ControllerOptionsUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::ControllerOptionsUpdate(base, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
 void Type7Screen0ChosenPage(PPCContext& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Type7Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
@@ -694,6 +710,11 @@ ITC_TYPE67_MODES(822338E8, Type6Screen0OpenMovie)
 ITC_TYPE67_MODES(82243E80, Type7Screen0OpenMovie)
 ITC_TYPE67_MODES(82233E80, Type6Screen0SetUpCar)
 ITC_TYPE67_MODES(822443E0, Type7Screen0SetUpCar)
+// The first screens' OnDialogClosed and ControllerOptions::Update (through
+// the machines' transitions).
+ITC_TYPE67_MODES(82234768, Type6Screen0OnDialogClosed)
+ITC_TYPE67_MODES(82244B60, Type7Screen0OnDialogClosed)
+ITC_TYPE67_MODES(821C7F98, ControllerOptionsUpdate)
 
 // The garage camera: Quaternion::FromAngles (from GarageCamera::Command,
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).

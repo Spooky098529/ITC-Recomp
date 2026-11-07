@@ -140,6 +140,12 @@ void Type6Screen0OpenMovie(PPCContext& ctx, uint8_t* base);
 void Type7Screen0OpenMovie(PPCContext& ctx, uint8_t* base);
 void Type6Screen0SetUpCar(PPCContext& ctx, uint8_t* base);
 void Type7Screen0SetUpCar(PPCContext& ctx, uint8_t* base);
+// Type6Screen0::OnDialogClosed sub_82234768 (r3 the screen, r4 the
+// dispatcher), Type7Screen0::OnDialogClosed sub_82244B60 (r3 the screen)
+// and ControllerOptions::Update sub_821C7F98.
+void Type6Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base);
+void Type7Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base);
+void ControllerOptionsUpdate(PPCContext& ctx, uint8_t* base);
 
 // Quaternion::FromAngles sub_8217C120 (r3 the destination, f1 to f3 the
 // angles; r3 left) and GarageCamera::Reset sub_8217D888 (r3 the camera; r3

@@ -345,4 +345,139 @@ uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, co
   return 1;  // FadeOut leaves its r3, the passes
 }
 
+uint64_t Type6Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                    const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82234768 Type6Screen0::OnDialogClosed");
+  const uint32_t screen = uint32_t(r3);
+  const uint32_t frame = sp - 96;
+  const uint32_t asked = LoadU32(base, screen + 9664);
+  if (asked != 4 && asked != 5) {
+    return r3;
+  }
+  StoreU32(base, screen + 9664, 0xFFFFFFFF);
+  const uint32_t pick = LoadU32(base, LoadU32(base, screen + 9640) + 72);
+  if (pick >= 3) {
+    return r3;
+  }
+  const uint32_t p = LoadU32(base, screen + 9644);
+  auto clear_pick = [&] { StoreU32(base, LoadU32(base, screen + 9640) + 72, 0xFFFFFFFF); };
+  auto page0 = [&] {
+    const uint32_t page = LoadU32(base, p);
+    if (page != 0) StoreU32(base, p + 8, page);
+    StoreU32(base, p + 0, 0);
+    StoreU32(base, p + 12, 0xFFFFFFFF);
+    StoreU32(base, p + 16, 0xFFFFFFFF);
+    clear_pick();
+    return Type6Screen0ShowPage(base, 0, frame);
+  };
+  if (asked == 4) {
+    if (pick != 1) {
+      return page0();
+    }
+    // Yes to the first confirm: the second one (ConfirmAgain, a guest call
+    // to its override).
+    const uint32_t page = LoadU32(base, p);
+    if (page != 0xFFFFFFFF) StoreU32(base, p + 8, page);
+    StoreU32(base, p + 0, 0xFFFFFFFF);
+    StoreU32(base, p + 12, 0xFFFFFFFF);
+    StoreU32(base, p + 16, 0xFFFFFFFF);
+    clear_pick();
+    calls.call(0x822340B0, frame, 0x82234810, r3, r4);
+    StoreU32(base, screen + 9656, 0);
+    StoreU32(base, screen + 9664, 5);
+    return Type6Screen0ShowPage(base, 2, frame);
+  }
+  if (pick == 2) {
+    return page0();
+  }
+  if (pick == 0) {
+    // Yes to the second: the fade out step, then page 3.
+    const uint32_t page = LoadU32(base, p);
+    if (page != 3) StoreU32(base, p + 8, page);
+    StoreU32(base, p + 16, 0xFFFFFFFF);
+    StoreU32(base, p + 0, 0xFFFFFFFF);
+    StoreU32(base, p + 12, 3);
+    StoreU32(base, p + 4, 3);
+    clear_pick();
+    return r3;
+  }
+  // No to the second: page 2, message 29 (the save screen).
+  const uint32_t page = LoadU32(base, p);
+  if (page != 2) StoreU32(base, p + 8, page);
+  StoreU32(base, p + 12, 0xFFFFFFFF);
+  StoreU32(base, p + 16, 0xFFFFFFFF);
+  StoreU32(base, p + 0, 2);
+  clear_pick();
+  Post(base, uint32_t(r4), 29);
+  return Type6Screen0ShowPage(base, 3, frame);
+}
+
+uint64_t Type7Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82244B60 Type7Screen0::OnDialogClosed");
+  const uint32_t screen = uint32_t(r3);
+  const uint32_t pick = LoadU32(base, LoadU32(base, screen + 9644) + 72);
+  if (pick >= 3) {
+    return r3;
+  }
+  const uint32_t p = LoadU32(base, screen + 9648);
+  const uint32_t page = LoadU32(base, p);
+  if (pick == 1) {
+    if (page != 2) StoreU32(base, p + 8, page);
+    StoreU32(base, p + 16, 0xFFFFFFFF);
+    StoreU32(base, p + 12, 3);
+    StoreU32(base, p + 4, 2);
+    StoreU32(base, p + 0, 0xFFFFFFFF);
+    StoreU32(base, LoadU32(base, screen + 9644) + 72, 0xFFFFFFFF);
+    return r3;
+  }
+  if (page != 0) StoreU32(base, p + 8, page);
+  StoreU32(base, p + 12, 0xFFFFFFFF);
+  StoreU32(base, p + 0, 0);
+  StoreU32(base, p + 16, 0xFFFFFFFF);
+  StoreU32(base, LoadU32(base, screen + 9644) + 72, 0xFFFFFFFF);
+  return Type7Screen0ShowPage(base, 0, sp);  // a tail call
+}
+
+uint64_t ControllerOptionsUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C7F98 ControllerOptions::Update");
+  const uint32_t frame = sp - 176;
+  // (The empty function sub_82106540 it calls first does nothing.) The
+  // steps' table in the frame, +124 stored first.
+  static constexpr uint32_t kSteps[12] = {0x821BFBD8, 0x821C5D68, 0x821C5F38, 0x821BFC68,
+                                          0x821BFD08, 0x821BFD98, 0x821C5F80, 0x821BFF20,
+                                          0x821BFFA0, 0x821C0030, 0x821C60D0, 0x821C01B8};
+  StoreU32(base, frame + 124, kSteps[11]);
+  const uint32_t page = LoadU32(base, kControllerPage);
+  const uint32_t step = LoadU32(base, page + 12);
+  for (uint32_t i = 0; i < 11; i++) {
+    StoreU32(base, frame + 80 + 4 * i, kSteps[i]);
+  }
+  // r3 and r4 as the table's build leaves them (sign-extended addresses).
+  uint64_t r3 = 0xFFFFFFFF00000000ull | 0x821BFD08;
+  constexpr uint64_t kR4 = 0xFFFFFFFF00000000ull | 0x821BFD98;
+  if (step == 0xFFFFFFFF) {
+    return r3;
+  }
+  uint32_t p = page;
+  if (int32_t(step) >= 0) {
+    const uint32_t target = LoadU32(base, frame + 80 + (step << 2));
+    r3 = calls.call(target, frame, 0x821C8080, uint64_t(page) + 24, kR4);
+    p = LoadU32(base, kControllerPage);
+    if (int32_t(r3) == 0) {
+      return r3;
+    }
+  }
+  const uint32_t next = LoadU32(base, p + 16);
+  if (next != 0xFFFFFFFF) {
+    StoreU32(base, p + 16, 0xFFFFFFFF);
+    StoreU32(base, p + 20, 0);
+    StoreU32(base, p + 12, next);
+  } else {
+    StoreU32(base, p + 0, LoadU32(base, p + 4));
+    StoreU32(base, p + 12, 0xFFFFFFFF);
+  }
+  StoreU32(base, p + 24, 0);
+  return r3;
+}
+
 }  // namespace type67_modes

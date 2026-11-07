@@ -422,6 +422,21 @@ uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& c
 // message 20 or 17; with a car, message 6 or 5; then
 // ScreenFades::FadeOut(1, 0, 0, 0, 0). r3 1, as FadeOut leaves it.
 uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82234768 Type6Screen0::OnDialogClosed (r4 the dispatcher): by the
+// confirm asked (+9664: 4, 5) and the pick (+9640's +72): page 0 and
+// ShowPage 0; the second confirm (Type6Screen0::ConfirmAgain, a guest call
+// to its override) and ShowPage 2; the fade out step; page 2, message 29 and
+// ShowPage 3. ShowPage's plain C++. r3 as the original leaves it.
+uint64_t Type6Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                    const Calls& calls);
+// sub_82244B60 Type7Screen0::OnDialogClosed: by the pick (+9644's +72):
+// page 0 and ShowPage 0 (a tail call from `sp`), or the fade out step.
+uint64_t Type7Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_821C7F98 ControllerOptions::Update: the 12-entry step table in its
+// frame, the page object's step (+12) called (a guest call, r3 the started
+// word +24) and, when done or another negative step, the page state moved
+// on. r3 as the original leaves it.
+uint64_t ControllerOptionsUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
 
 // --- The garage camera's reset (garage_camera.cpp) ---
 
