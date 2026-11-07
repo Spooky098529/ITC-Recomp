@@ -47,7 +47,14 @@ file's history. What's left to see in a drive, from every run:
   Validated `itc_4287` (race 91 s at 180, the harnesses ~86.6 s; 0
   errors, every harness 0 differing, 26 of 26 harness lines; none in the
   race, 8 in the replay `itc_4288` (ok), 18 to drive). Third migration
-  agent running.
+  d36330ef..ecb9b381 (`InputItems` with `MoveItem`, `InputOptions` with
+  `MoveOption`, `Leave` with `StoreOwnedParts`, `InputWheels` with
+  `AnimateWheels` and `FillPartRowsRight`/`Left`, `InputLevels` with
+  `MoveLevel`; 12 adapters removed; races 36-37 s, 0 errors, all its
+  harnesses 0 differing; six subagents, one at a time); left:
+  `InputTypes` `sub_821D74A0` with `MoveType` (1,766 lines); six
+  removable adapters in `tuning-screen.md` (a cleanup lead added).
+  Validation agent running.
 
 ## Done
 
@@ -73,5 +80,7 @@ file's history. What's left to see in a drive, from every run:
   452, unknown 1395).
 - After its second migration: ours 4534, work left 1885 (wrapped 57,
   known 433, unknown 1395).
+- After its third migration: ours 4546, work left 1874 (wrapped 57,
+  known 422, unknown 1395).
 
 ## Stopped

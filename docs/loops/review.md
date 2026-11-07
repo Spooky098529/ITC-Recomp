@@ -43,6 +43,15 @@ When the user has reviewed a run's section, its heading gets
   compared in their own groups). Lead for later: `car_makers`'
   `RestoreStand` harness crashes with other random seeds (its own
   set-up; the batch restores the generator after its group).
+- Its third migration (d36330ef..ecb9b381): `FillPartRowsLeft`
+  `sub_821F4768` (not seen in play) ported; `ResetStickerEditor`
+  `sub_821F8440` and `LoadStickers` `sub_821F86C0` (not seen) stay
+  recompiled, called through the guest; a shared wrapper
+  `tuning_screen::FillPartRow` added in `src/tuning_screen/rows.cpp`;
+  the new harness set-ups seed their generators through splitmix64
+  (consecutive xorshift streams fell into step); `WheelsFields` pins the
+  scene's child lookups; `MoveLevel`'s r4 found to be its own load (the
+  map's leftover note corrected).
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
