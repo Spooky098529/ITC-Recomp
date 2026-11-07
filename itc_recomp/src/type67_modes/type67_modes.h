@@ -227,6 +227,18 @@ void ModeNextMode(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint
 void ModeLeaving(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint32_t mode,
                  uint32_t frame, const Calls& calls);
 
+// sub_82235F28 Type6Mode::WaitForLoads and sub_822463D8
+// Type7Mode::WaitForLoads (r3 the answer, r4 the mode): the answer
+// cleared, the phase 1, LoadingScreen::Run(-1) (a guest call); when every
+// member's loaded word has bit 0 and the sound manager's slot 6 says bank 1
+// isn't loading: LoadingScreen::Finish(-1) and GarageStage::Draw (guest
+// calls), GarageStage::SetDrawWord and Sound::Play (bank 1's cue 2) through
+// their plain C++, the phase 3, the delegate NextModeThunk and the loaded
+// message (34, 28) queued, else Draw (1); then GameMessages::Dispatch (a
+// guest call). r3 the answer.
+uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, uint32_t sp,
+                          const Calls& calls);
+
 // --- The handlers with guest calls (screens.cpp). `sp` is the caller's
 // stack pointer (the original's r1 at entry); each returns r3 as the
 // original leaves it. ---

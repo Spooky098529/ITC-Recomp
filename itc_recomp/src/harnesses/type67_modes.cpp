@@ -531,7 +531,8 @@ void Handlers(Context& h, const Block& world) {
           });
 }
 
-// --- The modes' delegate functions: a mode block (its dispatcher without
+// --- The modes' delegate functions (NextMode, Leaving, WaitForLoads: its
+// world below): a mode block (its dispatcher without
 // handlers, so GameMessages::Dispatch takes the queued messages and
 // delivers none; its ring's count and start small) whose +848 is a screen
 // block with the checked machines' states picked (10, 6 and 11 among
@@ -540,6 +541,20 @@ void Handlers(Context& h, const Block& world) {
 // answer, the frame's +80 to +87 and r3 compared. ---
 
 constexpr uint32_t kModeBytes = 1024;
+
+// WaitForLoads' stand-in for the UI movies' update and ApplyAnimation (the
+// loading screen's UiMovie::Run and FinishNamed reach them): each call's
+// function, return address, r1, r3 and r4 recorded, answered 0.
+std::vector<uint32_t>* g_mode_calls = nullptr;
+bool ModeStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (g_mode_calls == nullptr || (function != 0x8211D2F8 && function != 0x825A08E0)) {
+    return false;
+  }
+  g_mode_calls->insert(g_mode_calls->end(), {function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u32,
+                                             ctx.r4.u32});
+  ctx.r3.u64 = 0;
+  return true;
+}
 constexpr uint32_t kScreenBlockBytes = 0x17000;
 
 void Modes(Context& h, const Block& world) {
@@ -557,6 +572,7 @@ void Modes(Context& h, const Block& world) {
     bool next;
     GuestFunction recompiled;
     GuestFunction native;
+    bool wait = false;  // WaitForLoads
   };
   const Function functions[] = {
       {"Type6Mode::NextMode", 0x822363B8, &t67::kType6Layout, true, __imp__sub_822363B8,
@@ -567,10 +583,33 @@ void Modes(Context& h, const Block& world) {
        hooks::Type6ModeLeaving},
       {"Type7Mode::Leaving", 0x82246590, &t67::kType7Layout, false, __imp__sub_82246590,
        hooks::Type7ModeLeaving},
+      {"Type6Mode::WaitForLoads", 0x82235F28, &t67::kType6Layout, false, __imp__sub_82235F28,
+       hooks::Type6ModeWaitForLoads, true},
+      {"Type7Mode::WaitForLoads", 0x822463D8, &t67::kType7Layout, false, __imp__sub_822463D8,
+       hooks::Type7ModeWaitForLoads, true},
   };
+  // WaitForLoads' world: the sound manager a fake in `extra` (+0; its
+  // vtable at +0x100: slot 6 the getter of its +60, the bank's loading
+  // answer; slot 10 a recorder), the loading screen's current movie 0 to 2
+  // (each a harness movie with empty animation lists; the update and
+  // ApplyAnimation recorded through the UI movies' stand-in), the stand's holder
+  // chain to a stage (`extra` +0x1000) whose garage camera isn't set up
+  // (GarageStage::Draw does nothing) and whose scene model (index 0 of the
+  // car scene's pool 7, the scene at `extra` +0x400) is in use.
+  constexpr uint32_t kExtraBytes = 0x4000, kLoadingCurrent = 0x82815E64;
+  constexpr uint32_t kLoadingMovies = 0x82815E68, kCarScene = 0x826C2E44;
+  const Block extra(kExtraBytes);
+  const Block loading_movie(0xA100);
+  if (!extra.address || !loading_movie.address) return;
+  const uint32_t wait_globals[7] = {menu_sounds::kSoundManager, kLoadingCurrent,
+                                    t67::kStandHolder, kCarScene, kLoadingMovies,
+                                    kLoadingMovies + 4, kLoadingMovies + 8};
+  uint32_t wait_saved[7];
+  for (int i = 0; i < 7; i++) wait_saved[i] = guest::LoadU32(base, wait_globals[i]);
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
-    const uint32_t frame_bytes = f.next ? t67::kNextModeFrame : t67::kLeavingFrame;
+    const uint32_t frame_bytes =
+        f.wait ? 160 : f.next ? t67::kNextModeFrame : t67::kLeavingFrame;
     const uint32_t frame = CallContext(h).r1.u32 - frame_bytes;
     const t67::ModeLayout& layout = *f.layout;
     for (int c = 0; c < 40; c++) {
@@ -596,13 +635,54 @@ void Modes(Context& h, const Block& world) {
         for (uint32_t i = 0; i < layout.leave_count; i++) {
           if (!f.next) put(layout.leave_checks[i], r.Below(12) == 0 ? kOther[r.Below(6)] : 6);
         }
-        if (!f.next) {
+        if (!f.next && !f.wait) {
           const uint32_t kList[] = {6, 6, 11, 11, 10, 5};
           put(layout.list, kList[r.Below(6)]);
+        }
+        if (f.wait) {
+          WriteRandom(base, extra.address, kExtraBytes, r);
+          const uint32_t manager = extra.address, vtable = extra.address + 0x100;
+          guest::StoreU32(base, manager, vtable);
+          guest::StoreU32(base, vtable + 24, 0x82090770);  // r3 = [r3 + 60]
+          guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
+          guest::StoreU32(base, manager + 60, r.Below(3) == 0 ? 0x101 : r.Below(4) == 0 ? 1 : 0);
+          guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+          guest::StoreU32(base, kLoadingCurrent, r.Below(3));
+          WriteRandom(base, loading_movie.address, 0xA100, r);
+          ui_movies::InitAnimationLists(base, loading_movie.address);
+          for (uint32_t k = 0; k < 3; k++) {
+            guest::StoreU32(base, kLoadingMovies + 4 * k, loading_movie.address);
+          }
+          const uint32_t scene = extra.address + 0x400, node = extra.address + 0x2000;
+          const uint32_t stage = extra.address + 0x800, holder = extra.address + 0x300;
+          guest::StoreU32(base, extra.address + 0x340, holder);
+          guest::StoreU32(base, holder, stage);
+          guest::StoreU32(base, t67::kStandHolder, extra.address + 0x340);
+          guest::StoreU32(base, stage + 8, 0);
+          guest::StoreU32(base, stage + 112, 0);
+          guest::StoreU32(base, scene + 5028, node);
+          guest::StoreU32(base, node + 8, 0);
+          guest::StoreU32(base, node + 16, 3);
+          guest::StoreU32(base, kCarScene, scene);
+          // The members' loaded words: bit 0 set mostly.
+          static constexpr uint32_t kLoaded[] = {29044, 62304, 91224, 19280, 50560, 9612,
+                                                 40464, 71944, 61604, 51964, 29040, 19272,
+                                                 40220, 9616, 81584};
+          const bool all = r.Below(3) != 0;
+          for (const uint32_t at : kLoaded) {
+            const uint32_t word = uint32_t(r.Next());
+            guest::StoreU32(base, block.address + at,
+                            all || r.Below(4) != 0 ? word | 1 : word & ~1u);
+          }
         }
         PPCContext t = CallContext(h);
         t.r3.u64 = world.address + 0x100;
         t.r4.u64 = mode.address;
+        std::vector<uint32_t> calls;
+        g_mode_calls = &calls;
+        const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+            ui_movies_hooks::g_update_callee_stand_in;
+        if (f.wait) ui_movies_hooks::g_update_callee_stand_in = ModeStandIn;
         if (v == 0) {
           ITC_FLAG(native_type67_modes) = false;
           f.recompiled(t, base);
@@ -610,11 +690,19 @@ void Modes(Context& h, const Block& world) {
         } else {
           f.native(t, base);
         }
+        ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
+        g_mode_calls = nullptr;
+        for (const uint32_t word : calls) out[v].Word(word);
         out[v].Bytes(Read(base, mode.address, mode.bytes));
         out[v].Bytes(Read(base, block.address, block.bytes));
         for (const uint32_t g : globals) out[v].Word(guest::LoadU32(base, g));
         out[v].Bytes(Read(base, world.address + 0x100, 8));
-        out[v].Bytes(Read(base, frame + 80, 8));
+        out[v].Bytes(Read(base, frame + 80, f.wait ? 16 : 8));
+        if (f.wait) {
+          out[v].Bytes(Read(base, extra.address, kExtraBytes));
+          out[v].Bytes(Read(base, loading_movie.address, 0xA100));
+          for (const uint32_t g : wait_globals) out[v].Word(guest::LoadU32(base, g));
+        }
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
       }
@@ -623,6 +711,7 @@ void Modes(Context& h, const Block& world) {
     results.Report();
   }
   for (int i = 0; i < 3; i++) guest::StoreU32(base, globals[i], saved[i]);
+  for (int i = 0; i < 7; i++) guest::StoreU32(base, wait_globals[i], wait_saved[i]);
 }
 
 // --- The handlers with guest calls. UiMovies::Open is recorded (its

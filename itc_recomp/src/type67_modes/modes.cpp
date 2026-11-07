@@ -9,7 +9,9 @@
 #include "type67_modes/type67_modes.h"
 
 #include "base/log.h"
+#include "front_end_car_draw/front_end_car_draw.h"
 #include "guest.h"
+#include "menu_sounds/menu_sounds.h"
 
 namespace type67_modes {
 
@@ -78,6 +80,25 @@ void SetDelegate(uint8_t* base, uint32_t mode, uint32_t frame) {
   StoreU32(base, holder, delegate);
 }
 
+uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
+                    uint32_t lr) {
+  return static_cast<const Calls*>(user)->call_set(function, args, set, r1, lr);
+}
+
+// What differs between the two WaitForLoads.
+struct LoadsLayout {
+  uint32_t phase;
+  uint32_t loaded[8];  // the members' loaded words (0: none)
+  uint32_t message;    // the loaded message
+  uint32_t run_lr, slot_lr, finish_lr, draw_lr, dispatch_lr;
+};
+constexpr LoadsLayout kType6Loads = {
+    91264, {29044, 62304, 91224, 19280, 50560, 9612, 40464, 71944}, 34,
+    0x82235F64, 0x82235FF4, 0x82236004, 0x8223602C, 0x822360F0};
+constexpr LoadsLayout kType7Loads = {
+    71284, {61604, 51964, 29040, 19272, 40220, 9616, 0, 0}, 28,
+    0x82246414, 0x82246484, 0x82246494, 0x822464BC, 0x82246580};
+
 }  // namespace
 
 const ModeLayout kType6Layout = {91264,       91256,       4,  0x82236100, 0x82235C18,
@@ -111,6 +132,74 @@ void ModeNextMode(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint
   SetDelegate(base, mode, frame);
   StoreU32(base, kLeavingFlag, 0);
   StoreU32(base, LoadU32(base, mode + kBlock) + layout.phase, 4);
+}
+
+uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, uint32_t sp,
+                          const Calls& calls) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_822463D8 Type7Mode::WaitForLoads");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82235F28 Type6Mode::WaitForLoads");
+  }
+  const LoadsLayout& layout = type7 ? kType7Loads : kType6Loads;
+  constexpr uint32_t kLoadingRun = 0x82247898, kLoadingFinish = 0x82247A60;
+  constexpr uint32_t kGarageStageDraw = 0x8217FE60, kNextModeThunk = 0x82235C08;
+  const uint32_t frame = sp - 160;
+  const uint32_t answer = uint32_t(r3), mode = uint32_t(r4);
+  ClearAnswer(base, answer);
+  StoreU32(base, LoadU32(base, mode + kBlock) + layout.phase, 1);
+  calls.call(kLoadingRun, frame, layout.run_lr, ~uint64_t(0), r4);
+  const uint32_t block = LoadU32(base, mode + kBlock);
+  uint32_t loaded = 0xFFFFFFFF;
+  for (const uint32_t at : layout.loaded) {
+    if (at != 0) loaded &= LoadU32(base, block + at);
+  }
+  uint32_t message = 1;
+  if ((loaded & 1) != 0) {
+    // The music's bank loading (the sound manager's slot 6 on bank 1).
+    StoreU32(base, frame + 80, 1);
+    const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
+    const uint64_t args[4] = {manager, frame + 80, 0, 0};
+    const uint64_t loading =
+        calls.call_set(LoadU32(base, LoadU32(base, manager) + 24), args, 2, frame, layout.slot_lr);
+    if ((loading & 0xFF) == 0) {
+      calls.call(kLoadingFinish, frame, layout.finish_lr, ~uint64_t(0), frame + 80);
+      front_end_car_draw::GarageStageSetDrawWord(
+          base, LoadU32(base, LoadU32(base, kStandHolder)), 0, frame);
+      const uint64_t draw[4] = {LoadU32(base, LoadU32(base, kStandHolder)), 0, 0, 0};
+      calls.call_set(kGarageStageDraw, draw, 3, frame, layout.draw_lr);
+      StoreU32(base, frame + 88, 1);
+      StoreU32(base, frame + 84, 2);
+      menu_sounds::PlaySound(base, frame + 88, frame + 84, frame,
+                             {const_cast<Calls*>(&calls), &SoundThunk});
+      const uint32_t now = LoadU32(base, mode + kBlock);
+      StoreU32(base, frame + 92, 0);
+      StoreU32(base, now + layout.phase, 3);
+      StoreU32(base, frame + 88, kNextModeThunk);
+      const uint32_t holder = mode + 4;
+      uint32_t delegate = holder + 4;
+      if (int32_t(delegate) != 0) {
+        StoreU32(base, delegate + 4, mode);
+        StoreU32(base, delegate + 8, LoadU32(base, frame + 88));
+        StoreU32(base, delegate + 12, LoadU32(base, frame + 92));
+        StoreU32(base, delegate + 0, kModeDelegateVtable);
+      } else {
+        delegate = 0;
+      }
+      StoreU32(base, holder, delegate);
+      message = layout.message;
+    }
+  }
+  const uint32_t ring = mode + 240;
+  const uint32_t count = LoadU32(base, ring + 600) + 1;
+  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
+  StoreU32(base, ring + 600, count);
+  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
+  StoreU32(base, slot + 8, 0);
+  StoreU32(base, slot + 4, 0);
+  StoreU32(base, slot + 0, message);
+  calls.call(kDispatch, frame, layout.dispatch_lr, mode + 36, 0);
+  return r3;
 }
 
 void ModeLeaving(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint32_t mode,

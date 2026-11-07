@@ -146,6 +146,10 @@ void Type7Screen0SetUpCar(PPCContext& ctx, uint8_t* base);
 void Type6Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base);
 void Type7Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base);
 void ControllerOptionsUpdate(PPCContext& ctx, uint8_t* base);
+// The modes' WaitForLoads (r3 the answer, r4 the mode): Type6Mode
+// sub_82235F28, Type7Mode sub_822463D8.
+void Type6ModeWaitForLoads(PPCContext& ctx, uint8_t* base);
+void Type7ModeWaitForLoads(PPCContext& ctx, uint8_t* base);
 
 // Quaternion::FromAngles sub_8217C120 (r3 the destination, f1 to f3 the
 // angles; r3 left) and GarageCamera::Reset sub_8217D888 (r3 the camera; r3
