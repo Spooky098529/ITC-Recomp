@@ -602,6 +602,12 @@ Rows not yet moved stay in the table below. So far:
   choices stored into the garage car, the stand car's previews (parts,
   wheels, decals), the command runners and node helpers over its UI
   movies, and the debug menus' empty state handlers (B7).
+- [`tuning-pages.md`](tuning-pages.md): the tuning shop's input pages:
+  its input handler by state (the category, items, level, type and
+  option pages, the wheels', paint's, light kits' and interior
+  accessory's, leaving the screen and the editors), their movie-side
+  updates, the confirm dialogs' yes answers, and the decal images the
+  vinyl and sticker editors draw (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
