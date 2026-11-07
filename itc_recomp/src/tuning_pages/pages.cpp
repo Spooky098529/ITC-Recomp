@@ -1593,4 +1593,164 @@ uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint3
   return MoveOption(base, call, s, frame, flags.native_slots);
 }
 
+
+namespace {
+
+// Bit n of the bitset at `set` (word n >> 5's 1 << (n & 31)) set; the word
+// as it was (the originals' r3).
+uint32_t SetBit(uint8_t* base, uint32_t set, uint32_t n) {
+  const uint32_t at = set + (n >> 5) * 4;
+  const uint32_t old = Load(base, at);
+  Store(base, at, old | (1u << (n & 31)));
+  return old;
+}
+
+}  // namespace
+
+uint64_t StoreOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821DD408 TuningScreen::StoreOwnedParts");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t car = tuning_screen::SelectedGarageCar(base, s) + 212 + 1904;
+  // The save data's bitset, its pointer read again at each bit as the
+  // original does.
+  auto save_bit = [&](uint32_t n) { return SetBit(base, Load(base, s + 18904) + 0x1996C, n); };
+  // `count` words from s + `from`, word k nonzero setting the car's bit
+  // `first` + k (or the save's).
+  auto words = [&](uint32_t from, uint32_t count, uint32_t first, bool save) {
+    uint32_t old = 0;
+    bool any = false;
+    for (uint32_t k = 0; k < count; k++) {
+      if (Load(base, s + from + 4 * k) != 0) {
+        old = save ? save_bit(first + k) : SetBit(base, car, first + k);
+        any = true;
+      }
+    }
+    return std::pair<bool, uint32_t>(any, old);
+  };
+  // The power items 0 and 1 of the part set [+33900]: 1 and 3 one half of
+  // the bits, 0, 2 and 4 the other, other sets none.
+  for (uint32_t i = 0; i < 10; i++) {
+    const uint32_t v = Load(base, s + 33900);
+    if (Load(base, s + (v * 10 + i + 8581) * 4) != 0) {
+      if (v == 1 || v == 3) {
+        SetBit(base, car, i);
+      } else if (v == 0 || v == 2 || v == 4) {
+        SetBit(base, car, i + 10);
+      }
+    }
+  }
+  for (uint32_t j = 20; j < 27; j++) {
+    const uint32_t v = Load(base, s + 33900);
+    if (Load(base, s + (v * 7 + j + 8686) * 4) != 0) {
+      if (v == 1 || v == 3) {
+        SetBit(base, car, j);
+      } else if (v == 0 || v == 2 || v == 4) {
+        SetBit(base, car, j + 7);
+      }
+    }
+  }
+  words(35028, 7, 34, false);
+  words(35144, 7, 41, false);
+  words(35232, 7, 48, false);
+  words(35320, 7, 55, false);
+  words(35408, 7, 62, false);
+  words(35500, 7, 69, false);
+  for (uint32_t j = 0; j < 10; j++) {
+    if (Load(base, s + 35612 + 4 * j) != 0) {
+      SetBit(base, car, j < 4 ? 76 + j : j < 7 ? 77 + j : 78 + j);
+    }
+  }
+  words(35712, 7, 88, false);
+  // The tires: bit 95 always, then three words a tire compared with 1.
+  for (uint32_t i = 0; i < 5; i++) {
+    if (i == 0) {
+      save_bit(95);
+      continue;
+    }
+    if (Load(base, s + 35828 + 12 * i) == 1) save_bit(95 + i);
+    if (Load(base, s + 35832 + 12 * i) == 1) save_bit(99 + i);
+    if (Load(base, s + 35836 + 12 * i) == 1) save_bit(103 + i);
+  }
+  words(36168, 5, 108, false);
+  words(36212, 5, 119, false);
+  words(36256, 5, 130, false);
+  if (Load(base, s + 25172) != 0) {
+    for (uint32_t i = 0; i < 6; i++) {
+      if (Load(base, s + 36304 + 4 * i) != 0 && i != 1) {
+        SetBit(base, car, i == 0 ? 141 : 140 + i);
+      }
+    }
+  } else {
+    words(36304, 5, 141, false);
+  }
+  for (uint32_t k = 0; k < 5; k++) {
+    if (Load(base, s + 36380 + 8 * k) != 0) SetBit(base, car, 152 + k);
+    if (Load(base, s + 36384 + 8 * k) != 0) SetBit(base, car, 158 + k);
+  }
+  words(36440, 4, 170, false);
+  words(36476, 4, 174, false);
+  words(36512, 4, 178, false);
+  words(36548, 4, 182, false);
+  words(36592, 3, 186, false);
+  // Every wheel's flag (set to 1 on the way) into the save's bits 189 on.
+  uint64_t r3 = 0;
+  for (uint32_t n = 0; n < 179; n++) {
+    const uint32_t was = TestAndSetWheelFlag(base, s, n);
+    r3 = was;
+    if (was != 0) {
+      save_bit(189 + n);
+    }
+  }
+  auto last = [&](std::pair<bool, uint32_t> set) {
+    if (set.first) r3 = set.second;
+  };
+  last(words(36616, 2, 389, false));
+  last(words(36672, 4, 391, false));
+  last(words(36716, 5, 395, true));
+  last(words(36756, 4, 400, false));
+  last(words(36800, 6, 404, false));
+  last(words(33624, 4, 435, true));
+  // The interior item 3's rows: five words each, their bits offset by the
+  // table's {3, 2, 1, 0}, kept in the frame as the original does.
+  static constexpr uint32_t kTable[4] = {3, 2, 1, 0};
+  for (uint32_t r = 0; r < 4; r++) {
+    Store(base, frame + 80 + 4 * r, kTable[r]);
+  }
+  static constexpr uint32_t kWords[5] = {4, 0, 8, 16, 12};
+  static constexpr uint32_t kFirsts[5] = {411, 416, 421, 426, 431};
+  for (uint32_t r = 0; r < 4; r++) {
+    const uint32_t row = s + 33820 + 20 * r;
+    for (uint32_t k = 0; k < 5; k++) {
+      if (Load(base, row + kWords[k]) != 0) {
+        r3 = save_bit(Load(base, frame + 80 + 4 * r) + kFirsts[k]);
+      }
+    }
+  }
+  return r3;
+}
+
+uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E25B0 TuningScreen::Leave");
+  const uint32_t s = uint32_t(r3);
+  const uint32_t frame = Frame(base, sp, 112);
+  if ((Load(base, kFadeOut) | Load(base, kFadeIn)) != 0) {
+    return r3;
+  }
+  Store(base, Load(base, s + 18904) + 6116, Load(base, s + 25116));
+  tuning_screen::StoreToGarageCar(base, r3, frame);
+  const uint64_t out = StoreOwnedParts(base, s, frame);
+  // Message 11 posted to r4's ring (+204: 50 records of 12 bytes, +804 the
+  // count, +808 the start).
+  const uint32_t ring = uint32_t(r4) + 204;
+  const uint32_t count = Load(base, ring + 600) + 1;
+  const uint32_t start = Load(base, ring + 604);
+  Store(base, ring + 600, count);
+  const uint32_t record = ring + ((start + count - 1) % 50) * 12;
+  Store(base, record + 0, 11);
+  Store(base, record + 4, 0);
+  Store(base, record + 8, 0);
+  return out;
+}
+
 }  // namespace tuning_pages

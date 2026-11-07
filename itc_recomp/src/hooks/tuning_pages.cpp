@@ -74,7 +74,9 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_821D5610 (no adapter: only InputOptions calls it; IsPickOwned, GetPrice, "
               "PageItemCount, PageCursor, GetCurrentChoice and the UI movies' FindNode and Child "
               "by their plain C++; Menu::Step, MenuSound::Play and the UI movie calls through "
-              "their overrides)) "
+              "their overrides); state 59's page Leave sub_821E25B0 with StoreOwnedParts "
+              "sub_821DD408 (no adapter: only Leave calls it; StoreToGarageCar and "
+              "TestAndSetWheelFlag by their plain C++)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -396,6 +398,15 @@ void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesStoreOwnedParts(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::StoreOwnedParts(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningPagesLeave(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = tp::Leave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32);
+}
+
 void TuningPagesOnDialogYes(PPCContext& ctx, uint8_t* base) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -468,6 +479,7 @@ ITC_TUNING_PAGES(821EEEA8, TuningPagesInputInches)
 ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
 ITC_TUNING_PAGES(821DFD48, TuningPagesInputItems)
 ITC_TUNING_PAGES(821D8160, TuningPagesInputOptions)
+ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
@@ -498,6 +510,10 @@ ITC_TUNING_PAGES(821D8160, TuningPagesInputOptions)
 // No adapter (B7 loop, 2026-11-07: its only caller, InputOptions, is native
 // and calls its plain C++; the register step above is the harness's):
 // MoveOption sub_821D5610.
+
+// No adapter (B7 loop, 2026-11-07: its only caller, Leave, is native and
+// calls its plain C++; the register step above is the harness's):
+// StoreOwnedParts sub_821DD408.
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // InputItems, is native and calls their plain C++; the register steps above

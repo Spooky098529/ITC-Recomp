@@ -112,6 +112,11 @@ void TuningPagesMoveItem(PPCContext& ctx, uint8_t* base);
 // harness's).
 void TuningPagesInputOptions(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base);
+// Leave sub_821E25B0 (r3 the screen, r4 the object with the message ring)
+// and StoreOwnedParts sub_821DD408 (no adapter: only Leave calls it; this
+// step is the harness's).
+void TuningPagesLeave(PPCContext& ctx, uint8_t* base);
+void TuningPagesStoreOwnedParts(PPCContext& ctx, uint8_t* base);
 // The confirm dialogs' yes answers (r3 the screen): OnDialogYes sub_821E2660
 // (SetCurrentChoice's Params::GetCarParts and AeroParts::Get82 by their plain
 // C++ with --native_car_specs), OnStickerDialogYes sub_821FA230 (no adapter:

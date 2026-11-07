@@ -830,6 +830,89 @@ void OptionFields(PPCContext& t, Random& world_random, const World& w) {
   HighWord(t, r);
 }
 
+// State 59's fields (Leave and StoreOwnedParts): the owned words each 0
+// half the time (else as laid: any word), the tires' words 0, 1 or any, the
+// part set [+33900] 0 to 7 (5 to 7 now and then: none of the power items'
+// bits), +25172 0 or any, the wheels' flags 0, 1 or any; StoreToGarageCar's
+// world as ItemFields lays it (the save data's garage list, the sticker
+// numbers, the vinyl layers' kinds and mirror index small); r4 the object
+// with the message ring, in the save block (its count and start any word,
+// small now and then). Seeded as ItemFields (its comment).
+void OwnedFields(PPCContext& t, Random& world_random, const World& w) {
+  uint64_t z = (uint64_t(guest::LoadU32(w.base, w.save)) << 32 |
+                guest::LoadU32(w.base, w.save + 4)) +
+               0x9E3779B97F4A7C15ull;
+  world_random.Next();
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  Random r(z ^ (z >> 31));
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  auto mix = [&](uint32_t from, uint32_t count) {
+    for (uint32_t k = 0; k < count; k++) {
+      if (r.Below(2) == 0) {
+        guest::StoreU32(base, s + from + 4 * k, 0);
+      }
+    }
+  };
+  // The wheels' flags (TestAndSetWheelFlag's words, by brand).
+  static constexpr uint32_t kBases[18] = {0,   1,   39,  47,  72,  99,  116, 123, 124,
+                                          126, 135, 144, 147, 162, 163, 165, 170, 179};
+  for (uint32_t b = 0; b < 17; b++) {
+    for (uint32_t k = 0; k < kBases[b + 1] - kBases[b]; k++) {
+      const uint32_t pick = r.Below(4);
+      guest::StoreU32(base, s + 27856 + 152 * b + 4 * k,
+                      pick < 2 ? 0 : pick == 2 ? 1 : uint32_t(r.Next()));
+    }
+  }
+  // The power items 0 and 1 of every part set 0 to 4 (and past them).
+  mix(34324, 10 * 8);
+  mix(34824, 7 * 8);
+  static constexpr std::pair<uint32_t, uint32_t> kRanges[] = {
+      {35028, 7}, {35144, 7}, {35232, 7}, {35320, 7}, {35408, 7}, {35500, 7}, {35612, 10},
+      {35712, 7}, {36168, 5}, {36212, 5}, {36256, 5}, {36304, 6}, {36380, 10}, {36440, 4},
+      {36476, 4}, {36512, 4}, {36548, 4}, {36592, 3}, {36616, 2}, {36672, 4}, {36716, 5},
+      {36756, 4}, {36800, 6}, {33624, 4}, {33820, 20}};
+  for (const auto& [from, count] : kRanges) {
+    mix(from, count);
+  }
+  for (uint32_t i = 0; i < 15; i++) {
+    const uint32_t pick = r.Below(4);
+    guest::StoreU32(base, s + 35828 + 4 * i, pick < 2 ? 0 : pick == 2 ? 1 : uint32_t(r.Next()));
+  }
+  guest::StoreU32(base, s + 33900, r.Below(4) == 0 ? 5 + r.Below(3) : r.Below(5));
+  guest::StoreU32(base, s + 25172, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  // StoreToGarageCar's world (ItemFields').
+  const uint32_t save = w.save, nodes = save + 6120;
+  for (uint32_t k = 0; k < 51; k++) {
+    guest::StoreU16(base, nodes + 4 * k, uint16_t(r.Below(51)));
+    guest::StoreU16(base, nodes + 4 * k + 2, uint16_t(r.Below(4)));
+  }
+  guest::StoreU16(base, nodes + 204, uint16_t(r.Below(51)));
+  guest::StoreU32(base, save + 0x19920, r.Below(6));
+  for (uint32_t k = 0; k < 4; k++) {
+    guest::StoreU32(base, nodes + 1968 * k + 212 + 12, r.Below(26));
+  }
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(base, s + 33800 + 4 * i,
+                    r.Below(4) == 0 ? 0xFFFFFFFFu : uint32_t(int32_t(r.Below(260)) - 100));
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t layer = s + 30580 + 4 * i;
+    guest::StoreU32(base, layer + 0, r.Below(3));
+    guest::StoreU32(base, layer + 80, r.Below(3));
+    guest::StoreU32(base, layer + 64, r.Below(8));
+  }
+  // The message ring's object.
+  const uint32_t object = save + 0x400;
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, object + 804, r.Below(60));
+    guest::StoreU32(base, object + 808, r.Below(60));
+  }
+  t.r4.u64 = object | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+  HighWord(t, r);
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -930,6 +1013,17 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputOptions", 400, __imp__sub_821D8160, hooks::TuningPagesInputOptions, 24,
        {{112, 152}}, OptionFields});
+  // StoreOwnedParts: state 59's fields (above); its r30, r31 and lr (24
+  // bytes).
+  Run(h, w,
+      {"TuningScreen::StoreOwnedParts", 300, __imp__sub_821DD408,
+       hooks::TuningPagesStoreOwnedParts, 24, {}, OwnedFields});
+  // Leave: its r30, r31 and lr (24 bytes); StoreToGarageCar's saves (112 to
+  // 176 below: its plain C++ doesn't write them) but StoreOwnedParts' table
+  // (144 to 160), which both write over them.
+  Run(h, w,
+      {"TuningScreen::Leave", 400, __imp__sub_821E25B0, hooks::TuningPagesLeave, 24,
+       {{112, 144}, {160, 176}}, OwnedFields});
 }
 
 }  // namespace harness

@@ -347,6 +347,20 @@ uint64_t MoveOption(uint8_t* base, const tuning_screen::GuestCall& call, uint32_
 uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                       uint32_t sp, const PageFlags& flags);
 
+// sub_821DD408 TuningScreen::StoreOwnedParts: the screen's owned flags
+// packed into the selected garage car's bitset (c+1904) and the save data's
+// (+0x1996C), every wheel's flag set on the way (TestAndSetWheelFlag; its
+// row). 128-byte frame, its {3, 2, 1, 0} table at frame + 80 as the
+// original leaves it (register saves not written). Returns r3 as the
+// original leaves it: the old word of the last bit set after the wheels,
+// else wheel 178's old flag.
+uint64_t StoreOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_821E25B0 TuningScreen::Leave: state 59's page (its row). With both
+// layer 0 fade counts 0: the money into the save data, StoreToGarageCar,
+// StoreOwnedParts, then message 11 posted to r4's ring (+204). 112-byte
+// frame; r3 as given, else StoreOwnedParts' r3.
+uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
+
 // --- The confirm dialogs' yes answers (dialogs.cpp; flush-to-zero off) ---
 // Guest calls through `call` from the originals' frames with their return
 // addresses: memcpy where Buffers_Memcpy declines, Career::PickNext and
