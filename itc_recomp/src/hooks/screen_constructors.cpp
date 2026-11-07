@@ -1,17 +1,13 @@
-// The type 6 and type 7 modes' screen constructors natively: adapters in
-// front of src/screen_constructors/ (docs/functions/screen-constructors.md)
-// for the two blocks' constructors, which the modes' slot 0 (recompiled)
-// calls; each returns its r3 (the block). The members have no adapters (the
-// flag switches the blocks' constructors): every caller they have in play
-// is native and calls their plain C++. The panel screens' four panels come
-// from operator new's plain C++ (the original's call, through the guest,
-// when it fails: the new handler and std::bad_alloc).
+// The type 6 and type 7 modes' screen constructors' flag
+// (src/screen_constructors/, docs/functions/screen-constructors.md): it
+// switches the blocks' constructors in their only callers, the modes' slot
+// 0 (native, src/hooks/type67_modes.cpp). The members have no adapters
+// either: every caller they have in play is native and calls their plain
+// C++.
 
 #include "screen_constructors/screen_constructors.h"
 
 #include "base/flags.h"
-#include "guest.h"
-#include "memory/c_runtime_heap.h"
 
 ITC_FLAG_BOOL(native_screen_constructors, true, "ITC",
               "Build the type 6 and type 7 modes' screens "
@@ -38,55 +34,8 @@ ITC_FLAG_BOOL(native_screen_constructors, true, "ITC",
               "translated code (the same stores; checked by "
               "--run_harnesses=screen_constructors)");
 
-namespace sc = screen_constructors;
-
-// Defines an adapter: the flag, else the original; `body` with ctx and base.
-#define ITC_SCREEN_CONSTRUCTOR(address, body)       \
-  extern "C" REX_FUNC(sub_##address) {              \
-    REX_FUNC_PROLOGUE();                            \
-    if (!ITC_FLAG(native_screen_constructors)) {    \
-      __imp__sub_##address(ctx, base);              \
-      return;                                       \
-    }                                               \
-    body;                                           \
-  }
-
-
-namespace {
-
-// The panels' operator new: its plain C++, else the original's call (from
-// the panel screen's frame) for its failure path.
-struct AdapterNew {
-  PPCContext* ctx;
-  uint8_t* base;
-};
-
-uint32_t NewPanel(void* user, uint32_t size, uint32_t frame) {
-  auto* a = static_cast<AdapterNew*>(user);
-  if (auto block = memory::crt::OperatorNew(a->base, size)) {
-    return *block;
-  }
-  PPCContext& ctx = *a->ctx;
-  const uint64_t stack = ctx.r1.u64, link = ctx.lr;
-  ctx.r1.u64 = frame;
-  ctx.r3.u64 = size;
-  __imp__sub_825A6880(ctx, a->base);
-  const uint32_t block = ctx.r3.u32;
-  ctx.r1.u64 = stack;
-  ctx.lr = link;
-  return block;
-}
-
-// The blocks' constructors (r3 the block, returned) from the registers.
-void BlockStep(PPCContext& ctx, uint8_t* base,
-               void (*construct)(uint8_t*, uint32_t, uint32_t, const sc::New&)) {
-  const uint64_t r3 = ctx.r3.u64;
-  AdapterNew user{&ctx, base};
-  construct(base, ctx.r3.u32, ctx.r1.u32, sc::New{&user, NewPanel});
-  ctx.r3.u64 = r3;
-}
-
-}  // namespace
-
-ITC_SCREEN_CONSTRUCTOR(822366F0, BlockStep(ctx, base, sc::Type6Screens))
-ITC_SCREEN_CONSTRUCTOR(82246B28, BlockStep(ctx, base, sc::Type7Screens))
+// No adapters (removed, B7 loop, 2026-11-07): the blocks' constructors'
+// only callers, the modes' slot 0 (src/hooks/type67_modes.cpp), are native
+// and call Type6Screens' and Type7Screens' plain C++ (the panels' operator
+// new its plain C++, the original's call through the guest when it fails),
+// or their originals with this flag off.

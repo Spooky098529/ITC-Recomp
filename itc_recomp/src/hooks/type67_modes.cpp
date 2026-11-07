@@ -17,6 +17,7 @@
 #include "ui_movies/game.h"
 #include "type67_modes/type67_modes.h"
 
+ITC_FLAG_DECLARE(bool, native_screen_constructors);
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 ITC_FLAG_DECLARE(bool, native_action_mappers);
@@ -415,6 +416,17 @@ void ModeInit(PPCContext& ctx, uint8_t* base, bool type7) {
   t67::ModeInitCalls calls;
   calls.call = screens.call_set;
   calls.construct = [&](uint32_t block, uint32_t sp) {
+    if (!ITC_FLAG(native_screen_constructors)) {
+      // The original, from the slot 0's frame (its call's return address).
+      const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+      ctx.r1.u64 = sp;
+      ctx.lr = type7 ? 0x82246CE4 : 0x822368D4;
+      ctx.r3.u64 = block;
+      (type7 ? __imp__sub_82246B28 : __imp__sub_822366F0)(ctx, base);
+      ctx.r1.u64 = stack;
+      ctx.lr = link;
+      return;
+    }
     const screen_constructors::New new_panel{&panel_new, PanelNew::New};
     if (type7) {
       screen_constructors::Type7Screens(base, block, sp, new_panel);
@@ -734,15 +746,13 @@ void StandSlotInit(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base, ##__VA_ARGS__);    \
   }
 
-ITC_TYPE67_MODES(82235138, Type67Init, 0x82235138)
-ITC_TYPE67_MODES(822454B8, Type67Init, 0x822454B8)
-ITC_TYPE67_MODES(822329A8, Type67Init, 0x822329A8)
-ITC_TYPE67_MODES(82242420, Type67Init, 0x82242420)
-ITC_TYPE67_MODES(821C9918, Type67Init, 0x821C9918)
-ITC_TYPE67_MODES(821C9430, Type67Init, 0x821C9430)
-ITC_TYPE67_MODES(821CB6E8, Type67Init, 0x821CB6E8)
-ITC_TYPE67_MODES(821CB090, Type67Init, 0x821CB090)
-ITC_TYPE67_MODES(821A8210, Type67Init, 0x821A8210)
+// The members' state machine Inits the modes' slot 0 call (Type6Screen0
+// sub_82235138, Type7Screen0 sub_822454B8, the dialogs sub_822329A8 and
+// sub_82242420, the controller options sub_821C9918 and sub_821C9430, the
+// options sub_821CB6E8 and sub_821CB090, the save screen sub_821A8210) have
+// no adapters (removed, B7 loop, 2026-11-07): their only caller, the slot 0,
+// is native and runs their plain C++ (RunInit); Type67Init is the harness's.
+// The screens' slot InitMachines below stay (reached through vtables).
 ITC_TYPE67_MODES(8223F9A8, Type67Init, 0x8223F9A8)
 ITC_TYPE67_MODES(822436A0, Type67Init, 0x822436A0)
 ITC_TYPE67_MODES(82230F80, Type67Init, 0x82230F80)
@@ -821,9 +831,10 @@ ITC_TYPE67_MODES(82225C70, Type6DialogLeave)
 ITC_TYPE67_MODES(82241E58, Type7DialogLeave)
 ITC_TYPE67_MODES(82233DF8, Type6Screen0Leave)
 ITC_TYPE67_MODES(82244350, Type7Screen0Leave)
-ITC_TYPE67_MODES(822515A0, ListScreenInit)
-ITC_TYPE67_MODES(82248E10, PanelScreenInit)
-ITC_TYPE67_MODES(82259128, NodeScreenInit)
+// ListScreen::Init sub_822515A0, PanelScreen::Init sub_82248E10 and
+// NodeScreen::Init sub_82259128 have no adapters (removed, B7 loop,
+// 2026-11-07): only the modes' slot 0 (native) calls them; their steps
+// above are the harness's.
 ITC_TYPE67_MODES(82234ED8, Type6Screen0Draw)
 ITC_TYPE67_MODES(82232740, Type6DialogDraw)
 ITC_TYPE67_MODES(822421C0, Type7DialogDraw)

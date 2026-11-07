@@ -2934,8 +2934,21 @@ void ModeInits(Context& h) {
   };
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    // The screen block's words that are stack leftovers: the members' Inits
+    // copy three frame words they never write into each transition's
+    // functor (its +32 to +40; the transitions 48 bytes from the machine's
+    // +0, their count at +9600), dead words; compared on their own
+    // (expected to differ: the original's callees that run recompiled, the
+    // screen block's constructor since its adapter went, leave register
+    // saves and back chains in the stack there that the plain C++ doesn't,
+    // and the plain C++ back chains the originals don't).
+    Results leftovers(fmt::format(
+        "{} (sub_{:08X}), the transitions' stack leftovers (expected to differ)", f.name,
+        f.address));
     for (int c = 0; c < 6; c++) {
       Outputs out[2];
+      std::vector<uint8_t> blocks[2];
+      std::vector<uint32_t> masked[2];  // the leftovers' offsets in the block
       for (int v = 0; v < 2; v++) {
         Random r(uint64_t(c) * 811 + f.address);
         saved.Restore();
@@ -2947,7 +2960,8 @@ void ModeInits(Context& h) {
         WriteRandom(base, mode.address, mode.bytes, r);
         WriteRandom(base, world.address, world.bytes, r);
         WriteRandom(base, t.r1.u32 - 0x1000, 0x1000, r);
-        guest::StoreU32(base, mode.address + 36 + 200, r.Below(8));
+        const uint32_t handlers = r.Below(8);
+        guest::StoreU32(base, mode.address + 36 + 200, handlers);
         const bool held = c % 3 == 2;
         guest::StoreU32(base, t67::kStandHolder, held ? world.address : 0);
         guest::StoreU32(base, scene::kScene, 0);
@@ -2984,14 +2998,33 @@ void ModeInits(Context& h) {
         StandTake take;
         take.Collect(base, held);
         const uint32_t block = guest::LoadU32(base, mode.address + 848);
-        take.Add(base, block, f.block_bytes);
-        if (memory::IsPages(block)) take.AddHeapFrom(base, block, f.block_bytes);
+        const bool block_made = memory::IsPages(block);
+        if (block_made) {
+          take.regions.push_back({block, f.block_bytes});
+          take.AddHeapFrom(base, block, f.block_bytes);
+        }
         // The recorded calls' frames and return addresses: r1 by its offset.
         for (size_t k = 0; k + 5 <= calls.size(); k += 5) {
           if (calls[k] != 0x8209DE48) calls[k + 3] -= t.r1.u32;
         }
         take.TakeCalls(base, calls, out[v]);
         take.TakeBlocks(base, out[v]);
+        out[v].Word(block_made);
+        if (block_made) {
+          blocks[v] = scene_pools_take::Normalized(base, take.regions, block, f.block_bytes);
+          // The machines the slot 0 added to the dispatcher.
+          const uint32_t added = guest::LoadU32(base, mode.address + 36 + 200);
+          for (uint32_t k = handlers; k < added && k < handlers + 16; k++) {
+            const uint32_t machine = guest::LoadU32(base, mode.address + 36 + 4 * k);
+            if (machine < block || machine - block >= f.block_bytes) continue;
+            const uint32_t count = guest::LoadU32(base, machine + game_modes::kTransitionCount);
+            for (uint32_t e = 0; e < count && e < 200; e++) {
+              for (const uint32_t word : {32u, 36u, 40u}) {
+                masked[v].push_back(machine - block + 48 * e + word);
+              }
+            }
+          }
+        }
         out[v].Bytes(scene_pools_take::Normalized(base, take.regions, mode.address, mode.bytes));
         out[v].Bytes(scene_pools_take::Normalized(base, take.regions, world.address,
                                                   world.bytes));
@@ -3007,12 +3040,27 @@ void ModeInits(Context& h) {
         out[v].Word(take.Word(t.r3.u32, t.r1.u32));
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         take.Free();
+        if (block_made) memory::FreePages(block);
         loading.Restore();
         Write(base, kFades, fades.data(), kFadesBytes);
       }
+      Outputs left[2];
+      for (int v = 0; v < 2; v++) {
+        std::vector<uint8_t> kept = blocks[v];
+        out[v].Word(uint32_t(masked[v].size()));
+        for (const uint32_t o : masked[v]) {
+          if (o + 4 > kept.size()) continue;
+          out[v].Word(o);
+          left[v].Bytes(std::vector<uint8_t>(kept.begin() + o, kept.begin() + o + 4));
+          std::fill(kept.begin() + o, kept.begin() + o + 4, 0);
+        }
+        out[v].Bytes(kept);
+      }
       results.Check(out[0], out[1], fmt::format("case {}", c));
+      leftovers.Check(left[0], left[1], fmt::format("case {}", c));
     }
     results.Report();
+    leftovers.Report();
   }
   saved.Restore();
   Write(base, kFades, fades.data(), kFadesBytes);
