@@ -402,7 +402,11 @@ void StoreWords(uint8_t* base, uint32_t block, const WordsAt& w) {
 
 uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
                   const ModeInitCalls& calls) {
-  ITC_NATIVE_RUNNING(type7 ? "sub_82246C90 Type7Mode::Init" : "sub_82236880 Type6Mode::Init");
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_82246C90 Type7Mode::Init");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82236880 Type6Mode::Init");
+  }
   const ModeInitLayout& l = type7 ? kType7Init : kType6Init;
   const uint32_t frame = sp - l.frame;
   StoreU32(base, frame, sp);
