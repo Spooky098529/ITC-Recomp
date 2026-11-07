@@ -7,8 +7,18 @@
 #include "hooks/tuning_screen.h"
 
 #include "base/flags.h"
+#include "front_end_car_draw/front_end_car_draw.h"
+#include "hooks/car_makers.h"
+#include "hooks/front_end_car_draw.h"
+#include "hooks/load_poll.h"
 #include "hooks/stand_models.h"
+#include "load_poll/load_poll.h"
 #include "tuning_screen/tuning_screen.h"
+
+#include <optional>
+
+ITC_FLAG_DECLARE(bool, native_stand_models);
+ITC_FLAG_DECLARE(bool, native_race_setup);
 
 ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Run the tuning screen's functions (docs/functions/tuning-screen.md: the part "
@@ -36,8 +46,14 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "LoopNamed, SetText, ScrollText and sub_8211C5F8 "
               "through their overrides; the lists' "
               "UpdateListDots sub_821EE9B0, ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, "
-              "LayOutItems sub_82203110 and ShowItems sub_82203B00, movies 2's and 13's nodes) natively instead of through the "
-              "translated code (the same writes; checked by --run_harnesses=tuning_screen)");
+              "LayOutItems sub_82203110 and ShowItems sub_82203B00, movies 2's and 13's nodes; the calls onto the "
+              "stand, with the stand's, the car makers' and the front end's car draw's flags "
+              "(else the originals): SetInteriorPair sub_821CCC50, GarageStage::FitSelectedCar "
+              "sub_8217DAC0, PickCameraPreset sub_821D99A0 (its piece sub_821D9B60 merged), "
+              "UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00 and ApplyDecals "
+              "sub_822042D8) natively instead of through the "
+              "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
+              "car_makers)");
 
 namespace hooks {
 
@@ -246,6 +262,76 @@ ITC_TUNING_DISPATCH_STEP(Command30)
 
 #undef ITC_TUNING_DISPATCH_STEP
 
+bool TuningStandCalleesNative() {
+  return ITC_FLAG(native_stand_models) && ITC_FLAG(native_race_setup) &&
+         CarMakersSetCarCalleesNative();
+}
+
+namespace {
+
+// A step onto the stand: the guest calls and the car makers' (with the load
+// poll's), lr put back, flush-to-zero off.
+template <typename Body>
+void WithStand(PPCContext& ctx, uint8_t* base, Body body) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  const ts::GuestCall call = StandModelsGuestCall(ctx, base);
+  const ts::StandCalls stand{call, calls};
+  const uint64_t r3 = body(stand);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
+}
+
+}  // namespace
+
+void TuningSetInteriorPair(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::SetInteriorPair(base, stand.call, r4, r5, sp);
+  });
+}
+
+void TuningFitSelectedCar(PPCContext& ctx, uint8_t* base) {
+  const uint32_t holder = ctx.r3.u32, sp = ctx.r1.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64;
+  double f1 = 0.0;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::FitSelectedCar(base, stand.calls, holder, r4, r5, sp, &f1);
+  });
+  ctx.f1.f64 = f1;
+}
+
+#define ITC_TUNING_STAND_STEP(Name)                                             \
+  void Tuning##Name(PPCContext& ctx, uint8_t* base) {                          \
+    const uint64_t r3 = ctx.r3.u64;                                            \
+    const uint32_t sp = ctx.r1.u32;                                            \
+    WithStand(ctx, base,                                                       \
+              [&](const ts::StandCalls& stand) { return ts::Name(base, stand, r3, sp); }); \
+  }
+
+ITC_TUNING_STAND_STEP(PickCameraPreset)
+ITC_TUNING_STAND_STEP(UpdateBusyIcon)
+ITC_TUNING_STAND_STEP(ApplyDecals)
+
+#undef ITC_TUNING_STAND_STEP
+
+void TuningPreviewWheels(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  std::optional<double> f1;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::PreviewWheels(base, stand.call, r3, sp, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original. HideTireMarks sub_821DFB20
@@ -312,3 +398,22 @@ ITC_TUNING_SCREEN(821D06B0, TuningPlayIntro)
 ITC_TUNING_SCREEN(821D0A48, TuningOpenItems)
 ITC_TUNING_SCREEN(821FF1D0, TuningCommand15)
 ITC_TUNING_SCREEN(82202090, TuningCommand22)
+
+// The calls onto the stand: also the original unless their callees are
+// native.
+#define ITC_TUNING_STAND(address, step)                                      \
+  extern "C" REX_FUNC(sub_##address) {                                       \
+    REX_FUNC_PROLOGUE();                                                     \
+    if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningStandCalleesNative()) { \
+      __imp__sub_##address(ctx, base);                                       \
+      return;                                                                \
+    }                                                                        \
+    hooks::step(ctx, base);                                                  \
+  }
+
+ITC_TUNING_STAND(821CCC50, TuningSetInteriorPair)
+ITC_TUNING_STAND(8217DAC0, TuningFitSelectedCar)
+ITC_TUNING_STAND(821D99A0, TuningPickCameraPreset)
+ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
+ITC_TUNING_STAND(821E0E00, TuningPreviewWheels)
+ITC_TUNING_STAND(822042D8, TuningApplyDecals)

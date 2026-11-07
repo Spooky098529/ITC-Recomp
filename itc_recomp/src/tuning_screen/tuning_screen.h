@@ -14,6 +14,11 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <optional>
+
+namespace front_end_car_draw {
+struct Calls;
+}
 
 namespace tuning_screen {
 
@@ -260,6 +265,58 @@ uint64_t Command15(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // looped, its six words copied as Command23's; text (2, 0)'s scroll reset,
 // string 811, scrolled. 128-byte frame; ScrollText's r3.
 uint64_t Command22(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+
+// --- The calls onto the stand (stand.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the words it
+// stores there; its callees' frames below it as their plain C++ writes them)
+// and r3 as the original leaves it. The stand's holder is [[0x826D83E0]].
+
+// The guest calls (`call`: the UI movies' and the stand's setters', as
+// hooks::StandModelsGuestCall makes them) and the car makers' (`calls`, with
+// the load poll's calls; hooks::FrontEndCarDrawCalls).
+struct StandCalls {
+  const GuestCall& call;
+  const front_end_car_draw::Calls& calls;
+};
+
+// sub_821CCC50 TuningScreen::SetInteriorPair: k = r4 for 0 to 4 (else 0),
+// the word by (k, r5) (its row), then the tail call
+// GarageStage::SetInteriorPair(holder, k, word) from `sp` (its r3).
+uint64_t SetInteriorPair(uint8_t* base, const GuestCall& call, uint64_t r4, uint64_t r5,
+                         uint32_t sp);
+// sub_8217DAC0 GarageStage::FitSelectedCar: SaveData::Of(0)'s selected garage
+// car's bytes +88 and +89 set to r4's and r5's low bytes while a car object
+// made from it at frame + 96 (Car::Init, memcpy, Car::Refresh) is fitted
+// (GarageStage::FitCar), then put back through their conversions (the
+// doublewords at frame + 80 and + 88). 4,048-byte frame; FitCar's r3, `*f1`
+// its f1.
+uint64_t FitSelectedCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t holder,
+                        uint64_t r4, uint64_t r5, uint32_t sp, double* f1);
+// sub_821D99A0 TuningScreen::PickCameraPreset (its case 0 the split piece
+// sub_821D9B60, merged): r3 = the screen (all 64 bits). +25072 by the state,
+// the category and the item (its row), FitSelectedCar and
+// GarageStage::SetWord5016 for some, then GarageStage::Command(holder,
+// +25072) when 0 or more. 112-byte frame.
+uint64_t PickCameraPreset(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821D6100 TuningScreen::UpdateBusyIcon: r3 = the screen (all 64 bits).
+// With the movie +10020 (0 or more): by GarageStage::IsBusy and +10016 the
+// icon's animations started (+10024, +10028 looped) or ended (+10028,
+// +10032). 112-byte frame.
+uint64_t UpdateBusyIcon(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821E0E00 TuningScreen::PreviewWheels: r3 = the screen (all 64 bits).
+// States 16 and 17: the selected garage car's +1944 and +1952 by +25196
+// (its row); states 15 to 17, +25196 0 to 2: TuningScreen::PreviewWheel(the
+// screen, WheelNumber(+25204, +25220), +25196); outside 17 +25244 = 1.
+// 96-byte frame; `*f1` as PreviewWheel leaves it.
+uint64_t PreviewWheels(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp,
+                       std::optional<double>* f1);
+// sub_822042D8 TuningScreen::ApplyDecals: r3 = the screen (all 64 bits). By
+// +10012: 5 and 8 the stand's decals cleared, 6 the selected garage car put
+// on the stand (a car object at frame + 144: Car::Init, memcpy, +3888 |= 1,
+// Car::Refresh, GarageStage::SetCar), 7 the screen's decals set (its row);
+// GarageStage::ReloadDecals after 5, 7 and 8; then +10012 = -1. 4,112-byte
+// frame.
+uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
 
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:

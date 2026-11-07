@@ -13,8 +13,11 @@
 
 #include "harness.h"
 
+#include "base/log.h"
 #include "hooks/car_makers.h"
 #include "hooks/stand_models.h"
+#include "hooks/tuning_screen.h"
+#include "tuning_screen/tuning_screen.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
 
@@ -636,6 +639,39 @@ constexpr uint32_t kModels = 0x12000;    // two scene models, 0x1400 apart
 constexpr uint32_t kOtherRecord = 0x15000;  // a record to copy from
 constexpr uint32_t kScenePointer = 0x826C2E44;
 
+// A movie in `block` (the busy markers' movie 6, and the tuning screen's
+// busy icon's): at +0, its lists set up, its first 128 named animations over
+// a root scene (+0xA000) and one of 8 animations of no tracks (+0xB000).
+// Returns the movie.
+uint32_t LayMarkerMovie(uint8_t* base, uint32_t block, Random& r) {
+  constexpr uint32_t kMovie = 0x0, kRoot = 0xA000, kAnimations = 0xB000;
+  const uint32_t movie = block + kMovie, root = block + kRoot;
+  ui_movies::InitAnimationLists(base, movie);
+  guest::StoreU32(base, movie + 16, root);
+  guest::StoreU32(base, movie + 20, root);
+  guest::StoreU32(base, movie + 24, root);
+  for (uint32_t k = 0; k < 128; k++) {
+    const uint32_t named = movie + 176 + 36 * k;
+    guest::StoreU32(base, named + 28, root);
+    guest::StoreU32(base, named + 32, block + kAnimations + 64 * r.Below(8));
+  }
+  for (uint32_t k = 0; k < 8; k++) {
+    const uint32_t animation = block + kAnimations + 64 * k;
+    for (uint32_t i = 0; i < 64; i += 4) {
+      guest::StoreU32(base, animation + i, 0);
+    }
+    guest::StoreFloat(base, animation + 12, float(r.Below(100)) / 4.0f);
+  }
+  guest::StoreU32(base, root + 100, 0);
+  guest::StoreU32(base, root + 104, 4);
+  guest::StoreU32(base, root + 108, r.Below(4));
+  guest::StoreU32(base, root + 116, 70);
+  for (uint32_t i = 0; i < 94; i++) {
+    guest::StoreU32(base, root + 128 + 8 * i, block + kAnimations + 64 * r.Below(8));
+  }
+  return movie;
+}
+
 void Stand(Context& h, Random& r) {
   const uint32_t allocation = memory::Alloc(kGarageBytes + 16, 0);
   const uint32_t block = (allocation + 15) & ~15u;
@@ -717,7 +753,7 @@ void Stand(Context& h, Random& r) {
     // Movie 6 in the block: its lists set up, its first 128 named
     // animations over a root scene and one of 8 animations of no tracks;
     // the movie table at the one pair {6, the movie} (put back after).
-    constexpr uint32_t kMovie = 0x0, kRoot = 0xA000, kAnimations = 0xB000, kPairs = 0xB400;
+    constexpr uint32_t kPairs = 0xB400;
     const std::vector<uint8_t> table = Read(h.base, ui_movies::kMovieTable, 12);
     for (int which = 0; which < 2; which++) {
       Results results(which == 0 ? "sub_8219ED10 (the busy marker shown)"
@@ -726,30 +762,7 @@ void Stand(Context& h, Random& r) {
         Case(
             h, results, block, r,
             [&](PPCContext&) {
-              const uint32_t movie = block + kMovie, root = block + kRoot;
-              ui_movies::InitAnimationLists(h.base, movie);
-              guest::StoreU32(h.base, movie + 16, root);
-              guest::StoreU32(h.base, movie + 20, root);
-              guest::StoreU32(h.base, movie + 24, root);
-              for (uint32_t k = 0; k < 128; k++) {
-                const uint32_t named = movie + 176 + 36 * k;
-                guest::StoreU32(h.base, named + 28, root);
-                guest::StoreU32(h.base, named + 32, block + kAnimations + 64 * r.Below(8));
-              }
-              for (uint32_t k = 0; k < 8; k++) {
-                const uint32_t animation = block + kAnimations + 64 * k;
-                for (uint32_t i = 0; i < 64; i += 4) {
-                  guest::StoreU32(h.base, animation + i, 0);
-                }
-                guest::StoreFloat(h.base, animation + 12, float(r.Below(100)) / 4.0f);
-              }
-              guest::StoreU32(h.base, root + 100, 0);
-              guest::StoreU32(h.base, root + 104, 4);
-              guest::StoreU32(h.base, root + 108, r.Below(4));
-              guest::StoreU32(h.base, root + 116, 70);
-              for (uint32_t i = 0; i < 94; i++) {
-                guest::StoreU32(h.base, root + 128 + 8 * i, block + kAnimations + 64 * r.Below(8));
-              }
+              const uint32_t movie = LayMarkerMovie(h.base, block, r);
               // Some calls before: the marker already shown or hidden.
               guest::StoreU32(h.base, block + kPairs, 6);
               guest::StoreU32(h.base, block + kPairs + 4, movie);
@@ -806,9 +819,16 @@ void LayGarageList(uint8_t* base, uint32_t block, Random& r) {
 // model's +5100 the pool 5 wheels object (its +28 the first set's wheels),
 // table 73 at the parameters' +8 (its records' +16 and +28 floats, NaNs and
 // infinities among them), the spec's stock record's too, SaveData::Of(0)'s
-// garage list ending at the template car (the car spec's id kCarId).
-void LayWheelWorld(uint8_t* base, uint32_t block, Random& r, int c, bool tires) {
-  LayGarage(base, block, r, c);
+// garage list ending at the template car (the car spec's id kCarId). With
+// `stand_car`, the template car LayStandCar's (what
+// SceneModelRecord::FromCar takes).
+void LayWheelWorld(uint8_t* base, uint32_t block, Random& r, int c, bool tires,
+                   bool stand_car = false) {
+  if (stand_car) {
+    LayStandCar(base, block, r, c, false);
+  } else {
+    LayGarage(base, block, r, c);
+  }
   const uint32_t car = block + kGarageCar, spec = block + kSpec;
   if (tires) {
     for (uint32_t at : {3132u, 3164u, 3168u, 3224u, 3256u, 3260u}) {
@@ -945,6 +965,299 @@ void Wheels(Context& h, Random& r) {
 }
 
 
+// --- The tuning screen's calls onto the stand (tuning_screen/stand.cpp,
+// docs/functions/tuning-screen.md): the wheels' world (LayWheelWorld; for
+// ApplyDecals LayStandCar's car, which GarageStage::SetCar's
+// SceneModelRecord::FromCar takes), the stage's models loading (+5028 1:
+// SceneModel::ApplyRecord stops at its poll) and not ready (+5036 0: the
+// paint, light kit and decal re-applies do nothing), now and then traffic,
+// the garage camera not set up (+112 0: the presets kept at +6088), the
+// screen in a block of its own (its +18904 the save data) and, for
+// UpdateBusyIcon, a movie in another (LayMarkerMovie, the movie table's
+// pair its id), both compared too. The callees run as their adapters run
+// them on both sides; the stage's sizes, the wheel records and the decals'
+// floats compared as floats. ---
+
+constexpr uint32_t kTuningScreenBytes = 0x9400;
+constexpr uint32_t kIconMovieBytes = 0xC000;
+
+void TuningStand(Context& h, Random& r) {
+  if (!hooks::TuningStandCalleesNative()) {
+    ITC_LOG_WARN("harness: car_makers: the tuning screen's stand calls skipped (their callees' "
+                 "plain C++ isn't native)");
+    return;
+  }
+  const uint32_t allocation = memory::Alloc(kGarageBytes + 16, 0);
+  const uint32_t block = (allocation + 15) & ~15u;
+  const uint32_t screen = memory::Alloc(kTuningScreenBytes, 0);
+  const uint32_t movie_block = memory::Alloc(kIconMovieBytes, 0);
+  constexpr uint32_t kPairs = 0xB400;
+  const uint32_t globals[4] = {kScenePointer, kParamsPointer, kHolderPointer, kSaveDataPointer};
+  uint32_t saved[4];
+  for (int i = 0; i < 4; i++) {
+    saved[i] = guest::LoadU32(h.base, globals[i]);
+  }
+  const std::vector<uint8_t> table = Read(h.base, ui_movies::kMovieTable, 12);
+  std::vector<uint8_t> screen_inputs, movie_inputs;
+  const auto before = [&] {
+    guest::StoreU32(h.base, kScenePointer, block + kCarScene);
+    guest::StoreU32(h.base, kHolderPointer, block + kHolderWord);
+    guest::StoreU32(h.base, kSaveDataPointer, block + kSaveData);
+    Write(h.base, screen, screen_inputs.data(), kTuningScreenBytes);
+    Write(h.base, movie_block, movie_inputs.data(), kIconMovieBytes);
+    guest::StoreU32(h.base, ui_movies::kMovieTable, movie_block + kPairs);
+    guest::StoreU32(h.base, ui_movies::kMovieTable + 4, 8);
+    guest::StoreU32(h.base, ui_movies::kMovieTable + 8, 1);
+  };
+  const auto blocks = [&](Outputs& out, const PPCContext&) {
+    out.Bytes(Read(h.base, screen, kTuningScreenBytes));
+    out.Bytes(Read(h.base, movie_block, kIconMovieBytes));
+  };
+  const auto with_f1 = [&](Outputs& out, const PPCContext& t) {
+    blocks(out, t);
+    out.Double(t.f1.u64);
+  };
+  FloatRanges floats = WheelFloats(block);
+  floats.push_back({block + kStage + 6096, 20});
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t model = block + kModels + 0x1400 * i;
+    for (const uint32_t at : {224u, 416u}) {
+      for (uint32_t word = 0; word < 3; word++) {
+        const uint32_t e = model + 64 * word + at;
+        floats.push_back({e + 16, 2});
+        floats.push_back({e + 32, 1});
+        floats.push_back({e + 48, 2});
+      }
+    }
+  }
+  // The world, the screen at random (its save data the world's), the
+  // movie's block at random.
+  const auto lay = [&](int c, bool stand_car) {
+    LayWheelWorld(h.base, block, r, c, false, stand_car);
+    // The garage list walked through distinct nodes (LayGarageList's walk
+    // can come back to a node it relinked, ending on a random slot), the
+    // template car copied to the last one's slot, its paint pick (the
+    // halfword +0, ApplyDecals' GarageStage::SetCar's) -2 to 5.
+    {
+      guest::StoreU16(h.base, block + kGarageCar, uint16_t(int32_t(r.Below(8)) - 2));
+      const uint32_t save = block + kSaveData, nodes = save + 6120;
+      const uint32_t steps = r.Below(4);
+      guest::StoreU32(h.base, save + 0x19920, steps);
+      uint16_t at = uint16_t(r.Below(10));
+      guest::StoreU16(h.base, nodes + 204, at);
+      for (uint32_t i = 0; i < steps; i++) {
+        const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
+        guest::StoreU16(h.base, nodes + 4 * at, next);
+        at = next;
+      }
+      const uint32_t slot = r.Below(3);
+      guest::StoreU16(h.base, nodes + 4 * at + 2, uint16_t(slot));
+      Write(h.base, nodes + 212 + 1968 * slot, Read(h.base, block + kGarageCar, 1884).data(),
+            1884);
+    }
+    const uint32_t scene = block + kCarScene;
+    guest::StoreU32(h.base, scene + 4, 0);
+    for (uint32_t i = 0; i < 2; i++) {
+      const uint32_t model = block + kModels + 0x1400 * i;
+      guest::StoreU32(h.base, model + 5028, 1);
+      guest::StoreU32(h.base, model + 5036, 0);
+      guest::StoreU32(h.base, model + 5116, scene);
+      guest::StoreU32(h.base, model + 32, r.Below(4) == 0 ? 3 : r.Below(3));
+    }
+    guest::StoreU32(h.base, block + kStage + 112, 0);
+    screen_inputs.resize(kTuningScreenBytes);
+    for (uint32_t i = 0; i < kTuningScreenBytes; i += 4) {
+      guest::StoreU32(screen_inputs.data(), i, uint32_t(r.Next()));
+    }
+    guest::StoreU32(screen_inputs.data(), tuning_screen::kSaveData, block + kSaveData);
+    movie_inputs.assign(kIconMovieBytes, 0);
+  };
+  // A screen field (in the inputs).
+  const auto field = [&](uint32_t at, uint32_t value) {
+    guest::StoreU32(screen_inputs.data(), at, value);
+  };
+  const auto byte = [&](uint32_t at, uint32_t value) {
+    screen_inputs[at] = uint8_t(value);
+  };
+  const auto small = [&](uint32_t below) {
+    return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(below);
+  };
+  {
+    Results results("TuningScreen::SetInteriorPair (sub_821CCC50)");
+    for (int c = 0; c < 20; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            t.r3.u64 = r.Next();
+            t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(7);
+            t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(6);
+          },
+          __imp__sub_821CCC50, hooks::TuningSetInteriorPair, 0, floats,
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x1000, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // The top 48 bytes: the original's register saves (r29 to r31, lr, f30,
+    // f31).
+    Results results("GarageStage::FitSelectedCar (sub_8217DAC0)");
+    for (int c = 0; c < 20; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            t.r3.u64 = block + kHolder;
+            t.r4.u64 = r.Below(3) == 0 ? 0 : r.Next();
+            t.r5.u64 = r.Below(3) == 0 ? 0 : r.Next();
+          },
+          __imp__sub_8217DAC0, hooks::TuningFitSelectedCar, 48, floats,
+          fmt::format("case {}", c), 0, 0, before, with_f1, 0x3000, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // The states, categories and items it tests, the wheel sets and the
+    // vinyl's picks small; the garage car's id 14 or 15 now and then (not
+    // where FitSelectedCar refreshes the car from its id). The top 24
+    // bytes: r30, r31 and lr's saves.
+    Results results("TuningScreen::PickCameraPreset (sub_821D99A0)");
+    constexpr uint32_t kStates[] = {3, 4, 62, 5, 6, 7, 8, 15, 16, 17, 19,
+                                    20, 21, 22, 23, 53, 54, 55, 56, 57, 58};
+    for (int c = 0; c < 25; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            const uint32_t state = r.Below(8) == 0 ? r.Below(64) : kStates[r.Below(21)];
+            const uint32_t m = r.Below(8) == 0 ? uint32_t(int32_t(r.Below(9)) - 1) : r.Below(7);
+            field(tuning_screen::kState, state);
+            field(tuning_screen::kCategory, m);
+            byte(tuning_screen::kItem, r.Below(8) == 0 ? r.Below(256) : r.Below(10));
+            field(30492, small(5));
+            field(30724, small(3));
+            field(25196, small(4));
+            // The last pick (left where nothing picks): a preset 14 to 64 or
+            // none, as the picks leave it.
+            field(25072, r.Below(4) == 0 ? 0xFFFFFFFFu : 14 + r.Below(51));
+            if (state != 3 && state != 4 && m != 6 && r.Below(2) == 0) {
+              Write(h.base, screen, screen_inputs.data(), kTuningScreenBytes);
+              const uint32_t c_at = tuning_screen::SelectedGarageCar(h.base, screen);
+              guest::StoreU32(h.base, c_at + 224, 14 + r.Below(2));
+            }
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821D99A0, hooks::TuningPickCameraPreset, 24, floats,
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x3000, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // The icon's movie in its block, the movie table's pair its id (+10020,
+    // now and then -1 or below: nothing); its named animations 0 to 127;
+    // the stand loading (busy), or a loaded traffic model with no body or
+    // wheels (SceneModel::PollLoad 1) and the stage's +4 -1 or not. The top
+    // 24 bytes: r30, r31 and lr's saves.
+    Results results("TuningScreen::UpdateBusyIcon (sub_821D6100)");
+    for (int c = 0; c < 25; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            movie_inputs.assign(kIconMovieBytes, 0);
+            Write(h.base, movie_block, movie_inputs.data(), kIconMovieBytes);
+            const uint32_t movie = LayMarkerMovie(h.base, movie_block, r);
+            const uint32_t id = r.Below(6) == 0 ? uint32_t(-1 - int32_t(r.Below(3))) : r.Below(20);
+            guest::StoreU32(h.base, movie_block + kPairs, id);
+            guest::StoreU32(h.base, movie_block + kPairs + 4, movie);
+            movie_inputs = Read(h.base, movie_block, kIconMovieBytes);
+            field(10020, id);
+            field(10016, r.Below(4) == 0 ? r.Next() : r.Below(2));
+            for (const uint32_t at : {10024u, 10028u, 10032u}) {
+              field(at, r.Below(128));
+            }
+            if (r.Below(2) == 0) {
+              const uint32_t index = guest::LoadU32(h.base, block + kStage + 8);
+              const uint32_t model = block + kModels + 0x1400 * index;
+              for (const uint32_t at : {5028u, 5040u, 5092u, 5100u}) {
+                guest::StoreU32(h.base, model + at, 0);
+              }
+              guest::StoreU32(h.base, model + 32, 3);
+            }
+            guest::StoreU32(h.base, block + kStage + 4,
+                            r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(4));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821D6100, hooks::TuningUpdateBusyIcon, 24, floats,
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x1000, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // The wheel states 15 to 17 mostly, which wheels 0 to 3, the group 0
+    // half the time, the model small. The top 16 bytes: r31 and lr's saves.
+    Results results("TuningScreen::PreviewWheels (sub_821E0E00)");
+    constexpr uint32_t kStates[] = {15, 16, 17, 16, 17, 5};
+    for (int c = 0; c < 25; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            field(tuning_screen::kState, r.Below(8) == 0 ? r.Below(64) : kStates[r.Below(6)]);
+            field(25196, small(4));
+            field(25204, r.Below(2) == 0 ? 0 : r.Below(18));
+            field(25220, r.Below(12));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821E0E00, hooks::TuningPreviewWheels, 16, floats,
+          fmt::format("case {}", c), 0, 0, before, with_f1, 0x5000, kGarageBytes);
+    }
+    results.Report();
+  }
+  {
+    // +10012 5 to 8 mostly; the decals' records' words small or any, their
+    // angles ordinary floats; the edited entry 0 to 3, its set 0 or 1. The
+    // top 56 bytes: r27 to r31, lr and f31's saves.
+    Results results("TuningScreen::ApplyDecals (sub_822042D8)");
+    for (int c = 0; c < 25; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const uint32_t kind = r.Below(8) == 0 ? r.Below(12) : 5 + r.Below(4);
+            lay(c, kind == 6);
+            field(10012, kind);
+            for (uint32_t k = 0; k < 6; k++) {
+              const uint32_t e = 31024 + 24 * k;
+              field(e + 0, uint32_t(int32_t(r.Below(1000)) - 500));
+              field(e + 4, uint32_t(int32_t(r.Below(1000)) - 500));
+              field(e + 8, RandomFloat(r));
+              field(e + 12, RandomFloat(r));
+              field(e + 16, small(4));
+              field(31192 + 4 * k, r.Below(3) == 0 ? 0xFFFFFFFFu : small(30));
+            }
+            field(30732, r.Below(4));
+            field(30724, r.Below(4) == 0 ? r.Next() : r.Below(2));
+            field(30832, uint32_t(int32_t(r.Below(1000)) - 500));
+            field(30836, uint32_t(int32_t(r.Below(1000)) - 500));
+            field(30840, RandomFloat(r));
+            field(30844, RandomFloat(r));
+            field(30848, small(4));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_822042D8, hooks::TuningApplyDecals, 56, floats,
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x5000, kGarageBytes);
+    }
+    results.Report();
+  }
+  for (int i = 0; i < 4; i++) {
+    guest::StoreU32(h.base, globals[i], saved[i]);
+  }
+  Write(h.base, ui_movies::kMovieTable, table.data(), 12);
+  memory::Free(movie_block);
+  memory::Free(screen);
+  memory::Free(allocation);
+}
+
 // --- GarageStage::ReloadModel: a block holding the car scene ([0x826C2E44]
 // pointed at it; its +4 0: no sound loads; a teardown counting down or
 // running, its accessory skipped (+5048 1)), its pool 7 list one scene model
@@ -1034,6 +1347,7 @@ void CarMakers(Context& h) {
   Garage(h, r);
   Stand(h, r);
   Wheels(h, r);
+  TuningStand(h, r);
   Reloads(h);
 }
 

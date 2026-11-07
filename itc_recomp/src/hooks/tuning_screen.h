@@ -78,6 +78,21 @@ void TuningOpenItems(PPCContext& ctx, uint8_t* base);
 void TuningCommand15(PPCContext& ctx, uint8_t* base);
 void TuningCommand22(PPCContext& ctx, uint8_t* base);
 
+// The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
+// with TuningStandCalleesNative: --native_stand_models, --native_race_setup
+// and CarMakersSetCarCalleesNative): SetInteriorPair sub_821CCC50 (r4 a
+// choice, r5 a level), GarageStage::FitSelectedCar sub_8217DAC0 (r3 the
+// holder, r4, r5 two bytes; f1 FitCar's), PickCameraPreset sub_821D99A0,
+// UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00 (f1 as
+// PreviewWheel leaves it) and ApplyDecals sub_822042D8 (r3 the screen).
+bool TuningStandCalleesNative();
+void TuningSetInteriorPair(PPCContext& ctx, uint8_t* base);
+void TuningFitSelectedCar(PPCContext& ctx, uint8_t* base);
+void TuningPickCameraPreset(PPCContext& ctx, uint8_t* base);
+void TuningUpdateBusyIcon(PPCContext& ctx, uint8_t* base);
+void TuningPreviewWheels(PPCContext& ctx, uint8_t* base);
+void TuningApplyDecals(PPCContext& ctx, uint8_t* base);
+
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
 // DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,
