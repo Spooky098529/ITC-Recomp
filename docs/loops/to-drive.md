@@ -47,6 +47,16 @@ here loses its heading.
   TuningScreen::SaveAreaDecals, `sub_821F8598` TuningScreen::StoreStickers,
   `sub_821F84C8` TuningScreen::GarageDecal, `sub_821FE798`
   DecalImages::SwapKept, `sub_821CD498` TuningScreen::MarkOwned.
+- The tuning pages' third migration (attract race `itc_4330`, replay
+  `itc_4331` ok; `tuning-pages.md`): `sub_821D8160`
+  TuningScreen::InputOptions, `sub_821D5610` TuningScreen::MoveOption,
+  `sub_821F6688` TuningScreen::InputWheels, `sub_821F60E0`
+  TuningScreen::AnimateWheels, `sub_821F40B8`
+  TuningScreen::FillPartRowsRight, `sub_821F4768`
+  TuningScreen::FillPartRowsLeft (and, from the earlier migrations,
+  still: `SetEditorLimits`, `LoadVinyls`, `LoadPageLayouts`,
+  `LoadDecalImages`, `ShowPricePanel`, `SetWheelListEnd`, `InchListEnd`,
+  `SetBrandLogo`, their adapters now removed).
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

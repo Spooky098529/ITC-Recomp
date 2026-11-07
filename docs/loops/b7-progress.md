@@ -54,7 +54,10 @@ file's history. What's left to see in a drive, from every run:
   harnesses 0 differing; six subagents, one at a time); left:
   `InputTypes` `sub_821D74A0` with `MoveType` (1,766 lines); six
   removable adapters in `tuning-screen.md` (a cleanup lead added).
-  Validation agent running.
+  Validated `itc_4330` (race 90 s at 180, the harnesses ~88 s; 0
+  errors, every harness 0 differing, 23 of 23 harness lines; none in
+  the race, 9 in the replay `itc_4331` (ok), 14 to drive). Fourth
+  migration agent running (`InputTypes` with `MoveType`).
 
 ## Done
 
