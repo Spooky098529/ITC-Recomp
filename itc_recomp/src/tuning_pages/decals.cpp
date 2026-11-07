@@ -4,13 +4,25 @@
 #include "tuning_pages/tuning_pages.h"
 
 #include "base/log.h"
+#include "car_models/tga.h"
+#include "car_models/vinyl.h"
+#include "graphics/resources.h"
 #include "guest.h"
+#include "memory/heap.h"
 #include "mode_tick/mode_tick.h"
+#include "native/buffers.h"
 #include "tuning_screen/tuning_screen.h"
 
 namespace tuning_pages {
 
 namespace {
+
+constexpr uint32_t kTgaCreateImage = 0x820ED020;
+constexpr uint32_t kResourceRelease = 0x822A67B0;
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kVirtualFree = 0x82295330;
+constexpr uint32_t kTextureFree = 0x820ECFC8;
+constexpr uint32_t kTextureFromTga = 0x820ED528;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -37,6 +49,17 @@ uint32_t RestoreTexture(uint8_t* base, uint32_t images, uint32_t id, uint32_t pl
   const uint32_t value = Load(base, images + placeholder);
   SetMovieTexture(base, Load(base, entry), n, value);
   return entry;
+}
+
+// VirtualFree(address, 0, MEM_RELEASE) as its adapter answers it for the
+// layer's range (the native heap active: the callers' condition), else the
+// guest's from `frame` with return address `lr`.
+uint64_t VirtualFree(const tuning_screen::GuestCall& call, uint32_t address, uint32_t frame,
+                     uint32_t lr) {
+  if (memory::InRange(address)) {
+    return memory::FreePages(address) ? 1 : 0;
+  }
+  return call(kVirtualFree, {address, 0, 0x8000}, frame, lr);
 }
 
 constexpr uint32_t kFadeIn = 0x826A50DC;   // layer 0's fade-in count
@@ -240,6 +263,117 @@ uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp) {
     SetUpVinylBusyIcon(base, s);
   }
   return screen;
+}
+
+std::optional<uint64_t> TextureFromTga(uint8_t* base, const tuning_screen::GuestCall& call,
+                                       uint32_t file, uint32_t size, uint32_t header_out,
+                                       uint32_t data_out, uint32_t sp) {
+  if (!native::Buffers_NativeMemcpy()) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_820ED528 Texture::FromTga");
+  const uint32_t f = Frame(base, sp, 160);
+  Store(base, f + 180, file);  // into the caller's frame, as the original
+  car_models::TgaHeaderClear(base, f + 96);
+  Store(base, f + 80, 0);
+  if (!car_models::TgaCreateImage(base, f + 96, size, f + 180, f + 80, f)) {
+    call(kTgaCreateImage, {f + 96, size, f + 180, f + 80}, f, 0x820ED568);
+  }
+  car_models::TextureCreate(base, car_models::kSheetFormat, guest::LoadU16(base, f + 110),
+                            guest::LoadU16(base, f + 112), header_out, data_out, f);
+  const uint32_t surface = graphics::GetSurfaceLevel(base, Load(base, header_out), 0);
+  graphics::LockSurfaceRect(base, surface, f + 88, 0, 0);
+  const uint32_t pitch = Load(base, f + 88);
+  graphics::UnlockSurface(base, surface);
+  call(kResourceRelease, {surface}, f, 0x820ED5B8);
+  // The rows, written straight into the texture's data after the unlock.
+  uint32_t to = Load(base, data_out);
+  uint32_t from = Load(base, f + 80);
+  for (int32_t y = 0; y < int32_t(guest::LoadU16(base, f + 112)); y++) {
+    const uint32_t row = uint32_t(guest::LoadU16(base, f + 110)) << 2;
+    if (!native::Buffers_Memcpy(base, to, from, row, 0x820ED5E8)) {
+      call(kMemcpy, {to, from, row}, f, 0x820ED5E8);
+    }
+    to += pitch & ~3u;
+    from += row;
+  }
+  VirtualFree(call, Load(base, f + 80), f, 0x820ED61C);
+  // The empty sub_82106540(f + 96) left out.
+  return uint64_t(f) + 96;
+}
+
+uint64_t UpdateImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                      uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FE628 DecalImages::Update");
+  const uint32_t f = Frame(base, sp, 112);
+  uint64_t r3 = images;
+  for (uint32_t i = 0; i < 200; i++) {
+    const uint32_t e = uint32_t(images) + 36 * i;
+    if (Load(base, e + 20) == 0 || int32_t(Load(base, e + 8)) != 2) {
+      continue;
+    }
+    const uint32_t file = Load(base, e + 12), size = Load(base, e + 16);
+    if (const auto made = TextureFromTga(base, call, file, size, e + 28, e + 32, f)) {
+      r3 = *made;
+    } else {
+      r3 = call(kTextureFromTga, {file, size, e + 28, e + 32}, f, 0x821FE670);
+    }
+    Store(base, e + 20, 0);
+  }
+  return r3;
+}
+
+uint64_t Unload(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images, uint64_t i,
+                uint32_t sp, bool native_free) {
+  ITC_NATIVE_RUNNING("sub_821FEA68 DecalImages::Unload");
+  const uint32_t f = Frame(base, sp, 112);
+  const uint32_t e = uint32_t(i * 36 + images);
+  if (int32_t(Load(base, e + 8)) != 2) {
+    return images;
+  }
+  Store(base, e + 0, 0xFFFFFFFFu);
+  Store(base, e + 4, 0);
+  Store(base, e + 8, 0);
+  // FreeTexture's tail call Texture::Free runs from this frame, returning
+  // here.
+  FreeTexture(base, images, i, [&](uint32_t header_in, uint32_t data_in) -> uint64_t {
+    if (native_free && car_models::TextureFreeable(base, header_in)) {
+      return car_models::TextureFree(base, header_in, data_in);
+    }
+    return call(kTextureFree, {header_in, data_in}, f, 0x821FEAA8);
+  });
+  const uint32_t file = Load(base, e + 12);
+  Store(base, e + 28, 0);
+  Store(base, e + 32, 0);
+  const uint64_t r3 = VirtualFree(call, file, f, 0x821FEAC4);
+  Store(base, e + 12, 0);
+  Store(base, e + 16, 0);
+  Store(base, e + 20, 0);
+  Store(base, e + 24, 0);
+  return r3;
+}
+
+uint64_t UnloadAll(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                   uint32_t sp, bool native_free) {
+  ITC_NATIVE_RUNNING("sub_82208738 DecalImages::UnloadAll");
+  const uint32_t f = Frame(base, sp, 112);
+  uint64_t r3 = RestoreVinylMovie(base, images, f);
+  r3 = RestoreStickerMovie(base, images, f);
+  for (uint64_t i = 0; i < 200; i++) {
+    r3 = Unload(base, call, images, i, f, native_free);
+  }
+  for (uint32_t k = 0; k < 200; k++) {
+    const uint32_t kept = uint32_t(images) + 7236 + 8 * k;
+    if (Load(base, kept) == 0 || Load(base, kept + 4) == 0) {
+      continue;
+    }
+    if (native_free && car_models::TextureFreeable(base, kept)) {
+      r3 = car_models::TextureFree(base, kept, kept + 4);
+    } else {
+      r3 = call(kTextureFree, {kept, kept + 4}, f, 0x822087A4);
+    }
+  }
+  return r3;
 }
 
 }  // namespace tuning_pages

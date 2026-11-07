@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 
 #include "tuning_screen/tuning_screen.h"
 
@@ -121,6 +122,44 @@ uint64_t BindVinylTextures(uint8_t* base, uint64_t screen, uint32_t sp);
 // the queue to state 23 (command 15, SetUpVinylBusyIcon) or 38 (command 32).
 // 96-byte frame; r3 the screen, AllLoaded's 0 or FadeIn's (the passes).
 uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp);
+
+// --- The decal images' update and unload (decals.cpp) ---
+// They allocate and free (the allocation layer's pages and physical
+// blocks), so the adapters run them only while the native heap is active
+// (hooks::NativeHeapActive()). Guest calls through `call` (from the
+// original's frame, with its return address): TGA::CreateImage where its
+// plain C++ declines, Resource::Release, memcpy where Buffers_Memcpy
+// declines, VirtualFree outside the layer's range, Texture::Free where
+// car_models' plain C++ isn't taken, Texture::FromTga where it declines.
+
+// sub_820ED528 Texture::FromTga: the TGA file `file` (`size` bytes) into a
+// new A8R8G8B8 texture (Texture::Create into `header_out` and `data_out`),
+// its rows copied at the level's pitch, the pixels freed. 160-byte frame
+// (`file` stored at frame + 180, the caller's sp + 20, and passed as the
+// buffer's address; the header at frame + 96, the pixels at + 80, the pitch
+// at + 88). r3 frame + 96 (the empty sub_82106540's argument); nullopt,
+// with nothing done, where memcpy isn't native (Buffers_NativeMemcpy).
+std::optional<uint64_t> TextureFromTga(uint8_t* base, const tuning_screen::GuestCall& call,
+                                       uint32_t file, uint32_t size, uint32_t header_out,
+                                       uint32_t data_out, uint32_t sp);
+// sub_821FE628 DecalImages::Update: each entry with +20 set and +8 2 made a
+// texture (Texture::FromTga(+12, +16, e + 28, e + 32)), then +20 = 0.
+// 112-byte frame; r3 the last FromTga's, else `images` (all 64 bits).
+uint64_t UpdateImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                      uint32_t sp);
+// sub_821FEA68 DecalImages::Unload: entry i (not checked), when loaded
+// (+8 2): +0 = -1, +4 = +8 = 0, FreeTexture, +28 = +32 = 0, its file freed
+// (VirtualFree(+12, 0, MEM_RELEASE)), +12 to +24 = 0. 112-byte frame; r3
+// VirtualFree's, else `images`. `native_free` Texture::Free by car_models'
+// plain C++ (--native_car_models) where TextureFreeable.
+uint64_t Unload(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images, uint64_t i,
+                uint32_t sp, bool native_free);
+// sub_82208738 DecalImages::UnloadAll: RestoreVinylMovie, RestoreStickerMovie,
+// Unload for the 200 entries, then Texture::Free(&header, &data) for each
+// kept texture (images + 7236 + 8k) whose words are both set. 112-byte
+// frame; r3 the last call's.
+uint64_t UnloadAll(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                   uint32_t sp, bool native_free);
 
 // --- The vinyls' records (vinyls.cpp; flush-to-zero off) ---
 

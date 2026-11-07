@@ -30,7 +30,11 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "RestoreStickerTexture sub_821F89B8, BindVinylTexture sub_82204730, "
               "BindVinylTextures sub_82203D40, EnterEditor sub_821D84F8 (FadeIn's plain C++), "
               "RestoreMovieTexture sub_822081A0, RestoreVinylMovie sub_822081D8 and "
-              "RestoreStickerMovie sub_821F6DD8; the "
+              "RestoreStickerMovie sub_821F6DD8; with the native heap DecalImages::Update "
+              "sub_821FE628 (Texture::FromTga sub_820ED528 under it, no adapter: TGA::CreateImage, "
+              "Texture::Create and the surface calls by their plain C++, Resource::Release a guest "
+              "call) and DecalImages::UnloadAll sub_82208738 (DecalImages::Unload sub_821FEA68 "
+              "under it, no adapter; Texture::Free by its plain C++ with --native_car_models); the "
               "vinyls' records StoreVinyls sub_82203F20 and LoadVinyls sub_822040A8 (memcpy's plain "
               "C++ where Buffers_Memcpy takes it); ShowPricePanel sub_821D9E68, SetBrandLogo "
               "sub_821EED98 (its piece sub_821EEE14 merged), movie 2's nodes through the UI "
@@ -207,6 +211,31 @@ void TuningPagesSetCurrentChoice(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesUpdateImages(PPCContext& ctx, uint8_t* base) {
+  if (!NativeHeapActive()) {
+    __imp__sub_821FE628(ctx, base);
+    return;
+  }
+  const uint64_t images = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::UpdateImages(base, call, images, sp);
+  });
+}
+
+void TuningPagesUnloadAll(PPCContext& ctx, uint8_t* base) {
+  if (!NativeHeapActive()) {
+    __imp__sub_82208738(ctx, base);
+    return;
+  }
+  const uint64_t images = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_free = ITC_FLAG(native_car_models);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::UnloadAll(base, call, images, sp, native_free);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -244,6 +273,9 @@ ITC_TUNING_PAGES(822040A8, TuningPagesLoadVinyls)
 ITC_TUNING_PAGES(821D9E68, TuningPagesShowPricePanel)
 ITC_TUNING_PAGES(821EED98, TuningPagesSetBrandLogo)
 ITC_TUNING_PAGES(8224AB50, TuningPagesHsvToRgb)
+
+ITC_TUNING_PAGES(821FE628, TuningPagesUpdateImages)
+ITC_TUNING_PAGES(82208738, TuningPagesUnloadAll)
 
 ITC_TUNING_PAGES(821DE160, TuningPagesSetAeroAvailability)
 ITC_TUNING_PAGES(821E1DB0, TuningPagesSetCurrentChoice)

@@ -16,12 +16,15 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_models/vinyl.h"
+#include "graphics/resources.h"
 #include "hooks/tuning_pages.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <string>
@@ -413,6 +416,330 @@ void FreeTextures(Context& h, const World& w) {
   results.Report();
 }
 
+// Allocations (whose addresses differ between the two runs) compared as
+// which one and where in it.
+struct Known {
+  uint32_t address;
+  uint32_t bytes;
+};
+
+void Address(Outputs& out, uint32_t value, const std::vector<Known>& known) {
+  for (uint32_t i = 0; i < known.size(); i++) {
+    if (known[i].address != 0 && value - known[i].address < known[i].bytes) {
+      out.Word(1 + i);
+      out.Word(value - known[i].address);
+      return;
+    }
+  }
+  out.Word(0);
+  out.Word(value);
+}
+
+void Addresses(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
+               const std::vector<Known>& known) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    Address(out, guest::LoadU32(base, address + i), known);
+  }
+}
+
+// A texture's data bytes as Texture::Create sizes it.
+uint32_t TextureBytes(uint8_t* base, uint32_t width, uint32_t height) {
+  return graphics::XGSetTextureHeader(base, width, height, 1, 2, car_models::kSheetFormat, 0, 0, 0,
+                                      0, 0, 0);
+}
+
+// A TGA file as the archive gives it (the layer's pages): uncompressed 24-
+// or 32-bit, `w` x `hh`, its other header bytes and pixels random (as
+// car_models' harness makes them).
+uint32_t MakeTga(uint8_t* base, uint32_t w, uint32_t hh, uint32_t bits, Random& r,
+                 uint32_t* size) {
+  *size = 18 + w * hh * (bits / 8);
+  const uint32_t buffer = memory::AllocPages(*size, 4096);
+  WriteRandom(base, buffer, (*size + 3) & ~3u, r);
+  guest::StoreU8(base, buffer + 2, 2);
+  guest::StoreU8(base, buffer + 12, uint8_t(w));
+  guest::StoreU8(base, buffer + 13, uint8_t(w >> 8));
+  guest::StoreU8(base, buffer + 14, uint8_t(hh));
+  guest::StoreU8(base, buffer + 15, uint8_t(hh >> 8));
+  guest::StoreU8(base, buffer + 16, uint8_t(bits));
+  return buffer;
+}
+
+void ZeroHoles(uint8_t* base, uint32_t sp, const Holes& holes) {
+  for (const auto& [from, to] : holes) {
+    for (uint32_t a = sp - to; a < sp - from; a++) {
+      guest::StoreU8(base, a, 0);
+    }
+  }
+}
+
+// DecalImages::Update (with Texture::FromTga under it): 0 to 4 entries
+// loaded with +20 set (real TGA files, 1 to 48 pixels a side, 24 or 32
+// bits, made once a case and shared by both runs), the others with +20 0,
+// or +8 not 2 (now and then any word), or both. The textures made on each
+// side (headers of the layer's pages, physical data) and the last call's
+// pixels compared as tokens, then freed; the screen's block, the textures'
+// headers and data bytes, the stack (but for the saves: Update's r30, r31
+// and lr 24 bytes, FromTga's __savegprlr_28 40 bytes below its frame,
+// Resource::Release's r31 below FromTga's), the caller's area, r1 and r3.
+void UpdateCases(Context& h, const World& w) {
+  Results results("DecalImages::Update");
+  const Holes holes = {{112, 152}, {280, 288}};
+  for (int c = 0; c < 30; c++) {
+    Random& g = h.random;
+    struct Live {
+      uint32_t entry, file, size, width, height;
+    };
+    std::vector<Live> live;
+    const uint32_t count = c < 3 ? 0 : g.Below(5);
+    for (uint32_t k = 0; k < count; k++) {
+      uint32_t entry = g.Below(200);
+      bool taken = false;
+      for (const Live& l : live) taken |= l.entry == entry;
+      if (taken) continue;
+      Live l{entry, 0, 0, 1 + g.Below(48), 1 + g.Below(48)};
+      l.file = MakeTga(h.base, l.width, l.height, g.Below(2) ? 32 : 24, g, &l.size);
+      live.push_back(l);
+    }
+    const uint64_t seed = g.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
+      WriteRandom(h.base, w.screen_block.address, w.screen_block.bytes, r);
+      const uint32_t images = w.screen() + 10048;
+      for (uint32_t i = 0; i < 200; i++) {
+        const uint32_t e = images + 36 * i;
+        const uint32_t pick = r.Below(3);
+        if (pick != 1) {
+          guest::StoreU32(h.base, e + 20, 0);
+        }
+        if (pick != 0) {
+          uint32_t state = Around(r, -1, 3);
+          guest::StoreU32(h.base, e + 8, state == 2 ? 3 : state);
+        }
+        if (pick == 2 && r.Below(2) == 0) {
+          guest::StoreU32(h.base, e + 8, 2);
+        }
+      }
+      for (const Live& l : live) {
+        const uint32_t e = images + 36 * l.entry;
+        guest::StoreU32(h.base, e + 8, 2);
+        guest::StoreU32(h.base, e + 20, uint32_t(r.Next()) | 1);
+        guest::StoreU32(h.base, e + 12, l.file);
+        guest::StoreU32(h.base, e + 16, l.size);
+      }
+      t.r3.u64 = images;
+      if (r.Below(6) == 0) {
+        t.r3.u64 |= r.Next() << 32;
+      }
+      t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_tuning_pages);
+        ITC_FLAG(native_tuning_pages) = false;
+        __imp__sub_821FE628(t, h.base);
+        ITC_FLAG(native_tuning_pages) = flag;
+      } else {
+        hooks::TuningPagesUpdateImages(t, h.base);
+      }
+      ZeroHoles(h.base, sp, holes);
+      std::vector<Known> known;
+      std::vector<std::pair<uint32_t, uint32_t>> made;
+      for (const Live& l : live) {
+        const uint32_t e = images + 36 * l.entry;
+        const uint32_t header = guest::LoadU32(h.base, e + 28);
+        const uint32_t data = guest::LoadU32(h.base, e + 32);
+        const uint32_t bytes = TextureBytes(h.base, l.width, l.height);
+        known.push_back({header, 52});
+        known.push_back({data, bytes});
+        known.push_back({data - 0x40000000u, bytes});
+        known.push_back({data + 0x40000000u, bytes});
+        made.push_back({header, data});
+      }
+      // The last call's pixels (freed), at FromTga's frame + 80.
+      if (!live.empty()) {
+        const uint32_t pixels = guest::LoadU32(h.base, sp - 112 - 160 + 80);
+        const Live& last = *std::max_element(
+            live.begin(), live.end(), [](const Live& a, const Live& b) { return a.entry < b.entry; });
+        known.push_back({pixels, last.width * last.height * 4});
+      }
+      Addresses(out[v], h.base, w.screen_block.address, w.screen_block.bytes, known);
+      for (size_t k = 0; k < live.size(); k++) {
+        Addresses(out[v], h.base, made[k].first, 52, known);
+        out[v].Bytes(Read(h.base, made[k].second, TextureBytes(h.base, live[k].width,
+                                                               live[k].height)));
+      }
+      Addresses(out[v], h.base, sp - kStackBytes, kStackBytes - 24, known);
+      Addresses(out[v], h.base, sp, kCallerBytes, known);
+      out[v].Word(t.r1.u32);
+      Address(out[v], t.r3.u32, known);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (const auto& [header, data] : made) {
+        const bool alive = memory::IsPages(header);
+        out[v].Word(alive);
+        if (alive) memory::FreePages(header);
+        memory::FreePhysical(data);
+      }
+      for (const Live& l : live) {
+        out[v].Word(memory::IsPages(l.file));
+      }
+    }
+    for (const Live& l : live) {
+      if (memory::IsPages(l.file)) memory::FreePages(l.file);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({} made)", c, live.size()));
+  }
+  results.Report();
+}
+
+// DecalImages::UnloadAll (with DecalImages::Unload under it, and the
+// restores and FreeTexture before it): a quarter of the entries loaded (+8
+// 2) with a real file buffer (the layer's pages) and a texture of their own
+// (a real header, and real physical data or 0; or none), a kept texture's
+// (whose slot frees it) or, for entries 33 to 50, another of those
+// entries'; the others in another state with random words. The kept
+// textures 0 and a random word (one of them 0), or real ones. The movies'
+// world as the restores' cases. The allocations compared as tokens, and
+// whether each is still alive (the pages by the layer, the physical data by
+// a word still holding it), then freed. The stack but for the saves: the
+// restores' and Unload's (112 to 144 below, RestoreStickerMovie's callees'
+// 208 to 264 and 320 to 344), UnloadAll's own 24 bytes.
+void UnloadAllCases(Context& h, const World& w) {
+  Results results("DecalImages::UnloadAll");
+  const Holes holes = {{112, 144}, {208, 264}, {320, 344}};
+  for (int c = 0; c < 30; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      std::vector<std::vector<uint8_t>> saved;
+      for (const Global& g : kGlobals) {
+        saved.push_back(Read(h.base, g.address, g.bytes));
+      }
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
+      WriteRandom(h.base, w.screen_block.address, w.screen_block.bytes, r);
+      WriteRandom(h.base, w.movie.address, w.movie.bytes, r);
+      ShapeMovie(h.base, w, r);
+      const uint32_t images = w.screen() + 10048;
+      std::vector<Known> known;
+      std::vector<uint32_t> pages, physical;
+      auto page = [&](uint32_t bytes) {
+        const uint32_t a = memory::AllocPages(bytes, 4096);
+        pages.push_back(a);
+        known.push_back({a, bytes});
+        return a;
+      };
+      auto data = [&]() {
+        const uint32_t a = memory::AllocPhysical(0x1000, 0, 0xFFFFFFFF, 0, 0x404);
+        physical.push_back(a);
+        known.push_back({a, 0x1000});
+        return a;
+      };
+      // The kept textures: one word 0, or both real (a tenth of them).
+      bool kept_used[200] = {};
+      for (uint32_t k = 0; k < 200; k++) {
+        const uint32_t kept = images + 7236 + 8 * k;
+        if (r.Below(10) == 0) {
+          guest::StoreU32(h.base, kept, page(52));
+          guest::StoreU32(h.base, kept + 4, data());
+          kept_used[k] = true;
+        } else {
+          const uint32_t zero = r.Below(3);
+          if (zero != 1) guest::StoreU32(h.base, kept, 0);
+          if (zero != 0) guest::StoreU32(h.base, kept + 4, 0);
+        }
+      }
+      bool loaded[200], assigned[200] = {};
+      for (uint32_t i = 0; i < 200; i++) {
+        loaded[i] = r.Below(4) == 0;
+        const uint32_t e = images + 36 * i;
+        if (!loaded[i]) {
+          const uint32_t state = Around(r, -1, 3);
+          guest::StoreU32(h.base, e + 8, state == 2 ? 1 : state);
+        } else {
+          guest::StoreU32(h.base, e + 8, 2);
+          guest::StoreU32(h.base, e + 12, page(1 + r.Below(8192)));
+        }
+      }
+      for (uint32_t i = 0; i < 200; i++) {
+        if (!loaded[i] || assigned[i]) continue;
+        const uint32_t e = images + 36 * i;
+        const uint32_t mode = r.Below(4);
+        uint32_t header = 0, physical_data = 0;
+        if (mode == 1 || (mode == 3 && (i < 33 || i > 50))) {
+          header = page(52);
+          physical_data = r.Below(4) == 0 ? 0 : data();
+        } else if (mode == 2) {
+          uint32_t k = r.Below(200);
+          while (kept_used[k]) k = (k + 1) % 200;
+          kept_used[k] = true;
+          header = page(52);
+          physical_data = r.Below(4) == 0 ? 0 : data();
+          guest::StoreU32(h.base, images + 7236 + 8 * k, header);
+          guest::StoreU32(h.base, images + 7236 + 8 * k + 4, physical_data);
+        } else if (mode == 3) {
+          header = page(52);
+          physical_data = r.Below(4) == 0 ? 0 : data();
+          uint32_t j = 33 + r.Below(18);
+          if (j == i) j = j == 50 ? 33 : j + 1;
+          // Only an entry not yet given a texture (after this one).
+          if (j > i && !assigned[j]) {
+            assigned[j] = true;
+            guest::StoreU32(h.base, images + 36 * j + 28, header);
+            guest::StoreU32(h.base, images + 36 * j + 32, physical_data);
+          }
+        }
+        guest::StoreU32(h.base, e + 28, header);
+        guest::StoreU32(h.base, e + 32, physical_data);
+      }
+      t.r3.u64 = images;
+      if (r.Below(6) == 0) {
+        t.r3.u64 |= r.Next() << 32;
+      }
+      t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_tuning_pages);
+        ITC_FLAG(native_tuning_pages) = false;
+        __imp__sub_82208738(t, h.base);
+        ITC_FLAG(native_tuning_pages) = flag;
+      } else {
+        hooks::TuningPagesUnloadAll(t, h.base);
+      }
+      ZeroHoles(h.base, sp, holes);
+      Addresses(out[v], h.base, w.screen_block.address, w.screen_block.bytes, known);
+      out[v].Bytes(Read(h.base, w.movie.address, w.movie.bytes));
+      for (size_t i = 0; i < saved.size(); i++) {
+        out[v].Bytes(Read(h.base, kGlobals[i].address, kGlobals[i].bytes));
+        Write(h.base, kGlobals[i].address, saved[i].data(), kGlobals[i].bytes);
+      }
+      Addresses(out[v], h.base, sp - kStackBytes, kStackBytes - 24, known);
+      Addresses(out[v], h.base, sp, kCallerBytes, known);
+      out[v].Word(t.r1.u32);
+      Address(out[v], t.r3.u32, known);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (const uint32_t a : pages) {
+        const bool alive = memory::IsPages(a);
+        out[v].Word(alive);
+        if (alive) memory::FreePages(a);
+      }
+      for (const uint32_t a : physical) {
+        bool alive = false;
+        for (uint32_t at = images; at < images + 8836; at += 4) {
+          alive |= guest::LoadU32(h.base, at) == a;
+        }
+        out[v].Word(alive);
+        if (alive) memory::FreePhysical(a);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void TuningPages(Context& h) {
@@ -487,6 +814,9 @@ void TuningPages(Context& h) {
   // __savegprlr_29's 32, r31 and lr's 16). r3 the images (now and then with
   // upper bits), the textures 0 to 199 (the movie's table).
   FreeTextures(h, w);
+  // The update and the unload (allocating, as FreeTexture's cases).
+  UpdateCases(h, w);
+  UnloadAllCases(h, w);
 
   // Movie 2's nodes (r30, r31 and lr's saves 24 bytes; r31 and lr's 16).
   Group(

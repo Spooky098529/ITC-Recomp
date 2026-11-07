@@ -53,6 +53,12 @@ void TuningPagesEnterEditor(PPCContext& ctx, uint8_t* base);
 void TuningPagesRestoreMovieTexture(PPCContext& ctx, uint8_t* base);
 void TuningPagesRestoreVinylMovie(PPCContext& ctx, uint8_t* base);
 void TuningPagesRestoreStickerMovie(PPCContext& ctx, uint8_t* base);
+// With the native heap active (else the originals): DecalImages::Update
+// sub_821FE628 (Texture::FromTga sub_820ED528 under it) and UnloadAll
+// sub_82208738 (DecalImages::Unload sub_821FEA68 under it; Texture::Free by
+// car_models' plain C++ with --native_car_models), r3 the images.
+void TuningPagesUpdateImages(PPCContext& ctx, uint8_t* base);
+void TuningPagesUnloadAll(PPCContext& ctx, uint8_t* base);
 
 // The vinyls' records (r3 = the screen; flush-to-zero off): StoreVinyls
 // sub_82203F20, LoadVinyls sub_822040A8 (memcpy through the guest where
