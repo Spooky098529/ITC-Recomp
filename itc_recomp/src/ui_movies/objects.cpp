@@ -502,6 +502,87 @@ std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::Forma
   return movie + kMovieTexts;
 }
 
+std::optional<uint32_t> SetNumberText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                      uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                      uint32_t child, uint64_t value) {
+  constexpr uint32_t kStringTable = 0x826C5C34;
+  return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C740 UiMovie::SetNumberText");
+    Zero(base, Load(base, record), 4096);
+    // String 8 with r6 = 0 when the value's low word is 0, else 9 with the
+    // value (all 64 bits, as the original's mr r6,r28); r7 to r10, the
+    // memset's leftovers in the original, passed 0 (dead frame words).
+    const bool zero = uint32_t(value) == 0;
+    const uint64_t varargs[5] = {zero ? 0 : value, 0, 0, 0, 0};
+    strings_and_font::StringsFormat(base, calls, stack - 128, Load(base, kStringTable),
+                                    Load(base, record), zero ? 8 : 9, varargs);
+  });
+}
+
+std::optional<uint32_t> SetNameText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                    uint32_t stack, uint32_t movie, uint32_t node, uint32_t name) {
+  ITC_NATIVE_RUNNING("sub_8211CAA0 UiMovie::SetNameText");
+  const auto index = [&](uint32_t offset) {
+    return int32_t(int16_t(guest::LoadU16(base, name + offset)));
+  };
+  // The original's checks: below `bound` signed, then the halfword's
+  // unsigned value below 32768 (or at least 0, signed), as its branches.
+  const auto in_range = [](int32_t i, int32_t bound) { return i < bound && i >= 0; };
+  const uint32_t kind = Load(base, name + 4);
+  if (kind == 5) {
+    const int32_t i = index(8);
+    if (!in_range(i, 71)) {
+      return movie;
+    }
+    // r6 to r10 the lookup's leftovers in the original: passed 0.
+    const uint64_t varargs[5] = {};
+    return SetNodeText(base, calls, stack - 128, movie, node, uint32_t(i + 5837), varargs);
+  }
+  int32_t first = -1, second = -1;
+  if (kind == 0) {
+    const int32_t i = index(8);
+    first = guest::LoadU8(base, name + 10) != 0 ? i + 5477 : i + 5657;
+    if (!in_range(i, 90)) {
+      first = -1;
+    }
+  } else if (kind == 1 || kind == 4) {
+    const int32_t i = index(8);
+    first = i + (kind == 1 ? 5908 : 5463);
+    if (!in_range(i, kind == 1 ? 4 : 105)) {
+      first = -1;
+    }
+  }
+  const int32_t second_kind = int32_t(Load(base, name + 12));
+  if (second_kind == 2) {
+    const int32_t i = index(16);
+    second = guest::LoadU8(base, name + 18) != 0 ? i + 5567 : i + 5747;
+    if (!in_range(i, 90)) {
+      second = -1;
+    }
+  } else if (second_kind == 3) {
+    const int32_t i = index(16);
+    second = i + 5912;
+    if (!in_range(i, 6)) {
+      second = -1;
+    }
+  }
+  if (first == -1 || second == -1) {
+    return movie;
+  }
+  // String 532 with the two ids; r8 to r10, unset, passed 0.
+  const uint64_t varargs[5] = {uint64_t(int64_t(first)), uint64_t(int64_t(second)), 0, 0, 0};
+  return SetNodeText(base, calls, stack - 128, movie, node, 532, varargs);
+}
+
+std::optional<uint32_t> SetChildNameText(uint8_t* base,
+                                         const strings_and_font::FormatCalls& calls,
+                                         uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                         uint32_t child, uint32_t name) {
+  ITC_NATIVE_RUNNING("sub_8211D930 UiMovie::SetChildNameText");
+  const uint32_t node = FindNode(base, movie, sub_scene, child);
+  return SetNameText(base, calls, stack - 112, movie, node, name);
+}
+
 std::optional<uint32_t> SetTextScrollSpeed(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                            uint32_t child, uint32_t delay, double speed) {
   return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {

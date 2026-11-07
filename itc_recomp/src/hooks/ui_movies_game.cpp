@@ -64,7 +64,10 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "sub_8211C680 (Strings::CountLines sub_821087D8), ScrollNodeText sub_8211CCC0 and "
               "ResetNodeTextScroll sub_8211CD28, UiMovie::SetText sub_8211C1F8 (its "
               "Strings::FormatV through the plain C++) and UiMovie::SetNodeText sub_8211C7E8 (the "
-              "same, from its override in src/debug/pause_movie_log.cpp); "
+              "same, from its override in src/debug/pause_movie_log.cpp), UiMovie::SetNumberText "
+              "sub_8211C740 and UiMovie::SetChildNameText sub_8211D930 (with "
+              "UiMovie::SetNameText sub_8211CAA0, no adapter; the original with "
+              "--log_pause_movie); "
               "the full-frame effect sub_8211BEE8 (CameraPasses::RenderTarget and sub_8259EBE8 "
               "through their overrides); with --native_heap and the archive's queue native, "
               "UiMovie::Load sub_8211E798 and the movie table's UiMovies::Open sub_8211E808, "
@@ -889,6 +892,46 @@ void SetNodeText(PPCContext& ctx, uint8_t* base) {
   __imp__sub_8211C7E8(ctx, base);
 }
 }  // namespace ui_movies_game_hooks
+
+// UiMovie::SetNumberText: r3 = movie, r4 = a sub-scene's index or -1, r5 =
+// a child's index, r6 = the value; r3 the movie's texts' map.
+extern "C" REX_FUNC(sub_8211C740) {
+  REX_FUNC_PROLOGUE();
+  if (NativeHeap()) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    hooks::FormatGuestCalls calls(ctx, base);
+    const auto r3 = ui_movies::SetNumberText(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+                                             ctx.r4.u32, ctx.r5.u32, ctx.r6.u64);
+    ctx.lr = lr;
+    if (r3) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_8211C740(ctx, base);
+}
+
+// UiMovie::SetChildNameText: r3 = movie, r4 = a sub-scene's index or -1,
+// r5 = a child's index, r6 = the name record; r3 as SetNameText
+// leaves it. With --log_pause_movie the original runs (its SetNodeText
+// logged).
+extern "C" REX_FUNC(sub_8211D930) {
+  REX_FUNC_PROLOGUE();
+  if (NativeHeap() && !ITC_FLAG(log_pause_movie)) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    hooks::FormatGuestCalls calls(ctx, base);
+    const auto r3 = ui_movies::SetChildNameText(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+                                                ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+    ctx.lr = lr;
+    if (r3) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_8211D930(ctx, base);
+}
 
 // UiMovie::RevealText and sub_8211D8D8: 1 or 0.
 extern "C" REX_FUNC(sub_8211D880) {

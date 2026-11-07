@@ -527,6 +527,34 @@ std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::Forma
                                     uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
                                     const uint64_t varargs[5]);
 
+// sub_8211C740 UiMovie::SetNumberText: as ClearText (no TXT check), its
+// text record's buffer cleared (+8 and +20 kept) and string 8 (`value`'s
+// low word 0) or 9 with `value` formatted into it (Strings::Format from its
+// 128-byte frame below `stack`). Returns as SetText.
+std::optional<uint32_t> SetNumberText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                      uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                      uint32_t child, uint64_t value);
+
+// sub_8211CAA0 UiMovie::SetNameText: the text of a name record
+// (+4 a kind, +8 a 16-bit index, +10 a flag; +12 a second kind, +16 its
+// index, +18 its flag) on `node` through SetNodeText from its 128-byte
+// frame below `stack`: kind 5 string 5837 + index (0 to 70); else, when
+// both ids are in range, string 532 with the first (kind 0: 5477 or, flag
+// clear, 5657 + index below 90; 1: 5908 + index below 4; 4: 5463 + index
+// below 105) and the second (kind 2: 5567 or, flag clear, 5747 + index
+// below 90; 3: 5912 + index below 6). The varargs the original leaves set
+// by its callees passed 0. Returns the r3 left: SetNodeText's, or `movie`
+// with no call; nullopt where SetNodeText is (the original must run).
+std::optional<uint32_t> SetNameText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                    uint32_t stack, uint32_t movie, uint32_t node, uint32_t name);
+
+// sub_8211D930 UiMovie::SetChildNameText: the node (FindNode), then
+// SetNameText from its 112-byte frame below `stack`.
+std::optional<uint32_t> SetChildNameText(uint8_t* base,
+                                         const strings_and_font::FormatCalls& calls,
+                                         uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                         uint32_t child, uint32_t name);
+
 // sub_8211E798 UiMovie::Load: the asset's size (Archive::AssetSize) in pages
 // (VirtualAlloc's, AllocPages), then load(id, them, sub_8211E500, the movie).
 // Returns the serial (r3).

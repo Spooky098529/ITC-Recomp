@@ -705,6 +705,92 @@ constexpr const char* kFirstLine = "UiMovie::FirstLine (sub_8211C3F8)";
 constexpr const char* kLineCount = "UiMovie::LineCount (sub_8211C680; sub_821087D8)";
 constexpr const char* kScrollNodeText = "UiMovie::ScrollNodeText (sub_8211CCC0)";
 constexpr const char* kResetNodeTextScroll = "UiMovie::ResetNodeTextScroll (sub_8211CD28)";
+constexpr const char* kSetNumberText = "UiMovie::SetNumberText (sub_8211C740)";
+constexpr const char* kSetChildNameText =
+    "UiMovie::SetChildNameText (sub_8211D930; sub_8211CAA0)";
+
+// The number and name setters' string table (their cases only, put back
+// after): 17 files over containers of 8,192 entries (every id they name is
+// in range), each entry letters only, but for the file holding string 9
+// (one int control: the value) and the one holding 532 (two 0xFFD7: the two
+// ids). Strings with no more argument codes than the callers set, as the
+// varargs the originals leave unset are passed 0 natively (the parking
+// area's call, 2026-10-30).
+class NameStrings {
+ public:
+  NameStrings(uint8_t* base, Random& r) : base_(base) {
+    constexpr uint32_t kBounds = 0x82007E18;
+    const uint32_t plain = Container(r, 0, 0), file9 = FileOf(9), file532 = FileOf(532);
+    const uint32_t nine = Container(r, 9 - Load(base, kBounds + 4 * file9), 1);
+    const uint32_t name = file532 == file9
+                                 ? nine
+                                 : Container(r, 532 - Load(base, kBounds + 4 * file532), 2);
+    if (file532 == file9) {
+      SetSpecial(nine, 532 - Load(base, kBounds + 4 * file532), 2);
+    }
+    table_ = memory::Alloc(18 * 4, 0);
+    for (uint32_t k = 0; k < 18; k++) {
+      Store(base, table_ + 4 * k, k == file9 ? nine : k == file532 ? name : plain);
+    }
+  }
+  ~NameStrings() {
+    for (uint32_t block : blocks_) {
+      memory::Free(block);
+    }
+    memory::Free(table_);
+  }
+  uint32_t table() const { return table_; }
+
+ private:
+  static constexpr uint32_t kEntries = 8192;
+  uint32_t FileOf(uint32_t id) {
+    for (uint32_t i = 0; i < 17; i++) {
+      if (int32_t(id) < int32_t(Load(base_, 0x82007E18 + 4 + 4 * i))) {
+        return i;
+      }
+    }
+    return 17;
+  }
+  // Eight letter strings, then the two special ones; every entry one of the
+  // eight but `special`'s (`kind` 1 or 2).
+  uint32_t Container(Random& r, uint32_t special, uint32_t kind) {
+    const uint32_t texts = 4 + 4 * kEntries;
+    const uint32_t block = memory::Alloc(texts + 10 * 64, 0);
+    blocks_.push_back(block);
+    Store(base_, block, __builtin_bswap32(kEntries));
+    for (uint32_t k = 0; k < 10; k++) {
+      const uint32_t at = block + texts + 64 * k;
+      const uint32_t length = 1 + r.Below(12);
+      uint32_t c = 0;
+      if (k == 8) {
+        guest::StoreU16(base_, at + 2 * c++, uint16_t(0xFFEC + r.Below(10)));
+      }
+      if (k == 9) {
+        guest::StoreU16(base_, at + 2 * c++, 0xFFD7);
+        guest::StoreU16(base_, at + 2 * c++, ' ');
+        guest::StoreU16(base_, at + 2 * c++, 0xFFD7);
+      }
+      for (uint32_t n = 0; n < length; n++) {
+        guest::StoreU16(base_, at + 2 * c++, uint16_t('a' + r.Below(26)));
+      }
+      guest::StoreU16(base_, at + 2 * c, 0);
+    }
+    for (uint32_t k = 0; k < kEntries; k++) {
+      Store(base_, block + 4 + 4 * k, __builtin_bswap32(texts + 64 * (k % 8)));
+    }
+    if (kind != 0) {
+      SetSpecial(block, special, kind);
+    }
+    return block;
+  }
+  void SetSpecial(uint32_t block, uint32_t index, uint32_t kind) {
+    Store(base_, block + 4 + 4 * index,
+          __builtin_bswap32(4 + 4 * kEntries + 64 * (kind == 1 ? 8 : 9)));
+  }
+  uint8_t* base_;
+  uint32_t table_ = 0;
+  std::vector<uint32_t> blocks_;
+};
 
 void SetterCases(Context& h, uint32_t movie) {
   const SetterFunction functions[] = {
@@ -732,6 +818,12 @@ void SetterCases(Context& h, uint32_t movie) {
       {kLineCount, __imp__sub_8211C680, sub_8211C680},
       {kScrollNodeText, __imp__sub_8211CCC0, sub_8211CCC0},
       {kResetNodeTextScroll, __imp__sub_8211CD28, sub_8211CD28},
+      // On TXT nodes (SetNodeText's original loops forever on others); r6
+      // the value (0, a low word of 0, small, any) or a name record of
+      // the case's (kinds 0 to 6 and others, indexes around their bounds),
+      // with the table above. 40 cases each.
+      {kSetNumberText, __imp__sub_8211C740, sub_8211C740},
+      {kSetChildNameText, __imp__sub_8211D930, sub_8211D930},
   };
   constexpr uint32_t kMissing = 0x826C5CD8;
   constexpr uint32_t kOdd[] = {0x7FC00000, 0xFF800001, 0x7F800000, 0x80000000, 0x00000001};
@@ -785,9 +877,12 @@ void SetterCases(Context& h, uint32_t movie) {
       }
     }
   };
+  Random name_random(0x42696E64696E67ull);  // "Binding"
+  const NameStrings name_strings(h.base, name_random);
   for (const SetterFunction& f : functions) {
     Results results(f.name);
-    for (int i = 0; i < 200; i++) {
+    const bool numbers = f.name == kSetNumberText || f.name == kSetChildNameText;
+    for (int i = 0; i < (numbers ? 40 : 200); i++) {
       const uint64_t seed = h.random.Next();
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
@@ -800,7 +895,7 @@ void SetterCases(Context& h, uint32_t movie) {
         Store(h.base, scene + 128, sub);
         Store(h.base, sub + 108, 0);
         const bool texts = f.name == kSetText || f.name == kSetNodeText ||
-                           f.name == kSetFirstLine || f.name == kFirstLine;
+                           f.name == kSetFirstLine || f.name == kFirstLine || numbers;
         if (texts) {
           Store(h.base, sub, 0x54585400);  // child 0 of the scene: a TXT too
         }
@@ -868,6 +963,36 @@ void SetterCases(Context& h, uint32_t movie) {
         }
         if (f.name == kSetFirstLine) {
           t.r6.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);
+        }
+        if (numbers) {
+          Store(h.base, kStringTable, name_strings.table());
+        }
+        if (f.name == kSetNumberText) {
+          switch (r.Below(4)) {
+            case 0: t.r6.u64 = 0; break;
+            case 1: t.r6.u64 = r.Next() << 32; break;
+            case 2: t.r6.u64 = r.Below(100000); break;
+            default: t.r6.u64 = r.Next(); break;
+          }
+        }
+        if (f.name == kSetChildNameText) {
+          const uint32_t name = h.data + 2048;
+          RandomFill(r, h.base, name, 24);
+          const uint32_t kinds[] = {0, 1, 2, 3, 4, 5, 6, 0xFFFFFFFF};
+          // Mostly the kinds that name strings, so most cases make a call.
+          const uint32_t firsts[] = {0, 1, 4, 5}, seconds[] = {2, 3};
+          Store(h.base, name + 4, r.Below(4) == 0 ? kinds[r.Below(8)] : firsts[r.Below(4)]);
+          Store(h.base, name + 12, r.Below(4) == 0 ? kinds[r.Below(8)] : seconds[r.Below(2)]);
+          for (uint32_t at : {8u, 16u}) {
+            const uint32_t pick = r.Below(4);
+            guest::StoreU16(h.base, name + at,
+                            pick == 0   ? uint16_t(r.Next())
+                            : pick == 1 ? uint16_t(int16_t(r.Below(8)) - 3)
+                                        : uint16_t(r.Below(110)));
+          }
+          guest::StoreU8(h.base, name + 10, r.Below(2) == 0 ? 0 : uint8_t(r.Next()));
+          guest::StoreU8(h.base, name + 18, r.Below(2) == 0 ? 0 : uint8_t(r.Next()));
+          t.r6.u64 = name;
         }
         if (f.name == kScrollNodeText || f.name == kResetNodeTextScroll) {
           t.r4.u64 = nodes + 128 * r.Below(8);
