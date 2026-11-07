@@ -242,7 +242,14 @@ goes in `src/` as overrides), American English.
   validation halted on an existing `car_makers` harness case (its
   garage list could end on a random slot, a car outside the case's
   block; fixed, then passed), and the run was concluded there by the
-  user's call. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  user's call; its thirty-seventh run (`b7-loop-07-11-26`, 2026-11-07,
+  3 subsystems) made the tuning screen's pages (`tuning-pages.md`, 72
+  of 74), the type 6 and 7 modes' screen constructors
+  (`screen-constructors.md`, 41 of 41) and the type 6 and 7 modes
+  themselves (`type6-type7-modes.md`, 110 of 117 in play: two
+  front-end hubs over the garage car on its stand) native, with 15
+  cleanup adapters removed (ours 4,476 -> 4,699), and stopped at its
+  limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2778,6 +2785,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-07 | The tuning screen (the front end's tuning shop: its update's subtree, not the update `sub_821E6C50` or its refresh `sub_821E3AD0`: the debug state handlers, the command queue's runners, the category bar, lists, pages, marks, texts, the stand's calls, `RefreshMenu`, `RefreshMovie13`; with `GarageStage::Draw` and three UI movie text calls) | `tuning-screen.md` (and rows in `front-end-car-draw.md`, `ui-movies-game.md`, `car-makers.md`) | 82 of 82 in play (five migrations) | `--native_tuning_screen` (and `--native_front_end_car_draw`, `--native_ui_movies_game`) |
 | 2026-11-07 | The tuning screen's pages (its input handler `TuningScreen::HandleInput` `sub_821E6950`'s pages for states 0, 3-8, 15-22, 53-62: the levels, types, options, items, wheels, wheel parts, inches and categories inputs, `Leave`, `OnDialogYes` with the sticker dialog, the vinyl editor's entry and exit, the decal images' load, update and unload, `Menu::StepList`, `Color::HsvToRgb`; not the handler itself) | `tuning-pages.md` | 72 of 74 (four migrations; 26 adapters removed) | `--native_tuning_pages` |
 | 2026-11-07 | The type 6 and 7 modes' screen constructors (the screen blocks the modes' slot 0 allocates at +848, `Type6Screens` `sub_822366F0` and `Type7Screens` `sub_82246B28`, with their list, node, panel and machine screens) | `screen-constructors.md` | 41 of 41 (one migration; 24 adapters removed) | `--native_screen_constructors` |
+| 2026-11-07 | The type 6 and 7 modes (probably two front-end hubs over the player's garage car on its stand: the list screen starts a race; with the stand scene, the garage camera and lights, the first screens, dialogs, options, controller pages and save screen's Inits, the modes' `NextMode`, `Leaving`, `WaitForLoads` and `TearDown`) | `type6-type7-modes.md` | 110 of 117 in play (four migrations; 7 adapters removed) | `--native_type67_modes` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4830,3 +4838,20 @@ functions (916 pairs): overridden 109, Native 36, Dropped 26, never
 called 70, live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 4,589, work left 1,831 (Wrapped 57, with a row
 420, no row yet 1,354), from 1,872.
+
+**2026-11-07, the type 6 and 7 modes (branch `b7-loop-07-11-26`):** the
+thirty-seventh run's third subsystem (`type6-type7-modes.md`,
+`--native_type67_modes`, `src/type67_modes/`), in four migrations: the
+two modes' machines' Inits (their step tables generated from
+`generated/`), the first screens, dialogs and controller options, the
+list, panel and node screens' Inits, the stand scene, the garage camera
+and lights, the modes' `NextMode`, `Leaving`, `WaitForLoads` and
+`TearDown`. Their slot 0 (`sub_82236880`, `sub_82246C90`) waits on
+`StandScene::Create` `sub_82180B00` and its fill `sub_820C8DE8` (a
+cleanup lead); the screens' pages and handlers are leads. The pad
+replay reaches only the stand, the garage camera and the controller
+options: the rest waits for a drive. The run stopped at its limit (3
+subsystems). The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 4,699, work left 1,721
+(Wrapped 57, with a row 427, no row yet 1,237), from 1,831.

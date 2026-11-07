@@ -145,9 +145,17 @@ file's history. What's left to see in a drive, from every run:
   `ShowCarInfo` and `Update`; 10 functions; races 38 s, 0 errors, its
   harnesses 0 differing; one subagent, alone, for the Updates); left:
   none ready in the file (the modes' slot 0 wait on `sub_820C8DE8` in
-  `car-models.md`, itself ready). Validation agent running.
+  `car-models.md`, itself ready; a cleanup lead added). Validated
+  `itc_4417` (race 89 s at 180, the harnesses ~89 s; 0 errors, every
+  harness 0 differing, 10 of 10 harness lines; 1 in the replay
+  `itc_4418` (ok), 9 to drive). Recorded.
 
 ## Done
+
+- `type6-type7-modes.md`: 110 of 117 in play native (the type 6 and 7
+  modes' machines, screens, dialogs, stand scene, garage camera and
+  lights; 7 adapters removed), `--native_type67_modes`; a96949ba,
+  48b60036..f65f43a4.
 
 - `screen-constructors.md`: 41 of 41 native (the type 6 and 7 modes'
   screen blocks and members; 24 adapters removed),
@@ -200,5 +208,14 @@ file's history. What's left to see in a drive, from every run:
   known 455, unknown 1237).
 - After its third migration and validation (`itc_4395`): ours 4689,
   work left 1731 (wrapped 57, known 437, unknown 1237).
+- After its fourth migration and validation (`itc_4417`): ours 4699,
+  work left 1721 (wrapped 57, known 427, unknown 1237).
 
 ## Stopped
+
+2026-11-07, at the run's limit: 3 subsystems finished (the tuning
+screen's pages, the screen constructors, the type 6 and 7 modes), with
+two cleanup leads. Every validation passed; nothing uncommitted. The
+run's summary (`b7-loop-2026-11-07-1056.md`), the plan's "B7 in
+progress" line and CLAUDE.md's B7 sentence are up to date. The user
+reviews and merges.

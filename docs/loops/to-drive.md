@@ -108,6 +108,14 @@ here loses its heading.
   `sub_82244AB8`, `sub_82244760`, `sub_82244610`, `sub_822338E8`,
   `sub_82243E80`, `sub_82233E80`, `sub_822443E0`, `sub_82234768`,
   `sub_82244B60`, `sub_82235F28`, `sub_822463D8`.
+- The type 6 and 7 modes' fourth migration (attract race `itc_4417`,
+  replay `itc_4418` ok): `sub_82235C18` Type6Mode::TearDown,
+  `sub_82246098` Type7Mode::TearDown, `sub_82244BF8`
+  Type7Screen0::MenuPage, `sub_82233C80` Type6Screen0::Show,
+  `sub_82233B70` Type6Screen0::ShowCarInfo, `sub_822441D8`
+  Type7Screen0::Show, `sub_822440D8` Type7Screen0::ShowCarInfo,
+  `sub_82234F08` Type6Screen0::Update, `sub_82245200`
+  Type7Screen0::Update.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

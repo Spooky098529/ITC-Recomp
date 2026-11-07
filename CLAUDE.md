@@ -562,6 +562,20 @@ walked through distinct nodes, then passed); the run was concluded there
 by the user's call (2026-11-07). The rest waits on the tuning
 screen's update `sub_821E6C50` and refresh `sub_821E3AD0`, a cleanup lead
 in `front-end-car-draw.md` and the leads in `docs/loops/leads.md`.
+Its thirty-seventh run (`b7-loop-07-11-26`, 2026-11-07, not yet merged;
+summary `docs/loops/b7-loop-2026-11-07-1056.md`; 3 subsystems) made the
+tuning screen's pages (`tuning-pages.md`, `--native_tuning_pages`, 72
+of 74: `HandleInput`'s pages, the vinyl editor's entry and exit, the
+decal images), the type 6 and 7 modes' screen constructors
+(`screen-constructors.md`, `--native_screen_constructors`, 41 of 41)
+and the type 6 and 7 modes (`type6-type7-modes.md`,
+`--native_type67_modes`, 110 of 117 in play: two front-end hubs over
+the garage car on its stand) native, with two cleanup leads (15
+adapters in `front-end-car-draw.md` and `tuning-screen.md`) (ours
+4,476 -> 4,699); it stopped at its limit. The rest waits on
+`HandleInput`'s vinyl and sticker editors' pages, `StandScene::Create`
+with `sub_820C8DE8` (a cleanup lead) and the leads in
+`docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
