@@ -23,6 +23,14 @@ When the user has reviewed a run's section, its heading gets
   the stack pointer (`StoreVinyls`, `HsvToRgb`), varargs `SetText`
   calls, unbounded state history pops; keeping a sticker area calls
   `Career::PickNext` (the game's own).
+- Its first migration (94da1ea6..5fd92bc3, `--native_tuning_pages`): a
+  new flag (no call put the pages under `--native_tuning_screen`); the
+  harness quiets signaling NaN inputs of `StoreVinyls`, `LoadVinyls`
+  and `HsvToRgb` before running (the originals' lfs/stfs quiet them, the
+  host's copies may not); `EnterEditor`'s cases keep the state history
+  below 60 entries (a deeper push overwrites the queue pointer at
+  +10036, the original's unbounded pop/push); `FreeTexture`'s
+  allocations compared as tokens.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

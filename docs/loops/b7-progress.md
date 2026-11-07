@@ -23,7 +23,15 @@ file's history. What's left to see in a drive, from every run:
   errors; 48 ready groups; 4 leads added (the vinyl and sticker editors'
   pages, the screen's other helper callers, `sub_8224B248`), the menu
   helpers' lead trimmed; three subagents, one at a time). Migration
-  agent running.
+  94da1ea6..5fd92bc3 (`--native_tuning_pages`, harness `tuning_pages`:
+  the counts, owned flags, wheel and inch list ends, the decal images'
+  textures and movie restores, `EnterEditor`, `StoreVinyls`,
+  `LoadVinyls`, `ShowPricePanel`, `SetBrandLogo`, `Color::HsvToRgb`; 22
+  Overridden, 6 Merged, 6 adapters removed; race 38 s, 0 errors, all
+  its harnesses 0 differing; no subagents); left: 27 ready groups
+  (`DecalImages::UnloadAll`/`Unload` first; the pages; `sub_821D74A0`
+  with `sub_821D32C8` over 1,500 lines, to split). Validation agent
+  running.
 
 ## Done
 
@@ -45,5 +53,7 @@ file's history. What's left to see in a drive, from every run:
   unknown 1462).
 - After the tuning pages' map: ours 4476, work left 1937 (wrapped 57,
   known 485, unknown 1395).
+- After its migration: ours 4510, work left 1904 (wrapped 57, known
+  452, unknown 1395).
 
 ## Stopped
