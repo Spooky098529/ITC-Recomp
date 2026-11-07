@@ -613,6 +613,12 @@ Rows not yet moved stay in the table below. So far:
   their list, node and panel screens, the state machines with ten words
   after them, the node tables, list parts, panel groups, panels and the
   panel set (B7).
+- [`type6-type7-modes.md`](type6-type7-modes.md): the type 6 and 7
+  front-end modes (hubs over the player's own car on the stand): their
+  slots and delegates, the stand scene and garage cameras, the first
+  screens' menus, the yes/no dialogs, the options' controller pages, and
+  the Inits of their list, node, panel, power graph, options and save
+  screens (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
