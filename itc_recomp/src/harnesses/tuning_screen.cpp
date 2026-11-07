@@ -90,6 +90,18 @@ void ShapeScreen(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, s + 25196, r.Below(16));
   guest::StoreU32(base, s + 25204, r.Below(17));
   guest::StoreU32(base, s + 25220, r.Below(38));
+  // The debug pages: the front-end menu at +10040 (its +0 the cursor), the
+  // line counts, the decal area (the debug lists' index grows with it).
+  guest::StoreU32(base, s + 10040, s + 0x9300);
+  guest::StoreU32(base, s + 0x9300, r.Below(12));
+  guest::StoreU8(base, s + 9677, uint8_t(r.Below(8)));
+  guest::StoreU8(base, s + 9678, uint8_t(r.Below(8)));
+  guest::StoreU32(base, s + 30724, r.Below(8));
+  // Category 5's item 6 (the stickers) now and then.
+  if (r.Below(4) == 0) {
+    guest::StoreU32(base, s + ts::kCategory, 5);
+    guest::StoreU8(base, s + ts::kItem, 6);
+  }
 }
 
 // A small index for r4 (all 64 bits), now and then with upper bits.
@@ -178,6 +190,46 @@ void TuningScreen(Context& h) {
       h, w, "TuningScreen::GetChoiceFlag", 40,
       [](PPCContext& t, Random& r, const World&) { t.r4.u64 = SmallIndex(r, 10); },
       __imp__sub_821CDC38, hooks::TuningGetChoiceFlag, 0);
+
+  // The debug state handlers: `saves` is each original's register saves
+  // (__savegprlr_N's 8 x (32 - N) + 8 bytes, or its inline stores).
+  struct Handler {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t saves;
+  };
+  const Handler handlers[] = {
+      {"TuningScreen::DebugMainMenu", __imp__sub_821CBE08, hooks::TuningDebugMainMenu, 32},
+      {"TuningScreen::DebugLevelSelect", __imp__sub_821CBEE8, hooks::TuningDebugLevelSelect, 40},
+      {"TuningScreen::DebugTypeSelect", __imp__sub_821CBFC0, hooks::TuningDebugTypeSelect, 40},
+      {"TuningScreen::DebugOptionSelect", __imp__sub_821CC248, hooks::TuningDebugOptionSelect,
+       16},
+      {"TuningScreen::DebugConfirmBuy", __imp__sub_821CC3A8, hooks::TuningDebugConfirmBuy, 8},
+      {"TuningScreen::DebugConfirmEquip", __imp__sub_821CC488, hooks::TuningDebugConfirmEquip,
+       8},
+      {"TuningScreen::DebugCategoryMenu", __imp__sub_821CFCE8, hooks::TuningDebugCategoryMenu,
+       152},
+      {"TuningScreen::DebugWheelPartSelect", __imp__sub_821E8068,
+       hooks::TuningDebugWheelPartSelect, 40},
+      {"TuningScreen::DebugWheelKindSelect", __imp__sub_821E8128,
+       hooks::TuningDebugWheelKindSelect, 104},
+      {"TuningScreen::DebugWheelInchSelect", __imp__sub_821E8298,
+       hooks::TuningDebugWheelInchSelect, 32},
+      {"TuningScreen::DebugDecalTopMenu", __imp__sub_821FD710, hooks::TuningDebugDecalTopMenu,
+       32},
+      {"TuningScreen::DebugLayerSelect", __imp__sub_821FD880, hooks::TuningDebugLayerSelect, 56},
+      {"TuningScreen::DebugLayerEdit", __imp__sub_821FDCB8, hooks::TuningDebugLayerEdit, 48},
+      {"TuningScreen::DebugLayerSet", __imp__sub_821FE080, hooks::TuningDebugLayerSet, 24},
+      {"TuningScreen::DebugEditPosition", __imp__sub_821FE100, hooks::TuningDebugEditPosition, 0},
+      {"TuningScreen::DebugEditView", __imp__sub_821FE178, hooks::TuningDebugEditView, 0},
+      {"TuningScreen::DebugPaintConfirm", __imp__sub_821FE190, hooks::TuningDebugPaintConfirm,
+       32},
+  };
+  for (const Handler& handler : handlers) {
+    Group(h, w, handler.name, 20, kScreenOnly, handler.recompiled, handler.native,
+          handler.saves);
+  }
 }
 
 }  // namespace harness

@@ -49,4 +49,37 @@ uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen);
 // choice `choice`, 0 where there's none.
 uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice);
 
+// --- The debug state handlers (debug.cpp) ---
+// Each only prints a debug menu through the empty sub_82106540, left out:
+// its frame's back chain and string tables written as the original leaves
+// them; r3 the last print's first argument. sub_821CBE08
+// TuningScreen::DebugMainMenu (state 3), sub_821CBEE8 DebugLevelSelect (5),
+// sub_821CBFC0 DebugTypeSelect (6), sub_821CC248 DebugOptionSelect (8; 500
+// or 520 by the category and item), sub_821CC3A8 DebugConfirmBuy (9),
+// sub_821CC488 DebugConfirmEquip (11), sub_821CFCE8 DebugCategoryMenu (4;
+// r3 CategoryItemCount's last answer), sub_821E8068 DebugWheelPartSelect
+// (15), sub_821E8128 DebugWheelKindSelect (16), sub_821E8298
+// DebugWheelInchSelect (17), sub_821FD710 DebugDecalTopMenu (23, 38),
+// sub_821FD880 DebugLayerSelect (24, 39), sub_821FDCB8 DebugLayerEdit (26,
+// 41), sub_821FE080 DebugLayerSet (28, 43), sub_821FE100 DebugEditPosition
+// (29, 44; no frame), sub_821FE178 DebugEditView (34, 49; no frame),
+// sub_821FE190 DebugPaintConfirm (35, 50).
+uint32_t DebugMainMenu(uint8_t* base, uint32_t sp);
+uint32_t DebugLevelSelect(uint8_t* base, uint32_t sp);
+uint32_t DebugTypeSelect(uint8_t* base, uint32_t sp);
+uint32_t DebugOptionSelect(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugConfirmBuy(uint8_t* base, uint32_t sp);
+uint32_t DebugConfirmEquip(uint8_t* base, uint32_t sp);
+uint32_t DebugCategoryMenu(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugWheelPartSelect(uint8_t* base, uint32_t sp);
+uint32_t DebugWheelKindSelect(uint8_t* base, uint32_t sp);
+uint32_t DebugWheelInchSelect(uint8_t* base, uint32_t sp);
+uint32_t DebugDecalTopMenu(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugLayerSelect(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugLayerEdit(uint8_t* base, uint32_t sp);
+uint32_t DebugLayerSet(uint8_t* base, uint32_t sp);
+uint32_t DebugEditPosition();
+uint32_t DebugEditView();
+uint32_t DebugPaintConfirm(uint8_t* base, uint32_t sp);
+
 }  // namespace tuning_screen

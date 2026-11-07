@@ -411,6 +411,7 @@ set(ITC_SOURCES
     src/build_screen/builds.cpp
     src/hooks/tuning_screen.cpp
     src/tuning_screen/tables.cpp
+    src/tuning_screen/debug.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

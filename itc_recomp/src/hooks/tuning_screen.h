@@ -21,4 +21,31 @@ void TuningGetPrice(PPCContext& ctx, uint8_t* base);
 void TuningGetCurrentChoice(PPCContext& ctx, uint8_t* base);
 void TuningGetChoiceFlag(PPCContext& ctx, uint8_t* base);
 
+// The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
+// DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
+// DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,
+// DebugConfirmEquip sub_821CC488, DebugCategoryMenu sub_821CFCE8,
+// DebugWheelPartSelect sub_821E8068, DebugWheelKindSelect sub_821E8128,
+// DebugWheelInchSelect sub_821E8298, DebugDecalTopMenu sub_821FD710,
+// DebugLayerSelect sub_821FD880, DebugLayerEdit sub_821FDCB8, DebugLayerSet
+// sub_821FE080, DebugEditPosition sub_821FE100, DebugEditView sub_821FE178,
+// DebugPaintConfirm sub_821FE190.
+void TuningDebugMainMenu(PPCContext& ctx, uint8_t* base);
+void TuningDebugLevelSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugTypeSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugOptionSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugConfirmBuy(PPCContext& ctx, uint8_t* base);
+void TuningDebugConfirmEquip(PPCContext& ctx, uint8_t* base);
+void TuningDebugCategoryMenu(PPCContext& ctx, uint8_t* base);
+void TuningDebugWheelPartSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugWheelKindSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugWheelInchSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugDecalTopMenu(PPCContext& ctx, uint8_t* base);
+void TuningDebugLayerSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugLayerEdit(PPCContext& ctx, uint8_t* base);
+void TuningDebugLayerSet(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditPosition(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditView(PPCContext& ctx, uint8_t* base);
+void TuningDebugPaintConfirm(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
