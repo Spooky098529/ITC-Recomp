@@ -33,8 +33,18 @@ file's history. What's left to see in a drive, from every run:
   with `sub_821D32C8` over 1,500 lines, to split). Validated
   `itc_4251` (race 92 s at 180, the harnesses ~86 s; 0 errors, every
   harness 0 differing, 28 of 28 harness lines; none in the race, 10 in
-  the replay `itc_4252` (ok), 18 to drive). Second migration agent
-  running.
+  the replay `itc_4252` (ok), 18 to drive). Second migration
+  8e5ecf93..bd66f968 (`SetAeroAvailability`, `SetCurrentChoice`, the
+  decal images' update, load and unload with `Texture::FromTga`,
+  `Menu::StepList`, `LeaveEditor`, `InputCategories`, `BackToItems`,
+  `InputWheelParts`, `InputInches`, `OnDialogYes` with the sticker
+  dialog's callees; 11 Overridden, 11 Native without adapters, 1
+  Merged, 4 adapters removed; races 37-38 s, 0 errors, all its
+  harnesses 0 differing; four subagents, one at a time); left: 9 ready
+  groups in the file (`sub_821D6E20`, `sub_821D74A0` with `sub_821D32C8`,
+  `sub_821F6688`, `sub_821DFD48`, `sub_821D8160`, `sub_821E25B0` each
+  over 1,100 lines; `sub_821FFB20`, `sub_82202530`, `sub_82201B40`).
+  Validation agent running.
 
 ## Done
 
@@ -58,5 +68,7 @@ file's history. What's left to see in a drive, from every run:
   known 485, unknown 1395).
 - After its migration: ours 4510, work left 1904 (wrapped 57, known
   452, unknown 1395).
+- After its second migration: ours 4534, work left 1885 (wrapped 57,
+  known 433, unknown 1395).
 
 ## Stopped

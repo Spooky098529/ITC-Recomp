@@ -31,6 +31,18 @@ When the user has reviewed a run's section, its heading gets
   below 60 entries (a deeper push overwrites the queue pointer at
   +10036, the original's unbounded pop/push); `FreeTexture`'s
   allocations compared as tokens.
+- Its second migration (8e5ecf93..bd66f968): `DecalImages::Update`,
+  `UnloadAll` and `Texture::FromTga` native only while the native heap
+  is on (as `MakePlate`); `DecalImages::Load` `sub_821F6D40` and the
+  sticker dialog's `SaveAreaDecals`, `StoreStickers`, `GarageDecal`,
+  `SwapKept` (not seen in play) ported; `SetCurrentChoice`'s other
+  caller `sub_821F1780` (not seen) stays recompiled; `Menu::StepList`'s
+  row and `known-data.md`'s front-end menu +52 corrected (the row before
+  the step); `OnDialogYes`' cases for states 35 and 36 run with
+  `--native_tuning_pages` on for the recompiled side too (their callees
+  compared in their own groups). Lead for later: `car_makers`'
+  `RestoreStand` harness crashes with other random seeds (its own
+  set-up; the batch restores the generator after its group).
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
