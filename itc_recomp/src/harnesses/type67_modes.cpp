@@ -513,6 +513,100 @@ void Handlers(Context& h, const Block& world) {
           });
 }
 
+// --- The modes' delegate functions: a mode block (its dispatcher without
+// handlers, so GameMessages::Dispatch takes the queued messages and
+// delivers none; its ring's count and start small) whose +848 is a screen
+// block with the checked machines' states picked (10, 6 and 11 among
+// them), the answer in the world, the original's frame random words; the
+// mode, the block, the globals (the leaving flag, the cars' words), the
+// answer, the frame's +80 to +87 and r3 compared. ---
+
+constexpr uint32_t kModeBytes = 1024;
+constexpr uint32_t kScreenBlockBytes = 0x17000;
+
+void Modes(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  const Block mode(kModeBytes);
+  const Block block(kScreenBlockBytes);
+  if (!mode.address || !block.address) return;
+  const uint32_t globals[3] = {t67::kLeavingFlag, t67::kType6Layout.car, t67::kType7Layout.car};
+  uint32_t saved[3];
+  for (int i = 0; i < 3; i++) saved[i] = guest::LoadU32(base, globals[i]);
+  struct Function {
+    const char* name;
+    uint32_t address;
+    const t67::ModeLayout* layout;
+    bool next;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Function functions[] = {
+      {"Type6Mode::NextMode", 0x822363B8, &t67::kType6Layout, true, __imp__sub_822363B8,
+       hooks::Type6ModeNextMode},
+      {"Type7Mode::NextMode", 0x82246800, &t67::kType7Layout, true, __imp__sub_82246800,
+       hooks::Type7ModeNextMode},
+      {"Type6Mode::Leaving", 0x82236100, &t67::kType6Layout, false, __imp__sub_82236100,
+       hooks::Type6ModeLeaving},
+      {"Type7Mode::Leaving", 0x82246590, &t67::kType7Layout, false, __imp__sub_82246590,
+       hooks::Type7ModeLeaving},
+  };
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    const uint32_t frame_bytes = f.next ? t67::kNextModeFrame : t67::kLeavingFrame;
+    const uint32_t frame = CallContext(h).r1.u32 - frame_bytes;
+    const t67::ModeLayout& layout = *f.layout;
+    for (int c = 0; c < 40; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 977 + f.address);
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, mode.address, mode.bytes, r);
+        WriteRandom(base, block.address, block.bytes, r);
+        WriteRandom(base, frame, frame_bytes, r);
+        for (const uint32_t g : globals) guest::StoreU32(base, g, uint32_t(r.Next()));
+        guest::StoreU32(base, mode.address + 36 + 200, 0);  // no handlers
+        guest::StoreU32(base, mode.address + 840, r.Below(4));
+        guest::StoreU32(base, mode.address + 844, r.Below(200));
+        guest::StoreU32(base, mode.address + 848, block.address);
+        auto put = [&](const t67::MachineAt& at, uint32_t state) {
+          guest::StoreU32(base, block.address + at.machine + 9604, state);
+        };
+        const uint32_t kOther[] = {0, 1, 4, 5, 7, 9};
+        for (uint32_t i = 0; i < layout.next_count; i++) {
+          put(layout.next_checks[i], r.Below(10) == 0 ? 10 : kOther[r.Below(6)]);
+        }
+        for (uint32_t i = 0; i < layout.leave_count; i++) {
+          if (!f.next) put(layout.leave_checks[i], r.Below(12) == 0 ? kOther[r.Below(6)] : 6);
+        }
+        if (!f.next) {
+          const uint32_t kList[] = {6, 6, 11, 11, 10, 5};
+          put(layout.list, kList[r.Below(6)]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = world.address + 0x100;
+        t.r4.u64 = mode.address;
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          f.native(t, base);
+        }
+        out[v].Bytes(Read(base, mode.address, mode.bytes));
+        out[v].Bytes(Read(base, block.address, block.bytes));
+        for (const uint32_t g : globals) out[v].Word(guest::LoadU32(base, g));
+        out[v].Bytes(Read(base, world.address + 0x100, 8));
+        out[v].Bytes(Read(base, frame + 80, 8));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  for (int i = 0; i < 3; i++) guest::StoreU32(base, globals[i], saved[i]);
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -526,6 +620,7 @@ void Type67Modes(Context& h) {
   }
   Inits(h, object);
   Handlers(h, world);
+  Modes(h, world);
 }
 
 }  // namespace harness

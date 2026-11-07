@@ -34,7 +34,10 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "sub_822339F0 and sub_82243F58, OnLeft sub_82233870 and sub_82243E08, "
               "WaitForMovie sub_82233B18 and sub_82244080, PickYes sub_82233990 and "
               "sub_82243F28, PickNo sub_822339A0 and Type6Screen0::GoOn sub_822339C0; blocks "
-              "over the allocation layer, the originals where a block isn't its pages) "
+              "over the allocation layer, the originals where a block isn't its pages; the "
+              "modes' Type6Mode::NextMode sub_822363B8, Type7Mode::NextMode sub_82246800, "
+              "Type6Mode::Leaving sub_82236100 and Type7Mode::Leaving sub_82246590, "
+              "GameMessages::Dispatch a guest call to its override) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -172,6 +175,50 @@ void Type6Screen0GoOn(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::Type6Screen0GoOn(base, ctx.r3.u64);
 }
 
+// --- The modes' delegate functions ---
+
+namespace {
+
+t67::Calls GuestCalls(PPCContext& ctx, uint8_t* base) {
+  t67::Calls calls;
+  calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3,
+                            uint64_t r4) -> uint64_t {
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    REX_CALL_INDIRECT_FUNC(target);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    return ctx.r3.u64;
+  };
+  return calls;
+}
+
+void NextMode(PPCContext& ctx, uint8_t* base, const t67::ModeLayout& layout) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t answer = ctx.r3.u32, mode = ctx.r4.u32;
+  t67::ModeNextMode(base, layout, answer, mode, ctx.r1.u32 - t67::kNextModeFrame,
+                    GuestCalls(ctx, base));
+  ctx.r3.u64 = r3;
+}
+
+void Leaving(PPCContext& ctx, uint8_t* base, const t67::ModeLayout& layout) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t answer = ctx.r3.u32, mode = ctx.r4.u32;
+  t67::ModeLeaving(base, layout, answer, mode, ctx.r1.u32 - t67::kLeavingFrame,
+                   GuestCalls(ctx, base));
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace
+
+void Type6ModeNextMode(PPCContext& ctx, uint8_t* base) { NextMode(ctx, base, t67::kType6Layout); }
+void Type7ModeNextMode(PPCContext& ctx, uint8_t* base) { NextMode(ctx, base, t67::kType7Layout); }
+void Type6ModeLeaving(PPCContext& ctx, uint8_t* base) { Leaving(ctx, base, t67::kType6Layout); }
+void Type7ModeLeaving(PPCContext& ctx, uint8_t* base) { Leaving(ctx, base, t67::kType7Layout); }
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -259,3 +306,9 @@ ITC_TYPE67_MODES(82233990, Type6Screen0PickYes)
 ITC_TYPE67_MODES(822339A0, Type6Screen0PickNo)
 ITC_TYPE67_MODES(82243F28, Type7Screen0PickYes)
 ITC_TYPE67_MODES(822339C0, Type6Screen0GoOn)
+
+// The modes' delegate functions (held by the delegate, no direct callers).
+ITC_TYPE67_MODES(822363B8, Type6ModeNextMode)
+ITC_TYPE67_MODES(82246800, Type7ModeNextMode)
+ITC_TYPE67_MODES(82236100, Type6ModeLeaving)
+ITC_TYPE67_MODES(82246590, Type7ModeLeaving)

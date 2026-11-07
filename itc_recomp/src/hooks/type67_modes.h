@@ -55,4 +55,13 @@ void Type6Screen0PickNo(PPCContext& ctx, uint8_t* base);
 void Type7Screen0PickYes(PPCContext& ctx, uint8_t* base);
 void Type6Screen0GoOn(PPCContext& ctx, uint8_t* base);
 
+// The modes' delegate functions (r3 the answer, r4 the mode; r3 left the
+// answer): Type6Mode::NextMode sub_822363B8, Type7Mode::NextMode
+// sub_82246800, Type6Mode::Leaving sub_82236100, Type7Mode::Leaving
+// sub_82246590. Their guest calls through `ctx`.
+void Type6ModeNextMode(PPCContext& ctx, uint8_t* base);
+void Type7ModeNextMode(PPCContext& ctx, uint8_t* base);
+void Type6ModeLeaving(PPCContext& ctx, uint8_t* base);
+void Type7ModeLeaving(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

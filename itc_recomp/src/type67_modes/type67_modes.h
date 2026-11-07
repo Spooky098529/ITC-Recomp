@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace type67_modes {
@@ -152,5 +153,62 @@ uint64_t Screen0Pick(uint8_t* base, uint64_t r3, uint32_t menu, uint32_t pick);
 // sub_822339C0 Type6Screen0::GoOn: the page (+9644)'s +8 = +0 unless it's
 // 3; +12 = 3, +16 = -1, +4 = 3, +0 = -1.
 uint64_t Type6Screen0GoOn(uint8_t* base, uint64_t r3);
+
+// --- The modes' delegate functions (modes.cpp) ---
+
+// The guest calls the modes make: `target` with r3 and r4 from a frame at
+// `sp` returning to `lr`; r3 after (GameMessages::Dispatch through its
+// override).
+struct Calls {
+  std::function<uint64_t(uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3, uint64_t r4)>
+      call;
+};
+
+// A machine whose state a mode checks: the block's +`test` tested for 0
+// (the cast's null check), then the machine at +`machine` (state -1 for
+// none).
+struct MachineAt {
+  uint32_t test;
+  uint32_t machine;
+};
+
+// What differs between the type 6 and type 7 modes' delegate functions.
+struct ModeLayout {
+  uint32_t phase;      // the block's phase word (4 leaving, 5 torn down)
+  uint32_t answer;     // the block's 8-byte answer
+  uint32_t leave_message;
+  uint32_t leaving;    // the Leaving function (the delegate's after NextMode)
+  uint32_t tear_down;  // the TearDown function (after Leaving)
+  uint32_t car;        // the mode's car's +1972 word (-1: made again)
+  uint32_t next_lr, leaving_lr;  // the Dispatch calls' return addresses
+  const MachineAt* next_checks;  // NextMode's, any in state 10
+  uint32_t next_count;
+  const MachineAt* leave_checks;  // Leaving's, all in state 6
+  uint32_t leave_count;
+  MachineAt list;  // the list screen (6 or 11 ends the mode)
+};
+extern const ModeLayout kType6Layout;
+extern const ModeLayout kType7Layout;
+
+constexpr uint32_t kNextModeFrame = 144;  // NextMode's stwu
+constexpr uint32_t kLeavingFrame = 128;   // Leaving's
+constexpr uint32_t kModeDelegateVtable = 0x82010FA0;
+constexpr uint32_t kLeavingFlag = 0x826364EC;  // 0 once NextMode leaves
+
+// sub_822363B8 Type6Mode::NextMode, sub_82246800 Type7Mode::NextMode: Draw
+// and Update queued in the mode's ring, GameMessages::Dispatch(mode + 36,
+// 0), the answer cleared; when a machine is in state 10, the delegate's
+// function = Leaving (its member functor built at the frame's +80),
+// [0x826364EC] = 0 and the phase 4. `frame` is the original's r1.
+void ModeNextMode(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint32_t mode,
+                  uint32_t frame, const Calls& calls);
+// sub_82236100 Type6Mode::Leaving, sub_82246590 Type7Mode::Leaving: the
+// answer cleared, Leave queued and dispatched (r4 the mode); when every
+// checked machine is done (6): with the list done, phase 5, the car's word
+// -1 and the delegate's function TearDown; with the list in 11 (a race
+// picked), phase 5, the block's answer = the doubleword at the frame's +80
+// (byte 1, the three bytes the frame holds, word 1) and TearDown.
+void ModeLeaving(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint32_t mode,
+                 uint32_t frame, const Calls& calls);
 
 }  // namespace type67_modes
