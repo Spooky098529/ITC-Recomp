@@ -2776,6 +2776,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | The garage stage's scene model holders (`GarageStage::MakeModel` `sub_8217FCB0`, the stand's record setters at `82178EC0`-`82179A18`, `SetWheel` `sub_8217DD38` with its 179-entry table, `FitAxles`, `SetTireGrade`, the second wheels; the wheels' setters `SceneWheels::SetSizes`, `SetTireGrades`, `Wheels::SetTireTextures`; the tuning screen's `PreviewWheel`, `StepSecondWheels`, `SetTireGrade`; with `SceneModel::ApplyRecord` `sub_820DA758` and `ReloadDecals` `sub_820D9D48`) | `stand-models.md` (and rows in `scene-models.md`) | 28 of 28 in play (one migration) | `--native_stand_models` (and `--native_scene_models`) |
 | 2026-11-06 | The build screen (the front-end screen over `[0x826D8448]`, four levels as the states of `[0x826D843C]`: groups by category, a group's builds, one build on the stand, its details; its 21 transitions, lists, rows and prompts; with `CarScene::Update` `sub_820C9608`, `SceneModel::Update`, `GarageStage::ReloadModel`; and the cleanup leads before it, `GarageStage::ReapplyRecord`, `SetCar`, `ShowCarById` and their pairs) | `build-screen.md` (and rows in `scene.md`, `scene-models.md`, `vehicle-accessors.md`, `accessories.md`, `car-makers.md`) | 59 of 60 (three migrations; `BackToBuilds` kept recompiled, the user's call) | `--native_build_screen` (and `--native_scene`, `--native_car_makers`) |
 | 2026-11-07 | The tuning screen (the front end's tuning shop: its update's subtree, not the update `sub_821E6C50` or its refresh `sub_821E3AD0`: the debug state handlers, the command queue's runners, the category bar, lists, pages, marks, texts, the stand's calls, `RefreshMenu`, `RefreshMovie13`; with `GarageStage::Draw` and three UI movie text calls) | `tuning-screen.md` (and rows in `front-end-car-draw.md`, `ui-movies-game.md`, `car-makers.md`) | 82 of 82 in play (five migrations) | `--native_tuning_screen` (and `--native_front_end_car_draw`, `--native_ui_movies_game`) |
+| 2026-11-07 | The tuning screen's pages (its input handler `TuningScreen::HandleInput` `sub_821E6950`'s pages for states 0, 3-8, 15-22, 53-62: the levels, types, options, items, wheels, wheel parts, inches and categories inputs, `Leave`, `OnDialogYes` with the sticker dialog, the vinyl editor's entry and exit, the decal images' load, update and unload, `Menu::StepList`, `Color::HsvToRgb`; not the handler itself) | `tuning-pages.md` | 72 of 74 (four migrations; 26 adapters removed) | `--native_tuning_pages` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4795,3 +4796,21 @@ call. The boundary: 449 functions (916 pairs): overridden 109, Native
 36, Dropped 26, never called 70, live 208. Imports: 186 called, 54 with
 a live caller. B7 (`b7_status.py`): ours 4,476, work left 1,937
 (Wrapped 57, with a row 418, no row yet 1,462), from 2,021.
+
+**2026-11-07, the tuning screen's pages (branch `b7-loop-07-11-26`):**
+the thirty-seventh run's first subsystem (`tuning-pages.md`,
+`--native_tuning_pages`, `src/tuning_pages/`), in four migrations: the
+pages `TuningScreen::HandleInput` `sub_821E6950` runs by state (the
+levels, types, options, items, wheels, wheel parts, inches and
+categories inputs with their moves and animations, `Leave`,
+`OnDialogYes` with the sticker dialog's callees, the vinyl editor's
+entry and exit), the decal images' load, update and unload with
+`Texture::FromTga`, `Menu::StepList` and `Color::HsvToRgb`. The handler
+waits on the vinyl and sticker editors' pages (leads). Only the pad
+replay reaches the screen; the rest waits for a drive. The harnesses'
+new set-ups seed their generators through splitmix64 (consecutive
+xorshift streams fell into step). The boundary: 449 functions (916
+pairs): overridden 109, Native 36, Dropped 26, never called 70, live
+208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
+ours 4,548, work left 1,872 (Wrapped 57, with a row 420, no row yet
+1,395), from 1,937.

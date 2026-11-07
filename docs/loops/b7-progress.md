@@ -61,9 +61,16 @@ file's history. What's left to see in a drive, from every run:
   of `PageItemCount`, `PageCursor`, `IsPickOwned` and `MoveType`
   removed; races 35-36 s, 0 errors, its harnesses 0 differing; two
   subagents, one at a time); left: none in the file (72 of 74 ours;
-  `HandleInput` waits on the editors' leads). Validation agent running.
+  `HandleInput` waits on the editors' leads). Validated `itc_4346`
+  (race 90 s at 180, the harnesses ~88.5 s; 0 errors, every harness 0
+  differing, 5 of 5 harness lines; 4 in the replay `itc_4347` (ok),
+  `IsPickOwned` to drive, already listed). Recorded.
 
 ## Done
+
+- `tuning-pages.md`: 72 of 74 native (the tuning screen's input pages,
+  the vinyl editor's entry and exit, the decal images; 26 adapters
+  removed), `--native_tuning_pages`; 92fea740, 94da1ea6..43d9b8ec.
 
 ## Rows to review
 
