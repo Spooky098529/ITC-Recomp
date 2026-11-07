@@ -402,13 +402,13 @@ made native, or whose adapter it removed:
 1. **Checks the print** is the first statement of its plain C++ (grep
    `itc_recomp/src` for the address). Missing ones it adds, in one commit,
    pushed (a print only, no other change).
-2. **Runs** the build and `attract_race.sh 120 --run_harnesses=all` with
+2. **Runs** the build and `attract_race.sh 180 --run_harnesses=all` with
    the default flags (every harness, once a migration: the migration
    agent runs only its own, so this run is what shows that nothing else
    was broken; the user's call, 2026-10-28; 60 s since all of them
    outgrew 40, the user's call, 2026-10-30; 120 s since they took 56.7
-   of the 60, the user's call, 2026-10-31; migration agents stay at
-   40), checks every harness is at
+   of the 60, the user's call, 2026-10-31; 180 s since they took ~85 of
+   the 120, the user's call, 2026-11-07; migration agents stay at 40), checks every harness is at
    0 differing outside "(expected to differ)" groups (one that isn't,
    in any subsystem, goes in the report's `race:` line, and the lead
    halts), and checks the log has a `native running
@@ -558,10 +558,11 @@ Calls so far for decisions the loop meets often:
   (`BuildScreen::BackToBuilds` `sub_821A1258` storing the r7
   `UiMovie::Run` leaves into its machine's +24, 2026-11-06).
 - Harness run times: migration agents `attract_race.sh 40` with their
-  own harnesses; the validation agent `attract_race.sh 120
+  own harnesses; the validation agent `attract_race.sh 180
   --run_harnesses=all` (60 s on 2026-10-30, when all of them outgrew
-  40 s; 120 s on 2026-10-31, when they took 56.7 of the 60). If they
-  outgrow 120 too, that's a new case for the user.
+  40 s; 120 s on 2026-10-31, when they took 56.7 of the 60; 180 s on
+  2026-11-07, when they took ~85 of the 120). If they outgrow 180 too,
+  that's a new case for the user.
 - Adapters a new harness would use as hooks (to see which callees a
   recompiled caller calls): deleted anyway once their callers in play
   are ours, and the harness built the bigger way, with the callees'

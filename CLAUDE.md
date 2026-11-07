@@ -547,8 +547,8 @@ Harness runs use `attract_race.sh 40` (the user's call,
 no halt. B7 loop migration agents run only their subsystem's harnesses
 (and those of files they touched); the validation agent runs them all
 once after each migration (the user's call, 2026-10-28), with
-`attract_race.sh 120` since they outgrew 40 s and then 60 (the user's
-calls, 2026-10-30 and 2026-10-31).
+`attract_race.sh 180` since they outgrew 40 s, 60 and then 120 (the
+user's calls, 2026-10-30, 2026-10-31 and 2026-11-07).
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
