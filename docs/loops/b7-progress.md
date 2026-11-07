@@ -151,7 +151,9 @@ file's history. What's left to see in a drive, from every run:
   `EquipChoice`, `AeroPartValue`, the part marks; 738 harness cases;
   race 38 s, 0 errors, all harnesses 0 differing; no subagents); left:
   ~40 ready roots needing movies 2/13's UI movie calls in the harness.
-  Validation agent running.
+  Validated `itc_3839` (race 33 s, the harnesses ~85 s of the 120; 0
+  errors, every harness 0 differing, 28 of 28 harness lines; 12 in the
+  replay `itc_3840` (ok), 16 to drive). Second migration agent running.
 
 ## Done
 
@@ -229,3 +231,5 @@ file's history. What's left to see in a drive, from every run:
   work left 2021 (wrapped 57, known 422, unknown 1542).
 - After the tuning screen's map: ours 4390, work left 2021 (wrapped 57,
   known 502, unknown 1462).
+- After its migration and validation (`itc_3839`): ours 4421, work left
+  1991 (wrapped 57, known 472, unknown 1462).

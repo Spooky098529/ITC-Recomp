@@ -74,6 +74,13 @@ here loses its heading.
   BuildScreen::InitStandList, `sub_8219D550` BuildScreen::DrawStandRow,
   `sub_8219D7B0` BuildScreen::StandArrows, `sub_8219DA58`
   BuildScreen::SetPrompts, `sub_8219DB50` BuildScreen::SetHelp.
+- The tuning screen, first migration (attract race `itc_3839`, replay
+  `itc_3840` ok; `tuning-screen.md`, names in its rows: mostly the debug
+  state handlers, `WheelNumber`, `HidePartMarks`, `ShowPartMarks`):
+  `sub_821CDED8`, `sub_821CC248`, `sub_821CC3A8`, `sub_821CC488`,
+  `sub_821E8068`, `sub_821E8128`, `sub_821E8298`, `sub_821FD710`,
+  `sub_821FD880`, `sub_821FDCB8`, `sub_821FE080`, `sub_821FE100`,
+  `sub_821FE178`, `sub_821FE190`, `sub_821EE6D0`, `sub_821EE760`.
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 
