@@ -486,8 +486,6 @@ ITC_TUNING_PAGES(821CCD38, TuningPagesPageCursor)
 ITC_TUNING_PAGES(821CCDB0, TuningPagesPageItemCount)
 ITC_TUNING_PAGES(821CCE30, TuningPagesIsPickOwned)
 ITC_TUNING_PAGES(821CDF98, TuningPagesTestAndSetWheelFlag)
-ITC_TUNING_PAGES(821E7DB0, TuningPagesSetWheelListEnd)
-ITC_TUNING_PAGES(821EF288, TuningPagesInchListEnd)
 ITC_TUNING_PAGES(821FE6A0, TuningPagesFreeTexture)
 ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
 ITC_TUNING_PAGES(82204730, TuningPagesBindVinylTexture)
@@ -495,8 +493,6 @@ ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
 
 ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
 
-ITC_TUNING_PAGES(821D9E68, TuningPagesShowPricePanel)
-ITC_TUNING_PAGES(821EED98, TuningPagesSetBrandLogo)
 ITC_TUNING_PAGES(8224AB50, TuningPagesHsvToRgb)
 
 ITC_TUNING_PAGES(821FE628, TuningPagesUpdateImages)
@@ -545,6 +541,12 @@ ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
 // No adapter (B7 loop, 2026-11-07: its only caller, InputOptions, is native
 // and calls its plain C++; the register step above is the harness's):
 // MoveOption sub_821D5610.
+
+// No adapters (removed, B7 loop, 2026-11-07: their only callers in play,
+// InputWheelParts and InputWheels, are native and call their plain C++; the
+// register steps above are the harness's): SetWheelListEnd sub_821E7DB0,
+// InchListEnd sub_821EF288, ShowPricePanel sub_821D9E68, SetBrandLogo
+// sub_821EED98.
 
 // No adapters (B7 loop, 2026-11-07: their only callers, InputWheels and
 // AnimateWheels, are native and call their plain C++; the register steps
