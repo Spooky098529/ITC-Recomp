@@ -1,21 +1,11 @@
 // The type 6 and type 7 modes' screen constructors natively: adapters in
-// front of src/screen_constructors/ (docs/functions/screen-constructors.md).
-// Each original returns its r3 (the object), which the adapters leave as it
-// is. Functions reached only from native callers have no adapters (the flag
-// switches their callers): NodeBase::NodeBase (sub_82258FB0), from
-// PanelGroupBase::PanelGroupBase; PanelSetBase::PanelSetBase
-// (sub_8224AD28), from PanelSet::PanelSet; PanelEBase::PanelEBase
-// (sub_8224EF78), from PanelE::PanelE; ListPartBase::ListPartBase,
-// ListPartInnerBase::ListPartInnerBase and ListPartInner::ListPartInner
-// (sub_822523F8, sub_822525E0, sub_822526A0), from ListPart::ListPart;
-// ColorListScreen::ColorListScreen and ColorNodeTable::ColorNodeTable
-// (sub_822550F8, sub_82247D08), from Type7ListScreen::Type7ListScreen;
-// the type 6 block's members (Type6ListScreen with TitledListScreen and
-// NodeListScreen, Type6NodeScreen with NodeScreen, Type6PanelScreen) from
-// Type6Screens::Type6Screens, and Type7PanelScreen from
-// Type7Screens::Type7Screens. The panel screens' four panels come from
-// operator new's plain C++ (the original's call, through the guest, when it
-// fails: the new handler and std::bad_alloc).
+// front of src/screen_constructors/ (docs/functions/screen-constructors.md)
+// for the two blocks' constructors, which the modes' slot 0 (recompiled)
+// calls; each returns its r3 (the block). The members have no adapters (the
+// flag switches the blocks' constructors): every caller they have in play
+// is native and calls their plain C++. The panel screens' four panels come
+// from operator new's plain C++ (the original's call, through the guest,
+// when it fails: the new handler and std::bad_alloc).
 
 #include "screen_constructors/screen_constructors.h"
 
@@ -61,31 +51,6 @@ namespace sc = screen_constructors;
     body;                                           \
   }
 
-ITC_SCREEN_CONSTRUCTOR(8224B660, sc::PanelSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                              ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r1.u32))
-ITC_SCREEN_CONSTRUCTOR(82230800, sc::PanelE(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SCREEN_CONSTRUCTOR(82252290, sc::ListScreen(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82252908, sc::ListPart(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(8224D6D0, sc::PanelCBase(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(8224EEA8, sc::PanelGroupBase(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(8224FA88, sc::PanelFBase(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82247BE8, sc::NodeTable(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(8224CFA0, sc::PanelDBase(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(8224CF58, sc::MachineScreen(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82235BD8, sc::Type6Screen0(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82249C08, sc::GroupPair(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_SCREEN_CONSTRUCTOR(82245FF8, sc::Type7Screen0(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82231CD0, sc::Panel6C(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SCREEN_CONSTRUCTOR(822416D8, sc::Panel7C(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SCREEN_CONSTRUCTOR(82231E40, sc::Panel6D(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SCREEN_CONSTRUCTOR(822418B8, sc::Panel7D(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SCREEN_CONSTRUCTOR(822308E8, sc::Panel6F(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SCREEN_CONSTRUCTOR(82240268, sc::Panel7F(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SCREEN_CONSTRUCTOR(82240110, sc::PanelGroup(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82231C68, sc::PanelGroup6B(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82241680, sc::PanelGroup7B(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82247C60, sc::PairedNodeTable(base, ctx.r3.u32))
-ITC_SCREEN_CONSTRUCTOR(82242BE8, sc::Type7ListScreen(base, ctx.r3.u32))
 
 namespace {
 
