@@ -273,21 +273,21 @@ void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_FRONT_END_CAR_DRAW(82179BE0, FrontEndCarDrawIsBusy)
-ITC_FRONT_END_CAR_DRAW(8217AFE8, FrontEndCarDrawSyncPlates)
 ITC_FRONT_END_CAR_DRAW(82178B40, FrontEndCarDrawSetDrawWord)
-ITC_FRONT_END_CAR_DRAW(8217D2B0, FrontEndCarDrawApplyPreset)
 ITC_FRONT_END_CAR_DRAW(82180108, FrontEndCarDrawCommand)
-ITC_FRONT_END_CAR_DRAW(8217D120, FrontEndCarDrawAnimsRun)
-ITC_FRONT_END_CAR_DRAW(82179678, FrontEndCarDrawSetLightKit)
-ITC_FRONT_END_CAR_DRAW(820C8480, FrontEndCarDrawFloorDraw)
-ITC_FRONT_END_CAR_DRAW(8217BA20, FrontEndCarDrawSetLights)
-ITC_FRONT_END_CAR_DRAW(8217CAB8, FrontEndCarDrawPoseCar)
 ITC_FRONT_END_CAR_DRAW(8217FE60, FrontEndCarDrawDraw)
 
 // SceneModel::ApplyLightKit sub_820D9D10 has no adapter (removed, B7 loop,
 // 2026-11-06): its callers in play, GarageStage::SetLightKit and the
 // garage stage's re-applies (car_makers), are native and call its plain C++
 // (its register step above is the harness's).
+// No adapters (removed, B7 loop, 2026-11-07: their callers in play are
+// native and call their plain C++; the register steps above are the
+// harness's): GarageStage::SyncPlates sub_8217AFE8, GarageAnims::Run
+// sub_8217D120, GarageStage::SetLights sub_8217BA20, PoseCar sub_8217CAB8
+// and Floor::Draw sub_820C8480 (GarageStage::Draw), GarageStage::ApplyPreset
+// sub_8217D2B0 (GarageStage::Draw and Command), GarageStage::SetLightKit
+// sub_82179678 (GarageStage::Draw and TuningScreen::RestoreStand).
 // No adapters (2026-11-04: their callers in play are native, which call
 // their plain C++; the steps above are the harness's): Plates::Hide
 // sub_820DF190 and Show sub_820DF180 (GarageStage::SyncPlates),

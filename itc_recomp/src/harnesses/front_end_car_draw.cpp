@@ -859,8 +859,10 @@ void Floors(Context& h, Random& r) {
 // (camera_modes.cpp's GarageCameras): viewport 0 and a stand-in app
 // interface of the case's, camera pass 0, its outputs and the open chunks'
 // count put back after. The callees run as their adapters run them on both
-// sides. Compared: the block, the stack (the top 40 bytes, the original's
-// saved registers, left out), the scene lights' constants, 0x826C5100,
+// sides (this file's own as their originals on the recompiled side: no
+// adapters). Compared: the block, the stack (the top 40 bytes, the
+// original's saved registers, and its callees' saves under its frame left
+// out), the scene lights' constants, 0x826C5100,
 // camera pass 0, the viewport, the garage camera's outputs and r3.
 void Draws(Context& h, uint32_t block, Random& r) {
   constexpr uint32_t kFirstSet = 0x826C2E40, kMirrored = 0x826C5100;
@@ -891,6 +893,7 @@ void Draws(Context& h, uint32_t block, Random& r) {
   const uint32_t viewports = viewport + kViewportBytes;
   const uint32_t stand_in = memory::Alloc(kStandInBytes, 0);
   Results results("GarageStage::Draw (sub_8217FE60)");
+  const uint32_t sp = CallContext(h).r1.u32 & ~0xFu;
   for (int c = 0; c < 40; c++) {
     World w{block};
     std::vector<uint8_t> viewport_in, pass_in;
@@ -989,7 +992,13 @@ void Draws(Context& h, uint32_t block, Random& r) {
         },
         __imp__sub_8217FE60, hooks::FrontEndCarDrawDraw, 40,
         {{w.stage() + 84, 1}, {w.model(0) + 4288 + 640, 1}, {w.model(1) + 4288 + 640, 1}},
-        fmt::format("case {}", c), nullptr, {},
+        fmt::format("case {}", c), nullptr,
+        // The 208 bytes under its frame: its callees' saved registers
+        // (GarageStage::SetLights' r18 to r31, f25 to f31, v126 and v127 the
+        // most; PoseCar's, ApplyPreset's and the others' inside them), whose
+        // originals run on the recompiled side since their adapters went (B7
+        // loop, 2026-11-07); the plain C++ doesn't save them.
+        {{sp - 256 - 208, 208}},
         [&](Outputs& o) {
           o.Bytes(Read(h.base, kAmbient, 16));
           o.Bytes(Read(h.base, kLights, kLightBytes));

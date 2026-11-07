@@ -1623,7 +1623,10 @@ void TuningStand(Context& h, Random& r) {
     // below 8, the aero set pick below 4. The top 64 bytes: f30, f31, r27
     // to r31 and lr's saves; the 32 under the frame and the 56 from 112
     // under it as PreviewItem's (also GarageStage::SetColor's pieces' f29
-    // to f31 and ScenePools::GetB's r30 and r31 under them).
+    // to f31 and ScenePools::GetB's r30 and r31 under them); the 24 under
+    // those 32: GarageStage::SetLightKit's original's f29 to f31 saves (its
+    // original runs on the recompiled side since its adapter went, B7 loop,
+    // 2026-11-07).
     Results results("TuningScreen::RestoreStand (sub_821E0FB0)");
     for (int c = 0; c < 640; c++) {
       Case(
@@ -1692,7 +1695,7 @@ void TuningStand(Context& h, Random& r) {
           },
           __imp__sub_821E0FB0, hooks::TuningRestoreStand, 64, floats,
           fmt::format("case {}", c), 224, 32, before, with_f1, 0x5000, kGarageBytes,
-          {{224 + 112, 56}, {224 + 4000 + 16, 16}});
+          {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16}});
     }
     results.Report();
   }
