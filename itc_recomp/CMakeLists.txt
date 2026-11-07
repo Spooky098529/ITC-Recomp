@@ -409,6 +409,8 @@ set(ITC_SOURCES
     src/build_screen/rows.cpp
     src/build_screen/transitions.cpp
     src/build_screen/builds.cpp
+    src/hooks/tuning_screen.cpp
+    src/tuning_screen/tables.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
@@ -604,6 +606,7 @@ set(ITC_SOURCES
     src/harnesses/race_update.cpp
     src/harnesses/stand_models.cpp
     src/harnesses/build_screen.cpp
+    src/harnesses/tuning_screen.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
