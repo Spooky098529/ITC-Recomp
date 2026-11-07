@@ -13,6 +13,7 @@
 
 ITC_FLAG_DECLARE(bool, native_car_models);
 ITC_FLAG_DECLARE(bool, native_car_specs);
+ITC_FLAG_DECLARE(bool, native_action_mappers);
 
 ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "Run the tuning screen's pages' functions (docs/functions/tuning-pages.md: "
@@ -42,7 +43,14 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "movies' plain C++; Color::HsvToRgb sub_8224AB50; the current choices "
               "SetAeroAvailability sub_821DE160 and SetCurrentChoice sub_821E1DB0 (its piece "
               "sub_821E203C merged; Params::GetCarParts and AeroParts::Get82 by their plain C++ "
-              "with --native_car_specs)) "
+              "with --native_car_specs); the decal images' loads LoadDecalImages sub_821FEE10 with "
+              "DecalImages::Request sub_821FE830 and Load sub_821F6D40 under it (these two with "
+              "no adapters: only LoadDecalImages calls them; VirtualAlloc and Archive::Load through "
+              "their overrides); the input pages Menu::StepList sub_821CE1D0, LeaveEditor "
+              "sub_821D8670 and InputCategories sub_821D6AD0 (the mappers' slots by their plain C++ "
+              "with --native_action_mappers; Menu::Step, MenuSound::Play and the UI movie calls "
+              "through their overrides; FadeIn, FadeOut, CategoryItemCount, MoveCategory and, with "
+              "the native heap, DecalImages::UnloadAll by their plain C++)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -237,6 +245,58 @@ void TuningPagesUnloadAll(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesLoadDecalImages(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::LoadDecalImages(base, call, screen, sp);
+  });
+}
+
+void TuningPagesRequestImage(PPCContext& ctx, uint8_t* base) {
+  const uint64_t images = ctx.r3.u64, id = ctx.r4.u64, i = ctx.r5.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::RequestImage(base, call, images, id, i, sp);
+  });
+}
+
+void TuningPagesLoadImage(PPCContext& ctx, uint8_t* base) {
+  const uint64_t images = ctx.r3.u64, id = ctx.r4.u64, i = ctx.r5.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::LoadImage(base, call, images, id, i, sp);
+  });
+}
+
+void TuningPagesStepList(PPCContext& ctx, uint8_t* base) {
+  const uint64_t menu = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::StepList(base, call, menu, sp, native_slots);
+  });
+}
+
+void TuningPagesLeaveEditor(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::LeaveEditor(base, call, screen, sp);
+  });
+}
+
+void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  tp::PageFlags flags;
+  flags.native_slots = ITC_FLAG(native_action_mappers);
+  flags.native_heap = NativeHeapActive();
+  flags.native_free = ITC_FLAG(native_car_models);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputCategories(base, call, screen, sp, flags);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -279,6 +339,11 @@ ITC_TUNING_PAGES(82208738, TuningPagesUnloadAll)
 ITC_TUNING_PAGES(821DE160, TuningPagesSetAeroAvailability)
 ITC_TUNING_PAGES(821E1DB0, TuningPagesSetCurrentChoice)
 
+ITC_TUNING_PAGES(821FEE10, TuningPagesLoadDecalImages)
+ITC_TUNING_PAGES(821CE1D0, TuningPagesStepList)
+ITC_TUNING_PAGES(821D8670, TuningPagesLeaveEditor)
+ITC_TUNING_PAGES(821D6AD0, TuningPagesInputCategories)
+
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
 // are the harness's): SetUpVinylBusyIcon sub_821FE560, DecalImages::AllLoaded
@@ -290,3 +355,7 @@ ITC_TUNING_PAGES(821E1DB0, TuningPagesSetCurrentChoice)
 // (RestoreMovieTexture), RestoreMovieTexture sub_822081A0
 // (RestoreStickerMovie), RestoreVinylMovie sub_822081D8 and
 // RestoreStickerMovie sub_821F6DD8 (UnloadAll).
+
+// No adapters (B7 loop, 2026-11-07: their only caller, LoadDecalImages, is
+// native and calls their plain C++; the register steps above are the
+// harness's): DecalImages::Request sub_821FE830 and Load sub_821F6D40.

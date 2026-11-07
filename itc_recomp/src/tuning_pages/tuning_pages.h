@@ -214,4 +214,67 @@ uint64_t SetAeroAvailability(uint8_t* base, const tuning_screen::GuestCall& call
 uint64_t SetCurrentChoice(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3,
                           uint32_t sp, bool native_specs);
 
+// --- The decal images' loads (loads.cpp) ---
+// Guest calls through `call` from the originals' frames with their return
+// addresses: VirtualAlloc (its override) and Archive::Load (its override,
+// r7 = r8 = 0); Archive::AssetSize by its plain C++.
+
+// sub_821FE830 DecalImages::Request: r3 = the decal images, r4 an asset id,
+// r5 an entry i (all 64 bits; e = i * 36 + r3, i not checked). Nothing when
+// e+8 is 1 or 2; else e+0 the id (a group's "none" id swapped for its
+// stand-in, entries above 108 keeping theirs), the file's pages into +12,
+// Archive::Load into +4, +8 = +24 = 1, +16 the size, +20 = 0. 96-byte frame;
+// r3 the last AssetSize's, else `images`.
+uint64_t RequestImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                      uint64_t id, uint64_t i, uint32_t sp);
+// sub_821F6D40 DecalImages::Load: Request without its state check and id
+// swap. 96-byte frame; r3 the last AssetSize's.
+uint64_t LoadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                   uint64_t id, uint64_t i, uint32_t sp);
+// sub_821FEE10 TuningScreen::LoadDecalImages: r3 = the screen (all 64 bits).
+// With +9656 5 and byte +9660 6 the vinyls' 51 entries requested (its row),
+// else the 200 sticker images loaded. 128-byte frame; r3 the last call's.
+uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp);
+
+// --- The input pages and the list menu's step (pages.cpp) ---
+// Guest calls through `call` from the originals' frames with their return
+// addresses: Menu::Step, MenuSound::Play, UiMovie::Finish, Play and Loop
+// (their overrides); the player's mapper's slots 10 and 12 by
+// ActionMapper::Pressed's and Fired's plain C++ with `native_slots`
+// (--native_action_mappers) where the vtable holds them, else through `call`;
+// ScreenFades::FadeIn and FadeOut, TuningScreen::CategoryItemCount and
+// MoveCategory by their plain C++.
+
+// The flags the pages pass on: the mappers' slots (--native_action_mappers),
+// the native heap (hooks::NativeHeapActive(): DecalImages::UnloadAll by its
+// plain C++, else the guest's) and Texture::Free under it by car_models'
+// plain C++ (--native_car_models).
+struct PageFlags {
+  bool native_slots = false;
+  bool native_heap = false;
+  bool native_free = false;
+};
+
+// sub_821CE1D0 Menu::StepList: Menu::Step for a scrolling list, r3 = the
+// menu (all 64 bits; its row): +4 = +0, +44 = +36 = 0, the first of up,
+// down (the cursor and the row +48 stepped, +52 the row before), left, right
+// (+36) fired on the player's mapper (slot 12), then the cursor wrapped
+// (+44 = 1) or clamped to [+12, +16], the row to [+56, +60 - 1] (or to the
+// other end after a wrap), +8 the way it moved. 128-byte frame; r3 the last
+// slot's, else the menu.
+uint64_t StepList(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp,
+                  bool native_slots);
+// sub_821D8670 TuningScreen::LeaveEditor: state 61's page (its row): with
+// layer 0's fade counts 0, Push(61), the queue to state 62, FadeIn, movie
+// 2's item animation (27, item + 2) finished, played and looped, the busy
+// icon. 128-byte frame; r3 Loop's, else the screen (all 64 bits).
+uint64_t LeaveEditor(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                     uint32_t sp);
+// sub_821D6AD0 TuningScreen::InputCategories: state 3's page (its row):
+// Menu::Step on [+10040]; moved, A or B (the player's mapper's slot 10 on
+// 159, 158); MoveCategory always. 112-byte frame; r3 MoveCategory's.
+uint64_t InputCategories(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                         uint32_t sp, const PageFlags& flags);
+
 }  // namespace tuning_pages

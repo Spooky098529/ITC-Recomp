@@ -35,6 +35,9 @@ ITC_FLAG_DECLARE(bool, native_tuning_pages);
 
 namespace harness {
 
+// The input pages' cases over a movie world (tuning_pages_movie.cpp).
+void TuningPagesMovie(Context& h);
+
 namespace {
 
 constexpr uint32_t kScreenBytes = 0xA000;  // the screen (to +40960: the picks' tables with any byte)
@@ -740,6 +743,145 @@ void UnloadAllCases(Context& h, const World& w) {
   results.Report();
 }
 
+// The decal images' loads (LoadDecalImages, Request, Load): Archive::Load
+// recorded (harness::ArchiveLoads: its calls' r3 to r8 compared, answered
+// with random serials or -1), VirtualAlloc's pages real (both runs allocate
+// them in the same order): the pages compared as tokens by the order they
+// first appear in the recorded calls (and in entries' +12), their first 64
+// bytes compared (cleared), then freed. The screen's block, the stack but
+// for `holes` and the top `saves` bytes, the caller's area, r1 and all of
+// r3.
+using LoadSetup = std::function<void(PPCContext&, Random&, const World&)>;
+
+void LoadGroup(Context& h, const World& w, const char* name, int cases, const LoadSetup& setup,
+               GuestFunction recompiled, GuestFunction native, uint32_t saves,
+               const Holes& holes) {
+  Results results(name);
+  for (int c = 0; c < cases; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
+      WriteRandom(h.base, w.screen_block.address, w.screen_block.bytes, r);
+      const uint32_t images = w.screen() + 10048;
+      // The entries' states: 0, 1 (loading), 2 (loaded) or any word; their
+      // ids sensible (163 to 581: a decal image's).
+      for (uint32_t i = 0; i < 200; i++) {
+        const uint32_t e = images + 36 * i;
+        const uint32_t kind = r.Below(4);
+        guest::StoreU32(h.base, e + 8, kind == 3 ? uint32_t(r.Next()) : kind);
+        guest::StoreU32(h.base, e + 0, 163 + r.Below(419));
+      }
+      t.r3.u64 = w.screen();
+      std::vector<int64_t> serials;
+      for (int k = 0; k < 260; k++) {
+        serials.push_back(r.Below(5) == 0 ? -1 : int64_t(r.Below(1000)));
+      }
+      setup(t, r, w);
+      t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      ArchiveLoads loads(serials);
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_tuning_pages);
+        ITC_FLAG(native_tuning_pages) = false;
+        recompiled(t, h.base);
+        ITC_FLAG(native_tuning_pages) = flag;
+      } else {
+        native(t, h.base);
+      }
+      ZeroHoles(h.base, sp, holes);
+      // The pages, in the order the loads name them.
+      std::vector<uint32_t> pages;
+      auto token = [&](uint32_t word) -> uint32_t {
+        if (word == 0 || !memory::IsPages(word)) return word;
+        for (uint32_t k = 0; k < pages.size(); k++) {
+          if (pages[k] == word) return 0xA110C000u + k;
+        }
+        pages.push_back(word);
+        return 0xA110C000u + uint32_t(pages.size() - 1);
+      };
+      const std::vector<uint32_t>& calls = loads.calls();
+      out[v].Word(uint32_t(calls.size()));
+      for (size_t k = 0; k < calls.size(); k++) {
+        out[v].Word(k % 6 == 1 ? token(calls[k]) : calls[k]);
+      }
+      for (uint32_t i = 0; i < 200; i++) {
+        const uint32_t e = images + 36 * i;
+        guest::StoreU32(h.base, e + 12, token(guest::LoadU32(h.base, e + 12)));
+      }
+      out[v].Bytes(Read(h.base, w.screen_block.address, w.screen_block.bytes));
+      out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes - saves));
+      out[v].Bytes(Read(h.base, sp, kCallerBytes));
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(uint32_t(pages.size()));
+      for (const uint32_t a : pages) {
+        out[v].Bytes(Read(h.base, a, 64));
+        memory::FreePages(a);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void LoadCases(Context& h, const World& w) {
+  // LoadDecalImages: the vinyls (category 5's item 6) four times in five,
+  // else another category or item (the stickers' 200 loads); the layer ids
+  // +31168 to +31188 small, now and then -1 (the "none" ids 162 and 188).
+  // Its saves (__savegprlr_28: 40 bytes) and Request's or Load's (r31 and
+  // lr, 16 bytes below its frame) out.
+  LoadGroup(
+      h, w, "TuningScreen::LoadDecalImages", 25,
+      [](PPCContext& t, Random& r, const World& w) {
+        const uint32_t s = w.screen();
+        const bool vinyls = r.Below(5) != 0;
+        guest::StoreU32(w.base, s + 9656, vinyls ? 5 : Around(r, -1, 7));
+        guest::StoreU8(w.base, s + 9660, uint8_t(vinyls ? 6 : r.Below(9)));
+        for (uint32_t k = 0; k < 6; k++) {
+          guest::StoreU32(w.base, s + 31168 + 4 * k,
+                          r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(30));
+        }
+        if (r.Below(4) == 0) {
+          t.r3.u64 |= r.Next() << 32;
+        }
+      },
+      __imp__sub_821FEE10, hooks::TuningPagesLoadDecalImages, 40, {{128, 144}});
+  // Request: entries in each of the id swaps' ranges (0 to 20, 21 to 50,
+  // 51 to 79, 80 to 108, 109 to 120; now and then any word, with upper
+  // bits), the id the range's "none" id half the time (now and then another
+  // range's), else a decal image's (the entry's +0 for the entries keeping
+  // their id: a decal image's).
+  const LoadSetup request = [](PPCContext& t, Random& r, const World& w) {
+    t.r3.u64 = w.screen() + 10048;
+    static constexpr uint32_t kFrom[] = {0, 21, 51, 80, 109, 121};
+    static constexpr uint32_t kNone[] = {162, 188, 382, 382, 162};
+    const uint32_t range = r.Below(5);
+    uint64_t i = kFrom[range] + r.Below(kFrom[range + 1] - kFrom[range]);
+    t.r4.u64 = r.Below(2) == 0 ? (r.Below(5) == 0 ? kNone[r.Below(5)] : kNone[range])
+                               : 163 + r.Below(419);
+    if (r.Below(8) == 0) {
+      t.r4.u64 |= r.Next() << 32;
+    }
+    if (r.Below(10) == 0) {
+      i = r.Next();
+      // Inside the block, now and then with upper bits.
+      i = (uint32_t(i) % 200) | (r.Below(2) == 0 ? (i & ~0xFFFFFFFFull) : 0);
+    }
+    t.r5.u64 = i;
+    // The entry's state 0 two times in three, else 0 to 2.
+    guest::StoreU32(w.base, w.screen() + 10048 + 36 * uint32_t(i % 200) + 8,
+                    r.Below(3) == 0 ? r.Below(3) : 0);
+  };
+  LoadGroup(h, w, "DecalImages::Request", 80, request, __imp__sub_821FE830,
+            hooks::TuningPagesRequestImage, 16, {});
+  LoadGroup(h, w, "DecalImages::Load", 30, request, __imp__sub_821F6D40,
+            hooks::TuningPagesLoadImage, 16, {});
+}
+
 }  // namespace
 
 void TuningPages(Context& h) {
@@ -972,6 +1114,11 @@ void TuningPages(Context& h) {
         }
       },
       __imp__sub_821E1DB0, hooks::TuningPagesSetCurrentChoice, 8, {{96, 112}});
+
+  // The decal images' loads.
+  LoadCases(h, w);
+  // The input pages over movie 2 (tuning_pages_movie.cpp).
+  TuningPagesMovie(h);
 }
 
 }  // namespace harness

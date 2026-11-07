@@ -78,4 +78,20 @@ void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetAeroAvailability(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetCurrentChoice(PPCContext& ctx, uint8_t* base);
 
+// The decal images' loads: TuningScreen::LoadDecalImages sub_821FEE10 (r3
+// the screen), DecalImages::Request sub_821FE830 and Load sub_821F6D40 (r3
+// the images, r4 an id, r5 an entry).
+void TuningPagesLoadDecalImages(PPCContext& ctx, uint8_t* base);
+void TuningPagesRequestImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesLoadImage(PPCContext& ctx, uint8_t* base);
+
+// The input pages: Menu::StepList sub_821CE1D0 (r3 the menu),
+// TuningScreen::LeaveEditor sub_821D8670 and InputCategories sub_821D6AD0
+// (r3 the screen; the mappers' slots by their plain C++ with
+// --native_action_mappers, DecalImages::UnloadAll by its plain C++ with the
+// native heap).
+void TuningPagesStepList(PPCContext& ctx, uint8_t* base);
+void TuningPagesLeaveEditor(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
