@@ -144,6 +144,52 @@ uint64_t BindVinylTextures(uint8_t* base, uint64_t screen, uint32_t sp) {
   return entry;
 }
 
+uint64_t RestoreMovieTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_t n,
+                             uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_822081A0 DecalImages::RestoreMovieTexture");
+  const uint32_t frame = Frame(base, sp, 112);
+  RestoreVinylTexture(base, images, w, n, frame);
+  return RestoreStickerTexture(base, images, w, n, frame);
+}
+
+uint64_t RestoreVinylMovie(uint8_t* base, uint64_t images, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_822081D8 DecalImages::RestoreVinylMovie");
+  // The textures BindVinylTextures replaces: group 0's back to the
+  // placeholder +8836 (w 0), group 1's to +8840 (w 1), in the original's
+  // order, each followed by RestoreStickerTexture (nothing for w 0 and 1 but
+  // its frame).
+  static constexpr uint8_t kGroup0[12] = {181, 183, 184, 191, 192, 193,
+                                          168, 169, 170, 171, 172, 173};
+  static constexpr uint8_t kGroup1[12] = {175, 177, 178, 194, 195, 196,
+                                          160, 161, 162, 163, 164, 165};
+  const uint32_t frame = Frame(base, sp, 128);
+  uint64_t r3 = images;
+  for (uint32_t w = 0; w < 2; w++) {
+    for (const uint8_t n : w == 0 ? kGroup0 : kGroup1) {
+      RestoreTexture(base, uint32_t(images), 13, w == 0 ? 8836 : 8840, n, frame);
+      r3 = RestoreStickerTexture(base, images, w, n, frame);
+    }
+  }
+  return r3;
+}
+
+uint64_t RestoreStickerMovie(uint8_t* base, uint64_t images, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F6DD8 DecalImages::RestoreStickerMovie");
+  static constexpr uint8_t kPlaceholder3[16] = {159, 161, 163, 165, 167, 169, 173, 176,
+                                                178, 180, 182, 190, 192, 194, 196, 198};
+  static constexpr uint8_t kPlaceholder2[16] = {160, 162, 164, 166, 168, 170, 174, 177,
+                                                179, 181, 183, 191, 193, 195, 197, 199};
+  const uint32_t frame = Frame(base, sp, 96);
+  uint64_t r3 = images;
+  for (const uint8_t n : kPlaceholder3) {
+    r3 = RestoreMovieTexture(base, images, 3, n, frame);
+  }
+  for (const uint8_t n : kPlaceholder2) {
+    r3 = RestoreMovieTexture(base, images, 2, n, frame);
+  }
+  return r3;
+}
+
 uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821D84F8 TuningScreen::EnterEditor");
   const uint32_t s = uint32_t(screen);

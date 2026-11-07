@@ -530,6 +530,29 @@ void TuningPages(Context& h) {
         t.r5.u64 = Around(r, -1, 2);
       },
       __imp__sub_82204730, hooks::TuningPagesBindVinylTexture, 32);
+  // The restores: RestoreMovieTexture's __savegprlr_29 (32 bytes) with its
+  // callees' (24, 112 bytes below); RestoreVinylMovie's (32) with
+  // RestoreStickerTexture's (24, 128 below); RestoreStickerMovie's r31 and
+  // lr (16) with RestoreMovieTexture's (32, 96 below) and its callees' (24,
+  // 208 below).
+  auto images = [](PPCContext& t, Random& r, const World& w) {
+    t.r3.u64 = w.screen() + 10048;
+    if (r.Below(6) == 0) {
+      t.r3.u64 |= r.Next() << 32;
+    }
+  };
+  Group(
+      h, w, "DecalImages::RestoreMovieTexture", 30,
+      [images](PPCContext& t, Random& r, const World& w) {
+        images(t, r, w);
+        t.r4.u64 = Around(r, -1, 4);
+        t.r5.u64 = r.Below(200);
+      },
+      __imp__sub_822081A0, hooks::TuningPagesRestoreMovieTexture, 32, {{112, 136}});
+  Group(h, w, "DecalImages::RestoreVinylMovie", 20, images, __imp__sub_822081D8,
+        hooks::TuningPagesRestoreVinylMovie, 32, {{128, 152}});
+  Group(h, w, "DecalImages::RestoreStickerMovie", 20, images, __imp__sub_821F6DD8,
+        hooks::TuningPagesRestoreStickerMovie, 16, {{96, 128}, {208, 232}});
   Group(h, w, "TuningScreen::BindVinylTextures", 20, kScreenOnly, __imp__sub_82203D40,
         hooks::TuningPagesBindVinylTextures, 16);
   // EnterEditor: the fades' counts 0 and the images loaded most of the

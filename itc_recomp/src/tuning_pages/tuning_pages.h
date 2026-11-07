@@ -98,6 +98,19 @@ uint64_t RestoreStickerTexture(uint8_t* base, uint64_t images, uint32_t w, uint3
 // entry.
 uint32_t BindVinylTexture(uint8_t* base, uint64_t images, uint32_t i, uint32_t group,
                           uint32_t sp);
+// sub_822081A0 DecalImages::RestoreMovieTexture: RestoreVinylTexture then
+// RestoreStickerTexture with (images, w, n), from its 112-byte frame; r3 the
+// second's.
+uint64_t RestoreMovieTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_t n,
+                             uint32_t sp);
+// sub_822081D8 DecalImages::RestoreVinylMovie: movie 13's 24 textures back
+// to their placeholders (its row), each followed by RestoreStickerTexture.
+// 128-byte frame; r3 the last RestoreStickerTexture's (`images`).
+uint64_t RestoreVinylMovie(uint8_t* base, uint64_t images, uint32_t sp);
+// sub_821F6DD8 DecalImages::RestoreStickerMovie: RestoreMovieTexture for
+// movie 14's 32 textures (placeholder 3, then 2; its row). 96-byte frame; r3
+// the last one's.
+uint64_t RestoreStickerMovie(uint8_t* base, uint64_t images, uint32_t sp);
 // sub_82203D40 TuningScreen::BindVinylTextures: with +9656 5 and byte +9660
 // 6, the 24 entries' textures into movie 13's (its row). 112-byte frame; r3
 // the movie's entry, else the screen (all 64 bits).

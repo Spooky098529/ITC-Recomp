@@ -27,7 +27,9 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "textures DecalImages::FreeTexture sub_821FE6A0 (Texture::Free by its plain C++ with "
               "--native_car_models and the native heap), RestoreVinylTexture sub_82204698, "
               "RestoreStickerTexture sub_821F89B8, BindVinylTexture sub_82204730, "
-              "BindVinylTextures sub_82203D40 and EnterEditor sub_821D84F8 (FadeIn's plain C++); the "
+              "BindVinylTextures sub_82203D40, EnterEditor sub_821D84F8 (FadeIn's plain C++), "
+              "RestoreMovieTexture sub_822081A0, RestoreVinylMovie sub_822081D8 and "
+              "RestoreStickerMovie sub_821F6DD8; the "
               "vinyls' records StoreVinyls sub_82203F20 and LoadVinyls sub_822040A8 (memcpy's plain "
               "C++ where Buffers_Memcpy takes it); ShowPricePanel sub_821D9E68, SetBrandLogo "
               "sub_821EED98 (its piece sub_821EEE14 merged), movie 2's nodes through the UI "
@@ -128,6 +130,18 @@ void TuningPagesEnterEditor(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = tp::EnterEditor(base, ctx.r3.u64, ctx.r1.u32);
 }
 
+void TuningPagesRestoreMovieTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::RestoreMovieTexture(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
+void TuningPagesRestoreVinylMovie(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::RestoreVinylMovie(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void TuningPagesRestoreStickerMovie(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::RestoreStickerMovie(base, ctx.r3.u64, ctx.r1.u32);
+}
+
 void TuningPagesStoreVinyls(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   tp::StoreVinyls(base, ctx.r3.u64, ctx.r1.u32);
@@ -187,6 +201,9 @@ ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
 ITC_TUNING_PAGES(82204730, TuningPagesBindVinylTexture)
 ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
 
+ITC_TUNING_PAGES(822081A0, TuningPagesRestoreMovieTexture)
+ITC_TUNING_PAGES(822081D8, TuningPagesRestoreVinylMovie)
+ITC_TUNING_PAGES(821F6DD8, TuningPagesRestoreStickerMovie)
 ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
 ITC_TUNING_PAGES(822040A8, TuningPagesLoadVinyls)
 
