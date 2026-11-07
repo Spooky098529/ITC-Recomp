@@ -93,9 +93,17 @@ file's history. What's left to see in a drive, from every run:
   Overridden (their callers, the modes' slot 0, recompiled), 39 Native,
   24 adapters removed; the stack leftovers copied; races 38 s, 0
   errors, its harnesses 0 differing; no subagents); left: none.
-  Validation agent running.
+  Validated `itc_4363` (race 90 s at 180, the harnesses ~88.3 s; 0
+  errors, every harness 0 differing, 41 of 41 harness lines; none in the
+  race or the replay `itc_4364` (ok): the modes aren't reached; all 41
+  to drive). Recorded.
+- Picking subsystem 3.
 
 ## Done
+
+- `screen-constructors.md`: 41 of 41 native (the type 6 and 7 modes'
+  screen blocks and members; 24 adapters removed),
+  `--native_screen_constructors`; fbb76124, c0ce0aec..bc2f1e67.
 
 - Cleanup: 15 adapters removed in `front-end-car-draw.md` and
   `tuning-screen.md` (now Native); c1cd4b85..99c60056.
@@ -134,5 +142,7 @@ file's history. What's left to see in a drive, from every run:
   Overridden -> Native).
 - After the screen constructors' map: ours 4548, work left 1872
   (wrapped 57, known 461, unknown 1354).
+- After its migration and validation (`itc_4363`): ours 4589, work left
+  1831 (wrapped 57, known 420, unknown 1354).
 
 ## Stopped

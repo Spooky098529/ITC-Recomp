@@ -2777,6 +2777,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | The build screen (the front-end screen over `[0x826D8448]`, four levels as the states of `[0x826D843C]`: groups by category, a group's builds, one build on the stand, its details; its 21 transitions, lists, rows and prompts; with `CarScene::Update` `sub_820C9608`, `SceneModel::Update`, `GarageStage::ReloadModel`; and the cleanup leads before it, `GarageStage::ReapplyRecord`, `SetCar`, `ShowCarById` and their pairs) | `build-screen.md` (and rows in `scene.md`, `scene-models.md`, `vehicle-accessors.md`, `accessories.md`, `car-makers.md`) | 59 of 60 (three migrations; `BackToBuilds` kept recompiled, the user's call) | `--native_build_screen` (and `--native_scene`, `--native_car_makers`) |
 | 2026-11-07 | The tuning screen (the front end's tuning shop: its update's subtree, not the update `sub_821E6C50` or its refresh `sub_821E3AD0`: the debug state handlers, the command queue's runners, the category bar, lists, pages, marks, texts, the stand's calls, `RefreshMenu`, `RefreshMovie13`; with `GarageStage::Draw` and three UI movie text calls) | `tuning-screen.md` (and rows in `front-end-car-draw.md`, `ui-movies-game.md`, `car-makers.md`) | 82 of 82 in play (five migrations) | `--native_tuning_screen` (and `--native_front_end_car_draw`, `--native_ui_movies_game`) |
 | 2026-11-07 | The tuning screen's pages (its input handler `TuningScreen::HandleInput` `sub_821E6950`'s pages for states 0, 3-8, 15-22, 53-62: the levels, types, options, items, wheels, wheel parts, inches and categories inputs, `Leave`, `OnDialogYes` with the sticker dialog, the vinyl editor's entry and exit, the decal images' load, update and unload, `Menu::StepList`, `Color::HsvToRgb`; not the handler itself) | `tuning-pages.md` | 72 of 74 (four migrations; 26 adapters removed) | `--native_tuning_pages` |
+| 2026-11-07 | The type 6 and 7 modes' screen constructors (the screen blocks the modes' slot 0 allocates at +848, `Type6Screens` `sub_822366F0` and `Type7Screens` `sub_82246B28`, with their list, node, panel and machine screens) | `screen-constructors.md` | 41 of 41 (one migration; 24 adapters removed) | `--native_screen_constructors` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4814,3 +4815,18 @@ pairs): overridden 109, Native 36, Dropped 26, never called 70, live
 208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
 ours 4,548, work left 1,872 (Wrapped 57, with a row 420, no row yet
 1,395), from 1,937.
+
+**2026-11-07, the screen constructors (branch `b7-loop-07-11-26`):** the
+thirty-seventh run's second subsystem (`screen-constructors.md`,
+`--native_screen_constructors`, `src/screen_constructors/`), in one
+migration: the constructors of the screen blocks the type 6 and 7
+modes allocate (91,272 and 71,292 bytes) and of their members; stack
+leftovers (`NodeScreen` storing into its caller's frame,
+`PanelSetBase` below its stack pointer) copied as the original leaves
+them. The modes' slot 0 functions that call them, with their screens'
+Inits, are leads. Neither the attract race nor the pad replay reaches
+the two modes: their functions wait for a drive. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 4,589, work left 1,831 (Wrapped 57, with a row
+420, no row yet 1,354), from 1,872.

@@ -65,6 +65,19 @@ here loses its heading.
   TuningScreen::PreviewWheels, `sub_821EE6D0`
   TuningScreen::HidePartMarks, `sub_821EE760`
   TuningScreen::ShowPartMarks, `sub_821CDED8` TuningScreen::WheelNumber.
+- The screen constructors (attract race `itc_4363`, replay `itc_4364`
+  ok; `screen-constructors.md`): all 41 rows (the type 6 and 7 modes'
+  screens, neither reached by the replay): `sub_822366F0`,
+  `sub_82235BD8`, `sub_822330F0`, `sub_822570F0`, `sub_82256F68`,
+  `sub_82236C30`, `sub_8225A3D8`, `sub_822309C8`, `sub_82246B28`,
+  `sub_82245FF8`, `sub_82242BE8`, `sub_822550F8`, `sub_822403A0`,
+  `sub_8224CF58`, `sub_82252290`, `sub_82247BE8`, `sub_82247C60`,
+  `sub_82247D08`, `sub_82252908`, `sub_822523F8`, `sub_822526A0`,
+  `sub_822525E0`, `sub_82240110`, `sub_82231C68`, `sub_82241680`,
+  `sub_8224EEA8`, `sub_82258FB0`, `sub_82231CD0`, `sub_822416D8`,
+  `sub_8224D6D0`, `sub_82231E40`, `sub_822418B8`, `sub_8224CFA0`,
+  `sub_82230800`, `sub_8224EF78`, `sub_822308E8`, `sub_82240268`,
+  `sub_8224FA88`, `sub_8224B660`, `sub_8224AD28`, `sub_82249C08`.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
