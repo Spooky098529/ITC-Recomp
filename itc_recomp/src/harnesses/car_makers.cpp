@@ -16,6 +16,7 @@
 #include "base/log.h"
 #include "hooks/car_makers.h"
 #include "hooks/stand_models.h"
+#include "hooks/tuning_pages.h"
 #include "hooks/tuning_screen.h"
 #include "tuning_screen/tuning_screen.h"
 #include "memory/heap.h"
@@ -1438,6 +1439,64 @@ void TuningStand(Context& h, Random& r) {
           },
           0x4000, kGarageBytes);
     }
+    results.Report();
+  }
+  {
+    // TuningScreen::OnDialogYes's states 35 and 36 (the vinyl editor's
+    // discard and keep, which fit the selected car on the stand: its world
+    // is this one; the other states are tuning_pages' cases): category 5's
+    // item 6 mostly, the page +30724 0 or 1 mostly (2 or 3: no swaps), the
+    // history at least 10 deep with a 23 below its depth, the command queue
+    // in the screen; movie 13 the text world's, its +28 texture table in the
+    // screen (+0x8800, its 200 words naming 8-byte entries at +0x8C00). Its
+    // callees with adapters run natively on both sides (StoreVinyls,
+    // BindVinylTexture, FitSelectedCar: their own cases compare them). The
+    // top 32 bytes: OnDialogYes's __savegprlr_29; OnStickerDialogYes's r31
+    // and lr (112 to 128 below r1) left out. The generator put back after,
+    // so the groups after it keep their cases (RestoreStand's read guest
+    // 0x00000008 on the cases a moved generator gave it, 2026-11-07).
+    const Random kept = r;
+    TextWorld text(h.base);
+    Results results("TuningScreen::OnDialogYes (sub_821E2660, states 35 and 36)");
+    constexpr uint32_t kQueue = 0x9380, kTextures = 0x8800, kEntries = 0x8C00;
+    for (int c = 0; c < 30 && text.ok(); c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            text.Lay(r);
+            guest::StoreU32(text.inputs.data(), text.movie - text.block + 28, screen + kTextures);
+            for (uint32_t k = 0; k < 200; k++) {
+              field(kTextures + 4 * k, screen + kEntries + 8 * r.Below(200));
+            }
+            field(10036, screen + kQueue);
+            field(tuning_screen::kState, 35 + r.Below(2));
+            if (r.Below(5) == 0) {
+              field(tuning_screen::kCategory, r.Below(7));
+              byte(tuning_screen::kItem, r.Below(9));
+            } else {
+              field(tuning_screen::kCategory, 5);
+              byte(tuning_screen::kItem, 6);
+            }
+            field(30724, r.Below(5) == 0 ? r.Below(4) : r.Below(2));
+            const uint32_t depth = 10 + r.Below(50);
+            byte(10008, depth);
+            field(9756 + 4 * r.Below(depth), 23);
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821E2660, hooks::TuningPagesOnDialogYes, 32, floats,
+          fmt::format("case {}", c), 112, 16,
+          [&] {
+            before();
+            text.Before();
+          },
+          [&](Outputs& out, const PPCContext& t) {
+            with_f1(out, t);
+            text.Add(out);
+          },
+          0x3000, kGarageBytes);
+    }
+    r = kept;
     results.Report();
   }
   // The first set's tires and calipers as stand_models' harness lays the

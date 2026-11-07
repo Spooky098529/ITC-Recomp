@@ -75,6 +75,8 @@ constexpr uint32_t kQueueAt = 0x9F00;    // the command queue [+10036] in the sc
 // pointers name (+0x100: car ids 0 to 25 and levels to 255 stay inside).
 constexpr uint32_t kParamsBytes = 0x4000;
 constexpr uint32_t kCarParams = 0x826C2E48;
+constexpr uint32_t kSaveDataPointer = 0x826C5B58;  // SaveData::Of(0)
+constexpr uint32_t kMenuAt = 0x9E00;  // the front-end menu [+10040] in the screen's block
 
 struct World {
   World()
@@ -101,6 +103,7 @@ constexpr Global kGlobals[] = {
     {kMissingMovie, 4},
     {kFades, kFadesBytes},
     {kCarParams, 4},
+    {kSaveDataPointer, 4},
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -332,6 +335,106 @@ const SetupFn kVinyls = [](PPCContext&, Random& r, const World& w) {
     }
   }
 };
+
+// The confirm dialogs' yes answers: the state (+9652) one of the answers'
+// (now and then any), the category, item and type their branches test
+// (now and then other ones), the paint and light kit's fields, the vinyl and
+// sticker editors' page, layer and area small; the front-end menu in the
+// screen's block; the history at least 10 deep with each state the answers
+// pop to (3, 4, 15, 19, 23, 24, 53, 56) somewhere below its depth; the
+// screen's saved and placed sticker records without signaling NaNs (the
+// originals' lfs and stfs quiet them, the host's float copies may not);
+// SaveData::Of(0) the world's save data, its +70 below 15 (Career::PickNext's
+// gate skips: past it, never seen in play, its original would run on the
+// world's random words).
+void ShapeDialog(PPCContext& t, Random& r, const World& w, bool stickers) {
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 10040, s + kMenuAt);
+  static constexpr uint32_t kStates[] = {9, 11, 11, 11, 12, 12, 13, 13, 14, 14, 14, 37, 37,
+                                         50, 51, 52};
+  static constexpr uint32_t kStickerStates[] = {50, 50, 51, 52, 52};
+  uint32_t state = stickers ? kStickerStates[r.Below(5)] : kStates[r.Below(16)];
+  if (r.Below(10) == 0) {
+    state = Around(r, 0, 64);
+  }
+  if (state == 35 || state == 36) {
+    state = 37;  // FitSelectedCar's world is car_makers'
+  }
+  guest::StoreU32(base, s + 9652, state);
+  // (category, item, type): the picks the state's branches test, now and
+  // then any.
+  struct Pick {
+    int32_t category;
+    uint8_t item, type;
+  };
+  static constexpr Pick k11[] = {{2, 0, 0}, {5, 0, 0}, {5, 2, 0}, {6, 3, 0}, {6, 1, 0},
+                                 {4, 3, 1}, {1, 1, 0}, {0, 2, 0}, {3, 0, 2}};
+  static constexpr Pick k12[] = {{5, 4, 0}, {5, 5, 0}, {5, 5, 0}, {5, 6, 0}, {4, 4, 0}};
+  static constexpr Pick k14[] = {{4, 3, 1}, {4, 9, 0}, {4, 3, 0}, {4, 9, 1}, {5, 5, 0},
+                                 {5, 4, 0}, {6, 3, 0}, {6, 3, 0}, {6, 2, 0}};
+  static constexpr Pick k37[] = {{5, 6, 0}, {5, 7, 0}, {5, 2, 0}, {4, 6, 0}};
+  Pick pick{int32_t(r.Below(7)), uint8_t(r.Below(10)), uint8_t(r.Below(3))};
+  if (r.Below(6) != 0) {
+    switch (state) {
+      case 11: pick = k11[r.Below(9)]; break;
+      case 12:
+      case 13: pick = k12[r.Below(5)]; break;
+      case 14: pick = k14[r.Below(9)]; break;
+      case 37: pick = k37[r.Below(4)]; break;
+      default: break;
+    }
+  }
+  if (r.Below(10) == 0) {
+    pick.category = int32_t(Around(r, -1, 7));
+  }
+  guest::StoreU32(base, s + 9656, uint32_t(pick.category));
+  guest::StoreU8(base, s + 9660, pick.item);
+  guest::StoreU8(base, s + 9662, pick.type);
+  guest::StoreU32(base, s + 33540, r.Below(8) == 0 ? Around(r, 0, 3) : r.Below(2));
+  guest::StoreU32(base, s + 33576, r.Below(8));
+  guest::StoreU32(base, s + 25196, r.Below(2) == 0 ? 0 : 1 + r.Below(3));
+  guest::StoreU32(base, s + 30500, r.Below(8) == 0 ? Around(r, 0, 3) : r.Below(2));
+  guest::StoreU32(base, s + 30492, r.Below(2) == 0 ? 3 : uint32_t(int32_t(r.Below(5)) - 1));
+  guest::StoreU32(base, s + 30724, r.Below(3));
+  guest::StoreU32(base, s + 30732, r.Below(3));
+  if (state >= 50 && state <= 52) {
+    guest::StoreU32(base, s + 30724, r.Below(8));
+    guest::StoreU32(base, s + 30732, r.Below(5));
+  }
+  // The history.
+  const uint32_t depth = 10 + r.Below(50);
+  guest::StoreU8(base, s + 10008, uint8_t(depth));
+  static constexpr uint32_t kTargets[] = {3, 4, 15, 19, 23, 24, 53, 56};
+  std::vector<uint32_t> slots(depth);
+  for (uint32_t i = 0; i < depth; i++) {
+    slots[i] = i;
+  }
+  for (const uint32_t target : kTargets) {
+    const uint32_t k = r.Below(uint32_t(slots.size()));
+    guest::StoreU32(base, s + 9756 + 4 * slots[k], target);
+    slots.erase(slots.begin() + k);
+  }
+  // The stickers' records: the saved ones and the placed ones
+  // (SaveAreaDecals copies them over the saved).
+  QuietRange(base, s + 31240, 32200 - 31240);
+  QuietRange(base, s + 32360, 33320 - 32360);
+  if (r.Below(2) == 0) {
+    for (uint32_t i = 0; i < 40; i++) {
+      const uint32_t record = s + 31240 + 24 * i;
+      guest::StoreU32(base, record + 0, Around(r, -300, 300));
+      guest::StoreU32(base, record + 4, Around(r, -300, 300));
+      guest::StoreFloat(base, record + 8, float(int32_t(r.Below(720)) - 360));
+      guest::StoreFloat(base, record + 12, float(r.Below(100)) / 16.0f);
+      guest::StoreU32(base, record + 16, Around(r, 0, 1));
+    }
+  }
+  guest::StoreU32(base, kSaveDataPointer, w.save.address);
+  guest::StoreU16(base, w.save.address + 70, uint16_t(int16_t(int32_t(r.Below(18)) - 3)));
+  if (r.Below(4) == 0) {
+    t.r3.u64 |= r.Next() << 32;
+  }
+}
 
 // DecalImages::FreeTexture: entry i 0 to 60 (now and then any word, with
 // upper bits); its texture held by a kept slot (mode 1), by another of
@@ -1114,6 +1217,23 @@ void TuningPages(Context& h) {
         }
       },
       __imp__sub_821E1DB0, hooks::TuningPagesSetCurrentChoice, 8, {{96, 112}});
+
+  // The confirm dialogs' yes answers (states 35 and 36, which fit the car on
+  // the stand, are car_makers' cases: its world has the stand). Their
+  // saves: OnDialogYes' __savegprlr_29 (32 bytes), OnStickerDialogYes' r31
+  // and lr (16); below them, the callees' saves their plain C++ doesn't
+  // write: SetCurrentChoice's lr and OnStickerDialogYes' r31 and lr (112 to
+  // 128 below OnDialogYes' r1), SetAeroAvailability's and StoreStickers'
+  // r31 and lr (208 to 224; SaveAreaDecals' saves there are overwritten by
+  // StoreStickers' conversions and saves).
+  Group(
+      h, w, "TuningScreen::OnStickerDialogYes", 60,
+      [](PPCContext& t, Random& r, const World& w) { ShapeDialog(t, r, w, true); },
+      __imp__sub_821FA230, hooks::TuningPagesOnStickerDialogYes, 16, {{96, 112}});
+  Group(
+      h, w, "TuningScreen::OnDialogYes", 600,
+      [](PPCContext& t, Random& r, const World& w) { ShapeDialog(t, r, w, false); },
+      __imp__sub_821E2660, hooks::TuningPagesOnDialogYes, 32, {{112, 128}, {208, 224}});
 
   // The decal images' loads.
   LoadCases(h, w);

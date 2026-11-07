@@ -517,11 +517,16 @@ void TuningPagesMovie(Context& h) {
          t.r3.u64 = w.menu();
          HighWord(t, r);
        }});
-  // LeaveEditor: the fades' counts (above), r3's high word; __savegprlr_28:
-  // 40 bytes.
+  // LeaveEditor: the fades' counts (above; one set now and then, for the
+  // early return), r3's high word; __savegprlr_28: 40 bytes.
   Run(h, w,
       {"TuningScreen::LeaveEditor", 40, __imp__sub_821D8670, hooks::TuningPagesLeaveEditor, 40,
-       {}, [](PPCContext& t, Random& r, const World&) { HighWord(t, r); }});
+       {}, [](PPCContext& t, Random& r, const World& w) {
+         if (r.Below(4) == 0) {
+           guest::StoreU32(w.base, r.Below(2) == 0 ? kFadeIn : kFadeOut, 1 + r.Below(30));
+         }
+         HighWord(t, r);
+       }});
   // InputCategories: the menu, the mappers and the category (above); r4 any
   // word (not read). Its r30, r31 and lr (24 bytes); with B, UnloadAll's
   // (112 to 136 below) and its callees' (RestoreVinylMovie's and

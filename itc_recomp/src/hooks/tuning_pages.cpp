@@ -55,7 +55,13 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "InputInches sub_821EEEA8 with AnimateInches sub_821E9110 (these two with no "
               "adapters: only their pages call them; SetWheelListEnd, ShowPricePanel, "
               "PageItemCount, PageCursor, IsPickOwned, GetPrice, PreviewWheels and the UI movies' "
-              "FindNode and Child by their plain C++)) "
+              "FindNode and Child by their plain C++); the confirm dialogs' yes answers OnDialogYes "
+              "sub_821E2660 with OnStickerDialogYes sub_821FA230 and, under them, "
+              "DecalImages::SwapKept sub_821FE798, SaveAreaDecals sub_821F6CE8, StoreStickers "
+              "sub_821F8598 and GarageDecal sub_821F84C8 (no adapters: only OnDialogYes and "
+              "OnStickerDialogYes call them in play; MarkOwned, SetCurrentChoice, PageItemCount, "
+              "PageCursor, StoreVinyls, BindVinylTexture and SaveData::Of by their plain C++, "
+              "Career::PickNext and GarageStage::FitSelectedCar through their overrides)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -344,6 +350,23 @@ void TuningPagesAnimateInches(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesOnDialogYes(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_specs = ITC_FLAG(native_car_specs);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::OnDialogYes(base, call, screen, sp, native_specs);
+  });
+}
+
+void TuningPagesOnStickerDialogYes(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::OnStickerDialogYes(base, call, screen, sp);
+  });
+}
+
 void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   tp::PageFlags flags;
@@ -404,6 +427,7 @@ ITC_TUNING_PAGES(821D6AD0, TuningPagesInputCategories)
 ITC_TUNING_PAGES(821D87C0, TuningPagesBackToItems)
 ITC_TUNING_PAGES(821EE390, TuningPagesInputWheelParts)
 ITC_TUNING_PAGES(821EEEA8, TuningPagesInputInches)
+ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
@@ -420,3 +444,9 @@ ITC_TUNING_PAGES(821EEEA8, TuningPagesInputInches)
 // No adapters (B7 loop, 2026-11-07: their only caller, LoadDecalImages, is
 // native and calls their plain C++; the register steps above are the
 // harness's): DecalImages::Request sub_821FE830 and Load sub_821F6D40.
+
+// No adapters (B7 loop, 2026-11-07: their only caller in play, OnDialogYes, is
+// native and calls their plain C++; the register step above is the
+// harness's): OnStickerDialogYes sub_821FA230, and under it SaveAreaDecals
+// sub_821F6CE8, StoreStickers sub_821F8598 with GarageDecal sub_821F84C8; under
+// OnDialogYes DecalImages::SwapKept sub_821FE798.

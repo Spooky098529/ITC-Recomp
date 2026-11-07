@@ -309,4 +309,38 @@ uint64_t InputInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32
 uint64_t AnimateInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                        uint32_t sp, bool native_slots);
 
+// --- The confirm dialogs' yes answers (dialogs.cpp; flush-to-zero off) ---
+// Guest calls through `call` from the originals' frames with their return
+// addresses: memcpy where Buffers_Memcpy declines, Career::PickNext and
+// GarageStage::FitSelectedCar (their adapters); SaveData::Of, MarkOwned,
+// SetCurrentChoice, PageItemCount, PageCursor, StoreVinyls and
+// BindVinylTexture by their plain C++.
+
+// sub_821FE798 DecalImages::SwapKept: entry i's texture (+28, +32) swapped
+// with the kept texture k (images + 7236 + 8k, + 7240 + 8k). No frame.
+void SwapKept(uint8_t* base, uint64_t images, uint64_t k, uint64_t i);
+// sub_821F84C8 TuningScreen::GarageDecal: the selected garage car's 32-byte
+// decal record for an area 0 to 7 (unsigned: else 0) and a slot (its row).
+// No frame.
+uint32_t GarageDecal(uint8_t* base, uint32_t screen, uint32_t area, uint64_t slot);
+// sub_821F6CE8 TuningScreen::SaveAreaDecals: area a's five placed decals
+// (ids +33320 + 20a, records +32360 + 120a) copied to the saved ones (+32200,
+// +31240). 112-byte frame; r3 the last memcpy's (its destination).
+uint64_t SaveAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint64_t area, uint32_t sp);
+// sub_821F8598 TuningScreen::StoreStickers: the saved sticker records into
+// the garage car's (GarageDecal; its row), the int conversions' doublewords
+// at frame + 80 and + 88 as the last ones leave them. 112-byte frame; r3 the
+// last GarageDecal's.
+uint64_t StoreStickers(uint8_t* base, uint64_t screen, uint32_t sp);
+// sub_821FA230 TuningScreen::OnStickerDialogYes: states 50 to 52's answers
+// (its row). 96-byte frame; r3 SaveData::Of(0)'s in state 50, else `screen`.
+uint64_t OnStickerDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                            uint32_t sp);
+// sub_821E2660 TuningScreen::OnDialogYes: the confirm dialogs' yes answers by
+// the state +9652 (its row), then OnStickerDialogYes. 112-byte frame; r3
+// OnStickerDialogYes's. `native_specs` as SetCurrentChoice's.
+uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                     uint32_t sp, bool native_specs);
+
 }  // namespace tuning_pages

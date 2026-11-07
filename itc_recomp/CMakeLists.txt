@@ -434,6 +434,7 @@ set(ITC_SOURCES
     src/tuning_pages/choices.cpp
     src/tuning_pages/loads.cpp
     src/tuning_pages/pages.cpp
+    src/tuning_pages/dialogs.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
