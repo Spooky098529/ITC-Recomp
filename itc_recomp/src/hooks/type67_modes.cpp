@@ -7,7 +7,10 @@
 #include "hooks/type67_modes.h"
 
 #include "base/flags.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
+#include "hooks/ui_movies_game.h"
+#include "ui_movies/game.h"
 #include "type67_modes/type67_modes.h"
 
 ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
@@ -37,7 +40,15 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "over the allocation layer, the originals where a block isn't its pages; the "
               "modes' Type6Mode::NextMode sub_822363B8, Type7Mode::NextMode sub_82246800, "
               "Type6Mode::Leaving sub_82236100 and Type7Mode::Leaving sub_82246590, "
-              "GameMessages::Dispatch a guest call to its override) "
+              "GameMessages::Dispatch a guest call to its override; the handlers with guest "
+              "calls Dialog::OpenMovies sub_82225810, Dialog::Leave sub_82225C70, "
+              "Type7Dialog::Leave sub_82241E58, Type6Screen0::Leave sub_82233DF8, "
+              "Type7Screen0::Leave sub_82244350 (UiMovies::Open and Delete natively where their "
+              "adapters would), ListScreen::Init sub_822515A0, PanelScreen::Init sub_82248E10, "
+              "NodeScreen::Init sub_82259128 (their vtable slots' plain C++ where ours), and the "
+              "Draw handlers Type6Screen0::Draw sub_82234ED8, Type6Dialog::Draw sub_82232740, "
+              "Type7Dialog::Draw sub_822421C0, Type7Screen0::Draw sub_82245148 and "
+              "ControllerOptions::Draw sub_821C7F28 (the pages' handlers guest calls)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -175,11 +186,9 @@ void Type6Screen0GoOn(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::Type6Screen0GoOn(base, ctx.r3.u64);
 }
 
-// --- The modes' delegate functions ---
+// --- The guest calls and the modes' delegate functions ---
 
-namespace {
-
-t67::Calls GuestCalls(PPCContext& ctx, uint8_t* base) {
+t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
   t67::Calls calls;
   calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3,
                             uint64_t r4) -> uint64_t {
@@ -193,8 +202,41 @@ t67::Calls GuestCalls(PPCContext& ctx, uint8_t* base) {
     ctx.lr = link;
     return ctx.r3.u64;
   };
+  calls.open = [&ctx, base](uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr) -> uint64_t {
+    if (ui_movies_game_hooks::OpenNative()) {
+      return ui_movies::OpenMovie(base, id, asset, sp - 128, hooks::NativeArchiveLoad(base),
+                                  ui_movies_game_hooks::OpenCalls(ctx, base, sp));
+    }
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = id;
+    ctx.r4.u64 = asset;
+    sub_8211E808(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    return ctx.r3.u64;
+  };
+  calls.remove = [&ctx, base](uint32_t id, uint32_t sp, uint32_t lr) -> uint64_t {
+    if (ui_movies_game_hooks::DeleteNative()) {
+      return ui_movies::DeleteMovie(base, id, sp - 128,
+                                    ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
+    }
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = id;
+    sub_8211E258(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    return ctx.r3.u64;
+  };
   return calls;
 }
+
+namespace {
+
+t67::Calls GuestCalls(PPCContext& ctx, uint8_t* base) { return Type67Calls(ctx, base); }
 
 void NextMode(PPCContext& ctx, uint8_t* base, const t67::ModeLayout& layout) {
   const uint64_t r3 = ctx.r3.u64;
@@ -218,6 +260,57 @@ void Type6ModeNextMode(PPCContext& ctx, uint8_t* base) { NextMode(ctx, base, t67
 void Type7ModeNextMode(PPCContext& ctx, uint8_t* base) { NextMode(ctx, base, t67::kType7Layout); }
 void Type6ModeLeaving(PPCContext& ctx, uint8_t* base) { Leaving(ctx, base, t67::kType6Layout); }
 void Type7ModeLeaving(PPCContext& ctx, uint8_t* base) { Leaving(ctx, base, t67::kType7Layout); }
+
+// --- The handlers with guest calls ---
+
+void DialogOpenMovies(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogOpenMovies(base, ctx.r1.u32, Type67Calls(ctx, base));
+}
+void Type6DialogLeave(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogLeave(base, ctx.r3.u32, ctx.r4.u32, false, ctx.r1.u32,
+                                Type67Calls(ctx, base));
+}
+void Type7DialogLeave(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogLeave(base, ctx.r3.u32, ctx.r4.u32, true, ctx.r1.u32,
+                                Type67Calls(ctx, base));
+}
+void Type6Screen0Leave(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Screen0Leave(base, ctx.r3.u32, ctx.r4.u32, false, ctx.r1.u32,
+                                 Type67Calls(ctx, base));
+}
+void Type7Screen0Leave(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Screen0Leave(base, ctx.r3.u32, ctx.r4.u32, true, ctx.r1.u32,
+                                 Type67Calls(ctx, base));
+}
+void ListScreenInit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::ListScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
+}
+void PanelScreenInit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::PanelScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
+}
+void NodeScreenInit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::NodeScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
+}
+void Type6Screen0Draw(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Type6Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                     uint32_t(ctx.lr), Type67Calls(ctx, base));
+}
+void Type6DialogDraw(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogDraw(base, ctx.r3.u64, ctx.r4.u64, false, ctx.r1.u32,
+                               Type67Calls(ctx, base));
+}
+void Type7DialogDraw(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogDraw(base, ctx.r3.u64, ctx.r4.u64, true, ctx.r1.u32,
+                               Type67Calls(ctx, base));
+}
+void Type7Screen0Draw(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Type7Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                     Type67Calls(ctx, base));
+}
+void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::ControllerOptionsDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                          Type67Calls(ctx, base));
+}
 
 }  // namespace hooks
 
@@ -312,3 +405,19 @@ ITC_TYPE67_MODES(822363B8, Type6ModeNextMode)
 ITC_TYPE67_MODES(82246800, Type7ModeNextMode)
 ITC_TYPE67_MODES(82236100, Type6ModeLeaving)
 ITC_TYPE67_MODES(82246590, Type7ModeLeaving)
+
+// The handlers with guest calls: reached through their functors, the
+// screens' vtables and the modes' slot 0 (recompiled).
+ITC_TYPE67_MODES(82225810, DialogOpenMovies)
+ITC_TYPE67_MODES(82225C70, Type6DialogLeave)
+ITC_TYPE67_MODES(82241E58, Type7DialogLeave)
+ITC_TYPE67_MODES(82233DF8, Type6Screen0Leave)
+ITC_TYPE67_MODES(82244350, Type7Screen0Leave)
+ITC_TYPE67_MODES(822515A0, ListScreenInit)
+ITC_TYPE67_MODES(82248E10, PanelScreenInit)
+ITC_TYPE67_MODES(82259128, NodeScreenInit)
+ITC_TYPE67_MODES(82234ED8, Type6Screen0Draw)
+ITC_TYPE67_MODES(82232740, Type6DialogDraw)
+ITC_TYPE67_MODES(822421C0, Type7DialogDraw)
+ITC_TYPE67_MODES(82245148, Type7Screen0Draw)
+ITC_TYPE67_MODES(821C7F28, ControllerOptionsDraw)

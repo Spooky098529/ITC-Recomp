@@ -162,6 +162,11 @@ uint64_t Type6Screen0GoOn(uint8_t* base, uint64_t r3);
 struct Calls {
   std::function<uint64_t(uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3, uint64_t r4)>
       call;
+  // UiMovies::Open(id, asset) and UiMovies::Delete(id) called from the
+  // frame at `sp` returning to `lr` (natively where their adapters would
+  // run them natively, else their adapters); their r3.
+  std::function<uint64_t(uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr)> open;
+  std::function<uint64_t(uint32_t id, uint32_t sp, uint32_t lr)> remove;
 };
 
 // A machine whose state a mode checks: the block's +`test` tested for 0
@@ -210,5 +215,47 @@ void ModeNextMode(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint
 // (byte 1, the three bytes the frame holds, word 1) and TearDown.
 void ModeLeaving(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint32_t mode,
                  uint32_t frame, const Calls& calls);
+
+// --- The handlers with guest calls (screens.cpp). `sp` is the caller's
+// stack pointer (the original's r1 at entry); each returns r3 as the
+// original leaves it. ---
+
+// sub_82225810 Dialog::OpenMovies: UiMovies::Open of movies 16 to 19
+// (assets 22559 to 22562).
+uint64_t DialogOpenMovies(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82225C70 Dialog::Leave (type 6's, message 4) and sub_82241E58
+// Type7Dialog::Leave (message 3): state 7, movies 16 to 19 deleted, the
+// message queued in the dispatcher's ring.
+uint64_t DialogLeave(uint8_t* base, uint32_t dialog, uint32_t dispatcher, bool type7,
+                     uint32_t sp, const Calls& calls);
+// sub_82233DF8 Type6Screen0::Leave (state 7 first, message 4) and
+// sub_82244350 Type7Screen0::Leave (state 7 at +9608 after, message 3):
+// movie 22 deleted, the message queued.
+uint64_t Screen0Leave(uint8_t* base, uint32_t screen, uint32_t dispatcher, bool type7,
+                      uint32_t sp, const Calls& calls);
+// sub_822515A0 ListScreen::Init, sub_82248E10 PanelScreen::Init,
+// sub_82259128 NodeScreen::Init: the screen's words reset, then its two
+// vtable slots (the state machine Inits' and PanelScreen::InitWords' plain
+// C++ where a slot holds them, else guest calls), then the state word 0.
+uint64_t ListScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t PanelScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t NodeScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82234ED8 Type6Screen0::Draw: the page's (+9644's +0) handler from the
+// table at 0x826367B8, a tail call; nothing for page -1.
+uint64_t Type6Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
+                          const Calls& calls);
+// sub_82232740 Type6Dialog::Draw, sub_822421C0 Type7Dialog::Draw: the page
+// (+9640)'s handler (ConfirmPage, NoticePage) from a table in the frame.
+uint64_t DialogDraw(uint8_t* base, uint64_t r3, uint64_t r4, bool type7, uint32_t sp,
+                    const Calls& calls);
+// sub_82245148 Type7Screen0::Draw: the page's member function from the
+// table at 0x82815E20 (built once, its guard bit 0 at 0x82815E38, from
+// words in the frame), on the screen plus its adjustment.
+uint64_t Type7Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                          const Calls& calls);
+// sub_821C7F28 ControllerOptions::Draw: the page's (the page object's +0)
+// handler from a three-entry table in the frame, on r4.
+uint64_t ControllerOptionsDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                               const Calls& calls);
 
 }  // namespace type67_modes

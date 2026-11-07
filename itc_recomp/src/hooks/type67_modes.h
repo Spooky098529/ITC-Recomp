@@ -6,6 +6,7 @@
 #pragma once
 
 #include "guest.h"
+#include "type67_modes/type67_modes.h"
 
 #include <cstdint>
 
@@ -63,5 +64,31 @@ void Type6ModeNextMode(PPCContext& ctx, uint8_t* base);
 void Type7ModeNextMode(PPCContext& ctx, uint8_t* base);
 void Type6ModeLeaving(PPCContext& ctx, uint8_t* base);
 void Type7ModeLeaving(PPCContext& ctx, uint8_t* base);
+
+// The plain C++'s guest calls through `ctx` (r1 and lr put back after):
+// any function, and UiMovies::Open and Delete natively where their
+// adapters would run natively, else their adapters.
+type67_modes::Calls Type67Calls(PPCContext& ctx, uint8_t* base);
+
+// The handlers with guest calls (screens.cpp), with their originals'
+// registers: Dialog::OpenMovies sub_82225810, the dialogs' Leave
+// sub_82225C70 and sub_82241E58 and the first screens' sub_82233DF8 and
+// sub_82244350 (r3 the screen, r4 the dispatcher), ListScreen::Init
+// sub_822515A0, PanelScreen::Init sub_82248E10, NodeScreen::Init
+// sub_82259128, and the Draw handlers sub_82234ED8, sub_82232740,
+// sub_822421C0, sub_82245148 and sub_821C7F28 (r3, r4).
+void DialogOpenMovies(PPCContext& ctx, uint8_t* base);
+void Type6DialogLeave(PPCContext& ctx, uint8_t* base);
+void Type7DialogLeave(PPCContext& ctx, uint8_t* base);
+void Type6Screen0Leave(PPCContext& ctx, uint8_t* base);
+void Type7Screen0Leave(PPCContext& ctx, uint8_t* base);
+void ListScreenInit(PPCContext& ctx, uint8_t* base);
+void PanelScreenInit(PPCContext& ctx, uint8_t* base);
+void NodeScreenInit(PPCContext& ctx, uint8_t* base);
+void Type6Screen0Draw(PPCContext& ctx, uint8_t* base);
+void Type6DialogDraw(PPCContext& ctx, uint8_t* base);
+void Type7DialogDraw(PPCContext& ctx, uint8_t* base);
+void Type7Screen0Draw(PPCContext& ctx, uint8_t* base);
+void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

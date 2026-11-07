@@ -28,10 +28,12 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "game_modes/game_modes.h"
+#include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "hooks/type67_modes.h"
 #include "memory/heap.h"
 #include "type67_modes/type67_modes.h"
+#include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
@@ -205,6 +207,10 @@ struct Globals {
 };
 
 uint32_t g_movie = 0;  // the harness's movie block (0xA000 bytes)
+// Whether the cases plant it (off for the UiMovies::Delete callers: Delete
+// would unload a movie it finds there; with 0 it finds none, as in the
+// game when the id isn't in the table).
+bool g_plant_movie = true;
 constexpr uint32_t kMovieLoaded = 0x9FD0;
 
 using Native = std::function<void(PPCContext&, uint8_t*)>;
@@ -227,10 +233,13 @@ void Handler(Context& h, const Block& world, const char* name, uint32_t address,
       Side& side = sides[v];
       Random r(uint64_t(c) * 7919 + address);
       WriteRandom(h.base, world.address, world.bytes, r);
+      // The stack the calls' frames go in (so a word only one side writes
+      // shows).
+      WriteRandom(h.base, CallContext(h).r1.u32 - 2048, 2048, r);
       guest::StoreU32(h.base, t67::kControllerData, 0);
       guest::StoreU32(h.base, t67::kControllerPage, 0);
       guest::StoreU32(h.base, t67::kModeType, r.Below(10));
-      guest::StoreU32(h.base, Globals::kMissingMovie, g_movie);
+      guest::StoreU32(h.base, Globals::kMissingMovie, g_plant_movie ? g_movie : 0);
       guest::StoreU32(h.base, g_movie + kMovieLoaded, r.Below(3) ? 1 : 0);
       setup(r, world.address);
       PPCContext t = CallContext(h);
@@ -607,6 +616,166 @@ void Modes(Context& h, const Block& world) {
   for (int i = 0; i < 3; i++) guest::StoreU32(base, globals[i], saved[i]);
 }
 
+// --- The handlers with guest calls. UiMovies::Open is recorded (its
+// adapter's recorder on the original's side, the plain C++'s open on the
+// native side), each call's id, asset, frame and return address compared,
+// answered 1. UiMovies::Delete runs for real: the movies these delete (16
+// to 19, 22) aren't in the movie table when the harnesses run (checked
+// first), so it finds none on both sides. The Inits' vtables are in the
+// world, their slots a state machine Init of ours, PanelScreen::InitWords
+// or the empty handler sub_82106540 (picked). The Draw handlers' page
+// handlers: Type6Screen0::Draw's table (0x826367B8) and Type7Screen0::Draw's
+// (0x82815E20, its guard set) hold the empty handler for the case (put
+// back after); the dialogs' and the controller pages' tables are built in
+// their frames with the real pages, so their cases have page -1 (none
+// called) and compare the frame's table. ---
+
+constexpr uint32_t kEmpty = 0x82106540;
+
+std::vector<uint32_t> g_opens;
+bool RecordOpen(PPCContext& ctx, uint32_t address) {
+  if (address != 0x8211E808) return false;
+  g_opens.insert(g_opens.end(), {ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, uint32_t(ctx.lr)});
+  ctx.r3.u64 = 1;
+  return true;
+}
+
+void GuestCallHandlers(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  for (const uint32_t id : {16u, 17u, 18u, 19u, 22u}) {
+    if (ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id) != 0x826C5CDC) {
+      ITC_LOG_ERROR("harness: type67_modes: movie {} is in the table; the guest call cases skipped",
+                    id);
+      return;
+    }
+  }
+  const uint32_t sp = CallContext(h).r1.u32;
+  const HandlerArgs plain = [](PPCContext&, uint32_t) {};
+  g_plant_movie = false;
+  // The dispatcher at the world's +0x3200 (its ring's count and start small).
+  const HandlerSetup ring = [base](Random& r, uint32_t w) {
+    guest::StoreU32(base, w + 0x3200 + 204 + 600, r.Below(50));
+    guest::StoreU32(base, w + 0x3200 + 204 + 604, r.Below(60));
+  };
+  const HandlerArgs dispatcher = [](PPCContext& t, uint32_t w) { t.r4.u64 = w + 0x3200; };
+  // The frame words a handler leaves, compared (its frame below `sp`).
+  auto frame_out = [base, sp](uint32_t bytes, uint32_t words) {
+    return [base, sp, bytes, words](Side& side, PPCContext&, uint32_t) {
+      side.out.Bytes(Read(base, sp - bytes + 80, 4 * words));
+    };
+  };
+
+  {
+    // Dialog::OpenMovies: the opens recorded.
+    Results results("Dialog::OpenMovies (sub_82225810)");
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      g_opens.clear();
+      PPCContext t = CallContext(h);
+      if (v == 0) {
+        const hooks::StartUpRecorder saved = hooks::g_start_up_recorder;
+        hooks::g_start_up_recorder = RecordOpen;
+        ITC_FLAG(native_type67_modes) = false;
+        __imp__sub_82225810(t, base);
+        ITC_FLAG(native_type67_modes) = true;
+        hooks::g_start_up_recorder = saved;
+      } else {
+        t67::Calls calls = hooks::Type67Calls(t, base);
+        calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
+          g_opens.insert(g_opens.end(), {id, asset, frame, lr});
+          return 1;
+        };
+        t.r3.u64 = t67::DialogOpenMovies(base, t.r1.u32, calls);
+      }
+      for (const uint32_t word : g_opens) out[v].Word(word);
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], "the four opens");
+    results.Report();
+  }
+  Handler(h, world, "Dialog::Leave", 0x82225C70, 8, ring, dispatcher, __imp__sub_82225C70,
+          hooks::Type6DialogLeave);
+  Handler(h, world, "Type7Dialog::Leave", 0x82241E58, 8, ring, dispatcher, __imp__sub_82241E58,
+          hooks::Type7DialogLeave);
+  Handler(h, world, "Type6Screen0::Leave", 0x82233DF8, 8, ring, dispatcher, __imp__sub_82233DF8,
+          hooks::Type6Screen0Leave);
+  Handler(h, world, "Type7Screen0::Leave", 0x82244350, 8, ring, dispatcher, __imp__sub_82244350,
+          hooks::Type7Screen0Leave);
+
+  // The Inits: the vtable at the world's +0x3800.
+  constexpr uint32_t kVtable = 0x3800;
+  auto vtable = [base](uint32_t first, uint32_t second, std::vector<uint32_t> inits) {
+    return [base, first, second, inits](Random& r, uint32_t w) {
+      guest::StoreU32(base, w, w + kVtable);
+      const uint32_t picks[3] = {0x82230740, kEmpty, inits[r.Below(uint32_t(inits.size()))]};
+      guest::StoreU32(base, w + kVtable + first, picks[r.Below(3)]);
+      guest::StoreU32(base, w + kVtable + second, inits[r.Below(uint32_t(inits.size()))]);
+      // The machines empty (StateMachine::Add's count at +9600).
+      for (const uint32_t m : {4u, 460u}) {
+        guest::StoreU32(base, w + m + 9600, r.Below(4) == 0 ? r.Below(20) : 0);
+      }
+    };
+  };
+  Handler(h, world, "ListScreen::Init", 0x822515A0, 12,
+          vtable(16, 20, {0x8223F9A8, 0x822436A0}), plain, __imp__sub_822515A0,
+          hooks::ListScreenInit);
+  Handler(h, world, "PanelScreen::Init", 0x82248E10, 12,
+          vtable(0, 4, {0x82230F80, 0x82240998}), plain, __imp__sub_82248E10,
+          hooks::PanelScreenInit);
+  Handler(h, world, "NodeScreen::Init", 0x82259128, 12, vtable(28, 32, {0x82237320}), plain,
+          __imp__sub_82259128, hooks::NodeScreenInit);
+
+  // The Draws.
+  constexpr uint32_t kType6Pages = 0x826367B8, kType7Table = 0x82815E20, kType7Guard = 0x82815E38;
+  uint32_t saved6[8], saved7[7];
+  for (uint32_t i = 0; i < 8; i++) saved6[i] = guest::LoadU32(base, kType6Pages + 4 * i);
+  for (uint32_t i = 0; i < 7; i++) saved7[i] = guest::LoadU32(base, kType7Table + 4 * i);
+  for (uint32_t i = 0; i < 8; i++) guest::StoreU32(base, kType6Pages + 4 * i, kEmpty);
+  constexpr uint32_t kPageBlock = 0x3100;
+  Handler(h, world, "Type6Screen0::Draw", 0x82234ED8, 8,
+          [base](Random& r, uint32_t w) {
+            guest::StoreU32(base, w + 9644, w + kPageBlock);
+            guest::StoreU32(base, w + kPageBlock, r.Below(3) ? r.Below(8) : 0xFFFFFFFF);
+          },
+          [](PPCContext& t, uint32_t w) { t.r4.u64 = w + 0x3200; }, __imp__sub_82234ED8,
+          hooks::Type6Screen0Draw);
+  // Type7Screen0::Draw: the guard clear (the table built; page -1) or set
+  // with the empty handler in the table.
+  Handler(h, world, "Type7Screen0::Draw", 0x82245148, 12,
+          [base](Random& r, uint32_t w) {
+            guest::StoreU32(base, w + 9648, w + kPageBlock);
+            if (r.Below(3) == 0) {
+              guest::StoreU32(base, kType7Guard, 0);
+              guest::StoreU32(base, w + kPageBlock, 0xFFFFFFFF);
+            } else {
+              guest::StoreU32(base, kType7Guard, 1);
+              for (uint32_t i = 0; i < 3; i++) {
+                guest::StoreU32(base, kType7Table + 8 * i, kEmpty);
+                guest::StoreU32(base, kType7Table + 8 * i + 4, r.Below(64));
+              }
+              guest::StoreU32(base, w + kPageBlock, r.Below(4) ? r.Below(3) : 0xFFFFFFFF);
+            }
+          },
+          [](PPCContext& t, uint32_t w) { t.r4.u64 = w + 0x3200; }, __imp__sub_82245148,
+          hooks::Type7Screen0Draw, [base, frame_out](Side& side, PPCContext& t, uint32_t w) {
+            frame_out(112, 6)(side, t, w);
+            for (uint32_t i = 0; i < 7; i++) side.out.Word(guest::LoadU32(base, kType7Table + 4 * i));
+          });
+  for (uint32_t i = 0; i < 8; i++) guest::StoreU32(base, kType6Pages + 4 * i, saved6[i]);
+  for (uint32_t i = 0; i < 7; i++) guest::StoreU32(base, kType7Table + 4 * i, saved7[i]);
+  const HandlerSetup no_page = [base](Random&, uint32_t w) {
+    guest::StoreU32(base, w + 9640, 0xFFFFFFFF);
+    guest::StoreU32(base, t67::kControllerPage, w + kPageBlock);
+    guest::StoreU32(base, w + kPageBlock, 0xFFFFFFFF);
+  };
+  Handler(h, world, "Type6Dialog::Draw", 0x82232740, 2, no_page, dispatcher, __imp__sub_82232740,
+          hooks::Type6DialogDraw, frame_out(96, 2));
+  Handler(h, world, "Type7Dialog::Draw", 0x822421C0, 2, no_page, dispatcher, __imp__sub_822421C0,
+          hooks::Type7DialogDraw, frame_out(96, 2));
+  Handler(h, world, "ControllerOptions::Draw", 0x821C7F28, 2, no_page, dispatcher,
+          __imp__sub_821C7F28, hooks::ControllerOptionsDraw, frame_out(112, 3));
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -621,6 +790,7 @@ void Type67Modes(Context& h) {
   Inits(h, object);
   Handlers(h, world);
   Modes(h, world);
+  GuestCallHandlers(h, world);
 }
 
 }  // namespace harness
