@@ -178,8 +178,13 @@ file's history. What's left to see in a drive, from every run:
   `sub_8211D930` with `sub_8211CAA0`, `sub_8211C740`. Validated
   `itc_4204` (race 79 s at 180, the harnesses ~86 s; 0 errors, every
   harness 0 differing, 1 of 1; in the replay `itc_4205` (ok)). Fifth
-  migration agent running (`GarageStage::Draw`, the UI movie calls,
-  then `UpdateStand`, `RefreshMovie13` and what they unblock).
+  migration 59c3072d..00ba6bcd (`UiMovie::SetNumberText`,
+  `SetChildNameText` with `SetNameText`; `GarageStage::Draw` (frame dump
+  pixel-identical against `--native_front_end_car_draw=false` in the
+  replay); `UpdateStand`; `RefreshMovie13`; 4 adapters removed; 190
+  cases; race 37 s, 0 errors, all harnesses 0 differing; no subagents);
+  left: none in the file; 7 removable adapters in
+  `front-end-car-draw.md` (a cleanup lead). Validation agent running.
 
 ## Done
 
