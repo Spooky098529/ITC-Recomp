@@ -608,6 +608,11 @@ Rows not yet moved stay in the table below. So far:
   accessory's, leaving the screen and the editors), their movie-side
   updates, the confirm dialogs' yes answers, and the decal images the
   vinyl and sticker editors draw (B7).
+- [`screen-constructors.md`](screen-constructors.md): the
+  constructors of the type 6 and 7 game modes' front-end screen blocks:
+  their list, node and panel screens, the state machines with ten words
+  after them, the node tables, list parts, panel groups, panels and the
+  panel set (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

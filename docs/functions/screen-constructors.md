@@ -1,0 +1,120 @@
+# Known functions: the type 6 and 7 modes' screen constructors
+
+The constructors of the two front-end screen blocks the game modes of
+type 6 and 7 make (`ModeType6::ModeType6` `sub_82235E88` and
+`ModeType7::ModeType7` `sub_82246340`, `Mode::Create`, all in
+[`game-modes.md`](game-modes.md); what the two modes are isn't known: both
+load string files 0 and 1, `Strings::Load(3)`, and their screens set up
+car objects). Each mode's slot 0 (`sub_82236880` for type 6,
+`sub_82246C90` for type 7, not read here: a lead in
+`../loops/leads.md`) allocates its block with `VirtualAlloc` (91,272 and
+71,292 bytes, 4 KB pages; `heap.md`), stores it at the mode's +848,
+builds it with the constructors below, then runs each member's Init
+(not here). The blocks hold four to five screens each, most with a state
+machine with ten words after it (`ScreenMachine::ScreenMachine`
+`sub_82107358`, [`boot-mode.md`](boot-mode.md)): screens over a list
+(machine, -1 tables, a node table), a screen over a node table, and a
+screen of five panels (two groups, four panels made with `operator new`,
+a set holding them and a pair of the groups). Every function here only
+stores constants, `this`-relative addresses and its arguments: no reads
+of game state except the table at `0x826370A0` (`Type7ListScreen`) and
+the word at `0x82805EAC` (`PanelSet`), and no calls but each other,
+`ScreenMachine::ScreenMachine` and `operator new` (`sub_825A6880`,
+`heap.md`). Each runs once each time its mode starts. The blocks'
+layouts are in `../known-data.md` ("type 6 screens", "type 7 screens").
+Names are ours, from the layouts (what each screen shows isn't known).
+
+Other constructors of the same member classes never ran in play and get
+no rows: `sub_822386F0` (`MachineScreen`), `sub_8223A100`
+(`PanelDBase`), `sub_82239E78` (`PanelCBase`), `sub_82239C10`
+(`PanelGroupBase`), `sub_82239D58` (`PanelEBase`), `sub_82239C70`
+(`PanelFBase`), `sub_8224B750` (`PanelSetBase`), `sub_82253190` and
+`sub_82254488` (`ListPartBase`), `sub_82253030` and `sub_822543C0`
+(`ListPartInnerBase`), `sub_822574D0` (`NodeListScreen`) and
+`sub_8223DFC0` (`ColorListScreen`).
+
+Shared, with rows in other files: `ScreenMachine::ScreenMachine`
+(`sub_82107358`, Overridden) in [`boot-mode.md`](boot-mode.md);
+`operator new` (`sub_825A6880`) and `VirtualAlloc` (`sub_82295398`) in
+[`heap.md`](heap.md); `ModeType6::ModeType6` and `ModeType7::ModeType7`
+in [`game-modes.md`](game-modes.md).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_822366F0` | `Type6Screens::Type6Screens` | | r3 = the type 6 mode's block (91,272 bytes): +0 = vtable `0x82010A78`; `Type6Screen0::Type6Screen0` on +4; `ScreenMachine::ScreenMachine` on +9672; `Type6ListScreen` on +19432, `Type6NodeScreen` on +30396, `Type6PanelScreen` on +40948; `ScreenMachine` on +52696 with vtable `0x82010A68` at +52692 (stored after the machine); `ScreenMachine` on +62336, +71976 and +81616; then +91260 = 0, byte +91256 = 0, +91264 = 0. Returns r3. From `sub_82236880` (the type 6 mode's slot 0, vtable `0x82010A48`) when its `VirtualAlloc` succeeded. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82235BD8` | `Type6Screen0::Type6Screen0` | | r3 = the screen (the type 6 block's +4): `ScreenMachine::ScreenMachine` on r3 itself. Returns r3. From `Type6Screens::Type6Screens`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822330F0` | `Type6ListScreen::Type6ListScreen` | | r3 = the screen (10,964 bytes; the type 6 block's +19432): `TitledListScreen::TitledListScreen`; vtable `0x820109A8`; `ListPart::ListPart` on +10824 and +9676 = its address; then constants: +9712 = 0, +9716 = 10, +9720 = 11, +9724 = 15, +9728 = 7, +9732 = 2, +9740 = 1, +9744 = 8, +9748 = 0, +9752 = 8, +9756 = 9, +9760 = 19, +9768 = 3, +9784 = 0, +9788 = 0, +9800 = 0, +9804 = 1, +9812 = 4, +9816 = 0, +9828 = 0, +9832 = 104, +9856 = 105, +9860 = 0, +9868 = 98, +9872 = 107, +9876 = 5, +9880 = 106, +9892 = 6, +9896 = 7, +9900 = 103, +9904 = 20, +9908 = 21, +9928 = 33, +9932 = 32, +9936 to +9964 = 10 to 17; and through the node table (`[+9672]`, its +10360): +8 = 10, +12 = 9, +16 to +120 = 46 to 72 (27 words), +156 to +260 = 1 to 27, +124 to +152 = 77 to 84, +296 to +308 = 6 to 9, +420 = 6, +424 = 55 (probably the UI movie's node numbers for 27 items and 8 others). Returns r3. From `Type6Screens::Type6Screens`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822570F0` | `TitledListScreen::TitledListScreen` (probably) | | r3 = the screen: `NodeListScreen::NodeListScreen`; vtable `0x820115C8`; +10820 = 923 (probably a string id). Returns r3. From `Type6ListScreen::Type6ListScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82256F68` | `NodeListScreen::NodeListScreen` | | r3 = the screen: `ListScreen::ListScreen`; vtable `0x82011558`; +10204, +10212, +10276, +10284, +10348, +10356 = 0; `PairedNodeTable::PairedNodeTable` on +10360, +9672 = its address, +9680 = 25 and the table's +4 (+10364) = 25. Returns r3. From `TitledListScreen::TitledListScreen` (and `sub_822574D0`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82236C30` | `Type6NodeScreen::Type6NodeScreen` | | r3 = the screen (10,552 bytes; the type 6 block's +30396): `NodeScreen::NodeScreen`; vtable `0x82010A80`; then constants over its node table (its +0): +8 = 11, +12 = 10, +16 to +120 = 48 to 74, +156 to +260 = 1 to 27, +124 to +152 = 79 to 86, +296 to +308 = 6 to 9, +420 = 6, +424 = 55; and +10276 = 8, +10280 = 5, +10284 = 101, +10296 = 0, +10304 = 47, +10308 = 102, +10312 = 43, +10324 = 44, +10328 = 45, +10336 = 16, +10340 = 17, +10344 = 29, +10348 = 28, +10352 to +10372 = 6 to 11, +10392 = 103, +10396 = 8, +10400 = 9, +10404 = 0, +10408 = 10, +10412 = 11, +10416 to +10452 = 30, 35, ... 75 (steps of 5), +10456 to +10492 = 31, 36, ... 76, +10496 to +10532 = 32, 37, ... 77, +10536 = 0, +10540 = 1, +10544 = 15, +10548 = 0. Returns r3. From `Type6Screens::Type6Screens`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8225A3D8` | `NodeScreen::NodeScreen` | | r3 = the screen: `ScreenMachine::ScreenMachine` on +460, then `PairedNodeTable::PairedNodeTable` on r3 (its +0 to +456); vtable `0x820116B8`; +4 = 15 and +10100 = 15; +10192, +10200, +10264, +10272 = 0; -1 at +10276, +10284 to +10340, +10352 to +10388, +10392 to +10412, +10416 to +10532, +10536 and +10540. Its own frame's +80 to +100 written (0, 0, 0, 15, 10, r3 + 10456) and two read back; r3 stored at r1 + 148, its caller's frame + 20 (memory leftovers a migration copies). Returns r3. From `Type6NodeScreen::Type6NodeScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822309C8` | `Type6PanelScreen::Type6PanelScreen` | | r3 = the screen (11,744 bytes; the type 6 block's +40948): `MachineScreen::MachineScreen`; vtable `0x82010920`; `PanelGroup::PanelGroup` on +9664 (group A), `PanelGroup6B::PanelGroup6B` on +9708 (group B); then four panels from `operator new` (`sub_825A6880`), each built when the allocation isn't 0 (else 0): 320 bytes `Panel6C::Panel6C(p, B)`, 92 bytes `Panel6D::Panel6D(p, B)`, 160 bytes `PanelE::PanelE(p, A)`, 144 bytes `Panel6F::Panel6F(p, A)`; `PanelSet::PanelSet(+9752, F, E, D, C, B)`; `GroupPair::GroupPair(+11728, A, B)`; +9644 = +9752's address, +9648 and +11648 = +11728's, +11672 and +11676 = 0, +11716 = 45, +11720 = 44, +11724 = 46. Returns r3. From `Type6Screens::Type6Screens`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82246B28` | `Type7Screens::Type7Screens` | | r3 = the type 7 mode's block (71,292 bytes): +0 = vtable `0x82010FE0`; `Type7Screen0::Type7Screen0` on +4; `ScreenMachine::ScreenMachine` on +9664; `Type7ListScreen` on +19428, `Type7PanelScreen` on +30608; `ScreenMachine` on +42356 with vtable `0x82010FD0` at +42352 (stored after the machine); `ScreenMachine` on +51996 and +61636; then +71280 = 0, byte +71276 = 0, +71284 = 0. Returns r3. From `sub_82246C90` (the type 7 mode's slot 0, vtable `0x82010FB0`) when its `VirtualAlloc` succeeded. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82245FF8` | `Type7Screen0::Type7Screen0` | | r3 = the screen (the type 7 block's +4): `ScreenMachine::ScreenMachine` on +4; +0 = vtable `0x82010B5C` (the empty base many classes share, as `ListNode`'s in `archive.md`). Returns r3. From `Type7Screens::Type7Screens`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82242BE8` | `Type7ListScreen::Type7ListScreen` | | r3 = the screen (11,180 bytes; the type 7 block's +19428): `ColorListScreen::ColorListScreen`; vtable `0x82010F18`; `ListPart::ListPart` on +11040 and +9676 = its address; then constants: +9684 = 0, +9712 = 0, +9716 = 10, +9720 = 11, +9724 = 16, +9728 = 6, +9732 = 2, +9736 = 9, +9740 = 1, +9744 = 21, +9748 = 0, +9752 = 8, +9756 = 9, +9768 = 3, +9776 = `0x826371A4` (an address in data), +9784 = 2, +9788 = 1, +9800 = 0, +9804 = 1, +9808 = 0, +9812 = 4, +9816 = 0, +9828 = 0, +9832 = 165, +9840 = 166, +9844 = 168, +9848 = 167, +9852 = 169, +9856 = 170, +9860 = 0, +9868 = 47, +9872 = 171, +9876 = 5, +9884 = 82, +9892 = 6, +9896 = 7, +9900 = 87, +9904 = 139, +9908 = 140, +9912 = 100, +9916 = 101, +9920 = 20, +9924 = 21, +9928 = 152, +9932 = 151, +9936 to +9944 = 129 to 131, +9976 to +9984 = 90 to 92, +10016 to +10024 = 10 to 12, +10056 to +10064 = 141 to 143, +10096 to +10104 = 155 to 157, +10852 = 5, +10856 = 20, +10916 = 79, +10920 = 76, +10924 = 77, +10932 = 78, +10936 = 80, +10940 = 81, +10952 = 67, +10956 = 64, +10960 = 65, +10968 = 66, +10972 = 68, +10976 = 69; over the node table (`[+9672]`, its +10432): +8 = 12, +12 = 11, +296 to +308 = 6 to 9, and for 15 items i: +16 + 4i = 48 + i, +156 + 4i = 1 + i, +312 + 4i = a bit mask from the i-th 28-byte record at `0x826370A0` (`0x82637098` + 8; its +0 a count: 0 gives 0, 1 gives 1 << +12, 2 or more (1 << +16) \| (1 << +12)). Returns r3. From `Type7Screens::Type7Screens`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822550F8` | `ColorListScreen::ColorListScreen` | | r3 = the screen: `ListScreen::ListScreen`; vtable `0x820114E0`; +10204, +10212, +10276, +10284, +10348, +10356, +10420, +10428 = 0; `ColorNodeTable::ColorNodeTable` on +10432, +9672 = its address, its +4 (+10436) = +9680 (1 from `ListScreen`); +11016 to +11032 = 545 to 549, +11036 = -1. Returns r3. From `Type7ListScreen::Type7ListScreen` (and `sub_8223DFC0`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822403A0` | `Type7PanelScreen::Type7PanelScreen` | | r3 = the screen (11,744 bytes; the type 7 block's +30608): as `Type6PanelScreen::Type6PanelScreen` (the same layout and calls) with vtable `0x82010E90`, `PanelGroup7B` for group B, `Panel7C`, `Panel7D` and `Panel7F` for C, D and F (`PanelGroup` and `PanelE` the same), and +11680 = 0 too. Returns r3. From `Type7Screens::Type7Screens`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8224CF58` | `MachineScreen::MachineScreen` | | r3 = the screen: `ScreenMachine::ScreenMachine` on +4; +0 = vtable `0x82011168`; +9652 = 0. Returns r3. From `Type6PanelScreen::Type6PanelScreen`, `Type7PanelScreen::Type7PanelScreen` (and `sub_822386F0`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82252290` | `ListScreen::ListScreen` | | r3 = the screen: `ScreenMachine::ScreenMachine` on +4; +0 = vtable `0x82011218`; +9676 = 0, +9680 = 1, +9684 = 1, +9708 = 0, +9772 = 0, +9776 = 0, +9784 = 0, +9788 = 1, +10136 = 0; -1 at +9712 to +9768, +9792 to +9932, five runs of ten words from +9936, +9976, +10016, +10056 and +10096 (+9936 to +10132), and +10140; +9780 not written. Returns r3. From `NodeListScreen::NodeListScreen` and `ColorListScreen::ColorListScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82247BE8` | `NodeTable::NodeTable` | | r3 = the table (428 bytes): +0 = vtable `0x82010FF0`; -1 at +8, +12, +16 to +120 (27 words), +124 to +152 (8), +156 to +260 (27), +264 to +292 (8), +296 to +308, +420 and +424; 0 at +312 to +416 (27). Leaf. From `PairedNodeTable::PairedNodeTable` and `ColorNodeTable::ColorNodeTable`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82247C60` | `PairedNodeTable::PairedNodeTable` | | r3 = the table (460 bytes): `NodeTable::NodeTable`; vtable `0x82010FF8`; four pairs at +428 to +456 (0, -1). Returns r3. From `NodeListScreen::NodeListScreen` and `NodeScreen::NodeScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82247D08` | `ColorNodeTable::ColorNodeTable` | | r3 = the table (584 bytes): `NodeTable::NodeTable`; vtable `0x82011000`; four pairs at +428 to +456 (0, -1), +476 = -1, -1 at +480 to +512 and +516 to +548; +552 to +564 = 255 and +568 to +580 = 205, 235, 67, 255 (probably two colors, white and a yellow green). Returns r3. From `ColorListScreen::ColorListScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82252908` | `ListPart::ListPart` | | r3 = the part (140 bytes): `ListPartBase::ListPartBase`; vtable `0x82011314`; `ListPartInner::ListPartInner` on +20, +16 = its address, +12 = 16. Returns r3. From `Type6ListScreen::Type6ListScreen` (+10824) and `Type7ListScreen::Type7ListScreen` (+11040). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822523F8` | `ListPartBase::ListPartBase` | | r3 = the part: +0 = vtable `0x820112A0`; +4 to +16 = 0. Leaf. From `ListPart::ListPart` (and `sub_82253190`, `sub_82254488`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822526A0` | `ListPartInner::ListPartInner` | | r3 = the inner part (120 bytes): `ListPartInnerBase::ListPartInnerBase`; vtable `0x820112F8`; +100, +108, +116 = 0, +112 = 3. Returns r3. From `ListPart::ListPart`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822525E0` | `ListPartInnerBase::ListPartInnerBase` | | r3 = the inner part: +0 = vtable `0x820112CC`; +32 and +36 = 0. Leaf. From `ListPartInner::ListPartInner` (and `sub_82253030`, `sub_822543C0`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82240110` | `PanelGroup::PanelGroup` | | r3 = the group (44 bytes; the panel screens' +9664, group A): `PanelGroupBase::PanelGroupBase`; vtable `0x82010E8C`; +4 = 4, +12 = 1, +32 = 0. Returns r3. From `Type6PanelScreen::Type6PanelScreen` and `Type7PanelScreen::Type7PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82231C68` | `PanelGroup6B::PanelGroup6B` | | r3 = the group (the type 6 panel screen's +9708, group B): as `PanelGroup::PanelGroup` with +4 = 28, +12 = 4. Returns r3. From `Type6PanelScreen::Type6PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82241680` | `PanelGroup7B::PanelGroup7B` | | r3 = the group (the type 7 panel screen's +9708, group B): as `PanelGroup::PanelGroup` with +4 = 28, +12 = 2. Returns r3. From `Type7PanelScreen::Type7PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8224EEA8` | `PanelGroupBase::PanelGroupBase` | | r3 = the group: `NodeBase::NodeBase`; vtable `0x82010974` (the panels' too); +8 to +32 = -1. Returns r3. From the three `PanelGroup` constructors (and `sub_82239C10`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82258FB0` | `NodeBase::NodeBase` | | r3 = the object: +0 = vtable `0x82010B5C` (the empty base many classes share, as `ListNode::ListNode`'s in `archive.md`, which stores r4 where this stores 0), +4 = 0. Leaf. From `PanelGroupBase::PanelGroupBase`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82231CD0` | `Panel6C::Panel6C` | | r3 = the panel (320 bytes, `operator new`), r4 = its group (B): `PanelCBase::PanelCBase`; vtable `0x82010980`; +12 = r4; +4 = 0, +20 = 7, +24 = 0, +32 = 5, +40 = 109, +44 to +56 = -1, +60 = 112, +68 = 5, +72 = 6, +108 = 15, +112 = 16, +124 = 0, +128 = 43, +132 = 13, +136 = 14, +140 = 15, +144 = 5, +152 = 0, +160 = 5, +164 = 6, +168 = 7, +172 = 8, +176 = 11, +180 = 12, +216 = 9, +220 = 10, +224 = 13, +228 = 14, +272 = 4, +276 = 123, +280 = 112. Returns r3. From `Type6PanelScreen::Type6PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822416D8` | `Panel7C::Panel7C` | | r3 = the panel (320 bytes), r4 = its group (B): as `Panel6C::Panel6C` with vtable `0x82010EE4`, +20 = 6, +24 = 4 and +32 = 3. Returns r3. From `Type7PanelScreen::Type7PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8224D6D0` | `PanelCBase::PanelCBase` | | r3 = the panel: +0 = vtable `0x820111C0`; +4 = 1, +12 = 0; -1 at +8, +16, +24 to +140, +148 to +244 and +260 to +272; 0 at +276 to +312 and +316. Leaf. From `Panel6C::Panel6C`, `Panel7C::Panel7C` (and `sub_82239E78`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82231E40` | `Panel6D::Panel6D` | | r3 = the panel (92 bytes, `operator new`), r4 = its group (B): `PanelDBase::PanelDBase`; vtable `0x82010974`; +4 = r4; +12 = 22, +16 = 110, +20 = 111, +24 = 96, +28 to +40 = 105 to 108, +60 = 21, +64 = 0, +68 = 1, +80 = 2. Returns r3. From `Type6PanelScreen::Type6PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822418B8` | `Panel7D::Panel7D` | | r3 = the panel (92 bytes), r4 = its group (B): as `Panel6D::Panel6D` with +12 = 20, +24 = 94, +28 to +40 = 103 to 106, +60 = 19. Returns r3. From `Type7PanelScreen::Type7PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8224CFA0` | `PanelDBase::PanelDBase` | | r3 = the panel: +0 = vtable `0x82010B5C`, +4 = 0, +8 to +80 = -1, +88 = 0. Leaf. From `Panel6D::Panel6D`, `Panel7D::Panel7D` (and `sub_8223A100`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82230800` | `PanelE::PanelE` | | r3 = the panel (160 bytes, `operator new`), r4 = its group (A): `PanelEBase::PanelEBase`; +0 = r4 (no vtable); +4 = 4, +16 = 4, +20 to +32 = 5 to 8, +60 = 9, +64 = 5, +68 = 15, +72 = 16, +76 = 80, +80 = 81, +88 = 82, +92 = 62, +96 = 67, +100 = 68, +104 = 72, +112 = 2, +116 = 83, +120 = 3, +124 to +136 = 5 to 8, +140 = -1, +144 = 1, +148 = 3. Returns r3. From both panel screens. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8224EF78` | `PanelEBase::PanelEBase` | | r3 = the panel: +0 and +4 = 0; -1 at +8 to +56 and +60 to +148; +152 and +156 = 0. Leaf. From `PanelE::PanelE` (and `sub_82239D58`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_822308E8` | `Panel6F::Panel6F` | | r3 = the panel (144 bytes, `operator new`), r4 = its group (A): `PanelFBase::PanelFBase`; vtable `0x82010974`; +4 = r4; +28 = 3, +32 = 6, +36 = 0, +40 = 0, +44 = 5, +48 = 6, +52 = 7, +84 = 4, +88 = 1, +92 = 0, +96 = 5, +100 = 15, +104 = 16, +108 = 29, +112 = 30, +116 = 79, +120 = 73, +124 = 2, +132 = 75, +136 = 83. Returns r3. From `Type6PanelScreen::Type6PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82240268` | `Panel7F::Panel7F` | | r3 = the panel (144 bytes), r4 = its group (A): the same stores as `Panel6F::Panel6F` (a separate copy of its code). Returns r3. From `Type7PanelScreen::Type7PanelScreen`. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8224FA88` | `PanelFBase::PanelFBase` | | r3 = the panel: +0 = vtable `0x82010B5C`, +4 = 0; -1 at +24 to +80 and +84 to +136; +140 = 0. Leaf. From `Panel6F::Panel6F`, `Panel7F::Panel7F` (and `sub_82239C70`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8224B660` | `PanelSet::PanelSet` | | r3 = the set (the panel screens' +9752), r4 to r7 = panels F, E, D and C, r8 = group B: +0 = vtable `0x820110C8`; `PanelSetBase::PanelSetBase` on +4; `[0x82805EAC]` = 0; +1900 = F and F +140 = `[0x82805EAC]`, +1904 = E and E +156 = it, +1908 = D and D +88 = it, +1912 = C and C +316 = it (the word read again each time; panels not checked for 0), +1960 = r8. Returns r3. From both panel screens. Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_8224AD28` | `PanelSetBase::PanelSetBase` | | r3 = the set's base (the set's +4): +0 = vtable `0x820110C4`; 0 at +4, +12 to +28, +120, +128, +192, +200 to +248 (except +224 = -1), +784, +1300, +1816, +1876, +1892 to +1916, +1944, +1956 and `[0x82805EAC]`; 1 at +1920, +1928, +1936, +1940, +1948; -1 at +1932, +1952, +1960 to +1968. A leaf without a frame: eleven words below its stack pointer (r1 - 48 to r1 - 8) set to 0, ten read back (dead words). From `PanelSet::PanelSet` (and `sub_8224B750`, not seen in play). Seen in play. Read in full 2026-11-07 (B7 loop). |
+| `sub_82249C08` | `GroupPair::GroupPair` | | r3 = the pair (16 bytes; the panel screens' +11728), r4 = group A, r5 = group B: +0 = vtable `0x82011084`, +8 = r4, +12 = r5 (+4 not written). Leaf. From both panel screens. Seen in play. Read in full 2026-11-07 (B7 loop). |
