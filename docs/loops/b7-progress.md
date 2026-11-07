@@ -145,7 +145,12 @@ file's history. What's left to see in a drive, from every run:
   deleted from `leads.md`). Map checked (9cc3556f: `tuning-screen.md`,
   91 rows, all new, 80 in play; 0 errors; 60 ready groups; 4 leads added,
   two trimmed; five subagents, one at a time, for the reading). Migration
-  agent running.
+  113d853c..6c8c5a52 (`--native_tuning_screen`: the category tables,
+  prices and choices, the 17 debug state handlers, `StoreToGarageCar`,
+  `EquipChoice`, `AeroPartValue`, the part marks; 738 harness cases;
+  race 38 s, 0 errors, all harnesses 0 differing; no subagents); left:
+  ~40 ready roots needing movies 2/13's UI movie calls in the harness.
+  Validation agent running.
 
 ## Done
 
