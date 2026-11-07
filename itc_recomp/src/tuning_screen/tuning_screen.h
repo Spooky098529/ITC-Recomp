@@ -25,7 +25,8 @@ constexpr uint32_t kType2 = 9663;      // a byte
 constexpr uint32_t kOption = 9664;     // a byte: the option pick
 constexpr uint32_t kPrice = 25120;     // GetPrice's answer kept
 constexpr uint32_t kPartSet = 33900;   // the power and power train tables' row
-constexpr uint32_t kSaveData = 18904;  // the save data (its +6120 the garage's list)
+constexpr uint32_t kSaveData = 18904;
+constexpr uint32_t kMovieId = 2;       // the screen's UI movie (13 and 14 the editors')  // the save data (its +6120 the garage's list)
 
 // --- The part tables (tables.cpp): leaves with no frame ---
 
@@ -73,6 +74,23 @@ void EquipChoice(uint8_t* base, uint32_t screen);
 // original leaves them, then the selected car's table[type][item] (r3
 // zero-extended), all 64 bits set for the ids with none.
 uint64_t AeroPartValue(uint8_t* base, uint32_t screen, uint64_t type, uint64_t item,
+                       uint32_t sp);
+
+// --- The part list's marks (marks.cpp) ---
+
+// Movie 2: its id at `frame` + 80, then UiMovies::Find's movie.
+uint32_t Movie(uint8_t* base, uint32_t frame);
+// sub_821EE6D0 TuningScreen::HidePartMarks: the six rows' (sub-scene 1's
+// nodes 14 to 19) children 3 to 5 hidden. Its 128-byte frame below `sp`.
+// r3 the last child.
+uint32_t HidePartMarks(uint8_t* base, uint32_t sp);
+// sub_821EE760 TuningScreen::ShowPartMarks: r3 = the screen (all 64 bits),
+// `row` a row node, `group` and `index` a wheel (WheelNumber's). By +25196
+// (0 both, 1 front, 2 rear): child 5 shown, with 4 for the front wheel's
+// match (+27836) and 3 for the rear's (+27840). Its 128-byte frame. r3 as
+// the original leaves it: the last child shown, else WheelNumber's, else
+// the screen.
+uint64_t ShowPartMarks(uint8_t* base, uint64_t r3, uint32_t row, uint64_t group, uint64_t index,
                        uint32_t sp);
 
 // --- The debug state handlers (debug.cpp) ---

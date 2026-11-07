@@ -29,6 +29,12 @@ void TuningEquipChoice(PPCContext& ctx, uint8_t* base);
 // aero item.
 void TuningAeroPartValue(PPCContext& ctx, uint8_t* base);
 
+// The part list's marks: HidePartMarks sub_821EE6D0, ShowPartMarks
+// sub_821EE760 (r3 = the screen, r4 = a row node, r5 = a group, r6 = an
+// index).
+void TuningHidePartMarks(PPCContext& ctx, uint8_t* base);
+void TuningShowPartMarks(PPCContext& ctx, uint8_t* base);
+
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
 // DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,

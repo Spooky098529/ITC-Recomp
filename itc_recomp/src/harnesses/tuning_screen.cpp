@@ -18,6 +18,7 @@
 #include "hooks/tuning_screen.h"
 #include "memory/heap.h"
 #include "tuning_screen/tuning_screen.h"
+#include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
@@ -55,12 +56,24 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
   }
 }
 
+// Movie 2's block: the movie (+0, its live scene the first node), the movie
+// table's pairs (+0x100) and a pool of 40 nodes (+0x400), each child entry
+// of a node another of the pool.
+constexpr uint32_t kMovieBytes = 0xC000;
+constexpr uint32_t kPairsAt = 0x100;
+constexpr uint32_t kNodesAt = 0x400;
+constexpr uint32_t kNodeBytes = 0x400;
+constexpr uint32_t kNodeCount = 40;
+constexpr uint32_t kMissingMovie = 0x826C5CDC;
+
 struct World {
-  World() : block(kBlockBytes), save(kSaveBytes) {}
-  bool ok() const { return block.address != 0 && save.address != 0; }
+  World() : block(kBlockBytes), save(kSaveBytes), movie(kMovieBytes) {}
+  bool ok() const { return block.address != 0 && save.address != 0 && movie.address != 0; }
+  uint32_t node(uint32_t n) const { return movie.address + kNodesAt + kNodeBytes * n; }
   uint32_t screen() const { return block.address; }
   Block block;
   Block save;  // the save data the screen's +18904 points at
+  Block movie;
   uint8_t* base = nullptr;
 };
 
@@ -158,6 +171,46 @@ void ShapeScreen(uint8_t* base, const World& w, Random& r) {
   }
 }
 
+// Movie 2 and its nodes, and the movie table pointed at its pair (now and
+// then not found: UiMovies::Find answers the missing movie's word, the same
+// movie).
+void ShapeMovie(uint8_t* base, const World& w, Random& r) {
+  const uint32_t movie = w.movie.address;
+  guest::StoreU32(base, movie + 16, w.node(0));
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    const uint32_t node = w.node(n);
+    guest::StoreU32(base, node + 108, r.Below(20));
+    for (uint32_t e = 0; e < (kNodeBytes - 128) / 8; e++) {
+      guest::StoreU32(base, node + 128 + 8 * e, w.node(r.Below(kNodeCount)));
+    }
+  }
+  guest::StoreU32(base, movie + kPairsAt, 2);
+  guest::StoreU32(base, movie + kPairsAt + 4, movie);
+  guest::StoreU32(base, ui_movies::kMovieTable, movie + kPairsAt);
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, r.Below(8) == 0 ? 0 : 1);
+  guest::StoreU32(base, kMissingMovie, movie);
+}
+
+// The globals a case points into its world, put back after.
+class SavedGlobals {
+ public:
+  explicit SavedGlobals(uint8_t* base)
+      : base_(base), table_(Read(base, ui_movies::kMovieTable, 12)),
+        missing_(Read(base, kMissingMovie, 4)) {}
+  ~SavedGlobals() {
+    Write(base_, ui_movies::kMovieTable, table_.data(), 12);
+    Write(base_, kMissingMovie, missing_.data(), 4);
+  }
+  SavedGlobals(const SavedGlobals&) = delete;
+  SavedGlobals& operator=(const SavedGlobals&) = delete;
+
+ private:
+  uint8_t* base_;
+  std::vector<uint8_t> table_;
+  std::vector<uint8_t> missing_;
+};
+
 // A small index for r4 (all 64 bits), now and then with upper bits.
 uint64_t SmallIndex(Random& r, uint32_t hi) {
   uint64_t v = r.Below(hi + 1);
@@ -182,7 +235,10 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
     WriteRandom(h.base, w.block.address, w.block.bytes, r);
     WriteRandom(h.base, w.save.address, w.save.bytes, r);
+    WriteRandom(h.base, w.movie.address, w.movie.bytes, r);
+    SavedGlobals globals(h.base);
     ShapeScreen(h.base, w, r);
+    ShapeMovie(h.base, w, r);
     t.r3.u64 = w.screen();
     setup(t, r, w);
     t.lr = 0x82000000 | (r.Below(0x10000) << 2);
@@ -196,6 +252,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     }
     out[v].Bytes(Read(h.base, w.block.address, w.block.bytes));
     out[v].Bytes(Read(h.base, w.save.address, w.save.bytes));
+    out[v].Bytes(Read(h.base, w.movie.address, w.movie.bytes));
     out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes - saves));
     out[v].Bytes(Read(h.base, sp, kCallerBytes));
     out[v].Word(t.r1.u32);
@@ -272,6 +329,27 @@ void TuningScreen(Context& h) {
         t.r5.u64 = SmallIndex(r, 9);
       },
       __imp__sub_821DE2D8, hooks::TuningAeroPartValue, 64);
+
+  // The part list's marks (__savegprlr_28's saves left out). ShowPartMarks:
+  // a row node of the pool, a wheel, and the screen's front and rear wheel
+  // numbers matching it half the time each.
+  Group(h, w, "TuningScreen::HidePartMarks", 24, kScreenOnly, __imp__sub_821EE6D0,
+        hooks::TuningHidePartMarks, 40);
+  Group(
+      h, w, "TuningScreen::ShowPartMarks", 40,
+      [](PPCContext& t, Random& r, const World& w) {
+        t.r4.u64 = w.node(r.Below(kNodeCount));
+        t.r5.u64 = r.Below(8) == 0 ? r.Next() : r.Below(18);
+        t.r6.u64 = r.Below(8) == 0 ? r.Next() : r.Below(40);
+        const uint32_t number = uint32_t(ts::WheelNumber(t.r5.u64, t.r6.u64));
+        guest::StoreU32(w.base, w.screen() + 25196, Around(r, 0, 3));
+        for (uint32_t field : {27836u, 27840u}) {
+          if (r.Below(2) == 0) {
+            guest::StoreU32(w.base, w.screen() + field, number);
+          }
+        }
+      },
+      __imp__sub_821EE760, hooks::TuningShowPartMarks, 40);
 
   // The debug state handlers: `saves` is each original's register saves
   // (__savegprlr_N's 8 x (32 - N) + 8 bytes, or its inline stores).
