@@ -43,6 +43,16 @@ void TuningHideTireMarks(PPCContext& ctx, uint8_t* base);
 void TuningHideNode19(PPCContext& ctx, uint8_t* base);
 void TuningShowTireMarks(PPCContext& ctx, uint8_t* base);
 
+// The movie calls (r3 = the screen; the UI movie calls through their
+// overrides, lr put back): UpdateListCounter sub_821EED00, SetPartName
+// sub_821F2068, PlayGroupAnimation sub_821EE880, Command31 sub_82202880,
+// Command9 sub_821E9050.
+void TuningUpdateListCounter(PPCContext& ctx, uint8_t* base);
+void TuningSetPartName(PPCContext& ctx, uint8_t* base);
+void TuningPlayGroupAnimation(PPCContext& ctx, uint8_t* base);
+void TuningCommand31(PPCContext& ctx, uint8_t* base);
+void TuningCommand9(PPCContext& ctx, uint8_t* base);
+
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
 // DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,

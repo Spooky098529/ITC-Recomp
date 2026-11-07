@@ -7,6 +7,7 @@
 #include "hooks/tuning_screen.h"
 
 #include "base/flags.h"
+#include "hooks/stand_models.h"
 #include "tuning_screen/tuning_screen.h"
 
 ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
@@ -25,7 +26,10 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "StoreToGarageCar sub_821DCC28, EquipChoice sub_821DF448 and AeroPartValue "
               "sub_821DE2D8; the part list's marks HidePartMarks sub_821EE6D0 and ShowPartMarks "
               "sub_821EE760, ShowInteriorPicture sub_821DA3F8, HideTireMarks sub_821DFB20, HideNode19 "
-              "sub_821DFBE8 and ShowTireMarks sub_821E22E8, movie 2's nodes through the UI movies' plain C++) natively instead of through the "
+              "sub_821DFBE8 and ShowTireMarks sub_821E22E8, movie 2's nodes through the UI movies' plain C++; "
+              "UpdateListCounter sub_821EED00, SetPartName sub_821F2068, PlayGroupAnimation "
+              "sub_821EE880 (its piece sub_821EE8E8 merged), Command31 sub_82202880 and Command9 "
+              "sub_821E9050, UiMovie::FinishNamed, PlayNamed and SetText through their overrides) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen)");
 
 namespace hooks {
@@ -160,6 +164,36 @@ void TuningShowTireMarks(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::ShowTireMarks(base, ctx.r3.u32, ctx.r1.u32);
 }
 
+namespace {
+
+// A step with the guest calls (hooks::StandModelsGuestCall), lr put back.
+template <typename Body>
+void WithCalls(PPCContext& ctx, uint8_t* base, Body body) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const ts::GuestCall call = StandModelsGuestCall(ctx, base);
+  const uint64_t r3 = body(call);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace
+
+#define ITC_TUNING_CALLS_STEP(Name)                                                    \
+  void Tuning##Name(PPCContext& ctx, uint8_t* base) {                                 \
+    const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;                              \
+    WithCalls(ctx, base,                                                              \
+              [&](const ts::GuestCall& call) { return ts::Name(base, call, screen, sp); }); \
+  }
+
+ITC_TUNING_CALLS_STEP(UpdateListCounter)
+ITC_TUNING_CALLS_STEP(SetPartName)
+ITC_TUNING_CALLS_STEP(PlayGroupAnimation)
+ITC_TUNING_CALLS_STEP(Command31)
+ITC_TUNING_CALLS_STEP(Command9)
+
+#undef ITC_TUNING_CALLS_STEP
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -205,3 +239,8 @@ ITC_TUNING_SCREEN(821DA3F8, TuningShowInteriorPicture)
 ITC_TUNING_SCREEN(821DFB20, TuningHideTireMarks)
 ITC_TUNING_SCREEN(821DFBE8, TuningHideNode19)
 ITC_TUNING_SCREEN(821E22E8, TuningShowTireMarks)
+ITC_TUNING_SCREEN(821EED00, TuningUpdateListCounter)
+ITC_TUNING_SCREEN(821F2068, TuningSetPartName)
+ITC_TUNING_SCREEN(821EE880, TuningPlayGroupAnimation)
+ITC_TUNING_SCREEN(82202880, TuningCommand31)
+ITC_TUNING_SCREEN(821E9050, TuningCommand9)

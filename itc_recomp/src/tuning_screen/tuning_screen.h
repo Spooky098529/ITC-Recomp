@@ -12,6 +12,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <initializer_list>
 
 namespace tuning_screen {
 
@@ -113,6 +115,59 @@ uint64_t HideNode19(uint8_t* base, uint64_t r3, uint32_t sp);
 // marks on nodes (30, 0) and (33, 0) (its row), HideTireMarks from its
 // frame outside the tire states. r3 the last child, or GetCurrentChoice's.
 uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp);
+
+// --- The movie calls (pages.cpp) ---
+
+// A guest function `function` (through the function table: its override
+// when it has one) with r3 on from `args` (all 64 bits each; the registers
+// past them left), r1 = `frame` and the link register `lr` (the original's
+// return address); its r3. Flush-to-zero off after it. (The same type as
+// stand_models::GuestCall: hooks::StandModelsGuestCall makes it.)
+using GuestCall = std::function<uint64_t(uint32_t function, std::initializer_list<uint64_t> args,
+                                         uint32_t frame, uint32_t lr)>;
+
+constexpr uint32_t kFinishNamed = 0x8211DF20;  // UiMovie::FinishNamed(movie, named)
+constexpr uint32_t kPlayNamed = 0x8211DAC8;    // UiMovie::PlayNamed(movie, named, chained, 0, 0, 0)
+constexpr uint32_t kSetText = 0x8211C1F8;      // UiMovie::SetText(movie, sub, child, id, ...)
+
+// The movie table's entry for movie `id` (UiMovies::Find, the id at
+// `frame` + 80): the address of the movie's word.
+uint32_t MovieEntry(uint8_t* base, uint32_t frame, uint32_t id);
+// The UI movie calls from the frame `frame` with the return address `lr`:
+// FinishNamed, PlayNamed(movie, named, chained, 0, 0, 0) and SetText with
+// one argument (r7; r8 to r10 0). Their r3.
+uint64_t FinishNamed(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
+                     uint32_t named);
+uint64_t PlayNamed(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
+                   uint32_t named, uint32_t chained);
+uint64_t SetText(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
+                 uint32_t sub_scene, uint32_t child, uint32_t id, uint64_t argument);
+// The command queue's step at [+10036] the handlers make inline: its next
+// (+16) made current (+12) with +20 = 0 and +16 = -1, or with no next +12 =
+// -1 and +0 = +4; then +24 = 0.
+void Advance(uint8_t* base, uint32_t screen);
+
+// sub_821EED00 TuningScreen::UpdateListCounter: SetText(movie 2, 1, 23,
+// string 8, +25220 + 1), (1, 24, 449), (1, 25, 8, +25224 + 1). 112-byte
+// frame; the last SetText's r3.
+uint64_t UpdateListCounter(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F2068 TuningScreen::SetPartName: the 180-word table at frame + 96
+// (376, then 1000 to 1178), SetText(movie 2, 1, 20, table[WheelNumber(
+// +25204, +25220)]) (unchecked). 848-byte frame; SetText's r3.
+uint64_t SetPartName(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EE880 TuningScreen::PlayGroupAnimation (with its piece
+// sub_821EE8E8, merged): the group +25204's animation (65, 66, 67, 68)
+// restarted (FinishNamed, PlayNamed chained), and 71 with +25208 11 and the
+// group 10 or 12. 112-byte frame; the last PlayNamed's r3, else the movie's
+// entry.
+uint64_t PlayGroupAnimation(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82202880 TuningScreen::Command31: +9720 = 1; movie 13's 220 (state 23)
+// or 222 (24) restarted. 112-byte frame; PlayNamed's r3, else the entry.
+uint64_t Command31(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821E9050 TuningScreen::Command9: with +9716 set 61 restarted, +9720
+// and +9716 0; with +9724 set the queue's step (+9724 left). 128-byte
+// frame; PlayNamed's r3, else the entry.
+uint64_t Command9(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:

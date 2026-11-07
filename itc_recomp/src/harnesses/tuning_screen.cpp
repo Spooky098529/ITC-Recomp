@@ -288,6 +288,9 @@ const SetupFn kScreenOnly = [](PPCContext&, Random&, const World&) {};
 
 }  // namespace
 
+// The movie calls' cases (tuning_screen_pages.cpp).
+void TuningScreenPages(Context& h);
+
 void TuningScreen(Context& h) {
   World w;
   w.base = h.base;
@@ -448,6 +451,7 @@ void TuningScreen(Context& h) {
     Group(h, w, handler.name, 20, kScreenOnly, handler.recompiled, handler.native,
           handler.saves);
   }
+  TuningScreenPages(h);
 }
 
 }  // namespace harness
