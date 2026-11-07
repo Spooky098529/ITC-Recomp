@@ -258,4 +258,25 @@ uint64_t Type7Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
 uint64_t ControllerOptionsDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                                const Calls& calls);
 
+// --- The stand scene's teardown and the garage camera's presets
+// (garage.cpp) ---
+
+constexpr uint32_t kStandHolder = 0x826D83E0;  // [it] the stand's holder (three slots)
+constexpr uint32_t kPresetsAsset = 22600;
+constexpr uint32_t kOnPresetsLoaded = 0x8217FBE8;
+
+// sub_821802D8 GarageCamera::LoadPresets: the presets' asset (22600) size
+// from its TOC entry (+8, else +4), that many bytes allocated (the layer's
+// pages) and cleared (XMemSet), and Archive::Load(22600, the block,
+// OnPresetsLoaded, the camera) through `load`. Returns its serial.
+int64_t GarageCameraLoadPresets(uint8_t* base, uint32_t camera,
+                                const std::function<int64_t(uint32_t, uint32_t, uint32_t,
+                                                            uint32_t)>& load);
+// sub_82180738 StandScene::Release: Viewports::Release, then each of the
+// holder's three slots (StandSlot::Free, the slot freed, its word 0), the
+// holder freed and [0x826D83E0] = 0. nullopt, with nothing done, where a
+// block isn't the allocation layer's pages (the adapter runs the
+// original). r3 the holder's free's.
+std::optional<uint64_t> StandSceneRelease(uint8_t* base);
+
 }  // namespace type67_modes

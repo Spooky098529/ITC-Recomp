@@ -26,9 +26,12 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "archive/archive.h"
 #include "base/log.h"
+#include "cameras/cameras.h"
 #include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "hooks/type67_modes.h"
 #include "memory/heap.h"
@@ -776,6 +779,121 @@ void GuestCallHandlers(Context& h, const Block& world) {
           __imp__sub_821C7F28, hooks::ControllerOptionsDraw, frame_out(112, 3));
 }
 
+// --- GarageCamera::LoadPresets: Archive::Load recorded (ArchiveLoads),
+// each call's words compared but the destination, which is compared by
+// content (the presets' size from the TOC) and freed. StandScene::Release:
+// the stand's holder, its slots (none, a slot without a block, or one with
+// a block and 0 to 3 presets) and the viewports' block and two viewports
+// made of the layer's pages for the case (the game's globals put back
+// after); whether each made block is still pages after, the globals and r3
+// compared. ---
+
+void Garage(Context& h) {
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_ERROR("harness: type67_modes: the native heap or archive queue is off; garage skipped");
+    return;
+  }
+  {
+    Results results("GarageCamera::LoadPresets (sub_821802D8)");
+    const uint32_t entry = archive::Toc(base, t67::kPresetsAsset) + 0x60000 - 31600;
+    const uint32_t size = guest::LoadU32(base, entry + 8) != 0 ? guest::LoadU32(base, entry + 8)
+                                                              : guest::LoadU32(base, entry + 4);
+    for (int c = 0; c < 4; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        ArchiveLoads loads({c % 2 == 0 ? int64_t(c + 5) : -1});
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + 64 * c;
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          __imp__sub_821802D8(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          hooks::GarageCameraLoadPresets(t, base);
+        }
+        std::vector<uint32_t> calls = loads.calls();
+        out[v].Word(uint32_t(calls.size()));
+        if (calls.size() >= 2) {
+          const uint32_t destination = calls[1];
+          out[v].Word(memory::IsPages(destination));
+          out[v].Bytes(Read(base, destination, size < 0x10000 ? size : 0x10000));
+          memory::FreePages(destination);
+          calls[1] = 0;
+        }
+        for (const uint32_t w : calls) out[v].Word(w);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("StandScene::Release (sub_82180738)");
+    const uint32_t saved_holder = guest::LoadU32(base, t67::kStandHolder);
+    const uint32_t saved_viewports = guest::LoadU32(base, cameras::kViewports);
+    for (int c = 0; c < 12; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 131 + 0x82180738);
+        std::vector<uint32_t> made;
+        auto pages = [&](uint32_t bytes) {
+          const uint32_t block = memory::AllocPages(bytes, 4096);
+          WriteRandom(base, block, bytes < 64 ? bytes : 64, r);
+          made.push_back(block);
+          return block;
+        };
+        const uint32_t viewports = pages(12);
+        guest::StoreU32(base, viewports + 0, pages(1872));
+        guest::StoreU32(base, viewports + 4, pages(1872));
+        guest::StoreU32(base, cameras::kViewports, viewports);
+        const uint32_t holder = pages(12);
+        guest::StoreU32(base, t67::kStandHolder, holder);
+        for (uint32_t i = 0; i < 3; i++) {
+          uint32_t slot = 0;
+          const uint32_t kind = r.Below(3);
+          if (kind != 0) {
+            slot = pages(64);
+            guest::StoreU32(base, slot, 0);
+            if (kind == 2) {
+              const uint32_t block = pages(8192);
+              guest::StoreU32(base, slot, block);
+              const uint32_t count = r.Below(4);
+              guest::StoreU32(base, block + 112 + 4392, count);
+              for (uint32_t p = 0; p < count; p++) {
+                guest::StoreU32(base, block + 112 + 296 + 4 * p, pages(64));
+              }
+            }
+          }
+          guest::StoreU32(base, holder + 4 * i, slot);
+        }
+        PPCContext t = CallContext(h);
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          __imp__sub_82180738(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else if (!hooks::StandSceneRelease(t, base)) {
+          ITC_LOG_ERROR("harness: type67_modes: StandScene::Release refused");
+        }
+        out[v].Word(uint32_t(made.size()));
+        for (const uint32_t block : made) {
+          out[v].Word(memory::IsPages(block));
+          if (memory::IsPages(block)) memory::FreePages(block);
+        }
+        out[v].Word(guest::LoadU32(base, t67::kStandHolder));
+        out[v].Word(guest::LoadU32(base, cameras::kViewports));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    guest::StoreU32(base, t67::kStandHolder, saved_holder);
+    guest::StoreU32(base, cameras::kViewports, saved_viewports);
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -791,6 +909,7 @@ void Type67Modes(Context& h) {
   Handlers(h, world);
   Modes(h, world);
   GuestCallHandlers(h, world);
+  Garage(h);
 }
 
 }  // namespace harness

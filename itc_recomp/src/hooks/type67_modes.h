@@ -91,4 +91,10 @@ void Type7DialogDraw(PPCContext& ctx, uint8_t* base);
 void Type7Screen0Draw(PPCContext& ctx, uint8_t* base);
 void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base);
 
+// GarageCamera::LoadPresets sub_821802D8 (r3 the camera; needs the native
+// heap and the archive's queue: the adapter checks) and StandScene::Release
+// sub_82180738 (false where a block isn't the layer's pages).
+void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base);
+bool StandSceneRelease(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

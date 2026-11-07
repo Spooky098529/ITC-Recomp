@@ -45,10 +45,12 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "Type7Dialog::Leave sub_82241E58, Type6Screen0::Leave sub_82233DF8, "
               "Type7Screen0::Leave sub_82244350 (UiMovies::Open and Delete natively where their "
               "adapters would), ListScreen::Init sub_822515A0, PanelScreen::Init sub_82248E10, "
-              "NodeScreen::Init sub_82259128 (their vtable slots' plain C++ where ours), and the "
+              "NodeScreen::Init sub_82259128 (their vtable slots' plain C++ where ours), the "
               "Draw handlers Type6Screen0::Draw sub_82234ED8, Type6Dialog::Draw sub_82232740, "
               "Type7Dialog::Draw sub_822421C0, Type7Screen0::Draw sub_82245148 and "
-              "ControllerOptions::Draw sub_821C7F28 (the pages' handlers guest calls)) "
+              "ControllerOptions::Draw sub_821C7F28 (the pages' handlers guest calls); "
+              "GarageCamera::LoadPresets sub_821802D8 (Archive::Load through its plain C++) and "
+              "StandScene::Release sub_82180738) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -312,6 +314,15 @@ void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base) {
                                           Type67Calls(ctx, base));
 }
 
+// --- The stand scene's teardown and the presets' load ---
+
+void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base) {
+  SetArchiveSerial(ctx, t67::GarageCameraLoadPresets(base, ctx.r3.u32, NativeArchiveLoad(base)));
+}
+bool StandSceneRelease(PPCContext& ctx, uint8_t* base) {
+  return Set(ctx, t67::StandSceneRelease(base));
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -421,3 +432,17 @@ ITC_TYPE67_MODES(82232740, Type6DialogDraw)
 ITC_TYPE67_MODES(822421C0, Type7DialogDraw)
 ITC_TYPE67_MODES(82245148, Type7Screen0Draw)
 ITC_TYPE67_MODES(821C7F28, ControllerOptionsDraw)
+
+// GarageCamera::LoadPresets (from GarageCamera::Init, recompiled): over the
+// layer and the archive's native queue only.
+extern "C" REX_FUNC(sub_821802D8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||
+      !hooks::NativeArchiveQueue()) {
+    __imp__sub_821802D8(ctx, base);
+    return;
+  }
+  hooks::GarageCameraLoadPresets(ctx, base);
+}
+// StandScene::Release (from StandMode::Release, recompiled).
+ITC_TYPE67_FREES(82180738, StandSceneRelease)
