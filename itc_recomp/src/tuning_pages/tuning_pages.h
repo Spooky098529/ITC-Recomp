@@ -388,6 +388,20 @@ uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint3
 // movie's entry, the slot's r3 or IsItemAvailable's 0.
 uint64_t MoveLevel(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                    uint32_t sp, bool native_slots);
+// sub_821D32C8 TuningScreen::MoveType: state 6's movie side (its row): by
+// the front-end menu's step (+8) and wrap (+40), the type list's bars slid
+// or snapped (the list's node +16 = float(type) x 40.0) and the type's rows
+// restarted and looped, or (G2 only) finished and dimmed (+68) when
+// IsItemAvailable says the type isn't, for G1 (category 0 item 2:
+// sub-scene 29), G2 (category 4, category 5 item 3, category 6 items 0 and
+// 1: sub-scene 28, rows 489 and 428) and G3 (category 5 item 2, category 6
+// item 2: rows 489 only); with no step A (with the level available: the
+// rows finished, the type's pictures played) or B (the rows finished, the
+// page before played) asked again. IsItemAvailable's r4 leftover is the
+// type (the leaf leaves it). 128-byte frame; the last call's r3, else the
+// movie's entry, the slot's r3 or IsItemAvailable's.
+uint64_t MoveType(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                  uint32_t sp, bool native_slots);
 // sub_821D6E20 TuningScreen::InputLevels: state 5's page (its row):
 // Menu::StepList for the 10-level lists, else Menu::Step; moved (the level
 // and the long list's rows), A (refused when IsItemAvailable says the level
