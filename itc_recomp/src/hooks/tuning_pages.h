@@ -34,4 +34,18 @@ void TuningPagesKeepListTextures(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetEditorLimits(PPCContext& ctx, uint8_t* base);
 void TuningPagesLoadPageLayouts(PPCContext& ctx, uint8_t* base);
 
+// The decal images' textures: DecalImages::FreeTexture sub_821FE6A0 (r3 the
+// images, r4 an entry; Texture::Free by car_models' plain C++ with
+// --native_car_models and the native heap, else through the guest),
+// RestoreVinylTexture sub_82204698 and RestoreStickerTexture sub_821F89B8
+// (r4 w, r5 a texture), BindVinylTexture sub_82204730 (r4 an entry, r5 a
+// group); TuningScreen::BindVinylTextures sub_82203D40 and EnterEditor
+// sub_821D84F8 (r3 the screen).
+void TuningPagesFreeTexture(PPCContext& ctx, uint8_t* base);
+void TuningPagesRestoreVinylTexture(PPCContext& ctx, uint8_t* base);
+void TuningPagesRestoreStickerTexture(PPCContext& ctx, uint8_t* base);
+void TuningPagesBindVinylTexture(PPCContext& ctx, uint8_t* base);
+void TuningPagesBindVinylTextures(PPCContext& ctx, uint8_t* base);
+void TuningPagesEnterEditor(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

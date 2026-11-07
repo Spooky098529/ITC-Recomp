@@ -6,7 +6,11 @@
 #include "hooks/tuning_pages.h"
 
 #include "base/flags.h"
+#include "car_models/vinyl.h"
+#include "hooks/heap.h"
 #include "tuning_pages/tuning_pages.h"
+
+ITC_FLAG_DECLARE(bool, native_car_models);
 
 ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "Run the tuning screen's pages' functions (docs/functions/tuning-pages.md: "
@@ -17,7 +21,12 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_821E7DB0 (its piece sub_821E7DE4 merged), InchListEnd sub_821EF288 (its piece "
               "sub_821EF2FC merged); the vinyl editor's set-up SetUpVinylBusyIcon sub_821FE560, "
               "DecalImages::AllLoaded sub_821FE5D8, KeepListTextures sub_821FE7D8, "
-              "SetEditorLimits sub_821FE420 and LoadPageLayouts sub_822045F8) natively instead of "
+              "SetEditorLimits sub_821FE420 and LoadPageLayouts sub_822045F8; the decal images' "
+              "textures DecalImages::FreeTexture sub_821FE6A0 (Texture::Free by its plain C++ with "
+              "--native_car_models and the native heap), RestoreVinylTexture sub_82204698, "
+              "RestoreStickerTexture sub_821F89B8, BindVinylTexture sub_82204730, "
+              "BindVinylTextures sub_82203D40 and EnterEditor sub_821D84F8 (FadeIn's plain C++)) "
+              "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
 
@@ -79,6 +88,40 @@ void TuningPagesLoadPageLayouts(PPCContext& ctx, uint8_t* base) {
   tp::LoadPageLayouts(base, ctx.r3.u32);
 }
 
+void TuningPagesFreeTexture(PPCContext& ctx, uint8_t* base) {
+  const tp::TextureFreeFn free = [&ctx, base](uint32_t header_in, uint32_t data_in) -> uint64_t {
+    if (ITC_FLAG(native_car_models) && NativeHeapActive() &&
+        car_models::TextureFreeable(base, header_in)) {
+      return car_models::TextureFree(base, header_in, data_in);
+    }
+    ctx.r3.u64 = header_in;
+    ctx.r4.u64 = data_in;
+    sub_820ECFC8(ctx, base);
+    return ctx.r3.u64;
+  };
+  ctx.r3.u64 = tp::FreeTexture(base, ctx.r3.u64, ctx.r4.u64, free);
+}
+
+void TuningPagesRestoreVinylTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::RestoreVinylTexture(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
+void TuningPagesRestoreStickerTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::RestoreStickerTexture(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
+void TuningPagesBindVinylTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::BindVinylTexture(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
+void TuningPagesBindVinylTextures(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::BindVinylTextures(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void TuningPagesEnterEditor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::EnterEditor(base, ctx.r3.u64, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -106,3 +149,9 @@ ITC_TUNING_PAGES(821FE5D8, TuningPagesAllLoaded)
 ITC_TUNING_PAGES(821FE7D8, TuningPagesKeepListTextures)
 ITC_TUNING_PAGES(821FE420, TuningPagesSetEditorLimits)
 ITC_TUNING_PAGES(822045F8, TuningPagesLoadPageLayouts)
+ITC_TUNING_PAGES(821FE6A0, TuningPagesFreeTexture)
+ITC_TUNING_PAGES(82204698, TuningPagesRestoreVinylTexture)
+ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
+ITC_TUNING_PAGES(82204730, TuningPagesBindVinylTexture)
+ITC_TUNING_PAGES(82203D40, TuningPagesBindVinylTextures)
+ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)

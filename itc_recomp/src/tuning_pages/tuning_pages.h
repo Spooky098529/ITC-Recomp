@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace tuning_pages {
 
@@ -65,5 +66,45 @@ void SetEditorLimits(uint8_t* base, uint32_t screen);
 // sub_822045F8 TuningScreen::LoadPageLayouts: +30800 to +30831 from the
 // table at 0x8200C560 by the selected garage car's id (unchecked). r3 left.
 void LoadPageLayouts(uint8_t* base, uint32_t screen);
+
+// --- The decal images' textures (decals.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the movie
+// id at frame + 80; its register saves not written) and r3 as the original
+// leaves it.
+
+// Texture::Free (sub_820ECFC8) on (header_in, data_in): its r3. The adapter
+// gives car_models::TextureFree's plain C++ where it runs natively, else the
+// guest's.
+using TextureFreeFn = std::function<uint64_t(uint32_t header_in, uint32_t data_in)>;
+
+// sub_821FE6A0 DecalImages::FreeTexture: r3 = the decal images, r4 = an
+// entry i (all 64 bits each). Its texture e+28 freed (the tail call
+// Texture::Free(e + 28, e + 32), its r3) unless a kept texture's header
+// (r3 + 7236 + 8k) or, for i 33 to 50, another of entries 33 to 50 holds it;
+// then r3 = e + 28 (64 bits). No frame.
+uint64_t FreeTexture(uint8_t* base, uint64_t images, uint64_t i, const TextureFreeFn& free);
+// sub_82204698 DecalImages::RestoreVinylTexture: w 0 or 1, movie 13's
+// texture n's +0 = [images + 8836] or [+ 8840]. 112-byte frame; r3 the
+// movie's entry, else `images` (r3 as it came, all 64 bits).
+uint64_t RestoreVinylTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_t n, uint32_t sp);
+// sub_821F89B8 DecalImages::RestoreStickerTexture: w 2 or 3, movie 14's
+// texture n's +0 = [images + 8844] or [+ 8848]. The same frame and r3.
+uint64_t RestoreStickerTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_t n,
+                               uint32_t sp);
+// sub_82204730 DecalImages::BindVinylTexture: entry i's texture into movie
+// 13's texture by i and the group (its row). 128-byte frame; r3 the movie's
+// entry.
+uint32_t BindVinylTexture(uint8_t* base, uint64_t images, uint32_t i, uint32_t group,
+                          uint32_t sp);
+// sub_82203D40 TuningScreen::BindVinylTextures: with +9656 5 and byte +9660
+// 6, the 24 entries' textures into movie 13's (its row). 112-byte frame; r3
+// the movie's entry, else the screen (all 64 bits).
+uint64_t BindVinylTextures(uint8_t* base, uint64_t screen, uint32_t sp);
+// sub_821D84F8 TuningScreen::EnterEditor: state 60's page (its row). With
+// layer 0's fade counts 0 and the decal images all loaded: FadeIn, then for
+// the vinyls or the stickers BindVinylTextures and KeepListTextures, Push(4),
+// the queue to state 23 (command 15, SetUpVinylBusyIcon) or 38 (command 32).
+// 96-byte frame; r3 the screen, AllLoaded's 0 or FadeIn's (the passes).
+uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp);
 
 }  // namespace tuning_pages
