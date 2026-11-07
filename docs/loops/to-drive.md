@@ -33,6 +33,20 @@ here loses its heading.
   `sub_822040A8` TuningScreen::LoadVinyls, `sub_821D9E68`
   TuningScreen::ShowPricePanel, `sub_821EED98` TuningScreen::SetBrandLogo,
   `sub_8224AB50` Color::HsvToRgb.
+- The tuning pages' second migration (attract race `itc_4287`, replay
+  `itc_4288` ok; `tuning-pages.md`): `sub_821E1DB0`
+  TuningScreen::SetCurrentChoice, `sub_820ED528` Texture::FromTga,
+  `sub_821D8670` TuningScreen::LeaveEditor, `sub_821FEE10`
+  TuningScreen::LoadDecalImages, `sub_821FE830` DecalImages::Request,
+  `sub_821F6D40` DecalImages::Load, `sub_821D87C0`
+  TuningScreen::BackToItems, `sub_821EE390` TuningScreen::InputWheelParts,
+  `sub_821E8CE0` TuningScreen::AnimateWheelParts, `sub_821EEEA8`
+  TuningScreen::InputInches, `sub_821E9110` TuningScreen::AnimateInches,
+  `sub_821E2660` TuningScreen::OnDialogYes, `sub_821FA230`
+  TuningScreen::OnStickerDialogYes, `sub_821F6CE8`
+  TuningScreen::SaveAreaDecals, `sub_821F8598` TuningScreen::StoreStickers,
+  `sub_821F84C8` TuningScreen::GarageDecal, `sub_821FE798`
+  DecalImages::SwapKept, `sub_821CD498` TuningScreen::MarkOwned.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

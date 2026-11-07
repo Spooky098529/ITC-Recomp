@@ -44,7 +44,10 @@ file's history. What's left to see in a drive, from every run:
   groups in the file (`sub_821D6E20`, `sub_821D74A0` with `sub_821D32C8`,
   `sub_821F6688`, `sub_821DFD48`, `sub_821D8160`, `sub_821E25B0` each
   over 1,100 lines; `sub_821FFB20`, `sub_82202530`, `sub_82201B40`).
-  Validation agent running.
+  Validated `itc_4287` (race 91 s at 180, the harnesses ~86.6 s; 0
+  errors, every harness 0 differing, 26 of 26 harness lines; none in the
+  race, 8 in the replay `itc_4288` (ok), 18 to drive). Third migration
+  agent running.
 
 ## Done
 
