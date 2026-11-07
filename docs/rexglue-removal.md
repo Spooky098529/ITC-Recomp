@@ -238,9 +238,11 @@ goes in `src/` as overrides), American English.
   (`stand-models.md`, 28 of 28 in play), the build screen
   (`build-screen.md`, 59 of 60, with `CarScene::Update`) and the tuning
   screen (`tuning-screen.md`, 82 of 82 in play, with
-  `GarageStage::Draw`) native (ours 4,252 -> 4,476) and halted at the
-  tuning screen's fifth validation (an existing `car_makers` harness
-  case crashing in the all-harnesses run; fixed after (the case's garage list could come back to a node it relinked and end on a random slot, a car ~18 MB outside the block; now walked through distinct nodes, `LayGarageWalk`), then the validation passed (`itc_4240`)). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  `GarageStage::Draw`) native (ours 4,252 -> 4,476); its last
+  validation halted on an existing `car_makers` harness case (its
+  garage list could end on a random slot, a car outside the case's
+  block; fixed, then passed), and the run was concluded there by the
+  user's call. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2773,6 +2775,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-06 | The race's update (`RaceScene::LoadScenery` `sub_8215B790` with the scenery's physical allocation (`XPhysicalSize` answered from our allocation layer, the user's call), `Create`, `Setup`, `SetupPools`; `RaceScene::Update` `sub_8215D2B0` once a tick with `Scenery::Update`, the race lights and `Car::TickUpdate`; `RaceScene::RemakeCarModel` with `ScenePools::SetUpB`, the second set's set-ups and `SceneModel::Build`; `RaceScene::VaryCar`) | `race-update.md` (and rows in `course-scenery.md`, `heap.md`, `scene-models.md`, `car-models.md`, `vehicle-accessors.md`, `post-effects.md`, `screen-objects.md`) | 7 of 7 (three migrations; ours 4,252 -> 4,286 with the other files' rows) | `--native_race_update` (and `--native_course_scenery`, `--native_scene_models`, `--native_vehicle_accessors`, `--native_heap`) |
 | 2026-11-06 | The garage stage's scene model holders (`GarageStage::MakeModel` `sub_8217FCB0`, the stand's record setters at `82178EC0`-`82179A18`, `SetWheel` `sub_8217DD38` with its 179-entry table, `FitAxles`, `SetTireGrade`, the second wheels; the wheels' setters `SceneWheels::SetSizes`, `SetTireGrades`, `Wheels::SetTireTextures`; the tuning screen's `PreviewWheel`, `StepSecondWheels`, `SetTireGrade`; with `SceneModel::ApplyRecord` `sub_820DA758` and `ReloadDecals` `sub_820D9D48`) | `stand-models.md` (and rows in `scene-models.md`) | 28 of 28 in play (one migration) | `--native_stand_models` (and `--native_scene_models`) |
 | 2026-11-06 | The build screen (the front-end screen over `[0x826D8448]`, four levels as the states of `[0x826D843C]`: groups by category, a group's builds, one build on the stand, its details; its 21 transitions, lists, rows and prompts; with `CarScene::Update` `sub_820C9608`, `SceneModel::Update`, `GarageStage::ReloadModel`; and the cleanup leads before it, `GarageStage::ReapplyRecord`, `SetCar`, `ShowCarById` and their pairs) | `build-screen.md` (and rows in `scene.md`, `scene-models.md`, `vehicle-accessors.md`, `accessories.md`, `car-makers.md`) | 59 of 60 (three migrations; `BackToBuilds` kept recompiled, the user's call) | `--native_build_screen` (and `--native_scene`, `--native_car_makers`) |
+| 2026-11-07 | The tuning screen (the front end's tuning shop: its update's subtree, not the update `sub_821E6C50` or its refresh `sub_821E3AD0`: the debug state handlers, the command queue's runners, the category bar, lists, pages, marks, texts, the stand's calls, `RefreshMenu`, `RefreshMovie13`; with `GarageStage::Draw` and three UI movie text calls) | `tuning-screen.md` (and rows in `front-end-car-draw.md`, `ui-movies-game.md`, `car-makers.md`) | 82 of 82 in play (five migrations) | `--native_tuning_screen` (and `--native_front_end_car_draw`, `--native_ui_movies_game`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4773,3 +4776,22 @@ its 120. The boundary: 449 functions (916 pairs): overridden 109,
 Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
 54 with a live caller. B7 (`b7_status.py`): ours 4,390, work left 2,021
 (Wrapped 57, with a row 422, no row yet 1,542), from 2,092.
+
+**2026-11-07, the tuning screen (branch `b7-loop-06-11-26`):** the
+thirty-sixth run's fourth subsystem (`tuning-screen.md`,
+`--native_tuning_screen`, `src/tuning_screen/`), in five migrations:
+the screen's update subtree (its 17 debug state handlers, which only
+print through the empty `sub_82106540`, the command queue's runners,
+the category bar, lists, pages, marks and texts, the stand's calls,
+`RefreshMenu` and `RefreshMovie13`), with `GarageStage::Draw`
+`sub_8217FE60` and three UI movie text calls (`SetNumberText`,
+`SetChildNameText`, `SetNameText`); the screen's update `sub_821E6C50`
+and its refresh `sub_821E3AD0` are leads. The fifth validation first
+halted on an existing `car_makers` harness case crashing only in the
+all-harnesses run (its garage list could end on a node with no slot, a
+car ~18 MB outside the case's block); fixed (the list walked through
+distinct nodes), then it passed. The run concluded there, by the user's
+call. The boundary: 449 functions (916 pairs): overridden 109, Native
+36, Dropped 26, never called 70, live 208. Imports: 186 called, 54 with
+a live caller. B7 (`b7_status.py`): ours 4,476, work left 1,937
+(Wrapped 57, with a row 418, no row yet 1,462), from 2,021.

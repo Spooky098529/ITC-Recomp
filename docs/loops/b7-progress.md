@@ -277,6 +277,8 @@ file's history. What's left to see in a drive, from every run:
   work left 1944 (wrapped 57, known 425, unknown 1462).
 - After its fourth and fifth migrations: ours 4476, work left 1937
   (wrapped 57, known 418, unknown 1462).
+- After its fifth validation (`itc_4240`, after the harness fix): ours
+  4476, work left 1937.
 
 ## Stopped
 
@@ -305,3 +307,15 @@ by all four of its set-ups). Validation `attract_race.sh 180
 expected ones, all ten functions' lines there and passing, 91 s raced,
 no error lines. The replay (`itc_4238`) needs no rerun: only harness
 code changed.
+
+Concluded 2026-11-07 by the user's call ("conclude this run"), after the
+fix: the tuning screen recorded as finished (its row under "B7's loop
+runs" in `docs/rexglue-removal.md`, the boundary entry: unchanged, 449
+functions, ours 4476, work left 1937); the run's summary brought up to
+date with its status changes (248); `RefreshMovie13` `sub_822076E8`
+added to `to-drive.md` (the fifth migration's other functions not seen
+in play, `sub_82202F30`, `sub_82203110`, `sub_82203B00`, `sub_822042D8`,
+were there from earlier migrations; the rest ran in the replay
+`itc_4238`); the cleanup lead (7 removable adapters in
+`front-end-car-draw.md`) added to `leads.md`, not taken. The user
+reviews and merges.

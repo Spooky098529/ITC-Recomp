@@ -96,6 +96,11 @@ here loses its heading.
   `sub_821F1DE0` TuningScreen::SetStateTexts, `sub_821F4BF8`
   TuningScreen::FillPartRows, `sub_822019D0` TuningScreen::DecalCommand,
   `sub_821F5F70` TuningScreen::Command8.
+- The tuning screen, fourth and fifth migrations (attract race
+  `itc_4240`, replay `itc_4238` ok; `tuning-screen.md`): `sub_822076E8`
+  TuningScreen::RefreshMovie13 (the vinyl editor's movie; the replay
+  doesn't open it). `sub_82202F30`, `sub_82203110`, `sub_82203B00` and
+  `sub_822042D8`, whose adapters it removed, are in the lines above.
 
 ## Run 2026-11-06 11:15 (`b7-loop-06-11-26`)
 
