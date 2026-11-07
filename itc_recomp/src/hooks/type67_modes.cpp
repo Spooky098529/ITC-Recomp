@@ -60,8 +60,8 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "StandScene::Release sub_82180738; Quaternion::FromAngles sub_8217C120 and "
               "GarageCamera::Reset sub_8217D888 and GarageLights::Init sub_8217D3C8 with the "
               "translated code's float steps; StandScene::Create sub_82180B00 (Viewports::Init "
-              "and CarScene::Create guest calls, CarScene::SetUp's register step); "
-              "StandSlot::Init sub_82180AA0 with "
+              "and CarScene::Create guest calls, CarScene::SetUp's register step) with "
+              "StandSlot::Init sub_82180AA0 (no adapter: its caller is native), "
               "GarageStage::Init sub_82180968 and GarageCamera::Init sub_82180918; the dialogs' "
               "Type6Dialog::OpenConfirm sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, "
               "Dialog::DrawWaiting sub_82241C18, Dialog::OpenConfirmStep sub_822325E0, "
@@ -855,10 +855,11 @@ ITC_TYPE67_MODES(8217C120, QuaternionFromAngles)
 ITC_TYPE67_MODES(8217D888, GarageCameraReset)
 // No adapter for GarageLights::Init sub_8217D3C8: only GarageStage::Init
 // (native) calls it; its step above is the harness's.
-// StandSlot::Init (from StandScene::Create, recompiled): over the layer and
-// the archive's native queue only. GarageStage::Init sub_82180968 and
-// GarageCamera::Init sub_82180918 have no adapters (only StandSlot::Init
-// and GarageStage::Init reach them; the flag switches those).
+// StandSlot::Init sub_82180AA0 has no adapter (removed, B7 loop, 2026-11-07:
+// its only caller, StandScene::Create, is native and calls its plain C++;
+// its step above is the harness's), nor do GarageStage::Init sub_82180968
+// and GarageCamera::Init sub_82180918 (only StandSlot::Init and
+// GarageStage::Init reach them).
 // StandScene::Create (from the modes' slot 0, recompiled): over the layer
 // and the archive's native queue only.
 extern "C" REX_FUNC(sub_82180B00) {
@@ -869,13 +870,4 @@ extern "C" REX_FUNC(sub_82180B00) {
     return;
   }
   hooks::StandSceneCreate(ctx, base);
-}
-extern "C" REX_FUNC(sub_82180AA0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||
-      !hooks::NativeArchiveQueue()) {
-    __imp__sub_82180AA0(ctx, base);
-    return;
-  }
-  hooks::StandSlotInit(ctx, base);
 }
