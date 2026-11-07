@@ -13,7 +13,9 @@ namespace hooks {
 // sub_821CC728, TypeCount sub_821CC7B8, PageCursor sub_821CCD38,
 // PageItemCount sub_821CCDB0, IsPickOwned sub_821CCE30, MarkOwned
 // sub_821CD498, TestAndSetWheelFlag sub_821CDF98 (r4 a wheel number),
-// SetWheelListEnd sub_821E7DB0, InchListEnd sub_821EF288.
+// SetWheelListEnd sub_821E7DB0, InchListEnd sub_821EF288 (PageCursor,
+// PageItemCount and IsPickOwned with no adapters: their callers in play are
+// native; these steps are the harness's).
 void TuningPagesLevelCount(PPCContext& ctx, uint8_t* base);
 void TuningPagesTypeCount(PPCContext& ctx, uint8_t* base);
 void TuningPagesPageCursor(PPCContext& ctx, uint8_t* base);
@@ -118,8 +120,8 @@ void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveLevel(PPCContext& ctx, uint8_t* base);
 // InputLevels sub_821D6E20 (r3 the screen), state 5's page.
 void TuningPagesInputLevels(PPCContext& ctx, uint8_t* base);
-// MoveType sub_821D32C8 (r3 the screen), state 6's movie side (its caller,
-// InputTypes, is recompiled).
+// MoveType sub_821D32C8 (r3 the screen), state 6's movie side (no adapter:
+// only InputTypes calls it; this step is the harness's).
 void TuningPagesMoveType(PPCContext& ctx, uint8_t* base);
 // InputTypes sub_821D74A0 (r3 the screen), state 6's page.
 void TuningPagesInputTypes(PPCContext& ctx, uint8_t* base);

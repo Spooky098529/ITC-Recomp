@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "Run the tuning screen's pages' functions (docs/functions/tuning-pages.md: "
               "TuningScreen::LevelCount sub_821CC728, TypeCount sub_821CC7B8, PageCursor "
               "sub_821CCD38 (its piece sub_821CCD70 merged), PageItemCount sub_821CCDB0 (its piece "
-              "sub_821CCDE8 merged), IsPickOwned sub_821CCE30, MarkOwned sub_821CD498 (its piece "
+              "sub_821CCDE8 merged), IsPickOwned sub_821CCE30 (these three with no adapters: "
+              "their callers in play are native), MarkOwned sub_821CD498 (its piece "
               "sub_821CD6C8 merged; no adapter: only OnDialogYes calls it), TestAndSetWheelFlag sub_821CDF98, SetWheelListEnd "
               "sub_821E7DB0 (its piece sub_821E7DE4 merged), InchListEnd sub_821EF288 (its piece "
               "sub_821EF2FC merged); the vinyl editor's set-up SetUpVinylBusyIcon sub_821FE560, "
@@ -92,7 +93,7 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "by their plain C++; Menu::Step, MenuSound::Play and the UI movie calls through "
               "their overrides); "
               "state 6's page InputTypes sub_821D74A0 with its movie side MoveType "
-              "sub_821D32C8 (IsItemAvailable, IsPickOwned, GetPrice, PageItemCount, PageCursor, "
+              "sub_821D32C8 (no adapter: only InputTypes calls it; IsItemAvailable, IsPickOwned, GetPrice, PageItemCount, PageCursor, "
               "GetCurrentChoice and the UI movies' FindNode and Child by their plain C++; "
               "Menu::Step, MenuSound::Play and the UI movie calls through their overrides)) "
               "natively instead of "
@@ -524,9 +525,6 @@ void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-ITC_TUNING_PAGES(821CCD38, TuningPagesPageCursor)
-ITC_TUNING_PAGES(821CCDB0, TuningPagesPageItemCount)
-ITC_TUNING_PAGES(821CCE30, TuningPagesIsPickOwned)
 ITC_TUNING_PAGES(821CDF98, TuningPagesTestAndSetWheelFlag)
 ITC_TUNING_PAGES(821FE6A0, TuningPagesFreeTexture)
 ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
@@ -553,7 +551,6 @@ ITC_TUNING_PAGES(821D8160, TuningPagesInputOptions)
 ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
 ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
 ITC_TUNING_PAGES(821D6E20, TuningPagesInputLevels)
-ITC_TUNING_PAGES(821D32C8, TuningPagesMoveType)
 ITC_TUNING_PAGES(821D74A0, TuningPagesInputTypes)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
@@ -585,6 +582,14 @@ ITC_TUNING_PAGES(821D74A0, TuningPagesInputTypes)
 // No adapter (B7 loop, 2026-11-07: its only caller, InputOptions, is native
 // and calls its plain C++; the register step above is the harness's):
 // MoveOption sub_821D5610.
+
+// No adapters (removed, B7 loop, 2026-11-07: their only callers in play are
+// native and call their plain C++; the register steps above are the
+// harness's): PageItemCount sub_821CCDB0 and PageCursor sub_821CCD38
+// (InputLevels, InputTypes, InputOptions, InputItems, OnDialogYes,
+// InputWheelParts), IsPickOwned sub_821CCE30 (InputLevels, InputTypes,
+// InputOptions, InputInches; its callers not seen in play, recompiled, call
+// the original) and MoveType sub_821D32C8 (InputTypes).
 
 // No adapters (removed, B7 loop, 2026-11-07: their only callers in play,
 // InputItems and InputLevels, are native and call their plain C++; the
