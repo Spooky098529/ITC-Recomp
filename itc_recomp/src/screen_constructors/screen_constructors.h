@@ -23,6 +23,23 @@ constexpr uint32_t kPanelWord = 0x82815EAC;
 // The frames of the originals that call others with stack leftovers below
 // them.
 constexpr uint32_t kPanelSetFrame = 112;
+constexpr uint32_t kPanelScreenFrame = 160;  // Type6PanelScreen's, Type7PanelScreen's
+constexpr uint32_t kType6NodeScreenFrame = 112;
+constexpr uint32_t kNodeScreenFrame = 128;
+constexpr uint32_t kScreensFrame = 112;  // Type6Screens', Type7Screens'
+
+// The blocks' sizes (the modes' slot 0 allocates them).
+constexpr uint32_t kType6ScreensBytes = 91272;
+constexpr uint32_t kType7ScreensBytes = 71292;
+
+// operator new for the panel screens' four panels: a block, or 0 (the
+// original's answer). `frame` is the caller's r1 (its frame), for a guest
+// call.
+struct New {
+  void* user;
+  uint32_t (*call)(void* user, uint32_t size, uint32_t frame);
+  uint32_t operator()(uint32_t size, uint32_t frame) const { return call(user, size, frame); }
+};
 
 // --- The panels and their groups (the panel screens' members) ---
 
@@ -109,5 +126,47 @@ void ColorListScreen(uint8_t* base, uint32_t screen);
 // node table at [+9672] (read again for each store) and 15 items' masks from
 // the 28-byte records at 0x826370A0.
 void Type7ListScreen(uint8_t* base, uint32_t screen);
+
+// sub_82256F68 NodeListScreen::NodeListScreen: ListScreen, then a
+// PairedNodeTable at +10360 (+9672 its address, +9680 and its +4 = 25).
+void NodeListScreen(uint8_t* base, uint32_t screen);
+// sub_822570F0 TitledListScreen::TitledListScreen: NodeListScreen, vtable,
+// +10820 = 923.
+void TitledListScreen(uint8_t* base, uint32_t screen);
+// sub_822330F0 Type6ListScreen::Type6ListScreen (10,964 bytes):
+// TitledListScreen, a ListPart at +10824, then its words, those of the node
+// table through [+9672] (read again for each store).
+void Type6ListScreen(uint8_t* base, uint32_t screen);
+
+// --- The node screen ---
+
+// sub_8225A3D8 NodeScreen::NodeScreen: ScreenMachine on +460, a
+// PairedNodeTable on the screen, then its words. The original keeps the
+// screen in its caller's frame (`sp` + 20) and stores through the word read
+// back, and builds six words in its own frame (`sp` - 128 + 80 to + 100),
+// one of which (the screen + 10456) it stores through: both copied. Returns
+// the screen as read back (the original's r3).
+uint32_t NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_82236C30 Type6NodeScreen::Type6NodeScreen (10,552 bytes):
+// NodeScreen (from `sp` less its frame), then its words.
+void Type6NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp);
+
+// --- The panel screens ---
+
+// sub_822309C8 Type6PanelScreen::Type6PanelScreen and sub_822403A0
+// Type7PanelScreen::Type7PanelScreen (11,744 bytes): MachineScreen, the
+// groups A (+9664) and B (+9708), four panels from `new_panel` (each built
+// unless 0), the panel set at +9752 (from `sp` less the frame), the group
+// pair at +11728, then their words.
+void Type6PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_panel);
+void Type7PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_panel);
+
+// --- The blocks ---
+
+// sub_822366F0 Type6Screens::Type6Screens and sub_82246B28
+// Type7Screens::Type7Screens: the blocks' screens and machines, then their
+// last words (members from `sp` less the frame).
+void Type6Screens(uint8_t* base, uint32_t block, uint32_t sp, const New& new_panel);
+void Type7Screens(uint8_t* base, uint32_t block, uint32_t sp, const New& new_panel);
 
 }  // namespace screen_constructors

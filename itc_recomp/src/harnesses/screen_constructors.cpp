@@ -10,14 +10,19 @@
 // word, r3, and the stack words the originals leave (NodeScreen's,
 // PanelSetBase's); the plain C++ must leave every other stack word as it
 // was (the originals write only their saved registers and back chains
-// there besides). The functions store words without float math, so
-// everything is compared exactly.
+// there besides; in Type6Screens' cases one of NodeScreen's words ends as
+// Type6PanelScreen's back chain, left out). operator new's four panels are
+// blocks of the world (by size) on both sides: the plain C++'s through its
+// New, the originals' through operator new's adapter's recorder
+// (hooks::g_start_up_recorder). The functions store words without float
+// math, so everything is compared exactly.
 
 #include "harness.h"
 
 #include "base/flags.h"
-#include "screen_constructors/screen_constructors.h"
+#include "hooks/app_start_up.h"
 #include "memory/heap.h"
+#include "screen_constructors/screen_constructors.h"
 
 #include <fmt/format.h>
 
@@ -78,6 +83,8 @@ struct Function {
   uint32_t object_at;
   std::function<void(PPCContext& t, uint32_t world, Random& r)> args;
   std::vector<Leftovers> leftovers;
+  // Stack words the plain C++ writes that end as the originals' back chains.
+  std::vector<Leftovers> ignored = {};
 };
 
 bool InLeftovers(const std::vector<Leftovers>& leftovers, uint32_t r1, uint32_t address) {
@@ -126,7 +133,7 @@ void Run(Context& h, Random& random, const Block& world, const Function& f, int 
         const std::vector<uint8_t> after = Read(h.base, low, kStackBelow + kStackAbove);
         uint32_t written = 0;
         for (uint32_t i = 0; i + 4 <= after.size(); i += 4) {
-          if (!InLeftovers(f.leftovers, r1, low + i) &&
+          if (!InLeftovers(f.leftovers, r1, low + i) && !InLeftovers(f.ignored, r1, low + i) &&
               !std::equal(after.begin() + i, after.begin() + i + 4, stack_before.begin() + i)) {
             written++;
           }
@@ -141,15 +148,60 @@ void Run(Context& h, Random& random, const Block& world, const Function& f, int 
 }
 
 // A panel's offset in the world block (past the biggest object a case
-// builds), for the panel set's cases.
-constexpr uint32_t kPanelsAt = 0x10000;
+// builds, the type 6 block), for the panel set's cases and operator new's
+// answers.
+constexpr uint32_t kPanelsAt = 0x17000;
+constexpr uint32_t kWorldBytes = 0x18000;
+
+// operator new's answer for a panel of `size` bytes: its block in the world
+// at `world` (0 for other sizes).
+uint32_t PanelBlock(uint32_t world, uint32_t size) {
+  switch (size) {
+    case 320:
+      return world + kPanelsAt;
+    case 92:
+      return world + kPanelsAt + 320;
+    case 160:
+      return world + kPanelsAt + 448;
+    case 144:
+      return world + kPanelsAt + 640;
+  }
+  return 0;
+}
+
+uint32_t g_world = 0;
+
+// operator new's adapter's calls on the originals' side.
+bool NewRecorder(PPCContext& ctx, uint32_t function) {
+  if (function != 0x825A6880) {
+    return false;
+  }
+  ctx.r3.u64 = PanelBlock(g_world, ctx.r3.u32);
+  return true;
+}
+
+// The original with --native_screen_constructors off and operator new
+// answered from the world.
+template <GuestFunction recompiled>
+void OriginalNew(PPCContext& ctx, uint8_t* base) {
+  const hooks::StartUpRecorder saved = hooks::g_start_up_recorder;
+  hooks::g_start_up_recorder = NewRecorder;
+  Original<recompiled>(ctx, base);
+  hooks::g_start_up_recorder = saved;
+}
+
+// The plain C++'s New: the same blocks.
+sc::New WorldNew() {
+  return {nullptr, [](void*, uint32_t size, uint32_t) { return PanelBlock(g_world, size); }};
+}
 
 }  // namespace
 
 void ScreenConstructors(Context& h) {
   Random& random = h.random;
-  const Block world(0x18000);
+  const Block world(kWorldBytes);
   if (!world.address) return;
+  g_world = world.address;
 
   auto r3 = [](void (*f)(uint8_t*, uint32_t)) {
     return [f](PPCContext& t, uint8_t* base) { f(base, t.r3.u32); };
@@ -235,7 +287,54 @@ void ScreenConstructors(Context& h) {
       {"Type7ListScreen::Type7ListScreen (sub_82242BE8)", Original<__imp__sub_82242BE8>,
        r3(sc::Type7ListScreen), 0, nullptr, {}},
   };
+  auto with_new = [](void (*f)(uint8_t*, uint32_t, uint32_t, const sc::New&)) {
+    return [f](PPCContext& t, uint8_t* base) { f(base, t.r3.u32, t.r1.u32, WorldNew()); };
+  };
+  // PanelSetBase's words from a panel screen's r1, and those of a block's.
+  const int32_t panel_set_base =
+      -int32_t(sc::kPanelScreenFrame + sc::kPanelSetFrame);  // PanelSetBase's r1
+  const Leftovers panel_words{panel_set_base - 48, panel_set_base - 4};
+  const int32_t members = -int32_t(sc::kScreensFrame);
+  const Leftovers block_panel_words{members + panel_words.from, members + panel_words.to};
+  // NodeScreen's r1 in a Type6NodeScreen's call, and in a block's.
+  const int32_t node = -int32_t(sc::kType6NodeScreenFrame);
+  const int32_t block_node = members + node;
+  const std::vector<Function> screens = {
+      {"NodeListScreen::NodeListScreen (sub_82256F68)", Original<__imp__sub_82256F68>,
+       r3(sc::NodeListScreen), 0, nullptr, {}},
+      {"TitledListScreen::TitledListScreen (sub_822570F0)", Original<__imp__sub_822570F0>,
+       r3(sc::TitledListScreen), 0, nullptr, {}},
+      {"Type6ListScreen::Type6ListScreen (sub_822330F0)", Original<__imp__sub_822330F0>,
+       r3(sc::Type6ListScreen), 0, nullptr, {}},
+      {"ColorNodeTable::ColorNodeTable (sub_82247D08)", Original<__imp__sub_82247D08>,
+       r3(sc::ColorNodeTable), 0, nullptr, {}},
+      {"ColorListScreen::ColorListScreen (sub_822550F8)", Original<__imp__sub_822550F8>,
+       r3(sc::ColorListScreen), 0, nullptr, {}},
+      // Its caller's frame word (r1 + 20) and its frame's +80 to +100.
+      {"NodeScreen::NodeScreen (sub_8225A3D8)", Original<__imp__sub_8225A3D8>,
+       [](PPCContext& t, uint8_t* base) {
+         t.r3.u64 = sc::NodeScreen(base, t.r3.u32, t.r1.u32);
+       },
+       0, nullptr, {{20, 24}, {-48, -24}}},
+      {"Type6NodeScreen::Type6NodeScreen (sub_82236C30)", Original<__imp__sub_82236C30>,
+       [](PPCContext& t, uint8_t* base) { sc::Type6NodeScreen(base, t.r3.u32, t.r1.u32); }, 0,
+       nullptr, {{node + 20, node + 24}, {node - 48, node - 24}}},
+      {"Type6PanelScreen::Type6PanelScreen (sub_822309C8)", OriginalNew<__imp__sub_822309C8>,
+       with_new(sc::Type6PanelScreen), 0, nullptr, {panel_words}},
+      {"Type7PanelScreen::Type7PanelScreen (sub_822403A0)", OriginalNew<__imp__sub_822403A0>,
+       with_new(sc::Type7PanelScreen), 0, nullptr, {panel_words}},
+      // NodeScreen's frame's +80 ends as Type6PanelScreen's back chain.
+      {"Type6Screens::Type6Screens (sub_822366F0)", OriginalNew<__imp__sub_822366F0>,
+       with_new(sc::Type6Screens), 0, nullptr,
+       {{block_node + 20, block_node + 24}, {block_node - 44, block_node - 24}, block_panel_words},
+       {{block_node - 48, block_node - 44}}},
+      {"Type7Screens::Type7Screens (sub_82246B28)", OriginalNew<__imp__sub_82246B28>,
+       with_new(sc::Type7Screens), 0, nullptr, {block_panel_words}},
+  };
   for (const Function& f : functions) {
+    Run(h, random, world, f, 4);
+  }
+  for (const Function& f : screens) {
     Run(h, random, world, f, 4);
   }
   for (const Function& f : more) {

@@ -9,12 +9,19 @@
 // ListPartInnerBase::ListPartInnerBase and ListPartInner::ListPartInner
 // (sub_822523F8, sub_822525E0, sub_822526A0), from ListPart::ListPart;
 // ColorListScreen::ColorListScreen and ColorNodeTable::ColorNodeTable
-// (sub_822550F8, sub_82247D08), from Type7ListScreen::Type7ListScreen.
+// (sub_822550F8, sub_82247D08), from Type7ListScreen::Type7ListScreen;
+// the type 6 block's members (Type6ListScreen with TitledListScreen and
+// NodeListScreen, Type6NodeScreen with NodeScreen, Type6PanelScreen) from
+// Type6Screens::Type6Screens, and Type7PanelScreen from
+// Type7Screens::Type7Screens. The panel screens' four panels come from
+// operator new's plain C++ (the original's call, through the guest, when it
+// fails: the new handler and std::bad_alloc).
 
 #include "screen_constructors/screen_constructors.h"
 
 #include "base/flags.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 
 ITC_FLAG_BOOL(native_screen_constructors, true, "ITC",
               "Build the type 6 and type 7 modes' screens "
@@ -33,7 +40,11 @@ ITC_FLAG_BOOL(native_screen_constructors, true, "ITC",
               "Panel7F sub_82240268, PanelGroup sub_82240110, PanelGroup6B sub_82231C68, "
               "PanelGroup7B sub_82241680, PairedNodeTable::PairedNodeTable sub_82247C60 and "
               "Type7ListScreen::Type7ListScreen sub_82242BE8 with ColorListScreen sub_822550F8 "
-              "and ColorNodeTable sub_82247D08) natively instead of through the "
+              "and ColorNodeTable sub_82247D08, Type6Screens::Type6Screens sub_822366F0 with "
+              "Type6ListScreen sub_822330F0, TitledListScreen sub_822570F0, NodeListScreen "
+              "sub_82256F68, Type6NodeScreen sub_82236C30, NodeScreen sub_8225A3D8 (its stack "
+              "words copied) and Type6PanelScreen sub_822309C8, Type7Screens::Type7Screens "
+              "sub_82246B28 with Type7PanelScreen sub_822403A0) natively instead of through the "
               "translated code (the same stores; checked by "
               "--run_harnesses=screen_constructors)");
 
@@ -75,3 +86,42 @@ ITC_SCREEN_CONSTRUCTOR(82231C68, sc::PanelGroup6B(base, ctx.r3.u32))
 ITC_SCREEN_CONSTRUCTOR(82241680, sc::PanelGroup7B(base, ctx.r3.u32))
 ITC_SCREEN_CONSTRUCTOR(82247C60, sc::PairedNodeTable(base, ctx.r3.u32))
 ITC_SCREEN_CONSTRUCTOR(82242BE8, sc::Type7ListScreen(base, ctx.r3.u32))
+
+namespace {
+
+// The panels' operator new: its plain C++, else the original's call (from
+// the panel screen's frame) for its failure path.
+struct AdapterNew {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+
+uint32_t NewPanel(void* user, uint32_t size, uint32_t frame) {
+  auto* a = static_cast<AdapterNew*>(user);
+  if (auto block = memory::crt::OperatorNew(a->base, size)) {
+    return *block;
+  }
+  PPCContext& ctx = *a->ctx;
+  const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+  ctx.r1.u64 = frame;
+  ctx.r3.u64 = size;
+  __imp__sub_825A6880(ctx, a->base);
+  const uint32_t block = ctx.r3.u32;
+  ctx.r1.u64 = stack;
+  ctx.lr = link;
+  return block;
+}
+
+// The blocks' constructors (r3 the block, returned) from the registers.
+void BlockStep(PPCContext& ctx, uint8_t* base,
+               void (*construct)(uint8_t*, uint32_t, uint32_t, const sc::New&)) {
+  const uint64_t r3 = ctx.r3.u64;
+  AdapterNew user{&ctx, base};
+  construct(base, ctx.r3.u32, ctx.r1.u32, sc::New{&user, NewPanel});
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace
+
+ITC_SCREEN_CONSTRUCTOR(822366F0, BlockStep(ctx, base, sc::Type6Screens))
+ITC_SCREEN_CONSTRUCTOR(82246B28, BlockStep(ctx, base, sc::Type7Screens))

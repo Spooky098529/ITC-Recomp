@@ -133,6 +133,53 @@ uint32_t Bit(uint32_t amount) {
   return (amount & 0x20) != 0 ? 0 : 1u << (amount & 0x1F);
 }
 
+// The panel screens: `group_b`, `panel_c`, `panel_d` and `panel_f` the
+// screen type's constructors, `last_zero` the last word cleared (+11676 or
+// +11680).
+struct PanelScreenType {
+  uint32_t vtable;
+  void (*group_b)(uint8_t*, uint32_t);
+  void (*panel_c)(uint8_t*, uint32_t, uint32_t);
+  void (*panel_d)(uint8_t*, uint32_t, uint32_t);
+  void (*panel_f)(uint8_t*, uint32_t, uint32_t);
+  uint32_t last_zero;
+};
+
+void PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_panel,
+                 const PanelScreenType& type) {
+  const uint32_t frame = sp - kPanelScreenFrame;
+  MachineScreen(base, screen);
+  Store(base, screen + 0, type.vtable);
+  const uint32_t group_a = screen + 9664;
+  PanelGroup(base, group_a);
+  const uint32_t group_b = screen + 9708;
+  type.group_b(base, group_b);
+  // Each panel built unless operator new gave 0 (the original's check).
+  auto make = [&](uint32_t size, void (*construct)(uint8_t*, uint32_t, uint32_t),
+                  uint32_t group) {
+    const uint32_t panel = new_panel(size, frame);
+    if (panel != 0) {
+      construct(base, panel, group);
+    }
+    return panel;
+  };
+  const uint32_t c = make(320, type.panel_c, group_b);
+  const uint32_t d = make(92, type.panel_d, group_b);
+  const uint32_t e = make(160, PanelE, group_a);
+  const uint32_t f = make(144, type.panel_f, group_a);
+  const uint32_t set = screen + 9752;
+  PanelSet(base, set, f, e, d, c, group_b, frame);
+  const uint32_t pair = screen + 11728;
+  GroupPair(base, pair, group_a, group_b);
+  Store(base, screen + 9644, set);
+  Store(base, screen + 9648, pair);
+  Store(base, screen + 11648, pair);
+  Fill(base, screen + 11672, screen + type.last_zero, 0);
+  Store(base, screen + 11716, 45);
+  Store(base, screen + 11720, 44);
+  Store(base, screen + 11724, 46);
+}
+
 // Type7ListScreen's items' records (28 bytes; +0 a count, +12 and +16 bit
 // numbers).
 constexpr uint32_t kType7Records = 0x826370A0;
@@ -528,6 +575,188 @@ void Type7ListScreen(uint8_t* base, uint32_t screen) {
   Store(base, screen + 9684, 0);
   Store(base, screen + 9928, 152);
   Store(base, screen + 9932, 151);
+}
+
+void NodeListScreen(uint8_t* base, uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_82256F68 NodeListScreen::NodeListScreen");
+  ListScreen(base, screen);
+  Store(base, screen + 0, 0x82011558);
+  for (uint32_t offset : {10204u, 10212u, 10276u, 10284u, 10348u, 10356u}) {
+    Store(base, screen + offset, 0);
+  }
+  PairedNodeTable(base, screen + 10360);
+  Store(base, screen + 9672, screen + 10360);
+  Store(base, screen + 9680, 25);
+  Store(base, screen + 10364, 25);
+}
+
+void TitledListScreen(uint8_t* base, uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_822570F0 TitledListScreen::TitledListScreen");
+  NodeListScreen(base, screen);
+  Store(base, screen + 0, 0x820115C8);
+  Store(base, screen + 10820, 923);
+}
+
+void Type6ListScreen(uint8_t* base, uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_822330F0 Type6ListScreen::Type6ListScreen");
+  TitledListScreen(base, screen);
+  Store(base, screen + 0, 0x820109A8);
+  ListPart(base, screen + 10824);
+  Store(base, screen + 9676, screen + 10824);
+  static constexpr uint32_t kWords[][2] = {
+      {9712, 0},   {9716, 10},  {9720, 11},  {9724, 15},  {9728, 7},   {9732, 2},
+      {9740, 1},   {9744, 8},   {9748, 0},   {9752, 8},   {9756, 9},   {9760, 19},
+      {9768, 3},   {9784, 0},   {9788, 0},   {9800, 0},   {9804, 1},   {9812, 4},
+      {9816, 0},   {9828, 0},   {9832, 104}, {9856, 105}, {9860, 0},   {9868, 98},
+      {9872, 107}, {9876, 5},   {9880, 106}, {9892, 6},   {9896, 7},   {9900, 103},
+      {9904, 20},  {9908, 21},  {9928, 33},  {9932, 32},
+  };
+  for (const auto& w : kWords) {
+    Store(base, screen + w[0], w[1]);
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    Store(base, screen + 9936 + 4 * i, 10 + i);  // +9936 to +9964: 10 to 17
+  }
+  // The node table's words, each through [+9672] read again.
+  auto table = [&](uint32_t offset, uint32_t value) {
+    Store(base, Load(base, screen + 9672) + offset, value);
+  };
+  table(8, 10);
+  table(12, 9);
+  for (uint32_t i = 0; i < 4; i++) {
+    table(296 + 4 * i, 6 + i);  // +296 to +308: 6 to 9
+  }
+  for (uint32_t i = 0; i < 27; i++) {
+    table(156 + 4 * i, 1 + i);  // +156 to +260: 1 to 27
+    table(16 + 4 * i, 46 + i);  // +16 to +120: 46 to 72
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    table(124 + 4 * i, 77 + i);  // +124 to +152: 77 to 84
+  }
+  table(420, 6);
+  table(424, 55);
+}
+
+uint32_t NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8225A3D8 NodeScreen::NodeScreen");
+  const uint32_t frame = sp - kNodeScreenFrame;
+  Store(base, sp + 20, screen);  // its caller's frame
+  boot_mode::ScreenMachineConstruct(base, screen + 460);
+  PairedNodeTable(base, screen);
+  Store(base, frame + 92, 15);
+  Store(base, screen + 0, 0x820116B8);
+  Store(base, frame + 84, 0);
+  Store(base, frame + 88, 0);
+  Store(base, frame + 80, 0);
+  Store(base, frame + 100, screen + 10456);
+  Store(base, frame + 96, 10);
+  const uint32_t s = Load(base, sp + 20);
+  Store(base, s + 10200, 0);
+  Store(base, s + 10192, 0);
+  Store(base, s + 10272, Load(base, frame + 84));
+  Store(base, s + 10264, Load(base, frame + 88));
+  Store(base, s + 4, 15);
+  const uint32_t runs = Load(base, frame + 100);
+  Store(base, s + 10100, 15);
+  Store(base, s + 10276, kNone);
+  Fill(base, s + 10284, s + 10340, kNone);
+  Fill(base, s + 10392, s + 10412, kNone);
+  Store(base, s + 10536, kNone);
+  Store(base, s + 10540, kNone);
+  // Three runs of ten words through the frame's word (+10416 to +10532).
+  for (uint32_t i = 0; i < 10; i++) {
+    Store(base, runs - 40 + 4 * i, kNone);
+    Store(base, runs + 4 * i, kNone);
+    Store(base, runs + 40 + 4 * i, kNone);
+  }
+  Fill(base, s + 10352, s + 10388, kNone);
+  return s;
+}
+
+void Type6NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82236C30 Type6NodeScreen::Type6NodeScreen");
+  NodeScreen(base, screen, sp - kType6NodeScreenFrame);
+  Store(base, screen + 0, 0x82010A80);
+  // The node table (the screen's +0).
+  Store(base, screen + 8, 11);
+  Store(base, screen + 12, 10);
+  for (uint32_t i = 0; i < 27; i++) {
+    Store(base, screen + 16 + 4 * i, 48 + i);  // +16 to +120: 48 to 74
+    Store(base, screen + 156 + 4 * i, 1 + i);  // +156 to +260: 1 to 27
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    Store(base, screen + 124 + 4 * i, 79 + i);  // +124 to +152: 79 to 86
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, screen + 296 + 4 * i, 6 + i);  // +296 to +308: 6 to 9
+  }
+  Store(base, screen + 420, 6);
+  Store(base, screen + 424, 55);
+  static constexpr uint32_t kWords[][2] = {
+      {10276, 8},   {10280, 5},   {10284, 101}, {10296, 0},  {10304, 47}, {10308, 102},
+      {10312, 43},  {10324, 44},  {10328, 45},  {10336, 16}, {10340, 17}, {10344, 29},
+      {10348, 28},  {10392, 103}, {10396, 8},   {10400, 9},  {10404, 0},  {10408, 10},
+      {10412, 11},  {10536, 0},   {10540, 1},   {10544, 15}, {10548, 0},
+  };
+  for (const auto& w : kWords) {
+    Store(base, screen + w[0], w[1]);
+  }
+  for (uint32_t i = 0; i < 6; i++) {
+    Store(base, screen + 10352 + 4 * i, 6 + i);  // +10352 to +10372: 6 to 11
+  }
+  for (uint32_t i = 0; i < 10; i++) {
+    Store(base, screen + 10416 + 4 * i, 30 + 5 * i);  // 30, 35, ... 75
+    Store(base, screen + 10456 + 4 * i, 31 + 5 * i);  // 31, 36, ... 76
+    Store(base, screen + 10496 + 4 * i, 32 + 5 * i);  // 32, 37, ... 77
+  }
+}
+
+void Type6PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_panel) {
+  ITC_NATIVE_RUNNING("sub_822309C8 Type6PanelScreen::Type6PanelScreen");
+  PanelScreen(base, screen, sp, new_panel,
+              {0x82010920, PanelGroup6B, Panel6C, Panel6D, Panel6F, 11676});
+}
+
+void Type7PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_panel) {
+  ITC_NATIVE_RUNNING("sub_822403A0 Type7PanelScreen::Type7PanelScreen");
+  PanelScreen(base, screen, sp, new_panel,
+              {0x82010E90, PanelGroup7B, Panel7C, Panel7D, Panel7F, 11680});
+}
+
+void Type6Screens(uint8_t* base, uint32_t block, uint32_t sp, const New& new_panel) {
+  ITC_NATIVE_RUNNING("sub_822366F0 Type6Screens::Type6Screens");
+  const uint32_t members = sp - kScreensFrame;
+  Store(base, block + 0, 0x82010A78);
+  Type6Screen0(base, block + 4);
+  boot_mode::ScreenMachineConstruct(base, block + 9672);
+  Type6ListScreen(base, block + 19432);
+  Type6NodeScreen(base, block + 30396, members);
+  Type6PanelScreen(base, block + 40948, members, new_panel);
+  boot_mode::ScreenMachineConstruct(base, block + 52696);
+  Store(base, block + 52692, 0x82010A68);
+  boot_mode::ScreenMachineConstruct(base, block + 62336);
+  boot_mode::ScreenMachineConstruct(base, block + 71976);
+  boot_mode::ScreenMachineConstruct(base, block + 81616);
+  Store(base, block + 91260, 0);
+  guest::StoreU8(base, block + 91256, 0);
+  Store(base, block + 91264, 0);
+}
+
+void Type7Screens(uint8_t* base, uint32_t block, uint32_t sp, const New& new_panel) {
+  ITC_NATIVE_RUNNING("sub_82246B28 Type7Screens::Type7Screens");
+  const uint32_t members = sp - kScreensFrame;
+  Store(base, block + 0, 0x82010FE0);
+  Type7Screen0(base, block + 4);
+  boot_mode::ScreenMachineConstruct(base, block + 9664);
+  Type7ListScreen(base, block + 19428);
+  Type7PanelScreen(base, block + 30608, members, new_panel);
+  boot_mode::ScreenMachineConstruct(base, block + 42356);
+  Store(base, block + 42352, 0x82010FD0);
+  boot_mode::ScreenMachineConstruct(base, block + 51996);
+  boot_mode::ScreenMachineConstruct(base, block + 61636);
+  Store(base, block + 71280, 0);
+  guest::StoreU8(base, block + 71276, 0);
+  Store(base, block + 71284, 0);
 }
 
 }  // namespace screen_constructors
