@@ -347,6 +347,20 @@ Setup Dialog(const uint32_t (&states)[N]) {
     guest::StoreU32(w.base, w.screen() + ts::kState, state);
   };
 }
+// The scene's own animations (UiMovie::Play, Finish and Loop by index, the
+// live scene node 0 and its children the pool's): each node's animation
+// index +116 100 to 103, its entries 100 to 111 (past the children the
+// cases reach) the 8 animations.
+void SceneAnimations(const World& w, Random& r) {
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    const uint32_t node = w.node(n);
+    guest::StoreU32(w.base, node + 116, 100 + r.Below(4));
+    for (uint32_t e = 100; e < (kNodeBytes - 128) / 8; e++) {
+      guest::StoreU32(w.base, node + 128 + 8 * e, w.at(kAnimationsAt) + 64 * r.Below(8));
+    }
+  }
+}
+
 constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
 constexpr uint32_t kCommand30States[] = {35, 36, 37};
 
@@ -422,6 +436,46 @@ void TuningScreenPages(Context& h) {
                  guest::StoreU32(w.base, s + ts::kState, 29 + r.Below(3));
                }
                guest::StoreU32(w.base, s + 30724, r.Below(8));
+             }});
+  // PlayIntro: the scene's and sub-scene 9's animation 0.
+  Run(h, w, {"TuningScreen::PlayIntro", 20, __imp__sub_821D06B0, hooks::TuningPlayIntro,
+             {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
+               SceneAnimations(w, r);
+             }});
+  // OpenItems: aero (+9656 4) half the time, the named 976, 1012 and 1013.
+  Run(h, w, {"TuningScreen::OpenItems", 25, __imp__sub_821D0A48, hooks::TuningOpenItems,
+             {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
+               SceneAnimations(w, r);
+               NamedAnimations(w, r);
+               guest::StoreU32(w.base, w.screen() + 9656, r.Below(2) == 0 ? 4 : r.Below(8));
+             }});
+  // Command15: +30724 mostly small (6 on a named animation), now and then
+  // negative.
+  Run(h, w, {"TuningScreen::Command15", 20, __imp__sub_821FF1D0, hooks::TuningCommand15,
+             {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
+               NamedAnimations(w, r);
+               const uint32_t v = r.Below(6) == 0 ? uint32_t(-int32_t(r.Below(5))) : r.Below(8);
+               guest::StoreU32(w.base, w.screen() + 30724, v);
+             }});
+  // Command22: the set 0 to 2, +30732 0 to 2, the word it picks -1 half the
+  // time; the movie's +28 table pointing into the block.
+  Run(h, w, {"TuningScreen::Command22", 25, __imp__sub_82202090, hooks::TuningCommand22,
+             {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
+               NamedAnimations(w, r);
+               guest::StoreU32(w.base, w.at(kMovieAt) + 28, w.at(kTableAt));
+               for (uint32_t k = 0; k < 6; k++) {
+                 guest::StoreU32(w.base, w.at(kTableAt) + 640 + 4 * k,
+                                 w.at(kTargetsAt) + 4 * r.Below(64));
+                 guest::StoreU32(w.base, w.at(kTableAt) + 672 + 4 * k,
+                                 w.at(kTargetsAt) + 4 * r.Below(64));
+               }
+               const uint32_t s = w.screen();
+               const uint32_t set = r.Below(3), pick = r.Below(3);
+               guest::StoreU32(w.base, s + 30724, set);
+               guest::StoreU32(w.base, s + 30732, pick);
+               if (r.Below(2) == 0) {
+                 guest::StoreU32(w.base, s + 31192 + 4 * (3 * set + pick), 0xFFFFFFFFu);
+               }
              }});
 }
 

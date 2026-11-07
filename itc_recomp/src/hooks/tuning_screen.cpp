@@ -30,8 +30,10 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "UpdateListCounter sub_821EED00, SetPartName sub_821F2068, PlayGroupAnimation "
               "sub_821EE880 (its piece sub_821EE8E8 merged), Command31 sub_82202880 and Command9 "
               "sub_821E9050, ShowDialog sub_821D6230, Command30 sub_82202750, Command7 sub_821E8B68, "
-              "Command23 sub_82202368, Command18 sub_82200600 and Command25 sub_82204888, "
-              "UiMovie::FinishNamed, PlayNamed, LoopNamed, SetText, ScrollText and sub_8211C5F8 "
+              "Command23 sub_82202368, Command18 sub_82200600, Command25 sub_82204888, "
+              "PlayIntro sub_821D06B0, OpenItems sub_821D0A48, Command15 sub_821FF1D0 and "
+              "Command22 sub_82202090, UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
+              "LoopNamed, SetText, ScrollText and sub_8211C5F8 "
               "through their overrides; the lists' "
               "UpdateListDots sub_821EE9B0, ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, "
               "LayOutItems sub_82203110 and ShowItems sub_82203B00, movies 2's and 13's nodes) natively instead of through the "
@@ -222,6 +224,10 @@ ITC_TUNING_CALLS_STEP(Command7)
 ITC_TUNING_CALLS_STEP(Command23)
 ITC_TUNING_CALLS_STEP(Command18)
 ITC_TUNING_CALLS_STEP(Command25)
+ITC_TUNING_CALLS_STEP(PlayIntro)
+ITC_TUNING_CALLS_STEP(OpenItems)
+ITC_TUNING_CALLS_STEP(Command15)
+ITC_TUNING_CALLS_STEP(Command22)
 
 #undef ITC_TUNING_CALLS_STEP
 
@@ -301,3 +307,7 @@ ITC_TUNING_SCREEN(821E8B68, TuningCommand7)
 ITC_TUNING_SCREEN(82202368, TuningCommand23)
 ITC_TUNING_SCREEN(82200600, TuningCommand18)
 ITC_TUNING_SCREEN(82204888, TuningCommand25)
+ITC_TUNING_SCREEN(821D06B0, TuningPlayIntro)
+ITC_TUNING_SCREEN(821D0A48, TuningOpenItems)
+ITC_TUNING_SCREEN(821FF1D0, TuningCommand15)
+ITC_TUNING_SCREEN(82202090, TuningCommand22)

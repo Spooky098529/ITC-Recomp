@@ -1,6 +1,6 @@
 // The tuning screen's movie calls (docs/functions/tuning-screen.md): see
-// tuning_screen.h. The UI movie calls (UiMovie::FinishNamed, PlayNamed,
-// SetText) through their overrides from each original's frame with its
+// tuning_screen.h. The UI movie calls (UiMovie::Play, Loop, Finish,
+// FinishNamed, PlayNamed, LoopNamed, SetText, ScrollText) through their overrides from each original's frame with its
 // return addresses; SetText's unset varargs passed as 0 (the user's call,
 // 2026-10-30).
 
@@ -61,6 +61,23 @@ uint64_t DialogTexts(uint8_t* base, const GuestCall& call, uint32_t frame, uint3
   const uint64_t r3 = SetText(call, frame, lr[2], movie, 1, 4, 3, 0);
   Store(base, movie + 40960, 0);
   return r3;
+}
+
+// Command22's and Command23's copy: by the set (+30724) 0 or 1, its six
+// words 36 bytes apart (from +10580 or +11336) into the pointers of the
+// movie's +28 table (+672 or +640 on; the table read again for each).
+void CopySetWords(uint8_t* base, uint32_t screen, uint32_t movie, int32_t set) {
+  auto copy = [&](uint32_t from, uint32_t to) {
+    for (uint32_t k = 0; k < 6; k++) {
+      const uint32_t at = Load(base, Load(base, movie + 28) + to + 4 * k);
+      Store(base, at, Load(base, screen + from + 36 * k));
+    }
+  };
+  if (set == 0) {
+    copy(10580, 672);
+  } else if (set == 1) {
+    copy(11336, 640);
+  }
 }
 
 }  // namespace
@@ -286,19 +303,7 @@ uint64_t Command23(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   const uint32_t entry = MovieEntry(base, frame, 13);
   const int32_t set = int32_t(Load(base, screen + 30724));
   const uint32_t movie = Load(base, entry);
-  // The six words 36 bytes apart into the pointers of the movie's +28
-  // table (read again for each).
-  auto copy = [&](uint32_t from, uint32_t to) {
-    for (uint32_t k = 0; k < 6; k++) {
-      const uint32_t at = Load(base, Load(base, movie + 28) + to + 4 * k);
-      Store(base, at, Load(base, screen + from + 36 * k));
-    }
-  };
-  if (set == 0) {
-    copy(10580, 672);
-  } else if (set == 1) {
-    copy(11336, 640);
-  }
+  CopySetWords(base, screen, movie, set);
   uint64_t r3 = entry;
   const int32_t pick = int32_t(Load(base, screen + 9640));
   if (pick == 2 || pick == 1) {
@@ -371,6 +376,170 @@ uint64_t Command25(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   call(kResetTextScroll, {movie, 2, 0}, frame, 0x82204950);
   SetText(call, frame, 0x82204964, movie, 2, 0, 820, 0);
   return call(kScrollText, {movie, 2, 0, 1}, frame, 0x82204978);
+}
+
+uint64_t PlayIntro(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821D06B0 TuningScreen::PlayIntro");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = MovieEntry(base, frame, kMovieId);
+  const uint32_t movie = Load(base, entry);
+  if (Load(base, screen + 9716) == 0) {
+    return entry;
+  }
+  call(kFinish, {movie, 9, 0}, frame, 0x821D06F8);
+  call(kPlay, {movie, 9, 0, 1, 0, 0, 0}, frame, 0x821D0718);
+  uint64_t r3 = call(kLoop, {movie, 9, 0}, frame, 0x821D0728);
+  if (Load(base, screen + 9720) != 0) {
+    call(kPlay, {movie, kAllScenes, 0, 0, 0, 0, 0}, frame, 0x821D0758);
+    r3 = call(kFinish, {movie, kAllScenes, 0}, frame, 0x821D0768);
+    Advance(base, screen);
+    Store(base, screen + 9720, 0);
+  } else {
+    call(kFinish, {movie, kAllScenes, 0}, frame, 0x821D07A8);
+    r3 = call(kPlay, {movie, kAllScenes, 0, 0, 0, 0, 0}, frame, 0x821D07C8);
+  }
+  Store(base, screen + 9716, 0);
+  return r3;
+}
+
+namespace {
+
+// OpenItems' +9716 handling for animation `index` of the scene: with +9720
+// the animation snapped to its end, 1012 and `named` (when not 0) played
+// and finished, the queue's step, +9720 = 0; else it restarted; +9716 = 0.
+// The return addresses from `lr` in call order. The last call's r3.
+uint64_t SnapOrRestart(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t frame,
+                       uint32_t movie, uint32_t index, uint32_t named,
+                       std::initializer_list<uint32_t> lr) {
+  const uint32_t* at = lr.begin();
+  uint64_t r3;
+  if (Load(base, screen + 9720) != 0) {
+    call(kPlay, {movie, kAllScenes, index, 0, 0, 0, 0}, frame, at[0]);
+    call(kFinish, {movie, kAllScenes, index}, frame, at[1]);
+    PlayNamed(call, frame, at[2], movie, 1012, 0);
+    r3 = FinishNamed(call, frame, at[3], movie, 1012);
+    if (named != 0) {
+      PlayNamed(call, frame, at[4], movie, named, 0);
+      r3 = FinishNamed(call, frame, at[5], movie, named);
+    }
+    Advance(base, screen);
+    Store(base, screen + 9720, 0);
+  } else {
+    const uint32_t* restart = at + (named != 0 ? 6 : 4);
+    call(kFinish, {movie, kAllScenes, index}, frame, restart[0]);
+    r3 = call(kPlay, {movie, kAllScenes, index, 1, 0, 0, 0}, frame, restart[1]);
+  }
+  Store(base, screen + 9716, 0);
+  return r3;
+}
+
+}  // namespace
+
+uint64_t OpenItems(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821D0A48 TuningScreen::OpenItems");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = MovieEntry(base, frame, kMovieId);
+  const uint32_t movie = Load(base, entry);
+  if (int32_t(Load(base, screen + 9656)) == 4) {
+    if (Load(base, screen + 9716) != 0) {
+      SnapOrRestart(base, call, screen, frame, movie, 2, 0,
+                    {0x821D0ABC, 0x821D0ACC, 0x821D0AE8, 0x821D0AF4, 0x821D0B34, 0x821D0B54});
+    }
+    FinishNamed(call, frame, 0x821D0B64, movie, 976);
+    PlayNamed(call, frame, 0x821D0B80, movie, 976, 1);
+    FinishNamed(call, frame, 0x821D0B8C, movie, 1013);
+    PlayNamed(call, frame, 0x821D0BA8, movie, 1013, 1);
+    return LoopNamed(call, frame, 0x821D0BB4, movie, 1013);
+  }
+  if (Load(base, screen + 9716) == 0) {
+    return entry;
+  }
+  return SnapOrRestart(base, call, screen, frame, movie, 1, 1,
+                       {0x821D0BF0, 0x821D0C00, 0x821D0C1C, 0x821D0C28, 0x821D0C44, 0x821D0C50,
+                        0x821D0C90, 0x821D0CB0});
+}
+
+namespace {
+
+// Command15's and Command22's text: (2, 0)'s scroll reset, string `id`,
+// scrolled. ScrollText's r3.
+uint64_t ScrolledText(const GuestCall& call, uint32_t frame, uint32_t movie, uint32_t id,
+                      const uint32_t (&lr)[3]) {
+  call(kResetTextScroll, {movie, 2, 0}, frame, lr[0]);
+  SetText(call, frame, lr[1], movie, 2, 0, id, 0);
+  return call(kScrollText, {movie, 2, 0, 1}, frame, lr[2]);
+}
+
+}  // namespace
+
+uint64_t Command15(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FF1D0 TuningScreen::Command15");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, entry);
+  if (Load(base, screen + 9716) != 0) {
+    if (Load(base, screen + 9720) != 0) {
+      Advance(base, screen);
+      Store(base, screen + 9720, 0);
+    } else {
+      FinishNamed(call, frame, 0x821FF260, movie, 218);
+      PlayNamed(call, frame, 0x821FF27C, movie, 218, 1);
+      FinishNamed(call, frame, 0x821FF288, movie, 1);
+      PlayNamed(call, frame, 0x821FF2A4, movie, 1, 1);
+      LoopNamed(call, frame, 0x821FF2B0, movie, 1);
+      FinishNamed(call, frame, 0x821FF2BC, movie, 153);
+      PlayNamed(call, frame, 0x821FF2D8, movie, 153, 1);
+      LoopNamed(call, frame, 0x821FF2E4, movie, 153);
+    }
+    Store(base, screen + 9716, 0);
+  }
+  const uint32_t node = ui_movies::FindNode(base, movie, 3, 0);
+  // extsw, std, lfd, fcfid, frsp; fmuls by the float at 0x82001FB0 (40.0).
+  const int64_t x = int32_t(Load(base, screen + 30724));
+  Store64(base, frame + 80, uint64_t(x));
+  const double scaled = steps::Fmuls(steps::Single(double(x)), steps::Lfs(base, 0x82001FB0));
+  Store(base, node + 16, steps::Bits(scaled));
+  auto named = [&] { return uint64_t(Load(base, screen + 30724)) + 6; };
+  FinishNamed(call, frame, 0x821FF330, movie, named());
+  PlayNamed(call, frame, 0x821FF350, movie, named(), 1);
+  LoopNamed(call, frame, 0x821FF360, movie, named());
+  return ScrolledText(call, frame, movie, 804, {0x821FF370, 0x821FF384, 0x821FF398});
+}
+
+uint64_t Command22(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82202090 TuningScreen::Command22");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, entry);
+  if (Load(base, screen + 9716) != 0) {
+    if (Load(base, screen + 9720) != 0) {
+      Advance(base, screen);
+      Store(base, screen + 9720, 0);
+    } else {
+      // The word at +31192 + 4 × (3 × set + +30732), the sum's low word.
+      const uint32_t index =
+          Load(base, screen + 30724) * 3 + Load(base, screen + 30732) + 7798;
+      const bool none = int32_t(Load(base, screen + (index << 2))) == -1;
+      const uint32_t named = none ? 233 : 223;
+      FinishNamed(call, frame, none ? 0x82202144 : 0x82202154, movie, named);
+      PlayNamed(call, frame, 0x82202170, movie, named, 1);
+    }
+    Store(base, screen + 9716, 0);
+  }
+  const int32_t set = int32_t(Load(base, screen + 30724));
+  if (set == 0 || set == 1) {
+    // 167 then 166, or 162 then 161, restarted and looped.
+    const uint32_t first = set == 0 ? 167 : 162;
+    const uint32_t b = set == 0 ? 166 : 161;
+    FinishNamed(call, frame, set == 0 ? 0x8220218C : 0x822021F8, movie, first);
+    PlayNamed(call, frame, set == 0 ? 0x822021A8 : 0x82202214, movie, first, 1);
+    LoopNamed(call, frame, set == 0 ? 0x822021B4 : 0x82202220, movie, first);
+    FinishNamed(call, frame, set == 0 ? 0x822021C0 : 0x8220222C, movie, b);
+    PlayNamed(call, frame, set == 0 ? 0x822021DC : 0x82202248, movie, b, 1);
+    LoopNamed(call, frame, 0x82202254, movie, b);
+  }
+  CopySetWords(base, screen, movie, int32_t(Load(base, screen + 30724)));
+  return ScrolledText(call, frame, movie, 811, {0x82202338, 0x8220234C, 0x82202360});
 }
 
 }  // namespace tuning_screen

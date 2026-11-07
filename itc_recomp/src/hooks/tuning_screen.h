@@ -71,6 +71,12 @@ void TuningCommand7(PPCContext& ctx, uint8_t* base);
 void TuningCommand23(PPCContext& ctx, uint8_t* base);
 void TuningCommand18(PPCContext& ctx, uint8_t* base);
 void TuningCommand25(PPCContext& ctx, uint8_t* base);
+// PlayIntro sub_821D06B0, OpenItems sub_821D0A48, Command15 sub_821FF1D0,
+// Command22 sub_82202090.
+void TuningPlayIntro(PPCContext& ctx, uint8_t* base);
+void TuningOpenItems(PPCContext& ctx, uint8_t* base);
+void TuningCommand15(PPCContext& ctx, uint8_t* base);
+void TuningCommand22(PPCContext& ctx, uint8_t* base);
 
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,

@@ -160,6 +160,10 @@ constexpr uint32_t kSetText = 0x8211C1F8;      // UiMovie::SetText(movie, sub, c
 constexpr uint32_t kLoopNamed = 0x8211DDE0;    // UiMovie::LoopNamed(movie, named)
 constexpr uint32_t kResetTextScroll = 0x8211C5F8;  // (movie, sub, child): the scroll counter 0
 constexpr uint32_t kScrollText = 0x8211C570;   // UiMovie::ScrollText(movie, sub, child, scrolling)
+constexpr uint32_t kPlay = 0x8211D978;     // UiMovie::Play(movie, sub, index, chained, 0, 0, 0)
+constexpr uint32_t kLoop = 0x8211DDD8;     // UiMovie::Loop(movie, sub, index)
+constexpr uint32_t kFinish = 0x8211DE38;   // UiMovie::Finish(movie, sub, index)
+constexpr uint64_t kAllScenes = ~0ull;     // sub-scene -1 (li r4,-1): the scene itself
 
 // The movie table's entry for movie `id` (UiMovies::Find, the id at
 // `frame` + 80): the address of the movie's word.
@@ -232,6 +236,30 @@ uint64_t Command18(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // +9720; PlaceStateNodes from its frame; text (2, 0)'s scroll reset, string
 // 820, scrolled. 128-byte frame; ScrollText's r3.
 uint64_t Command25(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D06B0 TuningScreen::PlayIntro: with +9716 set, sub-scene 9's
+// animation 0 restarted and looped; then with +9720 the scene's animation 0
+// snapped to its end (Play, Finish), the queue's step, +9720 = 0, else
+// restarted (Finish, Play); +9716 = 0. 128-byte frame; the last call's r3,
+// else the entry.
+uint64_t PlayIntro(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D0A48 TuningScreen::OpenItems: aero (+9656 4): with +9716 the
+// scene's animation 2 snapped (with 1012 played and finished, the queue's
+// step) or restarted by +9720; then 976 and 1013 restarted, 1013 looped.
+// Others: with +9716 the same for animation 1 (with 1012 and 1 played and
+// finished). 128-byte frame; the last call's r3, else the entry.
+uint64_t OpenItems(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821FF1D0 TuningScreen::Command15: with +9716 the queue's step (+9720)
+// or 218, 1 and 153 restarted (1 and 153 looped); node (3, 0)'s +16 =
+// float(+30724) × 40.0 (the doubleword at frame + 80); +30724 + 6 restarted
+// and looped; text (2, 0)'s scroll reset, string 804, scrolled. 128-byte
+// frame; ScrollText's r3.
+uint64_t Command15(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82202090 TuningScreen::Command22: with +9716 the queue's step (+9720)
+// or 233 / 223 restarted by the word at +31192 + 4 × (3 × +30724 +
+// +30732); by the set +30724, 167 and 166 or 162 and 161 restarted and
+// looped, its six words copied as Command23's; text (2, 0)'s scroll reset,
+// string 811, scrolled. 128-byte frame; ScrollText's r3.
+uint64_t Command22(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:
