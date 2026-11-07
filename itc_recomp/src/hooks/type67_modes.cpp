@@ -52,7 +52,8 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "GarageCamera::LoadPresets sub_821802D8 (Archive::Load through its plain C++) and "
               "StandScene::Release sub_82180738; Quaternion::FromAngles sub_8217C120 and "
               "GarageCamera::Reset sub_8217D888 and GarageLights::Init sub_8217D3C8 with the "
-              "translated code's float steps) "
+              "translated code's float steps; StandSlot::Init sub_82180AA0 with "
+              "GarageStage::Init sub_82180968 and GarageCamera::Init sub_82180918) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -344,6 +345,32 @@ void GarageLightsInit(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+namespace {
+
+// r3 as GarageLights::Init leaves it, its frame below GarageStage::Init's
+// at `stage_frame`.
+uint64_t LightsR3(const PPCContext& ctx, uint32_t stage_frame) {
+  return ((ctx.r1.u64 & 0xFFFFFFFF00000000ull) | (stage_frame - t67::kGarageLightsFrame)) + 96;
+}
+
+}  // namespace
+
+void GarageCameraInit(PPCContext& ctx, uint8_t* base) {
+  SetArchiveSerial(ctx, t67::GarageCameraInit(base, ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad(base)));
+  ctx.fpscr.disableFlushMode();
+}
+void GarageStageInit(PPCContext& ctx, uint8_t* base) {
+  t67::GarageStageInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad(base));
+  ctx.r3.u64 = LightsR3(ctx, ctx.r1.u32 - t67::kGarageStageInitFrame);
+  ctx.fpscr.disableFlushMode();
+}
+void StandSlotInit(PPCContext& ctx, uint8_t* base) {
+  if (t67::StandSlotInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad(base))) {
+    ctx.r3.u64 = LightsR3(ctx, ctx.r1.u32 - t67::kStandSlotInitFrame - t67::kGarageStageInitFrame);
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -474,3 +501,16 @@ ITC_TYPE67_MODES(8217C120, QuaternionFromAngles)
 ITC_TYPE67_MODES(8217D888, GarageCameraReset)
 // GarageLights::Init (from GarageStage::Init, recompiled).
 ITC_TYPE67_MODES(8217D3C8, GarageLightsInit)
+// StandSlot::Init (from StandScene::Create, recompiled): over the layer and
+// the archive's native queue only. GarageStage::Init sub_82180968 and
+// GarageCamera::Init sub_82180918 have no adapters (only StandSlot::Init
+// and GarageStage::Init reach them; the flag switches those).
+extern "C" REX_FUNC(sub_82180AA0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||
+      !hooks::NativeArchiveQueue()) {
+    __imp__sub_82180AA0(ctx, base);
+    return;
+  }
+  hooks::StandSlotInit(ctx, base);
+}

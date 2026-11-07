@@ -105,5 +105,13 @@ void GarageCameraReset(PPCContext& ctx, uint8_t* base);
 // GarageLights::Init sub_8217D3C8 (r3 the lights; r3 left as the original
 // leaves it: its frame + 96).
 void GarageLightsInit(PPCContext& ctx, uint8_t* base);
+// GarageCamera::Init sub_82180918 (r3 the camera; r3 after the presets'
+// load's serial), GarageStage::Init sub_82180968 (r3 the stage, r4 its
+// index) and StandSlot::Init sub_82180AA0 (r3 the slot, r4 its index): r3
+// as GarageLights::Init leaves it where they reach it. They need the
+// native heap and the archive's native queue (the adapter checks).
+void GarageCameraInit(PPCContext& ctx, uint8_t* base);
+void GarageStageInit(PPCContext& ctx, uint8_t* base);
+void StandSlotInit(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

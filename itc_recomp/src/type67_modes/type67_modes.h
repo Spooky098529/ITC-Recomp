@@ -272,6 +272,29 @@ constexpr uint32_t kOnPresetsLoaded = 0x8217FBE8;
 int64_t GarageCameraLoadPresets(uint8_t* base, uint32_t camera,
                                 const std::function<int64_t(uint32_t, uint32_t, uint32_t,
                                                             uint32_t)>& load);
+using LoadCall = std::function<int64_t(uint32_t, uint32_t, uint32_t, uint32_t)>;
+constexpr uint32_t kGarageCameraInitFrame = 96;
+constexpr uint32_t kGarageStageInitFrame = 144;
+constexpr uint32_t kStandSlotInitFrame = 112;
+constexpr uint32_t kGarageStageBytes = 6208;
+// sub_82180918 GarageCamera::Init: GarageCamera::Reset (its frame below
+// this one's), no presets (+4392 = 0), the presets' index table (+292 =
+// 0x82619428), not set up (+0 = 0), then GarageCamera::LoadPresets through
+// `load`. `sp` is the caller's stack pointer. Returns the load's serial.
+int64_t GarageCameraInit(uint8_t* base, uint32_t camera, uint32_t sp, const LoadCall& load);
+// sub_82180968 GarageStage::Init: the stage's words and sizes, its two
+// (0, 0, 0, 1.0) vectors through its frame, then GarageStage::ResetPose
+// (+32), GarageCamera::Init (+112), GarageLights::Init (+4512) and +6048 =
+// 0.
+void GarageStageInit(uint8_t* base, uint32_t stage, uint32_t index, uint32_t sp,
+                     const LoadCall& load);
+// sub_82180AA0 StandSlot::Init: when the slot's +0 is 0, a 6,208-byte
+// stage from the allocation layer's pages (VirtualAlloc's zeroed pages)
+// stored there and GarageStage::Init'ed. Whether it did (r3 is then
+// GarageLights::Init's, else the slot).
+bool StandSlotInit(uint8_t* base, uint32_t slot, uint32_t index, uint32_t sp,
+                   const LoadCall& load);
+
 // sub_82180738 StandScene::Release: Viewports::Release, then each of the
 // holder's three slots (StandSlot::Free, the slot freed, its word 0), the
 // holder freed and [0x826D83E0] = 0. nullopt, with nothing done, where a

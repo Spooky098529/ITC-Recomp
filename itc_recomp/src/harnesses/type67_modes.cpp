@@ -1055,6 +1055,121 @@ void GarageLights(Context& h, const Block& world) {
   results.Report();
 }
 
+// GarageCamera::Init, GarageStage::Init and StandSlot::Init: the object (a
+// camera, a stage or a slot with a stage's room after it) random words at
+// the world's +0x100, Archive::Load recorded (ArchiveLoads, a serial or -1),
+// its destination (the presets' block) compared by content and freed;
+// StandSlot::Init's stage (when the slot is 0) compared by content and
+// freed; the lights' globals random first and compared; the frames' words
+// the functions write (not their saved registers) and r3 compared.
+void StandSlots(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_ERROR("harness: type67_modes: the native heap or archive queue is off; stand slots skipped");
+    return;
+  }
+  constexpr uint32_t kConstants = 0x8296B950, kConstantBytes = 0x350;
+  std::vector<uint8_t> constants = Read(base, kConstants, kConstantBytes);
+  std::vector<uint8_t> ambient = Read(base, 0x8265ED00, 16);
+  const uint32_t entry = archive::Toc(base, t67::kPresetsAsset) + 0x60000 - 31600;
+  const uint32_t size = guest::LoadU32(base, entry + 8) != 0 ? guest::LoadU32(base, entry + 8)
+                                                            : guest::LoadU32(base, entry + 4);
+  const uint32_t sp = CallContext(h).r1.u32;
+  const uint32_t object = world.address + 0x100;
+  struct Function {
+    const char* name;
+    uint32_t address;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t stage_frame;  // GarageStage::Init's frame (0: none)
+  };
+  const Function functions[] = {
+      {"GarageCamera::Init", 0x82180918, __imp__sub_82180918, hooks::GarageCameraInit, 0},
+      {"GarageStage::Init", 0x82180968, __imp__sub_82180968, hooks::GarageStageInit,
+       sp - t67::kGarageStageInitFrame},
+      {"StandSlot::Init", 0x82180AA0, __imp__sub_82180AA0, hooks::StandSlotInit,
+       sp - t67::kStandSlotInitFrame - t67::kGarageStageInitFrame},
+  };
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    for (int c = 0; c < 8; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 523 + f.address);
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, sp - 2048, 2048, r);
+        WriteRandom(base, kConstants, kConstantBytes, r);
+        WriteRandom(base, 0x8265ED00, 16, r);
+        const bool slot = f.address == 0x82180AA0;
+        // StandSlot::Init: the slot empty (a stage made) or not (nothing).
+        if (slot && c % 4 != 3) guest::StoreU32(base, object, 0);
+        ArchiveLoads loads({c % 2 == 0 ? int64_t(c + 3) : -1});
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object;
+        t.r4.u64 = r.Below(3);
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          f.native(t, base);
+        }
+        std::vector<uint32_t> calls = loads.calls();
+        out[v].Word(uint32_t(calls.size()));
+        if (calls.size() >= 2) {
+          const uint32_t destination = calls[1];
+          out[v].Word(memory::IsPages(destination));
+          out[v].Bytes(Read(base, destination, size < 0x10000 ? size : 0x10000));
+          memory::FreePages(destination);
+          calls[1] = 0;
+          // The camera's address as the load's context: compared by its
+          // offset in the stage (the stage's address differs per side).
+          if (calls.size() >= 4) calls[3] -= slot ? guest::LoadU32(base, object) : 0;
+        }
+        for (const uint32_t w : calls) out[v].Word(w);
+        if (slot) {
+          const uint32_t stage = guest::LoadU32(base, object);
+          const bool made = c % 4 != 3;
+          out[v].Word(made && memory::IsPages(stage));
+          if (made && memory::IsPages(stage)) {
+            out[v].Bytes(Read(base, stage, t67::kGarageStageBytes));
+            memory::FreePages(stage);
+            guest::StoreU32(base, object, 0);
+          }
+          out[v].Bytes(Read(base, object + 4, 0x1000));
+        } else {
+          out[v].Bytes(Read(base, object, 0x2000));
+        }
+        out[v].Bytes(Read(base, kConstants, kConstantBytes));
+        out[v].Bytes(Read(base, 0x8265ED00, 16));
+        // The frames: GarageCamera::Init's Reset frame and FromAngles'
+        // scratch; GarageStage::Init's +80 to +111, the lights' and Reset's
+        // frames below it (but the lights' saved registers).
+        if (f.stage_frame == 0) {
+          const uint32_t reset = sp - t67::kGarageCameraInitFrame - t67::kGarageCameraResetFrame;
+          // Not +192: a word GarageCamera::LoadPresets' callees' frames
+          // leave there on the recompiled side (the plain C++ replays no
+          // frame for them, as in the first migration).
+          out[v].Bytes(Read(base, reset + 80, 112));
+          out[v].Bytes(Read(base, reset + 196, 60));
+          out[v].Bytes(Read(base, reset - 32, 16));
+        } else {
+          const uint32_t g = f.stage_frame;
+          out[v].Bytes(Read(base, g + 80, 32));
+          out[v].Bytes(Read(base, g - 316, 124));  // not the lights' back chain
+          out[v].Bytes(Read(base, g - 432, 16));
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Write(base, kConstants, constants.data(), kConstantBytes);
+  Write(base, 0x8265ED00, ambient.data(), 16);
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -1073,6 +1188,7 @@ void Type67Modes(Context& h) {
   Garage(h);
   GarageCamera(h, world);
   GarageLights(h, world);
+  StandSlots(h, world);
 }
 
 }  // namespace harness
