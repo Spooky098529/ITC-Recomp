@@ -134,6 +134,12 @@ void Type7Screen0PlaceCursor(PPCContext& ctx, uint8_t* base);
 void Type7Screen0ShowHelp(PPCContext& ctx, uint8_t* base);
 void Type7Screen0FadeOutStep(PPCContext& ctx, uint8_t* base);
 void Type7Screen0ChosenPage(PPCContext& ctx, uint8_t* base);
+// The first screens' OpenMovie (Type6 sub_822338E8, Type7 sub_82243E80) and
+// SetUpCar (Type6 sub_82233E80, Type7 sub_822443E0; r4 the dispatcher).
+void Type6Screen0OpenMovie(PPCContext& ctx, uint8_t* base);
+void Type7Screen0OpenMovie(PPCContext& ctx, uint8_t* base);
+void Type6Screen0SetUpCar(PPCContext& ctx, uint8_t* base);
+void Type7Screen0SetUpCar(PPCContext& ctx, uint8_t* base);
 
 // Quaternion::FromAngles sub_8217C120 (r3 the destination, f1 to f3 the
 // angles; r3 left) and GarageCamera::Reset sub_8217D888 (r3 the camera; r3

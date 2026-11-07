@@ -72,7 +72,9 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "the UI movies' text setters native) and Type6Screen0::ShowPage sub_822344A8; "
               "the type 7 first screen's ShowPage sub_82244930, PlaceCursor sub_822448B0, "
               "ShowHelp sub_82244AB8 (with the text setters native), FadeOutStep sub_82244760 "
-              "and ChosenPage sub_82244610) "
+              "and ChosenPage sub_82244610; the first screens' OpenMovie sub_822338E8 and "
+              "sub_82243E80 and SetUpCar sub_82233E80 and sub_822443E0 (GarageStage::MakeModel, "
+              "Command and GarageCar::Reset guest calls)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -460,6 +462,26 @@ void Type7Screen0FadeOutStep(PPCContext& ctx, uint8_t* base) {
       t67::Type7Screen0FadeOutStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
+void Type6Screen0OpenMovie(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Screen0OpenMovie(base, false, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+void Type7Screen0OpenMovie(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Screen0OpenMovie(base, true, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+void Type6Screen0SetUpCar(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Screen0SetUpCar(base, false, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+void Type7Screen0SetUpCar(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Screen0SetUpCar(base, true, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
 void Type7Screen0ChosenPage(PPCContext& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Type7Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
@@ -666,6 +688,12 @@ ITC_TYPE67_MODES(822448B0, Type7Screen0PlaceCursor)
 ITC_TYPE67_TEXTS(82244AB8, Type7Screen0ShowHelp)
 ITC_TYPE67_MODES(82244760, Type7Screen0FadeOutStep)
 ITC_TYPE67_MODES(82244610, Type7Screen0ChosenPage)
+// The first screens' OpenMovie and SetUpCar (through the machines'
+// transitions).
+ITC_TYPE67_MODES(822338E8, Type6Screen0OpenMovie)
+ITC_TYPE67_MODES(82243E80, Type7Screen0OpenMovie)
+ITC_TYPE67_MODES(82233E80, Type6Screen0SetUpCar)
+ITC_TYPE67_MODES(822443E0, Type7Screen0SetUpCar)
 
 // The garage camera: Quaternion::FromAngles (from GarageCamera::Command,
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).

@@ -8,11 +8,14 @@
 #include "type67_modes/type67_modes.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
+#include "car_makers/car_makers.h"
 #include "guest.h"
 #include "menu_sounds/menu_sounds.h"
 #include "mode_tick/mode_tick.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstdlib>
 
@@ -93,6 +96,22 @@ uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int s
 
 constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
+constexpr uint32_t kMakeModel = 0x8217FCB0;    // GarageStage::MakeModel
+constexpr uint32_t kCommand = 0x82180108;      // GarageStage::Command
+constexpr uint32_t kGarageCarReset = 0x82110448;
+constexpr uint32_t kMemcpy = 0x825A7410;
+
+// The selected garage car's node: the list at `garage` +204 walked
+// [save +0x19920] times through the halfword links (each node 4 bytes at
+// `garage` + 4 x its index, sign-extended), as the originals' loops do.
+uint32_t GarageNode(uint8_t* base, uint32_t garage, uint32_t steps) {
+  uint32_t node = garage + (uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204)))) << 2);
+  while (steps != 0) {
+    node = garage + (uint32_t(int32_t(int16_t(guest::LoadU16(base, node)))) << 2);
+    steps--;
+  }
+  return node;
+}
 
 }  // namespace
 
@@ -264,6 +283,66 @@ uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher,
   StoreU32(base, frame + 88, 0);
   return menu_sounds::PlaySound(base, frame + 92, frame + 88, frame,
                                 {const_cast<Calls*>(&calls), &SoundThunk});
+}
+
+uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& calls) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_82243E80 Type7Screen0::OpenMovie");
+  } else {
+    ITC_NATIVE_RUNNING("sub_822338E8 Type6Screen0::OpenMovie");
+  }
+  const uint32_t frame = sp - 96;
+  const uint32_t lr = type7 ? 0x82243E9C : 0x82233904;
+  calls.open(22, type7 ? 22569 : 22564, frame, lr);
+  const uint32_t block = car_makers::BlockOf(0);
+  const uint32_t holder = LoadU32(base, LoadU32(base, kStandHolder));
+  const uint64_t args[4] = {holder, block, 1, 0};
+  calls.call_set(kMakeModel, args, 3, frame, lr + 0x20);
+  return calls.call(kCommand, frame, lr + 0x30, LoadU32(base, LoadU32(base, kStandHolder)), 14);
+}
+
+uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, const Calls& calls) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_822443E0 Type7Screen0::SetUpCar");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82233E80 Type6Screen0::SetUpCar");
+  }
+  const uint32_t frame = sp - 128;
+  const uint32_t dispatcher = uint32_t(r4);
+  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  const uint32_t car = type7 ? kType7Car : kType6Car;
+  uint32_t message = type7 ? 5 : 6;
+  if (LoadU32(base, car + 1972) == 0xFFFFFFFF) {
+    calls.call(kGarageCarReset, frame, type7 ? 0x82244418 : 0x82233EB8, car, r4);
+    if (guest::LoadU16(base, save + 6328) == 0) {
+      message = type7 ? 17 : 20;
+    } else {
+      const uint32_t garage = save + 6120, steps = save + 0x19920;
+      const int32_t slot = int16_t(guest::LoadU16(base, GarageNode(base, garage, LoadU32(base, steps)) + 2));
+      const uint32_t from = uint32_t(slot) * 1968 + garage + 212;
+      if (!c_runtime::Memcpy(base, car, from, 1968)) {
+        const uint64_t args[4] = {car, from, 1968, 0};
+        calls.call_set(kMemcpy, args, 3, frame, type7 ? 0x82244478 : 0x82233F18);
+      }
+      StoreU32(base, car + 1972, 2);
+      StoreU32(base, car + 1976, LoadU32(base, steps));
+      const int32_t again =
+          int16_t(guest::LoadU16(base, GarageNode(base, garage, LoadU32(base, steps)) + 2));
+      StoreU32(base, car + 1980,
+               uint32_t(int32_t(int16_t(
+                   guest::LoadU16(base, uint32_t(again) * 1968 + garage + 212)))));
+    }
+  }
+  const uint32_t ring = dispatcher + 204;
+  const uint32_t count = LoadU32(base, ring + 600) + 1;
+  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
+  StoreU32(base, ring + 600, count);
+  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
+  StoreU32(base, slot + 8, 0);
+  StoreU32(base, slot + 4, 0);
+  StoreU32(base, slot + 0, message);
+  mode_tick::ScreenFadesFadeOut(base, 1, 0, 0, 0, 0);
+  return 1;  // FadeOut leaves its r3, the passes
 }
 
 }  // namespace type67_modes

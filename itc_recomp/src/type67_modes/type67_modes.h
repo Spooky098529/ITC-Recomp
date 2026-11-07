@@ -404,6 +404,25 @@ uint64_t Type7Screen0FadeOutStep(uint8_t* base, uint32_t screen, uint32_t sp, co
 uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                 const Calls& calls);
 
+// The two modes' cars (1,968-byte garage cars, then +1968 the model made,
+// +1972 where from (-1 none, 0 stock, 2 the garage), +1976 the garage index,
+// +1980 the car's halfword +0).
+constexpr uint32_t kType6Car = 0x826367E8;
+constexpr uint32_t kType7Car = 0x826371D0;
+// sub_822338E8 Type6Screen0::OpenMovie and sub_82243E80
+// Type7Screen0::OpenMovie: UiMovies::Open(22, 22564 or 22569) (calls.open),
+// then GarageStage::MakeModel([[0x826D83E0]], CarModels::BlockOf(0), 1)
+// and GarageStage::Command(the same, 14), guest calls to their overrides.
+// r3 Command's.
+uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& calls);
+// sub_82233E80 Type6Screen0::SetUpCar and sub_822443E0
+// Type7Screen0::SetUpCar (r4 the dispatcher): with no car yet (+1972 -1),
+// GarageCar::Reset (a guest call) and the selected garage car copied from
+// SaveData::Of(0)'s garage (message 6 or 5), or with an empty garage
+// message 20 or 17; with a car, message 6 or 5; then
+// ScreenFades::FadeOut(1, 0, 0, 0, 0). r3 1, as FadeOut leaves it.
+uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, const Calls& calls);
+
 // --- The garage camera's reset (garage_camera.cpp) ---
 
 // sub_8217C120 Quaternion::FromAngles: the quaternion of the three angles

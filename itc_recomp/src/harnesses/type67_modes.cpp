@@ -1661,6 +1661,137 @@ void Screen0Helpers(Context& h, const Block& world) {
   guest::StoreU32(base, kMissingText, saved_missing);
 }
 
+// --- The first screens' OpenMovie and SetUpCar: the stand's holder
+// [0x826D83E0] pointed at a harness word naming a holder whose +0 is a stage
+// with a model claimed (+16 nonzero: GarageStage::MakeModel does nothing)
+// and its garage camera not set up (+112's +0 0: GarageStage::Command 14's
+// ApplyPreset only stores +6088), the stage's words random otherwise;
+// UiMovies::Open recorded as in the guest call handlers' cases. SetUpCar:
+// SaveData::Of(0) ([0x826C5B58]) a harness save data whose garage (+6120)
+// holds the list walked [+0x19920] 0 to 3 steps through distinct nodes to a
+// slot 0 to 2 (as car_makers' harness lays it), its count (+6328) 0 or
+// not; the mode's car's +1972 -1, 0 or 2; GarageCar::Reset runs for real
+// (its override on both sides). The dispatcher at the world's +0x3200. The
+// world, the stage, the save data, both modes' cars, the screen fades'
+// words, the opens, the stack below the call (but the original's back
+// chain and saved registers) and r3 compared; the globals put back. ---
+
+void Cars(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  constexpr uint32_t kSaveBytes = 0x1A000, kStageBytes = 0x1900;
+  constexpr uint32_t kSavePointer = 0x826C5B58, kCarBytes = 1984;
+  constexpr uint32_t kFades = mode_tick::kFadeOutDurations, kFadesBytes = 64;
+  const Block save_block(kSaveBytes);
+  const Block stage_block(kStageBytes + 0x100);
+  if (!save_block.address || !stage_block.address) return;
+  const uint32_t save = save_block.address, stage = stage_block.address;
+  const uint32_t holder = stage + kStageBytes, holder_word = holder + 0x40;
+  const uint32_t sp = CallContext(h).r1.u32;
+  const uint32_t saved_holder = guest::LoadU32(base, t67::kStandHolder);
+  const uint32_t saved_save = guest::LoadU32(base, kSavePointer);
+  const std::vector<uint8_t> saved_cars[2] = {Read(base, t67::kType6Car, kCarBytes),
+                                              Read(base, t67::kType7Car, kCarBytes)};
+  const std::vector<uint8_t> saved_fades = Read(base, kFades, kFadesBytes);
+  struct Function {
+    const char* name;
+    uint32_t address, frame, saves;
+    GuestFunction recompiled;
+    bool type7, set_up;
+  };
+  const Function functions[] = {
+      {"Type6Screen0::OpenMovie", 0x822338E8, 96, 16, __imp__sub_822338E8, false, false},
+      {"Type7Screen0::OpenMovie", 0x82243E80, 96, 16, __imp__sub_82243E80, true, false},
+      {"Type6Screen0::SetUpCar", 0x82233E80, 128, 40, __imp__sub_82233E80, false, true},
+      {"Type7Screen0::SetUpCar", 0x822443E0, 128, 40, __imp__sub_822443E0, true, true},
+  };
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    for (int c = 0; c < (f.set_up ? 32 : 8); c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 1009 + f.address);
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, stage, kStageBytes, r);
+        WriteRandom(base, save, 0x400, r);
+        WriteRandom(base, save + 6120, 0x400, r);
+        WriteRandom(base, sp - 1024, 1024 + 256, r);
+        WriteRandom(base, kFades, kFadesBytes, r);
+        guest::StoreU32(base, stage + 16, 1 + r.Below(3));
+        guest::StoreU32(base, stage + 112, 0);
+        guest::StoreU32(base, holder, stage);
+        guest::StoreU32(base, holder_word, holder);
+        guest::StoreU32(base, t67::kStandHolder, holder_word);
+        // The save data's garage list (car_makers' LayGarageWalk's shape),
+        // the slot's car random words.
+        const uint32_t nodes = save + 6120;
+        const uint32_t steps = r.Below(4);
+        guest::StoreU32(base, save + 0x19920, steps);
+        uint16_t at = uint16_t(r.Below(10));
+        guest::StoreU16(base, nodes + 204, at);
+        for (uint32_t i = 0; i < steps; i++) {
+          const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
+          guest::StoreU16(base, nodes + 4 * at, next);
+          at = next;
+        }
+        const uint32_t slot = r.Below(3);
+        guest::StoreU16(base, nodes + 4 * at + 2, uint16_t(slot));
+        WriteRandom(base, nodes + 212 + 1968 * slot, 1968, r);
+        guest::StoreU16(base, save + 6328, r.Below(3) == 0 ? 0 : uint16_t(1 + r.Below(20)));
+        guest::StoreU32(base, kSavePointer, save);
+        const uint32_t car = f.type7 ? t67::kType7Car : t67::kType6Car;
+        WriteRandom(base, car, kCarBytes, r);
+        static constexpr uint32_t kFrom[] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0, 2};
+        guest::StoreU32(base, car + 1972, kFrom[r.Below(4)]);
+        guest::StoreU32(base, world.address + 0x3200 + 204 + 600, r.Below(50));
+        guest::StoreU32(base, world.address + 0x3200 + 204 + 604, r.Below(60));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = world.address | (uint64_t(r.Below(2)) << 32);
+        t.r4.u64 = world.address + 0x3200;
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        g_opens.clear();
+        if (v == 0) {
+          const hooks::StartUpRecorder saved = hooks::g_start_up_recorder;
+          hooks::g_start_up_recorder = RecordOpen;
+          ITC_FLAG(native_type67_modes) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+          hooks::g_start_up_recorder = saved;
+        } else {
+          t67::Calls calls = hooks::Type67Calls(t, base);
+          calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
+            g_opens.insert(g_opens.end(), {id, asset, frame, lr});
+            return 1;
+          };
+          const uint64_t lr = t.lr;
+          t.r3.u64 = f.set_up ? t67::Screen0SetUpCar(base, f.type7, t.r4.u64, t.r1.u32, calls)
+                              : t67::Screen0OpenMovie(base, f.type7, t.r1.u32, calls);
+          t.lr = lr;
+        }
+        for (const uint32_t word : g_opens) out[v].Word(word);
+        out[v].Bytes(Read(base, world.address, world.bytes));
+        out[v].Bytes(Read(base, stage, kStageBytes + 0x100));
+        out[v].Bytes(Read(base, save, kSaveBytes));
+        out[v].Bytes(Read(base, t67::kType6Car, kCarBytes));
+        out[v].Bytes(Read(base, t67::kType7Car, kCarBytes));
+        out[v].Bytes(Read(base, kFades, kFadesBytes));
+        out[v].Bytes(Read(base, sp - 1024, 1024 - f.frame));
+        out[v].Bytes(Read(base, sp - f.frame + 4, f.frame - 4 - f.saves));
+        out[v].Bytes(Read(base, sp, 256));
+        out[v].Word(uint32_t(t.lr));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  guest::StoreU32(base, t67::kStandHolder, saved_holder);
+  guest::StoreU32(base, kSavePointer, saved_save);
+  Write(base, t67::kType6Car, saved_cars[0].data(), kCarBytes);
+  Write(base, t67::kType7Car, saved_cars[1].data(), kCarBytes);
+  Write(base, kFades, saved_fades.data(), kFadesBytes);
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -1682,6 +1813,7 @@ void Type67Modes(Context& h) {
   StandSlots(h, world);
   Dialogs(h, world);
   Screen0Helpers(h, world);
+  Cars(h, world);
 }
 
 }  // namespace harness
