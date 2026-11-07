@@ -116,6 +116,34 @@ uint64_t HideNode19(uint8_t* base, uint64_t r3, uint32_t sp);
 // frame outside the tire states. r3 the last child, or GetCurrentChoice's.
 uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp);
 
+// --- The lists on movies 2 and 13 (lists.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the movie
+// id at +80) and r3 as the original leaves it; `show` r4's low word.
+
+// sub_821EE9B0 TuningScreen::UpdateListDots: node (1, 6)'s 38 children
+// hidden with +108 sized by n = +25224, children 0 to n shown, and the dots
+// around the cursor +25220 (wrapped over n + 1) sized 4 at it, one less a
+// step away (its row). 176-byte frame; r3 the last child.
+uint32_t UpdateListDots(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_82202F30 TuningScreen::ShowOptionMarks: movie 13's option marks in
+// sub-scene 28 or 27 (+30724) by +30756 and +30732 (its row). 112-byte
+// frame; r3 the last node shown or hidden, else the movie's entry.
+uint32_t ShowOptionMarks(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp);
+// sub_82202C08 TuningScreen::PlaceStateNodes: movie 13's nodes (29, 4) to
+// (29, 10) placed by the state from the table at 0x8200C860 (its row); the
+// last conversion's doubleword left at frame + 80. 128-byte frame; r3 the
+// last node, else the movie's entry.
+uint32_t PlaceStateNodes(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_82203110 TuningScreen::LayOutItems: movie 13's nodes 19 to 21 (+30724
+// 0) or 22 to 24 (1) laid out from their records (its row); the
+// conversions' doublewords left at frame + 80 to + 111. 192-byte frame; r3
+// the last node, else the movie's entry.
+uint32_t LayOutItems(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_82203B00 TuningScreen::ShowItems: movie 13's nodes 19 to 24 hidden, or
+// the set +30724 picks shown with its marks (its row). 144-byte frame; r3
+// the last node shown or hidden, else the movie's entry.
+uint32_t ShowItems(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp);
+
 // --- The movie calls (pages.cpp) ---
 
 // A guest function `function` (through the function table: its override

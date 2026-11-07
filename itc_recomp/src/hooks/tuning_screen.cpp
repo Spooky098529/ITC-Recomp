@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821DFBE8 and ShowTireMarks sub_821E22E8, movie 2's nodes through the UI movies' plain C++; "
               "UpdateListCounter sub_821EED00, SetPartName sub_821F2068, PlayGroupAnimation "
               "sub_821EE880 (its piece sub_821EE8E8 merged), Command31 sub_82202880 and Command9 "
-              "sub_821E9050, UiMovie::FinishNamed, PlayNamed and SetText through their overrides) natively instead of through the "
+              "sub_821E9050, UiMovie::FinishNamed, PlayNamed and SetText through their overrides; the lists' "
+              "UpdateListDots sub_821EE9B0, ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, "
+              "LayOutItems sub_82203110 and ShowItems sub_82203B00, movies 2's and 13's nodes) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen)");
 
 namespace hooks {
@@ -164,6 +166,28 @@ void TuningShowTireMarks(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::ShowTireMarks(base, ctx.r3.u32, ctx.r1.u32);
 }
 
+void TuningUpdateListDots(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::UpdateListDots(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningShowOptionMarks(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::ShowOptionMarks(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+void TuningPlaceStateNodes(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ts::PlaceStateNodes(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningLayOutItems(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ts::LayOutItems(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningShowItems(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::ShowItems(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
 namespace {
 
 // A step with the guest calls (hooks::StandModelsGuestCall), lr put back.
@@ -244,3 +268,8 @@ ITC_TUNING_SCREEN(821F2068, TuningSetPartName)
 ITC_TUNING_SCREEN(821EE880, TuningPlayGroupAnimation)
 ITC_TUNING_SCREEN(82202880, TuningCommand31)
 ITC_TUNING_SCREEN(821E9050, TuningCommand9)
+ITC_TUNING_SCREEN(821EE9B0, TuningUpdateListDots)
+ITC_TUNING_SCREEN(82202F30, TuningShowOptionMarks)
+ITC_TUNING_SCREEN(82202C08, TuningPlaceStateNodes)
+ITC_TUNING_SCREEN(82203110, TuningLayOutItems)
+ITC_TUNING_SCREEN(82203B00, TuningShowItems)

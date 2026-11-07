@@ -43,6 +43,16 @@ void TuningHideTireMarks(PPCContext& ctx, uint8_t* base);
 void TuningHideNode19(PPCContext& ctx, uint8_t* base);
 void TuningShowTireMarks(PPCContext& ctx, uint8_t* base);
 
+// The lists on movies 2 and 13 (r3 = the screen; r4 = 0 to hide, else
+// show, for ShowOptionMarks and ShowItems): UpdateListDots sub_821EE9B0,
+// ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, LayOutItems
+// sub_82203110, ShowItems sub_82203B00.
+void TuningUpdateListDots(PPCContext& ctx, uint8_t* base);
+void TuningShowOptionMarks(PPCContext& ctx, uint8_t* base);
+void TuningPlaceStateNodes(PPCContext& ctx, uint8_t* base);
+void TuningLayOutItems(PPCContext& ctx, uint8_t* base);
+void TuningShowItems(PPCContext& ctx, uint8_t* base);
+
 // The movie calls (r3 = the screen; the UI movie calls through their
 // overrides, lr put back): UpdateListCounter sub_821EED00, SetPartName
 // sub_821F2068, PlayGroupAnimation sub_821EE880, Command31 sub_82202880,

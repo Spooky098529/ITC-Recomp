@@ -412,6 +412,79 @@ void TuningScreen(Context& h) {
   Group(h, w, "TuningScreen::ShowTireMarks", 25, tire, __imp__sub_821E22E8,
         hooks::TuningShowTireMarks, 88, {{176, 176 + 32}});
 
+  // The lists on movies 2 and 13 (savegprlr_23's, r30, r31 and lr's,
+  // savegprlr_29's, savegprlr_26's with f29 to f31, savegprlr_27's saves
+  // left out). Movie 13 isn't in the table: UiMovies::Find answers the
+  // missing movie's word, the same movie. UpdateListDots: the list's last
+  // index -1 to 10 and the cursor in the list (past it a wrapped index
+  // reads a node's own fields as a child).
+  Group(
+      h, w, "TuningScreen::UpdateListDots", 20,
+      [](PPCContext&, Random& r, const World& w) {
+        const uint32_t s = w.screen();
+        const int32_t n = r.Below(8) == 0 ? -1 : int32_t(r.Below(11));
+        guest::StoreU32(w.base, s + 25224, uint32_t(n));
+        guest::StoreU32(w.base, s + 25220, n >= 0 ? r.Below(uint32_t(n) + 1) : 3 + r.Below(5));
+      },
+      __imp__sub_821EE9B0, hooks::TuningUpdateListDots, 80);
+  // The sets 0 and 1 mostly, the marks' modes -1 to 3, the option 0 to 2.
+  auto option_set = [](Random& r, const World& w) {
+    const uint32_t s = w.screen();
+    guest::StoreU32(w.base, s + 30724, r.Below(5) == 0 ? 2 + r.Below(3) : r.Below(2));
+    guest::StoreU32(w.base, s + 30756, Around(r, -1, 3));
+    guest::StoreU32(w.base, s + 30732, r.Below(3));
+  };
+  Group(
+      h, w, "TuningScreen::ShowOptionMarks", 20,
+      [option_set](PPCContext& t, Random& r, const World& w) {
+        t.r4.u64 = r.Below(3) == 0 ? (r.Below(2) == 0 ? 0 : r.Next() << 32) : r.Next() | 1;
+        option_set(r, w);
+      },
+      __imp__sub_82202F30, hooks::TuningShowOptionMarks, 24);
+  Group(
+      h, w, "TuningScreen::PlaceStateNodes", 20,
+      [](PPCContext&, Random& r, const World& w) {
+        const uint32_t s = w.screen();
+        guest::StoreU32(w.base, s + ts::kState, r.Below(5) == 0 ? Around(r, 26, 34) : 29 + r.Below(3));
+        guest::StoreU32(w.base, s + 30724, r.Below(8));
+      },
+      __imp__sub_82202C08, hooks::TuningPlaceStateNodes, 32);
+  // LayOutItems: the records' +8 (copied with lfs and stfs) as ordinary
+  // floats and infinities, never signaling NaNs; the rest random.
+  Group(
+      h, w, "TuningScreen::LayOutItems", 25,
+      [option_set](PPCContext&, Random& r, const World& w) {
+        const uint32_t s = w.screen();
+        constexpr uint32_t kStates[] = {5, 23, 24, 25, 27, 28, 26, 29, 30, 31, 34};
+        guest::StoreU32(w.base, s + ts::kState, kStates[r.Below(11)]);
+        option_set(r, w);
+        constexpr uint32_t kFloats[] = {0x00000000u, 0x3F800000u, 0xBF000000u, 0x42C80000u,
+                                        0x7F800000u, 0xFF800000u, 0x7FC00000u, 0x80000001u};
+        for (const uint32_t records : {31024u, 31096u}) {
+          for (uint32_t i = 0; i < 3; i++) {
+            const uint32_t record = s + records + 24 * i;
+            guest::StoreU32(w.base, record + 8,
+                            r.Below(2) == 0 ? kFloats[r.Below(8)]
+                                            : (uint32_t(r.Next()) & 0x3FFFFFFFu) | 0x3C000000u);
+            if (r.Below(2) == 0) {
+              guest::StoreU32(w.base, record + 16, 0);
+            }
+          }
+        }
+      },
+      __imp__sub_82203110, hooks::TuningLayOutItems, 80);
+  Group(
+      h, w, "TuningScreen::ShowItems", 20,
+      [option_set](PPCContext& t, Random& r, const World& w) {
+        t.r4.u64 = r.Below(4) == 0 ? (r.Below(2) == 0 ? 0 : r.Next() << 32) : r.Next() | 1;
+        option_set(r, w);
+        for (uint32_t k = 0; k < 6; k++) {
+          guest::StoreU32(w.base, w.screen() + 31192 + 4 * k,
+                          r.Below(2) == 0 ? 0xFFFFFFFFu : Around(r, -2, 3));
+        }
+      },
+      __imp__sub_82203B00, hooks::TuningShowItems, 48);
+
   // The debug state handlers: `saves` is each original's register saves
   // (__savegprlr_N's 8 x (32 - N) + 8 bytes, or its inline stores).
   struct Handler {
