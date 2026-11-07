@@ -830,6 +830,136 @@ void OptionFields(PPCContext& t, Random& world_random, const World& w) {
   HighWord(t, r);
 }
 
+// State 5's fields (MoveLevel), seeded as ItemFields (its comment): the
+// category and item one of the level lists most of the time (the short
+// ones, the long ones, the tire's), else one with no list or as the world
+// laid them; the level +9661 0 to 9 (0 and 1 more often: the A path's
+// level checks), the level count +9677 1 to 10 (above and below 8; 9 or
+// 10 most of the time for the long lists); the
+// long list's rows +25100 and +25104 -1 to 8 (the wraps' pairs 7, 0 and 0,
+// 7 often); the menu's step (+8) -1, 0 or 1 (now and then any word) and
+// wrap (+40); +9708; the level's IsItemAvailable word 0 a third of the
+// time, and its GetCurrentChoice word the level half the time (three
+// times in four for the tire's); a few of the
+// lists' named animations playing; most cases A or B answered on the
+// player's mapper (the entry blocked now and then).
+void LevelFields(PPCContext& t, Random& world_random, const World& w) {
+  uint64_t z = (uint64_t(guest::LoadU32(w.base, w.save)) << 32 |
+                guest::LoadU32(w.base, w.save + 4)) +
+               0x9E3779B97F4A7C15ull;
+  world_random.Next();
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  Random r(z ^ (z >> 31));
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  struct Pick {
+    int32_t category;
+    uint8_t item;
+  };
+  static constexpr Pick kShort[] = {{0, 1}, {0, 2}, {0, 3}, {1, 0}, {1, 1},
+                                    {1, 2}, {1, 3}, {1, 3}, {2, 0}, {2, 5}};
+  static constexpr Pick kLong[] = {{0, 0}, {1, 4}};
+  static constexpr Pick kNone[] = {{0, 4}, {1, 5}, {4, 4}, {5, 1}, {-1, 0}, {7, 2}};
+  const uint32_t kind = r.Below(10);
+  Pick pick{-2, 0};
+  if (kind < 4) {
+    pick = kShort[r.Below(10)];
+  } else if (kind < 6) {
+    pick = kLong[r.Below(2)];
+  } else if (kind < 8) {
+    pick = {3, uint8_t(r.Below(4))};
+  } else if (kind < 9) {
+    pick = kNone[r.Below(6)];
+  }
+  if (pick.category != -2) {
+    guest::StoreU32(base, s + 9656, uint32_t(pick.category));
+    guest::StoreU8(base, s + 9660, pick.item);
+  }
+  const uint32_t level = r.Below(4) == 0 ? r.Below(2) : r.Below(10);
+  guest::StoreU8(base, s + 9661, uint8_t(level));
+  // The long lists' rows move only with more than 8 levels: 9 or 10 most of
+  // the time there.
+  const bool long_list = (kind == 4 || kind == 5) && r.Below(4) != 0;
+  guest::StoreU8(base, s + 9677, uint8_t(long_list ? 9 + r.Below(2) : 1 + r.Below(10)));
+  int32_t before = int32_t(r.Below(10)) - 1, now = int32_t(r.Below(10)) - 1;
+  if (r.Below(3) == 0) {
+    const bool down = r.Below(2) == 0;
+    before = down ? 0 : 7;
+    now = down ? 7 : 0;
+  }
+  guest::StoreU32(base, s + 25104, uint32_t(before));
+  guest::StoreU32(base, s + 25100, uint32_t(now));
+  const uint32_t menu = w.menu();
+  static constexpr uint32_t kSteps[] = {0xFFFFFFFFu, 0, 1};
+  guest::StoreU32(base, menu + 8, r.Below(10) == 0 ? uint32_t(r.Next()) : kSteps[r.Below(3)]);
+  guest::StoreU32(base, menu + 40, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  guest::StoreU32(base, s + 9708, r.Below(3) == 0 ? 0 : r.Below(4) == 0 ? uint32_t(r.Next()) : 1);
+  const uint32_t parts = r.Below(4);
+  guest::StoreU32(base, s + 33900, parts);
+  // The level's words: IsItemAvailable's (by category and item, + 4 x the
+  // level) and GetCurrentChoice's (the item's word).
+  const int32_t category = int32_t(guest::LoadU32(base, s + 9656));
+  const uint32_t item = guest::LoadU8(base, s + 9660);
+  uint32_t available = 0, choice = 0;
+  if (category == 0) {
+    static constexpr uint32_t kAvailable[] = {34104, 34664, 34992, 35084};
+    static constexpr uint32_t kChoice[] = {34304, 34804, 35020, 35140};
+    if (item < 4) {
+      available = kAvailable[item] + (item == 0 ? 40 : item == 1 ? 28 : 0) * parts;
+      choice = kChoice[item] + (item < 2 ? 4 * parts : 0);
+    }
+  } else if (category == 1) {
+    static constexpr uint32_t kAvailable[] = {35200, 35288, 35376, 35464, 35568};
+    static constexpr uint32_t kChoice[] = {35228, 35316, 35404, 35492, 35608};
+    if (item < 5) {
+      available = kAvailable[item];
+      choice = kChoice[item];
+    }
+  } else if (category == 2) {
+    available = 35680;
+    choice = 35708;
+  } else if (category == 3) {
+    static constexpr uint32_t kChoice[] = {35820, 35948, 36076};
+    available = 35800;
+    choice = item < 3 ? kChoice[item] : 0;
+  }
+  if (available != 0) {
+    guest::StoreU32(base, s + available + 4 * level,
+                    r.Below(3) == 0 ? 0 : r.Below(4) == 0 ? uint32_t(r.Next()) | 1 : 1);
+  }
+  if (choice != 0 && r.Below(category == 3 ? 4 : 2) != 0) {
+    guest::StoreU32(base, s + choice, level);
+  }
+  // A few of the lists' named animations playing (now and then moved to
+  // the looping list).
+  const uint32_t movie = w.at(kMovieAt);
+  for (uint32_t k = r.Below(12); k > 0; k--) {
+    static constexpr uint32_t kFirst[] = {489, 428, 632, 571, 501, 444, 455, 644, 587, 598, 415};
+    static constexpr uint32_t kSingle[] = {499, 500, 642, 643, 1013, 465, 608, 972, 973, 974};
+    const uint32_t pick_named = r.Below(14);
+    const uint32_t named = pick_named < 11 ? kFirst[pick_named] + r.Below(10) : kSingle[r.Below(10)];
+    ui_movies::PlayNamed(base, movie, named, r.Below(2), 0, 0, 0);
+    if (r.Below(3) == 0) {
+      ui_movies::MoveNamedAnimation(base, movie, named, true);
+    }
+  }
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, menu + 64, 0);
+  }
+  static constexpr uint32_t kActions[] = {159, 159, 159, 158, 158, 153};
+  const uint32_t action = r.Below(8);
+  if (action < 6) {
+    const uint32_t c = guest::LoadU32(base, kControllerEntries);
+    const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+    const uint32_t bit = 1u << (kActions[action] - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, bit);
+    guest::StoreU32(base, mapper + 464, 0);
+  }
+  HighWord(t, r);
+}
+
 // State 59's fields (Leave and StoreOwnedParts): the owned words each 0
 // half the time (else as laid: any word), the tires' words 0, 1 or any, the
 // part set [+33900] 0 to 7 (5 to 7 now and then: none of the power items'
@@ -1134,6 +1264,10 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputOptions", 400, __imp__sub_821D8160, hooks::TuningPagesInputOptions, 24,
        {{112, 152}}, OptionFields});
+  // MoveLevel: state 5's fields (above); __savegprlr_28: 40 bytes.
+  Run(h, w,
+      {"TuningScreen::MoveLevel", 800, __imp__sub_821D1A18, hooks::TuningPagesMoveLevel, 40, {},
+       LevelFields});
   // StoreOwnedParts: state 59's fields (above); its r30, r31 and lr (24
   // bytes).
   Run(h, w,

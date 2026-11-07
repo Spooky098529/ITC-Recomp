@@ -84,7 +84,10 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "SetBrandLogo, GetPrice, SetPartName, PlayGroupAnimation, FillPartRows, "
               "HidePartMarks, ShowPartMarks and the UI movies' FindNode and Child by their plain "
               "C++; MenuSound::Play, SetText and the named animations through their overrides, "
-              "the varargs SetText calls leave unset passed as 0)) "
+              "the varargs SetText calls leave unset passed as 0); "
+              "state 5's movie side MoveLevel sub_821D1A18 (IsItemAvailable, GetCurrentChoice "
+              "and the UI movies' FindNode and Child by their plain C++, the UI movie calls "
+              "through their overrides)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -406,6 +409,14 @@ void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesMoveLevel(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveLevel(base, call, screen, sp, native_slots);
+  });
+}
+
 void TuningPagesInputWheels(PPCContext& ctx, uint8_t* base) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -511,6 +522,7 @@ ITC_TUNING_PAGES(821DFD48, TuningPagesInputItems)
 ITC_TUNING_PAGES(821D8160, TuningPagesInputOptions)
 ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
 ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
+ITC_TUNING_PAGES(821D1A18, TuningPagesMoveLevel)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above

@@ -1594,6 +1594,322 @@ uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint3
   return MoveOption(base, call, s, frame, flags.native_slots);
 }
 
+namespace {
+
+// MoveLevel's lists (its row): the short ones (category 0 items 1 to 3,
+// category 1 items 0 to 3, category 2: sub-scene 28, bars 499 and 500, rows
+// 489 + l and 428 + l), the long ones (category 0 item 0, category 1 item
+// 4: the rows +25100 now and +25104 before) and the tire's (category 3:
+// sub-scene 30, bars 642 and 643, rows 632 + l); else none.
+enum class LevelList { kNone, kShort, kLong, kTire };
+
+LevelList LevelListOf(uint8_t* base, uint32_t screen) {
+  const int32_t category = int32_t(Load(base, screen + 9656));
+  const uint32_t item = Byte(base, screen + 9660);
+  if ((category == 0 && item >= 1 && item <= 3) || (category == 1 && item <= 3) ||
+      category == 2) {
+    return LevelList::kShort;
+  }
+  if ((category == 0 && item == 0) || (category == 1 && item == 4)) {
+    return LevelList::kLong;
+  }
+  return category == 3 ? LevelList::kTire : LevelList::kNone;
+}
+
+}  // namespace
+
+uint64_t MoveLevel(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                   uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_821D1A18 TuningScreen::MoveLevel");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, tuning_screen::kMovieId);
+  const uint32_t menu = Load(base, s + 10040);
+  const uint32_t movie = Load(base, found);
+  const int32_t step = int32_t(Load(base, menu + 8));
+  auto level = [&] { return uint64_t(Byte(base, s + 9661)); };
+  auto count = [&] { return uint64_t(Byte(base, s + 9677)); };
+  auto word = [&](uint32_t offset) { return uint64_t(Load(base, s + offset)); };
+  auto finish = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::FinishNamed(call, frame, lr, movie, named);
+  };
+  auto play = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::PlayNamed(call, frame, lr, movie, named, 1);
+  };
+  auto loop = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::LoopNamed(call, frame, lr, movie, named);
+  };
+  // The list's node: sub-scene `sub`'s child 1 (FindNode), its child i.
+  auto list_child = [&](uint32_t sub, uint32_t i) {
+    return ui_movies::Child(base, ui_movies::FindNode(base, movie, sub, 1), i);
+  };
+  // The bar snapped: child 0's +16 = float(x) x 40.0 (x read after the
+  // lookups).
+  auto snap = [&](uint32_t sub, auto x) {
+    const uint32_t node = list_child(sub, 0);
+    Store(base, node + 16, ItemPosition(base, frame, x()));
+  };
+  // A row not available dimmed: child i's +68 = the float at 0x82002A3C.
+  auto dim = [&](uint32_t sub, uint32_t i) -> uint64_t {
+    const uint32_t node = list_child(sub, i);
+    Store(base, node + 68, camera_modes::steps::Bits(camera_modes::steps::Lfs(base, 0x82002A3C)));
+    return node;
+  };
+  // IsItemAvailable(screen, l): a leaf that leaves r4 as the original loads
+  // it, the level l, which the original reads back after the call (its row):
+  // the level read before the call stands for it.
+  auto available = [&](uint64_t l) { return tuning_screen::IsItemAvailable(base, s, l) != 0; };
+  if (step == -1 || step == 1) {
+    const bool up = step == -1;
+    const LevelList list = LevelListOf(base, s);
+    const bool wrapped = int32_t(Load(base, menu + 40)) != 0;
+    auto by_level = [&] { return int64_t(level()); };
+    if (list == LevelList::kShort) {
+      if (up && wrapped) {
+        finish(499, 0x821D1B1C);
+        finish(500, 0x821D1B28);
+        snap(28, by_level);
+        finish(count() + 488, 0x821D1B78);
+        finish(level() + 489, 0x821D1B88);
+        play(level() + 489, 0x821D1BA8);
+        loop(level() + 489, 0x821D1BB8);
+        finish(count() + 427, 0x821D1BC8);
+        finish(level() + 428, 0x821D1BD8);
+        play(level() + 428, 0x821D1BF8);
+        return loop(level() + 428, 0x821D1F9C);
+      }
+      if (!up && wrapped) {
+        // The new row snapped to its end (not looped).
+        finish(499, 0x821D2088);
+        finish(500, 0x821D2094);
+        snap(28, by_level);
+        finish(489, 0x821D20E0);
+        play(level() + 489, 0x821D2100);
+        finish(level() + 489, 0x821D2110);
+        dim(28, uint32_t(level() + 5));
+        finish(428, 0x821D2148);
+        play(level() + 428, 0x821D2168);
+        return finish(level() + 428, 0x821D1E9C);
+      }
+      // The bar slid one way: 499 (up) or 500 (down) restarted; the row
+      // before (l + 1 up, l - 1 down) finished, the level's restarted and
+      // looped, or with the level not available finished and the row
+      // before's mark dimmed.
+      const uint64_t bar = up ? 499 : 500;
+      finish(bar, up ? 0x821D1C08 : 0x821D2174);
+      play(bar, up ? 0x821D1C24 : 0x821D2190);
+      const uint64_t l = level();
+      const bool on = available(l);
+      const uint64_t before = up ? l + 490 : l + 488;
+      if (on) {
+        finish(before, up ? 0x821D1C44 : 0x821D21B0);
+        finish(level() + 489, up ? 0x821D1C54 : 0x821D21C0);
+        play(level() + 489, up ? 0x821D1C74 : 0x821D21E0);
+        loop(level() + 489, up ? 0x821D1C84 : 0x821D21F0);
+        finish(level() + (up ? 429 : 427), 0x821D1BC8);
+        finish(level() + 428, 0x821D1BD8);
+        play(level() + 428, 0x821D1BF8);
+        return loop(level() + 428, 0x821D1F9C);
+      }
+      finish(before, up ? 0x821D1C94 : 0x821D21FC);
+      finish(level() + 489, up ? 0x821D1CA4 : 0x821D220C);
+      dim(28, uint32_t(level() + (up ? 6 : 4)));
+      finish(level() + (up ? 429 : 427), 0x821D1CE0);
+      return finish(level() + 428, 0x821D1E9C);
+    }
+    if (list == LevelList::kTire) {
+      if (up && wrapped) {
+        finish(642, 0x821D1EC0);
+        finish(643, 0x821D1ECC);
+        snap(30, by_level);
+        finish(count() + 631, 0x821D1F5C);
+        finish(level() + 632, 0x821D1F6C);
+        play(level() + 632, 0x821D1F8C);
+        return loop(level() + 632, 0x821D1F9C);
+      }
+      if (!up && wrapped) {
+        finish(642, 0x821D2380);
+        finish(643, 0x821D238C);
+        snap(30, by_level);
+        finish(632, 0x821D23D8);
+        play(level() + 632, 0x821D23F8);
+        finish(level() + 632, 0x821D2408);
+        return dim(30, uint32_t(level() + 5));
+      }
+      const uint64_t bar = up ? 642 : 643;
+      finish(bar, up ? 0x821D1F20 : 0x821D242C);
+      play(bar, up ? 0x821D1F3C : 0x821D2448);
+      const uint64_t l = level();
+      const bool on = available(l);
+      const uint64_t before = up ? l + 633 : l + 631;
+      if (on) {
+        finish(before, 0x821D1F5C);
+        finish(level() + 632, 0x821D1F6C);
+        play(level() + 632, 0x821D1F8C);
+        return loop(level() + 632, 0x821D1F9C);
+      }
+      finish(before, up ? 0x821D1FA4 : 0x821D2468);
+      finish(level() + 632, up ? 0x821D1FB4 : 0x821D2478);
+      return dim(30, uint32_t(level() + (up ? 6 : 4)));
+    }
+    if (list != LevelList::kLong || count() <= 8) {
+      return found;
+    }
+    // The long list: the bar snapped at the wraps (7 to 0 up, 0 to 7 down),
+    // else (with +9708 set) slid inside the visible rows; then the rows.
+    const int32_t before = int32_t(Load(base, s + 25104));
+    const int32_t now = int32_t(Load(base, s + 25100));
+    if (up ? (before == 7 && now == 0) : (before == 0 && now == 7)) {
+      finish(499, up ? 0x821D1D40 : 0x821D229C);
+      finish(500, up ? 0x821D1D4C : 0x821D22A8);
+      snap(28, [&] { return int64_t(int32_t(Load(base, s + 25100))); });
+    } else {
+      if (Load(base, s + 9708) == 0) {
+        return found;
+      }
+      if (up ? (before > 0 && now >= 0 && now < 7) : (before < 7 && now <= 7 && now > 0)) {
+        finish(up ? 499 : 500, up ? 0x821D1E34 : 0x821D2340);
+        play(up ? 499 : 500, 0x821D235C);
+      }
+    }
+    if (available(level())) {
+      finish(word(25104) + 489, 0x821D1D78);
+      finish(word(25100) + 489, 0x821D1D88);
+      play(word(25100) + 489, 0x821D1DA8);
+      loop(word(25100) + 489, 0x821D1DB8);
+      finish(word(25104) + 428, 0x821D1DC8);
+      finish(word(25100) + 428, 0x821D1DD8);
+      play(word(25100) + 428, 0x821D1DF8);
+      return loop(word(25100) + 428, 0x821D1F9C);
+    }
+    finish(word(25104) + 489, 0x821D1E40);
+    finish(word(25100) + 489, 0x821D1E50);
+    dim(28, Load(base, s + 25104) + 5);
+    finish(word(25104) + 428, 0x821D1E8C);
+    return finish(word(25100) + 428, 0x821D1E9C);
+  }
+  // No step: A (with the level available: the rows and bars finished, then
+  // the type or option list's level pictures played) or B (the same, then
+  // the page before played) asked again.
+  uint64_t r3 = found;
+  auto asked = [&](uint64_t action, uint32_t lr) {
+    return Asked(base, call, entry, 40, action, frame, lr, native_slots, &r3);
+  };
+  // The list's rows and bars finished (k 0 to 9); the last call's r3, else
+  // `r3`.
+  struct Finishes {
+    uint32_t short_rows[2], long_rows[2], short_bar, tire_rows[2], tire_bar, last;
+  };
+  auto finish_all = [&](const Finishes& lr, uint64_t r3_in) {
+    const LevelList list = LevelListOf(base, s);
+    if (list == LevelList::kShort || list == LevelList::kLong) {
+      const uint32_t* rows = list == LevelList::kShort ? lr.short_rows : lr.long_rows;
+      for (uint64_t k = 0; k < 10; k++) {
+        finish(k + 489, rows[0]);
+        finish(k + 428, rows[1]);
+      }
+      finish(499, lr.short_bar);
+      return finish(500, lr.last);
+    }
+    if (list == LevelList::kTire) {
+      for (uint64_t k = 0; k < 10; k++) {
+        finish(k + 632, lr.tire_rows[0]);
+        finish(k + 571, lr.tire_rows[1]);
+      }
+      finish(642, lr.tire_bar);
+      return finish(643, lr.last);
+    }
+    return r3_in;
+  };
+  if (asked(159, 0x821D24C8)) {
+    const uint32_t on = tuning_screen::IsItemAvailable(base, s, level());
+    if (on == 0) {
+      return on;
+    }
+    r3 = finish_all({{0x821D2590, 0x821D259C},
+                     {0x821D25F8, 0x821D2604},
+                     0x821D25B4,
+                     {0x821D2630, 0x821D263C},
+                     0x821D2654,
+                     0x821D2660},
+                    on);
+    if (count() > 8) {
+      r3 = finish(1013, 0x821D2678);
+    }
+    const int32_t category = int32_t(Load(base, s + 9656));
+    const uint32_t item = Byte(base, s + 9660);
+    // The level's pictures: the type list's (501, 444) for the levels that
+    // open one, the option list's (644, 587) for the tire's; the current
+    // choice's picture (455 or 598 + l), else 465 or 608.
+    uint64_t first, second, chosen, other;
+    const uint32_t* lrs;
+    if ((category == 0 && item == 2) || (category == 1 && item == 3 && level() >= 1)) {
+      first = 501, second = 444, chosen = 455, other = 465;
+      static constexpr uint32_t kLrs[6] = {0x821D26C0, 0x821D26E0, 0x821D26F0,
+                                           0x821D2710, 0x821D2730, 0x821D2744};
+      lrs = kLrs;
+    } else if (category == 3 && level() != 0) {
+      first = 644, second = 587, chosen = 598, other = 608;
+      static constexpr uint32_t kLrs[6] = {0x821D276C, 0x821D278C, 0x821D279C,
+                                           0x821D27BC, 0x821D27DC, 0x821D27F0};
+      lrs = kLrs;
+    } else {
+      return r3;
+    }
+    finish(level() + first, lrs[0]);
+    play(level() + first, lrs[1]);
+    finish(level() + second, lrs[2]);
+    play(level() + second, lrs[3]);
+    const int32_t choice = int32_t(tuning_screen::GetCurrentChoice(base, s));
+    uint64_t picture;
+    if (choice == int32_t(level())) {
+      picture = level() + chosen;
+      finish(picture, lrs[4]);
+    } else {
+      picture = other;
+      finish(picture, lrs[5]);
+    }
+    return tuning_screen::PlayNamed(call, frame, 0x821D2A78, movie, picture, 0);
+  }
+  if (!asked(158, 0x821D281C)) {
+    return r3;
+  }
+  r3 = finish_all({{0x821D28D0, 0x821D28DC},
+                   {0x821D2938, 0x821D2944},
+                   0x821D28F4,
+                   {0x821D2970, 0x821D297C},
+                   0x821D2994,
+                   0x821D29A0},
+                  r3);
+  if (count() > 8) {
+    r3 = finish(1013, 0x821D29B8);
+  }
+  if (count() > 8) {
+    r3 = call(tuning_screen::kFinish, {movie, tuning_screen::kAllScenes, 15}, frame, 0x821D29D4);
+  }
+  if (int32_t(Load(base, s + 9656)) == 3) {
+    const uint64_t item = Byte(base, s + 9660);
+    finish(item + 415, 0x821D29F0);
+    r3 = play(uint64_t(Byte(base, s + 9660)) + 415, 0x821D2A10);
+  }
+  // Back to the items: 972 (category 0), 973 (1 and 2) or 974 (3).
+  const uint32_t category = Load(base, s + 9656);
+  uint64_t back;
+  uint32_t lr;
+  if (category < 1) {
+    back = 972, lr = 0x821D2A5C;
+  } else if (category < 3) {
+    back = 973, lr = 0x821D2A48;
+  } else if (category == 3) {
+    back = 974, lr = 0x821D2A34;
+  } else {
+    return r3;
+  }
+  finish(back, lr);
+  return tuning_screen::PlayNamed(call, frame, 0x821D2A78, movie, back, 0);
+}
+
 
 namespace {
 

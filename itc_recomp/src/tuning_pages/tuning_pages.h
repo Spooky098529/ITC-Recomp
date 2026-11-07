@@ -375,6 +375,20 @@ uint64_t MoveOption(uint8_t* base, const tuning_screen::GuestCall& call, uint32_
 uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                       uint32_t sp, const PageFlags& flags);
 
+// sub_821D1A18 TuningScreen::MoveLevel: state 5's movie side (its row): by
+// the front-end menu's step (+8) and wrap (+40), the level list's bars slid
+// or snapped (the list's node +16 = float(level) x 40.0) and the level's
+// rows restarted and looped, or finished and dimmed (+68) when
+// IsItemAvailable says the level isn't, for the short lists (sub-scene
+// 28), the long ones (+25100 now, +25104 before, with more than 8 levels)
+// and the tire's (sub-scene 30); with no step A (the rows finished, the
+// type or option list's level pictures played) or B (the rows finished,
+// the page before played) asked again. IsItemAvailable's r4 leftover is the
+// level (the leaf leaves it). 128-byte frame; the last call's r3, else the
+// movie's entry, the slot's r3 or IsItemAvailable's 0.
+uint64_t MoveLevel(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                   uint32_t sp, bool native_slots);
+
 // sub_821DD408 TuningScreen::StoreOwnedParts: the screen's owned flags
 // packed into the selected garage car's bitset (c+1904) and the save data's
 // (+0x1996C), every wheel's flag set on the way (TestAndSetWheelFlag; its
