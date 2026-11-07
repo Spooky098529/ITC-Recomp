@@ -65,6 +65,13 @@ file's history. What's left to see in a drive, from every run:
   (race 90 s at 180, the harnesses ~88.5 s; 0 errors, every harness 0
   differing, 5 of 5 harness lines; 4 in the replay `itc_4347` (ok),
   `IsPickOwned` to drive, already listed). Recorded.
+- Cleanup leads (no mapping, not counted), taken together: seven
+  removable adapters in `front-end-car-draw.md` (`sub_8217D2B0`,
+  `sub_8217D120`, `sub_82179678`, `sub_8217AFE8`, `sub_8217BA20`,
+  `sub_8217CAB8`, `sub_820C8480`) and six in `tuning-screen.md`
+  (`sub_821F4BF8`, `sub_821F2068`, `sub_821EE880`, `sub_821E0E00`,
+  `sub_821EE6D0`, `sub_821EE760`); `b7_groups.py --removable` lists all
+  13; both lines deleted from `leads.md`. Migration agent running.
 
 ## Done
 
