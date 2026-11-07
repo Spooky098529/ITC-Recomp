@@ -57,6 +57,14 @@ here loses its heading.
   still: `SetEditorLimits`, `LoadVinyls`, `LoadPageLayouts`,
   `LoadDecalImages`, `ShowPricePanel`, `SetWheelListEnd`, `InchListEnd`,
   `SetBrandLogo`, their adapters now removed).
+- The cleanup leads (attract race `itc_4356`, replay `itc_4357` ok;
+  `front-end-car-draw.md`, `tuning-screen.md`): `sub_82179678`
+  GarageStage::SetLightKit, `sub_821F4BF8` TuningScreen::FillPartRows,
+  `sub_821F2068` TuningScreen::SetPartName, `sub_821EE880`
+  TuningScreen::PlayGroupAnimation, `sub_821E0E00`
+  TuningScreen::PreviewWheels, `sub_821EE6D0`
+  TuningScreen::HidePartMarks, `sub_821EE760`
+  TuningScreen::ShowPartMarks, `sub_821CDED8` TuningScreen::WheelNumber.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

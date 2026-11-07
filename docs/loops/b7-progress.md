@@ -76,9 +76,15 @@ file's history. What's left to see in a drive, from every run:
   `sub_821CDED8` that became removable: 15 Native; races 34-35 s, 0
   errors, the four files' harnesses 0 differing; the callers' harnesses
   leave out the callees' register saves below their frames; no
-  subagents); left: none removable. Validation agent running.
+  subagents); left: none removable. Validated `itc_4356` (race 90 s at
+  180, the harnesses ~88.5 s; 0 errors, every harness 0 differing, 15
+  of 15 harness lines; 7 in the replay `itc_4357` (ok), 8 to drive).
+- Picking subsystem 2.
 
 ## Done
+
+- Cleanup: 15 adapters removed in `front-end-car-draw.md` and
+  `tuning-screen.md` (now Native); c1cd4b85..99c60056.
 
 - `tuning-pages.md`: 72 of 74 native (the tuning screen's input pages,
   the vinyl editor's entry and exit, the decal images; 26 adapters
@@ -110,6 +116,7 @@ file's history. What's left to see in a drive, from every run:
   known 422, unknown 1395).
 - After its fourth migration: ours 4548, work left 1872 (wrapped 57,
   known 420, unknown 1395).
-- After the cleanup leads: see the validation's line.
+- After the cleanup leads (`itc_4356`): ours 4548, work left 1872 (15
+  Overridden -> Native).
 
 ## Stopped
