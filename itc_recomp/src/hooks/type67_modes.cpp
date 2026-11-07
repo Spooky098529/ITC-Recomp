@@ -12,6 +12,7 @@
 #include "hooks/heap.h"
 #include "hooks/strings_and_font.h"
 #include "memory/c_runtime_heap.h"
+#include "screen_constructors/screen_constructors.h"
 #include "hooks/ui_movies_game.h"
 #include "ui_movies/game.h"
 #include "type67_modes/type67_modes.h"
@@ -59,7 +60,10 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "GarageCamera::LoadPresets sub_821802D8 (Archive::Load through its plain C++) and "
               "StandScene::Release sub_82180738; Quaternion::FromAngles sub_8217C120 and "
               "GarageCamera::Reset sub_8217D888 and GarageLights::Init sub_8217D3C8 with the "
-              "translated code's float steps; StandScene::Create sub_82180B00 (Viewports::Init "
+              "translated code's float steps; the modes' slot 0 Type6Mode::Init sub_82236880 and "
+              "Type7Mode::Init sub_82246C90 (the UI movies' start, Strings::Load, StandScene::Create "
+              "and LoadingScreen::Show guest calls; the screen blocks' constructors, the Inits and "
+              "ScreenFades::FadeIn their plain C++); StandScene::Create sub_82180B00 (Viewports::Init "
               "and CarScene::Create guest calls, CarScene::SetUp's register step) with "
               "StandSlot::Init sub_82180AA0 (no adapter: its caller is native), "
               "GarageStage::Init sub_82180968 and GarageCamera::Init sub_82180918; the dialogs' "
@@ -379,6 +383,59 @@ void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base) {
 void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base) {
   SetArchiveSerial(ctx, t67::GarageCameraLoadPresets(base, ctx.r3.u32, NativeArchiveLoad(base)));
 }
+namespace {
+
+// The screen blocks' panels' operator new: its plain C++, else the
+// original's call from the constructor's frame (as the constructors'
+// adapters do).
+struct PanelNew {
+  PPCContext* ctx;
+  uint8_t* base;
+  static uint32_t New(void* user, uint32_t size, uint32_t frame) {
+    auto* p = static_cast<PanelNew*>(user);
+    if (auto block = memory::crt::OperatorNew(p->base, size)) {
+      return *block;
+    }
+    PPCContext& ctx = *p->ctx;
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = size;
+    __imp__sub_825A6880(ctx, p->base);
+    const uint32_t block = ctx.r3.u32;
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    return block;
+  }
+};
+
+void ModeInit(PPCContext& ctx, uint8_t* base, bool type7) {
+  const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+  const t67::Calls screens = Type67Calls(ctx, base);
+  PanelNew panel_new{&ctx, base};
+  t67::ModeInitCalls calls;
+  calls.call = screens.call_set;
+  calls.construct = [&](uint32_t block, uint32_t sp) {
+    const screen_constructors::New new_panel{&panel_new, PanelNew::New};
+    if (type7) {
+      screen_constructors::Type7Screens(base, block, sp, new_panel);
+    } else {
+      screen_constructors::Type6Screens(base, block, sp, new_panel);
+    }
+    ctx.fpscr.disableFlushMode();
+  };
+  calls.screens = &screens;
+  ctx.fpscr.disableFlushMode();
+  const uint64_t r3 = t67::ModeInit(base, type7, ctx.r3.u32, ctx.r1.u32, calls);
+  ctx.r1.u64 = stack;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace
+
+void Type6ModeInit(PPCContext& ctx, uint8_t* base) { ModeInit(ctx, base, false); }
+void Type7ModeInit(PPCContext& ctx, uint8_t* base) { ModeInit(ctx, base, true); }
+
 void StandSceneCreate(PPCContext& ctx, uint8_t* base) {
   const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
   auto guest = [&](uint32_t frame, uint32_t link, void (*target)(PPCContext&, uint8_t*)) {
@@ -860,6 +917,25 @@ ITC_TYPE67_MODES(8217D888, GarageCameraReset)
 // its step above is the harness's), nor do GarageStage::Init sub_82180968
 // and GarageCamera::Init sub_82180918 (only StandSlot::Init and
 // GarageStage::Init reach them).
+// The modes' slot 0 (Type6Mode::Init, Type7Mode::Init, through their
+// vtables from Modes::Tick): over the layer only (their block is
+// VirtualAlloc's pages).
+extern "C" REX_FUNC(sub_82236880) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) {
+    __imp__sub_82236880(ctx, base);
+    return;
+  }
+  hooks::Type6ModeInit(ctx, base);
+}
+extern "C" REX_FUNC(sub_82246C90) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) {
+    __imp__sub_82246C90(ctx, base);
+    return;
+  }
+  hooks::Type7ModeInit(ctx, base);
+}
 // StandScene::Create (from the modes' slot 0, recompiled): over the layer
 // and the archive's native queue only.
 extern "C" REX_FUNC(sub_82180B00) {

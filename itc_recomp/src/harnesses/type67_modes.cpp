@@ -25,6 +25,7 @@
 
 #include "harness.h"
 #include "exit_table.h"
+#include "loading_world.h"
 #include "scene_pools_take.h"
 
 #include "base/flags.h"
@@ -44,10 +45,12 @@
 #include "hooks/ui_movies.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
 #include "models/model.h"
 #include "mode_tick/mode_tick.h"
+#include "race_loading/race_loading.h"
 #include "race_setup/race_setup.h"
 #include "scene/scene.h"
 #include "scene_loaders/pools.h"
@@ -56,6 +59,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <limits>
@@ -64,6 +68,11 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_type67_modes);
+
+namespace time_hooks {
+void SetFakeNow(uint64_t now);
+void ClearFakeNow();
+}  // namespace time_hooks
 
 namespace harness {
 
@@ -2593,11 +2602,228 @@ void TearDowns(Context& h, const Block& world) {
 // (scene_pools_take::TakeProvider), the part files' pages, the globals,
 // the palette and its two words, the viewports' vectors and near plane,
 // the stages' constants, the exit table's additions and r3; then all freed
-// and the globals put back. ---
+// and the globals put back. The modes' slot 0 (below) take the stand the
+// same way. ---
+
+constexpr uint32_t kTakeMarker = 0x50414745;
+
+// The globals and image words StandScene::Create's callees write, saved
+// once and put back before each side and at the end.
+struct StandSaved {
+  explicit StandSaved(uint8_t* base) : base(base) {
+    for (const uint32_t g : kGlobals) Keep(g, 4);
+    Keep(kPalette, 1024);
+    Keep(0x82601854, 8);       // CarScene::Create's two words
+    Keep(0x826C2CF0, 0x34);    // the viewports' vectors and guard
+    Keep(0x826BAC00 + 384, 4); // camera pass 0's near plane
+    Keep(0x8296B950, 0x350);   // the stages' constants
+    Keep(0x8265ED00, 16);      // the ambient
+  }
+  ~StandSaved() { Restore(); }
+  void Keep(uint32_t at, uint32_t bytes) { saved.push_back({at, bytes, Read(base, at, bytes)}); }
+  void Restore() const {
+    for (const Saved& k : saved) Write(base, k.address, k.data.data(), k.bytes);
+  }
+  // The words compared after a side (the globals by `regions`).
+  void Take(const std::vector<scene_pools_take::PageRegion>& regions, Outputs& out) const {
+    for (const uint32_t g : kGlobals) {
+      out.Bytes(scene_pools_take::Normalized(base, regions, g, 4));
+    }
+    for (size_t k = std::size(kGlobals); k < saved.size(); k++) {
+      out.Bytes(Read(base, saved[k].address, saved[k].bytes));
+    }
+  }
+  struct Saved {
+    uint32_t address, bytes;
+    std::vector<uint8_t> data;
+  };
+  static constexpr uint32_t kPalette = 0x826C5110;
+  static constexpr uint32_t kGlobals[] = {t67::kStandHolder, cameras::kViewports, scene::kScene,
+                                          scene::kFirstSet, accessories::kSet};
+  uint8_t* base;
+  std::vector<Saved> saved;
+};
+
+// Archive::Load's calls (and, for the modes' slot 0, the UI movies' start
+// and Strings::Load's) recorded through hooks::g_start_up_recorder: each
+// call's address, r3 to r6 (r1 and lr for the two others); Archive::Load
+// answered 7.
+std::vector<uint32_t>* g_stand_calls = nullptr;
+bool g_record_mode_calls = false;
+bool StandRecorder(PPCContext& ctx, uint32_t address) {
+  if (g_stand_calls == nullptr) return false;
+  if (address == 0x8209DE48) {
+    g_stand_calls->insert(g_stand_calls->end(),
+                          {address, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32});
+    ctx.r3.u64 = 7;
+    return true;
+  }
+  if (g_record_mode_calls && (address == 0x8211AD00 || address == 0x8210A8D0)) {
+    g_stand_calls->insert(g_stand_calls->end(), {address, ctx.r3.u32, ctx.r4.u32,
+                                                 ctx.r1.u32, uint32_t(ctx.lr)});
+    return true;
+  }
+  return false;
+}
+
+// The blocks a side made, found from the globals: regions for the
+// pointers' offsets, freed after.
+struct StandTake {
+  std::vector<scene_pools_take::PageRegion> regions;
+  std::vector<std::pair<uint32_t, uint32_t>> made;  // pages, bytes
+  std::vector<std::pair<int, uint32_t>> objects;    // first-set pool (-1 second), object
+  std::vector<uint32_t> heap;                       // operator new's blocks
+  uint32_t scene = 0;
+
+  void Add(uint8_t*, uint32_t at, uint32_t bytes) {
+    if (at != 0 && memory::IsPages(at)) {
+      for (const auto& [m, n] : made) {
+        if (m == at) return;
+      }
+      regions.push_back({at, bytes});
+      made.push_back({at, bytes});
+    }
+  }
+  // Heap blocks named by words of [at, at + bytes) (operator new's).
+  void AddHeapFrom(uint8_t* base, uint32_t at, uint32_t bytes) {
+    for (uint32_t o = 0; o + 4 <= bytes; o += 4) {
+      const uint32_t w = guest::LoadU32(base, at + o);
+      if (w != 0 && memory::IsHeapBlock(w) &&
+          std::find(heap.begin(), heap.end(), w) == heap.end()) {
+        heap.push_back(w);
+        regions.push_back({w, memory::Size(w)});
+      }
+    }
+  }
+  void Collect(uint8_t* base, bool held) {
+    namespace sl = scene_loaders;
+    const uint32_t viewports = guest::LoadU32(base, cameras::kViewports);
+    Add(base, viewports, 12);
+    if (memory::IsPages(viewports)) {
+      Add(base, guest::LoadU32(base, viewports + 0), 1872);
+      Add(base, guest::LoadU32(base, viewports + 4), 1872);
+    }
+    scene = guest::LoadU32(base, scene::kScene);
+    const uint32_t first = guest::LoadU32(base, scene::kFirstSet);
+    Add(base, scene, scene::kSceneBytes);
+    Add(base, first, 140);
+    Add(base, guest::LoadU32(base, accessories::kSet), 32);
+    const uint32_t holder = guest::LoadU32(base, t67::kStandHolder);
+    if (!held) {
+      Add(base, holder, 24);
+      for (uint32_t i = 0; memory::IsPages(holder) && i < 3; i++) {
+        const uint32_t slot = guest::LoadU32(base, holder + 4 * i);
+        Add(base, slot, 4);
+        if (memory::IsPages(slot)) Add(base, guest::LoadU32(base, slot), t67::kGarageStageBytes);
+      }
+    }
+    if (memory::IsPages(scene)) {
+      for (uint32_t pool = 0; pool < 8; pool++) {
+        for (uint32_t node = guest::LoadU32(base, scene + 4944 + 12 * pool), n = 0;
+             node != 0 && n < 16; node = guest::LoadU32(base, node + 8), n++) {
+          if (memory::IsPages(node)) {
+            Add(base, node, car_models::kSecondSetBytes[pool]);
+            objects.push_back({-1, node});
+          }
+        }
+      }
+    }
+    if (memory::IsPages(first)) {
+      Add(base, guest::LoadU32(base, first + 52),
+          80 * (guest::LoadU32(base, first + 12) + guest::LoadU32(base, first + 40)));
+      for (uint32_t pool = 0; pool < 7; pool++) {
+        for (uint32_t node = guest::LoadU32(base, first + 56 + 12 * pool), n = 0;
+             node != 0 && n < 16; node = guest::LoadU32(base, node + 8), n++) {
+          if (memory::IsPages(node)) {
+            Add(base, node, sl::kPoolObjectBytes[pool]);
+            objects.push_back({int(pool), node});
+          }
+        }
+      }
+    }
+  }
+  // The recorded calls: the presets' blocks by content (then freed), the
+  // words into the regions as offsets, other pages as markers.
+  void TakeCalls(uint8_t* base, std::vector<uint32_t> calls, Outputs& out) {
+    out.Word(uint32_t(calls.size()));
+    for (size_t k = 0; k + 5 <= calls.size(); k += 5) {
+      if (calls[k] == 0x8209DE48 && calls[k + 3] == t67::kOnPresetsLoaded &&
+          memory::IsPages(calls[k + 2])) {
+        out.Bytes(Read(base, calls[k + 2], 0x400));
+        presets.push_back(calls[k + 2]);
+        calls[k + 2] = kTakeMarker;
+      }
+    }
+    for (uint32_t& w : calls) {
+      bool in_region = false;
+      for (size_t k = 0; k < regions.size(); k++) {
+        if (w >= regions[k].start && w - regions[k].start < regions[k].bytes + 16) {
+          w = 0xB0000000u + (uint32_t(k) << 20) + (w - regions[k].start);
+          in_region = true;
+          break;
+        }
+      }
+      if (!in_region && w != 0 && memory::IsPages(w)) w = kTakeMarker;
+    }
+    for (const uint32_t w : calls) out.Word(w);
+  }
+  // The scene's part files' pages and every provider, then each block.
+  void TakeBlocks(uint8_t* base, Outputs& out) {
+    namespace pt = scene_pools_take;
+    constexpr uint32_t kOwn[] = {452, 4112, 1152, 1176, 1200, 1224};
+    if (memory::IsPages(scene)) {
+      for (const uint32_t at : kOwn) {
+        const uint32_t pages = guest::LoadU32(base, scene + at + 16);
+        if (pages != 0 && memory::IsPages(pages)) {
+          out.Word(kTakeMarker);
+          memory::FreePages(pages);
+          guest::StoreU32(base, scene + at + 16, kTakeMarker);
+        } else {
+          out.Word(pages);
+        }
+      }
+      for (const uint32_t provider : scene::kAssetsProviders) {
+        pt::TakeProvider(base, scene + scene::kAssets + provider, out);
+      }
+      for (const uint32_t model : scene::kAssetsModels) {
+        pt::TakeProvider(base, scene + scene::kAssets + model + models::kModelTextures, out);
+      }
+    }
+    for (const auto& [pool, object] : objects) {
+      if (pool >= 0) {
+        for (const uint32_t offset : pt::PoolProviders(uint32_t(pool))) {
+          pt::TakeProvider(base, object + offset, out);
+        }
+      }
+    }
+    out.Word(uint32_t(made.size()));
+    for (const auto& [at, bytes] : made) {
+      out.Bytes(pt::Normalized(base, regions, at, bytes));
+    }
+    out.Word(uint32_t(heap.size()));
+    for (const uint32_t at : heap) {
+      out.Word(memory::Size(at));
+      out.Bytes(pt::Normalized(base, regions, at, memory::Size(at)));
+    }
+  }
+  // r3 as a region and offset, else its offset from `sp`.
+  uint32_t Word(uint32_t value, uint32_t sp) const {
+    for (size_t k = 0; k < regions.size(); k++) {
+      if (value >= regions[k].start && value - regions[k].start < regions[k].bytes) {
+        return 0xB0000000u + (uint32_t(k) << 20) + (value - regions[k].start);
+      }
+    }
+    return value - sp;
+  }
+  void Free() {
+    for (const auto& [at, bytes] : made) memory::FreePages(at);
+    for (const uint32_t p : presets) memory::FreePages(p);
+    for (const uint32_t at : heap) memory::crt::OperatorDelete(at);
+  }
+  std::vector<uint32_t> presets;
+};
 
 void StandSceneCreates(Context& h) {
-  namespace pt = scene_pools_take;
-  namespace sl = scene_loaders;
   uint8_t* const base = h.base;
   if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
       !hooks::CarModelsSceneSetUpNative()) {
@@ -2607,27 +2833,7 @@ void StandSceneCreates(Context& h) {
   }
   std::lock_guard<std::recursive_mutex> exits(c_runtime::ExitMutex());
   std::lock_guard<std::recursive_mutex> blocks(models::MemoryBlocksMutex());
-  constexpr uint32_t kPalette = 0x826C5110, kPaletteBytes = 1024, kWords = 0x82601854;
-  constexpr uint32_t kVectors = 0x826C2CF0, kVectorBytes = 0x34, kNear = 0x826BAC00 + 384;
-  constexpr uint32_t kConstants = 0x8296B950, kConstantBytes = 0x350, kAmbient = 0x8265ED00;
-  constexpr uint32_t kOwn[] = {452, 4112, 1152, 1176, 1200, 1224};
-  constexpr uint32_t kMarker = 0x50414745;
-  const uint32_t globals[] = {t67::kStandHolder, cameras::kViewports, scene::kScene,
-                              scene::kFirstSet, accessories::kSet};
-  struct Saved {
-    uint32_t address, bytes;
-    std::vector<uint8_t> data;
-  };
-  std::vector<Saved> saved;
-  for (const uint32_t g : globals) saved.push_back({g, 4, Read(base, g, 4)});
-  for (const auto& [at, bytes] : std::vector<std::pair<uint32_t, uint32_t>>{
-           {kPalette, kPaletteBytes}, {kWords, 8}, {kVectors, kVectorBytes}, {kNear, 4},
-           {kConstants, kConstantBytes}, {kAmbient, 16}}) {
-    saved.push_back({at, bytes, Read(base, at, bytes)});
-  }
-  auto restore = [&] {
-    for (const Saved& s : saved) Write(base, s.address, s.data.data(), s.bytes);
-  };
+  const StandSaved saved(base);
   const Block world(0x1000);
   if (!world.address) return;
   Random random(0x82180B00);
@@ -2637,7 +2843,7 @@ void StandSceneCreates(Context& h) {
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
       Random r(seed);
-      restore();
+      saved.Restore();
       PPCContext t = CallContext(h);
       t.r1.u64 &= ~0xFull;
       WriteRandom(base, world.address, world.bytes, r);
@@ -2648,8 +2854,10 @@ void StandSceneCreates(Context& h) {
       guest::StoreU32(base, scene::kFirstSet, 0);
       guest::StoreU32(base, accessories::kSet, 0);
       const uint32_t mark = exit_table::Mark(base);
-      std::optional<ArchiveLoads> loads;
-      loads.emplace(std::vector<int64_t>(64, 7));
+      std::vector<uint32_t> calls;
+      g_stand_calls = &calls;
+      const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+      hooks::g_start_up_recorder = StandRecorder;
       const uint32_t cars[] = {1, 3, 1, 0, 2, 3};
       t.r3.u64 = cars[r.Below(6)];
       if (v == 0) {
@@ -2659,148 +2867,155 @@ void StandSceneCreates(Context& h) {
       } else {
         hooks::StandSceneCreate(t, base);
       }
-      std::vector<uint32_t> calls = loads->calls();
-      loads.reset();
-      // The blocks made, as regions.
-      std::vector<pt::PageRegion> regions;
-      std::vector<std::pair<uint32_t, uint32_t>> made;  // freed after
-      auto add = [&](uint32_t at, uint32_t bytes) {
-        if (at != 0 && memory::IsPages(at)) {
-          regions.push_back({at, bytes});
-          made.push_back({at, bytes});
-        }
-      };
-      const uint32_t viewports = guest::LoadU32(base, cameras::kViewports);
-      add(viewports, 12);
-      if (memory::IsPages(viewports)) {
-        add(guest::LoadU32(base, viewports + 0), 1872);
-        add(guest::LoadU32(base, viewports + 4), 1872);
-      }
-      const uint32_t the_scene = guest::LoadU32(base, scene::kScene);
-      const uint32_t first = guest::LoadU32(base, scene::kFirstSet);
-      add(the_scene, scene::kSceneBytes);
-      add(first, 140);
-      add(guest::LoadU32(base, accessories::kSet), 32);
-      const uint32_t holder = guest::LoadU32(base, t67::kStandHolder);
-      if (!held) {
-        add(holder, 24);
-        for (uint32_t i = 0; memory::IsPages(holder) && i < 3; i++) {
-          const uint32_t slot = guest::LoadU32(base, holder + 4 * i);
-          add(slot, 4);
-          if (memory::IsPages(slot)) {
-            const uint32_t stage = guest::LoadU32(base, slot);
-            add(stage, t67::kGarageStageBytes);
-          }
-        }
-      }
-      std::vector<std::pair<int, uint32_t>> objects;  // first-set pool (-1 second), object
-      uint32_t records = 0;
-      if (memory::IsPages(the_scene)) {
-        for (uint32_t pool = 0; pool < 8; pool++) {
-          for (uint32_t node = guest::LoadU32(base, the_scene + 4944 + 12 * pool), n = 0;
-               node != 0 && n < 16; node = guest::LoadU32(base, node + 8), n++) {
-            if (memory::IsPages(node)) {
-              add(node, car_models::kSecondSetBytes[pool]);
-              objects.push_back({-1, node});
-            }
-          }
-        }
-      }
-      if (memory::IsPages(first)) {
-        records = guest::LoadU32(base, first + 52);
-        add(records, 80 * (guest::LoadU32(base, first + 12) + guest::LoadU32(base, first + 40)));
-        for (uint32_t pool = 0; pool < 7; pool++) {
-          for (uint32_t node = guest::LoadU32(base, first + 56 + 12 * pool), n = 0;
-               node != 0 && n < 16; node = guest::LoadU32(base, node + 8), n++) {
-            if (memory::IsPages(node)) {
-              add(node, sl::kPoolObjectBytes[pool]);
-              objects.push_back({int(pool), node});
-            }
-          }
-        }
-      }
-      // The loads: the presets' blocks by content (then freed), the part
-      // files' pages as markers (freed from their slots below).
-      out[v].Word(uint32_t(calls.size()));
-      std::vector<uint32_t> presets;
-      for (size_t k = 0; k + 6 <= calls.size(); k += 6) {
-        if (calls[k + 2] == t67::kOnPresetsLoaded && memory::IsPages(calls[k + 1])) {
-          out[v].Bytes(Read(base, calls[k + 1], 0x400));
-          presets.push_back(calls[k + 1]);
-          calls[k + 1] = kMarker;
-        }
-      }
-      for (uint32_t& w : calls) {
-        bool in_region = false;
-        for (size_t k = 0; k < regions.size(); k++) {
-          if (w >= regions[k].start && w - regions[k].start < regions[k].bytes + 16) {
-            w = 0xB0000000u + (uint32_t(k) << 20) + (w - regions[k].start);
-            in_region = true;
-            break;
-          }
-        }
-        if (!in_region && w != 0 && memory::IsPages(w)) w = kMarker;
-      }
-      for (const uint32_t w : calls) out[v].Word(w);
-      if (memory::IsPages(the_scene)) {
-        for (const uint32_t at : kOwn) {
-          const uint32_t pages = guest::LoadU32(base, the_scene + at + 16);
-          if (pages != 0 && memory::IsPages(pages)) {
-            out[v].Word(kMarker);
-            memory::FreePages(pages);
-            guest::StoreU32(base, the_scene + at + 16, kMarker);
-          } else {
-            out[v].Word(pages);
-          }
-        }
-        for (const uint32_t provider : scene::kAssetsProviders) {
-          pt::TakeProvider(base, the_scene + scene::kAssets + provider, out[v]);
-        }
-        for (const uint32_t model : scene::kAssetsModels) {
-          pt::TakeProvider(base, the_scene + scene::kAssets + model + models::kModelTextures,
-                           out[v]);
-        }
-      }
-      for (const auto& [pool, object] : objects) {
-        if (pool >= 0) {
-          for (const uint32_t offset : pt::PoolProviders(uint32_t(pool))) {
-            pt::TakeProvider(base, object + offset, out[v]);
-          }
-        }
-      }
-      out[v].Word(uint32_t(made.size()));
-      for (const auto& [at, bytes] : made) {
-        out[v].Bytes(pt::Normalized(base, regions, at, bytes));
-      }
-      out[v].Bytes(pt::Normalized(base, regions, world.address, world.bytes));
-      for (const uint32_t g : globals) {
-        out[v].Bytes(pt::Normalized(base, regions, g, 4));
-      }
-      out[v].Bytes(pt::Normalized(base, regions, t.r1.u32 - 176 + 80, 48));
-      out[v].Bytes(Read(base, kPalette, kPaletteBytes));
-      out[v].Bytes(Read(base, kWords, 8));
-      out[v].Bytes(Read(base, kVectors, kVectorBytes));
-      out[v].Word(guest::LoadU32(base, kNear));
-      out[v].Bytes(Read(base, kConstants, kConstantBytes));
-      out[v].Bytes(Read(base, kAmbient, 16));
+      hooks::g_start_up_recorder = saved_recorder;
+      g_stand_calls = nullptr;
+      StandTake take;
+      take.Collect(base, held);
+      take.TakeCalls(base, calls, out[v]);
+      take.TakeBlocks(base, out[v]);
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, world.address, world.bytes));
+      saved.Take(take.regions, out[v]);
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, t.r1.u32 - 176 + 80, 48));
       exit_table::Take(base, mark, out[v]);
-      // r3: a block made (its region and offset), else its offset from r1.
-      uint32_t r3 = t.r3.u32 - t.r1.u32;
-      for (size_t k = 0; k < regions.size(); k++) {
-        if (t.r3.u32 >= regions[k].start && t.r3.u32 - regions[k].start < regions[k].bytes) {
-          r3 = 0xB0000000u + (uint32_t(k) << 20) + (t.r3.u32 - regions[k].start);
-          break;
-        }
-      }
-      out[v].Word(r3);
+      out[v].Word(take.Word(t.r3.u32, t.r1.u32));
       out[v].Word(uint32_t(t.r3.u64 >> 32));
-      for (const auto& [at, bytes] : made) memory::FreePages(at);
-      for (const uint32_t p : presets) memory::FreePages(p);
+      take.Free();
     }
     results.Check(out[0], out[1], fmt::format("case {}", c));
   }
-  restore();
+  saved.Restore();
   results.Report();
+}
+
+// --- The modes' slot 0 (Type6Mode::Init, Type7Mode::Init): the mode a
+// block of random words (its dispatcher's count 0 to 7), the stand made as
+// StandScene::Create's cases have it (its holder none or held), the UI
+// movies' start and Strings::Load recorded (their adapters' recorder; the
+// native side's guest calls reach the same adapters), Archive::Load
+// recorded, LoadingScreen::Show over the loading screen's world
+// (loading_world.h, a made-up time for the tip), the screen fades' words
+// saved and put back. Compared: the recorded calls, the mode, the screen
+// block, its panels (operator new's blocks, found by the words naming
+// them) and every block the stand made, with the pointers into them made
+// offsets; the loading world, the fades, the stand's globals, the answer's
+// frame words and r3; then all freed. The originals run with the flag on
+// (their callees' adapters native, as in the game). ---
+
+void ModeInits(Context& h) {
+  namespace lw = loading_world;
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
+      !hooks::CarModelsSceneSetUpNative()) {
+    ITC_LOG_WARN("harness: type67_modes: the allocation layer, the archive's queue, the models' "
+                 "lifetime or memcpy isn't native: the modes' slot 0 cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> exits(c_runtime::ExitMutex());
+  std::lock_guard<std::recursive_mutex> blocks(models::MemoryBlocksMutex());
+  constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x40;
+  const std::vector<uint8_t> fades = Read(base, kFades, kFadesBytes);
+  const StandSaved saved(base);
+  const lw::MovieWorld w;
+  const Block mode(kModeBytes);
+  const Block world(0x1000);
+  if (!w.ok() || !mode.address || !world.address) return;
+  struct Function {
+    const char* name;
+    uint32_t address;
+    bool type7;
+    GuestFunction recompiled, native;
+    uint32_t frame, block_bytes;
+  };
+  const Function functions[] = {
+      {"Type6Mode::Init", 0x82236880, false, __imp__sub_82236880, hooks::Type6ModeInit,
+       t67::kType6ModeInitFrame, 91272},
+      {"Type7Mode::Init", 0x82246C90, true, __imp__sub_82246C90, hooks::Type7ModeInit,
+       t67::kType7ModeInitFrame, 71292},
+  };
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    for (int c = 0; c < 6; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 811 + f.address);
+        saved.Restore();
+        const lw::SavedGlobals loading(base);
+        lw::ShapeMovieWorld(base, w, r);
+        lw::BuildStringTable(base, w);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        WriteRandom(base, mode.address, mode.bytes, r);
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, t.r1.u32 - 0x1000, 0x1000, r);
+        guest::StoreU32(base, mode.address + 36 + 200, r.Below(8));
+        const bool held = c % 3 == 2;
+        guest::StoreU32(base, t67::kStandHolder, held ? world.address : 0);
+        guest::StoreU32(base, scene::kScene, 0);
+        guest::StoreU32(base, scene::kFirstSet, 0);
+        guest::StoreU32(base, accessories::kSet, 0);
+        guest::StoreU32(base, race_loading::kLoadingCurrent, r.Below(3));
+        guest::StoreU32(base, race_loading::kLoadingShown, uint32_t(r.Next()));
+        for (uint32_t i = 0; i < 3; i++) {
+          guest::StoreU32(base, race_loading::kLoadingAnimations + 4 * i,
+                          r.Below(2) ? (i == 1 ? 13 : 0) : r.Below(256));
+        }
+        const uint32_t mark = exit_table::Mark(base);
+        time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
+        std::vector<uint32_t> calls;
+        g_stand_calls = &calls;
+        g_record_mode_calls = true;
+        const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+        hooks::g_start_up_recorder = StandRecorder;
+        t.r3.u64 = mode.address;
+        // The original with the flag on: its callees' adapters native, as
+        // the game runs it (with the flag off, the members' Inits would run
+        // recompiled and leave register saves and back chains in their
+        // frames that later Inits copy as leftovers; the plain C++ Inits
+        // write neither, as in the game).
+        if (v == 0) {
+          f.recompiled(t, base);
+        } else {
+          f.native(t, base);
+        }
+        hooks::g_start_up_recorder = saved_recorder;
+        g_record_mode_calls = false;
+        g_stand_calls = nullptr;
+        time_hooks::ClearFakeNow();
+        StandTake take;
+        take.Collect(base, held);
+        const uint32_t block = guest::LoadU32(base, mode.address + 848);
+        take.Add(base, block, f.block_bytes);
+        if (memory::IsPages(block)) take.AddHeapFrom(base, block, f.block_bytes);
+        // The recorded calls' frames and return addresses: r1 by its offset.
+        for (size_t k = 0; k + 5 <= calls.size(); k += 5) {
+          if (calls[k] != 0x8209DE48) calls[k + 3] -= t.r1.u32;
+        }
+        take.TakeCalls(base, calls, out[v]);
+        take.TakeBlocks(base, out[v]);
+        out[v].Bytes(scene_pools_take::Normalized(base, take.regions, mode.address, mode.bytes));
+        out[v].Bytes(scene_pools_take::Normalized(base, take.regions, world.address,
+                                                  world.bytes));
+        saved.Take(take.regions, out[v]);
+        out[v].Bytes(Read(base, t.r1.u32 - f.frame + 80, 8));
+        out[v].Bytes(Read(base, w.movies.address, w.movies.bytes));
+        out[v].Bytes(Read(base, w.texts.address, w.texts.bytes));
+        out[v].Bytes(Read(base, w.strings.address, w.strings.bytes));
+        out[v].Word(guest::LoadU32(base, race_loading::kLoadingShown));
+        out[v].Word(guest::LoadU32(base, race_loading::kLoadingCurrent));
+        out[v].Bytes(Read(base, kFades, kFadesBytes));
+        exit_table::Take(base, mark, out[v]);
+        out[v].Word(take.Word(t.r3.u32, t.r1.u32));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        take.Free();
+        loading.Restore();
+        Write(base, kFades, fades.data(), kFadesBytes);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  saved.Restore();
+  Write(base, kFades, fades.data(), kFadesBytes);
 }
 
 void Type67Modes(Context& h) {
@@ -2828,6 +3043,7 @@ void Type67Modes(Context& h) {
   PollTeardown(h);
   TearDowns(h, world);
   StandSceneCreates(h);
+  ModeInits(h);
 }
 
 }  // namespace harness

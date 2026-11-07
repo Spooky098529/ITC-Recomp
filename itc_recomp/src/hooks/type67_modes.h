@@ -102,6 +102,11 @@ bool StandSceneRelease(PPCContext& ctx, uint8_t* base);
 // overrides, CarScene::SetUp through its register step (its plain C++ where
 // its checks hold).
 void StandSceneCreate(PPCContext& ctx, uint8_t* base);
+// Type6Mode::Init sub_82236880 and Type7Mode::Init sub_82246C90 (r3 the
+// mode; r3 as the original leaves it): over the layer only (the adapters
+// check).
+void Type6ModeInit(PPCContext& ctx, uint8_t* base);
+void Type7ModeInit(PPCContext& ctx, uint8_t* base);
 
 // The dialogs' confirm (r3 the dialog): Type6Dialog::OpenConfirm
 // sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, Dialog::DrawWaiting

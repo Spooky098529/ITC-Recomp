@@ -251,6 +251,41 @@ constexpr uint32_t kTearDownFrame = 176;
 uint64_t ModeTearDown(uint8_t* base, bool type7, uint64_t r3, uint32_t mode, uint32_t sp,
                       const Calls& calls);
 
+// sub_82236880 Type6Mode::Init and sub_82246C90 Type7Mode::Init (the
+// modes' slot 0, r3 the mode; frames of 160 and 144 bytes at `sp` less
+// them, the back chain written): the UI movies' start (sub_8211AD00, r3 the
+// mode), Strings::Load([0x826C5C34], 3) and StandScene::Create(1) as guest
+// calls to their overrides; the screen block (91,272 or 71,292 bytes, the
+// allocation layer's pages as VirtualAlloc's) at the mode's +848 and, when
+// made, Type6Screens or Type7Screens (its plain C++, `new_panel` the panels'
+// operator new); with the block, the members' Inits (the state machine
+// Inits' and the list, panel and node screens' plain C++; the power graph
+// screen's vtable slot 0 its Init's plain C++ when it holds it, else a guest
+// call), the machines added to the dispatcher (+36, its count at +236; a
+// cast's 0 for a member at address 0), each machine's +9612 = 1 and +9616 =
+// 0, and the block's answer: the doubleword at the frame's +80 (byte 1, the
+// three bytes the frame holds, word 4) and the two words after it 0. Then
+// LoadingScreen::Show(1, 0, -1) (a guest call to its override),
+// ScreenFades::FadeIn([0x82001BEC], black, layer 0) through its plain C++
+// and the delegate (+8 the vtable, +12 the mode, +16 WaitForLoads, +20 0;
+// +4 = +8). Returns r3 as the original leaves it (FadeIn's passes).
+struct ModeInitCalls {
+  // A guest call to `target`'s override with the first `set` of r3 to r8
+  // from `args`, from the frame at `r1` returning to `lr`; its r3.
+  std::function<uint64_t(uint32_t target, const uint64_t args[6], int set, uint32_t r1,
+                         uint32_t lr)>
+      call;
+  // The screen block's constructor (Type6Screens or Type7Screens) on
+  // `block` from the frame at `sp`.
+  std::function<void(uint32_t block, uint32_t sp)> construct;
+  // The list, panel and node screens' Inits' calls.
+  const Calls* screens = nullptr;
+};
+constexpr uint32_t kType6ModeInitFrame = 160;
+constexpr uint32_t kType7ModeInitFrame = 144;
+uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
+                  const ModeInitCalls& calls);
+
 // --- The handlers with guest calls (screens.cpp). `sp` is the caller's
 // stack pointer (the original's r1 at entry); each returns r3 as the
 // original leaves it. ---
