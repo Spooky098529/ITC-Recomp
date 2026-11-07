@@ -29,7 +29,10 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821DFBE8 and ShowTireMarks sub_821E22E8, movie 2's nodes through the UI movies' plain C++; "
               "UpdateListCounter sub_821EED00, SetPartName sub_821F2068, PlayGroupAnimation "
               "sub_821EE880 (its piece sub_821EE8E8 merged), Command31 sub_82202880 and Command9 "
-              "sub_821E9050, UiMovie::FinishNamed, PlayNamed and SetText through their overrides; the lists' "
+              "sub_821E9050, ShowDialog sub_821D6230, Command30 sub_82202750, Command7 sub_821E8B68, "
+              "Command23 sub_82202368, Command18 sub_82200600 and Command25 sub_82204888, "
+              "UiMovie::FinishNamed, PlayNamed, LoopNamed, SetText, ScrollText and sub_8211C5F8 "
+              "through their overrides; the lists' "
               "UpdateListDots sub_821EE9B0, ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, "
               "LayOutItems sub_82203110 and ShowItems sub_82203B00, movies 2's and 13's nodes) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen)");
@@ -215,8 +218,27 @@ ITC_TUNING_CALLS_STEP(SetPartName)
 ITC_TUNING_CALLS_STEP(PlayGroupAnimation)
 ITC_TUNING_CALLS_STEP(Command31)
 ITC_TUNING_CALLS_STEP(Command9)
+ITC_TUNING_CALLS_STEP(Command7)
+ITC_TUNING_CALLS_STEP(Command23)
+ITC_TUNING_CALLS_STEP(Command18)
+ITC_TUNING_CALLS_STEP(Command25)
 
 #undef ITC_TUNING_CALLS_STEP
+
+// The same with r3 all 64 bits and r4 the update's dispatcher.
+#define ITC_TUNING_DISPATCH_STEP(Name)                                                \
+  void Tuning##Name(PPCContext& ctx, uint8_t* base) {                                \
+    const uint64_t r3 = ctx.r3.u64;                                                  \
+    const uint32_t dispatcher = ctx.r4.u32, sp = ctx.r1.u32;                         \
+    WithCalls(ctx, base, [&](const ts::GuestCall& call) {                            \
+      return ts::Name(base, call, r3, dispatcher, sp);                               \
+    });                                                                              \
+  }
+
+ITC_TUNING_DISPATCH_STEP(ShowDialog)
+ITC_TUNING_DISPATCH_STEP(Command30)
+
+#undef ITC_TUNING_DISPATCH_STEP
 
 }  // namespace hooks
 
@@ -273,3 +295,9 @@ ITC_TUNING_SCREEN(82202F30, TuningShowOptionMarks)
 ITC_TUNING_SCREEN(82202C08, TuningPlaceStateNodes)
 ITC_TUNING_SCREEN(82203110, TuningLayOutItems)
 ITC_TUNING_SCREEN(82203B00, TuningShowItems)
+ITC_TUNING_SCREEN(821D6230, TuningShowDialog)
+ITC_TUNING_SCREEN(82202750, TuningCommand30)
+ITC_TUNING_SCREEN(821E8B68, TuningCommand7)
+ITC_TUNING_SCREEN(82202368, TuningCommand23)
+ITC_TUNING_SCREEN(82200600, TuningCommand18)
+ITC_TUNING_SCREEN(82204888, TuningCommand25)

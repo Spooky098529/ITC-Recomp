@@ -157,17 +157,22 @@ using GuestCall = std::function<uint64_t(uint32_t function, std::initializer_lis
 constexpr uint32_t kFinishNamed = 0x8211DF20;  // UiMovie::FinishNamed(movie, named)
 constexpr uint32_t kPlayNamed = 0x8211DAC8;    // UiMovie::PlayNamed(movie, named, chained, 0, 0, 0)
 constexpr uint32_t kSetText = 0x8211C1F8;      // UiMovie::SetText(movie, sub, child, id, ...)
+constexpr uint32_t kLoopNamed = 0x8211DDE0;    // UiMovie::LoopNamed(movie, named)
+constexpr uint32_t kResetTextScroll = 0x8211C5F8;  // (movie, sub, child): the scroll counter 0
+constexpr uint32_t kScrollText = 0x8211C570;   // UiMovie::ScrollText(movie, sub, child, scrolling)
 
 // The movie table's entry for movie `id` (UiMovies::Find, the id at
 // `frame` + 80): the address of the movie's word.
 uint32_t MovieEntry(uint8_t* base, uint32_t frame, uint32_t id);
 // The UI movie calls from the frame `frame` with the return address `lr`:
-// FinishNamed, PlayNamed(movie, named, chained, 0, 0, 0) and SetText with
-// one argument (r7; r8 to r10 0). Their r3.
+// FinishNamed, PlayNamed(movie, named, chained, 0, 0, 0), LoopNamed and
+// SetText with one argument (r7; r8 to r10 0). Their r3.
 uint64_t FinishNamed(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
-                     uint32_t named);
+                     uint64_t named);
 uint64_t PlayNamed(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
-                   uint32_t named, uint32_t chained);
+                   uint64_t named, uint32_t chained);
+uint64_t LoopNamed(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
+                   uint64_t named);
 uint64_t SetText(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
                  uint32_t sub_scene, uint32_t child, uint32_t id, uint64_t argument);
 // The command queue's step at [+10036] the handlers make inline: its next
@@ -196,6 +201,37 @@ uint64_t Command31(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // and +9716 0; with +9724 set the queue's step (+9724 left). 128-byte
 // frame; PlayNamed's r3, else the entry.
 uint64_t Command9(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D6230 TuningScreen::ShowDialog: r3 = the screen (all 64 bits),
+// `dispatcher` the update's r4 (its message ring at +204). +9728 = 0; by the
+// state: 9, 11 to 14 movie 16's texts (string 14, 15, 18, 19, 16 into (-1,
+// 0), 2 into (1, 3), 3 into (1, 4)), its +40960 = 0, message 34 posted; 10
+// movie 19's (-1, 1) string 23, message 37; then the queue's step. 128-byte
+// frame; the last SetText's r3, else the screen.
+uint64_t ShowDialog(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t dispatcher,
+                    uint32_t sp);
+// sub_82202750 TuningScreen::Command30: the same dialog texts for the states
+// 35 to 37 (strings 18, 19, 16), message 34; no step. 128-byte frame; the
+// last SetText's r3, else the screen.
+uint64_t Command30(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t dispatcher,
+                   uint32_t sp);
+// sub_821E8B68 TuningScreen::Command7: movie 2's 415 + x (x = +25196), 1008
+// and 1012 or 964 by +9716 and +9720; node (27, 0)'s +16 = float(x × 40)
+// (the doubleword at frame + 80); the queue's step with +9724. 128-byte
+// frame; r3 the node.
+uint64_t Command7(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82202368 TuningScreen::Command23: the set +30724's six words into the
+// movie 13's +28 table's pointers, then 165, 160, 164 or 159 by +9640;
+// +9640 = 0. 112-byte frame; PlayNamed's r3, else the entry.
+uint64_t Command23(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82200600 TuningScreen::Command18: the queue's step or 225 / 239 by
+// +9716 and +9720; node (11, 1)'s child 0 +16 = float(+30748) × 40.0 (the
+// doubleword at frame + 80); +30748 + 130 restarted and looped. 128-byte
+// frame; LoopNamed's r3.
+uint64_t Command18(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82204888 TuningScreen::Command25: the queue's step or 227 by +9716 and
+// +9720; PlaceStateNodes from its frame; text (2, 0)'s scroll reset, string
+// 820, scrolled. 128-byte frame; ScrollText's r3.
+uint64_t Command25(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:

@@ -52,7 +52,10 @@ constexpr uint32_t kAnimationsAt = 0x15400;  // 8 animations of no tracks (64 by
 constexpr uint32_t kZeroAt = 0x15600;        // words past the animations: 0
 constexpr uint32_t kScreenAt = 0x16000;      // the screen (0x9400)
 constexpr uint32_t kQueueAt = kScreenAt + 0x9380;  // the command queue [+10036]
-constexpr uint32_t kBlockBytes = 0x1F400;
+constexpr uint32_t kTableAt = 0x1F400;       // Command23's movie +28 table (0x300)
+constexpr uint32_t kTargetsAt = 0x1F700;     // its pointers' words (0x100)
+constexpr uint32_t kDispatcherAt = 0x1F800;  // the dialogs' dispatcher (its ring at +204)
+constexpr uint32_t kBlockBytes = 0x1FC00;
 constexpr uint32_t kSaveBytes = 0x1A000;
 
 constexpr uint32_t kStackBytes = 2048;
@@ -243,12 +246,15 @@ struct Range {
   int32_t to;
 };
 
+using Setup = std::function<void(PPCContext&, Random&, const World&)>;
+
 struct Spec {
   const char* name;
   int cases;
   GuestFunction recompiled;
   GuestFunction native;
   std::vector<Range> stack;  // compared below r1
+  Setup setup = {};          // after the world, the globals and the stack
 };
 
 void Run(Context& h, const World& w, const Spec& spec) {
@@ -269,6 +275,9 @@ void Run(Context& h, const World& w, const Spec& spec) {
       WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
       t.r3.u64 = w.screen();
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      if (spec.setup) {
+        spec.setup(t, r, w);
+      }
       if (v == 0) {
         const bool native = ITC_FLAG(native_tuning_screen);
         ITC_FLAG(native_tuning_screen) = false;
@@ -300,6 +309,47 @@ void Run(Context& h, const World& w, const Spec& spec) {
   results.Report();
 }
 
+// The named animations past the first 128 (to 1,023, the last below the
+// animation lists at +0x90B4) over the root and the 8 animations, as
+// MakeWorld lays the first.
+void NamedAnimations(const World& w, Random& r) {
+  const uint32_t movie = w.at(kMovieAt);
+  for (uint32_t k = 128; k < 1024; k++) {
+    const uint32_t named = movie + 176 + 36 * k;
+    guest::StoreU32(w.base, named + 28, w.at(kRootAt));
+    guest::StoreU32(w.base, named + 32, w.at(kAnimationsAt) + 64 * r.Below(8));
+  }
+}
+
+// Movies 16 and 19 (the dialogs') named by the pairs too, when they're there.
+void DialogPairs(const World& w) {
+  const uint32_t pairs = w.at(kPairsAt), movie = w.at(kMovieAt);
+  guest::StoreU32(w.base, pairs + 16, 16);
+  guest::StoreU32(w.base, pairs + 20, movie);
+  guest::StoreU32(w.base, pairs + 24, 19);
+  guest::StoreU32(w.base, pairs + 28, movie);
+  if (guest::LoadU32(w.base, ui_movies::kMovieTable + 8) != 0) {
+    guest::StoreU32(w.base, ui_movies::kMovieTable + 8, 4);
+  }
+}
+
+// The dialogs: r4 the dispatcher (its ring's count and start random words),
+// r3's high word now and then set, the state one of `states` mostly.
+template <size_t N>
+Setup Dialog(const uint32_t (&states)[N]) {
+  return [&states](PPCContext& t, Random& r, const World& w) {
+    DialogPairs(w);
+    t.r4.u64 = w.at(kDispatcherAt);
+    if (r.Below(4) == 0) {
+      t.r3.u64 |= r.Next() << 32;
+    }
+    const uint32_t state = r.Below(4) == 0 ? r.Below(40) : states[r.Below(N)];
+    guest::StoreU32(w.base, w.screen() + ts::kState, state);
+  };
+}
+constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
+constexpr uint32_t kCommand30States[] = {35, 36, 37};
+
 }  // namespace
 
 void TuningScreenPages(Context& h) {
@@ -322,6 +372,57 @@ void TuningScreenPages(Context& h) {
              {{-112, -24}}});
   Run(h, w, {"TuningScreen::Command9", 20, __imp__sub_821E9050, hooks::TuningCommand9,
              {{-128, -32}}});
+  // savegprlr_28: 40 bytes.
+  Run(h, w, {"TuningScreen::ShowDialog", 25, __imp__sub_821D6230, hooks::TuningShowDialog,
+             {{-128, -128 + 48}, {-128 + 80, -40}}, Dialog(kShowDialogStates)});
+  Run(h, w, {"TuningScreen::Command30", 20, __imp__sub_82202750, hooks::TuningCommand30,
+             {{-128, -128 + 48}, {-128 + 80, -32}}, Dialog(kCommand30States)});
+  // Command7: the wheel x mostly 0 to 3, now and then to 599 (415 + x a
+  // named animation).
+  Run(h, w, {"TuningScreen::Command7", 20, __imp__sub_821E8B68, hooks::TuningCommand7,
+             {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
+               NamedAnimations(w, r);
+               guest::StoreU32(w.base, w.screen() + 25196,
+                               r.Below(4) == 0 ? r.Below(600) : r.Below(4));
+             }});
+  // Command23: the movie's +28 table pointing into the block, the set 0 to
+  // 2, the pick 0 to 3.
+  Run(h, w, {"TuningScreen::Command23", 20, __imp__sub_82202368, hooks::TuningCommand23,
+             {{-112, -24}}, [](PPCContext&, Random& r, const World& w) {
+               NamedAnimations(w, r);
+               guest::StoreU32(w.base, w.at(kMovieAt) + 28, w.at(kTableAt));
+               for (uint32_t k = 0; k < 6; k++) {
+                 guest::StoreU32(w.base, w.at(kTableAt) + 640 + 4 * k,
+                                 w.at(kTargetsAt) + 4 * r.Below(64));
+                 guest::StoreU32(w.base, w.at(kTableAt) + 672 + 4 * k,
+                                 w.at(kTargetsAt) + 4 * r.Below(64));
+               }
+               guest::StoreU32(w.base, w.screen() + 30724, r.Below(3));
+               guest::StoreU32(w.base, w.screen() + 9640, r.Below(4));
+             }});
+  // Command18: the slot's word 28 half the time, +30748 mostly small (130
+  // on a named animation).
+  Run(h, w, {"TuningScreen::Command18", 20, __imp__sub_82200600, hooks::TuningCommand18,
+             {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
+               NamedAnimations(w, r);
+               const uint32_t s = w.screen();
+               const uint32_t slot = r.Below(256);
+               guest::StoreU8(w.base, s + 10008, uint8_t(slot));
+               if (r.Below(2) == 0) {
+                 guest::StoreU32(w.base, s + 9752 + 4 * slot, 28);
+               }
+               guest::StoreU32(w.base, s + 30748, r.Below(4) == 0 ? r.Below(890) : r.Below(8));
+             }});
+  // Command25: PlaceStateNodes' states now and then, its rows 0 to 7.
+  Run(h, w, {"TuningScreen::Command25", 20, __imp__sub_82204888, hooks::TuningCommand25,
+             {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
+               NamedAnimations(w, r);
+               const uint32_t s = w.screen();
+               if (r.Below(2) == 0) {
+                 guest::StoreU32(w.base, s + ts::kState, 29 + r.Below(3));
+               }
+               guest::StoreU32(w.base, s + 30724, r.Below(8));
+             }});
 }
 
 }  // namespace harness

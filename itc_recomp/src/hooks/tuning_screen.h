@@ -62,6 +62,15 @@ void TuningSetPartName(PPCContext& ctx, uint8_t* base);
 void TuningPlayGroupAnimation(PPCContext& ctx, uint8_t* base);
 void TuningCommand31(PPCContext& ctx, uint8_t* base);
 void TuningCommand9(PPCContext& ctx, uint8_t* base);
+// ShowDialog sub_821D6230 and Command30 sub_82202750 (r4 = the update's
+// dispatcher), Command7 sub_821E8B68, Command23 sub_82202368, Command18
+// sub_82200600, Command25 sub_82204888.
+void TuningShowDialog(PPCContext& ctx, uint8_t* base);
+void TuningCommand30(PPCContext& ctx, uint8_t* base);
+void TuningCommand7(PPCContext& ctx, uint8_t* base);
+void TuningCommand23(PPCContext& ctx, uint8_t* base);
+void TuningCommand18(PPCContext& ctx, uint8_t* base);
+void TuningCommand25(PPCContext& ctx, uint8_t* base);
 
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
