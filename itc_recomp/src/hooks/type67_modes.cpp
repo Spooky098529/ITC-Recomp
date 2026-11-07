@@ -380,12 +380,12 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
 // (only native callers reach them in play, and the flag switches those;
 // their steps above are the harness's): CameraPreset::CameraPreset
 // sub_8217BE08 (from Copy), CameraPreset::Copy sub_8217D7D0 (from
-// OnPresetsLoaded) and GarageCamera::FreePresets sub_8217D760 (from
-// StandSlot::Free).
+// OnPresetsLoaded), GarageCamera::FreePresets sub_8217D760 (from
+// StandSlot::Free) and StandSlot::Free sub_821800B0 (from
+// StandScene::Release).
 ITC_TYPE67_MODES(82178DE8, GarageStageSetPlates)
 ITC_TYPE67_MODES(8217A2D8, GarageStageResetPose)
 ITC_TYPE67_FREES(8217FBE8, GarageCameraOnPresetsLoaded)
-ITC_TYPE67_FREES(821800B0, StandSlotFree)
 ITC_TYPE67_ALLOCATES(821BB120, ControllerOptionsOnEnter)
 ITC_TYPE67_FREES(821BB1F8, ControllerOptionsOnLeft)
 ITC_TYPE67_MODES(821BB260, ControllerOptionsShow)
