@@ -562,9 +562,6 @@ ITC_TUNING_SCREEN(821EE880, TuningPlayGroupAnimation)
 ITC_TUNING_SCREEN(82202880, TuningCommand31)
 ITC_TUNING_SCREEN(821E9050, TuningCommand9)
 ITC_TUNING_SCREEN(821EE9B0, TuningUpdateListDots)
-ITC_TUNING_SCREEN(82202F30, TuningShowOptionMarks)
-ITC_TUNING_SCREEN(82203110, TuningLayOutItems)
-ITC_TUNING_SCREEN(82203B00, TuningShowItems)
 ITC_TUNING_SCREEN(821D6230, TuningShowDialog)
 ITC_TUNING_SCREEN(82202750, TuningCommand30)
 ITC_TUNING_SCREEN(821E8B68, TuningCommand7)
@@ -604,11 +601,16 @@ ITC_TUNING_STAND(8217DAC0, TuningFitSelectedCar)
 ITC_TUNING_STAND(821D99A0, TuningPickCameraPreset)
 ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
 ITC_TUNING_STAND(821E0E00, TuningPreviewWheels)
-ITC_TUNING_STAND(822042D8, TuningApplyDecals)
 ITC_TUNING_STAND(822019D0, TuningDecalCommand)
 
 ITC_TUNING_STAND(821E07B0, TuningPreviewItem)
 ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
+
+// No adapters (removed, B7 loop, 2026-11-07, the fifth migration: their
+// callers in play are native and call their plain C++; the register steps
+// above are the harness's): ShowOptionMarks sub_82202F30 and ShowItems
+// sub_82203B00 (RefreshMovie13), LayOutItems sub_82203110 (UpdateItems and
+// RefreshMovie13), ApplyDecals sub_822042D8 (UpdateStand).
 
 // SetInteriorPair sub_821CCC50 has no adapter (removed, B7 loop, 2026-11-07):
 // its callers in play, PreviewItem and RestoreStand, are native and call its
