@@ -573,7 +573,6 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
 // StandSlot::Free) and StandSlot::Free sub_821800B0 (from
 // StandScene::Release).
 ITC_TYPE67_MODES(82178DE8, GarageStageSetPlates)
-ITC_TYPE67_MODES(8217A2D8, GarageStageResetPose)
 ITC_TYPE67_FREES(8217FBE8, GarageCameraOnPresetsLoaded)
 ITC_TYPE67_ALLOCATES(821BB120, ControllerOptionsOnEnter)
 ITC_TYPE67_FREES(821BB1F8, ControllerOptionsOnLeft)
@@ -622,17 +621,10 @@ ITC_TYPE67_MODES(822421C0, Type7DialogDraw)
 ITC_TYPE67_MODES(82245148, Type7Screen0Draw)
 ITC_TYPE67_MODES(821C7F28, ControllerOptionsDraw)
 
-// GarageCamera::LoadPresets (from GarageCamera::Init, recompiled): over the
-// layer and the archive's native queue only.
-extern "C" REX_FUNC(sub_821802D8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||
-      !hooks::NativeArchiveQueue()) {
-    __imp__sub_821802D8(ctx, base);
-    return;
-  }
-  hooks::GarageCameraLoadPresets(ctx, base);
-}
+// No adapters for GarageStage::ResetPose sub_8217A2D8 and
+// GarageCamera::LoadPresets sub_821802D8: only GarageStage::Init and
+// GarageCamera::Init reach them, native under StandSlot::Init (the flag
+// switches those); their steps above are the harness's.
 // StandScene::Release (from StandMode::Release, recompiled).
 ITC_TYPE67_FREES(82180738, StandSceneRelease)
 
