@@ -292,3 +292,9 @@ were at 0.
 |---|---|---|---|---|
 | `sub_825BEB80` Device::SetPredication | against the original as it is | 600 of 600 | Packets nothing reads (the SET_BIN_MASK packet's two words left out: the write position and r3 8 bytes earlier; its group without the packet matches) | for review (2026-11-06 01:02 run) |
 | `sub_822B6AD8` Device::BeginTiledSegments | against the original as it is | 600 of 600 | Packets nothing reads (the segment chain's 256-byte header not written, its space still reserved; only the worker's job reads it, which never runs; its group without the header matches) | for review (2026-11-06 01:02 run) |
+
+### `type6-type7-modes.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82236880` Type6Mode::Init | the transitions' stack leftovers | 6 of 6 | Unwritten stack bytes copied (the members' state machine Inits copy three frame words they never write into each 48-byte transition's functor, +32 to +40; the screen block's constructor, recompiled under the original, leaves other words there than the plain C++'s back chains; dead words; type 7's same group matches) | for review (2026-11-07 22:22 run) |

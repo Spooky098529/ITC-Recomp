@@ -15,7 +15,12 @@ file's history. What's left to see in a drive, from every run:
   set's fill under `StandScene::Create`, `car-models.md`), ready, with
   what it unblocks in `type6-type7-modes.md` (`StandScene::Create`
   `sub_82180B00`, the modes' slot 0 `sub_82236880`, `sub_82246C90`);
-  its line deleted from `leads.md`. Migration agent running.
+  its line deleted from `leads.md`. Migration c709d9ed..92169ce4
+  (`CarScene::SetUp`, `StandScene::Create`, `Type6Mode::Init`,
+  `Type7Mode::Init`; 15 adapters removed; race 33 s, 0 errors, its
+  harnesses 0 differing outside one new expected group,
+  `Type6Mode::Init`'s transitions' stack leftovers; no subagents);
+  left: none. Validation agent running.
 
 ## Done
 
@@ -35,3 +40,5 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 4699, work left 1721 (wrapped 57, known 427,
   unknown 1237).
+- After the cleanup lead's migration: ours 4703, work left 1717
+  (wrapped 57, known 423, unknown 1237).

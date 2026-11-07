@@ -13,6 +13,25 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- Cleanup lead `sub_820C8DE8` (c709d9ed..92169ce4): `CarScene::SetUp`
+  (`car-models.md`, the second set's fill, under `--native_car_models`),
+  `StandScene::Create` and the type 6 and 7 modes' slot 0
+  (`Type6Mode::Init`, `Type7Mode::Init`, under `--native_type67_modes`)
+  native; 15 adapters removed (the members' Inits, the screen blocks'
+  constructors in `screen-constructors.md`, `StandSlot::Init`). Choices
+  to review: the guest calls kept from native code to callees with
+  worlds of their own (`Viewports::Init`, `CarScene::Create`, the UI
+  movies' start `sub_8211AD00`, `Strings::Load`, `StandScene::Create`,
+  `LoadingScreen::Show`), made through their adapters from the
+  original's frame (the type 6 and 7 modes' precedent); the slot 0
+  cases run the original with the flag on (the `OnDialogClosed`
+  precedent); harness helpers moved into `scene_pools_take.h` and
+  `loading_world.h`; `hooks::SceneLoadersCreateAWith` added; one new
+  expected group (`Type6Mode::Init`'s transitions' stack leftovers,
+  `expected-differences.md`). Adapters kept for recompiled callers:
+  `sub_820C8DE8`, `sub_820C8A50`, `sub_820D0D50` (`RaceScene::SetUpCars`,
+  `LocationScreen::Create`), `sub_82180B00` (types 2 and 12).
+
 ## Run 2026-11-07 10:56 (`b7-loop-07-11-26`)
 
 - `functions/tuning-pages.md` (new, 106 rows, 67 in play; 92fea740):
