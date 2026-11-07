@@ -196,12 +196,10 @@ ITC_TUNING_PAGES(821EF288, TuningPagesInchListEnd)
 ITC_TUNING_PAGES(821FE420, TuningPagesSetEditorLimits)
 ITC_TUNING_PAGES(822045F8, TuningPagesLoadPageLayouts)
 ITC_TUNING_PAGES(821FE6A0, TuningPagesFreeTexture)
-ITC_TUNING_PAGES(82204698, TuningPagesRestoreVinylTexture)
 ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
 ITC_TUNING_PAGES(82204730, TuningPagesBindVinylTexture)
 ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
 
-ITC_TUNING_PAGES(822081A0, TuningPagesRestoreMovieTexture)
 ITC_TUNING_PAGES(822081D8, TuningPagesRestoreVinylMovie)
 ITC_TUNING_PAGES(821F6DD8, TuningPagesRestoreStickerMovie)
 ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
@@ -215,3 +213,9 @@ ITC_TUNING_PAGES(8224AB50, TuningPagesHsvToRgb)
 // EnterEditor, is native and calls their plain C++; the register steps above
 // are the harness's): SetUpVinylBusyIcon sub_821FE560, DecalImages::AllLoaded
 // sub_821FE5D8, KeepListTextures sub_821FE7D8, BindVinylTextures sub_82203D40.
+
+// No adapters (removed, B7 loop, 2026-11-07: their only callers in play are
+// native and call their plain C++; the register steps above are the
+// harness's): DecalImages::RestoreVinylTexture sub_82204698
+// (RestoreMovieTexture), RestoreMovieTexture sub_822081A0
+// (RestoreStickerMovie).
