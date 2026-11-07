@@ -12,7 +12,12 @@ file's history. What's left to see in a drive, from every run:
   for this run), from 48e2b333; summary `b7-loop-2026-11-07-1056.md`.
   Limit: 3 subsystems (`b7-loop.md`'s setting; the previous run's 8 was
   the user's call for that run).
-- Picking the first lead.
+- Subsystem 1 of 3: the tuning screen's other vtable slots and pages
+  (lead picked: `sub_821D6AD0` and the 17 others, the most ready groups
+  in `leads.md`, 45, beside the tuning screen just finished; the top two
+  leads skipped: `sub_82562FF0` inside the movie library's range, the
+  worker pools blocked only by the core's event and critical section
+  wrappers; its line deleted from `leads.md`). Mapping agent running.
 
 ## Done
 
