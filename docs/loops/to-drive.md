@@ -102,6 +102,12 @@ here loses its heading.
   Dialog::MoveCursorStep, `sub_82233FC8` Type6Screen0::Confirm,
   `sub_822340B0` Type6Screen0::ConfirmAgain, `sub_82244528`
   Type7Screen0::Confirm, `sub_822344A8` Type6Screen0::ShowPage.
+- The type 6 and 7 modes' third migration (attract race `itc_4395`,
+  replay `itc_4396` ok): `sub_82232328`, `sub_82241EF8`,
+  `sub_82232798`, `sub_82242218`, `sub_82244930`, `sub_822448B0`,
+  `sub_82244AB8`, `sub_82244760`, `sub_82244610`, `sub_822338E8`,
+  `sub_82243E80`, `sub_82233E80`, `sub_822443E0`, `sub_82234768`,
+  `sub_82244B60`, `sub_82235F28`, `sub_822463D8`.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

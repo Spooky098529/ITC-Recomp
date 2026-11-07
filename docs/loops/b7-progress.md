@@ -137,7 +137,10 @@ file's history. What's left to see in a drive, from every run:
   functions, 2 adapters removed; races 38 s, 0 errors, its harnesses 0
   differing; no subagents); left: 8 ready groups (the first screens'
   `Show`, `ShowCarInfo` and `Update`, `StandScene::PollTeardown`,
-  `Type7Screen0::MenuPage`). Validation agent running.
+  `Type7Screen0::MenuPage`). Validated `itc_4395` (race 90 s at 180,
+  the harnesses ~88.5 s; 0 errors, every harness 0 differing, 20 of 20
+  harness lines; 3 in the replay `itc_4396` (ok), 17 to drive). Fourth
+  migration agent running.
 
 ## Done
 
@@ -190,5 +193,7 @@ file's history. What's left to see in a drive, from every run:
   470, unknown 1238).
 - After its second migration: ours 4671, work left 1749 (wrapped 57,
   known 455, unknown 1237).
+- After its third migration and validation (`itc_4395`): ours 4689,
+  work left 1731 (wrapped 57, known 437, unknown 1237).
 
 ## Stopped
