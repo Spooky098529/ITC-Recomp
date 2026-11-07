@@ -444,6 +444,7 @@ set(ITC_SOURCES
     src/type67_modes/handlers.cpp
     src/type67_modes/inits.cpp
     src/type67_modes/modes.cpp
+    src/type67_modes/screen0.cpp
     src/type67_modes/screens.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp

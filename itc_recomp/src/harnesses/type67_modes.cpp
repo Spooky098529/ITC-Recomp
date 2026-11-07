@@ -1353,6 +1353,186 @@ void Dialogs(Context& h, const Block& world) {
   guest::StoreU32(base, menu_sounds::kSoundManager, saved_manager);
 }
 
+// --- The first screens' confirms and Type6Screen0::ShowPage: one harness
+// movie as both 16 and 22 in a harness movie table; its live scene a node
+// whose child 0 is a TXT node, child 1 a sub-scene with TXT children 3 and
+// 4, child 3 a sub-scene whose children 4 to 14 are tagged PIC, PRM, TXT or
+// nothing; the TXT nodes' text ids 0 to 14 (0: the movie's +0x9FCC plus
+// one), ids 1 to 14 in the movie's texts' map with records of a texts
+// block (and the word at 0x826C5CD8 another, so none is made); the string
+// table (0x826C5C34) one container of strings of letters only (no argument
+// codes: the user's call, 2026-10-30), as the location screen's harness
+// builds it. The dispatcher at the world's +0x3200 (its ring's count and
+// start small). The world, the movie, the nodes, the texts, the stack below
+// the call (but the original's back chain, saved registers and SetText's
+// unset varargs' words, its frame's +48 to +79) and r3 compared. ---
+
+void BuildLetterStrings(uint8_t* base, uint32_t at, uint32_t bytes) {
+  constexpr uint32_t kBounds = 0x82007E18;
+  uint32_t span = 1;
+  for (uint32_t i = 0; i < 17; i++) {
+    const int32_t from = int32_t(guest::LoadU32(base, kBounds + 4 * i));
+    const int32_t to = int32_t(guest::LoadU32(base, kBounds + 4 * i + 4));
+    if (to > from && uint32_t(to - from) > span) span = uint32_t(to - from);
+  }
+  const uint32_t container = at + 0x100;
+  if (container + 4 + 4 * span + 8 * 64 > at + bytes) {
+    span = (bytes - 0x100 - 8 * 64 - 4) / 4;
+  }
+  for (uint32_t i = 0; i < 18; i++) guest::StoreU32(base, at + 4 * i, container);
+  guest::StoreU32(base, container, __builtin_bswap32(span));
+  Random r(0x5479706536ull);
+  const uint32_t text = container + 4 + 4 * span;
+  for (uint32_t k = 0; k < 8; k++) {
+    const uint32_t length = r.Below(30);
+    for (uint32_t c = 0; c < length; c++) {
+      guest::StoreU16(base, text + 64 * k + 2 * c, uint16_t('A' + r.Below(26)));
+    }
+    guest::StoreU16(base, text + 64 * k + 2 * length, 0);
+  }
+  for (uint32_t i = 0; i < span; i++) {
+    guest::StoreU32(base, container + 4 + 4 * i,
+                    __builtin_bswap32(text + 64 * r.Below(8) - container));
+  }
+}
+
+void Screen0Helpers(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  if (!hooks::Type67TextsNative(base)) {
+    ITC_LOG_ERROR("harness: type67_modes: the UI movies' text setters aren't native; confirms skipped");
+    return;
+  }
+  constexpr uint32_t kMovieBlockBytes = 0xA100, kNodeBytes = 0x200, kNodes = 16;
+  constexpr uint32_t kStringTable = 0x826C5C34, kMissingText = 0x826C5CD8;
+  constexpr uint32_t kStringsBytes = 0x10000, kTextsBytes = 0x11000;
+  const Block movie_block(kMovieBlockBytes);
+  const Block nodes(kNodeBytes * kNodes);
+  const Block texts(kTextsBytes);
+  const Block strings(kStringsBytes);
+  const Block pairs(0x100);
+  if (!movie_block.address || !nodes.address || !texts.address || !strings.address ||
+      !pairs.address) {
+    return;
+  }
+  const uint32_t movie = movie_block.address;
+  auto node = [&](uint32_t i) { return nodes.address + kNodeBytes * i; };
+  const uint32_t sp = CallContext(h).r1.u32;
+  const std::vector<uint8_t> table = Read(base, ui_movies::kMovieTable, 12);
+  const uint32_t saved_strings = guest::LoadU32(base, kStringTable);
+  const uint32_t saved_missing = guest::LoadU32(base, kMissingText);
+  struct Function {
+    const char* name;
+    uint32_t address;
+    bool confirm;
+    GuestFunction recompiled, native;
+  };
+  const Function functions[] = {
+      {"Type6Screen0::Confirm", 0x82233FC8, true, __imp__sub_82233FC8,
+       hooks::Type6Screen0Confirm},
+      {"Type6Screen0::ConfirmAgain", 0x822340B0, true, __imp__sub_822340B0,
+       hooks::Type6Screen0ConfirmAgain},
+      {"Type7Screen0::Confirm", 0x82244528, true, __imp__sub_82244528,
+       hooks::Type7Screen0Confirm},
+      {"Type6Screen0::ShowPage", 0x822344A8, false, __imp__sub_822344A8,
+       hooks::Type6Screen0ShowPage},
+  };
+  constexpr uint32_t kTagTxt = 0x54585400;
+  static constexpr uint32_t kTags[] = {0x50494300, 0x50524D00, kTagTxt, 0x12345678};
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    for (int c = 0; c < 16; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 977 + f.address);
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, movie, kMovieBlockBytes, r);
+        WriteRandom(base, nodes.address, nodes.bytes, r);
+        WriteRandom(base, texts.address, 0x1000, r);
+        WriteRandom(base, sp - 1024, 1024 + 256, r);
+        BuildLetterStrings(base, strings.address, kStringsBytes);
+        guest::StoreU32(base, kStringTable, strings.address);
+        // The scene: node 0 live; its children 0 (TXT node 1), 1 (sub-scene
+        // node 2: children 3, 4 TXT nodes 3, 4) and 3 (sub-scene node 5:
+        // children 4 to 14 nodes 6 to 15 and 3, tagged at random).
+        guest::StoreU32(base, movie + ui_movies::kMovieLive, node(0));
+        for (const uint32_t scene : {node(0), node(2), node(5)}) {
+          guest::StoreU32(base, scene + 108, 0);
+        }
+        auto child = [&](uint32_t scene, uint32_t i, uint32_t to) {
+          guest::StoreU32(base, scene + 128 + 8 * i, to);
+        };
+        child(node(0), 0, node(1));
+        child(node(0), 1, node(2));
+        child(node(0), 3, node(5));
+        child(node(2), 3, node(3));
+        child(node(2), 4, node(4));
+        for (uint32_t i = 4; i <= 14; i++) child(node(5), i, i == 14 ? node(3) : node(2 + i));
+        for (uint32_t i = 6; i < kNodes; i++) guest::StoreU32(base, node(i), kTags[r.Below(4)]);
+        for (const uint32_t t : {1u, 3u, 4u}) {
+          guest::StoreU32(base, node(t), kTagTxt);
+          guest::StoreU32(base, node(t) + 108, r.Below(15));
+        }
+        guest::StoreU32(base, movie + 0x9FCC, r.Below(14));
+        // The texts: ids 1 to 14 with records (+0 a 4 KB buffer), the
+        // missing id's word another record.
+        for (uint32_t k = 0; k < 15; k++) {
+          const uint32_t record = texts.address + 32 * k;
+          guest::StoreU32(base, record, texts.address + 0x1000 + 0x1000 * k);
+          if (k < 14) {
+            guest::StoreU32(base, movie + 0x9BCC + 8 * k, k + 1);
+            guest::StoreU32(base, movie + 0x9BCC + 8 * k + 4, record);
+          }
+        }
+        guest::StoreU32(base, movie + 0x9BCC + 1024, 14);
+        guest::StoreU32(base, kMissingText, texts.address + 32 * 14);
+        // The movie table: 16 and 22 the movie, among others.
+        const uint32_t count = 2 + r.Below(4);
+        const uint32_t first = r.Below(count - 1);
+        for (uint32_t i = 0; i < count; i++) {
+          const uint32_t id = i == first ? 16 : i == first + 1 ? 22 : 30 + i;
+          guest::StoreU32(base, pairs.address + 8 * i, id);
+          guest::StoreU32(base, pairs.address + 8 * i + 4,
+                          id == 16 || id == 22 ? movie : uint32_t(r.Next()));
+        }
+        guest::StoreU32(base, ui_movies::kMovieTable, pairs.address);
+        guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+        guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+        guest::StoreU32(base, world.address + 0x3200 + 204 + 600, r.Below(50));
+        guest::StoreU32(base, world.address + 0x3200 + 204 + 604, r.Below(60));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = uint32_t(r.Next());
+        t.r4.u64 = f.confirm ? world.address + 0x3200
+                             : (r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(5));
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          f.native(t, base);
+        }
+        out[v].Bytes(Read(base, world.address, world.bytes));
+        out[v].Bytes(Read(base, movie, kMovieBlockBytes));
+        out[v].Bytes(Read(base, nodes.address, nodes.bytes));
+        out[v].Bytes(Read(base, texts.address, kTextsBytes));
+        const uint32_t frame = sp - 112;
+        out[v].Bytes(Read(base, sp - 1024, frame - (sp - 1024)));
+        out[v].Bytes(Read(base, frame + 4, 44));
+        out[v].Bytes(Read(base, frame + 80, 112 - 80 - 24));
+        out[v].Bytes(Read(base, sp, 256));
+        out[v].Word(uint32_t(t.lr));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Write(base, ui_movies::kMovieTable, table.data(), 12);
+  guest::StoreU32(base, kStringTable, saved_strings);
+  guest::StoreU32(base, kMissingText, saved_missing);
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -1373,6 +1553,7 @@ void Type67Modes(Context& h) {
   GarageLights(h, world);
   StandSlots(h, world);
   Dialogs(h, world);
+  Screen0Helpers(h, world);
 }
 
 }  // namespace harness

@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "strings_and_font/strings_and_font.h"
+
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -334,6 +336,30 @@ uint64_t DialogCloseConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, con
 // highlight finished (UiMovie::FinishNamed), the cursor's played and looped,
 // +9664 = 1; UiMovie::Run. Returns 1.
 uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls);
+
+// --- The first screens' helpers (screen0.cpp) ---
+
+// The confirms: movie 16's texts (-1, 0) = `text`, (1, 3) = 2 and (1, 4) =
+// 3 (UiMovie::SetText from the 112-byte frame below `sp`, r7 to r10 0), its
+// +40960 (the default choice) = `choice`, then message (`message`, 0, 0)
+// queued in the dispatcher's ring. r3 the last SetText's.
+struct ConfirmKind {
+  const char* name;
+  uint32_t text, choice, message;
+};
+// sub_82233FC8 Type6Screen0::Confirm (27, 1, 7), sub_822340B0
+// Type6Screen0::ConfirmAgain (29, 0, 7), sub_82244528 Type7Screen0::Confirm
+// (27, 1, 6).
+inline constexpr ConfirmKind kType6Confirm{"sub_82233FC8 Type6Screen0::Confirm", 27, 1, 7};
+inline constexpr ConfirmKind kType6ConfirmAgain{"sub_822340B0 Type6Screen0::ConfirmAgain", 29, 0,
+                                                7};
+inline constexpr ConfirmKind kType7Confirm{"sub_82244528 Type7Screen0::Confirm", 27, 1, 6};
+uint64_t Screen0Confirm(uint8_t* base, const ConfirmKind& kind, uint32_t dispatcher, uint32_t sp,
+                        const strings_and_font::FormatCalls& calls);
+// sub_822344A8 Type6Screen0::ShowPage: movie 22's sub-scene 3 nodes 4 and 5
+// shown, 6 to 9, 13 and 14 hidden, then by `page` (0 to 3) nodes shown and
+// their textures set (else 4 and 5 hidden). r3 the last node.
+uint64_t Type6Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp);
 
 // --- The garage camera's reset (garage_camera.cpp) ---
 

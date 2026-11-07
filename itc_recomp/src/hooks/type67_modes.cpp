@@ -9,9 +9,14 @@
 #include "base/flags.h"
 #include "hooks/archive.h"
 #include "hooks/heap.h"
+#include "hooks/strings_and_font.h"
+#include "memory/c_runtime_heap.h"
 #include "hooks/ui_movies_game.h"
 #include "ui_movies/game.h"
 #include "type67_modes/type67_modes.h"
+
+ITC_FLAG_DECLARE(bool, native_ui_movies_game);
+ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
 ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "Run the type 6 and 7 modes (docs/functions/type6-type7-modes.md: the state "
@@ -57,7 +62,9 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "Type6Dialog::OpenConfirm sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, "
               "Dialog::DrawWaiting sub_82241C18, Dialog::OpenConfirmStep sub_822325E0, "
               "CloseConfirmStep sub_8223AA10 and MoveCursorStep sub_8223AB50, UiMovie::Run, "
-              "FinishAll and FinishNamed guest calls) "
+              "FinishAll and FinishNamed guest calls; the first screens' Type6Screen0::Confirm "
+              "sub_82233FC8, ConfirmAgain sub_822340B0, Type7Screen0::Confirm sub_82244528 (with "
+              "the UI movies' text setters native) and Type6Screen0::ShowPage sub_822344A8) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -369,6 +376,35 @@ void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::DialogMoveCursorStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
 }
 
+// --- The first screens' helpers ---
+
+bool Type67TextsNative(uint8_t* base) {
+  return ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap) &&
+         NativeHeapActive() && memory::crt::GetProcessHeap(base) != 0;
+}
+
+namespace {
+
+void Confirm(PPCContext& ctx, uint8_t* base, const t67::ConfirmKind& kind) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32, dispatcher = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  FormatGuestCalls format(ctx, base);
+  ctx.r3.u64 = t67::Screen0Confirm(base, kind, dispatcher, sp, format.get());
+  ctx.lr = lr;
+}
+
+}  // namespace
+
+void Type6Screen0Confirm(PPCContext& ctx, uint8_t* base) { Confirm(ctx, base, t67::kType6Confirm); }
+void Type6Screen0ConfirmAgain(PPCContext& ctx, uint8_t* base) {
+  Confirm(ctx, base, t67::kType6ConfirmAgain);
+}
+void Type7Screen0Confirm(PPCContext& ctx, uint8_t* base) { Confirm(ctx, base, t67::kType7Confirm); }
+void Type6Screen0ShowPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Type6Screen0ShowPage(base, ctx.r4.u32, ctx.r1.u32);
+}
+
 // --- The garage camera's reset ---
 
 void QuaternionFromAngles(PPCContext& ctx, uint8_t* base) {
@@ -546,6 +582,23 @@ ITC_TYPE67_MODES(82241C18, DialogDrawWaiting)
 ITC_TYPE67_MODES(822325E0, DialogOpenConfirmStep)
 ITC_TYPE67_MODES(8223AA10, DialogCloseConfirmStep)
 ITC_TYPE67_MODES(8223AB50, DialogMoveCursorStep)
+
+// The first screens' confirms (from their recompiled callers): natively
+// while the UI movies' text setters are. Type6Screen0::ShowPage (from
+// recompiled page handlers).
+#define ITC_TYPE67_TEXTS(address, step)                                         \
+  extern "C" REX_FUNC(sub_##address) {                                          \
+    REX_FUNC_PROLOGUE();                                                        \
+    if (!ITC_FLAG(native_type67_modes) || !hooks::Type67TextsNative(base)) {    \
+      __imp__sub_##address(ctx, base);                                          \
+      return;                                                                   \
+    }                                                                           \
+    hooks::step(ctx, base);                                                     \
+  }
+ITC_TYPE67_TEXTS(82233FC8, Type6Screen0Confirm)
+ITC_TYPE67_TEXTS(822340B0, Type6Screen0ConfirmAgain)
+ITC_TYPE67_TEXTS(82244528, Type7Screen0Confirm)
+ITC_TYPE67_MODES(822344A8, Type6Screen0ShowPage)
 
 // The garage camera: Quaternion::FromAngles (from GarageCamera::Command,
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).

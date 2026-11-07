@@ -108,6 +108,16 @@ void DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base);
 void DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base);
 void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base);
 
+// The first screens' confirms (r4 the dispatcher): Type6Screen0::Confirm
+// sub_82233FC8, ConfirmAgain sub_822340B0 and Type7Screen0::Confirm
+// sub_82244528; Type6Screen0::ShowPage sub_822344A8 (r4 the page). The
+// confirms need the UI movies' text setters native (Type67TextsNative).
+bool Type67TextsNative(uint8_t* base);
+void Type6Screen0Confirm(PPCContext& ctx, uint8_t* base);
+void Type6Screen0ConfirmAgain(PPCContext& ctx, uint8_t* base);
+void Type7Screen0Confirm(PPCContext& ctx, uint8_t* base);
+void Type6Screen0ShowPage(PPCContext& ctx, uint8_t* base);
+
 // Quaternion::FromAngles sub_8217C120 (r3 the destination, f1 to f3 the
 // angles; r3 left) and GarageCamera::Reset sub_8217D888 (r3 the camera; r3
 // after the camera + 192, as its FromAngles call leaves it).
