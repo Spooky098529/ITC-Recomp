@@ -153,7 +153,13 @@ file's history. What's left to see in a drive, from every run:
   ~40 ready roots needing movies 2/13's UI movie calls in the harness.
   Validated `itc_3839` (race 33 s, the harnesses ~85 s of the 120; 0
   errors, every harness 0 differing, 28 of 28 harness lines; 12 in the
-  replay `itc_3840` (ok), 16 to drive). Second migration agent running.
+  replay `itc_3840` (ok), 16 to drive). Second migration
+  e2ef9640..03d785be (24 more: the movie 2 and 13 nodes, marks, lists,
+  dialog, intro and commands, UI movie calls through their overrides;
+  2 adapters removed; 505 cases; race 38 s, 0 errors, all harnesses 0
+  differing; subagents for batches 3-5, one at a time); left: 18 ready
+  (the stand and car calls, `MoveCategory`, `UpdateItems`, `RefreshMenu`,
+  `FillPartRows` and the rest). Validation agent running (180 s).
 
 ## Done
 

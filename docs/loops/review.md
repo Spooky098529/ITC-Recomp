@@ -13,6 +13,8 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
+- Second `tuning-screen.md` migration (e2ef9640..03d785be, harness file `src/harnesses/tuning_screen_pages.cpp` laying movies 2 and 13 with their animations, nodes and a string table): 24 more, `HideTireMarks` `sub_821DFB20` and `PlaceStateNodes` `sub_82202C08` Native. UI movie calls go through their overrides from each original's frame; SetText's unset varargs pass 0, their parameter area left out of the comparison; the int-to-float doublewords at frame +80 (`PlaceStateNodes`, `LayOutItems`, `Command7`, `Command15`, `Command18`) copied as the originals leave them.
+
 - The user's calls (2026-11-07): the run's limit raised to 8 subsystems; the validation agent's race is `attract_race.sh 180` (the harnesses took ~85 s of the 120).
 
 - `tuning-screen.md` migration (113d853c..6c8c5a52, `--native_tuning_screen`; `src/tuning_screen/`, harness `tuning_screen`, `garage_car.cpp` with strict floats): 28 Overridden, 3 Merged (`sub_821CDF0C`, `sub_821CD308`, `sub_821DF24C`). For review: `StoreToGarageCar` `sub_821DCC28` writes its stack tables and int-to-float temporaries below sp as the original leaves them and reproduces its r3 leftover exactly; not reproduced: a vinyl mirror index (+64) past 7 or a sticker's tens past 15 would read the original's register saves (sp - 64 on), which native code doesn't write (the harness keeps them in range; its row). `AeroPartValue` `sub_821DE2D8`'s 900 frame table words taken from `generated/` by simulating its stores. The 17 debug handlers leave out the empty `sub_82106540`'s calls and the loads feeding them; back chain, string tables and r3 as the original leaves them.
