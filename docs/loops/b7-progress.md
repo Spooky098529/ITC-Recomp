@@ -130,7 +130,14 @@ file's history. What's left to see in a drive, from every run:
   harnesses ~88.8 s; 0 errors, every harness 0 differing, 16 of 16
   harness lines; the three confirms' shared print split into one each,
   db5f51a2; 6 in the replay `itc_4386` (ok), 10 to drive). Third
-  migration agent running.
+  migration cff3fe09..3e80c383 (the dialogs' `ConfirmPage` and
+  `Update`, `Type7Screen0`'s pages and steps, the first screens'
+  `OpenMovie`, `SetUpCar` and `OnDialogClosed`,
+  `ControllerOptions::Update`, both modes' `WaitForLoads`; 18
+  functions, 2 adapters removed; races 38 s, 0 errors, its harnesses 0
+  differing; no subagents); left: 8 ready groups (the first screens'
+  `Show`, `ShowCarInfo` and `Update`, `StandScene::PollTeardown`,
+  `Type7Screen0::MenuPage`). Validation agent running.
 
 ## Done
 

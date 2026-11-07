@@ -110,6 +110,11 @@ When the user has reviewed a run's section, its heading gets
   `GarageCamera::Init`'s harness leaves out one dead frame word left by
   `LoadPresets`' callees on the recompiled side; `tan` run with nearest
   rounding set and restored around `c_runtime::Tan`.
+- Its third migration (cff3fe09..3e80c383): `ControllerOptions::Update`
+  copies the frame doublewords and the r3/r4 leftovers it stores into
+  live state (reproducible here, so not kept recompiled);
+  `ConfirmAgain` `sub_822340B0` keeps its adapter (its native caller
+  reaches it by a guest call for the format calls).
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
