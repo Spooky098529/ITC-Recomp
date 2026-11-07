@@ -551,14 +551,10 @@ ITC_TUNING_SCREEN(821FE190, TuningDebugPaintConfirm)
 ITC_TUNING_SCREEN(821DCC28, TuningStoreToGarageCar)
 ITC_TUNING_SCREEN(821DF448, TuningEquipChoice)
 ITC_TUNING_SCREEN(821DE2D8, TuningAeroPartValue)
-ITC_TUNING_SCREEN(821EE6D0, TuningHidePartMarks)
-ITC_TUNING_SCREEN(821EE760, TuningShowPartMarks)
 ITC_TUNING_SCREEN(821DA3F8, TuningShowInteriorPicture)
 ITC_TUNING_SCREEN(821DFBE8, TuningHideNode19)
 ITC_TUNING_SCREEN(821E22E8, TuningShowTireMarks)
 ITC_TUNING_SCREEN(821EED00, TuningUpdateListCounter)
-ITC_TUNING_SCREEN(821F2068, TuningSetPartName)
-ITC_TUNING_SCREEN(821EE880, TuningPlayGroupAnimation)
 ITC_TUNING_SCREEN(82202880, TuningCommand31)
 ITC_TUNING_SCREEN(821E9050, TuningCommand9)
 ITC_TUNING_SCREEN(821EE9B0, TuningUpdateListDots)
@@ -580,7 +576,6 @@ ITC_TUNING_SCREEN(821D12C0, TuningShowLevels)
 ITC_TUNING_SCREEN(822036E8, TuningUpdateItems)
 ITC_TUNING_SCREEN(821D2A80, TuningShowTypes)
 ITC_TUNING_SCREEN(821F1DE0, TuningSetStateTexts)
-ITC_TUNING_SCREEN(821F4BF8, TuningFillPartRows)
 ITC_TUNING_SCREEN(821F5F70, TuningCommand8)
 ITC_TUNING_SCREEN(821D8978, TuningRefreshMenu)
 ITC_TUNING_SCREEN(822076E8, TuningRefreshMovie13)
@@ -600,7 +595,6 @@ ITC_TUNING_SCREEN(822076E8, TuningRefreshMovie13)
 ITC_TUNING_STAND(8217DAC0, TuningFitSelectedCar)
 ITC_TUNING_STAND(821D99A0, TuningPickCameraPreset)
 ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
-ITC_TUNING_STAND(821E0E00, TuningPreviewWheels)
 ITC_TUNING_STAND(822019D0, TuningDecalCommand)
 
 ITC_TUNING_STAND(821E07B0, TuningPreviewItem)
@@ -611,6 +605,14 @@ ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 // above are the harness's): ShowOptionMarks sub_82202F30 and ShowItems
 // sub_82203B00 (RefreshMovie13), LayOutItems sub_82203110 (UpdateItems and
 // RefreshMovie13), ApplyDecals sub_822042D8 (UpdateStand).
+
+// No adapters (removed, B7 loop, 2026-11-07, a cleanup lead: their callers
+// in play are native and call their plain C++; the register steps above are
+// the harness's): FillPartRows sub_821F4BF8, SetPartName sub_821F2068 and
+// PlayGroupAnimation sub_821EE880 (tuning_pages' sub_821F5F70 and
+// sub_821F60E0), PreviewWheels sub_821E0E00 (tuning_pages' sub_821EE390,
+// sub_821EEEA8 and sub_821F6688), HidePartMarks sub_821EE6D0 and
+// ShowPartMarks sub_821EE760 (FillPartRows and tuning_pages' sub_821F40B8).
 
 // SetInteriorPair sub_821CCC50 has no adapter (removed, B7 loop, 2026-11-07):
 // its callers in play, PreviewItem and RestoreStand, are native and call its

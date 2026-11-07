@@ -1585,28 +1585,38 @@ void TuningPagesMovie(Context& h) {
       {"TuningScreen::Leave", 400, __imp__sub_821E25B0, hooks::TuningPagesLeave, 24,
        {{112, 144}, {160, 176}}, OwnedFields});
   // The wheel list's rows after a step right or left: r23 to r31 and lr
-  // saved (80 bytes).
+  // saved (80 bytes); HidePartMarks' and ShowPartMarks' saves (176 to 216
+  // below: their originals run on the recompiled side since their adapters
+  // went, 2026-11-07, and their plain C++ doesn't write them).
   Run(h, w,
       {"TuningScreen::FillPartRowsRight", 150, __imp__sub_821F40B8,
-       hooks::TuningPagesFillPartRowsRight, 80, {},
+       hooks::TuningPagesFillPartRowsRight, 80, {{176, 216}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
   Run(h, w,
       {"TuningScreen::FillPartRowsLeft", 150, __imp__sub_821F4768,
-       hooks::TuningPagesFillPartRowsLeft, 80, {},
+       hooks::TuningPagesFillPartRowsLeft, 80, {{176, 216}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
   // AnimateWheels: __savegprlr_29 (32 bytes); FillPartRowsRight's and
   // Left's saves (128 to 208 below), which their plain C++ doesn't write.
+  // Since the adapters of FillPartRows, SetPartName, PlayGroupAnimation and
+  // the part marks went (2026-11-07), their originals run on the recompiled
+  // side: also HidePartMarks' and ShowPartMarks' saves under FillPartRows
+  // (304 to 344) and SetPartName's frame's +48 to +79 (896 to 928: SetText's
+  // parameter area, the r7 to r10 its calls leave unset, passed as 0
+  // natively, the user's call of 2026-10-30).
   Run(h, w,
       {"TuningScreen::AnimateWheels", 300, __imp__sub_821F60E0, hooks::TuningPagesAnimateWheels,
-       32, {{128, 208}},
+       32, {{128, 208}, {304, 344}, {896, 928}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
   // InputWheels: __savegprlr_29 (32 bytes); its frame's +48 to +79
   // (SetText's parameter area: the r7 to r10 the calls leave unset, passed
   // as 0 natively, the user's call of 2026-10-30), AnimateWheels' saves (128
-  // to 160 below) and FillPartRowsRight's and Left's (256 to 336).
+  // to 160 below) and FillPartRowsRight's and Left's (256 to 336); as
+  // AnimateWheels' own (2026-11-07), 128 deeper: the part marks' saves (432
+  // to 472) and SetPartName's SetText parameter area (1024 to 1056).
   Run(h, w,
       {"TuningScreen::InputWheels", 600, __imp__sub_821F6688, hooks::TuningPagesInputWheels, 32,
-       {{48, 80}, {128, 160}, {256, 336}},
+       {{48, 80}, {128, 160}, {256, 336}, {432, 472}, {1024, 1056}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, true); }});
 }
 
