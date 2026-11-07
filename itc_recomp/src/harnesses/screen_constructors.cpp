@@ -206,7 +206,39 @@ void ScreenConstructors(Context& h) {
       {"Type7Screen0::Type7Screen0 (sub_82245FF8)", Original<__imp__sub_82245FF8>,
        r3(sc::Type7Screen0), 0, nullptr, {}},
   };
+  auto with_group = [](void (*f)(uint8_t*, uint32_t, uint32_t)) {
+    return [f](PPCContext& t, uint8_t* base) { f(base, t.r3.u32, t.r4.u32); };
+  };
+  auto group = [](PPCContext& t, uint32_t, Random& r) { t.r4.u64 = uint32_t(r.Next()); };
+  const std::vector<Function> more = {
+      {"Panel6C::Panel6C (sub_82231CD0)", Original<__imp__sub_82231CD0>,
+       with_group(sc::Panel6C), 0, group, {}},
+      {"Panel7C::Panel7C (sub_822416D8)", Original<__imp__sub_822416D8>,
+       with_group(sc::Panel7C), 0, group, {}},
+      {"Panel6D::Panel6D (sub_82231E40)", Original<__imp__sub_82231E40>,
+       with_group(sc::Panel6D), 0, group, {}},
+      {"Panel7D::Panel7D (sub_822418B8)", Original<__imp__sub_822418B8>,
+       with_group(sc::Panel7D), 0, group, {}},
+      {"Panel6F::Panel6F (sub_822308E8)", Original<__imp__sub_822308E8>,
+       with_group(sc::Panel6F), 0, group, {}},
+      {"Panel7F::Panel7F (sub_82240268)", Original<__imp__sub_82240268>,
+       with_group(sc::Panel7F), 0, group, {}},
+      {"PanelGroup::PanelGroup (sub_82240110)", Original<__imp__sub_82240110>,
+       r3(sc::PanelGroup), 0, nullptr, {}},
+      {"PanelGroup6B::PanelGroup6B (sub_82231C68)", Original<__imp__sub_82231C68>,
+       r3(sc::PanelGroup6B), 0, nullptr, {}},
+      {"PanelGroup7B::PanelGroup7B (sub_82241680)", Original<__imp__sub_82241680>,
+       r3(sc::PanelGroup7B), 0, nullptr, {}},
+      {"PairedNodeTable::PairedNodeTable (sub_82247C60)", Original<__imp__sub_82247C60>,
+       r3(sc::PairedNodeTable), 0, nullptr, {}},
+      // Its items' masks read the game's records at 0x826370A0 (both sides).
+      {"Type7ListScreen::Type7ListScreen (sub_82242BE8)", Original<__imp__sub_82242BE8>,
+       r3(sc::Type7ListScreen), 0, nullptr, {}},
+  };
   for (const Function& f : functions) {
+    Run(h, random, world, f, 4);
+  }
+  for (const Function& f : more) {
     Run(h, random, world, f, 4);
   }
 }

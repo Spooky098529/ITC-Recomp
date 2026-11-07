@@ -41,6 +41,26 @@ void PanelEBase(uint8_t* base, uint32_t panel);
 void PanelE(uint8_t* base, uint32_t panel, uint32_t group);
 // sub_8224FA88 PanelFBase::PanelFBase (a leaf).
 void PanelFBase(uint8_t* base, uint32_t panel);
+// sub_82231CD0 Panel6C::Panel6C and sub_822416D8 Panel7C::Panel7C (320
+// bytes; `group`: group B): PanelCBase, then their words (the two differ in
+// the vtable, +20, +24 and +32).
+void Panel6C(uint8_t* base, uint32_t panel, uint32_t group);
+void Panel7C(uint8_t* base, uint32_t panel, uint32_t group);
+// sub_82231E40 Panel6D::Panel6D and sub_822418B8 Panel7D::Panel7D (92
+// bytes; `group`: group B): PanelDBase, then their words.
+void Panel6D(uint8_t* base, uint32_t panel, uint32_t group);
+void Panel7D(uint8_t* base, uint32_t panel, uint32_t group);
+// sub_822308E8 Panel6F::Panel6F and sub_82240268 Panel7F::Panel7F (144
+// bytes; `group`: group A): PanelFBase, then the same words (two copies of
+// the code).
+void Panel6F(uint8_t* base, uint32_t panel, uint32_t group);
+void Panel7F(uint8_t* base, uint32_t panel, uint32_t group);
+// sub_82240110 PanelGroup::PanelGroup (group A), sub_82231C68
+// PanelGroup6B::PanelGroup6B and sub_82241680 PanelGroup7B::PanelGroup7B
+// (group B): PanelGroupBase, then +4, +12 and +32.
+void PanelGroup(uint8_t* base, uint32_t group);
+void PanelGroup6B(uint8_t* base, uint32_t group);
+void PanelGroup7B(uint8_t* base, uint32_t group);
 // sub_8224AD28 PanelSetBase::PanelSetBase (a leaf without a frame: eleven
 // words below `sp` cleared, ten read back into the base) and sub_8224B660
 // PanelSet::PanelSet (panels F, E, D and C, group B; the panels written
@@ -67,6 +87,11 @@ void Type7Screen0(uint8_t* base, uint32_t screen);
 
 // sub_82247BE8 NodeTable::NodeTable (a leaf).
 void NodeTable(uint8_t* base, uint32_t table);
+// sub_82247C60 PairedNodeTable::PairedNodeTable (460 bytes) and
+// sub_82247D08 ColorNodeTable::ColorNodeTable (584 bytes): NodeTable, then
+// their words.
+void PairedNodeTable(uint8_t* base, uint32_t table);
+void ColorNodeTable(uint8_t* base, uint32_t table);
 // sub_82252290 ListScreen::ListScreen: ScreenMachine on +4, then its words.
 void ListScreen(uint8_t* base, uint32_t screen);
 // sub_822523F8 ListPartBase::ListPartBase and sub_822525E0
@@ -76,5 +101,13 @@ void ListPartBase(uint8_t* base, uint32_t part);
 void ListPartInnerBase(uint8_t* base, uint32_t inner);
 void ListPartInner(uint8_t* base, uint32_t inner);
 void ListPart(uint8_t* base, uint32_t part);
+// sub_822550F8 ColorListScreen::ColorListScreen: ListScreen, then a
+// ColorNodeTable at +10432 (+9672 its address, its +4 = +9680 as read).
+void ColorListScreen(uint8_t* base, uint32_t screen);
+// sub_82242BE8 Type7ListScreen::Type7ListScreen (11,180 bytes):
+// ColorListScreen, a ListPart at +11040, then its words, some through the
+// node table at [+9672] (read again for each store) and 15 items' masks from
+// the 28-byte records at 0x826370A0.
+void Type7ListScreen(uint8_t* base, uint32_t screen);
 
 }  // namespace screen_constructors
