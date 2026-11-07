@@ -302,5 +302,6 @@ void CarMakers(Context& h);
 void StandModels(Context& h);
 void BuildScreen(Context& h);
 void TuningScreen(Context& h);
+void TuningPages(Context& h);
 
 }  // namespace harness
