@@ -50,8 +50,8 @@ met here. The power curve's set-up `sub_821E7368` stays in its lead.
 Shared, with rows elsewhere: `UiMovie::` and `UiMovies::Find`
 (`ui-movies-game.md`, `ui-movies.md`: among them `sub_8211C740`,
 `sub_8211D930` and `sub_8211CAA0`, which `RefreshMovie13` and others
-call and which aren't ours yet); `GarageStage::Draw` (`sub_8217FE60`,
-which `UpdateStand` calls, not ours yet), `Command`, `IsBusy`,
+call, native since 2026-11-07); `GarageStage::Draw` (`sub_8217FE60`,
+which `UpdateStand` calls, native since 2026-11-07), `Command`, `IsBusy`,
 `SetLightKit` (`front-end-car-draw.md`); the stand's record setters
 (`GarageStage::SetPart`, `SetInteriorClass`, `SetInteriorWord`,
 `SetInteriorLevel`, `SetInteriorPair`, `ClearChoice`, `SetChoice`,
