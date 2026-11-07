@@ -91,7 +91,24 @@ pages); `UiMovies::IsLoaded` on an id not in the movie table reads the
 word at `0x826C5CDC` as the movie (the harness plants a movie there for
 its cases, and 0 for `UiMovies::Delete`'s callers, which would otherwise
 unload what it finds); the pages' handlers the Draw handlers call and
-`GameMessages::Dispatch` stay guest calls.
+`GameMessages::Dispatch` stay guest calls. The third (2026-11-07) kept those rules:
+the dialogs' pages and Updates, the first screens' helpers, OpenMovie,
+SetUpCar and OnDialogClosed, `ControllerOptions::Update` and the modes'
+`WaitForLoads` call `Menu::Step`, `Menu::Pressed`, `MenuSound::Play`,
+`Sound::Play`, `ScreenFades::FadeOut`, `GarageStage::SetDrawWord` and the
+UI movies' node and text setters through their plain C++, and make guest
+calls to the overrides of the steps and pages in tables, `UiMovie::Run`,
+`FinishAll`, `LoadingScreen::Run` and `Finish`, `GarageStage::MakeModel`,
+`Command` and `Draw`, `GarageCar::Reset` and `Type6Screen0::ConfirmAgain`
+(whose adapter therefore stays). Their harness worlds keep those callees
+cheap: the stage's model claimed (MakeModel does nothing) and its garage
+camera not set up (Command 14 and Draw only store or return), the loading
+screen's movie a harness movie whose update is recorded, the controller
+pages' steps 0 and 3 with their started word set (they answer 1). Where a
+recompiled caller's callees would run recompiled with the flag off and
+leave register saves the native side doesn't, the cases run the original
+with the flag on (`OnDialogClosed`) or the steps recompiled on both sides
+(the dialogs' Updates).
 
 Shared, with rows in other files: `StateMachine::Add` (`sub_82106158`)
 and the modes' constructors in `game-modes.md`; the screens'
