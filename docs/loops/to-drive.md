@@ -94,6 +94,14 @@ here loses its heading.
   `sub_822470A8`, `sub_82248E10`, `sub_822515A0`, `sub_82259128` (the
   modes' own screens: the replay reaches only the stand, the garage
   camera, the controller options and the dialog movies).
+- The type 6 and 7 modes' second migration (attract race `itc_4385`,
+  replay `itc_4386` ok): `sub_822320D8` Type6Dialog::OpenConfirm,
+  `sub_82241B40` Type7Dialog::OpenConfirm, `sub_82241C18`
+  Dialog::DrawWaiting, `sub_822325E0` Dialog::OpenConfirmStep,
+  `sub_8223AA10` Dialog::CloseConfirmStep, `sub_8223AB50`
+  Dialog::MoveCursorStep, `sub_82233FC8` Type6Screen0::Confirm,
+  `sub_822340B0` Type6Screen0::ConfirmAgain, `sub_82244528`
+  Type7Screen0::Confirm, `sub_822344A8` Type6Screen0::ShowPage.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

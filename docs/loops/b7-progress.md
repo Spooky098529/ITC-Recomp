@@ -126,7 +126,11 @@ file's history. What's left to see in a drive, from every run:
   screens' confirms and `Type6Screen0::ShowPage`; 16 functions, a row
   added for `Type6Screen0::Confirm` `sub_82233FC8`; 1 adapter removed;
   races 38 s, 0 errors, its harnesses 0 differing; no subagents); left:
-  24 ready groups. Validation agent running.
+  24 ready groups. Validated `itc_4385` (race 77 s at 180, the
+  harnesses ~88.8 s; 0 errors, every harness 0 differing, 16 of 16
+  harness lines; the three confirms' shared print split into one each,
+  db5f51a2; 6 in the replay `itc_4386` (ok), 10 to drive). Third
+  migration agent running.
 
 ## Done
 
