@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_front_end_car_draw, true, "ITC",
               "SceneModel::ApplyLightKit sub_820D9D10 (no adapter: its native callers call it), and Floor::Draw sub_820C8480 (with "
               "--native_scenery_lists and the command list's diagnostics off), "
               "GarageStage::SetLights sub_8217BA20, and GarageStage::PoseCar sub_8217CAB8 (with "
-              "--native_matrix_math, --native_accessories and --native_memcpy), natively instead "
+              "--native_matrix_math, --native_accessories and --native_memcpy), and "
+              "GarageStage::Draw sub_8217FE60 (GarageCamera::Update, CarScene::Update and Draw "
+              "through their overrides, inside their diagnostics' wraps), natively instead "
               "of through the translated code, "
               "with --native_vehicle_accessors, --native_math, --native_menu_sounds and "
               "--native_load_poll with its callees (else the originals; the same writes; "
@@ -227,6 +229,26 @@ void FrontEndCarDrawPoseCar(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base) {
+  ITC_FRONT_END_ORIGINAL(8217FE60)
+  const uint64_t lr = ctx.lr;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  SceneryDrawGuest guest{ctx, base};
+  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  calls.draw = SceneryListsDrawCalls(&guest);
+  fe::DrawCallees callees;
+  // PoseCar's and Floor::Draw's plain C++ where their adapters would run
+  // them.
+  callees.pose_native = ITC_FLAG(native_matrix_math) && ITC_FLAG(native_accessories) &&
+                        native::Buffers_NativeMemcpy();
+  callees.floor_native = ITC_FLAG(native_scenery_lists) && !SceneryListsSlotDiagnostics();
+  callees.caller_r24 = ctx.r24.u32;
+  ctx.r3.u64 = fe::GarageStageDraw(base, calls, ctx.r3.u64, ctx.r5.u32, callees, ctx.r1.u32);
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
 #undef ITC_FRONT_END_ORIGINAL
 
 }  // namespace hooks
@@ -251,6 +273,7 @@ ITC_FRONT_END_CAR_DRAW(82179678, FrontEndCarDrawSetLightKit)
 ITC_FRONT_END_CAR_DRAW(820C8480, FrontEndCarDrawFloorDraw)
 ITC_FRONT_END_CAR_DRAW(8217BA20, FrontEndCarDrawSetLights)
 ITC_FRONT_END_CAR_DRAW(8217CAB8, FrontEndCarDrawPoseCar)
+ITC_FRONT_END_CAR_DRAW(8217FE60, FrontEndCarDrawDraw)
 
 // SceneModel::ApplyLightKit sub_820D9D10 has no adapter (removed, B7 loop,
 // 2026-11-06): its callers in play, GarageStage::SetLightKit and the

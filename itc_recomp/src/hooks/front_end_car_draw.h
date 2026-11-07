@@ -55,5 +55,8 @@ void FrontEndCarDrawSetLights(PPCContext& ctx, uint8_t* base);
 // block, r5 out; with --native_matrix_math, --native_accessories and
 // --native_memcpy, else the original).
 void FrontEndCarDrawPoseCar(PPCContext& ctx, uint8_t* base);
+// GarageStage::Draw sub_8217FE60 (r3 the holder, r5 turn the car); r3 as
+// CarScene::Draw leaves it.
+void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -169,4 +169,32 @@ uint32_t GarageStageSetLights(uint8_t* base, uint32_t lights, uint32_t mirrored,
 uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, uint32_t block,
                             uint32_t out, uint32_t stack);
 
+// --- The draw (draw.cpp) ---
+
+// What GarageStage::Draw's adapter decides for its callees: PoseCar's and
+// Floor::Draw's plain C++ where their adapters would run them (else their
+// guest calls), and the r24 Floor::Draw hands Model::DrawShape (the
+// caller's: Draw doesn't save it).
+struct DrawCallees {
+  bool pose_native = false;
+  bool floor_native = false;
+  uint32_t caller_r24 = 0;
+};
+// sub_8217FE60 GarageStage::Draw: `r3` the holder (r3 at entry, all 64
+// bits), `turn` (r5) whether the car turns. Nothing when the garage camera
+// (stage +112) isn't set up (r3 returned as given). Else the preset waiting
+// applied (ApplyPreset), the yaw less 0.5° when `turn`, GarageAnims::Run,
+// GarageCamera::Update (a guest call: its adapter's checks), the light kit
+// off when +6060 is set (SetLightKit), SyncPlates, the stage's values into
+// the scene model's block (m + 4288), its 256-byte frame's +80 matrix's w
+// words 1.0, then SetLights (r4 0) and PoseCar, and CarScene::Update and
+// Draw (guest calls through their overrides: their diagnostics' wraps):
+// with +6052 set first the mirror (0x826C5100 toggled,
+// CarScene::SetInteriorWord 0, Draw with the frame's +80, the car's matrix
+// copied to +144 by memcpy, Floor::Draw), then upright (SetLights, PoseCar,
+// the toggle, SetInteriorWord 1); else SetLights, PoseCar and Update. Then
+// CarScene::Draw(scene, 0), whose r3 it returns.
+uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_t turn,
+                         const DrawCallees& callees, uint32_t stack);
+
 }  // namespace front_end_car_draw

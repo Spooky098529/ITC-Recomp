@@ -310,6 +310,7 @@ set(ITC_SOURCES
     src/front_end_car_draw/garage_stage.cpp
     src/front_end_car_draw/lights.cpp
     src/front_end_car_draw/pose.cpp
+    src/front_end_car_draw/draw.cpp
     src/hooks/replay_snapshots.cpp
     src/replay_snapshots/records.cpp
     src/replay_snapshots/race_replay.cpp
@@ -798,7 +799,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_scene_draw/lights.cpp src/car_scene_draw/texture_projection.cpp
     src/car_scene_draw/scene_draw.cpp
     src/front_end_car_draw/garage_stage.cpp src/front_end_car_draw/lights.cpp
-    src/front_end_car_draw/pose.cpp
+    src/front_end_car_draw/pose.cpp src/front_end_car_draw/draw.cpp
     src/post_effects/record.cpp
     src/scene_target/scene_target.cpp
     src/power_graph/power_graph.cpp

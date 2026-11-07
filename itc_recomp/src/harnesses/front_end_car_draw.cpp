@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstring>
 #include <functional>
 #include <string>
 #include <utility>
@@ -139,7 +140,8 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
           GuestFunction native, uint32_t saves, const FloatRanges& floats,
           const std::string& what, const uint32_t* floor = nullptr,
           const FloatRanges& skips = {},
-          const std::function<void(Outputs&)>& extra = {}) {
+          const std::function<void(Outputs&)>& extra = {},
+          const std::function<void()>& before = {}) {
   const Saved saved(h.base);
   RandomBytes(h.base, block, kBlockBytes, r);
   guest::StoreU32(h.base, kScenePointer, block + kScene);
@@ -156,6 +158,9 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     guest::StoreU32(h.base, kScenePointer, block + kScene);
     guest::StoreU32(h.base, kSoundManagerPointer, block + kManager);
     Fill(h.base, sp - kStackBytes, kStackBytes + kArgBytes);
+    if (before) {
+      before();
+    }
     PPCContext t = start;
     t.fpscr.disableFlushModeUnconditional();
     (v == 0 ? recompiled : native)(t, h.base);
@@ -843,6 +848,199 @@ void Floors(Context& h, Random& r) {
   memory::Free(allocation);
 }
 
+// GarageStage::Draw over the stage's world (Lay, the garage camera, the
+// animation list, the light kit, the pose's fields), the car scene's +0 4
+// (CarScene::Update only counts its +48 down, CarScene::Draw returns at
+// once: their own harnesses draw), its +4 1 (Floor::Draw draws nothing: its
+// own cases draw), its pool 7's count 0 to 2 (CarScene::SetInteriorWord;
+// the interiors at the block's +0x56A0, so their +11616 is the block's
+// +0x8400), the first pool set [0x826C2E40] 0 (ScenePools::UpdateA does
+// nothing). GarageCamera::Update over the garage camera harness's world
+// (camera_modes.cpp's GarageCameras): viewport 0 and a stand-in app
+// interface of the case's, camera pass 0, its outputs and the open chunks'
+// count put back after. The callees run as their adapters run them on both
+// sides. Compared: the block, the stack (the top 40 bytes, the original's
+// saved registers, left out), the scene lights' constants, 0x826C5100,
+// camera pass 0, the viewport, the garage camera's outputs and r3.
+void Draws(Context& h, uint32_t block, Random& r) {
+  constexpr uint32_t kFirstSet = 0x826C2E40, kMirrored = 0x826C5100;
+  constexpr uint32_t kLights = 0x8296B950, kLightBytes = 0x8296BCE0 - 0x8296B950;
+  constexpr uint32_t kAmbient = 0x8265ED00;
+  constexpr uint32_t kPass0 = 0x826BAC00, kPassBytes = 592;
+  constexpr uint32_t kAppInterface = 0x826BABA0, kViewports = 0x826C2CE8;
+  constexpr uint32_t kOuts = 0x8296B8F4, kOutsBytes = 0x2C, kEye = 0x8265ECE0;
+  constexpr uint32_t kOpenChunks = 0x8296BD28;
+  constexpr uint32_t kViewportBytes = 1872, kStandInBytes = 4096;
+  // The stand-in app interface's layout (the garage camera harness's).
+  constexpr uint32_t kSceneVtable = 320, kManager = 400, kManagerVtable = 720, kQueue = 760,
+                     kQueueVtable = 800, kList = 840, kSlots = 2048;
+  struct Global {
+    Global(uint8_t* base, uint32_t address, uint32_t bytes)
+        : base(base), address(address), bytes(Read(base, address, bytes)) {}
+    ~Global() { Write(base, address, bytes.data(), uint32_t(bytes.size())); }
+    uint8_t* base;
+    uint32_t address;
+    std::vector<uint8_t> bytes;
+  };
+  const Global saved[] = {{h.base, kFirstSet, 4},         {h.base, kMirrored, 4},
+                          {h.base, kLights, kLightBytes}, {h.base, kAmbient, 16},
+                          {h.base, kPass0, kPassBytes},   {h.base, kAppInterface, 4},
+                          {h.base, kViewports, 4},        {h.base, kOuts, kOutsBytes},
+                          {h.base, kEye, 16},             {h.base, kOpenChunks, 4}};
+  const uint32_t viewport = memory::Alloc(kViewportBytes + 16, 0);
+  const uint32_t viewports = viewport + kViewportBytes;
+  const uint32_t stand_in = memory::Alloc(kStandInBytes, 0);
+  Results results("GarageStage::Draw (sub_8217FE60)");
+  for (int c = 0; c < 40; c++) {
+    World w{block};
+    std::vector<uint8_t> viewport_in, pass_in;
+    uint32_t mirrored = 0, used = 0, type = 0;
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          w = Lay(h.base, block, r, true);
+          LayCamera(h.base, w, r);
+          // The presets ordinary (a camera's: the garage camera's update
+          // loops on some non-finite angles, as its own cases avoid).
+          for (uint32_t i = 0; i < kPresetCount; i++) {
+            const uint32_t preset = block + kPresets + 64 * i;
+            for (uint32_t k = 0; k < 16; k++) {
+              guest::StoreFloat(h.base, preset + 4 * k, car_draw_shared::Spread(r, 3.0f));
+            }
+            guest::StoreFloat(h.base, preset + 8, 2.0f + float(r.Below(100)) / 10.0f);
+            guest::StoreFloat(h.base, preset + 12, 20.0f + float(r.Below(800)) / 10.0f);
+          }
+          // The animation list as Run's cases lay it (their values the
+          // stage's), with the opening values.
+          const uint32_t count = r.Below(4);
+          LayList(h.base, w, r, count);
+          for (uint32_t i = 0; i < count; i++) {
+            // No doors (4, 5): their originals save the callers' registers,
+            // which differ (Run's own cases cover them).
+            const uint32_t types[] = {0, 1, 2, 3, 6, 7};
+            LayEntry(h.base, w, r, w.stage() + 5600 + 28 * i, types[r.Below(6)]);
+          }
+          LayValues(h.base, w, r);
+          // The light kit as LayKit lays it, the models' +32 kept as
+          // PollAnswer left it (so SyncPlates' poll stops where it says).
+          for (int i = 0; i < 2; i++) {
+            const uint32_t m = w.model(i);
+            guest::StoreU32(h.base, m + 5036, r.Below(4) == 0 ? 0 : 1 + r.Below(3));
+            guest::StoreU32(h.base, m + 5084, r.Below(5) == 0 ? 0 : w.block + kKit);
+          }
+          guest::StoreU32(h.base, w.block + kKit + 28, w.block + kPool4);
+          guest::StoreU32(h.base, w.block + kKit + 13152, 0);
+          const uint32_t s = w.stage(), camera = s + 112;
+          guest::StoreU32(h.base, s + 6088, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(kPresetCount));
+          guest::StoreU32(h.base, s + 6060, r.Below(3) == 0 ? 1 : 0);
+          guest::StoreU32(h.base, s + 6052, r.Below(2));
+          for (const uint32_t at : {80u, 84u, 88u}) {
+            guest::StoreU32(h.base, s + at, RandomAngle(r));
+          }
+          guest::StoreFloat(h.base, s + 32, car_draw_shared::Spread(r, 1.0f));
+          // The pose's fields and the lights, mostly finite.
+          for (const uint32_t at : {6104u, 6108u, 6112u, 6116u, 6120u, 6124u, 6136u, 6140u,
+                                    6152u, 6184u, 6200u}) {
+            guest::StoreFloat(h.base, s + at, car_draw_shared::Spread(r, 1.0f));
+          }
+          for (uint32_t k = 0; k < 1088 / 4; k++) {
+            guest::StoreFloat(h.base, s + 4512 + 4 * k, car_draw_shared::Spread(r, 50.0f));
+          }
+          // The garage camera's orbit, mostly ordinary.
+          guest::StoreFloat(h.base, camera + 100, car_draw_shared::Spread(r, 1.0f));
+          guest::StoreFloat(h.base, camera + 176, car_draw_shared::Spread(r, 3.0f));
+          guest::StoreFloat(h.base, camera + 180, 2.0f + float(r.Below(100)) / 10.0f);
+          guest::StoreFloat(h.base, camera + 224, 20.0f + float(r.Below(800)) / 10.0f);
+          guest::StoreFloat(h.base, camera + 248, car_draw_shared::Spread(r, 1.0f));
+          for (uint32_t k = 0; k < 12; k++) {
+            guest::StoreFloat(h.base, camera + 16 + 4 * k, car_draw_shared::Spread(r, 5.0f));
+            guest::StoreFloat(h.base, camera + 256 + 4 * (k % 4), car_draw_shared::Spread(r, 5.0f));
+          }
+          // The car scene.
+          const uint32_t scene = block + kScene;
+          guest::StoreU32(h.base, scene + 0, 4);
+          guest::StoreU32(h.base, scene + 4, 1);
+          guest::StoreU32(h.base, scene + 48, 1 + r.Below(5));
+          guest::StoreU32(h.base, scene + 5036, r.Below(3));
+          for (int i = 0; i < 2; i++) {
+            guest::StoreU32(h.base, w.model(i) + 5072, r.Below(2));
+            guest::StoreU32(h.base, w.model(i) + 5068, block + 0x56A0);
+          }
+          // Viewport 0 and camera pass 0 (as the garage camera harness).
+          viewport_in.resize(kViewportBytes);
+          for (uint32_t i = 0; i < kViewportBytes; i += 4) {
+            const uint32_t word = i >= 1600 && i < 1600 + 4 * 48
+                                      ? std::bit_cast<uint32_t>(car_draw_shared::Spread(r, 5.0f))
+                                      : uint32_t(r.Next());
+            std::memcpy(viewport_in.data() + i, &word, 4);
+          }
+          pass_in.resize(kPassBytes);
+          for (uint32_t i = 0; i < kPassBytes; i += 4) {
+            const uint32_t word = uint32_t(r.Next());
+            std::memcpy(pass_in.data() + i, &word, 4);
+          }
+          mirrored = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          used = r.Below(1000);
+          type = r.Below(22);
+          t.r3.u64 = w.holder() | (r.Next() << 32);
+          t.r4.u64 = r.Next();
+          t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
+          t.r24.u64 = r.Next();
+        },
+        __imp__sub_8217FE60, hooks::FrontEndCarDrawDraw, 40,
+        {{w.stage() + 84, 1}, {w.model(0) + 4288 + 640, 1}, {w.model(1) + 4288 + 640, 1}},
+        fmt::format("case {}", c), nullptr, {},
+        [&](Outputs& o) {
+          o.Bytes(Read(h.base, kAmbient, 16));
+          o.Bytes(Read(h.base, kLights, kLightBytes));
+          o.Word(guest::LoadU32(h.base, kMirrored));
+          o.Bytes(Read(h.base, kPass0, kPassBytes));
+          o.Bytes(Read(h.base, viewport, kViewportBytes));
+          o.Bytes(Read(h.base, kOuts, kOutsBytes));
+          o.Bytes(Read(h.base, kEye, 16));
+          o.Bytes(Read(h.base, stand_in, kStandInBytes));
+          o.Word(guest::LoadU32(h.base, kOpenChunks));
+        },
+        [&]() {
+          guest::StoreU32(h.base, kFirstSet, 0);
+          guest::StoreU32(h.base, kMirrored, mirrored);
+          Write(h.base, viewport, viewport_in.data(), kViewportBytes);
+          guest::StoreU32(h.base, viewports, viewport);
+          guest::StoreU32(h.base, kViewports, viewports);
+          Write(h.base, kPass0, pass_in.data(), kPassBytes);
+          guest::StoreU32(h.base, kPass0, 0x82001EC0);
+          guest::StoreU32(h.base, kPass0 + 584, type);
+          guest::StoreU32(h.base, kPass0 + 504, 1280);
+          guest::StoreU32(h.base, kPass0 + 508, 720);
+          for (uint32_t i = 0; i < kOutsBytes; i += 4) {
+            guest::StoreU32(h.base, kOuts + i, used + i);
+          }
+          const uint32_t d = stand_in;
+          for (uint32_t i = 0; i < kStandInBytes; i += 4) {
+            guest::StoreU32(h.base, d + i, 0);
+          }
+          guest::StoreU32(h.base, d, d + kSceneVtable);
+          guest::StoreU32(h.base, d + kSceneVtable + 32, 0x8248CA78);
+          guest::StoreU32(h.base, d + 284, d + kManager);
+          guest::StoreU32(h.base, d + kManager, d + kManagerVtable);
+          guest::StoreU32(h.base, d + kManagerVtable + 4, 0x8248CA78);
+          guest::StoreU32(h.base, d + kManagerVtable + 8, 0x82379320);
+          guest::StoreU32(h.base, d + kManager + 284, d + kList);
+          guest::StoreU32(h.base, d + kManager + 124, d + kQueue);
+          guest::StoreU32(h.base, d + kQueue, d + kQueueVtable);
+          guest::StoreU32(h.base, d + kQueueVtable + 16, 0x8209F5C8);
+          guest::StoreU32(h.base, d + kList + 8, used + 1000);
+          guest::StoreU32(h.base, d + kList + 12, used);
+          guest::StoreU32(h.base, d + kList + 32, d + kSlots);
+          guest::StoreU32(h.base, kOpenChunks, 0);
+          guest::StoreU32(h.base, kAppInterface, d);
+        });
+  }
+  results.Report();
+  memory::Free(viewport);
+  memory::Free(stand_in);
+}
+
 }  // namespace
 
 void FrontEndCarDraw(Context& h) {
@@ -855,6 +1053,7 @@ void FrontEndCarDraw(Context& h) {
   LightKit(h, block, r);
   Lights(h, block, r);
   Pose(h, block, r);
+  Draws(h, block, r);
   memory::Free(allocation);
   Floors(h, r);
 }
