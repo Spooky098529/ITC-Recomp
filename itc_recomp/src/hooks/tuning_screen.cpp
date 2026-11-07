@@ -21,7 +21,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "DebugWheelKindSelect sub_821E8128, DebugWheelInchSelect sub_821E8298, "
               "DebugDecalTopMenu sub_821FD710, DebugLayerSelect sub_821FD880, DebugLayerEdit "
               "sub_821FDCB8, DebugLayerSet sub_821FE080, DebugEditPosition sub_821FE100, "
-              "DebugEditView sub_821FE178, DebugPaintConfirm sub_821FE190) natively instead of through the "
+              "DebugEditView sub_821FE178, DebugPaintConfirm sub_821FE190; the selected garage car's "
+              "StoreToGarageCar sub_821DCC28 and EquipChoice sub_821DF448) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen)");
 
 namespace hooks {
@@ -120,6 +121,13 @@ void TuningDebugPaintConfirm(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::DebugPaintConfirm(base, ctx.r1.u32);
 }
 
+void TuningStoreToGarageCar(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ts::StoreToGarageCar(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void TuningEquipChoice(PPCContext& ctx, uint8_t* base) { ts::EquipChoice(base, ctx.r3.u32); }
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -156,3 +164,5 @@ ITC_TUNING_SCREEN(821FE080, TuningDebugLayerSet)
 ITC_TUNING_SCREEN(821FE100, TuningDebugEditPosition)
 ITC_TUNING_SCREEN(821FE178, TuningDebugEditView)
 ITC_TUNING_SCREEN(821FE190, TuningDebugPaintConfirm)
+ITC_TUNING_SCREEN(821DCC28, TuningStoreToGarageCar)
+ITC_TUNING_SCREEN(821DF448, TuningEquipChoice)

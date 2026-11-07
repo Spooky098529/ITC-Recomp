@@ -21,6 +21,11 @@ void TuningGetPrice(PPCContext& ctx, uint8_t* base);
 void TuningGetCurrentChoice(PPCContext& ctx, uint8_t* base);
 void TuningGetChoiceFlag(PPCContext& ctx, uint8_t* base);
 
+// The garage car: StoreToGarageCar sub_821DCC28, EquipChoice sub_821DF448
+// (r3 = the screen).
+void TuningStoreToGarageCar(PPCContext& ctx, uint8_t* base);
+void TuningEquipChoice(PPCContext& ctx, uint8_t* base);
+
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
 // DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,

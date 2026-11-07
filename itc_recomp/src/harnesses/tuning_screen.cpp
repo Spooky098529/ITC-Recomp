@@ -36,6 +36,7 @@ namespace ts = tuning_screen;
 
 constexpr uint32_t kScreenBytes = 0x9400;  // the screen (to +37888)
 constexpr uint32_t kBlockBytes = 0xA000;
+constexpr uint32_t kSaveBytes = 0x1A000;   // the save data (to +0x19924)
 constexpr uint32_t kStackBytes = 1024;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
 
@@ -55,10 +56,12 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
 }
 
 struct World {
-  World() : block(kBlockBytes) {}
-  bool ok() const { return block.address != 0; }
+  World() : block(kBlockBytes), save(kSaveBytes) {}
+  bool ok() const { return block.address != 0 && save.address != 0; }
   uint32_t screen() const { return block.address; }
   Block block;
+  Block save;  // the save data the screen's +18904 points at
+  uint8_t* base = nullptr;
 };
 
 // A small signed word in [lo, hi], now and then any word.
@@ -97,6 +100,57 @@ void ShapeScreen(uint8_t* base, const World& w, Random& r) {
   guest::StoreU8(base, s + 9677, uint8_t(r.Below(8)));
   guest::StoreU8(base, s + 9678, uint8_t(r.Below(8)));
   guest::StoreU32(base, s + 30724, r.Below(8));
+  // The save data's garage list: 51 nodes of 4 bytes from +6120 (the head
+  // halfword at +204), each link and the head a node, each slot 0 to 3; the
+  // walk [+0x19920] steps; the cars' ids (+12) around the 23 known.
+  const uint32_t save = w.save.address, nodes = save + 6120;
+  guest::StoreU32(base, s + ts::kSaveData, save);
+  for (uint32_t k = 0; k < 51; k++) {
+    guest::StoreU16(base, nodes + 4 * k, uint16_t(r.Below(51)));
+    guest::StoreU16(base, nodes + 4 * k + 2, uint16_t(r.Below(4)));
+  }
+  guest::StoreU16(base, nodes + 204, uint16_t(r.Below(51)));
+  guest::StoreU32(base, save + 0x19920, r.Below(6));
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t c = nodes + 1968 * k + 212;
+    guest::StoreU32(base, c + 12, r.Below(26));
+    if (r.Below(3) == 0) {
+      guest::StoreU16(base, c + 4, 0xFFFF);
+    }
+  }
+  // StoreToGarageCar's and EquipChoice's choices.
+  guest::StoreU32(base, s + 35496, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(7));
+  guest::StoreU32(base, s + 35608, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(8));
+  guest::StoreU32(base, s + 35948, Around(r, 0, 1));
+  guest::StoreU32(base, s + 36076, Around(r, 0, 1));
+  guest::StoreU32(base, s + 25172, Around(r, 0, 1));
+  guest::StoreU32(base, s + 36300, Around(r, -1, 7));
+  guest::StoreU32(base, s + 36372, Around(r, 0, 2));
+  guest::StoreU32(base, s + 36376, Around(r, 0, 2));
+  guest::StoreU32(base, s + 36824, Around(r, 0, 1));
+  guest::StoreU32(base, s + 36708, Around(r, 0, 5));
+  guest::StoreU32(base, s + 36712, Around(r, 0, 4));
+  guest::StoreU32(base, s + 33616, Around(r, 0, 4));
+  guest::StoreU32(base, s + 33620, Around(r, 0, 6));
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t layer = s + 30580 + 4 * i;
+    guest::StoreU32(base, layer + 0, Around(r, 0, 2));
+    guest::StoreU32(base, layer + 80, Around(r, 0, 2));
+    // The mirror table's index stays 0 to 7: past it the original reads its
+    // own register saves, which the native version doesn't write.
+    guest::StoreU32(base, layer + 64, r.Below(8));
+    if (r.Below(2) == 0) {
+      for (uint32_t f : {16u, 32u, 48u, 112u}) {
+        guest::StoreU32(base, layer + f, uint32_t(int32_t(r.Below(721)) - 360));
+      }
+    }
+  }
+  // The stickers: -1 for none, or a number whose tens stay below 16 (past
+  // that the original's tens table reaches its register saves).
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(base, s + 33800 + 4 * i,
+                    r.Below(4) == 0 ? 0xFFFFFFFFu : uint32_t(int32_t(r.Below(260)) - 100));
+  }
   // Category 5's item 6 (the stickers) now and then.
   if (r.Below(4) == 0) {
     guest::StoreU32(base, s + ts::kCategory, 5);
@@ -127,6 +181,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
     WriteRandom(h.base, w.block.address, w.block.bytes, r);
+    WriteRandom(h.base, w.save.address, w.save.bytes, r);
     ShapeScreen(h.base, w, r);
     t.r3.u64 = w.screen();
     setup(t, r, w);
@@ -140,6 +195,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
       native(t, h.base);
     }
     out[v].Bytes(Read(h.base, w.block.address, w.block.bytes));
+    out[v].Bytes(Read(h.base, w.save.address, w.save.bytes));
     out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes - saves));
     out[v].Bytes(Read(h.base, sp, kCallerBytes));
     out[v].Word(t.r1.u32);
@@ -165,6 +221,7 @@ const SetupFn kScreenOnly = [](PPCContext&, Random&, const World&) {};
 
 void TuningScreen(Context& h) {
   World w;
+  w.base = h.base;
   if (!w.ok()) {
     ITC_LOG_ERROR("harness: tuning_screen: no memory for the world");
     return;
@@ -190,6 +247,20 @@ void TuningScreen(Context& h) {
       h, w, "TuningScreen::GetChoiceFlag", 40,
       [](PPCContext& t, Random& r, const World&) { t.r4.u64 = SmallIndex(r, 10); },
       __imp__sub_821CDC38, hooks::TuningGetChoiceFlag, 0);
+
+  // The garage car: StoreToGarageCar's register saves (__savegprlr_25)
+  // left out; its floats are stored with float instructions but compared
+  // exactly (the products of ints, never NaN).
+  Group(h, w, "TuningScreen::StoreToGarageCar", 40, kScreenOnly, __imp__sub_821DCC28,
+        hooks::TuningStoreToGarageCar, 64);
+  Group(
+      h, w, "TuningScreen::EquipChoice", 40,
+      [](PPCContext&, Random& r, const World& w) {
+        // States 5 to 8 most of the time.
+        guest::StoreU32(w.base, w.screen() + ts::kState, r.Below(6) == 0 ? Around(r, 3, 12)
+                                                                          : 5 + r.Below(4));
+      },
+      __imp__sub_821DF448, hooks::TuningEquipChoice, 0);
 
   // The debug state handlers: `saves` is each original's register saves
   // (__savegprlr_N's 8 x (32 - N) + 8 bytes, or its inline stores).

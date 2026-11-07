@@ -412,6 +412,7 @@ set(ITC_SOURCES
     src/hooks/tuning_screen.cpp
     src/tuning_screen/tables.cpp
     src/tuning_screen/debug.cpp
+    src/tuning_screen/garage_car.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
@@ -806,7 +807,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/camera_modes/camera_modes.cpp src/camera_modes/anims.cpp src/camera_modes/views.cpp
     src/camera_modes/paths.cpp src/camera_modes/chase.cpp src/camera_modes/director.cpp
     src/camera_modes/cutscene.cpp src/camera_modes/cutscene_scripts.cpp
-    src/build_screen/rows.cpp PROPERTIES
+    src/build_screen/rows.cpp
+    src/tuning_screen/garage_car.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

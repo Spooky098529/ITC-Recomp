@@ -25,6 +25,7 @@ constexpr uint32_t kType2 = 9663;      // a byte
 constexpr uint32_t kOption = 9664;     // a byte: the option pick
 constexpr uint32_t kPrice = 25120;     // GetPrice's answer kept
 constexpr uint32_t kPartSet = 33900;   // the power and power train tables' row
+constexpr uint32_t kSaveData = 18904;  // the save data (its +6120 the garage's list)
 
 // --- The part tables (tables.cpp): leaves with no frame ---
 
@@ -48,6 +49,23 @@ uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen);
 // sub_821CDC38 TuningScreen::GetChoiceFlag: the current item's word for
 // choice `choice`, 0 where there's none.
 uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice);
+
+// --- The selected garage car (garage_car.cpp) ---
+
+// The selected garage car's record g (the save data's list at +6120 walked
+// [+0x19920] steps from the head halfword +204, cars of 1,968 bytes from
+// it); the fields the screen writes are at g + 212 + k ("c+k").
+uint32_t SelectedGarageCar(uint8_t* base, uint32_t screen);
+// sub_821DCC28 TuningScreen::StoreToGarageCar: r3 = the screen (all 64
+// bits). The screen's current choices into the car. No frame: its tables
+// and conversion temporaries below `sp` as the original leaves them (its
+// register saves, sp - 64 to sp, aren't written). Returns r3 as the
+// original leaves it: the sticker loop's last tens x 10 (64 bits), else the
+// screen.
+uint64_t StoreToGarageCar(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_821DF448 TuningScreen::EquipChoice: the choice just made into the car,
+// by the state (5 to 8). A leaf; r3 left as it is.
+void EquipChoice(uint8_t* base, uint32_t screen);
 
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:
