@@ -84,7 +84,10 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "calls); the modes' Type6Mode::TearDown sub_82235C18 and Type7Mode::TearDown "
               "sub_82246098 (the sound manager's slots guest calls); Type7Screen0::MenuPage "
               "sub_82244BF8 (Menu::Step, Pressed and MenuSound::Play's plain C++; the power "
-              "graph's set-up sub_82250488 and Type7Screen0::Confirm guest calls)) "
+              "graph's set-up sub_82250488 and Type7Screen0::Confirm guest calls); the first "
+              "screens' Show sub_82233C80 and sub_822441D8 with their ShowCarInfo sub_82233B70 "
+              "and sub_822440D8 (with the text setters native; Car::Init, SetModel, Refresh and "
+              "SetModelAndClass's plain C++, GarageCar::Reset a guest call)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -575,6 +578,27 @@ void Type7ModeTearDown(PPCContext& ctx, uint8_t* base) {
                                  Type67Calls(ctx, base));
   ctx.lr = lr;
 }
+namespace {
+
+void Show(PPCContext& ctx, uint8_t* base, bool type7, bool info) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr, r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const t67::Calls calls = Type67Calls(ctx, base);
+  FormatGuestCalls format(ctx, base);
+  ctx.r3.u64 = info ? t67::Screen0ShowCarInfo(base, type7, sp, calls, format.get())
+                    : t67::Screen0Show(base, type7, r3, sp, calls, format.get());
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
+}  // namespace
+
+void Type6Screen0Show(PPCContext& ctx, uint8_t* base) { Show(ctx, base, false, false); }
+void Type7Screen0Show(PPCContext& ctx, uint8_t* base) { Show(ctx, base, true, false); }
+void Type6Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base) { Show(ctx, base, false, true); }
+void Type7Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base) { Show(ctx, base, true, true); }
+
 void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Type7Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
@@ -745,6 +769,8 @@ ITC_TYPE67_MODES(822344A8, Type6Screen0ShowPage)
 ITC_TYPE67_MODES(82244930, Type7Screen0ShowPage)
 ITC_TYPE67_MODES(822448B0, Type7Screen0PlaceCursor)
 ITC_TYPE67_TEXTS(82244AB8, Type7Screen0ShowHelp)
+ITC_TYPE67_TEXTS(82233C80, Type6Screen0Show)
+ITC_TYPE67_TEXTS(822441D8, Type7Screen0Show)
 ITC_TYPE67_MODES(82244760, Type7Screen0FadeOutStep)
 ITC_TYPE67_MODES(82244610, Type7Screen0ChosenPage)
 // The first screens' OpenMovie and SetUpCar (through the machines'
@@ -767,6 +793,9 @@ ITC_TYPE67_MODES(82179AE8, StandScenePollTeardown)
 // The modes' TearDown (held by the delegate, no direct callers).
 ITC_TYPE67_MODES(82235C18, Type6ModeTearDown)
 ITC_TYPE67_MODES(82246098, Type7ModeTearDown)
+// The first screens' Show (through the machines' transitions), while the UI
+// movies' text setters are native (ITC_TYPE67_TEXTS below). No adapters for
+// their ShowCarInfo sub_82233B70 and sub_822440D8 (only Show calls them).
 // Type7Screen0::MenuPage (from the Draw's table, a guest call).
 ITC_TYPE67_MODES(82244BF8, Type7Screen0MenuPage)
 

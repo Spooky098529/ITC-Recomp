@@ -10,13 +10,17 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "car_makers/car_makers.h"
+#include "car_specs/car_specs.h"
+#include "career/career.h"
 #include "guest.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
 #include "mode_tick/mode_tick.h"
+#include "race_setup/race_setup.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 #include "vehicle_accessors/vehicle_accessors.h"
+#include "xaudio/ppc_float.h"
 
 #include <cstdlib>
 
@@ -114,6 +118,12 @@ constexpr uint32_t kMakeModel = 0x8217FCB0;    // GarageStage::MakeModel
 constexpr uint32_t kCommand = 0x82180108;      // GarageStage::Command
 constexpr uint32_t kGarageCarReset = 0x82110448;
 constexpr uint32_t kMemcpy = 0x825A7410;
+
+// Flush-to-zero off, as the car's plain C++ expects at entry.
+void FlushOff() {
+  using Fpscr = rex::platform::FPSCRPlatform;
+  Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+}
 
 // The selected garage car's node: the list at `garage` +204 walked
 // [save +0x19920] times through the halfword links (each node 4 bytes at
@@ -570,6 +580,119 @@ uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   StoreU32(base, menu + 4, item);
   to_step(0, 1, 0);
   return played;
+}
+
+uint64_t Screen0ShowCarInfo(uint8_t* base, bool type7, uint32_t sp, const Calls& calls,
+                            const strings_and_font::FormatCalls& format) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_822440D8 Type7Screen0::ShowCarInfo");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82233B70 Type6Screen0::ShowCarInfo");
+  }
+  constexpr uint32_t kRefresh = 0x820C4998;
+  const uint32_t frame = sp - (type7 ? kType7ShowCarInfoFrame : kType6ShowCarInfoFrame);
+  StoreU32(base, frame, sp);  // the back chain, for the guest calls
+  const uint32_t movie = MovieAt(base, frame, 22);
+  ui_movies::ResetPose(base, movie);
+  // The menu's labels, from a table in the frame (+96).
+  static constexpr uint32_t kType6Labels[] = {109, 120, 110, 113, 114};
+  static constexpr uint32_t kType7Labels[] = {109, 110, 113, 114};
+  const uint32_t* labels = type7 ? kType7Labels : kType6Labels;
+  const uint32_t count = type7 ? 4 : 5;
+  for (uint32_t i = 0; i < count; i++) {
+    StoreU32(base, frame + 96 + 4 * i, labels[i]);
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    SetText(base, format, frame, movie, type7 ? 3 : 4, 5 + i, LoadU32(base, frame + 96 + 4 * i));
+  }
+  // The car object in the frame: built from the type 6 car's id, or the
+  // type 7 car copied, then refreshed.
+  const uint32_t car = frame + (type7 ? 112 : 128);
+  const uint32_t from = type7 ? kType7Car : kType6Car;
+  FlushOff();
+  race_setup::CarInit(base, car);
+  if (type7) {
+    if (!c_runtime::Memcpy(base, car, from, 1884)) {
+      const uint64_t args[4] = {car, from, 1884, 0};
+      calls.call_set(0x825A7410, args, 3, frame, 0x82244174);
+    }
+  } else {
+    race_setup::SetModel(base, car, LoadU32(base, from + 12));
+    StoreU32(base, car + 3888, LoadU32(base, car + 3888) | 1);
+  }
+  FlushOff();
+  uint32_t refreshed = 0;
+  if (!car_specs::CarRefresh(base, car, &refreshed)) {
+    calls.call(kRefresh, frame, type7 ? 0x8224417C : 0x82233C24, car, 0);
+  }
+  FlushOff();
+  const uint32_t block2 = vehicle_accessors::ObjectRecord1888(car);
+  const uint32_t first = type7 ? 12 : 10;
+  SetText(base, format, frame, movie, 0xFFFFFFFF, first, guest::LoadU8(base, block2 + 129) + 1934);
+  SetText(base, format, frame, movie, 0xFFFFFFFF, first + 1, LoadU32(base, from + 12) + 1646);
+  return SetText(base, format, frame, movie, 0xFFFFFFFF, first + 2,
+                 LoadU32(base, from + 12) + 1718);
+}
+
+uint64_t Screen0Show(uint8_t* base, bool type7, uint64_t r3, uint32_t sp, const Calls& calls,
+                     const strings_and_font::FormatCalls& format) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_822441D8 Type7Screen0::Show");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82233C80 Type6Screen0::Show");
+  }
+  const uint32_t screen = uint32_t(r3);
+  const uint32_t d = type7 ? 4 : 0;
+  const uint32_t frame = sp - kShowFrame;
+  StoreU32(base, frame, sp);  // the back chain, for the guest calls
+  const uint32_t car = type7 ? kType7Car : kType6Car;
+  StoreU32(base, car + 1968, 0);
+  StoreU32(base, LoadU32(base, screen + 9640 + d), 0);
+  if (LoadU32(base, car + 1972) == 0xFFFFFFFF) {
+    const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+    calls.call(kGarageCarReset, frame, type7 ? 0x82244224 : 0x82233CCC, car, 0);
+    uint32_t word = 0;  // +1980
+    if (guest::LoadU16(base, save + 6328) == 0) {
+      FlushOff();
+      career::CarSetModelAndClass(base, car, 0, frame);
+      if (guest::LoadU16(base, car + 4) == 0xFFFF) {
+        guest::StoreU16(base, car + 4, 0);
+      }
+      guest::StoreU16(base, car + 2, guest::LoadU16(base, car + 0));
+      guest::StoreU16(base, car + 0, 0);
+      StoreU32(base, car + 1972, 0);
+      StoreU32(base, car + 1976, 0);
+    } else {
+      const uint32_t garage = save + 6120, steps = save + 0x19920;
+      const int32_t slot =
+          int16_t(guest::LoadU16(base, GarageNode(base, garage, LoadU32(base, steps)) + 2));
+      const uint32_t source = uint32_t(slot) * 1968 + garage + 212;
+      if (!c_runtime::Memcpy(base, car, source, 1968)) {
+        const uint64_t args[4] = {car, source, 1968, 0};
+        calls.call_set(kMemcpy, args, 3, frame, type7 ? 0x822442B8 : 0x82233D60);
+      }
+      StoreU32(base, car + 1972, 2);
+      StoreU32(base, car + 1976, LoadU32(base, steps));
+      const int32_t again =
+          int16_t(guest::LoadU16(base, GarageNode(base, garage, LoadU32(base, steps)) + 2));
+      word = uint32_t(int32_t(int16_t(guest::LoadU16(base, uint32_t(again) * 1968 + garage + 212))));
+    }
+    StoreU32(base, car + 1980, word);
+  }
+  // The menu: the previous item = the cursor, the cursor = the item picked.
+  const uint32_t menu = LoadU32(base, screen + 9648 + d);
+  const uint32_t cursor = LoadU32(base, menu);
+  StoreU32(base, menu + 0, LoadU32(base, screen + 9652 + d));
+  StoreU32(base, menu + 4, cursor);
+  const uint64_t answer = Screen0ShowCarInfo(base, type7, frame, calls, format);
+  const uint32_t p = LoadU32(base, screen + 9644 + d);
+  const uint32_t page = LoadU32(base, p);
+  if (page != 0) StoreU32(base, p + 8, page);
+  StoreU32(base, p + 12, 0);
+  StoreU32(base, p + 4, 0);
+  StoreU32(base, p + 16, 0xFFFFFFFF);
+  StoreU32(base, p + 0, 0xFFFFFFFF);
+  return answer;
 }
 
 }  // namespace type67_modes

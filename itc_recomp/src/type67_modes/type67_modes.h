@@ -470,6 +470,28 @@ uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& c
 // message 20 or 17; with a car, message 6 or 5; then
 // ScreenFades::FadeOut(1, 0, 0, 0, 0). r3 1, as FadeOut leaves it.
 uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82233B70 Type6Screen0::ShowCarInfo and sub_822440D8
+// Type7Screen0::ShowCarInfo: movie 22 reset (UiMovie::ResetPose), the
+// menu's labels (sub-scene 4, strings 109, 120, 110, 113, 114; type 7
+// sub-scene 3 without 120) from a table in the frame, a car object in the
+// frame (Car::Init; type 6 Car::SetModel from the type 6 car's id and its
+// +3888 |= 1, type 7 the type 7 car copied; Car::Refresh), then texts 10 to
+// 12 (type 7: 12 to 14) its class (1934 + block 2's byte +129), name and
+// maker (1646 and 1718 + the id). UiMovie::SetText with r7 to r10 0. r3 the
+// last SetText's. `sp` is the caller's stack pointer.
+constexpr uint32_t kType6ShowCarInfoFrame = 4064;
+constexpr uint32_t kType7ShowCarInfoFrame = 4048;
+uint64_t Screen0ShowCarInfo(uint8_t* base, bool type7, uint32_t sp, const Calls& calls,
+                            const strings_and_font::FormatCalls& format);
+// sub_82233C80 Type6Screen0::Show and sub_822441D8 Type7Screen0::Show (r3
+// the screen): the car's model word 0, the loading animation's word 0; with
+// no car yet (+1972 -1), GarageCar::Reset (a guest call) and the stock car
+// 0 (Car::SetModelAndClass's plain C++) for an empty garage, else the
+// selected garage car copied; the menu's cursor back on the item picked,
+// ShowCarInfo, the page state to the opening step. r3 ShowCarInfo's.
+constexpr uint32_t kShowFrame = 128;
+uint64_t Screen0Show(uint8_t* base, bool type7, uint64_t r3, uint32_t sp, const Calls& calls,
+                     const strings_and_font::FormatCalls& format);
 // sub_82234768 Type6Screen0::OnDialogClosed (r4 the dispatcher): by the
 // confirm asked (+9664: 4, 5) and the pick (+9640's +72): page 0 and
 // ShowPage 0; the second confirm (Type6Screen0::ConfirmAgain, a guest call

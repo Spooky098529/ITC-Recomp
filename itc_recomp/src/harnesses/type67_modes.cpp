@@ -29,6 +29,7 @@
 #include "archive/archive.h"
 #include "base/log.h"
 #include "cameras/cameras.h"
+#include "car_specs/car_specs.h"
 #include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
 #include "hooks/archive.h"
@@ -39,6 +40,7 @@
 #include "menu_sounds/menu_sounds.h"
 #include "memory/heap.h"
 #include "mode_tick/mode_tick.h"
+#include "race_setup/race_setup.h"
 #include "type67_modes/type67_modes.h"
 #include "ui_movies/game.h"
 
@@ -52,6 +54,14 @@
 ITC_FLAG_DECLARE(bool, native_type67_modes);
 
 namespace harness {
+
+// The stand's car world (src/harnesses/car_makers.cpp): LayGarage's car
+// (+0x4000), its spec (+0xA000, its id 5) and parameters (+0x9100) in a
+// 0x10000-byte block. (The same definition is in car_makers.cpp.)
+struct StandWorld {
+  uint32_t params, holder_word, list;
+};
+StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint32_t holder);
 
 namespace {
 
@@ -1644,6 +1654,17 @@ void Screen0Helpers(Context& h, const Block& world) {
     // never seen in play and not laid here), the fake sound manager; the
     // original run with the flag on as the closes are.
     bool menu = false;
+    // The first screens' Show (1) and ShowCarInfo (2): the car world
+    // (LayShowCarWorld's, the mode's car its garage car, a save data's
+    // garage list to it as Cars' cases lay it, the parameters' table at the
+    // spec for the stock car 0 where an empty garage makes it), the live
+    // scene's children 4 (the menu's sub-scene) and 10 to 14 (the car's
+    // texts) laid, the TXT nodes' text ids small; the screen's loading
+    // word, page and menu blocks. `below`: the callee's register saves under
+    // the frame (ShowCarInfo's under Show's), left out.
+    int show = 0;
+    bool type7 = false;
+    uint32_t below = 0;
   };
   const Function functions[] = {
       {"Type6Screen0::Confirm", 0x82233FC8, true, __imp__sub_82233FC8,
@@ -1667,7 +1688,26 @@ void Screen0Helpers(Context& h, const Block& world) {
        hooks::Type7Screen0OnDialogClosed, 112, 24, 7},
       {"Type7Screen0::MenuPage", 0x82244BF8, true, __imp__sub_82244BF8,
        hooks::Type7Screen0MenuPage, 112, 24, 0, true},
+      {"Type6Screen0::ShowCarInfo", 0x82233B70, false, __imp__sub_82233B70,
+       hooks::Type6Screen0ShowCarInfo, 4064, 32, 0, false, 2, false},
+      {"Type7Screen0::ShowCarInfo", 0x822440D8, false, __imp__sub_822440D8,
+       hooks::Type7Screen0ShowCarInfo, 4048, 32, 0, false, 2, true},
+      {"Type6Screen0::Show", 0x82233C80, false, __imp__sub_82233C80, hooks::Type6Screen0Show,
+       128, 48, 0, false, 1, false, 32},
+      {"Type7Screen0::Show", 0x822441D8, false, __imp__sub_822441D8, hooks::Type7Screen0Show,
+       128, 48, 0, false, 1, true, 32},
   };
+  // The show cases' car block and save data, and the globals they point.
+  constexpr uint32_t kCarBlockBytes = 0x10000, kSaveBytes = 0x1A000, kCarBytes = 1984;
+  constexpr uint32_t kSavePointer = 0x826C5B58;
+  const Block car_block(kCarBlockBytes);
+  const Block save_block(kSaveBytes);
+  if (!car_block.address || !save_block.address) return;
+  const uint32_t saved_save = guest::LoadU32(base, kSavePointer);
+  const uint32_t saved_seed = guest::LoadU32(base, race_setup::kRandSeed);
+  const uint32_t saved_params = guest::LoadU32(base, car_specs::kParams);
+  const std::vector<uint8_t> saved_cars[2] = {Read(base, t67::kType6Car, kCarBytes),
+                                              Read(base, t67::kType7Car, kCarBytes)};
   const Block mappers(0x1000);
   const Block manager_block(0x1000);  // the fake manager (+0), its vtable (+0x800)
   if (!mappers.address || !manager_block.address) return;
@@ -1678,7 +1718,7 @@ void Screen0Helpers(Context& h, const Block& world) {
   static constexpr uint32_t kTags[] = {0x50494300, 0x50524D00, kTagTxt, 0x12345678};
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
-    for (int c = 0; c < (f.menu ? 96 : f.closed != 0 ? 48 : 16); c++) {
+    for (int c = 0; c < (f.menu ? 96 : f.closed != 0 || f.show != 0 ? 48 : 16); c++) {
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
         Random r(uint64_t(c) * 977 + f.address);
@@ -1754,6 +1794,65 @@ void Screen0Helpers(Context& h, const Block& world) {
           static constexpr uint32_t kAsked[] = {4, 4, 5, 5, 0xFFFFFFFFu};
           guest::StoreU32(base, world.address + 9664, kAsked[r.Below(5)]);
         }
+        if (f.show != 0) {
+          // The callees' frames below (ShowCarInfo's car object).
+          WriteRandom(base, sp - 9216, 9216 - 1024, r);
+          // UiMovie::ResetPose: the file and saved scenes the live one, its
+          // children 0 to 4 at most walked (a TXT node and untagged ones).
+          guest::StoreU32(base, movie + ui_movies::kMovieFile, node(0));
+          guest::StoreU32(base, movie + ui_movies::kMovieSaved, node(0));
+          guest::StoreU32(base, node(0) + 100, 0);
+          guest::StoreU32(base, node(0) + 104, r.Below(5));
+          guest::StoreU32(base, race_setup::kRandSeed, uint32_t(r.Next()));
+          guest::StoreU32(base, node(0) + 128 + 8 * 4, node(5));
+          for (uint32_t k = 0; k < 5; k++) {
+            guest::StoreU32(base, node(0) + 128 + 8 * (10 + k), node(6 + 2 * k));
+          }
+          // The texts' nodes TXT (SetText's original loops forever on another).
+          for (uint32_t i = 6; i < kNodes; i++) {
+            if (i <= 14) guest::StoreU32(base, node(i), kTagTxt);
+            guest::StoreU32(base, node(i) + 108, r.Below(15));
+          }
+          const uint32_t cars = car_block.address, save = save_block.address;
+          const StandWorld stand = LayShowCarWorld(base, cars, r, c, cars + 0xCE00);
+          const uint32_t garage_car = cars + 0x4000, spec = cars + 0xA000;
+          const uint32_t car = f.type7 ? t67::kType7Car : t67::kType6Car;
+          WriteRandom(base, car, kCarBytes, r);
+          Write(base, car, Read(base, garage_car, 1884).data(), 1884);
+          static constexpr uint32_t kFrom[] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0, 2};
+          const uint32_t from = kFrom[r.Below(4)];
+          guest::StoreU32(base, car + 1972, from);
+          WriteRandom(base, save, 0x400, r);
+          WriteRandom(base, save + 6120, 0x400, r);
+          const uint32_t nodes_at = save + 6120;
+          const uint32_t steps = r.Below(4);
+          guest::StoreU32(base, save + 0x19920, steps);
+          uint16_t at = uint16_t(r.Below(10));
+          guest::StoreU16(base, nodes_at + 204, at);
+          for (uint32_t i = 0; i < steps; i++) {
+            const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
+            guest::StoreU16(base, nodes_at + 4 * at, next);
+            at = next;
+          }
+          const uint32_t slot = r.Below(3);
+          guest::StoreU16(base, nodes_at + 4 * at + 2, uint16_t(slot));
+          WriteRandom(base, nodes_at + 212 + 1968 * slot, 1968, r);
+          Write(base, nodes_at + 212 + 1968 * slot, Read(base, garage_car, 1884).data(), 1884);
+          const bool empty = r.Below(3) == 0;
+          guest::StoreU16(base, save + 6328, empty ? 0 : uint16_t(1 + r.Below(20)));
+          guest::StoreU32(base, kSavePointer, save);
+          guest::StoreU32(base, car_specs::kParams, stand.params);
+          // The stock car 0 an empty garage makes: its spec the case's.
+          if (f.show == 1 && from == 0xFFFFFFFFu && empty) {
+            guest::StoreU32(base, stand.params + 12, spec);
+          }
+          const uint32_t d = f.type7 ? 4 : 0;
+          guest::StoreU32(base, world.address + 9640 + d, world.address + 0x3800);
+          guest::StoreU32(base, world.address + 9644 + d, world.address + 0x3A00);
+          guest::StoreU32(base, world.address + 9648 + d, world.address + 0x3900);
+          static constexpr uint32_t kPages[] = {0, 1, 2, 3, 0xFFFFFFFFu};
+          guest::StoreU32(base, world.address + 0x3A00, kPages[r.Below(5)]);
+        }
         if (f.menu) {
           const uint32_t menu = world.address + 0x3900, page = world.address + 0x3A00;
           guest::StoreU32(base, world.address + 9648, page);
@@ -1809,8 +1908,9 @@ void Screen0Helpers(Context& h, const Block& world) {
           guest::StoreU32(base, menu_sounds::kSoundManager, manager);
         }
         PPCContext t = CallContext(h);
-        t.r3.u64 = f.closed != 0 || f.menu ? world.address | (uint64_t(r.Below(2)) << 32)
-                                           : uint32_t(r.Next());
+        t.r3.u64 = f.closed != 0 || f.menu || f.show == 1
+                       ? world.address | (uint64_t(r.Below(2)) << 32)
+                       : uint32_t(r.Next());
         t.r4.u64 = f.confirm ? world.address + 0x3200
                              : (r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(5));
         t.lr = 0x82000000 | (r.Below(0x10000) << 2);
@@ -1831,8 +1931,17 @@ void Screen0Helpers(Context& h, const Block& world) {
           out[v].Bytes(Read(base, menu_helpers::kMapperEntries, 32));
           out[v].Bytes(Read(base, menu_helpers::kControllerEntries, 16));
         }
+        if (f.show != 0) {
+          out[v].Word(guest::LoadU32(base, race_setup::kRandSeed));
+          out[v].Bytes(Read(base, car_block.address, kCarBlockBytes));
+          out[v].Bytes(Read(base, save_block.address, kSaveBytes));
+          out[v].Bytes(Read(base, t67::kType6Car, kCarBytes));
+          out[v].Bytes(Read(base, t67::kType7Car, kCarBytes));
+        }
         const uint32_t frame = sp - f.frame;
-        out[v].Bytes(Read(base, sp - 1024, frame - (sp - 1024)));
+        if (f.frame <= 1024) {
+          out[v].Bytes(Read(base, sp - 1024, frame - f.below - (sp - 1024)));
+        }
         out[v].Bytes(Read(base, frame + 4, 44));
         out[v].Bytes(Read(base, frame + 80, f.frame - 80 - f.saves));
         out[v].Bytes(Read(base, sp, 256));
@@ -1850,6 +1959,11 @@ void Screen0Helpers(Context& h, const Block& world) {
   guest::StoreU32(base, menu_sounds::kSoundManager, saved_manager);
   Write(base, menu_helpers::kMapperEntries, saved_mappers.data(), 32);
   Write(base, menu_helpers::kControllerEntries, saved_controllers.data(), 16);
+  guest::StoreU32(base, kSavePointer, saved_save);
+  guest::StoreU32(base, race_setup::kRandSeed, saved_seed);
+  guest::StoreU32(base, car_specs::kParams, saved_params);
+  Write(base, t67::kType6Car, saved_cars[0].data(), kCarBytes);
+  Write(base, t67::kType7Car, saved_cars[1].data(), kCarBytes);
 }
 
 // --- The first screens' OpenMovie and SetUpCar: the stand's holder

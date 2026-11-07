@@ -171,6 +171,14 @@ void StandScenePollTeardown(PPCContext& ctx, uint8_t* base);
 // Type7Mode sub_82246098.
 void Type6ModeTearDown(PPCContext& ctx, uint8_t* base);
 void Type7ModeTearDown(PPCContext& ctx, uint8_t* base);
+// The first screens' Show (Type6 sub_82233C80, Type7 sub_822441D8; r3 the
+// screen) and ShowCarInfo (Type6 sub_82233B70, Type7 sub_822440D8; no
+// adapters: only Show calls them, natively): they need the UI movies' text
+// setters native (Type67TextsNative).
+void Type6Screen0Show(PPCContext& ctx, uint8_t* base);
+void Type7Screen0Show(PPCContext& ctx, uint8_t* base);
+void Type6Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base);
+void Type7Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base);
 // Type7Screen0::MenuPage sub_82244BF8 (r3 the screen, r4 the dispatcher).
 void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base);
 void GarageStageInit(PPCContext& ctx, uint8_t* base);
