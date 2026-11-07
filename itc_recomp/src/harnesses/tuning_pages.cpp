@@ -65,15 +65,23 @@ constexpr uint32_t kFades = 0x826A50AC;  // the screen fades' words (to 0x826A50
 constexpr uint32_t kFadesBytes = 0x3C;
 constexpr uint32_t kQueueAt = 0x9F00;    // the command queue [+10036] in the screen's block
 
+// The car parameters [0x826C2E48] (+0) and the one part table their nine
+// pointers name (+0x100: car ids 0 to 25 and levels to 255 stay inside).
+constexpr uint32_t kParamsBytes = 0x4000;
+constexpr uint32_t kCarParams = 0x826C2E48;
+
 struct World {
-  World() : screen_block(kScreenBytes), save(kSaveBytes), movie(kMovieBytes) {}
+  World()
+      : screen_block(kScreenBytes), save(kSaveBytes), movie(kMovieBytes), params(kParamsBytes) {}
   bool ok() const {
-    return screen_block.address != 0 && save.address != 0 && movie.address != 0;
+    return screen_block.address != 0 && save.address != 0 && movie.address != 0 &&
+           params.address != 0;
   }
   uint32_t screen() const { return screen_block.address; }
   Block screen_block;
   Block save;
   Block movie;
+  Block params;
   uint8_t* base = nullptr;
 };
 
@@ -86,6 +94,7 @@ constexpr Global kGlobals[] = {
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
     {kFades, kFadesBytes},
+    {kCarParams, 4},
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -189,6 +198,15 @@ void ShapeMovie(uint8_t* base, const World& w, Random& r) {
   }
 }
 
+// The car parameters: their nine part tables' pointers at the one table.
+void ShapeParams(uint8_t* base, const World& w) {
+  const uint32_t params = w.params.address;
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, params + 16 + 4 * i, params + 0x100);
+  }
+  guest::StoreU32(base, kCarParams, params);
+}
+
 using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
 
 // Stack bytes left out of the comparison besides the top register saves:
@@ -213,8 +231,10 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     WriteRandom(h.base, w.screen_block.address, w.screen_block.bytes, r);
     WriteRandom(h.base, w.save.address, w.save.bytes, r);
     WriteRandom(h.base, w.movie.address, w.movie.bytes, r);
+    WriteRandom(h.base, w.params.address, w.params.bytes, r);
     ShapeScreen(h.base, w, r);
     ShapeMovie(h.base, w, r);
+    ShapeParams(h.base, w);
     t.r3.u64 = w.screen();
     setup(t, r, w);
     t.lr = 0x82000000 | (r.Below(0x10000) << 2);
@@ -234,6 +254,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     out[v].Bytes(Read(h.base, w.screen_block.address, w.screen_block.bytes));
     out[v].Bytes(Read(h.base, w.save.address, w.save.bytes));
     out[v].Bytes(Read(h.base, w.movie.address, w.movie.bytes));
+    out[v].Bytes(Read(h.base, w.params.address, w.params.bytes));
     for (size_t i = 0; i < saved.size(); i++) {
       out[v].Bytes(Read(h.base, kGlobals[i].address, kGlobals[i].bytes));
       Write(h.base, kGlobals[i].address, saved[i].data(), kGlobals[i].bytes);
@@ -583,6 +604,44 @@ void TuningPages(Context& h) {
         }
       },
       __imp__sub_821D84F8, hooks::TuningPagesEnterEditor, 16, {{96, 112}});
+
+  // The current choices: the body kit [+36588] 0 a quarter of the time,
+  // else a level to 255 (r31 and lr's saves 16 bytes).
+  Group(
+      h, w, "TuningScreen::SetAeroAvailability", 40,
+      [](PPCContext&, Random& r, const World& w) {
+        guest::StoreU32(w.base, w.screen() + 36588, r.Below(4) == 0 ? 0 : r.Below(256));
+      },
+      __imp__sub_821DE160, hooks::TuningPagesSetAeroAvailability, 16);
+  // SetCurrentChoice: categories -1 to 7 and items 0 to 10 (now and then any
+  // byte), the indices [+33900] and [+33576] small, the wheels' +25196 0
+  // half the time, else 1 to 3; r3 now and then with upper bits (lr's save
+  // 8 bytes; SetAeroAvailability's r31 and lr, 96 bytes below, out too).
+  Group(
+      h, w, "TuningScreen::SetCurrentChoice", 120,
+      [](PPCContext& t, Random& r, const World& w) {
+        const uint32_t s = w.screen();
+        guest::StoreU32(w.base, s + 9656, Around(r, -1, 7));
+        guest::StoreU8(w.base, s + 9660, uint8_t(r.Below(10) == 0 ? r.Next() : r.Below(11)));
+        // A third of the time the paths with calls or more stores: the body
+        // kit, the wheels, category 3's item 0, the interior's item 3.
+        if (r.Below(3) == 0) {
+          static constexpr uint8_t kPicks[4][2] = {{4, 9}, {5, 0}, {3, 0}, {6, 3}};
+          const auto& pick = kPicks[r.Below(4)];
+          guest::StoreU32(w.base, s + 9656, pick[0]);
+          guest::StoreU8(w.base, s + 9660, pick[1]);
+        }
+        if (r.Below(4) == 0) {
+          guest::StoreU8(w.base, s + 9661 + r.Below(4), 0);
+        }
+        guest::StoreU32(w.base, s + 33900, r.Below(8));
+        guest::StoreU32(w.base, s + 33576, r.Below(8));
+        guest::StoreU32(w.base, s + 25196, r.Below(2) == 0 ? 0 : 1 + r.Below(3));
+        if (r.Below(6) == 0) {
+          t.r3.u64 |= r.Next() << 32;
+        }
+      },
+      __imp__sub_821E1DB0, hooks::TuningPagesSetCurrentChoice, 8, {{96, 112}});
 }
 
 }  // namespace harness

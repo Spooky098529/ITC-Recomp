@@ -66,4 +66,10 @@ void TuningPagesShowPricePanel(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetBrandLogo(PPCContext& ctx, uint8_t* base);
 void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base);
 
+// The current choices (r3 = the screen): SetAeroAvailability sub_821DE160,
+// SetCurrentChoice sub_821E1DB0 (Params::GetCarParts and AeroParts::Get82 by
+// their plain C++ with --native_car_specs, else through the guest).
+void TuningPagesSetAeroAvailability(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetCurrentChoice(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

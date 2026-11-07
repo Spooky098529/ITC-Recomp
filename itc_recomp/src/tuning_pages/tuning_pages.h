@@ -155,4 +155,24 @@ uint32_t SetBrandLogo(uint8_t* base, uint32_t screen, uint32_t sp);
 // flush-to-zero off. r3 left.
 void HsvToRgb(uint8_t* base, uint32_t out, uint32_t in, uint32_t sp);
 
+// --- The current choices (choices.cpp) ---
+// Guest calls through `call` (tuning_screen::GuestCall) where the plain C++
+// isn't taken: Params::GetCarParts and AeroParts::Get82 without
+// `native_specs` (--native_car_specs) or where Get82's plain C++ declines,
+// memcpy where Buffers_Memcpy declines.
+
+// sub_821DE160 TuningScreen::SetAeroAvailability: the aero items'
+// availability +25128 to +25164 by the selected garage car's body kit
+// [+36588] (its row). 192-byte frame (the parts at frame + 128, their copy
+// at frame + 80); r3 Get82's (frame + 128), else memcpy's (frame + 80).
+uint64_t SetAeroAvailability(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                             uint32_t sp, bool native_specs);
+// sub_821E1DB0 TuningScreen::SetCurrentChoice (its category 4 case 0 the
+// split piece sub_821E203C, merged): the choice just picked into the
+// current choice words (its row). 96-byte frame; r3 as the original leaves
+// it: 36080 (category 3 item 0), SetAeroAvailability's (category 4 item 9),
+// the last WheelNumber's (category 5 item 0), else r3 as it came.
+uint64_t SetCurrentChoice(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3,
+                          uint32_t sp, bool native_specs);
+
 }  // namespace tuning_pages

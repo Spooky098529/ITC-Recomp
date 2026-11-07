@@ -12,6 +12,7 @@
 #include "tuning_pages/tuning_pages.h"
 
 ITC_FLAG_DECLARE(bool, native_car_models);
+ITC_FLAG_DECLARE(bool, native_car_specs);
 
 ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "Run the tuning screen's pages' functions (docs/functions/tuning-pages.md: "
@@ -33,7 +34,10 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "vinyls' records StoreVinyls sub_82203F20 and LoadVinyls sub_822040A8 (memcpy's plain "
               "C++ where Buffers_Memcpy takes it); ShowPricePanel sub_821D9E68, SetBrandLogo "
               "sub_821EED98 (its piece sub_821EEE14 merged), movie 2's nodes through the UI "
-              "movies' plain C++; Color::HsvToRgb sub_8224AB50) "
+              "movies' plain C++; Color::HsvToRgb sub_8224AB50; the current choices "
+              "SetAeroAvailability sub_821DE160 and SetCurrentChoice sub_821E1DB0 (its piece "
+              "sub_821E203C merged; Params::GetCarParts and AeroParts::Get82 by their plain C++ "
+              "with --native_car_specs)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -171,6 +175,38 @@ void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base) {
   tp::HsvToRgb(base, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
+namespace {
+
+// A step with the guest calls (hooks::StandModelsGuestCall), lr put back.
+template <typename Body>
+void WithCalls(PPCContext& ctx, uint8_t* base, Body body) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const tuning_screen::GuestCall call = StandModelsGuestCall(ctx, base);
+  const uint64_t r3 = body(call);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace
+
+void TuningPagesSetAeroAvailability(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_specs = ITC_FLAG(native_car_specs);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::SetAeroAvailability(base, call, screen, sp, native_specs);
+  });
+}
+
+void TuningPagesSetCurrentChoice(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_specs = ITC_FLAG(native_car_specs);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::SetCurrentChoice(base, call, r3, sp, native_specs);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -208,6 +244,9 @@ ITC_TUNING_PAGES(822040A8, TuningPagesLoadVinyls)
 ITC_TUNING_PAGES(821D9E68, TuningPagesShowPricePanel)
 ITC_TUNING_PAGES(821EED98, TuningPagesSetBrandLogo)
 ITC_TUNING_PAGES(8224AB50, TuningPagesHsvToRgb)
+
+ITC_TUNING_PAGES(821DE160, TuningPagesSetAeroAvailability)
+ITC_TUNING_PAGES(821E1DB0, TuningPagesSetCurrentChoice)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
