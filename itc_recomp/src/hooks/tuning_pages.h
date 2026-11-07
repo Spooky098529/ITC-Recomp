@@ -48,4 +48,10 @@ void TuningPagesBindVinylTexture(PPCContext& ctx, uint8_t* base);
 void TuningPagesBindVinylTextures(PPCContext& ctx, uint8_t* base);
 void TuningPagesEnterEditor(PPCContext& ctx, uint8_t* base);
 
+// The vinyls' records (r3 = the screen; flush-to-zero off): StoreVinyls
+// sub_82203F20, LoadVinyls sub_822040A8 (memcpy through the guest where
+// Buffers_Memcpy declines).
+void TuningPagesStoreVinyls(PPCContext& ctx, uint8_t* base);
+void TuningPagesLoadVinyls(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <functional>
 
+#include "tuning_screen/tuning_screen.h"
+
 namespace tuning_pages {
 
 // --- The pages' counts and the owned flags (tables.cpp): leaves, no frame ---
@@ -106,5 +108,21 @@ uint64_t BindVinylTextures(uint8_t* base, uint64_t screen, uint32_t sp);
 // the queue to state 23 (command 15, SetUpVinylBusyIcon) or 38 (command 32).
 // 96-byte frame; r3 the screen, AllLoaded's 0 or FadeIn's (the passes).
 uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp);
+
+// --- The vinyls' records (vinyls.cpp; flush-to-zero off) ---
+
+// sub_82203F20 TuningScreen::StoreVinyls: the screen's six vinyl records
+// (+30880 + 24n, +30952 + 24n, the ids +31168 and +31180) into the selected
+// garage car's decal records (its row). No frame: the index list {0, 1, 2}
+// at sp - 16 and the conversions' doublewords at sp - 48 to sp - 24 as the
+// original leaves them. r3 left.
+void StoreVinyls(uint8_t* base, uint64_t screen, uint32_t sp);
+// sub_822040A8 TuningScreen::LoadVinyls: the inverse, then the ids and the
+// records copied to their saved copies (+31192, +31024: memcpy's plain C++
+// where Buffers_Memcpy takes it, else the guest's through `call`). 144-byte
+// frame (the index list at frame + 80); r3 the last memcpy's (its
+// destination).
+uint64_t LoadVinyls(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                    uint32_t sp);
 
 }  // namespace tuning_pages

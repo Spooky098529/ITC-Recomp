@@ -8,6 +8,7 @@
 #include "base/flags.h"
 #include "car_models/vinyl.h"
 #include "hooks/heap.h"
+#include "hooks/stand_models.h"
 #include "tuning_pages/tuning_pages.h"
 
 ITC_FLAG_DECLARE(bool, native_car_models);
@@ -26,7 +27,9 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "textures DecalImages::FreeTexture sub_821FE6A0 (Texture::Free by its plain C++ with "
               "--native_car_models and the native heap), RestoreVinylTexture sub_82204698, "
               "RestoreStickerTexture sub_821F89B8, BindVinylTexture sub_82204730, "
-              "BindVinylTextures sub_82203D40 and EnterEditor sub_821D84F8 (FadeIn's plain C++)) "
+              "BindVinylTextures sub_82203D40 and EnterEditor sub_821D84F8 (FadeIn's plain C++); the "
+              "vinyls' records StoreVinyls sub_82203F20 and LoadVinyls sub_822040A8 (memcpy's plain "
+              "C++ where Buffers_Memcpy takes it)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -123,6 +126,22 @@ void TuningPagesEnterEditor(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = tp::EnterEditor(base, ctx.r3.u64, ctx.r1.u32);
 }
 
+void TuningPagesStoreVinyls(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  tp::StoreVinyls(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void TuningPagesLoadVinyls(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  ctx.fpscr.disableFlushMode();
+  const tuning_screen::GuestCall call = StandModelsGuestCall(ctx, base);
+  const uint64_t r3 = tp::LoadVinyls(base, call, screen, sp);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -152,6 +171,9 @@ ITC_TUNING_PAGES(82204698, TuningPagesRestoreVinylTexture)
 ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
 ITC_TUNING_PAGES(82204730, TuningPagesBindVinylTexture)
 ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
+
+ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
+ITC_TUNING_PAGES(822040A8, TuningPagesLoadVinyls)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above

@@ -244,6 +244,52 @@ void Group(Context& h, const World& w, const char* name, int cases, const SetupF
 
 const SetupFn kScreenOnly = [](PPCContext&, Random&, const World&) {};
 
+// A word with a signaling NaN made quiet (the originals' lfs and stfs quiet
+// it, the host's float copies may not; not the game's data).
+uint32_t Quiet(uint32_t word) {
+  if ((word & 0x7F800000u) == 0x7F800000u && (word & 0x007FFFFFu) != 0) {
+    word |= 0x00400000u;
+  }
+  return word;
+}
+void QuietRange(uint8_t* base, uint32_t address, uint32_t bytes) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    guest::StoreU32(base, address + i, Quiet(guest::LoadU32(base, address + i)));
+  }
+}
+
+// The vinyls: the screen's records and the garage cars' decal records
+// without signaling NaNs, now and then small ints and plain floats (and
+// negative angles) in them.
+const SetupFn kVinyls = [](PPCContext&, Random& r, const World& w) {
+  const uint32_t s = w.screen();
+  QuietRange(w.base, s + 30880, 31220 - 30880);
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t c = w.save.address + 6120 + 1968 * k + 212;
+    QuietRange(w.base, c + 96, 192);
+    if (r.Below(2) == 0) {
+      for (uint32_t i = 0; i < 6; i++) {
+        const uint32_t record = c + 96 + 32 * i;
+        guest::StoreFloat(w.base, record + 0, float(int32_t(r.Below(720)) - 360));
+        guest::StoreFloat(w.base, record + 4, float(int32_t(r.Below(720)) - 360));
+        guest::StoreFloat(w.base, record + 8, float(r.Below(1000)) / 4.0f - 100.0f);
+        guest::StoreFloat(w.base, record + 12, float(r.Below(1000)) / 8.0f);
+        guest::StoreFloat(w.base, record + 16, float(r.Below(100)) / 16.0f);
+      }
+    }
+  }
+  if (r.Below(2) == 0) {
+    for (uint32_t i = 0; i < 6; i++) {
+      const uint32_t record = s + 30880 + 24 * i;
+      guest::StoreU32(w.base, record + 0, Around(r, -300, 300));
+      guest::StoreU32(w.base, record + 4, Around(r, -300, 300));
+      guest::StoreFloat(w.base, record + 8, float(r.Below(100)) / 16.0f);
+      guest::StoreFloat(w.base, record + 12, float(int32_t(r.Below(720)) - 360));
+      guest::StoreU32(w.base, record + 16, Around(r, 0, 1));
+    }
+  }
+};
+
 // DecalImages::FreeTexture: entry i 0 to 60 (now and then any word, with
 // upper bits); its texture held by a kept slot (mode 1), by another of
 // entries 33 to 50 (mode 2), or by nothing (mode 0: a real header of the
@@ -404,6 +450,12 @@ void TuningPages(Context& h) {
   // __savegprlr_29's 32, r31 and lr's 16). r3 the images (now and then with
   // upper bits), the textures 0 to 199 (the movie's table).
   FreeTextures(h, w);
+
+  // The vinyls' records (LoadVinyls' __savegprlr_27: 48 bytes).
+  Group(h, w, "TuningScreen::StoreVinyls", 40, kVinyls, __imp__sub_82203F20,
+        hooks::TuningPagesStoreVinyls);
+  Group(h, w, "TuningScreen::LoadVinyls", 40, kVinyls, __imp__sub_822040A8,
+        hooks::TuningPagesLoadVinyls, 48);
   auto restore = [](PPCContext& t, Random& r, const World& w) {
     t.r3.u64 = w.screen() + 10048;
     if (r.Below(6) == 0) {
