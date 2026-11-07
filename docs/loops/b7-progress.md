@@ -11,7 +11,8 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-11-06 14:33 on `b7-loop-06-11-26` (the previous
   run's branch, checked out by the user for this run), from 105ba4b9;
   summary `b7-loop-2026-11-06-1433.md`. Limit: 5 subsystems (the
-  user's call, 2026-11-06, raised from 3 during the run).
+  user's call, 2026-11-06, raised from 3 during the run); the loop ends
+  after the tuning screen, subsystem 4 (the user's call, 2026-11-07).
 - Subsystem 1 of 5: the course scenery's race-side owners (lead picked:
   `sub_8215B790`, `sub_8215D2B0`, `sub_821514A0`, `sub_821516F0`, the top
   of `leads.md`; ready groups under all four; its line deleted from
