@@ -53,7 +53,11 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "StandScene::Release sub_82180738; Quaternion::FromAngles sub_8217C120 and "
               "GarageCamera::Reset sub_8217D888 and GarageLights::Init sub_8217D3C8 with the "
               "translated code's float steps; StandSlot::Init sub_82180AA0 with "
-              "GarageStage::Init sub_82180968 and GarageCamera::Init sub_82180918) "
+              "GarageStage::Init sub_82180968 and GarageCamera::Init sub_82180918; the dialogs' "
+              "Type6Dialog::OpenConfirm sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, "
+              "Dialog::DrawWaiting sub_82241C18, Dialog::OpenConfirmStep sub_822325E0, "
+              "CloseConfirmStep sub_8223AA10 and MoveCursorStep sub_8223AB50, UiMovie::Run, "
+              "FinishAll and FinishNamed guest calls) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_modes)");
@@ -236,6 +240,22 @@ t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
     ctx.lr = link;
     return ctx.r3.u64;
   };
+  calls.call_set = [&ctx, base](uint32_t function, const uint64_t args[4], int set, uint32_t r1,
+                                uint32_t lr) -> uint64_t {
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = r1;
+    PPCRegister* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    for (int i = 0; i < set; i++) {
+      registers[i]->u64 = args[i];
+    }
+    ctx.lr = lr;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
   return calls;
 }
 
@@ -324,6 +344,29 @@ void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base) {
 }
 bool StandSceneRelease(PPCContext& ctx, uint8_t* base) {
   return Set(ctx, t67::StandSceneRelease(base));
+}
+
+// --- The dialogs' confirm ---
+
+void Type6DialogOpenConfirm(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogOpenConfirm(base, ctx.r3.u32, false, ctx.r1.u32);
+}
+void Type7DialogOpenConfirm(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogOpenConfirm(base, ctx.r3.u32, true, ctx.r1.u32);
+}
+void DialogDrawWaiting(PPCContext& ctx, uint8_t* base) {
+  if (const std::optional<uint64_t> r3 = t67::DialogDrawWaiting(base, ctx.r3.u32, ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+void DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogOpenConfirmStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+}
+void DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogCloseConfirmStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+}
+void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogMoveCursorStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
 }
 
 // --- The garage camera's reset ---
@@ -494,6 +537,15 @@ extern "C" REX_FUNC(sub_821802D8) {
 }
 // StandScene::Release (from StandMode::Release, recompiled).
 ITC_TYPE67_FREES(82180738, StandSceneRelease)
+
+// The dialogs' confirm: reached through their machines' transitions and
+// the Update's step table (no direct callers).
+ITC_TYPE67_MODES(822320D8, Type6DialogOpenConfirm)
+ITC_TYPE67_MODES(82241B40, Type7DialogOpenConfirm)
+ITC_TYPE67_MODES(82241C18, DialogDrawWaiting)
+ITC_TYPE67_MODES(822325E0, DialogOpenConfirmStep)
+ITC_TYPE67_MODES(8223AA10, DialogCloseConfirmStep)
+ITC_TYPE67_MODES(8223AB50, DialogMoveCursorStep)
 
 // The garage camera: Quaternion::FromAngles (from GarageCamera::Command,
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).

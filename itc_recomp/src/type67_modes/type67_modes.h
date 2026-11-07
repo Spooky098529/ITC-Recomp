@@ -167,6 +167,12 @@ struct Calls {
   // run them natively, else their adapters); their r3.
   std::function<uint64_t(uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr)> open;
   std::function<uint64_t(uint32_t id, uint32_t sp, uint32_t lr)> remove;
+  // A guest call with the first `set` of r3 to r6 from `args` (the others
+  // left), from the frame at `r1` returning to `lr` (MenuSound::Play's slot
+  // call, as menu_sounds::Calls makes it); its r3.
+  std::function<uint64_t(uint32_t function, const uint64_t args[4], int set, uint32_t r1,
+                         uint32_t lr)>
+      call_set;
 };
 
 // A machine whose state a mode checks: the block's +`test` tested for 0
@@ -301,6 +307,33 @@ bool StandSlotInit(uint8_t* base, uint32_t slot, uint32_t index, uint32_t sp,
 // block isn't the allocation layer's pages (the adapter runs the
 // original). r3 the holder's free's.
 std::optional<uint64_t> StandSceneRelease(uint8_t* base);
+
+// --- The dialogs' confirm (dialogs.cpp): r3 = the dialog; `sp` the
+// caller's stack pointer; each returns r3 as the original leaves it. ---
+
+// sub_822320D8 Type6Dialog::OpenConfirm and sub_82241B40
+// Type7Dialog::OpenConfirm (`type7`: without the final +9756 = 5): movie 16
+// (+9744 = 16) reset (UiMovie::ResetPose, whose r3 it leaves), the cursor
+// from the movie's +40960 (the previous to +9672), the pages cleared, then
+// state 4 with page 0 through step 0 when the movies are loaded (+9608),
+// else state 1.
+uint64_t DialogOpenConfirm(uint8_t* base, uint32_t dialog, bool type7, uint32_t sp);
+// sub_82241C18 Dialog::DrawWaiting: with a reopen queued (+9748), +9748 =
+// 0 and the open's work without the status store; nullopt (r3 left) when
+// none.
+std::optional<uint64_t> DialogDrawWaiting(uint8_t* base, uint32_t dialog, uint32_t sp);
+// sub_822325E0 Dialog::OpenConfirmStep: on the first frame (+9664 0)
+// MenuSound::Play(5), named animation 5 and +9664 = 1; UiMovie::Run(movie,
+// 0); when it returns 0, the cursor's highlight (named 1 or 2 from a table
+// at the frame's +80) played and looped. 1 when done, else 0.
+uint64_t DialogOpenConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls);
+// sub_8223AA10 Dialog::CloseConfirmStep: as the open's with named 6; when
+// done, UiMovie::FinishAll and +9740 = 9.
+uint64_t DialogCloseConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls);
+// sub_8223AB50 Dialog::MoveCursorStep: on the first frame the previous
+// highlight finished (UiMovie::FinishNamed), the cursor's played and looped,
+// +9664 = 1; UiMovie::Run. Returns 1.
+uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls);
 
 // --- The garage camera's reset (garage_camera.cpp) ---
 

@@ -34,6 +34,8 @@
 #include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "hooks/type67_modes.h"
+#include "hooks/ui_movies.h"
+#include "menu_sounds/menu_sounds.h"
 #include "memory/heap.h"
 #include "type67_modes/type67_modes.h"
 #include "ui_movies/game.h"
@@ -1170,6 +1172,187 @@ void StandSlots(Context& h, const Block& world) {
   Write(base, 0x8265ED00, ambient.data(), 16);
 }
 
+// --- The dialogs' confirm: the dialog at the world's +0 (random words, its
+// step word +9664, cursors +9668 and +9672 0 or 1, the loaded word +9608,
+// the reopen word +9748 picked); movie 16 a harness movie (0xA100 bytes, its
+// default choice at +40960 0 or 1) in a harness movie table (with a few
+// other ids), its live, saved and file scenes pool nodes whose children are
+// pool nodes tagged TFM, PIC, TXT or nothing; its named animations (16) on
+// the live scene with harness animations (no tracks, a length), now and then
+// a slot in its queue or looping list; the sound manager a fake whose slot
+// 10 records (as the race HUD object's harness has it). UiMovie::Update
+// (UiMovie::Run's jump) and ApplyAnimation (FinishAll's and FinishNamed's)
+// recorded through the UI movies' stand-in, answered from the case's
+// generator. The world, the movie, the nodes, the fake manager, the calls,
+// the stack below the call (but the original's back chain and saved
+// registers) and r3 compared. ---
+
+struct DialogCall {
+  uint32_t function, lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<DialogCall>* g_dialog_calls = nullptr;
+Random g_dialog_answers;
+
+bool DialogStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (g_dialog_calls == nullptr || (function != 0x8211D2F8 && function != 0x825A08E0)) {
+    return false;
+  }
+  g_dialog_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = function == 0x8211D2F8 ? g_dialog_answers.Below(2) : g_dialog_answers.Next();
+  return true;
+}
+
+void Dialogs(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  constexpr uint32_t kMovieBlockBytes = 0xA100, kNodeBytes = 0x800, kNodes = 8;
+  const Block movie_block(kMovieBlockBytes);
+  const Block nodes(kNodeBytes * kNodes + 8 * 64);
+  const Block misc(0x1000);  // the pairs (+0), the fake manager (+0x400), its vtable (+0x800)
+  if (!movie_block.address || !nodes.address || !misc.address) return;
+  const uint32_t movie = movie_block.address;
+  auto node = [&](uint32_t i) { return nodes.address + kNodeBytes * i; };
+  const uint32_t animations = nodes.address + kNodeBytes * kNodes;
+  const uint32_t sp = CallContext(h).r1.u32;
+  struct Function {
+    const char* name;
+    uint32_t address, frame, saves;
+    GuestFunction recompiled, native;
+  };
+  const Function functions[] = {
+      {"Type6Dialog::OpenConfirm", 0x822320D8, 112, 24, __imp__sub_822320D8,
+       hooks::Type6DialogOpenConfirm},
+      {"Type7Dialog::OpenConfirm", 0x82241B40, 112, 24, __imp__sub_82241B40,
+       hooks::Type7DialogOpenConfirm},
+      {"Dialog::DrawWaiting", 0x82241C18, 128, 32, __imp__sub_82241C18, hooks::DialogDrawWaiting},
+      {"Dialog::OpenConfirmStep", 0x822325E0, 128, 40, __imp__sub_822325E0,
+       hooks::DialogOpenConfirmStep},
+      {"Dialog::CloseConfirmStep", 0x8223AA10, 128, 32, __imp__sub_8223AA10,
+       hooks::DialogCloseConfirmStep},
+      {"Dialog::MoveCursorStep", 0x8223AB50, 128, 32, __imp__sub_8223AB50,
+       hooks::DialogMoveCursorStep},
+  };
+  const std::vector<uint8_t> table = Read(base, ui_movies::kMovieTable, 12);
+  const uint32_t saved_manager = guest::LoadU32(base, menu_sounds::kSoundManager);
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    for (int c = 0; c < 24; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 811 + f.address);
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, movie, kMovieBlockBytes, r);
+        WriteRandom(base, nodes.address, nodes.bytes, r);
+        WriteRandom(base, misc.address, misc.bytes, r);
+        WriteRandom(base, sp - 1024, 1024 + 256, r);
+        const uint32_t dialog = world.address;
+        guest::StoreU32(base, dialog + 9664, r.Below(2));
+        guest::StoreU32(base, dialog + 9668, r.Below(2));
+        guest::StoreU32(base, dialog + 9672, r.Below(2));
+        if (r.Below(2)) guest::StoreU32(base, dialog + 9608, 0);
+        if (r.Below(2)) guest::StoreU32(base, dialog + 9640, 0);
+        if (r.Below(2)) guest::StoreU32(base, dialog + 9748, 0);
+        // The movie: its lists, scenes, named animations and choice.
+        ui_movies::InitAnimationLists(base, movie);
+        guest::StoreU32(base, movie + ui_movies::kMovieLive, node(0));
+        guest::StoreU32(base, movie + ui_movies::kMovieSaved, node(1));
+        guest::StoreU32(base, movie + ui_movies::kMovieFile, node(2));
+        guest::StoreU32(base, movie + 40960, r.Below(2));
+        static constexpr uint32_t kTags[] = {0x54464D00, 0x50494300, 0x54585400, 0x12345678};
+        for (uint32_t i = 0; i < kNodes; i++) {
+          guest::StoreU32(base, node(i), kTags[r.Below(4)]);
+          guest::StoreU32(base, node(i) + 100, r.Below(4));
+          guest::StoreU32(base, node(i) + 104, i < 3 ? r.Below(4) : 0);
+          guest::StoreU32(base, node(i) + 108, r.Below(4));
+          guest::StoreU32(base, node(i) + 116, 0);  // a PRM's vertex count
+          for (uint32_t k = 128; k < 128 + 8 * 12; k += 8) {
+            guest::StoreU32(base, node(i) + k, node(3 + r.Below(kNodes - 3)));
+          }
+        }
+        for (uint32_t k = 0; k < 8; k++) {
+          for (uint32_t i = 0; i < 64; i += 4) guest::StoreU32(base, animations + 64 * k + i, 0);
+          guest::StoreFloat(base, animations + 64 * k + 12, float(r.Below(40)) / 4.0f);
+        }
+        for (uint32_t k = 0; k < 16; k++) {
+          guest::StoreU32(base, movie + 176 + 36 * k + 28, node(0));
+          guest::StoreU32(base, movie + 176 + 36 * k + 32, animations + 64 * r.Below(8));
+        }
+        guest::StoreU32(base, node(0) + 116, r.Below(4));  // the scene's animation index
+        for (uint32_t k = r.Below(3); k > 0; k--) {
+          ui_movies::Slot slot{};
+          slot[0] = r.Below(2);
+          slot[1] = 0xFFFFFFFFu;
+          static constexpr uint32_t kNamed[] = {1, 2, 5, 6, 0xFFFFFFFFu};
+          slot[2] = kNamed[r.Below(5)];
+          slot[3] = node(0);
+          slot[4] = animations + 64 * r.Below(8);
+          slot[5] = std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f);
+          slot[6] = r.Below(2);
+          slot[7] = r.Below(2);
+          ui_movies::Append(base, movie + (r.Below(2) ? ui_movies::kMovieQueue
+                                                      : ui_movies::kMovieLooping),
+                            slot);
+        }
+        // The movie table: movie 16 among a few others, in a random place.
+        const uint32_t pairs = misc.address;
+        const uint32_t count = 1 + r.Below(5);
+        const uint32_t at = r.Below(count);
+        for (uint32_t i = 0; i < count; i++) {
+          guest::StoreU32(base, pairs + 8 * i, i == at ? 16 : 20 + i);
+          guest::StoreU32(base, pairs + 8 * i + 4, i == at ? movie : uint32_t(r.Next()));
+        }
+        guest::StoreU32(base, ui_movies::kMovieTable, pairs);
+        guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+        guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+        // The fake sound manager.
+        const uint32_t manager = misc.address + 0x400, vtable = misc.address + 0x800;
+        guest::StoreU32(base, manager, vtable);
+        guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
+        guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = dialog | (uint64_t(r.Below(2)) << 32);
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        g_dialog_answers = Random(r.Next());
+        std::vector<DialogCall> calls;
+        g_dialog_calls = &calls;
+        const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+            ui_movies_hooks::g_update_callee_stand_in;
+        ui_movies_hooks::g_update_callee_stand_in = DialogStandIn;
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          f.native(t, base);
+        }
+        ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
+        g_dialog_calls = nullptr;
+        out[v].Word(uint32_t(calls.size()));
+        for (const DialogCall& call : calls) {
+          for (const uint32_t w : {call.function, call.lr, call.r1, uint32_t(call.r3),
+                                   uint32_t(call.r3 >> 32), uint32_t(call.r4),
+                                   uint32_t(call.r4 >> 32)}) {
+            out[v].Word(w);
+          }
+        }
+        out[v].Bytes(Read(base, world.address, world.bytes));
+        out[v].Bytes(Read(base, movie, kMovieBlockBytes));
+        out[v].Bytes(Read(base, nodes.address, nodes.bytes));
+        out[v].Bytes(Read(base, misc.address, misc.bytes));
+        out[v].Bytes(Read(base, sp - 1024, 1024 - f.frame));
+        out[v].Bytes(Read(base, sp - f.frame + 4, f.frame - 4 - f.saves));
+        out[v].Bytes(Read(base, sp, 256));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Write(base, ui_movies::kMovieTable, table.data(), 12);
+  guest::StoreU32(base, menu_sounds::kSoundManager, saved_manager);
+}
+
 }  // namespace
 
 void Type67Modes(Context& h) {
@@ -1189,6 +1372,7 @@ void Type67Modes(Context& h) {
   GarageCamera(h, world);
   GarageLights(h, world);
   StandSlots(h, world);
+  Dialogs(h, world);
 }
 
 }  // namespace harness

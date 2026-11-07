@@ -97,6 +97,17 @@ void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base);
 void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base);
 bool StandSceneRelease(PPCContext& ctx, uint8_t* base);
 
+// The dialogs' confirm (r3 the dialog): Type6Dialog::OpenConfirm
+// sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, Dialog::DrawWaiting
+// sub_82241C18, Dialog::OpenConfirmStep sub_822325E0, CloseConfirmStep
+// sub_8223AA10 and MoveCursorStep sub_8223AB50.
+void Type6DialogOpenConfirm(PPCContext& ctx, uint8_t* base);
+void Type7DialogOpenConfirm(PPCContext& ctx, uint8_t* base);
+void DialogDrawWaiting(PPCContext& ctx, uint8_t* base);
+void DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base);
+void DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base);
+void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base);
+
 // Quaternion::FromAngles sub_8217C120 (r3 the destination, f1 to f3 the
 // angles; r3 left) and GarageCamera::Reset sub_8217D888 (r3 the camera; r3
 // after the camera + 192, as its FromAngles call leaves it).
