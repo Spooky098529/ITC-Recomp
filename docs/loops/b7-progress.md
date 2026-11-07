@@ -10,10 +10,10 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-11-06 14:33 on `b7-loop-06-11-26` (the previous
   run's branch, checked out by the user for this run), from 105ba4b9;
-  summary `b7-loop-2026-11-06-1433.md`. Limit: 5 subsystems (the
-  user's call, 2026-11-06, raised from 3 during the run); the loop ends
-  after the tuning screen, subsystem 4 (the user's call, 2026-11-07).
-- Subsystem 1 of 5: the course scenery's race-side owners (lead picked:
+  summary `b7-loop-2026-11-06-1433.md`. Limit: 8 subsystems (the
+  user's call, 2026-11-07; raised from 3 to 5 on 2026-11-06, then to 8,
+  replacing an earlier call to end after the tuning screen).
+- Subsystem 1 of 8: the course scenery's race-side owners (lead picked:
   `sub_8215B790`, `sub_8215D2B0`, `sub_821514A0`, `sub_821516F0`, the top
   of `leads.md`; ready groups under all four; its line deleted from
   `leads.md`). Map checked (db8e723a: `race-update.md`, 9 rows, 1
@@ -53,7 +53,7 @@ file's history. What's left to see in a drive, from every run:
   in `race-update.md` (7 of 7 ours). Validated `itc_3747` (race 36 s,
   0 errors, every harness 0 differing, 32 of 32 harness lines, all ran
   in the race; none to drive). Recorded.
-- Subsystem 2 of 5: the scene models' holders (two leads taken together:
+- Subsystem 2 of 8: the scene models' holders (two leads taken together:
   what's left of the scene models' owners, `sub_8217FCB0`, `sub_82179998`,
   and the front end's re-applies of a scene model's record,
   `sub_82178DF8`, `sub_82178E60`, `sub_821799D8`, `sub_820E7380`,
@@ -95,7 +95,7 @@ file's history. What's left to see in a drive, from every run:
   Validated `itc_3786` (race 35 s, 0 errors, every harness 0 differing,
   8 of 8 harness lines; `ApplyWheelPaint` in the race, three in the
   replay `itc_3787` (ok), four to drive). Recorded.
-- Subsystem 3 of 5: the garage screen's transitions (lead picked:
+- Subsystem 3 of 8: the garage screen's transitions (lead picked:
   `sub_8219C528` and the 20 other transitions of the screen whose update
   is `sub_821A1380`; the most ready groups in `leads.md`, 67, and next
   to the garage stage work just done; its line deleted from
@@ -138,7 +138,7 @@ file's history. What's left to see in a drive, from every run:
   33 s, the harnesses ~85 s of the 120; 0 errors, every harness 0
   differing, 22 of 22 harness lines; 7 in the race, 5 in the replay
   `itc_3832` (ok), the 10 build screen functions to drive). Recorded.
-- Subsystem 4 of 5: the tuning screen (two leads taken together: its
+- Subsystem 4 of 8: the tuning screen (two leads taken together: its
   update `sub_821E6C50` with its state handlers, and its part, interior
   and wheel handlers `sub_821E07B0`, `sub_821E0E00`, `sub_821CCC50`,
   `sub_821CDB18`, `sub_821CDED8`; the second-most ready groups in
