@@ -222,11 +222,17 @@ uint64_t SmallIndex(Random& r, uint32_t hi) {
 
 using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
 
+// Stack bytes left out of the comparison besides the top register saves:
+// [from, to) bytes below the call's stack pointer (a callee's register
+// saves, which its native version doesn't write; a varargs callee's stores
+// into its caller's parameter area).
+using Holes = std::vector<std::pair<uint32_t, uint32_t>>;
+
 // `saves` the original's register saves' bytes below the stack pointer, left
 // out of the comparison.
 void Case(Context& h, Results& results, const World& w, uint64_t seed, const SetupFn& setup,
           GuestFunction recompiled, GuestFunction native, uint32_t saves,
-          const std::string& what) {
+          const std::string& what, const Holes& holes = {}) {
   Outputs out[2];
   for (int v = 0; v < 2; v++) {
     Random r(seed);
@@ -250,6 +256,11 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     } else {
       native(t, h.base);
     }
+    for (const auto& [from, to] : holes) {
+      for (uint32_t a = sp - to; a < sp - from; a++) {
+        guest::StoreU8(h.base, a, 0);
+      }
+    }
     out[v].Bytes(Read(h.base, w.block.address, w.block.bytes));
     out[v].Bytes(Read(h.base, w.save.address, w.save.bytes));
     out[v].Bytes(Read(h.base, w.movie.address, w.movie.bytes));
@@ -263,11 +274,12 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
 }
 
 void Group(Context& h, const World& w, const char* name, int cases, const SetupFn& setup,
-           GuestFunction recompiled, GuestFunction native, uint32_t saves) {
+           GuestFunction recompiled, GuestFunction native, uint32_t saves,
+           const Holes& holes = {}) {
   Results results(name);
   for (int c = 0; c < cases; c++) {
     Case(h, results, w, h.random.Next(), setup, recompiled, native, saves,
-         fmt::format("case {}", c));
+         fmt::format("case {}", c), holes);
   }
   results.Report();
 }
@@ -350,6 +362,52 @@ void TuningScreen(Context& h) {
         }
       },
       __imp__sub_821EE760, hooks::TuningShowPartMarks, 40);
+
+  // Movie 2's node setters (savegprlr_29's, r31 and lr's, savegprlr_22's
+  // saves left out). The states and categories they test, the tire's and
+  // the interior's mostly; the tire's choices equal half the time.
+  auto tire = [](PPCContext&, Random& r, const World& w) {
+    const uint32_t s = w.screen();
+    constexpr uint32_t kStates[] = {5, 8, 9, 10, 11, 6, 7};
+    guest::StoreU32(w.base, s + ts::kState, kStates[r.Below(7)]);
+    guest::StoreU32(w.base, s + ts::kCategory, r.Below(4) == 0 ? Around(r, -1, 7) : 3);
+    guest::StoreU8(w.base, s + ts::kItem, uint8_t(r.Below(4)));
+    for (const uint32_t pair : {35948u, 35952u}) {
+      guest::StoreU32(w.base, s + pair, r.Below(4));
+      guest::StoreU32(w.base, s + pair + 128,
+                      r.Below(2) == 0 ? guest::LoadU32(w.base, s + pair) : r.Below(4));
+    }
+    guest::StoreU8(w.base, s + ts::kLevel, uint8_t(r.Below(4)));
+  };
+  Group(
+      h, w, "TuningScreen::ShowInteriorPicture", 20,
+      [](PPCContext& t, Random& r, const World& w) {
+        t.r4.u64 = r.Below(3) == 0 ? 0 : (r.Below(4) == 0 ? r.Next() : r.Below(5));
+        t.r5.u64 = r.Below(4);
+        guest::StoreU8(w.base, w.screen() + ts::kType, uint8_t(r.Below(6)));
+      },
+      __imp__sub_821DA3F8, hooks::TuningShowInteriorPicture, 32);
+  Group(h, w, "TuningScreen::HideTireMarks", 15, kScreenOnly, __imp__sub_821DFB20,
+        hooks::TuningHideTireMarks, 32);
+  Group(
+      h, w, "TuningScreen::HideNode19", 25,
+      [](PPCContext&, Random& r, const World& w) {
+        const uint32_t s = w.screen();
+        constexpr uint32_t kStates[] = {5, 6, 8, 54, 56, 9, 10, 11, 14, 15, 7, 16};
+        guest::StoreU32(w.base, s + ts::kState, kStates[r.Below(12)]);
+        guest::StoreU32(w.base, s + ts::kCategory, r.Below(7));
+        guest::StoreU8(w.base, s + ts::kItem, uint8_t(r.Below(5)));
+        for (uint32_t k = ts::kLevel; k <= ts::kOption; k++) {
+          guest::StoreU8(w.base, s + k, uint8_t(r.Below(3)));
+        }
+        guest::StoreU32(w.base, s + 25172, r.Below(2));
+        guest::StoreU32(w.base, s + 33548, r.Below(2));
+        guest::StoreU32(w.base, s + 33564, 3 + r.Below(3));
+      },
+      __imp__sub_821DFBE8, hooks::TuningHideNode19, 16);
+  // ShowTireMarks: HideTireMarks' saves (its frame 128 bytes below) out too.
+  Group(h, w, "TuningScreen::ShowTireMarks", 25, tire, __imp__sub_821E22E8,
+        hooks::TuningShowTireMarks, 88, {{176, 176 + 32}});
 
   // The debug state handlers: `saves` is each original's register saves
   // (__savegprlr_N's 8 x (32 - N) + 8 bytes, or its inline stores).

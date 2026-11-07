@@ -24,7 +24,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "DebugEditView sub_821FE178, DebugPaintConfirm sub_821FE190; the selected garage car's "
               "StoreToGarageCar sub_821DCC28, EquipChoice sub_821DF448 and AeroPartValue "
               "sub_821DE2D8; the part list's marks HidePartMarks sub_821EE6D0 and ShowPartMarks "
-              "sub_821EE760, movie 2's nodes through the UI movies' plain C++) natively instead of through the "
+              "sub_821EE760, ShowInteriorPicture sub_821DA3F8, HideTireMarks sub_821DFB20, HideNode19 "
+              "sub_821DFBE8 and ShowTireMarks sub_821E22E8, movie 2's nodes through the UI movies' plain C++) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen)");
 
 namespace hooks {
@@ -143,6 +144,22 @@ void TuningShowPartMarks(PPCContext& ctx, uint8_t* base) {
       ts::ShowPartMarks(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, ctx.r6.u64, ctx.r1.u32);
 }
 
+void TuningShowInteriorPicture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::ShowInteriorPicture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
+void TuningHideTireMarks(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::HideTireMarks(base, ctx.r1.u32);
+}
+
+void TuningHideNode19(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::HideNode19(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void TuningShowTireMarks(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::ShowTireMarks(base, ctx.r3.u32, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -184,3 +201,7 @@ ITC_TUNING_SCREEN(821DF448, TuningEquipChoice)
 ITC_TUNING_SCREEN(821DE2D8, TuningAeroPartValue)
 ITC_TUNING_SCREEN(821EE6D0, TuningHidePartMarks)
 ITC_TUNING_SCREEN(821EE760, TuningShowPartMarks)
+ITC_TUNING_SCREEN(821DA3F8, TuningShowInteriorPicture)
+ITC_TUNING_SCREEN(821DFB20, TuningHideTireMarks)
+ITC_TUNING_SCREEN(821DFBE8, TuningHideNode19)
+ITC_TUNING_SCREEN(821E22E8, TuningShowTireMarks)

@@ -93,6 +93,27 @@ uint32_t HidePartMarks(uint8_t* base, uint32_t sp);
 uint64_t ShowPartMarks(uint8_t* base, uint64_t r3, uint32_t row, uint64_t group, uint64_t index,
                        uint32_t sp);
 
+// --- Movie 2's node setters (nodes.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the movie
+// id at +80) and r3 as the original leaves it.
+
+// sub_821DA3F8 TuningScreen::ShowInteriorPicture: `type` 0 hides node
+// (-1, 0); else it's shown and its child 0's +108 = `index` (+0, +4, +8,
+// +11 for the byte +9662 1 to 4; untouched otherwise). r3 the node or the
+// child.
+uint32_t ShowInteriorPicture(uint8_t* base, uint32_t screen, uint32_t type, uint32_t index,
+                             uint32_t sp);
+// sub_821DFB20 TuningScreen::HideTireMarks: nodes (30, 0) and (33, 0)'s
+// children 11, 10 and 1 hidden. r3 the last child.
+uint32_t HideTireMarks(uint8_t* base, uint32_t sp);
+// sub_821DFBE8 TuningScreen::HideNode19: node (-1, 19) hidden by the state
+// and picks (its row). r3 the node hidden, else the movie.
+uint64_t HideNode19(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_821E22E8 TuningScreen::ShowTireMarks: the tire's level and option
+// marks on nodes (30, 0) and (33, 0) (its row), HideTireMarks from its
+// frame outside the tire states. r3 the last child, or GetCurrentChoice's.
+uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp);
+
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:
 // its frame's back chain and string tables written as the original leaves

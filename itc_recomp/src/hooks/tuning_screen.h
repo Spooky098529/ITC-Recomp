@@ -35,6 +35,14 @@ void TuningAeroPartValue(PPCContext& ctx, uint8_t* base);
 void TuningHidePartMarks(PPCContext& ctx, uint8_t* base);
 void TuningShowPartMarks(PPCContext& ctx, uint8_t* base);
 
+// Movie 2's node setters (r3 = the screen): ShowInteriorPicture
+// sub_821DA3F8 (r4 a type, r5 an index), HideTireMarks sub_821DFB20,
+// HideNode19 sub_821DFBE8, ShowTireMarks sub_821E22E8.
+void TuningShowInteriorPicture(PPCContext& ctx, uint8_t* base);
+void TuningHideTireMarks(PPCContext& ctx, uint8_t* base);
+void TuningHideNode19(PPCContext& ctx, uint8_t* base);
+void TuningShowTireMarks(PPCContext& ctx, uint8_t* base);
+
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
 // DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,
