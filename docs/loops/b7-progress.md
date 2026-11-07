@@ -101,7 +101,14 @@ file's history. What's left to see in a drive, from every run:
   Inits (two leads taken together: `sub_82236880` and `sub_82246C90`
   with their members' Inits, found by the screen constructors' map;
   24 ready groups between them, above the constructors just made
-  native; both lines deleted from `leads.md`). Mapping agent running.
+  native; both lines deleted from `leads.md`). Map checked (a96949ba:
+  `type6-type7-modes.md`, 160 rows, all new, 116 in play: two
+  front-end hubs over the player's garage car on the stand (the list
+  screen starts a race), with the stand scene, the garage camera, the
+  first screens, dialogs, options, save screen and controller pages'
+  Inits; 0 errors; 98 ready groups; 5 leads added, five leads trimmed
+  (the car scene owners' deleted); five subagents, one at a time).
+  Migration agent running.
 
 ## Done
 
@@ -148,5 +155,7 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 57, known 461, unknown 1354).
 - After its migration and validation (`itc_4363`): ours 4589, work left
   1831 (wrapped 57, known 420, unknown 1354).
+- After the type 6 and 7 modes' map: ours 4589, work left 1831
+  (wrapped 57, known 536, unknown 1238).
 
 ## Stopped

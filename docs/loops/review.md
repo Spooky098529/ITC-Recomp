@@ -82,6 +82,17 @@ When the user has reviewed a run's section, its heading gets
   plain C++ writes no back chains; the panels' `operator new` falls
   back to the original's guest call (new handler, `bad_alloc`) on
   failure.
+- `functions/type6-type7-modes.md` (new, 160 rows, 116 in play;
+  a96949ba): the type 6 and 7 modes, probably two front-end hubs over
+  the player's garage car on the stand (which ones by name not settled:
+  the strings weren't read); 8 rows in `known-data.md`. Leads trimmed:
+  the car scene owners' line deleted (mapped here); functions taken out
+  of the stand screens', garage cars reset, stand's car makers' callers'
+  and menu helpers' lines; the vinyl editor's lead corrected
+  (`sub_8217C120`, `sub_8217D888` are the garage camera's quaternion and
+  reset). For the migration: three stack bytes land in the answer at
+  block +91257..+91259 (copied); the garage camera's presets arrive by
+  an archive callback on the loader thread.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
