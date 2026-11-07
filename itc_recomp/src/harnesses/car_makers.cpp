@@ -1369,7 +1369,7 @@ void TuningStand(Context& h, Random& r) {
     // or 15 now and then, +10012 -1, 0, 5 to 8 (ApplyDecals) or 11 (never
     // 1 to 4 or 9 and 10: ApplyAreaDecals and ApplyDecalWord, never seen in
     // play, run their originals deep into the screen's random words), the
-    // second wheels' step +25244 0 to 2, the paint's values small. The
+    // second wheels' step +25244 0 or 3, the paint's values small. The
     // garage camera isn't set up (+112 0), so GarageStage::Draw returns at
     // once (its own cases draw). The top 40 bytes: r29 to r31, lr and f31's
     // saves; in the paint's cases (GarageStage::SetColor, never seen in
@@ -1409,7 +1409,13 @@ void TuningStand(Context& h, Random& r) {
             }
             field(30456, r.Below(4) == 0 ? r.Next() : r.Below(2));
             field(10012, decals);
-            field(25244, r.Below(3));
+            // The stage's animation list (+5600, its count +448) short: the
+            // commands' GarageAnims::Add scans it with no bound.
+            guest::StoreU32(h.base, block + kStage + 5600 + 448, r.Below(4));
+            // Not 1 or 2: the second wheels' steps (AddSecondWheels,
+            // ApplyWheelPaint) read past this world (ScenePools::SetUpB's,
+            // which car_models' cases lay); 0 or 3 asks Pending only.
+            field(25244, r.Below(2) == 0 ? 0 : 3);
             for (uint32_t& o : open) {
               o = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2);
             }
