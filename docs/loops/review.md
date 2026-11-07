@@ -93,6 +93,14 @@ When the user has reviewed a run's section, its heading gets
   reset). For the migration: three stack bytes land in the answer at
   block +91257..+91259 (copied); the garage camera's presets arrive by
   an archive callback on the loader thread.
+- Its first migration (48b60036..e9a438b2, `--native_type67_modes`):
+  the 16 Inits' step tables (`src/type67_modes/init_tables.h`) made by
+  a scratch script from `generated/` (not committed); few harness cases
+  for some (`Dialog::OpenMovies` 1, the dialogs' and options' Draw 2);
+  one harness-only run (`itc_4366`, ~700 MB, left in place) logged
+  guest access violations from the harness's own cases
+  (`UiMovies::IsLoaded` on an id not in the table), fixed by giving
+  those cases a movie block of their own.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

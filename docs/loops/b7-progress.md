@@ -108,7 +108,15 @@ file's history. What's left to see in a drive, from every run:
   first screens, dialogs, options, save screen and controller pages'
   Inits; 0 errors; 98 ready groups; 5 leads added, five leads trimmed
   (the car scene owners' deleted); five subagents, one at a time).
-  Migration agent running.
+  Migration 48b60036..e9a438b2 (`--native_type67_modes`, harness
+  `type67_modes`: the 16 machines' Inits (step tables generated from
+  `generated/`), 31 handlers and helpers, the modes' `NextMode` and
+  `Leaving`, 13 handlers with guest calls (the list, panel and node
+  screens' Inits, the first screens' and dialogs' Draw and Leave), the
+  garage camera's presets, `StandScene::Release`; 66 Overridden, 4
+  adapters removed; races 38 s, 0 errors, its harnesses 0 differing;
+  no subagents); left: 37 ready groups (most over the UI movie helpers
+  and `GarageStage::MakeModel`/`Command`). Validation agent running.
 
 ## Done
 
@@ -157,5 +165,7 @@ file's history. What's left to see in a drive, from every run:
   1831 (wrapped 57, known 420, unknown 1354).
 - After the type 6 and 7 modes' map: ours 4589, work left 1831
   (wrapped 57, known 536, unknown 1238).
+- After its migration: ours 4655, work left 1765 (wrapped 57, known
+  470, unknown 1238).
 
 ## Stopped
