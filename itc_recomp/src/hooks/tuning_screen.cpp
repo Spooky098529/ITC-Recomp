@@ -525,9 +525,7 @@ void TuningPreviewWheels(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                \
   }
 
-ITC_TUNING_SCREEN(821CC6C0, TuningCategoryItemCount)
 ITC_TUNING_SCREEN(821CDB18, TuningIsItemAvailable)
-ITC_TUNING_SCREEN(821CDED8, TuningWheelNumber)
 ITC_TUNING_SCREEN(821CD160, TuningGetPrice)
 ITC_TUNING_SCREEN(821CD868, TuningGetCurrentChoice)
 ITC_TUNING_SCREEN(821CDC38, TuningGetChoiceFlag)
@@ -612,7 +610,11 @@ ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 // PlayGroupAnimation sub_821EE880 (tuning_pages' sub_821F5F70 and
 // sub_821F60E0), PreviewWheels sub_821E0E00 (tuning_pages' sub_821EE390,
 // sub_821EEEA8 and sub_821F6688), HidePartMarks sub_821EE6D0 and
-// ShowPartMarks sub_821EE760 (FillPartRows and tuning_pages' sub_821F40B8).
+// ShowPartMarks sub_821EE760 (FillPartRows and tuning_pages' sub_821F40B8);
+// then CategoryItemCount sub_821CC6C0 (DebugCategoryMenu and tuning_pages'
+// InputCategories) and WheelNumber sub_821CDED8 (PreviewWheels, FillPartRows,
+// ShowPartMarks, SetPartName and tuning_pages' SetCurrentChoice and
+// FillPartRowsRight).
 
 // SetInteriorPair sub_821CCC50 has no adapter (removed, B7 loop, 2026-11-07):
 // its callers in play, PreviewItem and RestoreStand, are native and call its
