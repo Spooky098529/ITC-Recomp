@@ -69,7 +69,7 @@ When the user has reviewed a run's section, its heading gets
 - `functions/screen-constructors.md` (new, 41 rows, all in play;
   fbb76124): the type 6 and 7 modes' screen blocks (91,272 and 71,292
   bytes) and their members' constructors, all names ours; rows in
-  `known-data.md` (type 6 and 7 screens, `0x82805EAC`, `0x826370A0`);
+  `known-data.md` (type 6 and 7 screens, `0x82815EAC`, `0x826370A0`);
   `boot-mode.md`'s `ScreenMachine::ScreenMachine` note pointed here.
   Leftovers for the migration: `NodeScreen::NodeScreen` storing r3 into
   its caller's frame, `PanelSetBase::PanelSetBase` zeroing and reading

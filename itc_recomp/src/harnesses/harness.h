@@ -303,5 +303,6 @@ void StandModels(Context& h);
 void BuildScreen(Context& h);
 void TuningScreen(Context& h);
 void TuningPages(Context& h);
+void ScreenConstructors(Context& h);
 
 }  // namespace harness

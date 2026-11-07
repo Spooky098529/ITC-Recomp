@@ -435,6 +435,8 @@ set(ITC_SOURCES
     src/tuning_pages/loads.cpp
     src/tuning_pages/pages.cpp
     src/tuning_pages/dialogs.cpp
+    src/hooks/screen_constructors.cpp
+    src/screen_constructors/screen_constructors.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
@@ -634,6 +636,7 @@ set(ITC_SOURCES
     src/harnesses/tuning_screen_pages.cpp
     src/harnesses/tuning_pages.cpp
     src/harnesses/tuning_pages_movie.cpp
+    src/harnesses/screen_constructors.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
