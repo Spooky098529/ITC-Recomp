@@ -647,13 +647,21 @@ void SceneLoadersCreateA(PPCContext& ctx, uint8_t* base) {
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
+  const uint32_t set = ctx.r3.u32, record = ctx.r4.u32;
+  ctx.r3.u64 = SceneLoadersCreateAWith(ctx, base, [&](const sl::CreateCalls& calls) {
+    return sl::CreateA(base, set, record, calls);
+  });
+  ctx.lr = lr;
+}
+
+uint32_t SceneLoadersCreateAWith(
+    PPCContext& ctx, uint8_t* base,
+    const std::function<uint32_t(const scene_loaders::CreateCalls&)>& run) {
   CreateAGuest guest{ctx, base};
   sl::CreateCalls calls;
   calls.construct = &CreateAGuest::Construct;
   calls.user = &guest;
-  const uint32_t set = ctx.r3.u32, record = ctx.r4.u32;
-  ctx.r3.u64 = sl::CreateA(base, set, record, calls);
-  ctx.lr = lr;
+  return run(calls);
 }
 
 }  // namespace hooks

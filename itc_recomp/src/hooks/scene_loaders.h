@@ -9,6 +9,9 @@
 #pragma once
 
 #include "guest.h"
+#include "scene_loaders/pools.h"
+
+#include <functional>
 
 namespace hooks {
 
@@ -204,6 +207,12 @@ void SceneLoadersTrafficOnFileLoaded(PPCContext& ctx, uint8_t* base);
 // constructors' originals called from its frame where their plain C++
 // declines.
 void SceneLoadersCreateA(PPCContext& ctx, uint8_t* base);
+// For CreateA's native callers: `run` given the calls CreateA's adapter
+// hands it (the constructors' originals from a 160-byte frame below ctx.r1,
+// which is to be CreateA's caller's frame); its answer returned.
+uint32_t SceneLoadersCreateAWith(
+    PPCContext& ctx, uint8_t* base,
+    const std::function<uint32_t(const scene_loaders::CreateCalls&)>& run);
 // Interior::OnPartLoaded sub_820D7578 (r3 = the request, r6 = the interior;
 // r3 as the original leaves it), only while hooks::ModelsNativeLifetime():
 // Model::Load's original called from its frame where its plain C++ declines.

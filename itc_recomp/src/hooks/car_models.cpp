@@ -12,12 +12,14 @@
 #include "car_models/parts.h"
 #include "car_models/plate.h"
 #include "car_models/raster.h"
+#include "car_models/scene_fill.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
 #include "hooks/archive.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
+#include "hooks/scene_loaders.h"
 #include "hooks/texture_compression.h"
 #include "native/buffers.h"
 
@@ -47,7 +49,9 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "with its reader; Vinyl::DrawDecal sub_820EE638 with the software rasterizer under "
               "it; with --native_heap CarModel::OnDecalLoaded sub_820D5750 with Vinyl::DrawDecals "
               "sub_820D4078, Vinyl::ClearCorner sub_820D3C80 and Vinyl::Compress sub_820ED090, which "
-              "calls XGCompressSurface sub_8235AAC0's plain C++) natively "
+              "calls XGCompressSurface sub_8235AAC0's plain C++; with --native_heap, the archive's "
+              "queue, --native_models and native memcpy CarScene::SetUp sub_820C8DE8, the second "
+              "set's fill) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=car_models)");
 
@@ -331,6 +335,29 @@ void CarModelsTgaCreateImage(PPCContext& ctx, uint8_t* base) {
   __imp__sub_820ED020(ctx, base);
 }
 
+bool CarModelsSceneSetUpNative() {
+  return hooks::NativeHeapActive() && hooks::NativeArchiveQueue() &&
+         hooks::ModelsNativeLifetime() && native::Buffers_NativeMemcpy();
+}
+
+void CarModelsSceneSetUp(PPCContext& ctx, uint8_t* base) {
+  if (!CarModelsSceneSetUpNative()) {
+    __imp__sub_820C8DE8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32, scene = ctx.r3.u32, record = ctx.r4.u32, r5 = ctx.r5.u32;
+  // CreateA's fallbacks run below this function's frame.
+  ctx.r1.u64 = sp - cm::kSceneSetUpFrame;
+  const uint32_t r3 = SceneLoadersCreateAWith(ctx, base, [&](const scene_loaders::CreateCalls& calls) {
+    return cm::SceneSetUp(base, scene, record, r5, sp, ctx.r13.u32, NativeArchiveLoad(base), calls);
+  });
+  ctx.r1.u64 = stack;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
 void CarModelsDrawDecal(PPCContext& ctx, uint8_t* base) {
   if (!cm::DecalRegionPorted(ctx.r3.u32)) {
     __imp__sub_820EE638(ctx, base);
@@ -508,3 +535,4 @@ ITC_CAR_MODELS(820EEBC0, CarModelsTgaHeaderClear)
 ITC_CAR_MODELS(820ED020, CarModelsTgaCreateImage)
 ITC_CAR_MODELS(820EE638, CarModelsDrawDecal)
 ITC_CAR_MODELS(820D5750, CarModelsOnDecalLoaded)
+ITC_CAR_MODELS(820C8DE8, CarModelsSceneSetUp)

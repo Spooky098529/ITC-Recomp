@@ -103,6 +103,13 @@ uint32_t CarModelsVinylCompressAt(PPCContext& ctx, uint8_t* base, uint32_t width
 // while --native_heap routes the game's heap to the layer, and where
 // car_models::DecalsNative agrees.
 void CarModelsOnDecalLoaded(PPCContext& ctx, uint8_t* base);
+// CarScene::SetUp sub_820C8DE8: r3 = the scene, r4 = the record, r5 the
+// word for +5044; r3 ScenePools::CreateA's. Natively only over the
+// allocation layer with the archive's queue, the models' lifetime and
+// memcpy native (its callees' adapters' conditions); CreateA's
+// constructors' originals from its frame where their plain C++ declines.
+bool CarModelsSceneSetUpNative();
+void CarModelsSceneSetUp(PPCContext& ctx, uint8_t* base);
 
 // ScenePools::SetUp sub_820C4338: r3 = the first set of pools, r4 = a pool,
 // r5 = an index, r6 = a record; r3 = the object, or 0 when it isn't in use.

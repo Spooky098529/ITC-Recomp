@@ -179,6 +179,7 @@ set(ITC_SOURCES
     src/car_models/load_slots.cpp
     src/car_models/car_model.cpp
     src/car_models/vinyl.cpp
+    src/car_models/scene_fill.cpp
     src/car_models/tga.cpp
     src/car_models/raster.cpp
     src/car_models/decals.cpp

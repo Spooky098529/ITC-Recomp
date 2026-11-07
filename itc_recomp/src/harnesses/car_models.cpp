@@ -8,6 +8,7 @@
 #include "harness.h"
 #include "car_model_inputs.h"
 #include "pending_frees.h"
+#include "scene_pools_take.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -18,6 +19,7 @@
 #include "car_models/parts.h"
 #include "car_models/plate.h"
 #include "car_models/raster.h"
+#include "car_models/scene_fill.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
 #include "graphics/resources.h"
@@ -2253,6 +2255,190 @@ void SceneReloadDecalCases(Context& h, uint32_t block) {
   memory::Free(allocation);
 }
 
+// CarScene::SetUp: a scene in a block of random bytes ([0x826C2E44] at it),
+// its second set's lists empty or holding one node in the block, its first
+// set in the block (the lists empty), a record of small counts (now and then
+// negative ones, outside the two that size the first set's records; the
+// parts at most one), its own load buffer now and then, r5 random; the
+// stack below r1 random alike. Archive::Load's calls recorded (the part
+// files' pages as markers). Compared: the calls, the part files' pages
+// (then freed), each first-set object's providers (TakeProvider), the
+// block, the first set's records' pages and each object of both sets with
+// the pointers into the case's pages made offsets, r3 the same way, the
+// paint palette (put back); then all freed. A random generator of its own.
+void SceneSetUpCases(Context& h) {
+  namespace pt = scene_pools_take;
+  namespace sl = scene_loaders;
+  if (!hooks::CarModelsSceneSetUpNative()) {
+    ITC_LOG_WARN("harness: car_models: the allocation layer, the archive's queue, the models' "
+                 "lifetime or memcpy isn't native: CarScene::SetUp's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x2000, kStack = 0x1000;
+  constexpr uint32_t kPalette = 0x826C5110, kPaletteBytes = 1024;
+  constexpr uint32_t kOwn[] = {452, 4112, 1152, 1176, 1200, 1224};
+  const uint32_t allocation = memory::Alloc(kBytes + 16, 0);
+  if (allocation == 0) {
+    ITC_LOG_WARN("harness: car_models: no block for CarScene::SetUp");
+    return;
+  }
+  const uint32_t block = (allocation + 15) & ~15u;
+  const uint32_t scene = block + 0x100, set = block + 0x1780, record = block + 0x1880;
+  const uint32_t nodes = block + 0x1900;
+  SavedWord saved_scene(h.base, car_models::kSceneSet);
+  SavedWord saved_set(h.base, sl::kFirstSet);
+  Random random(0x53435355);
+  Results results("CarScene::SetUp (sub_820C8DE8)");
+  for (int c = 0; c < 24; c++) {
+    const uint64_t seed = random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      const std::vector<uint8_t> palette = Read(h.base, kPalette, kPaletteBytes);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      RandomBytes(h.base, block, kBytes, r);
+      RandomBytes(h.base, t.r1.u32 - kStack, kStack, r);
+      Put(h.base, car_models::kSceneSet, scene);
+      Put(h.base, sl::kFirstSet, uint32_t(r.Next()));
+      Put(h.base, scene + 5040, set);
+      for (uint32_t pool = 0; pool < 8; pool++) {
+        const uint32_t list = scene + 4944 + 12 * pool, node = nodes + 16 * pool;
+        const bool one = r.Below(6) == 0;
+        Put(h.base, list + 0, one ? node : 0);
+        Put(h.base, list + 4, one ? node : 0);
+        Put(h.base, list + 8, one ? 1 : 0);
+        Put(h.base, node + 4, list);
+        Put(h.base, node + 8, 0);
+        Put(h.base, node + 12, 0);
+      }
+      for (uint32_t pool = 0; pool < 7; pool++) {
+        for (uint32_t w = 0; w < 3; w++) {
+          Put(h.base, set + 56 + 12 * pool + 4 * w, 0);
+        }
+      }
+      for (const uint32_t at : kOwn) {
+        Put(h.base, scene + at + 16, 0);
+      }
+      const uint32_t sets[] = {0, 0, 1, 1, 2, uint32_t(r.Next())};
+      Put(h.base, record + 0, sets[r.Below(6)]);
+      for (uint32_t k = 1; k < 9; k++) {
+        const uint32_t small[] = {0, 0, 1, 1, 2};
+        uint32_t count = small[r.Below(5)];
+        if (k == 2) {
+          count = r.Below(2);  // the car parts: at most one (106,016 bytes)
+        } else if (k != 1 && k != 8 && r.Below(8) == 0) {
+          count = 0x80000000u | r.Below(3);  // negative
+        }
+        Put(h.base, record + 4 * k, count);
+      }
+      const bool own_buffer = r.Below(4) == 0;
+      Put(h.base, record + 36, own_buffer ? block + 0x1C00 : 0);
+      Put(h.base, record + 40, own_buffer ? r.Below(0x20000) : uint32_t(r.Next()));
+      std::vector<int64_t> serials;
+      for (int k = 0; k < 64; k++) {
+        serials.push_back(r.Below(8) == 0 ? -1 : int64_t(r.Below(0x7FFFFFFF)));
+      }
+      std::optional<ArchiveLoads> loads;
+      loads.emplace(serials);
+      t.r3.u64 = scene;
+      t.r4.u64 = record;
+      t.r5.u64 = r.Next();
+      if (v == 0) {
+        ITC_FLAG(native_car_models) = false;
+        __imp__sub_820C8DE8(t, h.base);
+        ITC_FLAG(native_car_models) = true;
+      } else {
+        hooks::CarModelsSceneSetUp(t, h.base);
+      }
+      std::vector<uint32_t> calls = loads->calls();
+      loads.reset();
+      for (uint32_t& w : calls) {
+        if (w != 0 && memory::IsPages(w)) {
+          w = kMarker;
+        }
+      }
+      out[v].Word(uint32_t(calls.size()));
+      for (const uint32_t w : calls) {
+        out[v].Word(w);
+      }
+      for (const uint32_t at : kOwn) {
+        const uint32_t pages = guest::LoadU32(h.base, scene + at + 16);
+        if (pages != 0 && memory::IsPages(pages)) {
+          out[v].Word(kMarker);
+          memory::FreePages(pages);
+          Put(h.base, scene + at + 16, kMarker);
+        } else {
+          out[v].Word(pages);
+        }
+      }
+      // The objects of both sets along their lists (past a node already
+      // there), and the first set's records.
+      std::vector<pt::PageRegion> regions;
+      struct Object {
+        uint32_t address, bytes;
+        int first_pool;  // -1 for the second set's
+      };
+      std::vector<Object> objects;
+      const uint32_t records = guest::LoadU32(h.base, set + 52);
+      const bool records_pages = records != 0 && memory::IsPages(records);
+      regions.push_back({records, 80 * (guest::LoadU32(h.base, set + 12) +
+                                        guest::LoadU32(h.base, set + 40))});
+      auto walk = [&](uint32_t list, uint32_t bytes, int first_pool) {
+        for (uint32_t node = guest::LoadU32(h.base, list + 0), n = 0; node != 0 && n < 16;
+             node = guest::LoadU32(h.base, node + 8), n++) {
+          if (memory::IsPages(node)) {
+            objects.push_back({node, bytes, first_pool});
+            regions.push_back({node, bytes});
+          }
+        }
+      };
+      for (uint32_t pool = 0; pool < 8; pool++) {
+        walk(scene + 4944 + 12 * pool, car_models::kSecondSetBytes[pool], -1);
+      }
+      for (uint32_t pool = 0; pool < 7; pool++) {
+        walk(set + 56 + 12 * pool, sl::kPoolObjectBytes[pool], int(pool));
+      }
+      out[v].Word(uint32_t(objects.size()));
+      for (const Object& o : objects) {
+        if (o.first_pool >= 0) {
+          for (const uint32_t offset : pt::PoolProviders(uint32_t(o.first_pool))) {
+            pt::TakeProvider(h.base, o.address + offset, out[v]);
+          }
+        }
+      }
+      out[v].Bytes(pt::Normalized(h.base, regions, block, kBytes));
+      if (records_pages) {
+        out[v].Bytes(pt::Normalized(h.base, regions, records, regions[0].bytes));
+      }
+      for (const Object& o : objects) {
+        out[v].Bytes(pt::Normalized(h.base, regions, o.address, o.bytes));
+      }
+      uint32_t r3 = t.r3.u32;
+      for (size_t k = 0; k < regions.size(); k++) {
+        if (r3 >= regions[k].start && r3 - regions[k].start < regions[k].bytes + 16) {
+          r3 = 0xB0000000u + (uint32_t(k) << 20) + (r3 - regions[k].start);
+          break;
+        }
+      }
+      out[v].Word(r3);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Bytes(Read(h.base, kPalette, kPaletteBytes));
+      Write(h.base, kPalette, palette.data(), kPaletteBytes);
+      for (const Object& o : objects) {
+        memory::FreePages(o.address);
+      }
+      if (records_pages) {
+        memory::FreePages(records);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  memory::Free(allocation);
+}
+
 void Vinyls(Context& h, uint32_t block) {
   TgaHeaderClears(h, block);
   Rasterizer(h, block);
@@ -2840,6 +3026,7 @@ void CarModels(Context& h) {
     ScenePoolsSetUps(h);
     SecondSetUps(h);
     SetUpBCases(h);
+    SceneSetUpCases(h);
   }
 }
 
