@@ -25,6 +25,13 @@ file's history. What's left to see in a drive, from every run:
   group, 19 of 19 harness lines; the two modes' Inits' shared print
   split, 4ec19e07; 1 in the race, 2 in the replay `itc_4433` (ok), 16
   to drive). Recorded.
+- Subsystem 1 of 3: the options screen with the settings' load (two
+  leads taken together: `sub_821BB9A8` and the 10 others, the
+  `Type6Options`/`Type7Options` transition handlers, the most ready
+  groups in `leads.md`, 29, beside the type 6 and 7 modes; and
+  `sub_821BBF00` and the 4 others, the options screens' volume calls
+  over the same settings `[0x826D8478]`; both lines deleted from
+  `leads.md`). Mapping agent running.
 
 ## Done
 
