@@ -116,6 +116,11 @@ void TuningApplyDecals(PPCContext& ctx, uint8_t* base);
 // DecalCommand sub_822019D0 (r3 the screen; f1 as its last text call leaves
 // it), with TuningStandCalleesNative.
 void TuningDecalCommand(PPCContext& ctx, uint8_t* base);
+// PreviewItem sub_821E07B0 and RestoreStand sub_821E0FB0 (r3 the screen;
+// RestoreStand's f1 as the original leaves it), with
+// TuningStandCalleesNative.
+void TuningPreviewItem(PPCContext& ctx, uint8_t* base);
+void TuningRestoreStand(PPCContext& ctx, uint8_t* base);
 // SetCarStats sub_821DF788 (r3 the screen; f1 its last SetText's), only with
 // TuningCarStatsCalleesNative: CarMakersGarageCalleesNative and
 // --native_vehicle.

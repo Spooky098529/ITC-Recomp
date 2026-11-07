@@ -61,7 +61,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "(else the originals): SetInteriorPair sub_821CCC50, GarageStage::FitSelectedCar "
               "sub_8217DAC0, PickCameraPreset sub_821D99A0 (its piece sub_821D9B60 merged), "
               "UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00, ApplyDecals "
-              "sub_822042D8 and DecalCommand sub_822019D0; SetCarStats sub_821DF788 with the "
+              "sub_822042D8, DecalCommand sub_822019D0, PreviewItem sub_821E07B0 and RestoreStand "
+              "sub_821E0FB0 (their callees never seen in play through the guest); SetCarStats sub_821DF788 with the "
               "car makers' and --native_vehicle) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
@@ -381,6 +382,7 @@ void TuningFitSelectedCar(PPCContext& ctx, uint8_t* base) {
 ITC_TUNING_STAND_STEP(PickCameraPreset)
 ITC_TUNING_STAND_STEP(UpdateBusyIcon)
 ITC_TUNING_STAND_STEP(ApplyDecals)
+ITC_TUNING_STAND_STEP(PreviewItem)
 
 #undef ITC_TUNING_STAND_STEP
 
@@ -391,6 +393,18 @@ void TuningDecalCommand(PPCContext& ctx, uint8_t* base) {
     return ts::DecalCommand(base, stand, screen, sp, &f1);
   });
   ctx.f1.f64 = f1;
+}
+
+void TuningRestoreStand(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  std::optional<double> f1;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::RestoreStand(base, stand, r3, sp, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
 }
 
 bool TuningCarStatsCalleesNative() {
@@ -517,6 +531,8 @@ ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
 ITC_TUNING_STAND(821E0E00, TuningPreviewWheels)
 ITC_TUNING_STAND(822042D8, TuningApplyDecals)
 ITC_TUNING_STAND(822019D0, TuningDecalCommand)
+ITC_TUNING_STAND(821E07B0, TuningPreviewItem)
+ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 
 // SetCarStats: the original unless the car data's and the power curve's
 // callees are native.

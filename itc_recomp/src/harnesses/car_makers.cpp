@@ -1396,6 +1396,203 @@ void TuningStand(Context& h, Random& r) {
     }
     results.Report();
   }
+  // The first set's tires and calipers as stand_models' harness lays the
+  // tires (for the tire grades' Wheels::SetTireTextures and
+  // GarageStage::SetWheelExtras' SetCaliperTexture): part models at the
+  // wheels' +240, +704, +2336 and +2800 with no nodes, zero to two shapes
+  // each in an area of their own (+0x1C000, +0x1D000, +0x20000, +0x21000),
+  // each shape's material block up to one material a group; the wheels' textures +40 and +56 and the models' grades +4080
+  // and +4096 0 to 2. The models' interior (+5068, for SceneModel::ApplyInterior's
+  // copies into its +40 and its +36's +28) in the block too (+0x1E000, its
+  // +36 +0x1E400).
+  const auto lay_tires = [&] {
+    for (uint32_t i = 0; i < 2; i++) {
+      guest::StoreU32(h.base, block + kModels + 0x1400 * i + 5068, block + 0x1E000);
+    }
+    guest::StoreU32(h.base, block + 0x1E000 + 36, block + 0x1E400);
+    constexpr uint32_t kParts[4][2] = {
+        {240, 0x1C000}, {704, 0x1D000}, {2336, 0x20000}, {2800, 0x21000}};
+    for (const auto& [at, area] : kParts) {
+      const uint32_t model = block + kFirstWheels + at;
+      const uint32_t shapes = block + area;
+      guest::StoreU32(h.base, model + 408, 0);
+      guest::StoreU32(h.base, model + 412, r.Below(3));
+      guest::StoreU32(h.base, model + 40, shapes);
+      for (uint32_t k = 0; k < 2; k++) {
+        const uint32_t materials = shapes + 0x480 + 0x600 * k;
+        guest::StoreU32(h.base, shapes + 544 * k + 396, materials);
+        const uint32_t first = r.Below(2), second = r.Below(2);
+        guest::StoreU32(h.base, materials + 0, first + second);
+        guest::StoreU32(h.base, materials + 8, first);
+        guest::StoreU32(h.base, materials + 12, second);
+      }
+    }
+    guest::StoreU32(h.base, block + kFirstWheels + 40, r.Below(3));
+    guest::StoreU32(h.base, block + kFirstWheels + 56, r.Below(3));
+    for (uint32_t i = 0; i < 2; i++) {
+      const uint32_t model = block + kModels + 0x1400 * i;
+      guest::StoreU32(h.base, model + 4080, r.Below(3));
+      guest::StoreU32(h.base, model + 4096, r.Below(3));
+    }
+  };
+  // A choice word for the tables PreviewItem and RestoreStand index
+  // unchecked: -1 (cleared), else tens 0 to 9 and ones 0 to 5 (the reads
+  // stay below the frames' register saves, PreviewItem's from its +120,
+  // which the native versions don't write).
+  const auto choice_word = [&] {
+    return r.Below(4) == 0 ? 0xFFFFFFFFu : 10 * r.Below(10) + r.Below(6);
+  };
+  // The categories 0 to 6 mostly, now and then -1, 7 or 8; the items 0 to 9
+  // mostly, now and then any byte.
+  const auto category = [&] {
+    return r.Below(8) == 0 ? uint32_t(int32_t(r.Below(10)) - 1) : r.Below(7);
+  };
+  const auto item = [&] { return r.Below(8) == 0 ? r.Below(256) : r.Below(10); };
+  {
+    // The states it tests (3 and 4 nothing, 5 to 8, 54 and 55) mostly; the
+    // level byte below 8 for the tires (TuningScreen::SetTireGrade's table
+    // is read unchecked), the type byte below 4 for the aero sets
+    // (PreviewParts); the availability words zeroed now and then; the
+    // power tables' row +33900 small. The top 40 bytes: r28 to r31 and lr's
+    // saves; the 32 under the frame: the guest callees' saves (the
+    // original's r29 to r31); the 56 from 112 under it: the saves of the
+    // callees of a guest callee's 96- or 112-byte frame
+    // (SceneModel::ApplyRecord's r26 to r31 under GarageStage::SetChoice or
+    // SetDoorKind, ScenePools::GetB's), holding the original's registers,
+    // which the native version doesn't set; the 16 from 16 under
+    // TuningScreen::RefitAxles' 4,000-byte frame (its callee's save of the
+    // original's r30).
+    Results results("TuningScreen::PreviewItem (sub_821E07B0)");
+    constexpr uint32_t kStates[] = {3, 4, 5, 5, 6, 6, 7, 8, 54, 55};
+    // The states each category tests.
+    constexpr uint32_t kTested[7][4] = {{5, 6, 5, 6}, {5, 7, 5, 7}, {5, 5, 5, 6},
+                                        {5, 5, 5, 8}, {6, 6, 7, 8}, {5, 6, 7, 8},
+                                        {6, 7, 54, 55}};
+    for (int c = 0; c < 360; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            lay_tires();
+            // The categories in turn (two of nine cases any), each with its
+            // tested states in turn and the items 0 to 9 for each (now and
+            // then any state or any byte).
+            const int k = c / 9;
+            const uint32_t m = c % 9 < 7 ? uint32_t(c % 9) : category();
+            const uint32_t p = r.Below(10) == 0 ? item() : uint32_t(k / 4) % 10;
+            const uint32_t state = r.Below(10) == 0             ? r.Below(64)
+                                   : m < 7 && c % 9 != 8 ? kTested[m][k % 4]
+                                                         : kStates[r.Below(10)];
+            field(tuning_screen::kState, state);
+            field(tuning_screen::kCategory, m);
+            byte(tuning_screen::kItem, p);
+            byte(tuning_screen::kLevel,
+                 m == 3 || r.Below(4) != 0 ? r.Below(8) : r.Below(256));
+            byte(tuning_screen::kType, m == 4 ? r.Below(4) : r.Below(4) == 0 ? r.Below(256)
+                                                                            : r.Below(6));
+            byte(tuning_screen::kType2, r.Below(6) == 0 ? r.Below(256) : r.Below(3));
+            byte(tuning_screen::kOption, r.Below(6) == 0 ? r.Below(256) : r.Below(3));
+            field(tuning_screen::kPartSet, r.Below(4));
+            field(25172, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+            field(9712, r.Below(4) != 0 ? 0 : uint32_t(r.Next()));
+            field(33812, choice_word());
+            field(33816, choice_word());
+            field(33548, r.Below(6));
+            field(33556, r.Below(6));
+            if (r.Below(4) == 0) {
+              for (uint32_t at = 34104; at < 36824; at += 4) {
+                field(at, 0);
+              }
+            }
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821E07B0, hooks::TuningPreviewItem, 40, floats,
+          fmt::format("case {}", c), 160, 32, before, with_f1, 0x5000, kGarageBytes,
+          {{160 + 112, 56}, {160 + 4000 + 16, 16}});
+    }
+    results.Report();
+  }
+  {
+    // The saved values each page puts back: the tables' rows and indexes
+    // small (the tire grades' below 8, read unchecked), the choice words as
+    // above, the wheels' numbers 0 to 179 or any, the paint's components
+    // bytes or any, the light kits' flags 0 or 1 with their table indexes
+    // below 8, the aero set pick below 4. The top 64 bytes: f30, f31, r27
+    // to r31 and lr's saves; the 32 under the frame and the 56 from 112
+    // under it as PreviewItem's (also GarageStage::SetColor's pieces' f29
+    // to f31 and ScenePools::GetB's r30 and r31 under them).
+    Results results("TuningScreen::RestoreStand (sub_821E0FB0)");
+    for (int c = 0; c < 640; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            lay_tires();
+            // The categories in turn (the eighth case the paint's and the
+            // light kits' page, or any category), the items in turn (now
+            // and then any byte).
+            const bool paint = c % 8 == 7 && r.Below(2) == 0;
+            const uint32_t m = c % 8 < 7 ? uint32_t(c % 8) : paint ? 5 : category();
+            field(tuning_screen::kCategory, m);
+            byte(tuning_screen::kItem, paint                ? 4 + r.Below(2)
+                                       : r.Below(16) == 0 ? item()
+                                                          : uint32_t(c / 8) % 10);
+            // The pages' own switches by the round (c / 80, 0 to 7): the
+            // +36372 and +36376 words, the wheels' +25196 and +25240, the
+            // accessory's kind +33540 and slot +33576.
+            const uint32_t round = uint32_t(c / 80);
+            field(tuning_screen::kPartSet, r.Below(4));
+            field(35496, r.Below(7));
+            field(35708, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(7));
+            for (uint32_t at = 33800; at < 33828; at += 4) {
+              field(at, choice_word());
+            }
+            field(33812, choice_word());
+            field(33816, choice_word());
+            field(35948, r.Below(4) == 0 ? r.Below(8) : r.Below(5));
+            field(36076, r.Below(4) == 0 ? r.Below(8) : r.Below(5));
+            field(25172, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+            field(36300, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(6));
+            field(36372, round % 4);
+            field(36376, round / 4);
+            field(36588, r.Below(4));
+            field(25196, round % 5);
+            field(25240, round / 4 == 0 ? 0 : uint32_t(r.Next()) | 1);
+            for (const uint32_t at : {27832u, 27836u, 27840u}) {
+              field(at, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(180));
+            }
+            field(36612, r.Below(4));
+            field(36636, r.Below(4));
+            for (const uint32_t at : {30476u, 30480u, 30484u}) {
+              field(at, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(256));
+            }
+            field(30488, r.Below(3));
+            field(30500, r.Below(3));
+            field(30492, r.Below(5));
+            for (uint32_t g = 0; g < 3; g++) {
+              field(30580 + 4 * g, r.Below(2));
+              field(30660 + 4 * g, r.Below(2));
+              for (const uint32_t at : {30596u, 30612u, 30628u, 30692u}) {
+                field(at + 4 * g, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(360));
+              }
+              field(30644 + 4 * g, r.Below(8));
+              field(30708 + 4 * g, r.Below(8));
+              field(30676 + 4 * g, r.Below(4));
+            }
+            field(36708, r.Below(6));
+            field(36712, r.Below(5));
+            field(33540, round < 6 ? 1 : round == 6 ? 0 : 2);
+            field(33576, round < 6 ? round : r.Below(7));
+            field(33616, r.Below(6));
+            field(33620, r.Below(6));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821E0FB0, hooks::TuningRestoreStand, 64, floats,
+          fmt::format("case {}", c), 224, 32, before, with_f1, 0x5000, kGarageBytes,
+          {{224 + 112, 56}, {224 + 4000 + 16, 16}});
+    }
+    results.Report();
+  }
   for (int i = 0; i < 4; i++) {
     guest::StoreU32(h.base, globals[i], saved[i]);
   }

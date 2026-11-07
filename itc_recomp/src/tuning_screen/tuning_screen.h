@@ -409,6 +409,29 @@ uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
 // made with f1 as FitSelectedCar leaves it).
 uint64_t DecalCommand(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
                       double* f1);
+// sub_821E07B0 TuningScreen::PreviewItem: r3 = the screen (all 64 bits).
+// The highlighted item put on the stand by the state, the category and the
+// item bytes (its row): the stand's setters' plain C++, IsItemAvailable's
+// and SetInteriorPair's; SetCaliper, GarageStage::SetChoice, PreviewParts,
+// RefitAxles, GarageStage::SetAero2, SetDoorKind and SetAccessory (never
+// seen in play) through `call` with the original's return addresses. The
+// choice tables at frame + 80 and + 96, read unchecked. 160-byte frame; r3
+// the last call's, else the entry (nothing in states 3 and 4).
+uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821E0FB0 TuningScreen::RestoreStand: r3 = the screen (all 64 bits).
+// The current page's saved values put back on the stand by the category and
+// the item (its row): the stand's setters', PreviewWheel's, SetInteriorPair's
+// and GarageStage::SetLightKit's plain C++; SetCaliper, GarageStage::SetChoice,
+// PreviewParts, RefitAxles, SetAero2, SetDoorKind, SetAccessory,
+// GarageStage::SetColor and ClearLightKit (never seen in play) through the
+// guest (SetColor with f1 to f3, ClearLightKit with f1 as it is). The choice
+// tables at frame + 112 and + 128, the tire grades' at + 128, the
+// conversions' doublewords at + 80 to + 112 as the original leaves them.
+// 224-byte frame; r3 the last call's, else the entry; `*f1` set where the
+// function or a native callee leaves f1, nullopt where a guest call left it
+// (or nothing touched it).
+uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                      std::optional<double>* f1);
 // sub_821DF788 TuningScreen::SetCarStats: SetUpCarData (car_makers), a power
 // curve on the frame (+96: PowerCurve::FromEngine on +20180, ShiftPeak 0),
 // the stats +20768 to +20780 from the car data and the curve, the texts of
