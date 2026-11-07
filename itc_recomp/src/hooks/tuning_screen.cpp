@@ -248,7 +248,10 @@ ITC_TUNING_DISPATCH_STEP(Command30)
 
 }  // namespace hooks
 
-// Defines an adapter: the flag, else the original.
+// Defines an adapter: the flag, else the original. HideTireMarks sub_821DFB20
+// and PlaceStateNodes sub_82202C08 have none: only native callers
+// (ShowTireMarks, Command25) reach them, and the flag switches those; their
+// register steps are the harness's.
 #define ITC_TUNING_SCREEN(address, step)   \
   extern "C" REX_FUNC(sub_##address) {     \
     REX_FUNC_PROLOGUE();                   \
@@ -288,7 +291,6 @@ ITC_TUNING_SCREEN(821DE2D8, TuningAeroPartValue)
 ITC_TUNING_SCREEN(821EE6D0, TuningHidePartMarks)
 ITC_TUNING_SCREEN(821EE760, TuningShowPartMarks)
 ITC_TUNING_SCREEN(821DA3F8, TuningShowInteriorPicture)
-ITC_TUNING_SCREEN(821DFB20, TuningHideTireMarks)
 ITC_TUNING_SCREEN(821DFBE8, TuningHideNode19)
 ITC_TUNING_SCREEN(821E22E8, TuningShowTireMarks)
 ITC_TUNING_SCREEN(821EED00, TuningUpdateListCounter)
@@ -298,7 +300,6 @@ ITC_TUNING_SCREEN(82202880, TuningCommand31)
 ITC_TUNING_SCREEN(821E9050, TuningCommand9)
 ITC_TUNING_SCREEN(821EE9B0, TuningUpdateListDots)
 ITC_TUNING_SCREEN(82202F30, TuningShowOptionMarks)
-ITC_TUNING_SCREEN(82202C08, TuningPlaceStateNodes)
 ITC_TUNING_SCREEN(82203110, TuningLayOutItems)
 ITC_TUNING_SCREEN(82203B00, TuningShowItems)
 ITC_TUNING_SCREEN(821D6230, TuningShowDialog)
