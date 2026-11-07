@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-07 10:56 (`b7-loop-07-11-26`)
+
+Nothing yet.
+
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
 - The run halted (2026-11-07) at the tuning screen's fifth validation (`itc_4236`): the all-harnesses run crashed in `car_makers`' existing `TuningScreen::SetUpCarData` `sub_821DF2F8` group (a guest read of `0x00000004`, looping until the hard exit); with `car_makers,tuning_screen` alone (`itc_4237`) every group passes. Fixed after: the case's garage list could end on a node with no slot set (a random slot, case 24's car ~18 MB past the block); now walked through distinct nodes (`LayGarageWalk` in the `car_makers` harness, for its four set-ups); the validation then passed (`itc_4240`). Prints not first in their bodies, left as they are: `sub_8211C740` (inside its `ChangeText` lambda, as the file's other text calls), `GarageStage::Draw` (after the early return when the stage's +112 is 0).
