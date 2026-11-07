@@ -52,7 +52,7 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "ActionMapper::Held's plain C++ with --native_action_mappers; HighlightItem and "
               "HighlightSelected through the guest), ShowTypes sub_821D2A80 (its piece sub_821D2DFC "
               "merged; the aero parts by their plain C++ with --native_car_specs), SetStateTexts "
-              "sub_821F1DE0, FillPartRows sub_821F4BF8 (its piece sub_821F4CF0 merged) and Command8 sub_821F5F70, UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
+              "sub_821F1DE0, FillPartRows sub_821F4BF8 (its piece sub_821F4CF0 merged), Command8 sub_821F5F70 and RefreshMenu sub_821D8978, UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed, "
               "LoopNamed, SetText, SetNodeText, ScrollText and sub_8211C5F8 "
               "through their overrides; the lists' "
               "UpdateListDots sub_821EE9B0, ShowOptionMarks sub_82202F30, PlaceStateNodes sub_82202C08, "
@@ -312,6 +312,26 @@ void TuningCommand8(PPCContext& ctx, uint8_t* base) {
   WithCalls(ctx, base, [&](const ts::GuestCall& call) { return ts::Command8(base, call, r3, sp); });
 }
 
+void TuningRefreshMenu(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  std::optional<double> f1;
+  WithCalls(ctx, base, [&](const ts::GuestCall& inner) {
+    const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
+                                   uint32_t frame, uint32_t lr) {
+      if (f1) {
+        ctx.f1.f64 = *f1;
+        f1.reset();
+      }
+      return inner(function, args, frame, lr);
+    };
+    return ts::RefreshMenu(base, call, screen, sp, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
 // The same with r3 all 64 bits and r4 the update's dispatcher.
 #define ITC_TUNING_DISPATCH_STEP(Name)                                                \
   void Tuning##Name(PPCContext& ctx, uint8_t* base) {                                \
@@ -511,6 +531,7 @@ ITC_TUNING_SCREEN(821D2A80, TuningShowTypes)
 ITC_TUNING_SCREEN(821F1DE0, TuningSetStateTexts)
 ITC_TUNING_SCREEN(821F4BF8, TuningFillPartRows)
 ITC_TUNING_SCREEN(821F5F70, TuningCommand8)
+ITC_TUNING_SCREEN(821D8978, TuningRefreshMenu)
 
 // The calls onto the stand: also the original unless their callees are
 // native.

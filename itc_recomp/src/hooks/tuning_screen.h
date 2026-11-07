@@ -98,6 +98,10 @@ void TuningSetStateTexts(PPCContext& ctx, uint8_t* base);
 void TuningFillPartRows(PPCContext& ctx, uint8_t* base);
 // Command8 sub_821F5F70 (r3 all 64 bits).
 void TuningCommand8(PPCContext& ctx, uint8_t* base);
+// RefreshMenu sub_821D8978 (f1 as the original leaves it: each native
+// AnimationTime's or NamedAnimationTime's put in f1 before the next guest
+// call and at the end).
+void TuningRefreshMenu(PPCContext& ctx, uint8_t* base);
 
 // The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
 // with TuningStandCalleesNative: --native_stand_models, --native_race_setup

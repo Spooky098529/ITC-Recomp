@@ -279,6 +279,7 @@ struct Spec {
   GuestFunction native;
   std::vector<Range> stack;  // compared below r1
   Setup setup = {};          // after the world, the globals and the stack
+  bool f1 = false;           // f1 compared too (as a double)
 };
 
 void Run(Context& h, const World& w, const Spec& spec) {
@@ -324,6 +325,9 @@ void Run(Context& h, const World& w, const Spec& spec) {
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(uint32_t(t.lr));
+      if (spec.f1) {
+        out[v].Double(t.f1.u64);
+      }
       for (size_t i = 0; i < saved.size(); i++) {
         Write(h.base, kGlobals[i].address, saved[i].data(), kGlobals[i].bytes);
       }
@@ -592,6 +596,99 @@ void Command8World(const World& w, Random& r) {
   PartRowsWorld(w, r);
 }
 
+// RefreshMenu's world: the lists' pages (their animations and the named
+// ones), its states mostly (now and then another below 60), the fields its
+// blocks read small (the tabs' table index +25204 - +25212 + j kept -3 to
+// 16, the aero items' words at +25128 0 a third of the time, the flags
+// +9720 and +9724 1 a third of the time), and mostly one to three slots in
+// the looping list naming the state's triggers, at the time its block waits
+// for two times in three, else at a random one.
+void RefreshMenuWorld(const World& w, Random& r) {
+  ListPage(w, r);
+  const uint32_t s = w.screen();
+  static constexpr uint32_t kMenuStates[] = {16, 15, 4, 3, 17, 57, 58, 56, 53, 16};
+  const uint32_t state = r.Below(10) == 0 ? r.Below(60) : kMenuStates[r.Below(10)];
+  guest::StoreU32(w.base, s + ts::kState, state);
+  const uint32_t group = r.Below(3) == 0 ? (r.Below(2) == 0 ? 0 : 16) : 1 + r.Below(15);
+  guest::StoreU32(w.base, s + 25204, r.Below(4) == 0 ? 11 : group);
+  const uint32_t tab_group = guest::LoadU32(w.base, s + 25204);
+  guest::StoreU32(w.base, s + 25212, uint32_t(int32_t(tab_group) - int32_t(r.Below(17)) + 3));
+  guest::StoreU32(w.base, s + 25196, r.Below(4));
+  guest::StoreU32(w.base, s + 25100, r.Below(4));
+  guest::StoreU8(w.base, s + ts::kItem, uint8_t(r.Below(10)));
+  guest::StoreU8(w.base, s + 9676, uint8_t(r.Below(11)));
+  if (r.Below(3) == 0) {
+    guest::StoreU32(w.base, s + ts::kCategory, r.Below(2) == 0 ? 4 : 6);
+  }
+  guest::StoreU32(w.base, s + 36588, r.Below(2) == 0 ? 0 : 1 + r.Below(3));
+  for (int32_t k = -4; k < 18; k++) {
+    guest::StoreU32(w.base, s + 25128 + 4 * k, r.Below(3) == 0 ? 0 : 1 + r.Below(2));
+  }
+  guest::StoreU32(w.base, s + 25228, r.Below(8));
+  guest::StoreU32(w.base, s + 25232, r.Below(4) == 0 ? uint32_t(-int32_t(r.Below(3))) : r.Below(7));
+  guest::StoreU32(w.base, s + 33576, r.Below(5));
+  guest::StoreU32(w.base, s + 33564, r.Below(2) == 0 ? 4 : r.Below(6));
+  guest::StoreU32(w.base, s + 33540, r.Below(2) == 0 ? 1 : r.Below(3));
+  if (r.Below(2) == 0) {
+    guest::StoreU32(w.base, s + ts::kCategory, 6);
+    guest::StoreU8(w.base, s + ts::kItem, 3);
+  }
+  for (uint32_t k = 0; k < 5; k++) {
+    guest::StoreU32(w.base, s + 25176 + 4 * k, r.Below(2));
+  }
+  for (const uint32_t f : {9720u, 9724u}) {
+    if (r.Below(3) == 0) {
+      guest::StoreU32(w.base, s + f, 1);
+    }
+  }
+  // The triggers: (named index, or the scene's animation index + 0x10000;
+  // the time's address).
+  struct Trigger {
+    uint32_t what;
+    uint32_t at;
+  };
+  constexpr uint32_t C = 0x82002CAC;
+  static const std::vector<Trigger> kNone = {};
+  static const std::vector<Trigger> k16 = {{1007, 0x820021E8}, {62, C}};
+  static const std::vector<Trigger> k15 = {{964, C}, {1008, C}};
+  static const std::vector<Trigger> k4 = {{0x10001, C}, {0x10002, C}, {966, C}, {1004, C},
+                                          {972, C},     {973, C},     {974, C}, {975, C},
+                                          {982, C}};
+  static const std::vector<Trigger> k3 = {{0x10000, 0x82000C34}, {966, C}, {967, C}, {973, C}};
+  static const std::vector<Trigger> k17 = {{61, C}};
+  static const std::vector<Trigger> k57 = {{143, C}};
+  static const std::vector<Trigger> k56 = {{1005, C}, {144, 0x82002C78}};
+  static const std::vector<Trigger> k53 = {{1001, C}, {1003, C}, {1006, 0x82002C78}};
+  const std::vector<Trigger>& triggers = state == 16   ? k16
+                                         : state == 15 ? k15
+                                         : state == 4  ? k4
+                                         : state == 3  ? k3
+                                         : state == 17 ? k17
+                                         : state == 57 || state == 58 ? k57
+                                         : state == 56 ? k56
+                                         : state == 53 ? k53
+                                                       : kNone;
+  if (triggers.empty()) {
+    return;
+  }
+  const uint32_t looping = w.at(kMovieAt) + ui_movies::kMovieLooping;
+  const uint32_t count = r.Below(5) == 0 ? 0 : 1 + r.Below(3);
+  for (uint32_t k = 0; k < count; k++) {
+    const Trigger& t = triggers[r.Below(uint32_t(triggers.size()))];
+    ui_movies::Slot slot{};
+    if (t.what >= 0x10000) {
+      slot[0] = t.what - 0x10000;
+      slot[1] = 0xFFFFFFFFu;
+      slot[2] = 0xFFFFFFFFu;
+    } else {
+      slot[0] = 0x7777;
+      slot[2] = t.what;
+    }
+    slot[5] = r.Below(3) != 0 ? guest::LoadU32(w.base, t.at) : uint32_t(r.Next());
+    ui_movies::Append(w.base, looping, slot);
+  }
+}
+
 constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
 constexpr uint32_t kCommand30States[] = {35, 36, 37};
 
@@ -810,6 +907,12 @@ void TuningScreenPages(Context& h) {
   Run(h, w, {"TuningScreen::SetStateTexts", 25, __imp__sub_821F1DE0,
              hooks::TuningSetStateTexts, {{-224, -224 + 40}, {-224 + 80, -56}},
              [](PPCContext&, Random& r, const World& w) { StateTextsWorld(w, r); }});
+  // RefreshMenu: its world (above); r25 to r31 and f31 saved (72 bytes);
+  // SetNodeText's and SetText's parameter area (+40 to +79) left out; f1
+  // compared.
+  Run(h, w, {"TuningScreen::RefreshMenu", 40, __imp__sub_821D8978, hooks::TuningRefreshMenu,
+             {{-240, -240 + 40}, {-240 + 80, -72}},
+             [](PPCContext&, Random& r, const World& w) { RefreshMenuWorld(w, r); }, true});
   // Command8: FillPartRows' world and the named 1007 and 1011; r29 to r31
   // saved (32 bytes); r3's high word now and then set.
   Run(h, w, {"TuningScreen::Command8", 25, __imp__sub_821F5F70, hooks::TuningCommand8,

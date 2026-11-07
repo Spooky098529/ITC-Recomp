@@ -336,6 +336,16 @@ uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // 16).
 uint64_t SetStateTexts(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
                        std::optional<double>* f1);
+// sub_821D8978 TuningScreen::RefreshMenu (refresh_menu.cpp): movie 2's
+// menus by the state once their animation's time is reached (its row): 16
+// the group tabs, 15 the three-choice menu, 4 a category's items, 3 the
+// categories, 17 a setting list, 57 and 58, 56, 53 two choices; the
+// highlight (a node's +16) float(pick) x 40.0 through the doubleword at
+// frame + 80, state 16's tab table at frame + 96. 240-byte frame; r3 the
+// last call's, else the entry; `*f1` the last AnimationTime's or
+// NamedAnimationTime's (the caller applies it before each later guest call).
+uint64_t RefreshMenu(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+                     std::optional<double>* f1);
 // sub_821F4BF8 TuningScreen::FillPartRows (its case 0 the split piece
 // sub_821F4CF0, merged): r3 = the screen (all 64 bits). HidePartMarks, then
 // by n = +25224 rows 1 (0; the group 0's the car's picture), 1 and 2 (1), 0
