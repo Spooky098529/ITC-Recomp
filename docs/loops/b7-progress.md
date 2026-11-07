@@ -120,7 +120,13 @@ file's history. What's left to see in a drive, from every run:
   89 s at 180, the harnesses ~88.6 s; 0 errors, every harness 0
   differing, 66 of 66 harness lines (66 functions: the report's 70
   miscounted); 3 in the race, 14 in the replay `itc_4375` (ok), 49 to
-  drive). Second migration agent running.
+  drive). Second migration cb21f566..5dd1e34c (`Quaternion::FromAngles`,
+  `GarageCamera::Reset`, `GarageLights::Init`, `StandSlot::Init` with
+  the stage's and camera's Inits, the dialogs' confirm steps, the first
+  screens' confirms and `Type6Screen0::ShowPage`; 16 functions, a row
+  added for `Type6Screen0::Confirm` `sub_82233FC8`; 1 adapter removed;
+  races 38 s, 0 errors, its harnesses 0 differing; no subagents); left:
+  24 ready groups. Validation agent running.
 
 ## Done
 
@@ -171,5 +177,7 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 57, known 536, unknown 1238).
 - After its migration: ours 4655, work left 1765 (wrapped 57, known
   470, unknown 1238).
+- After its second migration: ours 4671, work left 1749 (wrapped 57,
+  known 455, unknown 1237).
 
 ## Stopped

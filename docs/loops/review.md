@@ -103,6 +103,13 @@ When the user has reviewed a run's section, its heading gets
   those cases a movie block of their own. `StandSlot::Free`'s prints
   sit on its two native paths, after its check that hands back to the
   recompiled code (not its first statement).
+- Its second migration (cb21f566..5dd1e34c): `GarageLights::Init`'s
+  row corrected (the spots keep the record's w; a zero direction gives
+  zeros); `Type6Screen0::Confirm` `sub_82233FC8` given a row (seen in
+  play, missed by the map; its caller `sub_82234958` has none);
+  `GarageCamera::Init`'s harness leaves out one dead frame word left by
+  `LoadPresets`' callees on the recompiled side; `tan` run with nearest
+  rounding set and restored around `c_runtime::Tan`.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
