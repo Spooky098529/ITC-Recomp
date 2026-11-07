@@ -18,4 +18,41 @@ bool Type67ModesNative();
 // r3 after as the last StateMachine::Add's adapter leaves it.
 void Type67Init(PPCContext& ctx, uint8_t* base, uint32_t address);
 
+// The handlers without guest calls (type67_modes handlers.cpp), each with
+// the registers its original takes. `Freeing` steps return false, with
+// nothing done, where a block isn't the allocation layer's pages (the
+// adapters then run the originals); the allocating ones run only over the
+// layer (the adapters check NativeHeapActive).
+void GarageStageSetPlates(PPCContext& ctx, uint8_t* base);
+void GarageStageResetPose(PPCContext& ctx, uint8_t* base);
+void CameraPresetConstruct(PPCContext& ctx, uint8_t* base);
+void CameraPresetCopy(PPCContext& ctx, uint8_t* base);
+bool GarageCameraFreePresets(PPCContext& ctx, uint8_t* base);
+bool GarageCameraOnPresetsLoaded(PPCContext& ctx, uint8_t* base);
+bool StandSlotFree(PPCContext& ctx, uint8_t* base);
+void ControllerOptionsOnEnter(PPCContext& ctx, uint8_t* base);
+bool ControllerOptionsOnLeft(PPCContext& ctx, uint8_t* base);
+void ControllerOptionsShow(PPCContext& ctx, uint8_t* base);
+void ControllerOptionsOpen(PPCContext& ctx, uint8_t* base);
+void ControllerOptionsLeave(PPCContext& ctx, uint8_t* base);
+void PanelScreenInitWords(PPCContext& ctx, uint8_t* base);
+void ScreenMachineWait(PPCContext& ctx, uint8_t* base);
+void ScreenReenter(PPCContext& ctx, uint8_t* base);
+void Type6DialogShown(PPCContext& ctx, uint8_t* base);
+void Type7DialogShown(PPCContext& ctx, uint8_t* base);
+void Type6DialogOnEnter(PPCContext& ctx, uint8_t* base);
+void Type7DialogOnEnter(PPCContext& ctx, uint8_t* base);
+void Type6DialogWaitForMovies(PPCContext& ctx, uint8_t* base);
+void Type7DialogWaitForMovies(PPCContext& ctx, uint8_t* base);
+void Type6Screen0OnEnter(PPCContext& ctx, uint8_t* base);
+void Type7Screen0OnEnter(PPCContext& ctx, uint8_t* base);
+bool Type6Screen0OnLeft(PPCContext& ctx, uint8_t* base);
+bool Type7Screen0OnLeft(PPCContext& ctx, uint8_t* base);
+void Type6Screen0WaitForMovie(PPCContext& ctx, uint8_t* base);
+void Type7Screen0WaitForMovie(PPCContext& ctx, uint8_t* base);
+void Type6Screen0PickYes(PPCContext& ctx, uint8_t* base);
+void Type6Screen0PickNo(PPCContext& ctx, uint8_t* base);
+void Type7Screen0PickYes(PPCContext& ctx, uint8_t* base);
+void Type6Screen0GoOn(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
