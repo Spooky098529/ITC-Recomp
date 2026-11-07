@@ -56,6 +56,16 @@ When the user has reviewed a run's section, its heading gets
   seen in play (`sub_821D7C90`, `sub_821F0D38`, `sub_821F1130`) stay
   recompiled and now run the original; nothing to reproduce in the
   registers both pages keep live across leaf calls.
+- Cleanup leads (c1cd4b85..99c60056): 15 adapters removed in
+  `front-end-car-draw.md` and `tuning-screen.md`. With their adapters
+  gone, the callers' recompiled side runs the callees' originals, which
+  save registers below the caller's frame where the plain C++ writes
+  nothing: the harnesses now leave those bytes out (`GarageStage::Draw`
+  208 bytes; `RestoreStand` SetLightKit's f29-f31; `FillPartRowsRight`
+  and `Left` 176-216 below r1; `AnimateWheels` 304-344 and 896-928,
+  the second `SetPartName`'s `SetText` r7-r10 area; `InputWheels` the
+  same 128 bytes deeper), following the earlier `GarageAnims::Add` and
+  `Open`/`Close` cases in the same harness file.
 
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 

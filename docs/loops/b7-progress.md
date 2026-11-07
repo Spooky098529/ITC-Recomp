@@ -71,7 +71,12 @@ file's history. What's left to see in a drive, from every run:
   `sub_8217CAB8`, `sub_820C8480`) and six in `tuning-screen.md`
   (`sub_821F4BF8`, `sub_821F2068`, `sub_821EE880`, `sub_821E0E00`,
   `sub_821EE6D0`, `sub_821EE760`); `b7_groups.py --removable` lists all
-  13; both lines deleted from `leads.md`. Migration agent running.
+  13; both lines deleted from `leads.md`. Migration c1cd4b85..99c60056
+  (the 13, with `CategoryItemCount` `sub_821CC6C0` and `WheelNumber`
+  `sub_821CDED8` that became removable: 15 Native; races 34-35 s, 0
+  errors, the four files' harnesses 0 differing; the callers' harnesses
+  leave out the callees' register saves below their frames; no
+  subagents); left: none removable. Validation agent running.
 
 ## Done
 
@@ -105,5 +110,6 @@ file's history. What's left to see in a drive, from every run:
   known 422, unknown 1395).
 - After its fourth migration: ours 4548, work left 1872 (wrapped 57,
   known 420, unknown 1395).
+- After the cleanup leads: see the validation's line.
 
 ## Stopped
