@@ -16,6 +16,24 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-07 10:56 (`b7-loop-07-11-26`)
+
+- The tuning pages' first migration (attract race `itc_4251`, replay
+  `itc_4252` ok; `tuning-pages.md`): `sub_821CCE30`
+  TuningScreen::IsPickOwned, `sub_821CD498` TuningScreen::MarkOwned,
+  `sub_821E7DB0` TuningScreen::SetWheelListEnd, `sub_821EF288`
+  TuningScreen::InchListEnd, `sub_821FE560`
+  TuningScreen::SetUpVinylBusyIcon, `sub_821FE5D8`
+  DecalImages::AllLoaded, `sub_821FE7D8` TuningScreen::KeepListTextures,
+  `sub_821FE420` TuningScreen::SetEditorLimits, `sub_822045F8`
+  TuningScreen::LoadPageLayouts, `sub_821FE6A0` DecalImages::FreeTexture,
+  `sub_82204730` DecalImages::BindVinylTexture, `sub_82203D40`
+  TuningScreen::BindVinylTextures, `sub_821D84F8`
+  TuningScreen::EnterEditor, `sub_82203F20` TuningScreen::StoreVinyls,
+  `sub_822040A8` TuningScreen::LoadVinyls, `sub_821D9E68`
+  TuningScreen::ShowPricePanel, `sub_821EED98` TuningScreen::SetBrandLogo,
+  `sub_8224AB50` Color::HsvToRgb.
+
 ## Run 2026-11-06 14:33 (`b7-loop-06-11-26`)
 
 - The stand models (attract race `itc_3761`, replay `itc_3762` ok;

@@ -30,7 +30,10 @@ file's history. What's left to see in a drive, from every run:
   Overridden, 6 Merged, 6 adapters removed; race 38 s, 0 errors, all
   its harnesses 0 differing; no subagents); left: 27 ready groups
   (`DecalImages::UnloadAll`/`Unload` first; the pages; `sub_821D74A0`
-  with `sub_821D32C8` over 1,500 lines, to split). Validation agent
+  with `sub_821D32C8` over 1,500 lines, to split). Validated
+  `itc_4251` (race 92 s at 180, the harnesses ~86 s; 0 errors, every
+  harness 0 differing, 28 of 28 harness lines; none in the race, 10 in
+  the replay `itc_4252` (ok), 18 to drive). Second migration agent
   running.
 
 ## Done
