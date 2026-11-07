@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "RestoreStickerTexture sub_821F89B8, BindVinylTexture sub_82204730, "
               "BindVinylTextures sub_82203D40 and EnterEditor sub_821D84F8 (FadeIn's plain C++); the "
               "vinyls' records StoreVinyls sub_82203F20 and LoadVinyls sub_822040A8 (memcpy's plain "
-              "C++ where Buffers_Memcpy takes it)) "
+              "C++ where Buffers_Memcpy takes it); ShowPricePanel sub_821D9E68, SetBrandLogo "
+              "sub_821EED98 (its piece sub_821EEE14 merged), movie 2's nodes through the UI "
+              "movies' plain C++; Color::HsvToRgb sub_8224AB50) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -142,6 +144,19 @@ void TuningPagesLoadVinyls(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+void TuningPagesShowPricePanel(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::ShowPricePanel(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningPagesSetBrandLogo(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::SetBrandLogo(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  tp::HsvToRgb(base, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -174,6 +189,10 @@ ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
 
 ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
 ITC_TUNING_PAGES(822040A8, TuningPagesLoadVinyls)
+
+ITC_TUNING_PAGES(821D9E68, TuningPagesShowPricePanel)
+ITC_TUNING_PAGES(821EED98, TuningPagesSetBrandLogo)
+ITC_TUNING_PAGES(8224AB50, TuningPagesHsvToRgb)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above

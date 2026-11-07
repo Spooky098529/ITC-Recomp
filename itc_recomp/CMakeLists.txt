@@ -430,6 +430,7 @@ set(ITC_SOURCES
     src/tuning_pages/editor.cpp
     src/tuning_pages/decals.cpp
     src/tuning_pages/vinyls.cpp
+    src/tuning_pages/nodes.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

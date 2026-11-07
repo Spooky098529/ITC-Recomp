@@ -54,4 +54,10 @@ void TuningPagesEnterEditor(PPCContext& ctx, uint8_t* base);
 void TuningPagesStoreVinyls(PPCContext& ctx, uint8_t* base);
 void TuningPagesLoadVinyls(PPCContext& ctx, uint8_t* base);
 
+// Movie 2's nodes (r3 = the screen): ShowPricePanel sub_821D9E68,
+// SetBrandLogo sub_821EED98; Color::HsvToRgb sub_8224AB50 (r4 out, r5 in).
+void TuningPagesShowPricePanel(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetBrandLogo(PPCContext& ctx, uint8_t* base);
+void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

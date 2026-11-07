@@ -22,6 +22,7 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <functional>
 #include <string>
 #include <utility>
@@ -49,8 +50,13 @@ struct Block {
 
 // Movie 13's (and 14's) block: the movie (+0, its +28 the texture table),
 // the table's 200 words (+0x100), the texture entries they point at (+0x500,
-// 8 bytes each), the movie table's pairs (+0xC00).
-constexpr uint32_t kMovieBytes = 0x1000;
+// 8 bytes each), the movie table's pairs (+0xC00; movie 2 too), a pool of 40
+// nodes (+0x1000, each child entry another of the pool; the live scene the
+// first).
+constexpr uint32_t kMovieBytes = 0xB000;
+constexpr uint32_t kNodesAt = 0x1000;
+constexpr uint32_t kNodeBytes = 0x400;
+constexpr uint32_t kNodeCount = 40;
 constexpr uint32_t kTableAt = 0x100;
 constexpr uint32_t kSlotsAt = 0x500;
 constexpr uint32_t kPairsAt = 0xC00;
@@ -162,9 +168,19 @@ void ShapeMovie(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, movie + kPairsAt + 4, movie);
   guest::StoreU32(base, movie + kPairsAt + 8, 14);
   guest::StoreU32(base, movie + kPairsAt + 12, movie);
+  guest::StoreU32(base, movie + kPairsAt + 16, 2);
+  guest::StoreU32(base, movie + kPairsAt + 20, movie);
   guest::StoreU32(base, ui_movies::kMovieTable, movie + kPairsAt);
   guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
-  guest::StoreU32(base, ui_movies::kMovieTable + 8, r.Below(8) == 0 ? 0 : 2);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, r.Below(8) == 0 ? 0 : 3);
+  const auto node = [&](uint32_t n) { return movie + kNodesAt + kNodeBytes * n; };
+  guest::StoreU32(base, movie + 16, node(0));
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    guest::StoreU32(base, node(n) + 108, r.Below(20));
+    for (uint32_t e = 0; e < (kNodeBytes - 128) / 8; e++) {
+      guest::StoreU32(base, node(n) + 128 + 8 * e, node(r.Below(kNodeCount)));
+    }
+  }
   guest::StoreU32(base, kMissingMovie, movie);
   const uint32_t s = w.screen();
   guest::StoreU32(base, s + 10036, s + kQueueAt);
@@ -450,6 +466,44 @@ void TuningPages(Context& h) {
   // __savegprlr_29's 32, r31 and lr's 16). r3 the images (now and then with
   // upper bits), the textures 0 to 199 (the movie's table).
   FreeTextures(h, w);
+
+  // Movie 2's nodes (r30, r31 and lr's saves 24 bytes; r31 and lr's 16).
+  Group(
+      h, w, "TuningScreen::ShowPricePanel", 30,
+      [](PPCContext&, Random& r, const World& w) {
+        constexpr uint32_t kStates[] = {16, 9, 10, 11, 14, 5, 15, 17};
+        guest::StoreU32(w.base, w.screen() + 9652, kStates[r.Below(8)]);
+        guest::StoreU32(w.base, w.screen() + 25204, r.Below(3) == 0 ? 0 : r.Below(17));
+      },
+      __imp__sub_821D9E68, hooks::TuningPagesShowPricePanel, 24);
+  Group(
+      h, w, "TuningScreen::SetBrandLogo", 30,
+      [](PPCContext&, Random& r, const World& w) {
+        guest::StoreU32(w.base, w.screen() + 25204, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(18));
+      },
+      __imp__sub_821EED98, hooks::TuningPagesSetBrandLogo, 16);
+  // HsvToRgb: r4 the out (four floats), r5 the in (h, s, v) in the screen's
+  // block; h 0 to 1.25 mostly (now and then negative, infinite, a quiet
+  // NaN), s 0.0 or -0.0 now and then, v 0 to 1.
+  Group(
+      h, w, "Color::HsvToRgb", 60,
+      [](PPCContext& t, Random& r, const World& w) {
+        const uint32_t in = w.screen() + 0x200, out = w.screen() + 0x100;
+        t.r4.u64 = out;
+        t.r5.u64 = in;
+        constexpr uint32_t kOdd[] = {0xBF000000u, 0x7F800000u, 0xFF800000u, 0x7FC00000u,
+                                     0x3F800000u, 0x00000000u};
+        guest::StoreU32(w.base, in + 0,
+                        r.Below(6) == 0 ? kOdd[r.Below(6)]
+                                        : std::bit_cast<uint32_t>(float(r.Below(1250)) / 1000.0f));
+        const uint32_t sat = r.Below(5);
+        guest::StoreU32(w.base, in + 4,
+                        sat == 0 ? 0u : sat == 1 ? 0x80000000u
+                                               : std::bit_cast<uint32_t>(float(r.Below(1001)) / 1000.0f));
+        guest::StoreU32(w.base, in + 8, std::bit_cast<uint32_t>(float(r.Below(1001)) / 1000.0f));
+        QuietRange(w.base, in + 12, 4);
+      },
+      __imp__sub_8224AB50, hooks::TuningPagesHsvToRgb);
 
   // The vinyls' records (LoadVinyls' __savegprlr_27: 48 bytes).
   Group(h, w, "TuningScreen::StoreVinyls", 40, kVinyls, __imp__sub_82203F20,

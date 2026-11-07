@@ -125,4 +125,21 @@ void StoreVinyls(uint8_t* base, uint64_t screen, uint32_t sp);
 uint64_t LoadVinyls(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                     uint32_t sp);
 
+// --- Movie 2's nodes and the color conversion (nodes.cpp) ---
+
+// sub_821D9E68 TuningScreen::ShowPricePanel: node (-1, 19) shown (UiMovie::
+// ShowNode's plain steps), then hidden in state 16 with the brand +25204 0
+// and in states 9, 10, 11, 14. 112-byte frame; r3 the node.
+uint32_t ShowPricePanel(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_821EED98 TuningScreen::SetBrandLogo (its brand 1 the split piece
+// sub_821EEE14, merged): node (-1, 17)'s child 0's +108 by the brand +25204
+// (1 to 16; else nothing). 112-byte frame; r3 the child.
+uint32_t SetBrandLogo(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_8224AB50 Color::HsvToRgb: `in` (h, s, v floats) into `out` (r, g, b,
+// then 1.0 at +12), with the original's single-precision steps; s 0.0 gives
+// v three times (no +12); no frame: the input copied below `sp` and the
+// sector's conversions there as the original leaves them. Needs
+// flush-to-zero off. r3 left.
+void HsvToRgb(uint8_t* base, uint32_t out, uint32_t in, uint32_t sp);
+
 }  // namespace tuning_pages
