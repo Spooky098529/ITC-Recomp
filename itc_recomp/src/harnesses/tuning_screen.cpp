@@ -37,7 +37,7 @@ namespace ts = tuning_screen;
 constexpr uint32_t kScreenBytes = 0x9400;  // the screen (to +37888)
 constexpr uint32_t kBlockBytes = 0xA000;
 constexpr uint32_t kSaveBytes = 0x1A000;   // the save data (to +0x19924)
-constexpr uint32_t kStackBytes = 1024;  // below the call's stack pointer
+constexpr uint32_t kStackBytes = 6144;  // below the call's stack pointer (AeroPartValue's frame is 4,400)
 constexpr uint32_t kCallerBytes = 256;  // above it
 
 struct Block {
@@ -261,6 +261,17 @@ void TuningScreen(Context& h) {
                                                                           : 5 + r.Below(4));
       },
       __imp__sub_821DF448, hooks::TuningEquipChoice, 0);
+
+  // AeroPartValue: the types 0 to 3 (r4 -1, the callers' type 0, reads a
+  // word the original never writes as a pointer), the items 0 to 9, with
+  // upper bits now and then; its register saves (__savegprlr_25) left out.
+  Group(
+      h, w, "TuningScreen::AeroPartValue", 40,
+      [](PPCContext& t, Random& r, const World&) {
+        t.r4.u64 = SmallIndex(r, 3);
+        t.r5.u64 = SmallIndex(r, 9);
+      },
+      __imp__sub_821DE2D8, hooks::TuningAeroPartValue, 64);
 
   // The debug state handlers: `saves` is each original's register saves
   // (__savegprlr_N's 8 x (32 - N) + 8 bytes, or its inline stores).

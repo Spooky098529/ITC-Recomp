@@ -413,6 +413,7 @@ set(ITC_SOURCES
     src/tuning_screen/tables.cpp
     src/tuning_screen/debug.cpp
     src/tuning_screen/garage_car.cpp
+    src/tuning_screen/aero.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

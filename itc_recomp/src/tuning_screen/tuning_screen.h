@@ -67,6 +67,14 @@ uint64_t StoreToGarageCar(uint8_t* base, uint64_t r3, uint32_t sp);
 // by the state (5 to 8). A leaf; r3 left as it is.
 void EquipChoice(uint8_t* base, uint32_t screen);
 
+// sub_821DE2D8 TuningScreen::AeroPartValue (its case 0 the split piece
+// sub_821DF24C, merged; aero.cpp): r4 = the type - 1, r5 = the aero item,
+// both unchecked. Its frame's constant tables written below `sp` as the
+// original leaves them, then the selected car's table[type][item] (r3
+// zero-extended), all 64 bits set for the ids with none.
+uint64_t AeroPartValue(uint8_t* base, uint32_t screen, uint64_t type, uint64_t item,
+                       uint32_t sp);
+
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:
 // its frame's back chain and string tables written as the original leaves

@@ -25,6 +25,9 @@ void TuningGetChoiceFlag(PPCContext& ctx, uint8_t* base);
 // (r3 = the screen).
 void TuningStoreToGarageCar(PPCContext& ctx, uint8_t* base);
 void TuningEquipChoice(PPCContext& ctx, uint8_t* base);
+// AeroPartValue sub_821DE2D8: r3 = the screen, r4 = the type - 1, r5 = the
+// aero item.
+void TuningAeroPartValue(PPCContext& ctx, uint8_t* base);
 
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
