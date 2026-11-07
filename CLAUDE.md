@@ -557,7 +557,9 @@ in live state) and the tuning screen (`tuning-screen.md`,
 native (ours 4,252 -> 4,476); by the user's call the validation race is
 `attract_race.sh 180`. It halted at the tuning screen's fifth
 validation: the all-harnesses run crashed in `car_makers`' existing
-`TuningScreen::SetUpCarData` case (passing alone), to debug with logs.
+`TuningScreen::SetUpCarData` case (passing alone), fixed after (its
+garage list walked through distinct nodes: the old one could end on a
+random slot, a car far outside the block), then the validation passed.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

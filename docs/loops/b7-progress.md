@@ -293,3 +293,15 @@ fragilities like those the fifth migration met in `RestoreStand` and
 recording as finished, the cleanup lead (7 removable adapters in
 `front-end-car-draw.md`). 4 subsystems of the 8 started. Nothing
 uncommitted. The user reviews and merges.
+
+Fixed after (2026-11-07, the user's request): a log in the case showed
+case 24's garage list walk ending on node 20, whose slot the set-up never
+wrote (each next node drawn from 0 to 39, so a node could be relinked);
+the block's random bytes gave slot 9333, a car at `0x032D2C2C`, ~18 MB
+past the block, its contents set by earlier harnesses. The `car_makers`
+harness now lays the list through distinct nodes (`LayGarageWalk`, used
+by all four of its set-ups). Validation `attract_race.sh 180
+--run_harnesses=all` (`itc_4240`): every group 0 differing but the
+expected ones, all ten functions' lines there and passing, 91 s raced,
+no error lines. The replay (`itc_4238`) needs no rerun: only harness
+code changed.

@@ -240,7 +240,7 @@ goes in `src/` as overrides), American English.
   screen (`tuning-screen.md`, 82 of 82 in play, with
   `GarageStage::Draw`) native (ours 4,252 -> 4,476) and halted at the
   tuning screen's fifth validation (an existing `car_makers` harness
-  case crashing in the all-harnesses run). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  case crashing in the all-harnesses run; fixed after (the case's garage list could come back to a node it relinked and end on a random slot, a car ~18 MB outside the block; now walked through distinct nodes, `LayGarageWalk`), then the validation passed (`itc_4240`)). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the

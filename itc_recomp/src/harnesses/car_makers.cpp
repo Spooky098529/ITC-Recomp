@@ -425,6 +425,27 @@ void LayGarage(uint8_t* base, uint32_t block, Random& r, int c) {
   }
 }
 
+// The save data's garage list at block + kSaveData (nodes at +6120:
+// halfwords next, slot) walked [+0x19920] 0 to 3 steps through distinct
+// nodes (step i's in 10i to 10i + 9, so the walk can't come back to a node
+// it relinked and end on a random slot, a garage car far outside the
+// block), the last one's slot 0 to 2, the template garage car copied there.
+void LayGarageWalk(uint8_t* base, uint32_t block, Random& r) {
+  const uint32_t save = block + kSaveData, nodes = save + 6120;
+  const uint32_t steps = r.Below(4);
+  guest::StoreU32(base, save + 0x19920, steps);
+  uint16_t at = uint16_t(r.Below(10));
+  guest::StoreU16(base, nodes + 204, at);
+  for (uint32_t i = 0; i < steps; i++) {
+    const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
+    guest::StoreU16(base, nodes + 4 * at, next);
+    at = next;
+  }
+  const uint32_t slot = r.Below(3);
+  guest::StoreU16(base, nodes + 4 * at + 2, uint16_t(slot));
+  Write(base, nodes + 212 + 1968 * slot, Read(base, block + kGarageCar, 1884).data(), 1884);
+}
+
 }  // namespace
 
 // For load_poll's GarageStage::SetCar and SetCarClass cases: LayGarage's car
@@ -656,25 +677,10 @@ void Garage(Context& h, Random& r) {
             count = r.Below(6);
             added = r.Below(3);
             // The screen where its +18912 is the case's car data: its save
-            // data's garage list (nodes at +6120: halfwords next, slot), the
-            // walk's length.
-            const uint32_t screen = block + kCarData - 18912, save = block + kSaveData, nodes = save + 6120;
-            guest::StoreU32(h.base, screen + 18904, save);
-            const uint32_t steps = r.Below(4);
-            guest::StoreU32(h.base, save + 0x19920, steps);
-            uint16_t at = uint16_t(r.Below(40));
-            guest::StoreU16(h.base, nodes + 204, at);
-            for (uint32_t i = 0; i <= steps; i++) {
-              const uint16_t next = uint16_t(r.Below(40));
-              guest::StoreU16(h.base, nodes + 4 * at, next);
-              if (i == steps) {
-                const uint32_t slot = r.Below(3);
-                guest::StoreU16(h.base, nodes + 4 * at + 2, uint16_t(slot));
-                const uint32_t car = nodes + 212 + 1968 * slot;
-                Write(h.base, car, Read(h.base, block + kGarageCar, 1884).data(), 1884);
-              }
-              at = next;
-            }
+            // data's garage list.
+            const uint32_t screen = block + kCarData - 18912;
+            guest::StoreU32(h.base, screen + 18904, block + kSaveData);
+            LayGarageWalk(h.base, block, r);
             t.r3.u64 = screen;
           },
           // The top 24 bytes: the original CarData::FromGarageCar's register
@@ -705,22 +711,9 @@ void Garage(Context& h, Random& r) {
             guest::StoreU32(h.base, kHolderPointer, block + kHolder);
             count = r.Below(6);
             added = r.Below(3);
-            const uint32_t screen = block + kCarData - 18912, save = block + kSaveData,
-                           nodes = save + 6120;
-            guest::StoreU32(h.base, screen + 18904, save);
-            const uint32_t steps = r.Below(4);
-            guest::StoreU32(h.base, save + 0x19920, steps);
-            uint16_t at = uint16_t(r.Below(10));
-            guest::StoreU16(h.base, nodes + 204, at);
-            for (uint32_t i = 0; i < steps; i++) {
-              const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
-              guest::StoreU16(h.base, nodes + 4 * at, next);
-              at = next;
-            }
-            const uint32_t slot = r.Below(3);
-            guest::StoreU16(h.base, nodes + 4 * at + 2, uint16_t(slot));
-            Write(h.base, nodes + 212 + 1968 * slot, Read(h.base, block + kGarageCar, 1884).data(),
-                  1884);
+            const uint32_t screen = block + kCarData - 18912;
+            guest::StoreU32(h.base, screen + 18904, block + kSaveData);
+            LayGarageWalk(h.base, block, r);
             guest::StoreU32(h.base, screen + 20788, r.Below(6) == 0 ? r.Next() : r.Below(6));
             guest::StoreU32(h.base, screen + 20784, r.Below(6) == 0 ? r.Next() : r.Below(3));
             text.Lay(r);
@@ -906,25 +899,6 @@ constexpr uint32_t kFirstWheels = 0x16400;    // the first set's wheels (+28 to 
 constexpr uint32_t kWheelRecords = 0x18000;   // table 73: 178 48-byte wheel records
 constexpr uint32_t kSaveDataPointer = 0x826C5B58;  // SaveData::Of(0)
 
-// The save data's garage list (nodes at +6120: halfwords next, slot) walked
-// [+0x19920] steps to a slot 0 to 2, the template garage car copied there.
-void LayGarageList(uint8_t* base, uint32_t block, Random& r) {
-  const uint32_t save = block + kSaveData, nodes = save + 6120;
-  const uint32_t steps = r.Below(4);
-  guest::StoreU32(base, save + 0x19920, steps);
-  uint16_t at = uint16_t(r.Below(40));
-  guest::StoreU16(base, nodes + 204, at);
-  for (uint32_t i = 0; i <= steps; i++) {
-    const uint16_t next = uint16_t(r.Below(40));
-    guest::StoreU16(base, nodes + 4 * at, next);
-    if (i == steps) {
-      const uint32_t slot = r.Below(3);
-      guest::StoreU16(base, nodes + 4 * at + 2, uint16_t(slot));
-      Write(base, nodes + 212 + 1968 * slot, Read(base, block + kGarageCar, 1884).data(), 1884);
-    }
-    at = next;
-  }
-}
 
 // SetWheel's world on LayGarage's: the holder (its +0 the stage, its +8
 // the model's index 0 or 1 in the car scene's pool 7, both in use), each
@@ -971,7 +945,7 @@ void LayWheelWorld(uint8_t* base, uint32_t block, Random& r, int c, bool tires,
   guest::StoreU32(base, stage + 8, r.Below(2));
   guest::StoreU32(base, block + kHolder, stage);
   guest::StoreU32(base, block + kHolderWord, block + kHolder);
-  LayGarageList(base, block, r);
+  LayGarageWalk(base, block, r);
   guest::StoreU32(base, block + kScreenSave, block + kSaveData);
 }
 
@@ -1146,27 +1120,10 @@ void TuningStand(Context& h, Random& r) {
   // movie's block at random.
   const auto lay = [&](int c, bool stand_car) {
     LayWheelWorld(h.base, block, r, c, false, stand_car);
-    // The garage list walked through distinct nodes (LayGarageList's walk
-    // can come back to a node it relinked, ending on a random slot), the
-    // template car copied to the last one's slot, its paint pick (the
-    // halfword +0, ApplyDecals' GarageStage::SetCar's) -2 to 5.
-    {
-      guest::StoreU16(h.base, block + kGarageCar, uint16_t(int32_t(r.Below(8)) - 2));
-      const uint32_t save = block + kSaveData, nodes = save + 6120;
-      const uint32_t steps = r.Below(4);
-      guest::StoreU32(h.base, save + 0x19920, steps);
-      uint16_t at = uint16_t(r.Below(10));
-      guest::StoreU16(h.base, nodes + 204, at);
-      for (uint32_t i = 0; i < steps; i++) {
-        const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
-        guest::StoreU16(h.base, nodes + 4 * at, next);
-        at = next;
-      }
-      const uint32_t slot = r.Below(3);
-      guest::StoreU16(h.base, nodes + 4 * at + 2, uint16_t(slot));
-      Write(h.base, nodes + 212 + 1968 * slot, Read(h.base, block + kGarageCar, 1884).data(),
-            1884);
-    }
+    // The template car's paint pick (the halfword +0, ApplyDecals'
+    // GarageStage::SetCar's) -2 to 5, the garage list walked to it.
+    guest::StoreU16(h.base, block + kGarageCar, uint16_t(int32_t(r.Below(8)) - 2));
+    LayGarageWalk(h.base, block, r);
     const uint32_t scene = block + kCarScene;
     guest::StoreU32(h.base, scene + 4, 0);
     for (uint32_t i = 0; i < 2; i++) {
