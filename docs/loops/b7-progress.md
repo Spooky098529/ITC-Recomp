@@ -97,7 +97,11 @@ file's history. What's left to see in a drive, from every run:
   errors, every harness 0 differing, 41 of 41 harness lines; none in the
   race or the replay `itc_4364` (ok): the modes aren't reached; all 41
   to drive). Recorded.
-- Picking subsystem 3.
+- Subsystem 3 of 3: the type 6 and 7 modes' slot 0 with their screens'
+  Inits (two leads taken together: `sub_82236880` and `sub_82246C90`
+  with their members' Inits, found by the screen constructors' map;
+  24 ready groups between them, above the constructors just made
+  native; both lines deleted from `leads.md`). Mapping agent running.
 
 ## Done
 
