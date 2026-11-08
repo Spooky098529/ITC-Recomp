@@ -487,6 +487,7 @@ set(ITC_SOURCES
     src/type2_screens/plate_transitions.cpp
     src/type2_screens/plate_pages.cpp
     src/type2_screens/init_states.cpp
+    src/type2_screens/sheet_build.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

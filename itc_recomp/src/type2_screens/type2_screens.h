@@ -63,6 +63,23 @@ constexpr uint32_t kListCancelled = 0x8220BDE0;
 constexpr uint32_t kListPressed152 = 0x8220BE70;
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 constexpr uint32_t kEmpty = 0x82106540;  // the empty shared function
+constexpr uint32_t kMemset = 0x825A71D0;
+constexpr uint32_t kMenuListRelease = 0x8220BBB0;
+
+// The spec sheet's globals: the page object (28 bytes), the menu (68) and
+// the data (1,968).
+constexpr uint32_t kSheetPages = 0x826D8464;
+constexpr uint32_t kSheetMenu = 0x826D8468;
+constexpr uint32_t kSheetData = 0x826D846C;
+constexpr uint32_t kSheetMovie = 9;
+// The build screen's globals (build_screen.h's): the transition machine
+// (28 bytes), the two menu lists (72 each) and the screen data (0x3266C).
+constexpr uint32_t kBuildPages = 0x826D843C;
+constexpr uint32_t kBuildList = 0x826D8440;
+constexpr uint32_t kBuildGroupList = 0x826D8444;
+constexpr uint32_t kBuildScreen = 0x826D8448;
+constexpr uint32_t kBuildScreenBytes = 0x3266C;
+constexpr uint32_t kBuildMovie = 6;
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
@@ -264,6 +281,74 @@ uint64_t PlateUpdatePage(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
 // UiMovie::Run(movie 26, 0). The last call's r3 (the movie for a negative
 // one). 304-byte frame.
 uint64_t PlateUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The spec sheet's and the build screen's handlers (sheet_build.cpp) ---
+
+// sub_821B8120 PowerGraphScreen::Create (r3 the machine): +9608 = 0; the
+// page object, the menu and the data VirtualAlloc'ed into their globals
+// with their first words; +9604 = 1 or 9 by +9612. The last VirtualAlloc's
+// r3. 112-byte frame.
+uint64_t SheetCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_82250328 PowerGraphScreen::OpenMovie: UiMovies::Open(9, 22550) (a
+// tail call). Its r3.
+uint64_t SheetOpenMovie(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_821B8900 PowerGraphScreen::WaitForLoad (r3 the machine): while +9608
+// is 0, +9608 = 1 once movie 9 is loaded; once set, the data's +0 = 1, +4 =
+// 0, +16 on cleared (memset, 1,952 bytes, through its override), +9604 =
+// 9. r3 IsLoaded's or memset's, else `r3`. 96-byte frame.
+uint64_t SheetWaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_821B8320 PowerGraphScreen::Close (r3 the machine, r4 the mode): +9604
+// = 7, UiMovies::Delete(9), message 4. Delete's r3. 96-byte frame.
+uint64_t SheetClose(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
+                    const Calls& calls);
+// sub_821B80B8 PowerGraphScreen::Destroy: the three blocks VirtualFree'd,
+// the globals 0. The last VirtualFree's r3. 112-byte frame.
+uint64_t SheetDestroy(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// sub_8219BD80 BuildScreen::Create (r3 the machine): +9608 = 0; the
+// transition machine, the two menu lists and the screen data
+// VirtualAlloc'ed into their globals with their first words; +9604 = 1 or
+// 9 by +9612. The last VirtualAlloc's r3. 112-byte frame.
+uint64_t BuildCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8219B950 BuildScreen::OpenMovie: UiMovies::Open(6, 22557) (a tail
+// call). Its r3.
+uint64_t BuildOpenMovie(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_8219BE98 BuildScreen::WaitForLoad (r3 the machine): +9608 = 1 once
+// movie 6 is loaded, then +9604 = 9 or 4 by +9612. r3 IsLoaded's when
+// called, else `r3`. 96-byte frame.
+uint64_t BuildWaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_8219C298 BuildScreen::Unload (r3 the machine): UiMovie::FinishAll(movie
+// 6); with +9616, UiMovies::Delete(6) and +9608 = 0. The last call's r3.
+// 112-byte frame.
+uint64_t BuildUnload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8219C300 BuildScreen::Close (r3 the machine, r4 the mode): +9604 = 7,
+// FinishAll(movie 6), Delete(6), message 4. Delete's r3. 112-byte frame.
+uint64_t BuildClose(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
+                    const Calls& calls);
+// sub_8219B8C8 BuildScreen::Destroy: MenuList::Release(the list), the four
+// blocks VirtualFree'd, the globals 0 but the group list's (left as it was).
+// The last VirtualFree's r3. 112-byte frame.
+uint64_t BuildDestroy(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219C100 BuildScreen::SaveBuildStates: player 0's save + 0x19A00 + 12i
+// = the build's +36 (the screen's + 0x2C7A8 + 52i) for the 400 builds. r3
+// the save data. 96-byte frame.
+uint32_t BuildSaveBuildStates(uint8_t* base, uint32_t sp);
+// sub_8219C3A8 BuildScreen::LeavePage (r3 the mode): GarageStage::SetDark(the
+// stage, 0) (build_screen's plain C++), SaveBuildStates, message 20. r3 the
+// save data. 96-byte frame.
+uint32_t BuildLeavePage(uint8_t* base, uint32_t mode, uint32_t sp);
+// sub_8219B960 BuildScreen::DetailsPage: MenuList::Update on the list; when
+// it isn't moving, accepted (sound 0) or cancelled (sound 2) back with
+// transition 20; while it moves, transition 19 and sound 4 (MenuList:: and
+// MenuSound::Play through their overrides). The last call's r3. 96-byte
+// frame.
+uint64_t BuildDetailsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219FA80 BuildScreen::UpdatePage (r4 the mode): the five page
+// handlers' addresses at the frame's +80; unless the level is -1, its
+// handler called (r3 the mode, through the guest context). Its r3, else
+// `r3`. 112-byte frame.
+uint64_t BuildUpdatePage(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                         const Calls& calls);
 
 // --- The machines' set-ups (init_states.cpp) ---
 //

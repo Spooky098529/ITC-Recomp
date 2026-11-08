@@ -39,7 +39,14 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "context, UiMovie::Run through its override); the four machines' set-ups "
               "Type2Hub::InitStates sub_82190B18, PowerGraphScreen2::InitStates sub_821B90D8, "
               "BuildScreen::InitStates sub_821A16C0 and PlateEditor::InitStates sub_8219B2E8 over "
-              "StateMachine::Add's plain C++ "
+              "StateMachine::Add's plain C++; the spec sheet's PowerGraphScreen::Create "
+              "sub_821B8120, OpenMovie sub_82250328, WaitForLoad sub_821B8900 (memset through its "
+              "override), Close sub_821B8320 and Destroy sub_821B80B8; the build screen's "
+              "machine's Create sub_8219BD80, OpenMovie sub_8219B950, WaitForLoad sub_8219BE98, "
+              "Unload sub_8219C298, Close sub_8219C300, Destroy sub_8219B8C8 (MenuList::Release "
+              "through its override), UpdatePage sub_8219FA80 (the page's handler through the "
+              "guest context), DetailsPage sub_8219B960 and LeavePage sub_8219C3A8 with "
+              "SaveBuildStates sub_8219C100 (GarageStage::SetDark's plain C++) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -249,6 +256,64 @@ void PlateUpdate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t2::PlateUpdate(base, ctx.r1.u32, guest.calls());
 }
 
+void SheetCreate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::SheetCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void SheetOpenMovie(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::SheetOpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void SheetWaitForLoad(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::SheetWaitForLoad(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void SheetClose(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::SheetClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void SheetDestroy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::SheetDestroy(base, ctx.r1.u32, guest.calls());
+}
+void BuildCreate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void BuildOpenMovie(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildOpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void BuildWaitForLoad(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::BuildWaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
+}
+void BuildUnload(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void BuildClose(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void BuildDestroy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildDestroy(base, ctx.r1.u32, guest.calls());
+}
+void BuildSaveBuildStates(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::BuildSaveBuildStates(base, ctx.r1.u32);
+}
+void BuildLeavePage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::BuildLeavePage(base, ctx.r3.u32, ctx.r1.u32);
+}
+void BuildDetailsPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildDetailsPage(base, ctx.r1.u32, guest.calls());
+}
+void BuildUpdatePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
 namespace {
 // An Init's register step: StateMachine::Add's adapter's r3, a new
 // transition's address from the machine's 64-bit r3.
@@ -296,6 +361,25 @@ ITC_TYPE2_SCREENS(82190B18, HubInitStates)
 ITC_TYPE2_SCREENS(821B90D8, SheetInitStates)
 ITC_TYPE2_SCREENS(821A16C0, BuildInitStates)
 ITC_TYPE2_SCREENS(8219B2E8, PlateInitStates)
+// The spec sheet's handlers (functors the machine calls; OpenMovie also
+// registered by three other modes' Inits).
+ITC_TYPE2_SCREENS(821B8120, SheetCreate)
+ITC_TYPE2_SCREENS(82250328, SheetOpenMovie)
+ITC_TYPE2_SCREENS(821B8900, SheetWaitForLoad)
+ITC_TYPE2_SCREENS(821B8320, SheetClose)
+ITC_TYPE2_SCREENS(821B80B8, SheetDestroy)
+// The build screen's machine's handlers (functors) and pages (from its
+// UpdatePage's table); no adapter for SaveBuildStates sub_8219C100 (only
+// LeavePage, native, calls it; its step above is the harness's).
+ITC_TYPE2_SCREENS(8219BD80, BuildCreate)
+ITC_TYPE2_SCREENS(8219B950, BuildOpenMovie)
+ITC_TYPE2_SCREENS(8219BE98, BuildWaitForLoad)
+ITC_TYPE2_SCREENS(8219C298, BuildUnload)
+ITC_TYPE2_SCREENS(8219C300, BuildClose)
+ITC_TYPE2_SCREENS(8219B8C8, BuildDestroy)
+ITC_TYPE2_SCREENS(8219FA80, BuildUpdatePage)
+ITC_TYPE2_SCREENS(8219B960, BuildDetailsPage)
+ITC_TYPE2_SCREENS(8219C3A8, BuildLeavePage)
 // The license plate editor's handlers: member function functors the machine
 // calls (no direct callers).
 ITC_TYPE2_SCREENS(82198210, PlateCreate)

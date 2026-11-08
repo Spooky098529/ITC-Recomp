@@ -74,7 +74,11 @@ constexpr uint32_t kAnimationsAt = 0x17400;  // 8 animations of no tracks (64 by
 constexpr uint32_t kAnimations = 8;
 constexpr uint32_t kNamed = 200;             // the movie's named animations shaped
 constexpr uint32_t kMenuWorldAt = 0x17800;   // the menus' mappers, vtables, sounds
-constexpr uint32_t kBlockBytes = 0x18400;
+constexpr uint32_t kStageAt = 0x18400;       // a garage stage (6,144 bytes)
+constexpr uint32_t kHolderAt = 0x19C00;      // [0x826D83E0] points here: +0 the stage
+constexpr uint32_t kSheetDataAt = 0x19C80;   // the spec sheet's data (1,968 bytes)
+constexpr uint32_t kGroupListAt = 0x2A90;    // the build screen's group list (72)
+constexpr uint32_t kBlockBytes = 0x1A480;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -83,6 +87,9 @@ constexpr uint32_t kMissingText = 0x826C5CD8;
 constexpr uint32_t kTxtTag = 0x54585400;  // "TXT\0"
 constexpr uint32_t kStringTable = 0x826C5C34;
 constexpr uint32_t kRandSeed = 0x82638188;  // the game's rand
+constexpr uint32_t kSaveSlots = 0x826C5B58;  // the players' save data
+constexpr uint32_t kSaveDataBytes = 0x1F978;
+constexpr uint32_t kStandHolder = 0x826D83E0;
 
 struct Global {
   uint32_t address;
@@ -90,6 +97,10 @@ struct Global {
 };
 constexpr Global kGlobals[] = {
     {t2::kPlatePages, 12},  // the plate editor's page object, list and data
+    {t2::kSheetPages, 12},  // the spec sheet's
+    {t2::kBuildPages, 16},  // the build screen's
+    {kSaveSlots, 16},
+    {kStandHolder, 4},
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
     {kMissingText, 4},
@@ -111,7 +122,8 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
 struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
-        block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)) {
+        block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)),
+        save(memory::Alloc(kSaveDataBytes, 0)), screen(memory::Alloc(t2::kBuildScreenBytes, 0)) {
     if (strings != 0) {
       MakeStrings();
     }
@@ -119,10 +131,12 @@ struct World {
   ~World() {
     memory::Free(allocation);
     memory::Free(strings);
+    memory::Free(save);
+    memory::Free(screen);
   }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0 && strings != 0; }
+  bool ok() const { return allocation != 0 && strings != 0 && save != 0 && screen != 0; }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t data() const { return at(kDataAt); }
   uint32_t node(uint32_t n) const { return at(kNodesAt) + kNodeBytes * n; }
@@ -135,6 +149,8 @@ struct World {
   // callers pass as 0 aren't read).
   static constexpr uint32_t kStringsBytes = 0x9000;
   uint32_t strings;
+  uint32_t save;    // player 0's save data (all four slots point at it)
+  uint32_t screen;  // the build screen's data ([0x826D8448])
 
  private:
   void MakeStrings() {
@@ -236,6 +252,18 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, kMissingMovie, w.at(kMovieAt));
   guest::StoreU32(base, kMissingText, 0);
   guest::StoreU32(base, kStringTable, w.strings);
+  guest::StoreU32(base, t2::kSheetPages, w.at(kPagesAt));
+  guest::StoreU32(base, t2::kSheetMenu, w.at(kListAt));
+  guest::StoreU32(base, t2::kSheetData, w.at(kSheetDataAt));
+  guest::StoreU32(base, t2::kBuildPages, w.at(kPagesAt));
+  guest::StoreU32(base, t2::kBuildList, w.at(kListAt));
+  guest::StoreU32(base, t2::kBuildGroupList, w.at(kGroupListAt));
+  guest::StoreU32(base, t2::kBuildScreen, w.screen);
+  for (uint32_t p = 0; p < 4; p++) {
+    guest::StoreU32(base, kSaveSlots + 4 * p, w.save);
+  }
+  guest::StoreU32(base, kStandHolder, w.at(kHolderAt));
+  guest::StoreU32(base, w.at(kHolderAt), w.at(kStageAt));
 }
 
 // The text records the setters made (stored in the movie's map): their
@@ -340,6 +368,7 @@ struct Spec {
   std::vector<Range> stack;  // compared below r1 (frames without their saves)
   SetupFn setup;
   AfterFn after = nullptr;
+  bool big = false;  // the save data and the build screen's data compared too
 };
 
 void Run(Context& h, const World& w, const Spec& spec) {
@@ -418,6 +447,10 @@ void Run(Context& h, const World& w, const Spec& spec) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
       }
       out[v].Bytes(Read(h.base, w.block, kBlockBytes));
+      if (spec.big) {
+        out[v].Bytes(Read(h.base, w.save, kSaveDataBytes));
+        out[v].Bytes(Read(h.base, w.screen, t2::kBuildScreenBytes));
+      }
       for (const Range& range : spec.stack) {
         out[v].Bytes(Read(h.base, sp + range.from, uint32_t(range.to - range.from)));
       }
@@ -809,6 +842,104 @@ void PlateTransitions(Context& h, const World& w) {
              ListBlock});
 }
 
+// The spec sheet's and the build screen's machines' handlers.
+void SheetAndBuild(Context& h, const World& w) {
+  if (hooks::NativeHeapActive()) {
+    Run(h, w, {"PowerGraphScreen::Create (sub_821B8120)", 60, __imp__sub_821B8120,
+               hooks::SheetCreate, {{-112, -24}}, Machine,
+               [&h](PPCContext& t, const World&, Outputs& out) {
+                 out.Word(t.r3.u32 == guest::LoadU32(h.base, t2::kSheetData) ? 1 : 0);
+                 t.r3.u64 = 0;
+                 Allocated(h.base, out, t2::kSheetPages, 28);
+                 Allocated(h.base, out, t2::kSheetMenu, 68);
+                 Allocated(h.base, out, t2::kSheetData, 1968);
+               }});
+    Run(h, w, {"PowerGraphScreen::Destroy (sub_821B80B8)", 60, __imp__sub_821B80B8,
+               hooks::SheetDestroy, {{-112, -32}},
+               [](PPCContext&, Random& r, const World& w) {
+                 guest::StoreU32(w.base, t2::kSheetPages, MakePages(w.base, 28, r));
+                 guest::StoreU32(w.base, t2::kSheetMenu, MakePages(w.base, 68, r));
+                 guest::StoreU32(w.base, t2::kSheetData, MakePages(w.base, 1968, r));
+               }});
+    // BuildScreen::Create: the screen data's first words and its +0x32668
+    // compared (the rest is the layer's zeroed pages).
+    Run(h, w, {"BuildScreen::Create (sub_8219BD80)", 60, __imp__sub_8219BD80,
+               hooks::BuildCreate, {{-112, -24}}, Machine,
+               [&h](PPCContext& t, const World&, Outputs& out) {
+                 out.Word(t.r3.u32 == guest::LoadU32(h.base, t2::kBuildScreen) ? 1 : 0);
+                 t.r3.u64 = 0;
+                 const uint32_t screen = guest::LoadU32(h.base, t2::kBuildScreen);
+                 if (screen != 0 && memory::IsPages(screen)) {
+                   out.Word(guest::LoadU32(h.base, screen + 0x32668));
+                 }
+                 Allocated(h.base, out, t2::kBuildPages, 28);
+                 Allocated(h.base, out, t2::kBuildList, 72);
+                 Allocated(h.base, out, t2::kBuildGroupList, 72);
+                 Allocated(h.base, out, t2::kBuildScreen, 64);
+               }});
+    // BuildScreen::Destroy: the four blocks the layer's pages (the list's
+    // +68 block one too, or none: MenuList::Release frees it).
+    Run(h, w, {"BuildScreen::Destroy (sub_8219B8C8)", 60, __imp__sub_8219B8C8,
+               hooks::BuildDestroy, {{-112, -32}},
+               [](PPCContext&, Random& r, const World& w) {
+                 uint8_t* base = w.base;
+                 const uint32_t list = MakePages(base, 72, r);
+                 guest::StoreU32(base, list + 68, r.Below(2) == 0 ? 0 : MakePages(base, 64, r));
+                 guest::StoreU32(base, t2::kBuildPages, MakePages(base, 28, r));
+                 guest::StoreU32(base, t2::kBuildList, list);
+                 guest::StoreU32(base, t2::kBuildGroupList, MakePages(base, 72, r));
+                 guest::StoreU32(base, t2::kBuildScreen, MakePages(base, t2::kBuildScreenBytes, r));
+               }});
+  }
+  Run(h, w, {"PowerGraphScreen::OpenMovie (sub_82250328)", 20, __imp__sub_82250328,
+             hooks::SheetOpenMovie, {}, None});
+  Run(h, w, {"PowerGraphScreen::WaitForLoad (sub_821B8900)", 100, __imp__sub_821B8900,
+             hooks::SheetWaitForLoad, {{-96, -16}}, Machine});
+  Run(h, w, {"PowerGraphScreen::Close (sub_821B8320)", 60, __imp__sub_821B8320,
+             hooks::SheetClose, {{-96, -16}}, MachineAndMode});
+  Run(h, w, {"BuildScreen::OpenMovie (sub_8219B950)", 20, __imp__sub_8219B950,
+             hooks::BuildOpenMovie, {}, None});
+  Run(h, w, {"BuildScreen::WaitForLoad (sub_8219BE98)", 100, __imp__sub_8219BE98,
+             hooks::BuildWaitForLoad, {{-96, -16}}, Machine});
+  Run(h, w, {"BuildScreen::Unload (sub_8219C298)", 60, __imp__sub_8219C298, hooks::BuildUnload,
+             {{-112, -16}}, Machine});
+  Run(h, w, {"BuildScreen::Close (sub_8219C300)", 60, __imp__sub_8219C300, hooks::BuildClose,
+             {{-112, -16}}, MachineAndMode});
+  // SaveBuildStates and LeavePage: the screen data and the save data random,
+  // compared (the stage in the block).
+  auto screen = [](PPCContext& t, Random& r, const World& w) {
+    WriteRandom(w.base, w.screen, t2::kBuildScreenBytes, r);
+    WriteRandom(w.base, w.save, kSaveDataBytes, r);
+    t.r3.u64 = w.at(kModeAt);
+  };
+  Run(h, w, {"BuildScreen::SaveBuildStates (sub_8219C100)", 20, __imp__sub_8219C100,
+             hooks::BuildSaveBuildStates, {{-96, -8}}, screen, nullptr, true});
+  Run(h, w, {"BuildScreen::LeavePage (sub_8219C3A8; sub_8219C100)", 20, __imp__sub_8219C3A8,
+             hooks::BuildLeavePage, {{-96, -16}}, screen, nullptr, true});
+  Run(h, w, {"BuildScreen::DetailsPage (sub_8219B960)", 300, __imp__sub_8219B960,
+             hooks::BuildDetailsPage, {{-96, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               if (r.Below(2) == 0) {
+                 guest::StoreU32(w.base, w.at(kListAt) + 8, guest::LoadU32(w.base, w.at(kListAt) + 4));
+               }
+               t.r3.u64 = w.at(kModeAt);
+             }});
+  // UpdatePage: the level -1, 3 (DetailsPage) or 4 (LeavePage); the others'
+  // worlds (the groups and builds) are the build screen harness's.
+  Run(h, w, {"BuildScreen::UpdatePage (sub_8219FA80)", 200, __imp__sub_8219FA80,
+             hooks::BuildUpdatePage, {{-112, -8}},
+             [screen](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               screen(t, r, w);
+               const uint32_t pick = r.Below(3);
+               guest::StoreU32(w.base, w.at(kPagesAt), pick == 0 ? 0xFFFFFFFFu : 2 + pick);
+               t.r3.u64 = w.at(kMachineAt);
+               t.r4.u64 = w.at(kModeAt);
+             },
+             nullptr, true});
+}
+
 }  // namespace
 
 void Type2Screens(Context& h) {
@@ -823,6 +954,7 @@ void Type2Screens(Context& h) {
     PlateCells(h, w);
     PlateTransitions(h, w);
     PlatePages(h, w);
+    SheetAndBuild(h, w);
   }
 }
 

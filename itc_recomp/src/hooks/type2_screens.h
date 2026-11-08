@@ -66,6 +66,23 @@ void PlateNumberPage(PPCContext& ctx, uint8_t* base);
 void PlateCharsPage(PPCContext& ctx, uint8_t* base);
 void PlateUpdatePage(PPCContext& ctx, uint8_t* base);
 void PlateUpdate(PPCContext& ctx, uint8_t* base);
+// The spec sheet's and the build screen's handlers (r3 the machine, r4 the
+// mode where the original reads it; the pages r3 the mode).
+void SheetCreate(PPCContext& ctx, uint8_t* base);
+void SheetOpenMovie(PPCContext& ctx, uint8_t* base);
+void SheetWaitForLoad(PPCContext& ctx, uint8_t* base);
+void SheetClose(PPCContext& ctx, uint8_t* base);
+void SheetDestroy(PPCContext& ctx, uint8_t* base);
+void BuildCreate(PPCContext& ctx, uint8_t* base);
+void BuildOpenMovie(PPCContext& ctx, uint8_t* base);
+void BuildWaitForLoad(PPCContext& ctx, uint8_t* base);
+void BuildUnload(PPCContext& ctx, uint8_t* base);
+void BuildClose(PPCContext& ctx, uint8_t* base);
+void BuildDestroy(PPCContext& ctx, uint8_t* base);
+void BuildSaveBuildStates(PPCContext& ctx, uint8_t* base);
+void BuildLeavePage(PPCContext& ctx, uint8_t* base);
+void BuildDetailsPage(PPCContext& ctx, uint8_t* base);
+void BuildUpdatePage(PPCContext& ctx, uint8_t* base);
 // The four machines' set-ups (r3 the machine).
 void HubInitStates(PPCContext& ctx, uint8_t* base);
 void SheetInitStates(PPCContext& ctx, uint8_t* base);
