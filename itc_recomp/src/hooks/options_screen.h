@@ -129,4 +129,12 @@ void OptionsChangeSlidersValue(PPCContext& ctx, uint8_t* base);
 void OptionsLeaveButtons(PPCContext& ctx, uint8_t* base);
 void OptionsLeaveAnalog(PPCContext& ctx, uint8_t* base);
 
+// The category pages (no arguments): Options::HudPage sub_821C1270,
+// SlidersPage sub_821C1888, ButtonsPage sub_821C1D08, AnalogPage
+// sub_821C21A8.
+void OptionsHudPage(PPCContext& ctx, uint8_t* base);
+void OptionsSlidersPage(PPCContext& ctx, uint8_t* base);
+void OptionsButtonsPage(PPCContext& ctx, uint8_t* base);
+void OptionsAnalogPage(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -439,6 +439,7 @@ set(ITC_SOURCES
     src/hooks/screen_constructors.cpp
     src/screen_constructors/screen_constructors.cpp
     src/hooks/options_screen.cpp
+    src/options_screen/category_pages.cpp
     src/options_screen/controls.cpp
     src/options_screen/handlers.cpp
     src/options_screen/nodes.cpp

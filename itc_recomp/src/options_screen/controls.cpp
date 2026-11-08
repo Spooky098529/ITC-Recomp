@@ -127,6 +127,42 @@ uint32_t IsAnalogTaken(uint8_t* base, uint32_t item, uint32_t sp) {
   return Taken(base, item, sp - 32, kEdits, 6);  // sp - 8 and - 4 not written
 }
 
+namespace {
+
+// HasButtonClash and HasAnalogClash: the edits copied below `sp` in menu
+// order (as the taken checks copy them), then 1 at the first pair of items
+// holding the same word, else 0.
+uint32_t Clash(uint8_t* base, uint32_t at, const uint32_t* offsets, uint32_t count) {
+  const uint32_t o = Settings(base);
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreU32(base, at + 4 * i, guest::LoadU32(base, o + offsets[i]));
+  }
+  for (uint32_t i = 0; i + 1 < count; i++) {
+    const uint32_t mine = guest::LoadU32(base, at + 4 * i);
+    for (uint32_t j = i + 1; j < count; j++) {
+      if (mine == guest::LoadU32(base, at + 4 * j)) {
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+}  // namespace
+
+uint32_t HasButtonClash(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821BA890 Options::HasButtonClash");
+  static constexpr uint32_t kEdits[12] = {284, 288, 292, 296, 300, 304,
+                                          320, 312, 316, 308, 324, 328};
+  return Clash(base, sp - 48, kEdits, 12);
+}
+
+uint32_t HasAnalogClash(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821BAC78 Options::HasAnalogClash");
+  static constexpr uint32_t kEdits[6] = {380, 384, 388, 396, 392, 400};
+  return Clash(base, sp - 32, kEdits, 6);
+}
+
 uint32_t StepButtons(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821BA550 Options::StepButtons");
   return Step(base, 668, 12);

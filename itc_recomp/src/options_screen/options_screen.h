@@ -107,6 +107,13 @@ uint32_t AnalogPicture(uint32_t index);
 uint32_t IsButtonTaken(uint8_t* base, uint32_t item, uint32_t sp);
 uint32_t IsAnalogTaken(uint8_t* base, uint32_t item, uint32_t sp);
 
+// sub_821BA890 Options::HasButtonClash and sub_821BAC78
+// Options::HasAnalogClash (leaves, never seen in play, ported with their
+// callers): the edits copied below `sp` as the taken checks copy them; 1
+// when two items hold the same word, else 0.
+uint32_t HasButtonClash(uint8_t* base, uint32_t sp);
+uint32_t HasAnalogClash(uint8_t* base, uint32_t sp);
+
 // sub_821BA550 Options::StepButtons and sub_821BABD8 Options::StepAnalog:
 // the settings' side word (+668 or +676) = the menu's side (+36) when it's
 // -1 or 1, else 0; with a side, 1 on the items before the last (12 or 6),
@@ -395,5 +402,20 @@ uint64_t ChangeSlidersValue(uint8_t* base, uint32_t step, uint32_t sp, const Cal
 // UiMovie::Run and +684 up by one: 1 from 10.
 uint64_t LeaveButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t LeaveAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
+// --- The category pages (category_pages.cpp) ---
+//
+// Options::Draw's pages 1, 3, 5 and 7 (r3 not read): Menu::Step on the
+// menu, then the cursor's move, the value's change, accept (OK, Default or
+// the cursor sent to the last row) or back, by their rows. From their
+// frames below `sp`; r3 the last call's.
+// sub_821C1270 Options::HudPage (96-byte frame).
+uint64_t HudPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C1888 Options::SlidersPage (96).
+uint64_t SlidersPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C1D08 Options::ButtonsPage (112).
+uint64_t ButtonsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C21A8 Options::AnalogPage (96).
+uint64_t AnalogPage(uint8_t* base, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

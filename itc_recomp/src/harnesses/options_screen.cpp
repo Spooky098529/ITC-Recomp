@@ -1155,6 +1155,132 @@ void CursorSteps(Context& h, const World& w) {
         __imp__sub_821C2A10, hooks::OptionsLeaveAnalog, {{240, 40}, {528, 408}, {400, 284}});
 }
 
+
+// --- The category pages (the third migration) ---
+
+// HasButtonClash and HasAnalogClash have no adapters (never seen in play,
+// called only by their pages' plain C++): their register steps here.
+void NativeHasButtonClash(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = os::HasButtonClash(base, ctx.r1.u32);
+}
+void NativeHasAnalogClash(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = os::HasAnalogClash(base, ctx.r1.u32);
+}
+
+// A generator of its own for a case's shaping: the cases' seeds follow one
+// another in the harness's xorshift stream (each case's stream the one
+// before shifted by a word), so the words a case shapes from its own are
+// mixed first (splitmix64's finalizer) to keep neighboring cases apart.
+Random Mixed(Random& r) {
+  uint64_t z = r.Next() + 0x9E3779B97F4A7C15ull;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return Random(z ^ (z >> 31));
+}
+
+// `count` edits from `at`: half the time distinct values below `hi` (one
+// pair made equal now and then), else any of them below `hi`.
+void ShapeEdits(uint8_t* base, uint32_t at, uint32_t count, uint32_t hi, Random& r) {
+  if (r.Below(2) == 0) {
+    for (uint32_t i = 0; i < count; i++) {
+      guest::StoreU32(base, at + 4 * i, r.Below(hi));
+    }
+    return;
+  }
+  std::vector<uint32_t> values(hi);
+  for (uint32_t i = 0; i < hi; i++) values[i] = i;
+  for (uint32_t i = hi - 1; i > 0; i--) std::swap(values[i], values[r.Below(i + 1)]);
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreU32(base, at + 4 * i, values[i]);
+  }
+  if (r.Below(3) == 0) {
+    const uint32_t a = r.Below(count), b = r.Below(count);
+    guest::StoreU32(base, at + 4 * b, guest::LoadU32(base, at + 4 * a));
+  }
+}
+
+void CategoryPages(Context& h, const World& w) {
+  Group(
+      h, w, "Options::HasButtonClash (sub_821BA890)", 150,
+      [&](PPCContext&, Random& from, const World& w) {
+        Random r = Mixed(from);
+        ShapeEdits(h.base, w.settings() + 284, 12, 17, r);
+      },
+      __imp__sub_821BA890, NativeHasButtonClash, {{48, 0}});
+  Group(
+      h, w, "Options::HasAnalogClash (sub_821BAC78)", 150,
+      [&](PPCContext&, Random& from, const World& w) {
+        Random r = Mixed(from);
+        ShapeEdits(h.base, w.settings() + 380, 6, 11, r);
+      },
+      __imp__sub_821BAC78, NativeHasAnalogClash, {{32, 0}});
+  // The pages: the options' menu for Menu::Step (items 0 to `last`, the
+  // cursor among them, its flags 0 or 1; the mappers as ShapeMappers makes
+  // them); the page block's page this page, -1 or another; OK/Default 0, 1
+  // or any; the edits, the current and the default settings.
+  const auto page = [&h](uint32_t number, uint32_t last,
+                         std::function<void(const World&, Random&)> fields) {
+    return [&h, number, last, fields](PPCContext&, Random& from, const World& w) {
+      Random r = Mixed(from);
+      ShapeMappers(h.base, w, r);
+      // Each mapper's fired word (+464: Menu::Step's moves, bits 2 to 5 and
+      // 16 to 19 up, down, left, right) one move, none or any bits, and its
+      // pressed word (+456: back 158 bit 7, accept 159 bit 8) one, both,
+      // none or any, so every path is taken.
+      for (uint32_t k = 0; k < 4; k++) {
+        const uint32_t mapper = w.mappers.address + 0x200 + 0x200 * k;
+        const uint32_t fired[8] = {0, 1u << 2, 1u << 3, 1u << 4, 1u << 5, 1u << 18, 1u << 19,
+                                   uint32_t(r.Next() & r.Next())};
+        const uint32_t pressed[5] = {0, 1u << 7, 1u << 8, (1u << 7) | (1u << 8), uint32_t(r.Next())};
+        guest::StoreU32(h.base, mapper + 464, fired[r.Below(8)]);
+        guest::StoreU32(h.base, mapper + 456, pressed[r.Below(5)]);
+      }
+      const uint32_t m = w.menu();
+      guest::StoreU32(h.base, m + menu_helpers::kFirst, 0);
+      guest::StoreU32(h.base, m + menu_helpers::kLast, last);
+      guest::StoreU32(h.base, m + menu_helpers::kCursor,
+                      r.Below(3) == 0 ? last : r.Below(last + 1));
+      for (const uint32_t o : {menu_helpers::kWraps, menu_helpers::kUpDownLocked,
+                               menu_helpers::kSidesStep, menu_helpers::kShouldersStep}) {
+        guest::StoreU32(h.base, m + o, r.Below(2));
+      }
+      const uint32_t pages[3] = {number, 0xFFFFFFFFu, r.Below(15)};
+      guest::StoreU32(h.base, w.page() + 0, pages[r.Below(3)]);
+      guest::StoreU32(h.base, w.settings() + 660,
+                      r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(2));
+      fields(w, r);
+    };
+  };
+  const auto words = [&h](const World& w, Random& r, std::initializer_list<uint32_t> offsets,
+                          uint32_t count, int32_t lo, int32_t hi) {
+    for (const uint32_t at : offsets) {
+      for (uint32_t i = 0; i < count; i++) {
+        guest::StoreU32(h.base, w.settings() + at + 4 * i, uint32_t(lo + int32_t(r.Below(uint32_t(hi - lo + 1)))));
+      }
+    }
+  };
+  Group(h, w, "Options::HudPage (sub_821C1270)", 200,
+        page(1, 4, [&](const World& w, Random& r) { words(w, r, {44, 236, 428}, 4, 0, 1); }),
+        __imp__sub_821C1270, hooks::OptionsHudPage, {{96, 16}});
+  Group(h, w, "Options::SlidersPage (sub_821C1888)", 200,
+        page(3, 3, [&](const World& w, Random& r) { words(w, r, {68, 260, 452}, 3, -10, 10); }),
+        __imp__sub_821C1888, hooks::OptionsSlidersPage, {{96, 16}});
+  Group(h, w, "Options::ButtonsPage (sub_821C1D08)", 200,
+        page(5, 12,
+             [&](const World& w, Random& r) {
+               ShapeEdits(h.base, w.settings() + 284, 12, 17, r);
+               words(w, r, {476}, 12, 0, 16);
+             }),
+        __imp__sub_821C1D08, hooks::OptionsButtonsPage, {{112, 24}});
+  Group(h, w, "Options::AnalogPage (sub_821C21A8)", 200,
+        page(7, 6,
+             [&](const World& w, Random& r) {
+               ShapeEdits(h.base, w.settings() + 380, 6, 11, r);
+               words(w, r, {572}, 6, 0, 10);
+             }),
+        __imp__sub_821C21A8, hooks::OptionsAnalogPage, {{96, 16}});
+}
+
 }  // namespace
 
 void OptionsScreen(Context& h) {
@@ -1171,6 +1297,7 @@ void OptionsScreen(Context& h) {
   PageHelpers(h, w);
   Dispatch(h, w);
   CursorSteps(h, w);
+  CategoryPages(h, w);
 }
 
 }  // namespace harness
