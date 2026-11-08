@@ -77,6 +77,7 @@ constexpr uint32_t kDrawPauseMenu = 0x82211D08;        // RaceScreens::DrawPause
 constexpr uint32_t kHudDrawWarning = 0x82212AC8;       // RaceHud::DrawWarning
 constexpr uint32_t kScreensCreate = 0x82211F40;        // RaceScreens::Create (race-hud-object.md)
 constexpr uint32_t kAfterRaceUpdate = 0x8221BD20;      // AfterRaceMenu::Update (race-screens.md)
+constexpr uint32_t kScreensDestroy = 0x82211D18;       // RaceScreens::Destroy (race-hud-object.md)
 // The in-race screens' holder ([0x826D84F0]), which the pause's update reads
 // instead of +9608.
 constexpr uint32_t kHolderGlobal = 0x826D84F0;
@@ -241,6 +242,11 @@ std::optional<uint64_t> OpenRacePause(uint8_t* base, uint64_t r3, uint32_t sp, u
 // sub_8216D8C8 RaceHudMachine::OpenCareerPause: PauseMenu::Open(holder +1012,
 // 1, IsFirstDay) from its 96-byte frame. Open's r3.
 uint64_t OpenCareerPause(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees);
+// sub_8216C208 RaceHudMachine::DestroyScreens: a tail call to
+// RaceScreens::Destroy from the caller's frame `sp` with its return address
+// `lr` (r3, the machine, passed on and not read). Destroy's r3.
+uint64_t DestroyScreens(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                        const Calls& callees);
 constexpr uint32_t kPauseMenuOpen = 0x8220FA88;  // PauseMenu::Open (race-screens.md)
 
 // --- The helpers (handlers.cpp) ---

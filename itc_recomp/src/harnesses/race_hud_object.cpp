@@ -1812,11 +1812,13 @@ void ScreensDestructs(Context& h) {
 // not), which blocks were freed, the holder's global, the track zones'
 // owner, the string table, the movie table's pairs, the frame (its
 // register saves left out), the caller's area, r1 and r3. What's left is
-// freed.
-void ScreensDestroys(Context& h) {
+// freed. The same world for RaceHudMachine::DestroyScreens (sub_8216C208,
+// its tail call; r3 a machine address it passes on unread).
+void ScreensDestroys(Context& h, const char* name, GuestFunction recompiled,
+                     GuestFunction native) {
   namespace sf = strings_and_font;
   namespace rs = race_screens;
-  Results results("RaceScreens::Destroy (sub_82211D18)");
+  Results results(name);
   if (!hooks::NativeHeapActive()) {
     return;
   }
@@ -1922,8 +1924,9 @@ void ScreensDestroys(Context& h) {
       guest::StoreU32(h.base, ui_movies::kMovieTable + 4, capacity);
       guest::StoreU32(h.base, ui_movies::kMovieTable + 8, count);
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      t.r3.u64 = r.Next();
       ITC_FLAG(native_race_hud_object) = v == 1;
-      (v == 0 ? __imp__sub_82211D18 : hooks::RaceHudObjectScreensDestroy)(t, h.base);
+      (v == 0 ? recompiled : native)(t, h.base);
       ITC_FLAG(native_race_hud_object) = true;
       for (const uint32_t global : globals) {
         out[v].Word(guest::LoadU32(h.base, global));
@@ -2002,7 +2005,10 @@ void RaceHudObject(Context& h) {
   Sounds(h, w);
   Panels(h, w);
   ScreensDestructs(h);
-  ScreensDestroys(h);
+  ScreensDestroys(h, "RaceScreens::Destroy (sub_82211D18)", __imp__sub_82211D18,
+                  hooks::RaceHudObjectScreensDestroy);
+  ScreensDestroys(h, "RaceHudMachine::DestroyScreens (sub_8216C208)", __imp__sub_8216C208,
+                  hooks::RaceHudMachineDestroyScreens);
 }
 
 }  // namespace harness

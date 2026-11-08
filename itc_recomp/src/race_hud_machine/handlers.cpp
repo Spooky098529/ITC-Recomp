@@ -751,4 +751,10 @@ uint32_t ItemBonus(uint8_t* base, uint32_t id, uint32_t sp) {
   return uint32_t(value / 1000);
 }
 
+uint64_t DestroyScreens(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                        const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216C208 RaceHudMachine::DestroyScreens");
+  return callees.Call(kScreensDestroy, sp, lr, r3);
+}
+
 }  // namespace race_hud_machine

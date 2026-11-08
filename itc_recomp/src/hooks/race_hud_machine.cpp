@@ -41,7 +41,8 @@ ITC_FLAG_BOOL(native_race_hud_machine, true, "ITC",
               "kinds 0 and 4 and kind 6's unseen screen the original), PauseDraw sub_8216CF08 and "
               "RacePauseDraw sub_8216CFE0 (RaceHud::Draw's, RunMovie's, DrawWarning's, "
               "RaceScreens::DrawPauseMenu's and AltHud::RunMovie's plain C++; kinds 0 and 4 the "
-              "original) natively instead of through the translated "
+              "original), DestroyScreens sub_8216C208 (RaceScreens::Destroy's plain C++ with "
+              "--native_heap) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=race_hud_machine)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
 
@@ -153,6 +154,13 @@ class Calls {
         // allocation layer, else the guest call.
         if (NativeHeapActive()) {
           return rh::ScreensCreate(base, r3, r1, self.calls());
+        }
+        break;
+      case rhm::kScreensDestroy:
+        // As its adapter (src/hooks/race_hud_object.cpp): over the
+        // allocation layer, else the guest call.
+        if (NativeHeapActive()) {
+          return rh::ScreensDestroy(base, r1, self.calls());
         }
         break;
       case rhm::kPauseMenuOpen:
@@ -429,6 +437,13 @@ void RaceHudMachineRacePauseDraw(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void RaceHudMachineDestroyScreens(PPCContext& ctx, uint8_t* base) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  Handle(ctx, base, __imp__sub_8216C208, [&](const rh::Calls& callees) {
+    return std::optional<uint64_t>(rhm::DestroyScreens(base, ctx.r3.u64, ctx.r1.u32, lr, callees));
+  });
+}
+
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rhm::IsFirstDay(base, ctx.r1.u32);
 }
@@ -503,3 +518,4 @@ ITC_RACE_HUD_MACHINE(8216D6D0, RaceHudMachineResultsDraw)
 ITC_RACE_HUD_MACHINE(8216C6D8, RaceHudMachineAfterRaceDraw)
 ITC_RACE_HUD_MACHINE(8216CF08, RaceHudMachinePauseDraw)
 ITC_RACE_HUD_MACHINE(8216CFE0, RaceHudMachineRacePauseDraw)
+ITC_RACE_HUD_MACHINE(8216C208, RaceHudMachineDestroyScreens)
