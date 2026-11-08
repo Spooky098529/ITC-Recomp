@@ -23,7 +23,8 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "sub_82213750, SetDistance sub_82214A50, Reset sub_822121C0, ShowGauge "
               "sub_82212D08, SetUpExtraGauges sub_82213DB0, ApplyOptions sub_82212768, "
               "UpdateView sub_82212B68, SetUpGauges sub_82213C90, SetUpMirror sub_822135B0, "
-              "TearDown sub_822141A0, SetUpSigns sub_822122B0, UpdateExtraGauges sub_82215160; "
+              "TearDown sub_822141A0 (no adapter: only RaceScreens::~RaceScreens's plain C++ "
+              "reaches it), SetUpSigns sub_822122B0, UpdateExtraGauges sub_82215160; "
               "memcpy where its plain C++ refuses, CameraPasses::RenderTarget, "
               "TrackZones::Create and the extra gauges' digits through their overrides "
               "or the originals; UpdateSigns sub_82214718, UpdateSign sub_82212F00, "
@@ -470,6 +471,7 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // DrawPauseMenu and DrawWarning (from the race HUD machine's PauseDraw and
 // RacePauseDraw, native); Draw (from the race HUD machine's eight draws in
 // play, native);
+// TearDown (from RaceScreens::~RaceScreens, native, 2026-11-08);
 // RaceScreens::Create (from the race HUD machine's CreateScreens, native,
 // with --native_heap; without it the original); ApplyOptions (from the race
 // HUD machine's SetUp, PauseUpdate and ClosePause, native).
@@ -484,7 +486,6 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                             \
   }
 
-ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
 // RaceScreens::~RaceScreens (from RaceScreens::Destroy, recompiled).
 ITC_RACE_HUD_OBJECT(82211B98, RaceHudObjectScreensDestruct)
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)

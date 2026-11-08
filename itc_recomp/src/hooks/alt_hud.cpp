@@ -10,7 +10,8 @@
 
 ITC_FLAG_BOOL(native_alt_hud, true, "ITC",
               "Run the alternate HUD's functions (docs/functions/alt-hud.md: MenuList::Release "
-              "sub_8220BBB0 and AltHud::Destroy sub_82216BA8 with --native_heap, their blocks "
+              "sub_8220BBB0 and AltHud::Destroy sub_82216BA8 (no adapter: only RaceScreens::"
+              "~RaceScreens's plain C++ reaches it) with --native_heap, their blocks "
               "the allocation layer's (Destroy's operator delete through its override where its "
               "plain C++ refuses); AltHud::SetUp sub_82217C70 with SetUpGauges sub_82216C40, "
               "PowerClass sub_82216B08 (Car::SetupVehicle through its override where its plain "
@@ -213,8 +214,9 @@ void AltHudRunMovie(PPCContext& ctx, uint8_t* base) {
 // SetThrottle, SetBrake and SetSteering (from Tick); SetUp and Tick, from
 // the race HUD machine's native handlers only in play (src/race_hud_machine/,
 // by their plain C++; kind 4's paths, never seen in play, reach the
-// originals; the user's call, 2026-10-31). MenuList::Release's stays for its
-// ~50 other callers.
+// originals; the user's call, 2026-10-31); Destroy, from RaceScreens::
+// ~RaceScreens's plain C++ only (src/race_hud_object/, 2026-11-08).
+// MenuList::Release's stays for its ~50 other callers.
 
 #define ITC_ALT_HUD(address, step)                \
   extern "C" REX_FUNC(sub_##address) {            \
@@ -227,5 +229,4 @@ void AltHudRunMovie(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_ALT_HUD(8220BBB0, AltHudMenuListRelease)
-ITC_ALT_HUD(82216BA8, AltHudDestroy)
 ITC_ALT_HUD(82216C00, AltHudRunMovie)
