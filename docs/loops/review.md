@@ -22,6 +22,14 @@ When the user has reviewed a run's section, its heading gets
   `build-screen.md`'s intro; two leads deleted as covered, four leads'
   lines given notes. `Type2Hub::Create` allocates 68 bytes and uses up
   to +447 (the original's, kept).
+- The type 2 screens' migration (e134d538..caa092b0): 61 of 121 ours
+  under `--native_type2_screens`; harness world fixes in its harness
+  (node +100 kept below 40, as `FindNode` adds a node's +108 to child
+  indices; at most 3 children for node (2, 2), as `ShowDigits` reads a
+  word per child past the three digits its callers write);
+  `PowerGraphScreen::OpenMovie` `sub_82250328`'s adapter also serves
+  three other modes' Inits that register it, behind the same flag;
+  nothing of it runs in an attract race (no counters or frame dumps).
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 

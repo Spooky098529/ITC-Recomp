@@ -22,8 +22,14 @@ file's history. What's left to see in a drive, from every run:
   screen's machine at +0x1BF20, the license plate editor at +0x20A70;
   97 ready groups; 5 leads added for the rest (+9640, +0x23018,
   +0x173D0, the tuning screen's Init, the mode's Init), two leads
-  deleted as covered; no subagents); map checked. Step: migration
-  (agent running).
+  deleted as covered; no subagents); map checked. Migration
+  e134d538..caa092b0 (the license plate editor whole: set-up, cells,
+  menus, transitions, pages, update; the four machines' InitStates; the
+  spec sheet's and the build screen machine's handlers; 12 adapters
+  removed; `--native_type2_screens`; races 33-38 s, 0 errors, its
+  harnesses 0 differing; two harness world fixes; no subagents). Left:
+  the hub whole, the build screen's Enter and its pages (ready). Step:
+  validation (agent running).
 
 ## Done
 
@@ -45,5 +51,7 @@ file's history. What's left to see in a drive, from every run:
   unknown 908).
 - After the type 2 screens' map: ours 5074, work left 1354 (wrapped
   56, known 510, unknown 788).
+- After its migration: ours 5135, work left 1293 (wrapped 56, known
+  449, unknown 788).
 
 ## Stopped
