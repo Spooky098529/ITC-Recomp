@@ -35,6 +35,7 @@ constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kPlayNamed = 0x8211DAC8;
 constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
+constexpr uint32_t kUnloopNamed = 0x8211DE30;
 constexpr uint32_t kShowNode = 0x8211AC00;
 constexpr uint32_t kHideNode = 0x8211AC48;
 constexpr uint32_t kSetNodeTexture = 0x8211A708;
@@ -358,6 +359,29 @@ uint64_t RowIsHidden(uint8_t* base, uint32_t panel, uint32_t sp);
 uint64_t CarIsShown(uint8_t* base, uint32_t panel, uint32_t sp);
 uint64_t ColorIsShown(uint8_t* base, uint32_t panel, uint32_t sp);
 uint64_t ColorIsIdle(uint8_t* base, uint32_t panel, uint32_t sp);
+
+// --- The panels' shows, selections and moves (panels.cpp; the loops they
+// start when not running tested with IsNamedActive's plain C++) ---
+
+// sub_8224FE50 TabPanel::Show: FinishAll, +116 played, the loops +124,
+// +132, +136.
+uint64_t TabShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224FB20 TabPanel::Select: the tab's animation (+96 + +8) replayed
+// when its word is set, the loops +128 and +132, the tabs' nodes dimmed by
+// their words (UiMovie's SetColor plain C++). Returns the movie.
+uint64_t TabSelect(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224F1D8 RowPanel::Show and sub_8224F340 RowPanel::Select.
+uint64_t RowShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls);
+uint64_t RowSelect(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224DA20 CarPanel::Show.
+uint64_t CarShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224DDF8 CarPanel::Move (r4 the action, r5 the one before, r6 the
+// direction) and sub_8224E050 CarPanel::Pick (r4, r5; then PlaceCursor's
+// plain C++), UiMovie::UnloopNamed through its override.
+uint64_t CarMove(uint8_t* base, uint32_t panel, uint64_t action, uint64_t before,
+                 uint64_t direction, uint32_t sp, const Calls& calls);
+uint64_t CarPick(uint8_t* base, uint64_t panel_r3, uint64_t action, uint64_t before, uint32_t sp,
+                 const Calls& calls);
 
 // --- The power graph's record (panels.cpp) ---
 

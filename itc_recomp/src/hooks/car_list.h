@@ -50,6 +50,14 @@ void CarListRowIsHidden(PPCContext& ctx, uint8_t* base);
 void CarListCarIsShown(PPCContext& ctx, uint8_t* base);
 void CarListColorIsShown(PPCContext& ctx, uint8_t* base);
 void CarListColorIsIdle(PPCContext& ctx, uint8_t* base);
+// The panels' shows, selections and moves.
+void CarListTabShow(PPCContext& ctx, uint8_t* base);
+void CarListTabSelect(PPCContext& ctx, uint8_t* base);
+void CarListRowShow(PPCContext& ctx, uint8_t* base);
+void CarListRowSelect(PPCContext& ctx, uint8_t* base);
+void CarListCarShow(PPCContext& ctx, uint8_t* base);
+void CarListCarMove(PPCContext& ctx, uint8_t* base);
+void CarListCarPick(PPCContext& ctx, uint8_t* base);
 // PowerGraph::SetEntry (r3 an entry, r4 the tab).
 void CarListPowerGraphSetEntry(PPCContext& ctx, uint8_t* base);
 

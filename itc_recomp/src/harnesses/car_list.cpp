@@ -772,6 +772,69 @@ void PanelAnswers(Context& h, const World& w) {
         __imp__sub_8224D288, hooks::CarListColorIsIdle);
 }
 
+// The panels' shows, selections and moves (the lists filled as for the
+// answers, so the loops they start find some running).
+void PanelShows(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const int n = 60;
+  Group(
+      h, w, "TabPanel::Show (sub_8224FE50)", n, {112, 24},
+      [base](PPCContext&, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        FillLists(base, w, r, {116, 124, 132, 136});
+      },
+      __imp__sub_8224FE50, hooks::CarListTabShow);
+  Group(
+      h, w, "TabPanel::Select (sub_8224FB20)", n, {112, 32},
+      [base](PPCContext&, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        guest::StoreU32(base, w.panel() + 8, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));
+        for (const uint32_t at : {12u, 16u, 20u}) {
+          guest::StoreU32(base, w.panel() + at, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+        }
+        FillLists(base, w, r, {128, 132});
+      },
+      __imp__sub_8224FB20, hooks::CarListTabSelect);
+  Group(
+      h, w, "RowPanel::Show (sub_8224F1D8)", n, {112, 24},
+      [base](PPCContext&, Random& r, const World& w) {
+        SetGroup(base, w, r, 0);
+        guest::StoreU32(base, w.panel() + 152, r.Below(2));
+        guest::StoreU32(base, w.panel() + 8, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(8));
+        FillLists(base, w, r, {76, 80, 112, 116});
+      },
+      __imp__sub_8224F1D8, hooks::CarListRowShow);
+  Group(
+      h, w, "RowPanel::Select (sub_8224F340)", n, {112, 24},
+      [base](PPCContext&, Random& r, const World& w) {
+        SetGroup(base, w, r, 0);
+        guest::StoreU32(base, w.panel() + 8, r.Below(8));
+        FillLists(base, w, r, {112, 116});
+      },
+      __imp__sub_8224F340, hooks::CarListRowSelect);
+  // The C panel: the highlighted action (+8) -1 or 0 to 9 (its word at +68
+  // on), the actions r4 and r5 0 to 9, the direction around 0.
+  Group(
+      h, w, "CarPanel::Show (sub_8224DA20)", n, {128, 48},
+      [base](PPCContext&, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        guest::StoreU32(base, w.panel() + 8, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(10));
+        FillLists(base, w, r, {68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 40, 44, 124, 128});
+      },
+      __imp__sub_8224DA20, hooks::CarListCarShow);
+  const auto swap = [base](PPCContext& t, Random& r, const World& w) {
+    SetGroup(base, w, r, 12);
+    FillLists(base, w, r, {68, 72, 76, 80, 84, 88, 92, 96, 100, 104});
+    t.r4.u64 = r.Below(10);
+    t.r5.u64 = r.Below(10);
+    t.r6.u64 = Around(r);
+  };
+  Group(h, w, "CarPanel::Move (sub_8224DDF8)", n, {128, 48}, swap, __imp__sub_8224DDF8,
+        hooks::CarListCarMove);
+  Group(h, w, "CarPanel::Pick (sub_8224E050)", n, {128, 40}, swap, __imp__sub_8224E050,
+        hooks::CarListCarPick);
+}
+
 // PanelSet's leaves on the objects block (r3 its start, its words random).
 void Leaves(Context& h, const World& w) {
   uint8_t* const base = h.base;
@@ -1382,6 +1445,7 @@ void CarList(Context& h) {
   Panels(h, w);
   MorePanels(h, w);
   PanelAnswers(h, w);
+  PanelShows(h, w);
   Leaves(h, w);
   Steps(h, w);
   SetUps(h, w);

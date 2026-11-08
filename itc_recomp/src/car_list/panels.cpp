@@ -864,6 +864,209 @@ uint64_t ColorIsIdle(uint8_t* base, uint32_t panel, uint32_t sp) {
   return a || b ? 0 : 1;
 }
 
+// --- The panels' shows, selections and moves ---
+
+namespace {
+// The loop the shows and selections start when it isn't running: for the
+// word at `at` (nothing when negative), IsNamedActive (r3 1 when it's
+// running), else PlayNamed(m, it, 1, 0, 0, 0) and LoopNamed from `lr_play`
+// and `lr_loop`. The word read again for each call, as the originals do.
+void LoopIfIdle(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t m, uint32_t panel,
+                uint32_t at, uint32_t lr_play, uint32_t lr_loop, uint64_t& r3) {
+  const uint32_t named = LoadU32(base, panel + at);
+  if (int32_t(named) < 0) {
+    return;
+  }
+  if (Active(base, m, named)) {
+    r3 = 1;
+    return;
+  }
+  PlayNamed(calls, frame, lr_play, m, LoadU32(base, panel + at), 1, 0, 0, 0);
+  r3 = calls.Call(kLoopNamed, frame, lr_loop, m, LoadU32(base, panel + at));
+}
+
+// FinishNamed on the word at `at` when it isn't negative.
+void FinishIfSet(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t m, uint32_t panel,
+                 uint32_t at, uint32_t lr, uint64_t& r3) {
+  const uint32_t named = LoadU32(base, panel + at);
+  if (int32_t(named) >= 0) {
+    r3 = calls.Call(kFinishNamed, frame, lr, m, named);
+  }
+}
+
+// The sum of two of the panel's words, as the originals' 64-bit add of two
+// zero-extended loads.
+uint64_t Sum(uint8_t* base, uint32_t panel, uint32_t a, uint32_t b) {
+  return uint64_t(LoadU32(base, panel + a)) + uint64_t(LoadU32(base, panel + b));
+}
+
+// The C panel's action word for `action` (+68 + 4 x action: the word at
+// panel + (action + 17) x 4, 32-bit).
+uint32_t ActionAt(uint32_t panel, uint64_t action) {
+  return panel + (uint32_t(action + 17) << 2);
+}
+}  // namespace
+
+uint64_t TabShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224FE50 TabPanel::Show");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 4), frame);
+  const uint32_t again = Movie(base, LoadU32(base, panel + 4), frame);
+  // r4 as PanelGroup::Movie leaves it (its frame's +80).
+  uint64_t r3 = calls.Call(kFinishAll, frame, 0x8224FE80, again, frame - 96 + 80);
+  const uint32_t first = LoadU32(base, panel + 116);
+  if (int32_t(first) >= 0) {
+    r3 = PlayNamed(calls, frame, 0x8224FEA4, m, first, 1, 0, 0, 0);
+  }
+  LoopIfIdle(base, calls, frame, m, panel, 124, 0x8224FEDC, 0x8224FEE8, r3);
+  LoopIfIdle(base, calls, frame, m, panel, 132, 0x8224FF20, 0x8224FF2C, r3);
+  LoopIfIdle(base, calls, frame, m, panel, 136, 0x8224FF64, 0x8224FF70, r3);
+  return r3;
+}
+
+uint64_t TabSelect(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224FB20 TabPanel::Select");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 4), frame);
+  uint64_t r3 = m;
+  // The tab (+8, unsigned) and its word (+12, +16, +20): when set, its
+  // animation (+96 + the tab) finished, played and looped.
+  const uint32_t tab = LoadU32(base, panel + 8);
+  if (tab < 3 && LoadU32(base, panel + 12 + 4 * tab) != 0) {
+    calls.Call(kFinishNamed, frame, 0x8224FB9C, m, uint64_t(LoadU32(base, panel + 96)) + tab);
+    PlayNamed(calls, frame, 0x8224FBC0, m, Sum(base, panel, 8, 96), 1, 0, 0, 0);
+    r3 = calls.Call(kLoopNamed, frame, 0x8224FBD4, m, Sum(base, panel, 8, 96));
+  }
+  LoopIfIdle(base, calls, frame, m, panel, 128, 0x8224FC0C, 0x8224FC18, r3);
+  LoopIfIdle(base, calls, frame, m, panel, 132, 0x8224FC50, 0x8224FC5C, r3);
+  // The three tabs' nodes dimmed (color 0) or not (2) by their words.
+  const uint32_t node =
+      ui_movies::FindNode(base, m, LoadU32(base, panel + 24), LoadU32(base, panel + 28));
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t child = ui_movies::Child(base, node, LoadU32(base, panel + 44 + 4 * i));
+    ui_movies::SetColor(base, child, LoadU32(base, panel + 12 + 4 * i) == 0 ? 2 : 0);
+  }
+  return m;
+}
+
+uint64_t RowShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224F1D8 RowPanel::Show");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 0), frame);
+  const uint32_t first = LoadU32(base, panel + (LoadU32(base, panel + 152) != 0 ? 80 : 76));
+  uint64_t r3 = PlayNamed(calls, frame, 0x8224F228, m, first, 1, 0, 1, 0);
+  LoopIfIdle(base, calls, frame, m, panel, 112, 0x8224F260, 0x8224F26C, r3);
+  LoopIfIdle(base, calls, frame, m, panel, 116, 0x8224F2A4, 0x8224F2B0, r3);
+  FinishIfSet(base, calls, frame, m, panel, 104, 0x8224F2C4, r3);
+  FinishIfSet(base, calls, frame, m, panel, 108, 0x8224F2D8, r3);
+  if (int32_t(LoadU32(base, panel + 8)) >= 0) {
+    r3 = calls.Call(kFinishNamed, frame, 0x8224F2F4, m, Sum(base, panel, 92, 8));
+    StoreU32(base, panel + 8, 0xFFFFFFFFu);
+  }
+  FinishIfSet(base, calls, frame, m, panel, 104, 0x8224F310, r3);
+  FinishIfSet(base, calls, frame, m, panel, 108, 0x8224F324, r3);
+  return r3;
+}
+
+uint64_t RowSelect(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224F340 RowPanel::Select");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 0), frame);
+  calls.Call(kFinishNamed, frame, 0x8224F374, m, Sum(base, panel, 8, 92));
+  PlayNamed(calls, frame, 0x8224F398, m, Sum(base, panel, 8, 92), 1, 0, 0, 0);
+  uint64_t r3 = calls.Call(kLoopNamed, frame, 0x8224F3AC, m, Sum(base, panel, 8, 92));
+  LoopIfIdle(base, calls, frame, m, panel, 112, 0x8224F3E4, 0x8224F3F0, r3);
+  LoopIfIdle(base, calls, frame, m, panel, 116, 0x8224F428, 0x8224F434, r3);
+  // The arrows (+104, +108) finished, played and looped.
+  static constexpr uint32_t kArrows[2][4] = {{104, 0x8224F448, 0x8224F464, 0x8224F470},
+                                             {108, 0x8224F484, 0x8224F4A0, 0x8224F4AC}};
+  for (const auto& a : kArrows) {
+    const uint32_t named = LoadU32(base, panel + a[0]);
+    if (int32_t(named) < 0) {
+      continue;
+    }
+    calls.Call(kFinishNamed, frame, a[1], m, named);
+    PlayNamed(calls, frame, a[2], m, LoadU32(base, panel + a[0]), 1, 0, 0, 0);
+    r3 = calls.Call(kLoopNamed, frame, a[3], m, LoadU32(base, panel + a[0]));
+  }
+  return r3;
+}
+
+uint64_t CarShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224DA20 CarPanel::Show");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 12), frame);
+  uint64_t r3 = m;
+  const uint32_t action = LoadU32(base, panel + 8);
+  if (int32_t(action) >= 0) {
+    calls.Call(kFinishNamed, frame, 0x8224DA58, m, LoadU32(base, ActionAt(panel, action)));
+    StoreU32(base, panel + 8, 0xFFFFFFFFu);
+  }
+  // The ten actions' animations (+68 on): played once when not running,
+  // then finished.
+  for (uint32_t i = 0; i < 10; i++) {
+    const uint32_t named = LoadU32(base, panel + 68 + 4 * i);
+    if (!Active(base, m, named)) {
+      PlayNamed(calls, frame, 0x8224DA9C, m, named, 1, 0, 0, 0);
+    }
+    r3 = calls.Call(kFinishNamed, frame, 0x8224DAA8, m, named);
+  }
+  for (uint32_t i = 0; i < 2; i++) {
+    r3 = PlayNamed(calls, frame, 0x8224DAD8, m, LoadU32(base, panel + 40 + 4 * i), 1, 0, 1, 0);
+  }
+  LoopIfIdle(base, calls, frame, m, panel, 124, 0x8224DB1C, 0x8224DB28, r3);
+  LoopIfIdle(base, calls, frame, m, panel, 128, 0x8224DB60, 0x8224DB6C, r3);
+  FinishIfSet(base, calls, frame, m, panel, 60, 0x8224DB80, r3);
+  FinishIfSet(base, calls, frame, m, panel, 64, 0x8224DB94, r3);
+  return r3;
+}
+
+namespace {
+// Move's and Pick's shared part: the action before's animation finished
+// and unlooped, the new one's finished, unlooped, played and looped, and
+// the scroll animations (+108, +112) finished. Its return addresses from
+// `lr` (Move's 0x8224DE30, Pick's 0x8224E084), the same steps apart.
+void CarSwap(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t m, uint32_t panel,
+             uint64_t action, uint64_t before, uint32_t lr) {
+  const uint32_t old_at = ActionAt(panel, before);
+  calls.Call(kFinishNamed, frame, lr, m, LoadU32(base, old_at));
+  calls.Call(kUnloopNamed, frame, lr + 0x0C, m, LoadU32(base, old_at));
+  const uint32_t new_at = ActionAt(panel, action);
+  calls.Call(kFinishNamed, frame, lr + 0x20, m, LoadU32(base, new_at));
+  calls.Call(kUnloopNamed, frame, lr + 0x2C, m, LoadU32(base, new_at));
+  PlayNamed(calls, frame, lr + 0x48, m, LoadU32(base, new_at), 1, 0, 0, 0);
+  calls.Call(kLoopNamed, frame, lr + 0x54, m, LoadU32(base, new_at));
+  calls.Call(kFinishNamed, frame, lr + 0x60, m, LoadU32(base, panel + 108));
+}
+}  // namespace
+
+uint64_t CarMove(uint8_t* base, uint32_t panel, uint64_t action, uint64_t before,
+                 uint64_t direction, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224DDF8 CarPanel::Move");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 12), frame);
+  CarSwap(base, calls, frame, m, panel, action, before, 0x8224DE30);
+  uint64_t r3 = calls.Call(kFinishNamed, frame, 0x8224DE9C, m, LoadU32(base, panel + 112));
+  const int32_t d = int32_t(uint32_t(direction));
+  if (d == 1) {
+    r3 = PlayNamed(calls, frame, 0x8224DED0, m, LoadU32(base, panel + 112), 1, 0, 0, 0);
+  } else if (d == -1) {
+    r3 = PlayNamed(calls, frame, 0x8224DED0, m, LoadU32(base, panel + 108), 1, 0, 0, 0);
+  }
+  return r3;
+}
+
+uint64_t CarPick(uint8_t* base, uint64_t panel_r3, uint64_t action, uint64_t before, uint32_t sp,
+                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224E050 CarPanel::Pick");
+  const uint32_t panel = uint32_t(panel_r3);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 12), frame);
+  CarSwap(base, calls, frame, m, panel, action, before, 0x8224E084);
+  calls.Call(kFinishNamed, frame, 0x8224E0F0, m, LoadU32(base, panel + 112));
+  return CarPlaceCursor(base, panel_r3, action, frame);
+}
+
 // --- The power graph's record ---
 
 uint64_t PowerGraphSetEntry(uint8_t* base, uint64_t entry_r3, uint64_t tab) {
