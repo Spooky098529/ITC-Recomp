@@ -1663,6 +1663,138 @@ void Panels(Context& h, const World& w) {
   }
 }
 
+// The panel's set-ups (RaceHud::SetUpTimer, SetUpRacers, SetMode): the
+// racers ([+444], the misc block's) with their count (+0) 1 to 4 (now and
+// then 0), the animation (+12) -1 to 5, the records' items (+8) -1 or ids
+// and their bars' targets (+788) ints around the bars' range; the last
+// racer's item -1 or 262 to 265 with its entry's byte +34 below 4 or 48 and
+// up (both picture paths, small pictures: a picture's +108 is a pool node's
+// child index the lookups after it read); the timer's node 3 and the
+// racers' node 0 with their first child (+100) 2 or more (the child n - 2
+// in the pool); the racers' movie's live scene a chunk list for ShowItem(-1)
+// whose headers and shown words lie past the child entries the lookups
+// read (+128 to +0x400: chunk 0 0x400 bytes, then chunks of 0x60 to 0xC0 to
+// a TRM before 0x700, or TRM at once); the two movies' animations; player
+// 0's save data's name record (+8) with small kinds and indices
+// (SetChildNameText's SetNameText, its SetNodeText recorded).
+void ShapePanel(uint8_t* base, const World& w, Random& r) {
+  const uint32_t hud = w.hud.address;
+  const uint32_t racers = w.racers();
+  guest::StoreU32(base, hud + 444, racers);
+  const uint32_t count = r.Below(8) == 0 ? 0 : 1 + r.Below(4);
+  guest::StoreU32(base, racers + 0, count);
+  guest::StoreU32(base, racers + 12, r.Below(7) - 1);
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, racers + 972 * i + 8, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(5000));
+    guest::StoreU32(base, racers + 972 * i + 788,
+                    r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(300)) - 30));
+  }
+  const uint32_t item = r.Below(4) == 0 ? 0xFFFFFFFFu : 262 + r.Below(4);
+  guest::StoreU32(base, racers + 972 * count - 964, item);
+  PointItems(base, w, item);
+  guest::StoreU8(base, w.misc.address + 0x5200 + 34,
+                 uint8_t(r.Below(2) == 0 ? r.Below(4) : 48 + r.Below(80)));
+  const uint32_t timer = guest::LoadU32(base, hud + rh::kHudTimer);
+  const uint32_t racer_movie = guest::LoadU32(base, hud + 604);
+  guest::StoreU32(base, ui_movies::FindNode(base, timer, 0xFFFFFFFFu, 3) + 100, 2 + r.Below(90));
+  guest::StoreU32(base, ui_movies::FindNode(base, racer_movie, 0xFFFFFFFFu, 0) + 100,
+                  2 + r.Below(90));
+  static constexpr uint32_t kTags[] = {0x50524D00, 0x50494300, 0x54585400, 0x53434500};
+  const uint32_t scene = guest::LoadU32(base, racer_movie + ui_movies::kMovieLive);
+  if (r.Below(10) == 0) {
+    guest::StoreU32(base, scene, 0x54524D00u);
+  } else {
+    // Chunk 0's tag isn't TXT: the scene is also a pool node, and a TXT node
+    // would take SetChildNameText's SetNodeText into a text record the world
+    // doesn't hold (not TXT, it goes to the original, whose SetNodeText is
+    // recorded).
+    static constexpr uint32_t kFirstTags[] = {0x50524D00, 0x50494300, 0x53434500};
+    guest::StoreU32(base, scene, kFirstTags[r.Below(3)]);
+    guest::StoreU32(base, scene + 4, 0x400);
+    uint32_t at = 0x400;
+    uint32_t size = 0x60 + 0x20 * r.Below(4);
+    while (at + size < 0x700) {
+      guest::StoreU32(base, scene + at, r.Below(5) == 0 ? uint32_t(r.Next()) : kTags[r.Below(4)]);
+      guest::StoreU32(base, scene + at + 4, size);
+      at += size;
+      size = 0x60 + 0x20 * r.Below(4);
+    }
+    guest::StoreU32(base, scene + at, 0x54524D00u);
+  }
+  ShapeAnimations(base, w, racer_movie, r);
+  ShapeAnimations(base, w, timer, r);
+  const uint32_t name = w.save.address + 8;
+  guest::StoreU32(base, name + 4, r.Below(7));
+  guest::StoreU16(base, name + 8, uint16_t(r.Below(120)));
+  guest::StoreU16(base, name + 10, uint16_t(r.Below(2)));
+  guest::StoreU32(base, name + 12, r.Below(5));
+  guest::StoreU16(base, name + 16, uint16_t(r.Below(120)));
+  guest::StoreU16(base, name + 18, uint16_t(r.Below(2)));
+}
+
+// The bars' float words SetUpRacers stores (+0 to +24 of each of the four).
+void PanelBarFloats(Spec& spec) {
+  for (uint32_t b = 0; b < 4; b++) {
+    spec.Floats(244 + 40 * b, 7);
+  }
+}
+
+void PanelSetUps(Context& h, const World& w) {
+  {
+    // __savegprlr_26: r26 to r31 and lr in the 56 bytes below sp.
+    Spec spec;
+    spec.frame = 144;
+    spec.saves = 56;
+    Group(
+        h, w, "RaceHud::SetUpTimer (sub_822123C8)", 300,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapePanel(h.base, w, r);
+          t.r3.u64 = w.hud.address;
+          t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
+        },
+        __imp__sub_822123C8, hooks::RaceHudObjectSetUpTimer, spec);
+  }
+  {
+    // __savegprlr_26 and f29 to f31: the 80 bytes below sp.
+    Spec spec;
+    spec.frame = 176;
+    spec.saves = 80;
+    PanelBarFloats(spec);
+    Group(
+        h, w, "RaceHud::SetUpRacers (sub_82213F20)", 300,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapePanel(h.base, w, r);
+          t.r3.u64 = w.hud.address;
+          t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
+        },
+        __imp__sub_82213F20, hooks::RaceHudObjectSetUpRacers, spec);
+  }
+  {
+    // The mode 0, 1, 4 (sub_822125B8, never seen in play: the original on
+    // both sides; its world the HUD's movie 7) or 5 and up, now and then
+    // with high bits (cmplwi reads the low word); modes 2 and 3
+    // (sub_82214C88, sub_822155C0: the time trial's splits and stages) need
+    // a world this one doesn't hold. The callees' frames are their own
+    // groups'.
+    Spec spec;
+    PanelBarFloats(spec);
+    Group(
+        h, w, "RaceHud::SetMode (sub_822157A8)", 300,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapePanel(h.base, w, r);
+          static constexpr uint32_t kModes[] = {0, 0, 1, 1, 4, 5, 7, 0xFFFFFFFFu};
+          uint64_t mode = kModes[r.Below(8)];
+          if (r.Below(4) == 0) {
+            mode |= uint64_t(r.Next()) << 32;
+          }
+          t.r3.u64 = w.hud.address;
+          t.r4.u64 = mode;
+          t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
+        },
+        __imp__sub_822157A8, hooks::RaceHudObjectSetMode, spec);
+  }
+}
+
 // RaceScreens::~RaceScreens over a holder of the case's: the HUD at +16
 // (its mirror's texture +588 0 or a word put back into the dashboard
 // movie's texture 56), the track zones' owner 0 or an operator new block,
@@ -2004,6 +2136,7 @@ void RaceHudObject(Context& h) {
   Movies(h, w);
   Sounds(h, w);
   Panels(h, w);
+  PanelSetUps(h, w);
   ScreensDestructs(h);
   ScreensDestroys(h, "RaceScreens::Destroy (sub_82211D18)", __imp__sub_82211D18,
                   hooks::RaceHudObjectScreensDestroy);

@@ -42,7 +42,9 @@ ITC_FLAG_BOOL(native_race_hud_machine, true, "ITC",
               "RacePauseDraw sub_8216CFE0 (RaceHud::Draw's, RunMovie's, DrawWarning's, "
               "RaceScreens::DrawPauseMenu's and AltHud::RunMovie's plain C++; kinds 0 and 4 the "
               "original), DestroyScreens sub_8216C208 (RaceScreens::Destroy's plain C++ with "
-              "--native_heap) natively instead of through the translated "
+              "--native_heap), StartCountdown sub_8216CC60 (Stages::Type's, RaceHud::SetMode's and "
+              "StartCountdown's plain C++; kind 4's +656 object, never seen in play, the "
+              "originals) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=race_hud_machine)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
 
@@ -163,6 +165,10 @@ class Calls {
           return rh::ScreensDestroy(base, r1, self.calls());
         }
         break;
+      case rhm::kHudSetMode:
+        return rh::SetMode(base, r3, args[1], r1, lr, self.calls());
+      case rhm::kHudStartCountdown:
+        return rh::StartCountdown(base, r3);
       case rhm::kPauseMenuOpen:
         return race_screens::PauseMenuOpen(base, r3, args[1], args[2], r1, self.calls());
       case rhm::kAfterRaceClose:
@@ -444,6 +450,12 @@ void RaceHudMachineDestroyScreens(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void RaceHudMachineStartCountdown(PPCContext& ctx, uint8_t* base) {
+  Handle(ctx, base, __imp__sub_8216CC60, [&](const rh::Calls& callees) {
+    return std::optional<uint64_t>(rhm::StartCountdown(base, ctx.r3.u64, ctx.r1.u32, callees));
+  });
+}
+
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rhm::IsFirstDay(base, ctx.r1.u32);
 }
@@ -519,3 +531,4 @@ ITC_RACE_HUD_MACHINE(8216C6D8, RaceHudMachineAfterRaceDraw)
 ITC_RACE_HUD_MACHINE(8216CF08, RaceHudMachinePauseDraw)
 ITC_RACE_HUD_MACHINE(8216CFE0, RaceHudMachineRacePauseDraw)
 ITC_RACE_HUD_MACHINE(8216C208, RaceHudMachineDestroyScreens)
+ITC_RACE_HUD_MACHINE(8216CC60, RaceHudMachineStartCountdown)

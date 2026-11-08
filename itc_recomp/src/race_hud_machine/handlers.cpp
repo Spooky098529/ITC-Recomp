@@ -501,6 +501,64 @@ uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
   return r3;
 }
 
+uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216CC60 RaceHudMachine::StartCountdown");
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t frame = Frame(base, sp, 112);
+  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const uint32_t race = Load(base, kRaceData);
+  uint64_t result = r3;
+  auto type = [&]() {
+    const uint32_t t = vehicle_accessors::StagesType(base, race + 0x59620, 0xFFFFFFFFu);
+    result = t;
+    return t;
+  };
+  uint64_t mode = 0;
+  switch (kind) {
+    case 1: {
+      const uint32_t t = type();
+      if (t == 1 || t == 3) {
+        mode = Load(base, Load(base, kRaceData) + 0xA3AF4) == 0 ? 2 : 1;
+      }
+      break;
+    }
+    case 2:
+      mode = 2;
+      break;
+    case 4: {
+      const uint32_t t = type();
+      mode = t == 1 || t == 3 ? 1 : 0;
+      break;
+    }
+    case 6: {
+      const uint32_t t = type();
+      mode = t == 0 || t == 2 ? 3 : t == 1 || t == 3 ? 4 : 0;
+      break;
+    }
+    default:
+      break;
+  }
+  if (ReplayBit(base, Holder(base, machine))) {
+    return result;
+  }
+  const int32_t now = int32_t(Load(base, machine + kKind));
+  if (now <= 0) {
+    return result;
+  }
+  const uint32_t progress = race_hud_object::kRaceProgress;
+  if (now <= 3 || now == 6) {
+    guest::StoreU32(base, Holder(base, machine) + 460, Load(base, progress) + 2184);
+    callees.Call(kHudSetMode, frame, 0x8216CDB4, Holder(base, machine) + kHud, mode);
+    return callees.Call(kHudStartCountdown, frame, 0x8216CDC0, Holder(base, machine) + kHud);
+  }
+  if (now == 4) {
+    guest::StoreU32(base, Holder(base, machine) + 1000, Load(base, progress) + 2184);
+    callees.Call(k656SetMode, frame, 0x8216CDEC, Holder(base, machine) + 656, mode);
+    return callees.Call(k656Start, frame, 0x8216CDF8, Holder(base, machine) + 656);
+  }
+  return result;
+}
+
 uint64_t ClosePause(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216C658 RaceHudMachine::ClosePause");
   const uint32_t machine = uint32_t(r3);

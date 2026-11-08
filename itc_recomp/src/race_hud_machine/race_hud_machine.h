@@ -78,6 +78,12 @@ constexpr uint32_t kHudDrawWarning = 0x82212AC8;       // RaceHud::DrawWarning
 constexpr uint32_t kScreensCreate = 0x82211F40;        // RaceScreens::Create (race-hud-object.md)
 constexpr uint32_t kAfterRaceUpdate = 0x8221BD20;      // AfterRaceMenu::Update (race-screens.md)
 constexpr uint32_t kScreensDestroy = 0x82211D18;       // RaceScreens::Destroy (race-hud-object.md)
+constexpr uint32_t kHudSetMode = 0x822157A8;           // RaceHud::SetMode(r3, r4 = mode)
+constexpr uint32_t kHudStartCountdown = 0x82212270;    // RaceHud::StartCountdown
+// The holder's +656 object's set-up and start (kind 4's, never seen in
+// play: the originals).
+constexpr uint32_t k656SetMode = 0x82216810;
+constexpr uint32_t k656Start = 0x822159F0;
 // The in-race screens' holder ([0x826D84F0]), which the pause's update reads
 // instead of +9608.
 constexpr uint32_t kHolderGlobal = 0x826D84F0;
@@ -189,6 +195,16 @@ std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
 // the original makes none; then +9608 = [0x826D84F0]. Create's r3, or the
 // type's where none is made.
 uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees);
+// sub_8216CC60 RaceHudMachine::StartCountdown: the panel's mode by the kind
+// and the current stage's type (Stages::Type(race data + 0x59620, -1)):
+// kind 1 types 1 and 3 1 (2 with the race data's +0xA3AF4 0), 2 2, 4
+// types 1 and 3 1, 6 types 0 and 2 3, 1 and 3 4, else 0; then without the
+// replay bit, kinds 1 to 3 and 6 the HUD's +460 = the race progress
+// ([0x826D82E8]) + 2184, RaceHud::SetMode(mode) and StartCountdown; kind 4
+// the holder's +1000 = it and the +656 object's set-up and start (never
+// seen in play: the originals through `callees`), all from a 112-byte
+// frame. The last call's r3, else Stages::Type's or `r3`.
+uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees);
 // sub_8216C658 RaceHudMachine::ClosePause: kinds 1 to 3 and 6
 // PauseMenu::Close(holder +1012) and RaceHud::ApplyOptions(holder +16); kind
 // 4 the holder's +1016 passed to the empty sub_82106540 (only its load

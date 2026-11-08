@@ -885,6 +885,78 @@ void ShapeCallees(uint8_t* base, const HudWorld& w, Random& r, bool draws,
   guest::StoreU32(base, w.object() + 236, Bits(AnyFloat(r, 100.0f)));
 }
 
+// The panel's set-ups' world (RaceHud::SetMode's SetUpTimer and
+// SetUpRacers, under StartCountdown), as the race HUD object's harness
+// shapes it (its ShapePanel), the racers at the race progress's +2184 (where
+// StartCountdown points the HUD's +444): their count 1 to 4 (now and then 0),
+// animation, items and bars' targets; the last racer's item -1 or 262 to
+// 265 (the data tables pointed at it) with small pictures; the timer's node
+// 3 and the racers' node 0 with their first child 2 or more; the racers'
+// movie's live scene's child entries (+128 to +0x400) pool nodes again
+// (ShapeChunks' headers land there) and a chunk list past them for
+// ShowItem(-1); the two movies' animations; player 0's name record.
+void ShapePanel(uint8_t* base, const HudWorld& w, Random& r) {
+  const uint32_t hud = w.hud();
+  // StartCountdown points the HUD's racers (+444, the holder's +460) at the
+  // race progress's +2184 before SetMode.
+  const uint32_t racers = guest::LoadU32(base, rh::kRaceProgress) + 2184;
+  guest::StoreU32(base, hud + 444, racers);
+  const uint32_t count = r.Below(8) == 0 ? 0 : 1 + r.Below(4);
+  guest::StoreU32(base, racers + 0, count);
+  guest::StoreU32(base, racers + 12, r.Below(7) - 1);
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, racers + 972 * i + 8, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(5000));
+    guest::StoreU32(base, racers + 972 * i + 788,
+                    r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(300)) - 30));
+  }
+  const uint32_t item = r.Below(4) == 0 ? 0xFFFFFFFFu : 262 + r.Below(4);
+  guest::StoreU32(base, racers + 972 * count - 964, item);
+  const uint32_t tables = w.misc.address + 0x5000;
+  guest::StoreU32(base, data_tables::kTables, tables);
+  guest::StoreU32(base, tables + 16, w.misc.address + 0x5200 - 3008 * item);
+  guest::StoreU8(base, w.misc.address + 0x5200 + 34,
+                 uint8_t(r.Below(2) == 0 ? r.Below(4) : 48 + r.Below(80)));
+  const uint32_t timer = guest::LoadU32(base, hud + rh::kHudTimer);
+  const uint32_t racer_movie = guest::LoadU32(base, hud + 604);
+  const uint32_t scene = guest::LoadU32(base, racer_movie + ui_movies::kMovieLive);
+  for (uint32_t i = 128; i < 0x400; i += 8) {
+    guest::StoreU32(base, scene + i, w.node(r.Below(kNodeCount)));
+  }
+  guest::StoreU32(base, ui_movies::FindNode(base, timer, 0xFFFFFFFFu, 3) + 100, 2 + r.Below(90));
+  guest::StoreU32(base, ui_movies::FindNode(base, racer_movie, 0xFFFFFFFFu, 0) + 100,
+                  2 + r.Below(90));
+  static constexpr uint32_t kTags[] = {0x50524D00, 0x50494300, 0x54585400, 0x53434500};
+  if (r.Below(10) == 0) {
+    guest::StoreU32(base, scene, 0x54524D00);
+  } else {
+    // Chunk 0's tag isn't TXT: the scene is also a pool node, and a TXT node
+    // would take SetChildNameText's SetNodeText into a text record the world
+    // doesn't hold (not TXT, it goes to the original, whose SetNodeText is
+    // recorded).
+    static constexpr uint32_t kFirstTags[] = {0x50524D00, 0x50494300, 0x53434500};
+    guest::StoreU32(base, scene, kFirstTags[r.Below(3)]);
+    guest::StoreU32(base, scene + 4, 0x400);
+    uint32_t at = 0x400;
+    uint32_t size = 0x60 + 0x20 * r.Below(4);
+    while (at + size < 0x700) {
+      guest::StoreU32(base, scene + at, r.Below(5) == 0 ? uint32_t(r.Next()) : kTags[r.Below(4)]);
+      guest::StoreU32(base, scene + at + 4, size);
+      at += size;
+      size = 0x60 + 0x20 * r.Below(4);
+    }
+    guest::StoreU32(base, scene + at, 0x54524D00);
+  }
+  ShapeAnimations(base, w, racer_movie, r);
+  ShapeAnimations(base, w, timer, r);
+  const uint32_t name = w.save.address + 8;
+  guest::StoreU32(base, name + 4, r.Below(7));
+  guest::StoreU16(base, name + 8, uint16_t(r.Below(120)));
+  guest::StoreU16(base, name + 10, uint16_t(r.Below(2)));
+  guest::StoreU32(base, name + 12, r.Below(5));
+  guest::StoreU16(base, name + 16, uint16_t(r.Below(120)));
+  guest::StoreU16(base, name + 18, uint16_t(r.Below(2)));
+}
+
 // The holder's float words (the HUD's curves +20 to +244, its racer bars'
 // +0, +8 and +24, its bar +404 to +416), as the race HUD object's harness
 // compares them; the alternate HUD's object's (its curves and bar, +4 to
@@ -1218,6 +1290,40 @@ void Handlers(Context& h) {
     by_all(t, r, w);
     guest::StoreU32(h.base, 0x826D84D4, w.misc.address + 0x4340);
   };
+  // StartCountdown: the signed kinds (4's +656 object, never seen in play,
+  // left out), the current stage's type 0 to 5 and the race data's mode
+  // (+0xA3AF4) 0 half the time; the panel's world (ShapePanel). Where the
+  // mode would be 2 or 3 (sub_82214C88, sub_822155C0: the time trial's
+  // splits and stages, a world this one doesn't hold) the replay bit is set
+  // (the mode still worked out, nothing called).
+  const HandlerSetupFn start_countdown = [&h, &by_signed](PPCContext& t, Random& r,
+                                                          const HudWorld& w) {
+    by_signed(t, r, w);
+    const uint32_t stages = w.race.address + 0x59620;
+    guest::StoreU32(h.base, stages + 804, r.Below(10));
+    for (uint32_t k = 0; k < 10; k++) {
+      guest::StoreU32(h.base, stages + 80 * k, r.Below(6));
+    }
+    guest::StoreU32(h.base, w.race.address + rh::kRaceMode,
+                    r.Below(2) == 0 ? 0 : 1 + r.Below(9));
+    ShapePanel(h.base, w, r);
+    const int32_t kind = int32_t(guest::LoadU32(h.base, w.machine.address + rhm::kKind));
+    const uint32_t type =
+        guest::LoadU32(h.base, stages + 80 * guest::LoadU32(h.base, stages + 804));
+    const bool odd = type == 1 || type == 3;
+    uint32_t mode = 0;
+    if (kind == 1 && odd) {
+      mode = guest::LoadU32(h.base, w.race.address + rh::kRaceMode) == 0 ? 2 : 1;
+    } else if (kind == 2) {
+      mode = 2;
+    } else if (kind == 6) {
+      mode = type == 0 || type == 2 ? 3 : odd ? 4 : 0;
+    }
+    if (mode == 2 || mode == 3) {
+      const uint32_t flags = w.holder.address + rhm::kHolderFlags;
+      guest::StoreU32(h.base, flags, guest::LoadU32(h.base, flags) | 1);
+    }
+  };
   // A UI movie of the world (the HUD's nine) for the screens' runs.
   auto any_movie = [](Random& r, const HudWorld& w) { return w.movie(r.Below(9)); };
   // ResultsDraw: the race data's kind 1 (its mode, +0xA3AF4, 1 to 3), 3, 5,
@@ -1368,6 +1474,10 @@ void Handlers(Context& h) {
        __imp__sub_8216CF08, hooks::RaceHudMachinePauseDraw, f96, true, countdown_draw},
       {"RaceHudMachine::RacePauseDraw (sub_8216CFE0, with sub_82211D08)", 150, &pause_draw,
        __imp__sub_8216CFE0, hooks::RaceHudMachineRacePauseDraw, f96, true, countdown_draw},
+      // __savegprlr_29: r29 to r31 and lr in the 32 bytes below sp.
+      {"RaceHudMachine::StartCountdown (sub_8216CC60)", 200, &start_countdown,
+       __imp__sub_8216CC60, hooks::RaceHudMachineStartCountdown, HandlerSpec{112, 32}, false,
+       nullptr},
   };
   for (const G& g : groups) {
     Results results(g.name);

@@ -14,6 +14,7 @@
 #include "menu_sounds/menu_sounds.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
 #include <optional>
@@ -199,6 +200,178 @@ uint64_t UpdateItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
   }
   guest::StoreU32(base, hud + 460, item);
   return ShowItem(base, hud, int32_t(item), sp, calls);
+}
+
+namespace {
+
+// The HUD's item picture: DataTables::Item(id)'s byte +34 (signed), or for
+// 48 and up id - 262 (the originals' word from the zero-extended id).
+uint32_t ItemPicture(uint8_t* base, uint32_t id) {
+  const int32_t kind = int8_t(guest::LoadU8(base, data_tables::Item(base, id) + 34));
+  return kind < 48 ? uint32_t(kind) : id - 262;
+}
+
+constexpr uint64_t kAll = ~0ull;  // a sub-scene of -1 in a guest call's register
+
+}  // namespace
+
+uint64_t SetUpTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_822123C8 RaceHud::SetUpTimer");
+  const uint32_t frame = sp - 144;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t racers = guest::LoadU32(base, hud + 444);
+  const uint32_t animation = guest::LoadU32(base, racers + 12);
+  const uint32_t count = guest::LoadU32(base, racers + 0);
+  guest::StoreU32(base, hud + 464, animation);
+  if (int32_t(animation) >= 0) {
+    for (uint32_t i = 0; i < 5; i++) {
+      calls.Call(kFinishNamed, frame, 0x82212408, Movie(base, hud, kHudTimer), i);
+    }
+    const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone, 0);
+    guest::StoreU32(base, node + 80, 1);
+    ui_movies::PlayNamed(base, Movie(base, hud, kHudTimer), guest::LoadU32(base, hud + 464), 0,
+                         0, 0, 0);
+    ui_movies::MoveNamedAnimation(base, Movie(base, hud, kHudTimer),
+                                  guest::LoadU32(base, hud + 464), true);
+  } else {
+    const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone, 0);
+    guest::StoreU32(base, node + 80, 0);
+  }
+  const uint32_t group = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone, 3);
+  for (int32_t k = 0; k < int32_t(guest::LoadU32(base, group + 104)); k++) {
+    const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone,
+                                              guest::LoadU32(base, group + 100) + uint32_t(k));
+    guest::StoreU32(base, node + 80, 0);
+  }
+  const uint32_t last = guest::LoadU32(base, guest::LoadU32(base, hud + 444) + count * 972 - 964);
+  if (int32_t(last) != -1) {
+    const uint32_t child = guest::LoadU32(base, group + 100) + count - 2;
+    const uint32_t shown = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone, child);
+    guest::StoreU32(base, shown + 80, 1);
+    const uint32_t picture = ui_movies::FindNode(base, Movie(base, hud, kHudTimer),
+                                                 guest::LoadU32(base, group + 100) + count - 2, 0);
+    guest::StoreU32(base, picture + 108, ItemPicture(base, last));
+  }
+  for (uint32_t i = 1; i < 4; i++) {
+    if (int32_t(i) < int32_t(count + 1)) {
+      const uint32_t id = guest::LoadU32(base, guest::LoadU32(base, hud + 444) + 972 * i + 8);
+      if (int32_t(id) != -1) {
+        // SetText's varargs (r7 to r10) passed 0: the original leaves them
+        // unset (the user's call for the parking area, 2026-10-30).
+        calls.Call(kSetText, frame, 0x82212568, Movie(base, hud, kHudTimer), kAll, i + 26,
+                   uint64_t(id) + 4650);
+      }
+    } else {
+      calls.Call(kClearText, frame, 0x8221257C, Movie(base, hud, kHudTimer), kAll, i + 26);
+    }
+  }
+  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  return calls.Call(kSetChildNameText, frame, 0x822125AC, Movie(base, hud, kHudTimer), kAll, 26,
+                    uint64_t(save) + 8);
+}
+
+uint64_t SetUpRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82213F20 RaceHud::SetUpRacers");
+  using namespace camera_modes::steps;
+  const uint32_t frame = sp - 176;
+  guest::StoreU32(base, frame, sp);
+  ShowItem(base, hud, -1, frame, calls);
+  const uint32_t count = guest::LoadU32(base, guest::LoadU32(base, hud + 444) + 0);
+  guest::StoreU32(base, hud + 452, count);
+  uint32_t group = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, 0);
+  {
+    uint32_t k = guest::LoadU32(base, group + 100);
+    uint32_t end = guest::LoadU32(base, group + 104) + k;
+    while (int32_t(k) < int32_t(end)) {
+      const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, k);
+      guest::StoreU32(base, node + 80, 0);
+      k++;
+      end = guest::LoadU32(base, group + 100) + guest::LoadU32(base, group + 104);
+    }
+  }
+  const uint32_t last = guest::LoadU32(
+      base, guest::LoadU32(base, hud + 444) + guest::LoadU32(base, hud + 452) * 972 - 964);
+  if (int32_t(last) != -1) {
+    const uint32_t shown = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone,
+                                               guest::LoadU32(base, group + 100) + count - 2);
+    guest::StoreU32(base, shown + 80, 1);
+    const uint32_t picture = ui_movies::FindNode(base, Movie(base, hud, kHudRacers),
+                                                 guest::LoadU32(base, group + 100) + count - 2, 0);
+    guest::StoreU32(base, picture + 108, ItemPicture(base, last));
+  }
+  for (uint32_t k = 1; k < 3; k++) {
+    const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, k + 2);
+    guest::StoreU32(base, node + 80, 1);
+  }
+  if (int32_t(count - 1) < 3) {
+    for (uint32_t k = count + 1; int32_t(k) < 5; k++) {
+      const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, k);
+      guest::StoreU32(base, node + 80, 0);
+    }
+  }
+  if (int32_t(count) > 0) {
+    // The constants, loaded once before the loop as the original does.
+    const double zero = Lfs(base, kZero);
+    const double scale4 = Lfs(base, 0x82002A60);
+    const double scale12 = Lfs(base, 0x8200F724);
+    for (uint32_t i = 0; int32_t(i) < int32_t(count); i++) {
+      group = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, i + 1);
+      if (i == 0) {
+        const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+        calls.Call(kSetChildNameText, frame, 0x822140D4, Movie(base, hud, kHudRacers), kAll,
+                   uint64_t(guest::LoadU32(base, group + 100)) + 5, uint64_t(save) + 8);
+      } else {
+        const uint32_t id = guest::LoadU32(base, guest::LoadU32(base, hud + 444) + 972 * i + 8);
+        if (int32_t(id) != -1) {
+          // SetText's varargs passed 0 (the user's call, 2026-10-30).
+          calls.Call(kSetText, frame, 0x82214108, Movie(base, hud, kHudRacers), kAll,
+                     uint64_t(guest::LoadU32(base, group + 100)) + 5, uint64_t(id) + 4650);
+        }
+      }
+      const uint32_t record = guest::LoadU32(base, hud + 444) + 972 * i;
+      const uint32_t bar = hud + 40 * i + 244;
+      const int64_t target = int32_t(guest::LoadU32(base, record + 788));
+      Stfs(base, bar + 16, zero);
+      Stfs(base, bar + 0, zero);
+      guest::StoreU32(base, bar + 32, 0);
+      guest::StoreU32(base, bar + 36, 0);
+      // std (the conversion's doubleword): the high word first.
+      guest::StoreU32(base, frame + 80, uint32_t(uint64_t(target) >> 32));
+      guest::StoreU32(base, frame + 84, uint32_t(target));
+      const double value = Single(double(target));
+      Stfs(base, bar + 20, value);
+      Stfs(base, bar + 24, value);
+      Stfs(base, bar + 8, value);
+      Stfs(base, bar + 4, Fmuls(value, scale4));
+      Stfs(base, bar + 12, Fmuls(value, scale12));
+    }
+  }
+  uint64_t r3 = 0;
+  for (uint32_t i = 0; i < 4; i++) {
+    r3 = calls.Call(kFinish, frame, 0x8221417C, Movie(base, hud, kHudRacers), kAll, i);
+  }
+  guest::StoreU32(base, hud + 456, 0);
+  return r3;
+}
+
+uint64_t SetMode(uint8_t* base, uint32_t hud, uint64_t mode, uint32_t sp, uint32_t lr,
+                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_822157A8 RaceHud::SetMode");
+  guest::StoreU32(base, hud + 448, uint32_t(mode));
+  switch (uint32_t(mode)) {
+    case 0:
+      return SetUpRacers(base, hud, sp, calls);
+    case 1:
+      return SetUpTimer(base, hud, sp, calls);
+    case 2:
+      return calls.Call(kSetUpMode2, sp, lr, hud, mode);
+    case 3:
+      return calls.Call(kSetUpMode3, sp, lr, hud, mode);
+    case 4:
+      return calls.Call(kSetUpMode4, sp, lr, hud, mode);
+    default:
+      return hud;
+  }
 }
 
 uint32_t MovieMask(uint32_t kind) {

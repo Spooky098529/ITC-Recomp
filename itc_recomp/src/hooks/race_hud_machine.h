@@ -42,6 +42,8 @@ void RaceHudMachineRacePauseDraw(PPCContext& ctx, uint8_t* base);   // sub_8216C
 // DestroyScreens sub_8216C208 (r3 = the machine; a tail call with the
 // caller's lr).
 void RaceHudMachineDestroyScreens(PPCContext& ctx, uint8_t* base);  // sub_8216C208
+// StartCountdown sub_8216CC60 (r3 = the machine).
+void RaceHudMachineStartCountdown(PPCContext& ctx, uint8_t* base);  // sub_8216CC60
 // The helpers: IsFirstDay sub_8216D3F0 (no arguments), OpponentPrize
 // sub_8216C820 and ItemBonus sub_8216C938 (r4 = the item id).
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base);

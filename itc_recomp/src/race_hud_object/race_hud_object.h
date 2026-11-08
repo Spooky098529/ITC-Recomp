@@ -364,6 +364,46 @@ uint64_t RunWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
 // the original leaves it (the last call's).
 uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t racer, uint32_t sp,
                         const Calls& calls, const menu_sounds::Calls& sounds);
+// UiMovie::SetChildNameText (its override: SetNameText's plain C++ where it
+// can) and the panel's set-ups for modes 2 to 4 (sub_82214C88,
+// sub_822155C0, sub_822125B8: the time trial's and the others' panels,
+// never seen in play: the originals).
+constexpr uint32_t kSetChildNameText = 0x8211D930;
+constexpr uint32_t kSetUpMode2 = 0x82214C88;
+constexpr uint32_t kSetUpMode3 = 0x822155C0;
+constexpr uint32_t kSetUpMode4 = 0x822125B8;
+// RaceHud::SetUpTimer (sub_822123C8): from a 144-byte frame, +464 = the
+// racers' (+444) +12 (k) and n = their +0 (the count); k 0 or more: the
+// timer movie's (+624) named animations 0 to 4 finished (UiMovie::FinishNamed
+// through `calls`), node 0 shown, k played and looped (PlayNamed,
+// LoopNamed's plain C++); else node 0 hidden. Node 3's children hidden; when
+// the last racer's item (record n - 1's +8) isn't -1, node 3's child n - 2
+// shown and its picture's (child 0) +108 the item's (DataTables::Item's byte
+// +34, signed; 48 and up: id - 262). Then texts 27 to 29: racer i's item's
+// string 4650 + id (UiMovie::SetText, its varargs 0) for i below n + 1 (none
+// for -1), else cleared (ClearText); text 26 player 0's save data's name
+// (+8, UiMovie::SetChildNameText), all through `calls`. SetChildNameText's
+// r3.
+uint64_t SetUpTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::SetUpRacers (sub_82213F20): from a 176-byte frame, ShowItem(-1),
+// +452 = the racers' count n (+444's +0); the racers' movie's (+604) node
+// 0's children hidden; when the last racer's item isn't -1, node 0's child
+// n - 2 shown and its picture's +108 the item's (as SetUpTimer); nodes 3
+// and 4 shown, n + 1 to 4 hidden (n below 4); for each racer i: group i + 1's
+// child 5 text player 0's save data's name (SetChildNameText) for 0, else
+// the racer's item's string 4650 + id (SetText, varargs 0; none for -1);
+// bar i (+244 + 40i): +0 and +16 the float 0.0, +32 and +36 0, the racer's
+// +788 (an int, at the frame's +80 as a doubleword) as a float to +20, +24
+// and +8, times the float at 0x82002A60 to +4 and at 0x8200F724 to +12.
+// Then UiMovie::Finish(+604, -1, i) for i 0 to 3 (through `calls`), +456 =
+// 0. The last Finish's r3.
+uint64_t SetUpRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::SetMode (sub_822157A8): +448 = `mode`, then a tail call by it
+// (unsigned; from the caller's frame `sp` with its return address `lr`): 0
+// SetUpRacers, 1 SetUpTimer, 2 to 4 the originals' set-ups through `calls`
+// (r3 the HUD, r4 the mode), others nothing (r3 the HUD).
+uint64_t SetMode(uint8_t* base, uint32_t hud, uint64_t mode, uint32_t sp, uint32_t lr,
+                 const Calls& calls);
 // RaceScreens::MovieMask (sub_82211BE8, with its jump table's case 0
 // sub_82211C1C merged): the movies to load for the race kind, 0 above 10.
 uint32_t MovieMask(uint32_t kind);

@@ -65,6 +65,10 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "and DrawAfterRaceMenu sub_82211D10 (no adapters: only the race HUD machine's "
               "PauseDraw's, RacePauseDraw's and AfterRaceDraw's plain C++ reach them; PauseMenu::Draw's and AfterRaceMenu::Draw's "
               "plain C++) "
+              "; SetMode sub_822157A8 (modes 2 to 4's set-ups, never seen in play, the "
+              "originals), SetUpTimer sub_822123C8 and SetUpRacers sub_82213F20 (UiMovie::"
+              "FinishNamed, Finish, SetText, ClearText and SetChildNameText through their "
+              "overrides, ShowItem's plain C++) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -374,6 +378,24 @@ void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::UpdateItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectSetUpTimer(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::SetUpTimer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectSetUpRacers(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::SetUpRacers(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectSetMode(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t lr = uint32_t(ctx.lr);
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::SetMode(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, lr, guest.calls());
+}
+
 void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::Make1004(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
@@ -503,3 +525,6 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // Destroy's, and only Destroy's calls ~RaceScreens'.
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
+ITC_RACE_HUD_OBJECT(822157A8, RaceHudObjectSetMode)
+ITC_RACE_HUD_OBJECT(822123C8, RaceHudObjectSetUpTimer)
+ITC_RACE_HUD_OBJECT(82213F20, RaceHudObjectSetUpRacers)

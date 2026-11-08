@@ -104,6 +104,12 @@ void RaceHudObjectRunWarning(PPCContext& ctx, uint8_t* base);
 // RaceHud::TickRacers sub_822151F8 and TickPanel sub_82215488: r3 = the HUD.
 void RaceHudObjectTickRacers(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base);
+// RaceHud::SetMode sub_822157A8: r3 = the HUD, r4 = the mode (a tail call
+// from the caller's frame and lr); SetUpTimer sub_822123C8 and SetUpRacers
+// sub_82213F20: r3 = the HUD.
+void RaceHudObjectSetMode(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectSetUpTimer(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectSetUpRacers(PPCContext& ctx, uint8_t* base);
 // RaceScreens::Make1004 sub_82216A60: r3 = the holder's +1004;
 // RaceScreens::Init sub_82211DA0: r3 = the holder, r4 = the race kind.
 void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base);
