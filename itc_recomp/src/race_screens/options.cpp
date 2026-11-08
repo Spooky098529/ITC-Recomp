@@ -291,6 +291,58 @@ uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls) {
   return PauseMenuShowOptions(base, frame);
 }
 
+uint64_t PauseMenuSetUpVolume(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220F3C0 PauseMenu::SetUpVolume");
+  const uint32_t frame = Frame(base, sp, 128);
+  guest::StoreU32(base, frame + 92, 158);
+  const uint32_t movie = PauseMovie(base);
+  guest::StoreU32(base, frame + 84, 159);
+  const uint64_t init[8] = {Get(base, kPauseList), 3, 3, 1, 154, 153, 155, 156};
+  calls.CallArgs(kListInit, frame, 0x8220F418, init);
+  {
+    const uint32_t data = Get(base, kPauseData);
+    guest::StoreU32(base, data + 52, guest::LoadU32(base, data + 16));
+    guest::StoreU32(base, data + 56, guest::LoadU32(base, data + 20));
+  }
+  guest::StoreU32(base, Get(base, kPauseData) + 144, 0);
+  PauseMenuRestoreNodes(base, 0xFFFFFFFFu, 9, frame, calls);
+  const uint32_t labels = ui_movies::FindNode(base, movie, 9, 0);
+  NodeText(calls, frame, 0x8220F47C, movie, ui_movies::Child(base, labels, 5), 2004);
+  NodeText(calls, frame, 0x8220F498, movie, ui_movies::Child(base, labels, 6), 2005);
+  const uint32_t marks = ui_movies::FindNode(base, movie, 9, 1);
+  NodeText(calls, frame, 0x8220F4C4, movie, ui_movies::Child(base, marks, 3), 4);
+  NodeText(calls, frame, 0x8220F4E0, movie, ui_movies::Child(base, marks, 4), 7);
+  PauseMenuShowVolumes(base, frame, calls);
+  return PauseMenuShowVolumesB(base, frame, calls);
+}
+
+uint64_t PauseMenuSetUpAdjust(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220F500 PauseMenu::SetUpAdjust");
+  const uint32_t frame = Frame(base, sp, 144);
+  guest::StoreU32(base, frame + 92, 158);
+  const uint32_t movie = PauseMovie(base);
+  guest::StoreU32(base, frame + 84, 159);
+  const uint64_t init[8] = {Get(base, kPauseList), 4, 4, 1, 154, 153, 155, 156};
+  calls.CallArgs(kListInit, frame, 0x8220F550, init);
+  {
+    const uint32_t data = Get(base, kPauseData);
+    for (uint32_t k = 0; k < 12; k += 4) {
+      guest::StoreU32(base, data + 60 + k, guest::LoadU32(base, data + 24 + k));
+    }
+  }
+  guest::StoreU32(base, Get(base, kPauseData) + 144, 0);
+  PauseMenuRestoreNodes(base, 0xFFFFFFFFu, 10, frame, calls);
+  const uint32_t labels = ui_movies::Child(base, ui_movies::FindNode(base, movie, 10, 0), 0);
+  for (uint32_t k = 0; k < 3; k++) {
+    NodeText(calls, frame, 0x8220F5D0, movie, ui_movies::Child(base, labels, 5 + k), 2006 + k);
+  }
+  const uint32_t marks = ui_movies::FindNode(base, movie, 10, 1);
+  NodeText(calls, frame, 0x8220F608, movie, ui_movies::Child(base, marks, 3), 4);
+  NodeText(calls, frame, 0x8220F624, movie, ui_movies::Child(base, marks, 4), 7);
+  PauseMenuShowAdjust(base, frame, calls);
+  return PauseMenuShowAdjustB(base, frame, calls);
+}
+
 uint64_t PauseMenuSetAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220F1B8 PauseMenu::SetAdjust");
   const uint32_t frame = Frame(base, sp, 112);

@@ -25,6 +25,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <cstring>
 #include <limits>
@@ -1856,6 +1857,54 @@ void MainPages(Context& h, const MovieWorld& w) {
   adjust.list_world = &list_world;
   MovieGroup(h, w, "PauseMenu::AdjustPage (sub_8220EBD8)", 400, set_values, __imp__sub_8220EBD8,
              hooks::RaceScreensPauseMenuAdjustPage, adjust);
+  // MenuList::Init's block made by SetUpVolume (3 items), SetUpAdjust (4)
+  // and SetUpMain (up to 6): the list's +68 put to 0 before the case; its
+  // item words compared (the list's count, at most 6), then it's freed and
+  // +68 put to 0.
+  auto list_block = [&](Outputs& out) {
+    const uint32_t list = w.block(rs::kPauseList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      const uint32_t count = std::min<uint32_t>(guest::LoadU32(h.base, list + rs::kListCount), 6);
+      out.Bytes(Read(h.base, block, count * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  const MovieSetupFn values_no_block = [&](PPCContext&, Random& r, const MovieWorld& w) {
+    values(r, w);
+    guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
+  };
+  // SetUpVolume and SetUpAdjust: the frame's +40 to +79 left out
+  // (SetNodeText's unset varargs, leftovers in the original and 0 in ours,
+  // as SetUpOptions' cases).
+  FrameSpec set_up_volume{128, 24, {40, 80}};
+  set_up_volume.after = list_block;
+  MovieGroup(h, w, "PauseMenu::SetUpVolume (sub_8220F3C0)", 150, values_no_block,
+             __imp__sub_8220F3C0, hooks::RaceScreensPauseMenuSetUpVolume, set_up_volume);
+  FrameSpec set_up_adjust{144, 40, {40, 80}};
+  set_up_adjust.after = list_block;
+  MovieGroup(h, w, "PauseMenu::SetUpAdjust (sub_8220F500)", 150, values_no_block,
+             __imp__sub_8220F500, hooks::RaceScreensPauseMenuSetUpAdjust, set_up_adjust);
+  // The transitions that call the set-ups: r3 the pause pages' step word (0
+  // or 1, the world's), the list's selection (the world's: 0 to 7, now and
+  // then up to 20).
+  const MovieSetupFn transition_values = [&](PPCContext& t, Random& r, const MovieWorld& w) {
+    values(r, w);
+    guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
+    StepWord(t, r, w, rs::kPausePages);
+  };
+  FrameSpec transition{112, 24};
+  transition.after = list_block;
+  MovieGroup(h, w, "PauseMenu::OpenMain (sub_8220ED90)", 150, transition_values,
+             __imp__sub_8220ED90, hooks::RaceScreensPauseMenuOpenMain, transition);
+  MovieGroup(h, w, "PauseMenu::CloseOptions (sub_8220EFA8)", 150, transition_values,
+             __imp__sub_8220EFA8, hooks::RaceScreensPauseMenuCloseOptions, transition);
+  MovieGroup(h, w, "PauseMenu::CloseVolume (sub_8220F0A0)", 150, transition_values,
+             __imp__sub_8220F0A0, hooks::RaceScreensPauseMenuCloseVolume, transition);
+  MovieGroup(h, w, "PauseMenu::CloseAdjust (sub_8220F2A8)", 150, transition_values,
+             __imp__sub_8220F2A8, hooks::RaceScreensPauseMenuCloseAdjust, transition);
 }
 
 // The dialog's page object and data as its draw's cases shape them (its

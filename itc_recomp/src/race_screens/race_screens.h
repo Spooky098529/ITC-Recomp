@@ -396,6 +396,20 @@ uint64_t PauseMenuShowAdjustB(uint8_t* base, uint32_t sp, const Calls& calls);
 // looped, the selected item's (type 7, selection + 1, r6 1) played and
 // looped, ColorItems; done.
 uint64_t PauseMenuShowMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220ED90 PauseMenu::OpenMain (transition 1): on its first call
+// animation 1 played, the data's +148 = 0, SetUpMain; done when the run
+// answers 0.
+uint64_t PauseMenuOpenMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220EFA8 PauseMenu::CloseOptions, sub_8220F0A0 CloseVolume and
+// sub_8220F2A8 CloseAdjust (transitions 10, 15 and 20): on their first call
+// the row's animation finished (type 8: selection + 4, or for item 4 by
+// +144 2 or 1; type 9: items 0 and 1 rows 1 and 2, item 2 by +144 4 or 3;
+// named: items 0 to 2 192 to 194, item 3 by +144 195 or 196; none past the
+// last item), animation 4, 6 or 8 played, SetUpMain; when the run answers
+// 0, ScreenPages::Go(0, transition 3) and the step word 0. Return 0.
+uint64_t PauseMenuCloseOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuCloseVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuCloseAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220FA88 PauseMenu::Open: the data's +132 = `kind`, +156 = `flag`, UI
 // movie 4 found into the screen's +0, UiMovie::ResetPose, PauseMenu::LoadData,
 // ScreenPages::Go(0, transition 1, then 2), MenuSound::Play(6) (both through
@@ -435,6 +449,17 @@ uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // RestoreNodes(-1, 8), the labels (UiMovie::SetNodeText, unset varargs 0),
 // ShowOptions. r3 ShowOptions'.
 uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220F3C0 PauseMenu::SetUpVolume and sub_8220F500 SetUpAdjust, from a
+// 128- and a 144-byte frame: MenuList::Init(list, 3 or 4 items, 1, 154,
+// 153, 155, 156; 159, 158), the edits (+52, +56; +60 to +68) from the saved
+// (+16, +20; +24 to +32), +144 = 0, RestoreNodes(-1, 9 or 10), the labels
+// (UiMovie::SetNodeText, unset varargs 0: strings 2004 and 2005 on the
+// type-9 node 0's children 5 and 6; 2006 to 2008 on the type-10 node 0's
+// child 0's children 5 to 7; 4 and 7 on node 1's children 3 and 4), then
+// ShowVolumes and ShowVolumesB, or ShowAdjust and ShowAdjustB. r3 the last
+// one's.
+uint64_t PauseMenuSetUpVolume(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuSetUpAdjust(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8220F1B8 PauseMenu::SetAdjust (transition 19): on item 3 the named
 // animations 195 and 196 swapped by +144, else ShowAdjust; done.
 uint64_t PauseMenuSetAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
