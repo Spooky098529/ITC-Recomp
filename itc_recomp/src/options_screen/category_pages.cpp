@@ -6,6 +6,8 @@
 #include "base/log.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
 
 namespace options_screen {
 
@@ -97,6 +99,46 @@ constexpr uint32_t kIsBankSlotEmpty = 32;  // slot 8
 constexpr uint32_t kStopCue = 52;        // slot 13
 constexpr uint32_t kIsCuePlaying = 56;   // slot 14
 constexpr uint32_t kSoundPlay = 0x82175850;  // Sound::Play, through its override
+
+// The category pages' set-ups: the menu's words (the cursor 0, `last` the
+// last item, wrapping; the words the originals clear), as they store them.
+void SetUpMenu(uint8_t* base, uint32_t last) {
+  const uint32_t menu = Menu(base);
+  StoreU32(base, menu + 12, 0);
+  StoreU32(base, menu + 16, last);
+  StoreU32(base, menu + 20, 1);
+  for (const uint32_t at : {0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
+    StoreU32(base, menu + at, 0);
+  }
+}
+
+// The movie's text calls from a set-up's frame: SetNodeText(m, node, id)
+// and SetText(m, sub, child, id) (their unset varargs passed as 0, the
+// user's call, 2026-10-30), ScrollText(m, 2, 0, 1) on the help line.
+struct Texts {
+  const Calls& calls;
+  uint32_t frame;
+  uint32_t m;
+  void Node(uint32_t lr, uint32_t node, uint64_t id) const {
+    calls.Call(kSetNodeText, frame, lr, m, node, id, 0);
+  }
+  void Text(uint32_t lr, uint64_t sub, uint64_t child, uint64_t id) const {
+    calls.Call(kSetText, frame, lr, m, sub, child, id);
+  }
+  uint64_t ScrollHelp(uint32_t lr) const { return calls.Call(kScrollText, frame, lr, m, 2, 0, 1); }
+  // The OK/Default row's two texts (strings 4 and 7) on `node`'s children
+  // 3 and 4.
+  void OkDefault(uint8_t* base, uint32_t node, uint32_t lr3, uint32_t lr4) const {
+    Node(lr3, ui_movies::Child(base, node, 3), 4);
+    Node(lr4, ui_movies::Child(base, node, 4), 7);
+  }
+};
+
+// The category table (5 contexts of 7 words) entry `index` of row `context`,
+// at the 32-bit address the originals compute.
+uint32_t Category(uint8_t* base, uint32_t context, uint32_t index) {
+  return LoadU32(base, kCategories + ((context * 7 + index) << 2));
+}
 
 }  // namespace
 
@@ -437,6 +479,170 @@ uint64_t LeaveSoundPage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
   }
   Go(base, kMinusOne, 0, 16);
   return r3;
+}
+
+uint64_t SetUpCategoryPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C4BE0 Options::SetUpCategoryPage");
+  const uint32_t frame = Frame(base, sp, 144);
+  const Texts t{calls, frame, FindMovie(base, frame)};
+  // The context's entries before its first -1 (at most 7).
+  const uint32_t context = LoadU32(base, Settings(base) + 4);
+  uint32_t count = 0;
+  while (count < 7 && int32_t(Category(base, context, count)) != -1) {
+    count++;
+  }
+  const uint32_t cursor = LoadU32(base, Settings(base) + 664);
+  const uint32_t menu = Menu(base);
+  StoreU32(base, menu + 12, 0);
+  StoreU32(base, menu + 16, count - 1);
+  StoreU32(base, menu + 20, 1);
+  for (const uint32_t at : {8u, 44u, 56u}) {
+    StoreU32(base, menu + at, 0);
+  }
+  StoreU32(base, menu + 0, cursor);
+  StoreU32(base, menu + 4, cursor);
+  StoreU32(base, menu + 60, 8);
+  for (const uint32_t at : {36u, 64u, 24u, 28u}) {
+    StoreU32(base, menu + at, 0);
+  }
+  // The category under the cursor's frame on nodes 28 and 29.
+  const uint32_t first = ui_movies::FindNode(base, t.m, kMinusOne, 28);
+  StoreU32(base, first + 108,
+           Category(base, LoadU32(base, Settings(base) + 4), LoadU32(base, Menu(base) + 0)));
+  const uint32_t second = ui_movies::FindNode(base, t.m, kMinusOne, 29);
+  StoreU32(base, second + 108,
+           Category(base, LoadU32(base, Settings(base) + 4), LoadU32(base, Menu(base) + 0)));
+  // The items' names, then the help line.
+  for (uint32_t i = 0; i < 7; i++) {
+    const uint32_t category = Category(base, LoadU32(base, Settings(base) + 4), i);
+    if (int32_t(category) == -1) {
+      break;
+    }
+    t.Text(0x821C4D34, 21, 5 + i, uint32_t(category + 174));
+  }
+  t.Text(0x821C4D74, 2, 0,
+         uint32_t(Category(base, LoadU32(base, Settings(base) + 4), LoadU32(base, Menu(base) + 0)) +
+                  982));
+  t.ScrollHelp(0x821C4D88);
+  const uint64_t prompts[6] = {0, 0, 1, 1, ~uint64_t(0), ~uint64_t(0)};
+  return ShowPrompts(base, prompts, frame);
+}
+
+uint64_t SetUpHudPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C4DB0 Options::SetUpHudPage");
+  const uint32_t frame = Frame(base, sp, 144);
+  const Texts t{calls, frame, FindMovie(base, frame)};
+  SetUpMenu(base, 4);
+  const uint32_t o = Settings(base);
+  CopyWords(base, o + 236, o + 44, 4);
+  StoreU32(base, Settings(base) + 660, 1);
+  ResetNode(base, kMinusOne, 5, frame, calls);
+  // The four items' names (strings 167 to 170).
+  const uint32_t names = ui_movies::FindNode(base, t.m, 5, 0);
+  for (uint32_t i = 0; i < 4; i++) {
+    t.Node(0x821C4EA8, ui_movies::Child(base, names, 5 + i), 167 + i);
+  }
+  t.OkDefault(base, ui_movies::FindNode(base, t.m, 5, 1), 0x821C4EE0, 0x821C4EFC);
+  // Each item's two choices (strings 0 and 1).
+  const uint32_t items = ui_movies::FindNode(base, t.m, 5, 2);
+  for (int32_t i = 0; i < int32_t(LoadU32(base, items + 104)); i++) {
+    const uint32_t item = ui_movies::FindNode(base, t.m, 5, LoadU32(base, items + 100) + i);
+    const uint32_t left = ui_movies::FindNode(base, t.m, 5, LoadU32(base, item + 100));
+    t.Node(0x821C4F5C, ui_movies::Child(base, left, 1), 0);
+    const uint32_t right = ui_movies::FindNode(base, t.m, 5, LoadU32(base, item + 100) + 1);
+    t.Node(0x821C4F88, ui_movies::Child(base, right, 1), 1);
+  }
+  t.Text(0x821C4FAC, 2, 0, 989);
+  t.ScrollHelp(0x821C4FC0);
+  return ShowHudValues(base, frame);
+}
+
+uint64_t SetUpSoundPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C4FD0 Options::SetUpSoundPage");
+  const uint32_t frame = Frame(base, sp, 128);
+  const Texts t{calls, frame, FindMovie(base, frame)};
+  ResetNode(base, kMinusOne, 6, frame, calls);
+  const uint32_t track = ui_movies::FindNode(base, t.m, 6, 3);
+  const bool tracks = int32_t(LoadU32(base, Settings(base) + 8)) == 1;
+  const uint32_t menu = Menu(base);
+  for (const uint32_t at : {12u, 0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
+    StoreU32(base, menu + at, 0);
+  }
+  // The music track's row when it's unlocked.
+  StoreU32(base, menu + 20, 1);
+  StoreU32(base, menu + 16, tracks ? 3 : 2);
+  StoreU32(base, track + 80, tracks ? 1 : 0);
+  const uint32_t o = Settings(base);
+  CopyWords(base, o + 252, o + 60, 2);
+  StoreU32(base, Settings(base) + 688, 0);
+  StoreU32(base, Settings(base) + 692, kMinusOne);
+  StoreU32(base, Settings(base) + 696, kMinusOne);
+  StoreU32(base, Settings(base) + 660, 0);
+  const uint32_t names = ui_movies::FindNode(base, t.m, 6, 0);
+  t.Node(0x821C5100, ui_movies::Child(base, names, 5), 171);
+  t.Node(0x821C511C, ui_movies::Child(base, names, 6), 172);
+  t.Node(0x821C5144, ui_movies::Child(base, ui_movies::FindNode(base, t.m, 6, 9), 5), 173);
+  t.OkDefault(base, ui_movies::FindNode(base, t.m, 6, 1), 0x821C5170, 0x821C518C);
+  ShowMusicName(base, LoadU32(base, Settings(base) + 688), frame, calls);
+  ShowVolumeNumbers(base, frame, calls);
+  ShowVolumeBars(base, frame);
+  t.Text(0x821C51B4, 2, 0, 993);
+  return t.ScrollHelp(0x821C51C8);
+}
+
+uint64_t SetUpSlidersPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C51D0 Options::SetUpSlidersPage");
+  const uint32_t frame = Frame(base, sp, 128);
+  const Texts t{calls, frame, FindMovie(base, frame)};
+  SetUpMenu(base, 3);
+  const uint32_t o = Settings(base);
+  CopyWords(base, o + 260, o + 68, 3);
+  StoreU32(base, Settings(base) + 660, 0);
+  ResetNode(base, kMinusOne, 7, frame, calls);
+  // The three sliders' names (strings 345 to 347).
+  const uint32_t sliders = ui_movies::Child(base, ui_movies::FindNode(base, t.m, 7, 0), 0);
+  for (uint32_t i = 0; i < 3; i++) {
+    t.Node(0x821C52C0, ui_movies::Child(base, sliders, 5 + i), 345 + i);
+  }
+  t.OkDefault(base, ui_movies::FindNode(base, t.m, 7, 1), 0x821C52F8, 0x821C5314);
+  t.Text(0x821C5328, 2, 0, 996);
+  t.ScrollHelp(0x821C533C);
+  ShowSliderNumbers(base, frame, calls);
+  return ShowSliderMarks(base, frame);
+}
+
+uint64_t SetUpButtonsPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C5580 Options::SetUpButtonsPage");
+  const uint32_t frame = Frame(base, sp, 128);
+  const Texts t{calls, frame, FindMovie(base, frame)};
+  SetUpMenu(base, 12);
+  const uint32_t o = Settings(base);
+  Copy(base, o + 284, o + 92, 48, frame, 0x821C560C, calls);
+  StoreU32(base, Settings(base) + 660, 0);
+  ResetNode(base, kMinusOne, 9, frame, calls);
+  ShowButtonList(base, frame, calls);
+  t.OkDefault(base, ui_movies::FindNode(base, t.m, 9, 2), 0x821C5650, 0x821C566C);
+  t.Text(0x821C5680, 2, 0, 999);
+  t.ScrollHelp(0x821C5694);
+  ShowButtonPicture(base, LoadU32(base, Settings(base) + 284), frame);
+  return ShowButtonClashes(base, frame, calls);
+}
+
+uint64_t SetUpAnalogPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C57D0 Options::SetUpAnalogPage");
+  const uint32_t frame = Frame(base, sp, 128);
+  const Texts t{calls, frame, FindMovie(base, frame)};
+  SetUpMenu(base, 6);
+  const uint32_t o = Settings(base);
+  Copy(base, o + 380, o + 188, 24, frame, 0x821C585C, calls);
+  StoreU32(base, Settings(base) + 660, 0);
+  ResetNode(base, kMinusOne, 11, frame, calls);
+  ShowAnalogList(base, frame, calls);
+  t.OkDefault(base, ui_movies::FindNode(base, t.m, 11, 2), 0x821C58A0, 0x821C58BC);
+  t.Text(0x821C58D0, 2, 0, 999);
+  t.ScrollHelp(0x821C58E4);
+  ShowAnalogPicture(base, AnalogPicture(LoadU32(base, Settings(base) + 380)), frame);
+  return ShowAnalogClashes(base, frame, calls);
 }
 
 }  // namespace options_screen

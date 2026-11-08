@@ -71,6 +71,9 @@ constexpr uint32_t kSetChildNameText = 0x8211D930;
 constexpr uint32_t kSetNumberText = 0x8211C740;
 constexpr uint32_t kClearText = 0x8211C470;
 constexpr uint32_t kResetTextScroll = 0x8211C5F8;
+constexpr uint32_t kScrollText = 0x8211C570;  // UiMovie::ScrollText
+// The category table (5 contexts of 7 words, -1 past the last).
+constexpr uint32_t kCategories = 0x8200A578;
 constexpr uint32_t kSetHudArrow = 0x821BE4A0;
 constexpr uint32_t kSetSoundArrow = 0x821BE7A8;
 constexpr uint32_t kSetSlidersArrow = 0x821BEDC8;
@@ -428,5 +431,23 @@ uint64_t SoundPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // the sound manager's slots through `calls`. `r3` returned as it came for
 // another +700.
 uint64_t LeaveSoundPage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// The set-ups (category_pages.cpp; no arguments, from their frames below
+// `sp`, the movie's text calls through their overrides with their unset
+// varargs 0):
+// sub_821C4BE0 Options::SetUpCategoryPage (144): the menu over the
+// context's categories, nodes 28 and 29's frame, the names and help line,
+// ShowPrompts(0, 0, 1, 1, -1, -1). ShowPrompts' r3.
+uint64_t SetUpCategoryPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C4DB0 SetUpHudPage (144), sub_821C4FD0 SetUpSoundPage (128),
+// sub_821C51D0 SetUpSlidersPage (128), sub_821C5580 SetUpButtonsPage (128),
+// sub_821C57D0 SetUpAnalogPage (128): the menu, the edits copied from the
+// current settings, the page's node reset, its texts and values shown. The
+// last call's r3.
+uint64_t SetUpHudPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SetUpSoundPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SetUpSlidersPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SetUpButtonsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SetUpAnalogPage(uint8_t* base, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

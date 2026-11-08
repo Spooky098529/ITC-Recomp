@@ -140,5 +140,14 @@ void OptionsAnalogPage(PPCContext& ctx, uint8_t* base);
 // Options::Draw leaves it).
 void OptionsSoundPage(PPCContext& ctx, uint8_t* base);
 void OptionsLeaveSoundPage(PPCContext& ctx, uint8_t* base);
+// The set-ups (no arguments): Options::SetUpCategoryPage sub_821C4BE0,
+// SetUpHudPage sub_821C4DB0, SetUpSoundPage sub_821C4FD0, SetUpSlidersPage
+// sub_821C51D0, SetUpButtonsPage sub_821C5580, SetUpAnalogPage sub_821C57D0.
+void OptionsSetUpCategoryPage(PPCContext& ctx, uint8_t* base);
+void OptionsSetUpHudPage(PPCContext& ctx, uint8_t* base);
+void OptionsSetUpSoundPage(PPCContext& ctx, uint8_t* base);
+void OptionsSetUpSlidersPage(PPCContext& ctx, uint8_t* base);
+void OptionsSetUpButtonsPage(PPCContext& ctx, uint8_t* base);
+void OptionsSetUpAnalogPage(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -1310,6 +1310,36 @@ void CategoryPages(Context& h, const World& w) {
         guest::StoreU32(h.base, w.page() + 0, r.Below(2) == 0 ? 13 : 0xFFFFFFFFu);
       },
       __imp__sub_821BA380, hooks::OptionsLeaveSoundPage, {{160, 32}});
+  // The set-ups: the context 0 to 4, the category cursor 0 to 6, the music
+  // tracks' flag 1, 0 or any; the current settings as the pages' cases
+  // shape them (the buttons 0 to 16, the analog inputs 0 to 10: they land
+  // in the world's child indexes). Their frames' words below +48 and from
+  // +80 compared up to their register saves (the movie's text calls store
+  // their varargs words at +48 to +79).
+  const auto set_up = [&h, words](const World& w, Random& from) {
+    Random r = Mixed(from);
+    guest::StoreU32(h.base, w.settings() + 4, r.Below(5));
+    guest::StoreU32(h.base, w.settings() + 664, r.Below(7));
+    guest::StoreU32(h.base, w.settings() + 8, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    words(w, r, {44}, 4, 0, 1);
+    words(w, r, {68}, 3, -10, 10);
+    words(w, r, {60}, 2, 0, 15);
+    ShapeEdits(h.base, w.settings() + 92, 12, 17, r);
+    ShapeEdits(h.base, w.settings() + 188, 6, 11, r);
+  };
+  const auto set_up_case = [set_up](PPCContext&, Random& r, const World& w) { set_up(w, r); };
+  Group(h, w, "Options::SetUpCategoryPage (sub_821C4BE0)", 100, set_up_case, __imp__sub_821C4BE0,
+        hooks::OptionsSetUpCategoryPage, {{144, 96}, {64, 48}});
+  Group(h, w, "Options::SetUpHudPage (sub_821C4DB0)", 100, set_up_case, __imp__sub_821C4DB0,
+        hooks::OptionsSetUpHudPage, {{144, 96}, {64, 48}});
+  Group(h, w, "Options::SetUpSoundPage (sub_821C4FD0)", 100, set_up_case, __imp__sub_821C4FD0,
+        hooks::OptionsSetUpSoundPage, {{128, 80}, {48, 32}});
+  Group(h, w, "Options::SetUpSlidersPage (sub_821C51D0)", 100, set_up_case, __imp__sub_821C51D0,
+        hooks::OptionsSetUpSlidersPage, {{128, 80}, {48, 40}});
+  Group(h, w, "Options::SetUpButtonsPage (sub_821C5580)", 100, set_up_case, __imp__sub_821C5580,
+        hooks::OptionsSetUpButtonsPage, {{128, 80}, {48, 32}});
+  Group(h, w, "Options::SetUpAnalogPage (sub_821C57D0)", 100, set_up_case, __imp__sub_821C57D0,
+        hooks::OptionsSetUpAnalogPage, {{128, 80}, {48, 32}});
 }
 
 }  // namespace

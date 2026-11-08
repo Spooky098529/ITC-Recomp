@@ -40,7 +40,9 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "LeaveAnalog sub_821C2A10; the category pages HudPage sub_821C1270, SlidersPage "
               "sub_821C1888, ButtonsPage sub_821C1D08 and AnalogPage sub_821C21A8 with "
               "HasButtonClash sub_821BA890 and HasAnalogClash sub_821BAC78, SoundPage sub_821C1498 "
-              "and LeaveSoundPage sub_821BA380; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
+              "and LeaveSoundPage sub_821BA380; the set-ups SetUpCategoryPage sub_821C4BE0, "
+              "SetUpHudPage sub_821C4DB0, SetUpSoundPage sub_821C4FD0, SetUpSlidersPage "
+              "sub_821C51D0, SetUpButtonsPage sub_821C5580 and SetUpAnalogPage sub_821C57D0; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -456,6 +458,36 @@ void OptionsLeaveSoundPage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::LeaveSoundPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
+void OptionsSetUpCategoryPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SetUpCategoryPage(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsSetUpHudPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SetUpHudPage(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsSetUpSoundPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SetUpSoundPage(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsSetUpSlidersPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SetUpSlidersPage(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsSetUpButtonsPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SetUpButtonsPage(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsSetUpAnalogPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SetUpAnalogPage(base, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -539,6 +571,12 @@ ITC_OPTIONS_SCREEN(821C1D08, OptionsButtonsPage)
 ITC_OPTIONS_SCREEN(821C21A8, OptionsAnalogPage)
 ITC_OPTIONS_SCREEN(821C1498, OptionsSoundPage)
 ITC_OPTIONS_SCREEN(821BA380, OptionsLeaveSoundPage)
+ITC_OPTIONS_SCREEN(821C4BE0, OptionsSetUpCategoryPage)
+ITC_OPTIONS_SCREEN(821C4DB0, OptionsSetUpHudPage)
+ITC_OPTIONS_SCREEN(821C4FD0, OptionsSetUpSoundPage)
+ITC_OPTIONS_SCREEN(821C51D0, OptionsSetUpSlidersPage)
+ITC_OPTIONS_SCREEN(821C5580, OptionsSetUpButtonsPage)
+ITC_OPTIONS_SCREEN(821C57D0, OptionsSetUpAnalogPage)
 // Options::ShowVolumeBar sub_821BE5A8: its override is the pause movie log's
 // wrap (src/debug/pause_movie_log.cpp), which calls the step under the flag.
 
