@@ -450,4 +450,23 @@ uint64_t SetUpSlidersPage(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t SetUpButtonsPage(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t SetUpAnalogPage(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// The third migration's steps (steps.cpp; r3 the step word, 112-byte
+// frames below `sp`):
+// sub_821C7080 Options::FadeIn (step 3): first pass sub-scene -1's
+// animations 1 and 0 played, 0 looped, ScreenFades::FadeIn([0x82001BEC],
+// black, layer 0) and SetUpCategoryPage; 1 once UiMovie::Run answers 0 and
+// layer 0's fade counts are 0, else 0.
+uint64_t FadeIn(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821C75E0 Options::CloseHud (step 12), sub_821C7710 CloseSound (16),
+// sub_821C7868 CloseSliders (20), sub_821C7B08 CloseButtons (28),
+// sub_821C7D18 CloseAnalog (36): first pass the cursor's animation finished
+// (none for the buttons and analog pages), the help line cleared, the
+// page's close played, SetUpCategoryPage; once UiMovie::Run answers 0, step
+// 5 with the categories after and the step word 0. 0.
+uint64_t CloseHud(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseSound(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseSliders(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
 }  // namespace options_screen

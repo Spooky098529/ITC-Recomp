@@ -149,5 +149,14 @@ void OptionsSetUpSoundPage(PPCContext& ctx, uint8_t* base);
 void OptionsSetUpSlidersPage(PPCContext& ctx, uint8_t* base);
 void OptionsSetUpButtonsPage(PPCContext& ctx, uint8_t* base);
 void OptionsSetUpAnalogPage(PPCContext& ctx, uint8_t* base);
+// The steps (r3 the step word): Options::FadeIn sub_821C7080, CloseHud
+// sub_821C75E0, CloseSound sub_821C7710, CloseSliders sub_821C7868,
+// CloseButtons sub_821C7B08, CloseAnalog sub_821C7D18.
+void OptionsFadeIn(PPCContext& ctx, uint8_t* base);
+void OptionsCloseHud(PPCContext& ctx, uint8_t* base);
+void OptionsCloseSound(PPCContext& ctx, uint8_t* base);
+void OptionsCloseSliders(PPCContext& ctx, uint8_t* base);
+void OptionsCloseButtons(PPCContext& ctx, uint8_t* base);
+void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -196,7 +196,8 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {menu_helpers::kControllerEntries, 16},
     {0x826367E8 + 1972, 4},
     {0x826371D0 + 1972, 4},
-    {0x826364EC, 4}};
+    {0x826364EC, 4},
+    {0x826A50AC, 64}};  // the screen fades' words (Options::FadeIn's)
 
 // Whether a case's movie table leaves movie 7 out (its pair's id 9): for
 // the functions that delete it (UiMovies::Delete would free our block).
@@ -1340,6 +1341,33 @@ void CategoryPages(Context& h, const World& w) {
         hooks::OptionsSetUpButtonsPage, {{128, 80}, {48, 32}});
   Group(h, w, "Options::SetUpAnalogPage (sub_821C57D0)", 100, set_up_case, __imp__sub_821C57D0,
         hooks::OptionsSetUpAnalogPage, {{128, 80}, {48, 32}});
+  // The steps over the set-ups: the step word 0 or 1, the menu's cursor 0
+  // to 5, OK/Default 0, 1 or any, the page 0 or another; the fades' counts
+  // 0 or any (FadeIn's answer).
+  const auto close_step = [&h, set_up](PPCContext& t, Random& from, const World& w) {
+    Random r = Mixed(from);
+    set_up(w, r);
+    guest::StoreU32(h.base, w.page() + 24, r.Below(2));
+    t.r3.u64 = w.page() + 24;
+    guest::StoreU32(h.base, w.menu() + 0, r.Below(6));
+    guest::StoreU32(h.base, w.settings() + 660, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    guest::StoreU32(h.base, w.page() + 0, r.Below(2) == 0 ? 0 : r.Below(15));
+    for (const uint32_t g : {0x826A50DCu, 0x826A50E4u}) {
+      guest::StoreU32(h.base, g, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+    }
+  };
+  Group(h, w, "Options::FadeIn (sub_821C7080)", 100, close_step, __imp__sub_821C7080,
+        hooks::OptionsFadeIn, {{112, 24}});
+  Group(h, w, "Options::CloseHud (sub_821C75E0)", 100, close_step, __imp__sub_821C75E0,
+        hooks::OptionsCloseHud, {{112, 24}});
+  Group(h, w, "Options::CloseSound (sub_821C7710)", 100, close_step, __imp__sub_821C7710,
+        hooks::OptionsCloseSound, {{112, 24}});
+  Group(h, w, "Options::CloseSliders (sub_821C7868)", 100, close_step, __imp__sub_821C7868,
+        hooks::OptionsCloseSliders, {{112, 24}});
+  Group(h, w, "Options::CloseButtons (sub_821C7B08)", 100, close_step, __imp__sub_821C7B08,
+        hooks::OptionsCloseButtons, {{112, 24}});
+  Group(h, w, "Options::CloseAnalog (sub_821C7D18)", 100, close_step, __imp__sub_821C7D18,
+        hooks::OptionsCloseAnalog, {{112, 24}});
 }
 
 }  // namespace

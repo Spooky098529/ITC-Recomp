@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "mode_tick/mode_tick.h"
 #include "native/buffers.h"
 #include "ui_movies/game.h"
 
@@ -640,6 +641,120 @@ uint64_t LeaveAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
       380, 188, 24,
       {0x821C2B20, 0x821C2B48, 0x821C2B58, 0x821C2B80, 0x821C2B94, 0x821C2BB0, 0, 0}};
   return RunLeave(base, step, sp, calls, kLeave, true);
+}
+
+namespace {
+
+// The category pages' closes (steps 12, 16, 20, 28, 36): from the 112-byte
+// frame, once (the step word 0) the cursor's animation finished (`finish`),
+// the help line cleared, the page's close (`close`) played on sub-scene -1
+// and Options::SetUpCategoryPage; then every pass UiMovie::Run, and once it
+// answers 0 the page block to step 5 with the categories after and the step
+// word 0. 0 (the next step is set here).
+template <typename Finish>
+uint64_t Close(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
+               const uint32_t (&lr)[4], uint64_t close, Finish finish) {
+  const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);
+  const Movie m{calls, frame, FindMovie(base, frame)};
+  if (LoadU32(base, step) == 0) {
+    finish(m);
+    m.ClearHelp(lr[0]);
+    m.Play(lr[1], kMinusOne64, close);
+    SetUpCategoryPage(base, frame, calls);
+    StoreU32(base, step, 1);
+  }
+  if (int32_t(m.Run(lr[2])) == 0) {
+    const uint32_t p = LoadU32(base, kPage);
+    const uint32_t page = LoadU32(base, p + 0);
+    if (page != 0) {
+      StoreU32(base, p + 8, page);
+    }
+    StoreU32(base, p + 16, kMinusOne);
+    StoreU32(base, p + 4, 0);
+    StoreU32(base, p + 12, 5);
+    StoreU32(base, p + 0, kMinusOne);
+    StoreU32(base, LoadU32(base, kPage) + 24, 0);
+  }
+  return 0;
+}
+
+}  // namespace
+
+uint64_t FadeIn(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C7080 Options::FadeIn");
+  const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);
+  const Movie m{calls, frame, FindMovie(base, frame)};
+  if (LoadU32(base, step) == 0) {
+    m.Play(0x821C70E0, kMinusOne64, 1);
+    m.Play(0x821C7100, kMinusOne64, 0);
+    m.Loop(0x821C7110, kMinusOne64, 0);
+    // ScreenFades::FadeIn([0x82001BEC], black, layer 0).
+    mode_tick::ScreenFadesFadeIn(base, LoadU32(base, 0x82001BEC), 0, 0, 0, 0);
+    SetUpCategoryPage(base, frame, calls);
+    StoreU32(base, step, 1);
+  }
+  const uint32_t run = uint32_t(m.Run(0x821C7144));
+  const uint32_t fades =
+      LoadU32(base, mode_tick::kFadeOutCounts) | LoadU32(base, mode_tick::kFadeInCounts);
+  return run == 0 && fades == 0 ? 1 : 0;
+}
+
+uint64_t CloseHud(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C75E0 Options::CloseHud");
+  static constexpr uint32_t kLr[4] = {0x821C7674, 0x821C7694, 0x821C76AC, 0};
+  return Close(base, step, sp, calls, kLr, 4, [&](const Movie& m) {
+    const uint64_t cursor = Cursor(base);
+    uint64_t index;
+    if (int32_t(cursor) < 4) {
+      index = cursor + 4;
+    } else {
+      index = LoadU32(base, Settings(base) + 660) != 0 ? 1 : 2;
+    }
+    m.Finish(0x821C7664, 5, index);
+  });
+}
+
+uint64_t CloseSound(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C7710 Options::CloseSound");
+  static constexpr uint32_t kLr[4] = {0x821C77D0, 0x821C77F0, 0x821C7808, 0};
+  return Close(base, step, sp, calls, kLr, 5, [&](const Movie& m) {
+    switch (uint32_t(Cursor(base))) {
+      case 0: m.Finish(0x821C77C0, 6, 1); break;
+      case 1: m.Finish(0x821C77C0, 6, 2); break;
+      case 2:
+        m.Finish(0x821C77C0, 6, int32_t(LoadU32(base, Settings(base) + 660)) == 1 ? 4 : 3);
+        break;
+      case 3: m.Finish(0x821C77C0, 6, 5); break;
+      default: break;
+    }
+  });
+}
+
+uint64_t CloseSliders(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C7868 Options::CloseSliders");
+  static constexpr uint32_t kLr[4] = {0x821C7920, 0x821C7940, 0x821C7958, 0};
+  return Close(base, step, sp, calls, kLr, 6, [&](const Movie& m) {
+    const uint32_t cursor = uint32_t(Cursor(base));
+    if (cursor < 3) {
+      m.FinishNamed(0x821C7910, 226 + cursor);
+    } else if (cursor == 3) {
+      m.FinishNamed(0x821C7910, LoadU32(base, Settings(base) + 660) == 0 ? 229 : 230);
+    }
+  });
+}
+
+uint64_t CloseButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C7B08 Options::CloseButtons");
+  static constexpr uint32_t kLr[4] = {0x821C7B58, 0x821C7B78, 0x821C7B90, 0};
+  return Close(base, step, sp, calls, kLr, 8, [](const Movie&) {});
+}
+
+uint64_t CloseAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C7D18 Options::CloseAnalog");
+  static constexpr uint32_t kLr[4] = {0x821C7D68, 0x821C7D88, 0x821C7DA0, 0};
+  return Close(base, step, sp, calls, kLr, 12, [](const Movie&) {});
 }
 
 }  // namespace options_screen

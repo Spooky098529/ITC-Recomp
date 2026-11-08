@@ -42,7 +42,9 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "HasButtonClash sub_821BA890 and HasAnalogClash sub_821BAC78, SoundPage sub_821C1498 "
               "and LeaveSoundPage sub_821BA380; the set-ups SetUpCategoryPage sub_821C4BE0, "
               "SetUpHudPage sub_821C4DB0, SetUpSoundPage sub_821C4FD0, SetUpSlidersPage "
-              "sub_821C51D0, SetUpButtonsPage sub_821C5580 and SetUpAnalogPage sub_821C57D0; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
+              "sub_821C51D0, SetUpButtonsPage sub_821C5580 and SetUpAnalogPage sub_821C57D0; the "
+              "steps FadeIn sub_821C7080, CloseHud sub_821C75E0, CloseSound sub_821C7710, "
+              "CloseSliders sub_821C7868, CloseButtons sub_821C7B08 and CloseAnalog sub_821C7D18; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -488,6 +490,36 @@ void OptionsSetUpAnalogPage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::SetUpAnalogPage(base, ctx.r1.u32, guest.calls());
 }
 
+void OptionsFadeIn(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::FadeIn(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsCloseHud(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::CloseHud(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsCloseSound(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::CloseSound(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsCloseSliders(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::CloseSliders(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsCloseButtons(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::CloseButtons(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::CloseAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -577,6 +609,12 @@ ITC_OPTIONS_SCREEN(821C4FD0, OptionsSetUpSoundPage)
 ITC_OPTIONS_SCREEN(821C51D0, OptionsSetUpSlidersPage)
 ITC_OPTIONS_SCREEN(821C5580, OptionsSetUpButtonsPage)
 ITC_OPTIONS_SCREEN(821C57D0, OptionsSetUpAnalogPage)
+ITC_OPTIONS_SCREEN(821C7080, OptionsFadeIn)
+ITC_OPTIONS_SCREEN(821C75E0, OptionsCloseHud)
+ITC_OPTIONS_SCREEN(821C7710, OptionsCloseSound)
+ITC_OPTIONS_SCREEN(821C7868, OptionsCloseSliders)
+ITC_OPTIONS_SCREEN(821C7B08, OptionsCloseButtons)
+ITC_OPTIONS_SCREEN(821C7D18, OptionsCloseAnalog)
 // Options::ShowVolumeBar sub_821BE5A8: its override is the pause movie log's
 // wrap (src/debug/pause_movie_log.cpp), which calls the step under the flag.
 
