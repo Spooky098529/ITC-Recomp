@@ -40,6 +40,31 @@ uint32_t SceneFrom36(uint8_t* base, uint32_t self);           // sub_82090908: -
 // set to (x, y) (sub_8258BE08, DebugFont::SetPosition).
 constexpr uint32_t kDebugFontPosition = 0x8296BCE0;
 void DebugFontSetPosition(uint8_t* base, uint32_t x, uint32_t y);
+
+// The debug font's guest calls: `function` (through its override) with r3
+// to r5 from the frame `r1`, returning to `lr`; its r3.
+using GuestCall = std::function<uint64_t(uint32_t function, uint32_t r1, uint32_t lr,
+                                         uint64_t r3, uint64_t r4, uint64_t r5)>;
+// sub_8258BD58 DebugFont::Init (probably): from a 112-byte frame below
+// `sp`, the byte 0x8265ED40 = 1; the font (0x8296BCE0) +0 to +16 cleared,
+// then +8 = 32, +12 = 0, +0 = 32, +4 = 0 and the bytes +16 to +19 = 255;
+// +20 = a texture set (operator new(24): its plain C++, or the original
+// through `call` where it declines; XPR::XPR's plain C++ when not 0),
+// XPR::Create(it, `data`) through `call`, then +32 and +36 = the float at
+// 0x82001FAC. XPR::Create's r3.
+constexpr uint32_t kDebugFontFlag = 0x8265ED40;
+uint64_t DebugFontInit(uint8_t* base, uint32_t data, uint32_t sp, const GuestCall& call);
+// sub_82090CC0 DebugText::LoadFont (the debug text's load job): from a
+// 128-byte frame below `sp`, a GameFile at the frame's +96 (its plain
+// C++), the open by name of game:\DATA\DEBUG\DEBFONT.XPR (0x82000BB0,
+// the byte at the frame's +80 = 0) through `call`; when it opens, the
+// size (File::GetSize's plain C++) at `text` +44, a buffer of that size
+// (operator new: its plain C++, or the original through `call`) at +48,
+// File::Read (the size at the frame's +84) and Close through `call`,
+// DebugFontInit(the buffer) and the font's +40 = 681 (sub_8258BE48's
+// store); then GameFile::~GameFile's plain C++. The file object (r3 as
+// the destructor leaves it).
+uint32_t DebugTextLoadFont(uint8_t* base, uint32_t text, uint32_t sp, const GuestCall& call);
 // DebugText::SetPosition (sub_82091050, vtable slot 2): `x` and `y` point to
 // the words.
 void DebugTextSetPosition(uint8_t* base, uint32_t x, uint32_t y);

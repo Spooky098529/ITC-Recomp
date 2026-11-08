@@ -33,4 +33,11 @@ void AppRun(PPCContext& ctx, uint8_t* base);
 void ForEachTickHandler(PPCContext& ctx, uint8_t* base);
 void ForEachRequest(PPCContext& ctx, uint8_t* base);
 
+// The debug font's register steps (the adapter's work, the harness's native
+// side): DebugText::LoadFont (sub_82090CC0; r3 the debug text) and
+// DebugFont::Init (sub_8258BD58; r3 the font's file, no adapter), each from
+// a frame like the original's; need --native_heap.
+void DebugTextLoadFontSteps(PPCContext& ctx, uint8_t* base);
+void DebugFontInitSteps(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -43,7 +43,10 @@ ITC_FLAG_BOOL(native_framework, true, "ITC",
               "--native_heap RunLoop::AddTickHandler sub_8209AAA8 and AddListener sub_8209AB48; "
               "the constructors, with --native_heap, Framework::Create sub_820909B8 (with "
               "Framework::Framework sub_82090420, no adapter) and DebugText::Create sub_82091160 "
-              "(with DebugText::DebugText sub_82090EA8, no adapter), FrameStart::FrameStart "
+              "(with DebugText::DebugText sub_82090EA8, no adapter), the debug text's load job "
+              "DebugText::LoadFont sub_82090CC0 (with --native_file_layer; DebugFont::Init "
+              "sub_8258BD58, no adapter, and sub_8258BE48's store; the open by name, File::Read "
+              "and Close and XPR::Create guest calls), FrameStart::FrameStart "
               "sub_82092710 and the "
               "PoolMakers sub_820AC8F8 and sub_820AC848, their calls guest calls; the entry and "
               "the main loop, main sub_82090108, sub_82090378, sub_8209ABE8, App::Run "
@@ -52,6 +55,8 @@ ITC_FLAG_BOOL(native_framework, true, "ITC",
               "instead of "
               "through the translated code (the same results; checked by "
               "--run_harnesses=framework)");
+
+ITC_FLAG_DECLARE(bool, native_file_layer);
 
 namespace fw = framework;
 
@@ -452,6 +457,53 @@ extern "C" REX_FUNC(sub_82091160) {
     return;
   }
   ctx.r3.u64 = *text;
+}
+
+// The debug font's guest calls (framework::GuestCall) through `ctx`: r1,
+// r3 to r5 and lr set, the function run through the function table (its
+// override), r1 put back.
+namespace {
+fw::GuestCall DebugFontCall(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t function, uint32_t r1, uint32_t lr, uint64_t r3, uint64_t r4,
+                      uint64_t r5) -> uint64_t {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.lr = lr;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u64;
+  };
+}
+}  // namespace
+
+void hooks::DebugTextLoadFontSteps(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = fw::DebugTextLoadFont(base, ctx.r3.u32, ctx.r1.u32, DebugFontCall(ctx, base));
+  ctx.lr = lr;
+}
+
+void hooks::DebugFontInitSteps(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = fw::DebugFontInit(base, ctx.r3.u32, ctx.r1.u32, DebugFontCall(ctx, base));
+  ctx.lr = lr;
+}
+
+// DebugText::LoadFont: r3 = the debug text (the job's delegate calls it;
+// no direct callers). DebugFont::Init has no adapter: only its plain C++
+// calls it.
+extern "C" REX_FUNC(sub_82090CC0) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap() || !ITC_FLAG(native_file_layer)) {
+    __imp__sub_82090CC0(ctx, base);
+    return;
+  }
+  hooks::DebugTextLoadFontSteps(ctx, base);
 }
 
 // --- The entry and the main loop (src/framework/main_loop.h) ---

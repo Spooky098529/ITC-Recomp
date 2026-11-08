@@ -25,6 +25,8 @@
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
+#include "models/xpr.h"
 
 #include <rex/memory/utils.h>
 
@@ -1848,10 +1850,189 @@ void Containers(Context& h) {
 
 }  // namespace
 
+namespace {
+
+// --- The debug font: DebugFont::Init over XPR2 files of the case's (0 to
+// 3 records of a vertex buffer's type, so only the records' +12 is
+// relocated, random words, and files that aren't XPR2) and
+// DebugText::LoadFont over the game's DEBFONT.XPR, each with the font
+// (0x8296BCE0, 48 bytes) and its flag byte (0x8265ED40) kept and put back.
+// Compared: the font with its texture set (+20) taken as whether it's 0,
+// the texture set's words, the header block's bytes and the data block's
+// with every word pointing into either taken back to an offset (the blocks
+// sit at different addresses on each side), the frame (its register saves
+// left out), r1 and r3; LoadFont also the debug text's size (+44) and
+// whether its buffer (+48) holds the file. What each side made is freed. ---
+
+constexpr uint32_t kFont = fw::kDebugFontPosition;
+constexpr uint32_t kFontBytes = 48;
+
+// An XPR::Create block given back: the header block (Memory::AllocVirtual's
+// pages) or the data block (AllocPhysical's).
+void FreeXprBlock(uint32_t block, bool data) {
+  if (block == 0) {
+    return;
+  }
+  const uint32_t header = block - models::kBlockHeaderBytes;
+  if (data) {
+    memory::crt::XMemFree(header, models::kXprDataAllocation);
+  } else {
+    memory::FreePages(header);
+  }
+}
+
+// The font and the texture set it made, into `out`; the set freed.
+void FontOut(uint8_t* base, Outputs& out, uint32_t header_bytes, uint32_t data_bytes) {
+  const uint32_t xpr = guest::LoadU32(base, kFont + 20);
+  std::vector<uint8_t> font = Read(base, kFont, kFontBytes);
+  for (int k = 0; k < 4; k++) font[20 + k] = 0;
+  out.Bytes(font);
+  out.Word(xpr != 0 ? 1 : 0);
+  out.Word(guest::LoadU8(base, fw::kDebugFontFlag));
+  if (xpr == 0) {
+    return;
+  }
+  const uint32_t block = guest::LoadU32(base, xpr + 0), data = guest::LoadU32(base, xpr + 8);
+  auto relative = [&](uint32_t w) -> uint32_t {
+    if (block != 0 && w >= block && w < block + header_bytes) return 0x10000000u + (w - block);
+    if (data != 0 && w >= data && w < data + data_bytes) return 0x20000000u + (w - data);
+    return w;
+  };
+  for (uint32_t i = 0; i < 24; i += 4) {
+    out.Word(relative(guest::LoadU32(base, xpr + i)));
+  }
+  if (block != 0) {
+    for (uint32_t i = 0; i + 4 <= header_bytes; i += 4) {
+      out.Word(relative(guest::LoadU32(base, block + i)));
+    }
+  }
+  if (data != 0) {
+    out.Bytes(Read(base, data, data_bytes));
+  }
+  FreeXprBlock(block, false);
+  FreeXprBlock(data, true);
+  memory::crt::OperatorDelete(xpr);
+}
+
+void DebugFonts(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_ERROR("harness: framework: the native heap is off; the debug font skipped");
+    return;
+  }
+  uint8_t* const base = h.base;
+  const std::vector<uint8_t> saved_font = Read(base, kFont, kFontBytes);
+  const uint8_t saved_flag = guest::LoadU8(base, fw::kDebugFontFlag);
+  {
+    Results results("DebugFont::Init (sub_8258BD58)");
+    constexpr uint32_t kFileBytes = 0x2000;
+    const uint32_t file = memory::Alloc(kFileBytes, 0);
+    for (int c = 0; c < 40; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      uint32_t header_bytes = 0, data_bytes = 0;
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        for (uint32_t i = 0; i < kFileBytes; i += 4) {
+          guest::StoreU32(base, file + i, uint32_t(r.Next()));
+        }
+        const bool xpr2 = r.Below(6) != 0;
+        const uint32_t records = r.Below(4);
+        header_bytes = 4 + 16 * records + 4 * r.Below(64);
+        data_bytes = r.Below(5) == 0 ? 0 : 1 + r.Below(4000);
+        guest::StoreU32(base, file + 0, xpr2 ? 0x58505232 : 0x58505231);
+        guest::StoreU32(base, file + 4, header_bytes);
+        guest::StoreU32(base, file + 8, data_bytes);
+        guest::StoreU32(base, file + 12, records);
+        for (uint32_t i = 0; i < records; i++) {
+          const uint32_t record = file + 16 + 16 * i;
+          guest::StoreU32(base, record, 0x56420000u | (guest::LoadU32(base, record) & 0xFFFFu));
+        }
+        PPCContext t = CallContext(h);
+        const uint32_t sp = t.r1.u32;
+        for (uint32_t i = 0; i < 512; i += 4) {
+          guest::StoreU32(base, sp - 512 + i, uint32_t(r.Next()));
+        }
+        t.r3.u64 = file;
+        if (v == 0) {
+          ITC_FLAG(native_framework) = false;
+          __imp__sub_8258BD58(t, base);
+          ITC_FLAG(native_framework) = true;
+        } else {
+          hooks::DebugFontInitSteps(t, base);
+        }
+        if (!xpr2) {
+          header_bytes = data_bytes = 0;
+        }
+        FontOut(base, out[v], header_bytes, data_bytes);
+        out[v].Bytes(Read(base, sp - 112, 80));
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    memory::Free(file);
+    results.Report();
+  }
+  {
+    Results results("DebugText::LoadFont (sub_82090CC0)");
+    const uint32_t text = memory::Alloc(64, 0);
+    for (int c = 0; c < 4; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      std::vector<uint8_t> loaded;
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        for (uint32_t i = 0; i < 64; i += 4) {
+          guest::StoreU32(base, text + i, uint32_t(r.Next()));
+        }
+        PPCContext t = CallContext(h);
+        const uint32_t sp = t.r1.u32;
+        for (uint32_t i = 0; i < 1024; i += 4) {
+          guest::StoreU32(base, sp - 1024 + i, uint32_t(r.Next()));
+        }
+        t.r3.u64 = text;
+        if (v == 0) {
+          ITC_FLAG(native_framework) = false;
+          __imp__sub_82090CC0(t, base);
+          ITC_FLAG(native_framework) = true;
+        } else {
+          hooks::DebugTextLoadFontSteps(t, base);
+        }
+        const uint32_t size = guest::LoadU32(base, text + 44);
+        const uint32_t buffer = guest::LoadU32(base, text + 48);
+        out[v].Word(size);
+        const std::vector<uint8_t> bytes = Read(base, buffer, size);
+        if (v == 0) {
+          loaded = bytes;
+        }
+        out[v].Word(bytes == loaded ? 1 : 0);
+        out[v].Word(size > 12 ? guest::LoadU32(base, buffer) : 0);
+        const uint32_t header_bytes = size > 12 ? guest::LoadU32(base, buffer + 4) : 0;
+        const uint32_t data_bytes = size > 12 ? guest::LoadU32(base, buffer + 8) : 0;
+        FontOut(base, out[v], header_bytes, data_bytes);
+        memory::crt::OperatorDelete(buffer);
+        out[v].Bytes(Read(base, sp - 128, 112));
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32 == sp - 32 ? 1 : t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    memory::Free(text);
+    results.Report();
+  }
+  Write(base, kFont, saved_font.data(), kFontBytes);
+  guest::StoreU8(base, fw::kDebugFontFlag, saved_flag);
+}
+
+}  // namespace
+
 void Framework(Context& h) {
   Getters(h);
   Positions(h);
   Containers(h);
+  DebugFonts(h);
 }
 
 }  // namespace harness

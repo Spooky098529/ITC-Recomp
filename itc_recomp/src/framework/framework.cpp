@@ -5,7 +5,9 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "file_layer/file_layer.h"
 #include "framework/run_loop.h"
+#include "models/xpr.h"
 #include "memory/c_runtime_heap.h"
 
 namespace framework {
@@ -91,6 +93,71 @@ void DebugFontSetPosition(uint8_t* base, uint32_t x, uint32_t y) {
   guest::StoreU32(base, kDebugFontPosition + 12, y);
   guest::StoreU32(base, kDebugFontPosition + 0, x);
   guest::StoreU32(base, kDebugFontPosition + 4, y);
+}
+
+uint64_t DebugFontInit(uint8_t* base, uint32_t data, uint32_t sp, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8258BD58 DebugFont::Init");
+  constexpr uint32_t kNew = 0x825A6880, kXprCreate = 0x82596F68;
+  const uint32_t frame = sp - 112;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t font = kDebugFontPosition;
+  guest::StoreU8(base, kDebugFontFlag, 1);
+  for (uint32_t offset = 0; offset <= 16; offset += 4) {
+    guest::StoreU32(base, font + offset, 0);
+  }
+  guest::StoreU32(base, font + 8, 32);
+  guest::StoreU32(base, font + 12, 0);
+  guest::StoreU32(base, font + 0, 32);
+  guest::StoreU32(base, font + 4, 0);
+  for (uint32_t offset = 16; offset < 20; offset++) {
+    guest::StoreU8(base, font + offset, 255);
+  }
+  uint32_t xpr;
+  if (const auto block = memory::crt::OperatorNew(base, 24)) {
+    xpr = *block;
+  } else {
+    xpr = uint32_t(call(kNew, frame, 0x8258BDD0, 24, 0, 0));
+  }
+  if (xpr != 0) {
+    models::XprConstruct(base, xpr);
+  }
+  guest::StoreU32(base, font + 20, xpr);
+  const uint64_t r3 = call(kXprCreate, frame, 0x8258BDF0, xpr, data, 0);
+  // lfs and two stfs: the float through a double and back.
+  const float scale = float(double(guest::LoadFloat(base, 0x82001FAC)));
+  guest::StoreFloat(base, font + 32, scale);
+  guest::StoreFloat(base, font + 36, scale);
+  return r3;
+}
+
+uint32_t DebugTextLoadFont(uint8_t* base, uint32_t text, uint32_t sp, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82090CC0 DebugText::LoadFont");
+  constexpr uint32_t kOpen = 0x820A6AB8, kNew = 0x825A6940, kRead = 0x8258C820;
+  constexpr uint32_t kClose = 0x8258C718;
+  constexpr uint32_t kName = 0x82000BB0;  // game:\DATA\DEBUG\DEBFONT.XPR
+  const uint32_t frame = sp - 128;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t file = frame + 96;
+  file_layer::GameFileConstruct(base, file);
+  guest::StoreU8(base, frame + 80, 0);
+  if ((call(kOpen, frame, 0x82090CF8, file, kName, frame + 80) & 0xFF) != 0) {
+    const uint32_t size = file_layer::FileGetSize(base, file);
+    guest::StoreU32(base, text + 44, size);
+    uint32_t buffer;
+    if (const auto block = memory::crt::OperatorNew(base, size)) {
+      buffer = *block;
+    } else {
+      buffer = uint32_t(call(kNew, frame, 0x82090D10, size, 0, 0));
+    }
+    guest::StoreU32(base, frame + 84, guest::LoadU32(base, text + 44));
+    guest::StoreU32(base, text + 48, buffer);
+    call(kRead, frame, 0x82090D2C, file, buffer, frame + 84);
+    call(kClose, frame, 0x82090D34, file, 0, 0);
+    DebugFontInit(base, guest::LoadU32(base, text + 48), frame, call);
+    guest::StoreU32(base, kDebugFontPosition + 40, 681);  // sub_8258BE48(681)
+  }
+  file_layer::GameFileDestruct(base, file);
+  return file;
 }
 
 void DebugTextSetPosition(uint8_t* base, uint32_t x, uint32_t y) {
