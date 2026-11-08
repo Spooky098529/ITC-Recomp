@@ -297,6 +297,10 @@ constexpr uint32_t kSaveWorldBytes = 0x3000;
 constexpr uint32_t kSaveObject36 = 0x40, kSaveDevices = 0x100, kSaveUsers = 0x200;
 constexpr uint32_t kSaveSlots = 0x800;
 
+// The options' dialogs' menu and the sign-in watch's checks.
+constexpr uint32_t kOptionsMenu = 0x826D8484;
+constexpr uint32_t kSignInWatch = 0x826BAB40;
+
 // The car entries: 4 of 0x2100 bytes (+744, +769, +8432 read).
 constexpr uint32_t kEntryBytes = 0x2100;
 constexpr uint32_t kEntryCount = 4;
@@ -345,6 +349,7 @@ struct World {
   uint32_t save_pages() const { return options.address + 0x900; }
   uint32_t page9() const { return options.address + 0xA00; }
   uint32_t page10() const { return options.address + 0xB00; }
+  uint32_t menu() const { return options.address + 0xD00; }
   Block options;
 };
 
@@ -365,7 +370,9 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {fe::kOptionsCategory6Pages, 4},
     {fe::kCarList, 4},
     {kSaveInterfaceGlobal, 4},
-    {kReplayList, 4}};
+    {kReplayList, 4},
+    {kOptionsMenu, 4},
+    {kSignInWatch, 8}};
 
 void ShapeSaveWorld(uint8_t* base, uint32_t block, Random& r) {
   WriteRandom(base, block, kSaveWorldBytes, r);
@@ -549,6 +556,7 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, kReplayList, w.options.address + 0xC00);
   guest::StoreU32(base, fe::kOptions, w.settings());
   guest::StoreU32(base, fe::kSaveList, w.list());
+  guest::StoreU32(base, kOptionsMenu, w.menu());
   guest::StoreU32(base, w.list() + 68, 0);
   for (const auto& [global, block] :
        {std::pair{fe::kSavePages, w.save_pages()}, std::pair{fe::kOptionsSavePages, w.page9()},
@@ -737,6 +745,55 @@ void Starts(Context& h, const World& w) {
         hooks::FrontEndOptionsSetUpCategory6Page, {{144, 120}, {64, 40}, {256, 168}});
 }
 
+// A small word: 0 to `n` - 1 mostly, now and then any.
+uint32_t Small(Random& r, uint32_t n) {
+  return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(n);
+}
+
+void Shows(Context& h, const World& w) {
+  // The steps (160-byte frames, saves 56): their +24 to +79 left out (the
+  // setters' varargs stores: leftovers in the original, 0 in ours); below
+  // them only SetNote's back chain (sp - 272): the rest is the register
+  // saves of the callees called from the step's frame (below sp - 160) and
+  // from SetNote's (below sp - 272), which hold the callers' registers (the
+  // originals' own, ours as the adapter's context holds them), and
+  // SetText's words its SetNodeText calls store (leftovers in the original).
+  const Frames frames = {{160, 136}, {80, 56}, {272, 264}};
+  // r3 the step word (0, 1 or any), the kind below the table's size + 2
+  // (or any), the state 0 to 3 (or any).
+  auto save = [&h](uint32_t kinds) {
+    return [&h, kinds](PPCContext& t, Random& r, const World& w) {
+      const uint32_t step = w.save_data() + 0x80;
+      const uint32_t words[3] = {0, 1, uint32_t(r.Next())};
+      guest::StoreU32(h.base, step, r.Below(4) != 0 ? 0 : words[r.Below(3)]);
+      guest::StoreU32(h.base, w.save_data() + 12, Small(r, kinds + 2));
+      guest::StoreU32(h.base, w.save_data() + 16, Small(r, 4));
+      t.r3.u64 = step;
+    };
+  };
+  Group(h, w, "SaveScreen::ShowMessage (sub_821A5668)", 300, save(12), __imp__sub_821A5668,
+        hooks::FrontEndSaveScreenShowMessage, frames);
+  Group(h, w, "SaveScreen::ShowMessage3 (sub_821A5980)", 300, save(17), __imp__sub_821A5980,
+        hooks::FrontEndSaveScreenShowMessage3, frames);
+  Group(h, w, "SaveScreen::ShowMessage4 (sub_821A5D00)", 300, save(13), __imp__sub_821A5D00,
+        hooks::FrontEndSaveScreenShowMessage4, frames);
+  auto options = [&h](uint32_t words, uint32_t kinds) {
+    return [&h, words, kinds](PPCContext& t, Random& r, const World& w) {
+      const uint32_t step = w.save_data() + 0x80;
+      guest::StoreU32(h.base, step, r.Below(4) == 0 ? (r.Below(2) == 0 ? 1 : uint32_t(r.Next()))
+                                                    : 0);
+      guest::StoreU32(h.base, w.settings() + words, Small(r, 4));
+      guest::StoreU32(h.base, w.settings() + words + 8, Small(r, kinds + 2));
+      guest::StoreU32(h.base, w.menu(), Small(r, 3));
+      t.r3.u64 = step;
+    };
+  };
+  Group(h, w, "Options::ShowSaveDialog (sub_821C6638)", 300, options(620, 13),
+        __imp__sub_821C6638, hooks::FrontEndOptionsShowSaveDialog, frames);
+  Group(h, w, "Options::ShowCategory6Dialog (sub_821C69D0)", 300, options(640, 12),
+        __imp__sub_821C69D0, hooks::FrontEndOptionsShowCategory6Dialog, frames);
+}
+
 void CarCards(Context& h, const World& w) {
   // FillAll (144, saves 56); Fill's frame below it (its +40 to +79 left
   // out).
@@ -775,6 +832,7 @@ void FrontEndScreenHelpers(Context& h) {
   BuildStringTable(h.base, w);
   Dialogs(h, w);
   Starts(h, w);
+  Shows(h, w);
   CarCards(h, w);
 }
 

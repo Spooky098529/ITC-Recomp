@@ -29,7 +29,12 @@ ITC_FLAG_BOOL(native_front_end_screen_helpers, true, "ITC",
               "sub_821A5540, Options::SetUpSavePage sub_821C6D48 and SetUpCategory6Page "
               "sub_821C6E50 (MenuList::Init, SaveSlots::State, ShowPrompts and "
               "SaveBuffers::Create through their overrides, the setters' varargs 0) and "
-              "CarCards::FillAll sub_821822F8) natively instead of through the translated code "
+              "CarCards::FillAll sub_821822F8; the dialogs' steps SaveScreen::ShowMessage "
+              "sub_821A5668, ShowMessage3 sub_821A5980 and ShowMessage4 sub_821A5D00 and "
+              "Options::ShowSaveDialog sub_821C6638 and ShowCategory6Dialog sub_821C69D0 (with "
+              "their split-off case 0s; the setters' plain C++, their unset varargs 0; the UI "
+              "movie calls, MenuList::, MenuSound::Play and ShowPrompts through their "
+              "overrides)) natively instead of through the translated code "
               "(the same writes; checked by --run_harnesses=front_end_screen_helpers)");
 
 namespace hooks {
@@ -192,6 +197,26 @@ void FrontEndOptionsSetUpCategory6Page(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::OptionsSetUpDialogPage(base, 14, ctx.r1.u32, guest.calls());
 }
+void FrontEndSaveScreenShowMessage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(base, 0, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void FrontEndSaveScreenShowMessage3(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(base, 1, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void FrontEndSaveScreenShowMessage4(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(base, 2, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void FrontEndOptionsShowSaveDialog(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::OptionsShowDialog(base, 13, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void FrontEndOptionsShowCategory6Dialog(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::OptionsShowDialog(base, 14, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
 void FrontEndCarCardsFillAll(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::CarCardsFillAll(base, ctx.r1.u32, guest.calls());
@@ -261,6 +286,16 @@ ITC_FRONT_END_HELPERS(821A5450, FrontEndSaveScreenStartCheck)
 ITC_FRONT_END_HELPERS(821A5540, FrontEndSaveScreenStart)
 ITC_FRONT_END_HELPERS(821C6D48, FrontEndOptionsSetUpSavePage)
 ITC_FRONT_END_HELPERS(821C6E50, FrontEndOptionsSetUpCategory6Page)
+// The dialogs' steps: the save screen's Update table (steps 0, 3 and 4)
+// and Options::Update's (43 and 46), no direct callers. Their jump tables'
+// split-off case 0 functions (sub_821A56E8, sub_821A5A00, sub_821A5D7C,
+// sub_821C66BC, sub_821C6A54) are reached only from those tables, so they
+// need no adapters.
+ITC_FRONT_END_HELPERS(821A5668, FrontEndSaveScreenShowMessage)
+ITC_FRONT_END_HELPERS(821A5980, FrontEndSaveScreenShowMessage3)
+ITC_FRONT_END_HELPERS(821A5D00, FrontEndSaveScreenShowMessage4)
+ITC_FRONT_END_HELPERS(821C6638, FrontEndOptionsShowSaveDialog)
+ITC_FRONT_END_HELPERS(821C69D0, FrontEndOptionsShowCategory6Dialog)
 // CarCards::FillAll (from sub_82183DE0 and sub_82184488, recompiled).
 ITC_FRONT_END_HELPERS(821822F8, FrontEndCarCardsFillAll)
 

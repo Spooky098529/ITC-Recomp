@@ -37,6 +37,14 @@ void FrontEndSaveScreenStartCheck(PPCContext& ctx, uint8_t* base);
 void FrontEndSaveScreenStart(PPCContext& ctx, uint8_t* base);
 void FrontEndOptionsSetUpSavePage(PPCContext& ctx, uint8_t* base);
 void FrontEndOptionsSetUpCategory6Page(PPCContext& ctx, uint8_t* base);
+// The dialogs' steps (r3 the step word): SaveScreen::ShowMessage,
+// ShowMessage3 and ShowMessage4, Options::ShowSaveDialog and
+// ShowCategory6Dialog.
+void FrontEndSaveScreenShowMessage(PPCContext& ctx, uint8_t* base);
+void FrontEndSaveScreenShowMessage3(PPCContext& ctx, uint8_t* base);
+void FrontEndSaveScreenShowMessage4(PPCContext& ctx, uint8_t* base);
+void FrontEndOptionsShowSaveDialog(PPCContext& ctx, uint8_t* base);
+void FrontEndOptionsShowCategory6Dialog(PPCContext& ctx, uint8_t* base);
 // CarCards::FillAll (no arguments).
 void FrontEndCarCardsFillAll(PPCContext& ctx, uint8_t* base);
 

@@ -307,4 +307,264 @@ uint64_t SaveScreenShowNotice(uint8_t* base, uint32_t step, uint32_t sp, const C
   return done ? 1 : 0;
 }
 
+// --- The dialogs' steps (ShowMessage and the options' dialogs) ---
+
+namespace {
+
+// A kind's question: its string (0: none), the varargs' r4 (the others 0:
+// the originals' are the earlier calls' leftovers, the parking area's
+// call, 2026-10-30), the default answer it sets (-1: none) and whether it
+// turns the sign-in watch's checks back on (0x826BAB40 +0 and +4 = 0).
+struct Kind {
+  uint16_t string;
+  uint16_t r4;
+  int8_t answer;
+  bool watch;
+};
+
+struct ShowLrs {
+  uint32_t play12, list_init, set_selection, play13_open, play13_close, sound, run, selection,
+      play_selection, play0, loop;
+};
+
+struct ShowSpec {
+  const Kind* kinds;
+  uint32_t kind_count;
+  ShowLrs lrs;
+};
+
+constexpr Kind kShowKinds[12] = {{62, 0, -1, false}, {61, 0, 1, false}, {0, 0, -1, false},
+                                 {0, 0, -1, false},  {71, 0, 0, false}, {72, 0, 1, false},
+                                 {65, 0, 1, false},  {66, 240, -1, false}, {63, 0, -1, false},
+                                 {64, 0, -1, false}, {67, 0, -1, false}, {65, 0, 1, false}};
+constexpr Kind kShow3Kinds[17] = {
+    {70, 0, -1, true},  {59, 0, 0, false},  {59, 0, 0, false},  {102, 0, 0, false},
+    {87, 0, -1, false}, {60, 0, -1, false}, {88, 0, -1, false}, {103, 0, -1, false},
+    {61, 0, 1, false},  {62, 0, -1, false}, {63, 0, -1, false}, {64, 0, -1, false},
+    {65, 0, 1, false},  {65, 0, 1, false},  {65, 0, 1, false},  {66, 240, 0, false},
+    {67, 0, 0, false}};
+constexpr Kind kShow4Kinds[13] = {
+    {62, 0, -1, false}, {89, 0, 1, false},  {70, 0, -1, false}, {90, 0, 1, false},
+    {91, 0, -1, false}, {92, 0, 1, false},  {92, 0, 1, false},  {93, 0, -1, false},
+    {94, 0, -1, false}, {95, 0, -1, false}, {98, 0, -1, false}, {103, 0, -1, false},
+    {92, 0, -1, false}};
+
+constexpr ShowSpec kShows[3] = {
+    {kShowKinds, 12,
+     {0x821A588C, 0x821A58C0, 0x821A58D0, 0x821A5838, 0x821A57D4, 0x821A58E0, 0x821A58F0,
+      0x821A5940, 0x821A5964, 0x821A5930, 0x821A5970}},
+    {kShow3Kinds, 17,
+     {0x821A5C0C, 0x821A5C40, 0x821A5C50, 0x821A5BB8, 0x821A5B54, 0x821A5C60, 0x821A5C70,
+      0x821A5CC0, 0x821A5CE4, 0x821A5CB0, 0x821A5CF0}},
+    {kShow4Kinds, 13,
+     {0x821A5F40, 0x821A5F74, 0x821A5F84, 0x821A5EE8, 0x821A5E80, 0x821A5F94, 0x821A5FA4,
+      0x821A5FF4, 0x821A6018, 0x821A5FE4, 0x821A6024}}};
+
+constexpr uint32_t kSignInWatch = 0x826BAB40;
+
+uint64_t PlayNamed(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie,
+                   uint64_t named) {
+  return calls.Call(kPlayNamed, frame, lr, movie, named, 0, 0);
+}
+
+// The question and its note, both with the kind's string (their plain C++).
+template <typename Text, typename Note>
+const Kind* AskKind(const Kind* kinds, uint32_t count, uint32_t kind, Text text, Note note) {
+  if (kind >= count || kinds[kind].string == 0) {
+    return nullptr;
+  }
+  const Kind& k = kinds[kind];
+  const uint64_t varargs[7] = {k.r4, 0, 0, 0, 0, 0, 0};
+  text(k.string, varargs);
+  note(k.string, varargs);
+  return &k;
+}
+
+}  // namespace
+
+uint64_t SaveScreenShowMessage(uint8_t* base, uint32_t which, uint32_t step, uint32_t sp,
+                               const Calls& calls) {
+  if (which == 0) {
+    ITC_NATIVE_RUNNING("sub_821A5668 SaveScreen::ShowMessage");
+  } else if (which == 1) {
+    ITC_NATIVE_RUNNING("sub_821A5980 SaveScreen::ShowMessage3");
+  } else {
+    ITC_NATIVE_RUNNING("sub_821A5D00 SaveScreen::ShowMessage4");
+  }
+  const ShowSpec& spec = kShows[which];
+  const ShowLrs& lr = spec.lrs;
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t movie = FindMovie(base, 44, frame + 96);
+  if (Load(base, step) == 0) {
+    const uint32_t kind = Load(base, SaveData(base) + 12);
+    const Kind* k = AskKind(
+        spec.kinds, spec.kind_count, kind,
+        [&](uint32_t id, const uint64_t* v) { SaveScreenSetText(base, id, v, frame, calls); },
+        [&](uint32_t id, const uint64_t* v) { SaveScreenSetNote(base, id, v, frame, calls); });
+    if (k != nullptr && k->watch) {
+      Store(base, kSignInWatch + 0, 0);
+      Store(base, kSignInWatch + 4, 0);
+    }
+    if (k != nullptr && k->answer >= 0) {
+      Store(base, SaveData(base) + 48, uint32_t(k->answer));
+    }
+    const uint32_t state = Load(base, SaveData(base) + 16);
+    if (state == 0) {
+      PlayNamed(calls, frame, lr.play12, movie, 12);
+      Store(base, frame + 84, 159);
+      Store(base, frame + 92, 158);
+      const uint64_t args[8] = {Load(base, kSaveList), 2, 2, 1, 154, 153, 155, 156};
+      calls.CallArgs(kMenuListInit, frame, lr.list_init, args);
+      calls.Call(kListSetSelection, frame, lr.set_selection, Load(base, kSaveList),
+                 Load(base, SaveData(base) + 48));
+      Store(base, SaveData(base) + 56, 1);
+    } else if (state == 1) {
+      PlayNamed(calls, frame, lr.play13_open, movie, 13);
+      Store(base, ui_movies::FindNode(base, movie, 0, 0) + 80, 0);
+      Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 0, 2), 0) + 80, 1);
+      Store(base, SaveData(base) + 56, 1);
+    } else if (state == 2) {
+      PlayNamed(calls, frame, lr.play13_close, movie, 13);
+      Store(base, ui_movies::FindNode(base, movie, 0, 0) + 80, 1);
+      Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 0, 2), 0) + 80, 0);
+      Store(base, SaveData(base) + 24, 0);
+      Store(base, SaveData(base) + 56, 0);
+    }
+    calls.Call(kMenuSoundPlay, frame, lr.sound, 5);
+    Store(base, step, 1);
+  }
+  const bool done = uint32_t(calls.Call(kRun, frame, lr.run, movie, 0)) == 0;
+  if (done) {
+    const int32_t state = int32_t(Load(base, SaveData(base) + 16));
+    if (state == 0) {
+      const uint64_t named =
+          calls.Call(kListSelection, frame, lr.selection, Load(base, kSaveList)) + 2;
+      PlayNamed(calls, frame, lr.play_selection, movie, named);
+      calls.Call(kLoopNamed, frame, lr.loop, movie, named);
+    } else if (state == 2) {
+      PlayNamed(calls, frame, lr.play0, movie, 0);
+      calls.Call(kLoopNamed, frame, lr.loop, movie, 0);
+    }
+  }
+  return done ? 1 : 0;
+}
+
+namespace {
+
+constexpr Kind kSaveDialogKinds[13] = {
+    {62, 0, -1, false}, {83, 0, 1, false},  {69, 0, -1, false}, {70, 0, -1, false},
+    {84, 0, 1, false},  {85, 0, -1, false}, {86, 0, 1, false},  {86, 0, 1, false},
+    {87, 0, -1, false}, {88, 0, -1, false}, {60, 0, -1, false}, {103, 0, -1, false},
+    {104, 0, -1, false}};
+constexpr Kind kCategory6DialogKinds[12] = {
+    {62, 0, -1, false}, {61, 0, 1, false},  {0, 0, -1, false},    {0, 0, -1, false},
+    {71, 0, 1, false},  {72, 0, 1, false},  {65, 0, 1, false},    {66, 240, -1, false},
+    {63, 0, -1, false}, {64, 0, -1, false}, {67, 0, -1, false},   {65, 0, 1, false}};
+
+constexpr uint32_t kOptionsMenu = 0x826D8484;  // the dialogs' two-item menu
+
+}  // namespace
+
+uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uint32_t sp,
+                           const Calls& calls) {
+  const bool save = sub_scene == 13;
+  if (save) {
+    ITC_NATIVE_RUNNING("sub_821C6638 Options::ShowSaveDialog");
+  } else {
+    ITC_NATIVE_RUNNING("sub_821C69D0 Options::ShowCategory6Dialog");
+  }
+  // Page 9's words (+620 the state, +628 the kind, +632, +636 the default
+  // answer) and animations, or page 10's (+640 to +656).
+  const uint32_t words = save ? 620 : 640;
+  const uint32_t open_named = save ? 853 : 869, shown_named = save ? 854 : 870;
+  const uint32_t cursor_named = save ? 843 : 859, close_named = save ? 841 : 857;
+  // The calls' return addresses: MenuSound::Play, PlayNamed in states 0, 1
+  // and 2, ShowPrompts, Run, the two PlayNamed after it and LoopNamed.
+  const uint32_t lr_sound = save ? 0x821C6680 : 0x821C6A18;
+  const uint32_t lr_play0 = save ? 0x821C68C4 : 0x821C6C38;
+  const uint32_t lr_play1 = save ? 0x821C6868 : 0x821C6BDC;
+  const uint32_t lr_play2 = save ? 0x821C67FC : 0x821C6B70;
+  const uint32_t lr_prompts = save ? 0x821C6938 : 0x821C6CAC;
+  const uint32_t lr_run = save ? 0x821C6948 : 0x821C6CBC;
+  const uint32_t lr_cursor = save ? 0x821C69B8 : 0x821C6D2C;
+  const uint32_t lr_close = save ? 0x821C6988 : 0x821C6CFC;
+  const uint32_t lr_loop = save ? 0x821C69C4 : 0x821C6D38;
+  auto o = [&]() { return Load(base, kOptions); };
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t movie = FindMovie(base, 7, frame + 96);
+  if (Load(base, step) == 0) {
+    calls.Call(kMenuSoundPlay, frame, lr_sound, 5);
+    const uint32_t kind = Load(base, o() + words + 8);
+    const Kind* k = AskKind(
+        save ? kSaveDialogKinds : kCategory6DialogKinds, save ? 13 : 12, kind,
+        [&](uint32_t id, const uint64_t* v) {
+          OptionsSetDialogText(base, sub_scene, id, v, frame, calls);
+        },
+        [&](uint32_t id, const uint64_t* v) {
+          OptionsSetDialogNote(base, sub_scene, id, v, frame, calls);
+        });
+    if (k != nullptr && k->answer >= 0) {
+      Store(base, o() + words + 16, uint32_t(k->answer));
+    }
+    // The menu's words all 0 (in the original's order), +16 and +20 1 for
+    // state 0.
+    auto reset_menu = [&](uint32_t first) {
+      const uint32_t m = Load(base, kOptionsMenu);
+      Store(base, m + 16, first);
+      Store(base, m + 12, 0);
+      Store(base, m + 20, first);
+      for (const uint32_t at : {0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
+        Store(base, m + at, 0);
+      }
+    };
+    const uint64_t none = 0xFFFFFFFFFFFFFFFFull;
+    const uint32_t state = Load(base, o() + words);
+    if (state <= 2) {
+      uint64_t first_two = 0;
+      if (state == 0) {
+        PlayNamed(calls, frame, lr_play0, movie, open_named);
+        reset_menu(1);
+        const uint32_t m = Load(base, kOptionsMenu);
+        const uint32_t was = Load(base, m + 0);
+        const uint32_t answer = Load(base, o() + words + 16);
+        Store(base, m + 4, was);
+        Store(base, m + 0, answer);
+      } else if (state == 1) {
+        Store(base, ui_movies::FindNode(base, movie, sub_scene, 0) + 80, 0);
+        Store(base,
+              ui_movies::Child(base, ui_movies::FindNode(base, movie, sub_scene, 2), 0) + 80, 1);
+        PlayNamed(calls, frame, lr_play1, movie, shown_named);
+        const uint32_t m = Load(base, kOptionsMenu);
+        for (const uint32_t at :
+             {12u, 16u, 20u, 0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
+          Store(base, m + at, 0);
+        }
+      } else {
+        Store(base, ui_movies::FindNode(base, movie, sub_scene, 0) + 80, 1);
+        Store(base,
+              ui_movies::Child(base, ui_movies::FindNode(base, movie, sub_scene, 2), 0) + 80, 0);
+        PlayNamed(calls, frame, lr_play2, movie, shown_named);
+        Store(base, o() + words + 12, 0);
+        first_two = none;
+      }
+      const uint64_t args[8] = {first_two, first_two, none, none, none, none, 0, 0};
+      calls.CallArgs(kShowPrompts, frame, lr_prompts, args);
+    }
+    Store(base, step, 1);
+  }
+  const bool done = uint32_t(calls.Call(kRun, frame, lr_run, movie, 0)) == 0;
+  if (done) {
+    const int32_t state = int32_t(Load(base, o() + words));
+    if (state == 0) {
+      const uint64_t named = uint64_t(Load(base, Load(base, kOptionsMenu) + 0)) + cursor_named;
+      PlayNamed(calls, frame, lr_cursor, movie, named);
+      calls.Call(kLoopNamed, frame, lr_loop, movie, named);
+    } else if (state == 2) {
+      PlayNamed(calls, frame, lr_close, movie, close_named);
+      calls.Call(kLoopNamed, frame, lr_loop, movie, close_named);
+    }
+  }
+  return done ? 1 : 0;
+}
+
 }  // namespace front_end_screen_helpers

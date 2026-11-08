@@ -55,6 +55,8 @@ constexpr uint32_t kMenuListInit = 0x8220BAC0;
 constexpr uint32_t kSaveSlotsState = 0x8228F9E8;
 constexpr uint32_t kSaveBuffersCreate = 0x8228F6B0;
 constexpr uint32_t kShowPrompts = 0x821C1068;  // Options::ShowPrompts
+constexpr uint32_t kListSelection = 0x8220BC20;     // MenuList::Selection
+constexpr uint32_t kListSetSelection = 0x8220BC30;  // MenuList::SetSelection
 
 // The save screen's data ([0x826D8454]) and the front end's car data
 // ([0x826D83F4]: +12, +36 words, +48 and +52 the list's index, +1136 the
@@ -168,6 +170,39 @@ uint64_t SaveScreenStart(uint8_t* base, uint32_t sp, const Calls& calls);
 // 144-byte frames.
 uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
                                 const Calls& calls);
+
+// sub_821A5668 SaveScreen::ShowMessage (`which` 0), sub_821A5980
+// ShowMessage3 (1) and sub_821A5D00 ShowMessage4 (2): steps 0, 3 and 4 of
+// the save screen's table, `step` the started word, with their jump
+// tables' case 0 split off by the recompiler (sub_821A56E8, sub_821A5A00,
+// sub_821A5D7C) done here. First call: by the data's kind (+12) the
+// question and note with its string (SetText and SetNote's plain C++, r4
+// 240 for kind 7 (15 for ShowMessage3) and the other varargs 0), the
+// default answer (+48) for some kinds (ShowMessage3's kind 0 also
+// 0x826BAB40 +0 and +4 = 0); by the state (+16): 0 PlayNamed(movie 44,
+// 12), MenuList::Init(2, 2, 1, ...) and SetSelection(+48), +56 = 1; 1
+// PlayNamed(13), FindNode(0, 0) +80 = 0 and Child(FindNode(0, 2), 0) +80 =
+// 1, +56 = 1; 2 PlayNamed(13), the two words 1 and 0, +24 = 0, +56 = 0;
+// MenuSound::Play(5), the word = 1. Every call: Run(movie, 0); when it
+// answers 0, state 0 named Selection + 2 played and looped, 2 named 0's.
+// Whether Run answered 0. 160-byte frames.
+uint64_t SaveScreenShowMessage(uint8_t* base, uint32_t which, uint32_t step, uint32_t sp,
+                               const Calls& calls);
+// sub_821C6638 Options::ShowSaveDialog (`sub_scene` 13: page 9's words
+// `o` +620 to +636) and sub_821C69D0 Options::ShowCategory6Dialog (14:
+// +640 to +656), steps 43 and 46, with their case 0 (sub_821C66BC,
+// sub_821C6A54) done here. First call: MenuSound::Play(5); the question
+// and note by the kind (+8), the default answer (+16) for some kinds; by
+// the state: 0 PlayNamed(853 or 869), the dialogs' menu ([0x826D8484])
+// reset with +16 and +20 1, its +4 = its +0 and +0 = the default answer;
+// 1 FindNode(sub_scene, 0) +80 = 0, Child(FindNode(sub_scene, 2), 0) +80 =
+// 1, PlayNamed(854 or 870), the menu's words 0; 2 the two words 1 and 0,
+// PlayNamed(854 or 870), +12 = 0; ShowPrompts(0, 0, -1, -1, -1, -1), or
+// all -1 for 2; the word = 1. Every call: Run; when it answers 0, state 0
+// named 843 (859) + the menu's +0 played and looped, 2 named 841's (857).
+// Whether Run answered 0. 160-byte frames.
+uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uint32_t sp,
+                           const Calls& calls);
 
 // --- The car cards (car_cards.cpp) ---
 
