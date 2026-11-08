@@ -13,6 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The car list's third migration (35b39ea5..9fb09b97, the update
+  group, 5 adapters removed without counter runs): `Update` writes its
+  27-entry step table and the two `lis` leftovers at +80 and +84 on its
+  frame, calls the native steps directly and the others through the
+  table; `GarageStage::ReloadModel`, `SetCar`, `Command`, `IsBusy`,
+  `Draw`, `MenuList::Selection` and the named animations stay guest
+  calls through their overrides; `sub_82192770`, never seen, runs as
+  the original. Harness gap (in the row): the stages' garage cameras
+  aren't set up, so `GarageStage::Draw` draws nothing and
+  `ReloadModel` answers 0; `UpdateStand`'s branch after a reload has no
+  cases (the same sequence as `ShowStandCar`'s, covered in `load_poll`).
+
 - The car list's second migration (39d443d6..8d948f88, 8 functions):
   `Build`'s entries from `memory::AllocPages`, `memcpy`'s original
   where `c_runtime::Memcpy` refuses; `Build`'s harness makes its own

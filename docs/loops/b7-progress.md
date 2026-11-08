@@ -120,7 +120,12 @@ file's history. What's left to see in a drive, from every run:
   `GarageStages::DrawAll`). Validated `itc_4519` (race 86 s at 180,
   the harnesses ~92 s; 0 errors, every harness 0 differing, 8 of 8
   harness lines; none in the race or the replay `itc_4520` (ok); all 8
-  to drive). Third migration agent running.
+  to drive). Third migration 35b39ea5..9fb09b97 (`PanelSet::Update`
+  with `PanelSetBase::Update`, `UpdateStand`, `GarageStages::DrawAll`;
+  4 functions, 5 adapters removed; races 36 s, 0 errors, `car_list` and
+  `load_poll` 0 differing; no subagents); left: none ready (71 of 94
+  in play ours; the rest wait on `sub_8211BC18` and `sub_8211DE30`).
+  Validation agent running.
 
 ## Done
 
@@ -174,3 +179,5 @@ file's history. What's left to see in a drive, from every run:
   460, unknown 1002).
 - After its second migration: ours 4916, work left 1510 (wrapped 56,
   known 452, unknown 1002).
+- After its third migration: ours 4920, work left 1506 (wrapped 56,
+  known 448, unknown 1002).
