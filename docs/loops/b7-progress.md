@@ -42,8 +42,13 @@ file's history. What's left to see in a drive, from every run:
   their Jumps (ready). Validated `itc_4668` (race 75 s at 180, the
   harnesses ~105 s; 0 errors, every harness 0 differing outside the
   expected groups, 49 of 49 harness lines, no prints added; 1 in the
-  race, 28 in the replay `itc_4669` (ok), 20 to drive). Step: third
-  migration (agent running).
+  race, 28 in the replay `itc_4669` (ok), 20 to drive). Third
+  migration be6b79e6..c18081f3 (the build screen's three pages with
+  their six jumps, `Type2Hub::Update` with `PutCarOnStand` over a
+  stand car harness world; `ShowBusy`, `HideBusy` adapters removed;
+  121 of 121 in play ours; races 34-38 s, 0 errors, its harnesses 0
+  differing; no subagents). Left: none. Step: its validation (agent
+  running).
 
 ## Done
 

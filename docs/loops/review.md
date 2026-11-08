@@ -40,6 +40,17 @@ When the user has reviewed a run's section, its heading gets
   list; the `Fill` cases lay 400 items of their own (the data tables
   aren't loaded when harnesses run); `Archive::Load` calls recorded by
   the harness's recorder.
+- The type 2 screens' third migration (be6b79e6..c18081f3): the build
+  screen's pages and jumps, `Type2Hub::Update` and `PutCarOnStand`
+  (the stand car's world from `load_poll`'s `StandCarWorld` and the
+  car dealer's `StandWorld` shaping; the harness world has a 0x2800-byte
+  stand block, `0x826C2E40` and `0x826D83E4` put back around cases).
+  A harness hazard for review: the hub's `MenuPage` cases reach
+  `sub_8218D708` (recompiled on both sides, never seen in play) over a
+  random car spec; once new cases shifted the seeds, one looped on
+  guest 0 access violations (`itc_4670`; a like hang in `BuildEntry`,
+  `itc_4666`). The new cases now run last so the earlier seeds hold;
+  the `MenuPage` world is still fragile.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
