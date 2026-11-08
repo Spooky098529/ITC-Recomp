@@ -19,7 +19,17 @@ file's history. What's left to see in a drive, from every run:
   into the existing `ui-movies-game.md` (9f12739f: 8 new rows, 3 in
   play, `sub_8211BC18`, `sub_8211DE30`, `sub_8211CC50`, each a ready
   group; 5 never run; no leads added; no subagents); map checked.
-  Step: migration, agent running.
+  Migration e052912e..e73bf7db (the three native under
+  `--native_ui_movies_game`, with `sub_8211DCE8`'s adapter removed;
+  cleanup in `car-list.md` they unblocked: the panels' answers, shows,
+  selections and moves, eight steps, `SetUpRows`, `SetUpCarPage`, under
+  `--native_car_list`; 22 adapters removed; resumed once after an API
+  sign-in error cut it off mid-batch; race 36 s, 0 errors, its
+  harnesses 0 differing; no subagents). Left: `Step17` `sub_8224C450`
+  and `CarPage` `sub_8224B8D8` (need a harness world with the stand's
+  car), and `sub_8211E500`, `sub_8211E2C8`, `sub_8211E370`,
+  `sub_8211CBD8`, `sub_8211CA18` in `ui-movies-game.md`, ready, not
+  taken. Step: validation, agent running.
 
 ## Done
 
@@ -41,5 +51,7 @@ file's history. What's left to see in a drive, from every run:
   unknown 1002).
 - After the UI movie helpers' map: ours 4920, work left 1506 (wrapped
   56, known 451, unknown 999).
+- After its migration: ours 4944, work left 1482 (wrapped 56, known
+  427, unknown 999).
 
 ## Stopped

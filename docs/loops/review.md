@@ -21,6 +21,16 @@ When the user has reviewed a run's section, its heading gets
   intro, the "UI movie animation list" row in `known-data.md`, and
   stale "no row" mentions corrected in `car-list.md`,
   `type6-type7-modes.md` and `race-screens.md`.
+- The UI movie helpers' migration (e052912e..e73bf7db): the three under
+  `--native_ui_movies_game`; cleanup in `car-list.md` (the panels'
+  answers, shows, selections and moves, eight `PanelSetBase` steps,
+  `SetUpRows`, `SetUpCarPage`; 22 adapters removed in all, with
+  `UiMovie::MoveNamedAnimation`'s and `IsNamedActive`'s). Harness world
+  fixes in `harnesses/car_list.cpp` (the original crashed on them too,
+  once new cases shifted the seeds): the set-ups world's garage built as
+  a chain of distinct links; `ShapeSet` keeps E's +16 non-negative (a -1
+  read a random word once `RowPanel::SetRow` stored a -1 logo frame in a
+  node's +108).
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
