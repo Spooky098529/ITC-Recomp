@@ -18,6 +18,20 @@ here loses its heading.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The options screen's second migration (attract race `itc_4463`,
+  replay `itc_4464` ok; `options-screen.md`): `sub_821BECA8`
+  Options::ShowSliderNumbers, `sub_821BED38` Options::ShowSliderMarks,
+  `sub_821BEAC8` Options::StepSliders, `sub_821BEFE8`
+  Options::ShowButtonList, `sub_821BF520` Options::ShowAnalogList,
+  `sub_821BF158` Options::ShowButtonClashes, `sub_821BF698`
+  Options::ShowAnalogClashes, `sub_821BDE88` Options::EnterAnalog,
+  `sub_821C09B0` Options::MoveSaveDialogCursor, `sub_821C08B0`
+  Options::ChangeSaveDialog, `sub_821C6F58` Options::SavePage,
+  `sub_821C0FF0` Settings::Reload, `sub_821C3398`
+  Options::MoveSlidersCursor, `sub_821C35F0` Options::ChangeSlidersValue,
+  `sub_821C2778` Options::LeaveButtons, `sub_821C2A10`
+  Options::LeaveAnalog (`IsButtonTaken`, `IsAnalogTaken`, `ShowSlider`
+  and `SetCategoryArrow`, now Native, already listed above).
 - The options screen's first migration (attract race `itc_4443`,
   replay `itc_4444` ok; `options-screen.md`): `sub_821BAD08`
   Controls::AnalogPicture, `sub_821BA7E0` Options::IsButtonTaken,

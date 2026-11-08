@@ -56,7 +56,10 @@ file's history. What's left to see in a drive, from every run:
   differing; no subagents); left: the type 2 and 4 options' Inits (step
   tables to generate), the controller pages' picks under
   `sub_821C4BE0`, `sub_821BA380`, `sub_821C1498` and the other users of
-  the settings. Validation agent running.
+  the settings. Validated `itc_4463` (race 88 s at 180, the
+  harnesses ~90.5 s; 0 errors, every harness 0 differing, 42 of 42
+  harness lines; 1 in the race, 21 in the replay `itc_4464` (ok), 20 to
+  drive). Third migration agent running.
 
 ## Done
 
