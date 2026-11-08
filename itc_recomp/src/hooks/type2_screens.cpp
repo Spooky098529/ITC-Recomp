@@ -552,8 +552,14 @@ ITC_TYPE2_SCREENS(8219C3A8, BuildLeavePage)
 // UpdatePage's table on its stack, recompiled) and helpers (from the
 // recompiled hub code). No adapters for ImagesLoadedA sub_8218E2D8 and
 // ImagesLoadedB sub_8218E320 (only WaitForLoad), PostMessage5 sub_8218E7A4
-// (only Choose) and SetUpStatus sub_8218E810 (only Start): their steps
-// above are the harness's.
+// (only Choose) and SetUpStatus sub_8218E810 (only Start), nor (removed,
+// B7 loop, 2026-11-08) for SetPrompts sub_8218F530 (Back, OnDialogDone,
+// FillMenu, MenuPage, Transition5; SavePromptPage and OnMessage44, never
+// seen in play, reach the original), NextNotice sub_8218DBD0 (Start,
+// NoticePage) and NextNotice2 sub_8218DD78 (Start, NoticePage,
+// OnDialogDone; sub_8218DE18, not read, reaches the original): their
+// callers in play are native, the flag switches those; their steps above
+// are the harness's.
 ITC_TYPE2_SCREENS(8218D6A8, HubOnYes)
 ITC_TYPE2_SCREENS(8218D6C0, HubOnNo)
 ITC_TYPE2_SCREENS(8218E420, HubWaitForLoad)
@@ -563,11 +569,8 @@ ITC_TYPE2_SCREENS(8218D9B8, HubReenter)
 ITC_TYPE2_SCREENS(8218E768, HubChoose)
 ITC_TYPE2_SCREENS(8218E530, HubUnload)
 ITC_TYPE2_SCREENS(8218E688, HubClose)
-ITC_TYPE2_SCREENS(8218F530, HubSetPrompts)
 ITC_TYPE2_SCREENS(8218F698, HubBack)
 ITC_TYPE2_SCREENS(8218F6E0, HubStart)
-ITC_TYPE2_SCREENS(8218DBD0, HubNextNotice)
-ITC_TYPE2_SCREENS(8218DD78, HubNextNotice2)
 // The hub's Create, OpenMovie and Destroy (functors) and the archive's
 // callback ImageLoaded (its address handed to Archive::Load; also by
 // sub_8225BD10, not read). No adapters for MarkNoticeImages sub_8218DCC0
