@@ -47,6 +47,11 @@ constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kLoopLast = 0x8211DDE8;
 constexpr uint32_t kFinish = 0x8211DE38;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
+// UiMovie::SetText and SetNodeText (varargs: their unset r7 to r10 passed
+// as 0, the user's call, 2026-10-30) and UiMovie::RestorePose.
+constexpr uint32_t kSetText = 0x8211C1F8;
+constexpr uint32_t kSetNodeText = 0x8211C7E8;
+constexpr uint32_t kRestorePose = 0x82119B80;
 
 // The screen's blocks (docs/known-data.md): the page block (28 bytes), the
 // front-end menu (68), the settings `o` (716).
@@ -184,5 +189,41 @@ uint64_t EnterSliders(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
 // picture's (423 + 2 x the settings' +284, from the 17-word table at the
 // frame's +96, read as the original does for any value). A 208-byte frame.
 uint64_t EnterButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
+// --- The node helpers on the movie (nodes.cpp) ---
+//
+// Each from its frame below `sp` (+80 the movie id, then the words its
+// conversions leave); r3 as the original leaves it. The node lookups
+// (UiMovie::FindNode, UiMovie::Child) are their plain C++.
+
+// sub_821BE218 Options::SetCategoryArrow: node (-1, 21)'s child 0's +16 =
+// `value` as a float. 112-byte frame. The child.
+uint32_t SetCategoryArrow(uint8_t* base, uint64_t value, uint32_t sp);
+// sub_821BE518 Options::ShowVolumeNumber: SetNodeText(m, the node's child 2,
+// 8, volume), then children 4 to 18's +80 = 1 for the volume's (1 to 15).
+// 128-byte frame. The last child.
+uint64_t ShowVolumeNumber(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp,
+                          const Calls& calls);
+// sub_821BE930 Options::ShowMusicName: SetText(m, 6, 8, 501 + value).
+// 112-byte frame. SetText's r3.
+uint64_t ShowMusicName(uint8_t* base, uint64_t value, uint32_t sp, const Calls& calls);
+// sub_821BE988 Options::ShowSlider: SetNodeText(m, child 0, 8, value), child
+// 2's +12 = 16 - trunc((value + 10) x [0x8200A6AC]) as a float. 128-byte
+// frame. Child 2.
+uint32_t ShowSlider(uint8_t* base, uint32_t slider, uint64_t value, uint32_t sp,
+                    const Calls& calls);
+// sub_821BEA48 Options::ShowSliderMark: child 3's +12 as ShowSlider's child
+// 2's. 112-byte frame. Child 3.
+uint32_t ShowSliderMark(uint8_t* base, uint32_t slider, uint64_t value, uint32_t sp);
+// sub_821BF0F0 Options::ShowButtonPicture and sub_821BF630
+// ShowAnalogPicture: nodes (9, 6) to (9, 22), or (11, 6) to (11, 16), +80 =
+// 1 for child 6 + `shown`, else 0. 128-byte frames. The last node.
+uint32_t ShowButtonPicture(uint8_t* base, uint32_t shown, uint32_t sp);
+uint32_t ShowAnalogPicture(uint8_t* base, uint32_t shown, uint32_t sp);
+// sub_821BFA68 Options::ResetNode: child `child` (under `group` unless -1)
+// of the file, live and saved scenes; UiMovie::RestorePose on the live and
+// the saved against the file's. 128-byte frame. The second RestorePose's r3.
+uint64_t ResetNode(uint8_t* base, uint32_t group, uint32_t child, uint32_t sp,
+                   const Calls& calls);
 
 }  // namespace options_screen

@@ -55,4 +55,19 @@ void OptionsEnterSound(PPCContext& ctx, uint8_t* base);
 void OptionsEnterSliders(PPCContext& ctx, uint8_t* base);
 void OptionsEnterButtons(PPCContext& ctx, uint8_t* base);
 
+// The node helpers: Options::SetCategoryArrow sub_821BE218 (r3 the value),
+// ShowVolumeNumber sub_821BE518 (r3 the node, r4 the volume), ShowMusicName
+// sub_821BE930 (r3), ShowSlider sub_821BE988 and ShowSliderMark sub_821BEA48
+// (r3 the slider, r4 the value), ShowButtonPicture sub_821BF0F0 and
+// ShowAnalogPicture sub_821BF630 (r3 the picture), ResetNode sub_821BFA68
+// (r3 the group, r4 the child).
+void OptionsSetCategoryArrow(PPCContext& ctx, uint8_t* base);
+void OptionsShowVolumeNumber(PPCContext& ctx, uint8_t* base);
+void OptionsShowMusicName(PPCContext& ctx, uint8_t* base);
+void OptionsShowSlider(PPCContext& ctx, uint8_t* base);
+void OptionsShowSliderMark(PPCContext& ctx, uint8_t* base);
+void OptionsShowButtonPicture(PPCContext& ctx, uint8_t* base);
+void OptionsShowAnalogPicture(PPCContext& ctx, uint8_t* base);
+void OptionsResetNode(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

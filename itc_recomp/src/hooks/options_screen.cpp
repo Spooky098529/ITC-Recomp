@@ -19,7 +19,10 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "Leave sub_821BCF08, ClosePage sub_821BD330 and Wait sub_821BD3C8; the steps OpenCategories "
               "sub_821BD468, ReturnToCategories sub_821BD5B0, EnterHud sub_821BD728, "
               "ChangeHudValue sub_821BD800, EnterSound sub_821BD908, EnterSliders sub_821BD9A0 "
-              "and EnterButtons sub_821BDAD0; the sound "
+              "and EnterButtons sub_821BDAD0; the node helpers SetCategoryArrow sub_821BE218, "
+              "ShowVolumeNumber sub_821BE518, ShowMusicName sub_821BE930, ShowSlider "
+              "sub_821BE988, ShowSliderMark sub_821BEA48, ShowButtonPicture sub_821BF0F0, "
+              "ShowAnalogPicture sub_821BF630 and ResetNode sub_821BFA68; the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -192,6 +195,44 @@ void OptionsEnterButtons(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::EnterButtons(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void OptionsSetCategoryArrow(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::SetCategoryArrow(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void OptionsShowVolumeNumber(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      options_screen::ShowVolumeNumber(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void OptionsShowMusicName(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ShowMusicName(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+
+void OptionsShowSlider(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ShowSlider(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void OptionsShowSliderMark(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::ShowSliderMark(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32);
+}
+
+void OptionsShowButtonPicture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::ShowButtonPicture(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void OptionsShowAnalogPicture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::ShowAnalogPicture(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void OptionsResetNode(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      options_screen::ResetNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -229,6 +270,14 @@ ITC_OPTIONS_SCREEN(821BD800, OptionsChangeHudValue)
 ITC_OPTIONS_SCREEN(821BD908, OptionsEnterSound)
 ITC_OPTIONS_SCREEN(821BD9A0, OptionsEnterSliders)
 ITC_OPTIONS_SCREEN(821BDAD0, OptionsEnterButtons)
+ITC_OPTIONS_SCREEN(821BE218, OptionsSetCategoryArrow)
+ITC_OPTIONS_SCREEN(821BE518, OptionsShowVolumeNumber)
+ITC_OPTIONS_SCREEN(821BE930, OptionsShowMusicName)
+ITC_OPTIONS_SCREEN(821BE988, OptionsShowSlider)
+ITC_OPTIONS_SCREEN(821BEA48, OptionsShowSliderMark)
+ITC_OPTIONS_SCREEN(821BF0F0, OptionsShowButtonPicture)
+ITC_OPTIONS_SCREEN(821BF630, OptionsShowAnalogPicture)
+ITC_OPTIONS_SCREEN(821BFA68, OptionsResetNode)
 
 // An adapter whose step allocates: the original where the native heap isn't
 // active.

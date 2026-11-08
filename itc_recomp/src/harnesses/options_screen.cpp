@@ -677,6 +677,63 @@ void MovieHandlers(Context& h, const World& w) {
   }
 }
 
+// --- The node helpers ---
+//
+// The frames compared without the words the varargs SetText and
+// SetNodeText store from their unset r7 to r10 (+48 to +79 of the frame:
+// passed as 0 by ours, the user's call, 2026-10-30).
+
+void NodeHelpers(Context& h, const World& w) {
+  // A small value or any word.
+  const auto value = [](Random& r, int32_t lo, int32_t hi) -> uint64_t {
+    return r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(lo + int32_t(r.Below(uint32_t(hi - lo + 1)))));
+  };
+  Group(
+      h, w, "Options::SetCategoryArrow (sub_821BE218)", 60,
+      [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = value(r, -200, 200); },
+      __imp__sub_821BE218, hooks::OptionsSetCategoryArrow, {{112, 24}});
+  Group(
+      h, w, "Options::ShowVolumeNumber (sub_821BE518)", 60,
+      [&](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.leaf(r.Below(kLeaves));
+        t.r4.u64 = value(r, -1, 17);
+      },
+      __imp__sub_821BE518, hooks::OptionsShowVolumeNumber, {{128, 80}, {48, 32}});
+  Group(
+      h, w, "Options::ShowMusicName (sub_821BE930)", 40,
+      [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = value(r, 0, 6); },
+      __imp__sub_821BE930, hooks::OptionsShowMusicName, {{112, 64}, {32, 16}});
+  Group(
+      h, w, "Options::ShowSlider (sub_821BE988)", 60,
+      [&](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.leaf(r.Below(kLeaves));
+        t.r4.u64 = value(r, -12, 12);
+      },
+      __imp__sub_821BE988, hooks::OptionsShowSlider, {{128, 80}, {48, 40}});
+  Group(
+      h, w, "Options::ShowSliderMark (sub_821BEA48)", 60,
+      [&](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.leaf(r.Below(kLeaves));
+        t.r4.u64 = value(r, -12, 12);
+      },
+      __imp__sub_821BEA48, hooks::OptionsShowSliderMark, {{112, 16}});
+  Group(
+      h, w, "Options::ShowButtonPicture (sub_821BF0F0)", 40,
+      [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = value(r, -2, 20); },
+      __imp__sub_821BF0F0, hooks::OptionsShowButtonPicture, {{128, 32}});
+  Group(
+      h, w, "Options::ShowAnalogPicture (sub_821BF630)", 40,
+      [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = value(r, -2, 14); },
+      __imp__sub_821BF630, hooks::OptionsShowAnalogPicture, {{128, 32}});
+  Group(
+      h, w, "Options::ResetNode (sub_821BFA68)", 60,
+      [&](PPCContext& t, Random& r, const World&) {
+        t.r3.u64 = r.Below(3) == 0 ? ~uint64_t(0) : r.Below(6);
+        t.r4.u64 = r.Below(10);
+      },
+      __imp__sub_821BFA68, hooks::OptionsResetNode, {{128, 40}});
+}
+
 }  // namespace
 
 void OptionsScreen(Context& h) {
@@ -689,6 +746,7 @@ void OptionsScreen(Context& h) {
   Leaves(h, w);
   Handlers(h, w);
   MovieHandlers(h, w);
+  NodeHelpers(h, w);
 }
 
 }  // namespace harness
