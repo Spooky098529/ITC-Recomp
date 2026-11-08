@@ -23,14 +23,18 @@
 #include "type67_modes/type67_modes.h"
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace type67_screens {
 
-// The guest calls (type67_modes::Calls: call, open, remove, call_set), and
-// whether MenuList::Release's plain C++ may free (--native_heap).
+// The guest calls (type67_modes::Calls: call, open, remove, call_set),
+// whether MenuList::Release's plain C++ may free (--native_heap), and r4 set
+// for the guest calls after a slot the plain C++ ran with an r4 of its own
+// (the original's r4 left as the call set it).
 struct Calls : type67_modes::Calls {
   bool native_heap = false;
+  std::function<void(uint64_t r4)> set_r4;
 };
 
 // The guest functions called: UiMovie::ResetPose, FinishAll and Run, and
@@ -133,5 +137,101 @@ uint64_t NodeScreenOpenAsset(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t l
 // sub_82236EC0 Type6NodeScreen::Release: UiMovies::Delete([+10100]), then
 // MenuList::Release on +10132 and +10204.
 uint64_t NodeScreenRelease(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// --- The panel groups and the group pair (panel_parts.cpp; a group's +4
+// its UI movie, the pair's +4 the current group, +8 group A, +12 group B) ---
+
+// sub_82258FC8 PanelGroup::Movie: the movie of the group's id
+// (UiMovies::Find on 0x826C5CCC, the id at its frame's +80).
+uint64_t PanelGroupMovie(uint8_t* base, uint64_t group, uint32_t sp);
+// sub_82259008 PanelGroup::Run: UiMovie::Run(the group's movie, 0).
+uint64_t PanelGroupRun(uint8_t* base, uint64_t group, uint32_t sp, const Calls& calls);
+// sub_82249C30 GroupPair::SelectA: +4 = +8. r3 left.
+uint64_t GroupPairSelectA(uint8_t* base, uint64_t r3);
+// sub_82249C40 GroupPair::Reset: +4 = +8, UiMovie::ResetPose on group A's
+// movie.
+uint64_t GroupPairReset(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82249BE0 GroupPair::Run: PanelGroup::Run on +4 (a tail call).
+uint64_t GroupPairRun(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82249BA8 GroupPair::WaitForFade: [0x82815EB0] = 0 when it's set and
+// both fade counts are 0. r3 left.
+uint64_t GroupPairWaitForFade(uint8_t* base, uint64_t r3);
+// sub_82249C70 GroupPair::FinishAll: UiMovie::FinishAll on group A's, then
+// group B's movie.
+uint64_t GroupPairFinishAll(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// --- The panel screens' slots (panel_parts.cpp) ---
+
+// sub_82230790 PanelScreen::IsLoaded: bit 0 of UiMovies::IsLoaded(4) AND
+// IsLoaded(28).
+uint64_t PanelScreenIsLoaded(uint8_t* base, uint32_t sp);
+// sub_82230758 Type6PanelScreen::OpenMovies (assets 22567, 22568) and
+// sub_822401D0 Type7PanelScreen::OpenMovies (22571, 22572): UiMovies::Open
+// of movies 4 and 28.
+uint64_t PanelScreenOpenMovies(uint8_t* base, uint32_t sp, bool type7, const Calls& calls);
+// sub_82240208 PanelScreen::DeleteMovies: UiMovies::Delete of 4 and 28.
+uint64_t PanelScreenDeleteMovies(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82240860 Type7PanelScreen::Back (+9608 = 9, message 5),
+// sub_82247058 Type6PanelScreen::OpenPowerGraph (message 21) and
+// sub_822408B8 Type7PanelScreen::OpenPowerGraph (18), by `function`: the
+// message queued in r4's ring. r3 left.
+uint64_t PanelScreenPost(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t function);
+// sub_82240238 Type7PanelScreen::CarList, sub_82240248 CarEntry,
+// sub_82240258 CarSlot: the type 7 car's +1972, +1976 or +1980 (`offset`).
+uint64_t Type7CarWord(uint8_t* base, uint32_t offset);
+
+// --- The panel screens' handlers (panel_screens.cpp; state +9608, loaded
+// +9612, open +9616, the car list +9644, the group pair +9648) ---
+
+// sub_82249D18 PanelScreen::OnEnter: +9612 = 0, the car list's slot 2
+// (+8), the pair's slot 3 (+12), +9608 = 1 when +9616 is set, else 9.
+uint64_t PanelScreenOnEnter(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                            const Calls& calls);
+// sub_82248CD0 PanelScreen::OpenMovie: a tail call of slot 13 (+52).
+uint64_t PanelScreenOpenMovie(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
+                              const Calls& calls);
+// sub_82249D88 PanelScreen::WaitForMovie: +9612 = slot 2 (+8); when set,
+// +9608 = 3 when +9652 is set, else 9 when +9616 is set, else 4.
+uint64_t PanelScreenWaitForMovie(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
+// sub_82249DF8 PanelScreen::Open: with +9612 set, +9608 = 4 and a tail call
+// of the car list's slot 13 (+52) with r4 = 1; else +9608 = 1.
+uint64_t PanelScreenOpen(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                         const Calls& calls);
+// sub_82248CE0 PanelScreen::Show: unless +9652 is set, the car list's
+// slots 15 to 17 (+60 to +68) with the screen's slots 6 to 8 (+24 to +32);
+// then the car list's slots 3 (+12) and 1 (+4), the pair's slot 5 (+20).
+uint64_t PanelScreenShow(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                         const Calls& calls);
+// sub_82248C48 PanelScreen::Update: the pair's slot 2 (+8), the car list's
+// slot 6 (+24), the pair's slot 1 (+4), each when its pointer isn't 0.
+uint64_t PanelScreenUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                           const Calls& calls);
+// sub_82248DF8 PanelScreen::OnMessage24: a tail call of the car list's
+// slot 11 (+44) with r4 = 0.
+uint64_t PanelScreenOnMessage24(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                                const Calls& calls);
+// sub_82249E38 PanelScreen::Leave: the car list's and the pair's slot 7
+// (+28), the screen's slot 18 (+72), +9608 = 7.
+uint64_t PanelScreenLeave(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                          const Calls& calls);
+// sub_82248B08 PanelScreen::OnLeft: the car list's and the pair's slot 4
+// (+16).
+uint64_t PanelScreenOnLeft(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                           const Calls& calls);
+// sub_82248B58 PanelScreen::DrawList: with the car list, its slot 5 (+20),
+// then the screen's slot 3, 4 or 5 (+12 to +20) for the first of its slots
+// 8, 9, 10 (+32 to +40) answering nonzero; then the screen's slot 10 (+40).
+uint64_t PanelScreenDrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                             const Calls& calls);
+// sub_82240908 Type7PanelScreen::DrawList: PanelScreen::DrawList, then
+// Type7PanelScreen::AskQuit (sub_82240518, never seen in play: the
+// original) when +11700 is set.
+uint64_t Type7PanelScreenDrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                  const Calls& calls);
+// sub_82240958 Type7PanelScreen::Draw: DrawList (a tail call) while the
+// quit dialog +9656 is 0; at 2, +9608 = 10 once both fade counts are 0.
+uint64_t Type7PanelScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
 
 }  // namespace type67_screens

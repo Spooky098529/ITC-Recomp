@@ -458,6 +458,8 @@ set(ITC_SOURCES
     src/type67_modes/screens.cpp
     src/hooks/type67_screens.cpp
     src/type67_screens/list_screens.cpp
+    src/type67_screens/panel_parts.cpp
+    src/type67_screens/panel_screens.cpp
     src/type67_screens/slots.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp

@@ -39,4 +39,37 @@ void Type6NodeScreenIsLoaded(PPCContext& ctx, uint8_t* base);
 void Type6NodeScreenOpenMovie(PPCContext& ctx, uint8_t* base);
 void Type6NodeScreenRelease(PPCContext& ctx, uint8_t* base);
 
+// The panel groups and the group pair (PanelGroup::Run sub_82259008 has
+// no adapter: only GroupPair::Run calls it).
+void PanelGroupMovie(PPCContext& ctx, uint8_t* base);
+void GroupPairSelectA(PPCContext& ctx, uint8_t* base);
+void GroupPairReset(PPCContext& ctx, uint8_t* base);
+void GroupPairRun(PPCContext& ctx, uint8_t* base);
+void GroupPairWaitForFade(PPCContext& ctx, uint8_t* base);
+void GroupPairFinishAll(PPCContext& ctx, uint8_t* base);
+
+// The panel screens' slots and handlers (Type7PanelScreen::DrawList
+// sub_82240908 has no adapter: only Type7PanelScreen::Draw calls it).
+void PanelScreenIsLoaded(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenOpenMovies(PPCContext& ctx, uint8_t* base);
+void Type7PanelScreenOpenMovies(PPCContext& ctx, uint8_t* base);
+void PanelScreenDeleteMovies(PPCContext& ctx, uint8_t* base);
+void Type7PanelScreenBack(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenOpenPowerGraph(PPCContext& ctx, uint8_t* base);
+void Type7PanelScreenOpenPowerGraph(PPCContext& ctx, uint8_t* base);
+void Type7PanelScreenCarList(PPCContext& ctx, uint8_t* base);
+void Type7PanelScreenCarEntry(PPCContext& ctx, uint8_t* base);
+void Type7PanelScreenCarSlot(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnEnter(PPCContext& ctx, uint8_t* base);
+void PanelScreenOpenMovie(PPCContext& ctx, uint8_t* base);
+void PanelScreenWaitForMovie(PPCContext& ctx, uint8_t* base);
+void PanelScreenOpen(PPCContext& ctx, uint8_t* base);
+void PanelScreenShow(PPCContext& ctx, uint8_t* base);
+void PanelScreenUpdate(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnMessage24(PPCContext& ctx, uint8_t* base);
+void PanelScreenLeave(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnLeft(PPCContext& ctx, uint8_t* base);
+void PanelScreenDrawList(PPCContext& ctx, uint8_t* base);
+void Type7PanelScreenDraw(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

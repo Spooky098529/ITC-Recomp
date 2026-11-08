@@ -27,6 +27,7 @@
 #include "base/log.h"
 #include "hooks/app_start_up.h"
 #include "hooks/type67_screens.h"
+#include "hooks/ui_movies.h"
 #include "memory/heap.h"
 #include "type67_screens/type67_screens.h"
 #include "ui_movies/game.h"
@@ -90,6 +91,20 @@ bool Record(PPCContext& ctx, uint32_t address) {
   return false;
 }
 
+// UiMovie::Update (UiMovie::Run's jump) recorded through the UI movies'
+// stand-in: (address, r3, r4, r1, lr), answered 0.
+bool RecordUpdate(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (function != 0x8211D2F8) return false;
+  g_records.insert(g_records.end(),
+                   {function, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, uint32_t(ctx.lr)});
+  ctx.r3.u64 = 0;
+  return true;
+}
+
+uint32_t g_movie = 0;  // the harness's movie block (kMovieBytes)
+constexpr uint32_t kMovieBytes = 0xA100;
+constexpr uint32_t kFadeWords[3] = {ts::kFadeWait, ts::kFadeCountA, ts::kFadeCountB};
+
 // The plain C++ with the recording calls.
 using NativeCall = std::function<uint64_t(PPCContext&, uint8_t*, const ts::Calls&)>;
 
@@ -110,11 +125,13 @@ ts::Calls RecordingCalls(PPCContext& t, uint8_t* base) {
 using Setup = std::function<void(Random&, uint32_t)>;
 
 // Runs `cases` cases of a function: the world random, the vtable picked
-// from `targets`, the lists' blocks made, then `setup`; r3 the screen, r4
-// the dispatcher, lr a return address of the harness's.
+// from `targets`, the lists' blocks made, then `setup`; r3 the screen (plus
+// `r3_offset`, an object in the world; now and then with its high half
+// set), r4 the dispatcher, lr a return address of the harness's.
 void Cases(Context& h, const Block& world, const char* name, uint32_t address, int cases,
            const std::vector<uint32_t>& targets, const std::vector<uint32_t>& lists,
-           const Setup& setup, GuestFunction recompiled, const NativeCall& native) {
+           const Setup& setup, GuestFunction recompiled, const NativeCall& native,
+           uint32_t r3_offset = 0) {
   uint8_t* const base = h.base;
   Results results(fmt::format("{} (sub_{:08X})", name, address));
   for (int c = 0; c < cases; c++) {
@@ -138,10 +155,13 @@ void Cases(Context& h, const Block& world, const char* name, uint32_t address, i
       }
       setup(r, w);
       PPCContext t = CallContext(h);
-      t.r3.u64 = (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0) | w;
+      t.r3.u64 = ((r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0) | w) + r3_offset;
       t.r4.u64 = w + kDispatcher;
       t.lr = 0x82000000 + 4 * r.Below(1024);
       g_records.clear();
+      const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+          ui_movies_hooks::g_update_callee_stand_in;
+      ui_movies_hooks::g_update_callee_stand_in = RecordUpdate;
       if (v == 0) {
         const hooks::StartUpRecorder saved = hooks::g_start_up_recorder;
         hooks::g_start_up_recorder = Record;
@@ -153,6 +173,7 @@ void Cases(Context& h, const Block& world, const char* name, uint32_t address, i
         const ts::Calls calls = RecordingCalls(t, base);
         t.r3.u64 = native(t, base, calls);
       }
+      ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
       for (size_t i = 0; i < lists.size(); i++) {
         const uint32_t block = blocks[i];
         if (block == 0) continue;
@@ -166,6 +187,8 @@ void Cases(Context& h, const Block& world, const char* name, uint32_t address, i
       for (const uint32_t word : g_records) out[v].Word(word);
       out[v].Word(0xFFFFFFFF);
       out[v].Bytes(Read(base, w, world.bytes));
+      out[v].Bytes(Read(base, g_movie, kMovieBytes));
+      for (const uint32_t g : kFadeWords) out[v].Word(guest::LoadU32(base, g));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
     }
@@ -282,16 +305,221 @@ void ListAndNodeScreens(Context& h, const Block& world, uint32_t movie) {
   guest::StoreU32(base, kMissingMovie, saved_missing);
 }
 
+
+// The panel screens: the car list at the world's +0x3600 (its vtable at
+// +0x3900), the group pair at +0x3A00 (vtable +0x3B00; its groups at
+// +0x3C00 and +0x3C40, their ids 16 to 19), the fade words random (their
+// counts mostly 0) and put back after; +11700 0 (Type7PanelScreen::AskQuit
+// never ran in play: its branch is the original's, not taken here).
+void PanelScreens(Context& h, const Block& world, uint32_t movie) {
+  uint8_t* const base = h.base;
+  for (const uint32_t id : {4u, 28u, 16u, 17u, 18u, 19u}) {
+    if (id >= 16 && ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id) != kMissingMovie) {
+      ITC_LOG_ERROR("harness: type67_screens: movie {} is in the table; the panels skipped", id);
+      return;
+    }
+  }
+  const uint32_t saved_missing = guest::LoadU32(base, kMissingMovie);
+  constexpr uint32_t kList = 0x3600, kListVtable = 0x3900, kPair = 0x3A00, kPairVtable = 0x3B00;
+  const std::vector<uint32_t> stand_ins = {ts::kEmpty, kSetR4, kGetter};
+  // The screen's slots: the stand-ins and the panel screens' slots (the
+  // posts only where r4 is the dispatcher: not slots 6 to 8, which Show
+  // calls with r4 left by the call before).
+  const std::vector<uint32_t> screen_targets = {
+      ts::kEmpty, kSetR4,     kGetter,    ts::kEmpty, kSetR4,     kGetter,    0x82230790,
+      0x82230758, 0x822401D0, 0x82240208, 0x82240860, 0x82247058, 0x822408B8, 0x82240238,
+      0x82240248, 0x82240258};
+  const std::vector<uint32_t> no_posts = {ts::kEmpty, kSetR4,     kGetter,   0x82240238,
+                                          0x82240248, 0x82240258, 0x82230790};
+  const std::vector<uint32_t> pair_targets = {ts::kEmpty, kSetR4,     kGetter,    0x82249C30,
+                                              0x82249C40, 0x82249BE0, 0x82249BA8, 0x82249C70};
+  // Update and DrawList test their pointers; the other handlers read them
+  // as set.
+  static bool nulls = false;
+  const Setup panel = [base, movie, stand_ins, no_posts, pair_targets](Random& r, uint32_t w) {
+    for (const uint32_t at : {9612u, 9616u, 9652u}) {
+      guest::StoreU32(base, w + at, r.Below(2) == 0 ? 0 : r.Below(3));
+    }
+    guest::StoreU32(base, w + 9656, r.Below(4));
+    guest::StoreU32(base, w + 11700, 0);
+    guest::StoreU32(base, w + 9644, nulls && r.Below(4) == 0 ? 0 : w + kList);
+    guest::StoreU32(base, w + 9648, nulls && r.Below(4) == 0 ? 0 : w + kPair);
+    for (const uint32_t slot : {24u, 28u, 32u}) {
+      guest::StoreU32(base, w + kVtable + slot, no_posts[r.Below(uint32_t(no_posts.size()))]);
+    }
+    guest::StoreU32(base, w + kList, w + kListVtable);
+    guest::StoreU32(base, w + kList + 80, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+    for (uint32_t i = 0; i < 20; i++) {
+      guest::StoreU32(base, w + kListVtable + 4 * i,
+                      stand_ins[r.Below(uint32_t(stand_ins.size()))]);
+    }
+    guest::StoreU32(base, w + kPair, w + kPairVtable);
+    guest::StoreU32(base, w + kPair + 8, w + 0x3C00);
+    guest::StoreU32(base, w + kPair + 12, w + 0x3C40);
+    guest::StoreU32(base, w + kPair + 4, r.Below(2) == 0 ? w + 0x3C00 : w + 0x3C40);
+    guest::StoreU32(base, w + kPair + 80, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+    for (uint32_t i = 0; i < 8; i++) {
+      guest::StoreU32(base, w + kPairVtable + 4 * i,
+                      pair_targets[r.Below(uint32_t(pair_targets.size()))]);
+    }
+    guest::StoreU32(base, w + 0x3C00 + 4, 16 + r.Below(4));
+    guest::StoreU32(base, w + 0x3C40 + 4, 16 + r.Below(4));
+    guest::StoreU32(base, kMissingMovie, movie);
+    guest::StoreU32(base, movie + kMovieLoaded, r.Below(3) ? 1 : 0);
+    guest::StoreU32(base, ts::kFadeWait, r.Below(2));
+    guest::StoreU32(base, ts::kFadeCountA, r.Below(3) == 0 ? r.Below(3) : 0);
+    guest::StoreU32(base, ts::kFadeCountB, r.Below(3) == 0 ? r.Below(3) : 0);
+  };
+  const int n = 24;
+  struct Function {
+    const char* name;
+    uint32_t address;
+    int cases;
+    uint32_t r3_offset;  // r3 = the world + this (the screen at 0)
+    GuestFunction recompiled;
+    NativeCall native;
+  };
+  const Function functions[] = {
+      {"PanelGroup::Movie", 0x82258FC8, 8, 0x3C00, __imp__sub_82258FC8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelGroupMovie(b, t.r3.u64, t.r1.u32);
+       }},
+      {"PanelGroup::Run", 0x82259008, 8, 0x3C40, __imp__sub_82259008,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelGroupRun(b, t.r3.u64, t.r1.u32, c);
+       }},
+      {"GroupPair::SelectA", 0x82249C30, 4, kPair, __imp__sub_82249C30,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) { return ts::GroupPairSelectA(b, t.r3.u64); }},
+      {"GroupPair::Reset", 0x82249C40, 8, kPair, __imp__sub_82249C40,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::GroupPairReset(b, t.r3.u64, t.r1.u32, c);
+       }},
+      {"GroupPair::Run", 0x82249BE0, 8, kPair, __imp__sub_82249BE0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::GroupPairRun(b, t.r3.u64, t.r1.u32, c);
+       }},
+      {"GroupPair::WaitForFade", 0x82249BA8, 12, kPair, __imp__sub_82249BA8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::GroupPairWaitForFade(b, t.r3.u64);
+       }},
+      {"GroupPair::FinishAll", 0x82249C70, 8, kPair, __imp__sub_82249C70,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::GroupPairFinishAll(b, t.r3.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::IsLoaded", 0x82230790, 8, 0, __imp__sub_82230790,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenIsLoaded(b, t.r1.u32);
+       }},
+      {"Type6PanelScreen::OpenMovies", 0x82230758, 2, 0, __imp__sub_82230758,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOpenMovies(b, t.r1.u32, false, c);
+       }},
+      {"Type7PanelScreen::OpenMovies", 0x822401D0, 2, 0, __imp__sub_822401D0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOpenMovies(b, t.r1.u32, true, c);
+       }},
+      {"PanelScreen::DeleteMovies", 0x82240208, 2, 0, __imp__sub_82240208,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenDeleteMovies(b, t.r1.u32, c);
+       }},
+      {"Type7PanelScreen::Back", 0x82240860, 8, 0, __imp__sub_82240860,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x82240860);
+       }},
+      {"Type6PanelScreen::OpenPowerGraph", 0x82247058, 8, 0, __imp__sub_82247058,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x82247058);
+       }},
+      {"Type7PanelScreen::OpenPowerGraph", 0x822408B8, 8, 0, __imp__sub_822408B8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x822408B8);
+       }},
+      {"Type7PanelScreen::CarList", 0x82240238, 2, 0, __imp__sub_82240238,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1972); }},
+      {"Type7PanelScreen::CarEntry", 0x82240248, 2, 0, __imp__sub_82240248,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1976); }},
+      {"Type7PanelScreen::CarSlot", 0x82240258, 2, 0, __imp__sub_82240258,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1980); }},
+      {"PanelScreen::OnEnter", 0x82249D18, n, 0, __imp__sub_82249D18,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOnEnter(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::OpenMovie", 0x82248CD0, n, 0, __imp__sub_82248CD0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOpenMovie(b, t.r3.u64, t.r4.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"PanelScreen::WaitForMovie", 0x82249D88, n, 0, __imp__sub_82249D88,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenWaitForMovie(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::Open", 0x82249DF8, n, 0, __imp__sub_82249DF8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOpen(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"PanelScreen::Show", 0x82248CE0, n, 0, __imp__sub_82248CE0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenShow(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::Update", 0x82248C48, n, 0, __imp__sub_82248C48,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenUpdate(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::OnMessage24", 0x82248DF8, 8, 0, __imp__sub_82248DF8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOnMessage24(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"PanelScreen::Leave", 0x82249E38, n, 0, __imp__sub_82249E38,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenLeave(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::OnLeft", 0x82248B08, n, 0, __imp__sub_82248B08,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOnLeft(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::DrawList", 0x82248B58, 32, 0, __imp__sub_82248B58,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"Type7PanelScreen::DrawList", 0x82240908, n, 0, __imp__sub_82240908,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::Type7PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"Type7PanelScreen::Draw", 0x82240958, 32, 0, __imp__sub_82240958,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::Type7PanelScreenDraw(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+  };
+  for (const Function& f : functions) {
+    nulls = f.address == 0x82248C48 || f.address == 0x82248B58 || f.address == 0x82240908 ||
+            f.address == 0x82240958;
+    Cases(h, world, f.name, f.address, f.cases, screen_targets, {}, panel, f.recompiled, f.native,
+          f.r3_offset);
+  }
+  guest::StoreU32(base, kMissingMovie, saved_missing);
+}
+
 }  // namespace
 
 void Type67Screens(Context& h) {
   const Block world(kWorldBytes);
-  const Block movie(0xA000);
+  const Block movie(kMovieBytes);
   if (!world.address || !movie.address) {
     ITC_LOG_ERROR("harness: type67_screens: no block from the allocation layer");
     return;
   }
+  g_movie = movie.address;
+  // A movie with nothing queued or looping and empty scenes (its live,
+  // saved and file scenes a node at +0xA000 without children): ResetPose
+  // and FinishAll leave it as it is.
+  Fill(h.base, movie.address, kMovieBytes, 0);
+  for (const uint32_t at : {16u, 20u, 24u}) {
+    guest::StoreU32(h.base, movie.address + at, movie.address + 0xA000);
+  }
+  uint32_t saved_fades[3];
+  for (int i = 0; i < 3; i++) saved_fades[i] = guest::LoadU32(h.base, kFadeWords[i]);
   ListAndNodeScreens(h, world, movie.address);
+  PanelScreens(h, world, movie.address);
+  for (int i = 0; i < 3; i++) guest::StoreU32(h.base, kFadeWords[i], saved_fades[i]);
 }
 
 }  // namespace harness

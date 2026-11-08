@@ -34,6 +34,7 @@ ts::Calls Type67ScreensCalls(PPCContext& ctx, uint8_t* base) {
   ts::Calls calls;
   static_cast<type67_modes::Calls&>(calls) = Type67Calls(ctx, base);
   calls.native_heap = NativeHeapActive();
+  calls.set_r4 = [&ctx](uint64_t r4) { ctx.r4.u64 = r4; };
   return calls;
 }
 
@@ -71,6 +72,42 @@ ITC_TS_STEP(Type6NodeScreenOpenMovie,
             ts::NodeScreenOpenAsset(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(Type6NodeScreenRelease, ts::NodeScreenRelease(base, ctx.r3.u64, ctx.r1.u32, calls))
 
+ITC_TS_STEP(PanelGroupMovie, ts::PanelGroupMovie(base, ctx.r3.u64, ctx.r1.u32))
+ITC_TS_STEP(GroupPairSelectA, ts::GroupPairSelectA(base, ctx.r3.u64))
+ITC_TS_STEP(GroupPairReset, ts::GroupPairReset(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(GroupPairRun, ts::GroupPairRun(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(GroupPairWaitForFade, ts::GroupPairWaitForFade(base, ctx.r3.u64))
+ITC_TS_STEP(GroupPairFinishAll, ts::GroupPairFinishAll(base, ctx.r3.u64, ctx.r1.u32, calls))
+
+ITC_TS_STEP(PanelScreenIsLoaded, ts::PanelScreenIsLoaded(base, ctx.r1.u32))
+ITC_TS_STEP(Type6PanelScreenOpenMovies, ts::PanelScreenOpenMovies(base, ctx.r1.u32, false, calls))
+ITC_TS_STEP(Type7PanelScreenOpenMovies, ts::PanelScreenOpenMovies(base, ctx.r1.u32, true, calls))
+ITC_TS_STEP(PanelScreenDeleteMovies, ts::PanelScreenDeleteMovies(base, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7PanelScreenBack, ts::PanelScreenPost(base, ctx.r3.u64, ctx.r4.u64, 0x82240860))
+ITC_TS_STEP(Type6PanelScreenOpenPowerGraph,
+            ts::PanelScreenPost(base, ctx.r3.u64, ctx.r4.u64, 0x82247058))
+ITC_TS_STEP(Type7PanelScreenOpenPowerGraph,
+            ts::PanelScreenPost(base, ctx.r3.u64, ctx.r4.u64, 0x822408B8))
+ITC_TS_STEP(Type7PanelScreenCarList, ts::Type7CarWord(base, 1972))
+ITC_TS_STEP(Type7PanelScreenCarEntry, ts::Type7CarWord(base, 1976))
+ITC_TS_STEP(Type7PanelScreenCarSlot, ts::Type7CarWord(base, 1980))
+ITC_TS_STEP(PanelScreenOnEnter, ts::PanelScreenOnEnter(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenOpenMovie,
+            ts::PanelScreenOpenMovie(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(PanelScreenWaitForMovie,
+            ts::PanelScreenWaitForMovie(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenOpen, ts::PanelScreenOpen(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(PanelScreenShow, ts::PanelScreenShow(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenUpdate, ts::PanelScreenUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenOnMessage24,
+            ts::PanelScreenOnMessage24(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(PanelScreenLeave, ts::PanelScreenLeave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenOnLeft, ts::PanelScreenOnLeft(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenDrawList,
+            ts::PanelScreenDrawList(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7PanelScreenDraw,
+            ts::Type7PanelScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -106,3 +143,35 @@ ITC_TYPE67_SCREENS(82259298, NodeScreenOnLeft)
 ITC_TYPE67_SCREENS(82236FD8, Type6NodeScreenIsLoaded)
 ITC_TYPE67_SCREENS(82236EB0, Type6NodeScreenOpenMovie)
 ITC_TYPE67_SCREENS(82236EC0, Type6NodeScreenRelease)
+// The group pair's slots (through its vtable) and PanelGroup::Movie (from
+// the car list's functions, recompiled).
+ITC_TYPE67_SCREENS(82258FC8, PanelGroupMovie)
+ITC_TYPE67_SCREENS(82249C30, GroupPairSelectA)
+ITC_TYPE67_SCREENS(82249C40, GroupPairReset)
+ITC_TYPE67_SCREENS(82249BE0, GroupPairRun)
+ITC_TYPE67_SCREENS(82249BA8, GroupPairWaitForFade)
+ITC_TYPE67_SCREENS(82249C70, GroupPairFinishAll)
+// The panel screens' vtable slots.
+ITC_TYPE67_SCREENS(82230790, PanelScreenIsLoaded)
+ITC_TYPE67_SCREENS(82230758, Type6PanelScreenOpenMovies)
+ITC_TYPE67_SCREENS(822401D0, Type7PanelScreenOpenMovies)
+ITC_TYPE67_SCREENS(82240208, PanelScreenDeleteMovies)
+ITC_TYPE67_SCREENS(82240860, Type7PanelScreenBack)
+ITC_TYPE67_SCREENS(82247058, Type6PanelScreenOpenPowerGraph)
+ITC_TYPE67_SCREENS(822408B8, Type7PanelScreenOpenPowerGraph)
+ITC_TYPE67_SCREENS(82240238, Type7PanelScreenCarList)
+ITC_TYPE67_SCREENS(82240248, Type7PanelScreenCarEntry)
+ITC_TYPE67_SCREENS(82240258, Type7PanelScreenCarSlot)
+// The panel screens' handlers (through their machines' transitions);
+// PanelScreen::DrawList also from the other screens' draws (recompiled).
+ITC_TYPE67_SCREENS(82249D18, PanelScreenOnEnter)
+ITC_TYPE67_SCREENS(82248CD0, PanelScreenOpenMovie)
+ITC_TYPE67_SCREENS(82249D88, PanelScreenWaitForMovie)
+ITC_TYPE67_SCREENS(82249DF8, PanelScreenOpen)
+ITC_TYPE67_SCREENS(82248CE0, PanelScreenShow)
+ITC_TYPE67_SCREENS(82248C48, PanelScreenUpdate)
+ITC_TYPE67_SCREENS(82248DF8, PanelScreenOnMessage24)
+ITC_TYPE67_SCREENS(82249E38, PanelScreenLeave)
+ITC_TYPE67_SCREENS(82248B08, PanelScreenOnLeft)
+ITC_TYPE67_SCREENS(82248B58, PanelScreenDrawList)
+ITC_TYPE67_SCREENS(82240958, Type7PanelScreenDraw)

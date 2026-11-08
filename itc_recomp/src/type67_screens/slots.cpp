@@ -29,7 +29,6 @@ namespace {
 std::optional<uint64_t> Native(uint8_t* base, uint32_t target, uint64_t r3,
                                std::optional<uint64_t> r4, uint32_t sp, uint32_t lr,
                                const Calls& calls) {
-  (void)r4;
   switch (target) {
     case kEmpty:
       return r3;
@@ -49,8 +48,71 @@ std::optional<uint64_t> Native(uint8_t* base, uint32_t target, uint64_t r3,
       return NodeScreenOpenAsset(base, r3, sp, lr, calls);
     case 0x82236EC0:
       return NodeScreenRelease(base, r3, sp, calls);
+    case 0x82230790:
+      return PanelScreenIsLoaded(base, sp);
+    case 0x82230758:
+      return PanelScreenOpenMovies(base, sp, false, calls);
+    case 0x822401D0:
+      return PanelScreenOpenMovies(base, sp, true, calls);
+    case 0x82240208:
+      return PanelScreenDeleteMovies(base, sp, calls);
+    case 0x82240860:
+    case 0x82247058:
+    case 0x822408B8:
+      if (!r4) return std::nullopt;
+      return PanelScreenPost(base, r3, *r4, target);
+    case 0x82240238:
+      return Type7CarWord(base, 1972);
+    case 0x82240248:
+      return Type7CarWord(base, 1976);
+    case 0x82240258:
+      return Type7CarWord(base, 1980);
+    case 0x82249C30:
+      return GroupPairSelectA(base, r3);
+    case 0x82249C40:
+      return GroupPairReset(base, r3, sp, calls);
+    case 0x82249BE0:
+      return GroupPairRun(base, r3, sp, calls);
+    case 0x82249BA8:
+      return GroupPairWaitForFade(base, r3);
+    case 0x82249C70:
+      return GroupPairFinishAll(base, r3, sp, calls);
     default:
       return std::nullopt;
+  }
+}
+
+// Whether Native runs `target` (given whether the call sets r4).
+bool IsNative(uint32_t target, bool has_r4) {
+  switch (target) {
+    case 0x82240860:
+    case 0x82247058:
+    case 0x822408B8:
+      return has_r4;
+    case kEmpty:
+    case 0x82242F70:
+    case 0x82233320:
+    case 0x82242F10:
+    case 0x82233330:
+    case 0x82242F20:
+    case 0x82236FD8:
+    case 0x82236EB0:
+    case 0x82236EC0:
+    case 0x82230790:
+    case 0x82230758:
+    case 0x822401D0:
+    case 0x82240208:
+    case 0x82240238:
+    case 0x82240248:
+    case 0x82240258:
+    case 0x82249C30:
+    case 0x82249C40:
+    case 0x82249BE0:
+    case 0x82249BA8:
+    case 0x82249C70:
+      return true;
+    default:
+      return false;
   }
 }
 
@@ -59,8 +121,12 @@ std::optional<uint64_t> Native(uint8_t* base, uint32_t target, uint64_t r3,
 uint64_t Slot(uint8_t* base, uint64_t object_r3, uint32_t slot, std::optional<uint64_t> r4,
               uint32_t frame, uint32_t lr, const Calls& calls) {
   const uint32_t target = LoadU32(base, LoadU32(base, uint32_t(object_r3)) + slot);
-  if (const std::optional<uint64_t> r3 = Native(base, target, object_r3, r4, frame, lr, calls)) {
-    return *r3;
+  if (IsNative(target, r4.has_value())) {
+    // The original sets r4 before the call; the callee may leave another.
+    if (r4) {
+      calls.set_r4(*r4);
+    }
+    return *Native(base, target, object_r3, r4, frame, lr, calls);
   }
   if (r4) {
     return calls.call(target, frame, lr, object_r3, *r4);
