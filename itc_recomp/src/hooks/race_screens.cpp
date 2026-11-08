@@ -31,7 +31,8 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "ColorItems, ShowAdjust and Open, the options page's ToggleOption, OptionsPage, "
               "SetUpOptions and SetAdjust, the menu after the race's ConfirmPage, Intro, Show, "
               "CloseMain, Move, ShowItems, SetUpItems, ColorItems, Start and Open, "
-              "the confirm dialog's Question, OpenAnim, Move, Draw, SetText (its UI movie "
+              "the confirm dialog's Question, OpenAnim, Move, ShowMessage (its messages 0 to 11, "
+              "never seen in play, the original), Draw, SetText (its UI movie "
               "setters' unset varargs 0) and Open (SetText's plain C++, its unset varargs 0), "
               "PauseMenu::OpenOptions, "
               "the draws PauseMenu::, AfterRaceMenu:: and CareerResults::Draw, the career's "
@@ -409,6 +410,19 @@ void RaceScreensRaceDialogMove(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = race_screens::RaceDialogMove(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceScreensRaceDialogShowMessage(PPCContext& ctx, uint8_t* base) {
+  std::optional<uint64_t> r3;
+  {
+    GuestCalls guest(ctx, base);
+    r3 = race_screens::RaceDialogShowMessage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  }
+  if (!r3) {
+    __imp__sub_82218C10(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
 void RaceScreensRaceDialogDraw(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogDraw(base, ctx.r1.u32, guest.calls());
@@ -532,6 +546,7 @@ ITC_RACE_SCREENS(8221BA68, RaceScreensAfterRaceMenuOpen)
 ITC_RACE_SCREENS(82217F40, RaceScreensRaceDialogQuestion)
 ITC_RACE_SCREENS(822186A8, RaceScreensRaceDialogOpenAnim)
 ITC_RACE_SCREENS(82218788, RaceScreensRaceDialogMove)
+ITC_RACE_SCREENS(82218C10, RaceScreensRaceDialogShowMessage)
 // RaceDialog::SetText (from Open, AskSlot and ShowMessage, recompiled).
 ITC_RACE_SCREENS(82218838, RaceScreensRaceDialogSetText)
 // RaceDialog::Open (from PauseMenu::MainPage and AfterRaceMenu::MainPage,

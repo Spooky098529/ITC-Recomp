@@ -147,6 +147,9 @@ void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogQuestion(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogOpenAnim(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogMove(PPCContext& ctx, uint8_t* base);
+// ShowMessage sub_82218C10 (transition 0, r3 the step word; the original for
+// the messages 0 to 11).
+void RaceScreensRaceDialogShowMessage(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogDraw(PPCContext& ctx, uint8_t* base);
 // PauseMenu::OpenOptions sub_8220EEF0 (r3 the step word); the draws (r3 the
 // screen): PauseMenu::Draw sub_8220FB10, AfterRaceMenu::Draw sub_8221BB48,

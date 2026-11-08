@@ -1450,6 +1450,35 @@ void Dialog(Context& h, const MovieWorld& w) {
              hooks::RaceScreensRaceDialogOpenAnim, {128, 32});
   MovieGroup(h, w, "RaceDialog::Move (sub_82218788)", 100, step, __imp__sub_82218788,
              hooks::RaceScreensRaceDialogMove, {128, 32});
+  // ShowMessage: the step word 0 or 1 (the world's), the message (+12) the
+  // question's (13) mostly, now and then any word or 0 to 11 (the jump
+  // table's messages, never seen in play: the original on both sides), the
+  // mode (+16) 0 to 3 or any (data's), the selection to set (+28) 0 to 2 or
+  // any; the dialog list's item block (+68) 0 first, MenuList::Init's then
+  // compared and freed.
+  FrameSpec show{160, 48};
+  show.after = [&](Outputs& out) {
+    const uint32_t list = w.block(rs::kDialogList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 2 * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  MovieGroup(
+      h, w, "RaceDialog::ShowMessage (sub_82218C10)", 200,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        data(r, w);
+        StepWord(t, r, w, rs::kDialogPages);
+        const uint32_t d = w.block(rs::kDialogData);
+        const uint32_t messages[6] = {13, 13, 13, 13, uint32_t(r.Next()), r.Below(12)};
+        guest::StoreU32(h.base, d + 12, messages[r.Below(6)]);
+        guest::StoreU32(h.base, d + 28, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(3));
+        guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
+      },
+      __imp__sub_82218C10, hooks::RaceScreensRaceDialogShowMessage, show);
   // Draw: the running transition (+12) none (-1), OpenAnim's (1), Move's (2)
   // or another negative one (ShowMessage's, 0, never seen in play, left out:
   // the original on both sides), the queued one (+16) -1 or 0 to 2.
@@ -1550,12 +1579,19 @@ void Draws(Context& h, const MovieWorld& w) {
       __imp__sub_8220EEF0, hooks::RaceScreensPauseMenuOpenOptions, open_options);
   FrameSpec pause_draw{320, 144};
   pause_draw.after = pause_block;
+  // The pause list's item block (+68) 0 only for OpenOptions (6), whose
+  // MenuList::Init frees it; the other transitions read the world's item
+  // words (ShowMain's ColorItems: with the block 0 the original read guest
+  // address 0, a harness gap met once the cases' seeds moved, 2026-11-08).
   const MovieSetupFn pause_draw_setup = [&h](PPCContext& t, Random& r, const MovieWorld& w) {
-    guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
     const uint32_t pages = w.block(rs::kPausePages);
     const uint32_t transitions[16] = {0xFFFFFFFFu, 0xFFFFFFFFu, uint32_t(-2 - int32_t(r.Below(9))),
                                       0, 2, 3, 4, 5, 6, 7, 8, 9, 12, 17, 18, 19};
-    guest::StoreU32(h.base, pages + 12, transitions[r.Below(16)]);
+    const uint32_t transition = transitions[r.Below(16)];
+    guest::StoreU32(h.base, pages + 12, transition);
+    if (transition == 6) {
+      guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
+    }
     guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(21));
     guest::StoreU32(h.base, pages + 4, r.Below(3) == 0 ? 4 : r.Below(6));
     guest::StoreU32(h.base, pages + 0, r.Below(3) == 0 ? 4 : r.Below(6));

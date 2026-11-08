@@ -471,6 +471,19 @@ uint64_t RaceDialogMove(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
 // negative transition other than -1: Finish(1)); else UiMovie::Run(movie,
 // 0). r3 as the original leaves it.
 uint64_t RaceDialogDraw(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82218C10 RaceDialog::ShowMessage (transition 0), from a 160-byte
+// frame: on its first call (the step word 0; it's set to 1) by the data's
+// +16: 0 the named animation 13 played, the type-0 node 0's +80 = 0 and node
+// 2's child 0's +80 = 1; 1 named 12 played, MenuList::Init(dialog list, 2,
+// 2, 1, 153 to 156, 159, 158) and its selection the data's +28; 2 as 0
+// with the two words swapped and the data's +24 = 0; then sound 5. Every
+// call UiMovie::Run(movie, 0); when it answers 0, by +16: 1 the selection's
+// named animation (+2) played and looped, 2 named 0's; returns whether it
+// answered 0. nullopt, with nothing done, for a first call with the data's
+// +12 0 to 11 (the jump table's messages: RaceDialog::SetNote, sub_82218918,
+// and case 0, sub_82218C90, never seen in play).
+std::optional<uint64_t> RaceDialogShowMessage(uint8_t* base, uint32_t step, uint32_t sp,
+                                              const Calls& calls);
 
 // sub_8220EEF0 PauseMenu::OpenOptions (transition 6): on its first call the
 // data's +148 = the selection, the item's animation (type 7) finished,

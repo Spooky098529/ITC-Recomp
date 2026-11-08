@@ -8,6 +8,8 @@
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
+#include <optional>
+
 namespace race_screens {
 
 namespace {
@@ -251,6 +253,56 @@ uint64_t RaceDialogOpen(uint8_t* base, uint32_t mode, uint64_t player, uint32_t 
   guest::StoreU32(base, Get(base, kDialogData) + 32, 1);
   guest::StoreU32(base, Get(base, kDialogData) + 36, 0);
   return r3;
+}
+
+std::optional<uint64_t> RaceDialogShowMessage(uint8_t* base, uint32_t step, uint32_t sp,
+                                              const Calls& calls) {
+  const bool first = guest::LoadU32(base, step) == 0;
+  if (first && guest::LoadU32(base, Get(base, kDialogData) + 12) <= 11) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82218C10 RaceDialog::ShowMessage");
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t movie = DialogMovie(base, frame + 96);
+  if (first) {
+    guest::StoreU32(base, step, 1);
+    const uint32_t mode = guest::LoadU32(base, Get(base, kDialogData) + 16);
+    // Modes 0 and 2: the type-0 node 0's +80 and node 2's child 0's +80.
+    auto marks = [&](uint32_t lr, uint32_t node_word, uint32_t child_word) {
+      PlayNamed(calls, frame, lr, movie, 13);
+      guest::StoreU32(base, ui_movies::FindNode(base, movie, 0, 0) + 80, node_word);
+      const uint32_t node = ui_movies::FindNode(base, movie, 0, 2);
+      guest::StoreU32(base, ui_movies::Child(base, node, 0) + 80, child_word);
+    };
+    if (mode == 0) {
+      marks(0x82218E54, 0, 1);
+    } else if (mode == 1) {
+      PlayNamed(calls, frame, 0x82218DF0, movie, 12);
+      guest::StoreU32(base, frame + 84, 159);
+      guest::StoreU32(base, frame + 92, 158);
+      const uint64_t init[8] = {Get(base, kDialogList), 2, 2, 1, 154, 153, 155, 156};
+      calls.CallArgs(kListInit, frame, 0x82218E24, init);
+      ListSetSelection(base, Get(base, kDialogList),
+                       guest::LoadU32(base, Get(base, kDialogData) + 28));
+    } else if (mode == 2) {
+      marks(0x82218D90, 1, 0);
+      guest::StoreU32(base, Get(base, kDialogData) + 24, 0);
+    }
+    calls.Call(kMenuSoundPlay, frame, 0x82218E94, 5);
+  }
+  const uint64_t done = uint32_t(Run(calls, frame, 0x82218EA0, movie)) == 0 ? 1 : 0;
+  if (done != 0) {
+    const int32_t mode = int32_t(guest::LoadU32(base, Get(base, kDialogData) + 16));
+    if (mode == 1) {
+      const uint64_t named = uint64_t(ListSelection(base, Get(base, kDialogList))) + 2;
+      PlayNamed(calls, frame, 0x82218F14, movie, named);
+      calls.Call(kLoopNamed, frame, 0x82218F20, movie, named);
+    } else if (mode == 2) {
+      PlayNamed(calls, frame, 0x82218EE0, movie, 0);
+      calls.Call(kLoopNamed, frame, 0x82218F20, movie, 0);
+    }
+  }
+  return done;
 }
 
 }  // namespace race_screens
