@@ -18,6 +18,43 @@ here loses its heading.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The car list's first migration (attract race `itc_4507`, replay
+  `itc_4508` ok; `car-list.md`; all 58, the replay doesn't reach the
+  panel screens): `sub_8224FD90` TabPanel::SetButtons, `sub_8224F558`
+  RowPanel::Unhighlight, `sub_8224F4C8` RowPanel::Hide, `sub_8224D010`
+  ColorPanel::Show, `sub_8224D2D0` ColorPanel::SetArrows, `sub_8224D3E0`
+  ColorPanel::PlaceCursor, `sub_8224D458` ColorPanel::SetCount,
+  `sub_8224D518` ColorPanel::SetSwatches, `sub_8224D860`
+  CarPanel::SetButtons, `sub_8224D9A0` CarPanel::PlaceCursor,
+  `sub_8224DF30` CarPanel::StopArrows, `sub_8224E288`
+  CarPanel::SetStats, `sub_822417E8` CarPanel::SetCarName,
+  `sub_82241868` Panel7C::ShowArrows, `sub_8224E920`
+  CarPanel::ShowStats, `sub_822501C8` TabPanel::SetTab, `sub_8224D580`
+  ColorPanel::Move, `sub_82250368` PowerGraph::SetEntry, `sub_822496C8`
+  PanelSet::Reset, `sub_82249848` PanelSet::Picked, `sub_82249870`
+  PanelSet::WentBack, `sub_82249898` PanelSet::WantsPowerGraph,
+  `sub_8224B6D8` PanelSet::SetOpenKind, `sub_8224B6E8`
+  PanelSet::SetPreviousTab, `sub_8224B6F0` PanelSet::SetPreviousEntry,
+  `sub_8224B6F8` PanelSet::SetPreviousColor, `sub_82248EF0`
+  PanelSetBase::PickedPage, `sub_82249668` PanelSetBase::SaveData,
+  `sub_82249730` PanelSet::Open, `sub_8224B880` PanelSet::Free,
+  `sub_8224CA28` PanelSet::HandleInput, `sub_8224A3F8`
+  PanelSetBase::BackPage8, `sub_82248F00` PanelSetBase::Step2,
+  `sub_8224A718` PanelSetBase::Step3, `sub_82249098`
+  PanelSetBase::Step7, `sub_8224A7E0` PanelSetBase::Step11,
+  `sub_82249258` PanelSetBase::Step18, `sub_8224A8E0`
+  PanelSetBase::Step26, `sub_8224A978` PanelSetBase::SetUpRows,
+  `sub_8224C560` PanelSetBase::SetUpCarPage, `sub_8224EF18`
+  PanelGroup::SetCaption, `sub_8224FD20` TabPanel::SetCursorY,
+  `sub_8224F018` RowPanel::SetRow, `sub_8224F680` RowPanel::SetArrows,
+  `sub_8224D358` ColorPanel::ShowSwatches, `sub_8224D4A0`
+  ColorPanel::SetSwatch, `sub_82249558` PanelSetBase::ToTabs,
+  `sub_8224B538` PanelSetBase::Free, `sub_8224BF30`
+  PanelSetBase::HandleInput, `sub_82249CF0` PanelPart::FinishAll,
+  `sub_8224FF88` TabPanel::Move, `sub_8224F8F8` RowPanel::Move,
+  `sub_8224DCF0` CarPanel::Select, `sub_8224D118` ColorPanel::Select,
+  `sub_8224F758` RowPanel::Fill, `sub_8224F888` RowPanel::Refresh,
+  `sub_8224D7F0` CarPanel::SetTexts, `sub_8224DED8` CarPanel::SetName.
 - The type 6 and 7 screens (attract race `itc_4490`, replay `itc_4491`
   ok; `type67-screens.md`; all 48, the replay doesn't reach the modes):
   `sub_82251618` ListScreen::OnEnter, `sub_82251508`

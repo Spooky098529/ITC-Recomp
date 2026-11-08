@@ -107,7 +107,10 @@ file's history. What's left to see in a drive, from every run:
   37-38 s, 0 errors, its harnesses 0 differing; no subagents); left:
   `Build`, the tabs, rows and power graph pages, the stand car's draw
   and `Update`; blocked by `sub_8211BC18` and `sub_8211DE30`.
-  Validation agent running.
+  Validated `itc_4507` (race 86 s at 180, the harnesses ~92 s; 0
+  errors, every harness 0 differing, 58 of 58 harness lines; two
+  prints added, bca570ca; none in the race or the replay `itc_4508`
+  (ok); all 58 to drive). Second migration agent running.
 
 ## Done
 
