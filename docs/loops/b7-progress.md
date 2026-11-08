@@ -70,8 +70,13 @@ file's history. What's left to see in a drive, from every run:
   cleared the pause list's items on every case once seeds moved; races
   28-34 s, 0 errors, its harnesses 0 differing; no subagents). Left
   from these: none (other ready groups in `race-screens.md` and
-  `race-hud-machine.md`, probably freed by `SetNodeTextV`). Step: its
-  validation, agent running.
+  `race-hud-machine.md`, probably freed by `SetNodeTextV`). Validated
+  `itc_4571` (race 85 s at 180; 0 errors, every harness 0 differing
+  outside the expected groups, 4 of 4 harness lines; 2 in the race, 2 in
+  the replay `itc_4572` (ok), none to drive). Step: third migration (the
+  ready groups left in `race-screens.md` and `race-hud-machine.md`:
+  `sub_8220D898`, `sub_8221A4A8`, `sub_8216E5B0`, `sub_8216CC60`,
+  `sub_8220E418`, `sub_8220E810`, `sub_8220E908`), agent running.
 
 ## Done
 
