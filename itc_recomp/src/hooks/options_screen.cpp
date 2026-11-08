@@ -529,8 +529,14 @@ void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base) {
 // IsAnalogTaken (ShowAnalogClashes), ShowSlider (ShowSliderNumbers),
 // Settings::Read (Options::Show, Settings::Reload), Options::SetUpMovie
 // (Show), SetCategoryArrow (MoveCategoryCursor) and ShowVolumeNumber
-// (ShowVolumeNumbers, ChangeSoundValue); their register steps stay for the
-// harness.
+// (ShowVolumeNumbers, ChangeSoundValue); and (the third migration) for
+// Controls::AnalogPicture, Options::ResetNode, ShowMusicName,
+// ShowButtonPicture, ShowAnalogPicture, StepHud, ShowHudValues, StepSound,
+// ShowVolumeNumbers, ShowVolumeBars, StepSliders, ShowSliderNumbers,
+// ShowSliderMarks, StepButtons, ShowButtonList, ShowButtonClashes,
+// StepAnalog, ShowAnalogList and ShowAnalogClashes (their callers in play
+// the pages, their set-ups and steps, all calling the plain C++); their
+// register steps stay for the harness.
 
 #define ITC_OPTIONS_SCREEN(address, step)   \
   extern "C" REX_FUNC(sub_##address) {      \
@@ -542,9 +548,6 @@ void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                 \
   }
 
-ITC_OPTIONS_SCREEN(821BAD08, OptionsAnalogPicture)
-ITC_OPTIONS_SCREEN(821BA550, OptionsStepButtons)
-ITC_OPTIONS_SCREEN(821BABD8, OptionsStepAnalog)
 ITC_OPTIONS_SCREEN(821BBBA0, OptionsWaitForMovie)
 ITC_OPTIONS_SCREEN(821B9F88, OptionsOpenMovie)
 ITC_OPTIONS_SCREEN(821BCE38, OptionsOnClosed)
@@ -559,21 +562,7 @@ ITC_OPTIONS_SCREEN(821BD800, OptionsChangeHudValue)
 ITC_OPTIONS_SCREEN(821BD908, OptionsEnterSound)
 ITC_OPTIONS_SCREEN(821BD9A0, OptionsEnterSliders)
 ITC_OPTIONS_SCREEN(821BDAD0, OptionsEnterButtons)
-ITC_OPTIONS_SCREEN(821BE930, OptionsShowMusicName)
 ITC_OPTIONS_SCREEN(821BEA48, OptionsShowSliderMark)
-ITC_OPTIONS_SCREEN(821BF0F0, OptionsShowButtonPicture)
-ITC_OPTIONS_SCREEN(821BF630, OptionsShowAnalogPicture)
-ITC_OPTIONS_SCREEN(821BFA68, OptionsResetNode)
-ITC_OPTIONS_SCREEN(821BE820, OptionsShowVolumeNumbers)
-ITC_OPTIONS_SCREEN(821BECA8, OptionsShowSliderNumbers)
-ITC_OPTIONS_SCREEN(821BED38, OptionsShowSliderMarks)
-ITC_OPTIONS_SCREEN(821BE290, OptionsShowHudValues)
-ITC_OPTIONS_SCREEN(821BE5F8, OptionsStepSound)
-ITC_OPTIONS_SCREEN(821BEAC8, OptionsStepSliders)
-ITC_OPTIONS_SCREEN(821BEFE8, OptionsShowButtonList)
-ITC_OPTIONS_SCREEN(821BF520, OptionsShowAnalogList)
-ITC_OPTIONS_SCREEN(821BF158, OptionsShowButtonClashes)
-ITC_OPTIONS_SCREEN(821BF698, OptionsShowAnalogClashes)
 ITC_OPTIONS_SCREEN(821BDE88, OptionsEnterAnalog)
 ITC_OPTIONS_SCREEN(821C09B0, OptionsMoveSaveDialogCursor)
 ITC_OPTIONS_SCREEN(821C0B50, OptionsMoveCategory6DialogCursor)
@@ -583,8 +572,6 @@ ITC_OPTIONS_SCREEN(821C80F0, OptionsDraw)
 ITC_OPTIONS_SCREEN(821C81E8, OptionsUpdate)
 ITC_OPTIONS_SCREEN(821C6F58, OptionsSavePage)
 ITC_OPTIONS_SCREEN(821BD228, OptionsCategory6Page)
-ITC_OPTIONS_SCREEN(821BE3E0, OptionsStepHud)
-ITC_OPTIONS_SCREEN(821BE8A8, OptionsShowVolumeBars)
 ITC_OPTIONS_SCREEN(821C1068, OptionsShowPrompts)
 ITC_OPTIONS_SCREEN(821C0FF0, OptionsSettingsReload)
 ITC_OPTIONS_SCREEN(821BC670, OptionsCategoryPage)
