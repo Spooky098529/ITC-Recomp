@@ -464,6 +464,7 @@ set(ITC_SOURCES
     src/type67_screens/slots.cpp
     src/hooks/car_list.cpp
     src/car_list/panels.cpp
+    src/car_list/set.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

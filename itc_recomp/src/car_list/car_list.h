@@ -67,7 +67,27 @@ uint64_t TabSetCursorY(uint8_t* base, uint32_t panel, uint64_t y, uint32_t sp);
 // +87 textures 0, 0, 1, 1; +88, +89 hidden).
 uint64_t TabSetButtons(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls);
 
+// sub_822501C8 TabPanel::SetTab (r4 the tab): +8 = it, the cursor at 40 x
+// the tab, the tabs' texts, nodes +88 and +92's +108 by the tab, caption
+// 929 with +140 (two players), else 930 + the tab.
+uint64_t TabSetTab(uint8_t* base, uint32_t panel, uint64_t tab, uint32_t sp, const Calls& calls);
+// sub_8224FF88 TabPanel::Move (r4 the tab, r5 the tab before, r6 the
+// moves).
+uint64_t TabMove(uint8_t* base, uint32_t panel, uint64_t tab, uint64_t before, uint64_t moves,
+                 uint32_t sp, const Calls& calls);
+
 // --- The car rows E (+0 the group) ---
+
+// sub_8224F758 RowPanel::Fill (r4 the list, r5 the scroll, r6 the item).
+uint64_t RowFill(uint8_t* base, uint64_t panel, uint32_t list, uint64_t scroll, uint64_t item,
+                 uint32_t sp, const Calls& calls);
+// sub_8224F888 RowPanel::Refresh (r4 the list, r5 the scroll).
+uint64_t RowRefresh(uint8_t* base, uint64_t panel, uint32_t list, uint64_t scroll, uint32_t sp,
+                    const Calls& calls);
+// sub_8224F8F8 RowPanel::Move (r4 the row, r5 the row before, r6 the
+// moves, r7 the scroll, r9 the list; r8 unread).
+uint64_t RowMove(uint8_t* base, uint64_t panel, uint64_t row, uint64_t before, uint64_t moves,
+                 uint64_t scroll, uint32_t list, uint32_t sp, const Calls& calls);
 
 // sub_8224F018 RowPanel::SetRow: row `row` (-1: +60) from `entry`: the
 // logo's frame and the three texts.
@@ -95,6 +115,11 @@ uint64_t ColorSetArrows(uint8_t* base, uint32_t panel, uint64_t up, uint64_t dow
 uint64_t ColorShowSwatches(uint8_t* base, uint32_t panel, uint64_t count, uint32_t sp);
 // sub_8224D3E0 ColorPanel::PlaceCursor (r4 the item).
 uint64_t ColorPlaceCursor(uint8_t* base, uint32_t panel, uint64_t item, uint32_t sp);
+// sub_8224D580 ColorPanel::Move (r4 the item, r5 the one before, r6 the
+// moves, r7 the scroll, r8 the menu's +84, r9 its +92, r10 the colors).
+uint64_t ColorMove(uint8_t* base, uint64_t panel, uint64_t item, uint64_t before, uint64_t moves,
+                   uint64_t scroll, uint64_t step, uint64_t placed, uint32_t list, uint32_t sp,
+                   const Calls& calls);
 // sub_8224D458 ColorPanel::SetCount: ShowSwatches, then caption 552 unless
 // +88 (two players).
 uint64_t ColorSetCount(uint8_t* base, uint32_t panel, uint64_t count, uint32_t sp,
@@ -141,5 +166,39 @@ uint64_t Panel7CShowArrows(uint8_t* base, uint32_t panel, uint64_t shown, uint32
 // +4 set.
 uint64_t CarShowStats(uint8_t* base, uint64_t panel_r3, uint32_t entry, uint32_t sp,
                       const Calls& calls);
+
+// --- PanelSet's leaves (set.cpp; r3 the set, b = the set + 4 its base) ---
+
+// The two-player word (0 in PanelSet, 1 in PanelSetPair).
+constexpr uint32_t kTwoPlayers = 0x82815EAC;
+// The players' save data pointer sub_82105678 answers (two players).
+constexpr uint32_t kPairSaveData = 0x826C5B5C;
+
+// sub_822496C8 PanelSet::Reset (slot 2): the base's words reset. r3 left.
+uint64_t SetReset(uint8_t* base, uint64_t set);
+// sub_82249848 PanelSet::Picked, sub_82249870 WentBack, sub_82249898
+// WantsPowerGraph (slots 8 to 10).
+uint64_t SetPicked(uint8_t* base, uint32_t set);
+uint64_t SetWentBack(uint8_t* base, uint32_t set);
+uint64_t SetWantsPowerGraph(uint8_t* base, uint32_t set);
+// sub_8224B6D8 SetOpenKind (+1932), sub_8224B6E8 SetPreviousTab (+1884),
+// sub_8224B6F0 SetPreviousEntry (+1888), sub_8224B6F8 SetPreviousColor
+// (+1892): the set's word at `offset` = r4. r3 left.
+uint64_t SetWord(uint8_t* base, uint64_t set, uint32_t offset, uint64_t value);
+// sub_82248EF0 PanelSetBase::PickedPage (page 5; r3 = b): +12 = 1. r3 left.
+uint64_t PickedPage(uint8_t* base, uint64_t b);
+// sub_82249668 PanelSetBase::SaveData (r3 = b): with two players, the
+// players' save data ([0x826C5B5C], sub_82105678's, never seen in play:
+// ported) + 120,108 x +1952, else SaveData::Of(0).
+uint64_t SaveData(uint8_t* base, uint32_t b, uint32_t sp);
+
+// --- The power graph's record (panels.cpp) ---
+
+// The power graph screen's record's holder ([0x82815EBC]; the record at
+// its +8).
+constexpr uint32_t kPowerGraph = 0x82815EBC;
+// sub_82250368 PowerGraph::SetEntry (r3 an entry, r4 the tab; a leaf, its
+// switch's case 0 and 4 the split piece sub_822503F0, merged). r3 left.
+uint64_t PowerGraphSetEntry(uint8_t* base, uint64_t entry, uint64_t tab);
 
 }  // namespace car_list

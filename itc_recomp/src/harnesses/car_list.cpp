@@ -118,6 +118,9 @@ constexpr uint32_t kTagTxt = 0x54585400;
 constexpr uint32_t kObjectsBytes = 0x1000;
 constexpr uint32_t kGroupA = 0x200, kGroupB = 0x240, kVtable = 0x300, kRecord = 0x400;
 constexpr uint32_t kColors = 0x800, kColorRecords = 0x900;
+// A car list (128 entry pointers, +512 the count) at +0xA04, the word
+// before it an entry pointer too (RowPanel::Move reads it).
+constexpr uint32_t kList = 0xA04;
 constexpr uint32_t kEntryBytes = 8448;
 
 struct World {
@@ -144,7 +147,8 @@ struct World {
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
-    {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4}};
+    {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4},
+    {car_list::kTwoPlayers, 4},   {car_list::kPowerGraph, 4}};
 
 // The string table: 17 files' pointers to one container of entries enough
 // for the widest file (the bounds at 0x82007E18), each one of 8 strings of
@@ -277,6 +281,12 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t i = 0; i < 13; i++) {
     guest::StoreU32(base, w.at(kColors) + 4 * i, w.at(kColorRecords) + 32 * i);
   }
+  for (uint32_t i = 0; i <= 128; i++) {
+    guest::StoreU32(base, w.at(kList) - 4 + 4 * i, w.entry.address);
+  }
+  guest::StoreU32(base, w.at(kList) + 512, r.Below(21));
+  guest::StoreU32(base, car_list::kTwoPlayers, 0);
+  guest::StoreU32(base, car_list::kPowerGraph, w.at(kRecord));
   guest::StoreU32(base, w.entry.address + 8432, r.Below(80));
   guest::StoreU8(base, w.entry.address + 769, uint8_t(r.Below(10)));
   ShapeMovieWorld(base, w, r);
@@ -315,9 +325,13 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     for (const auto& [address, bytes] : kSavedGlobals) {
       out[v].Bytes(Read(h.base, address, bytes));
     }
-    const uint32_t bottom = sp - frame.size;
-    out[v].Bytes(Read(h.base, bottom, 40));
-    out[v].Bytes(Read(h.base, bottom + 80, frame.size - 80 - frame.saves));
+    if (frame.size != 0) {
+      const uint32_t bottom = sp - frame.size;
+      out[v].Bytes(Read(h.base, bottom, 40));
+      out[v].Bytes(Read(h.base, bottom + 80, frame.size - 80 - frame.saves));
+    } else {
+      out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes));  // a leaf: none written
+    }
     out[v].Bytes(Read(h.base, sp, kCallerBytes));
     out[v].Word(t.r1.u32);
     out[v].Word(t.r3.u32);
@@ -563,6 +577,142 @@ void Panels(Context& h, const World& w) {
       __imp__sub_8224E920, hooks::CarListCarShowStats);
 }
 
+// A small word around 0 (-2 to 3), now and then any word.
+uint64_t Around(Random& r) {
+  return r.Below(8) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(6)) - 2));
+}
+
+void MorePanels(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const int n = 40;
+  Group(
+      h, w, "TabPanel::SetTab (sub_822501C8)", n, {144, 56},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        guest::StoreU32(base, w.panel() + 140, r.Below(2));
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(4);
+      },
+      __imp__sub_822501C8, hooks::CarListTabSetTab);
+  Group(
+      h, w, "TabPanel::Move (sub_8224FF88)", 80, {160, 72},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        guest::StoreU32(base, w.panel() + 140, r.Below(2));
+        for (const uint32_t at : {12u, 16u, 20u}) {
+          guest::StoreU32(base, w.panel() + at, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+        }
+        t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(4);
+        t.r5.u64 = r.Below(4) == 0 ? r.Next() : t.r4.u64 + Around(r);
+        t.r6.u64 = Around(r);
+      },
+      __imp__sub_8224FF88, hooks::CarListTabMove);
+  // The rows over the world's list: the rows shown (+4) 0 to 8, the scroll
+  // 0 to 10, the item 0 to 9.
+  const auto rows = [base](PPCContext& t, Random& r, const World& w) {
+    SetGroup(base, w, r, 0);
+    guest::StoreU32(base, w.panel() + 4, r.Below(9));
+    guest::StoreU32(base, w.panel() + 156, r.Below(2));
+    // The rows' nodes not negative (as RowPanel::SetRow's cases).
+    for (uint32_t at = 20; at <= 60; at += 4) {
+      guest::StoreU32(base, w.panel() + at, r.Below(64));
+    }
+    t.r4.u64 = w.at(kList);
+    t.r5.u64 = r.Below(11);
+  };
+  Group(
+      h, w, "RowPanel::Fill (sub_8224F758)", 60, {192, 104},
+      [rows](PPCContext& t, Random& r, const World& w) {
+        rows(t, r, w);
+        t.r6.u64 = r.Below(10);
+      },
+      __imp__sub_8224F758, hooks::CarListRowFill);
+  Group(h, w, "RowPanel::Refresh (sub_8224F888)", n, {128, 48}, rows, __imp__sub_8224F888,
+        hooks::CarListRowRefresh);
+  Group(
+      h, w, "RowPanel::Move (sub_8224F8F8)", 80, {160, 80},
+      [rows](PPCContext& t, Random& r, const World& w) {
+        rows(t, r, w);
+        t.r7.u64 = t.r5.u64;  // the scroll
+        t.r4.u64 = r.Below(8);
+        t.r5.u64 = r.Below(8);
+        t.r6.u64 = r.Below(4) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : Around(r);
+        t.r8.u64 = r.Next();
+        t.r9.u64 = w.at(kList);
+      },
+      __imp__sub_8224F8F8, hooks::CarListRowMove);
+  Group(
+      h, w, "ColorPanel::Move (sub_8224D580)", 80, {160, 80},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        t.r4.u64 = r.Below(13);
+        t.r5.u64 = r.Below(13);
+        t.r6.u64 = r.Below(4) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : Around(r);
+        t.r7.u64 = r.Below(13);
+        t.r8.u64 = Around(r);
+        t.r9.u64 = r.Below(3) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : r.Below(2);
+        t.r10.u64 = w.at(kColors);
+        guest::StoreU32(base, w.at(kColors) + 52, r.Below(9));
+      },
+      __imp__sub_8224D580, hooks::CarListColorMove);
+  // PowerGraph::SetEntry: the record at the world's +0x408; the byte +708 0
+  // to 9, the floats any bits or small.
+  Group(
+      h, w, "PowerGraph::SetEntry (sub_82250368)", n, {0, 0},
+      [base](PPCContext& t, Random& r, const World& w) {
+        guest::StoreU8(base, w.entry.address + 708, uint8_t(r.Below(10)));
+        for (const uint32_t at : {652u, 656u, 660u, 664u}) {
+          if (r.Below(2) == 0) {
+            guest::StoreFloat(base, w.entry.address + at, float(r.Below(100000)) / 3.0f);
+          }
+        }
+        t.r3.u64 = w.entry.address | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(3);
+      },
+      __imp__sub_82250368, hooks::CarListPowerGraphSetEntry);
+}
+
+// PanelSet's leaves on the objects block (r3 its start, its words random).
+void Leaves(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const int n = 24;
+  const auto words = [base](PPCContext& t, Random& r, const World& w) {
+    for (const uint32_t at : {12u, 16u, 20u}) {
+      guest::StoreU32(base, w.panel() + at, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    }
+    t.r4.u64 = r.Next();
+  };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+  } leaves[] = {
+      {"PanelSet::Reset (sub_822496C8)", __imp__sub_822496C8, hooks::CarListSetReset},
+      {"PanelSet::Picked (sub_82249848)", __imp__sub_82249848, hooks::CarListSetPicked},
+      {"PanelSet::WentBack (sub_82249870)", __imp__sub_82249870, hooks::CarListSetWentBack},
+      {"PanelSet::WantsPowerGraph (sub_82249898)", __imp__sub_82249898,
+       hooks::CarListSetWantsPowerGraph},
+      {"PanelSet::SetOpenKind (sub_8224B6D8)", __imp__sub_8224B6D8, hooks::CarListSetOpenKind},
+      {"PanelSet::SetPreviousTab (sub_8224B6E8)", __imp__sub_8224B6E8,
+       hooks::CarListSetPreviousTab},
+      {"PanelSet::SetPreviousEntry (sub_8224B6F0)", __imp__sub_8224B6F0,
+       hooks::CarListSetPreviousEntry},
+      {"PanelSet::SetPreviousColor (sub_8224B6F8)", __imp__sub_8224B6F8,
+       hooks::CarListSetPreviousColor},
+      {"PanelSetBase::PickedPage (sub_82248EF0)", __imp__sub_82248EF0, hooks::CarListPickedPage},
+  };
+  for (const auto& leaf : leaves) {
+    Group(h, w, leaf.name, n, {0, 0}, words, leaf.recompiled, leaf.native);
+  }
+  // SaveData: one player (SaveData::Of(0)) or two (the pointer at
+  // 0x826C5B5C plus 120,108 x the player).
+  Group(
+      h, w, "PanelSetBase::SaveData (sub_82249668)", n, {96, 16},
+      [base](PPCContext&, Random& r, const World& w) {
+        guest::StoreU32(base, car_list::kTwoPlayers, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+        guest::StoreU32(base, w.panel() + 1952, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
+      },
+      __imp__sub_82249668, hooks::CarListSaveData);
+}
+
 }  // namespace
 
 void CarList(Context& h) {
@@ -573,6 +723,8 @@ void CarList(Context& h) {
   }
   BuildStringTable(h.base, w);
   Panels(h, w);
+  MorePanels(h, w);
+  Leaves(h, w);
 }
 
 }  // namespace harness

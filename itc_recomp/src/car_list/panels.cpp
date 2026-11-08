@@ -128,6 +128,90 @@ uint64_t TabSetButtons(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& 
                     LoadU32(base, panel + 84) + 5, 1);
 }
 
+
+// The two nodes' +108 by the tab (0, 1, 2; nothing for 3 and above).
+void SetTabWords(uint8_t* base, uint32_t a, uint32_t b, uint64_t tab) {
+  const uint32_t t = uint32_t(tab);
+  if (t >= 3) {
+    return;
+  }
+  StoreU32(base, a + 108, t);
+  StoreU32(base, b + 108, t);
+}
+
+uint64_t TabSetTab(uint8_t* base, uint32_t panel, uint64_t tab, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_822501C8 TabPanel::SetTab");
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 4), frame);
+  StoreU32(base, panel + 8, uint32_t(tab));
+  TabSetCursorY(base, panel, tab * 40, frame);
+  static constexpr uint32_t kLr[3] = {0x8225022C, 0x8225022C, 0x8225022C};
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t node =
+        ui_movies::FindNode(base, m, LoadU32(base, panel + 24), LoadU32(base, panel + 28));
+    const uint32_t child = ui_movies::Child(base, node, LoadU32(base, panel + 44 + 4 * i));
+    calls.Call(kSetNodeText, frame, kLr[i], m, child, 124 + i);
+  }
+  const uint32_t node =
+      ui_movies::FindNode(base, m, LoadU32(base, panel + 24), LoadU32(base, panel + 32));
+  const uint32_t a = ui_movies::Child(base, node, LoadU32(base, panel + 88));
+  const uint32_t b = ui_movies::Child(base, node, LoadU32(base, panel + 92));
+  SetTabWords(base, a, b, tab);
+  const uint64_t id = LoadU32(base, panel + 140) != 0 ? 929 : tab + 930;
+  return SetCaption(base, LoadU32(base, panel + 4), id, frame, calls);
+}
+
+uint64_t TabMove(uint8_t* base, uint32_t panel, uint64_t tab, uint64_t before, uint64_t moves,
+                 uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224FF88 TabPanel::Move");
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 4), frame);
+  const uint32_t node =
+      ui_movies::FindNode(base, m, LoadU32(base, panel + 24), LoadU32(base, panel + 32));
+  const uint32_t a = ui_movies::Child(base, node, LoadU32(base, panel + 88));
+  const uint32_t b = ui_movies::Child(base, node, LoadU32(base, panel + 92));
+  SetTabWords(base, a, b, tab);
+  bool enabled = false;
+  calls.Call(kFinishNamed, frame, 0x82250024, m, LoadU32(base, panel + 120));
+  PlayNamed(calls, frame, 0x82250040, m, LoadU32(base, panel + 120), 1, 0, 0, 0);
+  calls.Call(kFinishNamed, frame, 0x82250050, m, LoadU32(base, panel + 96) + before);
+  // The tab's word (+12, +16, +20 for tabs 0 to 2): 1 its animation played
+  // and looped, else the moves' two animations played and finished.
+  const int32_t t = int32_t(uint32_t(tab));
+  const bool known = t == 0 || t == 1 || t == 2;
+  if (known && LoadU32(base, panel + 12 + 4 * uint32_t(t)) == 1) {
+    enabled = true;
+    calls.Call(kFinishNamed, frame, 0x82250098, m, LoadU32(base, panel + 96) + tab);
+    PlayNamed(calls, frame, 0x822500B8, m, LoadU32(base, panel + 96) + tab, 1, 0, 0, 0);
+    calls.Call(kLoopNamed, frame, 0x822500C8, m, LoadU32(base, panel + 96) + tab);
+  } else {
+    const uint32_t c = LoadU32(base, panel + 108);
+    if (int32_t(c) >= 0) {
+      PlayNamed(calls, frame, 0x822500F0, m, c, 0, 0, 0, 0);
+      calls.Call(kFinishNamed, frame, 0x822500FC, m, LoadU32(base, panel + 108));
+    }
+    const uint32_t d = LoadU32(base, panel + 112);
+    if (int32_t(d) >= 0) {
+      PlayNamed(calls, frame, 0x82250120, m, d, 1, 1, 0, 0);
+      calls.Call(kFinishNamed, frame, 0x8225012C, m, LoadU32(base, panel + 112));
+    }
+  }
+  calls.Call(kFinishNamed, frame, 0x82250138, m, LoadU32(base, panel + 100));
+  uint64_t r3 = calls.Call(kFinishNamed, frame, 0x82250144, m, LoadU32(base, panel + 104));
+  const int32_t step = int32_t(uint32_t(tab - before));
+  if (step > 1 || step < -1) {
+    r3 = TabSetCursorY(base, panel, tab * 40, frame);
+  } else if (int32_t(uint32_t(moves)) == 1) {
+    r3 = PlayNamed(calls, frame, 0x8225017C, m, LoadU32(base, panel + 104), 1, 0, 0, 0);
+  } else if (int32_t(uint32_t(moves)) == -1) {
+    r3 = PlayNamed(calls, frame, 0x8225017C, m, LoadU32(base, panel + 100), 1, 0, 0, 0);
+  }
+  if (LoadU32(base, panel + 140) != 0) {
+    return r3;
+  }
+  return SetCaption(base, LoadU32(base, panel + 4), enabled ? tab + 930 : 584, frame, calls);
+}
+
 // --- The car rows E ---
 
 uint64_t RowSetRow(uint8_t* base, uint32_t panel, uint64_t row, uint32_t entry, uint32_t sp,
@@ -179,6 +263,95 @@ uint64_t RowSetRow(uint8_t* base, uint32_t panel, uint64_t row, uint32_t entry, 
     r3 = calls.Call(kSetNodeText, frame, 0x8224F150, m, c, LoadU32(base, entry + 8432) + 1718);
   }
   return r3;
+}
+
+uint64_t RowFill(uint8_t* base, uint64_t panel_r3, uint32_t list, uint64_t scroll, uint64_t item,
+                 uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224F758 RowPanel::Fill");
+  const uint32_t panel = uint32_t(panel_r3);
+  const uint32_t frame = Frame(base, sp, 192);
+  const int32_t count = int32_t(LoadU32(base, list + 512));
+  const uint32_t m = Movie(base, LoadU32(base, panel + 0), frame);
+  const uint32_t node =
+      ui_movies::FindNode(base, m, LoadU32(base, panel + 12), LoadU32(base, panel + 16));
+  const uint32_t first = list + (uint32_t(scroll) << 2);
+  for (int32_t i = 0; i < int32_t(LoadU32(base, panel + 4)); i++) {
+    const uint32_t row = ui_movies::Child(base, node, LoadU32(base, panel + 20 + 4 * uint32_t(i)));
+    if (i < count) {
+      StoreU32(base, row + 80, 1);
+      RowSetRow(base, panel, uint32_t(i), LoadU32(base, first + 4 * uint32_t(i)), frame, calls);
+    } else {
+      StoreU32(base, row + 80, 0);
+    }
+  }
+  const uint32_t sub = LoadU32(base, panel + 12);
+  const uint32_t cursor = int32_t(sub) >= 0
+                              ? ui_movies::FindNode(base, m, sub, LoadU32(base, panel + 144))
+                              : ui_movies::Child(base, node, LoadU32(base, panel + 144));
+  StoreU32(base, cursor + 80, count > int32_t(LoadU32(base, panel + 4)) ? 1 : 0);
+  if (LoadU32(base, panel + 156) == 0) {
+    const uint32_t entry = LoadU32(base, list + (uint32_t(scroll + item) << 2));
+    SetCaption(base, LoadU32(base, panel + 0), LoadU32(base, entry + 8432) + 1862, frame, calls);
+  }
+  return RowSetArrows(base, panel_r3, scroll, LoadU32(base, list + 512), frame);
+}
+
+uint64_t RowRefresh(uint8_t* base, uint64_t panel_r3, uint32_t list, uint64_t scroll, uint32_t sp,
+                    const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224F888 RowPanel::Refresh");
+  const uint32_t panel = uint32_t(panel_r3);
+  const uint32_t frame = Frame(base, sp, 128);
+  uint64_t r3 = panel_r3;
+  const uint32_t first = list + (uint32_t(scroll) << 2);
+  for (int32_t i = 0; i < int32_t(LoadU32(base, panel + 4)); i++) {
+    if (uint32_t(i) + uint32_t(scroll) < LoadU32(base, list + 512)) {
+      r3 = RowSetRow(base, panel, uint32_t(i), LoadU32(base, first + 4 * uint32_t(i)), frame,
+                     calls);
+    }
+  }
+  return r3;
+}
+
+uint64_t RowMove(uint8_t* base, uint64_t panel_r3, uint64_t row, uint64_t before, uint64_t moves,
+                 uint64_t scroll, uint32_t list, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224F8F8 RowPanel::Move");
+  const uint32_t panel = uint32_t(panel_r3);
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 0), frame);
+  StoreU32(base, panel + 8, uint32_t(row));
+  calls.Call(kFinishNamed, frame, 0x8224F938, m, before + LoadU32(base, panel + 92));
+  calls.Call(kFinishNamed, frame, 0x8224F948, m, row + LoadU32(base, panel + 92));
+  PlayNamed(calls, frame, 0x8224F968, m, row + LoadU32(base, panel + 92), 1, 0, 0, 0);
+  calls.Call(kLoopNamed, frame, 0x8224F978, m, row + LoadU32(base, panel + 92));
+  if (uint32_t(moves) != 0) {
+    const uint32_t first = list + (uint32_t(scroll) << 2);
+    for (uint32_t i = 0;; i++) {
+      uint32_t count = LoadU32(base, list + 512);
+      const uint32_t rows = LoadU32(base, panel + 4);
+      if (count >= rows) count = rows;
+      if (i >= count) break;
+      RowSetRow(base, panel, i, LoadU32(base, first + 4 * i), frame, calls);
+    }
+    calls.Call(kFinishNamed, frame, 0x8224F9D4, m, LoadU32(base, panel + 96));
+    calls.Call(kFinishNamed, frame, 0x8224F9E0, m, LoadU32(base, panel + 100));
+    calls.Call(kFinishNamed, frame, 0x8224F9EC, m, LoadU32(base, panel + 96));
+    calls.Call(kFinishNamed, frame, 0x8224F9F8, m, LoadU32(base, panel + 100));
+    uint32_t named;
+    if (int32_t(uint32_t(moves)) < 0) {
+      const uint32_t at = uint32_t(LoadU32(base, panel + 4) + scroll) << 2;
+      RowSetRow(base, panel, 0xFFFFFFFFFFFFFFFFull, LoadU32(base, list + at), frame, calls);
+      named = LoadU32(base, panel + 100);
+    } else {
+      RowSetRow(base, panel, 0xFFFFFFFFFFFFFFFFull, LoadU32(base, first - 4), frame, calls);
+      named = LoadU32(base, panel + 96);
+    }
+    PlayNamed(calls, frame, 0x8224FA48, m, named, 1, 0, 0, 0);
+  }
+  if (LoadU32(base, panel + 156) == 0) {
+    const uint32_t entry = LoadU32(base, list + (uint32_t(row + scroll) << 2));
+    SetCaption(base, LoadU32(base, panel + 0), LoadU32(base, entry + 8432) + 1862, frame, calls);
+  }
+  return RowSetArrows(base, panel_r3, scroll, LoadU32(base, list + 512), frame);
 }
 
 uint64_t RowSetArrows(uint8_t* base, uint64_t panel_r3, uint64_t scroll, uint64_t count,
@@ -321,6 +494,39 @@ uint64_t ColorPlaceCursor(uint8_t* base, uint32_t panel, uint64_t item, uint32_t
   const uint32_t child = ui_movies::Child(base, node, LoadU32(base, panel + 64));
   steps::Stfs(base, child + 16, y);
   return child;
+}
+
+uint64_t ColorMove(uint8_t* base, uint64_t panel_r3, uint64_t item, uint64_t before, uint64_t moves,
+                   uint64_t scroll, uint64_t step, uint64_t placed, uint32_t list, uint32_t sp,
+                   const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224D580 ColorPanel::Move");
+  const uint32_t panel = uint32_t(panel_r3);
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 4), frame);
+  calls.Call(kFinishNamed, frame, 0x8224D5C4, m, LoadU32(base, panel + 24) + before);
+  calls.Call(kFinishNamed, frame, 0x8224D5D4, m, LoadU32(base, panel + 24) + item);
+  PlayNamed(calls, frame, 0x8224D5F4, m, LoadU32(base, panel + 24) + item, 1, 0, 0, 0);
+  calls.Call(kLoopNamed, frame, 0x8224D604, m, LoadU32(base, panel + 24) + item);
+  calls.Call(kFinishNamed, frame, 0x8224D610, m, LoadU32(base, panel + 28));
+  uint64_t r3 = calls.Call(kFinishNamed, frame, 0x8224D61C, m, LoadU32(base, panel + 32));
+  if (uint32_t(placed) == 0) {
+    const int32_t s = int32_t(uint32_t(step));
+    if (s != 0) {
+      r3 = PlayNamed(calls, frame, 0x8224D654, m, LoadU32(base, panel + (s > 0 ? 32 : 28)), 1, 0,
+                     0, 0);
+    }
+  } else {
+    r3 = ColorPlaceCursor(base, panel, item, frame);
+  }
+  const int32_t moved = int32_t(uint32_t(moves));
+  if (moved == 0) {
+    return r3;
+  }
+  ColorSetSwatches(base, panel_r3, list, scroll, frame);
+  calls.Call(kFinishNamed, frame, 0x8224D688, m, LoadU32(base, panel + 44));
+  r3 = calls.Call(kFinishNamed, frame, 0x8224D694, m, LoadU32(base, panel + 48));
+  return PlayNamed(calls, frame, 0x8224D6C4, m, LoadU32(base, panel + (moved < 0 ? 40 : 36)), 1,
+                   0, 0, 0);
 }
 
 uint64_t ColorSetCount(uint8_t* base, uint32_t panel, uint64_t count, uint32_t sp,
@@ -597,6 +803,37 @@ uint64_t CarShowStats(uint8_t* base, uint64_t panel_r3, uint32_t entry, uint32_t
     r3 = calls.Call(kSetPrice, frame, 0x8224E9F8, panel_r3, LoadU32(base, entry + 744));
   }
   return r3;
+}
+
+// --- The power graph's record ---
+
+uint64_t PowerGraphSetEntry(uint8_t* base, uint64_t entry_r3, uint64_t tab) {
+  ITC_NATIVE_RUNNING("sub_82250368 PowerGraph::SetEntry");
+  const uint32_t entry = uint32_t(entry_r3);
+  const uint32_t record = LoadU32(base, kPowerGraph) + 8;
+  StoreU32(base, record + 80, uint32_t(tab));
+  StoreU32(base, record + 0, 0);
+  StoreU32(base, record + 4, LoadU32(base, entry + 712));
+  StoreU32(base, record + 8, LoadU32(base, entry + 716));
+  StoreU32(base, record + 12, LoadU32(base, entry + 724));
+  StoreU32(base, record + 16, LoadU32(base, entry + 720));
+  StoreU32(base, record + 20, LoadU32(base, entry + 8432));
+  StoreU32(base, record + 24, guest::LoadU8(base, entry + 769));
+  StoreU32(base, record + 28, guest::LoadU8(base, entry + 770));
+  // The switch on the byte +708 (its cases 0 and 4 the split piece
+  // sub_822503F0); nothing above 7.
+  static constexpr uint32_t kKinds[8] = {6, 2, 3, 4, 6, 0, 1, 5};
+  const uint8_t kind = guest::LoadU8(base, entry + 708);
+  if (kind <= 7) {
+    StoreU32(base, record + 32, kKinds[kind]);
+  }
+  StoreU32(base, record + 36, guest::LoadU8(base, entry + 709) != 0 ? 1 : 0);
+  StoreU32(base, record + 40, LoadU32(base, entry + 648));
+  StoreU32(base, record + 44, uint32_t(steps::Fctiwz(steps::Lfs(base, entry + 652))));
+  StoreU32(base, record + 48, uint32_t(steps::Fctiwz(steps::Lfs(base, entry + 656))));
+  steps::Stfs(base, record + 52, steps::Lfs(base, entry + 660));
+  StoreU32(base, record + 56, uint32_t(steps::Fctiwz(steps::Lfs(base, entry + 664))));
+  return entry_r3;
 }
 
 }  // namespace car_list

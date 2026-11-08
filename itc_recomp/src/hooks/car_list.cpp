@@ -18,7 +18,14 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "sub_8224D518; the car's CarPanel::SetTexts sub_8224D7F0, SetButtons sub_8224D860, "
               "PlaceCursor sub_8224D9A0, Select sub_8224DCF0, StopArrows sub_8224DF30, SetName "
               "sub_8224DED8, SetStats sub_8224E288, SetCarName sub_822417E8 and ShowStats "
-              "sub_8224E920 (SetPrice the original), Panel7C::ShowArrows sub_82241868; the UI "
+              "sub_8224E920 (SetPrice the original), Panel7C::ShowArrows sub_82241868; TabPanel::SetTab "
+              "sub_822501C8 and Move sub_8224FF88, RowPanel::Fill sub_8224F758, Refresh "
+              "sub_8224F888 and Move sub_8224F8F8, ColorPanel::Move sub_8224D580; "
+              "PowerGraph::SetEntry sub_82250368; PanelSet::Reset sub_822496C8, Picked "
+              "sub_82249848, WentBack sub_82249870, WantsPowerGraph sub_82249898, SetOpenKind "
+              "sub_8224B6D8, SetPreviousTab sub_8224B6E8, SetPreviousEntry sub_8224B6F0, "
+              "SetPreviousColor sub_8224B6F8, PanelSetBase::PickedPage sub_82248EF0 and SaveData "
+              "sub_82249668 (SaveData::Of's plain C++); the UI "
               "movie calls through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=car_list)");
 
@@ -114,6 +121,28 @@ ITC_CL_STEP(CarListCarSetCarName,
             cl::CarSetCarName(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp, calls))
 ITC_CL_STEP(CarListPanel7CShowArrows, cl::Panel7CShowArrows(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
 ITC_CL_STEP(CarListCarShowStats, cl::CarShowStats(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListTabSetTab, cl::TabSetTab(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListTabMove, cl::TabMove(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp,
+                                        calls))
+ITC_CL_STEP(CarListRowFill,
+            cl::RowFill(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, ctx.r6.u64, sp, calls))
+ITC_CL_STEP(CarListRowRefresh, cl::RowRefresh(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, sp, calls))
+ITC_CL_STEP(CarListRowMove, cl::RowMove(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
+                                        ctx.r7.u64, ctx.r9.u32, sp, calls))
+ITC_CL_STEP(CarListColorMove,
+            cl::ColorMove(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+                          ctx.r8.u64, ctx.r9.u64, ctx.r10.u32, sp, calls))
+ITC_CL_STEP(CarListPowerGraphSetEntry, cl::PowerGraphSetEntry(base, ctx.r3.u64, ctx.r4.u64))
+ITC_CL_STEP(CarListSetReset, cl::SetReset(base, ctx.r3.u64))
+ITC_CL_STEP(CarListSetPicked, cl::SetPicked(base, ctx.r3.u32))
+ITC_CL_STEP(CarListSetWentBack, cl::SetWentBack(base, ctx.r3.u32))
+ITC_CL_STEP(CarListSetWantsPowerGraph, cl::SetWantsPowerGraph(base, ctx.r3.u32))
+ITC_CL_STEP(CarListSetOpenKind, cl::SetWord(base, ctx.r3.u64, 1932, ctx.r4.u64))
+ITC_CL_STEP(CarListSetPreviousTab, cl::SetWord(base, ctx.r3.u64, 1884, ctx.r4.u64))
+ITC_CL_STEP(CarListSetPreviousEntry, cl::SetWord(base, ctx.r3.u64, 1888, ctx.r4.u64))
+ITC_CL_STEP(CarListSetPreviousColor, cl::SetWord(base, ctx.r3.u64, 1892, ctx.r4.u64))
+ITC_CL_STEP(CarListPickedPage, cl::PickedPage(base, ctx.r3.u64))
+ITC_CL_STEP(CarListSaveData, cl::SaveData(base, ctx.r3.u32, sp))
 
 #undef ITC_CL_STEP
 
@@ -157,3 +186,23 @@ ITC_CAR_LIST(8224E288, CarListCarSetStats)
 ITC_CAR_LIST(822417E8, CarListCarSetCarName)
 ITC_CAR_LIST(82241868, CarListPanel7CShowArrows)
 ITC_CAR_LIST(8224E920, CarListCarShowStats)
+ITC_CAR_LIST(822501C8, CarListTabSetTab)
+ITC_CAR_LIST(8224FF88, CarListTabMove)
+ITC_CAR_LIST(8224F758, CarListRowFill)
+ITC_CAR_LIST(8224F888, CarListRowRefresh)
+ITC_CAR_LIST(8224F8F8, CarListRowMove)
+ITC_CAR_LIST(8224D580, CarListColorMove)
+// PowerGraph::SetEntry (from PanelSetBase::PowerGraphPage, recompiled).
+ITC_CAR_LIST(82250368, CarListPowerGraphSetEntry)
+// PanelSet's vtable slots 2, 8 to 10, 13, 15 to 17, the page 5 handler (from
+// the page table) and PanelSetBase::SaveData (from the set's functions).
+ITC_CAR_LIST(822496C8, CarListSetReset)
+ITC_CAR_LIST(82249848, CarListSetPicked)
+ITC_CAR_LIST(82249870, CarListSetWentBack)
+ITC_CAR_LIST(82249898, CarListSetWantsPowerGraph)
+ITC_CAR_LIST(8224B6D8, CarListSetOpenKind)
+ITC_CAR_LIST(8224B6E8, CarListSetPreviousTab)
+ITC_CAR_LIST(8224B6F0, CarListSetPreviousEntry)
+ITC_CAR_LIST(8224B6F8, CarListSetPreviousColor)
+ITC_CAR_LIST(82248EF0, CarListPickedPage)
+ITC_CAR_LIST(82249668, CarListSaveData)
