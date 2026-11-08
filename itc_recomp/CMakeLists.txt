@@ -481,6 +481,8 @@ set(ITC_SOURCES
     src/car_dealer/update.cpp
     src/car_dealer/pages.cpp
     src/car_dealer/menus.cpp
+    src/hooks/type2_screens.cpp
+    src/type2_screens/plate_editor.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
@@ -687,6 +689,7 @@ set(ITC_SOURCES
     src/harnesses/car_list.cpp
     src/harnesses/front_end_screen_helpers.cpp
     src/harnesses/car_dealer.cpp
+    src/harnesses/type2_screens.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
