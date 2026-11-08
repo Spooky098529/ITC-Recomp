@@ -438,6 +438,8 @@ set(ITC_SOURCES
     src/tuning_pages/dialogs.cpp
     src/hooks/screen_constructors.cpp
     src/screen_constructors/screen_constructors.cpp
+    src/hooks/options_screen.cpp
+    src/options_screen/controls.cpp
     src/hooks/type67_modes.cpp
     src/type67_modes/dialogs.cpp
     src/type67_modes/garage.cpp
@@ -647,6 +649,7 @@ set(ITC_SOURCES
     src/harnesses/tuning_pages.cpp
     src/harnesses/tuning_pages_movie.cpp
     src/harnesses/screen_constructors.cpp
+    src/harnesses/options_screen.cpp
     src/harnesses/type67_modes.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
