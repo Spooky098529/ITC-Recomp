@@ -32,8 +32,14 @@ file's history. What's left to see in a drive, from every run:
   Validated `itc_4654` (race 78 s at 180, the harnesses ~100 s; 0
   errors, every harness 0 differing outside the expected groups, 61 of
   61 harness lines, no prints added; none in the race, 20 in the replay
-  `itc_4655` (ok), 41 to drive). Step: second migration (agent
-  running).
+  `itc_4655` (ok), 41 to drive). Second migration 36e01983..67b6d2c4
+  (the hub: start, notices, images, pages, transitions, dialogs;
+  `WaitForLoad` keeps the patched 1; the build screen's `Enter` with
+  `Fill`, `RemoveAt`, `SetUpStatus`; 3 adapters removed; 110 of 121
+  ours; races 34-37 s, 0 errors, its harnesses 0 differing; no
+  subagents). Left: `Type2Hub::Update` with `PutCarOnStand` (needs the
+  stand car's harness world), the build screen's three pages with
+  their Jumps (ready). Step: its validation (agent running).
 
 ## Done
 
@@ -57,5 +63,7 @@ file's history. What's left to see in a drive, from every run:
   56, known 510, unknown 788).
 - After its migration: ours 5135, work left 1293 (wrapped 56, known
   449, unknown 788).
+- After its second migration: ours 5184, work left 1244 (wrapped 56,
+  known 400, unknown 788).
 
 ## Stopped

@@ -30,6 +30,16 @@ When the user has reviewed a run's section, its heading gets
   `PowerGraphScreen::OpenMovie` `sub_82250328`'s adapter also serves
   three other modes' Inits that register it, behind the same flag;
   nothing of it runs in an attract race (no counters or frame dumps).
+- The type 2 screens' second migration (36e01983..67b6d2c4): the hub
+  and the build screen's `Enter`; `Type2Hub::WaitForLoad`
+  `sub_8218E420` Patched -> Overridden, its patched count of 1 kept
+  (the original's 60); `Type2Hub::Choose`'s items traced in its row.
+  Harness world fixes: the hub world's stage +0 points into its own
+  area (`GarageStage::SetPlates` writes `[[stage]]+6092`); the global
+  `0x826364EC` `OnDialogDone` clears added to the harness's put-back
+  list; the `Fill` cases lay 400 items of their own (the data tables
+  aren't loaded when harnesses run); `Archive::Load` calls recorded by
+  the harness's recorder.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
