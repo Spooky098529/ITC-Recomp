@@ -368,8 +368,9 @@ ITC_CAR_DEALER(82183428, CarDealerPage1)
 ITC_CAR_DEALER(82183600, CarDealerPage2)
 ITC_CAR_DEALER(82181A10, CarDealerPage3)
 ITC_CAR_DEALER(82181B98, CarDealerPage4)
-// The helpers (from the recompiled pages, transitions and set-ups).
-ITC_CAR_DEALER(82181330, CarDealerReloadStandModel)
+// The helpers (from the recompiled transitions and set-ups). No adapter for
+// ReloadStandModel sub_82181330 (Page2, Transition9; Transition10, never
+// seen in play, reaches the original) (removed, B7 loop, 2026-11-08).
 // StartFirstRace (from the title menu's sub_82221AC0, recompiled; Leave is
 // native). No adapters for BuildLists sub_821813B0 (only Start calls it),
 // Buy sub_82182E68 (only OnDialogDone), FillStatus sub_82183AC8 (only
@@ -379,17 +380,18 @@ ITC_CAR_DEALER(82181330, CarDealerReloadStandModel)
 // in play are native, the flag switches those; their steps above are the
 // harness's.
 ITC_CAR_DEALER(82180CE8, CarDealerStartFirstRace)
-ITC_CAR_DEALER(82182158, CarDealerSetKindBar)
 ITC_CAR_DEALER(82182770, CarDealerSetColorBar)
-ITC_CAR_DEALER(82182DD0, CarDealerSetScrollArrows)
 ITC_CAR_DEALER(82182C28, CarDealerSetHeader)
-// ShowCarInfo (from OpenCar and Transition13), ShowSwatches (from OpenColors
-// and Transition17), both recompiled. No adapters
+// No adapters for SetKindBar sub_82182158 (OpenListMenu, OpenCar),
+// SetScrollArrows sub_82182DD0 (OpenCarList, Transition7) and ShowCarInfo
+// sub_82182620 (OpenCar; Transition13, never seen in play, reaches the
+// original) (removed, B7 loop, 2026-11-08): their callers in play are native,
+// the flag switches those. ShowSwatches (from OpenColors and Transition17,
+// recompiled). No adapters
 // for SetNameTexts sub_82182388, SetPriceTexts sub_82182418, SetSpecTexts
 // sub_821824A8 (only ShowCarInfo calls them) and SetSwatchColor
 // sub_82181270 (only ShowSwatches): their callers are native, the flag
 // switches those; their steps above are the harness's.
-ITC_CAR_DEALER(82182620, CarDealerShowCarInfo)
 ITC_CAR_DEALER(821826C0, CarDealerShowSwatches)
 ITC_CAR_DEALER(82199B38, HelpLineSet)
 // No adapters for the menus' openers OpenListMenu sub_82184338
