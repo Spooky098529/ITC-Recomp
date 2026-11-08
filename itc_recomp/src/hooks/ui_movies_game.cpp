@@ -1326,5 +1326,6 @@ extern "C" REX_FUNC(sub_8211E370) {
     __imp__sub_8211E370(ctx, base);
     return;
   }
+  ITC_NATIVE_RUNNING("sub_8211E370 UiMovies::DeleteAll's jump");
   DeleteAllSteps(ctx, base);
 }
