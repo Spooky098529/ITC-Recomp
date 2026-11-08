@@ -127,6 +127,7 @@ constexpr uint32_t kEntryBytes = 8448;
 constexpr uint32_t kSetBytes = 0x1000;
 constexpr uint32_t kSaveBytes = 0x4000;
 constexpr uint32_t kBigSaveBytes = 0x1A000;
+constexpr uint32_t kStandBytes = 0x8000;
 
 struct World {
   World()
@@ -138,11 +139,13 @@ struct World {
         set(kSetBytes),
         save(kSaveBytes),
         big_save(kBigSaveBytes),
-        menus(0x1000) {}
+        menus(0x1000),
+        stand(kStandBytes) {}
   bool ok() const {
     return objects.address != 0 && entry.address != 0 && movies.address != 0 &&
            texts.address != 0 && strings.address != 0 && set.address != 0 &&
-           save.address != 0 && big_save.address != 0 && menus.address != 0;
+           save.address != 0 && big_save.address != 0 && menus.address != 0 &&
+           stand.address != 0;
   }
   uint32_t b() const { return set.address + 4; }
   uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
@@ -159,6 +162,7 @@ struct World {
   Block save;  // the two players' save data ([0x826C5B5C], player 0)
   Block big_save;  // a whole save data (Build reads its +104740)
   Block menus;  // the players' mappers (+0x100 vtables, +0x200 the mappers), the sound manager (+0xC00)
+  Block stand;  // the stand's world (StandWorld)
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
@@ -168,7 +172,10 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {car_list::kPairSaveData, 4}, {0x826C2E48, 4},  // Params ([0x826C2E48])
     // The pages': the mapper and controller entries, the sound manager, the
     // players' save data pointers, the power graph's shown word.
-    {0x826BAB80, 32}, {0x826BABA4, 16}, {0x826C5C80, 4}, {0x826C5B58, 4}, {0x82815EC0, 4}};
+    {0x826BAB80, 32}, {0x826BABA4, 16}, {0x826C5C80, 4}, {0x826C5B58, 4}, {0x82815EC0, 4},
+    // The update's: the stand's holders and reload count, the car scene and
+    // the first pool set, the two-player stand's wait word.
+    {car_list::kStandHolders, 8}, {0x826C2E40, 8}, {car_list::kStandWait, 4}};
 
 // The string table: 17 files' pointers to one container of entries enough
 // for the widest file (the bounds at 0x82007E18), each one of 8 strings of
@@ -359,6 +366,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     out[v].Bytes(Read(h.base, w.entry.address, w.entry.bytes));
     out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
     out[v].Bytes(Read(h.base, w.texts.address, w.texts.bytes));
+    out[v].Bytes(Read(h.base, w.stand.address, w.stand.bytes));
     for (const auto& [address, bytes] : kSavedGlobals) {
       out[v].Bytes(Read(h.base, address, bytes));
     }
@@ -1187,6 +1195,127 @@ void Builds(Context& h, const World& w) {
       __imp__sub_8224CAD8, hooks::CarListSetBuild, after);
 }
 
+
+// --- PanelSet's update ---
+//
+// The stand's world (in the world's stand block; as the type 6 and 7 modes'
+// and GarageStage::ReloadModel's harnesses lay it): [0x826D83E0] pointing at
+// three holder words, each holder's stage (+0x100, +0x1A00, +0x3300) with
+// its garage camera not set up (+112 0: GarageStage::Draw does nothing, as
+// its callers' cases in type67_modes.cpp; Draw's own cases draw), +4 -1 or
+// not, +8 0 (the car scene's one pool 7 model), +16 set or not, the draw
+// word +6056 0, 1 or any word, +6052 and +6088 random; the car scene
+// ([0x826C2E44] at +0x4C00; +4 0, a teardown counting down or its models
+// updating, the accessory skipped) with that model (+0x6000, a car with no
+// parts, its build deferred: SceneModel::PollLoad answers 1 unless +5028 or
+// +5040 is set), the first pool set none, the reload count 0 to 2 (so
+// GarageStage::ReloadModel answers 0: the branch after it, which makes the
+// car object and calls GarageStage::SetCar, isn't laid, as in the type 6
+// and 7 modes' cases: SetCar's scene model world is the load_poll
+// harness's; its Car::Init, SetModel and Refresh are ShowStandCar's, covered
+// there). The set's stand words: +20 and +28 0 or 1, +24 0, 1 or another,
+// the row +236, +240 small (the world's list, its entry's car id below 80),
+// group B (+1956) 0 or a group, its animations +1960 to +1968 indices, the
+// player +1952 0 or 1; the two-player word 0 or 1 and the wait word
+// [0x826379B8] 0 or 1.
+constexpr uint32_t kStandStages[3] = {0x100, 0x1A00, 0x3300};
+constexpr uint32_t kStandScene = 0x4C00, kStandModel = 0x6000;
+constexpr uint32_t kDeepStackBytes = 0x8000;  // below the call's stack pointer
+
+void StandWorld(uint8_t* base, const World& w, Random& r) {
+  const uint32_t s = w.stand.address;
+  WriteRandom(base, s, w.stand.bytes, r);
+  guest::StoreU32(base, car_list::kStandHolders, s);
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t holder = s + 0x40 * (i + 1), stage = s + kStandStages[i];
+    guest::StoreU32(base, s + 4 * i, holder);
+    guest::StoreU32(base, holder, stage);
+    guest::StoreU32(base, stage + 4, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(4));
+    guest::StoreU32(base, stage + 8, 0);
+    guest::StoreU32(base, stage + 16, r.Below(3) == 0 ? 0 : 1 + r.Below(2));
+    guest::StoreU32(base, stage + 112, 0);
+    const uint32_t word = r.Below(4);
+    guest::StoreU32(base, stage + 6056, word < 2 ? word : uint32_t(r.Next()));
+  }
+  const uint32_t scene = s + kStandScene, model = s + kStandModel;
+  guest::StoreU32(base, 0x826C2E44, scene);
+  guest::StoreU32(base, 0x826C2E40, 0);
+  guest::StoreU32(base, 0x826D83E4, r.Below(3));
+  guest::StoreU32(base, scene + 0, r.Below(2) == 0 ? 4 : r.Below(4));
+  guest::StoreU32(base, scene + 48, 3 + r.Below(4));
+  guest::StoreU32(base, scene + 4, 0);
+  guest::StoreU32(base, scene + 5048, 1);
+  guest::StoreU32(base, scene + 5028, model);
+  guest::StoreU32(base, scene + 5036, 1);
+  guest::StoreU32(base, model + 8, 0);
+  guest::StoreU32(base, model + 16, 3);
+  guest::StoreU32(base, model + 20, r.Below(6));
+  guest::StoreU32(base, model + 32, 1);
+  guest::StoreU32(base, model + 5028, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5040, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5044, 3 + r.Below(3));
+  for (const uint32_t at : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+    guest::StoreU32(base, model + at, 0);
+  }
+  guest::StoreU32(base, model + 5116, scene);
+  // The set's stand words.
+  const uint32_t b = w.b();
+  guest::StoreU32(base, b + 20, r.Below(2));
+  const uint32_t loaded = r.Below(4);
+  guest::StoreU32(base, b + 24, loaded < 2 ? loaded : uint32_t(r.Next()));
+  guest::StoreU32(base, b + 28, r.Below(2));
+  guest::StoreU32(base, b + 236, r.Below(4));
+  guest::StoreU32(base, b + 240, r.Below(4));
+  guest::StoreU32(base, b + 1820, w.at(kList));
+  guest::StoreU32(base, b + 1956, r.Below(5) == 0 ? 0 : w.at(r.Below(2) == 0 ? kGroupA : kGroupB));
+  for (const uint32_t at : {1960u, 1964u, 1968u}) {
+    guest::StoreU32(base, b + at, Index(r));
+  }
+  guest::StoreU32(base, b + 1952, r.Below(2));
+  guest::StoreU32(base, car_list::kTwoPlayers, r.Below(3) == 0 ? 1 : 0);
+  guest::StoreU32(base, car_list::kStandWait, r.Below(2));
+}
+
+void Updates(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  // The deep stack (UpdateStand's frame and its callees') random too.
+  const auto deep = [base](PPCContext& t, Random& r) {
+    WriteRandom(base, t.r1.u32 - kDeepStackBytes, kDeepStackBytes - kStackBytes, r);
+  };
+  const auto stand = [base, deep](PPCContext& t, Random& r, const World& w) {
+    deep(t, r);
+    StandWorld(base, w, r);
+    t.r3.u64 = w.b() | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+  };
+  Group(h, w, "GarageStages::DrawAll (sub_821807D8)", 60, {160, 40}, stand, __imp__sub_821807D8,
+        hooks::CarListDrawAll);
+  Group(h, w, "PanelSetBase::UpdateStand (sub_8224C008)", 80, {9952, 88}, stand,
+        __imp__sub_8224C008, hooks::CarListUpdateStand);
+  // Update: the set as the steps' cases shape it, the step -1, below -1, or
+  // one of the steps made native (their worlds the steps' cases'), the
+  // stand's world after.
+  const auto update = [base, deep](PPCContext& t, Random& r, const World& w) {
+    deep(t, r);
+    ShapeSet(base, w, r, true);
+    guest::StoreU32(base, w.b() + 56, r.Below(3) == 0 ? 1 : 0);
+    StandWorld(base, w, r);
+    static constexpr uint32_t kSteps[9] = {0xFFFFFFFFu, 0xFFFFFFFEu, 0xFFFFFFF0u, 2, 3, 7, 11,
+                                           18, 26};
+    guest::StoreU32(base, w.b() + 44, kSteps[r.Below(9)]);
+    t.r3.u64 = w.b() | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+  };
+  const AfterFn settle = [base](const World& w, Outputs& out) { SettleBlocks(base, w, out); };
+  Group(h, w, "PanelSetBase::Update (sub_8224CD00)", 80, {368, 152}, update, __imp__sub_8224CD00,
+        hooks::CarListBaseUpdate, settle);
+  Group(
+      h, w, "PanelSet::Update (sub_8224CF18)", 30, {368, 152},
+      [update](PPCContext& t, Random& r, const World& w) {
+        update(t, r, w);
+        t.r3.u64 -= 4;  // the set
+      },
+      __imp__sub_8224CF18, hooks::CarListSetUpdate, settle);
+}
+
 }  // namespace
 
 void CarList(Context& h) {
@@ -1203,6 +1332,7 @@ void CarList(Context& h) {
   SetUps(h, w);
   Builds(h, w);
   Pages(h, w);
+  Updates(h, w);
 }
 
 }  // namespace harness

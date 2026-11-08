@@ -466,6 +466,7 @@ set(ITC_SOURCES
     src/car_list/panels.cpp
     src/car_list/set.cpp
     src/car_list/pages.cpp
+    src/car_list/update.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

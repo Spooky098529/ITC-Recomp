@@ -311,6 +311,39 @@ uint64_t PowerGraphPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& cal
 // Returns ShowStandCar's r3.
 uint64_t SetUpColors(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 
+// --- PanelSet's update (update.cpp; r3 = b) ---
+
+// The guest calls the update makes: GarageStage::ReloadModel, SetCar,
+// Command, IsBusy and Draw through their overrides, the garage tab's car
+// (sub_82192770, never seen in play: the original); the two-player stand's
+// wait word.
+constexpr uint32_t kReloadModel = 0x8217F880;
+constexpr uint32_t kSetCar = 0x8217FD58;
+constexpr uint32_t kGarageStageCommand = 0x82180108;
+constexpr uint32_t kGarageStageIsBusy = 0x82179BE0;
+constexpr uint32_t kGarageStageDraw = 0x8217FE60;
+constexpr uint32_t kGarageTabCar = 0x82192770;
+constexpr uint32_t kStandWait = 0x826379B8;
+
+// sub_821807D8 GarageStages::DrawAll: the three stages of [0x826D83E0]
+// (GarageStage::SetDrawWord's plain C++): each holding a model has its draw
+// word kept and set to 0, each kept word nonzero drawn alone (draw word 1,
+// GarageStage::Draw(holder, 1, 1) through its override, draw word 0), the
+// words put back. Its 160-byte frame. Returns r3 as the original leaves it.
+uint64_t DrawAll(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8224C008 PanelSetBase::UpdateStand: the stand's car (the stage by the
+// player; its model reloaded for the entry's car, then a car on its
+// 9,952-byte frame: Car::Init, SetModel or the garage's car copied, SetPlates,
+// Car::Refresh, their plain C++; GarageStage::SetCar), DrawAll, and group
+// B's busy animations (+1960, +1964 looped; +1968 once not busy). Returns r3
+// as the original leaves it.
+uint64_t UpdateStand(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224CD00 PanelSetBase::Update (and sub_8224CF18 PanelSet::Update on
+// the set + 4): the step at +44 from the table of 27 on its 368-byte frame
+// (the steps' plain C++ where ours, else guest calls), the next step or page
+// when it answers nonzero and [0x82815EB0] is 0, then UpdateStand. Returns 1.
+uint64_t Update(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+
 // --- The power graph's record (panels.cpp) ---
 
 // The power graph screen's record's holder ([0x82815EBC]; the record at

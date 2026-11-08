@@ -42,7 +42,10 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "GarageStage::SetCarClass through its override), the pages TabsPage "
               "sub_82249EB8, RowsPage sub_8224A178, ColorsPage sub_8224AEA8 and PowerGraphPage "
               "sub_8224BDC0 (the menu list, MenuSound::Play and the power graphs' set-ups guest "
-              "calls); the UI "
+              "calls), GarageStages::DrawAll sub_821807D8, PanelSetBase::UpdateStand sub_8224C008 and "
+              "Update sub_8224CD00 and PanelSet::Update sub_8224CF18 (the steps' plain C++ where "
+              "ours; GarageStage::ReloadModel, SetCar, Command, IsBusy and Draw through their "
+              "overrides; with the car makers' callees native); the UI "
               "movie calls through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=car_list)");
 
@@ -196,6 +199,17 @@ ITC_CL_STEP(CarListColorsPage, cl::ColorsPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListPowerGraphPage, cl::PowerGraphPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListSetUpColors, cl::SetUpColors(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListShowStandCar, cl::ShowStandCar(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListDrawAll, cl::DrawAll(base, sp, calls))
+ITC_CL_STEP(CarListUpdateStand, cl::UpdateStand(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListBaseUpdate, cl::Update(base, ctx.r3.u64, sp, calls))
+// PanelSet::Update: a tail call of the base's on the set + 4.
+void CarListSetUpdate(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_8224CF18 PanelSet::Update");
+  GuestCalls guest(ctx, base);
+  const car_list::Calls calls = guest.calls();
+  const uint32_t sp = ctx.r1.u32;
+  ctx.r3.u64 = cl::Update(base, ctx.r3.u64 + 4, sp, calls);
+}
 // PanelSet::Build: a tail call of the base's on the set + 4.
 void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8224CAD8 PanelSet::Build");
@@ -309,3 +323,22 @@ extern "C" REX_FUNC(sub_8224B248) {
   }
   hooks::CarListSetUpColors(ctx, base);
 }
+// GarageStages::DrawAll (from UpdateStand, and two type 6 functions not seen
+// in play, recompiled).
+ITC_CAR_LIST(821807D8, CarListDrawAll)
+// The update (PanelSet's slot 6, the base's from it, UpdateStand from the
+// base's): the same gate as the stand's car (Car::Init, SetModel and
+// Refresh's plain C++).
+#define ITC_CAR_LIST_STAND(address, step)                                                     \
+  extern "C" REX_FUNC(sub_##address) {                                                       \
+    REX_FUNC_PROLOGUE();                                                                     \
+    if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {      \
+      __imp__sub_##address(ctx, base);                                                       \
+      return;                                                                                \
+    }                                                                                        \
+    hooks::step(ctx, base);                                                                  \
+  }
+ITC_CAR_LIST_STAND(8224C008, CarListUpdateStand)
+ITC_CAR_LIST_STAND(8224CD00, CarListBaseUpdate)
+ITC_CAR_LIST_STAND(8224CF18, CarListSetUpdate)
+#undef ITC_CAR_LIST_STAND
