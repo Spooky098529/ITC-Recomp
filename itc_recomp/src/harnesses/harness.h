@@ -306,5 +306,6 @@ void TuningPages(Context& h);
 void ScreenConstructors(Context& h);
 void Type67Modes(Context& h);
 void OptionsScreen(Context& h);
+void Type67Screens(Context& h);
 
 }  // namespace harness
