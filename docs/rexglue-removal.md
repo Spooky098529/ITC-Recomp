@@ -2786,6 +2786,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-07 | The tuning screen's pages (its input handler `TuningScreen::HandleInput` `sub_821E6950`'s pages for states 0, 3-8, 15-22, 53-62: the levels, types, options, items, wheels, wheel parts, inches and categories inputs, `Leave`, `OnDialogYes` with the sticker dialog, the vinyl editor's entry and exit, the decal images' load, update and unload, `Menu::StepList`, `Color::HsvToRgb`; not the handler itself) | `tuning-pages.md` | 72 of 74 (four migrations; 26 adapters removed) | `--native_tuning_pages` |
 | 2026-11-07 | The type 6 and 7 modes' screen constructors (the screen blocks the modes' slot 0 allocates at +848, `Type6Screens` `sub_822366F0` and `Type7Screens` `sub_82246B28`, with their list, node, panel and machine screens) | `screen-constructors.md` | 41 of 41 (one migration; 24 adapters removed) | `--native_screen_constructors` |
 | 2026-11-07 | The type 6 and 7 modes (probably two front-end hubs over the player's garage car on its stand: the list screen starts a race; with the stand scene, the garage camera and lights, the first screens, dialogs, options, controller pages and save screen's Inits, the modes' `NextMode`, `Leaving`, `WaitForLoads` and `TearDown`) | `type6-type7-modes.md` | 110 of 117 in play (four migrations; 7 adapters removed) | `--native_type67_modes` |
+| 2026-11-08 | The options screen (the front end's options: its machine's handlers, `Draw`'s 15 pages and `Update`'s 49 steps, the HUD, sound, sliders, buttons and analog pages, the settings' `Reset`, `Read`, `Write` and `Reload` over `[0x826D8478]`, the type 2, 4, 6 and 7 options' and controller pages' Inits; with the cleanup lead before it, `CarScene::SetUp` `sub_820C8DE8`, which unblocked `StandScene::Create` and the type 6 and 7 modes' slot 0) | `options-screen.md` | 98 of 100 in play (three migrations; 31 adapters removed) | `--native_options_screen` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4855,3 +4856,21 @@ subsystems). The boundary: 449 functions (916 pairs): overridden 109,
 Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
 54 with a live caller. B7 (`b7_status.py`): ours 4,699, work left 1,721
 (Wrapped 57, with a row 427, no row yet 1,237), from 1,831.
+
+**2026-11-08, the options screen (branch `b7-loop-07-11-26-2`):** the
+thirty-eighth run's first subsystem (`options-screen.md`,
+`--native_options_screen`, `src/options_screen/`), in three
+migrations, after the cleanup lead `sub_820C8DE8` (`CarScene::SetUp`,
+`StandScene::Create` and the type 6 and 7 modes' slot 0, now 113 of
+117 in play). The machines' step tables are generated from
+`generated/` by `itc_recomp/tools/init_step_tables.py`.
+`Options::FadeOut` stays recompiled (a register leftover stored into
+live state, the `BackToBuilds` call); `Options::OpenCategory` waits on
+the save screens' lead and `sub_8211CBD8`. Code addresses `lis` leaves
+in registers are sign-extended in the 64-bit registers. The pad replay
+reaches the options' categories, HUD and sound pages; the sliders,
+buttons and analog pages wait for a drive. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 4,801, work left 1,624 (Wrapped 56, with a row
+425, no row yet 1,143), from 1,721.

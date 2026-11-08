@@ -18,6 +18,17 @@ here loses its heading.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The options screen's third migration (attract race `itc_4480`,
+  replay `itc_4481` ok; `options-screen.md`): `sub_821C1888`
+  Options::SlidersPage, `sub_821C1D08` Options::ButtonsPage,
+  `sub_821C21A8` Options::AnalogPage, `sub_821BA890`
+  Options::HasButtonClash, `sub_821BAC78` Options::HasAnalogClash,
+  `sub_821C51D0` Options::SetUpSlidersPage, `sub_821C5580`
+  Options::SetUpButtonsPage, `sub_821C57D0` Options::SetUpAnalogPage,
+  `sub_821C7868` Options::CloseSliders, `sub_821C7B08`
+  Options::CloseButtons, `sub_821C7D18` Options::CloseAnalog (the
+  pages' other functions without a game line, now Native, already
+  listed above).
 - The options screen's second migration (attract race `itc_4463`,
   replay `itc_4464` ok; `options-screen.md`): `sub_821BECA8`
   Options::ShowSliderNumbers, `sub_821BED38` Options::ShowSliderMarks,

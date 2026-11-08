@@ -67,10 +67,17 @@ file's history. What's left to see in a drive, from every run:
   removed; races 36 s, 0 errors, its harnesses 0 differing; no
   subagents); left: none in the file (98 of 100 in play ours;
   `Options::OpenCategory` waits on the save screens' lead and
-  `sub_8211CBD8`; `FadeOut` stays recompiled). Validation agent
-  running.
+  `sub_8211CBD8`; `FadeOut` stays recompiled). Validated `itc_4480`
+  (race 87 s at 180, the harnesses ~91 s; 0 errors, every harness 0
+  differing, 43 of 43 harness lines; 2 in the race, 18 in the replay
+  `itc_4481` (ok), 23 to drive). Recorded.
 
 ## Done
+
+- `options-screen.md`: 98 of 100 in play native (the options screen's
+  machine, pages, steps, settings' read, write and reload, the type 2,
+  4, 6 and 7 options' and controller pages' Inits; 31 adapters
+  removed), `--native_options_screen`; bce411a9, a9b2152f..95016660.
 
 - Cleanup: `CarScene::SetUp` (`car-models.md`), `StandScene::Create`
   and the type 6 and 7 modes' slot 0 (`type6-type7-modes.md`, now 113
