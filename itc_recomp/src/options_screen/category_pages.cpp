@@ -65,6 +65,39 @@ bool Pressed(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr, uin
   return uint32_t(r3) != 0;
 }
 
+// The page block to `page` with no step (pages 11 to 13, the music
+// preview's and the sound page's leave).
+void ToPage(uint8_t* base, uint32_t page) {
+  const uint32_t p = LoadU32(base, kPage);
+  const uint32_t current = LoadU32(base, p + 0);
+  if (current != page) {
+    StoreU32(base, p + 8, current);
+  }
+  StoreU32(base, p + 12, kMinusOne);
+  StoreU32(base, p + 0, page);
+  StoreU32(base, p + 16, kMinusOne);
+}
+
+// The volumes as SoundOptions::SetEffectsVolume and SetMusicVolume take
+// them: the setting's low byte sign-extended.
+uint64_t Setting(uint8_t* base, uint32_t field) {
+  return uint64_t(int64_t(int8_t(LoadU32(base, Settings(base) + field) & 0xFF)));
+}
+
+// The sound manager's slot at `slot` (bytes into its vtable) with r4 and r5
+// the arguments' addresses (r5 0 where the original leaves it unset).
+uint64_t Slot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame, uint32_t lr,
+              uint64_t r4, uint64_t r5 = 0) {
+  const uint32_t manager = LoadU32(base, kSoundManagerGlobal);
+  return calls.Call(LoadU32(base, LoadU32(base, manager) + slot), frame, lr, manager, r4, r5);
+}
+
+constexpr uint32_t kReleaseBank = 20;    // slot 5
+constexpr uint32_t kIsBankSlotEmpty = 32;  // slot 8
+constexpr uint32_t kStopCue = 52;        // slot 13
+constexpr uint32_t kIsCuePlaying = 56;   // slot 14
+constexpr uint32_t kSoundPlay = 0x82175850;  // Sound::Play, through its override
+
 }  // namespace
 
 uint64_t HudPage(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -273,6 +306,137 @@ uint64_t AnalogPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   // Back (the edits not put back).
   Go(base, kMinusOne, 2, 36);
   return Sound(calls, frame, 0x821C2374, 2);
+}
+
+uint64_t SoundPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C1498 Options::SoundPage");
+  const uint32_t frame = Frame(base, sp, 160);
+  calls.Call(kMenuStep, frame, 0x821C14B0, Menu(base));
+  uint64_t r3;
+  if (LoadU32(base, Menu(base) + 8) != 0) {
+    Go(base, 2, 14, kMinusOne);
+    return Sound(calls, frame, 0x821C187C, 4);
+  }
+  if (StepSound(base) != 0) {
+    // The edits heard at once.
+    calls.Call(kSetEffectsVolume, frame, 0x821C151C, Setting(base, 256));
+    calls.Call(kSetMusicVolume, frame, 0x821C152C, Setting(base, 252));
+    r3 = Sound(calls, frame, 0x821C1534, 4);
+    Go(base, 2, 15, kMinusOne);
+    return r3;
+  }
+  if (Pressed(base, calls, frame, 0x821C156C, 159, r3)) {
+    r3 = Sound(calls, frame, 0x821C157C, 0);
+    const uint32_t menu = Menu(base);
+    const int32_t cursor = int32_t(LoadU32(base, menu + 0));
+    const uint32_t o = Settings(base);
+    const int32_t choice = int32_t(LoadU32(base, o + 660));
+    if (cursor == 2 && choice == 0) {
+      // OK: the edits applied, the page left through page 13.
+      CopyWords(base, o + 60, o + 252, 2);
+      ShowVolumeBars(base, frame);
+      StoreU32(base, Settings(base) + 700, 0);
+      ToPage(base, 13);
+      calls.Call(kSetEffectsVolume, frame, 0x821C1604, Setting(base, 64));
+      return calls.Call(kSetMusicVolume, frame, 0x821C1660, Setting(base, 60));
+    }
+    if (cursor == 2 && choice == 1) {
+      // Default: the defaults into the edits, heard.
+      CopyWords(base, o + 252, o + 444, 2);
+      ShowVolumeNumbers(base, frame, calls);
+      calls.Call(kSetEffectsVolume, frame, 0x821C1650, Setting(base, 256));
+      return calls.Call(kSetMusicVolume, frame, 0x821C1660, Setting(base, 252));
+    }
+    if (cursor == 3) {
+      // The track: the menu music (bank 1's cues 0 to 3) stopped, then the
+      // preview stopped (page 11) or the track picked played (page 12).
+      static constexpr uint32_t kCues[4][2] = {{84, 80}, {92, 88}, {100, 96}, {108, 104}};
+      static constexpr uint32_t kLr[4] = {0x821C169C, 0x821C16C0, 0x821C16E8, 0x821C1710};
+      for (uint32_t cue = 0; cue < 4; cue++) {
+        StoreU32(base, frame + kCues[cue][1], cue);
+        StoreU32(base, frame + kCues[cue][0], 1);
+        r3 = Slot(base, calls, kStopCue, frame, kLr[cue], frame + kCues[cue][0],
+                  frame + kCues[cue][1]);
+      }
+      const uint32_t settings = Settings(base);
+      if (LoadU32(base, settings + 692) == LoadU32(base, settings + 688)) {
+        StoreU32(base, settings + 692, kMinusOne);
+        StoreU32(base, Settings(base) + 700, 0);
+        ToPage(base, 11);
+      } else {
+        StoreU32(base, settings + 700, 0);
+        const uint32_t s = Settings(base);
+        StoreU32(base, s + 692, LoadU32(base, s + 688));
+        ToPage(base, 12);
+      }
+      return r3;
+    }
+    // The cursor sent to OK.
+    StoreU32(base, menu + 4, LoadU32(base, menu + 0));
+    StoreU32(base, menu + 0, 2);
+    StoreU32(base, Settings(base) + 660, 0);
+    Go(base, 2, 14, kMinusOne);
+    return r3;
+  }
+  if (!Pressed(base, calls, frame, 0x821C17F0, 158, r3)) {
+    return r3;
+  }
+  // Back: the edits dropped, the page left through page 13.
+  const uint32_t o = Settings(base);
+  CopyWords(base, o + 252, o + 60, 2);
+  ShowVolumeNumbers(base, frame, calls);
+  StoreU32(base, Settings(base) + 700, 0);
+  ToPage(base, 13);
+  calls.Call(kSetEffectsVolume, frame, 0x821C1864, Setting(base, 64));
+  calls.Call(kSetMusicVolume, frame, 0x821C1874, Setting(base, 60));
+  return Sound(calls, frame, 0x821C187C, 2);
+}
+
+uint64_t LeaveSoundPage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BA380 Options::LeaveSoundPage");
+  const uint32_t frame = Frame(base, sp, 160);
+  const int32_t state = int32_t(LoadU32(base, Settings(base) + 700));
+  if (state == 0) {
+    // The preview (bank 2's cue 0) stopped.
+    StoreU32(base, frame + 80, 0);
+    StoreU32(base, frame + 84, 2);
+    r3 = Slot(base, calls, kStopCue, frame, 0x821BA3CC, frame + 84, frame + 80);
+    StoreU32(base, Settings(base) + 700, 1);
+    return r3;
+  }
+  if (state == 1) {
+    // Once it's stopped, bank 2 released.
+    StoreU32(base, frame + 88, 0);
+    StoreU32(base, frame + 92, 2);
+    r3 = Slot(base, calls, kIsCuePlaying, frame, 0x821BA414, frame + 92, frame + 88);
+    if ((r3 & 0xFF) != 0) {
+      return r3;
+    }
+    StoreU32(base, frame + 96, 2);
+    r3 = Slot(base, calls, kReleaseBank, frame, 0x821BA438, frame + 96);
+    StoreU32(base, Settings(base) + 700, 2);
+    return r3;
+  }
+  if (state != 2) {
+    return r3;
+  }
+  // Once bank 2's slot is empty: the menu music started again unless it's
+  // playing, and the sound page's close queued.
+  StoreU32(base, frame + 100, 2);
+  r3 = Slot(base, calls, kIsBankSlotEmpty, frame, 0x821BA46C, frame + 100);
+  if ((r3 & 0xFF) == 0) {
+    return r3;
+  }
+  StoreU32(base, frame + 108, 1);
+  StoreU32(base, frame + 104, LoadU32(base, Settings(base) + 704));
+  r3 = Slot(base, calls, kIsCuePlaying, frame, 0x821BA4A4, frame + 108, frame + 104);
+  if ((r3 & 0xFF) == 0) {
+    StoreU32(base, frame + 116, 1);
+    StoreU32(base, frame + 112, LoadU32(base, Settings(base) + 704));
+    r3 = calls.Call(kSoundPlay, frame, 0x821BA4C8, frame + 116, frame + 112);
+  }
+  Go(base, kMinusOne, 0, 16);
+  return r3;
 }
 
 }  // namespace options_screen

@@ -136,5 +136,9 @@ void OptionsHudPage(PPCContext& ctx, uint8_t* base);
 void OptionsSlidersPage(PPCContext& ctx, uint8_t* base);
 void OptionsButtonsPage(PPCContext& ctx, uint8_t* base);
 void OptionsAnalogPage(PPCContext& ctx, uint8_t* base);
+// Options::SoundPage sub_821C1498 and LeaveSoundPage sub_821BA380 (r3 as
+// Options::Draw leaves it).
+void OptionsSoundPage(PPCContext& ctx, uint8_t* base);
+void OptionsLeaveSoundPage(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

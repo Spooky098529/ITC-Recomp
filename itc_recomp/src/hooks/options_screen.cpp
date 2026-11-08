@@ -39,7 +39,8 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "sub_821C3398, ChangeSlidersValue sub_821C35F0, LeaveButtons sub_821C2778 and "
               "LeaveAnalog sub_821C2A10; the category pages HudPage sub_821C1270, SlidersPage "
               "sub_821C1888, ButtonsPage sub_821C1D08 and AnalogPage sub_821C21A8 with "
-              "HasButtonClash sub_821BA890 and HasAnalogClash sub_821BAC78; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
+              "HasButtonClash sub_821BA890 and HasAnalogClash sub_821BAC78, SoundPage sub_821C1498 "
+              "and LeaveSoundPage sub_821BA380; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -445,6 +446,16 @@ void OptionsAnalogPage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::AnalogPage(base, ctx.r1.u32, guest.calls());
 }
 
+void OptionsSoundPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SoundPage(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsLeaveSoundPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::LeaveSoundPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -526,6 +537,8 @@ ITC_OPTIONS_SCREEN(821C1270, OptionsHudPage)
 ITC_OPTIONS_SCREEN(821C1888, OptionsSlidersPage)
 ITC_OPTIONS_SCREEN(821C1D08, OptionsButtonsPage)
 ITC_OPTIONS_SCREEN(821C21A8, OptionsAnalogPage)
+ITC_OPTIONS_SCREEN(821C1498, OptionsSoundPage)
+ITC_OPTIONS_SCREEN(821BA380, OptionsLeaveSoundPage)
 // Options::ShowVolumeBar sub_821BE5A8: its override is the pause movie log's
 // wrap (src/debug/pause_movie_log.cpp), which calls the step under the flag.
 

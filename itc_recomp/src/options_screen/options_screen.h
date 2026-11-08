@@ -417,5 +417,16 @@ uint64_t SlidersPage(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t ButtonsPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_821C21A8 Options::AnalogPage (96).
 uint64_t AnalogPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C1498 Options::SoundPage (160): the volumes heard on a change
+// (SoundOptions::SetEffectsVolume and SetMusicVolume through their
+// overrides), the track's row stopping the menu music and going to page 11
+// or 12, OK and back leaving through page 13.
+uint64_t SoundPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821BA380 Options::LeaveSoundPage (page 13, 160): by the settings'
+// +700, the preview stopped, bank 2 released, the menu music started again
+// (Sound::Play through its override) and the sound page's close queued;
+// the sound manager's slots through `calls`. `r3` returned as it came for
+// another +700.
+uint64_t LeaveSoundPage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

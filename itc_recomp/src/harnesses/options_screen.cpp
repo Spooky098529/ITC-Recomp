@@ -1279,6 +1279,37 @@ void CategoryPages(Context& h, const World& w) {
                words(w, r, {572}, 6, 0, 10);
              }),
         __imp__sub_821C21A8, hooks::OptionsAnalogPage, {{96, 16}});
+  // The sound page: the volumes (edits, current, defaults) around 0 to 15,
+  // the track picked and the one previewed 0 to 16 (the same half the
+  // time), the menu music's cue 0 to 3. Its register saves (r28 to r31 and
+  // lr, 40 bytes) left out.
+  Group(h, w, "Options::SoundPage (sub_821C1498)", 250,
+        page(2, 3,
+             [&](const World& w, Random& r) {
+               for (const uint32_t f : {60u, 64u, 252u, 256u, 444u, 448u}) {
+                 guest::StoreU32(h.base, w.settings() + f, Around(r, -1, 16));
+               }
+               const uint32_t track = r.Below(17);
+               guest::StoreU32(h.base, w.settings() + 688, track);
+               guest::StoreU32(h.base, w.settings() + 692,
+                               r.Below(2) == 0 ? track : Around(r, -1, 16));
+               guest::StoreU32(h.base, w.settings() + 704, r.Below(4));
+             }),
+        __imp__sub_821C1498, hooks::OptionsSoundPage, {{160, 40}});
+  // The sound page's leave: the state +700 0 to 2 or another, the menu
+  // music's cue 0 to 3; the sound manager's slot 8 (IsBankSlotEmpty) the
+  // getter too. Its register saves (r29 to r31 and lr) left out.
+  Group(
+      h, w, "Options::LeaveSoundPage (sub_821BA380)", 150,
+      [&](PPCContext&, Random& from, const World& w) {
+        Random r = Mixed(from);
+        const uint32_t states[5] = {0, 1, 2, 2, uint32_t(r.Next())};
+        guest::StoreU32(h.base, w.settings() + 700, states[r.Below(5)]);
+        guest::StoreU32(h.base, w.settings() + 704, r.Below(4));
+        guest::StoreU32(h.base, w.manager() + 0x400 + 32, kGet60);
+        guest::StoreU32(h.base, w.page() + 0, r.Below(2) == 0 ? 13 : 0xFFFFFFFFu);
+      },
+      __imp__sub_821BA380, hooks::OptionsLeaveSoundPage, {{160, 32}});
 }
 
 }  // namespace
