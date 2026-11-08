@@ -27,7 +27,12 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "sub_82199D88 with ShowRegionCells sub_821990D0, ShowDigitCells sub_82199350 and "
               "ShowCharCells sub_82199488 (MenuList::Init, SetSelection, Fit, UiMovie::SetText, "
               "SetNodeText and ClearText through their overrides, their unset varargs 0; "
-              "HelpLine::Set's plain C++) "
+              "HelpLine::Set's plain C++); the transitions Transition0 sub_8219A3A8, Transition1 "
+              "sub_82198A40, Transition4 sub_82198C20, Transition5 sub_8219A5E8, Transition6 "
+              "sub_82198D00, Transition8 sub_8219A820, Transition10 sub_8219AA00, Transition11 "
+              "sub_82198DC8, Transition13 sub_8219AC88 and Transition19 sub_82198FB8 (the named "
+              "animations, UiMovie::FinishAll and UiMovie::Run through their overrides; the "
+              "plate editor's helpers and HelpLine::Set their plain C++) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -176,6 +181,46 @@ void PlateSetUpCharsMenu(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateSetUpCharsMenu(base, ctx.r1.u32, guest.calls());
 }
+void PlateTransition0(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition1(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition1(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition4(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition5(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition6(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition6(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition8(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition8(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition10(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition10(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition11(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition11(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition13(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition13(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateTransition19(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateTransition19(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
 
 }  // namespace hooks
 
@@ -217,6 +262,18 @@ ITC_TYPE2_SCREENS(82199A20, PlateShowPlate)
 ITC_TYPE2_SCREENS(82199C10, PlateSetUpRegionMenu)
 ITC_TYPE2_SCREENS(82199CC8, PlateSetUpNumberMenu)
 ITC_TYPE2_SCREENS(82199D88, PlateSetUpCharsMenu)
+// The transitions (from PlateEditor::Update's table on its stack,
+// recompiled).
+ITC_TYPE2_SCREENS(8219A3A8, PlateTransition0)
+ITC_TYPE2_SCREENS(82198A40, PlateTransition1)
+ITC_TYPE2_SCREENS(82198C20, PlateTransition4)
+ITC_TYPE2_SCREENS(8219A5E8, PlateTransition5)
+ITC_TYPE2_SCREENS(82198D00, PlateTransition6)
+ITC_TYPE2_SCREENS(8219A820, PlateTransition8)
+ITC_TYPE2_SCREENS(8219AA00, PlateTransition10)
+ITC_TYPE2_SCREENS(82198DC8, PlateTransition11)
+ITC_TYPE2_SCREENS(8219AC88, PlateTransition13)
+ITC_TYPE2_SCREENS(82198FB8, PlateTransition19)
 // No adapters for ShowRegionCells sub_821990D0 (SetUpRegionMenu;
 // Transition3, never seen in play, reaches the original), ShowDigitCells
 // sub_82199350 (only SetUpNumberMenu) and ShowCharCells sub_82199488

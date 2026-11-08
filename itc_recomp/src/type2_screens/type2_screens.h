@@ -54,6 +54,9 @@ constexpr uint32_t kClearText = 0x8211C470;
 constexpr uint32_t kListInit = 0x8220BAC0;
 constexpr uint32_t kListSetSelection = 0x8220BC30;
 constexpr uint32_t kListFit = 0x8220BC40;
+constexpr uint32_t kPlayNamed = 0x8211DAC8;
+constexpr uint32_t kLoopNamed = 0x8211DDE0;
+constexpr uint32_t kRun = 0x8211E1B8;
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
@@ -180,5 +183,51 @@ uint32_t PlateShowPlate(uint8_t* base, uint32_t plate, uint32_t sp);
 uint64_t PlateSetUpRegionMenu(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t PlateSetUpNumberMenu(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t PlateSetUpCharsMenu(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The license plate editor's transitions (plate_transitions.cpp) ---
+//
+// Each takes `step`, the address of the page object's +24 (r3): its set-up
+// on the first call (the word 0, then 1), then UiMovie::Run(movie 26, 0);
+// the named animations (UiMovie::PlayNamed with r5 to r8 0, LoopNamed,
+// FinishNamed, FinishAll) and Run through their overrides; the plate
+// editor's helpers and HelpLine::Set their plain C++. r3 1, or 1 when Run
+// answers 0 where said.
+
+// sub_8219A3A8 PlateEditor::Transition0: named 66, SetUpRegionMenu,
+// ShowPlate(the data's +4). Run's answer. 112-byte frame.
+uint64_t PlateTransition0(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82198A40 PlateEditor::Transition1: named 2 + the selection x 3 + the
+// column, 0 and 68 played and looped; node (3, 1) +68 = the float at
+// 0x82000A30. 128-byte frame.
+uint64_t PlateTransition1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82198C20 PlateEditor::Transition4: the region's cell, 0 and 68
+// finished, FinishAll, named 67 played. Run's answer. 112-byte frame.
+uint64_t PlateTransition4(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219A5E8 PlateEditor::Transition5: FinishRegionAnim, named 69, the
+// data's +56 = 0, SetUpNumberMenu, the help line 569, ShowDigits(the three
+// digits as words at the frame's +88). Run's answer. 144-byte frame.
+uint64_t PlateTransition5(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82198D00 PlateEditor::Transition6: named 15 + the selection x 4 + the
+// column played and looped; node (4, 1) +68 = the float at 0x82000A30.
+// 128-byte frame.
+uint64_t PlateTransition6(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219A820 PlateEditor::Transition8: the digit's animation finished,
+// SetUpNumberMenu, ShowDigits (the frame's +88). 144-byte frame.
+uint64_t PlateTransition8(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219AA00 PlateEditor::Transition10: FinishDigitAnim, the data's +56 =
+// 0, SetUpCharsMenu, named 71, the help line 571; when Run answers 0,
+// ShowCharLine(the data's +60). Run's answer. 128-byte frame.
+uint64_t PlateTransition10(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82198DC8 PlateEditor::Transition11: named 27 + the selection x 10 +
+// the column played and looped. 128-byte frame.
+uint64_t PlateTransition11(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219AC88 PlateEditor::Transition13: the character's animation
+// finished, SetUpCharsMenu, the seven characters as words at the frame's
+// +96, the data's +60 = CharLineKind, ShowChars, ShowCharLine(+60).
+// 160-byte frame.
+uint64_t PlateTransition13(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82198FB8 PlateEditor::Transition19: FinishAll, the root's nodes 7, 6,
+// 5, 3, 4, 8, 9 hidden. 160-byte frame.
+uint64_t PlateTransition19(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace type2_screens

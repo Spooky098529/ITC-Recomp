@@ -48,5 +48,16 @@ void PlateShowPlate(PPCContext& ctx, uint8_t* base);
 void PlateSetUpRegionMenu(PPCContext& ctx, uint8_t* base);
 void PlateSetUpNumberMenu(PPCContext& ctx, uint8_t* base);
 void PlateSetUpCharsMenu(PPCContext& ctx, uint8_t* base);
+// The transitions (r3 the started word's address).
+void PlateTransition0(PPCContext& ctx, uint8_t* base);
+void PlateTransition1(PPCContext& ctx, uint8_t* base);
+void PlateTransition4(PPCContext& ctx, uint8_t* base);
+void PlateTransition5(PPCContext& ctx, uint8_t* base);
+void PlateTransition6(PPCContext& ctx, uint8_t* base);
+void PlateTransition8(PPCContext& ctx, uint8_t* base);
+void PlateTransition10(PPCContext& ctx, uint8_t* base);
+void PlateTransition11(PPCContext& ctx, uint8_t* base);
+void PlateTransition13(PPCContext& ctx, uint8_t* base);
+void PlateTransition19(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -294,6 +294,25 @@ uint32_t MakePages(uint8_t* base, uint32_t bytes, Random& r) {
   return block;
 }
 
+// UiMovie::Run's update (sub_8211D2F8), stood in for: each call's return
+// address, stack pointer (from the case's), r3 and r4 kept and answered 0
+// or 1 from the case's generator (the update would draw the movie).
+struct UpdateCall {
+  uint32_t lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<UpdateCall> g_updates;
+Random g_answers;
+uint32_t g_case_sp = 0;
+bool UpdateStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (function != 0x8211D2F8) {
+    return false;
+  }
+  g_updates.push_back({uint32_t(ctx.lr), g_case_sp - ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = g_answers.Below(2);
+  return true;
+}
+
 // A stack range compared, relative to the call's r1: [from, to).
 struct Range {
   int32_t from;
@@ -339,6 +358,12 @@ void Run(Context& h, const World& w, const Spec& spec) {
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
       time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
       g_opens.clear();
+      g_updates.clear();
+      g_answers = Random(r.Next());
+      g_case_sp = sp;
+      const ui_movies_hooks::UpdateCalleeStandIn stand_in =
+          ui_movies_hooks::g_update_callee_stand_in;
+      ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
       const hooks::StartUpRecorder recorder = hooks::g_start_up_recorder;
       g_chained = recorder;
       hooks::g_start_up_recorder = RecordOpen;
@@ -352,7 +377,17 @@ void Run(Context& h, const World& w, const Spec& spec) {
       }
       hooks::g_start_up_recorder = recorder;
       g_chained = nullptr;
+      ui_movies_hooks::g_update_callee_stand_in = stand_in;
       time_hooks::ClearFakeNow();
+      out[v].Word(uint32_t(g_updates.size()));
+      for (const UpdateCall& call : g_updates) {
+        out[v].Word(call.lr);
+        out[v].Word(call.r1);
+        out[v].Word(uint32_t(call.r3 >> 32));
+        out[v].Word(uint32_t(call.r3));
+        out[v].Word(uint32_t(call.r4 >> 32));
+        out[v].Word(uint32_t(call.r4));
+      }
       out[v].Word(uint32_t(g_opens.size()));
       for (const uint32_t word : g_opens) {
         out[v].Word(word);
@@ -526,6 +561,21 @@ void CellsWorld(Random& r, const World& w) {
   guest::StoreU32(base, w.at(kListAt) + 4, uint32_t(int32_t(r.Below(8)) - 1));
   guest::StoreU32(base, w.at(kListAt) + 68, r.Below(2) == 0 ? 0 : MakePages(base, 64, r));
 }
+// Node (2, 2) given 3 children, as in the game: ShowDigits reads as many
+// words as it has children, past the three digits its callers write into
+// their frames (the saves: a register's value stored into a node's +108,
+// where FindNode reads its first child's index).
+void ThreeDigits(const World& w) {
+  const uint32_t node = ui_movies::FindNode(w.base, w.at(kMovieAt), 2, 2);
+  guest::StoreU32(w.base, node + 104, 3);
+}
+// Every node at most 3 children (the transitions' callees may move which
+// node is (2, 2) before ShowDigits runs), the root none.
+void SmallNodes(Random& r, const World& w) {
+  for (uint32_t n = 1; n < kNodeCount; n++) {
+    guest::StoreU32(w.base, w.node(n) + 104, r.Below(4));
+  }
+}
 void ListBlock(PPCContext&, const World& w, Outputs& out) {
   const uint32_t list = w.at(kListAt);
   Allocated(w.base, out, list + 68, 4 * std::min(guest::LoadU32(w.base, list + 0), 128u));
@@ -556,6 +606,9 @@ void PlateCells(Context& h, const World& w) {
              [](PPCContext& t, Random& r, const World& w) {
                CellsWorld(r, w);
                guest::StoreU32(w.base, t.r1.u32 - 144 + 92, r.Below(12));
+               if (r.Below(2) == 0) {
+                 ThreeDigits(w);
+               }
                t.r3.u64 = w.data() + 4;
              }});
   // The menus' set-ups: their frames (MenuList::Init's stack words) without
@@ -573,6 +626,48 @@ void PlateCells(Context& h, const World& w) {
              __imp__sub_82199D88, hooks::PlateSetUpCharsMenu, {{-128, -24}}, cells, ListBlock});
 }
 
+// The transitions: r3 the started word's address (the page object's +24:
+// 0, 1 or any), the cells' world; UiMovie::Run's update stood in (answered
+// 0 or 1); their frames without the saves.
+void PlateTransitions(Context& h, const World& w) {
+  auto step = [](PPCContext& t, Random& r, const World& w) {
+    CellsWorld(r, w);
+    SmallNodes(r, w);
+    const uint32_t at = w.at(kPagesAt) + 24;
+    guest::StoreU32(w.base, at, r.Below(3) == 0 ? 1 : r.Below(5) == 0 ? uint32_t(r.Next()) : 0);
+    t.r3.u64 = at;
+  };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    int32_t frame, saves;
+  } kCases[] = {
+      {"PlateEditor::Transition0 (sub_8219A3A8; sub_82199C10, sub_82199A20)", __imp__sub_8219A3A8,
+       hooks::PlateTransition0, 112, 24},
+      {"PlateEditor::Transition1 (sub_82198A40)", __imp__sub_82198A40, hooks::PlateTransition1,
+       128, 32},
+      {"PlateEditor::Transition4 (sub_82198C20)", __imp__sub_82198C20, hooks::PlateTransition4,
+       112, 24},
+      {"PlateEditor::Transition5 (sub_8219A5E8; sub_82199CC8, sub_821998F0)", __imp__sub_8219A5E8,
+       hooks::PlateTransition5, 144, 32},
+      {"PlateEditor::Transition6 (sub_82198D00)", __imp__sub_82198D00, hooks::PlateTransition6,
+       128, 32},
+      {"PlateEditor::Transition8 (sub_8219A820; sub_82199CC8, sub_821998F0)", __imp__sub_8219A820,
+       hooks::PlateTransition8, 144, 32},
+      {"PlateEditor::Transition10 (sub_8219AA00; sub_82199D88, sub_82199688)",
+       __imp__sub_8219AA00, hooks::PlateTransition10, 128, 32},
+      {"PlateEditor::Transition11 (sub_82198DC8)", __imp__sub_82198DC8, hooks::PlateTransition11,
+       128, 32},
+      {"PlateEditor::Transition13 (sub_8219AC88; sub_821981C8, sub_82199990)",
+       __imp__sub_8219AC88, hooks::PlateTransition13, 160, 32},
+      {"PlateEditor::Transition19 (sub_82198FB8)", __imp__sub_82198FB8, hooks::PlateTransition19,
+       160, 72},
+  };
+  for (const auto& c : kCases) {
+    Run(h, w, {c.name, 80, c.recompiled, c.native, {{-c.frame, -c.saves}}, step, ListBlock});
+  }
+}
+
 }  // namespace
 
 void Type2Screens(Context& h) {
@@ -584,6 +679,7 @@ void Type2Screens(Context& h) {
   PlateEditor(h, w);
   if (hooks::NativeHeapActive()) {
     PlateCells(h, w);
+    PlateTransitions(h, w);
   }
 }
 
