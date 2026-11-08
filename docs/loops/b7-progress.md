@@ -119,7 +119,13 @@ file's history. What's left to see in a drive, from every run:
   (`sub_82183DE0`, `sub_82184488`, `sub_82182DD0`, `sub_82185920`; the
   lead this run's second map added, the closest to ready: two roots
   ready, the others with ready groups under them; its line deleted from
-  `leads.md`). Step: mapping, agent running.
+  `leads.md`). Mapped `car-dealer.md` (c96dfffd: 75 rows, 57 in play:
+  the car dealer, one of the type 2 mode's 13 screen machines, its 23
+  transitions, 6 pages, the color pick and the purchase, the career's
+  first car; 38 ready groups; the paint color lead taken whole, four
+  leads' lines trimmed, 1 lead added (the type 2 mode's other screen
+  machines); no subagents); map checked. Step: migration, agent
+  running.
 
 ## Done
 
@@ -175,5 +181,7 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 56, known 417, unknown 965).
 - After its migration: ours 5016, work left 1411 (wrapped 56, known
   390, unknown 965).
+- After the car dealer's map: ours 5016, work left 1411 (wrapped 56,
+  known 447, unknown 908).
 
 ## Stopped

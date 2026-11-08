@@ -122,6 +122,17 @@ When the user has reviewed a run's section, its heading gets
   read) zeroed before comparing; in the frames below the steps only
   `SetNote`'s back chain is compared (the rest callees' register save
   slots and `SetNodeText`'s varargs leftovers).
+- The car dealer's map (c96dfffd): new `car-dealer.md`, 75 rows (18
+  not seen in play): the type 2 mode's dealer machine (its block at the
+  mode's +848, +0x19978), 23 transitions, 6 pages and 22 page
+  transitions, the two car lists by the spec's byte +771, the color
+  pick (HSV records), the purchase (money at +6116, `Garage::Add`, the
+  garage-full and not-enough-money cases) and the career's first car
+  (`sub_82180CE8`: the boot movies' list, `Career::SetUpEvent`,
+  `Race::SetUp`). `known-data.md`: `0x826D83E8`-`0x826D83F0` added,
+  `0x826D83F4` (the dealer's 1,196-byte data) rewritten. The paint color
+  lead (`sub_821847A0`) taken whole; four leads' lines trimmed; one lead
+  added (the type 2 mode's other screen machines).
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
