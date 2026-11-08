@@ -96,5 +96,19 @@ void OptionsMoveSaveDialogCursor(PPCContext& ctx, uint8_t* base);
 void OptionsMoveCategory6DialogCursor(PPCContext& ctx, uint8_t* base);
 void OptionsChangeSaveDialog(PPCContext& ctx, uint8_t* base);
 void OptionsChangeCategory6Dialog(PPCContext& ctx, uint8_t* base);
+// Draw sub_821C80F0 (r4 the dispatcher), Update sub_821C81E8, SavePage
+// sub_821C6F58 (r3 passed on), Category6Page sub_821BD228 (r3, r4 passed
+// on), StepHud sub_821BE3E0, ShowVolumeBars sub_821BE8A8, ShowPrompts
+// sub_821C1068 (r3 to r8), Settings::Reload sub_821C0FF0, OnLeft
+// sub_821B9E70 (the allocation layer's pages).
+void OptionsDraw(PPCContext& ctx, uint8_t* base);
+void OptionsUpdate(PPCContext& ctx, uint8_t* base);
+void OptionsSavePage(PPCContext& ctx, uint8_t* base);
+void OptionsCategory6Page(PPCContext& ctx, uint8_t* base);
+void OptionsStepHud(PPCContext& ctx, uint8_t* base);
+void OptionsShowVolumeBars(PPCContext& ctx, uint8_t* base);
+void OptionsShowPrompts(PPCContext& ctx, uint8_t* base);
+void OptionsSettingsReload(PPCContext& ctx, uint8_t* base);
+void OptionsOnLeft(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

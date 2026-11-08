@@ -29,7 +29,11 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "sub_821BEFE8, ShowAnalogList sub_821BF520, ShowButtonClashes sub_821BF158 and "
               "ShowAnalogClashes sub_821BF698; the steps EnterAnalog sub_821BDE88, "
               "MoveSaveDialogCursor sub_821C09B0, MoveCategory6DialogCursor sub_821C0B50, "
-              "ChangeSaveDialog sub_821C08B0 and ChangeCategory6Dialog sub_821C0A50; MenuSound::Play and the sound "
+              "ChangeSaveDialog sub_821C08B0 and ChangeCategory6Dialog sub_821C0A50; Options::Draw "
+              "sub_821C80F0, Update sub_821C81E8, SavePage sub_821C6F58, Category6Page "
+              "sub_821BD228, StepHud sub_821BE3E0, ShowVolumeBars sub_821BE8A8, ShowPrompts "
+              "sub_821C1068, Settings::Reload sub_821C0FF0 and Options::OnLeft sub_821B9E70 "
+              "(with --native_heap); the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -315,6 +319,51 @@ void OptionsChangeCategory6Dialog(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::ChangeCategory6Dialog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void OptionsDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::Draw(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void OptionsUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::Update(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsSavePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SavePage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+
+void OptionsCategory6Page(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      options_screen::Category6Page(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void OptionsStepHud(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::StepHud(base, ctx.r1.u32);
+}
+
+void OptionsShowVolumeBars(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::ShowVolumeBars(base, ctx.r1.u32);
+}
+
+void OptionsShowPrompts(PPCContext& ctx, uint8_t* base) {
+  const uint64_t values[6] = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64,
+                              ctx.r6.u64, ctx.r7.u64, ctx.r8.u64};
+  ctx.r3.u64 = options_screen::ShowPrompts(base, values, ctx.r1.u32);
+}
+
+void OptionsSettingsReload(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SettingsReload(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsOnLeft(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::OnLeft(base, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -375,6 +424,14 @@ ITC_OPTIONS_SCREEN(821C09B0, OptionsMoveSaveDialogCursor)
 ITC_OPTIONS_SCREEN(821C0B50, OptionsMoveCategory6DialogCursor)
 ITC_OPTIONS_SCREEN(821C08B0, OptionsChangeSaveDialog)
 ITC_OPTIONS_SCREEN(821C0A50, OptionsChangeCategory6Dialog)
+ITC_OPTIONS_SCREEN(821C80F0, OptionsDraw)
+ITC_OPTIONS_SCREEN(821C81E8, OptionsUpdate)
+ITC_OPTIONS_SCREEN(821C6F58, OptionsSavePage)
+ITC_OPTIONS_SCREEN(821BD228, OptionsCategory6Page)
+ITC_OPTIONS_SCREEN(821BE3E0, OptionsStepHud)
+ITC_OPTIONS_SCREEN(821BE8A8, OptionsShowVolumeBars)
+ITC_OPTIONS_SCREEN(821C1068, OptionsShowPrompts)
+ITC_OPTIONS_SCREEN(821C0FF0, OptionsSettingsReload)
 // Options::ShowVolumeBar sub_821BE5A8: its override is the pause movie log's
 // wrap (src/debug/pause_movie_log.cpp), which calls the step under the flag.
 
@@ -387,4 +444,15 @@ extern "C" REX_FUNC(sub_821BB9A8) {
     return;
   }
   hooks::OptionsOnEnter(ctx, base);
+}
+
+// Options::OnLeft frees the blocks OnEnter took from the allocation layer:
+// the original where the native heap isn't active.
+extern "C" REX_FUNC(sub_821B9E70) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_options_screen) || !hooks::NativeHeapActive()) {
+    __imp__sub_821B9E70(ctx, base);
+    return;
+  }
+  hooks::OptionsOnLeft(ctx, base);
 }

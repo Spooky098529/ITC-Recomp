@@ -442,6 +442,7 @@ set(ITC_SOURCES
     src/options_screen/controls.cpp
     src/options_screen/handlers.cpp
     src/options_screen/nodes.cpp
+    src/options_screen/pages.cpp
     src/options_screen/settings.cpp
     src/options_screen/steps.cpp
     src/hooks/type67_modes.cpp

@@ -54,6 +54,13 @@ constexpr uint32_t kSetNodeText = 0x8211C7E8;
 constexpr uint32_t kRestorePose = 0x82119B80;
 // MenuSound::Play through its override.
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
+// Menu::Pressed, VirtualFree (outside the allocation layer) and
+// Options::ShowCareerInfo (never seen in play: the original) through the
+// function table; the sound manager [0x826C5C80].
+constexpr uint32_t kMenuPressed = 0x821864C8;
+constexpr uint32_t kVirtualFree = 0x82295330;
+constexpr uint32_t kShowCareerInfo = 0x821C0EF0;
+constexpr uint32_t kSoundManagerGlobal = 0x826C5C80;
 
 // The screen's blocks (docs/known-data.md): the page block (28 bytes), the
 // front-end menu (68), the settings `o` (716).
@@ -292,5 +299,48 @@ uint64_t MoveCategory6DialogCursor(uint8_t* base, uint32_t step, uint32_t sp,
 // answers 0 (the state = +624, or +644), else 0. 128-byte frames.
 uint64_t ChangeSaveDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t ChangeCategory6Dialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// --- The machine's dispatch and the page helpers (pages.cpp) ---
+
+// sub_821C80F0 Options::Draw: the 15 pages' handlers at its 224-byte
+// frame's +80; the page p +0's (not -1, no bounds check) called with r3 =
+// r4 = the dispatcher and the original's leftovers in r5 to r10. Its r3, or
+// 0x821C2388 (the original's last table register) with no page.
+uint64_t Draw(uint8_t* base, uint64_t dispatcher, uint32_t sp, const Calls& calls);
+// sub_821C81E8 Options::Update: the 49 steps at its 480-byte frame's +128
+// (+80 to +112 the spilled 0x821C0000); the step p +12: -1 UiMovie::Run(m,
+// 0) unless the page is 14; >= 0 called (r3 = p + 24, r4 to r10 the
+// original's leftovers) and, when it answers nonzero, the step ended (the
+// queued one, or the page after); other negatives ended at once. Its r3:
+// the step's, Run's or `m`.
+uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C6F58 Options::SavePage (page 9) and sub_821BD228 Category6Page
+// (page 10): the dialog's cancel to step 41 (42) with page 9 (10) after and
+// the sub-pages' block ([0x826D847C] or [0x826D8488]) to 5; its sub-page
+// called from the 7-entry (6-entry) table at the frame's +80 (r3 as it
+// came; r4 too for page 10; the leftovers); page 9 then Menu::Pressed(menu,
+// 158). 128- and 112-byte frames. r3: Pressed's; the handler's or `r3`.
+uint64_t SavePage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t Category6Page(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_821BE3E0 Options::StepHud: the five values' addresses at the frame's
+// +80; by the menu's side, left on a 0 -> 1, right on a 1 -> 0, then
+// ShowHudValues, 1; else 0. 112-byte frame.
+uint64_t StepHud(uint8_t* base, uint32_t sp);
+// sub_821BE8A8 Options::ShowVolumeBars: ShowVolumeBar on (6, 6) and (6, 7)
+// with +252 and +256. 112-byte frame. The second's r3.
+uint64_t ShowVolumeBars(uint8_t* base, uint32_t sp);
+// sub_821C1068 Options::ShowPrompts: `values` r3 to r8 (three prompts'
+// first and second frames) at the frame's +88 and +104; prompt i's node (1,
+// i) shown with its two choices' +108 set when neither is -1, else hidden.
+// 176-byte frame. The last second choice's node.
+uint64_t ShowPrompts(uint8_t* base, const uint64_t (&values)[6], uint32_t sp);
+// sub_821C0FF0 Settings::Reload: by the context, 1 ShowCareerInfo (the
+// original) and PlayTime::Mark on player 0's save data, 2 and 3 a word -1;
+// then Settings::Read. 96-byte frame. Read's r3.
+uint64_t SettingsReload(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821B9E70 Options::OnLeft: the sound manager's StopCue(2, 0) and
+// ReleaseBank(2) (slots 13 and 5), the seven blocks freed (the allocation
+// layer's pages, else VirtualFree) and the globals 0. 160-byte frame. The
+// last free's answer.
+uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

@@ -19,6 +19,7 @@
 #include "hooks/options_screen.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
+#include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
 #include "options_screen/options_screen.h"
 #include "ui_movies/game.h"
@@ -27,6 +28,7 @@
 
 #include <cstring>
 #include <functional>
+#include <initializer_list>
 #include <string>
 #include <utility>
 #include <vector>
@@ -147,10 +149,12 @@ struct World {
         misc(kMiscBytes),
         movies(kMovieWorldBytes),
         texts(kTextWorldBytes),
-        strings(kStringWorldBytes) {}
+        strings(kStringWorldBytes),
+        mappers(0x1000) {}
   bool ok() const {
     return blocks.address != 0 && save.address != 0 && misc.address != 0 &&
-           movies.address != 0 && texts.address != 0 && strings.address != 0;
+           movies.address != 0 && texts.address != 0 && strings.address != 0 &&
+           mappers.address != 0;
   }
   uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
   uint32_t root() const { return movies.address + kRootAt; }
@@ -173,6 +177,7 @@ struct World {
   Block movies;
   Block texts;
   Block strings;
+  Block mappers;
 };
 
 // The globals a case points at its world, put back after.
@@ -186,7 +191,11 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
     {kMissingText, 4},
-    {kStringTable, 4}};
+    {kStringTable, 4},
+    {menu_helpers::kMapperEntries, 32},
+    {menu_helpers::kControllerEntries, 16},
+    {0x826367E8 + 1972, 4},
+    {0x826371D0 + 1972, 4}};
 
 // Whether a case's movie table leaves movie 7 out (its pair's id 9): for
 // the functions that delete it (UiMovies::Delete would free our block).
@@ -357,6 +366,9 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, vtable + menu_sounds::kSetCategoryVolumeSlot, kGet60);
   // Slot 10 (PlayCue2D, MenuSound::Play's) the getter too.
   guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, kGet60);
+  // Slots 5 (ReleaseBank) and 13 (StopCue), Options::OnLeft's, too.
+  guest::StoreU32(base, vtable + 20, kGet60);
+  guest::StoreU32(base, vtable + 52, kGet60);
   guest::StoreU32(base, menu_sounds::kSoundManager, manager);
   // The UI movies; movie 7's loaded flag 0 or 1.
   ShapeMovieWorld(base, w, r);
@@ -855,6 +867,164 @@ void PageHelpers(Context& h, const World& w) {
         __imp__sub_821C0A50, hooks::OptionsChangeCategory6Dialog, {{128, 32}});
 }
 
+
+// --- The machine's dispatch and the page helpers ---
+
+// The players' action mappers (Menu::Pressed's), as the type 6 and 7 modes'
+// harness shapes them, and the options' menu's fields Pressed reads.
+void ShapeMappers(uint8_t* base, const World& w, Random& r) {
+  WriteRandom(base, w.mappers.address, w.mappers.bytes, r);
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t vt = w.mappers.address + 0x100 + 0x40 * k;
+    const uint32_t mapper = w.mappers.address + 0x200 + 0x200 * k;
+    guest::StoreU32(base, menu_helpers::kControllerEntries + 4 * k, r.Below(4));
+    guest::StoreU32(base, menu_helpers::kMapperEntries + 8 * k, mapper);
+    guest::StoreU32(base, menu_helpers::kMapperEntries + 8 * k + 4, r.Below(5) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper, vt);
+    guest::StoreU32(base, vt + menu_helpers::kPressedOffset, menu_helpers::kPressedSlot);
+    guest::StoreU32(base, vt + menu_helpers::kFiredOffset, menu_helpers::kFiredSlot);
+    for (uint32_t i = 0; i < 6; i++) {
+      const uint32_t bits = r.Below(3) == 0 ? 0 : uint32_t(r.Next() & r.Next());
+      guest::StoreU32(base, mapper + 448 + 4 * i, bits);
+    }
+  }
+  const uint32_t menu = w.menu();
+  guest::StoreU32(base, menu + menu_helpers::kPlayer, r.Below(4));
+  guest::StoreU32(base, menu + menu_helpers::kMoved, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, menu + menu_helpers::kSide, r.Below(4) == 0 ? 1 : 0);
+}
+
+void Dispatch(Context& h, const World& w) {
+  const auto pick = [](Random& r, std::initializer_list<int32_t> values) {
+    const int32_t* v = values.begin();
+    return uint32_t(v[r.Below(uint32_t(values.size()))]);
+  };
+  // Pages 9 and 10: the cancel word 0, 1 or any; the sub-pages' page among
+  // those the world runs (the save pages' 4 and 5, the notes' 5) and
+  // negatives; the options' page around 9 and 10.
+  const auto save_pages = [&h, pick](const World& w, Random& r) {
+    ShapeMappers(h.base, w, r);
+    guest::StoreU32(h.base, w.settings() + 708, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    guest::StoreU32(h.base, w.block(0x826D847C) + 0, pick(r, {-1, -3, 4, 5, 5}));
+    guest::StoreU32(h.base, w.block(0x826D8488) + 0, pick(r, {-1, -2, 5, 5}));
+    guest::StoreU32(h.base, w.page() + 0, pick(r, {9, 10, 3, -1}));
+  };
+  Group(
+      h, w, "Options::SavePage (sub_821C6F58)", 100,
+      [&](PPCContext& t, Random& r, const World& w) {
+        save_pages(w, r);
+        t.r3.u64 = w.dispatcher();
+      },
+      __imp__sub_821C6F58, hooks::OptionsSavePage, {{128, 8}});
+  Group(
+      h, w, "Options::Category6Page (sub_821BD228)", 100,
+      [&](PPCContext& t, Random& r, const World& w) {
+        save_pages(w, r);
+        t.r3.u64 = w.dispatcher();
+        t.r4.u64 = w.dispatcher();
+      },
+      __imp__sub_821BD228, hooks::OptionsCategory6Page, {{112, 8}});
+  // Draw: no page, the close (14), or pages 9 and 10 (theirs as above).
+  Group(
+      h, w, "Options::Draw (sub_821C80F0)", 100,
+      [&](PPCContext& t, Random& r, const World& w) {
+        save_pages(w, r);
+        guest::StoreU32(h.base, w.page() + 0, pick(r, {-1, 14, 9, 10}));
+        t.r3.u64 = w.machine();
+        t.r4.u64 = w.dispatcher();
+      },
+      __imp__sub_821C80F0, hooks::OptionsDraw, {{224, 80}});
+  // Update: the step none (-1, with the page 14 or not), other negatives,
+  // or one the world runs (the native steps); the queued step -1 or one;
+  // the steps' fields as their own cases shape them.
+  Group(
+      h, w, "Options::Update (sub_821C81E8)", 200,
+      [&](PPCContext&, Random& r, const World& w) {
+        const uint32_t p = w.page();
+        guest::StoreU32(h.base, p + 12,
+                        pick(r, {-1, -1, -2, -7, 0, 4, 5, 9, 11, 13, 17, 25, 33, 44, 45, 47, 48}));
+        guest::StoreU32(h.base, p + 16, pick(r, {-1, -1, 3, 9}));
+        guest::StoreU32(h.base, p + 0, pick(r, {14, 2, 0}));
+        guest::StoreU32(h.base, p + 24, r.Below(2));
+        guest::StoreU32(h.base, w.settings() + 684, Around(r, -1, 12));
+        guest::StoreU32(h.base, w.menu() + 0, r.Below(6));
+        guest::StoreU32(h.base, w.settings() + 4, r.Below(7));
+        guest::StoreU32(h.base, w.settings() + 660, r.Below(2));
+        guest::StoreU32(h.base, w.settings() + 284, r.Below(17));
+        guest::StoreU32(h.base, w.settings() + 380, r.Below(19));
+        const uint32_t menu = w.block(0x826D8484);
+        guest::StoreU32(h.base, menu + 0, r.Below(4));
+        guest::StoreU32(h.base, menu + 4, r.Below(4));
+        for (const uint32_t f : {620u, 640u}) {
+          guest::StoreU32(h.base, w.settings() + f, r.Below(4));
+        }
+      },
+      __imp__sub_821C81E8, hooks::OptionsUpdate, {{480, 152}});
+  // StepHud: the side -1, 1, 0 or any; the cursor 0 to 4; the values 0, 1
+  // or any. ShowHudValues' frame below its own.
+  Group(
+      h, w, "Options::StepHud (sub_821BE3E0)", 150,
+      [&](PPCContext&, Random& r, const World& w) {
+        const uint32_t sides[4] = {0xFFFFFFFFu, 1, 0, uint32_t(r.Next())};
+        guest::StoreU32(h.base, w.menu() + 36, sides[r.Below(4)]);
+        guest::StoreU32(h.base, w.menu() + 0, r.Below(5));
+        for (const uint32_t f : {236u, 240u, 244u, 248u, 660u}) {
+          guest::StoreU32(h.base, w.settings() + f,
+                          r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
+        }
+      },
+      __imp__sub_821BE3E0, hooks::OptionsStepHud, {{112, 8}, {320, 200}});
+  Group(
+      h, w, "Options::ShowVolumeBars (sub_821BE8A8)", 60,
+      [&](PPCContext&, Random& r, const World& w) {
+        for (const uint32_t f : {252u, 256u}) {
+          guest::StoreU32(h.base, w.settings() + f, Around(r, -1, 17));
+        }
+      },
+      __imp__sub_821BE8A8, hooks::OptionsShowVolumeBars, {{112, 24}, {224, 144}});
+  // ShowPrompts: each frame -1 or 0 to 8 (they land in the world's child
+  // indexes).
+  Group(
+      h, w, "Options::ShowPrompts (sub_821C1068)", 100,
+      [&](PPCContext& t, Random& r, const World&) {
+        PPCRegister* regs[6] = {&t.r3, &t.r4, &t.r5, &t.r6, &t.r7, &t.r8};
+        for (PPCRegister* reg : regs) {
+          reg->u64 = r.Below(4) == 0 ? ~uint64_t(0) : r.Below(9);
+        }
+      },
+      __imp__sub_821C1068, hooks::OptionsShowPrompts, {{176, 56}});
+  // Settings::Reload: the context 0 to 4 or any (1 runs ShowCareerInfo, the
+  // original, on both sides). Settings::Read's frame below its own.
+  Group(
+      h, w, "Settings::Reload (sub_821C0FF0)", 100,
+      [&](PPCContext&, Random& r, const World& w) {
+        guest::StoreU32(h.base, w.settings() + 4, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(5));
+        for (uint32_t f = 44; f < 284; f += 4) {
+          guest::StoreU32(h.base, w.options() + f, r.Below(34));
+        }
+      },
+      __imp__sub_821C0FF0, hooks::OptionsSettingsReload, {{96, 8}, {368, 152}});
+  // OnLeft frees the seven blocks: each case gives it seven of the
+  // allocation layer's pages (as OnEnter's), compared freed after.
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_ERROR("harness: options_screen: the native heap isn't active; OnLeft skipped");
+    return;
+  }
+  Group(
+      h, w, "Options::OnLeft (sub_821B9E70)", 40,
+      [&](PPCContext&, Random&, const World&) {
+        for (uint32_t i = 0; i < 7; i++) {
+          guest::StoreU32(h.base, kGlobals + 4 * i, memory::AllocPages(64, 4096));
+        }
+      },
+      __imp__sub_821B9E70, hooks::OptionsOnLeft, {{160, 64}},
+      [&h](PPCContext&, const World&, Outputs& out) {
+        for (uint32_t i = 0; i < 7; i++) {
+          out.Word(guest::LoadU32(h.base, kGlobals + 4 * i));
+        }
+      });
+}
+
 }  // namespace
 
 void OptionsScreen(Context& h) {
@@ -869,6 +1039,7 @@ void OptionsScreen(Context& h) {
   MovieHandlers(h, w);
   NodeHelpers(h, w);
   PageHelpers(h, w);
+  Dispatch(h, w);
 }
 
 }  // namespace harness
