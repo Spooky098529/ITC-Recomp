@@ -663,10 +663,11 @@ ITC_TYPE2_SCREENS(8218E078, HubCreate)
 ITC_TYPE2_SCREENS(8218E368, HubOpenMovie)
 ITC_TYPE2_SCREENS(8218E1A8, HubDestroy)
 ITC_TYPE2_SCREENS(8218D8E8, HubImageLoaded)
-// The hub's UpdatePage (a functor), RecordPage (from UpdatePage's table),
-// ShowBusy and HideBusy (from the recompiled Update) and the transitions
-// (from Update's table on its stack, recompiled; Transition3 also in
-// sub_822240B0's). No adapters for SetRecordText sub_8218F4D8 (only
+// The hub's UpdatePage (a functor), RecordPage (from UpdatePage's table)
+// and the transitions (from Update's table on its stack; Transition3 also
+// in sub_822240B0's). No adapters (removed, B7 loop, 2026-11-08) for
+// ShowBusy sub_8218EA90 and HideBusy sub_8218EB10 (only Update, native).
+// No adapters for SetRecordText sub_8218F4D8 (only
 // RecordPage), ShowNoticeImage sub_8218F3F8 (only ShowNotice), ShowNotice
 // sub_821903D0 (Transition5; Transition8 and Transition10, never seen in
 // play, reach the original) and FillMenu sub_8218FB20 (Transition0,
@@ -676,8 +677,6 @@ ITC_TYPE2_SCREENS(8218D8E8, HubImageLoaded)
 ITC_TYPE2_SCREENS(821907F8, HubUpdate)
 ITC_TYPE2_SCREENS(82190498, HubUpdatePage)
 ITC_TYPE2_SCREENS(821900B8, HubRecordPage)
-ITC_TYPE2_SCREENS(8218EA90, HubShowBusy)
-ITC_TYPE2_SCREENS(8218EB10, HubHideBusy)
 ITC_TYPE2_SCREENS(821901C0, HubTransition0)
 ITC_TYPE2_SCREENS(8218EC78, HubTransition1)
 ITC_TYPE2_SCREENS(8218EE48, HubTransition2)
