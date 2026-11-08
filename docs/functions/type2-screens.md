@@ -100,6 +100,16 @@ pages 3 and 4. `ShowDigits` reads as many words as node (2, 2) has
 children (3 in the game) from its callers' frames, past the three digits
 they write: a harness with more children reads the frames' saves, so the
 harness gives the transitions' nodes at most 3 children.
+Its second migration (2026-11-08) made the hub native but for `Update`
+with `PutCarOnStand` (the stand's reload and car need the car scene's
+world in the harness) and its handlers and transitions never seen in
+play (`hub.cpp`, `hub_images.cpp`, `hub_movie.cpp`, `hub_pages.cpp`;
+`Type2Hub::Create` asks `VirtualAlloc` for 68 bytes, as the original, and
+uses the page to +447; `WaitForLoad` keeps the patched count of 1), and
+the build screen's `Enter` with `Fill`, `SetUpStatus` and
+`BuildList::RemoveAt` (`build_enter.cpp`). The harness runs before the
+game loads its data tables, so `Fill`'s cases lay 400 items of their own;
+`OnDialogDone` clears `[0x826364EC]`, which the harness puts back.
 
 Shared, with their rows where they are: `StateMachine::Add`
 ([`game-modes.md`](game-modes.md)), `ScreenMachine::Reenter`
