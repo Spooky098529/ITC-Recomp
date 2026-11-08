@@ -23,7 +23,10 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "sub_8224E920 (SetPrice the original), Panel7C::ShowArrows sub_82241868; TabPanel::SetTab "
               "sub_822501C8 and Move sub_8224FF88, RowPanel::Fill sub_8224F758, Refresh "
               "sub_8224F888 and Move sub_8224F8F8, ColorPanel::Move sub_8224D580; "
-              "PowerGraph::SetEntry sub_82250368; PanelSet::Reset sub_822496C8, Picked "
+              "PowerGraph::SetEntry sub_82250368; the panels' answers TabPanel::IsShown sub_8224FCE0, "
+              "RowPanel::IsShown sub_8224F5E8 and IsHidden sub_8224F640, CarPanel::IsShown "
+              "sub_8224E108, ColorPanel::IsShown sub_8224D1F0 and IsIdle sub_8224D288 "
+              "(UiMovie::IsNamedActive's plain C++); PanelSet::Reset sub_822496C8, Picked "
               "sub_82249848, WentBack sub_82249870, WantsPowerGraph sub_82249898, SetOpenKind "
               "sub_8224B6D8, SetPreviousTab sub_8224B6E8, SetPreviousEntry sub_8224B6F0, "
               "SetPreviousColor sub_8224B6F8, PanelSetBase::PickedPage sub_82248EF0 and SaveData "
@@ -152,6 +155,12 @@ ITC_CL_STEP(CarListRowMove, cl::RowMove(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64
 ITC_CL_STEP(CarListColorMove,
             cl::ColorMove(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                           ctx.r8.u64, ctx.r9.u64, ctx.r10.u32, sp, calls))
+ITC_CL_STEP(CarListTabIsShown, cl::TabIsShown(base, ctx.r3.u32, sp))
+ITC_CL_STEP(CarListRowIsShown, cl::RowIsShown(base, ctx.r3.u32, sp))
+ITC_CL_STEP(CarListRowIsHidden, cl::RowIsHidden(base, ctx.r3.u32, sp))
+ITC_CL_STEP(CarListCarIsShown, cl::CarIsShown(base, ctx.r3.u32, sp))
+ITC_CL_STEP(CarListColorIsShown, cl::ColorIsShown(base, ctx.r3.u32, sp))
+ITC_CL_STEP(CarListColorIsIdle, cl::ColorIsIdle(base, ctx.r3.u32, sp))
 ITC_CL_STEP(CarListPowerGraphSetEntry, cl::PowerGraphSetEntry(base, ctx.r3.u64, ctx.r4.u64))
 ITC_CL_STEP(CarListSetReset, cl::SetReset(base, ctx.r3.u64))
 ITC_CL_STEP(CarListSetPicked, cl::SetPicked(base, ctx.r3.u32))
@@ -263,6 +272,13 @@ ITC_CAR_LIST(82241868, CarListPanel7CShowArrows)
 ITC_CAR_LIST(8224E920, CarListCarShowStats)
 ITC_CAR_LIST(822501C8, CarListTabSetTab)
 ITC_CAR_LIST(8224D580, CarListColorMove)
+// The panels' answers (from the steps, recompiled).
+ITC_CAR_LIST(8224FCE0, CarListTabIsShown)
+ITC_CAR_LIST(8224F5E8, CarListRowIsShown)
+ITC_CAR_LIST(8224F640, CarListRowIsHidden)
+ITC_CAR_LIST(8224E108, CarListCarIsShown)
+ITC_CAR_LIST(8224D1F0, CarListColorIsShown)
+ITC_CAR_LIST(8224D288, CarListColorIsIdle)
 // PowerGraph::SetEntry (from PanelSetBase::PowerGraphPage, recompiled).
 ITC_CAR_LIST(82250368, CarListPowerGraphSetEntry)
 // PanelSet's vtable slots 2, 8 to 10, 13, 15 to 17, the page 5 handler (from

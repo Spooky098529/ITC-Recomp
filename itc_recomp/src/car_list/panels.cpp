@@ -805,6 +805,65 @@ uint64_t CarShowStats(uint8_t* base, uint64_t panel_r3, uint32_t entry, uint32_t
   return r3;
 }
 
+// --- The panels' answers (UiMovie::IsNamedActive's plain C++, a leaf) ---
+
+namespace {
+// Whether named animation `named` of the movie is playing or looping.
+bool Active(uint8_t* base, uint32_t m, uint32_t named) {
+  return ui_movies::IsNamedActive(base, m, named) != 0;
+}
+}  // namespace
+
+uint64_t TabIsShown(uint8_t* base, uint32_t panel, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8224FCE0 TabPanel::IsShown");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 4), frame);
+  return Active(base, m, LoadU32(base, panel + 116)) ? 0 : 1;
+}
+
+uint64_t RowIsShown(uint8_t* base, uint32_t panel, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8224F5E8 RowPanel::IsShown");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 0), frame);
+  const uint32_t named = LoadU32(base, panel + (LoadU32(base, panel + 152) != 0 ? 80 : 76));
+  return Active(base, m, named) ? 0 : 1;
+}
+
+uint64_t RowIsHidden(uint8_t* base, uint32_t panel, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8224F640 RowPanel::IsHidden");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 0), frame);
+  return Active(base, m, LoadU32(base, panel + 88)) ? 0 : 1;
+}
+
+uint64_t CarIsShown(uint8_t* base, uint32_t panel, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8224E108 CarPanel::IsShown");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 12), frame);
+  for (uint32_t i = 0; i < 2; i++) {
+    if (Active(base, m, LoadU32(base, panel + 40 + 4 * i))) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+uint64_t ColorIsShown(uint8_t* base, uint32_t panel, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8224D1F0 ColorPanel::IsShown");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 4), frame);
+  return Active(base, m, LoadU32(base, panel + 16)) ? 0 : 1;
+}
+
+uint64_t ColorIsIdle(uint8_t* base, uint32_t panel, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8224D288 ColorPanel::IsIdle");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 4), frame);
+  const bool a = Active(base, m, LoadU32(base, panel + 40));
+  const bool b = Active(base, m, LoadU32(base, panel + 36));
+  return a || b ? 0 : 1;
+}
+
 // --- The power graph's record ---
 
 uint64_t PowerGraphSetEntry(uint8_t* base, uint64_t entry_r3, uint64_t tab) {

@@ -718,6 +718,60 @@ void MorePanels(Context& h, const World& w) {
       __imp__sub_82250368, hooks::CarListPowerGraphSetEntry);
 }
 
+// Both movies' animation lists given 0 to 5 used slots each, as
+// UiMovie::PlayNamed fills them (-1, -1, the named index, its entry's scene
+// and animation, a time of 0.0, chained), their named indices the panel's
+// words at `offsets` (read after the setup's shaping) or any index, so the
+// panels' answers (UiMovie::IsNamedActive) find some.
+void FillLists(uint8_t* base, const World& w, Random& r, const std::vector<uint32_t>& offsets) {
+  for (uint32_t m = 0; m < kMovieCount; m++) {
+    const uint32_t movie = w.movie(m);
+    for (const uint32_t list : {ui_movies::kMovieQueue, ui_movies::kMovieLooping}) {
+      const uint32_t used = r.Below(6);
+      for (uint32_t k = 0; k < used; k++) {
+        uint32_t named = Index(r);
+        if (offsets.size() != 0 && r.Below(3) != 0) {
+          named = guest::LoadU32(base, w.panel() + offsets[r.Below(uint32_t(offsets.size()))]);
+        }
+        const uint32_t entry = movie + 176 + 36 * (named < 900 ? named : 0);
+        const ui_movies::Slot slot = {0xFFFFFFFFu, 0xFFFFFFFFu, named,
+                                      guest::LoadU32(base, entry + 28),
+                                      guest::LoadU32(base, entry + 32), 0, 1, 0, 0, 0};
+        ui_movies::Append(base, movie + list, slot);
+      }
+    }
+  }
+}
+
+// The panels' answers (UiMovie::IsNamedActive over the lists FillLists
+// fills): r3 the panel with its group at the offset each reads.
+void PanelAnswers(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const int n = 60;
+  const auto answer = [base](uint32_t at, std::initializer_list<uint32_t> offsets) {
+    const std::vector<uint32_t> named(offsets);
+    return [base, at, named](PPCContext&, Random& r, const World& w) {
+      SetGroup(base, w, r, at);
+      if (at == 0) {
+        guest::StoreU32(base, w.panel() + 152, r.Below(2));
+      }
+      FillLists(base, w, r, named);
+    };
+  };
+  Group(h, w, "TabPanel::IsShown (sub_8224FCE0)", n, {96, 16}, answer(4, {116}),
+        __imp__sub_8224FCE0, hooks::CarListTabIsShown);
+  Group(h, w, "RowPanel::IsShown (sub_8224F5E8)", n, {96, 16}, answer(0, {76, 80}),
+        __imp__sub_8224F5E8, hooks::CarListRowIsShown);
+  Group(h, w, "RowPanel::IsHidden (sub_8224F640)", n, {96, 16}, answer(0, {88}),
+        __imp__sub_8224F640, hooks::CarListRowIsHidden);
+  Group(h, w, "CarPanel::IsShown (sub_8224E108)", n, {128, 40}, answer(12, {40, 44}),
+        __imp__sub_8224E108, hooks::CarListCarIsShown);
+  Group(h, w, "ColorPanel::IsShown (sub_8224D1F0)", n, {96, 16}, answer(4, {16}),
+        __imp__sub_8224D1F0, hooks::CarListColorIsShown);
+  Group(h, w, "ColorPanel::IsIdle (sub_8224D288)", n, {112, 32}, answer(4, {36, 40}),
+        __imp__sub_8224D288, hooks::CarListColorIsIdle);
+}
+
 // PanelSet's leaves on the objects block (r3 its start, its words random).
 void Leaves(Context& h, const World& w) {
   uint8_t* const base = h.base;
@@ -1327,6 +1381,7 @@ void CarList(Context& h) {
   BuildStringTable(h.base, w);
   Panels(h, w);
   MorePanels(h, w);
+  PanelAnswers(h, w);
   Leaves(h, w);
   Steps(h, w);
   SetUps(h, w);

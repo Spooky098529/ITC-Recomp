@@ -344,6 +344,21 @@ uint64_t UpdateStand(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls)
 // when it answers nonzero and [0x82815EB0] is 0, then UpdateStand. Returns 1.
 uint64_t Update(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 
+// --- The panels' answers (panels.cpp; UiMovie::IsNamedActive's plain C++,
+// a leaf, so no guest call): 1 when the named animations they name aren't
+// playing or looping, else 0 ---
+
+// sub_8224FCE0 TabPanel::IsShown (+116), sub_8224F5E8 RowPanel::IsShown
+// (+76, or +80 with +152 set), sub_8224F640 RowPanel::IsHidden (+88),
+// sub_8224E108 CarPanel::IsShown (+40 and +44), sub_8224D1F0
+// ColorPanel::IsShown (+16), sub_8224D288 ColorPanel::IsIdle (+40 and +36).
+uint64_t TabIsShown(uint8_t* base, uint32_t panel, uint32_t sp);
+uint64_t RowIsShown(uint8_t* base, uint32_t panel, uint32_t sp);
+uint64_t RowIsHidden(uint8_t* base, uint32_t panel, uint32_t sp);
+uint64_t CarIsShown(uint8_t* base, uint32_t panel, uint32_t sp);
+uint64_t ColorIsShown(uint8_t* base, uint32_t panel, uint32_t sp);
+uint64_t ColorIsIdle(uint8_t* base, uint32_t panel, uint32_t sp);
+
 // --- The power graph's record (panels.cpp) ---
 
 // The power graph screen's record's holder ([0x82815EBC]; the record at

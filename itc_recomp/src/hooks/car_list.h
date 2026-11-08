@@ -43,6 +43,13 @@ void CarListRowFill(PPCContext& ctx, uint8_t* base);
 void CarListRowRefresh(PPCContext& ctx, uint8_t* base);
 void CarListRowMove(PPCContext& ctx, uint8_t* base);
 void CarListColorMove(PPCContext& ctx, uint8_t* base);
+// The panels' answers (r3 the panel).
+void CarListTabIsShown(PPCContext& ctx, uint8_t* base);
+void CarListRowIsShown(PPCContext& ctx, uint8_t* base);
+void CarListRowIsHidden(PPCContext& ctx, uint8_t* base);
+void CarListCarIsShown(PPCContext& ctx, uint8_t* base);
+void CarListColorIsShown(PPCContext& ctx, uint8_t* base);
+void CarListColorIsIdle(PPCContext& ctx, uint8_t* base);
 // PowerGraph::SetEntry (r3 an entry, r4 the tab).
 void CarListPowerGraphSetEntry(PPCContext& ctx, uint8_t* base);
 
