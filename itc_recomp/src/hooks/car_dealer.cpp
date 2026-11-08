@@ -44,7 +44,10 @@ ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
               "sub_82184338, OpenCarList sub_82184488 and OpenCar sub_82184650 (MenuList::Init, "
               "SetSelection, Fit, CarCards::FillAll and GarageStage::SetPlates through their "
               "overrides; SetKindBar's, SetScrollArrows', ShowCarInfo's and HelpLine::Set's plain "
-              "C++) "
+              "C++); the transitions Transition0 sub_82184C70, Transition4 sub_82184DA0, "
+              "Transition5 sub_82184E60, Transition8 sub_82184FB8 and Transition9 sub_821850B8 "
+              "(the openers', SetHeader's and ReloadStandModel's plain C++; the named animations "
+              "and UiMovie::Run through their overrides) "
               "(the same writes; checked by --run_harnesses=car_dealer)");
 
 namespace hooks {
@@ -164,6 +167,26 @@ void CarDealerLeave(PPCContext& ctx, uint8_t* base) {
 void CarDealerTransition3(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition0(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition4(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition5(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition8(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition8(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition9(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition9(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 void CarDealerShowCarInfo(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
@@ -301,6 +324,11 @@ ITC_CAR_DEALER(82183160, CarDealerOnDialogDone)
 // switches it; their steps above are the harness's.
 // The transitions (from CarDealer::Update's table on its stack).
 ITC_CAR_DEALER(82181D68, CarDealerTransition3)
+ITC_CAR_DEALER(82184C70, CarDealerTransition0)
+ITC_CAR_DEALER(82184DA0, CarDealerTransition4)
+ITC_CAR_DEALER(82184E60, CarDealerTransition5)
+ITC_CAR_DEALER(82184FB8, CarDealerTransition8)
+ITC_CAR_DEALER(821850B8, CarDealerTransition9)
 // The page handlers (from UpdatePage's table on its stack).
 ITC_CAR_DEALER(82180F90, CarDealerPage0)
 ITC_CAR_DEALER(82183428, CarDealerPage1)

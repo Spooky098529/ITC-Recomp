@@ -1148,6 +1148,49 @@ void Openers(Context& h, const World& w) {
              hooks::CarDealerOpenCar, {{-144, -96}, {-64, -40}}, setup, FreeMenuBlocks});
 }
 
+// The transitions: r3 the started word (the page object's +24: 0, 1 or
+// any), the openers' world as Openers lays it (both lists 1 to 8 cars for
+// the car list's openers), the stand's for ReloadStandModel; UiMovie::Run's
+// update stood in (answered 0 or 1); the frames without their saves.
+void Transitions(Context& h, const World& w) {
+  auto setup = [](bool cars, bool stand) {
+    return [cars, stand](PPCContext& t, Random& r, const World& w) {
+      uint8_t* base = w.base;
+      MenuWorld(r, w);
+      MenuBlocks(r, w);
+      if (stand) {
+        StandWorld(base, r, w);
+      }
+      const uint32_t data = w.data();
+      guest::StoreU32(base, data + 40, uint32_t(Small(r, 3)));
+      guest::StoreU32(base, data + 44, uint32_t(Small(r, 3)));
+      for (const uint32_t count : {616u, 1132u}) {
+        guest::StoreU32(base, data + count,
+                        cars ? 1 + r.Below(8) : (r.Below(3) == 0 ? 0 : r.Below(8)));
+      }
+      for (uint32_t k = 0; k < kEntryCount; k++) {
+        guest::StoreU32(base, w.entry(k) + 652, FloatBits(r));
+        guest::StoreU32(base, w.entry(k) + 660, FloatBits(r));
+        guest::StoreU8(base, w.entry(k) + 709, uint8_t(r.Below(2) == 0 ? 0 : r.Below(256)));
+      }
+      const uint32_t step = w.at(kPagesAt) + 24;
+      const uint32_t words[3] = {0, 1, uint32_t(r.Next())};
+      guest::StoreU32(base, step, words[r.Below(4) == 0 ? 1 + r.Below(2) : 0]);
+      t.r3.u64 = step;
+    };
+  };
+  Run(h, w, {"CarDealer::Transition0 (sub_82184C70; sub_82184338)", 100, __imp__sub_82184C70,
+             hooks::CarDealerTransition0, {{-112, -24}}, setup(false, false), FreeMenuBlocks});
+  Run(h, w, {"CarDealer::Transition4 (sub_82184DA0; sub_82184488)", 100, __imp__sub_82184DA0,
+             hooks::CarDealerTransition4, {{-128, -32}}, setup(true, false), FreeMenuBlocks});
+  Run(h, w, {"CarDealer::Transition5 (sub_82184E60; sub_82184488)", 100, __imp__sub_82184E60,
+             hooks::CarDealerTransition5, {{-112, -24}}, setup(true, false), FreeMenuBlocks});
+  Run(h, w, {"CarDealer::Transition8 (sub_82184FB8; sub_82184338)", 100, __imp__sub_82184FB8,
+             hooks::CarDealerTransition8, {{-128, -32}}, setup(false, false), FreeMenuBlocks});
+  Run(h, w, {"CarDealer::Transition9 (sub_821850B8; sub_82184650)", 100, __imp__sub_821850B8,
+             hooks::CarDealerTransition9, {{-112, -24}}, setup(true, true), FreeMenuBlocks});
+}
+
 }  // namespace
 
 void CarDealer(Context& h) {
@@ -1165,6 +1208,7 @@ void CarDealer(Context& h) {
   Pages(h, w);
   if (hooks::NativeHeapActive()) {
     Openers(h, w);
+    Transitions(h, w);
   }
 }
 

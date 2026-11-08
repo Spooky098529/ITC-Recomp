@@ -92,6 +92,7 @@ constexpr uint32_t kListSetSelection = 0x8220BC30;
 constexpr uint32_t kListFit = 0x8220BC40;
 constexpr uint32_t kCarCardsFillAll = 0x821822F8;
 constexpr uint32_t kStageSetPlates = 0x82178DE8;
+constexpr uint32_t kLoopNamed = 0x8211DDE0;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -218,6 +219,33 @@ uint64_t Leave(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp, const Cal
 // UiMovie::Run(movie 4, 0). 1 when both fades' counts are 0. 112-byte
 // frame.
 uint64_t Transition3(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+//
+// The others (r3 the started word, `step`): on the first call (the word 0)
+// their set-up and the word 1; then UiMovie::Run(movie 4, 0); 1 when Run
+// answers 0 unless said. The named animations (UiMovie::PlayNamed, LoopNamed,
+// FinishNamed) and Run through their overrides.
+//
+// sub_82184C70 CarDealer::Transition0: the data's +40 = 0, OpenListMenu,
+// SetHeader(0, 0), 149 and 83 played (r5 1), 83 looped; when done, 75 and 77
+// played and looped. 112-byte frame.
+uint64_t Transition0(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82184DA0 CarDealer::Transition4: the data's +48, +52 = 0, OpenCarList,
+// SetHeader(0, 1), 37 + the list menu's selection finished, 150 played.
+// 128-byte frame.
+uint64_t Transition4(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82184E60 CarDealer::Transition5: as Transition4 with the first list
+// shown (+1136 = +104, +44 = 0), SetHeader(1, 1), 159 and 83 played, 83
+// looped; when done as Transition0. 112-byte frame.
+uint64_t Transition5(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82184FB8 CarDealer::Transition8: 24 + the selection and 34 finished,
+// 153 played, the data's +40 = +44, OpenListMenu, SetHeader(1, 0); when
+// Run answers 0, transition 1 to page 0 (none queued, the started word 0).
+// Always 0. 128-byte frame.
+uint64_t Transition8(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821850B8 CarDealer::Transition9: 24 + the selection and 34 finished,
+// 151 played, ReloadStandModel and OpenCar (their plain C++). 112-byte
+// frame.
+uint64_t Transition9(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The update, the start and the dialogs' end (update.cpp) ---
 
