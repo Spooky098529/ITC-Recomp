@@ -611,10 +611,12 @@ void AnimationListCases(Context& h, const Block& block) {
   struct Lookup {
     const char* name;
     GuestFunction recompiled, native;
+    bool f1 = true;  // IsNamedActive answers in r3 only
   };
   const Lookup lookups[] = {
       {"UiMovie::AnimationTime (sub_8211BA00)", __imp__sub_8211BA00, sub_8211BA00},
       {"UiMovie::NamedAnimationTime (sub_8211BB18)", __imp__sub_8211BB18, sub_8211BB18},
+      {"UiMovie::IsNamedActive (sub_8211BC18)", __imp__sub_8211BC18, sub_8211BC18, false},
   };
   const uint32_t movie = block.at;
   for (const Lookup& f : lookups) {
@@ -637,7 +639,7 @@ void AnimationListCases(Context& h, const Block& block) {
               f.recompiled, f.native,
               fmt::format("case {}: {} and {} used, r4 {:X} r5 {}", i, queue.used, looping.used,
                           r4, r5),
-              true);
+              f.f1);
     }
     results.Report();
   }
@@ -972,6 +974,7 @@ void MoveCases(Context& h, const Block& block) {
       {"UiMovie::Loop (sub_8211DDD8)", __imp__sub_8211DDD8, sub_8211DDD8},
       {"UiMovie::LoopNamed (sub_8211DDE0)", __imp__sub_8211DDE0, sub_8211DDE0},
       {"UiMovie::LoopLast (sub_8211DDE8)", __imp__sub_8211DDE8, sub_8211DDE8},
+      {"UiMovie::UnloopNamed (sub_8211DE30)", __imp__sub_8211DE30, sub_8211DE30},
   };
   const uint32_t movie = block.at;
   for (const Move& f : moves) {

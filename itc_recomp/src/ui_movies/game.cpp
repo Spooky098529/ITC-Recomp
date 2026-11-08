@@ -286,6 +286,17 @@ uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index) {
                   [&](uint32_t slot) { return guest::LoadU32(base, slot + 8) == index; });
 }
 
+uint32_t IsNamedActive(uint8_t* base, uint32_t movie, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_8211BC18 UiMovie::IsNamedActive");
+  for (uint32_t list : {movie + kMovieLooping, movie + kMovieQueue}) {
+    if (FindSlot(base, list,
+                 [&](uint32_t slot) { return guest::LoadU32(base, slot + 8) == index; })) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 Slot LoadSlot(uint8_t* base, uint32_t address) {
   Slot slot;
   for (uint32_t k = 0; k < slot.size(); k++) {
@@ -340,6 +351,11 @@ Moved MoveAnimation(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t 
 Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_looping) {
   ITC_NATIVE_RUNNING("sub_8211DCE8 UiMovie::MoveNamedAnimation");
   return Move(base, movie, to_looping, [&](const Slot& slot) { return slot[2] == index; });
+}
+
+Moved UnloopNamed(uint8_t* base, uint32_t movie, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_8211DE30 UiMovie::UnloopNamed");
+  return MoveNamedAnimation(base, movie, index, false);
 }
 
 namespace {

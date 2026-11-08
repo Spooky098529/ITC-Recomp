@@ -34,7 +34,7 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "animation lists' sub_8211A9E8, sub_8211B230, AnimationList::Insert "
               "sub_8211B4D0, AnimationList::RemoveAt sub_8211B080, AnimationList::Get "
               "sub_8211B298, UiMovie::AnimationTime sub_8211BA00 and "
-              "UiMovie::NamedAnimationTime sub_8211BB18; the pairs' lookups TextMap::Find "
+              "UiMovie::NamedAnimationTime sub_8211BB18, UiMovie::IsNamedActive sub_8211BC18; the pairs' lookups TextMap::Find "
               "sub_8211B310, TextMap::Set sub_8211B370 and UiMovies::Find sub_8211B3F0; the "
               "screens' movie table reset sub_8211AD00 (its renderer calls still the game's); the "
               "layers sub_8211BD10 (its buckets in its frame on the guest stack, as the "
@@ -43,7 +43,8 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "sub_8211B9B8 and sub_8211B940, and UiMovies::IsLoaded sub_8211BE98; the moves "
               "between the animation lists UiMovie::MoveAnimation sub_8211DBE0, "
               "UiMovie::MoveNamedAnimation sub_8211DCE8, UiMovie::Loop sub_8211DDD8, "
-              "UiMovie::LoopNamed sub_8211DDE0, UiMovie::LoopLast sub_8211DDE8, the "
+              "UiMovie::LoopNamed sub_8211DDE0, UiMovie::LoopLast sub_8211DDE8, "
+              "UiMovie::UnloopNamed sub_8211DE30, the "
               "stops UiMovie::Finish sub_8211DE38, UiMovie::FinishNamed sub_8211DF20 and "
               "UiMovie::FinishAll sub_8211DFF8 (UiMovie::ApplyAnimation through its override), "
               "and the "
@@ -62,7 +63,7 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "(sub_8211C930) and sub_8211D8D8 (sub_8211C9C0), the build screen's text helpers "
               "UiMovie::SetFirstLine sub_8211C370, FirstLine sub_8211C3F8, LineCount "
               "sub_8211C680 (Strings::CountLines sub_821087D8), ScrollNodeText sub_8211CCC0 and "
-              "ResetNodeTextScroll sub_8211CD28, UiMovie::SetText sub_8211C1F8 (its "
+              "ResetNodeTextScroll sub_8211CD28, UiMovie::ClearNodeText sub_8211CC50, UiMovie::SetText sub_8211C1F8 (its "
               "Strings::FormatV through the plain C++) and UiMovie::SetNodeText sub_8211C7E8 (the "
               "same, from its override in src/debug/pause_movie_log.cpp), UiMovie::SetNumberText "
               "sub_8211C740 and UiMovie::SetChildNameText sub_8211D930 (with "
@@ -282,6 +283,14 @@ extern "C" REX_FUNC(sub_8211BB18) {
   ctx.f1.f64 = double(std::bit_cast<float>(time));
 }
 
+// UiMovie::IsNamedActive: r3 = movie, r4 = a named animation's index; 1
+// when it's in either list.
+extern "C" REX_FUNC(sub_8211BC18) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211BC18);
+  ctx.r3.u64 = ui_movies::IsNamedActive(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 // TextMap::Find: r3 = a movie's texts, r4 = an id's address.
 extern "C" REX_FUNC(sub_8211B310) {
   REX_FUNC_PROLOGUE();
@@ -427,6 +436,16 @@ extern "C" REX_FUNC(sub_8211DDE0) {
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(ui_movies::MoveNamedAnimation(base, movie, ctx.r4.u32, true), ctx.r1.u32,
                        movie);
+}
+
+// UiMovie::UnloopNamed: sub_8211DCE8 with r5 = 0 (a tail call: the frame
+// where its caller's ends).
+extern "C" REX_FUNC(sub_8211DE30) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DE30);
+  ctx.r5.s64 = 0;
+  const uint32_t movie = ctx.r3.u32;
+  ctx.r3.u64 = MovedR3(ui_movies::UnloopNamed(base, movie, ctx.r4.u32), ctx.r1.u32, movie);
 }
 
 // UiMovie::LoopLast: r3 = movie (its tail calls make their frames where
@@ -839,6 +858,12 @@ extern "C" REX_FUNC(sub_8211CCC0) {
   REX_FUNC_PROLOGUE();
   NATIVE_HEAP_OR_ORIGINAL(8211CCC0,
                           ui_movies::ScrollNodeText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+// UiMovie::ClearNodeText: r3 = movie, r4 = the node.
+extern "C" REX_FUNC(sub_8211CC50) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211CC50, ui_movies::ClearNodeText(base, ctx.r3.u32, ctx.r4.u32));
 }
 
 extern "C" REX_FUNC(sub_8211CD28) {

@@ -122,6 +122,11 @@ void RemoveAt(uint8_t* base, uint32_t list, uint32_t position);
 // 0x82001BE0.
 uint32_t AnimationTime(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index);
 uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index);
+// sub_8211BC18 (UiMovie::IsNamedActive): 1 when a slot with +8 = `index`
+// is in the looping list or the queue (looked for in that order, walked as
+// AnimationTime's), else 0: whether the named animation is still playing
+// or looping.
+uint32_t IsNamedActive(uint8_t* base, uint32_t movie, uint32_t index);
 
 // A list's 40-byte slot as its ten words, and the slot of the last
 // animation started (+0x9FD8: +0 index, +4 sub-scene, +8 named index).
@@ -171,6 +176,9 @@ struct Moved {
 Moved MoveAnimation(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index,
                     bool to_looping);
 Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_looping);
+// sub_8211DE30 (UiMovie::UnloopNamed): MoveNamedAnimation to the queue (the
+// original's tail call with r5 = 0).
+Moved UnloopNamed(uint8_t* base, uint32_t movie, uint32_t index);
 // sub_8211DDE8 (UiMovie::LoopLast): the last started animation moved to the
 // looping list, by name when its +8 isn't -1.
 Moved LoopLast(uint8_t* base, uint32_t movie);
@@ -504,6 +512,11 @@ uint32_t CountLines(uint8_t* base, uint32_t text);
 std::optional<uint32_t> ScrollNodeText(uint8_t* base, uint32_t movie, uint32_t node,
                                        uint32_t scrolling);
 std::optional<uint32_t> ResetNodeTextScroll(uint8_t* base, uint32_t movie, uint32_t node);
+// sub_8211CC50 UiMovie::ClearNodeText: the node's text buffer's 4 KB
+// cleared (memset; +8 kept, unlike ClearText), with the node given (no TXT
+// check). The original's frame words (+80 the record, +84 the id) aren't
+// written, as the other setters' aren't.
+std::optional<uint32_t> ClearNodeText(uint8_t* base, uint32_t movie, uint32_t node);
 
 // sub_8211C1F8 UiMovie::SetText: the node (FindNode) must be a TXT (else
 // nullopt: the original loops forever there, an assert); `varargs` (its r7

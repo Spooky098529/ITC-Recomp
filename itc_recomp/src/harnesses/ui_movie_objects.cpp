@@ -705,6 +705,7 @@ constexpr const char* kFirstLine = "UiMovie::FirstLine (sub_8211C3F8)";
 constexpr const char* kLineCount = "UiMovie::LineCount (sub_8211C680; sub_821087D8)";
 constexpr const char* kScrollNodeText = "UiMovie::ScrollNodeText (sub_8211CCC0)";
 constexpr const char* kResetNodeTextScroll = "UiMovie::ResetNodeTextScroll (sub_8211CD28)";
+constexpr const char* kClearNodeText = "UiMovie::ClearNodeText (sub_8211CC50)";
 constexpr const char* kSetNumberText = "UiMovie::SetNumberText (sub_8211C740)";
 constexpr const char* kSetChildNameText =
     "UiMovie::SetChildNameText (sub_8211D930; sub_8211CAA0)";
@@ -818,6 +819,8 @@ void SetterCases(Context& h, uint32_t movie) {
       {kLineCount, __imp__sub_8211C680, sub_8211C680},
       {kScrollNodeText, __imp__sub_8211CCC0, sub_8211CCC0},
       {kResetNodeTextScroll, __imp__sub_8211CD28, sub_8211CD28},
+      // UiMovie::ClearNodeText (r4 one of the 8 nodes; ui-movies-game.md).
+      {kClearNodeText, __imp__sub_8211CC50, sub_8211CC50},
       // On TXT nodes (SetNodeText's original loops forever on others); r6
       // the value (0, a low word of 0, small, any) or a name record of
       // the case's (kinds 0 to 6 and others, indexes around their bounds),
@@ -994,7 +997,8 @@ void SetterCases(Context& h, uint32_t movie) {
           guest::StoreU8(h.base, name + 18, r.Below(2) == 0 ? 0 : uint8_t(r.Next()));
           t.r6.u64 = name;
         }
-        if (f.name == kScrollNodeText || f.name == kResetNodeTextScroll) {
+        if (f.name == kScrollNodeText || f.name == kResetNodeTextScroll ||
+            f.name == kClearNodeText) {
           t.r4.u64 = nodes + 128 * r.Below(8);
           t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
         }

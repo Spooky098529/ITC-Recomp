@@ -688,6 +688,13 @@ std::optional<uint32_t> ResetNodeTextScroll(uint8_t* base, uint32_t movie, uint3
   });
 }
 
+std::optional<uint32_t> ClearNodeText(uint8_t* base, uint32_t movie, uint32_t node) {
+  return ChangeNodeText(base, movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CC50 UiMovie::ClearNodeText");
+    Zero(base, Load(base, record), 4096);
+  });
+}
+
 std::optional<uint32_t> RevealText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                    uint32_t child) {
   bool stepped = false;
