@@ -18,6 +18,15 @@ here loses its heading.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
+- The cleanup lead's third migration (attract race `itc_4603`, replay
+  `itc_4604` ok but a free start, no countdown; `race-screens.md`,
+  `race-hud-machine.md`, `race-hud-object.md`, `career.md`): the
+  countdown, the race's end with its prizes, the career results and the
+  menu after the race: `sub_8221A4A8`, `sub_8220E908`, `sub_8220EBD8`,
+  `sub_8216CC60`, `sub_8216E5B0`, `sub_8220D248`, `sub_822157A8`,
+  `sub_822123C8`, `sub_82213F20`, `sub_82212270`, `sub_8216E150`,
+  `sub_8221A1F0`, `sub_822197A8`, `sub_8221BA68`, `sub_8216D3F0`,
+  `sub_8216C820`, `sub_8216C938`, `sub_82110590`, `sub_82110B18`.
 - The cleanup lead after the UI movie helpers (attract race
   `itc_4564`, replay `itc_4565` ok; `type6-type7-modes.md`):
   `sub_82246038` StandMode::Release.

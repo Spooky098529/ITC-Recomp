@@ -85,7 +85,12 @@ file's history. What's left to see in a drive, from every run:
   differing). Left: the pause menu's transitions they made ready
   (`sub_8220E988`, `sub_8220F3C0`, `sub_8220F500`, `sub_8220ED90`,
   `sub_8220EFA8`, `sub_8220F6D0`, `sub_8220F0A0`, `sub_8220F788`,
-  `sub_8220F2A8`). Step: its validation, agent running.
+  `sub_8220F2A8`). Validated `itc_4603` (race 83 s at 180, the
+  harnesses ~96 s; 0 errors, every harness 0 differing outside the
+  expected groups, 26 of 26 harness lines; none in the race, 7 in the
+  replay `itc_4604` (ok, a free start: no countdown), 19 to drive).
+  Step: fourth migration (the pause menu's transitions), agent
+  running.
 
 ## Done
 
@@ -121,5 +126,7 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 56, known 413, unknown 997).
 - After its second migration: ours 4962, work left 1464 (wrapped 56,
   known 411, unknown 997).
+- After its third migration: ours 4979, work left 1447 (wrapped 56,
+  known 394, unknown 997).
 
 ## Stopped
