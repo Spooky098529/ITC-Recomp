@@ -43,6 +43,15 @@ void CarDealerSetNameTexts(PPCContext& ctx, uint8_t* base);
 void CarDealerSetPriceTexts(PPCContext& ctx, uint8_t* base);
 void CarDealerSetSpecTexts(PPCContext& ctx, uint8_t* base);
 void CarDealerSetSwatchColor(PPCContext& ctx, uint8_t* base);
+// The update, the start and the dialogs' end: Update (r3 the machine),
+// Start, OnDialogDone (r4 the mode) with adapters; ShowBusy, HideBusy and
+// HideBusyNow without (only Update calls them).
+void CarDealerUpdate(PPCContext& ctx, uint8_t* base);
+void CarDealerStart(PPCContext& ctx, uint8_t* base);
+void CarDealerOnDialogDone(PPCContext& ctx, uint8_t* base);
+void CarDealerShowBusy(PPCContext& ctx, uint8_t* base);
+void CarDealerHideBusy(PPCContext& ctx, uint8_t* base);
+void CarDealerHideBusyNow(PPCContext& ctx, uint8_t* base);
 // The helpers.
 void CarDealerCheckLimits(PPCContext& ctx, uint8_t* base);
 void CarDealerReloadStandModel(PPCContext& ctx, uint8_t* base);

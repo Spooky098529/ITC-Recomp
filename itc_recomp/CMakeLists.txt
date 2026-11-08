@@ -478,6 +478,7 @@ set(ITC_SOURCES
     src/car_dealer/lifecycle.cpp
     src/car_dealer/info.cpp
     src/car_dealer/transitions.cpp
+    src/car_dealer/update.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

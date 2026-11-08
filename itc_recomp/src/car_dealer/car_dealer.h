@@ -68,6 +68,17 @@ constexpr uint32_t kSetNumberText = 0x8211C740;
 constexpr uint32_t kResetPose = 0x8211ABA8;
 constexpr uint32_t kFadeOut = 0x8209D0C8;
 constexpr uint32_t kRun = 0x8211E1B8;
+constexpr uint32_t kEmpty = 0x82106540;  // the empty shared function
+constexpr uint32_t kPlayNamed = 0x8211DAC8;
+constexpr uint32_t kLoopLast = 0x8211DDE8;
+constexpr uint32_t kFinishNamed = 0x8211DF20;
+constexpr uint32_t kStageIsBusy = 0x82179BE0;
+constexpr uint32_t kStageCommand = 0x82180108;
+constexpr uint32_t kShowCarById = 0x82182C90;
+constexpr uint32_t kStageDraw = 0x8217FE60;
+constexpr uint32_t kStageSetDrawWord = 0x82178B40;
+constexpr uint32_t kFadeIn = 0x8209D038;
+constexpr uint32_t kShowDriveDialog = 0x82182990;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -194,6 +205,37 @@ uint64_t Leave(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp, const Cal
 // UiMovie::Run(movie 4, 0). 1 when both fades' counts are 0. 112-byte
 // frame.
 uint64_t Transition3(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
+// --- The update, the start and the dialogs' end (update.cpp) ---
+
+// sub_82181558 CarDealer::ShowBusy, sub_821815D8 HideBusy and sub_82181640
+// HideBusyNow: movie 4's busy marker (named animations 80, 79 and 81
+// played, looped or finished). The last call's r3. 112-byte frames.
+uint64_t ShowBusy(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t HideBusy(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t HideBusyNow(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82185600 CarDealer::Update (r3 the machine, not read): the empty
+// sub_82106540
+// with its arguments; the running transition's handler from the 22 on the
+// frame (+96 to +180) called with the page object's +24 (r4 to r10 as the
+// original leaves them) and the next started, or UiMovie::Run(movie 4, 0);
+// then the stand: the busy marker by GarageStage::IsBusy, the model reloaded
+// (ReloadModel, Command(55), ShowCarById) or drawn (GarageStage::Draw), or
+// HideBusyNow. The last call's r3 (movie 4, the pair's word UiMovies::Find
+// answers, with none). 320-byte frame.
+uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82184B80 CarDealer::Start: BuildLists and FillStatus (their plain C++),
+// the page object to page 0 or 1 by its transitions, the stand drawn once
+// (SetDrawWord 0, Draw, SetDrawWord 1) and ScreenFades::FadeIn. FadeIn's
+// r3. 96-byte frame.
+uint64_t Start(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82183160 CarDealer::OnDialogDone (r4 the mode): by the dialog's step
+// (the data's +36) the page object's transitions, messages 32 and 34 and
+// Buy (its plain C++), ShowDriveDialog (sub_82182990, never seen in play:
+// the original, through the guest context) or SetPrompts. The last call's
+// r3, else `r3`. 112-byte frame.
+uint64_t OnDialogDone(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                      const Calls& calls);
 
 // --- The movie 4 setters (texts.cpp) ---
 

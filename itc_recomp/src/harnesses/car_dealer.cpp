@@ -76,7 +76,10 @@ constexpr uint32_t kNodeCount = 40;
 constexpr uint32_t kEntriesAt = 0x1C400;     // 6 car entries of 8,448 bytes
 constexpr uint32_t kEntryBytes = 0x2100;
 constexpr uint32_t kEntryCount = 6;
-constexpr uint32_t kBlockBytes = 0x28C00;
+constexpr uint32_t kAnimationsAt = 0x28C00;  // 8 animations of no tracks (64 bytes)
+constexpr uint32_t kAnimations = 8;
+constexpr uint32_t kNamed = 200;             // movie 4's named animations shaped
+constexpr uint32_t kBlockBytes = 0x29000;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -234,6 +237,20 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
       guest::StoreU32(base, node + 128 + 8 * e, w.node(r.Below(kNodeCount)));
     }
   }
+  // The named animations (+176, 36 bytes each): over the root, each one of
+  // the 8 animations of no tracks (a duration at +12).
+  for (uint32_t k = 0; k < kNamed; k++) {
+    const uint32_t named = movie + 176 + 36 * k;
+    guest::StoreU32(base, named + 28, w.node(0));
+    guest::StoreU32(base, named + 32, w.at(kAnimationsAt) + 64 * r.Below(kAnimations));
+  }
+  for (uint32_t k = 0; k < kAnimations; k++) {
+    const uint32_t animation = w.at(kAnimationsAt) + 64 * k;
+    for (uint32_t i = 0; i < 64; i += 4) {
+      guest::StoreU32(base, animation + i, 0);
+    }
+    guest::StoreFloat(base, animation + 12, float(r.Below(100)) / 4.0f);
+  }
   // The root's own children none (+104 0), so UiMovie::ResetPose's walks
   // (over the live and saved roots' children) copy nothing; FindNode reads
   // the root's table, not its count.
@@ -283,7 +300,7 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
 // teardown counting down or its models updating) with one pool 7 scene
 // model in use (a car with no parts, its build deferred), the first set
 // none, the reload count 0 to 5, the stage's +16 set or not.
-void StandWorld(uint8_t* base, Random& r, const World& w) {
+void StandWorld(uint8_t* base, Random& r, const World& w, bool drawless = false) {
   const uint32_t scene = w.at(kSceneAt), model = w.at(kSceneModelAt);
   const uint32_t stage = w.at(kStageAt);
   guest::StoreU32(base, 0x826C2E44, scene);
@@ -308,6 +325,17 @@ void StandWorld(uint8_t* base, Random& r, const World& w) {
   guest::StoreU32(base, model + 5116, scene);
   guest::StoreU32(base, stage + 8, 0);
   guest::StoreU32(base, stage + 16, r.Below(2));
+  if (drawless) {
+    // As the car list's harness lays the stand for its callers: the garage
+    // camera not set up (+112 0: GarageStage::Draw does nothing; its own
+    // cases draw), +4 -1 or not (GarageStage::IsBusy), the reload count 0
+    // to 2 (GarageStage::ReloadModel answers 0: the branch after it, the
+    // stand's car made by ShowCarById, is the car makers' and load_poll's
+    // harnesses', not laid here).
+    guest::StoreU32(base, stage + 112, 0);
+    guest::StoreU32(base, stage + 4, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(4));
+    guest::StoreU32(base, 0x826D83E4, r.Below(3));
+  }
 }
 
 // The text records the setters made (stored in the movie's map): their
@@ -663,6 +691,75 @@ void ShapeGarage(uint8_t* base, uint32_t garage, Random& r, uint32_t count) {
   guest::StoreU16(base, garage + 208, uint16_t(count));
 }
 
+// The entries BuildLists made (the layer's pages appended to the lists):
+// compared (their 8,436 bytes written), freed, their words 1; r3 (the last
+// memcpy's destination) 1 when it was one.
+void FreeBuilt(PPCContext& t, const World& w, Outputs& out) {
+  uint8_t* base = w.base;
+  out.Word(memory::IsPages(t.r3.u32) ? 1 : 0);
+  t.r3.u64 = memory::IsPages(t.r3.u32) ? 1 : t.r3.u64;
+  for (const uint32_t list : {104u, 620u}) {
+    const uint32_t n = std::min(guest::LoadU32(base, w.data() + list + 512), 128u);
+    for (uint32_t i = 0; i < n; i++) {
+      const uint32_t at = w.data() + list + 4 * i;
+      const uint32_t entry = guest::LoadU32(base, at);
+      if (entry != 0 && memory::IsPages(entry)) {
+        out.Bytes(Read(base, entry, 8436));
+        memory::FreePages(entry);
+        guest::StoreU32(base, at, 1);
+      }
+    }
+  }
+}
+
+// BuildLists' world: the save's bit set of ids (0 to 71) and the specs'
+// byte +771 (0, 1 or another) at random, the day (any, or 0 or more for
+// Start: FillStatus stores day % 7 at a node's child index), the garage's
+// count, the lists' counts small.
+void ListsWorld(Random& r, const World& w, bool day_positive) {
+  uint8_t* base = w.base;
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t bits = r.Below(4) == 0 ? 0 : uint32_t(r.Next() & r.Next());
+    guest::StoreU32(base, w.save + 0x19924 + 4 * k, bits);
+  }
+  for (uint32_t id = 0; id < kSpecCount; id++) {
+    const uint32_t kinds[4] = {0, 1, 2, 0xFF};
+    guest::StoreU8(base, w.spec(id) + 771, uint8_t(kinds[r.Below(4)]));
+  }
+  const int32_t days[] = {0, 6, 7, 999, 1000, -8};
+  const int32_t day = r.Below(2) == 0 ? days[r.Below(6)] : int32_t(r.Below(2000));
+  guest::StoreU32(base, w.save + 6100, uint32_t(day_positive && day < 0 ? -day : day));
+  guest::StoreU16(base, w.save + 6328,
+                  uint16_t(r.Below(4) == 0 ? 0xFFF0 + r.Below(16) : r.Below(8)));
+  guest::StoreU32(base, w.data() + 616, r.Below(3));
+  guest::StoreU32(base, w.data() + 1132, r.Below(3));
+}
+
+// Buy's world: the garage as the career's harness shapes it (fewer than 49
+// cars), the selected car's id one of the four specs Car::SetModelAndClass
+// reads (their byte +708 0 to 9), Career::PickNext's gate closed (the
+// stats' races below 15 or the day below 3), the data's +4 and +24 0 or 1.
+void BuyWorld(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  ShapeGarage(base, w.save + career::kGarage, r, r.Below(49));
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU8(base, w.spec(i) + 708, uint8_t(r.Below(10)));
+  }
+  const uint32_t data = w.data();
+  for (uint32_t k = 0; k < kEntryCount; k++) {
+    guest::StoreU32(base, w.entry(k) + 8432, r.Below(4));
+  }
+  guest::StoreU32(base, data + 4, r.Below(2));
+  guest::StoreU32(base, data + 24, r.Below(2));
+  if (r.Below(2) == 0) {
+    guest::StoreU16(base, w.save + 70, uint16_t(int16_t(int32_t(r.Below(20)) - 5)));
+  } else {
+    guest::StoreU16(base, w.save + 70, uint16_t(15 + r.Below(500)));
+    guest::StoreU32(base, w.save + 6100, uint32_t(2 - int32_t(r.Below(1000))));
+  }
+  guest::StoreU32(base, w.save + career::kSelectedCar, r.Below(4));
+}
+
 void Lifecycle(Context& h, const World& w) {
   auto machine = [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kMachineAt); };
   if (!hooks::NativeHeapActive()) {
@@ -710,67 +807,12 @@ void Lifecycle(Context& h, const World& w) {
   // VirtualAlloc made compared (their 8,436 bytes written) and freed.
   Run(h, w, {"CarDealer::BuildLists (sub_821813B0)", 60, __imp__sub_821813B0,
              hooks::CarDealerBuildLists, {{-128, -48}},
-             [](PPCContext&, Random& r, const World& w) {
-               uint8_t* base = w.base;
-               for (uint32_t k = 0; k < 3; k++) {
-                 const uint32_t bits = r.Below(4) == 0 ? 0 : uint32_t(r.Next() & r.Next());
-                 guest::StoreU32(base, w.save + 0x19924 + 4 * k, bits);
-               }
-               for (uint32_t id = 0; id < kSpecCount; id++) {
-                 const uint32_t kinds[4] = {0, 1, 2, 0xFF};
-                 guest::StoreU8(base, w.spec(id) + 771, uint8_t(kinds[r.Below(4)]));
-               }
-               const int32_t days[] = {0, 6, 7, 999, 1000, -8};
-               guest::StoreU32(base, w.save + 6100,
-                               uint32_t(r.Below(2) == 0 ? days[r.Below(6)] : int32_t(r.Below(2000))));
-               guest::StoreU16(base, w.save + 6328,
-                               uint16_t(r.Below(4) == 0 ? 0xFFF0 + r.Below(16) : r.Below(8)));
-               guest::StoreU32(base, w.data() + 616, r.Below(3));
-               guest::StoreU32(base, w.data() + 1132, r.Below(3));
-             },
-             [](PPCContext& t, const World& w, Outputs& out) {
-               uint8_t* base = w.base;
-               out.Word(memory::IsPages(t.r3.u32) ? 1 : 0);
-               t.r3.u64 = memory::IsPages(t.r3.u32) ? 1 : t.r3.u64;
-               for (const uint32_t list : {104u, 620u}) {
-                 const uint32_t n = std::min(guest::LoadU32(base, w.data() + list + 512), 128u);
-                 for (uint32_t i = 0; i < n; i++) {
-                   const uint32_t at = w.data() + list + 4 * i;
-                   const uint32_t entry = guest::LoadU32(base, at);
-                   if (entry != 0 && memory::IsPages(entry)) {
-                     out.Bytes(Read(base, entry, 8436));
-                     memory::FreePages(entry);
-                     guest::StoreU32(base, at, 1);
-                   }
-                 }
-               }
-             }});
-  // Buy: the garage as the career's harness shapes it (fewer than 49
-  // cars), the selected car's id one of the four specs Car::SetModelAndClass
-  // reads (their byte +708 0 to 9), Career::PickNext's gate closed (the
-  // stats' races below 15 or the day below 3), the data's +4 and +24 0 or 1.
+             [](PPCContext&, Random& r, const World& w) { ListsWorld(r, w, false); },
+             FreeBuilt});
+  // Buy: BuyWorld.
   Run(h, w, {"CarDealer::Buy (sub_82182E68)", 80, __imp__sub_82182E68, hooks::CarDealerBuy,
              {{-2112, -48}},
-             [](PPCContext&, Random& r, const World& w) {
-               uint8_t* base = w.base;
-               ShapeGarage(base, w.save + career::kGarage, r, r.Below(49));
-               for (uint32_t i = 0; i < 4; i++) {
-                 guest::StoreU8(base, w.spec(i) + 708, uint8_t(r.Below(10)));
-               }
-               const uint32_t data = w.data();
-               for (uint32_t k = 0; k < kEntryCount; k++) {
-                 guest::StoreU32(base, w.entry(k) + 8432, r.Below(4));
-               }
-               guest::StoreU32(base, data + 4, r.Below(2));
-               guest::StoreU32(base, data + 24, r.Below(2));
-               if (r.Below(2) == 0) {
-                 guest::StoreU16(base, w.save + 70, uint16_t(int16_t(int32_t(r.Below(20)) - 5)));
-               } else {
-                 guest::StoreU16(base, w.save + 70, uint16_t(15 + r.Below(500)));
-                 guest::StoreU32(base, w.save + 6100, uint32_t(2 - int32_t(r.Below(1000))));
-               }
-               guest::StoreU32(base, w.save + career::kSelectedCar, r.Below(4));
-             }});
+             [](PPCContext&, Random& r, const World& w) { BuyWorld(r, w); }});
   // OnYes: the dialog's step 2 or another.
   Run(h, w, {"CarDealer::OnYes (sub_82181968)", 80, __imp__sub_82181968, hooks::CarDealerOnYes,
              {{-112, -24}},
@@ -886,6 +928,61 @@ void Info(Context& h, const World& w) {
              }});
 }
 
+void Updates(Context& h, const World& w) {
+  // The busy marker's three (112-byte frames, r31 saved).
+  Run(h, w, {"CarDealer::ShowBusy (sub_82181558)", 40, __imp__sub_82181558,
+             hooks::CarDealerShowBusy, {{-112, -16}}, None});
+  Run(h, w, {"CarDealer::HideBusy (sub_821815D8)", 40, __imp__sub_821815D8,
+             hooks::CarDealerHideBusy, {{-112, -16}}, None});
+  Run(h, w, {"CarDealer::HideBusyNow (sub_82181640)", 40, __imp__sub_82181640,
+             hooks::CarDealerHideBusyNow, {{-112, -16}}, None});
+  // Update: the running transition -1, another negative or 3 (Transition3's
+  // plain C++ through its adapter: the fades' counts 0 or not), the queued
+  // one -1 or small, the page 4 or another; the stand drawless (as the car
+  // list's harness lays it); the data's +20, +28 and +32 0 or not.
+  Run(h, w, {"CarDealer::Update (sub_82185600; sub_82181558, sub_821815D8, sub_82181640)", 200,
+             __imp__sub_82185600, hooks::CarDealerUpdate, {{-320, -136}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               StandWorld(base, r, w, true);
+               const uint32_t pages = w.at(kPagesAt);
+               const uint32_t running[3] = {0xFFFFFFFFu, 0xFFFFFFF0u + r.Below(15), 3};
+               guest::StoreU32(base, pages + 12, running[r.Below(3)]);
+               guest::StoreU32(base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(22));
+               guest::StoreU32(base, pages + 0, r.Below(3) == 0 ? 4 : r.Below(6));
+               for (const uint32_t count : {0x826A50E4u, 0x826A50DCu}) {
+                 guest::StoreU32(base, count, r.Below(2) == 0 ? 0 : r.Below(30));
+               }
+               guest::StoreU32(base, w.data() + 20, r.Below(2));
+               guest::StoreU32(base, w.data() + 28, r.Below(4) == 0 ? 0 : 1);
+               guest::StoreU32(base, w.data() + 32, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+               t.r3.u64 = w.at(kMachineAt);
+             }});
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  // Start: BuildLists' world (the day 0 or more) and the drawless stand;
+  // the entries it made compared and freed.
+  Run(h, w, {"CarDealer::Start (sub_82184B80; sub_821813B0, sub_82183AC8)", 60,
+             __imp__sub_82184B80, hooks::CarDealerStart, {{-96, -16}},
+             [](PPCContext&, Random& r, const World& w) {
+               ListsWorld(r, w, true);
+               StandWorld(w.base, r, w, true);
+             },
+             FreeBuilt});
+  // OnDialogDone: the step 0 to 3 or another, the answer 0 or 1, Buy's
+  // world; ShowDriveDialog (the original) on movie 4 (16 isn't in the
+  // table: the missing movie's word is 4's).
+  Run(h, w, {"CarDealer::OnDialogDone (sub_82183160; sub_82182E68)", 200, __imp__sub_82183160,
+             hooks::CarDealerOnDialogDone, {{-112, -24}},
+             [](PPCContext& t, Random& r, const World& w) {
+               BuyWorld(r, w);
+               guest::StoreU32(w.base, w.data() + 36, r.Below(6) == 0 ? r.Below(9) : r.Below(4));
+               guest::StoreU32(w.base, w.data() + 16, r.Below(2));
+               t.r4.u64 = w.at(kModeAt);
+             }});
+}
+
 }  // namespace
 
 void CarDealer(Context& h) {
@@ -899,6 +996,7 @@ void CarDealer(Context& h) {
   Helpers(h, w);
   Lifecycle(h, w);
   Info(h, w);
+  Updates(h, w);
 }
 
 }  // namespace harness

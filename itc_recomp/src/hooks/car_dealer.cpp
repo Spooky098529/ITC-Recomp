@@ -30,7 +30,12 @@ ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
               "their overrides); ShowCarInfo sub_82182620 with SetSpecTexts sub_821824A8, "
               "SetNameTexts sub_82182388 and SetPriceTexts sub_82182418 (the setters' unset "
               "varargs 0), ShowSwatches sub_821826C0 with SetSwatchColor sub_82181270, and "
-              "FillStatus sub_82183AC8 (SetPrompts' plain C++) "
+              "FillStatus sub_82183AC8 (SetPrompts' plain C++); Update sub_82185600 with "
+              "ShowBusy sub_82181558, HideBusy sub_821815D8 and HideBusyNow sub_82181640 (the "
+              "running transition through the guest context, the stand's calls through their "
+              "overrides), Start sub_82184B80 (BuildLists' and FillStatus' plain C++) and "
+              "OnDialogDone sub_82183160 (Buy's and SetPrompts' plain C++; ShowDriveDialog "
+              "sub_82182990, never seen in play, the original) "
               "(the same writes; checked by --run_harnesses=car_dealer)");
 
 namespace hooks {
@@ -161,6 +166,30 @@ void CarDealerSetSpecTexts(PPCContext& ctx, uint8_t* base) {
 void CarDealerSetSwatchColor(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cd::SetSwatchColor(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
+void CarDealerUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Update(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Start(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerOnDialogDone(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::OnDialogDone(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerShowBusy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::ShowBusy(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerHideBusy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::HideBusy(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerHideBusyNow(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::HideBusyNow(base, ctx.r1.u32, guest.calls());
+}
 void CarDealerStartFirstRace(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::StartFirstRace(base, ctx.r1.u32, guest.calls());
@@ -227,6 +256,12 @@ ITC_CAR_DEALER(82180E70, CarDealerDestroy)
 ITC_CAR_DEALER(82181968, CarDealerOnYes)
 ITC_CAR_DEALER(82184AF0, CarDealerUpdatePage)
 ITC_CAR_DEALER(821817C0, CarDealerLeave)
+ITC_CAR_DEALER(82185600, CarDealerUpdate)
+ITC_CAR_DEALER(82184B80, CarDealerStart)
+ITC_CAR_DEALER(82183160, CarDealerOnDialogDone)
+// No adapters for ShowBusy sub_82181558, HideBusy sub_821815D8 and
+// HideBusyNow sub_82181640: only Update (native) calls them, the flag
+// switches it; their steps above are the harness's.
 // The transitions (from CarDealer::Update's table on its stack).
 ITC_CAR_DEALER(82181D68, CarDealerTransition3)
 // The page handlers (from UpdatePage's table on its stack).
