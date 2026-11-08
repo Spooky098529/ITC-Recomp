@@ -5,6 +5,7 @@
 #include "hooks/car_list.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "car_list/car_list.h"
 
 ITC_FLAG_BOOL(native_car_list, true, "ITC",
@@ -155,9 +156,23 @@ ITC_CL_STEP(CarListSaveData, cl::SaveData(base, ctx.r3.u32, sp))
 ITC_CL_STEP(CarListToTabs, cl::ToTabs(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListOpen, cl::Open(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListBaseFree, cl::Free(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListSetFree, cl::Free(base, ctx.r3.u64 + 4, sp, calls))
+// PanelSet::Free and HandleInput are tail calls of the base's on the set
+// + 4, with no plain C++ of their own: their prints are here.
+void CarListSetFree(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_8224B880 PanelSet::Free");
+  GuestCalls guest(ctx, base);
+  const car_list::Calls calls = guest.calls();
+  const uint32_t sp = ctx.r1.u32;
+  ctx.r3.u64 = cl::Free(base, ctx.r3.u64 + 4, sp, calls);
+}
 ITC_CL_STEP(CarListBaseHandleInput, cl::HandleInput(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListSetHandleInput, cl::HandleInput(base, ctx.r3.u64 + 4, sp, calls))
+void CarListSetHandleInput(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_8224CA28 PanelSet::HandleInput");
+  GuestCalls guest(ctx, base);
+  const car_list::Calls calls = guest.calls();
+  const uint32_t sp = ctx.r1.u32;
+  ctx.r3.u64 = cl::HandleInput(base, ctx.r3.u64 + 4, sp, calls);
+}
 ITC_CL_STEP(CarListBackPage8, cl::BackPage8(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListStep2, cl::Step2(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListStep3, cl::Step3(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
