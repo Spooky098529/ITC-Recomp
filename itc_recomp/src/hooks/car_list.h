@@ -102,6 +102,8 @@ void CarListBaseBuild(PPCContext& ctx, uint8_t* base);
 void CarListSetBuild(PPCContext& ctx, uint8_t* base);
 void CarListShowStandCar(PPCContext& ctx, uint8_t* base);
 void CarListSetUpColors(PPCContext& ctx, uint8_t* base);
+void CarListStep17(PPCContext& ctx, uint8_t* base);
+void CarListCarPage(PPCContext& ctx, uint8_t* base);
 // PanelSet's update: GarageStages::DrawAll (no r3), PanelSetBase::
 // UpdateStand and Update (r3 = b), PanelSet::Update (r3 the set).
 void CarListDrawAll(PPCContext& ctx, uint8_t* base);

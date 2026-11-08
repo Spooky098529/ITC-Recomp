@@ -33,6 +33,7 @@
 #include "car_list/car_list.h"
 #include "hooks/car_list.h"
 #include "memory/heap.h"
+#include "stand_car_world.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -1559,6 +1560,210 @@ void Updates(Context& h, const World& w) {
       __imp__sub_8224CF18, hooks::CarListSetUpdate, settle);
 }
 
+// --- Step 17 and the car's page (with the stand's car) ---
+//
+// The colors panel D at the objects' +0x600 (its words indices, +4 a group,
+// +12 its swatches' node index small), apart from the other panel (C's
+// +12 is a group).
+constexpr uint32_t kColorPanel = 0x600;
+
+void ShapeColorPanel(uint8_t* base, const World& w, Random& r) {
+  const uint32_t d = w.at(kColorPanel);
+  for (uint32_t i = 0; i < 0x60; i += 4) {
+    guest::StoreU32(base, d + i, Index(r));
+  }
+  guest::StoreU32(base, d + 4, w.at(r.Below(2) == 0 ? kGroupA : kGroupB));
+  guest::StoreU32(base, d + 12, r.Below(64));
+  guest::StoreU32(base, w.b() + 1904, r.Below(6) == 0 ? 0 : d);
+}
+
+// A menu list at `list` as ShapeMenu lays b +60 (1 to 4 items, the
+// selection and scroll small, its enabled words a tracked block).
+void ShapeList(uint8_t* base, uint32_t list, Random& r) {
+  const uint32_t count = 1 + r.Below(4);
+  guest::StoreU32(base, list + 0, count);
+  const uint32_t scroll = r.Below(2);
+  guest::StoreU32(base, list + 4, scroll);
+  guest::StoreU32(base, list + 8, r.Below(3) == 0 ? r.Below(2) : scroll);
+  guest::StoreU32(base, list + 12, count);
+  guest::StoreU32(base, list + 16, r.Below(count));
+  guest::StoreU32(base, list + 20, r.Below(count));
+  guest::StoreU32(base, list + 24, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, list + 28, 0);
+  guest::StoreU32(base, list + 32, r.Below(2));
+  static constexpr uint32_t kIds[6] = {154, 153, 155, 156, 159, 158};
+  for (uint32_t i = 0; i < 6; i++) guest::StoreU32(base, list + 36 + 4 * i, kIds[i]);
+  guest::StoreU32(base, list + 60, r.Below(4));
+  guest::StoreU32(base, list + 64, r.Below(2));
+  TrackBlock(base, list + 68);
+  const uint32_t enabled = guest::LoadU32(base, list + 68);
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU32(base, enabled + 4 * i, r.Below(4) == 0 ? 0 : 1);
+  }
+}
+
+// The car's page's world: the pages' (ShapeSet, ShapeMenu), the rows' menu
+// (b +132) a menu list too, the garage a chain of distinct links, C (the
+// other panel) with the world's vtable (slots 1 and 2 SetStats and
+// SetCarName or the stand-in; +4 0: SetPrice never ran in play).
+void ShapeCarPage(uint8_t* base, const World& w, Random& r) {
+  ShapeSet(base, w, r, true);
+  ShapeMenu(base, w, r);
+  ShapeList(base, w.b() + 132, r);
+  GarageChain(base, w, r);
+  const uint32_t c = w.at(kOtherPanel);
+  guest::StoreU32(base, w.b() + 1908, c);
+  guest::StoreU32(base, c + 0, w.at(kVtable));
+  guest::StoreU32(base, c + 4, 0);
+}
+
+void CarPageAndStep17(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const uint32_t sp = CallContext(h).r1.u32;
+  const AfterFn settle = [base](const World& w, Outputs& out) { SettleBlocks(base, w, out); };
+  const AfterFn settle_menu = [base](const World& w, Outputs& out) { SettleMenu(base, w, out); };
+  // Step 17's later passes (the word 1): D's IsShown, or 1 without D.
+  Group(
+      h, w, "PanelSetBase::Step17 (sub_8224C450), later passes", 30, {112, 24},
+      [base](PPCContext& t, Random& r, const World& w) {
+        ShapeSet(base, w, r, true);
+        ShapeColorPanel(base, w, r);
+        guest::StoreU32(base, w.b() + 56, 1);
+        t.r3.u64 = w.b() | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+        t.r4.u64 = w.b() + 56;
+      },
+      __imp__sub_8224C450, hooks::CarListStep17, settle);
+  // The car's page without the stand's car: every path but the pick's for
+  // the tab 0 without the confirm panel (its cases below, with the stand's
+  // world) and the garage tab's (tab 2).
+  Group(
+      h, w, "PanelSetBase::CarPage (sub_8224B8D8)", 80, {112, 32},
+      [base](PPCContext& t, Random& r, const World& w) {
+        ShapeCarPage(base, w, r);
+        const uint32_t b = w.b();
+        // Tabs 0 and 1 only: the garage tab's calls (CarPanel::ShowCarStats
+        // and sub_82250488, never seen in play, the originals) make a car
+        // from a garage record, as SetUpCarPage's cases leave out.
+        const bool confirm = guest::LoadU32(base, b + 1912) != 0;
+        guest::StoreU32(base, b + 232, confirm ? r.Below(2) : 1);
+        t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+      },
+      __imp__sub_8224B8D8, hooks::CarListCarPage, settle_menu);
+
+  // With the stand's car (load_poll's re-applies' ShowStandCar world,
+  // stand_car_world.h): its blocks, globals and the car list entry's car
+  // id; the rest the car list's world.
+  StandCarWorld stand(base);
+  if (!stand.ok()) {
+    ITC_LOG_WARN("harness: car_list: step 17's first pass and the car page's pick skipped (the "
+                 "stand's world: no block, or its callees' plain C++ isn't native)");
+    return;
+  }
+  // Step 17's first pass: C's StopArrows and D's Show (each when there),
+  // SetUpColors in its world (the rows shown +1924 2 to 7, the colors'
+  // selection and scroll +244 and +248 small, the entry's color count
+  // +8376 0 to 8 and its records +8116, the colors' list +1824 0 to 3
+  // records of the layer's pages), ShowStandCar. The records it makes
+  // compared (+0 to +15 and +28 exactly, +16 to +27 as floats) and freed,
+  // SetUpColors' frame (+80 to +144, +128 to +143 as floats), the stand's
+  // world (StandCarWorld::Settle) with ShowStandCar's frame below them.
+  Group(
+      h, w, "PanelSetBase::Step17 (sub_8224C450), first pass with the stand's car", 30,
+      {112, 24},
+      [base, &stand](PPCContext& t, Random& r, const World& w) {
+        const uint32_t b = w.b();
+        ShapeSet(base, w, r, true);
+        ShapeColorPanel(base, w, r);
+        guest::StoreU32(base, b + 56, 0);
+        guest::StoreU32(base, b + 1924, 2 + r.Below(6));
+        guest::StoreU32(base, b + 244, r.Below(4));
+        guest::StoreU32(base, b + 248, r.Below(3));
+        guest::StoreU32(base, b + 236, r.Below(4));
+        guest::StoreU32(base, b + 240, r.Below(4));
+        guest::StoreU32(base, b + 1952, r.Below(2));
+        guest::StoreU32(base, car_list::kTwoPlayers, r.Below(2));
+        const uint32_t entry = w.entry.address;
+        guest::StoreU32(base, entry + 8376, r.Below(9));
+        for (uint32_t k = 0; k < 9; k++) {
+          guest::StoreU16(base, entry + 8116 + 20 * k, uint16_t(r.Below(2)));
+          guest::StoreU32(base, entry + 8116 + 20 * k + 4, uint32_t(r.Next()));
+        }
+        const uint32_t old = r.Below(4);
+        guest::StoreU32(base, b + 1876, old);
+        for (uint32_t k = 0; k < old; k++) TrackBlock(base, b + 1824 + 4 * k);
+        stand.Lay(r, entry, t.r1.u32);
+        t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+        t.r4.u64 = b + 56;
+      },
+      __imp__sub_8224C450, hooks::CarListStep17,
+      [base, sp, &stand](const World& w, Outputs& out) {
+        const uint32_t b = w.b();
+        const uint32_t made = guest::LoadU32(base, b + 1876);
+        out.Word(made);
+        for (uint32_t k = 0; k < made && k < 13; k++) {
+          const uint32_t record = guest::LoadU32(base, b + 1824 + 4 * k);
+          const bool pages = record != 0 && memory::IsPages(record);
+          out.Word(pages ? 1 : 0);
+          if (pages) {
+            out.Bytes(Read(base, record, 16));
+            out.Floats(base, record + 16, 3);
+            out.Bytes(Read(base, record + 28, 4));
+            memory::FreePages(record);
+          }
+          guest::StoreU32(base, b + 1824 + 4 * k, 0xC0100000 + k);
+        }
+        const uint32_t colors_frame = sp - 112 - 224;
+        out.Bytes(Read(base, colors_frame + 80, 48));
+        out.Floats(base, colors_frame + 128, 4);
+        stand.Settle(out, colors_frame);
+        SettleBlocks(base, w, out);
+      });
+  // The car's page's pick for the tab 0 without the confirm panel: the
+  // menu (b +60) not moved (+84 0, the scroll +64 and +68 0) with its
+  // selection 0 (action 0) and its player's mapper answering only the
+  // accept action (Pressed's bit 8 of +456; nothing fired), the confirm
+  // panel (+1912) 0, the tab (+232) 0, the rows' selection and scroll
+  // small; ShowStandCar(b, +244) in the stand's world.
+  int picks = 0, runs = 0;
+  Group(
+      h, w, "PanelSetBase::CarPage (sub_8224B8D8), the pick with the stand's car", 30, {112, 32},
+      [base, &stand](PPCContext& t, Random& r, const World& w) {
+        const uint32_t b = w.b(), list = b + 60;
+        ShapeCarPage(base, w, r);
+        guest::StoreU32(base, list + 24, 0);
+        guest::StoreU32(base, list + 4, 0);
+        guest::StoreU32(base, list + 8, 0);
+        guest::StoreU32(base, list + 16, 0);
+        const uint32_t player = guest::LoadU32(base, list + 60);
+        guest::StoreU32(base, 0x826BAB80 + 8 * player + 4, 0);
+        const uint32_t mapper = guest::LoadU32(base, 0x826BAB80 + 8 * player);
+        for (uint32_t i = 0; i < 6; i++) guest::StoreU32(base, mapper + 448 + 4 * i, 0);
+        guest::StoreU32(base, mapper + 456, 1u << (159 - 151));
+        guest::StoreU32(base, b + 1912, 0);
+        guest::StoreU32(base, b + 232, 0);
+        guest::StoreU32(base, b + 132 + 16, r.Below(4));
+        guest::StoreU32(base, b + 136, r.Below(4));
+        guest::StoreU32(base, b + 244, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(6));
+        stand.Lay(r, w.entry.address, t.r1.u32);
+        t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+      },
+      __imp__sub_8224B8D8, hooks::CarListCarPage,
+      [base, sp, &stand, &picks, &runs](const World& w, Outputs& out) {
+        const uint32_t b = w.b();
+        runs++;
+        if (guest::LoadU32(base, b + 44) == 17 && guest::LoadU32(base, b + 36) == 3) picks++;
+        // Without the car on ShowStandCar's frame: the words Car::Init
+        // leaves there are what the page's earlier callees left on the stack
+        // below its frame (the native ones don't write the originals' frame
+        // words), dead once ShowStandCar returns; what SetCarClass takes from
+        // the car is in the world's block.
+        stand.Settle(out, sp - 112, false);
+        SettleMenu(base, w, out);
+      });
+  ITC_LOG_INFO("harness: car_list: the car page's pick reached ShowStandCar in {} of {} runs",
+               picks, runs);
+}
+
 }  // namespace
 
 void CarList(Context& h) {
@@ -1578,6 +1783,7 @@ void CarList(Context& h) {
   Builds(h, w);
   Pages(h, w);
   Updates(h, w);
+  CarPageAndStep17(h, w);
 }
 
 }  // namespace harness

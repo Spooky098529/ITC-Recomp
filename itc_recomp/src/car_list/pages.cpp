@@ -192,6 +192,9 @@ uint64_t HandleInput(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& cal
       case 0x8224AEA8:
         r3 = ColorsPage(base, b_r3, frame, calls);
         break;
+      case 0x8224B8D8:
+        r3 = CarPage(base, b_r3, frame, calls);
+        break;
       case 0x8224BDC0:
         r3 = PowerGraphPage(base, b_r3, frame, calls);
         break;
@@ -1238,5 +1241,178 @@ uint64_t Step19(uint8_t* base, uint64_t b_r3, uint32_t word, uint32_t sp, const 
   return answer;
 }
 
+uint64_t Step17(uint8_t* base, uint64_t b_r3, uint32_t word, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224C450 PanelSetBase::Step17");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 112);
+  if (LoadU32(base, word) == 0) {
+    const uint32_t car = LoadU32(base, b + 1908);
+    if (car != 0) {
+      CarStopArrows(base, car, frame, calls);
+    }
+    const uint32_t colors = LoadU32(base, b + 1904);
+    if (colors != 0) {
+      ColorShow(base, colors, frame, calls);
+    }
+    SetUpColors(base, b_r3, frame, calls);
+    StoreU32(base, word, 1);
+  }
+  const uint32_t colors = LoadU32(base, b + 1904);
+  return colors != 0 ? ColorIsShown(base, colors, frame) : 1;
+}
+
+uint64_t CarPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224B8D8 PanelSetBase::CarPage");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint64_t menu = b_r3 + 60, rows = b_r3 + 132;
+  // The garage's record `steps` links on (SaveData's address + 6120, the
+  // record's +212), as the original's 64-bit adds and mulli leave it.
+  const auto garage_record = [&](uint32_t steps) {
+    const uint64_t garage = SaveData(base, b, frame) + 6120;
+    const uint32_t node = GarageNode(base, uint32_t(garage), steps);
+    const int64_t slot = int16_t(guest::LoadU16(base, node + 2));
+    return uint64_t(slot * 1968) + garage + 212;
+  };
+  const auto entry_at = [&](uint32_t steps) {
+    return LoadU32(base, LoadU32(base, b + 1820) + (steps << 2));
+  };
+  calls.Call(kMenuListUpdate, frame, 0x8224B8F4, menu);
+  if (LoadU32(base, b + 84) != 0 || LoadU32(base, b + 64) != LoadU32(base, b + 68)) {
+    const uint64_t r3 = Sound(4, frame, 0x8224BD88, calls);
+    Leave(base, b, 2);
+    StoreU32(base, b + 48, 0xFFFFFFFFu);
+    StoreU32(base, b + 44, 12);
+    StoreU32(base, b + 32, 0xFFFFFFFFu);
+    StoreU32(base, b + 36, 2);
+    return r3;
+  }
+  const uint64_t accepted = calls.Call(kMenuListAccepted, frame, 0x8224B918, menu);
+  if (uint32_t(accepted) != 0) {
+    Sound(0, frame, 0x8224B928, calls);
+    const uint64_t row = calls.Call(kMenuListSelection, frame, 0x8224B930, rows);
+    StoreU32(base, b + 240, LoadU32(base, b + 136));
+    StoreU32(base, b + 236, uint32_t(row));
+    const uint64_t before = calls.Call(kMenuListPrevious, frame, 0x8224B948, menu);
+    const uint64_t item = calls.Call(kMenuListSelection, frame, 0x8224B954, menu);
+    CarPick(base, LoadU32(base, b + 1908), item, before, frame, calls);
+    uint64_t r3 = calls.Call(kMenuListSelection, frame, 0x8224B96C, menu);
+    const uint32_t action = uint32_t(r3);
+    if (action > 1) {
+      return r3;
+    }
+    if (action == 1) {
+      // The power graph.
+      const uint32_t steps = LoadU32(base, b + 236) + LoadU32(base, b + 240);
+      if (LoadU32(base, kTwoPlayers) != 0) {
+        if (LoadU32(base, b + 232) == 2) {
+          const uint64_t record = garage_record(steps);
+          r3 = calls.Call(kShowCarStats, frame, 0x8224B9F0, LoadU32(base, b + 1908), record);
+        } else {
+          r3 = CarShowStats(base, LoadU32(base, b + 1908), entry_at(steps), frame, calls);
+        }
+        Leave(base, b, 6);
+        StoreU32(base, b + 44, 15);
+        StoreU32(base, b + 32, 0xFFFFFFFFu);
+        StoreU32(base, b + 36, 6);
+      } else {
+        const uint32_t tab = LoadU32(base, b + 232);
+        if (tab == 2) {
+          const uint64_t record = garage_record(steps);
+          calls.Call(kGaragePowerGraphRecord, frame, 0x8224BA90, record, LoadU32(base, b + 232));
+        } else {
+          PowerGraphSetEntry(base, entry_at(steps), tab);
+        }
+        r3 = CarSetButtons(base, LoadU32(base, b + 1908), 0, 1, 0xFFFFFFFFFFFFFFFFull,
+                           0xFFFFFFFFFFFFFFFFull, frame, calls);
+        Leave(base, b, 6);
+        StoreU32(base, b + 32, 6);
+        StoreU32(base, b + 44, 0xFFFFFFFFu);
+      }
+      StoreU32(base, b + 48, 0xFFFFFFFFu);
+      StoreU32(base, b + 16, 1);
+      StoreU32(base, b + 8, 1);
+      return r3;
+    }
+    // Action 0: the pick.
+    const uint32_t tab = LoadU32(base, b + 232);
+    if (LoadU32(base, b + 1912) != 0) {
+      if (tab == 0) {
+        Leave(base, b, 3);
+        StoreU32(base, b + 44, 17);
+        StoreU32(base, b + 48, 18);
+        StoreU32(base, b + 32, 0xFFFFFFFFu);
+        StoreU32(base, b + 36, 3);
+      } else {
+        Leave(base, b, 4);
+        StoreU32(base, b + 44, 21);
+        StoreU32(base, b + 48, 22);
+        StoreU32(base, b + 36, 4);
+        StoreU32(base, b + 32, 0xFFFFFFFFu);
+        StoreU32(base, b + 8, 1);
+      }
+      return r3;
+    }
+    if (tab == 1 || tab == 2) {
+      Leave(base, b, 5);
+      StoreU32(base, b + 48, 0xFFFFFFFFu);
+      StoreU32(base, b + 44, 3);
+      StoreU32(base, b + 36, 5);
+      StoreU32(base, b + 32, 0xFFFFFFFFu);
+      StoreU32(base, b + 8, 1);
+      return r3;
+    }
+    Leave(base, b, 3);
+    StoreU32(base, b + 44, 17);
+    StoreU32(base, b + 48, 18);
+    StoreU32(base, b + 36, 3);
+    StoreU32(base, b + 32, 0xFFFFFFFFu);
+    return ShowStandCar(base, b_r3, LoadU32(base, b + 244), frame, calls);
+  }
+  const uint64_t cancelled = calls.Call(kMenuListCancelled, frame, 0x8224BC00, menu);
+  if (uint32_t(cancelled) != 0) {
+    uint64_t r3 = Sound(2, frame, 0x8224BC10, calls);
+    const uint32_t panel = LoadU32(base, b + 1900);
+    if (panel != 0) {
+      r3 = RowUnhighlight(base, panel, frame, calls);
+    }
+    const bool confirm = LoadU32(base, b + 1892) != 0;
+    Leave(base, b, confirm ? 7 : 1);
+    StoreU32(base, b + 44, 14);
+    StoreU32(base, b + 48, confirm ? 26 : 6);
+    StoreU32(base, b + 32, 0xFFFFFFFFu);
+    StoreU32(base, b + 36, confirm ? 7 : 1);
+    return r3;
+  }
+  const uint64_t updated = calls.Call(kMenuListUpdate, frame, 0x8224BC74, rows);
+  if (LoadU32(base, b + 156) == 0 && LoadU32(base, b + 136) == LoadU32(base, b + 140)) {
+    return updated;
+  }
+  Sound(4, frame, 0x8224BC98, calls);
+  Leave(base, b, 2);
+  StoreU32(base, b + 48, 0xFFFFFFFFu);
+  StoreU32(base, b + 44, 13);
+  StoreU32(base, b + 36, 2);
+  StoreU32(base, b + 32, 0xFFFFFFFFu);
+  if (LoadU32(base, b + 232) == 2) {
+    const uint64_t data = SaveData(base, b, frame);
+    const uint64_t row = calls.Call(kMenuListSelection, frame, 0x8224BCE4, rows);
+    const uint64_t garage = data + 6120;
+    const uint32_t node =
+        GarageNode(base, uint32_t(garage), uint32_t(row) + LoadU32(base, b + 136));
+    const int64_t slot = int16_t(guest::LoadU16(base, node + 2));
+    calls.Call(kShowCarStats, frame, 0x8224BD24, LoadU32(base, b + 1908),
+               uint64_t(slot * 1968) + garage + 212);
+  } else {
+    const uint64_t row = calls.Call(kMenuListSelection, frame, 0x8224BD30, rows);
+    CarShowStats(base, LoadU32(base, b + 1908),
+                 entry_at(uint32_t(row) + LoadU32(base, b + 136)), frame, calls);
+  }
+  StoreU32(base, b + 248, 0);
+  const uint64_t row = calls.Call(kMenuListSelection, frame, 0x8224BD60, rows);
+  StoreU32(base, b + 244,
+           LoadU32(base, entry_at(uint32_t(row) + LoadU32(base, b + 136)) + 8436));
+  return row;
+}
 
 }  // namespace car_list

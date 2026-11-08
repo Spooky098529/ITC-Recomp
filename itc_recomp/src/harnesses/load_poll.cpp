@@ -14,6 +14,7 @@
 // the saved registers' slots).
 
 #include "harness.h"
+#include "stand_car_world.h"
 
 #include "base/log.h"
 #include "hooks/car_list.h"
@@ -1520,6 +1521,183 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
 }
 
 }  // namespace
+
+// --- ShowStandCar's world for the car list's harness (stand_car_world.h) ---
+
+namespace {
+constexpr uint32_t kStandHolder = 0x1A000, kStandStage = 0x1A040;
+constexpr uint32_t kStandCarBlockBytes = 0x10000;
+constexpr uint32_t kStandDeepBytes = 0x6000;
+// The globals the world points at: the scene, the accessories' set, the
+// parameters, the stand's holders, the stand's car list, the rand seed.
+const std::vector<std::pair<uint32_t, uint32_t>> kStandGlobals = {
+    {kSceneGlobal, 4}, {kAccessoriesGlobal, 4}, {0x826C2E48, 4},
+    {0x826D83E0, 4},   {0x826D83F4, 4},         {0x82638188, 4}};
+}  // namespace
+
+StandCarWorld::StandCarWorld(uint8_t* base)
+    : base_(base),
+      allocation_(memory::Alloc(kBlockBytes + 16, 0)),
+      block_((allocation_ + 15) & ~15u),
+      car_allocation_(memory::Alloc(kStandCarBlockBytes + 16, 0)),
+      car_block_((car_allocation_ + 15) & ~15u) {
+  for (const auto& [address, bytes] : kStandGlobals) {
+    saved_.push_back(Read(base_, address, bytes));
+  }
+}
+
+StandCarWorld::~StandCarWorld() {
+  loads_.reset();
+  for (size_t i = 0; i < kStandGlobals.size(); i++) {
+    Write(base_, kStandGlobals[i].first, saved_[i].data(), kStandGlobals[i].second);
+  }
+  memory::Free(allocation_);
+  memory::Free(car_allocation_);
+}
+
+bool StandCarWorld::ok() const {
+  return allocation_ != 0 && car_allocation_ != 0 && hooks::LoadPollCalleesNative() &&
+         hooks::CarMakersReapplyCalleesNative() && hooks::CarMakersShowCarByIdCalleesNative(true);
+}
+
+// The re-applies' world for their ShowStandCar cases (Reapplies, above),
+// step for step.
+void StandCarWorld::Lay(Random& r, uint32_t entry, uint32_t sp) {
+  uint8_t* const base = base_;
+  const uint32_t block = block_;
+  const int c = int(r.Below(32));
+  RandomBytes(base, sp - kStandDeepBytes, kStandDeepBytes - kStackBytes, r);
+  RandomBytes(base, block, kBlockBytes, r);
+  for (uint32_t m = 0; m < 8; m++) {
+    MakeModel(base, block, block + kModels + 0x200 * m, m, r);
+  }
+  Put(base, block + kScene + 4, r.Below(2));
+  const uint32_t accessories = block + kSmall + 0x780;
+  for (uint32_t i = 0; i < 3; i++) {
+    Put(base, accessories + 4 + 4 * i, 0);
+  }
+  if (r.Below(3) == 0) {
+    Put(base, accessories + 4, block + kSmall + 0x7C0 - 1096);
+    Put(base, block + kSmall + 0x7C0, r.Below(2));
+  }
+  const uint32_t model = block + kObject, car = block + kCar;
+  const bool traffic = c % 8 == 7;
+  PollWorld(base, block, model, r, traffic);
+  if (traffic) {
+    Put(base, model + 5092, model + 0x16400);
+  }
+  const uint32_t parts = model + 0x1400, interior = model + 0xA800;
+  if (r.Below(4) != 0) {
+    Put(base, model + 5028, 0);
+    Put(base, model + 5040, 0);
+    Put(base, block + kSmall + 0x500 + 8, r.Below(2));
+    for (uint32_t i = 0; i < 2; i++) {
+      Put(base, car + 3972 + 24 * i, 3);
+    }
+    Put(base, car + 3748, 3);
+    Put(base, car + 4088, 3);
+    for (const uint32_t at : {0x1400u + 100, 0xA800u + 11660, 0xD800u + 4312, 0xEA00u + 13156,
+                              0x12000u + 16768}) {
+      Put(base, model + at, 1);
+    }
+  }
+  Put(base, model + 5048, block + kSubs);
+  Put(base, model + 5060, parts);
+  Put(base, model + 5068, interior);
+  Put(base, block + kSmall + 0x7E0 + 4, 0);
+  Put(base, parts + 24, block + kSubs);
+  Put(base, parts + 37284, block + kScene);
+  Put(base, interior + 24, block + kSubs);
+  InteriorParts(base, block, interior);
+  Put(base, model + 48, r.Below(3) == 0 ? 5 : r.Below(40));
+  DecalIds(base, model + 48 + 176, r);
+  DecalIds(base, model + 48 + 560, r);
+  Put(base, model + 48 + 3692, r.Below(2) == 0 ? 0 : 2 + r.Below(4));
+  Put(base, model + 48 + 3680, r.Below(6));
+  PartsRecord(base, model + 3744, r);
+  InteriorRecord(base, model + 3804, r);
+  Put(base, model + 5036, c % 2 == 0 ? 0 : 1);
+  const uint32_t first_set = block + kSmall + 0x500, records = block + kSmall + 0x300;
+  Put(base, car + 7256, first_set);
+  Put(base, first_set + 40, 1);
+  Put(base, first_set + 12, r.Below(3));
+  Put(base, first_set + 52, records);
+  for (uint32_t i = 0; i < 12; i++) {
+    Put(base, records + 20 * i + 16, r.Below(3) == 0 ? 0 : 2);
+  }
+  constexpr uint32_t kSharedBuffer = 5056, kSharedBufferSize = 5060;  // car_models/load_slots.h
+  Put(base, block + kScene + kSharedBuffer, uint32_t(r.Next()));
+  Put(base, block + kScene + kSharedBufferSize, 0x200000);
+  Put(base, block + kStandHolder, block + kStandStage);
+  Put(base, block + kStandStage + 8, 0);
+  const uint32_t list = block + kScene + 12 * (7 + 412);
+  Put(base, list + 0, model);
+  Put(base, list + 8, 1);
+  Put(base, model + 8, 0);
+  Put(base, model + 16, 3);
+  RandomBytes(base, car_block_, kStandCarBlockBytes, r);
+  const StandWorld show = LayShowCarWorld(base, car_block_, r, c, block + kStandHolder);
+  for (uint32_t k = 1; k < 3; k++) {
+    Put(base, show.holder_word + 4 * k, block + kStandHolder);
+  }
+  // The car id LayShowCarWorld gives its entry (+0xC400).
+  Put(base, entry + 8432, guest::LoadU32(base, car_block_ + 0xC400 + 8432));
+  Put(base, 0x826C2E48, show.params);
+  Put(base, 0x826D83E0, show.holder_word);
+  Put(base, 0x826D83F4, show.list);
+  Put(base, 0x82638188, uint32_t(r.Next()));
+  Put(base, kSceneGlobal, block + kScene);
+  Put(base, kAccessoriesGlobal, accessories);
+  old_header_ = guest::LoadU32(base, car + 6684);
+  loads_.emplace(std::vector<int64_t>{1, 2, -1, 4});
+}
+
+void StandCarWorld::Settle(Outputs& out, uint32_t stand_sp, bool frame_car) {
+  uint8_t* const base = base_;
+  const uint32_t block = block_, car = block + kCar;
+  constexpr uint32_t kSheetFormat = 0x18280086;  // car_models/vinyl.h
+  constexpr uint32_t kSheetWidth = 0x82602570;   // car_models/raster.h
+  out.Word(guest::LoadU32(base, 0x82638188));
+  for (size_t i = 0; i < kStandGlobals.size(); i++) {
+    Write(base, kStandGlobals[i].first, saved_[i].data(), kStandGlobals[i].second);
+  }
+  const uint32_t header = guest::LoadU32(base, car + 6684);
+  const bool made = header != old_header_;
+  const uint32_t data = guest::LoadU32(base, car + 6688);
+  const uint32_t bytes = graphics::XGSetTextureHeader(
+      base, guest::LoadU32(base, kSheetWidth), guest::LoadU32(base, kSheetWidth + 4), 1, 2,
+      kSheetFormat, 0, 0, 0, 0, 0, 0);
+  std::vector<Known> known;
+  if (made) {
+    known = {{header, 52}, {data, bytes}};
+  }
+  Addresses(out, base, block, kBlockBytes, known);
+  out.Bytes(Read(base, car_block_, kStandCarBlockBytes));
+  // The car on ShowStandCar's 4,032-byte frame (+80) up to its register
+  // saves (the last 40), its float blocks (+1888 to +3884) as floats.
+  constexpr uint32_t kFrameBytes = 4032, kSaves = 40;
+  if (frame_car) {
+    const uint32_t car_at = stand_sp - kFrameBytes + 80;
+    out.Bytes(Read(base, car_at, 1888));
+    out.Floats(base, car_at + 1888, (3884 - 1888) / 4);
+    out.Bytes(Read(base, car_at + 3884, kFrameBytes - 80 - kSaves - 3884));
+  }
+  if (made) {
+    Addresses(out, base, header, 52, known);
+    out.Bytes(Read(base, data, bytes));
+  }
+  if (loads_) {
+    out.Word(uint32_t(loads_->calls().size()));
+    for (const uint32_t word : loads_->calls()) {
+      Address(out, word, known);
+    }
+    loads_.reset();
+  }
+  if (made) {
+    memory::FreePages(header);
+    memory::FreePhysical(data);
+  }
+}
 
 void LoadPoll(Context& h) {
   if (!hooks::LoadPollCalleesNative()) {

@@ -49,8 +49,10 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "sub_8224CAD8 (the entries from the allocation layer's pages), "
               "PanelSetBase::ShowStandCar sub_8224A490 and SetUpColors sub_8224B248 (with the car makers' callees native: "
               "GarageStage::SetCarClass through its override), the pages TabsPage "
-              "sub_82249EB8, RowsPage sub_8224A178, ColorsPage sub_8224AEA8 and PowerGraphPage "
-              "sub_8224BDC0 (the menu list, MenuSound::Play and the power graphs' set-ups guest "
+              "sub_82249EB8, RowsPage sub_8224A178, ColorsPage sub_8224AEA8, CarPage sub_8224B8D8 "
+              "(ShowStandCar's plain C++; CarPanel::ShowCarStats and sub_82250488, never seen in "
+              "play, the originals) and PowerGraphPage sub_8224BDC0, step 17 sub_8224C450 (SetUpColors' "
+              "plain C++, with the stand's gate) (the menu list, MenuSound::Play and the power graphs' set-ups guest "
               "calls), GarageStages::DrawAll sub_821807D8, PanelSetBase::UpdateStand sub_8224C008 and "
               "Update sub_8224CD00 and PanelSet::Update sub_8224CF18 (the steps' plain C++ where "
               "ours; GarageStage::ReloadModel, SetCar, Command, IsBusy and Draw through their "
@@ -229,6 +231,8 @@ ITC_CL_STEP(CarListRowsPage, cl::RowsPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListColorsPage, cl::ColorsPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListPowerGraphPage, cl::PowerGraphPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListSetUpColors, cl::SetUpColors(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListStep17, cl::Step17(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListCarPage, cl::CarPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListShowStandCar, cl::ShowStandCar(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_CL_STEP(CarListDrawAll, cl::DrawAll(base, sp, calls))
 ITC_CL_STEP(CarListUpdateStand, cl::UpdateStand(base, ctx.r3.u64, sp, calls))
@@ -349,6 +353,9 @@ ITC_CAR_LIST(82249EB8, CarListTabsPage)
 ITC_CAR_LIST(8224A178, CarListRowsPage)
 ITC_CAR_LIST(8224AEA8, CarListColorsPage)
 ITC_CAR_LIST(8224BDC0, CarListPowerGraphPage)
+// The car's page (page 2, the same): its stand's car through ShowStandCar's
+// plain C++, as ColorsPage's.
+ITC_CAR_LIST(8224B8D8, CarListCarPage)
 // The stand's car (from the car and colors pages and SetUpColors,
 // recompiled): the original when the car makers' callees aren't native.
 extern "C" REX_FUNC(sub_8224A490) {
@@ -367,6 +374,17 @@ extern "C" REX_FUNC(sub_8224B248) {
     return;
   }
   hooks::CarListSetUpColors(ctx, base);
+}
+// Step 17 (from the step table: PanelSetBase::Update's plain C++ calls
+// its; PanelSetPair's, never seen in play, the original's), the same gate
+// (SetUpColors' plain C++).
+extern "C" REX_FUNC(sub_8224C450) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
+    __imp__sub_8224C450(ctx, base);
+    return;
+  }
+  hooks::CarListStep17(ctx, base);
 }
 // PanelSet's slot 6 (the panel screens' update): the same gate as the
 // stand's car (Car::Init, SetModel and Refresh's plain C++). PanelSetBase::

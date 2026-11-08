@@ -329,6 +329,9 @@ uint64_t Update(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
       case 0x822492C8:
         answer = Step19(base, b_r3, word, frame, calls);
         break;
+      case 0x8224C450:
+        answer = Step17(base, b_r3, word, frame, calls);
+        break;
       default:
         answer = calls.Call(handler, frame, 0x8224CE94, b_r3, b_r3 + 56);
         break;

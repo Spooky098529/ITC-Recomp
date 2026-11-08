@@ -334,6 +334,26 @@ uint64_t PowerGraphPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& cal
 // Returns ShowStandCar's r3.
 uint64_t SetUpColors(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 
+// sub_8224C450 PanelSetBase::Step17 (r4 the first-pass word): first pass:
+// C's StopArrows, D's Show (each when there), SetUpColors, the word = 1.
+// Answers D's IsShown (1 without D).
+uint64_t Step17(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+// The garage tab's power graph record (sub_82250488, never seen in play:
+// the original), from the car's page.
+constexpr uint32_t kGaragePowerGraphRecord = 0x82250488;
+// sub_8224B8D8 PanelSetBase::CarPage (page 2, the car's actions; menu +60,
+// the rows' menu +132): moved, accepted (C's Pick; action 1 the power graph:
+// C's stats with two players, else the power graph's record and C's
+// buttons; action 0 the pick: steps 17, 21 or 3, the stand's car through
+// ShowStandCar's plain C++ for tab 0 without the confirm panel), cancelled
+// (E's Unhighlight), else the rows' menu (moved: C's stats, +244 the
+// entry's color). The menu lists, MenuSound::Play, CarPanel::ShowCarStats
+// and the garage tab's power graph record (both never seen in play: the
+// originals) guest calls; C's Pick, ShowStats and SetButtons, E's
+// Unhighlight, PowerGraph::SetEntry and SaveData their plain C++. Its
+// 112-byte frame.
+uint64_t CarPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+
 // --- PanelSet's update (update.cpp; r3 = b) ---
 
 // The guest calls the update makes: GarageStage::ReloadModel, SetCar,
