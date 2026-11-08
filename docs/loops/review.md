@@ -13,6 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The car list's first migration (24d1bfd6..098104fe,
+  `--native_car_list`, 58 functions, 18 adapters removed without
+  counter runs: the car list isn't reached in attract races): `Free`
+  through the allocation layer's `FreePages` (else a guest call to
+  `VirtualFree`'s override); `HandleInput`'s sign-extended r3 copied;
+  `SetUpCarPage`'s garage-tab branch ported without harness cases (its
+  callee `CarPanel::ShowCarStats` `sub_8224EA10`, never seen in play,
+  stays the original and would build a car from a random garage
+  record); the harness leaves the `SetText` frame words +40 to +79 out
+  (the 2026-10-30 call); `SaveData::Of(0)` can be 0 when the harnesses
+  run, so set-up cases use the harness's own save block.
+
 - `functions/car-list.md` (new, 154 rows, 93 in play; c595a898): the
   car list the type 6 and 7 panel screens show (`PanelSet`, vtable
   `0x820110C8`: its slots, 9 pages and 27 steps, the panels and panel

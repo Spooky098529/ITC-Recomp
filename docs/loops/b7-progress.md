@@ -99,7 +99,15 @@ file's history. What's left to see in a drive, from every run:
   errors; 49 ready groups; blocked by the UI movie helper
   `sub_8211BC18` (a new lead) and `sub_8211DE30`; 2 leads added, five
   trimmed, `sub_8224B248`'s deleted (mapped here); no subagents).
-  Migration agent running.
+  Migration 24d1bfd6..098104fe (`--native_car_list`, harness
+  `car_list`: the panels and panel groups, the panel moves,
+  `PowerGraph::SetEntry`, `PanelSet`'s leaves, `ToTabs`, `Open`,
+  `Free`, `HandleInput`, `BackPage8`, six steps, `SetUpRows`,
+  `SetUpCarPage`; 58 functions, 1 Merged, 18 adapters removed; races
+  37-38 s, 0 errors, its harnesses 0 differing; no subagents); left:
+  `Build`, the tabs, rows and power graph pages, the stand car's draw
+  and `Update`; blocked by `sub_8211BC18` and `sub_8211DE30`.
+  Validation agent running.
 
 ## Done
 
@@ -149,3 +157,5 @@ file's history. What's left to see in a drive, from every run:
   425, unknown 1095).
 - After the car list's map: ours 4849, work left 1576 (wrapped 56,
   known 518, unknown 1002).
+- After its migration: ours 4908, work left 1518 (wrapped 56, known
+  460, unknown 1002).
