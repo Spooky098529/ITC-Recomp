@@ -65,7 +65,10 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "sub_8218FB20 and the transitions Transition0 sub_821901C0, Transition1 "
               "sub_8218EC78, Transition2 sub_8218EE48, Transition3 sub_8218ED98, Transition5 "
               "sub_82190548, Transition6 sub_8218F098 and Transition7 sub_821902C8 (the movie's "
-              "calls, the fades and Params::GetCarSpec through their overrides) "
+              "calls, the fades and Params::GetCarSpec through their overrides); MenuPage "
+              "sub_8218FCC8 with FillPlayerRecord sub_8218DA48, NoticePage sub_8218E8F8 and "
+              "OnDialogDone sub_8218F800 (Menu::, MenuSound::Play, the text calls, memcpy, "
+              "PlayTime:: and the spec sheet's sub_8218D708 through their overrides) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -461,6 +464,23 @@ ITC_HUB_TRANSITION(6)
 ITC_HUB_TRANSITION(7)
 #undef ITC_HUB_TRANSITION
 
+void HubMenuPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubMenuPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void HubNoticePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubNoticePage(base, ctx.r1.u32, guest.calls());
+}
+void HubOnDialogDone(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubOnDialogDone(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void HubFillPlayerRecord(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  t2::HubFillPlayerRecord(base, ctx.r1.u32, guest.calls());
+}
+
 namespace {
 // An Init's register step: StateMachine::Add's adapter's r3, a new
 // transition's address from the machine's 64-bit r3.
@@ -577,6 +597,13 @@ ITC_TYPE2_SCREENS(8218ED98, HubTransition3)
 ITC_TYPE2_SCREENS(82190548, HubTransition5)
 ITC_TYPE2_SCREENS(8218F098, HubTransition6)
 ITC_TYPE2_SCREENS(821902C8, HubTransition7)
+// The hub's MenuPage and NoticePage (from UpdatePage's table, native, through
+// the guest context) and OnDialogDone (a functor). No adapter for
+// FillPlayerRecord sub_8218DA48 (only MenuPage): its step above is the
+// harness's.
+ITC_TYPE2_SCREENS(8218FCC8, HubMenuPage)
+ITC_TYPE2_SCREENS(8218E8F8, HubNoticePage)
+ITC_TYPE2_SCREENS(8218F800, HubOnDialogDone)
 // The license plate editor's handlers: member function functors the machine
 // calls (no direct callers).
 ITC_TYPE2_SCREENS(82198210, PlateCreate)

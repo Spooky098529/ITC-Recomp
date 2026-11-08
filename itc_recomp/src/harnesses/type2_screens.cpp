@@ -34,6 +34,7 @@
 #include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
 #include "models/memory_blocks.h"
 #include "models/xpr.h"
@@ -82,8 +83,8 @@ constexpr uint32_t kStageAt = 0x18400;       // a garage stage (6,144 bytes)
 constexpr uint32_t kHolderAt = 0x19C00;      // [0x826D83E0] points here: +0 the stage
 constexpr uint32_t kSheetDataAt = 0x19C80;   // the spec sheet's data (1,968 bytes)
 constexpr uint32_t kGroupListAt = 0x2A90;    // the build screen's group list (72)
-constexpr uint32_t kHubAt = 0x1A480;         // the hub's world (0x400 bytes)
-constexpr uint32_t kBlockBytes = 0x1A880;
+constexpr uint32_t kHubAt = 0x1A480;         // the hub's world (0x800 bytes)
+constexpr uint32_t kBlockBytes = 0x1AC80;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -109,6 +110,8 @@ constexpr Global kGlobals[] = {
     {t2::kHubPages, 16},  // the hub's page object, menu, data and counter
     {data_tables::kTables, 4},
     {car_specs::kParams, 4},
+    {t2::kRecordScreen, 4},
+    {0x826364EC, 4},  // the front-end menu to show on return (OnDialogDone clears it)
     {0x826A50AC, 64},  // the screen fades
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
@@ -1186,6 +1189,69 @@ void HubMovie(Context& h, const World& w) {
   }
 }
 
+// The hub's menu world: the movie world, the menus' (MenuWorld's mappers
+// and sound manager) with the hub's front-end menu's fields (at the list's
+// place): the cursor 0 to 8 or -1, moved (+8) 0 mostly, first 0, last 7,
+// its steps and side small, the player 0 to 3; the dialog's step (+24) and
+// answer (+28) 0 to 3; the player's record's screen ([0x826D84CC]) in the
+// hub's area.
+void HubMenuWorld(Random& r, const World& w) {
+  namespace mh = menu_helpers;
+  HubMovieWorld(r, w);
+  MenuWorld(r, w);
+  uint8_t* base = w.base;
+  const uint32_t menu = w.at(kListAt);
+  guest::StoreU32(base, menu + mh::kCursor, r.Below(10) == 0 ? 0xFFFFFFFFu : r.Below(9));
+  guest::StoreU32(base, menu + mh::kPrevious, r.Below(8));
+  guest::StoreU32(base, menu + mh::kMoved, r.Below(4) == 0 ? (r.Below(2) == 0 ? 1 : 0xFFFFFFFFu) : 0);
+  guest::StoreU32(base, menu + mh::kFirst, 0);
+  guest::StoreU32(base, menu + mh::kLast, 7);
+  guest::StoreU32(base, menu + mh::kWraps, r.Below(2));
+  guest::StoreU32(base, menu + mh::kUpDownLocked, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, menu + mh::kSidesStep, r.Below(3));
+  guest::StoreU32(base, menu + mh::kShouldersStep, r.Below(3));
+  guest::StoreU32(base, menu + mh::kSide, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, menu + mh::kWrapped, r.Below(2));
+  guest::StoreU32(base, menu + mh::kPlayer, r.Below(4));
+  guest::StoreU32(base, w.data() + 24, r.Below(5));
+  guest::StoreU32(base, w.data() + 28, r.Below(5));
+  guest::StoreU32(base, w.data() + 20, r.Below(3));
+  guest::StoreU32(base, t2::kRecordScreen, w.at(kHubAt) + 0x400);
+}
+
+// The player's record's floats (+12, +20, +24 of [0x826D84CC] + 8: stored
+// with stfs) compared as floats, then zeroed for the block's comparison.
+void RecordFloats(PPCContext&, const World& w, Outputs& out) {
+  const uint32_t record = w.at(kHubAt) + 0x400 + 8;
+  for (const uint32_t at : {12u, 20u, 24u}) {
+    out.Floats(w.base, record + at, 1);
+    guest::StoreU32(w.base, record + at, 0);
+  }
+}
+
+void HubPages(Context& h, const World& w) {
+  auto menu = [](PPCContext& t, Random& r, const World& w) {
+    HubMenuWorld(r, w);
+    t.r3.u64 = w.at(kModeAt);
+    t.r4.u64 = w.at(kModeAt);
+  };
+  Run(h, w, {"Type2Hub::FillPlayerRecord (sub_8218DA48)", 100, __imp__sub_8218DA48,
+             hooks::HubFillPlayerRecord, {{-6176, -32}}, menu, RecordFloats});
+  Run(h, w, {"Type2Hub::NoticePage (sub_8218E8F8; sub_8218DBD0, sub_8218DD78)", 300,
+             __imp__sub_8218E8F8, hooks::HubNoticePage, {{-112, -24}}, menu, nullptr, true});
+  // OnDialogDone: SetText's parameter area left out.
+  Run(h, w, {"Type2Hub::OnDialogDone (sub_8218F800; sub_8218F530, sub_8218DD78)", 300,
+             __imp__sub_8218F800, hooks::HubOnDialogDone, {{-128, -80}, {-48, -32}},
+             [menu](PPCContext& t, Random& r, const World& w) {
+               menu(t, r, w);
+               t.r3.u64 = r.Next();
+             },
+             nullptr, true});
+  Run(h, w, {"Type2Hub::MenuPage (sub_8218FCC8; sub_8218DA48, sub_8218F530)", 300,
+             __imp__sub_8218FCC8, hooks::HubMenuPage, {{-2112, -2064}, {-2032, -40}}, menu,
+             RecordFloats});
+}
+
 void Hub(Context& h, const World& w) {
   auto hub = [](PPCContext&, Random& r, const World& w) { HubWorld(r, w); };
   auto machine = [hub](PPCContext& t, Random& r, const World& w) {
@@ -1399,6 +1465,7 @@ void Hub(Context& h, const World& w) {
                guest::StoreU32(base, image + 12, 1);
              }});
   HubMovie(h, w);
+  HubPages(h, w);
 }
 
 }  // namespace

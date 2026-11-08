@@ -135,6 +135,12 @@ void HubTransition3(PPCContext& ctx, uint8_t* base);
 void HubTransition5(PPCContext& ctx, uint8_t* base);
 void HubTransition6(PPCContext& ctx, uint8_t* base);
 void HubTransition7(PPCContext& ctx, uint8_t* base);
+// The hub's pages (MenuPage r3 the mode; NoticePage no arguments read),
+// OnDialogDone (r4 the mode) and FillPlayerRecord (no arguments).
+void HubMenuPage(PPCContext& ctx, uint8_t* base);
+void HubNoticePage(PPCContext& ctx, uint8_t* base);
+void HubOnDialogDone(PPCContext& ctx, uint8_t* base);
+void HubFillPlayerRecord(PPCContext& ctx, uint8_t* base);
 // The four machines' set-ups (r3 the machine).
 void HubInitStates(PPCContext& ctx, uint8_t* base);
 void SheetInitStates(PPCContext& ctx, uint8_t* base);

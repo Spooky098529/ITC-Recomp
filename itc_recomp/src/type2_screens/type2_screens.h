@@ -562,6 +562,49 @@ uint64_t HubTransition5(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
 uint64_t HubTransition6(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t HubTransition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+// --- The hub's pages and dialog replies (hub_pages.cpp) ---
+//
+// Menu::Step, Menu::Pressed, MenuSound::Play, UiMovie::RevealText,
+// HasMoreText and SetText, memcpy, PlayTime::Add and Update and the spec
+// sheet's car data sub_8218D708 (never seen in play) through their
+// overrides (or the original); the hub's helpers their plain C++.
+constexpr uint32_t kMenuStep = 0x82186568;
+constexpr uint32_t kMenuPressed = 0x821864C8;
+constexpr uint32_t kRevealText = 0x8211D880;
+constexpr uint32_t kPlayTimeAdd = 0x821109B8;
+constexpr uint32_t kPlayTimeUpdate = 0x82112838;
+constexpr uint32_t kSheetCarData = 0x8218D708;
+// The player's record's screen (sub_8220B408's: +8 the record).
+constexpr uint32_t kRecordScreen = 0x826D84CC;
+
+// sub_8218DA48 Type2Hub::FillPlayerRecord: into [0x826D84CC] + 8 from a copy
+// of player 0's save +48 (6,044 bytes, memcpy into the frame's +96): three
+// halfwords, the ratio (single precision: +12 / +22 x [0x82002A0C], or
+// [0x82000A34] with +22 0), more fields (one truncated as fctiwz, as the
+// recompiled code: NaN 0x80000000, from INT_MAX saturated), the play time
+// (PlayTime::Add into the frame's +80), the garage's count and save +
+// 0x1991C. 6,176-byte frame.
+void HubFillPlayerRecord(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8218E8F8 Type2Hub::NoticePage: Menu::Pressed(159) (sound 0): while
+// movie 0's text (0, 2) reveals more, node (0, 0) shown by HasMoreText;
+// done, NextNotice: page 4 after 11 and 10 or 9 and 8; none, NextNotice2:
+// page 5 or 0 after 6 and 7. The last call's r3. 112-byte frame.
+uint64_t HubNoticePage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8218F800 Type2Hub::OnDialogDone (r4 the mode): by the data's +24 (the
+// dialog's step) and +28 (the answer): the second quit question (movie 16,
+// message 34), page 0 with the prompts, page 6 and message 43, page 3
+// after 3 with PlayTime::Update, NextNotice2's page 5. The last call's r3,
+// else `r3`. 128-byte frame.
+uint64_t HubOnDialogDone(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                         const Calls& calls);
+// sub_8218FCC8 Type2Hub::MenuPage (r3 the mode): Menu::Step (moved: sound
+// 4, transition 2); else by Menu::Pressed: 159 by the item (page 3 after
+// transition 3, sound 3 for items 1 and 2 with a second-list car, or the
+// quit question), 158 transition 12, 163 the spec sheet (the car copied to
+// the frame's +96, sub_8218D708, message 24), 164 the record
+// (FillPlayerRecord, message 27). The last call's r3. 2,112-byte frame.
+uint64_t HubMenuPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+
 // --- The machines' set-ups (init_states.cpp) ---
 //
 // The transitions added to `machine` (StateMachine::Add's plain C++) from
