@@ -31,6 +31,20 @@ When the user has reviewed a run's section, its heading gets
   a chain of distinct links; `ShapeSet` keeps E's +16 non-negative (a -1
   read a random word once `RowPanel::SetRow` stored a -1 logo frame in a
   node's +108).
+- The UI movie helpers' second migration (f2cce057..97ac1b9f):
+  `sub_8211CBD8` renamed `UiMovie::SetNodeTextV` (its r6 is a
+  `va_list` passed to `Strings::FormatV`); `UiMovie::OnLoaded` with
+  `File::GetSize` (`files-and-saves.md`, `--native_file_layer`). The car
+  list's `Step17` and `CarPage`: a new shared harness world
+  (`harnesses/stand_car_world.h`, implemented in `load_poll.cpp`) lays
+  load_poll's `ShowStandCar` world beside the car list's. Harness gaps
+  (in the rows): `CarPage`'s pick cases force the menu to accept action
+  0 and reach `ShowStandCar` in 9 of 30; they don't compare the car on
+  `ShowStandCar`'s frame (`Car::Init` leaves words unwritten, holding
+  earlier callees' stack leftovers the native callees don't write;
+  `Step17`'s cases compare it and match); `CarPage`'s garage tab (tab
+  2) has no cases (`CarPanel::ShowCarStats` and `sub_82250488`, never
+  seen in play, stay guest calls to the originals).
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 

@@ -32,8 +32,16 @@ file's history. What's left to see in a drive, from every run:
   taken. Validated `itc_4536` (race 85 s at 180; 0 errors, every
   harness 0 differing outside the expected groups, 34 of 34 harness
   lines, no prints added; `sub_8211DCE8` in the race, none more in the
-  replay `itc_4537` (ok), 33 to drive). Step: second migration (the
-  ready groups left), agent running.
+  replay `itc_4537` (ok), 33 to drive). Second migration
+  f2cce057..97ac1b9f (`UiMovies::DeleteAll`, `SetNodeTextV`,
+  `SetNodeNumberText`, `OnLoaded` with `File::GetSize`
+  (`--native_file_layer`); the car list's `Step17` and `CarPage` with a
+  stand's car harness world (`harnesses/stand_car_world.h`); 12
+  adapters removed; race 35 s, 0 errors, its harnesses 0 differing; no
+  subagents). Left: none in either file; newly ready in other files:
+  `sub_82211B98`, `sub_82246038`, `sub_82218838`, `sub_82090CC0` (with
+  `sub_8258BD58`, `sub_8258BE48`), and 12 callers without rows. Step:
+  its validation, agent running.
 
 ## Done
 
@@ -57,5 +65,7 @@ file's history. What's left to see in a drive, from every run:
   56, known 451, unknown 999).
 - After its migration: ours 4944, work left 1482 (wrapped 56, known
   427, unknown 999).
+- After its second migration: ours 4952, work left 1474 (wrapped 56,
+  known 419, unknown 999).
 
 ## Stopped
