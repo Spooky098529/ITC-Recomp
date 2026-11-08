@@ -1,0 +1,251 @@
+# Known functions: the type 6 and 7 modes' list, panel and node screens
+
+Three of the screens in the front-end modes of type 6 and 7
+([`type6-type7-modes.md`](type6-type7-modes.md), which has the modes,
+their first screens and these screens' state machine Inits with every
+transition; the screens' constructors are in
+[`screen-constructors.md`](screen-constructors.md)): the **list screen**
+(`Type6ListScreen` at the type 6 block's +19432, `Type7ListScreen` at the
+type 7 block's +19428; UI movie `[+9680]`, assets 22565 and 22570; item 0
+of the modes' menus, probably the race or course pick: its slot 7 sets
+the race up and leaves the mode with state 11, which makes the mode
+answer the race), the **panel screen** (`Type6PanelScreen` +40948,
+`Type7PanelScreen` +30608; UI movies 4 and 28, assets 22567/22568 and
+22571/22572; the car pick: its car list (+9644, `PanelSet`) lists the
+unlocked cars and the garage, and its slot 3 copies the picked one into
+the mode's car, `0x826367E8` or `0x826371D0`) and the **node screen**
+(`Type6NodeScreen` +30396, type 6 only; UI movie 15, asset 22566; it
+reads the course records, `CourseRecords::Of`, probably a records or
+course screen). Here: the handlers their Inits register, the screens'
+vtable slots (and their bases' and the list part's), the panel screens'
+group pair, and the callees only they call.
+
+All three follow the screen pattern of the modes' other screens (`r` in
+the rows is the screen, `m` its UI movie by `UiMovies::Find` on
+`0x826C5CCC`; the list and panel screens' machine state is +9608, the
+node screen's +10064): the entry (0, 1) clears the loaded word and goes to
+state 1 (open the movie) when +9616 (+10072) is set, else 9; (1, 1) opens
+the movie (vtable slot 13, +52, or slot 12, +48, for the lists); (2, 1)
+waits for it (slot 1, 2 or 3: `UiMovies::IsLoaded`) and then goes to 9
+(wait for the mode) or 4; the open message (9, n) goes to 4; (4, 1)
+shows; (5, 1) draws and (5, 0) updates; (5, 4) and the others leave
+(state 7, the movie deleted by slot 18 or 19), and (7, 4) ends in 6 (or
+11 for a list that set the race). Messages are posted straight into the
+dispatcher r4's ring (+204: the count +804 up by one, the record at 12 ×
+((start +808 + count − 1) mod 50); no overflow check), as the first
+screens' are. In play (`../coverage.md`) every screen's entry, movie open
+and wait ran at the mode's start, and the panel screen was opened and
+used; the list and node screens were never opened (their show, Draw,
+Update and open handlers never ran), so most of their slots have no
+coverage. The type 6 panel screen's own slots (its Draw, its car pick,
+its dialog) didn't run either: only type 7's did.
+
+Not mapped here (leads in `../loops/leads.md`): the car list itself
+(`PanelSet`, vtable `0x820110C8`, at the panel screens' +9752: its slots
+and the step table its update builds, about 130 functions; the panel
+handlers call it through its vtable: slots 1 to 3, 5 to 11, 13, 15 to 18),
+and the list and node screens' pages and steps (the tables their Draw and
+Update slots build on first use: `0x82815F88` and others, and the list
+part's inner object, vtable `0x820112F8`). Fields worked out are in
+`../known-data.md` ("type 6 and 7 list, panel and node screens", "group
+pair"). Read by the B7 loop's mapping agent, 2026-11-08, from the lead
+"the type 6 and 7 modes' list, panel and node screens' transition
+handlers".
+
+For a migration: the handlers call the screens', the car list's, the
+group pair's and the list part's vtable slots (indirect calls only; the
+car list's are recompiled and not here); the list screens' Draw and Update
+slots build tables of member functions on first use (guard words at
+`0x82815FD0` and others) and call through them; the race set-ups
+(`sub_822334C8`, `sub_82243018`) never ran; `UiMovie::SetText` calls
+leave r7 to r10 unset (precedent, 2026-10-30: pass 0); `sub_82258FC8`
+(the group's movie) is also called by about 80 of the car list's
+functions.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82251618` | `ListScreen::OnEnter` | | (0, 1) of both list screens (`Type6ListScreen::InitMachine`, `Type7ListScreen::InitMachine`): r3 = the screen: +9612 = 0, +9688 = 0 (the race-set word `ListScreen::OnLeft` reads), vtable slot 8 (+32; the empty `sub_82106540` in both), then +9608 = 1 when +9616 is set, else 9. No direct callers (a functor, vtable `0x82010978`). Seen in play. Read in full. |
+| `sub_82251508` | `ListScreen::OpenMovie` | | (1, 1) → 2: +9612 = 0, then a tail call of vtable slot 12 (+48: `Type6ListScreen::OpenMovie` `sub_82233320`, `Type7ListScreen::OpenMovie` `sub_82242F10`). Seen in play. Read in full. |
+| `sub_82251678` | `ListScreen::WaitForMovie` | | (2, 1), r4 = the dispatcher: while +9612 is 0, +9612 = slot 1 (+4: `ListScreen::IsLoaded` `sub_82242F70`, both); once set, +9692 = 1 and +9608 = 9 when +9616 is set, else 4; every call then slot 13 (+52, r4 passed; empty in both). Seen in play. Read in full. |
+| `sub_82251F98` | `ListScreen::Show` | | (4, 1) → 5, r4 = the dispatcher: `ListScreen::SetUpMovie` (`sub_82251EC8`); m = movie `[+9680]`; when +9728 ≥ 0: `UiMovie::SetText(m, +9728, +9712, 322)` when +9712 ≥ 0, `SetText(m, +9728, +9716, 0)` when +9716 isn't 0, `SetText(m, +9728, +9720, 1)` when +9720 isn't 0; +9696 = 0; slot 22 (+88: the page block's reset, `TitledListScreen::Reset` `sub_82257558` or `ColorListScreen::Reset` `sub_82255200`); slot 14 (+56, r4: the menus' set-up, `sub_82233378` or `sub_82243588`). Not seen in play. Read in full. |
+| `sub_82251520` | `ListScreen::Draw` | | (5, 1): slot 23 (+92: the page table's draw, `TitledListScreen::Draw` `sub_822579E8` or `ColorListScreen::Draw` `sub_82256CA0`), then slot 10 (+40, r4; empty). Not seen in play. Read in full. |
+| `sub_822517B8` | `ListScreen::Update` | | (5, 0): nothing when +9680 < 0. m = movie `[+9680]`. With a step running (+9656 isn't -1): slot 24 (+96: `TitledListScreen::Update` `sub_82258998` or `ColorListScreen::Update` `sub_82256E08`); when it answers nonzero, the page block at +9644 moves on (+16, the queued step, -1: +0 = +4 and +12 = -1; else +20 = 0, +12 = +16, +16 = -1; then +24 = 0: the options' page block layout, `options-screen.md`). Without a step: `UiMovie::Run(m, 0)`, then, when +9696 is set and the list part (+9676) isn't 0, the part's slot 3 (+12: `ListPartBase::Input` `sub_82252500`) with r4 = +9644. Not seen in play. Read in full. |
+| `sub_82251580` | `ListScreen::Suspend` | | (5, 15) → 8 type 6, (5, 14) → 8 type 7: a tail call of slot 16 (+64; empty in both). Not seen in play. Read in full. |
+| `sub_82251590` | `ListScreen::Resume` | | (8, 3) type 6, (8, 2) type 7: a tail call of slot 17 (+68; empty in both). Not seen in play. Read in full. |
+| `sub_822517A0` | `ListScreen::Open` | | (9, 14) type 6, (9, 13) type 7 (the first screen's item 0, string 109): +9608 = 4, then a tail call of slot 15 (+60; empty in both). Not seen in play. Read in full. |
+| `sub_82251760` | `ListScreen::Leave` | | (5, 4), (9, 4), (10, 4) type 6; (5, 3), (9, 3), (10, 3) type 7: slot 18 (+72: `Type6ListScreen::Release` `sub_82233330`, `Type7ListScreen::Release` `sub_82242F20`), then +9608 = 7. Seen in play (leaving the mode). Read in full. |
+| `sub_82251710` | `ListScreen::OnLeft` | | (7, 4) type 6, (7, 3) type 7: slot 9 (+36; empty in both), then +9608 = 11 when +9688 is 1 (the race set: `Type6Mode::Leaving` then answers the race), else 6. +9688 is the page block's +44, written by a step (not found in this map). Seen in play. Read in full. |
+| `sub_82251EC8` | `ListScreen::SetUpMovie` | | From `ListScreen::Show`: m = movie `[+9680]`, `UiMovie::ResetPose(m)`; the node table (`[+9672]`) slot 1 (+4) when set; when +9724 and +9748 are ≥ 0: `UiMovie::ShowNode(m, +9724, +9748)` when +9788 is set, else `HideNode`; then `ListScreen::SetArrows(r, 0, 0)` and `(r, 1, 0)` (`sub_82251E10`) and `ListScreen::SetIcons` (`sub_82251C30`). Not seen in play. Not read in detail. |
+| `sub_82251E10` | `ListScreen::SetArrows` (probably) | | r3 = the screen, r4 = 0 or 1, r5: `UiMovies::Find` on +9680, `UiMovie::FindNode` twice with +9728, +9752 / +9756, +9800 / +9804, a word +108 of the node set. Also from `sub_82252068` and `sub_82252198` (not seen in play, not here). Not seen in play. Not read in detail. |
+| `sub_82251C30` | `ListScreen::SetIcons` (probably) | | From `ListScreen::SetUpMovie`: `UiMovies::Find` on +9680, four `UiMovie::SetNodeTexture` and two `UiMovie::HideNode` calls with +9732 and +9812. Not seen in play. Not read in detail. |
+| `sub_82242F70` | `ListScreen::IsLoaded` | | Slot 1 of both list screens' vtables (`0x820109A8`, `0x82010F18`): 1 when `UiMovies::IsLoaded([+9680])` answers nonzero, else 0. From `ListScreen::WaitForMovie`. Seen in play. Read in full. |
+| `sub_82233320` | `Type6ListScreen::OpenMovie` | | Slot 12 (+48) of `Type6ListScreen` (`0x820109A8`): `UiMovies::Open([+9680], 22565)`. Seen in play. Read in full. |
+| `sub_82242F10` | `Type7ListScreen::OpenMovie` | | Slot 12 of `Type7ListScreen` (`0x82010F18`): `UiMovies::Open([+9680], 22570)`. Seen in play. Read in full. |
+| `sub_82233330` | `Type6ListScreen::Release` | | Slot 18 (+72) of `Type6ListScreen`: `UiMovies::Delete([+9680])`, then `MenuList::Release` (`alt-hud.md`) on +10216, +10288 and +10144. From `ListScreen::Leave`. Seen in play. Read in full. |
+| `sub_82242F20` | `Type7ListScreen::Release` | | Slot 18 of `Type7ListScreen`: `UiMovies::Delete([+9680])`, then `MenuList::Release` on +10144, +10288, +10360 and +10216. Seen in play. Read in full. |
+| `sub_822336C0` | `Type6ListScreen::SetItemTexts` (probably) | | Slot 2 (+8) of `Type6ListScreen`: m = movie `[+9680]`; for i = 0 to 6, `UiMovie::SetText(m, 8, 5 + i, [0x826366FC + 4 × r4 + 4i]` (probably; the table's index register not followed). Callers not found (no handler here calls slot 2: a step, probably). Not seen in play. Not read in detail. |
+| `sub_822337B0` | `Type6ListScreen::Back` | | Slot 6 (+24) of `Type6ListScreen`, r4 = the dispatcher: +9608 = 9, message (6, r8, 0) posted (6: back to `Type6Screen0`, its (9, 6) `ScreenMachine::Reenter`; r8 left as the caller has it), the music player's (`[0x826C5C80]`) slot +52 with words 0 and 1, `Sound::Play` (`menu-sounds.md`) with 1 and 2. Called by a step (not found in this map). Not seen in play. Not read in detail. |
+| `sub_822334C8` | `Type6ListScreen::SetUpRace` | | Slot 7 (+28) of `Type6ListScreen`: `RaceData::ResetGlobal`, `Stages::Clear`, the menu lists' `MenuList::Selection`, `sub_820FF968`, then `Type6ListScreen::AddRacers` (`sub_8223356C`) or its own copy of it (`Stages::SetRoute`, `Race::SetRoute`, the player's car: `RacerRecord::Init`, `Car::SetModel`, `memcpy` of 1,884 bytes, `Car::Refresh`, `Race::AddRacer`, `Stages::AddRacer`, `SaveData::Of`, `Race::AddStage`, `Race::PlaceRacers`; all in `race-setup.md` and `car-specs.md`), a vtable call on the list part (`[+9676]`), then +9608 = 10 (leave the mode). 157 lines. Not seen in play. Not read in detail. |
+| `sub_8223356C` | `Type6ListScreen::AddRacers` (probably) | | From `Type6ListScreen::SetUpRace` only: `Stages::SetRoute`, `Race::SetRoute`, two `MenuList::Selection`, `sub_820FF918`, `RacerRecord::Init`, `Car::SetModel`, `memcpy` (1,884 bytes), `Car::Refresh`, `Race::AddRacer`, `Stages::AddRacer`, `SaveData::Of`, `Race::AddStage`, `Race::PlaceRacers`, a vtable call on `[+9676]`, +9608 written. Not seen in play. Not read in detail. |
+| `sub_82233378` | `Type6ListScreen::SetUpMenus` | | Slot 14 (+56) of `Type6ListScreen`, from `ListScreen::Show`: `MenuList::Init` three times (strings 153 to 162), `MenuList::SetSelection` twice, `NodeListScreen::LoadItem` (`sub_82257060`) and a slot 2 call on an object. Not seen in play. Not read in detail. |
+| `sub_82233730` | `Type6ListScreen::ShowMarks` (probably) | | Slot 26 (+104) of `Type6ListScreen`: m = movie `[+9680]`; `UiMovie::FindNode(m, -1, 17)` +80 = (r4 isn't 0), `FindNode(m, -1, 18)` +80 = (r4 isn't 2) (probably; the registers not followed). Not seen in play. Not read in detail. |
+| `sub_82237008` | `Type6ListScreen::ItemInfo` | | Slot 25 (+100) of `Type6ListScreen` and slot 4 of `Type6NodeScreen` (`0x82010A80`; one function in both): r4 = an item (0 to 7, else nothing), r5 = 16 bytes copied from `0x82636720` + 16 × r4. Leaf. From `NodeListScreen::LoadItem` and `ColorListScreen::LoadItem` (through the slot). Not seen in play. Read in full. |
+| `sub_822332D8` | `Type6ListScreen::~Type6ListScreen` | | +0 = vtable `0x820109A8`; `ListPart::~ListPart` on +10824 (`sub_82252968`); `TitledListScreen::~TitledListScreen` (`sub_82257138`). From `sub_82233478` and `sub_822367C0` (not seen in play; probably the type 6 block's destructor). Not seen in play. Read in full. |
+| `sub_82233478` | `Type6ListScreen::DeletingDestructor` | | Slot 0 of `Type6ListScreen`: `~Type6ListScreen`, then `operator delete` when bit 0 of r4 is set. Not seen in play (the screens get no destructor call: `StandMode::Release`). Read in full. |
+| `sub_82243238` | `Type7ListScreen::SetItemText` (probably) | | Slot 2 of `Type7ListScreen`: `UiMovies::Find` on `[+9680]`, one `UiMovie::SetText` from a table near `0x82637xxx`. Not seen in play. Not read in detail. |
+| `sub_822432A8` | `Type7ListScreen::ClearItemText` (probably) | | Slot 3 of `Type7ListScreen`: `UiMovies::Find`, `UiMovie::ClearText`. Not seen in play. Not read in detail. |
+| `sub_822434C8` | `Type7ListScreen::Back` | | Slot 6 of `Type7ListScreen`: as `Type6ListScreen::Back` with message 5 (type 7's back to `Type7Screen0`, its (9, 5) `Screen::Reenter`). Not seen in play. Not read in detail. |
+| `sub_82243018` | `Type7ListScreen::SetUpRace` | | Slot 7 of `Type7ListScreen`: as `Type6ListScreen::SetUpRace` with more `MenuList::Selection` reads, `sub_820FF938` and `Type7ListScreen::AddRacers` (`sub_822430BC`); +9608 = 10. 182 lines. Not seen in play. Not read in detail. |
+| `sub_822430BC` | `Type7ListScreen::AddRacers` (probably) | | From `Type7ListScreen::SetUpRace` only: as `Type6ListScreen::AddRacers` (with `sub_820FF938`; no `Stages::SetRoute`). Not seen in play. Not read in detail. |
+| `sub_82243588` | `Type7ListScreen::SetUpMenus` | | Slot 14 of `Type7ListScreen`: `MenuList::Init` four times (strings 153 to 159), `MenuList::SetSelection` twice, `MenuList::Selection`, `Type7ListScreen::SetTitle` (`sub_822433D8`), `ColorListScreen::LoadItem` (`sub_82255238`). Not seen in play. Not read in detail. |
+| `sub_822433D8` | `Type7ListScreen::SetTitle` (probably) | | From `Type7ListScreen::SetUpMenus` only: `UiMovies::Find`, one `UiMovie::SetText` from a table near `0x82637xxx`. Not seen in play. Not read in detail. |
+| `sub_82243308` | `Type7ListScreen::SetDetails` (probably) | | Slot 26 of `Type7ListScreen`: `UiMovies::Find` on `[+9680]`, `MenuList::Init` (strings 153 to 159), `UiMovie::SetText` and `ClearText`. Not seen in play. Not read in detail. |
+| `sub_82243448` | `Type7ListScreen::ShowMarks` (probably) | | Slot 27 of `Type7ListScreen`: as `Type6ListScreen::ShowMarks` (two `UiMovie::FindNode`, their +80 set). Not seen in play. Not read in detail. |
+| `sub_82242FA0` | `Type7ListScreen::ItemInfo` | | Slot 25 of `Type7ListScreen`: r4 = an item (0 to 8, else nothing), r5 = 28 bytes copied (`memcpy`) from `0x82637098` + 28 × r4 (the records whose counts give the items' color masks, `Type7ListScreen::Type7ListScreen` in `screen-constructors.md`). Not seen in play. Read in full. |
+| `sub_82242EC8` | `Type7ListScreen::~Type7ListScreen` | | +0 = vtable `0x82010F18`; `ListPart::~ListPart` on +11040; `ColorListScreen::~ColorListScreen` (`sub_82255198`). From `sub_82242FC8` and `sub_82246BE0` (not seen in play; probably the type 7 block's destructor). Not seen in play. Read in full. |
+| `sub_82242FC8` | `Type7ListScreen::DeletingDestructor` | | Slot 0 of `Type7ListScreen`: `~Type7ListScreen`, `operator delete` when bit 0 of r4 is set. Not seen in play. Read in full. |
+| `sub_82257558` | `TitledListScreen::Reset` | | Slot 22 (+88) of `TitledListScreen` (`0x820115C8`) and `Type6ListScreen`: the page block: +9652 = +9644 unless it's 2, then +9660 = -1, +9656 = 0, +9648 = 2, +9644 = -1. Leaf. From `ListScreen::Show`. Not seen in play. Read in full. |
+| `sub_822579E8` | `TitledListScreen::Draw` | | Slot 23 (+92) of `TitledListScreen` and `Type6ListScreen`: builds, on first use (`0x82815FD0` bit 0), a table of 9 member functions at `0x82815F88` (8 bytes each: the function, the this offset 0): the empty `sub_82106540` for pages 0, 1, 5 and 6, `sub_82257148`, `sub_822572F0`, `sub_82257360`, `sub_82257490`, `sub_82255818` (leads); calls page +9644 unless it's -1. Not seen in play. Read in full. |
+| `sub_82258998` | `TitledListScreen::Update` | | Slot 24 (+96) of `TitledListScreen` and `Type6ListScreen`: as `TitledListScreen::Draw` for the step +9656 over a 3-entry table built on first use at `0x82815FD4` (guard `0x82815FEC`: `sub_82257D48`, `sub_82257FF8`, `sub_822580E0`, leads); answers the step's answer. Not seen in play. Not read in detail. |
+| `sub_82257138` | `TitledListScreen::~TitledListScreen` | | +0 = vtable `0x820115C8`, then `NodeListScreen::~NodeListScreen` (`sub_82257000`). From `~Type6ListScreen`. Not seen in play. Read in full. |
+| `sub_82257990` | `TitledListScreen::DeletingDestructor` | | Slot 0 of `TitledListScreen`: `NodeListScreen::~NodeListScreen`, `operator delete` when bit 0 of r4 is set. Not seen in play. Not read in detail. |
+| `sub_82257060` | `NodeListScreen::LoadItem` (probably) | | r3 = the screen, r4 = an item: slot 25 (+100, `ItemInfo`) into 16 bytes on its frame; when the node table (`[+9672]`) is set, `NodeTable::SetPairs` on +10360 (`sub_82247CB8`) with them; then +9700 and +9704 = bits 0 and 1 of the info's +12 word. From `Type6ListScreen::SetUpMenus` and the list pages `sub_8223F3F0`, `sub_82257148`, `sub_82257588`, `sub_82257768`. Not seen in play. Read in full. |
+| `sub_82256FE8` | `NodeListScreen::ItemInfo` | | Slot 25 of `NodeListScreen` (`0x82011558`) and `TitledListScreen`: r5's three words = -1. Leaf. Not seen in play. Read in full. |
+| `sub_82257000` | `NodeListScreen::~NodeListScreen` | | +0 = vtable `0x82011558`; `NodeTable::~NodeTable` on +10360 (`sub_82247DC0`); `MenuList::Release` on +10288, +10216 and +10144; `ListScreen::~ListScreen` (`sub_82251EB8`). From the deleting destructors and `sub_82257548`, `sub_82257B20`. Not seen in play. Read in full. |
+| `sub_82257940` | `NodeListScreen::DeletingDestructor` | | Slot 0 of `NodeListScreen`: `~NodeListScreen`, `operator delete` when bit 0 of r4 is set. Not seen in play. Not read in detail. |
+| `sub_82255200` | `ColorListScreen::Reset` | | Slot 22 of `ColorListScreen` (`0x820114E0`) and `Type7ListScreen`: as `TitledListScreen::Reset` but +9656 = 1, then `ColorNodeTable::Clear` on +10432 (`sub_82247DD0`). From `ListScreen::Show`. Not seen in play. Read in full. |
+| `sub_82256CA0` | `ColorListScreen::Draw` | | Slot 23 of `ColorListScreen` and `Type7ListScreen`: as `TitledListScreen::Draw` with an 11-entry table built on first use at `0x82815EC8` (guard `0x82815F20`: `sub_822552B8`, `sub_82255490`, `sub_82255658`, `sub_82256508`, `sub_822565A0`, `sub_822557F0`, `sub_822562E0`, `sub_82255818`; empty for pages 0, 1 and 8; leads). Not seen in play. Not read in detail. |
+| `sub_82256E08` | `ColorListScreen::Update` | | Slot 24 of `ColorListScreen` and `Type7ListScreen`: as `TitledListScreen::Update` with an 11-entry step table built on first use at `0x82815F28` (guard `0x82815F80`: `sub_82258578`, `sub_82255890`, `sub_82256740`, `sub_82255B58`, `sub_82256908`, `sub_82255C88` twice, `sub_82255CD0`, `sub_82256AC0`, `sub_82256030`, `sub_82255EB0`; leads). Not seen in play. Not read in detail. |
+| `sub_82255238` | `ColorListScreen::LoadItem` (probably) | | r3 = the screen, r4 = an item, r5 = an index: slot 25 (`ItemInfo`) into its frame, `ColorNodeTable::Set` on +10432 (`sub_82247E00`) with it, then +10908 = the info's word r5 (from +20) when 0 ≤ r5 < its +8, else -1. From `Type7ListScreen::SetUpMenus`, `sub_8223E320` and the list pages `sub_82255490`, `sub_82255658`. Not seen in play. Read in full. |
+| `sub_82255198` | `ColorListScreen::~ColorListScreen` | | +0 = vtable `0x820114E0`; `NodeTable::~NodeTable` on +10432; `MenuList::Release` on +10360, +10288, +10216, +10144; `ListScreen::~ListScreen`. From `~Type7ListScreen`, `ColorListScreen::DeletingDestructor`, `sub_82106BB0` and `sub_8223E2B8`. Not seen in play. Read in full. |
+| `sub_82255840` | `ColorListScreen::DeletingDestructor` | | Slot 0 of `ColorListScreen`: `~ColorListScreen`, `operator delete` when bit 0 of r4 is set. Not seen in play. Not read in detail. |
+| `sub_82251EB8` | `ListScreen::~ListScreen` | | +0 = vtable `0x82011218`. Leaf. From `~NodeListScreen` and `~ColorListScreen`. Not seen in play. Read in full. |
+| `sub_82252248` | `ListScreen::DeletingDestructor` | | Slot 0 of `ListScreen` (`0x82011218`): +0 = vtable `0x82011218`, `operator delete` when bit 0 of r4 is set. Not seen in play. Read in full. |
+| `sub_82247DC0` | `NodeTable::~NodeTable` | | r3 = a node table: +0 = vtable `0x82010FF0` (the base's). Leaf. From `~NodeListScreen`, `~ColorListScreen`, `NodeScreen::~NodeScreen`. Not seen in play. Read in full. |
+| `sub_82247CB8` | `NodeTable::SetPairs` (probably) | | r3 = a paired node table, r4 = 16 bytes: +428 = r4 +4, +436 = +8, +444 = +0, +452 = +12 (the four pairs' first words, `PairedNodeTable::PairedNodeTable`). Leaf. From `NodeListScreen::LoadItem`. Not seen in play. Read in full. |
+| `sub_82247DD0` | `ColorNodeTable::Clear` (probably) | | r3 = a color node table: +428, +436, +444, +452 = 0; +432, +440, +448, +456, +476 = -1. Leaf. From `ColorListScreen::Reset`. Not seen in play. Read in full. |
+| `sub_82247E00` | `ColorNodeTable::Set` (probably) | | r3 = a color node table, r4 = an item's 28-byte info: +428 = +0, +452 = +4, +436 = +12, +444 = -1 when +8 is 1 else +16, +460 = +20, +468 = +24. Leaf. From `ColorListScreen::LoadItem` and the list pages `sub_822552B8`, `sub_82255490`, `sub_82255658`. Not seen in play. Read in full. |
+| `sub_82252430` | `ListPartBase::Open` (probably) | | Slot 1 of the list part (`0x82011314`; `ListPartBase`'s too, `0x820112A0`): the inner part (+16) slot 1 with r4 = +12, then its own slot 9 (+36; empty). Not seen in play. Read in full. |
+| `sub_82252490` | `ListPartBase::Pick` (probably) | | Slot 2: answers 1 without an inner part; else the inner's slot 2 (r4 = +12, r5 = r4); when nonzero, +4 = the inner's +32 and +8 = its +36. Not seen in play. Read in full. |
+| `sub_82252500` | `ListPartBase::Input` (probably) | | Slot 3: a tail call of the inner's slot 3 (r4 = +12, r5 = r4) when there is one. From `ListScreen::Update` (r4 = the screen's page block). Not seen in play. Read in full. |
+| `sub_82252530` | `ListPartBase::Close` (probably) | | Slot 4: the inner's slot 5, then its own slot 10 (+40; empty). Not seen in play. Read in full. |
+| `sub_82252590` | `ListPartBase::IsIdle` (probably) | | Slot 5: the inner's slot 4, or 1 without one. Not seen in play. Read in full. |
+| `sub_822525B8` | `ListPartBase::CanLeave` (probably) | | Slot 8: the inner's slot 6, or 1 without one. Also called by `Type6Mode::Interrupt` and `Type7Mode::Interrupt` (`type6-type7-modes.md`, not seen) on the list part `[block +29108]` / `[+29104]`. Not seen in play. Read in full. |
+| `sub_82252968` | `ListPart::~ListPart` | | +0 = vtable `0x82011314`; `ListPartInner::~ListPartInner` on +20 (`sub_822526F8`); `ListPartBase::~ListPartBase` (`sub_82252420`). From `~Type6ListScreen`, `~Type7ListScreen` and slot 0. Not seen in play. Read in full. |
+| `sub_82252A38` | `ListPart::DeletingDestructor` | | Slot 0 of the list part: `~ListPart`, `operator delete` when bit 0 of r4 is set. Not seen in play. Read in full. |
+| `sub_822526F8` | `ListPartInner::~ListPartInner` | | +0 = vtable `0x820112F8`; `MenuList::Release` on +40; `ListPartInnerBase::~ListPartInnerBase` (`sub_82252600`). From `~ListPart` and `sub_822529B0` (the inner's slot 0, a lead). Not seen in play. Read in full. |
+| `sub_82252600` | `ListPartInnerBase::~ListPartInnerBase` | | +0 = vtable `0x820112CC`. Leaf. From `~ListPartInner`, `sub_82253088`, `sub_82254418`. Not seen in play. Read in full. |
+| `sub_82252420` | `ListPartBase::~ListPartBase` | | +0 = vtable `0x8201127C`. Leaf. From `~ListPart`, `sub_822531F0`, `sub_822544E8`. Not seen in play. Read in full. |
+| `sub_82249D18` | `PanelScreen::OnEnter` | | (0, 1) of both panel screens (`Type6PanelScreen::InitMachine`, `Type7PanelScreen::InitMachine`): +9612 = 0; the car list's (+9644) slot 2 (+8: `sub_822496C8`, its reset; a lead); the group pair's (+9648) slot 3 (+12: `GroupPair::SelectA` `sub_82249C30`); +9608 = 1 when +9616 is set, else 9. Seen in play. Read in full. |
+| `sub_82248CD0` | `PanelScreen::OpenMovie` | | (1, 1) → 2: a tail call of slot 13 (+52: `Type6PanelScreen::OpenMovies` `sub_82230758`, `Type7PanelScreen::OpenMovies` `sub_822401D0`). Seen in play. Read in full. |
+| `sub_82249D88` | `PanelScreen::WaitForMovie` | | (2, 1): +9612 = slot 2 (+8: `PanelScreen::IsLoaded` `sub_82230790`); when loaded, +9608 = 3 when +9652 is set, else 9 when +9616 is set, else 4. Seen in play. Read in full. |
+| `sub_82249DF8` | `PanelScreen::Open` | | (9, 18) type 6, (9, 15) type 7 (the first screen's item 2 / 1, string 110): with the movies loaded (+9612), +9608 = 4 and the car list's slot 13 (+52: `sub_8224B6D8`, its +1932 = r4) with r4 = 1; else +9608 = 1. Seen in play. Read in full. |
+| `sub_822404D8` | `PanelScreen::OpenEmpty` (probably) | | (9, 20) type 6, (9, 17) type 7 (the empty-garage message of `Type6Screen0::SetUpCar` and type 7's): as `PanelScreen::Open` with r4 = 0 (the car list without the garage, probably). Not seen in play. Read in full. |
+| `sub_82248CE0` | `PanelScreen::Show` | | (4, 1) → 5: unless +9652 is set, the car list's slots 15, 16, 17 (+60, +64, +68: its +1884, +1888, +1892) with the screen's slots 6, 7, 8 (the mode's car's +1972, +1976, +1980: the list, the entry and the slot picked before); then the car list's slot 3 (+12: `sub_82249730`, set up by its +1932), slot 1 (+4: `sub_8224CAD8`, builds its lists of unlocked and garage cars: `VirtualAlloc`, `Params::GetCarSpec`), and the group pair's slot 5 (+20: `GroupPair::Reset` `sub_82249C40`). Also called directly by `sub_82238928` (not seen in play, another screen's). Seen in play. Read in full. |
+| `sub_82248C48` | `PanelScreen::Update` | | (5, 0): the group pair's slot 2 (+8: `GroupPair::WaitForFade` `sub_82249BA8`), the car list's slot 6 (+24: `sub_8224CF18`, its update: the step table and the draw, a lead), the group pair's slot 1 (+4: `GroupPair::Run` `sub_82249BE0`), each when its pointer isn't 0. Seen in play. Read in full. |
+| `sub_82230F40` | `Type6PanelScreen::Draw` | | (5, 1) of `Type6PanelScreen`: when +9656 is 0, `Type6PanelScreen::DrawList` (`sub_82230EF0`); when it's 2 and the screen fades' counts (`0x826A50E4`, `0x826A50DC`) are both 0, +9608 = 10 (leave the mode); else nothing. Not seen in play. Read in full. |
+| `sub_82240958` | `Type7PanelScreen::Draw` | | (5, 1) of `Type7PanelScreen`: as `Type6PanelScreen::Draw` with `Type7PanelScreen::DrawList` (`sub_82240908`). Seen in play. Read in full. |
+| `sub_82230EF0` | `Type6PanelScreen::DrawList` | | `PanelScreen::DrawList` (`sub_82248B58`), then `Type6PanelScreen::AskQuit` (`sub_82230BA8`) when +11700 is set. From `Type6PanelScreen::Draw`. Not seen in play. Read in full. |
+| `sub_82240908` | `Type7PanelScreen::DrawList` | | As `Type6PanelScreen::DrawList` with `Type7PanelScreen::AskQuit` (`sub_82240518`). From `Type7PanelScreen::Draw`. Seen in play. Read in full. |
+| `sub_82248B58` | `PanelScreen::DrawList` | | r3 = a panel screen, r4 = the dispatcher: with the car list (+9644): its slot 5 (+20: `sub_8224CA28`, its draw), then by its answers: slot 8 (+32: a pick, its +16 and +12 set) → the screen's slot 3 (+12, the car picked), else slot 9 (+36: +16 set, +12 clear) → slot 4 (+16, back), else slot 10 (+40: +20 and +12 set) → slot 5 (+20, the power graph); then the screen's slot 10 (+40; empty in both). Also from `sub_82238DC8` (not seen in play, another screen's). Seen in play. Read in full. |
+| `sub_82230BA8` | `Type6PanelScreen::AskQuit` (probably) | | m = UI movie 16 (the dialog's): `UiMovie::SetText(m, -1, 0, 27)`, `SetText(m, 1, 3, 2)`, `SetText(m, 1, 4, 3)`, m's word +40960 = 1 (the dialog's default cursor: no), message (7, 0, 0) posted (type 6: the dialog's open), +9656 = 1, +9660 = -1. From `Type6PanelScreen::DrawList`. Not seen in play. Read in full. |
+| `sub_82240518` | `Type7PanelScreen::AskQuit` (probably) | | As `Type6PanelScreen::AskQuit` with message 6 (type 7's dialog open, `OpenConfirm`). From `Type7PanelScreen::DrawList`. Not seen in play (+11700 never set). Read in full. |
+| `sub_822609E0` | `PanelScreen::OnYes` | | (5, 9) type 6, (5, 8) type 7 (the dialog's yes): +9660 = 0. Leaf. Not seen in play. Read in full. |
+| `sub_822609D0` | `PanelScreen::OnNo` | | (5, 10) type 6, (5, 9) type 7: +9660 = 1. Leaf. Not seen in play. Read in full. |
+| `sub_822306D0` | `PanelScreen::OnBack` | | (5, 12) type 6, (5, 11) type 7: +9660 = 2. Leaf. Not seen in play. Read in full. |
+| `sub_822306E0` | `PanelScreen::OnDialogClosed` | | (5, 13) type 6, (5, 12) type 7: with +9660 = 0 (yes), `ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0)` (`mode-tick.md`) and +9656 = 2 (the Draw then leaves the mode once faded); else +9656 = 0. Not seen in play. Read in full. |
+| `sub_82248DF8` | `PanelScreen::OnMessage24` | | (5, 24) type 6, (5, 21) type 7: the car list's slot 11 (+44, `sub_820CC470` in `race-setup.md`, one function in both: its +20 = r4) with r4 = 0. Seen in play. Read in full. |
+| `sub_82248DE0` | `PanelScreen::Suspend` | | (5, 19) → 8 type 6, (5, 16) → 8 type 7: the group pair's slot 7 (+28: `GroupPair::FinishAll` `sub_82249C70`). Not seen in play. Read in full. |
+| `sub_82249E38` | `PanelScreen::Leave` | | (5, 4), (9, 4), (10, 4) type 6; the same with 3 type 7, r4 = the dispatcher: the car list's slot 7 (+28: `sub_8224B880`, frees its lists, `VirtualFree`, and releases its menus), the group pair's slot 7 (`FinishAll`), the screen's slot 18 (+72: `PanelScreen::DeleteMovies` `sub_82240208`), then +9608 = 7. Seen in play. Read in full. |
+| `sub_82248B08` | `PanelScreen::OnLeft` | | (7, 4) → 6 type 6, (7, 3) → 6 type 7: the car list's slot 4 (+16; empty) and the group pair's slot 4 (empty). Seen in play. Read in full. |
+| `sub_82230790` | `PanelScreen::IsLoaded` | | Slot 2 of both panel screens' vtables (`0x82010920`, `0x82010E90`): 1 when `UiMovies::IsLoaded(4)` and `IsLoaded(28)` both answer nonzero (bit 0 of their AND), else 0. From `PanelScreen::WaitForMovie`. Seen in play. Read in full. |
+| `sub_82230758` | `Type6PanelScreen::OpenMovies` | | Slot 13 of `Type6PanelScreen`: `UiMovies::Open(4, 22567)`, `UiMovies::Open(28, 22568)`. Seen in play. Read in full. |
+| `sub_822401D0` | `Type7PanelScreen::OpenMovies` | | Slot 13 of `Type7PanelScreen`: `UiMovies::Open(4, 22571)`, `UiMovies::Open(28, 22572)`. Seen in play. Read in full. |
+| `sub_82240208` | `PanelScreen::DeleteMovies` | | Slot 18 of both panel screens: `UiMovies::Delete(4)`, `UiMovies::Delete(28)`. From `PanelScreen::Leave`. Seen in play. Read in full. |
+| `sub_82230C88` | `Type6PanelScreen::PickCar` | | Slot 3 of `Type6PanelScreen`: as `Type7PanelScreen::PickCar` on the type 6 car (`0x826367E8`), message 6. Not seen in play. Not read in detail (the same calls and stores). |
+| `sub_822405F8` | `Type7PanelScreen::PickCar` | | Slot 3 of `Type7PanelScreen`, r4 = the dispatcher, from `PanelScreen::DrawList` when the car list answers a pick. c = the type 7 car (`0x826371D0`): `GarageCar::Reset(c)` (`car-makers.md`); s = the car list's slot 18 (+72, `sub_820B67D8`: the list + 208); when s +28 (the list's tab) is 2 (the garage): the garage car at `SaveData::Of(0)` + 6120, found by walking the halfword links from +204 (s +36 + s +32 steps), copied into c (`memcpy`, 1,968 bytes from its +212); else `Car::SetModelAndClass(c, [s +1616's entry (s +36 + s +32)] +8432)` (`career.md`) and c's halfwords: +4 = s +40 + s +44 when it was 0xFFFF, +2 = +0, +0 = that sum. Then c +1972 = s +28, c +1980 = c's halfword +0, c +1976 = s +32 + s +36; +9608 = 9; message (5, 0, 0) posted (back to `Type7Screen0`). Seen in play. Read in full. The `sub_822405F8` part of the car makers' lead (`../loops/leads.md`). |
+| `sub_8223E708` | `Type6PanelScreen::Back` | | Slot 4 of `Type6PanelScreen`, r4 = the dispatcher: +9608 = 9, message (6, 0, 0) posted (back to `Type6Screen0`). Not seen in play. Read in full. |
+| `sub_82240860` | `Type7PanelScreen::Back` | | Slot 4 of `Type7PanelScreen`: +9608 = 9, message (5, 0, 0) posted. Seen in play. Read in full. |
+| `sub_82247058` | `Type6PanelScreen::OpenPowerGraph` | | Slot 5 of `Type6PanelScreen`, r4 = the dispatcher: message (21, 0, 0) posted (the power graph screen; the state not changed). Seen in play. Read in full. |
+| `sub_822408B8` | `Type7PanelScreen::OpenPowerGraph` | | Slot 5 of `Type7PanelScreen`: message (18, 0, 0) posted. Seen in play. Read in full. |
+| `sub_822307D0` | `Type6PanelScreen::CarList` | | Slot 6 of `Type6PanelScreen`: the type 6 car's +1972 (`0x82636F9C`). Leaf. From `PanelScreen::Show`. Not seen in play. Read in full. |
+| `sub_822307E0` | `Type6PanelScreen::CarEntry` | | Slot 7: the type 6 car's +1976. Leaf. Not seen in play. Read in full. |
+| `sub_822307F0` | `Type6PanelScreen::CarSlot` | | Slot 8: the type 6 car's +1980. Leaf. Not seen in play. Read in full. |
+| `sub_82240238` | `Type7PanelScreen::CarList` | | Slot 6 of `Type7PanelScreen`: the type 7 car's +1972 (`0x82637984`). Leaf. From `PanelScreen::Show`. Seen in play. Read in full. |
+| `sub_82240248` | `Type7PanelScreen::CarEntry` | | Slot 7: the type 7 car's +1976. Leaf. Seen in play. Read in full. |
+| `sub_82240258` | `Type7PanelScreen::CarSlot` | | Slot 8: the type 7 car's +1980. Leaf. Seen in play. Read in full. |
+| `sub_82249C30` | `GroupPair::SelectA` | | Slot 3 of the group pair (`0x82011084`, the panel screens' +11728): +4 (the current group) = +8 (group A). Leaf. From `PanelScreen::OnEnter`. Seen in play. Read in full. |
+| `sub_82249C40` | `GroupPair::Reset` | | Slot 5: +4 = +8 (group A), then `UiMovie::ResetPose` on group A's movie (`PanelGroup::Movie` `sub_82258FC8`). From `PanelScreen::Show`. Seen in play. Read in full. |
+| `sub_82249BE0` | `GroupPair::Run` | | Slot 1: `PanelGroup::Run` (`sub_82259008`) on the current group (+4). From `PanelScreen::Update`. Seen in play. Read in full. |
+| `sub_82249BA8` | `GroupPair::WaitForFade` (probably) | | Slot 2: when `[0x82815EB0]` is set and the screen fades' counts (`0x826A50E4`, `0x826A50DC`) are both 0, `[0x82815EB0]` = 0 (the car list's step update waits on it). Leaf. From `PanelScreen::Update`. Seen in play. Read in full. |
+| `sub_82249C70` | `GroupPair::FinishAll` | | Slot 7: `UiMovie::FinishAll` (`ui-movies-game.md`) on group A's and group B's movies (`PanelGroup::Movie`). From `PanelScreen::Leave` and `Suspend`. Seen in play. Read in full. |
+| `sub_8224ACE0` | `GroupPair::DeletingDestructor` | | Slots 0 and 8 of the group pair's vtable: +0 = vtable `0x82011064`, `operator delete` when bit 0 of r4 is set. Not seen in play. Read in full. |
+| `sub_82258FC8` | `PanelGroup::Movie` | | r3 = a panel group (+4 its UI movie: 4 for group A, 28 for B): returns the movie (`UiMovies::Find` on `0x826C5CCC`). From the group pair's slots and about 80 functions of the car list and its panels (`822417E8`, `82241868`, `8224C008`, `8224D010` to `822501C8`; leads). Seen in play. Read in full. |
+| `sub_82259008` | `PanelGroup::Run` | | r3 = a panel group: `UiMovie::Run(PanelGroup::Movie's movie, 0)`. From `GroupPair::Run`. Seen in play. Read in full. |
+| `sub_822591B0` | `NodeScreen::OnEnter` | | (0, 1) of `Type6NodeScreen` (`Type6NodeScreen::InitMachine`): r3 = the screen (its machine at +460): +10068 = 0, slot 9 (+36; empty), then +10064 = 1 when +10072 is set, else 9. Seen in play. Read in full. |
+| `sub_822590D0` | `NodeScreen::OpenMovie` | | (1, 1) → 2: +10068 = 0, then a tail call of slot 13 (+52: `Type6NodeScreen::OpenMovie` `sub_82236EB0`). Seen in play. Read in full. |
+| `sub_82259208` | `NodeScreen::WaitForMovie` | | (2, 1): while +10068 is 0, +10068 = slot 3 (+12: `Type6NodeScreen::IsLoaded` `sub_82236FD8`); once set, +10064 = 9 when +10072 is set, else 4; every call then slot 14 (+56; empty). Seen in play. Read in full. |
+| `sub_82259318` | `NodeScreen::Open` | | (9, 16) (`Type6Screen0`'s item 1, string 120): +10064 = 4. Leaf. Not seen in play. Read in full. |
+| `sub_82259CA0` | `NodeScreen::Show` | | (4, 1) → 5: `NodeScreen::Refresh` (`sub_822599B0`), then texts on movie `[+10100]` (`UiMovie::SetText` three times, one with 322, from +10276, +10404 to +10412) and +10104 to +10120 written; a vtable call. Not seen in play. Not read in detail. |
+| `sub_8225A1B8` | `NodeScreen::Draw` | | (5, 1): a 6-entry page table built on first use at `0x82816078` (guard `0x828160A8` bit 0: empty for pages 0, 1 and 3, `sub_82259D80`, `sub_822590E8`, `sub_82259328`; leads), the page +10104 called unless it's -1. Not seen in play. Not read in detail. |
+| `sub_8225A2C0` | `NodeScreen::Update` | | (5, 0): a 3-entry step table built on first use at `0x828160AC` (guard `0x828160C4`: `sub_82259750`, `sub_82259EC0`, `sub_82259680`; leads), the page block's moves as `ListScreen::Update`'s, `UiMovies::Find` and `UiMovie::Run`. Not seen in play. Not read in detail. |
+| `sub_822592D8` | `NodeScreen::Leave` | | (5, 4), (9, 4), (10, 4): slot 19 (+76: `Type6NodeScreen::Release` `sub_82236EC0`), then +10064 = 7. Seen in play (leaving the mode). Read in full. |
+| `sub_82259298` | `NodeScreen::OnLeft` | | (7, 4) → 6: slot 10 (+40; empty), then +10064 = 6. Seen in play. Read in full. |
+| `sub_822599B0` | `NodeScreen::Refresh` (probably) | | From `NodeScreen::Show`: `UiMovies::Find` on `[+10100]`, `UiMovie::ResetPose`, `MenuList::Selection` twice on +10136, `NodeScreen::ShowRecords` (`sub_82259410`), `NodeScreen::SetArrows` (`sub_82259368`) twice, two vtable calls (+4 of the node table, slot 20 of the screen). Not seen in play. Not read in detail. |
+| `sub_82259410` | `NodeScreen::ShowRecords` (probably) | | r3 = the screen: `SaveData::Of`, `CourseRecords::Of` (the course records), `UiMovie::SetText` three times (999 and 528 among the constants), `UiMovie::ClearText` three times, `UiMovie::SetNodeTexture`. From `Type6NodeScreen::SetUpMenus`, `NodeScreen::Refresh` and the node page `sub_82259D80`. 178 lines. Not seen in play. Not read in detail. |
+| `sub_82259368` | `NodeScreen::SetArrows` (probably) | | As `ListScreen::SetArrows` over the node screen's words (+10100, +10276, +10396, +10400, +10536, +10540). From `NodeScreen::Refresh` and the node steps `sub_82259A78`, `sub_82259B70`. Not seen in play. Not read in detail. |
+| `sub_82259050` | `NodeScreen::LoadItem` (probably) | | `MenuList::Selection` on +10136, slot 4 (+16, `ItemInfo`) into its frame, then the node table's pairs (+428, +436, +444, +452) from it. From `Type6NodeScreen::SetUpMenus` and the node page `sub_82259D80`. Not seen in play. Not read in detail. |
+| `sub_82236FD8` | `Type6NodeScreen::IsLoaded` | | Slot 3 of `Type6NodeScreen` (`0x82010A80`): 1 when `UiMovies::IsLoaded([+10100])` answers nonzero (movie 15), else 0. From `NodeScreen::WaitForMovie`. Seen in play. Read in full. |
+| `sub_82236EB0` | `Type6NodeScreen::OpenMovie` | | Slot 13: `UiMovies::Open([+10100], 22566)`. Seen in play. Read in full. |
+| `sub_82236EC0` | `Type6NodeScreen::Release` | | Slot 19: `UiMovies::Delete([+10100])`, `MenuList::Release` on +10132 and +10204. From `NodeScreen::Leave`. Seen in play. Read in full. |
+| `sub_82236F00` | `Type6NodeScreen::SetUpMenus` | | Slot 15 of `Type6NodeScreen`: `MenuList::Init` twice (strings 153 to 159), `MenuList::SetSelection`, `NodeScreen::LoadItem`, `MenuList::Selection` twice, `NodeScreen::ShowRecords`, a slot 2 call on an object. Callers not found (no handler here calls slot 15: a page, probably). Not seen in play. Not read in detail. |
+| `sub_822370A0` | `Type6NodeScreen::SetText` (probably) | | Slot 2: `UiMovies::Find`, one `UiMovie::SetText` from a table near `0x826367xx`. Not seen in play. Not read in detail. |
+| `sub_82237110` | `Type6NodeScreen::Back` | | Slot 6, r4 = the dispatcher: message (6, 0, 0) posted (back to `Type6Screen0`). Not seen in play. Read in full. |
+| `sub_82237160` | `Type6NodeScreen::SetIcons` (probably) | | Slot 20: `UiMovies::Find`, `UiMovie::SetNodeTexture` twice and `UiMovie::HideNode` six times. Not seen in play. Not read in detail. |
+| `sub_82237228` | `Type6NodeScreen::SetScrollText` (probably) | | Slot 21: `UiMovies::Find`, `sub_8211C5F8` (`ui-movies-game.md`), `UiMovie::SetText` (string 934) and `UiMovie::ScrollText`. Not seen in play. Not read in detail. |
+| `sub_822372A0` | `Type6NodeScreen::ShowMarks` (probably) | | Slot 22: as `Type6ListScreen::ShowMarks` (two `UiMovie::FindNode`, their +80 set). Not seen in play. Not read in detail. |
+| `sub_82247FE0` | `NodeScreen::SetUpTexts` (probably) | | Slot 1 of `NodeScreen` (`0x820116B8`) and `Type6NodeScreen`: `UiMovies::Find`, three `UiMovie::HideNode` and four `UiMovie::SetText` (strings 401, 402, 407, 408) by the node table's +4, +8, +12, +420, +424. Callers not found. Not seen in play. Not read in detail. |
+| `sub_82259998` | `NodeScreen::ItemInfo` | | Slot 4 of `NodeScreen`: r5's four words = -1. Leaf. Not seen in play. Read in full. |
+| `sub_82259948` | `NodeScreen::~NodeScreen` | | +0 = vtable `0x820116B8`; `MenuList::Release` on +10204 and +10132; `NodeTable::~NodeTable` (the table at +0). From the deleting destructors and `sub_82236EA0` (not seen in play). Not seen in play. Read in full. |
+| `sub_8225A168` | `NodeScreen::DeletingDestructor` | | Slot 0 of `NodeScreen`: `~NodeScreen`, `operator delete` when bit 0 of r4 is set. Not seen in play. Not read in detail. |
+| `sub_82237048` | `Type6NodeScreen::DeletingDestructor` | | Slot 0 of `Type6NodeScreen`: +0 = vtable `0x82010A80`, `~NodeScreen`, `operator delete` when bit 0 of r4 is set. Not seen in play. Not read in detail. |

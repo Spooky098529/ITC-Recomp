@@ -625,6 +625,11 @@ Rows not yet moved stay in the table below. So far:
   pages (HUD, sound with the music preview, sliders, buttons, analog
   inputs, the two-player ones), their steps and helpers, and the
   options' and controller pages' Inits of types 2, 4 and 8 (B7).
+- [`type67-screens.md`](type67-screens.md): the type 6 and 7 modes'
+  list, panel and node screens: their machines' handlers, their vtable
+  slots and their bases' (the race set-ups, the car pick, the movies'
+  opens and releases, the destructors), the list part and the panel
+  screens' group pair (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

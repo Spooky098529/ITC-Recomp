@@ -47,7 +47,7 @@ panel screens' handlers, the power graph screen's, the options' and the
 save screen's are not mapped here: their Inits are (the transitions
 listed, the handlers named by address), the handlers are leads in
 `../loops/leads.md`; none of the list or node screens' open, Draw or
-Update handlers ran in the coverage sessions (`../coverage.md`).
+Update handlers ran in the coverage sessions (`../coverage.md`). Since 2026-11-08 the list, panel and node screens' handlers and vtable slots are in [`type67-screens.md`](type67-screens.md).
 
 Messages (type 6 / type 7) and states as the screens use them: 0 Update
 and 1 Draw; the loaded message 34 / 28; leave 4 / 3; states 0 enter, 1
