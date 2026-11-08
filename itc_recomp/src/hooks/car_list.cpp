@@ -266,6 +266,8 @@ ITC_CAR_LIST(8224A8E0, CarListStep26)
 // The rows' and the car page's set-ups (from recompiled steps and pages).
 ITC_CAR_LIST(8224A978, CarListSetUpRows)
 ITC_CAR_LIST(8224C560, CarListSetUpCarPage)
-// PanelSet's slot 1 (the panel screens' show) and the base's Build.
+// PanelSet's slot 1 (the panel screens' show). PanelSetBase::Build
+// sub_8224C698 has no adapter (removed, B7 loop, 2026-11-08: in play only
+// PanelSet::Build, native, reaches it; the register step stays for the
+// harness).
 ITC_CAR_LIST(8224CAD8, CarListSetBuild)
-ITC_CAR_LIST(8224C698, CarListBaseBuild)
