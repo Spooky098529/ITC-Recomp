@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <climits>
+#include <cmath>
 #include <cstdint>
 
 #include "guest.h"
@@ -63,5 +65,23 @@ inline uint32_t SelectedGarageCar(uint8_t* base, uint32_t save) {
   const int32_t slot = int16_t(guest::LoadU16(base, link + 2));
   return garage + 1968 * uint32_t(slot);
 }
+
+// fctiwz as the recompiled code does it: NaN 0x80000000, from INT_MAX
+// saturated, below INT_MIN 0x80000000 (cvttsd2si).
+inline int32_t TruncateWord(double value) {
+  if (std::isnan(value)) {
+    return INT32_MIN;
+  }
+  if (value >= double(INT_MAX)) {
+    return INT_MAX;
+  }
+  if (value < -2147483648.0) {
+    return INT32_MIN;
+  }
+  return int32_t(value);
+}
+
+// fcfid then frsp: an integer word as the single the original rounds it to.
+inline float Single(int32_t value) { return float(double(int64_t(value))); }
 
 }  // namespace type2_screens

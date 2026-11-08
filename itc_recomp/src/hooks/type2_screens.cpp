@@ -68,7 +68,10 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "calls, the fades and Params::GetCarSpec through their overrides); MenuPage "
               "sub_8218FCC8 with FillPlayerRecord sub_8218DA48, NoticePage sub_8218E8F8 and "
               "OnDialogDone sub_8218F800 (Menu::, MenuSound::Play, the text calls, memcpy, "
-              "PlayTime:: and the spec sheet's sub_8218D708 through their overrides) "
+              "PlayTime:: and the spec sheet's sub_8218D708 through their overrides); the build "
+              "screen's Enter sub_821A0860 with Fill sub_821A0228, BuildList::RemoveAt "
+              "sub_8219C160 and SetUpStatus sub_8219C438 (memcpy, BuildList::Insert, Stage::Of, "
+              "the text setters and the fade through their overrides) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -481,6 +484,22 @@ void HubFillPlayerRecord(PPCContext& ctx, uint8_t* base) {
   t2::HubFillPlayerRecord(base, ctx.r1.u32, guest.calls());
 }
 
+void BuildEnter(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildEnter(base, ctx.r1.u32, guest.calls());
+}
+void BuildFill(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildFill(base, ctx.r1.u32, guest.calls());
+}
+void BuildSetUpStatus(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildSetUpStatus(base, ctx.r1.u32, guest.calls());
+}
+void BuildListRemoveAt(PPCContext& ctx, uint8_t* base) {
+  t2::BuildListRemoveAt(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 namespace {
 // An Init's register step: StateMachine::Add's adapter's r3, a new
 // transition's address from the machine's 64-bit r3.
@@ -547,6 +566,10 @@ ITC_TYPE2_SCREENS(8219B8C8, BuildDestroy)
 ITC_TYPE2_SCREENS(8219FA80, BuildUpdatePage)
 ITC_TYPE2_SCREENS(8219B960, BuildDetailsPage)
 ITC_TYPE2_SCREENS(8219C3A8, BuildLeavePage)
+// BuildScreen::Enter (a functor); no adapters for Fill sub_821A0228 and
+// SetUpStatus sub_8219C438 (only Enter) and BuildList::RemoveAt
+// sub_8219C160 (only Fill): their steps above are the harness's.
+ITC_TYPE2_SCREENS(821A0860, BuildEnter)
 // The hub's handlers (functors the machine calls: WaitForLoad, Start,
 // Unload, OpenSelected, Reenter, Close, OnYes, OnNo, Back; Choose from
 // UpdatePage's table on its stack, recompiled) and helpers (from the

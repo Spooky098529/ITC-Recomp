@@ -135,7 +135,8 @@ struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
         block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)),
-        save(memory::Alloc(kSaveDataBytes, 0)), screen(memory::Alloc(t2::kBuildScreenBytes, 0)) {
+        save(memory::Alloc(kSaveDataBytes, 0)), screen(memory::Alloc(t2::kBuildScreenBytes, 0)),
+        items(memory::Alloc(kItemBytes * 400, 0)) {
     if (strings != 0) {
       MakeStrings();
     }
@@ -145,10 +146,13 @@ struct World {
     memory::Free(strings);
     memory::Free(save);
     memory::Free(screen);
+    memory::Free(items);
   }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0 && strings != 0 && save != 0 && screen != 0; }
+  bool ok() const {
+    return allocation != 0 && strings != 0 && save != 0 && screen != 0 && items != 0;
+  }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t data() const { return at(kDataAt); }
   uint32_t node(uint32_t n) const { return at(kNodesAt) + kNodeBytes * n; }
@@ -163,6 +167,10 @@ struct World {
   uint32_t strings;
   uint32_t save;    // player 0's save data (all four slots point at it)
   uint32_t screen;  // the build screen's data ([0x826D8448])
+  // The data tables' 400 items (3,008 bytes each: DataTables::Item), for the
+  // build screen's Fill (the harness runs before the game loads its own).
+  static constexpr uint32_t kItemBytes = 3008;
+  uint32_t items;
 
  private:
   void MakeStrings() {
@@ -1468,6 +1476,80 @@ void Hub(Context& h, const World& w) {
   HubPages(h, w);
 }
 
+// A name record (UiMovie::SetNameText's kinds and indexes) at `at`.
+void NameRecord(uint8_t* base, uint32_t at, Random& r) {
+  guest::StoreU32(base, at + 4, r.Below(6));
+  guest::StoreU16(base, at + 8, uint16_t(r.Below(110)));
+  guest::StoreU16(base, at + 10, uint16_t(r.Below(2)));
+  guest::StoreU32(base, at + 12, r.Below(6));
+  guest::StoreU16(base, at + 16, uint16_t(r.Below(110)));
+  guest::StoreU16(base, at + 18, uint16_t(r.Below(2)));
+}
+
+// The build screen's entry: the screen data and the save data random (the
+// data tables the game's), compared whole.
+void BuildEntry(Context& h, const World& w) {
+  // RemoveAt: a list in the screen data (+76) with links and slots below
+  // 400, its count small, the position 0 to 5.
+  Run(h, w, {"BuildList::RemoveAt (sub_8219C160)", 200, __imp__sub_8219C160,
+             hooks::BuildListRemoveAt, {},
+             [](PPCContext& t, Random& r, const World& w) {
+               const uint32_t list = w.screen + 76;
+               for (uint32_t k = 0; k < 400; k++) {
+                 guest::StoreU16(w.base, list + 4 * k, uint16_t(r.Below(400)));
+                 guest::StoreU16(w.base, list + 4 * k + 2, uint16_t(r.Below(400)));
+               }
+               for (const uint32_t at : {1600u, 1604u}) {
+                 guest::StoreU16(w.base, list + at, uint16_t(r.Below(400)));
+               }
+               guest::StoreU16(w.base, list + 1608, uint16_t(r.Below(50)));
+               t.r3.u64 = list;
+               t.r4.u64 = r.Below(6);
+             },
+             nullptr, true});
+  auto screen = [](PPCContext&, Random& r, const World& w) {
+    WriteRandom(w.base, w.screen, t2::kBuildScreenBytes, r);
+    WriteRandom(w.base, w.save, kSaveDataBytes, r);
+    NameRecord(w.base, w.screen + 4, r);
+    NameRecord(w.base, w.save + 8, r);
+    SmallNodes(r, w);
+    // The items: the group (+34) 0 to 49 (48 and 49 the two special
+    // groups), the kind (+40) 1, 2, 4, 7 or another, the stage (+42) below
+    // 8; the data tables' global at a table of the hub's area.
+    for (uint32_t i = 0; i < 400; i++) {
+      const uint32_t item = w.items + World::kItemBytes * i;
+      guest::StoreU16(w.base, item + 0, uint16_t(r.Next()));
+      guest::StoreU8(w.base, item + 34, uint8_t(r.Below(4) == 0 ? 48 + r.Below(2) : r.Below(48)));
+      guest::StoreU8(w.base, item + 36, uint8_t(r.Next()));
+      static constexpr uint16_t kKinds[5] = {1, 2, 4, 7, 3};
+      guest::StoreU16(w.base, item + 40, kKinds[r.Below(5)]);
+      guest::StoreU16(w.base, item + 42, uint16_t(r.Below(8)));
+    }
+    const uint32_t tables = w.at(kHubAt) + 0x500;
+    guest::StoreU32(w.base, tables + 16, w.items);
+    guest::StoreU32(w.base, data_tables::kTables, tables);
+    guest::StoreU32(w.base, w.screen + 28, r.Below(7));
+    guest::StoreU32(w.base, w.screen + 32, r.Below(1000));
+    const uint32_t pick = r.Below(3);
+    guest::StoreU32(w.base, w.save + 6100,
+                    pick == 0 ? uint32_t(r.Next()) : pick == 1 ? 990 + r.Below(20) : r.Below(999));
+  };
+  // SetUpStatus: SetText's parameter area past its r7 left out.
+  Run(h, w, {"BuildScreen::SetUpStatus (sub_8219C438)", 60, __imp__sub_8219C438,
+             hooks::BuildSetUpStatus, {{-112, -56}, {-32, -24}}, screen, nullptr, true});
+  Run(h, w, {"BuildScreen::Fill (sub_821A0228; sub_8219C160)", 10, __imp__sub_821A0228,
+             hooks::BuildFill, {{-240, -88}}, screen, nullptr, true});
+  Run(h, w, {"BuildScreen::Enter (sub_821A0860; sub_821A0228, sub_8219C438)", 10,
+             __imp__sub_821A0860, hooks::BuildEnter, {{-96, -8}},
+             [screen](PPCContext& t, Random& r, const World& w) {
+               screen(t, r, w);
+               if (r.Below(3) == 0) {
+                 guest::StoreU32(w.base, w.at(kPagesAt), 0);
+               }
+             },
+             nullptr, true});
+}
+
 }  // namespace
 
 void Type2Screens(Context& h) {
@@ -1484,6 +1566,7 @@ void Type2Screens(Context& h) {
     PlatePages(h, w);
     SheetAndBuild(h, w);
     Hub(h, w);
+    BuildEntry(h, w);
   }
 }
 

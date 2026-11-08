@@ -141,6 +141,12 @@ void HubMenuPage(PPCContext& ctx, uint8_t* base);
 void HubNoticePage(PPCContext& ctx, uint8_t* base);
 void HubOnDialogDone(PPCContext& ctx, uint8_t* base);
 void HubFillPlayerRecord(PPCContext& ctx, uint8_t* base);
+// The build screen's Enter and the helpers without adapters (Fill and
+// SetUpStatus no arguments; RemoveAt r3 the list, r4 the position).
+void BuildEnter(PPCContext& ctx, uint8_t* base);
+void BuildFill(PPCContext& ctx, uint8_t* base);
+void BuildSetUpStatus(PPCContext& ctx, uint8_t* base);
+void BuildListRemoveAt(PPCContext& ctx, uint8_t* base);
 // The four machines' set-ups (r3 the machine).
 void HubInitStates(PPCContext& ctx, uint8_t* base);
 void SheetInitStates(PPCContext& ctx, uint8_t* base);

@@ -605,6 +605,40 @@ uint64_t HubOnDialogDone(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
 // (FillPlayerRecord, message 27). The last call's r3. 2,112-byte frame.
 uint64_t HubMenuPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
 
+// --- The build screen's entry (build_enter.cpp) ---
+//
+// DataTables::Item, SaveData::Of and UiMovie::FindNode their plain C++;
+// memcpy, BuildList::Insert, Stage::Of, UiMovie::ResetPose, the text
+// setters and ScreenFades::FadeIn through their overrides.
+constexpr uint32_t kBuildListInsert = 0x8219C230;
+constexpr uint32_t kStageOf = 0x821121F8;
+
+// sub_8219C160 BuildList::RemoveAt (r3 a build list, r4 a position): the
+// node at the position unlinked (by the halfword links from +1604) and put
+// at the head of the free list (+1600), the count (+1608) down by one. A
+// leaf: r3 the list.
+void BuildListRemoveAt(uint8_t* base, uint32_t list, uint32_t position);
+// sub_821A0228 BuildScreen::Fill: the screen data from player 0's save data
+// and the data tables: the name, money, weekday and day (at most 999); the
+// 400 builds (52-byte records built in the frame's +96 and memcpy'd to
+// +0x2C784 + 52i); the 56 build lists (+76 + 3252j) made empty, each build
+// inserted into its group's (BuildList::Insert from the frame's +80); the
+// count of state-2 builds as a percentage (+0x32654, single precision and
+// fctiwz as the recompiled code); each list's summary (+36 + 3252j);
+// the builds above the player's stage (Stage::Of + 1) removed
+// (RemoveAt's plain C++); +0x32658 whether a kind-3 list has builds. The
+// last call's r3. 240-byte frame.
+uint64_t BuildFill(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219C438 BuildScreen::SetUpStatus: movie 6's ResetPose; the name (0,
+// 6), money (0, 9) and day (0, 13, string 8) from the screen data's +4 to
+// +32, node (0, 11)'s frame the weekday; the data's +0x3265C and +0x32660
+// = 0, +0 = 1. r3 the node. 112-byte frame.
+uint32_t BuildSetUpStatus(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821A0860 BuildScreen::Enter: Fill and SetUpStatus (their plain C++);
+// the transition machine started (page 0 after transitions 0 and 1);
+// ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0). FadeIn's r3. 96-byte frame.
+uint64_t BuildEnter(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The machines' set-ups (init_states.cpp) ---
 //
 // The transitions added to `machine` (StateMachine::Add's plain C++) from

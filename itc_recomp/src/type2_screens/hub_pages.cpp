@@ -3,9 +3,6 @@
 
 #include "type2_screens/type2_screens.h"
 
-#include <climits>
-#include <cmath>
-
 #include "base/log.h"
 #include "type2_screens/internal.h"
 #include "ui_movies/game.h"
@@ -69,20 +66,6 @@ uint64_t ToMenu(uint8_t* base, uint32_t frame) {
   Store(base, pages + 16, kNone);
   static constexpr uint32_t kPrompts[6] = {0, 0, 6, 2, 7, 3};
   return HubSetPrompts(base, kPrompts, frame);
-}
-
-// fctiwz as the recompiled code does it.
-int32_t TruncateWord(double value) {
-  if (std::isnan(value)) {
-    return INT32_MIN;
-  }
-  if (value >= double(INT_MAX)) {
-    return INT_MAX;
-  }
-  if (value < -2147483648.0) {
-    return INT32_MIN;
-  }
-  return int32_t(value);
 }
 
 }  // namespace
