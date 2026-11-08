@@ -1312,8 +1312,9 @@ void Openers(Context& h, const MovieWorld& w) {
 // a stack of the world's (their callees' frames below theirs). The menu
 // after the race's list's item block (+68, 0 before) compared and freed.
 // The originals of AwardPrize and OnRaceEnd with --native_race_hud_machine
-// off as well, so their callees' originals run (OpponentPrize, ItemBonus,
-// and OnRaceEnd's AwardPrize).
+// off as well, so any of the machine's adapters they reach runs its original
+// (their callees AwardPrize, OpponentPrize and ItemBonus have none since
+// 2026-11-08: their originals run anyway).
 template <GuestFunction original>
 void WithoutMachine(PPCContext& ctx, uint8_t* base) {
   ITC_FLAG(native_race_hud_machine) = false;

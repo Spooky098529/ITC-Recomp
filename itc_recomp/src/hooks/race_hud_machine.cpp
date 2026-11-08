@@ -537,9 +537,11 @@ ITC_RACE_HUD_MACHINE(8216D198, RaceHudMachineCloseResults)
 ITC_RACE_HUD_MACHINE(8216DFD0, RaceHudMachineResultsUpdate)
 ITC_RACE_HUD_MACHINE(8216DB70, RaceHudMachinePauseUpdate)
 ITC_RACE_HUD_MACHINE(8216DD88, RaceHudMachineAfterRaceUpdate)
-ITC_RACE_HUD_MACHINE(8216D3F0, RaceHudMachineIsFirstDay)
-ITC_RACE_HUD_MACHINE(8216C820, RaceHudMachineOpponentPrize)
-ITC_RACE_HUD_MACHINE(8216C938, RaceHudMachineItemBonus)
+// IsFirstDay, OpponentPrize and ItemBonus have no adapters (removed, B7 loop,
+// 2026-11-08): their callers in play (ResultsDraw, OpenCareerPause,
+// ResultsUpdate and OnRaceEnd; AwardPrize) are native and call their plain
+// C++ (the unseen results' originals the originals); their steps are the
+// harness's.
 ITC_RACE_HUD_MACHINE(8216D600, RaceHudMachineOpenPause)
 ITC_RACE_HUD_MACHINE(8216DA40, RaceHudMachineOpenRacePause)
 ITC_RACE_HUD_MACHINE(8216CA28, RaceHudMachineCreateScreens)
@@ -551,4 +553,5 @@ ITC_RACE_HUD_MACHINE(8216CFE0, RaceHudMachineRacePauseDraw)
 ITC_RACE_HUD_MACHINE(8216C208, RaceHudMachineDestroyScreens)
 ITC_RACE_HUD_MACHINE(8216CC60, RaceHudMachineStartCountdown)
 ITC_RACE_HUD_MACHINE(8216E5B0, RaceHudMachineOnRaceEnd)
-ITC_RACE_HUD_MACHINE(8216E150, RaceHudMachineAwardPrize)
+// AwardPrize has no adapter (removed, 2026-11-08): its only caller,
+// OnRaceEnd, is native and calls its plain C++; its step is the harness's.

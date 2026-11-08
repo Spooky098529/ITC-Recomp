@@ -306,10 +306,14 @@ void CareerGarageAdd(PPCContext& ctx, uint8_t* base) {
 
 CAREER_ADAPTER(82111628, CareerPlayTimeMark)
 CAREER_ADAPTER(82110580, CareerDayBlockWinStreak)
-CAREER_ADAPTER(82110590, CareerDayBlockAddWord4832)
+// DayBlock::AddWord4832 has no adapter (removed, B7 loop, 2026-11-08): its
+// only caller in play, RaceHudMachine::AwardPrize, is native and calls its
+// plain C++; its step is the harness's.
 CAREER_ADAPTER(821105A0, CareerDayBlockWord4832)
 CAREER_ADAPTER(82110B10, CareerStatsWinStreak)
-CAREER_ADAPTER(82110B18, CareerStatsAddPoints)
+// Stats::AddPoints has no adapter (removed, 2026-11-08): its only caller in
+// play, RaceHudMachine::AwardPrize, calls its plain C++ (sub_82192958, never
+// seen in play, the original).
 CAREER_ADAPTER(82112860, CareerItemFlagsSet)
 CAREER_ADAPTER(82115CC0, CareerPickFromCar)
 CAREER_ADAPTER(821121F8, CareerStageOf)

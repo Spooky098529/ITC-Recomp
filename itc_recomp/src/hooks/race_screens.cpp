@@ -591,7 +591,9 @@ ITC_RACE_SCREENS(8221A7A8, RaceScreensAfterRaceMenuShow)
 ITC_RACE_SCREENS(8221A950, RaceScreensAfterRaceMenuCloseMain)
 ITC_RACE_SCREENS(8221AA20, RaceScreensAfterRaceMenuMove)
 ITC_RACE_SCREENS(8221B860, RaceScreensAfterRaceMenuStart)
-ITC_RACE_SCREENS(8221BA68, RaceScreensAfterRaceMenuOpen)
+// AfterRaceMenu::Open has no adapter (removed, 2026-11-08): its caller in
+// play, the race HUD machine's AwardPrize, calls its plain C++ (the unseen
+// ShowSplitResults and ShowResults the original).
 ITC_RACE_SCREENS(82217F40, RaceScreensRaceDialogQuestion)
 ITC_RACE_SCREENS(822186A8, RaceScreensRaceDialogOpenAnim)
 ITC_RACE_SCREENS(82218788, RaceScreensRaceDialogMove)
@@ -607,5 +609,6 @@ ITC_RACE_SCREENS(82219210, RaceScreensCareerResultsIntro)
 ITC_RACE_SCREENS(822192B0, RaceScreensCareerResultsShow)
 ITC_RACE_SCREENS(822193D8, RaceScreensCareerResultsClose1)
 ITC_RACE_SCREENS(82219A78, RaceScreensCareerResultsPage1)
-ITC_RACE_SCREENS(822197A8, RaceScreensCareerResultsSetTexts)
-ITC_RACE_SCREENS(8221A1F0, RaceScreensCareerResultsOpen)
+// CareerResults::SetTexts and Open have no adapters (removed, 2026-11-08):
+// their only callers, Open and the race HUD machine's AwardPrize, are native
+// and call their plain C++; their steps are the harness's.
