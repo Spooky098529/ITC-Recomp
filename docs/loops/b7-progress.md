@@ -132,7 +132,7 @@ file's history. What's left to see in a drive, from every run:
   known 411, unknown 997).
 - After its third migration: ours 4979, work left 1447 (wrapped 56,
   known 394, unknown 997).
-- After its fourth migration: ours 4990, work left 1436 (wrapped 56,
-  known 383, unknown 997).
+- After its fourth migration: ours 4989, work left 1438 (wrapped 56,
+  known 385, unknown 997).
 
 ## Stopped
