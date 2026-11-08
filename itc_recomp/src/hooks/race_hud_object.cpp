@@ -45,7 +45,8 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "UpdateWarning sub_82212C50, UpdateRecordingFull sub_82212E60 (UiMovie::Finish "
               "and FinishNamed through their overrides), ShowItem sub_82213638 (UiMovie::SetNodeText "
               "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0, Create sub_82211F40 (with --native_heap; the in-race screens' makers' plain C++) and Make1004 sub_82216A60 "
-              "(and RaceScreens::Destroy sub_82211D18 with --native_heap: the in-race screens' "
+              "(and RaceScreens::Destroy sub_82211D18 with --native_heap, no adapter: only the race "
+              "HUD machine's DestroyScreens' plain C++ reaches it: the in-race screens' "
               "teardowns' plain C++, the holder freed; RaceScreens::~RaceScreens sub_82211B98 "
               "with --native_heap, no adapter: only Destroy's plain C++ reaches it: TearDown's and "
               "AltHud::Destroy's plain C++, Strings::Release and UiMovies::DeleteAll's jump "
@@ -497,9 +498,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                             \
   }
 
-// RaceScreens::Destroy (from the race HUD machine's DestroyScreens,
-// recompiled). ~RaceScreens has no adapter (removed, 2026-11-08): only
-// Destroy's plain C++ calls it.
-ITC_RACE_HUD_OBJECT(82211D18, RaceHudObjectScreensDestroy)
+// RaceScreens::Destroy and ~RaceScreens have no adapters (removed,
+// 2026-11-08): only the race HUD machine's DestroyScreens' plain C++ calls
+// Destroy's, and only Destroy's calls ~RaceScreens'.
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
