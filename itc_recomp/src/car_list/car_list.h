@@ -265,6 +265,21 @@ constexpr uint32_t kMemcpy = 0x825A7410;
 // C++, the original where c_runtime::Memcpy refuses).
 uint64_t Build(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 
+// The stand's holders ([0x826D83E0]: three slots, by the player) and the
+// guest calls ShowStandCar makes: Car::Refresh's original where its plain
+// C++ declines, GarageStage::SetCarClass through its override.
+constexpr uint32_t kStandHolders = 0x826D83E0;
+constexpr uint32_t kCarRefresh = 0x820C4998;
+constexpr uint32_t kSetCarClass = 0x8217FDC8;
+// sub_8224A490 PanelSetBase::ShowStandCar (r4 a color; below 0 the rows'
+// selection + scroll): the stage by the player (slot 0 one player, else 1
+// or 2 by +1952), a car on its 4,032-byte frame (+80: Car::Init,
+// Car::SetModel with the entry's car, +3888 |= 1 or 128 for player 2,
+// Car::Refresh: their plain C++), GarageStage::SetPlates(stage, 0) and
+// GarageStage::SetCarClass(stage, car, color). Returns SetCarClass' r3.
+uint64_t ShowStandCar(uint8_t* base, uint64_t b, uint64_t color, uint32_t sp,
+                      const Calls& calls);
+
 // --- The power graph's record (panels.cpp) ---
 
 // The power graph screen's record's holder ([0x82815EBC]; the record at

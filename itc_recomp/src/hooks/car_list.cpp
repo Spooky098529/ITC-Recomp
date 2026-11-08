@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "car_list/car_list.h"
+#include "hooks/car_makers.h"
 
 ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "Run the type 6 and 7 panel screens' car list (docs/functions/car-list.md: "
@@ -36,7 +37,9 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "(the menu lists, the screen fades and sub_825C8390 guest calls), SetUpRows "
               "sub_8224A978 and SetUpCarPage sub_8224C560 (CarPanel::ShowCarStats, never seen "
               "in play, the original), PanelSetBase::Build sub_8224C698 and PanelSet::Build "
-              "sub_8224CAD8 (the entries from the allocation layer's pages); the UI "
+              "sub_8224CAD8 (the entries from the allocation layer's pages), "
+              "PanelSetBase::ShowStandCar sub_8224A490 (with the car makers' callees native: "
+              "GarageStage::SetCarClass through its override); the UI "
               "movie calls through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=car_list)");
 
@@ -184,6 +187,7 @@ ITC_CL_STEP(CarListStep26, cl::Step26(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListSetUpRows, cl::SetUpRows(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListSetUpCarPage, cl::SetUpCarPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListBaseBuild, cl::Build(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListShowStandCar, cl::ShowStandCar(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 // PanelSet::Build: a tail call of the base's on the set + 4.
 void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8224CAD8 PanelSet::Build");
@@ -271,3 +275,13 @@ ITC_CAR_LIST(8224C560, CarListSetUpCarPage)
 // PanelSet::Build, native, reaches it; the register step stays for the
 // harness).
 ITC_CAR_LIST(8224CAD8, CarListSetBuild)
+// The stand's car (from the car and colors pages and SetUpColors,
+// recompiled): the original when the car makers' callees aren't native.
+extern "C" REX_FUNC(sub_8224A490) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
+    __imp__sub_8224A490(ctx, base);
+    return;
+  }
+  hooks::CarListShowStandCar(ctx, base);
+}

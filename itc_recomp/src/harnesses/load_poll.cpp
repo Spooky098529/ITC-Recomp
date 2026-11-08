@@ -16,6 +16,7 @@
 #include "harness.h"
 
 #include "base/log.h"
+#include "hooks/car_list.h"
 #include "hooks/car_makers.h"
 #include "graphics/resources.h"
 #include "hooks/load_poll.h"
@@ -1173,6 +1174,7 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
     bool set_car;  // SetCar or SetCarClass: a car object for FromCar first
     bool show_car = false;  // ShowCarById or WithClass: the car made from its id
     bool with_class = false;
+    bool stand_car = false;  // the car list's ShowStandCar: its set and list too
   };
   const Reapply reapplies[] = {
       {"GarageStage::ReapplyRecord (sub_82178DF8)", __imp__sub_82178DF8,
@@ -1186,9 +1188,19 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
        hooks::CarMakersShowCarById, false, true, false},
       {"GarageStage::ShowCarByIdWithClass (sub_82182D30)", __imp__sub_82182D30,
        hooks::CarMakersShowCarByIdWithClass, false, true, true},
+      // The car list's (src/car_list/, docs/functions/car-list.md): its
+      // world ShowCarByIdWithClass' with the set's base b in the car block
+      // (+0xE800: the menu's selection +76, the scroll +64, +236 and +240
+      // small, +1952 the player, +1820 a list at +0xF000 whose entry at
+      // +236 + +240 is the world's entry of kCarId), the holder's three
+      // slots the case's holder, the two-player word ([0x82815EAC]) 0 or 1;
+      // r4 a color or below 0.
+      {"PanelSetBase::ShowStandCar (sub_8224A490)", __imp__sub_8224A490,
+       hooks::CarListShowStandCar, false, true, true, true},
   };
   constexpr uint32_t kParamsGlobal = 0x826C2E48, kHolderGlobal = 0x826D83E0,
-                     kCarListGlobal = 0x826D83F4, kRandSeed = 0x82638188;
+                     kCarListGlobal = 0x826D83F4, kRandSeed = 0x82638188,
+                     kTwoPlayersGlobal = 0x82815EAC;
   const uint32_t model = block + kObject, car = block + kCar;
   // SetCar's and SetCarClass' car object, in a block of its own
   // (car_makers.cpp's LayStandCar), and FitCar's deeper frames.
@@ -1295,6 +1307,8 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
       start.r3.u64 = block + kHolder;
       std::vector<uint8_t> car_inputs;
       StandWorld show{};
+      uint32_t stand_players = 0;
+      const uint32_t saved_players = guest::LoadU32(h.base, kTwoPlayersGlobal);
       if (car_world) {
         RandomBytes(h.base, car_block, kCarBlockBytes, r);
         const uint64_t picks[] = {0xFFFFFFFFFFFFFFFFull, 0xFFFFFFFFFFFFFFFEull, r.Below(6),
@@ -1302,6 +1316,23 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
         if (reapply.show_car) {
           show = LayShowCarWorld(h.base, car_block, r, c, block + kHolder);
           start.r3.u64 = picks[r.Below(5)];
+          if (reapply.stand_car) {
+            const uint32_t b = car_block + 0xE800, list = car_block + 0xF000;
+            const uint32_t at = r.Below(4), scroll = r.Below(4);
+            Put(h.base, b + 76, r.Below(6));
+            Put(h.base, b + 64, r.Below(6));
+            Put(h.base, b + 236, at);
+            Put(h.base, b + 240, scroll);
+            Put(h.base, b + 1952, r.Below(2));
+            Put(h.base, b + 1820, list);
+            Put(h.base, list + 4 * (at + scroll), car_block + 0xC400);
+            for (uint32_t k = 1; k < 3; k++) {
+              Put(h.base, show.holder_word + 4 * k, block + kHolder);
+            }
+            start.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+            start.r4.u64 = r.Below(3) == 0 ? (r.Next() | 0x80000000ull) : picks[r.Below(5)];
+            stand_players = r.Below(2);
+          }
         } else {
           start.r4.u64 = LayStandCar(h.base, car_block, r, c, traffic);
           start.r5.u64 = picks[r.Below(5)];
@@ -1330,6 +1361,7 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
           Put(h.base, kHolderGlobal, show.holder_word);
           Put(h.base, kCarListGlobal, show.list);
           Put(h.base, kRandSeed, saved_seed);
+          Put(h.base, kTwoPlayersGlobal, stand_players);
         }
         Put(h.base, kSceneGlobal, block + kScene);
         Put(h.base, kAccessoriesGlobal, accessories);
@@ -1345,6 +1377,7 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
           Put(h.base, kHolderGlobal, saved_holder);
           Put(h.base, kCarListGlobal, saved_list);
           Put(h.base, kRandSeed, saved_seed);
+          Put(h.base, kTwoPlayersGlobal, saved_players);
         }
         const uint32_t header = guest::LoadU32(h.base, car + 6684);
         const bool made = header != old_header;
@@ -1381,10 +1414,13 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
           // to r1, which the native version doesn't write), its float blocks
           // (+1888 to +3884) as floats, the rest exactly.
           out[v].Word(seed_left);
-          const uint32_t frame_car = start.r1.u32 - 4016 + 80;
+          // ShowStandCar's frame is 4,032 bytes, its saves the last 40.
+          const uint32_t frame_bytes = reapply.stand_car ? 4032 : 4016;
+          const uint32_t saves = reapply.stand_car ? 40 : 32;
+          const uint32_t frame_car = start.r1.u32 - frame_bytes + 80;
           out[v].Bytes(Read(h.base, frame_car, 1888));
           out[v].Floats(h.base, frame_car + 1888, (3884 - 1888) / 4);
-          out[v].Bytes(Read(h.base, frame_car + 3884, 4016 - 80 - 32 - 3884));
+          out[v].Bytes(Read(h.base, frame_car + 3884, frame_bytes - 80 - saves - 3884));
         }
         if (made) {
           Addresses(out[v], h.base, header, 52, known);

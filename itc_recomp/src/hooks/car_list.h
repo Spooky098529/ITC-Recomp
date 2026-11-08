@@ -77,5 +77,6 @@ void CarListSetUpRows(PPCContext& ctx, uint8_t* base);
 void CarListSetUpCarPage(PPCContext& ctx, uint8_t* base);
 void CarListBaseBuild(PPCContext& ctx, uint8_t* base);
 void CarListSetBuild(PPCContext& ctx, uint8_t* base);
+void CarListShowStandCar(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

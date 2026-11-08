@@ -3,10 +3,14 @@
 #include "car_list/car_list.h"
 
 #include "base/log.h"
-#include "guest.h"
 #include "c_runtime/strings.h"
 #include "car_specs/car_specs.h"
+#include "guest.h"
 #include "memory/heap.h"
+#include "race_setup/race_setup.h"
+#include "type67_modes/type67_modes.h"
+
+#include <rex/platform/fpscr.h>
 
 namespace car_list {
 
@@ -510,6 +514,44 @@ uint64_t Build(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
   }
   StoreU32(base, b + 4, 1);
   return r3;
+}
+
+uint64_t ShowStandCar(uint8_t* base, uint64_t b_r3, uint64_t color, uint32_t sp,
+                      const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224A490 PanelSetBase::ShowStandCar");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 4032);
+  const uint32_t at = (LoadU32(base, b + 240) + LoadU32(base, b + 236)) << 2;
+  const uint32_t id = LoadU32(base, LoadU32(base, at + LoadU32(base, b + 1820)) + 8432);
+  const uint64_t item = calls.Call(kMenuListSelection, frame, 0x8224A4C8, b_r3 + 60);
+  uint64_t pick = uint64_t(LoadU32(base, b + 64)) + item;
+  if (int32_t(uint32_t(color)) >= 0) {
+    pick = color;
+  }
+  uint32_t slot = 0, flag = 1;
+  if (LoadU32(base, kTwoPlayers) != 0) {
+    if (LoadU32(base, b + 1952) == 0) {
+      slot = 1;
+    } else {
+      slot = 2;
+      flag = 128;
+    }
+  }
+  const uint32_t car = frame + 80;
+  race_setup::CarInit(base, car);
+  race_setup::SetModel(base, car, id);
+  StoreU32(base, car + 3888, LoadU32(base, car + 3888) | flag);
+  // Flush-to-zero off, as Car::Refresh's plain C++ expects.
+  using Fpscr = rex::platform::FPSCRPlatform;
+  Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+  uint32_t refreshed = 0;
+  if (!car_specs::CarRefresh(base, car, &refreshed)) {
+    calls.Call(kCarRefresh, frame, 0x8224A53C, car);
+  }
+  type67_modes::GarageStageSetPlates(base, LoadU32(base, LoadU32(base, kStandHolders) + 4 * slot),
+                                     0);
+  const uint32_t holder = LoadU32(base, LoadU32(base, kStandHolders) + 4 * slot);
+  return calls.Call(kSetCarClass, frame, 0x8224A568, holder, car, pick);
 }
 
 }  // namespace car_list
