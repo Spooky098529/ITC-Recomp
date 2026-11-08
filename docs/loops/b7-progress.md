@@ -63,8 +63,15 @@ file's history. What's left to see in a drive, from every run:
   Validated `itc_4564` (race 85 s at 180; 0 errors, every harness 0
   differing outside the expected groups, 17 of 17 harness lines, no
   prints added; 14 in the race, 2 more in the replay `itc_4565` (ok), 1
-  to drive). Step: second migration (`sub_8216C208`, `sub_82218C10`),
-  agent running.
+  to drive). Second migration cd0cb488..2c188a95 (`DestroyScreens`,
+  `ShowMessage`, its message 0-11 first calls left on the original,
+  their callees never ran; `RaceScreens::Destroy` and `SetText`
+  adapters removed; a harness gap fixed: `PauseMenu::Draw`'s set-up
+  cleared the pause list's items on every case once seeds moved; races
+  28-34 s, 0 errors, its harnesses 0 differing; no subagents). Left
+  from these: none (other ready groups in `race-screens.md` and
+  `race-hud-machine.md`, probably freed by `SetNodeTextV`). Step: its
+  validation, agent running.
 
 ## Done
 
@@ -98,5 +105,7 @@ file's history. What's left to see in a drive, from every run:
   known 419, unknown 999).
 - After the cleanup lead's migration: ours 4960, work left 1466
   (wrapped 56, known 413, unknown 997).
+- After its second migration: ours 4962, work left 1464 (wrapped 56,
+  known 411, unknown 997).
 
 ## Stopped

@@ -57,6 +57,19 @@ When the user has reviewed a run's section, its heading gets
   `Strings::Release` and `UiMovies::DeleteAll`'s jump are called through
   their overrides (recompiled callers left). `File::GetSize` keeps its
   adapter (15 calls an attract race through vtables), its row says so.
+- Its second migration (cd0cb488..2c188a95): `DestroyScreens` (a tail
+  call into `RaceScreens::Destroy`, its adapter kept for the machine's
+  functor; its cases in the race HUD object's harness);
+  `RaceDialog::ShowMessage` native for non-first calls and first calls
+  with a message above 11 (13 is the only one seen), the original for
+  0-11 (`SetNote` `sub_82218918` and case 0 `sub_82218C90` never ran),
+  its adapter kept for `Draw`'s handler table. `RaceScreens::Destroy`'s
+  and `SetText`'s adapters removed without counter runs (their callers
+  run at a race's end and in the confirm dialog, which attract races
+  don't reach). Harness world fix: `PauseMenu::Draw`'s set-up clears the
+  pause list's items (+68) only for transition 6 (`OpenOptions`); it
+  cleared them on every case, and the original then looped on address
+  0 once the seeds moved.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
