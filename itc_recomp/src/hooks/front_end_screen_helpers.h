@@ -31,6 +31,15 @@ void FrontEndOptionsSetCategory6DialogNote(PPCContext& ctx, uint8_t* base);
 // SaveScreen::ShowNotice (r3 the step word).
 void FrontEndSaveScreenShowNotice(PPCContext& ctx, uint8_t* base);
 
+// SaveScreen::StartCheck and Start, Options::SetUpSavePage and
+// SetUpCategory6Page (no arguments).
+void FrontEndSaveScreenStartCheck(PPCContext& ctx, uint8_t* base);
+void FrontEndSaveScreenStart(PPCContext& ctx, uint8_t* base);
+void FrontEndOptionsSetUpSavePage(PPCContext& ctx, uint8_t* base);
+void FrontEndOptionsSetUpCategory6Page(PPCContext& ctx, uint8_t* base);
+// CarCards::FillAll (no arguments).
+void FrontEndCarCardsFillAll(PPCContext& ctx, uint8_t* base);
+
 // The car cards: CarCard::Fill (r3 the node, r4 the entry),
 // CarCard::FillDetail, CarDetail::Open (r4 the mode).
 void FrontEndCarCardFill(PPCContext& ctx, uint8_t* base);

@@ -25,7 +25,11 @@ ITC_FLAG_BOOL(native_front_end_screen_helpers, true, "ITC",
               "SetCategory6DialogNote sub_821C0CD0 (the UI movie setters through their "
               "overrides, their unset varargs 0) and SaveScreen::ShowNotice sub_821A63B0; the "
               "car cards CarCard::Fill sub_821821C8, CarCard::FillDetail sub_821827E0 and "
-              "CarDetail::Open sub_821830C0) natively instead of through the translated code "
+              "CarDetail::Open sub_821830C0; SaveScreen::StartCheck sub_821A5450 and Start "
+              "sub_821A5540, Options::SetUpSavePage sub_821C6D48 and SetUpCategory6Page "
+              "sub_821C6E50 (MenuList::Init, SaveSlots::State, ShowPrompts and "
+              "SaveBuffers::Create through their overrides, the setters' varargs 0) and "
+              "CarCards::FillAll sub_821822F8) natively instead of through the translated code "
               "(the same writes; checked by --run_harnesses=front_end_screen_helpers)");
 
 namespace hooks {
@@ -172,6 +176,27 @@ void FrontEndSaveScreenShowNotice(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = fe::SaveScreenShowNotice(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void FrontEndSaveScreenStartCheck(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::SaveScreenStartCheck(base, ctx.r1.u32, guest.calls());
+}
+void FrontEndSaveScreenStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::SaveScreenStart(base, ctx.r1.u32, guest.calls());
+}
+void FrontEndOptionsSetUpSavePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::OptionsSetUpDialogPage(base, 13, ctx.r1.u32, guest.calls());
+}
+void FrontEndOptionsSetUpCategory6Page(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::OptionsSetUpDialogPage(base, 14, ctx.r1.u32, guest.calls());
+}
+void FrontEndCarCardsFillAll(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = fe::CarCardsFillAll(base, ctx.r1.u32, guest.calls());
+}
+
 void FrontEndCarCardFill(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::CarCardFill(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
@@ -228,6 +253,16 @@ ITC_FRONT_END_HELPERS(821A63B0, FrontEndSaveScreenShowNotice)
 // No adapter for SaveScreen::SetMessage sub_821A5360: its only caller,
 // ShowNotice, is native (the flag switches it); its step above is the
 // harness's.
+
+// The save screen's starts (from its Shows sub_821A6650 and sub_821A6608,
+// recompiled) and the options' dialog pages' set-ups (from
+// Options::OpenCategory sub_821C7188, recompiled).
+ITC_FRONT_END_HELPERS(821A5450, FrontEndSaveScreenStartCheck)
+ITC_FRONT_END_HELPERS(821A5540, FrontEndSaveScreenStart)
+ITC_FRONT_END_HELPERS(821C6D48, FrontEndOptionsSetUpSavePage)
+ITC_FRONT_END_HELPERS(821C6E50, FrontEndOptionsSetUpCategory6Page)
+// CarCards::FillAll (from sub_82183DE0 and sub_82184488, recompiled).
+ITC_FRONT_END_HELPERS(821822F8, FrontEndCarCardsFillAll)
 
 // The car cards: Fill from CarCards::FillAll and sub_82183DE0 (recompiled),
 // Open through a functor (no direct callers). No adapter for

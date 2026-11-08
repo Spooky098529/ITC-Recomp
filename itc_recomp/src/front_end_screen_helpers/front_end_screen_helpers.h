@@ -51,12 +51,24 @@ constexpr uint32_t kPlayNamed = 0x8211DAC8;
 constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
+constexpr uint32_t kMenuListInit = 0x8220BAC0;
+constexpr uint32_t kSaveSlotsState = 0x8228F9E8;
+constexpr uint32_t kSaveBuffersCreate = 0x8228F6B0;
+constexpr uint32_t kShowPrompts = 0x821C1068;  // Options::ShowPrompts
 
 // The save screen's data ([0x826D8454]) and the front end's car data
 // ([0x826D83F4]: +12, +36 words, +48 and +52 the list's index, +1136 the
 // car entries).
 constexpr uint32_t kSaveData = 0x826D8454;
 constexpr uint32_t kCarData = 0x826D83F4;
+// The save screen's menu list and page block; the options' settings `o`
+// and pages 9's and 10's blocks; the car list (+4 its scroll).
+constexpr uint32_t kSaveList = 0x826D8450;
+constexpr uint32_t kSavePages = 0x826D844C;
+constexpr uint32_t kOptions = 0x826D8478;
+constexpr uint32_t kOptionsSavePages = 0x826D847C;
+constexpr uint32_t kOptionsCategory6Pages = 0x826D8488;
+constexpr uint32_t kCarList = 0x826D83EC;
 
 // The mode's block (VirtualFree'd by every release).
 constexpr uint32_t kModeBlock = 848;
@@ -135,6 +147,28 @@ uint64_t OptionsSetDialogNote(uint8_t* base, uint32_t sub_scene, uint64_t id,
 // LoopNamed(movie, 2). Whether Run answered 0. 144-byte frame.
 uint64_t SaveScreenShowNotice(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+// sub_821A5450 SaveScreen::StartCheck: the data's +4 = 0, +0 = 1, +28 = 0;
+// MenuList::Init([0x826D8450], 1, 1, 0, 154, 153, 155, 156, 159, 158);
+// by SaveSlots::State(0): SetNote(70), +12 = 3, +24 = 0, or SetNote(69),
+// +12 = 2 (their plain C++, varargs 0: the originals' are SaveSlots::State's
+// leftovers); +16 = 1; the page block to page 1 by step 0; +56 = 1. The
+// note's r3. 128-byte frame.
+uint64_t SaveScreenStartCheck(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821A5540 SaveScreen::Start: +0 = 1, SaveSlots::State(0), the list's
+// Init, +28 = 0, +56 = 1; by the state SetNote(70) and the page block to
+// page 6 by step 3, or SetText(102) and page 5 by step 3. The setter's r3.
+// 144-byte frame.
+uint64_t SaveScreenStart(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C6D48 Options::SetUpSavePage (`sub_scene` 13) and sub_821C6E50
+// Options::SetUpCategory6Page (14): by SaveSlots::State(0) the dialog's
+// note 70 (kind 3, +4 0) or 69 (kind 2); ShowPrompts(0, 0, -1, -1, -1, -1)
+// and the state 1 (page 10: the state first, ShowPrompts after the block);
+// the page block to page 2; FindNode(movie 7, sub_scene, 0) +80 = 0;
+// SaveBuffers::Create (r3 the node); `o` +712 and +708 = 0. Create's r3.
+// 144-byte frames.
+uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
+                                const Calls& calls);
+
 // --- The car cards (car_cards.cpp) ---
 
 // sub_821821C8 CarCard::Fill: `node` a card's node in UI movie 4, `entry` a
@@ -144,6 +178,11 @@ uint64_t SaveScreenShowNotice(uint8_t* base, uint32_t step, uint32_t sp, const C
 // child 9 string 435. The last SetNodeText's r3. 128-byte frame.
 uint64_t CarCardFill(uint8_t* base, uint32_t node, uint32_t entry, uint32_t sp,
                      const Calls& calls);
+// sub_821822F8 CarCards::FillAll: movie 4's cards FindNode(7, i + 5) for i
+// 0 to 3 below the entries' count (P +512, read once) filled from P[the car
+// list's scroll ([0x826D83EC] +4) + i] (CarCard::Fill's plain C++). The
+// last Fill's r3, or UiMovies::Find's (the pair) with none. 144-byte frame.
+uint64_t CarCardsFillAll(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_821827E0 CarCard::FillDetail: UI movie 18's +0xA000 = 0 and its nodes
 // set from the car entry P[+48 + +52] (P [0x826D83F4] +1136). The last
 // SetNodeText's r3. 192-byte frame.

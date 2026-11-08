@@ -135,6 +135,154 @@ uint64_t OptionsSetDialogNote(uint8_t* base, uint32_t sub_scene, uint64_t id,
   return SetNote(base, 7, 14, 0x821C0D58, id, varargs, sp, calls);
 }
 
+namespace {
+
+// MenuList::Init([0x826D8450], 1, 1, 0, 154, 153, 155, 156, 159, 158): the
+// last two on the frame's +84 and +92 (the originals store them first).
+uint64_t InitSaveList(uint8_t* base, uint32_t frame, uint32_t lr, const Calls& calls) {
+  Store(base, frame + 92, 158);
+  Store(base, frame + 84, 159);
+  const uint64_t args[8] = {Load(base, kSaveList), 1, 1, 0, 154, 153, 155, 156};
+  return calls.CallArgs(kMenuListInit, frame, lr, args);
+}
+
+// A page block's change to `page`: +8 = +0 unless +0 is `page`, then the
+// stores in the order given by the caller.
+void PageFrom(uint8_t* base, uint32_t block, uint32_t page) {
+  const uint32_t now = Load(base, block);
+  if (int32_t(now) != int32_t(page)) {
+    Store(base, block + 8, now);
+  }
+}
+
+uint32_t SaveData(uint8_t* base) { return Load(base, kSaveData); }
+
+constexpr uint64_t kNoVarargs[7] = {0, 0, 0, 0, 0, 0, 0};
+
+}  // namespace
+
+uint64_t SaveScreenStartCheck(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821A5450 SaveScreen::StartCheck");
+  const uint32_t frame = Frame(base, sp, 128);
+  Store(base, frame + 92, 158);
+  Store(base, frame + 84, 159);
+  Store(base, SaveData(base) + 4, 0);
+  Store(base, SaveData(base) + 0, 1);
+  Store(base, SaveData(base) + 28, 0);
+  const uint64_t args[8] = {Load(base, kSaveList), 1, 1, 0, 154, 153, 155, 156};
+  calls.CallArgs(kMenuListInit, frame, 0x821A54B8, args);
+  const uint64_t state = calls.Call(kSaveSlotsState, frame, 0x821A54C0, 0);
+  uint64_t r3 = 0;
+  if (int32_t(uint32_t(state)) != 0) {
+    r3 = SaveScreenSetNote(base, 70, kNoVarargs, frame, calls);
+    Store(base, SaveData(base) + 12, 3);
+    Store(base, SaveData(base) + 24, 0);
+  } else {
+    r3 = SaveScreenSetNote(base, 69, kNoVarargs, frame, calls);
+    Store(base, SaveData(base) + 12, 2);
+  }
+  Store(base, SaveData(base) + 16, 1);
+  const uint32_t pages = Load(base, kSavePages);
+  PageFrom(base, pages, 1);
+  Store(base, pages + 12, 0);
+  Store(base, pages + 4, 1);
+  Store(base, pages + 16, 0xFFFFFFFFu);
+  Store(base, pages + 0, 0xFFFFFFFFu);
+  Store(base, SaveData(base) + 56, 1);
+  return r3;
+}
+
+uint64_t SaveScreenStart(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821A5540 SaveScreen::Start");
+  const uint32_t frame = Frame(base, sp, 144);
+  Store(base, SaveData(base) + 0, 1);
+  const uint64_t state = calls.Call(kSaveSlotsState, frame, 0x821A5564, 0);
+  InitSaveList(base, frame, 0x821A55A0, calls);
+  Store(base, SaveData(base) + 28, 0);
+  Store(base, SaveData(base) + 56, 1);
+  uint64_t r3 = 0;
+  const uint32_t pages_global = kSavePages;
+  if (int32_t(uint32_t(state)) != 0) {
+    r3 = SaveScreenSetNote(base, 70, kNoVarargs, frame, calls);
+    Store(base, SaveData(base) + 12, 0);
+    Store(base, SaveData(base) + 16, 1);
+    const uint32_t pages = Load(base, pages_global);
+    PageFrom(base, pages, 6);
+    Store(base, pages + 16, 0xFFFFFFFFu);
+    Store(base, pages + 12, 3);
+    Store(base, pages + 4, 6);
+    Store(base, pages + 0, 0xFFFFFFFFu);
+    Store(base, SaveData(base) + 24, 0);
+  } else {
+    r3 = SaveScreenSetText(base, 102, kNoVarargs, frame, calls);
+    Store(base, SaveData(base) + 12, 3);
+    Store(base, SaveData(base) + 16, 0);
+    const uint32_t pages = Load(base, pages_global);
+    PageFrom(base, pages, 5);
+    Store(base, pages + 12, 3);
+    Store(base, pages + 16, 0xFFFFFFFFu);
+    Store(base, pages + 4, 5);
+    Store(base, pages + 0, 0xFFFFFFFFu);
+  }
+  return r3;
+}
+
+uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
+                                const Calls& calls) {
+  const bool save = sub_scene == 13;
+  if (save) {
+    ITC_NATIVE_RUNNING("sub_821C6D48 Options::SetUpSavePage");
+  } else {
+    ITC_NATIVE_RUNNING("sub_821C6E50 Options::SetUpCategory6Page");
+  }
+  // Page 9's words (+620 the state, +628 the kind, +632) and block
+  // [0x826D847C], or page 10's (+640, +648, +652) and [0x826D8488].
+  const uint32_t state_at = save ? 620 : 640, kind_at = save ? 628 : 648;
+  const uint32_t pages_global = save ? kOptionsSavePages : kOptionsCategory6Pages;
+  const uint32_t lr_state = save ? 0x821C6D7C : 0x821C6E84;
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t movie = FindMovie(base, 7, frame + 96);
+  const uint64_t state = calls.Call(kSaveSlotsState, frame, lr_state, 0);
+  if (int32_t(uint32_t(state)) != 0) {
+    OptionsSetDialogNote(base, sub_scene, 70, kNoVarargs, frame, calls);
+    Store(base, Load(base, kOptions) + kind_at, 3);
+    Store(base, Load(base, kOptions) + kind_at + 4, 0);
+  } else {
+    OptionsSetDialogNote(base, sub_scene, 69, kNoVarargs, frame, calls);
+    Store(base, Load(base, kOptions) + kind_at, 2);
+  }
+  auto prompts = [&](uint32_t lr) {
+    const uint64_t none = 0xFFFFFFFFFFFFFFFFull;
+    const uint64_t args[8] = {0, 0, none, none, none, none, 0, 0};
+    // ShowPrompts reads r3 to r8; r9 and r10 as the previous call leaves
+    // them (0 here).
+    calls.CallArgs(kShowPrompts, frame, lr, args);
+  };
+  if (save) {
+    prompts(0x821C6DE8);
+    Store(base, Load(base, kOptions) + state_at, 1);
+  } else {
+    Store(base, Load(base, kOptions) + state_at, 1);
+  }
+  const uint32_t pages = Load(base, pages_global);
+  PageFrom(base, pages, 2);
+  Store(base, pages + 0, 2);
+  Store(base, pages + 12, 0xFFFFFFFFu);
+  Store(base, pages + 16, 0xFFFFFFFFu);
+  if (!save) {
+    prompts(0x821C6F24);
+  }
+  const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, 0);
+  Store(base, node + 80, 0);
+  // SaveBuffers::Create with r3 the node (FindNode's, which it leaves when
+  // the buffers are there).
+  const uint64_t r3 =
+      calls.Call(kSaveBuffersCreate, frame, save ? 0x821C6E34 : 0x821C6F3C, node);
+  Store(base, Load(base, kOptions) + 712, 0);
+  Store(base, Load(base, kOptions) + 708, 0);
+  return r3;
+}
+
 uint64_t SaveScreenShowNotice(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A63B0 SaveScreen::ShowNotice");
   const uint32_t frame = Frame(base, sp, 144);

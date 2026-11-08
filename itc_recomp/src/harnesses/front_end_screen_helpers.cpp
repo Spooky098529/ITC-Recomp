@@ -288,6 +288,15 @@ constexpr uint32_t kMissingMovie = 0x826C5CDC;  // UiMovies::Find's answer when 
 constexpr uint32_t kTagTxt = 0x54585400;
 constexpr uint32_t kTagSce = 0x53434500;
 
+// The save system's interface and the replay list, pointed at a world of
+// the case's own (SaveSlots::State), built as the race screens' harness
+// builds it.
+constexpr uint32_t kSaveInterfaceGlobal = 0x826BDC90;
+constexpr uint32_t kReplayList = 0x828161F0;
+constexpr uint32_t kSaveWorldBytes = 0x3000;
+constexpr uint32_t kSaveObject36 = 0x40, kSaveDevices = 0x100, kSaveUsers = 0x200;
+constexpr uint32_t kSaveSlots = 0x800;
+
 // The car entries: 4 of 0x2100 bytes (+744, +769, +8432 read).
 constexpr uint32_t kEntryBytes = 0x2100;
 constexpr uint32_t kEntryCount = 4;
@@ -298,22 +307,26 @@ struct World {
         texts(kTextWorldBytes),
         strings(kStringWorldBytes),
         misc(0x2000),
-        entries(kEntryCount * kEntryBytes) {}
+        entries(kEntryCount * kEntryBytes),
+        save(kSaveWorldBytes),
+        options(0x1000) {}
   bool ok() const {
     return movies.address && texts.address && strings.address && misc.address &&
-           entries.address;
+           entries.address && save.address && options.address;
   }
   uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
   uint32_t root() const { return movies.address + kRootAt; }
   uint32_t sub(uint32_t k) const { return movies.address + kSubScenesAt + kTreeNodeBytes * k; }
   uint32_t leaf(uint32_t k) const { return movies.address + kLeavesAt + kTreeNodeBytes * k; }
   uint32_t animation(uint32_t k) const { return movies.address + kAnimationsAt + 64 * k; }
-  // The misc block: the save screen's data (+0), the car data (+0x100, its
-  // entries' pointers at +0x700), the mode (+0x800, its ring at +204), the
+  // The misc block: the save screen's data (+0), the car data (+0x100), the
+  // car list (+0x600, its +4 the scroll), the mode (+0x800, its ring at
+  // +204), the car entries' pointers (+0x1000, their count at +0x1200), the
   // sound manager (+0x1400) and its vtable (+0x1800).
   uint32_t save_data() const { return misc.address; }
   uint32_t car_data() const { return misc.address + 0x100; }
-  uint32_t car_list() const { return misc.address + 0x700; }
+  uint32_t car_scroll_list() const { return misc.address + 0x600; }
+  uint32_t car_list() const { return misc.address + 0x1000; }
   uint32_t mode() const { return misc.address + 0x800; }
   uint32_t manager() const { return misc.address + 0x1400; }
   uint32_t entry(uint32_t k) const { return entries.address + kEntryBytes * k; }
@@ -322,6 +335,17 @@ struct World {
   Block strings;
   Block misc;
   Block entries;
+  Block save;  // the save system's interface world (ShapeSaveWorld)
+  // The options block: the settings `o` (+0), the save screen's menu list
+  // (+0x800, its item block +68), its page block (+0x900), the options'
+  // pages 9's and 10's blocks (+0xA00, +0xB00) and the replay list's header
+  // (+0xC00: SaveBuffers::Create makes nothing).
+  uint32_t settings() const { return options.address; }
+  uint32_t list() const { return options.address + 0x800; }
+  uint32_t save_pages() const { return options.address + 0x900; }
+  uint32_t page9() const { return options.address + 0xA00; }
+  uint32_t page10() const { return options.address + 0xB00; }
+  Block options;
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
@@ -333,7 +357,40 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
     {kMissingText, 4},
-    {fe::kStringTable, 4}};
+    {fe::kStringTable, 4},
+    {fe::kSaveList, 4},
+    {fe::kSavePages, 4},
+    {fe::kOptions, 4},
+    {fe::kOptionsSavePages, 4},
+    {fe::kOptionsCategory6Pages, 4},
+    {fe::kCarList, 4},
+    {kSaveInterfaceGlobal, 4},
+    {kReplayList, 4}};
+
+void ShapeSaveWorld(uint8_t* base, uint32_t block, Random& r) {
+  WriteRandom(base, block, kSaveWorldBytes, r);
+  guest::StoreU32(base, block, 0x82000E38);
+  guest::StoreU32(base, block + 8, block + kSaveObject36);
+  guest::StoreU32(base, block + kSaveObject36, 0x82000AFC);
+  guest::StoreU32(base, block + kSaveObject36 + 88, block + kSaveDevices);
+  guest::StoreU32(base, block + kSaveObject36 + 92, block + kSaveUsers);
+  guest::StoreU32(base, block + kSaveDevices, 0x82002198);
+  guest::StoreU32(base, block + kSaveDevices + 44, block + kSaveSlots);
+  guest::StoreU32(base, block + kSaveUsers, 0x82000FA0);
+  guest::StoreU32(base, block + kSaveUsers + 216, r.Below(6));
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, block + kSaveUsers + 200 + 4 * i, r.Below(4));
+    guest::StoreU32(base, block + kSaveUsers + 8 + 40 * i, r.Below(3) == 0 ? 0 : r.Below(5));
+  }
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t slot = block + kSaveSlots + 1000 * k;
+    guest::StoreU32(base, slot + 988, r.Below(2) == 0 ? 3 : r.Below(12));
+    for (uint32_t word = 960; word <= 980; word += 4) {
+      guest::StoreU32(base, slot + word, r.Below(2));
+    }
+  }
+  guest::StoreU32(base, kSaveInterfaceGlobal, block);
+}
 
 // The string table: 17 files' pointers to one container of entries enough
 // for the widest file (the bounds at 0x82007E18), each one of 8 strings of
@@ -482,6 +539,24 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
     const int32_t id = r.Below(3) == 0 ? kIds[r.Below(8)] : int32_t(r.Below(126)) - 5;
     guest::StoreU32(base, w.entry(k) + 8432, uint32_t(id));
   }
+  guest::StoreU32(base, w.car_list() + 512, uint32_t(int32_t(r.Below(7)) - 1));
+  guest::StoreU32(base, fe::kCarList, w.car_scroll_list());
+  guest::StoreU32(base, w.car_scroll_list() + 4, r.Below(4));
+  // The save system, the options block and its globals: the page blocks'
+  // page (+0) 1, 2, 5, 6, -1 or any; the menu list's item block 0.
+  ShapeSaveWorld(base, w.save.address, r);
+  WriteRandom(base, w.options.address, w.options.bytes, r);
+  guest::StoreU32(base, kReplayList, w.options.address + 0xC00);
+  guest::StoreU32(base, fe::kOptions, w.settings());
+  guest::StoreU32(base, fe::kSaveList, w.list());
+  guest::StoreU32(base, w.list() + 68, 0);
+  for (const auto& [global, block] :
+       {std::pair{fe::kSavePages, w.save_pages()}, std::pair{fe::kOptionsSavePages, w.page9()},
+        std::pair{fe::kOptionsCategory6Pages, w.page10()}}) {
+    guest::StoreU32(base, global, block);
+    const uint32_t pages[6] = {1, 2, 5, 6, 0xFFFFFFFFu, uint32_t(r.Next())};
+    guest::StoreU32(base, block, pages[r.Below(6)]);
+  }
   // The mode's dispatcher ring: its count and start small, now and then any.
   guest::StoreU32(base, w.mode() + 204 + 600, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(50));
   guest::StoreU32(base, w.mode() + 204 + 604, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(60));
@@ -560,6 +635,16 @@ void Group(Context& h, const World& w, const char* name, int cases, const SetupF
       out[v].Bytes(Read(h.base, w.texts.address, w.texts.bytes));
       out[v].Bytes(Read(h.base, w.misc.address, w.misc.bytes));
       out[v].Bytes(Read(h.base, w.entries.address, w.entries.bytes));
+      // MenuList::Init's new item block: whether made, its words, freed.
+      const uint32_t items = guest::LoadU32(h.base, w.list() + 68);
+      out[v].Word(items != 0 ? 1 : 0);
+      if (items != 0 && memory::IsPages(items)) {
+        out[v].Bytes(Read(h.base, items, 2 * 4));
+        memory::FreePages(items);
+      }
+      guest::StoreU32(h.base, w.list() + 68, 0);
+      out[v].Bytes(Read(h.base, w.options.address, w.options.bytes));
+      out[v].Bytes(Read(h.base, w.save.address, w.save.bytes));
       for (const auto& [address, bytes] : kSavedGlobals) {
         out[v].Bytes(Read(h.base, address, bytes));
       }
@@ -634,7 +719,31 @@ void Dialogs(Context& h, const World& w) {
       {{144, 120}, {64, 32}, {288, 248}, {208, 200}});
 }
 
+void Starts(Context& h, const World& w) {
+  // StartCheck (128-byte frame, saves 32) and Start (144, saves 40): their
+  // frames' +24 to +79 left out (the setters' varargs stores:
+  // SaveSlots::State's leftovers in the original, 0 in ours) and the
+  // setters' frames below (their +40 to +79 and register saves left out).
+  const auto none = [](PPCContext&, Random&, const World&) {};
+  Group(h, w, "SaveScreen::StartCheck (sub_821A5450)", 200, none, __imp__sub_821A5450,
+        hooks::FrontEndSaveScreenStartCheck, {{128, 104}, {48, 32}, {240, 152}});
+  Group(h, w, "SaveScreen::Start (sub_821A5540)", 200, none, __imp__sub_821A5540,
+        hooks::FrontEndSaveScreenStart,
+        {{144, 120}, {64, 40}, {288, 248}, {208, 200}});
+  // The options' set-ups (144, saves 40), the note's frame below theirs.
+  Group(h, w, "Options::SetUpSavePage (sub_821C6D48)", 200, none, __imp__sub_821C6D48,
+        hooks::FrontEndOptionsSetUpSavePage, {{144, 120}, {64, 40}, {256, 168}});
+  Group(h, w, "Options::SetUpCategory6Page (sub_821C6E50)", 200, none, __imp__sub_821C6E50,
+        hooks::FrontEndOptionsSetUpCategory6Page, {{144, 120}, {64, 40}, {256, 168}});
+}
+
 void CarCards(Context& h, const World& w) {
+  // FillAll (144, saves 56); Fill's frame below it (its +40 to +79 left
+  // out).
+  Group(
+      h, w, "CarCards::FillAll (sub_821822F8)", 200, [](PPCContext&, Random&, const World&) {},
+      __imp__sub_821822F8, hooks::FrontEndCarCardsFillAll,
+      {{144, 56}, {272, 232}, {192, 176}});
   // Fill: r3 a leaf (TXT nodes all), r4 one of the entries.
   Group(
       h, w, "CarCard::Fill (sub_821821C8)", 200,
@@ -665,6 +774,7 @@ void FrontEndScreenHelpers(Context& h) {
   }
   BuildStringTable(h.base, w);
   Dialogs(h, w);
+  Starts(h, w);
   CarCards(h, w);
 }
 

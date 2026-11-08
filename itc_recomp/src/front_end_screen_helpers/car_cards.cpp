@@ -72,6 +72,27 @@ uint64_t CarCardFill(uint8_t* base, uint32_t node, uint32_t entry, uint32_t sp,
                     435);
 }
 
+uint64_t CarCardsFillAll(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821822F8 CarCards::FillAll");
+  const uint32_t frame = Frame(base, sp, 144);
+  Store(base, frame + 80, 4);
+  const uint32_t pair = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
+  const uint32_t movie = Load(base, pair);
+  uint64_t r3 = pair;
+  const int32_t count = int32_t(Load(base, Load(base, Load(base, kCarData) + 1136) + 512));
+  for (int32_t i = 0; i < 4; i++) {
+    if (i >= count) {
+      continue;
+    }
+    const uint32_t scroll = Load(base, Load(base, kCarList) + 4);
+    const uint32_t node = ui_movies::FindNode(base, movie, 7, uint32_t(i) + 5);
+    const uint32_t entries = Load(base, Load(base, kCarData) + 1136);
+    const uint32_t entry = Load(base, ((scroll + uint32_t(i)) << 2) + entries);
+    r3 = CarCardFill(base, node, entry, frame, calls);
+  }
+  return r3;
+}
+
 uint64_t CarCardFillDetail(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821827E0 CarCard::FillDetail");
   const uint32_t frame = Frame(base, sp, 192);
