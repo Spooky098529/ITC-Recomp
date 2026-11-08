@@ -71,7 +71,12 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "PlayTime:: and the spec sheet's sub_8218D708 through their overrides); the build "
               "screen's Enter sub_821A0860 with Fill sub_821A0228, BuildList::RemoveAt "
               "sub_8219C160 and SetUpStatus sub_8219C438 (memcpy, BuildList::Insert, Stage::Of, "
-              "the text setters and the fade through their overrides) "
+              "the text setters and the fade through their overrides); the build screen's "
+              "GroupsPage sub_8219EEC0, BuildsPage sub_8219F048 and BuildPage sub_8219F1C8 with "
+              "their jumps JumpGroupA sub_8219DBC8, JumpGroupB sub_8219DDB8, JumpBuildA "
+              "sub_8219DFA8, JumpBuildB sub_8219E348, JumpStandA sub_8219E600 and JumpStandB "
+              "sub_8219E9A0 (the mapper's slot 12, MenuList::, UiMovie::FinishNamed and "
+              "MenuSound::Play through their overrides) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -492,6 +497,42 @@ void BuildFill(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildFill(base, ctx.r1.u32, guest.calls());
 }
+void BuildGroupsPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildGroupsPage(base, ctx.r1.u32, guest.calls());
+}
+void BuildBuildsPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildBuildsPage(base, ctx.r1.u32, guest.calls());
+}
+void BuildBuildPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildBuildPage(base, ctx.r1.u32, guest.calls());
+}
+void BuildJumpGroupA(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildJumpGroupA(base, ctx.r1.u32, guest.calls());
+}
+void BuildJumpGroupB(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildJumpGroupB(base, ctx.r1.u32, guest.calls());
+}
+void BuildJumpBuildA(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildJumpBuildA(base, ctx.r1.u32, guest.calls());
+}
+void BuildJumpBuildB(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildJumpBuildB(base, ctx.r1.u32, guest.calls());
+}
+void BuildJumpStandA(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildJumpStandA(base, ctx.r1.u32, guest.calls());
+}
+void BuildJumpStandB(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::BuildJumpStandB(base, ctx.r1.u32, guest.calls());
+}
 void BuildSetUpStatus(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildSetUpStatus(base, ctx.r1.u32, guest.calls());
@@ -570,6 +611,13 @@ ITC_TYPE2_SCREENS(8219C3A8, BuildLeavePage)
 // SetUpStatus sub_8219C438 (only Enter) and BuildList::RemoveAt
 // sub_8219C160 (only Fill): their steps above are the harness's.
 ITC_TYPE2_SCREENS(821A0860, BuildEnter)
+// BuildScreen's level pages (from UpdatePage's table); no adapters for
+// the jumps (only the pages call them): their steps above are the
+// harness's.
+ITC_TYPE2_SCREENS(8219EEC0, BuildGroupsPage)
+ITC_TYPE2_SCREENS(8219F048, BuildBuildsPage)
+ITC_TYPE2_SCREENS(8219F1C8, BuildBuildPage)
+
 // The hub's handlers (functors the machine calls: WaitForLoad, Start,
 // Unload, OpenSelected, Reenter, Close, OnYes, OnNo, Back; Choose from
 // UpdatePage's table on its stack, recompiled) and helpers (from the

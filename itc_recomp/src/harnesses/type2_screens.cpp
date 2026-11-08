@@ -997,6 +997,111 @@ void SheetAndBuild(Context& h, const World& w) {
              nullptr, true});
 }
 
+// The build screen's levels (GroupsPage, BuildsPage, BuildPage and their
+// jumps): the menus' world, the group list ([0x826D8444]) shaped as the
+// list is (its own player, counts and actions, the same flags block), the
+// screen data random with its shown groups (the 56 pointers and the 4
+// words below them at its groups, whose +28 and +32 are 0, 1 or 2) and
+// their count (-1 to 56), its build list shown (every node's link and slot
+// in 0 to 399, the head too, the slots build records in the screen's own
+// at +0x2C784: +8 a kind 0 to 3, +32 and +36 0 to 2 or equal) and its
+// count (a halfword, -1 to 12 or up to 399); the list's scroll and
+// selection not negative (MenuList::Update keeps their sum so: a cursor
+// below -1 walks the build list ~2^32 links), or the cursor -1 when
+// `cursor_minus_one` and the case asks.
+void LevelsWorld(Random& r, const World& w, bool cursor_minus_one) {
+  namespace rs = race_screens;
+  uint8_t* base = w.base;
+  MenuWorld(r, w);
+  const uint32_t list = w.at(kListAt), groups = w.at(kGroupListAt);
+  guest::StoreU32(base, groups + rs::kListPlayer, r.Below(4));
+  const uint32_t group_count = r.Below(13);
+  guest::StoreU32(base, groups + rs::kListCount, group_count);
+  guest::StoreU32(base, groups + rs::kListShown, r.Below(group_count + 2));
+  guest::StoreU32(base, groups + rs::kListScroll, r.Below(group_count + 1));
+  guest::StoreU32(base, groups + rs::kListScrollBefore, r.Below(group_count + 1));
+  guest::StoreU32(base, groups + rs::kListSelection, r.Below(group_count + 2));
+  for (uint32_t field = rs::kListDown; field <= rs::kListBack; field += 4) {
+    guest::StoreU32(base, groups + field, 151 + r.Below(30));
+  }
+  guest::StoreU32(base, groups + rs::kListWraps, r.Below(2));
+  guest::StoreU32(base, groups + rs::kListMove, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
+  guest::StoreU32(base, groups + rs::kListSide, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
+  guest::StoreU32(base, groups + rs::kListBlock, guest::LoadU32(base, list + rs::kListBlock));
+  const uint32_t count = guest::LoadU32(base, list + rs::kListCount);
+  guest::StoreU32(base, list + rs::kListScroll, r.Below(count + 1));
+  guest::StoreU32(base, list + rs::kListSelection, r.Below(count + 2));
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, list + rs::kListScrollBefore,
+                    guest::LoadU32(base, list + rs::kListScroll));
+  }
+  if (cursor_minus_one && r.Below(10) == 0) {
+    guest::StoreU32(base, list + rs::kListScroll, 0);
+    guest::StoreU32(base, list + rs::kListSelection, 0xFFFFFFFFu);
+  }
+  const uint32_t screen = w.screen;
+  WriteRandom(base, screen, t2::kBuildScreenBytes, r);
+  for (uint32_t g = 0; g < 56; g++) {
+    const uint32_t group = screen + 36 + 3252 * g;
+    guest::StoreU32(base, group + 28, r.Below(2) == 0 ? 0 : r.Below(3));
+    guest::StoreU32(base, group + 32, r.Below(2) == 0 ? 0 : r.Below(3));
+  }
+  for (uint32_t i = 0; i < 60; i++) {
+    guest::StoreU32(base, screen + 0x318C4 - 16 + 4 * i, screen + 36 + 3252 * r.Below(56));
+  }
+  guest::StoreU32(base, screen + 0x319A4,
+                  r.Below(5) == 0 ? uint32_t(int32_t(r.Below(58)) - 1) : r.Below(14));
+  const uint32_t builds = screen + 0x319A8;
+  for (uint32_t i = 0; i < 400; i++) {
+    guest::StoreU16(base, builds + 4 * i, uint16_t(r.Below(400)));
+    guest::StoreU16(base, builds + 4 * i + 2, uint16_t(r.Below(400)));
+    guest::StoreU32(base, builds + 1612 + 4 * i, screen + 0x2C784 + 52 * r.Below(400));
+    const uint32_t build = screen + 0x2C784 + 52 * i;
+    guest::StoreU32(base, build + 8, r.Below(4));
+    guest::StoreU32(base, build + 32, r.Below(3));
+    guest::StoreU32(base, build + 36, r.Below(2) == 0 ? guest::LoadU32(base, build + 32)
+                                                      : r.Below(3));
+  }
+  guest::StoreU16(base, builds + 1604, uint16_t(r.Below(400)));
+  guest::StoreU16(base, builds + 1608,
+                  uint16_t(r.Below(6) == 0 ? r.Below(400) : int32_t(r.Below(14)) - 1));
+}
+
+void BuildLevels(Context& h, const World& w) {
+  auto jump = [](PPCContext& t, Random& r, const World& w) {
+    LevelsWorld(r, w, true);
+    t.r3.u64 = w.at(kModeAt);
+  };
+  auto page = [](PPCContext& t, Random& r, const World& w) {
+    LevelsWorld(r, w, false);
+    t.r3.u64 = w.at(kModeAt);
+  };
+  // The jumps: their frames without the saves (r24 or r25 on).
+  Run(h, w, {"BuildScreen::JumpGroupA (sub_8219DBC8)", 300, __imp__sub_8219DBC8,
+             hooks::BuildJumpGroupA, {{-160, -72}}, jump, nullptr, true});
+  Run(h, w, {"BuildScreen::JumpGroupB (sub_8219DDB8)", 300, __imp__sub_8219DDB8,
+             hooks::BuildJumpGroupB, {{-160, -72}}, jump, nullptr, true});
+  Run(h, w, {"BuildScreen::JumpBuildA (sub_8219DFA8)", 300, __imp__sub_8219DFA8,
+             hooks::BuildJumpBuildA, {{-160, -72}}, jump, nullptr, true});
+  Run(h, w, {"BuildScreen::JumpBuildB (sub_8219E348)", 300, __imp__sub_8219E348,
+             hooks::BuildJumpBuildB, {{-160, -72}}, jump, nullptr, true});
+  Run(h, w, {"BuildScreen::JumpStandA (sub_8219E600)", 300, __imp__sub_8219E600,
+             hooks::BuildJumpStandA, {{-160, -64}}, jump, nullptr, true});
+  Run(h, w, {"BuildScreen::JumpStandB (sub_8219E9A0)", 300, __imp__sub_8219E9A0,
+             hooks::BuildJumpStandB, {{-160, -64}}, jump, nullptr, true});
+  // The pages: their frames without the saves, and their callees' below
+  // (the jumps' without theirs).
+  Run(h, w, {"BuildScreen::GroupsPage (sub_8219EEC0; sub_8219DBC8, sub_8219DDB8)", 300,
+             __imp__sub_8219EEC0, hooks::BuildGroupsPage, {{-96, -16}, {-256, -168}}, page,
+             nullptr, true});
+  Run(h, w, {"BuildScreen::BuildsPage (sub_8219F048; sub_8219DFA8, sub_8219E348)", 300,
+             __imp__sub_8219F048, hooks::BuildBuildsPage, {{-112, -24}, {-272, -184}}, page,
+             nullptr, true});
+  Run(h, w, {"BuildScreen::BuildPage (sub_8219F1C8; sub_8219E600, sub_8219E9A0)", 300,
+             __imp__sub_8219F1C8, hooks::BuildBuildPage, {{-112, -24}, {-272, -176}}, page,
+             nullptr, true});
+}
+
 // The hub's world: the movie table's pairs 0 (the movie), 9 and 10 (two
 // stubs whose loaded flags are in the hub's area), the movie's object (+28)
 // there, the menu's cursor, the data's image lists (counts 0 to 4, records
@@ -1567,6 +1672,10 @@ void Type2Screens(Context& h) {
     SheetAndBuild(h, w);
     Hub(h, w);
     BuildEntry(h, w);
+    // Last, so the cases before keep the seeds they had (the hub's MenuPage
+    // cases reach sub_8218D708, the original on both sides, over a random
+    // car spec: some seeds send it into a loop reading guest 0).
+    BuildLevels(h, w);
   }
 }
 

@@ -639,6 +639,50 @@ uint32_t BuildSetUpStatus(uint8_t* base, uint32_t sp, const Calls& calls);
 // ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0). FadeIn's r3. 96-byte frame.
 uint64_t BuildEnter(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The build screen's level pages and their jumps (build_pages.cpp) ---
+//
+// The jumps (the shoulder buttons over the list [0x826D8440]): the player's
+// action mapper (0x826BAB80 + 8 x [0x826BABA4], none when its +4 is 1)
+// asked through its slot 12 (+48, through `calls`) for the back action,
+// then the forward one; the cursor (the list's scroll + selection) moved to
+// the previous (from the cursor down, wrapping from the end) or next
+// (wrapping to the start) item the jump takes; then UiMovie::FinishNamed on
+// movie 6 (29 + the selection for the groups, 61 + it for the builds, 93
+// for the stand), MenuList::SetSelection(the item less the scroll) and
+// MenuList::Fit(0) through `calls`. 1 when it jumped, else 0. 160-byte
+// frames (the movie id at +80).
+// sub_8219DBC8 JumpGroupA: 161 and 162 over the shown groups (the screen's
+// +0x318C4, count +0x319A4) marked (+32 set).
+uint32_t BuildJumpGroupA(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219DDB8 JumpGroupB: 163 and 164 over the groups whose +28 is 0.
+uint32_t BuildJumpGroupB(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219DFA8 JumpBuildA: 161 and 162 over the screen's build list
+// (+0x319A8, its halfword count +0x31FF0) to builds whose +32 isn't their
+// +36.
+uint32_t BuildJumpBuildA(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219E348 JumpBuildB: 163 and 164 to builds whose kind (+8) isn't 2.
+uint32_t BuildJumpBuildB(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219E600 JumpStandA and sub_8219E9A0 JumpStandB: as JumpBuildA and B
+// with the named animation 93.
+uint32_t BuildJumpStandA(uint8_t* base, uint32_t sp, const Calls& calls);
+uint32_t BuildJumpStandB(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219EEC0 BuildScreen::GroupsPage (level 0): MenuList::Update on the
+// list; still, JumpGroupA and B (their plain C++); moving or jumped,
+// transition 3 and sound 4; else accepted (sound 0, transitions 6 then 7
+// to level 1), cancelled (sound 2, transition 5 to level 4) or the list's
+// +28 set (sound 4, transition 4). The last call's r3. 96-byte frame.
+uint64_t BuildGroupsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219F048 BuildScreen::BuildsPage (level 1): both lists updated; the
+// list moving or a jump (JumpBuildA, B), transition 8; the group list
+// moving (+24), transition 9 (sound 4 for both); accepted, transitions 11
+// then 12 to level 2 (sound 0); cancelled, transition 10 back (sound 2).
+// The last call's r3. 112-byte frame.
+uint64_t BuildBuildsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8219F1C8 BuildScreen::BuildPage (level 2): as BuildsPage with
+// JumpStandA, B and transitions 14, 15, 17 then 18 to level 3 (the selected
+// build's +36 = its +32), 16 back.
+uint64_t BuildBuildPage(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The machines' set-ups (init_states.cpp) ---
 //
 // The transitions added to `machine` (StateMachine::Add's plain C++) from
