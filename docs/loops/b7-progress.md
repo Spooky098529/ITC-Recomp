@@ -80,7 +80,12 @@ file's history. What's left to see in a drive, from every run:
   and base classes, the list part, the panel screens' group pair; 0
   errors; 43 ready groups (through vtables the panel handlers call the
   car list, `PanelSet`, a new lead); 2 leads added; no subagents).
-  Migration agent running.
+  Migration 42695d6d..cfbe6bd6 (`--native_type67_screens`, harness
+  `type67_screens`: the list and node screens' handlers, the panel
+  screens, the group pair and panel groups, `Type7PanelScreen::PickCar`;
+  48 of 48 in play, 1 adapter removed; race 38 s, 0 errors, its
+  harnesses 0 differing; no subagents); left: none. Validation agent
+  running.
 
 ## Done
 
@@ -121,3 +126,5 @@ file's history. What's left to see in a drive, from every run:
   known 425, unknown 1143).
 - After the type 6 and 7 screens' map: ours 4801, work left 1624
   (wrapped 56, known 473, unknown 1095).
+- After its migration: ours 4849, work left 1576 (wrapped 56, known
+  425, unknown 1095).

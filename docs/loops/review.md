@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The type 6 and 7 screens' migration (42695d6d..cfbe6bd6,
+  `--native_type67_screens`, 48 functions): the car list's vtable
+  calls stay guest calls; `PanelScreen::DrawList`'s adapter removed
+  (the other screens' draws that call it, never seen in play, run the
+  original); the 97 functions never seen in play keep their recompiled
+  code. Some harness groups have few cases (2 to 12: the movie opens,
+  releases, getters and the group pair's small steps).
+
 - `functions/type67-screens.md` (new, 145 rows, 48 in play; 973a1f10):
   the type 6 and 7 modes' list, panel and node screens (the panel
   screen is the car pick: +9644 the car list `PanelSet`, slot 3 copies
