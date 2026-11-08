@@ -1,0 +1,201 @@
+# Known functions: the car dealer
+
+A front-end screen of the type 2 mode (`82180C08`-`82185920`, with
+`sub_82199B38`): the **car dealer**, where the player buys a car. It
+lists the cars the save data's bit set at +0x19924 marks (car ids 0 to
+71; each a copy of the car's spec, `Params::GetCarSpec`, in a list by
+the spec's byte +771: 0 the first list, 1 the second, others not sold),
+shows the selected one on the stand (`GarageStage::`,
+[`front-end-car-draw.md`](front-end-car-draw.md),
+[`car-makers.md`](car-makers.md)) with four car cards
+(`CarCard::Fill`, `CarCards::FillAll`,
+[`front-end-screen-helpers.md`](front-end-screen-helpers.md)) and its
+numbers, lets the player pick one of the car's colors (the spec's
+records at +8116, HSV turned into RGB, `Color::HsvToRgb`,
+[`material-passes.md`](material-passes.md)), and buys it: the price
+(+744) taken from the money (save +6116), the car added to the garage
+(`Garage::Add`, [`career.md`](career.md)) unless the garage is full
+(the count +6328 against save +0x1991C, probably the garage's size) or
+the money is short. With an empty garage (the career's start) it's the
+first car's purchase: the screen opens straight on the car list, can't
+be left without a car, and starts the first race after it
+(`CarDealer::StartFirstRace`). Names are ours: "dealer" is a guess from
+what the screen does (the lead guessed the car dealer or the garage
+list); which list is which (the spec's byte +771) isn't known.
+
+The type 2 mode's Init (`sub_82197278`, a lead in `../loops/leads.md`)
+allocates a 162,688-byte block at the mode's +848 and sets up 13 screen
+machines in it; this one is at +0x19978, set up by
+`CarDealer::InitStates` (`sub_82185920`) with 23 transitions
+(`StateMachine::Add`, [`game-modes.md`](game-modes.md); keys (state,
+message, 0, 0), member function functors over vtable `0x82011918`, r3
+the machine and r4 the mode, whose message ring at +204 the handlers
+post to as `CarDetail::Open` does): 0 create, 1 open UI movie 4, 2 wait
+for it, 4 start, 5 running (message 0 the transitions and the stand, 1
+the page's input; 26, 29 to 31 and 38 to 42 the replies of the dialogs
+other screens show for it; 9 unload, 50 to state 10 with no handler),
+8 leave (message 3), 7 destroy (message 4, from 5, 9 or 10 after
+`CarDealer::Close`), 9 (message 10, `ScreenMachine::Reenter`
+`sub_822895E0`, [`location-screen.md`](location-screen.md)). The
+screen's messages to the others (6 back to the mode's hub, 24 the
+spec sheet at `[0x826D8464]`, 28 the buy question, 32, 34, 36 and 37
+the dialogs, 4) go to machines not mapped yet (the type 2 mode's
+others, a lead). Its globals (`../known-data.md`): the page object
+`[0x826D83E8]` (6 pages, input handlers run by `CarDealer::UpdatePage`,
+and 22 page transitions, animation handlers run by `CarDealer::Update`
+until they report done), two menus `[0x826D83EC]` and `[0x826D83F0]`
+(72 bytes; `MenuList::`, [`race-screens.md`](race-screens.md)) and the
+dealer's data `[0x826D83F4]` (1,196 bytes: the lists, the selection,
+the dialogs' state). Page 0 picks the list (the first menu's two
+items), 1 is the car list (the cards; the first menu, the second
+menu's selection kept for the stand), 2 one car (buy or its specs), 3
+its color (the second menu), 4 leaving (message 9), 5 done (message
+50). Read 2026-11-08 by the B7 loop's mapping agent: the machine's set-up,
+the handlers, the pages, the set-up and teardown, the buy and the small
+helpers in full; the transitions skimmed (their animations, calls and
+page object writes), marked "Not read in detail".
+
+Shared, with their rows where they are: the car cards (`CarCard::Fill`
+`sub_821821C8`, `CarCards::FillAll` `sub_821822F8`,
+`CarCard::FillDetail` `sub_821827E0`, `CarDetail::Open` `sub_821830C0`,
+this screen's (5, 29) handler; `front-end-screen-helpers.md`), the
+stand's car makers (`GarageStage::ShowCarById` `sub_82182C90`,
+`GarageStage::ShowCarByIdWithClass` `sub_82182D30`, `ReloadModel`,
+`CarModels::BlockOf`, `CarData::FromGarageCar`, `GarageCar::Reset`;
+`car-makers.md`), `GarageStage::Draw`, `Command`, `IsBusy` and
+`SetDrawWord` (`front-end-car-draw.md`), `GarageStage::SetPlates`
+([`type6-type7-modes.md`](type6-type7-modes.md)), the UI movie calls
+([`ui-movies-game.md`](ui-movies-game.md),
+[`ui-movies.md`](ui-movies.md)), `MenuSound::Play`
+([`menu-sounds.md`](menu-sounds.md)), `MenuList::Init`
+([`save-data.md`](save-data.md)) and `Release`
+([`alt-hud.md`](alt-hud.md)), the screen fades
+([`mode-tick.md`](mode-tick.md)), the career's (`Career::PickNext`,
+`PickFromCar`, `SetUpEvent`, `Garage::Add`, `Car::SetModelAndClass`;
+`career.md`), `Race::SetUp`, `Car::Clear`, `Car::Init`, `Car::SetModel`
+([`race-setup.md`](race-setup.md)), `SaveData::Of`
+([`vehicle-accessors.md`](vehicle-accessors.md)), `VirtualAlloc` and
+`VirtualFree` ([`heap.md`](heap.md)) and `memcpy`
+([`c-runtime.md`](c-runtime.md)).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82185920` | `CarDealer::InitStates` | | r3 = the dealer's machine (the type 2 mode's block +0x19978): 23 transitions through `StateMachine::Add`, keys (state, message, 0, 0), each a member function functor (vtable `0x82011918`, the machine, the function) with the next state at the storage's +24 (0 unless given): (0, 1) `CarDealer::Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForLoad`; (4, 1) → 5 `Start`; (5, 1) `UpdatePage`; (5, 0) `Update`; (5, 26) `sub_82183078`; (5, 40) `sub_82180C18`; (5, 30) `sub_82180C30`; (5, 29) `CarDetail::Open` (`front-end-screen-helpers.md`); (5, 31) `sub_82180C48`; (5, 38) `OnYes`; (5, 39) and (5, 41) `OnNo`; (5, 42) `OnDialogDone`; (5, 9) → 8 `Unload`; (5, 50) → 10 with an empty functor (vtable `0x820069BC`, no function); (8, 3) `Leave`; (9, 10) `ScreenMachine::Reenter` (`sub_822895E0`, `location-screen.md`); (5, 4), (9, 4) and (10, 4) `Close`; (7, 4) → 6 `Destroy`. A 1,632-byte frame (`__savegprlr_25`). Only caller the type 2 mode's Init `sub_82197278` (a lead). Seen in play. Read in full. |
+| `sub_82180D68` | `CarDealer::Create` | | (0, 1). r3 = the machine: +9608 = 0; `VirtualAlloc`s (`MEM_COMMIT`, `PAGE_READWRITE`) the page object (28 bytes, `[0x826D83E8]`: +0, +4, +8, +24 = 0, +12 and +20 = -1), the two menus (72 bytes each, `[0x826D83EC]`, `[0x826D83F0]`: +60 and +68 = 0 when allocated) and the data (1,196 bytes, `[0x826D83F4]`: +0 and +20 = 0); then +9604 = 1 when +9612 is 0, else 9. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82180C08` | `CarDealer::OpenMovie` | | (1, 1) → 2. `UiMovies::Open(4, 22555)` (tail call). Seen in play. Read in full. |
+| `sub_82180F20` | `CarDealer::WaitForLoad` | | (2, 1). r3 = the machine: while +9608 is 0, +9608 = 1 once `UiMovies::IsLoaded(4)`; once set, +9604 = 9 when +9612 is set, else 4. Seen in play. Read in full. |
+| `sub_82184B80` | `CarDealer::Start` | | (4, 1) → 5. `CarDealer::BuildLists`, `CarDealer::FillStatus`; then the page object: with the data's +4 (an empty garage) the page 1 after transitions 5 and 6 (+4 = 1, +12 = 5, +16 = 6), else the page 0 after transitions 0 and 1 (+4 = 0, +12 = 0, +16 = 1); +0 = -1, +8 = the page before (when not already the new one); `GarageStage::SetDrawWord(stage, 0)`, `GarageStage::Draw(stage, 0, 1)`, `SetDrawWord(stage, 1)` (the stage: `[0x826D83E0]`'s +0 block); `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`. Seen in play. Read in full. |
+| `sub_82184AF0` | `CarDealer::UpdatePage` | | (5, 1). r4 = the mode: when the page object's +0 (the page) isn't -1, calls the page's handler with r3 = the mode, from a table on its stack: 0 `CarDealer::Page0`, 1 `Page1`, 2 `Page2`, 3 `Page3`, 4 `Page4`, 5 `Page5`. Seen in play. Read in full. |
+| `sub_82185600` | `CarDealer::Update` | | (5, 0). r3 = the machine (its +0 read, not used). `sub_82106540(100, 30, 0, 0x82009F10)` (the empty shared destructor, `audio.md`; its arguments set anyway); movie 4. With a transition running (the page object's +12 not -1), its handler from a 22-entry table on the stack (`CarDealer::Transition0` to `Transition21`) called with the page object's +24; when it answers nonzero, the queued transition (+16) starts (+12 = +16, +16 = -1, +20 and +24 = 0) or, with none, the page becomes +4 (+0 = +4, +12 = -1); with none running and the page not 4, `UiMovie::Run(movie, 0)`. Then, when the data's +28 (a car shown) is set and the page isn't 4: the stand's busy marker (`GarageStage::IsBusy` against the data's +20: `CarDealer::ShowBusy` when it turns busy, `HideBusy` when it turns idle); with no model yet (the data's +32 0), `GarageStage::ReloadModel(stage, CarModels::BlockOf(the selected car's id))` into +32 and, when it answers nonzero, `GarageStage::Command(stage, 55)` and `GarageStage::ShowCarById(the color's selection + scroll)`; with the model there, `GarageStage::Draw(stage, 0, 1)`. Without +28 and with +20 set, `HideBusyNow` and +20 = 0. A 320-byte frame (`__savegprlr_16`). Seen in play. Read in full. |
+| `sub_82181558` | `CarDealer::ShowBusy` | | Movie 4: named animations 80 and 79 played (`UiMovie::PlayNamed`, the rest 0), then `UiMovie::LoopLast`. From `CarDealer::Update`. Seen in play. Read in full. |
+| `sub_821815D8` | `CarDealer::HideBusy` | | Movie 4: named animation 81 played, 79 finished (`UiMovie::FinishNamed`). From `CarDealer::Update`. Seen in play. Read in full. |
+| `sub_82181640` | `CarDealer::HideBusyNow` | | As `CarDealer::HideBusy`, with 81 finished too. From `CarDealer::Update`. Not seen in play. Read in full. |
+| `sub_82183078` | `CarDealer::OnMessage26` | | (5, 26): the page object's +0 = 2 (+8 the page before when not 2), +12 and +16 = -1; then `CarDealer::SetPrompts(0, 0, 1, 1, -1, -1)` (tail call). Probably back to the car's page after another screen. Not seen in play. Read in full. |
+| `sub_82180C18` | `CarDealer::OnMessage40` | | (5, 40): the data's +36 (the dialog's step) = 1. Leaf. Not seen in play. Read in full. |
+| `sub_82180C30` | `CarDealer::CloseDetail` | | (5, 30): the data's +12 (set by `CarDetail::Open`) = 0. Leaf. Not seen in play. Read in full. |
+| `sub_82180C48` | `CarDealer::AfterDetail` | | (5, 31): only when the data's +12 is 0: with the data's +44 (the list) 0, transition 20 with nothing queued and no page after (+12 = 20, +16, +4 and +0 = -1); else transitions 10 then 11 and the page 2 after (+12 = 10, +16 = 11, +4 = 2, +0 = -1); +8 the page before when it differs. Leaf. Seen in play. Read in full. |
+| `sub_82181968` | `CarDealer::OnYes` | | (5, 38): the data's +16 (the answer) = 1; when +36 (the dialog's step) is 2, the money shown (+84) less the selected car's price (its +744) and `UiMovie::SetNumberText(movie 4, 15, 9, it)`. Seen in play. Read in full. |
+| `sub_82180CD0` | `CarDealer::OnNo` | | (5, 39) and (5, 41): the data's +16 (the answer) = 0. Leaf. Not seen in play. Read in full. |
+| `sub_82183160` | `CarDealer::OnDialogDone` | | (5, 42). r4 = the mode. By the data's +36 (the dialog's step): 0, with the answer (+16) set, transition 3 to page 5 and +8 = 1 (leaving after the purchase), else the page 1 with nothing running; 1, transition 14 to page 1, `CarDealer::SetPrompts(0, 0, 1, 1, -1, -1)`, +28 = 0; 2, with the answer set and an empty garage (+4) as step 3 without its +24, with the answer set otherwise `CarDealer::ShowDriveDialog`, message 34 and +36 = 3, without it message 32 and transitions 10 then 11 to page 2; 3, +24 = the answer, transition 3 to page 4, message 32 and `CarDealer::Buy`. The messages are posted on the mode's ring as `CarDetail::Open` does. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82182E68` | `CarDealer::Buy` | | Player 0's save data (`SaveData::Of(0)`): the money (+6116) less the selected car's price (its +744; 0 when short); a garage car on the stack (2,112-byte frame, the car at +96) made with `GarageCar::Reset` and `Car::SetModelAndClass(it, the car's id)`, its halfword +100 = the color (the data's +56 + +60) when 0xFFFF, +96 the same, +98 the old +96; `Garage::Add(save, car)`; the stats' halfword +6052 up to 9999 (probably the cars bought); the new last garage car's +1780 (20 bytes) from `[0x826D8438]`'s +4. With an empty garage before (the data's +4) the selected garage car (save +0x19920) = the new one and `Career::PickFromCar(save)`; else with the data's +24 (the second answer) the same selection, `Career::PickNext(save, 1)`, the save's pick (+8, 20 bytes) copied to the data's +64 and `UiMovie::SetChildNameText(movie 4, 15, 6, +64)`. From `CarDealer::OnDialogDone`. Seen in play. Read in full. Was in the career screens' lead (`../loops/leads.md`). |
+| `sub_821816B8` | `CarDealer::Unload` | | (5, 9) → 8. r3 = the machine: every entry of the two lists (+104, its count +616; +620, +1132) and the colors (+1140, +1192) freed (`VirtualFree(entry, 0, MEM_RELEASE)`, from the last); `UiMovie::FinishAll(movie 4)`; when +9616 is set, `UiMovies::Delete(4)` and +9608 = 0. Seen in play. Read in full. |
+| `sub_821817C0` | `CarDealer::Leave` | | (8, 3). r3 = the machine, r4 = the mode: with an empty garage at the start (the data's +4) +9604 = 10 and `CarDealer::StartFirstRace` (tail call); else +9604 = 9 and message 6 posted on the mode's ring. Seen in play. Read in full. |
+| `sub_82180CE8` | `CarDealer::StartFirstRace` (probably) | | No arguments. The boot movies' list (`0x826C5BAC`, `boot-mode.md`): the five ids 11 (none), +20 (the mode after them) = 1, +24 = 1, +28 = 0; `Career::SetUpEvent(SaveData::Of(0), 0, 0)`; `Race::SetUp(SaveData::Of(0), -1)`. From `CarDealer::Leave` and the title menu's `sub_82221AC0` (a lead). Seen in play. Read in full. Was in the lead of `Race::SetUp`'s callers (`../loops/leads.md`). |
+| `sub_82181838` | `CarDealer::Close` | | (5, 4), (9, 4) and (10, 4). r3 = the machine, r4 = the mode: +9604 = 7; `UiMovie::FinishAll(movie 4)`, `UiMovies::Delete(4)`; the two lists' entries freed (as `CarDealer::Unload`; not the colors); message 4 posted on the mode's ring. Seen in play. Read in full. |
+| `sub_82180E70` | `CarDealer::Destroy` | | (7, 4) → 6. r3 = the machine: +9604 = 14 when the data's +8 (left after a purchase) is set, else 20 when +4 (an empty garage) is set (else left at 6); `MenuList::Release([0x826D83EC])`; the page object, both menus and the data freed (`VirtualFree`, `MEM_RELEASE`) and the three globals cleared (not `[0x826D83F0]`). Seen in play. Read in full. |
+| `sub_821813B0` | `CarDealer::BuildLists` | | From `CarDealer::Start`. Player 0's save data: its pick (+8, 20 bytes) copied to the data's +64; the data's +84 = the money (+6116), +88 = the day (+6100) % 7, +92 = the day (at most 999), +96 = the garage's count (+6328), +100 = save +0x1991C (probably the garage's size); +4 = 1 when the count is 0 or less, else 0. Then for each car id 0 to 71 whose bit is set in the save's bit set at +0x19924: an 8,448-byte entry (`VirtualAlloc`), +8432 = the id, its first 8,432 bytes the car's spec (`memcpy` from `Params::GetCarSpec(id)`); added to the first list (+104, count +616) when the spec's byte +771 is 0, to the second (+620, count +1132) when 1, else freed. Seen in play. Read in full. |
+| `sub_82183AC8` | `CarDealer::FillStatus` | | From `CarDealer::Start`. Movie 4: `UiMovie::ResetPose`; with a garage (the data's +4 0) `SetChildNameText(15, 6, the data's +64)` (the career's pick); `SetNumberText(15, 9, +84)` (the money); `SetText(15, 13, string 8, +92)` (the day); node (15, 11)'s frame (+108) = +88 (the weekday); `CarDealer::SetPrompts(0, 0, 1, 1, -1, -1)`; the data's +8, +28 and +32 = 0, +0 = 1. Seen in play. Read in full. |
+| `sub_82182B30` | `CarDealer::SetPrompts` (probably) | | r3 to r8 = three pairs: (r3, r4), (r5, r6), (r7, r8). Movie 4, sub-scene 16: for i = 0 to 2, node i and its two children by its +100 (the first and the next): with both of pair i not -1, both children shown (+80 = 1) with frames (+108) the pair's two values, else both hidden. Probably the button prompts. A 176-byte frame. From `OnMessage26`, `OnDialogDone`, `Page2`, `FillStatus`. Seen in play. Read in full. |
+| `sub_82182C28` | `CarDealer::SetHeader` (probably) | | r3, r4: movie 4's nodes (2, 1) and (2, 2) get the frames (+108) r3 and r4. From 10 transitions (the header's two parts by the page). Seen in play. Read in full. |
+| `sub_82180F90` | `CarDealer::Page0` | | The list's menu (`[0x826D83EC]`): `MenuList::Update`; when its +24 is set (moved), transition 2 with page 0 after (the page before kept) and `MenuSound::Play(4)`; accepted (`MenuList::Accepted`): the selection 0 sets the data's +1136 (the list shown) to +104, 1 to +620, +44 = the selection, and with entries (+1136's +512) transitions 4 then 6 to page 1 and sound 0, without sound 3; cancelled: transition 3 to page 4 and sound 2. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82183428` | `CarDealer::Page1` | | The car list (`[0x826D83EC]`, the cards): `MenuList::Update`; while it moves (its +24 set, or its +4 and +8 differ) transition 7 to page 1 and sound 4; accepted, the data's +48 = the selection and +52 = the menu's +4 (the scroll), transitions 9 then 11 to page 2, sound 0; cancelled, sound 2 and with an empty garage `CarDealer::ShowFirstCarDialog`, message 34, the data's +36 = 0 and no transition, else transition 8 to page 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82183600` | `CarDealer::Page2` | | One car: both menus updated (`MenuList::Update`); while the first moves, transition 12 to page 2 and sound 4; while the second does, transition 13; accepted (sound 0): selection 1 `CarDealer::SetUpSpecSheet`, message 24 and `SetPrompts(0, 1, -1, -1, -1, -1)`; selection 0 with the garage full (+100 not above +96) message 37 and string 22 in movie 19's (-1, 1) (`UiMovie::SetText`), with the price (+744) above the money (+84) the same with string 23, with the first list (+44 0) transitions 15 then 16 to page 3, else `CarDealer::CheckLimits`, message 28 and transition 21. Cancelled: transition 14 to page 1, +28 = 0, sound 2. With `MenuList::Pressed166`: the car id 43 and 2 swapped in the entry's +8432 (two versions of one car, probably), `CarDealer::ReloadStandModel` and the help line (`HelpLine::Set`) string 1864 or 1905. A 144-byte frame. Seen in play. Read in full. |
+| `sub_82181A10` | `CarDealer::Page3` | | The color menu (`[0x826D83F0]`): `MenuList::Update`; while it moves, transition 17 to page 3 and sound 4; accepted, `CarDealer::CheckLimits`, the data's +56 = the selection, +60 = the menu's +4, transition 19 with no page after, message 28 and sound 0; cancelled, transition 18 to page 2 and sound 2. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82181B98` | `CarDealer::Page4` | | Message 9 posted on the mode's ring (r3; to `CarDealer::Unload`). Leaf. Seen in play. Read in full. |
+| `sub_82181BE8` | `CarDealer::Page5` | | Message 50 posted on the mode's ring (r3; state 10). Leaf. Not seen in play. Read in full. |
+| `sub_82184C70` | `CarDealer::Transition0` | | Opening (the list's menu): first call, the data's +40 = 0, `CarDealer::OpenListMenu`, `SetHeader(0, 0)`, named animations 149 and 83 (83 looped); then `UiMovie::Run(movie 4, 0)` until 0, then 75 and 77 looped. Answers 1 when Run is done. Seen in play. Not read in detail. |
+| `sub_82181C38` | `CarDealer::Transition1` | | The list's menu shown: first call, the selected list's animation (37 for the first with entries, 38 for the second) played and looped; nodes (8, 5) and (8, 6) colored 0 or 2 (`UiMovie::SetNodeColor`) by whether each list has entries; then `Run`. Answers 1. Seen in play. Not read in detail. |
+| `sub_82183BD8` | `CarDealer::Transition2` | | The list's menu moved: nodes (11, 0) and (11, 1) frames by the selection; animation 78 finished and played, the previous item's (37 + it) finished, the new one's played and looped as `Transition1`; 47 or 48 played by the menu's +24 (the direction); the help line string 550 + the selection, or 583 when its list is empty. Answers 1. Not seen in play. Not read in detail. |
+| `sub_82181D68` | `CarDealer::Transition3` | | Leaving: first call `ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0)`; then `Run`; answers 1 when both fades' counts (`0x826A50E4`, `0x826A50DC`) are 0. Seen in play. Read in full. |
+| `sub_82184DA0` | `CarDealer::Transition4` | | Opening the car list: first call the data's +48 and +52 = 0, `CarDealer::OpenCarList`, `SetHeader(0, 1)`, the list's animation (37 + the selection) finished, 150 played; answers 1 when `Run` is done. Seen in play. Not read in detail. |
+| `sub_82184E60` | `CarDealer::Transition5` | | The first car's opening: as `Transition4` with the first list set (+1136 = +104, +44 = 0), `SetHeader(1, 1)`, animations 159 and 83 (looped), then 75 and 77 looped when done (as `Transition0`). Seen in play. Not read in detail. |
+| `sub_82181E10` | `CarDealer::Transition6` | | First call, the selected card's animation (24 + the selection) and 34 played and looped; `Run`; answers 1. Seen in play. Not read in detail. |
+| `sub_82183DE0` | `CarDealer::Transition7` | | The car list moved: the previous card's animation (24 + it) finished, the new one's played and looped; when the scroll changed, the cards refilled (`CarCards::FillAll`), animations 29 and 30 finished, the card coming in filled (`CarCard::Fill` with node (7, 9) and the entry before or after the shown four) and 30 or 29 played, and `CarDealer::SetScrollArrows`; the help line string 1862 + the car's id. Answers 1. Seen in play. Not read in detail. |
+| `sub_82184FB8` | `CarDealer::Transition8` | | Back to the list's menu: first call the card's animation and 34 finished, 153 played, the data's +40 = +44, `OpenListMenu`, `SetHeader(0, 1)`; when `Run` is done, transition 1 with nothing queued and page 0 after, +24 = 0. Answers 0 (it sets the next transition itself). Seen in play. Not read in detail. |
+| `sub_821850B8` | `CarDealer::Transition9` | | Opening a car: first call the card's animation and 34 finished, 151 played, `CarDealer::ReloadStandModel`, `CarDealer::OpenCar`; answers 1 when `Run` is done. Seen in play. Not read in detail. |
+| `sub_82185178` | `CarDealer::Transition10` | | Back to a car (after the colors or the specs): first call 158 played, `OpenCar`, `ReloadStandModel`, `SetHeader(3, 1)`; answers 1 when `Run` is done. Not seen in play. Not read in detail. |
+| `sub_82181ED0` | `CarDealer::Transition11` | | The car shown: first call the item's animation (37 + the selection), 86 and 87 played and looped, the data's +28 = 1 (the stand drawn); `Run`; answers 1. Seen in play. Not read in detail. |
+| `sub_82181FC0` | `CarDealer::Transition12` | | The car's menu moved: the previous item's animation (37 + it) finished, the new one's played and looped; 47 and 48 finished and one played by the menu's +24. Answers 1. Not seen in play. Not read in detail. |
+| `sub_82183F68` | `CarDealer::Transition13` | | The second menu moved on the car's page: the data's +48 and +52 = its selection and +4, `ReloadStandModel`, `CarDealer::ShowCarInfo(the sum)`, the help line string 1862 + the car's id. Answers 1. Not seen in play. Read in full. |
+| `sub_82185220` | `CarDealer::Transition14` | | Back to the car list: first call the item's animation, 86 and 87 finished, 154 played, `OpenCarList`; when `Run` is done, transition 6 with page 1 after, +24 = 0. Answers 0. Not seen in play. Not read in detail. |
+| `sub_82185310` | `CarDealer::Transition15` | | Opening the colors: first call the item's animation, 86 and 87 finished, 152 played, the data's +56 and +60 = 0, `CarDealer::OpenColors`, `SetHeader(1, 2)`; answers 1 when `Run` is done. Seen in play. Not read in detail. |
+| `sub_821820C0` | `CarDealer::Transition16` | | First call the color's animation (134 + the selection) played and looped; `Run`; answers 1. Seen in play. Not read in detail. |
+| `sub_82184018` | `CarDealer::Transition17` | | The color moved: the data's +56 and +60 = the menu's selection and +4; the previous color's animation (134 + it) finished, the new one's played and looped; 143 and 144 finished; `GarageStage::ShowCarByIdWithClass(the sum)`; without the menu's +32, 143 or 144 played by its +24, with it `CarDealer::SetColorBar(selection × 32 + 3)`; when the scroll changed, `CarDealer::ShowSwatches`, 29 and 30 finished and 146 or 145 played. Answers 1. Seen in play. Not read in detail. Was in the lead of the stand's car makers' callers (`../loops/leads.md`). |
+| `sub_82185400` | `CarDealer::Transition18` | | Back from the colors: first call the color's animation finished, 155 played, `OpenCar`, the help line string 1862 + the car's id, `SetHeader(2, 1)`; when `Run` is done, transition 11 with page 2 after, +24 = 0. Answers 0. Not seen in play. Not read in detail. |
+| `sub_821841B0` | `CarDealer::Transition19` | | The color picked: first call the color's animation finished, `SetHeader(2, 3)`, 156 played; answers 1 when `Run` is done. Seen in play. Read in full. |
+| `sub_82185518` | `CarDealer::Transition20` | | Back to the colors (after the buy question was declined): first call 157 played, `OpenColors`, `SetHeader(2, 3)`; when `Run` is done, transition 16 with page 3 after, +24 = 0. Answers 0. Not seen in play. Read in full. |
+| `sub_82184268` | `CarDealer::Transition21` | | Buying from the second list (no colors): first call the item's animation, 86 and 87 finished, `SetHeader(1, 3)`, 160 played; answers 1 when `Run` is done. Not seen in play. Read in full. |
+| `sub_82184338` | `CarDealer::OpenListMenu` | | `MenuList::Init([0x826D83EC], 2, 2, 1, 153, 154, 155, 156, 159 and 158 on the frame)`, its selection the data's +40 (`MenuList::SetSelection`), `CarDealer::SetKindBar(+40 × 40)`; movie 4's (8, 5) and (8, 6) strings 124 and 125 (`SetText`); nodes (11, 1) and (11, 0) frames 1 for selection 1, else 0; the help line string 550 + the selection, or 583 when its list is empty. A 160-byte frame. From `Transition0` and `Transition8`. Seen in play. Read in full. |
+| `sub_82184488` | `CarDealer::OpenCarList` | | n = the shown list's count (+1136's +512): `MenuList::Init([0x826D83EC], n, min(n, 4), 1, 153, 154, 155, 156, ...)` and `[0x826D83F0]` (n, min(n, 4), 1, 162, 161, 153, 154, ...); the first's selection = the data's +48, its +4 = +52, `MenuList::Fit(menu, 1)`; movie 4's cards (7, 5 to 8) shown for those below n; node (7, 1) shown with more than four and `CarDealer::SetScrollArrows(scroll, n)`; `CarCards::FillAll`; the help line string 1862 + the selected car's id. A 176-byte frame. From `Transition4`, `Transition5`, `Transition14`. Seen in play. Read in full. |
+| `sub_82184650` | `CarDealer::OpenCar` | | `MenuList::Init([0x826D83EC], 2, 2, 1, 153, ...)` (buy, specs); `[0x826D83F0]`'s selection = the data's +48 and its +4 = +52, `MenuList::Fit`; `SetKindBar(selection × 40)`; strings 127 and 112 at (8, 5) and (8, 6); `CarDealer::ShowCarInfo(+48 + +52)`; nodes (-1, 23) and (-1, 24) shown unless the list has one car; `GarageStage::SetPlates(stage, 0)`. A 144-byte frame. From `Transition9`, `Transition10`, `Transition18`. Seen in play. Read in full. |
+| `sub_821847A0` | `CarDealer::OpenColors` | | The selected car's entry e: n = its color count (+8376); `MenuList::Init([0x826D83EC], n, min(n, 9), 1, 153, ...)`, selection = the data's +56, its +4 = +60, `MenuList::Fit`; `SetColorBar(selection × 32 + 3)`; node (-1, 25) shown with more than nine; the old color records freed (+1140, count +1192); for each color (20-byte records from e +8116: +0 a halfword kind, +4 a halfword, +6 and +7 bytes): a 32-byte record (`VirtualAlloc`) with +16 the halfword +4 and +20 the byte +6 (× `[0x82002200]`) as floats, +24 the byte +7 plus `[0x82002FF4]` (kind 1) or `[0x82002FF8]` (others), clamped to 0 to 255 and scaled, `Color::HsvToRgb` on +16 to +24 into +0 to +8 (× `[0x82000C44]`, as integers), added to +1140; sub-scene 26's swatches shown for those below n; `CarDealer::ShowSwatches`; `GarageStage::ShowCarById(+56 + +60)`; the help line string 552. A 240-byte frame. From `Transition15` and `Transition20`. Seen in play. Read in full; the floats' constants not looked up. Was in the paint color screen's lead (`../loops/leads.md`). |
+| `sub_82182620` | `CarDealer::ShowCarInfo` | | r3 = an index in the shown list: from the entry e, a 24-byte record on the stack (e's byte +770, its byte +709 != 0, +712, +648, `(int)` +652, +660) for `CarDealer::SetSpecTexts`; `CarDealer::SetNameTexts(e +8432, e's byte +769)`; `CarDealer::SetPriceTexts(e +744)`. A 128-byte frame. From `OpenCar` and `Transition13`. Seen in play. Read in full. |
+| `sub_821824A8` | `CarDealer::SetSpecTexts` | | r3 = the record from `ShowCarInfo`. Movie 4, sub-scene 18: child 5 string 421 + +0, 6 426 + +4, 7 string 8 with +12, 8 string 8 with +8 × a double (`[0x82009F00]`), 11 string 8 with +16, 12 string 436 with +20 × a double (`[0x82009F08]`), and the labels 438, 440, 437, 439 at 9, 10, 13, 14 (`UiMovie::SetText`). Probably the car's drive, transmission, weight, power, torque and a ratio. Seen in play. Read in full. |
+| `sub_82182388` | `CarDealer::SetNameTexts` | | r3 = a car id, r4 = a byte: movie 4's (-1, 20) string 1934 + r4, (-1, 21) 1646 + r3, (-1, 22) 1718 + r3 (`SetText`), as the card's texts. From `ShowCarInfo`. Seen in play. Read in full. |
+| `sub_82182418` | `CarDealer::SetPriceTexts` | | r3 = the price: movie 4's (19, 2) `SetNumberText(r3)`, (19, 3) string 435, (19, 4) string 527 with r3. From `ShowCarInfo`. Seen in play. Read in full. |
+| `sub_82182158` | `CarDealer::SetKindBar` (probably) | | r3 = an integer: movie 4's node (8, 0) +16 (a float) = r3. From `OpenListMenu` and `OpenCar` (selection × 40: probably the menu's highlight position). Seen in play. Read in full. |
+| `sub_82182770` | `CarDealer::SetColorBar` (probably) | | r3 = an integer: movie 4's node (26, 0) +16 = r3 as a float. From `OpenColors` and `Transition17` (selection × 32 + 3). Seen in play. Read in full. Was in the paint color screen's lead. |
+| `sub_821826C0` | `CarDealer::ShowSwatches` | | Movie 4's node (26, 1); for up to nine colors (the count +1192), from the color menu's scroll (`[0x826D83EC]` +4): sub-scene 26's swatch (its +100 + i) colored from the record (`CarDealer::SetSwatchColor`). A 144-byte frame. From `OpenColors` and `Transition17`. Seen in play. Read in full. Was in the paint color screen's lead. |
+| `sub_82181270` | `CarDealer::SetSwatchColor` | | r3 = a node, r4 = a color record: the node's child 2 (`UiMovie::Child`) +56, +60, +64 = the record's +0, +4, +8 (red, green, blue). From `ShowSwatches`. Seen in play. Read in full. |
+| `sub_82182DD0` | `CarDealer::SetScrollArrows` | | r3 = the scroll, r4 = the count: movie 4's (7, 3) and (7, 4) (+80 shown): with the scroll 0 the first hidden and the second shown; else the first shown and the second shown unless scroll + 4 = the count. From `Transition7` and `OpenCarList`. Seen in play. Read in full. |
+| `sub_82181330` | `CarDealer::ReloadStandModel` | | `GarageStage::ReloadModel(stage, CarModels::BlockOf(the selected car's id))` into the data's +32; +56 and +60 (the color) = 0. From `Page2`, `Transition9`, `Transition10`, `Transition13`. Seen in play. Read in full. Was in the lead of the stand's car makers' callers. |
+| `sub_821812B8` | `CarDealer::CheckLimits` (probably) | | The selected car's spec: `[0x826D8438]`'s +48 = 1, and its +44 = 1 when +648 ≤ 2000, +716 ≤ 4700, +720 ≤ 2000 and +724 ≤ 1700, else 0 (another screen's object; what it checks isn't known). Leaf. From `Page2` and `Page3`. Seen in play. Read in full. |
+| `sub_821810E0` | `CarDealer::SetUpSpecSheet` (probably) | | For message 24: the selected car's spec into `[0x826D8464]` + 16 (another screen's): +80 = 1, +0 = 0, +4 to +16 the spec's +712, +716, +724, +720, +20 the id, +24 and +28 bytes +769 and +770, +32 by the byte +708 (0 to 7, a jump table: 0, 1, 2, 3, 4, 5 or 6; above 7 not written), +36 byte +709 != 0, +40 +648, +44 and +48 `(int)` +652 and +656, +52 the float +660, +56 `(int)` +664; a car object on its 2,000-byte frame (`Car::Clear`, `Car::SetModel(id)`), then `CarData::FromGarageCar(stage, car, record +96)`. From `Page2`. Not seen in play. Read in full. |
+| `sub_8218119C` | | | A piece of `CarDealer::SetUpSpecSheet` (the byte +708's case 6, given its own entry by the recompiler; 6 into the record's +32, then the rest as the function's). Called only from it. Not seen in play. Read in full. |
+| `sub_82182990` | `CarDealer::ShowDriveDialog` (probably) | | Movie 16: its word +40960 = 0; node (-1, 0) `SetNodeText` string 97 with the car's 1934 + byte +769, 1646 + id and 1718 + id, (1, 3) string 2, (1, 4) string 3 (yes, no). A 160-byte frame. From `OnDialogDone` (step 2, before message 34). Not seen in play. Read in full. |
+| `sub_82182A80` | `CarDealer::ShowFirstCarDialog` (probably) | | Movie 16: +40960 = 1; (-1, 0) string 28, (1, 3) 2, (1, 4) 3. From `Page1` when leaving with an empty garage. Not seen in play. Read in full. |
+| `sub_82199B38` | `HelpLine::Set` (probably) | | r3 = a string id: movie 4's (17, 0) `SetText(r3)`, `UiMovie::ScrollText(17, 0, 1)` and the scroll reset (`sub_8211C5F8`). Probably the help line at the screen's bottom. A 112-byte frame. 13 callers: this screen's and `sub_82199C10`, `sub_82199E48`, `sub_8219A5E8`, `sub_8219AA00`, `sub_8219AF50` (another screen's, not mapped). Seen in play. Read in full. Was in the paint color screen's lead. |

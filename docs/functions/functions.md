@@ -639,6 +639,10 @@ Rows not yet moved stay in the table below. So far:
   releases (types 2, 4, 5, 9, 10 and 12), the save screen's and the
   options' save dialogs (their text setters and the steps that show
   them) and the car cards (B7).
+- [`car-dealer.md`](car-dealer.md): the car dealer, a screen of the
+  type 2 mode where the player buys a car (the first one at the
+  career's start): its state machine, pages and transitions, its car
+  lists, colors and the buy, and the help line (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
