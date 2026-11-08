@@ -480,6 +480,7 @@ set(ITC_SOURCES
     src/car_dealer/transitions.cpp
     src/car_dealer/update.cpp
     src/car_dealer/pages.cpp
+    src/car_dealer/menus.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

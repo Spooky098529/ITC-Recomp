@@ -87,6 +87,11 @@ constexpr uint32_t kListPressed166 = 0x8220BF90;
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 constexpr uint32_t kShowFirstCarDialog = 0x82182A80;
 constexpr uint32_t kSetUpSpecSheet = 0x821810E0;
+constexpr uint32_t kListInit = 0x8220BAC0;
+constexpr uint32_t kListSetSelection = 0x8220BC30;
+constexpr uint32_t kListFit = 0x8220BC40;
+constexpr uint32_t kCarCardsFillAll = 0x821822F8;
+constexpr uint32_t kStageSetPlates = 0x82178DE8;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -289,5 +294,33 @@ uint64_t SetPrompts(uint8_t* base, const uint32_t args[6], uint32_t sp);
 // (UiMovie::SetText, its unset varargs 0), ScrollText(17, 0, 1) and the
 // scroll reset sub_8211C5F8. The reset's r3. 112-byte frame.
 uint64_t HelpLineSet(uint8_t* base, uint64_t id, uint32_t sp, const Calls& calls);
+
+// --- The menus' openers (menus.cpp) ---
+//
+// Each sets up the list menu (MenuList::Init with the menu actions 154, 153,
+// 155, 156 in r7 to r10 and 159, 158 at the frame's +84 and +92) and the
+// color menu where it reads it (MenuList::SetSelection and Fit), all
+// through their overrides, and movie 4's nodes; UiMovie::SetText's unset
+// varargs 0. The last call's r3.
+
+// sub_82184338 CarDealer::OpenListMenu: the list's menu (two items), its
+// selection the data's +40, SetKindBar (its plain C++), strings 124 and 125
+// at (8, 5) and (8, 6), nodes (11, 1) and (11, 0) +108 by the selection,
+// HelpLine::Set (its plain C++) 550 + the selection or 583 for an empty
+// list. 160-byte frame.
+uint64_t OpenListMenu(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82184488 CarDealer::OpenCarList: both menus over the shown list's n
+// cars (min(n, 4) shown), the list menu's selection and scroll from the
+// data's +48 and +52, the cards (7, 5 to 8) shown below n, (7, 1) and
+// SetScrollArrows (its plain C++) with more than four, CarCards::FillAll
+// (through its override), the help line 1862 + the selected car's id.
+// 176-byte frame.
+uint64_t OpenCarList(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82184650 CarDealer::OpenCar: the list menu (buy, specs), the color
+// menu's selection and scroll from the data's +48 and +52, SetKindBar,
+// strings 127 and 112, ShowCarInfo (their plain C++), (-1, 23) and (-1, 24)
+// shown unless the list has one car, GarageStage::SetPlates(stage, 0)
+// (through its override). 144-byte frame.
+uint64_t OpenCar(uint8_t* base, uint32_t sp, const Calls& calls);
 
 }  // namespace car_dealer

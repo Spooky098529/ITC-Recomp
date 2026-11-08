@@ -40,7 +40,11 @@ ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
               "original), Page2 sub_82183600 (SetUpSpecSheet sub_821810E0, never seen in play, "
               "the original; SetPrompts', CheckLimits', ReloadStandModel's and HelpLine::Set's "
               "plain C++; SetText's unset varargs 0) and Page3 sub_82181A10 (MenuList:: and "
-              "MenuSound::Play through their overrides) "
+              "MenuSound::Play through their overrides); the menus' openers OpenListMenu "
+              "sub_82184338, OpenCarList sub_82184488 and OpenCar sub_82184650 (MenuList::Init, "
+              "SetSelection, Fit, CarCards::FillAll and GarageStage::SetPlates through their "
+              "overrides; SetKindBar's, SetScrollArrows', ShowCarInfo's and HelpLine::Set's plain "
+              "C++) "
               "(the same writes; checked by --run_harnesses=car_dealer)");
 
 namespace hooks {
@@ -245,6 +249,18 @@ void CarDealerSetPrompts(PPCContext& ctx, uint8_t* base) {
                             ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};
   ctx.r3.u64 = cd::SetPrompts(base, args, ctx.r1.u32);
 }
+void CarDealerOpenListMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::OpenListMenu(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerOpenCarList(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::OpenCarList(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerOpenCar(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::OpenCar(base, ctx.r1.u32, guest.calls());
+}
 void HelpLineSet(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::HelpLineSet(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
@@ -315,3 +331,7 @@ ITC_CAR_DEALER(82182C28, CarDealerSetHeader)
 ITC_CAR_DEALER(82182620, CarDealerShowCarInfo)
 ITC_CAR_DEALER(821826C0, CarDealerShowSwatches)
 ITC_CAR_DEALER(82199B38, HelpLineSet)
+// The menus' openers (from the recompiled transitions).
+ITC_CAR_DEALER(82184338, CarDealerOpenListMenu)
+ITC_CAR_DEALER(82184488, CarDealerOpenCarList)
+ITC_CAR_DEALER(82184650, CarDealerOpenCar)

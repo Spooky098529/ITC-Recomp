@@ -1104,6 +1104,50 @@ void Pages(Context& h, const World& w) {
              }});
 }
 
+// The menus' flag blocks (+68): 0 or the layer's pages (MenuList::Init
+// frees the old one and allocates a new one); after the run, the new ones
+// compared by content (4 bytes an item) and freed.
+void MenuBlocks(Random& r, const World& w) {
+  for (const uint32_t list : {w.at(kListMenuAt), w.at(kColorMenuAt)}) {
+    guest::StoreU32(w.base, list + 68, r.Below(2) == 0 ? 0 : MakePages(w.base, 64, r));
+  }
+}
+void FreeMenuBlocks(PPCContext&, const World& w, Outputs& out) {
+  for (const uint32_t list : {w.at(kListMenuAt), w.at(kColorMenuAt)}) {
+    const uint32_t count = std::min(guest::LoadU32(w.base, list + 0), 128u);
+    Allocated(w.base, out, list + 68, 4 * count);
+  }
+}
+
+// The menus' openers: the menus' world with their flag blocks; the shown
+// list 1 to 8 cars (n 0 never reaches them: Page0 refuses an empty list);
+// the entries' float fields as ShowCarInfo's cases shape them; the frames
+// without their saves and SetText's parameter area (+48 to +79: r7 on, the
+// originals' leftovers).
+void Openers(Context& h, const World& w) {
+  auto setup = [](PPCContext&, Random& r, const World& w) {
+    MenuWorld(r, w);
+    MenuBlocks(r, w);
+    const uint32_t data = w.data();
+    guest::StoreU32(w.base, data + 40, uint32_t(Small(r, 3)));
+    guest::StoreU32(w.base, guest::LoadU32(w.base, data + 1136) + 512, 1 + r.Below(8));
+    for (const uint32_t count : {616u, 1132u}) {
+      guest::StoreU32(w.base, data + count, r.Below(3) == 0 ? 0 : r.Below(8));
+    }
+    for (uint32_t k = 0; k < kEntryCount; k++) {
+      guest::StoreU32(w.base, w.entry(k) + 652, FloatBits(r));
+      guest::StoreU32(w.base, w.entry(k) + 660, FloatBits(r));
+      guest::StoreU8(w.base, w.entry(k) + 709, uint8_t(r.Below(2) == 0 ? 0 : r.Below(256)));
+    }
+  };
+  Run(h, w, {"CarDealer::OpenListMenu (sub_82184338)", 100, __imp__sub_82184338,
+             hooks::CarDealerOpenListMenu, {{-160, -112}, {-80, -48}}, setup, FreeMenuBlocks});
+  Run(h, w, {"CarDealer::OpenCarList (sub_82184488)", 100, __imp__sub_82184488,
+             hooks::CarDealerOpenCarList, {{-176, -128}, {-96, -64}}, setup, FreeMenuBlocks});
+  Run(h, w, {"CarDealer::OpenCar (sub_82184650)", 100, __imp__sub_82184650,
+             hooks::CarDealerOpenCar, {{-144, -96}, {-64, -40}}, setup, FreeMenuBlocks});
+}
+
 }  // namespace
 
 void CarDealer(Context& h) {
@@ -1119,6 +1163,9 @@ void CarDealer(Context& h) {
   Info(h, w);
   Updates(h, w);
   Pages(h, w);
+  if (hooks::NativeHeapActive()) {
+    Openers(h, w);
+  }
 }
 
 }  // namespace harness

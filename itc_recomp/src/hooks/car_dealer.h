@@ -56,6 +56,10 @@ void CarDealerOnDialogDone(PPCContext& ctx, uint8_t* base);
 void CarDealerShowBusy(PPCContext& ctx, uint8_t* base);
 void CarDealerHideBusy(PPCContext& ctx, uint8_t* base);
 void CarDealerHideBusyNow(PPCContext& ctx, uint8_t* base);
+// The menus' openers (no arguments).
+void CarDealerOpenListMenu(PPCContext& ctx, uint8_t* base);
+void CarDealerOpenCarList(PPCContext& ctx, uint8_t* base);
+void CarDealerOpenCar(PPCContext& ctx, uint8_t* base);
 // The helpers.
 void CarDealerCheckLimits(PPCContext& ctx, uint8_t* base);
 void CarDealerReloadStandModel(PPCContext& ctx, uint8_t* base);
