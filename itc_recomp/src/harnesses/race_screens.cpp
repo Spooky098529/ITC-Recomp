@@ -13,6 +13,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "data_tables/data_tables.h"
 #include "hooks/race_hud_machine.h"
 #include "hooks/race_hud_object.h"
 #include "hooks/race_screens.h"
@@ -34,6 +35,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_race_screens);
+ITC_FLAG_DECLARE(bool, native_race_hud_machine);
 
 namespace harness {
 
@@ -1276,6 +1278,205 @@ void Openers(Context& h, const MovieWorld& w) {
   guest::StoreU32(h.base, kRaceData, saved_race);
 }
 
+// The career's results' opener and texts, and the race HUD machine's
+// results at the race's end (race-hud-machine.md), whose callees
+// (CareerResults::Open with SetTexts, AfterRaceMenu::Open) run for real in
+// this world, the originals with --native_race_screens off and ours with
+// their plain C++.
+//
+// SetTexts and Open: the screen [0x826D8500]'s block (the kind +0 0 to 3 or
+// any, the values +4 to +28 and +164 small, either sign, or any; the floats
+// +12 and +24 any) with its movie (+180) movie 6's; Open's source block one
+// of our own (random words shaped as those), compared. SetTexts' frame's +48
+// to +79 left out (SetText stores its r7 to r10 there: the float's double,
+// then leftovers in the original and 0 in ours, the user's call for the
+// parking area, 2026-10-30).
+//
+// AwardPrize and OnRaceEnd: the machine (+9612 the kind, 1 for AwardPrize
+// without the replay bit, where SaveData::Of(0) is read; +9608 the holder),
+// the holder (+8 the replay bit 0 or 1, +1020 the menu after the race's
+// screen, +1024 the career's results' block), the race data (its +0xA3AF0
+// race kind 0 to 2, +0xA3AF4 mode 0 or not; the stage list's current stage
+// +804, count +800 and word +808; the racer records' count 1 to 3 and the
+// last one's entries: +0 the count 0 to 4, their item ids -1 or 370 to 409,
+// the floats +828, +844 and +852 on (0.0 now and then) with the halfword
+// +968 0 to 17 (more would write the pairs past the block, onto its own
+// count), +3920 1, 3 or another, +3924 1 to 3 or another), player 0's save
+// data (the day's win streak +72 + 4828 around the factors' bounds, the
+// day +6100 1 half the time, the money +6116 and points +48 + 6024 small
+// or near 9,999,999 or any; the items' records +0x199F8, 12 bytes each) and
+// the data tables' items (370 to 409; their bytes +35 and +37 random).
+// OnRaceEnd's kinds 2, 4, 6 and 1 with the mode 0 (the results never seen
+// in play, ShowResults, ShowSplitResults and ShowKind6Results: the
+// originals, whose worlds this one doesn't hold) are left out. Both run on
+// a stack of the world's (their callees' frames below theirs). The menu
+// after the race's list's item block (+68, 0 before) compared and freed.
+// The originals of AwardPrize and OnRaceEnd with --native_race_hud_machine
+// off as well, so their callees' originals run (OpponentPrize, ItemBonus,
+// and OnRaceEnd's AwardPrize).
+template <GuestFunction original>
+void WithoutMachine(PPCContext& ctx, uint8_t* base) {
+  ITC_FLAG(native_race_hud_machine) = false;
+  original(ctx, base);
+  ITC_FLAG(native_race_hud_machine) = true;
+}
+
+void Results(Context& h, const MovieWorld& w) {
+  constexpr uint32_t kRaceData = 0x826C5B2C;
+  constexpr uint32_t kFirstItem = 370, kItems = 40;
+  const Block machine(9620 + 12);
+  const Block holder(0x420);
+  const Block race(0xA3B00);
+  const Block source(0x100);
+  const Block items(3008 * kItems + 0x40);
+  if (!machine.address || !holder.address || !race.address || !source.address ||
+      !items.address) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  // A screen block's words: the kind, the values, the two floats.
+  auto values = [&h](Random& r, uint32_t at) {
+    guest::StoreU32(h.base, at + 0, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));
+    for (const uint32_t field : {4u, 8u, 16u, 20u, 28u, 164u}) {
+      const uint32_t picks[4] = {r.Below(100000), uint32_t(-int32_t(r.Below(100000))),
+                                 uint32_t(r.Next()), 0};
+      guest::StoreU32(h.base, at + field, picks[r.Below(4)]);
+    }
+    for (const uint32_t field : {12u, 24u}) {
+      guest::StoreU32(h.base, at + field, AnyFloatBits(r, 100.0f));
+    }
+  };
+  auto screen = [&](Random& r, const MovieWorld& w) {
+    const uint32_t at = w.block(rs::kCareerResults);
+    values(r, at);
+    guest::StoreU32(h.base, at + 180, w.movie(2));
+    return at;
+  };
+  FrameSpec set_texts{128, 40, {48, 80}, true};
+  MovieGroup(
+      h, w, "CareerResults::SetTexts (sub_822197A8)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) { t.r3.u64 = screen(r, w); },
+      __imp__sub_822197A8, hooks::RaceScreensCareerResultsSetTexts, set_texts);
+  FrameSpec open{112, 24, {0, 0}, true};
+  open.after = [&](Outputs& out) { out.Bytes(Read(h.base, source.address, source.bytes)); };
+  MovieGroup(
+      h, w, "CareerResults::Open (sub_8221A1F0)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        t.r3.u64 = screen(r, w);
+        WriteRandom(h.base, source.address, source.bytes, r);
+        values(r, source.address);
+        t.r4.u64 = source.address;
+      },
+      __imp__sub_8221A1F0, hooks::RaceScreensCareerResultsOpen, open);
+
+  // The race HUD machine's results.
+  auto shape = [&](PPCContext& t, Random& r, const MovieWorld& w, bool award) {
+    WriteRandom(h.base, machine.address, machine.bytes, r);
+    WriteRandom(h.base, holder.address, holder.bytes, r);
+    WriteRandom(h.base, race.address + 0x59600, 0x4A500, r);
+    WriteRandom(h.base, items.address, items.bytes, r);
+    const uint32_t bit = r.Below(4) == 0 ? 1 : 0;
+    int32_t kind = 1;
+    if (!award) {
+      const int32_t kinds[7] = {1, 1, 1, -1, 0, 3, 5};
+      kind = r.Below(8) == 0 ? int32_t(r.Next()) : kinds[r.Below(7)];
+      if (kind == 2 || kind == 4 || kind == 6) {
+        kind = 1;
+      }
+    } else if (bit == 1 && r.Below(2) == 0) {
+      kind = int32_t(r.Below(8));
+    }
+    guest::StoreU32(h.base, machine.address + 9612, uint32_t(kind));
+    guest::StoreU32(h.base, machine.address + 9608, holder.address);
+    guest::StoreU32(h.base, holder.address + 8, (uint32_t(r.Next()) & ~1u) | bit);
+    guest::StoreU32(h.base, holder.address + 1020, w.block(rs::kAfterScreen));
+    guest::StoreU32(h.base, holder.address + 1024, w.block(rs::kCareerResults));
+    guest::StoreU32(h.base, w.block(rs::kAfterList) + rs::kListBlock, 0);
+    guest::StoreU32(h.base, kRaceData, race.address);
+    guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(3));
+    // OnRaceEnd's kind 1 with the mode 0 runs ShowResults: left out.
+    const bool mode_zero = r.Below(3) == 0 && award;
+    guest::StoreU32(h.base, race.address + 0xA3AF4,
+                    mode_zero ? 0 : (r.Below(4) == 0 ? uint32_t(r.Next()) | 1 : 1 + r.Below(8)));
+    const uint32_t stages = race.address + 0x59620;
+    guest::StoreU32(h.base, stages + 800, r.Below(6));
+    guest::StoreU32(h.base, stages + 804, r.Below(6));
+    guest::StoreU32(h.base, stages + 808, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+    const uint32_t records = race.address + 0x59AE8;
+    const uint32_t count = 1 + r.Below(3);
+    guest::StoreU32(h.base, records + 0x49FE0, count);
+    const uint32_t result = records + 3936 * (count - 1);
+    const uint32_t entries = r.Below(5);
+    guest::StoreU32(h.base, result + 0, entries);
+    for (uint32_t i = 0; i + 1 < entries; i++) {
+      guest::StoreU32(h.base, result + 980 + 972 * i,
+                      r.Below(5) == 0 ? 0xFFFFFFFFu : kFirstItem + r.Below(kItems));
+    }
+    auto any_float = [&r](float range) {
+      return r.Below(5) == 0 ? 0u : AnyFloatBits(r, range);
+    };
+    guest::StoreU32(h.base, result + 828, any_float(1.0e7f));
+    guest::StoreU32(h.base, result + 844, any_float(100.0f));
+    for (uint32_t k = 0; k < 17; k++) {
+      guest::StoreU32(h.base, result + 852 + 8 * k, any_float(100.0f));
+    }
+    guest::StoreU16(h.base, result + 968, uint16_t(r.Below(18)));
+    const uint32_t outcomes[5] = {1, 1, 3, 0, uint32_t(r.Next())};
+    guest::StoreU32(h.base, result + 3920, outcomes[r.Below(5)]);
+    const uint32_t places[5] = {1, 1, 2, 3, r.Below(2) == 0 ? 0 : uint32_t(r.Next())};
+    guest::StoreU32(h.base, result + 3924, places[r.Below(5)]);
+    const uint32_t save = w.save.address;
+    const uint16_t streaks[5] = {uint16_t(r.Below(25)), uint16_t(r.Below(25)),
+                                 uint16_t(r.Below(0x10000)), 20, 3};
+    guest::StoreU16(h.base, save + 72 + 4828, streaks[r.Below(5)]);
+    guest::StoreU32(h.base, save + 6100, r.Below(2) == 0 ? 1 : r.Below(4));
+    for (const uint32_t field : {6116u, 48u + 6024u}) {
+      const uint32_t picks[4] = {r.Below(1000000), 9999999 - r.Below(1000), uint32_t(r.Next()),
+                                 0};
+      guest::StoreU32(h.base, save + field, picks[r.Below(4)]);
+    }
+    for (uint32_t i = 0; i < kItems; i++) {
+      const uint32_t record = save + 0x199F8 + 12 * (kFirstItem + i);
+      guest::StoreU16(h.base, record + 2, r.Below(2) == 0 ? 1 : uint16_t(r.Below(4)));
+    }
+    const uint32_t tables = items.address + 3008 * kItems;
+    guest::StoreU32(h.base, data_tables::kTables, tables);
+    guest::StoreU32(h.base, tables + 16, items.address - 3008 * kFirstItem);
+    t.r3.u64 = machine.address;
+  };
+  const uint32_t saved_race = guest::LoadU32(h.base, kRaceData);
+  const uint32_t saved_tables = guest::LoadU32(h.base, data_tables::kTables);
+  auto after = [&](Outputs& out) {
+    out.Bytes(Read(h.base, machine.address, machine.bytes));
+    out.Bytes(Read(h.base, holder.address, holder.bytes));
+    out.Bytes(Read(h.base, race.address + 0x59600, 0x4A500));
+    out.Bytes(Read(h.base, w.save.address, w.save.bytes));
+    const uint32_t list = w.block(rs::kAfterList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 4 * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  // __savegprlr_26 and f30, f31: the 72 bytes below sp.
+  FrameSpec award{336, 72, {0, 0}, true};
+  award.after = after;
+  MovieGroup(
+      h, w, "RaceHudMachine::AwardPrize (sub_8216E150)", 300,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, true); },
+      WithoutMachine<__imp__sub_8216E150>, hooks::RaceHudMachineAwardPrize, award);
+  FrameSpec end{96, 16, {0, 0}, true};
+  end.after = after;
+  MovieGroup(
+      h, w, "RaceHudMachine::OnRaceEnd (sub_8216E5B0)", 200,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, false); },
+      WithoutMachine<__imp__sub_8216E5B0>, hooks::RaceHudMachineOnRaceEnd, end);
+  guest::StoreU32(h.base, kRaceData, saved_race);
+  guest::StoreU32(h.base, data_tables::kTables, saved_tables);
+}
+
 // The menu after the race's pages and transitions: its data's kind (+0) 0
 // to 7, item count (+4) 0 to 4, flag (+8) 0, 1 or any, selection (+16) 0
 // to 3; its list's selections as the pause menu's. Init's item block (+68,
@@ -1996,6 +2197,7 @@ void Transitions(Context& h) {
   MovieGroup(h, w, "PauseMenu::SetAdjust (sub_8220F1B8)", 100, pause_step,
              __imp__sub_8220F1B8, hooks::RaceScreensPauseMenuSetAdjust, {112, 24});
   Openers(h, w);
+  Results(h, w);
   AfterRace(h, w);
   Dialog(h, w);
   Draws(h, w);

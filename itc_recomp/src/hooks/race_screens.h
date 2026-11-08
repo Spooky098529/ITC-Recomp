@@ -176,5 +176,9 @@ void RaceScreensCareerResultsIntro(PPCContext& ctx, uint8_t* base);
 void RaceScreensCareerResultsShow(PPCContext& ctx, uint8_t* base);
 void RaceScreensCareerResultsClose1(PPCContext& ctx, uint8_t* base);
 void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base);
+// CareerResults::SetTexts sub_822197A8 (r3 the screen) and Open
+// sub_8221A1F0 (r3 the screen, r4 the 168-byte block).
+void RaceScreensCareerResultsSetTexts(PPCContext& ctx, uint8_t* base);
+void RaceScreensCareerResultsOpen(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

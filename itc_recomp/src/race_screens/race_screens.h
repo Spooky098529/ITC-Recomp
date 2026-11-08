@@ -571,6 +571,27 @@ uint64_t CareerResultsClose1(uint8_t* base, uint32_t step, uint32_t sp, const Ca
 // 159, 158 through player 0's mapper, slot 10; sound 0): +20 above 0 Go(2,
 // 2); else +24 above 0.0 Go(3, 3); else Go(4, 6). Returns 0.
 uint64_t CareerResultsPage1(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls);
+// sub_822197A8 CareerResults::SetTexts (r3 the screen), from a 128-byte
+// frame: the texts on the screen's movie (+180, read again before each
+// call) type-7 node 0's and 2's children (strings 1969 on, 2051), type-8
+// node 3's (2051), and the single ones: UiMovie::SetNumberText with +4, +8,
+// +16, +20, +28 and the running sums (+16 + +164, + +20, + +28, each at
+// least 0, as 64-bit sums of the words); UiMovie::SetText with strings 1983
+// (r7 and f1 the float +12 as a double, its word left at the frame's +48),
+// 1973 to 1975, 1982, 2051 and 2052 (+24 times the double at 0x8200A510,
+// rounded to single). The setters through their overrides, SetText's unset
+// varargs 0 (the user's call, 2026-10-30). SetNumberText's last r3.
+uint64_t CareerResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+// sub_8221A1F0 CareerResults::Open (r3 the screen, r4 the 168-byte block),
+// from a 112-byte frame: the block copied to +0 (memcpy: c_runtime::Memcpy,
+// else the guest's), UI movie 6 found (the id at the frame's +80) into +180
+// and its pose reset (through its override), ScreenPages::Init(+184, 1)
+// (plain C++) and Go(0, 0, -1) (through its override), SetTexts, +168 =
+// +28 + +164 + +20 + +16 (at least 0), +172 = 0, then [0x826D8500]'s movie's
+// type -1 node 11's +108 = 0, 1 or 2 by [0x826D8500]'s +0 (0, 1, 2; left
+// for 3 and above). Returns that node.
+uint64_t CareerResultsOpen(uint8_t* base, uint32_t screen, uint32_t block, uint32_t sp,
+                           const Calls& calls);
 
 constexpr uint32_t kShowVolume = 0x8220D040;
 constexpr uint32_t kArrowB = 0x8220D1D8;

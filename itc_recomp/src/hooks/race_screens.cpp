@@ -38,7 +38,8 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "setters' unset varargs 0) and Open (SetText's plain C++, its unset varargs 0), "
               "PauseMenu::OpenOptions, "
               "the draws PauseMenu::, AfterRaceMenu:: and CareerResults::Draw, the career's "
-              "results' Intro, Show, Close1 and Page1, "
+              "results' Intro, Show, Close1, Page1, SetTexts (its UI movie setters' unset "
+              "varargs 0) and Open, "
               "the UI movie calls through their overrides) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
@@ -483,6 +484,19 @@ void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base) {
       race_screens::CareerResultsPage1(base, ctx.r1.u32, NativeSlots(), guest.calls());
 }
 
+void RaceScreensCareerResultsSetTexts(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::CareerResultsSetTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensCareerResultsOpen(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::CareerResultsOpen(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -593,3 +607,5 @@ ITC_RACE_SCREENS(82219210, RaceScreensCareerResultsIntro)
 ITC_RACE_SCREENS(822192B0, RaceScreensCareerResultsShow)
 ITC_RACE_SCREENS(822193D8, RaceScreensCareerResultsClose1)
 ITC_RACE_SCREENS(82219A78, RaceScreensCareerResultsPage1)
+ITC_RACE_SCREENS(822197A8, RaceScreensCareerResultsSetTexts)
+ITC_RACE_SCREENS(8221A1F0, RaceScreensCareerResultsOpen)

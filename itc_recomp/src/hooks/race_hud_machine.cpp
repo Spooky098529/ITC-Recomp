@@ -44,7 +44,9 @@ ITC_FLAG_BOOL(native_race_hud_machine, true, "ITC",
               "original), DestroyScreens sub_8216C208 (RaceScreens::Destroy's plain C++ with "
               "--native_heap), StartCountdown sub_8216CC60 (Stages::Type's, RaceHud::SetMode's and "
               "StartCountdown's plain C++; kind 4's +656 object, never seen in play, the "
-              "originals) natively instead of through the translated "
+              "originals), OnRaceEnd sub_8216E5B0 and AwardPrize sub_8216E150 "
+              "(CareerResults::Open's and AfterRaceMenu::Open's plain C++; the results of the "
+              "race kinds never seen in play the originals) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=race_hud_machine)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
 
@@ -171,6 +173,10 @@ class Calls {
         return rh::StartCountdown(base, r3);
       case rhm::kPauseMenuOpen:
         return race_screens::PauseMenuOpen(base, r3, args[1], args[2], r1, self.calls());
+      case rhm::kCareerResultsOpen:
+        return race_screens::CareerResultsOpen(base, r3, uint32_t(args[1]), r1, self.calls());
+      case rhm::kAfterRaceOpen:
+        return race_screens::AfterRaceMenuOpen(base, r3, args[1], args[2], r1, self.calls());
       case rhm::kAfterRaceClose:
         // As its adapter (src/hooks/race_screens.cpp): over the allocation
         // layer where the release is native, else the guest call.
@@ -456,6 +462,18 @@ void RaceHudMachineStartCountdown(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void RaceHudMachineOnRaceEnd(PPCContext& ctx, uint8_t* base) {
+  Handle(ctx, base, __imp__sub_8216E5B0, [&](const rh::Calls& callees) {
+    return std::optional<uint64_t>(rhm::OnRaceEnd(base, ctx.r3.u64, ctx.r1.u32, callees));
+  });
+}
+
+void RaceHudMachineAwardPrize(PPCContext& ctx, uint8_t* base) {
+  Handle(ctx, base, __imp__sub_8216E150, [&](const rh::Calls& callees) {
+    return std::optional<uint64_t>(rhm::AwardPrize(base, ctx.r3.u64, ctx.r1.u32, callees));
+  });
+}
+
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rhm::IsFirstDay(base, ctx.r1.u32);
 }
@@ -532,3 +550,5 @@ ITC_RACE_HUD_MACHINE(8216CF08, RaceHudMachinePauseDraw)
 ITC_RACE_HUD_MACHINE(8216CFE0, RaceHudMachineRacePauseDraw)
 ITC_RACE_HUD_MACHINE(8216C208, RaceHudMachineDestroyScreens)
 ITC_RACE_HUD_MACHINE(8216CC60, RaceHudMachineStartCountdown)
+ITC_RACE_HUD_MACHINE(8216E5B0, RaceHudMachineOnRaceEnd)
+ITC_RACE_HUD_MACHINE(8216E150, RaceHudMachineAwardPrize)

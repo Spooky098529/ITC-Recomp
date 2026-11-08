@@ -7,6 +7,8 @@
 #include "race_hud_machine/race_hud_machine.h"
 
 #include "base/log.h"
+#include "camera_modes/steps.h"
+#include "career/career.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "race_states/steps.h"
@@ -813,6 +815,193 @@ uint64_t DestroyScreens(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                         const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216C208 RaceHudMachine::DestroyScreens");
   return callees.Call(kScreensDestroy, sp, lr, r3);
+}
+
+uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216E5B0 RaceHudMachine::OnRaceEnd");
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t frame = Frame(base, sp, 96);
+  uint64_t last = r3;
+  switch (int32_t(Load(base, machine + kKind))) {
+    case 1:
+      if (Load(base, Load(base, kRaceData) + 0xA3AF4) == 0) {
+        last = callees.Call(kShowResults, frame, 0x8216E630, r3, 1);
+      } else {
+        last = IsFirstDay(base, frame);
+        if (uint32_t(last) == 0) {
+          last = AwardPrize(base, r3, frame, callees);
+        }
+      }
+      break;
+    case 2:
+      last = callees.Call(kShowResults, frame, 0x8216E630, r3, 0);
+      break;
+    case 4:
+      last = callees.Call(kShowSplitResults, frame, 0x8216E5F8, r3);
+      break;
+    case 6:
+      last = callees.Call(kShowKind6Results, frame, 0x8216E5EC, r3);
+      break;
+    default:
+      break;
+  }
+  guest::StoreU32(base, Holder(base, machine) + 440, 0);
+  return last;
+}
+
+uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216E150 RaceHudMachine::AwardPrize");
+  using namespace camera_modes::steps;
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t frame = Frame(base, sp, 336);
+  const uint32_t block = frame + 96;
+  auto store = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, block + offset, value); };
+  auto word = [&](uint32_t offset) { return Load(base, block + offset); };
+  const uint32_t result =
+      vehicle_accessors::RacerRecordsAt(base, Load(base, kRaceData) + 0x59AE8, 0xFFFFFFFFu);
+  uint32_t save = 0;
+  if (int32_t(Load(base, machine + kKind)) == 1) {
+    save = vehicle_accessors::SaveDataOf(base, 0);
+  }
+  if (!ReplayBit(base, Holder(base, machine))) {
+    // memset(block, 0, 168).
+    for (uint32_t i = 0; i < 168; i++) {
+      base[block + i] = 0;
+    }
+    const int32_t outcome = int32_t(Load(base, result + 3920));
+    if (outcome == 1) {
+      const int32_t place = int32_t(Load(base, result + 3924));
+      if (place == 1) {
+        store(0, 0);
+      } else if (place == 2) {
+        store(0, 2);
+      } else if (place == 3) {
+        store(0, 1);
+      }
+      if (int32_t(Load(base, result + 3924)) == 1) {
+        store(8, 0);
+        store(4, 0);
+        store(20, 0);
+        const double f0 = Fmuls(Lfs(base, result + 828), Lfs(base, 0x82001FD8));
+        guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(f0)));
+        store(8, uint32_t(int32_t(Load(base, frame + 80)) / 1000));
+        if (int32_t(Load(base, result + 0)) > 1) {
+          int32_t i = 1;
+          uint32_t at = result + 980;
+          do {
+            const uint32_t prize = OpponentPrize(base, Load(base, at), frame);
+            store(4, prize + word(4));
+            const uint32_t bonus = ItemBonus(base, Load(base, at), frame);
+            i++;
+            at += 972;
+            store(20, bonus + word(20));
+          } while (i < int32_t(Load(base, result + 0)));
+        }
+      }
+    } else if (outcome == 3) {
+      store(4, 0);
+      store(8, 0);
+      store(0, 2);
+    }
+    const double f30 = Lfs(base, 0x82000A30);
+    const double f31 = Lfs(base, 0x82000A34);
+    double factor = f31;
+    if (save != 0) {
+      const uint32_t day = save + 72;
+      // DayBlock::WinStreak again before each test, as the original.
+      auto streak = [&] { return int32_t(int16_t(career::DayBlockWinStreak(base, day))); };
+      if (streak() >= 20) {
+        factor = Lfs(base, 0x820021E8);
+      } else if (streak() >= 15) {
+        factor = Lfs(base, 0x82002CF0);
+      } else if (streak() >= 10) {
+        factor = Lfs(base, 0x820027A8);
+      } else if (streak() >= 7) {
+        factor = Lfs(base, 0x820029F0);
+      } else if (streak() >= 5) {
+        factor = Lfs(base, 0x820029D4);
+      } else if (streak() >= 3) {
+        factor = Lfs(base, 0x82002CB0);
+      } else {
+        factor = f30;
+      }
+    }
+    Stfs(base, block + 12, factor);
+    {
+      // (+4 + +8) as a doubleword at the frame's +80 (fcfid), times it.
+      const int64_t sum = int32_t(word(8) + word(4));
+      guest::StoreU32(base, frame + 80, uint32_t(uint64_t(sum) >> 32));
+      guest::StoreU32(base, frame + 84, uint32_t(sum));
+      store(16, uint32_t(Fctiwz(Fmuls(Single(double(sum)), factor))));
+    }
+    double f0;
+    if (guest::LoadU16(base, result + 968) == 0) {
+      f0 = f31;
+      Stfs(base, block + 24, f0);
+    } else {
+      f0 = Lfs(base, result + 844);
+      Stfs(base, block + 24, f0);
+      if (f0 == f31) {
+        f0 = f30;
+        Stfs(base, block + 24, f0);
+      }
+    }
+    const double scale = Lfs(base, 0x82001BE0);
+    store(28, uint32_t(Fctiwz(Fmuls(f0, scale))));
+    if (int32_t(int16_t(guest::LoadU16(base, result + 968))) > 1) {
+      int32_t k = 1;
+      uint32_t at = result + 852;
+      do {
+        double value = Lfs(base, at);
+        Stfs(base, frame + 80, value);
+        if (value == f31) {
+          value = f30;
+          Stfs(base, frame + 80, value);
+        }
+        const uint32_t n = word(160);
+        const double product = Fmuls(value, scale);
+        store(160, n + 1);
+        k++;
+        at += 8;
+        guest::StoreU32(base, frame + 84, uint32_t(Fctiwz(product)));
+        // The doubleword at the frame's +80 (the float, the int) copied as
+        // one (ld, std).
+        const uint32_t high = Load(base, frame + 80), low = Load(base, frame + 84);
+        const uint32_t pair = frame + 128 + (n << 3);
+        guest::StoreU32(base, pair, high);
+        guest::StoreU32(base, pair + 4, low);
+      } while (k < int32_t(int16_t(guest::LoadU16(base, result + 968))));
+    }
+    store(164, Load(base, save + 6116));
+    callees.Call(kCareerResultsOpen, frame, 0x8216E4A4, Load(base, Holder(base, machine) + 1024),
+                 block);
+    uint64_t total = uint64_t(word(28)) + word(16) + word(20);
+    const uint32_t pairs = word(160);
+    for (uint32_t p = 0; p < pairs; p++) {
+      total += Load(base, block + 36 + 8 * p);
+    }
+    career::DayBlockAddWord4832(base, save + 72, total);
+    uint32_t money = uint32_t(Load(base, save + 6116) + total);
+    if (int32_t(money) > 9999999) {
+      money = 9999999;
+    }
+    guest::StoreU32(base, save + 6116, money);
+    career::StatsAddPoints(base, save + 48, total);
+  }
+  const uint32_t flag = Load(base, result + 3920) == 3 ? 1 : 0;
+  uint32_t race = Load(base, kRaceData);
+  uint32_t menu;
+  if (Load(base, race + 0xA3AF4) == 0) {
+    menu = 4;
+  } else if (vehicle_accessors::StagesHasNext(base, race + 0x59620) != 0 &&
+             int32_t(Load(base, result + 3924)) == 1) {
+    menu = 3;
+  } else {
+    race = Load(base, kRaceData);
+    menu = int32_t(vehicle_accessors::StagesWord808(base, race + 0x59620)) != 0 ? 1 : 0;
+  }
+  return callees.Call(kAfterRaceOpen, frame, 0x8216E5A0, Load(base, Holder(base, machine) + 1020),
+                      menu, flag);
 }
 
 }  // namespace race_hud_machine

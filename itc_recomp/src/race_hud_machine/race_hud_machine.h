@@ -265,6 +265,30 @@ uint64_t DestroyScreens(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                         const Calls& callees);
 constexpr uint32_t kPauseMenuOpen = 0x8220FA88;  // PauseMenu::Open (race-screens.md)
 
+// The results' openers OnRaceEnd calls: CareerResults::Open and
+// AfterRaceMenu::Open (race-screens.md, their plain C++), and the results
+// of the race kinds never seen in play (the originals, with the original's
+// registers: r3 the machine, ShowResults' r4 the flag).
+constexpr uint32_t kCareerResultsOpen = 0x8221A1F0;  // CareerResults::Open(r3, r4 = the block)
+constexpr uint32_t kAfterRaceOpen = 0x8221BA68;      // AfterRaceMenu::Open(r3, r4, r5)
+constexpr uint32_t kShowResults = 0x8216D270;        // RaceHudMachine::ShowResults(r3, r4)
+constexpr uint32_t kShowSplitResults = 0x8216D328;   // RaceHudMachine::ShowSplitResults
+constexpr uint32_t kShowKind6Results = 0x8216D7B8;   // RaceHudMachine::ShowKind6Results
+// sub_8216E5B0 RaceHudMachine::OnRaceEnd, from a 96-byte frame: by the kind
+// (+9612) 1 ShowResults(1) with the race data's +0xA3AF4 0, else unless
+// IsFirstDay (plain C++) AwardPrize; 2 ShowResults(0); 4 ShowSplitResults;
+// 6 ShowKind6Results (r3 the machine as given); then the holder's +440 = 0.
+// The last call's r3 (`r3` where it calls none).
+uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees);
+// sub_8216E150 RaceHudMachine::AwardPrize, from a 336-byte frame (the
+// 168-byte block at its +96, the conversions' words at +80 and +84 left as
+// the original leaves them): see the row. CareerResults::Open and
+// AfterRaceMenu::Open through `callees`; RacerRecords::At, SaveData::Of,
+// DayBlock::WinStreak and AddWord4832, Stats::AddPoints, Stages::HasNext
+// and Word808, OpponentPrize and ItemBonus their plain C++; memset done
+// here. AfterRaceMenu::Open's r3.
+uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees);
+
 // --- The helpers (handlers.cpp) ---
 
 // sub_8216D3F0 RaceHudMachine::IsFirstDay (probably): 1 when the race data's
