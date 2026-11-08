@@ -13,6 +13,20 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The options screen's third migration (6c23d796..95016660, 24
+  functions, 19 adapters removed without counter runs: their callers in
+  play are menu pages attract races don't reach): a new tool,
+  `itc_recomp/tools/init_step_tables.py`, generates machine Inits' step
+  tables from `generated/` (checked by reprinting three of
+  `type67_modes/init_tables.h`'s exactly); the screen fades' 64 bytes at
+  `0x826A50AC` added to the harness's saved globals. A harness finding
+  for every harness: `Random` is xorshift64 and each case's seed is the
+  next output of the harness's generator, so case k+1's stream is case
+  k's shifted by one word and neighboring cases are correlated (a path,
+  `AnalogPage`'s step 35, never ran in 600 cases); the new groups mix
+  their generator with splitmix64 (`Mixed`), the other harnesses are
+  untouched. A lead for later (not a subsystem: not in `leads.md`).
+
 - The options screen's second migration (e55413be..bbb0cfe3, 43
   functions): `ShowVolumeBar` `sub_821BE5A8` Wrapped -> Overridden, its
   pause-movie-log wrap kept around the native body; four callees never

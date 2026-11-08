@@ -59,7 +59,16 @@ file's history. What's left to see in a drive, from every run:
   the settings. Validated `itc_4463` (race 88 s at 180, the
   harnesses ~90.5 s; 0 errors, every harness 0 differing, 42 of 42
   harness lines; 1 in the race, 21 in the replay `itc_4464` (ok), 20 to
-  drive). Third migration agent running.
+  drive). Third migration 6c23d796..95016660 (the HUD, sliders,
+  buttons, analog and sound pages, the clash checks, the page set-ups,
+  `FadeIn`, the pages' closes, the type 2 and 4 options' and controller
+  pages' Inits with their step tables from the new
+  `itc_recomp/tools/init_step_tables.py`; 24 functions, 19 adapters
+  removed; races 36 s, 0 errors, its harnesses 0 differing; no
+  subagents); left: none in the file (98 of 100 in play ours;
+  `Options::OpenCategory` waits on the save screens' lead and
+  `sub_8211CBD8`; `FadeOut` stays recompiled). Validation agent
+  running.
 
 ## Done
 
@@ -91,3 +100,5 @@ file's history. What's left to see in a drive, from every run:
   482, unknown 1143).
 - After its second migration: ours 4777, work left 1646 (wrapped 56,
   known 447, unknown 1143).
+- After its third migration: ours 4801, work left 1624 (wrapped 56,
+  known 425, unknown 1143).
