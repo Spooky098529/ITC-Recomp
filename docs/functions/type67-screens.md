@@ -62,6 +62,19 @@ leave r7 to r10 unset (precedent, 2026-10-30: pass 0); `sub_82258FC8`
 (the group's movie) is also called by about 80 of the car list's
 functions.
 
+Made native by the B7 loop (2026-11-08, `--native_type67_screens`,
+`src/type67_screens/`, harness `type67_screens`): the 48 functions seen in
+play. The screens' vtable calls go through one dispatcher (`Slot`): the
+plain C++ where a slot holds one of these functions, nothing for the empty
+handler, else a guest call (the car list's slots, `PanelSet`, stay
+recompiled). Several handlers call slots without setting r4 (the original
+passes whatever the call before left); those calls pass r4 through
+untouched, and a slot the plain C++ runs with an r4 of its own sets r4
+first, so the guest calls after it see what the original's would. The
+slots that read r4 (the posts, `PickCar`) run natively only where the call
+sets it. `PickCar`'s stock-car branch goes through `Car::SetModel`, which
+draws from rand (the seed at `0x82638188`).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
