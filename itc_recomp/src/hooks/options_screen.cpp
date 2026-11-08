@@ -368,8 +368,10 @@ void OptionsOnLeft(PPCContext& ctx, uint8_t* base) {
 
 // No adapters (Native: their only callers in play call their plain C++)
 // for Controls::ButtonIndex and AnalogIndex (Settings::Read), ButtonCode
-// (Settings::Write), Settings::Reset (Options::OnEnter) and Settings::Write
-// (Options::OnClosed); their register steps stay for the harness.
+// (Settings::Write), Settings::Reset (Options::OnEnter), Settings::Write
+// (Options::OnClosed), Options::IsButtonTaken (ShowButtonClashes),
+// IsAnalogTaken (ShowAnalogClashes) and ShowSlider (ShowSliderNumbers);
+// their register steps stay for the harness.
 
 #define ITC_OPTIONS_SCREEN(address, step)   \
   extern "C" REX_FUNC(sub_##address) {      \
@@ -382,8 +384,6 @@ void OptionsOnLeft(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_OPTIONS_SCREEN(821BAD08, OptionsAnalogPicture)
-ITC_OPTIONS_SCREEN(821BA7E0, OptionsIsButtonTaken)
-ITC_OPTIONS_SCREEN(821BAB58, OptionsIsAnalogTaken)
 ITC_OPTIONS_SCREEN(821BA550, OptionsStepButtons)
 ITC_OPTIONS_SCREEN(821BABD8, OptionsStepAnalog)
 ITC_OPTIONS_SCREEN(821BBF00, OptionsSettingsRead)
@@ -404,7 +404,6 @@ ITC_OPTIONS_SCREEN(821BDAD0, OptionsEnterButtons)
 ITC_OPTIONS_SCREEN(821BE218, OptionsSetCategoryArrow)
 ITC_OPTIONS_SCREEN(821BE518, OptionsShowVolumeNumber)
 ITC_OPTIONS_SCREEN(821BE930, OptionsShowMusicName)
-ITC_OPTIONS_SCREEN(821BE988, OptionsShowSlider)
 ITC_OPTIONS_SCREEN(821BEA48, OptionsShowSliderMark)
 ITC_OPTIONS_SCREEN(821BF0F0, OptionsShowButtonPicture)
 ITC_OPTIONS_SCREEN(821BF630, OptionsShowAnalogPicture)
