@@ -398,21 +398,22 @@ ITC_CAR_DEALER(82181B98, CarDealerPage4)
 // in play are native, the flag switches those; their steps above are the
 // harness's.
 ITC_CAR_DEALER(82180CE8, CarDealerStartFirstRace)
-ITC_CAR_DEALER(82182770, CarDealerSetColorBar)
-ITC_CAR_DEALER(82182C28, CarDealerSetHeader)
-// OpenColors (from Transition15, native, and Transition20, recompiled).
-ITC_CAR_DEALER(821847A0, CarDealerOpenColors)
+// No adapters for SetColorBar sub_82182770 and ShowSwatches sub_821826C0
+// (Transition17, OpenColors), SetHeader sub_82182C28 (Transition0, 4, 5, 8,
+// 15 and 19; Transition10, 18, 20 and 21, never seen in play, reach the
+// original) and OpenColors sub_821847A0 (Transition15; Transition20, never
+// seen in play, reaches the original) (removed, B7 loop, 2026-11-08): their
+// callers in play are native, the flag switches those; their steps above
+// are the harness's.
 // No adapters for SetKindBar sub_82182158 (OpenListMenu, OpenCar),
 // SetScrollArrows sub_82182DD0 (OpenCarList, Transition7) and ShowCarInfo
 // sub_82182620 (OpenCar; Transition13, never seen in play, reaches the
 // original) (removed, B7 loop, 2026-11-08): their callers in play are native,
-// the flag switches those. ShowSwatches (from OpenColors and Transition17,
-// recompiled). No adapters
+// the flag switches those. No adapters
 // for SetNameTexts sub_82182388, SetPriceTexts sub_82182418, SetSpecTexts
 // sub_821824A8 (only ShowCarInfo calls them) and SetSwatchColor
 // sub_82181270 (only ShowSwatches): their callers are native, the flag
 // switches those; their steps above are the harness's.
-ITC_CAR_DEALER(821826C0, CarDealerShowSwatches)
 ITC_CAR_DEALER(82199B38, HelpLineSet)
 // No adapters for the menus' openers OpenListMenu sub_82184338
 // (Transition0, Transition8), OpenCarList sub_82184488 (Transition4,
