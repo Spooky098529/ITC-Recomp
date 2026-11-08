@@ -89,6 +89,11 @@ file's history. What's left to see in a drive, from every run:
   harness 0 differing, 48 of 48 harness lines; none in the race or the
   replay `itc_4491` (ok): the modes aren't reached; all 48 to drive).
   Recorded.
+- Subsystem 3 of 3: the car list the type 6 and 7 panel screens show
+  (`PanelSet`; lead picked: `sub_8224CAD8` and the 12 others, beside
+  the screens just finished, whose vtable calls it answers; 13 ready
+  groups, about as many as the stand screens' 15 and the save screens'
+  13; its line deleted from `leads.md`). Mapping agent running.
 
 ## Done
 
