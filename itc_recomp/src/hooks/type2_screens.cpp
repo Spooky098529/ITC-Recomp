@@ -209,9 +209,7 @@ ITC_TYPE2_SCREENS(82198988, PlateLeavePage)
 // switches it; their steps above are the harness's.
 ITC_TYPE2_SCREENS(821981C8, PlateCharLineKind)
 ITC_TYPE2_SCREENS(821998F0, PlateShowDigits)
-ITC_TYPE2_SCREENS(82199898, PlateShowRegion)
 ITC_TYPE2_SCREENS(82199990, PlateShowChars)
-ITC_TYPE2_SCREENS(82199AA8, PlateMarkField)
 ITC_TYPE2_SCREENS(821992D8, PlateFinishRegionAnim)
 ITC_TYPE2_SCREENS(82199410, PlateFinishDigitAnim)
 ITC_TYPE2_SCREENS(82199688, PlateShowCharLine)
@@ -222,6 +220,9 @@ ITC_TYPE2_SCREENS(82199D88, PlateSetUpCharsMenu)
 // No adapters for ShowRegionCells sub_821990D0 (SetUpRegionMenu;
 // Transition3, never seen in play, reaches the original), ShowDigitCells
 // sub_82199350 (only SetUpNumberMenu) and ShowCharCells sub_82199488
-// (SetUpCharsMenu; Transition12, never seen in play, reaches the original):
-// their callers in play are native, the flag switches those; their steps
-// above are the harness's.
+// (SetUpCharsMenu; Transition12, never seen in play, reaches the original),
+// nor (removed, B7 loop, 2026-11-08) for ShowRegion sub_82199898 (ShowPlate;
+// Transition3, never seen in play, reaches the original) and MarkField
+// sub_82199AA8 (the three menus' set-ups; SetUpConfirmMenu, never seen in
+// play, reaches the original): their callers in play are native, the flag
+// switches those; their steps above are the harness's.
