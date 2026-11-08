@@ -117,7 +117,10 @@ file's history. What's left to see in a drive, from every run:
   in `load_poll`'s world; races 37 s, 0 errors, `car_list` and
   `load_poll` 0 differing; no subagents); left: the update group under
   `PanelSet::Update` `sub_8224CF18` (`Update`, `UpdateStand`,
-  `GarageStages::DrawAll`). Validation agent running.
+  `GarageStages::DrawAll`). Validated `itc_4519` (race 86 s at 180,
+  the harnesses ~92 s; 0 errors, every harness 0 differing, 8 of 8
+  harness lines; none in the race or the replay `itc_4520` (ok); all 8
+  to drive). Third migration agent running.
 
 ## Done
 

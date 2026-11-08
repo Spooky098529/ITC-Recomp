@@ -18,6 +18,13 @@ here loses its heading.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The car list's second migration (attract race `itc_4519`, replay
+  `itc_4520` ok; `car-list.md`): `sub_8224CAD8` PanelSet::Build,
+  `sub_8224C698` PanelSetBase::Build, `sub_8224A490`
+  PanelSetBase::ShowStandCar, `sub_82249EB8` PanelSetBase::TabsPage,
+  `sub_8224A178` PanelSetBase::RowsPage, `sub_8224AEA8`
+  PanelSetBase::ColorsPage, `sub_8224BDC0` PanelSetBase::PowerGraphPage,
+  `sub_8224B248` PanelSetBase::SetUpColors.
 - The car list's first migration (attract race `itc_4507`, replay
   `itc_4508` ok; `car-list.md`; all 58, the replay doesn't reach the
   panel screens): `sub_8224FD90` TabPanel::SetButtons, `sub_8224F558`
