@@ -18,6 +18,14 @@ here loses its heading.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
+- The car dealer's second migration (attract race `itc_4643`, replay
+  `itc_4644` ok, never entering the dealer; `car-dealer.md`):
+  `sub_82184338`, `sub_82184488`, `sub_82184650`, `sub_82184C70`,
+  `sub_82184DA0`, `sub_82184E60`, `sub_82184FB8`, `sub_821850B8`,
+  `sub_82181C38`, `sub_82181E10`, `sub_82181ED0`, `sub_821820C0`,
+  `sub_821841B0`, `sub_82183DE0`, `sub_82185310`, `sub_821847A0`,
+  `sub_82184018`, `sub_82182620`, `sub_82182158`, `sub_82182DD0`,
+  `sub_82181330`, `sub_82182C28`, `sub_82182770`, `sub_821826C0`.
 - The car dealer's migration (attract race `itc_4630`, replay
   `itc_4631` ok, the dealer only opened and closed; `car-dealer.md`):
   `sub_82180C48`, `sub_82181B98`, `sub_821812B8`, `sub_82181330`,

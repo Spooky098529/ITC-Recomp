@@ -255,7 +255,14 @@ goes in `src/` as overrides), American English.
   of 100 in play), the type 6 and 7 modes' list, panel and node screens
   (`type67-screens.md`, 48 of 48 in play) and their car list
   (`car-list.md`, 71 of 94 in play) native (ours 4,699 -> 4,920), and
-  stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  stopped at its limit. Its thirty-ninth run (`b7-loop-08-11-26`,
+  2026-11-08, 3 subsystems) made the UI movie helpers
+  (`ui-movies-game.md`, 92 of 92, with the car list's rest: 94 of 94),
+  a cleanup lead over what they unblocked (the in-race screens, the
+  race HUD's set-ups, the countdown, the race's end, the pause menu's
+  pages), the front-end screen helpers (`front-end-screen-helpers.md`,
+  27 of 32, 5 Merged) and the car dealer (`car-dealer.md`, 58 of 58 in
+  play) native (ours 4,920 -> 5,074), and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2797,6 +2804,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-08 | The car list (`PanelSet`, the type 6 and 7 panel screens' car pick: its vtable slots, 9 pages and 27 steps, the tab, row, color and car panels, `Build` over our allocation layer, `Update` with the stand car and `GarageStages::DrawAll`) | `car-list.md` | 71 of 94 in play (three migrations; 24 adapters removed) | `--native_car_list` |
 | 2026-11-08 | The UI movie helpers (`UiMovie::IsNamedActive`, `UnloopNamed`, `ClearNodeText`, `SetNodeTextV`, `SetNodeNumberText`, `OnLoaded`, `UiMovies::DeleteAll`), with the car list's groups they unblocked (the panels, steps, `Step17`, `CarPage`) | `ui-movies-game.md`, `car-list.md` | 8 new rows, 92 of 92 ours; the car list 94 of 94 (two migrations; 34 adapters removed) | `--native_ui_movies_game`, `--native_car_list` |
 | 2026-11-08 | The front-end screen helpers (the 852-byte modes' releases, the save screen's and options' dialog text setters with their dialog steps and pages, the car cards) | `front-end-screen-helpers.md` | 27 of 32 in play (5 Merged; one migration; 6 adapters removed) | `--native_front_end_screen_helpers` |
+| 2026-11-08 | The car dealer (the type 2 mode's dealer machine: its 23 transitions, 6 pages, the car lists, the color pick, the purchase, the career's first car) | `car-dealer.md` | 58 of 58 in play (two migrations; 16 adapters removed) | `--native_car_dealer` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4948,3 +4956,17 @@ car cards. The boundary: 449 functions (916 pairs): overridden 109,
 Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
 54 with a live caller. B7 (`b7_status.py`): ours 5,016, work left
 1,411 (Wrapped 56, with a row 390, no row yet 965), from 1,474.
+
+**2026-11-08, the car dealer (branch `b7-loop-08-11-26`):** the
+thirty-ninth run's third subsystem (`car-dealer.md`,
+`--native_car_dealer`, `src/car_dealer/`), in two migrations: the
+type 2 mode's dealer machine (`InitStates` and its transitions, the six
+pages, `Update`, the two car lists, the car info and color swatches,
+the purchase, the career's first car and its race start). The
+transitions keep their adapters (`Update`'s table); callees never seen
+in play run as the originals. The pad replay only opens and closes the
+dealer: the rest waits for a drive. The run stopped at its limit (3
+subsystems). The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,074, work left
+1,354 (Wrapped 56, with a row 390, no row yet 908), from 1,411.

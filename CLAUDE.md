@@ -590,6 +590,20 @@ panel and node screens (`type67-screens.md`, `--native_type67_screens`,
 native (ours 4,699 -> 4,920); it stopped at its limit. The rest waits
 on the UI movie helpers `sub_8211BC18` and `sub_8211DE30`, the save
 screens' lead and the leads in `docs/loops/leads.md`.
+Its thirty-ninth run (`b7-loop-08-11-26`, 2026-11-08, not yet merged;
+summary `docs/loops/b7-loop-2026-11-08-1300.md`; 3 subsystems) made the
+UI movie helpers (`ui-movies-game.md`, 92 of 92, with the rest of the
+car list: 94 of 94), a cleanup lead over what they unblocked (the
+in-race screens' teardown, the race dialog, the pause menu's pages and
+transitions, the race HUD's set-ups, the countdown, the race's end and
+the career results, ~60 adapters removed), the front-end screen helpers
+(`front-end-screen-helpers.md`, `--native_front_end_screen_helpers`, 27
+of 32 in play: the modes' releases, the save and options dialogs, the
+car cards) and the car dealer (`car-dealer.md`, `--native_car_dealer`,
+58 of 58 in play: the type 2 mode's dealer machine, the purchase, the
+career's first car) native (ours 4,920 -> 5,074); it stopped at its
+limit. The rest waits on the type 2 mode's other screen machines and
+the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

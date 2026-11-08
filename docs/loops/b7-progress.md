@@ -138,9 +138,16 @@ file's history. What's left to see in a drive, from every run:
   transitions 0, 1, 4-9, 11, 15-17, 19, `OpenListMenu`, `OpenCarList`,
   `OpenCar`, `OpenColors`; 11 adapters removed after counter runs; 58
   of 58 in play ours; race 36 s, 0 errors, its harnesses 0 differing;
-  no subagents). Left: none. Step: its validation, agent running.
+  no subagents). Left: none. Validated `itc_4643` (race 79 s at 180;
+  0 errors, every harness 0 differing outside the expected groups, 24
+  of 24 harness lines; none in the race or the replay `itc_4644` (ok),
+  24 to drive). Recorded. The run's limit reached.
 
 ## Done
+
+- `car-dealer.md`: 58 of 58 in play native (the type 2 mode's dealer
+  machine; 16 adapters removed), `--native_car_dealer`; c96dfffd,
+  3480d4e6..5b3fe2c2.
 
 - `front-end-screen-helpers.md`: 27 of 32 in play native (5 Merged;
   the modes' releases, the save and options dialogs, the car cards; 6
@@ -202,3 +209,10 @@ file's history. What's left to see in a drive, from every run:
   known 390, unknown 908).
 
 ## Stopped
+
+2026-11-08, at the run's limit: 3 subsystems finished (the UI movie
+helpers, the front-end screen helpers, the car dealer), with a cleanup
+lead of four migrations. Every validation passed; nothing uncommitted.
+The run's summary (`b7-loop-2026-11-08-1300.md`), the plan's "B7 in
+progress" line and CLAUDE.md's B7 sentence are up to date. The user
+reviews and merges.
