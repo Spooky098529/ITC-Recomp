@@ -147,6 +147,10 @@ void BuildEnter(PPCContext& ctx, uint8_t* base);
 void BuildFill(PPCContext& ctx, uint8_t* base);
 void BuildSetUpStatus(PPCContext& ctx, uint8_t* base);
 void BuildListRemoveAt(PPCContext& ctx, uint8_t* base);
+// The hub's Update (no arguments read) and PutCarOnStand (r3 the car; only
+// Update calls it, no adapter).
+void HubUpdate(PPCContext& ctx, uint8_t* base);
+void HubPutCarOnStand(PPCContext& ctx, uint8_t* base);
 // The build screen's level pages (r3 the mode, not read) and their jumps
 // (no arguments; only the pages call them, no adapters).
 void BuildGroupsPage(PPCContext& ctx, uint8_t* base);

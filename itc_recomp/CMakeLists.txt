@@ -494,6 +494,7 @@ set(ITC_SOURCES
     src/type2_screens/hub_pages.cpp
     src/type2_screens/build_enter.cpp
     src/type2_screens/build_pages.cpp
+    src/type2_screens/hub_update.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

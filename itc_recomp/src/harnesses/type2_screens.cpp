@@ -22,6 +22,7 @@
 // parking area, 2026-10-30).
 
 #include "harness.h"
+#include "stand_car_world.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -39,6 +40,7 @@
 #include "models/memory_blocks.h"
 #include "models/xpr.h"
 #include "race_screens/race_screens.h"
+#include "race_setup/race_setup.h"
 #include "type2_screens/type2_screens.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -123,6 +125,8 @@ constexpr Global kGlobals[] = {
     {menu_sounds::kSoundManager, 4},
     {menu_sounds::kEffectsVolume, 8},
     {menu_sounds::kMusicVolume, 4},
+    {0x826C2E40, 8},  // the car scene's first set and the scene ([0x826C2E44])
+    {0x826D83E4, 4},  // the stand's reload count
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -136,7 +140,7 @@ struct World {
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
         block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)),
         save(memory::Alloc(kSaveDataBytes, 0)), screen(memory::Alloc(t2::kBuildScreenBytes, 0)),
-        items(memory::Alloc(kItemBytes * 400, 0)) {
+        items(memory::Alloc(kItemBytes * 400, 0)), stand(memory::Alloc(kStandBytes, 0)) {
     if (strings != 0) {
       MakeStrings();
     }
@@ -147,11 +151,13 @@ struct World {
     memory::Free(save);
     memory::Free(screen);
     memory::Free(items);
+    memory::Free(stand);
   }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
   bool ok() const {
-    return allocation != 0 && strings != 0 && save != 0 && screen != 0 && items != 0;
+    return allocation != 0 && strings != 0 && save != 0 && screen != 0 && items != 0 &&
+           stand != 0;
   }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t data() const { return at(kDataAt); }
@@ -171,6 +177,10 @@ struct World {
   // build screen's Fill (the harness runs before the game loads its own).
   static constexpr uint32_t kItemBytes = 3008;
   uint32_t items;
+  // The car scene and its pool 7 scene model for the hub's stand (the
+  // scene at +0, the model at +0x1400).
+  static constexpr uint32_t kStandBytes = 0x2800;
+  uint32_t stand;
 
  private:
   void MakeStrings() {
@@ -1657,6 +1667,172 @@ void BuildEntry(Context& h, const World& w) {
 
 }  // namespace
 
+// The hub's update. The stand's world without the car (as the car
+// dealer's harness lays it, drawless): the car scene ([0x826C2E44] the
+// world's stand block; +4 0, no sound loads; a teardown counting down or its
+// models updating) with one pool 7 scene model in use (a car with no parts,
+// its build deferred), the first set none, the reload count 0 to 2
+// (GarageStage::ReloadModel answers 0), the stage (the hub world's, [the
+// holder's +0]) its model index (+8) 0, +16 set or not, +4 -1 or small
+// (GarageStage::IsBusy), the garage camera not set up (+112 0:
+// GarageStage::Draw does nothing).
+void DrawlessStand(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t scene = w.stand, model = w.stand + 0x1400;
+  WriteRandom(base, w.stand, World::kStandBytes, r);
+  guest::StoreU32(base, 0x826C2E44, scene);
+  guest::StoreU32(base, 0x826C2E40, 0);
+  guest::StoreU32(base, 0x826D83E4, r.Below(3));
+  guest::StoreU32(base, scene + 0, r.Below(2) == 0 ? 4 : r.Below(4));
+  guest::StoreU32(base, scene + 48, 3 + r.Below(4));
+  guest::StoreU32(base, scene + 4, 0);
+  guest::StoreU32(base, scene + 5048, 1);
+  guest::StoreU32(base, scene + 5028, model);
+  guest::StoreU32(base, scene + 5036, 1);
+  guest::StoreU32(base, model + 8, 0);
+  guest::StoreU32(base, model + 16, 3);
+  guest::StoreU32(base, model + 20, r.Below(6));
+  guest::StoreU32(base, model + 32, 1);
+  guest::StoreU32(base, model + 5028, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5040, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5044, 3 + r.Below(3));
+  for (const uint32_t at : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+    guest::StoreU32(base, model + at, 0);
+  }
+  guest::StoreU32(base, model + 5116, scene);
+  const uint32_t stage = guest::LoadU32(base, w.at(kStageAt));
+  guest::StoreU32(base, stage + 4, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(4));
+  guest::StoreU32(base, stage + 8, 0);
+  guest::StoreU32(base, stage + 16, r.Below(2));
+  guest::StoreU32(base, stage + 112, 0);
+}
+
+// The hub's page object and data for its update: the running transition
+// -1, -2 (none: done) or one of those seen in play (0 to 3, 5 to 7: their
+// worlds the transitions' cases', the page object's +24 and the menu as
+// they lay them), the queued one -1 or small, the page 3 now and then (the
+// stand left alone), the data's +8 (the stand's model made) and +16 (the
+// busy marker shown) 0 or 1.
+void UpdateWorld(Random& r, const World& w, bool transitions) {
+  uint8_t* base = w.base;
+  HubMovieWorld(r, w);
+  const uint32_t pages = w.at(kPagesAt), menu = w.at(kListAt);
+  guest::StoreU32(base, pages + 24,
+                  r.Below(3) == 0 ? 1 : r.Below(5) == 0 ? uint32_t(r.Next()) : 0);
+  guest::StoreU32(base, menu + 0, r.Below(8));
+  guest::StoreU32(base, menu + 4, r.Below(8));
+  const uint32_t way = r.Below(3);
+  guest::StoreU32(base, menu + 8, way == 0 ? 1 : way == 1 ? 0xFFFFFFFFu : r.Below(4));
+  guest::StoreU32(base, w.data() + 12, r.Below(2));
+  static constexpr uint32_t kSeen[7] = {0, 1, 2, 3, 5, 6, 7};
+  const uint32_t pick = r.Below(4);
+  guest::StoreU32(base, pages + 12,
+                  !transitions || pick == 0 ? 0xFFFFFFFFu
+                  : pick == 1               ? 0xFFFFFFFEu
+                                            : kSeen[r.Below(7)]);
+  guest::StoreU32(base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(14));
+  guest::StoreU32(base, pages + 0, transitions && r.Below(4) == 0 ? 3 : r.Below(3));
+  guest::StoreU32(base, w.data() + 8, transitions ? r.Below(2) : 0);
+  guest::StoreU32(base, w.data() + 16, r.Below(2));
+}
+
+// Player 0's selected garage car (as the hub finds it: the garage's slot
+// links from +204, the save's +0x19920 steps): its 1,968-byte record.
+uint32_t SelectedGarageCar(uint8_t* base, uint32_t save) {
+  const uint32_t garage = save + 6120;
+  auto link = [&](uint32_t at) {
+    return garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, at))));
+  };
+  uint32_t node = link(garage + 204);
+  for (uint32_t steps = guest::LoadU32(base, save + 0x19920); steps != 0; steps--) {
+    node = link(node);
+  }
+  return garage + 1968 * uint32_t(int32_t(int16_t(guest::LoadU16(base, node + 2))));
+}
+
+void HubUpdateCases(Context& h, const World& w) {
+  // Update without the car: the transitions, the busy marker, the drawless
+  // stand and the model not remade; its frame without the saves (r24 on).
+  Run(h, w, {"Type2Hub::Update (sub_821907F8), the stand drawless", 200, __imp__sub_821907F8,
+             hooks::HubUpdate, {{-2208, -72}},
+             [](PPCContext& t, Random& r, const World& w) {
+               UpdateWorld(r, w, true);
+               DrawlessStand(r, w);
+               t.r3.u64 = w.at(kMachineAt);
+               t.r4.u64 = w.at(kModeAt);
+             }});
+  // With the stand's car: load_poll's re-applies' world (StandCarWorld,
+  // stand_car_world.h, as the car dealer's and car list's harnesses lay it
+  // for GarageStage::ShowCarById), its entry the items' block (its +8432 the
+  // world's car id); the car a car of that id (Car::Init and Car::SetModel,
+  // their plain C++, in the items' block; its +12 the id too) copied over the
+  // selected garage car's (+212, its first 1,884 bytes); the stage's garage
+  // camera not set up (+112 0: GarageStage::Draw and ApplyPreset only note
+  // the preset); the reload count 0 to 5. Settled after the run (its blocks
+  // and loads compared, its globals put back), without the car on
+  // PutCarOnStand's frame in Update's cases (the words Car::Init leaves
+  // there are its earlier callees', the originals' saves among them).
+  StandCarWorld stand(h.base);
+  if (!stand.ok()) {
+    ITC_LOG_WARN("harness: type2_screens: the hub's stand car cases skipped (the stand's world: "
+                 "no block, or its callees' plain C++ isn't native)");
+    return;
+  }
+  auto lay = [&stand](PPCContext& t, Random& r, const World& w, uint32_t car) {
+    uint8_t* base = w.base;
+    stand.Lay(r, w.items, t.r1.u32);
+    const uint32_t id = guest::LoadU32(base, w.items + 8432);
+    race_setup::CarInit(base, car);
+    race_setup::SetModel(base, car, id);
+    guest::StoreU32(base, car + 12, id);
+    guest::StoreU32(base, 0x826D83E4, r.Below(6));
+    // ReloadModel's callees as the car dealer's StandWorld has them:
+    // CarScene::Update a teardown counting down (state 4, +48 3 to 6: not
+    // done this call), the first set none; SceneModel::SetUp (through
+    // ScenePools::SetUpB) with no sound loads (the scene's +4 0) and the
+    // pool 7 model's build deferred (+5044 3 to 5).
+    const uint32_t scene = guest::LoadU32(base, 0x826C2E44);
+    guest::StoreU32(base, scene + 0, 4);
+    guest::StoreU32(base, scene + 48, 3 + r.Below(4));
+    guest::StoreU32(base, scene + 4, 0);
+    guest::StoreU32(base, guest::LoadU32(base, scene + 5028) + 5044, 3 + r.Below(3));
+    guest::StoreU32(base, 0x826C2E40, 0);
+    const uint32_t holder = guest::LoadU32(base, guest::LoadU32(base, kStandHolder));
+    guest::StoreU32(base, guest::LoadU32(base, holder) + 112, 0);
+  };
+  int reached = 0, runs = 0;
+  auto settle = [&stand](PPCContext&, const World&, Outputs& out) { stand.Settle(out, 0, false); };
+  Run(h, w, {"Type2Hub::PutCarOnStand (sub_8218DB60)", 30, __imp__sub_8218DB60,
+             hooks::HubPutCarOnStand, {{-3920, -16}},
+             [lay](PPCContext& t, Random& r, const World& w) {
+               const uint32_t car = w.items + 0x3000;
+               lay(t, r, w, car);
+               t.r3.u64 = car;
+             },
+             settle});
+  Run(h, w, {"Type2Hub::Update (sub_821907F8; sub_8218DB60), with the stand's car", 30,
+             __imp__sub_821907F8, hooks::HubUpdate, {{-2208, -72}},
+             [lay](PPCContext& t, Random& r, const World& w) {
+               UpdateWorld(r, w, false);
+               const uint32_t car = w.items + 0x3000;
+               lay(t, r, w, car);
+               const uint32_t record = SelectedGarageCar(w.base, w.save) + 212;
+               Write(w.base, record, Read(w.base, car, 1884).data(), 1884);
+               t.r3.u64 = w.at(kMachineAt);
+               t.r4.u64 = w.at(kModeAt);
+             },
+             [&stand, &reached, &runs](PPCContext&, const World& w, Outputs& out) {
+               runs++;
+               if (guest::LoadU32(w.base, w.data() + 8) != 0) {
+                 reached++;
+               }
+               stand.Settle(out, 0, false);
+             }});
+  ITC_LOG_INFO("harness: type2_screens: the hub's update made the stand's model (the car put "
+               "on it) in {} of {} runs",
+               reached, runs);
+}
+
 void Type2Screens(Context& h) {
   const World w(h.base);
   if (!w.ok()) {
@@ -1676,6 +1852,7 @@ void Type2Screens(Context& h) {
     // cases reach sub_8218D708, the original on both sides, over a random
     // car spec: some seeds send it into a loop reading guest 0).
     BuildLevels(h, w);
+    HubUpdateCases(h, w);
   }
 }
 

@@ -76,7 +76,10 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "their jumps JumpGroupA sub_8219DBC8, JumpGroupB sub_8219DDB8, JumpBuildA "
               "sub_8219DFA8, JumpBuildB sub_8219E348, JumpStandA sub_8219E600 and JumpStandB "
               "sub_8219E9A0 (the mapper's slot 12, MenuList::, UiMovie::FinishNamed and "
-              "MenuSound::Play through their overrides) "
+              "MenuSound::Play through their overrides); the hub's Update sub_821907F8 with "
+              "PutCarOnStand sub_8218DB60 (the transitions, UiMovie::Run, the garage stage's "
+              "calls, CarModels::BlockOf, Car::Init, Car::Refresh and memcpy through their "
+              "overrides; SaveData::Of, ShowBusy and HideBusy their plain C++) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -497,6 +500,14 @@ void BuildFill(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildFill(base, ctx.r1.u32, guest.calls());
 }
+void HubUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubUpdate(base, ctx.r1.u32, guest.calls());
+}
+void HubPutCarOnStand(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubPutCarOnStand(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
 void BuildGroupsPage(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildGroupsPage(base, ctx.r1.u32, guest.calls());
@@ -660,6 +671,9 @@ ITC_TYPE2_SCREENS(8218D8E8, HubImageLoaded)
 // sub_821903D0 (Transition5; Transition8 and Transition10, never seen in
 // play, reach the original) and FillMenu sub_8218FB20 (Transition0,
 // Transition7): their steps above are the harness's.
+// The hub's Update (a functor); no adapter for PutCarOnStand sub_8218DB60
+// (only Update): its step above is the harness's.
+ITC_TYPE2_SCREENS(821907F8, HubUpdate)
 ITC_TYPE2_SCREENS(82190498, HubUpdatePage)
 ITC_TYPE2_SCREENS(821900B8, HubRecordPage)
 ITC_TYPE2_SCREENS(8218EA90, HubShowBusy)

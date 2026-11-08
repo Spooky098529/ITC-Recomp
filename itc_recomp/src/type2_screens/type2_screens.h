@@ -639,6 +639,27 @@ uint32_t BuildSetUpStatus(uint8_t* base, uint32_t sp, const Calls& calls);
 // ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0). FadeIn's r3. 96-byte frame.
 uint64_t BuildEnter(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The hub's update (hub_update.cpp) ---
+
+// sub_8218DB60 Type2Hub::PutCarOnStand (r3 a garage car's car, 1,884
+// bytes): a car object on its 4,000-byte frame (+80: Car::Init, the car
+// copied over it, +3888 |= 1, Car::Refresh), then
+// GarageStage::SetCar([0x826D83E0]'s +0 word, the car, -1), all through
+// their overrides. SetCar's r3.
+uint64_t HubPutCarOnStand(uint8_t* base, uint32_t car, uint32_t sp, const Calls& calls);
+// sub_821907F8 Type2Hub::Update (the (5, 0) handler): the debug prints
+// (the empty sub_82106540); movie 0; the running transition from the
+// 13-entry table on its frame (+96, through `calls`) or, with none,
+// UiMovie::Run(movie, 0) unless the page is 3; then the stand
+// ([0x826D83E0]'s +0 word): GarageStage::IsBusy shows or hides the busy
+// marker (ShowBusy, HideBusy: their plain C++; the data's +16); unless the
+// page is 3, with the data's +8 GarageStage::Draw(stage, 0, 1), else the
+// selected garage car copied to the frame (+160, 1,968 bytes),
+// GarageStage::ReloadModel(stage, CarModels::BlockOf(its +12)) into the
+// data's +8 and, when made, PutCarOnStand (its plain C++) and
+// GarageStage::Command(stage, 14). The last call's r3. 2,208-byte frame.
+uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The build screen's level pages and their jumps (build_pages.cpp) ---
 //
 // The jumps (the shoulder buttons over the list [0x826D8440]): the player's
