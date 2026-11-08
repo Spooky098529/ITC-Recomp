@@ -40,6 +40,11 @@ void CarDealerTransition4(PPCContext& ctx, uint8_t* base);
 void CarDealerTransition5(PPCContext& ctx, uint8_t* base);
 void CarDealerTransition8(PPCContext& ctx, uint8_t* base);
 void CarDealerTransition9(PPCContext& ctx, uint8_t* base);
+void CarDealerTransition1(PPCContext& ctx, uint8_t* base);
+void CarDealerTransition6(PPCContext& ctx, uint8_t* base);
+void CarDealerTransition11(PPCContext& ctx, uint8_t* base);
+void CarDealerTransition16(PPCContext& ctx, uint8_t* base);
+void CarDealerTransition19(PPCContext& ctx, uint8_t* base);
 // The car's texts and the swatches: ShowCarInfo (r3 the index), ShowSwatches
 // and FillStatus (no arguments) with adapters; SetNameTexts (r3 the id, r4
 // the maker byte), SetPriceTexts (r3 the price), SetSpecTexts (r3 the

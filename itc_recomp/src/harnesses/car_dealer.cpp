@@ -1189,6 +1189,29 @@ void Transitions(Context& h, const World& w) {
              hooks::CarDealerTransition8, {{-128, -32}}, setup(false, false), FreeMenuBlocks});
   Run(h, w, {"CarDealer::Transition9 (sub_821850B8; sub_82184650)", 100, __imp__sub_821850B8,
              hooks::CarDealerTransition9, {{-112, -24}}, setup(true, true), FreeMenuBlocks});
+  // The animations' ones: the lists 0 to 7 cars (Transition1 colors by
+  // them), the data's +28 any (Transition11 sets it).
+  auto plain = [](PPCContext& t, Random& r, const World& w) {
+    uint8_t* base = w.base;
+    MenuWorld(r, w);
+    for (const uint32_t count : {616u, 1132u}) {
+      guest::StoreU32(base, w.data() + count, r.Below(3) == 0 ? 0 : r.Below(8));
+    }
+    const uint32_t step = w.at(kPagesAt) + 24;
+    const uint32_t words[3] = {0, 1, uint32_t(r.Next())};
+    guest::StoreU32(base, step, words[r.Below(4) == 0 ? 1 + r.Below(2) : 0]);
+    t.r3.u64 = step;
+  };
+  Run(h, w, {"CarDealer::Transition1 (sub_82181C38)", 100, __imp__sub_82181C38,
+             hooks::CarDealerTransition1, {{-128, -32}}, plain});
+  Run(h, w, {"CarDealer::Transition6 (sub_82181E10)", 60, __imp__sub_82181E10,
+             hooks::CarDealerTransition6, {{-128, -32}}, plain});
+  Run(h, w, {"CarDealer::Transition11 (sub_82181ED0)", 60, __imp__sub_82181ED0,
+             hooks::CarDealerTransition11, {{-128, -32}}, plain});
+  Run(h, w, {"CarDealer::Transition16 (sub_821820C0)", 60, __imp__sub_821820C0,
+             hooks::CarDealerTransition16, {{-128, -32}}, plain});
+  Run(h, w, {"CarDealer::Transition19 (sub_821841B0)", 60, __imp__sub_821841B0,
+             hooks::CarDealerTransition19, {{-112, -24}}, plain});
 }
 
 }  // namespace

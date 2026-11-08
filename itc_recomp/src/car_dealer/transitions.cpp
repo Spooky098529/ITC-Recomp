@@ -175,4 +175,97 @@ uint64_t Transition9(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   return uint32_t(Run(calls, frame, 0x82185158, movie)) == 0 ? 1 : 0;
 }
 
+uint64_t Transition1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82181C38 CarDealer::Transition1");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = FindMovie(base, 4, frame + 80);
+  if (Load(base, step) == 0) {
+    const uint32_t selection = uint32_t(Selection(base, calls, frame, 0x82181C7C));
+    if (selection < 1) {
+      if (Load(base, Load(base, kData) + 616) > 0) {
+        Play(calls, frame, 0x82181CEC, movie, 37);
+        Loop(calls, frame, 0x82181CF8, movie, 37);
+      }
+    } else if (selection == 1) {
+      if (Load(base, Load(base, kData) + 1132) > 0) {
+        Play(calls, frame, 0x82181CB8, movie, 38);
+        Loop(calls, frame, 0x82181CF8, movie, 38);
+      }
+    }
+    // The two items colored 0, or 2 for an empty list.
+    calls.Call(kSetNodeColor, frame, 0x82181D20, movie, 8, 5,
+               Load(base, Load(base, kData) + 616) > 0 ? 0 : 2);
+    calls.Call(kSetNodeColor, frame, 0x82181D48, movie, 8, 6,
+               Load(base, Load(base, kData) + 1132) > 0 ? 0 : 2);
+    Store(base, step, 1);
+  }
+  Run(calls, frame, 0x82181D5C, movie);
+  return 1;
+}
+
+// Transition6, Transition11 and Transition16: on the first call the
+// animation `offset` + the list menu's selection played and looped, then
+// the extra ones (Transition11: the data's +28 = 1, the stand drawn); then
+// Run. Always 1. 128-byte frames.
+namespace {
+struct Extra {
+  uint32_t id, play_lr, loop_lr;
+};
+uint64_t ShowSelected(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
+                      const uint32_t lr[4], uint32_t offset, const Extra* extra,
+                      uint32_t extras, bool draw_stand) {
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = FindMovie(base, 4, frame + 80);
+  if (Load(base, step) == 0) {
+    const uint64_t id = Selection(base, calls, frame, lr[0]) + offset;
+    Play(calls, frame, lr[1], movie, id);
+    Loop(calls, frame, lr[2], movie, id);
+    for (uint32_t k = 0; k < extras; k++) {
+      Play(calls, frame, extra[k].play_lr, movie, extra[k].id);
+      Loop(calls, frame, extra[k].loop_lr, movie, extra[k].id);
+    }
+    if (draw_stand) {
+      Store(base, Load(base, kData) + 28, 1);
+    }
+    Store(base, step, 1);
+  }
+  Run(calls, frame, lr[3], movie);
+  return 1;
+}
+}  // namespace
+
+uint64_t Transition6(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82181E10 CarDealer::Transition6");
+  static constexpr uint32_t kLr[4] = {0x82181E54, 0x82181E78, 0x82181E84, 0x82181EC0};
+  static constexpr Extra kExtra[1] = {{34, 0x82181EA0, 0x82181EAC}};
+  return ShowSelected(base, step, sp, calls, kLr, 24, kExtra, 1, false);
+}
+
+uint64_t Transition11(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82181ED0 CarDealer::Transition11");
+  static constexpr uint32_t kLr[4] = {0x82181F14, 0x82181F38, 0x82181F44, 0x82181FB4};
+  static constexpr Extra kExtra[2] = {{86, 0x82181F60, 0x82181F6C}, {87, 0x82181F88, 0x82181F94}};
+  return ShowSelected(base, step, sp, calls, kLr, 37, kExtra, 2, true);
+}
+
+uint64_t Transition16(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821820C0 CarDealer::Transition16");
+  static constexpr uint32_t kLr[4] = {0x82182104, 0x82182128, 0x82182134, 0x82182148};
+  return ShowSelected(base, step, sp, calls, kLr, 134, nullptr, 0, false);
+}
+
+uint64_t Transition19(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821841B0 CarDealer::Transition19");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t movie = FindMovie(base, 4, frame + 80);
+  if (Load(base, step) == 0) {
+    const uint64_t selection = Selection(base, calls, frame, 0x821841FC);
+    Finish(calls, frame, 0x8218420C, movie, selection + 134);
+    SetHeader(base, 2, 3, frame);
+    Play(calls, frame, 0x82184234, movie, 156);
+    Store(base, step, 1);
+  }
+  return uint32_t(Run(calls, frame, 0x82184248, movie)) == 0 ? 1 : 0;
+}
+
 }  // namespace car_dealer

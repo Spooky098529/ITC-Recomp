@@ -45,9 +45,10 @@ ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
               "SetSelection, Fit, CarCards::FillAll and GarageStage::SetPlates through their "
               "overrides; SetKindBar's, SetScrollArrows', ShowCarInfo's and HelpLine::Set's plain "
               "C++); the transitions Transition0 sub_82184C70, Transition4 sub_82184DA0, "
-              "Transition5 sub_82184E60, Transition8 sub_82184FB8 and Transition9 sub_821850B8 "
-              "(the openers', SetHeader's and ReloadStandModel's plain C++; the named animations "
-              "and UiMovie::Run through their overrides) "
+              "Transition5 sub_82184E60, Transition8 sub_82184FB8, Transition9 sub_821850B8, "
+              "Transition1 sub_82181C38, Transition6 sub_82181E10, Transition11 sub_82181ED0, "
+              "Transition16 sub_821820C0 and Transition19 sub_821841B0 (the openers', SetHeader's and ReloadStandModel's plain C++; the named animations, "
+              "UiMovie::SetNodeColor and UiMovie::Run through their overrides) "
               "(the same writes; checked by --run_harnesses=car_dealer)");
 
 namespace hooks {
@@ -187,6 +188,26 @@ void CarDealerTransition8(PPCContext& ctx, uint8_t* base) {
 void CarDealerTransition9(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition9(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition1(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition1(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition6(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition6(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition11(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition11(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition16(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition16(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition19(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition19(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 void CarDealerShowCarInfo(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
@@ -329,6 +350,11 @@ ITC_CAR_DEALER(82184DA0, CarDealerTransition4)
 ITC_CAR_DEALER(82184E60, CarDealerTransition5)
 ITC_CAR_DEALER(82184FB8, CarDealerTransition8)
 ITC_CAR_DEALER(821850B8, CarDealerTransition9)
+ITC_CAR_DEALER(82181C38, CarDealerTransition1)
+ITC_CAR_DEALER(82181E10, CarDealerTransition6)
+ITC_CAR_DEALER(82181ED0, CarDealerTransition11)
+ITC_CAR_DEALER(821820C0, CarDealerTransition16)
+ITC_CAR_DEALER(821841B0, CarDealerTransition19)
 // The page handlers (from UpdatePage's table on its stack).
 ITC_CAR_DEALER(82180F90, CarDealerPage0)
 ITC_CAR_DEALER(82183428, CarDealerPage1)

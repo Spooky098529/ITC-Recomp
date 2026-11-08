@@ -93,6 +93,7 @@ constexpr uint32_t kListFit = 0x8220BC40;
 constexpr uint32_t kCarCardsFillAll = 0x821822F8;
 constexpr uint32_t kStageSetPlates = 0x82178DE8;
 constexpr uint32_t kLoopNamed = 0x8211DDE0;
+constexpr uint32_t kSetNodeColor = 0x8211A5B8;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -246,6 +247,23 @@ uint64_t Transition8(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
 // 151 played, ReloadStandModel and OpenCar (their plain C++). 112-byte
 // frame.
 uint64_t Transition9(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82181C38 CarDealer::Transition1: the selected list's animation (37 or
+// 38) played and looped when its list has cars; (8, 5) and (8, 6) colored 0
+// or 2 by whether each list has cars (UiMovie::SetNodeColor through its
+// override). Always 1. 128-byte frame.
+uint64_t Transition1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82181E10 CarDealer::Transition6: 24 + the selection and 34 played and
+// looped. Always 1. 128-byte frame.
+uint64_t Transition6(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82181ED0 CarDealer::Transition11: 37 + the selection, 86 and 87
+// played and looped, the data's +28 = 1. Always 1. 128-byte frame.
+uint64_t Transition11(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821820C0 CarDealer::Transition16: 134 + the selection played and
+// looped. Always 1. 128-byte frame.
+uint64_t Transition16(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821841B0 CarDealer::Transition19: 134 + the selection finished,
+// SetHeader(2, 3), 156 played. 112-byte frame.
+uint64_t Transition19(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The update, the start and the dialogs' end (update.cpp) ---
 
