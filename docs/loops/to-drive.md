@@ -18,6 +18,9 @@ here loses its heading.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
+- The cleanup lead after the UI movie helpers (attract race
+  `itc_4564`, replay `itc_4565` ok; `type6-type7-modes.md`):
+  `sub_82246038` StandMode::Release.
 - The UI movie helpers' second migration (attract race `itc_4552`,
   replay `itc_4553` ok; `ui-movies-game.md`, `car-list.md`):
   `sub_8211CA18`, `sub_8224C450`, `sub_8224B8D8`, `sub_82249668`,

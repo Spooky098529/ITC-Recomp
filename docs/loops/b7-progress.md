@@ -60,7 +60,11 @@ file's history. What's left to see in a drive, from every run:
   races 26-38 s, 0 errors, its harnesses 0 differing outside the known
   `Type6Mode::Init` group; no subagents). Left: `sub_8216C208`
   (`race-hud-machine.md`) and `sub_82218C10` (`race-screens.md`), ready.
-  Step: validation, agent running.
+  Validated `itc_4564` (race 85 s at 180; 0 errors, every harness 0
+  differing outside the expected groups, 17 of 17 harness lines, no
+  prints added; 14 in the race, 2 more in the replay `itc_4565` (ok), 1
+  to drive). Step: second migration (`sub_8216C208`, `sub_82218C10`),
+  agent running.
 
 ## Done
 
