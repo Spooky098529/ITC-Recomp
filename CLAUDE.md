@@ -576,6 +576,20 @@ adapters in `front-end-car-draw.md` and `tuning-screen.md`) (ours
 `HandleInput`'s vinyl and sticker editors' pages, `StandScene::Create`
 with `sub_820C8DE8` (a cleanup lead) and the leads in
 `docs/loops/leads.md`.
+Its thirty-eighth run (`b7-loop-07-11-26-2`, 2026-11-07 to 08, not yet
+merged; summary `docs/loops/b7-loop-2026-11-07-2222.md`; 3 subsystems)
+made the cleanup lead `sub_820C8DE8` (`CarScene::SetUp`, with
+`StandScene::Create` and the type 6 and 7 modes' slot 0), the options
+screen (`options-screen.md`, `--native_options_screen`, 98 of 100 in
+play: its machine, pages, steps, the settings' read, write and reload,
+the type 2, 4, 6 and 7 options' Inits, their step tables from
+`itc_recomp/tools/init_step_tables.py`), the type 6 and 7 modes' list,
+panel and node screens (`type67-screens.md`, `--native_type67_screens`,
+48 of 48 in play) and their car list (`car-list.md`,
+`--native_car_list`, 71 of 94 in play: `PanelSet`, the car pick)
+native (ours 4,699 -> 4,920); it stopped at its limit. The rest waits
+on the UI movie helpers `sub_8211BC18` and `sub_8211DE30`, the save
+screens' lead and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

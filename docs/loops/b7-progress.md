@@ -125,9 +125,16 @@ file's history. What's left to see in a drive, from every run:
   4 functions, 5 adapters removed; races 36 s, 0 errors, `car_list` and
   `load_poll` 0 differing; no subagents); left: none ready (71 of 94
   in play ours; the rest wait on `sub_8211BC18` and `sub_8211DE30`).
-  Validation agent running.
+  Validated `itc_4524` (race 86 s at 180, the harnesses ~92 s; 0
+  errors, every harness 0 differing, 6 of 6 harness lines; none in the
+  race or the replay `itc_4525` (ok); 4 more to drive). Recorded.
 
 ## Done
+
+- `car-list.md`: 71 of 94 in play native (the type 6 and 7 panel
+  screens' car list `PanelSet`: its slots, pages, steps, panels, build,
+  update and the stand car; 24 adapters removed), `--native_car_list`;
+  c595a898, 24d1bfd6..9fb09b97.
 
 - `type67-screens.md`: 48 of 48 in play native (the type 6 and 7
   modes' list, panel (car pick) and node screens, the group pair, the
@@ -179,5 +186,14 @@ file's history. What's left to see in a drive, from every run:
   460, unknown 1002).
 - After its second migration: ours 4916, work left 1510 (wrapped 56,
   known 452, unknown 1002).
-- After its third migration: ours 4920, work left 1506 (wrapped 56,
-  known 448, unknown 1002).
+- After its third migration and validation (`itc_4524`): ours 4920,
+  work left 1506 (wrapped 56, known 448, unknown 1002).
+
+## Stopped
+
+2026-11-08, at the run's limit: 3 subsystems finished (the options
+screen, the type 6 and 7 modes' screens, the car list), with the
+cleanup lead `sub_820C8DE8`. Every validation passed; nothing
+uncommitted. The run's summary (`b7-loop-2026-11-07-2222.md`), the
+plan's "B7 in progress" line and CLAUDE.md's B7 sentence are up to
+date. The user reviews and merges.

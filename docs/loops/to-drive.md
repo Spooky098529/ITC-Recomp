@@ -18,6 +18,12 @@ here loses its heading.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The car list's third migration (attract race `itc_4524`, replay
+  `itc_4525` ok; `car-list.md`): `sub_8224CF18` PanelSet::Update,
+  `sub_8224CD00` PanelSetBase::Update, `sub_8224C008`
+  PanelSetBase::UpdateStand, `sub_821807D8` GarageStages::DrawAll
+  (`ColorPanel::PlaceCursor` and `SetCount`, now Native, already listed
+  above).
 - The car list's second migration (attract race `itc_4519`, replay
   `itc_4520` ok; `car-list.md`): `sub_8224CAD8` PanelSet::Build,
   `sub_8224C698` PanelSetBase::Build, `sub_8224A490`

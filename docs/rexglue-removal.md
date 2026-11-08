@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-06):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-08):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -249,7 +249,13 @@ goes in `src/` as overrides), American English.
   themselves (`type6-type7-modes.md`, 110 of 117 in play: two
   front-end hubs over the garage car on its stand) native, with 15
   cleanup adapters removed (ours 4,476 -> 4,699), and stopped at its
-  limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  limit; its thirty-eighth run (`b7-loop-07-11-26-2`, 2026-11-07 to
+  08, 3 subsystems) made the cleanup lead `sub_820C8DE8` with the type
+  6 and 7 modes' slot 0, the options screen (`options-screen.md`, 98
+  of 100 in play), the type 6 and 7 modes' list, panel and node screens
+  (`type67-screens.md`, 48 of 48 in play) and their car list
+  (`car-list.md`, 71 of 94 in play) native (ours 4,699 -> 4,920), and
+  stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2788,6 +2794,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-07 | The type 6 and 7 modes (probably two front-end hubs over the player's garage car on its stand: the list screen starts a race; with the stand scene, the garage camera and lights, the first screens, dialogs, options, controller pages and save screen's Inits, the modes' `NextMode`, `Leaving`, `WaitForLoads` and `TearDown`) | `type6-type7-modes.md` | 110 of 117 in play (four migrations; 7 adapters removed) | `--native_type67_modes` |
 | 2026-11-08 | The options screen (the front end's options: its machine's handlers, `Draw`'s 15 pages and `Update`'s 49 steps, the HUD, sound, sliders, buttons and analog pages, the settings' `Reset`, `Read`, `Write` and `Reload` over `[0x826D8478]`, the type 2, 4, 6 and 7 options' and controller pages' Inits; with the cleanup lead before it, `CarScene::SetUp` `sub_820C8DE8`, which unblocked `StandScene::Create` and the type 6 and 7 modes' slot 0) | `options-screen.md` | 98 of 100 in play (three migrations; 31 adapters removed) | `--native_options_screen` |
 | 2026-11-08 | The type 6 and 7 modes' screens (the list, panel and node screens the modes' menus open: their machines' handlers, movie opens and releases, the panel screens as the car pick with `Type7PanelScreen::PickCar`, the group pair and panel groups) | `type67-screens.md` | 48 of 48 in play (one migration; 1 adapter removed) | `--native_type67_screens` |
+| 2026-11-08 | The car list (`PanelSet`, the type 6 and 7 panel screens' car pick: its vtable slots, 9 pages and 27 steps, the tab, row, color and car panels, `Build` over our allocation layer, `Update` with the stand car and `GarageStages::DrawAll`) | `car-list.md` | 71 of 94 in play (three migrations; 24 adapters removed) | `--native_car_list` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4889,3 +4896,17 @@ wait for a drive. The boundary: 449 functions (916 pairs): overridden
 109, Native 36, Dropped 26, never called 70, live 208. Imports: 186
 called, 54 with a live caller. B7 (`b7_status.py`): ours 4,849, work
 left 1,576 (Wrapped 56, with a row 425, no row yet 1,095), from 1,624.
+
+**2026-11-08, the car list (branch `b7-loop-07-11-26-2`):** the
+thirty-eighth run's third subsystem (`car-list.md`, `--native_car_list`,
+`src/car_list/`), in three migrations: `PanelSet`'s slots, its pages
+and steps (the steps through the 27-entry table its `Update` writes on
+its frame), the panels, `Build` over `memory::AllocPages`, the stand
+car and `GarageStages::DrawAll`. The rest waits on two UI movie
+helpers, `sub_8211BC18` (a lead) and `sub_8211DE30`. Neither the
+attract race nor the pad replay reaches the panel screens: all wait for
+a drive. The run stopped at its limit (3 subsystems). The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 4,920, work left 1,506 (Wrapped 56, with a row
+448, no row yet 1,002), from 1,576.
