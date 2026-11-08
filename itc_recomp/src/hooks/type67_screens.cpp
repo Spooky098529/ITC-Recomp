@@ -103,8 +103,6 @@ ITC_TS_STEP(PanelScreenOnMessage24,
             ts::PanelScreenOnMessage24(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(PanelScreenLeave, ts::PanelScreenLeave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(PanelScreenOnLeft, ts::PanelScreenOnLeft(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(PanelScreenDrawList,
-            ts::PanelScreenDrawList(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7PanelScreenDraw,
             ts::Type7PanelScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
@@ -162,8 +160,11 @@ ITC_TYPE67_SCREENS(822408B8, Type7PanelScreenOpenPowerGraph)
 ITC_TYPE67_SCREENS(82240238, Type7PanelScreenCarList)
 ITC_TYPE67_SCREENS(82240248, Type7PanelScreenCarEntry)
 ITC_TYPE67_SCREENS(82240258, Type7PanelScreenCarSlot)
-// The panel screens' handlers (through their machines' transitions);
-// PanelScreen::DrawList also from the other screens' draws (recompiled).
+// The panel screens' handlers (through their machines' transitions).
+// PanelScreen::DrawList sub_82248B58 has no adapter (removed, B7 loop,
+// 2026-11-08): in play only Type7PanelScreen::DrawList (native) calls it;
+// the other screens' draws that call it (sub_82230EF0, sub_82238DC8, never
+// seen in play) run the original.
 ITC_TYPE67_SCREENS(82249D18, PanelScreenOnEnter)
 ITC_TYPE67_SCREENS(82248CD0, PanelScreenOpenMovie)
 ITC_TYPE67_SCREENS(82249D88, PanelScreenWaitForMovie)
@@ -173,5 +174,4 @@ ITC_TYPE67_SCREENS(82248C48, PanelScreenUpdate)
 ITC_TYPE67_SCREENS(82248DF8, PanelScreenOnMessage24)
 ITC_TYPE67_SCREENS(82249E38, PanelScreenLeave)
 ITC_TYPE67_SCREENS(82248B08, PanelScreenOnLeft)
-ITC_TYPE67_SCREENS(82248B58, PanelScreenDrawList)
 ITC_TYPE67_SCREENS(82240958, Type7PanelScreenDraw)

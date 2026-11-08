@@ -69,7 +69,6 @@ void PanelScreenUpdate(PPCContext& ctx, uint8_t* base);
 void PanelScreenOnMessage24(PPCContext& ctx, uint8_t* base);
 void PanelScreenLeave(PPCContext& ctx, uint8_t* base);
 void PanelScreenOnLeft(PPCContext& ctx, uint8_t* base);
-void PanelScreenDrawList(PPCContext& ctx, uint8_t* base);
 void Type7PanelScreenDraw(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
