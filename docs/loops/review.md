@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
+
+(Nothing yet.)
+
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
 - The car list's third migration (35b39ea5..9fb09b97, the update

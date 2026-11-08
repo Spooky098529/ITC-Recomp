@@ -8,151 +8,21 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-11-07 22:22 on `b7-loop-07-11-26-2` (made by the
-  user for this run), from 565fde58; summary `b7-loop-2026-11-07-2222.md`.
+- Run started 2026-11-08 on `b7-loop-08-11-26` (made by the user for
+  this run), from 2bf66687; summary `b7-loop-2026-11-08-1300.md`.
   Limit: 3 subsystems.
-- Cleanup lead (no mapping, not counted): `sub_820C8DE8` (the second
-  set's fill under `StandScene::Create`, `car-models.md`), ready, with
-  what it unblocks in `type6-type7-modes.md` (`StandScene::Create`
-  `sub_82180B00`, the modes' slot 0 `sub_82236880`, `sub_82246C90`);
-  its line deleted from `leads.md`. Migration c709d9ed..92169ce4
-  (`CarScene::SetUp`, `StandScene::Create`, `Type6Mode::Init`,
-  `Type7Mode::Init`; 15 adapters removed; race 33 s, 0 errors, its
-  harnesses 0 differing outside one new expected group,
-  `Type6Mode::Init`'s transitions' stack leftovers; no subagents);
-  left: none. Validated `itc_4432` (race 78 s at 180, the harnesses
-  ~88.6 s; 0 errors, every harness 0 differing outside the expected
-  group, 19 of 19 harness lines; the two modes' Inits' shared print
-  split, 4ec19e07; 1 in the race, 2 in the replay `itc_4433` (ok), 16
-  to drive). Recorded.
-- Subsystem 1 of 3: the options screen with the settings' load (two
-  leads taken together: `sub_821BB9A8` and the 10 others, the
-  `Type6Options`/`Type7Options` transition handlers, the most ready
-  groups in `leads.md`, 29, beside the type 6 and 7 modes; and
-  `sub_821BBF00` and the 4 others, the options screens' volume calls
-  over the same settings `[0x826D8478]`; both lines deleted from
-  `leads.md`). Map checked (bce411a9: `options-screen.md`, 155 rows,
-  1 moved from `functions.md` (`sub_821BE5A8`, Wrapped), 95 in play:
-  the machine's handlers, `Settings::Reset`, `Read`, `Write`,
-  `Reload`, `Draw`'s 15 pages, `Update`'s 49 steps, the music preview,
-  the two-player pages, the type 2, 4 and 8 options' and controller
-  pages' Inits; 0 errors; 66 ready groups; 1 lead added (the options'
-  save side); three subagents, one at a time). Migration
-  a9b2152f..e81aa1ef (`--native_options_screen`, harness
-  `options_screen`: the controls' tables, `Settings::Reset`, `Read`,
-  `Write`, the handlers, `Close`, `Leave`, `ClosePage`, `Wait`, the
-  steps on its movie, the node helpers; 34 functions, 4 tails Merged, 5
-  adapters removed; `Options::FadeOut` `sub_821BD680` left recompiled by
-  the `BackToBuilds` precedent; races 35-38 s, 0 errors, its harnesses
-  0 differing; no subagents); left: 37 ready groups. Validated
-  `itc_4443` (race 83 s at 180, the harnesses ~90.1 s; 0 errors, every
-  harness 0 differing, 34 of 34 harness lines; 5 in the race, 17 in the
-  replay `itc_4444` (ok), 12 to drive). Second migration
-  e55413be..bbb0cfe3 (`Draw`, `Update`, the volume, slider and HUD
-  helpers, the lists and clashes, the dialogs, the save pages, the
-  cursors and value changes, `Settings::Reload`, `OnLeft`, `Show`; 43
-  functions, `ShowVolumeBar` Wrapped -> Overridden with its wrap kept,
-  7 adapters removed; races 33-37 s, 0 errors, its harnesses 0
-  differing; no subagents); left: the type 2 and 4 options' Inits (step
-  tables to generate), the controller pages' picks under
-  `sub_821C4BE0`, `sub_821BA380`, `sub_821C1498` and the other users of
-  the settings. Validated `itc_4463` (race 88 s at 180, the
-  harnesses ~90.5 s; 0 errors, every harness 0 differing, 42 of 42
-  harness lines; 1 in the race, 21 in the replay `itc_4464` (ok), 20 to
-  drive). Third migration 6c23d796..95016660 (the HUD, sliders,
-  buttons, analog and sound pages, the clash checks, the page set-ups,
-  `FadeIn`, the pages' closes, the type 2 and 4 options' and controller
-  pages' Inits with their step tables from the new
-  `itc_recomp/tools/init_step_tables.py`; 24 functions, 19 adapters
-  removed; races 36 s, 0 errors, its harnesses 0 differing; no
-  subagents); left: none in the file (98 of 100 in play ours;
-  `Options::OpenCategory` waits on the save screens' lead and
-  `sub_8211CBD8`; `FadeOut` stays recompiled). Validated `itc_4480`
-  (race 87 s at 180, the harnesses ~91 s; 0 errors, every harness 0
-  differing, 43 of 43 harness lines; 2 in the race, 18 in the replay
-  `itc_4481` (ok), 23 to drive). Recorded.
-- Subsystem 2 of 3: the type 6 and 7 modes' list, panel and node
-  screens' transition handlers (lead picked: `sub_82251618` and the 19
-  others, the most ready groups left in `leads.md`, 20, beside the
-  type 6 and 7 modes; its line deleted from `leads.md`). Map checked
-  (973a1f10: `type67-screens.md`, 145 rows, all new, 48 in play: the
-  list, panel (the car pick) and node screens' handlers, vtable slots
-  and base classes, the list part, the panel screens' group pair; 0
-  errors; 43 ready groups (through vtables the panel handlers call the
-  car list, `PanelSet`, a new lead); 2 leads added; no subagents).
-  Migration 42695d6d..cfbe6bd6 (`--native_type67_screens`, harness
-  `type67_screens`: the list and node screens' handlers, the panel
-  screens, the group pair and panel groups, `Type7PanelScreen::PickCar`;
-  48 of 48 in play, 1 adapter removed; race 38 s, 0 errors, its
-  harnesses 0 differing; no subagents); left: none. Validated
-  `itc_4490` (race 87 s at 180, the harnesses ~91 s; 0 errors, every
-  harness 0 differing, 48 of 48 harness lines; none in the race or the
-  replay `itc_4491` (ok): the modes aren't reached; all 48 to drive).
-  Recorded.
-- Subsystem 3 of 3: the car list the type 6 and 7 panel screens show
-  (`PanelSet`; lead picked: `sub_8224CAD8` and the 12 others, beside
-  the screens just finished, whose vtable calls it answers; 13 ready
-  groups, about as many as the stand screens' 15 and the save screens'
-  13; its line deleted from `leads.md`). Map checked (c595a898:
-  `car-list.md`, 154 rows, all new, 93 in play: `PanelSet`'s 19 slots,
-  its 9 pages and 27 steps, the panels, `PanelSetPair` (not seen); 0
-  errors; 49 ready groups; blocked by the UI movie helper
-  `sub_8211BC18` (a new lead) and `sub_8211DE30`; 2 leads added, five
-  trimmed, `sub_8224B248`'s deleted (mapped here); no subagents).
-  Migration 24d1bfd6..098104fe (`--native_car_list`, harness
-  `car_list`: the panels and panel groups, the panel moves,
-  `PowerGraph::SetEntry`, `PanelSet`'s leaves, `ToTabs`, `Open`,
-  `Free`, `HandleInput`, `BackPage8`, six steps, `SetUpRows`,
-  `SetUpCarPage`; 58 functions, 1 Merged, 18 adapters removed; races
-  37-38 s, 0 errors, its harnesses 0 differing; no subagents); left:
-  `Build`, the tabs, rows and power graph pages, the stand car's draw
-  and `Update`; blocked by `sub_8211BC18` and `sub_8211DE30`.
-  Validated `itc_4507` (race 86 s at 180, the harnesses ~92 s; 0
-  errors, every harness 0 differing, 58 of 58 harness lines; two
-  prints added, bca570ca; none in the race or the replay `itc_4508`
-  (ok); all 58 to drive). Second migration 39d443d6..8d948f88
-  (`PanelSet::Build` and `PanelSetBase::Build` over `memory::AllocPages`,
-  `ShowStandCar`, the tabs, rows, colors and power graph pages,
-  `SetUpColors`; 8 functions, 1 adapter removed; the stand car's cases
-  in `load_poll`'s world; races 37 s, 0 errors, `car_list` and
-  `load_poll` 0 differing; no subagents); left: the update group under
-  `PanelSet::Update` `sub_8224CF18` (`Update`, `UpdateStand`,
-  `GarageStages::DrawAll`). Validated `itc_4519` (race 86 s at 180,
-  the harnesses ~92 s; 0 errors, every harness 0 differing, 8 of 8
-  harness lines; none in the race or the replay `itc_4520` (ok); all 8
-  to drive). Third migration 35b39ea5..9fb09b97 (`PanelSet::Update`
-  with `PanelSetBase::Update`, `UpdateStand`, `GarageStages::DrawAll`;
-  4 functions, 5 adapters removed; races 36 s, 0 errors, `car_list` and
-  `load_poll` 0 differing; no subagents); left: none ready (71 of 94
-  in play ours; the rest wait on `sub_8211BC18` and `sub_8211DE30`).
-  Validated `itc_4524` (race 86 s at 180, the harnesses ~92 s; 0
-  errors, every harness 0 differing, 6 of 6 harness lines; none in the
-  race or the replay `itc_4525` (ok); 4 more to drive). Recorded.
+- Subsystem 1 of 3: the UI movie helpers without rows (two leads taken
+  together: `sub_8211BC18`, whether an animation is running or queued,
+  which 19 of the car list's groups wait on, the top recommendation of
+  the last run; and `sub_8211CC50`, the node text block's clear beside
+  the UI movie text calls; both lines deleted from `leads.md`). Step:
+  mapping, agent running.
 
 ## Done
 
-- `car-list.md`: 71 of 94 in play native (the type 6 and 7 panel
-  screens' car list `PanelSet`: its slots, pages, steps, panels, build,
-  update and the stand car; 24 adapters removed), `--native_car_list`;
-  c595a898, 24d1bfd6..9fb09b97.
-
-- `type67-screens.md`: 48 of 48 in play native (the type 6 and 7
-  modes' list, panel (car pick) and node screens, the group pair, the
-  panel groups; 1 adapter removed), `--native_type67_screens`;
-  973a1f10, 42695d6d..cfbe6bd6.
-
-- `options-screen.md`: 98 of 100 in play native (the options screen's
-  machine, pages, steps, settings' read, write and reload, the type 2,
-  4, 6 and 7 options' and controller pages' Inits; 31 adapters
-  removed), `--native_options_screen`; bce411a9, a9b2152f..95016660.
-
-- Cleanup: `CarScene::SetUp` (`car-models.md`), `StandScene::Create`
-  and the type 6 and 7 modes' slot 0 (`type6-type7-modes.md`, now 113
-  of 117 in play); 15 adapters removed; c709d9ed..4ec19e07.
-
 ## Rows to review
 
-`review.md`, "Run 2026-11-07 22:22".
+`review.md`, "Run 2026-11-08 13:00".
 
 ## Expected to differ
 
@@ -164,36 +34,7 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
-- At the start: ours 4699, work left 1721 (wrapped 57, known 427,
-  unknown 1237).
-- After the cleanup lead's migration: ours 4703, work left 1717
-  (wrapped 57, known 423, unknown 1237).
-- After the options screen's map: ours 4703, work left 1717 (wrapped
-  57, known 517, unknown 1143).
-- After its migration: ours 4741, work left 1682 (wrapped 57, known
-  482, unknown 1143).
-- After its second migration: ours 4777, work left 1646 (wrapped 56,
-  known 447, unknown 1143).
-- After its third migration: ours 4801, work left 1624 (wrapped 56,
-  known 425, unknown 1143).
-- After the type 6 and 7 screens' map: ours 4801, work left 1624
-  (wrapped 56, known 473, unknown 1095).
-- After its migration: ours 4849, work left 1576 (wrapped 56, known
-  425, unknown 1095).
-- After the car list's map: ours 4849, work left 1576 (wrapped 56,
-  known 518, unknown 1002).
-- After its migration: ours 4908, work left 1518 (wrapped 56, known
-  460, unknown 1002).
-- After its second migration: ours 4916, work left 1510 (wrapped 56,
-  known 452, unknown 1002).
-- After its third migration and validation (`itc_4524`): ours 4920,
-  work left 1506 (wrapped 56, known 448, unknown 1002).
+- At the start: ours 4920, work left 1506 (wrapped 56, known 448,
+  unknown 1002).
 
 ## Stopped
-
-2026-11-08, at the run's limit: 3 subsystems finished (the options
-screen, the type 6 and 7 modes' screens, the car list), with the
-cleanup lead `sub_820C8DE8`. Every validation passed; nothing
-uncommitted. The run's summary (`b7-loop-2026-11-07-2222.md`), the
-plan's "B7 in progress" line and CLAUDE.md's B7 sentence are up to
-date. The user reviews and merges.
