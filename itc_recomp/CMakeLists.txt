@@ -475,6 +475,7 @@ set(ITC_SOURCES
     src/car_dealer/init_states.cpp
     src/car_dealer/handlers.cpp
     src/car_dealer/texts.cpp
+    src/car_dealer/lifecycle.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp

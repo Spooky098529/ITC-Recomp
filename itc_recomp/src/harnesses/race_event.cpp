@@ -15,8 +15,11 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "car_specs/car_specs.h"
+#include "car_dealer/car_dealer.h"
 #include "career/career.h"
 #include "data_tables/data_tables.h"
+#include "hooks/app_start_up.h"
+#include "hooks/car_dealer.h"
 #include "hooks/career.h"
 #include "hooks/race_event.h"
 #include "memory/heap.h"
@@ -34,6 +37,7 @@
 
 ITC_FLAG_DECLARE(bool, native_race_event);
 ITC_FLAG_DECLARE(bool, native_career);
+ITC_FLAG_DECLARE(bool, native_car_dealer);
 
 namespace harness {
 
@@ -941,6 +945,74 @@ uint32_t ShapeSetUpTables(uint8_t* base, uint32_t tables, Random& r) {
   return entries0;
 }
 
+// Race::SetUp's calls, recorded while StartFirstRace's cases run.
+std::vector<uint32_t> g_setups;
+bool RecordSetUp(PPCContext& ctx, uint32_t address) {
+  if (address != car_dealer::kRaceSetUp) return false;
+  g_setups.insert(g_setups.end(), {ctx.r3.u32, ctx.r4.u32, uint32_t(ctx.r4.u64 >> 32), ctx.r1.u32,
+                                   uint32_t(ctx.lr)});
+  ctx.r3.u64 = 1;
+  return true;
+}
+
+// StartFirstRace with --native_car_dealer, --native_career and
+// --native_race_event off.
+void OriginalStartFirstRace(PPCContext& ctx, uint8_t* base) {
+  ITC_FLAG(native_car_dealer) = false;
+  Original<__imp__sub_82180CE8>(ctx, base);
+  ITC_FLAG(native_car_dealer) = true;
+}
+
+void StartFirstRaceGroup(Context& h, World& w, const SetupFn& shape, uint32_t frame_bytes,
+                         uint32_t compared) {
+  uint8_t* const base = h.base;
+  std::vector<uint32_t> boot(8);
+  for (uint32_t k = 0; k < 8; k++) {
+    boot[k] = guest::LoadU32(base, car_dealer::kBootList + 4 * k);
+  }
+  Group(
+      h, w, "CarDealer::StartFirstRace (sub_82180CE8)", 32,
+      [&h, base, &shape, frame_bytes](Random& shared, const World& w, PPCContext& t) {
+        shape(shared, w, t);
+        const uint32_t sp = t.r1.u32;
+        Random r(shared.Next());
+        WriteRandom(base, sp - frame_bytes - 96, 96, r);
+        WriteRandom(base, car_dealer::kBootList, 32, r);
+        g_setups.clear();
+        hooks::g_start_up_recorder = RecordSetUp;
+      },
+      OriginalStartFirstRace, hooks::CarDealerStartFirstRace,
+      [&h, base, frame_bytes, compared](Outputs& out, const World& w, PPCContext&) {
+        hooks::g_start_up_recorder = nullptr;
+        out.Word(uint32_t(g_setups.size()));
+        for (const uint32_t word : g_setups) {
+          out.Word(word);
+        }
+        out.Bytes(Read(base, car_dealer::kBootList, 32));
+        const uint32_t e = guest::LoadU32(base, re::kEvent);
+        out.Word(e == 0 ? 0 : e == w.event() ? 1 : 2);
+        if (e != 0) {
+          CaptureEvent(out, base, e);
+          if (e != w.event()) {
+            memory::Free(e);
+          }
+        }
+        if (e != w.event()) {
+          CaptureEvent(out, base, w.event());
+        }
+        out.Bytes(Read(base, w.save.address, w.save.bytes));
+        out.Bytes(Read(base, w.race.address, w.race.bytes));
+        out.Bytes(Read(base, h.data, kScratchBytes));
+        const uint32_t sp = CallContext(h).r1.u32;
+        out.Bytes(Read(base, sp, h.data - sp));
+        out.Bytes(Read(base, sp - 96, 88));
+        out.Bytes(Read(base, sp - 96 - frame_bytes + 80, compared));
+      });
+  for (uint32_t k = 0; k < 8; k++) {
+    guest::StoreU32(base, car_dealer::kBootList + 4 * k, boot[k]);
+  }
+}
+
 void SetUpEvents(Context& h, World& w) {
   uint8_t* const base = h.base;
   const Block tables(8 * kTableBytes);
@@ -951,8 +1023,7 @@ void SetUpEvents(Context& h, World& w) {
   const uint32_t frame_bytes = career::kSetUpEventFrame;
   const uint32_t compared = 1280 + 13 * 6 * 192 * 8 - 80;
   uint64_t runs = 0;
-  Group(
-      h, w, "Career::SetUpEvent (sub_82114268)", 64,
+  const SetupFn shape =
       [&h, base, &tables, frame_bytes, &runs](Random& shared, const World& w, PPCContext& t) {
         // A generator of the case's own (the same for its two runs): the
         // cases' streams are the shared one's shifted, and fall into step
@@ -994,7 +1065,9 @@ void SetUpEvents(Context& h, World& w) {
         t.r3.u64 = save;
         t.r4.u64 = r.Below(8) == 0 ? r.Below(8) : r.Below(4);
         t.r5.u64 = r.Below(4) == 0 ? locations[6 + r.Below(4)] : locations[r.Below(6)];
-      },
+      };
+  Group(
+      h, w, "Career::SetUpEvent (sub_82114268)", 64, shape,
       Original<__imp__sub_82114268>, hooks::CareerSetUpEvent,
       [&h, base, frame_bytes, compared](Outputs& out, const World& w, PPCContext&) {
         const uint32_t e = guest::LoadU32(base, re::kEvent);
@@ -1015,6 +1088,12 @@ void SetUpEvents(Context& h, World& w) {
         out.Bytes(Read(base, sp, h.data - sp));
         out.Bytes(Read(base, sp - frame_bytes + 80, compared));
       });
+  // CarDealer::StartFirstRace (car-dealer.md): SetUpEvent's world (its frame
+  // below StartFirstRace's 96 bytes), Race::SetUp's calls recorded on both
+  // sides (the start-up recorder; answered 1); the boot movies' list, the
+  // event, the save and race blocks, StartFirstRace's frame (but its lr
+  // save) and SetUpEvent's compared.
+  StartFirstRaceGroup(h, w, shape, frame_bytes, compared);
 }
 
 }  // namespace

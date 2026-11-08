@@ -17,8 +17,17 @@ void CarDealerCreate(PPCContext& ctx, uint8_t* base);
 void CarDealerOpenMovie(PPCContext& ctx, uint8_t* base);
 void CarDealerWaitForLoad(PPCContext& ctx, uint8_t* base);
 void CarDealerAfterDetail(PPCContext& ctx, uint8_t* base);
+void CarDealerUnload(PPCContext& ctx, uint8_t* base);
+void CarDealerClose(PPCContext& ctx, uint8_t* base);
+void CarDealerDestroy(PPCContext& ctx, uint8_t* base);
+void CarDealerOnYes(PPCContext& ctx, uint8_t* base);
+void CarDealerUpdatePage(PPCContext& ctx, uint8_t* base);
 // The pages (r3 the mode).
 void CarDealerPage4(PPCContext& ctx, uint8_t* base);
+// The set-up and the purchase (no arguments).
+void CarDealerStartFirstRace(PPCContext& ctx, uint8_t* base);
+void CarDealerBuildLists(PPCContext& ctx, uint8_t* base);
+void CarDealerBuy(PPCContext& ctx, uint8_t* base);
 // The helpers.
 void CarDealerCheckLimits(PPCContext& ctx, uint8_t* base);
 void CarDealerReloadStandModel(PPCContext& ctx, uint8_t* base);

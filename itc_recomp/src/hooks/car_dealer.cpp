@@ -18,7 +18,14 @@ ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
               "GarageStage::ReloadModel through their overrides), SetKindBar sub_82182158, "
               "SetColorBar sub_82182770, SetScrollArrows sub_82182DD0, SetHeader sub_82182C28, "
               "SetPrompts sub_82182B30 and HelpLine::Set sub_82199B38 (UiMovie::SetText, its "
-              "unset varargs 0, ScrollText and the scroll reset through their overrides) "
+              "unset varargs 0, ScrollText and the scroll reset through their overrides); "
+              "Unload sub_821816B8, Close sub_82181838 and Destroy sub_82180E70 (VirtualFree, "
+              "MenuList::Release, UiMovie::FinishAll and UiMovies::Delete through their "
+              "overrides), OnYes sub_82181968, UpdatePage sub_82184AF0 (the page's handler "
+              "through the guest context), StartFirstRace sub_82180CE8 (Career::SetUpEvent and "
+              "Race::SetUp through their overrides), BuildLists sub_821813B0 (VirtualAlloc and "
+              "memcpy through their overrides) and Buy sub_82182E68 (the garage car's and the "
+              "career's calls through their overrides) "
               "(the same writes; checked by --run_harnesses=car_dealer)");
 
 namespace hooks {
@@ -95,6 +102,38 @@ void CarDealerWaitForLoad(PPCContext& ctx, uint8_t* base) {
 }
 void CarDealerAfterDetail(PPCContext&, uint8_t* base) { cd::AfterDetail(base); }
 void CarDealerPage4(PPCContext& ctx, uint8_t* base) { cd::Page4(base, ctx.r3.u32); }
+void CarDealerUnload(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Unload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerClose(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerDestroy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerOnYes(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::OnYes(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void CarDealerUpdatePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::UpdatePage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+void CarDealerStartFirstRace(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::StartFirstRace(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerBuildLists(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::BuildLists(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerBuy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Buy(base, ctx.r1.u32, guest.calls());
+}
 void CarDealerCheckLimits(PPCContext&, uint8_t* base) { cd::CheckLimits(base); }
 void CarDealerReloadStandModel(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
@@ -143,11 +182,22 @@ ITC_CAR_DEALER(82180D68, CarDealerCreate)
 ITC_CAR_DEALER(82180C08, CarDealerOpenMovie)
 ITC_CAR_DEALER(82180F20, CarDealerWaitForLoad)
 ITC_CAR_DEALER(82180C48, CarDealerAfterDetail)
+ITC_CAR_DEALER(821816B8, CarDealerUnload)
+ITC_CAR_DEALER(82181838, CarDealerClose)
+ITC_CAR_DEALER(82180E70, CarDealerDestroy)
+ITC_CAR_DEALER(82181968, CarDealerOnYes)
+ITC_CAR_DEALER(82184AF0, CarDealerUpdatePage)
 // The page handlers (from UpdatePage's table on its stack).
 ITC_CAR_DEALER(82181B98, CarDealerPage4)
 // The helpers (from the recompiled pages, transitions and set-ups).
 ITC_CAR_DEALER(821812B8, CarDealerCheckLimits)
 ITC_CAR_DEALER(82181330, CarDealerReloadStandModel)
+// StartFirstRace (from CarDealer::Leave and the title menu's sub_82221AC0,
+// recompiled), BuildLists (from CarDealer::Start, recompiled), Buy (from
+// CarDealer::OnDialogDone, recompiled).
+ITC_CAR_DEALER(82180CE8, CarDealerStartFirstRace)
+ITC_CAR_DEALER(821813B0, CarDealerBuildLists)
+ITC_CAR_DEALER(82182E68, CarDealerBuy)
 ITC_CAR_DEALER(82182158, CarDealerSetKindBar)
 ITC_CAR_DEALER(82182770, CarDealerSetColorBar)
 ITC_CAR_DEALER(82182DD0, CarDealerSetScrollArrows)

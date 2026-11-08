@@ -52,6 +52,21 @@ constexpr uint32_t kScrollText = 0x8211C570;
 constexpr uint32_t kScrollReset = 0x8211C5F8;
 constexpr uint32_t kCarModelsBlockOf = 0x8215AAD0;
 constexpr uint32_t kStageReloadModel = 0x8217F880;
+constexpr uint32_t kFinishAll = 0x8211DFF8;
+constexpr uint32_t kMoviesDelete = 0x8211E258;
+constexpr uint32_t kMenuListRelease = 0x8220BBB0;
+constexpr uint32_t kSetUpEvent = 0x82114268;
+constexpr uint32_t kRaceSetUp = 0x82115D98;
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kGarageCarReset = 0x82110448;
+constexpr uint32_t kSetModelAndClass = 0x821104D8;
+constexpr uint32_t kGarageAdd = 0x82116CE0;
+constexpr uint32_t kPickNext = 0x821159B0;
+constexpr uint32_t kPickFromCar = 0x82115CC0;
+constexpr uint32_t kSetChildNameText = 0x8211D930;
+constexpr uint32_t kSetNumberText = 0x8211C740;
+// The boot movies' list (boot-mode.md).
+constexpr uint32_t kBootList = 0x826C5BAC;
 
 // --- The machine's set-up (init_states.cpp) ---
 
@@ -91,6 +106,47 @@ void CheckLimits(uint8_t* base);
 // CarModels::BlockOf(the selected car's id)) into the data's +32, the color
 // (+56, +60) 0. ReloadModel's r3. 96-byte frame.
 uint64_t ReloadStandModel(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The set-up, teardown and purchase (lifecycle.cpp) ---
+
+// sub_821816B8 CarDealer::Unload (r3 the machine): both lists' and the
+// colors' entries VirtualFree'd from the last; UiMovie::FinishAll(movie 4);
+// with +9616, UiMovies::Delete(4) and +9608 = 0. The last call's r3.
+// 128-byte frame.
+uint64_t Unload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_82181838 CarDealer::Close (r3 the machine, r4 the mode): +9604 = 7;
+// FinishAll(movie 4), Delete(4); both lists' entries freed; message 4
+// posted. The last call's r3. 112-byte frame.
+uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_82180E70 CarDealer::Destroy (r3 the machine): +9604 = 14 or 20 by the
+// data's +8 and +4; MenuList::Release(the list menu); the page object, both
+// menus and the data freed and the three globals cleared. The last
+// VirtualFree's r3. 128-byte frame.
+uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_82180CE8 CarDealer::StartFirstRace: the boot movies' list
+// (0x826C5BAC) set, Career::SetUpEvent(SaveData::Of(0), 0, 0),
+// Race::SetUp(SaveData::Of(0), -1). SetUp's r3. 96-byte frame.
+uint64_t StartFirstRace(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821813B0 CarDealer::BuildLists: player 0's save data into the data's
+// words, then an 8,448-byte entry (VirtualAlloc, the spec memcpy'd) for each
+// car id 0 to 71 marked in the save's bit set, added to a list by the spec's
+// byte +771 or freed. The last call's r3. 128-byte frame.
+uint64_t BuildLists(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82182E68 CarDealer::Buy: the money less the price; a garage car on
+// the frame (GarageCar::Reset, Car::SetModelAndClass) with the color,
+// Garage::Add; the stats' cars bought; the new car's +1780 from
+// [0x826D8438] +4; the selection and Career::PickFromCar or PickNext with
+// SetChildNameText. The last call's r3. 2,112-byte frame.
+uint64_t Buy(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82181968 CarDealer::OnYes: the data's +16 = 1; at step 2 the money
+// shown less the price (SetNumberText). SetNumberText's r3, else `r3`.
+// 112-byte frame.
+uint64_t OnYes(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82184AF0 CarDealer::UpdatePage (r4 the mode): the six page handlers'
+// addresses at the frame's +80; unless the page is -1, the page's handler
+// called (r3 and r4 the mode, r5 to r10 the handlers, as the original
+// leaves them). The handler's r3, else `r3`. 112-byte frame.
+uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls);
 
 // --- The movie 4 setters (texts.cpp) ---
 

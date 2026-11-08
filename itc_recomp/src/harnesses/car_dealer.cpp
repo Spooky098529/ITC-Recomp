@@ -26,6 +26,8 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "car_dealer/car_dealer.h"
+#include "car_specs/car_specs.h"
+#include "career/career.h"
 #include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
 #include "hooks/car_dealer.h"
@@ -37,6 +39,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <utility>
@@ -80,6 +83,11 @@ constexpr uint32_t kMissingMovie = 0x826C5CDC;
 constexpr uint32_t kMissingText = 0x826C5CD8;
 constexpr uint32_t kStringTable = 0x826C5C34;
 constexpr uint32_t kTxtTag = 0x54585400;  // "TXT\0"
+constexpr uint32_t kSaveSlots = 0x826C5B58;    // the players' save data
+constexpr uint32_t kSaveDataBytes = 0x1F978;
+constexpr uint32_t kSpecCount = 72;
+constexpr uint32_t kSpecBytes = 8432;
+constexpr uint32_t kRandSeed = 0x82638188;     // rand's (Car::SetModel's picks)
 
 struct Global {
   uint32_t address;
@@ -93,6 +101,9 @@ constexpr Global kGlobals[] = {
     {kMissingText, 4},
     {kStringTable, 4},
     {0x826C2E40, 8},  // the first pool set and the car scene
+    {kSaveSlots, 16},
+    {car_specs::kParams, 4},
+    {kRandSeed, 4},
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -104,18 +115,30 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
 struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
-        block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)) {
+        block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)),
+        save(memory::Alloc(kSaveDataBytes, 0)),
+        specs(memory::Alloc(0x40 + kSpecCount * kSpecBytes, 0)) {
     if (strings != 0) {
       MakeStrings();
+    }
+    if (specs != 0) {
+      // The car specs' object: +12 the 72 specs (random words once; the
+      // cases shape the bytes the functions test).
+      Random r(0x5370656373ull);  // "Specs"
+      WriteRandom(base, specs, 0x40 + kSpecCount * kSpecBytes, r);
+      guest::StoreU32(base, specs + 12, specs + 0x40);
     }
   }
   ~World() {
     memory::Free(allocation);
     memory::Free(strings);
+    memory::Free(save);
+    memory::Free(specs);
   }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0 && strings != 0; }
+  bool ok() const { return allocation != 0 && strings != 0 && save != 0 && specs != 0; }
+  uint32_t spec(uint32_t id) const { return specs + 0x40 + kSpecBytes * id; }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t data() const { return at(kDataAt); }
   uint32_t entry(uint32_t k) const { return at(kEntriesAt) + kEntryBytes * k; }
@@ -129,6 +152,8 @@ struct World {
   // callers pass as 0 aren't read).
   static constexpr uint32_t kStringsBytes = 0x9000;
   uint32_t strings;
+  uint32_t save;   // player 0's save data (all four slots point at it)
+  uint32_t specs;  // the car specs' object ([0x826C2E48])
 
  private:
   void MakeStrings() {
@@ -193,7 +218,10 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   // Movie 4: its live scene node 0, each node's children the pool's; its
   // loaded flag set or not.
   const uint32_t movie = w.at(kMovieAt);
-  guest::StoreU32(base, movie + 16, w.node(0));
+  ui_movies::InitAnimationLists(base, movie);
+  for (const uint32_t field : {16u, 20u, 24u}) {
+    guest::StoreU32(base, movie + field, w.node(0));
+  }
   for (uint32_t n = 0; n < kNodeCount; n++) {
     const uint32_t node = w.node(n);
     guest::StoreU32(base, node + 0, kTxtTag);
@@ -210,8 +238,12 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, w.at(kPairsAt), 4);
   guest::StoreU32(base, w.at(kPairsAt) + 4, movie);
   guest::StoreU32(base, w.at(kHolderAt), w.at(kStageAt));
-  // The machine's words: +9608, +9612 0 or 1 or any.
-  for (const uint32_t field : {cd::kMachineLoaded, cd::kMachineReenter}) {
+  // Player 0's save data: random words; the garage's count (+6328) small.
+  WriteRandom(base, w.save, kSaveDataBytes, r);
+  guest::StoreU16(base, w.save + 6328, uint16_t(r.Below(6)));
+  guest::StoreU32(base, kRandSeed, uint32_t(r.Next()));
+  // The machine's words: +9608, +9612, +9616 0 or 1 or any.
+  for (const uint32_t field : {cd::kMachineLoaded, cd::kMachineReenter, cd::kMachineDelete}) {
     guest::StoreU32(base, w.at(kMachineAt) + field,
                     r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
   }
@@ -234,6 +266,10 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, kMissingText, 0);
   guest::StoreU32(base, kStringTable, w.strings);
   guest::StoreU32(base, w.at(kHolderWordAt), w.at(kHolderAt));
+  for (uint32_t p = 0; p < 4; p++) {
+    guest::StoreU32(base, kSaveSlots + 4 * p, w.save);
+  }
+  guest::StoreU32(base, car_specs::kParams, w.specs);
 }
 
 // The stand's world for GarageStage::ReloadModel (as the build screen's
@@ -305,13 +341,40 @@ void Allocated(uint8_t* base, Outputs& out, uint32_t slot, uint32_t bytes) {
   guest::StoreU32(base, slot, 1);
 }
 
-// UiMovies::Open's calls, recorded on both sides and answered 1.
+// UiMovies::Open's and Delete's calls, recorded on both sides and answered
+// 1 (Delete would free our movie).
 std::vector<uint32_t> g_opens;
 bool RecordOpen(PPCContext& ctx, uint32_t address) {
-  if (address != cd::kMoviesOpen) return false;
-  g_opens.insert(g_opens.end(), {ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, uint32_t(ctx.lr)});
+  if (address != cd::kMoviesOpen && address != cd::kMoviesDelete) return false;
+  // Delete reads only r3: its r4 (a leftover) isn't compared.
+  g_opens.insert(g_opens.end(), {address, ctx.r3.u32,
+                                 address == cd::kMoviesDelete ? 0u : ctx.r4.u32, ctx.r1.u32,
+                                 uint32_t(ctx.lr)});
   ctx.r3.u64 = 1;
   return true;
+}
+
+// The layer's pages a case made (entries the function frees): after the
+// run, whether each is still pages (then freed); words naming them in the
+// world replaced by their index first (Normalize), as the two runs' blocks
+// may lie at different addresses.
+std::vector<uint32_t> g_made;
+uint32_t MakePages(uint8_t* base, uint32_t bytes, Random& r) {
+  const uint32_t block = memory::AllocPages(bytes, 4096);
+  WriteRandom(base, block, std::min(bytes, 64u), r);
+  g_made.push_back(block);
+  return block;
+}
+void Normalize(uint8_t* base, uint32_t from, uint32_t words) {
+  for (uint32_t i = 0; i < words; i++) {
+    const uint32_t word = guest::LoadU32(base, from + 4 * i);
+    for (size_t k = 0; k < g_made.size(); k++) {
+      if (word == g_made[k]) {
+        guest::StoreU32(base, from + 4 * i, 0x100 + uint32_t(k));
+        break;
+      }
+    }
+  }
 }
 
 // A stack range compared, relative to the call's r1: [from, to).
@@ -348,6 +411,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
       }
       MakeWorld(h.base, w, r);
       PointGlobals(h.base, w, r);
+      g_made.clear();
       PPCContext t = CallContext(h);
       const uint32_t sp = t.r1.u32;
       WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
@@ -378,11 +442,21 @@ void Run(Context& h, const World& w, const Spec& spec) {
       if (spec.after) {
         spec.after(t, w, out[v]);
       }
+      out[v].Word(uint32_t(g_made.size()));
+      for (const uint32_t block : g_made) {
+        const bool pages = memory::IsPages(block);
+        out[v].Word(pages ? 1 : 0);
+        if (pages) {
+          memory::FreePages(block);
+        }
+      }
+      g_made.clear();
       TextRecords(h.base, w, out[v]);
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
       }
       out[v].Bytes(Read(h.base, w.block, kBlockBytes));
+      out[v].Bytes(Read(h.base, w.save, kSaveDataBytes));
       for (const Range& range : spec.stack) {
         out[v].Bytes(Read(h.base, sp + range.from, uint32_t(range.to - range.from)));
       }
@@ -509,6 +583,170 @@ void Helpers(Context& h, const World& w) {
              [](PPCContext& t, Random& r, const World&) { t.r3.u64 = r.Below(8192); }});
 }
 
+// The lists' and the colors' entries as the layer's pages (0 to 4 each).
+void PagedEntries(PPCContext&, Random& r, const World& w) {
+  const uint32_t data = w.data();
+  for (const auto& [list, count] : {std::pair{104u, 616u}, {620u, 1132u}, {1140u, 1192u}}) {
+    const uint32_t n = r.Below(5);
+    for (uint32_t i = 0; i < n; i++) {
+      guest::StoreU32(w.base, data + list + 4 * i, MakePages(w.base, 64, r));
+    }
+    guest::StoreU32(w.base, data + count, n);
+  }
+}
+void NormalizeEntries(PPCContext&, const World& w, Outputs&) {
+  for (const uint32_t list : {104u, 620u, 1140u}) {
+    Normalize(w.base, w.data() + list, 8);
+  }
+}
+
+// Player 0's garage as the career's harness shapes it: `count` of 50 nodes
+// linked from the head, the rest on the free list, each slot 0 to 49.
+void ShapeGarage(uint8_t* base, uint32_t garage, Random& r, uint32_t count) {
+  uint32_t order[50];
+  for (uint32_t i = 0; i < 50; i++) {
+    order[i] = i;
+  }
+  for (uint32_t i = 49; i > 0; i--) {
+    std::swap(order[i], order[r.Below(i + 1)]);
+  }
+  const auto link = [&](uint32_t head_at, uint32_t from, uint32_t to) {
+    guest::StoreU16(base, garage + head_at, uint16_t(from < to ? order[from] : 0xFFFF));
+    for (uint32_t i = from; i < to; i++) {
+      guest::StoreU16(base, garage + 4 * order[i], uint16_t(i + 1 < to ? order[i + 1] : 0xFFFF));
+      guest::StoreU16(base, garage + 4 * order[i] + 2, uint16_t(r.Below(50)));
+    }
+  };
+  link(204, 0, count);
+  link(200, count, 50);
+  guest::StoreU16(base, garage + 208, uint16_t(count));
+}
+
+void Lifecycle(Context& h, const World& w) {
+  auto machine = [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kMachineAt); };
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  Run(h, w, {"CarDealer::Unload (sub_821816B8)", 80, __imp__sub_821816B8, hooks::CarDealerUnload,
+             {{-128, -32}},
+             [machine](PPCContext& t, Random& r, const World& w) {
+               PagedEntries(t, r, w);
+               machine(t, r, w);
+             },
+             NormalizeEntries});
+  Run(h, w, {"CarDealer::Close (sub_82181838)", 80, __imp__sub_82181838, hooks::CarDealerClose,
+             {{-112, -24}},
+             [machine](PPCContext& t, Random& r, const World& w) {
+               PagedEntries(t, r, w);
+               machine(t, r, w);
+               t.r4.u64 = w.at(kModeAt);
+             },
+             NormalizeEntries});
+  // Destroy: the page object, both menus and the data the layer's pages (the
+  // list menu's +68 block one too, or none), their globals cleared.
+  Run(h, w, {"CarDealer::Destroy (sub_82180E70)", 80, __imp__sub_82180E70,
+             hooks::CarDealerDestroy, {{-128, -40}},
+             [machine](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               const uint32_t pages = MakePages(base, 28, r);
+               const uint32_t list = MakePages(base, 72, r);
+               const uint32_t colors = MakePages(base, 72, r);
+               const uint32_t data = MakePages(base, 64, r);
+               guest::StoreU32(base, list + 68, r.Below(2) == 0 ? 0 : MakePages(base, 64, r));
+               guest::StoreU32(base, data + 8, r.Below(3) == 0 ? 1 : 0);
+               guest::StoreU32(base, data + 4, r.Below(2));
+               guest::StoreU32(base, cd::kPages, pages);
+               guest::StoreU32(base, cd::kListMenu, list);
+               guest::StoreU32(base, cd::kColorMenu, colors);
+               guest::StoreU32(base, cd::kData, data);
+               machine(t, r, w);
+             },
+             [](PPCContext&, const World& w, Outputs&) {
+               Normalize(w.base, cd::kStandHolder, 6);
+             }});
+  // BuildLists: the save's bit set of ids (0 to 71) and the specs' byte
+  // +771 (0, 1 or another) at random, the lists' counts small; the entries
+  // VirtualAlloc made compared (their 8,436 bytes written) and freed.
+  Run(h, w, {"CarDealer::BuildLists (sub_821813B0)", 60, __imp__sub_821813B0,
+             hooks::CarDealerBuildLists, {{-128, -48}},
+             [](PPCContext&, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               for (uint32_t k = 0; k < 3; k++) {
+                 const uint32_t bits = r.Below(4) == 0 ? 0 : uint32_t(r.Next() & r.Next());
+                 guest::StoreU32(base, w.save + 0x19924 + 4 * k, bits);
+               }
+               for (uint32_t id = 0; id < kSpecCount; id++) {
+                 const uint32_t kinds[4] = {0, 1, 2, 0xFF};
+                 guest::StoreU8(base, w.spec(id) + 771, uint8_t(kinds[r.Below(4)]));
+               }
+               const int32_t days[] = {0, 6, 7, 999, 1000, -8};
+               guest::StoreU32(base, w.save + 6100,
+                               uint32_t(r.Below(2) == 0 ? days[r.Below(6)] : int32_t(r.Below(2000))));
+               guest::StoreU16(base, w.save + 6328,
+                               uint16_t(r.Below(4) == 0 ? 0xFFF0 + r.Below(16) : r.Below(8)));
+               guest::StoreU32(base, w.data() + 616, r.Below(3));
+               guest::StoreU32(base, w.data() + 1132, r.Below(3));
+             },
+             [](PPCContext& t, const World& w, Outputs& out) {
+               uint8_t* base = w.base;
+               out.Word(memory::IsPages(t.r3.u32) ? 1 : 0);
+               t.r3.u64 = memory::IsPages(t.r3.u32) ? 1 : t.r3.u64;
+               for (const uint32_t list : {104u, 620u}) {
+                 const uint32_t n = std::min(guest::LoadU32(base, w.data() + list + 512), 128u);
+                 for (uint32_t i = 0; i < n; i++) {
+                   const uint32_t at = w.data() + list + 4 * i;
+                   const uint32_t entry = guest::LoadU32(base, at);
+                   if (entry != 0 && memory::IsPages(entry)) {
+                     out.Bytes(Read(base, entry, 8436));
+                     memory::FreePages(entry);
+                     guest::StoreU32(base, at, 1);
+                   }
+                 }
+               }
+             }});
+  // Buy: the garage as the career's harness shapes it (fewer than 49
+  // cars), the selected car's id one of the four specs Car::SetModelAndClass
+  // reads (their byte +708 0 to 9), Career::PickNext's gate closed (the
+  // stats' races below 15 or the day below 3), the data's +4 and +24 0 or 1.
+  Run(h, w, {"CarDealer::Buy (sub_82182E68)", 80, __imp__sub_82182E68, hooks::CarDealerBuy,
+             {{-2112, -48}},
+             [](PPCContext&, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               ShapeGarage(base, w.save + career::kGarage, r, r.Below(49));
+               for (uint32_t i = 0; i < 4; i++) {
+                 guest::StoreU8(base, w.spec(i) + 708, uint8_t(r.Below(10)));
+               }
+               const uint32_t data = w.data();
+               for (uint32_t k = 0; k < kEntryCount; k++) {
+                 guest::StoreU32(base, w.entry(k) + 8432, r.Below(4));
+               }
+               guest::StoreU32(base, data + 4, r.Below(2));
+               guest::StoreU32(base, data + 24, r.Below(2));
+               if (r.Below(2) == 0) {
+                 guest::StoreU16(base, w.save + 70, uint16_t(int16_t(int32_t(r.Below(20)) - 5)));
+               } else {
+                 guest::StoreU16(base, w.save + 70, uint16_t(15 + r.Below(500)));
+                 guest::StoreU32(base, w.save + 6100, uint32_t(2 - int32_t(r.Below(1000))));
+               }
+               guest::StoreU32(base, w.save + career::kSelectedCar, r.Below(4));
+             }});
+  // OnYes: the dialog's step 2 or another.
+  Run(h, w, {"CarDealer::OnYes (sub_82181968)", 80, __imp__sub_82181968, hooks::CarDealerOnYes,
+             {{-112, -24}},
+             [](PPCContext&, Random& r, const World& w) {
+               guest::StoreU32(w.base, w.data() + 36, r.Below(2) == 0 ? 2 : r.Below(5));
+             }});
+  // UpdatePage: the page -1, 4 or 5 (the leaves' handlers: Page4's plain
+  // C++ through its adapter, Page5 the original), r4 the mode.
+  Run(h, w, {"CarDealer::UpdatePage (sub_82184AF0)", 60, __imp__sub_82184AF0,
+             hooks::CarDealerUpdatePage, {{-112, -8}},
+             [](PPCContext& t, Random& r, const World& w) {
+               const uint32_t pages[3] = {0xFFFFFFFFu, 4, 5};
+               guest::StoreU32(w.base, w.at(kPagesAt), pages[r.Below(3)]);
+               t.r4.u64 = w.at(kModeAt);
+             }});
+}
+
 }  // namespace
 
 void CarDealer(Context& h) {
@@ -520,6 +758,7 @@ void CarDealer(Context& h) {
   InitStates(h, w);
   Handlers(h, w);
   Helpers(h, w);
+  Lifecycle(h, w);
 }
 
 }  // namespace harness
