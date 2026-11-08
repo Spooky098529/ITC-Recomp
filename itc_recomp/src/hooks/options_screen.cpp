@@ -136,6 +136,11 @@ void OptionsOnClosed(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
+// No adapters (Native: their only callers in play call their plain C++)
+// for Controls::ButtonIndex and AnalogIndex (Settings::Read), ButtonCode
+// (Settings::Write), Settings::Reset (Options::OnEnter) and Settings::Write
+// (Options::OnClosed); their register steps stay for the harness.
+
 #define ITC_OPTIONS_SCREEN(address, step)   \
   extern "C" REX_FUNC(sub_##address) {      \
     REX_FUNC_PROLOGUE();                    \
@@ -146,17 +151,12 @@ void OptionsOnClosed(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                 \
   }
 
-ITC_OPTIONS_SCREEN(821BA950, OptionsButtonIndex)
-ITC_OPTIONS_SCREEN(821BAA18, OptionsButtonCode)
-ITC_OPTIONS_SCREEN(821BAAE0, OptionsAnalogIndex)
 ITC_OPTIONS_SCREEN(821BAD08, OptionsAnalogPicture)
 ITC_OPTIONS_SCREEN(821BA7E0, OptionsIsButtonTaken)
 ITC_OPTIONS_SCREEN(821BAB58, OptionsIsAnalogTaken)
 ITC_OPTIONS_SCREEN(821BA550, OptionsStepButtons)
 ITC_OPTIONS_SCREEN(821BABD8, OptionsStepAnalog)
-ITC_OPTIONS_SCREEN(821B9DB8, OptionsSettingsReset)
 ITC_OPTIONS_SCREEN(821BBF00, OptionsSettingsRead)
-ITC_OPTIONS_SCREEN(821BAE10, OptionsSettingsWrite)
 ITC_OPTIONS_SCREEN(821BBBA0, OptionsWaitForMovie)
 ITC_OPTIONS_SCREEN(821B9F88, OptionsOpenMovie)
 ITC_OPTIONS_SCREEN(821BCE38, OptionsOnClosed)
