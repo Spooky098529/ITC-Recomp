@@ -13,6 +13,19 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The car list's second migration (39d443d6..8d948f88, 8 functions):
+  `Build`'s entries from `memory::AllocPages`, `memcpy`'s original
+  where `c_runtime::Memcpy` refuses; `Build`'s harness makes its own
+  params and 72 specs (the game's aren't loaded when the harnesses
+  run); `ShowStandCar`'s and `SetUpColors`' cases in `load_poll`'s
+  stand-car world (the `SetCar` precedent), their adapters native only
+  with `hooks::CarMakersShowCarByIdCalleesNative(true)`. Coverage gaps,
+  in the rows: `SetUpColors` keeps D (+1904) at 0, `ColorsPage` never
+  has the car loaded, `PowerGraphPage`'s set-ups end at
+  `[0x82815EC0]` = 0 (`sub_82250700`, never seen, stays the original).
+  A test run's log `itc_4509` (674 MB: a first harness try read address
+  0xC; fixed) can be deleted.
+
 - The car list's first migration (24d1bfd6..098104fe,
   `--native_car_list`, 58 functions, 18 adapters removed without
   counter runs: the car list isn't reached in attract races): `Free`

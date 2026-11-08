@@ -110,7 +110,14 @@ file's history. What's left to see in a drive, from every run:
   Validated `itc_4507` (race 86 s at 180, the harnesses ~92 s; 0
   errors, every harness 0 differing, 58 of 58 harness lines; two
   prints added, bca570ca; none in the race or the replay `itc_4508`
-  (ok); all 58 to drive). Second migration agent running.
+  (ok); all 58 to drive). Second migration 39d443d6..8d948f88
+  (`PanelSet::Build` and `PanelSetBase::Build` over `memory::AllocPages`,
+  `ShowStandCar`, the tabs, rows, colors and power graph pages,
+  `SetUpColors`; 8 functions, 1 adapter removed; the stand car's cases
+  in `load_poll`'s world; races 37 s, 0 errors, `car_list` and
+  `load_poll` 0 differing; no subagents); left: the update group under
+  `PanelSet::Update` `sub_8224CF18` (`Update`, `UpdateStand`,
+  `GarageStages::DrawAll`). Validation agent running.
 
 ## Done
 
@@ -162,3 +169,5 @@ file's history. What's left to see in a drive, from every run:
   known 518, unknown 1002).
 - After its migration: ours 4908, work left 1518 (wrapped 56, known
   460, unknown 1002).
+- After its second migration: ours 4916, work left 1510 (wrapped 56,
+  known 452, unknown 1002).
