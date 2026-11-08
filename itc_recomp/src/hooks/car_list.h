@@ -73,5 +73,7 @@ void CarListStep7(PPCContext& ctx, uint8_t* base);
 void CarListStep11(PPCContext& ctx, uint8_t* base);
 void CarListStep18(PPCContext& ctx, uint8_t* base);
 void CarListStep26(PPCContext& ctx, uint8_t* base);
+void CarListSetUpRows(PPCContext& ctx, uint8_t* base);
+void CarListSetUpCarPage(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

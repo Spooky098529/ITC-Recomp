@@ -240,6 +240,19 @@ uint64_t Step11(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Cal
 uint64_t Step18(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
 uint64_t Step26(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
 
+// MenuList::Fit (sub_8220BC40) and CarPanel::ShowCarStats (sub_8224EA10,
+// never seen in play: the original) through `Calls`.
+constexpr uint32_t kMenuListFit = 0x8220BC40;
+constexpr uint32_t kShowCarStats = 0x8224EA10;
+// sub_8224A978 PanelSetBase::SetUpRows: the two menus set up for the list's
+// (or, tab 2, the garage's) count, the selection and scroll put back, E
+// filled and refreshed.
+uint64_t SetUpRows(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224C560 PanelSetBase::SetUpCarPage: the actions' menu set up, the
+// rows' selection put back, C's cursor, texts, stats (the garage tab's
+// through ShowCarStats, the original) and name.
+uint64_t SetUpCarPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+
 // --- The power graph's record (panels.cpp) ---
 
 // The power graph screen's record's holder ([0x82815EBC]; the record at

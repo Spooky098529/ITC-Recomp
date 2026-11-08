@@ -32,7 +32,9 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "sub_8224CA28 (the pages' plain C++ where ours, else guest calls), BackPage8 "
               "sub_8224A3F8, the steps Step2 sub_82248F00, Step3 sub_8224A718, Step7 "
               "sub_82249098, Step11 sub_8224A7E0, Step18 sub_82249258 and Step26 sub_8224A8E0 "
-              "(the menu lists, the screen fades and sub_825C8390 guest calls); the UI "
+              "(the menu lists, the screen fades and sub_825C8390 guest calls), SetUpRows "
+              "sub_8224A978 and SetUpCarPage sub_8224C560 (CarPanel::ShowCarStats, never seen "
+              "in play, the original); the UI "
               "movie calls through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=car_list)");
 
@@ -163,6 +165,8 @@ ITC_CL_STEP(CarListStep7, cl::Step7(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListStep11, cl::Step11(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListStep18, cl::Step18(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListStep26, cl::Step26(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListSetUpRows, cl::SetUpRows(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetUpCarPage, cl::SetUpCarPage(base, ctx.r3.u64, sp, calls))
 
 #undef ITC_CL_STEP
 
@@ -236,3 +240,6 @@ ITC_CAR_LIST(82249098, CarListStep7)
 ITC_CAR_LIST(8224A7E0, CarListStep11)
 ITC_CAR_LIST(82249258, CarListStep18)
 ITC_CAR_LIST(8224A8E0, CarListStep26)
+// The rows' and the car page's set-ups (from recompiled steps and pages).
+ITC_CAR_LIST(8224A978, CarListSetUpRows)
+ITC_CAR_LIST(8224C560, CarListSetUpCarPage)

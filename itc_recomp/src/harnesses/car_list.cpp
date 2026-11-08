@@ -124,6 +124,7 @@ constexpr uint32_t kColors = 0x800, kColorRecords = 0x900;
 constexpr uint32_t kList = 0xA04;
 constexpr uint32_t kEntryBytes = 8448;
 constexpr uint32_t kSetBytes = 0x1000;
+constexpr uint32_t kSaveBytes = 0x4000;
 
 struct World {
   World()
@@ -132,10 +133,12 @@ struct World {
         movies(kMovieWorldBytes),
         texts(kTextWorldBytes),
         strings(kStringWorldBytes),
-        set(kSetBytes) {}
+        set(kSetBytes),
+        save(kSaveBytes) {}
   bool ok() const {
     return objects.address != 0 && entry.address != 0 && movies.address != 0 &&
-           texts.address != 0 && strings.address != 0 && set.address != 0;
+           texts.address != 0 && strings.address != 0 && set.address != 0 &&
+           save.address != 0;
   }
   uint32_t b() const { return set.address + 4; }
   uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
@@ -149,12 +152,14 @@ struct World {
   Block texts;
   Block strings;
   Block set;  // a PanelSet at +0 (its base b at +4)
+  Block save;  // the two players' save data ([0x826C5B5C], player 0)
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4},
     {car_list::kTwoPlayers, 4},   {car_list::kPowerGraph, 4},
-    {car_list::kFadeWait, 4},     {0x826A50AC, 64}};  // the screen fades' words
+    {car_list::kFadeWait, 4},     {0x826A50AC, 64},  // the screen fades' words
+    {car_list::kPairSaveData, 4}};
 
 // The string table: 17 files' pointers to one container of entries enough
 // for the widest file (the bounds at 0x82007E18), each one of 8 strings of
@@ -294,6 +299,8 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, w.at(kList) + 512, r.Below(21));
   guest::StoreU32(base, car_list::kTwoPlayers, 0);
   guest::StoreU32(base, car_list::kPowerGraph, w.at(kRecord));
+  WriteRandom(base, w.save.address, w.save.bytes, r);
+  guest::StoreU32(base, car_list::kPairSaveData, w.save.address);
   guest::StoreU32(base, w.entry.address + 8432, r.Below(80));
   guest::StoreU8(base, w.entry.address + 769, uint8_t(r.Below(10)));
   ShapeMovieWorld(base, w, r);
@@ -333,6 +340,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
       after(w, out[v]);
     }
     out[v].Bytes(Read(h.base, w.set.address, w.set.bytes));
+    out[v].Bytes(Read(h.base, w.save.address, w.save.bytes));
     out[v].Bytes(Read(h.base, w.objects.address, w.objects.bytes));
     out[v].Bytes(Read(h.base, w.entry.address, w.entry.bytes));
     out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
@@ -899,6 +907,49 @@ void Steps(Context& h, const World& w) {
   }
 }
 
+// The set-ups: the tab (+232) 0 to 2 (2 the garage's count, with two
+// players: the world's save data, the player +1952 0), the rows
+// shown (+1916) 0 to 10, the selection and scroll (+236, +240) small, the
+// garage's count (+6328) 0 to 20. SetUpCarPage's garage tab (its
+// ShowCarStats, never seen in play, the original over a garage car) isn't
+// in the cases.
+void SetUps(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const AfterFn settle = [base](const World& w, Outputs& out) { SettleBlocks(base, w, out); };
+  const auto shape = [base](PPCContext& t, Random& r, const World& w, uint32_t tabs) {
+    ShapeSet(base, w, r, true);
+    const uint32_t b = w.b();
+    guest::StoreU32(base, b + 232, r.Below(tabs));
+    guest::StoreU32(base, b + 1916, r.Below(11));
+    guest::StoreU32(base, b + 236, r.Below(6));
+    guest::StoreU32(base, b + 240, r.Below(6));
+    guest::StoreU32(base, b + 1952, 0);
+    // Tab 2 with two players only: player 0's save data may be 0 when the
+    // harness runs (an attract race's).
+    guest::StoreU32(base, car_list::kTwoPlayers,
+                    guest::LoadU32(base, b + 232) == 2 ? 1 : r.Below(2));
+    guest::StoreU16(base, w.save.address + 6328, uint16_t(r.Below(21)));
+    t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+  };
+  Group(
+      h, w, "PanelSetBase::SetUpRows (sub_8224A978)", 60, {144, 48},
+      [shape](PPCContext& t, Random& r, const World& w) { shape(t, r, w, 3); },
+      __imp__sub_8224A978, hooks::CarListSetUpRows, settle);
+  Group(
+      h, w, "PanelSetBase::SetUpCarPage (sub_8224C560)", 60, {128, 32},
+      [shape, base](PPCContext& t, Random& r, const World& w) {
+        shape(t, r, w, 2);
+        // C's vtable (+0): slots 1 and 2 SetStats and SetCarName; its +4 0
+        // (SetPrice never ran in play).
+        const uint32_t c = guest::LoadU32(base, w.b() + 1908);
+        if (c != 0) {
+          guest::StoreU32(base, c + 0, w.at(kVtable));
+          guest::StoreU32(base, c + 4, 0);
+        }
+      },
+      __imp__sub_8224C560, hooks::CarListSetUpCarPage, settle);
+}
+
 }  // namespace
 
 void CarList(Context& h) {
@@ -912,6 +963,7 @@ void CarList(Context& h) {
   MorePanels(h, w);
   Leaves(h, w);
   Steps(h, w);
+  SetUps(h, w);
 }
 
 }  // namespace harness

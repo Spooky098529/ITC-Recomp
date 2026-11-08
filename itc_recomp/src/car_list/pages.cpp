@@ -298,4 +298,101 @@ uint64_t Step26(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Cal
   return done;
 }
 
+namespace {
+
+// MenuList::Init(list, count, shown, 1, a, b, c, d) with the two words the
+// original stores at its frame's +84 (159) and +92 (158).
+uint64_t MenuInit(uint8_t* base, uint64_t list, uint64_t count, uint64_t shown,
+                  const uint32_t (&ids)[4], uint32_t frame, uint32_t lr, const Calls& calls) {
+  StoreU32(base, frame + 92, 158);
+  StoreU32(base, frame + 84, 159);
+  const uint64_t args[8] = {list, count, shown, 1, ids[0], ids[1], ids[2], ids[3]};
+  return calls.CallArgs(kMenuListInit, frame, lr, args);
+}
+
+}  // namespace
+
+uint64_t SetUpRows(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224A978 PanelSetBase::SetUpRows");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t save = uint32_t(SaveData(base, b, frame));
+  // The count: the garage's (a halfword, sign-extended) for tab 2, else the
+  // list's.
+  const uint64_t count =
+      LoadU32(base, b + 232) == 2
+          ? uint64_t(int64_t(int16_t(guest::LoadU16(base, save + 6328))))
+          : uint64_t(LoadU32(base, LoadU32(base, b + 1820) + 512));
+  uint64_t shown = LoadU32(base, b + 1916);
+  static constexpr uint32_t kRows[4] = {154, 153, 155, 156};
+  static constexpr uint32_t kList[4] = {162, 161, 153, 154};
+  if (LoadU32(base, kTwoPlayers) != 0) {
+    if (!(int32_t(uint32_t(count)) > int32_t(uint32_t(shown)))) {
+      shown = count;
+    }
+    MenuInit(base, b_r3 + 60, count, shown, kRows, frame, 0x8224A9FC, calls);
+    MenuInit(base, b_r3 + 132, count, count, kList, frame, 0x8224AA28, calls);
+    StoreU32(base, b + 192, LoadU32(base, b + 1952) != 0 ? 1 : 0);
+  } else if (int32_t(uint32_t(count)) < int32_t(uint32_t(shown))) {
+    MenuInit(base, b_r3 + 60, count, count, kRows, frame, 0x8224AA80, calls);
+    MenuInit(base, b_r3 + 132, count, count, kList, frame, 0x8224AAAC, calls);
+  } else {
+    MenuInit(base, b_r3 + 60, count, shown, kRows, frame, 0x8224AABC, calls);
+    MenuInit(base, b_r3 + 132, count, count, kList, frame, 0x8224AAE8, calls);
+  }
+  calls.Call(kMenuListSetSelection, frame, 0x8224AAF4, b_r3 + 60, LoadU32(base, b + 236));
+  StoreU32(base, b + 64, LoadU32(base, b + 240));
+  calls.Call(kMenuListFit, frame, 0x8224AB08, b_r3 + 60, 1);
+  if (LoadU32(base, b + 1900) != 0) {
+    const uint64_t item = calls.Call(kMenuListSelection, frame, 0x8224AB1C, b_r3 + 60);
+    RowFill(base, LoadU32(base, b + 1900), LoadU32(base, b + 1820), LoadU32(base, b + 64), item,
+            frame, calls);
+  }
+  const uint32_t rows = LoadU32(base, b + 1900);
+  if (rows == 0) {
+    return 0;
+  }
+  return RowRefresh(base, rows, LoadU32(base, b + 1820), LoadU32(base, b + 64), frame, calls);
+}
+
+uint64_t SetUpCarPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224C560 PanelSetBase::SetUpCarPage");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 128);
+  static constexpr uint32_t kActions[4] = {154, 153, 155, 156};
+  MenuInit(base, b_r3 + 60, 2, 2, kActions, frame, 0x8224C5A8, calls);
+  calls.Call(kMenuListSetSelection, frame, 0x8224C5B8, b_r3 + 132, LoadU32(base, b + 236));
+  StoreU32(base, b + 136, LoadU32(base, b + 240));
+  uint64_t r3 = calls.Call(kMenuListFit, frame, 0x8224C5CC, b_r3 + 132, 1);
+  if (LoadU32(base, b + 1908) == 0) {
+    return r3;
+  }
+  const uint64_t action = calls.Call(kMenuListSelection, frame, 0x8224C5E0, b_r3 + 60);
+  CarPlaceCursor(base, LoadU32(base, b + 1908), action, frame);
+  CarSetTexts(base, LoadU32(base, b + 1908), frame, calls);
+  const auto entry = [&] {
+    const uint32_t at = (LoadU32(base, b + 240) + LoadU32(base, b + 236)) << 2;
+    return LoadU32(base, LoadU32(base, b + 1820) + at);
+  };
+  if (LoadU32(base, b + 232) == 2) {
+    // The garage's car at the selection: its halfword links from +204 of
+    // the garage (save data + 6120) walked selection + scroll times.
+    const uint32_t garage = uint32_t(SaveData(base, b, frame)) + 6120;
+    uint64_t steps = uint64_t(LoadU32(base, b + 240)) + uint64_t(LoadU32(base, b + 236));
+    int16_t node = int16_t(guest::LoadU16(base, garage + 204));
+    uint32_t at = garage + (uint32_t(int32_t(node)) << 2);
+    while (steps != 0) {
+      node = int16_t(guest::LoadU16(base, at));
+      steps--;
+      at = garage + (uint32_t(int32_t(node)) << 2);
+    }
+    const int32_t slot = int16_t(guest::LoadU16(base, at + 2));
+    const uint32_t car = garage + uint32_t(slot * 1968) + 212;
+    calls.Call(kShowCarStats, frame, 0x8224C64C, LoadU32(base, b + 1908), car);
+  } else {
+    CarShowStats(base, LoadU32(base, b + 1908), entry(), frame, calls);
+  }
+  return CarSetName(base, LoadU32(base, b + 1908), entry(), frame, calls);
+}
+
 }  // namespace car_list
