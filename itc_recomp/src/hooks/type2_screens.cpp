@@ -53,7 +53,12 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "sub_8218E768 with PostMessage5 sub_8218E7A4, Unload sub_8218E530, Close "
               "sub_8218E688, SetPrompts sub_8218F530, Back sub_8218F698, Start sub_8218F6E0 with "
               "SetUpStatus sub_8218E810 (the text setters through their overrides), NextNotice "
-              "sub_8218DBD0 and NextNotice2 sub_8218DD78 "
+              "sub_8218DBD0 and NextNotice2 sub_8218DD78; Create sub_8218E078 with "
+              "MarkNoticeImages sub_8218DCC0, Destroy sub_8218E1A8 with FreeImages sub_8218DE88, "
+              "OpenMovie sub_8218E368 with LoadNoticeImages sub_8218E240 and LoadNoticeImage "
+              "sub_8218DF38, and the archive's callback ImageLoaded sub_8218D8E8 (VirtualAlloc, "
+              "VirtualFree, XMemSet, memcpy, Archive::Load, GarageStage::MakeModel, "
+              "UiMovies::Open and the XPR's calls through their overrides) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -372,6 +377,38 @@ void HubStart(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t2::HubStart(base, ctx.r1.u32, guest.calls());
 }
 
+void HubCreate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void HubDestroy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void HubOpenMovie(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubOpenMovie(base, ctx.r1.u32, guest.calls());
+}
+void HubImageLoaded(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubImageLoaded(base, ctx.r4.u32, ctx.r6.u32, ctx.r1.u32, guest.calls());
+}
+void HubMarkNoticeImages(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::HubMarkNoticeImages(base, ctx.r1.u32);
+}
+void HubFreeImages(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubFreeImages(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void HubLoadNoticeImage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubLoadNoticeImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void HubLoadNoticeImages(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubLoadNoticeImages(base, ctx.r1.u32, guest.calls());
+}
+
 namespace {
 // An Init's register step: StateMachine::Add's adapter's r3, a new
 // transition's address from the machine's 64-bit r3.
@@ -459,6 +496,16 @@ ITC_TYPE2_SCREENS(8218F698, HubBack)
 ITC_TYPE2_SCREENS(8218F6E0, HubStart)
 ITC_TYPE2_SCREENS(8218DBD0, HubNextNotice)
 ITC_TYPE2_SCREENS(8218DD78, HubNextNotice2)
+// The hub's Create, OpenMovie and Destroy (functors) and the archive's
+// callback ImageLoaded (its address handed to Archive::Load; also by
+// sub_8225BD10, not read). No adapters for MarkNoticeImages sub_8218DCC0
+// (only Create), FreeImages sub_8218DE88 (only Destroy), LoadNoticeImages
+// sub_8218E240 (only OpenMovie) and LoadNoticeImage sub_8218DF38 (only
+// LoadNoticeImages): their steps above are the harness's.
+ITC_TYPE2_SCREENS(8218E078, HubCreate)
+ITC_TYPE2_SCREENS(8218E368, HubOpenMovie)
+ITC_TYPE2_SCREENS(8218E1A8, HubDestroy)
+ITC_TYPE2_SCREENS(8218D8E8, HubImageLoaded)
 // The license plate editor's handlers: member function functors the machine
 // calls (no direct callers).
 ITC_TYPE2_SCREENS(82198210, PlateCreate)

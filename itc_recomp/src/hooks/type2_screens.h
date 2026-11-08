@@ -105,6 +105,18 @@ void HubSetUpStatus(PPCContext& ctx, uint8_t* base);
 void HubNextNotice(PPCContext& ctx, uint8_t* base);
 void HubNextNotice2(PPCContext& ctx, uint8_t* base);
 void HubStart(PPCContext& ctx, uint8_t* base);
+// The hub's set-up and teardown (Create, Destroy r3 the machine; OpenMovie
+// none), the archive's callback ImageLoaded (r4 the buffer, r6 the record)
+// and the helpers without adapters (MarkNoticeImages, LoadNoticeImages no
+// arguments; FreeImages r3 the data; LoadNoticeImage r3 the data, r4 i).
+void HubCreate(PPCContext& ctx, uint8_t* base);
+void HubDestroy(PPCContext& ctx, uint8_t* base);
+void HubOpenMovie(PPCContext& ctx, uint8_t* base);
+void HubImageLoaded(PPCContext& ctx, uint8_t* base);
+void HubMarkNoticeImages(PPCContext& ctx, uint8_t* base);
+void HubFreeImages(PPCContext& ctx, uint8_t* base);
+void HubLoadNoticeImage(PPCContext& ctx, uint8_t* base);
+void HubLoadNoticeImages(PPCContext& ctx, uint8_t* base);
 // The four machines' set-ups (r3 the machine).
 void HubInitStates(PPCContext& ctx, uint8_t* base);
 void SheetInitStates(PPCContext& ctx, uint8_t* base);

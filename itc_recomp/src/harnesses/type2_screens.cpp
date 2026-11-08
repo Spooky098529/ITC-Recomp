@@ -34,6 +34,8 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
+#include "models/memory_blocks.h"
+#include "models/xpr.h"
 #include "race_screens/race_screens.h"
 #include "type2_screens/type2_screens.h"
 #include "ui_movies/game.h"
@@ -313,7 +315,19 @@ void Allocated(uint8_t* base, Outputs& out, uint32_t slot, uint32_t bytes) {
 constexpr uint32_t kMoviesOpen = t2::kMoviesOpen, kMoviesDelete = t2::kMoviesDelete;
 std::vector<uint32_t> g_opens;
 hooks::StartUpRecorder g_chained = nullptr;
+// Archive::Load's calls (the hub's notice images), recorded and answered a
+// serial: their buffers and records compared and freed after the run.
+struct LoadCall {
+  uint32_t id, buffer, callback, record, r7, r8, r1, lr;
+};
+std::vector<LoadCall> g_loads;
 bool RecordOpen(PPCContext& ctx, uint32_t address) {
+  if (address == t2::kArchiveLoad) {
+    g_loads.push_back({ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32,
+                       ctx.r1.u32, uint32_t(ctx.lr)});
+    ctx.r3.u64 = 0x100 + g_loads.size();
+    return true;
+  }
   if (address != kMoviesOpen && address != kMoviesDelete) {
     return g_chained != nullptr && g_chained(ctx, address);
   }
@@ -400,6 +414,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
       time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
       g_opens.clear();
+      g_loads.clear();
       g_updates.clear();
       g_answers = Random(r.Next());
       g_case_sp = sp;
@@ -434,6 +449,30 @@ void Run(Context& h, const World& w, const Spec& spec) {
       for (const uint32_t word : g_opens) {
         out[v].Word(word);
       }
+      // The loads: their words, the buffers (zeroed) and the records
+      // compared and freed, the records' list slots in the data marked.
+      out[v].Word(uint32_t(g_loads.size()));
+      for (size_t k = 0; k < g_loads.size(); k++) {
+        const LoadCall& load = g_loads[k];
+        for (const uint32_t word : {load.id, load.callback, load.r7, load.r8, load.r1, load.lr}) {
+          out[v].Word(word);
+        }
+        for (const uint32_t block : {load.buffer, load.record}) {
+          const bool pages = memory::IsPages(block);
+          out[v].Word(pages ? 1 : 0);
+          if (pages) {
+            out[v].Bytes(Read(h.base, block, block == load.record ? 16 : 64));
+            memory::FreePages(block);
+          }
+        }
+        for (uint32_t i = 0; i < 2 * 46; i++) {
+          const uint32_t slot = w.data() + (i < 46 ? 32 + 4 * i : 220 + 4 * (i - 46));
+          if (guest::LoadU32(h.base, slot) == load.record) {
+            guest::StoreU32(h.base, slot, 0xF00D0000u + uint32_t(k));
+          }
+        }
+      }
+      g_loads.clear();
       if (spec.after) {
         spec.after(t, w, out[v]);
       }
@@ -976,6 +1015,8 @@ void HubWorld(Random& r, const World& w) {
   // The stage's +0 (GarageStage::SetPlates writes its +6092) at a word of
   // the area.
   guest::StoreU32(base, w.at(kStageAt), hub + 0x3C8 - 6092);
+  // Its +16 set (GarageStage::MakeModel then makes nothing).
+  guest::StoreU32(base, hub + 0x3C8 - 6092 + 16, 1 + r.Below(4));
   guest::StoreU32(base, w.at(kListAt) + 0, r.Below(6) == 0 ? 0xFFFFFFFFu : r.Below(10));
   for (const uint32_t list : {32u, 220u}) {
     guest::StoreU32(base, data + list + 184, r.Below(5));
@@ -992,14 +1033,22 @@ void HubWorld(Random& r, const World& w) {
   for (uint32_t k = 5; k < 9; k++) {
     guest::StoreU32(base, hub + 0x140 + 4 * k, hub + 0x180);
   }
+  // The table's entries: chains that end inside it (+8 the step to the
+  // next, 0 at the end), +16 an image index below 64 or negative.
   for (uint32_t k = 0; k < 8; k++) {
-    guest::StoreU32(base, hub + 0x180 + 56 * k + 8, r.Below(2) == 0 ? 0 : r.Below(4));
+    const uint32_t entry = hub + 0x180 + 56 * k;
+    guest::StoreU32(base, entry + 8, k < 7 && r.Below(2) == 0 ? 1 + r.Below(7 - k) : 0);
+    guest::StoreU32(base, entry + 16, r.Below(5) == 0 ? uint32_t(-int32_t(1 + r.Below(9))) : r.Below(64));
   }
+  // The image bits (+408, +412) sparse.
+  guest::StoreU32(base, data + 408, uint32_t(r.Next() & r.Next() & r.Next()));
+  guest::StoreU32(base, data + 412, uint32_t(r.Next() & r.Next() & r.Next()) & 0x3FFF);
   guest::StoreU32(base, t2::kHubCounter, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(100));
   for (const uint32_t list : {0x1C778u, 0x1CA84u}) {
     for (uint32_t i = 0; i < 12; i++) {
-      WriteRandom(base, save + list + 12 * i, 12, r);
       guest::StoreU32(base, save + list + 12 * i, r.Below(2));
+      guest::StoreU32(base, save + list + 12 * i + 4, r.Below(4));
+      guest::StoreU32(base, save + list + 12 * i + 8, r.Below(8));
     }
   }
   guest::StoreU32(base, save + 0x1CA78, r.Below(9));
@@ -1011,6 +1060,15 @@ void HubWorld(Random& r, const World& w) {
   guest::StoreU32(base, save + 8 + 12, r.Below(6));
   guest::StoreU16(base, save + 8 + 16, uint16_t(r.Below(110)));
   guest::StoreU16(base, save + 8 + 18, uint16_t(r.Below(2)));
+  // The garage (+6120): its slot links (halfwords at +4h, below 60, and
+  // +4h + 2, the slots below 50), the head at +204, the steps
+  // (+0x19920) below 4, then the count (+6328).
+  for (uint32_t k = 0; k < 64; k++) {
+    guest::StoreU16(base, save + 6120 + 4 * k, uint16_t(r.Below(60)));
+    guest::StoreU16(base, save + 6120 + 4 * k + 2, uint16_t(r.Below(50)));
+  }
+  guest::StoreU32(base, save + 0x19920, r.Below(4));
+  guest::StoreU16(base, save + 6328, uint16_t(r.Below(4) == 0 ? 0 : 1 + r.Below(59)));
   const uint32_t pick = r.Below(4);
   guest::StoreU32(base, save + 6100,
                   pick == 0 ? uint32_t(r.Next()) : pick == 1 ? 990 + r.Below(20) : r.Below(999));
@@ -1110,6 +1168,125 @@ void Hub(Context& h, const World& w) {
                }
              },
              nullptr, true});
+  Run(h, w, {"Type2Hub::MarkNoticeImages (sub_8218DCC0)", 200, __imp__sub_8218DCC0,
+             hooks::HubMarkNoticeImages, {{-160, -56}}, hub});
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  // Create: the three blocks compared by content (the data's first 448
+  // bytes), MarkNoticeImages' frame under its own.
+  Run(h, w, {"Type2Hub::Create (sub_8218E078; sub_8218DCC0)", 100, __imp__sub_8218E078,
+             hooks::HubCreate, {{-128, -40}, {-288, -184}}, machine,
+             [&h](PPCContext&, const World&, Outputs& out) {
+               Allocated(h.base, out, t2::kHubPages, 28);
+               Allocated(h.base, out, t2::kHubMenu, 68);
+               Allocated(h.base, out, t2::kHubData, 448);
+             }});
+  // FreeImages and Destroy: the image lists (counts 0 to 3) of records in
+  // the layer's pages, each with its two blocks.
+  auto images = [](Random& r, uint32_t data, const World& w) {
+    for (const uint32_t list : {32u, 220u}) {
+      const uint32_t count = r.Below(4);
+      guest::StoreU32(w.base, data + list + 184, count);
+      for (uint32_t i = 0; i < count; i++) {
+        const uint32_t record = MakePages(w.base, 16, r);
+        guest::StoreU32(w.base, record + 8, MakePages(w.base, 12, r));
+        guest::StoreU32(w.base, record + 12, MakePages(w.base, 24, r));
+        guest::StoreU32(w.base, data + list + 4 * i, record);
+      }
+    }
+  };
+  Run(h, w, {"Type2Hub::FreeImages (sub_8218DE88; sub_8218D650)", 100, __imp__sub_8218DE88,
+             hooks::HubFreeImages, {{-112, -32}, {-208, -128}},
+             [hub, images](PPCContext& t, Random& r, const World& w) {
+               hub(t, r, w);
+               images(r, w.data(), w);
+               t.r3.u64 = w.data();
+             }});
+  Run(h, w, {"Type2Hub::Destroy (sub_8218E1A8; sub_8218DE88)", 100, __imp__sub_8218E1A8,
+             hooks::HubDestroy, {{-128, -40}, {-240, -160}, {-336, -256}},
+             [machine, images](PPCContext& t, Random& r, const World& w) {
+               machine(t, r, w);
+               uint8_t* base = w.base;
+               const uint32_t data = MakePages(base, 448, r);
+               WriteRandom(base, data, 448, r);
+               images(r, data, w);
+               guest::StoreU32(base, t2::kHubPages, MakePages(base, 28, r));
+               guest::StoreU32(base, t2::kHubMenu, MakePages(base, 68, r));
+               guest::StoreU32(base, t2::kHubData, data);
+             }});
+  // The notice images' loads: Archive::Load recorded (no load queued).
+  Run(h, w, {"Type2Hub::LoadNoticeImage (sub_8218DF38)", 40, __imp__sub_8218DF38,
+             hooks::HubLoadNoticeImage, {{-144, -56}},
+             [data](PPCContext& t, Random& r, const World& w) {
+               data(t, r, w);
+               for (const uint32_t list : {32u, 220u}) {
+                 guest::StoreU32(w.base, w.data() + list + 184, r.Below(8));
+               }
+               t.r4.u64 = r.Below(46);
+             }});
+  Run(h, w, {"Type2Hub::LoadNoticeImages (sub_8218E240; sub_8218DF38)", 40,
+             __imp__sub_8218E240, hooks::HubLoadNoticeImages, {{-112, -24}, {-256, -168}}, hub});
+  // OpenMovie: the selected garage car copied into its frame (compared).
+  Run(h, w, {"Type2Hub::OpenMovie (sub_8218E368; sub_8218E240)", 60, __imp__sub_8218E368,
+             hooks::HubOpenMovie, {{-2064, -8}, {-2176, -2088}, {-2320, -2232}}, hub});
+  // ImageLoaded: an XPR2 file of 1 to 4 records in the layer's pages (the
+  // callback frees it), as the location screen's harness makes them; the
+  // XPR's and the texture record's words compared (the texture and the
+  // XPR's +16 as offsets in its header block), then the blocks freed.
+  Run(h, w, {"Type2Hub::ImageLoaded (sub_8218D8E8)", 60, __imp__sub_8218D8E8,
+             hooks::HubImageLoaded, {{-144, -24}},
+             [hub](PPCContext& t, Random& r, const World& w) {
+               hub(t, r, w);
+               uint8_t* base = w.base;
+               const uint32_t records = 1 + r.Below(4);
+               const uint32_t textures_at = 4 + 16 * records;
+               const uint32_t header_bytes = textures_at + 52 * records + 4 * r.Below(16);
+               const uint32_t data_bytes = 1 + r.Below(4000);
+               const uint32_t bytes = 12 + header_bytes + data_bytes;
+               const uint32_t buffer = MakePages(base, bytes, r);
+               WriteRandom(base, buffer, bytes & ~3u, r);
+               guest::StoreU32(base, buffer + 0, 0x58505232);
+               guest::StoreU32(base, buffer + 4, header_bytes);
+               guest::StoreU32(base, buffer + 8, data_bytes);
+               const uint32_t header = buffer + 12;
+               guest::StoreU32(base, header, records);
+               for (uint32_t i = 0; i < records; i++) {
+                 const uint32_t record = header + 4 + 16 * i;
+                 const bool texture = i == 0 || r.Below(2) == 0;
+                 guest::StoreU32(base, record,
+                                 (texture ? 0x54580000u : 0x56420000u) | r.Below(0x10000));
+                 guest::StoreU32(base, record + 4, textures_at + 52 * i);
+               }
+               t.r4.u64 = buffer;
+               t.r6.u64 = w.at(kHubAt) + 0x340;
+             },
+             [&h](PPCContext&, const World& w, Outputs& out) {
+               uint8_t* base = h.base;
+               const uint32_t image = w.at(kHubAt) + 0x340;
+               const uint32_t texture = guest::LoadU32(base, image + 8);
+               const uint32_t xpr = guest::LoadU32(base, image + 12);
+               out.Word(memory::IsPages(texture) ? 1 : 0);
+               out.Word(memory::IsPages(xpr) ? 1 : 0);
+               if (!memory::IsPages(texture) || !memory::IsPages(xpr)) {
+                 return;
+               }
+               const uint32_t header = guest::LoadU32(base, xpr + 0);
+               const uint32_t data = guest::LoadU32(base, xpr + 8);
+               out.Word(guest::LoadU32(base, xpr + 4));
+               out.Word(guest::LoadU32(base, xpr + 12));
+               out.Word(guest::LoadU32(base, xpr + 16) - header);
+               out.Word(guest::LoadU32(base, xpr + 20));
+               out.Word(guest::LoadU32(base, texture + 0) - header);
+               out.Word(guest::LoadU32(base, texture + 4));
+               out.Word(guest::LoadU32(base, texture + 8));
+               memory::FreePages(header - models::kBlockHeaderBytes);
+               memory::crt::XMemFree(data - models::kBlockHeaderBytes, models::kXprDataAllocation);
+               memory::FreePages(texture);
+               memory::FreePages(xpr);
+               guest::StoreU32(base, image + 8, 1);
+               guest::StoreU32(base, image + 12, 1);
+             }});
 }
 
 }  // namespace

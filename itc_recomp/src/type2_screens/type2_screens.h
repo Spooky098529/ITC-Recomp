@@ -435,6 +435,66 @@ uint32_t HubNextNotice2(uint8_t* base, uint32_t sp);
 // data's +20 = 0. NextNotice's or NextNotice2's r3. 112-byte frame.
 uint32_t HubStart(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The hub's set-up, teardown and notice images (hub_images.cpp) ---
+//
+// VirtualAlloc, VirtualFree, XMemSet, memcpy, Archive::Load (the load
+// queued, the callback ImageLoaded), GarageStage::MakeModel, UiMovies::Open,
+// XPR::Create, XPR::GetTexture and Texture::GetLevelDesc through their
+// overrides; Archive::AssetSize, CarModels::BlockOf, SaveData::Of and
+// DataTables::Entry56 their plain C++.
+constexpr uint32_t kXMemSet = 0x822962B0;
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kArchiveLoad = 0x8209DE48;
+constexpr uint32_t kStageMakeModel = 0x8217FCB0;
+constexpr uint32_t kXprCreate = 0x82596F68;
+constexpr uint32_t kXprGetTexture = 0x82597118;
+constexpr uint32_t kGetLevelDesc = 0x822A5B78;
+constexpr uint32_t kHubImageLoaded = 0x8218D8E8;
+
+// sub_8218DCC0 Type2Hub::MarkNoticeImages: for each entry of player 0's
+// first notice list, its data table chain (Entry56, by the entries' +8):
+// bit +16 of each (when not negative) set in the data's +408 bit set; the
+// entry's +0 at the frame's +80. The last Entry56's r3, else the save data.
+// 160-byte frame.
+uint32_t HubMarkNoticeImages(uint8_t* base, uint32_t sp);
+// sub_8218E078 Type2Hub::Create (r3 the machine): +9608 = 0; the page
+// object (28 bytes), the menu (68) and the data (68 asked for: a page, used
+// up to +447) VirtualAlloc'ed into their globals with their first words;
+// MarkNoticeImages; +9604 = 1 or 9 by +9612. MarkNoticeImages' r3. 128-byte
+// frame.
+uint32_t HubCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8218DE88 Type2Hub::FreeImages (r3 the data): both image lists emptied
+// from the last, each record FreeImage'd (its plain C++) and VirtualFree'd.
+// The last VirtualFree's r3, else the data. 112-byte frame.
+uint64_t HubFreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& calls);
+// sub_8218E1A8 Type2Hub::Destroy (r3 the machine): the data's +20 = 0; with
+// its +4, +9604 = 14; FreeImages; the three blocks VirtualFree'd, the
+// globals 0. The last VirtualFree's r3. 128-byte frame.
+uint64_t HubDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8218DF38 Type2Hub::LoadNoticeImage (r3 the data, r4 i): for assets
+// 22696 + i and 22741 + i, a buffer of the asset's size (VirtualAlloc,
+// XMemSet 0), a 16-byte record (+4 = i) appended to the first or second
+// list, Archive::Load(asset, buffer, ImageLoaded, record, 0, 0). The last
+// Load's r3. 144-byte frame.
+uint64_t HubLoadNoticeImage(uint8_t* base, uint32_t data, uint32_t index, uint32_t sp,
+                            const Calls& calls);
+// sub_8218E240 Type2Hub::LoadNoticeImages: LoadNoticeImage (its plain C++)
+// for each i below 46 set in the data's +408. r3 the data. 112-byte frame.
+uint32_t HubLoadNoticeImages(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8218E368 Type2Hub::OpenMovie: with a car in player 0's garage, the
+// selected one (by the slot links) copied to the frame's +80 (memcpy, 1,968
+// bytes) and its model block (CarModels::BlockOf(its +12)), else 0;
+// GarageStage::MakeModel(the stage, the block, 1); UiMovies::Open(0,
+// 22545); LoadNoticeImages. r3 the data. 2,064-byte frame.
+uint32_t HubOpenMovie(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8218D8E8 Type2Hub::ImageLoaded (the archive's callback: r4 the buffer,
+// r6 the record): +12 = XPR::Create on a 24-byte VirtualAlloc, +8 = a
+// 12-byte texture record (VirtualAlloc: +0 XPR::GetTexture(0), +4 and +8
+// the level's width and height from Texture::GetLevelDesc into the frame's
+// +80); the buffer VirtualFree'd; +0 = 1. VirtualFree's r3. 144-byte frame.
+uint64_t HubImageLoaded(uint8_t* base, uint32_t buffer, uint32_t record, uint32_t sp,
+                        const Calls& calls);
+
 // --- The machines' set-ups (init_states.cpp) ---
 //
 // The transitions added to `machine` (StateMachine::Add's plain C++) from
