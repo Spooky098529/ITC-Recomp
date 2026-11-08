@@ -244,6 +244,15 @@ uint64_t RaceDialogUpdate(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& 
 // area, 2026-10-30), the three through their overrides. The last's r3.
 uint64_t RaceDialogSetText(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
                            const Calls& calls);
+// sub_82218B30 RaceDialog::Open: from a 128-byte frame, the dialog list's
+// player (+60) = 0 for `player` 0, 1 for 1 (left for others); for `mode` 0
+// to 5 the question (strings 1954 to 1959, RaceDialogSetText with r4 the
+// player and r5 to r10 0: the strings have no argument codes, only dead
+// frame words differ, as the user's call for the parking area,
+// 2026-10-30); the data's +12 = 13, +16 = 1, +28 = 1, ScreenPages::Go(the
+// pages, 1, 0, -1) through its override, +32 = 1, +36 = 0. Go's r3.
+uint64_t RaceDialogOpen(uint8_t* base, uint32_t mode, uint64_t player, uint32_t sp,
+                        const Calls& calls);
 // sub_822191D0 CareerResults::Start: ScreenPages::Go([0x826D8500] + 184, 1,
 // transition 1); returns 0.
 uint64_t CareerResultsStart(uint8_t* base, uint32_t sp, const Calls& calls);

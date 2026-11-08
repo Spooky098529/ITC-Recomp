@@ -115,6 +115,9 @@ void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base);
 // where the native heap isn't active (AltHud::Destroy's plain C++ frees
 // over the allocation layer).
 void RaceHudObjectScreensDestruct(PPCContext& ctx, uint8_t* base);
+// RaceScreens::Destroy sub_82211D18: no arguments; the original where the
+// native heap isn't active.
+void RaceHudObjectScreensDestroy(PPCContext& ctx, uint8_t* base);
 // sub_82211D08 RaceScreens::DrawPauseMenu and sub_82211D10
 // DrawAfterRaceMenu (r3 = the holder; tail calls). Neither has an adapter
 // (their callers in play, the race HUD machine's PauseDraw, RacePauseDraw and

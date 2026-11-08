@@ -1486,6 +1486,19 @@ void Dialog(Context& h, const MovieWorld& w) {
         t.r10.u64 = r.Next();
       },
       __imp__sub_82218838, hooks::RaceScreensRaceDialogSetText, set_text);
+  // Open: the mode 0 to 5 or any up to 7, the player 0, 1 or any word. The
+  // frame's +32 to +79 left out: SetText stores r5 to r10 there, the
+  // caller's leftovers in the original and 0 in ours (the user's call for
+  // the parking area, 2026-10-30).
+  FrameSpec open{128, 32};
+  open.skip = {32, 80};
+  MovieGroup(
+      h, w, "RaceDialog::Open (sub_82218B30)", 100,
+      [&](PPCContext& t, Random& r, const MovieWorld&) {
+        t.r3.u64 = r.Below(8);
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
+      },
+      __imp__sub_82218B30, hooks::RaceScreensRaceDialogOpen, open);
 }
 
 // The dialog's page object and data as its draw's cases shape them (its

@@ -8,6 +8,7 @@
 #include "camera_modes/steps.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "helpers/debug_output.h"
 #include "memory/heap.h"
 #include "race_screens/race_screens.h"
 #include "menu_sounds/menu_sounds.h"
@@ -15,6 +16,7 @@
 #include "ui_movies/ui_movies.h"
 
 #include <bit>
+#include <optional>
 
 namespace race_hud_object {
 
@@ -291,6 +293,46 @@ uint64_t ScreensDestruct(uint8_t* base, uint32_t holder, uint32_t sp, const Call
   const uint64_t r3 =
       calls.Call(kStringsRelease, frame, 0x82211BCC, guest::LoadU32(base, 0x826C5C34), 47);
   return calls.Call(kDeleteAllJump, frame, 0x82211BD0, r3);
+}
+
+uint64_t ScreensDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82211D18 RaceScreens::Destroy");
+  const uint32_t frame = sp - 96;
+  guest::StoreU32(base, frame, sp);
+  struct Teardown {
+    std::optional<uint64_t> (*native)(uint8_t*, uint32_t);
+    uint32_t original, lr;
+  };
+  static constexpr Teardown kTeardowns[8] = {
+      {race_screens::PauseMenuDestroy, 0x8220C4C8, 0x82211D2C},
+      {race_screens::PauseMenu4Destroy, 0x8220FC98, 0x82211D30},
+      {race_screens::AfterRaceMenuDestroy, 0x8221A3E8, 0x82211D34},
+      {race_screens::CareerResultsDestroy, 0x82219170, 0x82211D38},
+      {race_screens::RaceResultsDestroy, 0x8221F3C8, 0x82211D3C},
+      {race_screens::SplitResultsDestroy, 0x8221FA68, 0x82211D40},
+      {race_screens::RaceDialogDestroy, 0x82217CD0, 0x82211D44},
+      {race_screens::Kind6MenuDestroy, 0x8221BE30, 0x82211D48},
+  };
+  for (const Teardown& teardown : kTeardowns) {
+    if (!teardown.native(base, frame)) {
+      calls.Call(teardown.original, frame, teardown.lr);
+    }
+  }
+  ScreensDestruct(base, guest::LoadU32(base, kScreensHolder), frame, calls);
+  const uint32_t holder = guest::LoadU32(base, kScreensHolder);
+  if (holder == 0) {
+    constexpr uint32_t kText = 0x8200D1C4;
+    helpers::DebugOutput(nullptr);
+    return uint64_t(int64_t(int32_t(kText)));
+  }
+  uint64_t r3;
+  if (memory::IsPages(holder)) {
+    r3 = memory::FreePages(holder) ? 1 : 0;
+  } else {
+    r3 = calls.Call(0x82295330, frame, 0x82211D70, holder, 0, 0x8000);
+  }
+  guest::StoreU32(base, kScreensHolder, 0);
+  return r3;
 }
 
 uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& calls) {

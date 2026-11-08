@@ -28,6 +28,7 @@
 #include "strings_and_font/strings_and_font.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_hud_object/race_hud_object.h"
+#include "race_screens/race_screens.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -1804,6 +1805,185 @@ void ScreensDestructs(Context& h) {
   results.Report();
 }
 
+// RaceScreens::Destroy over the in-race screens' blocks (each global the
+// layer's pages, the menu lists' blocks, +68, 0 or pages, as the screens'
+// teardowns' cases make them) and a holder of the layer's pages (its world
+// as ~RaceScreens's cases make it). Compared: the screens' globals (0 or
+// not), which blocks were freed, the holder's global, the track zones'
+// owner, the string table, the movie table's pairs, the frame (its
+// register saves left out), the caller's area, r1 and r3. What's left is
+// freed.
+void ScreensDestroys(Context& h) {
+  namespace sf = strings_and_font;
+  namespace rs = race_screens;
+  Results results("RaceScreens::Destroy (sub_82211D18)");
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  const Block movie(0x100), textures(0x400), table(sf::kStringsBytes);
+  if (!movie.address || !textures.address || !table.address) {
+    ITC_LOG_ERROR("harness: race_hud_object: no block from the allocation layer");
+    return;
+  }
+  const uint32_t globals[] = {rs::kPauseScreen,  rs::kPauseData,   rs::kPauseList,
+                              rs::kPausePages,   rs::kPause4Screen, rs::kPause4Data,
+                              rs::kPause4List,   rs::kPause4Pages,  rs::kAfterScreen,
+                              rs::kAfterData,    rs::kAfterList,    rs::kAfterPages,
+                              rs::kDialogList,   rs::kDialogPages,  rs::kDialogData,
+                              rs::kCareerResults, rs::kRaceResults, rs::kSplitResults,
+                              rs::kKind6Menu};
+  const uint32_t lists[] = {rs::kPauseList, rs::kPause4List, rs::kAfterList, rs::kDialogList};
+  for (int c = 0; c < 30; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      SavedBytes saved(h.base, {{kOwner, 4},
+                                {ui_movies::kMovieTable, 12},
+                                {0x826C5C34, 4},
+                                {kScreenGlobals, kScreenGlobalsBytes},
+                                {kUnseenGlobals, kUnseenGlobalsBytes}});
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
+      WriteRandom(h.base, kScreenGlobals, kScreenGlobalsBytes, r);
+      WriteRandom(h.base, kUnseenGlobals, kUnseenGlobalsBytes, r);
+      std::vector<uint32_t> blocks;
+      for (const uint32_t global : globals) {
+        const uint32_t block = memory::AllocPages(0x100, 4096);
+        WriteRandom(h.base, block, 0x100, r);
+        guest::StoreU32(h.base, global, block);
+        blocks.push_back(block);
+      }
+      std::vector<uint32_t> list_pages;
+      for (const uint32_t list : lists) {
+        const uint32_t pages = r.Below(3) != 0 ? memory::AllocPages(0x1000, 4096) : 0;
+        guest::StoreU32(h.base, guest::LoadU32(h.base, list) + 68, pages);
+        list_pages.push_back(pages);
+      }
+      // The holder and ~RaceScreens's world.
+      const uint32_t holder = memory::AllocPages(1040, 4096);
+      WriteRandom(h.base, holder, 1040, r);
+      guest::StoreU32(h.base, rh::kScreensHolder, holder);
+      WriteRandom(h.base, movie.address, movie.bytes, r);
+      WriteRandom(h.base, textures.address, textures.bytes, r);
+      const uint32_t hud = holder + 16;
+      guest::StoreU32(h.base, hud + 608, movie.address);
+      guest::StoreU32(h.base, movie.address + 28, textures.address);
+      if (r.Below(2) == 0) {
+        guest::StoreU32(h.base, hud + 588, 0);
+      }
+      const uint32_t owner =
+          r.Below(3) == 0 ? 0 : memory::crt::OperatorNew(h.base, 64).value_or(0);
+      guest::StoreU32(h.base, kOwner, owner);
+      const uint32_t object =
+          r.Below(5) == 0 ? 0 : memory::crt::OperatorNew(h.base, 264).value_or(0);
+      const uint32_t alt_list = memory::crt::OperatorNew(h.base, 72).value_or(0);
+      if (alt_list == 0) {
+        ITC_LOG_ERROR("harness: race_hud_object: operator new failed");
+        return;
+      }
+      if (object != 0) {
+        WriteRandom(h.base, object, 264, r);
+      }
+      WriteRandom(h.base, alt_list, 72, r);
+      const uint32_t alt_pages =
+          r.Below(4) == 0 ? 0 : memory::AllocPages(0x1000 * (1 + r.Below(4)), 4096);
+      guest::StoreU32(h.base, alt_list + 68, alt_pages);
+      guest::StoreU32(h.base, holder + 1004, object);
+      guest::StoreU32(h.base, holder + 1008, alt_list);
+      WriteRandom(h.base, table.address, table.bytes, r);
+      uint32_t files[sf::kStringFiles];
+      uint32_t kinds[sf::kStringFiles];
+      for (uint32_t f = 0; f < sf::kStringFiles; f++) {
+        kinds[f] = r.Below(3);
+        uint32_t count = r.Below(4);
+        files[f] = kinds[f] == 0   ? 0
+                   : kinds[f] == 1 ? memory::AllocPages(64, 4096)
+                                   : uint32_t(r.Next()) | 1;
+        if (kinds[f] == 2 && count == 1) {
+          count = 2;
+        }
+        guest::StoreU32(h.base, table.address + 4 * f, files[f]);
+        guest::StoreU32(h.base, table.address + 68 + 4 * f, r.Below(2));
+        guest::StoreU32(h.base, table.address + 4236 + 4 * f, count);
+      }
+      guest::StoreU32(h.base, 0x826C5C34, table.address);
+      const uint32_t capacity = 1 + r.Below(4);
+      const uint32_t count = r.Below(capacity + 1);
+      const uint32_t array = memory::crt::OperatorNewArray(h.base, 8 * capacity).value_or(0);
+      WriteRandom(h.base, array, 8 * capacity, r);
+      for (uint32_t k = 0; k < count; k++) {
+        const uint32_t key = k > 0 && r.Below(4) == 0 ? 100 + r.Below(k) : 100 + k;
+        guest::StoreU32(h.base, array + 8 * k, key);
+        guest::StoreU32(h.base, array + 8 * k + 4, 0);
+      }
+      guest::StoreU32(h.base, ui_movies::kMovieTable, array);
+      guest::StoreU32(h.base, ui_movies::kMovieTable + 4, capacity);
+      guest::StoreU32(h.base, ui_movies::kMovieTable + 8, count);
+      t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      ITC_FLAG(native_race_hud_object) = v == 1;
+      (v == 0 ? __imp__sub_82211D18 : hooks::RaceHudObjectScreensDestroy)(t, h.base);
+      ITC_FLAG(native_race_hud_object) = true;
+      for (const uint32_t global : globals) {
+        out[v].Word(guest::LoadU32(h.base, global));
+      }
+      for (const uint32_t block : blocks) {
+        out[v].Word(memory::IsPages(block) ? 1 : 0);
+      }
+      for (const uint32_t pages : list_pages) {
+        out[v].Word(pages != 0 && memory::IsPages(pages) ? 1 : 0);
+      }
+      out[v].Word(guest::LoadU32(h.base, rh::kScreensHolder));
+      out[v].Word(memory::IsPages(holder) ? 1 : 0);
+      if (memory::IsPages(holder)) {
+        out[v].Bytes(Read(h.base, holder, 1040));
+      }
+      out[v].Bytes(Read(h.base, textures.address, textures.bytes));
+      out[v].Word(guest::LoadU32(h.base, kOwner));
+      out[v].Word(owner != 0 && memory::IsHeapBlock(owner) ? 1 : 0);
+      out[v].Word(object != 0 && memory::IsHeapBlock(object) ? 1 : 0);
+      out[v].Word(memory::IsHeapBlock(alt_list) ? 1 : 0);
+      out[v].Word(alt_pages != 0 && memory::IsPages(alt_pages) ? 1 : 0);
+      for (uint32_t f = 0; f < sf::kStringFiles; f++) {
+        const uint32_t now = guest::LoadU32(h.base, table.address + 4 * f);
+        out[v].Word(now == files[f] ? 1 : now);
+        if (kinds[f] == 1) {
+          const bool left = memory::IsPages(files[f]);
+          out[v].Word(left ? 1 : 0);
+          if (left) {
+            memory::FreePages(files[f]);
+          }
+        }
+      }
+      out[v].Bytes(Read(h.base, table.address + 68, table.bytes - 68));
+      const uint32_t now = guest::LoadU32(h.base, ui_movies::kMovieTable);
+      out[v].Word(now == array ? 1 : now);
+      out[v].Bytes(Read(h.base, ui_movies::kMovieTable + 4, 8));
+      out[v].Bytes(Read(h.base, array, 8 * capacity));
+      out[v].Bytes(Read(h.base, sp - 96, 80));
+      out[v].Bytes(Read(h.base, sp, kCallerBytes));
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (const uint32_t block : blocks) {
+        if (memory::IsPages(block)) memory::FreePages(block);
+      }
+      for (const uint32_t pages : list_pages) {
+        if (pages != 0 && memory::IsPages(pages)) memory::FreePages(pages);
+      }
+      if (memory::IsPages(holder)) memory::FreePages(holder);
+      if (owner != 0 && memory::IsHeapBlock(owner)) memory::crt::OperatorDelete(owner);
+      if (object != 0 && memory::IsHeapBlock(object)) memory::crt::OperatorDelete(object);
+      if (memory::IsHeapBlock(alt_list)) memory::crt::OperatorDelete(alt_list);
+      if (alt_pages != 0 && memory::IsPages(alt_pages)) memory::FreePages(alt_pages);
+      if (array != 0 && memory::IsHeapBlock(array)) memory::crt::OperatorDeleteArray(array);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceHudObject(Context& h) {
@@ -1822,6 +2002,7 @@ void RaceHudObject(Context& h) {
   Sounds(h, w);
   Panels(h, w);
   ScreensDestructs(h);
+  ScreensDestroys(h);
 }
 
 }  // namespace harness

@@ -231,4 +231,26 @@ uint64_t RaceDialogSetText(uint8_t* base, uint64_t id, const uint64_t varargs[7]
   return calls.Call(kSetNodeText, frame, 0x8221890C, movie, fourth, 3);
 }
 
+uint64_t RaceDialogOpen(uint8_t* base, uint32_t mode, uint64_t player, uint32_t sp,
+                        const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82218B30 RaceDialog::Open");
+  const uint32_t frame = Frame(base, sp, 128);
+  if (uint32_t(player) < 1) {
+    guest::StoreU32(base, Get(base, kDialogList) + kListPlayer, 0);
+  } else if (uint32_t(player) == 1) {
+    guest::StoreU32(base, Get(base, kDialogList) + kListPlayer, 1);
+  }
+  if (mode <= 5) {
+    const uint64_t varargs[7] = {player, 0, 0, 0, 0, 0, 0};
+    RaceDialogSetText(base, 1954 + mode, varargs, frame, calls);
+  }
+  guest::StoreU32(base, Get(base, kDialogData) + 12, 13);
+  guest::StoreU32(base, Get(base, kDialogData) + 16, 1);
+  guest::StoreU32(base, Get(base, kDialogData) + 28, 1);
+  const uint64_t r3 = Go(calls, frame, 0x82218BF8, Get(base, kDialogPages), 1, 0, kNone);
+  guest::StoreU32(base, Get(base, kDialogData) + 32, 1);
+  guest::StoreU32(base, Get(base, kDialogData) + 36, 0);
+  return r3;
+}
+
 }  // namespace race_screens

@@ -394,6 +394,15 @@ constexpr uint32_t kAltHudDestroy = 0x82216BA8;
 constexpr uint32_t kStringsRelease = 0x8210A538;
 constexpr uint32_t kDeleteAllJump = 0x8211E370;
 uint64_t ScreensDestruct(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls);
+// RaceScreens::Destroy (sub_82211D18): from a 96-byte frame, the other
+// in-race screens' teardowns (race_screens::PauseMenuDestroy and the rest,
+// their plain C++, each through `calls` to its override where it refuses),
+// ScreensDestruct(the holder), then the holder freed (VirtualFree: the
+// allocation layer's FreePages, or through `calls` where it isn't the
+// layer's pages) and [0x826D84F0] = 0; with the holder 0 after the
+// destructor, OutputDebugStringA(0x8200D1C4) instead (discarded,
+// helpers::DebugOutput; r3 the text). VirtualFree's r3.
+uint64_t ScreensDestroy(uint8_t* base, uint32_t sp, const Calls& calls);
 // The in-race screens' holder ([0x826D84F0]).
 constexpr uint32_t kScreensHolder = 0x826D84F0;
 // RaceScreens::Create (sub_82211F40): the holder (VirtualAlloc(0, 1040,

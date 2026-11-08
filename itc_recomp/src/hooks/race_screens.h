@@ -84,6 +84,8 @@ void RaceScreensRaceDialogUpdate(PPCContext& ctx, uint8_t* base);
 // RaceDialog::SetText sub_82218838: r3 = the string id, r4 to r10 the
 // varargs.
 void RaceScreensRaceDialogSetText(PPCContext& ctx, uint8_t* base);
+// RaceDialog::Open sub_82218B30: r3 = the mode, r4 = the player.
+void RaceScreensRaceDialogOpen(PPCContext& ctx, uint8_t* base);
 void RaceScreensCareerResultsStart(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuStepVolume(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuStepAdjust(PPCContext& ctx, uint8_t* base);
