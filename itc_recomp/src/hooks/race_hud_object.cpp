@@ -70,7 +70,9 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "FinishNamed, Finish, SetText, ClearText and SetChildNameText through their "
               "overrides, ShowItem's plain C++) "
               "natively instead of through the translated code (the same writes; checked by "
-              "--run_harnesses=race_hud_object)");
+              "--run_harnesses=race_hud_object). No adapter is left (2026-11-08): every "
+              "function here is reached in play only from native callers, which call the plain "
+              "C++ and are switched by their own flags; this one switches nothing in the game");
 
 namespace hooks {
 
@@ -510,21 +512,14 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // with --native_heap; without it the original); ApplyOptions (from the race
 // HUD machine's SetUp, PauseUpdate and ClosePause, native).
 
-#define ITC_RACE_HUD_OBJECT(address, step)              \
-  extern "C" REX_FUNC(sub_##address) {                  \
-    REX_FUNC_PROLOGUE();                                \
-    if (!ITC_FLAG(native_race_hud_object)) {            \
-      __imp__sub_##address(ctx, base);                  \
-      return;                                           \
-    }                                                   \
-    hooks::step(ctx, base);                             \
-  }
-
-// RaceScreens::Destroy and ~RaceScreens have no adapters (removed,
+// StartCountdown, ShowItem, SetMode, SetUpTimer and SetUpRacers have no
+// adapters either (removed, 2026-11-08): only the race HUD machine's
+// StartCountdown's plain C++ reaches SetMode and StartCountdown, only
+// SetMode's reaches SetUpTimer and SetUpRacers, and only SetUpRacers' and
+// UpdateItem's reach ShowItem in play (the unseen sub_822155C0 runs the
+// original). RaceScreens::Destroy and ~RaceScreens have none (removed,
 // 2026-11-08): only the race HUD machine's DestroyScreens' plain C++ calls
-// Destroy's, and only Destroy's calls ~RaceScreens'.
-ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
-ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
-ITC_RACE_HUD_OBJECT(822157A8, RaceHudObjectSetMode)
-ITC_RACE_HUD_OBJECT(822123C8, RaceHudObjectSetUpTimer)
-ITC_RACE_HUD_OBJECT(82213F20, RaceHudObjectSetUpRacers)
+// Destroy's, and only Destroy's calls ~RaceScreens'. So no adapter is left
+// here, and --native_race_hud_object switches nothing in the game: the
+// native callers' flags (--native_race_hud_machine, --native_alt_hud) do;
+// the harnesses still set it.
