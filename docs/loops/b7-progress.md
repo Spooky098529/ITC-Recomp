@@ -47,7 +47,16 @@ file's history. What's left to see in a drive, from every run:
   0 differing; no subagents); left: 37 ready groups. Validated
   `itc_4443` (race 83 s at 180, the harnesses ~90.1 s; 0 errors, every
   harness 0 differing, 34 of 34 harness lines; 5 in the race, 17 in the
-  replay `itc_4444` (ok), 12 to drive). Second migration agent running.
+  replay `itc_4444` (ok), 12 to drive). Second migration
+  e55413be..bbb0cfe3 (`Draw`, `Update`, the volume, slider and HUD
+  helpers, the lists and clashes, the dialogs, the save pages, the
+  cursors and value changes, `Settings::Reload`, `OnLeft`, `Show`; 43
+  functions, `ShowVolumeBar` Wrapped -> Overridden with its wrap kept,
+  7 adapters removed; races 33-37 s, 0 errors, its harnesses 0
+  differing; no subagents); left: the type 2 and 4 options' Inits (step
+  tables to generate), the controller pages' picks under
+  `sub_821C4BE0`, `sub_821BA380`, `sub_821C1498` and the other users of
+  the settings. Validation agent running.
 
 ## Done
 
@@ -77,3 +86,5 @@ file's history. What's left to see in a drive, from every run:
   57, known 517, unknown 1143).
 - After its migration: ours 4741, work left 1682 (wrapped 57, known
   482, unknown 1143).
+- After its second migration: ours 4777, work left 1646 (wrapped 56,
+  known 447, unknown 1143).

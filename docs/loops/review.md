@@ -13,6 +13,17 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The options screen's second migration (e55413be..bbb0cfe3, 43
+  functions): `ShowVolumeBar` `sub_821BE5A8` Wrapped -> Overridden, its
+  pause-movie-log wrap kept around the native body; four callees never
+  seen in play (`ShowCareerInfo` `sub_821C0EF0`, `SetHudArrow`,
+  `SetSoundArrow`, `SetSlidersArrow`) called as the originals through
+  the function table; `OnLeft`'s frees through the allocation layer.
+  Learned: code addresses left in registers by `lis` are sign-extended
+  in the 64-bit registers (`Draw`'s no-page r3 is 0xFFFFFFFF821C2388),
+  copied as such. The harness world grew (named animations to 900,
+  sound manager slots, a players' mappers block, more saved globals).
+
 - The options screen's first migration (a9b2152f..e81aa1ef,
   `--native_options_screen`, harness `options_screen`, 34 functions):
   `Options::FadeOut` `sub_821BD680` stays recompiled (its
