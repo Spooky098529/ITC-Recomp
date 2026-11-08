@@ -40,6 +40,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <bit>
 #include <functional>
 #include <string>
 #include <utility>
@@ -104,6 +105,7 @@ constexpr Global kGlobals[] = {
     {kSaveSlots, 16},
     {car_specs::kParams, 4},
     {kRandSeed, 4},
+    {0x826A50AC, 64},  // the screen fades
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -232,6 +234,10 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
       guest::StoreU32(base, node + 128 + 8 * e, w.node(r.Below(kNodeCount)));
     }
   }
+  // The root's own children none (+104 0), so UiMovie::ResetPose's walks
+  // (over the live and saved roots' children) copy nothing; FindNode reads
+  // the root's table, not its count.
+  guest::StoreU32(base, w.node(0) + 104, 0);
   guest::StoreU32(base, movie + ui_movies::kMovieTexts + 1024, 0);
   guest::StoreU32(base, movie + 0x9FCC, r.Below(7));
   guest::StoreU32(base, movie + ui_movies::kMovieLoaded, r.Below(2));
@@ -377,6 +383,25 @@ void Normalize(uint8_t* base, uint32_t from, uint32_t words) {
   }
 }
 
+// UiMovie::Run's update (sub_8211D2F8), stood in for: each call's return
+// address, stack pointer (from the case's), r3 and r4 kept and answered 0
+// or 1 from the case's generator (the update would draw the movie).
+struct UpdateCall {
+  uint32_t lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<UpdateCall> g_updates;
+Random g_answers;
+uint32_t g_case_sp = 0;
+bool UpdateStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (function != 0x8211D2F8) {
+    return false;
+  }
+  g_updates.push_back({uint32_t(ctx.lr), g_case_sp - ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = g_answers.Below(2);
+  return true;
+}
+
 // A stack range compared, relative to the call's r1: [from, to).
 struct Range {
   int32_t from;
@@ -424,8 +449,14 @@ void Run(Context& h, const World& w, const Spec& spec) {
       spec.setup(t, r, w);
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
       g_opens.clear();
+      g_updates.clear();
+      g_answers = Random(r.Next());
+      g_case_sp = sp;
       const hooks::StartUpRecorder recorder = hooks::g_start_up_recorder;
       hooks::g_start_up_recorder = RecordOpen;
+      const ui_movies_hooks::UpdateCalleeStandIn stand_in =
+          ui_movies_hooks::g_update_callee_stand_in;
+      ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
       if (v == 0) {
         const bool native = ITC_FLAG(native_car_dealer);
         ITC_FLAG(native_car_dealer) = false;
@@ -435,6 +466,16 @@ void Run(Context& h, const World& w, const Spec& spec) {
         spec.native(t, h.base);
       }
       hooks::g_start_up_recorder = recorder;
+      ui_movies_hooks::g_update_callee_stand_in = stand_in;
+      out[v].Word(uint32_t(g_updates.size()));
+      for (const UpdateCall& call : g_updates) {
+        out[v].Word(call.lr);
+        out[v].Word(call.r1);
+        out[v].Word(uint32_t(call.r3 >> 32));
+        out[v].Word(uint32_t(call.r3));
+        out[v].Word(uint32_t(call.r4 >> 32));
+        out[v].Word(uint32_t(call.r4));
+      }
       out[v].Word(uint32_t(g_opens.size()));
       for (const uint32_t word : g_opens) {
         out[v].Word(word);
@@ -747,6 +788,104 @@ void Lifecycle(Context& h, const World& w) {
              }});
 }
 
+// The entry fields ShowCarInfo reads as floats (+652, +660): now and then
+// a NaN (quiet or signaling), an infinity, a huge or a negative value.
+uint32_t FloatBits(Random& r) {
+  static constexpr uint32_t kSpecial[] = {0x7FC00000u, 0x7F800001u, 0xFFA00000u, 0x7F800000u,
+                                          0xFF800000u, 0x4F000000u, 0xCF000001u, 0x4F7FFFFFu,
+                                          0xBF800000u, 0x00000001u};
+  if (r.Below(3) == 0) {
+    return kSpecial[r.Below(10)];
+  }
+  return std::bit_cast<uint32_t>(float(r.Below(40000)) / 7.0f - 100.0f);
+}
+
+void Info(Context& h, const World& w) {
+  // ShowCarInfo: the index small; the entries' float fields shaped.
+  auto shape_entries = [](Random& r, const World& w) {
+    for (uint32_t k = 0; k < kEntryCount; k++) {
+      guest::StoreU32(w.base, w.entry(k) + 652, FloatBits(r));
+      guest::StoreU32(w.base, w.entry(k) + 660, FloatBits(r));
+      guest::StoreU8(w.base, w.entry(k) + 709, uint8_t(r.Below(2) == 0 ? 0 : r.Below(256)));
+    }
+  };
+  Run(h, w, {"CarDealer::ShowCarInfo (sub_82182620; sub_821824A8, sub_82182388, sub_82182418)",
+             100, __imp__sub_82182620, hooks::CarDealerShowCarInfo, {{-128, -16}},
+             [shape_entries](PPCContext& t, Random& r, const World& w) {
+               shape_entries(r, w);
+               t.r3.u64 = r.Below(6);
+             }});
+  // The setters: their parameter areas (+48 to +79, or +56 on where the
+  // last SetText's r7 is set) left out (the originals' leftovers).
+  Run(h, w, {"CarDealer::SetSpecTexts (sub_821824A8)", 100, __imp__sub_821824A8,
+             hooks::CarDealerSetSpecTexts, {{-112, -64}, {-32, -24}},
+             [](PPCContext& t, Random& r, const World& w) {
+               const uint32_t record = w.at(kColorsAt);
+               WriteRandom(w.base, record, 24, r);
+               guest::StoreU32(w.base, record + 0, r.Below(5));
+               guest::StoreU32(w.base, record + 4, r.Below(5));
+               guest::StoreU32(w.base, record + 8, r.Below(2) == 0 ? r.Below(3000) : r.Next());
+               guest::StoreU32(w.base, record + 20, FloatBits(r));
+               t.r3.u64 = record;
+             }});
+  Run(h, w, {"CarDealer::SetNameTexts (sub_82182388)", 100, __imp__sub_82182388,
+             hooks::CarDealerSetNameTexts, {{-112, -64}, {-32, -24}},
+             [](PPCContext& t, Random& r, const World&) {
+               t.r3.u64 = r.Below(80);
+               t.r4.u64 = r.Below(256);
+             }});
+  Run(h, w, {"CarDealer::SetPriceTexts (sub_82182418)", 100, __imp__sub_82182418,
+             hooks::CarDealerSetPriceTexts, {{-112, -56}, {-32, -24}},
+             [](PPCContext& t, Random& r, const World&) {
+               t.r3.u64 = r.Below(2) == 0 ? r.Below(100000) : r.Next();
+             }});
+  Run(h, w, {"CarDealer::ShowSwatches (sub_821826C0; sub_82181270)", 100, __imp__sub_821826C0,
+             hooks::CarDealerShowSwatches, {{-144, -56}},
+             [](PPCContext&, Random& r, const World& w) {
+               guest::StoreU32(w.base, w.data() + 1192, uint32_t(int32_t(r.Below(14)) - 2));
+               guest::StoreU32(w.base, w.at(kListMenuAt) + 4, r.Below(4));
+             }});
+  Run(h, w, {"CarDealer::SetSwatchColor (sub_82181270)", 60, __imp__sub_82181270,
+             hooks::CarDealerSetSwatchColor, {{-96, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               t.r3.u64 = w.node(r.Below(kNodeCount));
+               t.r4.u64 = w.at(kColorsAt) + 32 * r.Below(16);
+             }});
+  // FillStatus: SetText's parameter area from +56 (its r7 set) left out;
+  // SetPrompts' frame below (its saves left out).
+  Run(h, w, {"CarDealer::FillStatus (sub_82183AC8; sub_82182B30)", 100, __imp__sub_82183AC8,
+             hooks::CarDealerFillStatus, {{-112, -56}, {-32, -24}, {-288, -168}},
+             [](PPCContext&, Random& r, const World& w) {
+               // The weekday (+88, stored at node (15, 11)'s +108, its first
+               // child's index) 0 to 6, so the walks after stay in the pool.
+               guest::StoreU32(w.base, w.data() + 4, r.Below(2));
+               guest::StoreU32(w.base, w.data() + 88, r.Below(7));
+             }});
+  // Leave: the garage not empty (the first car's path, StartFirstRace, is
+  // race_event's).
+  Run(h, w, {"CarDealer::Leave (sub_821817C0)", 60, __imp__sub_821817C0, hooks::CarDealerLeave,
+             {},
+             [](PPCContext& t, Random&, const World& w) {
+               guest::StoreU32(w.base, w.data() + 4, 0);
+               t.r3.u64 = w.at(kMachineAt);
+               t.r4.u64 = w.at(kModeAt);
+             }});
+  // Transition3: r3 the started word (0, 1 or any), the fades' counts 0 or
+  // not.
+  Run(h, w, {"CarDealer::Transition3 (sub_82181D68)", 100, __imp__sub_82181D68,
+             hooks::CarDealerTransition3, {{-112, -24}},
+             [](PPCContext& t, Random& r, const World& w) {
+               const uint32_t step = w.at(kPagesAt) + 24;
+               const uint32_t words[3] = {0, 1, uint32_t(r.Next())};
+               guest::StoreU32(w.base, step, words[r.Below(3)]);
+               WriteRandom(w.base, 0x826A50AC, 64, r);
+               for (const uint32_t count : {0x826A50E4u, 0x826A50DCu}) {
+                 guest::StoreU32(w.base, count, r.Below(2) == 0 ? 0 : r.Below(30));
+               }
+               t.r3.u64 = step;
+             }});
+}
+
 }  // namespace
 
 void CarDealer(Context& h) {
@@ -759,6 +898,7 @@ void CarDealer(Context& h) {
   Handlers(h, w);
   Helpers(h, w);
   Lifecycle(h, w);
+  Info(h, w);
 }
 
 }  // namespace harness

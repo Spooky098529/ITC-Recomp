@@ -963,6 +963,14 @@ void OriginalStartFirstRace(PPCContext& ctx, uint8_t* base) {
   ITC_FLAG(native_car_dealer) = true;
 }
 
+// CarDealer::Leave with --native_car_dealer, --native_career and
+// --native_race_event off.
+void OriginalLeave(PPCContext& ctx, uint8_t* base) {
+  ITC_FLAG(native_car_dealer) = false;
+  Original<__imp__sub_821817C0>(ctx, base);
+  ITC_FLAG(native_car_dealer) = true;
+}
+
 void StartFirstRaceGroup(Context& h, World& w, const SetupFn& shape, uint32_t frame_bytes,
                          uint32_t compared) {
   uint8_t* const base = h.base;
@@ -970,20 +978,36 @@ void StartFirstRaceGroup(Context& h, World& w, const SetupFn& shape, uint32_t fr
   for (uint32_t k = 0; k < 8; k++) {
     boot[k] = guest::LoadU32(base, car_dealer::kBootList + 4 * k);
   }
+  const uint32_t dealer_data = guest::LoadU32(base, car_dealer::kData);
+  // Leave's first-car path: the dealer's machine (+0) and data (+0x2600, its
+  // +4 set) in a block of their own.
+  const Block dealer(0x2700);
+  for (const bool leave : {false, true}) {
   Group(
-      h, w, "CarDealer::StartFirstRace (sub_82180CE8)", 32,
-      [&h, base, &shape, frame_bytes](Random& shared, const World& w, PPCContext& t) {
+      h, w, leave ? "CarDealer::Leave (sub_821817C0; the first car's path)"
+                  : "CarDealer::StartFirstRace (sub_82180CE8)", 32,
+      [&h, base, &shape, frame_bytes, &dealer, leave](Random& shared, const World& w,
+                                                      PPCContext& t) {
         shape(shared, w, t);
         const uint32_t sp = t.r1.u32;
         Random r(shared.Next());
         WriteRandom(base, sp - frame_bytes - 96, 96, r);
         WriteRandom(base, car_dealer::kBootList, 32, r);
+        if (leave) {
+          WriteRandom(base, dealer.address, dealer.bytes, r);
+          guest::StoreU32(base, dealer.address + 0x2600 + 4, 1 + r.Below(4));
+          guest::StoreU32(base, car_dealer::kData, dealer.address + 0x2600);
+          t.r3.u64 = dealer.address;
+          t.r4.u64 = r.Next();
+        }
         g_setups.clear();
         hooks::g_start_up_recorder = RecordSetUp;
       },
-      OriginalStartFirstRace, hooks::CarDealerStartFirstRace,
-      [&h, base, frame_bytes, compared](Outputs& out, const World& w, PPCContext&) {
+      leave ? OriginalLeave : OriginalStartFirstRace,
+      leave ? hooks::CarDealerLeave : hooks::CarDealerStartFirstRace,
+      [&h, base, frame_bytes, compared, &dealer](Outputs& out, const World& w, PPCContext&) {
         hooks::g_start_up_recorder = nullptr;
+        out.Bytes(Read(base, dealer.address, dealer.bytes));
         out.Word(uint32_t(g_setups.size()));
         for (const uint32_t word : g_setups) {
           out.Word(word);
@@ -1008,9 +1032,11 @@ void StartFirstRaceGroup(Context& h, World& w, const SetupFn& shape, uint32_t fr
         out.Bytes(Read(base, sp - 96, 88));
         out.Bytes(Read(base, sp - 96 - frame_bytes + 80, compared));
       });
+  }
   for (uint32_t k = 0; k < 8; k++) {
     guest::StoreU32(base, car_dealer::kBootList + 4 * k, boot[k]);
   }
+  guest::StoreU32(base, car_dealer::kData, dealer_data);
 }
 
 void SetUpEvents(Context& h, World& w) {

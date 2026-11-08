@@ -25,7 +25,12 @@ ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
               "through the guest context), StartFirstRace sub_82180CE8 (Career::SetUpEvent and "
               "Race::SetUp through their overrides), BuildLists sub_821813B0 (VirtualAlloc and "
               "memcpy through their overrides) and Buy sub_82182E68 (the garage car's and the "
-              "career's calls through their overrides) "
+              "career's calls through their overrides); Leave sub_821817C0 (StartFirstRace's plain "
+              "C++), Transition3 sub_82181D68 (ScreenFades::FadeOut and UiMovie::Run through "
+              "their overrides); ShowCarInfo sub_82182620 with SetSpecTexts sub_821824A8, "
+              "SetNameTexts sub_82182388 and SetPriceTexts sub_82182418 (the setters' unset "
+              "varargs 0), ShowSwatches sub_821826C0 with SetSwatchColor sub_82181270, and "
+              "FillStatus sub_82183AC8 (SetPrompts' plain C++) "
               "(the same writes; checked by --run_harnesses=car_dealer)");
 
 namespace hooks {
@@ -122,6 +127,40 @@ void CarDealerUpdatePage(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::UpdatePage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
+void CarDealerLeave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Leave(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerTransition3(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Transition3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerShowCarInfo(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::ShowCarInfo(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void CarDealerShowSwatches(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cd::ShowSwatches(base, ctx.r1.u32);
+}
+void CarDealerFillStatus(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::FillStatus(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerSetNameTexts(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::SetNameTexts(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+void CarDealerSetPriceTexts(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::SetPriceTexts(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void CarDealerSetSpecTexts(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::SetSpecTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerSetSwatchColor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cd::SetSwatchColor(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
 void CarDealerStartFirstRace(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::StartFirstRace(base, ctx.r1.u32, guest.calls());
@@ -187,6 +226,9 @@ ITC_CAR_DEALER(82181838, CarDealerClose)
 ITC_CAR_DEALER(82180E70, CarDealerDestroy)
 ITC_CAR_DEALER(82181968, CarDealerOnYes)
 ITC_CAR_DEALER(82184AF0, CarDealerUpdatePage)
+ITC_CAR_DEALER(821817C0, CarDealerLeave)
+// The transitions (from CarDealer::Update's table on its stack).
+ITC_CAR_DEALER(82181D68, CarDealerTransition3)
 // The page handlers (from UpdatePage's table on its stack).
 ITC_CAR_DEALER(82181B98, CarDealerPage4)
 // The helpers (from the recompiled pages, transitions and set-ups).
@@ -203,4 +245,13 @@ ITC_CAR_DEALER(82182770, CarDealerSetColorBar)
 ITC_CAR_DEALER(82182DD0, CarDealerSetScrollArrows)
 ITC_CAR_DEALER(82182C28, CarDealerSetHeader)
 ITC_CAR_DEALER(82182B30, CarDealerSetPrompts)
+// ShowCarInfo (from OpenCar and Transition13), ShowSwatches (from OpenColors
+// and Transition17), FillStatus (from Start), all recompiled. No adapters
+// for SetNameTexts sub_82182388, SetPriceTexts sub_82182418, SetSpecTexts
+// sub_821824A8 (only ShowCarInfo calls them) and SetSwatchColor
+// sub_82181270 (only ShowSwatches): their callers are native, the flag
+// switches those; their steps above are the harness's.
+ITC_CAR_DEALER(82182620, CarDealerShowCarInfo)
+ITC_CAR_DEALER(821826C0, CarDealerShowSwatches)
+ITC_CAR_DEALER(82183AC8, CarDealerFillStatus)
 ITC_CAR_DEALER(82199B38, HelpLineSet)

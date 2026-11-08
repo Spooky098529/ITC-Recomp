@@ -65,6 +65,9 @@ constexpr uint32_t kPickNext = 0x821159B0;
 constexpr uint32_t kPickFromCar = 0x82115CC0;
 constexpr uint32_t kSetChildNameText = 0x8211D930;
 constexpr uint32_t kSetNumberText = 0x8211C740;
+constexpr uint32_t kResetPose = 0x8211ABA8;
+constexpr uint32_t kFadeOut = 0x8209D0C8;
+constexpr uint32_t kRun = 0x8211E1B8;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -147,6 +150,50 @@ uint64_t OnYes(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 // called (r3 and r4 the mode, r5 to r10 the handlers, as the original
 // leaves them). The handler's r3, else `r3`. 112-byte frame.
 uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls);
+
+// --- The car's texts and the swatches (info.cpp) ---
+
+// sub_82182388 CarDealer::SetNameTexts: movie 4's (-1, 20) string 1934 +
+// `maker`, (-1, 21) 1646 + `id`, (-1, 22) 1718 + `id` (UiMovie::SetText,
+// its unset varargs 0). The last SetText's r3. 112-byte frame.
+uint64_t SetNameTexts(uint8_t* base, uint64_t id, uint64_t maker, uint32_t sp, const Calls& calls);
+// sub_82182418 CarDealer::SetPriceTexts: (19, 2) SetNumberText(`price`),
+// (19, 3) string 435, (19, 4) string 527 with the price. The last SetText's
+// r3. 112-byte frame.
+uint64_t SetPriceTexts(uint8_t* base, uint64_t price, uint32_t sp, const Calls& calls);
+// sub_821824A8 CarDealer::SetSpecTexts: sub-scene 18's texts from the
+// record at `record` (the doubles at 0x82009F00 and 0x82009F08 scaling two).
+// The last SetText's r3. 112-byte frame.
+uint64_t SetSpecTexts(uint8_t* base, uint32_t record, uint32_t sp, const Calls& calls);
+// sub_82182620 CarDealer::ShowCarInfo: the shown list's entry `index`'s
+// record on the frame (+80 to +100) for SetSpecTexts, then SetNameTexts and
+// SetPriceTexts (their plain C++). SetPriceTexts' r3. 128-byte frame.
+uint64_t ShowCarInfo(uint8_t* base, uint64_t index, uint32_t sp, const Calls& calls);
+// sub_82181270 CarDealer::SetSwatchColor: the node's child 2 +56, +60, +64
+// from the record's +0, +4, +8. The child (r3). 96-byte frame.
+uint64_t SetSwatchColor(uint8_t* base, uint32_t node, uint32_t record, uint32_t sp);
+// sub_821826C0 CarDealer::ShowSwatches: up to nine of sub-scene 26's
+// swatches colored from the color records from the color menu's scroll.
+// The last SetSwatchColor's r3, else FindNode(26, 1)'s. 144-byte frame.
+uint64_t ShowSwatches(uint8_t* base, uint32_t sp);
+// sub_82183AC8 CarDealer::FillStatus: movie 4's pose reset, the pick, the
+// money, the day and the weekday; SetPrompts(0, 0, 1, 1, -1, -1) (its plain
+// C++); the data's +8, +28, +32 = 0 and +0 = 1. SetPrompts' r3. 112-byte
+// frame.
+uint64_t FillStatus(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821817C0 CarDealer::Leave (r3 the machine, r4 the mode): with an
+// empty garage +9604 = 10 and StartFirstRace (its plain C++, on the caller's
+// frame: a tail call), else +9604 = 9 and message 6. StartFirstRace's r3,
+// else `r3`.
+uint64_t Leave(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp, const Calls& calls);
+
+// --- The transitions (transitions.cpp) ---
+
+// sub_82181D68 CarDealer::Transition3 (r3 the started word): first call
+// ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0) and the word 1; then
+// UiMovie::Run(movie 4, 0). 1 when both fades' counts are 0. 112-byte
+// frame.
+uint64_t Transition3(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The movie 4 setters (texts.cpp) ---
 

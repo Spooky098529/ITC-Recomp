@@ -111,6 +111,18 @@ void AfterDetail(uint8_t* base) {
   Store(base, pages + 0, 0xFFFFFFFFu);
 }
 
+uint64_t Leave(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821817C0 CarDealer::Leave");
+  const uint32_t machine = uint32_t(r3);
+  if (Load(base, Load(base, kData) + 4) != 0) {
+    Store(base, machine + kMachineState, 10);
+    return StartFirstRace(base, sp, calls);
+  }
+  Store(base, machine + kMachineState, 9);
+  Post(base, mode, 6);
+  return r3;
+}
+
 void CheckLimits(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821812B8 CarDealer::CheckLimits");
   const uint32_t limits = Load(base, kLimits);

@@ -28,6 +28,21 @@ void CarDealerPage4(PPCContext& ctx, uint8_t* base);
 void CarDealerStartFirstRace(PPCContext& ctx, uint8_t* base);
 void CarDealerBuildLists(PPCContext& ctx, uint8_t* base);
 void CarDealerBuy(PPCContext& ctx, uint8_t* base);
+void CarDealerLeave(PPCContext& ctx, uint8_t* base);
+// The transitions (r3 the started word).
+void CarDealerTransition3(PPCContext& ctx, uint8_t* base);
+// The car's texts and the swatches: ShowCarInfo (r3 the index), ShowSwatches
+// and FillStatus (no arguments) with adapters; SetNameTexts (r3 the id, r4
+// the maker byte), SetPriceTexts (r3 the price), SetSpecTexts (r3 the
+// record) and SetSwatchColor (r3 the node, r4 the record) without (only
+// native callers reach them).
+void CarDealerShowCarInfo(PPCContext& ctx, uint8_t* base);
+void CarDealerShowSwatches(PPCContext& ctx, uint8_t* base);
+void CarDealerFillStatus(PPCContext& ctx, uint8_t* base);
+void CarDealerSetNameTexts(PPCContext& ctx, uint8_t* base);
+void CarDealerSetPriceTexts(PPCContext& ctx, uint8_t* base);
+void CarDealerSetSpecTexts(PPCContext& ctx, uint8_t* base);
+void CarDealerSetSwatchColor(PPCContext& ctx, uint8_t* base);
 // The helpers.
 void CarDealerCheckLimits(PPCContext& ctx, uint8_t* base);
 void CarDealerReloadStandModel(PPCContext& ctx, uint8_t* base);
