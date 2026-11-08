@@ -13,9 +13,27 @@
 
 #pragma once
 
+#include "race_hud_object/race_hud_object.h"
+
 #include <cstdint>
 
 namespace options_screen {
+
+// The guest calls the plain C++ makes: through the function table from the
+// original's frame with its return address (the adapter's job).
+using Calls = race_hud_object::Calls;
+
+// The mode type (0x826032DC) the context and the posts follow, and the save
+// data's options (player 0's save data + 0x1F85C).
+constexpr uint32_t kModeType = 0x826032DC;
+constexpr uint32_t kSaveOptions = 0x1F85C;
+// The guest functions called through `Calls`: memcpy where its plain C++
+// declines, SoundOptions::SetEffectsVolume and SetMusicVolume and
+// UiMovies::Open through their overrides.
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kSetEffectsVolume = 0x821B9C20;
+constexpr uint32_t kSetMusicVolume = 0x821B9CF0;
+constexpr uint32_t kMoviesOpen = 0x8211E808;
 
 // The screen's blocks (docs/known-data.md): the page block (28 bytes), the
 // front-end menu (68), the settings `o` (716).
@@ -63,5 +81,43 @@ uint32_t StepAnalog(uint8_t* base);
 // at sp - 112. Returns r3 as the original leaves it (memset's last
 // destination, `settings` + 12).
 uint32_t SettingsReset(uint8_t* base, uint32_t settings, uint32_t sp);
+
+// --- The settings' read and write (settings.cpp) ---
+
+// sub_821BBF00 Settings::Read: the settings from player 0's save data (its
+// row): the context by the mode type, the current settings, the controls'
+// indexes (Controls::ButtonIndex and AnalogIndex over the four 60-byte
+// records copied to its frame), the defaults (a 13-word table on its
+// frame), type 2's career info, then SoundOptions::SetEffectsVolume and
+// SetMusicVolume (through `calls`). Its 272-byte frame below `sp` (+80 the
+// globals' base 0x826E0000, +84 the table, +144 the last record). r3
+// SetMusicVolume's.
+uint64_t SettingsRead(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821BAE10 Settings::Write: the settings back into player 0's save
+// data (its row; the analog slot 4's word 8 kept as the original writes
+// it). Its 176-byte frame below `sp` (+80 the record). r3 the last
+// memcpy's (the last record's address).
+uint64_t SettingsWrite(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The machine's handlers (handlers.cpp) ---
+
+// sub_821BB9A8 Options::OnEnter: r3 = the machine: +9608 = 0, the seven
+// blocks allocated (the allocation layer's pages: the adapter runs it only
+// over the layer) and set up, Settings::Reset on the settings, +9604 = 1 or
+// 9 by +9612. Its 128-byte frame below `sp`. r3 the last block.
+uint32_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp);
+// sub_821BBBA0 Options::WaitForMovie: r3 = the machine: while +9608 is 0,
+// it = 1 once UiMovies::IsLoaded(7); then +9604 = 9 or 4 by +9612. Its
+// 96-byte frame. r3 IsLoaded's when asked, else the machine (`r3`).
+uint64_t WaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_821B9F88 Options::OpenMovie: UiMovies::Open(7, 22553), a tail call
+// (`sp` and `lr` the caller's). Its r3.
+uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_821BCE38 Options::OnClosed: r3 = the machine, r4 = the dispatcher:
+// Settings::Write (from its 112-byte frame), message 6 (types 2, 6, 8), 5
+// (type 7) or 8 (type 4) queued in the dispatcher's ring (+204), +9604 = 9.
+// r3 Settings::Write's.
+uint64_t OnClosed(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+                  const Calls& calls);
 
 }  // namespace options_screen

@@ -24,4 +24,15 @@ void OptionsStepAnalog(PPCContext& ctx, uint8_t* base);
 // Settings::Reset sub_821B9DB8 (r3 the settings).
 void OptionsSettingsReset(PPCContext& ctx, uint8_t* base);
 
+// Settings::Read sub_821BBF00, Settings::Write sub_821BAE10 (no arguments).
+void OptionsSettingsRead(PPCContext& ctx, uint8_t* base);
+void OptionsSettingsWrite(PPCContext& ctx, uint8_t* base);
+// Options::OnEnter sub_821BB9A8 (r3 the machine; the allocation layer's
+// pages), WaitForMovie sub_821BBBA0 (r3 the machine), OpenMovie sub_821B9F88,
+// OnClosed sub_821BCE38 (r3 the machine, r4 the dispatcher).
+void OptionsOnEnter(PPCContext& ctx, uint8_t* base);
+void OptionsWaitForMovie(PPCContext& ctx, uint8_t* base);
+void OptionsOpenMovie(PPCContext& ctx, uint8_t* base);
+void OptionsOnClosed(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

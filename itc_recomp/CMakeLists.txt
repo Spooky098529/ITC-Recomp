@@ -440,6 +440,8 @@ set(ITC_SOURCES
     src/screen_constructors/screen_constructors.cpp
     src/hooks/options_screen.cpp
     src/options_screen/controls.cpp
+    src/options_screen/handlers.cpp
+    src/options_screen/settings.cpp
     src/hooks/type67_modes.cpp
     src/type67_modes/dialogs.cpp
     src/type67_modes/garage.cpp
