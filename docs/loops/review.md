@@ -133,6 +133,20 @@ When the user has reviewed a run's section, its heading gets
   `0x826D83F4` (the dealer's 1,196-byte data) rewritten. The paint color
   lead (`sub_821847A0`) taken whole; four leads' lines trimmed; one lead
   added (the type 2 mode's other screen machines).
+- Its migration (3480d4e6..f51e5073, `--native_car_dealer`,
+  `src/car_dealer/`): 41 of 58 in play; 5 adapters removed, 7 helpers
+  Native with no adapter (`HideBusyNow` `sub_82181640` never ran,
+  ported). Callees never seen run as the originals through the guest
+  context (`ShowDriveDialog` `sub_82182990`, `ShowFirstCarDialog`
+  `sub_82182A80`, `SetUpSpecSheet` `sub_821810E0`); the empty
+  `sub_82106540` still called. Harness gaps (the car list's and type 6
+  and 7's precedent): `Update`'s stand drawless (`ReloadModel` answers
+  0, its reload branch not exercised); `Page2`'s selection 1 (the spec
+  sheet) not laid. Two groups in `harnesses/race_event.cpp`
+  (`StartFirstRace`, `Leave`'s first car path: `Career::SetUpEvent`'s
+  world). `ShowCarInfo`'s +660 float word copied as is (signaling NaNs
+  kept). Rows corrected: `Update` `sub_82185600`'s r3 is movie 4, not
+  the machine; `Page3` uses the menu at `[0x826D83EC]`.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 

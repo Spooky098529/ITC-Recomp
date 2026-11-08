@@ -124,8 +124,14 @@ file's history. What's left to see in a drive, from every run:
   transitions, 6 pages, the color pick and the purchase, the career's
   first car; 38 ready groups; the paint color lead taken whole, four
   leads' lines trimmed, 1 lead added (the type 2 mode's other screen
-  machines); no subagents); map checked. Step: migration, agent
-  running.
+  machines); no subagents); map checked. Migration 3480d4e6..f51e5073
+  (41 of 58 in play: `InitStates`, `Create`, the pages 0-4, `Update`,
+  `Start`, the lists, `Buy`, the info and swatches, the first race's
+  start; 5 adapters removed; `--native_car_dealer`; race 36 s, 0
+  errors, its harnesses 0 differing; no subagents). Left: the
+  transitions 1, 6, 7, 9, 11, 15, 16, 17, 19 and the set-ups
+  `OpenListMenu`, `OpenCarList`, `OpenCar`, `OpenColors` (ready). Step:
+  validation, agent running.
 
 ## Done
 
@@ -183,5 +189,7 @@ file's history. What's left to see in a drive, from every run:
   390, unknown 965).
 - After the car dealer's map: ours 5016, work left 1411 (wrapped 56,
   known 447, unknown 908).
+- After its migration: ours 5057, work left 1371 (wrapped 56, known
+  407, unknown 908).
 
 ## Stopped
