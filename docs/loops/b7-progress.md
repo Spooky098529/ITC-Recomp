@@ -29,7 +29,11 @@ file's history. What's left to see in a drive, from every run:
   and `CarPage` `sub_8224B8D8` (need a harness world with the stand's
   car), and `sub_8211E500`, `sub_8211E2C8`, `sub_8211E370`,
   `sub_8211CBD8`, `sub_8211CA18` in `ui-movies-game.md`, ready, not
-  taken. Step: validation, agent running.
+  taken. Validated `itc_4536` (race 85 s at 180; 0 errors, every
+  harness 0 differing outside the expected groups, 34 of 34 harness
+  lines, no prints added; `sub_8211DCE8` in the race, none more in the
+  replay `itc_4537` (ok), 33 to drive). Step: second migration (the
+  ready groups left), agent running.
 
 ## Done
 

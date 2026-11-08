@@ -16,6 +16,20 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
+
+- The UI movie helpers' migration with the car list's cleanup
+  (attract race `itc_4536`, replay `itc_4537` ok; `ui-movies-game.md`,
+  `car-list.md`): `sub_8211BC18`, `sub_8211CC50`, `sub_8211DE30`,
+  `sub_82248F70`, `sub_82248FE0`, `sub_82249128`, `sub_822492C8`,
+  `sub_8224A570`, `sub_8224A6A0`, `sub_8224A978`, `sub_8224B078`,
+  `sub_8224C560`, `sub_8224CB28`, `sub_8224D1F0`, `sub_8224D288`,
+  `sub_8224D2D0`, `sub_8224D518`, `sub_8224D580`, `sub_8224D9A0`,
+  `sub_8224DA20`, `sub_8224DDF8`, `sub_8224E050`, `sub_8224E108`,
+  `sub_8224F1D8`, `sub_8224F340`, `sub_8224F4C8`, `sub_8224F5E8`,
+  `sub_8224F640`, `sub_8224FB20`, `sub_8224FCE0`, `sub_8224FD90`,
+  `sub_8224FE50`, `sub_822501C8`.
+
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
 - The car list's third migration (attract race `itc_4524`, replay
