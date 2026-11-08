@@ -34,8 +34,9 @@ The handler table's order (index: function): 0 `sub_821A08D8`, 1
 20 `sub_8219FF78`. Who queues them (the machine's +16) isn't read: the
 screen's input, through its vtable. The screen's entry `sub_821A0860`
 (the screen data filled by `sub_821A0228`, transition 0 started with 1
-queued, the fade in) and its exit `sub_8219C3A8` are a lead
-(`../loops/leads.md`).
+queued, the fade in) and its exit `sub_8219C3A8` are in
+[`type2-screens.md`](type2-screens.md) (since 2026-11-08, with the
+screen's machine `BuildScreen::InitStates` and its pages).
 
 The menu lists are `[0x826D8440]` (the level's list: the groups, the
 builds, one build, or the details' lines) and `[0x826D8444]` (the groups
@@ -108,7 +109,7 @@ unseen `sub_8219F520`, `sub_821A0B38`) wait with it. (Unblocked 2026-11-06: `Car
 `GarageStage::ReloadModel` made native in the build screen's third
 migration, then `PutOnStand`, `SetUpStand` and `OpenStand`.) Outside callers:
 `sub_8219C230` is also called by the screen's fill `sub_821A0228`, and
-`sub_8217D0C8` by its exit `sub_8219C3A8` (the lead), so both keep
+`sub_8217D0C8` by its exit `sub_8219C3A8` (`BuildScreen::LeavePage`, `type2-screens.md`), so both keep
 adapters until those are ours. Nothing here needs a call the user
 hasn't made.
 

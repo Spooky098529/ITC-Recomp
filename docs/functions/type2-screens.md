@@ -1,0 +1,317 @@
+# Known functions: the type 2 mode's screens
+
+Four of the screen machines of the type 2 front-end mode (the career's
+garage menus; the mode's other machines are in
+[`car-dealer.md`](car-dealer.md), [`options-screen.md`](options-screen.md)
+and the leads in `../loops/leads.md`). The mode's Init (`sub_82197278`,
+slot 0 of vtable `0x82006B9C`, a lead) starts a screen
+(`sub_8211AD00`), loads strings (`Strings::Load([0x826C5C34],
+0x100BB)`), waits on the archive, makes the stand's scene
+(`StandScene::Create(3)`), `VirtualAlloc`s a 162,688-byte block at the
+mode's +848 and sets up 14 machines in it, each through its Init
+(keys (state, message, 0, 0), member function functors over vtable
+`0x82011918`, r3 the machine and r4 the mode, whose message ring at +204
+the handlers post to; `StateMachine::Add`,
+[`game-modes.md`](game-modes.md)): +0 the hub (here), +9640
+`sub_8218CE10` (UI movie 1), +19792 the tuning screen's `sub_821E7568`, +56624 the
+spec sheet (here), +0x102D8 `sub_8220B408`, +0x12880
+`Type2Options::Init`, +0x14E28 `Type2ControllerOptions::Init`, +0x173D0
+`sub_821B6FC0` (UI movie 3), +0x19978 the car dealer, +0x1BF20 the
+build screen (here), +0x23018 `sub_82196520` (UI movie 5), +0x255C0 `sub_821A6E18`,
++0x1E4C8 `sub_82188178`, +0x20A70 the license plate editor (here); adds
+14 of them to the mode's dispatcher (+36, count +236), sets every one's
++9612 = 1 (open on its message) and +9616 = 0, puts which screen comes
+first in the block's +0x27B68 and +0x27B6C (4 with an empty garage, the
+save's +6328; 3 with `[0x826032E0]` 1 and the race data's +0xA3AF4 0 or
+1; else 0), after `Career::NextDay` on player 0's save data when its day
+(+6100, at most 999) is 0, and again when `[0x826032E0]` isn't 4 and the
+day is 1; then shows the loading screen
+(`LoadingScreen::Show(1, 0, -1)`) and sets the mode's delegate (vtable
+`0x82010FA0`, `0x8223D4C0`). Read in outline for this map.
+
+Each machine here has the shape the car dealer's has (its states: 0
+create, 1 open the UI movie, 2 wait for it, 4 start, 5 running (message
+0 the transitions, 1 the page's input, others the replies of the
+dialogs other screens show for it), 8 leave (message 3), 7 destroy
+(message 4, from 5, 9 or 10 after the close), 9 suspended (opened by its
+own message)), a 28-byte page object (+0 the page, -1 while a transition
+runs; +4 the page after the transitions; +8 the page before; +12 the
+running transition, -1 none; +16 the queued one; +20, +24 the
+transition's words: a transition does its set-up while its +24 is 0,
+then runs the movie (`UiMovie::Run`) each call, and its nonzero answer
+moves to the queued one), a 68- or 72-byte menu (`../known-data.md`'s
+"front-end menu" or "menu list") and a data block, all three
+`VirtualAlloc`ed by its Create and freed by its Destroy:
+
+- **The hub** (`Type2Hub::`, block +0, UI movie 0, asset 22545; globals
+  `0x826D8410` to `0x826D841C`): the menu of eight items over the
+  selected garage car on its stand (`GarageStage::`,
+  [`front-end-car-draw.md`](front-end-car-draw.md),
+  [`car-makers.md`](car-makers.md)), the player's name, money, day and
+  weekday, and the notices (news of what was unlocked, with two images
+  each, from two lists in the save data; strings 4650 + and 6683 +). The
+  items open the others with a message from the leave handler: 0 → 8
+  (`sub_8218CE10`'s machine), 1 → 12 (the tuning screen), 2 → 18
+  (`sub_821B6FC0`'s), 3 → 10 (the car dealer), 4 → 23 (`sub_82196520`'s), 5 →
+  21 (the build screen), 6 → 14, 7 a quit question (message 34, a
+  dialog over movie 16); button 163 the selected car's spec sheet
+  (message 24), 164 the player's record (message 27, `[0x826D84CC]`,
+  `sub_8220B408`'s screen). The others post 6 to come back (`(5, 6)`).
+- **The spec sheet** (`PowerGraphScreen::`, block +56624, UI movie 9,
+  asset 22550, globals `0x826D8464` to `0x826D846C`, opened by message
+  24): the power graph screen, its update in
+  [`power-graph.md`](power-graph.md) (`sub_821B8F60`); its handlers
+  are shared with the Init `sub_821B96B8` (another mode's, not read) and
+  some with the type 6 and 7 modes' (`type6-type7-modes.md`).
+- **The build screen** (`BuildScreen::`, block +0x1BF20, UI movie 6,
+  asset 22557, globals `0x826D843C` to `0x826D8448`, opened by message
+  21): its update and transitions are in
+  [`build-screen.md`](build-screen.md) and
+  [`car-makers.md`](car-makers.md) (`sub_821A1380`); here its machine,
+  its entry and exit and its pages.
+- **The license plate editor** (`PlateEditor::`, block +0x20A70, UI
+  movie 26, asset 22556, globals `0x826D8430` to `0x826D8438`, opened by
+  message 28 from the car dealer when a car is bought): the new car's
+  plate, a region (14, strings 5411 +), a three-digit number (each digit
+  0 to 9, 10 blank) and seven characters (38, strings 5425 +; 10
+  probably a separator), made at random first
+  (`GetLocalTime` and `rand`) with the class the dealer picked
+  (`CarDealer::CheckLimits`: the small car limits); the dealer copies
+  the result (`[0x826D8438]` + 4, 20 bytes) into the garage car's +1780
+  (`CarDealer::Buy`). Its help line is the dealer's
+  (`HelpLine::Set`, [`car-dealer.md`](car-dealer.md)). It answers 29
+  (done) and 30 (cancelled) to the dealer.
+
+Names are ours ("hub", "spec sheet" and "license plate" are guesses
+from what the code does: no text was read). Read 2026-11-08 by the B7
+loop's mapping agent: the machines' Inits through
+`itc_recomp/tools/init_step_tables.py` (they decode as the other Inits:
+step tables), the handlers, pages and helpers in full, the transitions
+read for their calls and page object writes ("Read in outline" where
+not traced branch by branch). Fields and globals: `../known-data.md`.
+
+Shared, with their rows where they are: `StateMachine::Add`
+([`game-modes.md`](game-modes.md)), `ScreenMachine::Reenter`
+`sub_822895E0` ([`location-screen.md`](location-screen.md)),
+`ScreenMachine::Wait` `sub_82277068`
+([`type6-type7-modes.md`](type6-type7-modes.md)), the UI movie calls
+([`ui-movies-game.md`](ui-movies-game.md),
+[`ui-movies.md`](ui-movies.md)), `Menu::Step` and `Menu::Pressed`
+([`menu-helpers.md`](menu-helpers.md)), the menu lists (`MenuList::`,
+[`race-screens.md`](race-screens.md); `MenuList::Init`,
+[`save-data.md`](save-data.md); `MenuList::Release`,
+[`alt-hud.md`](alt-hud.md)), `MenuSound::Play`
+([`menu-sounds.md`](menu-sounds.md)), the screen fades
+([`mode-tick.md`](mode-tick.md)), `SaveData::Of`
+([`vehicle-accessors.md`](vehicle-accessors.md)), `DataTables::`
+([`data-tables.md`](data-tables.md)), `Stage::Of` ([`career.md`](career.md)), `PlayTime::`
+([`save-interface.md`](save-interface.md)),
+`BuildList::Insert`, `GarageStage::SetDark`
+([`build-screen.md`](build-screen.md)), `Car::Init` ([`race-setup.md`](race-setup.md)), `Car::Refresh` and
+`Params::GetCarSpec` ([`car-specs.md`](car-specs.md)),
+`Archive::AssetSize` and `Archive::Load`
+([`files-and-saves.md`](files-and-saves.md)), `XPR::Create`
+([`models.md`](models.md)), `XPR::GetTexture` and `GetLocalTime`
+([`functions.md`](functions.md)), `Texture::GetLevelDesc`
+([`graphics-resources.md`](graphics-resources.md)), `rand`
+([`race-overlays.md`](race-overlays.md)), `VirtualAlloc`, `VirtualFree`
+([`heap.md`](heap.md)), `XMemSet`, `memcpy`, `memset`
+([`c-runtime.md`](c-runtime.md)) and the empty `sub_82106540`
+([`audio.md`](audio.md)).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82190B18` | `Type2Hub::InitStates` | | r3 = the hub's machine (the type 2 block's +0, the address `VirtualAlloc` returned, as the mode's Init leaves it in r3): 22 transitions through `StateMachine::Add`, keys (state, message, 0, 0), functors over vtable `0x82011918` (the machine, the function), the next state at the storage's +24 (0 unless given): (0, 1) `Type2Hub::Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForLoad`; (4, 1) → 5 `Start`; (5, 1) `UpdatePage`; (5, 0) `Update`; (5, 6), (5, 26) and (5, 45) `Back`; (5, 48) `OnMessage48`; (5, 38), (5, 39), (5, 41) `OnYes`, `OnNo`, `OnAnswer2`; (5, 42) `OnDialogDone`; (5, 44) `OnMessage44`; (5, 5) → 8 `Unload`; (8, 3) `OpenSelected`; (9, 6) `Reenter`; (5, 4), (9, 4), (10, 4) `Close`; (7, 4) → 6 `Destroy`. A 1,552-byte frame (r27 to r31 saved). It decodes as the other Inits' step tables (`itc_recomp/tools/init_step_tables.py`, the functors' words the original never writes copied as the frame holds them). Only caller the type 2 mode's Init `sub_82197278`. Seen in play. Read in full (through the tool). |
+| `sub_8218E078` | `Type2Hub::Create` | | (0, 1). r3 = the machine: +9608 = 0; `VirtualAlloc`s (`MEM_COMMIT`, `PAGE_READWRITE`) the page object (28 bytes, `[0x826D8410]`: +0, +4, +8, +24 = 0, +12 and +20 = -1), the menu (68 bytes, `[0x826D8414]`: +16 = 7 the last item, +20 = 1 wrapping, +0 to +12 and +24 to +64 0) and the data (`[0x826D8418]`, asked for 68 bytes, but used up to +447: `VirtualAlloc` gives a page; +0, +4, +8, +16, +20, +216, +404, +408, +412 = 0, +424 and +436 = -1); `Type2Hub::MarkNoticeImages`; then +9604 = 1 when +9612 is set, else 9. A 128-byte frame (`__savegprlr_28`). Seen in play. Read in full. |
+| `sub_8218E368` | `Type2Hub::OpenMovie` | | (1, 1) → 2. With a car in player 0's garage (save +6328 nonzero): the selected garage car (save +6120 + 212 + 1,968 × the slot found through the halfword links from +6120 + 204, `[save + 0x19920]` steps) copied to the frame (1,968 bytes) and its model block `CarModels::BlockOf(car +12)`, else 0; `GarageStage::MakeModel(stage, block, 1)` (the stage `[0x826D83E0]`'s +0 word); `UiMovies::Open(0, 22545)`; `Type2Hub::LoadNoticeImages`. A 2,064-byte frame. Seen in play. Read in full. Was a lead (with `sub_8218E240`, "a screen that shows a car by its id"). |
+| `sub_8218E420` | `Type2Hub::WaitForLoad` | Patched | (2, 1). r3 = the machine: while +9608 is 0, +9608 = 1 once UI movies 0, 9 and 10 are loaded (`UiMovies::IsLoaded`) and both image lists are (`Type2Hub::ImagesLoadedA`, `ImagesLoadedB` on the data); a counter `[0x826D841C]` (a debug print through the empty `sub_82106540` while the count / 15 is even) counted up each call; once loaded and the counter at least 1 (60 in the original), the counter = 0 and +9604 = 9 when +9612 is set, else 4. Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races (the `PATCH:` in `generated/`: Gliniak's Xenia patch, xenia-project/game-compatibility#651); a native version keeps 1. A 112-byte frame. Seen in play. Read in full (B7 loop, 2026-11-08; the row moved from `functions.md`). |
+| `sub_8218E2D8` | `Type2Hub::ImagesLoadedA` | | r3 = the hub's data: 1 when every record of its first image list (+32, count +216) has its +0 (loaded) set, else 0. Leaf. Only caller `WaitForLoad`. Seen in play. Read in full. |
+| `sub_8218E320` | `Type2Hub::ImagesLoadedB` | | As `ImagesLoadedA` for the second list (+220, count +404). Leaf. Only caller `WaitForLoad`. Seen in play. Read in full. |
+| `sub_8218F6E0` | `Type2Hub::Start` | | (4, 1) → 5. Movie 0 (`UiMovies::Find`): its object's (+28) +36 and +32 kept in the data's +440 and +444; `Type2Hub::SetUpStatus`; `NextNotice`: with a notice (0 or 1), the page object to page 4 after transitions 5 and 1 (+12 = 5, +16 = 1, +4 = 4, +0 = -1, +8 the page before unless 4); with none (2), `NextNotice2`: found, page 5 after transitions 0 and 1; none, page 0 after them; then the data's +20 = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82190498` | `Type2Hub::UpdatePage` | | (5, 1). r3 = the machine, r4 = the mode: unless the page (`[0x826D8410]` +0) is -1, the page's handler from a 7-entry table on the stack, called with r3 = the mode and r4 = the machine: 0 `MenuPage`, 1 and 2 the empty `sub_82106540`, 3 `Choose`, 4 `NoticePage`, 5 `RecordPage`, 6 `SavePromptPage`. A 128-byte frame. Seen in play. Read in full. |
+| `sub_821907F8` | `Type2Hub::Update` | | (5, 0). Debug prints through the empty `sub_82106540` (the menu's items from `0x82636264`, the cursor); movie 0; with a transition running (+12 not -1), its handler from a 13-entry table (`Transition0` to `Transition12`) called with the page object's +24; a nonzero answer starts the queued one (+12 = +16, +16 = -1, +20 and +24 = 0) or, with none, the page becomes +4 (+12 = -1); with none running, `UiMovie::Run(movie, 0)` unless the page is 3. Then the stand: `GarageStage::IsBusy` shows or hides the busy marker (`ShowBusy`, `HideBusy`, the data's +16); unless the page is 3, with the data's +8 the stand drawn (`GarageStage::Draw(stage, 0, 1)`), else the selected garage car's model remade (`GarageStage::ReloadModel(stage, CarModels::BlockOf(car +12))`, its answer into +8) and, when made, `PutCarOnStand(car)` and `GarageStage::Command(stage, 14)`. A 2,208-byte frame (`__savegprlr_24`). Seen in play. Read in full. Was in a lead (the screens that show a car on their stand). |
+| `sub_8218F698` | `Type2Hub::Back` | | (5, 6), (5, 26), (5, 45): another screen came back. The page object to page 0 (+0 = 0, +12 = -1, +16 = -1, +8 the page before unless 0); `SetPrompts(0, 0, 6, 2, 7, 3)` (tail call). Seen in play. Read in full. |
+| `sub_8218D6F0` | `Type2Hub::OnMessage48` | | (5, 48): the data's +20 = 1. Leaf. Not seen in play. Read in full. |
+| `sub_8218D6A8` | `Type2Hub::OnYes` | | (5, 38): the data's +28 (the dialog's answer) = 0. Leaf. Seen in play. Read in full. |
+| `sub_8218D6C0` | `Type2Hub::OnNo` | | (5, 39): the data's +28 = 1. Leaf. Seen in play. Read in full. |
+| `sub_8218D6D8` | `Type2Hub::OnAnswer2` | | (5, 41): the data's +28 = 2. Leaf. Not seen in play. Read in full. |
+| `sub_8218F800` | `Type2Hub::OnDialogDone` | | (5, 42), r4 = the mode: by the data's +24 (the dialog's step): 0 with answer (+28) 0: the second question (movie 16's texts (-1, 0) 29, (1, 3) 2 and (1, 4) 3, its word +40960 = 0), the page object to none and message 34, +24 = 1; 0 with 1 or 2, and 1 with 2: page 0 and `SetPrompts(0, 0, 6, 2, 7, 3)`; 1 with 0: page 6 and message 43; 1 with 1: page 3 after transition 3, `[0x826364EC]` = 0, `PlayTime::Update(SaveData::Of(0))`; 2: with +20 1 page 0 and the prompts, else `NextNotice2`: found, page 5; none, page 0 and the prompts; 3 or more nothing. Probably the quit questions and the record's dialog. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8218FAA0` | `Type2Hub::OnMessage44` | | (5, 44): `[0x826364EC]` = 0; page 3 after transition 3 (+12 = 3, +16 = -1, +4 = 3, +0 = -1); `PlayTime::Update(SaveData::Of(0))`; `SetPrompts(0, 0, 6, 2, 7, 3)`. Not seen in play. Read in full. |
+| `sub_8218E530` | `Type2Hub::Unload` | | (5, 5) → 8. The data's +20 = 0; movie 0's `UiMovie::FinishAll`, its object's +36 and +32 put back from the data's +440 and +444; with +9616 set, `UiMovies::Delete(0)` and +9608 = 0. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8218E5B0` | `Type2Hub::OpenSelected` | | (8, 3), r4 = the mode: message by the menu's cursor (`[0x826D8414]` +0): 0 → 8, 1 → 12, 2 → 18, 3 → 10, 4 → 23, 5 → 21, 6 → 14, else 51 (posted into the mode's 50-entry ring of 12-byte entries at +204, its count +600 and start +604, as every post here); +9604 = 9. Leaf. Seen in play. Read in full. |
+| `sub_8218D9B8` | `Type2Hub::Reenter` | | (9, 6): with +9608 set, the page object to page 0 after transitions 4 and 1 when the data's +0 is set, else after 0 and 1 (+0 = -1, +8 the page before unless 0), and +9604 = 4; without, +9604 = 1. Leaf. Seen in play. Read in full. |
+| `sub_8218E688` | `Type2Hub::Close` | | (5, 4), (9, 4), (10, 4), r4 = the mode: +9604 = 7; movie 0's `FinishAll` (when found), its object's words put back (as `Unload`), `UiMovies::Delete(0)`; message 4. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8218E1A8` | `Type2Hub::Destroy` | | (7, 4) → 6. The data's +20 = 0; with its +4 set, +9604 = 14; `FreeImages(data)`; `VirtualFree` (`MEM_RELEASE`) of the page object, the menu and the data, and the three globals 0. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8218DCC0` | `Type2Hub::MarkNoticeImages` | | For each entry of player 0's first notice list (save + 0x1C778, 12 bytes an entry, count at +0x1CA78), the chain of its data table entries (`DataTables::Entry56(+4, +8)`, the next by the entry's +8): bit +16 of each set in the hub data's bit set at +408. A 160-byte frame. Only caller `Create`. Seen in play. Read in full. |
+| `sub_8218E240` | `Type2Hub::LoadNoticeImages` | | For i = 0 to 45 with bit i set in the data's +408: `LoadNoticeImage(data, i)`. A 112-byte frame. Only caller `OpenMovie`. Seen in play. Read in full. Was in a lead. |
+| `sub_8218DF38` | `Type2Hub::LoadNoticeImage` | | r3 = the data, r4 = i: for the assets 22696 + i and 22741 + i, a buffer of its size (`Archive::AssetSize`, `VirtualAlloc`, `XMemSet` 0), a 16-byte record (`VirtualAlloc`: +0 loaded = 0, +4 = i, +8, +12 = 0) appended to the data's first list (+32, count +216) or second (+220, count +404), and `Archive::Load(asset, buffer, ImageLoaded, record, 0)`. A 144-byte frame. Only caller `LoadNoticeImages`. Seen in play. Read in full. Was in a lead. |
+| `sub_8218D8E8` | `Type2Hub::ImageLoaded` | | The archive's load callback (r4 = the buffer, r6 = the record): the record's +12 = `XPR::Create` on a 24-byte `VirtualAlloc`, +8 = a 12-byte texture record (`VirtualAlloc`): +0 `XPR::GetTexture(xpr, 0)`, +4 and +8 the level's width and height (`Texture::GetLevelDesc(texture, 0)`); the buffer freed; +0 = 1. A 144-byte frame. No direct callers (its address passed by `LoadNoticeImage`; also by `sub_8225BD10`, not read). Seen in play. Read in full. |
+| `sub_8218DE88` | `Type2Hub::FreeImages` | | r3 = the data: both image lists emptied from the last: each record `FreeImage`d and `VirtualFree`d. A 112-byte frame. Only caller `Destroy`. Seen in play. Read in full. |
+| `sub_8218D650` | `Type2Hub::FreeImage` | | r3 = an image record: +0 = 0; `VirtualFree` of its +8 and +12. A 96-byte frame. From `FreeImages` and `sub_8225BC60` (not read). Seen in play. Read in full. |
+| `sub_8218E810` | `Type2Hub::SetUpStatus` | | Movie 0: the player's name (save +8) into (8, 6) (`UiMovie::SetChildNameText`), the money (+6116) into (8, 9) (`SetNumberText`), the day (+6100, at most 999) into (8, 13) with string 8 (`SetText`), node (8, 11)'s frame (+108) = the day % 7; `GarageStage::SetPlates(stage, 1)`; the data's +0 = 1, +4 and +8 = 0. A 128-byte frame. Only caller `Start`. Seen in play. Read in full. |
+| `sub_8218DBD0` | `Type2Hub::NextNotice` | | With the data's +436 not -1 and the entry (`DataTables::Entry56(+432, +436)`) chained (+8 nonzero): +436 += it, answers 0. Else the first entry of player 0's first notice list (save + 0x1C778) with +0 0: +0 = 1, its 12 bytes copied to the data's +428 (so +432, +436 its table and entry), answers 1; none: the list's count (save + 0x1CA78) = 0, answers 2. A 96-byte frame. From `Start`, `NoticePage`. Seen in play. Read in full. |
+| `sub_8218DD78` | `Type2Hub::NextNotice2` | | The first entry of player 0's second list (save + 0x1CA84, count at + 0x1D504) with +0 0: +0 = 1, its 12 bytes copied to the data's +416, answers 1; none: the count = 0, answers 0. A 96-byte frame. From `Start`, `NoticePage`, `OnDialogDone` and `sub_8218DE18` (not read). Seen in play. Read in full. |
+| `sub_8218FCC8` | `Type2Hub::MenuPage` | | Page 0, r3 = the mode. `Menu::Step` on `[0x826D8414]`: moved, sound 4 and transition 2 (page 0 after it). Else by the button (`Menu::Pressed`): 159 (accept) by the item (the cursor + 1): item 0, and items 1 and 2 unless the selected car is from the second list (the data's +12; then sound 3 and nothing), 3 to 6: sound 0, transition 3 to page 3; item 7: sound 0, the quit question (movie 16's texts (-1, 0) 27, (1, 3) 2, (1, 4) 3, its word +40960 = 1), the page object to none, message 34, the data's +24 = 0, `SetPrompts(0, 0, 1, 1, -1, -1)`; 158 (back): sound 2, transition 12 to page 0; 163: sound 0, the selected garage car copied to the frame (1,968 bytes) and `sub_8218D708` on it (the spec sheet's car data, not seen in play: in a lead), message 24, page 2 and `SetPrompts(6, 2, -1, -1, -1, -1)`; 164: sound 0, `FillPlayerRecord`, message 27, page 2 and `SetPrompts(7, 3, -1, -1, -1, -1)`. A 2,112-byte frame. Seen in play. Read in full. Was in a lead (the menu helpers' callers). |
+| `sub_8218E768` | `Type2Hub::Choose` | | Page 3, r3 = the mode, r4 = the machine: by the menu's cursor (0 to 7, more returns) through a byte table at `0x8200A1F0` into its own code: `PostMessage5` (tail) or the machine's +9604 = 10 and the data's +4 = 1 (which items take which not traced). Leaf. Seen in play. Read in outline. |
+| `sub_8218E7A4` | `Type2Hub::PostMessage5` | | r3 = the mode: message 5 (the hub's own (5, 5) → 8, then `OpenSelected`). Leaf. From `Choose` (its jump table lands on it too). Seen in play. Read in full. |
+| `sub_8218E8F8` | `Type2Hub::NoticePage` | | Page 4. `Menu::Pressed(159)` (sound 0): while movie 0's text (0, 2) has more (`UiMovie::RevealText`), node (0, 0) shown (+80) by `HasMoreText`; done, `NextNotice`: 0, transition 11 then 10 (page 4); 1, transition 9 then 8 (page 4); 2, `NextNotice2`: found, transitions 6 and 7 to page 5; none, to page 0. A 112-byte frame. Seen in play. Read in full. Was in a lead (the menu helpers' callers). |
+| `sub_821900B8` | `Type2Hub::RecordPage` | | Page 5, r3 = the mode: `SetRecordText`; the page object to none; message 35; the data's +24 = 2. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82190168` | `Type2Hub::SavePromptPage` | | Page 6: by `[0x826D8454]` +56 (the save screens' data, `type6-type7-modes.md`): 0 `SetPrompts(-1 ×6)`, 1 `SetPrompts(0, 0, -1, -1, -1, -1)` (tail calls), else nothing. Not seen in play. Read in full. |
+| `sub_8218F4D8` | `Type2Hub::SetRecordText` | | Movie 17's (-1, 1) text = string 7527 + the data's +424. A 96-byte frame. Only caller `RecordPage`. Seen in play. Read in full. |
+| `sub_8218DA48` | `Type2Hub::FillPlayerRecord` | | Into `[0x826D84CC]` + 8 (`sub_8220B408`'s screen's, a lead): from a copy of player 0's save +48 (6,044 bytes): three halfwords (+12, +14, +16) as words, a ratio (+12 / +22 × `[0x82002A0C]`, or `[0x82000A34]` when +22 is 0), more fields (+5968, +6024, +6000, +6040 truncated), the play time (`PlayTime::Add`, 8 bytes), the garage's count (+6328) and save + 0x1991C. Probably the player's record (wins, races, the win rate). A 6,176-byte frame. Only caller `MenuPage`. Seen in play. Read in outline. |
+| `sub_8218F530` | `Type2Hub::SetPrompts` | | r3 to r8 = three pairs: movie 0, sub-scene 10: for i = 0 to 2, node i and its two children by its +100: both of pair i not -1, the node shown (+80 = 1) and the children's frames (+108) the pair, else hidden. As `CarDealer::SetPrompts` (`car-dealer.md`) on movie 0. A 192-byte frame. From `Back`, `OnDialogDone`, `OnMessage44`, `FillMenu`, `MenuPage`, `SavePromptPage`, `Transition5`. Seen in play. Read in full. |
+| `sub_8218FB20` | `Type2Hub::FillMenu` | | Movie 0: the eight items' texts (11, 5 + i) = strings 109, 116, 111, 117, 118, 119, 113, 114; the description (9, 0): `ScrollText(1)`, the scroll reset (`sub_8211C5F8`) and string 536 + the cursor (587 for item 2 and 588 for item 3 when the car is from the second list); `SetPrompts(0, 0, 6, 2, 7, 3)`; the data's +12 = 1 when the selected garage car's spec (`Params::GetCarSpec(car +224)`) has its byte +771 1, else 0. A 176-byte frame. From `Transition0`, `Transition7`. Seen in play. Read in full. |
+| `sub_821903D0` | `Type2Hub::ShowNotice` | | Movie 0: the notice's entry (`DataTables::Entry56(+432, +436)`): (0, 1) = string 4650 + its +12, (0, 2) = string 6683 + the data's +436; `ShowNoticeImage(entry +16)`; node (0, 0) shown (+80) by `HasMoreText(0, 2)`. A 128-byte frame. From `Transition5`, `Transition8`, `Transition10`. Seen in play. Read in full. |
+| `sub_8218F3F8` | `Type2Hub::ShowNoticeImage` | | r3 = an image index: movie 0's object (+28): +36 = the texture record (+8) of the first list's record for it (0 when none), +32 the second list's. Leaf apart from `UiMovies::Find`. A 112-byte frame. Only caller `ShowNotice`. Seen in play. Read in full. |
+| `sub_8218EA90` | `Type2Hub::ShowBusy` | | Movie 0: `PlayNamed` 56 and 54, `LoopLast`. A 112-byte frame. Only caller `Update`. Seen in play. Read in full. |
+| `sub_8218EB10` | `Type2Hub::HideBusy` | | Movie 0: `PlayNamed` 57, `FinishNamed` 54. A 112-byte frame. Only caller `Update`. Seen in play. Read in full. |
+| `sub_8218DB60` | `Type2Hub::PutCarOnStand` | | r3 = a garage car: a car object on the frame (`Car::Init`, the car's 1,884 bytes copied over it, +3888 \|= 1, `Car::Refresh`), then `GarageStage::SetCar(stage, car, -1)`. A 4,000-byte frame. Only caller `Update`. Seen in play. Read in full. |
+| `sub_821901C0` | `Type2Hub::Transition0` | | The opening: on its first call movie 0's animations (-1, 0), (8, 0) and (15, 0) played (the last two looped, `LoopLast`), `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`, `FillMenu`, +0 = 1; each call `UiMovie::Run`, answers 1 once it returns 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8218EC78` | `Type2Hub::Transition1` | | The item highlighted: first call, (11, item + 2) played and looped (not for items 1 and 2 with a second-list car), (12, 1) played and looped, with such a car nodes (11, 6) and (11, 7) colored 2 (`SetNodeColor`); answers 1. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8218EE48` | `Type2Hub::Transition2` | | The cursor moved: the old item's (11, +4 + 2) finished; the new one's played and looped (items 1 and 2 with a second-list car: named 39 and 40 instead); (11, 13), (11, 12) finished; by the step's way (+8) and the wrap, (11, 13) or (11, 12) played or node (11, 0)'s +16 set to `[0x82008914]` or `[0x82000A34]`; the description (9, 0) as `FillMenu` writes it (535 + item); answers 1. A 144-byte frame. Seen in play. Read in outline. |
+| `sub_8218ED98` | `Type2Hub::Transition3` | | Leaving: first call `ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0)`; runs the movie; answers 1 once both fades (`[0x826A50E4]`, `[0x826A50DC]`) are 0. A 112-byte frame. Also in another screen's table (`sub_822240B0`). Seen in play. Read in full. |
+| `sub_8218EB78` | `Type2Hub::Transition4` | | As `Transition0` without (-1, 0) and `FillMenu`; answers when the fades are done. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_82190548` | `Type2Hub::Transition5` | | A notice opened: (-1, 2), (8, 0) and (15, 0) played (looped), named 2 played and looped, `FadeIn`, `SetPrompts(0, 0, -1, -1, -1, -1)`, `ShowNotice`; answers once the movie stops. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8218F098` | `Type2Hub::Transition6` | | The notice closed: named 2 finished, `ScreenFades::FadeOut(60, 0, 0, 0, 0)`; answers when the fades are done. A 112-byte frame. Seen in play. Read in full. |
+| `sub_821902C8` | `Type2Hub::Transition7` | | Back from the notices: (-1, 3) played, `FadeIn(60, …)`, `FillMenu`; answers when the fades are done, and then with a second-list car nodes (11, 6) and (11, 7) colored 2. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82190690` | `Type2Hub::Transition8` | | The next notice: `FadeIn(60, …)`, (-1, 4) played, `ShowNotice`; answers when the fades are done. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8218F150` | `Type2Hub::Transition9` | | `FadeOut(60, …)`, (-1, 5) played; answers when the fades are done. A 112-byte frame. Also in `sub_8225CDE8`'s table. Not seen in play. Read in full. |
+| `sub_82190760` | `Type2Hub::Transition10` | | (-1, 4) played, `ShowNotice`; answers once the movie stops. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8218F220` | `Type2Hub::Transition11` | | (-1, 5) played; answers once the movie stops. A 112-byte frame. Also in `sub_8225CDE8`'s table. Not seen in play. Read in full. |
+| `sub_8218F2B8` | `Type2Hub::Transition12` | | Back pressed on the menu: the cursor put on item 7 (+0 = 7, +4 the old), (11, old + 2) finished, (11, 9) played and looped, (11, 13) and (11, 12) finished, node (11, 0)'s +16 = `[0x82008914]`, the description = string 543 and its scroll reset; answers 1. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_821B90D8` | `PowerGraphScreen2::InitStates` | | r3 = the spec sheet's machine (the type 2 block's +56624): 12 transitions as `Type2Hub::InitStates`'s: (0, 1) `PowerGraphScreen::Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForLoad`; (4, 1) → 5 and (5, 5) → 8 the empty `sub_82106540`; (5, 1) `UpdatePage`; (5, 0) the update `sub_821B8F60` (`power-graph.md`); (8, 3) `ScreenMachine::Wait`; (9, 24) `Open`; (5, 4) and (9, 4) `Close`; (7, 4) → 6 `Destroy`. A 912-byte frame. Only caller the type 2 mode's Init. Seen in play. Read in full (through the tool). |
+| `sub_821B8120` | `PowerGraphScreen::Create` | | (0, 1). +9608 = 0; `VirtualAlloc`s the page object (28 bytes, `[0x826D8464]`, as the hub's), the menu (68 bytes, `[0x826D8468]`: +16 = 7, the rest 0) and the data (1,968 bytes, `[0x826D846C]`: +0, +4 = 0, +8 = 21); +9604 = 1 or 9 (+9612). A 112-byte frame. Also registered by the Init `sub_821B96B8` (not read). Seen in play. Read in full. |
+| `sub_82250328` | `PowerGraphScreen::OpenMovie` | | (1, 1) → 2: `UiMovies::Open(9, 22550)` (tail call). Registered by four Inits: this one, `sub_821B96B8`, and the type 6 and 7 modes' (`PowerGraphScreen6::InitMachine` `sub_82237B78`, `sub_822470A8`; `type6-type7-modes.md`). Seen in play. Read in full. |
+| `sub_821B8900` | `PowerGraphScreen::WaitForLoad` | | (2, 1). While +9608 is 0, +9608 = 1 once movie 9 is loaded; once set: the data's +0 = 1, +4 = 0, +16 to +1967 cleared (`memset`), +9604 = 9. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821B8238` | `PowerGraphScreen::Open` | | (9, 24): with +9608 set, the page object to page 0 after transition 0 and +9604 = 4; else +9604 = 1. Leaf. Not seen in play. Read in full. |
+| `sub_821B8840` | `PowerGraphScreen::UpdatePage` | | (5, 1): unless the page (`[0x826D8464]` +0) is -1, `Page0` or `Page1` (a table on the stack) with r3 = the mode. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_821B83A8` | `PowerGraphScreen::Page0` | | `Menu::Step` on `[0x826D8468]`; by the data's +96 (0: buttons 158 and 163; 1 or 2: 158 and 159; else none) a press: the page object to page 1 after transition 1, message 25, sound 2. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_821B84C8` | `PowerGraphScreen::Page1` | | The data's +8 = 9 (the machine's next state, which the update applies); message 26. Leaf. Not seen in play. Read in full. |
+| `sub_821B8320` | `PowerGraphScreen::Close` | | (5, 4), (9, 4): +9604 = 7, `UiMovies::Delete(9)`, message 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821B80B8` | `PowerGraphScreen::Destroy` | | (7, 4) → 6: `VirtualFree` of the three blocks, the globals 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_821A16C0` | `BuildScreen::InitStates` | | r3 = the build screen's machine (the type 2 block's +0x1BF20): 12 transitions: (0, 1) `BuildScreen::Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForLoad`; (4, 1) → 5 `Enter`; (5, 1) `UpdatePage`; (5, 0) the update `sub_821A1380` (`car-makers.md`); (5, 20) → 8 `Unload`; (8, 3) `Screen::LeaveToHub`; (9, 21) `ScreenMachine::Reenter`; (5, 4) and (9, 4) `Close`; (7, 4) → 6 `Destroy`. A 912-byte frame. Only caller the type 2 mode's Init. Seen in play. Read in full (through the tool). |
+| `sub_8219BD80` | `BuildScreen::Create` | | (0, 1). +9608 = 0; `VirtualAlloc`s the transition machine (28 bytes, `[0x826D843C]`), the two menu lists (72 bytes each, `[0x826D8440]`, `[0x826D8444]`: +60 and +68 = 0 when made) and the screen data (0x3266C bytes, `[0x826D8448]`: +0 and +0x32668 = 0); +9604 = 1 or 9. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219B950` | `BuildScreen::OpenMovie` | | (1, 1) → 2: `UiMovies::Open(6, 22557)` (tail call). Seen in play. Read in full. |
+| `sub_8219BE98` | `BuildScreen::WaitForLoad` | | (2, 1): +9608 = 1 once movie 6 is loaded; then +9604 = 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A0860` | `BuildScreen::Enter` | | (4, 1) → 5: `BuildScreen::Fill`, `SetUpStatus`; the transition machine started (+12 = 0, +16 = 1, +4 = 0, +0 = -1, +8 the state before unless 0); `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`. A 96-byte frame. Seen in play. Read in full. Was a lead (the build screen's entry and exit). |
+| `sub_821A0228` | `BuildScreen::Fill` | | The screen data from player 0's save data and the data tables: +4 to +23 the name (save +8), +24 the money, +28 the weekday, +32 the day (at most 999); the 400 builds (52 bytes each at +0x2C784, from `DataTables::Item(i)`: its id, kind, flags, values, a kind by its +40 (1, 2, 4, 7 → 0 to 3), states by the save's three halfwords at + 0x199FA + 12i, a bit of the save's set at + 0x1ACE4 (word 27449), a string pick 48 to 55, the save's word +6 of the entry); the 56 groups' lists (3,252 bytes each from +36) reset and each build inserted (`BuildList::Insert`); a number (+0x32654) from the count of builds of kind 2; per group its counts, flags, a value and a kind (+36 by its index: 52 to 55 → 2, 48 to 51 → 1); builds past the stage (`Stage::Of(save)` + 1) taken out of their groups (`BuildList::RemoveAt`); +0x32658 = 1 when any group of kind 3 has builds. A 240-byte frame (`__savegprlr_22`). Only caller `Enter`. Seen in play. Read in outline. Was a lead. |
+| `sub_8219C160` | `BuildList::RemoveAt` (probably) | | r3 = a build list, r4 = a position: the node at it unlinked and put on the free list (+1600), the count (+1608) down by one. Leaf. Only caller `BuildScreen::Fill`. Seen in play. Read in full. Was a lead. |
+| `sub_8219C438` | `BuildScreen::SetUpStatus` | | Movie 6: `UiMovie::ResetPose`; the name (0, 6), the money (0, 9), the day (0, 13) with string 8, node (0, 11)'s frame the weekday, from the screen data's +4 to +32; the data's +0x3265C and +0x32660 = 0, +0 = 1. A 112-byte frame. Only caller `Enter`. Seen in play. Read in full. Was a lead. |
+| `sub_8219FA80` | `BuildScreen::UpdatePage` | | (5, 1): unless the level (`[0x826D843C]` +0) is -1, its handler from a 5-entry table with r3 = the mode: 0 `GroupsPage`, 1 `BuildsPage`, 2 `BuildPage`, 3 `DetailsPage`, 4 `LeavePage`. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219EEC0` | `BuildScreen::GroupsPage` | | Level 0: `MenuList::Update` on `[0x826D8440]`; when it isn't moving (+24 0, +4 = +8): `JumpGroupA`, `JumpGroupB`; else accepted, sound 0 and transitions 6 then 7 to level 1; cancelled, sound 2 and transition 5 to level 4; its +28 set (a side step), sound 4 and transition 4 to level 0. While it moves, sound 4 and transition 3 (level 0). A 96-byte frame. Seen in play. Read in full. |
+| `sub_8219F048` | `BuildScreen::BuildsPage` | | Level 1: both lists updated; still: `JumpBuildA`, `JumpBuildB`; the second list moving (+24), transition 9 (level 1); accepted, transitions 11 then 12 to level 2 and sound 0; cancelled, transition 10 (back, level -1) and sound 2. While the first moves, transition 8 (level 1) and sound 4. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219F1C8` | `BuildScreen::BuildPage` | | Level 2: as `BuildsPage` with `JumpStandA`, `JumpStandB`, transitions 15 (the second list), 17 then 18 to level 3 (accepted: the selected build's +36 = its +32, seen), 16 (back), 14 (moving). A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219B960` | `BuildScreen::DetailsPage` | | Level 3: `MenuList::Update`; still: accepted (sound 0) or cancelled (sound 2), transition 20 (back, level -1); moving, transition 19 (level 3) and sound 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_8219C3A8` | `BuildScreen::LeavePage` | | Level 4, r3 = the mode: `GarageStage::SetDark(stage, 0)`, `SaveBuildStates`, message 20. A 96-byte frame. Seen in play. Read in full. Was a lead (the exit). |
+| `sub_8219C100` | `BuildScreen::SaveBuildStates` | | Player 0's save + 0x19A00 + 12i = the build's word +36 (the data's + 0x2C7A8 + 52i) for the 400 builds. A 96-byte frame. Only caller `LeavePage`. Seen in play. Read in full. Was a lead. |
+| `sub_8219DBC8` | `BuildScreen::JumpGroupA` | | The player's action mapper (`0x826BAB80` + 8 × `[0x826BABA4]`, unless its +4 is 1) asked through its slot 12 for 161, then 162: the group list's cursor moved to the previous (161, wrapping from the end) or next (162, wrapping to the start) group whose +32 is set (the groups of the category, `[+0x318C4 + 4k]`, count +0x319A4); then named animation 29 + the old row finished, `MenuList::SetSelection`, `MenuList::Fit(0)`; answers 1 when it jumped, else 0. A 160-byte frame. Only caller `GroupsPage`. Seen in play. Read in full. |
+| `sub_8219DDB8` | `BuildScreen::JumpGroupB` | | As `JumpGroupA` with 163 and 164 and groups whose +28 is 0. A 160-byte frame. Only caller `GroupsPage`. Seen in play. Read in full. |
+| `sub_8219DFA8` | `BuildScreen::JumpBuildA` | | As `JumpGroupA` over the chosen group's builds (+0x319A8, count +0x31FF0) with 161 and 162, to builds whose +32 isn't their +36; named 61 + the row finished. A 160-byte frame. Only caller `BuildsPage`. Seen in play. Read in full. |
+| `sub_8219E348` | `BuildScreen::JumpBuildB` | | As `JumpBuildA` with 163 and 164 and builds whose +8 isn't 2. A 160-byte frame. Only caller `BuildsPage`. Seen in play. Read in full. |
+| `sub_8219E600` | `BuildScreen::JumpStandA` | | As `JumpBuildA` on level 2 (named 93 finished). A 160-byte frame. Only caller `BuildPage`. Seen in play. Read in full. |
+| `sub_8219E9A0` | `BuildScreen::JumpStandB` | | As `JumpBuildB` on level 2 (named 93). A 160-byte frame. Only caller `BuildPage`. Seen in play. Read in full. |
+| `sub_8219C298` | `BuildScreen::Unload` | | (5, 20) → 8: movie 6's `FinishAll`; with +9616 set, `UiMovies::Delete(6)` and +9608 = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_821D6A20` | `Screen::LeaveToHub` (probably) | | (8, 3) of four type 2 machines (the build screen, the plate editor, `sub_82196520`'s and the tuning screen's `sub_821E7568`), r3 = the machine, r4 = the mode: message 6 (the hub's `Back`), +9604 = 9. Leaf. Seen in play. Read in full. |
+| `sub_8219C300` | `BuildScreen::Close` | | (5, 4), (9, 4): +9604 = 7, movie 6's `FinishAll`, `UiMovies::Delete(6)`, message 4. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219B8C8` | `BuildScreen::Destroy` | | (7, 4) → 6: `MenuList::Release` on `[0x826D8440]`; `VirtualFree` of the four blocks; `[0x826D843C]`, `[0x826D8440]` and `[0x826D8448]` = 0 (`[0x826D8444]` freed but left as it was). A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219B2E8` | `PlateEditor::InitStates` | | r3 = the plate editor's machine (the type 2 block's +0x20A70): 12 transitions: (0, 1) `PlateEditor::Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForLoad`; (4, 1) → 5 `Start`; (5, 1) `UpdatePage`; (5, 0) `Update`; (5, 32) `OnMessage32`; (8, 3) `Screen::LeaveToHub`; (9, 28) `ScreenMachine::Reenter` (message 28, the car dealer's); (5, 4) and (9, 4) `Close`; (7, 4) → 6 `Destroy`. A 912-byte frame. Only caller the type 2 mode's Init. Seen in play. Read in full (through the tool). |
+| `sub_82198210` | `PlateEditor::Create` | | (0, 1). +9608 = 0; `VirtualAlloc`s the page object (28 bytes, `[0x826D8430]`), a menu list (72 bytes, `[0x826D8434]`: +60 and +68 = 0 when made) and the data (76 bytes, `[0x826D8438]`: +0 = 0, +72 = 21); +9604 = 1 or 9. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82198180` | `PlateEditor::OpenMovie` | | (1, 1) → 2: `UiMovies::Open(26, 22556)` (tail call). Seen in play. Read in full. |
+| `sub_821982F0` | `PlateEditor::WaitForLoad` | | (2, 1): +9608 = 1 once movie 26 is loaded; then +9604 = 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82199BB8` | `PlateEditor::Start` | | (4, 1) → 5: `LoadPlate`, `ResetMovie`; the page object to page 0 after transitions 0 and 1. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82198420` | `PlateEditor::LoadPlate` | | With the data's +48 set, `RandomPlate(+44, data + 24)`; then the 20 bytes at +24 copied to +4 (the plate being edited). A 96-byte frame. Only caller `Start`. Seen in play. Read in full. |
+| `sub_82198360` | `PlateEditor::RandomPlate` | | r3 = the class (not read), r4 = a plate (20 bytes): byte +1 = a region 0 to 13, +2 to +4 three digits 0 to 9, +5 to +11 seven characters 0 to 37, each `rand()` × the local time's milliseconds (`GetLocalTime`, its halfword +14) modulo the count; byte +0 not written. Returns r4. A 128-byte frame. Only caller `LoadPlate`. Seen in play. Read in full. |
+| `sub_821989E8` | `PlateEditor::ResetMovie` | | The data's +64 = 5 and +68 = 4 (the region and character menus' rows); movie 26's `UiMovie::ResetPose`. A 96-byte frame. Only caller `Start`. Seen in play. Read in full. |
+| `sub_8219B050` | `PlateEditor::UpdatePage` | | (5, 1): unless the page (`[0x826D8430]` +0) is -1, its handler from a 5-entry table with r3 = the mode: 0 `RegionPage`, 1 `NumberPage`, 2 `CharsPage`, 3 `ConfirmPage`, 4 `LeavePage`; then, when the data's +72 isn't 21, the machine's +9604 = it and +72 = 21. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219B108` | `PlateEditor::Update` | | (5, 0). A debug print (the empty `sub_82106540`); movie 26; with a transition running, its handler from a 20-entry table (`Transition0` to `Transition19`) with the page object's +24, the queued one started on a nonzero answer (as `Type2Hub::Update`); with none, `UiMovie::Run(movie, 0)`. A 304-byte frame (`__savegprlr_18`). Seen in play. Read in full. |
+| `sub_82199ED0` | `PlateEditor::RegionPage` | | Page 0, r3 = the mode: `MenuList::Update`; accepted (sound 0): byte +5 = (the list's +4 + the selection) × 3 + the column (+52), transitions 5 then 6 to page 1; cancelled (sound 2): message 30, transition 4 to page 4; `MenuList::Pressed152` (sound 0): byte +5 set, `FinishRegionAnim`, message 29 and transition 19 (no page after); while it moves (+24, +28 or +4 against +8), transition 3 (page 0). A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219A138` | `PlateEditor::NumberPage` | | Page 1: accepted, digit +56 (byte +6 + it) = the selection × 4 + the column; at the third digit (+56 2) transitions 10 then 11 to page 2, else +56 up and transitions 8 then 6 (page 1); cancelled at the first digit, transition 9 to page 0, else +56 down and transition 8; `Pressed152`: the digit set, `FinishDigitAnim`, message 29, transition 19; moving, transition 7 (page 1). A 112-byte frame. Seen in play. Read in full. |
+| `sub_82198540` | `PlateEditor::CharsPage` | | Page 2: accepted, character +56 (byte +9 + it) = (the list's +4 + the selection) × 10 + the column; at the seventh (+56 6) message 29 and transition 19, else +56 up and transitions 13 then 11 (page 2); cancelled at the first, transition 14 to page 1, else +56 down and transition 13; `Pressed152`: set, message 29, transition 19; moving, sound 4 and transition 12 (page 2). A 112-byte frame. Seen in play. Read in full. |
+| `sub_82198830` | `PlateEditor::ConfirmPage` | | Page 3: accepted (sound 0): the data's +20 = the selection, message 29, transition 19; cancelled (sound 2): transition 18 (page 10 after it); moving, sound 4 and transition 17 (page 3). A 128-byte frame. Not seen in play. Read in full. |
+| `sub_82198988` | `PlateEditor::LeavePage` | | Page 4, r3 = the mode: the data's +72 = 9 (the machine to state 9 through `UpdatePage`); message 31. Leaf. Seen in play. Read in full. |
+| `sub_82198190` | `PlateEditor::OnMessage32` | | (5, 32): the page object to page 4 after transition 4. Leaf. Seen in play. Read in full. |
+| `sub_82198498` | `PlateEditor::Close` | | (5, 4), (9, 4): +9604 = 7, movie 26's `FinishAll`, `UiMovies::Delete(26)`, message 4. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82198118` | `PlateEditor::Destroy` | | (7, 4) → 6: `VirtualFree` of the three blocks, the globals 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219A3A8` | `PlateEditor::Transition0` | | Opening: named 66 played, `SetUpRegionMenu`, `ShowPlate(data + 4)`; answers once the movie stops. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82198A40` | `PlateEditor::Transition1` | | The region highlighted: named 2 + the selection × 3 + the column, 0 and 68 played and looped; node (3, 1)'s +68 = `[0x82000A30]`; answers 1. A 128-byte frame. Seen in play. Read in full. |
+| `sub_82198B58` | `PlateEditor::Transition2` | | As `Transition1` with only the region's animation. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_8219A450` | `PlateEditor::Transition3` | | The region's cursor moved: the column (+52) from the list's +28 (0 to 2), the region index (at most 13: then column 1 and +52 1); `ShowRegion`; the old cell's animation finished and the new one played and looped, sound 4; when the list scrolled, `ShowRegionCells`, named 11 and 12 finished, `ShowRegionRow` for the row coming in and 12 or 11 played; answers 1. A 176-byte frame. Not seen in play. Read in outline. |
+| `sub_82198C20` | `PlateEditor::Transition4` | | Leaving the regions: their animations (the cell's, 0, 68) finished, `FinishAll`, named 67 played; answers once the movie stops. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8219A5E8` | `PlateEditor::Transition5` | | To the number: `FinishRegionAnim`, named 69, +56 = 0, `SetUpNumberMenu`, the help line string 569 (`HelpLine::Set`), `ShowDigits` with the three digits; answers once the movie stops. A 144-byte frame. Seen in play. Read in full. |
+| `sub_82198D00` | `PlateEditor::Transition6` | | The digit highlighted: named 15 + the selection × 4 + the column played and looped; node (4, 1)'s +68 = `[0x82000A30]`; answers 1. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219A6B8` | `PlateEditor::Transition7` | | The digit's cursor moved: the column (0 to 3), the digit (at most 9: else the selection put back); `ShowDigits` with the moving digit in its place; the old animation finished, the new played and looped, sound 4; answers 1. A 160-byte frame. Not seen in play. Read in outline. |
+| `sub_8219A820` | `PlateEditor::Transition8` | | The next or previous digit: the digit's animation finished, `SetUpNumberMenu`, `ShowDigits`; answers 1. A 144-byte frame. Seen in play. Read in full. |
+| `sub_8219A8E0` | `PlateEditor::Transition9` | | Back to the region: the digit's animation finished, named 70, `ShowDigits`, `SetUpRegionMenu`; once the movie stops, the page object to page 0 after transition 2 (its +24 = 0); answers 0. A 144-byte frame. Not seen in play. Read in full. |
+| `sub_8219AA00` | `PlateEditor::Transition10` | | To the characters: `FinishDigitAnim`, +56 = 0, `SetUpCharsMenu`, named 71, the help line string 571; once the movie stops, `ShowCharLine(+60)` and answers 1. A 128-byte frame. Seen in play. Read in full. |
+| `sub_82198DC8` | `PlateEditor::Transition11` | | The character highlighted: named 27 + the selection × 10 + the column played and looped; answers 1. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8219AAB0` | `PlateEditor::Transition12` | | The character's cursor moved: the column (0 to 9), the character (at most 37: then column 7); `ShowChars` with the moving one; the animations swapped; when the list scrolled, `ShowCharCells`, named 58 and 59 finished, `ShowCharRow` for the row coming in and 59 or 58 played; answers 1. A 208-byte frame. Not seen in play. Read in outline. |
+| `sub_8219AC88` | `PlateEditor::Transition13` | | The next or previous character: its animation finished, `SetUpCharsMenu`, the data's +60 = `CharLineKind(chars)`, `ShowChars`, `ShowCharLine(+60)`; answers 1. A 160-byte frame. Seen in play. Read in full. |
+| `sub_8219AD68` | `PlateEditor::Transition14` | | Back to the number: `ShowChars`, the character's animation finished, named 72, +56 = 2, `SetUpNumberMenu`; once the movie stops, page 1 after transition 6; answers 0. A 176-byte frame. Not seen in play. Read in full. |
+| `sub_8219AE90` | `PlateEditor::Transition15` | | To the confirmation: the animation finished, named 73, `SetUpConfirmMenu`; answers 1. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_82198E70` | `PlateEditor::Transition16` | | The confirmation's item highlighted: named 62 + the selection played and looped; answers 1. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_82198F08` | `PlateEditor::Transition17` | | The confirmation's cursor moved: named 62 + the old finished, 62 + the new played and looped; answers 1. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_8219AF50` | `PlateEditor::Transition18` | | Back to the characters: 62 + the selection finished, named 74, +56 = 3, `SetUpCharsMenu`, the help line 571; once the movie stops, page 2 after transition 11 and `ShowCharLine(+60)`; answers 0. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_82198FB8` | `PlateEditor::Transition19` | | Done: `FinishAll`; the movie's top nodes 3 to 9 (sub-scene -1) hidden (+80 = 0); answers 1. A 160-byte frame. Seen in play. Read in full. |
+| `sub_821992D8` | `PlateEditor::FinishRegionAnim` | | Movie 26: named 2 + the selection × 3 + the column finished. A 112-byte frame. From `RegionPage`, `Transition5`. Seen in play. Read in full. |
+| `sub_82199410` | `PlateEditor::FinishDigitAnim` | | Named 15 + the selection × 4 + the column finished. A 112-byte frame. From `NumberPage`, `Transition10`. Seen in play. Read in full. |
+| `sub_82199C10` | `PlateEditor::SetUpRegionMenu` | | `MenuList::Init(list, rows (+64), 3, 0, actions 153 to 156, 159, 158)`; the row (byte +5 / 3) selected (`SetSelection`, `Fit(1)`) and the column (+52) = byte +5 % 3; `MarkField(0)`; `ShowRegionCells`; the help line string 568. A 128-byte frame. From `Transition0`, `Transition9`. Seen in play. Read in full. |
+| `sub_82199CC8` | `PlateEditor::SetUpNumberMenu` | | `MenuList::Init(list, 3, 3, 0, …)` with the same actions; the digit +56's row (/ 4) selected, column % 4; `MarkField(+56 + 1)`; `ShowDigitCells`. A 128-byte frame. From `Transition5`, `Transition8`, `Transition14`. Seen in play. Read in full. |
+| `sub_82199D88` | `PlateEditor::SetUpCharsMenu` | | `MenuList::Init(list, rows (+68), 3, 0, …)`; the character +56's row (/ 10) selected, column % 10; `MarkField(+56 + 4)`; `ShowCharCells`. A 128-byte frame. From `Transition10`, `Transition13`, `Transition18`. Seen in play. Read in full. |
+| `sub_82199E48` | `PlateEditor::SetUpConfirmMenu` | | `MenuList::Init(list, 2, 2, 1, …)`, the selection the data's +20; `MarkField(-1)`; `ShowConfirmCells`; the help line string 572. A 112-byte frame. Only caller `Transition15`. Not seen in play. Read in full. |
+| `sub_82199AA8` | `PlateEditor::MarkField` | | r3 = a field (0 the region, 1 to 3 the digits, 4 to 10 the characters, -1 none): movie 26's node (1, 0)'s children shown (+80) only for that one. A 128-byte frame. From the four menus' set-ups. Seen in play. Read in full. |
+| `sub_82199A20` | `PlateEditor::ShowPlate` | | r3 = a plate: `ShowRegion(byte +1)`, `ShowDigits` (+2 to +4), `ShowChars` (+5 to +11). A 144-byte frame. Only caller `Transition0`. Seen in play. Read in full. |
+| `sub_82199898` | `PlateEditor::ShowRegion` | | r3 = a region: node (2, 0)'s frame (+108) = it. A 112-byte frame. From `ShowPlate`, `Transition3`. Seen in play. Read in full. |
+| `sub_821998F0` | `PlateEditor::ShowDigits` | | r3 = three words: node (2, 2)'s children: frame the digit and shown, hidden for 10. A 144-byte frame. From `ShowPlate` and the number's transitions. Seen in play. Read in full. |
+| `sub_82199990` | `PlateEditor::ShowChars` | | r3 = seven words: node (2, 1)'s children: frame the character and shown below 37, else hidden. A 144-byte frame. From `ShowPlate` and the characters' transitions. Seen in play. Read in full. |
+| `sub_821981C8` | `PlateEditor::CharLineKind` | | r3 = seven words: 0 when +56 is 0; else 1 when the character before +56 isn't 10; else 2 when +56 is 3, 0 otherwise. Leaf. Only caller `Transition13`. Seen in play. Read in full. |
+| `sub_82199688` | `PlateEditor::ShowCharLine` | | r3 = 0, 1 or 2: node (4, 2)'s children colored (`sub_8211A630`): 0, child 0 color 2 and the rest 0; 1, child 10 color 2; 2, children 0 and 10 color 2 (probably the separator's cell shown or not). A 128-byte frame. From `Transition10`, `13`, `18`. Seen in play. Read in full. |
+| `sub_821990D0` | `PlateEditor::ShowRegionCells` | | Node (3, 0)'s and (3, 2)'s children for the list's shown rows (from its +4): string 5411 + 3 × row + i in each (`UiMovie::SetNodeText`), shown, or hidden past 13; the arrows (-1, 8) and (-1, 9) shown when there are rows above and below (+64 − 3). A 176-byte frame. From `SetUpRegionMenu`, `Transition3`. Seen in play. Read in full. |
+| `sub_82199220` | `PlateEditor::ShowRegionRow` | | r3 = a row: its three cells (node 3's children 12 to 14 and 33 to 35) as `ShowRegionCells` writes them. A 160-byte frame. Only caller `Transition3`. Not seen in play. Read in full. |
+| `sub_82199350` | `PlateEditor::ShowDigitCells` | | Node (4, 0)'s children: `SetText(8, i)` for the first ten, the rest cleared (`UiMovie::ClearText`); the arrows hidden. A 128-byte frame. Only caller `SetUpNumberMenu`. Seen in play. Read in full. |
+| `sub_82199488` | `PlateEditor::ShowCharCells` | | As `ShowRegionCells` on nodes (5, 0) and (5, 2), ten a row, strings 5425 +, hidden past 37; the arrows by +68 − 3. A 176-byte frame. From `SetUpCharsMenu`, `Transition12`. Seen in play. Read in full. |
+| `sub_821995D8` | `PlateEditor::ShowCharRow` | | r3 = a row: its ten cells (node 5's children 33 to 42 and 103 to 112) as `ShowCharCells` writes them. A 160-byte frame. Only caller `Transition12`. Not seen in play. Read in full. |
+| `sub_821997E8` | `PlateEditor::ShowConfirmCells` | | Node (6, 0)'s children: strings 270 + i; the arrows hidden. A 128-byte frame. Only caller `SetUpConfirmMenu`. Not seen in play. Read in full. |
