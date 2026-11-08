@@ -84,10 +84,18 @@ file's history. What's left to see in a drive, from every run:
   `type67_screens`: the list and node screens' handlers, the panel
   screens, the group pair and panel groups, `Type7PanelScreen::PickCar`;
   48 of 48 in play, 1 adapter removed; race 38 s, 0 errors, its
-  harnesses 0 differing; no subagents); left: none. Validation agent
-  running.
+  harnesses 0 differing; no subagents); left: none. Validated
+  `itc_4490` (race 87 s at 180, the harnesses ~91 s; 0 errors, every
+  harness 0 differing, 48 of 48 harness lines; none in the race or the
+  replay `itc_4491` (ok): the modes aren't reached; all 48 to drive).
+  Recorded.
 
 ## Done
+
+- `type67-screens.md`: 48 of 48 in play native (the type 6 and 7
+  modes' list, panel (car pick) and node screens, the group pair, the
+  panel groups; 1 adapter removed), `--native_type67_screens`;
+  973a1f10, 42695d6d..cfbe6bd6.
 
 - `options-screen.md`: 98 of 100 in play native (the options screen's
   machine, pages, steps, settings' read, write and reload, the type 2,

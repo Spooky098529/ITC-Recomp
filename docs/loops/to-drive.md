@@ -18,6 +18,39 @@ here loses its heading.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The type 6 and 7 screens (attract race `itc_4490`, replay `itc_4491`
+  ok; `type67-screens.md`; all 48, the replay doesn't reach the modes):
+  `sub_82251618` ListScreen::OnEnter, `sub_82251508`
+  ListScreen::OpenMovie, `sub_82251678` ListScreen::WaitForMovie,
+  `sub_82251760` ListScreen::Leave, `sub_82251710` ListScreen::OnLeft,
+  `sub_82242F70` ListScreen::IsLoaded, `sub_82233320`
+  Type6ListScreen::OpenMovie, `sub_82242F10` Type7ListScreen::OpenMovie,
+  `sub_82233330` Type6ListScreen::Release, `sub_82242F20`
+  Type7ListScreen::Release, `sub_822591B0` NodeScreen::OnEnter,
+  `sub_822590D0` NodeScreen::OpenMovie, `sub_82259208`
+  NodeScreen::WaitForMovie, `sub_822592D8` NodeScreen::Leave,
+  `sub_82259298` NodeScreen::OnLeft, `sub_82236FD8`
+  Type6NodeScreen::IsLoaded, `sub_82236EB0` Type6NodeScreen::OpenMovie,
+  `sub_82236EC0` Type6NodeScreen::Release, `sub_82249D18`
+  PanelScreen::OnEnter, `sub_82248CD0` PanelScreen::OpenMovie,
+  `sub_82249D88` PanelScreen::WaitForMovie, `sub_82249DF8`
+  PanelScreen::Open, `sub_82248CE0` PanelScreen::Show, `sub_82248C48`
+  PanelScreen::Update, `sub_82248DF8` PanelScreen::OnMessage24,
+  `sub_82249E38` PanelScreen::Leave, `sub_82248B08` PanelScreen::OnLeft,
+  `sub_82248B58` PanelScreen::DrawList, `sub_82240958`
+  Type7PanelScreen::Draw, `sub_82240908` Type7PanelScreen::DrawList,
+  `sub_82230790` PanelScreen::IsLoaded, `sub_82230758`
+  Type6PanelScreen::OpenMovies, `sub_822401D0`
+  Type7PanelScreen::OpenMovies, `sub_82240208`
+  PanelScreen::DeleteMovies, `sub_82240860` Type7PanelScreen::Back,
+  `sub_82247058` Type6PanelScreen::OpenPowerGraph, `sub_822408B8`
+  Type7PanelScreen::OpenPowerGraph, `sub_82240238`
+  Type7PanelScreen::CarList, `sub_82240248` Type7PanelScreen::CarEntry,
+  `sub_82240258` Type7PanelScreen::CarSlot, `sub_82249C30`
+  GroupPair::SelectA, `sub_82249C40` GroupPair::Reset, `sub_82249BE0`
+  GroupPair::Run, `sub_82249BA8` GroupPair::WaitForFade, `sub_82249C70`
+  GroupPair::FinishAll, `sub_82258FC8` PanelGroup::Movie, `sub_82259008`
+  PanelGroup::Run, `sub_822405F8` Type7PanelScreen::PickCar.
 - The options screen's third migration (attract race `itc_4480`,
   replay `itc_4481` ok; `options-screen.md`): `sub_821C1888`
   Options::SlidersPage, `sub_821C1D08` Options::ButtonsPage,

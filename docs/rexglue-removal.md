@@ -2787,6 +2787,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-07 | The type 6 and 7 modes' screen constructors (the screen blocks the modes' slot 0 allocates at +848, `Type6Screens` `sub_822366F0` and `Type7Screens` `sub_82246B28`, with their list, node, panel and machine screens) | `screen-constructors.md` | 41 of 41 (one migration; 24 adapters removed) | `--native_screen_constructors` |
 | 2026-11-07 | The type 6 and 7 modes (probably two front-end hubs over the player's garage car on its stand: the list screen starts a race; with the stand scene, the garage camera and lights, the first screens, dialogs, options, controller pages and save screen's Inits, the modes' `NextMode`, `Leaving`, `WaitForLoads` and `TearDown`) | `type6-type7-modes.md` | 110 of 117 in play (four migrations; 7 adapters removed) | `--native_type67_modes` |
 | 2026-11-08 | The options screen (the front end's options: its machine's handlers, `Draw`'s 15 pages and `Update`'s 49 steps, the HUD, sound, sliders, buttons and analog pages, the settings' `Reset`, `Read`, `Write` and `Reload` over `[0x826D8478]`, the type 2, 4, 6 and 7 options' and controller pages' Inits; with the cleanup lead before it, `CarScene::SetUp` `sub_820C8DE8`, which unblocked `StandScene::Create` and the type 6 and 7 modes' slot 0) | `options-screen.md` | 98 of 100 in play (three migrations; 31 adapters removed) | `--native_options_screen` |
+| 2026-11-08 | The type 6 and 7 modes' screens (the list, panel and node screens the modes' menus open: their machines' handlers, movie opens and releases, the panel screens as the car pick with `Type7PanelScreen::PickCar`, the group pair and panel groups) | `type67-screens.md` | 48 of 48 in play (one migration; 1 adapter removed) | `--native_type67_screens` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4874,3 +4875,17 @@ functions (916 pairs): overridden 109, Native 36, Dropped 26, never
 called 70, live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 4,801, work left 1,624 (Wrapped 56, with a row
 425, no row yet 1,143), from 1,721.
+
+**2026-11-08, the type 6 and 7 modes' screens (branch
+`b7-loop-07-11-26-2`):** the thirty-eighth run's second subsystem
+(`type67-screens.md`, `--native_type67_screens`,
+`src/type67_screens/`), in one migration: the list, panel and node
+screens' handlers, the panel screens (the car pick) and their group
+pair. The panel screens call the car list (`PanelSet`) through its
+vtable, still recompiled (a lead); the list and node screens' pages
+and the 97 functions never seen in play keep their recompiled code.
+Neither the attract race nor the pad replay reaches the modes: all 48
+wait for a drive. The boundary: 449 functions (916 pairs): overridden
+109, Native 36, Dropped 26, never called 70, live 208. Imports: 186
+called, 54 with a live caller. B7 (`b7_status.py`): ours 4,849, work
+left 1,576 (Wrapped 56, with a row 425, no row yet 1,095), from 1,624.
