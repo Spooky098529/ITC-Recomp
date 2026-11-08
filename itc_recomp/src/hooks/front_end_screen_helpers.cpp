@@ -265,14 +265,14 @@ ITC_FRONT_END_RELEASE(8225D590, FrontEndModeType9Release)
 ITC_FRONT_END_RELEASE(82288898, FrontEndModeType10Release)
 ITC_FRONT_END_RELEASE(82277DB0, FrontEndModeType12Release)
 
-// The dialogs' text setters, from the save screen's and the options'
-// steps (recompiled).
-ITC_FRONT_END_HELPERS(821A51C8, FrontEndSaveScreenSetText)
-ITC_FRONT_END_HELPERS(821A52C0, FrontEndSaveScreenSetNote)
-ITC_FRONT_END_HELPERS(821C0D70, FrontEndOptionsSetSaveDialogText)
-ITC_FRONT_END_HELPERS(821C0E50, FrontEndOptionsSetSaveDialogNote)
-ITC_FRONT_END_HELPERS(821C0BF0, FrontEndOptionsSetCategory6DialogText)
-ITC_FRONT_END_HELPERS(821C0CD0, FrontEndOptionsSetCategory6DialogNote)
+// No adapters for the dialogs' text setters SaveScreen::SetText
+// sub_821A51C8 and SetNote sub_821A52C0, Options::SetSaveDialogText
+// sub_821C0D70, SetSaveDialogNote sub_821C0E50, SetCategory6DialogText
+// sub_821C0BF0 and SetCategory6DialogNote sub_821C0CD0 (removed, B7 loop,
+// 2026-11-08): their callers in play (the save screen's and the options'
+// steps and starts) are native, the flag switches those; their steps above
+// are the harness's. SaveScreen::ShowMessage5 sub_821A6030 (never seen in
+// play) reaches the originals.
 // The save screen's step 6 (its Update's table, no direct callers).
 ITC_FRONT_END_HELPERS(821A63B0, FrontEndSaveScreenShowNotice)
 // No adapter for SaveScreen::SetMessage sub_821A5360: its only caller,
