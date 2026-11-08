@@ -68,9 +68,9 @@ take `[0x82815EB0]` (set to 1 with each fade, cleared by
 `GroupPair::WaitForFade`), and the fades' passes come from
 `[0x82001BEC]` (5) and `[0x82001BF0]` (15); `PanelGroup::SetCaption`
 calls `UiMovie::SetText` with r7 to r10 unset (precedent, 2026-10-30:
-pass 0); `sub_8211BC18` (a UI movie helper with no row: whether a named
-animation is running, probably; a lead) and `sub_8211DE30` (in the
-sticker editor's lead) are the only callees outside this file that run
+pass 0); `sub_8211BC18` (`UiMovie::IsNamedActive`: whether a named
+animation is playing or looping, probably) and `sub_8211DE30`
+(`UiMovie::UnloopNamed`; both in `ui-movies-game.md` since 2026-11-08) are the only callees outside this file that run
 and aren't ours. The colors' list (b +1824, up to 13 32-byte records,
 count at b +1876) is `VirtualAlloc`ed per color. Read by the B7 loop's
 mapping agent, 2026-11-08, from the lead "the car list the type 6 and 7

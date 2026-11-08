@@ -120,8 +120,8 @@ and `Mode::NextModeThunk` (`sub_82235C08`) in `boot-mode.md`;
 (`sub_822895E0`, `Type6Screen0`'s (9, 6)) in `location-screen.md`; `sub_820C8DE8` (the second set's
 fill, `StandScene::Create`'s) in `car-models.md`; `sub_8211AD00` and
 `UiMovies::DeleteAll`'s jump `sub_8211E370` in `ui-movies-game.md`;
-`sub_8211DE30` (a UI movie helper, no row: in a lead in
-`../loops/leads.md`);
+`sub_8211DE30` (`UiMovie::UnloopNamed`, in `ui-movies-game.md`
+since 2026-11-08);
 `LoadingScreen::Show`, `Run` and `Finish` in `race-loading.md`;
 `GarageStage::` in `front-end-car-draw.md` and `car-makers.md`.
 
