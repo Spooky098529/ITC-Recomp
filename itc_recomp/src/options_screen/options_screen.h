@@ -384,5 +384,16 @@ uint64_t MoveHudCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& c
 uint64_t MoveSoundCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t ChangeSoundValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t MoveSlidersCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821C35F0 Options::ChangeSlidersValue (step 19, 112-byte frame): on
+// the last row the OK/Default animations (229, 230), else
+// ShowSliderNumbers. 1.
+uint64_t ChangeSlidersValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821C2778 Options::LeaveButtons (step 1, 336-byte frame) and
+// sub_821C2A10 LeaveAnalog (step 2, 240): their tables written each pass;
+// first pass +684 = 0, the cursor's animations finished (or the last
+// row's), the edits put back (memcpy), the list and clashes shown; then
+// UiMovie::Run and +684 up by one: 1 from 10.
+uint64_t LeaveButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t LeaveAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

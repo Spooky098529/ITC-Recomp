@@ -123,5 +123,10 @@ void OptionsMoveHudCursor(PPCContext& ctx, uint8_t* base);
 void OptionsMoveSoundCursor(PPCContext& ctx, uint8_t* base);
 void OptionsChangeSoundValue(PPCContext& ctx, uint8_t* base);
 void OptionsMoveSlidersCursor(PPCContext& ctx, uint8_t* base);
+// The steps ChangeSlidersValue sub_821C35F0, LeaveButtons sub_821C2778 and
+// LeaveAnalog sub_821C2A10 (r3 the step word).
+void OptionsChangeSlidersValue(PPCContext& ctx, uint8_t* base);
+void OptionsLeaveButtons(PPCContext& ctx, uint8_t* base);
+void OptionsLeaveAnalog(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

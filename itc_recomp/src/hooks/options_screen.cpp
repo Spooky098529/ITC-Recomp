@@ -35,8 +35,9 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "sub_821C1068, Settings::Reload sub_821C0FF0 and Options::OnLeft sub_821B9E70 "
               "(with --native_heap), CategoryPage sub_821BC670, SetUpMovie sub_821BCFF0, Show "
               "sub_821C1158, MoveCategoryCursor sub_821C2BE0, MoveHudCursor sub_821C2E28, "
-              "MoveSoundCursor sub_821C3008, ChangeSoundValue sub_821C3278 and MoveSlidersCursor "
-              "sub_821C3398; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
+              "MoveSoundCursor sub_821C3008, ChangeSoundValue sub_821C3278, MoveSlidersCursor "
+              "sub_821C3398, ChangeSlidersValue sub_821C35F0, LeaveButtons sub_821C2778 and "
+              "LeaveAnalog sub_821C2A10; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -407,6 +408,21 @@ void OptionsMoveSlidersCursor(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::MoveSlidersCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void OptionsChangeSlidersValue(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ChangeSlidersValue(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsLeaveButtons(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::LeaveButtons(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsLeaveAnalog(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::LeaveAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -481,6 +497,9 @@ ITC_OPTIONS_SCREEN(821C2E28, OptionsMoveHudCursor)
 ITC_OPTIONS_SCREEN(821C3008, OptionsMoveSoundCursor)
 ITC_OPTIONS_SCREEN(821C3278, OptionsChangeSoundValue)
 ITC_OPTIONS_SCREEN(821C3398, OptionsMoveSlidersCursor)
+ITC_OPTIONS_SCREEN(821C35F0, OptionsChangeSlidersValue)
+ITC_OPTIONS_SCREEN(821C2778, OptionsLeaveButtons)
+ITC_OPTIONS_SCREEN(821C2A10, OptionsLeaveAnalog)
 // Options::ShowVolumeBar sub_821BE5A8: its override is the pause movie log's
 // wrap (src/debug/pause_movie_log.cpp), which calls the step under the flag.
 

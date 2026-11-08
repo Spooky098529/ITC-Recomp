@@ -1118,6 +1118,41 @@ void CursorSteps(Context& h, const World& w) {
         hooks::OptionsChangeSoundValue, {{128, 40}, {256, 208}, {160, 156}});
   Group(h, w, "Options::MoveSlidersCursor (sub_821C3398)", 150, cursor_step,
         __imp__sub_821C3398, hooks::OptionsMoveSlidersCursor, {{144, 96}, {64, 56}});
+  // ChangeSlidersValue: ShowSliderNumbers' frame below its own.
+  Group(
+      h, w, "Options::ChangeSlidersValue (sub_821C35F0)", 100,
+      [&](PPCContext& t, Random& r, const World& w) {
+        cursor_step(t, r, w);
+        guest::StoreU32(h.base, w.menu() + 0, r.Below(5));
+        for (const uint32_t f : {260u, 264u, 268u}) {
+          guest::StoreU32(h.base, w.settings() + f, uint32_t(int32_t(r.Below(21)) - 10));
+        }
+      },
+      __imp__sub_821C35F0, hooks::OptionsChangeSlidersValue, {{112, 24}, {256, 144}});
+  // The leaves: the cursor 0 to the last row (now and then past it), the
+  // first row shown 0 to 2, the edits and the current settings 0 to 16 (or
+  // 10: they land in the world's child indexes), the counter around 0 to 12.
+  // Below their frames the clashes' (with the list's varargs and register
+  // saves they leave unwritten left out) and the taken check's copy.
+  const auto leave = [&h](uint32_t last, uint32_t edits, uint32_t current, uint32_t count,
+                          uint32_t hi) {
+    return [&h, last, edits, current, count, hi](PPCContext& t, Random& r, const World& w) {
+      guest::StoreU32(h.base, w.page() + 24, r.Below(2));
+      t.r3.u64 = w.page() + 24;
+      guest::StoreU32(h.base, w.menu() + 0, r.Below(8) == 0 ? last + 1 : r.Below(last + 1));
+      guest::StoreU32(h.base, w.menu() + 48, r.Below(3));
+      for (uint32_t i = 0; i < count; i++) {
+        guest::StoreU32(h.base, w.settings() + edits + 4 * i, r.Below(hi + 1));
+        guest::StoreU32(h.base, w.settings() + current + 4 * i, r.Below(hi + 1));
+      }
+      guest::StoreU32(h.base, w.settings() + 660, r.Below(2));
+      guest::StoreU32(h.base, w.settings() + 684, Around(r, -1, 12));
+    };
+  };
+  Group(h, w, "Options::LeaveButtons (sub_821C2778)", 100, leave(12, 284, 92, 12, 16),
+        __imp__sub_821C2778, hooks::OptionsLeaveButtons, {{336, 40}, {640, 504}, {496, 380}});
+  Group(h, w, "Options::LeaveAnalog (sub_821C2A10)", 100, leave(6, 380, 188, 6, 10),
+        __imp__sub_821C2A10, hooks::OptionsLeaveAnalog, {{240, 40}, {528, 408}, {400, 284}});
 }
 
 }  // namespace

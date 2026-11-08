@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "native/buffers.h"
 #include "ui_movies/game.h"
 
 namespace options_screen {
@@ -518,6 +519,127 @@ uint64_t MoveSlidersCursor(uint8_t* base, uint32_t step, uint32_t sp, const Call
     m.SetHelp(0x821C35AC, uint64_t(c.now) + 996);
     m.ResetHelpScroll(0x821C35BC);
   });
+}
+
+uint64_t ChangeSlidersValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C35F0 Options::ChangeSlidersValue");
+  return Step(base, step, sp, 112, 0x821C36D4, calls, [&](const Movie& m, uint32_t frame) {
+    if (int32_t(LoadU32(base, LoadU32(base, kMenu) + 0)) != 3) {
+      ShowSliderNumbers(base, frame, calls);
+      return;
+    }
+    if (LoadU32(base, Settings(base) + 660) == 0) {
+      m.FinishNamed(0x821C3664, 230);
+      m.PlayNamed(0x821C3680, 229);
+      m.LoopNamed(0x821C36B8, 229);
+    } else {
+      m.FinishNamed(0x821C3690, 229);
+      m.PlayNamed(0x821C36AC, 230);
+      m.LoopNamed(0x821C36B8, 230);
+    }
+  });
+}
+
+namespace {
+
+// Steps 1 and 2 (the buttons' and analog pages' leave), their tables
+// written to the frame on every pass: the edits in menu order at +96 and
+// the pictures' two animations at `first` and `second`.
+struct LeaveStep {
+  uint32_t bytes;          // the frame
+  uint32_t edits[12];      // the edits' offsets in menu order
+  uint32_t count;          // the items
+  uint32_t first, second;  // the pictures' tables' offsets in the frame
+  const uint32_t* first_table;
+  const uint32_t* second_table;
+  uint32_t pictures;       // the tables' words
+  uint32_t row;            // the cursor's first animation (407 or 658)
+  uint32_t ok, back;       // the last row's (OK/Default 0, else)
+  uint32_t copy_to, copy_from, copy_bytes;  // the edits put back
+  uint32_t lr[8];  // FinishNamed (the row, the picture's two), the last row's
+                   // FinishNamed, memcpy, UiMovie::Run (two unused)
+};
+
+uint64_t RunLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls, const LeaveStep& l,
+                  bool analog) {
+  const uint32_t frame = sp - l.bytes;
+  StoreU32(base, frame, sp);
+  const Movie m{calls, frame, FindMovie(base, frame)};
+  const uint32_t o = Settings(base);
+  for (uint32_t i = 0; i < l.count; i++) {
+    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o + l.edits[i]));
+  }
+  for (uint32_t i = 0; i < l.pictures; i++) {
+    StoreU32(base, frame + l.first + 4 * i, l.first_table[i]);
+    StoreU32(base, frame + l.second + 4 * i, l.second_table[i]);
+  }
+  if (LoadU32(base, step) == 0) {
+    StoreU32(base, o + 684, 0);
+    const uint32_t menu = LoadU32(base, kMenu);
+    const uint32_t cursor = LoadU32(base, menu + 0);
+    if (cursor != l.count) {
+      m.FinishNamed(l.lr[0], uint64_t(cursor) - uint64_t(LoadU32(base, menu + 48)) + l.row);
+      uint32_t picture = LoadU32(base, frame + 96 + (cursor << 2));
+      if (analog) {
+        picture = AnalogPicture(picture);
+      }
+      const uint32_t index = picture << 2;
+      m.FinishNamed(l.lr[1], LoadU32(base, frame + l.first + index));
+      m.FinishNamed(l.lr[2], LoadU32(base, frame + l.second + index));
+      if (analog) {
+        ShowAnalogPicture(base, kMinusOne, frame);
+      } else {
+        ShowButtonPicture(base, kMinusOne, frame);
+      }
+    } else {
+      m.FinishNamed(l.lr[3], LoadU32(base, Settings(base) + 660) != 0 ? l.back : l.ok);
+    }
+    const uint32_t settings = Settings(base);
+    const uint32_t to = settings + l.copy_to, from = settings + l.copy_from;
+    if (!native::Buffers_Memcpy(base, to, from, l.copy_bytes, l.lr[4])) {
+      calls.Call(kMemcpy, frame, l.lr[4], to, from, l.copy_bytes);
+    }
+    if (analog) {
+      ShowAnalogList(base, frame, calls);
+      ShowAnalogClashes(base, frame, calls);
+    } else {
+      ShowButtonList(base, frame, calls);
+      ShowButtonClashes(base, frame, calls);
+    }
+    StoreU32(base, step, 1);
+  }
+  m.Run(l.lr[5]);
+  const uint32_t settings = Settings(base);
+  StoreU32(base, settings + 684, LoadU32(base, settings + 684) + 1);
+  return int32_t(LoadU32(base, Settings(base) + 684)) >= 10 ? 1 : 0;
+}
+
+}  // namespace
+
+uint64_t LeaveButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C2778 Options::LeaveButtons");
+  static constexpr uint32_t kFirst[17] = {422, 424, 426, 428, 430, 432, 434, 436, 438,
+                                          440, 442, 444, 446, 448, 450, 452, 454};
+  static constexpr uint32_t kSecond[17] = {423, 425, 427, 429, 431, 433, 435, 437, 439,
+                                           441, 443, 445, 447, 449, 451, 453, 455};
+  static constexpr LeaveStep kLeave = {
+      336, {284, 288, 292, 296, 300, 304, 320, 312, 316, 308, 324, 328},
+      12, 144, 224, kFirst, kSecond, 17, 407, 353, 354, 284, 92, 48,
+      {0x821C2958, 0x821C2978, 0x821C2988, 0x821C29B0, 0x821C29C4, 0x821C29E0, 0, 0}};
+  return RunLeave(base, step, sp, calls, kLeave, false);
+}
+
+uint64_t LeaveAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C2A10 Options::LeaveAnalog");
+  // Seven words each (the others' tables have 11: picture 10 reads past
+  // them, as the original).
+  static constexpr uint32_t kFirst[7] = {673, 675, 677, 679, 681, 683, 693};
+  static constexpr uint32_t kSecond[7] = {674, 676, 678, 680, 682, 684, 694};
+  static constexpr LeaveStep kLeave = {
+      240, {380, 384, 388, 396, 392, 400}, 6, 128, 160, kFirst, kSecond, 7, 658, 604, 605,
+      380, 188, 24,
+      {0x821C2B20, 0x821C2B48, 0x821C2B58, 0x821C2B80, 0x821C2B94, 0x821C2BB0, 0, 0}};
+  return RunLeave(base, step, sp, calls, kLeave, true);
 }
 
 }  // namespace options_screen
