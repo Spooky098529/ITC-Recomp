@@ -13,6 +13,23 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- `functions/options-screen.md` (new, 155 rows, 95 in play; bce411a9):
+  the front end's options screen and the settings' load
+  (`Settings::Reset`, `Read`, `Write`, `Reload`; `Draw`'s 15 pages and
+  `Update`'s 49 steps from their tables), `sub_821BE5A8` moved from
+  `functions.md`; `known-data.md`'s settings row (`0x826D8470`..
+  `0x826D8494`: three 192-byte blocks, current, edits and defaults,
+  mapped to the save options at `SaveData::Of(0)` + 0x1F85C; the
+  category table). Game quirks kept (no behavior change):
+  `Settings::Write` stores player 1's analog slot 4 from word 3, so
+  that setting never persists; step 39 (`ChangeAnalog2P`) can't change
+  item 3; step 2 (`LeaveAnalog`) reads past its 7-entry tables for
+  analog index 14 (only a saved value could give it). Inferred: type 8
+  / context 4 as split screen, the controller pages as player 2's.
+  Four jump-table tails the recompiler split off are rows marked as
+  tails. Noted, not changed: `src/debug/pause_movie_log.cpp`'s comment
+  says `sub_821BE5A8` sets children 1-15's +80 flag; it sets 22-36.
+
 - Cleanup lead `sub_820C8DE8` (c709d9ed..92169ce4): `CarScene::SetUp`
   (`car-models.md`, the second set's fill, under `--native_car_models`),
   `StandScene::Create` and the type 6 and 7 modes' slot 0

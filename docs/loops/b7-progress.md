@@ -31,7 +31,14 @@ file's history. What's left to see in a drive, from every run:
   groups in `leads.md`, 29, beside the type 6 and 7 modes; and
   `sub_821BBF00` and the 4 others, the options screens' volume calls
   over the same settings `[0x826D8478]`; both lines deleted from
-  `leads.md`). Mapping agent running.
+  `leads.md`). Map checked (bce411a9: `options-screen.md`, 155 rows,
+  1 moved from `functions.md` (`sub_821BE5A8`, Wrapped), 95 in play:
+  the machine's handlers, `Settings::Reset`, `Read`, `Write`,
+  `Reload`, `Draw`'s 15 pages, `Update`'s 49 steps, the music preview,
+  the two-player pages, the type 2, 4 and 8 options' and controller
+  pages' Inits; 0 errors; 66 ready groups; 1 lead added (the options'
+  save side); three subagents, one at a time). Migration agent
+  running.
 
 ## Done
 
@@ -57,3 +64,5 @@ file's history. What's left to see in a drive, from every run:
   unknown 1237).
 - After the cleanup lead's migration: ours 4703, work left 1717
   (wrapped 57, known 423, unknown 1237).
+- After the options screen's map: ours 4703, work left 1717 (wrapped
+  57, known 517, unknown 1143).
