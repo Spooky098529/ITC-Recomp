@@ -1,0 +1,301 @@
+// PanelSet's pages and steps (docs/functions/car-list.md): see car_list.h.
+
+#include "car_list/car_list.h"
+
+#include "base/log.h"
+#include "guest.h"
+#include "memory/heap.h"
+
+namespace car_list {
+
+namespace {
+
+using guest::LoadU32;
+using guest::StoreU32;
+
+uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+  StoreU32(base, sp - bytes, sp);
+  return sp - bytes;
+}
+
+// VirtualFree(block, 0, MEM_RELEASE): the allocation layer's pages freed
+// (1), else a guest call to its override.
+uint64_t FreePages(uint32_t block, uint32_t frame, uint32_t lr, const Calls& calls) {
+  if (memory::IsPages(block)) {
+    return memory::FreePages(block) ? 1 : 0;
+  }
+  return calls.Call(kVirtualFree, frame, lr, block, 0, 0x8000);
+}
+
+// The fade the steps start: [0x82815EB0] = 1, then ScreenFades::FadeOut or
+// FadeIn([passes], 0, 0, 0, 0).
+uint64_t Fade(uint8_t* base, uint32_t function, uint32_t passes, uint32_t frame, uint32_t lr,
+              const Calls& calls) {
+  const uint32_t count = LoadU32(base, passes);
+  StoreU32(base, kFadeWait, 1);
+  return calls.Call(function, frame, lr, count, 0, 0, 0);
+}
+
+}  // namespace
+
+uint64_t ToTabs(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82249558 PanelSetBase::ToTabs");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t page = LoadU32(base, b + 32);
+  if (page != 0) {
+    StoreU32(base, b + 40, page);
+  }
+  StoreU32(base, b + 44, 0);
+  StoreU32(base, b + 48, 1);
+  StoreU32(base, b + 36, 0);
+  StoreU32(base, b + 32, 0xFFFFFFFFu);
+  StoreU32(base, LoadU32(base, b + 1900) + 152, 0);
+  if (LoadU32(base, b + 1936) == 0) {
+    return b_r3;
+  }
+  StoreU32(base, frame + 84, 159);
+  StoreU32(base, frame + 92, 158);
+  // The menu's address as addi leaves it (r3's high half kept).
+  const uint64_t args[8] = {b_r3 + 60, 3, 3, 1, 154, 153, 155, 156};
+  calls.CallArgs(kMenuListInit, frame, 0x822495E8, args);
+  return calls.Call(kMenuListSetSelection, frame, 0x822495F4, b_r3 + 60, LoadU32(base, b + 232));
+}
+
+uint64_t Open(uint8_t* base, uint64_t set, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82249730 PanelSet::Open");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint64_t b_r3 = set + 4;
+  const uint32_t b = uint32_t(b_r3);
+  for (const uint32_t at : {8u, 12u, 16u, 20u, 24u}) StoreU32(base, b + at, 0);
+  StoreU32(base, b + 1940, 1);
+  StoreU32(base, b + 1948, 1);
+  for (const uint32_t at : {36u, 32u, 40u, 52u, 44u}) StoreU32(base, b + at, 0xFFFFFFFFu);
+  StoreU32(base, b + 56, 0);
+  StoreU32(base, b + 1820, 0);
+  for (const uint32_t at : {228u, 232u, 236u, 240u, 244u, 248u}) StoreU32(base, b + at, 0);
+  const uint32_t kind = LoadU32(base, uint32_t(set) + 1932);
+  StoreU32(base, b + 52, 0xFFFFFFFFu);
+  StoreU32(base, b + 44, 0xFFFFFFFFu);
+  StoreU32(base, b + 56, 0);
+  uint64_t r3 = b_r3;
+  if (kind == 1) {
+    StoreU32(base, b + 36, 0);
+    StoreU32(base, b + 32, 0);
+    StoreU32(base, b + 40, 0);
+    const uint32_t tab = LoadU32(base, b + 1880);
+    StoreU32(base, b + 232, tab);
+    StoreU32(base, b + 228, tab);
+    r3 = ToTabs(base, b_r3, frame, calls);
+  } else {
+    StoreU32(base, b + 36, 1);
+    StoreU32(base, b + 32, 1);
+    StoreU32(base, b + 40, 1);
+    StoreU32(base, b + 228, 0);
+    StoreU32(base, b + 232, 0);
+    StoreU32(base, b + 1820, b + 272);
+    const uint32_t page = LoadU32(base, b + 32);
+    if (page != 1) {
+      StoreU32(base, b + 40, page);
+    }
+    StoreU32(base, b + 36, 1);
+    StoreU32(base, b + 32, 0xFFFFFFFFu);
+    StoreU32(base, b + 44, 4);
+    StoreU32(base, b + 48, 6);
+    StoreU32(base, LoadU32(base, b + 1900) + 152, 1);
+  }
+  StoreU32(base, uint32_t(set) + 1944, 0);
+  return r3;
+}
+
+uint64_t Free(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224B538 PanelSetBase::Free");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 112);
+  StoreU32(base, b + 1820, 0);
+  // Each list (its entries from +0, the count at `count`) freed from the
+  // last entry down.
+  const auto free_list = [&](uint32_t list, uint32_t count, uint32_t whole, uint32_t lr) {
+    while (LoadU32(base, b + whole) != 0) {
+      const uint32_t n = LoadU32(base, list + count) - 1;
+      StoreU32(base, list + count, n);
+      FreePages(LoadU32(base, list + 4 * n), frame, lr, calls);
+    }
+  };
+  free_list(b + 272, 512, 784, 0x8224B588);
+  free_list(b + 788, 512, 1300, 0x8224B5C4);
+  free_list(b + 1304, 512, 1816, 0x8224B600);
+  free_list(b + 1824, 52, 1876, 0x8224B63C);
+  calls.Call(kMenuListRelease, frame, 0x8224B650, b_r3 + 60);
+  return calls.Call(kMenuListRelease, frame, 0x8224B658, b_r3 + 132);
+}
+
+uint64_t BackPage8(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224A3F8 PanelSetBase::BackPage8");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t confirm = LoadU32(base, b + 1892);
+  if (confirm != 0) {
+    StoreU32(base, confirm + 4, LoadU32(base, confirm + 12));
+  }
+  const uint64_t r3 = Fade(base, kFadeIn, kFadeInPasses, frame, 0x8224A448, calls);
+  const uint32_t page = LoadU32(base, b + 32);
+  if (page != 2) {
+    StoreU32(base, b + 40, page);
+  }
+  StoreU32(base, b + 44, 9);
+  StoreU32(base, b + 48, 11);
+  StoreU32(base, b + 36, 2);
+  StoreU32(base, b + 32, 0xFFFFFFFFu);
+  return r3;
+}
+
+uint64_t HandleInput(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224BF30 PanelSetBase::HandleInput");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 176);
+  // The handlers' table on the frame (+80 to +112), two words 0 after it.
+  static constexpr uint32_t kPages[9] = {0x82249EB8, 0x8224A178, 0x8224B8D8,
+                                         0x8224AEA8, 0x82248E60, 0x82248EF0,
+                                         0x8224BDC0, 0x8224A368, 0x8224A3F8};
+  const uint32_t page = LoadU32(base, b + 32);
+  for (uint32_t i = 0; i < 9; i++) {
+    StoreU32(base, frame + 80 + 4 * i, kPages[i]);
+  }
+  StoreU32(base, frame + 116, 0);
+  StoreU32(base, frame + 120, 0);
+  StoreU32(base, b + 1936, page != LoadU32(base, b + 1932) ? 1 : 0);
+  // r3 as the original's lis and addi leave it (sign-extended) when no
+  // handler runs.
+  uint64_t r3 = 0xFFFFFFFF8224B8D8ull;
+  if (page != 0xFFFFFFFFu) {
+    const uint32_t handler = LoadU32(base, frame + 80 + 4 * page);
+    switch (handler) {
+      case 0x82248EF0:
+        r3 = PickedPage(base, b_r3);
+        break;
+      case 0x8224A3F8:
+        r3 = BackPage8(base, b_r3, frame, calls);
+        break;
+      default:
+        r3 = calls.Call(handler, frame, 0x8224BFF8, b_r3);
+        break;
+    }
+  }
+  StoreU32(base, b + 1932, page);
+  return r3;
+}
+
+uint64_t Step2(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82248F00 PanelSetBase::Step2");
+  const uint32_t frame = Frame(base, sp, 128);
+  if (LoadU32(base, word) != 0) {
+    return 1;
+  }
+  const uint32_t tabs = LoadU32(base, b + 1896);
+  if (tabs != 0) {
+    const uint32_t moves = LoadU32(base, b + 84);
+    const uint64_t before = calls.Call(kMenuListPrevious, frame, 0x82248F3C, b + 60);
+    const uint64_t tab = calls.Call(kMenuListSelection, frame, 0x82248F48, b + 60);
+    TabMove(base, LoadU32(base, b + 1896), tab, before, moves, frame, calls);
+  }
+  StoreU32(base, word, 1);
+  return 1;
+}
+
+uint64_t Step3(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224A718 PanelSetBase::Step3");
+  const uint32_t frame = Frame(base, sp, 112);
+  if (LoadU32(base, word) == 0) {
+    if (LoadU32(base, b + 1948) != 0) {
+      Fade(base, kFadeOut, kFadeOutPasses, frame, 0x8224A76C, calls);
+    }
+    // The empty sub_82106540 on F (its override does nothing).
+    StoreU32(base, word, 1);
+  }
+  uint32_t waited = 1;
+  uint64_t r3 = 1;
+  if (LoadU32(base, b + 1948) != 0) {
+    waited = LoadU32(base, kFadeWait) == 0 ? 1 : 0;
+  }
+  const uint32_t tabs = LoadU32(base, b + 1896);
+  if (tabs != 0) {
+    r3 = calls.Call(kTabFinished, frame, 0x8224A7B8, tabs);
+  }
+  return waited != 0 && uint32_t(r3) != 0 ? 1 : 0;
+}
+
+uint64_t Step7(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82249098 PanelSetBase::Step7");
+  const uint32_t frame = Frame(base, sp, 144);
+  if (LoadU32(base, word) != 0) {
+    return 1;
+  }
+  if (LoadU32(base, b + 1900) != 0) {
+    const uint32_t list = b + 60;
+    const uint32_t step = LoadU32(base, b + 84);
+    const uint32_t scroll = LoadU32(base, b + 64);
+    const uint64_t moves = uint64_t(LoadU32(base, list + 4)) - uint64_t(LoadU32(base, list + 8));
+    const uint64_t before = calls.Call(kMenuListPrevious, frame, 0x822490E4, list);
+    const uint64_t row = calls.Call(kMenuListSelection, frame, 0x822490F0, list);
+    RowMove(base, LoadU32(base, b + 1900), row, before, moves, scroll, LoadU32(base, b + 1820),
+            frame, calls);
+    (void)step;  // r8, which RowPanel::Move doesn't read
+  }
+  StoreU32(base, word, 1);
+  return 1;
+}
+
+uint64_t Step11(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224A7E0 PanelSetBase::Step11");
+  const uint32_t frame = Frame(base, sp, 112);
+  if (LoadU32(base, word) != 0) {
+    return 1;
+  }
+  if (LoadU32(base, b + 1908) != 0) {
+    const uint64_t item = calls.Call(kMenuListSelection, frame, 0x8224A818, b + 60);
+    StoreU32(base, LoadU32(base, b + 1908) + 8, uint32_t(item));
+    const uint32_t count = LoadU32(base, LoadU32(base, b + 1820) + 512);
+    CarSelect(base, LoadU32(base, b + 1908), count > 1 ? 1 : 0, frame, calls);
+  }
+  StoreU32(base, word, 1);
+  return 1;
+}
+
+uint64_t Step18(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82249258 PanelSetBase::Step18");
+  const uint32_t frame = Frame(base, sp, 112);
+  if (LoadU32(base, word) != 0) {
+    return 1;
+  }
+  if (LoadU32(base, b + 1904) != 0) {
+    const uint64_t item = calls.Call(kMenuListSelection, frame, 0x82249294, b + 60);
+    ColorSelect(base, LoadU32(base, b + 1904), item, frame, calls);
+  }
+  StoreU32(base, word, 1);
+  return 1;
+}
+
+uint64_t Step26(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224A8E0 PanelSetBase::Step26");
+  const uint32_t frame = Frame(base, sp, 112);
+  if (LoadU32(base, word) == 0) {
+    if (LoadU32(base, b + 1948) != 0) {
+      Fade(base, kFadeOut, kFadeOutPasses, frame, 0x8224A934, calls);
+    }
+    StoreU32(base, word, 1);
+  }
+  const uint32_t done = LoadU32(base, kFadeWait) == 0 ? 1 : 0;
+  if (done == 0) {
+    return 0;
+  }
+  if (LoadU32(base, b + 1904) != 0) {
+    PartFinishAll(base, LoadU32(base, b + 1904), frame, calls);
+  }
+  if (LoadU32(base, b + 1896) != 0) {
+    PartFinishAll(base, LoadU32(base, b + 1896), frame, calls);
+  }
+  return done;
+}
+
+}  // namespace car_list

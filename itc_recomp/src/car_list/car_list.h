@@ -192,6 +192,54 @@ uint64_t PickedPage(uint8_t* base, uint64_t b);
 // ported) + 120,108 x +1952, else SaveData::Of(0).
 uint64_t SaveData(uint8_t* base, uint32_t b, uint32_t sp);
 
+// --- PanelSet's pages and steps (pages.cpp; r3 = b, a step's r4 its
+// first-pass word b + 56) ---
+
+// The guest calls: MenuList::Init (r3 to r10 and two words at the
+// caller's frame + 84 and + 92), SetSelection, Selection, the previous
+// selection (sub_8220BC28), Release; VirtualFree (where the block isn't the
+// allocation layer's pages); ScreenFades::FadeIn and FadeOut; sub_825C8390
+// (TabPanel's "finished", 1).
+constexpr uint32_t kMenuListInit = 0x8220BAC0;
+constexpr uint32_t kMenuListSetSelection = 0x8220BC30;
+constexpr uint32_t kMenuListSelection = 0x8220BC20;
+constexpr uint32_t kMenuListPrevious = 0x8220BC28;
+constexpr uint32_t kMenuListRelease = 0x8220BBB0;
+constexpr uint32_t kVirtualFree = 0x82295330;
+constexpr uint32_t kFadeIn = 0x8209D038;
+constexpr uint32_t kFadeOut = 0x8209D0C8;
+constexpr uint32_t kTabFinished = 0x825C8390;
+// The fades' pass counts (FadeIn's, FadeOut's) and the steps' wait word.
+constexpr uint32_t kFadeInPasses = 0x82001BEC;
+constexpr uint32_t kFadeOutPasses = 0x82001BF0;
+constexpr uint32_t kFadeWait = 0x82815EB0;
+
+// sub_82249558 PanelSetBase::ToTabs.
+uint64_t ToTabs(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+// sub_82249730 PanelSet::Open (slot 3; r3 the set).
+uint64_t Open(uint8_t* base, uint64_t set, uint32_t sp, const Calls& calls);
+// sub_8224B538 PanelSetBase::Free (the lists' entries and the colors freed,
+// VirtualFree; the menus released) and sub_8224B880 PanelSet::Free (slot
+// 7, on the set + 4).
+uint64_t Free(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224BF30 PanelSetBase::HandleInput and sub_8224CA28
+// PanelSet::HandleInput (slot 5, on the set + 4): the page's handler from
+// the table of 9 on the frame (the plain C++ where it's ours, else a guest
+// call).
+uint64_t HandleInput(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224A3F8 PanelSetBase::BackPage8 (page 8).
+uint64_t BackPage8(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+// The steps (each returns its answer): sub_82248F00 Step2 (F's Move),
+// sub_8224A718 Step3 (the fade out, F finished), sub_82249098 Step7 (E's
+// Move), sub_8224A7E0 Step11 (C's Select), sub_82249258 Step18 (D's
+// Select), sub_8224A8E0 Step26 (the fade out, D and F finished).
+uint64_t Step2(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step3(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step7(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step11(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step18(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step26(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+
 // --- The power graph's record (panels.cpp) ---
 
 // The power graph screen's record's holder ([0x82815EBC]; the record at

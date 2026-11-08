@@ -98,7 +98,7 @@ Random Mixed(uint64_t seed) {
 // The movie world.
 constexpr uint32_t kMovieHeaderBytes = 0xA000;
 constexpr uint32_t kMovieCount = 2;
-constexpr uint32_t kTreeNodeBytes = 0x400;
+constexpr uint32_t kTreeNodeBytes = 0x800;  // 240 entries: RowPanel::SetRow stores a logo frame (up to 79) at a node's +108
 constexpr uint32_t kNodes = 48, kAnimations = 8;
 constexpr uint32_t kNodesAt = kMovieCount * kMovieHeaderBytes;
 constexpr uint32_t kAnimationsAt = kNodesAt + kNodes * kTreeNodeBytes;
@@ -118,10 +118,12 @@ constexpr uint32_t kTagTxt = 0x54585400;
 constexpr uint32_t kObjectsBytes = 0x1000;
 constexpr uint32_t kGroupA = 0x200, kGroupB = 0x240, kVtable = 0x300, kRecord = 0x400;
 constexpr uint32_t kColors = 0x800, kColorRecords = 0x900;
-// A car list (128 entry pointers, +512 the count) at +0xA04, the word
-// before it an entry pointer too (RowPanel::Move reads it).
+// A car list (128 entry pointers, +512 the count) at +0xA04, the two words
+// before it entry pointers too (RowPanel::Move reads the word before the
+// scroll's entry).
 constexpr uint32_t kList = 0xA04;
 constexpr uint32_t kEntryBytes = 8448;
+constexpr uint32_t kSetBytes = 0x1000;
 
 struct World {
   World()
@@ -129,11 +131,13 @@ struct World {
         entry(kEntryBytes),
         movies(kMovieWorldBytes),
         texts(kTextWorldBytes),
-        strings(kStringWorldBytes) {}
+        strings(kStringWorldBytes),
+        set(kSetBytes) {}
   bool ok() const {
     return objects.address != 0 && entry.address != 0 && movies.address != 0 &&
-           texts.address != 0 && strings.address != 0;
+           texts.address != 0 && strings.address != 0 && set.address != 0;
   }
+  uint32_t b() const { return set.address + 4; }
   uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
   uint32_t node(uint32_t k) const { return movies.address + kNodesAt + kTreeNodeBytes * k; }
   uint32_t animation(uint32_t k) const { return movies.address + kAnimationsAt + 64 * k; }
@@ -144,11 +148,13 @@ struct World {
   Block movies;
   Block texts;
   Block strings;
+  Block set;  // a PanelSet at +0 (its base b at +4)
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4},
-    {car_list::kTwoPlayers, 4},   {car_list::kPowerGraph, 4}};
+    {car_list::kTwoPlayers, 4},   {car_list::kPowerGraph, 4},
+    {car_list::kFadeWait, 4},     {0x826A50AC, 64}};  // the screen fades' words
 
 // The string table: 17 files' pointers to one container of entries enough
 // for the widest file (the bounds at 0x82007E18), each one of 8 strings of
@@ -263,6 +269,7 @@ uint32_t Index(Random& r) { return r.Below(6) == 0 ? 0xFFFFFFFFu : r.Below(64); 
 // r3 + 20); the colors' list (count 0 to 13, its records' pointers); the
 // entry's car id 0 to 79 and the spec's bytes +769 0 to 9.
 void ShapeWorld(uint8_t* base, const World& w, Random& r) {
+  WriteRandom(base, w.set.address, w.set.bytes, r);
   WriteRandom(base, w.objects.address, w.objects.bytes, r);
   WriteRandom(base, w.entry.address, w.entry.bytes, r);
   for (uint32_t i = 0; i < 0x200; i += 4) {
@@ -281,8 +288,8 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t i = 0; i < 13; i++) {
     guest::StoreU32(base, w.at(kColors) + 4 * i, w.at(kColorRecords) + 32 * i);
   }
-  for (uint32_t i = 0; i <= 128; i++) {
-    guest::StoreU32(base, w.at(kList) - 4 + 4 * i, w.entry.address);
+  for (uint32_t i = 0; i <= 129; i++) {
+    guest::StoreU32(base, w.at(kList) - 8 + 4 * i, w.entry.address);
   }
   guest::StoreU32(base, w.at(kList) + 512, r.Below(21));
   guest::StoreU32(base, car_list::kTwoPlayers, 0);
@@ -293,6 +300,9 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
 }
 
 using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
+// Run after the function, before the outputs are read (blocks the run
+// allocated or freed compared by kind and put back).
+using AfterFn = std::function<void(const World&, Outputs&)>;
 
 // A function's frame: its size and the register saves at its top.
 struct Frame {
@@ -300,7 +310,8 @@ struct Frame {
 };
 
 void Case(Context& h, Results& results, const World& w, uint64_t seed, const SetupFn& setup,
-          GuestFunction recompiled, GuestFunction native, Frame frame, const std::string& what) {
+          GuestFunction recompiled, GuestFunction native, Frame frame, const std::string& what,
+          const AfterFn& after) {
   Outputs out[2];
   for (int v = 0; v < 2; v++) {
     Random r = Mixed(seed);
@@ -318,6 +329,10 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     ITC_FLAG(native_car_list) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_car_list) = true;
+    if (after) {
+      after(w, out[v]);
+    }
+    out[v].Bytes(Read(h.base, w.set.address, w.set.bytes));
     out[v].Bytes(Read(h.base, w.objects.address, w.objects.bytes));
     out[v].Bytes(Read(h.base, w.entry.address, w.entry.bytes));
     out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
@@ -341,11 +356,12 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
 }
 
 void Group(Context& h, const World& w, const char* name, int cases, Frame frame,
-           const SetupFn& setup, GuestFunction recompiled, GuestFunction native) {
+           const SetupFn& setup, GuestFunction recompiled, GuestFunction native,
+           const AfterFn& after = {}) {
   Results results(name);
   for (int c = 0; c < cases; c++) {
     Case(h, results, w, h.random.Next(), setup, recompiled, native, frame,
-         fmt::format("case {}", c));
+         fmt::format("case {}", c), after);
   }
   results.Report();
 }
@@ -713,6 +729,176 @@ void Leaves(Context& h, const World& w) {
       __imp__sub_82249668, hooks::CarListSaveData);
 }
 
+// --- PanelSet's pages and steps ---
+
+// Blocks a case allocated (the layer's pages) and the slots holding them,
+// and the menus' blocks (+68) a run may make: compared by whether they're
+// still pages after, freed, and their words replaced by markers.
+std::vector<std::pair<uint32_t, uint32_t>> g_blocks;
+
+void TrackBlock(uint8_t* base, uint32_t slot) {
+  const uint32_t block = memory::AllocPages(64, 4096);
+  guest::StoreU32(base, slot, block);
+  g_blocks.emplace_back(slot, block);
+}
+
+void SettleBlocks(uint8_t* base, const World& w, Outputs& out) {
+  uint32_t marker = 0xB10C0000;
+  for (const auto& [slot, block] : g_blocks) {
+    const bool pages = block != 0 && memory::IsPages(block);
+    out.Word(pages ? 1 : 0);
+    if (pages) memory::FreePages(block);
+    if (guest::LoadU32(base, slot) == block) guest::StoreU32(base, slot, marker);
+    marker++;
+  }
+  g_blocks.clear();
+  for (const uint32_t menu : {60u, 132u}) {
+    const uint32_t slot = w.b() + menu + 68;
+    const uint32_t block = guest::LoadU32(base, slot);
+    if (block == 0 || (block & 0xFFFF0000u) == 0xB10C0000u) continue;
+    const bool pages = memory::IsPages(block);
+    out.Word(pages ? 1 : 0);
+    if (pages) memory::FreePages(block);
+    guest::StoreU32(base, slot, 0xB10CFFFF);
+  }
+}
+
+// The set's shape: its panel E the world's panel (+0 a group, +4 the rows
+// shown 0 to 8, its rows' nodes +20 to +60 not negative), its panels F, D
+// and C one panel at the objects' +0x480 (its words indices, +4 and +12 a
+// group), each now and then 0 where the original tests the pointer (E
+// always set: Open and ToTabs write its +152); the list +1820 the world's
+// list, the two menus' words small (+68, the block, 0), the page words -1
+// to 8, the flags 0 or 1, the confirm panel (+1892) 0 or a block in the
+// objects' +0xE00.
+constexpr uint32_t kOtherPanel = 0x480;
+
+void ShapeSet(uint8_t* base, const World& w, Random& r, bool nulls) {
+  g_blocks.clear();
+  const uint32_t b = w.b();
+  SetGroup(base, w, r, 0);
+  guest::StoreU32(base, w.panel() + 4, r.Below(9));
+  for (uint32_t at = 20; at <= 60; at += 4) {
+    guest::StoreU32(base, w.panel() + at, r.Below(64));
+  }
+  const uint32_t other = w.at(kOtherPanel);
+  for (uint32_t i = 0; i < 0x180; i += 4) {
+    guest::StoreU32(base, other + i, Index(r));
+  }
+  for (const uint32_t at : {4u, 12u}) {
+    guest::StoreU32(base, other + at, w.at(r.Below(2) == 0 ? kGroupA : kGroupB));
+  }
+  for (const uint32_t at : {1896u, 1904u, 1908u}) {
+    guest::StoreU32(base, b + at, nulls && r.Below(6) == 0 ? 0 : other);
+  }
+  guest::StoreU32(base, b + 1900, w.panel());
+  guest::StoreU32(base, b + 1820, w.at(kList));
+  for (const uint32_t menu : {60u, 132u}) {
+    for (uint32_t i = 0; i < 72; i += 4) {
+      guest::StoreU32(base, b + menu + i, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(9));
+    }
+    guest::StoreU32(base, b + menu + 68, 0);
+  }
+  guest::StoreU32(base, b + 64, r.Below(9));  // the rows' scroll
+  for (const uint32_t at : {32u, 36u, 40u, 44u, 48u, 1932u}) {
+    guest::StoreU32(base, b + at, r.Below(10) - 1);
+  }
+  for (const uint32_t at : {1936u, 1940u, 1944u, 1948u}) {
+    guest::StoreU32(base, b + at, r.Below(2));
+  }
+  guest::StoreU32(base, b + 1880, r.Below(3));
+  guest::StoreU32(base, b + 232, r.Below(3));
+  guest::StoreU32(base, b + 1892, r.Below(2) == 0 ? 0 : w.at(0xE00));
+  guest::StoreU32(base, w.set.address + 1932, r.Below(3));  // the open kind
+  guest::StoreU32(base, car_list::kFadeWait, r.Below(2));
+}
+
+void Steps(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const int n = 30;
+  const auto set = [base](PPCContext& t, Random& r, const World& w) {
+    ShapeSet(base, w, r, true);
+    t.r3.u64 = w.b() | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+  };
+  const AfterFn settle = [base](const World& w, Outputs& out) { SettleBlocks(base, w, out); };
+  Group(h, w, "PanelSetBase::ToTabs (sub_82249558)", n, {128, 24}, set, __imp__sub_82249558,
+        hooks::CarListToTabs, settle);
+  Group(
+      h, w, "PanelSet::Open (sub_82249730)", n, {112, 24},
+      [set](PPCContext& t, Random& r, const World& w) {
+        set(t, r, w);
+        t.r3.u64 -= 4;  // the set
+      },
+      __imp__sub_82249730, hooks::CarListOpen, settle);
+  // Free: each list 0 to 3 entries of the layer's pages, the menus' blocks
+  // pages or 0.
+  const auto lists = [base, set](PPCContext& t, Random& r, const World& w) {
+    set(t, r, w);
+    const uint32_t b = w.b();
+    const uint32_t list_at[4] = {272, 788, 1304, 1824};
+    const uint32_t count_at[4] = {784, 1300, 1816, 1876};
+    for (int i = 0; i < 4; i++) {
+      const uint32_t count = r.Below(4);
+      guest::StoreU32(base, b + count_at[i], count);
+      for (uint32_t k = 0; k < count; k++) TrackBlock(base, b + list_at[i] + 4 * k);
+    }
+    for (const uint32_t menu : {60u, 132u}) {
+      if (r.Below(2) == 0) TrackBlock(base, b + menu + 68);
+    }
+  };
+  Group(h, w, "PanelSetBase::Free (sub_8224B538)", n, {112, 32}, lists, __imp__sub_8224B538,
+        hooks::CarListBaseFree, settle);
+  Group(
+      h, w, "PanelSet::Free (sub_8224B880)", 12, {112, 32},
+      [lists](PPCContext& t, Random& r, const World& w) {
+        lists(t, r, w);
+        t.r3.u64 -= 4;
+      },
+      __imp__sub_8224B880, hooks::CarListSetFree, settle);
+  // HandleInput: the pages -1, 5, 7 (BackPage7, the original through the
+  // table) and 8.
+  const auto input = [base, set](PPCContext& t, Random& r, const World& w) {
+    set(t, r, w);
+    static constexpr uint32_t kPages[4] = {0xFFFFFFFFu, 5, 7, 8};
+    guest::StoreU32(base, w.b() + 32, kPages[r.Below(4)]);
+  };
+  Group(h, w, "PanelSetBase::HandleInput (sub_8224BF30)", n, {176, 48}, input,
+        __imp__sub_8224BF30, hooks::CarListBaseHandleInput, settle);
+  Group(
+      h, w, "PanelSet::HandleInput (sub_8224CA28)", 12, {176, 48},
+      [input](PPCContext& t, Random& r, const World& w) {
+        input(t, r, w);
+        t.r3.u64 -= 4;
+      },
+      __imp__sub_8224CA28, hooks::CarListSetHandleInput, settle);
+  Group(h, w, "PanelSetBase::BackPage8 (sub_8224A3F8)", n, {96, 16}, set, __imp__sub_8224A3F8,
+        hooks::CarListBackPage8, settle);
+  // The steps: r4 the first-pass word (b + 56) 0 or 1.
+  const auto step = [base, set](PPCContext& t, Random& r, const World& w) {
+    set(t, r, w);
+    guest::StoreU32(base, w.b() + 56, r.Below(3) == 0 ? 1 : 0);
+    t.r4.u64 = w.b() + 56;
+  };
+  const struct {
+    const char* name;
+    Frame frame;
+    GuestFunction recompiled, native;
+  } steps[] = {
+      {"PanelSetBase::Step2 (sub_82248F00)", {128, 48}, __imp__sub_82248F00, hooks::CarListStep2},
+      {"PanelSetBase::Step3 (sub_8224A718)", {112, 32}, __imp__sub_8224A718, hooks::CarListStep3},
+      {"PanelSetBase::Step7 (sub_82249098)", {144, 64}, __imp__sub_82249098, hooks::CarListStep7},
+      {"PanelSetBase::Step11 (sub_8224A7E0)", {112, 32}, __imp__sub_8224A7E0,
+       hooks::CarListStep11},
+      {"PanelSetBase::Step18 (sub_82249258)", {112, 24}, __imp__sub_82249258,
+       hooks::CarListStep18},
+      {"PanelSetBase::Step26 (sub_8224A8E0)", {112, 32}, __imp__sub_8224A8E0,
+       hooks::CarListStep26},
+  };
+  for (const auto& s : steps) {
+    Group(h, w, s.name, 40, s.frame, step, s.recompiled, s.native, settle);
+  }
+}
+
 }  // namespace
 
 void CarList(Context& h) {
@@ -725,6 +911,7 @@ void CarList(Context& h) {
   Panels(h, w);
   MorePanels(h, w);
   Leaves(h, w);
+  Steps(h, w);
 }
 
 }  // namespace harness

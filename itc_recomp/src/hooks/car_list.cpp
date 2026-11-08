@@ -25,7 +25,14 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "sub_82249848, WentBack sub_82249870, WantsPowerGraph sub_82249898, SetOpenKind "
               "sub_8224B6D8, SetPreviousTab sub_8224B6E8, SetPreviousEntry sub_8224B6F0, "
               "SetPreviousColor sub_8224B6F8, PanelSetBase::PickedPage sub_82248EF0 and SaveData "
-              "sub_82249668 (SaveData::Of's plain C++); the UI "
+              "sub_82249668 (SaveData::Of's plain C++); PanelSetBase::ToTabs "
+              "sub_82249558, PanelSet::Open sub_82249730, PanelSetBase::Free sub_8224B538 and "
+              "PanelSet::Free sub_8224B880 (VirtualFree over the allocation layer, else a guest "
+              "call), PanelSetBase::HandleInput sub_8224BF30 and PanelSet::HandleInput "
+              "sub_8224CA28 (the pages' plain C++ where ours, else guest calls), BackPage8 "
+              "sub_8224A3F8, the steps Step2 sub_82248F00, Step3 sub_8224A718, Step7 "
+              "sub_82249098, Step11 sub_8224A7E0, Step18 sub_82249258 and Step26 sub_8224A8E0 "
+              "(the menu lists, the screen fades and sub_825C8390 guest calls); the UI "
               "movie calls through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=car_list)");
 
@@ -143,6 +150,19 @@ ITC_CL_STEP(CarListSetPreviousEntry, cl::SetWord(base, ctx.r3.u64, 1888, ctx.r4.
 ITC_CL_STEP(CarListSetPreviousColor, cl::SetWord(base, ctx.r3.u64, 1892, ctx.r4.u64))
 ITC_CL_STEP(CarListPickedPage, cl::PickedPage(base, ctx.r3.u64))
 ITC_CL_STEP(CarListSaveData, cl::SaveData(base, ctx.r3.u32, sp))
+ITC_CL_STEP(CarListToTabs, cl::ToTabs(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListOpen, cl::Open(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListBaseFree, cl::Free(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetFree, cl::Free(base, ctx.r3.u64 + 4, sp, calls))
+ITC_CL_STEP(CarListBaseHandleInput, cl::HandleInput(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetHandleInput, cl::HandleInput(base, ctx.r3.u64 + 4, sp, calls))
+ITC_CL_STEP(CarListBackPage8, cl::BackPage8(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListStep2, cl::Step2(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep3, cl::Step3(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep7, cl::Step7(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep11, cl::Step11(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep18, cl::Step18(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep26, cl::Step26(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 
 #undef ITC_CL_STEP
 
@@ -205,3 +225,18 @@ ITC_CAR_LIST(8224B6F0, CarListSetPreviousEntry)
 ITC_CAR_LIST(8224B6F8, CarListSetPreviousColor)
 ITC_CAR_LIST(82248EF0, CarListPickedPage)
 ITC_CAR_LIST(82249668, CarListSaveData)
+// PanelSet's slots 3, 5 and 7, the base's (from recompiled callers), the
+// page 8 handler (the page table) and the steps (the step table).
+ITC_CAR_LIST(82249558, CarListToTabs)
+ITC_CAR_LIST(82249730, CarListOpen)
+ITC_CAR_LIST(8224B538, CarListBaseFree)
+ITC_CAR_LIST(8224B880, CarListSetFree)
+ITC_CAR_LIST(8224BF30, CarListBaseHandleInput)
+ITC_CAR_LIST(8224CA28, CarListSetHandleInput)
+ITC_CAR_LIST(8224A3F8, CarListBackPage8)
+ITC_CAR_LIST(82248F00, CarListStep2)
+ITC_CAR_LIST(8224A718, CarListStep3)
+ITC_CAR_LIST(82249098, CarListStep7)
+ITC_CAR_LIST(8224A7E0, CarListStep11)
+ITC_CAR_LIST(82249258, CarListStep18)
+ITC_CAR_LIST(8224A8E0, CarListStep26)

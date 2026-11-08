@@ -58,4 +58,20 @@ void CarListSetPreviousColor(PPCContext& ctx, uint8_t* base);
 void CarListPickedPage(PPCContext& ctx, uint8_t* base);
 void CarListSaveData(PPCContext& ctx, uint8_t* base);
 
+// PanelSet's pages and steps (r3 the set or its base b, a step's r4 its
+// first-pass word).
+void CarListToTabs(PPCContext& ctx, uint8_t* base);
+void CarListOpen(PPCContext& ctx, uint8_t* base);
+void CarListBaseFree(PPCContext& ctx, uint8_t* base);
+void CarListSetFree(PPCContext& ctx, uint8_t* base);
+void CarListBaseHandleInput(PPCContext& ctx, uint8_t* base);
+void CarListSetHandleInput(PPCContext& ctx, uint8_t* base);
+void CarListBackPage8(PPCContext& ctx, uint8_t* base);
+void CarListStep2(PPCContext& ctx, uint8_t* base);
+void CarListStep3(PPCContext& ctx, uint8_t* base);
+void CarListStep7(PPCContext& ctx, uint8_t* base);
+void CarListStep11(PPCContext& ctx, uint8_t* base);
+void CarListStep18(PPCContext& ctx, uint8_t* base);
+void CarListStep26(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
