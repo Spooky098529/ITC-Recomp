@@ -39,7 +39,11 @@ file's history. What's left to see in a drive, from every run:
   ours; races 34-37 s, 0 errors, its harnesses 0 differing; no
   subagents). Left: `Type2Hub::Update` with `PutCarOnStand` (needs the
   stand car's harness world), the build screen's three pages with
-  their Jumps (ready). Step: its validation (agent running).
+  their Jumps (ready). Validated `itc_4668` (race 75 s at 180, the
+  harnesses ~105 s; 0 errors, every harness 0 differing outside the
+  expected groups, 49 of 49 harness lines, no prints added; 1 in the
+  race, 28 in the replay `itc_4669` (ok), 20 to drive). Step: third
+  migration (agent running).
 
 ## Done
 

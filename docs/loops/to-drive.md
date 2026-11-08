@@ -18,6 +18,13 @@ here loses its heading.
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 
+- The type 2 screens' second migration (attract race `itc_4668`, replay
+  `itc_4669` ok; `type2-screens.md`): `sub_8218D6A8`, `sub_8218D6C0`,
+  `sub_8218D650`, `sub_8218F698`, `sub_8218DF38`, `sub_8218D8E8`,
+  `sub_821900B8`, `sub_8218F4D8`, `sub_821903D0`, `sub_8218F3F8`,
+  `sub_82190548`, `sub_8218F098`, `sub_821902C8`, `sub_8218DA48`,
+  `sub_8218E8F8`, `sub_8218F800`, `sub_821A0860`, `sub_821A0228`,
+  `sub_8219C160`, `sub_8219C438`.
 - The type 2 screens' migration (attract race `itc_4654`, replay
   `itc_4655` ok, the plate editor and the build screen only opened and
   closed; `type2-screens.md`): `sub_82198190`, `sub_82198988`,
