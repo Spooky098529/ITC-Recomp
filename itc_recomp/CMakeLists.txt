@@ -462,6 +462,8 @@ set(ITC_SOURCES
     src/type67_screens/panel_screens.cpp
     src/type67_screens/pick_car.cpp
     src/type67_screens/slots.cpp
+    src/hooks/car_list.cpp
+    src/car_list/panels.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
@@ -665,6 +667,7 @@ set(ITC_SOURCES
     src/harnesses/options_screen.cpp
     src/harnesses/type67_modes.cpp
     src/harnesses/type67_screens.cpp
+    src/harnesses/car_list.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp

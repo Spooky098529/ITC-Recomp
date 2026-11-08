@@ -1,0 +1,159 @@
+// The car list natively: adapters in front of src/car_list/
+// (docs/functions/car-list.md), with the register steps the harness shares
+// (hooks/car_list.h).
+
+#include "hooks/car_list.h"
+
+#include "base/flags.h"
+#include "car_list/car_list.h"
+
+ITC_FLAG_BOOL(native_car_list, true, "ITC",
+              "Run the type 6 and 7 panel screens' car list (docs/functions/car-list.md: "
+              "PanelGroup::SetCaption sub_8224EF18, PanelPart::FinishAll sub_82249CF0; the tabs' "
+              "TabPanel::SetCursorY sub_8224FD20 and SetButtons sub_8224FD90; the rows' "
+              "RowPanel::SetRow sub_8224F018, SetArrows sub_8224F680, Unhighlight sub_8224F558 "
+              "and Hide sub_8224F4C8; the colors' ColorPanel::Show sub_8224D010, Select "
+              "sub_8224D118, SetArrows sub_8224D2D0, ShowSwatches sub_8224D358, PlaceCursor "
+              "sub_8224D3E0, SetCount sub_8224D458, SetSwatch sub_8224D4A0 and SetSwatches "
+              "sub_8224D518; the car's CarPanel::SetTexts sub_8224D7F0, SetButtons sub_8224D860, "
+              "PlaceCursor sub_8224D9A0, Select sub_8224DCF0, StopArrows sub_8224DF30, SetName "
+              "sub_8224DED8, SetStats sub_8224E288, SetCarName sub_822417E8 and ShowStats "
+              "sub_8224E920 (SetPrice the original), Panel7C::ShowArrows sub_82241868; the UI "
+              "movie calls through their overrides) natively instead of through the translated "
+              "code (the same writes; checked by --run_harnesses=car_list)");
+
+namespace hooks {
+
+namespace {
+
+// The guest calls the plain C++ makes (car_list::Calls), through this
+// context: r1, r3 to r10, f1 when given and lr set, the function run
+// through the function table (its override when it has one), r1 put back.
+// The adapter's lr is put back when it ends.
+class GuestCalls {
+ public:
+  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  ~GuestCalls() { ctx_.lr = lr_; }
+  GuestCalls(const GuestCalls&) = delete;
+  GuestCalls& operator=(const GuestCalls&) = delete;
+  car_list::Calls calls() { return {this, &GuestCalls::Call}; }
+
+ private:
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
+                       uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    PPCContext& ctx = self.ctx_;
+    uint8_t* base = self.base_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = args[0];
+    ctx.r4.u64 = args[1];
+    ctx.r5.u64 = args[2];
+    ctx.r6.u64 = args[3];
+    ctx.r7.u64 = args[4];
+    ctx.r8.u64 = args[5];
+    ctx.r9.u64 = args[6];
+    ctx.r10.u64 = args[7];
+    if (f1 != nullptr) {
+      ctx.f1.f64 = *f1;
+    }
+    ctx.lr = lr;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  PPCContext& ctx_;
+  uint8_t* base_;
+  uint64_t lr_;
+};
+
+}  // namespace
+
+#define ITC_CL_STEP(name, expression)          \
+  void name(PPCContext& ctx, uint8_t* base) {  \
+    GuestCalls guest(ctx, base);               \
+    const car_list::Calls calls = guest.calls(); \
+    (void)calls;                               \
+    const uint32_t sp = ctx.r1.u32;            \
+    ctx.r3.u64 = (expression);                 \
+  }
+
+namespace cl = car_list;
+
+ITC_CL_STEP(CarListSetCaption, cl::SetCaption(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListPartFinishAll, cl::PartFinishAll(base, ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListTabSetCursorY, cl::TabSetCursorY(base, ctx.r3.u32, ctx.r4.u64, sp))
+ITC_CL_STEP(CarListTabSetButtons, cl::TabSetButtons(base, ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListRowSetRow,
+            cl::RowSetRow(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, sp, calls))
+ITC_CL_STEP(CarListRowSetArrows, cl::RowSetArrows(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_CL_STEP(CarListRowUnhighlight, cl::RowUnhighlight(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListRowHide, cl::RowHide(base, ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListColorShow, cl::ColorShow(base, ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListColorSelect, cl::ColorSelect(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListColorSetArrows,
+            cl::ColorSetArrows(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_CL_STEP(CarListColorShowSwatches, cl::ColorShowSwatches(base, ctx.r3.u32, ctx.r4.u64, sp))
+ITC_CL_STEP(CarListColorPlaceCursor, cl::ColorPlaceCursor(base, ctx.r3.u32, ctx.r4.u64, sp))
+ITC_CL_STEP(CarListColorSetCount, cl::ColorSetCount(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListColorSetSwatch,
+            cl::ColorSetSwatch(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, sp))
+ITC_CL_STEP(CarListColorSetSwatches,
+            cl::ColorSetSwatches(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, sp))
+ITC_CL_STEP(CarListCarSetTexts, cl::CarSetTexts(base, ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListCarSetButtons, cl::CarSetButtons(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64,
+                                                    ctx.r6.u64, ctx.r7.u64, sp, calls))
+ITC_CL_STEP(CarListCarPlaceCursor, cl::CarPlaceCursor(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_CL_STEP(CarListCarSelect, cl::CarSelect(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListCarStopArrows, cl::CarStopArrows(base, ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListCarSetName, cl::CarSetName(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListCarSetStats, cl::CarSetStats(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListCarSetCarName,
+            cl::CarSetCarName(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp, calls))
+ITC_CL_STEP(CarListPanel7CShowArrows, cl::Panel7CShowArrows(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListCarShowStats, cl::CarShowStats(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+
+#undef ITC_CL_STEP
+
+}  // namespace hooks
+
+#define ITC_CAR_LIST(address, step)       \
+  extern "C" REX_FUNC(sub_##address) {    \
+    REX_FUNC_PROLOGUE();                  \
+    if (!ITC_FLAG(native_car_list)) {     \
+      __imp__sub_##address(ctx, base);    \
+      return;                             \
+    }                                     \
+    hooks::step(ctx, base);               \
+  }
+
+// The panel groups and panels (from the car list's functions, recompiled,
+// and the C panels' vtables).
+ITC_CAR_LIST(8224EF18, CarListSetCaption)
+ITC_CAR_LIST(82249CF0, CarListPartFinishAll)
+ITC_CAR_LIST(8224FD20, CarListTabSetCursorY)
+ITC_CAR_LIST(8224FD90, CarListTabSetButtons)
+ITC_CAR_LIST(8224F018, CarListRowSetRow)
+ITC_CAR_LIST(8224F680, CarListRowSetArrows)
+ITC_CAR_LIST(8224F558, CarListRowUnhighlight)
+ITC_CAR_LIST(8224F4C8, CarListRowHide)
+ITC_CAR_LIST(8224D010, CarListColorShow)
+ITC_CAR_LIST(8224D118, CarListColorSelect)
+ITC_CAR_LIST(8224D2D0, CarListColorSetArrows)
+ITC_CAR_LIST(8224D358, CarListColorShowSwatches)
+ITC_CAR_LIST(8224D3E0, CarListColorPlaceCursor)
+ITC_CAR_LIST(8224D458, CarListColorSetCount)
+ITC_CAR_LIST(8224D4A0, CarListColorSetSwatch)
+ITC_CAR_LIST(8224D518, CarListColorSetSwatches)
+ITC_CAR_LIST(8224D7F0, CarListCarSetTexts)
+ITC_CAR_LIST(8224D860, CarListCarSetButtons)
+ITC_CAR_LIST(8224D9A0, CarListCarPlaceCursor)
+ITC_CAR_LIST(8224DCF0, CarListCarSelect)
+ITC_CAR_LIST(8224DF30, CarListCarStopArrows)
+ITC_CAR_LIST(8224DED8, CarListCarSetName)
+ITC_CAR_LIST(8224E288, CarListCarSetStats)
+ITC_CAR_LIST(822417E8, CarListCarSetCarName)
+ITC_CAR_LIST(82241868, CarListPanel7CShowArrows)
+ITC_CAR_LIST(8224E920, CarListCarShowStats)

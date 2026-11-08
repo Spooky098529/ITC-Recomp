@@ -1,0 +1,578 @@
+// The car list (src/car_list/, docs/functions/car-list.md) against the
+// recompiled functions. Each case fills a world of our own with random
+// words from the case's seed (mixed with splitmix64: the harness
+// generator's consecutive seeds are correlated): the objects block (the
+// panel at +0, its two panel groups at +0x200 and +0x240, the C panel's
+// vtable at +0x300, a record at +0x400, the colors' list at +0x800 and its
+// records at +0x900), a car list entry (8,448 bytes), the stack below the
+// call's stack pointer and the caller's area above it; shapes the fields
+// the function tests (the indices small or -1, the groups' movie ids 7 or
+// 14); runs the original (with --native_car_list off) or the register steps
+// (hooks/car_list.h); and compares the world, the movie world, the
+// original's frame (its register saves and the varargs words SetText and
+// SetNodeText store, +40 to +79, left out), the caller's area, r1 and r3,
+// all exactly (the floats the functions store are converted from integers
+// or copied as the originals' lfs and stfs do).
+//
+// The UI movie world: two movies (ids 7 and 14 in the movie table; the word
+// UiMovies::Find answers for a missing one movie 7's) with empty animation
+// lists, their live, saved and file scenes one tree's root and their 900
+// named animations over it, each one of 8 animations of no tracks; the
+// tree's 48 nodes all TXT nodes (UiMovie::SetText's assert) whose child
+// index (+108, also their text id) is 0 to 8 and whose entries (from -1)
+// are nodes of the tree, their children's range +100 below 16 and +104 0 to 6; each
+// movie's texts ids 1 to 7 and the string table of letters only (no
+// argument codes: the user's call, 2026-10-30). The callees run for real on
+// both sides (the originals' and ours reach the same overrides of the UI
+// movie calls).
+
+#include "harness.h"
+
+#include "base/flags.h"
+#include "base/log.h"
+#include "car_list/car_list.h"
+#include "hooks/car_list.h"
+#include "memory/heap.h"
+#include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
+
+#include <fmt/format.h>
+
+#include <cstring>
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
+
+ITC_FLAG_DECLARE(bool, native_car_list);
+
+namespace harness {
+
+namespace {
+
+constexpr uint32_t kStackBytes = 1024;  // below the call's stack pointer
+constexpr uint32_t kCallerBytes = 256;  // above it
+
+struct Block {
+  explicit Block(uint32_t bytes) : bytes(bytes), address(memory::Alloc(bytes, 0)) {}
+  ~Block() { memory::Free(address); }
+  Block(const Block&) = delete;
+  Block& operator=(const Block&) = delete;
+  uint32_t bytes;
+  uint32_t address;
+};
+
+class SavedBytes {
+ public:
+  SavedBytes(uint8_t* base, std::vector<std::pair<uint32_t, uint32_t>> ranges)
+      : base_(base), ranges_(std::move(ranges)) {
+    for (const auto& [address, bytes] : ranges_) {
+      saved_.push_back(Read(base_, address, bytes));
+    }
+  }
+  ~SavedBytes() {
+    for (size_t i = 0; i < ranges_.size(); i++) {
+      std::memcpy(base_ + ranges_[i].first, saved_[i].data(), ranges_[i].second);
+    }
+  }
+
+ private:
+  uint8_t* base_;
+  std::vector<std::pair<uint32_t, uint32_t>> ranges_;
+  std::vector<std::vector<uint8_t>> saved_;
+};
+
+void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& random) {
+  for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
+    guest::StoreU32(base, address + i, uint32_t(random.Next()));
+  }
+}
+
+Random Mixed(uint64_t seed) {
+  uint64_t z = seed + 0x9E3779B97F4A7C15ull;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return Random(z ^ (z >> 31));
+}
+
+// The movie world.
+constexpr uint32_t kMovieHeaderBytes = 0xA000;
+constexpr uint32_t kMovieCount = 2;
+constexpr uint32_t kTreeNodeBytes = 0x400;
+constexpr uint32_t kNodes = 48, kAnimations = 8;
+constexpr uint32_t kNodesAt = kMovieCount * kMovieHeaderBytes;
+constexpr uint32_t kAnimationsAt = kNodesAt + kNodes * kTreeNodeBytes;
+constexpr uint32_t kPairsAt = kAnimationsAt + kAnimations * 64;
+constexpr uint32_t kTexturesAt = kPairsAt + 0x40;
+constexpr uint32_t kMovieWorldBytes = kTexturesAt + 0x100;
+constexpr uint32_t kTextsPerMovie = 8;
+constexpr uint32_t kTextBuffersAt = 0x1000;
+constexpr uint32_t kTextWorldBytes = kTextBuffersAt + kMovieCount * kTextsPerMovie * 0x1000;
+constexpr uint32_t kStringWorldBytes = 0x10000;
+constexpr uint32_t kMissingMovie = 0x826C5CDC;
+constexpr uint32_t kMissingText = 0x826C5CD8;
+constexpr uint32_t kStringTable = 0x826C5C34;
+constexpr uint32_t kTagTxt = 0x54585400;
+
+// The objects block.
+constexpr uint32_t kObjectsBytes = 0x1000;
+constexpr uint32_t kGroupA = 0x200, kGroupB = 0x240, kVtable = 0x300, kRecord = 0x400;
+constexpr uint32_t kColors = 0x800, kColorRecords = 0x900;
+constexpr uint32_t kEntryBytes = 8448;
+
+struct World {
+  World()
+      : objects(kObjectsBytes),
+        entry(kEntryBytes),
+        movies(kMovieWorldBytes),
+        texts(kTextWorldBytes),
+        strings(kStringWorldBytes) {}
+  bool ok() const {
+    return objects.address != 0 && entry.address != 0 && movies.address != 0 &&
+           texts.address != 0 && strings.address != 0;
+  }
+  uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
+  uint32_t node(uint32_t k) const { return movies.address + kNodesAt + kTreeNodeBytes * k; }
+  uint32_t animation(uint32_t k) const { return movies.address + kAnimationsAt + 64 * k; }
+  uint32_t panel() const { return objects.address; }
+  uint32_t at(uint32_t offset) const { return objects.address + offset; }
+  Block objects;
+  Block entry;
+  Block movies;
+  Block texts;
+  Block strings;
+};
+
+const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
+    {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4}};
+
+// The string table: 17 files' pointers to one container of entries enough
+// for the widest file (the bounds at 0x82007E18), each one of 8 strings of
+// letters (no argument codes), as the options screen's harness builds it.
+void BuildStringTable(uint8_t* base, const World& w) {
+  constexpr uint32_t kBounds = 0x82007E18;
+  uint32_t span = 1;
+  for (uint32_t i = 0; i < 17; i++) {
+    const int32_t from = int32_t(guest::LoadU32(base, kBounds + 4 * i));
+    const int32_t to = int32_t(guest::LoadU32(base, kBounds + 4 * i + 4));
+    if (to > from && uint32_t(to - from) > span) {
+      span = uint32_t(to - from);
+    }
+  }
+  const uint32_t at = w.strings.address, container = at + 0x100;
+  if (container + 4 + 4 * span + 8 * 64 > at + w.strings.bytes) {
+    ITC_LOG_ERROR("harness: car_list: a file of {} strings doesn't fit", span);
+    span = (w.strings.bytes - 0x100 - 8 * 64 - 4) / 4;
+  }
+  for (uint32_t i = 0; i < 18; i++) {
+    guest::StoreU32(base, at + 4 * i, container);
+  }
+  guest::StoreU32(base, container, __builtin_bswap32(span));
+  Random r(0x4361724C697374ull);  // "CarList"
+  const uint32_t text = container + 4 + 4 * span;
+  for (uint32_t k = 0; k < 8; k++) {
+    const uint32_t length = r.Below(30);
+    for (uint32_t c = 0; c < length; c++) {
+      guest::StoreU16(base, text + 64 * k + 2 * c, uint16_t('A' + r.Below(26)));
+    }
+    guest::StoreU16(base, text + 64 * k + 2 * length, 0);
+  }
+  for (uint32_t i = 0; i < span; i++) {
+    guest::StoreU32(base, container + 4 + 4 * i,
+                    __builtin_bswap32(text + 64 * r.Below(8) - container));
+  }
+}
+
+void ShapeMovieWorld(uint8_t* base, const World& w, Random& r) {
+  WriteRandom(base, w.movies.address, w.movies.bytes, r);
+  WriteRandom(base, w.texts.address, w.texts.bytes, r);
+  for (uint32_t m = 0; m < kMovieCount; m++) {
+    const uint32_t movie = w.movie(m);
+    ui_movies::InitAnimationLists(base, movie);
+    for (const uint32_t field : {16u, 20u, 24u}) {
+      guest::StoreU32(base, movie + field, w.node(0));
+    }
+    guest::StoreU32(base, movie + 28, w.movies.address + kTexturesAt);
+    for (uint32_t k = 0; k < 900; k++) {
+      const uint32_t named = movie + 176 + 36 * k;
+      guest::StoreU32(base, named + 28, w.node(0));
+      guest::StoreU32(base, named + 32, w.animation(r.Below(kAnimations)));
+    }
+    for (uint32_t k = 0; k < kTextsPerMovie; k++) {
+      const uint32_t record = w.texts.address + 0x100 * m + 32 * k;
+      const uint32_t buffer = w.texts.address + kTextBuffersAt + 0x1000 * (kTextsPerMovie * m + k);
+      guest::StoreU32(base, record, buffer);
+      guest::StoreU32(base, record + 20, r.Below(5) - 1);
+      const uint32_t length = r.Below(60);
+      for (uint32_t c = 0; c < length; c++) {
+        guest::StoreU16(base, buffer + 2 * c,
+                        r.Below(6) == 0 ? 0xFFD1 : uint16_t('a' + r.Below(26)));
+      }
+      guest::StoreU16(base, buffer + 2 * length, 0);
+      if (k + 1 < kTextsPerMovie) {
+        guest::StoreU32(base, movie + ui_movies::kMovieTexts + 8 * k, k + 1);
+        guest::StoreU32(base, movie + ui_movies::kMovieTexts + 8 * k + 4, record);
+      }
+    }
+    guest::StoreU32(base, movie + ui_movies::kMovieTexts + 1024, kTextsPerMovie - 1);
+    guest::StoreU32(base, movie + ui_movies::kMovieTextCount, kTextsPerMovie);
+  }
+  guest::StoreU32(base, kMissingText, w.texts.address + 32 * (kTextsPerMovie - 1));
+  for (uint32_t k = 0; k < kAnimations; k++) {
+    for (uint32_t i = 0; i < 64; i += 4) {
+      guest::StoreU32(base, w.animation(k) + i, 0);
+    }
+    guest::StoreFloat(base, w.animation(k) + 12, float(r.Below(100)) / 4.0f);
+  }
+  constexpr uint32_t kEntries = (kTreeNodeBytes - 128) / 8;
+  for (uint32_t k = 0; k < kNodes; k++) {
+    const uint32_t node = w.node(k);
+    guest::StoreU32(base, node, kTagTxt);
+    guest::StoreU32(base, node + 100, r.Below(16));
+    guest::StoreU32(base, node + 104, r.Below(8) == 0 ? 0 : r.Below(7));
+    guest::StoreU32(base, node + 108, r.Below(9));
+    // Entry -1 (+120) a node too: a -1 index with +108 0 reads it.
+    guest::StoreU32(base, node + 120, w.node(r.Below(kNodes)));
+    for (uint32_t i = 0; i < kEntries; i++) {
+      guest::StoreU32(base, node + 128 + 8 * i, w.node(r.Below(kNodes)));
+    }
+  }
+  const uint32_t pairs = w.movies.address + kPairsAt;
+  guest::StoreU32(base, pairs, 7);
+  guest::StoreU32(base, pairs + 4, w.movie(0));
+  guest::StoreU32(base, pairs + 8, 14);
+  guest::StoreU32(base, pairs + 12, w.movie(1));
+  guest::StoreU32(base, ui_movies::kMovieTable, pairs);
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, kMovieCount);
+  guest::StoreU32(base, kMissingMovie, w.movie(0));
+  guest::StoreU32(base, kStringTable, w.strings.address);
+}
+
+// An index: 0 to 63, now and then -1.
+uint32_t Index(Random& r) { return r.Below(6) == 0 ? 0xFFFFFFFFu : r.Below(64); }
+
+// The world's shape: the objects random, then every panel word an index;
+// the groups' ids 7 or 14, their +12 a sub-scene (0 to 63, now and then
+// -1) and +32 an index; the C panel's vtable (slots 1 and 2 SetStats and
+// SetCarName, now and then the stand-in sub_820CC470, which stores r4 at
+// r3 + 20); the colors' list (count 0 to 13, its records' pointers); the
+// entry's car id 0 to 79 and the spec's bytes +769 0 to 9.
+void ShapeWorld(uint8_t* base, const World& w, Random& r) {
+  WriteRandom(base, w.objects.address, w.objects.bytes, r);
+  WriteRandom(base, w.entry.address, w.entry.bytes, r);
+  for (uint32_t i = 0; i < 0x200; i += 4) {
+    guest::StoreU32(base, w.panel() + i, Index(r));
+  }
+  for (const uint32_t g : {kGroupA, kGroupB}) {
+    guest::StoreU32(base, w.at(g) + 4, r.Below(2) == 0 ? 7 : 14);
+    guest::StoreU32(base, w.at(g) + 12, Index(r));
+    guest::StoreU32(base, w.at(g) + 32, Index(r));
+  }
+  constexpr uint32_t kStandIn = 0x820CC470;
+  guest::StoreU32(base, w.at(kVtable) + 4, r.Below(4) == 0 ? kStandIn : car_list::kSetStats);
+  guest::StoreU32(base, w.at(kVtable) + 8, r.Below(4) == 0 ? kStandIn : car_list::kSetCarName);
+  const uint32_t count = r.Below(14);
+  guest::StoreU32(base, w.at(kColors) + 52, count);
+  for (uint32_t i = 0; i < 13; i++) {
+    guest::StoreU32(base, w.at(kColors) + 4 * i, w.at(kColorRecords) + 32 * i);
+  }
+  guest::StoreU32(base, w.entry.address + 8432, r.Below(80));
+  guest::StoreU8(base, w.entry.address + 769, uint8_t(r.Below(10)));
+  ShapeMovieWorld(base, w, r);
+}
+
+using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
+
+// A function's frame: its size and the register saves at its top.
+struct Frame {
+  uint32_t size, saves;
+};
+
+void Case(Context& h, Results& results, const World& w, uint64_t seed, const SetupFn& setup,
+          GuestFunction recompiled, GuestFunction native, Frame frame, const std::string& what) {
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Random r = Mixed(seed);
+    SavedBytes saved(h.base, kSavedGlobals);
+    PPCContext t = CallContext(h);
+    const uint32_t sp = t.r1.u32;
+    WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
+    ShapeWorld(h.base, w, r);
+    t.r3.u64 = w.panel() | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+    for (PPCRegister* reg : {&t.r4, &t.r5, &t.r6, &t.r7}) {
+      reg->u64 = r.Next();
+    }
+    setup(t, r, w);
+    t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+    ITC_FLAG(native_car_list) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_car_list) = true;
+    out[v].Bytes(Read(h.base, w.objects.address, w.objects.bytes));
+    out[v].Bytes(Read(h.base, w.entry.address, w.entry.bytes));
+    out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
+    out[v].Bytes(Read(h.base, w.texts.address, w.texts.bytes));
+    for (const auto& [address, bytes] : kSavedGlobals) {
+      out[v].Bytes(Read(h.base, address, bytes));
+    }
+    const uint32_t bottom = sp - frame.size;
+    out[v].Bytes(Read(h.base, bottom, 40));
+    out[v].Bytes(Read(h.base, bottom + 80, frame.size - 80 - frame.saves));
+    out[v].Bytes(Read(h.base, sp, kCallerBytes));
+    out[v].Word(t.r1.u32);
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+  }
+  results.Check(out[0], out[1], what);
+}
+
+void Group(Context& h, const World& w, const char* name, int cases, Frame frame,
+           const SetupFn& setup, GuestFunction recompiled, GuestFunction native) {
+  Results results(name);
+  for (int c = 0; c < cases; c++) {
+    Case(h, results, w, h.random.Next(), setup, recompiled, native, frame,
+         fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// The panel's group pointer at `at` (A or B).
+void SetGroup(uint8_t* base, const World& w, Random& r, uint32_t at) {
+  guest::StoreU32(base, w.panel() + at, w.at(r.Below(2) == 0 ? kGroupA : kGroupB));
+}
+
+// r4 a small signed word (0 to 15, now and then -1 or any word).
+uint64_t Small(Random& r) {
+  switch (r.Below(8)) {
+    case 0:
+      return 0xFFFFFFFFFFFFFFFFull;
+    case 1:
+      return r.Next();
+    default:
+      return r.Below(16);
+  }
+}
+
+void Panels(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const int n = 40;
+  const auto group = [base](uint32_t at) {
+    return [base, at](PPCContext&, Random& r, const World& w) { SetGroup(base, w, r, at); };
+  };
+  // PanelGroup::SetCaption: r3 a group, r4 a string id below 2,000.
+  Group(
+      h, w, "PanelGroup::SetCaption (sub_8224EF18)", n, {112, 32},
+      [](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.at(r.Below(2) == 0 ? kGroupA : kGroupB);
+        t.r4.u64 = r.Below(2000);
+      },
+      __imp__sub_8224EF18, hooks::CarListSetCaption);
+  Group(h, w, "PanelPart::FinishAll (sub_82249CF0)", 16, {96, 8}, group(4), __imp__sub_82249CF0,
+        hooks::CarListPartFinishAll);
+  Group(
+      h, w, "TabPanel::SetCursorY (sub_8224FD20)", n, {112, 24},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : 40 * r.Below(3);
+      },
+      __imp__sub_8224FD20, hooks::CarListTabSetCursorY);
+  Group(h, w, "TabPanel::SetButtons (sub_8224FD90)", n, {112, 24}, group(4),
+        __imp__sub_8224FD90, hooks::CarListTabSetButtons);
+  // The rows: r4 the row (0 to 7, now and then -1), r5 the entry.
+  Group(
+      h, w, "RowPanel::SetRow (sub_8224F018)", 80, {128, 48},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 0);
+        t.r4.u64 = r.Below(6) == 0 ? 0xFFFFFFFFFFFFFFFFull : r.Below(8);
+        // The rows' nodes (+20 to +48, +60) not negative: without one the
+        // original reads a child of node 0.
+        for (uint32_t at = 20; at <= 60; at += 4) {
+          guest::StoreU32(base, w.panel() + at, r.Below(64));
+        }
+        t.r5.u64 = w.entry.address;
+        // The car ids the logo's frame maps.
+        static constexpr uint32_t kIds[] = {0, 2, 34, 35, 43, 46, 47, 56, 57, 71, 72, 79};
+        guest::StoreU32(base, w.entry.address + 8432,
+                        r.Below(2) == 0 ? kIds[r.Below(12)] : r.Below(80));
+      },
+      __imp__sub_8224F018, hooks::CarListRowSetRow);
+  Group(
+      h, w, "RowPanel::SetArrows (sub_8224F680)", n, {128, 48},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 0);
+        t.r4.u64 = Small(r);
+        t.r5.u64 = r.Below(2) == 0 ? guest::LoadU32(base, w.panel() + 4) + uint32_t(t.r4.u64)
+                                   : Small(r);
+      },
+      __imp__sub_8224F680, hooks::CarListRowSetArrows);
+  Group(
+      h, w, "RowPanel::Unhighlight (sub_8224F558)", n, {112, 24},
+      [base](PPCContext&, Random& r, const World& w) {
+        SetGroup(base, w, r, 0);
+        guest::StoreU32(base, w.panel() + 156, r.Below(2));
+      },
+      __imp__sub_8224F558, hooks::CarListRowUnhighlight);
+  Group(h, w, "RowPanel::Hide (sub_8224F4C8)", n, {112, 24}, group(0), __imp__sub_8224F4C8,
+        hooks::CarListRowHide);
+  // The colors.
+  Group(h, w, "ColorPanel::Show (sub_8224D010)", n, {112, 24}, group(4), __imp__sub_8224D010,
+        hooks::CarListColorShow);
+  Group(
+      h, w, "ColorPanel::Select (sub_8224D118)", n, {112, 32},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        t.r4.u64 = r.Below(13);
+      },
+      __imp__sub_8224D118, hooks::CarListColorSelect);
+  Group(
+      h, w, "ColorPanel::SetArrows (sub_8224D2D0)", n, {128, 40},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        t.r4.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
+        t.r5.u64 = r.Below(3) == 0 ? t.r4.u64 : r.Below(2);
+      },
+      __imp__sub_8224D2D0, hooks::CarListColorSetArrows);
+  Group(
+      h, w, "ColorPanel::ShowSwatches (sub_8224D358)", n, {128, 40},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        t.r4.u64 = Small(r);
+      },
+      __imp__sub_8224D358, hooks::CarListColorShowSwatches);
+  Group(
+      h, w, "ColorPanel::PlaceCursor (sub_8224D3E0)", n, {128, 32},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        t.r4.u64 = Small(r);
+      },
+      __imp__sub_8224D3E0, hooks::CarListColorPlaceCursor);
+  Group(
+      h, w, "ColorPanel::SetCount (sub_8224D458)", n, {96, 16},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        guest::StoreU32(base, w.panel() + 88, r.Below(2));
+        t.r4.u64 = Small(r);
+      },
+      __imp__sub_8224D458, hooks::CarListColorSetCount);
+  Group(
+      h, w, "ColorPanel::SetSwatch (sub_8224D4A0)", n, {128, 40},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        t.r4.u64 = r.Below(8);
+        t.r5.u64 = w.at(kColorRecords) + 32 * r.Below(13);
+      },
+      __imp__sub_8224D4A0, hooks::CarListColorSetSwatch);
+  Group(
+      h, w, "ColorPanel::SetSwatches (sub_8224D518)", n, {128, 40},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 4);
+        t.r4.u64 = w.at(kColors);
+        t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(13);
+        // The swatches drawn (each node's +104) stay few: the count 0 to 8.
+        guest::StoreU32(base, w.at(kColors) + 52, r.Below(9));
+      },
+      __imp__sub_8224D518, hooks::CarListColorSetSwatches);
+  // The car's info.
+  Group(h, w, "CarPanel::SetTexts (sub_8224D7F0)", n, {112, 32}, group(12), __imp__sub_8224D7F0,
+        hooks::CarListCarSetTexts);
+  Group(
+      h, w, "CarPanel::SetButtons (sub_8224D860)", n, {144, 56},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        for (PPCRegister* reg : {&t.r4, &t.r5, &t.r6, &t.r7}) {
+          reg->u64 = r.Below(3) == 0 ? 0xFFFFFFFFFFFFFFFFull
+                                     : (r.Below(4) == 0 ? r.Next() : r.Below(8));
+        }
+      },
+      __imp__sub_8224D860, hooks::CarListCarSetButtons);
+  Group(
+      h, w, "CarPanel::PlaceCursor (sub_8224D9A0)", n, {128, 32},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        t.r4.u64 = Small(r);
+      },
+      __imp__sub_8224D9A0, hooks::CarListCarPlaceCursor);
+  Group(
+      h, w, "CarPanel::Select (sub_8224DCF0)", n, {112, 32},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        guest::StoreU32(base, w.panel() + 8, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(10));
+        t.r4.u64 = r.Below(3) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : r.Below(2);
+      },
+      __imp__sub_8224DCF0, hooks::CarListCarSelect);
+  Group(h, w, "CarPanel::StopArrows (sub_8224DF30)", n, {112, 24}, group(12),
+        __imp__sub_8224DF30, hooks::CarListCarStopArrows);
+  Group(
+      h, w, "CarPanel::SetName (sub_8224DED8)", n, {112, 24},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        guest::StoreU32(base, w.panel() + 316, r.Below(2));
+        t.r4.u64 = w.entry.address;
+      },
+      __imp__sub_8224DED8, hooks::CarListCarSetName);
+  // SetStats: the record's ids small, its values any words, +24 a float
+  // (any bits).
+  const auto stats_record = [base](Random& r, uint32_t record) {
+    guest::StoreU32(base, record + 0, r.Below(5));
+    guest::StoreU32(base, record + 4, r.Below(5));
+    if (r.Below(2) == 0) {
+      guest::StoreFloat(base, record + 24, float(r.Below(100000)) / 7.0f);
+    }
+  };
+  Group(
+      h, w, "CarPanel::SetStats (sub_8224E288)", 80, {144, 48},
+      [base, stats_record](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        stats_record(r, w.at(kRecord));
+        if (r.Below(2) == 0) {
+          guest::StoreU32(base, w.at(kRecord) + 8, r.Below(400));
+        }
+        t.r4.u64 = w.at(kRecord);
+      },
+      __imp__sub_8224E288, hooks::CarListCarSetStats);
+  Group(
+      h, w, "CarPanel::SetCarName (sub_822417E8)", n, {128, 40},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        t.r4.u64 = r.Below(80);
+        t.r5.u64 = r.Below(10);
+      },
+      __imp__sub_822417E8, hooks::CarListCarSetCarName);
+  Group(
+      h, w, "Panel7C::ShowArrows (sub_82241868)", n, {96, 16},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        t.r4.u64 = r.Below(3) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : r.Below(2);
+      },
+      __imp__sub_82241868, hooks::CarListPanel7CShowArrows);
+  // ShowStats: the C panel's vtable at +0, its +4 0 (CarPanel::SetPrice never
+  // ran in play), the entry's floats any bits or small.
+  Group(
+      h, w, "CarPanel::ShowStats (sub_8224E920)", 80, {144, 24},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        guest::StoreU32(base, w.panel() + 0, w.at(kVtable));
+        guest::StoreU32(base, w.panel() + 4, 0);
+        for (const uint32_t at : {652u, 656u, 660u, 664u}) {
+          if (r.Below(2) == 0) {
+            guest::StoreFloat(base, w.entry.address + at, float(r.Below(100000)) / 3.0f);
+          }
+        }
+        t.r4.u64 = w.entry.address;
+      },
+      __imp__sub_8224E920, hooks::CarListCarShowStats);
+}
+
+}  // namespace
+
+void CarList(Context& h) {
+  const World w;
+  if (!w.ok()) {
+    ITC_LOG_ERROR("harness: car_list: no block from the allocation layer");
+    return;
+  }
+  BuildStringTable(h.base, w);
+  Panels(h, w);
+}
+
+}  // namespace harness
