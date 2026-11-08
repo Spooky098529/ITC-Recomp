@@ -43,4 +43,16 @@ void OptionsLeave(PPCContext& ctx, uint8_t* base);
 void OptionsClosePage(PPCContext& ctx, uint8_t* base);
 void OptionsWait(PPCContext& ctx, uint8_t* base);
 
+// The steps on the movie (r3 the step word): Options::OpenCategories
+// sub_821BD468, ReturnToCategories sub_821BD5B0, EnterHud sub_821BD728,
+// ChangeHudValue sub_821BD800, EnterSound sub_821BD908, EnterSliders
+// sub_821BD9A0, EnterButtons sub_821BDAD0.
+void OptionsOpenCategories(PPCContext& ctx, uint8_t* base);
+void OptionsReturnToCategories(PPCContext& ctx, uint8_t* base);
+void OptionsEnterHud(PPCContext& ctx, uint8_t* base);
+void OptionsChangeHudValue(PPCContext& ctx, uint8_t* base);
+void OptionsEnterSound(PPCContext& ctx, uint8_t* base);
+void OptionsEnterSliders(PPCContext& ctx, uint8_t* base);
+void OptionsEnterButtons(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -91,8 +91,9 @@ uint32_t Around(Random& r, int32_t lo, int32_t hi) {
 // movies (ids 7, or 9 where a case wants movie 7 missing, and 14 in the
 // movie table; the word UiMovies::Find answers for a missing one movie 7's
 // block) with empty animation lists, live, saved and file scenes one tree's
-// root, their 256 first named animations over the root and one of 8
-// animations of no tracks; the root's child index (+108) 0 to 3, its
+// root, their first named animations over the root and one of 8
+// animations of no tracks (512 of them: the options' named animations
+// reach 455); the root's child index (+108) 0 to 3, its
 // entries sub-scenes up to 60 and animations after (its animation index,
 // +116, 60); the 16 sub-scenes' child index 0 to 3, their entries leaves up
 // to 64 and animations after (+116 64); the 32 leaves TXT nodes
@@ -237,7 +238,7 @@ void ShapeMovieWorld(uint8_t* base, const World& w, Random& r) {
       guest::StoreU32(base, movie + field, w.root());
     }
     guest::StoreU32(base, movie + 28, w.movies.address + kTexturesAt);
-    for (uint32_t k = 0; k < 256; k++) {
+    for (uint32_t k = 0; k < 512; k++) {  // the options' named animations reach 455
       const uint32_t named = movie + 176 + 36 * k;
       guest::StoreU32(base, named + 28, w.root());
       guest::StoreU32(base, named + 32, w.animation(r.Below(kAnimations)));
@@ -640,6 +641,40 @@ void MovieHandlers(Context& h, const World& w) {
   };
   Group(h, w, "Options::Wait (sub_821BD3C8)", 80, step, __imp__sub_821BD3C8, hooks::OptionsWait,
         {{112, 24}});
+  // The steps on the movie: the step word 0 or 1, the menu's cursor 0 to 5
+  // (the animations' indexes stay in the world's nodes), the context 0 to
+  // 6, OK/Default 0 or 1, the first button edit 0 to 16 (the picture's
+  // table index).
+  const auto movie_step = [&h, step](PPCContext& t, Random& r, const World& w) {
+    step(t, r, w);
+    guest::StoreU32(h.base, w.menu() + 0, r.Below(6));
+    guest::StoreU32(h.base, w.settings() + 4, r.Below(7));
+    guest::StoreU32(h.base, w.settings() + 660, r.Below(2));
+    guest::StoreU32(h.base, w.settings() + 284, r.Below(17));
+  };
+  struct StepCase {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+  };
+  const StepCase kSteps[] = {
+      {"Options::OpenCategories (sub_821BD468)", __imp__sub_821BD468,
+       hooks::OptionsOpenCategories, 128, 32},
+      {"Options::ReturnToCategories (sub_821BD5B0)", __imp__sub_821BD5B0,
+       hooks::OptionsReturnToCategories, 128, 32},
+      {"Options::EnterHud (sub_821BD728)", __imp__sub_821BD728, hooks::OptionsEnterHud, 128, 32},
+      {"Options::ChangeHudValue (sub_821BD800)", __imp__sub_821BD800, hooks::OptionsChangeHudValue,
+       112, 24},
+      {"Options::EnterSound (sub_821BD908)", __imp__sub_821BD908, hooks::OptionsEnterSound, 112,
+       24},
+      {"Options::EnterSliders (sub_821BD9A0)", __imp__sub_821BD9A0, hooks::OptionsEnterSliders,
+       112, 24},
+      {"Options::EnterButtons (sub_821BDAD0)", __imp__sub_821BDAD0, hooks::OptionsEnterButtons, 208,
+       32},
+  };
+  for (const StepCase& c : kSteps) {
+    Group(h, w, c.name, 80, movie_step, c.recompiled, c.native, {{c.frame, c.saves}});
+  }
 }
 
 }  // namespace

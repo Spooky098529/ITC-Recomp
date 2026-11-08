@@ -442,6 +442,7 @@ set(ITC_SOURCES
     src/options_screen/controls.cpp
     src/options_screen/handlers.cpp
     src/options_screen/settings.cpp
+    src/options_screen/steps.cpp
     src/hooks/type67_modes.cpp
     src/type67_modes/dialogs.cpp
     src/type67_modes/garage.cpp

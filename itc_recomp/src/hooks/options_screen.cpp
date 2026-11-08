@@ -16,7 +16,10 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "sub_821BABD8; Settings::Reset sub_821B9DB8, Read sub_821BBF00 and Write "
               "sub_821BAE10; Options::OnEnter sub_821BB9A8 (with --native_heap), WaitForMovie "
               "sub_821BBBA0, OpenMovie sub_821B9F88, OnClosed sub_821BCE38, Close sub_821BCD28, "
-              "Leave sub_821BCF08, ClosePage sub_821BD330 and Wait sub_821BD3C8; the sound "
+              "Leave sub_821BCF08, ClosePage sub_821BD330 and Wait sub_821BD3C8; the steps OpenCategories "
+              "sub_821BD468, ReturnToCategories sub_821BD5B0, EnterHud sub_821BD728, "
+              "ChangeHudValue sub_821BD800, EnterSound sub_821BD908, EnterSliders sub_821BD9A0 "
+              "and EnterButtons sub_821BDAD0; the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -154,6 +157,41 @@ void OptionsWait(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::Wait(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void OptionsOpenCategories(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::OpenCategories(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsReturnToCategories(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ReturnToCategories(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsEnterHud(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::EnterHud(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsChangeHudValue(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ChangeHudValue(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsEnterSound(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::EnterSound(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsEnterSliders(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::EnterSliders(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsEnterButtons(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::EnterButtons(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -184,6 +222,13 @@ ITC_OPTIONS_SCREEN(821BCD28, OptionsClose)
 ITC_OPTIONS_SCREEN(821BCF08, OptionsLeave)
 ITC_OPTIONS_SCREEN(821BD330, OptionsClosePage)
 ITC_OPTIONS_SCREEN(821BD3C8, OptionsWait)
+ITC_OPTIONS_SCREEN(821BD468, OptionsOpenCategories)
+ITC_OPTIONS_SCREEN(821BD5B0, OptionsReturnToCategories)
+ITC_OPTIONS_SCREEN(821BD728, OptionsEnterHud)
+ITC_OPTIONS_SCREEN(821BD800, OptionsChangeHudValue)
+ITC_OPTIONS_SCREEN(821BD908, OptionsEnterSound)
+ITC_OPTIONS_SCREEN(821BD9A0, OptionsEnterSliders)
+ITC_OPTIONS_SCREEN(821BDAD0, OptionsEnterButtons)
 
 // An adapter whose step allocates: the original where the native heap isn't
 // active.

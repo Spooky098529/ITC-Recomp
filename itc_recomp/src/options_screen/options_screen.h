@@ -39,6 +39,14 @@ constexpr uint32_t kMoviesOpen = 0x8211E808;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kMoviesDelete = 0x8211E258;
+// UiMovie::Play, PlayNamed, Loop, LoopNamed, LoopLast, Finish, FinishNamed.
+constexpr uint32_t kPlay = 0x8211D978;
+constexpr uint32_t kPlayNamed = 0x8211DAC8;
+constexpr uint32_t kLoop = 0x8211DDD8;
+constexpr uint32_t kLoopNamed = 0x8211DDE0;
+constexpr uint32_t kLoopLast = 0x8211DDE8;
+constexpr uint32_t kFinish = 0x8211DE38;
+constexpr uint32_t kFinishNamed = 0x8211DF20;
 
 // The screen's blocks (docs/known-data.md): the page block (28 bytes), the
 // front-end menu (68), the settings `o` (716).
@@ -147,5 +155,34 @@ uint64_t ClosePage(uint8_t* base, uint64_t dispatcher);
 // settings' +684 = 0 and the word 1; UiMovie::Run(m, 0); +684 up by one; 1
 // once it's 10 or more, else 0. Its 112-byte frame.
 uint64_t Wait(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
+// --- The steps on the movie (steps.cpp) ---
+//
+// r3 the step word (the page block's +24, 0 on the first pass): the first
+// pass's animations (UiMovie::Play, Loop and the like through their
+// overrides), then UiMovie::Run(m, 0) every pass; 1 (done). Each from its
+// frame below `sp` (+80 the movie id).
+
+// sub_821BD468 Options::OpenCategories (step 4): sub-scene 23's animation
+// 1, 16's or 17's 0 by the context (1, or 0 and 2 to 4; none from 5), and
+// 21's cursor + 2, each played and looped. A 128-byte frame.
+uint64_t OpenCategories(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821BD5B0 Options::ReturnToCategories (step 5): 23's 1 and 21's cursor
+// + 2. A 128-byte frame.
+uint64_t ReturnToCategories(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821BD728 Options::EnterHud (step 9): 5's cursor + 4 below 4, else 2
+// (OK/Default +660 1) or 1. A 128-byte frame.
+uint64_t EnterHud(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821BD800 Options::ChangeHudValue (step 11): on the last row (cursor 4)
+// 5's 2 or 1 finished and the other played and looped. A 112-byte frame.
+uint64_t ChangeHudValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821BD908 Options::EnterSound (step 13): 6's 1 played, LoopLast. 112.
+uint64_t EnterSound(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821BD9A0 Options::EnterSliders (step 17): named 226. 112.
+uint64_t EnterSliders(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821BDAD0 Options::EnterButtons (step 25): named 407, then the button
+// picture's (423 + 2 x the settings' +284, from the 17-word table at the
+// frame's +96, read as the original does for any value). A 208-byte frame.
+uint64_t EnterButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen
