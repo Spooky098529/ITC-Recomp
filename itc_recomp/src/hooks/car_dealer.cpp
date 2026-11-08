@@ -359,7 +359,10 @@ ITC_CAR_DEALER(82182C28, CarDealerSetHeader)
 ITC_CAR_DEALER(82182620, CarDealerShowCarInfo)
 ITC_CAR_DEALER(821826C0, CarDealerShowSwatches)
 ITC_CAR_DEALER(82199B38, HelpLineSet)
-// The menus' openers (from the recompiled transitions).
-ITC_CAR_DEALER(82184338, CarDealerOpenListMenu)
-ITC_CAR_DEALER(82184488, CarDealerOpenCarList)
-ITC_CAR_DEALER(82184650, CarDealerOpenCar)
+// No adapters for the menus' openers OpenListMenu sub_82184338
+// (Transition0, Transition8), OpenCarList sub_82184488 (Transition4,
+// Transition5; Transition14, never seen in play, reaches the original) and
+// OpenCar sub_82184650 (Transition9; Transition10 and Transition18, never
+// seen in play, reach the original) (removed, B7 loop, 2026-11-08): their
+// callers in play are native, the flag switches those; their steps above are
+// the harness's.
