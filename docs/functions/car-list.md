@@ -74,7 +74,11 @@ sticker editor's lead) are the only callees outside this file that run
 and aren't ours. The colors' list (b +1824, up to 13 32-byte records,
 count at b +1876) is `VirtualAlloc`ed per color. Read by the B7 loop's
 mapping agent, 2026-11-08, from the lead "the car list the type 6 and 7
-panel screens show".
+panel screens show". Its third migration (2026-11-08) made the update native
+(`PanelSet::Update`, `PanelSetBase::Update`, `UpdateStand`,
+`GarageStages::DrawAll`, `src/car_list/update.cpp`): what's left here waits
+on `sub_8211BC18` and `sub_8211DE30`; the update's steps that wait on them
+stay guest calls through its table.
 
 Status:
 
