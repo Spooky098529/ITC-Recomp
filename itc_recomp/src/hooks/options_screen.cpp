@@ -44,7 +44,11 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "SetUpHudPage sub_821C4DB0, SetUpSoundPage sub_821C4FD0, SetUpSlidersPage "
               "sub_821C51D0, SetUpButtonsPage sub_821C5580 and SetUpAnalogPage sub_821C57D0; the "
               "steps FadeIn sub_821C7080, CloseHud sub_821C75E0, CloseSound sub_821C7710, "
-              "CloseSliders sub_821C7868, CloseButtons sub_821C7B08 and CloseAnalog sub_821C7D18; the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
+              "CloseSliders sub_821C7868, CloseButtons sub_821C7B08 and CloseAnalog sub_821C7D18; the "
+              "type 2 and 4 modes' Inits Type2Options::Init sub_821C9E00, Type4Options::Init "
+              "sub_821CA458, Type2ControllerOptions::Init sub_821C8578 and "
+              "Type4ControllerOptions::Init sub_821C8A60 (step tables, "
+              "tools/init_step_tables.py); the pages' and steps' handlers, Menu::Pressed, MenuSound::Play and the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -520,6 +524,16 @@ void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::CloseAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void OptionsInit(PPCContext& ctx, uint8_t* base, uint32_t address) {
+  const uint64_t object_r3 = ctx.r3.u64;
+  const options_screen::InitResult result =
+      options_screen::RunInit(base, address, ctx.r3.u32, ctx.r1.u32);
+  // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
+  // transition's address from the machine's 64-bit r3.
+  const uint64_t machine_r3 = object_r3 + (result.machine - ctx.r3.u32);
+  ctx.r3.u64 = result.replaced ? result.r3 : machine_r3 + (result.r3 - result.machine);
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -602,6 +616,22 @@ ITC_OPTIONS_SCREEN(821C7710, OptionsCloseSound)
 ITC_OPTIONS_SCREEN(821C7868, OptionsCloseSliders)
 ITC_OPTIONS_SCREEN(821C7B08, OptionsCloseButtons)
 ITC_OPTIONS_SCREEN(821C7D18, OptionsCloseAnalog)
+// The type 2 and 4 modes' Inits.
+#define ITC_OPTIONS_INIT(address)            \
+  extern "C" REX_FUNC(sub_##address) {      \
+    REX_FUNC_PROLOGUE();                    \
+    if (!ITC_FLAG(native_options_screen)) { \
+      __imp__sub_##address(ctx, base);      \
+      return;                               \
+    }                                       \
+    hooks::OptionsInit(ctx, base, 0x##address); \
+  }
+ITC_OPTIONS_INIT(821C9E00)
+ITC_OPTIONS_INIT(821CA458)
+ITC_OPTIONS_INIT(821C8578)
+ITC_OPTIONS_INIT(821C8A60)
+#undef ITC_OPTIONS_INIT
+
 // Options::ShowVolumeBar sub_821BE5A8: its override is the pause movie log's
 // wrap (src/debug/pause_movie_log.cpp), which calls the step under the flag.
 

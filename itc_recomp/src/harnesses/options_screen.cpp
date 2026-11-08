@@ -14,6 +14,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "hooks/options_screen.h"
@@ -1370,6 +1371,77 @@ void CategoryPages(Context& h, const World& w) {
         hooks::OptionsCloseAnalog, {{112, 24}});
 }
 
+// --- The type 2 and 4 modes' Inits (as the type 6 and 7 modes' harness
+// checks theirs) ---
+
+GuestFunction RecompiledInit(uint32_t address) {
+  switch (address) {
+    case 0x821C9E00: return __imp__sub_821C9E00;
+    case 0x821CA458: return __imp__sub_821CA458;
+    case 0x821C8578: return __imp__sub_821C8578;
+    case 0x821C8A60: return __imp__sub_821C8A60;
+    default: return nullptr;
+  }
+}
+
+// Each Init on a machine block: half the cases a new machine, half one of
+// random transitions whose keys are small numbers (states below 12,
+// messages below 50, so some match the Init's: Add replaces those). The
+// machine, the frame from its back chain up to the register saves and r3
+// (64 bits) compared.
+void Inits(Context& h) {
+  namespace gm = game_modes;
+  const Block machine(0x2600);
+  if (machine.address == 0) {
+    ITC_LOG_ERROR("harness: options_screen: no memory for the Inits' machine");
+    return;
+  }
+  for (const os::InitInfo& info : os::kInits) {
+    Results results(fmt::format("{} (sub_{:08X})", info.name, info.address));
+    const uint32_t saves = (32 - info.first_saved) * 8 + 8;
+    const uint32_t sp = CallContext(h).r1.u32;
+    const uint32_t frame = sp - info.frame;
+    for (uint64_t seed = 0; seed < 24; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 151 + info.address);
+        r = Mixed(r);
+        WriteRandom(h.base, machine.address, machine.bytes, r);
+        WriteRandom(h.base, frame, info.frame, r);
+        if (seed % 2 == 0) {
+          gm::StateMachineConstruct(h.base, machine.address);
+          guest::StoreU32(h.base, machine.address + gm::kTransitionCount, 0);
+        } else {
+          const uint32_t count = 8 + r.Below(160);
+          guest::StoreU32(h.base, machine.address + gm::kTransitionCount, count);
+          for (uint32_t i = 0; i < gm::kTransitions; i++) {
+            const uint32_t at = machine.address + gm::kTransitionBytes * i;
+            guest::StoreU32(h.base, at, r.Below(12));
+            guest::StoreU32(h.base, at + 4, r.Below(50));
+            guest::StoreU32(h.base, at + 8, r.Below(8) == 0 ? 1 : 0);
+            guest::StoreU32(h.base, at + 12, 0);
+          }
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = machine.address;
+        if (v == 0) {
+          ITC_FLAG(native_options_screen) = false;
+          RecompiledInit(info.address)(t, h.base);
+          ITC_FLAG(native_options_screen) = true;
+        } else {
+          hooks::OptionsInit(t, h.base, info.address);
+        }
+        out[v].Bytes(Read(h.base, machine.address, machine.bytes));
+        out[v].Bytes(Read(h.base, frame, info.frame - saves));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void OptionsScreen(Context& h) {
@@ -1387,6 +1459,7 @@ void OptionsScreen(Context& h) {
   Dispatch(h, w);
   CursorSteps(h, w);
   CategoryPages(h, w);
+  Inits(h);
 }
 
 }  // namespace harness

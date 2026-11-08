@@ -406,6 +406,33 @@ uint64_t ChangeSlidersValue(uint8_t* base, uint32_t step, uint32_t sp, const Cal
 uint64_t LeaveButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t LeaveAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+// --- The type 2 and 4 modes' Inits (inits.cpp) ---
+
+// An Init's result: StateMachine::Add's last answer, the machine, and
+// whether that Add replaced a transition (its answer then an index).
+struct InitResult {
+  uint32_t r3;
+  uint32_t machine;
+  bool replaced;
+};
+// An Init: its address, name, frame (its stwu size) and the first register
+// __savegprlr_<n> saves (r<n> to r31 and lr: (32 - n) * 8 + 8 bytes below
+// the caller's r1).
+struct InitInfo {
+  uint32_t address;
+  const char* name;
+  uint32_t frame;
+  uint32_t first_saved;
+};
+constexpr int kInitCount = 4;
+extern const InitInfo kInits[kInitCount];
+// sub_821C9E00 Type2Options::Init, sub_821CA458 Type4Options::Init,
+// sub_821C8578 Type2ControllerOptions::Init and sub_821C8A60
+// Type4ControllerOptions::Init (r3 the machine, `object`): their frames'
+// stores and copies below `sp` (the back chain too) and their
+// StateMachine::Add calls (plain C++) in their order.
+InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t sp);
+
 // --- The category pages (category_pages.cpp) ---
 //
 // Options::Draw's pages 1, 3, 5 and 7 (r3 not read): Menu::Step on the

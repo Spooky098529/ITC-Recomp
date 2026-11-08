@@ -159,4 +159,9 @@ void OptionsCloseSliders(PPCContext& ctx, uint8_t* base);
 void OptionsCloseButtons(PPCContext& ctx, uint8_t* base);
 void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base);
 
+// The type 2 and 4 modes' Inits (r3 the machine): Type2Options::Init
+// sub_821C9E00, Type4Options::Init sub_821CA458, Type2ControllerOptions::Init
+// sub_821C8578, Type4ControllerOptions::Init sub_821C8A60 by `address`.
+void OptionsInit(PPCContext& ctx, uint8_t* base, uint32_t address);
+
 }  // namespace hooks
