@@ -159,22 +159,21 @@ ITC_CL_STEP(CarListSaveData, cl::SaveData(base, ctx.r3.u32, sp))
   }
 
 // The panel groups and panels (from the car list's functions, recompiled,
-// and the C panels' vtables).
-ITC_CAR_LIST(8224EF18, CarListSetCaption)
+// and the C panels' vtables). PanelGroup::SetCaption sub_8224EF18,
+// TabPanel::SetCursorY sub_8224FD20, RowPanel::SetRow sub_8224F018 and
+// SetArrows sub_8224F680, ColorPanel::ShowSwatches sub_8224D358 and
+// SetSwatch sub_8224D4A0 have no adapter (removed, B7 loop, 2026-11-08):
+// in play only native callers reach them; the register steps stay for the
+// harness.
 ITC_CAR_LIST(82249CF0, CarListPartFinishAll)
-ITC_CAR_LIST(8224FD20, CarListTabSetCursorY)
 ITC_CAR_LIST(8224FD90, CarListTabSetButtons)
-ITC_CAR_LIST(8224F018, CarListRowSetRow)
-ITC_CAR_LIST(8224F680, CarListRowSetArrows)
 ITC_CAR_LIST(8224F558, CarListRowUnhighlight)
 ITC_CAR_LIST(8224F4C8, CarListRowHide)
 ITC_CAR_LIST(8224D010, CarListColorShow)
 ITC_CAR_LIST(8224D118, CarListColorSelect)
 ITC_CAR_LIST(8224D2D0, CarListColorSetArrows)
-ITC_CAR_LIST(8224D358, CarListColorShowSwatches)
 ITC_CAR_LIST(8224D3E0, CarListColorPlaceCursor)
 ITC_CAR_LIST(8224D458, CarListColorSetCount)
-ITC_CAR_LIST(8224D4A0, CarListColorSetSwatch)
 ITC_CAR_LIST(8224D518, CarListColorSetSwatches)
 ITC_CAR_LIST(8224D7F0, CarListCarSetTexts)
 ITC_CAR_LIST(8224D860, CarListCarSetButtons)
