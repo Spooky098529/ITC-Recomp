@@ -182,15 +182,17 @@ ITC_CL_STEP(CarListStep26, cl::Step26(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 // and the C panels' vtables). PanelGroup::SetCaption sub_8224EF18,
 // TabPanel::SetCursorY sub_8224FD20, RowPanel::SetRow sub_8224F018 and
 // SetArrows sub_8224F680, ColorPanel::ShowSwatches sub_8224D358 and
-// SetSwatch sub_8224D4A0 have no adapter (removed, B7 loop, 2026-11-08):
+// SetSwatch sub_8224D4A0, and (the second removal) PanelSetBase::ToTabs
+// sub_82249558, Free sub_8224B538, HandleInput sub_8224BF30,
+// PanelPart::FinishAll sub_82249CF0, TabPanel::Move sub_8224FF88,
+// RowPanel::Move sub_8224F8F8, CarPanel::Select sub_8224DCF0 and
+// ColorPanel::Select sub_8224D118 have no adapter (removed, B7 loop, 2026-11-08):
 // in play only native callers reach them; the register steps stay for the
 // harness.
-ITC_CAR_LIST(82249CF0, CarListPartFinishAll)
 ITC_CAR_LIST(8224FD90, CarListTabSetButtons)
 ITC_CAR_LIST(8224F558, CarListRowUnhighlight)
 ITC_CAR_LIST(8224F4C8, CarListRowHide)
 ITC_CAR_LIST(8224D010, CarListColorShow)
-ITC_CAR_LIST(8224D118, CarListColorSelect)
 ITC_CAR_LIST(8224D2D0, CarListColorSetArrows)
 ITC_CAR_LIST(8224D3E0, CarListColorPlaceCursor)
 ITC_CAR_LIST(8224D458, CarListColorSetCount)
@@ -198,7 +200,6 @@ ITC_CAR_LIST(8224D518, CarListColorSetSwatches)
 ITC_CAR_LIST(8224D7F0, CarListCarSetTexts)
 ITC_CAR_LIST(8224D860, CarListCarSetButtons)
 ITC_CAR_LIST(8224D9A0, CarListCarPlaceCursor)
-ITC_CAR_LIST(8224DCF0, CarListCarSelect)
 ITC_CAR_LIST(8224DF30, CarListCarStopArrows)
 ITC_CAR_LIST(8224DED8, CarListCarSetName)
 ITC_CAR_LIST(8224E288, CarListCarSetStats)
@@ -206,10 +207,8 @@ ITC_CAR_LIST(822417E8, CarListCarSetCarName)
 ITC_CAR_LIST(82241868, CarListPanel7CShowArrows)
 ITC_CAR_LIST(8224E920, CarListCarShowStats)
 ITC_CAR_LIST(822501C8, CarListTabSetTab)
-ITC_CAR_LIST(8224FF88, CarListTabMove)
 ITC_CAR_LIST(8224F758, CarListRowFill)
 ITC_CAR_LIST(8224F888, CarListRowRefresh)
-ITC_CAR_LIST(8224F8F8, CarListRowMove)
 ITC_CAR_LIST(8224D580, CarListColorMove)
 // PowerGraph::SetEntry (from PanelSetBase::PowerGraphPage, recompiled).
 ITC_CAR_LIST(82250368, CarListPowerGraphSetEntry)
@@ -227,11 +226,8 @@ ITC_CAR_LIST(82248EF0, CarListPickedPage)
 ITC_CAR_LIST(82249668, CarListSaveData)
 // PanelSet's slots 3, 5 and 7, the base's (from recompiled callers), the
 // page 8 handler (the page table) and the steps (the step table).
-ITC_CAR_LIST(82249558, CarListToTabs)
 ITC_CAR_LIST(82249730, CarListOpen)
-ITC_CAR_LIST(8224B538, CarListBaseFree)
 ITC_CAR_LIST(8224B880, CarListSetFree)
-ITC_CAR_LIST(8224BF30, CarListBaseHandleInput)
 ITC_CAR_LIST(8224CA28, CarListSetHandleInput)
 ITC_CAR_LIST(8224A3F8, CarListBackPage8)
 ITC_CAR_LIST(82248F00, CarListStep2)
