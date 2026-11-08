@@ -71,6 +71,11 @@ file's history. What's left to see in a drive, from every run:
   (race 87 s at 180, the harnesses ~91 s; 0 errors, every harness 0
   differing, 43 of 43 harness lines; 2 in the race, 18 in the replay
   `itc_4481` (ok), 23 to drive). Recorded.
+- Subsystem 2 of 3: the type 6 and 7 modes' list, panel and node
+  screens' transition handlers (lead picked: `sub_82251618` and the 19
+  others, the most ready groups left in `leads.md`, 20, beside the
+  type 6 and 7 modes; its line deleted from `leads.md`). Mapping agent
+  running.
 
 ## Done
 
