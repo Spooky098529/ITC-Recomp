@@ -59,7 +59,8 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "Type7Dialog::Draw sub_822421C0, Type7Screen0::Draw sub_82245148 and "
               "ControllerOptions::Draw sub_821C7F28 (the pages' handlers guest calls); "
               "GarageCamera::LoadPresets sub_821802D8 (Archive::Load through its plain C++) and "
-              "StandScene::Release sub_82180738; Quaternion::FromAngles sub_8217C120 and "
+              "StandScene::Release sub_82180738, StandMode::Release sub_82246038 (Strings::Release "
+              "and UiMovies::DeleteAll's jump through their overrides); Quaternion::FromAngles sub_8217C120 and "
               "GarageCamera::Reset sub_8217D888 and GarageLights::Init sub_8217D3C8 with the "
               "translated code's float steps; the modes' slot 0 Type6Mode::Init sub_82236880 and "
               "Type7Mode::Init sub_82246C90 (the UI movies' start, Strings::Load, StandScene::Create "
@@ -479,6 +480,10 @@ bool StandSceneRelease(PPCContext& ctx, uint8_t* base) {
   return Set(ctx, t67::StandSceneRelease(base));
 }
 
+bool StandModeRelease(PPCContext& ctx, uint8_t* base) {
+  return Set(ctx, t67::StandModeRelease(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base)));
+}
+
 // --- The dialogs' confirm ---
 
 void Type6DialogOpenConfirm(PPCContext& ctx, uint8_t* base) {
@@ -847,6 +852,8 @@ ITC_TYPE67_MODES(821C7F28, ControllerOptionsDraw)
 // switches those); their steps above are the harness's.
 // StandScene::Release (from StandMode::Release, recompiled).
 ITC_TYPE67_FREES(82180738, StandSceneRelease)
+// StandMode::Release (both modes' slot 1, from Modes::Tick, recompiled).
+ITC_TYPE67_FREES(82246038, StandModeRelease)
 
 // The dialogs' confirm: reached through their machines' transitions and
 // the Update's step table (no direct callers).

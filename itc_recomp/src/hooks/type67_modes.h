@@ -96,6 +96,9 @@ void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base);
 // sub_82180738 (false where a block isn't the layer's pages).
 void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base);
 bool StandSceneRelease(PPCContext& ctx, uint8_t* base);
+// StandMode::Release sub_82246038 (r3 the mode; false where its screen
+// block isn't the layer's pages).
+bool StandModeRelease(PPCContext& ctx, uint8_t* base);
 // StandScene::Create sub_82180B00 (r3 the cars; r3 as the original leaves
 // it): over the layer with the archive's native queue only (the adapter
 // checks); Viewports::Init and CarScene::Create guest calls to their

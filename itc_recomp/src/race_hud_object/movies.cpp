@@ -3,6 +3,7 @@
 
 #include "race_hud_object/race_hud_object.h"
 
+#include "alt_hud/alt_hud.h"
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "data_tables/data_tables.h"
@@ -275,6 +276,21 @@ uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
   const uint64_t r3 = Make1004(base, holder + 1004, frame, calls);
   guest::StoreU32(base, holder + 8, 0);
   return r3;
+}
+
+uint64_t ScreensDestruct(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82211B98 RaceScreens::~RaceScreens");
+  const uint32_t frame = sp - 96;
+  guest::StoreU32(base, frame, sp);
+  TearDown(base, holder + 16, frame, calls);
+  if (!alt_hud::Destroy(base, holder + 1004, frame, calls)) {
+    calls.Call(kAltHudDestroy, frame, 0x82211BBC, holder + 1004);
+  }
+  // The jump reads no argument; r3 as Strings::Release leaves it (DeleteAll
+  // hands it back when the movie table is empty).
+  const uint64_t r3 =
+      calls.Call(kStringsRelease, frame, 0x82211BCC, guest::LoadU32(base, 0x826C5C34), 47);
+  return calls.Call(kDeleteAllJump, frame, 0x82211BD0, r3);
 }
 
 uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& calls) {

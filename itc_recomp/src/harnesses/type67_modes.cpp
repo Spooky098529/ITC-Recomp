@@ -3066,6 +3066,146 @@ void ModeInits(Context& h) {
   Write(base, kFades, fades.data(), kFadesBytes);
 }
 
+// StandMode::Release over a mode of the case's: its screen block (+848)
+// the layer's pages, the stand holder and viewports as StandScene::
+// Release's cases make them, the string table ([0x826C5C34]) a table of the
+// case's (each file none, the layer's pages or a pointer never freed,
+// counts 0 to 3) and the movie table 0 to 4 pairs of no movie (keys 100 +
+// n, some repeated). Both sides reach the same overrides of
+// StandScene::Release (the original's) or its plain C++ (ours, the same
+// work), Strings::Release and UiMovies::DeleteAll's jump. Compared: what's
+// freed, the mode, the globals, the string table, the movie table's pairs,
+// the frame (its register saves left out), the caller's area, r1 and r3
+// (the string table as 1, the movie table as 2, a pair by its offset).
+void StandModeReleases(Context& h) {
+  namespace sf = strings_and_font;
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  Results results("StandMode::Release (sub_82246038)");
+  const Block mode(0x400), table(sf::kStringsBytes);
+  if (!mode.address || !table.address) {
+    ITC_LOG_ERROR("harness: type67_modes: no block from the allocation layer");
+    return;
+  }
+  const uint32_t saved_holder = guest::LoadU32(base, t67::kStandHolder);
+  const uint32_t saved_viewports = guest::LoadU32(base, cameras::kViewports);
+  const uint32_t saved_strings = guest::LoadU32(base, 0x826C5C34);
+  const std::vector<uint8_t> saved_movies = Read(base, ui_movies::kMovieTable, 12);
+  for (int c = 0; c < 40; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      std::vector<uint32_t> made;
+      auto pages = [&](uint32_t bytes) {
+        const uint32_t block = memory::AllocPages(bytes, 4096);
+        WriteRandom(base, block, bytes < 64 ? bytes : 64, r);
+        made.push_back(block);
+        return block;
+      };
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(base, sp - 512, 512 + 256, r);
+      WriteRandom(base, mode.address, mode.bytes, r);
+      guest::StoreU32(base, mode.address + 848, pages(0x2000));
+      const uint32_t viewports = pages(12);
+      guest::StoreU32(base, viewports + 0, pages(1872));
+      guest::StoreU32(base, viewports + 4, pages(1872));
+      guest::StoreU32(base, cameras::kViewports, viewports);
+      const uint32_t holder = pages(12);
+      guest::StoreU32(base, t67::kStandHolder, holder);
+      for (uint32_t i = 0; i < 3; i++) {
+        uint32_t slot = 0;
+        if (r.Below(2) != 0) {
+          slot = pages(64);
+          guest::StoreU32(base, slot, 0);
+        }
+        guest::StoreU32(base, holder + 4 * i, slot);
+      }
+      WriteRandom(base, table.address, table.bytes, r);
+      uint32_t files[sf::kStringFiles];
+      uint32_t kinds[sf::kStringFiles];
+      for (uint32_t f = 0; f < sf::kStringFiles; f++) {
+        kinds[f] = r.Below(3);
+        uint32_t count = r.Below(4);
+        files[f] = kinds[f] == 0   ? 0
+                   : kinds[f] == 1 ? memory::AllocPages(64, 4096)
+                                   : uint32_t(r.Next()) | 1;
+        if (kinds[f] == 2 && count == 1) {
+          count = 2;
+        }
+        guest::StoreU32(base, table.address + 4 * f, files[f]);
+        guest::StoreU32(base, table.address + 68 + 4 * f, r.Below(2));
+        guest::StoreU32(base, table.address + 4236 + 4 * f, count);
+      }
+      guest::StoreU32(base, 0x826C5C34, table.address);
+      const uint32_t capacity = 1 + r.Below(4);
+      const uint32_t count = r.Below(capacity + 1);
+      const uint32_t array = memory::crt::OperatorNewArray(base, 8 * capacity).value_or(0);
+      WriteRandom(base, array, 8 * capacity, r);
+      for (uint32_t k = 0; k < count; k++) {
+        const uint32_t key = k > 0 && r.Below(4) == 0 ? 100 + r.Below(k) : 100 + k;
+        guest::StoreU32(base, array + 8 * k, key);
+        guest::StoreU32(base, array + 8 * k + 4, 0);
+      }
+      guest::StoreU32(base, ui_movies::kMovieTable, array);
+      guest::StoreU32(base, ui_movies::kMovieTable + 4, capacity);
+      guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+      t.r3.u64 = mode.address;
+      t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      if (v == 0) {
+        ITC_FLAG(native_type67_modes) = false;
+        __imp__sub_82246038(t, base);
+        ITC_FLAG(native_type67_modes) = true;
+      } else if (!hooks::StandModeRelease(t, base)) {
+        ITC_LOG_ERROR("harness: type67_modes: StandMode::Release refused");
+      }
+      out[v].Word(uint32_t(made.size()));
+      for (const uint32_t block : made) {
+        out[v].Word(memory::IsPages(block));
+        if (memory::IsPages(block)) memory::FreePages(block);
+      }
+      out[v].Bytes(Read(base, mode.address, mode.bytes));
+      out[v].Word(guest::LoadU32(base, t67::kStandHolder));
+      out[v].Word(guest::LoadU32(base, cameras::kViewports));
+      for (uint32_t f = 0; f < sf::kStringFiles; f++) {
+        const uint32_t now = guest::LoadU32(base, table.address + 4 * f);
+        out[v].Word(now == files[f] ? 1 : now);
+        if (kinds[f] == 1) {
+          const bool left = memory::IsPages(files[f]);
+          out[v].Word(left ? 1 : 0);
+          if (left) {
+            memory::FreePages(files[f]);
+          }
+        }
+      }
+      out[v].Bytes(Read(base, table.address + 68, table.bytes - 68));
+      const uint32_t now = guest::LoadU32(base, ui_movies::kMovieTable);
+      out[v].Word(now == array ? 1 : now);
+      out[v].Bytes(Read(base, ui_movies::kMovieTable + 4, 8));
+      out[v].Bytes(Read(base, array, 8 * capacity));
+      out[v].Bytes(Read(base, sp - 96, 80));
+      out[v].Bytes(Read(base, sp, 256));
+      out[v].Word(t.r1.u32);
+      const uint32_t r3 = t.r3.u32;
+      out[v].Word(r3 == table.address              ? 1
+                  : r3 == ui_movies::kMovieTable   ? 2
+                  : r3 >= array && r3 < array + 64 ? 0x100 + (r3 - array)
+                                                   : r3);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      if (array != 0 && memory::IsHeapBlock(array)) memory::crt::OperatorDeleteArray(array);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(base, t67::kStandHolder, saved_holder);
+  guest::StoreU32(base, cameras::kViewports, saved_viewports);
+  guest::StoreU32(base, 0x826C5C34, saved_strings);
+  Write(base, ui_movies::kMovieTable, saved_movies.data(), 12);
+  results.Report();
+}
+
 void Type67Modes(Context& h) {
   const Block object(kObjectBytes);
   const Block world(kWorldBytes);
@@ -3092,6 +3232,7 @@ void Type67Modes(Context& h) {
   TearDowns(h, world);
   StandSceneCreates(h);
   ModeInits(h);
+  StandModeReleases(h);
 }
 
 }  // namespace harness

@@ -500,4 +500,23 @@ uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
   return passes;
 }
 
+std::optional<uint64_t> StandModeRelease(uint8_t* base, uint32_t mode, uint32_t sp,
+                                         const Calls& calls) {
+  if (!memory::IsPages(LoadU32(base, mode + kBlock))) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82246038 StandMode::Release");
+  constexpr uint32_t kStandSceneRelease = 0x82180738, kStringsRelease = 0x8210A538;
+  constexpr uint32_t kDeleteAllJump = 0x8211E370;
+  const uint32_t frame = sp - kStandModeReleaseFrame;
+  StoreU32(base, frame, sp);
+  if (!StandSceneRelease(base)) {
+    calls.call(kStandSceneRelease, frame, 0x82246050, mode, 0);
+  }
+  memory::FreePages(LoadU32(base, mode + kBlock));
+  StoreU32(base, mode + kBlock, 0);
+  const uint64_t r3 = calls.call(kStringsRelease, frame, 0x8224607C, LoadU32(base, 0x826C5C34), 3);
+  return calls.call(kDeleteAllJump, frame, 0x82246080, r3, 0);
+}
+
 }  // namespace type67_modes

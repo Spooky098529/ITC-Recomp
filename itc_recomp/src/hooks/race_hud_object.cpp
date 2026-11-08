@@ -44,6 +44,9 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "UpdateWarning sub_82212C50, UpdateRecordingFull sub_82212E60 (UiMovie::Finish "
               "and FinishNamed through their overrides), ShowItem sub_82213638 (UiMovie::SetNodeText "
               "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0, Create sub_82211F40 (with --native_heap; the in-race screens' makers' plain C++) and Make1004 sub_82216A60 "
+              "(and RaceScreens::~RaceScreens sub_82211B98 with --native_heap: TearDown's and "
+              "AltHud::Destroy's plain C++, Strings::Release and UiMovies::DeleteAll's jump "
+              "through their overrides) "
               "(the UI movies' start, Strings::Load, UiMovies::Open, operator new, memset and "
               "MenuList::Init through their overrides); MovieMask, RaceHud::Init and Make1004 "
               "have no adapters: only RaceScreens::Init's plain C++ reaches them, and the flag "
@@ -386,6 +389,15 @@ void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::ScreensCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectScreensDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!NativeHeapActive()) {
+    __imp__sub_82211B98(ctx, base);
+    return;
+  }
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::ScreensDestruct(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 void RaceHudObjectDrawPauseMenu(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
@@ -473,5 +485,7 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
+// RaceScreens::~RaceScreens (from RaceScreens::Destroy, recompiled).
+ITC_RACE_HUD_OBJECT(82211B98, RaceHudObjectScreensDestruct)
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)

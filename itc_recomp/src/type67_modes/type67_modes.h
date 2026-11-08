@@ -286,6 +286,18 @@ constexpr uint32_t kType7ModeInitFrame = 144;
 uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
                   const ModeInitCalls& calls);
 
+// sub_82246038 StandMode::Release (both modes' slot 1): StandScene::Release
+// (its plain C++, or a guest call to its override where that refuses), the
+// screen block (+848, the allocation layer's pages: VirtualFree's plain
+// C++) freed and +848 = 0, then Strings::Release([0x826C5C34], 3) and
+// UiMovies::DeleteAll's jump (sub_8211E370, r3 as Strings::Release leaves
+// it) through their overrides, all from a 96-byte frame below `sp`. The
+// jump's r3. nullopt, with nothing done, where +848 isn't the layer's pages
+// (the adapter runs the original).
+constexpr uint32_t kStandModeReleaseFrame = 96;
+std::optional<uint64_t> StandModeRelease(uint8_t* base, uint32_t mode, uint32_t sp,
+                                         const Calls& calls);
+
 // --- The handlers with guest calls (screens.cpp). `sp` is the caller's
 // stack pointer (the original's r1 at entry); each returns r3 as the
 // original leaves it. ---

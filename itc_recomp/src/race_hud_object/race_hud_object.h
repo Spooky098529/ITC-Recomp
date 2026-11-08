@@ -385,6 +385,15 @@ uint64_t Make1004(uint8_t* base, uint32_t owner, uint32_t sp, const Calls& calls
 // +8 = 0. Make1004's r3.
 uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
                      const Calls& calls);
+// RaceScreens::~RaceScreens (sub_82211B98): TearDown(+16) and
+// AltHud::Destroy(+1004) (their plain C++; Destroy through `calls` where
+// it refuses), then Strings::Release([0x826C5C34], 47) and UiMovies::
+// DeleteAll's jump (sub_8211E370) through their overrides (their other
+// callers are recompiled), all from a 96-byte frame. The jump's r3.
+constexpr uint32_t kAltHudDestroy = 0x82216BA8;
+constexpr uint32_t kStringsRelease = 0x8210A538;
+constexpr uint32_t kDeleteAllJump = 0x8211E370;
+uint64_t ScreensDestruct(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls);
 // The in-race screens' holder ([0x826D84F0]).
 constexpr uint32_t kScreensHolder = 0x826D84F0;
 // RaceScreens::Create (sub_82211F40): the holder (VirtualAlloc(0, 1040,
