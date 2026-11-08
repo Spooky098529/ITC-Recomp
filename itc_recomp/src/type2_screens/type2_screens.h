@@ -350,6 +350,91 @@ uint64_t BuildDetailsPage(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t BuildUpdatePage(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
                          const Calls& calls);
 
+// --- The hub's handlers and helpers (hub.cpp) ---
+//
+// The hub's globals: the page object (28 bytes), the menu (68), the data
+// (asked for 68 bytes, used up to +447: VirtualAlloc gives a page) and the
+// load counter; its movie 0.
+constexpr uint32_t kHubPages = 0x826D8410;
+constexpr uint32_t kHubMenu = 0x826D8414;
+constexpr uint32_t kHubData = 0x826D8418;
+constexpr uint32_t kHubCounter = 0x826D841C;
+constexpr uint32_t kHubMovie = 0;
+constexpr uint32_t kSetChildNameText = 0x8211D930;
+constexpr uint32_t kSetNumberText = 0x8211C740;
+
+// sub_8218D6A8 Type2Hub::OnYes and sub_8218D6C0 OnNo: the data's +28 = 0
+// or 1. Leaves.
+void HubOnYes(uint8_t* base);
+void HubOnNo(uint8_t* base);
+// sub_8218E2D8 Type2Hub::ImagesLoadedA and sub_8218E320 ImagesLoadedB (r3
+// the data): 1 when every record of the first list (+32, count +216) or
+// the second (+220, count +404) has its +0 set, else 0. Leaves.
+uint32_t HubImagesLoadedA(uint8_t* base, uint32_t data);
+uint32_t HubImagesLoadedB(uint8_t* base, uint32_t data);
+// sub_8218E420 Type2Hub::WaitForLoad (r3 the machine): while +9608 is 0,
+// +9608 = 1 once movies 0, 9 and 10 and both image lists are loaded; the
+// counter at 0x826D841C (the empty sub_82106540 called while its / 15 is
+// even) counted up; once loaded and the counter at least 1 (the patched
+// comparison: 60 in the original, the PATCH: in generated/), the counter 0
+// and +9604 = 9 or 4 by +9612. The last call's r3, else `r3`. 112-byte
+// frame.
+uint64_t HubWaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_8218D650 Type2Hub::FreeImage (r3 an image record): +0 = 0, its +8 and
+// +12 VirtualFree'd. The last VirtualFree's r3. 96-byte frame.
+uint64_t HubFreeImage(uint8_t* base, uint32_t record, uint32_t sp, const Calls& calls);
+// sub_8218E5B0 Type2Hub::OpenSelected (r3 the machine, r4 the mode): the
+// message by the menu's cursor (8, 12, 18, 10, 23, 21, 14, else 51)
+// posted, +9604 = 9. A leaf.
+void HubOpenSelected(uint8_t* base, uint32_t machine, uint32_t mode);
+// sub_8218D9B8 Type2Hub::Reenter (r3 the machine): with +9608, the page
+// object to page 0 after transition 4 (the data's +0 set) or 0, then 1, and
+// +9604 = 4; else +9604 = 1. A leaf.
+void HubReenter(uint8_t* base, uint32_t machine);
+// sub_8218E7A4 Type2Hub::PostMessage5 (r3 the mode): message 5. A leaf.
+void HubPostMessage5(uint8_t* base, uint32_t mode);
+// sub_8218E768 Type2Hub::Choose (r3 the mode, r4 the machine): by the menu's
+// cursor (more than 7 nothing): 0 to 6 PostMessage5, 7 the machine's +9604
+// = 10 and the data's +4 = 1. A leaf.
+void HubChoose(uint8_t* base, uint32_t mode, uint32_t machine);
+// sub_8218E530 Type2Hub::Unload (r3 the machine): the data's +20 = 0;
+// FinishAll(movie 0), its object's (+28) +36 and +32 put back from the
+// data's +440 and +444; with +9616, UiMovies::Delete(0) and +9608 = 0. The
+// last call's r3. 128-byte frame.
+uint64_t HubUnload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8218E688 Type2Hub::Close (r3 the machine, r4 the mode): +9604 = 7;
+// FinishAll(movie 0) when found, its object's words put back, Delete(0),
+// message 4. Delete's r3. 112-byte frame.
+uint64_t HubClose(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
+                  const Calls& calls);
+// sub_8218F530 Type2Hub::SetPrompts (r3 to r8 three pairs): movie 0's
+// sub-scene 10 nodes 0 to 2 shown (+80) with their two children's frames
+// (+108) the pair when neither is -1, else hidden. The last FindNode's r3.
+// 192-byte frame.
+uint32_t HubSetPrompts(uint8_t* base, const uint32_t args[6], uint32_t sp);
+// sub_8218F698 Type2Hub::Back: the page object to page 0 (no transition),
+// then SetPrompts(0, 0, 6, 2, 7, 3) (a tail call, on `sp`). Its r3.
+uint32_t HubBack(uint8_t* base, uint32_t sp);
+// sub_8218E810 Type2Hub::SetUpStatus: movie 0's name (8, 6), money (8, 9)
+// and day (8, 13, string 8, at most 999) from player 0's save data
+// (SetChildNameText, SetNumberText and SetText through their overrides),
+// node (8, 11)'s frame the day % 7; GarageStage::SetPlates(the stage, 1);
+// the data's +0 = 1, +4 and +8 = 0. r3 the stage. 128-byte frame.
+uint64_t HubSetUpStatus(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8218DBD0 Type2Hub::NextNotice: the chained entry (0), the first
+// unread entry of the first notice list copied to the data's +428 (1), or
+// none, the list's count 0 (2). 96-byte frame.
+uint32_t HubNextNotice(uint8_t* base, uint32_t sp);
+// sub_8218DD78 Type2Hub::NextNotice2: the first unread entry of the second
+// list copied to the data's +416 (1), or none, its count 0 (0). 96-byte
+// frame.
+uint32_t HubNextNotice2(uint8_t* base, uint32_t sp);
+// sub_8218F6E0 Type2Hub::Start: movie 0's object's +36 and +32 kept in the
+// data's +440 and +444; SetUpStatus; NextNotice: a notice, page 4 after
+// transitions 5 and 1; none, NextNotice2: page 5 or 0 after 0 and 1; the
+// data's +20 = 0. NextNotice's or NextNotice2's r3. 112-byte frame.
+uint32_t HubStart(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The machines' set-ups (init_states.cpp) ---
 //
 // The transitions added to `machine` (StateMachine::Add's plain C++) from

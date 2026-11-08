@@ -25,6 +25,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "data_tables/data_tables.h"
 #include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
@@ -78,7 +79,8 @@ constexpr uint32_t kStageAt = 0x18400;       // a garage stage (6,144 bytes)
 constexpr uint32_t kHolderAt = 0x19C00;      // [0x826D83E0] points here: +0 the stage
 constexpr uint32_t kSheetDataAt = 0x19C80;   // the spec sheet's data (1,968 bytes)
 constexpr uint32_t kGroupListAt = 0x2A90;    // the build screen's group list (72)
-constexpr uint32_t kBlockBytes = 0x1A480;
+constexpr uint32_t kHubAt = 0x1A480;         // the hub's world (0x400 bytes)
+constexpr uint32_t kBlockBytes = 0x1A880;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -101,6 +103,8 @@ constexpr Global kGlobals[] = {
     {t2::kBuildPages, 16},  // the build screen's
     {kSaveSlots, 16},
     {kStandHolder, 4},
+    {t2::kHubPages, 16},  // the hub's page object, menu, data and counter
+    {data_tables::kTables, 4},
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
     {kMissingText, 4},
@@ -940,6 +944,174 @@ void SheetAndBuild(Context& h, const World& w) {
              nullptr, true});
 }
 
+// The hub's world: the movie table's pairs 0 (the movie), 9 and 10 (two
+// stubs whose loaded flags are in the hub's area), the movie's object (+28)
+// there, the menu's cursor, the data's image lists (counts 0 to 4, records
+// of the area, loaded or not), its notice (+432 a table 0 to 3, +436 -1 or
+// 0 to 7) over a 56-byte table the data tables' global points at, the load
+// counter, the stage's +0, and player 0's save data (random): its notice lists (counts 0 to 8,
+// entries read or not), name, money and day.
+void HubWorld(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t hub = w.at(kHubAt), data = w.data(), save = w.save;
+  const uint32_t pairs = w.at(kPairsAt);
+  guest::StoreU32(base, t2::kHubPages, w.at(kPagesAt));
+  guest::StoreU32(base, t2::kHubMenu, w.at(kListAt));
+  guest::StoreU32(base, t2::kHubData, data);
+  WriteRandom(base, save, kSaveDataBytes, r);
+  const uint32_t stubs[2] = {hub + 0x3C0 - ui_movies::kMovieLoaded,
+                             hub + 0x3C4 - ui_movies::kMovieLoaded};
+  guest::StoreU32(base, pairs + 0, t2::kHubMovie);
+  guest::StoreU32(base, pairs + 4, w.at(kMovieAt));
+  guest::StoreU32(base, pairs + 8, 9);
+  guest::StoreU32(base, pairs + 12, stubs[0]);
+  guest::StoreU32(base, pairs + 16, 10);
+  guest::StoreU32(base, pairs + 20, stubs[1]);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, r.Below(8) == 0 ? 0 : 3);
+  for (const uint32_t stub : stubs) {
+    guest::StoreU32(base, stub + ui_movies::kMovieLoaded, r.Below(4) == 0 ? 0 : 1);
+  }
+  guest::StoreU32(base, w.at(kMovieAt) + ui_movies::kMovieLoaded, r.Below(4) == 0 ? 0 : 1);
+  guest::StoreU32(base, w.at(kMovieAt) + 28, hub);
+  // The stage's +0 (GarageStage::SetPlates writes its +6092) at a word of
+  // the area.
+  guest::StoreU32(base, w.at(kStageAt), hub + 0x3C8 - 6092);
+  guest::StoreU32(base, w.at(kListAt) + 0, r.Below(6) == 0 ? 0xFFFFFFFFu : r.Below(10));
+  for (const uint32_t list : {32u, 220u}) {
+    guest::StoreU32(base, data + list + 184, r.Below(5));
+    for (uint32_t i = 0; i < 46; i++) {
+      guest::StoreU32(base, data + list + 4 * i, hub + 0x40 + 16 * r.Below(16));
+    }
+  }
+  for (uint32_t k = 0; k < 16; k++) {
+    guest::StoreU32(base, hub + 0x40 + 16 * k, r.Below(5) == 0 ? 0 : 1);
+  }
+  guest::StoreU32(base, data + 432, r.Below(4));
+  guest::StoreU32(base, data + 436, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(8));
+  guest::StoreU32(base, data_tables::kTables, hub + 0x140);
+  for (uint32_t k = 5; k < 9; k++) {
+    guest::StoreU32(base, hub + 0x140 + 4 * k, hub + 0x180);
+  }
+  for (uint32_t k = 0; k < 8; k++) {
+    guest::StoreU32(base, hub + 0x180 + 56 * k + 8, r.Below(2) == 0 ? 0 : r.Below(4));
+  }
+  guest::StoreU32(base, t2::kHubCounter, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(100));
+  for (const uint32_t list : {0x1C778u, 0x1CA84u}) {
+    for (uint32_t i = 0; i < 12; i++) {
+      WriteRandom(base, save + list + 12 * i, 12, r);
+      guest::StoreU32(base, save + list + 12 * i, r.Below(2));
+    }
+  }
+  guest::StoreU32(base, save + 0x1CA78, r.Below(9));
+  guest::StoreU32(base, save + 0x1D504, r.Below(9));
+  // The name record (UiMovie::SetNameText's kinds and indexes).
+  guest::StoreU32(base, save + 8 + 4, r.Below(6));
+  guest::StoreU16(base, save + 8 + 8, uint16_t(r.Below(110)));
+  guest::StoreU16(base, save + 8 + 10, uint16_t(r.Below(2)));
+  guest::StoreU32(base, save + 8 + 12, r.Below(6));
+  guest::StoreU16(base, save + 8 + 16, uint16_t(r.Below(110)));
+  guest::StoreU16(base, save + 8 + 18, uint16_t(r.Below(2)));
+  const uint32_t pick = r.Below(4);
+  guest::StoreU32(base, save + 6100,
+                  pick == 0 ? uint32_t(r.Next()) : pick == 1 ? 990 + r.Below(20) : r.Below(999));
+  guest::StoreU32(base, save + 6116, uint32_t(r.Next()));
+}
+
+void Hub(Context& h, const World& w) {
+  auto hub = [](PPCContext&, Random& r, const World& w) { HubWorld(r, w); };
+  auto machine = [hub](PPCContext& t, Random& r, const World& w) {
+    hub(t, r, w);
+    t.r3.u64 = w.at(kMachineAt);
+    t.r4.u64 = w.at(kModeAt);
+  };
+  auto data = [hub](PPCContext& t, Random& r, const World& w) {
+    hub(t, r, w);
+    t.r3.u64 = w.data();
+  };
+  Run(h, w, {"Type2Hub::OnYes (sub_8218D6A8)", 20, __imp__sub_8218D6A8, hooks::HubOnYes, {}, hub});
+  Run(h, w, {"Type2Hub::OnNo (sub_8218D6C0)", 20, __imp__sub_8218D6C0, hooks::HubOnNo, {}, hub});
+  Run(h, w, {"Type2Hub::ImagesLoadedA (sub_8218E2D8)", 100, __imp__sub_8218E2D8,
+             hooks::HubImagesLoadedA, {}, data});
+  Run(h, w, {"Type2Hub::ImagesLoadedB (sub_8218E320)", 100, __imp__sub_8218E320,
+             hooks::HubImagesLoadedB, {}, data});
+  Run(h, w, {"Type2Hub::WaitForLoad (sub_8218E420; sub_8218E2D8, sub_8218E320)", 300,
+             __imp__sub_8218E420, hooks::HubWaitForLoad, {{-112, -24}}, machine});
+  if (hooks::NativeHeapActive()) {
+    // FreeImage: the record's two blocks the layer's pages.
+    Run(h, w, {"Type2Hub::FreeImage (sub_8218D650)", 40, __imp__sub_8218D650,
+               hooks::HubFreeImage, {{-96, -16}},
+               [](PPCContext& t, Random& r, const World& w) {
+                 const uint32_t record = w.at(kHubAt) + 0x340;
+                 guest::StoreU32(w.base, record + 8, MakePages(w.base, 24, r));
+                 guest::StoreU32(w.base, record + 12, MakePages(w.base, 12, r));
+                 t.r3.u64 = record;
+               }});
+  }
+  Run(h, w, {"Type2Hub::OpenSelected (sub_8218E5B0)", 100, __imp__sub_8218E5B0,
+             hooks::HubOpenSelected, {}, machine});
+  Run(h, w, {"Type2Hub::Reenter (sub_8218D9B8)", 100, __imp__sub_8218D9B8, hooks::HubReenter,
+             {},
+             [machine](PPCContext& t, Random& r, const World& w) {
+               machine(t, r, w);
+               if (r.Below(3) == 0) {
+                 guest::StoreU32(w.base, w.at(kPagesAt), 0);
+               }
+             }});
+  Run(h, w, {"Type2Hub::Choose (sub_8218E768; sub_8218E7A4)", 100, __imp__sub_8218E768,
+             hooks::HubChoose, {},
+             [machine](PPCContext& t, Random& r, const World& w) {
+               machine(t, r, w);
+               t.r3.u64 = w.at(kModeAt);
+               t.r4.u64 = w.at(kMachineAt);
+             }});
+  Run(h, w, {"Type2Hub::Unload (sub_8218E530)", 60, __imp__sub_8218E530, hooks::HubUnload,
+             {{-128, -40}}, machine});
+  Run(h, w, {"Type2Hub::Close (sub_8218E688)", 60, __imp__sub_8218E688, hooks::HubClose,
+             {{-112, -24}}, machine});
+  // SetPrompts: each pair's values -1 or small (stored into nodes' +108).
+  auto prompts = [hub](PPCContext& t, Random& r, const World& w) {
+    hub(t, r, w);
+    SmallNodes(r, w);
+    uint64_t* regs[6] = {&t.r3.u64, &t.r4.u64, &t.r5.u64, &t.r6.u64, &t.r7.u64, &t.r8.u64};
+    for (uint64_t* reg : regs) {
+      *reg = r.Below(4) == 0 ? 0xFFFFFFFFFFFFFFFFull : r.Below(12);
+    }
+  };
+  Run(h, w, {"Type2Hub::SetPrompts (sub_8218F530)", 200, __imp__sub_8218F530,
+             hooks::HubSetPrompts, {{-192, -64}}, prompts});
+  Run(h, w, {"Type2Hub::Back (sub_8218F698; sub_8218F530)", 100, __imp__sub_8218F698,
+             hooks::HubBack, {{-192, -64}},
+             [prompts](PPCContext& t, Random& r, const World& w) {
+               prompts(t, r, w);
+               if (r.Below(3) == 0) {
+                 guest::StoreU32(w.base, w.at(kPagesAt), 0);
+               }
+             }});
+  // SetUpStatus: SetText's parameter area past its r7 (+56 to +79, the
+  // original's leftovers) left out.
+  auto status = [hub](PPCContext& t, Random& r, const World& w) {
+    hub(t, r, w);
+    SmallNodes(r, w);
+  };
+  Run(h, w, {"Type2Hub::SetUpStatus (sub_8218E810)", 100, __imp__sub_8218E810,
+             hooks::HubSetUpStatus, {{-128, -72}, {-48, -40}}, status, nullptr, true});
+  Run(h, w, {"Type2Hub::NextNotice (sub_8218DBD0)", 200, __imp__sub_8218DBD0,
+             hooks::HubNextNotice, {{-96, -16}}, hub, nullptr, true});
+  Run(h, w, {"Type2Hub::NextNotice2 (sub_8218DD78)", 200, __imp__sub_8218DD78,
+             hooks::HubNextNotice2, {{-96, -8}}, hub, nullptr, true});
+  // Start: SetUpStatus's frame under its own (the same words), NextNotice's
+  // and NextNotice2's back chains over it.
+  Run(h, w, {"Type2Hub::Start (sub_8218F6E0; sub_8218E810, sub_8218DBD0, sub_8218DD78)", 200,
+             __imp__sub_8218F6E0, hooks::HubStart, {{-112, -24}, {-240, -184}, {-160, -152}},
+             [status](PPCContext& t, Random& r, const World& w) {
+               status(t, r, w);
+               if (r.Below(3) == 0) {
+                 guest::StoreU32(w.base, w.at(kPagesAt), r.Below(2) == 0 ? 4 : 5);
+               }
+             },
+             nullptr, true});
+}
+
 }  // namespace
 
 void Type2Screens(Context& h) {
@@ -955,6 +1127,7 @@ void Type2Screens(Context& h) {
     PlateTransitions(h, w);
     PlatePages(h, w);
     SheetAndBuild(h, w);
+    Hub(h, w);
   }
 }
 

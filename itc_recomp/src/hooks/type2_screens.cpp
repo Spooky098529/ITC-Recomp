@@ -46,7 +46,14 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "Unload sub_8219C298, Close sub_8219C300, Destroy sub_8219B8C8 (MenuList::Release "
               "through its override), UpdatePage sub_8219FA80 (the page's handler through the "
               "guest context), DetailsPage sub_8219B960 and LeavePage sub_8219C3A8 with "
-              "SaveBuildStates sub_8219C100 (GarageStage::SetDark's plain C++) "
+              "SaveBuildStates sub_8219C100 (GarageStage::SetDark's plain C++); the hub's "
+              "OnYes sub_8218D6A8, OnNo sub_8218D6C0, WaitForLoad sub_8218E420 (the patched "
+              "count of 1) with ImagesLoadedA sub_8218E2D8 and ImagesLoadedB sub_8218E320, "
+              "FreeImage sub_8218D650, OpenSelected sub_8218E5B0, Reenter sub_8218D9B8, Choose "
+              "sub_8218E768 with PostMessage5 sub_8218E7A4, Unload sub_8218E530, Close "
+              "sub_8218E688, SetPrompts sub_8218F530, Back sub_8218F698, Start sub_8218F6E0 with "
+              "SetUpStatus sub_8218E810 (the text setters through their overrides), NextNotice "
+              "sub_8218DBD0 and NextNotice2 sub_8218DD78 "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -314,6 +321,57 @@ void BuildUpdatePage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t2::BuildUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
+void HubOnYes(PPCContext&, uint8_t* base) { t2::HubOnYes(base); }
+void HubOnNo(PPCContext&, uint8_t* base) { t2::HubOnNo(base); }
+void HubImagesLoadedA(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::HubImagesLoadedA(base, ctx.r3.u32);
+}
+void HubImagesLoadedB(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::HubImagesLoadedB(base, ctx.r3.u32);
+}
+void HubWaitForLoad(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubWaitForLoad(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void HubFreeImage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubFreeImage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void HubOpenSelected(PPCContext& ctx, uint8_t* base) {
+  t2::HubOpenSelected(base, ctx.r3.u32, ctx.r4.u32);
+}
+void HubReenter(PPCContext& ctx, uint8_t* base) { t2::HubReenter(base, ctx.r3.u32); }
+void HubPostMessage5(PPCContext& ctx, uint8_t* base) { t2::HubPostMessage5(base, ctx.r3.u32); }
+void HubChoose(PPCContext& ctx, uint8_t* base) { t2::HubChoose(base, ctx.r3.u32, ctx.r4.u32); }
+void HubUnload(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void HubClose(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void HubSetPrompts(PPCContext& ctx, uint8_t* base) {
+  const uint32_t args[6] = {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                            ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};
+  ctx.r3.u64 = t2::HubSetPrompts(base, args, ctx.r1.u32);
+}
+void HubBack(PPCContext& ctx, uint8_t* base) { ctx.r3.u64 = t2::HubBack(base, ctx.r1.u32); }
+void HubSetUpStatus(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubSetUpStatus(base, ctx.r1.u32, guest.calls());
+}
+void HubNextNotice(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::HubNextNotice(base, ctx.r1.u32);
+}
+void HubNextNotice2(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::HubNextNotice2(base, ctx.r1.u32);
+}
+void HubStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubStart(base, ctx.r1.u32, guest.calls());
+}
+
 namespace {
 // An Init's register step: StateMachine::Add's adapter's r3, a new
 // transition's address from the machine's 64-bit r3.
@@ -380,6 +438,27 @@ ITC_TYPE2_SCREENS(8219B8C8, BuildDestroy)
 ITC_TYPE2_SCREENS(8219FA80, BuildUpdatePage)
 ITC_TYPE2_SCREENS(8219B960, BuildDetailsPage)
 ITC_TYPE2_SCREENS(8219C3A8, BuildLeavePage)
+// The hub's handlers (functors the machine calls: WaitForLoad, Start,
+// Unload, OpenSelected, Reenter, Close, OnYes, OnNo, Back; Choose from
+// UpdatePage's table on its stack, recompiled) and helpers (from the
+// recompiled hub code). No adapters for ImagesLoadedA sub_8218E2D8 and
+// ImagesLoadedB sub_8218E320 (only WaitForLoad), PostMessage5 sub_8218E7A4
+// (only Choose) and SetUpStatus sub_8218E810 (only Start): their steps
+// above are the harness's.
+ITC_TYPE2_SCREENS(8218D6A8, HubOnYes)
+ITC_TYPE2_SCREENS(8218D6C0, HubOnNo)
+ITC_TYPE2_SCREENS(8218E420, HubWaitForLoad)
+ITC_TYPE2_SCREENS(8218D650, HubFreeImage)
+ITC_TYPE2_SCREENS(8218E5B0, HubOpenSelected)
+ITC_TYPE2_SCREENS(8218D9B8, HubReenter)
+ITC_TYPE2_SCREENS(8218E768, HubChoose)
+ITC_TYPE2_SCREENS(8218E530, HubUnload)
+ITC_TYPE2_SCREENS(8218E688, HubClose)
+ITC_TYPE2_SCREENS(8218F530, HubSetPrompts)
+ITC_TYPE2_SCREENS(8218F698, HubBack)
+ITC_TYPE2_SCREENS(8218F6E0, HubStart)
+ITC_TYPE2_SCREENS(8218DBD0, HubNextNotice)
+ITC_TYPE2_SCREENS(8218DD78, HubNextNotice2)
 // The license plate editor's handlers: member function functors the machine
 // calls (no direct callers).
 ITC_TYPE2_SCREENS(82198210, PlateCreate)

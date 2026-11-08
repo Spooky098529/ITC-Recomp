@@ -83,6 +83,28 @@ void BuildSaveBuildStates(PPCContext& ctx, uint8_t* base);
 void BuildLeavePage(PPCContext& ctx, uint8_t* base);
 void BuildDetailsPage(PPCContext& ctx, uint8_t* base);
 void BuildUpdatePage(PPCContext& ctx, uint8_t* base);
+// The hub's handlers (r3 the machine, r4 the mode where the original reads
+// it; Choose r3 the mode, r4 the machine; PostMessage5 r3 the mode) and
+// helpers (ImagesLoadedA and B r3 the data, FreeImage r3 the record,
+// SetPrompts r3 to r8, the others no arguments).
+void HubOnYes(PPCContext& ctx, uint8_t* base);
+void HubOnNo(PPCContext& ctx, uint8_t* base);
+void HubImagesLoadedA(PPCContext& ctx, uint8_t* base);
+void HubImagesLoadedB(PPCContext& ctx, uint8_t* base);
+void HubWaitForLoad(PPCContext& ctx, uint8_t* base);
+void HubFreeImage(PPCContext& ctx, uint8_t* base);
+void HubOpenSelected(PPCContext& ctx, uint8_t* base);
+void HubReenter(PPCContext& ctx, uint8_t* base);
+void HubPostMessage5(PPCContext& ctx, uint8_t* base);
+void HubChoose(PPCContext& ctx, uint8_t* base);
+void HubUnload(PPCContext& ctx, uint8_t* base);
+void HubClose(PPCContext& ctx, uint8_t* base);
+void HubSetPrompts(PPCContext& ctx, uint8_t* base);
+void HubBack(PPCContext& ctx, uint8_t* base);
+void HubSetUpStatus(PPCContext& ctx, uint8_t* base);
+void HubNextNotice(PPCContext& ctx, uint8_t* base);
+void HubNextNotice2(PPCContext& ctx, uint8_t* base);
+void HubStart(PPCContext& ctx, uint8_t* base);
 // The four machines' set-ups (r3 the machine).
 void HubInitStates(PPCContext& ctx, uint8_t* base);
 void SheetInitStates(PPCContext& ctx, uint8_t* base);
