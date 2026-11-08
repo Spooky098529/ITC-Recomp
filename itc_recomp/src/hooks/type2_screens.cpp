@@ -252,16 +252,8 @@ ITC_TYPE2_SCREENS(82198988, PlateLeavePage)
 // adapters for LoadPlate sub_82198420, RandomPlate sub_82198360 and
 // ResetMovie sub_821989E8: only Start (native) reaches them, the flag
 // switches it; their steps above are the harness's.
-ITC_TYPE2_SCREENS(821981C8, PlateCharLineKind)
-ITC_TYPE2_SCREENS(821998F0, PlateShowDigits)
-ITC_TYPE2_SCREENS(82199990, PlateShowChars)
 ITC_TYPE2_SCREENS(821992D8, PlateFinishRegionAnim)
 ITC_TYPE2_SCREENS(82199410, PlateFinishDigitAnim)
-ITC_TYPE2_SCREENS(82199688, PlateShowCharLine)
-ITC_TYPE2_SCREENS(82199A20, PlateShowPlate)
-ITC_TYPE2_SCREENS(82199C10, PlateSetUpRegionMenu)
-ITC_TYPE2_SCREENS(82199CC8, PlateSetUpNumberMenu)
-ITC_TYPE2_SCREENS(82199D88, PlateSetUpCharsMenu)
 // The transitions (from PlateEditor::Update's table on its stack,
 // recompiled).
 ITC_TYPE2_SCREENS(8219A3A8, PlateTransition0)
@@ -282,4 +274,13 @@ ITC_TYPE2_SCREENS(82198FB8, PlateTransition19)
 // Transition3, never seen in play, reaches the original) and MarkField
 // sub_82199AA8 (the three menus' set-ups; SetUpConfirmMenu, never seen in
 // play, reaches the original): their callers in play are native, the flag
-// switches those; their steps above are the harness's.
+// switches those; their steps above are the harness's. No adapters either
+// (removed, B7 loop, 2026-11-08) for CharLineKind sub_821981C8 (Transition13),
+// ShowDigits sub_821998F0 (ShowPlate, Transition5, Transition8), ShowChars
+// sub_82199990 (ShowPlate, Transition13), ShowCharLine sub_82199688
+// (Transition10, Transition13), ShowPlate sub_82199A20 (Transition0) and the
+// menus' set-ups SetUpRegionMenu sub_82199C10 (Transition0), SetUpNumberMenu
+// sub_82199CC8 (Transition5, Transition8) and SetUpCharsMenu sub_82199D88
+// (Transition10, Transition13): their callers in play are native (the
+// transitions never seen in play reach the originals), the flag switches
+// those; their steps above are the harness's.
