@@ -291,23 +291,18 @@ void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
 // SetUpRows sub_8224A978 and SetUpCarPage sub_8224C560 have no adapter
 // (removed, B7 loop, 2026-11-08): in play only native callers reach them;
 // the register steps stay for the harness.
-ITC_CAR_LIST(8224F558, CarListRowUnhighlight)
-ITC_CAR_LIST(8224D010, CarListColorShow)
-ITC_CAR_LIST(8224D860, CarListCarSetButtons)
-ITC_CAR_LIST(8224DF30, CarListCarStopArrows)
+// The C panels' vtable slots 1 to 3. RowPanel::Unhighlight sub_8224F558,
+// ColorPanel::Show sub_8224D010 and IsShown sub_8224D1F0, CarPanel::
+// SetButtons sub_8224D860, StopArrows sub_8224DF30, ShowStats sub_8224E920
+// and Pick sub_8224E050, PowerGraph::SetEntry sub_82250368 and
+// PanelSetBase::SaveData sub_82249668 have no adapter (removed, B7 loop,
+// 2026-11-08, after step 17 and the car's page: in play only native
+// callers reach them; the register steps stay for the harness).
 ITC_CAR_LIST(8224E288, CarListCarSetStats)
 ITC_CAR_LIST(822417E8, CarListCarSetCarName)
 ITC_CAR_LIST(82241868, CarListPanel7CShowArrows)
-ITC_CAR_LIST(8224E920, CarListCarShowStats)
-// The panels' answers (from the steps, recompiled).
-ITC_CAR_LIST(8224D1F0, CarListColorIsShown)
-// The panels' shows, selections and moves (from the steps and the car's
-// page, recompiled).
-ITC_CAR_LIST(8224E050, CarListCarPick)
-// PowerGraph::SetEntry (from PanelSetBase::PowerGraphPage, recompiled).
-ITC_CAR_LIST(82250368, CarListPowerGraphSetEntry)
-// PanelSet's vtable slots 2, 8 to 10, 13, 15 to 17, the page 5 handler (from
-// the page table) and PanelSetBase::SaveData (from the set's functions).
+// PanelSet's vtable slots 2, 8 to 10, 13, 15 to 17 and the page 5 handler
+// (from the page table).
 ITC_CAR_LIST(822496C8, CarListSetReset)
 ITC_CAR_LIST(82249848, CarListSetPicked)
 ITC_CAR_LIST(82249870, CarListSetWentBack)
@@ -317,7 +312,6 @@ ITC_CAR_LIST(8224B6E8, CarListSetPreviousTab)
 ITC_CAR_LIST(8224B6F0, CarListSetPreviousEntry)
 ITC_CAR_LIST(8224B6F8, CarListSetPreviousColor)
 ITC_CAR_LIST(82248EF0, CarListPickedPage)
-ITC_CAR_LIST(82249668, CarListSaveData)
 // PanelSet's slots 3, 5 and 7, the base's (from recompiled callers), the
 // page 8 handler (the page table) and the steps (the step table).
 ITC_CAR_LIST(82249730, CarListOpen)
@@ -356,28 +350,14 @@ ITC_CAR_LIST(8224BDC0, CarListPowerGraphPage)
 // The car's page (page 2, the same): its stand's car through ShowStandCar's
 // plain C++, as ColorsPage's.
 ITC_CAR_LIST(8224B8D8, CarListCarPage)
-// The stand's car (from the car and colors pages and SetUpColors,
-// recompiled): the original when the car makers' callees aren't native.
-extern "C" REX_FUNC(sub_8224A490) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
-    __imp__sub_8224A490(ctx, base);
-    return;
-  }
-  hooks::CarListShowStandCar(ctx, base);
-}
-// The colors' set-up (from steps 17 and 25, recompiled), the same gate.
-extern "C" REX_FUNC(sub_8224B248) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
-    __imp__sub_8224B248(ctx, base);
-    return;
-  }
-  hooks::CarListSetUpColors(ctx, base);
-}
-// Step 17 (from the step table: PanelSetBase::Update's plain C++ calls
-// its; PanelSetPair's, never seen in play, the original's), the same gate
-// (SetUpColors' plain C++).
+// PanelSetBase::ShowStandCar sub_8224A490 and SetUpColors sub_8224B248
+// have no adapter (removed, B7 loop, 2026-11-08: in play only the car and
+// colors pages', SetUpColors' and step 17's plain C++ reach them; step 25,
+// never seen in play, runs SetUpColors' original).
+// Step 17 (from the step table: PanelSetBase::Update's plain C++ calls its;
+// PanelSetPair's, never seen in play, the original's): the original when the
+// car makers' callees aren't native (SetUpColors' and ShowStandCar's plain
+// C++).
 extern "C" REX_FUNC(sub_8224C450) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
