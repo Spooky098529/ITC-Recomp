@@ -237,7 +237,9 @@ void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
 // and the C panels' vtables). PanelGroup::SetCaption sub_8224EF18,
 // TabPanel::SetCursorY sub_8224FD20, RowPanel::SetRow sub_8224F018 and
 // SetArrows sub_8224F680, ColorPanel::ShowSwatches sub_8224D358 and
-// SetSwatch sub_8224D4A0, and (the second removal) PanelSetBase::ToTabs
+// SetSwatch sub_8224D4A0, ColorPanel::PlaceCursor sub_8224D3E0 and SetCount
+// sub_8224D458 (the fourth: their callers in play, SetUpColors and
+// ColorPanel::Move, are native), and (the second removal) PanelSetBase::ToTabs
 // sub_82249558, Free sub_8224B538, HandleInput sub_8224BF30,
 // PanelPart::FinishAll sub_82249CF0, TabPanel::Move sub_8224FF88,
 // RowPanel::Move sub_8224F8F8, CarPanel::Select sub_8224DCF0 and
@@ -251,8 +253,6 @@ ITC_CAR_LIST(8224F558, CarListRowUnhighlight)
 ITC_CAR_LIST(8224F4C8, CarListRowHide)
 ITC_CAR_LIST(8224D010, CarListColorShow)
 ITC_CAR_LIST(8224D2D0, CarListColorSetArrows)
-ITC_CAR_LIST(8224D3E0, CarListColorPlaceCursor)
-ITC_CAR_LIST(8224D458, CarListColorSetCount)
 ITC_CAR_LIST(8224D518, CarListColorSetSwatches)
 ITC_CAR_LIST(8224D860, CarListCarSetButtons)
 ITC_CAR_LIST(8224D9A0, CarListCarPlaceCursor)
@@ -323,12 +323,13 @@ extern "C" REX_FUNC(sub_8224B248) {
   }
   hooks::CarListSetUpColors(ctx, base);
 }
-// GarageStages::DrawAll (from UpdateStand, and two type 6 functions not seen
-// in play, recompiled).
-ITC_CAR_LIST(821807D8, CarListDrawAll)
-// The update (PanelSet's slot 6, the base's from it, UpdateStand from the
-// base's): the same gate as the stand's car (Car::Init, SetModel and
-// Refresh's plain C++).
+// PanelSet's slot 6 (the panel screens' update): the same gate as the
+// stand's car (Car::Init, SetModel and Refresh's plain C++). PanelSetBase::
+// Update sub_8224CD00, UpdateStand sub_8224C008 and GarageStages::DrawAll
+// sub_821807D8 have no adapter (removed, B7 loop, 2026-11-08: in play only
+// PanelSet::Update's and their native callers' plain C++ reach them; DrawAll's
+// two type 6 callers, not seen in play, run its original; the register steps
+// stay for the harness).
 #define ITC_CAR_LIST_STAND(address, step)                                                     \
   extern "C" REX_FUNC(sub_##address) {                                                       \
     REX_FUNC_PROLOGUE();                                                                     \
@@ -338,7 +339,5 @@ ITC_CAR_LIST(821807D8, CarListDrawAll)
     }                                                                                        \
     hooks::step(ctx, base);                                                                  \
   }
-ITC_CAR_LIST_STAND(8224C008, CarListUpdateStand)
-ITC_CAR_LIST_STAND(8224CD00, CarListBaseUpdate)
 ITC_CAR_LIST_STAND(8224CF18, CarListSetUpdate)
 #undef ITC_CAR_LIST_STAND
