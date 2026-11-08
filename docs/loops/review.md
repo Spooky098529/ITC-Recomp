@@ -108,6 +108,20 @@ When the user has reviewed a run's section, its heading gets
   screen). Calls followed: unset varargs passed as 0 (the parking
   area); the sound manager's `StopCue` (recompiled) reached through its
   vtable, as the race sounds' native code does.
+- Its migration (92fe4c38..99d3bf29, `--native_front_end_screen_helpers`,
+  `src/front_end_screen_helpers/`): 27 of 32 ours; five split-off case
+  0s Merged into their steps (`b7_groups.py` still lists them as ready
+  groups: it doesn't count Merged as ours). The six dialog setters'
+  adapters removed though `--removable` didn't list them (their callers
+  in play are native or those Merged tails; no counter run: attract
+  races don't reach them); `ShowMessage5` `sub_821A6030`, never seen,
+  still reaches the original setters. The releases free their blocks
+  over the allocation layer, falling back to the original for blocks
+  that aren't its pages (as `StandMode::Release`). Harness choices: the
+  `StopCue` recorder's r6 (a leftover `AudioManager::StopCue` doesn't
+  read) zeroed before comparing; in the frames below the steps only
+  `SetNote`'s back chain is compared (the rest callees' register save
+  slots and `SetNodeText`'s varargs leftovers).
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 

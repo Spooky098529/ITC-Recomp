@@ -106,7 +106,13 @@ file's history. What's left to see in a drive, from every run:
   the modes' releases (types 2, 4, 5, 9, 10, 12), the save and options
   dialogs' text setters with the steps they unblocked, the car cards;
   15 ready groups; 1 lead added, four leads' lines trimmed; no
-  subagents); map checked. Step: migration, agent running.
+  subagents); map checked. Migration 92fe4c38..99d3bf29 (the 15
+  groups and what they made ready: the save screen's starts and dialog
+  steps, the options' save and category 6 pages and dialogs, the car
+  cards' fill; 27 of 32 ours, 5 Merged case-0 tails; 6 adapters
+  removed; `--native_front_end_screen_helpers`; race 36 s, 0 errors,
+  its harnesses 0 differing; no subagents). Left: none. Step:
+  validation, agent running.
 
 ## Done
 
@@ -155,5 +161,7 @@ file's history. What's left to see in a drive, from every run:
   known 385, unknown 997).
 - After the front-end screen helpers' map: ours 4989, work left 1438
   (wrapped 56, known 417, unknown 965).
+- After its migration: ours 5016, work left 1411 (wrapped 56, known
+  390, unknown 965).
 
 ## Stopped
