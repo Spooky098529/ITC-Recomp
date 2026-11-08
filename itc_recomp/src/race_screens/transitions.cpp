@@ -456,4 +456,105 @@ uint64_t PauseMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t f
   return calls.Call(kMenuSoundPlay, frame, 0x8220FAFC, 6);
 }
 
+uint64_t PauseMenuShowCareer(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220D418 PauseMenu::ShowCareer");
+  using namespace camera_modes::steps;
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = PauseMovie(base);
+  const uint32_t panel = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 0);
+  const uint32_t kind = guest::LoadU32(base, Get(base, kPauseData) + 132);
+  guest::StoreU32(base, panel + 80, kind <= 2 ? 1 : 0);
+  // UiMovie::SetText(movie, -1, child, id, value) through its override, its
+  // unset varargs 0 (the user's call, 2026-10-30).
+  auto text = [&](uint32_t lr, uint64_t child, uint64_t id, uint64_t value) {
+    const uint64_t args[8] = {movie, kNone, child, id, value, 0, 0, 0};
+    calls.CallArgs(kSetText, frame, lr, args);
+  };
+  text(0x8220D498, 28, 8, guest::LoadU32(base, Get(base, kPauseData) + 120));
+  // The car's two values (+124, +128) as floats times the double at
+  // 0x8200A510, truncated (stfiwx over the double word's high half).
+  const double scale = std::bit_cast<double>(
+      (uint64_t(guest::LoadU32(base, 0x8200A510)) << 32) | guest::LoadU32(base, 0x8200A514));
+  auto scaled = [&](uint32_t field) {
+    const int64_t word = int64_t(int32_t(guest::LoadU32(base, Get(base, kPauseData) + field)));
+    guest::StoreU32(base, frame + 84, uint32_t(word));
+    const int32_t truncated = Fctiwz(Fmuls(Single(double(word)), scale));
+    guest::StoreU32(base, frame + 80, uint32_t(truncated));
+    return uint64_t(uint32_t(truncated));
+  };
+  text(0x8220D4E4, 29, 8, scaled(124));
+  text(0x8220D528, 30, 8, scaled(128));
+  calls.Call(kSetNumberText, frame, 0x8220D540, movie, kNone, 21,
+             guest::LoadU32(base, Get(base, kPauseData) + 108));
+  text(0x8220D55C, 26, 8, guest::LoadU32(base, Get(base, kPauseData) + 116));
+  text(0x8220D570, 31, 2009, 0);
+  text(0x8220D584, 32, 2010, 0);
+  text(0x8220D598, 33, 2011, 0);
+  const uint32_t weekday = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 24);
+  guest::StoreU32(base, weekday + 108, guest::LoadU32(base, Get(base, kPauseData) + 112));
+  return weekday;
+}
+
+uint64_t PauseMenuSetUpMain(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220E418 PauseMenu::SetUpMain");
+  const uint32_t frame = Frame(base, sp, 144);
+  {
+    const uint32_t data = Get(base, kPauseData);
+    guest::StoreU32(base, data + 136, 6);
+    const uint32_t row = kPauseItems + guest::LoadU32(base, data + 132) * 24;
+    for (uint32_t i = 0; i < 6; i++) {
+      if (int32_t(guest::LoadU32(base, row + 4 * i)) == -1) {
+        guest::StoreU32(base, data + 136, i);
+        break;
+      }
+    }
+  }
+  const uint64_t count = guest::LoadU32(base, Get(base, kPauseData) + 136);
+  guest::StoreU32(base, frame + 84, 159);
+  guest::StoreU32(base, frame + 92, 158);
+  const uint64_t init[8] = {Get(base, kPauseList), count, count, 1, 154, 153, 155, 156};
+  calls.CallArgs(kListInit, frame, 0x8220E4B0, init);
+  ListSetSelection(base, Get(base, kPauseList),
+                   guest::LoadU32(base, Get(base, kPauseData) + 148));
+  if (guest::LoadU32(base, Get(base, kPauseData) + 156) != 0) {
+    for (int32_t i = 0; i < int32_t(guest::LoadU32(base, Get(base, kPauseData) + 136)); i++) {
+      const uint32_t kind = guest::LoadU32(base, Get(base, kPauseData) + 132);
+      if (int32_t(guest::LoadU32(base, kPauseItems + ((kind * 6 + uint32_t(i)) << 2))) == 4) {
+        ListSetEnabled(base, Get(base, kPauseList), uint32_t(i), 0);
+      }
+    }
+  }
+  PauseMenuShowItems(base, frame, calls);
+  return PauseMenuShowCareer(base, frame, calls);
+}
+
+uint64_t PauseMenuShowVolumesB(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220E810 PauseMenu::ShowVolumesB");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t movie = PauseMovie(base);
+  const uint32_t effects = ui_movies::FindNode(base, movie, 9, 5);
+  calls.Call(kShowVolumeBar, frame, 0x8220E850, effects,
+             guest::LoadU32(base, Get(base, kPauseData) + 52));
+  const uint32_t music = ui_movies::FindNode(base, movie, 9, 6);
+  return calls.Call(kShowVolumeBar, frame, 0x8220E86C, music,
+                    guest::LoadU32(base, Get(base, kPauseData) + 56));
+}
+
+uint64_t PauseMenuShowAdjustB(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220E908 PauseMenu::ShowAdjustB");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = PauseMovie(base);
+  const uint32_t data = Get(base, kPauseData);
+  for (uint32_t k = 0; k < 3; k++) {
+    guest::StoreU32(base, frame + 80 + 4 * k, guest::LoadU32(base, data + 60 + 4 * k));
+  }
+  const uint32_t node = ui_movies::FindNode(base, movie, 10, 0);
+  uint64_t r3 = 0;
+  for (uint32_t k = 0; k < 3; k++) {
+    r3 = calls.Call(kShowSliderMark, frame, 0x8220E96C, ui_movies::Child(base, node, k + 4),
+                    guest::LoadU32(base, frame + 80 + 4 * k));
+  }
+  return r3;
+}
+
 }  // namespace race_screens

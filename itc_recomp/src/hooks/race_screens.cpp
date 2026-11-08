@@ -28,7 +28,8 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "transitions RunTen, BackToMain, CloseMain, MoveMain, ShowOptionsRow, ToggleOptions, "
               "ShowVolumeRow, ShowAdjustRow, MoveOptions, MoveAdjust and ShowMain, ConfirmPage, "
               "ShowItems, SetArrowA, ShowOptions, ShowVolumes, ShowSlider, RestoreNodes, "
-              "ColorItems, ShowAdjust, Open and MainPage, the options page's ToggleOption, OptionsPage, "
+              "ColorItems, ShowAdjust, Open, MainPage, AdjustPage, ShowCareer, SetUpMain, "
+              "ShowVolumesB and ShowAdjustB, the options page's ToggleOption, OptionsPage, "
               "SetUpOptions and SetAdjust, the menu after the race's ConfirmPage, Intro, Show, "
               "CloseMain, Move, ShowItems, SetUpItems, ColorItems, Start, Open and MainPage (the "
               "replay's save flow, never seen in play, the original), "
@@ -359,6 +360,18 @@ void RaceScreensAfterRaceMenuMainPage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = race_screens::AfterRaceMenuMainPage(base, ctx.r1.u32, guest.calls());
 }
 
+#define ITC_RACE_SCREENS_STEP(name)                                                \
+  void RaceScreens##name(PPCContext& ctx, uint8_t* base) {                       \
+    GuestCalls guest(ctx, base);                                                 \
+    ctx.r3.u64 = race_screens::name(base, ctx.r1.u32, guest.calls());            \
+  }
+ITC_RACE_SCREENS_STEP(PauseMenuShowCareer)
+ITC_RACE_SCREENS_STEP(PauseMenuSetUpMain)
+ITC_RACE_SCREENS_STEP(PauseMenuShowVolumesB)
+ITC_RACE_SCREENS_STEP(PauseMenuShowAdjustB)
+ITC_RACE_SCREENS_STEP(PauseMenuAdjustPage)
+#undef ITC_RACE_SCREENS_STEP
+
 void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuSetUpOptions(base, ctx.r1.u32, guest.calls());
@@ -549,6 +562,11 @@ ITC_RACE_SCREENS(8220DB98, RaceScreensPauseMenuOptionsPage)
 // The two main pages (reached through the Updates' page tables).
 ITC_RACE_SCREENS(8220D898, RaceScreensPauseMenuMainPage)
 ITC_RACE_SCREENS(8221A4A8, RaceScreensAfterRaceMenuMainPage)
+ITC_RACE_SCREENS(8220EBD8, RaceScreensPauseMenuAdjustPage)
+ITC_RACE_SCREENS(8220D418, RaceScreensPauseMenuShowCareer)
+ITC_RACE_SCREENS(8220E418, RaceScreensPauseMenuSetUpMain)
+ITC_RACE_SCREENS(8220E810, RaceScreensPauseMenuShowVolumesB)
+ITC_RACE_SCREENS(8220E908, RaceScreensPauseMenuShowAdjustB)
 ITC_RACE_SCREENS(8220F1B8, RaceScreensPauseMenuSetAdjust)
 ITC_RACE_SCREENS(8221A6C8, RaceScreensAfterRaceMenuConfirmPage)
 ITC_RACE_SCREENS(8221A730, RaceScreensAfterRaceMenuIntro)

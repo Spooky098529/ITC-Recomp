@@ -199,6 +199,65 @@ uint64_t PauseMenuOptionsPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   return back();
 }
 
+uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220EBD8 PauseMenu::AdjustPage");
+  const uint32_t frame = Frame(base, sp, 112);
+  calls.Call(kListUpdate, frame, 0x8220EBF8, Get(base, kPauseList));
+  uint64_t transition = 0;
+  if (guest::LoadU32(base, Get(base, kPauseList) + kListMove) != 0) {
+    transition = 18;
+  } else if (PauseMenuStepAdjust(base, frame) != 0) {
+    transition = 19;
+  }
+  if (transition != 0) {
+    calls.Call(kPagesGo, frame, 0x8220EC34, Get(base, kPausePages), 3, transition, kNone);
+    calls.Call(kMenuSoundPlay, frame, 0x8220EC3C, 4);
+    return 0;
+  }
+  // Three words copied from `from` to `to`, one at a time.
+  auto copy_three = [&](uint32_t to, uint32_t from) {
+    for (uint32_t k = 0; k < 12; k += 4) {
+      guest::StoreU32(base, to + k, guest::LoadU32(base, from + k));
+    }
+  };
+  // Back to the list: Go(-1, 0, then 20).
+  auto back = [&]() {
+    calls.Call(kPagesGo, frame, 0x8220ED70, Get(base, kPausePages), kNone, 0, 20);
+    return 0;
+  };
+  if (uint32_t(calls.Call(kListAccepted, frame, 0x8220EC48, Get(base, kPauseList))) != 0) {
+    calls.Call(kMenuSoundPlay, frame, 0x8220EC58, 0);
+    if (int32_t(ListSelection(base, Get(base, kPauseList))) == 3) {
+      const uint32_t data = Get(base, kPauseData);
+      if (guest::LoadU32(base, data + 144) == 0) {
+        copy_three(data + 24, data + 60);
+        PauseMenuShowAdjustB(base, frame, calls);
+        return back();
+      }
+    }
+    if (int32_t(ListSelection(base, Get(base, kPauseList))) == 3) {
+      const uint32_t data = Get(base, kPauseData);
+      if (int32_t(guest::LoadU32(base, data + 144)) == 1) {
+        copy_three(data + 60, data + 96);
+        PauseMenuShowAdjust(base, frame, calls);
+        return 0;
+      }
+    }
+    ListSetSelection(base, Get(base, kPauseList), 3);
+    guest::StoreU32(base, Get(base, kPauseData) + 144, 0);
+    calls.Call(kPagesGo, frame, 0x8220ED70, Get(base, kPausePages), 3, 18, kNone);
+    return 0;
+  }
+  if (uint32_t(calls.Call(kListCancelled, frame, 0x8220ED1C, Get(base, kPauseList))) == 0) {
+    return 0;
+  }
+  calls.Call(kMenuSoundPlay, frame, 0x8220ED2C, 2);
+  const uint32_t data = Get(base, kPauseData);
+  copy_three(data + 60, data + 24);
+  PauseMenuShowAdjust(base, frame, calls);
+  return back();
+}
+
 uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220E530 PauseMenu::SetUpOptions");
   const uint32_t frame = Frame(base, sp, 144);

@@ -1530,13 +1530,14 @@ void Dialog(Context& h, const MovieWorld& w) {
       __imp__sub_82218B30, hooks::RaceScreensRaceDialogOpen, open);
 }
 
-// The two main pages (PauseMenu::MainPage, AfterRaceMenu::MainPage): their
-// lists moved to a menu list world (MenuList::Update and its tests) as the
-// options page's cases do, the items read from the image's tables by the
-// data's kind (0 to 8, the world's) and the selection.
+// The two main pages (PauseMenu::MainPage, AfterRaceMenu::MainPage), then
+// the pause menu's set-ups and adjust page: the pages' lists moved to a
+// menu list world (MenuList::Update and its tests) as the options page's
+// cases do, the items read from the image's tables by the data's kind (0
+// to 8, the world's) and the selection.
 //
-// The pause menu's: the item count (+136) 0 to 6; the race data a block of the case's own (the current
-// stage +804 of the stage list at +0x59620, 0 to 9, its first word 1 or
+// The pause menu's: the item count (+136) 0 to 6; the race data a block of
+// the case's own (the current stage +804 of the stage list at +0x59620, 0 to 9, its first word 1 or
 // any; the race kind +0xA3AF0 6 or 0 to 7) and the word at 0x826C7824 0 or
 // any, for the end-race item 4 (Stages::Copy into the frame's +80).
 //
@@ -1599,6 +1600,60 @@ void MainPages(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
       },
       __imp__sub_8221A4A8, hooks::RaceScreensAfterRaceMenuMainPage, after);
+  // The pause menu's set-ups and the adjust page: the volumes (+52, +56) 0
+  // to 15 or any, the three values and their saved and default copies (+24
+  // to +32, +60 to +68, +96 to +104) -10 to 10 or any, the toggle (+144) 0
+  // to 2, the selection to set (+148) 0 to 7, the disabling flag (+156) 0,
+  // 1 or any; the career's numbers (+108 to +128) as the world leaves them.
+  auto values = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t data = w.block(rs::kPauseData);
+    for (const uint32_t field : {52u, 56u}) {
+      guest::StoreU32(h.base, data + field, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(16));
+    }
+    for (const uint32_t field : {24u, 28u, 32u, 60u, 64u, 68u, 96u, 100u, 104u}) {
+      guest::StoreU32(h.base, data + field,
+                      r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(21)) - 10));
+    }
+    guest::StoreU32(h.base, data + 144, r.Below(3));
+    guest::StoreU32(h.base, data + 148, r.Below(8));
+    guest::StoreU32(h.base, data + 156, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  };
+  const MovieSetupFn set_values = [&](PPCContext&, Random& r, const MovieWorld& w) {
+    values(r, w);
+  };
+  // ShowCareer: the frame's +48 to +79 left out (SetText stores its r7 to
+  // r10 there, leftovers in the original and 0 in ours for strings 2009 to
+  // 2011: the user's call for the parking area, 2026-10-30).
+  MovieGroup(h, w, "PauseMenu::ShowCareer (sub_8220D418)", 150, set_values, __imp__sub_8220D418,
+             hooks::RaceScreensPauseMenuShowCareer, {128, 32, {48, 80}});
+  // SetUpMain: MenuList::Init frees the list's old item block (+68, 0 here)
+  // and makes one: its words compared, then it's freed and +68 put to 0.
+  FrameSpec set_up{144, 40};
+  set_up.after = [&](Outputs& out) {
+    const uint32_t list = w.block(rs::kPauseList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 6 * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  MovieGroup(
+      h, w, "PauseMenu::SetUpMain (sub_8220E418)", 200,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        values(r, w);
+        guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
+      },
+      __imp__sub_8220E418, hooks::RaceScreensPauseMenuSetUpMain, set_up);
+  MovieGroup(h, w, "PauseMenu::ShowVolumesB (sub_8220E810)", 100, set_values, __imp__sub_8220E810,
+             hooks::RaceScreensPauseMenuShowVolumesB, {112, 24});
+  MovieGroup(h, w, "PauseMenu::ShowAdjustB (sub_8220E908)", 100, set_values, __imp__sub_8220E908,
+             hooks::RaceScreensPauseMenuShowAdjustB, {128, 32});
+  FrameSpec adjust{112, 24};
+  adjust.list_world = &list_world;
+  MovieGroup(h, w, "PauseMenu::AdjustPage (sub_8220EBD8)", 400, set_values, __imp__sub_8220EBD8,
+             hooks::RaceScreensPauseMenuAdjustPage, adjust);
 }
 
 // The dialog's page object and data as its draw's cases shape them (its

@@ -369,6 +369,29 @@ uint32_t PauseMenuColorItems(uint8_t* base, uint32_t sp);
 // each by ShowSlider with the data's +60 to +68 (copied to the frame's +80).
 // r3 the last ShowSlider's.
 uint32_t PauseMenuShowAdjust(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220D418 PauseMenu::ShowCareer: the node -1/0's +80 = 1 for kinds 0
+// to 2, else 0; the career's numbers as texts (SetText(movie, -1, child, 8,
+// value), the unset varargs 0; the car's two values times the double at
+// 0x8200A510, truncated, the words left at the frame's +80 and +84; node
+// 21 by SetNumberText, strings 2009 to 2011 at 31 to 33) and node -1/24's
+// +108 = the weekday (+112). Returns that node.
+uint64_t PauseMenuShowCareer(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220E418 PauseMenu::SetUpMain: the item count (+136: the kind's items
+// up to the first -1, at most 6), MenuList::Init(list, count, count, 1, 154,
+// 153, 155, 156; 159, 158), the selection from +148, with +156 set the items
+// of id 4 disabled, ShowItems, ShowCareer. r3 ShowCareer's.
+uint64_t PauseMenuSetUpMain(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220E810 PauseMenu::ShowVolumesB: Options::ShowVolumeBar (through its
+// override, the pause movie log's) on the type-9 nodes 5 and 6 with the
+// data's +52 and +56. r3 the last call's.
+// sub_8220E908 PauseMenu::ShowAdjustB: the data's +60 to +68 copied to the
+// frame's +80, then Options::ShowSliderMark (through its override) on the
+// type-10 node 0's children 4 to 6 with them. r3 the last call's.
+constexpr uint32_t kShowVolumeBar = 0x821BE5A8;
+constexpr uint32_t kShowSliderMark = 0x821BEA48;
+constexpr uint32_t kSetNumberText = 0x8211C740;
+uint64_t PauseMenuShowVolumesB(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowAdjustB(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8220EE28 PauseMenu::ShowMain (transition 2): animation 0 played and
 // looped, the selected item's (type 7, selection + 1, r6 1) played and
 // looped, ColorItems; done.
@@ -405,6 +428,8 @@ uint64_t PauseMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls);
 uint32_t PauseMenuToggleOption(uint8_t* base, uint32_t sp);
 // sub_8220DB98 PauseMenu::OptionsPage (page 1): see the row. 0 or 8.
 uint64_t PauseMenuOptionsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220EBD8 PauseMenu::AdjustPage (page 3): see the row. Returns 0.
+uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8220E530 PauseMenu::SetUpOptions: MenuList::Init(list, 5, 5, 1, 154,
 // 153, 155, 156; 159, 158), the edits from the options, +144 = 1,
 // RestoreNodes(-1, 8), the labels (UiMovie::SetNodeText, unset varargs 0),

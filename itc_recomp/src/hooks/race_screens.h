@@ -129,6 +129,14 @@ void RaceScreensPauseMenuOptionsPage(PPCContext& ctx, uint8_t* base);
 // sub_8221A4A8 (r3 as the original leaves it: 0).
 void RaceScreensPauseMenuMainPage(PPCContext& ctx, uint8_t* base);
 void RaceScreensAfterRaceMenuMainPage(PPCContext& ctx, uint8_t* base);
+// PauseMenu::AdjustPage sub_8220EBD8, ShowCareer sub_8220D418, SetUpMain
+// sub_8220E418, ShowVolumesB sub_8220E810, ShowAdjustB sub_8220E908 (no
+// arguments; r3 as the original leaves it).
+void RaceScreensPauseMenuAdjustPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowCareer(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuSetUpMain(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowVolumesB(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowAdjustB(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuSetAdjust(PPCContext& ctx, uint8_t* base);
 // The menu after the race: ConfirmPage sub_8221A6C8 (r4 passed on), the
