@@ -37,5 +37,16 @@ void PlateShowChars(PPCContext& ctx, uint8_t* base);
 void PlateMarkField(PPCContext& ctx, uint8_t* base);
 void PlateFinishRegionAnim(PPCContext& ctx, uint8_t* base);
 void PlateFinishDigitAnim(PPCContext& ctx, uint8_t* base);
+// The cells and menus: ShowRegionCells, ShowDigitCells, ShowCharCells and
+// the three menus' set-ups (no arguments), ShowCharLine (r3 the kind),
+// ShowPlate (r3 the plate).
+void PlateShowRegionCells(PPCContext& ctx, uint8_t* base);
+void PlateShowDigitCells(PPCContext& ctx, uint8_t* base);
+void PlateShowCharCells(PPCContext& ctx, uint8_t* base);
+void PlateShowCharLine(PPCContext& ctx, uint8_t* base);
+void PlateShowPlate(PPCContext& ctx, uint8_t* base);
+void PlateSetUpRegionMenu(PPCContext& ctx, uint8_t* base);
+void PlateSetUpNumberMenu(PPCContext& ctx, uint8_t* base);
+void PlateSetUpCharsMenu(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

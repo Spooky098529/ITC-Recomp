@@ -21,7 +21,13 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "through its override), CharLineKind sub_821981C8, ShowRegion sub_82199898, "
               "ShowDigits sub_821998F0, ShowChars sub_82199990, MarkField sub_82199AA8, "
               "FinishRegionAnim sub_821992D8 and FinishDigitAnim sub_82199410 "
-              "(UiMovie::FinishNamed through its override) "
+              "(UiMovie::FinishNamed through its override); ShowCharLine sub_82199688 "
+              "(sub_8211A630's plain C++), ShowPlate sub_82199A20, the menus' set-ups "
+              "SetUpRegionMenu sub_82199C10, SetUpNumberMenu sub_82199CC8 and SetUpCharsMenu "
+              "sub_82199D88 with ShowRegionCells sub_821990D0, ShowDigitCells sub_82199350 and "
+              "ShowCharCells sub_82199488 (MenuList::Init, SetSelection, Fit, UiMovie::SetText, "
+              "SetNodeText and ClearText through their overrides, their unset varargs 0; "
+              "HelpLine::Set's plain C++) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -140,6 +146,37 @@ void PlateFinishDigitAnim(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t2::PlateFinishDigitAnim(base, ctx.r1.u32, guest.calls());
 }
 
+void PlateShowRegionCells(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateShowRegionCells(base, ctx.r1.u32, guest.calls());
+}
+void PlateShowDigitCells(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateShowDigitCells(base, ctx.r1.u32, guest.calls());
+}
+void PlateShowCharCells(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateShowCharCells(base, ctx.r1.u32, guest.calls());
+}
+void PlateShowCharLine(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::PlateShowCharLine(base, ctx.r3.u32, ctx.r1.u32);
+}
+void PlateShowPlate(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::PlateShowPlate(base, ctx.r3.u32, ctx.r1.u32);
+}
+void PlateSetUpRegionMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateSetUpRegionMenu(base, ctx.r1.u32, guest.calls());
+}
+void PlateSetUpNumberMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateSetUpNumberMenu(base, ctx.r1.u32, guest.calls());
+}
+void PlateSetUpCharsMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateSetUpCharsMenu(base, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 #define ITC_TYPE2_SCREENS(address, step)     \
@@ -171,9 +208,20 @@ ITC_TYPE2_SCREENS(82198988, PlateLeavePage)
 // ResetMovie sub_821989E8: only Start (native) reaches them, the flag
 // switches it; their steps above are the harness's.
 ITC_TYPE2_SCREENS(821981C8, PlateCharLineKind)
-ITC_TYPE2_SCREENS(82199898, PlateShowRegion)
 ITC_TYPE2_SCREENS(821998F0, PlateShowDigits)
+ITC_TYPE2_SCREENS(82199898, PlateShowRegion)
 ITC_TYPE2_SCREENS(82199990, PlateShowChars)
 ITC_TYPE2_SCREENS(82199AA8, PlateMarkField)
 ITC_TYPE2_SCREENS(821992D8, PlateFinishRegionAnim)
 ITC_TYPE2_SCREENS(82199410, PlateFinishDigitAnim)
+ITC_TYPE2_SCREENS(82199688, PlateShowCharLine)
+ITC_TYPE2_SCREENS(82199A20, PlateShowPlate)
+ITC_TYPE2_SCREENS(82199C10, PlateSetUpRegionMenu)
+ITC_TYPE2_SCREENS(82199CC8, PlateSetUpNumberMenu)
+ITC_TYPE2_SCREENS(82199D88, PlateSetUpCharsMenu)
+// No adapters for ShowRegionCells sub_821990D0 (SetUpRegionMenu;
+// Transition3, never seen in play, reaches the original), ShowDigitCells
+// sub_82199350 (only SetUpNumberMenu) and ShowCharCells sub_82199488
+// (SetUpCharsMenu; Transition12, never seen in play, reaches the original):
+// their callers in play are native, the flag switches those; their steps
+// above are the harness's.

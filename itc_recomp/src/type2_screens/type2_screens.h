@@ -48,6 +48,12 @@ constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kResetPose = 0x8211ABA8;
 constexpr uint32_t kGetLocalTime = 0x822968B8;
+constexpr uint32_t kSetText = 0x8211C1F8;
+constexpr uint32_t kSetNodeText = 0x8211C7E8;
+constexpr uint32_t kClearText = 0x8211C470;
+constexpr uint32_t kListInit = 0x8220BAC0;
+constexpr uint32_t kListSetSelection = 0x8220BC30;
+constexpr uint32_t kListFit = 0x8220BC40;
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
@@ -132,5 +138,47 @@ uint64_t PlateFinishRegionAnim(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_82199410 PlateEditor::FinishDigitAnim: named 15 + the selection x 4 +
 // the column finished. Its r3. 112-byte frame.
 uint64_t PlateFinishDigitAnim(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The license plate editor's cells and menus (plate_cells.cpp) ---
+//
+// The text setters (UiMovie::SetText, SetNodeText, ClearText) and the menu
+// list's calls (MenuList::Init, SetSelection, Fit) through their overrides;
+// SetText's and SetNodeText's unset varargs 0 (the user's call for the
+// parking area, 2026-10-30).
+
+// sub_821990D0 PlateEditor::ShowRegionCells: nodes (3, 0)'s and (3, 2)'s
+// children for the rows from the list's scroll (+4): shown with string
+// 5411 + 3 x the scroll + i (SetNodeText on the first), or hidden from 14
+// on; the arrows (-1, 8) and (-1, 9) by the scroll and the data's +64. r3
+// the down arrow. 176-byte frame.
+uint32_t PlateShowRegionCells(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82199350 PlateEditor::ShowDigitCells: node (4, 0)'s children:
+// SetText(8, i) for the first ten, ClearText for the rest; the arrows
+// hidden. r3 the down arrow. 128-byte frame.
+uint32_t PlateShowDigitCells(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82199488 PlateEditor::ShowCharCells: as ShowRegionCells on nodes
+// (5, 0) and (5, 2), ten a row, strings 5425 +, hidden from 38 on; the
+// arrows by the scroll and the data's +68. r3 the down arrow. 176-byte
+// frame.
+uint32_t PlateShowCharCells(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82199688 PlateEditor::ShowCharLine (r3 0, 1 or 2): node (4, 2)'s
+// children colored (sub_8211A630's plain C++): 0, child 0 color 2 and the
+// rest 0; 1, child 10 color 2; 2, children 0 and 10. r3 the movie after a
+// color, else node (4, 2). 128-byte frame.
+uint32_t PlateShowCharLine(uint8_t* base, uint32_t kind, uint32_t sp);
+// sub_82199A20 PlateEditor::ShowPlate (r3 a plate): its bytes as words in
+// the frame (+80 the digits, +96 the characters), ShowRegion, ShowDigits
+// and ShowChars (their plain C++). ShowChars' r3. 144-byte frame.
+uint32_t PlateShowPlate(uint8_t* base, uint32_t plate, uint32_t sp);
+// sub_82199C10 PlateEditor::SetUpRegionMenu, sub_82199CC8
+// SetUpNumberMenu and sub_82199D88 SetUpCharsMenu: MenuList::Init over the
+// rows (the data's +64, 3 or the data's +68; 3 shown; the actions 154,
+// 153, 155, 156, 159, 158), the field's row selected (SetSelection, Fit 1)
+// and its column at the data's +52, MarkField and the cells (their plain
+// C++); the region's HelpLine::Set 568 (car_dealer's plain C++). The last
+// call's r3. 128-byte frames.
+uint64_t PlateSetUpRegionMenu(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PlateSetUpNumberMenu(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PlateSetUpCharsMenu(uint8_t* base, uint32_t sp, const Calls& calls);
 
 }  // namespace type2_screens

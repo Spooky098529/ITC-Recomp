@@ -14,7 +14,12 @@
 // are recorded on both sides (the start-up recorder) and answered 1; the
 // blocks VirtualAlloc makes (the layer's pages) are compared by content
 // where their pointers were stored, then freed. GetLocalTime answers a
-// made-up time (time_hooks::SetFakeNow) while a case runs.
+// made-up time (time_hooks::SetFakeNow) while a case runs. The text
+// records the setters make are compared and freed, and the menu list's
+// flags blocks MenuList::Init makes; the frames are compared without the
+// words the varargs UiMovie::SetText and SetNodeText calls store from r7 or
+// r6 on (the originals' leftovers, 0 in ours: the user's call for the
+// parking area, 2026-10-30).
 
 #include "harness.h"
 
@@ -28,11 +33,13 @@
 #include "memory/heap.h"
 #include "type2_screens/type2_screens.h"
 #include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
 
 #include <fmt/format.h>
 
 #include <algorithm>
 #include <functional>
+#include <string>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_type2_screens);
@@ -70,6 +77,7 @@ constexpr uint32_t kCallerBytes = 256;  // above it
 constexpr uint32_t kMissingMovie = 0x826C5CDC;
 constexpr uint32_t kMissingText = 0x826C5CD8;
 constexpr uint32_t kTxtTag = 0x54585400;  // "TXT\0"
+constexpr uint32_t kStringTable = 0x826C5C34;
 constexpr uint32_t kRandSeed = 0x82638188;  // the game's rand
 
 struct Global {
@@ -82,6 +90,7 @@ constexpr Global kGlobals[] = {
     {kMissingMovie, 4},
     {kMissingText, 4},
     {kRandSeed, 4},
+    {kStringTable, 4},
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -93,17 +102,52 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
 struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
-        block((allocation + 15) & ~15u) {}
-  ~World() { memory::Free(allocation); }
+        block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)) {
+    if (strings != 0) {
+      MakeStrings();
+    }
+  }
+  ~World() {
+    memory::Free(allocation);
+    memory::Free(strings);
+  }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0; }
+  bool ok() const { return allocation != 0 && strings != 0; }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t data() const { return at(kDataAt); }
   uint32_t node(uint32_t n) const { return at(kNodesAt) + kNodeBytes * n; }
   uint8_t* base;
   uint32_t allocation;
   uint32_t block;
+  // A string table of our own ([0x826C5C34] pointed at it): its 18 files
+  // all one container of 8,192 entries over 16 strings of letters, so any id
+  // below 8,192 has a string; no argument codes (the varargs the native
+  // callers pass as 0 aren't read).
+  static constexpr uint32_t kStringsBytes = 0x9000;
+  uint32_t strings;
+
+ private:
+  void MakeStrings() {
+    Random r(0x5479706532ull);  // "Type2"
+    const uint32_t container = strings + 128, text = strings + 128 + 4 + 4 * 8192;
+    for (uint32_t k = 0; k < 18; k++) {
+      guest::StoreU32(base, strings + 4 * k, container);
+    }
+    guest::StoreU32(base, container, __builtin_bswap32(8192));
+    for (uint32_t k = 0; k < 8192; k++) {
+      const uint32_t at = text + 64 * (k % 16);
+      guest::StoreU32(base, container + 4 + 4 * k, __builtin_bswap32(at - container));
+    }
+    for (uint32_t k = 0; k < 16; k++) {
+      const uint32_t at = text + 64 * k;
+      const uint32_t length = r.Below(30);
+      for (uint32_t c = 0; c < length; c++) {
+        guest::StoreU16(base, at + 2 * c, uint16_t('a' + r.Below(26)));
+      }
+      guest::StoreU16(base, at + 2 * length, 0);
+    }
+  }
 };
 
 void MakeWorld(uint8_t* base, const World& w, Random& r) {
@@ -130,7 +174,10 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t n = 0; n < kNodeCount; n++) {
     const uint32_t node = w.node(n);
     guest::StoreU32(base, node + 0, kTxtTag);
-    guest::StoreU32(base, node + 100, r.Below(60));
+    // +100 below 40, so a child index stays in the node's table (112
+    // entries) after a function stores a character (below 40) into a
+    // node's +108 (FindNode's first child's index).
+    guest::StoreU32(base, node + 100, r.Below(40));
     guest::StoreU32(base, node + 104, r.Below(12));
     guest::StoreU32(base, node + 108, r.Below(4));
     for (uint32_t e = 0; e < (kNodeBytes - 128) / 8; e++) {
@@ -179,6 +226,29 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, ui_movies::kMovieTable + 8, r.Below(8) == 0 ? 0 : 1);
   guest::StoreU32(base, kMissingMovie, w.at(kMovieAt));
   guest::StoreU32(base, kMissingText, 0);
+  guest::StoreU32(base, kStringTable, w.strings);
+}
+
+// The text records the setters made (stored in the movie's map): their
+// words and buffers compared, freed, their map words 0.
+void TextRecords(uint8_t* base, const World& w, Outputs& out) {
+  const uint32_t map = w.at(kMovieAt) + ui_movies::kMovieTexts;
+  const uint32_t pairs = guest::LoadU32(base, map + 1024);
+  for (uint32_t k = 0; k < pairs && k < 128; k++) {
+    const uint32_t value = guest::LoadU32(base, map + 8 * k + 4);
+    if (value != 0 && memory::IsHeapBlock(value)) {
+      const uint32_t buffer = guest::LoadU32(base, value);
+      out.Word(k);
+      out.Bytes(Read(base, value + 4, 24));
+      out.Word(memory::IsPages(buffer) ? 1 : 0);
+      if (memory::IsPages(buffer)) {
+        out.Bytes(Read(base, buffer, 4096));
+        memory::FreePages(buffer);
+      }
+      memory::crt::OperatorDelete(value);
+      guest::StoreU32(base, map + 8 * k + 4, 0);
+    }
+  }
 }
 
 // The pointer word at `slot` names a block the side allocated (the layer's
@@ -299,6 +369,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
         }
       }
       g_made.clear();
+      TextRecords(h.base, w, out[v]);
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
       }
@@ -434,6 +505,74 @@ void PlateEditor(Context& h, const World& w) {
              hooks::PlateFinishDigitAnim, {{-112, -16}}, None});
 }
 
+// The cells' and menus' world: the plate (the data's +4: the region 0 to
+// 13, the digits 0 to 10, the characters 0 to 37, now and then past them),
+// the field (+56) 0 to 6, the rows (+64, +68) 1 to 16, the list's scroll
+// (+4) -1 to 6, its flags block (+68) none or the layer's pages
+// (MenuList::Init frees it and makes another, compared after).
+void CellsWorld(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t data = w.data();
+  guest::StoreU8(base, data + 4 + 1, uint8_t(r.Below(16)));
+  for (uint32_t i = 0; i < 3; i++) {
+    guest::StoreU8(base, data + 4 + 2 + i, uint8_t(r.Below(12)));
+  }
+  for (uint32_t i = 0; i < 7; i++) {
+    guest::StoreU8(base, data + 4 + 5 + i, uint8_t(r.Below(40)));
+  }
+  guest::StoreU32(base, data + 56, r.Below(7));
+  guest::StoreU32(base, data + 64, 1 + r.Below(16));
+  guest::StoreU32(base, data + 68, 1 + r.Below(16));
+  guest::StoreU32(base, w.at(kListAt) + 4, uint32_t(int32_t(r.Below(8)) - 1));
+  guest::StoreU32(base, w.at(kListAt) + 68, r.Below(2) == 0 ? 0 : MakePages(base, 64, r));
+}
+void ListBlock(PPCContext&, const World& w, Outputs& out) {
+  const uint32_t list = w.at(kListAt);
+  Allocated(w.base, out, list + 68, 4 * std::min(guest::LoadU32(w.base, list + 0), 128u));
+}
+
+void PlateCells(Context& h, const World& w) {
+  auto cells = [](PPCContext&, Random& r, const World& w) { CellsWorld(r, w); };
+  // The cells: SetNodeText's parameter area (+40 to +79) left out.
+  Run(h, w, {"PlateEditor::ShowRegionCells (sub_821990D0)", 100, __imp__sub_821990D0,
+             hooks::PlateShowRegionCells, {{-176, -136}, {-96, -80}}, cells});
+  Run(h, w, {"PlateEditor::ShowCharCells (sub_82199488)", 100, __imp__sub_82199488,
+             hooks::PlateShowCharCells, {{-176, -136}, {-96, -88}}, cells});
+  // ShowDigitCells: SetText's parameter area (+48 to +79) left out.
+  Run(h, w, {"PlateEditor::ShowDigitCells (sub_82199350)", 100, __imp__sub_82199350,
+             hooks::PlateShowDigitCells, {{-128, -80}, {-48, -40}}, cells});
+  Run(h, w, {"PlateEditor::ShowCharLine (sub_82199688)", 100, __imp__sub_82199688,
+             hooks::PlateShowCharLine, {{-128, -32}},
+             [](PPCContext& t, Random& r, const World&) {
+               t.r3.u64 = r.Below(5) == 0 ? r.Next() : r.Below(4);
+             }});
+  // ShowPlate: ShowChars' frame (and ShowRegion's back chain) under its own.
+  // ShowDigits reads as many words as node (2, 2) has children (3 in the
+  // game): the frame's +92, between the digits and the characters, unwritten
+  // (the stack's word), small here, as a large one stored into a node's
+  // +108 sends FindNode out of the pool.
+  Run(h, w, {"PlateEditor::ShowPlate (sub_82199A20; sub_82199898)", 100, __imp__sub_82199A20,
+             hooks::PlateShowPlate, {{-144, -8}, {-288, -192}},
+             [](PPCContext& t, Random& r, const World& w) {
+               CellsWorld(r, w);
+               guest::StoreU32(w.base, t.r1.u32 - 144 + 92, r.Below(12));
+               t.r3.u64 = w.data() + 4;
+             }});
+  // The menus' set-ups: their frames (MenuList::Init's stack words) without
+  // the saves.
+  Run(h, w, {"PlateEditor::SetUpRegionMenu (sub_82199C10; sub_821990D0, sub_82199AA8)", 100,
+             __imp__sub_82199C10, hooks::PlateSetUpRegionMenu, {{-128, -24}}, cells, ListBlock});
+  Run(h, w, {"PlateEditor::SetUpNumberMenu (sub_82199CC8; sub_82199350)", 100,
+             __imp__sub_82199CC8, hooks::PlateSetUpNumberMenu, {{-128, -24}},
+             [](PPCContext&, Random& r, const World& w) {
+               CellsWorld(r, w);
+               guest::StoreU32(w.base, w.data() + 56, r.Below(3));
+             },
+             ListBlock});
+  Run(h, w, {"PlateEditor::SetUpCharsMenu (sub_82199D88; sub_82199488)", 100,
+             __imp__sub_82199D88, hooks::PlateSetUpCharsMenu, {{-128, -24}}, cells, ListBlock});
+}
+
 }  // namespace
 
 void Type2Screens(Context& h) {
@@ -443,6 +582,9 @@ void Type2Screens(Context& h) {
     return;
   }
   PlateEditor(h, w);
+  if (hooks::NativeHeapActive()) {
+    PlateCells(h, w);
+  }
 }
 
 }  // namespace harness
