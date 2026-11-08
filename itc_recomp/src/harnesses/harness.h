@@ -309,5 +309,6 @@ void OptionsScreen(Context& h);
 void Type67Screens(Context& h);
 void CarList(Context& h);
 void FrontEndScreenHelpers(Context& h);
+void CarDealer(Context& h);
 
 }  // namespace harness

@@ -471,6 +471,10 @@ set(ITC_SOURCES
     src/front_end_screen_helpers/releases.cpp
     src/front_end_screen_helpers/dialogs.cpp
     src/front_end_screen_helpers/car_cards.cpp
+    src/hooks/car_dealer.cpp
+    src/car_dealer/init_states.cpp
+    src/car_dealer/handlers.cpp
+    src/car_dealer/texts.cpp
     src/scene_models/apply.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
@@ -676,6 +680,7 @@ set(ITC_SOURCES
     src/harnesses/type67_screens.cpp
     src/harnesses/car_list.cpp
     src/harnesses/front_end_screen_helpers.cpp
+    src/harnesses/car_dealer.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
