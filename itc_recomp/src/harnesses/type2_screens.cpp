@@ -25,12 +25,15 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "hooks/type2_screens.h"
 #include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "menu_sounds/menu_sounds.h"
+#include "race_screens/race_screens.h"
 #include "type2_screens/type2_screens.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -70,7 +73,8 @@ constexpr uint32_t kNodeCount = 40;
 constexpr uint32_t kAnimationsAt = 0x17400;  // 8 animations of no tracks (64 bytes)
 constexpr uint32_t kAnimations = 8;
 constexpr uint32_t kNamed = 200;             // the movie's named animations shaped
-constexpr uint32_t kBlockBytes = 0x17800;
+constexpr uint32_t kMenuWorldAt = 0x17800;   // the menus' mappers, vtables, sounds
+constexpr uint32_t kBlockBytes = 0x18400;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -91,6 +95,11 @@ constexpr Global kGlobals[] = {
     {kMissingText, 4},
     {kRandSeed, 4},
     {kStringTable, 4},
+    {race_screens::kMapperEntries, 32},
+    {race_screens::kControllerEntries, 16},
+    {menu_sounds::kSoundManager, 4},
+    {menu_sounds::kEffectsVolume, 8},
+    {menu_sounds::kMusicVolume, 4},
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -629,6 +638,119 @@ void PlateCells(Context& h, const World& w) {
 // The transitions: r3 the started word's address (the page object's +24:
 // 0, 1 or any), the cells' world; UiMovie::Run's update stood in (answered
 // 0 or 1); their frames without the saves.
+// The menus' world, as the car dealer's harness lays it: the four
+// controllers' action mappers (their read slots ActionMapper::Pressed and
+// Fired, now and then another function; their bits random), the list's
+// player, counts, scroll and selection around each other, its actions
+// (151 to 180 or any), its wrap and move words; the sound manager (its
+// PlayCue2D slot sub_82090770).
+uint32_t Around(Random& r, int32_t lo, int32_t hi) {
+  return uint32_t(lo + int32_t(r.Below(uint32_t(hi - lo + 1))));
+}
+void MenuWorld(Random& r, const World& w) {
+  namespace rs = race_screens;
+  uint8_t* base = w.base;
+  const uint32_t at = w.at(kMenuWorldAt);
+  const uint32_t mappers = at, vtables = at + 0x800;
+  const uint32_t manager = at + 0xB00, manager_vtable = at + 0xB80;
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t mapper = mappers + 0x200 * c, vtable = vtables + 0x40 * c;
+    guest::StoreU32(base, rs::kControllerEntries + 4 * c, r.Below(4));
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c, mapper);
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c + 4, r.Below(5) == 0 ? 1 : r.Below(3));
+    guest::StoreU32(base, mapper, vtable);
+    guest::StoreU32(base, vtable + 40, r.Below(5) == 0 ? 0x8210BE70 : rs::kPressedSlot);
+    guest::StoreU32(base, vtable + 48, r.Below(5) == 0 ? 0x8210BE70 : rs::kFiredSlot);
+    for (uint32_t k = 0; k < 6; k++) {
+      guest::StoreU32(base, mapper + 448 + 4 * k,
+                      uint32_t(r.Next()) & uint32_t(r.Next()) & uint32_t(r.Next()));
+    }
+  }
+  const uint32_t list = w.at(kListAt);
+  guest::StoreU32(base, list + rs::kListPlayer, r.Below(4));
+  const int32_t count = int32_t(r.Below(13));
+  guest::StoreU32(base, list + rs::kListCount, uint32_t(count));
+  guest::StoreU32(base, list + rs::kListShown, Around(r, 0, count + 1));
+  guest::StoreU32(base, list + rs::kListScroll, Around(r, -1, count));
+  guest::StoreU32(base, list + rs::kListScrollBefore, Around(r, -1, count));
+  guest::StoreU32(base, list + rs::kListSelection, Around(r, -2, count + 1));
+  for (uint32_t field = rs::kListDown; field <= rs::kListBack; field += 4) {
+    guest::StoreU32(base, list + field, r.Below(8) == 0 ? uint32_t(r.Next()) : 151 + r.Below(30));
+  }
+  guest::StoreU32(base, list + rs::kListWraps, r.Below(3) == 0 ? 0 : r.Below(4));
+  guest::StoreU32(base, list + rs::kListMove, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
+  guest::StoreU32(base, list + rs::kListSide, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
+  guest::StoreU32(base, list + rs::kListBlock, at + 0x900);
+  for (uint32_t k = 0; k < 64; k++) {
+    guest::StoreU32(base, at + 0x900 + 4 * k, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  }
+  guest::StoreU32(base, manager, manager_vtable);
+  guest::StoreU32(base, manager_vtable + menu_sounds::kPlayCue2DSlot, 0x82090770);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+}
+
+// The pages: the menus' world, the field (+56) 0 to 6 (2 and 6 often: the
+// last digit and character), the column (+52) small; r3 the mode. Their
+// frames without the saves.
+void PlatePages(Context& h, const World& w) {
+  auto page = [](PPCContext& t, Random& r, const World& w) {
+    MenuWorld(r, w);
+    const uint32_t pick = r.Below(4);
+    guest::StoreU32(w.base, w.data() + 56, pick == 0 ? 2 : pick == 1 ? 6 : r.Below(7));
+    t.r3.u64 = w.at(kModeAt);
+  };
+  Run(h, w, {"PlateEditor::RegionPage (sub_82199ED0)", 300, __imp__sub_82199ED0,
+             hooks::PlateRegionPage, {{-112, -24}}, page});
+  Run(h, w, {"PlateEditor::NumberPage (sub_8219A138)", 300, __imp__sub_8219A138,
+             hooks::PlateNumberPage, {{-112, -24}}, page});
+  Run(h, w, {"PlateEditor::CharsPage (sub_82198540)", 300, __imp__sub_82198540,
+             hooks::PlateCharsPage, {{-112, -24}}, page});
+  // UpdatePage: the page -1 or 0 to 4 (3, ConfirmPage, never seen in play,
+  // the original on both sides), the data's +72 21 or another state.
+  Run(h, w, {"PlateEditor::UpdatePage (sub_8219B050)", 300, __imp__sub_8219B050,
+             hooks::PlateUpdatePage, {{-128, -16}},
+             [page](PPCContext& t, Random& r, const World& w) {
+               page(t, r, w);
+               guest::StoreU32(w.base, w.at(kPagesAt), uint32_t(int32_t(r.Below(6)) - 1));
+               guest::StoreU32(w.base, w.data() + 72, r.Below(2) == 0 ? 21 : r.Below(12));
+               t.r3.u64 = w.at(kMachineAt);
+               t.r4.u64 = w.at(kModeAt);
+             }});
+}
+
+// InitStates: the machine empty or holding random transitions with keys of
+// small numbers (states below 12, messages below 52), so some match the
+// Init's (Add replaces those); its frame (but its saves, r27 on) compared.
+void InitStates(Context& h, const World& w) {
+  auto machine = [](PPCContext& t, Random& r, const World& w) {
+    namespace gm = game_modes;
+    const uint32_t machine = w.at(kMachineAt);
+    if (r.Below(2) == 0) {
+      gm::StateMachineConstruct(w.base, machine);
+      guest::StoreU32(w.base, machine + gm::kTransitionCount, 0);
+    } else {
+      const uint32_t count = 8 + r.Below(160);
+      guest::StoreU32(w.base, machine + gm::kTransitionCount, count);
+      for (uint32_t i = 0; i < gm::kTransitions; i++) {
+        const uint32_t at = machine + gm::kTransitionBytes * i;
+        guest::StoreU32(w.base, at, r.Below(12));
+        guest::StoreU32(w.base, at + 4, r.Below(52));
+        guest::StoreU32(w.base, at + 8, r.Below(8) == 0 ? 1 : 0);
+        guest::StoreU32(w.base, at + 12, 0);
+      }
+    }
+    t.r3.u64 = machine;
+  };
+  Run(h, w, {"Type2Hub::InitStates (sub_82190B18)", 24, __imp__sub_82190B18,
+             hooks::HubInitStates, {{-1552, -48}}, machine});
+  Run(h, w, {"PowerGraphScreen2::InitStates (sub_821B90D8)", 24, __imp__sub_821B90D8,
+             hooks::SheetInitStates, {{-912, -48}}, machine});
+  Run(h, w, {"BuildScreen::InitStates (sub_821A16C0)", 24, __imp__sub_821A16C0,
+             hooks::BuildInitStates, {{-912, -48}}, machine});
+  Run(h, w, {"PlateEditor::InitStates (sub_8219B2E8)", 24, __imp__sub_8219B2E8,
+             hooks::PlateInitStates, {{-912, -48}}, machine});
+}
+
 void PlateTransitions(Context& h, const World& w) {
   auto step = [](PPCContext& t, Random& r, const World& w) {
     CellsWorld(r, w);
@@ -666,6 +788,25 @@ void PlateTransitions(Context& h, const World& w) {
   for (const auto& c : kCases) {
     Run(h, w, {c.name, 80, c.recompiled, c.native, {{-c.frame, -c.saves}}, step, ListBlock});
   }
+  // Update: the running transition -1, -2 (none: done) or one of those seen
+  // in play (the others' worlds aren't laid), its frame without the saves
+  // (r18 on).
+  Run(h, w, {"PlateEditor::Update (sub_8219B108)", 200, __imp__sub_8219B108, hooks::PlateUpdate,
+             {{-304, -120}},
+             [step](PPCContext& t, Random& r, const World& w) {
+               static constexpr uint32_t kSeen[10] = {0, 1, 4, 5, 6, 8, 10, 11, 13, 19};
+               step(t, r, w);
+               MenuWorld(r, w);
+               guest::StoreU32(w.base, w.at(kListAt) + 68, 0);
+               const uint32_t pick = r.Below(6);
+               guest::StoreU32(w.base, w.at(kPagesAt) + 12,
+                               pick == 0   ? 0xFFFFFFFFu
+                               : pick == 1 ? 0xFFFFFFFEu
+                                           : kSeen[r.Below(10)]);
+               guest::StoreU32(w.base, w.at(kPagesAt) + 16,
+                               r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(20));
+             },
+             ListBlock});
 }
 
 }  // namespace
@@ -676,10 +817,12 @@ void Type2Screens(Context& h) {
     ITC_LOG_ERROR("harness: type2_screens: no block from the allocation layer");
     return;
   }
+  InitStates(h, w);
   PlateEditor(h, w);
   if (hooks::NativeHeapActive()) {
     PlateCells(h, w);
     PlateTransitions(h, w);
+    PlatePages(h, w);
   }
 }
 

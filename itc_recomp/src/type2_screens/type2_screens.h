@@ -57,6 +57,12 @@ constexpr uint32_t kListFit = 0x8220BC40;
 constexpr uint32_t kPlayNamed = 0x8211DAC8;
 constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kRun = 0x8211E1B8;
+constexpr uint32_t kListUpdate = 0x8220C1E0;
+constexpr uint32_t kListAccepted = 0x8220BD50;
+constexpr uint32_t kListCancelled = 0x8220BDE0;
+constexpr uint32_t kListPressed152 = 0x8220BE70;
+constexpr uint32_t kMenuSoundPlay = 0x821103F0;
+constexpr uint32_t kEmpty = 0x82106540;  // the empty shared function
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
@@ -229,5 +235,54 @@ uint64_t PlateTransition13(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // sub_82198FB8 PlateEditor::Transition19: FinishAll, the root's nodes 7, 6,
 // 5, 3, 4, 8, 9 hidden. 160-byte frame.
 uint64_t PlateTransition19(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
+// --- The license plate editor's pages and update (plate_pages.cpp) ---
+//
+// The pages (r3 the mode): MenuList::Update, Accepted, Cancelled and
+// Pressed152 and MenuSound::Play through their overrides; the page object's
+// moves and the messages inline. The last call's r3 (Pressed152's when
+// nothing is pressed).
+
+// sub_82199ED0 PlateEditor::RegionPage. 112-byte frame.
+uint64_t PlateRegionPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_8219A138 PlateEditor::NumberPage. 112-byte frame.
+uint64_t PlateNumberPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_82198540 PlateEditor::CharsPage. 112-byte frame.
+uint64_t PlateCharsPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_8219B050 PlateEditor::UpdatePage (r3 the machine, r4 the mode): the
+// five page handlers' addresses at the frame's +80; unless the page is -1,
+// the page's handler called (r3 the mode, through the guest context); then,
+// when the data's +72 isn't 21, the machine's +9604 = it and +72 = 21. The
+// handler's r3, else `r3`. 128-byte frame.
+uint64_t PlateUpdatePage(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                         const Calls& calls);
+// sub_8219B108 PlateEditor::Update: the empty sub_82106540 with its
+// arguments; the twenty transitions' addresses at the frame's +96; the
+// running transition (the page object's +12) called with the page object's
+// +24's address (through the guest context), or none (a negative one counts
+// as done), the queued one started on a nonzero answer; with none (-1),
+// UiMovie::Run(movie 26, 0). The last call's r3 (the movie for a negative
+// one). 304-byte frame.
+uint64_t PlateUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The machines' set-ups (init_states.cpp) ---
+//
+// The transitions added to `machine` (StateMachine::Add's plain C++) from
+// functors built in a frame of their own (`frame`, the original's stores in
+// order). Each returns the last Add's r3 (an index when `replaced`, else
+// the new transition).
+
+// sub_82190B18 Type2Hub::InitStates: 22 transitions, a 1,552-byte frame.
+constexpr uint32_t kHubInitFrame = 1552;
+uint32_t HubInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+// sub_821B90D8 PowerGraphScreen2::InitStates: 12, 912 bytes.
+constexpr uint32_t kSheetInitFrame = 912;
+uint32_t SheetInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+// sub_821A16C0 BuildScreen::InitStates: 12, 912 bytes.
+constexpr uint32_t kBuildInitFrame = 912;
+uint32_t BuildInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+// sub_8219B2E8 PlateEditor::InitStates: 12, 912 bytes.
+constexpr uint32_t kPlateInitFrame = 912;
+uint32_t PlateInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
 
 }  // namespace type2_screens

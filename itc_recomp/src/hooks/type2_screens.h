@@ -59,5 +59,17 @@ void PlateTransition10(PPCContext& ctx, uint8_t* base);
 void PlateTransition11(PPCContext& ctx, uint8_t* base);
 void PlateTransition13(PPCContext& ctx, uint8_t* base);
 void PlateTransition19(PPCContext& ctx, uint8_t* base);
+// The pages (r3 the mode), UpdatePage (r3 the machine, r4 the mode),
+// Update (no arguments read).
+void PlateRegionPage(PPCContext& ctx, uint8_t* base);
+void PlateNumberPage(PPCContext& ctx, uint8_t* base);
+void PlateCharsPage(PPCContext& ctx, uint8_t* base);
+void PlateUpdatePage(PPCContext& ctx, uint8_t* base);
+void PlateUpdate(PPCContext& ctx, uint8_t* base);
+// The four machines' set-ups (r3 the machine).
+void HubInitStates(PPCContext& ctx, uint8_t* base);
+void SheetInitStates(PPCContext& ctx, uint8_t* base);
+void BuildInitStates(PPCContext& ctx, uint8_t* base);
+void PlateInitStates(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

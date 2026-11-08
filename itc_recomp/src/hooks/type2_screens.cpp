@@ -32,7 +32,14 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "sub_82198D00, Transition8 sub_8219A820, Transition10 sub_8219AA00, Transition11 "
               "sub_82198DC8, Transition13 sub_8219AC88 and Transition19 sub_82198FB8 (the named "
               "animations, UiMovie::FinishAll and UiMovie::Run through their overrides; the "
-              "plate editor's helpers and HelpLine::Set their plain C++) "
+              "plate editor's helpers and HelpLine::Set their plain C++); the pages RegionPage "
+              "sub_82199ED0, NumberPage sub_8219A138 and CharsPage sub_82198540 (MenuList:: and "
+              "MenuSound::Play through their overrides), UpdatePage sub_8219B050 and Update "
+              "sub_8219B108 (the page's handler and the running transition through the guest "
+              "context, UiMovie::Run through its override); the four machines' set-ups "
+              "Type2Hub::InitStates sub_82190B18, PowerGraphScreen2::InitStates sub_821B90D8, "
+              "BuildScreen::InitStates sub_821A16C0 and PlateEditor::InitStates sub_8219B2E8 over "
+              "StateMachine::Add's plain C++ "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -221,6 +228,52 @@ void PlateTransition19(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition19(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
+void PlateRegionPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateRegionPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateNumberPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateNumberPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateCharsPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateCharsPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void PlateUpdatePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void PlateUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::PlateUpdate(base, ctx.r1.u32, guest.calls());
+}
+
+namespace {
+// An Init's register step: StateMachine::Add's adapter's r3, a new
+// transition's address from the machine's 64-bit r3.
+template <uint32_t (*Init)(uint8_t*, uint32_t, uint32_t, bool*)>
+void InitStep(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = Init(base, machine, ctx.r1.u32 - frame_bytes, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+}  // namespace
+
+void HubInitStates(PPCContext& ctx, uint8_t* base) {
+  InitStep<t2::HubInitStates>(ctx, base, t2::kHubInitFrame);
+}
+void SheetInitStates(PPCContext& ctx, uint8_t* base) {
+  InitStep<t2::SheetInitStates>(ctx, base, t2::kSheetInitFrame);
+}
+void BuildInitStates(PPCContext& ctx, uint8_t* base) {
+  InitStep<t2::BuildInitStates>(ctx, base, t2::kBuildInitFrame);
+}
+void PlateInitStates(PPCContext& ctx, uint8_t* base) {
+  InitStep<t2::PlateInitStates>(ctx, base, t2::kPlateInitFrame);
+}
 
 }  // namespace hooks
 
@@ -237,6 +290,12 @@ void PlateTransition19(PPCContext& ctx, uint8_t* base) {
 // Screen::LeaveToHub: the (8, 3) handler of four type 2 machines (no direct
 // callers).
 ITC_TYPE2_SCREENS(821D6A20, ScreenLeaveToHub)
+// The four machines' set-ups (from the type 2 mode's Init sub_82197278,
+// recompiled).
+ITC_TYPE2_SCREENS(82190B18, HubInitStates)
+ITC_TYPE2_SCREENS(821B90D8, SheetInitStates)
+ITC_TYPE2_SCREENS(821A16C0, BuildInitStates)
+ITC_TYPE2_SCREENS(8219B2E8, PlateInitStates)
 // The license plate editor's handlers: member function functors the machine
 // calls (no direct callers).
 ITC_TYPE2_SCREENS(82198210, PlateCreate)
@@ -246,8 +305,13 @@ ITC_TYPE2_SCREENS(82198498, PlateClose)
 ITC_TYPE2_SCREENS(82198118, PlateDestroy)
 ITC_TYPE2_SCREENS(82198190, PlateOnMessage32)
 ITC_TYPE2_SCREENS(82199BB8, PlateStart)
+ITC_TYPE2_SCREENS(8219B050, PlateUpdatePage)
+ITC_TYPE2_SCREENS(8219B108, PlateUpdate)
 // The pages (from UpdatePage's table on its stack, recompiled).
 ITC_TYPE2_SCREENS(82198988, PlateLeavePage)
+ITC_TYPE2_SCREENS(82199ED0, PlateRegionPage)
+ITC_TYPE2_SCREENS(8219A138, PlateNumberPage)
+ITC_TYPE2_SCREENS(82198540, PlateCharsPage)
 // The helpers (from the recompiled transitions, pages and set-ups). No
 // adapters for LoadPlate sub_82198420, RandomPlate sub_82198360 and
 // ResetMovie sub_821989E8: only Start (native) reaches them, the flag
