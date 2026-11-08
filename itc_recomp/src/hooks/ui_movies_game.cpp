@@ -42,7 +42,7 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "accessors UiMovie::TextString sub_8211B720, sub_8211B770, sub_8211B7B8, "
               "sub_8211B9B8 and sub_8211B940, and UiMovies::IsLoaded sub_8211BE98; the moves "
               "between the animation lists UiMovie::MoveAnimation sub_8211DBE0, "
-              "UiMovie::MoveNamedAnimation sub_8211DCE8, UiMovie::Loop sub_8211DDD8, "
+              "UiMovie::MoveNamedAnimation sub_8211DCE8 (no adapter), UiMovie::Loop sub_8211DDD8, "
               "UiMovie::LoopNamed sub_8211DDE0, UiMovie::LoopLast sub_8211DDE8, "
               "UiMovie::UnloopNamed sub_8211DE30, the "
               "stops UiMovie::Finish sub_8211DE38, UiMovie::FinishNamed sub_8211DF20 and "
@@ -419,15 +419,9 @@ extern "C" REX_FUNC(sub_8211DBE0) {
       ctx.r1.u32, movie);
 }
 
-// UiMovie::MoveNamedAnimation: r3 = movie, r4 = a named animation's index,
-// r5 the direction.
-extern "C" REX_FUNC(sub_8211DCE8) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_UNWATCHED_OR_ORIGINAL(8211DCE8);
-  const uint32_t movie = ctx.r3.u32;
-  ctx.r3.u64 = MovedR3(ui_movies::MoveNamedAnimation(base, movie, ctx.r4.u32, ctx.r5.u32 != 0),
-                       ctx.r1.u32, movie);
-}
+// UiMovie::MoveNamedAnimation (sub_8211DCE8) has no adapter: only native
+// callers reach it in play (LoopNamed, UnloopNamed, LoopLast, FinishNamed
+// and the race HUD object's), and the flag switches those.
 
 // UiMovie::LoopNamed: sub_8211DCE8 with r5 = 1.
 extern "C" REX_FUNC(sub_8211DDE0) {

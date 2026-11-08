@@ -64,6 +64,17 @@ void NativeGet(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = to;
 }
 
+// UiMovie::MoveNamedAnimation (sub_8211DCE8, its adapter removed): r3 =
+// movie, r4 = a named animation's index, r5 the direction; r3 the slot
+// appended to or, with no match, the copy in its 176-byte frame (+80) when
+// the list had slots, else the movie.
+void NativeMoveNamedAnimation(PPCContext& ctx, uint8_t* base) {
+  const uint32_t movie = ctx.r3.u32;
+  const ui_movies::Moved moved =
+      ui_movies::MoveNamedAnimation(base, movie, ctx.r4.u32, ctx.r5.u32 != 0);
+  ctx.r3.u64 = moved.slot ? *moved.slot : moved.looked ? ctx.r1.u32 - 176 + 80 : movie;
+}
+
 // sub_8211B7B8 and sub_8211B9B8: r3 = movie, r4 = a text id; the text's
 // +24 or +4.
 void NativeTextField24(PPCContext& ctx, uint8_t* base) {
@@ -970,7 +981,8 @@ void MoveCases(Context& h, const Block& block) {
   };
   const Move moves[] = {
       {"UiMovie::MoveAnimation (sub_8211DBE0)", __imp__sub_8211DBE0, sub_8211DBE0},
-      {"UiMovie::MoveNamedAnimation (sub_8211DCE8)", __imp__sub_8211DCE8, sub_8211DCE8},
+      {"UiMovie::MoveNamedAnimation (sub_8211DCE8)", __imp__sub_8211DCE8,
+       NativeMoveNamedAnimation},
       {"UiMovie::Loop (sub_8211DDD8)", __imp__sub_8211DDD8, sub_8211DDD8},
       {"UiMovie::LoopNamed (sub_8211DDE0)", __imp__sub_8211DDE0, sub_8211DDE0},
       {"UiMovie::LoopLast (sub_8211DDE8)", __imp__sub_8211DDE8, sub_8211DDE8},
