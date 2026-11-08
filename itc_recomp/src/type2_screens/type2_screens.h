@@ -495,6 +495,73 @@ uint32_t HubOpenMovie(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t HubImageLoaded(uint8_t* base, uint32_t buffer, uint32_t record, uint32_t sp,
                         const Calls& calls);
 
+// --- The hub's page dispatch, movie helpers and transitions (hub_movie.cpp) ---
+//
+// UiMovie::Play (sub-scene, child), PlayNamed, Loop, LoopNamed, LoopLast,
+// Finish, FinishNamed, SetNodeColor, SetText, ScrollText, ScrollReset,
+// HasMoreText, Run, the screen fades and Params::GetCarSpec through their
+// overrides (Play's r6 to r9, PlayNamed's r5 to r8 as the call sites set
+// them; SetText's unset varargs 0); UiMovies::Find and UiMovie::FindNode
+// their plain C++.
+constexpr uint32_t kPlay = 0x8211D978;
+constexpr uint32_t kLoop = 0x8211DDD8;
+constexpr uint32_t kLoopLast = 0x8211DDE8;
+constexpr uint32_t kFinish = 0x8211DE38;
+constexpr uint32_t kSetNodeColor = 0x8211A5B8;
+constexpr uint32_t kScrollText = 0x8211C570;
+constexpr uint32_t kScrollReset = 0x8211C5F8;
+constexpr uint32_t kHasMoreText = 0x8211D8D8;
+constexpr uint32_t kFadeIn = 0x8209D038;
+constexpr uint32_t kFadeOut = 0x8209D0C8;
+constexpr uint32_t kGetCarSpec = 0x820C9E98;
+
+// sub_82190498 Type2Hub::UpdatePage (r3 the machine, r4 the mode): the seven
+// page handlers' addresses at the frame's +80; unless the page is -1, the
+// page's handler called (r3 the mode, r4 the machine, through the guest
+// context). Its r3, else `r3`. 128-byte frame.
+uint64_t HubUpdatePage(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                       const Calls& calls);
+// sub_8218F4D8 Type2Hub::SetRecordText: movie 17's (-1, 1) text = string
+// 7527 + the data's +424. SetText's r3. 96-byte frame.
+uint64_t HubSetRecordText(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821900B8 Type2Hub::RecordPage (r3 the mode): SetRecordText; the page
+// object to none; message 35; the data's +24 = 2. SetText's r3. 96-byte
+// frame.
+uint64_t HubRecordPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_8218EA90 Type2Hub::ShowBusy and sub_8218EB10 HideBusy: movie 0's
+// named 56 and 54 played and the last looped, or 57 played and 54 finished.
+// The last call's r3. 112-byte frames.
+uint64_t HubShowBusy(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t HubHideBusy(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8218F3F8 Type2Hub::ShowNoticeImage (r3 an image index): movie 0's
+// object's +36 and +32 the texture records (+8) of the two lists' records
+// for it, 0 when none. r3 UiMovies::Find's. 112-byte frame.
+uint32_t HubShowNoticeImage(uint8_t* base, uint32_t image, uint32_t sp);
+// sub_821903D0 Type2Hub::ShowNotice: the notice's entry (Entry56): texts
+// (0, 1) string 4650 + its +12 and (0, 2) 6683 + the data's +436;
+// ShowNoticeImage(its +16); node (0, 0) shown by HasMoreText(0, 2). r3 the
+// node. 128-byte frame.
+uint32_t HubShowNotice(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8218FB20 Type2Hub::FillMenu: the eight items' texts, the description
+// (ScrollText, ScrollReset, string 536 + the cursor or 587, 588), the
+// prompts, the data's +12 = the selected garage car's spec's byte +771 is 1.
+// GetCarSpec's r3. 176-byte frame.
+uint64_t HubFillMenu(uint8_t* base, uint32_t sp, const Calls& calls);
+// The transitions (r3 the started word's address: the set-up while it's 0,
+// then 1), each running movie 0 (Run(movie, 0)):
+// sub_821901C0 Transition0 (Run's answer 0), sub_8218EC78 Transition1 (1),
+// sub_8218EE48 Transition2 (1), sub_8218ED98 Transition3 (the fades done),
+// sub_82190548 Transition5 (Run's answer 0), sub_8218F098 Transition6 (the
+// fades done) and sub_821902C8 Transition7 (the fades done). Frames 112,
+// 128, 144, 112, 112, 112, 112.
+uint64_t HubTransition0(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HubTransition1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HubTransition2(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HubTransition3(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HubTransition5(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HubTransition6(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HubTransition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
 // --- The machines' set-ups (init_states.cpp) ---
 //
 // The transitions added to `machine` (StateMachine::Add's plain C++) from

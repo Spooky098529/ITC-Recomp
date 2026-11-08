@@ -58,7 +58,14 @@ ITC_FLAG_BOOL(native_type2_screens, true, "ITC",
               "OpenMovie sub_8218E368 with LoadNoticeImages sub_8218E240 and LoadNoticeImage "
               "sub_8218DF38, and the archive's callback ImageLoaded sub_8218D8E8 (VirtualAlloc, "
               "VirtualFree, XMemSet, memcpy, Archive::Load, GarageStage::MakeModel, "
-              "UiMovies::Open and the XPR's calls through their overrides) "
+              "UiMovies::Open and the XPR's calls through their overrides); UpdatePage "
+              "sub_82190498 (the page's handler through the guest context), RecordPage "
+              "sub_821900B8 with SetRecordText sub_8218F4D8, ShowBusy sub_8218EA90, HideBusy "
+              "sub_8218EB10, ShowNotice sub_821903D0 with ShowNoticeImage sub_8218F3F8, FillMenu "
+              "sub_8218FB20 and the transitions Transition0 sub_821901C0, Transition1 "
+              "sub_8218EC78, Transition2 sub_8218EE48, Transition3 sub_8218ED98, Transition5 "
+              "sub_82190548, Transition6 sub_8218F098 and Transition7 sub_821902C8 (the movie's "
+              "calls, the fades and Params::GetCarSpec through their overrides) "
               "(the same writes; checked by --run_harnesses=type2_screens)");
 
 namespace hooks {
@@ -409,6 +416,51 @@ void HubLoadNoticeImages(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t2::HubLoadNoticeImages(base, ctx.r1.u32, guest.calls());
 }
 
+void HubUpdatePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void HubRecordPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubRecordPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void HubSetRecordText(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubSetRecordText(base, ctx.r1.u32, guest.calls());
+}
+void HubShowBusy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubShowBusy(base, ctx.r1.u32, guest.calls());
+}
+void HubHideBusy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubHideBusy(base, ctx.r1.u32, guest.calls());
+}
+void HubShowNoticeImage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2::HubShowNoticeImage(base, ctx.r3.u32, ctx.r1.u32);
+}
+void HubShowNotice(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubShowNotice(base, ctx.r1.u32, guest.calls());
+}
+void HubFillMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2::HubFillMenu(base, ctx.r1.u32, guest.calls());
+}
+#define ITC_HUB_TRANSITION(n)                                                   \
+  void HubTransition##n(PPCContext& ctx, uint8_t* base) {                       \
+    GuestCalls guest(ctx, base);                                                \
+    ctx.r3.u64 = t2::HubTransition##n(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
+  }
+ITC_HUB_TRANSITION(0)
+ITC_HUB_TRANSITION(1)
+ITC_HUB_TRANSITION(2)
+ITC_HUB_TRANSITION(3)
+ITC_HUB_TRANSITION(5)
+ITC_HUB_TRANSITION(6)
+ITC_HUB_TRANSITION(7)
+#undef ITC_HUB_TRANSITION
+
 namespace {
 // An Init's register step: StateMachine::Add's adapter's r3, a new
 // transition's address from the machine's 64-bit r3.
@@ -506,6 +558,25 @@ ITC_TYPE2_SCREENS(8218E078, HubCreate)
 ITC_TYPE2_SCREENS(8218E368, HubOpenMovie)
 ITC_TYPE2_SCREENS(8218E1A8, HubDestroy)
 ITC_TYPE2_SCREENS(8218D8E8, HubImageLoaded)
+// The hub's UpdatePage (a functor), RecordPage (from UpdatePage's table),
+// ShowBusy and HideBusy (from the recompiled Update) and the transitions
+// (from Update's table on its stack, recompiled; Transition3 also in
+// sub_822240B0's). No adapters for SetRecordText sub_8218F4D8 (only
+// RecordPage), ShowNoticeImage sub_8218F3F8 (only ShowNotice), ShowNotice
+// sub_821903D0 (Transition5; Transition8 and Transition10, never seen in
+// play, reach the original) and FillMenu sub_8218FB20 (Transition0,
+// Transition7): their steps above are the harness's.
+ITC_TYPE2_SCREENS(82190498, HubUpdatePage)
+ITC_TYPE2_SCREENS(821900B8, HubRecordPage)
+ITC_TYPE2_SCREENS(8218EA90, HubShowBusy)
+ITC_TYPE2_SCREENS(8218EB10, HubHideBusy)
+ITC_TYPE2_SCREENS(821901C0, HubTransition0)
+ITC_TYPE2_SCREENS(8218EC78, HubTransition1)
+ITC_TYPE2_SCREENS(8218EE48, HubTransition2)
+ITC_TYPE2_SCREENS(8218ED98, HubTransition3)
+ITC_TYPE2_SCREENS(82190548, HubTransition5)
+ITC_TYPE2_SCREENS(8218F098, HubTransition6)
+ITC_TYPE2_SCREENS(821902C8, HubTransition7)
 // The license plate editor's handlers: member function functors the machine
 // calls (no direct callers).
 ITC_TYPE2_SCREENS(82198210, PlateCreate)

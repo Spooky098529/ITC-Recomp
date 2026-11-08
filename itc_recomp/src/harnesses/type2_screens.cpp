@@ -25,6 +25,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_specs/car_specs.h"
 #include "data_tables/data_tables.h"
 #include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
@@ -107,6 +108,8 @@ constexpr Global kGlobals[] = {
     {kStandHolder, 4},
     {t2::kHubPages, 16},  // the hub's page object, menu, data and counter
     {data_tables::kTables, 4},
+    {car_specs::kParams, 4},
+    {0x826A50AC, 64},  // the screen fades
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
     {kMissingText, 4},
@@ -1026,6 +1029,7 @@ void HubWorld(Random& r, const World& w) {
   }
   for (uint32_t k = 0; k < 16; k++) {
     guest::StoreU32(base, hub + 0x40 + 16 * k, r.Below(5) == 0 ? 0 : 1);
+    guest::StoreU32(base, hub + 0x40 + 16 * k + 4, r.Below(12));
   }
   guest::StoreU32(base, data + 432, r.Below(4));
   guest::StoreU32(base, data + 436, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(8));
@@ -1069,10 +1073,117 @@ void HubWorld(Random& r, const World& w) {
   }
   guest::StoreU32(base, save + 0x19920, r.Below(4));
   guest::StoreU16(base, save + 6328, uint16_t(r.Below(4) == 0 ? 0 : 1 + r.Below(59)));
+  // The garage cars' ids (+224, below 20) over the car specs ([0x826C2E48]
+  // the build screen's data block: Params::GetCarSpec's +771 byte read).
+  for (uint32_t k = 0; k < 50; k++) {
+    guest::StoreU32(base, save + 6120 + 1968 * k + 224, r.Below(20));
+  }
+  guest::StoreU32(base, car_specs::kParams, w.screen);
+  for (uint32_t k = 0; k < 20; k++) {
+    guest::StoreU8(base, w.screen + 72 + 8432 * k + 771, uint8_t(r.Below(3)));
+  }
   const uint32_t pick = r.Below(4);
   guest::StoreU32(base, save + 6100,
                   pick == 0 ? uint32_t(r.Next()) : pick == 1 ? 990 + r.Below(20) : r.Below(999));
   guest::StoreU32(base, save + 6116, uint32_t(r.Next()));
+}
+
+// The hub's movie world: the hub's, the nodes small (at most 3 children,
+// their animations' base +116 below 8: UiMovie::Play's index), the fades'
+// counts 0 or not.
+void HubMovieWorld(Random& r, const World& w) {
+  HubWorld(r, w);
+  SmallNodes(r, w);
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    guest::StoreU32(w.base, w.node(n) + 116, r.Below(8));
+  }
+  for (const uint32_t count : {0x826A50E4u, 0x826A50DCu}) {
+    guest::StoreU32(w.base, count, r.Below(2) == 0 ? 0 : r.Below(30));
+  }
+}
+
+void HubMovie(Context& h, const World& w) {
+  auto movie = [](PPCContext&, Random& r, const World& w) { HubMovieWorld(r, w); };
+  // UpdatePage: the page -1, 1 or 2 (the empty function), 3 (Choose) or 5
+  // (RecordPage); the others' worlds (MenuPage's, NoticePage's) aren't laid.
+  Run(h, w, {"Type2Hub::UpdatePage (sub_82190498)", 200, __imp__sub_82190498,
+             hooks::HubUpdatePage, {{-128, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               HubMovieWorld(r, w);
+               static constexpr uint32_t kPages[5] = {0xFFFFFFFFu, 1, 2, 3, 5};
+               guest::StoreU32(w.base, w.at(kPagesAt), kPages[r.Below(5)]);
+               t.r3.u64 = w.at(kMachineAt);
+               t.r4.u64 = w.at(kModeAt);
+             }});
+  // The varargs UiMovie::SetText calls' parameter area (+48 to +79 of the
+  // caller's frame: r7 to r10, the originals' leftovers) left out.
+  Run(h, w, {"Type2Hub::SetRecordText (sub_8218F4D8)", 60, __imp__sub_8218F4D8,
+             hooks::HubSetRecordText, {{-96, -48}, {-16, -8}}, movie});
+  Run(h, w, {"Type2Hub::RecordPage (sub_821900B8; sub_8218F4D8)", 60, __imp__sub_821900B8,
+             hooks::HubRecordPage, {{-96, -16}, {-192, -144}, {-112, -104}},
+             [](PPCContext& t, Random& r, const World& w) {
+               HubMovieWorld(r, w);
+               if (r.Below(3) == 0) {
+                 guest::StoreU32(w.base, w.at(kPagesAt), 0xFFFFFFFFu);
+               }
+               t.r3.u64 = w.at(kModeAt);
+             }});
+  Run(h, w, {"Type2Hub::ShowBusy (sub_8218EA90)", 40, __imp__sub_8218EA90, hooks::HubShowBusy,
+             {{-112, -16}}, movie});
+  Run(h, w, {"Type2Hub::HideBusy (sub_8218EB10)", 40, __imp__sub_8218EB10, hooks::HubHideBusy,
+             {{-112, -16}}, movie});
+  Run(h, w, {"Type2Hub::ShowNoticeImage (sub_8218F3F8)", 100, __imp__sub_8218F3F8,
+             hooks::HubShowNoticeImage, {{-112, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               HubMovieWorld(r, w);
+               t.r3.u64 = r.Below(14);
+             }});
+  // ShowNotice: ShowNoticeImage's frame under its own.
+  Run(h, w, {"Type2Hub::ShowNotice (sub_821903D0; sub_8218F3F8)", 100, __imp__sub_821903D0,
+             hooks::HubShowNotice, {{-128, -80}, {-48, -40}, {-240, -144}}, movie});
+  // FillMenu: SetPrompts' frame under its own (but its saves).
+  Run(h, w, {"Type2Hub::FillMenu (sub_8218FB20; sub_8218F530)", 100, __imp__sub_8218FB20,
+             hooks::HubFillMenu, {{-176, -128}, {-96, -40}, {-368, -240}}, movie});
+  // The transitions: r3 the page object's +24 (0, 1 or any); their own
+  // frames without the saves (Transition2's SetText parameter area left
+  // out); the callees' frames are their own cases'.
+  auto step = [](PPCContext& t, Random& r, const World& w) {
+    HubMovieWorld(r, w);
+    const uint32_t at = w.at(kPagesAt) + 24;
+    guest::StoreU32(w.base, at, r.Below(3) == 0 ? 1 : r.Below(5) == 0 ? uint32_t(r.Next()) : 0);
+    // The menu's cursor (0 to 7), its old one (+4) and way (+8: 1, -1 or
+    // another).
+    const uint32_t menu = w.at(kListAt);
+    guest::StoreU32(w.base, menu + 0, r.Below(8));
+    guest::StoreU32(w.base, menu + 4, r.Below(8));
+    const uint32_t way = r.Below(3);
+    guest::StoreU32(w.base, menu + 8, way == 0 ? 1 : way == 1 ? 0xFFFFFFFFu : r.Below(4));
+    guest::StoreU32(w.base, w.data() + 12, r.Below(2));
+    t.r3.u64 = at;
+  };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    std::vector<Range> stack;
+  } kCases[] = {
+      {"Type2Hub::Transition0 (sub_821901C0; sub_8218FB20)", __imp__sub_821901C0,
+       hooks::HubTransition0, {{-112, -24}}},
+      {"Type2Hub::Transition1 (sub_8218EC78)", __imp__sub_8218EC78, hooks::HubTransition1,
+       {{-128, -32}}},
+      {"Type2Hub::Transition2 (sub_8218EE48)", __imp__sub_8218EE48, hooks::HubTransition2,
+       {{-144, -96}, {-64, -48}}},
+      {"Type2Hub::Transition3 (sub_8218ED98)", __imp__sub_8218ED98, hooks::HubTransition3,
+       {{-112, -24}}},
+      {"Type2Hub::Transition5 (sub_82190548; sub_8218F530, sub_821903D0)", __imp__sub_82190548,
+       hooks::HubTransition5, {{-112, -24}}},
+      {"Type2Hub::Transition6 (sub_8218F098)", __imp__sub_8218F098, hooks::HubTransition6,
+       {{-112, -24}}},
+      {"Type2Hub::Transition7 (sub_821902C8; sub_8218FB20)", __imp__sub_821902C8,
+       hooks::HubTransition7, {{-112, -24}}},
+  };
+  for (const auto& c : kCases) {
+    Run(h, w, {c.name, 100, c.recompiled, c.native, c.stack, step});
+  }
 }
 
 void Hub(Context& h, const World& w) {
@@ -1287,6 +1398,7 @@ void Hub(Context& h, const World& w) {
                guest::StoreU32(base, image + 8, 1);
                guest::StoreU32(base, image + 12, 1);
              }});
+  HubMovie(h, w);
 }
 
 }  // namespace

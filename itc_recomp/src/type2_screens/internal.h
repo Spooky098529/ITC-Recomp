@@ -47,4 +47,21 @@ inline void PagesGo(uint8_t* base, uint32_t pages, uint32_t page, uint32_t trans
   Store(base, pages + 0, 0xFFFFFFFFu);
 }
 
+// Player 0's selected garage car: the garage (save + 6120) walked by its
+// halfword slot links from +204, [save + 0x19920] steps, to the slot at the
+// link's +2; its 1,968-byte record's address (garage + 1,968 x the slot;
+// the car itself at +212).
+inline uint32_t SelectedGarageCar(uint8_t* base, uint32_t save) {
+  const uint32_t garage = save + 6120;
+  uint32_t steps = Load(base, save + 0x19920);
+  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
+  while (steps != 0) {
+    const int32_t next = int16_t(guest::LoadU16(base, link));
+    steps -= 1;
+    link = garage + 4 * uint32_t(next);
+  }
+  const int32_t slot = int16_t(guest::LoadU16(base, link + 2));
+  return garage + 1968 * uint32_t(slot);
+}
+
 }  // namespace type2_screens

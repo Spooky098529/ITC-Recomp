@@ -117,6 +117,24 @@ void HubMarkNoticeImages(PPCContext& ctx, uint8_t* base);
 void HubFreeImages(PPCContext& ctx, uint8_t* base);
 void HubLoadNoticeImage(PPCContext& ctx, uint8_t* base);
 void HubLoadNoticeImages(PPCContext& ctx, uint8_t* base);
+// The hub's UpdatePage (r3 the machine, r4 the mode), RecordPage (r3 the
+// mode), its movie helpers (ShowNoticeImage r3 the image; the others no
+// arguments) and transitions (r3 the started word's address).
+void HubUpdatePage(PPCContext& ctx, uint8_t* base);
+void HubRecordPage(PPCContext& ctx, uint8_t* base);
+void HubSetRecordText(PPCContext& ctx, uint8_t* base);
+void HubShowBusy(PPCContext& ctx, uint8_t* base);
+void HubHideBusy(PPCContext& ctx, uint8_t* base);
+void HubShowNoticeImage(PPCContext& ctx, uint8_t* base);
+void HubShowNotice(PPCContext& ctx, uint8_t* base);
+void HubFillMenu(PPCContext& ctx, uint8_t* base);
+void HubTransition0(PPCContext& ctx, uint8_t* base);
+void HubTransition1(PPCContext& ctx, uint8_t* base);
+void HubTransition2(PPCContext& ctx, uint8_t* base);
+void HubTransition3(PPCContext& ctx, uint8_t* base);
+void HubTransition5(PPCContext& ctx, uint8_t* base);
+void HubTransition6(PPCContext& ctx, uint8_t* base);
+void HubTransition7(PPCContext& ctx, uint8_t* base);
 // The four machines' set-ups (r3 the machine).
 void HubInitStates(PPCContext& ctx, uint8_t* base);
 void SheetInitStates(PPCContext& ctx, uint8_t* base);

@@ -180,16 +180,8 @@ uint32_t HubOpenMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   uint32_t block = 0;
   if (guest::LoadU16(base, save + 6328) != 0) {
-    const uint32_t garage = save + 6120;
-    uint32_t steps = Load(base, save + 0x19920);
-    uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
-    while (steps != 0) {
-      const int32_t next = int16_t(guest::LoadU16(base, link));
-      steps -= 1;
-      link = garage + 4 * uint32_t(next);
-    }
-    const int32_t slot = int16_t(guest::LoadU16(base, link + 2));
-    calls.Call(kMemcpy, frame, 0x8218E3D4, frame + 80, garage + 1968 * uint32_t(slot) + 212, 1968);
+    calls.Call(kMemcpy, frame, 0x8218E3D4, frame + 80, SelectedGarageCar(base, save) + 212,
+               1968);
     block = car_makers::BlockOf(Load(base, frame + 92));
   }
   calls.Call(kStageMakeModel, frame, 0x8218E3FC, Load(base, Load(base, build_screen::kStandHolder)),
