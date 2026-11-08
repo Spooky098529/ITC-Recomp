@@ -295,4 +295,144 @@ uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
+uint64_t CategoryPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BC670 Options::CategoryPage");
+  const uint32_t frame = Frame(base, sp, 96);
+  calls.Call(kMenuStep, frame, 0x821BC68C, LoadU32(base, kMenu));
+  const uint32_t menu = LoadU32(base, kMenu);
+  uint32_t p;
+  if (LoadU32(base, menu + 8) != 0) {
+    // Moved: step 6, the categories after.
+    p = LoadU32(base, kPage);
+    const uint32_t page = LoadU32(base, p + 0);
+    if (page != 0) {
+      StoreU32(base, p + 8, page);
+    }
+    StoreU32(base, p + 4, 0);
+    StoreU32(base, p + 16, kMinusOne);
+    StoreU32(base, p + 12, 6);
+    StoreU32(base, p + 0, kMinusOne);
+    return calls.Call(kMenuSoundPlay, frame, 0x821BC728, 4);
+  }
+  if (uint32_t(calls.Call(kMenuPressed, frame, 0x821BC6D4, menu, 159)) != 0) {
+    // Accept: step 7 (OpenCategory) on the cursor.
+    StoreU32(base, Settings(base) + 664, LoadU32(base, LoadU32(base, kMenu) + 0));
+    p = LoadU32(base, kPage);
+    const uint32_t page = LoadU32(base, p + 0);
+    if (page != kMinusOne) {
+      StoreU32(base, p + 8, page);
+    }
+    StoreU32(base, p + 4, kMinusOne);
+    StoreU32(base, p + 16, kMinusOne);
+    StoreU32(base, p + 12, 7);
+    StoreU32(base, p + 0, kMinusOne);
+    return calls.Call(kMenuSoundPlay, frame, 0x821BC728, 0);
+  }
+  const uint64_t back = calls.Call(kMenuPressed, frame, 0x821BC738, LoadU32(base, kMenu), 158);
+  if (uint32_t(back) == 0) {
+    return back;
+  }
+  // Back: step 8 (the fade out), the close page after.
+  const uint64_t r3 = calls.Call(kMenuSoundPlay, frame, 0x821BC748, 2);
+  p = LoadU32(base, kPage);
+  const uint32_t page = LoadU32(base, p + 0);
+  if (page != 14) {
+    StoreU32(base, p + 8, page);
+  }
+  StoreU32(base, p + 16, kMinusOne);
+  StoreU32(base, p + 12, 8);
+  StoreU32(base, p + 4, 14);
+  StoreU32(base, p + 0, kMinusOne);
+  if (int32_t(LoadU32(base, kModeType)) == 4) {
+    StoreU32(base, 0x826364EC, 0);
+  }
+  return r3;
+}
+
+uint64_t SetUpMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BCFF0 Options::SetUpMovie");
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t m = FindMovie(base, frame);
+  calls.Call(kResetPose, frame, 0x821BD020, m);
+  const uint32_t career = ui_movies::FindNode(base, m, kMinusOne, 16);
+  const uint32_t other = ui_movies::FindNode(base, m, kMinusOne, 17);
+  const uint32_t title = ui_movies::FindNode(base, m, 17, 1);
+  // The career's panel (context 1) or the others' with the title's frame.
+  const auto others = [&](uint32_t title_frame) {
+    StoreU32(base, career + 80, 0);
+    StoreU32(base, other + 80, 1);
+    StoreU32(base, title + 108, title_frame);
+  };
+  switch (LoadU32(base, Settings(base) + 4)) {
+    case 0: others(4); break;
+    case 1: {
+      StoreU32(base, career + 80, 1);
+      StoreU32(base, other + 80, 0);
+      calls.Call(kSetChildNameText, frame, 0x821BD0D4, m, 16, 6, Settings(base) + 12);
+      calls.Call(kSetNumberText, frame, 0x821BD0EC, m, 16, 9, LoadU32(base, Settings(base) + 32));
+      // UiMovie::SetText(m, 16, 13, 8, the day): its unset varargs r8 to
+      // r10 passed as 0 (the user's call, 2026-10-30).
+      CallAll(calls, kSetText, frame, 0x821BD108,
+              {m, 16, 13, 8, LoadU32(base, Settings(base) + 40), 0, 0, 0});
+      const uint32_t weekday = ui_movies::FindNode(base, m, 16, 11);
+      StoreU32(base, weekday + 108, LoadU32(base, Settings(base) + 36));
+      break;
+    }
+    case 2: others(0); break;
+    case 3: others(1); break;
+    case 4: others(2); break;
+    default: break;
+  }
+  StoreU32(base, ui_movies::FindNode(base, m, 1, 4) + 108, 0);
+  StoreU32(base, ui_movies::FindNode(base, m, 1, 5) + 108, 0);
+  StoreU32(base, ui_movies::FindNode(base, m, 1, 6) + 108, 1);
+  StoreU32(base, ui_movies::FindNode(base, m, 1, 7) + 108, 1);
+  StoreU32(base, ui_movies::FindNode(base, m, 1, 8) + 80, 0);
+  StoreU32(base, ui_movies::FindNode(base, m, 1, 9) + 80, 0);
+  // The menu music playing: the first of bank 1's cues 0 to 3 the sound
+  // manager's slot 14 (IsCuePlaying, bank at +88 and cue at +84) answers.
+  uint64_t r3 = 0;
+  for (uint32_t cue = 0; cue < 4; cue++) {
+    StoreU32(base, frame + 84, cue);
+    StoreU32(base, frame + 88, 1);
+    const uint32_t manager = LoadU32(base, kSoundManagerGlobal);
+    r3 = calls.Call(LoadU32(base, LoadU32(base, manager) + 56), frame, 0x821BD1EC, manager,
+                    frame + 88, frame + 84);
+    if ((r3 & 0xFF) != 0) {
+      StoreU32(base, Settings(base) + 704, cue);
+      break;
+    }
+  }
+  StoreU32(base, Settings(base) + 692, kMinusOne);
+  StoreU32(base, Settings(base) + 0, 1);
+  return r3;
+}
+
+uint64_t Show(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C1158 Options::Show");
+  const uint32_t frame = Frame(base, sp, 112);
+  SettingsRead(base, frame, calls);
+  StoreU32(base, Settings(base) + 664, 0);
+  const uint64_t r3 = SetUpMovie(base, frame, calls);
+  const uint32_t p = LoadU32(base, kPage);
+  const uint32_t page = LoadU32(base, p + 0);
+  if (page != 0) {
+    StoreU32(base, p + 8, page);
+  }
+  StoreU32(base, p + 4, 0);
+  StoreU32(base, p + 12, 3);
+  StoreU32(base, p + 16, 4);
+  StoreU32(base, p + 0, kMinusOne);
+  // The controller pages' open message by the mode type.
+  switch (int32_t(LoadU32(base, kModeType))) {
+    case 2: Post(base, dispatcher, 16); break;
+    case 4: Post(base, dispatcher, 12); break;
+    case 6: Post(base, dispatcher, 27); break;
+    case 7: Post(base, dispatcher, 24); break;
+    case 8: Post(base, dispatcher, 23); break;
+    default: break;
+  }
+  return r3;
+}
+
 }  // namespace options_screen

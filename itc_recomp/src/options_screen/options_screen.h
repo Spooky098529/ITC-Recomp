@@ -61,6 +61,19 @@ constexpr uint32_t kMenuPressed = 0x821864C8;
 constexpr uint32_t kVirtualFree = 0x82295330;
 constexpr uint32_t kShowCareerInfo = 0x821C0EF0;
 constexpr uint32_t kSoundManagerGlobal = 0x826C5C80;
+// Through their overrides: Menu::Step, UiMovie::ResetPose, SetChildNameText,
+// SetNumberText, ClearText and the text scroll's reset (sub_8211C5F8); the
+// arrows never seen in play (Options::SetHudArrow, SetSoundArrow,
+// SetSlidersArrow: the originals).
+constexpr uint32_t kMenuStep = 0x82186568;
+constexpr uint32_t kResetPose = 0x8211ABA8;
+constexpr uint32_t kSetChildNameText = 0x8211D930;
+constexpr uint32_t kSetNumberText = 0x8211C740;
+constexpr uint32_t kClearText = 0x8211C470;
+constexpr uint32_t kResetTextScroll = 0x8211C5F8;
+constexpr uint32_t kSetHudArrow = 0x821BE4A0;
+constexpr uint32_t kSetSoundArrow = 0x821BE7A8;
+constexpr uint32_t kSetSlidersArrow = 0x821BEDC8;
 
 // The screen's blocks (docs/known-data.md): the page block (28 bytes), the
 // front-end menu (68), the settings `o` (716).
@@ -158,6 +171,11 @@ uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls);
 // r3 Settings::Write's.
 uint64_t OnClosed(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls);
+
+// A message (three words: `message`, 0, 0) queued in a dispatcher's ring
+// (+204: 50 slots of 12 bytes, the count at +600, the start at +604), with
+// no overflow check, as the handlers do it inline.
+void Post(uint8_t* base, uint32_t dispatcher, uint32_t message);
 
 // `m`: UI movie 7 (UiMovies::Find on the id stored at frame + 80, as the
 // originals do), the movie table's value or the word at 0x826C5CDC.
@@ -342,5 +360,29 @@ uint64_t SettingsReload(uint8_t* base, uint32_t sp, const Calls& calls);
 // layer's pages, else VirtualFree) and the globals 0. 160-byte frame. The
 // last free's answer.
 uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821BC670 Options::CategoryPage (page 0): Menu::Step; moved -> step 6
+// and sound 4; accept (159) -> the category +664, step 7, sound 0; back
+// (158) -> sound 2, step 8 with page 14 after (type 4: [0x826364EC] = 0).
+// 96-byte frame. The last call's r3.
+uint64_t CategoryPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821BCFF0 Options::SetUpMovie: ResetPose, the panels by the context
+// (type 2's career info texts), the prompts' frames, the menu music's cue
+// (+704), +692 = -1, +0 = 1. 160-byte frame. The last slot 14's r3.
+uint64_t SetUpMovie(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C1158 Options::Show: Settings::Read, the cursor +664 = 0,
+// SetUpMovie, the page block (steps 3 then 4) and the controller pages'
+// open message posted. 112-byte frame. SetUpMovie's r3.
+uint64_t Show(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls);
+// The cursor steps (steps.cpp; r3 the step word, 1): sub_821C2BE0
+// Options::MoveCategoryCursor (step 6, 160-byte frame), sub_821C2E28
+// MoveHudCursor (step 10, 160), sub_821C3008 MoveSoundCursor (step 14,
+// 144), sub_821C3278 ChangeSoundValue (step 15, 128), sub_821C3398
+// MoveSlidersCursor (step 18, 144). Their help lines' SetText unset varargs
+// passed as 0.
+uint64_t MoveCategoryCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveHudCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveSoundCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t ChangeSoundValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveSlidersCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

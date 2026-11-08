@@ -110,5 +110,18 @@ void OptionsShowVolumeBars(PPCContext& ctx, uint8_t* base);
 void OptionsShowPrompts(PPCContext& ctx, uint8_t* base);
 void OptionsSettingsReload(PPCContext& ctx, uint8_t* base);
 void OptionsOnLeft(PPCContext& ctx, uint8_t* base);
+// CategoryPage sub_821BC670, SetUpMovie sub_821BCFF0 (no arguments), Show
+// sub_821C1158 (r4 the dispatcher); the steps MoveCategoryCursor
+// sub_821C2BE0, MoveHudCursor sub_821C2E28, MoveSoundCursor sub_821C3008,
+// ChangeSoundValue sub_821C3278, MoveSlidersCursor sub_821C3398 (r3 the
+// step word).
+void OptionsCategoryPage(PPCContext& ctx, uint8_t* base);
+void OptionsSetUpMovie(PPCContext& ctx, uint8_t* base);
+void OptionsShow(PPCContext& ctx, uint8_t* base);
+void OptionsMoveCategoryCursor(PPCContext& ctx, uint8_t* base);
+void OptionsMoveHudCursor(PPCContext& ctx, uint8_t* base);
+void OptionsMoveSoundCursor(PPCContext& ctx, uint8_t* base);
+void OptionsChangeSoundValue(PPCContext& ctx, uint8_t* base);
+void OptionsMoveSlidersCursor(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

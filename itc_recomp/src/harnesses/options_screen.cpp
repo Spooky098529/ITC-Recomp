@@ -195,7 +195,8 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {menu_helpers::kMapperEntries, 32},
     {menu_helpers::kControllerEntries, 16},
     {0x826367E8 + 1972, 4},
-    {0x826371D0 + 1972, 4}};
+    {0x826371D0 + 1972, 4},
+    {0x826364EC, 4}};
 
 // Whether a case's movie table leaves movie 7 out (its pair's id 9): for
 // the functions that delete it (UiMovies::Delete would free our block).
@@ -366,9 +367,11 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, vtable + menu_sounds::kSetCategoryVolumeSlot, kGet60);
   // Slot 10 (PlayCue2D, MenuSound::Play's) the getter too.
   guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, kGet60);
-  // Slots 5 (ReleaseBank) and 13 (StopCue), Options::OnLeft's, too.
+  // Slots 5 (ReleaseBank) and 13 (StopCue), Options::OnLeft's, and 14
+  // (IsCuePlaying), Options::SetUpMovie's, too.
   guest::StoreU32(base, vtable + 20, kGet60);
   guest::StoreU32(base, vtable + 52, kGet60);
+  guest::StoreU32(base, vtable + 56, kGet60);
   guest::StoreU32(base, menu_sounds::kSoundManager, manager);
   // The UI movies; movie 7's loaded flag 0 or 1.
   ShapeMovieWorld(base, w, r);
@@ -1025,6 +1028,98 @@ void Dispatch(Context& h, const World& w) {
       });
 }
 
+
+// --- The category page, the movie's set-up and the cursor steps ---
+
+void CursorSteps(Context& h, const World& w) {
+  // The options' menu for Menu::Step: six items, its flags 0 or 1.
+  const auto menu = [&h](const World& w, Random& r) {
+    ShapeMappers(h.base, w, r);
+    const uint32_t m = w.menu();
+    guest::StoreU32(h.base, m + menu_helpers::kFirst, 0);
+    guest::StoreU32(h.base, m + menu_helpers::kLast, 5);
+    guest::StoreU32(h.base, m + menu_helpers::kCursor, r.Below(6));
+    for (const uint32_t o : {menu_helpers::kWraps, menu_helpers::kUpDownLocked,
+                             menu_helpers::kSidesStep, menu_helpers::kShouldersStep}) {
+      guest::StoreU32(h.base, m + o, r.Below(2));
+    }
+  };
+  Group(
+      h, w, "Options::CategoryPage (sub_821BC670)", 150,
+      [&](PPCContext&, Random& r, const World& w) {
+        menu(w, r);
+        guest::StoreU32(h.base, w.page() + 0, r.Below(4) == 0 ? 14 : r.Below(3) - 1);
+      },
+      __imp__sub_821BC670, hooks::OptionsCategoryPage, {{96, 16}});
+  // SetUpMovie: the context 0 to 6 or any; type 2's name record's kinds 0
+  // to 5 and small indexes, the day and weekday small.
+  const auto set_up = [&h](const World& w, Random& r) {
+    guest::StoreU32(h.base, w.settings() + 4, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(7));
+    const uint32_t name = w.settings() + 12;
+    guest::StoreU32(h.base, name + 4, r.Below(6));
+    guest::StoreU32(h.base, name + 8, r.Below(100) << 16);
+    guest::StoreU32(h.base, name + 12, r.Below(6));
+    guest::StoreU32(h.base, name + 16, r.Below(100) << 16);
+    guest::StoreU32(h.base, w.settings() + 32, r.Below(2000));
+    guest::StoreU32(h.base, w.settings() + 36, r.Below(7));
+    guest::StoreU32(h.base, w.settings() + 40, r.Below(1000));
+  };
+  Group(
+      h, w, "Options::SetUpMovie (sub_821BCFF0)", 100,
+      [&](PPCContext&, Random& r, const World& w) { set_up(w, r); }, __imp__sub_821BCFF0,
+      hooks::OptionsSetUpMovie, {{160, 104}, {80, 56}});
+  // Show: Settings::Read's records (codes 0 to 33) and the mode type (its
+  // context) as ShapeWorld picks; r4 the dispatcher. SetUpMovie's and
+  // Read's frames below its own.
+  Group(
+      h, w, "Options::Show (sub_821C1158)", 100,
+      [&](PPCContext& t, Random& r, const World& w) {
+        for (uint32_t f = 44; f < 284; f += 4) {
+          guest::StoreU32(h.base, w.options() + f, r.Below(34));
+        }
+        guest::StoreU32(h.base, w.save.address + 6100, r.Below(1200));
+        guest::StoreU32(h.base, w.page() + 0, r.Below(3) == 0 ? 0 : r.Below(15));
+        t.r4.u64 = w.dispatcher();
+      },
+      __imp__sub_821C1158, hooks::OptionsShow, {{112, 24}, {272, 216}, {192, 168}, {384, 272}});
+  // The cursor steps: the step word 0 or 1; the cursor and the cursor
+  // before 0 to 5 (the last row 4, 2 or 3 by page), the direction -1, 0, 1
+  // or any, the menu's last item 0 to 5; the context 0 to 4; OK/Default 0,
+  // 1 or any; the volumes and the track small. The help line's SetText
+  // varargs words (+48 to +79 of the frame) left out.
+  // ChangeSoundValue's callees' frames below its own: the second
+  // ShowVolumeNumber's lower words (its varargs and register saves left
+  // out) and ShowMusicName's movie id (the rest of that area the first
+  // callee's register saves).
+  const auto cursor_step = [&h](PPCContext& t, Random& r, const World& w) {
+    guest::StoreU32(h.base, w.page() + 24, r.Below(2));
+    t.r3.u64 = w.page() + 24;
+    const uint32_t m = w.menu();
+    guest::StoreU32(h.base, m + 0, r.Below(6));
+    guest::StoreU32(h.base, m + 4, r.Below(6));
+    const uint32_t directions[4] = {0xFFFFFFFFu, 0, 1, uint32_t(r.Next())};
+    guest::StoreU32(h.base, m + 8, directions[r.Below(4)]);
+    guest::StoreU32(h.base, m + 16, r.Below(6));
+    guest::StoreU32(h.base, w.settings() + 4, r.Below(5));
+    guest::StoreU32(h.base, w.settings() + 660, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    for (const uint32_t f : {252u, 256u}) {
+      guest::StoreU32(h.base, w.settings() + f, r.Below(17));
+    }
+    guest::StoreU32(h.base, w.settings() + 688, r.Below(7));
+  };
+  Group(h, w, "Options::MoveCategoryCursor (sub_821C2BE0)", 150, cursor_step,
+        __imp__sub_821C2BE0, hooks::OptionsMoveCategoryCursor,
+        {{160, 112}, {80, 64}, {272, 184}});
+  Group(h, w, "Options::MoveHudCursor (sub_821C2E28)", 150, cursor_step, __imp__sub_821C2E28,
+        hooks::OptionsMoveHudCursor, {{160, 112}, {80, 64}});
+  Group(h, w, "Options::MoveSoundCursor (sub_821C3008)", 150, cursor_step, __imp__sub_821C3008,
+        hooks::OptionsMoveSoundCursor, {{144, 96}, {64, 56}});
+  Group(h, w, "Options::ChangeSoundValue (sub_821C3278)", 100, cursor_step, __imp__sub_821C3278,
+        hooks::OptionsChangeSoundValue, {{128, 40}, {256, 208}, {160, 156}});
+  Group(h, w, "Options::MoveSlidersCursor (sub_821C3398)", 150, cursor_step,
+        __imp__sub_821C3398, hooks::OptionsMoveSlidersCursor, {{144, 96}, {64, 56}});
+}
+
 }  // namespace
 
 void OptionsScreen(Context& h) {
@@ -1040,6 +1135,7 @@ void OptionsScreen(Context& h) {
   NodeHelpers(h, w);
   PageHelpers(h, w);
   Dispatch(h, w);
+  CursorSteps(h, w);
 }
 
 }  // namespace harness

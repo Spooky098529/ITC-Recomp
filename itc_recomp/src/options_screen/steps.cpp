@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "ui_movies/game.h"
 
 namespace options_screen {
 
@@ -20,8 +21,8 @@ struct Movie {
   const Calls& calls;
   uint32_t frame;
   uint32_t m;
-  void Play(uint32_t lr, uint64_t sub, uint64_t index) const {
-    calls.Call(kPlay, frame, lr, m, sub, index, 0);
+  void Play(uint32_t lr, uint64_t sub, uint64_t index, uint64_t r6 = 0) const {
+    calls.Call(kPlay, frame, lr, m, sub, index, r6);
   }
   void Loop(uint32_t lr, uint64_t sub, uint64_t index) const {
     calls.Call(kLoop, frame, lr, m, sub, index);
@@ -39,6 +40,12 @@ struct Movie {
   void FinishNamed(uint32_t lr, uint64_t named) const {
     calls.Call(kFinishNamed, frame, lr, m, named);
   }
+  // The help line (sub-scene 2's child 0): SetText with string `id` (its
+  // unset varargs r7 to r10 passed as 0, the user's call, 2026-10-30),
+  // ClearText, and the scroll reset (sub_8211C5F8).
+  void SetHelp(uint32_t lr, uint64_t id) const { calls.Call(kSetText, frame, lr, m, 2, 0, id); }
+  void ClearHelp(uint32_t lr) const { calls.Call(kClearText, frame, lr, m, 2, 0); }
+  void ResetHelpScroll(uint32_t lr) const { calls.Call(kResetTextScroll, frame, lr, m, 2, 0); }
   uint64_t Run(uint32_t lr) const { return calls.Call(kRun, frame, lr, m, 0); }
 };
 
@@ -60,6 +67,10 @@ uint64_t Step(uint8_t* base, uint32_t step, uint32_t sp, uint32_t bytes, uint32_
 }
 
 uint32_t Settings(uint8_t* base) { return LoadU32(base, kSettings); }
+
+constexpr uint32_t kMinusOne = 0xFFFFFFFFu;
+// -1 as the originals' `li` leaves it in a 64-bit register.
+constexpr uint64_t kMinusOne64 = ~uint64_t(0);
 // The menu's cursor (+0) as the originals load it (zero-extended), for the
 // indexes they add to it.
 uint64_t Cursor(uint8_t* base) { return LoadU32(base, LoadU32(base, kMenu) + 0); }
@@ -276,6 +287,237 @@ uint64_t ChangeCategory6Dialog(uint8_t* base, uint32_t step, uint32_t sp, const 
   static constexpr DialogAnimations kAnimations = {
       640, 859, 871, 872, 857, {0x821C0A94, 0x821C0AFC, 0x821C0B18, 0x821C0ACC, 0x821C0AD8}};
   return ChangeDialog(base, step, sp, calls, kAnimations, 0x821C0B2C);
+}
+
+namespace {
+
+// The options' menu's cursor (+0), the cursor before (+4) and the direction
+// (+8), as the steps load them.
+struct Cursor2 {
+  uint32_t now, before;
+};
+Cursor2 Cursors(uint8_t* base) {
+  const uint32_t menu = LoadU32(base, kMenu);
+  return {LoadU32(base, menu + 0), LoadU32(base, menu + 4)};
+}
+int32_t Direction(uint8_t* base) { return int32_t(LoadU32(base, LoadU32(base, kMenu) + 8)); }
+
+// The category table (0x8200A578, 7 words a context) at the context `o` +4
+// and the menu's cursor, both loaded again for each read as the original.
+uint32_t Category(uint8_t* base) {
+  const uint32_t index = LoadU32(base, Settings(base) + 4) * 7 + LoadU32(base, LoadU32(base, kMenu));
+  return LoadU32(base, 0x8200A578 + (index << 2));
+}
+
+}  // namespace
+
+uint64_t MoveCategoryCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C2BE0 Options::MoveCategoryCursor");
+  return Step(base, step, sp, 160, 0x821C2E18, calls, [&](const Movie& m, uint32_t frame) {
+    const Cursor2 c = Cursors(base);
+    const uint32_t title = ui_movies::FindNode(base, m.m, kMinusOne, 28);
+    StoreU32(base, title + 108, Category(base));
+    const uint32_t title2 = ui_movies::FindNode(base, m.m, kMinusOne, 29);
+    StoreU32(base, title2 + 108, Category(base));
+    m.Finish(0x821C2CB4, kMinusOne64, 2);
+    m.Play(0x821C2CD4, kMinusOne64, 2, 1);
+    const uint32_t menu = LoadU32(base, kMenu);
+    m.Finish(0x821C2CEC, 21, uint64_t(LoadU32(base, menu + 4)) + 2);
+    m.Play(0x821C2D14, 21, uint64_t(LoadU32(base, LoadU32(base, kMenu) + 0)) + 2, 1);
+    m.Loop(0x821C2D2C, 21, uint64_t(LoadU32(base, LoadU32(base, kMenu) + 0)) + 2);
+    m.Finish(0x821C2D3C, 21, 12);
+    m.Finish(0x821C2D4C, 21, 13);
+    const int32_t last = int32_t(LoadU32(base, LoadU32(base, kMenu) + 16));
+    const int32_t now = int32_t(c.now), before = int32_t(c.before);
+    if ((now == 0 && before == last) || (now == last && before == 0)) {
+      SetCategoryArrow(base, uint64_t(c.now) * 40, frame);
+    } else {
+      const int32_t direction = Direction(base);
+      if (direction == 1) {
+        m.Play(0x821C2DC0, 21, 13);
+      } else if (direction == -1) {
+        m.Play(0x821C2DC0, 21, 12);
+      }
+    }
+    m.SetHelp(0x821C2DF4, uint64_t(Category(base)) + 982);
+    m.ResetHelpScroll(0x821C2E04);
+  });
+}
+
+uint64_t MoveHudCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C2E28 Options::MoveHudCursor");
+  return Step(base, step, sp, 160, 0x821C2FF8, calls, [&](const Movie& m, uint32_t frame) {
+    const Cursor2 c = Cursors(base);
+    const int32_t now = int32_t(c.now), before = int32_t(c.before);
+    const auto ok = [&]() { return int32_t(LoadU32(base, Settings(base) + 660)) == 1; };
+    if (before < 4) {
+      m.Finish(0x821C2E90, 5, uint64_t(c.before) + 4);
+    } else {
+      m.Finish(0x821C2EB0, 5, ok() ? 1 : 2);
+      // Options::SetHudArrow sub_821BE4A0 (never seen in play: the original).
+      if (now == 0) {
+        calls.Call(kSetHudArrow, frame, 0x821C2ED0, 0);
+      } else if (now == 3) {
+        calls.Call(kSetHudArrow, frame, 0x821C2ED0, 120);
+      }
+      StoreU32(base, Settings(base) + 660, 1);
+    }
+    uint64_t index;
+    if (now < 4) {
+      index = uint64_t(c.now) + 4;
+      m.Play(0x821C2F04, 5, index);
+    } else if (ok()) {
+      index = 1;
+      m.Play(0x821C2F24, 5, index);
+    } else {
+      index = 2;
+      m.Play(0x821C2F34, 5, index);
+    }
+    m.Loop(0x821C2F44, 5, index);
+    m.FinishNamed(0x821C2F50, 15);
+    m.FinishNamed(0x821C2F5C, 14);
+    if (before != 4 && now != 4) {
+      const int32_t direction = Direction(base);
+      if (direction == 1) {
+        m.PlayNamed(0x821C2FA8, 15);
+      } else if (direction == -1) {
+        m.PlayNamed(0x821C2FA8, 14);
+      }
+    }
+    if (now < 4) {
+      m.SetHelp(0x821C2FC4, uint64_t(c.now) + 989);
+      m.ResetHelpScroll(0x821C2FD4);
+    } else {
+      m.ClearHelp(0x821C2FE8);
+    }
+  });
+}
+
+uint64_t MoveSoundCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C3008 Options::MoveSoundCursor");
+  return Step(base, step, sp, 144, 0x821C326C, calls, [&](const Movie& m, uint32_t frame) {
+    const Cursor2 c = Cursors(base);
+    const auto ok_or_default = [&]() -> uint64_t {
+      return int32_t(LoadU32(base, Settings(base) + 660)) == 1 ? 4 : 3;
+    };
+    // Options::SetSoundArrow sub_821BE7A8 (never seen in play: the original).
+    switch (c.before) {
+      case 0: m.Finish(0x821C30FC, 6, 1); break;
+      case 1: m.Finish(0x821C30FC, 6, 2); break;
+      case 2:
+        m.Finish(0x821C30B4, 6, ok_or_default());
+        if (c.now == 0) {
+          calls.Call(kSetSoundArrow, frame, 0x821C30D4, 0);
+        } else if (c.now == 1) {
+          calls.Call(kSetSoundArrow, frame, 0x821C30D4, 40);
+        }
+        StoreU32(base, Settings(base) + 660, 0);
+        break;
+      case 3:
+        m.Finish(0x821C307C, 6, 5);
+        if (c.now == 0) {
+          calls.Call(kSetSoundArrow, frame, 0x821C308C, 0);
+        }
+        break;
+      default: break;
+    }
+    if (c.now <= 3) {
+      static constexpr uint64_t kItems[4] = {1, 2, 0, 5};
+      m.Play(0x821C317C, 6, c.now == 2 ? ok_or_default() : kItems[c.now]);
+      m.LoopLast(0x821C3184);
+    }
+    m.FinishNamed(0x821C3190, 89);
+    m.FinishNamed(0x821C319C, 90);
+    if (c.before != 2 && c.now != 2 && c.before != 3 && c.now != 3) {
+      const int32_t direction = Direction(base);
+      if (direction == 1) {
+        m.PlayNamed(0x821C31F8, 90);
+      } else if (direction == -1) {
+        m.PlayNamed(0x821C31F8, 89);
+      }
+    }
+    switch (c.now) {
+      case 0: m.SetHelp(0x821C3248, 993); break;
+      case 1: m.SetHelp(0x821C3248, 994); break;
+      case 2: m.ClearHelp(0x821C3228); break;
+      case 3: m.SetHelp(0x821C3248, 995); break;
+      default: break;
+    }
+    m.ResetHelpScroll(0x821C3258);
+  });
+}
+
+uint64_t ChangeSoundValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C3278 Options::ChangeSoundValue");
+  return Step(base, step, sp, 128, 0x821C3388, calls, [&](const Movie& m, uint32_t frame) {
+    if (int32_t(LoadU32(base, LoadU32(base, kMenu) + 0)) == 2) {
+      if (int32_t(LoadU32(base, Settings(base) + 660)) == 1) {
+        m.Finish(0x821C32E8, 6, 3);
+        m.Play(0x821C3318, 6, 4);
+      } else {
+        m.Finish(0x821C32F8, 6, 4);
+        m.Play(0x821C3318, 6, 3);
+      }
+      m.LoopLast(0x821C3320);
+      return;
+    }
+    const uint32_t music = ui_movies::FindNode(base, m.m, 6, 6);
+    const uint32_t effects = ui_movies::FindNode(base, m.m, 6, 7);
+    ShowVolumeNumber(base, music, LoadU32(base, Settings(base) + 252), frame, calls);
+    ShowVolumeNumber(base, effects, LoadU32(base, Settings(base) + 256), frame, calls);
+    ShowMusicName(base, LoadU32(base, Settings(base) + 688), frame, calls);
+  });
+}
+
+uint64_t MoveSlidersCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C3398 Options::MoveSlidersCursor");
+  return Step(base, step, sp, 144, 0x821C35E4, calls, [&](const Movie& m, uint32_t frame) {
+    const Cursor2 c = Cursors(base);
+    const auto last_row = [&]() -> uint64_t {
+      return LoadU32(base, Settings(base) + 660) == 0 ? 229 : 230;
+    };
+    // Options::SetSlidersArrow sub_821BEDC8 (never seen in play: the
+    // original).
+    if (c.before < 3) {
+      m.FinishNamed(0x821C3468, 226 + c.before);
+    } else if (c.before == 3) {
+      m.FinishNamed(0x821C341C, last_row());
+      StoreU32(base, Settings(base) + 660, 0);
+      if (c.now == 0) {
+        calls.Call(kSetSlidersArrow, frame, 0x821C3448, 0);
+      } else if (c.now == 2) {
+        calls.Call(kSetSlidersArrow, frame, 0x821C3448, 80);
+      }
+    }
+    if (c.now <= 3) {
+      static constexpr uint32_t kPlayLr[3] = {0x821C3528, 0x821C3504, 0x821C34E0};
+      uint64_t named;
+      if (c.now < 3) {
+        named = 226 + c.now;
+        m.PlayNamed(kPlayLr[c.now], named);
+      } else {
+        named = last_row();
+        m.PlayNamed(named == 229 ? 0x821C34AC : 0x821C34BC, named);
+      }
+      m.LoopNamed(0x821C3534, named);
+    }
+    m.FinishNamed(0x821C3540, 182);
+    m.FinishNamed(0x821C354C, 183);
+    if (c.now == 3) {
+      m.ClearHelp(0x821C35D0);
+      return;
+    }
+    if (c.before != 3) {
+      const int32_t direction = Direction(base);
+      if (direction == 1) {
+        m.PlayNamed(0x821C3598, 183);
+      } else if (direction == -1) {
+        m.PlayNamed(0x821C3598, 182);
+      }
+    }
+    m.SetHelp(0x821C35AC, uint64_t(c.now) + 996);
+    m.ResetHelpScroll(0x821C35BC);
+  });
 }
 
 }  // namespace options_screen

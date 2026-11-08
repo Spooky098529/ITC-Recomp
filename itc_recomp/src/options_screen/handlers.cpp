@@ -43,9 +43,10 @@ void SetUpMenu(uint8_t* base, uint32_t menu, uint32_t items) {
   }
 }
 
-// A message (three words: `message`, 0, 0) queued in a dispatcher's ring
-// (+204: 50 slots of 12 bytes, the count at +600, the start at +604), with
-// no overflow check, as the handlers do it inline.
+int32_t Type(uint8_t* base) { return int32_t(LoadU32(base, kModeType)); }
+
+}  // namespace
+
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
   const uint32_t ring = dispatcher + 204;
   const uint32_t count = LoadU32(base, ring + 600) + 1;
@@ -56,10 +57,6 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
   StoreU32(base, slot + 4, 0);
   StoreU32(base, slot + 0, message);
 }
-
-int32_t Type(uint8_t* base) { return int32_t(LoadU32(base, kModeType)); }
-
-}  // namespace
 
 uint32_t FindMovie(uint8_t* base, uint32_t frame) {
   StoreU32(base, frame + 80, 7);
