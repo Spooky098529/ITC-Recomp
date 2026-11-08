@@ -233,6 +233,17 @@ uint64_t AfterRaceMenuUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
 // transition 1) and the data's +0 = 0; then the page's handler (r4 its
 // caller's, or 5 after the Go).
 uint64_t RaceDialogUpdate(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82218838 RaceDialog::SetText: the varargs (r4 to r10, `varargs`)
+// stored in the caller's area (`sp` + 24 to + 79, as the original's
+// prologue does), then from a 144-byte frame: UI movie 14 found (the id at
+// the frame's +80), its type-0 node 1 (UiMovie::FindNode), the text of
+// that node's child 0 set to string `id` with the varargs
+// (UiMovie::SetNodeTextV, the va_list's address sp + 24 at the frame's +80
+// and in r6), and its child 1's children 3 and 4 set to strings 2 and 3
+// (UiMovie::SetNodeText, its varargs 0: the user's call for the parking
+// area, 2026-10-30), the three through their overrides. The last's r3.
+uint64_t RaceDialogSetText(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+                           const Calls& calls);
 // sub_822191D0 CareerResults::Start: ScreenPages::Go([0x826D8500] + 184, 1,
 // transition 1); returns 0.
 uint64_t CareerResultsStart(uint8_t* base, uint32_t sp, const Calls& calls);

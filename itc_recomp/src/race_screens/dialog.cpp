@@ -210,4 +210,25 @@ uint64_t RaceDialogDraw(uint8_t* base, uint32_t sp, const Calls& calls) {
   return now;
 }
 
+uint64_t RaceDialogSetText(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+                           const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82218838 RaceDialog::SetText");
+  constexpr uint32_t kSetNodeTextV = 0x8211CBD8;
+  for (uint32_t i = 0; i < 7; i++) {
+    guest::StoreU32(base, sp + 24 + 8 * i, uint32_t(varargs[i] >> 32));
+    guest::StoreU32(base, sp + 28 + 8 * i, uint32_t(varargs[i]));
+  }
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t movie = DialogMovie(base, frame + 80);
+  const uint32_t node = ui_movies::FindNode(base, movie, 0, 1);
+  const uint32_t first = ui_movies::Child(base, node, 0);
+  const uint32_t second = ui_movies::Child(base, node, 1);
+  const uint32_t third = ui_movies::Child(base, second, 3);
+  const uint32_t fourth = ui_movies::Child(base, second, 4);
+  guest::StoreU32(base, frame + 80, sp + 24);
+  calls.Call(kSetNodeTextV, frame, 0x822188EC, movie, first, id, guest::LoadU32(base, frame + 80));
+  calls.Call(kSetNodeText, frame, 0x822188FC, movie, third, 2);
+  return calls.Call(kSetNodeText, frame, 0x8221890C, movie, fourth, 3);
+}
+
 }  // namespace race_screens

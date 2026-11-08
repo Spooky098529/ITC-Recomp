@@ -30,7 +30,8 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "ColorItems, ShowAdjust and Open, the options page's ToggleOption, OptionsPage, "
               "SetUpOptions and SetAdjust, the menu after the race's ConfirmPage, Intro, Show, "
               "CloseMain, Move, ShowItems, SetUpItems, ColorItems, Start and Open, "
-              "the confirm dialog's Question, OpenAnim, Move and Draw, PauseMenu::OpenOptions, "
+              "the confirm dialog's Question, OpenAnim, Move, Draw and SetText (its UI movie "
+              "setters' unset varargs 0), PauseMenu::OpenOptions, "
               "the draws PauseMenu::, AfterRaceMenu:: and CareerResults::Draw, the career's "
               "results' Intro, Show, Close1 and Page1, "
               "the UI movie calls through their overrides) natively instead "
@@ -233,6 +234,14 @@ void RaceScreensAfterRaceMenuUpdate(PPCContext& ctx, uint8_t* base) {
 void RaceScreensRaceDialogUpdate(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogUpdate(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensRaceDialogSetText(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  const uint64_t varargs[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+                               ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  ctx.r3.u64 = race_screens::RaceDialogSetText(base, ctx.r3.u64, varargs, ctx.r1.u32,
+                                               guest.calls());
 }
 
 void RaceScreensCareerResultsStart(PPCContext& ctx, uint8_t* base) {
@@ -520,6 +529,8 @@ ITC_RACE_SCREENS(8221BA68, RaceScreensAfterRaceMenuOpen)
 ITC_RACE_SCREENS(82217F40, RaceScreensRaceDialogQuestion)
 ITC_RACE_SCREENS(822186A8, RaceScreensRaceDialogOpenAnim)
 ITC_RACE_SCREENS(82218788, RaceScreensRaceDialogMove)
+// RaceDialog::SetText (from Open, AskSlot and ShowMessage, recompiled).
+ITC_RACE_SCREENS(82218838, RaceScreensRaceDialogSetText)
 ITC_RACE_SCREENS(8220EEF0, RaceScreensPauseMenuOpenOptions)
 ITC_RACE_SCREENS(82219210, RaceScreensCareerResultsIntro)
 ITC_RACE_SCREENS(822192B0, RaceScreensCareerResultsShow)

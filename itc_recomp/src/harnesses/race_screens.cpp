@@ -1465,6 +1465,27 @@ void Dialog(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, pages + 4, r.Below(8));
       },
       __imp__sub_82218F30, hooks::RaceScreensRaceDialogDraw, {128, 16});
+  // SetText: the string id one its callers pass (62, 75, 77, 1954 to 1956)
+  // or any below 2000, the varargs random words (the strings have no
+  // argument codes). The frame's +40 to +79 left out: UiMovie::SetNodeText
+  // stores its r6 to r10 there, leftovers of SetNodeTextV in the original
+  // and 0 in ours (the user's call for the parking area, 2026-10-30).
+  FrameSpec set_text{144, 48};
+  set_text.skip = {40, 80};
+  MovieGroup(
+      h, w, "RaceDialog::SetText (sub_82218838)", 100,
+      [&](PPCContext& t, Random& r, const MovieWorld&) {
+        const uint32_t ids[7] = {62, 75, 77, 1954, 1955, 1956, r.Below(2000)};
+        t.r3.u64 = ids[r.Below(7)];
+        t.r4.u64 = r.Next();
+        t.r5.u64 = r.Next();
+        t.r6.u64 = r.Next();
+        t.r7.u64 = r.Next();
+        t.r8.u64 = r.Next();
+        t.r9.u64 = r.Next();
+        t.r10.u64 = r.Next();
+      },
+      __imp__sub_82218838, hooks::RaceScreensRaceDialogSetText, set_text);
 }
 
 // The dialog's page object and data as its draw's cases shape them (its
