@@ -13,7 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 
-- Nothing yet.
+- The type 2 screens' map (eb666c7f): `type2-screens.md`, 150 rows (the
+  hub, the spec sheet, the build screen's machine, the license plate
+  editor; `Type2Hub::WaitForLoad` `sub_8218E420` moved from
+  `functions.md`, its patch kept), rows in `known-data.md`
+  (`0x826D8410`-`0x826D841C`, `0x826D8430`-`0x826D8438`,
+  `0x826D8464`-`0x826D846C`, `0x826D8448`'s +0 to +32), a pointer in
+  `build-screen.md`'s intro; two leads deleted as covered, four leads'
+  lines given notes. `Type2Hub::Create` allocates 68 bytes and uses up
+  to +447 (the original's, kept).
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 

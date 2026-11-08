@@ -16,7 +16,14 @@ file's history. What's left to see in a drive, from every run:
   `sub_821B6FC0`, `sub_821A16C0`, `sub_82196520`, `sub_8219B2E8`; the
   last run's recommendation, 8 ready roots; the top lead `sub_82562FF0`
   no longer runs in play and the next ones wait on the core's sync; its
-  line deleted from `leads.md`). Step: mapping (agent running).
+  line deleted from `leads.md`). Mapped `type2-screens.md` (eb666c7f:
+  150 rows, 121 in play, 1 moved from `functions.md`; four of the eight
+  machines in full: the hub at +0, the spec sheet at +56624, the build
+  screen's machine at +0x1BF20, the license plate editor at +0x20A70;
+  97 ready groups; 5 leads added for the rest (+9640, +0x23018,
+  +0x173D0, the tuning screen's Init, the mode's Init), two leads
+  deleted as covered; no subagents); map checked. Step: migration
+  (agent running).
 
 ## Done
 
@@ -36,5 +43,7 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 5074, work left 1354 (wrapped 56, known 390,
   unknown 908).
+- After the type 2 screens' map: ours 5074, work left 1354 (wrapped
+  56, known 510, unknown 788).
 
 ## Stopped
