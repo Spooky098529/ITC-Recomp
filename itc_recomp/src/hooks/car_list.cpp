@@ -276,39 +276,29 @@ void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
 // RowPanel::Move sub_8224F8F8, CarPanel::Select sub_8224DCF0 and
 // ColorPanel::Select sub_8224D118, and (the third) RowPanel::Fill
 // sub_8224F758 and Refresh sub_8224F888, CarPanel::SetTexts sub_8224D7F0
-// and SetName sub_8224DED8 have no adapter (removed, B7 loop, 2026-11-08):
-// in play only native callers reach them; the register steps stay for the
-// harness.
-ITC_CAR_LIST(8224FD90, CarListTabSetButtons)
+// and SetName sub_8224DED8, and (the fourth, after the steps over the
+// panels) TabPanel::SetTab sub_822501C8, Show sub_8224FE50, IsShown
+// sub_8224FCE0, Select sub_8224FB20 and SetButtons sub_8224FD90,
+// RowPanel::Show sub_8224F1D8, IsShown sub_8224F5E8, Hide sub_8224F4C8,
+// IsHidden sub_8224F640 and Select sub_8224F340, CarPanel::Show
+// sub_8224DA20, IsShown sub_8224E108, Move sub_8224DDF8 and PlaceCursor
+// sub_8224D9A0, ColorPanel::Move sub_8224D580, IsIdle sub_8224D288,
+// SetArrows sub_8224D2D0 and SetSwatches sub_8224D518, PanelSetBase::
+// SetUpRows sub_8224A978 and SetUpCarPage sub_8224C560 have no adapter
+// (removed, B7 loop, 2026-11-08): in play only native callers reach them;
+// the register steps stay for the harness.
 ITC_CAR_LIST(8224F558, CarListRowUnhighlight)
-ITC_CAR_LIST(8224F4C8, CarListRowHide)
 ITC_CAR_LIST(8224D010, CarListColorShow)
-ITC_CAR_LIST(8224D2D0, CarListColorSetArrows)
-ITC_CAR_LIST(8224D518, CarListColorSetSwatches)
 ITC_CAR_LIST(8224D860, CarListCarSetButtons)
-ITC_CAR_LIST(8224D9A0, CarListCarPlaceCursor)
 ITC_CAR_LIST(8224DF30, CarListCarStopArrows)
 ITC_CAR_LIST(8224E288, CarListCarSetStats)
 ITC_CAR_LIST(822417E8, CarListCarSetCarName)
 ITC_CAR_LIST(82241868, CarListPanel7CShowArrows)
 ITC_CAR_LIST(8224E920, CarListCarShowStats)
-ITC_CAR_LIST(822501C8, CarListTabSetTab)
-ITC_CAR_LIST(8224D580, CarListColorMove)
 // The panels' answers (from the steps, recompiled).
-ITC_CAR_LIST(8224FCE0, CarListTabIsShown)
-ITC_CAR_LIST(8224F5E8, CarListRowIsShown)
-ITC_CAR_LIST(8224F640, CarListRowIsHidden)
-ITC_CAR_LIST(8224E108, CarListCarIsShown)
 ITC_CAR_LIST(8224D1F0, CarListColorIsShown)
-ITC_CAR_LIST(8224D288, CarListColorIsIdle)
 // The panels' shows, selections and moves (from the steps and the car's
 // page, recompiled).
-ITC_CAR_LIST(8224FE50, CarListTabShow)
-ITC_CAR_LIST(8224FB20, CarListTabSelect)
-ITC_CAR_LIST(8224F1D8, CarListRowShow)
-ITC_CAR_LIST(8224F340, CarListRowSelect)
-ITC_CAR_LIST(8224DA20, CarListCarShow)
-ITC_CAR_LIST(8224DDF8, CarListCarMove)
 ITC_CAR_LIST(8224E050, CarListCarPick)
 // PowerGraph::SetEntry (from PanelSetBase::PowerGraphPage, recompiled).
 ITC_CAR_LIST(82250368, CarListPowerGraphSetEntry)
@@ -347,8 +337,6 @@ ITC_CAR_LIST(8224CB28, CarListStep9)
 ITC_CAR_LIST(82249128, CarListStep12)
 ITC_CAR_LIST(822492C8, CarListStep19)
 // The rows' and the car page's set-ups (from recompiled steps and pages).
-ITC_CAR_LIST(8224A978, CarListSetUpRows)
-ITC_CAR_LIST(8224C560, CarListSetUpCarPage)
 // PanelSet's slot 1 (the panel screens' show). PanelSetBase::Build
 // sub_8224C698 has no adapter (removed, B7 loop, 2026-11-08: in play only
 // PanelSet::Build, native, reaches it; the register step stays for the

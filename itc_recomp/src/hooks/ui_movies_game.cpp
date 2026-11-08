@@ -34,7 +34,7 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "animation lists' sub_8211A9E8, sub_8211B230, AnimationList::Insert "
               "sub_8211B4D0, AnimationList::RemoveAt sub_8211B080, AnimationList::Get "
               "sub_8211B298, UiMovie::AnimationTime sub_8211BA00 and "
-              "UiMovie::NamedAnimationTime sub_8211BB18, UiMovie::IsNamedActive sub_8211BC18; the pairs' lookups TextMap::Find "
+              "UiMovie::NamedAnimationTime sub_8211BB18, UiMovie::IsNamedActive sub_8211BC18 (no adapter); the pairs' lookups TextMap::Find "
               "sub_8211B310, TextMap::Set sub_8211B370 and UiMovies::Find sub_8211B3F0; the "
               "screens' movie table reset sub_8211AD00 (its renderer calls still the game's); the "
               "layers sub_8211BD10 (its buckets in its frame on the guest stack, as the "
@@ -283,13 +283,8 @@ extern "C" REX_FUNC(sub_8211BB18) {
   ctx.f1.f64 = double(std::bit_cast<float>(time));
 }
 
-// UiMovie::IsNamedActive: r3 = movie, r4 = a named animation's index; 1
-// when it's in either list.
-extern "C" REX_FUNC(sub_8211BC18) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211BC18);
-  ctx.r3.u64 = ui_movies::IsNamedActive(base, ctx.r3.u32, ctx.r4.u32);
-}
+// UiMovie::IsNamedActive (sub_8211BC18) has no adapter: only the car
+// list's native panels reach it in play, calling its plain C++.
 
 // TextMap::Find: r3 = a movie's texts, r4 = an id's address.
 extern "C" REX_FUNC(sub_8211B310) {

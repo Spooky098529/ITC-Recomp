@@ -75,6 +75,12 @@ void NativeMoveNamedAnimation(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = moved.slot ? *moved.slot : moved.looked ? ctx.r1.u32 - 176 + 80 : movie;
 }
 
+// UiMovie::IsNamedActive (sub_8211BC18, its adapter removed): r3 = movie,
+// r4 = a named animation's index; 1 when it's in either list.
+void NativeIsNamedActive(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::IsNamedActive(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 // sub_8211B7B8 and sub_8211B9B8: r3 = movie, r4 = a text id; the text's
 // +24 or +4.
 void NativeTextField24(PPCContext& ctx, uint8_t* base) {
@@ -627,7 +633,7 @@ void AnimationListCases(Context& h, const Block& block) {
   const Lookup lookups[] = {
       {"UiMovie::AnimationTime (sub_8211BA00)", __imp__sub_8211BA00, sub_8211BA00},
       {"UiMovie::NamedAnimationTime (sub_8211BB18)", __imp__sub_8211BB18, sub_8211BB18},
-      {"UiMovie::IsNamedActive (sub_8211BC18)", __imp__sub_8211BC18, sub_8211BC18, false},
+      {"UiMovie::IsNamedActive (sub_8211BC18)", __imp__sub_8211BC18, NativeIsNamedActive, false},
   };
   const uint32_t movie = block.at;
   for (const Lookup& f : lookups) {
