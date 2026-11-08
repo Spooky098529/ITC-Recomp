@@ -547,8 +547,9 @@ ITC_RACE_SCREENS(82217F40, RaceScreensRaceDialogQuestion)
 ITC_RACE_SCREENS(822186A8, RaceScreensRaceDialogOpenAnim)
 ITC_RACE_SCREENS(82218788, RaceScreensRaceDialogMove)
 ITC_RACE_SCREENS(82218C10, RaceScreensRaceDialogShowMessage)
-// RaceDialog::SetText (from Open, AskSlot and ShowMessage, recompiled).
-ITC_RACE_SCREENS(82218838, RaceScreensRaceDialogSetText)
+// RaceDialog::SetText has no adapter (removed, 2026-11-08): its callers in
+// play, Open's and ShowMessage's plain C++, call its plain C++ (AskSlot and
+// ShowMessage's messages, never seen in play, the original).
 // RaceDialog::Open (from PauseMenu::MainPage and AfterRaceMenu::MainPage,
 // recompiled).
 ITC_RACE_SCREENS(82218B30, RaceScreensRaceDialogOpen)
