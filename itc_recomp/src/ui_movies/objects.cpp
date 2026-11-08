@@ -502,20 +502,50 @@ std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::Forma
   return movie + kMovieTexts;
 }
 
+namespace {
+// SetNumberText's and SetNodeNumberText's change: the buffer cleared, then
+// string 8 with r6 = 0 when the value's low word is 0, else 9 with the
+// value (all 64 bits, as the originals' mr r6); r7 to r10, the memset's
+// leftovers in the originals, passed 0 (dead frame words).
+void FormatNumber(uint8_t* base, const strings_and_font::FormatCalls& calls, uint32_t stack,
+                  uint32_t record, uint64_t value) {
+  constexpr uint32_t kStringTable = 0x826C5C34;
+  Zero(base, Load(base, record), 4096);
+  const bool zero = uint32_t(value) == 0;
+  const uint64_t varargs[5] = {zero ? 0 : value, 0, 0, 0, 0};
+  strings_and_font::StringsFormat(base, calls, stack - 128, Load(base, kStringTable),
+                                  Load(base, record), zero ? 8 : 9, varargs);
+}
+}  // namespace
+
 std::optional<uint32_t> SetNumberText(uint8_t* base, const strings_and_font::FormatCalls& calls,
                                       uint32_t stack, uint32_t movie, uint32_t sub_scene,
                                       uint32_t child, uint64_t value) {
-  constexpr uint32_t kStringTable = 0x826C5C34;
   return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
     ITC_NATIVE_RUNNING("sub_8211C740 UiMovie::SetNumberText");
+    FormatNumber(base, calls, stack, record, value);
+  });
+}
+
+std::optional<uint32_t> SetNodeNumberText(uint8_t* base,
+                                          const strings_and_font::FormatCalls& calls,
+                                          uint32_t stack, uint32_t movie, uint32_t node,
+                                          uint64_t value) {
+  return ChangeNodeText(base, movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CA18 UiMovie::SetNodeNumberText");
+    FormatNumber(base, calls, stack, record, value);
+  });
+}
+
+std::optional<uint32_t> SetNodeTextV(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                     uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
+                                     uint32_t args) {
+  constexpr uint32_t kStringTable = 0x826C5C34;
+  return ChangeNodeText(base, movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CBD8 UiMovie::SetNodeTextV");
     Zero(base, Load(base, record), 4096);
-    // String 8 with r6 = 0 when the value's low word is 0, else 9 with the
-    // value (all 64 bits, as the original's mr r6,r28); r7 to r10, the
-    // memset's leftovers in the original, passed 0 (dead frame words).
-    const bool zero = uint32_t(value) == 0;
-    const uint64_t varargs[5] = {zero ? 0 : value, 0, 0, 0, 0};
-    strings_and_font::StringsFormat(base, calls, stack - 128, Load(base, kStringTable),
-                                    Load(base, record), zero ? 8 : 9, varargs);
+    strings_and_font::StringsFormatV(base, calls, stack - 144, Load(base, kStringTable),
+                                     Load(base, record), id & 0xFFFF, args);
   });
 }
 
@@ -793,6 +823,14 @@ uint32_t DeleteMovie(uint8_t* base, uint32_t id, uint32_t frame, const DeleteCal
   Store(base, frame + 84, id);
   Store(base, frame + 80, 0);
   return calls.set(frame + 84, frame + 80);
+}
+
+uint32_t DeleteAll(uint8_t* base, uint32_t frame, const DeleteCalls& calls, uint32_t r3) {
+  ITC_NATIVE_RUNNING("sub_8211E2C8 UiMovies::DeleteAll");
+  for (uint32_t i = 0; i < Load(base, kMovieTable + 8); i++) {
+    r3 = DeleteMovie(base, Load(base, Load(base, kMovieTable) + 8 * i), frame - 128, calls);
+  }
+  return r3;
 }
 
 }  // namespace ui_movies

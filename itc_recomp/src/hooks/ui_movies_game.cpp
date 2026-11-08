@@ -63,7 +63,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "(sub_8211C930) and sub_8211D8D8 (sub_8211C9C0), the build screen's text helpers "
               "UiMovie::SetFirstLine sub_8211C370, FirstLine sub_8211C3F8, LineCount "
               "sub_8211C680 (Strings::CountLines sub_821087D8), ScrollNodeText sub_8211CCC0 and "
-              "ResetNodeTextScroll sub_8211CD28, UiMovie::ClearNodeText sub_8211CC50, UiMovie::SetText sub_8211C1F8 (its "
+              "ResetNodeTextScroll sub_8211CD28, UiMovie::ClearNodeText sub_8211CC50, "
+              "UiMovie::SetNodeTextV sub_8211CBD8, UiMovie::SetNodeNumberText sub_8211CA18, "
+              "UiMovie::SetText sub_8211C1F8 (its "
               "Strings::FormatV through the plain C++) and UiMovie::SetNodeText sub_8211C7E8 (the "
               "same, from its override in src/debug/pause_movie_log.cpp), UiMovie::SetNumberText "
               "sub_8211C740 and UiMovie::SetChildNameText sub_8211D930 (with "
@@ -72,7 +74,8 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "the full-frame effect sub_8211BEE8 (CameraPasses::RenderTarget and sub_8259EBE8 "
               "through their overrides); with --native_heap and the archive's queue native, "
               "UiMovie::Load sub_8211E798 and the movie table's UiMovies::Open sub_8211E808, "
-              "and with --native_heap UiMovies::Delete sub_8211E258 with UiMovie::Unload "
+              "and with --native_heap UiMovies::Delete sub_8211E258 (and UiMovies::DeleteAll "
+              "sub_8211E2C8 with its jump sub_8211E370) with UiMovie::Unload "
               "sub_8211B540 (no adapter: only Delete's plain C++ calls it; their callees natively "
               "where their own checks say so) "
               "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
@@ -926,6 +929,44 @@ extern "C" REX_FUNC(sub_8211C740) {
   __imp__sub_8211C740(ctx, base);
 }
 
+// UiMovie::SetNodeNumberText: r3 = movie, r4 = the node, r5 = the value;
+// r3 the movie's texts' map.
+extern "C" REX_FUNC(sub_8211CA18) {
+  REX_FUNC_PROLOGUE();
+  if (NativeHeap()) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    hooks::FormatGuestCalls calls(ctx, base);
+    const auto r3 = ui_movies::SetNodeNumberText(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+                                                 ctx.r4.u32, ctx.r5.u64);
+    ctx.lr = lr;
+    if (r3) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_8211CA18(ctx, base);
+}
+
+// UiMovie::SetNodeTextV: r3 = movie, r4 = the node, r5 = the string id, r6
+// = a va_list's address; r3 the movie's texts' map.
+extern "C" REX_FUNC(sub_8211CBD8) {
+  REX_FUNC_PROLOGUE();
+  if (NativeHeap()) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    hooks::FormatGuestCalls calls(ctx, base);
+    const auto r3 = ui_movies::SetNodeTextV(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+                                            ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+    ctx.lr = lr;
+    if (r3) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_8211CBD8(ctx, base);
+}
+
 // UiMovie::SetChildNameText: r3 = movie, r4 = a sub-scene's index or -1,
 // r5 = a child's index, r6 = the name record; r3 as SetNameText
 // leaves it. With --log_pause_movie the original runs (its SetNodeText
@@ -1138,4 +1179,35 @@ extern "C" REX_FUNC(sub_8211E258) {
   ctx.r3.u64 = ui_movies::DeleteMovie(base, ctx.r3.u32, sp - 128,
                                       ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
   ctx.lr = lr;
+}
+
+// UiMovies::DeleteAll (sub_8211E2C8) and its jump sub_8211E370: no
+// arguments; r3 as the original leaves it. Each Delete from DeleteAll's
+// 112-byte frame (the jump's the same: a tail call).
+namespace {
+void DeleteAllSteps(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32 - 112;
+  ctx.r3.u64 = ui_movies::DeleteAll(base, sp, ui_movies_game_hooks::DeleteCalls(ctx, base, sp),
+                                    ctx.r3.u32);
+  ctx.lr = lr;
+}
+}  // namespace
+
+extern "C" REX_FUNC(sub_8211E2C8) {
+  REX_FUNC_PROLOGUE();
+  if (!ui_movies_game_hooks::DeleteNative()) {
+    __imp__sub_8211E2C8(ctx, base);
+    return;
+  }
+  DeleteAllSteps(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_8211E370) {
+  REX_FUNC_PROLOGUE();
+  if (!ui_movies_game_hooks::DeleteNative()) {
+    __imp__sub_8211E370(ctx, base);
+    return;
+  }
+  DeleteAllSteps(ctx, base);
 }

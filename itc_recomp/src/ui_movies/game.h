@@ -540,6 +540,15 @@ std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::Forma
                                     uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
                                     const uint64_t varargs[5]);
 
+// sub_8211CBD8 UiMovie::SetNodeTextV: SetNodeText with no TXT check and
+// +20 kept, `args` the va_list's address as given (r6, passed on to
+// Strings::FormatV from its 144-byte frame below `stack`). Its frame words
+// (+80 the record, +84 the id) aren't written, as the other setters'
+// aren't. Returns as SetText.
+std::optional<uint32_t> SetNodeTextV(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                     uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
+                                     uint32_t args);
+
 // sub_8211C740 UiMovie::SetNumberText: as ClearText (no TXT check), its
 // text record's buffer cleared (+8 and +20 kept) and string 8 (`value`'s
 // low word 0) or 9 with `value` formatted into it (Strings::Format from its
@@ -547,6 +556,12 @@ std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::Forma
 std::optional<uint32_t> SetNumberText(uint8_t* base, const strings_and_font::FormatCalls& calls,
                                       uint32_t stack, uint32_t movie, uint32_t sub_scene,
                                       uint32_t child, uint64_t value);
+// sub_8211CA18 UiMovie::SetNodeNumberText: SetNumberText with the node
+// given (its 128-byte frame the same).
+std::optional<uint32_t> SetNodeNumberText(uint8_t* base,
+                                          const strings_and_font::FormatCalls& calls,
+                                          uint32_t stack, uint32_t movie, uint32_t node,
+                                          uint64_t value);
 
 // sub_8211CAA0 UiMovie::SetNameText: the text of a name record
 // (+4 a kind, +8 a 16-bit index, +10 a flag; +12 a second kind, +16 its
@@ -638,5 +653,11 @@ struct DeleteCalls {
 // Returns r3 as the original leaves it (the entry's address when there was
 // none, else the set's).
 uint32_t DeleteMovie(uint8_t* base, uint32_t id, uint32_t frame, const DeleteCalls& calls);
+// sub_8211E2C8 UiMovies::DeleteAll (and its jump sub_8211E370): DeleteMovie
+// of each entry's key in the movie table, the array and count read again
+// after each (`frame` is the original's r1, 112 bytes, Delete's frame 128
+// below it; `calls` Delete's from there). Returns r3 as the original
+// leaves it: the last Delete's, or `r3` when the table is empty.
+uint32_t DeleteAll(uint8_t* base, uint32_t frame, const DeleteCalls& calls, uint32_t r3);
 
 }  // namespace ui_movies

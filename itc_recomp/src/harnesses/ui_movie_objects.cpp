@@ -707,6 +707,8 @@ constexpr const char* kScrollNodeText = "UiMovie::ScrollNodeText (sub_8211CCC0)"
 constexpr const char* kResetNodeTextScroll = "UiMovie::ResetNodeTextScroll (sub_8211CD28)";
 constexpr const char* kClearNodeText = "UiMovie::ClearNodeText (sub_8211CC50)";
 constexpr const char* kSetNumberText = "UiMovie::SetNumberText (sub_8211C740)";
+constexpr const char* kSetNodeNumberText = "UiMovie::SetNodeNumberText (sub_8211CA18)";
+constexpr const char* kSetNodeTextV = "UiMovie::SetNodeTextV (sub_8211CBD8)";
 constexpr const char* kSetChildNameText =
     "UiMovie::SetChildNameText (sub_8211D930; sub_8211CAA0)";
 
@@ -809,6 +811,10 @@ void SetterCases(Context& h, uint32_t movie) {
       // The same with the node in r4 (one of the 8, a TXT), the string id in
       // r5 and r6 to r10 its arguments; also compared: r1 + 40 to + 79.
       {kSetNodeText, __imp__sub_8211C7E8, sub_8211C7E8},
+      // The same without the TXT check (r4 any of the 8 nodes, a TXT or
+      // not) and r6 a va_list's address (r1 + 40, five slots of small
+      // ints); also compared: r1 + 40 to + 79.
+      {kSetNodeTextV, __imp__sub_8211CBD8, sub_8211CBD8},
       // The build screen's text helpers (docs/functions/build-screen.md):
       // SetFirstLine (r6 the line) and FirstLine on TXT nodes only (the
       // originals loop forever on others); LineCount (also compared: its
@@ -826,6 +832,8 @@ void SetterCases(Context& h, uint32_t movie) {
       // the case's (kinds 0 to 6 and others, indexes around their bounds),
       // with the table above. 40 cases each.
       {kSetNumberText, __imp__sub_8211C740, sub_8211C740},
+      // The same with the node in r4 (one of the 8) and the value in r5.
+      {kSetNodeNumberText, __imp__sub_8211CA18, sub_8211CA18},
       {kSetChildNameText, __imp__sub_8211D930, sub_8211D930},
   };
   constexpr uint32_t kMissing = 0x826C5CD8;
@@ -884,7 +892,8 @@ void SetterCases(Context& h, uint32_t movie) {
   const NameStrings name_strings(h.base, name_random);
   for (const SetterFunction& f : functions) {
     Results results(f.name);
-    const bool numbers = f.name == kSetNumberText || f.name == kSetChildNameText;
+    const bool numbers = f.name == kSetNumberText || f.name == kSetChildNameText ||
+                         f.name == kSetNodeNumberText;
     for (int i = 0; i < (numbers ? 40 : 200); i++) {
       const uint64_t seed = h.random.Next();
       Outputs out[2];
@@ -964,18 +973,38 @@ void SetterCases(Context& h, uint32_t movie) {
           t.r10.u64 = r.Below(100);
           Fill(h.base, t.r1.u32 + 40, 40);
         }
+        if (f.name == kSetNodeTextV) {
+          t.r4.u64 = nodes + 128 * r.Below(8);
+          if (r.Below(2) == 0) {
+            Store(h.base, t.r4.u32, uint32_t(r.Next()));  // not a TXT
+          }
+          t.r5.u64 = (r.Next() & ~0xFFFFull) | string_id(r);
+          Store(h.base, kStringTable, strings.address);
+          t.r6.u64 = t.r1.u32 + 40;
+          for (uint32_t k = 0; k < 5; k++) {
+            Store(h.base, t.r1.u32 + 40 + 8 * k, 0);
+            Store(h.base, t.r1.u32 + 44 + 8 * k, r.Below(100));
+          }
+        }
         if (f.name == kSetFirstLine) {
           t.r6.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);
         }
         if (numbers) {
           Store(h.base, kStringTable, name_strings.table());
         }
-        if (f.name == kSetNumberText) {
+        if (f.name == kSetNumberText || f.name == kSetNodeNumberText) {
+          uint64_t value;
           switch (r.Below(4)) {
-            case 0: t.r6.u64 = 0; break;
-            case 1: t.r6.u64 = r.Next() << 32; break;
-            case 2: t.r6.u64 = r.Below(100000); break;
-            default: t.r6.u64 = r.Next(); break;
+            case 0: value = 0; break;
+            case 1: value = r.Next() << 32; break;
+            case 2: value = r.Below(100000); break;
+            default: value = r.Next(); break;
+          }
+          if (f.name == kSetNumberText) {
+            t.r6.u64 = value;
+          } else {
+            t.r4.u64 = nodes + 128 * r.Below(8);
+            t.r5.u64 = value;
           }
         }
         if (f.name == kSetChildNameText) {
@@ -1055,7 +1084,7 @@ void SetterCases(Context& h, uint32_t movie) {
         if (f.name == kSetText) {
           out[v].Bytes(Read(h.base, CallContext(h).r1.u32 + 48, 32));
         }
-        if (f.name == kSetNodeText) {
+        if (f.name == kSetNodeText || f.name == kSetNodeTextV) {
           out[v].Bytes(Read(h.base, CallContext(h).r1.u32 + 40, 40));
         }
       }
@@ -1356,6 +1385,90 @@ void DeleteCases(Context& h) {
   results.Report();
 }
 
+// UiMovies::DeleteAll (and its jump sub_8211E370) over a table of the
+// case's: 0 to 4 pairs (keys 100 + n), each a loaded movie, 0 or a key
+// repeated (its movie deleted once). What's freed, the table, r3 (an entry
+// by its offset in the array, the table as 0, the empty entry as 1, the
+// incoming r3 as 2).
+void DeleteAllCases(Context& h) {
+  struct Function {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Function functions[] = {
+      {"UiMovies::DeleteAll (sub_8211E2C8)", __imp__sub_8211E2C8, sub_8211E2C8},
+      {"UiMovies::DeleteAll's jump (sub_8211E370)", __imp__sub_8211E370, sub_8211E370},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int i = 0; i < 30; i++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        TableSwap swap(h.base);
+        const uint32_t capacity = 1 + r.Below(4);
+        const uint32_t count = r.Below(capacity + 1);
+        const uint32_t array =
+            memory::crt::OperatorNewArray(h.base, 8 * capacity).value_or(0);
+        RandomFill(r, h.base, array, 8 * capacity);
+        std::vector<uint32_t> movies, blocks, pages;
+        std::vector<size_t> block_starts, page_starts;
+        for (uint32_t k = 0; k < count; k++) {
+          uint32_t key = 100 + k, movie = 0;
+          const uint32_t kind = r.Below(4);
+          if (kind == 0 && k > 0) {
+            key = 100 + r.Below(k);  // a key again: its later Delete finds 0
+          } else if (kind != 1) {
+            movie = memory::crt::OperatorNew(h.base, kMovieBytes).value_or(0);
+            block_starts.push_back(blocks.size());
+            page_starts.push_back(pages.size());
+            MakeLoadedMovie(r, h.base, movie, blocks, pages);
+            movies.push_back(movie);
+          }
+          Store(h.base, array + 8 * k, key);
+          Store(h.base, array + 8 * k + 4, movie);
+        }
+        Store(h.base, ui_movies::kMovieTable, array);
+        Store(h.base, ui_movies::kMovieTable + 4, capacity);
+        Store(h.base, ui_movies::kMovieTable + 8, count);
+        PPCContext t = CallContext(h);
+        const uint32_t incoming = 0x13572468;
+        t.r3.u64 = incoming;
+        if (v == 0) {
+          RunRecompiled(f.recompiled, t, h.base);
+        } else {
+          f.native(t, h.base);
+        }
+        const uint32_t now = Load(h.base, ui_movies::kMovieTable);
+        const uint32_t r3 = t.r3.u32;
+        out[v].Word(r3 == ui_movies::kMovieTable    ? 0
+                    : r3 == 0x826C5CDC              ? 1
+                    : r3 == incoming                ? 2
+                    : r3 >= now && r3 < now + 64    ? 0x100 + (r3 - now)
+                                                    : r3);
+        for (uint32_t movie : movies) {
+          out[v].Word(memory::IsHeapBlock(movie));
+        }
+        TableOutputs(h.base, array, 0, out[v]);
+        for (size_t m = 0; m < movies.size(); m++) {
+          const bool freed = !memory::IsHeapBlock(movies[m]);
+          const size_t b_end = m + 1 < movies.size() ? block_starts[m + 1] : blocks.size();
+          const size_t p_end = m + 1 < movies.size() ? page_starts[m + 1] : pages.size();
+          const std::vector<uint32_t> b(blocks.begin() + block_starts[m], blocks.begin() + b_end);
+          const std::vector<uint32_t> p(pages.begin() + page_starts[m], pages.begin() + p_end);
+          UnloadedOutputs(h.base, movies[m], b, p, freed, out[v]);
+          if (!freed) {
+            memory::crt::OperatorDelete(movies[m]);
+          }
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void UiMovieObjects(Context& h) {
@@ -1376,6 +1489,7 @@ void UiMovieObjects(Context& h) {
   memory::Free(movie);
   OpenCases(h);
   DeleteCases(h);
+  DeleteAllCases(h);
   EffectCases(h);
 }
 
