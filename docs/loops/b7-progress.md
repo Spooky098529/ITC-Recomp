@@ -76,7 +76,16 @@ file's history. What's left to see in a drive, from every run:
   the replay `itc_4572` (ok), none to drive). Step: third migration (the
   ready groups left in `race-screens.md` and `race-hud-machine.md`:
   `sub_8220D898`, `sub_8221A4A8`, `sub_8216E5B0`, `sub_8216CC60`,
-  `sub_8220E418`, `sub_8220E810`, `sub_8220E908`), agent running.
+  `sub_8220E418`, `sub_8220E810`, `sub_8220E908`). Migration
+  def0337f..53434c3a (the pause menu's main and adjust pages and set-up,
+  the menu after the race's main page and `Open`, the race HUD's mode,
+  timer and racers set-ups, `StartCountdown`, `OnRaceEnd` with
+  `AwardPrize` and the career results; 18 adapters removed; two batches
+  by subagents, one at a time; races 27-33 s, 0 errors, its harnesses 0
+  differing). Left: the pause menu's transitions they made ready
+  (`sub_8220E988`, `sub_8220F3C0`, `sub_8220F500`, `sub_8220ED90`,
+  `sub_8220EFA8`, `sub_8220F6D0`, `sub_8220F0A0`, `sub_8220F788`,
+  `sub_8220F2A8`). Step: its validation, agent running.
 
 ## Done
 

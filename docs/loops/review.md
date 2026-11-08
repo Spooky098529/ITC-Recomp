@@ -70,6 +70,23 @@ When the user has reviewed a run's section, its heading gets
   pause list's items (+68) only for transition 6 (`OpenOptions`); it
   cleared them on every case, and the original then looped on address
   0 once the seeds moved.
+- Its third migration (def0337f..53434c3a; two batches by subagents):
+  `PauseMenu::MainPage`, `SetUpMain`, `ShowCareer`, `ShowVolumesB`,
+  `ShowAdjustB`, `AdjustPage`; `AfterRaceMenu::MainPage` and `Open`;
+  `RaceHud::SetMode`, `SetUpTimer`, `SetUpRacers`; `RaceHudMachine::
+  StartCountdown`, `OnRaceEnd`, `AwardPrize`; `CareerResults::SetTexts`
+  and `Open`; two career helpers (`career.md`); 18 adapters removed.
+  `--native_race_hud_object` now switches nothing in the game (no
+  adapters left; its callers' flags do), its help says so. Harness
+  limits (after the openers' precedent): `SetMode`'s cases leave out
+  modes 2 and 3, `OnRaceEnd`'s kinds 2, 4, 6 and kind 1 with mode 0
+  (paths into originals never seen in play). `AfterRaceMenu::MainPage`'s
+  replay save runs `SaveBuffers::Create` through its override and
+  `RaceDialog::StartSave` (never seen) as the original. `AwardPrize`'s
+  pair loop can run past its 168-byte block when the halfword +968 is
+  above 17 (the original's addressing copied; the harness keeps it at
+  0-17). Rows corrected: the scale constant in `ShowCareer` and
+  `SetTexts` is the double at `0x8200A510`.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
