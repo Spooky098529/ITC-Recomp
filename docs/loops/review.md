@@ -87,6 +87,14 @@ When the user has reviewed a run's section, its heading gets
   above 17 (the original's addressing copied; the harness keeps it at
   0-17). Rows corrected: the scale constant in `ShowCareer` and
   `SetTexts` is the double at `0x8200A510`.
+- Its fourth migration (6709c224..f6ad7444): the pause menu's
+  `OpenMain`, `OpenVolume`, `OpenAdjust`, the three Closes,
+  `SetUpVolume`, `SetUpAdjust`, `VolumePage`, and `SaveVolumes` (never
+  seen in play: ported, Native with no adapter); 9 adapters removed.
+  `SetNodeText`'s unset varargs passed as 0 (the parking area's call),
+  the `SetUp` cases leaving their frame +40 to +79 out. `VolumePage`'s
+  cases replace the sound manager's slots 29 and 30 with the menu
+  sounds' harness's leaf recorders.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 

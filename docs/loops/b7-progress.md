@@ -89,8 +89,12 @@ file's history. What's left to see in a drive, from every run:
   harnesses ~96 s; 0 errors, every harness 0 differing outside the
   expected groups, 26 of 26 harness lines; none in the race, 7 in the
   replay `itc_4604` (ok, a free start: no countdown), 19 to drive).
-  Step: fourth migration (the pause menu's transitions), agent
-  running.
+  Fourth migration 6709c224..f6ad7444 (the pause menu's transitions,
+  volume and adjust pages' set-ups, `VolumePage` with `SaveVolumes`,
+  never seen, ported; 9 adapters removed after counter runs; race 32 s,
+  0 errors, its harnesses 0 differing; no subagents). Left: none (the
+  race screens' rows without a status never ran). Step: its
+  validation, agent running.
 
 ## Done
 
@@ -128,5 +132,7 @@ file's history. What's left to see in a drive, from every run:
   known 411, unknown 997).
 - After its third migration: ours 4979, work left 1447 (wrapped 56,
   known 394, unknown 997).
+- After its fourth migration: ours 4990, work left 1436 (wrapped 56,
+  known 383, unknown 997).
 
 ## Stopped
