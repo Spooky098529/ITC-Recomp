@@ -18,6 +18,16 @@ here loses its heading.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The options screen's first migration (attract race `itc_4443`,
+  replay `itc_4444` ok; `options-screen.md`): `sub_821BAD08`
+  Controls::AnalogPicture, `sub_821BA7E0` Options::IsButtonTaken,
+  `sub_821BAB58` Options::IsAnalogTaken, `sub_821BA550`
+  Options::StepButtons, `sub_821BABD8` Options::StepAnalog,
+  `sub_821BD9A0` Options::EnterSliders, `sub_821BDAD0`
+  Options::EnterButtons, `sub_821BE218` Options::SetCategoryArrow,
+  `sub_821BE988` Options::ShowSlider, `sub_821BEA48`
+  Options::ShowSliderMark, `sub_821BF0F0` Options::ShowButtonPicture,
+  `sub_821BF630` Options::ShowAnalogPicture.
 - The cleanup lead `sub_820C8DE8` (attract race `itc_4432`, replay
   `itc_4433` ok; `type6-type7-modes.md`, `screen-constructors.md`):
   `sub_82236880` Type6Mode::Init, `sub_82246C90` Type7Mode::Init,

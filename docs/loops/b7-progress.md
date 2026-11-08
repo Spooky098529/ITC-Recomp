@@ -44,8 +44,10 @@ file's history. What's left to see in a drive, from every run:
   steps on its movie, the node helpers; 34 functions, 4 tails Merged, 5
   adapters removed; `Options::FadeOut` `sub_821BD680` left recompiled by
   the `BackToBuilds` precedent; races 35-38 s, 0 errors, its harnesses
-  0 differing; no subagents); left: 37 ready groups. Validation agent
-  running.
+  0 differing; no subagents); left: 37 ready groups. Validated
+  `itc_4443` (race 83 s at 180, the harnesses ~90.1 s; 0 errors, every
+  harness 0 differing, 34 of 34 harness lines; 5 in the race, 17 in the
+  replay `itc_4444` (ok), 12 to drive). Second migration agent running.
 
 ## Done
 
