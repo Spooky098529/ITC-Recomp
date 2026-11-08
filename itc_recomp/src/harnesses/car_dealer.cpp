@@ -1212,6 +1212,24 @@ void Transitions(Context& h, const World& w) {
              hooks::CarDealerTransition16, {{-128, -32}}, plain});
   Run(h, w, {"CarDealer::Transition19 (sub_821841B0)", 60, __imp__sub_821841B0,
              hooks::CarDealerTransition19, {{-112, -24}}, plain});
+  // Transition7: the list menu's scroll 1 to 8, its scroll before the same
+  // or one off (the card coming in stays among the list's entries), its
+  // selection and previous selection 0 to 3; the frame without its saves
+  // (r24 on).
+  Run(h, w, {"CarDealer::Transition7 (sub_82183DE0)", 200, __imp__sub_82183DE0,
+             hooks::CarDealerTransition7, {{-160, -72}},
+             [plain](PPCContext& t, Random& r, const World& w) {
+               plain(t, r, w);
+               uint8_t* base = w.base;
+               const uint32_t list = w.at(kListMenuAt);
+               const uint32_t scroll = 1 + r.Below(8);
+               guest::StoreU32(base, list + 4, scroll);
+               guest::StoreU32(base, list + 8, scroll - 1 + r.Below(3));
+               guest::StoreU32(base, list + 16, r.Below(4));
+               guest::StoreU32(base, list + 20, r.Below(4));
+               guest::StoreU32(base, guest::LoadU32(base, w.data() + 1136) + 512,
+                               1 + r.Below(12));
+             }});
 }
 
 }  // namespace

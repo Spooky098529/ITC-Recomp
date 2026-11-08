@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "car_dealer/internal.h"
 #include "guest.h"
+#include "ui_movies/game.h"
 
 namespace car_dealer {
 
@@ -266,6 +267,49 @@ uint64_t Transition19(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
     Store(base, step, 1);
   }
   return uint32_t(Run(calls, frame, 0x82184248, movie)) == 0 ? 1 : 0;
+}
+
+uint64_t Transition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82183DE0 CarDealer::Transition7");
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t movie = FindMovie(base, 4, frame + 80);
+  if (Load(base, step) == 0) {
+    const uint64_t selection = Selection(base, calls, frame, 0x82183E24);
+    const uint64_t before =
+        calls.Call(kListSelectionBefore, frame, 0x82183E30, Load(base, kListMenu));
+    const uint32_t list = Load(base, kListMenu);
+    const uint32_t scroll = Load(base, list + 4);
+    const int32_t moved = int32_t(scroll - Load(base, list + 8));
+    Finish(calls, frame, 0x82183E50, movie, before + 24);
+    Play(calls, frame, 0x82183E70, movie, selection + 24);
+    Loop(calls, frame, 0x82183E7C, movie, selection + 24);
+    if (moved != 0) {
+      // The list scrolled: the cards refilled, the one coming in (after the
+      // shown four, or before them) filled into (7, 9) and slid in.
+      const uint32_t n = Load(base, Load(base, Load(base, kData) + 1136) + 512);
+      const uint32_t card = ui_movies::FindNode(base, movie, 7, 9);
+      calls.Call(kCarCardsFillAll, frame, 0x82183EAC);
+      Finish(calls, frame, 0x82183EB8, movie, 29);
+      Finish(calls, frame, 0x82183EC4, movie, 30);
+      const uint32_t shown = Load(base, Load(base, kData) + 1136);
+      uint32_t slide;
+      if (moved < 0) {
+        calls.Call(kCarCardFill, frame, 0x82183EE8, card, Load(base, ((scroll + 4) << 2) + shown));
+        slide = 30;
+      } else {
+        calls.Call(kCarCardFill, frame, 0x82183F00, card, Load(base, shown + (scroll << 2) - 4));
+        slide = 29;
+      }
+      Play(calls, frame, 0x82183F1C, movie, slide);
+      SetScrollArrows(base, scroll, n, frame);
+    }
+    const uint32_t index = (scroll + uint32_t(selection)) << 2;
+    const uint32_t entry = Load(base, index + Load(base, Load(base, kData) + 1136));
+    HelpLineSet(base, uint64_t(Load(base, entry + 8432)) + 1862, frame, calls);
+    Store(base, step, 1);
+  }
+  Run(calls, frame, 0x82183F5C, movie);
+  return 1;
 }
 
 }  // namespace car_dealer

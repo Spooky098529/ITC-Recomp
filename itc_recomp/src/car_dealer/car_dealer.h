@@ -94,6 +94,8 @@ constexpr uint32_t kCarCardsFillAll = 0x821822F8;
 constexpr uint32_t kStageSetPlates = 0x82178DE8;
 constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kSetNodeColor = 0x8211A5B8;
+constexpr uint32_t kListSelectionBefore = 0x8220BC28;
+constexpr uint32_t kCarCardFill = 0x821821C8;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -264,6 +266,14 @@ uint64_t Transition16(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
 // sub_821841B0 CarDealer::Transition19: 134 + the selection finished,
 // SetHeader(2, 3), 156 played. 112-byte frame.
 uint64_t Transition19(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82183DE0 CarDealer::Transition7: 24 + the previous selection
+// (MenuList::GetPreviousSelection) finished, 24 + the selection played and
+// looped; when the scroll moved, CarCards::FillAll, 29 and 30 finished, the
+// card coming in (after the shown four when it moved back, before them
+// otherwise) filled into (7, 9) (CarCard::Fill, through its override), 30
+// or 29 played and SetScrollArrows (its plain C++); the help line 1862 +
+// the selected car's id. Always 1. 160-byte frame.
+uint64_t Transition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The update, the start and the dialogs' end (update.cpp) ---
 
