@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "Update keep their --log_pause_movie and --log_pause_menu lines; the screens' makers "
               "and teardowns, PauseMenu::, PauseMenu4::, AfterRaceMenu::, RaceDialog::, "
               "CareerResults::, RaceResults::, SplitResults:: and Kind6Menu::Create and "
-              "Destroy, with --native_heap, and AfterRaceMenu::Close; PauseMenu::LoadData, "
+              "Destroy (no adapters: only RaceScreens::Destroy's plain C++ reaches the "
+              "Destroys), with --native_heap, and AfterRaceMenu::Close; PauseMenu::LoadData, "
               "SaveOptions, Close, SaveHudOptions and AnswerPage, AfterRaceMenu::AnswerPage and "
               "RaceDialog::Answer; the pages' dispatch, PauseMenu::, CareerResults::, "
               "AfterRaceMenu:: and RaceDialog::Update, the pages' handlers through the function "
@@ -494,14 +495,9 @@ ITC_RACE_SCREENS(8220BD50, RaceScreensListAccepted)
 ITC_RACE_SCREENS(8220BDE0, RaceScreensListCancelled)
 ITC_RACE_SCREENS(8220BE70, RaceScreensListPressed152)
 ITC_RACE_SCREENS(8220BF90, RaceScreensListPressed166)
-ITC_RACE_SCREENS(8220C4C8, RaceScreensPauseMenuDestroy)
-ITC_RACE_SCREENS(8220FC98, RaceScreensPauseMenu4Destroy)
-ITC_RACE_SCREENS(8221A3E8, RaceScreensAfterRaceMenuDestroy)
-ITC_RACE_SCREENS(82217CD0, RaceScreensRaceDialogDestroy)
-ITC_RACE_SCREENS(82219170, RaceScreensCareerResultsDestroy)
-ITC_RACE_SCREENS(8221F3C8, RaceScreensRaceResultsDestroy)
-ITC_RACE_SCREENS(8221FA68, RaceScreensSplitResultsDestroy)
-ITC_RACE_SCREENS(8221BE30, RaceScreensKind6MenuDestroy)
+// The eight screens' Destroys have no adapters (removed, B7 loop,
+// 2026-11-08): only RaceScreens::Destroy's plain C++ (src/race_hud_object/)
+// calls them; their steps above are the harness's.
 ITC_RACE_SCREENS(8220C5D0, RaceScreensPauseMenuAnswerPage)
 ITC_RACE_SCREENS(8221A720, RaceScreensAfterRaceMenuAnswerPage)
 ITC_RACE_SCREENS(82217D40, RaceScreensRaceDialogAnswer)
