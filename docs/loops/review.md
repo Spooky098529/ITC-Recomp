@@ -13,7 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
-(Nothing yet.)
+- The UI movie helpers' map (9f12739f): 8 new rows in
+  `ui-movies-game.md` (`UiMovie::IsNamedActive` `sub_8211BC18`,
+  `UiMovie::UnloopNamed` `sub_8211DE30`, `UiMovie::ClearNodeText`
+  `sub_8211CC50`, and five never run: `sub_8211DE28`, `sub_8211A130`,
+  `sub_82119EA8`, `sub_8211C2C8`, `sub_8211C8A0`), a paragraph in its
+  intro, the "UI movie animation list" row in `known-data.md`, and
+  stale "no row" mentions corrected in `car-list.md`,
+  `type6-type7-modes.md` and `race-screens.md`.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 

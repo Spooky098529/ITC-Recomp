@@ -15,8 +15,11 @@ file's history. What's left to see in a drive, from every run:
   together: `sub_8211BC18`, whether an animation is running or queued,
   which 19 of the car list's groups wait on, the top recommendation of
   the last run; and `sub_8211CC50`, the node text block's clear beside
-  the UI movie text calls; both lines deleted from `leads.md`). Step:
-  mapping, agent running.
+  the UI movie text calls; both lines deleted from `leads.md`). Mapped
+  into the existing `ui-movies-game.md` (9f12739f: 8 new rows, 3 in
+  play, `sub_8211BC18`, `sub_8211DE30`, `sub_8211CC50`, each a ready
+  group; 5 never run; no leads added; no subagents); map checked.
+  Step: migration, agent running.
 
 ## Done
 
@@ -36,5 +39,7 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 4920, work left 1506 (wrapped 56, known 448,
   unknown 1002).
+- After the UI movie helpers' map: ours 4920, work left 1506 (wrapped
+  56, known 451, unknown 999).
 
 ## Stopped
