@@ -74,8 +74,13 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the type 6 and 7 modes' list, panel and node
   screens' transition handlers (lead picked: `sub_82251618` and the 19
   others, the most ready groups left in `leads.md`, 20, beside the
-  type 6 and 7 modes; its line deleted from `leads.md`). Mapping agent
-  running.
+  type 6 and 7 modes; its line deleted from `leads.md`). Map checked
+  (973a1f10: `type67-screens.md`, 145 rows, all new, 48 in play: the
+  list, panel (the car pick) and node screens' handlers, vtable slots
+  and base classes, the list part, the panel screens' group pair; 0
+  errors; 43 ready groups (through vtables the panel handlers call the
+  car list, `PanelSet`, a new lead); 2 leads added; no subagents).
+  Migration agent running.
 
 ## Done
 
@@ -114,3 +119,5 @@ file's history. What's left to see in a drive, from every run:
   known 447, unknown 1143).
 - After its third migration: ours 4801, work left 1624 (wrapped 56,
   known 425, unknown 1143).
+- After the type 6 and 7 screens' map: ours 4801, work left 1624
+  (wrapped 56, known 473, unknown 1095).

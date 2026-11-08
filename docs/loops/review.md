@@ -13,6 +13,17 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- `functions/type67-screens.md` (new, 145 rows, 48 in play; 973a1f10):
+  the type 6 and 7 modes' list, panel and node screens (the panel
+  screen is the car pick: +9644 the car list `PanelSet`, slot 3 copies
+  the picked car into the mode's; the node screen reads the course
+  records), their vtables and base classes, the list part, the panel
+  screens' group pair; `known-data.md` rows for the screens' fields,
+  the group pair, `0x82815EB0`, `0x82636720`; leads added for the car
+  list (`PanelSet`, ~130 functions) and the list and node screens'
+  pages and steps (~75, none seen); notes added to the leads of
+  `sub_822405F8` (now mapped here) and `sub_8224BDC0`.
+
 - The options screen's third migration (6c23d796..95016660, 24
   functions, 19 adapters removed without counter runs: their callers in
   play are menu pages attract races don't reach): a new tool,
