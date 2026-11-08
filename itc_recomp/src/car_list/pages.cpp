@@ -177,6 +177,18 @@ uint64_t HandleInput(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& cal
   if (page != 0xFFFFFFFFu) {
     const uint32_t handler = LoadU32(base, frame + 80 + 4 * page);
     switch (handler) {
+      case 0x82249EB8:
+        r3 = TabsPage(base, b_r3, frame, calls);
+        break;
+      case 0x8224A178:
+        r3 = RowsPage(base, b_r3, frame, calls);
+        break;
+      case 0x8224AEA8:
+        r3 = ColorsPage(base, b_r3, frame, calls);
+        break;
+      case 0x8224BDC0:
+        r3 = PowerGraphPage(base, b_r3, frame, calls);
+        break;
       case 0x82248EF0:
         r3 = PickedPage(base, b_r3);
         break;
@@ -552,6 +564,315 @@ uint64_t ShowStandCar(uint8_t* base, uint64_t b_r3, uint64_t color, uint32_t sp,
                                      0);
   const uint32_t holder = LoadU32(base, LoadU32(base, kStandHolders) + 4 * slot);
   return calls.Call(kSetCarClass, frame, 0x8224A568, holder, car, pick);
+}
+
+namespace {
+
+// MenuSound::Play(cue) through its override.
+uint64_t Sound(uint32_t cue, uint32_t frame, uint32_t lr, const Calls& calls) {
+  return calls.Call(kMenuSoundPlay, frame, lr, cue);
+}
+
+// The step after a page: +40 = the page unless it's `page`, then the words
+// the originals store (their order kept by the callers).
+void Leave(uint8_t* base, uint32_t b, uint32_t page) {
+  const uint32_t now = LoadU32(base, b + 32);
+  if (now != page) {
+    StoreU32(base, b + 40, now);
+  }
+}
+
+}  // namespace
+
+uint64_t TabsPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82249EB8 PanelSetBase::TabsPage");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint64_t menu = b_r3 + 60;
+  if (LoadU32(base, b + 1936) != 0) {
+    StoreU32(base, frame + 84, 159);
+    StoreU32(base, frame + 92, 158);
+    const uint64_t args[8] = {menu, 3, 3, 1, 154, 153, 155, 156};
+    calls.CallArgs(kMenuListInit, frame, 0x82249F14, args);
+    calls.Call(kMenuListSetSelection, frame, 0x82249F20, menu, LoadU32(base, b + 232));
+    if (LoadU32(base, kTwoPlayers) != 0) {
+      calls.Call(kMenuListSetEnabled, frame, 0x82249F48, menu, 0,
+                 LoadU32(base, b + 784) != 0 ? 1 : 0);
+      calls.Call(kMenuListSetEnabled, frame, 0x82249F64, menu, 1,
+                 LoadU32(base, b + 1300) != 0 ? 1 : 0);
+      calls.Call(kMenuListSetEnabled, frame, 0x82249F80, menu, 2,
+                 LoadU32(base, b + 1816) != 0 ? 1 : 0);
+      const uint64_t item = calls.Call(kMenuListSelection, frame, 0x82249F88, menu);
+      const uint64_t on = calls.Call(kMenuListIsEnabled, frame, 0x82249F94, menu, item);
+      if (uint32_t(on) == 0) {
+        calls.Call(kMenuListSetSelection, frame, 0x82249FA8, menu, 0);
+      }
+    }
+  }
+  StoreU32(base, b + 1944, 0);
+  calls.Call(kMenuListUpdate, frame, 0x82249FB8, menu);
+  uint32_t step = 0;
+  uint64_t r3 = 0;
+  if (LoadU32(base, b + 84) != 0) {
+    r3 = Sound(4, frame, 0x82249FCC, calls);
+    const uint32_t now = LoadU32(base, b + 32);
+    if (now != 0) {
+      StoreU32(base, b + 40, now);
+    }
+    step = 2;
+    StoreU32(base, b + 36, 0);
+  } else {
+    const uint64_t accepted = calls.Call(kMenuListAccepted, frame, 0x82249FF0, menu);
+    if (uint32_t(accepted) != 0) {
+      const uint64_t tab = calls.Call(kMenuListSelection, frame, 0x8224A000, menu);
+      const uint32_t t = uint32_t(tab);
+      if (t < 1) {
+        StoreU32(base, b + 1820, b + 272);
+      } else if (t == 1) {
+        StoreU32(base, b + 1820, b + 788);
+      } else if (t < 3) {
+        StoreU32(base, b + 1820, b + 1304);
+      }
+      const uint32_t count = LoadU32(base, LoadU32(base, b + 1820) + 512);
+      if (int32_t(count) <= 0) {
+        return Sound(3, frame, 0x8224A048, calls);
+      }
+      r3 = Sound(0, frame, 0x8224A054, calls);
+      StoreU32(base, b + 232, t);
+      if (t == 0 || t == 1) {
+        for (uint32_t i = 0, at = 0; int32_t(i) < int32_t(count); i++, at += 4) {
+          uint32_t color = 0;
+          if (t == LoadU32(base, b + 1880) && i == LoadU32(base, b + 1884)) {
+            const uint32_t list = LoadU32(base, b + 1820);
+            color = LoadU32(base, b + 1888);
+            StoreU32(base, LoadU32(base, at + list) + 8436, color);
+          } else {
+            StoreU32(base, LoadU32(base, at + LoadU32(base, b + 1820)) + 8436, color);
+          }
+        }
+      }
+      Leave(base, b, 1);
+      StoreU32(base, b + 44, 4);
+      StoreU32(base, b + 48, 6);
+      StoreU32(base, b + 36, 1);
+      StoreU32(base, b + 32, 0xFFFFFFFFu);
+      const uint32_t picked = LoadU32(base, b + 232);
+      const uint32_t before = LoadU32(base, b + 1880);
+      StoreU32(base, b + 240, 0);
+      StoreU32(base, b + 236, picked == before ? LoadU32(base, b + 1884) : 0);
+      return r3;
+    }
+    const uint64_t cancelled = calls.Call(kMenuListCancelled, frame, 0x8224A114, menu);
+    if (uint32_t(cancelled) == 0) {
+      return cancelled;
+    }
+    r3 = Sound(2, frame, 0x8224A124, calls);
+    if (LoadU32(base, kTwoPlayers) != 0) {
+      StoreU32(base, b + 1944, 1);
+      if (LoadU32(base, b + 1940) == 0) {
+        return r3;
+      }
+    }
+    Leave(base, b, 5);
+    StoreU32(base, b + 36, 5);
+    step = 3;
+  }
+  StoreU32(base, b + 32, 0xFFFFFFFFu);
+  StoreU32(base, b + 48, 0xFFFFFFFFu);
+  StoreU32(base, b + 44, step);
+  return r3;
+}
+
+uint64_t RowsPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224A178 PanelSetBase::RowsPage");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint64_t menu = b_r3 + 60;
+  StoreU32(base, b + 1944, 0);
+  calls.Call(kMenuListUpdate, frame, 0x8224A19C, menu);
+  uint32_t step = 0, page = 0;
+  uint64_t r3 = 0;
+  if (LoadU32(base, b + 84) != 0 || LoadU32(base, b + 64) != LoadU32(base, b + 68)) {
+    r3 = Sound(4, frame, 0x8224A330, calls);
+    Leave(base, b, 1);
+    step = 7;
+    page = 1;
+  } else {
+    const uint64_t accepted = calls.Call(kMenuListAccepted, frame, 0x8224A1C0, menu);
+    if (uint32_t(accepted) != 0) {
+      Sound(0, frame, 0x8224A1D0, calls);
+      r3 = calls.Call(kMenuListSelection, frame, 0x8224A1D8, menu);
+      const uint32_t scroll = LoadU32(base, b + 64);
+      const uint32_t rows = LoadU32(base, b + 1900);
+      StoreU32(base, b + 236, uint32_t(r3));
+      StoreU32(base, b + 240, scroll);
+      if (rows != 0) {
+        r3 = RowUnhighlight(base, rows, frame, calls);
+      }
+      uint32_t next = 0;
+      if (LoadU32(base, b + 1892) != 0) {
+        Leave(base, b, 8);
+        StoreU32(base, b + 48, 0xFFFFFFFFu);
+        StoreU32(base, b + 44, 26);
+        StoreU32(base, b + 32, 0xFFFFFFFFu);
+        next = 8;
+      } else {
+        r3 = calls.Call(kMenuListSetSelection, frame, 0x8224A23C, menu, 0);
+        Leave(base, b, 2);
+        StoreU32(base, b + 44, 9);
+        StoreU32(base, b + 48, 11);
+        StoreU32(base, b + 32, 0xFFFFFFFFu);
+        next = 2;
+      }
+      StoreU32(base, b + 36, next);
+      const uint32_t at = (LoadU32(base, b + 240) + LoadU32(base, b + 236)) << 2;
+      const uint32_t list = LoadU32(base, b + 1820);
+      StoreU32(base, b + 248, 0);
+      StoreU32(base, b + 244, LoadU32(base, LoadU32(base, at + list) + 8436));
+      return r3;
+    }
+    const uint64_t cancelled = calls.Call(kMenuListCancelled, frame, 0x8224A29C, menu);
+    if (uint32_t(cancelled) == 0) {
+      return cancelled;
+    }
+    r3 = Sound(2, frame, 0x8224A2AC, calls);
+    if (LoadU32(base, b + 1928) == 1) {
+      Leave(base, b, 0);
+      StoreU32(base, b + 36, 0);
+      StoreU32(base, b + 44, 8);
+      StoreU32(base, b + 48, 1);
+      StoreU32(base, b + 32, 0xFFFFFFFFu);
+      return r3;
+    }
+    if (LoadU32(base, kTwoPlayers) != 0) {
+      return r3;
+    }
+    StoreU32(base, b + 1944, 1);
+    if (LoadU32(base, b + 1940) == 0) {
+      return r3;
+    }
+    Leave(base, b, 5);
+    step = 3;
+    page = 5;
+  }
+  StoreU32(base, b + 32, 0xFFFFFFFFu);
+  StoreU32(base, b + 36, page);
+  StoreU32(base, b + 48, 0xFFFFFFFFu);
+  StoreU32(base, b + 44, step);
+  return r3;
+}
+
+uint64_t ColorsPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224AEA8 PanelSetBase::ColorsPage");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint64_t menu = b_r3 + 60;
+  StoreU32(base, b + 20, 1);
+  calls.Call(kMenuListUpdate, frame, 0x8224AECC, menu);
+  if (LoadU32(base, b + 84) != 0 || LoadU32(base, b + 64) != LoadU32(base, b + 68)) {
+    uint64_t r3 = Sound(4, frame, 0x8224AFFC, calls);
+    Leave(base, b, 3);
+    StoreU32(base, b + 48, 0xFFFFFFFFu);
+    StoreU32(base, b + 44, 19);
+    StoreU32(base, b + 36, 3);
+    StoreU32(base, b + 32, 0xFFFFFFFFu);
+    if (LoadU32(base, b + 20) == 1 && LoadU32(base, b + 24) == 1) {
+      r3 = ShowStandCar(base, b_r3, 0xFFFFFFFFFFFFFFFFull, frame, calls);
+    }
+    if (LoadU32(base, kTwoPlayers) != 0) {
+      return r3;
+    }
+    r3 = calls.Call(kMenuListSelection, frame, 0x8224B064, menu);
+    const uint32_t scroll = LoadU32(base, b + 64);
+    StoreU32(base, b + 244, uint32_t(r3));
+    StoreU32(base, b + 248, scroll);
+    return r3;
+  }
+  const uint64_t accepted = calls.Call(kMenuListAccepted, frame, 0x8224AEF0, menu);
+  if (uint32_t(accepted) != 0) {
+    Sound(0, frame, 0x8224AF00, calls);
+    const uint64_t r3 = calls.Call(kMenuListSelection, frame, 0x8224AF08, menu);
+    const uint32_t scroll = LoadU32(base, b + 64);
+    const uint32_t confirm = LoadU32(base, b + 1912);
+    StoreU32(base, b + 244, uint32_t(r3));
+    StoreU32(base, b + 248, scroll);
+    uint32_t next = 0;
+    if (confirm != 0) {
+      Leave(base, b, 4);
+      StoreU32(base, b + 44, 21);
+      StoreU32(base, b + 48, 22);
+      StoreU32(base, b + 32, 0xFFFFFFFFu);
+      next = 4;
+    } else {
+      Leave(base, b, 5);
+      StoreU32(base, b + 48, 0xFFFFFFFFu);
+      StoreU32(base, b + 44, 3);
+      StoreU32(base, b + 32, 0xFFFFFFFFu);
+      next = 5;
+    }
+    StoreU32(base, b + 36, next);
+    StoreU32(base, b + 8, 1);
+    return r3;
+  }
+  const uint64_t cancelled = calls.Call(kMenuListCancelled, frame, 0x8224AF88, menu);
+  if (uint32_t(cancelled) == 0) {
+    return cancelled;
+  }
+  const uint64_t r3 = Sound(2, frame, 0x8224AF98, calls);
+  const uint32_t at = (LoadU32(base, b + 240) + LoadU32(base, b + 236)) << 2;
+  const uint32_t color = LoadU32(base, LoadU32(base, at + LoadU32(base, b + 1820)) + 8436);
+  StoreU32(base, b + 248, 0);
+  StoreU32(base, b + 244, color);
+  Leave(base, b, 2);
+  StoreU32(base, b + 44, 20);
+  StoreU32(base, b + 48, 11);
+  StoreU32(base, b + 36, 2);
+  StoreU32(base, b + 32, 0xFFFFFFFFu);
+  return r3;
+}
+
+uint64_t PowerGraphPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224BDC0 PanelSetBase::PowerGraphPage");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint64_t menu = b_r3 + 60;
+  StoreU32(base, b + 8, 0);
+  const uint32_t asked = LoadU32(base, b + 16);
+  if (LoadU32(base, kTwoPlayers) != 0) {
+    if (asked != 0) {
+      const uint64_t accepted = calls.Call(kMenuListAccepted, frame, 0x8224BE08, menu);
+      if (uint32_t(accepted) == 0) {
+        const uint64_t cancelled = calls.Call(kMenuListCancelled, frame, 0x8224BE18, menu);
+        if (uint32_t(cancelled) == 0) {
+          return cancelled;
+        }
+      }
+    }
+    Sound(2, frame, 0x8224BE28, calls);
+    Leave(base, b, 2);
+    StoreU32(base, b + 44, 16);
+    StoreU32(base, b + 32, 0xFFFFFFFFu);
+    StoreU32(base, b + 36, 2);
+  } else if (asked == 0) {
+    Leave(base, b, 2);
+    StoreU32(base, b + 32, 2);
+    StoreU32(base, b + 44, 0xFFFFFFFFu);
+  } else {
+    const uint64_t steps = uint64_t(LoadU32(base, b + 240)) + uint64_t(LoadU32(base, b + 236));
+    if (LoadU32(base, b + 232) == 2) {
+      // The record's address as the original's mulli and adds leave it (64
+      // bits).
+      const uint64_t garage = SaveData(base, b, frame) + 6120;
+      const uint32_t node = GarageNode(base, uint32_t(garage), uint32_t(steps));
+      const int64_t slot = int16_t(guest::LoadU16(base, node + 2));
+      return calls.Call(kGaragePowerGraph, frame, 0x8224BF00,
+                        uint64_t(slot * 1968) + garage + 212);
+    }
+    const uint32_t entry = LoadU32(base, LoadU32(base, b + 1820) + (uint32_t(steps) << 2));
+    return calls.Call(kEntryPowerGraph, frame, 0x8224BF14, entry);
+  }
+  StoreU32(base, b + 48, 0xFFFFFFFFu);
+  return CarSetButtons(base, LoadU32(base, b + 1908), 0, 0, 1, 1, frame, calls);
 }
 
 }  // namespace car_list

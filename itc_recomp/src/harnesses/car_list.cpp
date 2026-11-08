@@ -137,11 +137,12 @@ struct World {
         strings(kStringWorldBytes),
         set(kSetBytes),
         save(kSaveBytes),
-        big_save(kBigSaveBytes) {}
+        big_save(kBigSaveBytes),
+        menus(0x1000) {}
   bool ok() const {
     return objects.address != 0 && entry.address != 0 && movies.address != 0 &&
            texts.address != 0 && strings.address != 0 && set.address != 0 &&
-           save.address != 0 && big_save.address != 0;
+           save.address != 0 && big_save.address != 0 && menus.address != 0;
   }
   uint32_t b() const { return set.address + 4; }
   uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
@@ -157,13 +158,17 @@ struct World {
   Block set;  // a PanelSet at +0 (its base b at +4)
   Block save;  // the two players' save data ([0x826C5B5C], player 0)
   Block big_save;  // a whole save data (Build reads its +104740)
+  Block menus;  // the players' mappers (+0x100 vtables, +0x200 the mappers), the sound manager (+0xC00)
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4},
     {car_list::kTwoPlayers, 4},   {car_list::kPowerGraph, 4},
     {car_list::kFadeWait, 4},     {0x826A50AC, 64},  // the screen fades' words
-    {car_list::kPairSaveData, 4}, {0x826C2E48, 4}};  // the last Params ([0x826C2E48])
+    {car_list::kPairSaveData, 4}, {0x826C2E48, 4},  // Params ([0x826C2E48])
+    // The pages': the mapper and controller entries, the sound manager, the
+    // players' save data pointers, the power graph's shown word.
+    {0x826BAB80, 32}, {0x826BABA4, 16}, {0x826C5C80, 4}, {0x826C5B58, 4}, {0x82815EC0, 4}};
 
 // The string table: 17 files' pointers to one container of entries enough
 // for the widest file (the bounds at 0x82007E18), each one of 8 strings of
@@ -831,6 +836,128 @@ void ShapeSet(uint8_t* base, const World& w, Random& r, bool nulls) {
   guest::StoreU32(base, car_list::kFadeWait, r.Below(2));
 }
 
+// The pages' world (after ShapeSet): the four players' mappers (their
+// slots 10 and 12 ActionMapper::Pressed and Fired, their action bits few or
+// many), the sound manager (MenuSound::Play's slot 10 a getter), the menu at
+// b +60 as MenuList::Init leaves it (1 to 4 items, the selection and scroll
+// small, the move word now and then set, the ids 154, 153, 155, 156, 159,
+// 158, the player 0 to 3, its enabled words a block of the layer's pages,
+// mostly 1), the three lists 0 to 4 entries (the world's entry), the tab,
+// entry and color picked before small, b +236 and +240 small, the car not
+// loaded (+24 not 1: ColorsPage's ShowStandCar is load_poll's), E's +156 0
+// or 1, C always set, the power graph not shown ([0x82815EC0] 0: the
+// set-ups end there), the players' save data the world's (a garage of
+// link nodes from its +204 in the block, slots 0 to 2).
+void ShapeMenu(uint8_t* base, const World& w, Random& r) {
+  constexpr uint32_t kGet60 = 0x82090770;
+  const uint32_t m = w.menus.address;
+  WriteRandom(base, m, w.menus.bytes, r);
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t vt = m + 0x100 + 0x40 * k, mapper = m + 0x200 + 0x200 * k;
+    guest::StoreU32(base, 0x826BABA4 + 4 * k, r.Below(4));
+    guest::StoreU32(base, 0x826BAB80 + 8 * k, mapper);
+    guest::StoreU32(base, 0x826BAB80 + 8 * k + 4, r.Below(5) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper, vt);
+    guest::StoreU32(base, vt + 40, 0x8210BF40);
+    guest::StoreU32(base, vt + 48, 0x8210C010);
+    for (uint32_t i = 0; i < 6; i++) {
+      guest::StoreU32(base, mapper + 448 + 4 * i,
+                      r.Below(3) == 0 ? 0 : uint32_t(r.Next() & r.Next()));
+    }
+  }
+  const uint32_t manager = m + 0xC00;
+  guest::StoreU32(base, manager, m + 0xD00);
+  guest::StoreU32(base, m + 0xD00 + 40, kGet60);
+  guest::StoreU32(base, 0x826C5C80, manager);
+  const uint32_t b = w.b(), list = b + 60;
+  const uint32_t count = 1 + r.Below(4);
+  guest::StoreU32(base, list + 0, count);
+  const uint32_t scroll = r.Below(2);
+  guest::StoreU32(base, list + 4, scroll);
+  guest::StoreU32(base, list + 8, r.Below(3) == 0 ? r.Below(2) : scroll);
+  guest::StoreU32(base, list + 12, count);
+  guest::StoreU32(base, list + 16, r.Below(count));
+  guest::StoreU32(base, list + 20, r.Below(count));
+  guest::StoreU32(base, list + 24, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, list + 28, 0);
+  guest::StoreU32(base, list + 32, r.Below(2));
+  static constexpr uint32_t kIds[6] = {154, 153, 155, 156, 159, 158};
+  for (uint32_t i = 0; i < 6; i++) guest::StoreU32(base, list + 36 + 4 * i, kIds[i]);
+  guest::StoreU32(base, list + 60, r.Below(4));
+  guest::StoreU32(base, list + 64, r.Below(2));
+  TrackBlock(base, list + 68);
+  const uint32_t enabled = guest::LoadU32(base, list + 68);
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU32(base, enabled + 4 * i, r.Below(4) == 0 ? 0 : 1);
+  }
+  for (const uint32_t at : {272u, 788u, 1304u}) {
+    guest::StoreU32(base, b + at + 512, r.Below(5));
+    for (uint32_t i = 0; i < 4; i++) guest::StoreU32(base, b + at + 4 * i, w.entry.address);
+  }
+  guest::StoreU32(base, b + 1880, r.Below(3));
+  guest::StoreU32(base, b + 1884, r.Below(4));
+  guest::StoreU32(base, b + 236, r.Below(4));
+  guest::StoreU32(base, b + 240, r.Below(4));
+  guest::StoreU32(base, b + 24, r.Below(2) == 0 ? 0 : 2);
+  guest::StoreU32(base, b + 16, r.Below(2));
+  guest::StoreU32(base, b + 1952, 0);
+  guest::StoreU32(base, w.panel() + 156, r.Below(2));
+  guest::StoreU32(base, b + 1908, w.at(kOtherPanel));
+  guest::StoreU32(base, b + 1912, r.Below(2) == 0 ? 0 : w.at(0xE40));
+  guest::StoreU32(base, car_list::kTwoPlayers, r.Below(2));
+  guest::StoreU32(base, 0x82815EC0, 0);
+  guest::StoreU32(base, 0x826C5B58, w.save.address);
+  const uint32_t garage = w.save.address + 6120;
+  uint32_t node = 1000 + r.Below(100);
+  guest::StoreU16(base, garage + 204, uint16_t(node));
+  for (uint32_t k = 0; k < 8; k++) {
+    const uint32_t next = node + 2 + r.Below(3);
+    guest::StoreU16(base, garage + 4 * node, uint16_t(next));
+    guest::StoreU16(base, garage + 4 * node + 2, uint16_t(r.Below(3)));
+    node = next;
+  }
+}
+
+// The pages' after: the menu's enabled block (its words, while it's the
+// layer's pages) and the mappers' block, then SettleBlocks.
+void SettleMenu(uint8_t* base, const World& w, Outputs& out) {
+  const uint32_t list = w.b() + 60;
+  const uint32_t block = guest::LoadU32(base, list + 68);
+  if (block != 0 && memory::IsPages(block)) {
+    const uint32_t count = guest::LoadU32(base, list);
+    out.Bytes(Read(base, block, 4 * (count < 16 ? count : 16)));
+  }
+  out.Bytes(Read(base, w.menus.address, w.menus.bytes));
+  SettleBlocks(base, w, out);
+}
+
+void Pages(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const auto shape = [base](PPCContext& t, Random& r, const World& w) {
+    ShapeSet(base, w, r, true);
+    ShapeMenu(base, w, r);
+    t.r3.u64 = w.b() | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+  };
+  const AfterFn settle = [base](const World& w, Outputs& out) { SettleMenu(base, w, out); };
+  Group(h, w, "PanelSetBase::TabsPage (sub_82249EB8)", 60, {144, 40}, shape, __imp__sub_82249EB8,
+        hooks::CarListTabsPage, settle);
+  Group(h, w, "PanelSetBase::RowsPage (sub_8224A178)", 60, {112, 32}, shape, __imp__sub_8224A178,
+        hooks::CarListRowsPage, settle);
+  Group(h, w, "PanelSetBase::ColorsPage (sub_8224AEA8)", 60, {112, 32}, shape,
+        __imp__sub_8224AEA8, hooks::CarListColorsPage, settle);
+  Group(h, w, "PanelSetBase::PowerGraphPage (sub_8224BDC0)", 60, {112, 24}, shape,
+        __imp__sub_8224BDC0, hooks::CarListPowerGraphPage, settle);
+  // HandleInput over the pages it runs natively now (0, 1, 3, 6) and the
+  // others in its cases (-1, 5, 7, 8).
+  const auto input = [base, shape](PPCContext& t, Random& r, const World& w) {
+    shape(t, r, w);
+    static constexpr uint32_t kPages[8] = {0xFFFFFFFFu, 0, 1, 3, 5, 6, 7, 8};
+    guest::StoreU32(base, w.b() + 32, kPages[r.Below(8)]);
+  };
+  Group(h, w, "PanelSetBase::HandleInput, the pages (sub_8224BF30)", 60, {176, 48}, input,
+        __imp__sub_8224BF30, hooks::CarListBaseHandleInput, settle);
+}
+
 void Steps(Context& h, const World& w) {
   uint8_t* const base = h.base;
   const int n = 30;
@@ -1075,6 +1202,7 @@ void CarList(Context& h) {
   Steps(h, w);
   SetUps(h, w);
   Builds(h, w);
+  Pages(h, w);
 }
 
 }  // namespace harness

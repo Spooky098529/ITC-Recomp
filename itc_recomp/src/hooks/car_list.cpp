@@ -39,7 +39,10 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "in play, the original), PanelSetBase::Build sub_8224C698 and PanelSet::Build "
               "sub_8224CAD8 (the entries from the allocation layer's pages), "
               "PanelSetBase::ShowStandCar sub_8224A490 (with the car makers' callees native: "
-              "GarageStage::SetCarClass through its override); the UI "
+              "GarageStage::SetCarClass through its override), the pages TabsPage "
+              "sub_82249EB8, RowsPage sub_8224A178, ColorsPage sub_8224AEA8 and PowerGraphPage "
+              "sub_8224BDC0 (the menu list, MenuSound::Play and the power graphs' set-ups guest "
+              "calls); the UI "
               "movie calls through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=car_list)");
 
@@ -187,6 +190,10 @@ ITC_CL_STEP(CarListStep26, cl::Step26(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListSetUpRows, cl::SetUpRows(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListSetUpCarPage, cl::SetUpCarPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListBaseBuild, cl::Build(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListTabsPage, cl::TabsPage(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListRowsPage, cl::RowsPage(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListColorsPage, cl::ColorsPage(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPowerGraphPage, cl::PowerGraphPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListShowStandCar, cl::ShowStandCar(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 // PanelSet::Build: a tail call of the base's on the set + 4.
 void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
@@ -275,6 +282,13 @@ ITC_CAR_LIST(8224C560, CarListSetUpCarPage)
 // PanelSet::Build, native, reaches it; the register step stays for the
 // harness).
 ITC_CAR_LIST(8224CAD8, CarListSetBuild)
+// The pages 0, 1, 3 and 6 (from the page table: PanelSetBase::HandleInput's
+// plain C++ calls theirs; PanelSetPair's, never seen in play, the original's
+// table).
+ITC_CAR_LIST(82249EB8, CarListTabsPage)
+ITC_CAR_LIST(8224A178, CarListRowsPage)
+ITC_CAR_LIST(8224AEA8, CarListColorsPage)
+ITC_CAR_LIST(8224BDC0, CarListPowerGraphPage)
 // The stand's car (from the car and colors pages and SetUpColors,
 // recompiled): the original when the car makers' callees aren't native.
 extern "C" REX_FUNC(sub_8224A490) {

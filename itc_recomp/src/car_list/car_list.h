@@ -280,6 +280,27 @@ constexpr uint32_t kSetCarClass = 0x8217FDC8;
 uint64_t ShowStandCar(uint8_t* base, uint64_t b, uint64_t color, uint32_t sp,
                       const Calls& calls);
 
+// The pages' guest calls: MenuList::Update, Accepted, Cancelled, SetEnabled
+// and IsEnabled through their overrides, MenuSound::Play through its
+// override, the power graphs' set-ups (sub_82250670 through its override;
+// sub_82250700, the garage tab's, never seen in play, the original).
+constexpr uint32_t kMenuListUpdate = 0x8220C1E0;
+constexpr uint32_t kMenuListAccepted = 0x8220BD50;
+constexpr uint32_t kMenuListCancelled = 0x8220BDE0;
+constexpr uint32_t kMenuListSetEnabled = 0x8220BC00;
+constexpr uint32_t kMenuListIsEnabled = 0x8220BC10;
+constexpr uint32_t kMenuSoundPlay = 0x821103F0;
+constexpr uint32_t kEntryPowerGraph = 0x82250670;
+constexpr uint32_t kGaragePowerGraph = 0x82250700;
+// The pages (r3 = b; each returns r3 as the original leaves it):
+// sub_82249EB8 TabsPage (page 0), sub_8224A178 RowsPage (1), sub_8224AEA8
+// ColorsPage (3; ShowStandCar's plain C++ when the car is loaded) and
+// sub_8224BDC0 PowerGraphPage (6; CarPanel::SetButtons' plain C++).
+uint64_t TabsPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+uint64_t RowsPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+uint64_t ColorsPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+uint64_t PowerGraphPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+
 // --- The power graph's record (panels.cpp) ---
 
 // The power graph screen's record's holder ([0x82815EBC]; the record at
