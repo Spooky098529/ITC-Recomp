@@ -41,6 +41,7 @@
 #include <cstring>
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -125,6 +126,7 @@ constexpr uint32_t kList = 0xA04;
 constexpr uint32_t kEntryBytes = 8448;
 constexpr uint32_t kSetBytes = 0x1000;
 constexpr uint32_t kSaveBytes = 0x4000;
+constexpr uint32_t kBigSaveBytes = 0x1A000;
 
 struct World {
   World()
@@ -134,11 +136,12 @@ struct World {
         texts(kTextWorldBytes),
         strings(kStringWorldBytes),
         set(kSetBytes),
-        save(kSaveBytes) {}
+        save(kSaveBytes),
+        big_save(kBigSaveBytes) {}
   bool ok() const {
     return objects.address != 0 && entry.address != 0 && movies.address != 0 &&
            texts.address != 0 && strings.address != 0 && set.address != 0 &&
-           save.address != 0;
+           save.address != 0 && big_save.address != 0;
   }
   uint32_t b() const { return set.address + 4; }
   uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
@@ -153,13 +156,14 @@ struct World {
   Block strings;
   Block set;  // a PanelSet at +0 (its base b at +4)
   Block save;  // the two players' save data ([0x826C5B5C], player 0)
+  Block big_save;  // a whole save data (Build reads its +104740)
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4},
     {car_list::kTwoPlayers, 4},   {car_list::kPowerGraph, 4},
     {car_list::kFadeWait, 4},     {0x826A50AC, 64},  // the screen fades' words
-    {car_list::kPairSaveData, 4}};
+    {car_list::kPairSaveData, 4}, {0x826C2E48, 4}};  // the last Params ([0x826C2E48])
 
 // The string table: 17 files' pointers to one container of entries enough
 // for the widest file (the bounds at 0x82007E18), each one of 8 strings of
@@ -306,6 +310,10 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   ShapeMovieWorld(base, w, r);
 }
 
+// Blocks a run allocated that r3 may hold, by the marker the after function
+// gave them (their addresses may differ between the two runs).
+std::unordered_map<uint32_t, uint32_t> g_r3_markers;
+
 using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
 // Run after the function, before the outputs are read (blocks the run
 // allocated or freed compared by kind and put back).
@@ -334,6 +342,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     setup(t, r, w);
     t.lr = 0x82000000 | (r.Below(0x10000) << 2);
     ITC_FLAG(native_car_list) = v == 1;
+    g_r3_markers.clear();
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_car_list) = true;
     if (after) {
@@ -357,7 +366,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     }
     out[v].Bytes(Read(h.base, sp, kCallerBytes));
     out[v].Word(t.r1.u32);
-    out[v].Word(t.r3.u32);
+    const auto marker = g_r3_markers.find(t.r3.u32);
+    out[v].Word(marker != g_r3_markers.end() ? marker->second : t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
   }
   results.Check(out[0], out[1], what);
@@ -950,6 +960,106 @@ void SetUps(Context& h, const World& w) {
       __imp__sub_8224C560, hooks::CarListSetUpCarPage, settle);
 }
 
+// Build: two players (the save data the world's whole one at
+// [0x826C5B5C], player 0), the set built (+4) 0, 2 or 1 (1: nothing done)
+// or now and then one player's word 0; when built, each list 0 to 3 entries
+// of the layer's pages; the unlocked bits about one in eight; the garage 0
+// to 5 cars, a chain of link nodes from its +204 (in the save's +86,120 on)
+// over 8 records whose ids (+224) are cars below 72. The entries a run makes
+// are compared by their bytes, freed and their slots (and r3) given
+// markers.
+void Builds(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  // Params ([0x826C2E48]) of our own: its +12 the 72 specs (random, their
+  // byte +771 0 or 1, one in ten 2), as the attract race's harnesses run
+  // before the game's are loaded.
+  constexpr uint32_t kSpecBytes = 8432;
+  const Block params(16 + 72 * kSpecBytes);
+  if (params.address == 0) {
+    ITC_LOG_ERROR("harness: car_list: no block for Build's specs");
+    return;
+  }
+  {
+    Random r(0x4275696C64ull);  // "Build"
+    WriteRandom(base, params.address, params.bytes, r);
+    guest::StoreU32(base, params.address + 12, params.address + 16);
+    for (uint32_t id = 0; id < 72; id++) {
+      const uint32_t kind = r.Below(10);
+      guest::StoreU8(base, params.address + 16 + kSpecBytes * id + 771,
+                     uint8_t(kind == 0 ? 2 : kind % 2));
+    }
+  }
+  const uint32_t specs_global = params.address;
+  const auto shape = [base, specs_global](PPCContext& t, Random& r, const World& w) {
+    guest::StoreU32(base, 0x826C2E48, specs_global);
+    ShapeSet(base, w, r, true);
+    const uint32_t b = w.b();
+    static constexpr uint32_t kBuilt[4] = {0, 2, 1, 0};
+    const uint32_t built = kBuilt[r.Below(4)];
+    guest::StoreU32(base, b + 4, built);
+    guest::StoreU32(base, car_list::kTwoPlayers,
+                    built == 0 && r.Below(3) == 0 ? uint32_t(r.Next()) : 1);
+    guest::StoreU32(base, b + 1952, 0);
+    if (built != 0) {
+      const uint32_t list_at[3] = {272, 788, 1304};
+      for (int i = 0; i < 3; i++) {
+        const uint32_t count = r.Below(4);
+        guest::StoreU32(base, b + list_at[i] + 512, count);
+        for (uint32_t k = 0; k < count; k++) TrackBlock(base, b + list_at[i] + 4 * k);
+      }
+    } else {
+      for (const uint32_t at : {784u, 1300u, 1816u}) guest::StoreU32(base, b + at, r.Below(129));
+    }
+    const uint32_t save = w.big_save.address;
+    WriteRandom(base, save, w.big_save.bytes, r);
+    guest::StoreU32(base, car_list::kPairSaveData, save);
+    for (uint32_t i = 0; i < 3; i++) {
+      guest::StoreU32(base, save + 104740 + 4 * i,
+                      uint32_t(r.Next() & r.Next() & r.Next()));
+    }
+    const uint32_t garage = save + 6120;
+    const uint32_t cars = r.Below(6);
+    guest::StoreU16(base, save + 6328, uint16_t(cars));
+    uint32_t node = 20000 + r.Below(100);
+    guest::StoreU16(base, garage + 204, uint16_t(node));
+    for (uint32_t k = 0; k < 6; k++) {
+      const uint32_t next = node + 2 + r.Below(3);
+      guest::StoreU16(base, garage + 4 * node, uint16_t(next));
+      guest::StoreU16(base, garage + 4 * node + 2, uint16_t(r.Below(8)));
+      node = next;
+    }
+    for (uint32_t slot = 0; slot < 8; slot++) {
+      guest::StoreU32(base, garage + 1968 * slot + 224, r.Below(72));
+    }
+    t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+  };
+  const AfterFn after = [base](const World& w, Outputs& out) {
+    uint32_t marker = 0xE0000000;
+    for (const uint32_t list : {272u, 788u, 1304u}) {
+      const uint32_t at = w.b() + list;
+      const uint32_t count = guest::LoadU32(base, at + 512);
+      for (uint32_t i = 0; i < count && i < 128; i++, marker++) {
+        const uint32_t entry = guest::LoadU32(base, at + 4 * i);
+        if (entry == 0 || !memory::IsPages(entry)) continue;
+        out.Bytes(Read(base, entry, kEntryBytes));
+        memory::FreePages(entry);
+        guest::StoreU32(base, at + 4 * i, marker);
+        g_r3_markers[entry] = marker;
+      }
+    }
+    SettleBlocks(base, w, out);
+  };
+  Group(h, w, "PanelSetBase::Build (sub_8224C698)", 40, {160, 72}, shape, __imp__sub_8224C698,
+        hooks::CarListBaseBuild, after);
+  Group(
+      h, w, "PanelSet::Build (sub_8224CAD8)", 12, {160, 72},
+      [shape](PPCContext& t, Random& r, const World& w) {
+        shape(t, r, w);
+        t.r3.u64 -= 4;  // the set
+      },
+      __imp__sub_8224CAD8, hooks::CarListSetBuild, after);
+}
+
 }  // namespace
 
 void CarList(Context& h) {
@@ -964,6 +1074,7 @@ void CarList(Context& h) {
   Leaves(h, w);
   Steps(h, w);
   SetUps(h, w);
+  Builds(h, w);
 }
 
 }  // namespace harness

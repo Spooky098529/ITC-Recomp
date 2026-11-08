@@ -35,7 +35,8 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "sub_82249098, Step11 sub_8224A7E0, Step18 sub_82249258 and Step26 sub_8224A8E0 "
               "(the menu lists, the screen fades and sub_825C8390 guest calls), SetUpRows "
               "sub_8224A978 and SetUpCarPage sub_8224C560 (CarPanel::ShowCarStats, never seen "
-              "in play, the original); the UI "
+              "in play, the original), PanelSetBase::Build sub_8224C698 and PanelSet::Build "
+              "sub_8224CAD8 (the entries from the allocation layer's pages); the UI "
               "movie calls through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=car_list)");
 
@@ -182,6 +183,15 @@ ITC_CL_STEP(CarListStep18, cl::Step18(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListStep26, cl::Step26(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListSetUpRows, cl::SetUpRows(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListSetUpCarPage, cl::SetUpCarPage(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListBaseBuild, cl::Build(base, ctx.r3.u64, sp, calls))
+// PanelSet::Build: a tail call of the base's on the set + 4.
+void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_8224CAD8 PanelSet::Build");
+  GuestCalls guest(ctx, base);
+  const car_list::Calls calls = guest.calls();
+  const uint32_t sp = ctx.r1.u32;
+  ctx.r3.u64 = cl::Build(base, ctx.r3.u64 + 4, sp, calls);
+}
 
 #undef ITC_CL_STEP
 
@@ -256,3 +266,6 @@ ITC_CAR_LIST(8224A8E0, CarListStep26)
 // The rows' and the car page's set-ups (from recompiled steps and pages).
 ITC_CAR_LIST(8224A978, CarListSetUpRows)
 ITC_CAR_LIST(8224C560, CarListSetUpCarPage)
+// PanelSet's slot 1 (the panel screens' show) and the base's Build.
+ITC_CAR_LIST(8224CAD8, CarListSetBuild)
+ITC_CAR_LIST(8224C698, CarListBaseBuild)

@@ -253,6 +253,18 @@ uint64_t SetUpRows(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 // through ShowCarStats, the original) and name.
 uint64_t SetUpCarPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 
+// memcpy (sub_825A7410) where c_runtime::Memcpy refuses.
+constexpr uint32_t kMemcpy = 0x825A7410;
+// sub_8224C698 PanelSetBase::Build and sub_8224CAD8 PanelSet::Build (slot
+// 1, on the set + 4): nothing when +4 (built) and the two-player word share
+// a bit; else the lists' entries freed when built, then the unlocked cars
+// (the save data's bits at +104740) to lists 0 and 1 by their spec's byte
+// +771 (else freed) and the garage's cars to list 2, each an 8,448-byte
+// entry from the allocation layer's pages (VirtualAlloc, the 2026-10-22
+// call) with the spec copied in (Params::GetCarSpec's and memcpy's plain
+// C++, the original where c_runtime::Memcpy refuses).
+uint64_t Build(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+
 // --- The power graph's record (panels.cpp) ---
 
 // The power graph screen's record's holder ([0x82815EBC]; the record at

@@ -4,6 +4,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "c_runtime/strings.h"
+#include "car_specs/car_specs.h"
 #include "memory/heap.h"
 
 namespace car_list {
@@ -393,6 +395,121 @@ uint64_t SetUpCarPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& ca
     CarShowStats(base, LoadU32(base, b + 1908), entry(), frame, calls);
   }
   return CarSetName(base, LoadU32(base, b + 1908), entry(), frame, calls);
+}
+
+namespace {
+
+// The garage's car `steps` links from its head: the halfword links from
+// +204 of the garage, each a node of the garage's (its +0 the next, its +2
+// the car's slot) as the originals' lha and rlwinm leave them.
+uint32_t GarageNode(uint8_t* base, uint32_t garage, uint32_t steps) {
+  int16_t node = int16_t(guest::LoadU16(base, garage + 204));
+  uint32_t at = garage + (uint32_t(int32_t(node)) << 2);
+  while (steps != 0) {
+    node = int16_t(guest::LoadU16(base, at));
+    steps--;
+    at = garage + (uint32_t(int32_t(node)) << 2);
+  }
+  return at;
+}
+
+// The garage's record (1,968 bytes from the garage) of the node's slot.
+uint32_t GarageRecord(uint8_t* base, uint32_t garage, uint32_t node) {
+  const int32_t slot = int16_t(guest::LoadU16(base, node + 2));
+  return garage + uint32_t(slot * 1968);
+}
+
+// memcpy(destination, source, 8432): c_runtime::Memcpy's copy, else the
+// original. Returns r3 as memcpy leaves it (the destination).
+uint64_t CopySpec(uint8_t* base, uint32_t destination, uint32_t source, uint32_t frame,
+                  uint32_t lr, const Calls& calls) {
+  if (c_runtime::Memcpy(base, destination, source, 8432)) {
+    return destination;
+  }
+  return calls.Call(kMemcpy, frame, lr, destination, source, 8432);
+}
+
+}  // namespace
+
+uint64_t Build(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224C698 PanelSetBase::Build");
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t built = LoadU32(base, b + 4);
+  if ((built & LoadU32(base, kTwoPlayers)) != 0) {
+    return b_r3;
+  }
+  StoreU32(base, b + 252, 20);
+  StoreU32(base, b + 256, 6000);
+  StoreU32(base, b + 260, 1);
+  StoreU32(base, b + 264, 20);
+  StoreU32(base, b + 268, 10);
+  StoreU32(base, b + 208, 0);
+  if (built != 0) {
+    // Each list's entries freed from the last down.
+    const auto free_list = [&](uint32_t list, uint32_t whole, uint32_t lr) {
+      while (LoadU32(base, b + whole) != 0) {
+        const uint32_t n = LoadU32(base, list + 512) - 1;
+        StoreU32(base, list + 512, n);
+        FreePages(LoadU32(base, list + 4 * n), frame, lr, calls);
+      }
+    };
+    free_list(b + 272, 784, 0x8224C728);
+    free_list(b + 788, 1300, 0x8224C764);
+    free_list(b + 1304, 1816, 0x8224C7A0);
+  }
+  const uint32_t save = uint32_t(SaveData(base, b, frame));
+  uint64_t r3 = save;
+  StoreU32(base, b + 784, 0);
+  StoreU32(base, b + 1300, 0);
+  StoreU32(base, b + 1816, 0);
+  // The cars whose bit is set in the save data's words at +104740.
+  for (uint32_t car = 0; car < 72; car++) {
+    const uint32_t word = LoadU32(base, save + ((((car >> 5) + 26185) << 2)));
+    if ((word & (1u << (car & 31))) == 0) {
+      continue;
+    }
+    const uint32_t entry = memory::AllocPages(8448, 4096);
+    const uint32_t spec = car_specs::GetCarSpec(base, car);
+    r3 = CopySpec(base, entry, spec, frame, 0x8224C838, calls);
+    const int8_t kind = int8_t(guest::LoadU8(base, entry + 771));
+    StoreU32(base, entry + 8432, car);
+    StoreU32(base, entry + 8436, 0);
+    uint32_t list = 0;
+    if (kind == 0) {
+      list = b + 272;
+    } else if (kind == 1) {
+      list = b + 788;
+    } else {
+      r3 = FreePages(entry, frame, 0x8224C888, calls);
+      continue;
+    }
+    const uint32_t count = LoadU32(base, list + 512);
+    StoreU32(base, list + 512, count + 1);
+    StoreU32(base, list + 4 * count, entry);
+  }
+  // The garage's cars (the count a halfword, sign-extended, compared
+  // unsigned) to list 2.
+  const uint32_t garage = save + 6120;
+  const uint32_t list = b + 1304;
+  for (uint32_t i = 0; i < uint32_t(int32_t(int16_t(guest::LoadU16(base, save + 6328)))); i++) {
+    const uint32_t entry = memory::AllocPages(8448, 4096);
+    const uint32_t id = LoadU32(base, GarageRecord(base, garage, GarageNode(base, garage, i)) + 224);
+    r3 = CopySpec(base, entry, car_specs::GetCarSpec(base, id), frame, 0x8224C914, calls);
+    StoreU32(base, entry + 8432,
+             LoadU32(base, GarageRecord(base, garage, GarageNode(base, garage, i)) + 224));
+    const int16_t color =
+        int16_t(guest::LoadU16(base, GarageRecord(base, garage, GarageNode(base, garage, i)) + 212));
+    StoreU32(base, entry + 8436, uint32_t(int32_t(color)));
+    const uint32_t count = LoadU32(base, list + 512);
+    StoreU32(base, list + 512, count + 1);
+    StoreU32(base, list + 4 * count, entry);
+  }
+  if (LoadU32(base, b + 4) == 0) {
+    StoreU32(base, b + 1876, 0);
+  }
+  StoreU32(base, b + 4, 1);
+  return r3;
 }
 
 }  // namespace car_list
