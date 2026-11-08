@@ -134,8 +134,11 @@ file's history. What's left to see in a drive, from every run:
   Validated `itc_4630` (race 78 s at 180; 0 errors, every harness 0
   differing outside the expected groups, 41 of 41 harness lines; none
   in the race, 6 in the replay `itc_4631` (ok: the dealer opened and
-  closed only), 35 to drive). Step: second migration (the transitions
-  and set-ups left), agent running.
+  closed only), 35 to drive). Second migration 28903fcf..5b3fe2c2 (the
+  transitions 0, 1, 4-9, 11, 15-17, 19, `OpenListMenu`, `OpenCarList`,
+  `OpenCar`, `OpenColors`; 11 adapters removed after counter runs; 58
+  of 58 in play ours; race 36 s, 0 errors, its harnesses 0 differing;
+  no subagents). Left: none. Step: its validation, agent running.
 
 ## Done
 
@@ -195,5 +198,7 @@ file's history. What's left to see in a drive, from every run:
   known 447, unknown 908).
 - After its migration: ours 5057, work left 1371 (wrapped 56, known
   407, unknown 908).
+- After its second migration: ours 5074, work left 1354 (wrapped 56,
+  known 390, unknown 908).
 
 ## Stopped

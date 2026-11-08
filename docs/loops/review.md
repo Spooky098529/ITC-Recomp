@@ -147,6 +147,23 @@ When the user has reviewed a run's section, its heading gets
   world). `ShowCarInfo`'s +660 float word copied as is (signaling NaNs
   kept). Rows corrected: `Update` `sub_82185600`'s r3 is movie 4, not
   the machine; `Page3` uses the menu at `[0x826D83EC]`.
+- Its second migration (28903fcf..5b3fe2c2): the transitions and the
+  list, car and color set-ups (`src/car_dealer/menus.cpp`); 11 adapters
+  removed after counter runs; the transitions keep theirs (`Update`'s
+  table). T15, T17 and `OpenColors` call `GarageStage::ShowCarById`
+  and `ShowCarByIdWithClass` unconditionally: their cases run in the
+  stand car world (`stand_car_world.h`), the car on `ShowCarById`'s
+  frame not compared (as the car list's pick). The paint picks are kept
+  to 0-5, load_poll's range: a first try with T17's pick up to 19
+  crashed the harness reading guest `0x0000000A` (log `itc_4640`,
+  deleted at 674 MB); which side crashed wasn't confirmed, and that
+  such picks are outside the world's range is the agent's reading of
+  load_poll's cases, not checked. `RecordOpen` now passes addresses
+  other than `UiMovies::Open`/`Delete` on to the recorder set before
+  the run. The car list openers' cases keep the list at 1-8 cars
+  (`Page0` refuses an empty one). `ShowCarByIdWithClass` keeps its
+  adapter (T17 calls it by guest address). Row corrected: T8's header
+  is `SetHeader(1, 0)`.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
