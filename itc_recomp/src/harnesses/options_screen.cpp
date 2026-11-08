@@ -92,8 +92,8 @@ uint32_t Around(Random& r, int32_t lo, int32_t hi) {
 // movie table; the word UiMovies::Find answers for a missing one movie 7's
 // block) with empty animation lists, live, saved and file scenes one tree's
 // root, their first named animations over the root and one of 8
-// animations of no tracks (512 of them: the options' named animations
-// reach 455); the root's child index (+108) 0 to 3, its
+// animations of no tracks (900 of them: the options' named animations
+// reach 872, below the texts' map at +0x9BCC); the root's child index (+108) 0 to 3, its
 // entries sub-scenes up to 60 and animations after (its animation index,
 // +116, 60); the 16 sub-scenes' child index 0 to 3, their entries leaves up
 // to 64 and animations after (+116 64); the 32 leaves TXT nodes
@@ -137,7 +137,8 @@ constexpr uint32_t kSaveBytes = 0x20000;
 constexpr uint32_t kMiscBytes = 0x4000;
 constexpr uint32_t kSaveDataPointers = 0x826C5B58;
 constexpr uint32_t kMissingMovie = 0x826C5CDC;  // UiMovies::Find's answer when not found
-// The getter sub_82090770 (r3 = +60), the sound manager's slots 29 and 30.
+// The getter sub_82090770 (r3 = +60), the sound manager's slots 10, 29 and
+// 30.
 constexpr uint32_t kGet60 = 0x82090770;
 struct World {
   World()
@@ -238,7 +239,7 @@ void ShapeMovieWorld(uint8_t* base, const World& w, Random& r) {
       guest::StoreU32(base, movie + field, w.root());
     }
     guest::StoreU32(base, movie + 28, w.movies.address + kTexturesAt);
-    for (uint32_t k = 0; k < 512; k++) {  // the options' named animations reach 455
+    for (uint32_t k = 0; k < 900; k++) {  // the options' named animations reach 872
       const uint32_t named = movie + 176 + 36 * k;
       guest::StoreU32(base, named + 28, w.root());
       guest::StoreU32(base, named + 32, w.animation(r.Below(kAnimations)));
@@ -354,6 +355,8 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, manager + 60, r.Below(4) == 0 ? 0xFFFFFFFFu : uint32_t(r.Next()));
   guest::StoreU32(base, vtable + menu_sounds::kGetCategorySlot, kGet60);
   guest::StoreU32(base, vtable + menu_sounds::kSetCategoryVolumeSlot, kGet60);
+  // Slot 10 (PlayCue2D, MenuSound::Play's) the getter too.
+  guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, kGet60);
   guest::StoreU32(base, menu_sounds::kSoundManager, manager);
   // The UI movies; movie 7's loaded flag 0 or 1.
   ShapeMovieWorld(base, w, r);
@@ -799,6 +802,57 @@ void PageHelpers(Context& h, const World& w) {
         edits(w, r, 260, 268, -11, 11);
       },
       __imp__sub_821BEAC8, hooks::OptionsStepSliders, {{112, 16}});
+
+  // The lists: the edits 0 to `hi` only (stored into the picture nodes'
+  // +108, the world's child index: any word would send later lookups out of
+  // the world). The clashes: the edits 0 to 5 (clashes likely), now and then
+  // any word. The lists' frames without SetNodeText's varargs words (+40 to
+  // +79: r6 to r10, unset by the original, passed as 0 by ours); the
+  // clashes' with IsButtonTaken's (IsAnalogTaken's) copy below them.
+  const auto small = [&h](const World& w, Random& r, uint32_t from, uint32_t to, uint32_t hi) {
+    for (uint32_t f = from; f <= to; f += 4) {
+      guest::StoreU32(h.base, w.settings() + f, r.Below(hi + 1));
+    }
+  };
+  Group(
+      h, w, "Options::ShowButtonList (sub_821BEFE8)", 60,
+      [&](PPCContext&, Random& r, const World& w) { small(w, r, 284, 328, 16); },
+      __imp__sub_821BEFE8, hooks::OptionsShowButtonList, {{208, 168}, {128, 56}});
+  Group(
+      h, w, "Options::ShowAnalogList (sub_821BF520)", 60,
+      [&](PPCContext&, Random& r, const World& w) { small(w, r, 380, 400, 10); },
+      __imp__sub_821BF520, hooks::OptionsShowAnalogList, {{208, 168}, {128, 48}});
+  Group(
+      h, w, "Options::ShowButtonClashes (sub_821BF158)", 80,
+      [&](PPCContext&, Random& r, const World& w) { edits(w, r, 284, 328, 0, 5); },
+      __imp__sub_821BF158, hooks::OptionsShowButtonClashes, {{304, 40}});
+  Group(
+      h, w, "Options::ShowAnalogClashes (sub_821BF698)", 80,
+      [&](PPCContext&, Random& r, const World& w) { edits(w, r, 380, 400, 0, 3); },
+      __imp__sub_821BF698, hooks::OptionsShowAnalogClashes, {{288, 40}});
+  // The steps: r3 the step word (0 or 1); the analog edit -2 to 20; the
+  // dialog menu's cursors 0 to 3; the dialogs' states 0 to 3 or any.
+  const auto dialog_step = [&h, edit](PPCContext& t, Random& r, const World& w) {
+    guest::StoreU32(h.base, w.page() + 24, r.Below(2));
+    t.r3.u64 = w.page() + 24;
+    guest::StoreU32(h.base, w.settings() + 380, edit(r, -2, 20));
+    const uint32_t menu = w.block(0x826D8484);
+    guest::StoreU32(h.base, menu + 0, r.Below(4));
+    guest::StoreU32(h.base, menu + 4, r.Below(4));
+    for (const uint32_t f : {620u, 640u}) {
+      guest::StoreU32(h.base, w.settings() + f, edit(r, 0, 3));
+    }
+  };
+  Group(h, w, "Options::EnterAnalog (sub_821BDE88)", 80, dialog_step, __imp__sub_821BDE88,
+        hooks::OptionsEnterAnalog, {{176, 32}});
+  Group(h, w, "Options::MoveSaveDialogCursor (sub_821C09B0)", 60, dialog_step,
+        __imp__sub_821C09B0, hooks::OptionsMoveSaveDialogCursor, {{128, 32}});
+  Group(h, w, "Options::MoveCategory6DialogCursor (sub_821C0B50)", 60, dialog_step,
+        __imp__sub_821C0B50, hooks::OptionsMoveCategory6DialogCursor, {{128, 32}});
+  Group(h, w, "Options::ChangeSaveDialog (sub_821C08B0)", 100, dialog_step, __imp__sub_821C08B0,
+        hooks::OptionsChangeSaveDialog, {{128, 32}});
+  Group(h, w, "Options::ChangeCategory6Dialog (sub_821C0A50)", 100, dialog_step,
+        __imp__sub_821C0A50, hooks::OptionsChangeCategory6Dialog, {{128, 32}});
 }
 
 }  // namespace

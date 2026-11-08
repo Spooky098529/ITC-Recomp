@@ -52,6 +52,8 @@ constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kSetText = 0x8211C1F8;
 constexpr uint32_t kSetNodeText = 0x8211C7E8;
 constexpr uint32_t kRestorePose = 0x82119B80;
+// MenuSound::Play through its override.
+constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 
 // The screen's blocks (docs/known-data.md): the page block (28 bytes), the
 // front-end menu (68), the settings `o` (716).
@@ -256,5 +258,39 @@ uint64_t ShowSliderMarks(uint8_t* base, uint32_t sp);
 // and right choices' frame (child 0 +108) and shown (child 2 +80) words by
 // the value (1: the left lit). 208-byte frame. The last child, or the node.
 uint64_t ShowHudValues(uint8_t* base, uint32_t sp);
+// sub_821BEFE8 Options::ShowButtonList and sub_821BF520 ShowAnalogList: the
+// edits in menu order copied to the frame (+96, or +128 with the names at
+// +96); on node (9, 5) or (11, 5) each item's name (SetNodeText, strings
+// 348 to 359, or 351 to 355 and 359; its unset varargs 0) and picture
+// (child 1 +108 = the edit). 208-byte frames. The last picture node.
+uint32_t ShowButtonList(uint8_t* base, uint32_t sp, const Calls& calls);
+uint32_t ShowAnalogList(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821BF158 Options::ShowButtonClashes and sub_821BF698
+// ShowAnalogClashes: per item, the taken (358 + 4i, or 609 + 4i) or free
+// (357 + 4i, or 608 + 4i) animation by IsButtonTaken (IsAnalogTaken),
+// PlayNamed(m, it, 1) then FinishNamed. 256-byte frames (two 13-word tables
+// at +96 and +160). The last FinishNamed's r3.
+uint64_t ShowButtonClashes(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t ShowAnalogClashes(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// The second migration's steps (steps.cpp; r3 the step word, the frame
+// below `sp`):
+// sub_821BDE88 Options::EnterAnalog (step 33): named 658, then the analog
+// picture's (674 + 2 x AnalogPicture(+380), from the 11-word table at the
+// frame's +96). A 176-byte frame. 1.
+uint64_t EnterAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821C09B0 Options::MoveSaveDialogCursor (step 45) and sub_821C0B50
+// MoveCategory6DialogCursor (step 48): the dialog menu's (+4) before
+// finished, its (+0) played and looped (or finished), from 843 (or 859).
+// 128-byte frames. 1.
+uint64_t MoveSaveDialogCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveCategory6DialogCursor(uint8_t* base, uint32_t step, uint32_t sp,
+                                   const Calls& calls);
+// sub_821C08B0 Options::ChangeSaveDialog (step 44) and sub_821C0A50
+// ChangeCategory6Dialog (step 47): first pass MenuSound::Play(5) and the
+// dialog's animations by the state +620 (or +640); 1 once UiMovie::Run
+// answers 0 (the state = +624, or +644), else 0. 128-byte frames.
+uint64_t ChangeSaveDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t ChangeCategory6Dialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

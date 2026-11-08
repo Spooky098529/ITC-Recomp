@@ -25,7 +25,11 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "ShowAnalogPicture sub_821BF630 and ResetNode sub_821BFA68; ShowVolumeBar "
               "sub_821BE5A8 (inside the pause movie log's wrap), ShowVolumeNumbers sub_821BE820, "
               "ShowSliderNumbers sub_821BECA8, ShowSliderMarks sub_821BED38, ShowHudValues "
-              "sub_821BE290, StepSound sub_821BE5F8 and StepSliders sub_821BEAC8; the sound "
+              "sub_821BE290, StepSound sub_821BE5F8, StepSliders sub_821BEAC8, ShowButtonList "
+              "sub_821BEFE8, ShowAnalogList sub_821BF520, ShowButtonClashes sub_821BF158 and "
+              "ShowAnalogClashes sub_821BF698; the steps EnterAnalog sub_821BDE88, "
+              "MoveSaveDialogCursor sub_821C09B0, MoveCategory6DialogCursor sub_821C0B50, "
+              "ChangeSaveDialog sub_821C08B0 and ChangeCategory6Dialog sub_821C0A50; MenuSound::Play and the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -266,6 +270,51 @@ void OptionsStepSliders(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::StepSliders(base, ctx.r1.u32);
 }
 
+void OptionsShowButtonList(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ShowButtonList(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsShowAnalogList(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ShowAnalogList(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsShowButtonClashes(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ShowButtonClashes(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsShowAnalogClashes(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ShowAnalogClashes(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsEnterAnalog(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::EnterAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsMoveSaveDialogCursor(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::MoveSaveDialogCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsMoveCategory6DialogCursor(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::MoveCategory6DialogCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsChangeSaveDialog(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ChangeSaveDialog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsChangeCategory6Dialog(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ChangeCategory6Dialog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -317,6 +366,15 @@ ITC_OPTIONS_SCREEN(821BED38, OptionsShowSliderMarks)
 ITC_OPTIONS_SCREEN(821BE290, OptionsShowHudValues)
 ITC_OPTIONS_SCREEN(821BE5F8, OptionsStepSound)
 ITC_OPTIONS_SCREEN(821BEAC8, OptionsStepSliders)
+ITC_OPTIONS_SCREEN(821BEFE8, OptionsShowButtonList)
+ITC_OPTIONS_SCREEN(821BF520, OptionsShowAnalogList)
+ITC_OPTIONS_SCREEN(821BF158, OptionsShowButtonClashes)
+ITC_OPTIONS_SCREEN(821BF698, OptionsShowAnalogClashes)
+ITC_OPTIONS_SCREEN(821BDE88, OptionsEnterAnalog)
+ITC_OPTIONS_SCREEN(821C09B0, OptionsMoveSaveDialogCursor)
+ITC_OPTIONS_SCREEN(821C0B50, OptionsMoveCategory6DialogCursor)
+ITC_OPTIONS_SCREEN(821C08B0, OptionsChangeSaveDialog)
+ITC_OPTIONS_SCREEN(821C0A50, OptionsChangeCategory6Dialog)
 // Options::ShowVolumeBar sub_821BE5A8: its override is the pause movie log's
 // wrap (src/debug/pause_movie_log.cpp), which calls the step under the flag.
 

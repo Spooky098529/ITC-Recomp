@@ -235,4 +235,99 @@ uint64_t ShowHudValues(uint8_t* base, uint32_t sp) {
   return r3;
 }
 
+namespace {
+
+// The lists: node (`sub_scene`, 5); for item i, c = its child i + 1:
+// SetNodeText(m, c's child 0, `names[i]`) (its varargs, r6 to r10 left by
+// the original, passed as 0: the user's call, 2026-10-30) and c's child 1
+// +108 = the value at the frame's `values` + 4i. The last child 1.
+uint32_t ShowList(uint8_t* base, uint32_t frame, uint32_t m, uint32_t sub_scene,
+                  const uint32_t* names, uint32_t values, uint32_t count, uint32_t text_lr,
+                  const Calls& calls) {
+  const uint32_t node = ui_movies::FindNode(base, m, sub_scene, 5);
+  uint32_t picture = 0;
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t item = ui_movies::Child(base, node, i + 1);
+    const uint32_t text = ui_movies::Child(base, item, 0);
+    calls.Call(kSetNodeText, frame, text_lr, m, text, names[i], 0);
+    picture = ui_movies::Child(base, item, 1);
+    StoreU32(base, picture + 108, LoadU32(base, frame + values + 4 * i));
+  }
+  return picture;
+}
+
+// The clashes: two 13-word tables on the 256-byte frame (+96 the taken
+// animations, `taken` + 4k; +160 the others, `free` + 4k); for item i,
+// `is_taken(i)` (its frame below ours) picks one, PlayNamed(m, it, 1) then
+// FinishNamed(m, it). FinishNamed's last r3.
+template <typename IsTaken>
+uint64_t ShowClashes(uint8_t* base, uint32_t sp, uint32_t taken, uint32_t free, uint32_t count,
+                     const uint32_t lr[2], const Calls& calls, IsTaken is_taken) {
+  const uint32_t frame = Frame(base, sp, 256);
+  const uint32_t m = FindMovie(base, frame);
+  for (uint32_t k = 0; k < 13; k++) {
+    StoreU32(base, frame + 160 + 4 * k, free + 4 * k);
+  }
+  for (uint32_t k = 0; k < 13; k++) {
+    StoreU32(base, frame + 96 + 4 * k, taken + 4 * k);
+  }
+  uint64_t r3 = 0;
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t table = is_taken(i, frame) == 1 ? 96 : 160;
+    const uint32_t named = LoadU32(base, frame + table + 4 * i);
+    calls.Call(kPlayNamed, frame, lr[0], m, named, 1, 0);
+    r3 = calls.Call(kFinishNamed, frame, lr[1], m, named);
+  }
+  return r3;
+}
+
+}  // namespace
+
+uint32_t ShowButtonList(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BEFE8 Options::ShowButtonList");
+  const uint32_t frame = Frame(base, sp, 208);
+  const uint32_t m = FindMovie(base, frame);
+  // The twelve edits in menu order at the frame's +96.
+  static constexpr uint32_t kEdits[12] = {284, 288, 292, 296, 300, 304,
+                                          320, 312, 316, 308, 324, 328};
+  const uint32_t o = LoadU32(base, kSettings);
+  for (uint32_t i = 0; i < 12; i++) {
+    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o + kEdits[i]));
+  }
+  static constexpr uint32_t kNames[12] = {348, 349, 350, 351, 352, 353,
+                                          354, 355, 356, 357, 358, 359};
+  return ShowList(base, frame, m, 9, kNames, 96, 12, 0x821BF0C0, calls);
+}
+
+uint32_t ShowAnalogList(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BF520 Options::ShowAnalogList");
+  const uint32_t frame = Frame(base, sp, 208);
+  const uint32_t m = FindMovie(base, frame);
+  // The six edits in menu order at the frame's +128, the names at +96.
+  static constexpr uint32_t kEdits[6] = {380, 384, 388, 396, 392, 400};
+  static constexpr uint32_t kNames[6] = {351, 352, 353, 354, 355, 359};
+  const uint32_t o = LoadU32(base, kSettings);
+  for (uint32_t i = 0; i < 6; i++) {
+    StoreU32(base, frame + 128 + 4 * i, LoadU32(base, o + kEdits[i]));
+    StoreU32(base, frame + 96 + 4 * i, kNames[i]);
+  }
+  return ShowList(base, frame, m, 11, kNames, 128, 6, 0x821BF5FC, calls);
+}
+
+uint64_t ShowButtonClashes(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BF158 Options::ShowButtonClashes");
+  static constexpr uint32_t kLr[2] = {0x821BF290, 0x821BF29C};
+  return ShowClashes(base, sp, 358, 357, 12, kLr, calls, [&](uint32_t i, uint32_t frame) {
+    return IsButtonTaken(base, i, frame);
+  });
+}
+
+uint64_t ShowAnalogClashes(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BF698 Options::ShowAnalogClashes");
+  static constexpr uint32_t kLr[2] = {0x821BF7D0, 0x821BF7DC};
+  return ShowClashes(base, sp, 609, 608, 6, kLr, calls, [&](uint32_t i, uint32_t frame) {
+    return IsAnalogTaken(base, i, frame);
+  });
+}
+
 }  // namespace options_screen

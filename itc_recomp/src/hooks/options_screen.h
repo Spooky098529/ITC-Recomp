@@ -82,5 +82,19 @@ void OptionsShowSliderMarks(PPCContext& ctx, uint8_t* base);
 void OptionsShowHudValues(PPCContext& ctx, uint8_t* base);
 void OptionsStepSound(PPCContext& ctx, uint8_t* base);
 void OptionsStepSliders(PPCContext& ctx, uint8_t* base);
+// ShowButtonList sub_821BEFE8, ShowAnalogList sub_821BF520, ShowButtonClashes
+// sub_821BF158, ShowAnalogClashes sub_821BF698 (no arguments); the steps
+// EnterAnalog sub_821BDE88, MoveSaveDialogCursor sub_821C09B0,
+// MoveCategory6DialogCursor sub_821C0B50, ChangeSaveDialog sub_821C08B0,
+// ChangeCategory6Dialog sub_821C0A50 (r3 the step word).
+void OptionsShowButtonList(PPCContext& ctx, uint8_t* base);
+void OptionsShowAnalogList(PPCContext& ctx, uint8_t* base);
+void OptionsShowButtonClashes(PPCContext& ctx, uint8_t* base);
+void OptionsShowAnalogClashes(PPCContext& ctx, uint8_t* base);
+void OptionsEnterAnalog(PPCContext& ctx, uint8_t* base);
+void OptionsMoveSaveDialogCursor(PPCContext& ctx, uint8_t* base);
+void OptionsMoveCategory6DialogCursor(PPCContext& ctx, uint8_t* base);
+void OptionsChangeSaveDialog(PPCContext& ctx, uint8_t* base);
+void OptionsChangeCategory6Dialog(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

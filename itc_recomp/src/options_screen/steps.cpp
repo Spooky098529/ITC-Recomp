@@ -36,7 +36,10 @@ struct Movie {
   void Finish(uint32_t lr, uint64_t sub, uint64_t index) const {
     calls.Call(kFinish, frame, lr, m, sub, index);
   }
-  void Run(uint32_t lr) const { calls.Call(kRun, frame, lr, m, 0); }
+  void FinishNamed(uint32_t lr, uint64_t named) const {
+    calls.Call(kFinishNamed, frame, lr, m, named);
+  }
+  uint64_t Run(uint32_t lr) const { return calls.Call(kRun, frame, lr, m, 0); }
 };
 
 // A step's frame (`bytes` below `sp`, its back chain), `m`, the first
@@ -160,6 +163,119 @@ uint64_t EnterButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
     m.PlayNamed(0x821BDBEC, picture);
     m.LoopNamed(0x821BDBF8, picture);
   });
+}
+
+uint64_t EnterAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BDE88 Options::EnterAnalog");
+  // The analog pictures' animations (674, 676, ..., 694) at the frame's +96,
+  // written on every pass before the step word is read.
+  const uint32_t frame = sp - 176;
+  for (uint32_t i = 0; i < 11; i++) {
+    StoreU32(base, frame + 96 + 4 * i, 674 + 2 * i);
+  }
+  return Step(base, step, sp, 176, 0x821BDF9C, calls, [&](const Movie& m, uint32_t frame) {
+    m.PlayNamed(0x821BDF34, 658);
+    m.LoopNamed(0x821BDF40, 658);
+    const uint32_t index = AnalogPicture(LoadU32(base, Settings(base) + 380));
+    const uint32_t picture = LoadU32(base, frame + 96 + (index << 2));
+    m.PlayNamed(0x821BDF7C, picture);
+    m.LoopNamed(0x821BDF88, picture);
+  });
+}
+
+namespace {
+
+// The dialogs' menu (the second front-end menu, [0x826D8484]).
+uint32_t DialogMenu(uint8_t* base) { return LoadU32(base, 0x826D8484); }
+
+// Steps 45 and 48: the dialog menu's cursor before (+4) finished, the new
+// one (+0) played, then looped (step 45) or finished (step 48). A 128-byte
+// frame.
+uint64_t MoveDialogCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
+                          uint32_t first, const uint32_t lr[3], bool loop, uint32_t run_lr) {
+  return Step(base, step, sp, 128, run_lr, calls, [&](const Movie& m, uint32_t) {
+    const uint32_t menu = DialogMenu(base);
+    const uint64_t before = uint64_t(LoadU32(base, menu + 4)) + first;
+    const uint64_t now = uint64_t(LoadU32(base, menu + 0)) + first;
+    m.FinishNamed(lr[0], before);
+    m.PlayNamed(lr[1], now);
+    if (loop) {
+      m.LoopNamed(lr[2], now);
+    } else {
+      m.FinishNamed(lr[2], now);
+    }
+  });
+}
+
+// Steps 44 and 47: on the first pass MenuSound::Play(5) and the dialog's
+// animations by its shown state (`state`, the settings' +620 or +640); then
+// UiMovie::Run, and once it answers 0 the state = the next (+4) and 1.
+struct DialogAnimations {
+  uint32_t state;      // the settings' word
+  uint32_t first;      // the cursor's first animation
+  uint32_t open;       // state 0's
+  uint32_t shown;      // states 1 and 2's
+  uint32_t closing;    // state 2's finished
+  uint32_t lr[5];      // MenuSound::Play, state 0's FinishNamed, states 0 and 1's PlayNamed,
+                       // state 2's PlayNamed and FinishNamed
+};
+
+uint64_t ChangeDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
+                      const DialogAnimations& a, uint32_t run_lr) {
+  const uint32_t frame = sp - 128;
+  StoreU32(base, frame, sp);
+  const Movie m{calls, frame, FindMovie(base, frame)};
+  if (LoadU32(base, step) == 0) {
+    calls.Call(kMenuSoundPlay, frame, a.lr[0], 5);
+    switch (LoadU32(base, Settings(base) + a.state)) {
+      case 0:
+        m.FinishNamed(a.lr[1], uint64_t(LoadU32(base, DialogMenu(base) + 0)) + a.first);
+        m.PlayNamed(a.lr[2], a.open);
+        break;
+      case 1: m.PlayNamed(a.lr[2], a.shown); break;
+      case 2:
+        m.PlayNamed(a.lr[3], a.shown);
+        m.FinishNamed(a.lr[4], a.closing);
+        break;
+      default: break;
+    }
+    StoreU32(base, step, 1);
+  }
+  if (uint32_t(m.Run(run_lr)) != 0) {
+    return 0;
+  }
+  const uint32_t o = Settings(base);
+  StoreU32(base, o + a.state, LoadU32(base, o + a.state + 4));
+  return 1;
+}
+
+}  // namespace
+
+uint64_t MoveSaveDialogCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C09B0 Options::MoveSaveDialogCursor");
+  static constexpr uint32_t kLr[3] = {0x821C0A04, 0x821C0A24, 0x821C0A30};
+  return MoveDialogCursor(base, step, sp, calls, 843, kLr, true, 0x821C0A44);
+}
+
+uint64_t MoveCategory6DialogCursor(uint8_t* base, uint32_t step, uint32_t sp,
+                                   const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C0B50 Options::MoveCategory6DialogCursor");
+  static constexpr uint32_t kLr[3] = {0x821C0BA4, 0x821C0BC4, 0x821C0BD0};
+  return MoveDialogCursor(base, step, sp, calls, 859, kLr, false, 0x821C0BE4);
+}
+
+uint64_t ChangeSaveDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C08B0 Options::ChangeSaveDialog");
+  static constexpr DialogAnimations kAnimations = {
+      620, 843, 855, 856, 841, {0x821C08F4, 0x821C095C, 0x821C0978, 0x821C092C, 0x821C0938}};
+  return ChangeDialog(base, step, sp, calls, kAnimations, 0x821C098C);
+}
+
+uint64_t ChangeCategory6Dialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821C0A50 Options::ChangeCategory6Dialog");
+  static constexpr DialogAnimations kAnimations = {
+      640, 859, 871, 872, 857, {0x821C0A94, 0x821C0AFC, 0x821C0B18, 0x821C0ACC, 0x821C0AD8}};
+  return ChangeDialog(base, step, sp, calls, kAnimations, 0x821C0B2C);
 }
 
 }  // namespace options_screen
