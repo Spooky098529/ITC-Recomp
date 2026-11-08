@@ -95,6 +95,19 @@ When the user has reviewed a run's section, its heading gets
   the `SetUp` cases leaving their frame +40 to +79 out. `VolumePage`'s
   cases replace the sound manager's slots 29 and 30 with the menu
   sounds' harness's leaf recorders.
+- The front-end screen helpers' map (200c6832): new
+  `front-end-screen-helpers.md`, 34 rows: the 852-byte modes' releases
+  (vtable slot 1, read from `default.bin`: types 2, 4, 5, 9, 10, 12),
+  the save screen's (movie 44) and options' (movie 7) dialog text
+  setters with the dialog steps they unblocked (step 5 `sub_821A6030`
+  and its tail not seen in play), the options' categories 5 and 6
+  set-ups, the car cards (movie 4 or 18) and their callers;
+  `known-data.md` (the save screen's page block and dialog fields, the
+  options' dialog menu, the car list's fields); four leads' lines
+  trimmed of the taken functions; one lead added (the car cards'
+  screen). Calls followed: unset varargs passed as 0 (the parking
+  area); the sound manager's `StopCue` (recompiled) reached through its
+  vtable, as the race sounds' native code does.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 

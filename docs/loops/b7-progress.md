@@ -102,7 +102,11 @@ file's history. What's left to see in a drive, from every run:
   `sub_821C0BF0`, `sub_821C0CD0`, `sub_821C0D70`, `sub_821A51C8`,
   `sub_821A52C0`, `sub_821A5360`, `sub_821821C8`, `sub_821827E0`; ready
   since this run's first subsystem; its line deleted from `leads.md`).
-  Step: mapping, agent running.
+  Mapped `front-end-screen-helpers.md` (200c6832: 34 rows, 32 in play;
+  the modes' releases (types 2, 4, 5, 9, 10, 12), the save and options
+  dialogs' text setters with the steps they unblocked, the car cards;
+  15 ready groups; 1 lead added, four leads' lines trimmed; no
+  subagents); map checked. Step: migration, agent running.
 
 ## Done
 
@@ -149,5 +153,7 @@ file's history. What's left to see in a drive, from every run:
   known 394, unknown 997).
 - After its fourth migration: ours 4989, work left 1438 (wrapped 56,
   known 385, unknown 997).
+- After the front-end screen helpers' map: ours 4989, work left 1438
+  (wrapped 56, known 417, unknown 965).
 
 ## Stopped
