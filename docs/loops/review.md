@@ -13,6 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- `functions/car-list.md` (new, 154 rows, 93 in play; c595a898): the
+  car list the type 6 and 7 panel screens show (`PanelSet`, vtable
+  `0x820110C8`: its slots, 9 pages and 27 steps, the panels and panel
+  draws; the two-player `PanelSetPair`, never seen); vtables read from
+  the unpacked `default.bin`; `known-data.md` rows (the car list's
+  fields, `0x826379B8`, `0x82815EAC` as the two-player word); leads
+  trimmed (the stand screens', the power graph's, the stand car
+  makers', the power curve's) and `sub_8224B248`'s deleted
+  (`PanelSetBase::SetUpColors`, mapped here).
+
 - The type 6 and 7 screens' migration (42695d6d..cfbe6bd6,
   `--native_type67_screens`, 48 functions): the car list's vtable
   calls stay guest calls; `PanelScreen::DrawList`'s adapter removed

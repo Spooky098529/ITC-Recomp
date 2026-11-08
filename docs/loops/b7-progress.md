@@ -93,7 +93,13 @@ file's history. What's left to see in a drive, from every run:
   (`PanelSet`; lead picked: `sub_8224CAD8` and the 12 others, beside
   the screens just finished, whose vtable calls it answers; 13 ready
   groups, about as many as the stand screens' 15 and the save screens'
-  13; its line deleted from `leads.md`). Mapping agent running.
+  13; its line deleted from `leads.md`). Map checked (c595a898:
+  `car-list.md`, 154 rows, all new, 93 in play: `PanelSet`'s 19 slots,
+  its 9 pages and 27 steps, the panels, `PanelSetPair` (not seen); 0
+  errors; 49 ready groups; blocked by the UI movie helper
+  `sub_8211BC18` (a new lead) and `sub_8211DE30`; 2 leads added, five
+  trimmed, `sub_8224B248`'s deleted (mapped here); no subagents).
+  Migration agent running.
 
 ## Done
 
@@ -141,3 +147,5 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 56, known 473, unknown 1095).
 - After its migration: ours 4849, work left 1576 (wrapped 56, known
   425, unknown 1095).
+- After the car list's map: ours 4849, work left 1576 (wrapped 56,
+  known 518, unknown 1002).
