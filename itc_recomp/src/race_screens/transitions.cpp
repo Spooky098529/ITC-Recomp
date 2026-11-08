@@ -547,6 +547,43 @@ uint64_t PauseMenuCloseAdjust(uint8_t* base, uint32_t step, uint32_t sp, const C
                      });
 }
 
+namespace {
+
+// OpenVolume and OpenAdjust: on their first call +148 = the selection, the
+// item's animation finished, `set_up`, animation `animation` played, the
+// step word 1; done when the run answers 0.
+template <typename SetUp>
+uint64_t OpenPage(uint8_t* base, uint32_t step, uint32_t frame, uint64_t animation,
+                  uint32_t finish_lr, uint32_t play_lr, uint32_t run_lr, const Calls& calls,
+                  SetUp&& set_up) {
+  const uint32_t movie = PauseMovie(base);
+  if (guest::LoadU32(base, step) == 0) {
+    const uint32_t selection = Selection(base);
+    guest::StoreU32(base, Get(base, kPauseData) + 148, selection);
+    calls.Call(kFinish, frame, finish_lr, movie, 7, uint64_t(selection) + 1);
+    set_up();
+    Play(calls, frame, play_lr, movie, kNone, animation);
+    guest::StoreU32(base, step, 1);
+  }
+  return uint32_t(Run(calls, frame, run_lr, movie)) == 0 ? 1 : 0;
+}
+
+}  // namespace
+
+uint64_t PauseMenuOpenVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220F6D0 PauseMenu::OpenVolume");
+  const uint32_t frame = Frame(base, sp, 112);
+  return OpenPage(base, step, frame, 5, 0x8220F72C, 0x8220F750, 0x8220F764, calls,
+                  [&] { PauseMenuSetUpVolume(base, frame, calls); });
+}
+
+uint64_t PauseMenuOpenAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220F788 PauseMenu::OpenAdjust");
+  const uint32_t frame = Frame(base, sp, 112);
+  return OpenPage(base, step, frame, 7, 0x8220F7E4, 0x8220F808, 0x8220F81C, calls,
+                  [&] { PauseMenuSetUpAdjust(base, frame, calls); });
+}
+
 uint64_t PauseMenuShowCareer(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220D418 PauseMenu::ShowCareer");
   using namespace camera_modes::steps;

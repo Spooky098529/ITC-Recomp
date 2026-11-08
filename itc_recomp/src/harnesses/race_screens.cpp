@@ -1090,6 +1090,12 @@ bool UpdateStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
 
 using MovieSetupFn = std::function<void(PPCContext&, Random&, const MovieWorld&)>;
 
+// PauseMenu::SaveVolumes' register step (no adapter: its only caller,
+// VolumePage, is native).
+void NativeSaveVolumes(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuSaveVolumes(base, ctx.r1.u32);
+}
+
 // What a case compares of the function's frame: [sp - frame, sp - saves)
 // less `skip` (offsets from the frame's bottom: SetText's varargs stores).
 struct FrameSpec {
@@ -1905,6 +1911,59 @@ void MainPages(Context& h, const MovieWorld& w) {
              __imp__sub_8220F0A0, hooks::RaceScreensPauseMenuCloseVolume, transition);
   MovieGroup(h, w, "PauseMenu::CloseAdjust (sub_8220F2A8)", 150, transition_values,
              __imp__sub_8220F2A8, hooks::RaceScreensPauseMenuCloseAdjust, transition);
+  MovieGroup(h, w, "PauseMenu::OpenVolume (sub_8220F6D0)", 150, transition_values,
+             __imp__sub_8220F6D0, hooks::RaceScreensPauseMenuOpenVolume, transition);
+  MovieGroup(h, w, "PauseMenu::OpenAdjust (sub_8220F788)", 150, transition_values,
+             __imp__sub_8220F788, hooks::RaceScreensPauseMenuOpenAdjust, transition);
+  // The volume page and SaveVolumes: the volumes and their saved and default
+  // copies (+16, +20, +52, +56, +88, +92) 0 to 15 or any; the sound
+  // manager's slots 29 and 30 (GetCategory, SetCategoryVolume) the getter
+  // sub_82090770 (r3 = +60) and the recorder sub_820CE9F8 (r4, r5 to +444,
+  // +448), as the menu sounds' harness lays them; the volume globals the
+  // setters write compared as floats and put back, and player 0's options'
+  // bytes +28 and +29 (SaveVolumes) compared.
+  constexpr uint32_t kRecordR4 = 0x820CE9F8, kGet60 = 0x82090770;
+  constexpr uint32_t kVolumes[3] = {menu_sounds::kEffectsVolume, menu_sounds::kEffectsVolume2,
+                                    menu_sounds::kMusicVolume};
+  uint32_t saved_volumes[3];
+  for (int i = 0; i < 3; i++) {
+    saved_volumes[i] = guest::LoadU32(h.base, kVolumes[i]);
+  }
+  auto volumes = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t data = w.block(rs::kPauseData);
+    for (const uint32_t field : {16u, 20u, 52u, 56u, 88u, 92u}) {
+      guest::StoreU32(h.base, data + field, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(16));
+    }
+    const uint32_t vtable = w.misc.address + 0x400;
+    guest::StoreU32(h.base, vtable + menu_sounds::kGetCategorySlot,
+                    r.Below(4) == 0 ? kRecordR4 : kGet60);
+    guest::StoreU32(h.base, vtable + menu_sounds::kSetCategoryVolumeSlot, kRecordR4);
+    guest::StoreU32(h.base, w.misc.address + 60,
+                    r.Below(3) == 0 ? 0xFFFFFFFFu : (r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(4)));
+  };
+  auto volume_outputs = [&](Outputs& out) {
+    for (int i = 0; i < 3; i++) {
+      out.Float(guest::LoadU32(h.base, kVolumes[i]));
+      guest::StoreU32(h.base, kVolumes[i], saved_volumes[i]);
+    }
+    out.Bytes(Read(h.base, w.save.address + 0x1F85C + 24, 8));
+  };
+  FrameSpec volume_page{112, 24};
+  volume_page.list_world = &list_world;
+  volume_page.after = volume_outputs;
+  MovieGroup(
+      h, w, "PauseMenu::VolumePage (sub_8220E988)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        values(r, w);
+        volumes(r, w);
+      },
+      __imp__sub_8220E988, hooks::RaceScreensPauseMenuVolumePage, volume_page);
+  FrameSpec save_volumes{96, 8};
+  save_volumes.after = volume_outputs;
+  MovieGroup(
+      h, w, "PauseMenu::SaveVolumes (sub_8220D7A0)", 100,
+      [&](PPCContext&, Random& r, const MovieWorld& w) { volumes(r, w); }, __imp__sub_8220D7A0,
+      NativeSaveVolumes, save_volumes);
 }
 
 // The dialog's page object and data as its draw's cases shape them (its

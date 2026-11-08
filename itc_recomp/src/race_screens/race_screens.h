@@ -410,6 +410,13 @@ uint64_t PauseMenuOpenMain(uint8_t* base, uint32_t step, uint32_t sp, const Call
 uint64_t PauseMenuCloseOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t PauseMenuCloseVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t PauseMenuCloseAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220F6D0 PauseMenu::OpenVolume and sub_8220F788 OpenAdjust
+// (transitions 11 and 16): on their first call the data's +148 = the
+// selection, the item's animation (type 7, selection + 1) finished,
+// SetUpVolume or SetUpAdjust, then animation 5 or 7 played; done when the
+// run answers 0.
+uint64_t PauseMenuOpenVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuOpenAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220FA88 PauseMenu::Open: the data's +132 = `kind`, +156 = `flag`, UI
 // movie 4 found into the screen's +0, UiMovie::ResetPose, PauseMenu::LoadData,
 // ScreenPages::Go(0, transition 1, then 2), MenuSound::Play(6) (both through
@@ -444,6 +451,16 @@ uint32_t PauseMenuToggleOption(uint8_t* base, uint32_t sp);
 uint64_t PauseMenuOptionsPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8220EBD8 PauseMenu::AdjustPage (page 3): see the row. Returns 0.
 uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220D7A0 PauseMenu::SaveVolumes (never seen in play; only caller
+// VolumePage), from a 96-byte frame: player 0's save data's options
+// (+0x1F85C) bytes +28 and +29 from the data's +52 and +56. Returns the
+// save data (the original's r3).
+uint32_t PauseMenuSaveVolumes(uint8_t* base, uint32_t sp);
+// sub_8220E988 PauseMenu::VolumePage (page 2): see the row. SoundOptions::
+// SetEffectsVolume and SetMusicVolume through their overrides. Returns 0.
+constexpr uint32_t kSetEffectsVolume = 0x821B9C20;
+constexpr uint32_t kSetMusicVolume = 0x821B9CF0;
+uint64_t PauseMenuVolumePage(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8220E530 PauseMenu::SetUpOptions: MenuList::Init(list, 5, 5, 1, 154,
 // 153, 155, 156; 159, 158), the edits from the options, +144 = 1,
 // RestoreNodes(-1, 8), the labels (UiMovie::SetNodeText, unset varargs 0),

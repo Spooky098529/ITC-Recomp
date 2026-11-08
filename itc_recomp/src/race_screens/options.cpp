@@ -258,6 +258,89 @@ uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   return back();
 }
 
+uint32_t PauseMenuSaveVolumes(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8220D7A0 PauseMenu::SaveVolumes");
+  Frame(base, sp, 96);
+  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  const uint32_t options = save + 0x1F85C;
+  guest::StoreU8(base, options + 28, uint8_t(guest::LoadU32(base, Get(base, kPauseData) + 52)));
+  guest::StoreU8(base, options + 29, uint8_t(guest::LoadU32(base, Get(base, kPauseData) + 56)));
+  return save;
+}
+
+uint64_t PauseMenuVolumePage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220E988 PauseMenu::VolumePage");
+  const uint32_t frame = Frame(base, sp, 112);
+  // SoundOptions::SetEffectsVolume and SetMusicVolume through their
+  // overrides with the data's words at `effects` and `music` (their low
+  // bytes sign-extended).
+  auto set_volumes = [&](uint32_t effects, uint32_t effects_lr, uint32_t music,
+                         uint32_t music_lr) {
+    auto setting = [&](uint32_t field) {
+      return uint64_t(int64_t(int8_t(guest::LoadU32(base, Get(base, kPauseData) + field) & 0xFF)));
+    };
+    calls.Call(kSetEffectsVolume, frame, effects_lr, setting(effects));
+    calls.Call(kSetMusicVolume, frame, music_lr, setting(music));
+  };
+  // Two words copied from `from` to `to`, one at a time.
+  auto copy_two = [&](uint32_t to, uint32_t from) {
+    guest::StoreU32(base, to, guest::LoadU32(base, from));
+    guest::StoreU32(base, to + 4, guest::LoadU32(base, from + 4));
+  };
+  auto sound = [&](uint64_t cue) {
+    calls.Call(kMenuSoundPlay, frame, 0x8220EBBC, cue);
+    return 0;
+  };
+  calls.Call(kListUpdate, frame, 0x8220E9A8, Get(base, kPauseList));
+  if (guest::LoadU32(base, Get(base, kPauseList) + kListMove) != 0) {
+    calls.Call(kMenuSoundPlay, frame, 0x8220E9C0, 4);
+    calls.Call(kPagesGo, frame, 0x8220E9D8, Get(base, kPausePages), 2, 13, kNone);
+    return 0;
+  }
+  if (PauseMenuStepVolume(base, frame) != 0) {
+    calls.Call(kPagesGo, frame, 0x8220EA00, Get(base, kPausePages), 2, 14, kNone);
+    PauseMenuSaveVolumes(base, frame);
+    set_volumes(56, 0x8220EA18, 52, 0x8220EA28);
+    return sound(4);
+  }
+  if (uint32_t(calls.Call(kListAccepted, frame, 0x8220EA38, Get(base, kPauseList))) != 0) {
+    if (int32_t(ListSelection(base, Get(base, kPauseList))) == 2) {
+      const uint32_t data = Get(base, kPauseData);
+      if (guest::LoadU32(base, data + 144) == 0) {
+        copy_two(data + 16, data + 52);
+        PauseMenuShowVolumesB(base, frame, calls);
+        calls.Call(kPagesGo, frame, 0x8220EA98, Get(base, kPausePages), kNone, 0, 15);
+        set_volumes(20, 0x8220EAA8, 16, 0x8220EB10);
+        return sound(0);
+      }
+    }
+    if (int32_t(ListSelection(base, Get(base, kPauseList))) == 2) {
+      const uint32_t data = Get(base, kPauseData);
+      if (int32_t(guest::LoadU32(base, data + 144)) == 1) {
+        copy_two(data + 52, data + 88);
+        PauseMenuShowVolumes(base, frame, calls);
+        set_volumes(56, 0x8220EB00, 52, 0x8220EB10);
+        return sound(0);
+      }
+    }
+    ListSetSelection(base, Get(base, kPauseList), 2);
+    guest::StoreU32(base, Get(base, kPauseData) + 144, 0);
+    calls.Call(kPagesGo, frame, 0x8220EB44, Get(base, kPausePages), 2, 13, kNone);
+    return sound(0);
+  }
+  if (uint32_t(calls.Call(kListCancelled, frame, 0x8220EB50, Get(base, kPauseList))) == 0) {
+    return 0;
+  }
+  {
+    const uint32_t data = Get(base, kPauseData);
+    copy_two(data + 52, data + 16);
+  }
+  PauseMenuShowVolumes(base, frame, calls);
+  calls.Call(kPagesGo, frame, 0x8220EB94, Get(base, kPausePages), kNone, 0, 15);
+  set_volumes(20, 0x8220EBA4, 16, 0x8220EBB4);
+  return sound(2);
+}
+
 uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220E530 PauseMenu::SetUpOptions");
   const uint32_t frame = Frame(base, sp, 144);
