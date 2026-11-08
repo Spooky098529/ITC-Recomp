@@ -233,5 +233,16 @@ uint64_t Type7PanelScreenDrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint3
 // quit dialog +9656 is 0; at 2, +9608 = 10 once both fade counts are 0.
 uint64_t Type7PanelScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                               const Calls& calls);
+// sub_822405F8 Type7PanelScreen::PickCar (pick_car.cpp; r4 the
+// dispatcher): GarageCar::Reset on the type 7 car (a guest call), then from
+// the car list's selection (its slot 18, +72, called before each read): the
+// garage's car at its step copied in (memcpy's plain C++, or a guest call
+// where it declines) when its tab (+28) is 2, else Car::SetModelAndClass's
+// plain C++ with the list entry's car id and the car's halfwords (+4 when it
+// was 0xFFFF, +2 = +0, +0 = the selection's +40 + +44); then the car's
+// +1972, +1980, +1976, +9608 = 9 and message 5 posted. The last selection
+// call's r3.
+uint64_t Type7PanelScreenPickCar(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
 
 }  // namespace type67_screens

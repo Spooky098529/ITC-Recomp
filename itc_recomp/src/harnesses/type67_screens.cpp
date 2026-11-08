@@ -41,6 +41,14 @@ ITC_FLAG_DECLARE(bool, native_type67_screens);
 
 namespace harness {
 
+// The stand's car world (src/harnesses/car_makers.cpp): a spec and
+// parameters for one car id in a 0x10000-byte block. (The same definition
+// is in car_makers.cpp.)
+struct StandWorld {
+  uint32_t params, holder_word, list;
+};
+StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint32_t holder);
+
 namespace {
 
 namespace ts = type67_screens;
@@ -498,6 +506,109 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
   guest::StoreU32(base, kMissingMovie, saved_missing);
 }
 
+// Type7PanelScreen::PickCar: the car list at the world's +0x3600 with its
+// real slot 18 (sub_820B67D8, the list + 208: the selection), the
+// selection's tab (+28) 2 (the garage) or not, its steps (+32, +36) small,
+// its +40 and +44 random, its entry table (+1616) at the world's +0x3E00
+// naming an entry whose car id (+8432) is LayShowCarWorld's (the case's
+// spec and parameters, [0x826C2E48] pointed at them; rand's seed set per
+// case for Car::SetModel's picks); the save data a
+// harness block ([0x826C5B58]) with a garage list (the type 6 and 7 modes'
+// harness's shape) walked the selection's steps to a slot of random words;
+// the type 7 car random, its +4 0xFFFF now and then. GarageCar::Reset runs
+// through its adapter on both sides. Compared: the world, the save block,
+// the type 7 car, the stack below the call (but the original's register
+// saves) and r3 (both halves); the globals put back after.
+void PickCar(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  constexpr uint32_t kSaveBytes = 0x1A000, kSavePointer = 0x826C5B58, kParams = 0x826C2E48;
+  constexpr uint32_t kCarBytes = 1984, kFrame = 128, kSaves = 48;
+  const Block save_block(kSaveBytes), stand(0x10000), entry_block(0x2100);
+  if (!save_block.address || !stand.address || !entry_block.address) return;
+  const uint32_t save = save_block.address, entry = entry_block.address;
+  const uint32_t sp = CallContext(h).r1.u32;
+  const uint32_t saved_save = guest::LoadU32(base, kSavePointer);
+  const uint32_t saved_params = guest::LoadU32(base, kParams);
+  // rand's seed (Car::SetModel's picks), set per case and put back after.
+  constexpr uint32_t kRandSeed = 0x82638188;
+  const uint32_t saved_seed = guest::LoadU32(base, kRandSeed);
+  const std::vector<uint8_t> saved_car = Read(base, ts::kType7Car, kCarBytes);
+  Results results("Type7PanelScreen::PickCar (sub_822405F8)");
+  for (int c = 0; c < 32; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(SplitMix(0x822405F8ull << 16 ^ uint64_t(c)));
+      const uint32_t w = world.address;
+      WriteRandom(base, w, world.bytes, r);
+      WriteRandom(base, save, 0x400, r);
+      WriteRandom(base, save + 6120, 0x400, r);
+      WriteRandom(base, sp - 2048, 2048 + 256, r);
+      const StandWorld stand_world = LayShowCarWorld(base, stand.address, r, c, 0);
+      const uint32_t array = guest::LoadU32(base, stand_world.list + 1136);
+      const uint32_t at = guest::LoadU32(base, stand_world.list + 48) +
+                          guest::LoadU32(base, stand_world.list + 52);
+      const uint32_t car_id = guest::LoadU32(base, guest::LoadU32(base, array + 4 * at) + 8432);
+      guest::StoreU32(base, kParams, stand_world.params);
+      const uint32_t list = w + 0x3600, selection = list + 208;
+      guest::StoreU32(base, w + 9644, list);
+      guest::StoreU32(base, list, w + 0x3900);
+      guest::StoreU32(base, w + 0x3900 + 72, 0x820B67D8);
+      guest::StoreU32(base, selection + 28, r.Below(2) == 0 ? 2 : r.Below(3));
+      const uint32_t a = r.Below(3), b = r.Below(3);
+      guest::StoreU32(base, selection + 32, a);
+      guest::StoreU32(base, selection + 36, b);
+      guest::StoreU32(base, selection + 1616, w + 0x3E00);
+      guest::StoreU32(base, w + 0x3E00 + 4 * (a + b), entry);
+      WriteRandom(base, entry + 8400, 64, r);
+      guest::StoreU32(base, entry + 8432, car_id);
+      // The garage list: from +204, a + b steps through distinct nodes.
+      const uint32_t nodes = save + 6120;
+      uint16_t node = uint16_t(r.Below(10));
+      guest::StoreU16(base, nodes + 204, node);
+      for (uint32_t i = 0; i < a + b; i++) {
+        const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
+        guest::StoreU16(base, nodes + 4 * node, next);
+        node = next;
+      }
+      const uint32_t slot = r.Below(3);
+      guest::StoreU16(base, nodes + 4 * node + 2, uint16_t(slot));
+      WriteRandom(base, nodes + 212 + 1968 * slot, 1968, r);
+      guest::StoreU32(base, kSavePointer, save);
+      WriteRandom(base, ts::kType7Car, kCarBytes, r);
+      if (r.Below(2) == 0) guest::StoreU16(base, ts::kType7Car + 4, 0xFFFF);
+      guest::StoreU32(base, kRandSeed, uint32_t(r.Next()));
+      guest::StoreU32(base, w + kDispatcher + 204 + 600, r.Below(50));
+      guest::StoreU32(base, w + kDispatcher + 204 + 604, r.Below(60));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = w | (uint64_t(r.Below(2)) << 32);
+      t.r4.u64 = w + kDispatcher;
+      t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      if (v == 0) {
+        ITC_FLAG(native_type67_screens) = false;
+        __imp__sub_822405F8(t, base);
+        ITC_FLAG(native_type67_screens) = true;
+      } else {
+        const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
+        t.r3.u64 = ts::Type7PanelScreenPickCar(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
+      }
+      out[v].Bytes(Read(base, w, world.bytes));
+      out[v].Bytes(Read(base, save, kSaveBytes));
+      out[v].Bytes(Read(base, ts::kType7Car, kCarBytes));
+      out[v].Word(guest::LoadU32(base, kRandSeed));
+      out[v].Bytes(Read(base, sp - 2048, 2048 - kFrame));
+      out[v].Bytes(Read(base, sp - kFrame, kFrame - kSaves));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  guest::StoreU32(base, kSavePointer, saved_save);
+  guest::StoreU32(base, kParams, saved_params);
+  guest::StoreU32(base, kRandSeed, saved_seed);
+  Write(base, ts::kType7Car, saved_car.data(), kCarBytes);
+}
+
 }  // namespace
 
 void Type67Screens(Context& h) {
@@ -519,6 +630,7 @@ void Type67Screens(Context& h) {
   for (int i = 0; i < 3; i++) saved_fades[i] = guest::LoadU32(h.base, kFadeWords[i]);
   ListAndNodeScreens(h, world, movie.address);
   PanelScreens(h, world, movie.address);
+  PickCar(h, world);
   for (int i = 0; i < 3; i++) guest::StoreU32(h.base, kFadeWords[i], saved_fades[i]);
 }
 

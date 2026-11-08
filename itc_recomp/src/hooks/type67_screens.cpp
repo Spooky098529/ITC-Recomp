@@ -20,10 +20,23 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "screen's NodeScreen::OnEnter sub_822591B0, OpenMovie sub_822590D0, WaitForMovie "
               "sub_82259208, Leave sub_822592D8 and OnLeft sub_82259298, "
               "Type6NodeScreen::IsLoaded sub_82236FD8, OpenMovie sub_82236EB0 and Release "
-              "sub_82236EC0; their vtable calls to the plain C++ where a slot holds one, "
-              "else guest calls; UiMovies::Open and Delete natively where their adapters "
-              "would, MenuList::Release's plain C++ over the allocation layer) natively instead "
-              "of through the translated code (the same writes; checked by "
+              "sub_82236EC0; the panel screens' PanelScreen::OnEnter sub_82249D18, OpenMovie "
+              "sub_82248CD0, WaitForMovie sub_82249D88, Open sub_82249DF8, Show sub_82248CE0, "
+              "Update sub_82248C48, OnMessage24 sub_82248DF8, Leave sub_82249E38, OnLeft "
+              "sub_82248B08, DrawList sub_82248B58, IsLoaded sub_82230790 and DeleteMovies "
+              "sub_82240208, Type6PanelScreen::OpenMovies sub_82230758 and OpenPowerGraph "
+              "sub_82247058, Type7PanelScreen::Draw sub_82240958, DrawList sub_82240908, "
+              "OpenMovies sub_822401D0, PickCar sub_822405F8 (GarageCar::Reset a guest call, "
+              "memcpy's and Car::SetModelAndClass's plain C++), Back sub_82240860, "
+              "OpenPowerGraph sub_822408B8, CarList sub_82240238, CarEntry sub_82240248 and "
+              "CarSlot sub_82240258; the group pair's GroupPair::SelectA sub_82249C30, Reset "
+              "sub_82249C40, Run sub_82249BE0, WaitForFade sub_82249BA8 and FinishAll "
+              "sub_82249C70, PanelGroup::Movie sub_82258FC8 and Run sub_82259008 "
+              "(UiMovie::ResetPose, FinishAll and Run guest calls to their overrides); their "
+              "vtable calls to the plain C++ where a slot holds one, else guest calls (the car "
+              "list's); UiMovies::Open and Delete natively where their adapters would, "
+              "MenuList::Release's plain C++ over the allocation layer) natively instead of "
+              "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
 namespace hooks {
@@ -103,6 +116,8 @@ ITC_TS_STEP(PanelScreenOnMessage24,
             ts::PanelScreenOnMessage24(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(PanelScreenLeave, ts::PanelScreenLeave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(PanelScreenOnLeft, ts::PanelScreenOnLeft(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7PanelScreenPickCar,
+            ts::Type7PanelScreenPickCar(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7PanelScreenDraw,
             ts::Type7PanelScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
@@ -157,6 +172,7 @@ ITC_TYPE67_SCREENS(82240208, PanelScreenDeleteMovies)
 ITC_TYPE67_SCREENS(82240860, Type7PanelScreenBack)
 ITC_TYPE67_SCREENS(82247058, Type6PanelScreenOpenPowerGraph)
 ITC_TYPE67_SCREENS(822408B8, Type7PanelScreenOpenPowerGraph)
+ITC_TYPE67_SCREENS(822405F8, Type7PanelScreenPickCar)
 ITC_TYPE67_SCREENS(82240238, Type7PanelScreenCarList)
 ITC_TYPE67_SCREENS(82240248, Type7PanelScreenCarEntry)
 ITC_TYPE67_SCREENS(82240258, Type7PanelScreenCarSlot)

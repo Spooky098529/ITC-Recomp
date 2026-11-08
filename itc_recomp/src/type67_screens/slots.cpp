@@ -61,6 +61,9 @@ std::optional<uint64_t> Native(uint8_t* base, uint32_t target, uint64_t r3,
     case 0x822408B8:
       if (!r4) return std::nullopt;
       return PanelScreenPost(base, r3, *r4, target);
+    case 0x822405F8:
+      if (!r4) return std::nullopt;
+      return Type7PanelScreenPickCar(base, r3, *r4, sp, calls);
     case 0x82240238:
       return Type7CarWord(base, 1972);
     case 0x82240248:
@@ -88,6 +91,7 @@ bool IsNative(uint32_t target, bool has_r4) {
     case 0x82240860:
     case 0x82247058:
     case 0x822408B8:
+    case 0x822405F8:
       return has_r4;
     case kEmpty:
     case 0x82242F70:
