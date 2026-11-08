@@ -41,9 +41,26 @@ file's history. What's left to see in a drive, from every run:
   subagents). Left: none in either file; newly ready in other files:
   `sub_82211B98`, `sub_82246038`, `sub_82218838`, `sub_82090CC0` (with
   `sub_8258BD58`, `sub_8258BE48`), and 12 callers without rows. Step:
-  its validation, agent running.
+  its validation. Validated `itc_4552` (race 85 s at 180; 0 errors,
+  every harness 0 differing outside the expected groups, 19 of 19
+  harness lines; a print added for `sub_8211E370`, c87035a6; 4 in the
+  race, 1 more in the replay `itc_4553` (ok), 14 to drive). Recorded.
+- Cleanup lead (no mapping, not counted): the groups the UI movie
+  helpers made ready in mapped files: `RaceScreens::~RaceScreens`
+  `sub_82211B98` (`race-hud-object.md`), `StandMode::Release`
+  `sub_82246038` (`type6-type7-modes.md`), `RaceDialog::SetText`
+  `sub_82218838` (`race-screens.md`), the debug font loader
+  `sub_82090CC0` with `sub_8258BD58`, `sub_8258BE48`
+  (`files-and-saves.md`). Its callers without rows went to `leads.md`.
+  Step: migration, agent running.
 
 ## Done
+
+- `ui-movies-game.md`: 8 new rows, 92 of 92 ours (the UI movie
+  helpers), with the car list's groups they unblocked (`car-list.md`,
+  94 of 94; 34 adapters removed in all), `--native_ui_movies_game`,
+  `--native_car_list`, `--native_file_layer`; 9f12739f,
+  e052912e..c87035a6.
 
 ## Rows to review
 

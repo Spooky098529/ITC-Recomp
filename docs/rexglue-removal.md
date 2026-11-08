@@ -2795,6 +2795,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-08 | The options screen (the front end's options: its machine's handlers, `Draw`'s 15 pages and `Update`'s 49 steps, the HUD, sound, sliders, buttons and analog pages, the settings' `Reset`, `Read`, `Write` and `Reload` over `[0x826D8478]`, the type 2, 4, 6 and 7 options' and controller pages' Inits; with the cleanup lead before it, `CarScene::SetUp` `sub_820C8DE8`, which unblocked `StandScene::Create` and the type 6 and 7 modes' slot 0) | `options-screen.md` | 98 of 100 in play (three migrations; 31 adapters removed) | `--native_options_screen` |
 | 2026-11-08 | The type 6 and 7 modes' screens (the list, panel and node screens the modes' menus open: their machines' handlers, movie opens and releases, the panel screens as the car pick with `Type7PanelScreen::PickCar`, the group pair and panel groups) | `type67-screens.md` | 48 of 48 in play (one migration; 1 adapter removed) | `--native_type67_screens` |
 | 2026-11-08 | The car list (`PanelSet`, the type 6 and 7 panel screens' car pick: its vtable slots, 9 pages and 27 steps, the tab, row, color and car panels, `Build` over our allocation layer, `Update` with the stand car and `GarageStages::DrawAll`) | `car-list.md` | 71 of 94 in play (three migrations; 24 adapters removed) | `--native_car_list` |
+| 2026-11-08 | The UI movie helpers (`UiMovie::IsNamedActive`, `UnloopNamed`, `ClearNodeText`, `SetNodeTextV`, `SetNodeNumberText`, `OnLoaded`, `UiMovies::DeleteAll`), with the car list's groups they unblocked (the panels, steps, `Step17`, `CarPage`) | `ui-movies-game.md`, `car-list.md` | 8 new rows, 92 of 92 ours; the car list 94 of 94 (two migrations; 34 adapters removed) | `--native_ui_movies_game`, `--native_car_list` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4910,3 +4911,20 @@ functions (916 pairs): overridden 109, Native 36, Dropped 26, never
 called 70, live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 4,920, work left 1,506 (Wrapped 56, with a row
 448, no row yet 1,002), from 1,576.
+
+**2026-11-08, the UI movie helpers (branch `b7-loop-08-11-26`):** the
+thirty-ninth run's first subsystem, mapped into `ui-movies-game.md`
+(8 new rows, 3 in play) and made native in two migrations under
+`--native_ui_movies_game`, with what they unblocked: the car list's
+panels, steps, `Step17` and `CarPage` (`car-list.md`, now 94 of 94
+ours) and `File::GetSize` (`--native_file_layer`). `CarPage` and
+`Step17`'s harness cases use a shared world with the stand's car
+(`src/harnesses/stand_car_world.h`, laid by `load_poll.cpp`).
+`sub_8211CBD8` takes a `va_list` (`UiMovie::SetNodeTextV`). Newly
+ready in other files: `RaceScreens::~RaceScreens`,
+`StandMode::Release`, `RaceDialog::SetText` and the debug font loader
+(a cleanup lead). The panel screens still wait for a drive. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36,
+Dropped 26, never called 70, live 208. Imports: 186 called, 54 with a
+live caller. B7 (`b7_status.py`): ours 4,952, work left 1,474 (Wrapped
+56, with a row 419, no row yet 999), from 1,506.

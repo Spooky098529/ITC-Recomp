@@ -18,6 +18,12 @@ here loses its heading.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
+- The UI movie helpers' second migration (attract race `itc_4552`,
+  replay `itc_4553` ok; `ui-movies-game.md`, `car-list.md`):
+  `sub_8211CA18`, `sub_8224C450`, `sub_8224B8D8`, `sub_82249668`,
+  `sub_8224A490`, `sub_8224B248`, `sub_8224F558`, `sub_8224E050`,
+  `sub_8224DF30`, `sub_8224D860`, `sub_8224E920`, `sub_8224D010`,
+  `sub_8224D1F0`, `sub_82250368`.
 - The UI movie helpers' migration with the car list's cleanup
   (attract race `itc_4536`, replay `itc_4537` ok; `ui-movies-game.md`,
   `car-list.md`): `sub_8211BC18`, `sub_8211CC50`, `sub_8211DE30`,
