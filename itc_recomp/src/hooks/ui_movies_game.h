@@ -54,6 +54,13 @@ bool OpenNative();
 bool DeleteNative();
 ui_movies::OpenCalls OpenCalls(PPCContext& ctx, uint8_t* base, uint32_t sp);
 ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp);
+// UiMovie::OnLoaded's (sub_8211E500) calls from its 192-byte frame below
+// `sp`: their plain C++ where their own checks say so, else their originals.
+ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t sp);
+// Whether OnLoaded runs natively: --native_ui_movies_game and
+// --native_ui_movies over the allocation layer (--native_heap and the C
+// runtime's heap).
+bool OnLoadedNative();
 
 // UiMovie::SetNodeText (sub_8211C7E8; r3 = movie, r4 = a TXT node, r5 = the
 // string id, r6 to r10 its arguments): natively as SetText (its override

@@ -18,6 +18,10 @@ constexpr uint32_t kStreamVtable = 0x8206BFF8;
 constexpr uint32_t kPathVtable = 0x8206CC3C;
 constexpr uint32_t kGamePathVtable = 0x820022A0;
 
+// File::GetSize (sub_822B80D8): the file object's +12 (its size; on an XMD
+// archive its entry count, the same code). A leaf.
+uint32_t FileGetSize(uint8_t* base, uint32_t file);
+
 // File::File (sub_8258C938): +0 the vtable, +4 = -1 (closed), +8 = 0 (the
 // position), +12 = 0 (the size).
 void FileConstruct(uint8_t* base, uint32_t file);

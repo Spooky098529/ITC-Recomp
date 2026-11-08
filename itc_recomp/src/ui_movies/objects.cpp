@@ -825,6 +825,61 @@ uint32_t DeleteMovie(uint8_t* base, uint32_t id, uint32_t frame, const DeleteCal
   return calls.set(frame + 84, frame + 80);
 }
 
+uint32_t OnLoaded(uint8_t* base, uint32_t archive, uint32_t movie, uint32_t frame,
+                  const OnLoadedCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211E500 UiMovie::OnLoaded");
+  CheckXmd(base, archive);
+  const uint32_t file = XmdEntry(base, archive, 0);
+  const uint32_t end = FindChunk(base, file, kTagTrm);
+  const uint32_t size = Load(base, end + 4) - file + end;
+  for (uint32_t i = 0; i < 3; i++) {
+    Store(base, movie + 4 * i, memory::AllocPages(size, 4096));
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    calls.copy(i, Load(base, movie + 4 * i), file, size);
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    FixUpFile(base, Load(base, movie + 4 * i));
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    Store(base, movie + 16 + 4 * i, FileScene(base, Load(base, movie + 4 * i)));
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    calls.layers(i, movie, Load(base, movie + 16 + 4 * i));
+  }
+  ClearTextIds(base, movie);
+  calls.free_texts(movie);
+  Store(base, movie + 0x90B0, 0);
+  calls.add_named(movie, Load(base, movie + 16));
+  if (calls.get_size(archive) != 1) {
+    const uint32_t textures = Load(base, XmdEntry(base, archive, 1) + 12);
+    const uint32_t xpr = calls.make(0, 24);
+    if (xpr != 0) {
+      calls.xpr_construct(xpr);
+    }
+    Store(base, movie + 12, xpr);
+    calls.xpr_create(Load(base, movie + 12), XmdEntry(base, archive, 1));
+    for (uint32_t i = 0; i < textures; i++) {
+      const uint32_t entry = calls.make(1, 12);
+      if (entry != 0) {
+        Store(base, entry + 0, 0);
+        Store(base, entry + 4, 0);
+        Store(base, entry + 8, 0);
+      }
+      Store(base, frame + 80, entry);
+      const uint32_t texture = uint32_t(calls.get_texture(Load(base, movie + 12), i));
+      Store(base, entry + 0, texture);
+      calls.level_desc(texture, frame + 96);
+      Store(base, entry + 4, Load(base, frame + 120));
+      Store(base, entry + 8, Load(base, frame + 124));
+      calls.append(movie + kMovieTextures, frame + 80);
+    }
+  }
+  const uint32_t r3 = calls.virtual_free(archive);
+  Store(base, movie + kMovieLoaded, 1);
+  return r3;
+}
+
 uint32_t DeleteAll(uint8_t* base, uint32_t frame, const DeleteCalls& calls, uint32_t r3) {
   ITC_NATIVE_RUNNING("sub_8211E2C8 UiMovies::DeleteAll");
   for (uint32_t i = 0; i < Load(base, kMovieTable + 8); i++) {

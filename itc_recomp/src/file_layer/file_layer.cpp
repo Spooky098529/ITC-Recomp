@@ -6,6 +6,11 @@
 
 namespace file_layer {
 
+uint32_t FileGetSize(uint8_t* base, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_822B80D8 File::GetSize");
+  return guest::LoadU32(base, file + 12);
+}
+
 void FileConstruct(uint8_t* base, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_8258C938 File::File");
   guest::StoreU32(base, file + 8, 0);

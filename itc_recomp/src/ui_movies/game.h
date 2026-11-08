@@ -660,4 +660,43 @@ uint32_t DeleteMovie(uint8_t* base, uint32_t id, uint32_t frame, const DeleteCal
 // leaves it: the last Delete's, or `r3` when the table is empty.
 uint32_t DeleteAll(uint8_t* base, uint32_t frame, const DeleteCalls& calls, uint32_t r3);
 
+// sub_8211E500 UiMovie::OnLoaded's calls, from its 192-byte frame: memcpy
+// of the three copies (`which` 0 to 2), the layers (sub_8211BD10 with the
+// copy's scene as scene and group, layer 0, by bucket), the texts freed
+// (sub_8211AC90, its r3), the named animations (sub_8211E378), File::GetSize
+// (sub_822B80D8, on the archive: its entry count), operator new (`which` 0
+// the texture set's 24 bytes, 1 a texture entry's 12), XPR::XPR and
+// XPR::Create (sub_82596E68, sub_82596F68), XPR::GetTexture (sub_82597118,
+// its 64-bit r3), Texture::GetLevelDesc (sub_822A5B78), the word append
+// (sub_8211AE68) and VirtualFree(archive, 0, MEM_RELEASE) (its r3).
+struct OnLoadedCalls {
+  std::function<void(uint32_t which, uint32_t to, uint32_t from, uint32_t size)> copy;
+  std::function<void(uint32_t which, uint32_t movie, uint32_t scene)> layers;
+  std::function<void(uint32_t movie)> free_texts;
+  std::function<void(uint32_t movie, uint32_t scene)> add_named;
+  std::function<uint32_t(uint32_t archive)> get_size;
+  std::function<uint32_t(uint32_t which, uint32_t size)> make;
+  std::function<void(uint32_t xpr)> xpr_construct;
+  std::function<void(uint32_t xpr, uint32_t file)> xpr_create;
+  std::function<uint64_t(uint32_t xpr, uint32_t index)> get_texture;
+  std::function<void(uint32_t texture, uint32_t desc)> level_desc;
+  std::function<void(uint32_t vector, uint32_t word_address)> append;
+  std::function<uint32_t(uint32_t archive)> virtual_free;
+};
+// sub_8211E500 UiMovie::OnLoaded (Archive::Load's callback; `archive` the
+// loaded XMD archive, `movie` its context; `frame` the original's r1, 192
+// bytes): the archive checked (CheckXmd, its answer unused), entry 0 the
+// X2D file, its size up to the end of its TRM chunk, three copies
+// (VirtualAlloc: the allocation layer's pages) at +0, +4, +8, each fixed
+// up, their scenes at +16, +20, +24; the layers in each, the live texts'
+// ids cleared, the texts freed, +0x90B0 = 0 and the named animations from
+// the live scene. Unless the archive's count is 1: entry 1 an XPR2
+// texture set at +12 (a 24-byte XPR made and created) and for each of its
+// records a 12-byte entry (+0 the record's header, +4 and +8 the level
+// description's width and height, from the frame's +96 to +127) appended
+// to +28 through the frame's +80. The archive freed, +0x9FD0 = 1. Returns
+// VirtualFree's r3.
+uint32_t OnLoaded(uint8_t* base, uint32_t archive, uint32_t movie, uint32_t frame,
+                  const OnLoadedCalls& calls);
+
 }  // namespace ui_movies

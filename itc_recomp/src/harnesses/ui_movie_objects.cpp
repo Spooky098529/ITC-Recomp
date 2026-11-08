@@ -15,8 +15,11 @@
 #include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
+#include "models/xpr.h"
 #include "std_string/std_string.h"
 #include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
 
 #include <fmt/format.h>
 
@@ -1478,6 +1481,227 @@ void DeleteAllCases(Context& h) {
   }
 }
 
+// UiMovie::OnLoaded's register steps (the adapter's, without its flags).
+void NativeOnLoaded(PPCContext& t, uint8_t* base) {
+  const uint32_t sp = t.r1.u32;
+  t.r3.u64 = ui_movies::OnLoaded(base, t.r4.u32, t.r6.u32, sp - 192,
+                                 ui_movies_game_hooks::OnLoadedCalls(t, base, sp));
+}
+
+// A word of a block the run made, as an offset into it when it points
+// inside (`bytes` from `at`), else itself.
+uint32_t Relative(uint32_t word, uint32_t at, uint32_t bytes) {
+  return word - at < bytes ? 0xA0000000u | (word - at) : word;
+}
+
+// UiMovie::OnLoaded over archives of our own (the allocation layer's pages,
+// random bytes): an XMD of 1 or 2 entries (1: no texture set); entry 0 an
+// X2D file (its table 0 to 3 entries, no animations) whose chunks are its
+// header, a scene of 0 to 3 children (entries relative to it, its +100
+// range and its +112 count all of them) each a chunk of its own (TXT, PIC, PRM, GRP or another
+// tag, never SCE; their +100 and +104 0, their layer offset +72 0 to 63, now
+// and then out of range: the layers' original), then TRM; entry 1 an XPR2
+// file of 0 to 3 records (textures and others, their headers random words)
+// and 1 to 4,000 data bytes. The movie MakeLoadedMovie's (its texts freed,
+// its file copies leaked as the original leaves them). Compared: r3,
+// whether the archive was freed, the three copies (their pointers back to
+// offsets), the scenes (offsets into their copies), the texture set (its
+// words, the header block's bytes with the pointers XPR::Create makes back
+// to offsets, the data), the texture entries (old by whether still blocks,
+// new by their words, +0 an offset into the header block), the movie's
+// other bytes, the texts' blocks freed and the frame's +80 to +127.
+void OnLoadedCases(Context& h) {
+  Results results("UiMovie::OnLoaded (sub_8211E500)");
+  constexpr uint32_t kArchiveBytes = 0x4000, kFile = 0x100, kXpr = 0x1000;
+  constexpr uint32_t kTags[5] = {0x54585400, 0x50494300, 0x50524D00, 0x47525000, 0x41424300};
+  for (int i = 0; i < 40; i++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    uint32_t entries_seen = 0;
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      std::vector<uint32_t> blocks, pages;
+      const uint32_t movie = memory::crt::OperatorNew(h.base, kMovieBytes).value_or(0);
+      MakeLoadedMovie(r, h.base, movie, blocks, pages);
+      const uint32_t old_entries = Load(h.base, movie + 36);
+      const uint32_t archive = memory::AllocPages(kArchiveBytes, 4096);
+      RandomFill(r, h.base, archive, kArchiveBytes);
+      const uint32_t count = r.Below(3) == 0 ? 1 : 2;
+      Store(h.base, archive + 0, 0x584D4400);
+      Store(h.base, archive + 4, 0x30303100);
+      Store(h.base, archive + 8, 0);
+      Store(h.base, archive + 12, count);
+      Store(h.base, archive + 16, kFile);
+      Store(h.base, archive + 20, kXpr);
+      // The X2D file.
+      const uint32_t file = archive + kFile, scene = file + 0x80;
+      const uint32_t table = r.Below(4), children = r.Below(4);
+      Store(h.base, file + 0, 0x48445200);
+      Store(h.base, file + 4, 0x80);
+      Store(h.base, file + 8, 0x58324400);
+      Store(h.base, file + 12, 0x30303500);
+      Store(h.base, file + 16, 0);
+      Store(h.base, file + 20, 0);
+      Store(h.base, file + 24, table);
+      for (uint32_t k = 0; k < table; k++) {
+        Store(h.base, file + 32 + 8 * k, 0x80 + 4 * r.Below(64));
+      }
+      Store(h.base, scene + 0, ui_movies::kTagSce);
+      Store(h.base, scene + 4, 0x100);
+      for (const uint32_t at : {100u, 108u, 120u}) Store(h.base, scene + at, 0);
+      Store(h.base, scene + 104, children);
+      Store(h.base, scene + 112, children);
+      Store(h.base, scene + 116, children);
+      Store(h.base, scene + 124, children);
+      for (uint32_t k = 0; k < children; k++) {
+        const uint32_t node = scene + 0x100 * (k + 1);
+        Store(h.base, scene + 128 + 8 * k, 0x100 * (k + 1));
+        Store(h.base, node + 0, kTags[r.Below(5)]);
+        Store(h.base, node + 4, 0x100);
+        Store(h.base, node + 72, r.Below(6) == 0 ? 64 + r.Below(4) : r.Below(64));
+        Store(h.base, node + 100, 0);
+        Store(h.base, node + 104, 0);
+      }
+      const uint32_t end = scene + 0x100 * (children + 1);
+      Store(h.base, end + 0, ui_movies::kTagTrm);
+      Store(h.base, end + 4, 16);
+      const uint32_t size = end + 16 - file;
+      // The XPR2 file.
+      const uint32_t xpr2 = archive + kXpr;
+      const uint32_t records = r.Below(4);
+      const uint32_t textures_at = 4 + 16 * records;
+      const uint32_t header_bytes = textures_at + 52 * records + 16;
+      const uint32_t data_bytes = 1 + r.Below(4000);
+      std::vector<bool> texture(records);
+      Store(h.base, xpr2 + 0, 0x58505232);
+      Store(h.base, xpr2 + 4, header_bytes);
+      Store(h.base, xpr2 + 8, data_bytes);
+      Store(h.base, xpr2 + 12, records);
+      for (uint32_t k = 0; k < records; k++) {
+        texture[k] = r.Below(4) != 0;
+        const uint32_t record = xpr2 + 16 + 16 * k;
+        const uint32_t tag = Load(h.base, record) & 0xFFFFu;
+        Store(h.base, record, (texture[k] ? 0x54580000u : 0x56420000u) | tag);
+        Store(h.base, record + 4, textures_at + 52 * k);
+      }
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - 192;
+      Fill(h.base, frame + 80, 48);
+      t.r3.u64 = r.Next();
+      t.r4.u64 = archive;
+      t.r5.u64 = r.Next();
+      t.r6.u64 = movie;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211E500, t, h.base);
+      } else {
+        NativeOnLoaded(t, h.base);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(memory::IsPages(archive));
+      if (memory::IsPages(archive)) memory::FreePages(archive);
+      std::vector<uint32_t> masked = {0, 4, 8, 12, 16, 20, 24, 28, 40};
+      for (uint32_t k = 0; k < 3; k++) {
+        masked.push_back(0x9BCC + 8 * k + 4);
+      }
+      for (uint32_t k = 0; k < 3; k++) {
+        const uint32_t copy = Load(h.base, movie + 4 * k);
+        out[v].Word(memory::IsPages(copy));
+        for (uint32_t w = 0; w < size; w += 4) {
+          out[v].Word(Relative(Load(h.base, copy + w), copy, size));
+        }
+        out[v].Word(Load(h.base, movie + 16 + 4 * k) - copy);
+        memory::FreePages(copy);
+      }
+      // The texture set, its header block (made by XPR::Create) and data.
+      const uint32_t xpr = Load(h.base, movie + 12);
+      uint32_t header = 0;
+      if (count != 1) {
+        out[v].Word(memory::IsHeapBlock(xpr));
+        header = Load(h.base, xpr + 0);
+        const uint32_t data = Load(h.base, xpr + 8);
+        out[v].Word(Load(h.base, xpr + 4));
+        out[v].Word(Load(h.base, xpr + 12));
+        out[v].Word(Load(h.base, xpr + 16) - header);
+        out[v].Word(Load(h.base, xpr + 20));
+        std::vector<uint8_t> bytes = Read(h.base, header, header_bytes);
+        const auto word = [&](uint32_t offset, uint32_t minus) {
+          const uint32_t w = Load(h.base, header + offset) - minus;
+          for (int b = 0; b < 4; b++) bytes[offset + b] = uint8_t(w >> (24 - 8 * b));
+        };
+        for (uint32_t k = 0; k < records; k++) {
+          word(4 + 16 * k + 12, header);
+          if (texture[k]) {
+            const uint32_t at = textures_at + 52 * k;
+            word(at + 0x20, data);
+            if (((Load(h.base, header + at + 44) >> 6) & 0xF) != 0) {
+              word(at + 0x30, data);
+            }
+          }
+        }
+        out[v].Bytes(bytes);
+        out[v].Bytes(Read(h.base, data, data_bytes));
+      } else {
+        out[v].Word(xpr);
+      }
+      // The texture entries: the old ones still blocks, the new ones' words.
+      const uint32_t array = Load(h.base, movie + 28);
+      const uint32_t entries = Load(h.base, movie + 36);
+      out[v].Word(entries);
+      out[v].Word(memory::IsHeapBlock(array) ? memory::Size(array) : 0);
+      std::vector<uint32_t> made;
+      for (uint32_t k = 0; k < entries && k < 64; k++) {
+        const uint32_t entry = Load(h.base, array + 4 * k);
+        if (k < old_entries) {
+          out[v].Word(entry == 0 ? 0 : 1);
+          continue;
+        }
+        out[v].Word(memory::IsHeapBlock(entry));
+        out[v].Word(Load(h.base, entry + 0) - header);
+        out[v].Word(Load(h.base, entry + 4));
+        out[v].Word(Load(h.base, entry + 8));
+        made.push_back(entry);
+      }
+      if (v == 0) entries_seen = entries - old_entries;
+      // The frame: +80 the last new entry (by its number), the level
+      // description.
+      const uint32_t last = Load(h.base, frame + 80);
+      const auto found = std::find(made.begin(), made.end(), last);
+      out[v].Word(found != made.end() ? 0xE0000000u + uint32_t(found - made.begin()) : last);
+      out[v].Bytes(Read(h.base, frame + 84, 44));
+      out[v].Bytes(MovieBytes(h.base, movie, masked));
+      for (uint32_t block : blocks) {
+        out[v].Word(block != 0 && memory::IsHeapBlock(block));
+      }
+      for (uint32_t page : pages) {
+        out[v].Word(page != 0 && memory::IsPages(page));
+      }
+      // Freed: the new entries, the texture set, the movie's own and the
+      // case's blocks still there.
+      for (uint32_t entry : made) memory::crt::OperatorDelete(entry);
+      Store(h.base, movie + 36, old_entries);
+      if (count != 1 && memory::IsHeapBlock(xpr)) {
+        const uint32_t data = Load(h.base, xpr + 8);
+        if (header != 0) memory::FreePages(header - models::kBlockHeaderBytes);
+        if (data != 0) memory::crt::XMemFree(data - models::kBlockHeaderBytes,
+                                             models::kXprDataAllocation);
+        memory::crt::OperatorDelete(xpr);
+      }
+      Store(h.base, movie + 12, 0);
+      ui_movies::DestroyMovie(h.base, movie);
+      for (uint32_t block : blocks) {
+        if (block != 0 && memory::IsHeapBlock(block)) memory::crt::OperatorDelete(block);
+      }
+      for (uint32_t page : pages) {
+        if (page != 0 && memory::IsPages(page)) memory::FreePages(page);
+      }
+      memory::crt::OperatorDelete(movie);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: {} new textures", i, entries_seen));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovieObjects(Context& h) {
@@ -1499,6 +1723,7 @@ void UiMovieObjects(Context& h) {
   OpenCases(h);
   DeleteCases(h);
   DeleteAllCases(h);
+  OnLoadedCases(h);
   EffectCases(h);
 }
 

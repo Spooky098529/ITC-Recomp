@@ -41,6 +41,10 @@ ITC_NATIVE_STEP(NativeGamePathConstruct, GamePathConstruct)
 
 #undef ITC_NATIVE_STEP
 
+void NativeFileGetSize(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = file_layer::FileGetSize(base, ctx.r3.u32);
+}
+
 void NativePathBuild(PPCContext& ctx, uint8_t* base) {
   uint32_t result;
   if (!file_layer::PathBuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &result)) {
@@ -214,6 +218,8 @@ void FileLayer(Context& h) {
       {"Path::Path", __imp__sub_82593C28, NativePathConstruct},
       {"Path::~Path", __imp__sub_82593C48, NativePathDestruct},
       {"GamePath::GamePath", __imp__sub_820A6BE0, NativeGamePathConstruct},
+      // r3 the object's size (+12), the whole of r3 compared.
+      {"File::GetSize (sub_822B80D8)", __imp__sub_822B80D8, NativeFileGetSize},
   };
   for (const Function& f : functions) {
     Results results(f.name);

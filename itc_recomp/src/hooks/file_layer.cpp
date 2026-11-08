@@ -16,7 +16,8 @@ ITC_FLAG_BOOL(native_file_layer, true, "ITC",
               "GamePath::GamePath, sub_820A6BE0; GamePath::SetGame, sub_820A6BF0, and the open "
               "for read by name, sub_820A6AB8 (calling File::OpenRead's adapter), with "
               "Path::Path and ~Path, sub_82593C28 and sub_82593C48, and Path::Build, "
-              "sub_82593CA0, over the native sprintf, called from them) natively "
+              "sub_82593CA0, over the native sprintf, called from them; File::GetSize "
+              "sub_822B80D8) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=file_layer)");
 
@@ -37,6 +38,18 @@ ITC_FLAG_BOOL(native_file_layer, true, "ITC",
     }                                           \
     file_layer::function(base, ctx.r3.u32);     \
   }
+
+// File::GetSize: r3 = the file object; its size (+12). From the debug
+// font's loader (recompiled) and, as the XMD archive's count, from
+// UiMovie::OnLoaded.
+extern "C" REX_FUNC(sub_822B80D8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_file_layer)) {
+    __imp__sub_822B80D8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = file_layer::FileGetSize(base, ctx.r3.u32);
+}
 
 ITC_FILE_LAYER_OBJECT(820A6A00, GameFileConstruct)
 ITC_FILE_LAYER_OBJECT(820A6A40, GameFileDestruct)

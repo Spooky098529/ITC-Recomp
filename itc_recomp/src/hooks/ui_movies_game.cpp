@@ -8,6 +8,10 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "file_layer/file_layer.h"
+#include "graphics/resources.h"
+#include "models/xpr.h"
+#include "native/buffers.h"
 #include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/guest_call.h"
@@ -77,7 +81,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "and with --native_heap UiMovies::Delete sub_8211E258 (and UiMovies::DeleteAll "
               "sub_8211E2C8 through its jump sub_8211E370's adapter) with UiMovie::Unload "
               "sub_8211B540 (no adapter: only Delete's plain C++ calls it; their callees natively "
-              "where their own checks say so) "
+              "where their own checks say so), and with --native_heap and --native_ui_movies the "
+              "archive's callback UiMovie::OnLoaded sub_8211E500 (its callees natively where "
+              "their own checks say so, else their originals from its frame) "
               "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
               "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
               "sub_8211B940 have no adapters: only native callers reach "
@@ -87,6 +93,9 @@ ITC_FLAG_DECLARE(bool, native_ui_movies);
 ITC_FLAG_DECLARE(bool, log_pause_movie);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 ITC_FLAG_DECLARE(bool, native_strings_and_font);
+ITC_FLAG_DECLARE(bool, native_file_layer);
+ITC_FLAG_DECLARE(bool, native_models);
+ITC_FLAG_DECLARE(bool, native_graphics_resources);
 
 #define NATIVE_OR_ORIGINAL(address)          \
   if (!ITC_FLAG(native_ui_movies_game)) {    \
@@ -1064,6 +1073,10 @@ bool DeleteNative() {
   return NativeHeap();
 }
 
+bool OnLoadedNative() {
+  return NativeHeap() && ITC_FLAG(native_ui_movies);
+}
+
 bool OpenNative() {
   return NativeHeap() && hooks::NativeArchiveQueue();
 }
@@ -1144,6 +1157,102 @@ ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) 
   return calls;
 }
 
+ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+  ui_movies::OnLoadedCalls calls;
+  // Each callee's original (or override) from OnLoaded's 192-byte frame
+  // below `sp`, returning to `back`.
+  const auto call = [&ctx, base, sp](uint32_t back, void (*function)(PPCContext&, uint8_t*),
+                                     uint32_t r3, uint32_t r4 = 0, uint32_t r5 = 0) {
+    return CallFrom(ctx, base, sp, 192, back, function, r3, r4, r5);
+  };
+  calls.copy = [call, base](uint32_t which, uint32_t to, uint32_t from, uint32_t size) {
+    static constexpr uint32_t kBack[3] = {0x8211E5AC, 0x8211E5BC, 0x8211E5CC};
+    if (!native::Buffers_Memcpy(base, to, from, size, kBack[which])) {
+      call(kBack[which], sub_825A7410, to, from, size);
+    }
+  };
+  calls.layers = [&ctx, base, sp](uint32_t which, uint32_t movie, uint32_t scene) {
+    static constexpr uint32_t kBack[3] = {0x8211E62C, 0x8211E644, 0x8211E65C};
+    if (ITC_FLAG(native_ui_movies_game) && ui_movies::LayersFit(base, scene, scene)) {
+      ui_movies::AssignLayers(base, sp - 192, movie, scene, scene, 0, true);
+      return;
+    }
+    AtStack(ctx, sp, [&] {
+      guest_call::InFrame(ctx, base, 192, kBack[which], [&](uint32_t) {
+        ctx.r3.u64 = movie;
+        ctx.r4.u64 = scene;
+        ctx.r5.u64 = scene;
+        ctx.r6.u64 = 0;
+        ctx.r7.u64 = 1;
+        __imp__sub_8211BD10(ctx, base);
+      });
+    });
+  };
+  calls.free_texts = [call, base](uint32_t movie) {
+    if (!ui_movies::FreeTexts(base, movie)) {
+      call(0x8211E668, __imp__sub_8211AC90, movie);
+    }
+  };
+  calls.add_named = [call, base, sp](uint32_t movie, uint32_t scene) {
+    if (ui_movies::CanAllocate(base, 0)) {
+      ui_movies::AddNamedAnimations(base, sp - 192, movie, scene);
+      return;
+    }
+    call(0x8211E684, __imp__sub_8211E378, movie, scene);
+  };
+  calls.get_size = [call, base](uint32_t archive) -> uint32_t {
+    if (ITC_FLAG(native_file_layer)) {
+      return file_layer::FileGetSize(base, archive);
+    }
+    return call(0x8211E68C, __imp__sub_822B80D8, archive);
+  };
+  calls.make = [call, base](uint32_t which, uint32_t size) -> uint32_t {
+    if (const auto block = memory::crt::OperatorNew(base, size)) {
+      return *block;
+    }
+    return call(which == 0 ? 0x8211E6B0 : 0x8211E6FC, __imp__sub_825A6880, size);
+  };
+  calls.xpr_construct = [call, base](uint32_t xpr) {
+    if (ITC_FLAG(native_models)) {
+      models::XprConstruct(base, xpr);
+      return;
+    }
+    call(0x8211E6BC, __imp__sub_82596E68, xpr);
+  };
+  calls.xpr_create = [call, base](uint32_t xpr, uint32_t file) {
+    if (hooks::ModelsNativeLifetime() && models::XprCreate(base, xpr, file)) {
+      return;
+    }
+    call(0x8211E6E4, __imp__sub_82596F68, xpr, file);
+  };
+  calls.get_texture = [&ctx, call, base](uint32_t xpr, uint32_t index) -> uint64_t {
+    if (ITC_FLAG(native_models)) {
+      return models::XprGetTexture(base, xpr, index);
+    }
+    call(0x8211E72C, __imp__sub_82597118, xpr, index);
+    return ctx.r3.u64;
+  };
+  calls.level_desc = [call, base](uint32_t texture, uint32_t desc) {
+    if (ITC_FLAG(native_graphics_resources)) {
+      graphics::TextureLevelDesc(base, texture, 0, desc);
+      return;
+    }
+    call(0x8211E740, __imp__sub_822A5B78, texture, 0, desc);
+  };
+  calls.append = [call, base](uint32_t vector, uint32_t word_address) {
+    if (!ui_movies::WordsAppend(base, vector, guest::LoadU32(base, word_address))) {
+      call(0x8211E75C, __imp__sub_8211AE68, vector, word_address);
+    }
+  };
+  calls.virtual_free = [call](uint32_t archive) -> uint32_t {
+    if (const auto r3 = hooks::VirtualFree(archive, 0, 0x8000, 0x8211E77C)) {
+      return *r3;
+    }
+    return call(0x8211E77C, __imp__sub_82295330, archive, 0, 0x8000);
+  };
+  return calls;
+}
+
 }  // namespace ui_movies_game_hooks
 
 // UiMovies::Open: r3 = the movie id, r4 = the asset id; r3 = 1 or 0.
@@ -1178,6 +1287,22 @@ extern "C" REX_FUNC(sub_8211E258) {
   const uint32_t sp = ctx.r1.u32;
   ctx.r3.u64 = ui_movies::DeleteMovie(base, ctx.r3.u32, sp - 128,
                                       ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
+  ctx.lr = lr;
+}
+
+// UiMovie::OnLoaded: Archive::Load's callback (no direct callers): r4 =
+// the loaded XMD archive, r6 = the movie; r3 VirtualFree's.
+extern "C" REX_FUNC(sub_8211E500) {
+  REX_FUNC_PROLOGUE();
+  if (!ui_movies_game_hooks::OnLoadedNative()) {
+    __imp__sub_8211E500(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::OnLoaded(base, ctx.r4.u32, ctx.r6.u32, sp - 192,
+                                   ui_movies_game_hooks::OnLoadedCalls(ctx, base, sp));
   ctx.lr = lr;
 }
 
