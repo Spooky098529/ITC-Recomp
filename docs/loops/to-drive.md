@@ -18,6 +18,12 @@ here loses its heading.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
+- The front-end screen helpers (attract race `itc_4619`, replay
+  `itc_4620` ok; `front-end-screen-helpers.md`): `sub_8222FB90`,
+  `sub_82288898`, `sub_82277DB0`, `sub_821A63B0`, `sub_821A5360`,
+  `sub_821C0D70`, `sub_821C0E50`, `sub_821821C8`, `sub_821830C0`,
+  `sub_821827E0`, `sub_821A5450`, `sub_821C6D48`, `sub_821822F8`,
+  `sub_821A5668`, `sub_821A5D00`, `sub_821C6638`.
 - The cleanup lead's fourth migration (attract race `itc_4610`, replay
   `itc_4611` ok; `race-screens.md`): the pause menu's adjust page and
   the volumes' save: `sub_8220F500`, `sub_8220F2A8`, `sub_8220F788`,

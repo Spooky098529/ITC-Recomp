@@ -2796,6 +2796,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-08 | The type 6 and 7 modes' screens (the list, panel and node screens the modes' menus open: their machines' handlers, movie opens and releases, the panel screens as the car pick with `Type7PanelScreen::PickCar`, the group pair and panel groups) | `type67-screens.md` | 48 of 48 in play (one migration; 1 adapter removed) | `--native_type67_screens` |
 | 2026-11-08 | The car list (`PanelSet`, the type 6 and 7 panel screens' car pick: its vtable slots, 9 pages and 27 steps, the tab, row, color and car panels, `Build` over our allocation layer, `Update` with the stand car and `GarageStages::DrawAll`) | `car-list.md` | 71 of 94 in play (three migrations; 24 adapters removed) | `--native_car_list` |
 | 2026-11-08 | The UI movie helpers (`UiMovie::IsNamedActive`, `UnloopNamed`, `ClearNodeText`, `SetNodeTextV`, `SetNodeNumberText`, `OnLoaded`, `UiMovies::DeleteAll`), with the car list's groups they unblocked (the panels, steps, `Step17`, `CarPage`) | `ui-movies-game.md`, `car-list.md` | 8 new rows, 92 of 92 ours; the car list 94 of 94 (two migrations; 34 adapters removed) | `--native_ui_movies_game`, `--native_car_list` |
+| 2026-11-08 | The front-end screen helpers (the 852-byte modes' releases, the save screen's and options' dialog text setters with their dialog steps and pages, the car cards) | `front-end-screen-helpers.md` | 27 of 32 in play (5 Merged; one migration; 6 adapters removed) | `--native_front_end_screen_helpers` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4928,3 +4929,22 @@ boundary: 449 functions (916 pairs): overridden 109, Native 36,
 Dropped 26, never called 70, live 208. Imports: 186 called, 54 with a
 live caller. B7 (`b7_status.py`): ours 4,952, work left 1,474 (Wrapped
 56, with a row 419, no row yet 999), from 1,506.
+
+**2026-11-08, the front-end screen helpers (branch
+`b7-loop-08-11-26`):** between the first and second subsystems, a
+cleanup lead (four migrations, ~60 adapters removed) made native what
+the UI movie helpers unblocked in mapped files: the in-race screens'
+teardown, the race dialog, the pause menu's pages and transitions, the
+race HUD's set-ups, the countdown, the race's end with its prizes, the
+career results and the menu after the race (`race-screens.md`,
+`race-hud-machine.md`, `race-hud-object.md`, `career.md`); the replay
+reaches the pause menu, but not always the countdown. The thirty-ninth
+run's second subsystem (`front-end-screen-helpers.md`,
+`--native_front_end_screen_helpers`,
+`src/front_end_screen_helpers/`), in one migration: the six 852-byte
+modes' releases (vtable slot 1), the save screen's and options' dialog
+text setters with the dialog steps and pages they unblocked, and the
+car cards. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,016, work left
+1,411 (Wrapped 56, with a row 390, no row yet 965), from 1,474.

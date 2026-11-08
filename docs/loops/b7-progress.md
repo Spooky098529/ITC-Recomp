@@ -111,10 +111,22 @@ file's history. What's left to see in a drive, from every run:
   steps, the options' save and category 6 pages and dialogs, the car
   cards' fill; 27 of 32 ours, 5 Merged case-0 tails; 6 adapters
   removed; `--native_front_end_screen_helpers`; race 36 s, 0 errors,
-  its harnesses 0 differing; no subagents). Left: none. Step:
-  validation, agent running.
+  its harnesses 0 differing; no subagents). Left: none. Validated
+  `itc_4619` (race 81 s at 180; 0 errors, every harness 0 differing
+  outside the expected groups, 27 of 27 harness lines; 1 in the race,
+  10 in the replay `itc_4620` (ok), 16 to drive). Recorded.
+- Subsystem 3 of 3: the front-end screen with the car cards
+  (`sub_82183DE0`, `sub_82184488`, `sub_82182DD0`, `sub_82185920`; the
+  lead this run's second map added, the closest to ready: two roots
+  ready, the others with ready groups under them; its line deleted from
+  `leads.md`). Step: mapping, agent running.
 
 ## Done
+
+- `front-end-screen-helpers.md`: 27 of 32 in play native (5 Merged;
+  the modes' releases, the save and options dialogs, the car cards; 6
+  adapters removed), `--native_front_end_screen_helpers`; 200c6832,
+  92fe4c38..99d3bf29.
 
 - Cleanup lead after the UI movie helpers (not counted): the in-race
   screens, the race HUD machine and object, the pause menu's pages and
