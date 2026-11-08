@@ -28,8 +28,12 @@ file's history. What's left to see in a drive, from every run:
   spec sheet's and the build screen machine's handlers; 12 adapters
   removed; `--native_type2_screens`; races 33-38 s, 0 errors, its
   harnesses 0 differing; two harness world fixes; no subagents). Left:
-  the hub whole, the build screen's Enter and its pages (ready). Step:
-  validation (agent running).
+  the hub whole, the build screen's Enter and its pages (ready).
+  Validated `itc_4654` (race 78 s at 180, the harnesses ~100 s; 0
+  errors, every harness 0 differing outside the expected groups, 61 of
+  61 harness lines, no prints added; none in the race, 20 in the replay
+  `itc_4655` (ok), 41 to drive). Step: second migration (agent
+  running).
 
 ## Done
 

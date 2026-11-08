@@ -16,6 +16,22 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
+
+- The type 2 screens' migration (attract race `itc_4654`, replay
+  `itc_4655` ok, the plate editor and the build screen only opened and
+  closed; `type2-screens.md`): `sub_82198190`, `sub_82198988`,
+  `sub_82199BB8`, `sub_82198420`, `sub_82198360`, `sub_821989E8`,
+  `sub_821981C8`, `sub_82199898`, `sub_821998F0`, `sub_82199990`,
+  `sub_82199AA8`, `sub_821992D8`, `sub_82199410`, `sub_821990D0`,
+  `sub_82199350`, `sub_82199488`, `sub_82199688`, `sub_82199A20`,
+  `sub_82199C10`, `sub_82199CC8`, `sub_82199D88`, `sub_8219A3A8`,
+  `sub_82198A40`, `sub_82198C20`, `sub_8219A5E8`, `sub_82198D00`,
+  `sub_8219A820`, `sub_8219AA00`, `sub_82198DC8`, `sub_8219AC88`,
+  `sub_82198FB8`, `sub_82199ED0`, `sub_8219A138`, `sub_82198540`,
+  `sub_8219B050`, `sub_8219B108`, `sub_8219C298`, `sub_8219FA80`,
+  `sub_8219B960`, `sub_8219C3A8`, `sub_8219C100`.
+
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
 - The car dealer's second migration (attract race `itc_4643`, replay
