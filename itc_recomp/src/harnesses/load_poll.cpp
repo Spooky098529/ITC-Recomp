@@ -25,6 +25,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <optional>
@@ -1175,6 +1176,7 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
     bool show_car = false;  // ShowCarById or WithClass: the car made from its id
     bool with_class = false;
     bool stand_car = false;  // the car list's ShowStandCar: its set and list too
+    bool stand_colors = false;  // the car list's SetUpColors (above ShowStandCar)
   };
   const Reapply reapplies[] = {
       {"GarageStage::ReapplyRecord (sub_82178DF8)", __imp__sub_82178DF8,
@@ -1197,6 +1199,18 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
       // r4 a color or below 0.
       {"PanelSetBase::ShowStandCar (sub_8224A490)", __imp__sub_8224A490,
        hooks::CarListShowStandCar, false, true, true, true},
+      // SetUpColors in the same world: D (+1904) 0 (its panel calls need the
+      // UI movie world: D's functions are car_list's), the rows shown
+      // (+1924) 2 to 7, the colors' selection and scroll (+244, +248)
+      // small, the menu's block (+128) 0, the entry's color count (+8376)
+      // 0 to 8 and its records (+8116: the halfword +0 0 or 1, the word +4
+      // random), the colors' list (+1824) 0 to 3 records of the layer's
+      // pages (made for each version). The records it makes compared (+0
+      // to +15 and +28 exactly, +16 to +27 as floats) and freed, the menu's
+      // new block freed, both given markers; its own frame (+80 to +144,
+      // +128 to +143 as floats) compared too.
+      {"PanelSetBase::SetUpColors (sub_8224B248)", __imp__sub_8224B248,
+       hooks::CarListSetUpColors, false, true, true, true, true},
   };
   constexpr uint32_t kParamsGlobal = 0x826C2E48, kHolderGlobal = 0x826D83E0,
                      kCarListGlobal = 0x826D83F4, kRandSeed = 0x82638188,
@@ -1307,7 +1321,8 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
       start.r3.u64 = block + kHolder;
       std::vector<uint8_t> car_inputs;
       StandWorld show{};
-      uint32_t stand_players = 0;
+      uint32_t stand_players = 0, stand_colors = 0;
+      const uint32_t stand_b = car_block + 0xE800;
       const uint32_t saved_players = guest::LoadU32(h.base, kTwoPlayersGlobal);
       if (car_world) {
         RandomBytes(h.base, car_block, kCarBlockBytes, r);
@@ -1332,6 +1347,22 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
             start.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
             start.r4.u64 = r.Below(3) == 0 ? (r.Next() | 0x80000000ull) : picks[r.Below(5)];
             stand_players = r.Below(2);
+            if (reapply.stand_colors) {
+              const uint32_t entry = car_block + 0xC400;
+              Put(h.base, b + 1904, 0);
+              Put(h.base, b + 1924, 2 + r.Below(6));
+              Put(h.base, b + 244, r.Below(4));
+              Put(h.base, b + 248, r.Below(3));
+              Put(h.base, b + 128, 0);
+              const uint32_t colors = r.Below(9);
+              Put(h.base, entry + 8376, colors);
+              for (uint32_t k = 0; k < 9; k++) {
+                guest::StoreU16(h.base, entry + 8116 + 20 * k, uint16_t(r.Below(2)));
+                Put(h.base, entry + 8116 + 20 * k + 4, uint32_t(r.Next()));
+              }
+              stand_colors = r.Below(4);
+              Put(h.base, b + 1876, stand_colors);
+            }
           }
         } else {
           start.r4.u64 = LayStandCar(h.base, car_block, r, c, traffic);
@@ -1356,6 +1387,13 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
         if (car_world) {
           Write(h.base, car_block, car_inputs.data(), kCarBlockBytes);
         }
+        std::vector<uint32_t> old_colors;
+        if (reapply.stand_colors) {
+          for (uint32_t k = 0; k < stand_colors; k++) {
+            old_colors.push_back(memory::AllocPages(32, 4096));
+            Put(h.base, stand_b + 1824 + 4 * k, old_colors.back());
+          }
+        }
         if (reapply.show_car) {
           Put(h.base, kParamsGlobal, show.params);
           Put(h.base, kHolderGlobal, show.holder_word);
@@ -1378,6 +1416,41 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
           Put(h.base, kCarListGlobal, saved_list);
           Put(h.base, kRandSeed, saved_seed);
           Put(h.base, kTwoPlayersGlobal, saved_players);
+        }
+        if (reapply.stand_colors) {
+          // The old records freed; the new ones compared and freed; the
+          // menu's new block freed; markers in their slots.
+          for (const uint32_t old : old_colors) {
+            const bool pages = memory::IsPages(old);
+            out[v].Word(pages ? 1 : 0);
+            if (pages) memory::FreePages(old);
+          }
+          const uint32_t made_colors = guest::LoadU32(h.base, stand_b + 1876);
+          out[v].Word(made_colors);
+          for (uint32_t k = 0; k < made_colors && k < 13; k++) {
+            const uint32_t record = guest::LoadU32(h.base, stand_b + 1824 + 4 * k);
+            const bool pages = record != 0 && memory::IsPages(record);
+            out[v].Word(pages ? 1 : 0);
+            if (pages) {
+              out[v].Bytes(Read(h.base, record, 16));
+              out[v].Floats(h.base, record + 16, 3);
+              out[v].Bytes(Read(h.base, record + 28, 4));
+              memory::FreePages(record);
+            }
+            Put(h.base, stand_b + 1824 + 4 * k, 0xC0100000 + k);
+          }
+          const uint32_t menu_block = guest::LoadU32(h.base, stand_b + 128);
+          const bool menu_pages = menu_block != 0 && memory::IsPages(menu_block);
+          out[v].Word(menu_pages ? 1 : 0);
+          if (menu_pages) {
+            out[v].Bytes(Read(h.base, menu_block, 4 * std::min<uint32_t>(
+                                                      guest::LoadU32(h.base, stand_b + 60), 16)));
+            memory::FreePages(menu_block);
+          }
+          Put(h.base, stand_b + 128, 0xC010FFFF);
+          const uint32_t frame = start.r1.u32 - 224;
+          out[v].Bytes(Read(h.base, frame + 80, 48));
+          out[v].Floats(h.base, frame + 128, 4);
         }
         const uint32_t header = guest::LoadU32(h.base, car + 6684);
         const bool made = header != old_header;
@@ -1417,7 +1490,8 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
           // ShowStandCar's frame is 4,032 bytes, its saves the last 40.
           const uint32_t frame_bytes = reapply.stand_car ? 4032 : 4016;
           const uint32_t saves = reapply.stand_car ? 40 : 32;
-          const uint32_t frame_car = start.r1.u32 - frame_bytes + 80;
+          const uint32_t top = start.r1.u32 - (reapply.stand_colors ? 224 : 0);
+          const uint32_t frame_car = top - frame_bytes + 80;
           out[v].Bytes(Read(h.base, frame_car, 1888));
           out[v].Floats(h.base, frame_car + 1888, (3884 - 1888) / 4);
           out[v].Bytes(Read(h.base, frame_car + 3884, frame_bytes - 80 - saves - 3884));

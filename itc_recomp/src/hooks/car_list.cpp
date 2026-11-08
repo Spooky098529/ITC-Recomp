@@ -38,7 +38,7 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "sub_8224A978 and SetUpCarPage sub_8224C560 (CarPanel::ShowCarStats, never seen "
               "in play, the original), PanelSetBase::Build sub_8224C698 and PanelSet::Build "
               "sub_8224CAD8 (the entries from the allocation layer's pages), "
-              "PanelSetBase::ShowStandCar sub_8224A490 (with the car makers' callees native: "
+              "PanelSetBase::ShowStandCar sub_8224A490 and SetUpColors sub_8224B248 (with the car makers' callees native: "
               "GarageStage::SetCarClass through its override), the pages TabsPage "
               "sub_82249EB8, RowsPage sub_8224A178, ColorsPage sub_8224AEA8 and PowerGraphPage "
               "sub_8224BDC0 (the menu list, MenuSound::Play and the power graphs' set-ups guest "
@@ -194,6 +194,7 @@ ITC_CL_STEP(CarListTabsPage, cl::TabsPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListRowsPage, cl::RowsPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListColorsPage, cl::ColorsPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListPowerGraphPage, cl::PowerGraphPage(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetUpColors, cl::SetUpColors(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListShowStandCar, cl::ShowStandCar(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 // PanelSet::Build: a tail call of the base's on the set + 4.
 void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
@@ -298,4 +299,13 @@ extern "C" REX_FUNC(sub_8224A490) {
     return;
   }
   hooks::CarListShowStandCar(ctx, base);
+}
+// The colors' set-up (from steps 17 and 25, recompiled), the same gate.
+extern "C" REX_FUNC(sub_8224B248) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
+    __imp__sub_8224B248(ctx, base);
+    return;
+  }
+  hooks::CarListSetUpColors(ctx, base);
 }

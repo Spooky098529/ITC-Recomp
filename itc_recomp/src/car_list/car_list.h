@@ -301,6 +301,16 @@ uint64_t RowsPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 uint64_t ColorsPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 uint64_t PowerGraphPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 
+// sub_8224B248 PanelSetBase::SetUpColors: the colors' menu for the entry's
+// count (+8376; MenuList::Init, SetSelection, Fit guest calls), D's cursor
+// and arrows, the colors' list freed and made again (a 32-byte record from
+// the allocation layer's pages a color: the HSV from the entry's 20-byte
+// records at +8116 at +16 to +24, Color::HsvToRgb's plain C++, the RGB x
+// 255 at +0 to +8, as the original's single-precision steps and fctiwz), D's
+// SetCount and SetSwatches, then ShowStandCar(b, -1). Its 224-byte frame.
+// Returns ShowStandCar's r3.
+uint64_t SetUpColors(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+
 // --- The power graph's record (panels.cpp) ---
 
 // The power graph screen's record's holder ([0x82815EBC]; the record at

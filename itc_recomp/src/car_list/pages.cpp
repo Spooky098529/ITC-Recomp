@@ -8,9 +8,14 @@
 #include "guest.h"
 #include "memory/heap.h"
 #include "race_setup/race_setup.h"
+#include "tuning_pages/tuning_pages.h"
 #include "type67_modes/type67_modes.h"
 
 #include <rex/platform/fpscr.h>
+
+#include <climits>
+#include <cmath>
+#include <utility>
 
 namespace car_list {
 
@@ -873,6 +878,120 @@ uint64_t PowerGraphPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& 
   }
   StoreU32(base, b + 48, 0xFFFFFFFFu);
   return CarSetButtons(base, LoadU32(base, b + 1908), 0, 0, 1, 1, frame, calls);
+}
+
+namespace {
+
+// fctiwz as the translated code does it: NaN and below INT_MIN 0x80000000,
+// INT_MAX and above INT_MAX, else truncated; the low word.
+uint32_t Fctiwz(double value) {
+  if (std::isnan(value)) return 0x80000000u;
+  if (value >= double(INT32_MAX)) return uint32_t(INT32_MAX);
+  if (value < double(INT32_MIN)) return 0x80000000u;
+  return uint32_t(int32_t(value));
+}
+
+}  // namespace
+
+uint64_t SetUpColors(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224B248 PanelSetBase::SetUpColors");
+  using Fpscr = rex::platform::FPSCRPlatform;
+  const auto flush_off = [] { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); };
+  flush_off();
+  const uint32_t b = uint32_t(b_r3);
+  const uint32_t frame = Frame(base, sp, 224);
+  const uint64_t menu = b_r3 + 60;
+  const uint32_t at = (LoadU32(base, b + 240) + LoadU32(base, b + 236)) << 2;
+  const uint32_t limit = LoadU32(base, b + 1924);
+  const uint32_t entry = LoadU32(base, at + LoadU32(base, b + 1820));
+  const uint32_t count = LoadU32(base, entry + 8376);
+  const bool over = int32_t(count) > int32_t(limit);
+  StoreU32(base, frame + 92, 158);
+  StoreU32(base, frame + 84, 159);
+  const uint64_t args[8] = {menu, count, over ? limit : count, 1, 154, 153, 155, 156};
+  calls.CallArgs(kMenuListInit, frame, over ? 0x8224B2BC : 0x8224B2D8, args);
+  calls.Call(kMenuListSetSelection, frame, 0x8224B2E4, menu, LoadU32(base, b + 244));
+  StoreU32(base, b + 64, LoadU32(base, b + 248));
+  calls.Call(kMenuListFit, frame, 0x8224B2F8, menu, 1);
+  if (LoadU32(base, b + 1904) != 0) {
+    const uint64_t item = calls.Call(kMenuListSelection, frame, 0x8224B30C, menu);
+    ColorPlaceCursor(base, LoadU32(base, b + 1904), item, frame);
+  }
+  const uint32_t colors = LoadU32(base, b + 1904);
+  if (colors != 0) {
+    const uint32_t items = LoadU32(base, b + 60);
+    const uint32_t shown = LoadU32(base, b + 1924);
+    uint64_t up = 0, down = 0;
+    if (int32_t(items) > int32_t(shown)) {
+      const uint32_t scroll = LoadU32(base, b + 64);
+      if (scroll == 0) {
+        down = 1;
+      } else {
+        up = 1;
+        down = uint32_t(scroll + shown) == items ? 0 : 1;
+      }
+    }
+    ColorSetArrows(base, colors, up, down, frame);
+  }
+  // The colors' list freed, from the last record down.
+  const uint32_t list = b + 1824;
+  while (LoadU32(base, b + 1876) != 0) {
+    const uint32_t n = LoadU32(base, list + 52) - 1;
+    StoreU32(base, list + 52, n);
+    const uint32_t record = LoadU32(base, list + 4 * n);
+    if (record != 0) {
+      FreePages(record, frame, 0x8224B3B0, calls);
+    }
+  }
+  if (int32_t(count) > 0) {
+    const double scale = double(guest::LoadFloat(base, 0x82000C44));
+    const double unit = double(guest::LoadFloat(base, 0x82002200));
+    uint32_t source = entry + 8116;
+    for (uint32_t left = count; left != 0; left--, source += 20) {
+      const uint32_t record = memory::AllocPages(32, 4096);
+      const uint32_t word = LoadU32(base, source + 4);
+      const uint32_t raised = guest::LoadU16(base, source + 0);
+      StoreU32(base, frame + 96, word);
+      const uint32_t add = LoadU32(base, raised == 0 ? 0x82002FF8 : 0x82002FF4);
+      int32_t value = int32_t(guest::LoadU8(base, frame + 99) + add);
+      if (value < 0) {
+        value = 0;
+      } else if (value > 255) {
+        value = 255;
+      }
+      const uint64_t saturation = guest::LoadU8(base, frame + 98);
+      const uint64_t v = uint32_t(value) & 0xFF;
+      const uint64_t hue = guest::LoadU16(base, frame + 96);
+      // The three std's (big-endian doublewords: the high words 0).
+      for (const auto& [to, word] : {std::pair{frame + 104, saturation}, std::pair{frame + 112, v},
+                                     std::pair{frame + 120, hue}}) {
+        StoreU32(base, to, uint32_t(word >> 32));
+        StoreU32(base, to + 4, uint32_t(word));
+      }
+      const double s = double(float(double(int64_t(saturation))));
+      const double vv = double(float(double(int64_t(v))));
+      const double h = double(float(double(int64_t(hue))));
+      guest::StoreFloat(base, record + 16, float(h));
+      guest::StoreFloat(base, record + 20, float(double(float(s * unit))));
+      guest::StoreFloat(base, record + 24, float(double(float(vv * unit))));
+      tuning_pages::HsvToRgb(base, frame + 128, record + 16, frame);
+      flush_off();
+      const double red = double(float(double(guest::LoadFloat(base, frame + 128)) * scale));
+      const double green = double(float(double(guest::LoadFloat(base, frame + 132)) * scale));
+      const double blue = double(float(double(guest::LoadFloat(base, frame + 136)) * scale));
+      StoreU32(base, record + 0, Fctiwz(red));
+      StoreU32(base, record + 4, Fctiwz(green));
+      StoreU32(base, record + 8, Fctiwz(blue));
+      const uint32_t n = LoadU32(base, list + 52);
+      StoreU32(base, list + 52, n + 1);
+      StoreU32(base, list + 4 * n, record);
+    }
+  }
+  if (LoadU32(base, b + 1904) != 0) {
+    ColorSetCount(base, LoadU32(base, b + 1904), count, frame, calls);
+    ColorSetSwatches(base, LoadU32(base, b + 1904), list, LoadU32(base, b + 64), frame);
+  }
+  return ShowStandCar(base, b_r3, 0xFFFFFFFFFFFFFFFFull, frame, calls);
 }
 
 }  // namespace car_list
