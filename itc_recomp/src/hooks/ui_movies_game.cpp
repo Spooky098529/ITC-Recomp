@@ -75,7 +75,7 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "through their overrides); with --native_heap and the archive's queue native, "
               "UiMovie::Load sub_8211E798 and the movie table's UiMovies::Open sub_8211E808, "
               "and with --native_heap UiMovies::Delete sub_8211E258 (and UiMovies::DeleteAll "
-              "sub_8211E2C8 with its jump sub_8211E370) with UiMovie::Unload "
+              "sub_8211E2C8 through its jump sub_8211E370's adapter) with UiMovie::Unload "
               "sub_8211B540 (no adapter: only Delete's plain C++ calls it; their callees natively "
               "where their own checks say so) "
               "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
@@ -1181,9 +1181,10 @@ extern "C" REX_FUNC(sub_8211E258) {
   ctx.lr = lr;
 }
 
-// UiMovies::DeleteAll (sub_8211E2C8) and its jump sub_8211E370: no
-// arguments; r3 as the original leaves it. Each Delete from DeleteAll's
-// 112-byte frame (the jump's the same: a tail call).
+// UiMovies::DeleteAll's jump sub_8211E370: no arguments; r3 as DeleteAll
+// (sub_8211E2C8, no adapter: only this one reaches it in play) leaves it.
+// Each Delete from DeleteAll's 112-byte frame (the jump's tail call keeps
+// r1).
 namespace {
 void DeleteAllSteps(PPCContext& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
@@ -1193,15 +1194,6 @@ void DeleteAllSteps(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 }  // namespace
-
-extern "C" REX_FUNC(sub_8211E2C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ui_movies_game_hooks::DeleteNative()) {
-    __imp__sub_8211E2C8(ctx, base);
-    return;
-  }
-  DeleteAllSteps(ctx, base);
-}
 
 extern "C" REX_FUNC(sub_8211E370) {
   REX_FUNC_PROLOGUE();

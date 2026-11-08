@@ -1385,6 +1385,15 @@ void DeleteCases(Context& h) {
   results.Report();
 }
 
+// UiMovies::DeleteAll's register steps (its adapter removed: only the
+// jump's adapter reaches its plain C++): each Delete from its 112-byte
+// frame.
+void NativeDeleteAll(PPCContext& t, uint8_t* base) {
+  const uint32_t sp = t.r1.u32 - 112;
+  t.r3.u64 = ui_movies::DeleteAll(base, sp, ui_movies_game_hooks::DeleteCalls(t, base, sp),
+                                  t.r3.u32);
+}
+
 // UiMovies::DeleteAll (and its jump sub_8211E370) over a table of the
 // case's: 0 to 4 pairs (keys 100 + n), each a loaded movie, 0 or a key
 // repeated (its movie deleted once). What's freed, the table, r3 (an entry
@@ -1396,7 +1405,7 @@ void DeleteAllCases(Context& h) {
     GuestFunction recompiled, native;
   };
   const Function functions[] = {
-      {"UiMovies::DeleteAll (sub_8211E2C8)", __imp__sub_8211E2C8, sub_8211E2C8},
+      {"UiMovies::DeleteAll (sub_8211E2C8)", __imp__sub_8211E2C8, NativeDeleteAll},
       {"UiMovies::DeleteAll's jump (sub_8211E370)", __imp__sub_8211E370, sub_8211E370},
   };
   for (const Function& f : functions) {
