@@ -15,7 +15,8 @@ namespace hooks {
 // data load's harness; Career::EventQuery's and Race::SetUp's register
 // steps, for the location screen's; TrackZones::Create, UiMovie::SetText,
 // ClearText and SetNodeText, the UI movies' start sub_8211AD00,
-// UiMovies::Open, Strings::Load, operator new and MenuList::Init, for the
+// UiMovies::Open (and UiMovies::Delete, for the options screen's), Strings::Load,
+// operator new and MenuList::Init, for the
 // race HUD object's) hand their call to it first;
 // when it answers true, the adapter returns (the recorder set r3), so the
 // harness sees what App::StartUp hands each without setting anything up

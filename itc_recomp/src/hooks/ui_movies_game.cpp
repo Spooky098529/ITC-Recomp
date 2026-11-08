@@ -1112,6 +1112,9 @@ extern "C" REX_FUNC(sub_8211E808) {
 // UiMovies::Delete: r3 = the movie id; r3 as the original leaves it.
 extern "C" REX_FUNC(sub_8211E258) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211E258)) {
+    return;  // a harness's (the options screen's)
+  }
   if (!ui_movies_game_hooks::DeleteNative()) {
     __imp__sub_8211E258(ctx, base);
     return;

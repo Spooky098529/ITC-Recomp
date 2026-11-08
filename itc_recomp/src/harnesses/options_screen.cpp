@@ -17,6 +17,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "hooks/options_screen.h"
+#include "hooks/ui_movies.h"
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
 #include "options_screen/options_screen.h"
@@ -86,25 +87,74 @@ uint32_t Around(Random& r, int32_t lo, int32_t hi) {
   return uint32_t(lo + int32_t(r.Below(uint32_t(hi - lo + 1))));
 }
 
+// The UI movie world, built as the race screens' harness builds it: two
+// movies (ids 7, or 9 where a case wants movie 7 missing, and 14 in the
+// movie table; the word UiMovies::Find answers for a missing one movie 7's
+// block) with empty animation lists, live, saved and file scenes one tree's
+// root, their 256 first named animations over the root and one of 8
+// animations of no tracks; the root's child index (+108) 0 to 3, its
+// entries sub-scenes up to 60 and animations after (its animation index,
+// +116, 60); the 16 sub-scenes' child index 0 to 3, their entries leaves up
+// to 64 and animations after (+116 64); the 32 leaves TXT nodes
+// (UiMovie::SetText's assert), their children's range (+100 below 16, +104
+// 0 to 6), their text id and child index (+108) 0 to 8 and their entries
+// leaves; each movie's texts ids 1 to 7 (records of 4 KB buffers of letters
+// and page breaks; the text count 8; the missing text another record) and
+// the string table of letters only (no argument codes: the user's call,
+// 2026-10-30). The callees run for real on both sides (the originals' and
+// ours reach the same overrides of the UI movie calls); UiMovie::Run's
+// update (sub_8211D2F8) is stood in for, recorded and answered with 0 or a
+// word from the case's generator.
+constexpr uint32_t kMovieHeaderBytes = 0xA000;
+constexpr uint32_t kMovieCount = 2;
+constexpr uint32_t kTreeNodeBytes = 0x400;
+constexpr uint32_t kSubScenes = 16, kLeaves = 32, kAnimations = 8;
+constexpr uint32_t kRootAt = kMovieCount * kMovieHeaderBytes;
+constexpr uint32_t kSubScenesAt = kRootAt + kTreeNodeBytes;
+constexpr uint32_t kLeavesAt = kSubScenesAt + kSubScenes * kTreeNodeBytes;
+constexpr uint32_t kAnimationsAt = kLeavesAt + kLeaves * kTreeNodeBytes;
+constexpr uint32_t kPairsAt = kAnimationsAt + kAnimations * 64;
+constexpr uint32_t kTexturesAt = kPairsAt + 0x40;
+constexpr uint32_t kMovieWorldBytes = kTexturesAt + 0x100;
+constexpr uint32_t kTextsPerMovie = 8;
+constexpr uint32_t kTextBuffersAt = 0x1000;
+constexpr uint32_t kTextWorldBytes = kTextBuffersAt + kMovieCount * kTextsPerMovie * 0x1000;
+constexpr uint32_t kStringWorldBytes = 0x10000;
+constexpr uint32_t kMissingText = 0x826C5CD8;  // TextMap::Find's answer when not found
+constexpr uint32_t kStringTable = 0x826C5C34;
+constexpr uint32_t kTagTxt = 0x54585400;
+constexpr uint32_t kTagSce = 0x53434500;
+
 // The world: the seven blocks the screen's globals point at (0x400 bytes
 // each: the page block, the menu, the settings, then four more); player 0's
 // save data (its options at +0x1F85C); a misc block (the machine at +0, its
 // words up to +9616; the dispatcher at +0x2600, its ring at +204; the fake
 // sound manager at +0x3000 and its vtable at +0x3400; the movie table's
-// pairs at +0x3800); UI movie 7 (its loaded flag at +0x9FD0).
+// pairs at +0x3800, unused now); the UI movie world.
 constexpr uint32_t kBlockBytes = 0x400;
 constexpr uint32_t kSaveBytes = 0x20000;
 constexpr uint32_t kMiscBytes = 0x4000;
-constexpr uint32_t kMovieBytes = 0xA000;
 constexpr uint32_t kSaveDataPointers = 0x826C5B58;
 constexpr uint32_t kMissingMovie = 0x826C5CDC;  // UiMovies::Find's answer when not found
 // The getter sub_82090770 (r3 = +60), the sound manager's slots 29 and 30.
 constexpr uint32_t kGet60 = 0x82090770;
 struct World {
-  World() : blocks(7 * kBlockBytes), save(kSaveBytes), misc(kMiscBytes), movie(kMovieBytes) {}
+  World()
+      : blocks(7 * kBlockBytes),
+        save(kSaveBytes),
+        misc(kMiscBytes),
+        movies(kMovieWorldBytes),
+        texts(kTextWorldBytes),
+        strings(kStringWorldBytes) {}
   bool ok() const {
-    return blocks.address != 0 && save.address != 0 && misc.address != 0 && movie.address != 0;
+    return blocks.address != 0 && save.address != 0 && misc.address != 0 &&
+           movies.address != 0 && texts.address != 0 && strings.address != 0;
   }
+  uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
+  uint32_t root() const { return movies.address + kRootAt; }
+  uint32_t sub(uint32_t k) const { return movies.address + kSubScenesAt + kTreeNodeBytes * k; }
+  uint32_t leaf(uint32_t k) const { return movies.address + kLeavesAt + kTreeNodeBytes * k; }
+  uint32_t animation(uint32_t k) const { return movies.address + kAnimationsAt + 64 * k; }
   uint32_t machine() const { return misc.address; }
   uint32_t dispatcher() const { return misc.address + 0x2600; }
   uint32_t manager() const { return misc.address + 0x3000; }
@@ -118,7 +168,9 @@ struct World {
   Block blocks;
   Block save;
   Block misc;
-  Block movie;
+  Block movies;
+  Block texts;
+  Block strings;
 };
 
 // The globals a case points at its world, put back after.
@@ -130,7 +182,152 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {menu_sounds::kEffectsVolume, 8},
     {menu_sounds::kMusicVolume, 4},
     {ui_movies::kMovieTable, 12},
-    {kMissingMovie, 4}};
+    {kMissingMovie, 4},
+    {kMissingText, 4},
+    {kStringTable, 4}};
+
+// Whether a case's movie table leaves movie 7 out (its pair's id 9): for
+// the functions that delete it (UiMovies::Delete would free our block).
+bool g_movie7_missing = false;
+
+// The string table: 17 files' pointers to one container of entries enough
+// for the widest file (the bounds at 0x82007E18), each one of 8 strings of
+// letters (no argument codes), as the race screens' harness builds it.
+void BuildStringTable(uint8_t* base, const World& w) {
+  constexpr uint32_t kBounds = 0x82007E18;
+  uint32_t span = 1;
+  for (uint32_t i = 0; i < 17; i++) {
+    const int32_t from = int32_t(guest::LoadU32(base, kBounds + 4 * i));
+    const int32_t to = int32_t(guest::LoadU32(base, kBounds + 4 * i + 4));
+    if (to > from && uint32_t(to - from) > span) {
+      span = uint32_t(to - from);
+    }
+  }
+  const uint32_t at = w.strings.address, container = at + 0x100;
+  if (container + 4 + 4 * span + 8 * 64 > at + w.strings.bytes) {
+    ITC_LOG_ERROR("harness: options_screen: a file of {} strings doesn't fit", span);
+    span = (w.strings.bytes - 0x100 - 8 * 64 - 4) / 4;
+  }
+  for (uint32_t i = 0; i < 18; i++) {
+    guest::StoreU32(base, at + 4 * i, container);
+  }
+  guest::StoreU32(base, container, __builtin_bswap32(span));
+  Random r(0x4F7074696F6E73ull);  // "Options"
+  const uint32_t text = container + 4 + 4 * span;
+  for (uint32_t k = 0; k < 8; k++) {
+    const uint32_t length = r.Below(30);
+    for (uint32_t c = 0; c < length; c++) {
+      guest::StoreU16(base, text + 64 * k + 2 * c, uint16_t('A' + r.Below(26)));
+    }
+    guest::StoreU16(base, text + 64 * k + 2 * length, 0);
+  }
+  for (uint32_t i = 0; i < span; i++) {
+    guest::StoreU32(base, container + 4 + 4 * i,
+                    __builtin_bswap32(text + 64 * r.Below(8) - container));
+  }
+}
+
+void ShapeMovieWorld(uint8_t* base, const World& w, Random& r) {
+  WriteRandom(base, w.movies.address, w.movies.bytes, r);
+  WriteRandom(base, w.texts.address, w.texts.bytes, r);
+  for (uint32_t m = 0; m < kMovieCount; m++) {
+    const uint32_t movie = w.movie(m);
+    ui_movies::InitAnimationLists(base, movie);
+    for (const uint32_t field : {16u, 20u, 24u}) {
+      guest::StoreU32(base, movie + field, w.root());
+    }
+    guest::StoreU32(base, movie + 28, w.movies.address + kTexturesAt);
+    for (uint32_t k = 0; k < 256; k++) {
+      const uint32_t named = movie + 176 + 36 * k;
+      guest::StoreU32(base, named + 28, w.root());
+      guest::StoreU32(base, named + 32, w.animation(r.Below(kAnimations)));
+    }
+    for (uint32_t k = 0; k < kTextsPerMovie; k++) {
+      const uint32_t record = w.texts.address + 0x100 * m + 32 * k;
+      const uint32_t buffer = w.texts.address + kTextBuffersAt + 0x1000 * (kTextsPerMovie * m + k);
+      guest::StoreU32(base, record, buffer);
+      guest::StoreU32(base, record + 20, r.Below(5) - 1);
+      const uint32_t length = r.Below(60);
+      for (uint32_t c = 0; c < length; c++) {
+        guest::StoreU16(base, buffer + 2 * c,
+                        r.Below(6) == 0 ? 0xFFD1 : uint16_t('a' + r.Below(26)));
+      }
+      guest::StoreU16(base, buffer + 2 * length, 0);
+      if (k + 1 < kTextsPerMovie) {
+        guest::StoreU32(base, movie + ui_movies::kMovieTexts + 8 * k, k + 1);
+        guest::StoreU32(base, movie + ui_movies::kMovieTexts + 8 * k + 4, record);
+      }
+    }
+    guest::StoreU32(base, movie + ui_movies::kMovieTexts + 1024, kTextsPerMovie - 1);
+    guest::StoreU32(base, movie + ui_movies::kMovieTextCount, kTextsPerMovie);
+  }
+  guest::StoreU32(base, kMissingText, w.texts.address + 32 * (kTextsPerMovie - 1));
+  for (uint32_t k = 0; k < kAnimations; k++) {
+    for (uint32_t i = 0; i < 64; i += 4) {
+      guest::StoreU32(base, w.animation(k) + i, 0);
+    }
+    guest::StoreFloat(base, w.animation(k) + 12, float(r.Below(100)) / 4.0f);
+  }
+  constexpr uint32_t kEntries = (kTreeNodeBytes - 128) / 8;
+  guest::StoreU32(base, w.root(), kTagSce);
+  guest::StoreU32(base, w.root() + 100, 0);  // the pose resets walk children 0 to 3
+  guest::StoreU32(base, w.root() + 104, r.Below(5));
+  guest::StoreU32(base, w.root() + 108, r.Below(4));
+  guest::StoreU32(base, w.root() + 116, 60);
+  for (uint32_t i = 0; i < kEntries; i++) {
+    guest::StoreU32(base, w.root() + 128 + 8 * i,
+                    i < 60 ? w.sub(r.Below(kSubScenes)) : w.animation(r.Below(kAnimations)));
+  }
+  for (uint32_t k = 0; k < kSubScenes; k++) {
+    const uint32_t sub = w.sub(k);
+    guest::StoreU32(base, sub, kTagSce);
+    guest::StoreU32(base, sub + 100, r.Below(16));
+    guest::StoreU32(base, sub + 104, r.Below(7));
+    guest::StoreU32(base, sub + 108, r.Below(4));
+    guest::StoreU32(base, sub + 116, 64);
+    for (uint32_t i = 0; i < kEntries; i++) {
+      guest::StoreU32(base, sub + 128 + 8 * i,
+                      i < 64 ? w.leaf(r.Below(kLeaves)) : w.animation(r.Below(kAnimations)));
+    }
+  }
+  for (uint32_t k = 0; k < kLeaves; k++) {
+    const uint32_t leaf = w.leaf(k);
+    guest::StoreU32(base, leaf, kTagTxt);
+    guest::StoreU32(base, leaf + 100, r.Below(16));
+    guest::StoreU32(base, leaf + 104, r.Below(8) == 0 ? 0 : r.Below(7));
+    guest::StoreU32(base, leaf + 108, r.Below(9));
+    for (uint32_t i = 0; i < kEntries; i++) {
+      guest::StoreU32(base, leaf + 128 + 8 * i, w.leaf(r.Below(kLeaves)));
+    }
+  }
+  const uint32_t pairs = w.movies.address + kPairsAt;
+  guest::StoreU32(base, pairs, g_movie7_missing ? 9 : 7);
+  guest::StoreU32(base, pairs + 4, w.movie(0));
+  guest::StoreU32(base, pairs + 8, 14);
+  guest::StoreU32(base, pairs + 12, w.movie(1));
+  guest::StoreU32(base, ui_movies::kMovieTable, pairs);
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, kMovieCount);
+  guest::StoreU32(base, kMissingMovie, w.movie(0));
+  guest::StoreU32(base, kStringTable, w.strings.address);
+}
+
+// UiMovie::Run's update calls, kept and answered.
+struct UpdateCall {
+  uint32_t lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<UpdateCall>* g_updates = nullptr;
+Random g_update_answers;
+
+bool UpdateStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (g_updates == nullptr || function != 0x8211D2F8) {
+    return false;
+  }
+  g_updates->push_back({uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = g_update_answers.Below(2) == 0 ? 0 : g_update_answers.Next();
+  return true;
+}
 
 // The mode type: 2, 4, 6, 7 or 8, now and then another.
 uint32_t ModeType(Random& r) {
@@ -157,15 +354,9 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, vtable + menu_sounds::kGetCategorySlot, kGet60);
   guest::StoreU32(base, vtable + menu_sounds::kSetCategoryVolumeSlot, kGet60);
   guest::StoreU32(base, menu_sounds::kSoundManager, manager);
-  // The movie table: movie 7 (its loaded flag 0 or 1) or none.
-  const uint32_t pairs = w.misc.address + 0x3800;
-  guest::StoreU32(base, pairs, r.Below(4) == 0 ? 9 : 7);
-  guest::StoreU32(base, pairs + 4, w.movie.address);
-  guest::StoreU32(base, w.movie.address + ui_movies::kMovieLoaded, r.Below(2));
-  guest::StoreU32(base, ui_movies::kMovieTable, pairs);
-  guest::StoreU32(base, ui_movies::kMovieTable + 4, 4);
-  guest::StoreU32(base, ui_movies::kMovieTable + 8, 1);
-  guest::StoreU32(base, kMissingMovie, w.movie.address);
+  // The UI movies; movie 7's loaded flag 0 or 1.
+  ShapeMovieWorld(base, w, r);
+  guest::StoreU32(base, w.movie(0) + ui_movies::kMovieLoaded, r.Below(2));
   // The machine's words: +9608, +9612 0 or 1 or any.
   for (const uint32_t field : {9608u, 9612u}) {
     guest::StoreU32(base, w.machine() + field, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
@@ -175,12 +366,16 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, w.dispatcher() + 204 + 604, r.Below(60));
 }
 
-// UiMovies::Open's calls, recorded on both sides (its adapter hands them to
-// the start-up recorder) and answered 1.
+// UiMovies::Open's and Delete's calls, recorded on both sides (their
+// adapters hand them to the start-up recorder) and answered 1: Delete would
+// free our movie block.
 std::vector<uint32_t> g_opens;
 bool RecordOpen(PPCContext& ctx, uint32_t address) {
-  if (address != 0x8211E808) return false;
-  g_opens.insert(g_opens.end(), {ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, uint32_t(ctx.lr)});
+  if (address != 0x8211E808 && address != 0x8211E258) return false;
+  // Delete reads only r3: its r4 (a leftover) isn't compared.
+  g_opens.push_back(address);
+  g_opens.insert(g_opens.end(), {ctx.r3.u32, address == 0x8211E258 ? 0u : ctx.r4.u32, ctx.r1.u32,
+                                 uint32_t(ctx.lr)});
   ctx.r3.u64 = 1;
   return true;
 }
@@ -212,14 +407,33 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     g_opens.clear();
     const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
     hooks::g_start_up_recorder = RecordOpen;
+    g_update_answers = Random(r.Next());
+    std::vector<UpdateCall> updates;
+    g_updates = &updates;
+    const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+        ui_movies_hooks::g_update_callee_stand_in;
+    ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
     ITC_FLAG(native_options_screen) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_options_screen) = true;
+    ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
+    g_updates = nullptr;
     hooks::g_start_up_recorder = saved_recorder;
     if (after) {
       after(t, w, out[v]);
     }
     for (const uint32_t word : g_opens) out[v].Word(word);
+    out[v].Word(uint32_t(updates.size()));
+    for (const UpdateCall& u : updates) {
+      out[v].Word(u.lr);
+      out[v].Word(u.r1);
+      for (const uint64_t x : {u.r3, u.r4}) {
+        out[v].Word(uint32_t(x >> 32));
+        out[v].Word(uint32_t(x));
+      }
+    }
+    out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
+    out[v].Bytes(Read(h.base, w.texts.address, w.texts.bytes));
     out[v].Bytes(Read(h.base, w.blocks.address, w.blocks.bytes));
     out[v].Bytes(Read(h.base, w.misc.address, w.misc.bytes));
     out[v].Bytes(Read(h.base, w.save.address, 0x2000));
@@ -387,6 +601,47 @@ void Handlers(Context& h, const World& w) {
       });
 }
 
+// --- The handlers on the movie ---
+
+void MovieHandlers(Context& h, const World& w) {
+  const auto machine = [](PPCContext& t, Random&, const World& w) {
+    t.r3.u64 = w.machine();
+    t.r4.u64 = w.dispatcher();
+  };
+  // Close and Leave delete movie 7 (recorded). Leave's movie missing now and
+  // then (out of the table, the missing word 0: none finished or deleted).
+  Group(
+      h, w, "Options::Close (sub_821BCD28)", 80,
+      [&](PPCContext& t, Random& r, const World& w) {
+        machine(t, r, w);
+        guest::StoreU32(h.base, w.machine() + 9616, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+      },
+      __imp__sub_821BCD28, hooks::OptionsClose, {{112, 24}});
+  Group(
+      h, w, "Options::Leave (sub_821BCF08)", 80,
+      [&](PPCContext& t, Random& r, const World& w) {
+        machine(t, r, w);
+        if (r.Below(3) == 0) {
+          guest::StoreU32(h.base, w.movies.address + kPairsAt, 9);
+          guest::StoreU32(h.base, kMissingMovie, 0);
+        }
+      },
+      __imp__sub_821BCF08, hooks::OptionsLeave, {{112, 16}});
+  Group(
+      h, w, "Options::ClosePage (sub_821BD330)", 60,
+      [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.dispatcher(); },
+      __imp__sub_821BD330, hooks::OptionsClosePage);
+  // The steps: r3 the page block's step word (+24), 0 or 1; the counter
+  // +684 around 0 to 12.
+  const auto step = [&h](PPCContext& t, Random& r, const World& w) {
+    guest::StoreU32(h.base, w.page() + 24, r.Below(2));
+    guest::StoreU32(h.base, w.settings() + 684, Around(r, -1, 12));
+    t.r3.u64 = w.page() + 24;
+  };
+  Group(h, w, "Options::Wait (sub_821BD3C8)", 80, step, __imp__sub_821BD3C8, hooks::OptionsWait,
+        {{112, 24}});
+}
+
 }  // namespace
 
 void OptionsScreen(Context& h) {
@@ -395,8 +650,10 @@ void OptionsScreen(Context& h) {
     ITC_LOG_ERROR("harness: options_screen: no memory for the world");
     return;
   }
+  BuildStringTable(h.base, w);
   Leaves(h, w);
   Handlers(h, w);
+  MovieHandlers(h, w);
 }
 
 }  // namespace harness

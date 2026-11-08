@@ -35,4 +35,12 @@ void OptionsWaitForMovie(PPCContext& ctx, uint8_t* base);
 void OptionsOpenMovie(PPCContext& ctx, uint8_t* base);
 void OptionsOnClosed(PPCContext& ctx, uint8_t* base);
 
+// Options::Close sub_821BCD28 and Leave sub_821BCF08 (r3 the machine, r4 the
+// dispatcher), ClosePage sub_821BD330 (r3 the dispatcher), Wait sub_821BD3C8
+// (r3 the step word).
+void OptionsClose(PPCContext& ctx, uint8_t* base);
+void OptionsLeave(PPCContext& ctx, uint8_t* base);
+void OptionsClosePage(PPCContext& ctx, uint8_t* base);
+void OptionsWait(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

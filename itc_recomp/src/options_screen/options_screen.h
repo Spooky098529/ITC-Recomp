@@ -34,6 +34,11 @@ constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kSetEffectsVolume = 0x821B9C20;
 constexpr uint32_t kSetMusicVolume = 0x821B9CF0;
 constexpr uint32_t kMoviesOpen = 0x8211E808;
+// The UI movie calls, through their overrides: UiMovie::FinishAll, Run and
+// UiMovies::Delete.
+constexpr uint32_t kFinishAll = 0x8211DFF8;
+constexpr uint32_t kRun = 0x8211E1B8;
+constexpr uint32_t kMoviesDelete = 0x8211E258;
 
 // The screen's blocks (docs/known-data.md): the page block (28 bytes), the
 // front-end menu (68), the settings `o` (716).
@@ -119,5 +124,28 @@ uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls);
 // r3 Settings::Write's.
 uint64_t OnClosed(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls);
+
+// `m`: UI movie 7 (UiMovies::Find on the id stored at frame + 80, as the
+// originals do), the movie table's value or the word at 0x826C5CDC.
+uint32_t FindMovie(uint8_t* base, uint32_t frame);
+
+// sub_821BCD28 Options::Close: r3 the machine, r4 the dispatcher: FinishAll(m),
+// with +9616 set UiMovies::Delete(7) and +9608 = 0, then the mode's suspend
+// message posted (2 15, 4 11, 6 28, 7 25, 8 24). Its 112-byte frame; r3 the
+// last call's.
+uint64_t Close(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+               const Calls& calls);
+// sub_821BCF08 Options::Leave: +9604 = 7; with `m`, FinishAll and
+// UiMovies::Delete(7); message 4 (types 2, 4, 6, 8) or 3 (7) posted. Its
+// 112-byte frame; r3 Delete's, else `m` (0).
+uint64_t Leave(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+               const Calls& calls);
+// sub_821BD330 Options::ClosePage: r3 the dispatcher: by the mode type 2 13,
+// 4 9, 6 25, 7 and 8 22 posted. A leaf; r3 left.
+uint64_t ClosePage(uint8_t* base, uint64_t dispatcher);
+// sub_821BD3C8 Options::Wait (step 0): r3 the step word: first pass the
+// settings' +684 = 0 and the word 1; UiMovie::Run(m, 0); +684 up by one; 1
+// once it's 10 or more, else 0. Its 112-byte frame.
+uint64_t Wait(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

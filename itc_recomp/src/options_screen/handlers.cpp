@@ -43,7 +43,28 @@ void SetUpMenu(uint8_t* base, uint32_t menu, uint32_t items) {
   }
 }
 
+// A message (three words: `message`, 0, 0) queued in a dispatcher's ring
+// (+204: 50 slots of 12 bytes, the count at +600, the start at +604), with
+// no overflow check, as the handlers do it inline.
+void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
+  const uint32_t ring = dispatcher + 204;
+  const uint32_t count = LoadU32(base, ring + 600) + 1;
+  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
+  StoreU32(base, ring + 600, count);
+  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
+  StoreU32(base, slot + 8, 0);
+  StoreU32(base, slot + 4, 0);
+  StoreU32(base, slot + 0, message);
+}
+
+int32_t Type(uint8_t* base) { return int32_t(LoadU32(base, kModeType)); }
+
 }  // namespace
+
+uint32_t FindMovie(uint8_t* base, uint32_t frame) {
+  StoreU32(base, frame + 80, 7);
+  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+}
 
 uint32_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BB9A8 Options::OnEnter");
@@ -109,19 +130,83 @@ uint64_t OnClosed(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t
     default: break;
   }
   if (message != 0) {
-    // The dispatcher's ring (+204: 50 slots of 12 bytes, the count at +600,
-    // the start at +604), no overflow check.
-    const uint32_t ring = dispatcher + 204;
-    const uint32_t count = LoadU32(base, ring + 600) + 1;
-    const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-    StoreU32(base, ring + 600, count);
-    const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
-    StoreU32(base, slot + 8, 0);
-    StoreU32(base, slot + 4, 0);
-    StoreU32(base, slot + 0, message);
+    Post(base, dispatcher, message);
   }
   StoreU32(base, machine + 9604, 9);
   return r3;
+}
+
+uint64_t Close(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+              const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BCD28 Options::Close");
+  const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);
+  const uint32_t m = FindMovie(base, frame);
+  uint64_t r3 = calls.Call(kFinishAll, frame, 0x821BCD64, m);
+  if (LoadU32(base, machine + 9616) != 0) {
+    r3 = calls.Call(kMoviesDelete, frame, 0x821BCD78, 7);
+    StoreU32(base, machine + 9608, 0);
+  }
+  switch (Type(base)) {
+    case 2: Post(base, dispatcher, 15); break;
+    case 4: Post(base, dispatcher, 11); break;
+    case 6: Post(base, dispatcher, 28); break;
+    case 7: Post(base, dispatcher, 25); break;
+    case 8: Post(base, dispatcher, 24); break;
+    default: break;
+  }
+  return r3;
+}
+
+uint64_t Leave(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+              const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BCF08 Options::Leave");
+  const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);
+  StoreU32(base, frame + 80, 7);
+  StoreU32(base, machine + 9604, 7);
+  uint64_t r3 = LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  if (uint32_t(r3) != 0) {
+    calls.Call(kFinishAll, frame, 0x821BCF4C, r3);
+    r3 = calls.Call(kMoviesDelete, frame, 0x821BCF54, 7);
+  }
+  switch (Type(base)) {
+    case 2:
+    case 4:
+    case 6:
+    case 8: Post(base, dispatcher, 4); break;
+    case 7: Post(base, dispatcher, 3); break;
+    default: break;
+  }
+  return r3;
+}
+
+uint64_t ClosePage(uint8_t* base, uint64_t dispatcher) {
+  ITC_NATIVE_RUNNING("sub_821BD330 Options::ClosePage");
+  switch (Type(base)) {
+    case 2: Post(base, uint32_t(dispatcher), 13); break;
+    case 4: Post(base, uint32_t(dispatcher), 9); break;
+    case 6: Post(base, uint32_t(dispatcher), 25); break;
+    case 7:
+    case 8: Post(base, uint32_t(dispatcher), 22); break;
+    default: break;
+  }
+  return dispatcher;
+}
+
+uint64_t Wait(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BD3C8 Options::Wait");
+  const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);
+  const uint32_t m = FindMovie(base, frame);
+  if (LoadU32(base, step) == 0) {
+    StoreU32(base, LoadU32(base, kSettings) + 684, 0);
+    StoreU32(base, step, 1);
+  }
+  calls.Call(kRun, frame, 0x821BD428, m, 0);
+  const uint32_t o = LoadU32(base, kSettings);
+  StoreU32(base, o + 684, LoadU32(base, o + 684) + 1);
+  return int32_t(LoadU32(base, LoadU32(base, kSettings) + 684)) < 10 ? 0 : 1;
 }
 
 }  // namespace options_screen

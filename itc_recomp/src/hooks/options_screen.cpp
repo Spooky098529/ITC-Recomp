@@ -15,8 +15,9 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "sub_821BA7E0, IsAnalogTaken sub_821BAB58, StepButtons sub_821BA550 and StepAnalog "
               "sub_821BABD8; Settings::Reset sub_821B9DB8, Read sub_821BBF00 and Write "
               "sub_821BAE10; Options::OnEnter sub_821BB9A8 (with --native_heap), WaitForMovie "
-              "sub_821BBBA0, OpenMovie sub_821B9F88 and OnClosed sub_821BCE38; the sound options, "
-              "UiMovies::Open and memcpy where its plain C++ declines through their overrides) "
+              "sub_821BBBA0, OpenMovie sub_821B9F88, OnClosed sub_821BCE38, Close sub_821BCD28, "
+              "Leave sub_821BCF08, ClosePage sub_821BD330 and Wait sub_821BD3C8; the sound "
+              "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
 
@@ -134,6 +135,25 @@ void OptionsOnClosed(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::OnClosed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
+void OptionsClose(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsLeave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::Leave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
+void OptionsClosePage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::ClosePage(base, ctx.r3.u64);
+}
+
+void OptionsWait(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::Wait(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -160,6 +180,10 @@ ITC_OPTIONS_SCREEN(821BBF00, OptionsSettingsRead)
 ITC_OPTIONS_SCREEN(821BBBA0, OptionsWaitForMovie)
 ITC_OPTIONS_SCREEN(821B9F88, OptionsOpenMovie)
 ITC_OPTIONS_SCREEN(821BCE38, OptionsOnClosed)
+ITC_OPTIONS_SCREEN(821BCD28, OptionsClose)
+ITC_OPTIONS_SCREEN(821BCF08, OptionsLeave)
+ITC_OPTIONS_SCREEN(821BD330, OptionsClosePage)
+ITC_OPTIONS_SCREEN(821BD3C8, OptionsWait)
 
 // An adapter whose step allocates: the original where the native heap isn't
 // active.
