@@ -18,6 +18,17 @@ here loses its heading.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
+- The car dealer's migration (attract race `itc_4630`, replay
+  `itc_4631` ok, the dealer only opened and closed; `car-dealer.md`):
+  `sub_82180C48`, `sub_82181B98`, `sub_821812B8`, `sub_82181330`,
+  `sub_82182158`, `sub_82182770`, `sub_82182DD0`, `sub_82182C28`,
+  `sub_82182B30`, `sub_82199B38`, `sub_821816B8`, `sub_82180CE8`,
+  `sub_821813B0`, `sub_82182E68`, `sub_82181968`, `sub_82184AF0`,
+  `sub_82182620`, `sub_821824A8`, `sub_82182388`, `sub_82182418`,
+  `sub_821826C0`, `sub_82181270`, `sub_82183AC8`, `sub_821817C0`,
+  `sub_82181D68`, `sub_82185600`, `sub_82181558`, `sub_821815D8`,
+  `sub_82181640`, `sub_82184B80`, `sub_82183160`, `sub_82180F90`,
+  `sub_82183428`, `sub_82183600`, `sub_82181A10`.
 - The front-end screen helpers (attract race `itc_4619`, replay
   `itc_4620` ok; `front-end-screen-helpers.md`): `sub_8222FB90`,
   `sub_82288898`, `sub_82277DB0`, `sub_821A63B0`, `sub_821A5360`,

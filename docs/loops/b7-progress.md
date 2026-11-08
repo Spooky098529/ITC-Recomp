@@ -130,8 +130,12 @@ file's history. What's left to see in a drive, from every run:
   start; 5 adapters removed; `--native_car_dealer`; race 36 s, 0
   errors, its harnesses 0 differing; no subagents). Left: the
   transitions 1, 6, 7, 9, 11, 15, 16, 17, 19 and the set-ups
-  `OpenListMenu`, `OpenCarList`, `OpenCar`, `OpenColors` (ready). Step:
-  validation, agent running.
+  `OpenListMenu`, `OpenCarList`, `OpenCar`, `OpenColors` (ready).
+  Validated `itc_4630` (race 78 s at 180; 0 errors, every harness 0
+  differing outside the expected groups, 41 of 41 harness lines; none
+  in the race, 6 in the replay `itc_4631` (ok: the dealer opened and
+  closed only), 35 to drive). Step: second migration (the transitions
+  and set-ups left), agent running.
 
 ## Done
 
