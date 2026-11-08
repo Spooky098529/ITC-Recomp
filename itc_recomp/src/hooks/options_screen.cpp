@@ -22,7 +22,10 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "and EnterButtons sub_821BDAD0; the node helpers SetCategoryArrow sub_821BE218, "
               "ShowVolumeNumber sub_821BE518, ShowMusicName sub_821BE930, ShowSlider "
               "sub_821BE988, ShowSliderMark sub_821BEA48, ShowButtonPicture sub_821BF0F0, "
-              "ShowAnalogPicture sub_821BF630 and ResetNode sub_821BFA68; the sound "
+              "ShowAnalogPicture sub_821BF630 and ResetNode sub_821BFA68; ShowVolumeBar "
+              "sub_821BE5A8 (inside the pause movie log's wrap), ShowVolumeNumbers sub_821BE820, "
+              "ShowSliderNumbers sub_821BECA8, ShowSliderMarks sub_821BED38, ShowHudValues "
+              "sub_821BE290, StepSound sub_821BE5F8 and StepSliders sub_821BEAC8; the sound "
               "options, the UI movie calls, UiMovies::Open and Delete and memcpy where its plain C++ declines through their overrides) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
@@ -233,6 +236,36 @@ void OptionsResetNode(PPCContext& ctx, uint8_t* base) {
       options_screen::ResetNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
+void OptionsShowVolumeBar(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::ShowVolumeBar(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32);
+}
+
+void OptionsShowVolumeNumbers(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ShowVolumeNumbers(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsShowSliderNumbers(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::ShowSliderNumbers(base, ctx.r1.u32, guest.calls());
+}
+
+void OptionsShowSliderMarks(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::ShowSliderMarks(base, ctx.r1.u32);
+}
+
+void OptionsShowHudValues(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::ShowHudValues(base, ctx.r1.u32);
+}
+
+void OptionsStepSound(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::StepSound(base);
+}
+
+void OptionsStepSliders(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = options_screen::StepSliders(base, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // No adapters (Native: their only callers in play call their plain C++)
@@ -278,6 +311,14 @@ ITC_OPTIONS_SCREEN(821BEA48, OptionsShowSliderMark)
 ITC_OPTIONS_SCREEN(821BF0F0, OptionsShowButtonPicture)
 ITC_OPTIONS_SCREEN(821BF630, OptionsShowAnalogPicture)
 ITC_OPTIONS_SCREEN(821BFA68, OptionsResetNode)
+ITC_OPTIONS_SCREEN(821BE820, OptionsShowVolumeNumbers)
+ITC_OPTIONS_SCREEN(821BECA8, OptionsShowSliderNumbers)
+ITC_OPTIONS_SCREEN(821BED38, OptionsShowSliderMarks)
+ITC_OPTIONS_SCREEN(821BE290, OptionsShowHudValues)
+ITC_OPTIONS_SCREEN(821BE5F8, OptionsStepSound)
+ITC_OPTIONS_SCREEN(821BEAC8, OptionsStepSliders)
+// Options::ShowVolumeBar sub_821BE5A8: its override is the pause movie log's
+// wrap (src/debug/pause_movie_log.cpp), which calls the step under the flag.
 
 // An adapter whose step allocates: the original where the native heap isn't
 // active.

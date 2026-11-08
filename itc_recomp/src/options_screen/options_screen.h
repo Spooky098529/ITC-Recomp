@@ -93,6 +93,18 @@ uint32_t IsAnalogTaken(uint8_t* base, uint32_t item, uint32_t sp);
 uint32_t StepButtons(uint8_t* base);
 uint32_t StepAnalog(uint8_t* base);
 
+// sub_821BE5F8 Options::StepSound (a leaf): by the menu's side (-1 or 1)
+// and cursor: 0 and 1 the volume edits +252, +256 stepped within 0 to 15
+// (past a bound: the bound stored, 0), 2 the OK/Default word +660 (left on
+// a 1, right on a 0), 3 the track +688 stepped, wrapping within 0 to 16.
+// 1 when something changed.
+uint32_t StepSound(uint8_t* base);
+// sub_821BEAC8 Options::StepSliders: node (7, 0)'s children 4 to 6 looked up
+// (unused); cursor 0 to 2 the slider edits +260 to +268 stepped within -10
+// to 10 (none at a bound), 3 the OK/Default word. Its 112-byte frame. 1
+// when something changed.
+uint32_t StepSliders(uint8_t* base, uint32_t sp);
+
 // sub_821B9DB8 Settings::Reset: r3 = the settings (716 bytes): +0 = 0, the
 // three 192-byte blocks (+44, +236, +428) and +12 (32 bytes) cleared
 // (memset), then the words its row lists. Its 112-byte frame's back chain
@@ -225,5 +237,24 @@ uint32_t ShowAnalogPicture(uint8_t* base, uint32_t shown, uint32_t sp);
 // the saved against the file's. 128-byte frame. The second RestorePose's r3.
 uint64_t ResetNode(uint8_t* base, uint32_t group, uint32_t child, uint32_t sp,
                    const Calls& calls);
+
+// sub_821BE5A8 Options::ShowVolumeBar: children 22 to 36 of `node` +80 = 1
+// for child 21 + i with i <= the volume, else 0 (no movie lookup). 112-byte
+// frame. The last child.
+uint32_t ShowVolumeBar(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp);
+// sub_821BE820 Options::ShowVolumeNumbers: ShowVolumeNumber on nodes (6, 6)
+// and (6, 7) with the edits +252 and +256. 112-byte frame. The second's r3.
+uint64_t ShowVolumeNumbers(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821BECA8 Options::ShowSliderNumbers and sub_821BED38 ShowSliderMarks:
+// the edits +260 to +268 copied to the frame's +88, ShowSlider (or
+// ShowSliderMark) on node (7, 0)'s children 4 to 6. 144-byte frames. The
+// last call's r3.
+uint64_t ShowSliderNumbers(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t ShowSliderMarks(uint8_t* base, uint32_t sp);
+// sub_821BE290 Options::ShowHudValues: the HUD edits +236 to +248 and +660
+// copied to the frame's +96; for each of node (5, 2)'s +104 rows the left
+// and right choices' frame (child 0 +108) and shown (child 2 +80) words by
+// the value (1: the left lit). 208-byte frame. The last child, or the node.
+uint64_t ShowHudValues(uint8_t* base, uint32_t sp);
 
 }  // namespace options_screen

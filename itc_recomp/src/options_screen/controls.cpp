@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
 
 #include <cstring>
 #include <utility>
@@ -133,6 +135,83 @@ uint32_t StepButtons(uint8_t* base) {
 uint32_t StepAnalog(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821BABD8 Options::StepAnalog");
   return Step(base, 676, 6);
+}
+
+uint32_t StepSound(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_821BE5F8 Options::StepSound");
+  const uint32_t menu = guest::LoadU32(base, kMenu);
+  const int32_t side = int32_t(guest::LoadU32(base, menu + 36));
+  const uint32_t cursor = guest::LoadU32(base, menu + 0);
+  if (side != -1 && side != 1) {
+    return 0;
+  }
+  const uint32_t o = Settings(base);
+  // The volumes (0 to 15): a step past a bound stores the bound and answers 0.
+  const auto volume = [&](uint32_t field) -> uint32_t {
+    const int32_t value = int32_t(guest::LoadU32(base, o + field)) + side;
+    guest::StoreU32(base, o + field, uint32_t(value));
+    if (side == -1 ? value >= 0 : value <= 15) {
+      return 1;
+    }
+    guest::StoreU32(base, o + field, side == -1 ? 0 : 15);
+    return 0;
+  };
+  switch (cursor) {
+    case 0: return volume(252);
+    case 1: return volume(256);
+    case 2:
+      // OK/Default: left on a 1, right on a 0.
+      if (int32_t(guest::LoadU32(base, o + 660)) != (side == -1 ? 1 : 0)) {
+        return 0;
+      }
+      guest::StoreU32(base, o + 660, side == -1 ? 0 : 1);
+      return 1;
+    case 3: {
+      // The track, wrapping within 0 to 16.
+      const int32_t value = int32_t(guest::LoadU32(base, o + 688)) + side;
+      guest::StoreU32(base, o + 688, uint32_t(value));
+      if (value < 0) {
+        guest::StoreU32(base, o + 688, 16);
+      } else if (value > 16) {
+        guest::StoreU32(base, o + 688, 0);
+      }
+      return 1;
+    }
+    default: return 0;
+  }
+}
+
+uint32_t StepSliders(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821BEAC8 Options::StepSliders");
+  const uint32_t frame = sp - 112;
+  guest::StoreU32(base, frame, sp);
+  // Node (7, 0)'s children 4 to 6 looked up, unused (as the original).
+  const uint32_t node = ui_movies::FindNode(base, FindMovie(base, frame), 7, 0);
+  for (uint32_t i = 4; i <= 6; i++) {
+    ui_movies::Child(base, node, i);
+  }
+  const uint32_t menu = guest::LoadU32(base, kMenu);
+  const int32_t side = int32_t(guest::LoadU32(base, menu + 36));
+  const uint32_t cursor = guest::LoadU32(base, menu + 0);
+  if (side != -1 && side != 1) {
+    return 0;
+  }
+  const uint32_t o = Settings(base);
+  if (cursor < 3) {
+    // The sliders (-10 to 10): no change at a bound.
+    const uint32_t field = 260 + 4 * cursor;
+    const int32_t value = int32_t(guest::LoadU32(base, o + field));
+    if (side == -1 ? value <= -10 : value >= 10) {
+      return 0;
+    }
+    guest::StoreU32(base, o + field, uint32_t(value + side));
+    return 1;
+  }
+  if (cursor != 3 || int32_t(guest::LoadU32(base, o + 660)) != (side == -1 ? 1 : 0)) {
+    return 0;
+  }
+  guest::StoreU32(base, o + 660, side == -1 ? 0 : 1);
+  return 1;
 }
 
 uint32_t SettingsReset(uint8_t* base, uint32_t settings, uint32_t sp) {

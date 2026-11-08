@@ -70,4 +70,17 @@ void OptionsShowButtonPicture(PPCContext& ctx, uint8_t* base);
 void OptionsShowAnalogPicture(PPCContext& ctx, uint8_t* base);
 void OptionsResetNode(PPCContext& ctx, uint8_t* base);
 
+// The second migration's: Options::ShowVolumeBar sub_821BE5A8 (r3 the node,
+// r4 the volume; its override the pause movie log's wrap), ShowVolumeNumbers
+// sub_821BE820, ShowSliderNumbers sub_821BECA8, ShowSliderMarks
+// sub_821BED38, ShowHudValues sub_821BE290, StepSound sub_821BE5F8 and
+// StepSliders sub_821BEAC8 (no arguments).
+void OptionsShowVolumeBar(PPCContext& ctx, uint8_t* base);
+void OptionsShowVolumeNumbers(PPCContext& ctx, uint8_t* base);
+void OptionsShowSliderNumbers(PPCContext& ctx, uint8_t* base);
+void OptionsShowSliderMarks(PPCContext& ctx, uint8_t* base);
+void OptionsShowHudValues(PPCContext& ctx, uint8_t* base);
+void OptionsStepSound(PPCContext& ctx, uint8_t* base);
+void OptionsStepSliders(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

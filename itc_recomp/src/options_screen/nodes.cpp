@@ -144,4 +144,95 @@ uint64_t ResetNode(uint8_t* base, uint32_t group, uint32_t child, uint32_t sp,
   return calls.Call(kRestorePose, frame, 0x821BFB3C, m, saved, file, 0);
 }
 
+uint32_t ShowVolumeBar(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821BE5A8 Options::ShowVolumeBar");
+  Frame(base, sp, 112);
+  uint32_t child = 0;
+  for (int32_t i = 1; i <= 15; i++) {
+    child = ui_movies::Child(base, node, uint32_t(i) + 21);
+    StoreU32(base, child + 80, i <= int32_t(uint32_t(volume)) ? 1 : 0);
+  }
+  return child;
+}
+
+uint64_t ShowVolumeNumbers(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BE820 Options::ShowVolumeNumbers");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t m = FindMovie(base, frame);
+  const uint32_t music = ui_movies::FindNode(base, m, 6, 6);
+  ShowVolumeNumber(base, music, LoadU32(base, LoadU32(base, kSettings) + 252), frame, calls);
+  const uint32_t effects = ui_movies::FindNode(base, m, 6, 7);
+  return ShowVolumeNumber(base, effects, LoadU32(base, LoadU32(base, kSettings) + 256), frame,
+                          calls);
+}
+
+namespace {
+
+// The three slider edits (o +260 to +268) copied to the frame's +88, node
+// (7, 0), and `show` on its children 4 to 6 with each value. A 144-byte
+// frame. `show`'s last answer.
+template <typename Show>
+uint64_t ShowSliders(uint8_t* base, uint32_t sp, Show show) {
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t m = FindMovie(base, frame);
+  const uint32_t o = LoadU32(base, kSettings);
+  for (uint32_t i = 0; i < 3; i++) {
+    StoreU32(base, frame + 88 + 4 * i, LoadU32(base, o + 260 + 4 * i));
+  }
+  const uint32_t node = ui_movies::FindNode(base, m, 7, 0);
+  uint64_t r3 = 0;
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t slider = ui_movies::Child(base, node, i + 4);
+    r3 = show(slider, uint64_t(LoadU32(base, frame + 88 + 4 * i)), frame);
+  }
+  return r3;
+}
+
+}  // namespace
+
+uint64_t ShowSliderNumbers(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821BECA8 Options::ShowSliderNumbers");
+  return ShowSliders(base, sp, [&](uint32_t slider, uint64_t value, uint32_t frame) {
+    return uint64_t(ShowSlider(base, slider, value, frame, calls));
+  });
+}
+
+uint64_t ShowSliderMarks(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821BED38 Options::ShowSliderMarks");
+  return ShowSliders(base, sp, [&](uint32_t slider, uint64_t value, uint32_t frame) {
+    return uint64_t(ShowSliderMark(base, slider, value, frame));
+  });
+}
+
+uint64_t ShowHudValues(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821BE290 Options::ShowHudValues");
+  const uint32_t frame = Frame(base, sp, 208);
+  const uint32_t m = FindMovie(base, frame);
+  const uint32_t o = LoadU32(base, kSettings);
+  for (uint32_t i = 0; i < 4; i++) {
+    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o + 236 + 4 * i));
+  }
+  StoreU32(base, frame + 112, LoadU32(base, o + 660));
+  const uint32_t group = ui_movies::FindNode(base, m, 5, 2);
+  uint64_t r3 = group;
+  for (int32_t i = 0; i < int32_t(LoadU32(base, group + 104)); i++) {
+    const uint32_t row = ui_movies::FindNode(base, m, 5, LoadU32(base, group + 100) + uint32_t(i));
+    const uint32_t left = ui_movies::FindNode(base, m, 5, LoadU32(base, row + 100));
+    const uint32_t left_frame = ui_movies::Child(base, left, 0);
+    const uint32_t left_shown = ui_movies::Child(base, left, 2);
+    const uint32_t right = ui_movies::FindNode(base, m, 5, LoadU32(base, row + 100) + 1);
+    const uint32_t right_frame = ui_movies::Child(base, right, 0);
+    const uint32_t right_shown = ui_movies::Child(base, right, 2);
+    // The value as the frame holds it (rows past the five read the frame's
+    // next words, as the original does).
+    const uint32_t on = int32_t(LoadU32(base, frame + 96 + 4 * uint32_t(i))) == 1 ? 1 : 0;
+    StoreU32(base, left_frame + 108, on ^ 1);
+    StoreU32(base, left_shown + 80, on);
+    StoreU32(base, right_frame + 108, on);
+    StoreU32(base, right_shown + 80, on ^ 1);
+    r3 = right_shown;
+  }
+  return r3;
+}
+
 }  // namespace options_screen

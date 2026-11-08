@@ -734,6 +734,73 @@ void NodeHelpers(Context& h, const World& w) {
       __imp__sub_821BFA68, hooks::OptionsResetNode, {{128, 40}});
 }
 
+
+// --- The second migration's page helpers ---
+
+void PageHelpers(Context& h, const World& w) {
+  // A small value around [lo, hi] or any word.
+  const auto edit = [](Random& r, int32_t lo, int32_t hi) {
+    return r.Below(8) == 0 ? uint32_t(r.Next()) : uint32_t(lo + int32_t(r.Below(uint32_t(hi - lo + 1))));
+  };
+  const auto edits = [&h, edit](const World& w, Random& r, uint32_t from, uint32_t to, int32_t lo,
+                                int32_t hi) {
+    for (uint32_t f = from; f <= to; f += 4) {
+      guest::StoreU32(h.base, w.settings() + f, edit(r, lo, hi));
+    }
+  };
+  Group(
+      h, w, "Options::ShowVolumeBar (sub_821BE5A8)", 60,
+      [&](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.leaf(r.Below(kLeaves));
+        t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(19)) - 1));
+      },
+      __imp__sub_821BE5A8, hooks::OptionsShowVolumeBar, {{112, 32}});
+  // ShowVolumeNumbers: ShowVolumeNumber's frame below its own (its varargs
+  // words and register saves left out).
+  Group(
+      h, w, "Options::ShowVolumeNumbers (sub_821BE820)", 60,
+      [&](PPCContext&, Random& r, const World& w) { edits(w, r, 252, 256, -1, 17); },
+      __imp__sub_821BE820, hooks::OptionsShowVolumeNumbers, {{112, 24}, {240, 192}, {160, 144}});
+  Group(
+      h, w, "Options::ShowSliderNumbers (sub_821BECA8)", 60,
+      [&](PPCContext&, Random& r, const World& w) { edits(w, r, 260, 268, -12, 12); },
+      __imp__sub_821BECA8, hooks::OptionsShowSliderNumbers, {{144, 32}, {272, 224}, {192, 184}});
+  Group(
+      h, w, "Options::ShowSliderMarks (sub_821BED38)", 60,
+      [&](PPCContext&, Random& r, const World& w) { edits(w, r, 260, 268, -12, 12); },
+      __imp__sub_821BED38, hooks::OptionsShowSliderMarks, {{144, 32}, {256, 160}});
+  Group(
+      h, w, "Options::ShowHudValues (sub_821BE290)", 80,
+      [&](PPCContext&, Random& r, const World& w) {
+        edits(w, r, 236, 248, 0, 1);
+        edits(w, r, 660, 660, 0, 1);
+      },
+      __imp__sub_821BE290, hooks::OptionsShowHudValues, {{208, 88}});
+  // The steps: the menu's side -1, 0, 1 or any, its cursor 0 to 4 (now and
+  // then any), the edits around their bounds.
+  const auto side = [&h, edit](const World& w, Random& r) {
+    const uint32_t sides[4] = {0xFFFFFFFFu, 1, 0, uint32_t(r.Next())};
+    guest::StoreU32(h.base, w.menu() + 36, sides[r.Below(4)]);
+    guest::StoreU32(h.base, w.menu() + 0, edit(r, -1, 4));
+    guest::StoreU32(h.base, w.settings() + 660, edit(r, 0, 1));
+  };
+  Group(
+      h, w, "Options::StepSound (sub_821BE5F8)", 150,
+      [&](PPCContext&, Random& r, const World& w) {
+        side(w, r);
+        edits(w, r, 252, 256, -1, 16);
+        edits(w, r, 688, 688, -1, 17);
+      },
+      __imp__sub_821BE5F8, hooks::OptionsStepSound);
+  Group(
+      h, w, "Options::StepSliders (sub_821BEAC8)", 150,
+      [&](PPCContext&, Random& r, const World& w) {
+        side(w, r);
+        edits(w, r, 260, 268, -11, 11);
+      },
+      __imp__sub_821BEAC8, hooks::OptionsStepSliders, {{112, 16}});
+}
+
 }  // namespace
 
 void OptionsScreen(Context& h) {
@@ -747,6 +814,7 @@ void OptionsScreen(Context& h) {
   Handlers(h, w);
   MovieHandlers(h, w);
   NodeHelpers(h, w);
+  PageHelpers(h, w);
 }
 
 }  // namespace harness

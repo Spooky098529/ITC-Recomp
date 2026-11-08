@@ -23,6 +23,7 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/ui_movies.h"
+#include "hooks/options_screen.h"
 #include "hooks/race_screens.h"
 #include "hooks/ui_movies_game.h"
 
@@ -45,6 +46,7 @@ ITC_FLAG_BOOL(log_pause_movie, false, "ITC",
               "what changes them between updates), and the sub-menus' calls setting its "
               "nodes, by pass type");
 ITC_FLAG_DECLARE(bool, native_race_screens);
+ITC_FLAG_DECLARE(bool, native_options_screen);
 
 namespace debug {
 
@@ -578,13 +580,18 @@ extern "C" REX_FUNC(sub_8211C7E8) {
   __imp__sub_8211C7E8(ctx, base);
 }
 
+// sub_821BE5A8 (Options::ShowVolumeBar) natively under
+// --native_options_screen (src/options_screen/nodes.cpp), the log kept
+// around it.
 extern "C" REX_FUNC(sub_821BE5A8) {
   REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_821BE5A8(ctx, base);
+  if (ITC_FLAG(log_pause_movie)) {
+    debug::LogCall("821BE5A8 flags by selection", ctx);
+  }
+  if (ITC_FLAG(native_options_screen)) {
+    hooks::OptionsShowVolumeBar(ctx, base);
     return;
   }
-  debug::LogCall("821BE5A8 flags by selection", ctx);
   __imp__sub_821BE5A8(ctx, base);
 }
 
