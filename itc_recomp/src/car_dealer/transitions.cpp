@@ -312,4 +312,66 @@ uint64_t Transition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   return 1;
 }
 
+uint64_t Transition15(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82185310 CarDealer::Transition15");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t movie = FindMovie(base, 4, frame + 80);
+  if (Load(base, step) == 0) {
+    const uint64_t selection = Selection(base, calls, frame, 0x8218535C);
+    Finish(calls, frame, 0x8218536C, movie, selection + 37);
+    Finish(calls, frame, 0x82185378, movie, 86);
+    Finish(calls, frame, 0x82185384, movie, 87);
+    Play(calls, frame, 0x821853A0, movie, 152);
+    Store(base, Load(base, kData) + 56, 0);
+    Store(base, Load(base, kData) + 60, 0);
+    OpenColors(base, frame, calls);
+    SetHeader(base, 1, 2, frame);
+    Store(base, step, 1);
+  }
+  return uint32_t(Run(calls, frame, 0x821853DC, movie)) == 0 ? 1 : 0;
+}
+
+uint64_t Transition17(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82184018 CarDealer::Transition17");
+  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t movie = FindMovie(base, 4, frame + 80);
+  if (Load(base, step) == 0) {
+    const uint64_t selection = Selection(base, calls, frame, 0x8218405C);
+    const uint64_t before =
+        calls.Call(kListSelectionBefore, frame, 0x82184068, Load(base, kListMenu));
+    const uint32_t list = Load(base, kListMenu);
+    const uint32_t scroll = Load(base, list + 4);
+    const int32_t moved = int32_t(scroll - Load(base, list + 8));
+    Store(base, Load(base, kData) + 56, uint32_t(selection));
+    Store(base, Load(base, kData) + 60, scroll);
+    Finish(calls, frame, 0x8218409C, movie, before + 134);
+    Play(calls, frame, 0x821840BC, movie, selection + 134);
+    Loop(calls, frame, 0x821840C8, movie, selection + 134);
+    Finish(calls, frame, 0x821840D4, movie, 143);
+    Finish(calls, frame, 0x821840E0, movie, 144);
+    calls.Call(kShowCarByIdWithClass, frame, 0x821840E8, uint64_t(scroll) + selection);
+    const uint32_t menu = Load(base, kListMenu);
+    if (Load(base, menu + 32) == 0) {
+      // The move's arrow by its sign (none when 0).
+      const int32_t move = int32_t(Load(base, menu + 24));
+      if (move > 0) {
+        Play(calls, frame, 0x82184130, movie, 144);
+      } else if (move < 0) {
+        Play(calls, frame, 0x82184130, movie, 143);
+      }
+    } else {
+      SetColorBar(base, uint64_t(uint32_t(selection) << 5) + 3, frame);
+    }
+    if (moved != 0) {
+      ShowSwatches(base, frame);
+      Finish(calls, frame, 0x82184158, movie, 29);
+      Finish(calls, frame, 0x82184164, movie, 30);
+      Play(calls, frame, 0x8218418C, movie, moved < 0 ? 146 : 145);
+    }
+    Store(base, step, 1);
+  }
+  Run(calls, frame, 0x821841A0, movie);
+  return 1;
+}
+
 }  // namespace car_dealer

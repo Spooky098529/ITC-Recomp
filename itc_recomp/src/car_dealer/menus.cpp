@@ -8,6 +8,11 @@
 #include "guest.h"
 #include "ui_movies/game.h"
 
+#include <rex/platform/fpscr.h>
+
+#include <climits>
+#include <cmath>
+
 namespace car_dealer {
 
 namespace {
@@ -23,6 +28,22 @@ void InitList(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr, ui
   Store(base, frame + 84, 159);
   const uint64_t args[8] = {list, count, shown, 1, r7, r8, r9, r10};
   calls.CallArgs(kListInit, frame, lr, args);
+}
+
+// fctiwz as the translated code does it: NaN and below INT_MIN 0x80000000,
+// INT_MAX and above INT_MAX, else truncated; the low word.
+uint32_t Fctiwz(double value) {
+  if (std::isnan(value)) return 0x80000000u;
+  if (value >= double(INT32_MAX)) return uint32_t(INT32_MAX);
+  if (value < double(INT32_MIN)) return 0x80000000u;
+  return uint32_t(int32_t(value));
+}
+
+// A 64-bit integer stored big-endian at `at` (the original's std before
+// each conversion).
+void StoreWide(uint8_t* base, uint32_t at, int64_t value) {
+  Store(base, at, uint32_t(uint64_t(value) >> 32));
+  Store(base, at + 4, uint32_t(uint64_t(value)));
 }
 
 uint64_t SetText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie,
@@ -114,6 +135,91 @@ uint64_t OpenCar(uint8_t* base, uint32_t sp, const Calls& calls) {
   Store(base, ui_movies::FindNode(base, movie, kAll, 23) + 80, shown);
   Store(base, ui_movies::FindNode(base, movie, kAll, 24) + 80, shown);
   return calls.Call(kStageSetPlates, frame, 0x82184798, Load(base, Load(base, kStandHolder)), 0);
+}
+
+uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821847A0 CarDealer::OpenColors");
+  using Fpscr = rex::platform::FPSCRPlatform;
+  Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+  const uint32_t frame = Frame(base, sp, 240);
+  const uint32_t movie = FindMovie(base, 4, frame + 96);
+  uint32_t entry;
+  {
+    const uint32_t data = Load(base, kData);
+    const uint32_t index = (Load(base, data + 52) + Load(base, data + 48)) << 2;
+    entry = Load(base, index + Load(base, data + 1136));
+  }
+  const uint32_t n = Load(base, entry + 8376);
+  const bool over = int32_t(n) > 9;
+  InitList(base, calls, frame, over ? 0x82184838 : 0x82184858, Load(base, kListMenu), n,
+           over ? 9 : n, 154, 153, 155, 156);
+  calls.Call(kListSetSelection, frame, 0x82184868, Load(base, kListMenu),
+             Load(base, Load(base, kData) + 56));
+  Store(base, Load(base, kListMenu) + 4, Load(base, Load(base, kData) + 60));
+  calls.Call(kListFit, frame, 0x82184884, Load(base, kListMenu), 1);
+  const uint64_t selection = calls.Call(kListSelection, frame, 0x8218488C, Load(base, kListMenu));
+  SetColorBar(base, uint64_t(uint32_t(selection) << 5) + 3, frame);
+  Store(base, ui_movies::FindNode(base, movie, kAll, 25) + 80, over ? 1 : 0);
+  // The old color records freed, from the last.
+  while (Load(base, Load(base, kData) + 1192) != 0) {
+    const uint32_t colors = Load(base, kData) + 1140;
+    const uint32_t last = Load(base, colors + 52) - 1;
+    Store(base, colors + 52, last);
+    calls.Call(kVirtualFree, frame, 0x821848F0, Load(base, (last << 2) + colors), 0, 0x8000);
+  }
+  if (int32_t(n) > 0) {
+    // Each color (20-byte records from +8116: +0 the kind, +4 the hue, +6
+    // the saturation, +7 the value) into a 32-byte record: +16 to +24 the
+    // HSV floats, +0 to +8 the RGB integers.
+    const double scale = double(guest::LoadFloat(base, 0x82000C44));
+    const double unit = double(guest::LoadFloat(base, 0x82002200));
+    uint32_t source = entry + 8116;
+    for (uint32_t left = n; left != 0; left--, source += 20) {
+      const uint32_t record = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8218493C, 0, 32, 4096, 4));
+      const int64_t hue = int64_t(int32_t(guest::LoadU16(base, source + 4)));
+      StoreWide(base, frame + 96, hue);
+      guest::StoreFloat(base, record + 16, float(double(float(double(hue)))));
+      const int64_t saturation = guest::LoadU8(base, source + 6);
+      StoreWide(base, frame + 104, saturation);
+      const double s = double(float(double(saturation)));
+      guest::StoreFloat(base, record + 20, float(double(float(s * unit))));
+      const uint32_t kind = guest::LoadU16(base, source + 0);
+      const uint32_t add = Load(base, kind == 1 ? 0x82002FF4 : 0x82002FF8);
+      int32_t value = int32_t(guest::LoadU8(base, source + 7) + add);
+      if (value < 0) {
+        value = 0;
+      } else if (value > 255) {
+        value = 255;
+      }
+      StoreWide(base, kind == 1 ? frame + 112 : frame + 120, value);
+      const double v = double(float(double(int64_t(value))));
+      guest::StoreFloat(base, record + 24, float(double(float(v * unit))));
+      calls.Call(kHsvToRgb, frame, 0x82184A00, frame + 128, record + 16);
+      const double red = double(float(double(guest::LoadFloat(base, frame + 128)) * scale));
+      const double green = double(float(double(guest::LoadFloat(base, frame + 132)) * scale));
+      const double blue = double(float(double(guest::LoadFloat(base, frame + 136)) * scale));
+      Store(base, record + 0, Fctiwz(red));
+      Store(base, record + 4, Fctiwz(green));
+      Store(base, record + 8, Fctiwz(blue));
+      const uint32_t colors = Load(base, kData) + 1140;
+      const uint32_t count = Load(base, colors + 52);
+      Store(base, colors + 52, count + 1);
+      Store(base, (count << 2) + colors, record);
+    }
+  }
+  // Sub-scene 26's swatches shown for those below n.
+  const uint32_t swatches = ui_movies::FindNode(base, movie, 26, 1);
+  for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, swatches + 104)); i++) {
+    const uint32_t swatch = ui_movies::FindNode(base, movie, 26, i + Load(base, swatches + 100));
+    Store(base, swatch + 80, int32_t(i) < int32_t(n) ? 1 : 0);
+  }
+  ShowSwatches(base, frame);
+  {
+    const uint32_t data = Load(base, kData);
+    calls.Call(kShowCarById, frame, 0x82184AD4,
+               uint64_t(Load(base, data + 60)) + Load(base, data + 56));
+  }
+  return HelpLineSet(base, 552, frame, calls);
 }
 
 }  // namespace car_dealer

@@ -38,6 +38,7 @@
 #include "menu_sounds/menu_sounds.h"
 #include "race_screens/race_screens.h"
 #include "ui_movies/game.h"
+#include "stand_car_world.h"
 
 #include <fmt/format.h>
 
@@ -385,9 +386,14 @@ void Allocated(uint8_t* base, Outputs& out, uint32_t slot, uint32_t bytes) {
 
 // UiMovies::Open's and Delete's calls, recorded on both sides and answered
 // 1 (Delete would free our movie).
+// Other addresses go to the recorder set before the run (the stand's world's
+// archive loads, StandCarWorld), when there's one.
 std::vector<uint32_t> g_opens;
+hooks::StartUpRecorder g_chained = nullptr;
 bool RecordOpen(PPCContext& ctx, uint32_t address) {
-  if (address != cd::kMoviesOpen && address != cd::kMoviesDelete) return false;
+  if (address != cd::kMoviesOpen && address != cd::kMoviesDelete) {
+    return g_chained != nullptr && g_chained(ctx, address);
+  }
   // Delete reads only r3: its r4 (a leftover) isn't compared.
   g_opens.insert(g_opens.end(), {address, ctx.r3.u32,
                                  address == cd::kMoviesDelete ? 0u : ctx.r4.u32, ctx.r1.u32,
@@ -489,6 +495,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
       g_answers = Random(r.Next());
       g_case_sp = sp;
       const hooks::StartUpRecorder recorder = hooks::g_start_up_recorder;
+      g_chained = recorder;
       hooks::g_start_up_recorder = RecordOpen;
       const ui_movies_hooks::UpdateCalleeStandIn stand_in =
           ui_movies_hooks::g_update_callee_stand_in;
@@ -502,6 +509,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
         spec.native(t, h.base);
       }
       hooks::g_start_up_recorder = recorder;
+      g_chained = nullptr;
       ui_movies_hooks::g_update_callee_stand_in = stand_in;
       out[v].Word(uint32_t(g_updates.size()));
       for (const UpdateCall& call : g_updates) {
@@ -1232,6 +1240,120 @@ void Transitions(Context& h, const World& w) {
              }});
 }
 
+// The colors and the stand's car: GarageStage::ShowCarById and
+// ShowCarByIdWithClass run for real in load_poll's re-applies' world
+// (StandCarWorld, stand_car_world.h, as the car list's harness lays it for
+// its callers): laid with the selected car's entry (the data's +48 + +52)
+// as the world's car, then the dealer's data pointed at again; settled
+// after the run (its blocks and loads compared, its globals put back),
+// without the car on ShowCarById's frame (as the car list's pick: dead once
+// it returns). OpenColors (and Transition15 above it): the menus' world,
+// the old color records 0 to 4 of the layer's pages, the selected car's
+// color count (+8376) 0 to 12 and its records (+8116: the kind 0, 1 or
+// another, the hue, saturation and value word random), the data's +56 and
+// +60 small; the records it makes compared (+0 to +15 and +28 exactly, +16
+// to +27 as floats) and freed. Transition17: the list menu as Transition7
+// lays it but its scroll 0 to 3 and selection 0 to 2, its +32 0 or 1 and
+// its move (+24) -1 to 1. The paint picks ShowCarById and
+// ShowCarByIdWithClass get (the data's +56 + +60, the scroll + the
+// selection) stay 0 to 5, among the world's car's colors (load_poll's
+// picks).
+void StandCases(Context& h, const World& w) {
+  StandCarWorld stand(h.base);
+  if (!stand.ok()) {
+    ITC_LOG_WARN("harness: car_dealer: OpenColors, Transition15 and Transition17 skipped (the "
+                 "stand's world: no block, or its callees' plain C++ isn't native)");
+    return;
+  }
+  auto lay = [&stand](PPCContext& t, Random& r, const World& w) {
+    uint8_t* base = w.base;
+    const uint32_t data = w.data();
+    const uint32_t index = guest::LoadU32(base, data + 48) + guest::LoadU32(base, data + 52);
+    const uint32_t entry = guest::LoadU32(base, guest::LoadU32(base, data + 1136) + 4 * index);
+    stand.Lay(r, entry, t.r1.u32);
+    guest::StoreU32(base, cd::kData, data);
+  };
+  auto step = [](PPCContext& t, Random& r, const World& w) {
+    const uint32_t at = w.at(kPagesAt) + 24;
+    const uint32_t words[3] = {0, 1, uint32_t(r.Next())};
+    guest::StoreU32(w.base, at, words[r.Below(4) == 0 ? 1 + r.Below(2) : 0]);
+    t.r3.u64 = at;
+  };
+  auto colors = [lay](PPCContext& t, Random& r, const World& w) {
+    uint8_t* base = w.base;
+    MenuWorld(r, w);
+    MenuBlocks(r, w);
+    const uint32_t data = w.data();
+    const uint32_t old = r.Below(5);
+    for (uint32_t i = 0; i < old; i++) {
+      guest::StoreU32(base, data + 1140 + 4 * i, MakePages(base, 32, r));
+    }
+    guest::StoreU32(base, data + 1192, old);
+    guest::StoreU32(base, data + 56, r.Below(3));
+    guest::StoreU32(base, data + 60, r.Below(3));
+    for (uint32_t k = 0; k < kEntryCount; k++) {
+      const uint32_t entry = w.entry(k);
+      guest::StoreU32(base, entry + 8376, r.Below(4) == 0 ? 0 : r.Below(13));
+      for (uint32_t c = 0; c < 13; c++) {
+        const uint32_t kinds[3] = {0, 1, 2};
+        guest::StoreU16(base, entry + 8116 + 20 * c, uint16_t(kinds[r.Below(3)]));
+        guest::StoreU32(base, entry + 8116 + 20 * c + 4, uint32_t(r.Next()));
+      }
+    }
+    lay(t, r, w);
+  };
+  auto settle = [&stand](PPCContext&, const World& w, Outputs& out) {
+    uint8_t* base = w.base;
+    const uint32_t data = w.data();
+    const uint32_t made = guest::LoadU32(base, data + 1192);
+    out.Word(made);
+    for (uint32_t k = 0; k < made && k < 13; k++) {
+      const uint32_t record = guest::LoadU32(base, data + 1140 + 4 * k);
+      const bool pages = record != 0 && memory::IsPages(record);
+      out.Word(pages ? 1 : 0);
+      if (pages) {
+        out.Bytes(Read(base, record, 16));
+        out.Floats(base, record + 16, 3);
+        out.Bytes(Read(base, record + 28, 4));
+        memory::FreePages(record);
+        guest::StoreU32(base, data + 1140 + 4 * k, 0xC0100000 + k);
+      }
+    }
+    stand.Settle(out, 0, false);
+  };
+  auto settle_menus = [settle](PPCContext& t, const World& w, Outputs& out) {
+    settle(t, w, out);
+    FreeMenuBlocks(t, w, out);
+  };
+  Run(h, w, {"CarDealer::OpenColors (sub_821847A0)", 60, __imp__sub_821847A0,
+             hooks::CarDealerOpenColors, {{-240, -96}}, colors, settle_menus});
+  Run(h, w, {"CarDealer::Transition15 (sub_82185310; sub_821847A0)", 60, __imp__sub_82185310,
+             hooks::CarDealerTransition15, {{-112, -24}},
+             [colors, step](PPCContext& t, Random& r, const World& w) {
+               colors(t, r, w);
+               step(t, r, w);
+             },
+             settle_menus});
+  Run(h, w, {"CarDealer::Transition17 (sub_82184018)", 60, __imp__sub_82184018,
+             hooks::CarDealerTransition17, {{-160, -64}},
+             [lay, step](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               MenuWorld(r, w);
+               const uint32_t list = w.at(kListMenuAt);
+               const uint32_t scroll = r.Below(4);
+               guest::StoreU32(base, list + 4, scroll);
+               guest::StoreU32(base, list + 8, scroll - 1 + r.Below(3));
+               guest::StoreU32(base, list + 16, r.Below(3));
+               guest::StoreU32(base, list + 20, r.Below(4));
+               guest::StoreU32(base, list + 32, r.Below(2));
+               guest::StoreU32(base, list + 24, uint32_t(int32_t(r.Below(3)) - 1));
+               guest::StoreU32(base, w.data() + 1192, uint32_t(int32_t(r.Below(14)) - 2));
+               lay(t, r, w);
+               step(t, r, w);
+             },
+             [&stand](PPCContext&, const World&, Outputs& out) { stand.Settle(out, 0, false); }});
+}
+
 }  // namespace
 
 void CarDealer(Context& h) {
@@ -1250,6 +1372,7 @@ void CarDealer(Context& h) {
   if (hooks::NativeHeapActive()) {
     Openers(h, w);
     Transitions(h, w);
+    StandCases(h, w);
   }
 }
 

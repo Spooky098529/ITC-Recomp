@@ -96,6 +96,8 @@ constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kSetNodeColor = 0x8211A5B8;
 constexpr uint32_t kListSelectionBefore = 0x8220BC28;
 constexpr uint32_t kCarCardFill = 0x821821C8;
+constexpr uint32_t kHsvToRgb = 0x820D0D60;
+constexpr uint32_t kShowCarByIdWithClass = 0x82182D30;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -274,6 +276,18 @@ uint64_t Transition19(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
 // or 29 played and SetScrollArrows (its plain C++); the help line 1862 +
 // the selected car's id. Always 1. 160-byte frame.
 uint64_t Transition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82185310 CarDealer::Transition15: 37 + the selection, 86 and 87
+// finished, 152 played, the data's +56 and +60 = 0, OpenColors and
+// SetHeader(1, 2) (their plain C++). 112-byte frame.
+uint64_t Transition15(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82184018 CarDealer::Transition17: the data's +56 and +60 = the list
+// menu's selection and scroll; 134 + the previous selection finished, 134 +
+// the selection played and looped, 143 and 144 finished;
+// GarageStage::ShowCarByIdWithClass(the sum) (through its override); without
+// the menu's +32, 144 or 143 played by its move's sign (+24), with it
+// SetColorBar(selection x 32 + 3); when the scroll moved, ShowSwatches, 29
+// and 30 finished and 146 (back) or 145 played. Always 1. 160-byte frame.
+uint64_t Transition17(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The update, the start and the dialogs' end (update.cpp) ---
 
@@ -378,5 +392,15 @@ uint64_t OpenCarList(uint8_t* base, uint32_t sp, const Calls& calls);
 // shown unless the list has one car, GarageStage::SetPlates(stage, 0)
 // (through its override). 144-byte frame.
 uint64_t OpenCar(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821847A0 CarDealer::OpenColors: the selected car's n colors (+8376):
+// the list menu over them (min(n, 9) shown), its selection and scroll from
+// the data's +56 and +60, SetColorBar (its plain C++), (-1, 25) shown with
+// more than nine; the old color records freed (VirtualFree), a 32-byte
+// record for each color (VirtualAlloc; the HSV floats from the entry's
+// 20-byte records at +8116, Color::HsvToRgb's RGB scaled and truncated as
+// the translated fctiwz), sub-scene 26's swatches shown below n,
+// ShowSwatches (its plain C++), GarageStage::ShowCarById(+56 + +60), the
+// help line 552. 240-byte frame.
+uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls);
 
 }  // namespace car_dealer
