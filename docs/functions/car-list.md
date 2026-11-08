@@ -1,0 +1,278 @@
+# Known functions: the type 6 and 7 panel screens' car list
+
+The car list the type 6 and 7 modes' panel screens show (the car pick:
+[`type67-screens.md`](type67-screens.md); the modes in
+[`type6-type7-modes.md`](type6-type7-modes.md)): `PanelSet`, 1,972 bytes
+at the panel screens' +9752 (their +9644 points to it; built by
+`PanelSet::PanelSet` and `PanelSetBase::PanelSetBase` in
+[`screen-constructors.md`](screen-constructors.md)), vtable `0x820110C8`
+(19 slots, read from the image: 0 `sub_8224C9D8`, 1 `sub_8224CAD8`, 2
+`sub_822496C8`, 3 `sub_82249730`, 4 the empty `sub_82106540`, 5
+`sub_8224CA28`, 6 `sub_8224CF18`, 7 `sub_8224B880`, 8 to 10
+`sub_82249848`, `sub_82249870`, `sub_82249898`, 11 `sub_820CC470`
+(`race-setup.md`: its +20 = r4), 12 `sub_8224B700`, 13 to 17
+`sub_8224B6D8` to `sub_8224B6F8`, 18 `sub_820B67D8`
+(`vehicle-accessors.md`: the set + 208)). Its slots thunk to its base at
+the set's +4 (`b` in the rows: `b +N` is the set's +(N + 4); vtable
+`0x820110C4`, one slot, `sub_8224B888`), which holds the lists, a page
+machine and four panels the screens build (`PanelSet::PanelSet`): F at
+b +1896 (the tabs, 144 bytes, `Panel6F`/`Panel7F`), E at b +1900 (the
+car rows, 160 bytes, `PanelE`), D at b +1904 (the colors, 92 bytes,
+`Panel6D`/`Panel7D`) and C at b +1908 (the car's info, stats and button
+prompts, 320 bytes, `Panel6C`/`Panel7C`, vtables `0x82010980` and
+`0x82010EE4`: 0 the deleting destructor, 1 `sub_8224E288`, 2
+`sub_822417E8`, 3 `sub_82231DF0` or `sub_82241868`; their base's,
+`0x820111C0`: `sub_8224EB68`, `sub_8224E288`, `sub_8224E878`), each over
+a panel group (`PanelGroup::Movie`, `type67-screens.md`), and the
+screen's group B at b +1956.
+
+What it does: slot 1 (`PanelSet::Build`) builds three lists of 8,448-byte
+entries (`VirtualAlloc`, each the car's 8,432-byte spec from
+`Params::GetCarSpec`, +8432 the car's id, +8436 a color): the 72 cars
+whose bit is set in the save data's unlock words (+104740) go to list 0
+or 1 by their spec's byte +771, and the garage's cars (save data +6120,
+the garage `Garage::Add` in `career.md` fills: halfword links from
++204, 1,968-byte records, +224 the car's id, +212 the car, +6328 the
+count) to list 2; slot 7 frees them. The page
+machine (b +32 the page, +36 the page after the step, +40 the page
+before, +44 the step, +48 a queued step, +52 cleared on each step, +56
+the step's first-pass word) runs nine pages through slot 5 (each Draw:
+the page's input, a table of 9 member functions on its frame: 0 the
+tabs, 1 the car rows, 2 the car's actions, 3 the colors, 4 a two-player
+confirm, 5 picked, 6 the power graph, 7 and 8 back from it) and 27
+steps through slot 6 (each frame: the step at +44 from a table of 27,
+called until it answers nonzero and `[0x82815EB0]` is 0, then the queued
+step or the next page; then the stand's car, `PanelSetBase::UpdateStand`).
+The panel screens read the answers through slots 8 to 10 (picked, back,
+the power graph) and slot 18, and set the open kind (13: b +1928; 1
+opens on the tabs at the list picked before, else on list 0's rows) and
+what was picked before (15 to 17: b +1880 the tab, +1884 the entry,
++1888 its color). `0x82815EAC` is the two-player word: 0 in `PanelSet`,
+1 in the two-list variant (`PanelSetPair`, vtable `0x82011118`, two bases
+at +4 and +1976, b +1952 the player; built by `sub_8224B750` from the
+type 6 two-player panel screen `sub_822386F0`, not seen in play) whose
+slots run both bases. Fields are in `../known-data.md` ("car list").
+
+In play (`../coverage.md`) the type 7 panel screen's car pick ran: the
+tabs, the rows, the car's page, the colors, the power graph (pages 0 to
+3, 5, 6 and 8), the steps between them (15 of 27) and the stand's car;
+the two-player variant, its confirm panel (b +1912, `sub_8224EBB0`'s
+class), the type 6 panels' own slots, the destructors and the garage
+tab's stand car (`sub_82192770`) never ran.
+
+For a migration: slots 5 and 6 call their pages and steps through tables
+of member functions built on their frames (indirect calls; the targets
+are all here), step 9 calls C's vtable slot 3 and `CarPanel::ShowStats`
+its slots 1 and 2 (`sub_8224E288`, `sub_822417E8`, both here); the steps
+take `[0x82815EB0]` (set to 1 with each fade, cleared by
+`GroupPair::WaitForFade`), and the fades' passes come from
+`[0x82001BEC]` (5) and `[0x82001BF0]` (15); `PanelGroup::SetCaption`
+calls `UiMovie::SetText` with r7 to r10 unset (precedent, 2026-10-30:
+pass 0); `sub_8211BC18` (a UI movie helper with no row: whether a named
+animation is running, probably; a lead) and `sub_8211DE30` (in the
+sticker editor's lead) are the only callees outside this file that run
+and aren't ours. The colors' list (b +1824, up to 13 32-byte records,
+count at b +1876) is `VirtualAlloc`ed per color. Read by the B7 loop's
+mapping agent, 2026-11-08, from the lead "the car list the type 6 and 7
+panel screens show".
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8224C9D8` | `PanelSet::DeletingDestructor` | | Slot 0 of `0x820110C8`: `PanelSet::~PanelSet` (`sub_8224B708`), then `operator delete` when r4's bit 0 is set. Returns r3. Not seen in play. Read in full. |
+| `sub_8224B708` | `PanelSet::~PanelSet` | | r3 = the set: +0 = `0x820110C8`, `PanelSetBase::~PanelSetBase` on +4, then +0 = `0x82011018` (an interface's vtable: slot 0 `sub_8224AC98`, its others empty). From the two panel screens' destructors (`sub_82230668`, `sub_82240168`) and slot 0. Not seen in play. Read in full. |
+| `sub_8224CAD8` | `PanelSet::Build` | | Slot 1 (+4): tail call of `PanelSetBase::Build` on the set + 4. From the panel screens' show (`type67-screens.md`), after slots 15 to 17 and 3. Seen in play. Read in full. |
+| `sub_822496C8` | `PanelSet::Reset` | | Slot 2 (+8): on b (the set + 4): +8, +12, +16, +20, +24 = 0 (picked, done, the power graph asked, show the car, the car loaded); +1940 and +1948 = 1; +32, +36, +40, +44, +52 = -1 (the page block; +48 left); +56 = 0, +1820 = 0 (no list), +228 to +248 = 0. A leaf. From the panel screens' entry (`PanelScreen::OnEnter`). Seen in play. Read in full. |
+| `sub_82249730` | `PanelSet::Open` | | Slot 3 (+12): the same resets as `PanelSet::Reset` on b, then by the open kind (b +1928, slot 13): 1 = the tabs: +32, +36, +40 = 0, +228 and +232 = +1880 (the tab picked before), then `PanelSetBase::ToTabs`; else the rows of list 0: +32, +36, +40 = 1, +228 = +232 = 0, +1820 = b + 272 (list 0) (a page-change branch after it is dead: +32 was just set to 1); then +1940 = 0. Seen in play. Read in full. |
+| `sub_8224CA28` | `PanelSet::HandleInput` | | Slot 5 (+20): tail call of `PanelSetBase::HandleInput` on the set + 4. From the panel screens' Draw, once a Draw. Seen in play. Read in full. |
+| `sub_8224CF18` | `PanelSet::Update` | | Slot 6 (+24): tail call of `PanelSetBase::Update` on the set + 4. From the panel screens' update, once a frame while shown. Seen in play. Read in full. |
+| `sub_8224B880` | `PanelSet::Free` | | Slot 7 (+28): tail call of `PanelSetBase::Free` on the set + 4. From the panel screens' leave (`PanelScreen::Leave`). Seen in play. Read in full. |
+| `sub_82249848` | `PanelSet::Picked` | | Slot 8 (+32): r3 = the set: 1 when b +12 (done) and b +8 (picked) are set, else 0. A leaf. From the panel screens' Draw. Seen in play. Read in full. |
+| `sub_82249870` | `PanelSet::WentBack` | | Slot 9 (+36): 1 when b +12 (done) is set and b +8 (picked) is 0, else 0. A leaf. Seen in play. Read in full. |
+| `sub_82249898` | `PanelSet::WantsPowerGraph` | | Slot 10 (+40): 1 when b +16 (the power graph asked) and b +8 are set, else 0. A leaf. Seen in play. Read in full. |
+| `sub_8224B700` | `PanelSet::SetKind` | | Slot 12 (+48): tail call of `PanelSetBase::SetKind` on the set + 4. No callers seen. Not seen in play. Read in full. |
+| `sub_8224B6D8` | `PanelSet::SetOpenKind` | | Slot 13 (+52): the set's +1932 (b +1928) = r4 (1: open on the tabs). A leaf. From the panel screens' movie open. Seen in play. Read in full. |
+| `sub_8224B6E0` | `PanelSet::OpenKind` | | Slot 14 (+56): returns the set's +1932. A leaf. Not seen in play. Read in full. |
+| `sub_8224B6E8` | `PanelSet::SetPreviousTab` | | Slot 15 (+60): the set's +1884 (b +1880) = r4 (the mode's car's +1972). A leaf. From the panel screens' show. Seen in play. Read in full. |
+| `sub_8224B6F0` | `PanelSet::SetPreviousEntry` | | Slot 16 (+64): the set's +1888 (b +1884) = r4 (the mode's car's +1976). A leaf. Seen in play. Read in full. |
+| `sub_8224B6F8` | `PanelSet::SetPreviousColor` | | Slot 17 (+68): the set's +1892 (b +1888) = r4 (the mode's car's +1980; `PanelSetBase::TabsPage` gives it to the entry picked before as its color, +8436). A leaf. Seen in play. Read in full. |
+| `sub_8224B888` | `PanelSetBase::DeletingDestructor` | | Slot 0 of `0x820110C4`, the base's only slot: `PanelSetBase::~PanelSetBase`, then `operator delete` when r4's bit 0 is set. Not seen in play. Read in full. |
+| `sub_8224AE60` | `PanelSetBase::~PanelSetBase` | | r3 = b: +0 = `0x820110C4`; `MenuList::Release` on +132 and +60. From `PanelSet::~PanelSet`, `PanelSetPair::~PanelSetPair` and the base's slot 0. Not seen in play. Read in full. |
+| `sub_82249610` | `PanelSetBase::SetKind` | | r3 = b, r4 = a kind: +32, +36, +40 = r4, +44 and +52 = -1, +56 = 0; kind 0: +228 = +232 = +1880; kind 1: +228 = +232 = 0, +1820 = b + 272. A leaf. From `PanelSet::SetKind`. Not seen in play. Read in full. |
+| `sub_82249668` | `PanelSetBase::SaveData` | | r3 = b: with `[0x82815EAC]` set (two players), `sub_82105678` (not seen in play) + 120,108 × +1952 (the player), else `SaveData::Of(0)`. Returns it. From 7 of the set's functions. Seen in play. Read in full. |
+| `sub_82249558` | `PanelSetBase::ToTabs` | | r3 = b: when the page (+32) isn't 0: +40 = it, +44 = 0 (step 0), +48 = 1, +36 = 0, +32 = -1; then E's +152 = 0; when +1936 (the drawn page changed) is set, the menu at +60 set up for the tabs (`MenuList::Init(+60, 3, 3, 1, 154, 153, 155, 156, 159, 158)`) at +232 (`MenuList::SetSelection`). From `PanelSet::Open` and `PanelSetPair::Open`. Seen in play. Read in full. |
+| `sub_8224C698` | `PanelSetBase::Build` | | r3 = b. Nothing when +4 (built) and `[0x82815EAC]` are both set. Else +252 = 20, +256 = 6,000, +260 = 1, +264 = 20, +268 = 10, +208 = 0 (not read here); when built, the three lists' entries freed first (`VirtualFree`, `MEM_RELEASE`); the save data (`PanelSetBase::SaveData`); the counts (+784, +1300, +1816) = 0; for the cars 0 to 71 with their bit set in the save data's words at +104740: an 8,448-byte entry (`VirtualAlloc(0, 8448, MEM_COMMIT, PAGE_READWRITE)`), the car's spec copied in (`Params::GetCarSpec`, `memcpy` 8,432 bytes), +8432 = the car, +8436 = 0, pushed to list 0 (+272) when the spec's byte +771 is 0, list 1 (+788) when 1, else freed; then for each garage car (the count at the save data's +6328): an entry from the spec of the car found by walking the garage's halfword links (+6120 + 204, i steps; the 1,968-byte record's +224 the car's id), +8432 = the id, +8436 = the record's halfword +212 (its color, probably), pushed to list 2 (+1304). First time: +1876 = 0, +4 = 1. A list is 128 words and its count at +512. Seen in play. Read in full. |
+| `sub_8224B538` | `PanelSetBase::Free` | | r3 = b: +1820 = 0; every entry of the three lists and the colors' list (+1824, count +1876) freed (`VirtualFree`, `MEM_RELEASE`), counting down; `MenuList::Release` on +60 and +132. Seen in play. Read in full. |
+| `sub_8224BF30` | `PanelSetBase::HandleInput` | | r3 = b: the page (+32); +1936 = 1 when it isn't the page drawn last (+1932); for a page other than -1, its handler from a table of 9 built on the frame (0 `TabsPage`, 1 `RowsPage`, 2 `CarPage`, 3 `ColorsPage`, 4 `ConfirmPage`, 5 `PickedPage`, 6 `PowerGraphPage`, 7 `BackPage7`, 8 `BackPage8`; indirect call); then +1932 = the page. From `PanelSet::HandleInput` and `PanelSetPair::HandleInput`. Seen in play. Read in full. |
+| `sub_82249EB8` | `PanelSetBase::TabsPage` | | Page 0 (the tabs, menu +60): when the page changed, the tabs' menu set up again at +232, and with two players items 0 to 2 enabled by the lists' counts (`MenuList::SetEnabled`; selection 0 when the selected one is off); +1944 = 0; `MenuList::Update`. Moved (+84): sound 4 (`MenuSound::Play`), step 2, page 0. Accepted: +1820 = the list picked; empty: sound 3; else sound 0, +232 = the tab, for tabs 0 and 1 each entry's +8436 = +1888 for the entry +1884 of the tab +1880, else 0; step 4 then 6, page 1; +240 = 0, +236 = +1884 for the tab picked before, else 0. Cancelled: sound 2; two players: +1944 = 1 and, when +1940 is set, step 3 to page 5; one player: step 3 to page 5. Seen in play. Read in full. |
+| `sub_8224A178` | `PanelSetBase::RowsPage` | | Page 1 (the car rows, menu +60): +1944 = 0; `MenuList::Update`. Moved (the menu's +24 set, or its +4 not its +8): sound 4, step 7, page 1. Accepted: sound 0, +236 = the item, +240 = the menu's +4 (the scroll); E's `RowPanel::Unhighlight`; with +1888 set: step 26, page 8; else the menu's selection 0, steps 9 then 11, page 2; +248 = 0, +244 = the entry's +8436. Cancelled: sound 2; open kind 1: steps 8 then 1, page 0; else one player only: +1944 = 1 and with +1940 step 3, page 5. Seen in play. Read in full. |
+| `sub_8224B8D8` | `PanelSetBase::CarPage` | | Page 2 (the car's actions, menu +60; the rows' menu +132): `MenuList::Update` on +60. Moved: sound 4, step 12, page 2. Accepted: sound 0, +236 and +240 = +132's selection and scroll, C's `CarPanel::Pick`; action 1 (the power graph): two players: C's stats (`CarPanel::ShowCarStats` for the garage tab, `ShowStats` else), step 15, page 6; one player: the power graph's record (`sub_82250488`, not seen in play, for the garage tab; `PowerGraph::SetEntry` else), C's buttons (0, 1, -1, -1), page 6 at once; +16 and +8 = 1. Action 0 (pick): with +1912 (two players' confirm panel): tab 0 steps 17 then 18, page 3; else steps 21 then 22, page 4, +8 = 1; without: tabs 1 and 2 step 3, page 5, +8 = 1 (picked); tab 0 steps 17 then 18, page 3, and `PanelSetBase::ShowStandCar(b, +244)`. Cancelled: sound 2, E's `RowPanel::Unhighlight`; with +1892 set: steps 14 then 26, page 7; else 14 then 6, page 1. Else `MenuList::Update` on +132; moved: sound 4, step 13, page 2, C's stats for the new row, +248 = 0, +244 = its +8436. Seen in play. Read in full. |
+| `sub_8224AEA8` | `PanelSetBase::ColorsPage` | | Page 3 (the colors, menu +60): +20 = 1 (show the car); `MenuList::Update`. Moved: sound 4, step 19, page 3; when the car is shown and loaded (+20, +24 both 1) `ShowStandCar(b, -1)`; one player: +244 and +248 = the selection and scroll. Accepted: sound 0, +244 and +248 the same; with +1912: steps 21 then 22, page 4; else step 3, page 5; +8 = 1. Cancelled: sound 2, +244 = the entry's +8436, +248 = 0, steps 20 then 11, page 2. Seen in play. Read in full. |
+| `sub_82248E60` | `PanelSetBase::ConfirmPage` | | Page 4 (two players' confirm): cancelled: sound 2, step 23 to page 3 (tab 0) or 2, +12 = 0; else +12 = 1 (done). Not seen in play. Read in full. |
+| `sub_82248EF0` | `PanelSetBase::PickedPage` | | Page 5: +12 = 1 (done). A leaf. Seen in play. Read in full. |
+| `sub_8224BDC0` | `PanelSetBase::PowerGraphPage` | | Page 6 (the power graph): +8 = 0. Two players: when +16 is 0, or the menu at +60 answers `MenuList::Accepted` or `Cancelled`: sound 2, step 16, page 2. One player: +16 set: the graph drawn, `CarList::DrawCarPowerGraph` on the garage car (tab 2) or `CarList::DrawEntryPowerGraph` on the entry (`power-graph.md`); +16 0: page 2 at once; then the step queue -1 and C's buttons (0, 0, 1, 1). Seen in play. Read in full. |
+| `sub_8224A368` | `PanelSetBase::BackPage7` | | Page 7: when +1892 is set, its +4 = its +8; `ScreenFades::FadeIn([0x82001BEC])` with `[0x82815EB0]` = 1; step 6, page 1. Not seen in play. Read in full. |
+| `sub_8224A3F8` | `PanelSetBase::BackPage8` | | Page 8: when +1892 is set (0 in both constructors), its +4 = its +12; the fade in as page 7; steps 9 then 11, page 2. Seen in play. Read in full. |
+| `sub_8224CD00` | `PanelSetBase::Update` | | r3 = b: the step (+44): unless -1, when 0 or more its handler from a table of 27 built on the frame (indirect call, r4 = b + 56); when it answers nonzero and `[0x82815EB0]` is 0, or for a step below -1: no queued step (+48 = -1): +32 = +36, +44 = -1; else +52 = 0, +48 = -1, +44 = the queued step; +56 = 0. Then `PanelSetBase::UpdateStand`. Returns 1. Seen in play. Read in full. |
+| `sub_8224C008` | `PanelSetBase::UpdateStand` | | r3 = b: the stand's car. One player: stage 0 of `[0x826D83E0]`, `GarageStage::SetDrawWord(stage, 0)`; when +20 (show the car) is set: once loaded (+24) the draw word 1; else `GarageStage::ReloadModel(stage, CarModels::BlockOf(the entry's car))` into +24, and once that answers 1 a car on the frame (`Car::Init`; the garage tab's car copied from `sub_82192770`'s answer, not seen in play, with `SetPlates(stage, 1)`, else `Car::SetModel` with `SetPlates(stage, 0)`), 1 or-ed into +3888, `Car::Refresh`, `GarageStage::SetCar(stage, car, +244 + +248 for tab 0, else -1)`. Then `GarageStages::DrawAll`. Two players: stage 1 or 2 by the player (+1952), flag 1 or 128, command 56 or 57, the garage car through `sub_82105678` (not seen in play); after the car's set: `[0x826379B8]` = 0 and stages 1 and 2's draw words 0; once loaded with `[0x826379B8]` set: the stage's holder +6052 = 0, `GarageStage::Command(stage, 56 or 57)`, draw word 1; `DrawAll` only for player 1 with the word set. Then group B's movie (+1956): while +20 is set and the stage is busy (`GarageStage::IsBusy`) and +28 is 0, its animations +1960 (layer 0) and +1964 (layer 1, looped) played and +28 = 1; once not busy with +28 set, +1968 played and +28 = 0. A 9,952-byte frame (two cars). From `PanelSetBase::Update`, every frame. Seen in play. Read in full. |
+| `sub_8224A490` | `PanelSetBase::ShowStandCar` | | r3 = b, r4 = a color (below 0: the menu's selection + scroll): the stage by the player as `UpdateStand`; a car on the frame (`Car::Init`, `Car::SetModel` with the entry's car, flag 1 or 128 into +3888, `Car::Refresh`), `GarageStage::SetPlates(stage, 0)`, `GarageStage::SetCarClass(stage, car, color)`. From the car and colors pages and `SetUpColors`. Seen in play. Read in full. |
+| `sub_8224A978` | `PanelSetBase::SetUpRows` | | r3 = b: the count (the garage's for tab 2, else the list's +512); the menus `MenuList::Init(+60, count, min(count, +1916), 1, 154, 153, 155, 156, 159, 158)` and `(+132, count, count, 1, 162, 161, 153, 154, 159, 158)` (two players: +192 = the player isn't 0); +60 at +236, its scroll +64 = +240, `MenuList::Fit(+60, 1)`; E's `RowPanel::Fill` and `RowPanel::Refresh`. From steps 4, 5 and 14. Seen in play. Read in full. |
+| `sub_8224C560` | `PanelSetBase::SetUpCarPage` | | r3 = b: the actions' menu `MenuList::Init(+60, 2, 2, 1, 154, 153, 155, 156, 159, 158)`; the rows' menu +132 at +236, scroll +240, `Fit`; C's `PlaceCursor` at the action, `SetTexts`, its stats (`ShowCarStats` for the garage tab, else `ShowStats`) and `SetName`. From steps 9, 10 and 20. Seen in play. Read in full. |
+| `sub_8224B248` | `PanelSetBase::SetUpColors` | | r3 = b: the entry's color count (+8376); `MenuList::Init(+60, count, min(count, +1924), 1, ...)` at +244, scroll +248, `Fit`; D's cursor and arrows; the colors' list (+1824) freed, then one 32-byte record a color (`VirtualAlloc`) from the entry's 20-byte records at +8116: an HSV from the word at +4 (hue the high halfword; saturation byte +6 / 255; value (byte +7 + 25, or + 120 when the halfword +0 is set, `[0x82002FF8]`, `[0x82002FF4]`) clamped to 255, / 255) at +16 to +24, `Color::HsvToRgb` (`tuning-pages.md`), RGB × 255 at +0 to +8; D's `SetCount` and `SetSwatches`; `ShowStandCar(b, -1)`. From steps 17 and 25. Seen in play. Read in full. |
+| `sub_8224A570` | `PanelSetBase::Step0` | | Show the tabs (r3 = b, r4 = b + 56): first pass: F's +12, +16, +20 = lists 0 to 2 aren't empty, the tabs' menu set up at +228, F's `SetTab`, `Show` and `SetButtons`; with +1948 the fade in (`[0x82815EB0]` = 1). Answers F's `IsShown` (1 without F). Seen in play. Read in full. |
+| `sub_8224A6A0` | `PanelSetBase::Step1` | | First pass: `SaveData` (unused), F's +8 = the menu's item, F's `Select`. Answers 1. Seen in play. Read in full. |
+| `sub_82248F00` | `PanelSetBase::Step2` | | First pass: F's `Move` (the item, the item before, the menu's +24). Answers 1. Seen in play. Read in full. |
+| `sub_8224A718` | `PanelSetBase::Step3` | | First pass: with +1948, `ScreenFades::FadeOut([0x82001BF0])` and `[0x82815EB0]` = 1; the empty `sub_82106540` on F. Answers once the word is 0 (with +1948) and `sub_825C8390` (1) on F. Seen in play. Read in full. |
+| `sub_8224B078` | `PanelSetBase::Step4` | | Show the rows: first pass: `SetUpRows`, F's `SetButtons`, E's `Show`; with open kind 0 the fade in. Answers E's `IsShown`. Seen in play. Read in full. |
+| `sub_8224B138` | `PanelSetBase::Step5` | | As step 4 on list 0 (+1820 = b + 272, +232 = 0) with E's `ShowFirst`. Not seen in play. Read in full. |
+| `sub_82248F70` | `PanelSetBase::Step6` | | First pass: E's +8 = the menu's item, E's `Select`. Answers 1. Seen in play. Read in full. |
+| `sub_82249098` | `PanelSetBase::Step7` | | First pass: E's `Move` (the item, the item before, the menu's moves, its +4, +24, the list). Answers 1. Seen in play. Read in full. |
+| `sub_82248FE0` | `PanelSetBase::Step8` | | Hide the rows: first pass: E's `Hide`, +228 = +232. Once E's `IsHidden`: the tabs' menu set up at +228 and F's `SetTab`. Answers E's `IsHidden`. Seen in play. Read in full. |
+| `sub_8224CB28` | `PanelSetBase::Step9` | | Show the car: first pass: C's `Show`, `SetUpCarPage`, C's buttons (0, 0, 1, 1), C's vtable slot 3 (`ShowArrows`: the list has more than one entry; indirect call). Answers C's `IsShown`; then +20 = 1, +24 = 0 and, one player, `GarageStage::SetDrawWord(stage 0, 1)`. Seen in play. Read in full. |
+| `sub_8224CC00` | `PanelSetBase::Step10` | | First pass: C's `ShowAgain`, `SetUpCarPage`. Answers C's `IsShownAgain`. Not seen in play. Read in full. |
+| `sub_8224A7E0` | `PanelSetBase::Step11` | | First pass: C's +8 = the menu's item, C's `Select` (the list has more than one entry). Answers 1. Seen in play. Read in full. |
+| `sub_82249128` | `PanelSetBase::Step12` | | First pass: C's `Move` (the item, the item before, the menu's +24). Answers 1. Seen in play. Read in full. |
+| `sub_8224A850` | `PanelSetBase::Step13` | | First pass: +236, +240 = the rows' menu's item and scroll, +24 = 0, C's `SetName` for the entry. Answers 1. Not seen in play. Read in full. |
+| `sub_8224B1C8` | `PanelSetBase::Step14` | | Hide the car: first pass: C's `Hide`, `SetUpRows`, +20 = 0. Answers C's `IsHidden`. Not seen in play. Read in full. |
+| `sub_82249198` | `PanelSetBase::Step15` | | First pass: C's `PlayStats`. Answers its end (`StatsShown`). Not seen in play. Read in full. |
+| `sub_822491F8` | `PanelSetBase::Step16` | | First pass: C's `PlayStatsOut`. Answers its end. Not seen in play. Read in full. |
+| `sub_8224C450` | `PanelSetBase::Step17` | | Show the colors: first pass: C's `StopArrows`, D's `Show`, `SetUpColors`. Answers D's `IsShown`. Seen in play. Read in full. |
+| `sub_82249258` | `PanelSetBase::Step18` | | First pass: D's `Select` (the menu's item). Answers 1. Seen in play. Read in full. |
+| `sub_822492C8` | `PanelSetBase::Step19` | | First pass: D's `Move` (the item, the item before, the moves, the scroll, +84, +92, the colors' list). Each pass: D's arrows (up and down by +60's count, +1924 and the scroll); answers D's `IsIdle`, then D's `SetSwatches`. Seen in play. Read in full. |
+| `sub_8224CC78` | `PanelSetBase::Step20` | | Hide the colors: first pass: D's `Hide` (the item), `SetUpCarPage`. Answers D's `IsHidden`. Not seen in play. Read in full. |
+| `sub_822493D8` | `PanelSetBase::Step21` | | The confirm panel (+1912; nothing without it): first pass `ConfirmPanel::Show` (tab 0), `ShowNode(1)`; answers `ConfirmPanel::IsShown`. Not seen in play. Read in full. |
+| `sub_82249458` | `PanelSetBase::Step22` | | First pass: `ConfirmPanel::Loop`. Answers 1. Not seen in play. Read in full. |
+| `sub_822494A8` | `PanelSetBase::Step23` | | First pass: `ConfirmPanel::Hide`; answers `IsHidden`, then `ShowNode(0)`. Not seen in play. Read in full. |
+| `sub_82249510` | `PanelSetBase::Step24` | | First pass: `MenuList::Selection` (unused). Answers 1. Not seen in play. Read in full. |
+| `sub_8224C4D8` | `PanelSetBase::Step25` | | First pass: `SetUpColors`; then step 18 at once to page 3 (+44 = 18, +48 = -1, +56 = 0). Answers 0. Not seen in play. Read in full. |
+| `sub_8224A8E0` | `PanelSetBase::Step26` | | First pass: with +1948 the fade out (`[0x82815EB0]` = 1). Once the word is 0: `PanelPart::FinishAll` on D and F. Answers the word is 0. Seen in play. Read in full. |
+| `sub_82249CF0` | `PanelPart::FinishAll` | | r3 = a panel (D or F: +4 its group): `UiMovie::FinishAll` on the group's movie. From step 26. Seen in play. Read in full. |
+| `sub_8224FE50` | `TabPanel::Show` | | r3 = F (+4 the group): `UiMovie::FinishAll`, `PlayNamed` +116, the loops +124 to +136 when not running (`sub_8211BC18`, `LoopNamed`). From step 0. Seen in play. Read in outline. |
+| `sub_8224FCE0` | `TabPanel::IsShown` | | 1 when +116 isn't running (`sub_8211BC18`). Seen in play. Read in full. |
+| `sub_822501C8` | `TabPanel::SetTab` | | r3 = F, r4 = the tab: +8 = r4, the cursor at 40 × r4 (`TabPanel::SetCursorY`), the tabs' texts (`SetNodeText`, nodes +24/+28), the nodes +88 and +92; caption 929 (`PanelGroup::SetCaption`) unless +140 (two players). From steps 0 and 8. Seen in play. Read in outline. |
+| `sub_8224FB20` | `TabPanel::Select` | | r3 = F: the tab's animation (+96 + +8) played and looped, the loops +128 and +132, each tab node (+44, +48, +52) dimmed or not by +12, +16, +20 (`sub_8211A630`). From step 1. Seen in play. Read in outline. |
+| `sub_8224FF88` | `TabPanel::Move` | | r3 = F, r4 the tab, r5 the tab before, r6 the moves: +120 played, the tabs' animations, the scroll arrows +100 to +112 by the direction, the cursor at 40 × the tab, caption 584 unless +140. From step 2. Seen in play. Read in outline. |
+| `sub_8224FD20` | `TabPanel::SetCursorY` | | r3 = F, r4 = y: the node (+24, +28)'s child +40, its +16 = (float) r4. Seen in play. Read in full. |
+| `sub_8224FD90` | `TabPanel::SetButtons` | | r3 = F: the button prompts at node +36 (`UiMovie::SetNodeTexture` on +84 to +87, two hidden). From steps 0 and 4. Seen in play. Read in outline. |
+| `sub_8224F1D8` | `RowPanel::Show` | | r3 = E (+0 the group): `PlayNamed` +76 (or +80 when +152 is set), the loops +112 and +116, the arrows +104 and +108 finished. From step 4. Seen in play. Read in outline. |
+| `sub_8224F158` | `RowPanel::ShowFirst` | | The arrows finished, +84 played. From step 5. Not seen in play. Read in full. |
+| `sub_8224F5E8` | `RowPanel::IsShown` | | 1 when +76 (or +80 with +152) isn't running. Seen in play. Read in full. |
+| `sub_8224F4C8` | `RowPanel::Hide` | | The highlighted row's animation (+92 + +8) finished, +8 reset, the arrows finished, +88 played. From step 8. Seen in play. Read in outline. |
+| `sub_8224F640` | `RowPanel::IsHidden` | | 1 when +88 isn't running. Seen in play. Read in full. |
+| `sub_8224F340` | `RowPanel::Select` | | The row +8's animation (+92 + +8) played and looped, the loops +112, +116 and the arrows +104, +108 looped. From step 6. Seen in play. Read in outline. |
+| `sub_8224F8F8` | `RowPanel::Move` | | r3 = E, r4 the row, r5 the row before, r6 the moves, r7 the scroll, r8 the menu's +24, r9 the list: +8 = r4, the rows' animations, the scroll animations +96 and +100 by the direction, the rows filled again (`SetRow`), caption unless +156, `SetArrows`. From step 7. Seen in play. Read in outline. |
+| `sub_8224F558` | `RowPanel::Unhighlight` | | Two players only (+156): the row's animation finished, +92 + +4 played and finished. From the rows' and car's pages. Seen in play. Read in full. |
+| `sub_8224F758` | `RowPanel::Fill` | | r3 = E, r4 = the list, r5 = the scroll, r6 = the item: each shown row (+4 of them) set from list[scroll + i] (`SetRow`), the cursor child +144; caption unless +156; `SetArrows`. From `SetUpRows`. Seen in play. Read in outline. |
+| `sub_8224F888` | `RowPanel::Refresh` | | r3 = E, r4 = the list, r5 = the scroll: `SetRow(i, list[scroll + i])` for the rows below the count. From `SetUpRows`. Seen in play. Read in full. |
+| `sub_8224F018` | `RowPanel::SetRow` | | r3 = E, r4 = the row (-1: +60), r5 = an entry: the row's node (+20 + 4 × row); its logo child (+120) frame +108 from the car's id (below 35 the id, 2 → 35; 43 → 35; 47 to 56 → id − 11; 71 → 44; else -1); texts +124 = 1934 + the spec's byte +769, +128 = 1646 + id (the name, probably), +132 = 1718 + id. Seen in play. Read in full. |
+| `sub_8224F680` | `RowPanel::SetArrows` | | r3 = E, r4 = the scroll, r5 = the count: when +16 and +148 aren't negative, the up arrow (+148) shown when the scroll isn't 0, the down arrow (+149) when the rows (+4) + scroll isn't the count. Seen in play. Read in full. |
+| `sub_8224DA20` | `CarPanel::Show` | | r3 = C (+12 the group): the highlighted action (+8) finished and -1; the ten animations at +68 played once and finished, +40 and +44 played, the loops +124 and +128, the arrows +60 and +64 finished. From step 9. Seen in play. Read in outline. |
+| `sub_8224E108` | `CarPanel::IsShown` | | 1 when neither +40 nor +44 is running. Seen in play. Read in full. |
+| `sub_8224DBA0` | `CarPanel::ShowAgain` | | The action finished and -1, +56 played, the arrows finished. From step 10. Not seen in play. Read in full. |
+| `sub_8224E168` | `CarPanel::IsShownAgain` | | 1 when +56 isn't running. Not seen in play. Read in full. |
+| `sub_8224DC50` | `CarPanel::Hide` | | The action finished and -1, the arrows finished, +48 and +52 played. From step 14. Not seen in play. Read in full. |
+| `sub_8224E1A8` | `CarPanel::IsHidden` | | 1 when neither +48 nor +52 is running. Not seen in play. Read in full. |
+| `sub_8224DCF0` | `CarPanel::Select` | | r4 = the arrows on: the action +8's animation (+68 + 4 × +8) played and looped; with r4, the arrows +60 and +64 played and looped. From step 11. Seen in play. Read in full. |
+| `sub_8224DDF8` | `CarPanel::Move` | | r4 the action, r5 the one before, r6 the direction: the old one's animation finished (`sub_8211DE30`), the new one's played and looped, the scroll animation +112 (1) or +108 (-1). From step 12. Seen in play. Read in full. |
+| `sub_8224E050` | `CarPanel::Pick` | | r4 the action, r5 the one before: as `Move` without the scroll animation, then `PlaceCursor`. From the car's page. Seen in play. Read in full. |
+| `sub_8224D9A0` | `CarPanel::PlaceCursor` | | r4 = the action: when +152 isn't negative, the node (+16, +20)'s child +152 at y = 40 × r4. Seen in play. Read in full. |
+| `sub_8224DF30` | `CarPanel::StopArrows` | | The arrows +60 and +64 finished. From step 17. Seen in play. Read in full. |
+| `sub_8224DF90` | `CarPanel::PlayStats` | | +116 played. From step 15. Not seen in play. Read in full. |
+| `sub_8224E208` | `CarPanel::StatsShown` | | 1 when +116 isn't running. Not seen in play. Read in full. |
+| `sub_8224DFF0` | `CarPanel::PlayStatsOut` | | +120 played. From step 16. Not seen in play. Read in full. |
+| `sub_8224E248` | `CarPanel::StatsHidden` | | 1 when +120 isn't running. Not seen in play. Read in full. |
+| `sub_8224D7F0` | `CarPanel::SetTexts` | | The node (+16, +20)'s children +144 and +145 given the texts +276 and +280 (`UiMovie::SetNodeText`). From `SetUpCarPage`. Seen in play. Read in full. |
+| `sub_8224D860` | `CarPanel::SetButtons` | | r4 to r7 = four button icons (-1: hidden): the nodes +32 / +272 + i shown with that texture (`UiMovie::SetNodeTexture`) or hidden; +272 + 4 and + 5 hidden. From the car's and power graph's pages and step 9. Seen in play. Read in full. |
+| `sub_8224DED8` | `CarPanel::SetName` | | r4 = an entry: unless +316 (two players), the group's caption 1862 + the car's id (`PanelGroup::SetCaption`). From `SetUpCarPage` and step 13. Seen in play. Read in full. |
+| `sub_8224E920` | `CarPanel::ShowStats` | | r3 = C, r4 = an entry: a stats record on the frame from the spec (+770, +709 set, +712, +648, +652 and +656 as integers, +660, +664 as an integer) to C's vtable slot 1 (`CarPanel::SetStats`), then slot 2 (`SetCarName`) with the id and the spec's +769 (indirect calls); with +4 set, `CarPanel::SetPrice(+744)`. Seen in play. Read in full. |
+| `sub_8224EA10` | `CarPanel::ShowCarStats` | | The same from a garage car (r4, 1,968 bytes): a `CarData` and a car (`Car::Init`, `memcpy`, `Car::Refresh`, `sub_820C4550`, `Vehicle::SetupFromCar`, `PowerCurve::FromEngine`, `ShiftPeak`), then slots 1 and 2 and `SetPrice`. Not seen in play. Read in outline. |
+| `sub_8224E7E8` | `CarPanel::SetPrice` (probably) | | r4 = a value: the node (+16, +28)'s child +260 set from it (`sub_8211CA18`), +268 text 435, +264 text 527 with it. Not seen in play. Read in full. |
+| `sub_8224E288` | `CarPanel::SetStats` | | Slot 1 of `0x820111C0`, `0x82010980` and `0x82010EE4`: r4 = the stats record: about 20 of the node (-1, +24)'s children given texts (`SetNodeText`; ids 8 with the record's values, 436 to 440 and others). Seen in play. Read in outline. |
+| `sub_8224E878` | `CarPanelBase::SetCarName` | | Slot 2 of `0x820111C0`: three texts at the node's children +132, +136, +140. Not seen in play. Read in outline. |
+| `sub_822417E8` | `CarPanel::SetCarName` | | Slot 2 of `0x82010980` and `0x82010EE4`: r4 = the car's id, r5 = the spec's +769: `UiMovie::SetText(m, -1, +132, 1934 + r5)`, `(+136, 1646 + id)`, `(+140, 1718 + id)`, each when the node index isn't negative (r7 to r10 unset). Seen in play. Read in full. |
+| `sub_82241868` | `Panel7C::ShowArrows` | | Slot 3 of `0x82010EE4`: node (-1, 8) shown when r4 is set, else hidden. From step 9. Seen in play. Read in full. |
+| `sub_82231DF0` | `Panel6C::ShowArrows` | | Slot 3 of `0x82010980`: node (-1, 2) shown or hidden by r4. Not seen in play. Read in full. |
+| `sub_8224E490` | `Panel6C::SetStats` (probably) | | 18 texts of a stats node (`SetNodeText`). From `sub_8223A090` (a type 6 screen's, not seen in play). Not seen in play. Not read in detail. |
+| `sub_8224EB68` | `CarPanelBase::DeletingDestructor` | | Slot 0 of `0x820111C0`: +0 = `0x820111C0`, `operator delete` when r4's bit 0 is set. Not seen in play. Read in full. |
+| `sub_8224D7E0` | `CarPanelBase::~CarPanelBase` | | +0 = `0x820111C0`. From the two C panels' deleting destructors and two type 6 destructors. Not seen in play. Read in full. |
+| `sub_82231EF0` | `Panel6C::DeletingDestructor` | | Slot 0 of `0x82010980`: vtable reset, `~CarPanelBase`, `operator delete` by r4. Not seen in play. Read in full. |
+| `sub_82241968` | `Panel7C::DeletingDestructor` | | Slot 0 of `0x82010EE4`: as `Panel6C`'s. Not seen in play. Read in full. |
+| `sub_82230B50` | `PanelGroupBase::DeletingDestructor` | | Slot 0 of `0x82010974` (the panel groups' and the D, E, F panels' vtable): vtable reset, `ListNode::~ListNode` (`archive.md`), `operator delete` by r4. Not seen in play. Read in full. |
+| `sub_8224D010` | `ColorPanel::Show` | | r3 = D (+4 the group): `PlayNamed` +16, the arrows +52 and +56 finished. From step 17. Seen in play. Read in full. |
+| `sub_8224D1F0` | `ColorPanel::IsShown` | | 1 when +16 isn't running. Seen in play. Read in full. |
+| `sub_8224D090` | `ColorPanel::Hide` | | r4 = the item: its animation (+24 + r4) finished (`sub_8211DE30`), +20 played, the arrows finished. From step 20. Not seen in play. Read in full. |
+| `sub_8224D230` | `ColorPanel::IsHidden` | | 1 when +20 isn't running (asked twice). Not seen in play. Read in full. |
+| `sub_8224D118` | `ColorPanel::Select` | | r4 = the item: +24 finished, +24 + r4 played and looped, the arrows +52 and +56 played and looped. From step 18. Seen in play. Read in full. |
+| `sub_8224D580` | `ColorPanel::Move` | | r4 the item, r5 the one before, r6 the moves, r7 the scroll, r8 the menu's +84, r9 its +92, r10 the colors: the items' animations; without r9 the scroll animation +28 or +32 by r8's sign, else `PlaceCursor`; with moves, `SetSwatches` and +36 or +40 by their sign. From step 19. Seen in play. Read in outline. |
+| `sub_8224D288` | `ColorPanel::IsIdle` | | 1 when neither +40 nor +36 is running. Seen in play. Read in full. |
+| `sub_8224D2D0` | `ColorPanel::SetArrows` | | r4 = up, r5 = down: node (+8, +60) visible (r4 when they're equal, else 1), +72 = r4, +76 = r5 when set up. From step 19 and `SetUpColors`. Seen in play. Read in full. |
+| `sub_8224D358` | `ColorPanel::ShowSwatches` | | r4 = the count: the swatch node (+8, +12)'s child +68, its children (+100 + i, +104 of them) shown below the count. Seen in play. Read in full. |
+| `sub_8224D3E0` | `ColorPanel::PlaceCursor` | | r4 = the item: the node's child +64 at y = 32 × r4 + 8. Seen in play. Read in full. |
+| `sub_8224D458` | `ColorPanel::SetCount` | | `ShowSwatches`; unless +88 (two players), caption 552. From `SetUpColors`. Seen in play. Read in full. |
+| `sub_8224D4A0` | `ColorPanel::SetSwatch` | | r4 = the swatch, r5 = a color record: the swatch's child +80, its +56, +60, +64 = the RGB words. Seen in play. Read in full. |
+| `sub_8224D518` | `ColorPanel::SetSwatches` | | r4 = the colors' list (count +52), r5 = the scroll: swatch i = list[(i + scroll) mod count]. Seen in play. Read in full. |
+| `sub_8224EF18` | `PanelGroup::SetCaption` | | r3 = a panel group, r4 = a string id: when +32 isn't negative, `UiMovie::SetText(m, +12, +32, r4)` (r7 to r10 unset), `ScrollText(m, +12, +32, 1)`, `sub_8211C5F8`. From the panels (6 callers). Probably the group's, beside `PanelGroup::Movie` (`type67-screens.md`). Seen in play. Read in full. |
+| `sub_8224EBB0` | `ConfirmPanel::ConfirmPanel` | | r3 = the two players' confirm panel (b +1912): vtable `0x82010B5C` (slot 0 `sub_82589480`), +4 = 0, +8 = 2, +12 to +36 = -1. From `sub_8223A208` (type 6). Not seen in play. Read in full. |
+| `sub_8224EBF0` | `ConfirmPanel::Play` | | r4 = an animation (nothing for -1), r5 to r8 its arguments: `FinishNamed`, `PlayNamed`. Not seen in play. Read in full. |
+| `sub_8224EC50` | `ConfirmPanel::PlayLooped` | | As `Play`, then `LoopNamed`. Not seen in play. Read in full. |
+| `sub_8224ECC0` | `ConfirmPanel::ShowNode` | | r4: node (+16, +20 or +24 by +8) hidden when r4 is set, else shown. Not seen in play. Read in full. |
+| `sub_8224ED38` | `ConfirmPanel::Show` | | r4 = a kind: `Play(+32)`, +32 finished, `Play(+28)`, +8 = r4. From step 21. Not seen in play. Read in full. |
+| `sub_8224EDA8` | `ConfirmPanel::Loop` | | `PlayLooped(+32)`. From step 22. Not seen in play. Read in full. |
+| `sub_8224EDC0` | `ConfirmPanel::Hide` | | +32 finished, `Play(+36)`. From step 23. Not seen in play. Read in full. |
+| `sub_8224EE28` | `ConfirmPanel::IsShown` | | 1 when +28 isn't running. Not seen in play. Read in full. |
+| `sub_8224EE68` | `ConfirmPanel::IsHidden` | | 1 when +36 isn't running. Not seen in play. Read in full. |
+| `sub_8224B750` | `PanelSetPair::PanelSetPair` | | r3 = the pair: vtable `0x82011118`; two `PanelSetBase`s (+4, +1976); `[0x82815EAC]` = 1; each base's F, E, D, C from r4 to r10 and the stack, the word copied into them as `PanelSet::PanelSet` does; +1916, +3888 (their confirm panels) and +1960, +3932 from the stack. From `sub_822386F0` (the type 6 two-player panel screen, probably). Not seen in play. Read in full. |
+| `sub_8224B830` | `PanelSetPair::~PanelSetPair` | | Vtable `0x82011118`, the two bases destroyed (+1976, then +4), then `0x82011018`. From `sub_82238368` and its slot 0. Not seen in play. Read in full. |
+| `sub_8224CA30` | `PanelSetPair::DeletingDestructor` | | Slot 0. Not seen in play. Read in full. |
+| `sub_8224CAE0` | `PanelSetPair::Build` | | Slot 1: `PanelSetBase::Build` on +4 and +1976. Not seen in play. Read in full. |
+| `sub_822498C0` | `PanelSetPair::Reset` | | Slot 2: `PanelSet::Reset`'s stores on both bases (through stack words). Not seen in play. Read in full. |
+| `sub_822499F0` | `PanelSetPair::Open` | | Slot 3: both bases reset, `ToTabs` on each, then the players +1956 = 0 and +3928 = 1, and +1944, +1948, +1952 and their second-base words = 0. Not seen in play. Read in full. |
+| `sub_8224CA80` | `PanelSetPair::HandleInput` | | Slot 5: `[0x826379B8]` = 1, `PanelSetBase::HandleInput` on both bases. Not seen in play. Read in full. |
+| `sub_8224CF20` | `PanelSetPair::Update` | | Slot 6: `PanelSetBase::Update` on both bases. Not seen in play. Read in full. |
+| `sub_82249B60` | `PanelSetPair::Picked` | | Slot 8: 1 when both bases are done (+16, +1988) and both picked (+12, +1984). Not seen in play. Read in full. |
+| `sub_82250368` | `PowerGraph::SetEntry` | | r3 = an entry, r4 = the tab: the power graph screen's record (`[0x82815EBC]` + 8): +80 = r4, +0 = 0, +4 to +16 = the spec's +712, +716, +724, +720, +20 = the id, +24, +28 = bytes +769, +770, +32 by the byte +708 (a switch: 0 to 7 → 0 to 6), +36 = +709 set, +40 = +648, +44, +48, +56 the floats +652, +656, +664 as integers, +52 = +660. A leaf. From the car's page. Seen in play. Read in full. |
+| `sub_822503F0` | | | Not a function: a case of `PowerGraph::SetEntry`'s switch (+32 = 6) that the analyzer split off. Not seen in play. Read in full. |
+| `sub_821807D8` | `GarageStages::DrawAll` (probably) | | The three garage stages of `[0x826D83E0]`: each stage that holds one (its holder's +16) has its draw word (+6056) kept and set to 0; then each with a kept word nonzero drawn alone (`GarageStage::SetDrawWord(1)`, `GarageStage::Draw(stage, 1, 1)`, `SetDrawWord(0)`); then the words put back. A 160-byte frame. From `PanelSetBase::UpdateStand` (every frame with one player) and two type 6 functions not seen in play (`sub_8223B808`, `sub_8223DA00`). Seen in play. Read in full. |

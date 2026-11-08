@@ -630,6 +630,10 @@ Rows not yet moved stay in the table below. So far:
   slots and their bases' (the race set-ups, the car pick, the movies'
   opens and releases, the destructors), the list part and the panel
   screens' group pair (B7).
+- [`car-list.md`](car-list.md): the car list the type 6 and 7 panel
+  screens show (`PanelSet`): its slots, its lists of unlocked and garage
+  cars, its pages and steps, the stand's car, its tab, row, color and
+  car panels, the two-player variant and its confirm panel (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
