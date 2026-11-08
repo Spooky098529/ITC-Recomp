@@ -619,6 +619,12 @@ Rows not yet moved stay in the table below. So far:
   screens' menus, the yes/no dialogs, the options' controller pages, and
   the Inits of their list, node, panel, power graph, options and save
   screens (B7).
+- [`options-screen.md`](options-screen.md): the front end's options
+  screen (UI movie 7) and its settings: the machine's handlers, the
+  settings' reset, read from and write to the save data, the category
+  pages (HUD, sound with the music preview, sliders, buttons, analog
+  inputs, the two-player ones), their steps and helpers, and the
+  options' and controller pages' Inits of types 2, 4 and 8 (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -774,7 +780,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
 | `sub_822AED18` | `Device::LoadShaders` (probably) | | Not read in detail (from `native-renderer.md`, "The indexed draw without its packets"): the draw's shader load, called from `DrawIndexedVertices` and `DrawPackets_IndexedDraw` (`src/native/draw_packets.cpp`) when shader state is dirty. Writes SQ_PROGRAM_CNTL and +10404 at +10400, and +10408, +10432, +10452, +12440; patches the vertex shader for the bound declaration (`sub_822AE340`); sets the shaders' fences (+8); writes the microcode's load packets; returns more dirty bits. |
 | `sub_822A04F8` | `Device::Clear` | | Not read. From `Command::*` 26 (`sub_82590620`): the rect count and rects, flags (bits 0-3 render targets, `0x10` Z, `0x20` stencil), color (a D3DCOLOR), Z, stencil (`native-renderer.md`, "Progress on milestone 4"). |
-| `sub_821BE5A8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8258FBD0` | `Command::*` (1) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
 | `sub_8258FC30` | `Command::*` (2) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
 | `sub_8258FC90` | `Command::*` (3) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
