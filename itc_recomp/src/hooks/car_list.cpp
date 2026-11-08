@@ -29,7 +29,10 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "(UiMovie::IsNamedActive's plain C++), and their TabPanel::Show sub_8224FE50 and Select "
               "sub_8224FB20, RowPanel::Show sub_8224F1D8 and Select sub_8224F340, CarPanel::Show "
               "sub_8224DA20, Move sub_8224DDF8 and Pick sub_8224E050 (UiMovie::UnloopNamed "
-              "through its override); PanelSet::Reset sub_822496C8, Picked "
+              "through its override); the steps Step0 sub_8224A570, Step1 sub_8224A6A0, Step4 "
+              "sub_8224B078, Step6 sub_82248F70, Step8 sub_82248FE0, Step9 sub_8224CB28, Step12 "
+              "sub_82249128 and Step19 sub_822492C8 (GarageStage::SetDrawWord's plain C++); "
+              "PanelSet::Reset sub_822496C8, Picked "
               "sub_82249848, WentBack sub_82249870, WantsPowerGraph sub_82249898, SetOpenKind "
               "sub_8224B6D8, SetPreviousTab sub_8224B6E8, SetPreviousEntry sub_8224B6F0, "
               "SetPreviousColor sub_8224B6F8, PanelSetBase::PickedPage sub_82248EF0 and SaveData "
@@ -210,6 +213,14 @@ ITC_CL_STEP(CarListStep7, cl::Step7(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListStep11, cl::Step11(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListStep18, cl::Step18(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListStep26, cl::Step26(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep0, cl::Step0(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep1, cl::Step1(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep4, cl::Step4(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep6, cl::Step6(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep8, cl::Step8(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep9, cl::Step9(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep12, cl::Step12(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep19, cl::Step19(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListSetUpRows, cl::SetUpRows(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListSetUpCarPage, cl::SetUpCarPage(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListBaseBuild, cl::Build(base, ctx.r3.u64, sp, calls))
@@ -325,6 +336,16 @@ ITC_CAR_LIST(82249098, CarListStep7)
 ITC_CAR_LIST(8224A7E0, CarListStep11)
 ITC_CAR_LIST(82249258, CarListStep18)
 ITC_CAR_LIST(8224A8E0, CarListStep26)
+// The steps over the panels (the step table: PanelSetBase::Update's plain
+// C++ calls theirs; PanelSetPair's, never seen in play, the original's).
+ITC_CAR_LIST(8224A570, CarListStep0)
+ITC_CAR_LIST(8224A6A0, CarListStep1)
+ITC_CAR_LIST(8224B078, CarListStep4)
+ITC_CAR_LIST(82248F70, CarListStep6)
+ITC_CAR_LIST(82248FE0, CarListStep8)
+ITC_CAR_LIST(8224CB28, CarListStep9)
+ITC_CAR_LIST(82249128, CarListStep12)
+ITC_CAR_LIST(822492C8, CarListStep19)
 // The rows' and the car page's set-ups (from recompiled steps and pages).
 ITC_CAR_LIST(8224A978, CarListSetUpRows)
 ITC_CAR_LIST(8224C560, CarListSetUpCarPage)

@@ -45,6 +45,8 @@ constexpr uint32_t kSetNodeTexture = 0x8211A708;
 constexpr uint32_t kSetStats = 0x8224E288;
 constexpr uint32_t kSetCarName = 0x822417E8;
 constexpr uint32_t kSetPrice = 0x8224E7E8;
+// Slot 3 of the C panels: Panel7C::ShowArrows (ours), else a guest call.
+constexpr uint32_t kPanel7CShowArrows = 0x82241868;
 // The doubles the stats scale by (lfd).
 constexpr uint32_t kStatsScaleA = 0x82009F00;
 constexpr uint32_t kStatsScaleB = 0x82009F08;
@@ -241,6 +243,26 @@ uint64_t Step11(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Cal
 uint64_t Step18(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
 uint64_t Step26(uint8_t* base, uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
 
+// The steps over the panels' shows and answers (pages.cpp; r3 = b, r4 its
+// first-pass word b + 56; each returns its answer): sub_8224A570 Step0 (the
+// tabs shown: F's list words, the tabs' menu, F's SetTab, Show and
+// SetButtons, the fade in with +1948; F's IsShown), sub_8224A6A0 Step1
+// (F's Select), sub_8224B078 Step4 (the rows shown: SetUpRows, F's
+// SetButtons, E's Show, the fade in with open kind 0; E's IsShown),
+// sub_82248F70 Step6 (E's Select), sub_82248FE0 Step8 (E hidden, then the
+// tabs' menu and F's SetTab once E's IsHidden), sub_8224CB28 Step9 (the car
+// shown: C's Show, SetUpCarPage, C's buttons and slot 3; once C's IsShown,
+// +20 = 1, +24 = 0 and, one player, GarageStage::SetDrawWord(stage 0, 1)),
+// sub_82249128 Step12 (C's Move), sub_822492C8 Step19 (D's Move, its
+// arrows, then its swatches once D's IsIdle).
+uint64_t Step0(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step1(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step4(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step6(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step8(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step9(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step12(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step19(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
 // MenuList::Fit (sub_8220BC40) and CarPanel::ShowCarStats (sub_8224EA10,
 // never seen in play: the original) through `Calls`.
 constexpr uint32_t kMenuListFit = 0x8220BC40;

@@ -723,7 +723,8 @@ void MorePanels(Context& h, const World& w) {
 // and animation, a time of 0.0, chained), their named indices the panel's
 // words at `offsets` (read after the setup's shaping) or any index, so the
 // panels' answers (UiMovie::IsNamedActive) find some.
-void FillLists(uint8_t* base, const World& w, Random& r, const std::vector<uint32_t>& offsets) {
+void FillListsAt(uint8_t* base, const World& w, Random& r, uint32_t panel,
+                 const std::vector<uint32_t>& offsets) {
   for (uint32_t m = 0; m < kMovieCount; m++) {
     const uint32_t movie = w.movie(m);
     for (const uint32_t list : {ui_movies::kMovieQueue, ui_movies::kMovieLooping}) {
@@ -731,7 +732,7 @@ void FillLists(uint8_t* base, const World& w, Random& r, const std::vector<uint3
       for (uint32_t k = 0; k < used; k++) {
         uint32_t named = Index(r);
         if (offsets.size() != 0 && r.Below(3) != 0) {
-          named = guest::LoadU32(base, w.panel() + offsets[r.Below(uint32_t(offsets.size()))]);
+          named = guest::LoadU32(base, panel + offsets[r.Below(uint32_t(offsets.size()))]);
         }
         const uint32_t entry = movie + 176 + 36 * (named < 900 ? named : 0);
         const ui_movies::Slot slot = {0xFFFFFFFFu, 0xFFFFFFFFu, named,
@@ -741,6 +742,10 @@ void FillLists(uint8_t* base, const World& w, Random& r, const std::vector<uint3
       }
     }
   }
+}
+
+void FillLists(uint8_t* base, const World& w, Random& r, const std::vector<uint32_t>& offsets) {
+  FillListsAt(base, w, r, w.panel(), offsets);
 }
 
 // The panels' answers (UiMovie::IsNamedActive over the lists FillLists
@@ -926,6 +931,10 @@ void ShapeSet(uint8_t* base, const World& w, Random& r, bool nulls) {
   const uint32_t b = w.b();
   SetGroup(base, w, r, 0);
   guest::StoreU32(base, w.panel() + 4, r.Below(9));
+  // E's rows' node (+16, FindNode's child, unchecked) not negative: a -1
+  // there reads entry -2 of a node whose +108 a logo frame of -1 was stored
+  // in (RowPanel::SetRow), a random word, in the original too.
+  guest::StoreU32(base, w.panel() + 16, r.Below(64));
   for (uint32_t at = 20; at <= 60; at += 4) {
     guest::StoreU32(base, w.panel() + at, r.Below(64));
   }
@@ -1083,6 +1092,24 @@ void Pages(Context& h, const World& w) {
         __imp__sub_8224BF30, hooks::CarListBaseHandleInput, settle);
 }
 
+void StandWorld(uint8_t* base, const World& w, Random& r);
+
+// The two players' garage (the world's save data + 6120, [0x826C5B5C]'s
+// player 0) as a chain of 16 distinct link nodes from its +204 (nodes 1000
+// on, in the block), their slots 0 to 2, so walks of up to 15 links (the
+// rows' selection and scroll) stay in it.
+void GarageChain(uint8_t* base, const World& w, Random& r) {
+  const uint32_t garage = w.save.address + 6120;
+  uint32_t node = 1000 + r.Below(100);
+  guest::StoreU16(base, garage + 204, uint16_t(node));
+  for (uint32_t k = 0; k < 16; k++) {
+    const uint32_t next = node + 1 + r.Below(3);
+    guest::StoreU16(base, garage + 4 * node, uint16_t(next));
+    guest::StoreU16(base, garage + 4 * node + 2, uint16_t(r.Below(3)));
+    node = next;
+  }
+}
+
 void Steps(Context& h, const World& w) {
   uint8_t* const base = h.base;
   const int n = 30;
@@ -1167,10 +1194,108 @@ void Steps(Context& h, const World& w) {
   for (const auto& s : steps) {
     Group(h, w, s.name, 40, s.frame, step, s.recompiled, s.native, settle);
   }
+  // The steps over the panels' shows and answers: the lists filled with
+  // slots naming the panels' words (F, C and D the other panel, E the
+  // world's panel), the panels a step calls with no check set.
+  const uint32_t other_named_at[] = {16, 36, 40, 44, 76, 80, 88, 112, 116, 124, 128, 132, 136};
+  const auto panel_step = [base, step, other_named_at](PPCContext& t, Random& r,
+                                                       const World& w) {
+    step(t, r, w);
+    const std::vector<uint32_t> named(std::begin(other_named_at), std::end(other_named_at));
+    FillListsAt(base, w, r, r.Below(2) == 0 ? w.at(kOtherPanel) : w.panel(), named);
+  };
+  Group(h, w, "PanelSetBase::Step0 (sub_8224A570)", 40, {144, 40}, panel_step,
+        __imp__sub_8224A570, hooks::CarListStep0, settle);
+  Group(h, w, "PanelSetBase::Step1 (sub_8224A6A0)", 40, {112, 24}, panel_step,
+        __imp__sub_8224A6A0, hooks::CarListStep1, settle);
+  // Step4: SetUpRows' world (as its cases'), F set (its buttons unchecked).
+  Group(
+      h, w, "PanelSetBase::Step4 (sub_8224B078)", 40, {112, 24},
+      [base, panel_step](PPCContext& t, Random& r, const World& w) {
+        panel_step(t, r, w);
+        const uint32_t b = w.b();
+        guest::StoreU32(base, b + 1896, w.at(kOtherPanel));
+        guest::StoreU32(base, b + 232, r.Below(3));
+        guest::StoreU32(base, b + 1916, r.Below(11));
+        guest::StoreU32(base, b + 236, r.Below(6));
+        guest::StoreU32(base, b + 240, r.Below(6));
+        guest::StoreU32(base, b + 1952, 0);
+        guest::StoreU32(base, car_list::kTwoPlayers,
+                        guest::LoadU32(base, b + 232) == 2 ? 1 : r.Below(2));
+        guest::StoreU16(base, w.save.address + 6328, uint16_t(r.Below(21)));
+        GarageChain(base, w, r);
+        guest::StoreU32(base, b + 1928, r.Below(2));
+      },
+      __imp__sub_8224B078, hooks::CarListStep4, settle);
+  Group(h, w, "PanelSetBase::Step6 (sub_82248F70)", 40, {112, 24}, panel_step,
+        __imp__sub_82248F70, hooks::CarListStep6, settle);
+  // Step8: F set (its SetTab unchecked).
+  Group(
+      h, w, "PanelSetBase::Step8 (sub_82248FE0)", 40, {128, 32},
+      [base, panel_step](PPCContext& t, Random& r, const World& w) {
+        panel_step(t, r, w);
+        guest::StoreU32(base, w.b() + 1896, w.at(kOtherPanel));
+      },
+      __imp__sub_82248FE0, hooks::CarListStep8, settle);
+  // Step9: SetUpCarPage's world (as its cases', tabs 0 and 1), C set (its
+  // buttons and slot 3 unchecked) with the world's vtable (slot 3
+  // Panel7C::ShowArrows or the stand-in sub_820CC470), the stand's holders.
+  Group(
+      h, w, "PanelSetBase::Step9 (sub_8224CB28)", 40, {112, 32},
+      [base, panel_step](PPCContext& t, Random& r, const World& w) {
+        StandWorld(base, w, r);
+        panel_step(t, r, w);
+        const uint32_t b = w.b(), c = w.at(kOtherPanel);
+        guest::StoreU32(base, b + 1908, c);
+        guest::StoreU32(base, b + 1820, w.at(kList));
+        guest::StoreU32(base, b + 232, r.Below(2));
+        guest::StoreU32(base, b + 1916, r.Below(11));
+        guest::StoreU32(base, b + 236, r.Below(6));
+        guest::StoreU32(base, b + 240, r.Below(6));
+        guest::StoreU32(base, b + 1952, 0);
+        guest::StoreU32(base, car_list::kTwoPlayers, r.Below(2));
+        guest::StoreU32(base, c + 0, w.at(kVtable));
+        guest::StoreU32(base, c + 4, 0);
+        guest::StoreU32(base, w.at(kVtable) + 12,
+                        r.Below(4) == 0 ? 0x820CC470u : car_list::kPanel7CShowArrows);
+      },
+      __imp__sub_8224CB28, hooks::CarListStep9, settle);
+  // Step12: C set (its actions' words read by the menu's selection).
+  Group(
+      h, w, "PanelSetBase::Step12 (sub_82249128)", 40, {128, 48},
+      [base, panel_step](PPCContext& t, Random& r, const World& w) {
+        panel_step(t, r, w);
+        guest::StoreU32(base, w.b() + 1908,
+                        r.Below(6) == 0 ? 0 : w.at(kOtherPanel));
+      },
+      __imp__sub_82249128, hooks::CarListStep12, settle);
+  // Step19: D set (its swatches unchecked; its +12 a node index, not C's
+  // group), the colors' list (b +1824: the
+  // world's records, the count 0 to 8), the count (+60) 0 to 9, the rows
+  // shown (+1924) 0 to 7, the scroll (+64) 0 to 3.
+  Group(
+      h, w, "PanelSetBase::Step19 (sub_822492C8)", 40, {160, 80},
+      [base, panel_step](PPCContext& t, Random& r, const World& w) {
+        panel_step(t, r, w);
+        const uint32_t b = w.b();
+        guest::StoreU32(base, b + 1904, w.at(kOtherPanel));
+        // D's swatches' node index (+12, the other panel's C group word
+        // otherwise) small.
+        guest::StoreU32(base, w.at(kOtherPanel) + 12, r.Below(64));
+        for (uint32_t i = 0; i < 13; i++) {
+          guest::StoreU32(base, b + 1824 + 4 * i, w.at(kColorRecords) + 32 * i);
+        }
+        guest::StoreU32(base, b + 1876, r.Below(9));
+        guest::StoreU32(base, b + 60, r.Below(10));
+        guest::StoreU32(base, b + 1924, r.Below(8));
+        guest::StoreU32(base, b + 64, r.Below(4));
+      },
+      __imp__sub_822492C8, hooks::CarListStep19, settle);
 }
 
 // The set-ups: the tab (+232) 0 to 2 (2 the garage's count, with two
-// players: the world's save data, the player +1952 0), the rows
+// players: the world's save data with its garage a chain of distinct links
+// (GarageChain), the player +1952 0), the rows
 // shown (+1916) 0 to 10, the selection and scroll (+236, +240) small, the
 // garage's count (+6328) 0 to 20. SetUpCarPage's garage tab (its
 // ShowCarStats, never seen in play, the original over a garage car) isn't
@@ -1191,6 +1316,7 @@ void SetUps(Context& h, const World& w) {
     guest::StoreU32(base, car_list::kTwoPlayers,
                     guest::LoadU32(base, b + 232) == 2 ? 1 : r.Below(2));
     guest::StoreU16(base, w.save.address + 6328, uint16_t(r.Below(21)));
+    GarageChain(base, w, r);
     t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
   };
   Group(
