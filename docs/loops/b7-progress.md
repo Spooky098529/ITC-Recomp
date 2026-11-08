@@ -37,7 +37,14 @@ file's history. What's left to see in a drive, from every run:
   `Reload`, `Draw`'s 15 pages, `Update`'s 49 steps, the music preview,
   the two-player pages, the type 2, 4 and 8 options' and controller
   pages' Inits; 0 errors; 66 ready groups; 1 lead added (the options'
-  save side); three subagents, one at a time). Migration agent
+  save side); three subagents, one at a time). Migration
+  a9b2152f..e81aa1ef (`--native_options_screen`, harness
+  `options_screen`: the controls' tables, `Settings::Reset`, `Read`,
+  `Write`, the handlers, `Close`, `Leave`, `ClosePage`, `Wait`, the
+  steps on its movie, the node helpers; 34 functions, 4 tails Merged, 5
+  adapters removed; `Options::FadeOut` `sub_821BD680` left recompiled by
+  the `BackToBuilds` precedent; races 35-38 s, 0 errors, its harnesses
+  0 differing; no subagents); left: 37 ready groups. Validation agent
   running.
 
 ## Done
@@ -66,3 +73,5 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 57, known 423, unknown 1237).
 - After the options screen's map: ours 4703, work left 1717 (wrapped
   57, known 517, unknown 1143).
+- After its migration: ours 4741, work left 1682 (wrapped 57, known
+  482, unknown 1143).

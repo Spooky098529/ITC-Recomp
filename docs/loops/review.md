@@ -13,6 +13,19 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 
+- The options screen's first migration (a9b2152f..e81aa1ef,
+  `--native_options_screen`, harness `options_screen`, 34 functions):
+  `Options::FadeOut` `sub_821BD680` stays recompiled (its
+  `ScreenFades::FadeOut` call never sets r7, the layer, a register
+  leftover stored into live state: the `BackToBuilds` call of
+  2026-11-06); `UiMovies::Delete`'s adapter now hands its call to the
+  harnesses' start-up recorder first, as `UiMovies::Open`'s already
+  does, so the harness records the delete (comment in
+  `src/hooks/app_start_up.h`); five adapters (`ButtonIndex`,
+  `AnalogIndex`, `ButtonCode`, `Settings::Reset`, `Settings::Write`)
+  removed without the counter run, as the attract race never reaches
+  the options screen (a recompiled caller left would run the original).
+
 - `functions/options-screen.md` (new, 155 rows, 95 in play; bce411a9):
   the front end's options screen and the settings' load
   (`Settings::Reset`, `Read`, `Write`, `Reload`; `Draw`'s 15 pages and
