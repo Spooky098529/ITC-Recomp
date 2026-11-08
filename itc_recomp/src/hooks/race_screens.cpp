@@ -541,7 +541,8 @@ ITC_RACE_SCREENS(8221A720, RaceScreensAfterRaceMenuAnswerPage)
 ITC_RACE_SCREENS(82217D40, RaceScreensRaceDialogAnswer)
 ITC_RACE_SCREENS(822191D0, RaceScreensCareerResultsStart)
 ITC_RACE_SCREENS(8220CED0, RaceScreensPauseMenuStepVolume)
-ITC_RACE_SCREENS(8220D248, RaceScreensPauseMenuStepAdjust)
+// PauseMenu::StepAdjust has no adapter (removed, 2026-11-08): its caller in
+// play, AdjustPage's plain C++, calls its plain C++.
 ITC_RACE_SCREENS(8220C5E0, RaceScreensPauseMenuRunTen)
 ITC_RACE_SCREENS(8220C668, RaceScreensPauseMenuBackToMain)
 ITC_RACE_SCREENS(8220C700, RaceScreensPauseMenuCloseMain)
@@ -551,7 +552,8 @@ ITC_RACE_SCREENS(8220C930, RaceScreensPauseMenuToggleOptions)
 ITC_RACE_SCREENS(8220CA28, RaceScreensPauseMenuShowVolumeRow)
 ITC_RACE_SCREENS(8220CAB0, RaceScreensPauseMenuShowAdjustRow)
 ITC_RACE_SCREENS(8220C578, RaceScreensPauseMenuConfirmPage)
-ITC_RACE_SCREENS(8220CB38, RaceScreensPauseMenuShowItems)
+// PauseMenu::ShowItems has no adapter (removed, 2026-11-08): its caller in
+// play, SetUpMain's plain C++, calls its plain C++.
 ITC_RACE_SCREENS(8220D0B8, RaceScreensPauseMenuShowVolumes)
 ITC_RACE_SCREENS(8220D5D0, RaceScreensPauseMenuRestoreNodes)
 ITC_RACE_SCREENS(8220DD98, RaceScreensPauseMenuMoveOptions)
@@ -563,7 +565,8 @@ ITC_RACE_SCREENS(8220DB98, RaceScreensPauseMenuOptionsPage)
 ITC_RACE_SCREENS(8220D898, RaceScreensPauseMenuMainPage)
 ITC_RACE_SCREENS(8221A4A8, RaceScreensAfterRaceMenuMainPage)
 ITC_RACE_SCREENS(8220EBD8, RaceScreensPauseMenuAdjustPage)
-ITC_RACE_SCREENS(8220D418, RaceScreensPauseMenuShowCareer)
+// PauseMenu::ShowCareer has no adapter (removed, 2026-11-08): its only
+// caller, SetUpMain, is native; its step is the harness's.
 ITC_RACE_SCREENS(8220E418, RaceScreensPauseMenuSetUpMain)
 ITC_RACE_SCREENS(8220E810, RaceScreensPauseMenuShowVolumesB)
 ITC_RACE_SCREENS(8220E908, RaceScreensPauseMenuShowAdjustB)
