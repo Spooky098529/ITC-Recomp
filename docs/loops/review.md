@@ -45,6 +45,18 @@ When the user has reviewed a run's section, its heading gets
   `Step17`'s cases compare it and match); `CarPage`'s garage tab (tab
   2) has no cases (`CarPanel::ShowCarStats` and `sub_82250488`, never
   seen in play, stay guest calls to the originals).
+- The cleanup lead's migration (9ca12391..c33350d7):
+  `RaceScreens::~RaceScreens`, `StandMode::Release`,
+  `RaceDialog::SetText`, `DebugText::LoadFont` with `DebugFont::Init`
+  (new row, Native) and `sub_8258BE48` (new row, Merged),
+  `RaceScreens::Destroy`, `RaceDialog::Open`; 11 adapters removed (the
+  eight in-race screens' Destroys among them). By the parking area's
+  call (2026-10-30), `SetText` and `Open` pass 0 for the varargs they
+  leave unset; their harnesses leave out those dead frame bytes
+  (`SetText`'s frame +40 to +79, `Open`'s +32 to +79).
+  `Strings::Release` and `UiMovies::DeleteAll`'s jump are called through
+  their overrides (recompiled callers left). `File::GetSize` keeps its
+  adapter (15 calls an attract race through vtables), its row says so.
 
 ## Run 2026-11-07 22:22 (`b7-loop-07-11-26-2`)
 

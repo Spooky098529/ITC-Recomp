@@ -52,7 +52,15 @@ file's history. What's left to see in a drive, from every run:
   `sub_82218838` (`race-screens.md`), the debug font loader
   `sub_82090CC0` with `sub_8258BD58`, `sub_8258BE48`
   (`files-and-saves.md`). Its callers without rows went to `leads.md`.
-  Step: migration, agent running.
+  Migration 9ca12391..c33350d7 (the four, with `DebugFont::Init`,
+  `sub_8258BE48` Merged, and what they made ready: `RaceScreens::Destroy`,
+  `RaceDialog::Open`; 11 adapters removed: `RaceHud::TearDown`,
+  `AltHud::Destroy`, `~RaceScreens`, the eight in-race screens'
+  Destroys; `File::GetSize` keeps its adapter, called through vtables;
+  races 26-38 s, 0 errors, its harnesses 0 differing outside the known
+  `Type6Mode::Init` group; no subagents). Left: `sub_8216C208`
+  (`race-hud-machine.md`) and `sub_82218C10` (`race-screens.md`), ready.
+  Step: validation, agent running.
 
 ## Done
 
@@ -84,5 +92,7 @@ file's history. What's left to see in a drive, from every run:
   427, unknown 999).
 - After its second migration: ours 4952, work left 1474 (wrapped 56,
   known 419, unknown 999).
+- After the cleanup lead's migration: ours 4960, work left 1466
+  (wrapped 56, known 413, unknown 997).
 
 ## Stopped
