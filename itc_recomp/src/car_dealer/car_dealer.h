@@ -79,6 +79,14 @@ constexpr uint32_t kStageDraw = 0x8217FE60;
 constexpr uint32_t kStageSetDrawWord = 0x82178B40;
 constexpr uint32_t kFadeIn = 0x8209D038;
 constexpr uint32_t kShowDriveDialog = 0x82182990;
+constexpr uint32_t kListUpdate = 0x8220C1E0;
+constexpr uint32_t kListAccepted = 0x8220BD50;
+constexpr uint32_t kListCancelled = 0x8220BDE0;
+constexpr uint32_t kListSelection = 0x8220BC20;
+constexpr uint32_t kListPressed166 = 0x8220BF90;
+constexpr uint32_t kMenuSoundPlay = 0x821103F0;
+constexpr uint32_t kShowFirstCarDialog = 0x82182A80;
+constexpr uint32_t kSetUpSpecSheet = 0x821810E0;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -236,6 +244,29 @@ uint64_t Start(uint8_t* base, uint32_t sp, const Calls& calls);
 // r3, else `r3`. 112-byte frame.
 uint64_t OnDialogDone(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
                       const Calls& calls);
+
+// --- The pages (pages.cpp) ---
+//
+// The page handlers CarDealer::UpdatePage calls (r3 the mode): each updates
+// its menus (MenuList::Update) and by their move, accept, cancel or press
+// sets the page object's transitions and plays a menu sound
+// (MenuSound::Play), all through their overrides. The last call's r3.
+
+// sub_82180F90 CarDealer::Page0: the list's menu. 96-byte frame.
+uint64_t Page0(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82183428 CarDealer::Page1: the car list; with an empty garage,
+// leaving shows ShowFirstCarDialog (sub_82182A80, never seen in play: the
+// original, through the guest context) and posts message 34. 112-byte
+// frame.
+uint64_t Page1(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_82183600 CarDealer::Page2: one car (both menus; buy, the spec sheet
+// through SetUpSpecSheet sub_821810E0, never seen in play: the original;
+// SetPrompts, CheckLimits, ReloadStandModel and HelpLine::Set their plain
+// C++; UiMovie::SetText's unset varargs 0). 144-byte frame.
+uint64_t Page2(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_82181A10 CarDealer::Page3: the color (CheckLimits' plain C++).
+// 112-byte frame.
+uint64_t Page3(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
 
 // --- The movie 4 setters (texts.cpp) ---
 

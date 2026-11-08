@@ -23,6 +23,10 @@ void CarDealerDestroy(PPCContext& ctx, uint8_t* base);
 void CarDealerOnYes(PPCContext& ctx, uint8_t* base);
 void CarDealerUpdatePage(PPCContext& ctx, uint8_t* base);
 // The pages (r3 the mode).
+void CarDealerPage0(PPCContext& ctx, uint8_t* base);
+void CarDealerPage1(PPCContext& ctx, uint8_t* base);
+void CarDealerPage2(PPCContext& ctx, uint8_t* base);
+void CarDealerPage3(PPCContext& ctx, uint8_t* base);
 void CarDealerPage4(PPCContext& ctx, uint8_t* base);
 // The set-up and the purchase (no arguments).
 void CarDealerStartFirstRace(PPCContext& ctx, uint8_t* base);

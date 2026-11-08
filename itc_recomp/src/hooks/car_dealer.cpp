@@ -35,7 +35,12 @@ ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
               "running transition through the guest context, the stand's calls through their "
               "overrides), Start sub_82184B80 (BuildLists' and FillStatus' plain C++) and "
               "OnDialogDone sub_82183160 (Buy's and SetPrompts' plain C++; ShowDriveDialog "
-              "sub_82182990, never seen in play, the original) "
+              "sub_82182990, never seen in play, the original); the pages Page0 sub_82180F90, "
+              "Page1 sub_82183428 (ShowFirstCarDialog sub_82182A80, never seen in play, the "
+              "original), Page2 sub_82183600 (SetUpSpecSheet sub_821810E0, never seen in play, "
+              "the original; SetPrompts', CheckLimits', ReloadStandModel's and HelpLine::Set's "
+              "plain C++; SetText's unset varargs 0) and Page3 sub_82181A10 (MenuList:: and "
+              "MenuSound::Play through their overrides) "
               "(the same writes; checked by --run_harnesses=car_dealer)");
 
 namespace hooks {
@@ -112,6 +117,22 @@ void CarDealerWaitForLoad(PPCContext& ctx, uint8_t* base) {
 }
 void CarDealerAfterDetail(PPCContext&, uint8_t* base) { cd::AfterDetail(base); }
 void CarDealerPage4(PPCContext& ctx, uint8_t* base) { cd::Page4(base, ctx.r3.u32); }
+void CarDealerPage0(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Page0(base, ctx.r1.u32, guest.calls());
+}
+void CarDealerPage1(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Page1(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerPage2(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Page2(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void CarDealerPage3(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = cd::Page3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
 void CarDealerUnload(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Unload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
@@ -265,6 +286,10 @@ ITC_CAR_DEALER(82183160, CarDealerOnDialogDone)
 // The transitions (from CarDealer::Update's table on its stack).
 ITC_CAR_DEALER(82181D68, CarDealerTransition3)
 // The page handlers (from UpdatePage's table on its stack).
+ITC_CAR_DEALER(82180F90, CarDealerPage0)
+ITC_CAR_DEALER(82183428, CarDealerPage1)
+ITC_CAR_DEALER(82183600, CarDealerPage2)
+ITC_CAR_DEALER(82181A10, CarDealerPage3)
 ITC_CAR_DEALER(82181B98, CarDealerPage4)
 // The helpers (from the recompiled pages, transitions and set-ups).
 ITC_CAR_DEALER(821812B8, CarDealerCheckLimits)

@@ -35,6 +35,8 @@
 #include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "menu_sounds/menu_sounds.h"
+#include "race_screens/race_screens.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -79,7 +81,8 @@ constexpr uint32_t kEntryCount = 6;
 constexpr uint32_t kAnimationsAt = 0x28C00;  // 8 animations of no tracks (64 bytes)
 constexpr uint32_t kAnimations = 8;
 constexpr uint32_t kNamed = 200;             // movie 4's named animations shaped
-constexpr uint32_t kBlockBytes = 0x29000;
+constexpr uint32_t kMenuWorldAt = 0x29000;   // the menus' mappers, vtables, blocks, sounds
+constexpr uint32_t kBlockBytes = 0x29C00;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -109,6 +112,11 @@ constexpr Global kGlobals[] = {
     {car_specs::kParams, 4},
     {kRandSeed, 4},
     {0x826A50AC, 64},  // the screen fades
+    {race_screens::kMapperEntries, 32},
+    {race_screens::kControllerEntries, 16},
+    {menu_sounds::kSoundManager, 4},
+    {menu_sounds::kEffectsVolume, 8},
+    {menu_sounds::kMusicVolume, 4},
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -983,6 +991,119 @@ void Updates(Context& h, const World& w) {
              }});
 }
 
+// The menus' world (as the race screens' harness lays a menu list's): the
+// two menus' controller (+60) 0 to 3, each controller's entry 0 to 3, each
+// entry's mapper one of ours (its vtable's slots 10 and 12 Pressed and
+// Fired, now and then Held) with a few bits set in its words (+448 to
+// +471); each menu's count (+0) 0 to 12, scroll, shown and selection
+// around it (the first menu's selection `selections` when given), the
+// action ids, the wrap word, the move word 0 mostly and the block of item
+// words (half of them 0); the sound manager's slot 10 (MenuSound::Play's
+// PlayCue2D) the getter sub_82090770. The scroll, shown and selection stay
+// near the count (never any word: MenuList::Update's walk over the items
+// from a wild selection reads past any block, the original's too).
+uint32_t Around(Random& r, int32_t lo, int32_t hi) {
+  return uint32_t(lo + int32_t(r.Below(uint32_t(hi - lo + 1))));
+}
+
+void MenuWorld(Random& r, const World& w, const std::vector<uint32_t>& selections = {}) {
+  namespace rs = race_screens;
+  uint8_t* base = w.base;
+  const uint32_t at = w.at(kMenuWorldAt);
+  const uint32_t mappers = at, vtables = at + 0x800, blocks = at + 0x900;
+  const uint32_t manager = at + 0xB00, manager_vtable = at + 0xB80;
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t mapper = mappers + 0x200 * c, vtable = vtables + 0x40 * c;
+    guest::StoreU32(base, rs::kControllerEntries + 4 * c, r.Below(4));
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c, mapper);
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c + 4, r.Below(5) == 0 ? 1 : r.Below(3));
+    guest::StoreU32(base, mapper, vtable);
+    guest::StoreU32(base, vtable + 40, r.Below(5) == 0 ? 0x8210BE70 : rs::kPressedSlot);
+    guest::StoreU32(base, vtable + 48, r.Below(5) == 0 ? 0x8210BE70 : rs::kFiredSlot);
+    for (uint32_t k = 0; k < 6; k++) {
+      guest::StoreU32(base, mapper + 448 + 4 * k,
+                      uint32_t(r.Next()) & uint32_t(r.Next()) & uint32_t(r.Next()));
+    }
+  }
+  const uint32_t lists[2] = {w.at(kListMenuAt), w.at(kColorMenuAt)};
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t list = lists[i], block = blocks + 0x100 * i;
+    guest::StoreU32(base, list + rs::kListPlayer, r.Below(4));
+    const int32_t count = int32_t(r.Below(13));
+    guest::StoreU32(base, list + rs::kListCount, uint32_t(count));
+    guest::StoreU32(base, list + rs::kListShown, Around(r, 0, count + 1));
+    guest::StoreU32(base, list + rs::kListScroll, Around(r, -1, count));
+    guest::StoreU32(base, list + rs::kListSelection, Around(r, -2, count + 1));
+    for (uint32_t field = rs::kListDown; field <= rs::kListBack; field += 4) {
+      guest::StoreU32(base, list + field,
+                      r.Below(8) == 0 ? uint32_t(r.Next()) : 151 + r.Below(30));
+    }
+    guest::StoreU32(base, list + rs::kListWraps, r.Below(3) == 0 ? 0 : r.Below(4));
+    guest::StoreU32(base, list + rs::kListMove, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
+    guest::StoreU32(base, list + rs::kListBlock, block);
+    for (uint32_t k = 0; k < 64; k++) {
+      guest::StoreU32(base, block + 4 * k, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+    }
+  }
+  if (!selections.empty()) {
+    guest::StoreU32(base, lists[0] + rs::kListSelection,
+                    selections[r.Below(uint32_t(selections.size()))]);
+  }
+  guest::StoreU32(base, manager, manager_vtable);
+  guest::StoreU32(base, manager_vtable + menu_sounds::kPlayCue2DSlot, 0x82090770);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+}
+
+void Pages(Context& h, const World& w) {
+  auto mode = [](PPCContext& t, const World& w) { t.r3.u64 = w.at(kModeAt); };
+  Run(h, w, {"CarDealer::Page0 (sub_82180F90)", 300, __imp__sub_82180F90, hooks::CarDealerPage0,
+             {{-96, -16}},
+             [mode](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               for (const uint32_t count : {616u, 1132u}) {
+                 guest::StoreU32(w.base, w.data() + count, r.Below(3));
+               }
+               mode(t, w);
+             }});
+  Run(h, w, {"CarDealer::Page1 (sub_82183428)", 300, __imp__sub_82183428, hooks::CarDealerPage1,
+             {{-112, -24}},
+             [mode](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               guest::StoreU32(w.base, w.data() + 4, r.Below(2));
+               mode(t, w);
+             }});
+  // Page2: the first menu's selection 0, 2 or 3 (1, the spec sheet, goes to
+  // SetUpSpecSheet: never seen in play, the original, its world the car
+  // makers'), the garage's count and size, the price and money around each
+  // other, the list +44 0 or 1, the selected car 43, 2 or another (the
+  // press swaps them: ReloadStandModel over the stand's world);
+  // SetText's parameter area (+48 to +79) left out.
+  Run(h, w, {"CarDealer::Page2 (sub_82183600)", 400, __imp__sub_82183600, hooks::CarDealerPage2,
+             {{-144, -96}, {-64, -48}},
+             [mode](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               MenuWorld(r, w, {0, 2, 3});
+               StandWorld(base, r, w);
+               const uint32_t data = w.data();
+               guest::StoreU32(base, data + 96, r.Below(10));
+               guest::StoreU32(base, data + 100, r.Below(10));
+               guest::StoreU32(base, data + 84, r.Below(2000));
+               guest::StoreU32(base, data + 44, r.Below(2));
+               for (uint32_t k = 0; k < kEntryCount; k++) {
+                 const uint32_t ids[4] = {43, 2, 7, 70};
+                 guest::StoreU32(base, w.entry(k) + 8432, ids[r.Below(4)]);
+                 guest::StoreU32(base, w.entry(k) + 744, r.Below(2000));
+               }
+               mode(t, w);
+             }});
+  Run(h, w, {"CarDealer::Page3 (sub_82181A10)", 300, __imp__sub_82181A10, hooks::CarDealerPage3,
+             {{-112, -24}},
+             [mode](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               mode(t, w);
+             }});
+}
+
 }  // namespace
 
 void CarDealer(Context& h) {
@@ -997,6 +1118,7 @@ void CarDealer(Context& h) {
   Lifecycle(h, w);
   Info(h, w);
   Updates(h, w);
+  Pages(h, w);
 }
 
 }  // namespace harness
