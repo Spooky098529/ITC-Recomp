@@ -93,10 +93,25 @@ file's history. What's left to see in a drive, from every run:
   volume and adjust pages' set-ups, `VolumePage` with `SaveVolumes`,
   never seen, ported; 9 adapters removed after counter runs; race 32 s,
   0 errors, its harnesses 0 differing; no subagents). Left: none (the
-  race screens' rows without a status never ran). Step: its
-  validation, agent running.
+  race screens' rows without a status never ran). Validated
+  `itc_4610` (race 82 s at 180; 0 errors, every harness 0 differing
+  outside the expected groups, 17 of 17 harness lines; 11 in the replay
+  `itc_4611` (ok), 6 to drive). Recorded.
+- Subsystem 2 of 3: the UI movie helpers' ready callers without rows
+  (`sub_82196EC0`, `sub_82224AB8`, `sub_8222FB90`, `sub_8225D590`,
+  `sub_821C0BF0`, `sub_821C0CD0`, `sub_821C0D70`, `sub_821A51C8`,
+  `sub_821A52C0`, `sub_821A5360`, `sub_821821C8`, `sub_821827E0`; ready
+  since this run's first subsystem; its line deleted from `leads.md`).
+  Step: mapping, agent running.
 
 ## Done
+
+- Cleanup lead after the UI movie helpers (not counted): the in-race
+  screens, the race HUD machine and object, the pause menu's pages and
+  transitions, the career results (`race-screens.md`,
+  `race-hud-machine.md`, `race-hud-object.md`, `career.md`,
+  `type6-type7-modes.md`, `files-and-saves.md`), four migrations, ~60
+  adapters removed; 9ca12391..f6ad7444.
 
 - `ui-movies-game.md`: 8 new rows, 92 of 92 ours (the UI movie
   helpers), with the car list's groups they unblocked (`car-list.md`,

@@ -18,6 +18,10 @@ here loses its heading.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 
+- The cleanup lead's fourth migration (attract race `itc_4610`, replay
+  `itc_4611` ok; `race-screens.md`): the pause menu's adjust page and
+  the volumes' save: `sub_8220F500`, `sub_8220F2A8`, `sub_8220F788`,
+  `sub_8220D7A0`, `sub_8220E888`, `sub_8220E908`.
 - The cleanup lead's third migration (attract race `itc_4603`, replay
   `itc_4604` ok but a free start, no countdown; `race-screens.md`,
   `race-hud-machine.md`, `race-hud-object.md`, `career.md`): the
