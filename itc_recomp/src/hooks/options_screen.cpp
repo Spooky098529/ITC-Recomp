@@ -413,8 +413,11 @@ void OptionsMoveSlidersCursor(PPCContext& ctx, uint8_t* base) {
 // for Controls::ButtonIndex and AnalogIndex (Settings::Read), ButtonCode
 // (Settings::Write), Settings::Reset (Options::OnEnter), Settings::Write
 // (Options::OnClosed), Options::IsButtonTaken (ShowButtonClashes),
-// IsAnalogTaken (ShowAnalogClashes) and ShowSlider (ShowSliderNumbers);
-// their register steps stay for the harness.
+// IsAnalogTaken (ShowAnalogClashes), ShowSlider (ShowSliderNumbers),
+// Settings::Read (Options::Show, Settings::Reload), Options::SetUpMovie
+// (Show), SetCategoryArrow (MoveCategoryCursor) and ShowVolumeNumber
+// (ShowVolumeNumbers, ChangeSoundValue); their register steps stay for the
+// harness.
 
 #define ITC_OPTIONS_SCREEN(address, step)   \
   extern "C" REX_FUNC(sub_##address) {      \
@@ -429,7 +432,6 @@ void OptionsMoveSlidersCursor(PPCContext& ctx, uint8_t* base) {
 ITC_OPTIONS_SCREEN(821BAD08, OptionsAnalogPicture)
 ITC_OPTIONS_SCREEN(821BA550, OptionsStepButtons)
 ITC_OPTIONS_SCREEN(821BABD8, OptionsStepAnalog)
-ITC_OPTIONS_SCREEN(821BBF00, OptionsSettingsRead)
 ITC_OPTIONS_SCREEN(821BBBA0, OptionsWaitForMovie)
 ITC_OPTIONS_SCREEN(821B9F88, OptionsOpenMovie)
 ITC_OPTIONS_SCREEN(821BCE38, OptionsOnClosed)
@@ -444,8 +446,6 @@ ITC_OPTIONS_SCREEN(821BD800, OptionsChangeHudValue)
 ITC_OPTIONS_SCREEN(821BD908, OptionsEnterSound)
 ITC_OPTIONS_SCREEN(821BD9A0, OptionsEnterSliders)
 ITC_OPTIONS_SCREEN(821BDAD0, OptionsEnterButtons)
-ITC_OPTIONS_SCREEN(821BE218, OptionsSetCategoryArrow)
-ITC_OPTIONS_SCREEN(821BE518, OptionsShowVolumeNumber)
 ITC_OPTIONS_SCREEN(821BE930, OptionsShowMusicName)
 ITC_OPTIONS_SCREEN(821BEA48, OptionsShowSliderMark)
 ITC_OPTIONS_SCREEN(821BF0F0, OptionsShowButtonPicture)
@@ -475,7 +475,6 @@ ITC_OPTIONS_SCREEN(821BE8A8, OptionsShowVolumeBars)
 ITC_OPTIONS_SCREEN(821C1068, OptionsShowPrompts)
 ITC_OPTIONS_SCREEN(821C0FF0, OptionsSettingsReload)
 ITC_OPTIONS_SCREEN(821BC670, OptionsCategoryPage)
-ITC_OPTIONS_SCREEN(821BCFF0, OptionsSetUpMovie)
 ITC_OPTIONS_SCREEN(821C1158, OptionsShow)
 ITC_OPTIONS_SCREEN(821C2BE0, OptionsMoveCategoryCursor)
 ITC_OPTIONS_SCREEN(821C2E28, OptionsMoveHudCursor)
