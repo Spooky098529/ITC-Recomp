@@ -44,6 +44,69 @@ uint32_t Item(uint8_t* base, uint32_t kind, uint32_t i) {
 
 }  // namespace
 
+uint64_t AfterRaceMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8221A4A8 AfterRaceMenu::MainPage");
+  const uint32_t frame = Frame(base, sp, 112);
+  calls.Call(kListUpdate, frame, 0x8221A4C0, Get(base, kAfterList));
+  const uint32_t selection = Selection(base);
+  if (guest::LoadU32(base, Get(base, kAfterList) + kListMove) != 0) {
+    calls.Call(kPagesGo, frame, 0x8221A4F4, Get(base, kAfterPages), 1, 3, kNone);
+    calls.Call(kMenuSoundPlay, frame, 0x8221A4FC, 4);
+  }
+  if (uint32_t(calls.Call(kListAccepted, frame, 0x8221A508, Get(base, kAfterList))) == 0) {
+    return 0;
+  }
+  calls.Call(kMenuSoundPlay, frame, 0x8221A518, 0);
+  const uint32_t data = Get(base, kAfterData);
+  const uint32_t item = Item(base, guest::LoadU32(base, data), selection);
+  if (item > 8) {
+    return 0;
+  }
+  auto go = [&](uint64_t page, uint64_t transition) {
+    calls.Call(kPagesGo, frame, 0x8221A604, Get(base, kAfterPages), page, transition, kNone);
+    return 0;
+  };
+  // The answer (+12) and transition 4 to the closing page 7.
+  auto close = [&](uint32_t answer) {
+    guest::StoreU32(base, data + 12, answer);
+    return go(7, 4);
+  };
+  // The answer (+12), then the confirm dialog in `mode` and page 6.
+  auto confirm = [&](uint32_t answer, uint32_t mode) {
+    guest::StoreU32(base, data + 12, answer);
+    RaceDialogOpen(base, mode, 0, frame, calls);
+    return go(6, kNone);
+  };
+  switch (item) {
+    case 0:  // sub_8221A56C (merged)
+      return close(1);
+    case 1:  // the replay
+      return close(2);
+    case 2: {
+      // The replay's save: page 2 at once, the save buffers made and the
+      // dialog's save flow started (no arguments: the registers the calls
+      // leave are passed on, as the original's).
+      const uint64_t r3 =
+          calls.Call(kPagesGo, frame, 0x8221A59C, Get(base, kAfterPages), 2, kNone, kNone);
+      const uint64_t buffers = calls.Call(kSaveBuffersCreate, frame, 0x8221A5A0, r3, 2, kNone, kNone);
+      calls.Call(kStartSave, frame, 0x8221A5A4, buffers);
+      return 0;
+    }
+    case 3:
+      return confirm(4, 0);
+    case 4:
+      return confirm(5, 1);
+    case 5:
+      return confirm(6, 3);
+    case 6:
+      return confirm(7, 2);
+    case 7:
+      return close(8);
+    default:  // 8
+      return confirm(9, 2);
+  }
+}
+
 uint64_t AfterRaceMenuConfirmPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221A6C8 AfterRaceMenu::ConfirmPage");
   const uint32_t frame = Frame(base, sp, 96);

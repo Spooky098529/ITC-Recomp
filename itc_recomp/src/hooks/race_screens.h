@@ -125,6 +125,10 @@ void RaceScreensPauseMenuOpen(PPCContext& ctx, uint8_t* base);
 // SetUpOptions sub_8220E530, SetAdjust sub_8220F1B8 (r3 the step word).
 void RaceScreensPauseMenuToggleOption(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuOptionsPage(PPCContext& ctx, uint8_t* base);
+// The main pages: PauseMenu::MainPage sub_8220D898, AfterRaceMenu::MainPage
+// sub_8221A4A8 (r3 as the original leaves it: 0).
+void RaceScreensPauseMenuMainPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuMainPage(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuSetAdjust(PPCContext& ctx, uint8_t* base);
 // The menu after the race: ConfirmPage sub_8221A6C8 (r4 passed on), the

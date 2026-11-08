@@ -1530,6 +1530,77 @@ void Dialog(Context& h, const MovieWorld& w) {
       __imp__sub_82218B30, hooks::RaceScreensRaceDialogOpen, open);
 }
 
+// The two main pages (PauseMenu::MainPage, AfterRaceMenu::MainPage): their
+// lists moved to a menu list world (MenuList::Update and its tests) as the
+// options page's cases do, the items read from the image's tables by the
+// data's kind (0 to 8, the world's) and the selection.
+//
+// The pause menu's: the item count (+136) 0 to 6; the race data a block of the case's own (the current
+// stage +804 of the stage list at +0x59620, 0 to 9, its first word 1 or
+// any; the race kind +0xA3AF0 6 or 0 to 7) and the word at 0x826C7824 0 or
+// any, for the end-race item 4 (Stages::Copy into the frame's +80).
+//
+// The menu after the race's: its data's kind (+0) 0 to 7; the replay's save
+// (item 2) runs SaveBuffers::Create (the replay list's header set, so it
+// makes nothing) and RaceDialog::StartSave (the original on both sides)
+// over the save world the dialog's cases build; the dialog list's item
+// block (+68) 0 first, StartSave's MenuList::Init's then compared and freed.
+void MainPages(Context& h, const MovieWorld& w) {
+  const World list_world;
+  const Block race(0xA3B00);
+  const Block save(kSaveWorldBytes);
+  if (!list_world.ok() || !race.address || !save.address) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  const uint32_t saved_race = guest::LoadU32(h.base, rs::kRaceData);
+  const uint32_t saved_word = guest::LoadU32(h.base, rs::kStageWord);
+  FrameSpec pause{208, 48};
+  pause.list_world = &list_world;
+  MovieGroup(
+      h, w, "PauseMenu::MainPage (sub_8220D898)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        // The item count (+136) 0 to 6, as SetUpMain leaves it: the
+        // original's debug texts read the item table up to it (a wild count
+        // reads wild addresses).
+        guest::StoreU32(h.base, w.block(rs::kPauseData) + 136, r.Below(7));
+        const uint32_t stages = race.address + 0x59620;
+        WriteRandom(h.base, stages, 80 * 10 + 808, r);
+        const uint32_t stage = r.Below(10);
+        guest::StoreU32(h.base, stages + 804, stage);
+        guest::StoreU32(h.base, stages + 80 * stage, r.Below(2) == 0 ? 1 : uint32_t(r.Next()));
+        guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(2) == 0 ? 6 : r.Below(8));
+        guest::StoreU32(h.base, rs::kRaceData, race.address);
+        guest::StoreU32(h.base, rs::kStageWord, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+      },
+      __imp__sub_8220D898, hooks::RaceScreensPauseMenuMainPage, pause);
+  guest::StoreU32(h.base, rs::kRaceData, saved_race);
+  guest::StoreU32(h.base, rs::kStageWord, saved_word);
+  FrameSpec after{112, 32};
+  after.list_world = &list_world;
+  after.list_global = rs::kAfterList;
+  after.after = [&](Outputs& out) {
+    out.Bytes(Read(h.base, save.address, kSaveWorldBytes));
+    const uint32_t list = w.block(rs::kDialogList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  MovieGroup(
+      h, w, "AfterRaceMenu::MainPage (sub_8221A4A8)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        guest::StoreU32(h.base, w.block(rs::kAfterData), r.Below(8));
+        ShapeSaveWorld(h.base, save.address, r);
+        guest::StoreU32(h.base, kReplayList, save.address + kReplayHeader);
+        guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
+      },
+      __imp__sub_8221A4A8, hooks::RaceScreensAfterRaceMenuMainPage, after);
+}
+
 // The dialog's page object and data as its draw's cases shape them (its
 // running transition none, OpenAnim's, Move's or another negative one).
 void ShapeDialogPages(uint8_t* base, Random& r, const MovieWorld& w) {
@@ -1873,6 +1944,7 @@ void Transitions(Context& h) {
   AfterRace(h, w);
   Dialog(h, w);
   Draws(h, w);
+  MainPages(h, w);
 }
 
 }  // namespace

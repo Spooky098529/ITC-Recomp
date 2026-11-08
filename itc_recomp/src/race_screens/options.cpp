@@ -1,5 +1,5 @@
-// The pause menu's options page (docs/functions/race-screens.md): see
-// race_screens.h.
+// The pause menu's main and options pages (docs/functions/race-screens.md):
+// see race_screens.h.
 
 #include "race_screens/race_screens.h"
 
@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace race_screens {
 
@@ -37,6 +38,87 @@ uint64_t NodeText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movi
 }
 
 }  // namespace
+
+uint64_t PauseMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220D898 PauseMenu::MainPage");
+  const uint32_t frame = Frame(base, sp, 208);
+  // The debug texts (the kind's title, the items, the cursor at the list's
+  // selection) go to the empty sub_82106540 (audio.md): only their loads,
+  // which change nothing, are left out with them.
+  calls.Call(kListUpdate, frame, 0x8220D970, Get(base, kPauseList));
+  const uint32_t selection = ListSelection(base, Get(base, kPauseList));
+  // MenuList::GetPreviousSelection (sub_8220BC28): the word at +20.
+  const uint32_t before = guest::LoadU32(base, Get(base, kPauseList) + kListSelectionBefore);
+  if (selection != before) {
+    calls.Call(kPagesGo, frame, 0x8220D9A4, Get(base, kPausePages), 0, 4, kNone);
+    calls.Call(kMenuSoundPlay, frame, 0x8220D9AC, 4);
+  } else if (uint32_t(calls.Call(kListPressed152, frame, 0x8220D9B8, Get(base, kPauseList))) != 0 ||
+             uint32_t(calls.Call(kListCancelled, frame, 0x8220D9C8, Get(base, kPauseList))) != 0) {
+    guest::StoreU32(base, Get(base, kPauseData) + 140, 1);
+    calls.Call(kPagesGo, frame, 0x8220DB80, Get(base, kPausePages), 5, 5, kNone);
+    calls.Call(kMenuSoundPlay, frame, 0x8220DB88, 2);
+    return 0;
+  }
+  if (uint32_t(calls.Call(kListAccepted, frame, 0x8220D9D8, Get(base, kPauseList))) == 0) {
+    return 0;
+  }
+  calls.Call(kMenuSoundPlay, frame, 0x8220D9E8, 0);
+  const uint32_t at = ListSelection(base, Get(base, kPauseList));
+  const uint32_t kind = guest::LoadU32(base, Get(base, kPauseData) + 132);
+  const uint32_t item = guest::LoadU32(base, kPauseItems + ((kind * 6 + at) << 2));
+  auto go = [&](uint64_t page, uint64_t transition, uint64_t queued) {
+    calls.Call(kPagesGo, frame, 0x8220DA54, Get(base, kPausePages), page, transition, queued);
+    return 0;
+  };
+  // The items that end or restart the race: the answer (+140), then the
+  // confirm dialog in `mode` and page 4.
+  auto confirm = [&](uint32_t answer, uint32_t mode) {
+    guest::StoreU32(base, Get(base, kPauseData) + 140, answer);
+    RaceDialogOpen(base, mode, 0, frame, calls);
+    return go(4, kNone, kNone);
+  };
+  switch (item) {
+    case 0:  // sub_8220DA38, the resume (merged)
+      guest::StoreU32(base, Get(base, kPauseData) + 140, 1);
+      return go(5, 5, kNone);
+    case 1:
+      return go(1, 6, 7);
+    case 2:
+      return go(2, 11, 12);
+    case 3:
+      return go(3, 16, 17);
+    case 4: {
+      // Stages::Copy of the current stage into the frame's +80 (its plain
+      // C++, or the original through its adapter where it declines).
+      const uint32_t stages = Get(base, kRaceData) + 0x59620;
+      if (!vehicle_accessors::StagesCopy(base, frame + 80, stages, 0xFFFFFFFFu)) {
+        calls.Call(kStagesCopy, frame, 0x8220DAA4, frame + 80, stages, kNone);
+      }
+      uint32_t answer = 4;
+      if (int32_t(guest::LoadU32(base, Get(base, kRaceData) + 0xA3AF0)) == 6 &&
+          int32_t(guest::LoadU32(base, frame + 80)) != 1 &&
+          guest::LoadU32(base, kStageWord) == 0) {
+        answer = 5;
+      }
+      return confirm(answer, 4);
+    }
+    case 5:
+      return confirm(2, 1);
+    case 6:
+      return confirm(3, 3);
+    case 7:
+      return confirm(6, 2);
+    case 8:
+      return confirm(7, 2);
+    case 9:
+      return confirm(9, 2);
+    case 10:
+      return confirm(4, 5);
+    default:
+      guest::StoreU32(base, Get(base, kPauseData) + 140, 0);
+      return 0;
+  }
+}
 
 uint32_t PauseMenuToggleOption(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220CDA0 PauseMenu::ToggleOption");

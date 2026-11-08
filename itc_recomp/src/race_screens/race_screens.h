@@ -388,6 +388,16 @@ constexpr uint32_t kListUpdate = 0x8220C1E0;
 constexpr uint32_t kListAccepted = 0x8220BD50;
 constexpr uint32_t kListCancelled = 0x8220BDE0;
 constexpr uint32_t kListInit = 0x8220BAC0;
+constexpr uint32_t kListPressed152 = 0x8220BE70;
+// Stages::Copy (through its adapter where its plain C++ declines), the race
+// data's pointer and the word at 0x826C7824 PauseMenu::MainPage reads.
+constexpr uint32_t kStagesCopy = 0x820FFD88;
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kStageWord = 0x826C7824;
+// sub_8220D898 PauseMenu::MainPage (page 0; its case 0, sub_8220DA38,
+// merged), from a 208-byte frame: see the row. The debug texts (the empty
+// sub_82106540) left out. Returns 0.
+uint64_t PauseMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8220CDA0 PauseMenu::ToggleOption: by the list's side (+28: -1 sets, 1
 // clears) the selected item's edit (+36 to +48, item 4's +144; their
 // addresses at the frame's +80) changed when it differs, then ShowOptions; 1
@@ -438,6 +448,13 @@ uint32_t AfterRaceMenuColorItems(uint8_t* base, uint32_t screen, uint32_t sp);
 // sub_8221B860 AfterRaceMenu::Start (page 0): ColorItems, Go(1, transition
 // 1). Returns 0.
 uint64_t AfterRaceMenuStart(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8221A4A8 AfterRaceMenu::MainPage (page 1; its case 0, sub_8221A56C,
+// merged), from a 112-byte frame: see the row. The replay's save (item 2)
+// runs SaveBuffers::Create through its override and RaceDialog::StartSave
+// (never seen in play) the original. Returns 0.
+constexpr uint32_t kSaveBuffersCreate = 0x8228F6B0;
+constexpr uint32_t kStartSave = 0x822189B8;
+uint64_t AfterRaceMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8221BA68 AfterRaceMenu::Open: the data's +0 = `kind`, UI movie 9 into
 // the screen's +0 and its pose reset, +4 the kind's item count (at most 4),
 // +8 = `flag`, +16 = 0, SetUpItems, ScreenPages::Init(pages, 1) and Go(0,
