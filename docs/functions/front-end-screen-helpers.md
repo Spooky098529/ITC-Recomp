@@ -1,0 +1,138 @@
+# Known functions: the front-end screen helpers
+
+The front end's small **screen helpers** that call the UI movie helpers
+([`ui-movies-game.md`](ui-movies-game.md): `UiMovie::SetNodeText`,
+`SetNodeTextV`, `SetNodeNumberText`, `ClearNodeText`, and the jump to
+`UiMovies::DeleteAll` `sub_8211E370`), with the steps above them that
+were waiting only on them. Three kinds:
+
+- **The modes' releases**: slot 1 of the 852-byte modes' vtables
+  ([`game-modes.md`](game-modes.md); slot 0 is each mode's Init), run
+  when a mode is left: the mode's block at +848 freed, the menu music's
+  cue of bank 1 stopped, the mode's string files released
+  (`Strings::Release`, [`strings-and-font.md`](strings-and-font.md)) and
+  every UI movie deleted. Types 2 (`0x82006B9C`), 4 (`0x82006BE0`, the
+  title's), 5 (`0x82006C24`, the career's parking area,
+  [`location-screen.md`](location-screen.md)), 9 (`0x82006CAC`), 10
+  (`0x82006CF0`) and 12 (`0x82006C6C`); types 6 and 7 share
+  `StandMode::Release` ([`type6-type7-modes.md`](type6-type7-modes.md)).
+  The Inits (slot 0: `sub_82197278`, `sub_82224C70`, `sub_8222FD68`,
+  `sub_8225D6D0`, `sub_82288940`, `sub_82278058`) aren't here (leads in
+  `../loops/leads.md`).
+- **The save dialogs' texts and steps**: the yes/no dialog of the save
+  screen (UI movie 44, its blocks `[0x826D844C]` and `[0x826D8454]`,
+  `../known-data.md`; its Inits in `type6-type7-modes.md`) and of the
+  options screen's pages 9 and 10 (UI movie 7's sub-scenes 13 and 14,
+  [`options-screen.md`](options-screen.md), the settings `o` =
+  `[0x826D8478]` +620 to +656). Each has a text setter (the question by
+  a string id and varargs, the answers strings 2 and 3) and a note
+  setter (a second node's text, the same id), as the in-race confirm
+  dialog's `RaceDialog::SetText` and `SetNote`
+  ([`race-screens.md`](race-screens.md)); the steps that show a dialog
+  pick its question by a kind (a jump table; its case 0 split off by the
+  recompiler into a function of its own, as `sub_82218C90` is
+  `RaceDialog::ShowMessage`'s), then by the dialog's state open it (0:
+  named animation 12 or 853/869, the two-item menu, the default answer;
+  1: the note; 2: closing) and wait for the movie's animation, as
+  `RaceDialog::ShowMessage` does. The save screen's steps come from its
+  Update's table (`sub_821A64A0`: steps 0 `sub_821A5668`, 1
+  `sub_821A5118`, 2 `sub_821A5038`, 3 `sub_821A5980`, 4 `sub_821A5D00`,
+  5 `sub_821A6030`, 6 `sub_821A63B0`), the options' from
+  `Options::Update`'s (steps 43 and 46).
+- **The car cards**: a car's maker logo, name, class and price on a
+  front-end screen's UI movie 4 (four cards) and movie 18 (one), from
+  the car entries of `[0x826D83F4]` +1136 (`../known-data.md`).
+
+Shared with other files and named only here: the UI movie calls
+(`ui-movies-game.md`, [`ui-movies.md`](ui-movies.md)), `MenuSound::Play`
+([`menu-sounds.md`](menu-sounds.md)), `MenuList::Init`, `Selection` and
+`SetSelection` ([`race-screens.md`](race-screens.md)), `SaveSlots::State`
+and `SaveBuffers::Create` ([`save-interface.md`](save-interface.md)),
+`Options::ShowPrompts` (`options-screen.md`), `StandScene::Release`
+(`type6-type7-modes.md`), `VirtualFree` `sub_82295330`
+([`heap.md`](heap.md)) and the sound manager's `IsCuePlaying` and
+`StopCue` (slots 14 and 13, [`sound-cues.md`](sound-cues.md); called
+through the vtable). The varargs `SetNodeText` calls here leave r6 and
+on as the previous call leaves them (the user's call for the parking
+area, 2026-10-30: native callers pass 0).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82196EC0` | `ModeType2::Release` | | Slot 1 of the type 2 mode's vtable (`0x82006B9C`, its slot 0 `sub_82197278`), from `Modes::Tick` before the mode is deleted (probably; as `StandMode::Release`): r3 = the mode. `VirtualFree(mode +848, 0, MEM_RELEASE)` (`sub_82295330`), +848 = 0; then on the sound manager `[0x826C5C80]`: when `IsCuePlaying(bank 1, cue 0)` (slot 14, the indexes as words on its frame: the bank at +84, the cue at +80) `StopCue(1, 0)` (slot 13, +92 and +88), then the same for cue 2 (+96 to +108); `StandScene::Release` (`sub_82180738`, `type6-type7-modes.md`); `Strings::Release([0x826C5C34], 0x100BB)` (files 0, 1, 3, 4, 5, 7 and 16); then `sub_8211E370` (the jump to `UiMovies::DeleteAll`). A 144-byte frame (`__savegprlr_29`); returns the jump's r3. No direct callers. Seen in play. Read in full. |
+| `sub_82224AB8` | `ModeType4::Release` | | Slot 1 of the type 4 mode's vtable (`0x82006BE0`, its slot 0 the title's `sub_82224C70`), from `Modes::Tick` (probably): r3 = the mode. `VirtualFree(mode +848, 0, MEM_RELEASE)`, +848 = 0; `Strings::Release([0x826C5C34], 3)`; `sub_8211E370` (`UiMovies::DeleteAll`); then, unconditionally (no `IsCuePlaying` check, unlike the other releases) the sound manager's `StopCue(bank 1, cue 1)` (both words 1, at +80 and +84). A 112-byte frame (r31 saved); returns `StopCue`'s r3. No direct callers. Seen in play. Read in full. |
+| `sub_8222FB90` | `ModeType5::Release` | | Slot 1 of the type 5 mode's vtable (`0x82006C24`, its slot 0 `sub_8222FD68`: the career's parking area mode, `location-screen.md` and the lead in `../loops/leads.md`), from `Modes::Tick` (probably): r3 = the mode. `VirtualFree(mode +848, 0, MEM_RELEASE)` (the 28,940-byte block of three state machines), +848 = 0; when the sound manager's `IsCuePlaying(bank 1, cue 3)`, `StopCue(1, 3)` (cue at +80 and +88, bank at +84 and +92); `Strings::Release([0x826C5C34], 59)` (files 0, 1, 3, 4 and 5); `sub_8211E370`. A 128-byte frame (`__savegprlr_29`); returns the jump's r3. The block's state machines get no destructor call. No direct callers. Seen in play. Read in full. |
+| `sub_8225D590` | `ModeType9::Release` | | Slot 1 of the type 9 mode's vtable (`0x82006CAC`, its slot 0 `sub_8225D6D0`), from `Modes::Tick` (probably): r3 = the mode. As `ModeType5::Release` with cue 2 of bank 1 and `Strings::Release([0x826C5C34], 171)` (files 0, 1, 3, 5 and 7). A 128-byte frame (`__savegprlr_29`); returns the jump's r3. No direct callers. Seen in play. Read in full. |
+| `sub_82288898` | `ModeType10::Release` | | Slot 1 of the type 10 mode's vtable (`0x82006CF0`, its slot 0 `sub_82288940`), from `Modes::Tick` (probably): r3 = the mode. `VirtualFree(mode +848, 0, MEM_RELEASE)`, +848 = 0; `Strings::Release([0x826C5C34], 11)` (files 0, 1 and 3); `sub_8211E370`. No music stopped. A 96-byte frame (r31 saved); returns the jump's r3. No direct callers. Seen in play. Read in full. |
+| `sub_82277DB0` | `ModeType12::Release` | | Slot 1 of the type 12 mode's vtable (`0x82006C6C`, its slot 0 `sub_82278058`), from `Modes::Tick` (probably): r3 = the mode. `VirtualFree(mode +848, 0, MEM_RELEASE)`, +848 = 0; `StandScene::Release` (`sub_82180738`); `Strings::Release([0x826C5C34], 59)`; `sub_8211E370`. No music stopped. A 96-byte frame (r31 saved); returns the jump's r3. No direct callers. Seen in play. Read in full. |
+| `sub_821A51C8` | `SaveScreen::SetText` | | r3 = a string id, r4 and on: varargs (the prologue stores r4 to r10 into the caller's area, r1 + 24 to + 79). UI movie 44 found (`UiMovies::Find`, the key at +80); n = `UiMovie::FindNode(m, 0, 1)`; `SetNodeTextV(m, Child(n, 0), r3, va_list)` (the va_list's address, r1 + 168, stored at +80 and passed in r6); c = `Child(n, 1)`: `SetNodeText(m, Child(c, 3), 2)` and `SetNodeText(m, Child(c, 4), 3)` (the answers; r6 and on left as the previous call leaves them), then `Child(c, 8)` +80 = 1 (shown). As `RaceDialog::SetText` (`race-screens.md`) on movie 44, with the child 8 shown. A 144-byte frame (`__savegprlr_26`); returns the last `SetNodeText`'s r3. From the save screen's steps (`sub_821A5540`, `sub_821A5668`, `sub_821A5980`, `sub_821A5D00`, `sub_821A6030` and their split-off cases). Seen in play. Read in full. |
+| `sub_821A52C0` | `SaveScreen::SetNote` | | r3 = a string id, r4 and on: varargs (stored into the caller's area as `SetText`'s): movie 44's `Child(FindNode(m, 0, 2), 1)` set by `SetNodeTextV(m, node, r3, va_list)` (the va_list's address, r1 + 136, at +80). As `RaceDialog::SetNote`. A 112-byte frame (r30, r31 saved); returns `SetNodeTextV`'s r3. From `sub_821A5450`, `sub_821A5540` and the steps beside `SetText`. Seen in play. Read in full. |
+| `sub_821A5360` | `SaveScreen::SetMessage` (probably) | | r3 = a string id, r4 and on: varargs: as `SaveScreen::SetText` but with one answer: child 3 of `Child(n, 1)` gets string 4 (`SetNodeText`), child 4's text cleared (`UiMovie::ClearNodeText` `sub_8211CC50`) and child 8 +80 = 0 (hidden). A 144-byte frame (`__savegprlr_26`); returns `ClearNodeText`'s r3. Only caller `SaveScreen::ShowNotice`. Seen in play. Read in full. |
+| `sub_821A5450` | `SaveScreen::StartCheck` (probably) | | No arguments. d = `[0x826D8454]` (the save screen's data, `../known-data.md`): +4 = 0, +0 = 1, +28 = 0; `MenuList::Init([0x826D8450], 1, 1, 0, 154, 153, 155, 156, 159, 158)` (the last two on the frame's +84 and +92); by `SaveSlots::State(0)`: nonzero → `SaveScreen::SetNote(70)`, +12 = 3, +24 = 0; zero → `SetNote(69)`, +12 = 2; then +16 = 1 (the note). The page block `[0x826D844C]`: +8 = +0 unless +0 is 1, +12 = 0 (step 0, `SaveScreen::ShowMessage`), +4 = 1 (the page after), +16 = -1, +0 = -1; d +56 = 1. The same as `RaceDialog::StartSave`'s start. A 128-byte frame (`__savegprlr_29`). Only caller `sub_821A6650` (the save screen's Show for kind 0, the lead in `../loops/leads.md`). Seen in play. Read in full. |
+| `sub_821A5540` | `SaveScreen::Start` (probably) | | No arguments. d = `[0x826D8454]`: +0 = 1; s = `SaveSlots::State(0)`; `MenuList::Init([0x826D8450], 1, 1, 0, 154, 153, 155, 156, 159, 158)`; d +28 = 0, +56 = 1. s nonzero: `SetNote(70)`, d +12 = 0, +16 = 1 (the note); the page block `[0x826D844C]`: +8 = +0 unless +0 is 6, +16 = -1, +12 = 3 (step 3), +4 = 6, +0 = -1; d +24 = 0. s zero: `SetText(102)`, d +12 = 3, +16 = 0 (the question); the page block: +8 = +0 unless +0 is 5, +12 = 3, +4 = 5, +16 = -1, +0 = -1. A 144-byte frame (`__savegprlr_28`). Only caller `sub_821A6608` (the save screen's Show for kinds 1 to 4, after `SaveBuffers::Create`; lead in `../loops/leads.md`). Seen in play. Read in full. |
+| `sub_821A5668` | `SaveScreen::ShowMessage` | | Step 0 of the save screen's Update table (`sub_821A64A0`), r3 = the step's started word (the page block +24). m = UI movie 44. First call (the word 0): by d's (`[0x826D8454]`) kind +12 (a jump table, 0 to 11; above 11 none), `SetText` and `SetNote` with the same string: 0 62 (`sub_821A56E8`), 1 61, 4 71, 5 72, 6 and 11 65, 7 66 (with r4 = 240, an argument), 8 63, 9 64, 10 67, 2 and 3 none; d +48 (the default answer) = 1 for 1, 5, 6 and 11, 0 for 4. Then by d +16 (unsigned): 0 `PlayNamed(m, 12)`, `MenuList::Init([0x826D8450], 2, 2, 1, 154, 153, 155, 156, 159, 158)`, `SetSelection(list, d +48)`, d +56 = 1; 1 `PlayNamed(m, 13)`, `FindNode(m, 0, 0)` +80 = 0 and `Child(FindNode(m, 0, 2), 0)` +80 = 1, d +56 = 1; 2 `PlayNamed(m, 13)`, the same two words 1 and 0, d +24 = 0, +56 = 0; 3 and up nothing; then `MenuSound::Play(5)` and the word = 1. Every call: `UiMovie::Run(m, 0)`; when it answers 0, by d +16 (signed): 0 named animation 2 + `MenuList::Selection` played and looped (`PlayNamed`, `LoopNamed`), 2 named 0's. Returns whether Run answered 0. A 160-byte frame (`__savegprlr_26`; the key 44 at +96). As `RaceDialog::ShowMessage` with other strings. No direct callers. Seen in play. Read in full. |
+| `sub_821A56E8` | | | Case 0 of `SaveScreen::ShowMessage`'s jump table, split into a function of its own by the recompiler: `SetText(62)`, `SetNote(62)`, then the rest of `ShowMessage` (it doesn't return to it). Seen in play. Read in full. Reached only from `ShowMessage`'s table. |
+| `sub_821A5980` | `SaveScreen::ShowMessage3` | | Step 3 of the save screen's table: as `SaveScreen::ShowMessage` with a 17-entry kind table (word offsets): 0 70 (`sub_821A5A00`, which also sets `0x826BAB40` +0 and +4 = 0: the sign-in watch's checks back on, `mode-tick.md`), 1 and 2 59, 3 102, 4 87, 5 60, 6 88, 7 103, 8 61, 9 62, 10 63, 11 64, 12 to 14 65, 15 66 (r4 = 240), 16 67; d +48 = 0 for 1 to 3, 15 and 16, 1 for 8 and 12 to 14 (the others leave it). The rest as `ShowMessage`. A 160-byte frame (`__savegprlr_26`). No direct callers. Seen in play. Read in full (the kinds' strings and +48 by the table; the states' code compared with `ShowMessage`'s: the same). |
+| `sub_821A5A00` | | | Case 0 of `SaveScreen::ShowMessage3`'s jump table, split off by the recompiler: `SetText(70)`, `SetNote(70)`, `0x826BAB40` +0 and +4 = 0, then the rest of `ShowMessage3`. Seen in play. Read in full. |
+| `sub_821A5D00` | `SaveScreen::ShowMessage4` | | Step 4 of the save screen's table: as `SaveScreen::ShowMessage` with a 13-entry kind table: 0 62 (`sub_821A5D7C`), 1 89, 2 70, 3 90, 4 91, 5 and 6 92, 7 93, 8 94, 9 95, 10 98, 11 103, 12 92; d +48 = 1 for 1, 3, 5 and 6 (the others leave it). The rest as `ShowMessage` (the states' node words written as 0 and 1 from r29 and a fresh 0). A 160-byte frame (`__savegprlr_27`). No direct callers. Seen in play. Read in full (the kinds' strings and +48; the states compared with `ShowMessage`'s). |
+| `sub_821A5D7C` | | | Case 0 of `SaveScreen::ShowMessage4`'s jump table, split off by the recompiler: `SetText(62)`, `SetNote(62)`, then the rest of `ShowMessage4`. Seen in play. Read in full. |
+| `sub_821A6030` | `SaveScreen::ShowMessage5` | | Step 5 of the save screen's table: a 14-entry kind table (case 0 string 101, `sub_821A60B4`; others 60, 62, 83 to 86, 88, 99, 100, 103), some cases building arguments on its frame (+112); the started word set before the switch. Not seen in play. Not read in detail. |
+| `sub_821A60B4` | | | Case 0 of `SaveScreen::ShowMessage5`'s jump table, split off by the recompiler: `SetText(101)`, `SetNote(101)`, then the rest. Not seen in play. Not read in detail. |
+| `sub_821A63B0` | `SaveScreen::ShowNotice` (probably) | | Step 6 of the save screen's table, r3 = the started word. m = movie 44. First call: the word = 1; when d +12 is 0 `SaveScreen::SetMessage(107)`; when d +16 is 0 `PlayNamed(m, 12)`; `MenuSound::Play(5)`. Every call: `UiMovie::Run(m, 0)`; when it answers 0 and d +16 is 0: `PlayNamed(m, 2)` and `LoopNamed(m, 2)` (the one answer highlighted). Returns whether Run answered 0. A 144-byte frame (`__savegprlr_29`; the key 44 at +96). No direct callers. Seen in play. Read in full. |
+| `sub_821C0D70` | `Options::SetSaveDialogText` | | r3 = a string id, r4 and on: varargs: as `SaveScreen::SetText` on UI movie 7 with n = `FindNode(m, 13, 1)` (page 9's dialog, sub-scene 13), without the child 8 word: `SetNodeTextV` on child 0, strings 2 and 3 on `Child(n, 1)`'s children 3 and 4. A 144-byte frame (`__savegprlr_27`); returns the last `SetNodeText`'s r3. From `Options::ShowSaveDialog` and its case 0 `sub_821C66BC`. Seen in play. Read in full. |
+| `sub_821C0E50` | `Options::SetSaveDialogNote` | | r3 = a string id, r4 and on: varargs: movie 7's `Child(FindNode(m, 13, 2), 1)` set by `SetNodeTextV` (the va_list r1 + 136). A 112-byte frame (r30, r31 saved); returns `SetNodeTextV`'s r3. From `Options::ShowSaveDialog`, `sub_821C66BC` and `Options::SetUpSavePage`. Seen in play. Read in full. |
+| `sub_821C0BF0` | `Options::SetCategory6DialogText` | | As `Options::SetSaveDialogText` on sub-scene 14 (`FindNode(m, 14, 1)`, page 10's dialog). A 144-byte frame (`__savegprlr_27`). From `Options::ShowCategory6Dialog` and its case 0 `sub_821C6A54`. Seen in play. Read in full. |
+| `sub_821C0CD0` | `Options::SetCategory6DialogNote` | | As `Options::SetSaveDialogNote` on sub-scene 14 (`Child(FindNode(m, 14, 2), 1)`). A 112-byte frame (r30, r31 saved). From `Options::ShowCategory6Dialog`, `sub_821C6A54` and `Options::SetUpCategory6Page`. Seen in play. Read in full. |
+| `sub_821C6638` | `Options::ShowSaveDialog` (probably) | | Step 43 of `Options::Update`'s table (page 9's dialog), r3 = the started word (p +24). m = UI movie 7. First call: `MenuSound::Play(5)`; by `o` +628 (the kind, a jump table 0 to 12, above none) `SetSaveDialogText` and `SetSaveDialogNote` with the same string: 0 62 (`sub_821C66BC`), 1 83, 2 69, 3 70, 4 84, 5 85, 6 and 7 86, 8 87, 9 88, 10 60, 11 103, 12 104; `o` +636 (the default answer) = 1 for 1, 4, 6 and 7. Then by `o` +620 (unsigned): 0 `PlayNamed(m, 853)`, the dialog menu `[0x826D8484]` reset (+16 = 1, +20 = 1, +0 to +12, +24 to +40, +48, +52, +64 = 0), then its +4 = its +0 (0) and +0 = `o` +636, `ShowPrompts(0, 0, -1, -1, -1, -1)`; 1 `FindNode(m, 13, 0)` +80 = 0, `Child(FindNode(m, 13, 2), 0)` +80 = 1, `PlayNamed(m, 854)`, the menu's words all 0, `ShowPrompts(0, 0, -1, ...)`; 2 the two words 1 and 0, `PlayNamed(m, 854)`, `o` +632 = 0, `ShowPrompts(-1, -1, -1, -1, -1, -1)`; 3 and up nothing; the word = 1. Every call: `UiMovie::Run(m, 0)`; when it answers 0, by `o` +620: 0 named 843 + the menu's +0 played and looped, 2 named 841's. Returns whether Run answered 0. A 160-byte frame (`__savegprlr_26`). No direct callers. Seen in play. Read in full. |
+| `sub_821C66BC` | | | Case 0 of `Options::ShowSaveDialog`'s jump table, split off by the recompiler: `SetSaveDialogText(62)`, `SetSaveDialogNote(62)`, then the rest. Seen in play. Read in full. |
+| `sub_821C69D0` | `Options::ShowCategory6Dialog` (probably) | | Step 46 (page 10's dialog): as `Options::ShowSaveDialog` on page 10's words (`o` +640 the state, +648 the kind, +652, +656 the default answer), sub-scene 14, the animations 869 (state 0), 870 (1 and 2), 859 + the cursor and 857, and a 12-entry kind table: 0 62 (`sub_821C6A54`), 1 61, 4 71, 5 72, 6 and 11 65, 7 66 (r4 = 240), 8 63, 9 64, 10 67, 2 and 3 none; +656 = 1 for 1, 4, 5, 6 and 11 (the save screen's step 0 strings). A 160-byte frame (`__savegprlr_26`). No direct callers. Seen in play. Read in full. |
+| `sub_821C6A54` | | | Case 0 of `Options::ShowCategory6Dialog`'s jump table, split off by the recompiler: `SetCategory6DialogText(62)`, `SetCategory6DialogNote(62)`, then the rest. Seen in play. Read in full. |
+| `sub_821C6D48` | `Options::SetUpSavePage` (probably) | | Category 5's set-up, from `Options::OpenCategory` (animation 21). m = movie 7. By `SaveSlots::State(0)`: nonzero → `SetSaveDialogNote(70)`, `o` +628 = 3, +632 = 0; zero → `SetSaveDialogNote(69)`, +628 = 2; `ShowPrompts(0, 0, -1, -1, -1, -1)`; `o` +620 = 1 (the note); page 9's block `[0x826D847C]`: +8 = +0 unless +0 is 2, +0 = 2, +12 = -1, +16 = -1; `FindNode(m, 13, 0)` +80 = 0; `SaveBuffers::Create`; `o` +712 = 0, +708 = 0. A 144-byte frame (`__savegprlr_28`). Seen in play. Read in full. |
+| `sub_821C6E50` | `Options::SetUpCategory6Page` (probably) | | Category 6's set-up, from `Options::OpenCategory` (animation 23): as `SetUpSavePage` with `SetCategory6DialogNote`, `o` +648, +652 and +640, page 10's block `[0x826D8488]`, `ShowPrompts` before the node and sub-scene 14 (`FindNode(m, 14, 0)` +80 = 0). A 144-byte frame (`__savegprlr_28`). Seen in play. Read in full. |
+| `sub_821821C8` | `CarCard::Fill` (probably) | | r3 = a card's node in UI movie 4, r4 = a car entry (`[0x826D83F4]` +1136's, `../known-data.md`). m = movie 4. `Child(r3, 3)` +108 (a frame choice: the maker's logo) from the car id e +8432: 2 → 35, below 35 itself, 43 → 35, 47 to 56 → id - 11, 71 → 44, else -1; then `SetNodeText(m, Child(r3, 5), 1934 + the byte e +769)`, child 6 string 1646 + the id (probably the car's name), child 7 1718 + the id, `SetNodeNumberText(m, Child(r3, 8), e +744)` (probably the price), child 9 string 435 (the varargs left as the previous call leaves them). A 128-byte frame (`__savegprlr_29`); returns the last `SetNodeText`'s r3. From `CarCards::FillAll` and `sub_82183DE0` (twice; lead in `../loops/leads.md`). Seen in play. Read in full. |
+| `sub_821822F8` | `CarCards::FillAll` (probably) | | No arguments. m = movie 4; P = `[0x826D83F4]` +1136 (a pointer to the entries, their count at P +512). For i = 0 to 3, while i < the count: `CarCard::Fill(FindNode(m, 7, i + 5), P[[0x826D83EC] +4 + i])` (+4 probably the list's scroll). A 144-byte frame (`__savegprlr_26`). From `sub_82183DE0` and `sub_82184488` (lead in `../loops/leads.md`). Seen in play. Read in full. |
+| `sub_821827E0` | `CarCard::FillDetail` (probably) | | No arguments. m = UI movie 18; e = P[`[0x826D83F4]` +48 + +52] (P its +1136); the movie's word +40960 (`0xA000`) = 0. Nodes `FindNode(m, -1, 4 to 7)`, `(1, 4)`, `(1, 2)`, `(1, 3)`, `(2, 3)`, `(2, 4)`: (-1, 4) string 20, (-1, 5) 1934 + e +769, (-1, 6) 1646 + e +8432, (-1, 7) 1718 + e +8432, (1, 2) `SetNodeNumberText(e +744)`, (1, 4) 527, (1, 3) 435, (2, 3) 2 and (2, 4) 3 (`SetNodeText`, the varargs left as the previous call leaves them). As `CarCard::Fill` without the logo, with a yes/no pair. A 192-byte frame (`__savegprlr_21`). Only caller `CarDetail::Open`. Seen in play. Read in full. |
+| `sub_821830C0` | `CarDetail::Open` (probably) | | r3 not read, r4 = the mode (its dispatcher's ring at +204). `[0x826D83F4]` +12 = 1; `CarCard::FillDetail`; `[0x826D83F4]` +36 = 2; then the message (36, 0, 0) posted on the mode's ring: its count (+804) + 1, the slot (start +808 + count - 1) mod 50, 12 bytes each from +204. A 112-byte frame (r30, r31 saved). No direct callers (its address taken by `sub_82185920` and `sub_8227A4F8`: probably a transition's functor). Seen in play. Read in full. |

@@ -634,6 +634,11 @@ Rows not yet moved stay in the table below. So far:
   screens show (`PanelSet`): its slots, its lists of unlocked and garage
   cars, its pages and steps, the stand's car, its tab, row, color and
   car panels, the two-player variant and its confirm panel (B7).
+- [`front-end-screen-helpers.md`](front-end-screen-helpers.md): the
+  front end's callers of the UI movie helpers: the 852-byte modes'
+  releases (types 2, 4, 5, 9, 10 and 12), the save screen's and the
+  options' save dialogs (their text setters and the steps that show
+  them) and the car cards (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
