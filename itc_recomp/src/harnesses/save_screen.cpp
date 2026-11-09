@@ -22,6 +22,7 @@
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
+#include "hooks/app_start_up.h"
 #include "hooks/save_screen.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
@@ -581,9 +582,28 @@ bool UpdateStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
 using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
 // The stack compared, as [sp - from, sp - to) ranges.
 using Frames = std::vector<std::pair<uint32_t, uint32_t>>;
+// What a group compares after the run beyond the world (blocks the function
+// made or freed), before the world is read.
+using AfterFn = std::function<void(uint8_t*, const World&, Outputs&)>;
+
+// UiMovies::Open's and Delete's calls, recorded on both sides and answered
+// 1 (Delete would free our movie).
+std::vector<uint32_t>* g_opens = nullptr;
+bool RecordOpen(PPCContext& ctx, uint32_t address) {
+  if (g_opens == nullptr || (address != ss::kMoviesOpen && address != ss::kMoviesDelete)) {
+    return false;
+  }
+  // Delete reads only r3: its r4 (a leftover) isn't compared.
+  g_opens->insert(g_opens->end(), {address, ctx.r3.u32,
+                                   address == ss::kMoviesDelete ? 0u : ctx.r4.u32, ctx.r1.u32,
+                                   uint32_t(ctx.lr)});
+  ctx.r3.u64 = 1;
+  return true;
+}
 
 void Group(Context& h, const World& w, const char* name, int cases, const SetupFn& setup,
-           GuestFunction recompiled, GuestFunction native, const Frames& frames) {
+           GuestFunction recompiled, GuestFunction native, const Frames& frames,
+           const AfterFn& after = {}) {
   Results results(name);
   for (int c = 0; c < cases; c++) {
     const uint64_t seed = MixSeed(h.random.Next());
@@ -612,11 +632,23 @@ void Group(Context& h, const World& w, const char* name, int cases, const SetupF
       const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
           ui_movies_hooks::g_update_callee_stand_in;
       ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
+      std::vector<uint32_t> opens;
+      g_opens = &opens;
+      const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+      hooks::g_start_up_recorder = RecordOpen;
       ITC_FLAG(native_save_screen) = v == 1;
       (v == 0 ? recompiled : native)(t, h.base);
       ITC_FLAG(native_save_screen) = true;
+      hooks::g_start_up_recorder = saved_recorder;
+      g_opens = nullptr;
       ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
       g_updates = nullptr;
+      for (const uint32_t word : opens) {
+        out[v].Word(word);
+      }
+      if (after) {
+        after(h.base, w, out[v]);
+      }
       // The lists Replays::BuildList made (the layer's pages): their
       // records and entries by the count, freed, the pointers cleared.
       const uint32_t buffers = w.buffers.address;
@@ -796,6 +828,177 @@ void ReplayPages(Context& h, const World& w) {
       __imp__sub_821A4AC0, hooks::SaveScreenPage24, {{128, 48}});
 }
 
+// The menu list's item block (+68): 0, or a copy of the shaped one in the
+// layer's pages (MenuList::Init and Release free the old one).
+void ItemBlock(uint8_t* base, const World& w, Random& r) {
+  uint32_t block = 0;
+  if (Pick(r, 2) == 0) {
+    block = memory::AllocPages(0x100, 4096);
+    if (block != 0) {
+      std::memcpy(base + block, base + w.at(kMenuWorldAt) + 0x900, 0x100);
+    }
+  }
+  guest::StoreU32(base, w.list() + 68, block);
+}
+// After MenuList::Init: its item block, whether made, its words, freed.
+void FreeItemBlock(uint8_t* base, const World& w, Outputs& out) {
+  const uint32_t items = guest::LoadU32(base, w.list() + 68);
+  const bool made = items != 0 && memory::IsPages(items);
+  out.Word(made ? 1 : 0);
+  if (made) {
+    out.Bytes(Read(base, items, 2 * 4));
+    memory::FreePages(items);
+  }
+  guest::StoreU32(base, w.list() + 68, 0);
+}
+
+// A global's block made by the function (the layer's pages): its bytes
+// compared, freed, and the global put back to the world's.
+void MadeBlock(uint8_t* base, uint32_t global, uint32_t bytes, uint32_t world, Outputs& out) {
+  const uint32_t block = guest::LoadU32(base, global);
+  const bool made = block != world && block != 0 && memory::IsPages(block);
+  out.Word(made ? 1 : 0);
+  if (made) {
+    out.Bytes(Read(base, block, bytes));
+    memory::FreePages(block);
+  }
+  guest::StoreU32(base, global, world);
+}
+
+// The save buffers' header SaveBuffers::Create made when [0x828161F0] was 0:
+// its words, its buffers' first bytes, all freed, the global put back.
+void MadeBuffers(uint8_t* base, const World& w, Outputs& out) {
+  const uint32_t header = guest::LoadU32(base, ss::kSaveBuffers);
+  const bool made = header != w.buffers.address && header != 0 && memory::IsPages(header);
+  out.Word(made ? 1 : 0);
+  if (made) {
+    for (uint32_t field = 0; field < 24; field += 4) {
+      const uint32_t word = guest::LoadU32(base, header + field);
+      if (field < 12 && word != 0 && memory::IsPages(word)) {
+        out.Bytes(Read(base, word, 256));
+        memory::FreePages(word);
+      } else {
+        out.Word(word);
+      }
+    }
+    memory::FreePages(header);
+  }
+  guest::StoreU32(base, ss::kSaveBuffers, w.buffers.address);
+}
+
+// The layer's pages a case gave the function to free: after the run,
+// whether each is still pages (then freed here).
+std::vector<uint32_t> g_given;
+uint32_t GivePages(uint8_t* base, uint32_t from, uint32_t bytes) {
+  const uint32_t block = memory::AllocPages(bytes, 4096);
+  if (block != 0) {
+    if (from != 0) {
+      std::memcpy(base + block, base + from, bytes);
+    }
+    g_given.push_back(block);
+  }
+  return block;
+}
+void CheckGiven(Outputs& out) {
+  for (const uint32_t block : g_given) {
+    const bool left = memory::IsPages(block);
+    out.Word(left ? 1 : 0);
+    if (left) {
+      memory::FreePages(block);
+    }
+  }
+  g_given.clear();
+}
+
+void Handlers(Context& h, const World& w) {
+  // r3 the machine (the screen block's +0x1000 less +9604, so its words
+  // +9604 to +9612 are the block's), r4 the mode; +9608 and +9612 0 or 1.
+  auto machine = [&h](PPCContext& t, Random& r, const World& w) {
+    const uint32_t m = w.at(0x1000) - ss::kMachineState;
+    guest::StoreU32(h.base, m + ss::kMachineLoaded, Pick(r, 4) == 0 ? uint32_t(r.Next()) : Pick(r, 2));
+    guest::StoreU32(h.base, m + ss::kMachineAtOnce, Pick(r, 4) == 0 ? uint32_t(r.Next()) : Pick(r, 2));
+    t.r3.u64 = m;
+    t.r4.u64 = w.mode();
+  };
+  Group(h, w, "SaveScreen::OnEnter (sub_821A2608)", 100, machine, __imp__sub_821A2608,
+        hooks::SaveScreenOnEnter, {{112, 24}}, [](uint8_t* base, const World& w, Outputs& out) {
+          MadeBlock(base, ss::kPages, 28, w.pages(), out);
+          MadeBlock(base, ss::kList, 72, w.list(), out);
+          MadeBlock(base, ss::kData, 68, w.data(), out);
+        });
+  Group(h, w, "SaveScreen::OpenMovie (sub_821A1D10)", 50, machine, __imp__sub_821A1D10,
+        hooks::SaveScreenOpenMovie, {});
+  // WaitMovie: movie 44 loaded or not (its +0x9FD8... the table's pair kept).
+  Group(h, w, "SaveScreen::WaitMovie (sub_821A26F0)", 200, machine, __imp__sub_821A26F0,
+        hooks::SaveScreenWaitMovie, {{96, 16}});
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+  } kOpens[] = {
+      {"SaveScreen::OpenKind0 (sub_821A2760)", __imp__sub_821A2760, hooks::SaveScreenOpenKind0},
+      {"SaveScreen::OpenKind1 (sub_821A2790)", __imp__sub_821A2790, hooks::SaveScreenOpenKind1},
+      {"SaveScreen::OpenKind2 (sub_821A2820)", __imp__sub_821A2820, hooks::SaveScreenOpenKind2},
+      {"SaveScreen::OpenKind3 (sub_821A27F0)", __imp__sub_821A27F0, hooks::SaveScreenOpenKind3},
+      {"SaveScreen::OpenKind4 (sub_821A2850)", __imp__sub_821A2850, hooks::SaveScreenOpenKind4},
+      {"SaveScreen::OpenKind5 (sub_821A2880)", __imp__sub_821A2880, hooks::SaveScreenOpenKind5},
+      {"SaveScreen::OpenKind6 (sub_821A27C0)", __imp__sub_821A27C0, hooks::SaveScreenOpenKind6},
+      {"SaveScreen::OpenKind7 (sub_821A28B0)", __imp__sub_821A28B0, hooks::SaveScreenOpenKind7},
+  };
+  for (const auto& open : kOpens) {
+    Group(h, w, open.name, 40, machine, open.recompiled, open.native, {});
+  }
+  Group(h, w, "SaveScreen::Cancel (sub_821A1D20)", 20, machine, __imp__sub_821A1D20,
+        hooks::SaveScreenCancel, {});
+  // Show: the kind 0 to 7 (or any); the header's buffers none now and then
+  // (SaveBuffers::Create makes them); the item block 0 or pages.
+  auto show = [&h, machine](PPCContext& t, Random& r, const World& w) {
+    machine(t, r, w);
+    guest::StoreU32(h.base, w.data() + 36, Small(r, 8));
+    if (Pick(r, 4) == 0) {
+      guest::StoreU32(h.base, ss::kSaveBuffers, 0);
+    }
+    ItemBlock(h.base, w, r);
+  };
+  const AfterFn show_after = [](uint8_t* base, const World& w, Outputs& out) {
+    FreeItemBlock(base, w, out);
+    MadeBuffers(base, w, out);
+  };
+  Group(h, w, "SaveScreen::Show (sub_821A6608)", 400, show, __imp__sub_821A6608,
+        hooks::SaveScreenShow, {{96, 8}}, show_after);
+  Group(h, w, "SaveScreen::ShowKind2 (sub_821A1D38)", 100, show, __imp__sub_821A1D38,
+        hooks::SaveScreenShowKind2, {{128, 24}}, show_after);
+  Group(h, w, "SaveScreen::ShowKind7 (sub_821A2138)", 100, show, __imp__sub_821A2138,
+        hooks::SaveScreenShowKind7, {{128, 24}}, show_after);
+  Group(h, w, "SaveScreen::Leave (sub_821A4C58)", 100, machine, __imp__sub_821A4C58,
+        hooks::SaveScreenLeave, {{112, 16}});
+  // OnLeft: the three blocks copies of the shaped ones in the layer's pages
+  // (it frees them), the item block 0 or pages.
+  Group(
+      h, w, "SaveScreen::OnLeft (sub_821A1CA0)", 100,
+      [&h, machine](PPCContext& t, Random& r, const World& w) {
+        machine(t, r, w);
+        g_given.clear();
+        for (const auto& [global, bytes] :
+             {std::pair{ss::kPages, 28u}, std::pair{ss::kList, 72u}, std::pair{ss::kData, 68u}}) {
+          guest::StoreU32(h.base, global, GivePages(h.base, guest::LoadU32(h.base, global), bytes));
+        }
+        const uint32_t items = Pick(r, 2) == 0 ? GivePages(h.base, 0, 0x100) : 0;
+        guest::StoreU32(h.base, guest::LoadU32(h.base, ss::kList) + 68, items);
+      },
+      __imp__sub_821A1CA0, hooks::SaveScreenOnLeft, {{112, 32}},
+      [](uint8_t* base, const World& w, Outputs& out) {
+        // Freed by the function: any still pages are freed here (counted).
+        CheckGiven(out);
+        for (const auto& [global, world] : {std::pair{ss::kPages, w.pages()},
+                                            std::pair{ss::kList, w.list()},
+                                            std::pair{ss::kData, w.data()}}) {
+          const uint32_t block = guest::LoadU32(base, global);
+          out.Word(block);
+          guest::StoreU32(base, global, world);
+        }
+      });
+}
+
 }  // namespace
 
 void SaveScreen(Context& h) {
@@ -811,6 +1014,7 @@ void SaveScreen(Context& h) {
   EndPages(h, w);
   KindOnePages(h, w);
   ReplayPages(h, w);
+  Handlers(h, w);
 }
 
 }  // namespace harness

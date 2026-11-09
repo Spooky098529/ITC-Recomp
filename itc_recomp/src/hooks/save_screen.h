@@ -10,6 +10,25 @@
 
 namespace hooks {
 
+// The machine's handlers (r3 the machine, r4 the mode where read).
+void SaveScreenOnEnter(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenMovie(PPCContext& ctx, uint8_t* base);
+void SaveScreenWaitMovie(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenKind0(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenKind1(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenKind2(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenKind3(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenKind4(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenKind5(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenKind6(PPCContext& ctx, uint8_t* base);
+void SaveScreenOpenKind7(PPCContext& ctx, uint8_t* base);
+void SaveScreenShow(PPCContext& ctx, uint8_t* base);
+void SaveScreenCancel(PPCContext& ctx, uint8_t* base);
+void SaveScreenLeave(PPCContext& ctx, uint8_t* base);
+void SaveScreenOnLeft(PPCContext& ctx, uint8_t* base);
+// ShowKind2 and ShowKind7 (no arguments; no adapters: only Show calls them).
+void SaveScreenShowKind2(PPCContext& ctx, uint8_t* base);
+void SaveScreenShowKind7(PPCContext& ctx, uint8_t* base);
 // The dialog steps (r3 the started word).
 void SaveScreenMoveSelection(PPCContext& ctx, uint8_t* base);
 void SaveScreenCloseDialog(PPCContext& ctx, uint8_t* base);

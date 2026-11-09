@@ -8,7 +8,11 @@
 #include "save_screen/save_screen.h"
 
 ITC_FLAG_BOOL(native_save_screen, true, "ITC",
-              "Run the save screen (docs/functions/save-screen.md: the dialog steps "
+              "Run the save screen (docs/functions/save-screen.md: the machine's handlers "
+              "SaveScreen::OnEnter sub_821A2608, OpenMovie sub_821A1D10, WaitMovie sub_821A26F0, "
+              "OpenKind0 to OpenKind7, Show sub_821A6608 (with ShowKind2 sub_821A1D38 and "
+              "ShowKind7 sub_821A2138), Cancel sub_821A1D20, Leave sub_821A4C58 and OnLeft "
+              "sub_821A1CA0; the dialog steps "
               "SaveScreen::MoveSelection sub_821A5118 and CloseDialog sub_821A5038; the pages "
               "Page0 sub_821A28E0, Page1 sub_821A2AF8, Page2 sub_821A2C98, Page3 sub_821A2EE8 "
               "and the end pages Page4 sub_821A4D30, Page9 sub_821A4DE0, Page16 sub_821A4E60 and "
@@ -114,6 +118,48 @@ void SaveScreenStoreSettings(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ss::StoreSettings(base, ctx.r1.u32, guest.calls());
 }
 
+void SaveScreenOnEnter(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::OnEnter(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void SaveScreenOpenMovie(PPCContext& ctx, uint8_t* base) {
+  // A tail call: UiMovies::Open runs on the caller's frame with its lr.
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::OpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void SaveScreenWaitMovie(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ss::WaitMovie(base, ctx.r3.u64, ctx.r1.u32);
+}
+void SaveScreenOpenKind0(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 0); }
+void SaveScreenOpenKind1(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 1); }
+void SaveScreenOpenKind2(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 2); }
+void SaveScreenOpenKind3(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 3); }
+void SaveScreenOpenKind4(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 4); }
+void SaveScreenOpenKind5(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 5); }
+void SaveScreenOpenKind6(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 6); }
+void SaveScreenOpenKind7(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 7); }
+void SaveScreenShow(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::Show(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void SaveScreenShowKind2(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::ShowKind2(base, ctx.r1.u32, guest.calls());
+}
+void SaveScreenShowKind7(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::ShowKind7(base, ctx.r1.u32, guest.calls());
+}
+void SaveScreenCancel(PPCContext&, uint8_t* base) { ss::Cancel(base); }
+void SaveScreenLeave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::Leave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void SaveScreenOnLeft(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::OnLeft(base, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 #define ITC_SAVE_SCREEN(address, step)      \
@@ -126,6 +172,26 @@ void SaveScreenStoreSettings(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                 \
   }
 
+// The machine's handlers: member function functors the machine calls (no
+// direct callers).
+ITC_SAVE_SCREEN(821A2608, SaveScreenOnEnter)
+ITC_SAVE_SCREEN(821A1D10, SaveScreenOpenMovie)
+ITC_SAVE_SCREEN(821A26F0, SaveScreenWaitMovie)
+ITC_SAVE_SCREEN(821A2760, SaveScreenOpenKind0)
+ITC_SAVE_SCREEN(821A2790, SaveScreenOpenKind1)
+ITC_SAVE_SCREEN(821A2820, SaveScreenOpenKind2)
+ITC_SAVE_SCREEN(821A27F0, SaveScreenOpenKind3)
+ITC_SAVE_SCREEN(821A2850, SaveScreenOpenKind4)
+ITC_SAVE_SCREEN(821A2880, SaveScreenOpenKind5)
+ITC_SAVE_SCREEN(821A27C0, SaveScreenOpenKind6)
+ITC_SAVE_SCREEN(821A28B0, SaveScreenOpenKind7)
+ITC_SAVE_SCREEN(821A6608, SaveScreenShow)
+ITC_SAVE_SCREEN(821A1D20, SaveScreenCancel)
+ITC_SAVE_SCREEN(821A4C58, SaveScreenLeave)
+ITC_SAVE_SCREEN(821A1CA0, SaveScreenOnLeft)
+// No adapters for Show's case 0 sub_821A6650 (reached only from its jump
+// table) and ShowKind2 sub_821A1D38 and ShowKind7 sub_821A2138 (only Show
+// calls them); their steps above are the harness's.
 // The dialog steps (SaveScreen::Update's table on its stack, no direct
 // callers).
 ITC_SAVE_SCREEN(821A5118, SaveScreenMoveSelection)

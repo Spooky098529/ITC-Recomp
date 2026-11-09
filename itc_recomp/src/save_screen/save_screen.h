@@ -68,6 +68,26 @@ constexpr uint32_t kReplaysBuildList = 0x82290378;
 constexpr uint32_t kReplayWord84 = 0x82290640;     // never seen in play
 constexpr uint32_t kReplayCopyFrom = 0x821A66A8;   // never seen in play
 constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kVirtualAlloc = 0x82295398;
+constexpr uint32_t kVirtualFree = 0x82295330;
+constexpr uint32_t kMemRelease = 0x8000;
+constexpr uint32_t kMenuListInit = 0x8220BAC0;
+constexpr uint32_t kMenuListRelease = 0x8220BBB0;
+constexpr uint32_t kMoviesOpen = 0x8211E808;    // UiMovies::Open
+constexpr uint32_t kMoviesDelete = 0x8211E258;  // UiMovies::Delete
+constexpr uint32_t kFinishAll = 0x8211DFF8;     // UiMovie::FinishAll
+constexpr uint32_t kSaveBuffersCreate = 0x8228F6B0;
+// The kinds 3 to 6's Shows (never seen in play: the originals).
+constexpr uint32_t kShowKind3 = 0x821A1E18;
+constexpr uint32_t kShowKind4 = 0x821A1ED8;
+constexpr uint32_t kShowKind5 = 0x821A1FA8;
+constexpr uint32_t kShowKind6 = 0x821A2070;
+
+// The machine's words: +9604 the state, +9608 the movie loaded, +9612 load
+// the movie at once.
+constexpr uint32_t kMachineState = 9604;
+constexpr uint32_t kMachineLoaded = 9608;
+constexpr uint32_t kMachineAtOnce = 9612;
 constexpr uint32_t kSaveDataOf = 0x82105620;
 
 // The save buffers' header (+0 the game data's buffer, +4 a replay's, +20
@@ -84,6 +104,49 @@ constexpr uint32_t kGameDataBytes = 0x1F978;
 // the mapper, +4 1 when the controller isn't read).
 constexpr uint32_t kControllers = 0x826BABA4;
 constexpr uint32_t kMapperEntries = 0x826BAB80;
+
+// --- The machine's handlers (handlers.cpp): r3 the machine, r4 the mode ---
+
+// sub_821A2608 SaveScreen::OnEnter (0, 1): +9608 = 0; the page block (28
+// bytes), the menu list (72) and the data (68) made by VirtualAlloc
+// (MEM_COMMIT, PAGE_READWRITE) into their globals, their words set; +9604 =
+// 1 when +9612 is set, else 9. The data's VirtualAlloc r3. 112-byte frame.
+uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_821A1D10 SaveScreen::OpenMovie (1, 1): a tail call of
+// UiMovies::Open(44, 22588) on the caller's frame with its lr.
+uint64_t OpenMovie(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_821A26F0 SaveScreen::WaitMovie (2, 1): +9608 = 1 once UiMovies::IsLoaded(44)
+// (its plain C++); then +9604 = 9 or 4 by +9612. IsLoaded's r3, or the
+// machine. 96-byte frame.
+uint64_t WaitMovie(uint8_t* base, uint64_t machine, uint32_t sp);
+// The open messages' handlers: the data's +36 = `kind`; +9604 = 4 when the
+// movie is loaded, else 1. sub_821A2760 OpenKind0, sub_821A2790 OpenKind1,
+// sub_821A2820 OpenKind2, sub_821A27F0 OpenKind3, sub_821A2850 OpenKind4,
+// sub_821A2880 OpenKind5, sub_821A27C0 OpenKind6, sub_821A28B0 OpenKind7.
+void OpenKind(uint8_t* base, uint32_t machine, uint32_t kind);
+// sub_821A6608 SaveScreen::Show (4, 1), with its case 0 sub_821A6650
+// (ShowCheck) done here: by the data's +36, SaveBuffers::Create (kinds 0, 1
+// and 6), StartCheck's and Start's plain C++ (src/front_end_screen_helpers/),
+// ShowKind2's and ShowKind7's, the kinds 3 to 6's originals. The last
+// call's r3, or `r3` above 7. 96-byte frame.
+uint64_t Show(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_821A1D38 SaveScreen::ShowKind2 and sub_821A2138 ShowKind7: the data's
+// dialog set (message 2 with the note, page 13 by step 4; message 0, page 24
+// by step 6), MenuList::Init([0x826D8450], 1, 1, 0, 154, 153, 155, 156, 159,
+// 158; the last two on the frame's +84 and +92). Init's r3. 128-byte frames.
+uint64_t ShowKind2(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t ShowKind7(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821A1D20 SaveScreen::Cancel: the data's +28 = 1.
+void Cancel(uint8_t* base);
+// sub_821A4C58 SaveScreen::Leave (5, 4) and (9, 4): +9604 = 7, movie 44's
+// animations finished (UiMovie::FinishAll) and the movie deleted
+// (UiMovies::Delete); with the mode type 2, 4, 6, 8 or 10, message 4 posted
+// on the mode's ring. Delete's r3. 112-byte frame.
+uint64_t Leave(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_821A1CA0 SaveScreen::OnLeft (7, 4): MenuList::Release, the three
+// blocks freed (VirtualFree, MEM_RELEASE) and their globals 0. The last
+// VirtualFree's r3. 112-byte frame.
+uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
 
 // --- The dialog steps (steps.cpp): `step` the started word ---
 
