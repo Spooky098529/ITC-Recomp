@@ -116,4 +116,21 @@ uint32_t SavePlaceholders(uint8_t* base, uint32_t images, uint32_t sp);
 constexpr uint32_t kInitFrame = 1232;
 uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
 
+// --- The screen's set-up's callees (set_up.cpp) ---
+//
+// sub_821DE280 TuningScreen::LoadInteriorSlots (r3 the screen): when the
+// selected garage car's id (its +12) is 10, +25192 = 0 (the interior's
+// fifth slot unavailable). A leaf, no frame (r3 left).
+void LoadInteriorSlots(uint8_t* base, uint32_t screen);
+// sub_821DA4B0 TuningScreen::LoadCurrentChoices (r3 the screen): the
+// selected garage car's choices into the screen's current choice words (the
+// inverse of TuningScreen::StoreToGarageCar), the paint from the car or its
+// spec (Params::GetCarSpec's plain C++), the vinyl layers' angles (the
+// float words times [0x82002244], truncated), the mirror and sticker tables
+// in its frame (+80 to +108) read unchecked by the car's words. 192-byte
+// frame. `r1` the caller's (all 64 bits); r3 as the original leaves it: the
+// frame's +80 (r1's high word kept).
+constexpr uint32_t kLoadCurrentChoicesFrame = 192;
+uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1);
+
 }  // namespace tuning_machine

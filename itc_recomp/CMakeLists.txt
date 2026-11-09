@@ -504,6 +504,7 @@ set(ITC_SOURCES
     src/hooks/tuning_machine.cpp
     src/tuning_machine/handlers.cpp
     src/tuning_machine/init.cpp
+    src/tuning_machine/set_up.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp
@@ -930,7 +931,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/build_screen/rows.cpp
     src/tuning_screen/garage_car.cpp src/tuning_screen/lists.cpp
     src/tuning_screen/stand.cpp src/tuning_screen/menus.cpp src/tuning_screen/rows.cpp
-    src/tuning_screen/stats.cpp PROPERTIES
+    src/tuning_screen/stats.cpp src/tuning_machine/set_up.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

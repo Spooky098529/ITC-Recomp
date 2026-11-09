@@ -23,6 +23,8 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_specs/car_specs.h"
+#include "career/career.h"
 #include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
@@ -72,7 +74,16 @@ struct Global {
 constexpr Global kGlobals[] = {
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
+    {car_specs::kParams, 4},
 };
+
+// Player 0's save data (the screen's +18904; its garage list at +6120, the
+// selected car's index at +0x19920) and the car specs' object (+12 the 72
+// specs, a spare 0x400 past them for the paint entries read past the last).
+constexpr uint32_t kSaveDataBytes = 0x1F978;
+constexpr uint32_t kSpecCount = 72;
+constexpr uint32_t kSpecBytes = 8432;
+constexpr uint32_t kSpecsBytes = 0x40 + kSpecCount * kSpecBytes + 0x400;
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
   for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
@@ -83,17 +94,31 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
 struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
-        block((allocation + 15) & ~15u) {}
-  ~World() { memory::Free(allocation); }
+        block((allocation + 15) & ~15u), save(memory::Alloc(kSaveDataBytes, 0)),
+        specs(memory::Alloc(kSpecsBytes, 0)) {
+    if (specs != 0) {
+      // The car specs' object: +12 the 72 specs (random words once).
+      Random r(0x5370656373ull);  // "Specs"
+      WriteRandom(base, specs, kSpecsBytes, r);
+      guest::StoreU32(base, specs + 12, specs + 0x40);
+    }
+  }
+  ~World() {
+    memory::Free(allocation);
+    memory::Free(save);
+    memory::Free(specs);
+  }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0; }
+  bool ok() const { return allocation != 0 && save != 0 && specs != 0; }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t screen() const { return at(kScreenAt); }
   uint32_t node(uint32_t n) const { return at(kNodesAt) + kNodeBytes * n; }
   uint8_t* base;
   uint32_t allocation;
   uint32_t block;
+  uint32_t save;
+  uint32_t specs;
 };
 
 void MakeWorld(uint8_t* base, const World& w, Random& r) {
@@ -413,6 +438,135 @@ void Handlers(Context& h, const World& w) {
              hooks::TuningMachineSavePlaceholders14, {{-112, -16}}, images});
 }
 
+// TuningScreen::SetUp's callees: player 0's save with its garage shaped as
+// the garage screen's harness shapes it (50 nodes, `count` linked from the
+// head), the selected car one of them; the selected car's record random,
+// its tested words over every branch, in and out of range.
+void ShapeSave(uint8_t* base, const World& w, Random& r) {
+  const uint32_t garage = w.save + career::kGarage;
+  WriteRandom(base, garage, 212 + 50 * 1968, r);
+  uint32_t order[50];
+  for (uint32_t i = 0; i < 50; i++) {
+    order[i] = i;
+  }
+  for (uint32_t i = 49; i > 0; i--) {
+    std::swap(order[i], order[r.Below(i + 1)]);
+  }
+  const uint32_t count = 1 + r.Below(12);
+  const auto link = [&](uint32_t head_at, uint32_t from, uint32_t to) {
+    guest::StoreU16(base, garage + head_at, uint16_t(from < to ? order[from] : 0xFFFF));
+    for (uint32_t i = from; i < to; i++) {
+      guest::StoreU16(base, garage + 4 * order[i], uint16_t(i + 1 < to ? order[i + 1] : 0xFFFF));
+      guest::StoreU16(base, garage + 4 * order[i] + 2, uint16_t(r.Below(50)));
+    }
+  };
+  link(204, 0, count);
+  link(200, count, 50);
+  guest::StoreU16(base, garage + 208, uint16_t(count));
+  const uint32_t selected = r.Below(count);
+  guest::StoreU32(base, w.save + career::kSelectedCar, selected);
+  // The selected car's record (c = the slot's +212).
+  uint32_t node = garage + 4 * order[0];
+  for (uint32_t k = 0; k < selected; k++) {
+    node = garage + 4 * order[k + 1];
+  }
+  const uint32_t c = garage + 1968 * guest::LoadU16(base, node + 2) + 212;
+  auto pick = [&](uint32_t below) -> uint32_t {
+    switch (r.Below(8)) {
+      case 0: return uint32_t(r.Next());
+      case 1: return 0xFFFFFFFFu - r.Below(3);
+      default: return r.Below(below);
+    }
+  };
+  static constexpr uint32_t kIds[] = {8, 10, 4, 7, 12, 14, 0, 71};
+  guest::StoreU32(base, c + 12, r.Below(3) == 0 ? kIds[r.Below(8)] : r.Below(kSpecCount));
+  // The paint: -2 (the car's own) often, else an entry of the spec's
+  // (-4 to 15).
+  guest::StoreU16(base, c + 0,
+                  uint16_t(r.Below(3) == 0 ? 0xFFFE : uint16_t(int16_t(r.Below(20)) - 4)));
+  for (const uint32_t field : {1656u, 1664u, 1672u, 1668u, 1676u, 1680u, 1684u, 1688u, 1696u,
+                               1700u, 1708u, 1712u, 1720u, 1728u, 1732u, 1736u, 1740u, 1744u,
+                               1748u, 1752u, 1760u, 1768u, 1772u, 1776u, 1780u, 1784u, 1792u,
+                               1796u, 1808u, 1812u}) {
+    guest::StoreU32(base, c + field, pick(8));
+  }
+  guest::StoreU32(base, c + 1692, pick(8));
+  guest::StoreU32(base, c + 1704, r.Below(3) == 0 ? 0 : pick(4));
+  guest::StoreU32(base, c + 1716, r.Below(3) == 0 ? 0 : pick(4));
+  guest::StoreU32(base, c + 1724, r.Below(3) == 0 ? 0 : pick(4));
+  guest::StoreU32(base, c + 1756, uint32_t(int32_t(r.Below(15)) - 2) ^ (r.Below(8) == 0 ? 0x10000u : 0));
+  guest::StoreU32(base, c + 1764, pick(4));
+  guest::StoreU32(base, c + 1800, pick(7));
+  guest::StoreU32(base, c + 1804, pick(6));
+  guest::StoreU32(base, c + 1816, pick(6));
+  guest::StoreU32(base, c + 1820, pick(7));
+  // The vinyl layers: kinds 0, 1, 2 to 11 or others; their angles' floats
+  // small, any word now and then (NaNs, infinities, denormals).
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t e = c + 1588 + 20 * i;
+    guest::StoreU32(base, e + 0, r.Below(4) == 0 ? pick(14) : r.Below(3));
+    for (uint32_t k = 8; k <= 16; k += 4) {
+      switch (r.Below(6)) {
+        case 0: guest::StoreU32(base, e + k, uint32_t(r.Next())); break;
+        case 1: {
+          static constexpr uint32_t kOdd[] = {0x7FC00000u, 0xFFC00001u, 0x7F800000u, 0xFF800000u,
+                                              0x00000001u, 0x80400000u, 0x4F000000u, 0xCF000001u};
+          guest::StoreU32(base, e + k, kOdd[r.Below(8)]);
+          break;
+        }
+        default: guest::StoreFloat(base, e + k, float(int32_t(r.Below(2001)) - 1000) / 997.0f);
+      }
+    }
+  }
+  // The mirror table's index (the first layer's +4): 0 to 7, now and then
+  // below (the frame's words under the table; past +108 are the register
+  // saves).
+  guest::StoreU32(base, c + 1592,
+                  r.Below(5) == 0 ? uint32_t(-int32_t(r.Below(40))) : r.Below(8));
+  guest::StoreU8(base, c + 1568, uint8_t(r.Next()));
+  // The sticker layers: kinds 1, 2 or others, units 0 to 3, their +8 0 to 8
+  // (the table's index + 1; 5 to 8 the mirror table's words), now and then
+  // below.
+  for (uint32_t i = 0; i < 5; i++) {
+    const uint32_t e = c + 1824 + 12 * i;
+    guest::StoreU32(base, e + 0, r.Below(5) == 0 ? pick(4) : 1 + r.Below(2));
+    guest::StoreU32(base, e + 4, r.Below(5) == 0 ? pick(5) : r.Below(3));
+    guest::StoreU32(base, e + 8,
+                    r.Below(6) == 0 ? uint32_t(-int32_t(r.Below(40))) : r.Below(9));
+  }
+  // The screen: its save, the part set (0 to 4 in play), +25172 0 or 1 or
+  // any.
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 18904, w.save);
+  guest::StoreU32(base, s + 33900, r.Below(6) == 0 ? r.Below(200) : r.Below(5));
+  guest::StoreU32(base, s + 25172, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  guest::StoreU32(base, car_specs::kParams, w.specs);
+}
+
+void SetUpCallees(Context& h, const World& w) {
+  // The save's garage compared (neither writes it).
+  const auto after = [&h](PPCContext&, const World& w, Outputs& out) {
+    out.Bytes(Read(h.base, w.save + career::kGarage, 212 + 50 * 1968));
+    out.Word(guest::LoadU32(h.base, w.save + career::kSelectedCar));
+  };
+  Run(h, w, {"TuningScreen::LoadInteriorSlots (sub_821DE280)", 60, __imp__sub_821DE280,
+             hooks::TuningMachineLoadInteriorSlots, {},
+             [](PPCContext& t, Random& r, const World& w) {
+               ShapeSave(w.base, w, r);
+               Screen(t, r, w);
+             },
+             after});
+  // LoadCurrentChoices: its frame but its saves (r23 on, -80) compared;
+  // the vinyl angles' floats truncated to words (compared exactly).
+  Run(h, w, {"TuningScreen::LoadCurrentChoices (sub_821DA4B0; sub_820C9E98)", 200,
+             __imp__sub_821DA4B0, hooks::TuningMachineLoadCurrentChoices, {{-192, -80}},
+             [](PPCContext& t, Random& r, const World& w) {
+               ShapeSave(w.base, w, r);
+               Screen(t, r, w);
+             },
+             after});
+}
+
 }  // namespace
 
 void TuningMachine(Context& h) {
@@ -422,6 +576,7 @@ void TuningMachine(Context& h) {
     return;
   }
   Init(h, w);
+  SetUpCallees(h, w);
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
   }

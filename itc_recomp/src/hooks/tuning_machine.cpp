@@ -18,7 +18,9 @@ ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "override, the varargs it leaves unset passed as 0), Unload sub_821D69A0, Close "
               "sub_821D6A78 and Destroy sub_821CBD40 (DecalImages::UnloadAll and VirtualFree "
               "through their overrides); DecalImages::SavePlaceholders sub_82208130 with "
-              "SavePlaceholders14 sub_821F8950 (the same writes; checked by "
+              "SavePlaceholders14 sub_821F8950 (the same writes); TuningScreen::SetUp's callees "
+              "LoadInteriorSlots sub_821DE280 and LoadCurrentChoices sub_821DA4B0 "
+              "(Params::GetCarSpec by its plain C++) (checked by "
               "--run_harnesses=tuning_machine)");
 
 namespace hooks {
@@ -119,6 +121,14 @@ void TuningMachineInit(PPCContext& ctx, uint8_t* base) {
   const uint32_t r3 = tm::Init(base, machine, ctx.r1.u32 - tm::kInitFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
+void TuningMachineLoadInteriorSlots(PPCContext& ctx, uint8_t* base) {
+  tm::LoadInteriorSlots(base, ctx.r3.u32);
+}
+// The vinyl angles' float math as the original's (no flush to zero).
+void TuningMachineLoadCurrentChoices(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = tm::LoadCurrentChoices(base, ctx.r3.u32, ctx.r1.u64);
+}
 
 }  // namespace hooks
 
@@ -148,3 +158,6 @@ ITC_TUNING_MACHINE(821CBD40, TuningMachineDestroy)
 ITC_TUNING_MACHINE(82208130, TuningMachineSavePlaceholders)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_TUNING_MACHINE(821E7568, TuningMachineInit)
+// TuningScreen::SetUp's callees (from SetUp sub_821E1B48, recompiled).
+ITC_TUNING_MACHINE(821DE280, TuningMachineLoadInteriorSlots)
+ITC_TUNING_MACHINE(821DA4B0, TuningMachineLoadCurrentChoices)
