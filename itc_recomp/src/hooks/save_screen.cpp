@@ -8,7 +8,10 @@
 #include "save_screen/save_screen.h"
 
 ITC_FLAG_BOOL(native_save_screen, true, "ITC",
-              "Run the save screen (docs/functions/save-screen.md: the machine's handlers "
+              "Run the save screen (docs/functions/save-screen.md: the machines' set-ups "
+              "Type2SaveScreen::Init sub_821A6E18, Type4SaveScreen::Init sub_821A7470 and "
+              "Type10SaveScreen::Init sub_821A7AC8 (their step tables, StateMachine::Add's "
+              "plain C++); the machine's handlers "
               "SaveScreen::OnEnter sub_821A2608, OpenMovie sub_821A1D10, WaitMovie sub_821A26F0, "
               "OpenKind0 to OpenKind7, Show sub_821A6608 (with ShowKind2 sub_821A1D38 and "
               "ShowKind7 sub_821A2138), Update sub_821A64A0, Draw sub_821A6AF0, Cancel "
@@ -119,6 +122,22 @@ void SaveScreenStoreSettings(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ss::StoreSettings(base, ctx.r1.u32, guest.calls());
 }
 
+void SaveScreenInit(PPCContext& ctx, uint8_t* base, uint32_t address) {
+  uint32_t frame_bytes = 0;
+  for (const ss::InitInfo& info : ss::kInits) {
+    if (info.address == address) {
+      frame_bytes = info.frame;
+    }
+  }
+  const uint64_t object_r3 = ctx.r3.u64;
+  const ss::InitResult result =
+      ss::RunInit(base, address, ctx.r3.u32, ctx.r1.u32 - frame_bytes);
+  // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
+  // transition's address from the machine's 64-bit r3.
+  const uint64_t machine_r3 = object_r3 + (result.machine - ctx.r3.u32);
+  ctx.r3.u64 = result.replaced ? result.r3 : machine_r3 + (result.r3 - result.machine);
+}
+
 void SaveScreenOnEnter(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::OnEnter(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
@@ -171,6 +190,16 @@ void SaveScreenOnLeft(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
+#define ITC_SAVE_SCREEN_INIT(address)                  \
+  extern "C" REX_FUNC(sub_##address) {                 \
+    REX_FUNC_PROLOGUE();                               \
+    if (!ITC_FLAG(native_save_screen)) {               \
+      __imp__sub_##address(ctx, base);                 \
+      return;                                          \
+    }                                                  \
+    hooks::SaveScreenInit(ctx, base, 0x##address);     \
+  }
+
 #define ITC_SAVE_SCREEN(address, step)      \
   extern "C" REX_FUNC(sub_##address) {      \
     REX_FUNC_PROLOGUE();                    \
@@ -181,6 +210,11 @@ void SaveScreenOnLeft(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                 \
   }
 
+// The machines' set-ups (from the type 2, 4 and 10 modes' Inits
+// sub_82197278, sub_82224C70 and sub_82288940, recompiled).
+ITC_SAVE_SCREEN_INIT(821A6E18)
+ITC_SAVE_SCREEN_INIT(821A7470)
+ITC_SAVE_SCREEN_INIT(821A7AC8)
 // The machine's handlers: member function functors the machine calls (no
 // direct callers).
 ITC_SAVE_SCREEN(821A2608, SaveScreenOnEnter)

@@ -107,6 +107,35 @@ constexpr uint32_t kGameDataBytes = 0x1F978;
 constexpr uint32_t kControllers = 0x826BABA4;
 constexpr uint32_t kMapperEntries = 0x826BAB80;
 
+// --- The state machine Inits (inits.cpp): each adds the machine's
+// transitions through StateMachine::Add's plain C++, as the original builds
+// them in its frame (the step tables in init_tables.h, from
+// itc_recomp/tools/init_step_tables.py). `object` is the original's r3 (the
+// machine); each returns the last Add's answer (`replaced`: the index, else
+// the new transition) and `machine` the machine it was added to. ---
+
+struct InitResult {
+  uint32_t r3;
+  uint32_t machine;
+  bool replaced;
+};
+// An Init: its address, name, frame (its stwu size) and the registers
+// __savegprlr_<n> saves from (r<n> to r31 and lr).
+struct InitInfo {
+  uint32_t address;
+  const char* name;
+  uint32_t frame;
+  uint32_t first_saved;
+};
+// sub_821A6E18 Type2SaveScreen::Init, sub_821A7470 Type4SaveScreen::Init
+// (the title's) and sub_821A7AC8 Type10SaveScreen::Init (the replays').
+// Type8SaveScreen::Init sub_821A87F0 is never seen in play (recompiled).
+constexpr int kInitCount = 3;
+extern const InitInfo kInits[kInitCount];
+// The Init at `address` (one of kInits) on `object`, its frame at `frame`
+// (its back chain written).
+InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t frame);
+
 // --- The machine's handlers (handlers.cpp): r3 the machine, r4 the mode ---
 
 // sub_821A2608 SaveScreen::OnEnter (0, 1): +9608 = 0; the page block (28

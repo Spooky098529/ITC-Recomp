@@ -10,6 +10,9 @@
 
 namespace hooks {
 
+// The state machine Inits (r3 the machine): `address` one of
+// save_screen::kInits.
+void SaveScreenInit(PPCContext& ctx, uint8_t* base, uint32_t address);
 // The machine's handlers (r3 the machine, r4 the mode where read).
 void SaveScreenOnEnter(PPCContext& ctx, uint8_t* base);
 void SaveScreenOpenMovie(PPCContext& ctx, uint8_t* base);

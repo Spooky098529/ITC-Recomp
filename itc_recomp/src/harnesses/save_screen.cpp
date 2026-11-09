@@ -24,6 +24,7 @@
 #include "base/log.h"
 #include "hooks/app_start_up.h"
 #include "hooks/save_screen.h"
+#include "game_modes/game_modes.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
@@ -1018,6 +1019,76 @@ void Handlers(Context& h, const World& w) {
       });
 }
 
+// The Inits (as the type 6 and 7 modes' harness runs theirs): the machine
+// empty or holding random transitions already (fewer than 200 less the
+// Init's) with keys of small numbers, some the Init adds (so some Adds
+// replace); the original's frame filled with the same random words for both
+// (the words it never writes go into the transitions); the machine's block,
+// the frame (but its saved registers), the scratch area and r3 (both
+// halves) compared.
+GuestFunction RecompiledInit(uint32_t address) {
+  switch (address) {
+    case 0x821A6E18: return __imp__sub_821A6E18;
+    case 0x821A7470: return __imp__sub_821A7470;
+    case 0x821A7AC8: return __imp__sub_821A7AC8;
+    default: return nullptr;
+  }
+}
+
+void Inits(Context& h) {
+  namespace gm = game_modes;
+  const Block object(0x2A00);
+  if (object.address == 0) {
+    ITC_LOG_ERROR("harness: save_screen: no block for the Inits");
+    return;
+  }
+  for (const ss::InitInfo& info : ss::kInits) {
+    Results results(fmt::format("{} (sub_{:08X})", info.name, info.address));
+    const uint32_t saves = (32 - info.first_saved) * 8 + 8;
+    const uint32_t frame = CallContext(h).r1.u32 - info.frame;
+    for (uint64_t seed = 0; seed < 24; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(MixSeed(seed * 151 + info.address));
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, object.address, object.bytes, r);
+        WriteRandom(h.base, frame, info.frame, r);
+        const uint32_t machine = object.address;
+        if (seed % 2 == 0) {
+          gm::StateMachineConstruct(h.base, machine);
+          guest::StoreU32(h.base, machine + gm::kTransitionCount, 0);
+        } else {
+          const uint32_t count = 8 + Pick(r, 160);
+          guest::StoreU32(h.base, machine + gm::kTransitionCount, count);
+          for (uint32_t i = 0; i < gm::kTransitions; i++) {
+            const uint32_t at = machine + gm::kTransitionBytes * i;
+            guest::StoreU32(h.base, at, Pick(r, 12));
+            guest::StoreU32(h.base, at + 4, Pick(r, 50));
+            guest::StoreU32(h.base, at + 8, Pick(r, 8) == 0 ? 1 : 0);
+            guest::StoreU32(h.base, at + 12, 0);
+          }
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object.address;
+        if (v == 0) {
+          ITC_FLAG(native_save_screen) = false;
+          RecompiledInit(info.address)(t, h.base);
+          ITC_FLAG(native_save_screen) = true;
+        } else {
+          hooks::SaveScreenInit(t, h.base, info.address);
+        }
+        out[v].Bytes(Read(h.base, object.address, object.bytes));
+        out[v].Bytes(Read(h.base, frame, info.frame - saves));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 void UpdateAndDraw(Context& h, const World& w) {
   // Update: the running step -1, 0 to 6 or another negative, the queued -1
   // or 0 to 6, the started word 0 or 1; the message and the dialog's state
@@ -1108,6 +1179,7 @@ void UpdateAndDraw(Context& h, const World& w) {
 }  // namespace
 
 void SaveScreen(Context& h) {
+  Inits(h);
   base_of_world = h.base;
   const World w;
   if (!w.ok()) {

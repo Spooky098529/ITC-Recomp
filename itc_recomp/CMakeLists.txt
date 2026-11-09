@@ -485,6 +485,7 @@ set(ITC_SOURCES
     src/save_screen/steps.cpp
     src/save_screen/handlers.cpp
     src/save_screen/update.cpp
+    src/save_screen/inits.cpp
     src/save_screen/pages.cpp
     src/save_screen/pages_load.cpp
     src/save_screen/pages_replays.cpp
