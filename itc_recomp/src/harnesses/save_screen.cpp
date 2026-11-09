@@ -1,0 +1,664 @@
+// The save screen (src/save_screen/, docs/functions/save-screen.md) against
+// the recompiled functions. Each case fills a world of its own (blocks from
+// the allocation layer) with random words from the case's seed: the page
+// block, the menu list with its players' mappers (as the race screens'
+// harness lays a menu list's), the screen's data, a mode with its message
+// ring, UI movie 44 (as the front end's screen helpers' harness lays it:
+// its named animations over a tree of nodes, its texts and the string
+// table of letters only, no argument codes) and the movie table's pair
+// naming it, the save system's interface (its slots and their enumerated
+// saves, as the save interface's harness lays them), player 0's save data
+// and the save buffers' header with its game data's buffer; points the
+// globals into it (put back after); shapes the fields each function tests;
+// runs the original (with --native_save_screen off, so what it calls of the
+// screen's is the original too) or the register steps (hooks/save_screen.h);
+// and compares the blocks, the globals, the function's frame without its
+// register saves, the caller's area above r1, r1, r3 and UiMovie::Run's
+// update calls (stood in for, recorded and answered), all exactly (nothing
+// here is a float).
+
+#include "harness.h"
+
+#include "base/flags.h"
+#include "base/log.h"
+#include "hooks/save_screen.h"
+#include "hooks/ui_movies.h"
+#include "memory/heap.h"
+#include "menu_sounds/menu_sounds.h"
+#include "race_screens/race_screens.h"
+#include "save_screen/save_screen.h"
+#include "ui_movies/game.h"
+
+#include <fmt/format.h>
+
+#include <cstring>
+#include <functional>
+#include <initializer_list>
+#include <string>
+#include <utility>
+#include <vector>
+
+ITC_FLAG_DECLARE(bool, native_save_screen);
+
+namespace harness {
+
+namespace {
+
+namespace ss = save_screen;
+namespace rs = race_screens;
+
+constexpr uint32_t kStackBytes = 1024;  // below the call's stack pointer
+constexpr uint32_t kCallerBytes = 256;  // above it
+
+// The getter sub_82090770 (r3 = +60): the sound manager's PlayCue2D.
+constexpr uint32_t kGet60 = 0x82090770;
+constexpr uint32_t kMissingText = 0x826C5CD8;   // TextMap::Find's answer when not found
+constexpr uint32_t kMissingMovie = 0x826C5CDC;  // UiMovies::Find's answer when not found
+constexpr uint32_t kStringTable = 0x826C5C34;
+constexpr uint32_t kTagTxt = 0x54585400;
+constexpr uint32_t kTagSce = 0x53434500;
+constexpr uint32_t kSaveInterfaceGlobal = 0x826BDC90;
+constexpr uint32_t kSaveBuffers = 0x828161F0;
+constexpr uint32_t kSaveDataSlots = 0x826C5B58;  // the players' save data (SaveData::Of)
+constexpr uint32_t kGameDataBytes = 0x1F978;
+
+struct Block {
+  explicit Block(uint32_t bytes) : bytes(bytes), address(memory::Alloc(bytes, 0)) {}
+  ~Block() { memory::Free(address); }
+  Block(const Block&) = delete;
+  Block& operator=(const Block&) = delete;
+  uint32_t bytes;
+  uint32_t address;
+};
+
+class SavedBytes {
+ public:
+  SavedBytes(uint8_t* base, std::vector<std::pair<uint32_t, uint32_t>> ranges)
+      : base_(base), ranges_(std::move(ranges)) {
+    for (const auto& [address, bytes] : ranges_) {
+      saved_.push_back(Read(base_, address, bytes));
+    }
+  }
+  ~SavedBytes() {
+    for (size_t i = 0; i < ranges_.size(); i++) {
+      std::memcpy(base_ + ranges_[i].first, saved_[i].data(), ranges_[i].second);
+    }
+  }
+
+ private:
+  uint8_t* base_;
+  std::vector<std::pair<uint32_t, uint32_t>> ranges_;
+  std::vector<std::vector<uint8_t>> saved_;
+};
+
+void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& random) {
+  for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
+    guest::StoreU32(base, address + i, uint32_t(random.Next()));
+  }
+}
+
+// 0 to `n` - 1 from the high bits of the next word (Random::Below takes
+// the low bits, which consecutive draws of the xorshift share: back-to-back
+// picks would hardly ever reach some combinations).
+uint32_t Pick(Random& r, uint32_t n) { return uint32_t((r.Next() >> 32) % n); }
+
+// A case's seed (splitmix64's finalizer): the harness's seeds are its
+// generator's consecutive states, and a generator seeded with one state
+// draws the next case's sequence shifted by one word.
+uint64_t MixSeed(uint64_t x) {
+  x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
+  x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
+  return x ^ (x >> 31);
+}
+
+// A small word: 0 to `n` - 1 mostly, now and then any.
+uint32_t Small(Random& r, uint32_t n) {
+  return Pick(r, 8) == 0 ? uint32_t(r.Next()) : Pick(r, n);
+}
+// One of `values`, now and then any word.
+uint32_t OneOf(Random& r, std::initializer_list<uint32_t> values) {
+  const std::vector<uint32_t> list(values);
+  return Pick(r, 8) == 0 ? uint32_t(r.Next()) : list[Pick(r, uint32_t(list.size()))];
+}
+uint32_t Around(Random& r, int32_t lo, int32_t hi) {
+  return uint32_t(lo + int32_t(Pick(r, uint32_t(hi - lo + 1))));
+}
+
+// The screen's block: the page block (+0), the menu list (+0x40), the data
+// (+0x100; the steps' started word at +0x180), the mode (+0x200, its ring
+// at +204), the menu world (+0x600: four mappers of 0x200, their vtables
+// +0x800, the list's item block +0x900, the sound manager +0xB00 and its
+// vtable +0xB80).
+constexpr uint32_t kPagesAt = 0x0, kListAt = 0x40, kDataAt = 0x100, kStepAt = 0x180;
+constexpr uint32_t kModeAt = 0x200, kMenuWorldAt = 0x600, kScreenBytes = 0x1400;
+
+// Movie 44 (as the front end's screen helpers' harness lays its movies).
+constexpr uint32_t kMovieHeaderBytes = 0xA100;
+constexpr uint32_t kTreeNodeBytes = 0x400;
+constexpr uint32_t kSubScenes = 16, kLeaves = 32, kAnimations = 8;
+constexpr uint32_t kRootAt = kMovieHeaderBytes;
+constexpr uint32_t kSubScenesAt = kRootAt + kTreeNodeBytes;
+constexpr uint32_t kLeavesAt = kSubScenesAt + kSubScenes * kTreeNodeBytes;
+constexpr uint32_t kAnimationsAt = kLeavesAt + kLeaves * kTreeNodeBytes;
+constexpr uint32_t kPairsAt = kAnimationsAt + kAnimations * 64;
+constexpr uint32_t kTexturesAt = kPairsAt + 0x40;
+constexpr uint32_t kMovieWorldBytes = kTexturesAt + 0x100;
+constexpr uint32_t kTexts = 8;
+constexpr uint32_t kTextBuffersAt = 0x1000;
+constexpr uint32_t kTextWorldBytes = kTextBuffersAt + kTexts * 0x1000;
+constexpr uint32_t kStringWorldBytes = 0x10000;
+
+// The save system's interface (as the save interface's harness lays it):
+// the interface (+0), its +36 interface (+0x40), the devices (+0x100), the
+// users (+0x200), six 1,000-byte slots (+0x800: the users' count, 0 to 5,
+// is a slot too) and four enumerated saves of 308 bytes (+0x2000).
+constexpr uint32_t kSaveObject36 = 0x40, kSaveDevices = 0x100, kSaveUsers = 0x200;
+constexpr uint32_t kSaveSlots = 0x800, kSaveRecords = 0x2000, kSaveWorldBytes = 0x2800;
+
+struct World {
+  World()
+      : screen(kScreenBytes),
+        movies(kMovieWorldBytes),
+        texts(kTextWorldBytes),
+        strings(kStringWorldBytes),
+        save(kSaveWorldBytes),
+        save_data(kGameDataBytes),
+        buffers(0x100),
+        game_data(kGameDataBytes) {}
+  bool ok() const {
+    return screen.address && movies.address && texts.address && strings.address &&
+           save.address && save_data.address && buffers.address && game_data.address;
+  }
+  uint32_t at(uint32_t offset) const { return screen.address + offset; }
+  uint32_t pages() const { return at(kPagesAt); }
+  uint32_t list() const { return at(kListAt); }
+  uint32_t data() const { return at(kDataAt); }
+  uint32_t step() const { return at(kStepAt); }
+  uint32_t mode() const { return at(kModeAt); }
+  uint32_t movie() const { return movies.address; }
+  uint32_t root() const { return movies.address + kRootAt; }
+  uint32_t sub(uint32_t k) const { return movies.address + kSubScenesAt + kTreeNodeBytes * k; }
+  uint32_t leaf(uint32_t k) const { return movies.address + kLeavesAt + kTreeNodeBytes * k; }
+  uint32_t animation(uint32_t k) const { return movies.address + kAnimationsAt + 64 * k; }
+  Block screen;
+  Block movies;
+  Block texts;
+  Block strings;
+  Block save;
+  Block save_data;  // player 0's ([0x826C5B58])
+  Block buffers;    // the save buffers' header ([0x828161F0])
+  Block game_data;  // its +0
+};
+
+const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
+    {ss::kPages, 12},  // the page block, the menu list, the data
+    {ss::kModeType, 4},
+    {menu_sounds::kSoundManager, 4},
+    {menu_sounds::kEffectsVolume, 8},
+    {menu_sounds::kMusicVolume, 4},
+    {ui_movies::kMovieTable, 12},
+    {kMissingMovie, 4},
+    {kMissingText, 4},
+    {kStringTable, 4},
+    {kSaveInterfaceGlobal, 4},
+    {kSaveBuffers, 4},
+    {kSaveDataSlots, 16},
+    {rs::kMapperEntries, 32},
+    {rs::kControllerEntries, 16},
+};
+
+// The string table: 18 files' pointers to one container of entries enough
+// for the widest file (the bounds at 0x82007E18), each one of 8 strings of
+// letters (no argument codes), as the front end's helpers' harness builds it.
+void BuildStringTable(uint8_t* base, const World& w) {
+  constexpr uint32_t kBounds = 0x82007E18;
+  uint32_t span = 1;
+  for (uint32_t i = 0; i < 17; i++) {
+    const int32_t from = int32_t(guest::LoadU32(base, kBounds + 4 * i));
+    const int32_t to = int32_t(guest::LoadU32(base, kBounds + 4 * i + 4));
+    if (to > from && uint32_t(to - from) > span) {
+      span = uint32_t(to - from);
+    }
+  }
+  const uint32_t at = w.strings.address, container = at + 0x100;
+  if (container + 4 + 4 * span + 8 * 64 > at + w.strings.bytes) {
+    ITC_LOG_ERROR("harness: save_screen: a file of {} strings doesn't fit", span);
+    span = (w.strings.bytes - 0x100 - 8 * 64 - 4) / 4;
+  }
+  for (uint32_t i = 0; i < 18; i++) {
+    guest::StoreU32(base, at + 4 * i, container);
+  }
+  guest::StoreU32(base, container, __builtin_bswap32(span));
+  Random r(0x5361766553637265ull);  // "SaveScre"
+  const uint32_t text = container + 4 + 4 * span;
+  for (uint32_t k = 0; k < 8; k++) {
+    const uint32_t length = Pick(r, 30);
+    for (uint32_t c = 0; c < length; c++) {
+      guest::StoreU16(base, text + 64 * k + 2 * c, uint16_t('A' + Pick(r, 26)));
+    }
+    guest::StoreU16(base, text + 64 * k + 2 * length, 0);
+  }
+  for (uint32_t i = 0; i < span; i++) {
+    guest::StoreU32(base, container + 4 + 4 * i,
+                    __builtin_bswap32(text + 64 * Pick(r, 8) - container));
+  }
+}
+
+void ShapeMovieWorld(uint8_t* base, const World& w, Random& r) {
+  WriteRandom(base, w.movies.address, w.movies.bytes, r);
+  WriteRandom(base, w.texts.address, w.texts.bytes, r);
+  const uint32_t movie = w.movie();
+  ui_movies::InitAnimationLists(base, movie);
+  for (const uint32_t field : {16u, 20u, 24u}) {
+    guest::StoreU32(base, movie + field, w.root());
+  }
+  guest::StoreU32(base, movie + 28, w.movies.address + kTexturesAt);
+  for (uint32_t k = 0; k < 64; k++) {
+    const uint32_t named = movie + 176 + 36 * k;
+    guest::StoreU32(base, named + 28, w.root());
+    guest::StoreU32(base, named + 32, w.animation(Pick(r, kAnimations)));
+  }
+  for (uint32_t k = 0; k < kTexts; k++) {
+    const uint32_t record = w.texts.address + 32 * k;
+    const uint32_t buffer = w.texts.address + kTextBuffersAt + 0x1000 * k;
+    guest::StoreU32(base, record, buffer);
+    guest::StoreU32(base, record + 20, Pick(r, 5) - 1);
+    const uint32_t length = Pick(r, 60);
+    for (uint32_t c = 0; c < length; c++) {
+      guest::StoreU16(base, buffer + 2 * c, Pick(r, 6) == 0 ? 0xFFD1 : uint16_t('a' + Pick(r, 26)));
+    }
+    guest::StoreU16(base, buffer + 2 * length, 0);
+    if (k + 1 < kTexts) {
+      guest::StoreU32(base, movie + ui_movies::kMovieTexts + 8 * k, k + 1);
+      guest::StoreU32(base, movie + ui_movies::kMovieTexts + 8 * k + 4, record);
+    }
+  }
+  guest::StoreU32(base, movie + ui_movies::kMovieTexts + 1024, kTexts - 1);
+  guest::StoreU32(base, movie + ui_movies::kMovieTextCount, kTexts);
+  guest::StoreU32(base, kMissingText, w.texts.address + 32 * (kTexts - 1));
+  for (uint32_t k = 0; k < kAnimations; k++) {
+    for (uint32_t i = 0; i < 64; i += 4) {
+      guest::StoreU32(base, w.animation(k) + i, 0);
+    }
+    guest::StoreFloat(base, w.animation(k) + 12, float(Pick(r, 100)) / 4.0f);
+  }
+  constexpr uint32_t kEntries = (kTreeNodeBytes - 128) / 8;
+  guest::StoreU32(base, w.root(), kTagSce);
+  guest::StoreU32(base, w.root() + 100, 0);
+  guest::StoreU32(base, w.root() + 104, Pick(r, 5));
+  guest::StoreU32(base, w.root() + 108, Pick(r, 4));
+  guest::StoreU32(base, w.root() + 116, 60);
+  for (uint32_t i = 0; i < kEntries; i++) {
+    guest::StoreU32(base, w.root() + 128 + 8 * i,
+                    i < 60 ? w.sub(Pick(r, kSubScenes)) : w.animation(Pick(r, kAnimations)));
+  }
+  for (uint32_t k = 0; k < kSubScenes; k++) {
+    const uint32_t sub = w.sub(k);
+    guest::StoreU32(base, sub, kTagSce);
+    guest::StoreU32(base, sub + 100, Pick(r, 16));
+    guest::StoreU32(base, sub + 104, Pick(r, 7));
+    guest::StoreU32(base, sub + 108, Pick(r, 4));
+    guest::StoreU32(base, sub + 116, 64);
+    for (uint32_t i = 0; i < kEntries; i++) {
+      guest::StoreU32(base, sub + 128 + 8 * i,
+                      i < 64 ? w.leaf(Pick(r, kLeaves)) : w.animation(Pick(r, kAnimations)));
+    }
+  }
+  for (uint32_t k = 0; k < kLeaves; k++) {
+    const uint32_t leaf = w.leaf(k);
+    guest::StoreU32(base, leaf, kTagTxt);
+    guest::StoreU32(base, leaf + 100, Pick(r, 16));
+    guest::StoreU32(base, leaf + 104, Pick(r, 8) == 0 ? 0 : Pick(r, 7));
+    guest::StoreU32(base, leaf + 108, Pick(r, 9));
+    for (uint32_t i = 0; i < kEntries; i++) {
+      guest::StoreU32(base, leaf + 128 + 8 * i, w.leaf(Pick(r, kLeaves)));
+    }
+  }
+  const uint32_t pairs = w.movies.address + kPairsAt;
+  guest::StoreU32(base, pairs, 44);
+  guest::StoreU32(base, pairs + 4, movie);
+  guest::StoreU32(base, ui_movies::kMovieTable, pairs);
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, 1);
+  guest::StoreU32(base, kMissingMovie, movie);
+  guest::StoreU32(base, kStringTable, w.strings.address);
+}
+
+// The save system's interface linked over random words: the users (a count
+// of 0 to 5, controllers 0 to 3, signed in or not), the slots (a state the
+// pages test, 0 to 11 or any; their request words 0 or 1, all 0 half the
+// time; the device word +36 0 half the time; +992 0 to 5; their enumerated
+// saves the four records, 0 to 4 of them), the records' file names
+// SystemData.bin, another or random.
+void ShapeSaveWorld(uint8_t* base, uint32_t block, Random& r) {
+  WriteRandom(base, block, kSaveWorldBytes, r);
+  guest::StoreU32(base, block, 0x82000E38);
+  guest::StoreU32(base, block + 8, block + kSaveObject36);
+  guest::StoreU32(base, block + kSaveObject36, 0x82000AFC);
+  guest::StoreU32(base, block + kSaveObject36 + 88, block + kSaveDevices);
+  guest::StoreU32(base, block + kSaveObject36 + 92, block + kSaveUsers);
+  guest::StoreU32(base, block + kSaveDevices, 0x82002198);
+  guest::StoreU32(base, block + kSaveDevices + 44, block + kSaveSlots);
+  guest::StoreU32(base, block + kSaveUsers, 0x82000FA0);
+  guest::StoreU32(base, block + kSaveUsers + 216, Pick(r, 6));
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, block + kSaveUsers + 200 + 4 * i, Pick(r, 4));
+    guest::StoreU32(base, block + kSaveUsers + 8 + 40 * i, Pick(r, 3) == 0 ? 0 : Pick(r, 5));
+  }
+  const bool idle = Pick(r, 2) == 0;
+  for (uint32_t k = 0; k < 6; k++) {
+    const uint32_t slot = block + kSaveSlots + 1000 * k;
+    guest::StoreU32(base, slot + 988, Pick(r, 4) == 0 ? Small(r, 12) : OneOf(r, {1, 2, 3, 4, 7}));
+    guest::StoreU32(base, slot + 36, Pick(r, 2) == 0 ? 0 : uint32_t(r.Next()));
+    guest::StoreU32(base, slot + 992, Small(r, 6));
+    if (Pick(r, 2) == 0) {  // the free bytes: a little or a lot
+      guest::StoreU32(base, slot + 40, 0);
+      guest::StoreU32(base, slot + 44, Pick(r, 2) == 0 ? Pick(r, 0x40000) : 0x100000);
+    }
+    for (uint32_t word = 960; word <= 980; word += 4) {
+      guest::StoreU32(base, slot + word, idle ? 0 : Pick(r, 2));
+    }
+    guest::StoreU32(base, slot + 80, block + kSaveRecords);
+    guest::StoreU32(base, slot + 984, Pick(r, 5));
+  }
+  for (uint32_t e = 0; e < 4; e++) {
+    const uint32_t save = block + kSaveRecords + 308 * e;
+    const uint32_t pick = Pick(r, 3);
+    const char* name = pick == 0 ? "SystemData.bin" : "rex";
+    const uint32_t length = uint32_t(std::strlen(name)) + 1;
+    if (pick == 2) {
+      for (uint32_t i = 0; i < 20; i++) {
+        guest::StoreU8(base, save + 264 + i, uint8_t('a' + Pick(r, 26)));
+      }
+      guest::StoreU8(base, save + 284, 0);
+    } else {
+      Write(base, save + 264, name, length);
+    }
+  }
+  guest::StoreU32(base, kSaveInterfaceGlobal, block);
+}
+
+// The menu list (as the race screens' harness lays one): its player's
+// controller (+60) 0 to 3, each controller's entry 0 to 3, each entry's
+// mapper one of ours (its vtable's slots 10 and 12 Pressed and Fired, now
+// and then Held) with a few bits set in its words (+448 to +471); the count
+// (+0) 0 to 12, the scroll, shown and selection around it (the selection
+// one of `selections` when given), the action ids, the wrap word, the move
+// word 0 mostly and the block of item words (half of them 0); the sound
+// manager's slot 10 (MenuSound::Play's PlayCue2D) the getter.
+void MenuWorld(uint8_t* base, const World& w, Random& r,
+               const std::vector<uint32_t>& selections = {}) {
+  const uint32_t at = w.at(kMenuWorldAt);
+  const uint32_t mappers = at, vtables = at + 0x800, block = at + 0x900;
+  const uint32_t manager = at + 0xB00, manager_vtable = at + 0xB80;
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t mapper = mappers + 0x200 * c, vtable = vtables + 0x40 * c;
+    guest::StoreU32(base, rs::kControllerEntries + 4 * c, Pick(r, 4));
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c, mapper);
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c + 4, Pick(r, 5) == 0 ? 1 : Pick(r, 3));
+    guest::StoreU32(base, mapper, vtable);
+    guest::StoreU32(base, vtable + 40, Pick(r, 5) == 0 ? 0x8210BE70 : rs::kPressedSlot);
+    guest::StoreU32(base, vtable + 48, Pick(r, 5) == 0 ? 0x8210BE70 : rs::kFiredSlot);
+    for (uint32_t k = 0; k < 6; k++) {
+      guest::StoreU32(base, mapper + 448 + 4 * k,
+                      uint32_t(r.Next()) & uint32_t(r.Next()) & uint32_t(r.Next()));
+    }
+  }
+  const uint32_t list = w.list();
+  guest::StoreU32(base, list + rs::kListPlayer, Pick(r, 4));
+  const int32_t count = int32_t(Pick(r, 13));
+  guest::StoreU32(base, list + rs::kListCount, uint32_t(count));
+  guest::StoreU32(base, list + rs::kListShown, Around(r, 0, count + 1));
+  guest::StoreU32(base, list + rs::kListScroll, Around(r, -1, count));
+  guest::StoreU32(base, list + rs::kListSelection, Around(r, -2, count + 1));
+  guest::StoreU32(base, list + 20, Around(r, -2, count + 1));
+  for (uint32_t field = rs::kListDown; field <= rs::kListBack; field += 4) {
+    guest::StoreU32(base, list + field, Pick(r, 8) == 0 ? uint32_t(r.Next()) : 151 + Pick(r, 30));
+  }
+  guest::StoreU32(base, list + rs::kListWraps, Pick(r, 3) == 0 ? 0 : Pick(r, 4));
+  guest::StoreU32(base, list + rs::kListMove, Pick(r, 3) == 0 ? uint32_t(r.Next()) : 0);
+  guest::StoreU32(base, list + rs::kListBlock, block);
+  for (uint32_t k = 0; k < 64; k++) {
+    guest::StoreU32(base, block + 4 * k, Pick(r, 2) == 0 ? 0 : uint32_t(r.Next()));
+  }
+  if (!selections.empty()) {
+    guest::StoreU32(base, list + rs::kListSelection,
+                    selections[Pick(r, uint32_t(selections.size()))]);
+  }
+  guest::StoreU32(base, manager, manager_vtable);
+  guest::StoreU32(base, manager_vtable + menu_sounds::kPlayCue2DSlot, kGet60);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+}
+
+// The list's player's mapper made to answer the accept action (+52) alone
+// (its entry's +4 0, slot 10 Pressed, only the action's bit of +456 set),
+// so MenuList::Accepted answers 1 unless the update moves.
+void ForceAccept(uint8_t* base, const World& w, Random& r) {
+  const uint32_t list = w.list();
+  const uint32_t action = 151 + Pick(r, 30);
+  guest::StoreU32(base, list + rs::kListAccept, action);
+  const uint32_t player = guest::LoadU32(base, list + rs::kListPlayer);
+  const uint32_t controller = guest::LoadU32(base, rs::kControllerEntries + 4 * player);
+  const uint32_t entry = rs::kMapperEntries + 8 * controller;
+  guest::StoreU32(base, entry + 4, 0);
+  const uint32_t mapper = guest::LoadU32(base, entry);
+  guest::StoreU32(base, guest::LoadU32(base, mapper) + 40, rs::kPressedSlot);
+  for (uint32_t k = 0; k < 6; k++) {
+    guest::StoreU32(base, mapper + 448 + 4 * k, 0);
+  }
+  guest::StoreU32(base, mapper + 456, 1u << (action - 151));
+  guest::StoreU32(base, list + rs::kListMove, 0);
+}
+
+// A few named animations of movie 44 played (UiMovie::PlayNamed through its
+// override, the same on both sides), so the finishes find them.
+void PlaySome(uint8_t* base, const World& w, const PPCContext& from, Random& r) {
+  const uint32_t count = Pick(r, 6);
+  for (uint32_t i = 0; i < count; i++) {
+    PPCContext t = from;
+    t.r1.u64 = from.r1.u64 - 0x200;
+    t.r3.u64 = w.movie();
+    const uint32_t ids[10] = {0, 1, 2, 3, 4, 5, 12, 13, 14, 15};
+    t.r4.u64 = ids[Pick(r, 10)];
+    t.r5.u64 = 0;
+    t.r6.u64 = 0;
+    t.r7.u64 = 0;
+    t.r8.u64 = 0;
+    sub_8211DAC8(t, base);
+  }
+}
+
+void ShapeWorld(uint8_t* base, const World& w, Random& r) {
+  ShapeMovieWorld(base, w, r);
+  WriteRandom(base, w.screen.address, w.screen.bytes, r);
+  WriteRandom(base, w.save_data.address, w.save_data.bytes, r);
+  WriteRandom(base, w.buffers.address, w.buffers.bytes, r);
+  WriteRandom(base, w.game_data.address, w.game_data.bytes, r);
+  ShapeSaveWorld(base, w.save.address, r);
+  MenuWorld(base, w, r);
+  guest::StoreU32(base, ss::kPages, w.pages());
+  guest::StoreU32(base, ss::kList, w.list());
+  guest::StoreU32(base, ss::kData, w.data());
+  guest::StoreU32(base, ss::kModeType, OneOf(r, {2, 4, 6, 8, 10, 0}));
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, kSaveDataSlots + 4 * i, w.save_data.address);
+  }
+  guest::StoreU32(base, kSaveBuffers, w.buffers.address);
+  guest::StoreU32(base, w.buffers.address, w.game_data.address);
+  // The page block: the page (+0) 0 to 26 or -1, now and then any.
+  guest::StoreU32(base, w.pages(), Pick(r, 4) == 0 ? 0xFFFFFFFFu : Small(r, 27));
+  // The data: the answer (+4) 0 to 3, the state (+16) and the next (+20) -1
+  // to 3, the wait (+24) around the waits' 45 and 90.
+  const uint32_t data = w.data();
+  guest::StoreU32(base, data + 4, Small(r, 4));
+  guest::StoreU32(base, data + 16, Small(r, 5) - 1);
+  guest::StoreU32(base, data + 20, Small(r, 5) - 1);
+  const uint32_t waits[6] = {0, 43, 44, 45, 88, 89};
+  guest::StoreU32(base, data + 24, Pick(r, 8) == 0 ? uint32_t(r.Next()) : waits[Pick(r, 6)]);
+  // The mode's ring: its count and start small, now and then any.
+  guest::StoreU32(base, w.mode() + 204 + 600, Pick(r, 8) == 0 ? uint32_t(r.Next()) : Pick(r, 50));
+  guest::StoreU32(base, w.mode() + 204 + 604, Pick(r, 8) == 0 ? uint32_t(r.Next()) : Pick(r, 60));
+}
+
+// UiMovie::Run's update calls, kept and answered.
+struct UpdateCall {
+  uint32_t lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<UpdateCall>* g_updates = nullptr;
+Random g_update_answers;
+
+bool UpdateStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (g_updates == nullptr || function != 0x8211D2F8) {
+    return false;
+  }
+  g_updates->push_back({uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = g_update_answers.Below(2) == 0 ? 0 : g_update_answers.Next();
+  return true;
+}
+
+using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
+// The stack compared, as [sp - from, sp - to) ranges.
+using Frames = std::vector<std::pair<uint32_t, uint32_t>>;
+
+void Group(Context& h, const World& w, const char* name, int cases, const SetupFn& setup,
+           GuestFunction recompiled, GuestFunction native, const Frames& frames) {
+  Results results(name);
+  for (int c = 0; c < cases; c++) {
+    const uint64_t seed = MixSeed(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      SavedBytes saved(h.base, kSavedGlobals);
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
+      ShapeWorld(h.base, w, r);
+      t.r3.u64 = r.Next();
+      t.r4.u64 = r.Next();
+      t.r5.u64 = r.Next();
+      t.r6.u64 = r.Next();
+      t.r7.u64 = r.Next();
+      t.r8.u64 = r.Next();
+      t.r9.u64 = r.Next();
+      t.r10.u64 = r.Next();
+      setup(t, r, w);
+      PlaySome(h.base, w, t, r);
+      t.lr = 0x82000000 | (Pick(r, 0x10000) << 2);
+      g_update_answers = Random(r.Next());
+      std::vector<UpdateCall> updates;
+      g_updates = &updates;
+      const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+          ui_movies_hooks::g_update_callee_stand_in;
+      ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
+      ITC_FLAG(native_save_screen) = v == 1;
+      (v == 0 ? recompiled : native)(t, h.base);
+      ITC_FLAG(native_save_screen) = true;
+      ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
+      g_updates = nullptr;
+      out[v].Word(uint32_t(updates.size()));
+      for (const UpdateCall& u : updates) {
+        out[v].Word(u.lr);
+        out[v].Word(u.r1);
+        for (const uint64_t x : {u.r3, u.r4}) {
+          out[v].Word(uint32_t(x >> 32));
+          out[v].Word(uint32_t(x));
+        }
+      }
+      for (const Block* b : {&w.screen, &w.movies, &w.texts, &w.save, &w.save_data, &w.buffers,
+                             &w.game_data}) {
+        out[v].Bytes(Read(h.base, b->address, b->bytes));
+      }
+      for (const auto& [address, bytes] : kSavedGlobals) {
+        out[v].Bytes(Read(h.base, address, bytes));
+      }
+      for (const auto& [from, to] : frames) {
+        out[v].Bytes(Read(h.base, sp - from, from - to));
+      }
+      out[v].Bytes(Read(h.base, sp, kCallerBytes));
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// --- The cases ---
+
+// The dialog steps: r3 the started word (0 mostly, 1 or any), the state
+// (+16) -1 to 3; the list's selection and previous selection small.
+void Steps(Context& h, const World& w) {
+  auto setup = [&h](PPCContext& t, Random& r, const World& w) {
+    const uint32_t words[3] = {0, 1, uint32_t(r.Next())};
+    guest::StoreU32(h.base, w.step(), Pick(r, 3) != 0 ? 0 : words[Pick(r, 3)]);
+    guest::StoreU32(h.base, w.list() + 16, Small(r, 4));
+    guest::StoreU32(h.base, w.list() + 20, Small(r, 4));
+    t.r3.u64 = w.step();
+  };
+  Group(h, w, "SaveScreen::MoveSelection (sub_821A5118)", 200, setup, __imp__sub_821A5118,
+        hooks::SaveScreenMoveSelection, {{128, 40}});
+  Group(h, w, "SaveScreen::CloseDialog (sub_821A5038)", 200, setup, __imp__sub_821A5038,
+        hooks::SaveScreenCloseDialog, {{128, 32}});
+}
+
+// The pages: r3 the mode; the message (+12) one the page tests (or any);
+// the selection 0 or 1 mostly; the list made to accept half the time; the
+// wait (+24) one below `wait` (the page's count, 0 for none) half the time.
+SetupFn PageSetup(uint8_t* base, std::vector<uint32_t> messages, uint32_t wait = 0) {
+  return [base, messages, wait](PPCContext& t, Random& r, const World& w) {
+    if (wait != 0 && Pick(r, 2) == 0) {
+      guest::StoreU32(base, w.data() + 24, wait - 1);
+    }
+    const uint32_t message = Pick(r, 8) == 0 ? uint32_t(r.Next())
+                                             : messages[Pick(r, uint32_t(messages.size()))];
+    guest::StoreU32(base, w.data() + 12, message);
+    guest::StoreU32(base, w.list() + 16, Pick(r, 4) == 0 ? Small(r, 4) : Pick(r, 2));
+    if (Pick(r, 2) == 0) {
+      ForceAccept(base, w, r);
+    }
+    t.r3.u64 = Pick(r, 8) == 0 ? (uint64_t(r.Next()) << 32) | w.mode() : w.mode();
+  };
+}
+
+void KindZeroPages(Context& h, const World& w) {
+  Group(h, w, "SaveScreen::Page0 (sub_821A28E0)", 400,
+        PageSetup(h.base, {1, 4, 5, 6, 11, 0, 2}), __imp__sub_821A28E0, hooks::SaveScreenPage0,
+        {{128, 40}});
+  Group(h, w, "SaveScreen::Page1 (sub_821A2AF8)", 300,
+        PageSetup(h.base, {2, 3, 7, 9, 10, 0}, 45), __imp__sub_821A2AF8, hooks::SaveScreenPage1,
+        {{96, 16}});
+  Group(h, w, "SaveScreen::Page2 (sub_821A2C98)", 400, PageSetup(h.base, {0, 8, 1}, 90),
+        __imp__sub_821A2C98, hooks::SaveScreenPage2, {{96, 16}});
+  Group(h, w, "SaveScreen::Page3 (sub_821A2EE8)", 200, PageSetup(h.base, {0, 11}),
+        __imp__sub_821A2EE8, hooks::SaveScreenPage3, {{96, 8}});
+}
+
+void EndPages(Context& h, const World& w) {
+  const SetupFn setup = PageSetup(h.base, {0});
+  Group(h, w, "SaveScreen::Page4 (sub_821A4D30)", 100, setup, __imp__sub_821A4D30,
+        hooks::SaveScreenPage4, {});
+  Group(h, w, "SaveScreen::Page9 (sub_821A4DE0)", 100, setup, __imp__sub_821A4DE0,
+        hooks::SaveScreenPage9, {});
+  Group(h, w, "SaveScreen::Page16 (sub_821A4E60)", 100, setup, __imp__sub_821A4E60,
+        hooks::SaveScreenPage16, {});
+  Group(h, w, "SaveScreen::Page25 (sub_821A4FD8)", 100, setup, __imp__sub_821A4FD8,
+        hooks::SaveScreenPage25, {});
+}
+
+}  // namespace
+
+void SaveScreen(Context& h) {
+  const World w;
+  if (!w.ok()) {
+    ITC_LOG_ERROR("harness: save_screen: no block from the allocation layer");
+    return;
+  }
+  BuildStringTable(h.base, w);
+  Steps(h, w);
+  KindZeroPages(h, w);
+  EndPages(h, w);
+}
+
+}  // namespace harness
