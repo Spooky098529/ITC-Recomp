@@ -184,12 +184,10 @@ void GarageScreenInitStates(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                 \
   }
 
-// The movie 5 helpers.
-ITC_GARAGE_SCREEN(82193180, GarageScreenSetCarRow)
-ITC_GARAGE_SCREEN(82194CD8, GarageScreenFillRows)
-ITC_GARAGE_SCREEN(821939A0, GarageScreenSetPrompts)
-ITC_GARAGE_SCREEN(82193A90, GarageScreenSetHelpLine)
-ITC_GARAGE_SCREEN(821956C0, GarageScreenSetUpLists)
+// The movie 5 helpers' adapters removed (B7 loop, 2026-11-09): their callers
+// in play are native and call their plain C++; the recompiled callers never
+// seen in play run the originals. Their register steps stay for the harness.
+
 // The transitions seen in play (from Update's table on its stack).
 ITC_GARAGE_SCREEN(82195BA0, GarageScreenTransition0)
 ITC_GARAGE_SCREEN(82192D60, GarageScreenTransition1)
@@ -200,12 +198,11 @@ ITC_GARAGE_SCREEN(82192C18, GarageScreenLeavePage)
 // UpdatePage and Update (functors the machine calls).
 ITC_GARAGE_SCREEN(82194EA8, GarageScreenUpdatePage)
 ITC_GARAGE_SCREEN(82196230, GarageScreenUpdate)
-// The machine's handlers (functors), and Start's two helpers.
+// The machine's handlers (functors); Start's two helpers' adapters removed
+// (Start's plain C++ calls theirs).
 ITC_GARAGE_SCREEN(82191C58, GarageScreenCreate)
 ITC_GARAGE_SCREEN(82191618, GarageScreenOpenMovie)
 ITC_GARAGE_SCREEN(82191D70, GarageScreenWaitForLoad)
-ITC_GARAGE_SCREEN(82191BB0, GarageScreenReadSave)
-ITC_GARAGE_SCREEN(82192C80, GarageScreenSetHeader)
 ITC_GARAGE_SCREEN(82193DC0, GarageScreenStart)
 ITC_GARAGE_SCREEN(821927E8, GarageScreenUnload)
 ITC_GARAGE_SCREEN(82192850, GarageScreenClose)
