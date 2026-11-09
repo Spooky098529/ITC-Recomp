@@ -55,6 +55,17 @@ When the user has reviewed a run's section, its heading gets
   it removed seven differences from a previous case's leftovers. New:
   `src/garage_screen/`, `src/hooks/garage_screen.*`,
   `src/harnesses/garage_screen.cpp`.
+- The tuning machine's map (8db41a33): `tuning-machine.md`, 22 rows (19
+  in play: the tuning screen's machine at the type 2 mode's +19792, its
+  handlers, `Start`, `SetUp` `sub_821E1B48` and the part tables'
+  loaders, `DecalImages::Reset` and `SavePlaceholders`), the
+  machine's fields in `known-data.md`'s tuning screen row,
+  cross-references in `tuning-screen.md` and `tuning-pages.md`; the
+  power curve lead and the tuning screen's outside functions' lead
+  taken whole and deleted, three leads given notes. Noted: `Start`
+  writes 9,999,999 to the money word +25116 before `SetUp` overwrites
+  it (both kept); `OnDialogClosed`'s unset r7-r10 (the 2026-10-30
+  call).
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 
