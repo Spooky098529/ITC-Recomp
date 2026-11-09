@@ -23,6 +23,10 @@ file's history. What's left to see in a drive, from every run:
   0 errors, every harness 0 differing outside the expected groups, 28
   of 28 harness lines, no prints added; none in the race, 12 in the
   replay `itc_4722` (ok), 16 to drive). Recorded.
+- Subsystem 2 of 3: the type 2 mode's machine at +0x23018 (`sub_82196520`
+  and its transitions, UI movie 5, probably the garage; all 10 roots
+  ready, the closest of the type 2 machines' leads; its line deleted
+  from `leads.md`). Step: mapping; agent running.
 
 ## Done
 
