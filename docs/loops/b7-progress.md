@@ -41,6 +41,10 @@ file's history. What's left to see in a drive, from every run:
   outside the expected groups, 22 of 22 harness lines, no prints added;
   none in the race, 6 in the replay `itc_4734` (ok), 16 to drive).
   Recorded.
+- Subsystem 3 of 3: the tuning screen's machine (the type 2 mode's
+  +19792, `sub_821E7568` and its transitions; all 8 roots ready, one of
+  the type 2 Init's unmapped Inits; its line deleted from `leads.md`).
+  Step: mapping; agent running.
 
 ## Done
 
