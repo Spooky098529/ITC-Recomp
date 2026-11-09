@@ -13,9 +13,9 @@
 //
 // The guest calls go through `Calls` (race_hud_object::Calls: r3 to r6 as
 // given, r7 to r10 0, or all eight) by address, to the callees' overrides
-// (the functions never seen in play, ReloadStandCar, SetScrollArrows,
-// PutCarOnStand and the busy marker's three, to the originals: their
-// recompiled paths kept). UiMovies::Find, UiMovies::IsLoaded,
+// (the screen's own functions, never seen in play too, are native since
+// 2026-11-09 but Transition11, Transition15 and OnYes, which stay the
+// originals). UiMovies::Find, UiMovies::IsLoaded,
 // UiMovie::FindNode, UiMovie::Child, MenuList::Selection, SaveData::Of and
 // Params::GetCarSpec are their plain C++. The varargs UiMovie::SetText and
 // SetNodeText calls pass 0 for the arguments the call sites leave unset (the
@@ -89,13 +89,6 @@ constexpr uint32_t kStageDraw = 0x8217FE60;     // GarageStage::Draw
 constexpr uint32_t kBlockOf = 0x8215AAD0;       // CarModels::BlockOf
 constexpr uint32_t kReloadModel = 0x8217F880;   // GarageStage::ReloadModel
 constexpr uint32_t kStageCommand = 0x82180108;  // GarageStage::Command
-// The screen's own, never seen in play (their originals).
-constexpr uint32_t kSetScrollArrows = 0x82193288;
-constexpr uint32_t kReloadStandCar = 0x82193B10;
-constexpr uint32_t kPutCarOnStand = 0x82193BA8;
-constexpr uint32_t kShowBusy = 0x82193C58;
-constexpr uint32_t kHideBusy = 0x82193CE0;
-constexpr uint32_t kHideBusyNow = 0x82193D48;
 
 // --- The movie 5 helpers (helpers.cpp) ---
 

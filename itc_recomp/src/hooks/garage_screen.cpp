@@ -335,17 +335,14 @@ void GarageScreenInitStates(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                 \
   }
 
-// The movie 5 helpers' adapters removed (B7 loop, 2026-11-09): their callers
-// in play are native and call their plain C++; the recompiled callers never
-// seen in play run the originals. Their register steps stay for the harness.
-
-// The transitions seen in play (from Update's table on its stack).
-ITC_GARAGE_SCREEN(82195BA0, GarageScreenTransition0)
-ITC_GARAGE_SCREEN(82192D60, GarageScreenTransition1)
-ITC_GARAGE_SCREEN(82192E20, GarageScreenTransition3)
-// The pages seen in play (from UpdatePage's table on its stack).
-ITC_GARAGE_SCREEN(82194078, GarageScreenCarListPage)
-ITC_GARAGE_SCREEN(82192C18, GarageScreenLeavePage)
+// No adapters (removed, B7 loop, 2026-11-09: their callers are native and
+// call their plain C++; the recompiled callers, run only with the flag off,
+// run the originals; their register steps stay for the harness): the movie
+// 5 helpers; the pages (UpdatePage calls them from its table) and the
+// transitions but Transition11 and Transition15 (Update calls them from
+// its table); the texts, markers, stand helpers, value and price, car
+// objects and set-ups but ResetStand and SetUpActions (the recompiled
+// Transition11 and Transition15 reach them).
 // UpdatePage and Update (functors the machine calls).
 ITC_GARAGE_SCREEN(82194EA8, GarageScreenUpdatePage)
 ITC_GARAGE_SCREEN(82196230, GarageScreenUpdate)
@@ -358,61 +355,12 @@ ITC_GARAGE_SCREEN(82193DC0, GarageScreenStart)
 ITC_GARAGE_SCREEN(821927E8, GarageScreenUnload)
 ITC_GARAGE_SCREEN(82192850, GarageScreenClose)
 ITC_GARAGE_SCREEN(821915B0, GarageScreenDestroy)
-// The texts, markers and stand helpers never seen in play (their callers,
-// never seen in play, still recompiled).
-ITC_GARAGE_SCREEN(82193288, GarageScreenSetScrollArrows)
-ITC_GARAGE_SCREEN(821936B0, GarageScreenSetActionMarker)
-ITC_GARAGE_SCREEN(82193720, GarageScreenSetOptionMarker)
-ITC_GARAGE_SCREEN(82193798, GarageScreenShowSpecTexts)
-ITC_GARAGE_SCREEN(82193910, GarageScreenShowCarNames)
-ITC_GARAGE_SCREEN(82193320, GarageScreenSetPlateQuestion)
-ITC_GARAGE_SCREEN(82192770, GarageScreenCopyGarageCar)
-ITC_GARAGE_SCREEN(82193C58, GarageScreenShowBusy)
-ITC_GARAGE_SCREEN(82193CE0, GarageScreenHideBusy)
-ITC_GARAGE_SCREEN(82193D48, GarageScreenHideBusyNow)
+// ResetStand and SetUpActions (the recompiled Transition11 and
+// Transition15 reach them).
 ITC_GARAGE_SCREEN(82191B20, GarageScreenResetStand)
-ITC_GARAGE_SCREEN(82194AC8, GarageScreenSetUpView)
-ITC_GARAGE_SCREEN(821918D0, GarageScreenToggleTurn)
-ITC_GARAGE_SCREEN(82191920, GarageScreenToggleDoors)
-ITC_GARAGE_SCREEN(82191970, GarageScreenToggleDoors2)
-ITC_GARAGE_SCREEN(821919C0, GarageScreenTurnLeft)
-ITC_GARAGE_SCREEN(82191A18, GarageScreenTurnRight)
-ITC_GARAGE_SCREEN(82192378, GarageScreenCarValue)
-ITC_GARAGE_SCREEN(82192690, GarageScreenSalePrice)
-// The car objects never seen in play (their callers still recompiled).
-ITC_GARAGE_SCREEN(82193B10, GarageScreenReloadStandCar)
-ITC_GARAGE_SCREEN(82193BA8, GarageScreenPutCarOnStand)
-ITC_GARAGE_SCREEN(82194D90, GarageScreenShowCarSpecs)
-ITC_GARAGE_SCREEN(821933D0, GarageScreenSetUseQuestion)
-ITC_GARAGE_SCREEN(821934D0, GarageScreenSetSaleQuestion)
-ITC_GARAGE_SCREEN(82191810, GarageScreenSetUpPlateEditor)
-ITC_GARAGE_SCREEN(82191628, GarageScreenSetUpSpecSheet)
-ITC_GARAGE_SCREEN(82191A70, GarageScreenCameraA)
-ITC_GARAGE_SCREEN(82191AC8, GarageScreenCameraB)
-// The transitions and set-ups never seen in play (Update calls the
-// transitions' plain C++; the recompiled Transition11 and Transition15 and
-// the pages still reach the set-ups).
-ITC_GARAGE_SCREEN(82194F30, GarageScreenTransition2)
-ITC_GARAGE_SCREEN(82195D10, GarageScreenTransition4)
-ITC_GARAGE_SCREEN(82192EF8, GarageScreenTransition5)
-ITC_GARAGE_SCREEN(82194680, GarageScreenTransition6)
-ITC_GARAGE_SCREEN(821951A8, GarageScreenTransition7)
-ITC_GARAGE_SCREEN(82195E30, GarageScreenTransition8)
-ITC_GARAGE_SCREEN(82195410, GarageScreenTransition9)
-ITC_GARAGE_SCREEN(82195530, GarageScreenTransition10)
-ITC_GARAGE_SCREEN(821955E0, GarageScreenTransition12)
-ITC_GARAGE_SCREEN(82192FD0, GarageScreenTransition13)
-ITC_GARAGE_SCREEN(821948B0, GarageScreenTransition14)
-ITC_GARAGE_SCREEN(821930D8, GarageScreenTransition16)
-ITC_GARAGE_SCREEN(82196170, GarageScreenTransition17)
 ITC_GARAGE_SCREEN(821958D0, GarageScreenSetUpActions)
-ITC_GARAGE_SCREEN(82194B20, GarageScreenSetUpOptions)
-// The pages never seen in play (UpdatePage calls their plain C++) and the
-// reply handlers (functors the machine calls). OnYes sub_82192958 stays the
+// The reply handlers (functors the machine calls). OnYes sub_82192958 stays the
 // original: Garage::Sell, which it calls, is recompiled.
-ITC_GARAGE_SCREEN(821941A8, GarageScreenActionsPage)
-ITC_GARAGE_SCREEN(82191DE0, GarageScreenViewPage)
-ITC_GARAGE_SCREEN(82192030, GarageScreenViewOptionsPage)
 ITC_GARAGE_SCREEN(82193E38, GarageScreenOnSpecSheetClosed)
 ITC_GARAGE_SCREEN(821928F8, GarageScreenOnPlateCancelled)
 ITC_GARAGE_SCREEN(82193E80, GarageScreenOnPlateDone)

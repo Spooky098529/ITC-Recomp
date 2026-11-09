@@ -939,7 +939,9 @@ ITC_TYPE67_MODES(82245200, Type7Screen0Update)
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).
 ITC_TYPE67_MODES(8217C120, QuaternionFromAngles)
 ITC_TYPE67_MODES(8217D888, GarageCameraReset)
-ITC_TYPE67_MODES(82180358, GarageCameraCommand)
+// GarageCamera::Command sub_82180358 has no adapter (removed, B7 loop,
+// 2026-11-09: its only caller, GarageStage::CameraCommand, is native and
+// calls its plain C++; its step above is the harness's).
 ITC_TYPE67_MODES(821808F0, GarageStageCameraCommand)
 // No adapter for GarageLights::Init sub_8217D3C8: only GarageStage::Init
 // (native) calls it; its step above is the harness's.
