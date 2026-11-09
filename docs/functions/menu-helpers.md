@@ -5,8 +5,9 @@ read their buttons with, each once a page handler runs (every update
 while that page shows). A menu is a 68-byte object each screen
 allocates (`VirtualAlloc`) and fills in itself, inline, in its create
 function (no constructor or reset of its own; the parking area's four,
-`LocationScreen::Create` in `location-screen.md`, and the screen at
-`sub_821869B8`, in `../loops/leads.md`, are two): a cursor kept between
+`LocationScreen::Create` in `location-screen.md`, and the type 2
+mode's dialog's, `Type2Dialog::OnEnter` `sub_821869B8` in
+`type2-dialog.md`, are two): a cursor kept between
 a first and a last item, whether it wraps, which inputs move it, and the
 player whose pad drives it. Its layout is in `../known-data.md` ("front-end
 menu"). `Menu::Step` moves the cursor from the player's action mapper
@@ -33,7 +34,7 @@ with their own update; the helpers here don't touch them.
 
 Their callers (113 functions: 104 call `Menu::Pressed`, 101 `Menu::Step`, 92 both;
 the screens, other subsystems, not mapped here): `82187160`-`82187618`
-(the screen around these helpers, a lead), `8218AFD8`, `8218B2C8`,
+(the type 2 mode's dialog's pages, `type2-dialog.md`), `8218AFD8`, `8218B2C8`,
 `8218B750`, `8218E8F8`, `8218FCC8`, `821AA560`-`821C6F58` (39, the save
 screens' range, a lead), `821D6AD0`-`821DFD48` (6, `Menu::Step` only,
 beside the tuning screen), `821F9050`-`821FC270` (6), `8220B0D8` (the
@@ -51,7 +52,8 @@ lead "the front-end screens that use the menu helpers"
 Not here: `sub_82186428`, `sub_82186490` and `sub_821864A0`, just
 before `Menu::Pressed` in the image, belong to the screen at
 `sub_821869B8` (two transitions its set-up `sub_82188178` adds, and a
-test of its `[0x82636204]`): in the lead with it. Shared, with rows
+test of its `[0x82636204]`): in `type2-dialog.md` since 2026-11-09
+(the type 2 mode's dialog). Shared, with rows
 elsewhere: `ActionMapper::Pressed` and `ActionMapper::Fired`
 (`sub_8210BF40`, `sub_8210C010`, `action-mappers.md`, reached through
 the mapper's vtable), `MenuSound::Play` (`sub_821103F0`,

@@ -653,6 +653,10 @@ Rows not yet moved stay in the table below. So far:
   Inits and handlers, its kinds (the game data's check, save and load,
   the replays, the two-player load, the controller pick), its dialog
   steps and its 27 pages (B7).
+- [`type2-dialog.md`](type2-dialog.md): the type 2 mode's dialog
+  (its machine at +0x1E4C8): the yes/no questions and notices over UI
+  movies 16 to 19, their pages and their open, close and cursor steps
+  (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
