@@ -26,6 +26,7 @@
 // setters make are compared and freed.
 
 #include "harness.h"
+#include "stand_car_world.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -53,6 +54,9 @@
 ITC_FLAG_DECLARE(bool, native_garage_screen);
 
 namespace harness {
+
+// load_poll's SetCar cases' car (car_makers.cpp).
+uint32_t LayStandCar(uint8_t* base, uint32_t block, Random& r, int c, bool traffic);
 
 namespace {
 
@@ -92,6 +96,13 @@ constexpr uint32_t kSaveDataBytes = 0x1F978;
 constexpr uint32_t kSpecCount = 72;
 constexpr uint32_t kSpecBytes = 8432;
 constexpr uint32_t kFades = 0x826A50AC;
+// In the world's own stack, below the deepest frames: the spec sheet's data
+// ([0x826D846C]: +16 the sheet, +112 its vehicle), the plate editor's
+// ([0x826D8438]) and a car list entry for StandCarWorld::Lay.
+constexpr uint32_t kSheetAt = 0x1000;
+constexpr uint32_t kSheetBytes = 0x1000;
+constexpr uint32_t kPlateAt = 0x2400;
+constexpr uint32_t kEntryAt = 0x3000;
 
 struct Global {
   uint32_t address;
@@ -113,6 +124,8 @@ constexpr Global kGlobals[] = {
     {menu_sounds::kSoundManager, 4},
     {menu_sounds::kEffectsVolume, 8},
     {menu_sounds::kMusicVolume, 4},
+    {0x826D8438, 4},  // the plate editor's data
+    {0x826D846C, 4},  // the spec sheet's data
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -127,7 +140,8 @@ struct World {
         block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)),
         save(memory::Alloc(kSaveDataBytes, 0)),
         specs(memory::Alloc(0x40 + kSpecCount * kSpecBytes, 0)),
-        stack(memory::Alloc(kBigStackBytes, 0)) {
+        stack(memory::Alloc(kBigStackBytes, 0)),
+        car_allocation(memory::Alloc(0x10000 + 16, 0)) {
     if (strings != 0) {
       MakeStrings();
     }
@@ -144,11 +158,13 @@ struct World {
     memory::Free(save);
     memory::Free(specs);
     memory::Free(stack);
+    memory::Free(car_allocation);
   }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
   bool ok() const {
-    return allocation != 0 && strings != 0 && save != 0 && specs != 0 && stack != 0;
+    return allocation != 0 && strings != 0 && save != 0 && specs != 0 && stack != 0 &&
+           car_allocation != 0;
   }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t data() const { return at(kDataAt); }
@@ -169,6 +185,9 @@ struct World {
   // big frames (ReloadStandCar's 100,560 bytes): r1 near its top.
   static constexpr uint32_t kBigStackBytes = 0x30000;
   uint32_t stack;
+  // A block for load_poll's SetCar cases' car (LayStandCar's, 16-aligned).
+  uint32_t car_allocation;
+  uint32_t car_block() const { return (car_allocation + 15) & ~15u; }
 
  private:
   void MakeStrings() {
@@ -220,6 +239,17 @@ void ShapeGarage(uint8_t* base, uint32_t garage, Random& r, uint32_t count) {
     guest::StoreU32(base, garage + 212 + 1968 * slot + 12,
                     r.Below(4) == 0 ? kSpecial[r.Below(10)] : r.Below(kSpecCount));
   }
+}
+
+// The garage car record at `index` (the list walked from its head), as the
+// screen's functions find it.
+uint32_t GarageRecordAt(uint8_t* base, uint32_t save, uint32_t index) {
+  const uint32_t garage = save + 6120;
+  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
+  for (; index != 0; index--) {
+    link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link))));
+  }
+  return garage + 1968 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link + 2))));
 }
 
 void MakeWorld(uint8_t* base, const World& w, Random& r) {
@@ -314,6 +344,8 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
     guest::StoreU32(base, kSaveSlots + 4 * p, w.save);
   }
   guest::StoreU32(base, car_specs::kParams, w.specs);
+  guest::StoreU32(base, 0x826D8438, w.stack + kPlateAt);
+  guest::StoreU32(base, 0x826D846C, w.stack + kSheetAt);
 }
 
 // The stand's world (as the car dealer's harness lays it, drawless, as
@@ -1033,6 +1065,266 @@ void NeverSeenHelpers(Context& h, const World& w) {
              hooks::GarageScreenSalePrice, {{-112, -16}}, car});
 }
 
+// The selected garage car (the data's +44 + +48) among the linked cars,
+// its first 1,884 bytes the template car's.
+void SelectedCar(Random& r, const World& w, uint32_t car) {
+  uint8_t* base = w.base;
+  // At least one car (an empty garage's walk would read past it).
+  if (int16_t(guest::LoadU16(base, w.save + 6328)) <= 0) {
+    ShapeGarage(base, w.garage(), r, 1 + r.Below(10));
+  }
+  const int32_t count = int16_t(guest::LoadU16(base, w.save + 6328));
+  guest::StoreU32(base, w.data() + 44, 0);
+  guest::StoreU32(base, w.data() + 48, count > 0 ? r.Below(uint32_t(count)) : 0);
+  const uint32_t record =
+      GarageRecordAt(base, w.save, guest::LoadU32(base, w.data() + 48));
+  const uint32_t to = record + 212;
+  Write(base, to, Read(base, car, 1884).data(), 1884);
+  // No aero parts or wheels of its own (LayGarage's zeros: LayStandCar
+  // sets some levels after it, which Car::Refresh would look up in the
+  // laid parameters' tables, random words).
+  for (const uint32_t at : {1728u, 1736u, 1744u, 1748u, 1752u, 1756u, 1760u, 1764u, 1768u,
+                            1780u, 1784u}) {
+    guest::StoreU32(base, to + at, 0);
+  }
+}
+
+void LayCar(Random& r, const World& w);
+// The stand's world (StandCarWorld::Lay), then the selected garage car from
+// load_poll's SetCar cases' car (car_makers.cpp's LayStandCar, a player's:
+// not traffic) in a block of its own, the parameters its LayGarage laid
+// pointed at (Car::Refresh rebuilds that car from them), the screen's data
+// pointed at again.
+void LayStandAndCar(StandCarWorld& stand, PPCContext& t, Random& r, const World& w) {
+  stand.Lay(r, w.stack + kEntryAt, t.r1.u32);
+  LayCar(r, w);
+}
+// The car alone (no stand of load_poll's: the drawless stand's world laid
+// by the caller), as LayStandAndCar's.
+void LayCar(Random& r, const World& w) {
+  const uint32_t car = LayStandCar(w.base, w.car_block(), r, int(r.Below(32)), false);
+  guest::StoreU32(w.base, car_specs::kParams, w.car_block() + 0x9100);
+  SelectedCar(r, w, car);
+  guest::StoreU32(w.base, gs::kData, w.data());
+}
+
+// The car objects never seen in play: the stand's car (ReloadStandCar on
+// the drawless stand, as CarListPage's cases; PutCarOnStand in load_poll's
+// re-applies' world, StandCarWorld, its GarageStage::SetCar for real), and
+// the functions that build a car object from a garage car (ShowCarSpecs,
+// the questions, the plate editor's and the spec sheet's set-ups) from
+// StandCarWorld's template car (the parameters it lays refresh it, and
+// Vehicle::SetupFromCar takes it), over the world's own stack. Their frames
+// compared but their register saves and the varargs SetNodeText calls'
+// parameter area (+40 to +79, r6 on: 0 in ours where the call sites leave
+// them, the user's call for the parking area, 2026-10-30); the stand's
+// world settled after (its blocks and loads compared, its globals put
+// back).
+void CarObjects(Context& h, const World& w) {
+  StandCarWorld stand(h.base);
+  if (!stand.ok()) {
+    ITC_LOG_WARN("harness: garage_screen: the car objects' cases skipped (the stand's world: "
+                 "no block, or its callees' plain C++ isn't native)");
+    return;
+  }
+  auto settle = [&stand](PPCContext&, const World&, Outputs& out) { stand.Settle(out, 0, false); };
+  Run(h, w, {"GarageScreen::ReloadStandCar (sub_82193B10; sub_82192770)", 40,
+             __imp__sub_82193B10, hooks::GarageScreenReloadStandCar, {{-100688, -24}},
+             [](PPCContext&, Random& r, const World& w) {
+               StandWorld(w.base, r, w);
+               const int32_t count = int16_t(guest::LoadU16(w.base, w.save + 6328));
+               guest::StoreU32(w.base, w.data() + 44, 0);
+               guest::StoreU32(w.base, w.data() + 48, count > 0 ? r.Below(uint32_t(count)) : 0);
+             },
+             nullptr, true});
+  Run(h, w, {"GarageScreen::PutCarOnStand (sub_82193BA8; sub_82192770)", 40,
+             __imp__sub_82193BA8, hooks::GarageScreenPutCarOnStand, {{-104592, -16}},
+             [&stand](PPCContext& t, Random& r, const World& w) {
+               LayStandAndCar(stand, t, r, w);
+             },
+             settle, true});
+  // The others: r3 the template car itself.
+  auto car = [&stand](PPCContext& t, Random& r, const World& w) {
+    stand.Lay(r, w.stack + kEntryAt, t.r1.u32);
+    guest::StoreU32(w.base, gs::kData, w.data());
+    WriteRandom(w.base, w.stack + kSheetAt, kSheetBytes, r);
+    WriteRandom(w.base, w.stack + kPlateAt, 64, r);
+    t.r3.u64 = stand.car();
+  };
+  Run(h, w, {"GarageScreen::ShowCarSpecs (sub_82194D90; sub_82193798, sub_82193910)", 40,
+             __imp__sub_82194D90, hooks::GarageScreenShowCarSpecs, {{-6976, -24}}, car,
+             settle, true});
+  Run(h, w, {"GarageScreen::SetUseQuestion (sub_821933D0)", 40, __imp__sub_821933D0,
+             hooks::GarageScreenSetUseQuestion, {{-4064, -4024}, {-3984, -56}}, car, settle,
+             true});
+  Run(h, w, {"GarageScreen::SetSaleQuestion (sub_821934D0; sub_82192690)", 40,
+             __imp__sub_821934D0, hooks::GarageScreenSetSaleQuestion,
+             {{-4112, -4072}, {-4032, -112}}, car, settle, true});
+  Run(h, w, {"GarageScreen::SetUpPlateEditor (sub_82191810)", 40, __imp__sub_82191810,
+             hooks::GarageScreenSetUpPlateEditor, {{-4000, -16}}, car,
+             [settle](PPCContext& t, const World& w, Outputs& out) {
+               out.Bytes(Read(w.base, w.stack + kPlateAt, 64));
+               settle(t, w, out);
+             },
+             true});
+  Run(h, w, {"GarageScreen::SetUpSpecSheet (sub_82191628; sub_82191768)", 40,
+             __imp__sub_82191628, hooks::GarageScreenSetUpSpecSheet, {{-5104, -40}}, car,
+             [settle](PPCContext& t, const World& w, Outputs& out) {
+               out.Bytes(Read(w.base, w.stack + kSheetAt, kSheetBytes));
+               settle(t, w, out);
+             },
+             true});
+  // The view's camera buttons: the stand's commands' world, the stage's
+  // +384 (its camera's +272) 0, 1, 2 or any, the camera's floats random.
+  auto camera = [](PPCContext&, Random& r, const World& w) {
+    StageCommands(r, w);
+    const uint32_t moved[4] = {0, 1, 2, uint32_t(r.Next())};
+    guest::StoreU32(w.base, w.at(kStageAt) + 384, moved[r.Below(4)]);
+  };
+  Run(h, w, {"GarageScreen::CameraA (sub_82191A70; sub_821808F0)", 60, __imp__sub_82191A70,
+             hooks::GarageScreenCameraA, {{-96, -16}}, camera});
+  Run(h, w, {"GarageScreen::CameraB (sub_82191AC8; sub_821808F0)", 60, __imp__sub_82191AC8,
+             hooks::GarageScreenCameraB, {{-96, -16}}, camera});
+}
+
+// The selected garage car among the linked cars (at least one), without a
+// car world: the data's +44 0 and +48 below the count.
+void Linked(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  if (int16_t(guest::LoadU16(base, w.save + 6328)) <= 0) {
+    ShapeGarage(base, w.garage(), r, 1 + r.Below(10));
+  }
+  const int32_t count = int16_t(guest::LoadU16(base, w.save + 6328));
+  guest::StoreU32(base, w.data() + 44, 0);
+  guest::StoreU32(base, w.data() + 48, r.Below(uint32_t(count)));
+}
+
+// The current car (the save's +0x19920) the selected one now and then.
+void MaybeCurrent(Random& r, const World& w) {
+  if (r.Below(2) == 0) {
+    const uint32_t data = w.data();
+    guest::StoreU32(w.base, w.save + career::kSelectedCar,
+                    guest::LoadU32(w.base, data + 44) + guest::LoadU32(w.base, data + 48));
+  }
+}
+
+// The menu lists' marker and move words (+32, +24: 0, 1, -1 or any) and
+// their previous selection (+20) small.
+void ListMoves(Random& r, const World& w) {
+  for (const uint32_t list : {w.at(kListAt), w.at(kList2At)}) {
+    guest::StoreU32(w.base, list + 32, r.Below(2));
+    const uint32_t moves[4] = {0, 1, 0xFFFFFFFFu, uint32_t(r.Next())};
+    guest::StoreU32(w.base, list + 24, moves[r.Below(4)]);
+    guest::StoreU32(w.base, list + 20, r.Below(5));
+  }
+}
+
+// The car menu's, the view's and the plate's transitions and the actions'
+// and options' set-ups, never seen in play: the menus' world (their flag
+// blocks for the set-ups' MenuList::Init), the selected car among the
+// linked ones, the current car now and then, the started word; those that
+// reach ShowCarSpecs (SetUpActions, Transition4, Transition7 with
+// ReloadStandCar, Transition17) over the stand's and car's world as the car
+// objects' cases lay it, over the world's own stack.
+void MenuTransitions(Context& h, const World& w) {
+  auto settle = FreeMenuBlocks;
+  auto plain = [](PPCContext& t, Random& r, const World& w) {
+    MenuWorld(r, w);
+    ListMoves(r, w);
+    Linked(r, w);
+    MaybeCurrent(r, w);
+    guest::StoreU32(w.base, w.data() + 80, r.Below(2));
+    Started(t, r, w);
+  };
+  // The car's world over the drawless stand (ReloadStandCar's
+  // GarageStage::ReloadModel answers 0 there; ShowCarSpecs needs only the
+  // car and its parameters).
+  auto with_car = [](PPCContext& t, Random& r, const World& w) {
+    MenuWorld(r, w);
+    MenuBlocks(r, w);
+    ListMoves(r, w);
+    StandWorld(w.base, r, w);
+    LayCar(r, w);
+    MaybeCurrent(r, w);
+    Started(t, r, w);
+  };
+  // Transition2: ten cars, the list's scroll 1 to 5 and the one before it
+  // one off or the same (the row scrolled in among the linked cars).
+  Run(h, w, {"GarageScreen::Transition2 (sub_82194F30; sub_82194CD8, sub_82193180, sub_82193288)",
+             100, __imp__sub_82194F30, hooks::GarageScreenTransition2, {{-176, -80}},
+             [](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               ListMoves(r, w);
+               ShapeGarage(w.base, w.garage(), r, 10);
+               const uint32_t list = w.at(kListAt);
+               const uint32_t scroll = 1 + r.Below(5);
+               const uint32_t before[3] = {scroll - 1, scroll, scroll + 1};
+               guest::StoreU32(w.base, list + 4, scroll);
+               guest::StoreU32(w.base, list + 8, before[r.Below(3)]);
+               guest::StoreU32(w.base, w.save + career::kSelectedCar, r.Below(12));
+               Started(t, r, w);
+             }});
+  Run(h, w, {"GarageScreen::Transition4 (sub_82195D10; sub_821958D0)", 40, __imp__sub_82195D10,
+             hooks::GarageScreenTransition4, {{-128, -32}}, with_car, settle, true});
+  Run(h, w, {"GarageScreen::Transition5 (sub_82192EF8)", 100, __imp__sub_82192EF8,
+             hooks::GarageScreenTransition5, {{-128, -40}}, plain});
+  Run(h, w, {"GarageScreen::Transition6 (sub_82194680; sub_821936B0, sub_82193A90)", 100,
+             __imp__sub_82194680, hooks::GarageScreenTransition6, {{-224, -64}}, plain});
+  // Transition7: the second list's selection 0 and scroll the selected car
+  // (ReloadStandCar over the stand's world, ShowCarSpecs).
+  Run(h, w, {"GarageScreen::Transition7 (sub_821951A8; sub_82193B10, sub_82194D90)", 40,
+             __imp__sub_821951A8, hooks::GarageScreenTransition7, {{-2192, -56}},
+             [with_car](PPCContext& t, Random& r, const World& w) {
+               with_car(t, r, w);
+               const uint32_t list2 = w.at(kList2At);
+               guest::StoreU32(w.base, list2 + race_screens::kListSelection, 0);
+               guest::StoreU32(w.base, list2 + 4, guest::LoadU32(w.base, w.data() + 48));
+             },
+             settle, true});
+  Run(h, w, {"GarageScreen::Transition8 (sub_82195E30; sub_821956C0)", 100, __imp__sub_82195E30,
+             hooks::GarageScreenTransition8, {{-128, -40}},
+             [](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               MenuBlocks(r, w);
+               RowsWorld(r, w);
+               guest::StoreU32(w.base, w.data() + 44, uint32_t(Small(r, 4)));
+               guest::StoreU32(w.base, w.data() + 48, guest::LoadU32(w.base, w.at(kListAt) + 4));
+               Started(t, r, w);
+             },
+             FreeMenuBlocks});
+  auto view = [](PPCContext& t, Random& r, const World& w) {
+    MenuWorld(r, w);
+    StageCommands(r, w);
+    Started(t, r, w);
+  };
+  Run(h, w, {"GarageScreen::Transition9 (sub_82195410; sub_82194AC8)", 60, __imp__sub_82195410,
+             hooks::GarageScreenTransition9, {{-112, -24}}, view});
+  Run(h, w, {"GarageScreen::Transition10 (sub_82195530; sub_82194AC8)", 60, __imp__sub_82195530,
+             hooks::GarageScreenTransition10, {{-112, -24}}, view});
+  auto options = [plain](PPCContext& t, Random& r, const World& w) {
+    plain(t, r, w);
+    MenuBlocks(r, w);
+  };
+  Run(h, w, {"GarageScreen::Transition12 (sub_821955E0; sub_82194B20)", 100, __imp__sub_821955E0,
+             hooks::GarageScreenTransition12, {{-128, -32}}, options, FreeMenuBlocks});
+  Run(h, w, {"GarageScreen::Transition13 (sub_82192FD0)", 100, __imp__sub_82192FD0,
+             hooks::GarageScreenTransition13, {{-128, -32}}, plain});
+  Run(h, w, {"GarageScreen::Transition14 (sub_821948B0; sub_82193720, sub_82192770)", 100,
+             __imp__sub_821948B0, hooks::GarageScreenTransition14, {{-2160, -64}}, plain});
+  Run(h, w, {"GarageScreen::Transition16 (sub_821930D8)", 60, __imp__sub_821930D8,
+             hooks::GarageScreenTransition16, {{-128, -32}}, plain});
+  Run(h, w, {"GarageScreen::Transition17 (sub_82196170; sub_821958D0)", 40, __imp__sub_82196170,
+             hooks::GarageScreenTransition17, {{-128, -40}}, with_car, settle, true});
+  // The set-ups: their frames but the varargs calls' parameter areas (SetText
+  // +48 to +79, SetNodeText +40 to +79: the originals' leftovers).
+  Run(h, w, {"GarageScreen::SetUpActions (sub_821958D0; sub_82194D90)", 40, __imp__sub_821958D0,
+             hooks::GarageScreenSetUpActions, {{-2192, -2144}, {-2112, -56}}, with_car, settle,
+             true});
+  Run(h, w, {"GarageScreen::SetUpOptions (sub_82194B20)", 100, __imp__sub_82194B20,
+             hooks::GarageScreenSetUpOptions, {{-2160, -2120}, {-2080, -48}}, options,
+             FreeMenuBlocks});
+}
+
 }  // namespace
 
 void GarageScreen(Context& h) {
@@ -1048,6 +1340,8 @@ void GarageScreen(Context& h) {
     Pages(h, w);
     Handlers(h, w);
     NeverSeenHelpers(h, w);
+    CarObjects(h, w);
+    MenuTransitions(h, w);
   }
 }
 

@@ -39,6 +39,11 @@ class StandCarWorld {
   // with `stand_sp`; when `frame_car`) and the loads; what the run made
   // freed, the globals put back.
   void Settle(Outputs& out, uint32_t stand_sp, bool frame_car = true);
+  // The car block's template car (LayGarage's, at its +0x4000: a car object
+  // the laid parameters refresh and Vehicle::SetupFromCar takes), for
+  // callers that build their own car from a garage car (the garage
+  // screen's harness).
+  uint32_t car() const { return car_block_ + 0x4000; }
 
  private:
   uint8_t* base_;

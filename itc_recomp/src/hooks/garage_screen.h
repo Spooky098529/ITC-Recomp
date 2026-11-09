@@ -63,6 +63,34 @@ void GarageScreenTurnLeft(PPCContext& ctx, uint8_t* base);
 void GarageScreenTurnRight(PPCContext& ctx, uint8_t* base);
 void GarageScreenCarValue(PPCContext& ctx, uint8_t* base);
 void GarageScreenSalePrice(PPCContext& ctx, uint8_t* base);
+// The car objects never seen in play (r3 a garage car but ReloadStandCar,
+// PutCarOnStand and the cameras: no arguments).
+void GarageScreenReloadStandCar(PPCContext& ctx, uint8_t* base);
+void GarageScreenPutCarOnStand(PPCContext& ctx, uint8_t* base);
+void GarageScreenShowCarSpecs(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetUseQuestion(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetSaleQuestion(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetUpPlateEditor(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetUpSpecSheet(PPCContext& ctx, uint8_t* base);
+void GarageScreenCameraA(PPCContext& ctx, uint8_t* base);
+void GarageScreenCameraB(PPCContext& ctx, uint8_t* base);
+// The transitions never seen in play (r3 the started word) and the
+// actions' and options' set-ups (no arguments).
+void GarageScreenTransition2(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition4(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition5(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition6(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition7(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition8(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition9(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition10(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition12(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition13(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition14(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition16(PPCContext& ctx, uint8_t* base);
+void GarageScreenTransition17(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetUpActions(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetUpOptions(PPCContext& ctx, uint8_t* base);
 // InitStates (r3 the machine).
 void GarageScreenInitStates(PPCContext& ctx, uint8_t* base);
 

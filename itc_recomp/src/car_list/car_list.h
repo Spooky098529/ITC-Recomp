@@ -357,15 +357,14 @@ uint64_t CarPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 // --- PanelSet's update (update.cpp; r3 = b) ---
 
 // The guest calls the update makes: GarageStage::ReloadModel, SetCar,
-// Command, IsBusy and Draw through their overrides, the garage tab's car
-// (sub_82192770, never seen in play: the original); the two-player stand's
-// wait word.
+// Command, IsBusy and Draw through their overrides (the garage tab's car,
+// GarageScreen::CopyGarageCar, its plain C++); the two-player stand's wait
+// word.
 constexpr uint32_t kReloadModel = 0x8217F880;
 constexpr uint32_t kSetCar = 0x8217FD58;
 constexpr uint32_t kGarageStageCommand = 0x82180108;
 constexpr uint32_t kGarageStageIsBusy = 0x82179BE0;
 constexpr uint32_t kGarageStageDraw = 0x8217FE60;
-constexpr uint32_t kGarageTabCar = 0x82192770;
 constexpr uint32_t kStandWait = 0x826379B8;
 
 // sub_821807D8 GarageStages::DrawAll: the three stages of [0x826D83E0]

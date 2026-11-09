@@ -1,6 +1,7 @@
 // PanelSet's update (docs/functions/car-list.md): see car_list.h.
 
 #include "car_list/car_list.h"
+#include "garage_screen/garage_screen.h"
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
@@ -138,11 +139,11 @@ uint64_t UpdateStand(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& cal
           race_setup::CarInit(base, car);
           uint32_t plates = 0;
           if (LoadU32(base, b + 232) == 2) {
-            // The garage tab's car (sub_82192770, never seen in play: the
-            // original), copied in.
+            // The garage tab's car (GarageScreen::CopyGarageCar's plain
+            // C++), copied in.
             const uint64_t save = SaveData(base, b, frame);
-            const uint64_t from =
-                calls.Call(kGarageTabCar, frame, 0x8224C3A0, frame + 7888, save + 6120, row);
+            const uint64_t from = garage_screen::CopyGarageCar(
+                base, frame + 7888, uint32_t(save + 6120), uint32_t(row), frame, calls);
             CopyCar(base, car, uint32_t(from), frame, 0x8224C3B0, calls);
             plates = 1;
           } else {

@@ -142,6 +142,77 @@ uint64_t Transition1(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
 // fades' counts (0x826A50DC, 0x826A50E4) are both 0. 112-byte frame.
 uint64_t Transition3(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
 
+// --- The car menu's, the view's and the plate's transitions never seen in
+// play (menu.cpp; r3 the started word's address; Transition11 and
+// Transition15 stay the originals: their finish stores UiMovie::Run's r8
+// leftover into the started word, live state) ---
+//
+// sub_82194F30 Transition2 (the list moved): the highlight moved, and when
+// the list scrolled the rows refilled (FillRows), the scroll's animations,
+// the row scrolled in (SetCarRow in row 9), the current car's marker and
+// the arrows (SetScrollArrows). 1. 176-byte frame.
+uint64_t Transition2(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82195D10 Transition4 (into the car's menu): 67 + the row and 77
+// finished, 132 played, the data's +52 and +56 = 0, SetUpActions; once Run
+// answers 0, (7, 5) and (7, 6) colored 2 or 0 by whether it's the current
+// car. 1 when Run answers 0. 128-byte frame.
+uint64_t Transition4(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82192EF8 Transition5 (the action's highlight): 80 + the action played
+// and looped (not actions 0 and 1 on the current car), the data's +72 = 1.
+// 1. 128-byte frame.
+uint64_t Transition5(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82194680 Transition6 (the action moved): the highlights, 90 and 91,
+// the marker (SetActionMarker, or 90 or 91 by the move), the help line. 1.
+// 224-byte frame.
+uint64_t Transition6(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_821951A8 Transition7 (another car): the second list's selection and
+// scroll into the data's +44 and +48, the highlights, ReloadStandCar, the
+// car copied (+160) and ShowCarSpecs, the current car's mark and colors,
+// the help line. 1. 2,192-byte frame.
+uint64_t Transition7(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82195E30 Transition8 (back to the list): the highlight finished, 133
+// played, the data's +72 = 0, SetUpLists; once Run answers 0 the page
+// object to transition 1 then page 0 (+24 = 0). 0. 128-byte frame.
+uint64_t Transition8(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82195410 Transition9 (into the view) and sub_82195530 Transition10
+// (back to it from its options): the highlight finished, the view's
+// animations, SetUpView. 1 when Run answers 0. 112-byte frames.
+uint64_t Transition9(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t Transition10(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_821955E0 Transition12 (into the view's options): 143 played,
+// SetUpOptions; once Run answers 0 with the data's +80 set, node (2, 1)'s
+// children 6 and 7 colored 2. 1 when Run answers 0. 128-byte frame.
+uint64_t Transition12(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82192FD0 Transition13 (the option's highlight) and sub_821948B0
+// Transition14 (the option moved; 2,160-byte frame): the highlight (26 and
+// 27 for options 1 and 2 with the data's +80 set), Transition14 the marker
+// and the help line too. 1. 128-byte frame.
+uint64_t Transition13(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t Transition14(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_821930D8 Transition16 (to the plate editor) and sub_82196170
+// Transition17 (back from it: the data's +52 = 2, SetUpActions): 146 or
+// 147 played, nodes (3, 1) and (3, 2) +108 = 1 and 3 or 3 and 1. 1 when Run
+// answers 0. 128-byte frames.
+uint64_t Transition16(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t Transition17(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// Update's table: the transition at `target` run natively (its plain C++,
+// r3 into `*r3`) when it's one of the native ones; false otherwise.
+bool RunTransition(uint8_t* base, uint32_t target, uint32_t started, uint32_t sp,
+                   const Calls& calls, uint64_t* r3);
+// sub_821958D0 GarageScreen::SetUpActions: the first list as the five
+// actions, the second the car list (its selection, scroll, Fit), the
+// action's selection (+52) and marker, the actions' texts, the car copied
+// and ShowCarSpecs, SetPrompts(0, 0, 1, 1, -1, -1), the current car's
+// mark, the stage's +6052 = 1, the help line, nodes (-1, 0), (-1, 13) and
+// (-1, 14) shown unless the garage holds one car. The last node (r3).
+// 2,192-byte frame.
+uint64_t SetUpActions(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82194B20 GarageScreen::SetUpOptions: the first list as the view's
+// four options, the marker, the options' texts (node (2, 1)'s children 5 to
+// 8), the data's +80 (the car's spec's byte +771 is 1), the help line.
+// SetHelpLine's r3. 2,160-byte frame.
+uint64_t SetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The pages seen in play (pages.cpp; r3 the mode) ---
 //
 // sub_82194078 GarageScreen::CarListPage (page 0): MenuList::Update on the
@@ -274,6 +345,54 @@ uint64_t ToggleDoors2(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& call
 // frames.
 uint64_t TurnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t TurnRight(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The car objects never seen in play (cars.cpp) ---
+//
+// sub_82193B10 GarageScreen::ReloadStandCar: the save's garage list (98,612
+// bytes) copied to its frame's +2048, the selected car (the data's +44 +
+// +48) out of it (CopyGarageCar, its plain C++) to +80, its model
+// (CarModels::BlockOf) reloaded on the stand (GarageStage::ReloadModel)
+// into the data's +76. ReloadModel's r3. A 100,688-byte frame (__chkstk's
+// probe dropped).
+uint64_t ReloadStandCar(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82193BA8 GarageScreen::PutCarOnStand: the garage list copied, the
+// selected car out of it, a car object from it at its frame's +80
+// (Car::Init, 1,884 bytes, +3888 |= 1, Car::Refresh), then
+// GarageStage::SetCar(holder, car, -1). SetCar's r3. A 104,592-byte frame.
+uint64_t PutCarOnStand(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82194D90 GarageScreen::ShowCarSpecs (r3 a garage car): a car object
+// (+3040), a car data (+1184: CarData::CarData, Vehicle::SetupFromCar) and
+// its power curve (+112: PowerCurve::FromEngine, ShiftPeak) in its frame,
+// the figures' record at +80, ShowSpecTexts and ShowCarNames (their plain
+// C++). ShowCarNames' r3. A 6,976-byte frame.
+uint64_t ShowCarSpecs(uint8_t* base, uint32_t car, uint32_t sp, const Calls& calls);
+// sub_821933D0 GarageScreen::SetUseQuestion (r3 a garage car): movie 16's
+// cursor 0, its question (string 97 with the maker's and the car's names),
+// yes and no (SetNodeText), a car object at its frame's +96 for the maker.
+// The last SetNodeText's r3. A 4,064-byte frame.
+uint64_t SetUseQuestion(uint8_t* base, uint32_t car, uint32_t sp, const Calls& calls);
+// sub_821934D0 GarageScreen::SetSaleQuestion (r3 a garage car): the data's
+// +100 = SalePrice (its plain C++), movie 18's cursor 1 and its texts (25,
+// the maker, the names, the price by SetNodeNumberText, 527, 435, yes and
+// no). The last SetNodeText's r3. A 4,112-byte frame.
+uint64_t SetSaleQuestion(uint8_t* base, uint32_t car, uint32_t sp, const Calls& calls);
+// sub_82191810 GarageScreen::SetUpPlateEditor (r3 a garage car): a car
+// object at its frame's +80; the plate editor's data ([0x826D8438]) +48 =
+// 0, +44 = 1 when the car's sizes are small (record +8 <= 2000, +76 <=
+// 4700, +80 <= 2000, +84 <= 1700), +24 to +43 the car's +1568 to +1587. The
+// record (r3). A 4,000-byte frame.
+uint64_t SetUpPlateEditor(uint8_t* base, uint32_t car, uint32_t sp, const Calls& calls);
+// sub_82191628 GarageScreen::SetUpSpecSheet (r3 a garage car; its piece
+// sub_82191768 merged): a car object at its frame's +1152, the spec sheet's
+// vehicle ([0x826D846C] + 112: Vehicle::SetupFromCar), its curve (+80:
+// FromEngine, ShiftPeak), then the sheet's words (+16 on). ShiftPeak's r3.
+// A 5,104-byte frame.
+uint64_t SetUpSpecSheet(uint8_t* base, uint32_t car, uint32_t sp, const Calls& calls);
+// sub_82191A70 GarageScreen::CameraA and sub_82191AC8 CameraB: the data's
+// +88 = 0, command 1, then GarageStage::CameraCommand(holder, 0 or 1) (its
+// plain C++). Its r3. 96-byte frames.
+uint64_t CameraA(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t CameraB(uint8_t* base, uint32_t sp, const Calls& calls);
 
 // --- The value and the price (prices.cpp) ---
 //

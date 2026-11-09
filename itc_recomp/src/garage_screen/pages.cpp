@@ -36,7 +36,7 @@ uint64_t CarListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
       const uint32_t selection = race_screens::ListSelection(base, list);
       Store(base, Data(base) + 44, selection);
       Store(base, Data(base) + 48, Load(base, Load(base, kList) + 4));
-      calls.Call(kReloadStandCar, frame, 0x821940E8);
+      ReloadStandCar(base, frame, calls);
       const uint32_t pages = Load(base, kPages);
       const uint32_t before = Load(base, pages + 0);
       if (before != 1) {

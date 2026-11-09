@@ -47,10 +47,15 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
       // No bounds check: the word at the table's index. r4 to r10 as the
       // original leaves them (the table's build), not read by the
       // transitions.
+      // The native transitions' plain C++ by the word's address; the others
+      // (Transition11 and Transition15, or a word past the table) through the
+      // guest.
       const uint32_t target = Load(base, frame + 96 + (running << 2));
-      r3 = calls.CallArgs(target, frame, 0x82196380,
-                          {pages + 24, kTransitions[11], kTransitions[12], kTransitions[13],
-                           kTransitions[14], kTransitions[15], frame + 96, running << 2});
+      if (!RunTransition(base, target, pages + 24, frame, calls, &r3)) {
+        r3 = calls.CallArgs(target, frame, 0x82196380,
+                            {pages + 24, kTransitions[11], kTransitions[12], kTransitions[13],
+                             kTransitions[14], kTransitions[15], frame + 96, running << 2});
+      }
       pages = Load(base, kPages);
       finished = uint32_t(r3) != 0;
     }
@@ -99,7 +104,7 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (Load(base, Data(base) + 76) == 0) {
     return r3;
   }
-  calls.Call(kPutCarOnStand, frame, 0x821964D4);
+  PutCarOnStand(base, frame, calls);
   return calls.Call(kStageCommand, frame, 0x821964E4, Holder(base), 15);
 }
 

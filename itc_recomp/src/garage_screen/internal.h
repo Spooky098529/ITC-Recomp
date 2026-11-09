@@ -9,6 +9,7 @@
 
 #include "garage_screen/garage_screen.h"
 #include "guest.h"
+#include "native/buffers.h"
 #include "ui_movies/game.h"
 
 namespace garage_screen {
@@ -142,6 +143,16 @@ inline uint64_t SetText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_
                         uint64_t sub_scene, uint64_t child, uint64_t text, uint64_t r7 = 0,
                         uint64_t r10 = 0) {
   return calls.CallArgs(kSetText, frame, lr, {movie, sub_scene, child, text, r7, 0, 0, r10});
+}
+
+// memcpy: native::Buffers_Memcpy, else the guest call from `frame` with
+// `lr`. The destination (memcpy's r3).
+inline uint64_t Memcpy(uint8_t* base, const Calls& calls, uint64_t to, uint32_t from,
+                       uint32_t bytes, uint32_t frame, uint32_t lr) {
+  if (!native::Buffers_Memcpy(base, uint32_t(to), from, bytes, lr)) {
+    return calls.Call(0x825A7410, frame, lr, to, from, bytes);
+  }
+  return to;
 }
 
 }  // namespace garage_screen
