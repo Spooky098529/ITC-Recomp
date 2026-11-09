@@ -14,7 +14,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3: the type 2 mode's dialog (`type2-dialog.md`,
   mapped and checked by the last run, c257b0c2, its migration not
   started; the last run's "Next"). Map checked again (0 errors, 21 in
-  play, ready groups). Step: migration; agent running.
+  play, ready groups). Migration 415b58d5..e3269357 (the 10 steps, 4
+  pages, `Draw`, `Update`, the 11 handlers, `Init` over its step table;
+  28 of 28 ours, all Overridden: reached through functors and tables,
+  `Init` by the still recompiled type 2 Init; `--native_type2_dialog`;
+  races 38 s, 0 errors, its harnesses 0 differing; no subagents). Left:
+  none. Step: validation; agent running.
 
 ## Done
 
@@ -34,5 +39,7 @@ The run's section of `review.md` ("Run 2026-11-09 10:53").
 
 - At the start: ours 5237, work left 1196 (wrapped 56, known 410,
   unknown 730).
+- After the type 2 dialog's migration: ours 5265, work left 1175
+  (wrapped 56, known 389, unknown 730).
 
 ## Stopped

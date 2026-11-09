@@ -13,7 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-09 10:53 (`b7-loop-09-11-26`)
 
-- (Nothing yet.)
+- The type 2 dialog's migration (415b58d5..e3269357), over the last
+  run's map (`type2-dialog.md`, c257b0c2): all 28 rows Overridden (no
+  adapter removable: 27 reached through functors or the page and step
+  tables, `Init` from the recompiled `sub_82197278`). Followed: the
+  type 6 dialog's design (`Draw` and `Update` call pages and steps
+  through the guest), the type 2 screens' Init pattern (step table over
+  `StateMachine::Add`). Kept: the r4-r10 leftovers passed to the steps
+  and pages (unread); `Update`'s call to the empty `sub_82106540` left
+  out (returns at once; said in its row). Ported though not seen in
+  play: `Cancel`, `Wait`, `OpenNotice2`, `Notice2Page`, `TakesInput`,
+  `OpenNotice2Step`, `CloseNotice2Step`. New: `src/type2_dialog/`,
+  `src/hooks/type2_dialog.*`, `src/harnesses/type2_dialog.cpp`.
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 
