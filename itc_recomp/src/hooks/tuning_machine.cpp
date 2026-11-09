@@ -189,11 +189,10 @@ ITC_TUNING_MACHINE(821CBD40, TuningMachineDestroy)
 ITC_TUNING_MACHINE(82208130, TuningMachineSavePlaceholders)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_TUNING_MACHINE(821E7568, TuningMachineInit)
-// TuningScreen::SetUp's callees (from SetUp sub_821E1B48, recompiled).
-ITC_TUNING_MACHINE(821DE280, TuningMachineLoadInteriorSlots)
-ITC_TUNING_MACHINE(821DA4B0, TuningMachineLoadCurrentChoices)
-ITC_TUNING_MACHINE(821DBAB0, TuningMachineLoadOwnedParts)
-ITC_TUNING_MACHINE(821DAD58, TuningMachineSetPrices)
-ITC_TUNING_MACHINE(821CFFC8, TuningMachineLoadUnlockedParts)
+// TuningScreen::SetUp's callees LoadInteriorSlots sub_821DE280, LoadCurrentChoices
+// sub_821DA4B0, LoadOwnedParts sub_821DBAB0, SetPrices sub_821DAD58 and
+// LoadUnlockedParts sub_821CFFC8: no adapters (removed, B7 loop, 2026-11-09:
+// their only caller, SetUp, is native and calls their plain C++; the register
+// steps above are the harness's).
 // TuningScreen::SetUp (from Start sub_821E7368, recompiled).
 ITC_TUNING_MACHINE(821E1B48, TuningMachineSetUp)
