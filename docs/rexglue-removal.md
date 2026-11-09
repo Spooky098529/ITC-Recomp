@@ -2815,6 +2815,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-08 | The type 2 mode's screens (the hub at the mode's +848: its menu over the stand car, notices, images, pages and transitions; the spec sheet's machine; the build screen's machine, entry and pages; the license plate editor the dealer's buy opens) | `type2-screens.md` | 121 of 121 in play (three migrations; 17 adapters removed) | `--native_type2_screens` |
 | 2026-11-09 | The save screen (one machine, UI movie 44, that the type 2, 4, 6, 10 and 8 modes' Inits set up: the game data's check, save and load, the replays, the controller pick; its 27 pages and 7 steps) | `save-screen.md` | 42 of 42 in play (one migration; 2 adapters removed) | `--native_save_screen` |
 | 2026-11-09 | The type 2 mode's dialog (its machine at the mode's +0x1E4C8: four dialogs over UI movies 16 to 19, the confirm and notice pairs; its 11 transitions, `Draw`'s 4 pages, `Update`'s 10 steps and `Init`) | `type2-dialog.md` | 28 of 28 (one migration; no adapter removable) | `--native_type2_dialog` |
+| 2026-11-09 | The type 2 mode's garage screen (its machine at the mode's +0x23018, UI movie 5: the player's garage cars over the stand; its handlers, `InitStates`' 20 transitions, the list and leave pages, `UpdatePage`, `Update`, the list's set-up) | `garage-screen.md` | 22 of 22 in play (one migration; 7 adapters removed) | `--native_garage_screen` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5024,3 +5025,18 @@ boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
 26, never called 70, live 208. Imports: 186 called, 54 with a live
 caller. B7 (`b7_status.py`): ours 5,265, work left 1,175 (Wrapped 56,
 with a row 389, no row yet 730), from 1,196.
+
+**2026-11-09, the type 2 mode's garage screen (branch
+`b7-loop-09-11-26`):** the forty-first run's second subsystem
+(`garage-screen.md`, `--native_garage_screen`, `src/garage_screen/`),
+in one migration: the machine at the type 2 mode's +0x23018 (the
+player's garage cars over the stand), its handlers, `InitStates`, the
+list and leave pages, `UpdatePage`, `Update` and the list's set-up; 7
+helper adapters removed. The 56 functions never seen in play (the
+sell, plate, view and spec sheet paths) stay recompiled, reached
+through the tables, functors and a few direct guest calls. The replay
+opens and closes the screen; its pages wait for a drive. The boundary:
+449 functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,287, work left 1,153 (Wrapped 56, with a row
+389, no row yet 708), from 1,175.

@@ -18,6 +18,13 @@ here loses its heading.
 
 ## Run 2026-11-09 10:53 (`b7-loop-09-11-26`)
 
+- The garage screen's migration (attract race `itc_4733`, replay
+  `itc_4734` ok, opening and closing the screen only;
+  `garage-screen.md`): `sub_82193180`, `sub_82194CD8`, `sub_821939A0`,
+  `sub_82193A90`, `sub_821956C0`, `sub_82195BA0`, `sub_82192D60`,
+  `sub_82192E20`, `sub_82194078`, `sub_82192C18`, `sub_82194EA8`,
+  `sub_82196230`, `sub_82193DC0`, `sub_82191BB0`, `sub_82192C80`,
+  `sub_821927E8`.
 - The type 2 dialog's migration (attract race `itc_4721`, replay
   `itc_4722` ok, the confirm dialog only; `type2-dialog.md`):
   `sub_821864A0`, `sub_82186AD8`, `sub_82186AF0`, `sub_82186B90`,

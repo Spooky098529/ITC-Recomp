@@ -36,11 +36,16 @@ file's history. What's left to see in a drive, from every run:
   `Update`, the handlers, `InitStates`; 7 helper adapters removed; 22
   of 22 in play ours, the 56 never seen kept recompiled;
   `--native_garage_screen`; race 37 s, 0 errors, its harnesses 0
-  differing; no subagents). Left: none. Step: validation; agent
-  running.
+  differing; no subagents). Left: none. Validated `itc_4733` (race 68
+  s at 180, the harnesses ~110 s; 0 errors, every harness 0 differing
+  outside the expected groups, 22 of 22 harness lines, no prints added;
+  none in the race, 6 in the replay `itc_4734` (ok), 16 to drive).
+  Recorded.
 
 ## Done
 
+- The garage screen: `garage-screen.md`, 22 of 22 in play (7 Native),
+  `--native_garage_screen`, e10e29dd..52c21938.
 - The type 2 dialog: `type2-dialog.md`, 28 of 28 (all Overridden),
   `--native_type2_dialog`, 415b58d5..e3269357.
 
