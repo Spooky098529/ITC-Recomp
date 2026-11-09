@@ -789,6 +789,88 @@ void Pages(Context& h, const World& w) {
              FreeMenuBlocks});
 }
 
+// A name record (SetChildNameText's: +4 a kind, +8 a 16-bit index, +10 a
+// flag; +12 a second kind, +16 its index, +18 its flag) at `name`, the
+// kinds 0 to 5 and the indexes mostly in range.
+void NameRecord(uint8_t* base, uint32_t name, Random& r) {
+  guest::StoreU32(base, name + 4, r.Below(6));
+  guest::StoreU16(base, name + 8, uint16_t(r.Below(4) == 0 ? r.Next() : r.Below(110)));
+  guest::StoreU16(base, name + 10, uint16_t(r.Below(2)));
+  guest::StoreU32(base, name + 12, r.Below(6));
+  guest::StoreU16(base, name + 16, uint16_t(r.Below(4) == 0 ? r.Next() : r.Below(110)));
+  guest::StoreU16(base, name + 18, uint16_t(r.Below(2)));
+}
+
+// The save's day (+6100): around 0, 999 and the week's edges, negative now
+// and then; the money (+6116) any.
+void SaveHeader(Random& r, const World& w) {
+  static constexpr int32_t kDays[] = {0, 1, 6, 7, 998, 999, 1000, 5000, -1, -7, -8};
+  const int32_t day = r.Below(2) == 0 ? kDays[r.Below(11)] : int32_t(r.Below(1500));
+  guest::StoreU32(w.base, w.save + 6100, uint32_t(day));
+  NameRecord(w.base, w.save + 8, r);
+}
+
+void Handlers(Context& h, const World& w) {
+  auto machine = [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kMachineAt); };
+  // Create: the four blocks VirtualAlloc made compared by content.
+  Run(h, w, {"GarageScreen::Create (sub_82191C58)", 60, __imp__sub_82191C58,
+             hooks::GarageScreenCreate, {{-112, -24}}, machine,
+             [&h](PPCContext& t, const World&, Outputs& out) {
+               // r3 the data block's address (the last VirtualAlloc's).
+               out.Word(t.r3.u32 == guest::LoadU32(h.base, gs::kData) ? 1 : 0);
+               t.r3.u64 = 0;
+               Allocated(h.base, out, gs::kPages, 28);
+               Allocated(h.base, out, gs::kList, 72);
+               Allocated(h.base, out, gs::kList2, 72);
+               Allocated(h.base, out, gs::kData, 104);
+             }});
+  Run(h, w, {"GarageScreen::OpenMovie (sub_82191618)", 20, __imp__sub_82191618,
+             hooks::GarageScreenOpenMovie, {}, None});
+  Run(h, w, {"GarageScreen::WaitForLoad (sub_82191D70)", 100, __imp__sub_82191D70,
+             hooks::GarageScreenWaitForLoad, {{-96, -16}}, machine});
+  Run(h, w, {"GarageScreen::ReadSave (sub_82191BB0)", 100, __imp__sub_82191BB0,
+             hooks::GarageScreenReadSave, {{-96, -16}},
+             [](PPCContext&, Random& r, const World& w) {
+               SaveHeader(r, w);
+               guest::StoreU32(w.base, w.save + 6116, uint32_t(r.Next()));
+             }});
+  // SetHeader: the name record, the money, the day and the weekday small;
+  // SetText's parameter area from +56 (its r7 set) left out.
+  Run(h, w, {"GarageScreen::SetHeader (sub_82192C80)", 100, __imp__sub_82192C80,
+             hooks::GarageScreenSetHeader, {{-112, -56}, {-32, -24}},
+             [](PPCContext&, Random& r, const World& w) {
+               const uint32_t data = w.data();
+               NameRecord(w.base, data + 4, r);
+               guest::StoreU32(w.base, data + 24, r.Below(2) == 0 ? r.Below(100000) : r.Next());
+               guest::StoreU32(w.base, data + 28, r.Below(1000));
+               guest::StoreU32(w.base, data + 32, r.Below(7));
+             }});
+  Run(h, w, {"GarageScreen::Start (sub_82193DC0; sub_82191BB0, sub_82192C80)", 100,
+             __imp__sub_82193DC0, hooks::GarageScreenStart, {{-96, -8}},
+             [](PPCContext&, Random& r, const World& w) {
+               SaveHeader(r, w);
+               guest::StoreU32(w.base, w.save + 6116, r.Below(100000));
+             }});
+  Run(h, w, {"GarageScreen::Unload (sub_821927E8)", 60, __imp__sub_821927E8,
+             hooks::GarageScreenUnload, {{-112, -16}}, machine});
+  Run(h, w, {"GarageScreen::Close (sub_82192850)", 60, __imp__sub_82192850,
+             hooks::GarageScreenClose, {{-112, -16}},
+             [](PPCContext& t, Random&, const World& w) {
+               t.r3.u64 = w.at(kMachineAt);
+               t.r4.u64 = w.at(kModeAt);
+             }});
+  // Destroy: the page object, the first list and the data the layer's
+  // pages (whether each was freed compared), the second list left.
+  Run(h, w, {"GarageScreen::Destroy (sub_821915B0)", 60, __imp__sub_821915B0,
+             hooks::GarageScreenDestroy, {{-112, -32}},
+             [](PPCContext&, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               guest::StoreU32(base, gs::kPages, MakePages(base, 28, r));
+               guest::StoreU32(base, gs::kList, MakePages(base, 72, r));
+               guest::StoreU32(base, gs::kData, MakePages(base, 104, r));
+             }});
+}
+
 }  // namespace
 
 void GarageScreen(Context& h) {
@@ -801,6 +883,7 @@ void GarageScreen(Context& h) {
   if (hooks::NativeHeapActive()) {
     Transitions(h, w);
     Pages(h, w);
+    Handlers(h, w);
   }
 }
 

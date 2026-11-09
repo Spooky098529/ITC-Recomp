@@ -28,5 +28,16 @@ void GarageScreenLeavePage(PPCContext& ctx, uint8_t* base);
 // UpdatePage and Update (r3 the machine, r4 the mode).
 void GarageScreenUpdatePage(PPCContext& ctx, uint8_t* base);
 void GarageScreenUpdate(PPCContext& ctx, uint8_t* base);
+// The machine's handlers (r3 the machine and r4 the mode where read;
+// ReadSave, SetHeader, Start and Destroy no arguments).
+void GarageScreenCreate(PPCContext& ctx, uint8_t* base);
+void GarageScreenOpenMovie(PPCContext& ctx, uint8_t* base);
+void GarageScreenWaitForLoad(PPCContext& ctx, uint8_t* base);
+void GarageScreenReadSave(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetHeader(PPCContext& ctx, uint8_t* base);
+void GarageScreenStart(PPCContext& ctx, uint8_t* base);
+void GarageScreenUnload(PPCContext& ctx, uint8_t* base);
+void GarageScreenClose(PPCContext& ctx, uint8_t* base);
+void GarageScreenDestroy(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -174,4 +174,44 @@ uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint64_t r5, uint
 // original). The last call's r3 (or the movie). 272-byte frame.
 uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The machine's handlers (handlers.cpp) ---
+//
+// sub_82191C58 GarageScreen::Create (r3 the machine): +9608 = 0; the page
+// object (28 bytes), the two menu lists (72 each) and the data (104)
+// VirtualAlloc'ed into their globals with their first words; +9604 = 1 or 9
+// by +9612. The last VirtualAlloc's r3. 112-byte frame.
+uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_82191618 GarageScreen::OpenMovie: UiMovies::Open(5, 22579) (a tail
+// call, from `sp` with `lr`). Its r3.
+uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_82191D70 GarageScreen::WaitForLoad (r3 the machine): +9608 = 1 once
+// movie 5 is loaded, then +9604 = 9 or 4 by +9612. r3 IsLoaded's when
+// called, else the machine (`r3`). 96-byte frame.
+uint64_t WaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_82191BB0 GarageScreen::ReadSave: player 0's save data's career pick
+// (+8, 20 bytes), money (+6116), weekday and day (+6100, at most 999) into
+// the data's +4 to +32, the save at +36. SaveData::Of's r3. 96-byte frame.
+uint64_t ReadSave(uint8_t* base, uint32_t sp);
+// sub_82192C80 GarageScreen::SetHeader: movie 5's pose reset, the header's
+// texts (the pick's name, the money, string 8 with the day; SetText's
+// unset varargs 0) and the weekday's frame; the data's +72, +76 = 0, +0 =
+// 1. The weekday node (r3). 112-byte frame.
+uint64_t SetHeader(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82193DC0 GarageScreen::Start: ReadSave and SetHeader (their plain
+// C++), the page object to page 0 after transitions 0 and 1, the fade in.
+// ScreenFades::FadeIn's r3. 96-byte frame.
+uint64_t Start(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821927E8 GarageScreen::Unload (r3 the machine): UiMovie::FinishAll
+// (movie 5); with +9616, UiMovies::Delete(5) and +9608 = 0. The last call's
+// r3. 112-byte frame.
+uint64_t Unload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_82192850 GarageScreen::Close (r3 the machine, r4 the mode): +9604 =
+// 7, UiMovie::FinishAll(movie 5), UiMovies::Delete(5), message 4. Delete's
+// r3. 112-byte frame.
+uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_821915B0 GarageScreen::Destroy: the page object, the first list and
+// the data VirtualFree'd and their globals 0 (the second list kept, as the
+// original). The last VirtualFree's r3. 112-byte frame.
+uint64_t Destroy(uint8_t* base, uint32_t sp, const Calls& calls);
+
 }  // namespace garage_screen

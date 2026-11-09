@@ -18,7 +18,11 @@ ITC_FLAG_BOOL(native_garage_screen, true, "ITC",
               "the original) and LeavePage sub_82192C18; UpdatePage sub_82194EA8 and Update "
               "sub_82196230 (the pages and transitions through the guest from their tables, the "
               "stand's calls through their overrides, PutCarOnStand and the busy marker's three "
-              "the originals) (the same writes; checked by "
+              "the originals); the machine's handlers Create sub_82191C58 and Destroy "
+              "sub_821915B0 (VirtualAlloc and VirtualFree through their overrides), OpenMovie "
+              "sub_82191618, WaitForLoad sub_82191D70, Start sub_82193DC0 with ReadSave "
+              "sub_82191BB0 and SetHeader sub_82192C80, Unload sub_821927E8 and Close "
+              "sub_82192850 (the same writes; checked by "
               "--run_harnesses=garage_screen)");
 
 namespace hooks {
@@ -122,6 +126,41 @@ void GarageScreenUpdate(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = gs::Update(base, ctx.r1.u32, guest.calls());
 }
+void GarageScreenCreate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+// A tail call: Open runs from the adapter's frame with its lr.
+void GarageScreenOpenMovie(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::OpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void GarageScreenWaitForLoad(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gs::WaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
+}
+void GarageScreenReadSave(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gs::ReadSave(base, ctx.r1.u32);
+}
+void GarageScreenSetHeader(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::SetHeader(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::Start(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenUnload(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::Unload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void GarageScreenClose(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void GarageScreenDestroy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::Destroy(base, ctx.r1.u32, guest.calls());
+}
 
 }  // namespace hooks
 
@@ -151,3 +190,13 @@ ITC_GARAGE_SCREEN(82192C18, GarageScreenLeavePage)
 // UpdatePage and Update (functors the machine calls).
 ITC_GARAGE_SCREEN(82194EA8, GarageScreenUpdatePage)
 ITC_GARAGE_SCREEN(82196230, GarageScreenUpdate)
+// The machine's handlers (functors), and Start's two helpers.
+ITC_GARAGE_SCREEN(82191C58, GarageScreenCreate)
+ITC_GARAGE_SCREEN(82191618, GarageScreenOpenMovie)
+ITC_GARAGE_SCREEN(82191D70, GarageScreenWaitForLoad)
+ITC_GARAGE_SCREEN(82191BB0, GarageScreenReadSave)
+ITC_GARAGE_SCREEN(82192C80, GarageScreenSetHeader)
+ITC_GARAGE_SCREEN(82193DC0, GarageScreenStart)
+ITC_GARAGE_SCREEN(821927E8, GarageScreenUnload)
+ITC_GARAGE_SCREEN(82192850, GarageScreenClose)
+ITC_GARAGE_SCREEN(821915B0, GarageScreenDestroy)
