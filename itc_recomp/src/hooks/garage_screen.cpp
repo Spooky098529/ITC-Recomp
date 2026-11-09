@@ -14,7 +14,11 @@ ITC_FLAG_BOOL(native_garage_screen, true, "ITC",
               "SetPrompts sub_821939A0, SetHelpLine sub_82193A90 and SetUpLists sub_821956C0 "
               "(the UI movie and menu list calls through their overrides, SetScrollArrows the "
               "original); the transitions Transition0 sub_82195BA0, Transition1 sub_82192D60 "
-              "and Transition3 sub_82192E20 (the same writes; checked by "
+              "and Transition3 sub_82192E20; the pages CarListPage sub_82194078 (ReloadStandCar "
+              "the original) and LeavePage sub_82192C18; UpdatePage sub_82194EA8 and Update "
+              "sub_82196230 (the pages and transitions through the guest from their tables, the "
+              "stand's calls through their overrides, PutCarOnStand and the busy marker's three "
+              "the originals) (the same writes; checked by "
               "--run_harnesses=garage_screen)");
 
 namespace hooks {
@@ -102,6 +106,23 @@ void GarageScreenTransition3(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = gs::Transition3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void GarageScreenCarListPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::CarListPage(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenLeavePage(PPCContext& ctx, uint8_t* base) {
+  gs::LeavePage(base, ctx.r3.u32);
+}
+void GarageScreenUpdatePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      gs::UpdatePage(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32, guest.calls());
+}
+void GarageScreenUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::Update(base, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 #define ITC_GARAGE_SCREEN(address, step)    \
@@ -124,3 +145,9 @@ ITC_GARAGE_SCREEN(821956C0, GarageScreenSetUpLists)
 ITC_GARAGE_SCREEN(82195BA0, GarageScreenTransition0)
 ITC_GARAGE_SCREEN(82192D60, GarageScreenTransition1)
 ITC_GARAGE_SCREEN(82192E20, GarageScreenTransition3)
+// The pages seen in play (from UpdatePage's table on its stack).
+ITC_GARAGE_SCREEN(82194078, GarageScreenCarListPage)
+ITC_GARAGE_SCREEN(82192C18, GarageScreenLeavePage)
+// UpdatePage and Update (functors the machine calls).
+ITC_GARAGE_SCREEN(82194EA8, GarageScreenUpdatePage)
+ITC_GARAGE_SCREEN(82196230, GarageScreenUpdate)

@@ -50,6 +50,22 @@ inline uint32_t GarageRecord(uint8_t* base, uint32_t save, uint32_t index) {
   return garage + 1968 * uint32_t(slot);
 }
 
+// Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
+// start +604, 50 slots of 12 bytes), as the handlers do inline.
+inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
+  const uint32_t ring = mode + 204;
+  const uint32_t count = Load(base, ring + 600) + 1;
+  const uint32_t start = Load(base, ring + 604);
+  Store(base, ring + 600, count);
+  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
+  Store(base, slot + 0, id);
+  Store(base, slot + 4, 0);
+  Store(base, slot + 8, 0);
+}
+
+// The garage stage's holder ([[0x826D83E0]]).
+inline uint32_t Holder(uint8_t* base) { return Load(base, Load(base, kStandHolder)); }
+
 // The page object's moves the pages make inline: to `page` after
 // `transition` then `queued` (-1 for none), +8 the page before unless it
 // was `page`.

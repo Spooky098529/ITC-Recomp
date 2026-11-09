@@ -497,6 +497,8 @@ set(ITC_SOURCES
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp
+    src/garage_screen/pages.cpp
+    src/garage_screen/update.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp

@@ -22,5 +22,11 @@ void GarageScreenSetUpLists(PPCContext& ctx, uint8_t* base);
 void GarageScreenTransition0(PPCContext& ctx, uint8_t* base);
 void GarageScreenTransition1(PPCContext& ctx, uint8_t* base);
 void GarageScreenTransition3(PPCContext& ctx, uint8_t* base);
+// The pages seen in play (r3 the mode).
+void GarageScreenCarListPage(PPCContext& ctx, uint8_t* base);
+void GarageScreenLeavePage(PPCContext& ctx, uint8_t* base);
+// UpdatePage and Update (r3 the machine, r4 the mode).
+void GarageScreenUpdatePage(PPCContext& ctx, uint8_t* base);
+void GarageScreenUpdate(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

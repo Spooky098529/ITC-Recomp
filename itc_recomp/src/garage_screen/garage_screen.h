@@ -142,4 +142,36 @@ uint64_t Transition1(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
 // fades' counts (0x826A50DC, 0x826A50E4) are both 0. 112-byte frame.
 uint64_t Transition3(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
 
+// --- The pages seen in play (pages.cpp; r3 the mode) ---
+//
+// sub_82194078 GarageScreen::CarListPage (page 0): MenuList::Update on the
+// first list; when it didn't move, accept (the selection and scroll into
+// the data's +44 and +48, ReloadStandCar the original, transition 4 then 5
+// to page 1, sound 0) or back (transition 3 to page 4, sound 2); when it
+// moved, transition 2 on page 0, sound 4. MenuSound::Play's r3, or
+// Cancelled's (0). 96-byte frame.
+uint64_t CarListPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82192C18 GarageScreen::LeavePage (page 4): the stage's +6052 = 1,
+// message 22 posted on `mode`'s ring. A leaf (r3 left).
+void LeavePage(uint8_t* base, uint32_t mode);
+// sub_82194EA8 GarageScreen::UpdatePage (r3 the machine, r4 the mode): the
+// page from its table (112-byte frame, no bounds check) with r3 = the mode
+// and r5 as given. The page's r3, or `r3` with no page (-1).
+uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint64_t r5, uint32_t sp,
+                    const Calls& calls);
+
+// --- Update (update.cpp) ---
+//
+// sub_82196230 GarageScreen::Update (r3 the machine, r4 the mode; neither
+// read): the empty sub_82106540(100, 30, 0, 0x8200A3C8); the running
+// transition from its table in the frame (no bounds check; the originals
+// for those not seen in play) or, with none, UiMovie::Run unless on page 4;
+// a finished one starts the queued one or goes to the page after; then,
+// while the stand is shown (the data's +72), the busy marker (ShowBusy and
+// HideBusy, the originals) and the selected garage car's model reloaded,
+// the car put on the stand (PutCarOnStand, the original) and preset 1, or
+// the stand drawn; without it, the busy marker hidden (HideBusyNow, the
+// original). The last call's r3 (or the movie). 272-byte frame.
+uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls);
+
 }  // namespace garage_screen

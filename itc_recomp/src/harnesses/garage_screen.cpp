@@ -125,7 +125,8 @@ struct World {
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
         block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)),
         save(memory::Alloc(kSaveDataBytes, 0)),
-        specs(memory::Alloc(0x40 + kSpecCount * kSpecBytes, 0)) {
+        specs(memory::Alloc(0x40 + kSpecCount * kSpecBytes, 0)),
+        stack(memory::Alloc(kBigStackBytes, 0)) {
     if (strings != 0) {
       MakeStrings();
     }
@@ -141,10 +142,13 @@ struct World {
     memory::Free(strings);
     memory::Free(save);
     memory::Free(specs);
+    memory::Free(stack);
   }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0 && strings != 0 && save != 0 && specs != 0; }
+  bool ok() const {
+    return allocation != 0 && strings != 0 && save != 0 && specs != 0 && stack != 0;
+  }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t data() const { return at(kDataAt); }
   uint32_t node(uint32_t n) const { return at(kNodesAt) + kNodeBytes * n; }
@@ -160,6 +164,10 @@ struct World {
   uint32_t strings;
   uint32_t save;   // player 0's save data (all four slots and the data's +36 point at it)
   uint32_t specs;  // the car specs' object ([0x826C2E48])
+  // A stack of our own for the cases whose callees never seen in play have
+  // big frames (ReloadStandCar's 100,560 bytes): r1 near its top.
+  static constexpr uint32_t kBigStackBytes = 0x30000;
+  uint32_t stack;
 
  private:
   void MakeStrings() {
@@ -307,6 +315,41 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, car_specs::kParams, w.specs);
 }
 
+// The stand's world (as the car dealer's harness lays it, drawless, as
+// the car list's harness lays the stand for its callers): the car scene
+// ([0x826C2E44]; +4 0, no sound loads) with one pool 7 scene model in use,
+// the first set none; the garage camera not set up (+112 0:
+// GarageStage::Draw does nothing), +4 -1 or not (GarageStage::IsBusy), the
+// reload count 0 to 2 (GarageStage::ReloadModel answers 0).
+void StandWorld(uint8_t* base, Random& r, const World& w) {
+  const uint32_t scene = w.at(kSceneAt), model = w.at(kSceneModelAt);
+  const uint32_t stage = w.at(kStageAt);
+  guest::StoreU32(base, 0x826C2E44, scene);
+  guest::StoreU32(base, 0x826C2E40, 0);
+  guest::StoreU32(base, scene + 0, r.Below(2) == 0 ? 4 : r.Below(4));
+  guest::StoreU32(base, scene + 48, 3 + r.Below(4));
+  guest::StoreU32(base, scene + 4, 0);
+  guest::StoreU32(base, scene + 5048, 1);
+  guest::StoreU32(base, scene + 5028, model);
+  guest::StoreU32(base, scene + 5036, 1);
+  guest::StoreU32(base, model + 8, 0);
+  guest::StoreU32(base, model + 16, 3);
+  guest::StoreU32(base, model + 20, r.Below(6));
+  guest::StoreU32(base, model + 32, 1);
+  guest::StoreU32(base, model + 5028, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5040, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5044, 3 + r.Below(3));
+  for (const uint32_t at : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+    guest::StoreU32(base, model + at, 0);
+  }
+  guest::StoreU32(base, model + 5116, scene);
+  guest::StoreU32(base, stage + 8, 0);
+  guest::StoreU32(base, stage + 16, r.Below(2));
+  guest::StoreU32(base, stage + 112, 0);
+  guest::StoreU32(base, stage + 4, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(4));
+  guest::StoreU32(base, gs::kStandHolder + 4, r.Below(3));
+}
+
 // The text records the setters made (stored in the movie's map): their
 // words and buffers compared, freed, their map words 0.
 void TextRecords(uint8_t* base, const World& w, Outputs& out) {
@@ -409,6 +452,7 @@ struct Spec {
   std::vector<Range> stack;  // compared below r1 (frames without their saves)
   SetupFn setup;
   AfterFn after = nullptr;
+  bool big_stack = false;  // r1 in the world's own stack
 };
 
 void Run(Context& h, const World& w, const Spec& spec) {
@@ -426,6 +470,12 @@ void Run(Context& h, const World& w, const Spec& spec) {
       PointGlobals(h.base, w, r);
       g_made.clear();
       PPCContext t = CallContext(h);
+      if (spec.big_stack) {
+        // The whole stack random (the callees' frames read words they
+        // don't write).
+        t.r1.u64 = w.stack + World::kBigStackBytes - 1024;
+        WriteRandom(h.base, w.stack, World::kBigStackBytes, r);
+      }
       const uint32_t sp = t.r1.u32;
       WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
       t.r3.u64 = r.Next();
@@ -669,6 +719,76 @@ void Transitions(Context& h, const World& w) {
              hooks::GarageScreenTransition3, {{-112, -24}}, plain});
 }
 
+void Pages(Context& h, const World& w) {
+  // CarListPage: the menus' world (accept reaches ReloadStandCar, the
+  // original, over the world's own stack and the drawless stand: the
+  // selection among the linked cars, the scroll 0).
+  Run(h, w, {"GarageScreen::CarListPage (sub_82194078)", 300, __imp__sub_82194078,
+             hooks::GarageScreenCarListPage, {{-96, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               StandWorld(w.base, r, w);
+               const int32_t count = int16_t(guest::LoadU16(w.base, w.save + 6328));
+               const uint32_t list = w.at(kListAt);
+               guest::StoreU32(w.base, list + race_screens::kListScroll, 0);
+               guest::StoreU32(w.base, list + race_screens::kListSelection,
+                               count > 0 ? r.Below(uint32_t(count)) : 0);
+               if (r.Below(2) == 0) {
+                 guest::StoreU32(w.base, list + race_screens::kListScrollBefore, 0);
+                 guest::StoreU32(w.base, list + race_screens::kListMove, 0);
+               }
+               t.r3.u64 = w.at(kModeAt);
+             },
+             nullptr, true});
+  Run(h, w, {"GarageScreen::LeavePage (sub_82192C18)", 60, __imp__sub_82192C18,
+             hooks::GarageScreenLeavePage, {},
+             [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kModeAt); }});
+  // UpdatePage: the page -1, 0 (CarListPage, through its adapter, over the
+  // world's own stack and the drawless stand as its own cases) or 4
+  // (LeavePage); r4 the mode.
+  Run(h, w, {"GarageScreen::UpdatePage (sub_82194EA8; sub_82194078, sub_82192C18)", 150,
+             __imp__sub_82194EA8, hooks::GarageScreenUpdatePage, {{-112, -8}},
+             [](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               StandWorld(w.base, r, w);
+               const uint32_t pages[3] = {0xFFFFFFFFu, 0, 4};
+               guest::StoreU32(w.base, w.at(kPagesAt), pages[r.Below(3)]);
+               t.r4.u64 = w.at(kModeAt);
+             },
+             nullptr, true});
+  // Update: the running transition -1, another negative, 0, 1 or 3 (their
+  // plain C++ through their adapters, SetUpLists' world), the queued one -1
+  // or small, the page 4 or another, the started word; the stand drawless,
+  // the data's +72, +76 and +84 0 or not, its +44 and +48 among the linked
+  // cars.
+  Run(h, w, {"GarageScreen::Update (sub_82196230; sub_82195BA0, sub_82192D60, sub_82192E20)",
+             300, __imp__sub_82196230, hooks::GarageScreenUpdate, {{-272, -104}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               MenuWorld(r, w);
+               MenuBlocks(r, w);
+               RowsWorld(r, w);
+               StandWorld(base, r, w);
+               const uint32_t pages = w.at(kPagesAt);
+               const uint32_t running[5] = {0xFFFFFFFFu, 0xFFFFFFF0u + r.Below(15), 0, 1, 3};
+               guest::StoreU32(base, pages + 12, running[r.Below(5)]);
+               guest::StoreU32(base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(18));
+               guest::StoreU32(base, pages + 0, r.Below(3) == 0 ? 4 : r.Below(6));
+               const uint32_t words[3] = {0, 1, uint32_t(r.Next())};
+               guest::StoreU32(base, pages + 24, words[r.Below(4) == 0 ? 1 + r.Below(2) : 0]);
+               const uint32_t data = w.data();
+               const int32_t count = int16_t(guest::LoadU16(base, w.save + 6328));
+               guest::StoreU32(base, data + 44, 0);
+               guest::StoreU32(base, data + 48, count > 0 ? r.Below(uint32_t(count)) : 0);
+               guest::StoreU32(base, data + 72, r.Below(4) == 0 ? 0 : 1);
+               guest::StoreU32(base, data + 76, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+               guest::StoreU32(base, data + 84, r.Below(2));
+               t.r3.u64 = w.at(kMachineAt);
+               t.r4.u64 = w.at(kModeAt);
+             },
+             FreeMenuBlocks});
+}
+
 }  // namespace
 
 void GarageScreen(Context& h) {
@@ -680,6 +800,7 @@ void GarageScreen(Context& h) {
   Helpers(h, w);
   if (hooks::NativeHeapActive()) {
     Transitions(h, w);
+    Pages(h, w);
   }
 }
 
