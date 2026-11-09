@@ -133,4 +133,19 @@ void LoadInteriorSlots(uint8_t* base, uint32_t screen);
 constexpr uint32_t kLoadCurrentChoicesFrame = 192;
 uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1);
 
+// --- The owned parts (owned_parts.cpp) ---
+//
+// sub_821DBAB0 TuningScreen::LoadOwnedParts (r3 the screen): the screen's
+// owned words, each 1 or 0 from its bit in the selected garage car's
+// bitset (its +1904) or the save data's (+0x1996C), the inverse of
+// TuningScreen::StoreOwnedParts (tuning_pages.h; its row): the power items
+// by the part set [+33900] (none written outside 0 to 4), tire 0 and a few
+// words always 1, the interior's by [+25172], the wheels' flags cleared and
+// set through TestAndSetWheelFlag's plain C++, the interior item 3's rows
+// cleared and set by the {3, 2, 1, 0} table it keeps at frame + 80.
+// 160-byte frame (the back chain and the table written). r3: the last
+// TestAndSetWheelFlag's, else 35960 (a leftover of the tires' loop).
+constexpr uint32_t kLoadOwnedPartsFrame = 160;
+uint64_t LoadOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp);
+
 }  // namespace tuning_machine

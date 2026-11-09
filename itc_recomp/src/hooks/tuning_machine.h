@@ -28,5 +28,6 @@ void TuningMachineInit(PPCContext& ctx, uint8_t* base);
 // The screen's set-up's callees (r3 the screen).
 void TuningMachineLoadInteriorSlots(PPCContext& ctx, uint8_t* base);
 void TuningMachineLoadCurrentChoices(PPCContext& ctx, uint8_t* base);
+void TuningMachineLoadOwnedParts(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

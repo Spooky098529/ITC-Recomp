@@ -31,6 +31,7 @@
 #include "hooks/tuning_machine.h"
 #include "memory/heap.h"
 #include "tuning_machine/tuning_machine.h"
+#include "tuning_screen/tuning_screen.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -567,6 +568,58 @@ void SetUpCallees(Context& h, const World& w) {
              after});
 }
 
+// A bitset of `words` words at `at`: all clear, all set, a few bits, many
+// or random, by `mode` (5: each word its own mode).
+void FillBits(uint8_t* base, uint32_t at, uint32_t words, uint32_t mode, Random& r) {
+  for (uint32_t k = 0; k < words; k++) {
+    const uint32_t m = mode == 5 ? r.Below(5) : mode;
+    uint32_t word = 0;
+    switch (m) {
+      case 0: word = 0; break;
+      case 1: word = 0xFFFFFFFFu; break;
+      case 2: word = r.Below(3) == 0 ? 1u << r.Below(32) : 0; break;
+      case 3: word = uint32_t(r.Next()) | uint32_t(r.Next()); break;
+      default: word = uint32_t(r.Next()); break;
+    }
+    guest::StoreU32(base, at + 4 * k, word);
+  }
+}
+
+// LoadOwnedParts: the save shaped as for the other callees, the selected
+// car's +1904 bitset (13 words, bits 0 to 409) and the save's +0x1996C (14
+// words, bits 95 to 438) with few or many bits, the wheels' bits (189 to
+// 367) now and then all clear (r3 then the tires' leftover); the part set
+// [+33900] 0 to 4, now and then out of range; [+25172] 0, 1 or any. Its
+// frame but its saves (r26 on, -56) compared; the save compared.
+void OwnedParts(Context& h, const World& w) {
+  Run(h, w, {"TuningScreen::LoadOwnedParts (sub_821DBAB0; sub_821CDF98)", 240,
+             __imp__sub_821DBAB0, hooks::TuningMachineLoadOwnedParts, {{-160, -56}},
+             [](PPCContext& t, Random& r, const World& w) {
+               ShapeSave(w.base, w, r);
+               Screen(t, r, w);
+               const uint32_t s = w.screen();
+               const uint32_t car = tuning_screen::SelectedGarageCar(w.base, s) + 212 + 1904;
+               FillBits(w.base, car, 13, r.Below(6), r);
+               const uint32_t bits = w.save + 0x1996C;
+               FillBits(w.base, bits, 14, r.Below(6), r);
+               if (r.Below(4) == 0) {
+                 FillBits(w.base, bits + 5 * 4, 7, 0, r);  // bits 160 to 383
+               }
+               uint32_t set = r.Below(5);
+               switch (r.Below(6)) {
+                 case 0: set = 5 + r.Below(20); break;
+                 case 1: set = uint32_t(r.Next()); break;
+                 default: break;
+               }
+               guest::StoreU32(w.base, s + 33900, set);
+               guest::StoreU32(w.base, s + 25172,
+                               r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+             },
+             [&h](PPCContext&, const World& w, Outputs& out) {
+               out.Bytes(Read(h.base, w.save, kSaveDataBytes));
+             }});
+}
+
 }  // namespace
 
 void TuningMachine(Context& h) {
@@ -577,6 +630,7 @@ void TuningMachine(Context& h) {
   }
   Init(h, w);
   SetUpCallees(h, w);
+  OwnedParts(h, w);
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
   }

@@ -505,6 +505,7 @@ set(ITC_SOURCES
     src/tuning_machine/handlers.cpp
     src/tuning_machine/init.cpp
     src/tuning_machine/set_up.cpp
+    src/tuning_machine/owned_parts.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp
