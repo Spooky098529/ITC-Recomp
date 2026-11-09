@@ -71,6 +71,11 @@ When the user has reviewed a run's section, its heading gets
   harnesses share it (for a later look). Harness world fixes: `Page21`'s
   copy 0x1D52C bytes past player 1's save data; `sub_82290640`'s replay
   record from the save buffers' list.
+- The type 2 dialog's map (c257b0c2): `type2-dialog.md`, 28 rows (the
+  type 2 mode's machine at +0x1E4C8, like the type 6 and 7 dialogs,
+  sharing `Dialog::OpenMovies` and `Dialog::Leave`); a row in
+  `known-data.md` (`0x826D83F8`-`0x826D8400`, `0x82636200`,
+  `0x82636204`); `menu-helpers.md`'s pointers moved to the new file.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 

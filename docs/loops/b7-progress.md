@@ -73,7 +73,11 @@ file's history. What's left to see in a drive, from every run:
   (`sub_82188178`, `sub_821869B8`, `sub_82186428`, `sub_82186490`,
   `sub_821864A0`, `sub_82187160`, `sub_82187330`, `sub_82187508`,
   `sub_82187EC8`: the type 2 mode's +0x1E4C8 machine; all roots ready;
-  its line deleted from `leads.md`). Step: mapping (agent running).
+  its line deleted from `leads.md`). Mapped `type2-dialog.md`
+  (c257b0c2: 28 rows, 21 in play: the type 2 mode's dialog, four
+  dialogs over UI movies 16 to 19, its 16 transitions, pages and 10
+  steps; 21 ready groups; no leads added, one lead's line given a note;
+  no subagents); map checked. Step: migration (agent running).
 
 ## Done
 
@@ -114,5 +118,7 @@ file's history. What's left to see in a drive, from every run:
   known 426, unknown 751).
 - After its migration: ours 5237, work left 1196 (wrapped 56, known
   389, unknown 751).
+- After the type 2 dialog's map: ours 5237, work left 1196 (wrapped 56,
+  known 410, unknown 730).
 
 ## Stopped
