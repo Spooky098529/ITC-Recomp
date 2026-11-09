@@ -1,0 +1,204 @@
+# Known functions: the save screen
+
+The front end's **save screen** (UI movie 44, asset 22588): the yes/no
+dialogs and waits around the save layer
+([`save-interface.md`](save-interface.md): `SaveBuffers::Create` and
+`Destroy`, `SaveSlots::RequestDevice`, `State`, `Device`, `Pending`,
+`GameData::Save` and `Load`, `Replays::BuildList` and `Load`;
+`GameData::Check` in [`files-and-saves.md`](files-and-saves.md)).
+One state machine (`StateMachine::`, [`game-modes.md`](game-modes.md))
+in five front-end modes, each set up by an Init of its own with the same
+handlers and one or two open messages: type 6's at its block's +81616
+(`Type6SaveScreen::Init` `sub_821A8210`, in
+[`type6-type7-modes.md`](type6-type7-modes.md), shared), type 2's at
++0x255C0 (`sub_821A6E18`, [`type2-screens.md`](type2-screens.md)'s
+mode), type 4's (the title) at +19280, type 10's at +9640 and type 8's
+(`sub_821A87F0`, not seen in play). The handlers get r3 = the machine
+and r4 = the mode (its message ring at +204, which the end pages and
+`SaveScreen::Leave` post to). Its blocks are globals
+(`../known-data.md`): `[0x826D844C]` the page block (28 bytes, laid out
+as the options' `0x826D8470`: +0 the page `SaveScreen::Draw` runs, -1
+while a step runs; +4 the page after the step; +8 the page before; +12
+the step `SaveScreen::Update` runs, -1 none; +16 the step queued after
+it; +20; +24 the step's started word), `[0x826D8450]` a menu list (72
+bytes, `MenuList::`, [`race-screens.md`](race-screens.md)) and
+`[0x826D8454]` the screen's data (68 bytes; +12 the dialog's message,
++16 its state, +36 the kind).
+
+The machine: (0, 1) `OnEnter` makes the blocks and goes to 1 (load the
+movie now: the modes set +9612 = 1) or 9 (idle, the movie loaded when
+opened); (1, 1) opens the movie, (2, 1) waits for it, then 9 or 4; in 9
+an open message sets the kind (`[0x826D8454]` +36) and goes to 4 (or 1
+when the movie isn't loaded yet); (4, 1) `Show` sets the kind's first
+page and dialog up and goes to 5; in 5, Update (message 0) runs the
+dialog steps and Draw (message 1) the pages; a cancel message sets +28,
+which Draw turns into the kind's end page; the end pages post the
+result to the mode and send the machine back to 9 (through +32);
+message 4 (`SaveScreen::Leave`, from 5 and 9) finishes and deletes the
+movie and goes to 7; (7, 4) `OnLeft` frees the blocks and goes to 6.
+The kinds, by their open messages and the pages they use:
+
+| Kind | Opened by | Show | Pages | End page posts |
+|---|---|---|---|---|
+| 0 | type 6 msg 29 (the type 6 quit), type 2 msg 43 | `SaveBuffers::Create`, `SaveScreen::StartCheck` | 0 to 4 | 4: type 2 44 or 45, type 6 30 or 31 (by +4) |
+| 1 | type 4 msg 13 (the title), type 2 msg 46 | `SaveBuffers::Create`, `SaveScreen::Start` | 5 to 9 | 9: type 2 47, type 4 14 |
+| 2 to 5 | type 10 msgs 7 (2), 8 (3), 10 (4), 9 (5) | `ShowKind2` to `ShowKind5` | 10 to 16 (the replays) | 16: 11, 13, 14 or 12 (by +4) |
+| 6 | type 8 msg 29 (not seen) | `SaveBuffers::Create`, `ShowKind6` | 17 to 23 (the player at +44) | 21: 31 |
+| 7 | type 4 msg 15 (the title) | `ShowKind7` | 24, 25 | 25: 16 |
+
+Cancel messages (to `SaveScreen::Cancel`): type 6 32, type 2 48, type 4
+17, type 10 15, type 8 30. Page 26 (`sub_821A2338`) only sends the
+machine back to 9; no page goes to it.
+
+The dialog steps (`SaveScreen::Update`'s table): 0 `ShowMessage`, 1
+`MoveSelection`, 2 `CloseDialog`, 3 `ShowMessage3`, 4 `ShowMessage4`, 5
+`ShowMessage5`, 6 `ShowNotice`. Steps 0 and 3 to 6, their text setters
+and `SaveScreen::StartCheck` and `Start` are in
+[`front-end-screen-helpers.md`](front-end-screen-helpers.md) (shared);
+steps 1 and 2 are here. A page moves on in one of two ways: to another
+page through a step (+8 = +0 unless it's that page already, +12 = the
+step, usually 2 to close the dialog, +16 = the step queued after it,
+usually 0, 3 or 4 to show the next message, or -1, +4 = the page, +0 =
+-1: written "→ page n (step s, then t)" below), or straight to a page
+(+8, +0 = the page, +12 and +16 = -1: "jump to page n"). A page that
+goes on with a new message sets the data's +12 (the message, a kind of
+the next `ShowMessage` step's table, "msg m" below) and +20 (the
+dialog's state after the close, which step 2 copies to +16:
+`ShowMessage`'s 0 the question with its two answers, 1 and 2 the note),
+and some reset the wait counter +24. The waits count Draw's calls: 45
+(1.5 s) or 90 (3 s) before they read the slot again. "Moved" below: a
+page with a menu calls `MenuList::Cancelled` (its answer unused), and
+when the list's +24 is set (the selection moved this update)
+`MenuSound::Play(4)` and → its own page (step 1, then -1).
+
+Read for the B7 loop's mapping agent, 2026-11-09, from the handlers in
+the Inits (the keys read from the frames `StateMachine::Add` is given)
+and the tables in the code (`Show`'s kinds, `Update`'s steps, `Draw`'s
+27 pages). The pages seen in play were read in full, those not seen in
+play only for their calls and pages. Everything seen is ready
+(`b7_groups.py`); `Update`'s and `Draw`'s tables are indirect calls
+the tool doesn't count, so steps 1 and 2 and the pages go before
+`Update` and `Draw`. Shared, with their rows elsewhere:
+`StateMachine::Add` `sub_82106158` ([`game-modes.md`](game-modes.md)),
+the empty `sub_82106540` ([`audio.md`](audio.md); the (8, 3)
+transition, and `Update`'s first call, with r3 = 100, r4 = 30, r5 = 0,
+r6 = `0x8200A4F0`), the UI movie calls
+([`ui-movies-game.md`](ui-movies-game.md)), the menu list
+([`race-screens.md`](race-screens.md)), `MenuList::Init` `sub_8220BAC0`
+([`save-data.md`](save-data.md)) and `MenuList::Release` `sub_8220BBB0`
+([`alt-hud.md`](alt-hud.md)), `MenuSound::Play` `sub_821103F0`
+([`menu-sounds.md`](menu-sounds.md)), `SaveData::Of` `sub_82105620`
+([`vehicle-accessors.md`](vehicle-accessors.md)), `memcpy`
+([`c-runtime.md`](c-runtime.md)), `VirtualAlloc` and `VirtualFree`
+([`heap.md`](heap.md)), `XShowSigninUI` `sub_822952C0` (Dropped,
+[`system-services.md`](system-services.md); called only by pages not
+seen in play), `RaceSnapshot::Copy` `sub_82104EA8`
+([`replay-snapshots.md`](replay-snapshots.md)).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_821A6E18` | `Type2SaveScreen::Init` (probably) | | r3 = the machine at the type 2 block's +0x255C0 (`type2-screens.md`). As `Type6SaveScreen::Init` (`type6-type7-modes.md`): the same 10 transitions ((0, 1), (1, 1), (2, 1), (4, 1), (5, 1), (5, 0), (8, 3), (5, 4), (9, 4), (7, 4)), with (5, 48) `SaveScreen::Cancel`, (9, 43) `SaveScreen::OpenKind0` and (9, 46) `OpenKind1`: 13 `StateMachine::Add` calls, each given a key on the frame (+80 the state, +84 the message, +88 and +92 0) and a 24-byte functor copied by a six-word loop (vtable `0x82011918`, the machine, the handler), the next state at its +24 ((1, 1) → 2, (4, 1) → 5, (7, 4) → 6, the rest 0). 453 lines. Only caller the type 2 mode's Init `sub_82197278` (a lead). Seen in play. Read for its keys and handlers (the frame stores followed by a script); the copies as `Type6SaveScreen::Init`'s, whose native code (`src/type67_modes/inits.cpp`, the step table from `itc_recomp/tools/init_step_tables.py`) is the model. |
+| `sub_821A7470` | `Type4SaveScreen::Init` (probably) | | r3 = the machine at the type 4 (the title's) block's +19280. As `Type2SaveScreen::Init` with (5, 17) `SaveScreen::Cancel`, (9, 13) `OpenKind1` (the game data's load) and (9, 15) `OpenKind7` (the controller pick): 13 transitions. 453 lines. Only caller the title's mode Init `sub_82224C70` (a lead). Seen in play. Read for its keys and handlers. |
+| `sub_821A7AC8` | `Type10SaveScreen::Init` (probably) | | r3 = the machine at the type 10 block's +9640. As `Type2SaveScreen::Init` with (5, 15) `SaveScreen::Cancel`, (9, 8) `OpenKind3`, (9, 7) `OpenKind2`, (9, 9) `OpenKind5` and (9, 10) `OpenKind4` (the replays): 15 transitions. 519 lines. Only caller the type 10 mode's Init `sub_82288940` (a lead in `../loops/leads.md`). Seen in play. Read for its keys and handlers. |
+| `sub_821A87F0` | `Type8SaveScreen::Init` (probably) | | r3 = the machine at +0x13128 of the type 8 mode's block (probably). As `Type2SaveScreen::Init` with (5, 30) `SaveScreen::Cancel` and (9, 29) `OpenKind6`: 12 transitions. Only caller the type 8 mode's Init `sub_8223D5D8`. Not seen in play. Read for its keys and handlers. |
+| `sub_821A2608` | `SaveScreen::OnEnter` | | Transition (0, 1). r3 = the machine: +9608 (the movie loaded) = 0; `VirtualAlloc(0, 28, MEM_COMMIT, PAGE_READWRITE)` → `[0x826D844C]` (the page block: +0, +4, +8, +24 = 0, +12 and +20 = -1; +16 left), 72 → `[0x826D8450]` (the menu list: when not null +68 and +60 = 0), 68 → `[0x826D8454]` (the data: +0, +56, +60 = 0, +32 = 21, none); +9604 (the state) = 1 when +9612 is set (the movie loaded at once), else 9. The other blocks' words are left as `VirtualAlloc` gives them (zeroed pages). A 112-byte frame (r30, r31 saved). Seen in play. Read in full. |
+| `sub_821A1D10` | `SaveScreen::OpenMovie` | | Transition (1, 1) → 2: a tail call of `UiMovies::Open(44, 22588)` (`sub_8211E808`). Seen in play. Read in full. |
+| `sub_821A26F0` | `SaveScreen::WaitMovie` | | Transition (2, 1). r3 = the machine: when +9608 is 0 and `UiMovies::IsLoaded(44)` (`sub_8211BE98`), +9608 = 1; once +9608 is set, +9604 = 9 when +9612 is set, else 4 (opened already: show it). A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A2760` | `SaveScreen::OpenKind0` | | Transition (9, 29) of type 6 and (9, 43) of type 2: `[0x826D8454]` +36 = 0; +9604 = 4 when the movie is loaded (+9608), else 1. Leaf. Seen in play. Read in full. |
+| `sub_821A2790` | `SaveScreen::OpenKind1` | | (9, 13) of the title, (9, 46) of type 2: as `OpenKind0` with the kind 1. Leaf. Seen in play. Read in full. |
+| `sub_821A2820` | `SaveScreen::OpenKind2` | | (9, 7) of type 10: as `OpenKind0` with the kind 2. Leaf. Seen in play. Read in full. |
+| `sub_821A27F0` | `SaveScreen::OpenKind3` | | (9, 8) of type 10: as `OpenKind0` with the kind 3. Leaf. Not seen in play. Read in full. |
+| `sub_821A2850` | `SaveScreen::OpenKind4` | | (9, 10) of type 10: as `OpenKind0` with the kind 4 (+9604 = the 4 it holds when the movie is loaded). Leaf. Not seen in play. Read in full. |
+| `sub_821A2880` | `SaveScreen::OpenKind5` | | (9, 9) of type 10: as `OpenKind0` with the kind 5. Leaf. Not seen in play. Read in full. |
+| `sub_821A27C0` | `SaveScreen::OpenKind6` | | (9, 29) of type 8: as `OpenKind0` with the kind 6. Leaf. Not seen in play. Read in full. |
+| `sub_821A28B0` | `SaveScreen::OpenKind7` | | (9, 15) of the title: as `OpenKind0` with the kind 7. Leaf. Seen in play. Read in full. |
+| `sub_821A6608` | `SaveScreen::Show` | | Transition (4, 1) → 5. By the kind (`[0x826D8454]` +36, a jump table 0 to 7; above 7 nothing): 0 `SaveScreen::ShowCheck` (its own function: the recompiler split the case off); 1 `SaveBuffers::Create` (`sub_8228F6B0`) and `SaveScreen::Start` (`sub_821A5540`, `front-end-screen-helpers.md`); 2 `ShowKind2`; 3 `ShowKind3`; 4 `ShowKind4`; 5 `ShowKind5`; 6 `SaveBuffers::Create` and `ShowKind6`; 7 `ShowKind7`. A 96-byte frame. Seen in play. Read in full. (Corrects `type6-type7-modes.md`'s first look, which had kinds 0 to 4.) |
+| `sub_821A6650` | `SaveScreen::ShowCheck` | | Case 0 of `SaveScreen::Show`'s jump table, split into a function of its own by the recompiler: `SaveBuffers::Create`, `SaveScreen::StartCheck` (`sub_821A5450`, `front-end-screen-helpers.md`), then `Show`'s epilogue. Seen in play. Read in full. |
+| `sub_821A1D38` | `SaveScreen::ShowKind2` | | No arguments. d = `[0x826D8454]`, p = `[0x826D844C]`: d +28 = 0, +12 = 2 (the message), +16 = 1 (the note), +24 = 0; → page 13 (step 4, then -1); d +4 = 0; `MenuList::Init([0x826D8450], 1, 1, 0, 154, 153, 155, 156, 159, 158)` (the last two on the frame's +84 and +92); d +8 = 1, +56 = 1. A 128-byte frame. From `Show` only. Seen in play. Read in full. |
+| `sub_821A1E18` | `SaveScreen::ShowKind3` | | As `ShowKind2` with d +12 = 1, +16 = 0 (the question) and page 12 (step 4); d +8 = 0; d +24 not written. A 128-byte frame (`__savegprlr_29`). From `Show` only. Not seen in play. Read in full. |
+| `sub_821A1ED8` | `SaveScreen::ShowKind4` | | As `ShowKind2` with d +12 = 10 and page 13 (step 4); d +8 and +24 not written. A 128-byte frame. From `Show` only. Not seen in play. Read in full. |
+| `sub_821A1FA8` | `SaveScreen::ShowKind5` | | As `ShowKind2` with d +12 = 12, +16 = 0 and page 12 (step 4); d +24 and +8 not written. A 112-byte frame. From `Show` only. Not seen in play. Read in full. |
+| `sub_821A2070` | `SaveScreen::ShowKind6` | | d +28 = 0, +12 = 0, +16 = -1 (no dialog); jump to page 22; d +4 = 0, +44 = 0 (player 0 first); `MenuList::Init` as `ShowKind2`'s; d +56 = 1. A 112-byte frame. From `Show` only (after `SaveBuffers::Create`). Not seen in play. Read in full. |
+| `sub_821A2138` | `SaveScreen::ShowKind7` | | d +28, +12, +16 = 0; → page 24 (step 6 `ShowNotice`, then -1); d +4 = 1; `MenuList::Init` as `ShowKind2`'s; d +56 = 1. A 128-byte frame. From `Show` only. Seen in play. Read in full. |
+| `sub_821A64A0` | `SaveScreen::Update` | | Transition (5, 0). First the empty `sub_82106540(100, 30, 0, 0x8200A4F0)` (a debug print left out of the build, probably); m = UI movie 44 (`UiMovies::Find`, the key 44 on the frame's +80). The step table on the frame (+96 to +120): 0 `ShowMessage` `sub_821A5668`, 1 `MoveSelection` `sub_821A5118`, 2 `CloseDialog` `sub_821A5038`, 3 `sub_821A5980`, 4 `sub_821A5D00`, 5 `sub_821A6030`, 6 `sub_821A63B0`. p = `[0x826D844C]`: when p +12 isn't -1: a step 0 or more is called with r3 = p + 24 (the started word); when it answers nonzero, or at once for a negative step: with a queued step (p +16 not -1) p +12 = it, +16 = -1, +20 = 0; else p +12 = -1 and p +0 = p +4 (the page after); then p +24 = 0. When p +12 is -1 and the data's +16 (the dialog) isn't -1: `UiMovie::Run(m, 0)`. A 144-byte frame (r31 saved). Seen in play. Read in full. |
+| `sub_821A5118` | `SaveScreen::MoveSelection` | | Step 1 of `Update`'s table, r3 = the started word. m = movie 44. First call (the word 0): s = `MenuList::Selection(list)`, `UiMovie::FinishNamed(m, MenuList::GetPreviousSelection(list) + 2)`, `PlayNamed(m, s + 2, 0, 0, 0, 0)`, `LoopNamed(m, s + 2)`, the word = 1. Every call: `UiMovie::Run(m, 0)`; returns 1 (done at once). A 128-byte frame (`__savegprlr_28`). Seen in play. Read in full. |
+| `sub_821A5038` | `SaveScreen::CloseDialog` | | Step 2 of `Update`'s table, r3 = the started word. m = movie 44. First call: by the data's +16 (unsigned): 0 `FinishNamed(m, Selection(list) + 2)` and `PlayNamed(m, 14, 0, 0, 0, 0)`; 1 `PlayNamed(m, 15, ...)`; 2 `FinishNamed(m, 0)` and `PlayNamed(m, 15, ...)`; 3 and up neither; then `MenuSound::Play(5)` and the word = 1. Every call: `UiMovie::Run(m, 0)`; when it answers 0, the data's +16 = its +20 (the next dialog state). Returns whether Run answered 0. A 128-byte frame (`__savegprlr_29`). Seen in play. Read in full. |
+| `sub_821A6AF0` | `SaveScreen::Draw` | | Transition (5, 1). r3 = the machine, r4 = the mode (both kept on the frame). The cancel: unless a step runs (p +0 -1 with p +12 not -1), when the data's +28 is set and the page isn't an end page (4, 9, 16, 21, 25, 26), by the kind: 0 → page 4, 1 → page 9, 2 to 5 → page 16 (with d +4 = 0), 7 → page 25, each through step 2 (then -1); 6: with no dialog (d +16 -1) jump to page 21, else → page 21 (step 2); above 7 nothing. Then the page table on the frame (+96 to +200, 27 pages): 0 `sub_821A28E0`, 1 `sub_821A2AF8`, 2 `sub_821A2C98`, 3 `sub_821A2EE8`, 4 `sub_821A4D30`, 5 `sub_821A2FB0`, 6 `sub_821A32C0`, 7 `sub_821A33E8`, 8 `sub_821A3728`, 9 `sub_821A4DE0`, 10 `sub_821A3868`, 11 `sub_821A3950`, 12 `sub_821A3A08`, 13 `sub_821A3C60`, 14 `sub_821A67E8`, 15 `sub_821A3DE8`, 16 `sub_821A4E60`, 17 `sub_821A3ED8`, 18 `sub_821A4228`, 19 `sub_821A4450`, 20 `sub_821A4810`, 21 `sub_821A4EF8`, 22 `sub_821A2208`, 23 `sub_821A4970`, 24 `sub_821A4AC0`, 25 `sub_821A4FD8`, 26 `sub_821A2338`: the page p +0 is called (none when -1) with r3 = the mode. Then when the data's +32 isn't 21: the machine's +9604 = it, +32 = 21, and for kinds 0 and 1 `SaveBuffers::Destroy` (`sub_8228F8F8`). A 368-byte frame (`__savegprlr_14`). Seen in play. Read in full. |
+| `sub_821A1D20` | `SaveScreen::Cancel` | | The cancel transitions (5, 32) of type 6, (5, 48) of type 2, (5, 17) of the title, (5, 15) of type 10, (5, 30) of type 8: `[0x826D8454]` +28 = 1 (`Draw` turns it into the end page). Leaf. Not seen in play. Read in full. |
+| `sub_821A4C58` | `SaveScreen::Leave` | | Transitions (5, 4) and (9, 4). r3 = the machine, r4 = the mode: +9604 = 7; `UiMovie::FinishAll(movie 44)` (`sub_8211DFF8`, found by `UiMovies::Find`), `UiMovies::Delete(44)` (`sub_8211E258`); when the mode type `[0x826032DC]` is 2, 4, 6, 8 or 10, message {4, 0, 0} posted to the mode's ring (+204: the count +804 up by one, the slot (+808 + count - 1) mod 50, 12 bytes). A 112-byte frame (r31 saved). Seen in play. Read in full. |
+| `sub_821A1CA0` | `SaveScreen::OnLeft` | | Transition (7, 4) → 6: `MenuList::Release([0x826D8450])` (`sub_8220BBB0`), then `VirtualFree(.., 0, MEM_RELEASE)` (`sub_82295330`) on `[0x826D844C]`, `[0x826D8450]` and `[0x826D8454]` and the three globals = 0. A 112-byte frame (`__savegprlr_29`). Seen in play. Read in full. |
+| `sub_821A28E0` | `SaveScreen::Page0` (probably, kind 0's question) | | Draw's page 0 (kind 0's questions), r3 = the mode (unused). `MenuList::Update(list)`; when `MenuList::Accepted`: `MenuSound::Play(0)`, s = `Selection`; by the message d +12: 1 and 5 (save?): s 0 → page 2 (step 2, then 0), msg 8, d +20 = 2, `GameData::Save` (`sub_8228FB00`); else → page 0 (step 2, then 0), msg 6, d +20 = 0; 4: s 0 jump to page 3 and `SaveSlots::RequestDevice(0)`, else → page 0 msg 6; 6: s 0 → page 4 (step 2, then -1), else → page 2 (step 2, then 0), msg 0, d +20 = 2; 11: s 0 → page 4, else jump to page 3 and `RequestDevice(0)`; others nothing. Then moved (as the intro: → page 0, step 1). A 128-byte frame (`__savegprlr_28`). Seen in play. Read in full. |
+| `sub_821A2AF8` | `SaveScreen::Page1` (probably, kind 0's notes) | | Draw's page 1: d +24 up by one; at 45 or more with msg 3, jump to page 3 and `RequestDevice(0)`. When `Accepted`: `MenuSound::Play(0)`; by msg: 2 → page 4 (step 2, then -1); 3 jump to page 3 and `RequestDevice(0)`; 7 and 10 → page 0 (step 2, then 0), msg 6, d +20 = 0; 9 → page 4 (step 2) with d +4 = 1 (the end's answer). A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A2C98` | `SaveScreen::Page2` (probably, kind 0's wait) | | Draw's page 2. `SaveSlots::State(0)` 1 (probably no user or device) → page 0 (step 2, then 0), msg 4, d +20 = 0. Else d +24 up by one; at 90: msg 0: by `GameData::Check(0)` (`sub_8228FC50`, `files-and-saves.md`): 0 → page 0 msg 1, 1 → page 0 msg 5 (d +20 0), 2 → page 1 msg 7 (d +20 1), others nothing; msg 8 and the state not 7: state 2: by `SaveInterface::Word992` (`sub_8228FA20`): 2 → page 1 msg 10, 3 → page 1 msg 7 (d +20 1), then `sub_8228FA58(0)` (`Request980`); state 3 → page 1 msg 9 (d +20 1). Each through step 2, then 0. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A2EE8` | `SaveScreen::Page3` (probably, kind 0's device wait) | | Draw's page 3. Unless `SaveSlots::State(0)` is 4 (the selector still up, probably): `SaveSlots::Device(0)` (`sub_8228FA90`) nonzero → page 2 (step 2, then 0), msg 0, d +20 = 2; zero → page 0 (step 2, then 0), msg 11, d +20 = 0. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A4D30` | `SaveScreen::Page4` (kind 0's end) | | Draw's page 4, r3 = the mode. By d +4 and the mode type `[0x826032DC]`: d +4 1: type 2 posts 44, type 6 posts 30; else type 2 45, type 6 31; other types post nothing (the message {id, 0, 0} into the mode's ring, as `Leave`'s). d +32 = 9 (Draw sends the machine back to 9). Leaf. Seen in play. Read in full. |
+| `sub_821A2FB0` | `SaveScreen::Page5` (probably, kind 1's question) | | Draw's page 5: `MenuList::Update`, `Accepted`, `Selection`, `MenuSound::Play(0)`; a jump table by msg - 1 (0 to 15) sends the answers to pages 5, 6, 7, 9 or 10 (with `XShowSigninUI(1, 1)` for one of them, then a jump to page 10) and new messages (2, 6, 9, 12 to 16); case 0 is `sub_821A303C`; then moved (→ page 5, step 1). A 144-byte frame (`__savegprlr_26`). Not seen in play. Not read in detail. |
+| `sub_821A303C` | | | A case of `SaveScreen::Page5`'s jump table, split off by the recompiler: s nonzero → page 9 (step 2, then -1); zero → page 6 (step 2, then 3), msg 0, d +20 = 1; then the rest of `Page5`. Not seen in play. Not read in detail. Reached only from `Page5`'s table. |
+| `sub_821A32C0` | `SaveScreen::Page6` (probably, kind 1's note) | | Draw's page 6. d +24 up by one; at 45 or more with msg 0: when `SaveScreen::StoreSettings` answers nonzero (not while the profile read is pending), jump to page 8 and `RequestDevice(0)`. When `Accepted`: `MenuSound::Play(0)`; msg 0: the same through `StoreSettings`; 5, 6, 7 and 11 → page 9 (step 2, then -1). A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A33E8` | `SaveScreen::Page7` (probably, kind 1's load and save wait) | | Draw's page 7. s = `SaveSlots::State(0)`; d +24 up by one; at 90, by msg: 10: s 1 → page 5 msg 1; s 2: `Word992` 2 → page 5 msg 16, 3 → page 5 msg 15 (d +20 0), then `Request980(0)`; s 3 → page 6 msg 11 (d +20 1); 9: s 1 → page 5 msg 2; else `GameData::Check(0)`: 0 `GameData::Save` and → page 7 msg 10 (d +20 2), 2 → page 5 msg 15; 4: s 1 → page 5 msg 1; s 2: `Word992` 4 jump to page 11, then `Request980(0)`; s 3 with nothing pending (`SaveSlots::Pending(0)` 0): `memcpy(SaveData::Of(0), [0x828161F0] + 0, 129,400)` (the loaded game data into player 0's save data) → page 6 msg 6 (d +20 1). Each through step 2, then 3. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A3728` | `SaveScreen::Page8` (probably, kind 1's device wait) | | Draw's page 8. Unless `State(0)` is 4: `Device(0)` zero → page 9 (step 2, then -1); else by `GameData::Check(0)`: 0 and 2 → page 5 msg 8 (d +20 0); 1 → page 7 msg 4 (d +20 2) and `GameData::Load(0)` (`sub_8228FBC0`); others nothing. Each through step 2, then 3. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A4DE0` | `SaveScreen::Page9` (kind 1's end) | | Draw's page 9, r3 = the mode: the mode type 2 posts 47, 4 (the title) posts 14, others nothing; d +32 = 9. Leaf. Seen in play. Read in full. |
+| `sub_821A3868` | `SaveScreen::Page10` (probably) | | Draw's page 10: while `[0x826C7960]` or `[0x826C7964]` is set nothing; then `State(0)` zero → page 5 (step 2, then 3), msg 3, d +20 0; nonzero → page 6 (step 2, then 3), msg 0, d +20 1. Its page number is kind 1's (`Page5` goes to it after `XShowSigninUI`). A 96-byte frame. Not seen in play. Read in full. |
+| `sub_821A3950` | `SaveScreen::Page11` (probably) | | Draw's page 11 (from `Page7`): by `sub_8228FD50(0)` (`save-interface.md`): 3 `Request980(0)` and → page 6 msg 5, 7 → page 6 msg 5, 8 → page 6 msg 7 (d +20 1, step 2, then 3); others nothing. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_821A3A08` | `SaveScreen::Page12` (probably, the replays' question) | | Draw's page 12 (kinds 3 and 5). `MenuList::Update`; when `Accepted`: `MenuSound::Play(0)`, s = `Selection`; by msg: 12: s 0 d +4 = 1, else 0, then → page 16 (step 2, then -1); 6: s 0 → page 16, else jump to page 15 and `RequestDevice(0)`; 5: s 0 → page 16, else → page 14 (step 2, then 4), msg 0, d +20 2; 3: s 0 jump to page 15 and `RequestDevice(0)`, else → page 12 (step 2, then 4), msg 5, d +20 0; 1: s 0 → page 14 (step 2, then 4), msg 7, d +20 2, and `Replays::Load(d +40)` (`sub_8228FF88`); else d +4 = 3 and → page 16. Then moved (→ page 12, step 1). A 128-byte frame (`__savegprlr_27`). Seen in play. Read in full. |
+| `sub_821A3C60` | `SaveScreen::Page13` (probably, the replays' note) | | Draw's page 13 (kinds 2 and 4). d +24 up by one; at 45 or more with msg 2, jump to page 15 and `RequestDevice(0)`. When `Accepted`: `MenuSound::Play(0)`; by msg: 2 the same; 4 → page 12 (step 2, then 4), msg 6; 8 and 10 → page 16 (step 2, then -1); 9 and 11 → page 12 msg 5 (d +20 0). A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A67E8` | `SaveScreen::Page14` (probably, the replays' wait) | | Draw's page 14. s = `State(0)`; by msg: 0: d +24 up; at 90: s 1 → page 12 msg 3 (d +20 0); s 3 with nothing pending: `Replays::BuildList` (`sub_82290378`): 3 → page 13 msg 9 (d +20 1); 7: no replays (`[0x828161F0]` +20 0) → page 13 msg 4 (d +20 1), else d +4 = 1 when d +8 is set, else 2, and → page 16 (step 2, then -1). 7 (a replay's load): d +24 up; at 90: s 1 → page 12 msg 3; s 2: `Word992` 4: `sub_82290640(d +40)` 0 → page 13 msg 9, else msg 11 (d +20 1); then `Request980(0)`; s 3 with nothing pending: `Replay::CopyFrom([0x826C5B50], [0x828161F0] + 4)` (the loaded replay into the kept replay) → page 13 msg 8 (d +20 1), d +4 = 1. Each through step 2, then 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A3DE8` | `SaveScreen::Page15` (probably, the replays' device wait) | | Draw's page 15. Unless `State(0)` is 4: `Device(0)` nonzero: d +24 = 0, → page 14 (step 2, then 4), msg 0, d +20 2; zero → page 12 (step 2, then 4), msg 6, d +20 0. A 96-byte frame. Seen in play. Read in full. |
+| `sub_821A4E60` | `SaveScreen::Page16` (the replays' end) | | Draw's page 16, r3 = the mode: posts by d +4: 1 → 11, 2 → 13, 3 → 14, else 12; d +32 = 9. Leaf. Seen in play. Read in full. |
+| `sub_821A3ED8` | `SaveScreen::Page17` (probably, kind 6's question) | | Draw's page 17 (player d +44): `MenuList::Update`, `Accepted`, `Selection`, `MenuSound::Play(0)`; by msg (2, 4, 5, 6, 8, 9) the answers go to pages 17 to 20 (step 2 or 5, then 5), with `GameData::Load(d +44)`, `RequestDevice(d +44)` (a jump to page 20) or `SaveScreen::NextPlayer`; then moved (→ page 17, step 1). A 144-byte frame (`__savegprlr_26`). Not seen in play. Not read in detail. |
+| `sub_821A4228` | `SaveScreen::Page18` (probably, kind 6's note) | | Draw's page 18: d +24 up; at 45 or more with msg 1, `RequestDevice(d +44)` and a jump to page 20. When `Accepted`: by msg 0 `XShowSigninUI(2, 1)` and a jump to page 22; 1 the device as above; 7, 12 and 13 → page 17 (msgs 9 or 8); 11 `SaveScreen::NextPlayer`. A 96-byte frame. Not seen in play. Not read in detail. |
+| `sub_821A4450` | `SaveScreen::Page19` (probably, kind 6's load wait) | | Draw's page 19: as `Page7` for player d +44 (`State`, `Word992`, `Request980`, `Pending`, `GameData::Check`, `GameData::Load`), the loaded data copied with `memcpy` into `[0x826C5B5C]` (player 1's save data, by `sub_82105678`; 0x1D52C bytes, the progress). 265 lines. Not seen in play. Not read in detail. |
+| `sub_821A4810` | `SaveScreen::Page20` (probably, kind 6's device wait) | | Draw's page 20: unless `State(d +44)` is 4: `Device(d +44)` nonzero: d +24 = 0, → page 19 msg 3 (d +20 2); zero → page 17 msg 2 (d +20 0); step 2 then 5 while a dialog shows (d +16 not -1), else step 5. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_821A4EF8` | `SaveScreen::Page21` (kind 6's end) | | Draw's page 21, r3 = the mode: when exactly one of `State(0)` and `State(1)` is nonzero, `memcpy` of 0x1D52C bytes between the two halves of `[0x826C5B5C]` (`sub_82105678`; to +0x1D52C when player 0's state is nonzero, else from it); then posts 31; d +32 = 9. A 112-byte frame (`__savegprlr_29`). Not seen in play. Read in full. |
+| `sub_821A2208` | `SaveScreen::Page22` (probably, kind 6's start) | | Draw's page 22 (`ShowKind6`'s first): while `[0x826C7960]` or `[0x826C7964]` is set nothing; `State(d +44)` zero: player 0 → d +44 = 1 (the next player), player 1 → jump to page 21; nonzero: the menu list's +60 = 1 for player 1 (0 for player 0), d +12 = 1, +16 = 1, → page 18 (step 5, then -1), d +24 = 0. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_821A4970` | `SaveScreen::Page23` (probably) | | Draw's page 23: as `Page11` for player d +44 (`sub_8228FD50`, `Request980`): → page 18 with msg 13 or 12 (d +20 1), step 2 then 5 while a dialog shows, else step 5. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_821A4AC0` | `SaveScreen::Page24` (kind 7's controller pick) | | Draw's page 24. The four players' mapper entries (`0x826BAB80` + 8 × the controller `[0x826BABA4 + 4i]`, `action-mappers.md`): for player 0, unless the entry's +4 is 1, its mapper's slot 10 (+40, `ActionMapper::Pressed`) for action 159, then 158; then players 1, 2 and 3 for action 152. The first pressed sets d +52 (0 for player 0's, else the player) and → page 25 (step 2, then -1); none pressed, nothing. A 128-byte frame (`__savegprlr_27`). Seen in play. Read in full. |
+| `sub_821A4FD8` | `SaveScreen::Page25` (kind 7's end) | | Draw's page 25, r3 = the mode: posts 16; d +32 = 9. Leaf. Seen in play. Read in full. |
+| `sub_821A2338` | `SaveScreen::Page26` | | Draw's page 26: d +32 = 9 only. Leaf. No page goes to it. Not seen in play. Read in full. |
+| `sub_821A24B0` | `SaveScreen::StoreSettings` (probably) | | No arguments; returns 1, or 0 while the profile read (`0x826C6080`, `system-services.md`) is pending (997). Once (d +60, set when it's done; 1 at once when set): when `[0x826C7958]` isn't 0 and the read isn't pending: the profile's results `[[0x826C6AD0] + 4]` into player 0's save data (`SaveData::Of(0)` + 0x1F85C): +20 = its +632 is 0; +24 by its +672 (0 → 2, 1 → 0, 2 → 1; 3 and up the frame's +80 as the caller left it, copied as the original leaves it); the 60-byte block at +44 rewritten through the frame (`memcpy` there and back) with two words swapped by its +712 (13 and 9) and +752 (7 and 14): probably the controller settings from the profile. With `[0x826C7958]` 0 only d +60 = 1. A 224-byte frame (`__savegprlr_26`). Only caller `Page6`. Seen in play. Read in full. |
+| `sub_821A2350` | `SaveScreen::NextPlayer` (probably) | | No arguments. Player 1 (d +44 1): → page 21 (step 2, then -1). Player 0: d +44 = 1; `State(1)` zero → page 21; else → page 18 with msg 1 (d +20 1, +24 0; step 2 then 5 while a dialog shows, else step 5); the menu list's +60 = 1. A 112-byte frame. From `Page17` and `Page18`. Not seen in play. Read in full. |
+| `sub_821A66A8` | `Replay::CopyFrom` (probably) | | r3 = a replay (0x13C8F0 bytes, `../known-data.md`'s `0x826C5B50`), r4 = another: copies the second into the first in parts: `memcpy` 52 bytes, 32 at +52, 0x2B534 at +84, 80 at +0x2B588, four words at +0x2B5D8, one at +0x2B5E8, five at +0x2B5EC, one at +0x2B600, `RaceSnapshot::Copy` (`sub_82104EA8`) at +0x2B610, `memcpy` 0x107AC4 bytes at +0x34E20. Returns r3. From `Page14`, `sub_82218FF8` (`race-screens.md`), `sub_82287220` and `sub_82293028` (`replay-snapshots.md`'s callers). Not seen in play. Read in full. |

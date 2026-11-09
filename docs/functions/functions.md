@@ -648,6 +648,11 @@ Rows not yet moved stay in the table below. So far:
   notices and their images), the spec sheet's machine, the build
   screen's machine with its entry, exit and pages, and the license plate
   editor the car dealer opens (B7).
+- [`save-screen.md`](save-screen.md): the front end's save screen (UI
+  movie 44) in the type 2, 4, 6, 8 and 10 modes: its state machine's
+  Inits and handlers, its kinds (the game data's check, save and load,
+  the replays, the two-player load, the controller pick), its dialog
+  steps and its 27 pages (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
