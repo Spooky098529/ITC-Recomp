@@ -21,7 +21,8 @@ ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "SavePlaceholders14 sub_821F8950 (the same writes); TuningScreen::SetUp's callees "
               "LoadInteriorSlots sub_821DE280, LoadCurrentChoices sub_821DA4B0 "
               "(Params::GetCarSpec by its plain C++), LoadOwnedParts sub_821DBAB0 "
-              "(TestAndSetWheelFlag by its plain C++) and SetPrices sub_821DAD58 (checked by "
+              "(TestAndSetWheelFlag by its plain C++), SetPrices sub_821DAD58 and "
+              "LoadUnlockedParts sub_821CFFC8 (checked by "
               "--run_harnesses=tuning_machine)");
 
 namespace hooks {
@@ -138,6 +139,10 @@ void TuningMachineSetPrices(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   tm::SetPrices(base, ctx.r3.u32, ctx.r1.u32);
 }
+// A leaf; r3 left.
+void TuningMachineLoadUnlockedParts(PPCContext& ctx, uint8_t* base) {
+  tm::LoadUnlockedParts(base, ctx.r3.u32);
+}
 
 }  // namespace hooks
 
@@ -172,3 +177,4 @@ ITC_TUNING_MACHINE(821DE280, TuningMachineLoadInteriorSlots)
 ITC_TUNING_MACHINE(821DA4B0, TuningMachineLoadCurrentChoices)
 ITC_TUNING_MACHINE(821DBAB0, TuningMachineLoadOwnedParts)
 ITC_TUNING_MACHINE(821DAD58, TuningMachineSetPrices)
+ITC_TUNING_MACHINE(821CFFC8, TuningMachineLoadUnlockedParts)

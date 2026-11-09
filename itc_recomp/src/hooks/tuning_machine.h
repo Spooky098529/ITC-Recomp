@@ -30,5 +30,6 @@ void TuningMachineLoadInteriorSlots(PPCContext& ctx, uint8_t* base);
 void TuningMachineLoadCurrentChoices(PPCContext& ctx, uint8_t* base);
 void TuningMachineLoadOwnedParts(PPCContext& ctx, uint8_t* base);
 void TuningMachineSetPrices(PPCContext& ctx, uint8_t* base);
+void TuningMachineLoadUnlockedParts(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

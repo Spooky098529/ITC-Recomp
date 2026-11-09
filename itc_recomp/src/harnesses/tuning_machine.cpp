@@ -663,6 +663,32 @@ void Prices(Context& h, const World& w) {
              }});
 }
 
+// LoadUnlockedParts: the screen's +18904 at the save, its unlocked bitset
+// (+0x19930, 7 words: bits 0 to 223, the function reads 0 to 188) clear,
+// full, sparse, dense, random or each word its own; the part set [+33900]
+// 0 to 4, now and then out of range (nothing written then). A leaf without
+// a frame: the words below sp compared all the same, the save too.
+void UnlockedParts(Context& h, const World& w) {
+  Run(h, w, {"TuningScreen::LoadUnlockedParts (sub_821CFFC8)", 240, __imp__sub_821CFFC8,
+             hooks::TuningMachineLoadUnlockedParts, {{-256, 0}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Screen(t, r, w);
+               const uint32_t s = w.screen();
+               guest::StoreU32(w.base, s + 18904, w.save);
+               FillBits(w.base, w.save + 0x19930, 7, r.Below(6), r);
+               uint32_t set = r.Below(5);
+               switch (r.Below(6)) {
+                 case 0: set = 5 + r.Below(20); break;
+                 case 1: set = uint32_t(r.Next()); break;
+                 default: break;
+               }
+               guest::StoreU32(w.base, s + 33900, set);
+             },
+             [&h](PPCContext&, const World& w, Outputs& out) {
+               out.Bytes(Read(h.base, w.save, kSaveDataBytes));
+             }});
+}
+
 }  // namespace
 
 void TuningMachine(Context& h) {
@@ -675,6 +701,7 @@ void TuningMachine(Context& h) {
   SetUpCallees(h, w);
   OwnedParts(h, w);
   Prices(h, w);
+  UnlockedParts(h, w);
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
   }

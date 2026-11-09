@@ -162,4 +162,16 @@ uint64_t LoadOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp);
 // register saves (r17 on, sp - 128) aren't written. A leaf (r3 left).
 void SetPrices(uint8_t* base, uint32_t screen, uint32_t sp);
 
+// --- The unlocked parts (unlocked_parts.cpp) ---
+//
+// sub_821CFFC8 TuningScreen::LoadUnlockedParts (r3 the screen, as SetPrices
+// leaves it): the screen's unlocked words, each 1 or 0 from its bit in the
+// save data's (`[+18904]`, read again at each bit) bitset at +0x19930, the
+// unlocked counterpart of LoadOwnedParts: the power items by the part set
+// [+33900] (read at each word; none written outside 0 to 4), the other
+// items' lists (+34992 to +35704), the tires (+35800: tire 0 from bit 95,
+// tire i when any of bits 95 + i, 99 + i, 103 + i), +25164 cleared then set
+// from bit 187, +36576 (3) from bits 186 to 188. A leaf, no frame (r3 left).
+void LoadUnlockedParts(uint8_t* base, uint32_t screen);
+
 }  // namespace tuning_machine
