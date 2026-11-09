@@ -59,6 +59,18 @@ When the user has reviewed a run's section, its heading gets
   `SaveScreen::StoreSettings` `sub_821A24B0` reads a stack leftover
   (frame +80) when the profile's +672 is 3 or more: copied as the
   original leaves it (the track zones' precedent).
+- The save screen's migration (d393b07d..36674493): 42 of 42 in play
+  under `--native_save_screen`; 35 adapters kept (reached as functors
+  or from the tables `Update` and `Draw` write, as the car dealer's
+  `UpdatePage`); callees never seen in play left recompiled, reached
+  through the guest. `Draw`'s r3 and the table addresses in r4-r9 are
+  sign-extended as the originals' `lis`/`addi` leave them. The
+  `save_screen` harness mixes its seeds (splitmix64) and draws from the
+  high bits: the shared pattern (each case's seed the next xorshift
+  state, `Below` from low bits) left some branches unreached, and other
+  harnesses share it (for a later look). Harness world fixes: `Page21`'s
+  copy 0x1D52C bytes past player 1's save data; `sub_82290640`'s replay
+  record from the save buffers' list.
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 

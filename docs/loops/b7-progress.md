@@ -60,7 +60,12 @@ file's history. What's left to see in a drive, from every run:
   screen machine (UI movie 44) five modes' Inits share, its eight
   kinds, `Draw`'s 27 pages and `Update`'s 7 steps; 37 ready groups; the
   save screens' lead trimmed, 1 lead added (the type 10 mode's Init);
-  no subagents); map checked. Step: migration (agent running).
+  no subagents); map checked. Migration d393b07d..36674493 (the steps
+  1 and 2, 22 pages, `StoreSettings`, the machine's handlers, `Update`,
+  `Draw`, the type 2, 4 and 10 Inits; `StartCheck`, `Start` adapters
+  removed; 42 of 42 in play ours; `--native_save_screen`; races 31-37
+  s, 0 errors, its harnesses 0 differing; no subagents). Left: none.
+  Step: validation (agent running).
 
 ## Done
 
@@ -95,5 +100,7 @@ file's history. What's left to see in a drive, from every run:
   known 389, unknown 788).
 - After the save screen's map: ours 5195, work left 1233 (wrapped 56,
   known 426, unknown 751).
+- After its migration: ours 5237, work left 1196 (wrapped 56, known
+  389, unknown 751).
 
 ## Stopped
