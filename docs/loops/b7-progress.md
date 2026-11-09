@@ -47,10 +47,23 @@ file's history. What's left to see in a drive, from every run:
   their six jumps, `Type2Hub::Update` with `PutCarOnStand` over a
   stand car harness world; `ShowBusy`, `HideBusy` adapters removed;
   121 of 121 in play ours; races 34-38 s, 0 errors, its harnesses 0
-  differing; no subagents). Left: none. Step: its validation (agent
-  running).
+  differing; no subagents). Left: none. Validated `itc_4681` (race 75
+  s at 180; 0 errors, every harness 0 differing outside the expected
+  groups, 13 of 13 harness lines, no prints added; 4 in the replay
+  `itc_4682` (ok), 9 to drive). Recorded.
+- Subsystem 2 of 3: the type 6 quit's save screen (`sub_821A2608`,
+  `sub_821A1D10`, `sub_821A26F0`, `sub_821A6608`, `sub_821A6AF0`,
+  `sub_821A64A0`, `sub_821A2760`, `sub_821A4C58`, `sub_821A1CA0`,
+  `sub_821A6650`: `Type6SaveScreen::Init`'s transition handlers; all 10
+  roots ready, the closest lead; its line deleted from `leads.md`).
+  Step: mapping (agent running).
 
 ## Done
+
+- `type2-screens.md`: 121 of 121 in play native (the hub, the spec
+  sheet, the build screen's machine, the license plate editor; 17
+  adapters removed), `--native_type2_screens`; eb666c7f,
+  e134d538..c18081f3.
 
 ## Rows to review
 
@@ -74,5 +87,7 @@ file's history. What's left to see in a drive, from every run:
   449, unknown 788).
 - After its second migration: ours 5184, work left 1244 (wrapped 56,
   known 400, unknown 788).
+- After its third migration: ours 5195, work left 1233 (wrapped 56,
+  known 389, unknown 788).
 
 ## Stopped

@@ -18,6 +18,11 @@ here loses its heading.
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 
+- The type 2 screens' third migration (attract race `itc_4681`, replay
+  `itc_4682` ok, not reaching the build screen's pages;
+  `type2-screens.md`): `sub_8219EEC0`, `sub_8219DBC8`, `sub_8219DDB8`,
+  `sub_8219F048`, `sub_8219DFA8`, `sub_8219E348`, `sub_8219F1C8`,
+  `sub_8219E600`, `sub_8219E9A0`.
 - The type 2 screens' second migration (attract race `itc_4668`, replay
   `itc_4669` ok; `type2-screens.md`): `sub_8218D6A8`, `sub_8218D6C0`,
   `sub_8218D650`, `sub_8218F698`, `sub_8218DF38`, `sub_8218D8E8`,

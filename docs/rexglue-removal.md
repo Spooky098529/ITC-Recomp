@@ -2805,6 +2805,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-08 | The UI movie helpers (`UiMovie::IsNamedActive`, `UnloopNamed`, `ClearNodeText`, `SetNodeTextV`, `SetNodeNumberText`, `OnLoaded`, `UiMovies::DeleteAll`), with the car list's groups they unblocked (the panels, steps, `Step17`, `CarPage`) | `ui-movies-game.md`, `car-list.md` | 8 new rows, 92 of 92 ours; the car list 94 of 94 (two migrations; 34 adapters removed) | `--native_ui_movies_game`, `--native_car_list` |
 | 2026-11-08 | The front-end screen helpers (the 852-byte modes' releases, the save screen's and options' dialog text setters with their dialog steps and pages, the car cards) | `front-end-screen-helpers.md` | 27 of 32 in play (5 Merged; one migration; 6 adapters removed) | `--native_front_end_screen_helpers` |
 | 2026-11-08 | The car dealer (the type 2 mode's dealer machine: its 23 transitions, 6 pages, the car lists, the color pick, the purchase, the career's first car) | `car-dealer.md` | 58 of 58 in play (two migrations; 16 adapters removed) | `--native_car_dealer` |
+| 2026-11-08 | The type 2 mode's screens (the hub at the mode's +848: its menu over the stand car, notices, images, pages and transitions; the spec sheet's machine; the build screen's machine, entry and pages; the license plate editor the dealer's buy opens) | `type2-screens.md` | 121 of 121 in play (three migrations; 17 adapters removed) | `--native_type2_screens` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4970,3 +4971,19 @@ subsystems). The boundary: 449 functions (916 pairs): overridden 109,
 Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
 54 with a live caller. B7 (`b7_status.py`): ours 5,074, work left
 1,354 (Wrapped 56, with a row 390, no row yet 908), from 1,411.
+
+**2026-11-09, the type 2 mode's screens (branch `b7-loop-08-11-26-2`):**
+the fortieth run's first subsystem (`type2-screens.md`,
+`--native_type2_screens`, `src/type2_screens/`), in three migrations:
+four of the type 2 mode's screen machines (the hub at +0, the spec
+sheet at +56624, the build screen at +0x1BF20, the license plate editor
+at +0x20A70), their `InitStates`, handlers, pages, transitions and
+updates; `Type2Hub::WaitForLoad` keeps its patched count of 1. The
+mode's other machines (+9640, +0x23018, +0x173D0, the tuning screen's
+Init) and the mode's Init are leads. The four `InitStates` keep their
+adapters for the recompiled mode Init. The replay reaches the hub and
+opens the plate editor and the build screen; their pages wait for a
+drive. The boundary: 449 functions (916 pairs): overridden 109, Native
+36, Dropped 26, never called 70, live 208. Imports: 186 called, 54 with
+a live caller. B7 (`b7_status.py`): ours 5,195, work left 1,233
+(Wrapped 56, with a row 389, no row yet 788), from 1,354.
