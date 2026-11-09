@@ -39,7 +39,7 @@ subtree (106 functions, 67 seen in play). Left as leads
 `821F7000`-`821FC270`, none seen in play), with their helpers; the
 command runners these pages queue (commands 5, 10 to 14, 32 and 54 to
 58) stay in the update's lead; the callers outside the screen's pages
-(`sub_821CBD40`, `sub_821E1B48`, `sub_821DBAB0`, `sub_8224B248`).
+(`sub_821CBD40`, `sub_821E1B48`, `sub_821DBAB0`, `sub_8224B248`; the first three since 2026-11-09 in [`tuning-machine.md`](tuning-machine.md)).
 
 Shared, with rows elsewhere: the tuning screen's own functions
 (`TuningScreen::CategoryItemCount`, `MoveCategory`, `GetPrice`,

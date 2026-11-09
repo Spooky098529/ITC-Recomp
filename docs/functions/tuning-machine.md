@@ -1,0 +1,173 @@
+# Known functions: the tuning screen's machine
+
+The type 2 front-end mode's **tuning screen machine**: the state
+machine the tuning screen's object is (the type 2 mode block's +19792,
+set up by `TuningMachine::Init` `sub_821E7568` from the mode's Init
+`sub_82197278`; opened by message 12, the hub's item 1; the mode and
+its other machines are in [`type2-screens.md`](type2-screens.md),
+[`type2-dialog.md`](type2-dialog.md),
+[`garage-screen.md`](garage-screen.md), [`car-dealer.md`](car-dealer.md),
+[`options-screen.md`](options-screen.md),
+[`save-screen.md`](save-screen.md) and the leads in
+`../loops/leads.md`). The screen itself is mapped in
+[`tuning-screen.md`](tuning-screen.md) (its update's callees, the
+refresh's, the stand), [`tuning-pages.md`](tuning-pages.md) (its input
+pages, `TuningScreen::HandleInput`, `OnDialogYes`, the decal images)
+and [`front-end-car-draw.md`](front-end-car-draw.md) (the stand); this
+file holds the machine's handlers: the screen's creation, its UI movies
+(2, 13 and 14, assets 22547 to 22549: the shop, the vinyl editor and
+the sticker editor), its start (the screen's set-up from the selected
+garage car: the career's pick, the money, the day, the part tables'
+current choices, owned and unlocked flags and prices), the replies of
+the mode's dialog (`type2-dialog.md`: 38 yes, 39 no, 40 a notice
+closed, 41 back, 42 closed), its leave, close and teardown.
+
+It has the shape the type 2 mode's other machines have
+(`type2-screens.md`'s intro; keys (state, message, 0, 0), member
+function functors over vtable `0x82011918`, r3 the machine (here the
+screen: its +9604 is the machine's state) and r4 the mode, whose message
+ring at +204 the handlers post to): (0, 1) `Create` resets the screen
+and makes its blocks, then goes to 1 (the mode set +9612 = 1) or 9; (1,
+1) → 2 `OpenMovies`; (2, 1) `WaitForMovies` → 9 (or 4); (9, 12)
+`ScreenMachine::Reenter` → 4; (4, 1) → 5 `Start`; in 5, Draw (message 1)
+runs `TuningScreen::HandleInput` `sub_821E6950` (`tuning-pages.md`) and
+Update (message 0) the update `sub_821E6C50` (a lead); (5, 38)
+`TuningScreen::OnDialogYes` `sub_821E2660` (`tuning-pages.md`), (5, 39)
+and (5, 41) `OnDialogNo`, (5, 40) `OnNoticeClosed`, (5, 42)
+`OnDialogClosed`; `TuningScreen::Leave` (`tuning-pages.md`) posts 11,
+and (5, 11) → 8 `Unload`, (8, 3) `Screen::LeaveToHub` (message 6 to the
+hub) → 9; (5, 4) and (9, 4) `Close` → 7, (7, 4) → 6 `Destroy`. Unlike
+the garage screen's, its blocks are the screen's own words: `[+10036]`
+the command queue (28 bytes, the page object's layout), `[+10040]` the
+category menu and `[+10044]` a second menu (68 bytes each, front-end
+menus), each `VirtualAlloc`ed by `Create` and freed by `Destroy`; the
+decal images at +10048 (`DecalImages::`, `tuning-pages.md`) reset by
+`Create` and unloaded by `Destroy`. The screen's fields are in
+`../known-data.md` ("tuning screen").
+
+In play (`../coverage.md`) the screen was created, opened, started,
+left, closed and destroyed, and a buy's equip question was asked
+(`OnDialogClosed`); the dialog's no and back (`OnDialogNo`, with the
+sticker editor's `StickerDialogNo`) and the money-short notice's close
+(`OnNoticeClosed`) never ran (3 of the 22 rows not seen in play).
+
+Names are ours (guesses from what the code does). Read 2026-11-09 by
+the B7 loop's mapping agent: the Init through
+`itc_recomp/tools/init_step_tables.py` (17 transitions), the handlers
+and the small helpers in full, `Start`'s set-up (`TuningScreen::SetUp`)
+in full and its four table loaders and `OnDialogNo` in outline (their
+calls, the fields they read and write, their branches). Ready
+(`b7_groups.py`): 10 groups, their roots the Init, `Create` (with
+`ZeroRecord16` and `DecalImages::Reset`), `OpenMovies`,
+`WaitForMovies`, `OnDialogClosed`, `Unload`, `Close`, `Destroy`,
+`TuningScreen::SetUp` (6 functions, 3,748 lines: split the migration;
+its five callees are leaves or call only native functions) and
+`DecalImages::SavePlaceholders` (with `SavePlaceholders14`). Blocked:
+`Start` (`sub_821E7368`) by the screen's refresh `sub_821E3AD0` (3,838
+lines, its own lead). `OnDialogNo`, `OnNoticeClosed` and
+`StickerDialogNo` never ran in play.
+
+Shared, with their rows elsewhere: `StateMachine::Add` `sub_82106158`
+([`game-modes.md`](game-modes.md)), `Screen::LeaveToHub` `sub_821D6A20`
+([`type2-screens.md`](type2-screens.md)), `ScreenMachine::Reenter`
+`sub_822895E0` ([`location-screen.md`](location-screen.md)),
+`TuningScreen::HandleInput` `sub_821E6950`, `OnDialogYes`
+`sub_821E2660`, `PageItemCount` `sub_821CCDB0`, `PageCursor`
+`sub_821CCD38`, `SetAeroAvailability` `sub_821DE160`,
+`TestAndSetWheelFlag` `sub_821CDF98`, `DecalImages::UnloadAll`
+`sub_82208738` ([`tuning-pages.md`](tuning-pages.md)),
+`TuningScreen::SetUpCarData` `sub_821DF2F8`
+([`car-makers.md`](car-makers.md)), `PowerCurve::FromEngine`
+`sub_820CE7D8` and `ShiftPeak` `sub_820CE1D8`
+([`vehicle.md`](vehicle.md)), `Car::Init` `sub_820CD5D8`, `Car::Refresh`
+`sub_820C4998`, `Params::GetCarParts` `sub_820C9E00`, `CountBodyKits`
+`sub_820CBD20`, `sub_820C4550`, `Params::GetCarSpec` `sub_820C9E98`
+([`race-setup.md`](race-setup.md), [`car-specs.md`](car-specs.md)),
+`SaveData::Of` `sub_82105620`
+([`vehicle-accessors.md`](vehicle-accessors.md)), `memcpy`
+`sub_825A7410` ([`c-runtime.md`](c-runtime.md)), `VirtualAlloc`
+`sub_82295398` and `VirtualFree` `sub_82295330` ([`heap.md`](heap.md)),
+the UI movie calls `UiMovies::Open` `sub_8211E808`, `IsLoaded`
+`sub_8211BE98`, `Find` `sub_8211B3F0`, `Delete` `sub_8211E258`,
+`UiMovie::ResetPose` `sub_8211ABA8`, `FinishAll` `sub_8211DFF8`,
+`SetText` `sub_8211C1F8`, `HideNode` `sub_8211AC48`
+([`ui-movies-game.md`](ui-movies-game.md), [`ui-movies.md`](ui-movies.md)),
+`ScreenFades::FadeIn` `sub_8209D038`
+([`post-effects.md`](post-effects.md)). The update `sub_821E6C50` (the
+(5, 0) transition) and the refresh `sub_821E3AD0` are leads.
+
+Notes for the migration: `OnDialogClosed`'s three `UiMovie::SetText`
+calls leave r7 to r10 unset (register leftovers: native callers pass 0,
+the user's call of 2026-10-30, "Precedent first" in
+`../loops/b7-loop.md`). `TuningScreen::SetUp` calls `LoadUnlockedParts`
+with r3 as `SetPrices` leaves it (the screen: `SetPrices` never writes
+r3). `Start` writes the money word +25116 = 9,999,999 before `SetUp`
+overwrites it with the save's money. The Init's functors, the update
+and `HandleInput` stay where they are; the Init decodes as the garage
+screen's (its words the original never writes copied as the frame
+holds them). The four table loaders under `SetUp` are long and
+table-driven (1,000 to 2,500 lines each, no calls but
+`Params::GetCarSpec` and `TestAndSetWheelFlag`): they're the inverses
+of `TuningScreen::StoreToGarageCar` and `StoreOwnedParts`
+(`tuning-screen.md`, `tuning-pages.md`), which can guide them.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_821E7568` | `TuningMachine::Init` | | r3 = the tuning screen's machine (the type 2 mode block's +19792): 17 transitions through `StateMachine::Add` (`sub_82106158`), keys (state, message, 0, 0), each a member function functor over vtable `0x82011918` (the machine, the function) copied into the frame (six-word copy loops), the next state at the copy's +24 (0 for none): (0, 1) `Create` `sub_821CE4C8`; (1, 1) → 2 `OpenMovies` `sub_821CBDB0`; (2, 1) `WaitForMovies` `sub_821CE9E8`; (4, 1) → 5 `Start` `sub_821E7368`; (5, 1) `TuningScreen::HandleInput` `sub_821E6950`; (5, 0) the update `sub_821E6C50`; (5, 38) `TuningScreen::OnDialogYes` `sub_821E2660`; (5, 39) and (5, 41) `OnDialogNo` `sub_821CEA88`; (5, 40) `OnNoticeClosed` `sub_821CF8B8`; (5, 42) `OnDialogClosed` `sub_821D8898`; (5, 11) → 8 `Unload` `sub_821D69A0`; (8, 3) `Screen::LeaveToHub` `sub_821D6A20`; (9, 12) `ScreenMachine::Reenter` `sub_822895E0`; (5, 4) and (9, 4) `Close` `sub_821D6A78`; (7, 4) → 6 `Destroy` `sub_821CBD40`. A 1,232-byte frame (r27 to r31 saved). It decodes as the other Inits' step tables (`itc_recomp/tools/init_step_tables.py`, the functors' words the original never writes copied as the frame holds them). Returns the last `Add`'s r3. Only caller the type 2 mode's Init `sub_82197278`. Seen in play. Read in full (through the tool). |
+| `sub_821CE4C8` | `TuningMachine::Create` | | (0, 1). r3 = the screen. Resets the screen's words: +9608, +9652, +9656 = 0; bytes +9660 to +9668, +9676 to +9680 and +10008 (the state history's depth) = 0; +9708 = 1, +9712 = 0, +9728 = 1, +9684 = 17, +9688 to +9704 = -1; +9672, +9740 to +9752, +10016, +10036, +10040, +25196 to +25244, +30440 to +30472, +30492 to +30576, +30724 to +30756, +30764 to +30792 = 0; +10012 and +10020 to +10032 = -1; the vinyl layers' ids (+31168 + 4j and +31192 + 4j, j 0 to 5) = j mod 3, and +31216 to +31224 = 0, 1, 2 (written twice); the stickers' ids (+32200 + 4k and +33320 + 4k, k 0 to 39) = k mod 5, and +33480 to +33496 = 0 to 4 (written 8 times); the decal records (+30880 + 24j and +31024 + 24j, j 0 to 5; +31240 + 24j and +32360 + 24j, j 0 to 39): +0, +4 = 0, +8 = 0.0 (`[0x82000A34]`), +12 = 1.0 (`[0x82000A30]`), +16, +20 = 0; +30832, +30836, +30848, +30852 = 0, +30840 = 0.0, +30844 = 1.0; +33540 to +33580, +25120, +20768 to +20776 = 0, +20780 = 0.0, +36824 = 0; `ZeroRecord16`(screen, +30800) and (screen, +30816); the 63 history words from +9756 = 0. Then `VirtualAlloc(0, 28, 0x1000, 4)` → +10036 (the command queue), `VirtualAlloc(0, 68, …)` → +10040 (the category menu) and +10044 (a second menu); `DecalImages::Reset`(+10048). The queue: +0, +4, +8 = 3 (TUNING SHOP MAIN), +12 and +20 = -1, +24 = 0 (+16 not written); each menu: +12 = 0, +16 = 6, +20 = 1, +0 to +8, +24 to +40, +48, +52, +64 = 0 (+44, +56, +60 not written); written without a check of the allocations. Then +9604 = 1 when +9612 is set, else 9. A 144-byte frame (r26 to r31 by `__savegprlr_26`). Seen in play. Read in full. |
+| `sub_821FE540` | `TuningMachine::ZeroRecord16` (probably) | | r3 not read, r4 = a 16-byte record: +0, +4 = 0, +8, +12 = 0.0 (`[0x82000A34]`). Leaf, no frame. From `Create` only (the screen's +30800 and +30816: the two editor pages' layout records, `../known-data.md`). Seen in play. Read in full. |
+| `sub_821FE590` | `DecalImages::Reset` (probably) | | r3 = the decal images (the screen's +10048): its 200 36-byte entries: +0 = -1 (no asset), +4 to +32 = 0; then +8852 = 0. Leaf, no frame. From `Create` only. Seen in play. Read in full. |
+| `sub_821CBDB0` | `TuningMachine::OpenMovies` | | (1, 1) → 2. r3 = the screen. `UiMovies::Open(2, 22547)`, `Open(13, 22548)`, `Open(14, 22549)` (the shop, the vinyl editor, the sticker editor); +9608 = 0. A 96-byte frame (r31 saved). Returns the last `Open`'s r3. Seen in play. Read in full. |
+| `sub_821CE9E8` | `TuningMachine::WaitForMovies` | | (2, 1): every Draw in state 2. r3 = the screen. While +9608 is 0: `UiMovies::IsLoaded` of 2, then 13, then 14 (stopping at the first not loaded), and +9608 = 1 once all three answer. With +9608 set: +9708 = 1 (the refresh to run), +9604 = 9 when +9612 is set (wait for message 12), else 4. A 112-byte frame (r30, r31 saved). Returns the last `IsLoaded`'s r3 when called, else the screen. Seen in play. Read in full. |
+| `sub_821E7368` | `TuningMachine::Start` | | (4, 1) → 5. r3 = the screen. +25116 = 9,999,999 (overwritten by `SetUp` below), +25100, +25104 = 0, +9708 = 1, byte +25124 = -1, +9712 = 0, +9716 = 1, +9720, +9724, +9732 = 0, +9728 = 1, +25072 = 1, +25076 = 0, +25080 = 4, +9656 = 0 (power), +9652 = 3 (TUNING SHOP MAIN); +18904 = `SaveData::Of(0)`; `TuningScreen::SetUpCarData`(screen); a power curve on the frame (+96, 1,064 bytes): `PowerCurve::FromEngine`(curve, screen + 20180), `ShiftPeak`(curve, 0); the stats: +20768 = (int) the car data's +1288 (screen +20200), +20772 = (int) (car data +0 + (car data +672 + car data +400) × `[0x820021E8]`), +20776 = (int) the curve's +1056, +20780 = the curve's +1048 × `[0x8200ADA0]` (float); `DecalImages::SavePlaceholders`(+10048); `TuningScreen::SetUp`(screen); the busy icon: +10016 = 0, +10020 = 2 (movie 2), +10024 = 172, +10028 = 171, +10032 = 173; `UiMovie::ResetPose`(movie 2); the refresh `sub_821E3AD0`(screen); the queue `[+10036]`: +0, +4, +8 = +9652, +12 and +20 = -1, +24 = 0; the category menu `[+10040]`: +12 = 0, +16 = 6, +20 = 1, +8 = 0, +0 = +4 = +9656, +44, +56 = 0, +60 = 8, +36, +64, +24, +28 = 0; then command 0 queued (+8 = +0 when it differs from +9652, +12 = 0, +16 = -1, +4 = +9652, +0 = -1); `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`. A 1,216-byte frame (r28 to r31 by `__savegprlr_28`). Returns `FadeIn`'s r3. The power curve lead's `sub_821E7368` (taken here, 2026-11-09). Seen in play. Read in full. Blocked by the refresh `sub_821E3AD0` (a lead). |
+| `sub_821E1B48` | `TuningScreen::SetUp` (probably) | | r3 = the screen. +18904 = `SaveData::Of(0)` = s; +20792 to +20808 = s +8 to +27 (the career's pick); +25116 = s +6116 (the money); +25092 = the day s +6100, at most 999; +25096 = the day mod 7 (the weekday, signed division). The selected garage car c (s +6120's list walked `[s + 0x19920]` times from the head halfword +204, the slot +212 + 1,968 × the node's car): a car object on the frame (+176): `Car::Init`, `memcpy` of c's 1,884 bytes, `Car::Refresh`; its spec p = `sub_820C4550`(car) (the car's +1888): +20784 = byte p +69, +20788 = byte p +130; the price class +33900: 4 when c's +12 (the car's id) is 8, else by p's bytes +69 and +68: +69 1: 2 when +68 is 7, else 0; +69 0: 3 when +68 is 7, else 1; other +69: 0. `Params::GetCarParts`(frame + 128, the car's id), `memcpy` of its nine pointers to frame + 80, `CountBodyKits`: +25168 = 0 when it answers 1, else 1; +25176 to +25192 = 1; `LoadInteriorSlots`(screen); +25172 = 1 when p +120 is set, else 0; `LoadCurrentChoices`(screen); +25128 to +25164 = 1 (the aero items, then `TuningScreen::SetAeroAvailability`); `LoadOwnedParts`, `SetPrices`, `LoadUnlockedParts` (the last with r3 as `SetPrices` leaves it: the screen). A 4,128-byte frame (r27 to r31 by `__savegprlr_27`). From `Start` only. One of the tuning screen's functions outside its pages (lead, 2026-11-07; taken here). Seen in play. Read in full; its callees in outline. Ready as a group (6 functions, 3,748 lines: split the migration, the callees first). |
+| `sub_821DE280` | `TuningScreen::LoadInteriorSlots` (probably) | | r3 = the screen: the selected garage car (found as `SetUp` does): when its +12 (the car's id) is 10, +25192 = 0 (the interior's fifth slot unavailable). Leaf, no frame. From `SetUp` only. Seen in play. Read in full. |
+| `sub_821DA4B0` | `TuningScreen::LoadCurrentChoices` (probably) | | r3 = the screen. 1,182 lines. The garage car's choices into the screen's current choice words (the inverse of `TuningScreen::StoreToGarageCar`, `tuning-screen.md`): the selected garage car c (as `SetUp`), its +1656 to +1820 (the power, power train, body, tire, aero, exterior and interior items, `../known-data.md`'s "garage car") into the part tables (+34304 + 4 × `[+33900]` and the like, +35020 to +35492, +35496 to +36712), the paint and lights' saved words (+30476 to +30488, +30644 to +30656, +30708 to +30720), the wheels' saved words (+27840 to +27852); `Params::GetCarSpec` once. A 192-byte frame (r23 to r31 by `__savegprlr_23`). From `SetUp` only. Seen in play. Read in outline (its loads and stores, not each branch). |
+| `sub_821DBAB0` | `TuningScreen::LoadOwnedParts` (probably) | | r3 = the screen. 2,523 lines. The owned flags from the selected garage car's +1904 bitset (bit n in word n >> 5, 1 << (n & 31)), the inverse of `TuningScreen::StoreOwnedParts` (`tuning-pages.md`): power item 0's list (+34324 + 40 × `[+33900]` + 4i) from bit i for the class 1 or 3, i + 10 for 0, 2 or 4, and the other items' words the same way (+35828 to +36380, the interior's by `[+25172]`); the wheels' flags through `TuningScreen::TestAndSetWheelFlag`. A 160-byte frame (r26 to r31 by `__savegprlr_26`). From `SetUp` only. One of the tuning screen's functions outside its pages (lead, 2026-11-07; taken here). Seen in play. Read in outline. |
+| `sub_821DAD58` | `TuningScreen::SetPrices` (probably) | | r3 = the screen. 1,781 lines, no calls. The parts' prices: the selected garage car's +1900 (its base price, probably) converted to float, times constants (`[0x8200AD84]` to `[0x8200AD94]`, `[0x820021E4]` to `[0x82002204]`, `[0x82002C9C]` and others), each truncated to an integer, into the price tables (+33904 + 40 × `[+33900]` and on, to +36800) through frame words below the stack pointer (sp − 160, sp − 144; no frame of its own: `__savegprlr_17` saves r17 to r31). r3 left as given. From `SetUp` only. Seen in play. Read in outline. |
+| `sub_821CFFC8` | `TuningScreen::LoadUnlockedParts` (probably) | | r3 = the screen (as `SetPrices` leaves it). Flags from the save data's (`[+18904]`) bitset at +0x19930 (a copy of the table `0x826C50A8`, `../known-data.md`): for the class `[+33900]` and i 0 to 9, +34104 + 40 × class + 4i = 1 when bit i (class 1 or 3) or i + 10 (0, 2 or 4) is set, else 0; then the other items' lists the same way. 1,000 lines, leaf, no frame. From `SetUp` only. Seen in play. Read in outline. |
+| `sub_82208130` | `DecalImages::SavePlaceholders` (probably) | | r3 = the decal images (the screen's +10048). m = movie 13 (`UiMovies::Find`): +8836 = `[[m +28] +724]`, +8840 = `[[m +28] +700]` (movie 13's placeholder textures, `../known-data.md`'s +18884 to +18896); then `SavePlaceholders14`(r3). A 112-byte frame (r31 saved). From `Start` only. Seen in play. Read in full. |
+| `sub_821F8950` | `DecalImages::SavePlaceholders14` (probably) | | r3 = the decal images. m = movie 14: +8844 = `[[m +28] +640]`, +8848 = `[[m +28] +636]`. A 112-byte frame (r31 saved). From `SavePlaceholders` only. Seen in play. Read in full. |
+| `sub_821D8898` | `TuningMachine::OnDialogClosed` | | (5, 42). r3 = the screen, r4 = the mode. In state 11 (CONF EQUIP, +9652): m = movie 16 (the dialog's yes/no, `type2-dialog.md`): `UiMovie::SetText(m, -1, 0, 15)`, `SetText(m, 1, 3, 2)`, `SetText(m, 1, 4, 3)` (r7 to r10 not set: register leftovers); m's +40960 = 0 (the cursor on yes); message (34, 0, 0) posted to the mode's ring (the yes/no dialog 0 opened: the equip question). Always +9728 = 1 (the pages run again). A 128-byte frame (r29 to r31 by `__savegprlr_29`). Seen in play. Read in full. |
+| `sub_821CEA88` | `TuningMachine::OnDialogNo` | | (5, 39) and (5, 41): the dialog's no and back. r3 = the screen. By the state +9652, shorthands as in `TuningScreen::OnDialogYes`'s row (`tuning-pages.md`; PopTo pops the history byte +10008 / words +9756 until +9652 is the state named): 9 (CONF BUY): byte +9665 = 0, +9724 = 1, +9708 = 1, +9748 = the menu's +0, one state popped, the queue reset to it; the category menu set up again from `PageItemCount` and `PageCursor` (when the page has more than 8 items; else unless exterior item 0 or interior item 3, with +9712 = 1 for aero item 4), the list's scroll (+25100, +25104) for aero; then command 64 queued with the page's set-up after it by the state reached (3 command 0, 4 command 2, 15 command 7, 53 command 54, 57 command 58; 56 command 57 at once, with +9716 and +9720 cleared; 5 to 8, 17 and 55 their own); 11 (CONF EQUIP): PopTo 3 (category 2), 15 (category 5, item 0), 53 or 56 (category 6, item 3, by `[+33540]` 0 or 1), else 4, then as above; 12, 13, 14, 35, 36, 37 their own pops and commands (`[+30500]`, `[+25240]` read on the way). Then `StickerDialogNo`(screen). A 96-byte frame. 1,008 lines. Not seen in play. Read in outline (its branches by state, not each store). |
+| `sub_821F7988` | `TuningMachine::StickerDialogNo` (probably) | | r3 = the screen. In states 50 and 51 (the sticker editor's questions): +9652 = 39, the queue reset to 39, +0 = 39, +12 = +16 = -1, `UiMovie::HideNode(movie 14, 1, 1)`; in 52: +9652 = 40, the queue reset to 40, then command 64 with 36 after it (+0 = -1, +4 = 40). Other states: nothing. A 96-byte frame. From `OnDialogNo` only. Not seen in play. Read in full. |
+| `sub_821CF8B8` | `TuningMachine::OnNoticeClosed` | | (5, 40): a notice closed. r3 = the screen. Only in state 10 (the money short): +9732 = 1, +9708 = 1, +9716 = 1; pops the history (as `OnDialogNo`) to 3 (category 2), 15 (category 5, item 0), 53 or 56 (category 6, item 3, by `[+33540]` 0 or 1) or 4; the queue reset to that state; the category menu set up again from `PageItemCount` and `PageCursor` (aero with the list's scroll +25100, +25104; not for category 5 item 0 or category 6 item 3); then command 64 queued with 0 (state 3), 2 (4), 7 (15) or 54 (53) after it; state 56: command 57 at once, with +9716 and +9720 cleared. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_821D69A0` | `TuningMachine::Unload` | | (5, 11) → 8 (`TuningScreen::Leave` posts 11). r3 = the screen. When +9608 is set: `UiMovie::FinishAll`(movie 2). When +9616 is set: `UiMovies::Delete` of 2, 13 and 14, +9608 = 0. A 112-byte frame (r31 saved). Returns the last call's r3. Seen in play. Read in full. |
+| `sub_821D6A78` | `TuningMachine::Close` | | (5, 4) and (9, 4); also the +9640 machine's (5, 4), (9, 4) and (10, 4) (`sub_8218CE10`'s, a lead). r3 = the machine, r4 = the mode: +9604 = 7; message (4, 0, 0) posted to the mode's ring. Leaf, no frame (r3 left as given). Seen in play. Read in full. |
+| `sub_821CBD40` | `TuningMachine::Destroy` | | (7, 4) → 6. r3 = the screen. `DecalImages::UnloadAll`(+10048); `VirtualFree` of `[+10036]`, `[+10040]` and `[+10044]` (size 0, type 0x8000). A 112-byte frame (r30, r31 saved). Returns the last `VirtualFree`'s r3. One of the tuning screen's functions outside its pages (lead, 2026-11-07; taken here). Seen in play. Read in full. |

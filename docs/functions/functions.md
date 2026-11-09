@@ -662,6 +662,12 @@ Rows not yet moved stay in the table below. So far:
   player's cars over the stand, each car's actions (make it current,
   sell it, its plate, the view on the stand, its spec sheet), its pages
   and transitions (B7).
+- [`tuning-machine.md`](tuning-machine.md): the tuning screen's machine
+  (the type 2 mode's +19792, opened by message 12, UI movies 2, 13 and
+  14): its creation, start (the screen's set-up from the selected garage
+  car: current choices, owned and unlocked parts, prices), the dialog's
+  replies, leave, close and teardown (B7; the screen's update, pages
+  and helpers are in `tuning-screen.md` and `tuning-pages.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

@@ -45,7 +45,7 @@ with its two pieces and the state handlers and command runners that
 never ran in play (61 of them); the refresh `sub_821E3AD0` with its
 callees not seen in play; the screen's other vtable slots (its input
 pages); `GarageStage::SetColor`'s pieces and the stand's other setters
-met here. The power curve's set-up `sub_821E7368` stays in its lead.
+met here. The power curve's set-up `sub_821E7368` stayed in its lead (since 2026-11-09 `TuningMachine::Start` in [`tuning-machine.md`](tuning-machine.md), with the screen's machine).
 
 Shared, with rows elsewhere: `UiMovie::` and `UiMovies::Find`
 (`ui-movies-game.md`, `ui-movies.md`: among them `sub_8211C740`,
