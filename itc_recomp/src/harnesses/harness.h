@@ -313,5 +313,6 @@ void CarDealer(Context& h);
 void SaveScreen(Context& h);
 void Type2Screens(Context& h);
 void Type2Dialog(Context& h);
+void GarageScreen(Context& h);
 
 }  // namespace harness
