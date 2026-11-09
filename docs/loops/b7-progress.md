@@ -26,7 +26,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the type 2 mode's machine at +0x23018 (`sub_82196520`
   and its transitions, UI movie 5, probably the garage; all 10 roots
   ready, the closest of the type 2 machines' leads; its line deleted
-  from `leads.md`). Step: mapping; agent running.
+  from `leads.md`). Mapped `garage-screen.md` (5c43d083: 78 rows, 22
+  in play: the garage screen, the player's garage cars over the stand,
+  each made current, sold, its plate changed, viewed or its spec sheet
+  opened; Init's 20 transitions, 5 pages, 18 table transitions,
+  `Update`; 15 ready groups; no leads added, four leads' lines trimmed;
+  no subagents); map checked. Step: migration; agent running.
 
 ## Done
 
@@ -51,5 +56,7 @@ The run's section of `review.md` ("Run 2026-11-09 10:53").
   unknown 730).
 - After the type 2 dialog's migration: ours 5265, work left 1175
   (wrapped 56, known 389, unknown 730).
+- After the garage screen's map: ours 5265, work left 1175 (wrapped 56,
+  known 411, unknown 708).
 
 ## Stopped

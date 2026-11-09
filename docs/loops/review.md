@@ -25,6 +25,15 @@ When the user has reviewed a run's section, its heading gets
   play: `Cancel`, `Wait`, `OpenNotice2`, `Notice2Page`, `TakesInput`,
   `OpenNotice2Step`, `CloseNotice2Step`. New: `src/type2_dialog/`,
   `src/hooks/type2_dialog.*`, `src/harnesses/type2_dialog.cpp`.
+- The garage screen's map (5c43d083): `garage-screen.md`, 78 rows (22
+  in play; the type 2 mode's machine at +0x23018, UI movie 5), a row in
+  `known-data.md` (`0x826D8420`-`0x826D842C`; the save's +6116 confirmed
+  as the money), a pointer in `type2-screens.md`'s intro; four leads'
+  lines trimmed (the career screens', the stand screens', the mode
+  Init's, the stand setters'). Noted: `Destroy` never frees the second
+  menu list `[0x826D8428]` (probably the original's leak, kept);
+  `SetHelpLine` `sub_82193A90`'s leftover r5 to `UiMovie::SetText`
+  (the 2026-10-30 call: native callers pass 0).
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 
