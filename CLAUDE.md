@@ -616,6 +616,17 @@ native (ours 5,074 -> 5,237), and mapped the type 2 mode's dialog
 (`type2-dialog.md`, 21 ready groups, its migration not started). The
 rest waits on the type 2 mode's other machines, its Init and the leads
 in `docs/loops/leads.md`.
+Its forty-first run (`b7-loop-09-11-26`, 2026-11-09, not yet merged;
+summary `docs/loops/b7-loop-2026-11-09-1053.md`; 3 subsystems) made the
+type 2 mode's dialog (`type2-dialog.md`, `--native_type2_dialog`, 28 of
+28), its garage screen (`garage-screen.md`, `--native_garage_screen`,
+22 of 22 in play: the garage cars over the stand) and the tuning
+screen's machine (`tuning-machine.md`, `--native_tuning_machine`, 18 of
+19 in play: its handlers and `TuningScreen::SetUp` from the garage car)
+native (ours 5,237 -> 5,305); it stopped at its limit. The rest waits
+on the type 2 mode's +9640 and +0x173D0 machines, its Init
+`sub_82197278`, the tuning screen's refresh `sub_821E3AD0` (it blocks
+`Start`) and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

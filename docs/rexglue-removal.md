@@ -268,8 +268,14 @@ goes in `src/` as overrides), American English.
   (`type2-screens.md`, 121 of 121 in play: the hub, the spec sheet, the
   build screen's machine, the license plate editor) and the save screen
   (`save-screen.md`, 42 of 42 in play) native (ours 5,074 -> 5,237) and
-  mapped the type 2 mode's dialog (`type2-dialog.md`, its migration not
-  started). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  mapped the type 2 mode's dialog (`type2-dialog.md`). Its forty-first
+  run (`b7-loop-09-11-26`, 2026-11-09, stopped at its limit) made the
+  type 2 dialog (`type2-dialog.md`, 28 of 28), the garage screen
+  (`garage-screen.md`, 22 of 22 in play) and the tuning screen's machine
+  (`tuning-machine.md`, 18 of 19 in play) native (ours 5,237 -> 5,305);
+  the rest waits on the type 2 mode's +9640 and +0x173D0 machines, its
+  Init `sub_82197278`, the tuning screen's refresh `sub_821E3AD0` and
+  update `sub_821E6C50`. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2816,6 +2822,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-09 | The save screen (one machine, UI movie 44, that the type 2, 4, 6, 10 and 8 modes' Inits set up: the game data's check, save and load, the replays, the controller pick; its 27 pages and 7 steps) | `save-screen.md` | 42 of 42 in play (one migration; 2 adapters removed) | `--native_save_screen` |
 | 2026-11-09 | The type 2 mode's dialog (its machine at the mode's +0x1E4C8: four dialogs over UI movies 16 to 19, the confirm and notice pairs; its 11 transitions, `Draw`'s 4 pages, `Update`'s 10 steps and `Init`) | `type2-dialog.md` | 28 of 28 (one migration; no adapter removable) | `--native_type2_dialog` |
 | 2026-11-09 | The type 2 mode's garage screen (its machine at the mode's +0x23018, UI movie 5: the player's garage cars over the stand; its handlers, `InitStates`' 20 transitions, the list and leave pages, `UpdatePage`, `Update`, the list's set-up) | `garage-screen.md` | 22 of 22 in play (one migration; 7 adapters removed) | `--native_garage_screen` |
+| 2026-11-09 | The tuning screen's machine (the type 2 mode's +19792: its Init, creation, UI movies 2, 13 and 14, `TuningScreen::SetUp` from the garage car with the part tables' loaders and prices, the dialog's replies, unload, close and teardown; not `Start`, which waits on the refresh `sub_821E3AD0`) | `tuning-machine.md` | 18 of 19 in play (one migration, `SetUp` split over five parts; 5 adapters removed, 3 Native without one) | `--native_tuning_machine` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5040,3 +5047,17 @@ opens and closes the screen; its pages wait for a drive. The boundary:
 called 70, live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 5,287, work left 1,153 (Wrapped 56, with a row
 389, no row yet 708), from 1,175.
+
+**2026-11-09, the tuning screen's machine (branch `b7-loop-09-11-26`):**
+the forty-first run's third subsystem (`tuning-machine.md`,
+`--native_tuning_machine`, `src/tuning_machine/`), in one migration:
+the tuning screen's machine at the type 2 mode's +19792, its Init and
+handlers, and `TuningScreen::SetUp` with its five loaders (3,748 lines,
+split over five parts); 5 adapters removed. `Start` `sub_821E7368`
+stays recompiled, waiting on the refresh `sub_821E3AD0`; the three
+handlers never seen in play stay recompiled. The replay opens the
+tuning screen and reaches 17 of the 18. The run stopped at its limit
+(3 subsystems). The boundary: 449 functions (916 pairs): overridden
+109, Native 36, Dropped 26, never called 70, live 208. Imports: 186
+called, 54 with a live caller. B7 (`b7_status.py`): ours 5,305, work
+left 1,135 (Wrapped 56, with a row 390, no row yet 689), from 1,153.

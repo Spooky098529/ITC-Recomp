@@ -18,6 +18,9 @@ here loses its heading.
 
 ## Run 2026-11-09 10:53 (`b7-loop-09-11-26`)
 
+- The tuning machine's migration (attract race `itc_4743`, replay
+  `itc_4744` ok, one SDK "BaseHeap::Release failed" line as in earlier
+  runs; `tuning-machine.md`): `sub_821D8898`.
 - The garage screen's migration (attract race `itc_4733`, replay
   `itc_4734` ok, opening and closing the screen only;
   `garage-screen.md`): `sub_82193180`, `sub_82194CD8`, `sub_821939A0`,

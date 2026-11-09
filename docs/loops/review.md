@@ -88,6 +88,9 @@ When the user has reviewed a run's section, its heading gets
   in play). `SetUp` calls `SetAeroAvailability`'s plain C++ directly
   (`--native_tuning_pages` no longer switches it on this path);
   `Car::Init` and `Car::Refresh` through their overrides.
+- The tuning machine's replay (`itc_4744`) logged one SDK
+  "BaseHeap::Release failed because address is not a region start"
+  line, the intermittent one noted in earlier runs; not looked into.
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 

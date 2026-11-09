@@ -54,10 +54,17 @@ file's history. What's left to see in a drive, from every run:
   callees split over five subagents one at a time; 5 adapters removed,
   3 Native without one; 18 of 19 in play ours, `Start` blocked by the
   refresh; `--native_tuning_machine`; race 38 s, 0 errors, its
-  harnesses 0 differing). Left: none. Step: validation; agent running.
+  harnesses 0 differing). Left: none. Validated `itc_4743` (race 67 s
+  at 180, the harnesses ~112 s; 0 errors, every harness 0 differing
+  outside the expected groups, 18 of 18 harness lines, no prints added;
+  none in the race, 17 in the replay `itc_4744` (ok; one SDK
+  "BaseHeap::Release failed" line, as in earlier runs), 1 to drive).
+  Recorded. The run's limit reached.
 
 ## Done
 
+- The tuning machine: `tuning-machine.md`, 18 of 19 in play (8 Native),
+  `--native_tuning_machine`, 529f68d7..9a1c1037.
 - The garage screen: `garage-screen.md`, 22 of 22 in play (7 Native),
   `--native_garage_screen`, e10e29dd..52c21938.
 - The type 2 dialog: `type2-dialog.md`, 28 of 28 (all Overridden),
@@ -91,3 +98,12 @@ The run's section of `review.md` ("Run 2026-11-09 10:53").
   390, unknown 689).
 
 ## Stopped
+
+2026-11-09, at the run's limit: 3 subsystems finished (the type 2
+dialog, the garage screen, the tuning screen's machine). Every
+validation passed (every harness 0 differing outside the expected
+groups, no error lines in the races, the replays ok); no halts, no new
+questions for the user, no new expected-to-differ groups. Nothing
+uncommitted. The run's summary (`b7-loop-2026-11-09-1053.md`), the
+plan's "B7 in progress" line and CLAUDE.md's B7 sentence are up to
+date. The user reviews and merges.
