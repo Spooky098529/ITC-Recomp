@@ -159,6 +159,7 @@ constexpr uint32_t kSaveObject36 = 0x40, kSaveDevices = 0x100, kSaveUsers = 0x20
 constexpr uint32_t kSaveSlots = 0x800, kSaveRecords = 0x2000, kSaveWorldBytes = 0x2800;
 
 constexpr uint32_t kReplayBlockBytes = 0x13D000;
+constexpr uint32_t kSaveData1Bytes = 0x3B000;
 uint8_t* base_of_world = nullptr;  // the guest base, for the World's set-up
 
 struct World {
@@ -169,6 +170,7 @@ struct World {
         strings(kStringWorldBytes),
         save(kSaveWorldBytes),
         save_data(kGameDataBytes),
+        save_data1(kSaveData1Bytes),
         buffers(0x1000),
         game_data(kGameDataBytes),
         profile(0x400),
@@ -183,7 +185,8 @@ struct World {
   }
   bool ok() const {
     return screen.address && movies.address && texts.address && strings.address &&
-           save.address && save_data.address && buffers.address && game_data.address &&
+           save.address && save_data.address && save_data1.address && buffers.address &&
+           game_data.address &&
            profile.address && kept.address && replay.address;
   }
   uint32_t at(uint32_t offset) const { return screen.address + offset; }
@@ -202,7 +205,10 @@ struct World {
   Block texts;
   Block strings;
   Block save;
-  Block save_data;  // player 0's ([0x826C5B58])
+  Block save_data;   // player 0's ([0x826C5B58]; 2 and 3 too)
+  // Player 1's ([0x826C5B5C]): the kind 6 pages copy 0x1D52C bytes between
+  // its two halves.
+  Block save_data1;
   // The save buffers' header ([0x828161F0]: +0 the game data, +4 the
   // replay, +12 the records at +0x100, +16 the list entries at +0x200, +20
   // their count).
@@ -510,8 +516,9 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, ss::kList, w.list());
   guest::StoreU32(base, ss::kData, w.data());
   guest::StoreU32(base, ss::kModeType, OneOf(r, {2, 4, 6, 8, 10, 0}));
+  WriteRandom(base, w.save_data1.address, w.save_data1.bytes, r);
   for (uint32_t i = 0; i < 4; i++) {
-    guest::StoreU32(base, kSaveDataSlots + 4 * i, w.save_data.address);
+    guest::StoreU32(base, kSaveDataSlots + 4 * i, i == 1 ? w.save_data1.address : w.save_data.address);
   }
   // The save buffers: the game data, the replay, 1 to 4 records and their
   // list entries (each entry's +300 its record's +28, the names short: with
@@ -673,8 +680,8 @@ void Group(Context& h, const World& w, const char* name, int cases, const SetupF
           out[v].Word(uint32_t(x));
         }
       }
-      for (const Block* b : {&w.screen, &w.movies, &w.texts, &w.save, &w.save_data, &w.buffers,
-                             &w.game_data}) {
+      for (const Block* b : {&w.screen, &w.movies, &w.texts, &w.save, &w.save_data,
+                             &w.save_data1, &w.buffers, &w.game_data}) {
         out[v].Bytes(Read(h.base, b->address, b->bytes));
       }
       for (const auto& [address, bytes] : kSavedGlobals) {
@@ -800,9 +807,11 @@ void ReplayPages(Context& h, const World& w) {
       h, w, "SaveScreen::Page14 (sub_821A67E8)", 500,
       [&h, page14](PPCContext& t, Random& r, const World& w) {
         page14(t, r, w);
-        // The header's lists: none, or copies of the shaped ones in the
-        // layer's pages (Replays::BuildList frees the old ones).
-        const bool none = Pick(r, 2) == 0;
+        // The header's lists: none (with the message 0 only: the list's
+        // build; the message 7 reads a record from them), or copies of the
+        // shaped ones in the layer's pages (Replays::BuildList frees the old
+        // ones).
+        const bool none = guest::LoadU32(h.base, w.data() + 12) == 0 && Pick(r, 2) == 0;
         for (const auto& [field, bytes] : {std::pair{12u, 4u * 36}, std::pair{16u, 4u * 304}}) {
           uint32_t list = 0;
           if (!none) {
@@ -886,24 +895,34 @@ void MadeBuffers(uint8_t* base, const World& w, Outputs& out) {
   guest::StoreU32(base, ss::kSaveBuffers, w.buffers.address);
 }
 
-// The layer's pages a case gave the function to free: after the run,
-// whether each is still pages (then freed here).
-std::vector<uint32_t> g_given;
+// The layer's pages a case gave the function (to free, or to use where it
+// may free them): after the run, whether each is still pages, then its
+// bytes' hash, and freed here.
+std::vector<std::pair<uint32_t, uint32_t>> g_given;
 uint32_t GivePages(uint8_t* base, uint32_t from, uint32_t bytes) {
   const uint32_t block = memory::AllocPages(bytes, 4096);
   if (block != 0) {
     if (from != 0) {
       std::memcpy(base + block, base + from, bytes);
     }
-    g_given.push_back(block);
+    g_given.push_back({block, bytes});
   }
   return block;
 }
-void CheckGiven(Outputs& out) {
-  for (const uint32_t block : g_given) {
+bool Given(uint32_t block) {
+  for (const auto& [address, bytes] : g_given) {
+    if (address == block) {
+      return true;
+    }
+  }
+  return false;
+}
+void CheckGiven(uint8_t* base, Outputs& out) {
+  for (const auto& [block, bytes] : g_given) {
     const bool left = memory::IsPages(block);
     out.Word(left ? 1 : 0);
     if (left) {
+      out.Word(uint32_t(base::Hash64(base + block, bytes)));
       memory::FreePages(block);
     }
   }
@@ -988,7 +1007,7 @@ void Handlers(Context& h, const World& w) {
       __imp__sub_821A1CA0, hooks::SaveScreenOnLeft, {{112, 32}},
       [](uint8_t* base, const World& w, Outputs& out) {
         // Freed by the function: any still pages are freed here (counted).
-        CheckGiven(out);
+        CheckGiven(base, out);
         for (const auto& [global, world] : {std::pair{ss::kPages, w.pages()},
                                             std::pair{ss::kList, w.list()},
                                             std::pair{ss::kData, w.data()}}) {
@@ -996,6 +1015,93 @@ void Handlers(Context& h, const World& w) {
           out.Word(block);
           guest::StoreU32(base, global, world);
         }
+      });
+}
+
+void UpdateAndDraw(Context& h, const World& w) {
+  // Update: the running step -1, 0 to 6 or another negative, the queued -1
+  // or 0 to 6, the started word 0 or 1; the message and the dialog's state
+  // the steps test; the item block 0 or pages (ShowMessage's MenuList::Init).
+  Group(
+      h, w, "SaveScreen::Update (sub_821A64A0)", 500,
+      [&h](PPCContext& t, Random& r, const World& w) {
+        const uint32_t pages = w.pages();
+        const uint32_t steps[9] = {0xFFFFFFFFu, 0, 1, 2, 3, 4, 5, 6, 0xFFFFFFFEu};
+        guest::StoreU32(h.base, pages + 12, steps[Pick(r, 9)]);
+        guest::StoreU32(h.base, pages + 16, Pick(r, 3) == 0 ? 0xFFFFFFFFu : Pick(r, 7));
+        guest::StoreU32(h.base, pages + 24, Pick(r, 2));
+        guest::StoreU32(h.base, w.data() + 12, Small(r, 18));
+        guest::StoreU32(h.base, w.data() + 16, Small(r, 5) - 1);
+        guest::StoreU32(h.base, w.list() + 16, Small(r, 3));
+        ItemBlock(h.base, w, r);
+        t.r3.u64 = r.Next();
+      },
+      __imp__sub_821A64A0, hooks::SaveScreenUpdate, {{144, 16}},
+      [](uint8_t* base, const World& w, Outputs& out) { FreeItemBlock(base, w, out); });
+  // Draw: r3 the machine, r4 the mode; the page any of the 27 (those
+  // seen in play more often) or -1 (the pages for the player at the data's
+  // +44 given 0 or 1); a step running or not; the cancel 0 or 1 with the kind 0
+  // to 8; the next state 21 or another; the save buffers' header, its
+  // buffers and lists as the layer's pages (SaveBuffers::Destroy frees
+  // them); the pages' fields as their groups shape them.
+  Group(
+      h, w, "SaveScreen::Draw (sub_821A6AF0)", 500,
+      [&h](PPCContext& t, Random& r, const World& w) {
+        uint8_t* base = h.base;
+        const uint32_t m = w.at(0x1000) - ss::kMachineState;
+        t.r3.u64 = m;
+        t.r4.u64 = w.mode();
+        const uint32_t pages[22] = {0, 1, 2, 3, 4, 6, 7, 8, 9, 12, 13, 14, 15, 16, 24, 25, 26,
+                                    0xFFFFFFFFu, 0xFFFFFFFFu, 0, 6, 12};
+        guest::StoreU32(base, w.pages() + 0, Pick(r, 4) == 0 ? Pick(r, 27) : pages[Pick(r, 22)]);
+        guest::StoreU32(base, w.pages() + 12, Pick(r, 2) == 0 ? 0xFFFFFFFFu : Pick(r, 7));
+        guest::StoreU32(base, w.data() + 28, Pick(r, 2));
+        guest::StoreU32(base, w.data() + 36, Small(r, 9));
+        guest::StoreU32(base, w.data() + 32, Pick(r, 2) == 0 ? 21 : Small(r, 10));
+        guest::StoreU32(base, w.data() + 12, Small(r, 13));
+        guest::StoreU32(base, w.data() + 44, Pick(r, 2));
+        const uint32_t waits[4] = {44, 89, 0, 90};
+        guest::StoreU32(base, w.data() + 24, waits[Pick(r, 4)]);
+        guest::StoreU32(base, w.list() + 16, Pick(r, 2));
+        if (Pick(r, 2) == 0) {
+          ForceAccept(base, w, r);
+        }
+        Presses(base, r);
+        ItemBlock(base, w, r);
+        g_given.clear();
+        const uint32_t from = w.buffers.address;
+        const uint32_t header = GivePages(base, from, 24);
+        guest::StoreU32(base, header + 0, GivePages(base, w.game_data.address, kGameDataBytes));
+        guest::StoreU32(base, header + 4, GivePages(base, 0, kReplayBlockBytes));
+        guest::StoreU32(base, header + 8, Pick(r, 2) == 0 ? 0 : GivePages(base, 0, 64));
+        guest::StoreU32(base, header + 12, GivePages(base, from + 0x100, 4 * 36));
+        guest::StoreU32(base, header + 16, GivePages(base, from + 0x200, 4 * 304));
+        guest::StoreU32(base, ss::kSaveBuffers, header);
+      },
+      __imp__sub_821A6AF0, hooks::SaveScreenDraw, {{368, 152}},
+      [](uint8_t* base, const World& w, Outputs& out) {
+        FreeItemBlock(base, w, out);
+        // The header (0 once SaveBuffers::Destroy ran) and the lists
+        // Replays::BuildList made in it, compared and freed; then what's
+        // left of the given pages.
+        const uint32_t header = guest::LoadU32(base, ss::kSaveBuffers);
+        out.Word(header == 0 ? 0 : 1);
+        if (header != 0 && memory::IsPages(header)) {
+          const uint32_t count = guest::LoadU32(base, header + 20);
+          out.Word(count);
+          for (const auto& [field, bytes] : {std::pair{12u, 36u}, std::pair{16u, 304u}}) {
+            const uint32_t list = guest::LoadU32(base, header + field);
+            const bool made = list != 0 && !Given(list) && memory::IsPages(list);
+            out.Word(made ? 1 : 0);
+            if (made) {
+              out.Bytes(Read(base, list, bytes * std::min(count, 13u)));
+              memory::FreePages(list);
+            }
+            guest::StoreU32(base, header + field, 0);
+          }
+        }
+        CheckGiven(base, out);
+        guest::StoreU32(base, ss::kSaveBuffers, w.buffers.address);
       });
 }
 
@@ -1015,6 +1121,7 @@ void SaveScreen(Context& h) {
   KindOnePages(h, w);
   ReplayPages(h, w);
   Handlers(h, w);
+  UpdateAndDraw(h, w);
 }
 
 }  // namespace harness

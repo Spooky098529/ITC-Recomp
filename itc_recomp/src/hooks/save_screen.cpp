@@ -11,8 +11,9 @@ ITC_FLAG_BOOL(native_save_screen, true, "ITC",
               "Run the save screen (docs/functions/save-screen.md: the machine's handlers "
               "SaveScreen::OnEnter sub_821A2608, OpenMovie sub_821A1D10, WaitMovie sub_821A26F0, "
               "OpenKind0 to OpenKind7, Show sub_821A6608 (with ShowKind2 sub_821A1D38 and "
-              "ShowKind7 sub_821A2138), Cancel sub_821A1D20, Leave sub_821A4C58 and OnLeft "
-              "sub_821A1CA0; the dialog steps "
+              "ShowKind7 sub_821A2138), Update sub_821A64A0, Draw sub_821A6AF0, Cancel "
+              "sub_821A1D20, Leave sub_821A4C58 and OnLeft sub_821A1CA0 (the steps and pages "
+              "called through the guest from their tables); the dialog steps "
               "SaveScreen::MoveSelection sub_821A5118 and CloseDialog sub_821A5038; the pages "
               "Page0 sub_821A28E0, Page1 sub_821A2AF8, Page2 sub_821A2C98, Page3 sub_821A2EE8 "
               "and the end pages Page4 sub_821A4D30, Page9 sub_821A4DE0, Page16 sub_821A4E60 and "
@@ -142,6 +143,14 @@ void SaveScreenShow(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::Show(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
+void SaveScreenUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::Update(base, ctx.r1.u32, guest.calls());
+}
+void SaveScreenDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::Draw(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
 void SaveScreenShowKind2(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::ShowKind2(base, ctx.r1.u32, guest.calls());
@@ -186,6 +195,8 @@ ITC_SAVE_SCREEN(821A2880, SaveScreenOpenKind5)
 ITC_SAVE_SCREEN(821A27C0, SaveScreenOpenKind6)
 ITC_SAVE_SCREEN(821A28B0, SaveScreenOpenKind7)
 ITC_SAVE_SCREEN(821A6608, SaveScreenShow)
+ITC_SAVE_SCREEN(821A64A0, SaveScreenUpdate)
+ITC_SAVE_SCREEN(821A6AF0, SaveScreenDraw)
 ITC_SAVE_SCREEN(821A1D20, SaveScreenCancel)
 ITC_SAVE_SCREEN(821A4C58, SaveScreenLeave)
 ITC_SAVE_SCREEN(821A1CA0, SaveScreenOnLeft)

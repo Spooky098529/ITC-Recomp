@@ -77,6 +77,8 @@ constexpr uint32_t kMoviesOpen = 0x8211E808;    // UiMovies::Open
 constexpr uint32_t kMoviesDelete = 0x8211E258;  // UiMovies::Delete
 constexpr uint32_t kFinishAll = 0x8211DFF8;     // UiMovie::FinishAll
 constexpr uint32_t kSaveBuffersCreate = 0x8228F6B0;
+constexpr uint32_t kSaveBuffersDestroy = 0x8228F8F8;
+constexpr uint32_t kDebugPrint = 0x82106540;  // empty in the build
 // The kinds 3 to 6's Shows (never seen in play: the originals).
 constexpr uint32_t kShowKind3 = 0x821A1E18;
 constexpr uint32_t kShowKind4 = 0x821A1ED8;
@@ -147,6 +149,30 @@ uint64_t Leave(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, cons
 // blocks freed (VirtualFree, MEM_RELEASE) and their globals 0. The last
 // VirtualFree's r3. 112-byte frame.
 uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The machine's Update and Draw (update.cpp) ---
+
+// sub_821A64A0 SaveScreen::Update (5, 0): the empty sub_82106540(100, 30,
+// 0, 0x8200A4F0); movie 44; the step table on the frame (+96 to +120: steps
+// 0 to 6); with a step running (the page block's +12 not -1) a step 0 or
+// more called through the guest (r3 the block's +24, r4 to r9 steps 0 to 5's
+// addresses, r10 the step × 4, as the original leaves them), and when it
+// answers nonzero (or at once for a negative step) the queued step started
+// (+12 = +16, +16 = -1, +20 = 0) or, with none, the page after shown (+0 =
+// +4, +12 = -1), then +24 = 0; with none running and the dialog shown (the
+// data's +16 not -1), UiMovie::Run(movie, 0). The last call's r3 (the
+// movie with none). 144-byte frame.
+uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821A6AF0 SaveScreen::Draw (5, 1): r3 the machine and r4 the mode
+// stored in the caller's area (sp + 20, sp + 28); the cancel (the data's +28,
+// unless a step runs or the page is an end page) turned into the kind's end
+// page; the page table on the frame (+96 to +200: pages 0 to 26; +80 the
+// table's base 0x821A0000) and the page called through the guest (r3 the
+// mode, r4 to r9 pages 20 to 25's addresses, r10 the table's address, as
+// the original leaves them); then with the data's +32 not 21 the machine's
+// +9604 = it, +32 = 21 and, for the kinds 0 and 1, SaveBuffers::Destroy.
+// The last call's r3 (0x821A2C98 with none). 368-byte frame.
+uint64_t Draw(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
 
 // --- The dialog steps (steps.cpp): `step` the started word ---
 

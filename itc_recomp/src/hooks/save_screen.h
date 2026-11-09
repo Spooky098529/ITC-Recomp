@@ -26,6 +26,8 @@ void SaveScreenShow(PPCContext& ctx, uint8_t* base);
 void SaveScreenCancel(PPCContext& ctx, uint8_t* base);
 void SaveScreenLeave(PPCContext& ctx, uint8_t* base);
 void SaveScreenOnLeft(PPCContext& ctx, uint8_t* base);
+void SaveScreenUpdate(PPCContext& ctx, uint8_t* base);
+void SaveScreenDraw(PPCContext& ctx, uint8_t* base);
 // ShowKind2 and ShowKind7 (no arguments; no adapters: only Show calls them).
 void SaveScreenShowKind2(PPCContext& ctx, uint8_t* base);
 void SaveScreenShowKind7(PPCContext& ctx, uint8_t* base);
