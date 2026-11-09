@@ -501,6 +501,9 @@ set(ITC_SOURCES
     src/garage_screen/update.cpp
     src/garage_screen/handlers.cpp
     src/garage_screen/init.cpp
+    src/hooks/tuning_machine.cpp
+    src/tuning_machine/handlers.cpp
+    src/tuning_machine/init.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp
@@ -725,6 +728,7 @@ set(ITC_SOURCES
     src/harnesses/save_screen.cpp
     src/harnesses/type2_dialog.cpp
     src/harnesses/garage_screen.cpp
+    src/harnesses/tuning_machine.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
