@@ -2806,6 +2806,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-08 | The front-end screen helpers (the 852-byte modes' releases, the save screen's and options' dialog text setters with their dialog steps and pages, the car cards) | `front-end-screen-helpers.md` | 27 of 32 in play (5 Merged; one migration; 6 adapters removed) | `--native_front_end_screen_helpers` |
 | 2026-11-08 | The car dealer (the type 2 mode's dealer machine: its 23 transitions, 6 pages, the car lists, the color pick, the purchase, the career's first car) | `car-dealer.md` | 58 of 58 in play (two migrations; 16 adapters removed) | `--native_car_dealer` |
 | 2026-11-08 | The type 2 mode's screens (the hub at the mode's +848: its menu over the stand car, notices, images, pages and transitions; the spec sheet's machine; the build screen's machine, entry and pages; the license plate editor the dealer's buy opens) | `type2-screens.md` | 121 of 121 in play (three migrations; 17 adapters removed) | `--native_type2_screens` |
+| 2026-11-09 | The save screen (one machine, UI movie 44, that the type 2, 4, 6, 10 and 8 modes' Inits set up: the game data's check, save and load, the replays, the controller pick; its 27 pages and 7 steps) | `save-screen.md` | 42 of 42 in play (one migration; 2 adapters removed) | `--native_save_screen` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4987,3 +4988,17 @@ drive. The boundary: 449 functions (916 pairs): overridden 109, Native
 36, Dropped 26, never called 70, live 208. Imports: 186 called, 54 with
 a live caller. B7 (`b7_status.py`): ours 5,195, work left 1,233
 (Wrapped 56, with a row 389, no row yet 788), from 1,354.
+
+**2026-11-09, the save screen (branch `b7-loop-08-11-26-2`):** the
+fortieth run's second subsystem (`save-screen.md`,
+`--native_save_screen`, `src/save_screen/`), in one migration: the save
+screen machine five front-end modes set up (the type 6 quit's save, the
+title's load and controller pick, the replays), its handlers, `Draw`'s
+pages and `Update`'s steps, and the type 2, 4 and 10 Inits. Its 35
+adapters stay, reached as functors or through the page and step tables;
+callees never seen in play run as the originals. The replay reaches the
+title's load; the rest waits for a drive. The boundary: 449 functions
+(916 pairs): overridden 109, Native 36, Dropped 26, never called 70,
+live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,237, work left 1,196 (Wrapped 56, with a row
+389, no row yet 751), from 1,233.

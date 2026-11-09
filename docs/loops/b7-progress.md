@@ -65,9 +65,21 @@ file's history. What's left to see in a drive, from every run:
   `Draw`, the type 2, 4 and 10 Inits; `StartCheck`, `Start` adapters
   removed; 42 of 42 in play ours; `--native_save_screen`; races 31-37
   s, 0 errors, its harnesses 0 differing; no subagents). Left: none.
-  Step: validation (agent running).
+  Validated `itc_4711` (race 69 s at 180; 0 errors, every harness 0
+  differing outside the expected groups, 43 of 43 harness lines, no
+  prints added; 6 in the race, 12 in the replay `itc_4712` (ok), 25 to
+  drive). Recorded.
+- Subsystem 3 of 3: the front-end screen around the menu helpers
+  (`sub_82188178`, `sub_821869B8`, `sub_82186428`, `sub_82186490`,
+  `sub_821864A0`, `sub_82187160`, `sub_82187330`, `sub_82187508`,
+  `sub_82187EC8`: the type 2 mode's +0x1E4C8 machine; all roots ready;
+  its line deleted from `leads.md`). Step: mapping (agent running).
 
 ## Done
+
+- `save-screen.md`: 42 of 42 in play native (the save screen machine
+  five modes share; 2 adapters removed), `--native_save_screen`;
+  ce16c61a, d393b07d..36674493.
 
 - `type2-screens.md`: 121 of 121 in play native (the hub, the spec
   sheet, the build screen's machine, the license plate editor; 17
