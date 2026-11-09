@@ -489,6 +489,10 @@ set(ITC_SOURCES
     src/save_screen/pages.cpp
     src/save_screen/pages_load.cpp
     src/save_screen/pages_replays.cpp
+    src/hooks/type2_dialog.cpp
+    src/type2_dialog/steps.cpp
+    src/type2_dialog/pages.cpp
+    src/type2_dialog/handlers.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp
@@ -711,6 +715,7 @@ set(ITC_SOURCES
     src/harnesses/car_dealer.cpp
     src/harnesses/type2_screens.cpp
     src/harnesses/save_screen.cpp
+    src/harnesses/type2_dialog.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
