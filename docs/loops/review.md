@@ -66,6 +66,28 @@ When the user has reviewed a run's section, its heading gets
   writes 9,999,999 to the money word +25116 before `SetUp` overwrites
   it (both kept); `OnDialogClosed`'s unset r7-r10 (the 2026-10-30
   call).
+- The tuning machine's migration (529f68d7..9a1c1037): 18 of 19 in play
+  ours (8 Native: `SetUp`'s five callees, adapters removed in one
+  commit; `ZeroRecord16` `sub_821FE540`, `DecalImages::Reset`
+  `sub_821FE590`, `SavePlaceholders14` `sub_821F8950` with no adapter,
+  their callers all native); `Start` `sub_821E7368` left recompiled
+  (blocked by the refresh `sub_821E3AD0`); the three handlers never
+  seen in play kept recompiled. `SetUp`'s 3,748 lines split over five
+  subagents, one at a time. Map corrections in the rows:
+  `SavePlaceholders` reads `[[[m +28] +724]]`; `LoadCurrentChoices`'
+  +30644-+30656 and +30708-+30720 come from a mirror table in its
+  frame, `Params::GetCarSpec` only when the paint word isn't -2;
+  `LoadOwnedParts` and `SetPrices` write beyond the map's ranges
+  (`SetPrices`' fixed-address stores grouped by address, after a
+  store-by-store replay showed none written twice or read back);
+  `SetUp` takes the weekday from the day before its clamp to 999.
+  Kept: the leftovers (`Create`'s word at the caller's sp + 20,
+  `SetPrices`' words below sp, `LoadOwnedParts`' r3 35960, the Init's
+  unwritten functor words). `LoadCurrentChoices`' frame-table indexes
+  come from car words unchecked (the harness keeps them in range: 0-7
+  in play). `SetUp` calls `SetAeroAvailability`'s plain C++ directly
+  (`--native_tuning_pages` no longer switches it on this path);
+  `Car::Init` and `Car::Refresh` through their overrides.
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 

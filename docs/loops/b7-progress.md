@@ -49,8 +49,12 @@ file's history. What's left to see in a drive, from every run:
   `SetUp` from the garage car with the part tables' loaders, the type 2
   dialog's replies, unload, close and teardown; 10 ready groups, `Start`
   blocked by the refresh `sub_821E3AD0`; two leads taken whole and
-  deleted, three given notes; no subagents); map checked. Step:
-  migration; agent running.
+  deleted, three given notes; no subagents); map checked. Migration
+  529f68d7..9a1c1037 (the Init and handlers, `SetUp` and its five
+  callees split over five subagents one at a time; 5 adapters removed,
+  3 Native without one; 18 of 19 in play ours, `Start` blocked by the
+  refresh; `--native_tuning_machine`; race 38 s, 0 errors, its
+  harnesses 0 differing). Left: none. Step: validation; agent running.
 
 ## Done
 
@@ -83,5 +87,7 @@ The run's section of `review.md` ("Run 2026-11-09 10:53").
   389, unknown 708).
 - After the tuning machine's map: ours 5287, work left 1153 (wrapped
   56, known 408, unknown 689).
+- After its migration: ours 5305, work left 1135 (wrapped 56, known
+  390, unknown 689).
 
 ## Stopped
