@@ -500,6 +500,7 @@ set(ITC_SOURCES
     src/garage_screen/pages.cpp
     src/garage_screen/update.cpp
     src/garage_screen/handlers.cpp
+    src/garage_screen/init.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp

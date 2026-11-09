@@ -214,4 +214,13 @@ uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, cons
 // original). The last VirtualFree's r3. 112-byte frame.
 uint64_t Destroy(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The machine's set-up (init.cpp) ---
+//
+// sub_82196520 GarageScreen::InitStates: 20 transitions added to `machine`
+// (StateMachine::Add's plain C++) from functors built in its frame
+// (`frame`, the original's stores in order). The last Add's r3 (an index
+// when `replaced`, else the new transition).
+constexpr uint32_t kInitFrame = 1424;
+uint32_t InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+
 }  // namespace garage_screen

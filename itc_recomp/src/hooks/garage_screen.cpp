@@ -22,7 +22,8 @@ ITC_FLAG_BOOL(native_garage_screen, true, "ITC",
               "sub_821915B0 (VirtualAlloc and VirtualFree through their overrides), OpenMovie "
               "sub_82191618, WaitForLoad sub_82191D70, Start sub_82193DC0 with ReadSave "
               "sub_82191BB0 and SetHeader sub_82192C80, Unload sub_821927E8 and Close "
-              "sub_82192850 (the same writes; checked by "
+              "sub_82192850; InitStates sub_82196520 (its step table, StateMachine::Add's plain C++) "
+              "(the same writes; checked by "
               "--run_harnesses=garage_screen)");
 
 namespace hooks {
@@ -161,6 +162,15 @@ void GarageScreenDestroy(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = gs::Destroy(base, ctx.r1.u32, guest.calls());
 }
+// StateMachine::Add's adapter's r3: a new transition's address from the
+// machine's 64-bit r3, as the type 2 dialog's Init.
+void GarageScreenInitStates(PPCContext& ctx, uint8_t* base) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = gs::InitStates(base, machine, ctx.r1.u32 - gs::kInitFrame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
 
 }  // namespace hooks
 
@@ -200,3 +210,5 @@ ITC_GARAGE_SCREEN(82193DC0, GarageScreenStart)
 ITC_GARAGE_SCREEN(821927E8, GarageScreenUnload)
 ITC_GARAGE_SCREEN(82192850, GarageScreenClose)
 ITC_GARAGE_SCREEN(821915B0, GarageScreenDestroy)
+// InitStates (from the type 2 mode's Init sub_82197278, recompiled).
+ITC_GARAGE_SCREEN(82196520, GarageScreenInitStates)

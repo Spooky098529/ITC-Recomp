@@ -39,5 +39,7 @@ void GarageScreenStart(PPCContext& ctx, uint8_t* base);
 void GarageScreenUnload(PPCContext& ctx, uint8_t* base);
 void GarageScreenClose(PPCContext& ctx, uint8_t* base);
 void GarageScreenDestroy(PPCContext& ctx, uint8_t* base);
+// InitStates (r3 the machine).
+void GarageScreenInitStates(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -31,6 +31,7 @@
 #include "base/log.h"
 #include "career/career.h"
 #include "car_specs/car_specs.h"
+#include "game_modes/game_modes.h"
 #include "garage_screen/garage_screen.h"
 #include "hooks/app_start_up.h"
 #include "hooks/garage_screen.h"
@@ -810,6 +811,33 @@ void SaveHeader(Random& r, const World& w) {
   NameRecord(w.base, w.save + 8, r);
 }
 
+// InitStates: the machine empty or holding random transitions with keys of
+// small numbers (states below 12, messages below 52), so some match the
+// Init's (Add replaces those); its frame (but its saves, r27 on) compared.
+void InitStates(Context& h, const World& w) {
+  Run(h, w, {"GarageScreen::InitStates (sub_82196520)", 24, __imp__sub_82196520,
+             hooks::GarageScreenInitStates, {{-1424, -48}},
+             [](PPCContext& t, Random& r, const World& w) {
+               namespace gm = game_modes;
+               const uint32_t machine = w.at(kMachineAt);
+               if (r.Below(2) == 0) {
+                 gm::StateMachineConstruct(w.base, machine);
+                 guest::StoreU32(w.base, machine + gm::kTransitionCount, 0);
+               } else {
+                 const uint32_t count = 8 + r.Below(160);
+                 guest::StoreU32(w.base, machine + gm::kTransitionCount, count);
+                 for (uint32_t i = 0; i < gm::kTransitions; i++) {
+                   const uint32_t at = machine + gm::kTransitionBytes * i;
+                   guest::StoreU32(w.base, at, r.Below(12));
+                   guest::StoreU32(w.base, at + 4, r.Below(52));
+                   guest::StoreU32(w.base, at + 8, r.Below(8) == 0 ? 1 : 0);
+                   guest::StoreU32(w.base, at + 12, 0);
+                 }
+               }
+               t.r3.u64 = machine;
+             }});
+}
+
 void Handlers(Context& h, const World& w) {
   auto machine = [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kMachineAt); };
   // Create: the four blocks VirtualAlloc made compared by content.
@@ -879,6 +907,7 @@ void GarageScreen(Context& h) {
     ITC_LOG_ERROR("harness: garage_screen: no block from the allocation layer");
     return;
   }
+  InitStates(h, w);
   Helpers(h, w);
   if (hooks::NativeHeapActive()) {
     Transitions(h, w);
