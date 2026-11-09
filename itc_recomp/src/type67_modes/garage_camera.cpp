@@ -10,6 +10,7 @@
 #include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "matrix_math/matrix_math.h"
 #include "xaudio/ppc_float.h"
 
 #include <bit>
@@ -261,6 +262,134 @@ void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
   Stfs(base, camera + 176, zero);
   Stfs(base, camera + 180, Lfs(base, 0x82009ED0));
   QuaternionFromAngles(base, camera + 192, zero, zero, zero, f);
+}
+
+namespace {
+
+// GarageCamera::Command's constants (floats).
+constexpr uint32_t kTiltStep = 0x82001FBC;   // the tilt's step and its low bound
+constexpr uint32_t kTiltHigh = 0x82000A30;   // the tilt's high bound
+constexpr uint32_t kStep = 0x82002948;       // the turns' step
+constexpr uint32_t kTurnLow = 0x820029C4;    // a turn's low bound (wraps to the high)
+constexpr uint32_t kTurnHigh = 0x82002240;   // its high bound (wraps to the low)
+constexpr uint32_t kZoomStep = 0x8200222C;   // +180's step
+constexpr uint32_t kZoomLow = 0x820021F8;
+constexpr uint32_t kZoomHigh = 0x820035B0;
+constexpr uint32_t kFovLow = 0x82001FD8;     // +224's bounds
+constexpr uint32_t kFovHigh = 0x82002A0C;
+constexpr uint32_t kMoveStep = 0x82002204;   // +256, +260 and +264's step
+
+// The clamp the original applies: below `low` gives `low`, else above
+// `high` gives `high`.
+double Clamp(uint8_t* base, double v, uint32_t low, uint32_t high) {
+  const double lo = Lfs(base, low);
+  if (v < lo) {
+    return lo;
+  }
+  const double hi = Lfs(base, high);
+  return v > hi ? hi : v;
+}
+// The turns' wrap: below the low bound gives the high one, else above the
+// high one the low one.
+double Wrap(uint8_t* base, double v) {
+  const double lo = Lfs(base, kTurnLow);
+  if (v < lo) {
+    return Lfs(base, kTurnHigh);
+  }
+  return v > Lfs(base, kTurnHigh) ? lo : v;
+}
+
+}  // namespace
+
+uint64_t GarageCameraCommand(uint8_t* base, uint32_t camera, uint32_t command, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82180358 GarageCamera::Command");
+  pf::Mode mode;
+  mode.Scalar();
+  const uint32_t c = camera;
+  const uint32_t frame = sp - 192;
+  guest::StoreU32(base, frame, sp);
+  auto add = [&](uint32_t field, uint32_t step, bool up) {
+    const double v = Lfs(base, c + field), d = Lfs(base, step);
+    return pf::Round(up ? v + d : v - d);
+  };
+  // The commands that mark the camera moved (+272 = 1).
+  bool moved = true;
+  switch (command) {
+    case 0:  // the tilt up and down (sub_821803A0, the recompiler's piece, for 0)
+    case 1:
+      Stfs(base, c + 100, Clamp(base, add(100, kStep, command == 0), kTiltStep, kTiltHigh));
+      break;
+    case 2:  // the turn about the car
+    case 3:
+      Stfs(base, c + 176, Wrap(base, add(176, kStep, command == 2)));
+      break;
+    case 4:  // the distance
+    case 5:
+      Stfs(base, c + 180, Clamp(base, add(180, kZoomStep, command == 5), kZoomLow, kZoomHigh));
+      break;
+    case 6:  // the field of view
+    case 7:
+      Stfs(base, c + 224, Clamp(base, add(224, kTiltStep, command == 6), kFovLow, kFovHigh));
+      moved = false;
+      break;
+    case 8: case 9: case 10: case 11: case 12: case 13: {  // the angles +240 to +248
+      const uint32_t field = 240 + 4 * ((command - 8) / 2) ;
+      Stfs(base, c + field, Wrap(base, add(field, kStep, command % 2 == 0)));
+      moved = false;
+      break;
+    }
+    case 14: case 15: case 16: case 17: case 18: case 19: {  // the offsets
+      static constexpr uint32_t kFields[3] = {260, 256, 264};
+      const uint32_t field = kFields[(command - 14) / 2];
+      Stfs(base, c + field, add(field, kMoveStep, command % 2 == 0));
+      moved = false;
+      break;
+    }
+    case 20: {  // reset
+      if (int32_t(guest::LoadU32(base, c + 272)) == 1) {
+        guest::StoreU32(base, c + 272, 2);
+      }
+      GarageCameraReset(base, c, frame - kGarageCameraResetFrame);
+      mode.Scalar();
+      guest::StoreU32(base, c + 272, 0);
+      moved = false;
+      break;
+    }
+    default:  // above 20: only the matrices
+      moved = false;
+      break;
+  }
+  if (moved) {
+    guest::StoreU32(base, c + 272, 1);
+  }
+  // The quaternion from the turn (+176) and the tilt (+100); the rotation
+  // (+112) the identity (built at the frame's +96, memcpy) turned about x
+  // by the tilt (the angle at the frame's +80).
+  QuaternionFromAngles(base, c + 192, Lfs(base, c + 176), Lfs(base, c + 100),
+                       Lfs(base, 0x82000A34), frame);
+  mode.Scalar();
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t column = 0; column < 4; column++) {
+      guest::StoreU32(base, frame + 96 + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
+    }
+  }
+  if (!c_runtime::Memcpy(base, c + 112, frame + 96, 64)) {
+    for (uint32_t i = 0; i < 64; i += 4) {
+      guest::StoreU32(base, c + 112 + i, guest::LoadU32(base, frame + 96 + i));
+    }
+  }
+  Stfs(base, frame + 80, Lfs(base, c + 100));
+  matrix_math::RotateX(base, c + 112, c + 112, frame + 80, frame - 80);
+  return c + 112;
+}
+
+uint64_t GarageStageCameraCommand(uint8_t* base, uint64_t r3, uint32_t command, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821808F0 GarageStage::CameraCommand");
+  const uint32_t stage = guest::LoadU32(base, uint32_t(r3));
+  if (int32_t(guest::LoadU32(base, stage + 384)) == 2 && int32_t(command) != 20) {
+    return r3;
+  }
+  return GarageCameraCommand(base, stage + 112, command, sp);
 }
 
 void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {

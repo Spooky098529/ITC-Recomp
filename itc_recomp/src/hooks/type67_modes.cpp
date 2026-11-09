@@ -62,7 +62,9 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "StandScene::Release sub_82180738, StandMode::Release sub_82246038 (Strings::Release "
               "and UiMovies::DeleteAll's jump through their overrides); Quaternion::FromAngles sub_8217C120 and "
               "GarageCamera::Reset sub_8217D888 and GarageLights::Init sub_8217D3C8 with the "
-              "translated code's float steps; the modes' slot 0 Type6Mode::Init sub_82236880 and "
+              "translated code's float steps; GarageCamera::Command sub_82180358 (its piece "
+              "sub_821803A0 merged) and GarageStage::CameraCommand sub_821808F0 (the reset, "
+              "FromAngles and Matrix::RotateX their plain C++); the modes' slot 0 Type6Mode::Init sub_82236880 and "
               "Type7Mode::Init sub_82246C90 (the UI movies' start, Strings::Load, StandScene::Create "
               "and LoadingScreen::Show guest calls; the screen blocks' constructors, the Inits and "
               "ScreenFades::FadeIn their plain C++); StandScene::Create sub_82180B00 (Viewports::Init "
@@ -647,6 +649,15 @@ void GarageCameraReset(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = camera + 192;
   ctx.fpscr.disableFlushMode();
 }
+void GarageCameraCommand(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::GarageCameraCommand(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+// A tail call to Command: from the adapter's stack pointer.
+void GarageStageCameraCommand(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::GarageStageCameraCommand(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
 void GarageLightsInit(PPCContext& ctx, uint8_t* base) {
   const uint32_t frame = ctx.r1.u32 - t67::kGarageLightsFrame;
   t67::GarageLightsInit(base, ctx.r3.u32, frame);
@@ -928,6 +939,8 @@ ITC_TYPE67_MODES(82245200, Type7Screen0Update)
 // recompiled) and GarageCamera::Reset (from GarageCamera::Init and Command).
 ITC_TYPE67_MODES(8217C120, QuaternionFromAngles)
 ITC_TYPE67_MODES(8217D888, GarageCameraReset)
+ITC_TYPE67_MODES(82180358, GarageCameraCommand)
+ITC_TYPE67_MODES(821808F0, GarageStageCameraCommand)
 // No adapter for GarageLights::Init sub_8217D3C8: only GarageStage::Init
 // (native) calls it; its step above is the harness's.
 // StandSlot::Init sub_82180AA0 has no adapter (removed, B7 loop, 2026-11-07:

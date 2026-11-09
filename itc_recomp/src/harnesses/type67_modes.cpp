@@ -1110,6 +1110,57 @@ void GarageCamera(Context& h, const Block& world) {
   }
 }
 
+// GarageCamera::Command and GarageStage::CameraCommand: a camera of random
+// words (the stage's +112: the stage at the world's start, its holder's
+// word at +0x3F00), the fields the commands step (+100, +176, +180, +224,
+// +240 to +264) angles of every kind, +272 (the stage's +384) 0, 1, 2 or
+// any; the command 0 to 22 or any (above 20: only the matrices). The
+// camera, the frame (+80 to +159: the angle and the identity) and r3
+// compared; the frames below (Reset's, RotateX's) aren't.
+void GarageCameraCommands(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  const uint32_t stage = world.address, camera = stage + 112, holder = world.address + 0x3F00;
+  for (const bool through_stage : {false, true}) {
+    Results results(through_stage ? "GarageStage::CameraCommand (sub_821808F0; sub_82180358)"
+                                  : "GarageCamera::Command (sub_82180358; sub_821803A0)");
+    for (int c = 0; c < 200; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 977 + (through_stage ? 0x821808F0 : 0x82180358));
+        WriteRandom(base, world.address, 112 + 4400, r);
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 192;
+        WriteRandom(base, frame - 1024, 1024 + 192, r);
+        for (const uint32_t field : {100u, 176u, 180u, 224u, 240u, 244u, 248u, 256u, 260u, 264u}) {
+          guest::StoreFloat(base, camera + field, float(AngleOf(r)));
+        }
+        const uint32_t moved[4] = {0, 1, 2, uint32_t(r.Next())};
+        guest::StoreU32(base, camera + 272, moved[r.Below(4)]);
+        t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(23);
+        guest::StoreU32(base, holder, stage);
+        t.r3.u64 = through_stage ? holder : camera;
+        if (v == 0) {
+          ITC_FLAG(native_type67_modes) = false;
+          (through_stage ? __imp__sub_821808F0 : __imp__sub_82180358)(t, base);
+          ITC_FLAG(native_type67_modes) = true;
+        } else {
+          (through_stage ? hooks::GarageStageCameraCommand : hooks::GarageCameraCommand)(t, base);
+        }
+        out[v].Bytes(Read(base, stage, 112 + 16));
+        out[v].Floats(base, camera + 16, (272 - 16) / 4);
+        out[v].Bytes(Read(base, camera + 272, 4400 - 272));
+        out[v].Word(guest::LoadU32(base, frame));
+        out[v].Floats(base, frame + 80, (160 - 80) / 4);
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 // GarageLights::Init: the lights (random words) at the world's +0x1000, the
 // globals it writes (0x8265ED00 and the scene light constants) random words
 // first; the table it copies (0x82635950) the game's in some cases, else
@@ -3221,6 +3272,7 @@ void Type67Modes(Context& h) {
   GuestCallHandlers(h, world);
   Garage(h);
   GarageCamera(h, world);
+  GarageCameraCommands(h, world);
   GarageLights(h, world);
   StandSlots(h, world);
   Dialogs(h, world);

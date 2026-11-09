@@ -614,6 +614,21 @@ void QuaternionFromAngles(uint8_t* base, uint32_t out, double f1, double f2, dou
 // built in its frame at `frame` (its r1 after its stwu) first.
 void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame);
 constexpr uint32_t kGarageCameraResetFrame = 304;
+// sub_82180358 GarageCamera::Command (r3 the garage camera, r4 a command;
+// its piece sub_821803A0 merged): 0 to 19 step the camera's tilt (+100,
+// clamped), turn (+176, wrapped), distance (+180, clamped), field of view
+// (+224), angles (+240 to +248, wrapped) or offsets (+256 to +264), the
+// first six marking +272 = 1; 20 resets it (GarageCamera::Reset, +272 2
+// first when 1, then 0); then its quaternion (+192, FromAngles) and
+// rotation (+112: the identity turned about x by the tilt,
+// matrix_math::RotateX) from the result. Its 192-byte frame below `sp`.
+// The rotation's address (r3 as RotateX's adapter leaves it).
+uint64_t GarageCameraCommand(uint8_t* base, uint32_t camera, uint32_t command, uint32_t sp);
+// sub_821808F0 GarageStage::CameraCommand (r3 a holder whose +0 is the
+// stage, r4 a command): nothing (r3 left) when the stage's +384 is 2 and
+// the command isn't 20, else GarageCamera::Command(stage + 112, command)
+// (a tail call: from `sp`).
+uint64_t GarageStageCameraCommand(uint8_t* base, uint64_t r3, uint32_t command, uint32_t sp);
 // sub_8217D3C8 GarageLights::Init: the 11 light records (96 bytes each)
 // copied from the table at 0x82635950 to +16, the ambient (0.08 three
 // times, 1.0) to +1072 and 0x8265ED00, and the scene light constants
