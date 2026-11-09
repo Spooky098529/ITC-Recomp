@@ -63,6 +63,27 @@ constexpr uint32_t kRequest980 = 0x8228FA58;  // never seen in play
 constexpr uint32_t kGameDataSave = 0x8228FB00;
 constexpr uint32_t kGameDataLoad = 0x8228FBC0;
 constexpr uint32_t kGameDataCheck = 0x8228FC50;
+constexpr uint32_t kReplaysLoad = 0x8228FF88;      // never seen in play
+constexpr uint32_t kReplaysBuildList = 0x82290378;
+constexpr uint32_t kReplayWord84 = 0x82290640;     // never seen in play
+constexpr uint32_t kReplayCopyFrom = 0x821A66A8;   // never seen in play
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kSaveDataOf = 0x82105620;
+
+// The save buffers' header (+0 the game data's buffer, +4 a replay's, +20
+// the replays' count), the replay kept for the replay screen, the profile's
+// read (997 while pending), whether to read it, and the profile reader
+// (its +4 the results).
+constexpr uint32_t kSaveBuffers = 0x828161F0;
+constexpr uint32_t kKeptReplay = 0x826C5B50;
+constexpr uint32_t kProfileRead = 0x826C6080;
+constexpr uint32_t kProfileWanted = 0x826C7958;
+constexpr uint32_t kProfileReader = 0x826C6AD0;
+constexpr uint32_t kGameDataBytes = 0x1F978;
+// The players' controllers and their action mappers' entries (8 bytes: +0
+// the mapper, +4 1 when the controller isn't read).
+constexpr uint32_t kControllers = 0x826BABA4;
+constexpr uint32_t kMapperEntries = 0x826BAB80;
 
 // --- The dialog steps (steps.cpp): `step` the started word ---
 
@@ -93,6 +114,34 @@ uint64_t Page3(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
 // Page9 (kind 1), sub_821A4E60 Page16 (the replays), sub_821A4FD8 Page25
 // (kind 7).
 uint64_t Page4(uint8_t* base, uint64_t mode);
+// sub_821A32C0 SaveScreen::Page6: kind 1's note. 96-byte frame.
+uint64_t Page6(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_821A33E8 SaveScreen::Page7: kind 1's load and save wait (the loaded
+// game data copied into player 0's save data). 96-byte frame.
+uint64_t Page7(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_821A3728 SaveScreen::Page8: kind 1's device wait. 96-byte frame.
+uint64_t Page8(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_821A3A08 SaveScreen::Page12: the replays' question. 128-byte frame.
+uint64_t Page12(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_821A3C60 SaveScreen::Page13: the replays' note. 96-byte frame.
+uint64_t Page13(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_821A67E8 SaveScreen::Page14: the replays' wait (the list built, a
+// replay loaded). 96-byte frame.
+uint64_t Page14(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_821A3DE8 SaveScreen::Page15: the replays' device wait. 96-byte frame.
+uint64_t Page15(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_821A4AC0 SaveScreen::Page24: kind 7's controller pick (the players'
+// mappers' slot 10, ActionMapper::Pressed, through their vtables). 128-byte
+// frame.
+uint64_t Page24(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+
+// sub_821A24B0 SaveScreen::StoreSettings: once (the data's +60), the
+// profile's results into player 0's save data (+0x1F85C: +20, +24, the
+// 60-byte block at +44 rewritten through the frame with two pairs of words
+// swapped). With the profile's +672 3 or more, +24 the frame's +80 as the
+// caller left it (copied as the original leaves it). 1, or 0 while the
+// profile's read is pending. 224-byte frame.
+uint64_t StoreSettings(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t Page9(uint8_t* base, uint64_t mode);
 uint64_t Page16(uint8_t* base, uint64_t mode);
 uint64_t Page25(uint8_t* base, uint64_t mode);

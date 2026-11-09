@@ -20,6 +20,7 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/hash.h"
 #include "base/log.h"
 #include "hooks/save_screen.h"
 #include "hooks/ui_movies.h"
@@ -31,6 +32,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <cstring>
 #include <functional>
 #include <initializer_list>
@@ -155,6 +157,9 @@ constexpr uint32_t kStringWorldBytes = 0x10000;
 constexpr uint32_t kSaveObject36 = 0x40, kSaveDevices = 0x100, kSaveUsers = 0x200;
 constexpr uint32_t kSaveSlots = 0x800, kSaveRecords = 0x2000, kSaveWorldBytes = 0x2800;
 
+constexpr uint32_t kReplayBlockBytes = 0x13D000;
+uint8_t* base_of_world = nullptr;  // the guest base, for the World's set-up
+
 struct World {
   World()
       : screen(kScreenBytes),
@@ -163,11 +168,22 @@ struct World {
         strings(kStringWorldBytes),
         save(kSaveWorldBytes),
         save_data(kGameDataBytes),
-        buffers(0x100),
-        game_data(kGameDataBytes) {}
+        buffers(0x1000),
+        game_data(kGameDataBytes),
+        profile(0x400),
+        kept(kReplayBlockBytes),
+        replay(kReplayBlockBytes) {
+    if (replay.address != 0) {
+      Random r(0x5265706C6179ull);  // "Replay"
+      for (uint32_t i = 0; i < replay.bytes; i += 4) {
+        guest::StoreU32(base_of_world, replay.address + i, uint32_t(r.Next()));
+      }
+    }
+  }
   bool ok() const {
     return screen.address && movies.address && texts.address && strings.address &&
-           save.address && save_data.address && buffers.address && game_data.address;
+           save.address && save_data.address && buffers.address && game_data.address &&
+           profile.address && kept.address && replay.address;
   }
   uint32_t at(uint32_t offset) const { return screen.address + offset; }
   uint32_t pages() const { return at(kPagesAt); }
@@ -186,8 +202,17 @@ struct World {
   Block strings;
   Block save;
   Block save_data;  // player 0's ([0x826C5B58])
-  Block buffers;    // the save buffers' header ([0x828161F0])
+  // The save buffers' header ([0x828161F0]: +0 the game data, +4 the
+  // replay, +12 the records at +0x100, +16 the list entries at +0x200, +20
+  // their count).
+  Block buffers;
   Block game_data;  // its +0
+  // The profile reader ([0x826C6AD0], +4 the results at +0x100).
+  Block profile;
+  // The kept replay ([0x826C5B50]) and the replay at the header's +4
+  // (Replay::CopyFrom's), random words once.
+  Block kept;
+  Block replay;
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
@@ -205,6 +230,10 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {kSaveDataSlots, 16},
     {rs::kMapperEntries, 32},
     {rs::kControllerEntries, 16},
+    {ss::kProfileRead, 4},
+    {ss::kProfileWanted, 4},
+    {ss::kProfileReader, 4},
+    {ss::kKeptReplay, 4},
 };
 
 // The string table: 18 files' pointers to one container of entries enough
@@ -483,14 +512,46 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t i = 0; i < 4; i++) {
     guest::StoreU32(base, kSaveDataSlots + 4 * i, w.save_data.address);
   }
-  guest::StoreU32(base, kSaveBuffers, w.buffers.address);
-  guest::StoreU32(base, w.buffers.address, w.game_data.address);
+  // The save buffers: the game data, the replay, 1 to 4 records and their
+  // list entries (each entry's +300 its record's +28, the names short: with
+  // no entry found, Replays::Load, never seen in play, reads the name at
+  // address 42).
+  const uint32_t buffers = w.buffers.address;
+  guest::StoreU32(base, kSaveBuffers, buffers);
+  guest::StoreU32(base, buffers + 0, w.game_data.address);
+  guest::StoreU32(base, buffers + 4, w.replay.address);
+  guest::StoreU32(base, buffers + 12, buffers + 0x100);
+  guest::StoreU32(base, buffers + 16, buffers + 0x200);
+  const uint32_t records = 1 + Pick(r, 4);
+  guest::StoreU32(base, buffers + 20, records);
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t record = buffers + 0x100 + 36 * k, entry = buffers + 0x200 + 304 * k;
+    guest::StoreU32(base, entry + 300, guest::LoadU32(base, record + 28));
+    guest::StoreU8(base, entry + 20, 0);
+    guest::StoreU16(base, entry + 42 + 40, 0);
+  }
+  guest::StoreU32(base, ss::kKeptReplay, w.kept.address);
+  std::memset(base + w.kept.address, 0xAB, w.kept.bytes);
+  // The profile: wanted or not, its read pending (997) or not, its results'
+  // words +632, +712 and +752 0 or not and +672 0 to 4 (or any).
+  guest::StoreU32(base, ss::kProfileWanted, Pick(r, 3) == 0 ? 0 : 1);
+  guest::StoreU32(base, ss::kProfileRead, Pick(r, 4) == 0 ? 997 : Small(r, 4));
+  WriteRandom(base, w.profile.address, w.profile.bytes, r);
+  guest::StoreU32(base, ss::kProfileReader, w.profile.address);
+  guest::StoreU32(base, w.profile.address + 4, w.profile.address + 0x100);
+  for (const uint32_t field : {632u, 712u, 752u}) {
+    guest::StoreU32(base, w.profile.address + 0x100 + field, Pick(r, 2) == 0 ? 0 : uint32_t(r.Next()));
+  }
+  guest::StoreU32(base, w.profile.address + 0x100 + 672, Small(r, 5));
   // The page block: the page (+0) 0 to 26 or -1, now and then any.
   guest::StoreU32(base, w.pages(), Pick(r, 4) == 0 ? 0xFFFFFFFFu : Small(r, 27));
   // The data: the answer (+4) 0 to 3, the state (+16) and the next (+20) -1
   // to 3, the wait (+24) around the waits' 45 and 90.
   const uint32_t data = w.data();
   guest::StoreU32(base, data + 4, Small(r, 4));
+  guest::StoreU32(base, data + 8, Pick(r, 2) == 0 ? 0 : uint32_t(r.Next()));
+  guest::StoreU32(base, data + 40, Pick(r, records));
+  guest::StoreU32(base, data + 60, Pick(r, 3) == 0 ? uint32_t(r.Next()) : 0);
   guest::StoreU32(base, data + 16, Small(r, 5) - 1);
   guest::StoreU32(base, data + 20, Small(r, 5) - 1);
   const uint32_t waits[6] = {0, 43, 44, 45, 88, 89};
@@ -556,6 +617,21 @@ void Group(Context& h, const World& w, const char* name, int cases, const SetupF
       ITC_FLAG(native_save_screen) = true;
       ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
       g_updates = nullptr;
+      // The lists Replays::BuildList made (the layer's pages): their
+      // records and entries by the count, freed, the pointers cleared.
+      const uint32_t buffers = w.buffers.address;
+      const uint32_t count = guest::LoadU32(h.base, buffers + 20);
+      for (const auto& [field, bytes] : {std::pair{12u, 36u}, std::pair{16u, 304u}}) {
+        const uint32_t list = guest::LoadU32(h.base, buffers + field);
+        const bool made = list != 0 && memory::IsPages(list);
+        out[v].Word(made ? 1 : 0);
+        if (made) {
+          out[v].Bytes(Read(h.base, list, bytes * std::min(count, 100u)));
+          memory::FreePages(list);
+          guest::StoreU32(h.base, buffers + field, 0);
+        }
+      }
+      out[v].Word(uint32_t(base::Hash64(h.base + w.kept.address, w.kept.bytes)));
       out[v].Word(uint32_t(updates.size()));
       for (const UpdateCall& u : updates) {
         out[v].Word(u.lr);
@@ -647,9 +723,83 @@ void EndPages(Context& h, const World& w) {
         hooks::SaveScreenPage25, {});
 }
 
+// The players' presses for kind 7's pick: each controller's mapper (as
+// MenuWorld lays them) given the bit of the action its player tests (159 or
+// 158 for player 0, 152 for the others) now and then.
+void Presses(uint8_t* base, Random& r) {
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t entry =
+        rs::kMapperEntries + 8 * guest::LoadU32(base, rs::kControllerEntries + 4 * i);
+    const uint32_t mapper = guest::LoadU32(base, entry);
+    if (Pick(r, 3) == 0) {
+      const uint32_t action = i == 0 ? (Pick(r, 2) == 0 ? 159 : 158) : 152;
+      guest::StoreU32(base, mapper + 456,
+                      guest::LoadU32(base, mapper + 456) | (1u << (action - 151)));
+    }
+  }
+}
+
+void KindOnePages(Context& h, const World& w) {
+  // StoreSettings: no arguments; 224-byte frame, saves 48 and lr.
+  Group(h, w, "SaveScreen::StoreSettings (sub_821A24B0)", 300,
+        [](PPCContext&, Random&, const World&) {}, __imp__sub_821A24B0,
+        hooks::SaveScreenStoreSettings, {{224, 56}});
+  // Page6 with StoreSettings' frame below its own.
+  Group(h, w, "SaveScreen::Page6 (sub_821A32C0)", 400,
+        PageSetup(h.base, {0, 5, 6, 7, 11, 1}, 45), __imp__sub_821A32C0, hooks::SaveScreenPage6,
+        {{96, 16}, {320, 152}});
+  Group(h, w, "SaveScreen::Page7 (sub_821A33E8)", 500, PageSetup(h.base, {10, 9, 4, 0}, 90),
+        __imp__sub_821A33E8, hooks::SaveScreenPage7, {{96, 16}});
+  Group(h, w, "SaveScreen::Page8 (sub_821A3728)", 300, PageSetup(h.base, {0}),
+        __imp__sub_821A3728, hooks::SaveScreenPage8, {{96, 8}});
+}
+
+void ReplayPages(Context& h, const World& w) {
+  Group(h, w, "SaveScreen::Page12 (sub_821A3A08)", 400,
+        PageSetup(h.base, {12, 6, 5, 3, 1, 0}), __imp__sub_821A3A08, hooks::SaveScreenPage12,
+        {{128, 48}});
+  Group(h, w, "SaveScreen::Page13 (sub_821A3C60)", 400,
+        PageSetup(h.base, {2, 4, 8, 9, 10, 11, 0}, 45), __imp__sub_821A3C60,
+        hooks::SaveScreenPage13, {{96, 16}});
+  // Page14: the header's lists 0 half the time (Replays::BuildList makes
+  // new ones, compared and freed).
+  const SetupFn page14 = PageSetup(h.base, {0, 7, 1}, 90);
+  Group(
+      h, w, "SaveScreen::Page14 (sub_821A67E8)", 500,
+      [&h, page14](PPCContext& t, Random& r, const World& w) {
+        page14(t, r, w);
+        // The header's lists: none, or copies of the shaped ones in the
+        // layer's pages (Replays::BuildList frees the old ones).
+        const bool none = Pick(r, 2) == 0;
+        for (const auto& [field, bytes] : {std::pair{12u, 4u * 36}, std::pair{16u, 4u * 304}}) {
+          uint32_t list = 0;
+          if (!none) {
+            list = memory::AllocPages(bytes, 4096);
+            if (list != 0) {
+              std::memcpy(h.base + list, h.base + guest::LoadU32(h.base, w.buffers.address + field),
+                          bytes);
+            }
+          }
+          guest::StoreU32(h.base, w.buffers.address + field, list);
+        }
+      },
+      __imp__sub_821A67E8, hooks::SaveScreenPage14, {{96, 16}});
+  Group(h, w, "SaveScreen::Page15 (sub_821A3DE8)", 300, PageSetup(h.base, {0}),
+        __imp__sub_821A3DE8, hooks::SaveScreenPage15, {{96, 8}});
+  const SetupFn page24 = PageSetup(h.base, {0});
+  Group(
+      h, w, "SaveScreen::Page24 (sub_821A4AC0)", 300,
+      [&h, page24](PPCContext& t, Random& r, const World& w) {
+        page24(t, r, w);
+        Presses(h.base, r);
+      },
+      __imp__sub_821A4AC0, hooks::SaveScreenPage24, {{128, 48}});
+}
+
 }  // namespace
 
 void SaveScreen(Context& h) {
+  base_of_world = h.base;
   const World w;
   if (!w.ok()) {
     ITC_LOG_ERROR("harness: save_screen: no block from the allocation layer");
@@ -659,6 +809,8 @@ void SaveScreen(Context& h) {
   Steps(h, w);
   KindZeroPages(h, w);
   EndPages(h, w);
+  KindOnePages(h, w);
+  ReplayPages(h, w);
 }
 
 }  // namespace harness

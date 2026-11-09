@@ -12,7 +12,10 @@ ITC_FLAG_BOOL(native_save_screen, true, "ITC",
               "SaveScreen::MoveSelection sub_821A5118 and CloseDialog sub_821A5038; the pages "
               "Page0 sub_821A28E0, Page1 sub_821A2AF8, Page2 sub_821A2C98, Page3 sub_821A2EE8 "
               "and the end pages Page4 sub_821A4D30, Page9 sub_821A4DE0, Page16 sub_821A4E60 and "
-              "Page25 sub_821A4FD8; the menu list, MenuSound::Play, the UI movie calls and the "
+              "Page25 sub_821A4FD8; kind 1's Page6 sub_821A32C0 (with StoreSettings sub_821A24B0), "
+              "Page7 sub_821A33E8 and Page8 sub_821A3728; the replays' Page12 sub_821A3A08, "
+              "Page13 sub_821A3C60, Page14 sub_821A67E8 and Page15 sub_821A3DE8; kind 7's Page24 "
+              "sub_821A4AC0; the menu list, MenuSound::Play, the UI movie calls and the "
               "save layer through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=save_screen)");
 
@@ -98,6 +101,19 @@ void SaveScreenPage25(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ss::Page25(base, ctx.r3.u64);
 }
 
+void SaveScreenPage6(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page6); }
+void SaveScreenPage7(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page7); }
+void SaveScreenPage8(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page8); }
+void SaveScreenPage12(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page12); }
+void SaveScreenPage13(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page13); }
+void SaveScreenPage14(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page14); }
+void SaveScreenPage15(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page15); }
+void SaveScreenPage24(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page24); }
+void SaveScreenStoreSettings(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ss::StoreSettings(base, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 #define ITC_SAVE_SCREEN(address, step)      \
@@ -123,3 +139,13 @@ ITC_SAVE_SCREEN(821A4D30, SaveScreenPage4)
 ITC_SAVE_SCREEN(821A4DE0, SaveScreenPage9)
 ITC_SAVE_SCREEN(821A4E60, SaveScreenPage16)
 ITC_SAVE_SCREEN(821A4FD8, SaveScreenPage25)
+ITC_SAVE_SCREEN(821A32C0, SaveScreenPage6)
+ITC_SAVE_SCREEN(821A33E8, SaveScreenPage7)
+ITC_SAVE_SCREEN(821A3728, SaveScreenPage8)
+ITC_SAVE_SCREEN(821A3A08, SaveScreenPage12)
+ITC_SAVE_SCREEN(821A3C60, SaveScreenPage13)
+ITC_SAVE_SCREEN(821A67E8, SaveScreenPage14)
+ITC_SAVE_SCREEN(821A3DE8, SaveScreenPage15)
+ITC_SAVE_SCREEN(821A4AC0, SaveScreenPage24)
+// No adapter for SaveScreen::StoreSettings sub_821A24B0: its only caller,
+// Page6, is native (the flag switches it); its step above is the harness's.

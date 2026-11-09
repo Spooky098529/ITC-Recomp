@@ -22,5 +22,15 @@ void SaveScreenPage4(PPCContext& ctx, uint8_t* base);
 void SaveScreenPage9(PPCContext& ctx, uint8_t* base);
 void SaveScreenPage16(PPCContext& ctx, uint8_t* base);
 void SaveScreenPage25(PPCContext& ctx, uint8_t* base);
+void SaveScreenPage6(PPCContext& ctx, uint8_t* base);
+void SaveScreenPage7(PPCContext& ctx, uint8_t* base);
+void SaveScreenPage8(PPCContext& ctx, uint8_t* base);
+void SaveScreenPage12(PPCContext& ctx, uint8_t* base);
+void SaveScreenPage13(PPCContext& ctx, uint8_t* base);
+void SaveScreenPage14(PPCContext& ctx, uint8_t* base);
+void SaveScreenPage15(PPCContext& ctx, uint8_t* base);
+void SaveScreenPage24(PPCContext& ctx, uint8_t* base);
+// SaveScreen::StoreSettings (no arguments; no adapter: only Page6 calls it).
+void SaveScreenStoreSettings(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

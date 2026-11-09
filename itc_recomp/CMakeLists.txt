@@ -484,6 +484,8 @@ set(ITC_SOURCES
     src/hooks/save_screen.cpp
     src/save_screen/steps.cpp
     src/save_screen/pages.cpp
+    src/save_screen/pages_load.cpp
+    src/save_screen/pages_replays.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp
