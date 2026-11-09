@@ -16,6 +16,15 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-09 10:53 (`b7-loop-09-11-26`)
+
+- The type 2 dialog's migration (attract race `itc_4721`, replay
+  `itc_4722` ok, the confirm dialog only; `type2-dialog.md`):
+  `sub_821864A0`, `sub_82186AD8`, `sub_82186AF0`, `sub_82186B90`,
+  `sub_82186D40`, `sub_82186E40`, `sub_82187330`, `sub_82187508`,
+  `sub_82187618`, `sub_821878B0`, `sub_82187948`, `sub_821879F8`,
+  `sub_82187AC8`, `sub_82187B80`, `sub_82187C18`, `sub_82187D80`.
+
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 
 - The save screen's migration (attract race `itc_4711`, replay

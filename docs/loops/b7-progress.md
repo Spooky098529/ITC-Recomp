@@ -19,9 +19,15 @@ file's history. What's left to see in a drive, from every run:
   28 of 28 ours, all Overridden: reached through functors and tables,
   `Init` by the still recompiled type 2 Init; `--native_type2_dialog`;
   races 38 s, 0 errors, its harnesses 0 differing; no subagents). Left:
-  none. Step: validation; agent running.
+  none. Validated `itc_4721` (race 68 s at 180, the harnesses ~110 s;
+  0 errors, every harness 0 differing outside the expected groups, 28
+  of 28 harness lines, no prints added; none in the race, 12 in the
+  replay `itc_4722` (ok), 16 to drive). Recorded.
 
 ## Done
+
+- The type 2 dialog: `type2-dialog.md`, 28 of 28 (all Overridden),
+  `--native_type2_dialog`, 415b58d5..e3269357.
 
 ## Rows to review
 

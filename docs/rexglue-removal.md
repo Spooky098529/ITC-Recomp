@@ -2814,6 +2814,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-08 | The car dealer (the type 2 mode's dealer machine: its 23 transitions, 6 pages, the car lists, the color pick, the purchase, the career's first car) | `car-dealer.md` | 58 of 58 in play (two migrations; 16 adapters removed) | `--native_car_dealer` |
 | 2026-11-08 | The type 2 mode's screens (the hub at the mode's +848: its menu over the stand car, notices, images, pages and transitions; the spec sheet's machine; the build screen's machine, entry and pages; the license plate editor the dealer's buy opens) | `type2-screens.md` | 121 of 121 in play (three migrations; 17 adapters removed) | `--native_type2_screens` |
 | 2026-11-09 | The save screen (one machine, UI movie 44, that the type 2, 4, 6, 10 and 8 modes' Inits set up: the game data's check, save and load, the replays, the controller pick; its 27 pages and 7 steps) | `save-screen.md` | 42 of 42 in play (one migration; 2 adapters removed) | `--native_save_screen` |
+| 2026-11-09 | The type 2 mode's dialog (its machine at the mode's +0x1E4C8: four dialogs over UI movies 16 to 19, the confirm and notice pairs; its 11 transitions, `Draw`'s 4 pages, `Update`'s 10 steps and `Init`) | `type2-dialog.md` | 28 of 28 (one migration; no adapter removable) | `--native_type2_dialog` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5009,3 +5010,17 @@ title's load; the rest waits for a drive. The boundary: 449 functions
 live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 5,237, work left 1,196 (Wrapped 56, with a row
 389, no row yet 751), from 1,233.
+
+**2026-11-09, the type 2 mode's dialog (branch `b7-loop-09-11-26`):**
+the forty-first run's first subsystem (`type2-dialog.md`, mapped by the
+fortieth run, `--native_type2_dialog`, `src/type2_dialog/`), in one
+migration: the dialog machine at the type 2 mode's +0x1E4C8, its
+transitions, pages, steps, `Draw`, `Update` and `Init` (a step table
+over `StateMachine::Add`). Its 28 adapters stay: 27 reached as functors
+or through the page and step tables, `Init` from the type 2 mode's
+still recompiled Init `sub_82197278`. The replay opens and closes the
+confirm dialog; the notice and second pairs wait for a drive. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+26, never called 70, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,265, work left 1,175 (Wrapped 56,
+with a row 389, no row yet 730), from 1,196.
