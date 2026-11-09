@@ -25,7 +25,8 @@ ITC_FLAG_BOOL(native_type2_dialog, true, "ITC",
               "WaitForMovies sub_821880D0 (UiMovies::IsLoaded's plain C++), Shown sub_82186490, "
               "Wait sub_82186AD8, Cancel sub_82186E40, OpenConfirm sub_82186C30 "
               "(UiMovie::ResetPose through its override), OpenNotice sub_82186AF0, OpenConfirm2 "
-              "sub_82186D40 and OpenNotice2 sub_82186B90; TakesInput sub_821864A0 "
+              "sub_82186D40 and OpenNotice2 sub_82186B90; TakesInput sub_821864A0; "
+              "Type2Dialog::Init sub_82188178 (its step table, StateMachine::Add's plain C++) "
               "(the same writes; checked by --run_harnesses=type2_dialog)");
 
 namespace hooks {
@@ -172,6 +173,15 @@ void Type2DialogOnLeft(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::OnLeft(base, ctx.r1.u32, guest.calls());
 }
+// StateMachine::Add's adapter's r3: a new transition's address from the
+// machine's 64-bit r3, as the type 2 screens' Inits.
+void Type2DialogInit(PPCContext& ctx, uint8_t* base) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = t2d::Init(base, machine, ctx.r1.u32 - t2d::kInitFrame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
 void Type2DialogTakesInput(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t2d::TakesInput(base);
 }
@@ -218,5 +228,7 @@ ITC_TYPE2_DIALOG(82186AF0, Type2DialogOpenNotice)
 ITC_TYPE2_DIALOG(82186D40, Type2DialogOpenConfirm2)
 ITC_TYPE2_DIALOG(82186B90, Type2DialogOpenNotice2)
 ITC_TYPE2_DIALOG(82186428, Type2DialogOnLeft)
+// Init (from the type 2 mode's Init sub_82197278, recompiled).
+ITC_TYPE2_DIALOG(82188178, Type2DialogInit)
 // TakesInput (from the type 2 mode's sub_82197858, recompiled).
 ITC_TYPE2_DIALOG(821864A0, Type2DialogTakesInput)

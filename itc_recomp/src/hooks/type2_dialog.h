@@ -39,6 +39,8 @@ void Type2DialogOpenNotice(PPCContext& ctx, uint8_t* base);
 void Type2DialogOpenConfirm2(PPCContext& ctx, uint8_t* base);
 void Type2DialogOpenNotice2(PPCContext& ctx, uint8_t* base);
 void Type2DialogOnLeft(PPCContext& ctx, uint8_t* base);
+// Init (r3 the machine).
+void Type2DialogInit(PPCContext& ctx, uint8_t* base);
 // TakesInput (no arguments).
 void Type2DialogTakesInput(PPCContext& ctx, uint8_t* base);
 

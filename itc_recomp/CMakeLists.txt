@@ -493,6 +493,7 @@ set(ITC_SOURCES
     src/type2_dialog/steps.cpp
     src/type2_dialog/pages.cpp
     src/type2_dialog/handlers.cpp
+    src/type2_dialog/init.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp

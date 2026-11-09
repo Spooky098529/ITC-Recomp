@@ -22,6 +22,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "hooks/type2_dialog.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
@@ -61,7 +62,7 @@ constexpr uint32_t kNodes = 8;
 constexpr uint32_t kAnimationsAt = 0x12400;  // 8 animations of no tracks (64 bytes)
 constexpr uint32_t kBlockBytes = 0x12800;
 
-constexpr uint32_t kBelow = 1024;  // the stack compared below the call's r1
+constexpr uint32_t kBelow = 2048;  // the stack compared below the call's r1
 constexpr uint32_t kAbove = 256;   // and above it
 constexpr uint32_t kMissingMovie = 0x826C5CDC;
 
@@ -108,7 +109,10 @@ bool StandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
 // kOnEnter: the blocks VirtualAlloc makes compared by content where their
 // pointers were stored, then freed; kOnLeft: the globals pointing at blocks
 // of the layer's pages the case made, whether each was freed compared.
-enum class Kind { kStep, kPage, kDraw, kUpdate, kHandler, kLeaf, kOnEnter, kOnLeft };
+// kInit: the machine empty or holding random transitions with keys of
+// small numbers (states below 12, messages below 52), so some match the
+// Init's (Add replaces those).
+enum class Kind { kStep, kPage, kDraw, kUpdate, kHandler, kLeaf, kOnEnter, kOnLeft, kInit };
 
 struct Function {
   const char* name;
@@ -303,6 +307,25 @@ void Run(Context& h, uint32_t block, const Function& f, int cases) {
           break;
         case Kind::kLeaf:
           break;
+        case Kind::kInit: {
+          namespace gm = game_modes;
+          if (r.Below(2) == 0) {
+            gm::StateMachineConstruct(base, machine);
+            guest::StoreU32(base, machine + gm::kTransitionCount, 0);
+          } else {
+            const uint32_t count = 8 + r.Below(160);
+            guest::StoreU32(base, machine + gm::kTransitionCount, count);
+            for (uint32_t i = 0; i < gm::kTransitions; i++) {
+              const uint32_t at = machine + gm::kTransitionBytes * i;
+              guest::StoreU32(base, at, r.Below(12));
+              guest::StoreU32(base, at + 4, r.Below(52));
+              guest::StoreU32(base, at + 8, r.Below(8) == 0 ? 1 : 0);
+              guest::StoreU32(base, at + 12, 0);
+            }
+          }
+          t.r3.u64 = machine | high;
+          break;
+        }
         case Kind::kOnLeft:
           // The blocks to free: the layer's pages (none now and then).
           for (const uint32_t global : {t2d::kPages, t2d::kMenu, t2d::kData}) {
@@ -465,6 +488,8 @@ void Type2Dialog(Context& h) {
        hooks::Type2DialogOnLeft, Kind::kOnLeft},
       {"Type2Dialog::TakesInput", 0x821864A0, 0, 0, __imp__sub_821864A0,
        hooks::Type2DialogTakesInput, Kind::kLeaf},
+      {"Type2Dialog::Init", 0x82188178, 1168, 48, __imp__sub_82188178, hooks::Type2DialogInit,
+       Kind::kInit},
   };
   for (const Function& f : functions) {
     Run(h, block, f, f.kind == Kind::kStep ? 32 : 128);
