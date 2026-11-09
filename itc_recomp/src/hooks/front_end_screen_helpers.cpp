@@ -279,11 +279,12 @@ ITC_FRONT_END_HELPERS(821A63B0, FrontEndSaveScreenShowNotice)
 // ShowNotice, is native (the flag switches it); its step above is the
 // harness's.
 
-// The save screen's starts (from its Shows sub_821A6650 and sub_821A6608,
-// recompiled) and the options' dialog pages' set-ups (from
-// Options::OpenCategory sub_821C7188, recompiled).
-ITC_FRONT_END_HELPERS(821A5450, FrontEndSaveScreenStartCheck)
-ITC_FRONT_END_HELPERS(821A5540, FrontEndSaveScreenStart)
+// No adapters for the save screen's starts SaveScreen::StartCheck
+// sub_821A5450 and Start sub_821A5540 (removed, B7 loop, 2026-11-09): their
+// callers, SaveScreen::Show sub_821A6608 and its case 0 sub_821A6650, are
+// native (--native_save_screen switches them); their steps above are the
+// harness's. The options' dialog pages' set-ups (from Options::OpenCategory
+// sub_821C7188, recompiled).
 ITC_FRONT_END_HELPERS(821C6D48, FrontEndOptionsSetUpSavePage)
 ITC_FRONT_END_HELPERS(821C6E50, FrontEndOptionsSetUpCategory6Page)
 // The dialogs' steps: the save screen's Update table (steps 0, 3 and 4)
