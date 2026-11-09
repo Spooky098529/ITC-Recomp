@@ -91,6 +91,17 @@ void GarageScreenTransition16(PPCContext& ctx, uint8_t* base);
 void GarageScreenTransition17(PPCContext& ctx, uint8_t* base);
 void GarageScreenSetUpActions(PPCContext& ctx, uint8_t* base);
 void GarageScreenSetUpOptions(PPCContext& ctx, uint8_t* base);
+// The pages never seen in play (r3 the mode) and the reply handlers (r3
+// the machine, r4 the mode).
+void GarageScreenActionsPage(PPCContext& ctx, uint8_t* base);
+void GarageScreenViewPage(PPCContext& ctx, uint8_t* base);
+void GarageScreenViewOptionsPage(PPCContext& ctx, uint8_t* base);
+void GarageScreenOnSpecSheetClosed(PPCContext& ctx, uint8_t* base);
+void GarageScreenOnPlateCancelled(PPCContext& ctx, uint8_t* base);
+void GarageScreenOnPlateDone(PPCContext& ctx, uint8_t* base);
+void GarageScreenOnPlateEditorLeft(PPCContext& ctx, uint8_t* base);
+void GarageScreenOnNo(PPCContext& ctx, uint8_t* base);
+void GarageScreenOnDialogDone(PPCContext& ctx, uint8_t* base);
 // InitStates (r3 the machine).
 void GarageScreenInitStates(PPCContext& ctx, uint8_t* base);
 

@@ -82,6 +82,16 @@ uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint64_t r5, uint
   // No bounds check, as the original: the word at the table's index. r6 to
   // r10 as the original leaves them (the table's build).
   const uint32_t target = Load(base, frame + 80 + (page << 2));
+  // The pages' plain C++ by the word's address (all five native); a word
+  // past the table through the guest.
+  switch (target) {
+    case 0x82194078: return CarListPage(base, frame, calls);
+    case 0x821941A8: return ActionsPage(base, mode, frame, calls);
+    case 0x82191DE0: return ViewPage(base, mode, frame, calls);
+    case 0x82192030: return ViewOptionsPage(base, mode, frame, calls);
+    case 0x82192C18: LeavePage(base, uint32_t(mode)); return mode;
+    default: break;
+  }
   return calls.CallArgs(target, frame, 0x82194F1C,
                         {mode, mode, r5, kPageTable[0], kPageTable[1], kPageTable[2],
                          kPageTable[3], kPageTable[4]});

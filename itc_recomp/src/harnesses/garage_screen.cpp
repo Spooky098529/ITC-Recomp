@@ -1325,6 +1325,82 @@ void MenuTransitions(Context& h, const World& w) {
              FreeMenuBlocks});
 }
 
+// The mappers' slot 8 (+32, ActionMapper::Held) the view's pages read too.
+void HeldSlots(const World& w) {
+  for (uint32_t c = 0; c < 4; c++) {
+    guest::StoreU32(w.base, w.at(kMenuWorldAt) + 0x800 + 0x40 * c + 32, 0x8210BE70);
+  }
+}
+
+// The pages never seen in play and the reply handlers: the menus' world
+// (the held slot too), the selected car among the linked ones and the car's
+// world (ActionsPage's questions and set-ups: the drawless stand, the car
+// and its parameters), the stand's commands' world (the view's buttons:
+// the stage's +384 0, 1, 2 or any), the data's +60, +64, +68 and +80 0, 1,
+// 2 or any; r3 the mode (the pages) or the machine, r4 the mode.
+void PagesAndHandlers(Context& h, const World& w) {
+  auto data_words = [](Random& r, const World& w) {
+    for (const uint32_t field : {60u, 64u, 68u, 80u}) {
+      const uint32_t words[4] = {0, 1, 2, uint32_t(r.Next())};
+      guest::StoreU32(w.base, w.data() + field, words[r.Below(4)]);
+    }
+  };
+  Run(h, w, {"GarageScreen::ActionsPage (sub_821941A8; the questions, set-ups)", 300,
+             __imp__sub_821941A8, hooks::GarageScreenActionsPage, {{-144, -56}},
+             [data_words](PPCContext& t, Random& r, const World& w) {
+               MenuWorld(r, w);
+               HeldSlots(w);
+               ListMoves(r, w);
+               // The lists still now and then (an accept reaches the actions).
+               if (r.Below(2) == 0) {
+                 for (const uint32_t list : {w.at(kListAt), w.at(kList2At)}) {
+                   guest::StoreU32(w.base, list + 24, 0);
+                   guest::StoreU32(w.base, list + 8, guest::LoadU32(w.base, list + 4));
+                   guest::StoreU32(w.base, list + race_screens::kListScrollBefore,
+                                   guest::LoadU32(w.base, list + 4));
+                   guest::StoreU32(w.base, list + race_screens::kListMove, 0);
+                 }
+               }
+               StandWorld(w.base, r, w);
+               LayCar(r, w);
+               MaybeCurrent(r, w);
+               data_words(r, w);
+               t.r3.u64 = w.at(kModeAt);
+             },
+             nullptr, true});
+  auto view = [data_words](PPCContext& t, Random& r, const World& w) {
+    MenuWorld(r, w);
+    HeldSlots(w);
+    ListMoves(r, w);
+    StageCommands(r, w);
+    const uint32_t moved[4] = {0, 1, 2, uint32_t(r.Next())};
+    guest::StoreU32(w.base, w.at(kStageAt) + 384, moved[r.Below(4)]);
+    data_words(r, w);
+    t.r3.u64 = w.at(kModeAt);
+  };
+  Run(h, w, {"GarageScreen::ViewPage (sub_82191DE0; sub_821808F0, the turns and cameras)", 200,
+             __imp__sub_82191DE0, hooks::GarageScreenViewPage, {{-112, -24}}, view});
+  Run(h, w, {"GarageScreen::ViewOptionsPage (sub_82192030; the toggles, turns and cameras)", 200,
+             __imp__sub_82192030, hooks::GarageScreenViewOptionsPage, {{-112, -24}}, view});
+  auto handler = [data_words](PPCContext& t, Random& r, const World& w) {
+    data_words(r, w);
+    t.r3.u64 = w.at(kMachineAt);
+    t.r4.u64 = w.at(kModeAt);
+  };
+  Run(h, w, {"GarageScreen::OnSpecSheetClosed (sub_82193E38; sub_821939A0)", 60,
+             __imp__sub_82193E38, hooks::GarageScreenOnSpecSheetClosed, {}, handler});
+  Run(h, w, {"GarageScreen::OnPlateCancelled (sub_821928F8)", 60, __imp__sub_821928F8,
+             hooks::GarageScreenOnPlateCancelled, {}, handler});
+  Run(h, w, {"GarageScreen::OnPlateDone (sub_82193E80; sub_82193320)", 60, __imp__sub_82193E80,
+             hooks::GarageScreenOnPlateDone, {{-112, -24}}, handler});
+  Run(h, w, {"GarageScreen::OnPlateEditorLeft (sub_82193F18; sub_821939A0)", 60,
+             __imp__sub_82193F18, hooks::GarageScreenOnPlateEditorLeft, {}, handler});
+  Run(h, w, {"GarageScreen::OnNo (sub_82192BA8)", 60, __imp__sub_82192BA8,
+             hooks::GarageScreenOnNo, {}, handler});
+  Run(h, w, {"GarageScreen::OnDialogDone (sub_82193F80; sub_821939A0)", 100,
+             __imp__sub_82193F80, hooks::GarageScreenOnDialogDone, {{-96, -16}}, handler});
+}
+
 }  // namespace
 
 void GarageScreen(Context& h) {
@@ -1342,6 +1418,7 @@ void GarageScreen(Context& h) {
     NeverSeenHelpers(h, w);
     CarObjects(h, w);
     MenuTransitions(h, w);
+    PagesAndHandlers(h, w);
   }
 }
 

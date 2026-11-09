@@ -38,7 +38,12 @@ ITC_FLAG_BOOL(native_garage_screen, true, "ITC",
               "Transition4 sub_82195D10 to Transition10 sub_82195530, Transition12 sub_821955E0 to "
               "Transition14 sub_821948B0, Transition16 sub_821930D8, Transition17 sub_82196170, "
               "SetUpActions sub_821958D0 and SetUpOptions sub_82194B20 (Transition11 and "
-              "Transition15 the originals: Run's r8 leftover stored into live state) "
+              "Transition15 the originals: Run's r8 leftover stored into live state); the pages "
+              "ActionsPage sub_821941A8, ViewPage sub_82191DE0 and ViewOptionsPage sub_82192030 "
+              "(UpdatePage calls the pages' plain C++); the handlers OnSpecSheetClosed "
+              "sub_82193E38, OnPlateCancelled sub_821928F8, OnPlateDone sub_82193E80, "
+              "OnPlateEditorLeft sub_82193F18, OnNo sub_82192BA8 and OnDialogDone sub_82193F80 "
+              "(OnYes sub_82192958 the original: Garage::Sell is recompiled) "
               "(the same writes; checked by "
               "--run_harnesses=garage_screen)");
 
@@ -288,7 +293,26 @@ ITC_GARAGE_STEP(Transition16, Transition16(base, ctx.r3.u32, ctx.r1.u32, guest.c
 ITC_GARAGE_STEP(Transition17, Transition17(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
 ITC_GARAGE_STEP(SetUpActions, SetUpActions(base, ctx.r1.u32, guest.calls()))
 ITC_GARAGE_STEP(SetUpOptions, SetUpOptions(base, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(ActionsPage, ActionsPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(ViewPage, ViewPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(ViewOptionsPage, ViewOptionsPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(OnPlateDone, OnPlateDone(base, ctx.r4.u32, ctx.r1.u32, guest.calls()))
 #undef ITC_GARAGE_STEP
+// The handlers without guest calls (SetPrompts' a tail call from the
+// adapter's frame).
+void GarageScreenOnSpecSheetClosed(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gs::OnSpecSheetClosed(base, ctx.r1.u32);
+}
+void GarageScreenOnPlateCancelled(PPCContext& ctx, uint8_t* base) {
+  gs::OnPlateCancelled(base, ctx.r4.u32);
+}
+void GarageScreenOnPlateEditorLeft(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gs::OnPlateEditorLeft(base, ctx.r3.u64, ctx.r1.u32);
+}
+void GarageScreenOnNo(PPCContext& ctx, uint8_t* base) { gs::OnNo(base, ctx.r4.u32); }
+void GarageScreenOnDialogDone(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gs::OnDialogDone(base, ctx.r3.u64, ctx.r1.u32);
+}
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
 void GarageScreenInitStates(PPCContext& ctx, uint8_t* base) {
@@ -383,5 +407,17 @@ ITC_GARAGE_SCREEN(821930D8, GarageScreenTransition16)
 ITC_GARAGE_SCREEN(82196170, GarageScreenTransition17)
 ITC_GARAGE_SCREEN(821958D0, GarageScreenSetUpActions)
 ITC_GARAGE_SCREEN(82194B20, GarageScreenSetUpOptions)
+// The pages never seen in play (UpdatePage calls their plain C++) and the
+// reply handlers (functors the machine calls). OnYes sub_82192958 stays the
+// original: Garage::Sell, which it calls, is recompiled.
+ITC_GARAGE_SCREEN(821941A8, GarageScreenActionsPage)
+ITC_GARAGE_SCREEN(82191DE0, GarageScreenViewPage)
+ITC_GARAGE_SCREEN(82192030, GarageScreenViewOptionsPage)
+ITC_GARAGE_SCREEN(82193E38, GarageScreenOnSpecSheetClosed)
+ITC_GARAGE_SCREEN(821928F8, GarageScreenOnPlateCancelled)
+ITC_GARAGE_SCREEN(82193E80, GarageScreenOnPlateDone)
+ITC_GARAGE_SCREEN(82193F18, GarageScreenOnPlateEditorLeft)
+ITC_GARAGE_SCREEN(82192BA8, GarageScreenOnNo)
+ITC_GARAGE_SCREEN(82193F80, GarageScreenOnDialogDone)
 // InitStates (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_GARAGE_SCREEN(82196520, GarageScreenInitStates)

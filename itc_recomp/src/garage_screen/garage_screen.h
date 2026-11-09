@@ -231,6 +231,47 @@ void LeavePage(uint8_t* base, uint32_t mode);
 uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint64_t r5, uint32_t sp,
                     const Calls& calls);
 
+// --- The pages never seen in play and the reply handlers (view.cpp) ---
+//
+// sub_821941A8 GarageScreen::ActionsPage (page 1, r3 the mode): both lists
+// updated; a move of the actions (transition 6) or of the car list
+// (transitions 7 then 5); an accept by the action (0 the use question,
+// message 34; 1 the sale question, 36; neither for the current car, sound
+// 3; 2 the plate editor, 28, transition 16; 3 the view, transition 9; 4 the
+// spec sheet, 24) with SetPrompts; a cancel back to the list (transition
+// 8). MenuSound::Play's r3, or Cancelled's (0), or the action (above 4).
+// 144-byte frame.
+uint64_t ActionsPage(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_82191DE0 GarageScreen::ViewPage (page 2) and sub_82192030
+// ViewOptionsPage (page 3, r3 the mode): the player's mapper's buttons
+// (slot 12 fired, slot 8 held): back (transition 11 or 15), the options
+// (12 then 13) or the option's accept (the toggles, transition 15), then
+// the stand's buttons (the camera's commands 4 and 5, the turns, the
+// camera presets). The last call's r3 (the mode with none). 112-byte
+// frames.
+uint64_t ViewPage(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t ViewOptionsPage(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+// sub_82193E38 OnSpecSheetClosed (5, 26): page 1, SetPrompts(0, 0, 1, 1,
+// -1, -1) (a tail call from `sp`). Its r3.
+uint64_t OnSpecSheetClosed(uint8_t* base, uint32_t sp);
+// sub_821928F8 OnPlateCancelled (5, 30; r4 the mode): the data's +60 = 0,
+// message 32. A leaf (r3 left).
+void OnPlateCancelled(uint8_t* base, uint32_t mode);
+// sub_82193E80 OnPlateDone (5, 29; r4 the mode): the data's +60 = 1,
+// SetPlateQuestion, message 34, the data's +68 = 0. SetPlateQuestion's r3.
+// 112-byte frame.
+uint64_t OnPlateDone(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_82193F18 OnPlateEditorLeft (5, 31): unless the data's +60 is set,
+// transition 17 to page 1 and SetPrompts (a tail call). Its r3, or `r3`.
+uint64_t OnPlateEditorLeft(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_82192BA8 OnNo (5, 39 and 5, 41; r4 the mode): the data's +64 = 0;
+// with +68 0, message 32. A leaf (r3 left).
+void OnNo(uint8_t* base, uint32_t mode);
+// sub_82193F80 OnDialogDone (5, 42): answered yes (+64), transition 8 to
+// page 0; else SetPrompts and by the question (+68): 0 transition 17 to
+// page 1, 1 or 2 page 1 at once. SetPrompts' r3, or `r3`. 96-byte frame.
+uint64_t OnDialogDone(uint8_t* base, uint64_t r3, uint32_t sp);
+
 // --- Update (update.cpp) ---
 //
 // sub_82196230 GarageScreen::Update (r3 the machine, r4 the mode; neither
