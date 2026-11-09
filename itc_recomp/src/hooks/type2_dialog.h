@@ -29,5 +29,17 @@ void Type2DialogNotice2Page(PPCContext& ctx, uint8_t* base);
 // The machine's handlers (r3 the machine, r4 the mode where read).
 void Type2DialogDraw(PPCContext& ctx, uint8_t* base);
 void Type2DialogUpdate(PPCContext& ctx, uint8_t* base);
+void Type2DialogOnEnter(PPCContext& ctx, uint8_t* base);
+void Type2DialogWaitForMovies(PPCContext& ctx, uint8_t* base);
+void Type2DialogShown(PPCContext& ctx, uint8_t* base);
+void Type2DialogWait(PPCContext& ctx, uint8_t* base);
+void Type2DialogCancel(PPCContext& ctx, uint8_t* base);
+void Type2DialogOpenConfirm(PPCContext& ctx, uint8_t* base);
+void Type2DialogOpenNotice(PPCContext& ctx, uint8_t* base);
+void Type2DialogOpenConfirm2(PPCContext& ctx, uint8_t* base);
+void Type2DialogOpenNotice2(PPCContext& ctx, uint8_t* base);
+void Type2DialogOnLeft(PPCContext& ctx, uint8_t* base);
+// TakesInput (no arguments).
+void Type2DialogTakesInput(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

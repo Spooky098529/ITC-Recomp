@@ -104,7 +104,11 @@ bool StandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
 }
 
 // What a case shapes and passes.
-enum class Kind { kStep, kPage, kDraw, kUpdate };
+// kHandler: r3 the machine, r4 the mode; kLeaf: no arguments read;
+// kOnEnter: the blocks VirtualAlloc makes compared by content where their
+// pointers were stored, then freed; kOnLeft: the globals pointing at blocks
+// of the layer's pages the case made, whether each was freed compared.
+enum class Kind { kStep, kPage, kDraw, kUpdate, kHandler, kLeaf, kOnEnter, kOnLeft };
 
 struct Function {
   const char* name;
@@ -130,6 +134,7 @@ void MakeWorld(uint8_t* base, uint32_t block, Random& r, Kind kind) {
   guest::StoreU32(base, movie + ui_movies::kMovieSaved, node(1));
   guest::StoreU32(base, movie + ui_movies::kMovieFile, node(2));
   guest::StoreU32(base, movie + 40960, r.Below(2));
+  guest::StoreU32(base, movie + ui_movies::kMovieLoaded, r.Below(3) == 0 ? 0 : 1);
   static constexpr uint32_t kTags[] = {0x54464D00, 0x50494300, 0x54585400, 0x12345678};
   for (uint32_t i = 0; i < kNodes; i++) {
     guest::StoreU32(base, node(i), kTags[r.Below(4)]);
@@ -273,6 +278,7 @@ void Run(Context& h, uint32_t block, const Function& f, int cases) {
       MakeWorld(base, block, r, f.kind);
       PPCContext t = CallContext(h);
       const uint32_t sp = t.r1.u32;
+      std::vector<uint32_t> pages;
       WriteRandom(base, sp - kBelow, kBelow + kAbove, r);
       t.r3.u64 = r.Next();
       t.r4.u64 = r.Next();
@@ -290,8 +296,25 @@ void Run(Context& h, uint32_t block, const Function& f, int cases) {
           break;
         case Kind::kDraw:
         case Kind::kUpdate:
+        case Kind::kHandler:
+        case Kind::kOnEnter:
           t.r3.u64 = machine | high;
           t.r4.u64 = mode;
+          break;
+        case Kind::kLeaf:
+          break;
+        case Kind::kOnLeft:
+          // The blocks to free: the layer's pages (none now and then).
+          for (const uint32_t global : {t2d::kPages, t2d::kMenu, t2d::kData}) {
+            uint32_t made = 0;
+            if (r.Below(6) != 0) {
+              made = memory::AllocPages(global == t2d::kPages ? 28 : 68, 4096);
+              WriteRandom(base, made, 64, r);
+              pages.push_back(made);
+            }
+            guest::StoreU32(base, global, made);
+          }
+          t.r3.u64 = machine | high;
           break;
       }
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
@@ -323,6 +346,41 @@ void Run(Context& h, uint32_t block, const Function& f, int cases) {
           out[v].Word(w);
         }
       }
+      uint64_t r3 = t.r3.u64;
+      if (f.kind == Kind::kOnEnter) {
+        // The blocks made: their first words (the rest not written)
+        // compared, freed, their globals 1; r3 (the data block) as 1.
+        static constexpr uint32_t kWritten[3] = {28, 68, 12};
+        const uint32_t globals[3] = {t2d::kPages, t2d::kMenu, t2d::kData};
+        for (uint32_t k = 0; k < 3; k++) {
+          const uint32_t made = guest::LoadU32(base, globals[k]);
+          const bool ours = made != 0 && memory::IsPages(made);
+          out[v].Word(ours ? 1 : made);
+          if (ours) {
+            std::vector<uint8_t> bytes = Read(base, made, kWritten[k]);
+            if (k == 1) {
+              // The menu's +44, +56 and +60, not written (the layer's
+              // pages' contents).
+              for (const uint32_t at : {44u, 56u, 60u}) {
+                for (uint32_t i = 0; i < 4; i++) bytes[at + i] = 0;
+              }
+            } else if (k == 0) {
+              for (uint32_t i = 0; i < 4; i++) bytes[16 + i] = 0;  // +16 not written
+            }
+            out[v].Bytes(bytes);
+            if (uint32_t(r3) == made) r3 = 1;
+            memory::FreePages(made);
+            guest::StoreU32(base, globals[k], 1);
+          }
+        }
+      }
+      if (f.kind == Kind::kOnLeft) {
+        for (const uint32_t made : pages) {
+          const bool still = memory::IsPages(made);
+          out[v].Word(still ? 1 : 0);
+          if (still) memory::FreePages(made);
+        }
+      }
       out[v].Bytes(Read(base, block, kBlockBytes));
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(base, g.address, g.bytes));
@@ -332,8 +390,8 @@ void Run(Context& h, uint32_t block, const Function& f, int cases) {
       out[v].Bytes(Read(base, sp - f.frame, f.frame - f.saves));
       out[v].Bytes(Read(base, sp, kAbove));
       out[v].Word(t.r1.u32);
-      out[v].Word(t.r3.u32);
-      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(uint32_t(r3));
+      out[v].Word(uint32_t(r3 >> 32));
       for (size_t i = 0; i < saved.size(); i++) {
         Write(base, kGlobals[i].address, saved[i].data(), kGlobals[i].bytes);
       }
@@ -385,6 +443,28 @@ void Type2Dialog(Context& h) {
        Kind::kDraw},
       {"Type2Dialog::Update", 0x82187EC8, 208, 64, __imp__sub_82187EC8,
        hooks::Type2DialogUpdate, Kind::kUpdate, 40},
+      {"Type2Dialog::OnEnter", 0x821869B8, 128, 40, __imp__sub_821869B8,
+       hooks::Type2DialogOnEnter, Kind::kOnEnter},
+      {"Type2Dialog::WaitForMovies", 0x821880D0, 96, 16, __imp__sub_821880D0,
+       hooks::Type2DialogWaitForMovies, Kind::kHandler},
+      {"Type2Dialog::Shown", 0x82186490, 0, 0, __imp__sub_82186490, hooks::Type2DialogShown,
+       Kind::kLeaf},
+      {"Type2Dialog::Wait", 0x82186AD8, 0, 0, __imp__sub_82186AD8, hooks::Type2DialogWait,
+       Kind::kHandler},
+      {"Type2Dialog::Cancel", 0x82186E40, 40, 40, __imp__sub_82186E40, hooks::Type2DialogCancel,
+       Kind::kHandler},
+      {"Type2Dialog::OpenConfirm", 0x82186C30, 112, 24, __imp__sub_82186C30,
+       hooks::Type2DialogOpenConfirm, Kind::kHandler},
+      {"Type2Dialog::OpenNotice", 0x82186AF0, 0, 0, __imp__sub_82186AF0,
+       hooks::Type2DialogOpenNotice, Kind::kHandler},
+      {"Type2Dialog::OpenConfirm2", 0x82186D40, 112, 16, __imp__sub_82186D40,
+       hooks::Type2DialogOpenConfirm2, Kind::kHandler},
+      {"Type2Dialog::OpenNotice2", 0x82186B90, 0, 0, __imp__sub_82186B90,
+       hooks::Type2DialogOpenNotice2, Kind::kHandler},
+      {"Type2Dialog::OnLeft", 0x82186428, 112, 32, __imp__sub_82186428,
+       hooks::Type2DialogOnLeft, Kind::kOnLeft},
+      {"Type2Dialog::TakesInput", 0x821864A0, 0, 0, __imp__sub_821864A0,
+       hooks::Type2DialogTakesInput, Kind::kLeaf},
   };
   for (const Function& f : functions) {
     Run(h, block, f, f.kind == Kind::kStep ? 32 : 128);

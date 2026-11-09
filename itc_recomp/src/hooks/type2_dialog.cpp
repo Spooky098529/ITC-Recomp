@@ -19,7 +19,13 @@ ITC_FLAG_BOOL(native_type2_dialog, true, "ITC",
               "sub_82187160, NoticePage sub_82187508, Confirm2Page sub_82187330 and Notice2Page "
               "sub_82187618 (Menu::Step, Menu::Pressed and MenuSound::Play through their "
               "overrides); Draw sub_82187E50 and Update sub_82187EC8 (the pages and steps "
-              "through the guest from their tables, UiMovie::Run through its override) "
+              "through the guest from their tables, UiMovie::Run through its override); the "
+              "machine's handlers OnEnter sub_821869B8 and "
+              "OnLeft sub_82186428 (VirtualAlloc and VirtualFree through their overrides), "
+              "WaitForMovies sub_821880D0 (UiMovies::IsLoaded's plain C++), Shown sub_82186490, "
+              "Wait sub_82186AD8, Cancel sub_82186E40, OpenConfirm sub_82186C30 "
+              "(UiMovie::ResetPose through its override), OpenNotice sub_82186AF0, OpenConfirm2 "
+              "sub_82186D40 and OpenNotice2 sub_82186B90; TakesInput sub_821864A0 "
               "(the same writes; checked by --run_harnesses=type2_dialog)");
 
 namespace hooks {
@@ -137,6 +143,38 @@ void Type2DialogUpdate(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::Update(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
+void Type2DialogOnEnter(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2d::OnEnter(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void Type2DialogWaitForMovies(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2d::WaitForMovies(base, ctx.r3.u64, ctx.r1.u32);
+}
+void Type2DialogShown(PPCContext&, uint8_t* base) { t2d::Shown(base); }
+void Type2DialogWait(PPCContext& ctx, uint8_t* base) { t2d::Wait(base, ctx.r3.u32); }
+void Type2DialogCancel(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2d::Cancel(base, ctx.r3.u64, ctx.r4.u32);
+}
+void Type2DialogOpenConfirm(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2d::OpenConfirm(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void Type2DialogOpenNotice(PPCContext& ctx, uint8_t* base) {
+  t2d::OpenNotice(base, ctx.r3.u32, false);
+}
+void Type2DialogOpenConfirm2(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2d::OpenConfirm2(base, ctx.r3.u32, ctx.r1.u32);
+}
+void Type2DialogOpenNotice2(PPCContext& ctx, uint8_t* base) {
+  t2d::OpenNotice(base, ctx.r3.u32, true);
+}
+void Type2DialogOnLeft(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = t2d::OnLeft(base, ctx.r1.u32, guest.calls());
+}
+void Type2DialogTakesInput(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t2d::TakesInput(base);
+}
 
 }  // namespace hooks
 
@@ -169,3 +207,16 @@ ITC_TYPE2_DIALOG(82187618, Type2DialogNotice2Page)
 // Draw and Update (functors the machine calls).
 ITC_TYPE2_DIALOG(82187E50, Type2DialogDraw)
 ITC_TYPE2_DIALOG(82187EC8, Type2DialogUpdate)
+// The machine's other handlers (functors).
+ITC_TYPE2_DIALOG(821869B8, Type2DialogOnEnter)
+ITC_TYPE2_DIALOG(821880D0, Type2DialogWaitForMovies)
+ITC_TYPE2_DIALOG(82186490, Type2DialogShown)
+ITC_TYPE2_DIALOG(82186AD8, Type2DialogWait)
+ITC_TYPE2_DIALOG(82186E40, Type2DialogCancel)
+ITC_TYPE2_DIALOG(82186C30, Type2DialogOpenConfirm)
+ITC_TYPE2_DIALOG(82186AF0, Type2DialogOpenNotice)
+ITC_TYPE2_DIALOG(82186D40, Type2DialogOpenConfirm2)
+ITC_TYPE2_DIALOG(82186B90, Type2DialogOpenNotice2)
+ITC_TYPE2_DIALOG(82186428, Type2DialogOnLeft)
+// TakesInput (from the type 2 mode's sub_82197858, recompiled).
+ITC_TYPE2_DIALOG(821864A0, Type2DialogTakesInput)
