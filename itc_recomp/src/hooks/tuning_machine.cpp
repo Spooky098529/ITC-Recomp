@@ -20,8 +20,8 @@ ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "through their overrides); DecalImages::SavePlaceholders sub_82208130 with "
               "SavePlaceholders14 sub_821F8950 (the same writes); TuningScreen::SetUp's callees "
               "LoadInteriorSlots sub_821DE280, LoadCurrentChoices sub_821DA4B0 "
-              "(Params::GetCarSpec by its plain C++) and LoadOwnedParts sub_821DBAB0 "
-              "(TestAndSetWheelFlag by its plain C++) (checked by "
+              "(Params::GetCarSpec by its plain C++), LoadOwnedParts sub_821DBAB0 "
+              "(TestAndSetWheelFlag by its plain C++) and SetPrices sub_821DAD58 (checked by "
               "--run_harnesses=tuning_machine)");
 
 namespace hooks {
@@ -133,6 +133,11 @@ void TuningMachineLoadCurrentChoices(PPCContext& ctx, uint8_t* base) {
 void TuningMachineLoadOwnedParts(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = tm::LoadOwnedParts(base, ctx.r3.u32, ctx.r1.u32);
 }
+// The prices' float math as the original's (no flush to zero); r3 left.
+void TuningMachineSetPrices(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  tm::SetPrices(base, ctx.r3.u32, ctx.r1.u32);
+}
 
 }  // namespace hooks
 
@@ -166,3 +171,4 @@ ITC_TUNING_MACHINE(821E7568, TuningMachineInit)
 ITC_TUNING_MACHINE(821DE280, TuningMachineLoadInteriorSlots)
 ITC_TUNING_MACHINE(821DA4B0, TuningMachineLoadCurrentChoices)
 ITC_TUNING_MACHINE(821DBAB0, TuningMachineLoadOwnedParts)
+ITC_TUNING_MACHINE(821DAD58, TuningMachineSetPrices)

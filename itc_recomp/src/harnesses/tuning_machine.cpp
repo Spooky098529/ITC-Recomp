@@ -620,6 +620,49 @@ void OwnedParts(Context& h, const World& w) {
              }});
 }
 
+// SetPrices: the save shaped as for the other callees, the selected car's
+// price (its +1900) 0, small, large, negative, near the int limits, past
+// single's exact integers or any word; the part set [+33900] 0 to 4, now
+// and then out of range (-847 to 98 keep its rows in the screen; -334 puts
+// a 28-byte row's first word on +25172, read after); [+25172] 0, 1 or any.
+// Its words below sp but its saves (r17 on, -128) compared, the save too.
+// The prices are words truncated by fctiwz, compared exactly.
+void Prices(Context& h, const World& w) {
+  Run(h, w, {"TuningScreen::SetPrices (sub_821DAD58)", 240, __imp__sub_821DAD58,
+             hooks::TuningMachineSetPrices, {{-256, -128}},
+             [](PPCContext& t, Random& r, const World& w) {
+               ShapeSave(w.base, w, r);
+               Screen(t, r, w);
+               const uint32_t s = w.screen();
+               uint32_t price = 0;
+               switch (r.Below(9)) {
+                 case 0: price = 0; break;
+                 case 1: price = r.Below(100); break;
+                 case 2: price = 1000 * r.Below(200); break;
+                 case 3: price = r.Below(3000000); break;
+                 case 4: price = (1u << 24) + r.Below(1u << 30); break;
+                 case 5: price = uint32_t(-int32_t(r.Below(5000000))); break;
+                 case 6: price = 0x7FFFFFFFu - r.Below(200); break;
+                 case 7: price = 0x80000000u + r.Below(200); break;
+                 default: price = uint32_t(r.Next()); break;
+               }
+               guest::StoreU32(w.base, tuning_screen::SelectedGarageCar(w.base, s) + 2112, price);
+               uint32_t set = r.Below(5);
+               switch (r.Below(8)) {
+                 case 0: set = 5 + r.Below(94); break;
+                 case 1: set = uint32_t(-1 - int32_t(r.Below(847))); break;
+                 case 2: set = uint32_t(-334); break;
+                 default: break;
+               }
+               guest::StoreU32(w.base, s + 33900, set);
+               guest::StoreU32(w.base, s + 25172,
+                               r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+             },
+             [&h](PPCContext&, const World& w, Outputs& out) {
+               out.Bytes(Read(h.base, w.save, kSaveDataBytes));
+             }});
+}
+
 }  // namespace
 
 void TuningMachine(Context& h) {
@@ -631,6 +674,7 @@ void TuningMachine(Context& h) {
   Init(h, w);
   SetUpCallees(h, w);
   OwnedParts(h, w);
+  Prices(h, w);
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
   }

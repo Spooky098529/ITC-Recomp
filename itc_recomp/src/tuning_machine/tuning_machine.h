@@ -148,4 +148,18 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1);
 constexpr uint32_t kLoadOwnedPartsFrame = 160;
 uint64_t LoadOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp);
 
+// --- The prices (prices.cpp) ---
+//
+// sub_821DAD58 TuningScreen::SetPrices (r3 the screen): the parts' prices
+// from the selected garage car's price (its +1900): converted to single
+// (fcfid, frsp), times rodata floats (fmuls), truncated (fctiwz) into the
+// part set's rows (+33904 + 40 x [+33900] and +34524 + 28 x [+33900], the
+// part set read again for each store, unchecked; the car's price itself at
+// +33916 + 40 x set) and the other items' rows (+34964 to +36792, +25248,
+// +25400 to +27831 and +33584 to +33719, with fixed words 0, 50, 100 and
+// 200); +36280 0 when +25172 is set. No frame: the conversions' words left
+// below `sp` (sp - 160 to sp - 137) as the original leaves them; its
+// register saves (r17 on, sp - 128) aren't written. A leaf (r3 left).
+void SetPrices(uint8_t* base, uint32_t screen, uint32_t sp);
+
 }  // namespace tuning_machine
