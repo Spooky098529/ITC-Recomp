@@ -18,6 +18,15 @@ here loses its heading.
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 
+- The save screen's migration (attract race `itc_4711`, replay
+  `itc_4712` ok, the title's load only; `save-screen.md`):
+  `sub_821A5118`, `sub_821A28E0`, `sub_821A2AF8`, `sub_821A2C98`,
+  `sub_821A2EE8`, `sub_821A4D30`, `sub_821A4E60`, `sub_821A4FD8`,
+  `sub_821A3A08`, `sub_821A3C60`, `sub_821A67E8`, `sub_821A3DE8`,
+  `sub_821A4AC0`, `sub_821A2760`, `sub_821A2820`, `sub_821A27F0`,
+  `sub_821A2850`, `sub_821A2880`, `sub_821A27C0`, `sub_821A28B0`,
+  `sub_821A1D38`, `sub_821A2138`, `sub_821A1D20`, `sub_821A5450`,
+  `sub_821A7AC8`.
 - The type 2 screens' third migration (attract race `itc_4681`, replay
   `itc_4682` ok, not reaching the build screen's pages;
   `type2-screens.md`): `sub_8219EEC0`, `sub_8219DBC8`, `sub_8219DDB8`,
