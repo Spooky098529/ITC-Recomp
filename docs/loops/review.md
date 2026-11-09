@@ -32,8 +32,29 @@ When the user has reviewed a run's section, its heading gets
   lines trimmed (the career screens', the stand screens', the mode
   Init's, the stand setters'). Noted: `Destroy` never frees the second
   menu list `[0x826D8428]` (probably the original's leak, kept);
-  `SetHelpLine` `sub_82193A90`'s leftover r5 to `UiMovie::SetText`
-  (the 2026-10-30 call: native callers pass 0).
+  `SetHelpLine` `sub_82193A90`'s unset varargs registers to
+  `UiMovie::SetText` (the map said a leftover r5; the migration found
+  r5 = 0 and only r7-r10 unset; the 2026-10-30 call: native callers
+  pass 0).
+- The garage screen's migration (e10e29dd..52c21938): 22 of 22 in play
+  ours (15 Overridden, 7 Native: `SetCarRow`, `FillRows`, `SetPrompts`,
+  `SetHelpLine`, `SetUpLists`, `ReadSave`, `SetHeader`); the 56 never
+  seen in play kept recompiled, reached through the tables and functors
+  and a few direct guest calls (`ReloadStandCar` `sub_82193B10`,
+  `PutCarOnStand`, the busy markers, `SetScrollArrows`), each row says
+  how. Map corrections in the rows: `SetPrompts` stores 0 into a hidden
+  prompt's +80; `Transition1` always returns 1; `Transition3` returns 1
+  when both fade counts (`0x826A50DC`, `0x826A50E4`) are 0; `Update`'s
+  debug print's argument is `0x8200A3C8`. Followed: the 2026-10-30
+  varargs call (`SetHelpLine`, `SetHeader`, `SetCarRow`; their
+  `SetText`/`SetNodeText` parameter areas left out of the comparison),
+  no behavior change (`Destroy`'s unfreed list, the frame words copied).
+  New harness technique: `CarListPage` and `UpdatePage` get a 192 KB
+  guest stack of their own, filled with random words each case
+  (`ReloadStandCar`'s 100,560-byte frame reads words it never writes);
+  it removed seven differences from a previous case's leftovers. New:
+  `src/garage_screen/`, `src/hooks/garage_screen.*`,
+  `src/harnesses/garage_screen.cpp`.
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 

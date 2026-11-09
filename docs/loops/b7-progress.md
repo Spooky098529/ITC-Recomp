@@ -31,7 +31,13 @@ file's history. What's left to see in a drive, from every run:
   each made current, sold, its plate changed, viewed or its spec sheet
   opened; Init's 20 transitions, 5 pages, 18 table transitions,
   `Update`; 15 ready groups; no leads added, four leads' lines trimmed;
-  no subagents); map checked. Step: migration; agent running.
+  no subagents); map checked. Migration e10e29dd..52c21938 (the
+  helpers, transitions 0, 1, 3, the list and leave pages, `UpdatePage`,
+  `Update`, the handlers, `InitStates`; 7 helper adapters removed; 22
+  of 22 in play ours, the 56 never seen kept recompiled;
+  `--native_garage_screen`; race 37 s, 0 errors, its harnesses 0
+  differing; no subagents). Left: none. Step: validation; agent
+  running.
 
 ## Done
 
@@ -58,5 +64,7 @@ The run's section of `review.md` ("Run 2026-11-09 10:53").
   (wrapped 56, known 389, unknown 730).
 - After the garage screen's map: ours 5265, work left 1175 (wrapped 56,
   known 411, unknown 708).
+- After its migration: ours 5287, work left 1153 (wrapped 56, known
+  389, unknown 708).
 
 ## Stopped
