@@ -70,7 +70,7 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
   // The stand.
   if (Load(base, Data(base) + 72) == 0) {
     if (Load(base, Data(base) + 84) != 0) {
-      r3 = calls.Call(kHideBusyNow, frame, 0x82196510);
+      r3 = HideBusyNow(base, frame, calls);
       Store(base, Data(base) + 84, 0);
     }
     return r3;
@@ -78,11 +78,11 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
   r3 = calls.Call(kIsBusy, frame, 0x82196418, Holder(base));
   if (uint32_t(r3) != 0) {
     if (Load(base, Data(base) + 84) == 0) {
-      r3 = calls.Call(kShowBusy, frame, 0x82196434);
+      r3 = ShowBusy(base, frame, calls);
       Store(base, Data(base) + 84, 1);
     }
   } else if (Load(base, Data(base) + 84) != 0) {
-    r3 = calls.Call(kHideBusy, frame, 0x8219644C);
+    r3 = HideBusy(base, frame, calls);
     Store(base, Data(base) + 84, 0);
   }
   const uint32_t data = Data(base);

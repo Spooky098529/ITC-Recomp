@@ -501,6 +501,9 @@ set(ITC_SOURCES
     src/garage_screen/update.cpp
     src/garage_screen/handlers.cpp
     src/garage_screen/init.cpp
+    src/garage_screen/texts.cpp
+    src/garage_screen/stand.cpp
+    src/garage_screen/prices.cpp
     src/hooks/tuning_machine.cpp
     src/tuning_machine/handlers.cpp
     src/tuning_machine/init.cpp

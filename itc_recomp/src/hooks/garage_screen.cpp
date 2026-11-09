@@ -22,7 +22,15 @@ ITC_FLAG_BOOL(native_garage_screen, true, "ITC",
               "sub_821915B0 (VirtualAlloc and VirtualFree through their overrides), OpenMovie "
               "sub_82191618, WaitForLoad sub_82191D70, Start sub_82193DC0 with ReadSave "
               "sub_82191BB0 and SetHeader sub_82192C80, Unload sub_821927E8 and Close "
-              "sub_82192850; InitStates sub_82196520 (its step table, StateMachine::Add's plain C++) "
+              "sub_82192850; InitStates sub_82196520 (its step table, StateMachine::Add's plain C++); "
+              "the paths never seen in play: SetScrollArrows sub_82193288, SetActionMarker "
+              "sub_821936B0, SetOptionMarker sub_82193720, ShowSpecTexts sub_82193798, "
+              "ShowCarNames sub_82193910, SetPlateQuestion sub_82193320, CopyGarageCar "
+              "sub_82192770, ShowBusy sub_82193C58, HideBusy sub_82193CE0, HideBusyNow "
+              "sub_82193D48, ResetStand sub_82191B20, SetUpView sub_82194AC8, ToggleTurn "
+              "sub_821918D0, ToggleDoors sub_82191920, ToggleDoors2 sub_82191970, TurnLeft "
+              "sub_821919C0, TurnRight sub_82191A18, CarValue sub_82192378 and SalePrice "
+              "sub_82192690 "
               "(the same writes; checked by "
               "--run_harnesses=garage_screen)");
 
@@ -162,6 +170,85 @@ void GarageScreenDestroy(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = gs::Destroy(base, ctx.r1.u32, guest.calls());
 }
+void GarageScreenSetScrollArrows(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gs::SetScrollArrows(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+void GarageScreenSetActionMarker(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = gs::SetActionMarker(base, ctx.r3.u32, ctx.r1.u32);
+}
+void GarageScreenSetOptionMarker(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = gs::SetOptionMarker(base, ctx.r3.u32, ctx.r1.u32);
+}
+void GarageScreenShowSpecTexts(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::ShowSpecTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void GarageScreenShowCarNames(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::ShowCarNames(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+void GarageScreenSetPlateQuestion(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::SetPlateQuestion(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenCopyGarageCar(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::CopyGarageCar(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+                                 guest.calls());
+}
+void GarageScreenShowBusy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::ShowBusy(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenHideBusy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::HideBusy(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenHideBusyNow(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::HideBusyNow(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenResetStand(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::ResetStand(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenSetUpView(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::SetUpView(base, ctx.r1.u32, guest.calls());
+}
+// The toggles' commands are tail calls: from the adapter's frame and lr.
+void GarageScreenToggleTurn(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::ToggleTurn(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void GarageScreenToggleDoors(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::ToggleDoors(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void GarageScreenToggleDoors2(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::ToggleDoors2(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void GarageScreenTurnLeft(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::TurnLeft(base, ctx.r1.u32, guest.calls());
+}
+void GarageScreenTurnRight(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = gs::TurnRight(base, ctx.r1.u32, guest.calls());
+}
+// CarValue: f1 (r3 left the car).
+void GarageScreenCarValue(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = gs::CarValue(base, ctx.r3.u32, ctx.r1.u32);
+}
+void GarageScreenSalePrice(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = gs::SalePrice(base, ctx.r3.u32, ctx.r1.u32);
+}
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
 void GarageScreenInitStates(PPCContext& ctx, uint8_t* base) {
@@ -207,5 +294,26 @@ ITC_GARAGE_SCREEN(82193DC0, GarageScreenStart)
 ITC_GARAGE_SCREEN(821927E8, GarageScreenUnload)
 ITC_GARAGE_SCREEN(82192850, GarageScreenClose)
 ITC_GARAGE_SCREEN(821915B0, GarageScreenDestroy)
+// The texts, markers and stand helpers never seen in play (their callers,
+// never seen in play, still recompiled).
+ITC_GARAGE_SCREEN(82193288, GarageScreenSetScrollArrows)
+ITC_GARAGE_SCREEN(821936B0, GarageScreenSetActionMarker)
+ITC_GARAGE_SCREEN(82193720, GarageScreenSetOptionMarker)
+ITC_GARAGE_SCREEN(82193798, GarageScreenShowSpecTexts)
+ITC_GARAGE_SCREEN(82193910, GarageScreenShowCarNames)
+ITC_GARAGE_SCREEN(82193320, GarageScreenSetPlateQuestion)
+ITC_GARAGE_SCREEN(82192770, GarageScreenCopyGarageCar)
+ITC_GARAGE_SCREEN(82193C58, GarageScreenShowBusy)
+ITC_GARAGE_SCREEN(82193CE0, GarageScreenHideBusy)
+ITC_GARAGE_SCREEN(82193D48, GarageScreenHideBusyNow)
+ITC_GARAGE_SCREEN(82191B20, GarageScreenResetStand)
+ITC_GARAGE_SCREEN(82194AC8, GarageScreenSetUpView)
+ITC_GARAGE_SCREEN(821918D0, GarageScreenToggleTurn)
+ITC_GARAGE_SCREEN(82191920, GarageScreenToggleDoors)
+ITC_GARAGE_SCREEN(82191970, GarageScreenToggleDoors2)
+ITC_GARAGE_SCREEN(821919C0, GarageScreenTurnLeft)
+ITC_GARAGE_SCREEN(82191A18, GarageScreenTurnRight)
+ITC_GARAGE_SCREEN(82192378, GarageScreenCarValue)
+ITC_GARAGE_SCREEN(82192690, GarageScreenSalePrice)
 // InitStates (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_GARAGE_SCREEN(82196520, GarageScreenInitStates)

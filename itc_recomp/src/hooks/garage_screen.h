@@ -39,6 +39,30 @@ void GarageScreenStart(PPCContext& ctx, uint8_t* base);
 void GarageScreenUnload(PPCContext& ctx, uint8_t* base);
 void GarageScreenClose(PPCContext& ctx, uint8_t* base);
 void GarageScreenDestroy(PPCContext& ctx, uint8_t* base);
+// The texts, markers and stand helpers never seen in play
+// (SetScrollArrows r3 the scroll, r4 the count; the markers r3 the index;
+// ShowSpecTexts r3 a record; ShowCarNames r3 an id, r4 a maker;
+// CopyGarageCar r3 out, r4 a garage, r5 an index; CarValue and SalePrice
+// r3 a car; the others no arguments).
+void GarageScreenSetScrollArrows(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetActionMarker(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetOptionMarker(PPCContext& ctx, uint8_t* base);
+void GarageScreenShowSpecTexts(PPCContext& ctx, uint8_t* base);
+void GarageScreenShowCarNames(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetPlateQuestion(PPCContext& ctx, uint8_t* base);
+void GarageScreenCopyGarageCar(PPCContext& ctx, uint8_t* base);
+void GarageScreenShowBusy(PPCContext& ctx, uint8_t* base);
+void GarageScreenHideBusy(PPCContext& ctx, uint8_t* base);
+void GarageScreenHideBusyNow(PPCContext& ctx, uint8_t* base);
+void GarageScreenResetStand(PPCContext& ctx, uint8_t* base);
+void GarageScreenSetUpView(PPCContext& ctx, uint8_t* base);
+void GarageScreenToggleTurn(PPCContext& ctx, uint8_t* base);
+void GarageScreenToggleDoors(PPCContext& ctx, uint8_t* base);
+void GarageScreenToggleDoors2(PPCContext& ctx, uint8_t* base);
+void GarageScreenTurnLeft(PPCContext& ctx, uint8_t* base);
+void GarageScreenTurnRight(PPCContext& ctx, uint8_t* base);
+void GarageScreenCarValue(PPCContext& ctx, uint8_t* base);
+void GarageScreenSalePrice(PPCContext& ctx, uint8_t* base);
 // InitStates (r3 the machine).
 void GarageScreenInitStates(PPCContext& ctx, uint8_t* base);
 

@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include <bit>
+#include <climits>
+#include <cmath>
 #include <cstdint>
 
 #include "garage_screen/garage_screen.h"
@@ -79,6 +82,66 @@ inline void PagesGo(uint8_t* base, uint32_t pages, uint32_t page, uint32_t trans
   Store(base, pages + 16, queued);
   Store(base, pages + 12, transition);
   Store(base, pages + 4, page);
+}
+
+// A float word read as the translated lfs does (a double of the float).
+inline double Lfs(uint8_t* base, uint32_t address) {
+  return double(std::bit_cast<float>(Load(base, address)));
+}
+// A double stored as the translated stfs does (rounded to a float).
+inline void Stfs(uint8_t* base, uint32_t address, double value) {
+  Store(base, address, std::bit_cast<uint32_t>(float(value)));
+}
+// A doubleword at `address` (two words, high first).
+inline void Store64(uint8_t* base, uint32_t address, uint64_t value) {
+  Store(base, address, uint32_t(value >> 32));
+  Store(base, address + 4, uint32_t(value));
+}
+inline uint64_t Load64(uint8_t* base, uint32_t address) {
+  return (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
+}
+inline double Lfd(uint8_t* base, uint32_t address) {
+  return std::bit_cast<double>(Load64(base, address));
+}
+
+// fctiwz as the translated code does it: NaN 0x80000000, at or above
+// INT_MAX INT_MAX, else truncated (0x80000000 below INT_MIN).
+inline uint32_t Fctiwz(double d) {
+  if (std::isnan(d)) {
+    return 0x80000000u;
+  }
+  if (d >= double(INT_MAX)) {
+    return uint32_t(INT_MAX);
+  }
+  if (!(d > -2147483649.0)) {
+    return 0x80000000u;
+  }
+  return uint32_t(int32_t(d));
+}
+
+// An integer word converted as the originals do through their frame: its
+// 64-bit sign extension stored at `at` (std), loaded back (lfd), fcfid and
+// frsp. The float as a double.
+inline double IntToFloat(uint8_t* base, uint32_t at, uint32_t word) {
+  const int64_t wide = int64_t(int32_t(word));
+  Store64(base, at, uint64_t(wide));
+  return double(float(double(wide)));
+}
+
+// The garage stage's holder's command (GarageStage::Command through its
+// override) from `frame` returning to `lr`.
+inline uint64_t StageCommand(uint8_t* base, uint32_t command, uint32_t frame, uint32_t lr,
+                             const Calls& calls) {
+  return calls.Call(kStageCommand, frame, lr, Holder(base), command);
+}
+
+// UiMovie::SetText with r3 to r7 given and r8 to r10 0 (the varargs the
+// call sites leave unset: the user's call for the parking area,
+// 2026-10-30), or r10 given where the call site sets it.
+inline uint64_t SetText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie,
+                        uint64_t sub_scene, uint64_t child, uint64_t text, uint64_t r7 = 0,
+                        uint64_t r10 = 0) {
+  return calls.CallArgs(kSetText, frame, lr, {movie, sub_scene, child, text, r7, 0, 0, r10});
 }
 
 }  // namespace garage_screen

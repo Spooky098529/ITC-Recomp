@@ -214,6 +214,79 @@ uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, cons
 // original). The last VirtualFree's r3. 112-byte frame.
 uint64_t Destroy(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The texts and markers never seen in play (texts.cpp) ---
+//
+// sub_82193288 GarageScreen::SetScrollArrows (r3 the list's scroll, r4 the
+// count): node (6, 3) +80 (up) = scroll != 0; node (6, 4) +80 (down) = 1 at
+// scroll 0, else scroll + 4 != count. The down node (r3). 128-byte frame.
+uint64_t SetScrollArrows(uint8_t* base, uint32_t scroll, uint32_t count, uint32_t sp);
+// sub_821936B0 GarageScreen::SetActionMarker (r3 the action): node (7, 0)
+// +16 = the action as a float (through the frame's +80). The node (r3).
+// 112-byte frame.
+uint64_t SetActionMarker(uint8_t* base, uint32_t action, uint32_t sp);
+// sub_82193720 GarageScreen::SetOptionMarker (r3 the option): node (2, 1)'s
+// child 0 +16 = the option as a float. The child (r3). 112-byte frame.
+uint64_t SetOptionMarker(uint8_t* base, uint32_t option, uint32_t sp);
+// sub_82193798 GarageScreen::ShowSpecTexts (r3 a record of figures):
+// sub-scene 18's ten texts (as CarDealer::SetSpecTexts on movie 5). The
+// last SetText's r3. 112-byte frame.
+uint64_t ShowSpecTexts(uint8_t* base, uint32_t record, uint32_t sp, const Calls& calls);
+// sub_82193910 GarageScreen::ShowCarNames (r3 a car id, r4 its maker):
+// (-1, 19) string 1934 + maker, (-1, 20) 1646 + id, (-1, 21) 1718 + id. The
+// last SetText's r3. 112-byte frame.
+uint64_t ShowCarNames(uint8_t* base, uint64_t id, uint64_t maker, uint32_t sp,
+                      const Calls& calls);
+// sub_82193320 GarageScreen::SetPlateQuestion: movie 16's cursor word
+// +40960 = 0; (-1, 0) string 96, (1, 3) 2 and (1, 4) 3 (SetNodeText, its
+// unset varargs 0). The last SetNodeText's r3. 128-byte frame.
+uint64_t SetPlateQuestion(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The stand's helpers never seen in play (stand.cpp) ---
+//
+// sub_82192770 GarageScreen::CopyGarageCar (r3 out, r4 a garage list, r5
+// an index): the 1,968-byte car at the list's index (walked from its head)
+// copied to `out` (memcpy). `out` (r3). 96-byte frame.
+uint64_t CopyGarageCar(uint8_t* base, uint64_t out, uint32_t garage, uint32_t index,
+                       uint32_t sp, const Calls& calls);
+// sub_82193C58 GarageScreen::ShowBusy, sub_82193CE0 HideBusy and
+// sub_82193D48 HideBusyNow: movie 5's busy marker (122 then 120 played and
+// looped; 120 finished and 123 played; and 123 finished too). The last
+// call's r3. 112-byte frames.
+uint64_t ShowBusy(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t HideBusy(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t HideBusyNow(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82191B20 GarageScreen::ResetStand: commands 1 and 15 (the data's +88
+// = 0 between), 3 when +92 is 1 and 5 when +96 is 1 (each word 0 then). The
+// last Command's r3. 112-byte frame.
+uint64_t ResetStand(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82194AC8 GarageScreen::SetUpView: command 58, the stage's +6052 = 0,
+// SetHelpLine(553) (its plain C++). Its r3. 96-byte frame.
+uint64_t SetUpView(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821918D0 GarageScreen::ToggleTurn, sub_82191920 ToggleDoors and
+// sub_82191970 ToggleDoors2: the data's +88, +92 or +96 flipped (set: 0 and
+// command 1, 3 or 5; else 1 and 0, 2 or 4), the command a tail call from
+// `sp` with `lr`. Its r3.
+uint64_t ToggleTurn(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t ToggleDoors(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t ToggleDoors2(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_821919C0 GarageScreen::TurnLeft and sub_82191A18 TurnRight: the
+// data's +88 = 0, command 1, then 9 or 10. The last Command's r3. 96-byte
+// frames.
+uint64_t TurnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t TurnRight(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The value and the price (prices.cpp) ---
+//
+// sub_82192378 GarageScreen::CarValue (r3 a garage car): f1, from 0.0, plus
+// the car's +1900 (a count, as a float) times the weight of each of its
+// part bits set (454 bits from +1904; the weights' table around
+// 0x8200A260). A leaf: the count's doubleword at sp - 112.
+double CarValue(uint8_t* base, uint32_t car, uint32_t sp);
+// sub_82192690 GarageScreen::SalePrice (r3 a garage car): (CarValue x
+// [0x82002208] + +1900 x [0x8200A348]) x the factor by the float +1892's
+// threshold, truncated, at least 50. r3. 112-byte frame.
+uint64_t SalePrice(uint8_t* base, uint32_t car, uint32_t sp);
+
 // --- The machine's set-up (init.cpp) ---
 //
 // sub_82196520 GarageScreen::InitStates: 20 transitions added to `machine`

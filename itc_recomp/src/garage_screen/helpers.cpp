@@ -142,7 +142,7 @@ uint64_t SetUpLists(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t more = ui_movies::FindNode(base, movie, 6, 1);
   if (count > 4) {
     Store(base, more + 80, 1);
-    calls.Call(kSetScrollArrows, frame, 0x82195844, Load(base, Load(base, kList) + 4), n);
+    SetScrollArrows(base, Load(base, Load(base, kList) + 4), uint32_t(n), frame);
   } else {
     Store(base, more + 80, 0);
   }
