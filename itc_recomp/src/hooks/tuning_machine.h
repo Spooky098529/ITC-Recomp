@@ -19,6 +19,11 @@ void TuningMachineWaitForMovies(PPCContext& ctx, uint8_t* base);
 void TuningMachineOnDialogClosed(PPCContext& ctx, uint8_t* base);
 void TuningMachineUnload(PPCContext& ctx, uint8_t* base);
 void TuningMachineClose(PPCContext& ctx, uint8_t* base);
+// The no answers and the notice's close (r3 the screen); StickerDialogNo's
+// step is the harness's (its only caller, OnDialogNo, calls its plain C++).
+void TuningMachineOnDialogNo(PPCContext& ctx, uint8_t* base);
+void TuningMachineStickerDialogNo(PPCContext& ctx, uint8_t* base);
+void TuningMachineOnNoticeClosed(PPCContext& ctx, uint8_t* base);
 void TuningMachineDestroy(PPCContext& ctx, uint8_t* base);
 // The decal images' placeholders (r3 the decal images).
 void TuningMachineSavePlaceholders(PPCContext& ctx, uint8_t* base);

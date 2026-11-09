@@ -39,6 +39,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <utility>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_tuning_machine);
@@ -784,6 +785,66 @@ void SetUpScreen(Context& h, const World& w) {
              }});
 }
 
+// The no answers and the notice's close (never seen in play): the queue
+// and the category menu pointed at words of the screen's own (+36000 and
+// +36100); the state history (256 words from +9756) small states, each
+// state a PopTo can look for (3, 4, 15, 19, 24, 25, 39, 40, 53, 56) placed
+// in it so every walk ends; its depth byte any; the state 9 to 14, 35 to
+// 37, 50 to 52 or another; the category 2, 4, 5, 6 or another, its item
+// byte 0 to 9, the bytes and words the branches test (+9662, +30500,
+// +33540) 0, 1 or 2; PageItemCount's and PageCursor's bytes (+9660 to
+// +9680) small. The screen, the frames (their saves left out) and r3
+// compared.
+void DialogNo(Context& h, const World& w) {
+  auto shape = [](PPCContext& t, Random& r, const World& w) {
+    uint8_t* base = w.base;
+    const uint32_t s = w.screen();
+    guest::StoreU32(base, s + tm::kQueue, s + 36000);
+    guest::StoreU32(base, s + tm::kMenu, s + 36100);
+    // The history below its depth (11 to 60: its words stop short of the
+    // depth byte +10008 and the blocks' pointers), each target at a
+    // distinct index under it.
+    const uint32_t depth = 11 + r.Below(50);
+    uint32_t order[60];
+    for (uint32_t i = 0; i < depth; i++) {
+      order[i] = i;
+      guest::StoreU32(base, s + 9756 + 4 * i, r.Below(64));
+    }
+    for (uint32_t i = depth - 1; i > 0; i--) {
+      std::swap(order[i], order[r.Below(i + 1)]);
+    }
+    uint32_t k = 0;
+    for (const uint32_t target : {3u, 4u, 15u, 19u, 24u, 25u, 39u, 40u, 53u, 56u}) {
+      guest::StoreU32(base, s + 9756 + 4 * order[k++], target);
+    }
+    guest::StoreU8(base, s + 10008, uint8_t(depth));
+    static constexpr uint32_t kStates[] = {9, 10, 11, 12, 13, 14, 35, 36, 37, 50, 51, 52};
+    guest::StoreU32(base, s + 9652, r.Below(8) == 0 ? r.Below(64) : kStates[r.Below(12)]);
+    static constexpr uint32_t kCategories[] = {2, 4, 5, 6};
+    guest::StoreU32(base, s + 9656, r.Below(8) == 0 ? r.Below(8) : kCategories[r.Below(4)]);
+    for (uint32_t at = 9660; at <= 9680; at++) {
+      guest::StoreU8(base, s + at, uint8_t(r.Below(at == 9660 ? 10 : 12)));
+    }
+    guest::StoreU8(base, s + 9662, uint8_t(r.Below(3)));
+    for (const uint32_t at : {30500u, 33540u}) {
+      guest::StoreU32(base, s + at, r.Below(3));
+    }
+    Screen(t, r, w);
+  };
+  Run(h, w, {"TuningMachine::OnDialogNo (sub_821CEA88; sub_821F7988)", 400, __imp__sub_821CEA88,
+             hooks::TuningMachineOnDialogNo, {{-96, -8}, {-192, -104}}, shape});
+  Run(h, w, {"TuningMachine::StickerDialogNo (sub_821F7988)", 100, __imp__sub_821F7988,
+             hooks::TuningMachineStickerDialogNo, {{-96, -8}}, shape});
+  Run(h, w, {"TuningMachine::OnNoticeClosed (sub_821CF8B8)", 200, __imp__sub_821CF8B8,
+             hooks::TuningMachineOnNoticeClosed, {{-96, -8}},
+             [shape](PPCContext& t, Random& r, const World& w) {
+               shape(t, r, w);
+               if (r.Below(4) != 0) {
+                 guest::StoreU32(w.base, w.screen() + 9652, 10);
+               }
+             }});
+}
+
 }  // namespace
 
 void TuningMachine(Context& h) {
@@ -798,6 +859,7 @@ void TuningMachine(Context& h) {
   Prices(h, w);
   UnlockedParts(h, w);
   SetUpScreen(h, w);
+  DialogNo(h, w);
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
   }

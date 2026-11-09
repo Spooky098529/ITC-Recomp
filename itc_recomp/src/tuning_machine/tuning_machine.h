@@ -91,6 +91,22 @@ uint64_t OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
 // UiMovie::FinishAll(movie 2); with +9616, UiMovies::Delete of 2, 13 and 14
 // and +9608 = 0. The last call's r3, else `r3`. 112-byte frame.
 uint64_t Unload(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_821CEA88 TuningMachine::OnDialogNo (5, 39 and 5, 41; r3 the screen):
+// the dialogs' no and back by the state +9652 (9, 11 to 14, 35 to 37: the
+// state history popped, the command queue reset and given the page's
+// command, the category menu set up again from PageItemCount and
+// PageCursor), then StickerDialogNo. Its r3. 96-byte frame.
+uint64_t OnDialogNo(uint8_t* base, uint64_t screen, uint32_t sp, const Calls& calls);
+// sub_821F7988 TuningMachine::StickerDialogNo (r3 the screen): states 50
+// and 51 back to 39 (movie 14's node (1, 1) hidden, UiMovie::HideNode
+// through its override), 52 to 40 with command 64 then 36. HideNode's r3,
+// or `screen`. 96-byte frame.
+uint64_t StickerDialogNo(uint8_t* base, uint64_t screen, uint32_t sp, const Calls& calls);
+// sub_821CF8B8 TuningMachine::OnNoticeClosed (5, 40; r3 the screen): in
+// state 10 (the money short) back to the category's page, the menu set up
+// again, the page's command. PageCursor's r3, or `screen`. No guest calls
+// (its 96-byte frame holds only its back chain).
+uint64_t OnNoticeClosed(uint8_t* base, uint64_t screen, uint32_t sp);
 // sub_821D6A78 TuningMachine::Close (r3 the machine, r4 the mode): +9604 =
 // 7, message 4 posted. A leaf (r3 left).
 void Close(uint8_t* base, uint32_t machine, uint32_t mode);

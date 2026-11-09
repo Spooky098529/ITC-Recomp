@@ -18,7 +18,9 @@ ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "override); OpenMovies sub_821CBDB0, WaitForMovies sub_821CE9E8 (UiMovies::IsLoaded "
               "by its plain C++), OnDialogClosed sub_821D8898 (UiMovie::SetText through its "
               "override, the varargs it leaves unset passed as 0), Unload sub_821D69A0, Close "
-              "sub_821D6A78 and Destroy sub_821CBD40 (DecalImages::UnloadAll and VirtualFree "
+              "sub_821D6A78, OnDialogNo sub_821CEA88 with StickerDialogNo sub_821F7988 and OnNoticeClosed "
+              "sub_821CF8B8 (never seen in play; PageItemCount and PageCursor by their plain C++, "
+              "UiMovie::HideNode through its override) and Destroy sub_821CBD40 (DecalImages::UnloadAll and VirtualFree "
               "through their overrides); DecalImages::SavePlaceholders sub_82208130 with "
               "SavePlaceholders14 sub_821F8950 (the same writes); TuningScreen::SetUp's callees "
               "LoadInteriorSlots sub_821DE280, LoadCurrentChoices sub_821DA4B0 "
@@ -101,6 +103,17 @@ void TuningMachineOnDialogClosed(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tm::OnDialogClosed(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
+void TuningMachineOnDialogNo(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tm::OnDialogNo(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void TuningMachineStickerDialogNo(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tm::StickerDialogNo(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void TuningMachineOnNoticeClosed(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tm::OnNoticeClosed(base, ctx.r3.u64, ctx.r1.u32);
+}
 void TuningMachineUnload(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tm::Unload(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
@@ -180,6 +193,11 @@ ITC_TUNING_MACHINE(821CE9E8, TuningMachineWaitForMovies)
 ITC_TUNING_MACHINE(821D8898, TuningMachineOnDialogClosed)
 ITC_TUNING_MACHINE(821D69A0, TuningMachineUnload)
 ITC_TUNING_MACHINE(821D6A78, TuningMachineClose)
+// The no answers and the notice's close (functors; never seen in play).
+// StickerDialogNo sub_821F7988 has no adapter: OnDialogNo, its only caller,
+// calls its plain C++.
+ITC_TUNING_MACHINE(821CEA88, TuningMachineOnDialogNo)
+ITC_TUNING_MACHINE(821CF8B8, TuningMachineOnNoticeClosed)
 ITC_TUNING_MACHINE(821CBD40, TuningMachineDestroy)
 // Create's helpers ZeroRecord16 sub_821FE540 and DecalImages::Reset
 // sub_821FE590 have no adapters: Create, their only caller, calls their

@@ -509,6 +509,7 @@ set(ITC_SOURCES
     src/garage_screen/view.cpp
     src/hooks/tuning_machine.cpp
     src/tuning_machine/handlers.cpp
+    src/tuning_machine/dialog_no.cpp
     src/tuning_machine/init.cpp
     src/tuning_machine/set_up.cpp
     src/tuning_machine/owned_parts.cpp
