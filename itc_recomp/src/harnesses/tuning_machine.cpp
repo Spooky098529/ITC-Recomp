@@ -30,6 +30,7 @@
 #include "hooks/heap.h"
 #include "hooks/tuning_machine.h"
 #include "memory/heap.h"
+#include "save_data/save_data.h"
 #include "tuning_machine/tuning_machine.h"
 #include "tuning_screen/tuning_screen.h"
 #include "ui_movies/game.h"
@@ -76,6 +77,7 @@ constexpr Global kGlobals[] = {
     {ui_movies::kMovieTable, 12},
     {kMissingMovie, 4},
     {car_specs::kParams, 4},
+    {save_data::kSlots, 4},
 };
 
 // Player 0's save data (the screen's +18904; its garage list at +6120, the
@@ -85,6 +87,11 @@ constexpr uint32_t kSaveDataBytes = 0x1F978;
 constexpr uint32_t kSpecCount = 72;
 constexpr uint32_t kSpecBytes = 8432;
 constexpr uint32_t kSpecsBytes = 0x40 + kSpecCount * kSpecBytes + 0x400;
+// The parameters' tables Car::Refresh, GetCarParts and SetAeroAvailability
+// read: the nine aero part tables (each its stride per car, a spare car
+// before the first and after the last) and 8 wheels of 48 bytes.
+constexpr uint32_t kPartStrides[9] = {280, 280, 280, 280, 168, 168, 84, 108, 72};
+constexpr uint32_t kPartsBytes = 1720 * (kSpecCount + 2) + 8 * 48;
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
   for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
@@ -96,22 +103,31 @@ struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
         block((allocation + 15) & ~15u), save(memory::Alloc(kSaveDataBytes, 0)),
-        specs(memory::Alloc(kSpecsBytes, 0)) {
-    if (specs != 0) {
-      // The car specs' object: +12 the 72 specs (random words once).
+        specs(memory::Alloc(kSpecsBytes, 0)), parts(memory::Alloc(kPartsBytes, 0)) {
+    if (specs != 0 && parts != 0) {
+      // The car specs' object: +12 the 72 specs (random words once); +8 the
+      // wheels, +16 to +48 the aero part tables (random words once).
       Random r(0x5370656373ull);  // "Specs"
       WriteRandom(base, specs, kSpecsBytes, r);
+      WriteRandom(base, parts, kPartsBytes, r);
       guest::StoreU32(base, specs + 12, specs + 0x40);
+      uint32_t at = parts;
+      for (uint32_t k = 0; k < 9; k++) {
+        guest::StoreU32(base, specs + 16 + 4 * k, at + kPartStrides[k]);
+        at += kPartStrides[k] * (kSpecCount + 2);
+      }
+      guest::StoreU32(base, specs + 8, at);
     }
   }
   ~World() {
     memory::Free(allocation);
     memory::Free(save);
     memory::Free(specs);
+    memory::Free(parts);
   }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0 && save != 0 && specs != 0; }
+  bool ok() const { return allocation != 0 && save != 0 && specs != 0 && parts != 0; }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t screen() const { return at(kScreenAt); }
   uint32_t node(uint32_t n) const { return at(kNodesAt) + kNodeBytes * n; }
@@ -120,6 +136,7 @@ struct World {
   uint32_t block;
   uint32_t save;
   uint32_t specs;
+  uint32_t parts;
 };
 
 void MakeWorld(uint8_t* base, const World& w, Random& r) {
@@ -689,6 +706,84 @@ void UnlockedParts(Context& h, const World& w) {
              }});
 }
 
+// TuningScreen::SetUp with its callees: the save random, its garage shaped
+// as for the callees, the selected car's words Car::Refresh and
+// SetAeroAvailability read in range (Refresh's tables, as car_specs'
+// harness lays them: the id below 72 and often 8 or 10, the engine stage,
+// the tires' types and grades, the wheels, the aero levels, the body kit
+// 0 to 3); the car's spec's bytes the set-up tests (+708 and +709, the
+// record's +68 and +69: 7 or not, 0, 1 or others; +770, the record's +130;
+// the word +760, the record's +120, 0 or not; +771 the parts of car 0 or
+// its own) and table 82's two records' first words 0 or not (CountBodyKits
+// 0, 1 or 2); the day around 999, negative or any; the money any. The stack
+// below the harness's random fill made random too (the frame is 4,128
+// bytes). Its frame but its saves (r27 on, -48) compared, and SetPrices'
+// words below it (frame - 160 to - 128; the callees' saves above them, and
+// the frames below, are written by the originals only); the save too.
+void SetUpScreen(Context& h, const World& w) {
+  Run(h, w, {"TuningScreen::SetUp (sub_821E1B48; its five callees)", 100, __imp__sub_821E1B48,
+             hooks::TuningMachineSetUp,
+             {{-int32_t(tm::kSetUpFrame), -48},
+              {-int32_t(tm::kSetUpFrame) - 160, -int32_t(tm::kSetUpFrame) - 128}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               WriteRandom(base, t.r1.u32 - 8192, 8192 - kStackBytes, r);
+               WriteRandom(base, w.save, kSaveDataBytes, r);
+               ShapeSave(base, w, r);
+               Screen(t, r, w);
+               guest::StoreU32(base, save_data::kSlots, w.save);
+               int32_t day = 0;
+               switch (r.Below(6)) {
+                 case 0: day = 999 + int32_t(r.Below(5)) - 2; break;
+                 case 1: day = -int32_t(r.Below(30)); break;
+                 case 2: day = int32_t(r.Next()); break;
+                 default: day = int32_t(r.Below(1200)); break;
+               }
+               guest::StoreU32(base, w.save + 6100, uint32_t(day));
+               const uint32_t s = w.screen();
+               const uint32_t c = tuning_screen::SelectedGarageCar(base, s) + 212;
+               auto set = [&](uint32_t offset, uint32_t value) {
+                 guest::StoreU32(base, c + offset, value);
+               };
+               static constexpr uint32_t kIds[] = {8, 10};
+               const uint32_t id = r.Below(3) == 0 ? kIds[r.Below(2)] : r.Below(kSpecCount);
+               set(12, id);
+               set(1656, r.Below(16));
+               for (const uint32_t offset : {1712u, 1720u}) {
+                 const uint32_t type = r.Below(5);
+                 set(offset, type);
+                 set(offset + 4, type == 0 && r.Below(2) == 0 ? 0 : 1 + r.Below(5));
+               }
+               set(1728, r.Below(3) == 0 ? 0 : 1 + r.Below(8));
+               set(1736, r.Below(3) == 0 ? 0 : 1 + r.Below(8));
+               set(1732, r.Below(3) == 0 ? 0 : uint32_t(int32_t(r.Below(7)) - 2));
+               set(1740, r.Below(3) == 0 ? 0 : uint32_t(int32_t(r.Below(7)) - 2));
+               set(1744, r.Below(11));
+               set(1748, r.Below(11));
+               set(1752, r.Below(11));
+               set(1756, uint32_t(int32_t(r.Below(12)) - 1));
+               set(1760, r.Below(7));
+               set(1764, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+               set(1768, r.Below(4));
+               set(1780, r.Below(4));
+               set(1784, r.Below(4));
+               const uint32_t spec = w.specs + 0x40 + kSpecBytes * id;
+               static constexpr uint8_t kKinds[] = {0, 1, 2, 5};
+               guest::StoreU8(base, spec + 709, kKinds[r.Below(4)]);
+               guest::StoreU8(base, spec + 708, r.Below(2) == 0 ? 7 : uint8_t(r.Below(12)));
+               guest::StoreU8(base, spec + 770, uint8_t(r.Next()));
+               guest::StoreU8(base, spec + 771, r.Below(4) == 0 ? 1 : 0);
+               guest::StoreU32(base, spec + 760, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+               const uint32_t kits = guest::LoadU32(base, w.specs + 16 + 4 * 8) + 72 * id;
+               for (const uint32_t offset : {0u, 36u}) {
+                 guest::StoreU32(base, kits + offset, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+               }
+             },
+             [&h](PPCContext&, const World& w, Outputs& out) {
+               out.Bytes(Read(h.base, w.save, kSaveDataBytes));
+             }});
+}
+
 }  // namespace
 
 void TuningMachine(Context& h) {
@@ -702,6 +797,7 @@ void TuningMachine(Context& h) {
   OwnedParts(h, w);
   Prices(h, w);
   UnlockedParts(h, w);
+  SetUpScreen(h, w);
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
   }

@@ -174,4 +174,22 @@ void SetPrices(uint8_t* base, uint32_t screen, uint32_t sp);
 // from bit 187, +36576 (3) from bits 186 to 188. A leaf, no frame (r3 left).
 void LoadUnlockedParts(uint8_t* base, uint32_t screen);
 
+// --- The screen's set-up (set_up.cpp) ---
+//
+// sub_821E1B48 TuningScreen::SetUp (r3 the screen, all 64 bits; from
+// TuningMachine::Start): +18904 = SaveData::Of(0) (its plain C++), the
+// career's pick, the money and the day (at most 999, its weekday); the
+// selected garage car into the frame's car object (frame + 176: Car::Init,
+// memcpy of 1,884 bytes, Car::Refresh through their overrides), its spec's
+// bytes and the price class [+33900]; Params::GetCarParts into frame + 128
+// copied to frame + 80 and CountBodyKits (their plain C++ when
+// `native_specs`, else through the guest; memcpy natively where
+// Buffers_Memcpy takes it); the five callees above by their plain C++ with
+// the frames they'd get, SetAeroAvailability by its plain C++ (its guest
+// calls through `calls`). 4,128-byte frame (the back chain written; the
+// register saves, r27 on, aren't). `r1` the caller's (all 64 bits); r3 as
+// given.
+constexpr uint32_t kSetUpFrame = 4128;
+uint64_t SetUp(uint8_t* base, uint64_t r3, uint64_t r1, bool native_specs, const Calls& calls);
+
 }  // namespace tuning_machine

@@ -7,6 +7,8 @@
 #include "base/flags.h"
 #include "tuning_machine/tuning_machine.h"
 
+ITC_FLAG_DECLARE(bool, native_car_specs);
+
 ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "Run the type 2 mode's tuning screen machine (docs/functions/tuning-machine.md: "
               "the tuning screen's creation, movies, dialog replies, leave, close and teardown) "
@@ -22,8 +24,10 @@ ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "LoadInteriorSlots sub_821DE280, LoadCurrentChoices sub_821DA4B0 "
               "(Params::GetCarSpec by its plain C++), LoadOwnedParts sub_821DBAB0 "
               "(TestAndSetWheelFlag by its plain C++), SetPrices sub_821DAD58 and "
-              "LoadUnlockedParts sub_821CFFC8 (checked by "
-              "--run_harnesses=tuning_machine)");
+              "LoadUnlockedParts sub_821CFFC8; TuningScreen::SetUp sub_821E1B48 (its five callees "
+              "and SetAeroAvailability by their plain C++, Params::GetCarParts and CountBodyKits "
+              "by theirs under --native_car_specs, Car::Init, memcpy and Car::Refresh through "
+              "their overrides) (checked by --run_harnesses=tuning_machine)");
 
 namespace hooks {
 
@@ -143,6 +147,19 @@ void TuningMachineSetPrices(PPCContext& ctx, uint8_t* base) {
 void TuningMachineLoadUnlockedParts(PPCContext& ctx, uint8_t* base) {
   tm::LoadUnlockedParts(base, ctx.r3.u32);
 }
+// The callees' float math as the originals' (no flush to zero); r3 left
+// (the guest calls change ctx's, put back).
+void TuningMachineSetUp(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t r3 = ctx.r3.u64, r1 = ctx.r1.u64;
+  const bool native_specs = ITC_FLAG(native_car_specs);
+  uint64_t out;
+  {
+    GuestCalls guest(ctx, base);
+    out = tm::SetUp(base, r3, r1, native_specs, guest.calls());
+  }
+  ctx.r3.u64 = out;
+}
 
 }  // namespace hooks
 
@@ -178,3 +195,5 @@ ITC_TUNING_MACHINE(821DA4B0, TuningMachineLoadCurrentChoices)
 ITC_TUNING_MACHINE(821DBAB0, TuningMachineLoadOwnedParts)
 ITC_TUNING_MACHINE(821DAD58, TuningMachineSetPrices)
 ITC_TUNING_MACHINE(821CFFC8, TuningMachineLoadUnlockedParts)
+// TuningScreen::SetUp (from Start sub_821E7368, recompiled).
+ITC_TUNING_MACHINE(821E1B48, TuningMachineSetUp)

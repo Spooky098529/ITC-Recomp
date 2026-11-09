@@ -11,7 +11,10 @@
 #include "base/log.h"
 #include "car_specs/car_specs.h"
 #include "guest.h"
+#include "native/buffers.h"
+#include "tuning_pages/tuning_pages.h"
 #include "tuning_screen/tuning_screen.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace tuning_machine {
 
@@ -45,6 +48,13 @@ inline int32_t TruncateWord(double value) {
 }
 
 constexpr uint32_t kDegrees = 0x82002244;  // the float the vinyl angles are scaled by
+
+// SetUp's callees through the guest (their overrides).
+constexpr uint32_t kCarInit = 0x820CD5D8;       // Car::Init(car)
+constexpr uint32_t kCarRefresh = 0x820C4998;    // Car::Refresh(car)
+constexpr uint32_t kMemcpy = 0x825A7410;        // memcpy(to, from, bytes)
+constexpr uint32_t kGetCarParts = 0x820C9E00;   // Params::GetCarParts(out, car)
+constexpr uint32_t kCountBodyKits = 0x820CBD20; // CountBodyKits(parts)
 
 }  // namespace
 
@@ -298,6 +308,94 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
   }
   // r3: the frame's +80 (r1's high word kept).
   return ((r1 & 0xFFFFFFFF00000000ull) | frame) + 80;
+}
+
+uint64_t SetUp(uint8_t* base, uint64_t r3, uint64_t r1, bool native_specs, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821E1B48 TuningScreen::SetUp");
+  const uint32_t s = uint32_t(r3);
+  const uint32_t frame = Frame(base, uint32_t(r1), kSetUpFrame);
+  const uint32_t car = frame + 176;
+  // The save, the career's pick (s +8 to +27), the money and the day (at
+  // most 999; its weekday by signed division).
+  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  Store(base, s + tuning_screen::kSaveData, save);
+  for (uint32_t i = 0; i < 5; i++) {
+    Store(base, s + 20792 + 4 * i, Load(base, save + 8 + 4 * i));
+  }
+  Store(base, s + 25116, Load(base, save + 6116));
+  const int32_t day = int32_t(Load(base, save + 6100));
+  Store(base, s + 25092, uint32_t(day > 999 ? 999 : day));
+  Store(base, s + 25096, uint32_t(day - day / 7 * 7));
+  // The selected garage car in the frame's car object.
+  const uint32_t garage = tuning_screen::SelectedGarageCar(base, s) + 212;
+  calls.Call(kCarInit, frame, 0x821E1C08, car);
+  if (!native::Buffers_Memcpy(base, car, garage, 1884, 0x821E1C18)) {
+    calls.Call(kMemcpy, frame, 0x821E1C18, car, garage, 1884);
+  }
+  calls.Call(kCarRefresh, frame, 0x821E1C20, car);
+  const uint32_t p = vehicle_accessors::ObjectRecord1888(car);
+  Store(base, s + 20784, guest::LoadU8(base, p + 69));
+  Store(base, s + 20788, guest::LoadU8(base, p + 130));
+  // The price class.
+  uint32_t set = 0;
+  if (int32_t(Load(base, garage + 12)) == 8) {
+    set = 4;
+  } else {
+    const uint32_t kind = guest::LoadU8(base, p + 69);
+    if (kind == 1) {
+      set = guest::LoadU8(base, p + 68) == 7 ? 2 : 0;
+    } else if (kind == 0) {
+      set = guest::LoadU8(base, p + 68) == 7 ? 3 : 1;
+    }
+  }
+  Store(base, s + tuning_screen::kPartSet, set);
+  // The car's parts (the selected car found again) copied to frame + 80;
+  // the body kits counted.
+  const uint32_t id = Load(base, tuning_screen::SelectedGarageCar(base, s) + 224);
+  const uint32_t parts_out = frame + 128, parts = frame + 80;
+  uint32_t parts_at = parts_out;
+  if (native_specs) {
+    uint32_t words[9];
+    car_specs::GetCarParts(base, id, words);
+    for (uint32_t i = 0; i < 9; i++) {
+      Store(base, parts_out + 4 * i, words[i]);
+    }
+  } else {
+    parts_at = uint32_t(calls.Call(kGetCarParts, frame, 0x821E1D08, parts_out, id));
+  }
+  if (!native::Buffers_Memcpy(base, parts, parts_at, 36, 0x821E1D18)) {
+    calls.Call(kMemcpy, frame, 0x821E1D18, parts, parts_at, 36);
+  }
+  const uint32_t kits = native_specs ? car_specs::CountBodyKits(base, parts)
+                                     : uint32_t(calls.Call(kCountBodyKits, frame, 0x821E1D20, parts));
+  Store(base, s + 25168, int32_t(kits) == 1 ? 0 : 1);
+  for (uint32_t offset = 25176; offset <= 25192; offset += 4) {
+    Store(base, s + offset, 1);
+  }
+  LoadInteriorSlots(base, s);
+  Store(base, s + 25172, Load(base, p + 120) != 0 ? 1 : 0);
+  LoadCurrentChoices(base, s, (r1 & 0xFFFFFFFF00000000ull) | frame);
+  // The aero items available, then set by the body kit.
+  for (uint32_t item = 0; item < 10; item++) {
+    Store(base, s + 25128 + 4 * item, 1);
+  }
+  const tuning_screen::GuestCall call = [&calls](uint32_t function,
+                                                 std::initializer_list<uint64_t> args,
+                                                 uint32_t at, uint32_t lr) {
+    uint64_t words[8] = {};
+    uint32_t i = 0;
+    for (const uint64_t arg : args) {
+      if (i < 8) {
+        words[i++] = arg;
+      }
+    }
+    return calls.CallArgs(function, at, lr, words);
+  };
+  tuning_pages::SetAeroAvailability(base, call, s, frame, native_specs);
+  LoadOwnedParts(base, s, frame);
+  SetPrices(base, s, frame);
+  LoadUnlockedParts(base, s);
+  return r3;
 }
 
 }  // namespace tuning_machine
