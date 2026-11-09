@@ -51,6 +51,14 @@ When the user has reviewed a run's section, its heading gets
   guest 0 access violations (`itc_4670`; a like hang in `BuildEntry`,
   `itc_4666`). The new cases now run last so the earlier seeds hold;
   the `MenuPage` world is still fragile.
+- The save screen's map (ce16c61a): `save-screen.md`, 61 rows (the
+  machine five modes share, its kinds, pages and steps); a row in
+  `known-data.md` (`0x826D844C`-`0x826D8454`); `Type6SaveScreen::Init`
+  `sub_821A8210`'s row in `type6-type7-modes.md` corrected (`Show`
+  covers kinds 0 to 7); the save screens' lead trimmed.
+  `SaveScreen::StoreSettings` `sub_821A24B0` reads a stack leftover
+  (frame +80) when the profile's +672 is 3 or more: copied as the
+  original leaves it (the track zones' precedent).
 
 ## Run 2026-11-08 13:00 (`b7-loop-08-11-26`)
 

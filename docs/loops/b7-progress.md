@@ -56,7 +56,11 @@ file's history. What's left to see in a drive, from every run:
   `sub_821A64A0`, `sub_821A2760`, `sub_821A4C58`, `sub_821A1CA0`,
   `sub_821A6650`: `Type6SaveScreen::Init`'s transition handlers; all 10
   roots ready, the closest lead; its line deleted from `leads.md`).
-  Step: mapping (agent running).
+  Mapped `save-screen.md` (ce16c61a: 61 rows, 37 in play: the save
+  screen machine (UI movie 44) five modes' Inits share, its eight
+  kinds, `Draw`'s 27 pages and `Update`'s 7 steps; 37 ready groups; the
+  save screens' lead trimmed, 1 lead added (the type 10 mode's Init);
+  no subagents); map checked. Step: migration (agent running).
 
 ## Done
 
@@ -89,5 +93,7 @@ file's history. What's left to see in a drive, from every run:
   known 400, unknown 788).
 - After its third migration: ours 5195, work left 1233 (wrapped 56,
   known 389, unknown 788).
+- After the save screen's map: ours 5195, work left 1233 (wrapped 56,
+  known 426, unknown 751).
 
 ## Stopped
