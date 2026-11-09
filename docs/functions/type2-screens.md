@@ -17,7 +17,8 @@ the handlers post to; `StateMachine::Add`,
 spec sheet (here), +0x102D8 `sub_8220B408`, +0x12880
 `Type2Options::Init`, +0x14E28 `Type2ControllerOptions::Init`, +0x173D0
 `sub_821B6FC0` (UI movie 3), +0x19978 the car dealer, +0x1BF20 the
-build screen (here), +0x23018 `sub_82196520` (UI movie 5), +0x255C0 `sub_821A6E18`,
+build screen (here), +0x23018 the garage screen `sub_82196520` (UI movie 5,
+[`garage-screen.md`](garage-screen.md)), +0x255C0 `sub_821A6E18`,
 +0x1E4C8 `sub_82188178`, +0x20A70 the license plate editor (here); adds
 14 of them to the mode's dispatcher (+36, count +236), sets every one's
 +9612 = 1 (open on its message) and +9616 = 0, puts which screen comes

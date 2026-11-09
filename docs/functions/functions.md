@@ -657,6 +657,11 @@ Rows not yet moved stay in the table below. So far:
   (its machine at +0x1E4C8): the yes/no questions and notices over UI
   movies 16 to 19, their pages and their open, close and cursor steps
   (B7).
+- [`garage-screen.md`](garage-screen.md): the type 2 mode's garage
+  screen (its machine at +0x23018, UI movie 5): the list of the
+  player's cars over the stand, each car's actions (make it current,
+  sell it, its plate, the view on the stand, its spec sheet), its pages
+  and transitions (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
