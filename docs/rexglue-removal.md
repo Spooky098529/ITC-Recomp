@@ -272,8 +272,9 @@ goes in `src/` as overrides), American English.
   run (`b7-loop-09-11-26`, 2026-11-09, stopped at its limit) made the
   type 2 dialog (`type2-dialog.md`, 28 of 28), the garage screen
   (`garage-screen.md`, 22 of 22 in play) and the tuning screen's machine
-  (`tuning-machine.md`, 18 of 19 in play) native (ours 5,237 -> 5,305);
-  the rest waits on the type 2 mode's +9640 and +0x173D0 machines, its
+  (`tuning-machine.md`, 18 of 19 in play) native (ours 5,237 -> 5,305),
+  then, by the user's call, their paths never seen in play (ours 5,364);
+  the rest waits on `Garage::Sell`, the type 2 mode's +9640 and +0x173D0 machines, its
   Init `sub_82197278`, the tuning screen's refresh `sub_821E3AD0` and
   update `sub_821E6C50`. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
@@ -5061,3 +5062,17 @@ tuning screen and reaches 17 of the 18. The run stopped at its limit
 109, Native 36, Dropped 26, never called 70, live 208. Imports: 186
 called, 54 with a live caller. B7 (`b7_status.py`): ours 5,305, work
 left 1,135 (Wrapped 56, with a row 390, no row yet 689), from 1,153.
+
+**2026-11-09, the garage screen's and tuning machine's paths never seen
+in play (branch `b7-loop-09-11-26`, after the forty-first run's stop):**
+by the user's call (they will run in play), a cleanup without a map:
+53 of the garage screen's 56 unseen functions (the car's actions, view
+and options pages, the sale, plate and spec sheet set-ups, the
+transitions), the tuning machine's three unseen handlers and the
+stand's camera command (`type6-type7-modes.md`). `Transition11` and
+`Transition15` stay recompiled (a register leftover stored into live
+state, as `BackToBuilds`); `OnYes` waits on `Garage::Sell`. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+26, never called 70, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,364, work left 1,133 (Wrapped 56,
+with a row 390, no row yet 687), from 1,135.

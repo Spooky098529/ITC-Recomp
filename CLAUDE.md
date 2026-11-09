@@ -623,8 +623,11 @@ type 2 mode's dialog (`type2-dialog.md`, `--native_type2_dialog`, 28 of
 22 of 22 in play: the garage cars over the stand) and the tuning
 screen's machine (`tuning-machine.md`, `--native_tuning_machine`, 18 of
 19 in play: its handlers and `TuningScreen::SetUp` from the garage car)
-native (ours 5,237 -> 5,305); it stopped at its limit. The rest waits
-on the type 2 mode's +9640 and +0x173D0 machines, its Init
+native (ours 5,237 -> 5,305); it stopped at its limit. Then, by the
+user's call, the garage screen's and tuning machine's paths never seen
+in play were ported too (ours 5,364; `Transition11` and `Transition15`
+kept recompiled as `BackToBuilds`, `OnYes` waiting on `Garage::Sell`).
+The rest waits on `Garage::Sell`, the type 2 mode's +9640 and +0x173D0 machines, its Init
 `sub_82197278`, the tuning screen's refresh `sub_821E3AD0` (it blocks
 `Start`) and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,

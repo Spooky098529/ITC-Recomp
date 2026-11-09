@@ -91,6 +91,33 @@ When the user has reviewed a run's section, its heading gets
 - The tuning machine's replay (`itc_4744`) logged one SDK
   "BaseHeap::Release failed because address is not a region start"
   line, the intermittent one noted in earlier runs; not looked into.
+- After the run stopped, by the user's call (2026-11-09: "they will be
+  seen in play"; the loop's rules unchanged): the garage screen's and
+  tuning machine's functions never seen in play ported
+  (630e529f..f558b529): 53 of the garage screen's 56 (49 Native,
+  `ResetStand`, `SetUpActions` and the six reply handlers Overridden,
+  `SpecSheetUnits` `sub_82191768` Merged), the three tuning handlers,
+  and the stand's camera command (`GarageStage::CameraCommand`
+  `sub_821808F0` Overridden, `GarageCamera::Command` `sub_82180358`
+  Native, `sub_821803A0` Merged; rows in `type6-type7-modes.md`, code
+  in `src/type67_modes/garage_camera.cpp`; the stand setters' lead
+  trimmed). Left recompiled: `Transition11` `sub_82195F10` and
+  `Transition15` `sub_82196030` (they store `UiMovie::Run`'s r8 leftover
+  into the page object's started word, live state: the `BackToBuilds`
+  call, 2026-11-06); `OnYes` `sub_82192958` (blocked by `Garage::Sell`
+  `sub_82116D88`, with `Garage::Remove` `sub_82116BE0` and
+  `GarageList::Remove` `sub_82113400` under it, small, in `career.md`).
+  Map corrections in the rows (`SetScrollArrows`' test, the turns and
+  cameras take no arguments, which transitions always return 1 or 0,
+  `ViewOptionsPage`'s option 3, the view pages' held buttons,
+  `ReloadStandCar`'s 100,688-byte frame, `SetUpOptions`' +80). Harness
+  world: a `car()` accessor on `StandCarWorld`; the garage harness's car
+  block (car_makers' `LayStandCar`, aero levels zeroed, the garage held
+  nonempty: an empty garage's walk reads past the list); the tuning
+  DialogNo cases keep the state history under depth 61. `ActionsPage`'s
+  accept branches are reached by random mapper bits over 300 cases (not
+  counted per action). `__chkstk` Dropped: native big-frame callers skip
+  its probe.
 
 ## Run 2026-11-08 20:40 (`b7-loop-08-11-26-2`)
 

@@ -60,6 +60,15 @@ file's history. What's left to see in a drive, from every run:
   none in the race, 17 in the replay `itc_4744` (ok; one SDK
   "BaseHeap::Release failed" line, as in earlier runs), 1 to drive).
   Recorded. The run's limit reached.
+- After the stop, by the user's call (2026-11-09): the garage screen's
+  and tuning machine's paths never seen in play ported, a cleanup with
+  no mapping (630e529f..f558b529: 53 of 56 garage functions, the 3
+  tuning handlers, the stand's camera command; `Transition11`,
+  `Transition15` kept recompiled by the `BackToBuilds` call, `OnYes`
+  blocked by `Garage::Sell`; 0 differing, race 34 s, 0 errors; no
+  subagents). Validated `itc_4772` (race 65 s at 180; 0 errors, every
+  harness 0 differing, 62 of 62 harness lines; none in the race or the
+  replay `itc_4773` (ok), 57 more to drive).
 
 ## Done
 
@@ -96,6 +105,8 @@ The run's section of `review.md` ("Run 2026-11-09 10:53").
   56, known 408, unknown 689).
 - After its migration: ours 5305, work left 1135 (wrapped 56, known
   390, unknown 689).
+- After the never-seen paths' cleanup: ours 5364, work left 1133
+  (wrapped 56, known 390, unknown 687).
 
 ## Stopped
 

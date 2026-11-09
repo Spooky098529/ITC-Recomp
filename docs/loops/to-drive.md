@@ -18,6 +18,26 @@ here loses its heading.
 
 ## Run 2026-11-09 10:53 (`b7-loop-09-11-26`)
 
+- The garage screen's and tuning machine's paths never seen in play,
+  ported by the user's call (attract race `itc_4772`, replay `itc_4773`
+  ok, one SDK "BaseHeap::Release failed" line as before, not reaching
+  the garage's pages; `garage-screen.md`, `type6-type7-modes.md`,
+  `tuning-machine.md`; the five already listed above stay there):
+  `sub_82193288`, `sub_82192770`, `sub_82193C58`, `sub_82193CE0`,
+  `sub_82193D48`, `sub_821936B0`, `sub_82193720`, `sub_82193798`,
+  `sub_82193910`, `sub_82193320`, `sub_82194AC8`, `sub_821918D0`,
+  `sub_82191920`, `sub_82191970`, `sub_821919C0`, `sub_82191A18`,
+  `sub_82192378`, `sub_82192690`, `sub_82193B10`, `sub_82193BA8`,
+  `sub_82194D90`, `sub_821933D0`, `sub_821934D0`, `sub_82191810`,
+  `sub_82191628`, `sub_82191A70`, `sub_82191AC8`, `sub_82194F30`,
+  `sub_82195D10`, `sub_82192EF8`, `sub_82194680`, `sub_821951A8`,
+  `sub_82195E30`, `sub_82195410`, `sub_82195530`, `sub_821955E0`,
+  `sub_82192FD0`, `sub_821948B0`, `sub_821930D8`, `sub_82196170`,
+  `sub_82194B20`, `sub_821941A8`, `sub_82191DE0`, `sub_82192030`,
+  `sub_82191B20`, `sub_821958D0`, `sub_82193E38`, `sub_821928F8`,
+  `sub_82193E80`, `sub_82193F18`, `sub_82192BA8`, `sub_82193F80`,
+  `sub_821808F0`, `sub_82180358`, `sub_821CEA88`, `sub_821CF8B8`,
+  `sub_821F7988`.
 - The tuning machine's migration (attract race `itc_4743`, replay
   `itc_4744` ok, one SDK "BaseHeap::Release failed" line as in earlier
   runs; `tuning-machine.md`): `sub_821D8898`.
