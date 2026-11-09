@@ -262,7 +262,14 @@ goes in `src/` as overrides), American English.
   race HUD's set-ups, the countdown, the race's end, the pause menu's
   pages), the front-end screen helpers (`front-end-screen-helpers.md`,
   27 of 32, 5 Merged) and the car dealer (`car-dealer.md`, 58 of 58 in
-  play) native (ours 4,920 -> 5,074), and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  play) native (ours 4,920 -> 5,074), and stopped at its limit. Its
+  fortieth run (`b7-loop-08-11-26-2`, 2026-11-08 to 09, ended by the
+  user during its third subsystem) made the type 2 mode's screens
+  (`type2-screens.md`, 121 of 121 in play: the hub, the spec sheet, the
+  build screen's machine, the license plate editor) and the save screen
+  (`save-screen.md`, 42 of 42 in play) native (ours 5,074 -> 5,237) and
+  mapped the type 2 mode's dialog (`type2-dialog.md`, its migration not
+  started). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the

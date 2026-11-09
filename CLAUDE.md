@@ -604,6 +604,18 @@ car cards) and the car dealer (`car-dealer.md`, `--native_car_dealer`,
 career's first car) native (ours 4,920 -> 5,074); it stopped at its
 limit. The rest waits on the type 2 mode's other screen machines and
 the leads in `docs/loops/leads.md`.
+Its fortieth run (`b7-loop-08-11-26-2`, 2026-11-08 to 09, not yet
+merged; summary `docs/loops/b7-loop-2026-11-08-2040.md`; ended by the
+user during its third subsystem) made the type 2 mode's screens
+(`type2-screens.md`, `--native_type2_screens`, 121 of 121 in play: the
+hub, the spec sheet, the build screen's machine and pages, the license
+plate editor) and the save screen (`save-screen.md`,
+`--native_save_screen`, 42 of 42 in play: the machine five modes share
+for the game data's save and load, the replays and the controller pick)
+native (ours 5,074 -> 5,237), and mapped the type 2 mode's dialog
+(`type2-dialog.md`, 21 ready groups, its migration not started). The
+rest waits on the type 2 mode's other machines, its Init and the leads
+in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

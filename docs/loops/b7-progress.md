@@ -77,7 +77,9 @@ file's history. What's left to see in a drive, from every run:
   (c257b0c2: 28 rows, 21 in play: the type 2 mode's dialog, four
   dialogs over UI movies 16 to 19, its 16 transitions, pages and 10
   steps; 21 ready groups; no leads added, one lead's line given a note;
-  no subagents); map checked. Step: migration (agent running).
+  no subagents); map checked. Its migration agent was stopped at its
+  start by the user's call (nothing changed, nothing uncommitted); the
+  dialog is left for a later run.
 
 ## Done
 
@@ -122,3 +124,11 @@ file's history. What's left to see in a drive, from every run:
   known 410, unknown 730).
 
 ## Stopped
+
+2026-11-09, by the user's call, during the third subsystem: 2
+subsystems finished (the type 2 mode's screens, the save screen), the
+third (the type 2 dialog) mapped and checked, its migration not
+started (the agent stopped before any change). Every validation passed;
+nothing uncommitted. The run's summary (`b7-loop-2026-11-08-2040.md`),
+the plan's "B7 in progress" line and CLAUDE.md's B7 sentence are up to
+date. The user reviews and merges.
