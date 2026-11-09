@@ -3093,6 +3093,25 @@ E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
     graphics (`src/graphics/`, the `Vd*` and `XGetVideoMode` exports),
     unused since B3, go with it.
 
+E5. **The native code made native** (the user's call, 2026-11-09):
+    only after E4, once ReXGlue and guest memory are out of the picture.
+    B7's native code is a transcription of the recompiled code, not
+    native code yet: it reads and writes the game's objects in guest
+    memory by offset (big-endian), calls table and functor callees
+    through the guest, and copies what the PowerPC leaves behind (stack
+    frame words, register leftovers) to match the recompiled code byte
+    for byte. That shape is forced while native and recompiled code
+    share objects, so it stays until then. E5 reworks it, subsystem by
+    subsystem, into real C++: the game's objects as host structs and
+    classes, normal calls and interfaces, no stack or register
+    artifacts, harnesses comparing what the game observes instead of
+    bytes. Its inputs are the function files (`docs/functions/`,
+    `docs/known-data.md`) and the transcribed C++. The functions kept
+    recompiled for a register leftover stored into live state
+    (`BuildScreen::BackToBuilds` `sub_821A1258`, the garage screen's
+    `Transition11` `sub_82195F10` and `Transition15` `sub_82196030`)
+    need deciding before E4: they keep the PowerPC context alive.
+
 ## Risks
 
 - Saves (B4): players' saves must keep loading.
