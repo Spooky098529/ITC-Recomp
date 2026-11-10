@@ -157,12 +157,12 @@ ITC_RACE_MENU(8218AF08, RaceMenuUnload)
 ITC_RACE_MENU(8218AF80, RaceMenuLeaveToHub)
 ITC_RACE_MENU(82188FE0, RaceMenuDestroy)
 ITC_RACE_MENU(8218C9C8, RaceMenuStart)
-// Back (from Draw and its piece sub_8218C5DC) and SetEventRange (from
-// Start), recompiled.
+// Back (from Draw and its piece sub_8218C5DC, recompiled).
 ITC_RACE_MENU(82188A20, RaceMenuBack)
-ITC_RACE_MENU(82189158, RaceMenuSetEventRange)
-// SetUpEvents (from Start) and Refresh (from Start and Update), recompiled.
-ITC_RACE_MENU(821891C8, RaceMenuSetUpEvents)
+// SetEventRange sub_82189158 and SetUpEvents sub_821891C8: no adapters
+// (removed, B7 loop, 2026-11-10: their only caller, Start, is native and
+// calls their plain C++; the register steps above are the harness's).
+// Refresh (from Update, recompiled; Start calls its plain C++).
 ITC_RACE_MENU(8218BC18, RaceMenuRefresh)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_RACE_MENU(8218CE10, RaceMenuInit)

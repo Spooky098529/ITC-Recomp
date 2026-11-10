@@ -22,7 +22,8 @@ void RaceMenuUnload(PPCContext& ctx, uint8_t* base);
 void RaceMenuLeaveToHub(PPCContext& ctx, uint8_t* base);
 void RaceMenuDestroy(PPCContext& ctx, uint8_t* base);
 void RaceMenuStart(PPCContext& ctx, uint8_t* base);
-// Helpers (r3 the machine).
+// Helpers (r3 the machine). SetEventRange's and SetUpEvents' have no
+// adapters (only the harness runs their steps).
 void RaceMenuBack(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetUpEvents(PPCContext& ctx, uint8_t* base);
