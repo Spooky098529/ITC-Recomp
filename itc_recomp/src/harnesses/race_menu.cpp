@@ -853,6 +853,75 @@ void Update(Context& h, const World& w) {
              }});
 }
 
+// The menu (as menu_helpers' harness shapes it): items 0 to 2, and the
+// mappers' bits now and then only pressed ones (+456), so the menu doesn't
+// move and the pages' A and B are read.
+void PageInput(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  Mappers(r, w);
+  for (uint32_t c = 0; c < 4; c++) {
+    if (r.Below(3) != 0) {
+      continue;
+    }
+    const uint32_t mapper = w.at(kMappersAt) + 0x200 * c;
+    for (uint32_t k = 0; k < 6; k++) {
+      guest::StoreU32(base, mapper + 448 + 4 * k, k == 2 ? uint32_t(r.Next()) : 0);
+    }
+  }
+  const uint32_t menu = w.at(kMenuAt);
+  guest::StoreU32(base, menu + menu_helpers::kPlayer, r.Below(4));
+  guest::StoreU32(base, menu + menu_helpers::kFirst, 0);
+  guest::StoreU32(base, menu + menu_helpers::kLast, 2);
+  guest::StoreU32(base, menu + menu_helpers::kCursor, r.Below(3));
+  guest::StoreU32(base, menu + menu_helpers::kPrevious, r.Below(3));
+  for (const uint32_t o : {menu_helpers::kWraps, menu_helpers::kUpDownLocked,
+                           menu_helpers::kSidesStep, menu_helpers::kShouldersStep}) {
+    guest::StoreU32(base, menu + o, r.Below(2));
+  }
+  guest::StoreU32(base, menu + menu_helpers::kMoved, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, menu + menu_helpers::kSide, 0);
+  SoundManager(r, w);
+}
+
+// The kind page's words: the mode (+9820) and the one before it (+9824) 0
+// to 2 or now and then any, the history's depth (+9776) 0 to 11.
+void KindWords(PPCContext& t, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  Machine(t, r, w);
+  PageInput(r, w);
+  const uint32_t m = w.machine();
+  guest::StoreU32(base, m + 9820, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(3));
+  guest::StoreU32(base, m + 9824, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(3));
+  guest::StoreU8(base, m + 9776, uint8_t(r.Below(12)));
+}
+
+// The variant page's words: the choice (+10100) and its flag (+10104) 0 to
+// 2, the cursor's row and its second pair word small or -1, the list's top.
+void VariantWords(PPCContext& t, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  Machine(t, r, w);
+  PageInput(r, w);
+  const uint32_t m = w.machine();
+  guest::StoreU32(base, m + 10100, r.Below(3));
+  guest::StoreU32(base, m + 10104, r.Below(3));
+  guest::StoreU32(base, m + 9828, r.Below(15));
+  guest::StoreU32(base, m + 9972, r.Below(3));
+  for (uint32_t k = 0; k < 15; k++) {
+    guest::StoreU32(base, m + 9984 + 8 * k, SmallOrNone(r, 4));
+  }
+}
+
+void DrawPages(Context& h, const World& w) {
+  // Each page's frame up to its register saves and its animation's frame
+  // below it up to that one's (the callees' frames under them not).
+  Run(h, w, {"RaceMenu::AnimateKindPage (sub_821898C0)", 200, __imp__sub_821898C0,
+             hooks::RaceMenuAnimateKindPage, {{-128, -32}}, KindWords});
+  Run(h, w, {"RaceMenu::KindPage (sub_8218AFD8)", 300, __imp__sub_8218AFD8,
+             hooks::RaceMenuKindPage, {{-112, -24}}, KindWords});
+  Run(h, w, {"RaceMenu::VariantPage (sub_8218B750)", 300, __imp__sub_8218B750,
+             hooks::RaceMenuVariantPage, {{-112, -24}}, VariantWords});
+}
+
 }  // namespace
 
 void RaceMenu(Context& h) {
@@ -868,6 +937,7 @@ void RaceMenu(Context& h) {
     Start(h, w);
     Transitions(h, w);
     Update(h, w);
+    DrawPages(h, w);
   }
 }
 

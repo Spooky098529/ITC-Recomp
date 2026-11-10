@@ -173,6 +173,28 @@ uint64_t DebugVariantPage(uint8_t* base, uint32_t sp);
 // does. The last call's r3 (Find's, the pair's address, when none).
 uint64_t AnimateVariantPage(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
 
+// --- The pages Draw runs (pages.cpp) ---
+//
+// sub_8218AFD8 KindPage (page 3, the race mode; r3 the machine):
+// Menu::Step([0x826D840C]) through its override, then player 0's mapper
+// (slots 12: 153, 167 up; 154, 168 down; 10: 159 A, 158 B; nothing asked
+// while its entry's +4 is 1): the mode stepped (wrapping 0 to 2), page 4
+// through transition 3 with the page pushed on the history, or page 9 and
+// the fade out; MenuSound::Play through its override; then AnimateKindPage.
+// Its r3. 112-byte frame.
+uint64_t KindPage(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_821898C0 AnimateKindPage (r3 the machine): movie 1's animations for
+// page 3's input (the mapper asked again): the scroll reset and scene 19's
+// animations, node (19, 0)'s +16 the float of mode x 40 on a wrap (its 64
+// bits left at +80); Pressed(158)'s low byte stored at +80. The last call's
+// r3 (Find's, the pair's address, when none). 128-byte frame.
+uint64_t AnimateKindPage(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8218B750 VariantPage (page 5, the event's variant; r3 the machine):
+// Menu::Step, then the mapper: the variant chosen (+10100), the question
+// through transition 11 (page 6) or back to page 4 through transition 3;
+// then AnimateVariantPage's plain C++. Its r3. 112-byte frame.
+uint64_t VariantPage(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+
 // sub_8218C678 RaceMenu::Update ((5, 0); r3 the machine, its high bits kept
 // for Refresh; r4 the mode): movie 1's scene and variant animations by
 // UiMovie::AnimationTime (its plain C++) against the floats at 0x82001FB0

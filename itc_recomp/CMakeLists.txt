@@ -522,6 +522,7 @@ set(ITC_SOURCES
     src/race_menu/events.cpp
     src/race_menu/refresh.cpp
     src/race_menu/transitions.cpp
+    src/race_menu/pages.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp

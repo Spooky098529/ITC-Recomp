@@ -28,7 +28,10 @@ ITC_FLAG_BOOL(native_race_menu, true, "ITC",
               "pages sub_8218BB68, sub_82188A98 and sub_82188C00 (their calls to the empty "
               "sub_82106540 left out); RaceMenu::Update sub_8218C678 (UiMovie::AnimationTime, "
               "Refresh, the transitions and the debug pages as plain C++, UiMovie::Run and the "
-              "animation calls through their overrides) (the same writes; checked by "
+              "animation calls through their overrides); the pages Draw runs KindPage "
+              "sub_8218AFD8, AnimateKindPage sub_821898C0 and VariantPage sub_8218B750 "
+              "(Menu::Step, MenuSound::Play, the fade and the mapper's slots through their "
+              "overrides, AnimateVariantPage as plain C++) (the same writes; checked by "
               "--run_harnesses=race_menu)");
 
 namespace hooks {
@@ -164,6 +167,18 @@ void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::AnimateVariantPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
+void RaceMenuKindPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::KindPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void RaceMenuAnimateKindPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::AnimateKindPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void RaceMenuVariantPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::VariantPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
 void RaceMenuUpdate(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Update(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
@@ -217,5 +232,10 @@ ITC_RACE_MENU(82188A20, RaceMenuBack)
 // AnimateVariantPage (from VariantPage, recompiled; Update calls its plain
 // C++).
 ITC_RACE_MENU(8218A928, RaceMenuAnimateVariantPage)
+// The pages (from Draw and its piece sub_8218C5DC, recompiled; KindPage
+// calls AnimateKindPage's plain C++).
+ITC_RACE_MENU(8218AFD8, RaceMenuKindPage)
+ITC_RACE_MENU(821898C0, RaceMenuAnimateKindPage)
+ITC_RACE_MENU(8218B750, RaceMenuVariantPage)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_RACE_MENU(8218CE10, RaceMenuInit)
