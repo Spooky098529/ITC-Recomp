@@ -37,6 +37,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <bit>
 #include <functional>
 #include <vector>
 
@@ -564,6 +565,50 @@ uint32_t SmallOrNone(Random& r, uint32_t below) {
   return r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(below);
 }
 
+// Refresh's words: pages 0 to 10 (now and then any), the mode 0 to 2, the
+// list's cursor within 12 rows of its top, its first and last rows at the
+// top and two below it or not, the scroll flag 0 to 3, the variant, the two
+// tables' pairs small or -1 (ids below the string table's 8,192), the name
+// record and Refresh's frame's words from +80 (`sp` its caller's r1: the
+// event names past the list, left as they were) small.
+void RefreshWords(Random& r, const World& w, uint32_t sp) {
+  uint8_t* base = w.base;
+  const uint32_t m = w.machine();
+  const uint32_t page = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(11);
+  guest::StoreU32(base, m + rm::kPage, r.Below(2) == 0 ? 3 + r.Below(3) : page);
+  guest::StoreU32(base, m + 9820, r.Below(3));
+  const uint32_t top = r.Below(3);
+  const uint32_t row = r.Below(13);
+  const uint32_t cursor = top + row;
+  guest::StoreU32(base, m + 9972, top);
+  guest::StoreU32(base, m + 9828, cursor);
+  const uint32_t first_choices[] = {row, cursor, r.Below(15)};
+  const uint32_t last_choices[] = {row + 2, cursor, r.Below(15)};
+  guest::StoreU32(base, m + 9840, first_choices[r.Below(3)]);
+  guest::StoreU32(base, m + 9844, last_choices[r.Below(3)]);
+  guest::StoreU32(base, m + 9832,
+                  r.Below(2) == 0 ? guest::LoadU32(base, m + 9840 + 4 * r.Below(2))
+                                  : r.Below(15));
+  guest::StoreU32(base, m + 9836, r.Below(4));
+  guest::StoreU32(base, m + 9724, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  guest::StoreU32(base, m + 10148, ProgressBits(r));
+  for (uint32_t k = 0; k < 15; k++) {
+    guest::StoreU32(base, m + 9852 + 8 * k, SmallOrNone(r, 11));
+    guest::StoreU32(base, m + 9856 + 8 * k, r.Below(4) == 0 ? uint32_t(r.Next())
+                                                            : SmallOrNone(r, 4));
+    guest::StoreU32(base, m + 9980 + 8 * k, r.Below(20));
+    guest::StoreU32(base, m + 9984 + 8 * k, SmallOrNone(r, 20));
+  }
+  NameRecord(base, m + 10112, r);
+  guest::StoreU32(base, m + 10132, r.Below(2) == 0 ? r.Below(100000) : r.Next());
+  guest::StoreU32(base, m + 10136, r.Below(1000));
+  guest::StoreU32(base, m + 10140, r.Below(7));
+  const uint32_t frame = sp - 224;
+  for (uint32_t k = 80; k < 176; k += 4) {
+    guest::StoreU32(base, frame + k, r.Below(600));
+  }
+}
+
 void Pages(Context& h, const World& w) {
   // SetUpEvents: the progress bits' shapes; its frame's table words
   // (+80 to +199) compared.
@@ -573,52 +618,13 @@ void Pages(Context& h, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.machine() + 10148, ProgressBits(r));
              }});
-  // Refresh: pages 0 to 10 (now and then any), the mode 0 to 2, the list's
-  // cursor within 12 rows of its top, its first and last rows at the top
-  // and two below it or not, the scroll flag 0 to 3, the variant, the two
-  // tables' pairs small or -1 (ids below the string table's 8,192), the
-  // name record and the frame's words from +80 (the event names past the
-  // list, left as they were) small. SetText's parameter area (+48 to +79:
+  // Refresh: its words (RefreshWords). SetText's parameter area (+48 to +79:
   // r7 on, the original's leftovers) left out.
   Run(h, w, {"RaceMenu::Refresh (sub_8218BC18)", 300, __imp__sub_8218BC18,
              hooks::RaceMenuRefresh, {{-224, -176}, {-144, -64}},
              [](PPCContext& t, Random& r, const World& w) {
-               uint8_t* base = w.base;
                Machine(t, r, w);
-               const uint32_t m = w.machine();
-               const uint32_t page = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(11);
-               guest::StoreU32(base, m + rm::kPage, r.Below(2) == 0 ? 3 + r.Below(3) : page);
-               guest::StoreU32(base, m + 9820, r.Below(3));
-               const uint32_t top = r.Below(3);
-               const uint32_t row = r.Below(13);
-               const uint32_t cursor = top + row;
-               guest::StoreU32(base, m + 9972, top);
-               guest::StoreU32(base, m + 9828, cursor);
-               const uint32_t first_choices[] = {row, cursor, r.Below(15)};
-               const uint32_t last_choices[] = {row + 2, cursor, r.Below(15)};
-               guest::StoreU32(base, m + 9840, first_choices[r.Below(3)]);
-               guest::StoreU32(base, m + 9844, last_choices[r.Below(3)]);
-               guest::StoreU32(base, m + 9832,
-                               r.Below(2) == 0 ? guest::LoadU32(base, m + 9840 + 4 * r.Below(2))
-                                               : r.Below(15));
-               guest::StoreU32(base, m + 9836, r.Below(4));
-               guest::StoreU32(base, m + 9724, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
-               guest::StoreU32(base, m + 10148, ProgressBits(r));
-               for (uint32_t k = 0; k < 15; k++) {
-                 guest::StoreU32(base, m + 9852 + 8 * k, SmallOrNone(r, 11));
-                 guest::StoreU32(base, m + 9856 + 8 * k, r.Below(4) == 0 ? uint32_t(r.Next())
-                                                                         : SmallOrNone(r, 4));
-                 guest::StoreU32(base, m + 9980 + 8 * k, r.Below(20));
-                 guest::StoreU32(base, m + 9984 + 8 * k, SmallOrNone(r, 20));
-               }
-               NameRecord(base, m + 10112, r);
-               guest::StoreU32(base, m + 10132, r.Below(2) == 0 ? r.Below(100000) : r.Next());
-               guest::StoreU32(base, m + 10136, r.Below(1000));
-               guest::StoreU32(base, m + 10140, r.Below(7));
-               const uint32_t frame = t.r1.u32 - 224;
-               for (uint32_t k = 80; k < 176; k += 4) {
-                 guest::StoreU32(base, frame + k, r.Below(600));
-               }
+               RefreshWords(r, w, t.r1.u32);
              }});
 }
 
@@ -782,6 +788,71 @@ void Transitions(Context& h, const World& w) {
              }});
 }
 
+// Movie 1's animations Update times: up to three slots (the scene's -1, 1,
+// 4 or 2) in its looping list or queue, their times the floats Update tests
+// or not.
+void UpdateSlots(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t movie = w.at(kMovieAt);
+  static constexpr uint32_t kTimes[] = {0x82001FB0, 0x82001FD8};
+  for (uint32_t k = r.Below(4); k > 0; k--) {
+    ui_movies::Slot slot{};
+    static constexpr uint32_t kIndexes[] = {1, 4, 2, 6};
+    slot[0] = kIndexes[r.Below(4)];
+    slot[1] = r.Below(6) == 0 ? 8 : 0xFFFFFFFFu;
+    slot[2] = 0xFFFFFFFFu;
+    slot[3] = w.node(0);
+    slot[4] = w.at(kAnimationsAt) + 64 * r.Below(kAnimations);
+    slot[5] = r.Below(3) == 0 ? std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f)
+                              : guest::LoadU32(base, kTimes[r.Below(2)]);
+    slot[6] = r.Below(2);
+    slot[7] = r.Below(2);
+    ui_movies::Append(base,
+                      movie + (r.Below(2) ? ui_movies::kMovieQueue : ui_movies::kMovieLooping),
+                      slot);
+  }
+}
+
+void Update(Context& h, const World& w) {
+  // Update: the callees' words (Refresh's, the transitions', AskConfirm's,
+  // the debug pages', AnimateVariantPage's mappers), the page (+9640) 0 to
+  // 10 or any, +9780 and +9796 0, 1 or any, movie 1's timed slots, the page
+  // object's transition (+12) -1, 0 to 13 or any, its +24 0 or not and +16
+  // small or -1. Only Update's own frame words compared (up to its f31 and
+  // register saves; the callees' frames below it hold the recompiled
+  // callees' register saves).
+  Run(h, w, {"RaceMenu::Update (sub_8218C678)", 400, __imp__sub_8218C678, hooks::RaceMenuUpdate,
+             {{-176, -88}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               Machine(t, r, w);
+               const uint32_t m = w.machine();
+               RefreshWords(r, w, t.r1.u32 - 176);
+               Mappers(r, w);
+               UpdateSlots(r, w);
+               guest::StoreU32(base, m + 9812, Flag(r));
+               guest::StoreU32(base, m + 10100, r.Below(3));
+               guest::StoreU32(base, m + 10104, r.Below(3));
+               guest::StoreU32(base, m + 9796, Flag(r));
+               guest::StoreU32(base, m + 9780, Flag(r));
+               guest::StoreU32(base, m + 9720, r.Below(3) == 0 ? 0 : r.Below(17));
+               for (uint32_t k = 0; k < 16; k++) {
+                 guest::StoreU32(base, m + 9656 + 4 * k, r.Below(15));
+               }
+               const uint32_t page = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(11);
+               guest::StoreU32(base, m + rm::kPage, r.Below(2) == 0 ? 3 + r.Below(3) : page);
+               guest::StoreU32(base, w.save + 0x1F870, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+               guest::StoreU32(base, w.at(kMenuAt) + 8, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+               const uint32_t pages = w.at(kPagesAt);
+               const uint32_t transition = r.Below(5) == 0   ? 0xFFFFFFFFu
+                                           : r.Below(8) == 0 ? uint32_t(r.Next())
+                                                             : r.Below(14);
+               guest::StoreU32(base, pages + 12, transition);
+               guest::StoreU32(base, pages + 24, r.Below(3) == 0 ? Flag(r) : 0);
+               guest::StoreU32(base, pages + 16, SmallOrNone(r, 13));
+             }});
+}
+
 }  // namespace
 
 void RaceMenu(Context& h) {
@@ -796,6 +867,7 @@ void RaceMenu(Context& h) {
     Pages(h, w);
     Start(h, w);
     Transitions(h, w);
+    Update(h, w);
   }
 }
 

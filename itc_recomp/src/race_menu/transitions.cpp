@@ -1,8 +1,9 @@
-// The race menu's transitions and debug pages, the callees of
-// RaceMenu::Update (docs/functions/race-menu.md): see race_menu.h. Update
-// itself stays recompiled for now.
+// The race menu's Update, its transitions and debug pages
+// (docs/functions/race-menu.md): see race_menu.h.
 
 #include "race_menu/race_menu.h"
+
+#include <bit>
 
 #include "base/log.h"
 #include "guest.h"
@@ -31,6 +32,10 @@ constexpr uint32_t kFloatC34 = 0x82000C34;
 // The mapper's slots (bytes into its vtable).
 constexpr uint32_t kPressedOffset = menu_helpers::kPressedOffset;  // 10
 constexpr uint32_t kFiredOffset = menu_helpers::kFiredOffset;      // 12
+
+// The animation times RaceMenu::Update tests (floats).
+constexpr uint32_t kTimeA = 0x82001FB0;
+constexpr uint32_t kTimeB = 0x82001FD8;
 
 // The debug texts' strings: 0x82010000 + the originals' (negative) offsets.
 constexpr uint32_t Text(int32_t offset) { return uint32_t(0x82010000 + offset); }
@@ -345,6 +350,94 @@ uint64_t AnimateVariantPage(uint8_t* base, uint32_t machine, uint32_t sp, const 
   }
   Finish(calls, frame, 0x8218ABC4, m, 20, uint64_t(Load(base, machine + 9972)) + 28);
   return Play(calls, frame, 0x8218ACDC, m, 20, uint64_t(Load(base, machine + 9972)) + 28, 1);
+}
+
+uint64_t Update(uint8_t* base, uint64_t machine_r3, uint64_t mode_r4, uint32_t sp,
+                const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218C678 RaceMenu::Update");
+  const uint32_t machine = uint32_t(machine_r3);
+  const uint32_t frame = Frame(base, sp, 176);
+  // The debug print through the empty sub_82106540: left out.
+  const uint32_t m = FindMovie(base, kMovie, frame + 80);
+  // UiMovie::AnimationTime's plain C++ (r3 the movie, left; the time in f1,
+  // passed to the next guest call Update makes itself: its callees don't
+  // read it).
+  double f1 = 0.0;
+  const double* pending = nullptr;
+  auto time = [&](uint32_t index) {
+    f1 = double(std::bit_cast<float>(ui_movies::AnimationTime(base, m, kNone, index)));
+    pending = &f1;
+    return f1;
+  };
+  auto call = [&](uint32_t function, uint32_t lr, uint64_t r4, uint64_t r5, uint64_t r6) {
+    const double* f = pending;
+    pending = nullptr;
+    return calls.Call(function, frame, lr, m, r4, r5, r6, f);
+  };
+  auto lfs = [&](uint32_t at) { return double(std::bit_cast<float>(Load(base, at))); };
+  bool scene = time(1) == lfs(kTimeA);
+  const double b = lfs(kTimeB);
+  if (!scene) {
+    scene = time(4) == b;
+  }
+  if (scene) {
+    call(kFinish, 0x8218C718, kSceneRoot, 6, 0);
+    call(kPlay, 0x8218C738, kSceneRoot, 6, 0);
+    call(kLoop, 0x8218C748, kSceneRoot, 6, 0);
+  }
+  if (time(2) == b ||
+      (Load(base, machine + 9796) == 1 && Load(base, machine + kPage) == 5)) {
+    call(kShowNode, 0x8218C788, 8, 0, 0);
+    call(kFinish, 0x8218C79C, 8, uint64_t(Load(base, machine + 10100)) + 2, 0);
+    call(kPlay, 0x8218C7C0, 8, uint64_t(Load(base, machine + 10100)) + 2, 0);
+    call(kLoop, 0x8218C7D4, 8, uint64_t(Load(base, machine + 10100)) + 2, 0);
+  }
+  if (Load(base, machine + 9780) == 1) {
+    const uint64_t refreshed = Refresh(base, machine_r3, frame, calls);
+    Store(base, machine + 9780, uint32_t(refreshed) == 0 ? 1 : 0);
+  }
+  switch (Load(base, machine + kPage)) {
+    case 3: DebugKindPage(base, frame); break;
+    case 4: DebugEventPage(base, machine, frame); break;
+    case 5: DebugVariantPage(base, frame); break;
+    default: break;
+  }
+  // The page object's transition (+12): its set-up once (+24), then
+  // UiMovie::Run(movie 1, 0); the transition ended when Run answers 0.
+  const uint32_t pages = Load(base, kPages);
+  const uint32_t transition = Load(base, pages + 12);
+  const uint32_t movie = FindMovie(base, kMovie, frame + 80);
+  auto run = [&](uint32_t lr) {
+    const double* f = pending;
+    pending = nullptr;
+    return calls.Call(kRun, frame, lr, movie, 0, 0, 0, f);
+  };
+  if (transition == kNone) {
+    return run(0x8218C9BC);
+  }
+  if (transition > 12) {
+    const uint64_t r3 = run(0x8218C974);
+    EndTransition(base);
+    return r3;
+  }
+  if (Load(base, pages + 24) == 0) {
+    Store(base, pages + 24, 1);
+    switch (transition) {
+      case 0: Transition0(base, machine, frame, calls); break;  // the piece sub_8218C8A8
+      case 1: EndTransition(base); break;
+      case 3: Transition3(base, machine, frame, calls); break;
+      case 5: Transition5(base, machine, frame, calls); break;
+      case 6: AnimateVariantPage(base, machine, frame, calls); break;
+      case 11: AskConfirm(base, machine, uint32_t(mode_r4), frame, calls); break;
+      case 12: Transition12(base, frame, calls); break;
+      default: break;
+    }
+  }
+  const uint64_t r3 = run(0x8218C934);
+  if (uint32_t(r3) == 0) {
+    EndTransition(base);
+  }
+  return r3;
 }
 
 }  // namespace race_menu

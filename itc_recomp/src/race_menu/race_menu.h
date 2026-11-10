@@ -173,6 +173,19 @@ uint64_t DebugVariantPage(uint8_t* base, uint32_t sp);
 // does. The last call's r3 (Find's, the pair's address, when none).
 uint64_t AnimateVariantPage(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
 
+// sub_8218C678 RaceMenu::Update ((5, 0); r3 the machine, its high bits kept
+// for Refresh; r4 the mode): movie 1's scene and variant animations by
+// UiMovie::AnimationTime (its plain C++) against the floats at 0x82001FB0
+// and 0x82001FD8, Refresh while +9780 is 1, the page's debug text, then the
+// page object's transition (+12): its set-up once (+24; the transitions'
+// and debug pages' plain C++, transition 0 the piece sub_8218C8A8's work),
+// UiMovie::Run(movie 1, 0) through its override and the transition ended
+// when Run answers 0 (or at once above 12). The debug print through the
+// empty sub_82106540 left out. Run's r3. 176-byte frame (+80 the movie's
+// id).
+uint64_t Update(uint8_t* base, uint64_t machine_r3, uint64_t mode_r4, uint32_t sp,
+                const Calls& calls);
+
 // --- The machine's set-up (init.cpp) ---
 //
 // sub_8218CE10 RaceMenu::Init: 17 transitions added to `machine`

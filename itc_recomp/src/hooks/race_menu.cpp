@@ -26,7 +26,10 @@ ITC_FLAG_BOOL(native_race_menu, true, "ITC",
               "sub_8218ACE8, Transition12 sub_8218AE48, AnimateVariantPage sub_8218A928 (UiMovie's "
               "animation calls and the mapper's slots through their overrides) and the debug "
               "pages sub_8218BB68, sub_82188A98 and sub_82188C00 (their calls to the empty "
-              "sub_82106540 left out) (the same writes; checked by --run_harnesses=race_menu)");
+              "sub_82106540 left out); RaceMenu::Update sub_8218C678 (UiMovie::AnimationTime, "
+              "Refresh, the transitions and the debug pages as plain C++, UiMovie::Run and the "
+              "animation calls through their overrides) (the same writes; checked by "
+              "--run_harnesses=race_menu)");
 
 namespace hooks {
 
@@ -161,6 +164,10 @@ void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::AnimateVariantPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
+void RaceMenuUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::Update(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
 void RaceMenuInit(PPCContext& ctx, uint8_t* base) {
@@ -195,6 +202,8 @@ ITC_RACE_MENU(8218AF08, RaceMenuUnload)
 ITC_RACE_MENU(8218AF80, RaceMenuLeaveToHub)
 ITC_RACE_MENU(82188FE0, RaceMenuDestroy)
 ITC_RACE_MENU(8218C9C8, RaceMenuStart)
+// Update (the (5, 0) functor, from the recompiled state machine).
+ITC_RACE_MENU(8218C678, RaceMenuUpdate)
 // Back (from Draw and its piece sub_8218C5DC, recompiled).
 ITC_RACE_MENU(82188A20, RaceMenuBack)
 // SetEventRange sub_82189158 and SetUpEvents sub_821891C8: no adapters
