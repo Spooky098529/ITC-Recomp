@@ -13,6 +13,27 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 
+- The race menu's migration (a65e90d7..4414719e): 38 of 38 rows ours
+  (14 Overridden: reached through functors or the recompiled type 2
+  Init; 3 Merged: the split pieces `sub_8218C5DC`, `sub_82188D44`,
+  `sub_8218C8A8`; 21 Native). Followed: the `UiMovie::SetText` r7-r10
+  leftovers passed as 0 (2026-10-30); `StopCue`'s unread r6 passed as
+  0. Kept: `AnimateKindPage`'s unused `Pressed(158)` frame store,
+  `SetUpEvents`' overlapping frame stores in order, `Refresh` reading
+  past a list of fewer than 15 events into its caller's frame. Left
+  out: the calls to the empty `sub_82106540` (as the race screens).
+  For review: the last adapter removal (ae078313: `KindPage`,
+  `EventPage`, `VariantPage`, `Back`, `LeavePage`, `StartPage`,
+  `StartEvent`) skipped the temporary call counter (attract races never
+  open the race menu, so it would only have shown 0; every caller in
+  play is ours by `b7_groups.py --removable`). Map corrections: page 4's
+  list with bit 0x20 holds strings 360-374 (not 373); `Transition3`'s
+  +80 = 1 is node (11, 1)'s; `Start` gives node (11, 0) the same +12 and
+  +16 as (11, 1). New: `src/race_menu/`, `src/hooks/race_menu.*`, the
+  `race_menu` harness, `RaceMenuStartGroup` in
+  `src/harnesses/race_event.cpp`; `AnimateEventPage`'s harness world
+  gives nodes real track-less animations (the original faulted on
+  random words).
 - The race menu's map (e6f5b641): `race-menu.md`, 38 rows (31 in play;
   the type 2 mode's machine at +9640, UI movie 1, probably the career's
   race menu), rows in `known-data.md` (`0x826D8404`-`0x826D840C`, the

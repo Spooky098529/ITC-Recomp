@@ -20,7 +20,13 @@ file's history. What's left to see in a drive, from every run:
   start through `Career::SetUpEvent` and `Race::SetUp`; 21 ready
   groups, `Draw` over 1,500 lines to split; no leads added, the race
   set-up callers' lead deleted, two trimmed; no subagents); map
-  checked. Step: migration (agent running).
+  checked. Migration a65e90d7..4414719e (Init and the handlers,
+  `SetUpEvents`, `Refresh`, `Start`, the transitions and debug pages,
+  `Update`, the pages, `Draw` with `StartPage` and `StartEvent`; 38 of
+  38 ours: 14 Overridden, 3 Merged, 21 Native; `--native_race_menu`;
+  races 37-38 s at 40, 0 errors, its harnesses 0 differing; 7
+  subagents, one at a time). Left: none. Step: validation (agent
+  running).
 
 ## Done
 
@@ -42,5 +48,7 @@ The run's section of `review.md` ("Run 2026-11-10 21:02").
   unknown 687).
 - After the race menu's map: ours 5364, work left 1133 (wrapped 56,
   known 421, unknown 656).
+- After its migration: ours 5402, work left 1102 (wrapped 56, known
+  390, unknown 656).
 
 ## Stopped
