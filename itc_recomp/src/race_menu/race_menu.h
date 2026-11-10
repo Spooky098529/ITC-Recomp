@@ -133,6 +133,46 @@ uint64_t Refresh(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& c
 // +108 the cues' and banks' words).
 uint64_t Start(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& calls);
 
+// --- Update's callees (transitions.cpp) ---
+//
+// The transitions (r3 the machine): each its 128-byte frame (+80 the
+// movie's id) but Transition3's (176) and Transition12's (112), movie 1's
+// animations through UiMovie::Finish, Play and Loop's overrides.
+// sub_82189740 Transition0 (to page 3): the first time (+9812 0) the
+// scene's and the kinds' animations, then (19, mode + 2). Loop's r3.
+uint64_t Transition0(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_82189C28 Transition3 (to page 4): the first time the nodes' floats
+// and the badge's animation by the progress bits, then (10, 0) and (20,
+// row + 2), the rows' children 6 to 9 marked (+80 = 1, FindNode and
+// UiMovie::Child as plain C++); with +9796 set the transition ended. The
+// last Child's r3.
+uint64_t Transition3(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8218A7F0 Transition5 (to page 5): (20, row + 14) and (-1, 2) the first
+// time, then (11, 12); with +9796 set the transition ended. Loop's r3.
+uint64_t Transition5(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8218ACE8 AskConfirm (transition 11, r4 the mode): movie 16's three
+// texts (SetText's unset varargs 0), its first cursor from player 0's save
+// +0x1F870, page 8, message 34 posted, the transition ended. The ring
+// divide's r3.
+uint64_t AskConfirm(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
+                    const Calls& calls);
+// sub_8218AE48 Transition12 (back from the question; reads no register):
+// (10, 0), the transition ended. Loop's r3.
+uint64_t Transition12(uint8_t* base, uint32_t sp, const Calls& calls);
+// The debug pages: their calls to the empty sub_82106540 left out, the
+// frame words stored for them written. sub_8218BB68 DebugKindPage (128-byte
+// frame; 190); sub_82188A98 DebugEventPage (r3 the machine; 240-byte frame;
+// 190, or 170 with +9720 0); sub_82188C00 DebugVariantPage (128-byte frame;
+// with the menu's +8 set, page 5 through transition 10; 190).
+uint64_t DebugKindPage(uint8_t* base, uint32_t sp);
+uint64_t DebugEventPage(uint8_t* base, uint32_t machine, uint32_t sp);
+uint64_t DebugVariantPage(uint8_t* base, uint32_t sp);
+// sub_8218A928 AnimateVariantPage (r3 the machine; also transition 6): movie
+// 1's animations for page 5's input, player 0's mapper asked through its
+// slots 12 (153, 167 up; 154, 168 down) and 10 (159, 158) as the original
+// does. The last call's r3 (Find's, the pair's address, when none).
+uint64_t AnimateVariantPage(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+
 // --- The machine's set-up (init.cpp) ---
 //
 // sub_8218CE10 RaceMenu::Init: 17 transitions added to `machine`

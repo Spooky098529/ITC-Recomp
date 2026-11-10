@@ -5,7 +5,7 @@
 // menu's machine, the mode with its message ring, the two page objects, the
 // menu, movies 1 and 16 over a pool of 40 nodes (each child of a node
 // another of the pool, all TXTs) and the movie table's pairs naming them,
-// the menus' mappers and the sound manager, with player 0's save data and a
+// the players' action mappers and the sound manager, with player 0's save data and a
 // string table of our own; points the globals into it (put back after);
 // shapes the fields each function tests; runs the original (with
 // --native_race_menu off, so what it calls of the menu's is the original
@@ -64,7 +64,9 @@ constexpr uint32_t kNodeCount = 40;
 constexpr uint32_t kAnimationsAt = 0x22400;  // 8 animations of no tracks (64 bytes)
 constexpr uint32_t kAnimations = 8;
 constexpr uint32_t kNamed = 200;             // the movies' named animations shaped
-constexpr uint32_t kBlockBytes = 0x22800;
+constexpr uint32_t kMappersAt = 0x22800;      // 4 action mappers of 0x200
+constexpr uint32_t kMapperVtablesAt = 0x23000;  // their vtables (0x40 each)
+constexpr uint32_t kBlockBytes = 0x23200;
 
 constexpr uint32_t kStackBytes = 2048;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -274,11 +276,11 @@ uint32_t MakePages(uint8_t* base, uint32_t bytes, Random& r) {
   return block;
 }
 
-// The text records the setters made (stored in movie 1's map): their words
+// The text records the setters made (stored in movie 1's and 16's maps): their words
 // and buffers compared, freed, their map words 0 (as the garage screen's
 // harness does).
-void TextRecords(uint8_t* base, const World& w, Outputs& out) {
-  const uint32_t map = w.at(kMovieAt) + ui_movies::kMovieTexts;
+void TextRecords(uint8_t* base, uint32_t movie, Outputs& out) {
+  const uint32_t map = movie + ui_movies::kMovieTexts;
   const uint32_t pairs = guest::LoadU32(base, map + 1024);
   for (uint32_t k = 0; k < pairs && k < 128; k++) {
     const uint32_t value = guest::LoadU32(base, map + 8 * k + 4);
@@ -423,7 +425,8 @@ void Run(Context& h, const World& w, const Spec& spec) {
         }
       }
       g_made.clear();
-      TextRecords(h.base, w, out[v]);
+      TextRecords(h.base, w.at(kMovieAt), out[v]);
+      TextRecords(h.base, w.at(kMovie16At), out[v]);
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
       }
@@ -679,6 +682,106 @@ void Start(Context& h, const World& w) {
              }});
 }
 
+// The players' action mappers (as the garage screen's harness lays them):
+// each controller's entry 0 to 3, each entry's mapper one of ours (its
+// vtable's slots 10 and 12 ActionMapper::Pressed and Fired, now and then
+// Held), blocked (+4 1) now and then, a few bits set in its words (+448 to
+// +471).
+void Mappers(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t mapper = w.at(kMappersAt) + 0x200 * c;
+    const uint32_t vtable = w.at(kMapperVtablesAt) + 0x40 * c;
+    guest::StoreU32(base, menu_helpers::kControllerEntries + 4 * c, r.Below(4));
+    guest::StoreU32(base, menu_helpers::kMapperEntries + 8 * c, mapper);
+    guest::StoreU32(base, menu_helpers::kMapperEntries + 8 * c + 4,
+                    r.Below(5) == 0 ? 1 : r.Below(3));
+    guest::StoreU32(base, mapper, vtable);
+    guest::StoreU32(base, vtable + menu_helpers::kPressedOffset,
+                    r.Below(5) == 0 ? 0x8210BE70 : menu_helpers::kPressedSlot);
+    guest::StoreU32(base, vtable + menu_helpers::kFiredOffset,
+                    r.Below(5) == 0 ? 0x8210BE70 : menu_helpers::kFiredSlot);
+    for (uint32_t k = 0; k < 6; k++) {
+      guest::StoreU32(base, mapper + 448 + 4 * k,
+                      uint32_t(r.Next()) & uint32_t(r.Next()) & uint32_t(r.Next()));
+    }
+  }
+}
+
+// 0 or 1 mostly, now and then any.
+uint32_t Flag(Random& r) { return r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2); }
+
+// The transitions' words: the first-time flag (+9812), the mode (+9820)
+// and the list's top (+9972) small, the progress bits, the end flag (+9796).
+void TransitionWords(PPCContext& t, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  Machine(t, r, w);
+  guest::StoreU32(base, w.machine() + 9812, Flag(r));
+  guest::StoreU32(base, w.machine() + 9820, r.Below(3));
+  guest::StoreU32(base, w.machine() + 9972, r.Below(3));
+  guest::StoreU32(base, w.machine() + 10148, ProgressBits(r));
+  guest::StoreU32(base, w.machine() + 9796, Flag(r));
+}
+
+void Transitions(Context& h, const World& w) {
+  // Each frame compared up to its register saves (the callees' frames
+  // below it, which the native code's plain C++ lookups don't make, not).
+  Run(h, w, {"RaceMenu::Transition0 (sub_82189740)", 60, __imp__sub_82189740,
+             hooks::RaceMenuTransition0, {{-128, -32}}, TransitionWords});
+  Run(h, w, {"RaceMenu::Transition3 (sub_82189C28)", 100, __imp__sub_82189C28,
+             hooks::RaceMenuTransition3, {{-176, -88}}, TransitionWords});
+  Run(h, w, {"RaceMenu::Transition5 (sub_8218A7F0)", 60, __imp__sub_8218A7F0,
+             hooks::RaceMenuTransition5, {{-128, -32}}, TransitionWords});
+  Run(h, w, {"RaceMenu::Transition12 (sub_8218AE48)", 40, __imp__sub_8218AE48,
+             hooks::RaceMenuTransition12, {{-112, -16}}, TransitionWords});
+  // AskConfirm: player 0's save +0x1F870 0 or not. SetText's parameter area
+  // (+48 to +79: r7 on, the original's leftovers) left out.
+  Run(h, w, {"RaceMenu::AskConfirm (sub_8218ACE8)", 80, __imp__sub_8218ACE8,
+             hooks::RaceMenuAskConfirm, {{-128, -80}, {-48, -32}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Machine(t, r, w);
+               guest::StoreU32(w.base, w.save + 0x1F870,
+                               r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+             }});
+  Run(h, w, {"RaceMenu::DebugKindPage (sub_8218BB68)", 20, __imp__sub_8218BB68,
+             hooks::RaceMenuDebugKindPage, {{-128, -32}}, Machine});
+  // DebugEventPage: the list's count (+9720) 0 or small, its entries (+9656)
+  // small (the original reads its frame's strings by them).
+  Run(h, w, {"RaceMenu::DebugEventPage (sub_82188A98)", 40, __imp__sub_82188A98,
+             hooks::RaceMenuDebugEventPage, {{-240, -96}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Machine(t, r, w);
+               guest::StoreU32(w.base, w.machine() + 9720, r.Below(3) == 0 ? 0 : r.Below(17));
+               for (uint32_t k = 0; k < 16; k++) {
+                 guest::StoreU32(w.base, w.machine() + 9656 + 4 * k, r.Below(15));
+               }
+             }});
+  // DebugVariantPage: the menu's +8 0 or not.
+  Run(h, w, {"RaceMenu::DebugVariantPage (sub_82188C00)", 40, __imp__sub_82188C00,
+             hooks::RaceMenuDebugVariantPage, {{-128, -40}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Machine(t, r, w);
+               guest::StoreU32(w.base, w.at(kMenuAt) + 8, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+             }});
+  // AnimateVariantPage: the mappers, the variant (+10100) and its flag
+  // (+10104) 0 to 2, the cursor's row and its second pair word small or -1.
+  Run(h, w, {"RaceMenu::AnimateVariantPage (sub_8218A928)", 200, __imp__sub_8218A928,
+             hooks::RaceMenuAnimateVariantPage, {{-128, -32}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               Machine(t, r, w);
+               Mappers(r, w);
+               const uint32_t m = w.machine();
+               guest::StoreU32(base, m + 10100, r.Below(3));
+               guest::StoreU32(base, m + 10104, r.Below(3));
+               guest::StoreU32(base, m + 9828, r.Below(15));
+               guest::StoreU32(base, m + 9972, r.Below(3));
+               for (uint32_t k = 0; k < 15; k++) {
+                 guest::StoreU32(base, m + 9984 + 8 * k, SmallOrNone(r, 4));
+               }
+             }});
+}
+
 }  // namespace
 
 void RaceMenu(Context& h) {
@@ -692,6 +795,7 @@ void RaceMenu(Context& h) {
     Handlers(h, w);
     Pages(h, w);
     Start(h, w);
+    Transitions(h, w);
   }
 }
 

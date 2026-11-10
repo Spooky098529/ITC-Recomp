@@ -21,7 +21,12 @@ ITC_FLAG_BOOL(native_race_menu, true, "ITC",
               "varargs 0); RaceMenu::Init sub_8218CE10 (its step table, StateMachine::Add's "
               "plain C++); RaceMenu::Start sub_8218C9C8 (SaveData::Of, SetUpEvents, SetEventRange, "
               "Refresh and UiMovie::FindNode as plain C++, the sound manager's slots 14 and 13, "
-              "Sound::Play and the fade through their overrides) (the same writes; checked by --run_harnesses=race_menu)");
+              "Sound::Play and the fade through their overrides); Update's callees Transition0 "
+              "sub_82189740, Transition3 sub_82189C28, Transition5 sub_8218A7F0, AskConfirm "
+              "sub_8218ACE8, Transition12 sub_8218AE48, AnimateVariantPage sub_8218A928 (UiMovie's "
+              "animation calls and the mapper's slots through their overrides) and the debug "
+              "pages sub_8218BB68, sub_82188A98 and sub_82188C00 (their calls to the empty "
+              "sub_82106540 left out) (the same writes; checked by --run_harnesses=race_menu)");
 
 namespace hooks {
 
@@ -123,6 +128,39 @@ void RaceMenuRefresh(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Refresh(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
+void RaceMenuTransition0(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::Transition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void RaceMenuTransition3(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::Transition3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void RaceMenuTransition5(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::Transition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void RaceMenuAskConfirm(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::AskConfirm(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void RaceMenuTransition12(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::Transition12(base, ctx.r1.u32, guest.calls());
+}
+void RaceMenuDebugKindPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rm::DebugKindPage(base, ctx.r1.u32);
+}
+void RaceMenuDebugEventPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rm::DebugEventPage(base, ctx.r3.u32, ctx.r1.u32);
+}
+void RaceMenuDebugVariantPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rm::DebugVariantPage(base, ctx.r1.u32);
+}
+void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::AnimateVariantPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
 void RaceMenuInit(PPCContext& ctx, uint8_t* base) {
@@ -164,5 +202,16 @@ ITC_RACE_MENU(82188A20, RaceMenuBack)
 // calls their plain C++; the register steps above are the harness's).
 // Refresh (from Update, recompiled; Start calls its plain C++).
 ITC_RACE_MENU(8218BC18, RaceMenuRefresh)
+// Update's callees (from Update, recompiled; AnimateVariantPage from
+// VariantPage too).
+ITC_RACE_MENU(82189740, RaceMenuTransition0)
+ITC_RACE_MENU(82189C28, RaceMenuTransition3)
+ITC_RACE_MENU(8218A7F0, RaceMenuTransition5)
+ITC_RACE_MENU(8218ACE8, RaceMenuAskConfirm)
+ITC_RACE_MENU(8218AE48, RaceMenuTransition12)
+ITC_RACE_MENU(8218BB68, RaceMenuDebugKindPage)
+ITC_RACE_MENU(82188A98, RaceMenuDebugEventPage)
+ITC_RACE_MENU(82188C00, RaceMenuDebugVariantPage)
+ITC_RACE_MENU(8218A928, RaceMenuAnimateVariantPage)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_RACE_MENU(8218CE10, RaceMenuInit)

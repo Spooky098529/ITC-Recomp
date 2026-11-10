@@ -28,6 +28,16 @@ void RaceMenuBack(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetUpEvents(PPCContext& ctx, uint8_t* base);
 void RaceMenuRefresh(PPCContext& ctx, uint8_t* base);
+// Update's callees (r3 the machine, r4 the mode where read).
+void RaceMenuTransition0(PPCContext& ctx, uint8_t* base);
+void RaceMenuTransition3(PPCContext& ctx, uint8_t* base);
+void RaceMenuTransition5(PPCContext& ctx, uint8_t* base);
+void RaceMenuAskConfirm(PPCContext& ctx, uint8_t* base);
+void RaceMenuTransition12(PPCContext& ctx, uint8_t* base);
+void RaceMenuDebugKindPage(PPCContext& ctx, uint8_t* base);
+void RaceMenuDebugEventPage(PPCContext& ctx, uint8_t* base);
+void RaceMenuDebugVariantPage(PPCContext& ctx, uint8_t* base);
+void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base);
 // Init (r3 the machine).
 void RaceMenuInit(PPCContext& ctx, uint8_t* base);
 
