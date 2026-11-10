@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 
+- The race menu's map (e6f5b641): `race-menu.md`, 38 rows (31 in play;
+  the type 2 mode's machine at +9640, UI movie 1, probably the career's
+  race menu), rows in `known-data.md` (`0x826D8404`-`0x826D840C`, the
+  machine's fields). Read in outline only: `Refresh`, `SetUpEvents`,
+  `AnimateKindPage`, `AnimateEventPage`, `Transition3`. Leads: the race
+  set-up callers' line deleted (all five now in function files), the
+  menu helpers' callers and the type 2 Init's lines trimmed.
+
 ## Run 2026-11-09 10:53 (`b7-loop-09-11-26`)
 
 - The type 2 dialog's migration (415b58d5..e3269357), over the last

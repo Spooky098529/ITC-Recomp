@@ -15,7 +15,12 @@ file's history. What's left to see in a drive, from every run:
   and its transitions, UI movie 1, probably the career's race menu; all
   seen in play, its groups ready from the bottom up; first in the last
   run's "Next" after the small `Garage::Sell`; its line deleted from
-  `leads.md`). Step: mapping (agent running).
+  `leads.md`). Mapped `race-menu.md` (e6f5b641: 38 rows, 31 in play:
+  the race mode, event and variant pages, the confirm dialog, the
+  start through `Career::SetUpEvent` and `Race::SetUp`; 21 ready
+  groups, `Draw` over 1,500 lines to split; no leads added, the race
+  set-up callers' lead deleted, two trimmed; no subagents); map
+  checked. Step: migration (agent running).
 
 ## Done
 
@@ -35,5 +40,7 @@ The run's section of `review.md` ("Run 2026-11-10 21:02").
 
 - At the start: ours 5364, work left 1133 (wrapped 56, known 390,
   unknown 687).
+- After the race menu's map: ours 5364, work left 1133 (wrapped 56,
+  known 421, unknown 656).
 
 ## Stopped
