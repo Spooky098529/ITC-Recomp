@@ -53,6 +53,14 @@ constexpr uint32_t kMoviesDelete = 0x8211E258;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kFadeOut = 0x8209D0C8;
+constexpr uint32_t kCopyForward = 0x825A7830;  // the second memcpy
+constexpr uint32_t kShowNode = 0x8211AC00;
+constexpr uint32_t kHideNode = 0x8211AC48;
+constexpr uint32_t kSetNodeTexture = 0x8211A708;
+constexpr uint32_t kSetText = 0x8211C1F8;
+constexpr uint32_t kSetNumberText = 0x8211C740;
+constexpr uint32_t kSetChildNameText = 0x8211D930;
+constexpr uint32_t kScrollText = 0x8211C570;
 // The boot movies' list (boot-mode.md).
 constexpr uint32_t kBootList = 0x826C5BAC;
 
@@ -97,6 +105,21 @@ void Back(uint8_t* base, uint32_t machine);
 // sub_82189158 RaceMenu::SetEventRange: +9840, +9844 and +9848 by the
 // progress bits (+10148). A leaf (r3 left).
 void SetEventRange(uint8_t* base, uint32_t machine);
+
+// --- The pages' tables and texts (events.cpp, refresh.cpp) ---
+//
+// sub_821891C8 RaceMenu::SetUpEvents (r3 the machine, its high bits kept in
+// the destinations): the two 15-pair tables by the progress bits (+10148),
+// built in its 288-byte frame (+80 to +199, the original's stores in order,
+// some overwriting others) and copied by the second memcpy to +9980, then
+// +9852. The last copy's r3 (the machine's r3 + 9852).
+uint64_t SetUpEvents(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& calls);
+// sub_8218BC18 RaceMenu::Refresh (r3 the machine): movie 1's texts for the
+// page (+9640: 3 to 5; 6 nothing more). 1, or 0 for the other pages. Its
+// 224-byte frame: +80 the movie's id, +96 on page 4's event names (the
+// words past the list left as they were). SetText's varargs the call sites
+// leave unset passed 0.
+uint64_t Refresh(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& calls);
 
 // --- The machine's set-up (init.cpp) ---
 //

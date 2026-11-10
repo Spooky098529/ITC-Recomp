@@ -15,7 +15,8 @@
 // stood in for (each call's return address, stack pointer and arguments
 // kept, answered 0 or 1 from the case's generator); UiMovies::Open's and
 // Delete's calls are recorded on both sides and answered 1; the blocks
-// VirtualAlloc makes (the layer's pages) are compared by content and freed.
+// VirtualAlloc makes (the layer's pages) are compared by content and freed;
+// the text records the setters make are compared and freed.
 
 #include "harness.h"
 
@@ -26,6 +27,7 @@
 #include "hooks/heap.h"
 #include "hooks/race_menu.h"
 #include "hooks/ui_movies.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
@@ -272,6 +274,29 @@ uint32_t MakePages(uint8_t* base, uint32_t bytes, Random& r) {
   return block;
 }
 
+// The text records the setters made (stored in movie 1's map): their words
+// and buffers compared, freed, their map words 0 (as the garage screen's
+// harness does).
+void TextRecords(uint8_t* base, const World& w, Outputs& out) {
+  const uint32_t map = w.at(kMovieAt) + ui_movies::kMovieTexts;
+  const uint32_t pairs = guest::LoadU32(base, map + 1024);
+  for (uint32_t k = 0; k < pairs && k < 128; k++) {
+    const uint32_t value = guest::LoadU32(base, map + 8 * k + 4);
+    if (value != 0 && memory::IsHeapBlock(value)) {
+      const uint32_t buffer = guest::LoadU32(base, value);
+      out.Word(k);
+      out.Bytes(Read(base, value + 4, 24));
+      out.Word(memory::IsPages(buffer) ? 1 : 0);
+      if (memory::IsPages(buffer)) {
+        out.Bytes(Read(base, buffer, 4096));
+        memory::FreePages(buffer);
+      }
+      memory::crt::OperatorDelete(value);
+      guest::StoreU32(base, map + 8 * k + 4, 0);
+    }
+  }
+}
+
 // The pointer word at `slot` names a block the side allocated (the layer's
 // pages): its first `bytes` compared, freed, the word replaced by 1 (0 when
 // none, the word itself when not pages).
@@ -398,6 +423,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
         }
       }
       g_made.clear();
+      TextRecords(h.base, w, out[v]);
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
       }
@@ -520,6 +546,79 @@ void Handlers(Context& h, const World& w) {
              }});
 }
 
+// A name record (the machine's +10112): its kinds and indexes small or any.
+void NameRecord(uint8_t* base, uint32_t name, Random& r) {
+  guest::StoreU32(base, name + 4, r.Below(6));
+  guest::StoreU16(base, name + 8, uint16_t(r.Below(4) == 0 ? r.Next() : r.Below(110)));
+  guest::StoreU16(base, name + 10, uint16_t(r.Below(2)));
+  guest::StoreU32(base, name + 12, r.Below(6));
+  guest::StoreU16(base, name + 16, uint16_t(r.Below(4) == 0 ? r.Next() : r.Below(110)));
+  guest::StoreU16(base, name + 18, uint16_t(r.Below(2)));
+}
+
+// A small value or -1.
+uint32_t SmallOrNone(Random& r, uint32_t below) {
+  return r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(below);
+}
+
+void Pages(Context& h, const World& w) {
+  // SetUpEvents: the progress bits' shapes; its frame's table words
+  // (+80 to +199) compared.
+  Run(h, w, {"RaceMenu::SetUpEvents (sub_821891C8)", 80, __imp__sub_821891C8,
+             hooks::RaceMenuSetUpEvents, {{-288, -88}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Machine(t, r, w);
+               guest::StoreU32(w.base, w.machine() + 10148, ProgressBits(r));
+             }});
+  // Refresh: pages 0 to 10 (now and then any), the mode 0 to 2, the list's
+  // cursor within 12 rows of its top, its first and last rows at the top
+  // and two below it or not, the scroll flag 0 to 3, the variant, the two
+  // tables' pairs small or -1 (ids below the string table's 8,192), the
+  // name record and the frame's words from +80 (the event names past the
+  // list, left as they were) small. SetText's parameter area (+48 to +79:
+  // r7 on, the original's leftovers) left out.
+  Run(h, w, {"RaceMenu::Refresh (sub_8218BC18)", 300, __imp__sub_8218BC18,
+             hooks::RaceMenuRefresh, {{-224, -176}, {-144, -64}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               Machine(t, r, w);
+               const uint32_t m = w.machine();
+               const uint32_t page = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(11);
+               guest::StoreU32(base, m + rm::kPage, r.Below(2) == 0 ? 3 + r.Below(3) : page);
+               guest::StoreU32(base, m + 9820, r.Below(3));
+               const uint32_t top = r.Below(3);
+               const uint32_t row = r.Below(13);
+               const uint32_t cursor = top + row;
+               guest::StoreU32(base, m + 9972, top);
+               guest::StoreU32(base, m + 9828, cursor);
+               const uint32_t first_choices[] = {row, cursor, r.Below(15)};
+               const uint32_t last_choices[] = {row + 2, cursor, r.Below(15)};
+               guest::StoreU32(base, m + 9840, first_choices[r.Below(3)]);
+               guest::StoreU32(base, m + 9844, last_choices[r.Below(3)]);
+               guest::StoreU32(base, m + 9832,
+                               r.Below(2) == 0 ? guest::LoadU32(base, m + 9840 + 4 * r.Below(2))
+                                               : r.Below(15));
+               guest::StoreU32(base, m + 9836, r.Below(4));
+               guest::StoreU32(base, m + 9724, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+               guest::StoreU32(base, m + 10148, ProgressBits(r));
+               for (uint32_t k = 0; k < 15; k++) {
+                 guest::StoreU32(base, m + 9852 + 8 * k, SmallOrNone(r, 11));
+                 guest::StoreU32(base, m + 9856 + 8 * k, r.Below(4) == 0 ? uint32_t(r.Next())
+                                                                         : SmallOrNone(r, 4));
+                 guest::StoreU32(base, m + 9980 + 8 * k, r.Below(20));
+                 guest::StoreU32(base, m + 9984 + 8 * k, SmallOrNone(r, 20));
+               }
+               NameRecord(base, m + 10112, r);
+               guest::StoreU32(base, m + 10132, r.Below(2) == 0 ? r.Below(100000) : r.Next());
+               guest::StoreU32(base, m + 10136, r.Below(1000));
+               guest::StoreU32(base, m + 10140, r.Below(7));
+               const uint32_t frame = t.r1.u32 - 224;
+               for (uint32_t k = 80; k < 176; k += 4) {
+                 guest::StoreU32(base, frame + k, r.Below(600));
+               }
+             }});
+}
+
 }  // namespace
 
 void RaceMenu(Context& h) {
@@ -531,6 +630,7 @@ void RaceMenu(Context& h) {
   Init(h, w);
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
+    Pages(h, w);
   }
 }
 

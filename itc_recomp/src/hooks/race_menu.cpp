@@ -16,7 +16,9 @@ ITC_FLAG_BOOL(native_race_menu, true, "ITC",
               "sub_821895F0, OnNo sub_82189648, OnBack sub_82188938, OnDialogClosed "
               "sub_821896A0 (the fade and UiMovie::Run through their overrides), Unload "
               "sub_8218AF08 and LeaveToHub sub_8218AF80; Back sub_82188A20 and SetEventRange "
-              "sub_82189158; RaceMenu::Init sub_8218CE10 (its step table, StateMachine::Add's "
+              "sub_82189158; SetUpEvents sub_821891C8 (the second memcpy's plain C++) and Refresh "
+              "sub_8218BC18 (the UI movie setters through their overrides, SetText's unset "
+              "varargs 0); RaceMenu::Init sub_8218CE10 (its step table, StateMachine::Add's "
               "plain C++) (the same writes; checked by --run_harnesses=race_menu)");
 
 namespace hooks {
@@ -107,6 +109,14 @@ void RaceMenuBack(PPCContext& ctx, uint8_t* base) { rm::Back(base, ctx.r3.u32); 
 void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base) {
   rm::SetEventRange(base, ctx.r3.u32);
 }
+void RaceMenuSetUpEvents(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::SetUpEvents(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void RaceMenuRefresh(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::Refresh(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
 void RaceMenuInit(PPCContext& ctx, uint8_t* base) {
@@ -144,5 +154,8 @@ ITC_RACE_MENU(82188FE0, RaceMenuDestroy)
 // Start), recompiled.
 ITC_RACE_MENU(82188A20, RaceMenuBack)
 ITC_RACE_MENU(82189158, RaceMenuSetEventRange)
+// SetUpEvents (from Start) and Refresh (from Start and Update), recompiled.
+ITC_RACE_MENU(821891C8, RaceMenuSetUpEvents)
+ITC_RACE_MENU(8218BC18, RaceMenuRefresh)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_RACE_MENU(8218CE10, RaceMenuInit)
