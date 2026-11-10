@@ -911,6 +911,56 @@ void VariantWords(PPCContext& t, Random& r, const World& w) {
   }
 }
 
+// The event page's words: the list's ends (+9840 first, +9844 last) within
+// 0 to 14, the cursor (+9828) at an end, one past it, between them, -1 or
+// 15 (the list's scroll past its ends), the
+// old cursor (+9832) an end or any row, the visible row (+9972) and the old
+// (+9976) 0 to 2 (now and then -1 or 3), the event count (+9848) and the
+// cursor kept (+9716) around each other, the scroll flag (+9836) 0 to 3, the
+// rows' badges (+9856 + 8 x row) 0 to 2 (now and then -1, 3 or any), the
+// history's depth, player 0's save +0x1F870 0 or not. The scenes'
+// animations (UiMovie::Play's, then Finish's, of the same index) the 8 of no
+// tracks: each node's first animation entry (+116) 40 to 47, its entries 40
+// to 63 (past the children the sub-scenes are found among) those.
+void EventWords(PPCContext& t, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  Machine(t, r, w);
+  PageInput(r, w);
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    guest::StoreU32(base, w.node(n) + 116, 40 + r.Below(8));
+    for (uint32_t e = 40; e < 64; e++) {
+      guest::StoreU32(base, w.node(n) + 128 + 8 * e,
+                      w.at(kAnimationsAt) + 64 * r.Below(kAnimations));
+    }
+  }
+  const uint32_t m = w.machine();
+  const uint32_t first = r.Below(15);
+  const uint32_t last = r.Below(4) == 0 ? first : first + r.Below(15 - first);
+  const uint32_t cursors[] = {first, last, first - 1, last + 1, first + r.Below(last - first + 1),
+                              r.Below(15), 0xFFFFFFFFu, 15};
+  const uint32_t cursor = cursors[r.Below(8)];
+  guest::StoreU32(base, m + 9840, first);
+  guest::StoreU32(base, m + 9844, last);
+  guest::StoreU32(base, m + 9828, cursor);
+  const uint32_t olds[] = {first, last, cursor, r.Below(15)};
+  guest::StoreU32(base, m + 9832, olds[r.Below(4)]);
+  auto row = [&] { return r.Below(6) == 0 ? (r.Below(2) == 0 ? 0xFFFFFFFFu : 3u) : r.Below(3); };
+  guest::StoreU32(base, m + 9972, row());
+  guest::StoreU32(base, m + 9976, row());
+  const uint32_t kept = r.Below(16);
+  guest::StoreU32(base, m + 9716, kept);
+  guest::StoreU32(base, m + 9848, r.Below(3) == 0 ? kept : r.Below(16));
+  guest::StoreU32(base, m + 9836, r.Below(4));
+  // (Rows -1 and 15 read +9848 and +9976.)
+  for (uint32_t k = 0; k < 15; k++) {
+    const uint32_t badge = r.Below(6) == 0 ? (r.Below(2) == 0 ? uint32_t(r.Next()) : 3u)
+                                           : r.Below(3);
+    guest::StoreU32(base, m + 9856 + 8 * k, r.Below(8) == 0 ? 0xFFFFFFFFu : badge);
+  }
+  guest::StoreU8(base, m + 9776, uint8_t(r.Below(12)));
+  guest::StoreU32(base, w.save + 0x1F870, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+}
+
 void DrawPages(Context& h, const World& w) {
   // Each page's frame up to its register saves and its animation's frame
   // below it up to that one's (the callees' frames under them not).
@@ -920,6 +970,12 @@ void DrawPages(Context& h, const World& w) {
              hooks::RaceMenuKindPage, {{-112, -24}}, KindWords});
   Run(h, w, {"RaceMenu::VariantPage (sub_8218B750)", 300, __imp__sub_8218B750,
              hooks::RaceMenuVariantPage, {{-112, -24}}, VariantWords});
+  Run(h, w, {"RaceMenu::AnimateEventPage (sub_82189FE8)", 300, __imp__sub_82189FE8,
+             hooks::RaceMenuAnimateEventPage, {{-128, -32}}, EventWords});
+  // EventPage: SetText's parameter area (+48 to +79: r7 on, the original's
+  // leftovers) left out.
+  Run(h, w, {"RaceMenu::EventPage (sub_8218B2C8)", 400, __imp__sub_8218B2C8,
+             hooks::RaceMenuEventPage, {{-160, -112}, {-80, -64}}, EventWords});
 }
 
 }  // namespace

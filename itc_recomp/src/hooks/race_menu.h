@@ -44,6 +44,8 @@ void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuVariantPage(PPCContext& ctx, uint8_t* base);
+void RaceMenuEventPage(PPCContext& ctx, uint8_t* base);
+void RaceMenuAnimateEventPage(PPCContext& ctx, uint8_t* base);
 // Update (the (5, 0) functor: r3 the machine, r4 the mode).
 void RaceMenuUpdate(PPCContext& ctx, uint8_t* base);
 // Init (r3 the machine).

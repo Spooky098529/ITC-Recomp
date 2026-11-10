@@ -194,6 +194,24 @@ uint64_t AnimateKindPage(uint8_t* base, uint32_t machine, uint32_t sp, const Cal
 // through transition 11 (page 6) or back to page 4 through transition 3;
 // then AnimateVariantPage's plain C++. Its r3. 112-byte frame.
 uint64_t VariantPage(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8218B2C8 EventPage (page 4, the event; r3 the machine, r4 the mode):
+// Menu::Step, then the mapper: the list's cursor (+9828, the old +9832) and
+// visible row (+9972, the old +9976) stepped within its ends (+9840, +9844;
+// wrapping, the scroll flag +9836 1 or 2 past the rows), page 5 through
+// transition 5 when the event has variants (+9848 above +9716), else page 6
+// and the question asked at once as AskConfirm does (movie 16's texts,
+// SetText's unset varargs 0; message 34 posted), or back to page 3 through
+// transition 0; then AnimateEventPage's plain C++. Its r3. 160-byte frame
+// (+80 the movie's id).
+uint64_t EventPage(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
+                   const Calls& calls);
+// sub_82189FE8 AnimateEventPage (r3 the machine): movie 1's animations for
+// page 4's input (the mapper asked again): node 10's, scene 20's rows and
+// the list's ends, the badges (scene 11 and node 10 by the old and new
+// rows' pair words +9856), the scroll reset and finishes on A and B, then
+// the list's scroll (FinishNamed and PlayNamed 148 or 149 by +9836). The
+// last call's r3 (Find's, the pair's address, when none). 128-byte frame.
+uint64_t AnimateEventPage(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
 
 // sub_8218C678 RaceMenu::Update ((5, 0); r3 the machine, its high bits kept
 // for Refresh; r4 the mode): movie 1's scene and variant animations by
