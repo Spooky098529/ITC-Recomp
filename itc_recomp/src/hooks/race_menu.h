@@ -22,8 +22,8 @@ void RaceMenuUnload(PPCContext& ctx, uint8_t* base);
 void RaceMenuLeaveToHub(PPCContext& ctx, uint8_t* base);
 void RaceMenuDestroy(PPCContext& ctx, uint8_t* base);
 void RaceMenuStart(PPCContext& ctx, uint8_t* base);
-// Helpers (r3 the machine). SetEventRange's, SetUpEvents' and Refresh's
-// have no adapters (only the harness runs their steps).
+// Helpers (r3 the machine). Back's, SetEventRange's, SetUpEvents' and
+// Refresh's have no adapters (only the harness runs their steps).
 void RaceMenuBack(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetUpEvents(PPCContext& ctx, uint8_t* base);
@@ -39,16 +39,16 @@ void RaceMenuDebugKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuDebugEventPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuDebugVariantPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base);
-// The pages Draw runs (r3 the machine; r4 the mode for EventPage);
-// AnimateKindPage's and AnimateEventPage's have no adapters (only the
-// harness runs their steps).
+// The pages Draw runs (r3 the machine; r4 the mode for EventPage): no
+// adapters (only the harness runs their steps).
 void RaceMenuKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuVariantPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuEventPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateEventPage(PPCContext& ctx, uint8_t* base);
 // Draw (the (5, 1) functor: r3 the machine, r4 the mode) and its last
-// pages (r3 the machine; r4 the mode for LeavePage).
+// pages (r3 the machine; r4 the mode for LeavePage); only Draw has an
+// adapter (the others' steps are the harness's).
 void RaceMenuStartEvent(PPCContext& ctx, uint8_t* base);
 void RaceMenuStartPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuLeavePage(PPCContext& ctx, uint8_t* base);

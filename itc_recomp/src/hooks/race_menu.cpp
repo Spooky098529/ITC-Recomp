@@ -247,8 +247,9 @@ ITC_RACE_MENU(82188FE0, RaceMenuDestroy)
 ITC_RACE_MENU(8218C9C8, RaceMenuStart)
 // Update (the (5, 0) functor, from the recompiled state machine).
 ITC_RACE_MENU(8218C678, RaceMenuUpdate)
-// Back (from Draw and its piece sub_8218C5DC, recompiled).
-ITC_RACE_MENU(82188A20, RaceMenuBack)
+// Back sub_82188A20: no adapter (removed, B7 loop, 2026-11-10: its only
+// caller, Draw with its piece sub_8218C5DC, is native and calls its plain
+// C++; the register step above is the harness's).
 // SetEventRange sub_82189158 and SetUpEvents sub_821891C8: no adapters
 // (removed, B7 loop, 2026-11-10: their only caller, Start, is native and
 // calls their plain C++; the register steps above are the harness's).
@@ -260,10 +261,10 @@ ITC_RACE_MENU(82188A20, RaceMenuBack)
 // AnimateVariantPage sub_8218A928: no adapter (removed, B7 loop,
 // 2026-11-10: its callers, Update and VariantPage, are native and call its
 // plain C++; the register step above is the harness's).
-// The pages (from Draw and its piece sub_8218C5DC, recompiled).
-ITC_RACE_MENU(8218AFD8, RaceMenuKindPage)
-ITC_RACE_MENU(8218B750, RaceMenuVariantPage)
-ITC_RACE_MENU(8218B2C8, RaceMenuEventPage)
+// The pages KindPage sub_8218AFD8, VariantPage sub_8218B750 and EventPage
+// sub_8218B2C8: no adapters (removed, B7 loop, 2026-11-10: their only
+// caller, Draw with its piece sub_8218C5DC, is native and calls their plain
+// C++; the register steps above are the harness's).
 // AnimateEventPage sub_82189FE8: no adapter (removed, B7 loop, 2026-11-10:
 // its only caller, EventPage, is native and calls its plain C++; the
 // register step above is the harness's).
@@ -272,9 +273,9 @@ ITC_RACE_MENU(8218B2C8, RaceMenuEventPage)
 // register step above is the harness's).
 // Draw (the (5, 1) functor, from the recompiled state machine).
 ITC_RACE_MENU(8218C578, RaceMenuDraw)
-// The last pages and StartEvent (from Draw, native, through their plain C++).
-ITC_RACE_MENU(8218B9F0, RaceMenuLeavePage)
-ITC_RACE_MENU(8218BB18, RaceMenuStartPage)
-ITC_RACE_MENU(82188CE8, RaceMenuStartEvent)
+// LeavePage sub_8218B9F0, StartPage sub_8218BB18 and StartEvent sub_82188CE8:
+// no adapters (removed, B7 loop, 2026-11-10: their callers, Draw and
+// StartPage, are native and call their plain C++; the register steps above
+// are the harness's).
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_RACE_MENU(8218CE10, RaceMenuInit)
