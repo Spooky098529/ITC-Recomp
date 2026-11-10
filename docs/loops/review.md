@@ -11,6 +11,8 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
+
 ## Run 2026-11-09 10:53 (`b7-loop-09-11-26`)
 
 - The type 2 dialog's migration (415b58d5..e3269357), over the last
