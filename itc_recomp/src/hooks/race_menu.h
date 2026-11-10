@@ -28,8 +28,8 @@ void RaceMenuBack(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetUpEvents(PPCContext& ctx, uint8_t* base);
 void RaceMenuRefresh(PPCContext& ctx, uint8_t* base);
-// Update's callees (r3 the machine, r4 the mode where read); only
-// AnimateVariantPage's has an adapter (the others' only the harness runs).
+// Update's callees (r3 the machine, r4 the mode where read); none has an adapter
+// (only the harness runs their steps).
 void RaceMenuTransition0(PPCContext& ctx, uint8_t* base);
 void RaceMenuTransition3(PPCContext& ctx, uint8_t* base);
 void RaceMenuTransition5(PPCContext& ctx, uint8_t* base);
@@ -39,7 +39,8 @@ void RaceMenuDebugKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuDebugEventPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuDebugVariantPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base);
-// The pages Draw runs (r3 the machine).
+// The pages Draw runs (r3 the machine); AnimateKindPage's has no adapter
+// (only the harness runs its step).
 void RaceMenuKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuVariantPage(PPCContext& ctx, uint8_t* base);
