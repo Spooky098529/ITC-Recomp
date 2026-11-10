@@ -209,18 +209,13 @@ ITC_RACE_MENU(82188A20, RaceMenuBack)
 // SetEventRange sub_82189158 and SetUpEvents sub_821891C8: no adapters
 // (removed, B7 loop, 2026-11-10: their only caller, Start, is native and
 // calls their plain C++; the register steps above are the harness's).
-// Refresh (from Update, recompiled; Start calls its plain C++).
-ITC_RACE_MENU(8218BC18, RaceMenuRefresh)
-// Update's callees (from Update, recompiled; AnimateVariantPage from
-// VariantPage too).
-ITC_RACE_MENU(82189740, RaceMenuTransition0)
-ITC_RACE_MENU(82189C28, RaceMenuTransition3)
-ITC_RACE_MENU(8218A7F0, RaceMenuTransition5)
-ITC_RACE_MENU(8218ACE8, RaceMenuAskConfirm)
-ITC_RACE_MENU(8218AE48, RaceMenuTransition12)
-ITC_RACE_MENU(8218BB68, RaceMenuDebugKindPage)
-ITC_RACE_MENU(82188A98, RaceMenuDebugEventPage)
-ITC_RACE_MENU(82188C00, RaceMenuDebugVariantPage)
+// Refresh sub_8218BC18, the transitions sub_82189740, sub_82189C28,
+// sub_8218A7F0, sub_8218ACE8, sub_8218AE48 and the debug pages
+// sub_8218BB68, sub_82188A98, sub_82188C00: no adapters (removed, B7 loop,
+// 2026-11-10: their callers, Update and Start, are native and call their
+// plain C++; the register steps above are the harness's).
+// AnimateVariantPage (from VariantPage, recompiled; Update calls its plain
+// C++).
 ITC_RACE_MENU(8218A928, RaceMenuAnimateVariantPage)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_RACE_MENU(8218CE10, RaceMenuInit)

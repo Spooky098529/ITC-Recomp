@@ -22,13 +22,14 @@ void RaceMenuUnload(PPCContext& ctx, uint8_t* base);
 void RaceMenuLeaveToHub(PPCContext& ctx, uint8_t* base);
 void RaceMenuDestroy(PPCContext& ctx, uint8_t* base);
 void RaceMenuStart(PPCContext& ctx, uint8_t* base);
-// Helpers (r3 the machine). SetEventRange's and SetUpEvents' have no
-// adapters (only the harness runs their steps).
+// Helpers (r3 the machine). SetEventRange's, SetUpEvents' and Refresh's
+// have no adapters (only the harness runs their steps).
 void RaceMenuBack(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetUpEvents(PPCContext& ctx, uint8_t* base);
 void RaceMenuRefresh(PPCContext& ctx, uint8_t* base);
-// Update's callees (r3 the machine, r4 the mode where read).
+// Update's callees (r3 the machine, r4 the mode where read); only
+// AnimateVariantPage's has an adapter (the others' only the harness runs).
 void RaceMenuTransition0(PPCContext& ctx, uint8_t* base);
 void RaceMenuTransition3(PPCContext& ctx, uint8_t* base);
 void RaceMenuTransition5(PPCContext& ctx, uint8_t* base);
