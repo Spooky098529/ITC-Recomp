@@ -515,6 +515,9 @@ set(ITC_SOURCES
     src/tuning_machine/owned_parts.cpp
     src/tuning_machine/prices.cpp
     src/tuning_machine/unlocked_parts.cpp
+    src/hooks/race_menu.cpp
+    src/race_menu/handlers.cpp
+    src/race_menu/init.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp
@@ -740,6 +743,7 @@ set(ITC_SOURCES
     src/harnesses/type2_dialog.cpp
     src/harnesses/garage_screen.cpp
     src/harnesses/tuning_machine.cpp
+    src/harnesses/race_menu.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
