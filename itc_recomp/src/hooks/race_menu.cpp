@@ -245,8 +245,9 @@ ITC_RACE_MENU(82188A20, RaceMenuBack)
 ITC_RACE_MENU(8218AFD8, RaceMenuKindPage)
 ITC_RACE_MENU(8218B750, RaceMenuVariantPage)
 ITC_RACE_MENU(8218B2C8, RaceMenuEventPage)
-// AnimateEventPage (from EventPage).
-ITC_RACE_MENU(82189FE8, RaceMenuAnimateEventPage)
+// AnimateEventPage sub_82189FE8: no adapter (removed, B7 loop, 2026-11-10:
+// its only caller, EventPage, is native and calls its plain C++; the
+// register step above is the harness's).
 // AnimateKindPage sub_821898C0: no adapter (removed, B7 loop, 2026-11-10:
 // its only caller, KindPage, is native and calls its plain C++; the
 // register step above is the harness's).

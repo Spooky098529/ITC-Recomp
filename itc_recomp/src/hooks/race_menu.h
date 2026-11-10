@@ -39,8 +39,9 @@ void RaceMenuDebugKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuDebugEventPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuDebugVariantPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base);
-// The pages Draw runs (r3 the machine); AnimateKindPage's has no adapter
-// (only the harness runs its step).
+// The pages Draw runs (r3 the machine; r4 the mode for EventPage);
+// AnimateKindPage's and AnimateEventPage's have no adapters (only the
+// harness runs their steps).
 void RaceMenuKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuVariantPage(PPCContext& ctx, uint8_t* base);
