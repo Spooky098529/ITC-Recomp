@@ -226,6 +226,35 @@ uint64_t AnimateEventPage(uint8_t* base, uint32_t machine, uint32_t sp, const Ca
 uint64_t Update(uint8_t* base, uint64_t machine_r3, uint64_t mode_r4, uint32_t sp,
                 const Calls& calls);
 
+// --- Draw and its last pages (draw.cpp) ---
+//
+// sub_82188CE8 RaceMenu::StartEvent (r3 the machine): the location by the
+// event's type (the +9852 pair word of the cursor +9828; 0 to 14, case 0
+// the piece sub_82188D44's work; above 14 location 0), Career::SetUpEvent
+// (save +10144, mode +9820, location) through its override; location 14 to
+// 19: +9792 = 0 (SetUpEvent's r3); else +9792 = 1 and Race::SetUp(save, -1)
+// through its override (its r3). 112-byte frame.
+uint64_t StartEvent(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8218BB18 RaceMenu::StartPage (page 10): once both fades' counts are
+// 0, StartEvent's plain C++ and +9604 = 10 (its r3); else `machine_r3`.
+// 96-byte frame.
+uint64_t StartPage(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& calls);
+// sub_8218B9F0 RaceMenu::LeavePage (page 9; r4 the mode): once both fades'
+// counts are 0, the sound manager's slots 14 and 13 (cue 0 of bank 1
+// stopped when it plays), Sound::Play(1, 2) through its override unless cue
+// 2 plays, message 7 posted on the mode's ring, +9808 = 6. The last call's
+// r3, else `machine_r3`. 176-byte frame (+80 to +108 the cues' and banks'
+// words).
+uint64_t LeavePage(uint8_t* base, uint64_t machine_r3, uint32_t mode, uint32_t sp,
+                   const Calls& calls);
+// sub_8218C578 RaceMenu::Draw ((5, 1); r3 the machine, r4 the mode): with
+// +9784 set, the page object's +0 picks the page's plain C++ (3 KindPage,
+// the piece sub_8218C5DC's work; 4 EventPage; 5 VariantPage; 7 Back; 9
+// LeavePage; 10 StartPage), then Back when the second page object's +0 is
+// 7. The last callee's r3 (`machine_r3` for Back's). 112-byte frame.
+uint64_t Draw(uint8_t* base, uint64_t machine_r3, uint64_t mode_r4, uint32_t sp,
+              const Calls& calls);
+
 // --- The machine's set-up (init.cpp) ---
 //
 // sub_8218CE10 RaceMenu::Init: 17 transitions added to `machine`

@@ -978,6 +978,66 @@ void DrawPages(Context& h, const World& w) {
              hooks::RaceMenuEventPage, {{-160, -112}, {-80, -64}}, EventWords});
 }
 
+// The fades' counts: 0 three times in four, else one or both not.
+void FadeCounts(Random& r, const World& w) {
+  const bool done = r.Below(4) != 0;
+  for (const uint32_t count : {0x826A50E4u, 0x826A50DCu}) {
+    guest::StoreU32(w.base, count, done || r.Below(2) == 0 ? 0 : 1 + r.Below(30));
+  }
+}
+
+// LeavePage's and Draw's after: the StopCue recorder's r6 word (+336: it
+// reads r3 to r5 only, r6 the original's leftover) left out, as Start's.
+void ClearStopCueR6(PPCContext&, const World& w, Outputs&) {
+  guest::StoreU32(w.base, w.at(kMenuWorldAt) + 336, 0);
+}
+
+void Draw(Context& h, const World& w) {
+  // LeavePage: the sound manager, the fades' counts; its frame up to its
+  // register saves (__savegprlr_26: from -56).
+  Run(h, w, {"RaceMenu::LeavePage (sub_8218B9F0)", 200, __imp__sub_8218B9F0,
+             hooks::RaceMenuLeavePage, {{-176, -56}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Machine(t, r, w);
+               SoundManager(r, w);
+               FadeCounts(r, w);
+             },
+             ClearStopCueR6});
+  // Draw: the page object's +0 one of the pages (shaped as each page's
+  // harness shapes it) or another, +9784 0 now and then, the second page
+  // object's +0 7 now and then. Page 10 with a fade not done (StartPage's
+  // StartEvent, with Career::SetUpEvent's world, is race_event's harness's).
+  // Its own frame (+0 to +87) compared, the pages' under it not.
+  Run(h, w, {"RaceMenu::Draw (sub_8218C578)", 600, __imp__sub_8218C578, hooks::RaceMenuDraw,
+             {{-112, -24}},
+             [](PPCContext& t, Random& r, const World& w) {
+               static constexpr uint32_t kPageList[] = {3, 4, 5, 7, 9, 10, 0, 1, 2, 6, 8, 11};
+               const uint32_t page = r.Below(4) == 0 ? (r.Below(2) == 0 ? uint32_t(r.Next())
+                                                                         : kPageList[r.Below(12)])
+                                                     : kPageList[r.Below(6)];
+               switch (page) {
+                 case 3: KindWords(t, r, w); break;
+                 case 4: EventWords(t, r, w); break;
+                 case 5: VariantWords(t, r, w); break;
+                 case 9:
+                   Machine(t, r, w);
+                   SoundManager(r, w);
+                   FadeCounts(r, w);
+                   break;
+                 default: Machine(t, r, w); break;
+               }
+               if (page == 10) {
+                 guest::StoreU32(w.base, 0x826A50E4, 1 + r.Below(30));
+               }
+               uint8_t* base = w.base;
+               guest::StoreU32(base, w.machine() + 9784, r.Below(6) == 0 ? 0 : 1);
+               guest::StoreU32(base, w.at(kPagesAt), page);
+               guest::StoreU32(base, w.at(kPages2At),
+                               r.Below(3) == 0 ? 7 : r.Below(4) == 0 ? 6 : r.Below(13));
+             },
+             ClearStopCueR6});
+}
+
 }  // namespace
 
 void RaceMenu(Context& h) {
@@ -994,6 +1054,7 @@ void RaceMenu(Context& h) {
     Transitions(h, w);
     Update(h, w);
     DrawPages(h, w);
+    Draw(h, w);
   }
 }
 

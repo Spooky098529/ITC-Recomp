@@ -47,6 +47,12 @@ void RaceMenuAnimateKindPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuVariantPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuEventPage(PPCContext& ctx, uint8_t* base);
 void RaceMenuAnimateEventPage(PPCContext& ctx, uint8_t* base);
+// Draw (the (5, 1) functor: r3 the machine, r4 the mode) and its last
+// pages (r3 the machine; r4 the mode for LeavePage).
+void RaceMenuStartEvent(PPCContext& ctx, uint8_t* base);
+void RaceMenuStartPage(PPCContext& ctx, uint8_t* base);
+void RaceMenuLeavePage(PPCContext& ctx, uint8_t* base);
+void RaceMenuDraw(PPCContext& ctx, uint8_t* base);
 // Update (the (5, 0) functor: r3 the machine, r4 the mode).
 void RaceMenuUpdate(PPCContext& ctx, uint8_t* base);
 // Init (r3 the machine).

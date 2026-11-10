@@ -34,6 +34,24 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
   return Load(base, FindPair(base, id, key));
 }
 
+// The fades' counts (both 0 once the fades are done).
+constexpr uint32_t kFadeCountA = 0x826A50E4;
+constexpr uint32_t kFadeCountB = 0x826A50DC;
+
+constexpr uint32_t kSoundPlay = 0x82175850;  // Sound::Play, through its override
+
+// The sound manager and its vtable's slots (bytes into it).
+constexpr uint32_t kSoundManager = 0x826C5C80;
+constexpr uint32_t kStopCueSlot = 52;       // 13
+constexpr uint32_t kIsCuePlayingSlot = 56;  // 14
+
+// The sound manager's slot with r4 = the bank's word, r5 = the cue's.
+inline uint64_t CallSlot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame,
+                         uint32_t lr, uint32_t bank, uint32_t cue) {
+  const uint32_t manager = Load(base, kSoundManager);
+  return calls.Call(Load(base, Load(base, manager) + slot), frame, lr, manager, bank, cue);
+}
+
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
 inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {

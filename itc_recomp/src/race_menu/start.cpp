@@ -26,21 +26,8 @@ constexpr uint32_t kFloatA134 = 0x8200A134;
 constexpr uint32_t kFloatC34 = 0x82000C34;
 
 constexpr uint32_t kResetPose = 0x8211ABA8;
-constexpr uint32_t kSoundPlay = 0x82175850;  // Sound::Play, through its override
 constexpr uint32_t kFadeIn = 0x8209D038;     // ScreenFades::FadeIn, through its override
 constexpr uint32_t kFadeInLayer = 0x82001BEC;
-
-// The sound manager and its vtable's slots (bytes into it).
-constexpr uint32_t kSoundManager = 0x826C5C80;
-constexpr uint32_t kStopCueSlot = 52;       // 13
-constexpr uint32_t kIsCuePlayingSlot = 56;  // 14
-
-// The sound manager's slot with r4 = the bank's word, r5 = the cue's.
-uint64_t CallSlot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame, uint32_t lr,
-                  uint32_t bank, uint32_t cue) {
-  const uint32_t manager = Load(base, kSoundManager);
-  return calls.Call(Load(base, Load(base, manager) + slot), frame, lr, manager, bank, cue);
-}
 
 }  // namespace
 

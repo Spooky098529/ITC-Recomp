@@ -32,8 +32,11 @@ ITC_FLAG_BOOL(native_race_menu, true, "ITC",
               "sub_8218AFD8, AnimateKindPage sub_821898C0, VariantPage sub_8218B750, EventPage "
               "sub_8218B2C8 and AnimateEventPage sub_82189FE8 (movie 16's texts with SetText's "
               "unset varargs 0) (Menu::Step, MenuSound::Play, the fade and the mapper's slots through their "
-              "overrides, AnimateVariantPage and SaveData::Of as plain C++) (the same writes; checked by "
-              "--run_harnesses=race_menu)");
+              "overrides, AnimateVariantPage and SaveData::Of as plain C++); RaceMenu::Draw "
+              "sub_8218C578 (the pages as plain C++), LeavePage sub_8218B9F0 (the sound manager's "
+              "slots 14 and 13 and Sound::Play through their overrides), StartPage sub_8218BB18 and "
+              "StartEvent sub_82188CE8 (Career::SetUpEvent and Race::SetUp through their overrides) "
+              "(the same writes; checked by --run_harnesses=race_menu,race_event)");
 
 namespace hooks {
 
@@ -192,6 +195,22 @@ void RaceMenuUpdate(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Update(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
+void RaceMenuStartEvent(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::StartEvent(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void RaceMenuStartPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::StartPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+void RaceMenuLeavePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::LeavePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void RaceMenuDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
 void RaceMenuInit(PPCContext& ctx, uint8_t* base) {
@@ -251,5 +270,11 @@ ITC_RACE_MENU(8218B2C8, RaceMenuEventPage)
 // AnimateKindPage sub_821898C0: no adapter (removed, B7 loop, 2026-11-10:
 // its only caller, KindPage, is native and calls its plain C++; the
 // register step above is the harness's).
+// Draw (the (5, 1) functor, from the recompiled state machine).
+ITC_RACE_MENU(8218C578, RaceMenuDraw)
+// The last pages and StartEvent (from Draw, native, through their plain C++).
+ITC_RACE_MENU(8218B9F0, RaceMenuLeavePage)
+ITC_RACE_MENU(8218BB18, RaceMenuStartPage)
+ITC_RACE_MENU(82188CE8, RaceMenuStartEvent)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
 ITC_RACE_MENU(8218CE10, RaceMenuInit)

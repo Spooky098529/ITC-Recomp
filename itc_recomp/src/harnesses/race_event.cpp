@@ -22,6 +22,7 @@
 #include "hooks/car_dealer.h"
 #include "hooks/career.h"
 #include "hooks/race_event.h"
+#include "hooks/race_menu.h"
 #include "memory/heap.h"
 #include "race_event/race_event.h"
 #include "test_route.h"
@@ -38,6 +39,7 @@
 ITC_FLAG_DECLARE(bool, native_race_event);
 ITC_FLAG_DECLARE(bool, native_career);
 ITC_FLAG_DECLARE(bool, native_car_dealer);
+ITC_FLAG_DECLARE(bool, native_race_menu);
 
 namespace harness {
 
@@ -1039,6 +1041,98 @@ void StartFirstRaceGroup(Context& h, World& w, const SetupFn& shape, uint32_t fr
   guest::StoreU32(base, car_dealer::kData, dealer_data);
 }
 
+// RaceMenu::StartEvent and StartPage with --native_race_menu,
+// --native_career and --native_race_event off.
+template <GuestFunction recompiled>
+void OriginalRaceMenu(PPCContext& ctx, uint8_t* base) {
+  ITC_FLAG(native_race_menu) = false;
+  Original<recompiled>(ctx, base);
+  ITC_FLAG(native_race_menu) = true;
+}
+
+// RaceMenu::StartEvent (sub_82188CE8) and StartPage (sub_8218BB18,
+// race-menu.md): SetUpEvent's world (its frame below StartEvent's 112 bytes,
+// and StartPage's 96), the race menu's machine in a block of its own (random
+// words; the cursor +9828 0 to 14, its pair's type +9852 0 to 14 or above,
+// the variant +9724 small, the mode +9820, the save +10144 the world's), the
+// fades' counts 0 or not for StartPage; Race::SetUp's calls recorded on both
+// sides (answered 1). Compared: the calls, the machine, the fades' counts,
+// the event, the save and race blocks, the scratch area, the caller's area
+// and the function's own frame (but its register saves).
+void RaceMenuStartGroup(Context& h, World& w, const SetupFn& shape, uint32_t frame_bytes) {
+  uint8_t* const base = h.base;
+  static constexpr uint32_t kFadeCounts[] = {0x826A50E4, 0x826A50DC};
+  const uint32_t fades[] = {guest::LoadU32(base, kFadeCounts[0]),
+                            guest::LoadU32(base, kFadeCounts[1])};
+  const Block machine(10160);
+  for (const bool page : {false, true}) {
+    // The function's own frame: StartPage's 96 bytes (r31 at -16), else
+    // StartEvent's 112 (r30 at -24).
+    const uint32_t own = page ? 96 : 112;
+    const uint32_t saves = page ? 16 : 24;
+    Group(
+        h, w, page ? "RaceMenu::StartPage (sub_8218BB18)" : "RaceMenu::StartEvent (sub_82188CE8)",
+        48,
+        [&h, base, &shape, frame_bytes, &machine, page](Random& shared, const World& w,
+                                                        PPCContext& t) {
+          shape(shared, w, t);
+          const uint32_t sp = t.r1.u32;
+          Random r(shared.Next());
+          WriteRandom(base, sp - frame_bytes - 208, 208, r);
+          const uint32_t m = machine.address;
+          WriteRandom(base, m, machine.bytes, r);
+          const uint32_t cursor = r.Below(15);
+          guest::StoreU32(base, m + 9828, cursor);
+          const uint32_t type = r.Below(4) == 0 ? (r.Below(2) == 0 ? 15 + r.Below(100)
+                                                                   : uint32_t(r.Next()))
+                                                : r.Below(15);
+          guest::StoreU32(base, m + 9852 + 8 * cursor, type);
+          guest::StoreU32(base, m + 9724, r.Below(3) == 0 ? r.Below(40) : r.Below(12));
+          guest::StoreU32(base, m + 9820, r.Below(8) == 0 ? r.Below(8) : r.Below(4));
+          guest::StoreU32(base, m + 10144, w.save.address);
+          for (const uint32_t count : kFadeCounts) {
+            guest::StoreU32(base, count, page && r.Below(4) == 0 ? 1 + r.Below(30) : 0);
+          }
+          t.r3.u64 = m | (uint64_t(r.Below(2)) << 32);
+          t.r4.u64 = r.Next();
+          g_setups.clear();
+          hooks::g_start_up_recorder = RecordSetUp;
+        },
+        page ? OriginalRaceMenu<__imp__sub_8218BB18> : OriginalRaceMenu<__imp__sub_82188CE8>,
+        page ? hooks::RaceMenuStartPage : hooks::RaceMenuStartEvent,
+        [&h, base, &machine, own, saves](Outputs& out, const World& w, PPCContext&) {
+          hooks::g_start_up_recorder = nullptr;
+          out.Word(uint32_t(g_setups.size()));
+          for (const uint32_t word : g_setups) {
+            out.Word(word);
+          }
+          out.Bytes(Read(base, machine.address, machine.bytes));
+          for (const uint32_t count : kFadeCounts) {
+            out.Word(guest::LoadU32(base, count));
+          }
+          const uint32_t e = guest::LoadU32(base, re::kEvent);
+          out.Word(e == 0 ? 0 : e == w.event() ? 1 : 2);
+          if (e != 0) {
+            CaptureEvent(out, base, e);
+            if (e != w.event()) {
+              memory::Free(e);
+            }
+          }
+          if (e != w.event()) {
+            CaptureEvent(out, base, w.event());
+          }
+          out.Bytes(Read(base, w.save.address, w.save.bytes));
+          out.Bytes(Read(base, w.race.address, w.race.bytes));
+          out.Bytes(Read(base, h.data, kScratchBytes));
+          const uint32_t sp = CallContext(h).r1.u32;
+          out.Bytes(Read(base, sp, h.data - sp));
+          out.Bytes(Read(base, sp - own, own - saves));
+        });
+  }
+  guest::StoreU32(base, kFadeCounts[0], fades[0]);
+  guest::StoreU32(base, kFadeCounts[1], fades[1]);
+}
+
 void SetUpEvents(Context& h, World& w) {
   uint8_t* const base = h.base;
   const Block tables(8 * kTableBytes);
@@ -1120,6 +1214,8 @@ void SetUpEvents(Context& h, World& w) {
   // event, the save and race blocks, StartFirstRace's frame (but its lr
   // save) and SetUpEvent's compared.
   StartFirstRaceGroup(h, w, shape, frame_bytes, compared);
+  // RaceMenu::StartEvent and StartPage (race-menu.md): the same world.
+  RaceMenuStartGroup(h, w, shape, frame_bytes);
 }
 
 }  // namespace
