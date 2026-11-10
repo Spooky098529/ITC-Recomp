@@ -16,6 +16,14 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
+
+- The race menu (`race-menu.md`; attract race `itc_4804` never raced:
+  its validation halted on `Transition3`'s harness; replay `itc_4805`
+  ok): `sub_82189648` OnNo, `sub_82188938` OnBack, `sub_8218AF08`
+  Unload, `sub_8218AF80` LeaveToHub, `sub_82188A20` Back,
+  `sub_8218AE48` Transition12, `sub_8218B9F0` LeavePage.
+
 ## Run 2026-11-09 10:53 (`b7-loop-09-11-26`)
 
 - The garage screen's and tuning machine's paths never seen in play,

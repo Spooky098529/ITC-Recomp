@@ -630,6 +630,17 @@ kept recompiled as `BackToBuilds`, `OnYes` waiting on `Garage::Sell`).
 The rest waits on `Garage::Sell`, the type 2 mode's +9640 and +0x173D0 machines, its Init
 `sub_82197278`, the tuning screen's refresh `sub_821E3AD0` (it blocks
 `Start`) and the leads in `docs/loops/leads.md`.
+Its forty-second run (`b7-loop-10-11-26`, 2026-11-10, not yet merged;
+summary `docs/loops/b7-loop-2026-11-10-2102.md`) made the type 2
+mode's race menu (`race-menu.md`, `--native_race_menu`, 38 of 38: its
+mode, event and variant pages and the event's start, the machine at
++9640) native (ours 5,364 -> 5,402), then halted at its validation:
+`RaceMenu::Transition3`'s harness read the wild guest address
+0x701FAF40 over and over in the all-harness race, so 15 of its
+functions have no harness line; to fix and validate again. The rest
+waits on the type 2 mode's +0x173D0 machine, `Garage::Sell`, the
+tuning screen's refresh `sub_821E3AD0` and the leads in
+`docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

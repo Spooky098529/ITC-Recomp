@@ -276,7 +276,11 @@ goes in `src/` as overrides), American English.
   then, by the user's call, their paths never seen in play (ours 5,364);
   the rest waits on `Garage::Sell`, the type 2 mode's +9640 and +0x173D0 machines, its
   Init `sub_82197278`, the tuning screen's refresh `sub_821E3AD0` and
-  update `sub_821E6C50`. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  update `sub_821E6C50`. Its forty-second run (`b7-loop-10-11-26`,
+  2026-11-10, halted at its first validation) made the type 2 mode's
+  race menu (`race-menu.md`, 38 of 38) native (ours 5,364 -> 5,402);
+  `Transition3`'s harness read a wild address in the all-harness race,
+  to fix before validating again. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the

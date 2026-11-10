@@ -25,10 +25,19 @@ file's history. What's left to see in a drive, from every run:
   `Update`, the pages, `Draw` with `StartPage` and `StartEvent`; 38 of
   38 ours: 14 Overridden, 3 Merged, 21 Native; `--native_race_menu`;
   races 37-38 s at 40, 0 errors, its harnesses 0 differing; 7
-  subagents, one at a time). Left: none. Step: validation (agent
-  running).
+  subagents, one at a time). Left: none. Validation halted: the
+  all-harness race `itc_4804` never raced: `RaceMenu::Transition3`'s
+  harness (`src/harnesses/race_menu.cpp`) looped on "Unhandled guest
+  access violation: read of guest 0x701FAF40" (~6.96M lines, then the
+  title exited), after 15 race menu groups at 0 differing and every
+  earlier harness at 0; 20 of 35 harness lines, 15 missing (the race
+  menu's groups after Transition3). No prints added. The replay
+  `itc_4805` was ok (127 s, 0 errors): 28 ran in it, 7 to drive.
 
 ## Done
+
+- The race menu: `race-menu.md`, 38 of 38 (21 Native, 3 Merged),
+  `--native_race_menu`, a65e90d7..4414719e; its validation halted.
 
 ## Rows to review
 
@@ -52,3 +61,15 @@ The run's section of `review.md` ("Run 2026-11-10 21:02").
   390, unknown 656).
 
 ## Stopped
+
+2026-11-10, halted at the race menu's validation (subsystem 1 of 3):
+`RaceMenu::Transition3`'s harness cases read the wild guest address
+0x701FAF40 in the all-harness race (`itc_4804`), the access violation
+repeated until the title exited, so the race never started and 15 of
+the race menu's functions have no harness line ("When to halt": a
+harness failing, functions missing). Which side read the address isn't
+known (probably a world word the harness leaves unset, as `dbc8ee0`'s
+`ai_drivers` case); the migration agent's own runs of the race menu's
+harnesses (at 40 s) were at 0 differing. Not debugged by the loop. The
+replay `itc_4805` ran 28 of the 35 as native code with 0 errors.
+Nothing uncommitted. `itc_4804.log` is ~1.1 GB (the repeated line).
