@@ -91,6 +91,22 @@ through player 0's mapper entry `0x826BAB80` + 8 × `[0x826BABA4]`, as
 and 14 (`AudioManager::StopCue`, `IsCuePlaying`,
 [`sound-cues.md`](sound-cues.md)).
 
+Made native by the B7 loop on 2026-11-10 (`b7-loop-10-11-26`, 38 of 38
+ours): plain C++ in `itc_recomp/src/race_menu/` (`handlers.cpp`, `init.cpp`,
+`events.cpp`, `refresh.cpp`, `start.cpp`, `transitions.cpp`, `pages.cpp`,
+`draw.cpp`) behind `--native_race_menu`, harness `race_menu` (and
+`race_event` for `StartEvent` and `StartPage`, over `Career::SetUpEvent`'s
+world). The adapters left are the machine's functors (`Create`,
+`OpenMovie`, `WaitForMovie`, `Start`, `Draw`, `Update`, the replies,
+`Unload`, `LeaveToHub`, `Destroy`) and the Init (its caller, the type 2
+mode's Init `sub_82197278`, is recompiled); the three split pieces are
+Merged. The `UiMovie::SetText` r7 to r10 leftovers pass 0 (the user's
+call of 2026-10-30), and the calls to the empty `sub_82106540` are left
+out as in the race screens' native code. The map's corrections: page 4's
+list with bit 0x20 holds 15 names (strings 360 to 374); `Transition3`'s
++80 = 1 is node (11, 1)'s; `Start` sets node (11, 0)'s +12 and +16 as
+(11, 1)'s.
+
 Shared, with their rows elsewhere: `StateMachine::Add` `sub_82106158`
 ([`game-modes.md`](game-modes.md)), `ScreenMachine::Reenter`
 `sub_822895E0` ([`location-screen.md`](location-screen.md)),
