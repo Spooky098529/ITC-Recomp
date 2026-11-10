@@ -518,6 +518,7 @@ set(ITC_SOURCES
     src/hooks/race_menu.cpp
     src/race_menu/handlers.cpp
     src/race_menu/init.cpp
+    src/race_menu/start.cpp
     src/race_menu/events.cpp
     src/race_menu/refresh.cpp
     src/hooks/type2_screens.cpp

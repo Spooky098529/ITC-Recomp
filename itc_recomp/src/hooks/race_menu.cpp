@@ -19,7 +19,9 @@ ITC_FLAG_BOOL(native_race_menu, true, "ITC",
               "sub_82189158; SetUpEvents sub_821891C8 (the second memcpy's plain C++) and Refresh "
               "sub_8218BC18 (the UI movie setters through their overrides, SetText's unset "
               "varargs 0); RaceMenu::Init sub_8218CE10 (its step table, StateMachine::Add's "
-              "plain C++) (the same writes; checked by --run_harnesses=race_menu)");
+              "plain C++); RaceMenu::Start sub_8218C9C8 (SaveData::Of, SetUpEvents, SetEventRange, "
+              "Refresh and UiMovie::FindNode as plain C++, the sound manager's slots 14 and 13, "
+              "Sound::Play and the fade through their overrides) (the same writes; checked by --run_harnesses=race_menu)");
 
 namespace hooks {
 
@@ -105,6 +107,10 @@ void RaceMenuDestroy(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
+void RaceMenuStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rm::Start(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
 void RaceMenuBack(PPCContext& ctx, uint8_t* base) { rm::Back(base, ctx.r3.u32); }
 void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base) {
   rm::SetEventRange(base, ctx.r3.u32);
@@ -150,6 +156,7 @@ ITC_RACE_MENU(821896A0, RaceMenuOnDialogClosed)
 ITC_RACE_MENU(8218AF08, RaceMenuUnload)
 ITC_RACE_MENU(8218AF80, RaceMenuLeaveToHub)
 ITC_RACE_MENU(82188FE0, RaceMenuDestroy)
+ITC_RACE_MENU(8218C9C8, RaceMenuStart)
 // Back (from Draw and its piece sub_8218C5DC) and SetEventRange (from
 // Start), recompiled.
 ITC_RACE_MENU(82188A20, RaceMenuBack)

@@ -121,6 +121,18 @@ uint64_t SetUpEvents(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Call
 // leave unset passed 0.
 uint64_t Refresh(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& calls);
 
+// --- The machine's start (start.cpp) ---
+//
+// sub_8218C9C8 RaceMenu::Start ((4, 1) -> 5; r3 the machine, its high bits
+// kept for SetUpEvents and Refresh): the machine's words, player 0's save
+// data's name, money, day and progress bits, the two tables, movie 1's pose
+// reset and texts, the nodes' floats and badges, the page object on page 3
+// through transition 0, the menu, the hub's music stopped and the menu's
+// played (the sound manager's slots 14 and 13, Sound::Play), the fade in.
+// FadeIn's r3. 176-byte frame (+80 the movie's id, then the cue; +84 to
+// +108 the cues' and banks' words).
+uint64_t Start(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& calls);
+
 // --- The machine's set-up (init.cpp) ---
 //
 // sub_8218CE10 RaceMenu::Init: 17 transitions added to `machine`

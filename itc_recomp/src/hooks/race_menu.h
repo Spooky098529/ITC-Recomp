@@ -21,6 +21,7 @@ void RaceMenuOnDialogClosed(PPCContext& ctx, uint8_t* base);
 void RaceMenuUnload(PPCContext& ctx, uint8_t* base);
 void RaceMenuLeaveToHub(PPCContext& ctx, uint8_t* base);
 void RaceMenuDestroy(PPCContext& ctx, uint8_t* base);
+void RaceMenuStart(PPCContext& ctx, uint8_t* base);
 // Helpers (r3 the machine).
 void RaceMenuBack(PPCContext& ctx, uint8_t* base);
 void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base);

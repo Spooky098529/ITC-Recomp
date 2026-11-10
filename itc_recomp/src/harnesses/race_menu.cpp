@@ -619,6 +619,66 @@ void Pages(Context& h, const World& w) {
              }});
 }
 
+// The getter sub_82090770 (r3 = +60) and the leaf recorder sub_820A8420
+// (r4's low byte, r5 and r6 at +320, +332 and +336), as the front-end
+// screen helpers' harness uses them.
+constexpr uint32_t kGet60 = 0x82090770;
+constexpr uint32_t kRecordR4R6 = 0x820A8420;
+constexpr uint32_t kStopCueSlot = 52;       // 13
+constexpr uint32_t kIsCuePlayingSlot = 56;  // 14
+
+// The sound manager ([0x826C5C80], in the menus' world): IsCuePlaying (slot
+// 14) and PlayCue2D (slot 10, Sound::Play's) the getter (its +60's low byte
+// 0 half the time: both cues playing or neither), StopCue (slot 13) the
+// recorder.
+void SoundManager(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t manager = w.at(kMenuWorldAt), vtable = manager + 0x400;
+  guest::StoreU32(base, manager, vtable);
+  guest::StoreU32(base, manager + 60,
+                  r.Below(2) == 0 ? uint32_t(r.Next()) & ~0xFFu : uint32_t(r.Next()));
+  guest::StoreU32(base, vtable + kIsCuePlayingSlot, kGet60);
+  guest::StoreU32(base, vtable + kStopCueSlot, kRecordR4R6);
+  guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, kGet60);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+}
+
+// The save's day (+6100): 0 to 999 mostly, around 999, above it or any
+// (negative too: the weekday is a signed remainder).
+uint32_t Day(Random& r) {
+  switch (r.Below(5)) {
+    case 0: return 995 + r.Below(10);
+    case 1: return 1000 + r.Below(100000);
+    case 2: return uint32_t(r.Next());
+    default: return r.Below(1000);
+  }
+}
+
+void Start(Context& h, const World& w) {
+  // Start: player 0's save data shaped (the progress bits, the day, the
+  // money, the name record), the sound manager. Its frame (+0 to +111) and
+  // Refresh's below it (as Refresh's harness compares it, from Start's
+  // frame, without SetUpEvents' register saves from -264 left there)
+  // compared; the callees' frames under them (FindNode's, which the native
+  // code doesn't make) not. The recorder's r6 word (+336: StopCue reads r3
+  // to r5 only, r6 the original's leftover) left out.
+  Run(h, w, {"RaceMenu::Start (sub_8218C9C8)", 200, __imp__sub_8218C9C8, hooks::RaceMenuStart,
+             {{-176, -64}, {-400, -352}, {-320, -264}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               Machine(t, r, w);
+               guest::StoreU32(base, w.save + 0x199E0, ProgressBits(r));
+               guest::StoreU32(base, w.save + 6100, Day(r));
+               guest::StoreU32(base, w.save + 6116,
+                               r.Below(2) == 0 ? r.Below(100000) : uint32_t(r.Next()));
+               NameRecord(base, w.save + 8, r);
+               SoundManager(r, w);
+             },
+             [](PPCContext&, const World& w, Outputs&) {
+               guest::StoreU32(w.base, w.at(kMenuWorldAt) + 336, 0);
+             }});
+}
+
 }  // namespace
 
 void RaceMenu(Context& h) {
@@ -631,6 +691,7 @@ void RaceMenu(Context& h) {
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
     Pages(h, w);
+    Start(h, w);
   }
 }
 
