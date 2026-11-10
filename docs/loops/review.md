@@ -35,9 +35,12 @@ When the user has reviewed a run's section, its heading gets
   gives nodes real track-less animations (the original faulted on
   random words).
 - The race menu's validation halted (`itc_4804`): `Transition3`'s
-  harness reads the wild guest address 0x701FAF40 in the all-harness
-  run (not in the migration agent's own runs); to fix before the
-  merge, then validate again.
+  harness read the wild guest address 0x701FAF40 in the all-harness
+  run (not in the migration agent's own runs). Fixed (4438f1c3): the
+  world's random +116 words (each node's first scene animation entry)
+  now 40 to 47 over real track-less animations for every race menu
+  harness (before, only `EventWords` set them); validated again
+  (`itc_4807`, 35 of 35, all 0 differing).
 - The race menu's map (e6f5b641): `race-menu.md`, 38 rows (31 in play;
   the type 2 mode's machine at +9640, UI movie 1, probably the career's
   race menu), rows in `known-data.md` (`0x826D8404`-`0x826D840C`, the

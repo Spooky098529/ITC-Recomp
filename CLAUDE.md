@@ -636,8 +636,9 @@ mode's race menu (`race-menu.md`, `--native_race_menu`, 38 of 38: its
 mode, event and variant pages and the event's start, the machine at
 +9640) native (ours 5,364 -> 5,402), then halted at its validation:
 `RaceMenu::Transition3`'s harness read the wild guest address
-0x701FAF40 over and over in the all-harness race, so 15 of its
-functions have no harness line; to fix and validate again. The rest
+0x701FAF40 over and over in the all-harness race (the world's random
++116 scene animation words); fixed after the stop (4438f1c3, the
+user's call) and validated again (35 of 35 harness lines). The rest
 waits on the type 2 mode's +0x173D0 machine, `Garage::Sell`, the
 tuning screen's refresh `sub_821E3AD0` and the leads in
 `docs/loops/leads.md`.

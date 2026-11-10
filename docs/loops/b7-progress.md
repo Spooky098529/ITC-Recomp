@@ -33,11 +33,20 @@ file's history. What's left to see in a drive, from every run:
   earlier harness at 0; 20 of 35 harness lines, 15 missing (the race
   menu's groups after Transition3). No prints added. The replay
   `itc_4805` was ok (127 s, 0 errors): 28 ran in it, 7 to drive.
+- After the halt, by the user's call (2026-11-10, "fix it"): the
+  harness's world left each node's first scene animation entry (+116)
+  random, so `UiMovie::Play`'s lookups read anywhere in guest memory
+  (`itc_4806`: case 34, the recompiled side, sub-scene 20's entry
+  0x701FAF20 + 8 x 4); `MakeWorld` now gives every node `EventWords`'
+  set-up (4438f1c3). Validated again `itc_4807` (race 65 s at 180, the
+  harnesses ~113 s; 0 errors, every harness 0 differing outside the
+  expected groups, 35 of 35 harness lines). Recorded.
 
 ## Done
 
 - The race menu: `race-menu.md`, 38 of 38 (21 Native, 3 Merged),
-  `--native_race_menu`, a65e90d7..4414719e; its validation halted.
+  `--native_race_menu`, a65e90d7..4414719e; its validation halted, its
+  harness fixed (4438f1c3) and validated again.
 
 ## Rows to review
 
@@ -73,3 +82,5 @@ known (probably a world word the harness leaves unset, as `dbc8ee0`'s
 harnesses (at 40 s) were at 0 differing. Not debugged by the loop. The
 replay `itc_4805` ran 28 of the 35 as native code with 0 errors.
 Nothing uncommitted. `itc_4804.log` is ~1.1 GB (the repeated line).
+Fixed after the stop (4438f1c3, the user's call): the harness's random
++116 words; validated again (`itc_4807`, all 0 differing, 35 of 35).

@@ -280,7 +280,7 @@ goes in `src/` as overrides), American English.
   2026-11-10, halted at its first validation) made the type 2 mode's
   race menu (`race-menu.md`, 38 of 38) native (ours 5,364 -> 5,402);
   `Transition3`'s harness read a wild address in the all-harness race,
-  to fix before validating again. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  fixed after the stop (4438f1c3) and validated again. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
