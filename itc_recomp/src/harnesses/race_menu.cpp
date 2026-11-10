@@ -202,6 +202,19 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
       guest::StoreU32(base, node + 128 + 8 * e, w.node(r.Below(kNodeCount)));
     }
   }
+  // The scenes' animations (UiMovie::Play's and the like, of an index
+  // added to the scene's first): the 8 of no tracks. Each node's first
+  // animation entry (+116) 40 to 47, its entries 40 to 63 (past the
+  // children the sub-scenes are found among) those. Left random, +116 made
+  // an entry anywhere in guest memory, mapped or not by what ran before
+  // (RaceMenu::Transition3's case 34 read 0x701FAF40 in the all-harness run).
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    guest::StoreU32(base, w.node(n) + 116, 40 + r.Below(8));
+    for (uint32_t e = 40; e < 64; e++) {
+      guest::StoreU32(base, w.node(n) + 128 + 8 * e,
+                      w.at(kAnimationsAt) + 64 * r.Below(kAnimations));
+    }
+  }
   for (uint32_t k = 0; k < kAnimations; k++) {
     const uint32_t animation = w.at(kAnimationsAt) + 64 * k;
     for (uint32_t i = 0; i < 64; i += 4) {
@@ -918,21 +931,12 @@ void VariantWords(PPCContext& t, Random& r, const World& w) {
 // (+9976) 0 to 2 (now and then -1 or 3), the event count (+9848) and the
 // cursor kept (+9716) around each other, the scroll flag (+9836) 0 to 3, the
 // rows' badges (+9856 + 8 x row) 0 to 2 (now and then -1, 3 or any), the
-// history's depth, player 0's save +0x1F870 0 or not. The scenes'
-// animations (UiMovie::Play's, then Finish's, of the same index) the 8 of no
-// tracks: each node's first animation entry (+116) 40 to 47, its entries 40
-// to 63 (past the children the sub-scenes are found among) those.
+// history's depth, player 0's save +0x1F870 0 or not (the scenes'
+// animations are MakeWorld's).
 void EventWords(PPCContext& t, Random& r, const World& w) {
   uint8_t* base = w.base;
   Machine(t, r, w);
   PageInput(r, w);
-  for (uint32_t n = 0; n < kNodeCount; n++) {
-    guest::StoreU32(base, w.node(n) + 116, 40 + r.Below(8));
-    for (uint32_t e = 40; e < 64; e++) {
-      guest::StoreU32(base, w.node(n) + 128 + 8 * e,
-                      w.at(kAnimationsAt) + 64 * r.Below(kAnimations));
-    }
-  }
   const uint32_t m = w.machine();
   const uint32_t first = r.Below(15);
   const uint32_t last = r.Below(4) == 0 ? first : first + r.Below(15 - first);
