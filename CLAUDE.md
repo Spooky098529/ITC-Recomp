@@ -630,7 +630,9 @@ kept recompiled as `BackToBuilds`, `OnYes` waiting on `Garage::Sell`).
 The rest waits on `Garage::Sell`, the type 2 mode's +9640 and +0x173D0 machines, its Init
 `sub_82197278`, the tuning screen's refresh `sub_821E3AD0` (it blocks
 `Start`) and the leads in `docs/loops/leads.md`.
-Its forty-second run (`b7-loop-10-11-26`, 2026-11-10, not yet merged;
+Its forty-second run (`b7-loop-10-11-26`, 2026-11-10, ended by the
+user after its first subsystem and merged into `rexglue-removal-project`
+the same day;
 summary `docs/loops/b7-loop-2026-11-10-2102.md`) made the type 2
 mode's race menu (`race-menu.md`, `--native_race_menu`, 38 of 38: its
 mode, event and variant pages and the event's start, the machine at

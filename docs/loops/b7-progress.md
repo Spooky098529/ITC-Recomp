@@ -84,3 +84,5 @@ replay `itc_4805` ran 28 of the 35 as native code with 0 errors.
 Nothing uncommitted. `itc_4804.log` is ~1.1 GB (the repeated line).
 Fixed after the stop (4438f1c3, the user's call): the harness's random
 +116 words; validated again (`itc_4807`, all 0 differing, 35 of 35).
+Then the run was ended there by the user's call (2026-11-10, after 1
+of 3 subsystems) and merged into `rexglue-removal-project`.
