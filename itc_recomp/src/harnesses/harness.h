@@ -318,5 +318,6 @@ void TuningMachine(Context& h);
 void RaceMenu(Context& h);
 void CarSettings(Context& h);
 void UserInfo(Context& h);
+void Type2Mode(Context& h);
 
 }  // namespace harness

@@ -498,6 +498,10 @@ set(ITC_SOURCES
     src/user_info/handlers.cpp
     src/user_info/pages.cpp
     src/user_info/init.cpp
+    src/hooks/type2_mode.cpp
+    src/type2_mode/block.cpp
+    src/type2_mode/delegates.cpp
+    src/type2_mode/init.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp

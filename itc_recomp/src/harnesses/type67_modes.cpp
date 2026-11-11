@@ -42,6 +42,7 @@
 #include "hooks/car_models.h"
 #include "hooks/heap.h"
 #include "hooks/type67_modes.h"
+#include "hooks/type2_mode.h"
 #include "hooks/ui_movies.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
@@ -55,6 +56,7 @@
 #include "scene/scene.h"
 #include "scene_loaders/pools.h"
 #include "type67_modes/type67_modes.h"
+#include "type2_mode/type2_mode.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -68,6 +70,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_type67_modes);
+ITC_FLAG_DECLARE(bool, native_type2_mode);
 
 namespace time_hooks {
 void SetFakeNow(uint64_t now);
@@ -3285,6 +3288,499 @@ void Type67Modes(Context& h) {
   StandSceneCreates(h);
   ModeInits(h);
   StandModeReleases(h);
+}
+
+
+// --- The type 2 mode (src/type2_mode/, docs/functions/type2-mode.md; the
+// harness `type2_mode`, here for the stand's and the loading screen's worlds
+// this file lays). Each case: the mode a block of random words (its
+// dispatcher without handlers, so GameMessages::Dispatch takes the queued
+// messages and delivers none; its ring's count and start small), its +848 a
+// screen block of the type 2 mode's size (random words, the 14 machines'
+// states and loaded words picked, the shown index 0 to 7), the answer in
+// the world; the originals run with --native_type2_mode off (the functions
+// they call of the mode's are the originals too) or the register steps
+// (hooks/type2_mode.h). Compared: the mode, the block, the answer, the
+// globals, the function's frame without its register saves and r3. ---
+
+namespace {
+
+namespace t2m = type2_mode;
+
+constexpr uint32_t kType2BlockBytes = 0x27C00;  // past +0x27B7C
+// The 14 machines' offsets (MachineOf's).
+constexpr uint32_t kType2Machines[] = {0,       9640,    19792,   0x173D0, 0x19978,
+                                       0x23018, 0x1BF20, 0x12880, 56624,   0x102D8,
+                                       0x14E28, 0x1E4C8, 0x20A70, 0x255C0};
+
+// The block's machines' states (from the ones the functions test, now and
+// then any), loaded words (0 now and then), the shown index (0 to 7, now and
+// then 3, past 7 never: FindShown writes 0 to 7 only), the save screen's
+// state.
+void ShapeType2Block(uint8_t* base, uint32_t block, Random& r) {
+  static constexpr uint32_t kStates[] = {4, 5, 5, 6, 8, 9, 10, 11, 12, 14, 20, 1, 7};
+  const bool all_loaded = r.Below(3) != 0;
+  for (const uint32_t m : kType2Machines) {
+    guest::StoreU32(base, block + m + 9604,
+                    r.Below(8) == 0 ? uint32_t(r.Next()) : kStates[r.Below(std::size(kStates))]);
+    guest::StoreU32(base, block + m + 9608,
+                    all_loaded || r.Below(6) != 0 ? 1 + r.Below(3) : 0);
+  }
+  guest::StoreU32(base, block + t2m::kBlockLoaded, all_loaded || r.Below(6) != 0 ? 1 : 0);
+  guest::StoreU32(base, block + t2m::kShown, r.Below(8));
+  guest::StoreU32(base, block + t2m::kSaveScreenState, r.Below(3) == 0 ? 5 : r.Below(10));
+}
+
+// MachineOf, AllLoaded and FindShown.
+void Type2Blocks(Context& h) {
+  uint8_t* const base = h.base;
+  const Block block(kType2BlockBytes);
+  if (!block.address) return;
+  {
+    Results results("ModeType2::MachineOf (sub_82196FC0; sub_82197000)");
+    for (int c = 0; c < 400; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 131 + 0x82196FC0);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r.Below(3) == 0 ? r.Next() : uint32_t(r.Next());
+        const uint32_t pick = r.Below(4);
+        t.r4.u64 = pick == 0   ? r.Next()
+                   : pick == 1 ? uint64_t(int64_t(int32_t(r.Below(8)) - 4))
+                               : r.Below(48);
+        if (v == 0) {
+          ITC_FLAG(native_type2_mode) = false;
+          __imp__sub_82196FC0(t, base);
+          ITC_FLAG(native_type2_mode) = true;
+        } else {
+          hooks::Type2ModeMachineOf(t, base);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  struct Function {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t frame;
+  };
+  const Function functions[] = {
+      {"ModeType2::AllLoaded (sub_82197130)", __imp__sub_82197130, hooks::Type2ModeAllLoaded, 0},
+      {"ModeType2::FindShown (sub_82197218; sub_82196FC0)", __imp__sub_82197218,
+       hooks::Type2ModeFindShown, 96},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < 200; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 137 + f.frame);
+        PPCContext t = CallContext(h);
+        const uint32_t sp = t.r1.u32;
+        WriteRandom(base, block.address, block.bytes, r);
+        WriteRandom(base, sp - 256, 256, r);
+        ShapeType2Block(base, block.address, r);
+        t.r3.u64 = block.address | (uint64_t(r.Below(2)) << 32);
+        if (v == 0) {
+          ITC_FLAG(native_type2_mode) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type2_mode) = true;
+        } else {
+          f.native(t, base);
+        }
+        out[v].Bytes(Read(base, block.address, block.bytes));
+        if (f.frame != 0) out[v].Bytes(Read(base, sp - f.frame, f.frame - 8));
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// The delegate functions, the thunks and the +32 interface. WaitForLoads'
+// world as the type 6 and 7 modes' (Modes above): the sound manager a fake
+// (Sound::Play's PlayCue2D slot the recorder sub_820A8420), the loading
+// screen's current movie 0 to 2 (a harness movie with empty animation lists;
+// the update and ApplyAnimation recorded through the UI movies' stand-in);
+// its shown index never 3 (the hub's sub_8218F620 there, never seen in play,
+// not given a world). TearDown's stand as PollTeardown's cases lay it.
+// Interrupt's options settings ([0x826D8478] +712) 0 or not and the
+// dialog's status 0 to 5. The thunks' object a vtable in the world: each
+// slot the type 2 mode's function or the getter sub_82090770 (another
+// mode's). ForceExit's number 0 to 5 or any, the words below r1 compared.
+void Type2Delegates(Context& h, const Block& world) {
+  uint8_t* const base = h.base;
+  const Block mode(kModeBytes);
+  const Block block(kType2BlockBytes);
+  const Block stand(kStandBytes);
+  const Block extra(0x400);
+  const Block loading_movie(0xA100);
+  if (!mode.address || !block.address || !stand.address || !extra.address ||
+      !loading_movie.address) {
+    return;
+  }
+  constexpr uint32_t kLoadingCurrent = 0x82815E64, kLoadingMovies = 0x82815E68;
+  const uint32_t globals[] = {t2m::kPadBlocked0,     t2m::kPadBlocked1,  t2m::kLeavingFlag,
+                              t2m::kOptionsSettings, t2m::kDialogStatus, menu_sounds::kSoundManager,
+                              kLoadingCurrent,       kLoadingMovies,     kLoadingMovies + 4,
+                              kLoadingMovies + 8,    kStandGlobals[0],   kStandGlobals[1],
+                              kStandGlobals[2],      kStandGlobals[3]};
+  uint32_t saved[std::size(globals)];
+  for (size_t i = 0; i < std::size(globals); i++) saved[i] = guest::LoadU32(base, globals[i]);
+  enum Kind { kDelegate, kWait, kTearDown, kThunk, kInterrupt, kForceExit };
+  struct Function {
+    const char* name;
+    Kind kind;
+    GuestFunction recompiled, native;
+    int32_t frame, saves;  // the own frame compared: [-frame, -saves)
+    uint32_t slot = 0;     // a thunk's
+    uint32_t target = 0;   // its type 2 function
+  };
+  const Function functions[] = {
+      {"ModeType2::NextMode (sub_82197D50; sub_82197218)", kDelegate, __imp__sub_82197D50,
+       hooks::Type2ModeNextMode, 144, 56},
+      {"ModeType2::LeaveScreen (sub_82197C88; sub_82197218)", kDelegate, __imp__sub_82197C88,
+       hooks::Type2ModeLeaveScreen, 128, 32},
+      {"ModeType2::AfterLeaveScreen (sub_821977E0; sub_82197218)", kDelegate,
+       __imp__sub_821977E0, hooks::Type2ModeAfterLeaveScreen, 96, 8},
+      {"ModeType2::Restart (sub_82197A30)", kDelegate, __imp__sub_82197A30,
+       hooks::Type2ModeRestart, 112, 16},
+      {"ModeType2::Leaving (sub_82198008)", kDelegate, __imp__sub_82198008,
+       hooks::Type2ModeLeaving, 128, 32},
+      {"ModeType2::WaitForLoads (sub_82197B00; sub_82197218, sub_82197130)", kWait,
+       __imp__sub_82197B00, hooks::Type2ModeWaitForLoads, 144, 40},
+      {"ModeType2::TearDown (sub_821970C0)", kTearDown, __imp__sub_821970C0,
+       hooks::Type2ModeTearDown, 112, 24},
+      {"Mode::Slot8Thunk (sub_8223D4B0)", kThunk, __imp__sub_8223D4B0, hooks::ModeSlot8Thunk, 0,
+       0, 8, 0x82197A30},
+      {"Mode::Slot9Thunk (sub_8223D4C0)", kThunk, __imp__sub_8223D4C0, hooks::ModeSlot9Thunk, 0,
+       0, 9, 0x82197B00},
+      {"Mode::Slot10Thunk (sub_8223D4A0)", kThunk, __imp__sub_8223D4A0, hooks::ModeSlot10Thunk,
+       0, 0, 10, 0x82197C88},
+      {"Mode::Slot11Thunk (sub_8222FC60)", kThunk, __imp__sub_8222FC60, hooks::ModeSlot11Thunk,
+       0, 0, 11, 0x821970C0},
+      {"Mode::Slot12Thunk (sub_8222FC70)", kThunk, __imp__sub_8222FC70, hooks::ModeSlot12Thunk,
+       0, 0, 12, 0x821977E0},
+      {"Mode::Slot13Thunk (sub_8222FC80)", kThunk, __imp__sub_8222FC80, hooks::ModeSlot13Thunk,
+       0, 0, 13, 0x82198008},
+      {"ModeType2::Interrupt (sub_82197858; sub_82197130)", kInterrupt, __imp__sub_82197858,
+       hooks::Type2ModeInterrupt, 96, 16},
+      {"ModeType2::ForceExit (sub_82197930)", kForceExit, __imp__sub_82197930,
+       hooks::Type2ModeForceExit, 16, 0},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    const int cases = f.kind == kThunk ? 60 : 120;
+    for (int c = 0; c < cases; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(uint64_t(c) * 1009 + uint64_t(f.frame) * 7 + f.slot + uint64_t(f.kind) * 31);
+        PPCContext t = CallContext(h);
+        const uint32_t sp = t.r1.u32;
+        WriteRandom(base, world.address, world.bytes, r);
+        WriteRandom(base, mode.address, mode.bytes, r);
+        WriteRandom(base, block.address, block.bytes, r);
+        WriteRandom(base, sp - 1024, 1024 + 256, r);
+        ShapeType2Block(base, block.address, r);
+        guest::StoreU32(base, mode.address + 36 + 200, 0);  // no handlers
+        guest::StoreU32(base, mode.address + 840, r.Below(4));
+        guest::StoreU32(base, mode.address + 844, r.Below(200));
+        guest::StoreU32(base, mode.address + t2m::kBlock, block.address);
+        guest::StoreU32(base, t2m::kPadBlocked0, r.Below(4) == 0 ? 1 : 0);
+        guest::StoreU32(base, t2m::kPadBlocked1, r.Below(4) == 0 ? 1 : 0);
+        guest::StoreU32(base, t2m::kLeavingFlag, uint32_t(r.Next()));
+        guest::StoreU32(base, t2m::kOptionsSettings, world.address + 0x800);
+        guest::StoreU32(base, world.address + 0x800 + 712, r.Below(3) == 0 ? 0 : 1);
+        guest::StoreU32(base, t2m::kDialogStatus, r.Below(6));
+        const bool waits = f.kind == kWait || (f.kind == kThunk && f.slot == 9);
+        if (waits) {
+          // The shown index never 3 (FindShown's pick: the car settings,
+          // machine 3, not running or starting).
+          if (guest::LoadU32(base, block.address + t2m::kShown) == 3) {
+            guest::StoreU32(base, block.address + t2m::kShown, 4);
+          }
+          const uint32_t settings = block.address + 0x173D0 + 9604;
+          if (guest::LoadU32(base, settings) == 4 || guest::LoadU32(base, settings) == 5) {
+            guest::StoreU32(base, settings, 6);
+          }
+          WriteRandom(base, extra.address, 0x400, r);
+          const uint32_t manager = extra.address, vtable = extra.address + 0x100;
+          guest::StoreU32(base, manager, vtable);
+          guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
+          guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+          guest::StoreU32(base, kLoadingCurrent, r.Below(3));
+          WriteRandom(base, loading_movie.address, 0xA100, r);
+          ui_movies::InitAnimationLists(base, loading_movie.address);
+          for (uint32_t k = 0; k < 3; k++) {
+            guest::StoreU32(base, kLoadingMovies + 4 * k, loading_movie.address);
+          }
+        }
+        if (f.kind == kTearDown) {
+          LayStand(base, stand.address, r);
+          if (r.Below(2) == 0) {
+            guest::StoreU32(base, stand.address + 12, 1);
+            guest::StoreU32(base, stand.address + 16, 1);
+          }
+        }
+        t.r3.u64 = (world.address + 0x100) | (uint64_t(r.Below(2)) << 32);
+        t.r4.u64 = mode.address;
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (f.kind == kThunk) {
+          // The object's vtable at the world's +0x400: the slot the type 2
+          // mode's function, or the getter (another mode's).
+          const uint32_t vtable = world.address + 0x400;
+          guest::StoreU32(base, mode.address, vtable);
+          guest::StoreU32(base, vtable + 4 * f.slot, r.Below(4) == 0 ? 0x82090770 : f.target);
+          if (f.slot == 11) {
+            LayStand(base, stand.address, r);
+          }
+        }
+        if (f.kind == kInterrupt || f.kind == kForceExit) {
+          t.r3.u64 = mode.address + 32;
+          t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(6);
+        }
+        std::vector<uint32_t> calls;
+        g_mode_calls = &calls;
+        const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+            ui_movies_hooks::g_update_callee_stand_in;
+        ui_movies_hooks::g_update_callee_stand_in = ModeStandIn;
+        if (v == 0) {
+          ITC_FLAG(native_type2_mode) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type2_mode) = true;
+        } else {
+          f.native(t, base);
+        }
+        ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
+        g_mode_calls = nullptr;
+        for (const uint32_t word : calls) out[v].Word(word);
+        out[v].Bytes(Read(base, mode.address, mode.bytes));
+        out[v].Bytes(Read(base, block.address, block.bytes));
+        out[v].Bytes(Read(base, world.address, world.bytes));
+        for (const uint32_t g : globals) out[v].Word(guest::LoadU32(base, g));
+        if (waits) {
+          out[v].Bytes(Read(base, extra.address, 0x400));
+          out[v].Bytes(Read(base, loading_movie.address, 0xA100));
+        }
+        if (f.kind == kTearDown || (f.kind == kThunk && f.slot == 11)) {
+          out[v].Bytes(Read(base, stand.address, kStandBytes));
+        }
+        if (f.frame != 0) {
+          out[v].Bytes(Read(base, sp - uint32_t(f.frame), uint32_t(f.frame - f.saves)));
+        }
+        out[v].Bytes(Read(base, sp, 256));
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  for (size_t i = 0; i < std::size(globals); i++) guest::StoreU32(base, globals[i], saved[i]);
+}
+
+}  // namespace
+
+// --- ModeType2::Init, laid as the type 6 and 7 modes' slot 0 (ModeInits
+// above): the mode a block of random words (its dispatcher's count 0 to 7),
+// the stand made as StandScene::Create's cases have it (its holder none or
+// held), the UI movies' start and Strings::Load recorded, Archive::Load
+// recorded, LoadingScreen::Show over the loading screen's world (a made-up
+// time for the tip), the screen fades' words saved and put back; player 0's
+// save data random words with its day (+6100: 0, 1, a few, 999 or past it)
+// and its garage (+6120, 0 to 20 cars, shaped as the career's harness shapes
+// it, its count the halfword +6328) and day sums (Career::NextDay's), the
+// mode before 0 to 5 and the race data's race mode (+0xA3AF4) 0 to 3. The
+// 14 machines' Inits run through their adapters (native, as in the game) on
+// both sides. Compared: the recorded calls, the mode, the screen block
+// (VirtualAlloc's pages) and every block the stand made, with the pointers
+// into them made offsets; the save data, the loading world, the fades, the
+// stand's globals, the frame's +80 to +111, the caller's +20 and r3. ---
+
+namespace {
+
+void ShapeType2Garage(uint8_t* base, uint32_t garage, Random& r, uint32_t count) {
+  uint32_t order[50];
+  for (uint32_t i = 0; i < 50; i++) order[i] = i;
+  for (uint32_t i = 49; i > 0; i--) std::swap(order[i], order[r.Below(i + 1)]);
+  const auto link = [&](uint32_t head_at, uint32_t from, uint32_t to) {
+    guest::StoreU16(base, garage + head_at, uint16_t(from < to ? order[from] : 0xFFFF));
+    for (uint32_t i = from; i < to; i++) {
+      guest::StoreU16(base, garage + 4 * order[i], uint16_t(i + 1 < to ? order[i + 1] : 0xFFFF));
+      guest::StoreU16(base, garage + 4 * order[i] + 2, uint16_t(r.Below(50)));
+    }
+  };
+  link(204, 0, count);
+  link(200, count, 50);
+  guest::StoreU16(base, garage + 208, uint16_t(count));
+}
+
+// Career::NextDay's day sums (Stats::CloseDay's), as the career's harness
+// shapes them: finite floats, small counts and divisors.
+void ShapeType2DaySums(uint8_t* base, uint32_t stats, Random& r) {
+  for (const uint32_t at : {5928u, 5936u, 5944u}) {
+    guest::StoreFloat(base, stats + at, float(int32_t(r.Below(20000)) - 10000) / 8.0f);
+    guest::StoreU32(base, stats + at + 4, r.Below(4) == 0 ? 0 : r.Below(100));
+  }
+  guest::StoreU32(base, stats + 5952, r.Below(500));
+  const uint32_t divisors[] = {1, 2, 7, 30};
+  guest::StoreU32(base, stats + 5956, divisors[r.Below(4)]);
+  guest::StoreU32(base, stats + 5960, r.Below(99999));
+  guest::StoreU32(base, stats + 5964, r.Below(99999));
+  guest::StoreU16(base, stats + 6028, uint16_t(r.Below(100)));
+}
+
+}  // namespace
+
+void Type2ModeInits(Context& h) {
+  namespace lw = loading_world;
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
+      !hooks::CarModelsSceneSetUpNative()) {
+    ITC_LOG_WARN("harness: type2_mode: the allocation layer, the archive's queue, the models' "
+                 "lifetime or memcpy isn't native: ModeType2::Init's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> exits(c_runtime::ExitMutex());
+  std::lock_guard<std::recursive_mutex> blocks(models::MemoryBlocksMutex());
+  constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x40;
+  constexpr uint32_t kSaveSlots = 0x826C5B58, kSaveDataBytes = 0x1F978;
+  const std::vector<uint8_t> fades = Read(base, kFades, kFadesBytes);
+  const std::vector<uint8_t> slots = Read(base, kSaveSlots, 16);
+  const uint32_t mode_before = guest::LoadU32(base, t2m::kModeBefore);
+  const uint32_t race_data = guest::LoadU32(base, t2m::kRaceData);
+  const StandSaved saved(base);
+  const lw::MovieWorld w;
+  const Block mode(kModeBytes);
+  const Block world(0x1000);
+  const Block save(kSaveDataBytes);
+  if (!w.ok() || !mode.address || !world.address || !save.address) return;
+  Results results("ModeType2::Init (sub_82197278)");
+  for (int c = 0; c < 12; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(uint64_t(c) * 811 + 0x82197278);
+      saved.Restore();
+      const lw::SavedGlobals loading(base);
+      lw::ShapeMovieWorld(base, w, r);
+      lw::BuildStringTable(base, w);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(base, mode.address, mode.bytes, r);
+      WriteRandom(base, world.address, world.bytes, r);
+      WriteRandom(base, sp - 0x1000, 0x1000 + 0x100, r);
+      guest::StoreU32(base, mode.address + 36 + 200, r.Below(8));
+      const bool held = c % 3 == 2;
+      guest::StoreU32(base, t67::kStandHolder, held ? world.address : 0);
+      guest::StoreU32(base, scene::kScene, 0);
+      guest::StoreU32(base, scene::kFirstSet, 0);
+      guest::StoreU32(base, accessories::kSet, 0);
+      guest::StoreU32(base, race_loading::kLoadingCurrent, r.Below(3));
+      guest::StoreU32(base, race_loading::kLoadingShown, uint32_t(r.Next()));
+      for (uint32_t i = 0; i < 3; i++) {
+        guest::StoreU32(base, race_loading::kLoadingAnimations + 4 * i,
+                        r.Below(2) ? (i == 1 ? 13 : 0) : r.Below(256));
+      }
+      // Player 0's save data, the mode before and the race mode.
+      WriteRandom(base, save.address, save.bytes, r);
+      const uint32_t cars = r.Below(4) == 0 ? 0 : r.Below(21);
+      ShapeType2Garage(base, save.address + 6120, r, cars);
+      ShapeType2DaySums(base, save.address + 48, r);
+      static constexpr uint32_t kDays[] = {0, 0, 1, 1, 2, 7, 998, 999, 1000, 5000};
+      guest::StoreU32(base, save.address + 6100, kDays[r.Below(std::size(kDays))]);
+      guest::StoreU16(base, save.address + 70, uint16_t(r.Below(15)));  // PickNext's gate
+      guest::StoreU32(base, save.address + 48 + 5672, r.Below(12));
+      for (uint32_t p = 0; p < 4; p++) guest::StoreU32(base, kSaveSlots + 4 * p, save.address);
+      guest::StoreU32(base, t2m::kModeBefore, r.Below(6));
+      guest::StoreU32(base, t2m::kRaceData, world.address + 0x200 - 0xA3AF4);
+      guest::StoreU32(base, world.address + 0x200, r.Below(4));
+      const uint32_t mark = exit_table::Mark(base);
+      time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
+      std::vector<uint32_t> calls;
+      g_stand_calls = &calls;
+      g_record_mode_calls = true;
+      const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+      hooks::g_start_up_recorder = StandRecorder;
+      t.r3.u64 = mode.address;
+      if (v == 0) {
+        ITC_FLAG(native_type2_mode) = false;
+        __imp__sub_82197278(t, base);
+        ITC_FLAG(native_type2_mode) = true;
+      } else {
+        hooks::Type2ModeInit(t, base);
+      }
+      hooks::g_start_up_recorder = saved_recorder;
+      g_record_mode_calls = false;
+      g_stand_calls = nullptr;
+      time_hooks::ClearFakeNow();
+      StandTake take;
+      take.Collect(base, held);
+      const uint32_t block = guest::LoadU32(base, mode.address + t2m::kBlock);
+      const bool block_made = memory::IsPages(block);
+      if (block_made) {
+        take.regions.push_back({block, t2m::kBlockBytes});
+        take.AddHeapFrom(base, block, t2m::kBlockBytes);
+      }
+      // The recorded calls' frames and return addresses: r1 by its offset;
+      // the screen start's r4 (it reads r3 only: the original's caller's
+      // leftover, 0 in ours) left out.
+      for (size_t k = 0; k + 5 <= calls.size(); k += 5) {
+        if (calls[k] != 0x8209DE48) calls[k + 3] -= t.r1.u32;
+        if (calls[k] == 0x8211AD00) calls[k + 2] = 0;
+      }
+      take.TakeCalls(base, calls, out[v]);
+      take.TakeBlocks(base, out[v]);
+      out[v].Word(block_made);
+      if (block_made) {
+        out[v].Bytes(scene_pools_take::Normalized(base, take.regions, block, t2m::kBlockBytes));
+      }
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, mode.address, mode.bytes));
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, world.address, world.bytes));
+      saved.Take(take.regions, out[v]);
+      out[v].Bytes(Read(base, save.address, save.bytes));
+      out[v].Bytes(Read(base, sp - t2m::kInitFrame + 80, 32));
+      out[v].Word(guest::LoadU32(base, sp + 20));
+      out[v].Bytes(Read(base, w.movies.address, w.movies.bytes));
+      out[v].Bytes(Read(base, w.texts.address, w.texts.bytes));
+      out[v].Bytes(Read(base, w.strings.address, w.strings.bytes));
+      out[v].Word(guest::LoadU32(base, race_loading::kLoadingShown));
+      out[v].Word(guest::LoadU32(base, race_loading::kLoadingCurrent));
+      out[v].Bytes(Read(base, kFades, kFadesBytes));
+      exit_table::Take(base, mark, out[v]);
+      out[v].Word(take.Word(t.r3.u32, t.r1.u32));
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      take.Free();
+      if (block_made) memory::FreePages(block);
+      loading.Restore();
+      Write(base, kFades, fades.data(), kFadesBytes);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  saved.Restore();
+  Write(base, kFades, fades.data(), kFadesBytes);
+  Write(base, kSaveSlots, slots.data(), 16);
+  guest::StoreU32(base, t2m::kModeBefore, mode_before);
+  guest::StoreU32(base, t2m::kRaceData, race_data);
+}
+
+void Type2Mode(Context& h) {
+  const Block world(kWorldBytes);
+  if (!world.address) {
+    ITC_LOG_ERROR("harness: type2_mode: no block from the allocation layer");
+    return;
+  }
+  Type2Blocks(h);
+  Type2Delegates(h, world);
+  Type2ModeInits(h);
 }
 
 }  // namespace harness
