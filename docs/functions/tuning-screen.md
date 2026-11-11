@@ -48,6 +48,10 @@ met here. The power curve's set-up `sub_821E7368` stayed in its lead (since 2026
 The refresh `sub_821E3AD0` with its callees was mapped here later
 (2026-11-11, the B7 loop's mapping agent, from its own lead): see "The
 refresh" below and the last eight rows.
+The update `sub_821E6C50` with its two pieces and its 61 callees that
+never ran in play was mapped here last (2026-11-11, the B7 loop's
+mapping agent, from its own lead): see "The update" below and the last
+64 rows.
 
 Shared, with rows elsewhere: `UiMovie::` and `UiMovies::Find`
 (`ui-movies-game.md`, `ui-movies.md`: among them `sub_8211C740`,
@@ -325,6 +329,96 @@ but its adapter (`front-end-car-draw.md`, the plain C++ the recompiled
 refresh reaches) leaves f1 as it was; the native refresh does the same
 (f1 is probably dead after the refresh).
 
+
+The update (`TuningScreen::Update`, `sub_821E6C50`, mapped 2026-11-11):
+one function the recompiler cut into three (b7_groups: 1,601 lines, one
+ready group, "split the migration"), all seen in play, reached only
+through a vtable (the tuning machine's state 5, message 0,
+[`tuning-machine.md`](tuning-machine.md)). r3 = the screen s, r4 = the
+mode's dispatcher (kept in r28; passed on only to commands 30, 52 and
+63). Its pieces repeat its tail, so the native update is one function;
+line numbers are in `generated/default/itc_recomp.81.cpp` (the update
+itself, 8380 to 9761) unless said:
+
+1. The header (8380 to 8452): a 144-byte frame (`__savegprlr_26`); the
+   empty `sub_82106540`(490, 280, 0, "TUNING SHOP" `0x8200ADA4`);
+   while +9708 is 1, the refresh `sub_821E3AD0` (above) and +9708 =
+   (its r3 is 0).
+2. The state switch (8453 to 8879): state +9652 - 3 (unsigned, 0 to 55,
+   else none) through the 8-bit table at `0x8200AA00`, each case its
+   handler with r3 = s, then on to the tail: 3 `DebugMainMenu` (through
+   the piece `sub_821E6CD4`: `itc_recomp.13.cpp` 8731 to 9621, the
+   handler then the whole tail again), 4 `DebugCategoryMenu`, 5
+   `DebugLevelSelect`, 6 `DebugTypeSelect`, 7 `DebugColorSelect`, 8
+   `DebugOptionSelect`, 9 `DebugConfirmBuy`, 10 `DebugWarnMoney`, 11
+   `DebugConfirmEquip`, 12 `DebugReflectSet`, 13 `DebugAnnulSet`, 14
+   `DebugRemoveConfirm`, 15 to 17 the wheels' `DebugWheelPartSelect`,
+   `DebugWheelKindSelect`, `DebugWheelInchSelect`, 18
+   `DebugBodyColor`, 19 to 22 `DebugNeonPart`, `DebugNeonKind`,
+   `DebugNeonEdit`, `DebugLedEdit`; 23 to 37 and 38 to 52 the same
+   fifteen (vinyl, then sticker): `DebugDecalTopMenu`,
+   `DebugLayerSelect`, `DebugLayerOperate`, `DebugLayerEdit`,
+   `DebugLayerOrder`, `DebugLayerSet`, `DebugEditPosition`,
+   `DebugEditRotate`, `DebugEditScale`, `DebugEditColor`,
+   `DebugEditFlip`, `DebugEditView`, `DebugPaintConfirm`,
+   `DebugPaintCancelConfirm`, `DebugPaintRemoveConfirm`; 53 to 56
+   `DebugCockpitTop`, `DebugCockpitType`, `DebugCockpitColor`,
+   `DebugMeterKind`; 57 and 58 `DebugMeterPoint`. Every handler only
+   prints through the empty `sub_82106540`: no field written.
+3. The movie (8880 to 8996): q = `[+10036]` (the queue), c = q's +12;
+   key 13 for states 23 to 37, 14 for 38 to 52, and for state 61 13 when
+   category 5 item 6 (the vinyl) else 14 (61 has no handler in the
+   switch above); 2 for every other state; M = `[UiMovies::Find(
+   0x826C5CCC, key at frame +80)]`; `UpdateBusyIcon`(s); r27 = 0.
+4. The command (8997 to 9619): c -1, none; c above 64 (unsigned), none,
+   and the queue stepped after `Run` whatever it answers; else, only
+   when q's +24 is 0 (the command's first update): q's +24 = 1 and the
+   runner through the 8-bit table at `0x8200A9B8`, r3 = s (r4 = the
+   dispatcher for 30, 52, 63): 0 `PlayIntro` (through the piece
+   `sub_821E6F90`: `itc_recomp.62.cpp` 8935 to 9067, the runner then
+   the tail from `Run`), 1 `MoveCategory`, 2 `OpenItems`, 3
+   `ShowLevels`, 4 `ShowTypes`, 5 `Command5`, 6 `ShowOptions`, 7
+   `Command7`, 8 `Command8`, 9 `Command9`, 10 to 14 `Command10` to
+   `Command14`, 15 `Command15`, 16 `Command16`, 17 `Command17`, 18
+   `Command18`, 19 `Command19`, 20 `Command20`(s, +9644, +9648), 21
+   `Command21`, 22 `Command22`, 23 `Command23`, 24 and 28 the empty
+   `sub_82106540` with r3 = s (nothing), 25 `Command25`, 26 `Command26`,
+   27 `Command27`, 29 `DecalCommand`, 30 `Command30`, 31 `Command31`, 32
+   to 45 `Command32` to `Command45`, 46, 48 and 50 `Command46`, 47
+   `Command47`, 49 `Command49`, 51 `Command51`, 52 `Command52`, 53
+   `Command53`, 54 to 58 `Command54` to `Command58`, 59 to 62 no runner,
+   63 `ShowDialog`, 64 `MarkPick`.
+5. The run (9620 to 9700): `UiMovie::Run`(M, 0); done = (it answered 0);
+   done with c 32: `Command32Done`(s); done: the queue stepped (q's +16
+   -1: q's +0 = q's +4 and +12 = -1; else +20 = 0, +12 = +16, +16 = -1;
+   then +24 = 0, from `[+10036]` read again). The same step as several
+   runners do inline (`Command46`, `Command53`, ...).
+6. The rest (9701 to 9761, every update): `UpdateItems`,
+   `DrawPowerGraph`, `RefreshMenu`, `UpdateListDots`,
+   `UpdateListCounter`, `UpdateStand`; while +9732 is set
+   `StoreToGarageCar`, `SetCarStats`, `RestoreStand` and +9732 = 0.
+   No return value set (r3 and f1 as the last call leaves them).
+
+Every callee seen in play is already ours (the rows above and
+`ui-movies-game.md`'s `Find` and `Run`, `power-graph.md`'s
+`DrawPowerGraph`, `audio.md`'s empty `sub_82106540`). The 61 never seen
+are the last 61 rows. A split for the migration: first the update
+itself (blocks 1 to 6, about 1,600 lines in three pieces but a short
+function in C++: two jump tables and the queue's step), calling the 61
+never-seen callees through the guest, as the refresh calls its own
+(`sub_821F7A98`); then the never-seen callees in groups: the 23
+handlers (print only; the seen handlers' native versions write the
+frame words and string tables they leave, a precedent to follow), the
+vinyl editor's commands (movie 13: 17, 19, 20, 21, 26, 27), the sticker
+editor's (movie 14: 32 to 53 and `Command32Done`) and movie 2's (5, 10
+to 14, 54 to 58). The sticker editor's commands call helpers from the
+sticker editor's lead (`../loops/leads.md`: `sub_821F7518`,
+`sub_821F7F20`, `sub_821F8070`, `sub_821F8160`, `sub_821F8A50`,
+`sub_821F8D68`, `sub_821FA408`, `sub_821FA508`, `sub_821FBB60`,
+`sub_821F73F8`, `sub_821FD518`, with `sub_821FA460` added there) and
+the vinyl editor's `Command21` its lead's `sub_82207F38`: those groups
+wait on those leads.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
@@ -462,3 +556,67 @@ Status:
 | `sub_821E7E48` | `TuningScreen::PreviewInteriorChoices` (probably) | | r3 = the screen. A 208-byte frame (r22 to r31 by `__savegprlr_22`); two small tables on it: A = {3, 2, 1, 0, 2} at +80, B = {2, 1, 0, 4, 3} at +96. For the five choice codes w = +33800 + 4 × i, the stand's choice c (i 0, 1, 2 → 6, 5, 4; 3 → 0 when +35708 < 3, else 2, and 4 → 1 or 3, each after `GarageStage::ClearChoice`(holder, the other of the pair)): w -1 `ClearChoice`(holder, c), else `GarageStage::SetChoice`(holder, c, A[w / 10], B[w % 10]). Then the slot +33576 picks c the same way (5 and up: c left from the loop) and `SetChoice`(holder, c, A[+33564], B[+33572]). Holder `[[0x826D83E0]]`. Only caller `sub_821F2AD8` (state 57). Not seen in play. Read in full. |
 | `sub_821F7A98` | `TuningScreen::RefreshMovie14` (probably) | | States 38 to 52 (the sticker editor) of the refresh, and 23 to 37 when not the vinyl. r3 = the screen. A 112-byte frame (r30, r31 saved inline). Movie 14: `SetText`(m14, 0, 9, 9, +25116), (0, 13, 8, +25092); `SetNodeTexture`(m14, 0, 11, +25096); `HideNode`(m14, 1, 2), (1, 10), (1, 8), (1, 9); `SetNodeTexture`(m14, 1, 6, 1), (1, 7, 1) (movie 2's header in the refresh, on movie 14). Returns `SetNodeTexture`'s r3. Not seen in play. Read in full. Stays recompiled: the native refresh `sub_821E3AD0` calls it through the guest (2026-11-11). |
 | `sub_821E7DA0` | `UiNode::SetRgb` (probably) | | r4 = a node, r5, r6, r7 = red, green, blue: the node's +56, +60, +64 = r5, r6, r7 (as `SetColor` without the table). Leaf, r3 left. 12 calls from the refresh (state 7's swatches); 9 other callers, none seen in play and without rows (`sub_82263508`, `sub_822645B0`, `sub_8226B2F0`, `sub_8226B4D0`, `sub_8226B620`, `sub_8226E3C0`, `sub_8226E4D8`, `sub_82270118`, `sub_82270200`). Not seen in play. Read in full. Stays recompiled: the native refresh `sub_821E3AD0` calls it through the guest (2026-11-11). |
+| `sub_821E6C50` | `TuningScreen::Update` (probably) | | r3 = the tuning screen, r4 = the mode's dispatcher (probably; its message ring at +204, passed to commands 30, 52 and 63). No return value set. A 144-byte frame (`__savegprlr_26`). No direct callers: the tuning machine's state 5 runs it through a vtable (message 0, [`tuning-machine.md`](tuning-machine.md)). Prints "TUNING SHOP" through the empty `sub_82106540`; while +9708 is 1 runs the refresh `sub_821E3AD0` and sets +9708 to whether it answered 0; runs state +9652's debug handler (states 3 to 58, the 8-bit table at `0x8200AA00`); finds the state's movie (13 for 23 to 37, 14 for 38 to 52, 13 or 14 for 61 by the vinyl, else 2; `UiMovies::Find` on `0x826C5CCC`); `UpdateBusyIcon`; starts the queue's (`[+10036]`) current command once (its +24, the runner through the 8-bit table at `0x8200A9B8`, commands 0 to 64), then `UiMovie::Run`(M, 0) and steps the queue when the movie stops (`Command32Done` after command 32); then every update `UpdateItems`, `DrawPowerGraph`, `RefreshMenu`, `UpdateListDots`, `UpdateListCounter`, `UpdateStand`, and while +9732 is set `StoreToGarageCar`, `SetCarStats`, `RestoreStand`, +9732 = 0. Block by block in "The update" above. Read in full (its callees in outline). Seen in play. |
+| `sub_821E6CD4` | `TuningScreen::Update` (piece: state 3) | | The update's state switch's case 0 (state 3) as its own function: `DebugMainMenu`(s), then the update's whole tail (the movie, the command, the run, the per-update calls; `itc_recomp.13.cpp` 8731 to 9621), on the update's frame and registers (r28 the dispatcher, r31 the screen). Only reached from the update's switch (a tail call). Read in full. Seen in play. |
+| `sub_821E6F90` | `TuningScreen::Update` (piece: command 0) | | The update's command switch's case 0 as its own function: `PlayIntro`(s), then the update's tail from `UiMovie::Run` (the run, the step, the per-update calls; `itc_recomp.62.cpp` 8935 to 9067), on the update's frame and registers (r26 the command, r29 the movie, r27 0). Reached from the update and its piece `sub_821E6CD4` (tail calls). Read in full. Seen in play. |
+| `sub_821CC078` | `TuningScreen::DebugColorSelect` (probably) | | State 7's handler. r3 = the screen. A 96-byte frame (r31 saved). Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × `[[+10040]]`); then by the page: the bonnet (category 4 item 4) "COLOR_SELECT", NORMAL, CARBON; category 1 item 3 (the brake, probably its calipers) "COLOR_SELECT", NORMAL, BLACK, RED, BLUE, GOLD; category 6 item 0 "COLOR_SELECT", BLACK, RED, BLUE, YELLOW (state 7's color pages, as the refresh's state 7 lays them); other pages nothing more. No field written, no state set. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821CC430` | `TuningScreen::DebugWarnMoney` (probably) | | State 10's handler (the money short, probably: "WARN CP"). r3 = the screen. A 96-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × `[[+10040]]`), "WARN CP". No field written. Only caller the update. Not seen in play. Read in full. |
+| `sub_821CC510` | `TuningScreen::DebugReflectSet` (probably) | | State 12's handler. r3 = the screen. A 96-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × byte +9667), "REFLECT SET", YES, NO. No field written. Only caller the update. Not seen in play. Read in full. |
+| `sub_821CC598` | `TuningScreen::DebugAnnulSet` (probably) | | State 13's handler. r3 = the screen. A 96-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × byte +9668), "ANNUL SET", YES, NO. No field written. Only caller the update. Not seen in play. Read in full. |
+| `sub_821CC620` | `TuningScreen::DebugRemoveConfirm` (probably) | | State 14's handler. r3 = the screen. A 128-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × the word +9672), "REMOVE CONF", then NO and YES through `%s` from a stack table. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E8358` | `TuningScreen::DebugBodyColor` (probably) | | State 18's handler (the paint). r3 = the screen. A 112-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +30440), "BODY COLOR", then `%d` lines with +30444, +30448, +30452, +30456, +30460 (the paint page's values). No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E8440` | `TuningScreen::DebugNeonPart` (probably) | | State 19's handler. r3 = the screen. A 128-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +30492), "NEON LIGHTS PART", then FRONT, SIDE, REAR, ALL through `%s` from a stack table (520, 320 to 365). No field written. Only caller the update. Not seen in play. Read in full. |
+| `sub_821E84F8` | `TuningScreen::DebugNeonKind` (probably) | | State 20's handler. r3 = the screen. A 128-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +30500), "NEON LIGHTS KIND", then NEON, LED, REMOVE through `%s`. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E85A0` | `TuningScreen::DebugNeonEdit` (probably) | | State 21's handler. r3 = the screen. A 112-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +30508), "NEON EDIT", then `%d` lines with +30512 to +30528 (five words). No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E8688` | `TuningScreen::DebugLedEdit` (probably) | | State 22's handler. r3 = the screen. A 112-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +30544), "LED EDIT", then `%d` lines with +30548 to +30560 (four words). No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E8758` | `TuningScreen::DebugCockpitTop` (probably) | | State 53's handler (the interior's cockpit). r3 = the screen. A 128-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +33540), "COCKPIT TOP", then METER, ACCESSORIES through `%s`. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E8800` | `TuningScreen::DebugCockpitType` (probably) | | State 54's handler. r3 = the screen. A 128-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +33548), "COCKPIT TOP", then OFF, TYPE1, TYPE2, TYPE3 through `%s`. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E88C0` | `TuningScreen::DebugCockpitColor` (probably) | | State 55's handler. r3 = the screen. A 144-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +33556), "COCKPIT TOP", then WHITE, RED, BLUE, YELLOW, GREEN, PINK through `%s`. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E8998` | `TuningScreen::DebugMeterKind` (probably) | | State 56's handler. r3 = the screen. A 144-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +33564), a `%d` line, "COCKPIT METER KIND SELECT", then WATER TEMP, OIL TEMP, OIL PRESS, BOOST, REMOVE through `%s`. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E8A88` | `TuningScreen::DebugMeterPoint` (probably) | | The handler for states 57 and 58. r3 = the screen. A 144-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +33576, the slot), "METER SET POINT", then DASHBOAD 1 to 3, A PILLER 1 and 2 (sic) through `%s %d` with a word each (the slots' choices, probably). No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FDA80` | `TuningScreen::DebugLayerOperate` (probably) | | The handler for states 25 and 40. r3 = the screen. A 160-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +30732) and at (700, 320 + 15 × +30740); for the vinyl (category 5 item 6) "VINYL LAYER SELECT" and LAYRE01 to 03 with `%s %d` and the layers' ids +31192 + 4 × (3 × +30724 + j); else "STICKER LAYER SELECT" and LAYRE01 to 05 with +33320 + 20 × +30724 + 4j; then at x 700 "VINYL OPERATE SELECT" and VINYL EDIT, LAYER ORDER, NEW VINYL SET, VINYL REMOVE. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FDF10` | `TuningScreen::DebugLayerOrder` (probably) | | The handler for states 27 and 42. r3 = the screen. A 144-byte frame. Only calls the empty `sub_82106540`: `*` at (500, 320 + 15 × +30756); for the vinyl (category 5 item 6) "VINYL LAYER SELECT" and LAYRE01 to 03 with `%s %d` and the words +31216 to +31224; else "STICKER LAYER SELECT" and LAYRE01 to 05 with +33480 to +33496. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FE118` | `TuningScreen::DebugEditRotate` (probably) | | The handler for states 30 and 45. No frame: a tail call to the empty `sub_82106540` with (500, 300, 0, "EDIT ROTATE"), as `DebugEditView`. No effect. Only caller the update. Not seen in play. Read in full. |
+| `sub_821FE130` | `TuningScreen::DebugEditScale` (probably) | | The handler for states 31 and 46. No frame: a tail call to the empty `sub_82106540` with (500, 300, 0, "EDIT SCALE"). No effect. Only caller the update. Not seen in play. Read in full. |
+| `sub_821FE148` | `TuningScreen::DebugEditColor` (probably) | | The handler for states 32 and 47. No frame: a tail call to the empty `sub_82106540` with (500, 300, 0, "EDIT COLOR"). No effect. Only caller the update. Not seen in play. Read in full. |
+| `sub_821FE160` | `TuningScreen::DebugEditFlip` (probably) | | The handler for states 33 and 48. No frame: a tail call to the empty `sub_82106540` with (500, 300, 0, "EDIT FLIP"). No effect. Only caller the update. Not seen in play. Read in full. |
+| `sub_821FE230` | `TuningScreen::DebugPaintCancelConfirm` (probably) | | The handler for states 36 and 51. r3 = the screen. A 128-byte frame. Only calls the empty `sub_82106540`: `*` at a y of 40 × +30776 (as `DebugPaintConfirm`'s), "PAINT CANCEL CONF", then NO, YES through `%s`. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FE2D0` | `TuningScreen::DebugPaintRemoveConfirm` (probably) | | The handler for states 37 and 52. r3 = the screen. A 128-byte frame. Only calls the empty `sub_82106540`: `*` at a y of 40 × +30780, "PAINT REMOVE CONF", then NO, YES through `%s`. No field written. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821D4180` | `TuningScreen::Command5` (probably) | | The update's command 5 (state 7's color pages, probably the opening). r3 = the screen. A 128-byte frame. Movie 2. With the +9716, +9720 and +9724 flags as `Command7`'s. By the page: category 1 item 3, animation 28 and named animations on sub-scene 32's child 1; the bonnet (category 4 item 4), animation 32, sub-scene 30's marker (child 0's child 2) placed by `GetCurrentChoice` and the byte +9663, named animations looped; category 6 item 0, animation 36 and sub-scene 32's child 1 (+16 a float). `UiMovie::Finish`, `Play`, `FindNode`, `Child`, `FinishNamed`, `PlayNamed`, `LoopNamed`. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821F35C0` | `TuningScreen::Command10` (probably) | | The update's command 10 (the paint page's opening, probably: state 18). r3 = the screen. A 144-byte frame. Movie 2. Named animations 979 and 1009 with the +9716, +9720 and +9724 flags; sub-scene 21's children (2 to 5, their 10, 11 and 1) set up from the paint values +30440, +30456, +30460; animations 178, 179, 212 (looped); help line 794 (text (10, 0): scroll reset, `SetText`, `ScrollText`); `TuningScreen::SetPaintGradients` ([`tuning-pages.md`](tuning-pages.md)). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E9730` | `TuningScreen::Command11` (probably) | | The update's command 11 (state 19, the neon lights' part, probably). r3 = the screen. A 128-byte frame. Movie 2. Named animations 980 and 1009 with the +9716, +9720 and +9724 flags; sub-scene 36's child 0 with a named animation by +30492 (looped); help line 642 on text (10, 0). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821E9CA0` | `TuningScreen::Command12` (probably) | | The update's command 12 (state 20, the neon lights' kind, probably). r3 = the screen. A 128-byte frame. Movie 2. Named animation 983 with the +9716, +9720 and +9724 flags; sub-scene 37's child 0 with a named animation by +30500 (looped). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821EA460` | `TuningScreen::Command13` (probably) | | The update's command 13 (state 21, the neon edit, probably). r3 = the screen. A 144-byte frame. Movie 2. Named animations 985, 228, 238, 248 with the +9716, +9720 and +9724 flags; sub-scene 23's children 1 to 4 (their 6, 7), animations by +30508, +30524, +30528 (304 to 307, some looped); `TuningScreen::SetLightKind0Bars` ([`tuning-pages.md`](tuning-pages.md)). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821EAFA0` | `TuningScreen::Command14` (probably) | | The update's command 14 (state 22, the LED edit, probably). r3 = the screen. A 144-byte frame. Movie 2. Named animations 987 and 320 with the +9716, +9720 and +9724 flags; sub-scene 24's children 1, 3 and 14 (`SetNodeText` 450 with a row number), animations by +30544, +30548, +30556, +30560 (384 to 386, some looped); `TuningScreen::SetLightKind1Bar` ([`tuning-pages.md`](tuning-pages.md)). Only caller the update. Not seen in play. Read in outline. |
+| `sub_82200100` | `TuningScreen::Command17` (probably) | | The update's command 17 (the vinyl editor). r3 = the screen. A 128-byte frame. Movie 13. Named animation 221 with the +9716 and +9720 flags; sub-scene 10's child 0 with a named animation by +30740 (looped). Only caller the update. Not seen in play. Read in outline. |
+| `sub_82201C58` | `TuningScreen::Command19` (probably) | | The update's command 19 (the vinyl editor). r3 = the screen. A 128-byte frame. Movie 13. Named animation 236 and one by +30724 and +30732, with the +9716 and +9720 flags; help line 810 on text (2, 0). Only caller the update. Not seen in play. Read in outline. |
+| `sub_82201FA0` | `TuningScreen::Command20` (probably) | | The update's command 20, r4 = a, r5 = b (the update passes +9644 and +9648; `Command21` calls it too). r3 = the screen. A 128-byte frame (r29 to r31). Movie 13. With +30724 0: named animations 4a + 204 restarted with r5 1, then 4b + 203 with r5 0; with 1: 4a + 178 (1), then 4b + 177 (0); other values nothing. Callers the update and `Command21`. Not seen in play. Read in full. |
+| `sub_822087C8` | `TuningScreen::Command21` (probably) | | The update's command 21 (the vinyl editor's image list, probably). r3 = the screen. A 144-byte frame. Movie 13. Moves the cursor +30756 one way or the other (two like branches), sets +9644 and +9648 (the animation pair), calls `sub_821FD518` and `sub_82207F38` (leads), sets movie 13's slot textures from the decal images (`[+10048]` entries' +32), `Command20`(s, +9644, +9648), a named animation by the cursor, and `TuningScreen::LayOutItems`. Only caller the update. Not seen in play. Read in outline. |
+| `sub_82204980` | `TuningScreen::Command26` (probably) | | The update's command 26 (the vinyl editor). r3 = the screen. A 128-byte frame. Movie 13. Named animation 229 with the +9716 and +9720 flags; `TuningScreen::PlaceStateNodes`; help line 821 on text (2, 0). Only caller the update. Not seen in play. Read in outline. |
+| `sub_82204A78` | `TuningScreen::Command27` (probably) | | The update's command 27: as `Command26` with animation 230 and help line 822. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FC7B8` | `TuningScreen::Command32` (probably) | | The update's command 32 (the sticker editor's opening, probably). r3 = the screen. A 144-byte frame. Movie 14. Named animations 205, 203, 1 and 153 (looped) with the +9720 flag; sets the busy icon's +10016 to +10032 (shown 0, movie 14 and three named animations, `UpdateBusyIcon`'s); sub-scene 3; `HideNode`(30, 12); `SetText`(3, 5, ...); `UiMovie::SetChildNameText`(0, 6, +20792); help line 825; `ShowNode`(1, 1); `sub_821FA508`(1) (a lead); +9716 = 0. When its movie stops, the update calls `Command32Done`. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821F7498` | `TuningScreen::Command32Done` (probably) | | Called by the update when command 32's movie stops. r3 = the screen. A 112-byte frame. Movie 14: `UiMovie::SetNodeColor`(m, 3, 11, 1) and (3, 12, 1). Only caller the update (both its tails). Not seen in play. Read in full. |
+| `sub_821FCA80` | `TuningScreen::Command33` (probably) | | The update's command 33 (the sticker editor's top menu again, probably). r3 = the screen. A 160-byte frame. Movie 14. A named animation unlooped (`UiMovie::UnloopNamed`), animation 16, sub-scene 3, help line 825, `sub_821FA508`(1) (a lead). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FA658` | `TuningScreen::Command34` (probably) | | The update's command 34 (the sticker editor's layer select, probably). r3 = the screen. A 160-byte frame. Movie 14. Named animations 222, 207, 204, 43 with the +9720 flag; sub-scene 30's children; `HideNode`(30, 12); the decal images for the page (`sub_821FA460`, `sub_821FA408`, leads), the layer's placement (`sub_821F8160` on +32360, a lead); `SetText`(9, 4, 4), (9, 5, 5); help line 826; `HideNode`(1, 1); `sub_821F8A50`(1) (a lead). Reads +30724, +30732, +30756, `[+10044]`. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FA9C0` | `TuningScreen::Command35` (probably) | | The update's command 35. r3 = the screen. A 96-byte frame. `sub_821F8A50`(s, 1) (a lead), then the queue `[+10036]` stepped inline (the command ends at once). Only caller the update. Not seen in play. Read in full. |
+| `sub_821FAA28` | `TuningScreen::Command36` (probably) | | The update's command 36 (the sticker editor). r3 = the screen. A 128-byte frame. Movie 14. Named animations 223, 209, 206 and one by the page with the +9720 flag; `FindNode`(-1, 10); `HideNode`(30, 12); `sub_821FA460`, `sub_821FA408`, `sub_821F8160` (leads); `SetText`(10, 5, a string by +30740); `ShowNode`(1, 1); `sub_821F7518`(1) (a lead). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821F8C30` | `TuningScreen::Command37` (probably) | | The update's command 37 (back from command 36, probably). r3 = the screen. A 144-byte frame. Movie 14. A named animation unlooped, animation 59, `FindNode`(-1, 10), `sub_821F7518`(1) (a lead). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FAD00` | `TuningScreen::Command38` (probably) | | The update's command 38 (the sticker editor). r3 = the screen. A 144-byte frame. Movie 14. Named animations 213, 210 and one by the page with the +9720 flag; `sub_821FA460`, `sub_821FA408`, `sub_821F8160` (leads); sub-scene 11's texts (`SetNodeText` 456, 461, 4, 5), `SetNodeTexture`(1, 4, 0), (1, 5, 0), (1, 6, 1), (1, 7, 1); `HideNode`(30, 12), (1, 1), (1, 10); reads +30748; `sub_821F8D68`(1) (a lead). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FB0B8` | `TuningScreen::Command39` (probably) | | The update's command 39 (back from command 38, probably). r3 = the screen. A 144-byte frame. Movie 14. A named animation unlooped, animation 102, sub-scene 11's child 1, `sub_821F8D68`(1) (a lead). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FCC48` | `TuningScreen::Command40` (probably) | | The update's command 40 (the sticker editor's layer order, probably). r3 = the screen. A 144-byte frame. Movie 14 (found twice). Named animations 221 and one by the page with the +9720 flag; sub-scene 30's nodes shown and hidden by +30756; `ShowNode`(1, 1); `sub_821FA460`, `sub_821FA408`, `sub_821F8160`, `sub_821F8070` (leads; the last with `[[+10044]]`). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FCED0` | `TuningScreen::Command41` (probably) | | The update's command 41 (back from command 40, probably). r3 = the screen. A 160-byte frame. Movie 14 (found twice). A named animation unlooped, animations by the page (181, 182 bases), sub-scene 30's nodes by +30756, `sub_821FA408`, `sub_821F8160`, `sub_821F8070` (leads). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821F7618` | `TuningScreen::Command42` (probably) | | The update's command 42 (the sticker editor). r3 = the screen. A 128-byte frame. Movie 14. Steps +30756 (named animations by the page's 181 and 182 bases, by which way), then `HideNode`(30, 12 + ...). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FD128` | `TuningScreen::Command43` (probably) | | The update's command 43 (the sticker editor). r3 = the screen. A 128-byte frame. Movie 14. Named animations 208, one by the page, 160 and 159 (looped) with the +9720 flag; `HideNode`(30, 12); `sub_821FA460`, `sub_821FA408`, `sub_821F8160` (leads); help line 832; `ShowNode`(1, 1); reads +30764; `sub_821FBB60`(1) (a lead). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FD3F8` | `TuningScreen::Command44` (probably) | | The update's command 44 (back from command 43, probably). r3 = the screen. A 144-byte frame. Movie 14. Named animations 162 and 161, `sub_821F73F8`(`[[+10044] + 4]`, -1) and `sub_821FBB60`(1) (leads). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FB1F0` | `TuningScreen::Command45` (probably) | | The update's command 45 (the sticker editor: one of the edit pages, probably). r3 = the screen. A 160-byte frame. Movie 14. Named animation 212 with the +9720 flag; `sub_821FA460`, `sub_821FA408`, `sub_821F8160` (leads); sub-scene 31; `sub_821F7F20` (a lead); help line 841; `ShowNode`(1, 1). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821F8FC0` | `TuningScreen::Command46` (probably) | | The update's commands 46, 48 and 50. r3 = the screen. A 96-byte frame. `sub_821F8160`(s, the id +33320 + 20 × +30724 + 4 × +30732, s + 30832) and `sub_821F7F20`(s) (leads), then the queue `[+10036]` stepped inline (ends at once). Only caller the update. Not seen in play. Read in full. |
+| `sub_821FB450` | `TuningScreen::Command47` (probably) | | The update's command 47: as `Command45` with animation 214 and help line 842. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FB6B0` | `TuningScreen::Command49` (probably) | | The update's command 49: as `Command45` with animation 215 and help line 843. A 128-byte frame. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821FB8D8` | `TuningScreen::Command51` (probably) | | The update's command 51 (the sticker editor). r3 = the screen. A 128-byte frame. Movie 14. Named animation 225 with the +9720 flag; `sub_821FA408`(-1, 0) (a lead); help line 845; `SetNodeTexture`(1, 4, 0), (1, 5, 1); `HideNode`(1, 1); `ShowNode`(1, 10); `FindNode`(-1, 1). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821F77F0` | `TuningScreen::Command52` (probably) | | The update's command 52, r4 = the update's r4 (the dispatcher). The sticker editor's dialog, as `Command30` is the vinyl editor's: A 144-byte frame. +9728 = 0; by the state +9652 50, 51 or 52, movie 16 with string 18, 19 or 16 into text (-1, 0), 2 into (1, 3), 3 into (1, 4) (`UiMovie::SetText`), then `ShowNode`(1, 1). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821F7948` | `TuningScreen::Command53` (probably) | | The update's command 53. r3 = the screen. No frame, leaf: only the queue `[+10036]` stepped (the command ends at once; the update's step). Only caller the update. Not seen in play. Read in full. |
+| `sub_821EB8E8` | `TuningScreen::Command54` (probably) | | The update's command 54. r3 = the screen. A 128-byte frame. Movie 2. Named animation 1001 with the +9716, +9720 and +9724 flags; nothing else. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821EBDC8` | `TuningScreen::Command55` (probably) | | The update's command 55 (the interior's cockpit pages, probably). r3 = the screen. A 144-byte frame. Movie 2. Named animations 1002, 430, 491 and two by the current choice; sub-scene 28's marker (child 0's child 2, its +80 set) by `GetCurrentChoice` (called twice); sub-scene 28's child 1's child 0; the +9716, +9720 and +9724 flags. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821EC6A0` | `TuningScreen::Command56` (probably) | | The update's command 56. r3 = the screen. A 128-byte frame. Movie 2. Named animation 999 with the +9716, +9720 and +9724 flags; sub-scene 32's child 1 with a named animation (looped). Only caller the update. Not seen in play. Read in outline. |
+| `sub_821ECC68` | `TuningScreen::Command57` (probably) | | The update's command 57 (the interior pages' list, probably: states 57 and 58). r3 = the screen. A 176-byte frame. Movie 2. Tests two animations' times (`UiMovie::NamedAnimationTime` 1005 and 144); named animations 79, 144, 1011, 1005, 138 to 116 (a ladder, some looped); sub-scene 2's rows named with `SetNodeText` 379 and the row number, their +108 by `TuningScreen::GetChoiceFlag`. Only caller the update. Not seen in play. Read in outline. |
+| `sub_821EDB70` | `TuningScreen::Command58` (probably) | | The update's command 58. r3 = the screen. A 128-byte frame. Movie 2. Named animations 143 and 1012 and one by a field (looped), with the +9716, +9720 and +9724 flags. Only caller the update. Not seen in play. Read in outline. |
