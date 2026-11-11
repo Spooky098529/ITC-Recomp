@@ -35,9 +35,23 @@ file's history. What's left to see in a drive, from every run:
   differing; no prints added; the replay `itc_4920` ok (20 ran in it).
   By the user's call (2026-11-11, asked: "find, fix, continue"), a fix
   agent finds the wild read with logging and fixes the harness; then
-  the validation again. Step: fix agent.
+  the validation again. The fix (505b2a31): case 11's restore path
+  copied a random engine stage into the garage car, and `Car::Refresh`
+  read the spec's engine records past their end (a wild torque curve
+  count running off the stack top 0x700D0000; the address-dependent
+  case passed in the migration's shorter run); the stages and tire
+  types now laid in range from their own generator. Validated again by
+  the fix agent's run `itc_4926` (race 60 s at 180, 0 errors, every
+  harness 0 differing outside the expected groups, 88 of 88 harness
+  lines, checked by the lead). 20 ran in the replay `itc_4920` (ok), 68
+  to drive. Recorded.
 
 ## Done
+
+- The tuning screen's update: `tuning-screen.md` 126 of 126 ours (the
+  update Overridden, 47 adapters removed, 40 never-seen callees
+  ported, 21 left recompiled), under `--native_tuning_screen`,
+  1f7f4e8e..360b0cbc, harness fix 505b2a31; validated.
 
 ## Rows to review
 

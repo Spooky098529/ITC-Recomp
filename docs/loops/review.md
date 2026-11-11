@@ -34,6 +34,12 @@ When the user has reviewed a run's section, its heading gets
   142 (command 26) read the wild guest address 0x70081650 in a loop;
   worked around by giving `Command42`'s words their own seeded
   generator, not fixed at its root.
+- The update's validation stalled (`itc_4919`) on another wild read in
+  the same harness (case 11's restore path: a random engine stage
+  indexing the spec's engine records past their end); fixed by the
+  user's call (505b2a31: the engine stages and tire types laid in
+  range from their own generator), validated again (`itc_4926`). The
+  user's call to find, fix and go on is now under "Precedent first".
 
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 

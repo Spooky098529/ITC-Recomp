@@ -2846,6 +2846,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-11 | The car settings screen (the type 2 mode's +0x173D0 machine, UI movie 3, also set up by the type 5 mode: the garage car's gear ratios and settings, a test run; only its Inits and five handlers seen in play) | `car-settings.md` | 7 of 7 in play (one migration; no adapter removable: functors and recompiled callers); 84 never seen in play stay recompiled | `--native_car_settings` |
 | 2026-11-11 | The type 2 mode (its Init over the 14 machines' Inits, its vtable's delegates and slot thunks, `Interrupt`, `ForceExit`) and its user info screen (the player's record, UI movie 10, at the mode's block +0x102D8) | `type2-mode.md`, `user-info.md` | 20 of 21 and 14 of 14 (one migration; no adapter removable) | `--native_type2_mode`, `--native_user_info` |
 | 2026-11-11 | The tuning screen's refresh (`TuningScreen::Refresh`, 3,838 lines: the header, states 3 to 8 inside, the dispatch for 15 to 58; its 5 callees never seen in play stay recompiled) with `TuningMachine::Start` it unblocked | `tuning-screen.md`, `tuning-machine.md` | 83 of 83 and 22 of 22 in play (one migration, the refresh in four parts, 5 subagents; 15 adapters removed) | (`--native_tuning_screen`, `--native_tuning_machine`) |
+| 2026-11-11 | The tuning screen's update (`TuningScreen::Update` `sub_821E6C50`, 1,601 lines with its two pieces: its state switch over the debug handlers, the command queue's runners, the movie it picks, `UiMovie::Run`; 40 of its 61 callees never seen in play ported too) | `tuning-screen.md` | 126 of 126 rows ours (the update Overridden, its pieces Merged, 47 adapters removed; 21 never-seen runners stay recompiled, blocked by the sticker and vinyl editors' leads) | (`--native_tuning_screen`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5162,3 +5163,22 @@ of the 17. The boundary: 449 functions (916 pairs): overridden 109,
 Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
 54 with a live caller. B7 (`b7_status.py`): ours 5,445, work left 1,063
 (Wrapped 56, with a row 389, no row yet 618), from 1,065.
+
+**2026-11-11, the tuning screen's update (branch `b7-loop-11-11-26`,
+the forty-fourth run, its first subsystem):** `TuningScreen::Update`
+`sub_821E6C50` (rows in `tuning-screen.md`, under
+`--native_tuning_screen`; `src/tuning_screen/`), its pieces
+`sub_821E6CD4` and `sub_821E6F90` merged into it; 47 adapters removed;
+40 of its 61 callees never seen in play ported (the 23 debug state
+handlers, movie 2's and some of movies 13 and 14's command runners);
+21 stay recompiled behind guest calls: the sticker editor's commands
+and `Command21` wait on the sticker and vinyl editors' leads,
+`Command10`, `13` and `14` on three never-seen `tuning-pages.md`
+setters. Its validation first stalled on a harness wild read (the
+restore path's random engine stage indexing the spec's engine records
+past their end; fixed, 505b2a31, by the user's call), then passed. The
+replay ran 20 of the 88. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 26, never called 70, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,488, work left 1,060 (Wrapped 56, with a row 389, no row yet 615),
+from 1,063.
