@@ -39,6 +39,12 @@ Not in the attract race or the replay (`itc_4825`, `itc_4826`, ok):
 - `sub_82197930` ModeType2::ForceExit (`type2-mode.md`)
 - `sub_8222FC80` Mode::Slot13Thunk (`type2-mode.md`)
 
+Not in the attract race or the replay (`itc_4871`, `itc_4872`, ok):
+
+- `sub_821DA3F8` TuningScreen::ShowInteriorPicture (`tuning-screen.md`)
+- `sub_821F1DE0` TuningScreen::SetStateTexts (`tuning-screen.md`)
+- `sub_822076E8` TuningScreen::RefreshMovie13 (`tuning-screen.md`)
+
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 
 - The race menu (`race-menu.md`; attract race `itc_4804` never raced:

@@ -71,9 +71,17 @@ file's history. What's left to see in a drive, from every run:
   f2271108 (15 Native), a harness gap fixed dcaee620; races 29-38 s at
   40, 0 errors, its harnesses 0 differing; 5 subagents, one at a time.
   Left: none (the tuning screen's update `sub_821E6C50` now ready, its
-  lead in `leads.md`). Step: validation agent running.
+  lead in `leads.md`). Validated: `itc_4871` (race 62 s at 180, the
+  harnesses ~116 s, 0 errors, every harness 0 differing outside the
+  expected groups), 17 of 17 harness lines, no prints added; 14 ran in
+  the replay `itc_4872` (ok), 3 to drive. Recorded. Run's limit
+  reached.
 
 ## Done
+
+- The tuning screen's refresh with `TuningMachine::Start`:
+  `tuning-screen.md` 83 of 83, `tuning-machine.md` 22 of 22 in play,
+  2bbe3281..dcaee620; validated.
 
 - The type 2 mode and its user info screen: `type2-mode.md` 20 of 21,
   `user-info.md` 14 of 14, `--native_type2_mode`, `--native_user_info`,
@@ -117,6 +125,9 @@ The run's section of `review.md` ("Run 2026-11-10 23:52").
 
 ## Stopped
 
-(Halted 2026-11-11 at the car settings' validation on
-`GarageScreen::Transition6`'s harness; fixed and resumed by the user's
-call, see "Now".)
+2026-11-11, at the run's limit (3 subsystems: the car settings screen,
+the type 2 mode with its user info screen, the tuning screen's refresh
+with `TuningMachine::Start`). Its first validation had halted on
+`GarageScreen::Transition6`'s harness, fixed by the user's call
+(f691a91e) and validated again. Nothing uncommitted. Totals: ours
+5402 -> 5445, work left 1102 -> 1063.

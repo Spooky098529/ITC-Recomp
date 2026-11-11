@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-08):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-11):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -289,7 +289,11 @@ goes in `src/` as overrides), American English.
   harness (the forty-first run's) differing in 2 of 100 cases (a
   harness index out of play's range, fixed, f691a91e, the user's call),
   then went on: the type 2 mode and its user info screen
-  (`type2-mode.md`, 20 of 21; `user-info.md`, 14 of 14; ours 5,443).
+  (`type2-mode.md`, 20 of 21; `user-info.md`, 14 of 14; ours 5,443)
+  and the tuning screen's refresh with `TuningMachine::Start` (ours
+  5,445), and stopped at its limit; the rest waits on the tuning
+  screen's update `sub_821E6C50`, `Garage::Sell`, the car settings'
+  `Update` and the leads in `docs/loops/leads.md`.
   The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2841,6 +2845,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-10 | The type 2 mode's race menu (its machine at the mode's +9640: the race mode, event and variant pages, the confirm, the event's start) | `race-menu.md` | 38 of 38 (one migration, 7 subagents; 21 Native, 3 Merged); validation halted on its harness, fixed (4438f1c3) and validated again | `--native_race_menu` |
 | 2026-11-11 | The car settings screen (the type 2 mode's +0x173D0 machine, UI movie 3, also set up by the type 5 mode: the garage car's gear ratios and settings, a test run; only its Inits and five handlers seen in play) | `car-settings.md` | 7 of 7 in play (one migration; no adapter removable: functors and recompiled callers); 84 never seen in play stay recompiled | `--native_car_settings` |
 | 2026-11-11 | The type 2 mode (its Init over the 14 machines' Inits, its vtable's delegates and slot thunks, `Interrupt`, `ForceExit`) and its user info screen (the player's record, UI movie 10, at the mode's block +0x102D8) | `type2-mode.md`, `user-info.md` | 20 of 21 and 14 of 14 (one migration; no adapter removable) | `--native_type2_mode`, `--native_user_info` |
+| 2026-11-11 | The tuning screen's refresh (`TuningScreen::Refresh`, 3,838 lines: the header, states 3 to 8 inside, the dispatch for 15 to 58; its 5 callees never seen in play stay recompiled) with `TuningMachine::Start` it unblocked | `tuning-screen.md`, `tuning-machine.md` | 83 of 83 and 22 of 22 in play (one migration, the refresh in four parts, 5 subagents; 15 adapters removed) | (`--native_tuning_screen`, `--native_tuning_machine`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5142,3 +5147,18 @@ of them. The boundary: 449 functions (916 pairs): overridden 109,
 Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
 54 with a live caller. B7 (`b7_status.py`): ours 5,443, work left 1,065
 (Wrapped 56, with a row 390, no row yet 619), from 1,095.
+
+**2026-11-11, the tuning screen's refresh (branch `b7-loop-10-11-26-2`,
+the forty-third run, its third subsystem; the run stopped at its
+limit):** `TuningScreen::Refresh` `sub_821E3AD0` (rows in
+`tuning-screen.md`, under `--native_tuning_screen`, which now also needs
+`--native_car_specs`; `src/tuning_screen/refresh*.cpp`), migrated in
+four parts (the header, states 3 and 4 and the dispatch; state 5;
+state 6; states 7 and 8); its five callees never seen in play stay
+recompiled behind guest calls. `TuningMachine::Start` `sub_821E7368`
+(`tuning-machine.md`) it unblocked; 15 adapters removed. The tuning
+screen's update `sub_821E6C50` is now ready (a lead). The replay ran 14
+of the 17. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,445, work left 1,063
+(Wrapped 56, with a row 389, no row yet 618), from 1,065.

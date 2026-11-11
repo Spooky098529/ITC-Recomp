@@ -97,6 +97,9 @@ When the user has reviewed a run's section, its heading gets
   on leftover bytes); recompiled callees' saves and parameter areas left
   out of the comparisons (found by logging). Map corrections in the
   refresh's intro.
+- The refresh's validation (`itc_4871`, `itc_4872`): 17 of 17 harness
+  lines, 14 ran in the replay; `ShowInteriorPicture`, `SetStateTexts`,
+  `RefreshMovie13` to drive. The run stopped at its limit.
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 
