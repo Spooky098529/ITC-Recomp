@@ -19,6 +19,19 @@ When the user has reviewed a run's section, its heading gets
   `0x826D8460` and the 764-byte data block; the type 5 mode's Init
   `sub_821B7878` mapped here (its lead in `leads.md` notes it);
   `Update` `sub_821B6818` and its 114-function subtree left as a lead.
+- The car settings' migration (42211c94..73886334): 7 of 7 in play
+  ours, all Overridden (the five handlers are functors the machine
+  calls; the Inits' callers `sub_82197278` and `sub_8222FD68` are
+  recompiled). Not ported: the machine's other functors (`Start`,
+  `Draw`, `Update`, the replies, `Unload`, `Leave`, `Reenter`,
+  `ReenterToCourses`) and all under them, never seen in play; the
+  native Inits register them as the original does (unlike the garage
+  screen and tuning machine, 2026-11-09, where the user had such paths
+  ported: say if the same is wanted here). `OpenMovie`, a tail call,
+  passes the adapter's r1 and lr to `UiMovies::Open`; `Close` is the
+  machine's own (deletes movie 3, returns `Delete`'s r3 or 0, message 4
+  only for mode types 2 and 5); both Inits by step tables
+  (`init_step_tables.py`), unwritten frame words copied as left.
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 

@@ -19,7 +19,12 @@ file's history. What's left to see in a drive, from every run:
   screen, UI movie 3, the garage car's gear ratios and settings, with
   the type 5 mode's Init `sub_821B7878`; 7 ready groups; `Update`
   `sub_821B6818` and the 114 functions only it reaches left as a lead;
-  no subagents); map checked. Step: migration agent running.
+  no subagents); map checked. Migration 42211c94..73886334 (the five
+  handlers, then both Inits by step tables; 7 of 7 in play ours, all
+  Overridden: functors and recompiled callers; `--native_car_settings`;
+  races 38 s at 40, 0 errors, its 7 harnesses 0 differing; no
+  subagents). Left: none (the 84 never seen in play stay recompiled).
+  Step: validation agent running.
 
 ## Done
 
@@ -42,5 +47,8 @@ The run's section of `review.md` ("Run 2026-11-10 23:52").
 
 - After the car settings' map: ours 5402, work left 1102 (wrapped 56,
   known 397, unknown 649).
+
+- After its migration: ours 5409, work left 1095 (wrapped 56, known
+  390, unknown 649).
 
 ## Stopped
