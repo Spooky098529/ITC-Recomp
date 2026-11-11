@@ -15,7 +15,14 @@ file's history. What's left to see in a drive, from every run:
   `sub_821E6CD4`, `sub_821E6F90`; 1,601 lines, ready; first in the last
   run's "Next"; the top lead, `sub_82562FF0`, is inside the movie
   library's range, skipped as before); its line deleted from
-  `leads.md`. Step: mapping agent.
+  `leads.md`. Mapped into `tuning-screen.md` (eba99e25: 64 new rows,
+  3 in play: the update and its two pieces, read in full, six blocks by
+  line range in the intro's "The update"; 61 callees not seen in play,
+  23 debug state handlers and 38 command runners, in outline; the
+  sticker editor's commands wait on its lead, `Command21` on the vinyl
+  editor's; no leads added, `sub_821FA460` added to the sticker lead;
+  no subagents); map checked (0 errors, 1 ready group). Step: migration
+  agent.
 
 ## Done
 
@@ -35,5 +42,7 @@ The run's section of `review.md` ("Run 2026-11-11 08:38").
 
 - At the start: ours 5445, work left 1063 (wrapped 56, known 389,
   unknown 618).
+- After the update's map: ours 5445, work left 1063 (wrapped 56,
+  known 392, unknown 615).
 
 ## Stopped

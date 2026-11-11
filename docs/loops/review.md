@@ -13,7 +13,13 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-11 08:38 (`b7-loop-11-11-26`)
 
-(Nothing yet.)
+- The tuning screen's update's map (eba99e25): `tuning-screen.md`, 64
+  new rows (the update `sub_821E6C50` and its pieces `sub_821E6CD4`,
+  `sub_821E6F90`, in play; 23 debug state handlers and 38 command
+  runners, "Not seen in play", read in outline and named from their
+  strings), the intro's "The update", `known-data.md`'s state names
+  and the screen's +9644 and +9648; `sub_821FA460` added to the sticker
+  editor's lead.
 
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 
