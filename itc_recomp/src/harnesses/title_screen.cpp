@@ -100,6 +100,7 @@ constexpr Global kGlobals[] = {
     {menu_sounds::kSoundManager, 4},
     {menu_sounds::kEffectsVolume, 8},
     {menu_sounds::kMusicVolume, 4},
+    {0x826D8478, 4},  // the options' settings (ModeType4::Interrupt's +712)
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -112,7 +113,7 @@ struct World {
   explicit World(uint8_t* base)
       : base(base), allocation(memory::Alloc(kBlockBytes + 16, 0)),
         block((allocation + 15) & ~15u), strings(memory::Alloc(kStringsBytes, 0)),
-        save(memory::Alloc(kSaveDataBytes, 0)) {
+        save(memory::Alloc(kSaveDataBytes, 0)), screen(memory::Alloc(kScreenBytes, 0)) {
     if (strings != 0) {
       MakeStrings();
     }
@@ -121,10 +122,11 @@ struct World {
     memory::Free(allocation);
     memory::Free(strings);
     memory::Free(save);
+    memory::Free(screen);
   }
   World(const World&) = delete;
   World& operator=(const World&) = delete;
-  bool ok() const { return allocation != 0 && strings != 0 && save != 0; }
+  bool ok() const { return allocation != 0 && strings != 0 && save != 0 && screen != 0; }
   uint32_t at(uint32_t offset) const { return block + offset; }
   uint32_t node(uint32_t n) const { return at(kNodesAt) + kNodeBytes * n; }
   uint32_t machine() const { return at(kMachineAt); }
@@ -139,6 +141,9 @@ struct World {
   static constexpr uint32_t kStringsBytes = 0x9000;
   uint32_t strings;
   uint32_t save;  // player 0's save data (all four slots point at it)
+  // The type 4 mode's block (+848) for the delegate functions' cases.
+  static constexpr uint32_t kScreenBytes = 48224;
+  uint32_t screen;
 
  private:
   void MakeStrings() {
@@ -286,6 +291,14 @@ bool RecordOpen(PPCContext& ctx, uint32_t address) {
     // before the boot's data is loaded, which the first would load; the
     // second sets up a race; the third went round in the harness's save).
     g_opens.insert(g_opens.end(), {address, ctx.r3.u32, ctx.r1.u32, uint32_t(ctx.lr)});
+    return true;
+  }
+  if (address == 0x8211AD00 || address == 0x8210A8D0) {
+    // The UI movies' start and Strings::Load (ModeType4::Init's): recorded,
+    // r3 left. The start reads r3 only (its r4 a leftover).
+    g_opens.insert(g_opens.end(), {address, ctx.r3.u32,
+                                   address == 0x8211AD00 ? 0u : ctx.r4.u32, ctx.r1.u32,
+                                   uint32_t(ctx.lr)});
     return true;
   }
   if (address != ts::kMoviesOpen && address != ts::kMoviesDelete) {
@@ -897,6 +910,130 @@ void MenuPages(Context& h, const World& w) {
              hooks::TitleScreenMenu4, {{-112, -24}}, input});
 }
 
+// --- The mode: the mode the world's (its dispatcher without handlers, so
+// GameMessages::Dispatch takes the queued messages and delivers none; its
+// ring's count and start small), its block the world's screen block with
+// the five machines' states and loaded words picked, the answer in the
+// world. ---
+
+constexpr uint32_t kAnswerAt = 0x3400;
+constexpr uint32_t kMachineOffsets[5] = {28920, 38560, 0, 9640, 19280};
+
+void ModeWorld(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t mode = w.mode();
+  WriteRandom(base, w.screen, World::kScreenBytes, r);
+  guest::StoreU32(base, mode + 36 + 200, 0);  // no handlers
+  guest::StoreU32(base, mode + 840, r.Below(4));
+  guest::StoreU32(base, mode + 844, r.Below(200));
+  guest::StoreU32(base, mode + 848, w.screen);
+  static constexpr uint32_t kStates[] = {4, 5, 6, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1};
+  for (const uint32_t at : kMachineOffsets) {
+    guest::StoreU32(base, w.screen + at + 9604,
+                    r.Below(8) == 0 ? uint32_t(r.Next()) : kStates[r.Below(std::size(kStates))]);
+    guest::StoreU32(base, w.screen + at + 9608, r.Below(4) == 0 ? 0 : r.Below(3));
+  }
+  // Leaving's: now and then every machine in a leaving state.
+  if (r.Below(3) == 0) {
+    static constexpr uint32_t kLeft[] = {6, 11, 14, 12, 20};
+    for (const uint32_t at : kMachineOffsets) {
+      guest::StoreU32(base, w.screen + at + 9604, kLeft[r.Below(5)]);
+    }
+  }
+  guest::StoreU32(base, w.screen + 48200, r.Below(5));
+  guest::StoreU32(base, 0x826D8478, w.mode());
+  guest::StoreU32(base, w.mode() + 712, r.Below(2));
+}
+
+// r3 the answer, r4 the mode.
+void Delegate(PPCContext& t, Random& r, const World& w) {
+  ModeWorld(r, w);
+  t.r3.u64 = w.at(kAnswerAt);
+  t.r4.u64 = w.mode();
+}
+// r3 the mode + 32 (r4 a number for ForceExit).
+void Interface(PPCContext& t, Random& r, const World& w) {
+  ModeWorld(r, w);
+  t.r3.u64 = w.mode() + 32;
+  t.r4.u64 = r.Below(6);
+}
+// r3 the block (now and then with high bits), r4 an index.
+void BlockArgs(PPCContext& t, Random& r, const World& w) {
+  ModeWorld(r, w);
+  t.r3.u64 = w.screen | (uint64_t(r.Below(2)) << 32);
+  t.r4.u64 = r.Below(4) == 0 ? uint64_t(r.Next()) : r.Below(7);
+}
+// The screen block compared.
+void ScreenBlock(PPCContext&, const World& w, Outputs& out) {
+  out.Bytes(Read(w.base, w.screen, World::kScreenBytes));
+}
+
+// The words of [at, at + bytes) that point into [lo, lo + span) made their
+// offsets with a mark (the block VirtualAlloc made differs by side).
+void NormalizePointers(uint8_t* base, uint32_t at, uint32_t bytes, uint32_t lo, uint32_t span) {
+  for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
+    const uint32_t word = guest::LoadU32(base, at + i);
+    if (word >= lo && word < lo + span) {
+      guest::StoreU32(base, at + i, 0xB10C0000u ^ (word - lo));
+    }
+  }
+}
+
+void Mode(Context& h, const World& w) {
+  Run(h, w, {"ModeType4::MachineOf (sub_82224B40)", 60, __imp__sub_82224B40,
+             hooks::ModeType4MachineOf, {}, BlockArgs});
+  Run(h, w, {"ModeType4::AllLoaded (sub_82224BC0)", 60, __imp__sub_82224BC0,
+             hooks::ModeType4AllLoaded, {}, BlockArgs});
+  Run(h, w, {"ModeType4::FindShown (sub_82224C10)", 60, __imp__sub_82224C10,
+             hooks::ModeType4FindShown, {{-96, -8}}, BlockArgs, ScreenBlock});
+  Run(h, w, {"ModeType4::Restart (sub_82225098)", 100, __imp__sub_82225098,
+             hooks::ModeType4Restart, {{-112, -16}}, Delegate, ScreenBlock});
+  Run(h, w, {"ModeType4::NextMode (sub_82225390)", 200, __imp__sub_82225390,
+             hooks::ModeType4NextMode, {{-144, -56}, {-240, -152}}, Delegate, ScreenBlock});
+  Run(h, w, {"ModeType4::LeaveScreen (sub_822252C8)", 60, __imp__sub_822252C8,
+             hooks::ModeType4LeaveScreen, {{-128, -32}, {-224, -136}}, Delegate, ScreenBlock});
+  Run(h, w, {"ModeType4::WaitForLeave (sub_822251D0)", 100, __imp__sub_822251D0,
+             hooks::ModeType4WaitForLeave, {{-112, -16}, {-208, -120}}, Delegate, ScreenBlock});
+  Run(h, w, {"ModeType4::Leaving (sub_82225698)", 100, __imp__sub_82225698,
+             hooks::ModeType4Leaving, {{-128, -32}}, Delegate, ScreenBlock});
+  Run(h, w, {"ModeType4::NextModeAnswer (sub_82224B98)", 20, __imp__sub_82224B98,
+             hooks::ModeType4NextModeAnswer, {}, Delegate});
+  Run(h, w, {"ModeType4::Interrupt (sub_82224E20)", 100, __imp__sub_82224E20,
+             hooks::ModeType4Interrupt, {{-96, -8}}, Interface});
+  Run(h, w, {"ModeType4::ForceExit (sub_82224ED0)", 60, __imp__sub_82224ED0,
+             hooks::ModeType4ForceExit, {{-32, -16}}, Interface, ScreenBlock});
+  Run(h, w, {"ModeType4::Resume (sub_82225048)", 20, __imp__sub_82225048, hooks::ModeType4Resume,
+             {}, Interface});
+  // Init: the mode random words (its dispatcher's count 0 to 7); the UI
+  // movies' start and Strings::Load recorded; the block VirtualAlloc made
+  // compared by content and freed, its addresses in it, in the mode and in
+  // r3 made offsets; its frame's +80 to +87 compared (the machines' Inits'
+  // frames below hold the machines' addresses).
+  Run(h, w, {"ModeType4::Init (sub_82224C70)", 12, __imp__sub_82224C70, hooks::ModeType4Init,
+             {{-112 + 80, -112 + 88}},
+             [](PPCContext& t, Random& r, const World& w) {
+               guest::StoreU32(w.base, w.mode() + 36 + 200, r.Below(8));
+               t.r3.u64 = w.mode();
+             },
+             [](PPCContext& t, const World& w, Outputs& out) {
+               uint8_t* base = w.base;
+               const uint32_t block = guest::LoadU32(base, w.mode() + 848);
+               const bool made = memory::IsPages(block);
+               out.Word(made ? 1 : 0);
+               if (!made) {
+                 return;
+               }
+               NormalizePointers(base, block, 48220, block, 48220);
+               out.Bytes(Read(base, block, 48220));
+               NormalizePointers(base, w.mode(), 1024, block, 48220);
+               if (t.r3.u32 >= block && t.r3.u32 < block + 48220) {
+                 t.r3.u64 = 0xB10C0000u ^ (t.r3.u32 - block);
+               }
+               memory::FreePages(block);
+               guest::StoreU32(base, w.mode() + 848, 1);
+             }});
+}
+
 }  // namespace
 
 void TitleScreen(Context& h) {
@@ -911,6 +1048,7 @@ void TitleScreen(Context& h) {
     ScreenHandlers(h, w);
     Transitions(h, w);
     MenuPages(h, w);
+    Mode(h, w);
   }
 }
 

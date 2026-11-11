@@ -77,5 +77,21 @@ void TitleScreenSetUpMenu4(PPCContext& ctx, uint8_t* base);
 void TitleScreenMainMenu(PPCContext& ctx, uint8_t* base);
 void TitleScreenCareerMenu(PPCContext& ctx, uint8_t* base);
 void TitleScreenMenu4(PPCContext& ctx, uint8_t* base);
+// The mode: its Init (r3 the mode), the delegate functions (r3 the answer,
+// r4 the mode), the +32 interface (r3 the mode + 32, r4 ForceExit's number)
+// and the block's helpers (r3 the block, r4 MachineOf's index).
+void ModeType4Init(PPCContext& ctx, uint8_t* base);
+void ModeType4Restart(PPCContext& ctx, uint8_t* base);
+void ModeType4NextMode(PPCContext& ctx, uint8_t* base);
+void ModeType4LeaveScreen(PPCContext& ctx, uint8_t* base);
+void ModeType4WaitForLeave(PPCContext& ctx, uint8_t* base);
+void ModeType4Leaving(PPCContext& ctx, uint8_t* base);
+void ModeType4NextModeAnswer(PPCContext& ctx, uint8_t* base);
+void ModeType4Interrupt(PPCContext& ctx, uint8_t* base);
+void ModeType4ForceExit(PPCContext& ctx, uint8_t* base);
+void ModeType4Resume(PPCContext& ctx, uint8_t* base);
+void ModeType4MachineOf(PPCContext& ctx, uint8_t* base);
+void ModeType4AllLoaded(PPCContext& ctx, uint8_t* base);
+void ModeType4FindShown(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

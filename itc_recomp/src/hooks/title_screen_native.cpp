@@ -39,7 +39,14 @@ ITC_FLAG_BOOL(native_title_screen, true, "ITC",
               "menu pages MainMenu sub_82222700, CareerMenu sub_82221AC0 and Menu4 sub_82222378 "
               "(MenuList::Update, Accepted, Cancelled, Menu::Step and Pressed, MenuSound::Play, "
               "the Progress and Career calls and CarDealer::StartFirstRace through their "
-              "overrides) (the same writes; checked by --run_harnesses=title_screen)");
+              "overrides); the mode, ModeType4::Init sub_82224C70 (the title Inits as plain C++, "
+              "the screen start, Strings::Load, VirtualAlloc and the other machines' Inits "
+              "through their overrides), Restart sub_82225098, NextMode sub_82225390, "
+              "LeaveScreen sub_822252C8, WaitForLeave sub_822251D0, Leaving sub_82225698, "
+              "NextModeAnswer sub_82224B98 (GameMessages::Dispatch through its override), the "
+              "+32 interface Interrupt sub_82224E20, ForceExit sub_82224ED0 and Resume "
+              "sub_82225048, with MachineOf sub_82224B40, AllLoaded sub_82224BC0 and FindShown "
+              "sub_82224C10 (the same writes; checked by --run_harnesses=title_screen)");
 
 namespace hooks {
 
@@ -304,6 +311,47 @@ void TitleScreenMainMenu(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::MainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void ModeType4Init(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+// The delegate functions return the answer (r3 as it came).
+#define ITC_MODE_TYPE4_DELEGATE(name)                                       \
+  void ModeType4##name(PPCContext& ctx, uint8_t* base) {                    \
+    const uint64_t answer = ctx.r3.u64;                                     \
+    {                                                                       \
+      GuestCalls guest(ctx, base);                                          \
+      ts::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());    \
+    }                                                                       \
+    ctx.r3.u64 = answer;                                                    \
+  }
+ITC_MODE_TYPE4_DELEGATE(Restart)
+ITC_MODE_TYPE4_DELEGATE(NextMode)
+ITC_MODE_TYPE4_DELEGATE(LeaveScreen)
+ITC_MODE_TYPE4_DELEGATE(WaitForLeave)
+ITC_MODE_TYPE4_DELEGATE(Leaving)
+#undef ITC_MODE_TYPE4_DELEGATE
+void ModeType4NextModeAnswer(PPCContext& ctx, uint8_t* base) {
+  ts::NextModeAnswer(base, ctx.r3.u32, ctx.r4.u32);
+}
+void ModeType4Interrupt(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::Interrupt(base, ctx.r3.u32, ctx.r1.u32);
+}
+void ModeType4ForceExit(PPCContext& ctx, uint8_t* base) {
+  ts::ForceExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+void ModeType4Resume(PPCContext& ctx, uint8_t* base) { ts::Resume(base, ctx.r3.u32); }
+void ModeType4MachineOf(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ts::MachineOf(ctx.r3.u64, ctx.r4.u64);
+}
+void ModeType4AllLoaded(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::AllLoaded(base, ctx.r3.u32);
+}
+void ModeType4FindShown(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::FindShown(base, ctx.r3.u64, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 #define ITC_TITLE_SCREEN(address, step)   \
@@ -380,3 +428,19 @@ ITC_TITLE_SCREEN(822235D0, TitleScreenMoveMenu4Cursor)
 ITC_TITLE_SCREEN(82222700, TitleScreenMainMenu)
 ITC_TITLE_SCREEN(82221AC0, TitleScreenCareerMenu)
 ITC_TITLE_SCREEN(82222378, TitleScreenMenu4)
+// The mode: Init (vtable 0x82006BE0's slot 0, from Modes::Tick), the
+// delegate functions (its slots 6, 8, 10 to 13, through the slot thunks)
+// and the +32 interface (vtable 0x82006BD4). MachineOf sub_82224B40,
+// AllLoaded sub_82224BC0 and FindShown sub_82224C10: no adapters (only the
+// mode's functions, native, call them; the register steps above are the
+// harness's).
+ITC_TITLE_SCREEN(82224C70, ModeType4Init)
+ITC_TITLE_SCREEN(82225098, ModeType4Restart)
+ITC_TITLE_SCREEN(82225390, ModeType4NextMode)
+ITC_TITLE_SCREEN(822252C8, ModeType4LeaveScreen)
+ITC_TITLE_SCREEN(822251D0, ModeType4WaitForLeave)
+ITC_TITLE_SCREEN(82225698, ModeType4Leaving)
+ITC_TITLE_SCREEN(82224B98, ModeType4NextModeAnswer)
+ITC_TITLE_SCREEN(82224E20, ModeType4Interrupt)
+ITC_TITLE_SCREEN(82224ED0, ModeType4ForceExit)
+ITC_TITLE_SCREEN(82225048, ModeType4Resume)

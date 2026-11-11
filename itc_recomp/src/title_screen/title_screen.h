@@ -290,6 +290,41 @@ uint64_t CareerMenu(uint8_t* base, uint32_t sp, const Calls& calls);
 // and Pressed 159 or 158, or a move. 112-byte frame.
 uint64_t Menu4(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The mode (mode.cpp) ---
+
+// sub_82224B40 ModeType4::MachineOf: the machine `index` names (the 64-bit
+// block plus its offset: 0 the title load, 1 the title screen, 2 the
+// options, 3 the controller options, 4 the save screen), or 0. A leaf.
+uint64_t MachineOf(uint64_t block, uint64_t index);
+// sub_82224BC0 ModeType4::AllLoaded: 1 when the title screen's, the title
+// load's, the options' and the save screen's +9608 are all nonzero. A leaf.
+uint32_t AllLoaded(uint8_t* base, uint32_t block);
+// sub_82224C10 ModeType4::FindShown: the last of machines 0 to 4 in state
+// 4 or 5 into the block's +48200. MachineOf(block, 4)'s r3. 96-byte frame.
+uint64_t FindShown(uint8_t* base, uint64_t block, uint32_t sp);
+// sub_82224C70 ModeType4::Init (r3 the mode): see the row; the title
+// load's and the title screen's Inits as plain C++, the other callees
+// through their overrides. The save screen's Init's r3. 112-byte frame.
+uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// The delegate functions (r3 the 8-byte answer, r4 the mode; each returns
+// the answer): sub_82225098 Restart (112-byte frame), sub_82225390
+// NextMode (144), sub_822252C8 LeaveScreen (128), sub_822251D0
+// WaitForLeave (112), sub_82225698 Leaving (128, never seen in play) and
+// sub_82224B98 NextModeAnswer (a leaf).
+void Restart(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void WaitForLeave(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void NextModeAnswer(uint8_t* base, uint32_t answer, uint32_t mode);
+// The +32 interface (r3 the mode + 32), never seen in play: sub_82224E20
+// Interrupt (0 or 1; 96-byte frame), sub_82224ED0 ForceExit (r4 a number;
+// the doubleword built at sp - 32 as the original; a leaf) and sub_82225048
+// Resume (a leaf).
+uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp);
+void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp);
+void Resume(uint8_t* base, uint32_t object);
+
 // --- The machines' set-ups (init.cpp) ---
 //
 // sub_822213B0 TitleLoad::Init and sub_82224270 TitleScreen::Init: their

@@ -514,6 +514,7 @@ set(ITC_SOURCES
     src/title_screen/screen_handlers.cpp
     src/title_screen/transitions.cpp
     src/title_screen/pages.cpp
+    src/title_screen/mode.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp
