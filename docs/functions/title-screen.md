@@ -1,0 +1,293 @@
+# Known functions: the title screen
+
+The **type 4 front-end mode** (`ModeType4::`, the name ours): the title
+screen the boot leads to, its "press start", its main menu and the
+career's menu below it, and the attract race's set-up after 20 idle
+seconds. The boot before it and the attract race's timing are in
+[`../title-screen.md`](../title-screen.md); the boot mode in
+[`boot-mode.md`](boot-mode.md); the mode classes and their state
+machines in [`game-modes.md`](game-modes.md). The mode is 852 bytes like
+types 2, 5 to 7 (made by the factory in `game-modes.md`), released by
+`ModeType4::Release` `sub_82224AB8` (shared, in
+[`front-end-screen-helpers.md`](front-end-screen-helpers.md)).
+
+Its vtable `0x82006BE0` has 14 slots: 0 `Init` `sub_82224C70`, 1
+`Release`, 2 to 5 and 9 `Mode::NoNextMode` (`sub_8222FC90`), 6
+`NextMode` `sub_82225390`, 7 `Mode::DeletingDestructor` (`sub_82106E38`;
+both in `boot-mode.md`), 8 `Restart` `sub_82225098`, 10 `WaitForLeave`
+`sub_822251D0`, 11 `LeaveScreen` `sub_822252C8`, 12 `NextModeAnswer`
+`sub_82224B98`, 13 `Leaving` `sub_82225698` (reached through the slot
+thunks `Mode::SlotNThunk` in [`type2-mode.md`](type2-mode.md) and
+`Mode::NextModeThunk` `sub_82235C08` in `boot-mode.md`). Its +32 vtable
+`0x82006BD4` has three: `Interrupt` `sub_82224E20`, `ForceExit`
+`sub_82224ED0` and `Resume` `sub_82225048` (none seen in play).
+
+`Init` allocates the mode's block (48,220 bytes at +848, `VirtualAlloc`)
+with five state machines and adds them to the mode's dispatcher in this
+order: +0 the options (`Type4Options::Init`) and +9640 the controller
+options (`Type4ControllerOptions::Init`, both in
+[`options-screen.md`](options-screen.md)), +28920 the **title load**
+(`TitleLoad::Init` `sub_822213B0`), +38560 the **title screen**
+(`TitleScreen::Init` `sub_82224270`) and +19280 the save screen
+(`Type4SaveScreen::Init`, [`save-screen.md`](save-screen.md)). The
+machines have the shape of the type 2 mode's (`type2-screens.md`'s
+intro: keys (state, message, 0, 0), member function functors over
+vtable `0x82011918`, r3 the machine and r4 the mode, whose message ring
+at +204 the handlers post to; (0, 1) `Create` → 1 or 9, (1, 1) → 2
+`OpenMovie`, (2, 1) `WaitForMovie` → 4 or 9, (9, n) `ScreenMachine::Reenter`
+`sub_822895E0` ([`location-screen.md`](location-screen.md)) → 4, (4, 1)
+→ 5 `Start`, in 5 Draw (message 1) runs a page and Update (message 0) a
+transition, (5, 7) or (5, 5) → 8 `Unload`, (8, 3), (5, 4) and (9, 4)
+`Leave` → 7, (7, 4) → 6 `Destroy`). `Init` sets +9612 (open at once) on
+the title load, the title screen, the options and the save screen and
++9616 (delete the movie when unloaded) on the controller options.
+
+- **The title load** (`TitleLoad::`, UI movie 46, asset 22592): its
+  68-byte block `[0x82814E28]` (+4 a tick count, +8 the transition, +12
+  the page, +16 the transition's started word). Once the movie is
+  loaded, `Start` runs the data load at boot (`BootData::Load`,
+  [`data-load.md`](data-load.md)) and queues transition 12, which plays
+  the movie's animation 0 (probably the Genki logo) to its end; page 5
+  then waits for the archive's queue to empty, page 4 posts message 5
+  (→ 8, the movie deleted), and (8, 3) sets `[0x826364EC]` = 1 and posts
+  message 8, which opens the title screen. Its other transitions (0 to
+  11, tick waits) and pages (0 to 3, waiting for action 159) are a
+  debug sequence never taken.
+- **The title screen** (`TitleScreen::`, UI movie 0, asset 22558): its
+  blocks `[0x82814E2C]` (28 bytes: +0 the page `Draw` runs, -1 while a
+  transition runs; +4 the page after; +8 the page before; +12 the
+  transition `Update` runs, -1 none; +16 the one queued after it; +20;
+  +24 the transition's started word), `[0x82814E30]` the menu list
+  (`MenuList::`, [`race-screens.md`](race-screens.md)), `[0x82814E34]`
+  the title's words (68 bytes, `../known-data.md`) and `[0x82814E38]` a
+  front-end menu (`Menu::Step`, [`menu-helpers.md`](menu-helpers.md)).
+  Pages (`Draw`'s table on +0): 0 `PressStart` (`TitleScreen::Update`,
+  the idle count and the attract race), 1 `LoadGameData` (message 13:
+  the save screen's game data load), 2 `MainMenu` (seven items), 3
+  `CareerMenu` (two or three items), 4 `Menu4` (a two-item menu, not
+  seen), 5 `LeavePage`. Transitions (`Update`'s table on +12, 0 to 17;
+  each set up once while +24 is 0, then `UiMovie::Run(movie 0, 0)`; done
+  when it answers 1, then the queued one or the page after): 0 `Intro`,
+  1 `PressStartLoop`, 2 (not seen), 3 `LeavePressStart`, 4
+  `ShowMainMenu`, 5 `ShowMainMenuAtOnce`, 6 `HighlightMain`, 7
+  `MoveMainCursor`, 8 the type 2 hub's fade out (`Type2Hub::Transition3`
+  `sub_8218ED98`, shared, [`type2-screens.md`](type2-screens.md)), 9 and
+  10 (not seen), 11 `ShowCareerMenu`, 12 `HighlightCareer`, 13
+  `MoveCareerCursor`, 14 to 17 (not seen). The main menu's item (kept
+  in `[0x82814E34]` +4, 8 for the attract race) picks the mode after
+  this one: `Destroy` leaves the machine's +9604 at 11 (the race, type
+  1: the attract race), 13 (type 2, the career's garage), 20 (type 3: the
+  career menu's third item), 16 (type 6), 17 (type 7), 15 (type 12), 18
+  (type 8) or 19 (type 10), which `NextMode` turns into the next mode's
+  type; item 6 opens the options (message 10) and item 4 the controller
+  pick (message 15, the save screen's; its answer, message 16, gives
+  player 1 a controller).
+
+In play (`../coverage.md`) the title load, "press start", the game
+data's load, the main menu, the career menu and its new game and
+continue were seen; the debug sequence, `Menu4`, the attract race's
+set-up `TitleScreen::SetUpAttractRace` (probably not in the coverage
+session: attract races do reach it), several transitions and the +32
+interface never ran (32 of the 87 rows not seen in play).
+
+Names are ours (guesses from what the code does). Read 2026-11-11 by the
+B7 loop's mapping agent: both Inits' transitions extracted from their
+step tables, the handlers, the pages and transitions seen in play and
+the mode's slots in full, the ones not seen in play in outline (the
+debug sequence's tick waits not one by one). Ready (`b7_groups.py`):
+47 groups, among them both Inits, the mode's `Init`, `Restart`,
+`NextModeAnswer`, `AllLoaded`, `MachineOf`, every handler and page seen
+but `TitleScreen::Update` and `OnControllerPicked` (which wait only on
+`Players::AssignController` here) and the transitions seen; `FindShown`,
+`ShowMainMenu` and `ShowMainMenuAtOnce` and the mode's `NextMode`,
+`WaitForLeave` and `LeaveScreen` wait only on groups here. Nothing
+outside the subsystem blocks it. The indirect calls are player 0's
+action mapper's slot 10 (`ActionMapper::Pressed`,
+[`action-mappers.md`](action-mappers.md), through `0x826BAB80` + 8 ×
+`[0x826BABA4 + 4 × player]`), the sound manager's (`[0x826C5C80]`) slot
+14 (`AudioManager::IsCuePlaying`, [`sound-cues.md`](sound-cues.md)) and
+the two tables' entries.
+
+`TitleScreen::Update` `sub_822221A0` is Wrapped
+(`itc_recomp/src/hooks/title_screen.cpp`: `--attract_after_s`
+shortens the idle wait). Shared, with their rows elsewhere:
+`ModeType4::Release` `sub_82224AB8`
+([`front-end-screen-helpers.md`](front-end-screen-helpers.md)),
+`TitleScreen::ResetPlayer` `sub_82221D00`, `MenuList::Init`
+`sub_8220BAC0`, `SaveData::Delete`, `SaveData::Create` and
+`Players::ResetControllers` ([`save-data.md`](save-data.md)), the menu
+list's `Selection` `sub_8220BC20`, `GetPreviousSelection`
+`sub_8220BC28`, `SetSelection` `sub_8220BC30`, `Accepted`
+`sub_8220BD50`, `Cancelled` `sub_8220BDE0`, `Update` `sub_8220C1E0`
+([`race-screens.md`](race-screens.md)) and `Release` `sub_8220BBB0`
+([`alt-hud.md`](alt-hud.md)), `Menu::Step` and `Menu::Pressed`
+([`menu-helpers.md`](menu-helpers.md)), `StateMachine::Add`
+`sub_82106158` and `GameMessages::Dispatch` `sub_821062E8`
+([`game-modes.md`](game-modes.md)), `BootData::Load` `sub_82106618`
+([`data-load.md`](data-load.md)), `Archive::QueueLength` `sub_8209D7B0`
+([`archive.md`](archive.md)), `ScreenFades::FadeIn` `sub_8209D038`
+([`mode-tick.md`](mode-tick.md)), `MenuSound::Play` `sub_821103F0` and
+`Sound::Play` `sub_82175850` ([`menu-sounds.md`](menu-sounds.md)),
+`SaveSlots::State` `sub_8228F9E8`
+([`save-interface.md`](save-interface.md)), `SaveData::Of`
+`sub_82105620` and `sub_820FF918`, `sub_820FF968`
+([`vehicle-accessors.md`](vehicle-accessors.md)), `Progress::Clear`,
+`Progress::SetDefaults` and `Progress::Restart`
+([`save-data.md`](save-data.md)), `PlayTime::Mark`,
+`Career::PickFromCar`, `Career::NextDay` and `Bits24::SetAll`
+([`career.md`](career.md)), `CarDealer::StartFirstRace` `sub_82180CE8`
+([`car-dealer.md`](car-dealer.md)), `RaceData::ResetGlobal`,
+`Stages::Clear`, `Race::SetRoute`, `Race::AddRacer`, `Race::AddStage`,
+`Race::PlaceRacers`, `Car::Init` and `Car::FromBuild`
+([`race-setup.md`](race-setup.md)), `Car::Refresh`
+([`car-specs.md`](car-specs.md)), `DataTables::Item`
+([`data-tables.md`](data-tables.md)), `Pad::IsConnected`
+([`racer-controllers.md`](racer-controllers.md)), `rand`
+([`race-overlays.md`](race-overlays.md)), `Strings::Load`
+([`files-and-saves.md`](files-and-saves.md)), the empty `sub_82106540`
+(its calls here pass debug strings; [`audio.md`](audio.md)),
+`VirtualAlloc` and `VirtualFree` ([`heap.md`](heap.md)), the other
+machines' Inits (`Type4Options::Init`, `Type4ControllerOptions::Init`,
+`Type4SaveScreen::Init`), the mode's thunks (`Mode::NextModeThunk`
+`sub_82235C08`, `Mode::Slot10Thunk` to `Slot12Thunk`) and the UI movie
+calls `sub_8211AD00` (a screen's start), `UiMovies::Open`
+`sub_8211E808`, `IsLoaded` `sub_8211BE98`, `Find` `sub_8211B3F0`,
+`Delete` `sub_8211E258`, `UiMovie::ResetPose` `sub_8211ABA8`,
+`FindNode` `sub_8211A578`, `SetNodeColor` `sub_8211A5B8`, `SetText`
+`sub_8211C1F8`, `PlayNamed` `sub_8211DAC8`, `LoopNamed` `sub_8211DDE0`,
+`LoopLast` `sub_8211DDE8`, `FinishNamed` `sub_8211DF20`, `FinishAll`
+`sub_8211DFF8` and `Run` `sub_8211E1B8`
+([`ui-movies-game.md`](ui-movies-game.md)).
+
+Notes for the migration: `TitleScreen::SetUp`'s and the menus' set-ups'
+`UiMovie::SetText` calls leave r7 to r10 unset (register leftovers:
+native callers pass 0, the user's call of 2026-10-30). The tables
+(`TitleLoad::Draw`, `Update`, `TitleScreen::Draw`, `Update`) hold
+functions of other subsystems (`Type2Hub::Transition3`) and functions
+not seen in play: native tables call those through guest calls until
+they're ours.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+| `sub_82224C70` | `ModeType4::Init` | | Slot 0 of vtable `0x82006BE0`, from `Modes::Tick` once the mode is made: r3 = the mode. A 112-byte frame (r30, r31 saved). `sub_8211AD00` (a screen's start); `Strings::Load([0x826C5C34], 3)`; `VirtualAlloc(0, 48220, MEM_COMMIT, PAGE_READWRITE)` into +848 (the block); `Type4Options::Init(block)`, `Type4ControllerOptions::Init(block + 9640)`, `TitleLoad::Init(block + 28920)`, `TitleScreen::Init(block + 38560)`, `Type4SaveScreen::Init(block + 19280)`; the dispatcher (+36: count +200, the handler pointers from +36) given block, +9640, +28920, +38560 and +19280 in that order; +9612 = 1 and +9616 = 0 on +28920, +38560 and +0, +9612 = 0 and +9616 = 1 on +9640, +9612 = 1 and +9616 = 0 on +19280; the delegate (+8, pointed to by +4) = vtable `0x82010FA0` (`ModeDelegate::Invoke`), the mode, `Mode::Slot8Thunk` `0x8223D4B0` (`Restart`), its last word from a frame word set to 0. Seen in play. Read in full. Ready (with both Inits in its group). |
+| `sub_82225098` | `ModeType4::Restart` (probably) | | Slot 8 (set by `Init`), from `ModeDelegate::Invoke` every tick until the machines are loaded: r3 = the 8-byte answer, r4 = the mode. A 112-byte frame. The answer cleared (byte +0, word +4); when `AllLoaded(block)` is 1: the delegate's function = `Mode::NextModeThunk` `0x82235C08` (`NextMode`), then by `[0x826364EC]` (how the title was entered: 0 or 1 → message 8, the title screen's open after the title load; 2 → message 6, the title load's; more nothing) that message posted to the mode's ring (+240: count +840, start +844); then always message 1 posted and `GameMessages::Dispatch(mode + 36)`. Returns the answer. Seen in play. Read in full. Ready (with `AllLoaded`). |
+| `sub_82225390` | `ModeType4::NextMode` | | Slot 6, through `Mode::NextModeThunk` every tick once loaded: r3 = the answer, r4 = the mode. A 144-byte frame (r26 to r31). The answer cleared; `FindShown(block)`; the shown machine (`MachineOf(block, block +48200)`) in state 8: the delegate's function = `Mode::Slot11Thunk` `0x8222FC60` (`LeaveScreen`); in state 10: message 4 posted (+240); unless `[0x826C7960]` or `[0x826C7964]` is set, message 1 posted; message 0 posted and `GameMessages::Dispatch(mode + 36)`. Then the shown machine's state picks the next mode's type: 11 → 1 (the race), 13 → 2, 15 → 12, 16 → 6, 17 → 7, 18 → 8, 19 → 10, 20 → 3: block +48212 = (byte 1, the type) and the delegate's function = `Mode::Slot12Thunk` `0x8222FC70` (`NextModeAnswer`); other states nothing. Returns the answer. Seen in play. Read in full. Waits on `FindShown` and `MachineOf` only. |
+| `sub_822252C8` | `ModeType4::LeaveScreen` (probably) | | Slot 11, the delegate's function after `NextMode` saw the shown machine in state 8: r3 = the answer, r4 = the mode. A 128-byte frame. The answer cleared; `FindShown(block)`; message 3 posted (+240) and `GameMessages::Dispatch(mode + 36)`; the delegate's function = `Mode::Slot10Thunk` `0x8223D4A0` (`WaitForLeave`). Seen in play. Read in full. Waits on `FindShown` and `MachineOf` only. |
+| `sub_822251D0` | `ModeType4::WaitForLeave` (probably) | | Slot 10, after `LeaveScreen`: r3 = the answer, r4 = the mode. A 112-byte frame. The answer cleared; `FindShown(block)`; when the shown machine's +9608 (its movie loaded) is 1: the delegate's function = `Mode::NextModeThunk` (`NextMode`); message 1 posted (+240) and `GameMessages::Dispatch(mode + 36)`. Seen in play. Read in full. Waits on `FindShown` and `MachineOf` only. |
+| `sub_82224B98` | `ModeType4::NextModeAnswer` (probably) | | Slot 12, through `Mode::Slot12Thunk` (set by `NextMode`, `ForceExit` and `Leaving`): r3 = the answer, r4 = the mode: the 8 bytes at block (+848) +48212 (byte 1 and the next mode's type) copied into the answer. Leaf. Seen in play. Read in full. Ready. |
+| `sub_82225698` | `ModeType4::Leaving` (probably) | | Slot 13, through `Mode::Slot13Thunk`: r3 = the answer, r4 = the mode. A 128-byte frame. The answer cleared; message 4 posted (+240) and `GameMessages::Dispatch(mode + 36)`; then, when every machine `MachineOf(block, 0 to 46)` gives (the first five; 0 for the rest) is in state 6, 11, 12, 14 or 20, the delegate's function = `Mode::Slot12Thunk` (`NextModeAnswer`). Not seen in play. Read in outline. |
+| `sub_82224E20` | `ModeType4::Interrupt` (probably) | | The +32 vtable's (`0x82006BD4`) slot 0: r3 = the mode + 32 (its +816 the block). A 96-byte frame. 0 until `AllLoaded(block)`; then, when the save screen's state (block +28884) isn't 5 and `[0x826D8478]` (the options' settings) +712 is set, 1; else message 17 posted into the mode's ring (r3 + 208) and 0. Not seen in play. Read in full. |
+| `sub_82224ED0` | `ModeType4::ForceExit` (probably) | | The +32 slot 1: r3 = the mode + 32, r4 = a number. r4 0 or 1: message 4 posted (r3 + 208), the delegate's function (built at r1 - 32, below the stack pointer) = `Mode::Slot12Thunk`, block +48212 = (byte 1, 4: the title again); 2 or 3: the same with type 12; more nothing. Leaf. Not seen in play. Read in full. |
+| `sub_82225048` | `ModeType4::Resume` (probably) | | The +32 slot 2: r3 = the mode + 32: message 18 posted (r3 + 208; the title screen's `OnResume`). Leaf. Not seen in play. Read in full. |
+| `sub_82224BC0` | `ModeType4::AllLoaded` | | r3 = the block: 1 when the +9608 word (the movie loaded) of the title screen (+48168), the title load (+38528), the options (+9608) and the save screen (+28888) are all nonzero, else 0. Leaf. From `Restart` and `Interrupt`. Seen in play. Read in full. Ready. |
+| `sub_82224B40` | `ModeType4::MachineOf` (probably) | | r3 = the block, r4 = an index: the machine's address, or 0: 0 the title load (+28920), 1 the title screen (+38560), 2 the options (+0), 3 the controller options (+9640), 4 the save screen (+19280); 5 and more 0. Leaf. From `FindShown`, `NextMode`, `WaitForLeave` and `Leaving`. Seen in play. Read in full. Ready. |
+| `sub_82224C10` | `ModeType4::FindShown` (probably) | | r3 = the block: for r4 from 0 to 4, `MachineOf(block, r4)`; when it's in state 5 or 4, block +48200 = r4 (the last such wins). A 96-byte frame. From `NextMode`, `WaitForLeave` and `LeaveScreen`. Seen in play. Read in full. Waits on `MachineOf` only. |
+| `sub_822213B0` | `TitleLoad::Init` | | r3 = the title load's machine (the type 4 block's +28920): 12 transitions through `StateMachine::Add` (`sub_82106158`), keys (state, message, 0, 0), member function functors over vtable `0x82011918` copied into the frame (six-word copy loops), the next state at the copy's +24: (0, 1) `Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) → 5 `Start` `sub_82220C88`; (5, 1) `Draw`; (5, 0) `Update`; (5, 5) → 8 `Unload`; (8, 3) `OpenTitle`; (9, 6) `ScreenMachine::Reenter` `sub_822895E0`; (5, 4) and (9, 4) `Leave`; (7, 4) → 6 `Destroy`. The state not written. A 912-byte frame (r27 to r31 saved, `__savegprlr`). Only caller `ModeType4::Init`. Seen in play. Read in full (the step table extracted). In `Init`'s group. |
+| `sub_82220BA8` | `TitleLoad::Create` | | (0, 1): r3 = the machine. +9608 = 0; `VirtualAlloc(0, 68, MEM_COMMIT, PAGE_READWRITE)` into `[0x82814E28]`, its +0 = 0 (the rest zero from the allocation); +9604 = 1 when +9612 is set, else 9. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_822204B0` | `TitleLoad::OpenMovie` | | (1, 1) → 2: a jump to `UiMovies::Open(46, 22592)`. Seen in play. Read in full. Ready. |
+| `sub_82220C18` | `TitleLoad::WaitForMovie` | | (2, 1): while +9608 is 0, +9608 = 1 once `UiMovies::IsLoaded(46)`; once set, +9604 = 9 when +9612 is set, else 4. A 96-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82220C88` | `TitleLoad::Start` | | (4, 1) → 5: `BootData::Load([0x826C5B60])` (`data-load.md`; r3 unused there); then `[0x82814E28]` +4 = 0, +12 (the page) = -1, +8 (the transition) = 12. A 96-byte frame. Only reached through the functor. Seen in play. Read in full. Ready. |
+| `sub_82221198` | `TitleLoad::Draw` | | (5, 1): r3 = the machine, r4 = the mode. Runs the page `[0x82814E28]` +12 (unless -1) from a table built on its frame, with r3 = the mode: 0 `DebugPage0` `sub_82220CD8`, 1 `DebugPage1` `sub_82220D60`, 2 `DebugPage2` `sub_82220DE8`, 3 `DebugPage3` `sub_82220E70`, 4 `PostClose` `sub_82221078`, 5 `WaitForArchive` `sub_822204C0`. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82221228` | `TitleLoad::Update` | | (5, 0): r3 = the machine, r4 = the mode. A debug print (the empty `sub_82106540(100, 30, 0, string)`); the transition `[0x82814E28]` +8 run from a 13-entry table built on its frame with r3 = the block's +16 (the started word): 0 to 11 the debug sequence (`sub_822204F8` to `sub_82220B10`), 12 `PlayLogo` `sub_822210C8`. With +8 = -1: when `[0x826C7960]` or `[0x826C7964]` is set, +12 = 5, +16 = 0 and, once `Archive::QueueLength` is 0, message 5 posted to the mode's ring (+204). A 208-byte frame (r24 to r31). Seen in play. Read in full. Ready. |
+| `sub_822210C8` | `TitleLoad::PlayLogo` | | Transition 12: r3 = the started word. `UiMovies::Find(46)`; once (the started word 0): `UiMovie::PlayNamed(movie, 0, 0, 0, 0, 0)` and `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`, the word = 1; `UiMovie::Run(movie, 0)`; when it answers 0: +8 = -1, +12 = 5 (`WaitForArchive`), the word = 0. Returns nothing read (the table's caller ignores it). A 112-byte frame. Probably the Genki logo (`../title-screen.md`). Seen in play. Read in full. Ready. |
+| `sub_822204C0` | `TitleLoad::WaitForArchive` | | Page 5: once `Archive::QueueLength` is 0, `[0x82814E28]` +12 = 4 (`PostClose`). A 96-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82221078` | `TitleLoad::PostClose` | | Page 4: r3 = the mode: message 5 posted into its ring (+204: count +804 up by one, the record at 12 × ((start +808 + count − 1) mod 50); no overflow check), so (5, 5) → 8 unloads. Leaf. Seen in play. Read in full. Ready. |
+| `sub_82220EF8` | `TitleLoad::Unload` | | (5, 5) → 8: `UiMovie::FinishAll(UiMovies::Find(46))`; when +9616 is set, `UiMovies::Delete(46)` and +9608 = 0. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82220F60` | `TitleLoad::OpenTitle` | | (8, 3): `[0x826364EC]` = 1 (the title entered from the boot: `ModeType4::Restart` and `TitleScreen::Start` read it); message 8 posted to the mode's ring (+204), which the title screen's (9, 8) takes; +9604 = 9. Leaf. Seen in play. Read in full. Ready. |
+| `sub_82220FC8` | `TitleLoad::Leave` | | (5, 4) and (9, 4): +9604 = 7; `UiMovies::Find(46)`, when found `UiMovie::FinishAll` and `UiMovies::Delete(46)`; message 4 posted to the mode (+204), so (7, 4) → 6 frees the block on the next dispatch. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82220468` | `TitleLoad::Destroy` | | (7, 4) → 6: `VirtualFree([0x82814E28], 0, MEM_RELEASE)`, `[0x82814E28]` = 0. A 96-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82220CD8` | `TitleLoad::DebugPage0` (probably) | | Page 0 of the debug sequence: unless player 0's mapper entry (`0x826BAB80` + 8 × `[0x826BABA4]`) has +4 = 1, its slot 10 (`ActionMapper::Pressed`) for action 159; when pressed, `[0x82814E28]` +8 = 2, +12 = -1, +16 = 0. Not seen in play. Read in full. |
+| `sub_82220D60` | `TitleLoad::DebugPage1` (probably) | | As `DebugPage0`, the transition 5. Not seen in play. Read in full. |
+| `sub_82220DE8` | `TitleLoad::DebugPage2` (probably) | | As `DebugPage0`, the transition 8. Not seen in play. Read in full. |
+| `sub_82220E70` | `TitleLoad::DebugPage3` (probably) | | As `DebugPage0`, the transition 11. Not seen in play. Read in full. |
+| `sub_822204F8` | `TitleLoad::DebugStep0` (probably) | | Transition 0 of the debug sequence: r3 = the started word; once, `[0x82814E28]` +4 = 0 (the word = 1); a debug print (`sub_82106540(100, 60, 0, string)`); +4 up by one; past 10, +8 = 1, +12 = 0 and the word = 0. Not seen in play. Read in full. |
+| `sub_82220580` | `TitleLoad::DebugStep1` (probably) | | As `DebugStep0`: past 120 ticks, transition 2, page -1. Not seen in play. Read in full. |
+| `sub_82220610` | `TitleLoad::DebugStep2` (probably) | | As `DebugStep0`: past 10 ticks, transition 3. Not seen in play. Not read in detail. |
+| `sub_82220698` | `TitleLoad::DebugStep3` (probably) | | As `DebugStep0`: past 10 ticks, transition 4. Not seen in play. Not read in detail. |
+| `sub_82220720` | `TitleLoad::DebugStep4` (probably) | | As `DebugStep0`: past 120 ticks, the transition -1 and page 5 (probably). Not seen in play. Not read in detail. |
+| `sub_822207B0` | `TitleLoad::DebugStep5` (probably) | | As `DebugStep0`: past 10 ticks, page 2 and transition 6 (probably). Not seen in play. Not read in detail. |
+| `sub_82220840` | `TitleLoad::DebugStep6` (probably) | | As `DebugStep0`: past 10 ticks, transition 7 (probably). Not seen in play. Not read in detail. |
+| `sub_822208D0` | `TitleLoad::DebugStep7` (probably) | | As `DebugStep0`: past 180 ticks, transition 8 (probably). Not seen in play. Not read in detail. |
+| `sub_82220960` | `TitleLoad::DebugStep8` (probably) | | As `DebugStep0`: past 10 ticks, page 3 and transition 9 (probably). Not seen in play. Not read in detail. |
+| `sub_822209F0` | `TitleLoad::DebugStep9` (probably) | | As `DebugStep0`: past 10 ticks, transition 10 (probably). Not seen in play. Not read in detail. |
+| `sub_82220A80` | `TitleLoad::DebugStep10` (probably) | | As `DebugStep0`: past 240 ticks, transition 11 (probably). Not seen in play. Not read in detail. |
+| `sub_82220B10` | `TitleLoad::DebugStep11` (probably) | | As `DebugStep0`: past 10 ticks, `[0x82814E28]` +8 = -1 and +12 = 4 (`PostClose`); the started word left at 1. Not seen in play. Read in full. |
+| `sub_82224270` | `TitleScreen::Init` | | r3 = the title screen's machine (the type 4 block's +38560): 17 transitions through `StateMachine::Add`, as `TitleLoad::Init`'s: (0, 1) `Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) → 5 `Start`; (5, 1) `Draw`; (5, 0) `Update`; (5, 14) `OnGameDataLoaded`; (5, 16) `OnControllerPicked`; (5, 17) `OnInterrupt`; (5, 18) `OnResume`; (5, 7) → 8 `Unload`; (8, 3) `OpenNext`; (9, 8) `ScreenMachine::Reenter` `sub_822895E0`; (5, 4), (9, 4) and (10, 4) `Leave`; (7, 4) → 6 `Destroy`; then +9604 = 0. A 1,232-byte frame (r27 to r31 saved). Only caller `ModeType4::Init`. Seen in play. Read in full (the step table extracted). In `Init`'s group. |
+| `sub_82221D98` | `TitleScreen::Create` | | (0, 1): r3 = the machine. +9608 = 0; `VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE)` four times: 28 bytes into `[0x82814E2C]` (+0, +4, +8, +24 = 0; +12, +20 = -1), 72 into `[0x82814E30]` (the menu list: +68, +60 = 0 when allocated), 68 into `[0x82814E38]` (a front-end menu: +12 = 0, +16 = +20 = 1, +0 to +8, +24 to +40, +48, +52, +64 = 0), 68 into `[0x82814E34]` (+0, +40 = 0); +9604 = 1 when +9612 is set, else 9. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82221990` | `TitleScreen::OpenMovie` | | (1, 1) → 2: a jump to `UiMovies::Open(0, 22558)`. Seen in play. Read in full. Ready. |
+| `sub_82221FC8` | `TitleScreen::WaitForMovie` | | (2, 1): as `TitleLoad::WaitForMovie` with movie 0 (`UiMovies::IsLoaded(0)`): +9608 = 1 once loaded, then +9604 = 9 when +9612 is set (it is: (9, 8) opens it after the title load), else 4. A 96-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82223AB8` | `TitleScreen::Start` | | (4, 1) → 5. A 112-byte frame. By `[0x826364EC]`: 0 → `[0x82814E34]` +16 = 0, 1 (from the boot) → +16 = 1, more left. `SetUp`; the sound manager's (`[0x826C5C80]`) slot 14 (`IsCuePlaying`) for bank 1, cue 1 (two frame words): when not playing, `Sound::Play(&1, &1)` (the title's music, probably); `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`. Seen in play. Read in full. Ready (with `SetUp`). |
+| `sub_82222A50` | `TitleScreen::SetUp` | | From `Start`. A 176-byte frame (r28 to r31). Movie 0 (`UiMovies::Find`): `UiMovie::ResetPose`; `UiMovie::SetText(movie, 4, 5 + i, string)` for i 0 to 6 with strings 248, 249, 250, 257, 251, 252, 253 (r7 to r10 unset). Then, the page object `[0x82814E2C]` (+8 = the old page when it isn't 0): with `[0x82814E34]` +16 set (from the boot), +12 = 0 (`Intro`), +16 = 1 (`PressStartLoop` queued), +4 = 0 (`PressStart` after), +0 = -1; else (+8 = the old page unless 2) +12 = 5 (`ShowMainMenuAtOnce`), +16 = 6, +4 = 2 (`MainMenu`), +0 = -1. Seen in play. Read in full. In `Start`'s group. |
+| `sub_82223A18` | `TitleScreen::Draw` | | (5, 1): r3 = the machine, r4 = the mode. Runs the page `[0x82814E2C]` +0 (unless -1) from a table built on its frame, with r3 = the mode and r4 = the machine: 0 `TitleScreen::Update` `sub_822221A0` (press start), 1 `LoadGameData` `sub_82222688`, 2 `MainMenu` `sub_82222700`, 3 `CareerMenu` `sub_82221AC0`, 4 `Menu4` `sub_82222378`, 5 `LeavePage` `sub_822229D0`. A 128-byte frame. Seen in play. Read in full. Ready. |
+| `sub_822240B0` | `TitleScreen::Update` (the transitions) | | (5, 0): r3 = the machine, r4 = the mode. A 288-byte frame (r19 to r31). A debug print (the empty `sub_82106540(100, 30, 0, string)`); movie 0 (`UiMovies::Find`); with the transition `[0x82814E2C]` +12 = -1, `UiMovie::Run(movie, 0)`; else (0 and more) the transition from an 18-entry table built on its frame, r3 = the block's +24 (the started word): 0 `Intro`, 1 `PressStartLoop`, 2 `sub_82222C90`, 3 `LeavePressStart`, 4 `ShowMainMenu`, 5 `ShowMainMenuAtOnce`, 6 `HighlightMain`, 7 `MoveMainCursor`, 8 `Type2Hub::Transition3` `sub_8218ED98` (the fade out, `type2-screens.md`), 9 `sub_82223050`, 10 `sub_822231B0`, 11 `ShowCareerMenu`, 12 `HighlightCareer`, 13 `MoveCareerCursor`, 14 `BackFromCareer`, 15 `ShowMenu4`, 16 `BackFromMenu4`, 17 `MoveMenu4Cursor`. When it answers nonzero: with a queued one (+16 not -1), +12 = +16, +16 = -1, +20 = 0; else +0 = +4 (the page after), +12 = -1; +24 = 0 either way (a value below -1 takes the same path without the call). Also in `type2-screens.md`'s notes (`Type2Hub::Transition3`'s other table). Seen in play. Read in full. Ready. |
+| `sub_822221A0` | `TitleScreen::Update` | Wrapped | Counts idle ticks and starts the attract race at 600 (see "The title screen" in `../title-screen.md`). `--attract_after_s` shortens the wait. Moved from `functions.md` (2026-11-11). Read in full (B7 loop's mapping agent, 2026-11-11): page 0 of `TitleScreen::Draw` (r3 = the mode, r4 = the machine), so it runs on Draw messages. A 144-byte frame (r26 to r31). A debug print (`sub_82106540(120, 60, 0, string)`). For players 0 to 3 in turn, each mapper entry (`0x826BAB80` + 8 × `[0x826BABA4 + 4 × player]`) unless its +4 is 1, slot 10 (`ActionMapper::Pressed`) for action 152 (start): the first that answers gives its controller to player 0 (`Players::AssignController(0, [0x826BABA4 + 4 × player])`), `MenuSound::Play(1)`, and the page object goes to page 1 (`LoadGameData`) through transition 3 (`LeavePressStart`; +8 = the old page unless 1, +0 = -1, +4 = 1, +16 = -1, +12 = 3). Then (pressed or not) `[0x82814E34]` +36 up by one; at 600, `[0x82814E34]` +4 = 8 (the attract race), the page object to page 5 (`LeavePage`) through transition 8 (the fade out), and `SetUpAttractRace`. Seen in play. Waits on `Players::AssignController` only (the wrap stays as long as `--attract_after_s` does). |
+| `sub_82222038` | `TitleScreen::SetUpAttractRace` (probably) | | From `TitleScreen::Update` at 600 idle ticks. A 4,128-byte frame (stack probe). Six attract set-ups on its frame (three words each: a car item, a word for `sub_820FF968`, a route): (0, 0, 0), (27, 1, 1), (289, 2, 2), (92, 0, 3), (366, 1, 4), (304, 2, 5); one picked by `rand() % 6`. `RaceData::ResetGlobal`; `Stages::Clear([0x826C5B2C] + 0x59620)`; the race data's +0xA3AF0 = 0 and +0xA3AF4 = 6; `Race::SetRoute(route, 48)`; `Bits24::SetAll(&w)` (w 0 first) and the race data's +20 = w; `sub_820FF918(3)`; `DataTables::Item(car item)`; a car on its frame (+176): `Car::Init`, `Car::FromBuild(car, item + 160)`, `Car::Refresh`; `Race::AddRacer(car, [0x82000A34], 0, 0)`; `Race::AddStage(4)`; `sub_820FF968(word)`; `Race::PlaceRacers`. Not seen in play (the coverage session probably didn't wait for an attract race; attract races do reach it). Read in full. |
+| `sub_82222688` | `TitleScreen::LoadGameData` (probably) | | Page 1: r3 = the mode: message 13 posted into its ring (+204; the save screen's (9, 13) `OpenKind1`, the game data's load, `save-screen.md`); the page object's +8 = the old page unless -1; +0, +12, +16 = -1 (no page until message 14). Leaf. Seen in play. Read in full. Ready. |
+| `sub_822219A0` | `TitleScreen::OnGameDataLoaded` (probably) | | (5, 14): the page object to page 2 (`MainMenu`) through transitions 4 (`ShowMainMenu`) and 6 (`HighlightMain`): +8 = the old page unless 2, +12 = 4, +16 = 6, +4 = 2, +0 = -1. Leaf. Seen in play. Read in full. Ready. |
+| `sub_822219E0` | `TitleScreen::OnControllerPicked` (probably) | | (5, 16): the count c at `[0x826D8454]` +52 (the save screen's third block, `save-screen.md`): 0 → the page object to page 2 at once (+8 = the old page unless 2, +12, +16 = -1, +0 = 2); 1 to 3 → to page 5 (`LeavePage`) through transition 8 (+8 = the old page unless 5, +12 = 8, +16 = -1, +4 = 5, +0 = -1) and a tail call to `Players::AssignController(1, [0x826BABA4 + 4c])` (a second player for type 8, probably); 4 and more nothing. Leaf but for the tail call. Seen in play. Read in full. Waits on `Players::AssignController` only. |
+| `sub_82221A78` | `TitleScreen::OnInterrupt` (probably) | | (5, 17) (posted by `ModeType4::Interrupt`): `[0x82814E34]` +40 = 1. Leaf. Not seen in play. Read in full. |
+| `sub_82221A90` | `TitleScreen::OnResume` (probably) | | (5, 18) (posted by `ModeType4::Resume`): `[0x82814E34]` +40 = 0; the mode's system checks `0x826BAB40` +0 to +12 = 0 (`mode-tick.md`). Leaf. Not seen in play. Read in full. |
+| `sub_822224D0` | `TitleScreen::Unload` | | (5, 7) → 8: `UiMovie::FinishAll(UiMovies::Find(0))`; when +9616 is set, `UiMovies::Delete(0)` and +9608 = 0. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82222538` | `TitleScreen::OpenNext` (probably) | | (8, 3): when `MenuList::Selection([0x82814E30])` is 6 (the options), message 10 posted to the mode (+204; the options' (9, 10) `ScreenMachine::Reenter`); +9604 = 9. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_822225D8` | `TitleScreen::Leave` | | (5, 4), (9, 4) and (10, 4): +9604 = 7; `UiMovies::Find(0)`, when found `UiMovie::FinishAll` and `UiMovies::Delete(0)`; message 4 posted to the mode (+204), so (7, 4) → 6 runs `Destroy` on the next dispatch. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82221EC0` | `TitleScreen::Destroy` | | (7, 4) → 6: by `[0x82814E34]` +4 (the main menu's item): 0 → +9604 = 20 when `MenuList::Selection` is 2 (the career menu's third item), else 13; 1 → 16; 2 → 17; 3 → 15; 4 → 18; 5 → 19; 8 (the attract race) → 11; 6, 7 left (6). `MenuList::Release([0x82814E30])`; `VirtualFree(p, 0, MEM_RELEASE)` for `[0x82814E2C]`, `[0x82814E30]`, `[0x82814E38]`, `[0x82814E34]`; then `[0x82814E2C]`, `[0x82814E30]`, `[0x82814E34]` = 0 (`[0x82814E38]` left). A 128-byte frame (r28 to r31). `ModeType4::NextMode` reads the state it leaves. Seen in play. Read in full. Ready. |
+| `sub_82222700` | `TitleScreen::MainMenu` | | Page 2: r3 = the mode. A 144-byte frame (r29 to r31). Debug prints (seven strings, then the selection's; the empty `sub_82106540`). `MenuList::Update([0x82814E30])`; when it moved (+24 nonzero): to page 2 through transition 7 (`MoveMainCursor`; +8 = the old page unless 2, +16 = -1, +12 = 7, +4 = 2, +0 = -1), `MenuSound::Play(4)`. Else on `MenuList::Accepted`, by the selection s: 0 → to page 3 (`CareerMenu`) through transitions 11 and 12 (+12 = 11, +16 = 12, +0 = -1, +4 = 3), `[0x82814E34]` +4 = s, `MenuSound::Play(0)`; 1 and 2, or 5 when `SaveSlots::State(0)` answers nonzero → `[0x82814E34]` +4 = s, to page 5 (`LeavePage`) through transition 8, sound 0; 5 without → `MenuSound::Play(3)` (refused); 3 and 6 → to page 5 through transition 8, `[0x82814E34]` +4 = s, sound 0; 4 → `[0x82814E34]` +4 = 4, the page object's +0, +12, +16 = -1 (+8 the old page unless -1), message 15 posted to the mode (+204; the save screen's (9, 15) `OpenKind7`, the controller pick), sound 0. Seen in play. Read in full. Ready. |
+| `sub_82223700` | `TitleScreen::SetUpMainMenu` (probably) | | From `ShowMainMenu`, `ShowMainMenuAtOnce`, `BackFromCareer` and `BackFromMenu4`. A 144-byte frame (r28 to r31). `MenuList::Init([0x82814E30], 7, 7, 1, 153, 154, 155, 156, 159, 158)` (r7 to r10 and two frame words); `MenuList::SetSelection(list, [0x82814E34] +4)`; movie 0's node (4, 0) (`UiMovie::FindNode`) +16 = the selection × 40.0 (the cursor). Player 0's save data (`SaveData::Of(0)`): `[0x82814E34]` +12 = bit 0x20 of its +6092 (the career menu's third item); +8 = 1 when its +6100 (the day, at most 999) is nonzero and its halfword +6328 (the garage's count) nonzero, else 0 (continue possible). When `[0x82814E34]` +40 is 0, the mode's system checks `0x826BAB40` +0 to +12 = 0. Seen in play. Read in full. Ready. |
+| `sub_82221AC0` | `TitleScreen::CareerMenu` | | Page 3: r3 = the mode. A 128-byte frame (r30, r31). Debug prints (`sub_82106540`). `MenuList::Update([0x82814E30])`; when it moved: to page 3 through transition 13 (`MoveCareerCursor`), `MenuSound::Play(4)`. Else on `MenuList::Accepted`, by the selection: 0 (new game) → `Progress::Clear(save)`, `Progress::SetDefaults(save)` (player 0's, `SaveData::Of(0)`), to page 5 (`LeavePage`) through transition 8, `MenuSound::Play(0)`; 1 (continue) → when `[0x82814E34]` +8 is set, `PlayTime::Mark(SaveData::Of(0))` and the same, else `MenuSound::Play(3)`; 2 → when +8 is set, `Progress::Restart(save)`, `Career::PickFromCar(save)`, `Career::NextDay(save)`, to page 5 through transition 8, `MenuSound::Play(0)` and `CarDealer::StartFirstRace` (`car-dealer.md`), else sound 3. On `MenuList::Cancelled`: to page 2 through transition 14 (`BackFromCareer`), `MenuSound::Play(2)`. Seen in play. Read in full. Ready (`Progress::Restart` not seen in play). |
+| `sub_82223840` | `TitleScreen::SetUpCareerMenu` (probably) | | From `ShowCareerMenu`. A 144-byte frame (r28 to r31). n = 2, or 3 with `[0x82814E34]` +12 set: `MenuList::Init([0x82814E30], n, n, 1, 153, 154, 155, 156, 159, 158)`; `MenuList::SetSelection(list, [0x82814E34] +20)`; movie 0's node (5, 0) +16 = the selection × 40.0; `UiMovie::SetText(movie, 5, 5 + k, 254 + k)` for k below n (r7 to r10 unset). Seen in play. Read in full. In `ShowCareerMenu`'s group. |
+| `sub_82222378` | `TitleScreen::Menu4` (probably) | | Page 4: r3 = the mode. Debug prints; `Menu::Step([0x82814E38])`; `Menu::Pressed(menu, 159)` → to page 5 through transition 8; else `Menu::Pressed(menu, 158)` → to page 2 through transition 16 (`BackFromMenu4`); else when the menu moved (+8) → to page 4 through transition 17 (`MoveMenu4Cursor`). No sounds. Who opens it (transition 15) wasn't found. Not seen in play. Read in full. |
+| `sub_82223940` | `TitleScreen::SetUpMenu4` (probably) | | From `ShowMenu4`: `[0x82814E38]` reset (+12 = 0, +16 = +20 = 1, +0 to +8, +24 to +40, +48, +52, +64 = 0); movie 0's node (5, 0) +16 = +0 × 40.0; `UiMovie::SetText(movie, 5, 5, 935)` and `(movie, 5, 6, 936)`. Not seen in play. Read in full. |
+| `sub_822229D0` | `TitleScreen::LeavePage` (probably) | | Page 5: r3 = the mode, r4 = the machine. By `[0x82814E34]` +4: 6 (the options) → message 7 posted to the mode (+204; (5, 7) → 8 unloads, then (8, 3) opens the options); 0 to 5 and 8 → +9604 = 10 (`ModeType4::NextMode` then posts message 4: `Leave`, `Destroy`); 7 and more nothing. Leaf. Seen in play. Read in full. Ready. |
+| `sub_82222B60` | `TitleScreen::Intro` | | Transition 0: r3 = the started word. `UiMovies::Find(0)`; once: `TitleScreen::ResetPlayer` (`save-data.md`), `UiMovie::PlayNamed(movie, 82, 0, 0, 0, 0)`, the word = 1; `UiMovie::Run(movie, 0)`; answers 1 when it answers 0. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82222BF8` | `TitleScreen::PressStartLoop` | | Transition 1: once, `PlayNamed(movie, 81, ...)` and `UiMovie::LoopNamed(movie, 81)`; `Run(movie, 0)`; answers 1 at once. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82222C90` | | | Transition 2: once, `UiMovie::FinishNamed(movie, MenuList::Selection + 2)`, `TitleScreen::ResetPlayer`, `PlayNamed(movie, 85, ...)`; `Run`; answers 1 when it answers 0. Probably back to "press start" from the main menu (not set by any page read here). Not seen in play. Read in full. |
+| `sub_82222D40` | `TitleScreen::LeavePressStart` | | Transition 3: once, `PlayNamed(movie, 83, ...)`; `Run`; answers 1 when it answers 0. Seen in play. Read in full. Ready. |
+| `sub_82223B78` | `TitleScreen::ShowMainMenu` | | Transition 4: once, `SetUpMainMenu`, `PlayNamed(movie, 84, ...)`; `Run`; when it answers 0: `SaveSlots::State(0)` nonzero → `[0x82814E34]` +28 = 0 and `UiMovie::SetNodeColor(movie, 4, 10, 0)`, else +28 = 1 and color 2 (item 5 shown refused); answers 1 then. A 128-byte frame. Seen in play. Read in full. Waits on `SetUpMainMenu` only. |
+| `sub_82223C38` | `TitleScreen::ShowMainMenuAtOnce` | | Transition 5 (back from another mode): once, `PlayNamed` and `FinishNamed` 82, then 83, `PlayNamed` 81 with `LoopNamed` 81, `SetUpMainMenu`, `PlayNamed` 84; then as `ShowMainMenu`. Seen in play. Read in full. Waits on `SetUpMainMenu` only. |
+| `sub_82222DD0` | `TitleScreen::HighlightMain` | | Transition 6: once, unless `[0x82814E34]` +4 is 5 with +28 0, `PlayNamed(movie, +4 + 2, ...)` and `UiMovie::LoopLast(movie)`; `Run`; answers 1 at once. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82222E88` | `TitleScreen::MoveMainCursor` | | Transition 7: once, s = `MenuList::Selection`, p = `GetPreviousSelection`; `FinishNamed(movie, p + 2)`; s 5 with `[0x82814E34]` +28 set: `FinishNamed` 7, `PlayNamed` and `FinishNamed` 26, `PlayNamed(movie, 27, 1, 1, 0, 0)` and `FinishNamed` 27; else `PlayNamed(s + 2)` and `LoopNamed(s + 2)`. `FinishNamed` 12 and 13; wrapped (s 0 from p 6, or s 6 from p 0): node (4, 0) +16 = s × 40.0; else `PlayNamed(movie, 12 when the list's +24 is -1, else 13, 1, 0, 0, 0)` (the cursor up or down). `Run`; answers 1 at once. A 160-byte frame (f31, r26 to r31). Seen in play. Read in full. Ready. |
+| `sub_82223050` | | | Transition 9: as `MoveMainCursor`'s first half with `SaveSlots::State(0)`: item 5's refused look when it answers 0, `[0x82814E34]` +28 and node (4, 10)'s color (`SetNodeColor` 2 or 0) set from it. Who queues it wasn't found. Not seen in play. Read in full. |
+| `sub_822231B0` | | | Transition 10: the same for item 4 with `Pad::IsConnected` of player 1's controller (`0x826BAB80` + 8 × `[0x826BABA8]`): `[0x82814E34]` +32 and node (4, 9)'s color. Who queues it wasn't found. Not seen in play. Read in full. |
+| `sub_82223D70` | `TitleScreen::ShowCareerMenu` | | Transition 11: once, `FinishNamed(movie, MenuList::Selection + 2)`, `PlayNamed(movie, 86, ...)`, `[0x82814E34]` +20 = +8 (continue first when possible) and `SetUpCareerMenu`; `Run`; when it answers 0 and +8 is 0, `SetNodeColor(movie, 5, 6, 2)` (continue refused); answers 1 then. A 144-byte frame. Seen in play. Read in full. Ready (with `SetUpCareerMenu`). |
+| `sub_82223328` | `TitleScreen::HighlightCareer` | | Transition 12: once, by s = `MenuList::Selection`: s 1 with `[0x82814E34]` +8 0: `PlayNamed` and `FinishNamed` 65, `PlayNamed(movie, 66, 1, 1, 0, 0)` and `FinishNamed` 66; else `PlayNamed(s + 41)` and `LoopNamed(s + 41)`; `Run`; answers 1 at once. A 128-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82223428` | `TitleScreen::MoveCareerCursor` | | Transition 13: once, `FinishNamed(movie, GetPreviousSelection + 41)`, then as `HighlightCareer`; `FinishNamed` 51 and 52; when the list wrapped (+32): node (5, 0) +16 = s × 40.0, else `PlayNamed(movie, 51 when +24 is -1, else 52, 1, 0, 0, 0)`; `Run`; answers 1 at once. A 144-byte frame (f31). Seen in play. Read in full. Ready. |
+| `sub_82223E58` | `TitleScreen::BackFromCareer` | | Transition 14: once, `FinishNamed(movie, MenuList::Selection + 41)`, `PlayNamed(movie, 87, ...)`, `SetUpMainMenu`; `Run`; when it answers 0: to page 2 through transition 6 (+8 = the old page unless 2, +16 = -1, +12 = 6, +4 = 2, +0 = -1) and +24 = 0; answers 0 (it requeues itself). Not seen in play. Read in full. |
+| `sub_82223F30` | `TitleScreen::ShowMenu4` (probably) | | Transition 15: once, `FinishNamed(movie, MenuList::Selection + 2)`, `PlayNamed(movie, 86, ...)`, `[0x82814E34]` +24 = 0, `SetUpMenu4`; `Run`; answers 1 when it answers 0. Not seen in play. Read in full. |
+| `sub_82223FD8` | `TitleScreen::BackFromMenu4` (probably) | | Transition 16: as `BackFromCareer` with `FinishNamed(movie, [0x82814E38] +4 + 41)`. Not seen in play. Read in full. |
+| `sub_822235D0` | `TitleScreen::MoveMenu4Cursor` (probably) | | Transition 17: once, `[0x82814E34]` +24 = the menu's +0; `FinishNamed(movie, menu +4 + 41)`, 51 and 52; by the menu's +8 (-1 or 1) and its +4 and +0: node (5, 0) +16 = `[0x82001FB0]` or `[0x82000A34]` (wrapped), else `PlayNamed(movie, 51 or 52, 1, 0, 0, 0)`; `Run`; answers 1. Not seen in play. Read in full. |
+| `sub_8209F6B8` | `Players::AssignController` (probably) | | Puts controller r4 on player r3 in `826BABA4` (swapping with the player that had it) and asks for the profile read (`826C7938` = 1). From `sub_8209E698`, `sub_822219E0` and `sub_822221A0`. Moved from `functions.md` (2026-11-11). Read in full (B7 loop's mapping agent, 2026-11-11): the player holding r4 found among the four (4 when none: then the word after the table, `0x826BABB4`, gets player r3's controller); leaf. `sub_8209E698` (no row) not seen in play. Seen in play. Ready. |

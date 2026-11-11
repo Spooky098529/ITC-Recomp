@@ -2,8 +2,9 @@
 
 The game's data load at boot (`BootData::Load`, `sub_82106618`): once
 (its flag `0x826C5B8C`), from a front-end state machine's transition
-(`sub_82220C88`, registered by `sub_822213B0` from the screen start
-`sub_82224C70`; neither has rows: `../loops/leads.md`). In order: the
+(`TitleLoad::Start` `sub_82220C88`, registered by `TitleLoad::Init`
+`sub_822213B0` from the type 4 mode's Init `sub_82224C70`:
+[`title-screen.md`](title-screen.md)). In order: the
 shader pairs (`Shaders::LoadAll`, `models.md`), the text
 (`Text::Load`, `strings-and-font.md`), the objects the game keeps for
 the whole session (`BootData::CreateObjects`, `sub_82105868`: player 0's

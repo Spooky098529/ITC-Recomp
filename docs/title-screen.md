@@ -14,11 +14,14 @@ From launch, with no input (times as measured here):
 
 `sub_822221A0` (the title screen's update) checks four controllers for a
 button (152) and otherwise adds one to +36 of the object at `[0x82814E34]`.
-At 600 ticks (20 s) it sets the state at +4 to 5 (via 8), which starts an
+At 600 ticks (20 s) it sets the object's +4 to 8 and the title's page
+object `[0x82814E2C]` to page 5 (leaving), which starts an
 attract-mode race (AI cars, no input). After the race (~60 s) the game goes
 back to the title screen, and the next race follows ~22 s later. The front
 end's state objects are at `[0x82814E2C]`, `[0x82814E30]` and
-`[0x82814E34]`, created when the movie ends.
+`[0x82814E34]`, created when the movie ends. The title screen's functions
+(the type 4 mode, the title load and the title screen's machine) are in
+[`functions/title-screen.md`](functions/title-screen.md).
 
 Options for automated runs (both off by default):
 
