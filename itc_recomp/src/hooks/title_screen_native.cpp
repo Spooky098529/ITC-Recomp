@@ -31,8 +31,15 @@ ITC_FLAG_BOOL(native_title_screen, true, "ITC",
               "and transitions through the guest from their tables, UiMovie::Run through its "
               "override), OnGameDataLoaded sub_822219A0, OnInterrupt sub_82221A78, OnResume "
               "sub_82221A90, Unload sub_822224D0, OpenNext sub_82222538, Leave sub_822225D8 and "
-              "the pages LoadGameData sub_82222688 and LeavePage sub_822229D0 (the same "
-              "writes; checked by --run_harnesses=title_screen)");
+              "the pages LoadGameData sub_82222688 and LeavePage sub_822229D0; the "
+              "transitions sub_82222B60 to sub_822235D0 (8 is the type 2 hub's) with the menus' "
+              "set-ups SetUpMainMenu sub_82223700, SetUpCareerMenu sub_82223840 and SetUpMenu4 "
+              "sub_82223940 (the UI movie calls, MenuList::Init, SaveSlots::State, "
+              "Pad::IsConnected and TitleScreen::ResetPlayer through their overrides) and the "
+              "menu pages MainMenu sub_82222700, CareerMenu sub_82221AC0 and Menu4 sub_82222378 "
+              "(MenuList::Update, Accepted, Cancelled, Menu::Step and Pressed, MenuSound::Play, "
+              "the Progress and Career calls and CarDealer::StartFirstRace through their "
+              "overrides) (the same writes; checked by --run_harnesses=title_screen)");
 
 namespace hooks {
 
@@ -204,6 +211,99 @@ void TitleScreenLeavePage(PPCContext& ctx, uint8_t* base) {
   ts::ScreenLeavePage(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+void TitleScreenIntro(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::Intro(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenPressStartLoop(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::PressStartLoop(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenTransition2(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::BackToPressStart(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenLeavePressStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::LeavePressStart(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenShowMainMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ShowMainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenShowMainMenuAtOnce(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ShowMainMenuAtOnce(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenHighlightMain(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::HighlightMain(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenMoveMainCursor(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::MoveMainCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenTransition9(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::RefreshSaveItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenTransition10(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::RefreshPadItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenShowCareerMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ShowCareerMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenHighlightCareer(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::HighlightCareer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenMoveCareerCursor(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::MoveCareerCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenBackFromCareer(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::BackFromCareer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenShowMenu4(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ShowMenu4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenBackFromMenu4(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::BackFromMenu4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenMoveMenu4Cursor(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::MoveMenu4Cursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenSetUpMainMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::SetUpMainMenu(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenSetUpCareerMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::SetUpCareerMenu(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenSetUpMenu4(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::SetUpMenu4(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenCareerMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::CareerMenu(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenMenu4(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::Menu4(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenMainMenu(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::MainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 #define ITC_TITLE_SCREEN(address, step)   \
@@ -255,3 +355,28 @@ ITC_TITLE_SCREEN(82221EC0, TitleScreenDestroy)
 // step above is the harness's).
 ITC_TITLE_SCREEN(82222688, TitleScreenLoadGameData)
 ITC_TITLE_SCREEN(822229D0, TitleScreenLeavePage)
+// The transitions (from Update's table on its stack; 8 is the type 2 hub's)
+// and the menu pages (from Draw's). The menus' set-ups SetUpMainMenu
+// sub_82223700, SetUpCareerMenu sub_82223840 and SetUpMenu4 sub_82223940:
+// no adapters (only the transitions, native, call them; the register steps
+// above are the harness's).
+ITC_TITLE_SCREEN(82222B60, TitleScreenIntro)
+ITC_TITLE_SCREEN(82222BF8, TitleScreenPressStartLoop)
+ITC_TITLE_SCREEN(82222C90, TitleScreenTransition2)
+ITC_TITLE_SCREEN(82222D40, TitleScreenLeavePressStart)
+ITC_TITLE_SCREEN(82223B78, TitleScreenShowMainMenu)
+ITC_TITLE_SCREEN(82223C38, TitleScreenShowMainMenuAtOnce)
+ITC_TITLE_SCREEN(82222DD0, TitleScreenHighlightMain)
+ITC_TITLE_SCREEN(82222E88, TitleScreenMoveMainCursor)
+ITC_TITLE_SCREEN(82223050, TitleScreenTransition9)
+ITC_TITLE_SCREEN(822231B0, TitleScreenTransition10)
+ITC_TITLE_SCREEN(82223D70, TitleScreenShowCareerMenu)
+ITC_TITLE_SCREEN(82223328, TitleScreenHighlightCareer)
+ITC_TITLE_SCREEN(82223428, TitleScreenMoveCareerCursor)
+ITC_TITLE_SCREEN(82223E58, TitleScreenBackFromCareer)
+ITC_TITLE_SCREEN(82223F30, TitleScreenShowMenu4)
+ITC_TITLE_SCREEN(82223FD8, TitleScreenBackFromMenu4)
+ITC_TITLE_SCREEN(822235D0, TitleScreenMoveMenu4Cursor)
+ITC_TITLE_SCREEN(82222700, TitleScreenMainMenu)
+ITC_TITLE_SCREEN(82221AC0, TitleScreenCareerMenu)
+ITC_TITLE_SCREEN(82222378, TitleScreenMenu4)

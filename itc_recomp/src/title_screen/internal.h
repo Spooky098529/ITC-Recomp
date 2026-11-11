@@ -32,6 +32,8 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
   return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
 }
 
+inline uint32_t Words(uint8_t* base) { return Load(base, kWords); }
+
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
 inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {

@@ -5,6 +5,7 @@
 #include "hooks/car_dealer.h"
 
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "car_dealer/car_dealer.h"
 
 ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
@@ -389,15 +390,26 @@ ITC_CAR_DEALER(82181B98, CarDealerPage4)
 // The helpers (from the recompiled transitions and set-ups). No adapter for
 // ReloadStandModel sub_82181330 (Page2, Transition9; Transition10, never
 // seen in play, reaches the original) (removed, B7 loop, 2026-11-08).
-// StartFirstRace (from the title menu's sub_82221AC0, recompiled; Leave is
-// native). No adapters for BuildLists sub_821813B0 (only Start calls it),
+// StartFirstRace (from the title menu's sub_82221AC0, native under
+// --native_title_screen; Leave is native): asks the harness recorder first
+// (the title screen's harness records it). No adapters for BuildLists sub_821813B0 (only Start calls it),
 // Buy sub_82182E68 (only OnDialogDone), FillStatus sub_82183AC8 (only
 // Start), CheckLimits sub_821812B8 (Page2, Page3) and SetPrompts
 // sub_82182B30 (OnDialogDone, Page2, FillStatus; OnMessage26, never seen in
 // play, reaches the original) (removed, B7 loop, 2026-11-08): their callers
 // in play are native, the flag switches those; their steps above are the
 // harness's.
-ITC_CAR_DEALER(82180CE8, CarDealerStartFirstRace)
+extern "C" REX_FUNC(sub_82180CE8) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82180CE8)) {
+    return;
+  }
+  if (!ITC_FLAG(native_car_dealer)) {
+    __imp__sub_82180CE8(ctx, base);
+    return;
+  }
+  hooks::CarDealerStartFirstRace(ctx, base);
+}
 // No adapters for SetColorBar sub_82182770 and ShowSwatches sub_821826C0
 // (Transition17, OpenColors), SetHeader sub_82182C28 (Transition0, 4, 5, 8,
 // 15 and 19; Transition10, 18, 20 and 21, never seen in play, reach the

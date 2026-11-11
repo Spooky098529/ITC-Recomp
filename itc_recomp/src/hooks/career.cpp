@@ -320,7 +320,19 @@ CAREER_ADAPTER(821121F8, CareerStageOf)
 CAREER_ADAPTER(82115190, CareerAddRaceResult)
 CAREER_ADAPTER(821159B0, CareerPickNext)
 CAREER_ADAPTER(82116588, CareerAfterRace)
-CAREER_ADAPTER(82116AF0, CareerNextDay)
+// Career::NextDay asks the harness recorder first (the title screen's
+// harness records it: its career menu's third item).
+extern "C" REX_FUNC(sub_82116AF0) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82116AF0)) {
+    return;
+  }
+  if (!ITC_FLAG(native_career)) {
+    __imp__sub_82116AF0(ctx, base);
+    return;
+  }
+  hooks::CareerNextDay(ctx, base);
+}
 CAREER_ADAPTER(82111638, CareerEventQuery)
 CAREER_ADAPTER(82111650, CareerEventLocation)
 CAREER_ADAPTER(82114268, CareerSetUpEvent)

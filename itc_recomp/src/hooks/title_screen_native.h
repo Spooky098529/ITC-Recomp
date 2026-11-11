@@ -52,5 +52,30 @@ void TitleScreenLeave(PPCContext& ctx, uint8_t* base);
 void TitleScreenDestroy(PPCContext& ctx, uint8_t* base);
 void TitleScreenLoadGameData(PPCContext& ctx, uint8_t* base);
 void TitleScreenLeavePage(PPCContext& ctx, uint8_t* base);
+// The transitions (r3 the started word's address), the menus' set-ups (no
+// arguments) and the menu pages (r3 the mode).
+void TitleScreenIntro(PPCContext& ctx, uint8_t* base);
+void TitleScreenPressStartLoop(PPCContext& ctx, uint8_t* base);
+void TitleScreenTransition2(PPCContext& ctx, uint8_t* base);
+void TitleScreenLeavePressStart(PPCContext& ctx, uint8_t* base);
+void TitleScreenShowMainMenu(PPCContext& ctx, uint8_t* base);
+void TitleScreenShowMainMenuAtOnce(PPCContext& ctx, uint8_t* base);
+void TitleScreenHighlightMain(PPCContext& ctx, uint8_t* base);
+void TitleScreenMoveMainCursor(PPCContext& ctx, uint8_t* base);
+void TitleScreenTransition9(PPCContext& ctx, uint8_t* base);
+void TitleScreenTransition10(PPCContext& ctx, uint8_t* base);
+void TitleScreenShowCareerMenu(PPCContext& ctx, uint8_t* base);
+void TitleScreenHighlightCareer(PPCContext& ctx, uint8_t* base);
+void TitleScreenMoveCareerCursor(PPCContext& ctx, uint8_t* base);
+void TitleScreenBackFromCareer(PPCContext& ctx, uint8_t* base);
+void TitleScreenShowMenu4(PPCContext& ctx, uint8_t* base);
+void TitleScreenBackFromMenu4(PPCContext& ctx, uint8_t* base);
+void TitleScreenMoveMenu4Cursor(PPCContext& ctx, uint8_t* base);
+void TitleScreenSetUpMainMenu(PPCContext& ctx, uint8_t* base);
+void TitleScreenSetUpCareerMenu(PPCContext& ctx, uint8_t* base);
+void TitleScreenSetUpMenu4(PPCContext& ctx, uint8_t* base);
+void TitleScreenMainMenu(PPCContext& ctx, uint8_t* base);
+void TitleScreenCareerMenu(PPCContext& ctx, uint8_t* base);
+void TitleScreenMenu4(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

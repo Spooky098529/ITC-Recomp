@@ -31,6 +31,7 @@
 #include "memory/heap.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
+#include "race_screens/race_screens.h"
 #include "title_screen/title_screen.h"
 #include "ui_movies/game.h"
 
@@ -279,9 +280,11 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
 std::vector<uint32_t> g_opens;
 hooks::StartUpRecorder g_chained = nullptr;
 bool RecordOpen(PPCContext& ctx, uint32_t address) {
-  if (address == ts::kBootDataLoad) {
-    // BootData::Load (TitleLoad::Start's): recorded, r3 left (the harnesses
-    // run before the boot's data is loaded, which it would load).
+  if (address == ts::kBootDataLoad || address == 0x82180CE8 || address == 0x82116AF0) {
+    // BootData::Load (TitleLoad::Start's), CarDealer::StartFirstRace and
+    // Career::NextDay (CareerMenu's): recorded, r3 left (the harnesses run
+    // before the boot's data is loaded, which the first would load; the
+    // second sets up a race; the third went round in the harness's save).
     g_opens.insert(g_opens.end(), {address, ctx.r3.u32, ctx.r1.u32, uint32_t(ctx.lr)});
     return true;
   }
@@ -713,6 +716,187 @@ void ScreenHandlers(Context& h, const World& w) {
              }});
 }
 
+// The menus' input, as the race screens' harness shapes a list: the
+// players' action mappers (each controller's entry 0 to 3, each entry's
+// mapper one of ours, its slots 10 and 12 Pressed and Fired, now and then
+// Held; blocked now and then; a few bits set), the menu list (7 items, its
+// directions often the menus' own ids, its block of item words in the
+// world), the front-end menu (items 0 to 1) and the sound manager.
+constexpr uint32_t kHeldSlot = 0x8210BE70;
+constexpr uint32_t kListBlockAt = 0x2D00 + 0x600;  // in the menus' world: 8 item words
+void MenuInput(Random& r, const World& w) {
+  namespace rs = race_screens;
+  uint8_t* base = w.base;
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t mapper = w.at(kMappersAt) + 0x200 * c;
+    const uint32_t vtable = w.at(kMapperVtablesAt) + 0x40 * c;
+    guest::StoreU32(base, rs::kControllerEntries + 4 * c, r.Below(4));
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c, mapper);
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c + 4, r.Below(5) == 0 ? 1 : r.Below(3));
+    guest::StoreU32(base, mapper, vtable);
+    guest::StoreU32(base, vtable + 40, r.Below(5) == 0 ? kHeldSlot : rs::kPressedSlot);
+    guest::StoreU32(base, vtable + 48, r.Below(5) == 0 ? kHeldSlot : rs::kFiredSlot);
+    for (uint32_t k = 0; k < 6; k++) {
+      guest::StoreU32(base, mapper + 448 + 4 * k,
+                      uint32_t(r.Next()) & uint32_t(r.Next()) & uint32_t(r.Next()));
+    }
+  }
+  const uint32_t list = w.at(kListAt);
+  const uint32_t count = r.Below(4) == 0 ? 2 + r.Below(2) : 7;
+  guest::StoreU32(base, list + rs::kListCount, count);
+  guest::StoreU32(base, list + rs::kListScroll, 0);
+  guest::StoreU32(base, list + rs::kListShown, count);
+  guest::StoreU32(base, list + rs::kListSelection, r.Below(count + 1));
+  guest::StoreU32(base, list + rs::kListSelectionBefore, r.Below(8));
+  guest::StoreU32(base, list + rs::kListMove, r.Below(3) == 0 ? 1 : 0);
+  const uint32_t ids[6] = {154, 153, 155, 156, 159, 158};
+  for (uint32_t k = 0; k < 6; k++) {
+    guest::StoreU32(base, list + rs::kListDown + 4 * k,
+                    r.Below(6) == 0 ? 151 + r.Below(30) : ids[k] + (k < 4 && r.Below(2) ? 14 : 0));
+  }
+  guest::StoreU32(base, list + rs::kListPlayer, r.Below(4));
+  guest::StoreU32(base, list + rs::kListWraps, r.Below(2));
+  guest::StoreU32(base, list + rs::kListBlock, w.at(kListBlockAt));
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU32(base, w.at(kListBlockAt) + 4 * i, r.Below(4) == 0 ? 0 : 1);
+  }
+  const uint32_t menu = w.at(kMenuAt);
+  guest::StoreU32(base, menu + menu_helpers::kPlayer, r.Below(4));
+  guest::StoreU32(base, menu + menu_helpers::kFirst, 0);
+  guest::StoreU32(base, menu + menu_helpers::kLast, 1);
+  guest::StoreU32(base, menu + menu_helpers::kCursor, r.Below(2));
+  guest::StoreU32(base, menu + menu_helpers::kPrevious, r.Below(2));
+  for (const uint32_t o : {menu_helpers::kWraps, menu_helpers::kUpDownLocked,
+                           menu_helpers::kSidesStep, menu_helpers::kShouldersStep}) {
+    guest::StoreU32(base, menu + o, r.Below(2));
+  }
+  guest::StoreU32(base, menu + menu_helpers::kMoved, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, menu + menu_helpers::kSide, 0);
+  SoundManager(r, w);
+}
+
+// The title's words, the list's selections and moves, the menu's and player
+// 0's save shaped for the transitions and the menus' set-ups; the list's
+// block 0 (MenuList::Init makes one: compared and freed after).
+void TransitionWorld(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t words = w.at(kWordsAt), list = w.at(kListAt), menu = w.at(kMenuAt);
+  guest::StoreU32(base, words + 4, r.Below(10));
+  for (const uint32_t field : {8u, 12u, 28u, 40u}) {
+    guest::StoreU32(base, words + field, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  }
+  guest::StoreU32(base, words + 20, r.Below(3));
+  guest::StoreU32(base, list + 16, r.Below(8));
+  guest::StoreU32(base, list + 20, r.Below(8));
+  guest::StoreU32(base, list + 24, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(2));
+  guest::StoreU32(base, list + 32, r.Below(2));
+  guest::StoreU32(base, list + 68, 0);
+  guest::StoreU32(base, menu + 0, r.Below(2));
+  guest::StoreU32(base, menu + 4, r.Below(2));
+  guest::StoreU32(base, menu + 8, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(2));
+  guest::StoreU32(base, w.save + 6092, uint32_t(r.Next()));
+  guest::StoreU32(base, w.save + 6100,
+                  r.Below(3) == 0 ? 0 : r.Below(3) == 0 ? 995 + r.Below(10) : uint32_t(r.Next()));
+  guest::StoreU16(base, w.save + 6328, r.Below(3) == 0 ? 0 : uint16_t(r.Next()));
+}
+
+// r3 the started word (the page object's +24): 0 mostly, 1 or any.
+void Started(PPCContext& t, Random& r, const World& w) {
+  TransitionWorld(r, w);
+  const uint32_t at = w.at(kPagesAt) + 24;
+  guest::StoreU32(w.base, at, r.Below(3) == 0 ? 1 : r.Below(5) == 0 ? uint32_t(r.Next()) : 0);
+  t.r3.u64 = at;
+}
+
+// The list's block MenuList::Init made (7 words at most) compared and freed.
+void ListBlock(PPCContext&, const World& w, Outputs& out) {
+  Allocated(w.base, out, w.at(kListAt) + 68, 28);
+}
+
+void Transitions(Context& h, const World& w) {
+  struct Case {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    int32_t frame;
+    int32_t saves;
+  };
+  const Case cases[] = {
+      {"TitleScreen::Intro (sub_82222B60)", __imp__sub_82222B60, hooks::TitleScreenIntro, 112, 24},
+      {"TitleScreen::PressStartLoop (sub_82222BF8)", __imp__sub_82222BF8,
+       hooks::TitleScreenPressStartLoop, 112, 24},
+      {"TitleScreen::Transition2 (sub_82222C90)", __imp__sub_82222C90,
+       hooks::TitleScreenTransition2, 112, 24},
+      {"TitleScreen::LeavePressStart (sub_82222D40)", __imp__sub_82222D40,
+       hooks::TitleScreenLeavePressStart, 112, 24},
+      {"TitleScreen::ShowMainMenu (sub_82223B78)", __imp__sub_82223B78,
+       hooks::TitleScreenShowMainMenu, 128, 40},
+      {"TitleScreen::ShowMainMenuAtOnce (sub_82223C38)", __imp__sub_82223C38,
+       hooks::TitleScreenShowMainMenuAtOnce, 128, 40},
+      {"TitleScreen::HighlightMain (sub_82222DD0)", __imp__sub_82222DD0,
+       hooks::TitleScreenHighlightMain, 112, 24},
+      {"TitleScreen::MoveMainCursor (sub_82222E88)", __imp__sub_82222E88,
+       hooks::TitleScreenMoveMainCursor, 160, 64},
+      {"TitleScreen::Transition9 (sub_82223050)", __imp__sub_82223050,
+       hooks::TitleScreenTransition9, 160, 64},
+      {"TitleScreen::Transition10 (sub_822231B0)", __imp__sub_822231B0,
+       hooks::TitleScreenTransition10, 160, 64},
+      {"TitleScreen::ShowCareerMenu (sub_82223D70)", __imp__sub_82223D70,
+       hooks::TitleScreenShowCareerMenu, 144, 48},
+      {"TitleScreen::HighlightCareer (sub_82223328)", __imp__sub_82223328,
+       hooks::TitleScreenHighlightCareer, 128, 32},
+      {"TitleScreen::MoveCareerCursor (sub_82223428)", __imp__sub_82223428,
+       hooks::TitleScreenMoveCareerCursor, 144, 56},
+      {"TitleScreen::BackFromCareer (sub_82223E58)", __imp__sub_82223E58,
+       hooks::TitleScreenBackFromCareer, 128, 32},
+      {"TitleScreen::ShowMenu4 (sub_82223F30)", __imp__sub_82223F30, hooks::TitleScreenShowMenu4,
+       128, 32},
+      {"TitleScreen::BackFromMenu4 (sub_82223FD8)", __imp__sub_82223FD8,
+       hooks::TitleScreenBackFromMenu4, 128, 32},
+      {"TitleScreen::MoveMenu4Cursor (sub_822235D0)", __imp__sub_822235D0,
+       hooks::TitleScreenMoveMenu4Cursor, 144, 48},
+  };
+  // Each transition's own frame without its saves compared (the set-ups'
+  // frames below them have their own cases).
+  for (const Case& c : cases) {
+    Run(h, w, {c.name, 150, c.recompiled, c.native, {{-c.frame, -c.saves}}, Started, ListBlock});
+  }
+  // The set-ups: their frames without their saves (and without SetText's
+  // parameter area, +48 to +79: r7 on, the originals' leftovers).
+  auto setup = [](PPCContext&, Random& r, const World& w) { TransitionWorld(r, w); };
+  Run(h, w, {"TitleScreen::SetUpMainMenu (sub_82223700)", 150, __imp__sub_82223700,
+             hooks::TitleScreenSetUpMainMenu, {{-144, -40}}, setup, ListBlock});
+  Run(h, w, {"TitleScreen::SetUpCareerMenu (sub_82223840)", 150, __imp__sub_82223840,
+             hooks::TitleScreenSetUpCareerMenu, {{-144, -96}, {-64, -40}}, setup, ListBlock});
+  Run(h, w, {"TitleScreen::SetUpMenu4 (sub_82223940)", 60, __imp__sub_82223940,
+             hooks::TitleScreenSetUpMenu4, {{-128, -80}, {-48, -32}}, setup, ListBlock});
+}
+
+void MenuPages(Context& h, const World& w) {
+  // The pages: the menus' input (MenuInput), the title's words; their own
+  // frames without their saves.
+  auto input = [](PPCContext& t, Random& r, const World& w) {
+    TransitionWorld(r, w);
+    MenuInput(r, w);
+    t.r3.u64 = w.mode();
+  };
+  Run(h, w, {"TitleScreen::MainMenu (sub_82222700)", 400, __imp__sub_82222700,
+             hooks::TitleScreenMainMenu, {{-144, -32}}, input});
+  // CareerMenu: player 0's save a new game's (Progress::Clear run on it
+  // first, for Progress::Restart's garage), its day shaped after.
+  Run(h, w, {"TitleScreen::CareerMenu (sub_82221AC0)", 400, __imp__sub_82221AC0,
+             hooks::TitleScreenCareerMenu, {{-128, -24}},
+             [&h, input](PPCContext& t, Random& r, const World& w) {
+               PPCContext c = CallContext(h);
+               c.r3.u64 = w.save;
+               __imp__sub_82113BD8(c, w.base);
+               input(t, r, w);
+               guest::StoreU32(w.base, w.save + 6100, r.Below(3) == 0 ? 0 : 1 + r.Below(30));
+             }});
+  Run(h, w, {"TitleScreen::Menu4 (sub_82222378)", 200, __imp__sub_82222378,
+             hooks::TitleScreenMenu4, {{-112, -24}}, input});
+}
+
 }  // namespace
 
 void TitleScreen(Context& h) {
@@ -725,6 +909,8 @@ void TitleScreen(Context& h) {
   if (hooks::NativeHeapActive()) {
     TitleLoad(h, w);
     ScreenHandlers(h, w);
+    Transitions(h, w);
+    MenuPages(h, w);
   }
 }
 

@@ -78,6 +78,7 @@ constexpr uint32_t kResetPose = 0x8211ABA8;
 constexpr uint32_t kSetText = 0x8211C1F8;
 constexpr uint32_t kListRelease = 0x8220BBB0;
 constexpr uint32_t kSoundPlay = 0x82175850;
+constexpr uint32_t kResetPlayer = 0x82221D00;  // TitleScreen::ResetPlayer
 
 // The sound manager and its slot 14 (IsCuePlaying), bytes into its vtable.
 constexpr uint32_t kSoundManager = 0x826C5C80;
@@ -203,6 +204,91 @@ void ScreenLoadGameData(uint8_t* base, uint32_t mode);
 // machine): by the title's +4, message 7 posted (6) or +9604 = 10 (0 to 5,
 // 8). A leaf.
 void ScreenLeavePage(uint8_t* base, uint32_t mode, uint32_t machine);
+
+// --- The transitions and the menus' set-ups (transitions.cpp) ---
+//
+// Each transition takes the page object's +24 (its started word): set up
+// once while it's 0 (then 1), then UiMovie::Run(movie 0, 0); the answer the
+// table's caller reads (1 done). The UI movie calls, MenuList::Init,
+// SaveSlots::State, Pad::IsConnected and TitleScreen::ResetPlayer through
+// their overrides; MenuList::Selection, SetSelection, the previous
+// selection (+20) and SaveData::Of as plain C++.
+
+// sub_82222B60 TitleScreen::Intro (0): ResetPlayer, PlayNamed 82; Run's 0.
+// 112-byte frame.
+uint64_t Intro(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82222BF8 TitleScreen::PressStartLoop (1): PlayNamed and LoopNamed 81;
+// 1. 112-byte frame.
+uint64_t PressStartLoop(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82222C90 (2, never seen in play): FinishNamed(selection + 2),
+// ResetPlayer, PlayNamed 85; Run's 0. 112-byte frame.
+uint64_t BackToPressStart(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82222D40 TitleScreen::LeavePressStart (3): PlayNamed 83; Run's 0.
+uint64_t LeavePressStart(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82223B78 TitleScreen::ShowMainMenu (4): SetUpMainMenu, PlayNamed 84;
+// once Run answers 0, item 5's look by SaveSlots::State(0). 128-byte frame.
+uint64_t ShowMainMenu(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82223C38 TitleScreen::ShowMainMenuAtOnce (5): 82, 83 played and
+// finished, 81 looped, SetUpMainMenu, 84; then as ShowMainMenu.
+uint64_t ShowMainMenuAtOnce(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82222DD0 TitleScreen::HighlightMain (6): the item's animation played
+// and looped (not item 5 refused); 1. 112-byte frame.
+uint64_t HighlightMain(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82222E88 TitleScreen::MoveMainCursor (7): the old item finished, the
+// new one highlighted, the cursor moved or placed (wrapped); 1. 160-byte
+// frame.
+uint64_t MoveMainCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82223050 (9) and sub_822231B0 (10), never seen in play: as
+// MoveMainCursor's first half with item 5's look by SaveSlots::State(0) or
+// item 4's by Pad::IsConnected (player 1's controller); 1. 160-byte frames.
+uint64_t RefreshSaveItem(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t RefreshPadItem(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82223D70 TitleScreen::ShowCareerMenu (11): the item finished,
+// PlayNamed 86, the title's +20 from +8, SetUpCareerMenu; once Run answers
+// 0, continue shown refused when +8 is 0. 144-byte frame.
+uint64_t ShowCareerMenu(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82223328 TitleScreen::HighlightCareer (12) and sub_82223428
+// MoveCareerCursor (13): the career item highlighted (and the old one
+// finished, the cursor moved or placed); 1. 128- and 144-byte frames.
+uint64_t HighlightCareer(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t MoveCareerCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82223E58 TitleScreen::BackFromCareer (14) and sub_82223FD8
+// BackFromMenu4 (16, never seen in play): the item finished, PlayNamed 87,
+// SetUpMainMenu; once Run answers 0, to page 2 through transition 6 (+24 =
+// 0); 0. 128-byte frames.
+uint64_t BackFromCareer(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t BackFromMenu4(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82223F30 TitleScreen::ShowMenu4 (15) and sub_822235D0 MoveMenu4Cursor
+// (17), never seen in play. 128- and 144-byte frames.
+uint64_t ShowMenu4(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t MoveMenu4Cursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_82223700 TitleScreen::SetUpMainMenu: the list (7 items), its
+// selection from the title's +4, the cursor; the title's +12 and +8 from
+// player 0's save; the system checks cleared unless +40. SaveData::Of's r3.
+// 144-byte frame.
+uint64_t SetUpMainMenu(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82223840 TitleScreen::SetUpCareerMenu: the list (2 or 3 items), its
+// selection from +20, the cursor, the items' texts (SetText's unset varargs
+// 0). The last SetText's r3. 144-byte frame.
+uint64_t SetUpCareerMenu(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82223940 TitleScreen::SetUpMenu4 (never seen in play): the menu
+// reset, the cursor, its two texts. The last SetText's r3. 128-byte frame.
+uint64_t SetUpMenu4(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The menu pages (pages.cpp) ---
+
+// sub_82222700 TitleScreen::MainMenu (page 2, r3 the mode): MenuList::
+// Update; a move to transition 7; an accepted item picks the next page,
+// mode or message; MenuSound::Play. The sound's r3, Accepted's or the
+// selection. 144-byte frame.
+uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// sub_82221AC0 TitleScreen::CareerMenu (page 3): new game, continue and the
+// third item (CarDealer::StartFirstRace); cancel back to the main menu.
+// 128-byte frame.
+uint64_t CareerMenu(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82222378 TitleScreen::Menu4 (page 4, never seen in play): Menu::Step
+// and Pressed 159 or 158, or a move. 112-byte frame.
+uint64_t Menu4(uint8_t* base, uint32_t sp, const Calls& calls);
 
 // --- The machines' set-ups (init.cpp) ---
 //
