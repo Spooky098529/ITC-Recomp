@@ -39,6 +39,16 @@ Options for automated runs (both off by default):
 With `--skip_intro --attract_after_s=1` the attract race starts about 1 s
 after launch (21 s with only `--attract_after_s=1`, 39 s with neither).
 
+Since the B7 loop's migration (2026-11-11) the type 4 mode, the title load
+and the title screen are native (`--native_title_screen`,
+`itc_recomp/src/title_screen/`): `--attract_after_s`'s wrap of
+`TitleScreen::Update` now surrounds its plain C++ (`PressStart`), and
+`SetUpAttractRace` stays recompiled (called through the guest). The
+harnesses run before the boot's data load, so the `title_screen` harness
+records `BootData::Load`, `CarDealer::StartFirstRace` and
+`Career::NextDay` through their adapters' harness recorder check, and keeps
+the idle count below 600.
+
 How these were found: `--find_idle_timer` (`src/debug/idle_timer_scan.cpp`)
 compares guest memory every 30 logic passes outside races, logs words that
 step steadily like a timer (an integer by 30 or 60 ticks or about 1000 ms,
