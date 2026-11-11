@@ -1,8 +1,8 @@
 // The tuning screen natively: adapters in front of src/tuning_screen/
 // (docs/functions/tuning-screen.md), with the register steps the harness
-// shares (hooks/tuning_screen.h). The screen's update and refresh, and other
-// front-end screens, are still recompiled and call these, so the adapters
-// stay.
+// shares (hooks/tuning_screen.h). The adapters left are those recompiled
+// code still reaches (the update itself through the tuning machine's
+// functor, FitSelectedCar); the others went once their callers were native.
 
 #include "hooks/tuning_screen.h"
 
@@ -621,62 +621,6 @@ void TuningWithRefreshStand(
 
 }  // namespace hooks
 
-// Defines an adapter: the flag, else the original. HideTireMarks sub_821DFB20
-// and PlaceStateNodes sub_82202C08 have none: only native callers
-// (ShowTireMarks, Command25) reach them, and the flag switches those; their
-// register steps are the harness's.
-#define ITC_TUNING_SCREEN(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {     \
-    REX_FUNC_PROLOGUE();                   \
-    if (!ITC_FLAG(native_tuning_screen)) { \
-      __imp__sub_##address(ctx, base);     \
-      return;                              \
-    }                                      \
-    hooks::step(ctx, base);                \
-  }
-
-ITC_TUNING_SCREEN(821CBE08, TuningDebugMainMenu)
-ITC_TUNING_SCREEN(821CBEE8, TuningDebugLevelSelect)
-ITC_TUNING_SCREEN(821CBFC0, TuningDebugTypeSelect)
-ITC_TUNING_SCREEN(821CC248, TuningDebugOptionSelect)
-ITC_TUNING_SCREEN(821CC3A8, TuningDebugConfirmBuy)
-ITC_TUNING_SCREEN(821CC488, TuningDebugConfirmEquip)
-ITC_TUNING_SCREEN(821CFCE8, TuningDebugCategoryMenu)
-ITC_TUNING_SCREEN(821E8068, TuningDebugWheelPartSelect)
-ITC_TUNING_SCREEN(821E8128, TuningDebugWheelKindSelect)
-ITC_TUNING_SCREEN(821E8298, TuningDebugWheelInchSelect)
-ITC_TUNING_SCREEN(821FD710, TuningDebugDecalTopMenu)
-ITC_TUNING_SCREEN(821FD880, TuningDebugLayerSelect)
-ITC_TUNING_SCREEN(821FDCB8, TuningDebugLayerEdit)
-ITC_TUNING_SCREEN(821FE080, TuningDebugLayerSet)
-ITC_TUNING_SCREEN(821FE100, TuningDebugEditPosition)
-ITC_TUNING_SCREEN(821FE178, TuningDebugEditView)
-ITC_TUNING_SCREEN(821FE190, TuningDebugPaintConfirm)
-ITC_TUNING_SCREEN(821DCC28, TuningStoreToGarageCar)
-ITC_TUNING_SCREEN(821EED00, TuningUpdateListCounter)
-ITC_TUNING_SCREEN(82202880, TuningCommand31)
-ITC_TUNING_SCREEN(821E9050, TuningCommand9)
-ITC_TUNING_SCREEN(821EE9B0, TuningUpdateListDots)
-ITC_TUNING_SCREEN(821D6230, TuningShowDialog)
-ITC_TUNING_SCREEN(82202750, TuningCommand30)
-ITC_TUNING_SCREEN(821E8B68, TuningCommand7)
-ITC_TUNING_SCREEN(82202368, TuningCommand23)
-ITC_TUNING_SCREEN(82200600, TuningCommand18)
-ITC_TUNING_SCREEN(82204888, TuningCommand25)
-ITC_TUNING_SCREEN(821D06B0, TuningPlayIntro)
-ITC_TUNING_SCREEN(821D0A48, TuningOpenItems)
-ITC_TUNING_SCREEN(821FF1D0, TuningCommand15)
-ITC_TUNING_SCREEN(82202090, TuningCommand22)
-ITC_TUNING_SCREEN(821D07D8, TuningMoveCategory)
-ITC_TUNING_SCREEN(821D6420, TuningMarkPick)
-ITC_TUNING_SCREEN(821FF6F0, TuningCommand16)
-ITC_TUNING_SCREEN(821D5028, TuningShowOptions)
-ITC_TUNING_SCREEN(821D12C0, TuningShowLevels)
-ITC_TUNING_SCREEN(822036E8, TuningUpdateItems)
-ITC_TUNING_SCREEN(821D2A80, TuningShowTypes)
-ITC_TUNING_SCREEN(821F5F70, TuningCommand8)
-ITC_TUNING_SCREEN(821D8978, TuningRefreshMenu)
-
 // The calls onto the stand: also the original unless their callees are
 // native.
 #define ITC_TUNING_STAND(address, step)                                      \
@@ -690,10 +634,6 @@ ITC_TUNING_SCREEN(821D8978, TuningRefreshMenu)
   }
 
 ITC_TUNING_STAND(8217DAC0, TuningFitSelectedCar)
-ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
-ITC_TUNING_STAND(822019D0, TuningDecalCommand)
-
-ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 
 // No adapters (removed, B7 loop, 2026-11-07, the fifth migration: their
 // callers in play are native and call their plain C++; the register steps
@@ -731,39 +671,32 @@ ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 // its callers in play, PreviewItem and RestoreStand, are native and call its
 // plain C++ (its register step above is the harness's).
 
-// UpdateStand: the original unless its callees are native.
-extern "C" REX_FUNC(sub_821D9F10) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningUpdateStandCalleesNative()) {
-    __imp__sub_821D9F10(ctx, base);
-    return;
-  }
-  hooks::TuningUpdateStand(ctx, base);
-}
-
-// SetCarStats: the original unless the car data's and the power curve's
-// callees are native.
-extern "C" REX_FUNC(sub_821DF788) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningCarStatsCalleesNative()) {
-    __imp__sub_821DF788(ctx, base);
-    return;
-  }
-  hooks::TuningSetCarStats(ctx, base);
-}
-
-// Refresh: the original unless its callees onto the stand, SetCarStats' and
-// the car specs (state 6's rear spoiler: Params::GetCarParts, the aero parts)
-// are native.
-extern "C" REX_FUNC(sub_821E3AD0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningStandCalleesNative() ||
-      !hooks::TuningCarStatsCalleesNative() || !ITC_FLAG(native_car_specs)) {
-    __imp__sub_821E3AD0(ctx, base);
-    return;
-  }
-  hooks::TuningRefresh(ctx, base);
-}
+// No adapters (removed, B7 loop, 2026-11-11, after the update went native:
+// their callers in play, the update sub_821E6C50 and its pieces, merged, and
+// the other native callers named, call their plain C++; the register steps
+// above are the harness's; HideTireMarks sub_821DFB20 and PlaceStateNodes
+// sub_82202C08 never had one): the debug handlers DebugMainMenu
+// sub_821CBE08, DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
+// DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,
+// DebugConfirmEquip sub_821CC488, DebugCategoryMenu sub_821CFCE8,
+// DebugWheelPartSelect sub_821E8068, DebugWheelKindSelect sub_821E8128,
+// DebugWheelInchSelect sub_821E8298, DebugDecalTopMenu sub_821FD710,
+// DebugLayerSelect sub_821FD880, DebugLayerEdit sub_821FDCB8, DebugLayerSet
+// sub_821FE080, DebugEditPosition sub_821FE100, DebugEditView sub_821FE178,
+// DebugPaintConfirm sub_821FE190; the runners PlayIntro sub_821D06B0,
+// MoveCategory sub_821D07D8 (with tuning_pages' InputCategories), OpenItems
+// sub_821D0A48, ShowLevels sub_821D12C0, ShowTypes sub_821D2A80, ShowOptions
+// sub_821D5028, Command7 sub_821E8B68, Command8 sub_821F5F70, Command9
+// sub_821E9050, Command15 sub_821FF1D0, Command16 sub_821FF6F0, Command18
+// sub_82200600, DecalCommand sub_822019D0, Command22 sub_82202090,
+// Command23 sub_82202368, Command25 sub_82204888, Command30 sub_82202750,
+// Command31 sub_82202880, ShowDialog sub_821D6230, MarkPick sub_821D6420;
+// UpdateBusyIcon sub_821D6100, UpdateItems sub_822036E8, RefreshMenu
+// sub_821D8978, UpdateListDots sub_821EE9B0, UpdateListCounter sub_821EED00,
+// UpdateStand sub_821D9F10, StoreToGarageCar sub_821DCC28 (with tuning_pages'
+// InputItems and Leave), SetCarStats sub_821DF788 (with the refresh),
+// RestoreStand sub_821E0FB0 and the refresh sub_821E3AD0 (with
+// TuningMachine::Start).
 
 // Update: the original unless its callees' adapters would run their plain
 // C++ (the refresh's, UpdateStand's and SetCarStats' checks).

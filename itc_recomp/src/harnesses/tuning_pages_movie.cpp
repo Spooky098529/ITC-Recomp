@@ -1486,11 +1486,12 @@ void TuningPagesMovie(Context& h) {
   // word (not read). Its r30, r31 and lr (24 bytes); with B, UnloadAll's
   // (112 to 136 below) and its callees' (RestoreVinylMovie's and
   // RestoreStickerMovie's, Unload's) saves, which their plain C++ doesn't
-  // write.
+  // write; MoveCategory's (r29 to r31 and lr, 112 to 144 below: its adapter
+  // went, B7 loop, 2026-11-11, so the recompiled side runs its original).
   Run(h, w,
       {"TuningScreen::InputCategories", 80, __imp__sub_821D6AD0,
        hooks::TuningPagesInputCategories, 24,
-       {{112, 136}, {224, 256}, {320, 376}, {432, 456}},
+       {{112, 144}, {224, 256}, {320, 376}, {432, 456}},
        [](PPCContext& t, Random& r, const World&) {
          t.r4.u64 = r.Next();
          HighWord(t, r);
@@ -1542,10 +1543,13 @@ void TuningPagesMovie(Context& h) {
   // InputItems: its saves (__savegprlr_28: 40 bytes); StepList's,
   // MoveItem's and LoadVinyls' (128 to 176 below: their plain C++ doesn't
   // write them, LoadDecalImages' too) and LoadDecalImages' Request's or
-  // Load's (r31 and lr, 256 to 272 below); Archive::Load recorded.
+  // Load's (r31 and lr, 256 to 272 below); StoreToGarageCar's
+  // (__savegprlr_25, 128 to 192 below: its adapter went, B7 loop,
+  // 2026-11-11, so the recompiled side runs its original); Archive::Load
+  // recorded.
   Run(h, w,
       {"TuningScreen::InputItems", 500, __imp__sub_821DFD48, hooks::TuningPagesInputItems, 40,
-       {{128, 176}, {256, 272}}, ItemFields, true});
+       {{128, 192}, {256, 272}}, ItemFields, true});
   // MoveOption: state 8's fields (above); __savegprlr_28: 40 bytes.
   Run(h, w,
       {"TuningScreen::MoveOption", 300, __imp__sub_821D5610, hooks::TuningPagesMoveOption, 40, {},
