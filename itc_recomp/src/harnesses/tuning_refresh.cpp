@@ -20,8 +20,10 @@
 // the globals, the blocks, the stack below r1 (without the original's
 // register saves, the top 96 bytes of its frame, and the frame's +40 to +79,
 // the varargs SetText's parameter area, where the unset arguments are passed
-// 0 natively: the user's call, 2026-10-30), the caller's area, r1, all of
-// r3, lr and f1 (as a double).
+// 0 natively: the user's call, 2026-10-30; since the adapters of the
+// refresh's callees went, 2026-11-11, also their originals' register saves
+// and SetStateTexts' parameter area, which the recompiled refresh now
+// writes), the caller's area, r1, all of r3, lr and f1 (as a double).
 
 #include "harness.h"
 
@@ -599,6 +601,31 @@ void TuningRefresh(Context& h) {
         Fill(base, preview - 32, 32, 0);
         Fill(base, preview - 112 - 56, 56, 0);
         Fill(base, preview - 4000 - 16 - 16, 16, 0);
+        // Since the adapters of the refresh's callees went (B7 loop,
+        // 2026-11-11), the recompiled refresh calls their originals, whose
+        // register saves the native ones don't write: the 88 under the frame
+        // (ShowTireMarks' r22 to r31 and lr, the deepest; AeroPartValue's 64,
+        // SetStateTexts' 56 with f31, PreviewItem's 40, ShowInteriorPicture's
+        // and RefreshMovie13's 32, PickCameraPreset's 24, HideNode19's 16;
+        // RefreshMovie13's and ShowInteriorPicture's parameter areas, their
+        // 128-byte frames' +40 to +79, among them) and ShowTireMarks' callee HideTireMarks' 32 under its 176-byte
+        // frame (r29 to r31 and lr).
+        Fill(base, frame - 88, 88, 0);
+        Fill(base, frame - 176 - 32, 32, 0);
+        // States 15 to 17: the recompiled SetStateTexts' parameter area (its
+        // 224-byte frame's +40 to +79, where the varargs SetText and
+        // SetNodeText it calls store r7 to r10: unset ones passed 0 natively,
+        // the user's call of 2026-10-30).
+        if (st >= 15 && st <= 17) {
+          Fill(base, frame - 224 + 40, 40, 0);
+        }
+        // RefreshMovie13's states: the register saves of its recompiled
+        // callees (no adapters) under its 128-byte frame: LayOutItems' r26 to
+        // r31, f29 to f31 and lr (80 bytes, the deepest), ShowItems' 48,
+        // ShowOptionMarks' 24.
+        if (movie13) {
+          Fill(base, frame - 128 - 80, 80, 0);
+        }
       }
       TextMovieRecords(base, movie, out[v]);
       for (const auto& [address, bytes] : globals) {

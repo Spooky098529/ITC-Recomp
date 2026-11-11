@@ -571,10 +571,6 @@ void TuningWithRefreshStand(
     hooks::step(ctx, base);                \
   }
 
-ITC_TUNING_SCREEN(821CDB18, TuningIsItemAvailable)
-ITC_TUNING_SCREEN(821CD160, TuningGetPrice)
-ITC_TUNING_SCREEN(821CD868, TuningGetCurrentChoice)
-ITC_TUNING_SCREEN(821CDC38, TuningGetChoiceFlag)
 ITC_TUNING_SCREEN(821CBE08, TuningDebugMainMenu)
 ITC_TUNING_SCREEN(821CBEE8, TuningDebugLevelSelect)
 ITC_TUNING_SCREEN(821CBFC0, TuningDebugTypeSelect)
@@ -593,11 +589,6 @@ ITC_TUNING_SCREEN(821FE100, TuningDebugEditPosition)
 ITC_TUNING_SCREEN(821FE178, TuningDebugEditView)
 ITC_TUNING_SCREEN(821FE190, TuningDebugPaintConfirm)
 ITC_TUNING_SCREEN(821DCC28, TuningStoreToGarageCar)
-ITC_TUNING_SCREEN(821DF448, TuningEquipChoice)
-ITC_TUNING_SCREEN(821DE2D8, TuningAeroPartValue)
-ITC_TUNING_SCREEN(821DA3F8, TuningShowInteriorPicture)
-ITC_TUNING_SCREEN(821DFBE8, TuningHideNode19)
-ITC_TUNING_SCREEN(821E22E8, TuningShowTireMarks)
 ITC_TUNING_SCREEN(821EED00, TuningUpdateListCounter)
 ITC_TUNING_SCREEN(82202880, TuningCommand31)
 ITC_TUNING_SCREEN(821E9050, TuningCommand9)
@@ -619,10 +610,8 @@ ITC_TUNING_SCREEN(821D5028, TuningShowOptions)
 ITC_TUNING_SCREEN(821D12C0, TuningShowLevels)
 ITC_TUNING_SCREEN(822036E8, TuningUpdateItems)
 ITC_TUNING_SCREEN(821D2A80, TuningShowTypes)
-ITC_TUNING_SCREEN(821F1DE0, TuningSetStateTexts)
 ITC_TUNING_SCREEN(821F5F70, TuningCommand8)
 ITC_TUNING_SCREEN(821D8978, TuningRefreshMenu)
-ITC_TUNING_SCREEN(822076E8, TuningRefreshMovie13)
 
 // The calls onto the stand: also the original unless their callees are
 // native.
@@ -637,11 +626,9 @@ ITC_TUNING_SCREEN(822076E8, TuningRefreshMovie13)
   }
 
 ITC_TUNING_STAND(8217DAC0, TuningFitSelectedCar)
-ITC_TUNING_STAND(821D99A0, TuningPickCameraPreset)
 ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
 ITC_TUNING_STAND(822019D0, TuningDecalCommand)
 
-ITC_TUNING_STAND(821E07B0, TuningPreviewItem)
 ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 
 // No adapters (removed, B7 loop, 2026-11-07, the fifth migration: their
@@ -661,6 +648,20 @@ ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 // InputCategories) and WheelNumber sub_821CDED8 (PreviewWheels, FillPartRows,
 // ShowPartMarks, SetPartName and tuning_pages' SetCurrentChoice and
 // FillPartRowsRight).
+
+// No adapters (removed, B7 loop, 2026-11-11, after the refresh went native:
+// their callers in play are native and call their plain C++; the register
+// steps above are the harness's): IsItemAvailable sub_821CDB18 (the refresh,
+// PreviewItem and tuning_pages' InputLevels, InputTypes, MoveLevel and
+// MoveType), GetPrice sub_821CD160 (the refresh and tuning_pages'
+// InputLevels, InputTypes, InputOptions, InputInches and InputWheels),
+// GetCurrentChoice sub_821CD868 (the refresh, ShowLevels, ShowTypes,
+// ShowTireMarks and tuning_pages' MoveLevel, MoveType and MoveOption),
+// GetChoiceFlag sub_821CDC38, EquipChoice sub_821DF448, AeroPartValue
+// sub_821DE2D8, ShowInteriorPicture sub_821DA3F8, HideNode19 sub_821DFBE8,
+// ShowTireMarks sub_821E22E8, SetStateTexts sub_821F1DE0, RefreshMovie13
+// sub_822076E8, PickCameraPreset sub_821D99A0 and PreviewItem sub_821E07B0
+// (the refresh).
 
 // SetInteriorPair sub_821CCC50 has no adapter (removed, B7 loop, 2026-11-07):
 // its callers in play, PreviewItem and RestoreStand, are native and call its
