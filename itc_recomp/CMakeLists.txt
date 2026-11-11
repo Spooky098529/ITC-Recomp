@@ -524,6 +524,8 @@ set(ITC_SOURCES
     src/race_menu/transitions.cpp
     src/race_menu/pages.cpp
     src/race_menu/draw.cpp
+    src/hooks/car_settings.cpp
+    src/car_settings/handlers.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp
@@ -750,6 +752,7 @@ set(ITC_SOURCES
     src/harnesses/garage_screen.cpp
     src/harnesses/tuning_machine.cpp
     src/harnesses/race_menu.cpp
+    src/harnesses/car_settings.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp

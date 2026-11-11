@@ -316,5 +316,6 @@ void Type2Dialog(Context& h);
 void GarageScreen(Context& h);
 void TuningMachine(Context& h);
 void RaceMenu(Context& h);
+void CarSettings(Context& h);
 
 }  // namespace harness
