@@ -517,6 +517,12 @@ set(ITC_SOURCES
     src/title_screen/mode.cpp
     src/title_screen/press_start.cpp
     src/title_screen/debug.cpp
+    src/hooks/type10_mode.cpp
+    src/type10_mode/init.cpp
+    src/type10_mode/mode.cpp
+    src/type10_mode/theater.cpp
+    src/type10_mode/pages.cpp
+    src/type10_mode/transitions.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp
@@ -781,6 +787,7 @@ set(ITC_SOURCES
     src/harnesses/car_settings.cpp
     src/harnesses/user_info.cpp
     src/harnesses/title_screen.cpp
+    src/harnesses/type10_mode.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp

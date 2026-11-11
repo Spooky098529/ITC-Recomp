@@ -320,5 +320,6 @@ void CarSettings(Context& h);
 void UserInfo(Context& h);
 void Type2Mode(Context& h);
 void TitleScreen(Context& h);
+void Type10Mode(Context& h);
 
 }  // namespace harness
