@@ -27,7 +27,15 @@ file's history. What's left to see in a drive, from every run:
   recompiled, blocked by the sticker and vinyl editors' leads and three
   never-seen `tuning-pages.md` setters; under `--native_tuning_screen`;
   race 31 s at 40, 0 errors, its harnesses 0 differing; 3 subagents,
-  one at a time). Left: none. Step: validation agent.
+  one at a time). Left: none. Validation failed: `itc_4919`, the
+  `TuningScreen::Update` harness stuck at its `DebugRemoveConfirm`
+  (`sub_821CC620`) group reading guest 0x700D0000 over and over (9.4M
+  error lines, the race never started), 69 of 88 harness lines (19
+  debug handlers' groups never ran); every harness that finished at 0
+  differing; no prints added; the replay `itc_4920` ok (20 ran in it).
+  By the user's call (2026-11-11, asked: "find, fix, continue"), a fix
+  agent finds the wild read with logging and fixes the harness; then
+  the validation again. Step: fix agent.
 
 ## Done
 

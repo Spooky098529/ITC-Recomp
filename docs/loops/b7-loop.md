@@ -568,6 +568,13 @@ Calls so far for decisions the loop meets often:
   are ours, and the harness built the bigger way, with the callees'
   world as their own harnesses build it; no stand-in recorders in
   adapters (the race HUD machine, 2026-10-31).
+- A validation that fails on a harness fault (a harness case reading
+  a wild guest address, or giving a case inputs play never does) rather
+  than a native difference: an agent finds the cause with logging and
+  fixes the harness, the validation is run again, and the loop goes on
+  (`RaceMenu::Transition3`, 2026-11-10; `GarageScreen::Transition6` and
+  `TuningScreen::Update`'s debug handlers, 2026-11-11). A real
+  difference between native and recompiled still halts.
 - The C runtime's per-thread data over the kernel's TLS (`_mtinit`
   `sub_825AA708`, `_getptd` and the rest in `c-runtime.md`'s "Not
   here"): left for the core, not taken (2026-10-25). Only when it
