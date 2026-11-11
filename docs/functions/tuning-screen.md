@@ -42,10 +42,12 @@ stand screens' functions it reaches (`sub_821D9F10`, `sub_821D99A0`,
 `sub_821D9B60`, `sub_822019D0`, `sub_821D6100`, `sub_821E0FB0`); 60
 ready groups among them. Left as leads (`../loops/leads.md`): the update
 with its two pieces and the state handlers and command runners that
-never ran in play (61 of them); the refresh `sub_821E3AD0` with its
-callees not seen in play; the screen's other vtable slots (its input
+never ran in play (61 of them); the screen's other vtable slots (its input
 pages); `GarageStage::SetColor`'s pieces and the stand's other setters
 met here. The power curve's set-up `sub_821E7368` stayed in its lead (since 2026-11-09 `TuningMachine::Start` in [`tuning-machine.md`](tuning-machine.md), with the screen's machine).
+The refresh `sub_821E3AD0` with its callees was mapped here later
+(2026-11-11, the B7 loop's mapping agent, from its own lead): see "The
+refresh" below and the last eight rows.
 
 Shared, with rows elsewhere: `UiMovie::` and `UiMovies::Find`
 (`ui-movies-game.md`, `ui-movies.md`: among them `sub_8211C740`,
@@ -78,6 +80,118 @@ the debug handlers' calls to the empty `sub_82106540` pass varargs
 scene model's +64 to +111, the paint's offsets, while
 `SceneModel::ApplyWheelPaint`'s row reads +112 to +207: one of the two
 to check (neither piece ran in play).
+
+The refresh (`TuningScreen::Refresh`, `sub_821E3AD0`, mapped
+2026-11-11): one function of 3,838 lines (b7_groups' count;
+`generated/default/itc_recomp.50.cpp` lines 8236 to 15048), seen in
+play, called by the update `sub_821E6C50` (a lead) while +9708 is 1 and
+by `TuningMachine::Start` `sub_821E7368`
+([`tuning-machine.md`](tuning-machine.md)), which it alone blocks:
+`Start` is ready once the refresh is ours. Every callee seen in play is
+already ours (the UI movie calls in `ui-movies-game.md` and
+`ui-movies.md`, the helpers in this file, `GarageStage::SetLightsOn`,
+`Command`, `SetLightKit`, `SetChoice`, `ClearChoice`,
+`Params::GetCarParts`, `AeroParts::Get77`, `Get82`, `memcpy`); its
+callees not seen in play are the last rows here. Its migration is to be
+split (b7_groups: over 1,500 lines), by the blocks below (line numbers
+in that file, labels `loc_821E....`). m = movie 2 throughout
+(`UiMovies::Find` on `0x826C5CCC`, key 2), s = the screen, holder =
+`[[0x826D83E0]]` (the stand's holder, as `GarageStage::` setters take).
+
+1. The header (8236 to 8720, every call): `SetChildNameText`(m, 9, 6,
+   s + 20792); `SetNumberText`(m, 9, 9, +25116); `SetText`(m, 9, 13, 8,
+   +25092); `SetNodeTexture`(m, 9, 11, +25096); `ShowNode`(m, 8, 1);
+   `HideNode`(m, 8, 2), (8, 10); `SetNodeTexture`(m, 8, 6, 1), (8, 7, 1);
+   `EquipChoice`(s); `SetCarStats` (r3 = s, as `EquipChoice` leaves it);
+   the stats into sub-scene 18: `SetText`(m, 18, 7, 8, +20768), (18, 8,
+   8, (int) ((float) +20772 × the double at `0x82009F00`)), (18, 11, 8,
+   +20776), (18, 12, 436, float +20780 × the double at `0x82009F08`,
+   passed as a double in f1 and r7), (18, 9, 438), (18, 10, 440), (18,
+   13, 437), (18, 14, 439); `ShowNode`(m, -1, 19) unless the state is 16;
+   `HideNode19`(s); `SetText`(m, 19, 4, 527), (19, 2, 9, `GetPrice`(s)),
+   (19, 3, 435); `ShowTireMarks`(s) unless the state is 7 to 11 with
+   the bonnet (category 4, item 4); `HideNode`(m, -1, 20), (-1, 17), (-1,
+   0); `PickCameraPreset`(s); `PreviewItem`(s);
+   `GarageStage::SetLightsOn`(holder, 1 when the state is 6, 9, 10 or
+   11 with the headlights (category 4, item 6), else 0). Then the switch
+   on the state +9652 - 3 (0 to 55, else return 0) through the 16-bit
+   table at `0x8200A908`.
+2. State 3, TUNING SHOP MAIN (8837 to 8915): `SetNodeTexture`(m, 3, 1,
+   +9716 ? 0 : the category + 1), (3, 2, 0); `HideNode`(m, -1, 25), (-1,
+   26), (-1, 19); the help line (below) with string 596 + the category.
+3. State 4, the category's items (8916 to 9389): `SetNodeTexture`(m, 3,
+   1, +9716 ? 0 : by the category: item + 8, + 12, 3, + 17, + 20, + 30,
+   + 38; none for 7 and up), (3, 2, the category + 1); while +9716 is 0
+   and the animations 2 (and, for the aero, 1 and 2) aren't playing
+   (`AnimationTime` answering the float at `0x82001BE0`): sub-scene 27's
+   children 5 to 14 hidden and colored 0, then for each of the byte
+   +9676 items (8 rows at most) shown with string 203 + item - +25100 +
+   row and colored 2 when unavailable (aero: the word +25128 + 4 × that
+   index is 0; others always available, r29 = 1); the scroll arrows
+   (children 25 and 26 of the live scene) by the aero's row +25100;
+   `HideNode`(m, -1, 19); the help line by the category: 603, 607, none
+   (2), 612, 637, 645 + the item; aero 615 + the item when available,
+   else 857 (item 9) or 860.
+4. State 5, LEVEL_SELECT (9390 to 11557, the largest; a second jump
+   table, 8-bit, at `0x8200A8F8` on the level row for the aero's names
+   at 10213 to 10229): the textures as state 4 (+9716 0 only); the level
+   list's nodes in sub-scene 28 (categories 0 to 2, 4) or 30 (3) with
+   `UiMovie::Child`, `SetColor`, `SetNodeText` (strings 376, 377, 378
+   with the row) by `IsItemAvailable` (9390 to 10516); the current
+   choice's marker (`GetCurrentChoice`; +108 of the rows' children by
+   `GetChoiceFlag`) (10517 to 11244, `loc_821E49A8`); the scroll arrows
+   25 and 26 by the byte +9677 and +25100, node 20 shown for category 0
+   item 2 (11245 to 11349, `loc_821E4EC4`); the help line by the
+   category, item and level (strings 649 to 776, the power list's row
+   +33900 for category 0 items 0 and 1), or 857 when
+   `IsItemAvailable`(s, byte +9661) is 0 (11350 to 11557,
+   `loc_821E4F74`).
+5. State 6, TYPE_SELECT (11558 to 13191): the textures; the type list in
+   sub-scene 28 or 29 (byte +9678 rows, strings 375, 376, 379 with the
+   row; aero item 3 with +25172 set shifted by one), with
+   `IsItemAvailable` and `GetChoiceFlag` (to 12521); the arrows by
+   +9678, +9662 and +25108 (12522 to 12636, `loc_821E57D0`); sub-scene
+   8's child 2 and textures 3 and 10 for the exterior item 3, node 20,
+   node 17's child 0 +108 = `AeroPartValue` (aero), and
+   `ShowInteriorPicture`(s, byte +9662, 0) (category 6 item 0) (12637 to
+   12924); the help line (12925 to 13191, `loc_821E5A94`): for the rear
+   spoiler (aero item 3) the selected garage car's parts
+   (`Params::GetCarParts` on its +224, the garage slot walked as
+   `StoreToGarageCar` does, 36 bytes copied with `memcpy`),
+   `AeroParts::Get77` (the type, remapped through +25172) and
+   `AeroParts::Get82` (+36588), strings 629, 630 or 865 by their +24
+   bits; exterior 792 and 793; interior 846, 848, 849. r31 is moved to
+   s + 36588 on that path (only r30, the movie, is read after).
+6. State 7, the bonnet's and colors' choice (13192 to 14259): sub-scene
+   30's list for the bonnet (byte +9679 rows, `GetChoiceFlag`); for
+   category 1 item 3 and category 6 item 0 sub-scene 32's swatches
+   (children 2 and 3) colored with fixed RGB values through `sub_821E7DA0`
+   (12 calls, 13470 to 14077, `loc_821E5E64`, never seen in play); node 17 with
+   `AeroPartValue` (type − 1) for the bonnet; `ShowInteriorPicture`(s,
+   byte +9662, byte +9663); the help line (14215 to 14259).
+7. State 8, the option select (14260 to 14946): textures 6 and 31 for
+   the exterior's door, sub-scene 31 (bonnet, string 381), 33 (tire:
+   strings 200 to 202, the hardness) or 28 (door: 376 and the rest)
+   with `GetChoiceFlag` over byte +9680 rows; the door's
+   `GarageStage::Command`(holder, 4); node 17 with `AeroPartValue`; the
+   help line by byte +9664 (`SetText`, `ScrollText`).
+8. The shared tail (14947 to 14972, `loc_821E68B0`): the help line
+   `SetText`(m, 10, 0, string) then `ScrollText`(m, 10, 0, 1)
+   (`loc_821E68C0` the scroll alone); every page calls
+   `ResetTextScroll`(m, 10, 0) first.
+9. The dispatch (14973 to 15030): 15 to 17 `SetStateTexts`, 18
+   `RefreshPaint` `sub_821F2110`, 19 to 22 `RefreshLightKits`
+   `sub_821F2378`, 23 to 37 `RefreshMovie13` for the vinyl (+9656 5,
+   byte +9660 6) else `RefreshMovie14` `sub_821F7A98`, 38 to 52
+   `RefreshMovie14`, 53 to 58 `RefreshInterior` `sub_821F2AD8`; 9 and 11
+   nothing more. Returns 1 for 3 to 9, 11 and 15 to 58, 0 for 10, 12 to
+   14 and anything else (15031 to 15048; the update stores whether it
+   answered 0 into +9708).
+
+Calls to `SetText` without arguments leave r7 to r10 as they were: the
+precedent (native callers pass 0, the parking area, 2026-10-30)
+covers them. A 368-byte frame (r22 to r31 by `__savegprlr_22`, f31
+saved: state 4's float).
 
 Status:
 
@@ -208,3 +322,11 @@ Status:
 | `sub_821FE100` | `TuningScreen::DebugEditPosition` (probably) | Overridden | The handler for states 29 and 44. r3 = the screen (not read). No frame: a tail call to the empty `sub_82106540` with (500, 300, 0, "EDIT POSOTION" `0x8200CA60`, the game's spelling). No effect: no field written, no state set. Every update in states 29 and 44. Read in full. Seen in play. Overridden: plain C++ `tuning_screen::DebugEditPosition` (`src/tuning_screen/debug.cpp`; the prints through the empty `sub_82106540` and the loads feeding them left out, the native callers' precedent for the empty function; the frame's back chain and the string tables it builds there written as the original leaves them, r3 the last print's first argument) behind `--native_tuning_screen`, adapter in `src/hooks/tuning_screen.cpp` (the recompiled update calls it); harness `tuning_screen` (2026-11-07). |
 | `sub_821FE178` | `TuningScreen::DebugEditView` (probably) | Overridden | The handler for states 34 and 49. r3 = the screen (not read). No frame: a tail call to the empty `sub_82106540` with (500, 300, 0, "EDIT VIEW" `0x8200CAA0`). No effect: no field written, no state set. Every update in states 34 and 49. Read in full. Seen in play. Overridden: plain C++ `tuning_screen::DebugEditView` (`src/tuning_screen/debug.cpp`; the prints through the empty `sub_82106540` and the loads feeding them left out, the native callers' precedent for the empty function; the frame's back chain and the string tables it builds there written as the original leaves them, r3 the last print's first argument) behind `--native_tuning_screen`, adapter in `src/hooks/tuning_screen.cpp` (the recompiled update calls it); harness `tuning_screen` (2026-11-07). |
 | `sub_821FE190` | `TuningScreen::DebugPaintConfirm` (probably) | Overridden | The handler for states 35 and 50. r3 = the screen. A 128-byte frame (r29 to r31 saved). Only calls the empty `sub_82106540`: `*` at (500, 40 × (+30772 + 8)); "PAINT DECISION CONF" (`0x8200CAAC`) at (500, 300); "YES" at (520, 320), "NO" at (520, 360). No effect: no field written, no state set. Every update in states 35 and 50. Read in full. Seen in play. Overridden: plain C++ `tuning_screen::DebugPaintConfirm` (`src/tuning_screen/debug.cpp`; the prints through the empty `sub_82106540` and the loads feeding them left out, the native callers' precedent for the empty function; the frame's back chain and the string tables it builds there written as the original leaves them, r3 the last print's first argument) behind `--native_tuning_screen`, adapter in `src/hooks/tuning_screen.cpp` (the recompiled update calls it); harness `tuning_screen` (2026-11-07). |
+| `sub_821E3AD0` | `TuningScreen::Refresh` (probably) | | r3 = the tuning screen. The screen's movie 2 set up for the current state +9652: the header (the money, the stats, the price, `EquipChoice`, `SetCarStats`, `PickCameraPreset`, `PreviewItem`, `GarageStage::SetLightsOn`), then a page per state through the 16-bit table at `0x8200A908` (a second, 8-bit, at `0x8200A8F8` in state 5): states 3 to 8 inline, 15 to 17 `SetStateTexts`, 18 `sub_821F2110`, 19 to 22 `sub_821F2378`, 23 to 37 `RefreshMovie13` (vinyl) or `sub_821F7A98`, 38 to 52 `sub_821F7A98`, 53 to 58 `sub_821F2AD8`. Returns 1, or 0 for states 10, 12 to 14 and outside 3 to 58. Its blocks with their line ranges in `generated/` are in "The refresh" above (to split the migration). Callers: the update `sub_821E6C50` while +9708 is 1 (it stores whether this answered 0 into +9708; a lead) and `TuningMachine::Start` `sub_821E7368` (`tuning-machine.md`, blocked only by this). Calls 113 × `UiMovie::Child`, 58 × `FindNode`, `SetNodeText`, `ShowNode`, `HideNode`, `SetColor`, `SetNodeColor`, `SetNodeTexture`, `SetText`, `ResetTextScroll`, `ScrollText`, `AnimationTime`, `SetNumberText`, `SetChildNameText`, `UiMovies::Find` (`ui-movies-game.md`, `ui-movies.md`), `IsItemAvailable`, `GetChoiceFlag`, `GetCurrentChoice`, `GetPrice`, `AeroPartValue`, `ShowInteriorPicture`, `HideNode19`, `ShowTireMarks` (here), `GarageStage::Command` (`front-end-car-draw.md`), `Params::GetCarParts`, `AeroParts::Get77`, `Get82` (`race-setup.md`, `car-specs.md`), `memcpy`. Seen in play. Read in full for the map (the states' blocks in outline: the strings and nodes per category in `generated/`). Ready (b7_groups, 2026-11-11: 1 function, its unseen callees below). |
+| `sub_821F2110` | `TuningScreen::RefreshPaint` (probably) | | State 18 (the paint) of the refresh. r3 = the screen. A 112-byte frame (r30, r31 saved inline). Movie 2. With +9716 set: `SetNodeTexture`(m, 3, 1, 6), (3, 2, 34). `HideNode`(m, 8, 1); sub-scene 21's labels with `FindNode` and `UiMovie::Child` then `SetNodeText`: child 2's 8 and 9 strings 221 and 224, child 3's 222 and 225, child 4's 223 and 226, child 5's child 6 string 227, its children 4 and 5's child 0 strings 228 and 229, child 1's 3 and 4 strings 4 and 5; then child 3's and child 4's child 4 +104 = 1. Returns the last child (r3). Not seen in play. Read in full. |
+| `sub_821F2378` | `TuningScreen::RefreshLightKits` (probably) | | States 19 to 22 of the refresh (the light kits, probably: their groups at +30492 to +30708, `../known-data.md`). r3 = the screen. A 144-byte frame (r27 to r31 by `__savegprlr_27`). Movie 2. **19**: with +9716 set `SetNodeTexture`(m, 3, 1, 6), (3, 2, 35); sub-scene 36's children 5 to 14 hidden, 5 to 8 shown with strings 273, 274, 275, 272. **20**: sub-scene 37's children 5 to 14 hidden, 5 to 7 shown with 230, 231, 245; the help line by +30500 (0 to 2: 595, 796, 795). **21**: sub-scene 23's labels (232, 233, 234, 451; child 1's 3 and 4 strings 4 and 5), `HideNode`(m, 8, 1), `sub_821CC930`(s), sub-scene 23 child 5's children 4 to 11 (their child 2) colored with eight fixed RGB triples into +56, +60, +64 (the first 18, 173, 248); the help line by +30508 (0 to 4: 797 to 800, 4 by +30528: 593 or 594). **22**: `SetText`(m, 24, 13, 455), sub-scene 24's labels (234, 451, 4, 5), `HideNode`(m, 8, 1), `sub_821CC930`(s), the same eight swatches under sub-scene 24 child 4; the help line by +30544 (0 to 2: 801 to 803, 3 by +30560 as above). Each help line: `ResetTextScroll`, `SetText`(m, 10, 0, string), `ScrollText`(m, 10, 0, 1). Other states: nothing. Not seen in play. Read in full. |
+| `sub_821CC930` | `TuningScreen::PreviewLightKit` (probably) | | r3 = the screen. A 112-byte frame. By the state +9652: **21**: `GarageStage::SetLightKit`(holder `[[0x826D83E0]]`, +30492, 1, +30524, f1 = +30512, f2 = +30516, f3 = +30520, each int × the float at `0x820021FC`); **22**: `SetLightKit`(holder, +30492, +30548 + 2, +30556, f1 = the word +30596 + 4 × g, f2 = +30612 + 4 × g, f3 = +30552, the same scale; g = +30492); other states nothing. Only callers: `sub_821F2378` (twice). Not seen in play. Read in full. |
+| `sub_821F2AD8` | `TuningScreen::RefreshInterior` (probably) | | States 53 to 58 of the refresh (the interior item's pages, probably: `IsSlotAvailable`, the mode +33564 and slot +33576 among `../known-data.md`'s +33548 to +33620). r3 = the screen. A 176-byte frame (r22 to r31 by `__savegprlr_22`). Movie 2. **57, 58**: `HideNode`(m, -1, 19); with +33564 4 `HideNode`(m, 2, 2); sub-scene 2's children 4 to 8 hidden, child 4 + the slot +33576 shown; the help line: slot unavailable (`IsSlotAvailable`) 864 (mode 4) or 859; mode 4 with the choice code +33800 + 4 × slot -1 863; else by the slot 853 to 856, 595; then **57** only: `sub_821E7E48`(s) and state 56's block. **56**: sub-scene 2's child 2 by the mode, textures 41 and 43, node 17's child 0 +108 = a value clamped to 0 to 2, the help line. **55**: sub-scene 32 child 3's children 1 to 6 (their child 2) shown and colored with fixed RGB triples by a flag. **54**: textures 41 and 42; sub-scene 28's rows (375, then 379 with the row for 3 rows), the choice marks by `GetChoiceFlag` (+108 of child 15 + row's children), the help line. **53**: textures, the help line. Not seen in play. Read for the map (the states' outline). |
+| `sub_821E7E48` | `TuningScreen::PreviewInteriorChoices` (probably) | | r3 = the screen. A 208-byte frame (r22 to r31 by `__savegprlr_22`); two small tables on it: A = {3, 2, 1, 0, 2} at +80, B = {2, 1, 0, 4, 3} at +96. For the five choice codes w = +33800 + 4 × i, the stand's choice c (i 0, 1, 2 → 6, 5, 4; 3 → 0 when +35708 < 3, else 2, and 4 → 1 or 3, each after `GarageStage::ClearChoice`(holder, the other of the pair)): w -1 `ClearChoice`(holder, c), else `GarageStage::SetChoice`(holder, c, A[w / 10], B[w % 10]). Then the slot +33576 picks c the same way (5 and up: c left from the loop) and `SetChoice`(holder, c, A[+33564], B[+33572]). Holder `[[0x826D83E0]]`. Only caller `sub_821F2AD8` (state 57). Not seen in play. Read in full. |
+| `sub_821F7A98` | `TuningScreen::RefreshMovie14` (probably) | | States 38 to 52 (the sticker editor) of the refresh, and 23 to 37 when not the vinyl. r3 = the screen. A 112-byte frame (r30, r31 saved inline). Movie 14: `SetText`(m14, 0, 9, 9, +25116), (0, 13, 8, +25092); `SetNodeTexture`(m14, 0, 11, +25096); `HideNode`(m14, 1, 2), (1, 10), (1, 8), (1, 9); `SetNodeTexture`(m14, 1, 6, 1), (1, 7, 1) (movie 2's header in the refresh, on movie 14). Returns `SetNodeTexture`'s r3. Not seen in play. Read in full. |
+| `sub_821E7DA0` | `UiNode::SetRgb` (probably) | | r4 = a node, r5, r6, r7 = red, green, blue: the node's +56, +60, +64 = r5, r6, r7 (as `SetColor` without the table). Leaf, r3 left. 12 calls from the refresh (state 7's swatches); 9 other callers, none seen in play and without rows (`sub_82263508`, `sub_822645B0`, `sub_8226B2F0`, `sub_8226B4D0`, `sub_8226B620`, `sub_8226E3C0`, `sub_8226E4D8`, `sub_82270118`, `sub_82270200`). Not seen in play. Read in full. |

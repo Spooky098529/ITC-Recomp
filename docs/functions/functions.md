@@ -601,7 +601,9 @@ Rows not yet moved stay in the table below. So far:
   below its update and refresh: the parts' tables and prices, the
   choices stored into the garage car, the stand car's previews (parts,
   wheels, decals), the command runners and node helpers over its UI
-  movies, and the debug menus' empty state handlers (B7).
+  movies, and the debug menus' empty state handlers (B7); since
+  2026-11-11 the refresh itself (`TuningScreen::Refresh`, its pages by
+  state, the paint, light kit and interior pages).
 - [`tuning-pages.md`](tuning-pages.md): the tuning shop's input pages:
   its input handler by state (the category, items, level, type and
   option pages, the wheels', paint's, light kits' and interior
