@@ -2847,6 +2847,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-11 | The type 2 mode (its Init over the 14 machines' Inits, its vtable's delegates and slot thunks, `Interrupt`, `ForceExit`) and its user info screen (the player's record, UI movie 10, at the mode's block +0x102D8) | `type2-mode.md`, `user-info.md` | 20 of 21 and 14 of 14 (one migration; no adapter removable) | `--native_type2_mode`, `--native_user_info` |
 | 2026-11-11 | The tuning screen's refresh (`TuningScreen::Refresh`, 3,838 lines: the header, states 3 to 8 inside, the dispatch for 15 to 58; its 5 callees never seen in play stay recompiled) with `TuningMachine::Start` it unblocked | `tuning-screen.md`, `tuning-machine.md` | 83 of 83 and 22 of 22 in play (one migration, the refresh in four parts, 5 subagents; 15 adapters removed) | (`--native_tuning_screen`, `--native_tuning_machine`) |
 | 2026-11-11 | The tuning screen's update (`TuningScreen::Update` `sub_821E6C50`, 1,601 lines with its two pieces: its state switch over the debug handlers, the command queue's runners, the movie it picks, `UiMovie::Run`; 40 of its 61 callees never seen in play ported too) | `tuning-screen.md` | 126 of 126 rows ours (the update Overridden, its pieces Merged, 47 adapters removed; 21 never-seen runners stay recompiled, blocked by the sticker and vinyl editors' leads) | (`--native_tuning_screen`) |
+| 2026-11-11 | The title screen (the type 4 front-end mode: its Init, delegates and next mode; the title load machine with the boot's data load and logo; the title screen machine with press start, the main, career and fourth menus; `TitleScreen::Update` inside the `--attract_after_s` wrap) | `title-screen.md` | 86 of 87 (one migration; 2 adapters removed; `SetUpAttractRace` stays recompiled) | `--native_title_screen` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5182,3 +5183,22 @@ overridden 109, Native 36, Dropped 26, never called 70, live 208.
 Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
 5,488, work left 1,060 (Wrapped 56, with a row 389, no row yet 615),
 from 1,063.
+
+**2026-11-11, the title screen (branch `b7-loop-11-11-26`, the
+forty-fourth run, its second subsystem):** `title-screen.md` (87 rows,
+`--native_title_screen`, `src/title_screen/`): the type 4 front-end
+mode (vtable `0x82006BE0`, Init `sub_82224C70`), its title load machine
+at +28920 (`TitleLoad::Init`, the boot's data load, the logo movie, a
+debug sequence never seen in play) and its title screen machine at
++38560 (`TitleScreen::Init`, press start, the main, career and fourth
+menus), with `Players::AssignController`; `TitleScreen::Update` runs
+natively inside the `--attract_after_s` wrap. `SetUpAttractRace`
+`sub_82222038` stays recompiled: its harness needs the race data and
+car specs, which aren't loaded when the harnesses run. Three existing
+adapters (`BootData::Load`, `Career::NextDay`,
+`CarDealer::StartFirstRace`) now check the harness recorder first. The
+attract race ran 37 of them, the replay 12 more. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,574, work left 1,005 (Wrapped 55, with a row
+388, no row yet 562), from 1,060.

@@ -64,9 +64,16 @@ file's history. What's left to see in a drive, from every run:
   existing adapters (`BootData::Load`, `Career::NextDay`,
   `CarDealer::StartFirstRace`) now ask the harness recorder first;
   race 33 s at 40, 0 errors, its harnesses and the touched files' 0
-  differing; no subagents). Left: none. Step: validation agent.
+  differing; no subagents). Left: none. Validated: `itc_4943` (race
+  59 s at 180, 0 errors, every harness 0 differing outside the
+  expected groups), 86 of 86 harness lines, no prints added; 37 ran in
+  the race, 12 more in the replay `itc_4944` (ok), 37 to drive.
+  Recorded.
 
 ## Done
+
+- The title screen: `title-screen.md` 86 of 87 ours,
+  `--native_title_screen`, 05cef504..216e9843; validated.
 
 - The tuning screen's update: `tuning-screen.md` 126 of 126 ours (the
   update Overridden, 47 adapters removed, 40 never-seen callees

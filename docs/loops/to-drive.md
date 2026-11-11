@@ -91,6 +91,48 @@ first 40 here, may never run in play):
 - `sub_82202750` TuningScreen::Command30 (probably)
 - `sub_82202880` TuningScreen::Command31 (probably)
 
+Not in the attract race or the replay (`itc_4943`, `itc_4944`, ok; all
+in `title-screen.md`, the title screen and its menus; the debug pages
+and steps may never run in play):
+
+- `sub_82225698` ModeType4::Leaving
+- `sub_82224E20` ModeType4::Interrupt
+- `sub_82224ED0` ModeType4::ForceExit
+- `sub_82225048` ModeType4::Resume
+- `sub_82220CD8` TitleLoad::DebugPage0
+- `sub_82220D60` TitleLoad::DebugPage1
+- `sub_82220DE8` TitleLoad::DebugPage2
+- `sub_82220E70` TitleLoad::DebugPage3
+- `sub_822204F8` TitleLoad::DebugStep0
+- `sub_82220580` TitleLoad::DebugStep1
+- `sub_82220610` TitleLoad::DebugStep2
+- `sub_82220698` TitleLoad::DebugStep3
+- `sub_82220720` TitleLoad::DebugStep4
+- `sub_822207B0` TitleLoad::DebugStep5
+- `sub_82220840` TitleLoad::DebugStep6
+- `sub_822208D0` TitleLoad::DebugStep7
+- `sub_82220960` TitleLoad::DebugStep8
+- `sub_822209F0` TitleLoad::DebugStep9
+- `sub_82220A80` TitleLoad::DebugStep10
+- `sub_82220B10` TitleLoad::DebugStep11
+- `sub_822219E0` TitleScreen::OnControllerPicked
+- `sub_82221A78` TitleScreen::OnInterrupt
+- `sub_82221A90` TitleScreen::OnResume
+- `sub_822224D0` TitleScreen::Unload
+- `sub_82222538` TitleScreen::OpenNext
+- `sub_82222378` TitleScreen::Menu4
+- `sub_82223940` TitleScreen::SetUpMenu4
+- `sub_82222C90` TitleScreen::Transition2
+- `sub_82223C38` TitleScreen::ShowMainMenuAtOnce
+- `sub_82222E88` TitleScreen::MoveMainCursor
+- `sub_82223050` TitleScreen::Transition9
+- `sub_822231B0` TitleScreen::Transition10
+- `sub_82223428` TitleScreen::MoveCareerCursor
+- `sub_82223E58` TitleScreen::BackFromCareer
+- `sub_82223F30` TitleScreen::ShowMenu4
+- `sub_82223FD8` TitleScreen::BackFromMenu4
+- `sub_822235D0` TitleScreen::MoveMenu4Cursor
+
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 
 Not in the attract race or the replay (`itc_4810`, `itc_4811`, ok):
