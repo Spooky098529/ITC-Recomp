@@ -56,7 +56,15 @@ file's history. What's left to see in a drive, from every run:
   screen's at +38560 (`TitleScreen::Init` `sub_82224270`, 17
   transitions, its pages and transition table); `TitleScreen::Update`
   `sub_822221A0` Wrapped (the attract hook); 47 ready groups; no leads,
-  no subagents); map checked. Step: migration agent.
+  no subagents); map checked. Migration 05cef504..216e9843 (86 of 87
+  ours, `--native_title_screen`, `src/title_screen/`; `TitleScreen::Update`
+  Overridden inside the `--attract_after_s` wrap; the two machine Inits'
+  adapters removed; `SetUpAttractRace` `sub_82222038` left recompiled,
+  its harness world not built before the boot's data load; three
+  existing adapters (`BootData::Load`, `Career::NextDay`,
+  `CarDealer::StartFirstRace`) now ask the harness recorder first;
+  race 33 s at 40, 0 errors, its harnesses and the touched files' 0
+  differing; no subagents). Left: none. Step: validation agent.
 
 ## Done
 
@@ -87,5 +95,7 @@ The run's section of `review.md` ("Run 2026-11-11 08:38").
   389, unknown 615).
 - After the title screen's map: ours 5488, work left 1060 (wrapped 56,
   known 442, unknown 562).
+- After its migration: ours 5574, work left 1005 (wrapped 55, known
+  388, unknown 562).
 
 ## Stopped

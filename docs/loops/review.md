@@ -51,6 +51,22 @@ When the user has reviewed a run's section, its heading gets
   `known-data.md`). `sub_82222038` (the attract race's set-up from 6
   picked by `rand() % 6`) is marked "Not seen in play" though attract
   races reach it: missing from the coverage list.
+- The title screen's migration (05cef504..216e9843): 86 of 87 ours
+  under `--native_title_screen`; `SetUpAttractRace` stays recompiled
+  (its harness needs the race data, tables and car specs, absent before
+  the boot's data load). `TitleScreen::Update`'s native body runs
+  inside the existing `--attract_after_s` wrap. Three existing adapters
+  (`BootData::Load` `sub_82106618`, `Career::NextDay` `sub_82116AF0`,
+  `CarDealer::StartFirstRace` `sub_82180CE8`) now check
+  `hooks::StartUpRecorded` first, the `data_load` harness's pattern, so
+  the title screen's harness records those calls instead of running
+  them (`Career::NextDay` looped forever on the harness's save); say if
+  this pattern isn't wanted (the race HUD machine's call, 2026-10-31,
+  was against stand-in recorders in adapters made as hooks). Kept from
+  the originals: `TitleLoad::Update`'s return of its table's eighth
+  entry, `MenuSound::Play`'s r3 into `StartFirstRace`, `MenuList::Init`'s
+  r7 154 and r8 153, the frame doubleword under the `NextMode` and
+  `ForceExit` answers.
 
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 
