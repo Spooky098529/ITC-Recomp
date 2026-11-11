@@ -23,7 +23,7 @@ be left without a car, and starts the first race after it
 what the screen does (the lead guessed the car dealer or the garage
 list); which list is which (the spec's byte +771) isn't known.
 
-The type 2 mode's Init (`sub_82197278`, a lead in `../loops/leads.md`)
+The type 2 mode's Init (`sub_82197278`, [`type2-mode.md`](type2-mode.md))
 allocates a 162,688-byte block at the mode's +848 and sets up 13 screen
 machines in it; this one is at +0x19978, set up by
 `CarDealer::InitStates` (`sub_82185920`) with 23 transitions

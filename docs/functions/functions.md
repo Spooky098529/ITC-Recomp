@@ -678,6 +678,14 @@ Rows not yet moved stay in the table below. So far:
   and the type 5 mode's): the selected garage car's gear ratios and
   setting bytes edited page by page, applied to the garage car, and the
   test run's set-up on routes 8 to 10 (B7; its transitions a lead).
+- [`type2-mode.md`](type2-mode.md): the type 2 front-end mode itself:
+  its Init (the 14 screen machines in its block, the first screen), its
+  delegate functions (the load wait, the next-mode query, a screen's
+  leave, the teardown), its +32 interface and the delegates' slot
+  thunks (B7).
+- [`user-info.md`](user-info.md): the type 2 mode's user info screen
+  (its machine at +0x102D8, opened by message 27, UI movie 10): the
+  player's record, its texts and its way back to the hub (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

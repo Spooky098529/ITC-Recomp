@@ -38,7 +38,7 @@ the screens, other subsystems, not mapped here): `82187160`-`82187618`
 `8218B750`, `8218E8F8`, `8218FCC8`, `821AA560`-`821C6F58` (39, the save
 screens' range, a lead), `821D6AD0`-`821DFD48` (6, `Menu::Step` only,
 beside the tuning screen), `821F9050`-`821FC270` (6), `8220B0D8` (the
-screen at `sub_8220B408`, a lead), `8221E788`, `8221E980`, `8221EAE8`
+screen at `sub_8220B408`, `user-info.md`), `8221E788`, `8221E980`, `8221EAE8`
 (kind 6's in-race screen after the race, a lead), `82222378`,
 `82225D10`, `82225F30`, `82226088`, `82228A90`-`8222CA48` (11, the
 parking area's pages, `location-screen.md`), `82232328`-`82250948`
