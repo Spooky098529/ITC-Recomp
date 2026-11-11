@@ -1068,6 +1068,26 @@ void Wheels(Context& h, Random& r) {
 constexpr uint32_t kTuningScreenBytes = 0x9400;
 constexpr uint32_t kIconMovieBytes = 0xC000;
 
+// The stand's world in `block` (kGarageBytes): the wheels' world, the
+// template car's paint pick (the halfword +0, ApplyDecals'
+// GarageStage::SetCar's) -2 to 5, the garage list walked to it, the stage's
+// models loading and not ready, the garage camera not set up.
+void LayTuningStandBlock(uint8_t* base, uint32_t block, Random& r, int c, bool stand_car) {
+  LayWheelWorld(base, block, r, c, false, stand_car);
+  guest::StoreU16(base, block + kGarageCar, uint16_t(int32_t(r.Below(8)) - 2));
+  LayGarageWalk(base, block, r);
+  const uint32_t scene = block + kCarScene;
+  guest::StoreU32(base, scene + 4, 0);
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t model = block + kModels + 0x1400 * i;
+    guest::StoreU32(base, model + 5028, 1);
+    guest::StoreU32(base, model + 5036, 0);
+    guest::StoreU32(base, model + 5116, scene);
+    guest::StoreU32(base, model + 32, r.Below(4) == 0 ? 3 : r.Below(3));
+  }
+  guest::StoreU32(base, block + kStage + 112, 0);
+}
+
 void TuningStand(Context& h, Random& r) {
   if (!hooks::TuningStandCalleesNative()) {
     ITC_LOG_WARN("harness: car_makers: the tuning screen's stand calls skipped (their callees' "
@@ -1120,21 +1140,7 @@ void TuningStand(Context& h, Random& r) {
   // The world, the screen at random (its save data the world's), the
   // movie's block at random.
   const auto lay = [&](int c, bool stand_car) {
-    LayWheelWorld(h.base, block, r, c, false, stand_car);
-    // The template car's paint pick (the halfword +0, ApplyDecals'
-    // GarageStage::SetCar's) -2 to 5, the garage list walked to it.
-    guest::StoreU16(h.base, block + kGarageCar, uint16_t(int32_t(r.Below(8)) - 2));
-    LayGarageWalk(h.base, block, r);
-    const uint32_t scene = block + kCarScene;
-    guest::StoreU32(h.base, scene + 4, 0);
-    for (uint32_t i = 0; i < 2; i++) {
-      const uint32_t model = block + kModels + 0x1400 * i;
-      guest::StoreU32(h.base, model + 5028, 1);
-      guest::StoreU32(h.base, model + 5036, 0);
-      guest::StoreU32(h.base, model + 5116, scene);
-      guest::StoreU32(h.base, model + 32, r.Below(4) == 0 ? 3 : r.Below(3));
-    }
-    guest::StoreU32(h.base, block + kStage + 112, 0);
+    LayTuningStandBlock(h.base, block, r, c, stand_car);
     screen_inputs.resize(kTuningScreenBytes);
     for (uint32_t i = 0; i < kTuningScreenBytes; i += 4) {
       guest::StoreU32(screen_inputs.data(), i, uint32_t(r.Next()));
@@ -1782,6 +1788,38 @@ void Reloads(Context& h) {
 }
 
 }  // namespace
+
+// --- For TuningScreen::Refresh's cases (src/harnesses/tuning_refresh.cpp):
+// TuningStand's world (above) and SetCarStats' race data. ---
+
+uint32_t TuningStandWorldBytes() { return kGarageBytes; }
+
+uint32_t LayTuningStandWorld(uint8_t* base, uint32_t block, Random& r, int c) {
+  LayTuningStandBlock(base, block, r, c, false);
+  return block + kSaveData;
+}
+
+void PointTuningStandWorld(uint8_t* base, uint32_t block) {
+  guest::StoreU32(base, kScenePointer, block + kCarScene);
+  guest::StoreU32(base, kHolderPointer, block + kHolderWord);
+  guest::StoreU32(base, kSaveDataPointer, block + kSaveData);
+  guest::StoreU32(base, kParamsPointer, block + kGarageParams);
+}
+
+const std::vector<uint32_t>& TuningStandWorldGlobals() {
+  static const std::vector<uint32_t> globals = {kScenePointer, kParamsPointer, kHolderPointer,
+                                                kSaveDataPointer, kRaceDataPointer};
+  return globals;
+}
+
+uint32_t RaceDataBytes() { return kRaceDataBytes; }
+
+void ResetRaceData(uint8_t* base, uint32_t allocation, uint32_t count, uint32_t added) {
+  Fill(base, allocation, kRaceDataBytes, 0);
+  guest::StoreU32(base, allocation + 48 + 0x595E0, count);
+  guest::StoreU32(base, allocation + 48 + 0x595E4, added);
+  guest::StoreU32(base, kRaceDataPointer, allocation);
+}
 
 void CarMakers(Context& h) {
   Random r(0x6361726d616b6572ull);  // "carmaker"

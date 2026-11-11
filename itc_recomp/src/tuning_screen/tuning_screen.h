@@ -478,6 +478,21 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
 uint64_t SetCarStats(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t screen,
                      uint32_t sp, double* f1);
 
+// sub_821E3AD0 TuningScreen::Refresh (refresh.cpp, its pieces in refresh.h):
+// r3 = the screen (all 64 bits). Movie 2 set up for the state +9652: the
+// header (the money, EquipChoice, SetCarStats and sub-scene 18's stats, the
+// price, ShowTireMarks, PickCameraPreset, PreviewItem,
+// GarageStage::SetLightsOn), then the state's page (3 and 4 here; 5 to 8 not
+// ported yet, their adapter's gate runs the original; 15 to 17 SetStateTexts,
+// 23 to 37 RefreshMovie13 for the vinyl, RefreshPaint, RefreshLightKits,
+// RefreshMovie14 and RefreshInterior through the guest). 368-byte frame
+// (movie 2's id, then the weight's conversion at frame + 80; child 12's
+// double at + 48); returns 1, or 0 for the states 10, 12 to 14 and outside 3
+// to 58. `*f1` as RefreshMenu's (the caller applies it before each later
+// guest call and at the end).
+uint64_t Refresh(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                 std::optional<double>* f1);
+
 // sub_821D9F10 TuningScreen::UpdateStand: the screen's per-update calls
 // onto the stand (its row): the bonnet's, the roof's (cars 14 and 15) and
 // the doors' animations opened or closed by the page (the open states at

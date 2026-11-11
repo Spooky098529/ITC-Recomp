@@ -68,7 +68,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_822042D8, DecalCommand sub_822019D0, PreviewItem sub_821E07B0 and RestoreStand "
               "sub_821E0FB0 (their callees never seen in play through the guest), UpdateStand "
               "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag); SetCarStats sub_821DF788 with the "
-              "car makers' and --native_vehicle) natively instead of through the "
+              "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both, its states 5 to 8 not ported "
+              "yet and run by the original) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
 
@@ -509,6 +510,39 @@ void TuningPreviewWheels(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void TuningRefresh(PPCContext& ctx, uint8_t* base) {
+  // The gate for the refresh's split migration (temporary): states 5 to 8
+  // aren't ported yet and run the original; parts 2 to 4 remove it state by
+  // state (5 LEVEL_SELECT, 6 TYPE_SELECT, 7 and 8 the choice and option
+  // pages).
+  const int32_t state = int32_t(guest::LoadU32(base, ctx.r3.u32 + ts::kState));
+  if (state >= 5 && state <= 8) {
+    __imp__sub_821E3AD0(ctx, base);
+    return;
+  }
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  std::optional<double> f1;
+  WithStand(ctx, base, [&](const ts::StandCalls& inner) {
+    // RefreshMenu's f1 wrapper: the f1 the native code left put in f1
+    // before the next guest call.
+    const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
+                                   uint32_t frame, uint32_t lr) {
+      if (f1) {
+        ctx.f1.f64 = *f1;
+        f1.reset();
+      }
+      return inner.call(function, args, frame, lr);
+    };
+    const ts::StandCalls stand{call, inner.calls};
+    return ts::Refresh(base, stand, r3, sp, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original. HideTireMarks sub_821DFB20
@@ -639,4 +673,16 @@ extern "C" REX_FUNC(sub_821DF788) {
     return;
   }
   hooks::TuningSetCarStats(ctx, base);
+}
+
+// Refresh: the original unless its callees onto the stand and SetCarStats'
+// are native (states 5 to 8 still the original: the register step's gate).
+extern "C" REX_FUNC(sub_821E3AD0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningStandCalleesNative() ||
+      !hooks::TuningCarStatsCalleesNative()) {
+    __imp__sub_821E3AD0(ctx, base);
+    return;
+  }
+  hooks::TuningRefresh(ctx, base);
 }

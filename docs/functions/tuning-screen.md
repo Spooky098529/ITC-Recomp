@@ -121,17 +121,20 @@ in that file, labels `loc_821E....`). m = movie 2 throughout
    26), (-1, 19); the help line (below) with string 596 + the category.
 3. State 4, the category's items (8916 to 9389): `SetNodeTexture`(m, 3,
    1, +9716 ? 0 : by the category: item + 8, + 12, 3, + 17, + 20, + 30,
-   + 38; none for 7 and up), (3, 2, the category + 1); while +9716 is 0
-   and the animations 2 (and, for the aero, 1 and 2) aren't playing
-   (`AnimationTime` answering the float at `0x82001BE0`): sub-scene 27's
-   children 5 to 14 hidden and colored 0, then for each of the byte
-   +9676 items (8 rows at most) shown with string 203 + item - +25100 +
-   row and colored 2 when unavailable (aero: the word +25128 + 4 × that
-   index is 0; others always available, r29 = 1); the scroll arrows
-   (children 25 and 26 of the live scene) by the aero's row +25100;
-   `HideNode`(m, -1, 19); the help line by the category: 603, 607, none
-   (2), 612, 637, 645 + the item; aero 615 + the item when available,
-   else 857 (item 9) or 860.
+   + 38; none for 7 and up), (3, 2, the category + 1); while +9716 is 0,
+   for the aero only (the other categories leave after the first
+   `AnimationTime`), once the scene's animations 2, 1 and 2 answer the
+   float at `0x82001BE0` (none playing): sub-scene 27's children 5 to 14
+   hidden and colored 0, then for each of the byte +9676 items (8 rows at
+   most) shown with string 203 + item - +25100 + row (64 bits, unchecked)
+   and colored 2 when unavailable (the word +25128 + 4 × that index is 0;
+   the loop's "always available" path for other categories, r29 = 1, is
+   never taken); the scroll arrows (children 25 and 26 of the live scene)
+   for the aero by d = item - +25100: d 0, 25 shown and 26 hidden; else 25
+   hidden for d 2 (else shown) and 26 shown; other categories both
+   hidden; `HideNode`(m, -1, 19); the help line by the category: 603,
+   607, none (2 and 7 up: the scroll alone), 612, 637, 645 + the item;
+   aero 615 + the item when available, else 857 (item 9) or 860.
 4. State 5, LEVEL_SELECT (9390 to 11557, the largest; a second jump
    table, 8-bit, at `0x8200A8F8` on the level row for the aero's names
    at 10213 to 10229): the textures as state 4 (+9716 0 only); the level
@@ -192,6 +195,19 @@ Calls to `SetText` without arguments leave r7 to r10 as they were: the
 precedent (native callers pass 0, the parking area, 2026-10-30)
 covers them. A 368-byte frame (r22 to r31 by `__savegprlr_22`, f31
 saved: state 4's float).
+
+Found in its migration's part 1 (2026-11-11): the header runs to 8836
+(the switch); its `SetText`(m, 18, 8) sets r10 to the frame's +80 (the
+`stfiwx` address of the weight's conversion, passed as the original sets
+it); the holder for `SetLightsOn` stays in r23 (`0x826D83E0`), which
+`RefreshInterior`'s callee `sub_821E7E48` saves (state 57) without
+`RefreshInterior` setting it. Every state's f1 at the end is the last of
+`SetCarStats`', child 12's double, `SetLightsOn`'s light value (flag 0)
+and state 4's `AnimationTime`s, unless a guest call after them set it
+(`PickCameraPreset`'s `FitSelectedCar` sine, and the tangent of
+`GarageStage::ApplyPreset` when the garage camera is set up, are not
+reported by its plain C++; the light value overwrites them except with
+the headlights' flag 1).
 
 Status:
 

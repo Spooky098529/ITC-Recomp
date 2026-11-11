@@ -290,6 +290,8 @@ const SetupFn kScreenOnly = [](PPCContext&, Random&, const World&) {};
 
 // The movie calls' cases (tuning_screen_pages.cpp).
 void TuningScreenPages(Context& h);
+// TuningScreen::Refresh's cases (tuning_refresh.cpp).
+void TuningRefresh(Context& h);
 
 void TuningScreen(Context& h) {
   World w;
@@ -525,6 +527,7 @@ void TuningScreen(Context& h) {
           handler.saves);
   }
   TuningScreenPages(h);
+  TuningRefresh(h);
 }
 
 }  // namespace harness

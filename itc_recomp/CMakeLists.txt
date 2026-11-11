@@ -426,6 +426,7 @@ set(ITC_SOURCES
     src/tuning_screen/refresh_menu.cpp
     src/tuning_screen/refresh_movie13.cpp
     src/tuning_screen/stats.cpp
+    src/tuning_screen/refresh.cpp
     src/hooks/tuning_pages.cpp
     src/tuning_pages/tables.cpp
     src/tuning_pages/editor.cpp
@@ -746,6 +747,7 @@ set(ITC_SOURCES
     src/harnesses/build_screen.cpp
     src/harnesses/tuning_screen.cpp
     src/harnesses/tuning_screen_pages.cpp
+    src/harnesses/tuning_refresh.cpp
     src/harnesses/tuning_pages.cpp
     src/harnesses/tuning_pages_movie.cpp
     src/harnesses/screen_constructors.cpp
@@ -964,7 +966,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/build_screen/rows.cpp
     src/tuning_screen/garage_car.cpp src/tuning_screen/lists.cpp
     src/tuning_screen/stand.cpp src/tuning_screen/menus.cpp src/tuning_screen/rows.cpp
-    src/tuning_screen/stats.cpp src/tuning_machine/set_up.cpp
+    src/tuning_screen/stats.cpp src/tuning_screen/refresh.cpp src/tuning_machine/set_up.cpp
     src/tuning_machine/prices.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
