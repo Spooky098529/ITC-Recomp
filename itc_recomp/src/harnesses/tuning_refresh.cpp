@@ -1156,6 +1156,22 @@ void TuningRefresh(Context& h) {
           field(36712, r.Below(5));
           field(33616, r.Below(6));
           field(33620, r.Below(6));
+          // StoreToGarageCar's spec indexes as play gives them (from a
+          // generator of their own, the cases' draws kept): the engine
+          // stages +34304 + 4 x the part set 0 to 9 over the world's engine
+          // records (LayTuningStandEngines; SetCarStats' Car::Refresh copies
+          // the spec's record at the stage, unchecked, and a random record's
+          // torque curve count ran Vehicle::SetupFromCar's copy off the
+          // memory, past the stack's top at 0x700D0000, as the refresh's
+          // state 5 did), the tire types +35952 and +36080 0 to 3 (the
+          // spec's 21 tire records by type and grade).
+          Random rs(0x5374616765000000ull + round);  // "Stage"
+          for (uint32_t k = 0; k < 4; k++) {
+            field(34304 + 4 * k, rs.Below(10));
+          }
+          field(35952, rs.Below(4));
+          field(36080, rs.Below(4));
+          LayTuningStandEngines(base, block);
         }
         // r4 the dispatcher (its ring the block's random words), its high
         // word now and then set.

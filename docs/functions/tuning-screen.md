@@ -466,7 +466,18 @@ update's harness group, `Command42`'s words are laid from a generator of
 their own: drawing them from the cases' generator moved the later cases'
 worlds, and one (case 142, command 26, state 5) then read the wild guest
 address 0x70081650 over and over in the original, a fragility of that
-group's world not looked into further.
+group's world not looked into further. In the all-harness race
+(2026-11-11), its case 11 (state 14, the stand put back) read guest
+0x700D0000, the harness thread's stack top, over and over: the restore
+path's `StoreToGarageCar` wrote the screen's random engine stage
+(+34304 + 4 × the part set) into the garage car, `SetCarStats`'
+`Car::Refresh` copied the spec's engine record at that stage
+(unchecked), and its random torque curve count (+1280) ran
+`Vehicle::SetupFromCar`'s copy off the memory, as in the refresh's
+state 5 group; the world only differs by its blocks' addresses between
+runs. The group now lays the engine stages 0 to 9 over the world's
+engine records and the tire types 0 to 3 for the restore path, from a
+generator of their own (seeded by the case).
 
 Status:
 
