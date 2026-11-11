@@ -72,7 +72,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 5: the type 10 mode's Init `sub_82288940` with
   `sub_8228AC48` (ready, 706 lines, seen in play; probably the replay
   theater, its save screen at +9640 already native); its line deleted
-  from `leads.md`. Step: mapping agent.
+  from `leads.md`. Mapped `type10-mode.md` (1375de82: 47 new rows, 25
+  in play: the replay theater, its Init, the vtable `0x82006CF0`'s
+  slots, `ReplayTheater::InitStates` `sub_8228AC48` with UI movie 45
+  and 17 transitions; slot 12 and +32 slot 1 the type 9 mode's,
+  mapped here as shared; 18 ready groups; one lead added, the type 9
+  mode; no subagents); map checked. Step: migration agent.
 
 ## Done
 
@@ -108,5 +113,7 @@ The run's section of `review.md` ("Run 2026-11-11 08:38").
   known 442, unknown 562).
 - After its migration: ours 5574, work left 1005 (wrapped 55, known
   388, unknown 562).
+- After the type 10 mode's map: ours 5574, work left 1005 (wrapped 55,
+  known 413, unknown 537).
 
 ## Stopped

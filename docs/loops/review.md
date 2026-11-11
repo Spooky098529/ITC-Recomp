@@ -67,6 +67,15 @@ When the user has reviewed a run's section, its heading gets
   entry, `MenuSound::Play`'s r3 into `StartFirstRace`, `MenuList::Init`'s
   r7 154 and r8 153, the frame doubleword under the `NextMode` and
   `ForceExit` answers.
+- The type 10 mode's map (1375de82): `type10-mode.md`, 47 new rows (25
+  in play): the replay theater (named by the "TXR_ReplayTheater" string
+  its update passes to an empty function), its Init, slots, and its
+  own machine (`ReplayTheater::InitStates`, UI movie 45); the type 9
+  mode's slot 12 `sub_8225D638` and +32 slot 1 `sub_8225D828` mapped
+  here as shared (`ModeType9::NextModeAnswer`, `ForceExit`);
+  `known-data.md`'s type 10 block and `[0x828161E0]`-`[0x828161E8]`;
+  the save screens' lead names `sub_8228AA58` and `sub_822896C0` as the
+  theater's `Start` and `Leave`; a lead for the type 9 mode.
 
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 
