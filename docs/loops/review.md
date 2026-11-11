@@ -76,6 +76,27 @@ When the user has reviewed a run's section, its heading gets
   noted. Lead corrections: states 38 to 52 go to `sub_821F7A98` (movie
   14's header), 53 to 58 to `sub_821F2AD8` (the interior pages), 9 and
   11 return 1 after the header.
+- The refresh's migration (2bbe3281..dcaee620): `TuningScreen::Refresh`
+  and `TuningMachine::Start` Overridden, 15 adapters removed (13 tuning
+  screen helpers, `SetUp`, `SavePlaceholders`: Native). Followed:
+  `SetText`/`SetNodeText` unset varargs as 0 (2026-10-30); register
+  leftovers the refresh sets itself passed as it leaves them (header
+  `SetText(m, 18, 8)` r10 = frame + 80, state 5's rows r10 = +25100 and
+  r6, the bonnet's r10, the door's r6 = 31); the double through r7, f1
+  and the frame's +48. Left recompiled: `sub_821F2110`, `sub_821F2378`,
+  `sub_821F2AD8`, `sub_821F7A98`, `sub_821E7DA0` (never seen in play).
+  For the user's call: an inherited f1 gap, `PickCameraPreset`'s and
+  `GarageStage::Command`'s plain C++ don't report the f1 their originals
+  leave (a sine, a tangent, 60.0), so f1 after the refresh can differ in
+  states 9 to 11 with the headlights and state 8's door path; nothing
+  is known to read it. New: the native refresh and Start also require
+  `--native_car_specs` (plain C++ `GetCarParts`, `AeroPart77`, `82`).
+  Harness: levels, types and options kept in the world's ranges
+  (`SetCarStats` indexes the spec unchecked); sub-scenes 28 to 33 real
+  distinct nodes; the stand models' +5060 laid (dcaee620; it passed only
+  on leftover bytes); recompiled callees' saves and parameter areas left
+  out of the comparisons (found by logging). Map corrections in the
+  refresh's intro.
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 

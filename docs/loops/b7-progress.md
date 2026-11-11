@@ -64,8 +64,14 @@ file's history. What's left to see in a drive, from every run:
   `tuning-screen.md` (cbff27b9: 8 rows, 1 in play, the refresh; its
   blocks by line range in the intro's "The refresh"; its 7 callees not
   seen in play; no leads, no subagents); map checked. Step: migration
-  agent running (with `TuningMachine::Start` `sub_821E7368` once the
-  refresh is ours).
+  agent's migration: the refresh in four parts 2bbe3281..6ea90a0e,
+  recorded 0193bf93 (Overridden, under `--native_tuning_screen`; now
+  also needs `--native_car_specs`), `TuningMachine::Start` 026624e3
+  (under `--native_tuning_machine`), adapters removed fb788415,
+  f2271108 (15 Native), a harness gap fixed dcaee620; races 29-38 s at
+  40, 0 errors, its harnesses 0 differing; 5 subagents, one at a time.
+  Left: none (the tuning screen's update `sub_821E6C50` now ready, its
+  lead in `leads.md`). Step: validation agent running.
 
 ## Done
 
@@ -106,6 +112,8 @@ The run's section of `review.md` ("Run 2026-11-10 23:52").
   390, unknown 619).
 - After the refresh's map: ours 5443, work left 1065 (wrapped 56,
   known 391, unknown 618).
+- After its migration: ours 5445, work left 1063 (wrapped 56, known
+  389, unknown 618).
 
 ## Stopped
 
