@@ -286,7 +286,11 @@ goes in `src/` as overrides), American English.
   validation) made the car settings screen (`car-settings.md`, 7 of 7
   in play: the type 2 mode's +0x173D0 machine) native (ours 5,402 ->
   5,409); the all-harness race found `GarageScreen::Transition6`'s
-  harness (the forty-first run's) differing in 2 of 100 cases. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  harness (the forty-first run's) differing in 2 of 100 cases (a
+  harness index out of play's range, fixed, f691a91e, the user's call),
+  then went on: the type 2 mode and its user info screen
+  (`type2-mode.md`, 20 of 21; `user-info.md`, 14 of 14; ours 5,443).
+  The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2836,6 +2840,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-09 | The tuning screen's machine (the type 2 mode's +19792: its Init, creation, UI movies 2, 13 and 14, `TuningScreen::SetUp` from the garage car with the part tables' loaders and prices, the dialog's replies, unload, close and teardown; not `Start`, which waits on the refresh `sub_821E3AD0`) | `tuning-machine.md` | 18 of 19 in play (one migration, `SetUp` split over five parts; 5 adapters removed, 3 Native without one) | `--native_tuning_machine` |
 | 2026-11-10 | The type 2 mode's race menu (its machine at the mode's +9640: the race mode, event and variant pages, the confirm, the event's start) | `race-menu.md` | 38 of 38 (one migration, 7 subagents; 21 Native, 3 Merged); validation halted on its harness, fixed (4438f1c3) and validated again | `--native_race_menu` |
 | 2026-11-11 | The car settings screen (the type 2 mode's +0x173D0 machine, UI movie 3, also set up by the type 5 mode: the garage car's gear ratios and settings, a test run; only its Inits and five handlers seen in play) | `car-settings.md` | 7 of 7 in play (one migration; no adapter removable: functors and recompiled callers); 84 never seen in play stay recompiled | `--native_car_settings` |
+| 2026-11-11 | The type 2 mode (its Init over the 14 machines' Inits, its vtable's delegates and slot thunks, `Interrupt`, `ForceExit`) and its user info screen (the player's record, UI movie 10, at the mode's block +0x102D8) | `type2-mode.md`, `user-info.md` | 20 of 21 and 14 of 14 (one migration; no adapter removable) | `--native_type2_mode`, `--native_user_info` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5121,3 +5126,19 @@ harness differing in 2 of 100 cases, so the run halted. The boundary:
 called 70, live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 5,409, work left 1,095 (Wrapped 56, with a row
 390, no row yet 649), from 1,102.
+
+**2026-11-11, the type 2 mode and its user info screen (branch
+`b7-loop-10-11-26-2`, the forty-third run, after its halt was fixed):**
+the garage screen harness's action list kept to its 5 actions
+(f691a91e: `Transition6` read text from random ids in the all-harness
+race). `type2-mode.md` (21 rows, `--native_type2_mode`,
+`src/type2_mode/`): the mode's Init `sub_82197278` (by step tables,
+calling the 14 machines' Inits through their adapters), the vtable
+`0x82006B9C`'s delegates and slot thunks, `Interrupt`, `ForceExit`;
+`Resume` a jump into the hub's recompiled `sub_8218DE18`.
+`user-info.md` (14 rows, `--native_user_info`, `src/user_info/`): the
+user info screen (UI movie 10, the player's record). The replay ran 16
+of them. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,443, work left 1,065
+(Wrapped 56, with a row 390, no row yet 619), from 1,095.

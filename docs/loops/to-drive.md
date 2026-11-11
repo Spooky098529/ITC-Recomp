@@ -23,6 +23,22 @@ Not in the attract race or the replay (`itc_4810`, `itc_4811`, ok):
 - `sub_821B7878` CarSettings::InitType5 (`car-settings.md`; the type 5
   mode, the parking area's)
 
+Not in the attract race or the replay (`itc_4825`, `itc_4826`, ok):
+
+- `sub_8220AB60` UserInfo::Reenter (`user-info.md`)
+- `sub_8220B260` UserInfo::UpdatePage (`user-info.md`)
+- `sub_8220B2C0` UserInfo::Update (`user-info.md`)
+- `sub_8220B0D8` UserInfo::MenuPage (`user-info.md`)
+- `sub_8220AFC0` UserInfo::SetPlayTimeText (`user-info.md`)
+- `sub_8220B1C8` UserInfo::Opening (`user-info.md`)
+- `sub_8220AD08` UserInfo::SetTexts (`user-info.md`)
+- `sub_8220AC60` UserInfo::Closing (`user-info.md`)
+- `sub_82197A30` ModeType2::Restart (`type2-mode.md`)
+- `sub_82198008` ModeType2::Leaving (`type2-mode.md`)
+- `sub_82197858` ModeType2::Interrupt (`type2-mode.md`)
+- `sub_82197930` ModeType2::ForceExit (`type2-mode.md`)
+- `sub_8222FC80` Mode::Slot13Thunk (`type2-mode.md`)
+
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 
 - The race menu (`race-menu.md`; attract race `itc_4804` never raced:

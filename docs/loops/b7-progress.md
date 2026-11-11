@@ -53,13 +53,26 @@ file's history. What's left to see in a drive, from every run:
   `--native_type2_mode`; `Resume` a jump into the hub's recompiled
   `sub_8218DE18`); race 37 s at 40, 0 errors, their harnesses and
   `type67_modes`' 0 differing outside its recorded group; no
-  subagents. Left: none. Step: validation agent running.
+  subagents. Left: none. Validated: `itc_4825` (race 64 s at 180, the
+  harnesses ~114.5 s, 0 errors, every harness 0 differing outside the
+  expected groups), 33 of 33 harness lines, no prints added; 4 ran in
+  the race, 16 more in the replay `itc_4826` (ok), 13 to drive.
+  Recorded.
+- Subsystem 3 of 3: the tuning screen's refresh `sub_821E3AD0` (3,838
+  lines, seen in play, ready; it blocks `TuningMachine::Start`) and its
+  callees; its line deleted from `leads.md`. Step: mapping agent
+  running.
 
 ## Done
 
+- The type 2 mode and its user info screen: `type2-mode.md` 20 of 21,
+  `user-info.md` 14 of 14, `--native_type2_mode`, `--native_user_info`,
+  fd78a046, 5c818857; validated.
+
 - The car settings screen: `car-settings.md`, 7 of 7 in play (all
   Overridden), `--native_car_settings`, 42211c94..73886334; its
-  validation halted on another subsystem's harness.
+  validation halted on another subsystem's harness, fixed (f691a91e)
+  and validated again.
 
 ## Rows to review
 
