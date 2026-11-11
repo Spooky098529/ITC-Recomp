@@ -319,5 +319,6 @@ void RaceMenu(Context& h);
 void CarSettings(Context& h);
 void UserInfo(Context& h);
 void Type2Mode(Context& h);
+void TitleScreen(Context& h);
 
 }  // namespace harness

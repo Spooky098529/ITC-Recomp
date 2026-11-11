@@ -508,6 +508,9 @@ set(ITC_SOURCES
     src/type2_mode/block.cpp
     src/type2_mode/delegates.cpp
     src/type2_mode/init.cpp
+    src/hooks/title_screen_native.cpp
+    src/title_screen/title_load.cpp
+    src/title_screen/init.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp
@@ -771,6 +774,7 @@ set(ITC_SOURCES
     src/harnesses/race_menu.cpp
     src/harnesses/car_settings.cpp
     src/harnesses/user_info.cpp
+    src/harnesses/title_screen.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
