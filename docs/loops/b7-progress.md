@@ -49,7 +49,14 @@ file's history. What's left to see in a drive, from every run:
   `sub_82221AC0`: ready, seen in play at every boot) with the
   front-end machine's set-up beside it (`sub_822213B0`, `sub_82220C88`,
   probably the boot or title screen); both leads' lines deleted from
-  `leads.md`. Step: mapping agent.
+  `leads.md`. Mapped `title-screen.md` (de062dec: 87 rows, 2 moved
+  from `functions.md`, 55 in play: the type 4 mode, its Init
+  `sub_82224C70` and Release, the title load machine at +28920
+  (`TitleLoad::Init` `sub_822213B0`, 12 transitions) and the title
+  screen's at +38560 (`TitleScreen::Init` `sub_82224270`, 17
+  transitions, its pages and transition table); `TitleScreen::Update`
+  `sub_822221A0` Wrapped (the attract hook); 47 ready groups; no leads,
+  no subagents); map checked. Step: migration agent.
 
 ## Done
 
@@ -78,5 +85,7 @@ The run's section of `review.md` ("Run 2026-11-11 08:38").
   known 392, unknown 615).
 - After its migration: ours 5488, work left 1060 (wrapped 56, known
   389, unknown 615).
+- After the title screen's map: ours 5488, work left 1060 (wrapped 56,
+  known 442, unknown 562).
 
 ## Stopped

@@ -41,6 +41,17 @@ When the user has reviewed a run's section, its heading gets
   range from their own generator), validated again (`itc_4926`). The
   user's call to find, fix and go on is now under "Precedent first".
 
+- The title screen's map (de062dec): `title-screen.md`, 87 rows (the
+  type 4 mode, its title load and title screen machines; `sub_822221A0`
+  `TitleScreen::Update` and `sub_8209F6B8`, now `Players::AssignController`
+  (probably), moved from `functions.md`), `known-data.md`'s four title
+  blocks and `0x826364EC`. A correction: at 600 idle ticks the title
+  object's +4 becomes 8 and the page object `[0x82814E2C]` goes to page
+  5 (the old text said +4 became 5; fixed in `../title-screen.md` and
+  `known-data.md`). `sub_82222038` (the attract race's set-up from 6
+  picked by `rand() % 6`) is marked "Not seen in play" though attract
+  races reach it: missing from the coverage list.
+
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 
 - The car settings' map (98f0843b): `car-settings.md`, 91 new rows (7
