@@ -534,6 +534,27 @@ void TuningRefresh(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void TuningWithRefreshStand(
+    PPCContext& ctx, uint8_t* base, std::optional<double>* f1,
+    const std::function<uint64_t(const ts::StandCalls&)>& body) {
+  WithStand(ctx, base, [&](const ts::StandCalls& inner) {
+    const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
+                                   uint32_t frame, uint32_t lr) {
+      if (*f1) {
+        ctx.f1.f64 = **f1;
+        f1->reset();
+      }
+      return inner.call(function, args, frame, lr);
+    };
+    const ts::StandCalls stand{call, inner.calls};
+    return body(stand);
+  });
+  if (*f1) {
+    ctx.f1.f64 = **f1;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original. HideTireMarks sub_821DFB20

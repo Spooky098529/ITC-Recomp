@@ -527,6 +527,7 @@ set(ITC_SOURCES
     src/tuning_machine/owned_parts.cpp
     src/tuning_machine/prices.cpp
     src/tuning_machine/unlocked_parts.cpp
+    src/tuning_machine/start.cpp
     src/hooks/race_menu.cpp
     src/race_menu/handlers.cpp
     src/race_menu/init.cpp
@@ -973,6 +974,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/tuning_screen/refresh_level.cpp src/tuning_screen/refresh_type.cpp
     src/tuning_screen/refresh_choice.cpp
     src/tuning_machine/set_up.cpp
+    src/tuning_machine/start.cpp
     src/tuning_machine/prices.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)

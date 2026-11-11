@@ -5,9 +5,14 @@
 #include "hooks/tuning_machine.h"
 
 #include "base/flags.h"
+#include "hooks/tuning_screen.h"
 #include "tuning_machine/tuning_machine.h"
+#include "tuning_screen/tuning_screen.h"
+
+#include <optional>
 
 ITC_FLAG_DECLARE(bool, native_car_specs);
+ITC_FLAG_DECLARE(bool, native_tuning_screen);
 
 ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "Run the type 2 mode's tuning screen machine (docs/functions/tuning-machine.md: "
@@ -29,7 +34,11 @@ ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "LoadUnlockedParts sub_821CFFC8; TuningScreen::SetUp sub_821E1B48 (its five callees "
               "and SetAeroAvailability by their plain C++, Params::GetCarParts and CountBodyKits "
               "by theirs under --native_car_specs, Car::Init, memcpy and Car::Refresh through "
-              "their overrides) (checked by --run_harnesses=tuning_machine)");
+              "their overrides); TuningMachine::Start sub_821E7368 (with --native_tuning_screen, the "
+              "tuning screen's stand and car stats callees and --native_car_specs: SaveData::Of, "
+              "TuningScreen::SetUpCarData, PowerCurve::FromEngine and ShiftPeak, SavePlaceholders, "
+              "SetUp, UiMovies::Find, UiMovie::ResetPose, TuningScreen::Refresh and "
+              "ScreenFades::FadeIn by their plain C++) (checked by --run_harnesses=tuning_machine)");
 
 namespace hooks {
 
@@ -43,7 +52,8 @@ namespace tm = tuning_machine;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(PPCContext& ctx, uint8_t* base, std::optional<double>* pending = nullptr)
+      : ctx_(ctx), base_(base), lr_(ctx.lr), pending_(pending) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -65,6 +75,11 @@ class GuestCalls {
     ctx.r8.u64 = args[5];
     ctx.r9.u64 = args[6];
     ctx.r10.u64 = args[7];
+    // A native callee's f1 not yet in f1 (Start's) put there first.
+    if (self.pending_ != nullptr && *self.pending_) {
+      ctx.f1.f64 = **self.pending_;
+      self.pending_->reset();
+    }
     if (f1 != nullptr) {
       ctx.f1.f64 = *f1;
     }
@@ -78,6 +93,7 @@ class GuestCalls {
   PPCContext& ctx_;
   uint8_t* base_;
   uint64_t lr_;
+  std::optional<double>* pending_;
 };
 
 }  // namespace
@@ -174,6 +190,29 @@ void TuningMachineSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = out;
 }
 
+bool TuningMachineStartNative() {
+  return ITC_FLAG(native_tuning_screen) && TuningStandCalleesNative() &&
+         TuningCarStatsCalleesNative() && ITC_FLAG(native_car_specs);
+}
+
+// The callees' float math as the originals' (no flush to zero); the
+// refresh's f1 (and the car data's before it) put in f1 before the next guest
+// call and at the end; lr put back.
+void TuningMachineStart(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t r3 = ctx.r3.u64, r1 = ctx.r1.u64;
+  std::optional<double> f1;
+  uint64_t out = 0;
+  {
+    GuestCalls guest(ctx, base, &f1);
+    const tm::Calls calls = guest.calls();
+    TuningWithRefreshStand(ctx, base, &f1, [&](const tuning_screen::StandCalls& stand) {
+      return out = tm::Start(base, stand, calls, r3, r1, &f1);
+    });
+  }
+  ctx.r3.u64 = out;
+}
+
 }  // namespace hooks
 
 #define ITC_TUNING_MACHINE(address, step)    \
@@ -202,7 +241,8 @@ ITC_TUNING_MACHINE(821CBD40, TuningMachineDestroy)
 // Create's helpers ZeroRecord16 sub_821FE540 and DecalImages::Reset
 // sub_821FE590 have no adapters: Create, their only caller, calls their
 // plain C++ (their register steps are the harness's).
-// SavePlaceholders (from Start sub_821E7368, recompiled); SavePlaceholders14
+// SavePlaceholders (from Start sub_821E7368 where Start runs the original);
+// SavePlaceholders14
 // has no adapter: SavePlaceholders, its only caller, calls its plain C++.
 ITC_TUNING_MACHINE(82208130, TuningMachineSavePlaceholders)
 // Init (from the type 2 mode's Init sub_82197278, recompiled).
@@ -212,5 +252,16 @@ ITC_TUNING_MACHINE(821E7568, TuningMachineInit)
 // LoadUnlockedParts sub_821CFFC8: no adapters (removed, B7 loop, 2026-11-09:
 // their only caller, SetUp, is native and calls their plain C++; the register
 // steps above are the harness's).
-// TuningScreen::SetUp (from Start sub_821E7368, recompiled).
+// TuningScreen::SetUp (from Start sub_821E7368 where Start runs the
+// original).
 ITC_TUNING_MACHINE(821E1B48, TuningMachineSetUp)
+// Start (a functor the machine calls): the original unless its native
+// callees' conditions hold (TuningMachineStartNative).
+extern "C" REX_FUNC(sub_821E7368) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_tuning_machine) || !hooks::TuningMachineStartNative()) {
+    __imp__sub_821E7368(ctx, base);
+    return;
+  }
+  hooks::TuningMachineStart(ctx, base);
+}

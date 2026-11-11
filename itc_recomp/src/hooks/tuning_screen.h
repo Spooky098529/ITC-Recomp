@@ -7,6 +7,13 @@
 
 #include "guest.h"
 
+#include <functional>
+#include <optional>
+
+namespace tuning_screen {
+struct StandCalls;
+}  // namespace tuning_screen
+
 namespace hooks {
 
 // The part tables: r3 = the screen. TuningScreen::CategoryItemCount
@@ -137,6 +144,13 @@ void TuningSetCarStats(PPCContext& ctx, uint8_t* base);
 // TuningCarStatsCalleesNative (and --native_car_specs, its adapter's check):
 // every state natively.
 void TuningRefresh(PPCContext& ctx, uint8_t* base);
+// The refresh's guest calls for a native caller (TuningMachine::Start):
+// `body` run with the stand's calls (as TuningRefresh's), the pending `*f1`
+// put in f1 before each guest call through `call` (and at the end); lr put
+// back, flush-to-zero off, ctx.r3 the body's.
+void TuningWithRefreshStand(
+    PPCContext& ctx, uint8_t* base, std::optional<double>* f1,
+    const std::function<uint64_t(const tuning_screen::StandCalls&)>& body);
 // UpdateStand sub_821D9F10 (r3 the screen; r3 GarageStage::Draw's), only
 // with TuningUpdateStandCalleesNative: TuningStandCalleesNative,
 // FrontEndCarDrawDrawNative, --native_vehicle_accessors and

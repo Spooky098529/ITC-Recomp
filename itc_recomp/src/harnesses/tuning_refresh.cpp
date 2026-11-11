@@ -349,6 +349,13 @@ void ShapeChoiceList(uint8_t* base, uint32_t screen, uint32_t category, uint32_t
 
 }  // namespace
 
+// For TuningMachine::Start's cases (tuning_machine.cpp): the sub-scenes'
+// block and LaySubScenes.
+uint32_t RefreshSubScenesBytes() { return kSubScenesBytes; }
+void LayRefreshSubScenes(uint8_t* base, uint32_t block, uint32_t movie, Random& r) {
+  LaySubScenes(base, block, movie, r);
+}
+
 void TuningRefresh(Context& h) {
   if (!hooks::TuningStandCalleesNative() || !hooks::TuningCarStatsCalleesNative() ||
       !ITC_FLAG(native_car_specs)) {

@@ -21,8 +21,10 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 #include "race_hud_object/race_hud_object.h"
+#include "tuning_screen/tuning_screen.h"
 
 namespace tuning_machine {
 
@@ -207,5 +209,24 @@ void LoadUnlockedParts(uint8_t* base, uint32_t screen);
 // given.
 constexpr uint32_t kSetUpFrame = 4128;
 uint64_t SetUp(uint8_t* base, uint64_t r3, uint64_t r1, bool native_specs, const Calls& calls);
+
+// --- The screen's start (start.cpp) ---
+//
+// sub_821E7368 TuningMachine::Start ((4, 1) -> 5; r3 the screen, all 64
+// bits): the screen's words reset (its row), +18904 = SaveData::Of(0),
+// TuningScreen::SetUpCarData (`stand.calls`), a power curve on the frame
+// (+96: FromEngine on +20180, ShiftPeak 0), the stats +20768 to +20780,
+// DecalImages::SavePlaceholders, TuningScreen::SetUp (its guest calls
+// through `calls`; the car specs' plain C++), the busy icon's words, movie
+// 2's pose reset (UiMovies::Find's key 2 at the frame's +80), the refresh
+// in state 3 (`stand`; `*f1` its way: the caller puts it in f1 before each
+// later guest call and at the end), the command queue and the category menu
+// set up, command 0 queued, ScreenFades::FadeIn([0x82001BEC], black, layer
+// 0). 1,216-byte frame (the back chain and the curve written; its register
+// saves, r28 on, aren't). `r1` the caller's (all 64 bits). r3 FadeIn's (the
+// passes); `*f1` set to the car data's f1, then as the refresh leaves it.
+constexpr uint32_t kStartFrame = 1216;
+uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Calls& calls,
+               uint64_t r3, uint64_t r1, std::optional<double>* f1);
 
 }  // namespace tuning_machine

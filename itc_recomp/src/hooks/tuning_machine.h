@@ -38,5 +38,12 @@ void TuningMachineSetPrices(PPCContext& ctx, uint8_t* base);
 void TuningMachineLoadUnlockedParts(PPCContext& ctx, uint8_t* base);
 // The screen's set-up (r3 the screen).
 void TuningMachineSetUp(PPCContext& ctx, uint8_t* base);
+// Start (r3 the screen; r3 FadeIn's, f1 as the refresh leaves it), with
+// TuningMachineStartNative: --native_tuning_screen, the tuning screen's stand
+// and car stats callees (TuningStandCalleesNative,
+// TuningCarStatsCalleesNative) and --native_car_specs, the refresh's
+// conditions.
+bool TuningMachineStartNative();
+void TuningMachineStart(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

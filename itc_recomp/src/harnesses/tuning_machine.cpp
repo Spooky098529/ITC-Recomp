@@ -29,7 +29,9 @@
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "hooks/tuning_machine.h"
+#include "hooks/tuning_screen.h"
 #include "memory/heap.h"
+#include "mode_tick/mode_tick.h"
 #include "save_data/save_data.h"
 #include "tuning_machine/tuning_machine.h"
 #include "tuning_screen/tuning_screen.h"
@@ -45,6 +47,26 @@
 ITC_FLAG_DECLARE(bool, native_tuning_machine);
 
 namespace harness {
+
+// TuningMachine::Start's world (StartCases, below): the stand's
+// (car_makers.cpp), the text movie's (tuning_screen_pages.cpp) and the
+// refresh's sub-scenes (tuning_refresh.cpp), as the refresh's harness lays
+// them.
+uint32_t TuningStandWorldBytes();
+uint32_t LayTuningStandWorld(uint8_t* base, uint32_t block, Random& r, int c);
+void PointTuningStandWorld(uint8_t* base, uint32_t block);
+void LayTuningStandTires(uint8_t* base, uint32_t block, Random& r);
+void LayTuningStandEngines(uint8_t* base, uint32_t block);
+const std::vector<uint32_t>& TuningStandWorldGlobals();
+uint32_t RaceDataBytes();
+void ResetRaceData(uint8_t* base, uint32_t allocation, uint32_t count, uint32_t added);
+uint32_t LayTextMovie(uint8_t* base, uint32_t block, Random& r);
+void MakeTextStrings(uint8_t* base, uint32_t strings);
+const std::vector<std::pair<uint32_t, uint32_t>>& TextMovieGlobals();
+void PointTextMovieGlobals(uint8_t* base, uint32_t block, uint32_t strings);
+void TextMovieRecords(uint8_t* base, uint32_t movie, Outputs& out);
+uint32_t RefreshSubScenesBytes();
+void LayRefreshSubScenes(uint8_t* base, uint32_t block, uint32_t movie, Random& r);
 
 namespace {
 
@@ -845,6 +867,282 @@ void DialogNo(Context& h, const World& w) {
              }});
 }
 
+// TuningMachine::Start (its callees all native: SetUpCarData, the power
+// curve, SavePlaceholders, SetUp, UiMovies::Find, ResetPose, the refresh in
+// state 3, FadeIn) in the refresh harness's world (tuning_refresh.cpp): the
+// stand's (its save data the screen's and SaveData::Of(0)'s, its garage
+// car the selected one, the car specs' parameters, the holder; the race
+// data SetCarStats' FromGarageCar adds the car to), the text movie (ids 2
+// and 13; 14 the missing movie, the same) with the sub-scenes 28 to 33, a
+// misc block for the movie's +28 table (SavePlaceholders' and
+// SavePlaceholders14's slots 700, 724, 636 and 640 pointing at random
+// words; its file scene the live one) and the screen's command queue and category menu (Create's
+// blocks), the screen at random but for the fields the callees read
+// unchecked (the refresh harness's shaping; the save's career pick shaped
+// as the refresh's name record, its day and money; the selected garage
+// car's mirror index and sticker words in LoadCurrentChoices' table
+// ranges, as ShapeSave). The callees run as their adapters run them on both
+// sides. Compared: the text records, the globals (the fades' too), the
+// blocks, the race data, the stack below r1 but Start's register saves (r28
+// to r31 and lr, the top 40 bytes: the native one doesn't write them), the
+// caller's area, r1, all of r3, lr and f1 (as a double); the torque shown
+// (+20780) as a float.
+void StartCases(Context& h) {
+  if (!hooks::TuningMachineStartNative() || !ITC_FLAG(native_tuning_machine)) {
+    ITC_LOG_WARN("harness: tuning_machine: TuningMachine::Start skipped (its callees' plain "
+                 "C++ isn't native)");
+    return;
+  }
+  uint8_t* const base = h.base;
+  constexpr uint32_t kStartScreenBytes = 0x9400;
+  constexpr uint32_t kStartMiscBytes = 0x1000;
+  constexpr uint32_t kTextBytes = 0x16000;
+  constexpr uint32_t kStringsBytes = 0x9000;
+  constexpr uint32_t kQueueAt = 0xE00;  // in the misc block: the queue (28 bytes)
+  constexpr uint32_t kMenuAt = 0xE40;   // and the category menu (68 bytes)
+  constexpr uint32_t kStartStack = 0x8000;
+  constexpr uint32_t kStartCaller = 256;
+  constexpr uint32_t kStartSaves = 40;
+  // The stage's light points (the scene models' +5060, SetLightsOn's
+  // LightValue reads the float at +176 + 27664); the stand world's models at
+  // its block's +0x12000, 0x1400 apart (car_makers.cpp's kModels).
+  constexpr uint32_t kPointsBytes = 0x7000;
+  constexpr uint32_t kLightValueAt = 176 + 27664;
+  constexpr uint32_t kStandModels = 0x12000;
+  constexpr uint32_t kFades = mode_tick::kFadeOutDurations;  // to kFadeOutCounts + 8
+  constexpr uint32_t kFadesBytes = mode_tick::kFadeOutCounts + 8 - mode_tick::kFadeOutDurations;
+  const uint32_t stand_bytes = TuningStandWorldBytes();
+  const uint32_t sub_bytes = RefreshSubScenesBytes();
+  const uint32_t stand_allocation = memory::Alloc(stand_bytes + 16, 0);
+  const uint32_t text_allocation = memory::Alloc(kTextBytes + 16, 0);
+  const uint32_t screen = memory::Alloc(kStartScreenBytes, 0);
+  const uint32_t misc = memory::Alloc(kStartMiscBytes, 0);
+  const uint32_t strings = memory::Alloc(kStringsBytes, 0);
+  const uint32_t race = memory::Alloc(RaceDataBytes(), 0);
+  const uint32_t sub_scenes = memory::Alloc(sub_bytes, 0);
+  const uint32_t points = memory::Alloc(kPointsBytes, 0);
+  const uint32_t allocations[] = {stand_allocation, text_allocation, screen, misc,
+                                  strings,          race,            sub_scenes, points};
+  bool ok = true;
+  for (const uint32_t a : allocations) {
+    ok = ok && a != 0;
+  }
+  if (!ok) {
+    ITC_LOG_ERROR("harness: tuning_machine: no memory for TuningMachine::Start's world");
+    for (const uint32_t a : allocations) {
+      if (a != 0) {
+        memory::Free(a);
+      }
+    }
+    return;
+  }
+  const uint32_t block = (stand_allocation + 15) & ~15u;
+  const uint32_t text = (text_allocation + 15) & ~15u;
+  MakeTextStrings(base, strings);
+
+  std::vector<std::pair<uint32_t, uint32_t>> globals = TextMovieGlobals();
+  for (const uint32_t g : TuningStandWorldGlobals()) {
+    globals.push_back({g, 4});
+  }
+  globals.push_back({kFades, kFadesBytes});
+  std::vector<std::vector<uint8_t>> saved;
+  for (const auto& [address, bytes] : globals) {
+    saved.push_back(Read(base, address, bytes));
+  }
+
+  struct Region {
+    uint32_t address;
+    uint32_t bytes;
+    std::vector<uint8_t> inputs;
+  };
+  constexpr uint32_t kItemCounts[7] = {4, 5, 1, 3, 10, 8, 4};
+  const auto small = [](Random& r, uint32_t below) {
+    return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(below);
+  };
+
+  Random r(0x5374617274000000ull);  // "Start"
+  Results results("TuningMachine::Start (sub_821E7368)");
+  constexpr int kCases = 40;
+  for (int c = 0; c < kCases; c++) {
+    // The stand's world, its save data the screen's.
+    const uint32_t save = LayTuningStandWorld(base, block, r, c);
+    PointTuningStandWorld(base, block);
+    if (r.Below(2) == 0) {
+      LayTuningStandTires(base, block, r);
+    }
+    LayTuningStandEngines(base, block);
+    // The models' light points (the stand world leaves +5060 as the block
+    // held it: 0 in a fresh block, a read of guest 0x6CC0).
+    for (uint32_t i = 0; i < 2; i++) {
+      guest::StoreU32(base, block + kStandModels + 0x1400 * i + 5060, points);
+    }
+    guest::StoreFloat(base, points + kLightValueAt, float(r.Below(1000)) / 64.0f);
+    for (uint32_t i = 0; i < kStartScreenBytes; i += 4) {
+      guest::StoreU32(base, screen + i, uint32_t(r.Next()));
+    }
+    const auto field = [&](uint32_t at, uint32_t value) {
+      guest::StoreU32(base, screen + at, value);
+    };
+    const auto byte = [&](uint32_t at, uint32_t value) {
+      guest::StoreU8(base, screen + at, uint8_t(value));
+    };
+    field(tuning_screen::kSaveData, save);
+    field(tuning_screen::kState, r.Below(64));
+    // The item for the category Start sets (0, power): in its range mostly,
+    // now and then any byte (as the refresh harness's state 3 cases).
+    byte(tuning_screen::kItem, r.Below(10) == 0 ? r.Below(256) : r.Below(kItemCounts[0]));
+    byte(tuning_screen::kLevel, r.Below(4) == 0 ? r.Below(256) : r.Below(8));
+    byte(tuning_screen::kType, r.Below(4) == 0 ? r.Below(256) : r.Below(6));
+    byte(tuning_screen::kType2, r.Below(6) == 0 ? r.Below(256) : r.Below(3));
+    byte(tuning_screen::kOption, r.Below(6) == 0 ? r.Below(256) : r.Below(3));
+    byte(9676, r.Below(6) == 0 ? r.Below(13) : r.Below(11));
+    for (uint32_t k = 0; k < 280; k++) {
+      field(25128 + 4 * k, r.Below(3) == 0 ? 0 : (r.Below(2) == 0 ? 1 : uint32_t(r.Next())));
+    }
+    // PreviewItem's tables and PickCameraPreset's picks (as the refresh's
+    // cases; +25072 Start's own).
+    const auto choice_word = [&] {
+      return r.Below(4) == 0 ? 0xFFFFFFFFu : 10 * r.Below(10) + r.Below(6);
+    };
+    field(33812, choice_word());
+    field(33816, choice_word());
+    field(33548, r.Below(6));
+    field(33556, r.Below(6));
+    field(30492, small(r, 5));
+    field(30724, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    field(25196, small(r, 4));
+    // The command queue and the category menu (Create's blocks) in the misc
+    // block, random words.
+    for (uint32_t i = 0; i < kStartMiscBytes; i += 4) {
+      guest::StoreU32(base, misc + i, 0);
+    }
+    for (uint32_t i = 0x800; i < 0x900; i += 4) {
+      guest::StoreU32(base, misc + i, uint32_t(r.Next()));
+    }
+    for (uint32_t i = kQueueAt; i < kMenuAt + 68; i += 4) {
+      guest::StoreU32(base, misc + i, uint32_t(r.Next()));
+    }
+    field(tuning_machine::kQueue, misc + kQueueAt);
+    field(tuning_machine::kMenu, misc + kMenuAt);
+    // The save: the career's pick (SetUp copies it to the name record
+    // +20792 the header's SetChildNameText reads) naming strings two times
+    // in three, as the refresh's name record; the day 0 to 1,199 mostly,
+    // near 999, negative or any; the money any.
+    if (r.Below(3) != 0) {
+      const uint32_t name = save + 8;
+      const uint32_t firsts[] = {0, 1, 4, 5};
+      guest::StoreU32(base, name + 4, firsts[r.Below(4)]);
+      guest::StoreU16(base, name + 8, uint16_t(r.Below(4)));
+      guest::StoreU8(base, name + 10, uint8_t(r.Below(2)));
+      guest::StoreU32(base, name + 12, 2 + r.Below(2));
+      guest::StoreU16(base, name + 16, uint16_t(r.Below(6)));
+      guest::StoreU8(base, name + 18, uint8_t(r.Below(2)));
+    }
+    int32_t day = 0;
+    switch (r.Below(6)) {
+      case 0: day = 999 + int32_t(r.Below(5)) - 2; break;
+      case 1: day = -int32_t(r.Below(30)); break;
+      case 2: day = int32_t(r.Next()); break;
+      default: day = int32_t(r.Below(1200)); break;
+    }
+    guest::StoreU32(base, save + 6100, uint32_t(day));
+    guest::StoreU32(base, save + 6116, uint32_t(r.Next()));
+    // The selected garage car's words LoadCurrentChoices indexes its
+    // frame's tables by, unchecked (as ShapeSave): the mirror index (the
+    // first vinyl layer's +4) 0 to 7, the sticker layers' +8 0 to 8.
+    {
+      const uint32_t car = tuning_screen::SelectedGarageCar(base, screen) + 212;
+      guest::StoreU32(base, car + 1592, r.Below(8));
+      for (uint32_t i = 0; i < 5; i++) {
+        guest::StoreU32(base, car + 1824 + 12 * i + 8, r.Below(9));
+      }
+    }
+
+    // The text movie (its +28 table the misc block) and the sub-scenes.
+    const uint32_t movie = LayTextMovie(base, text, r);
+    // The file scene (+24) the live one (+16), as a loaded movie's file tree
+    // matches its live tree: ResetPose copies the file's pose over the live
+    // nodes (on themselves here). The text world's file scene is its root,
+    // whose children are animations: their words copied into the pool's
+    // TXT nodes' child entries (+128 to +136) sent the refresh's node walks
+    // to wild addresses (a read of guest 0x00006CC0, looping).
+    guest::StoreU32(base, movie + ui_movies::kMovieFile,
+                    guest::LoadU32(base, movie + ui_movies::kMovieLive));
+    guest::StoreU32(base, movie + 28, misc);
+    for (const uint32_t slot : {636u, 640u, 700u, 708u, 712u, 724u, 732u, 736u}) {
+      guest::StoreU32(base, misc + slot, misc + 0x800 + 4 * r.Below(64));
+    }
+    LayRefreshSubScenes(base, sub_scenes, movie, r);
+    const uint32_t race_count = r.Below(6), race_added = r.Below(3);
+    // The fades: random words (FadeIn writes some of them).
+    std::vector<uint8_t> fades(kFadesBytes);
+    for (uint8_t& b : fades) {
+      b = uint8_t(r.Next());
+    }
+
+    std::vector<Region> regions = {{block, stand_bytes, {}},
+                                   {screen, kStartScreenBytes, {}},
+                                   {text, kTextBytes, {}},
+                                   {misc, kStartMiscBytes, {}},
+                                   {sub_scenes, sub_bytes, {}}};
+    for (Region& region : regions) {
+      region.inputs = Read(base, region.address, region.bytes);
+    }
+    PPCContext start = CallContext(h);
+    start.r1.u64 &= ~0xFull;
+    start.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+    start.lr = 0x82000000 | (r.Below(0x10000) << 2);
+    start.f1.f64 = double(int32_t(r.Below(2000)) - 1000) / 8.0;
+    const uint32_t sp = start.r1.u32;
+
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (const Region& region : regions) {
+        Write(base, region.address, region.inputs.data(), region.bytes);
+      }
+      Fill(base, sp - kStartStack, kStartStack + kStartCaller);
+      PointTuningStandWorld(base, block);
+      PointTextMovieGlobals(base, text, strings);
+      ResetRaceData(base, race, race_count, race_added);
+      Write(base, kFades, fades.data(), kFadesBytes);
+      PPCContext t = start;
+      t.fpscr.disableFlushModeUnconditional();
+      (v == 0 ? __imp__sub_821E7368 : hooks::TuningMachineStart)(t, base);
+      TextMovieRecords(base, movie, out[v]);
+      for (const auto& [address, bytes] : globals) {
+        out[v].Bytes(Read(base, address, bytes));
+      }
+      out[v].Float(guest::LoadU32(base, screen + 20780));
+      out[v].Bytes(Read(base, sp - kStartStack, kStartStack - kStartSaves));
+      out[v].Bytes(Read(base, sp, kStartCaller));
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(uint32_t(t.lr));
+      out[v].Double(t.f1.u64);
+      for (const Region& region : regions) {
+        if (region.address == screen) {
+          // The torque shown compared as a float (above).
+          out[v].Bytes(Read(base, screen, 20780));
+          out[v].Bytes(Read(base, screen + 20784, kStartScreenBytes - 20784));
+        } else {
+          out[v].Bytes(Read(base, region.address, region.bytes));
+        }
+      }
+      out[v].Bytes(Read(base, race, RaceDataBytes()));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+
+  for (size_t i = 0; i < globals.size(); i++) {
+    Write(base, globals[i].first, saved[i].data(), globals[i].second);
+  }
+  for (const uint32_t a : allocations) {
+    memory::Free(a);
+  }
+}
+
 }  // namespace
 
 void TuningMachine(Context& h) {
@@ -863,6 +1161,8 @@ void TuningMachine(Context& h) {
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
   }
+  // After the groups above, so their seeds stay (its own generator).
+  StartCases(h);
 }
 
 }  // namespace harness
