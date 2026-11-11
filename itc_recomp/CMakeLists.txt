@@ -494,6 +494,10 @@ set(ITC_SOURCES
     src/type2_dialog/pages.cpp
     src/type2_dialog/handlers.cpp
     src/type2_dialog/init.cpp
+    src/hooks/user_info.cpp
+    src/user_info/handlers.cpp
+    src/user_info/pages.cpp
+    src/user_info/init.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp
@@ -754,6 +758,7 @@ set(ITC_SOURCES
     src/harnesses/tuning_machine.cpp
     src/harnesses/race_menu.cpp
     src/harnesses/car_settings.cpp
+    src/harnesses/user_info.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
