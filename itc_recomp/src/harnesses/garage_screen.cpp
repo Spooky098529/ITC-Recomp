@@ -1219,6 +1219,17 @@ void ListMoves(Random& r, const World& w) {
   }
 }
 
+// The action list's selection (MenuWorld's -2 to count + 1) one of its 5
+// actions, as SetUpActions inits it in play: Transition6 and Transition7
+// index the actions' 5-entry help line tables with it unchecked, and an
+// action outside them reads the text id from the frame's random words (or
+// the original's register saves), and SetText the text from wherever that
+// id points, memory earlier harnesses can leave different between the two
+// versions (the all-harness race itc_4810, cases 87 and 88).
+void OneAction(Random& r, const World& w) {
+  guest::StoreU32(w.base, w.at(kListAt) + race_screens::kListSelection, r.Below(5));
+}
+
 // The car menu's, the view's and the plate's transitions and the actions'
 // and options' set-ups, never seen in play: the menus' world (their flag
 // blocks for the set-ups' MenuList::Init), the selected car among the
@@ -1269,13 +1280,18 @@ void MenuTransitions(Context& h, const World& w) {
   Run(h, w, {"GarageScreen::Transition5 (sub_82192EF8)", 100, __imp__sub_82192EF8,
              hooks::GarageScreenTransition5, {{-128, -40}}, plain});
   Run(h, w, {"GarageScreen::Transition6 (sub_82194680; sub_821936B0, sub_82193A90)", 100,
-             __imp__sub_82194680, hooks::GarageScreenTransition6, {{-224, -64}}, plain});
+             __imp__sub_82194680, hooks::GarageScreenTransition6, {{-224, -64}},
+             [plain](PPCContext& t, Random& r, const World& w) {
+               plain(t, r, w);
+               OneAction(r, w);
+             }});
   // Transition7: the second list's selection 0 and scroll the selected car
   // (ReloadStandCar over the stand's world, ShowCarSpecs).
   Run(h, w, {"GarageScreen::Transition7 (sub_821951A8; sub_82193B10, sub_82194D90)", 40,
              __imp__sub_821951A8, hooks::GarageScreenTransition7, {{-2192, -56}},
              [with_car](PPCContext& t, Random& r, const World& w) {
                with_car(t, r, w);
+               OneAction(r, w);
                const uint32_t list2 = w.at(kList2At);
                guest::StoreU32(w.base, list2 + race_screens::kListSelection, 0);
                guest::StoreU32(w.base, list2 + 4, guest::LoadU32(w.base, w.data() + 48));
