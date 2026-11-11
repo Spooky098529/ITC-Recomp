@@ -67,6 +67,15 @@ When the user has reviewed a run's section, its heading gets
   the Init called its plain C++: a possible cleanup); `MachineOf`,
   `AllLoaded`, `FindShown` for recompiled callers. The `type2_mode`
   harness lives in `src/harnesses/type67_modes.cpp` (its worlds reused).
+- The tuning screen's refresh map (cbff27b9): 8 rows appended to
+  `tuning-screen.md` (`TuningScreen::Refresh` `sub_821E3AD0`, in play;
+  `sub_821F2110`, `sub_821F2378`, `sub_821F2AD8`, `sub_821F7A98`,
+  `sub_821E7DA0`, `sub_821CC930`, `sub_821E7E48` not seen in play), its
+  intro's "The refresh" section (the blocks by line range), fields in
+  `known-data.md`'s tuning screen row, `TuningMachine::Start`'s row
+  noted. Lead corrections: states 38 to 52 go to `sub_821F7A98` (movie
+  14's header), 53 to 58 to `sub_821F2AD8` (the interior pages), 9 and
+  11 return 1 after the header.
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 

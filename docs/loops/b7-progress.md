@@ -60,8 +60,12 @@ file's history. What's left to see in a drive, from every run:
   Recorded.
 - Subsystem 3 of 3: the tuning screen's refresh `sub_821E3AD0` (3,838
   lines, seen in play, ready; it blocks `TuningMachine::Start`) and its
-  callees; its line deleted from `leads.md`. Step: mapping agent
-  running.
+  callees; its line deleted from `leads.md`. Mapped into
+  `tuning-screen.md` (cbff27b9: 8 rows, 1 in play, the refresh; its
+  blocks by line range in the intro's "The refresh"; its 7 callees not
+  seen in play; no leads, no subagents); map checked. Step: migration
+  agent running (with `TuningMachine::Start` `sub_821E7368` once the
+  refresh is ours).
 
 ## Done
 
@@ -100,6 +104,8 @@ The run's section of `review.md` ("Run 2026-11-10 23:52").
   known 420, unknown 619).
 - After its migration: ours 5443, work left 1065 (wrapped 56, known
   390, unknown 619).
+- After the refresh's map: ours 5443, work left 1065 (wrapped 56,
+  known 391, unknown 618).
 
 ## Stopped
 
