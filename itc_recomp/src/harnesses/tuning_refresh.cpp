@@ -11,9 +11,12 @@
 // a small block for RefreshMovie13's texture table. The callees run as their
 // adapters run them on both sides. Each case runs every state 3 to 58 and
 // some outside (below 3, above 58, negative), the categories 0 to 6 and the
-// items in their play ranges mostly; states 5 to 8 go to the original on
-// both sides for now (the register step's gate; parts 2 to 4 of the
-// migration shape their cases). Compared: the text records SetText made,
+// items in their play ranges mostly; states 6 to 8 go to the original on
+// both sides for now (the register step's gate; parts 3 and 4 of the
+// migration shape their cases). State 5 has a group of its own after them
+// (so their seeds stay), over the same world with the sub-scenes 28 to 33
+// made real (LaySubScenes, for states 6 to 8 too) and the level list's
+// fields shaped (ShapeLevelList). Compared: the text records SetText made,
 // the globals, the blocks, the stack below r1 (without the original's
 // register saves, the top 96 bytes of its frame, and the frame's +40 to +79,
 // the varargs SetText's parameter area, where the unset arguments are passed
@@ -32,6 +35,7 @@
 #include <fmt/format.h>
 
 #include <bit>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -43,6 +47,8 @@ namespace harness {
 uint32_t TuningStandWorldBytes();
 uint32_t LayTuningStandWorld(uint8_t* base, uint32_t block, Random& r, int c);
 void PointTuningStandWorld(uint8_t* base, uint32_t block);
+void LayTuningStandTires(uint8_t* base, uint32_t block, Random& r);
+void LayTuningStandEngines(uint8_t* base, uint32_t block);
 const std::vector<uint32_t>& TuningStandWorldGlobals();
 uint32_t RaceDataBytes();
 void ResetRaceData(uint8_t* base, uint32_t allocation, uint32_t count, uint32_t added);
@@ -82,6 +88,113 @@ uint32_t Small(Random& r, uint32_t below) {
 // The items in each category's play range (CategoryItemCount's).
 constexpr uint32_t kItemCounts[7] = {4, 5, 1, 3, 10, 8, 4};
 
+// The sub-scenes 28 to 33 the list pages (states 5 to 8) reach, each in a
+// block of its own (LaySubScenes): the sub-scene node, its children 0 and 1
+// (the lists' parents), and 64 leaves for each of those two.
+constexpr uint32_t kFirstSubScene = 28;
+constexpr uint32_t kSubSceneCount = 6;
+constexpr uint32_t kBigNode = 0x400;   // 112 child entries from +128
+constexpr uint32_t kLeaf = 0x100;      // 16 child entries from +128
+constexpr uint32_t kLeaves = 64;       // per parent
+constexpr uint32_t kSubSceneBytes = 3 * kBigNode + 2 * kLeaves * kLeaf;
+constexpr uint32_t kSubScenesBytes = kSubSceneCount * kSubSceneBytes;
+constexpr uint32_t kPoolNodes = 40;    // the text movie's node pool (LayTextMovie)
+constexpr uint32_t kPoolNode = 0x400;
+constexpr uint32_t kTxt = 0x54585400;  // "TXT\0"
+
+// A node of `bytes` at random, a TXT with its first child's index `first`,
+// its child entries the pool's (from the live scene, node 0 of the pool).
+void LayNode(uint8_t* base, uint32_t node, uint32_t bytes, uint32_t first, uint32_t pool,
+             Random& r) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    guest::StoreU32(base, node + i, uint32_t(r.Next()));
+  }
+  guest::StoreU32(base, node + 0, kTxt);
+  guest::StoreU32(base, node + 100, r.Below(60));
+  guest::StoreU32(base, node + 104, r.Below(8));
+  guest::StoreU32(base, node + 108, first);
+  for (uint32_t e = 0; 128 + 8 * e < bytes; e++) {
+    guest::StoreU32(base, node + 128 + 8 * e, pool + kPoolNode * r.Below(kPoolNodes));
+  }
+}
+
+// The sub-scenes 28 to 33 made real in `block` (the text movie laid): the
+// live scene's entries for them pointed at their nodes, each sub-scene's
+// children 0 and 1 its own parents (first child's index 0), whose children
+// 0 to 63 are their own distinct leaves (TXT, index below 8, entries the
+// pool's), so the pages' rows, marks and markers are distinct nodes as in
+// the game, never the scene's own (the original's state 5 writes the +108 of
+// its rows' marks: on the pool's nodes that changed the scene's children).
+void LaySubScenes(uint8_t* base, uint32_t block, uint32_t movie, Random& r) {
+  const uint32_t scene = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+  const uint32_t pool = scene;
+  for (uint32_t k = 0; k < kSubSceneCount; k++) {
+    const uint32_t sub = block + k * kSubSceneBytes;
+    const uint32_t parents[2] = {sub + kBigNode, sub + 2 * kBigNode};
+    LayNode(base, sub, kBigNode, 0, pool, r);
+    guest::StoreU32(base, sub + 128, parents[0]);
+    guest::StoreU32(base, sub + 128 + 8, parents[1]);
+    for (uint32_t p = 0; p < 2; p++) {
+      LayNode(base, parents[p], kBigNode, 0, pool, r);
+      const uint32_t leaves = sub + 3 * kBigNode + p * kLeaves * kLeaf;
+      for (uint32_t j = 0; j < kLeaves; j++) {
+        const uint32_t leaf = leaves + j * kLeaf;
+        LayNode(base, leaf, kLeaf, r.Below(8), pool, r);
+        guest::StoreU32(base, parents[p] + 128 + 8 * j, leaf);
+      }
+    }
+    const uint32_t index = guest::LoadU32(base, scene + 108) + kFirstSubScene + k;
+    guest::StoreU32(base, scene + 128 + 8 * index, sub);
+  }
+}
+
+// State 5's fields as play gives them: the level +9661 0 to 9 (now and then
+// to 15) where the stand's world takes any (EquipChoice stores it into the
+// garage car, which SetCarStats then reads): the engine stage (category 0
+// item 0) 0 to 9, the world's engine records (LayTuningStandEngines: the
+// car's engine is copied from the spec's record at that stage, unchecked;
+// a random record's torque curve count ran its copy off the memory), the
+// power train's +1676 (item 3) 0 to 6 (a frame
+// table of 7, unchecked), the tire grades (category 3) 1 to 5 (the world's
+// tire records); the list's first row +25100 the level minus 0 to 7 (now and then
+// 0, or above the level by 1 or 2), its rows +9677 1 to 10 (now and then 0
+// or 11: the rows' children are indexed unchecked), the power list's row
+// +33900 0 to 4 (now and then 5 to 7), and the words IsItemAvailable,
+// GetChoiceFlag and GetCurrentChoice read (+34000 to +36800) 0 a quarter of
+// the time, else small, now and then any word.
+void ShapeLevelList(uint8_t* base, uint32_t screen, uint32_t category, uint32_t item,
+                    Random& r) {
+  uint32_t level = r.Below(8) == 0 ? r.Below(16) : r.Below(10);
+  if (category == 0 && item == 0) {
+    level = r.Below(10);
+  } else if (category == 0 && item == 3) {
+    level = r.Below(7);
+  } else if (category == 3) {
+    level = 1 + r.Below(5);
+  }
+  guest::StoreU8(base, screen + tuning_screen::kLevel, uint8_t(level));
+  uint32_t first;
+  switch (r.Below(8)) {
+    case 0: first = 0; break;
+    case 1: first = level + 1 + r.Below(2); break;
+    default: {
+      const uint32_t back = r.Below(8);
+      first = level >= back ? level - back : 0;
+      break;
+    }
+  }
+  guest::StoreU32(base, screen + 25100, first);
+  const uint32_t rows = r.Below(10) == 0 ? (r.Below(2) == 0 ? 0 : 11) : 1 + r.Below(10);
+  guest::StoreU8(base, screen + 9677, uint8_t(rows));
+  guest::StoreU32(base, screen + tuning_screen::kPartSet,
+                  r.Below(8) == 0 ? 5 + r.Below(3) : r.Below(5));
+  for (uint32_t at = 34000; at < 36800; at += 4) {
+    const uint32_t word =
+        r.Below(4) == 0 ? 0 : (r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(10));
+    guest::StoreU32(base, screen + at, word);
+  }
+}
+
 }  // namespace
 
 void TuningRefresh(Context& h) {
@@ -98,10 +211,12 @@ void TuningRefresh(Context& h) {
   const uint32_t misc = memory::Alloc(kMiscBytes, 0);
   const uint32_t strings = memory::Alloc(kRefreshStringsBytes, 0);
   const uint32_t race = memory::Alloc(RaceDataBytes(), 0);
+  const uint32_t sub_scenes = memory::Alloc(kSubScenesBytes, 0);
   if (stand_allocation == 0 || text_allocation == 0 || screen == 0 || misc == 0 ||
-      strings == 0 || race == 0) {
+      strings == 0 || race == 0 || sub_scenes == 0) {
     ITC_LOG_ERROR("harness: tuning_screen: no memory for TuningScreen::Refresh's world");
-    for (const uint32_t a : {stand_allocation, text_allocation, screen, misc, strings, race}) {
+    for (const uint32_t a :
+         {stand_allocation, text_allocation, screen, misc, strings, race, sub_scenes}) {
       if (a != 0) {
         memory::Free(a);
       }
@@ -122,50 +237,11 @@ void TuningRefresh(Context& h) {
     saved.push_back(Read(base, address, bytes));
   }
 
-  Random r(0x5265667265736800ull);  // "Refresh"
-  Results results("TuningScreen::Refresh (sub_821E3AD0)");
-  constexpr int kCases = 200;
-  for (int c = 0; c < kCases; c++) {
-    // The state: each of 3, 4 and 9 to 58 in turn for the first 104 cases
-    // (two rounds), then 3 and 4 mostly, the dispatch's states, and outside 3
-    // to 58 (below, above, negative). States 5 to 8 aren't among them yet:
-    // parts 2 to 4 of the migration add them with the worlds their pages
-    // need (in this one the original's state 5 page writes through a node
-    // at 1).
-    uint32_t state;
-    if (c < 104) {
-      const uint32_t k = uint32_t(c % 52);
-      state = k < 2 ? 3 + k : 7 + k;
-    } else {
-      static constexpr uint32_t kOutside[] = {0, 1, 2, 59, 60, 63, 100, 0xFFFFFFFFu,
-                                              0xFFFFFFFDu, 0x80000000u};
-      switch (r.Below(6)) {
-        case 0: state = kOutside[r.Below(10)]; break;
-        case 1: state = 15 + r.Below(44); break;
-        case 2: state = 9 + r.Below(6); break;
-        default: state = 3 + r.Below(2); break;
-      }
-    }
-    // The category 0 to 6 mostly, now and then 7, -1 or any word; the item
-    // in its range mostly, now and then any byte.
-    uint32_t category;
-    switch (r.Below(10)) {
-      case 0: category = r.Below(2) == 0 ? 7 : 0xFFFFFFFFu; break;
-      case 1: category = r.Below(4) == 0 ? uint32_t(r.Next()) : 4; break;
-      default: category = r.Below(7); break;
-    }
-    // State 4 the aero's list half the time (its rows' path), states 23 to
-    // 37 the vinyl (category 5, item 6: RefreshMovie13) half the time.
-    if (state == 4 && r.Below(2) == 0) {
-      category = 4;
-    }
-    const bool vinyl = state >= 23 && state <= 37 && r.Below(2) == 0;
-    if (vinyl) {
-      category = 5;
-    }
-    const uint32_t count = category < 7 ? kItemCounts[category] : 10;
-    const uint32_t item = vinyl ? 6 : r.Below(10) == 0 ? r.Below(256) : r.Below(count);
-
+  // One case: the world for `state`, `category` and `item` (the rest from
+  // `r`), `shape` (when given) run on it after the text movie is laid,
+  // then both versions run and compared.
+  const auto run = [&](Random& r, Results& results, int c, uint32_t state, uint32_t category,
+                       uint32_t item, const std::function<void(uint32_t movie)>& shape) {
     // The stand's world.
     const uint32_t save = LayTuningStandWorld(base, block, r, c);
     PointTuningStandWorld(base, block);
@@ -291,12 +367,16 @@ void TuningRefresh(Context& h) {
         ui_movies::Append(base, looping, slot);
       }
     }
+    if (shape) {
+      shape(movie);
+    }
     const uint32_t race_count = r.Below(6), race_added = r.Below(3);
 
     std::vector<Region> regions = {{block, stand_bytes, {}},
                                    {screen, kScreenBytes, {}},
                                    {text, kRefreshTextBytes, {}},
-                                   {misc, kMiscBytes, {}}};
+                                   {misc, kMiscBytes, {}},
+                                   {sub_scenes, kSubScenesBytes, {}}};
     for (Region& region : regions) {
       region.inputs = Read(base, region.address, region.bytes);
     }
@@ -383,13 +463,102 @@ void TuningRefresh(Context& h) {
     results.Check(out[0], out[1],
                   fmt::format("case {} (state {}, category {}, item {})", c, int32_t(state),
                               int32_t(category), item));
+  };
+
+  Random r(0x5265667265736800ull);  // "Refresh"
+  Results results("TuningScreen::Refresh (sub_821E3AD0)");
+  constexpr int kCases = 200;
+  for (int c = 0; c < kCases; c++) {
+    // The state: each of 3, 4 and 9 to 58 in turn for the first 104 cases
+    // (two rounds), then 3 and 4 mostly, the dispatch's states, and outside 3
+    // to 58 (below, above, negative). States 5 to 8 aren't among them: state
+    // 5 has its group below, 6 to 8 come with parts 3 and 4.
+    uint32_t state;
+    if (c < 104) {
+      const uint32_t k = uint32_t(c % 52);
+      state = k < 2 ? 3 + k : 7 + k;
+    } else {
+      static constexpr uint32_t kOutside[] = {0, 1, 2, 59, 60, 63, 100, 0xFFFFFFFFu,
+                                              0xFFFFFFFDu, 0x80000000u};
+      switch (r.Below(6)) {
+        case 0: state = kOutside[r.Below(10)]; break;
+        case 1: state = 15 + r.Below(44); break;
+        case 2: state = 9 + r.Below(6); break;
+        default: state = 3 + r.Below(2); break;
+      }
+    }
+    // The category 0 to 6 mostly, now and then 7, -1 or any word; the item
+    // in its range mostly, now and then any byte.
+    uint32_t category;
+    switch (r.Below(10)) {
+      case 0: category = r.Below(2) == 0 ? 7 : 0xFFFFFFFFu; break;
+      case 1: category = r.Below(4) == 0 ? uint32_t(r.Next()) : 4; break;
+      default: category = r.Below(7); break;
+    }
+    // State 4 the aero's list half the time (its rows' path), states 23 to
+    // 37 the vinyl (category 5, item 6: RefreshMovie13) half the time.
+    if (state == 4 && r.Below(2) == 0) {
+      category = 4;
+    }
+    const bool vinyl = state >= 23 && state <= 37 && r.Below(2) == 0;
+    if (vinyl) {
+      category = 5;
+    }
+    const uint32_t count = category < 7 ? kItemCounts[category] : 10;
+    const uint32_t item = vinyl ? 6 : r.Below(10) == 0 ? r.Below(256) : r.Below(count);
+    run(r, results, c, state, category, item, nullptr);
+
   }
   results.Report();
+
+  // State 5, LEVEL_SELECT (part 2 of the migration), a group of its own so
+  // the cases above keep their seeds: the same world, then the sub-scenes'
+  // nodes (LaySubScenes) and the level list's fields (ShapeLevelList).
+  {
+    Random r5(0x5265667265736805ull);  // "Refresh", 5
+    Results results5("TuningScreen::Refresh (sub_821E3AD0) state 5");
+    constexpr int kLevelCases = 420;
+    for (int c = 0; c < kLevelCases; c++) {
+      // The pages with a level list mostly, each in turn: the power parts'
+      // items 0 to 3, the power train's 0 to 4 (item 4 twice: its rows
+      // named through the 8-bit table), the category 2 item and the tires'
+      // 0 to 2; now and then the categories 4 to 6, 7, -1 or any word, or
+      // any item byte.
+      static constexpr uint32_t kPages[][2] = {{0, 0}, {0, 1}, {0, 2}, {0, 3}, {1, 0},
+                                               {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 4},
+                                               {2, 0}, {3, 0}, {3, 1}, {3, 2}};
+      constexpr uint32_t kPageCount = sizeof(kPages) / sizeof(kPages[0]);
+      uint32_t category = kPages[uint32_t(c) % kPageCount][0];
+      uint32_t item = kPages[uint32_t(c) % kPageCount][1];
+      switch (r5.Below(10)) {
+        case 0: category = 4 + r5.Below(3); item = r5.Below(kItemCounts[category]); break;
+        case 1:
+          category = r5.Below(2) == 0 ? 7 : (r5.Below(2) == 0 ? 0xFFFFFFFFu : uint32_t(r5.Next()));
+          item = r5.Below(10);
+          break;
+        case 2: item = r5.Below(256); break;
+        default: break;
+      }
+      run(r5, results5, c, 5, category, item, [&](uint32_t movie) {
+        LayTuningStandTires(base, block, r5);
+        LayTuningStandEngines(base, block);
+        LaySubScenes(base, sub_scenes, movie, r5);
+        ShapeLevelList(base, screen, category, item, r5);
+        // The power parts' pages: their power row +33900 0 to 5 in turn
+        // (their help lines by it; 5 none).
+        if (category == 0) {
+          guest::StoreU32(base, screen + ts::kPartSet, uint32_t(c) / kPageCount % 6);
+        }
+      });
+    }
+    results5.Report();
+  }
 
   for (size_t i = 0; i < globals.size(); i++) {
     Write(base, globals[i].first, saved[i].data(), globals[i].second);
   }
-  for (const uint32_t a : {stand_allocation, text_allocation, screen, misc, strings, race}) {
+  for (const uint32_t a :
+       {stand_allocation, text_allocation, screen, misc, strings, race, sub_scenes}) {
     memory::Free(a);
   }
 }

@@ -209,6 +209,45 @@ and state 4's `AnimationTime`s, unless a guest call after them set it
 reported by its plain C++; the light value overwrites them except with
 the headlights' flag 1).
 
+Found in its migration's part 2 (state 5, 2026-11-11; block 4 above
+corrected here): the textures are set only while +9716 is set (not 0):
+(m, 3, 1, the category + 1, 0 for 2) and (m, 3, 2, by the category:
+item + 8, + 12, 3, + 17, + 20, + 30, + 38, none from 7). The level list
+is in sub-scene 28 for the categories 0 to 2 and 30 for 3; the others
+(the aero included) have none. Its rows are children 5 to 14 of the
+sub-scene's child 1, all hidden and colored 0 first; then shown (colored
+2 when `IsItemAvailable` answers 0): for category 0 item 0 eight rows
+from +25100 (`SetNodeText` 376 for level 0, 377 for 9, else 378, r6 the
+level), for category 1 item 4 eight rows named through the 8-bit table
+at `0x8200A8F8` (the map's "aero" rows are these: levels 0 to 9 from
++25100 give 376, 383 (r6 1), 383 (2), 384, 385 (1), 385 (2), 386, 387
+(1), 387 (2), 388; none above 9), and for category 0 items 1 to 3,
+category 1 items 0 to 3, category 2 and category 3 the byte +9677 rows
+(376 first, 378 with the row, 377 the last at child 11 of 28 or 9 of
+30). On the eight-row pages r10 is +25100 at the `SetNodeText` calls
+(left from the row's arithmetic; passed as set). The marks are the
+sub-scene's child 0's children: 15 to 24 and 26 to 35 hidden, then for
+each row 15 + row and 26 + row shown and 38 + 2 row's +108 (probably a
+picture's frame) 0 when `GetChoiceFlag` answers (for the row from
++25100 on the eight-row pages, the row itself on the others), else 1;
+on the eight-row pages the marker (child 0's child 2) gets +16 =
+(+25100 minus the level plus `GetCurrentChoice`) as an int converted through the
+frame's +80 (`std`, the frame word left) times the float at
+`0x82001FB0`, and is shown when that row is 7 or less. The arrows: both
+hidden for +9677 up to 8; else d = the level - +25100: 0, 25 shown and
+26 hidden; else 25 hidden when +9677 - 1 = d + 7, and 26 shown. Node 20
+shown for category 0 items 0 to 2. The help line: 857 when
+`IsItemAvailable`(level) is 0; category 0 item 0 by +33900 (0 to 4:
+649, 664, 679, 689 + the level, 4 649 or 654 + the level below or from
+5; else the scroll alone), item 1 (704, 711 + the level for +33900 0
+and 1), item 2 721 + the level, item 3 729; category 1 items 0 to 4
+730, 737, 744, 751, 759 + the level; category 2 769 + and 3 776 + the
+level (the level the byte `IsItemAvailable` leaves in r4); anything else
+the scroll alone. Its header's `EquipChoice` stores the level into the
+garage car first (the engine stage for category 0 item 0, which
+`SetCarStats` reads the car spec's engine at, unchecked): the harness
+keeps the levels in its world's ranges.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the

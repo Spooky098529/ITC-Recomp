@@ -1088,6 +1088,55 @@ void LayTuningStandBlock(uint8_t* base, uint32_t block, Random& r, int c, bool s
   guest::StoreU32(base, block + kStage + 112, 0);
 }
 
+}  // namespace
+
+// The first set's tires and calipers (TuningStand's lay_tires, below; the
+// refresh's harness lays them for its pages that preview them).
+void LayTuningStandTires(uint8_t* base, uint32_t block, Random& r) {
+  for (uint32_t i = 0; i < 2; i++) {
+    guest::StoreU32(base, block + kModels + 0x1400 * i + 5068, block + 0x1E000);
+  }
+  guest::StoreU32(base, block + 0x1E000 + 36, block + 0x1E400);
+  constexpr uint32_t kParts[4][2] = {
+      {240, 0x1C000}, {704, 0x1D000}, {2336, 0x20000}, {2800, 0x21000}};
+  for (const auto& [at, area] : kParts) {
+    const uint32_t model = block + kFirstWheels + at;
+    const uint32_t shapes = block + area;
+    guest::StoreU32(base, model + 408, 0);
+    guest::StoreU32(base, model + 412, r.Below(3));
+    guest::StoreU32(base, model + 40, shapes);
+    for (uint32_t k = 0; k < 2; k++) {
+      const uint32_t materials = shapes + 0x480 + 0x600 * k;
+      guest::StoreU32(base, shapes + 544 * k + 396, materials);
+      const uint32_t first = r.Below(2), second = r.Below(2);
+      guest::StoreU32(base, materials + 0, first + second);
+      guest::StoreU32(base, materials + 8, first);
+      guest::StoreU32(base, materials + 12, second);
+    }
+  }
+  guest::StoreU32(base, block + kFirstWheels + 40, r.Below(3));
+  guest::StoreU32(base, block + kFirstWheels + 56, r.Below(3));
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t model = block + kModels + 0x1400 * i;
+    guest::StoreU32(base, model + 4080, r.Below(3));
+    guest::StoreU32(base, model + 4096, r.Below(3));
+  }
+}
+
+// The spec's engine records for the stages 0 to 9 (+980, 204 bytes each)
+// the garage car's own engine (the refresh's harness: its level pages store
+// the level into the garage car's engine stage, which Car::Refresh reads the
+// spec's record at, unchecked).
+void LayTuningStandEngines(uint8_t* base, uint32_t block) {
+  const uint32_t car = block + kGarageCar, spec = block + kSpec;
+  const std::vector<uint8_t> engine = Read(base, car + 2880, 204);
+  for (uint32_t k = 0; k < 10; k++) {
+    Write(base, spec + 980 + 204 * k, engine.data(), 204);
+  }
+}
+
+namespace {
+
 void TuningStand(Context& h, Random& r) {
   if (!hooks::TuningStandCalleesNative()) {
     ITC_LOG_WARN("harness: car_makers: the tuning screen's stand calls skipped (their callees' "
@@ -1514,36 +1563,7 @@ void TuningStand(Context& h, Random& r) {
   // and +4096 0 to 2. The models' interior (+5068, for SceneModel::ApplyInterior's
   // copies into its +40 and its +36's +28) in the block too (+0x1E000, its
   // +36 +0x1E400).
-  const auto lay_tires = [&] {
-    for (uint32_t i = 0; i < 2; i++) {
-      guest::StoreU32(h.base, block + kModels + 0x1400 * i + 5068, block + 0x1E000);
-    }
-    guest::StoreU32(h.base, block + 0x1E000 + 36, block + 0x1E400);
-    constexpr uint32_t kParts[4][2] = {
-        {240, 0x1C000}, {704, 0x1D000}, {2336, 0x20000}, {2800, 0x21000}};
-    for (const auto& [at, area] : kParts) {
-      const uint32_t model = block + kFirstWheels + at;
-      const uint32_t shapes = block + area;
-      guest::StoreU32(h.base, model + 408, 0);
-      guest::StoreU32(h.base, model + 412, r.Below(3));
-      guest::StoreU32(h.base, model + 40, shapes);
-      for (uint32_t k = 0; k < 2; k++) {
-        const uint32_t materials = shapes + 0x480 + 0x600 * k;
-        guest::StoreU32(h.base, shapes + 544 * k + 396, materials);
-        const uint32_t first = r.Below(2), second = r.Below(2);
-        guest::StoreU32(h.base, materials + 0, first + second);
-        guest::StoreU32(h.base, materials + 8, first);
-        guest::StoreU32(h.base, materials + 12, second);
-      }
-    }
-    guest::StoreU32(h.base, block + kFirstWheels + 40, r.Below(3));
-    guest::StoreU32(h.base, block + kFirstWheels + 56, r.Below(3));
-    for (uint32_t i = 0; i < 2; i++) {
-      const uint32_t model = block + kModels + 0x1400 * i;
-      guest::StoreU32(h.base, model + 4080, r.Below(3));
-      guest::StoreU32(h.base, model + 4096, r.Below(3));
-    }
-  };
+  const auto lay_tires = [&] { LayTuningStandTires(h.base, block, r); };
   // A choice word for the tables PreviewItem and RestoreStand index
   // unchecked: -1 (cleared), else tens 0 to 9 and ones 0 to 5 (the reads
   // stay below the frames' register saves, PreviewItem's from its +120,

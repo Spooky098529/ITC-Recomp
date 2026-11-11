@@ -75,14 +75,19 @@ struct Context {
   // 1)).
   void Help(uint64_t id) const;
   void HelpScroll() const;
+  // UiMovie::SetNodeText(movie, node, id, r6, r7, r8, r9, r10) from the
+  // frame with the original's return address: the arguments it leaves unset
+  // passed as 0 (the user's call, 2026-10-30), r6 and r10 as given.
+  void NodeText(uint32_t node, uint64_t id, uint32_t lr, uint64_t r6 = 0,
+                uint64_t r10 = 0) const;
 
   // The pieces.
   void Header();
   void State3();  // TUNING SHOP MAIN (block 2)
   void State4();  // the category's items (block 3)
+  void State5();  // LEVEL_SELECT (block 4, refresh_level.cpp)
   // Later parts (each in its own file once ported; stubs in refresh.cpp until
   // then, never reached: the adapter's gate runs the original for them).
-  void State5();  // LEVEL_SELECT (block 4, refresh_level.cpp)
   void State6();  // TYPE_SELECT (block 5, refresh_type.cpp)
   void State7();  // the bonnet's and colors' choice (block 6, refresh_choice.cpp)
   void State8();  // the option select (block 7, refresh_choice.cpp)

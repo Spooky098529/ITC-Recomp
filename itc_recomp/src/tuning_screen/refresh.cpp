@@ -253,11 +253,8 @@ void Context::State4() {
   }
 }
 
-// Parts 2 to 4 replace these (the gate in hooks::TuningRefresh runs the
-// original for states 5 to 8 until then).
-void Context::State5() {
-  ITC_LOG_ERROR("TuningScreen::Refresh: state 5 reached natively (not ported yet)");
-}
+// Parts 3 and 4 replace these (the gate in hooks::TuningRefresh runs the
+// original for states 6 to 8 until then).
 void Context::State6() {
   ITC_LOG_ERROR("TuningScreen::Refresh: state 6 reached natively (not ported yet)");
 }
