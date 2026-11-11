@@ -158,6 +158,15 @@ void TuningWithRefreshStand(
 bool TuningUpdateStandCalleesNative();
 void TuningUpdateStand(PPCContext& ctx, uint8_t* base);
 
+// Update sub_821E6C50 (r3 the screen, r4 the mode's dispatcher, both all
+// 64 bits; r3 UpdateStand's or RestoreStand's; f1 as the original leaves
+// it, RefreshMenu's way), with TuningUpdateCalleesNative:
+// TuningUpdateStandCalleesNative, TuningCarStatsCalleesNative and
+// --native_car_specs (the refresh's and its other callees' adapters'
+// checks).
+bool TuningUpdateCalleesNative();
+void TuningUpdate(PPCContext& ctx, uint8_t* base);
+
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
 // DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,

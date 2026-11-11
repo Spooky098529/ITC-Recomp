@@ -1819,6 +1819,12 @@ uint32_t LayTuningStandWorld(uint8_t* base, uint32_t block, Random& r, int c) {
   return block + kSaveData;
 }
 
+// The stage's animation list (+5600, its count +448) short, as the
+// UpdateStand cases lay it (GarageAnims::Add scans it with no bound).
+void ShortTuningStandAnimations(uint8_t* base, uint32_t block, Random& r) {
+  guest::StoreU32(base, block + kStage + 5600 + 448, r.Below(4));
+}
+
 void PointTuningStandWorld(uint8_t* base, uint32_t block) {
   guest::StoreU32(base, kScenePointer, block + kCarScene);
   guest::StoreU32(base, kHolderPointer, block + kHolderWord);

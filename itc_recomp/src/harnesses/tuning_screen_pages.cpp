@@ -742,6 +742,18 @@ uint32_t LayTextMovie(uint8_t* base, uint32_t block, Random& r) {
 
 void MakeTextStrings(uint8_t* base, uint32_t strings) { Strings(base, strings); }
 
+// The lists' pages' scene animations (ListAnimations) over LayTextMovie's
+// node pool in `block` (TuningScreen::Update's cases, tuning_refresh.cpp).
+void TextMovieListAnimations(uint8_t* base, uint32_t block, Random& r) {
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    const uint32_t node = NodeAt(block, n);
+    guest::StoreU32(base, node + 116, 60 + r.Below(4));
+    for (uint32_t e = 60; e < (kNodeBytes - 128) / 8; e++) {
+      guest::StoreU32(base, node + 128 + 8 * e, At(block, kAnimationsAt) + 64 * r.Below(8));
+    }
+  }
+}
+
 const std::vector<std::pair<uint32_t, uint32_t>>& TextMovieGlobals() {
   static const std::vector<std::pair<uint32_t, uint32_t>> globals = {
       {ui_movies::kMovieTable, 12}, {kMissingMovie, 4}, {kMissingText, 4}, {kStringTable, 4}};

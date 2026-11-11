@@ -69,6 +69,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821E0FB0 (their callees never seen in play through the guest), UpdateStand "
               "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag); SetCarStats sub_821DF788 with the "
               "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both and --native_car_specs, every state; "
+              "Update sub_821E6C50 (its pieces sub_821E6CD4 and sub_821E6F90 merged) with the refresh's and "
+              "UpdateStand's checks, its callees never seen in play and DrawPowerGraph through the guest; "
               "its swatch color setter sub_821E7DA0, never seen in play, through the guest) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
@@ -534,6 +536,68 @@ void TuningRefresh(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+bool TuningUpdateCalleesNative() {
+  return TuningUpdateStandCalleesNative() && TuningCarStatsCalleesNative() &&
+         ITC_FLAG(native_car_specs);
+}
+
+void TuningUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  ctx.fpscr.disableFlushMode();
+  std::optional<double> f1;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  SceneryDrawGuest guest{ctx, base};
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  calls.draw = SceneryListsDrawCalls(&guest);
+  const ts::GuestCall inner = StandModelsGuestCall(ctx, base);
+  // RefreshMenu's f1 wrapper: the f1 the native code left put in f1 before
+  // the next guest call.
+  const auto apply_f1 = [&] {
+    if (f1) {
+      ctx.f1.f64 = *f1;
+      f1.reset();
+    }
+  };
+  const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
+                                 uint32_t frame, uint32_t back) {
+    apply_f1();
+    return inner(function, args, frame, back);
+  };
+  const ts::StandCalls stand{call, calls};
+  const front_end_car_draw::DrawCallees draw = FrontEndCarDrawDrawCallees(ctx);
+  load_poll::Calls* paint_poll =
+      ITC_FLAG(native_load_poll) && LoadPollCalleesNative() ? &poll : nullptr;
+  const ts::UpdateCalls update{
+      stand,
+      draw,
+      paint_poll,
+      ITC_FLAG(native_action_mappers),
+      ITC_FLAG(native_car_specs),
+      [&](uint32_t frame, uint64_t screen, uint64_t r30) {
+        apply_f1();
+        const uint64_t stack = ctx.r1.u64;
+        const uint64_t r30_was = ctx.r30.u64, r31_was = ctx.r31.u64;
+        ctx.r1.u64 = frame;
+        ctx.r3.u64 = screen;
+        ctx.r30.u64 = r30;
+        ctx.r31.u64 = screen;
+        ctx.lr = 0x821E7318;
+        sub_821DF350(ctx, base);
+        ctx.r1.u64 = stack;
+        ctx.r30.u64 = r30_was;
+        ctx.r31.u64 = r31_was;
+        ctx.fpscr.disableFlushMode();
+      }};
+  const uint64_t answer = ts::Update(base, update, r3, r4, sp, &f1);
+  apply_f1();
+  ctx.lr = lr;
+  ctx.r3.u64 = answer;
+  ctx.fpscr.disableFlushMode();
+}
+
 void TuningWithRefreshStand(
     PPCContext& ctx, uint8_t* base, std::optional<double>* f1,
     const std::function<uint64_t(const ts::StandCalls&)>& body) {
@@ -699,4 +763,15 @@ extern "C" REX_FUNC(sub_821E3AD0) {
     return;
   }
   hooks::TuningRefresh(ctx, base);
+}
+
+// Update: the original unless its callees' adapters would run their plain
+// C++ (the refresh's, UpdateStand's and SetCarStats' checks).
+extern "C" REX_FUNC(sub_821E6C50) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningUpdateCalleesNative()) {
+    __imp__sub_821E6C50(ctx, base);
+    return;
+  }
+  hooks::TuningUpdate(ctx, base);
 }

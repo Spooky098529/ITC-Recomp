@@ -430,6 +430,7 @@ set(ITC_SOURCES
     src/tuning_screen/refresh_level.cpp
     src/tuning_screen/refresh_type.cpp
     src/tuning_screen/refresh_choice.cpp
+    src/tuning_screen/update.cpp
     src/hooks/tuning_pages.cpp
     src/tuning_pages/tables.cpp
     src/tuning_pages/editor.cpp

@@ -509,6 +509,35 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
                      const front_end_car_draw::DrawCallees& draw, load_poll::Calls* paint_poll,
                      uint32_t screen, uint32_t sp);
 
+// sub_821E6C50 TuningScreen::Update (update.cpp; its pieces sub_821E6CD4 and
+// sub_821E6F90 merged): r3 = the screen (all 64 bits), r4 = the mode's
+// dispatcher (all 64 bits; commands 30, 52 and 63). The refresh while +9708
+// is 1 (+9708 = whether it answered 0), the state's debug handler, movie
+// 2, 13 or 14 by the state (UiMovies::Find, the id at frame + 80),
+// UpdateBusyIcon, the queue [+10036]'s current command's runner on its first
+// update (+24), UiMovie::Run and the queue's step when it stops
+// (Command32Done after command 32), then UpdateItems, DrawPowerGraph,
+// RefreshMenu, UpdateListDots, UpdateListCounter, UpdateStand, and while
+// +9732 is set StoreToGarageCar, SetCarStats and RestoreStand (+9732 = 0).
+// The callees seen in play by their plain C++; DrawPowerGraph, UiMovie::Run
+// and those never seen in play (16 debug handlers, 39 command runners,
+// Command32Done) through the guest. 144-byte frame (movie's id at + 80);
+// r3 UpdateStand's or RestoreStand's; `*f1` as Refresh's (the caller applies
+// it before each later guest call and at the end).
+struct UpdateCalls {
+  const StandCalls& stand;
+  const front_end_car_draw::DrawCallees& draw;
+  load_poll::Calls* paint_poll;  // as UpdateStand's adapter gives it
+  bool native_slots;             // --native_action_mappers
+  bool native_specs;             // --native_car_specs
+  // TuningScreen::DrawPowerGraph (sub_821DF350) through its override from
+  // `frame` with r3 and r31 = `r3`, r30 = `r30` (its adapter saves them) and
+  // the original's return address; f1 left in the guest's.
+  std::function<void(uint32_t frame, uint64_t r3, uint64_t r30)> draw_power_graph;
+};
+uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r4, uint32_t sp,
+                std::optional<double>* f1);
+
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:
 // its frame's back chain and string tables written as the original leaves
