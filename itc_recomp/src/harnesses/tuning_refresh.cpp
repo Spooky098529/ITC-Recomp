@@ -11,13 +11,12 @@
 // a small block for RefreshMovie13's texture table. The callees run as their
 // adapters run them on both sides. Each case runs every state 3 to 58 and
 // some outside (below 3, above 58, negative), the categories 0 to 6 and the
-// items in their play ranges mostly; states 7 and 8 go to the original on
-// both sides for now (the register step's gate; part 4 of the migration
-// shapes their cases). States 5 and 6 have groups of their own after them
-// (so their seeds stay), over the same world with the sub-scenes 28 to 33
-// made real (LaySubScenes, for states 7 and 8 too) and the level and type
-// lists' fields shaped (ShapeLevelList, ShapeTypeList; state 6's nodes
-// LayTypeNodes). Compared: the text records SetText made,
+// items in their play ranges mostly (never 5 to 8). States 5 to 8 have
+// groups of their own after them (so their seeds stay), over the same world
+// with the sub-scenes 28 to 33 made real (LaySubScenes) and the level, type,
+// choice and option lists' fields shaped (ShapeLevelList, ShapeTypeList,
+// ShapeChoiceList; state 6's nodes LayTypeNodes, states 7's and 8's
+// LayChoiceNodes). Compared: the text records SetText made,
 // the globals, the blocks, the stack below r1 (without the original's
 // register saves, the top 96 bytes of its frame, and the frame's +40 to +79,
 // the varargs SetText's parameter area, where the unset arguments are passed
@@ -264,6 +263,88 @@ void ShapeTypeList(uint8_t* base, uint32_t screen, uint32_t category, uint32_t i
   }
   guest::StoreU32(base, screen + 36588,
                   r.Below(3) == 0 ? 0 : (r.Below(8) == 0 ? 4 + r.Below(4) : 1 + r.Below(3)));
+}
+
+// States 7's and 8's nodes as the game has them (after LaySubScenes and
+// LayTypeNodes), from leaves no other page reaches: sub-scene 32's children
+// 2 and 3 (state 7's swatches: category 1 item 3's and the interior's) its
+// child 0's leaves 10 and 11 (their first child's index 0), whose children 1
+// to 6 are its child 0's leaves 12 to 23 and those leaves' child 2 its child
+// 1's leaves 10 to 21 (without them the pages wrote the colors and +80 of
+// the pool's nodes, the live scene's among them); sub-scene 31's own
+// children 5 to 14 (state 8's bonnet rows) its child 0's leaves 20 to 29.
+void LayChoiceNodes(uint8_t* base, uint32_t block) {
+  const auto sub = [&](uint32_t k) { return block + (k - kFirstSubScene) * kSubSceneBytes; };
+  const auto leaf = [&](uint32_t k, uint32_t parent, uint32_t j) {
+    return sub(k) + 3 * kBigNode + parent * kLeaves * kLeaf + j * kLeaf;
+  };
+  const auto set_child = [&](uint32_t node, uint32_t i, uint32_t child) {
+    const uint32_t first = guest::LoadU32(base, node + 108);
+    guest::StoreU32(base, node + 128 + 8 * (first + i), child);
+  };
+  const uint32_t sub32 = sub(32);
+  for (uint32_t p = 0; p < 2; p++) {
+    const uint32_t parent = leaf(32, 0, 10 + p);
+    guest::StoreU32(base, parent + 108, 0);
+    guest::StoreU32(base, sub32 + 128 + 8 * (2 + p), parent);
+    for (uint32_t k = 1; k <= 6; k++) {
+      const uint32_t row = leaf(32, 0, 12 + 6 * p + (k - 1));
+      set_child(parent, k, row);
+      set_child(row, 2, leaf(32, 1, 10 + 6 * p + (k - 1)));
+    }
+  }
+  const uint32_t sub31 = sub(31);
+  for (uint32_t n = 5; n < 15; n++) {
+    guest::StoreU32(base, sub31 + 128 + 8 * n, leaf(31, 0, 15 + n));
+  }
+}
+
+// States 7's and 8's fields as play gives them: the level +9661 below 10
+// (the tires' grades 1 to 5: GetChoiceFlag reads +12 level, the world's tire
+// records; category 1 item 3 below 8, SetCaliper's word); the type +9662
+// below 5 (the bonnet's AeroPartValue reads its table of four types per car
+// unchecked, GetChoiceFlag + 8 type), now and then up to 12 elsewhere (the
+// interior's swatches and pictures check it); +9663 0 to 3 (the bonnet's
+// EquipChoice and PreviewItem 0 or 1), now and then any byte where nothing
+// indexes with it (the bonnet, the interior: SetInteriorPair checks it); the
+// option +9664 0 to 2 (the tires' hardness, the door's kind, the bonnet's),
+// now and then below 16 (the help line's string by it); the rows +9679 and
+// +9680 0 to 4, now and then up to 12 (the marks' children are indexed
+// unchecked: 38 + 2 row within each parent's 64 leaves); the words
+// GetChoiceFlag reads (+34000 to +36800) 0 a quarter of the time, else
+// small, now and then any word.
+void ShapeChoiceList(uint8_t* base, uint32_t screen, uint32_t category, uint32_t item,
+                     Random& r) {
+  const bool bonnet = category == 4 && item == 4;
+  const bool interior = category == 6 && item == 0;
+  uint32_t level = r.Below(10);
+  if (category == 3) {
+    level = 1 + r.Below(5);
+  } else if (category == 1 && item == 3) {
+    level = r.Below(8);
+  }
+  guest::StoreU8(base, screen + tuning_screen::kLevel, uint8_t(level));
+  uint32_t type = r.Below(5);
+  if (!bonnet && category != 4 && r.Below(8) == 0) {
+    type = r.Below(13);
+  }
+  guest::StoreU8(base, screen + tuning_screen::kType, uint8_t(type));
+  uint32_t type2 = r.Below(4);
+  if ((bonnet || interior) && r.Below(8) == 0) {
+    type2 = r.Below(256);
+  }
+  guest::StoreU8(base, screen + tuning_screen::kType2, uint8_t(type2));
+  const uint32_t option = r.Below(8) == 0 && !(category == 5 && item == 1) ? r.Below(16)
+                                                                             : r.Below(3);
+  guest::StoreU8(base, screen + tuning_screen::kOption, uint8_t(option));
+  for (const uint32_t at : {9679u, 9680u}) {
+    guest::StoreU8(base, screen + at, uint8_t(r.Below(8) == 0 ? r.Below(13) : r.Below(5)));
+  }
+  for (uint32_t at = 34000; at < 36800; at += 4) {
+    const uint32_t word =
+        r.Below(4) == 0 ? 0 : (r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(10));
+    guest::StoreU32(base, screen + at, word);
+  }
 }
 
 }  // namespace
@@ -543,8 +624,8 @@ void TuningRefresh(Context& h) {
   for (int c = 0; c < kCases; c++) {
     // The state: each of 3, 4 and 9 to 58 in turn for the first 104 cases
     // (two rounds), then 3 and 4 mostly, the dispatch's states, and outside 3
-    // to 58 (below, above, negative). States 5 to 8 aren't among them: states
-    // 5 and 6 have their groups below, 7 and 8 come with part 4.
+    // to 58 (below, above, negative). States 5 to 8 aren't among them: they
+    // have their groups below.
     uint32_t state;
     if (c < 104) {
       const uint32_t k = uint32_t(c % 52);
@@ -671,6 +752,56 @@ void TuningRefresh(Context& h) {
     }
     results6.Report();
   }
+
+  // States 7 and 8 (part 4 of the migration), groups of their own after
+  // state 6's: the same world with state 6's nodes, states 7's and 8's
+  // (LayChoiceNodes) and the fields shaped (ShapeChoiceList).
+  const auto choice_group = [&](uint64_t seed, const char* name, uint32_t state,
+                                const std::vector<std::pair<uint32_t, uint32_t>>& pages,
+                                int cases) {
+    Random rc(seed);
+    Results resultsc(name);
+    for (int c = 0; c < cases; c++) {
+      uint32_t category = pages[uint32_t(c) % pages.size()].first;
+      uint32_t item = pages[uint32_t(c) % pages.size()].second;
+      switch (rc.Below(12)) {
+        case 0:
+          category = rc.Below(2) == 0 ? 7 : (rc.Below(2) == 0 ? 0xFFFFFFFFu : uint32_t(rc.Next()));
+          item = rc.Below(10);
+          break;
+        case 1:
+          if (category != 4 && category != 1) {
+            item = rc.Below(256);
+          }
+          break;
+        default: break;
+      }
+      run(rc, resultsc, c, state, category, item, [&](uint32_t movie) {
+        LayTuningStandTires(base, block, rc);
+        LayTuningStandEngines(base, block);
+        LaySubScenes(base, sub_scenes, movie, rc);
+        LayTypeNodes(base, sub_scenes, movie);
+        LayChoiceNodes(base, sub_scenes);
+        ShapeChoiceList(base, screen, category, item, rc);
+      });
+    }
+    resultsc.Report();
+  };
+  // State 7: the bonnet (category 4 item 4), category 1 item 3's swatches
+  // and the interior's (category 6 item 0, its types 0 to 4 at random) each
+  // several times, then the pages without (the aero's other items, the power
+  // train's, the interior's others, categories 0, 2, 3 and 5).
+  choice_group(0x5265667265736807ull, "TuningScreen::Refresh (sub_821E3AD0) state 7", 7,
+               {{4, 4}, {1, 3}, {6, 0}, {4, 4}, {1, 3}, {6, 0}, {4, 4}, {6, 0}, {6, 0},
+                {4, 0}, {4, 3}, {4, 9}, {1, 0}, {1, 4}, {6, 1}, {6, 2}, {6, 3}, {0, 0},
+                {0, 2}, {2, 0}, {3, 1}, {5, 1}, {5, 3}},
+               300);
+  // State 8: the tires (category 3 items 0 to 2), the door (category 5 item
+  // 1) and the bonnet, each several times, then the pages without.
+  choice_group(0x5265667265736808ull, "TuningScreen::Refresh (sub_821E3AD0) state 8", 8,
+               {{3, 0}, {5, 1}, {4, 4}, {3, 1}, {5, 1}, {4, 4}, {3, 2}, {5, 1}, {4, 4},
+                {4, 0}, {4, 3}, {5, 0}, {5, 2}, {6, 0}, {1, 3}, {0, 0}, {2, 0}, {6, 3}},
+               300);
 
   for (size_t i = 0; i < globals.size(); i++) {
     Write(base, globals[i].first, saved[i].data(), globals[i].second);

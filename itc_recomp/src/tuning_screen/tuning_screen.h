@@ -482,8 +482,8 @@ uint64_t SetCarStats(uint8_t* base, const front_end_car_draw::Calls& calls, uint
 // r3 = the screen (all 64 bits). Movie 2 set up for the state +9652: the
 // header (the money, EquipChoice, SetCarStats and sub-scene 18's stats, the
 // price, ShowTireMarks, PickCameraPreset, PreviewItem,
-// GarageStage::SetLightsOn), then the state's page (3 to 5 here; 6 to 8 not
-// ported yet, their adapter's gate runs the original; 15 to 17 SetStateTexts,
+// GarageStage::SetLightsOn), then the state's page (3 to 8 here, in
+// refresh.cpp and refresh_level, _type and _choice.cpp; 15 to 17 SetStateTexts,
 // 23 to 37 RefreshMovie13 for the vinyl, RefreshPaint, RefreshLightKits,
 // RefreshMovie14 and RefreshInterior through the guest). 368-byte frame
 // (movie 2's id, then the weight's conversion at frame + 80; child 12's

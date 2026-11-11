@@ -1,8 +1,8 @@
 // TuningScreen::Refresh's pieces (sub_821E3AD0, docs/functions/tuning-screen.md's
 // "The refresh"), shared by its files: refresh.cpp (the header, states 3 and
-// 4, the help line's tail and the dispatch for states 15 to 58), and the
-// later parts' refresh_level.cpp (state 5), refresh_type.cpp (6) and
-// refresh_choice.cpp (7 and 8), each defining its state's method below.
+// 4, the help line's tail and the dispatch for states 15 to 58),
+// refresh_level.cpp (state 5), refresh_type.cpp (6) and refresh_choice.cpp
+// (7 and 8), each defining its state's method below.
 //
 // The original keeps the screen in r31 (all 64 bits of r3 at entry), movie
 // 2 in r30 and its 368-byte frame at r1; its callees' frames are below that
@@ -89,8 +89,6 @@ struct Context {
   void State6();  // TYPE_SELECT (block 5, refresh_type.cpp)
   // State 6's rear spoiler help string (629, 630 or 865; refresh_type.cpp).
   uint64_t SpoilerHelp() const;
-  // Later parts (each in its own file once ported; stubs in refresh.cpp until
-  // then, never reached: the adapter's gate runs the original for them).
   void State7();  // the bonnet's and colors' choice (block 6, refresh_choice.cpp)
   void State8();  // the option select (block 7, refresh_choice.cpp)
 };

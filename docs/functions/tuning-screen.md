@@ -284,6 +284,47 @@ path and nothing reads it after: the help line's tail reads r30 only,
 then the epilogue restores r22 to r31 (checked in `generated/`). The
 native state needs `--native_car_specs` too (the adapter's gate).
 
+Found in its migration's part 4 (states 7 and 8, 2026-11-11; blocks 6
+and 7 above corrected here; the refresh is native for every state since,
+the split migration's gate removed). State 7 sets no textures. The
+bonnet's list is sub-scene 30's child 1's children 5 to 14 (hidden, then
+5 with 376 and 6 with 380 shown) and its marks child 0's (as state 6's,
+over the byte +9679 rows); category 1 item 3 has one row, sub-scene 32's
+child 2's child 1 (376), and its swatches are that child 2's children 2
+to 5's child 2: (0, 0, 0), (240, 30, 30), (30, 30, 240), (255, 220,
+30), none shown or hidden. The interior's (category 6 item 0): sub-scene
+32's child 3's children 1 to **6** hidden (the loop counts before its
+test), then by the type +9662: 1 or 2, children 1 to 4 shown with their
+child 2 colored (170, 170, 170), (0, 0, 0), (240, 30, 30), (30, 30,
+240); 3, children 1 to 3 with (0, 0, 0), (240, 30, 30), (30, 30, 240);
+4, children 1 to 4 with (0, 0, 0), (216, 0, 150), (42, 0, 255), (170,
+170, 170); other types none. `sub_821E7DA0` is a leaf storing r5, r6
+and r7 (the color) into r4's +56, +60 and +64 (r3 the screen, unread); it
+stays recompiled, called through the guest. Node 17: the bonnet's as
+state 6's (`AeroPartValue`(type − 1, item) twice, hidden with +108 0 on
+-1; type 0 hides it); the interior's shown for a type other than 0 with
+no +108 set; categories 4's other items leave it. The help line: 758
+(category 1 item 3), 847 (the interior), else the scroll alone (after
+the reset, every category). State 8: the textures (m, 3, 1, 6) and (3,
+2, 31) only for the door (category 5 item 1) while +9716 is set. The
+rows: the bonnet's are sub-scene 31's own children 5 to 14 (not a
+child's): 5 with 381, 6 with 382; the tires' (category 3, any item)
+sub-scene 33's child 1's 5 to 7 with 200, 201, 202; the door's sub-scene
+28's child 1's 5 with 376 and 6 with 394. The marks (over the byte +9680
+rows, `GetChoiceFlag`) only for the tires (sub-scene 33's child 0) and
+the door (28's); the bonnet has none in state 8. Then the door's
+`GarageStage::Command`(holder, 4); node 17 for the bonnet as state 7's;
+the help line 781 + byte +9664 (the tires), 790 + it (the door), else
+the scroll alone. Register leftovers the `SetNodeText` calls get from
+the refresh's own code: r10 the item byte on the bonnet's rows (both
+states, from its category test) and r6 31 on the door's rows when the
+textures were set (the second `SetNodeTexture`'s; `FindNode` and `Child`
+keep r6 and r10). f1: `GarageStage::Command` 4 loads the float at
+`0x82000F14` (60.0) into f1 for its `GarageAnims::Add`, which keeps it,
+but its adapter (`front-end-car-draw.md`, the plain C++ the recompiled
+refresh reaches) leaves f1 as it was; the native refresh does the same
+(f1 is probably dead after the refresh).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the

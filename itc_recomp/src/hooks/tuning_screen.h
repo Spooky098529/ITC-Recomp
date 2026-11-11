@@ -134,8 +134,8 @@ bool TuningCarStatsCalleesNative();
 void TuningSetCarStats(PPCContext& ctx, uint8_t* base);
 // Refresh sub_821E3AD0 (r3 the screen, all 64 bits; r3 1 or 0; f1 as the
 // original leaves it, RefreshMenu's way), with TuningStandCalleesNative and
-// TuningCarStatsCalleesNative. Its states 5 to 8 run the original for now
-// (the split migration's gate).
+// TuningCarStatsCalleesNative (and --native_car_specs, its adapter's check):
+// every state natively.
 void TuningRefresh(PPCContext& ctx, uint8_t* base);
 // UpdateStand sub_821D9F10 (r3 the screen; r3 GarageStage::Draw's), only
 // with TuningUpdateStandCalleesNative: TuningStandCalleesNative,

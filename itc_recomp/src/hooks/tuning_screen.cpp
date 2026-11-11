@@ -68,8 +68,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_822042D8, DecalCommand sub_822019D0, PreviewItem sub_821E07B0 and RestoreStand "
               "sub_821E0FB0 (their callees never seen in play through the guest), UpdateStand "
               "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag); SetCarStats sub_821DF788 with the "
-              "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both and --native_car_specs, its states 7 "
-              "and 8 not ported yet and run by the original) natively instead of through the "
+              "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both and --native_car_specs, every state; "
+              "its swatch color setter sub_821E7DA0, never seen in play, through the guest) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
 
@@ -511,14 +511,6 @@ void TuningPreviewWheels(PPCContext& ctx, uint8_t* base) {
 }
 
 void TuningRefresh(PPCContext& ctx, uint8_t* base) {
-  // The gate for the refresh's split migration (temporary): states 7 and 8
-  // aren't ported yet and run the original; part 4 removes it (the choice and
-  // option pages).
-  const int32_t state = int32_t(guest::LoadU32(base, ctx.r3.u32 + ts::kState));
-  if (state >= 7 && state <= 8) {
-    __imp__sub_821E3AD0(ctx, base);
-    return;
-  }
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   std::optional<double> f1;
@@ -676,7 +668,7 @@ extern "C" REX_FUNC(sub_821DF788) {
 
 // Refresh: the original unless its callees onto the stand, SetCarStats' and
 // the car specs (state 6's rear spoiler: Params::GetCarParts, the aero parts)
-// are native (states 7 and 8 still the original: the register step's gate).
+// are native.
 extern "C" REX_FUNC(sub_821E3AD0) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningStandCalleesNative() ||

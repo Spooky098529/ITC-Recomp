@@ -429,6 +429,7 @@ set(ITC_SOURCES
     src/tuning_screen/refresh.cpp
     src/tuning_screen/refresh_level.cpp
     src/tuning_screen/refresh_type.cpp
+    src/tuning_screen/refresh_choice.cpp
     src/hooks/tuning_pages.cpp
     src/tuning_pages/tables.cpp
     src/tuning_pages/editor.cpp
@@ -970,6 +971,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/tuning_screen/stand.cpp src/tuning_screen/menus.cpp src/tuning_screen/rows.cpp
     src/tuning_screen/stats.cpp src/tuning_screen/refresh.cpp
     src/tuning_screen/refresh_level.cpp src/tuning_screen/refresh_type.cpp
+    src/tuning_screen/refresh_choice.cpp
     src/tuning_machine/set_up.cpp
     src/tuning_machine/prices.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
