@@ -6,9 +6,10 @@
 // every callee gets r3 = r31. The callees seen in play by their plain C++
 // (as their adapters run them), DrawPowerGraph through its override (its
 // adapter works through the guest), UiMovie::Run through its override, the
-// debug state handlers all by their plain C++ (debug.cpp), and the command
-// runners never seen in play (below) through the guest with the original's
-// return addresses. The empty
+// debug state handlers all by their plain C++ (debug.cpp), movie 2's command
+// runners never seen in play 5, 11, 12 and 54 to 58 by their plain C++
+// (commands.cpp), and the other command runners never seen in play (below)
+// through the guest with the original's return addresses. The empty
 // sub_82106540's calls (the "TUNING SHOP" print, commands 24 and 28) are
 // left out, as other native callers of it do.
 
@@ -39,10 +40,7 @@ struct Guest {
 // arguments: the switch below passes them.
 Guest CommandGuest(uint32_t command) {
   switch (command) {
-    case 5: return {0x821D4180, 0x821E6FD4};
     case 10: return {0x821F35C0, 0x821E7010};
-    case 11: return {0x821E9730, 0x821E701C};
-    case 12: return {0x821E9CA0, 0x821E7028};
     case 13: return {0x821EA460, 0x821E7034};
     case 14: return {0x821EAFA0, 0x821E7040};
     case 17: return {0x82200100, 0x821E7064};
@@ -73,11 +71,6 @@ Guest CommandGuest(uint32_t command) {
     case 51: return {0x821FB8D8, 0x821E7208};
     case 52: return {0x821F77F0, 0x821E7218};
     case 53: return {0x821F7948, 0x821E7224};
-    case 54: return {0x821EB8E8, 0x821E7230};
-    case 55: return {0x821EBDC8, 0x821E723C};
-    case 56: return {0x821EC6A0, 0x821E7248};
-    case 57: return {0x821ECC68, 0x821E7254};
-    case 58: return {0x821EDB70, 0x821E7260};
     default: return {0, 0};
   }
 }
@@ -215,10 +208,13 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
           case 2: OpenItems(base, call, s, frame); break;
           case 3: ShowLevels(base, call, s, frame); break;
           case 4: ShowTypes(base, call, s, frame, calls.native_specs); break;
+          case 5: Command5(base, call, s, frame); break;
           case 6: ShowOptions(base, call, s, frame); break;
           case 7: Command7(base, call, s, frame); break;
           case 8: Command8(base, call, r3, frame); break;
           case 9: Command9(base, call, s, frame); break;
+          case 11: Command11(base, call, s, frame); break;
+          case 12: Command12(base, call, s, frame); break;
           case 15: Command15(base, call, s, frame); break;
           case 16: Command16(base, call, s, frame); break;
           case 18: Command18(base, call, s, frame); break;
@@ -233,6 +229,11 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
           }
           case 30: Command30(base, call, r3, dispatcher, frame); break;
           case 31: Command31(base, call, s, frame); break;
+          case 54: Command54(base, call, s, frame); break;
+          case 55: Command55(base, call, s, frame); break;
+          case 56: Command56(base, call, s, frame); break;
+          case 57: Command57(base, call, s, frame, f1); break;
+          case 58: Command58(base, call, s, frame); break;
           case 63: ShowDialog(base, call, r3, dispatcher, frame); break;
           case 64: MarkPick(base, call, s, frame); break;
           default: break;  // 24 and 28 the empty sub_82106540, 59 to 62 none

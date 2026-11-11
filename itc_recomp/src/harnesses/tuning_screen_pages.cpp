@@ -728,6 +728,52 @@ void Movie13World(const World& w, Random& r) {
   }
 }
 
+// The command runners' pages (Command5 to Command58 of movie 2): the lists'
+// pages, the category 1, 4 or 6 mostly with the items Command5 tests half
+// the time; the fields named animations are made from small (+9663 now and
+// then to 250, +30492 to 136 and +30500 to 97, so the names stay below
+// 1,024), the fields GetCurrentChoice and GetChoiceFlag index by ([+33900],
+// +25204, [+33540]) small, [+36368] the type byte half the time, the page
+// [+33564] 4 half the time, the pick [+33548] 3 a third of the time, the
+// point [+33572] 0 to 6; the looping list given slots naming 1005 and 144
+// (time -1.0 or another; on node 0 and one of the 8 animations, as the
+// named animations' Finish reads them) now and then.
+void CommandPage(const World& w, Random& r) {
+  ListPage(w, r);
+  const uint32_t s = w.screen();
+  static constexpr uint32_t kCategories[] = {1, 4, 6, 1, 4, 6, 0, 3, 5};
+  const uint32_t category = r.Below(8) == 0 ? r.Below(8) : kCategories[r.Below(9)];
+  guest::StoreU32(w.base, s + ts::kCategory, category);
+  if (r.Below(2) == 0) {
+    guest::StoreU8(w.base, s + ts::kItem, uint8_t(category == 1 ? 3 : category == 4 ? 4 : 0));
+  }
+  guest::StoreU8(w.base, s + ts::kType2, uint8_t(r.Below(6) == 0 ? r.Below(251) : r.Below(8)));
+  guest::StoreU32(w.base, s + 30492, r.Below(4) == 0 ? r.Below(137) : r.Below(8));
+  guest::StoreU32(w.base, s + 30500, r.Below(4) == 0 ? r.Below(98) : r.Below(8));
+  guest::StoreU32(w.base, s + 33900, r.Below(8));
+  guest::StoreU32(w.base, s + 25204, r.Below(18));
+  guest::StoreU32(w.base, s + 33540, r.Below(3));
+  guest::StoreU32(w.base, s + 36368,
+                  r.Below(2) == 0 ? guest::LoadU8(w.base, s + ts::kType) : r.Below(8));
+  guest::StoreU32(w.base, s + 33564, r.Below(2) == 0 ? 4 : r.Below(6));
+  guest::StoreU32(w.base, s + 33548, r.Below(3) == 0 ? 3 : r.Below(5));
+  guest::StoreU32(w.base, s + 33556, r.Below(4) == 0 ? r.Below(250) : r.Below(8));
+  guest::StoreU32(w.base, s + 33572, r.Below(7));
+  guest::StoreU32(w.base, s + 33576, r.Below(4) == 0 ? r.Below(900) : r.Below(8));
+  const uint32_t looping = w.at(kMovieAt) + ui_movies::kMovieLooping;
+  for (const uint32_t named : {1005u, 144u}) {
+    if (r.Below(3) == 0) {
+      ui_movies::Slot slot{};
+      slot[0] = 0x7777;
+      slot[2] = named;
+      slot[3] = w.node(0);  // the node and animation FinishNamed reads
+      slot[4] = w.at(kAnimationsAt) + 64 * r.Below(8);
+      slot[5] = r.Below(2) == 0 ? 0xBF800000u : uint32_t(r.Next());
+      ui_movies::Append(w.base, looping, slot);
+    }
+  }
+}
+
 constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
 constexpr uint32_t kCommand30States[] = {35, 36, 37};
 
@@ -988,6 +1034,58 @@ void TuningScreenPages(Context& h) {
   Run(h, w, {"TuningScreen::RefreshMovie13", 40, __imp__sub_822076E8,
              hooks::TuningRefreshMovie13, {{-128, -128 + 40}, {-128 + 80, -32}},
              [](PPCContext&, Random& r, const World& w) { Movie13World(w, r); }, true});
+  // Movie 2's command runners never seen in play (after the groups above,
+  // so they keep their seeds): the command pages (above). Command5: f31 and
+  // r29 to r31 saved (40 bytes).
+  const Setup command_page = [](PPCContext&, Random& r, const World& w) { CommandPage(w, r); };
+  Run(h, w, {"TuningScreen::Command5", 50, __imp__sub_821D4180, hooks::TuningCommand5,
+             {{-128, -40}}, [](PPCContext&, Random& r, const World& w) {
+               // Its three pages (body's item 3, aero's 4, interior's 0) two
+               // times in three, their set-up (+9716) half of those.
+               CommandPage(w, r);
+               if (r.Below(3) != 0) {
+                 static constexpr uint8_t kPages[3][2] = {{1, 3}, {4, 4}, {6, 0}};
+                 const uint8_t(&page)[2] = kPages[r.Below(3)];
+                 guest::StoreU32(w.base, w.screen() + ts::kCategory, page[0]);
+                 guest::StoreU8(w.base, w.screen() + ts::kItem, page[1]);
+                 if (r.Below(2) == 0) {
+                   guest::StoreU32(w.base, w.screen() + 9716, 1);  // the page's set-up
+                 }
+               }
+             }});
+  // Command11: r28 to r31 saved (40 bytes), SetText's parameter area left
+  // out.
+  Run(h, w, {"TuningScreen::Command11", 25, __imp__sub_821E9730, hooks::TuningCommand11,
+             {{-128, -128 + 48}, {-128 + 80, -40}}, command_page});
+  // Command12: r29 to r31 saved (32 bytes).
+  Run(h, w, {"TuningScreen::Command12", 25, __imp__sub_821E9CA0, hooks::TuningCommand12,
+             {{-128, -32}}, command_page});
+  // Command54, Command56 and Command58: r28 to r31 saved (40 bytes).
+  Run(h, w, {"TuningScreen::Command54", 20, __imp__sub_821EB8E8, hooks::TuningCommand54,
+             {{-128, -40}}, command_page});
+  // Command55: f31 and r28 to r31 saved (48 bytes).
+  Run(h, w, {"TuningScreen::Command55", 40, __imp__sub_821EBDC8, hooks::TuningCommand55,
+             {{-144, -48}}, [](PPCContext&, Random& r, const World& w) {
+               // The current choice 3 or small two times in three (body's,
+               // [+35708]), the set-up (+9716) half of those.
+               CommandPage(w, r);
+               if (r.Below(3) != 0) {
+                 const uint32_t s = w.screen();
+                 guest::StoreU32(w.base, s + ts::kCategory, 2);
+                 guest::StoreU32(w.base, s + 35708, r.Below(2) == 0 ? 3 : r.Below(8));
+                 if (r.Below(2) == 0) {
+                   guest::StoreU32(w.base, s + 9716, 1);
+                 }
+               }
+             }});
+  Run(h, w, {"TuningScreen::Command56", 25, __imp__sub_821EC6A0, hooks::TuningCommand56,
+             {{-128, -40}}, command_page});
+  // Command57: f31 and r23 to r31 saved (88 bytes), SetNodeText's
+  // parameter area (+40 to +79) left out; f1 compared.
+  Run(h, w, {"TuningScreen::Command57", 40, __imp__sub_821ECC68, hooks::TuningCommand57,
+             {{-176, -176 + 40}, {-176 + 80, -88}}, command_page, true});
+  Run(h, w, {"TuningScreen::Command58", 25, __imp__sub_821EDB70, hooks::TuningCommand58,
+             {{-128, -40}}, command_page});
 }
 
 }  // namespace harness

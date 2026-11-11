@@ -111,6 +111,20 @@ void TuningCommand8(PPCContext& ctx, uint8_t* base);
 void TuningRefreshMenu(PPCContext& ctx, uint8_t* base);
 // RefreshMovie13 sub_822076E8 (r3 the screen; f1 as the original leaves it).
 void TuningRefreshMovie13(PPCContext& ctx, uint8_t* base);
+// Movie 2's command runners never seen in play, for the harness only (no
+// recompiled caller reaches them: the update's plain C++ calls their plain
+// C++; r3 = the screen): Command5 sub_821D4180, Command11 sub_821E9730,
+// Command12 sub_821E9CA0, Command54 sub_821EB8E8, Command55 sub_821EBDC8,
+// Command56 sub_821EC6A0, Command57 sub_821ECC68 (f1 as the original leaves
+// it, RefreshMenu's way) and Command58 sub_821EDB70.
+void TuningCommand5(PPCContext& ctx, uint8_t* base);
+void TuningCommand11(PPCContext& ctx, uint8_t* base);
+void TuningCommand12(PPCContext& ctx, uint8_t* base);
+void TuningCommand54(PPCContext& ctx, uint8_t* base);
+void TuningCommand55(PPCContext& ctx, uint8_t* base);
+void TuningCommand56(PPCContext& ctx, uint8_t* base);
+void TuningCommand57(PPCContext& ctx, uint8_t* base);
+void TuningCommand58(PPCContext& ctx, uint8_t* base);
 
 // The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
 // with TuningStandCalleesNative: --native_stand_models, --native_race_setup

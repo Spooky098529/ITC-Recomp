@@ -982,7 +982,7 @@ void TuningRefresh(Context& h) {
     // 26, 27, 53, 54, 56) and the empty ones (24, 28, 59 to 62).
     static constexpr uint32_t kRunners[] = {7,  9,  15, 16, 18, 22, 23, 25, 29, 30, 31, 63, 64,
                                             11, 12, 17, 19, 20, 26, 27, 53, 54, 56, 24, 28, 59,
-                                            60, 61, 62};
+                                            60, 61, 62, 5,  55, 57, 58};
     constexpr uint32_t kRunnerCount = sizeof(kRunners) / sizeof(kRunners[0]);
     constexpr int kUpdateCases = 400;
     for (int c = 0; c < kUpdateCases; c++) {

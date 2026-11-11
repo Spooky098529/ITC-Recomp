@@ -80,7 +80,11 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag); SetCarStats sub_821DF788 with the "
               "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both and --native_car_specs, every state; "
               "Update sub_821E6C50 (its pieces sub_821E6CD4 and sub_821E6F90 merged) with the refresh's and "
-              "UpdateStand's checks, its callees never seen in play and DrawPowerGraph through the guest; "
+              "UpdateStand's checks, its callees never seen in play and DrawPowerGraph through the guest "
+              "but movie 2's command runners never seen in play, called only by the update's plain C++: "
+              "Command5 sub_821D4180, Command11 sub_821E9730, Command12 sub_821E9CA0, Command54 "
+              "sub_821EB8E8, Command55 sub_821EBDC8, Command56 sub_821EC6A0, Command57 sub_821ECC68 "
+              "(UiMovie::NamedAnimationTime by its plain C++) and Command58 sub_821EDB70; "
               "its swatch color setter sub_821E7DA0, never seen in play, through the guest) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
@@ -370,6 +374,13 @@ ITC_TUNING_CALLS_STEP(MarkPick)
 ITC_TUNING_CALLS_STEP(Command16)
 ITC_TUNING_CALLS_STEP(ShowOptions)
 ITC_TUNING_CALLS_STEP(ShowLevels)
+ITC_TUNING_CALLS_STEP(Command5)
+ITC_TUNING_CALLS_STEP(Command11)
+ITC_TUNING_CALLS_STEP(Command12)
+ITC_TUNING_CALLS_STEP(Command54)
+ITC_TUNING_CALLS_STEP(Command55)
+ITC_TUNING_CALLS_STEP(Command56)
+ITC_TUNING_CALLS_STEP(Command58)
 
 #undef ITC_TUNING_CALLS_STEP
 
@@ -435,6 +446,26 @@ void TuningRefreshMenu(PPCContext& ctx, uint8_t* base) {
       return inner(function, args, frame, lr);
     };
     return ts::RefreshMenu(base, call, screen, sp, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
+void TuningCommand57(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  std::optional<double> f1;
+  WithCalls(ctx, base, [&](const ts::GuestCall& inner) {
+    const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
+                                   uint32_t frame, uint32_t lr) {
+      if (f1) {
+        ctx.f1.f64 = *f1;
+        f1.reset();
+      }
+      return inner(function, args, frame, lr);
+    };
+    return ts::Command57(base, call, screen, sp, &f1);
   });
   if (f1) {
     ctx.f1.f64 = *f1;
