@@ -644,6 +644,15 @@ user's call) and validated again (35 of 35 harness lines). The rest
 waits on the type 2 mode's +0x173D0 machine, `Garage::Sell`, the
 tuning screen's refresh `sub_821E3AD0` and the leads in
 `docs/loops/leads.md`.
+Its forty-third run (`b7-loop-10-11-26-2`, 2026-11-10 to 11, not yet
+merged; summary `docs/loops/b7-loop-2026-11-10-2352.md`) made the car
+settings screen (`car-settings.md`, `--native_car_settings`, 7 of 7 in
+play: the type 2 mode's +0x173D0 machine, its Inits and handlers; its
+pages and `Update` never ran) native (ours 5,402 -> 5,409), then halted
+at its validation: `GarageScreen::Transition6`'s harness (the
+forty-first run's) differed in 2 of 100 cases in the all-harness race
+(`itc_4810`). The rest waits on `Garage::Sell`, the tuning screen's
+refresh `sub_821E3AD0` and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

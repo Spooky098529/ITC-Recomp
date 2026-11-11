@@ -24,9 +24,17 @@ file's history. What's left to see in a drive, from every run:
   Overridden: functors and recompiled callers; `--native_car_settings`;
   races 38 s at 40, 0 errors, its 7 harnesses 0 differing; no
   subagents). Left: none (the 84 never seen in play stay recompiled).
-  Step: validation agent running.
+  Validation halted: `itc_4810` (race 65 s at 180, the harnesses
+  ~113 s, 0 errors), 7 of 7 harness lines, every `car_settings` case
+  matched, but `GarageScreen::Transition6`'s harness (the forty-first
+  run's `garage_screen`) differed in 2 of 100 cases. No prints added.
+  The replay `itc_4811` was ok: 6 ran in it, `InitType5` to drive.
 
 ## Done
+
+- The car settings screen: `car-settings.md`, 7 of 7 in play (all
+  Overridden), `--native_car_settings`, 42211c94..73886334; its
+  validation halted on another subsystem's harness.
 
 ## Rows to review
 
@@ -52,3 +60,12 @@ The run's section of `review.md` ("Run 2026-11-10 23:52").
   390, unknown 649).
 
 ## Stopped
+
+2026-11-11, halted at the car settings' validation (subsystem 1 of 3):
+in the all-harness race `itc_4810`, `GarageScreen::Transition6`
+(`sub_82194680`, `src/harnesses/` `garage_screen`, made in the
+forty-first run) differed in cases 87 and 88 at entry 12 (bytes, byte
+68): recompiled "gbhta" in UTF-16 and zeros, native 0x0259E3C0 x18 and
+random-looking bytes ("When to halt": a harness differs). Every
+`car_settings` case matched. Not debugged by the loop; probably a
+harness world word left random, as 4438f1c3. Nothing uncommitted.

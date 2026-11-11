@@ -32,6 +32,9 @@ When the user has reviewed a run's section, its heading gets
   machine's own (deletes movie 3, returns `Delete`'s r3 or 0, message 4
   only for mode types 2 and 5); both Inits by step tables
   (`init_step_tables.py`), unwritten frame words copied as left.
+- The halt (2026-11-11): `GarageScreen::Transition6`'s harness
+  differed in 2 of 100 cases in `itc_4810` (see the progress file's
+  "Stopped"); to fix before the merge.
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 

@@ -16,6 +16,13 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
+
+Not in the attract race or the replay (`itc_4810`, `itc_4811`, ok):
+
+- `sub_821B7878` CarSettings::InitType5 (`car-settings.md`; the type 5
+  mode, the parking area's)
+
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 
 - The race menu (`race-menu.md`; attract race `itc_4804` never raced:

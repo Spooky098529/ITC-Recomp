@@ -281,7 +281,12 @@ goes in `src/` as overrides), American English.
   race menu (`race-menu.md`, 38 of 38) native (ours 5,364 -> 5,402);
   `Transition3`'s harness read a wild address in the all-harness race,
   fixed after the stop (4438f1c3) and validated again; the run was
-  ended there by the user and merged. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  ended there by the user and merged. Its forty-third run
+  (`b7-loop-10-11-26-2`, 2026-11-10 to 11, halted at its first
+  validation) made the car settings screen (`car-settings.md`, 7 of 7
+  in play: the type 2 mode's +0x173D0 machine) native (ours 5,402 ->
+  5,409); the all-harness race found `GarageScreen::Transition6`'s
+  harness (the forty-first run's) differing in 2 of 100 cases. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2829,6 +2834,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-09 | The type 2 mode's dialog (its machine at the mode's +0x1E4C8: four dialogs over UI movies 16 to 19, the confirm and notice pairs; its 11 transitions, `Draw`'s 4 pages, `Update`'s 10 steps and `Init`) | `type2-dialog.md` | 28 of 28 (one migration; no adapter removable) | `--native_type2_dialog` |
 | 2026-11-09 | The type 2 mode's garage screen (its machine at the mode's +0x23018, UI movie 5: the player's garage cars over the stand; its handlers, `InitStates`' 20 transitions, the list and leave pages, `UpdatePage`, `Update`, the list's set-up) | `garage-screen.md` | 22 of 22 in play (one migration; 7 adapters removed) | `--native_garage_screen` |
 | 2026-11-09 | The tuning screen's machine (the type 2 mode's +19792: its Init, creation, UI movies 2, 13 and 14, `TuningScreen::SetUp` from the garage car with the part tables' loaders and prices, the dialog's replies, unload, close and teardown; not `Start`, which waits on the refresh `sub_821E3AD0`) | `tuning-machine.md` | 18 of 19 in play (one migration, `SetUp` split over five parts; 5 adapters removed, 3 Native without one) | `--native_tuning_machine` |
+| 2026-11-10 | The type 2 mode's race menu (its machine at the mode's +9640: the race mode, event and variant pages, the confirm, the event's start) | `race-menu.md` | 38 of 38 (one migration, 7 subagents; 21 Native, 3 Merged); validation halted on its harness, fixed (4438f1c3) and validated again | `--native_race_menu` |
+| 2026-11-11 | The car settings screen (the type 2 mode's +0x173D0 machine, UI movie 3, also set up by the type 5 mode: the garage car's gear ratios and settings, a test run; only its Inits and five handlers seen in play) | `car-settings.md` | 7 of 7 in play (one migration; no adapter removable: functors and recompiled callers); 84 never seen in play stay recompiled | `--native_car_settings` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5100,3 +5107,17 @@ boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
 26, never called 70, live 208. Imports: 186 called, 54 with a live
 caller. B7 (`b7_status.py`): ours 5,364, work left 1,133 (Wrapped 56,
 with a row 390, no row yet 687), from 1,135.
+
+**2026-11-11, the car settings screen (branch `b7-loop-10-11-26-2`,
+the forty-third run, halted at its first validation):** `car-settings.md`
+(91 rows, 7 in play), `--native_car_settings`, `src/car_settings/`: the
+type 2 mode's machine at +0x173D0 (UI movie 3), its two Inits (the type
+2 and type 5 modes', by step tables) and the five handlers seen in play;
+`Start`, `Draw`, `Update` and everything under them never ran and stay
+recompiled (`Update`'s 114-function subtree a lead). The validation's
+all-harness race (`itc_4810`) found `GarageScreen::Transition6`'s
+harness differing in 2 of 100 cases, so the run halted. The boundary:
+449 functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,409, work left 1,095 (Wrapped 56, with a row
+390, no row yet 649), from 1,102.
