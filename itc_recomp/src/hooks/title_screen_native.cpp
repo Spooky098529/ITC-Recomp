@@ -49,7 +49,8 @@ ITC_FLAG_BOOL(native_title_screen, true, "ITC",
               "sub_82224C10; press start, TitleScreen::Update sub_822221A0 (its wrap kept; the "
               "mappers' slot 10, MenuSound::Play and SetUpAttractRace, recompiled, through the "
               "guest), OnControllerPicked sub_822219E0 and Players::AssignController "
-              "sub_8209F6B8 (the same writes; checked by --run_harnesses=title_screen)");
+              "sub_8209F6B8; the title load's debug sequence, never seen in play, its pages "
+              "sub_82220CD8 to sub_82220E70 and steps sub_822204F8 to sub_82220B10 (the same writes; checked by --run_harnesses=title_screen)");
 
 namespace hooks {
 
@@ -366,6 +367,32 @@ void PlayersAssignController(PPCContext& ctx, uint8_t* base) {
   ts::AssignController(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+template <uint32_t kWhich>
+void TitleLoadDebugPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::LoadDebugPage(base, kWhich, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+template <uint32_t kWhich>
+void TitleLoadDebugStep(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::LoadDebugStep(base, kWhich, ctx.r3.u32, ctx.r1.u32);
+}
+template void TitleLoadDebugPage<0>(PPCContext&, uint8_t*);
+template void TitleLoadDebugPage<1>(PPCContext&, uint8_t*);
+template void TitleLoadDebugPage<2>(PPCContext&, uint8_t*);
+template void TitleLoadDebugPage<3>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<0>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<1>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<2>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<3>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<4>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<5>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<6>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<7>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<8>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<9>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<10>(PPCContext&, uint8_t*);
+template void TitleLoadDebugStep<11>(PPCContext&, uint8_t*);
+
 }  // namespace hooks
 
 #define ITC_TITLE_SCREEN(address, step)   \
@@ -466,3 +493,21 @@ ITC_TITLE_SCREEN(82225048, ModeType4Resume)
 // OnControllerPicked, are native; sub_8209E698, never seen in play, reaches
 // the original).
 ITC_TITLE_SCREEN(822219E0, TitleScreenOnControllerPicked)
+// The title load's debug sequence, never seen in play (from Draw's and
+// Update's tables).
+ITC_TITLE_SCREEN(82220CD8, TitleLoadDebugPage<0>)
+ITC_TITLE_SCREEN(82220D60, TitleLoadDebugPage<1>)
+ITC_TITLE_SCREEN(82220DE8, TitleLoadDebugPage<2>)
+ITC_TITLE_SCREEN(82220E70, TitleLoadDebugPage<3>)
+ITC_TITLE_SCREEN(822204F8, TitleLoadDebugStep<0>)
+ITC_TITLE_SCREEN(82220580, TitleLoadDebugStep<1>)
+ITC_TITLE_SCREEN(82220610, TitleLoadDebugStep<2>)
+ITC_TITLE_SCREEN(82220698, TitleLoadDebugStep<3>)
+ITC_TITLE_SCREEN(82220720, TitleLoadDebugStep<4>)
+ITC_TITLE_SCREEN(822207B0, TitleLoadDebugStep<5>)
+ITC_TITLE_SCREEN(82220840, TitleLoadDebugStep<6>)
+ITC_TITLE_SCREEN(822208D0, TitleLoadDebugStep<7>)
+ITC_TITLE_SCREEN(82220960, TitleLoadDebugStep<8>)
+ITC_TITLE_SCREEN(822209F0, TitleLoadDebugStep<9>)
+ITC_TITLE_SCREEN(82220A80, TitleLoadDebugStep<10>)
+ITC_TITLE_SCREEN(82220B10, TitleLoadDebugStep<11>)

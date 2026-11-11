@@ -1080,6 +1080,58 @@ void PressStart(Context& h, const World& w) {
              }});
 }
 
+// --- The title load's debug sequence: the pages over the menus' input,
+// the steps with the block's tick count around their limits. ---
+
+void Debug(Context& h, const World& w) {
+  struct Case {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Case pages[] = {
+      {"TitleLoad::DebugPage0 (sub_82220CD8)", __imp__sub_82220CD8, hooks::TitleLoadDebugPage<0>},
+      {"TitleLoad::DebugPage1 (sub_82220D60)", __imp__sub_82220D60, hooks::TitleLoadDebugPage<1>},
+      {"TitleLoad::DebugPage2 (sub_82220DE8)", __imp__sub_82220DE8, hooks::TitleLoadDebugPage<2>},
+      {"TitleLoad::DebugPage3 (sub_82220E70)", __imp__sub_82220E70, hooks::TitleLoadDebugPage<3>},
+  };
+  for (const Case& c : pages) {
+    Run(h, w, {c.name, 100, c.recompiled, c.native, {{-96, -8}},
+               [](PPCContext& t, Random& r, const World& w) {
+                 MenuInput(r, w);
+                 t.r3.u64 = w.mode() | (uint64_t(r.Below(2)) << 32);
+               }});
+  }
+  const Case steps[] = {
+      {"TitleLoad::DebugStep0 (sub_822204F8)", __imp__sub_822204F8, hooks::TitleLoadDebugStep<0>},
+      {"TitleLoad::DebugStep1 (sub_82220580)", __imp__sub_82220580, hooks::TitleLoadDebugStep<1>},
+      {"TitleLoad::DebugStep2 (sub_82220610)", __imp__sub_82220610, hooks::TitleLoadDebugStep<2>},
+      {"TitleLoad::DebugStep3 (sub_82220698)", __imp__sub_82220698, hooks::TitleLoadDebugStep<3>},
+      {"TitleLoad::DebugStep4 (sub_82220720)", __imp__sub_82220720, hooks::TitleLoadDebugStep<4>},
+      {"TitleLoad::DebugStep5 (sub_822207B0)", __imp__sub_822207B0, hooks::TitleLoadDebugStep<5>},
+      {"TitleLoad::DebugStep6 (sub_82220840)", __imp__sub_82220840, hooks::TitleLoadDebugStep<6>},
+      {"TitleLoad::DebugStep7 (sub_822208D0)", __imp__sub_822208D0, hooks::TitleLoadDebugStep<7>},
+      {"TitleLoad::DebugStep8 (sub_82220960)", __imp__sub_82220960, hooks::TitleLoadDebugStep<8>},
+      {"TitleLoad::DebugStep9 (sub_822209F0)", __imp__sub_822209F0, hooks::TitleLoadDebugStep<9>},
+      {"TitleLoad::DebugStep10 (sub_82220A80)", __imp__sub_82220A80,
+       hooks::TitleLoadDebugStep<10>},
+      {"TitleLoad::DebugStep11 (sub_82220B10)", __imp__sub_82220B10,
+       hooks::TitleLoadDebugStep<11>},
+  };
+  // Their frames without their saves (r28 or r29 on, or r31 for step 11).
+  for (const Case& c : steps) {
+    Run(h, w, {c.name, 80, c.recompiled, c.native, {{-128, -40}},
+               [](PPCContext& t, Random& r, const World& w) {
+                 static constexpr uint32_t kLimits[] = {10, 120, 180, 240};
+                 const uint32_t load = w.at(kLoadBlockAt);
+                 const uint32_t limit = kLimits[r.Below(4)];
+                 guest::StoreU32(w.base, load + 4,
+                                 r.Below(4) == 0 ? uint32_t(r.Next()) : limit - 2 + r.Below(4));
+                 t.r3.u64 = load + 16;
+               }});
+  }
+}
+
 }  // namespace
 
 void TitleScreen(Context& h) {
@@ -1096,6 +1148,7 @@ void TitleScreen(Context& h) {
     MenuPages(h, w);
     Mode(h, w);
     PressStart(h, w);
+    Debug(h, w);
   }
 }
 

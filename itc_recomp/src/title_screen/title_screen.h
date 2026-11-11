@@ -345,6 +345,22 @@ uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls);
 // (1 to 3: then 1); else nothing (`r3`). A leaf but for the tail call.
 uint64_t ScreenOnControllerPicked(uint8_t* base, uint64_t r3);
 
+// --- The title load's debug sequence (debug.cpp), never seen in play ---
+
+// sub_82220CD8, sub_82220D60, sub_82220DE8, sub_82220E70
+// TitleLoad::DebugPage0 to 3 (`which`; r3 the mode, unread): unless player
+// 0's mapper entry is blocked, its slot 10 (through the guest) for action
+// 159; on an answer, the block's +8 = 2, 5, 8 or 11, +12 = -1, +16 = 0. The
+// slot's r3, else `r3`. 96-byte frames.
+uint64_t LoadDebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp,
+                       const Calls& calls);
+// sub_822204F8 to sub_82220B10 TitleLoad::DebugStep0 to 11 (`which`; r3
+// the started word): once, the block's +4 = 0; +4 counted; past the step's
+// limit (10, 120, 180 or 240), the next transition and page (and the
+// started word 0 but in step 11). 100 (the print's r3). 96- to 128-byte
+// frames.
+uint64_t LoadDebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t sp);
+
 // --- The machines' set-ups (init.cpp) ---
 //
 // sub_822213B0 TitleLoad::Init and sub_82224270 TitleScreen::Init: their

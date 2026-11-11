@@ -100,5 +100,11 @@ void ModeType4FindShown(PPCContext& ctx, uint8_t* base);
 void TitleScreenPressStart(PPCContext& ctx, uint8_t* base);
 void TitleScreenOnControllerPicked(PPCContext& ctx, uint8_t* base);
 void PlayersAssignController(PPCContext& ctx, uint8_t* base);
+// The title load's debug sequence: its pages (r3 the mode) and steps (r3
+// the started word), 0 to 3 and 0 to 11.
+template <uint32_t kWhich>
+void TitleLoadDebugPage(PPCContext& ctx, uint8_t* base);
+template <uint32_t kWhich>
+void TitleLoadDebugStep(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
