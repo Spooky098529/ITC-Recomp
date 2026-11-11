@@ -526,6 +526,7 @@ set(ITC_SOURCES
     src/race_menu/draw.cpp
     src/hooks/car_settings.cpp
     src/car_settings/handlers.cpp
+    src/car_settings/init.cpp
     src/hooks/type2_screens.cpp
     src/type2_screens/plate_editor.cpp
     src/type2_screens/plate_cells.cpp

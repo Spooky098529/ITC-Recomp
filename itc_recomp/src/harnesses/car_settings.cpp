@@ -258,6 +258,35 @@ void Machine(PPCContext& t, Random& r, const World& w) {
   t.r4.u64 = w.mode();
 }
 
+// The machine's transitions: constructed empty, or a count of random
+// keys (some found again, replaced).
+void Transitions(PPCContext& t, Random& r, const World& w) {
+  namespace gm = game_modes;
+  const uint32_t machine = w.machine();
+  if (r.Below(2) == 0) {
+    gm::StateMachineConstruct(w.base, machine);
+    guest::StoreU32(w.base, machine + gm::kTransitionCount, 0);
+  } else {
+    const uint32_t count = 8 + r.Below(160);
+    guest::StoreU32(w.base, machine + gm::kTransitionCount, count);
+    for (uint32_t i = 0; i < gm::kTransitions; i++) {
+      const uint32_t at = machine + gm::kTransitionBytes * i;
+      guest::StoreU32(w.base, at, r.Below(12));
+      guest::StoreU32(w.base, at + 4, r.Below(52));
+      guest::StoreU32(w.base, at + 8, r.Below(8) == 0 ? 1 : 0);
+      guest::StoreU32(w.base, at + 12, 0);
+    }
+  }
+  t.r3.u64 = machine | (uint64_t(r.Below(2)) << 32);
+}
+
+void Inits(Context& h, const World& w) {
+  Run(h, w, {"CarSettings::Init (sub_821B6FC0)", 24, __imp__sub_821B6FC0, hooks::CarSettingsInit,
+             {{-int32_t(cs::kInitFrame), -48}}, Transitions});
+  Run(h, w, {"CarSettings::InitType5 (sub_821B7878)", 24, __imp__sub_821B7878,
+             hooks::CarSettingsInitType5, {{-int32_t(cs::kInitType5Frame), -48}}, Transitions});
+}
+
 void Handlers(Context& h, const World& w) {
   // Create: the three blocks VirtualAlloc made compared by content.
   Run(h, w, {"CarSettings::Create (sub_821AA2F8)", 60, __imp__sub_821AA2F8,
@@ -311,6 +340,7 @@ void CarSettings(Context& h) {
     ITC_LOG_ERROR("harness: car_settings: no block from the allocation layer");
     return;
   }
+  Inits(h, w);
   if (hooks::NativeHeapActive()) {
     Handlers(h, w);
   }

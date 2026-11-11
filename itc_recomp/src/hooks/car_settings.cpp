@@ -14,8 +14,10 @@ ITC_FLAG_BOOL(native_car_settings, true, "ITC",
               "its handlers Create sub_821AA2F8 and Destroy sub_821AA408 (VirtualAlloc and "
               "VirtualFree through their overrides), OpenMovie sub_821A8DD0, WaitForMovie "
               "sub_821AA490 (UiMovies::IsLoaded's plain C++) and Close sub_821AAF70 "
-              "(UiMovie::FinishAll and UiMovies::Delete through their overrides) (the same "
-              "writes; checked by --run_harnesses=car_settings)");
+              "(UiMovie::FinishAll and UiMovies::Delete through their overrides); the "
+              "set-ups CarSettings::Init sub_821B6FC0 and InitType5 sub_821B7878 (their step "
+              "tables, StateMachine::Add's plain C++) (the same writes; checked by "
+              "--run_harnesses=car_settings)");
 
 namespace hooks {
 
@@ -89,6 +91,23 @@ void CarSettingsDestroy(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cs::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+// StateMachine::Add's adapter's r3: a new transition's address from the
+// machine's 64-bit r3, as the race menu's Init.
+void CarSettingsInit(PPCContext& ctx, uint8_t* base) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = cs::Init(base, machine, ctx.r1.u32 - cs::kInitFrame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+void CarSettingsInitType5(PPCContext& ctx, uint8_t* base) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = cs::InitType5(base, machine, ctx.r1.u32 - cs::kInitType5Frame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_SETTINGS(address, step)  \
@@ -107,3 +126,7 @@ ITC_CAR_SETTINGS(821A8DD0, CarSettingsOpenMovie)
 ITC_CAR_SETTINGS(821AA490, CarSettingsWaitForMovie)
 ITC_CAR_SETTINGS(821AAF70, CarSettingsClose)
 ITC_CAR_SETTINGS(821AA408, CarSettingsDestroy)
+// The set-ups (from the type 2 mode's Init sub_82197278 and the type 5
+// mode's set-up sub_8222FD68, recompiled).
+ITC_CAR_SETTINGS(821B6FC0, CarSettingsInit)
+ITC_CAR_SETTINGS(821B7878, CarSettingsInitType5)
