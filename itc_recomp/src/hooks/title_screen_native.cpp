@@ -380,9 +380,10 @@ ITC_TITLE_SCREEN(82220468, TitleLoadDestroy)
 ITC_TITLE_SCREEN(82221078, TitleLoadPostClose)
 ITC_TITLE_SCREEN(822204C0, TitleLoadWaitForArchive)
 ITC_TITLE_SCREEN(822210C8, TitleLoadPlayLogo)
-// The Inits (from ModeType4::Init sub_82224C70).
-ITC_TITLE_SCREEN(822213B0, TitleLoadInit)
-ITC_TITLE_SCREEN(82224270, TitleScreenInit)
+// The Inits TitleLoad::Init sub_822213B0 and TitleScreen::Init
+// sub_82224270: no adapters (removed, B7 loop, 2026-11-11: their only
+// caller, ModeType4::Init, is native and calls their plain C++; the register
+// steps above are the harness's).
 // The title screen's handlers (functors the machine calls; no direct
 // callers), Update the (5, 0) functor (the transitions).
 ITC_TITLE_SCREEN(82221D98, TitleScreenCreate)
