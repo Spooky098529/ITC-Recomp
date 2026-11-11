@@ -374,11 +374,18 @@ void TuningRefresh(Context& h) {
   const uint32_t strings = memory::Alloc(kRefreshStringsBytes, 0);
   const uint32_t race = memory::Alloc(RaceDataBytes(), 0);
   const uint32_t sub_scenes = memory::Alloc(kSubScenesBytes, 0);
+  // The stage's light points (the stand models' +5060, which the stand world
+  // leaves as its block held it; GarageStage::SetLightsOn's LightValue reads
+  // the float at +176 + 27664), as TuningMachine::Start's harness lays them.
+  constexpr uint32_t kPointsBytes = 0x7000;
+  constexpr uint32_t kLightValueAt = 176 + 27664;
+  constexpr uint32_t kStandModels = 0x12000;  // car_makers.cpp's kModels, 0x1400 apart
+  const uint32_t points = memory::Alloc(kPointsBytes, 0);
   if (stand_allocation == 0 || text_allocation == 0 || screen == 0 || misc == 0 ||
-      strings == 0 || race == 0 || sub_scenes == 0) {
+      strings == 0 || race == 0 || sub_scenes == 0 || points == 0) {
     ITC_LOG_ERROR("harness: tuning_screen: no memory for TuningScreen::Refresh's world");
     for (const uint32_t a :
-         {stand_allocation, text_allocation, screen, misc, strings, race, sub_scenes}) {
+         {stand_allocation, text_allocation, screen, misc, strings, race, sub_scenes, points}) {
       if (a != 0) {
         memory::Free(a);
       }
@@ -407,6 +414,10 @@ void TuningRefresh(Context& h) {
     // The stand's world.
     const uint32_t save = LayTuningStandWorld(base, block, r, c);
     PointTuningStandWorld(base, block);
+    for (uint32_t i = 0; i < 2; i++) {
+      guest::StoreU32(base, block + kStandModels + 0x1400 * i + 5060, points);
+    }
+    guest::StoreFloat(base, points + kLightValueAt, float(c % 64) / 4.0f);
     // The screen at random, its save data the world's.
     for (uint32_t i = 0; i < kScreenBytes; i += 4) {
       guest::StoreU32(base, screen + i, uint32_t(r.Next()));
@@ -841,7 +852,7 @@ void TuningRefresh(Context& h) {
     Write(base, globals[i].first, saved[i].data(), globals[i].second);
   }
   for (const uint32_t a :
-       {stand_allocation, text_allocation, screen, misc, strings, race, sub_scenes}) {
+       {stand_allocation, text_allocation, screen, misc, strings, race, sub_scenes, points}) {
     memory::Free(a);
   }
 }
