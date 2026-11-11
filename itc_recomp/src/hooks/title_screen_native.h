@@ -93,5 +93,12 @@ void ModeType4Resume(PPCContext& ctx, uint8_t* base);
 void ModeType4MachineOf(PPCContext& ctx, uint8_t* base);
 void ModeType4AllLoaded(PPCContext& ctx, uint8_t* base);
 void ModeType4FindShown(PPCContext& ctx, uint8_t* base);
+// "Press start": TitleScreen::Update (r3 the mode, r4 the machine; its
+// override, the wrap in hooks/title_screen.cpp, calls it with the flag
+// on), OnControllerPicked (no arguments) and Players::AssignController (r3
+// the player, r4 the controller; no adapter).
+void TitleScreenPressStart(PPCContext& ctx, uint8_t* base);
+void TitleScreenOnControllerPicked(PPCContext& ctx, uint8_t* base);
+void PlayersAssignController(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

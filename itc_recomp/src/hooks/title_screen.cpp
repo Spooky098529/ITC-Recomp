@@ -10,6 +10,7 @@
 #include "title_screen.h"
 
 #include "hooks/boot_mode.h"
+#include "hooks/title_screen_native.h"
 
 #include "guest.h"
 
@@ -61,13 +62,19 @@ bool TitleScreen_SkipTickWait(bool in_race) {
 
 }  // namespace hooks
 
-// TitleScreen_Update.
+// TitleScreen_Update: its plain C++ (src/title_screen/press_start.cpp) with
+// --native_title_screen, the original without; the idle wait shortened
+// around either.
 extern "C" REX_FUNC(sub_822221A0) {
   REX_FUNC_PROLOGUE();
   int32_t after = ITC_FLAG(attract_after_s) * kTicksPerSecond;
   uint32_t title = guest::LoadU32(base, kTitleScreenPointer);
   int32_t before = title ? int32_t(guest::LoadU32(base, title + kIdleTicksOffset)) : 0;
-  __imp__sub_822221A0(ctx, base);
+  if (hooks::TitleScreenNative()) {
+    hooks::TitleScreenPressStart(ctx, base);  // src/title_screen/press_start.cpp
+  } else {
+    __imp__sub_822221A0(ctx, base);
+  }
   if (after <= 0 || !title || guest::LoadU32(base, kTitleScreenPointer) != title) {
     return;
   }

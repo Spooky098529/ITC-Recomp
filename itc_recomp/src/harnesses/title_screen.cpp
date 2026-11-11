@@ -101,6 +101,9 @@ constexpr Global kGlobals[] = {
     {menu_sounds::kEffectsVolume, 8},
     {menu_sounds::kMusicVolume, 4},
     {0x826D8478, 4},  // the options' settings (ModeType4::Interrupt's +712)
+    {0x826BABA4, 20},  // the players' controllers and the fifth word
+    {0x826C7938, 4},   // the profile read asked for
+    {0x826D8454, 4},   // the controller pick's block (+52 its count)
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -1034,6 +1037,49 @@ void Mode(Context& h, const World& w) {
              }});
 }
 
+// --- "Press start": the menus' input (the four players' mappers), the
+// title's idle count below the attract race's 600 (SetUpAttractRace stays
+// recompiled and needs the race data's world, which the harnesses, run
+// before the boot's data load, don't have: its 600 is seen in every attract
+// race), the controllers' words 0 to 4 or any. ---
+
+void PressStart(Context& h, const World& w) {
+  Run(h, w, {"Players::AssignController (sub_8209F6B8)", 100, __imp__sub_8209F6B8,
+             hooks::PlayersAssignController, {},
+             [](PPCContext& t, Random& r, const World& w) {
+               for (uint32_t k = 0; k < 5; k++) {
+                 guest::StoreU32(w.base, 0x826BABA4 + 4 * k,
+                                 r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(5));
+               }
+               t.r3.u64 = r.Below(4);
+               t.r4.u64 = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(5);
+             }});
+  Run(h, w, {"TitleScreen::OnControllerPicked (sub_822219E0)", 100, __imp__sub_822219E0,
+             hooks::TitleScreenOnControllerPicked, {},
+             [](PPCContext& t, Random& r, const World& w) {
+               guest::StoreU32(w.base, 0x826D8454, w.at(kAnswerAt) + 0x40);
+               guest::StoreU32(w.base, w.at(kAnswerAt) + 0x40 + 52,
+                               r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(6));
+               for (uint32_t k = 0; k < 5; k++) {
+                 guest::StoreU32(w.base, 0x826BABA4 + 4 * k, r.Below(5));
+               }
+               Machine(t, r, w);
+             }});
+  // TitleScreen::Update (the step, without the wrap): the players' input
+  // (MenuInput), the idle count 0 to 597 or negative; its frame without its
+  // saves.
+  Run(h, w, {"TitleScreen::Update (sub_822221A0)", 400, __imp__sub_822221A0,
+             hooks::TitleScreenPressStart, {{-144, -56}},
+             [](PPCContext& t, Random& r, const World& w) {
+               TransitionWorld(r, w);
+               MenuInput(r, w);
+               guest::StoreU32(w.base, w.at(kWordsAt) + 36,
+                               r.Below(4) == 0 ? uint32_t(-int32_t(r.Below(1000))) : r.Below(598));
+               t.r3.u64 = w.mode();
+               t.r4.u64 = w.machine();
+             }});
+}
+
 }  // namespace
 
 void TitleScreen(Context& h) {
@@ -1049,6 +1095,7 @@ void TitleScreen(Context& h) {
     Transitions(h, w);
     MenuPages(h, w);
     Mode(h, w);
+    PressStart(h, w);
   }
 }
 

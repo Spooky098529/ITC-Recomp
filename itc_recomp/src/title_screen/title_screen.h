@@ -325,6 +325,26 @@ uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp);
 void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp);
 void Resume(uint8_t* base, uint32_t object);
 
+// --- "Press start" (press_start.cpp) ---
+
+// sub_8209F6B8 Players::AssignController: controller `controller` on player
+// `player` in [0x826BABA4] (swapped with the player that had it, the fifth
+// word when none), the profile read asked for ([0x826C7938] = 1). A leaf.
+void AssignController(uint8_t* base, uint32_t player, uint32_t controller);
+// sub_822221A0 TitleScreen::Update (page 0, r3 the mode, r4 the machine):
+// players 0 to 3's mappers asked for action 152 (slot 10, through the
+// guest); the first that answers gets player 0 (AssignController's plain
+// C++), MenuSound::Play(1), the page object to page 1 through transition 3;
+// the title's +36 counted, at 600 the attract race: +4 = 8, to page 5
+// through transition 8, SetUpAttractRace (sub_82222038, recompiled, through
+// the guest). The last call's r3 (120 with none). 144-byte frame. The
+// wrap (--attract_after_s, hooks/title_screen.cpp) stays around it.
+uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_822219E0 TitleScreen::OnControllerPicked: by the pick's count, page 2
+// at once (0) or page 5 through transition 8 with player 1's controller
+// (1 to 3: then 1); else nothing (`r3`). A leaf but for the tail call.
+uint64_t ScreenOnControllerPicked(uint8_t* base, uint64_t r3);
+
 // --- The machines' set-ups (init.cpp) ---
 //
 // sub_822213B0 TitleLoad::Init and sub_82224270 TitleScreen::Init: their

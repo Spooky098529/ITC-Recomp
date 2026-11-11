@@ -46,7 +46,10 @@ ITC_FLAG_BOOL(native_title_screen, true, "ITC",
               "NextModeAnswer sub_82224B98 (GameMessages::Dispatch through its override), the "
               "+32 interface Interrupt sub_82224E20, ForceExit sub_82224ED0 and Resume "
               "sub_82225048, with MachineOf sub_82224B40, AllLoaded sub_82224BC0 and FindShown "
-              "sub_82224C10 (the same writes; checked by --run_harnesses=title_screen)");
+              "sub_82224C10; press start, TitleScreen::Update sub_822221A0 (its wrap kept; the "
+              "mappers' slot 10, MenuSound::Play and SetUpAttractRace, recompiled, through the "
+              "guest), OnControllerPicked sub_822219E0 and Players::AssignController "
+              "sub_8209F6B8 (the same writes; checked by --run_harnesses=title_screen)");
 
 namespace hooks {
 
@@ -352,6 +355,17 @@ void ModeType4FindShown(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::FindShown(base, ctx.r3.u64, ctx.r1.u32);
 }
 
+void TitleScreenPressStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::PressStart(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenOnControllerPicked(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::ScreenOnControllerPicked(base, ctx.r3.u64);
+}
+void PlayersAssignController(PPCContext& ctx, uint8_t* base) {
+  ts::AssignController(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 }  // namespace hooks
 
 #define ITC_TITLE_SCREEN(address, step)   \
@@ -445,3 +459,10 @@ ITC_TITLE_SCREEN(82224B98, ModeType4NextModeAnswer)
 ITC_TITLE_SCREEN(82224E20, ModeType4Interrupt)
 ITC_TITLE_SCREEN(82224ED0, ModeType4ForceExit)
 ITC_TITLE_SCREEN(82225048, ModeType4Resume)
+// "Press start": OnControllerPicked (the (5, 16) functor). TitleScreen::
+// Update sub_822221A0's override is the wrap in hooks/title_screen.cpp
+// (--attract_after_s around TitleScreenPressStart). Players::AssignController
+// sub_8209F6B8: no adapter (its callers in play, Update and
+// OnControllerPicked, are native; sub_8209E698, never seen in play, reaches
+// the original).
+ITC_TITLE_SCREEN(822219E0, TitleScreenOnControllerPicked)
