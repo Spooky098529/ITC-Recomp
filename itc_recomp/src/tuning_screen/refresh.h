@@ -86,9 +86,11 @@ struct Context {
   void State3();  // TUNING SHOP MAIN (block 2)
   void State4();  // the category's items (block 3)
   void State5();  // LEVEL_SELECT (block 4, refresh_level.cpp)
+  void State6();  // TYPE_SELECT (block 5, refresh_type.cpp)
+  // State 6's rear spoiler help string (629, 630 or 865; refresh_type.cpp).
+  uint64_t SpoilerHelp() const;
   // Later parts (each in its own file once ported; stubs in refresh.cpp until
   // then, never reached: the adapter's gate runs the original for them).
-  void State6();  // TYPE_SELECT (block 5, refresh_type.cpp)
   void State7();  // the bonnet's and colors' choice (block 6, refresh_choice.cpp)
   void State8();  // the option select (block 7, refresh_choice.cpp)
 };

@@ -248,6 +248,42 @@ garage car first (the engine stage for category 0 item 0, which
 `SetCarStats` reads the car spec's engine at, unchecked): the harness
 keeps the levels in its world's ranges.
 
+Found in its migration's part 3 (state 6, 2026-11-11; block 5 above
+corrected here): the textures are set only while +9716 is set: (m, 3, 1,
+the category + 1, with no exception for 2) and (m, 3, 2) as state 5's.
+The type list: category 0 item 2 uses sub-scene 29's own children 5 on
+(not a child's), the others sub-scene 28's child 1's children 5 to 14:
+the aero (any item), category 5 items 2 and 3 and category 6 items 0 to
+2; all hidden and colored 0 first. Rows: 376 first, then 379 with the
+row (r6) for rows 1 to +9678 - 1; the aero's item 3 with +25172 set has
+376, 375 (none) and 379 from child 7 with the row from 1 while row + 1
+< +9678; only the third group (aero items 0 to 2 and 4 to 9, exterior 2
+and 3, interior 0 to 2; 375 first for aero item 9) colors its rows 1 on
+2 when `IsItemAvailable` answers 0; the first row is never checked. The
+marks (sub-scene 28's child 0, as state 5's) for those same pages but
+category 0 item 2: 15 to 24 and 26 to 35 hidden, then for each of the
++9678 rows 15 + row and 26 + row shown, 38 + 2 row's +108 by
+`GetChoiceFlag`(row). The arrows as state 5's with +9678 and d = byte
++9662 - +25108. Category 5 item 3: `ShowNode`(m, 8, 2) and
+`SetNodeTexture`(m, 8, 8, 3), (8, 9, 10). Node 20 shown for category 0
+item 2. Node 17: the aero shows it for the type - 1 (- 2 for item 3 with
++25172 set; hidden for the types 0, or 0 and 1) with its child 0's +108 =
+`AeroPartValue`(s, that, the item), called twice (it leaves r4 and r5 as
+they came), hidden with +108 0 when it answers -1; category 6 item 0
+shows it for a type other than 0 with +108 4 for the types 1 and 2, else
+24. The help line: category 0 728 (item 2) else the scroll; the aero's
+item 3 the rear spoiler's (else the scroll); category 5 792 and 793;
+category 6 846, 848, 849; categories 1 to 3 and 7 on no help line at all
+(not even the reset). The rear spoiler's: the type for `Get77` is the
+byte +9662, or with +25172 set 0 for 0, - 1 for 2 to 5, -1 for 1, 0 above
+5; 865 when +36588 is 0 and that type is -1, else 629 or 630 by bit 0 of
+77's +24, or with +36588 set and bit 1 of 82's +24 clear by its bit 2.
+The parts are at the frame's +176 (`GetCarParts`), +96 (memcpy's copy),
++144 (77's record) and +224 (82's). r31 is moved to s + 36588 on that
+path and nothing reads it after: the help line's tail reads r30 only,
+then the epilogue restores r22 to r31 (checked in `generated/`). The
+native state needs `--native_car_specs` too (the adapter's gate).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the

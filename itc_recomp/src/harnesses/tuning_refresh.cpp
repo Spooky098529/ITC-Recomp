@@ -11,12 +11,13 @@
 // a small block for RefreshMovie13's texture table. The callees run as their
 // adapters run them on both sides. Each case runs every state 3 to 58 and
 // some outside (below 3, above 58, negative), the categories 0 to 6 and the
-// items in their play ranges mostly; states 6 to 8 go to the original on
-// both sides for now (the register step's gate; parts 3 and 4 of the
-// migration shape their cases). State 5 has a group of its own after them
+// items in their play ranges mostly; states 7 and 8 go to the original on
+// both sides for now (the register step's gate; part 4 of the migration
+// shapes their cases). States 5 and 6 have groups of their own after them
 // (so their seeds stay), over the same world with the sub-scenes 28 to 33
-// made real (LaySubScenes, for states 6 to 8 too) and the level list's
-// fields shaped (ShapeLevelList). Compared: the text records SetText made,
+// made real (LaySubScenes, for states 7 and 8 too) and the level and type
+// lists' fields shaped (ShapeLevelList, ShapeTypeList; state 6's nodes
+// LayTypeNodes). Compared: the text records SetText made,
 // the globals, the blocks, the stack below r1 (without the original's
 // register saves, the top 96 bytes of its frame, and the frame's +40 to +79,
 // the varargs SetText's parameter area, where the unset arguments are passed
@@ -39,6 +40,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+ITC_FLAG_DECLARE(bool, native_car_specs);
 
 namespace harness {
 
@@ -195,10 +198,79 @@ void ShapeLevelList(uint8_t* base, uint32_t screen, uint32_t category, uint32_t 
   }
 }
 
+// State 6's nodes as the game has them (after LaySubScenes): sub-scene 29's
+// own children 2 to 20 (its type list's rows, category 0 item 2) distinct
+// leaves (its child 1's leaves 32 to 50, which no page reaches), and the
+// live scene's children 0 and 17 (the interior's picture and the aero's
+// part picture, whose child 0's +108 the page writes: on the pool's nodes
+// that changed the scene's children) sub-scene 32's two parents (state 7's
+// only), so their children 0 are distinct leaves.
+void LayTypeNodes(uint8_t* base, uint32_t block, uint32_t movie) {
+  const uint32_t scene = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+  const auto sub = [&](uint32_t k) { return block + (k - kFirstSubScene) * kSubSceneBytes; };
+  const uint32_t sub29 = sub(29);
+  const uint32_t leaves = sub29 + 3 * kBigNode + kLeaves * kLeaf;  // child 1's
+  for (uint32_t n = 2; n <= 20; n++) {
+    guest::StoreU32(base, sub29 + 128 + 8 * n, leaves + (30 + n) * kLeaf);
+  }
+  const uint32_t first = guest::LoadU32(base, scene + 108);
+  guest::StoreU32(base, scene + 128 + 8 * (first + 17), sub(32) + kBigNode);
+  guest::StoreU32(base, scene + 128 + 8 * (first + 0), sub(32) + 2 * kBigNode);
+}
+
+// State 6's fields as play gives them: the type list's rows +9678 1 to 10
+// (now and then 0, 11 or 12: the rows' children are indexed unchecked), the
+// type +9662 below the rows and 6 (the aero below 5, below 6 on the rear
+// spoiler with +25172 set: AeroPartValue reads its table of four types per
+// car unchecked; EquipChoice stores it into the garage car, which
+// SetCarStats reads), now and then up to 12 elsewhere; the list's first row
+// +25108 the type minus 0 to 7 (now and then 0, or above the type by 1 or
+// 2); +25172 0 or set; the words IsItemAvailable and GetChoiceFlag read
+// (+34000 to +36800) 0 a quarter of the time, else small, now and then any
+// word; the body kit +36588 0 a third of the time, else 1 to 3 (AeroParts::
+// Get82's record, read unchecked), now and then 4 to 7.
+void ShapeTypeList(uint8_t* base, uint32_t screen, uint32_t category, uint32_t item,
+                   Random& r) {
+  const uint32_t rows = r.Below(10) == 0 ? (r.Below(3) == 0 ? 0 : 11 + r.Below(2))
+                                         : 1 + r.Below(10);
+  guest::StoreU8(base, screen + 9678, uint8_t(rows));
+  const bool shift = r.Below(2) != 0;
+  guest::StoreU32(base, screen + 25172, shift ? (r.Below(2) == 0 ? 1 : uint32_t(r.Next())) : 0);
+  uint32_t type;
+  if (category == 4) {
+    type = r.Below(item == 3 && shift ? 6 : 5);
+  } else if (r.Below(8) == 0) {
+    type = r.Below(13);
+  } else {
+    const uint32_t below = rows == 0 ? 1 : (rows < 6 ? rows : 6);
+    type = r.Below(below);
+  }
+  guest::StoreU8(base, screen + tuning_screen::kType, uint8_t(type));
+  uint32_t first;
+  switch (r.Below(8)) {
+    case 0: first = 0; break;
+    case 1: first = type + 1 + r.Below(2); break;
+    default: {
+      const uint32_t back = r.Below(8);
+      first = type >= back ? type - back : 0;
+      break;
+    }
+  }
+  guest::StoreU32(base, screen + 25108, first);
+  for (uint32_t at = 34000; at < 36800; at += 4) {
+    const uint32_t word =
+        r.Below(4) == 0 ? 0 : (r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(10));
+    guest::StoreU32(base, screen + at, word);
+  }
+  guest::StoreU32(base, screen + 36588,
+                  r.Below(3) == 0 ? 0 : (r.Below(8) == 0 ? 4 + r.Below(4) : 1 + r.Below(3)));
+}
+
 }  // namespace
 
 void TuningRefresh(Context& h) {
-  if (!hooks::TuningStandCalleesNative() || !hooks::TuningCarStatsCalleesNative()) {
+  if (!hooks::TuningStandCalleesNative() || !hooks::TuningCarStatsCalleesNative() ||
+      !ITC_FLAG(native_car_specs)) {
     ITC_LOG_WARN("harness: tuning_screen: TuningScreen::Refresh skipped (its callees' plain C++ "
                  "isn't native)");
     return;
@@ -471,8 +543,8 @@ void TuningRefresh(Context& h) {
   for (int c = 0; c < kCases; c++) {
     // The state: each of 3, 4 and 9 to 58 in turn for the first 104 cases
     // (two rounds), then 3 and 4 mostly, the dispatch's states, and outside 3
-    // to 58 (below, above, negative). States 5 to 8 aren't among them: state
-    // 5 has its group below, 6 to 8 come with parts 3 and 4.
+    // to 58 (below, above, negative). States 5 to 8 aren't among them: states
+    // 5 and 6 have their groups below, 7 and 8 come with part 4.
     uint32_t state;
     if (c < 104) {
       const uint32_t k = uint32_t(c % 52);
@@ -552,6 +624,52 @@ void TuningRefresh(Context& h) {
       });
     }
     results5.Report();
+  }
+
+  // State 6, TYPE_SELECT (part 3 of the migration), a group of its own after
+  // state 5's: the same world with the sub-scenes laid, state 6's nodes
+  // (LayTypeNodes) and the type list's fields (ShapeTypeList).
+  {
+    Random r6(0x5265667265736806ull);  // "Refresh", 6
+    Results results6("TuningScreen::Refresh (sub_821E3AD0) state 6");
+    constexpr int kTypeCases = 480;
+    for (int c = 0; c < kTypeCases; c++) {
+      // The pages with a type list mostly, each in turn: category 0 item 2
+      // (sub-scene 29), the aero's items 0 to 9 (item 3, the rear spoiler,
+      // three times: its help line by the garage car's aero parts), the
+      // exterior's items 2 and 3, the interior's 0 to 2; then the pages
+      // without (category 0's other items, 1 to 3, the exterior's 0, 1 and 4
+      // to 7, the interior's 3, the aero's 10); now and then 7, -1 or any
+      // word, or any item byte.
+      static constexpr uint32_t kPages[][2] = {
+          {0, 2}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 3}, {4, 3}, {4, 4}, {4, 5}, {4, 6},
+          {4, 7}, {4, 8}, {4, 9}, {5, 2}, {5, 3}, {6, 0}, {6, 1}, {6, 2}, {0, 2}, {6, 0},
+          {0, 0}, {0, 1}, {0, 3}, {1, 2}, {2, 0}, {3, 1}, {5, 0}, {5, 1}, {5, 4}, {5, 7},
+          {6, 3}, {4, 10}};
+      constexpr uint32_t kPageCount = sizeof(kPages) / sizeof(kPages[0]);
+      uint32_t category = kPages[uint32_t(c) % kPageCount][0];
+      uint32_t item = kPages[uint32_t(c) % kPageCount][1];
+      switch (r6.Below(12)) {
+        case 0:
+          category = r6.Below(2) == 0 ? 7 : (r6.Below(2) == 0 ? 0xFFFFFFFFu : uint32_t(r6.Next()));
+          item = r6.Below(10);
+          break;
+        case 1:
+          if (category != 4) {
+            item = r6.Below(256);
+          }
+          break;
+        default: break;
+      }
+      run(r6, results6, c, 6, category, item, [&](uint32_t movie) {
+        LayTuningStandTires(base, block, r6);
+        LayTuningStandEngines(base, block);
+        LaySubScenes(base, sub_scenes, movie, r6);
+        LayTypeNodes(base, sub_scenes, movie);
+        ShapeTypeList(base, screen, category, item, r6);
+      });
+    }
+    results6.Report();
   }
 
   for (size_t i = 0; i < globals.size(); i++) {
