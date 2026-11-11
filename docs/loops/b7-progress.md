@@ -45,6 +45,11 @@ file's history. What's left to see in a drive, from every run:
   harness 0 differing outside the expected groups, 88 of 88 harness
   lines, checked by the lead). 20 ran in the replay `itc_4920` (ok), 68
   to drive. Recorded.
+- Subsystem 2 of 5: the front end's title menu (`sub_82222B60`,
+  `sub_82221AC0`: ready, seen in play at every boot) with the
+  front-end machine's set-up beside it (`sub_822213B0`, `sub_82220C88`,
+  probably the boot or title screen); both leads' lines deleted from
+  `leads.md`. Step: mapping agent.
 
 ## Done
 
