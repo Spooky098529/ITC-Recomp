@@ -1,0 +1,210 @@
+# Known functions: the type 10 mode (the replay theater)
+
+The type 10 front-end mode (`ModeType10::`, the name ours): the **replay
+theater**, opened from the title's main menu (`TitleScreen::Destroy`
+leaves 19, which `ModeType4::NextMode` turns into type 10,
+[`title-screen.md`](title-screen.md)). Its screen's update passes the
+string "TXR_ReplayTheater" to an empty function (a debug print stripped
+from the release, probably), which names it. The mode is 852 bytes like
+types 2, 4 to 7 and 9 (made by `ModeType10::ModeType10` in
+[`game-modes.md`](game-modes.md)), released by `ModeType10::Release`
+`sub_82288898` ([`front-end-screen-helpers.md`](front-end-screen-helpers.md)).
+It lists the saved replays (the save layer's replay list,
+[`save-interface.md`](save-interface.md)) through the save screen's
+replay kinds 2 to 5 ([`save-screen.md`](save-screen.md)) and, when one
+is loaded, sets the race up from it and leaves for the race (mode 1);
+otherwise it goes back to the title (mode 4).
+
+Its vtable `0x82006CF0` has 14 slots: 0 `Init` `sub_82288940`, 1
+`Release`, 2 to 5 and 9 `Mode::NoNextMode` (`sub_8222FC90`), 6 `NextMode`
+`sub_82288E68`, 7 `Mode::DeletingDestructor` (`sub_82106E38`; both in
+[`boot-mode.md`](boot-mode.md)), 8 `WaitForLoads` `sub_82288B70`, 10
+`WaitForShown` `sub_82288CA0`, 11 `LeaveScreen` `sub_82288DA0`, 12
+`ModeType9::NextModeAnswer` `sub_8225D638` (shared with the type 9 mode's
+slot 12) and 13 `Leaving` `sub_822890D8` (reached through the slot thunks
+`Mode::SlotNThunk` in [`type2-mode.md`](type2-mode.md) and
+`Mode::NextModeThunk` `sub_82235C08` in `boot-mode.md`). Its +32 vtable
+`0x82006CE4` (the three words before the main one) has three:
+`Interrupt` `sub_82288A68`, `ModeType9::ForceExit` `sub_8225D828` (the
+type 9 mode's +32 slot 1 too, vtable `0x82006CA0`) and `Resume`
+`sub_82288B20` (none seen in play).
+
+`Init` allocates the mode's block (19,300 bytes at +848, `VirtualAlloc`)
+with two state machines and adds both to the mode's dispatcher: +0 the
+**replay theater** (`ReplayTheater::InitStates` `sub_8228AC48`, UI movie
+45, asset 22591) and +9640 the save screen (`Type10SaveScreen::Init`
+`sub_821A7AC8`, `save-screen.md`); both open on their message (+9612 =
+1, +9616 = 0). The block's +19280 is the shown machine's index (0 the
+theater, 1 the save screen; `ModeType10::FindShown`) and +19292 the
+next-mode answer `ForceExit` writes. The flow: `WaitForLoads` waits for
+both machines' movies and posts message 5 (the theater's (9, 5)
+`ScreenMachine::Reenter`), then `NextMode` runs each tick (Draw and
+Update queued, the shown machine watched): its state 8 goes through
+`LeaveScreen` (message 3) and `WaitForShown` (until its movie is loaded
+again) back to `NextMode`; 10 queues message 4; 11 answers mode 1 (the
+race, a replay loaded) and 14 mode 4 (the title, with `[0x826364EC]` =
+0) at once (no teardown step, unlike the type 2 mode).
+
+The theater's machine has the shape of the type 2 mode's
+(`type2-screens.md`'s intro: keys (state, message, 0, 0), member function
+functors over vtable `0x82011918`, r3 the machine and r4 the mode's
+dispatcher (+36), whose message ring at +204, the mode's +240, the
+handlers post to): (0, 1) `Create` → 1 or 9, (1, 1) → 2 `OpenMovie`,
+(2, 1) `WaitForMovie` → 4 or 9, (9, 5) `ScreenMachine::Reenter`
+`sub_822895E0` ([`location-screen.md`](location-screen.md)) → 4, (4, 1)
+→ 5 `Start`, in 5 Draw (message 1) runs a page and Update (message 0) a
+transition, (5, 11) to (5, 16) the save screen's replies and the
+interrupts, (5, 6) → 8 `Unload`, (8, 3) `Wait` → 9, (5, 4) and (9, 4)
+`Leave` → 7, (7, 4) → 6 `Destroy` (17 transitions). Its blocks are
+globals (`../known-data.md`): `[0x828161E0]` the page object (28 bytes,
+laid out as the title screen's: +0 the page `Draw` runs, -1 while a
+transition runs; +4 the page after; +8 the page before; +12 the
+transition `Update` runs, -1 none; +16 the one queued after it; +20;
++24 the transition's started word), `[0x828161E4]` a menu list (72
+bytes, `MenuList::`, [`race-screens.md`](race-screens.md)) and
+`[0x828161E8]` the theater's data (16 bytes: +0, +4 what was asked of
+the save screen, +8 a replay loaded, +12 interrupted).
+
+- **Pages** (`Draw`'s table on +0): 0 `ListPage` (the replay list: the
+  cursor, accept, back; not seen), 1 `AskList` (message 7: the save
+  screen's kind 2, the replays' list), 2 `AskLoad` (message 8: kind 3,
+  the picked replay's load; not seen), 3 `LeavePage` (message 6), 4 the
+  empty `sub_82106540` ([`audio.md`](audio.md)), 5 `WaitPage` (the
+  button prompts by the save screen's dialog).
+- **Transitions** (`Update`'s table on +12, 0 to 6; each set up once
+  while +24 is 0, then `UiMovie::Run(movie 45, 0)`; done when it answers
+  nonzero, then the queued one or the page after; with none running and
+  the page not 3, `Update` runs the movie itself): 0 `Intro`, 1
+  `FadeOut`, 2 `FadeInList`, 3 `ShowCursor`, 4 `MoveCursor`, 5
+  `HideCursor`, 6 `PickReplay` (2 to 6 not seen).
+- **The save screen's replies** (its page 16 posts 11, 13, 14 or 12,
+  `save-screen.md`), read by what was asked (data +4: 0 the list, 1 a
+  load, 2 the device lost, 3 back): 11 `OnDone` (the list built, or the
+  replay loaded and the race set up from it), 12 `OnFailed` (seen: back
+  to the title, or to the list), 13 `OnRetry`, 14 `OnBack`; the mode's
+  `Interrupt` and `Resume` post 15 (`OnInterrupt`, the save screen's
+  cancel too) and 16 (`OnResume`).
+
+In play (`../coverage.md`) the mode's Init, its load wait, `NextMode`,
+`LeaveScreen` and `WaitForShown`, and the theater's machine through
+`AskList`, the save screen's answer 12 (`OnFailed`), the fade out and the
+way back to the title were seen: a session that opened the theater with
+no replays saved, probably. The list page, the replay's load and the
+race set up from a replay weren't.
+
+Names are ours. Read 2026-11-11 by the B7 loop's mapping agent: the
+mode's functions, the machine's set-up and handlers, the pages and the
+transitions in full; the helpers under the list page in outline. Fields
+and globals: `../known-data.md`'s "type 10 mode block" and
+`[0x828161E0]` to `[0x828161E8]`. Shared, with rows elsewhere:
+`sub_8211AD00` (a screen's start), `UiMovies::Open`, `Find`,
+`IsLoaded`, `Delete`, `UiMovie::Run`, `FinishAll`, `FinishNamed`,
+`PlayNamed`, `LoopNamed`, `FindNode`, `SetText`, `ClearText`,
+`SetNodeText`, `ClearNodeText` ([`ui-movies-game.md`](ui-movies-game.md)),
+`UiMovie::Child` ([`ui-movies.md`](ui-movies.md)), `Strings::Load`
+([`files-and-saves.md`](files-and-saves.md)), `VirtualAlloc` and
+`VirtualFree` ([`heap.md`](heap.md)), `ScreenFades::FadeIn` and
+`FadeOut` ([`mode-tick.md`](mode-tick.md)), `GameMessages::Dispatch`
+and `StateMachine::Add` ([`game-modes.md`](game-modes.md)),
+`LoadingScreen::Run` ([`race-loading.md`](race-loading.md)),
+`MenuList::Init` ([`save-data.md`](save-data.md)), `MenuList::Update`,
+`Selection`, `GetPreviousSelection`, `Accepted` and `Cancelled`
+([`race-screens.md`](race-screens.md)), `MenuSound::Play`
+([`menu-sounds.md`](menu-sounds.md)), `SaveBuffers::Create`, `Destroy`
+and `SaveSlots::State` ([`save-interface.md`](save-interface.md)), the
+save screen's Init and handlers (`save-screen.md`),
+`ScreenMachine::Reenter` (`location-screen.md`), the empty
+`sub_82106540` (`audio.md`), and under `Replay::SetUpRace`
+`RaceData::ResetGlobal`, `Stages::Clear` and `sub_82101F68`
+([`race-setup.md`](race-setup.md)), `Car::Refresh`
+([`car-specs.md`](car-specs.md)), `RacerRecords::Add`
+([`vehicle-accessors.md`](vehicle-accessors.md)) and
+`RaceSnapshot::Copy` ([`replay-snapshots.md`](replay-snapshots.md)).
+Nothing in `itc_recomp/src` hooks this file's functions (checked
+2026-11-11).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82288940` | `ModeType10::Init` | | Slot 0 of vtable `0x82006CF0`, from `Modes::Tick` once the mode is made: r3 = the mode. A 112-byte frame (r31 and lr saved). `sub_8211AD00` (a screen's start); `Strings::Load([0x826C5C34], 11)` (files 0, 1 and 3; `ModeType10::Release` releases the same); mode +848 = `VirtualAlloc(0, 19300, 0x1000, 4)` (no check for 0, no `Archive::WaitIdle`, no stand scene); `ReplayTheater::InitStates(block)`; `Type10SaveScreen::Init(block + 9640)` (`save-screen.md`); `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`. The two machines added to the dispatcher (+36: handler [count +200] = the machine, the count up by one each; block +0, then +9640). Block +19284 and +19280 = 0; the theater's +9612 = 1 and +9616 = 0, the save screen's (+19252, +19256) the same. The delegate: mode +8 = {`0x82010FA0`, the mode, `0x8223D4B0` (`Mode::Slot8Thunk`: `WaitForLoads`), 0} (the last two words a doubleword from the frame's +80), mode +4 = mode + 8 (the original's null check on it can't fail). No loading screen shown. Seen in play. Read in full. Ready with `ReplayTheater::InitStates` (`b7_groups.py`: 2 functions, 706 lines). |
+| `sub_82288B70` | `ModeType10::WaitForLoads` | | Slot 8, the delegate's function set by `Init` (through `Mode::Slot8Thunk`), from `ModeDelegate::Invoke` every tick: r3 = the 8-byte answer, r4 = the mode. A 112-byte frame. The answer cleared (byte +0, word +4). When the theater's movie is loaded (block +9608) and the save screen's too (block +19248): the delegate = {`0x82010FA0`, mode, `Mode::NextModeThunk` `0x82235C08`, 0} at +8 (+4 = +8), message 5 queued (the theater's (9, 5) `ScreenMachine::Reenter`: the screen opens). Every call: message 1 (Draw) queued (ring at mode +240: count +600, start +604, 50 entries of (message, 0, 0)) and `GameMessages::Dispatch(mode + 36)`. Returns r3 (always "none"). Seen in play. Read in full. Ready. |
+| `sub_82288E68` | `ModeType10::NextMode` | | Slot 6, from `Mode::NextModeThunk` every tick once loaded: r3 = the answer, r4 = the mode. A 128-byte frame (`__savegprlr_28`). The answer cleared; `FindShown(block)`; the shown machine (block +19280: 0 the theater at +0, 1 the save screen at +9640, else none, read as address 0) in state 8 → the delegate's function = `0x8222FC60` (`Mode::Slot11Thunk`: `LeaveScreen`; the functor word at the frame's +80); in state 10 → message 4 queued. Then message 1 (Draw) queued unless `[0x826C7960]` or `[0x826C7964]` is set (as the type 2 mode's), message 0 (Update) queued, `GameMessages::Dispatch(mode + 36)`. After it, by the shown machine's state (looked up again): 11 → the answer = a doubleword from the frame's +80 with byte 1 and the word 1 (the race; the three bytes after byte 1 the frame's, the functor word's low bytes when state 8 was seen in the same call, else leftovers); 14 → the same with the word 4 (the title) and `[0x826364EC]` = 0. The mode changes at once (no teardown delegate). Returns r3. Seen in play. Read in full. Blocked (`b7_groups.py`) by `FindShown` only. |
+| `sub_82288DA0` | `ModeType10::LeaveScreen` (probably) | | Slot 11, the delegate's function for one tick after `NextMode` saw the shown machine in state 8: r3 = the answer, r4 = the mode. A 128-byte frame. The answer cleared; `FindShown(block)`; message 3 queued alone (the theater's (8, 3) `Wait`), `GameMessages::Dispatch(mode + 36)` (no Draw or Update); the delegate's function = `0x8223D4A0` (`Mode::Slot10Thunk`: `WaitForShown`; the original's null check can't fail). Returns r3. Seen in play. Read in full. Blocked by `FindShown` only. |
+| `sub_82288CA0` | `ModeType10::WaitForShown` (probably) | | Slot 10, the delegate's function after `LeaveScreen`: r3 = the answer, r4 = the mode. A 128-byte frame. The answer cleared; `FindShown(block)`; `LoadingScreen::Run(-1)`; when the shown machine's +9608 (its movie loaded) is 1, the delegate's function = `Mode::NextModeThunk` (`0x82235C08`) again; message 1 (Draw) queued and `GameMessages::Dispatch(mode + 36)`. Returns r3. In play `Unload` leaves +9608 set (+9616 is 0), so this lasts one tick. Seen in play. Read in full. Blocked by `FindShown` only. |
+| `sub_822890D8` | `ModeType10::Leaving` (probably) | | Slot 13, through `Mode::Slot13Thunk` (set by `ForceExit`): r3 = the answer, r4 = the mode. A 128-byte frame. The answer cleared; message 4 queued (leave) and `GameMessages::Dispatch(mode + 36)`; then for r11 from 0 to 46 the machine (0 the theater, 1 the save screen, the others none and skipped): when every one is in state 6, 11, 14, 12 or 20, the delegate's function = `0x8222FC70` (`Mode::Slot12Thunk`: `ModeType9::NextModeAnswer`). Returns r3. As `ModeType2::Leaving` with this mode's two machines. Not seen in play. Read in full. |
+| `sub_8225D638` | `ModeType9::NextModeAnswer` (probably) | | Slot 12 of the type 9 mode's vtable (`0x82006CAC`) and of this one's: r3 = the answer, r4 = the mode: the answer = the block's (+848) +19292 and +19296 (the 8 bytes `ForceExit` wrote). Leaf. In the type 9 mode's code (`8225D590`-`8225DE78`; its rows a lead in `../loops/leads.md`), shared by both modes: their blocks keep the answer at the same offset. Here set by `Leaving`. Not seen in play. Read in full. |
+| `sub_82288A68` | `ModeType10::Interrupt` (probably) | | The +32 vtable's (`0x82006CE4`) slot 0: r3 = the mode + 32 (its +816 the block). A 96-byte frame. 0 until the theater's movie (block +9608) and the save screen's (block +19248) are loaded; then with the save screen's state (block +19244) 5 or `ReplayTheater::OnList` answering 1: message 15 queued (the theater's `OnInterrupt` and the save screen's `SaveScreen::Cancel`; in the ring at r3 + 208 = mode + 240; no dispatch), 0 returned; else 1. As `ModeType2::Interrupt`. Not seen in play. Read in full. |
+| `sub_8225D828` | `ModeType9::ForceExit` (probably) | | The +32 slot 1 of the type 9 mode (vtable `0x82006CA0`) and of this one: r3 = the mode + 32, r4 = a number. r4 0 or 1: the delegate's function (at r3 - 32 + 8, built at r1 - 16, below the stack pointer) = `0x8222FC80` (`Mode::Slot13Thunk`: `Leaving`), block (r3 + 816) +19292 = {byte 1, the low three bytes of `0x8222FC80` (`0x22`, `0xFC`, `0x80`: the functor word stored there first), the word 4}, `[0x826364EC]` = 1; r4 2 or 3: the same with 12 and `[0x826364EC]` left; other values nothing. Leaf. The same mapping as `ModeType2::ForceExit`. Not seen in play. Read in full. |
+| `sub_82288B20` | `ModeType10::Resume` (probably) | | The +32 slot 2: r3 = the mode + 32: message 16 queued (the theater's `OnResume`; ring at r3 + 208). Leaf. Not seen in play. Read in full. |
+| `sub_822888F0` | `ModeType10::FindShown` (probably) | | r3 = the block: for r10 0 and 1 the machine (0 the theater at +0, 1 the save screen at +9640): when it's in state 5 or 4 (running or starting), block +19280 = r10 (the last such wins). Leaf. From `NextMode`, `LeaveScreen` and `WaitForShown`. Seen in play. Read in full. Ready. |
+| `sub_822893E8` | `ReplayTheater::OnList` (probably) | | No arguments: 1 when the theater's page (`[0x828161E0]` +0) is 0 (the list), else 0. Leaf. From `ModeType10::Interrupt` only. Not seen in play. Read in full. |
+| `sub_8228AC48` | `ReplayTheater::InitStates` | | r3 = the machine at the type 10 block's +0: 17 transitions (`StateMachine::Add`, member function functors over vtable `0x82011918`, built on a 1,296-byte frame): (0, 1) `Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) → 5 `Start`; (5, 1) `Draw`; (5, 0) `Update`; (5, 11) `OnDone`; (5, 12) `OnFailed`; (5, 13) `OnRetry`; (5, 14) `OnBack`; (5, 15) `OnInterrupt`; (5, 16) `OnResume`; (5, 6) → 8 `Unload`; (8, 3) `Wait`; (9, 5) `ScreenMachine::Reenter` (`location-screen.md`); (5, 4) and (9, 4) `Leave`; (7, 4) → 6 `Destroy`. Only caller `ModeType10::Init`. Seen in play. Read for its keys, handlers and next states. In `Init`'s group. |
+| `sub_82289408` | `ReplayTheater::Create` | | (0, 1), r3 = the machine: +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x828161E0]` (the page object: +0, +4, +8, +24 = 0, +12 and +20 = -1), 72 → `[0x828161E4]` (a menu list; when made, +68 and +60 = 0), 16 → `[0x828161E8]` (the data: +0 and +12 = 0; no check for 0); state 1 with +9612 set, else 9. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_822891F8` | `ReplayTheater::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(45, 22591)`. Leaf. Seen in play. Read in full. Ready. |
+| `sub_82289570` | `ReplayTheater::WaitForMovie` | | (2, 1), r3 = the machine: while +9608 is 0, `UiMovies::IsLoaded(45)` nonzero sets it to 1; once set, state 9 with +9612 set (the mode's Init sets it), else 4. A 96-byte frame. Seen in play. Read in full. Ready. |
+| `sub_8228AA58` | `ReplayTheater::Start` | | (4, 1): `SaveBuffers::Create`; `ReplayTheater::StartPage`; then the page object: +8 = +0 unless it's 1, +16 = -1, +12 = 0 (transition 0 `Intro`), +4 = 1 (page `AskList` after it), +0 = -1. A 96-byte frame. Seen in play. Read in full. Blocked by `SetPrompts` (ready) through `StartPage`. |
+| `sub_8228A508` | `ReplayTheater::StartPage` (probably) | | No arguments: `SetPrompts(-1, -1, -1, -1, -1, -1)` (every prompt hidden); the data (`[0x828161E8]`) +0 = 1, +8 = 0 (no replay loaded). A 96-byte frame. Only caller `Start`. Seen in play. Read in full. In `Start`'s group. |
+| `sub_8228A868` | `ReplayTheater::Draw` | | (5, 1), r4 = the dispatcher: runs the page `[0x828161E0]` +0 (nothing at -1) from a table built on the frame, with r3 = the dispatcher: 0 `ListPage` `sub_82289768`, 1 `AskList` `sub_82289958`, 2 `AskLoad` `sub_822899E0`, 3 `LeavePage` `sub_82289A70`, 4 the empty `sub_82106540` (`audio.md`), 5 `WaitPage` `sub_8228A4B0` (no bound check). A 112-byte frame; one indirect call. Seen in play. Read in full. Ready. |
+| `sub_8228A8F8` | `ReplayTheater::Update` | | (5, 0): first the empty `sub_82106540(100, 30, 0, 0x82011AD4)` (the string "TXR_ReplayTheater": a debug print stripped from the release, probably); movie 45 (`UiMovies::Find` on `0x826C5CCC`). With the page object's +12 -1: `UiMovie::Run(movie, 0)` unless the page is 3. Else for +12 0 to 6 the transition from a table on the frame (0 `Intro` `sub_82289AC0`, 1 `FadeOut` `sub_82289BD0`, 2 `FadeInList` `sub_82289CC0`, 3 `ShowCursor` `sub_82289D70`, 4 `MoveCursor` `sub_8228A658`, 5 `HideCursor` `sub_82289E08`, 6 `PickReplay` `sub_82289EB8`; no upper bound check) with r3 = the page object + 24 (the started word); when it answers nonzero (or at once for a negative +12 other than -1): with +16 -1, +0 = +4 (the page after) and +12 = -1; else +12 = +16, +16 = -1, +20 = 0; then +24 = 0. A 144-byte frame; one indirect call. Seen in play. Read in full. Ready. |
+| `sub_82289768` | `ReplayTheater::ListPage` (probably) | | Page 0, r3 = the dispatcher: the replay list. A 144-byte frame (`__savegprlr_25`). `SaveSlots::State(0)` 1 (the device lost, probably): the page object +8 = the page unless -1, +0, +12, +16 = -1, the data +4 = 2, message 9 posted (the save screen's kind 5). Then `MenuList::Update` on `[0x828161E4]`; with the list's +24 0 and +4 equal to +8: `MenuList::Accepted` → the save screen's data (`[0x826D8454]`) +40 = the list's +4 + `MenuList::Selection` (the replay picked), the page → 2 through transition 6 `PickReplay` (+8 = the page unless 2, +4 = 2, +12 = 6, +16 and +0 = -1), `MenuSound::Play(0)`; else `MenuList::Cancelled` → jump to page 5 (+8, +0 = 5, +12 and +16 = -1), the data +4 = 3, message 9 posted, `MenuSound::Play(2)`; else nothing. With the list moved (+24 nonzero or +4 not +8): transition 4 `MoveCursor`, page 0 after, `MenuSound::Play(4)`. Not seen in play. Read in full. |
+| `sub_82289958` | `ReplayTheater::AskList` (probably) | | Page 1, r3 = the dispatcher: message 7 posted (ring at +204: the save screen's (9, 7) `SaveScreen::OpenKind2`, the replays' list); jump to page 5 (+8 = the page unless 5, +0 = 5, +12 and +16 = -1); the data (`[0x828161E8]`) +4 = 0. Leaf. Seen in play. Read in full. Ready. |
+| `sub_822899E0` | `ReplayTheater::AskLoad` (probably) | | Page 2: as `AskList` with message 8 (`SaveScreen::OpenKind3`: the picked replay's load) and the data +4 = 1. Leaf. Not seen in play. Read in full. |
+| `sub_82289A70` | `ReplayTheater::LeavePage` (probably) | | Page 3, r3 = the dispatcher: message 6 posted (the theater's (5, 6) `Unload`). Leaf. Seen in play. Read in full. Ready. |
+| `sub_8228A4B0` | `ReplayTheater::WaitPage` (probably) | | Page 5, while the save screen works: by the save screen's data (`[0x826D8454]`) +56: 0 → `SetPrompts(-1, -1, -1, -1, -1, -1)`; 1 → `SetPrompts(0, 0, -1, -1, -1, -1)` (tail calls); other values nothing. Leaf. Seen in play. Read in full. Blocked by `SetPrompts` (ready). |
+| `sub_8228A3B8` | `ReplayTheater::SetPrompts` (probably) | | r3 to r8 = three pairs (r3, r4), (r5, r6), (r7, r8): for each pair i, movie 45's node (sub-scene 2, child i), then the two children of sub-scene 2 its +100 and +100 + 1 name (`UiMovie::FindNode`): with both values not -1, both nodes' +80 = 1 (shown) and their +108 = the pair's values; else both +80 = 0. Probably the button prompts at the screen's bottom. A 176-byte frame (`__savegprlr_26`). From `WaitPage`, `StartPage` and `BuildList`. Seen in play. Read in full. Ready. |
+| `sub_82289AC0` | `ReplayTheater::Intro` | | Transition 0, r3 = the started word: movie 45; the first time `UiMovie::PlayNamed(movie, 52, 0, 0, 0, 0)` and the word = 1; `UiMovie::Run(movie, 0)`; when it answers 0, `PlayNamed` and `LoopNamed` on 49, 43 and 0 in turn. Returns 1 always (done after one call). A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82289BD0` | `ReplayTheater::FadeOut` | | Transition 1: the first time `UiMovie::FinishNamed` on the list's selection + 5, 49, 43 and 0, `ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0)` and the word = 1; `UiMovie::Run(movie, 0)`; returns 1 when the fades' words `[0x826A50E4]` and `[0x826A50DC]` are both 0 (the fade done), else 0. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82289CC0` | `ReplayTheater::FadeInList` (probably) | | Transition 2: the first time `UiMovie::PlayNamed(movie, 50, 0, 0, 0, 0)`, `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)` and the word = 1; returns 1 when `UiMovie::Run(movie, 0)` answers 0. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_82289D70` | `ReplayTheater::ShowCursor` (probably) | | Transition 3: the first time `PlayNamed` and `LoopNamed` on the list's selection + 5 (the selected row's animation) and the word = 1; `UiMovie::Run(movie, 0)`; returns 1. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_8228A658` | `ReplayTheater::MoveCursor` (probably) | | Transition 4: the first time, from the list (`[0x828161E4]`: the selection, the previous one (`MenuList::GetPreviousSelection`), +4 the scroll, +8 the scroll before, +32) and the replays (`[0x828161F0]` +12): `FinishNamed` on the previous row + 5, `PlayNamed` and `LoopNamed` on the new row + 5, `ShowRecord` on the record at the scroll + selection, `FinishNamed` 15 and 16; with +32 set the cursor node (sub-scene 3, child 2, its child 0) +16 = selection × 40.0, else by the list's +24 (the scroll's direction, probably) the edge row's name text (`SetNodeText`, text 471, the record's +28 or +352) and `PlayNamed` 15 or 16; when the scroll changed, `FinishNamed` 28 and 27, `ShowListPage`, `PlayNamed` 28 (down) or 27 (up); the word = 1. Then `UiMovie::Run(movie, 0)`; returns 1. A 176-byte frame (`__savegprlr_23`, f31). Not seen in play. Read in full. |
+| `sub_82289E08` | `ReplayTheater::HideCursor` (probably) | | Transition 5: the first time `FinishNamed` on the selection + 5, `PlayNamed(movie, 51, ...)` and the word = 1; returns 1 when `UiMovie::Run(movie, 0)` answers 0. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_82289EB8` | `ReplayTheater::PickReplay` (probably) | | Transition 6: the first time `FinishNamed` on the selection + 5 and the word = 1; `UiMovie::Run(movie, 0)`; returns 1. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8228AAB0` | `ReplayTheater::OnDone` (probably) | | (5, 11), the save screen's success: by the data's +4: 0 (the list asked) → `BuildList`, then +8 = the page unless 0, +12 = 2 (`FadeInList`), +16 = 3 (`ShowCursor`), +0 = -1, +4 = 0 (the list after); 1 (a load asked) → the data +8 = 1, +8 = the page unless 3, +12 = 1 (`FadeOut`), +16 = -1, +4 = 3 (`LeavePage`), +0 = -1, then `Replay::SetUpRace([0x826C5B50], [0x826C5B2C], [0x826C5B4C])` (the kept replay, the race data, the input recordings); 2 → +12 = 5 (`HideCursor`), page 1 after; 3 → +12 = 1 (`FadeOut`), page 3 after; others nothing. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_82289208` | `ReplayTheater::OnFailed` (probably) | | (5, 12), the save screen's other answer: with the data's +12 (interrupted) 0, by its +4: 0 or 1 → +8 = the page unless 3, +4 = 3 (`LeavePage`), +0 = -1, +12 = 1 (`FadeOut`), +16 = -1 (back to the title); 2 → page 1 after `HideCursor` (+4 = 1, +12 = 5); 3 → jump to page 0 (+0 = 0, +12 and +16 = -1). With +12 set and +4 1 to 3: +4 = -1, +12 = 5, +0 and +16 = -1. Leaf. Seen in play (with no replays saved, probably). Read in full. Ready. |
+| `sub_8228ABE0` | `ReplayTheater::OnRetry` (probably) | | (5, 13): with the data's +4 1 (a load asked): `BuildList`, then +12 = 3 (`ShowCursor`), +16 = -1, +4 = 0 (the list), +0 = -1. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_82289308` | `ReplayTheater::OnBack` (probably) | | (5, 14): with the data's +4 1: as `OnRetry` without `BuildList`. Leaf. Not seen in play. Read in full. |
+| `sub_82289358` | `ReplayTheater::OnInterrupt` (probably) | | (5, 15) (from `ModeType10::Interrupt`; the save screen's cancel too): the data's +12 = 1; when the page is 0 (the list): +8 = 0, +0 = -1, +4 = -1, +12 = 5 (`HideCursor`), +16 = -1. Leaf. Not seen in play. Read in full. |
+| `sub_822893A8` | `ReplayTheater::OnResume` (probably) | | (5, 16) (from `ModeType10::Resume`): the data's +12 = 0; jump to page 1 (`AskList`: the list asked again; +8 = the page unless 1, +0 = 1, +12 and +16 = -1). Leaf. Not seen in play. Read in full. |
+| `sub_82289600` | `ReplayTheater::Unload` | | (5, 6) → 8: `UiMovie::FinishAll(movie 45)`; with +9616 set (the mode's Init leaves it 0) `UiMovies::Delete(45)` and +9608 = 0. A 112-byte frame. Seen in play. Read in full. Ready. |
+| `sub_82289668` | `ReplayTheater::Wait` (probably) | | (8, 3): message 4 posted (r4's ring at +204), state 9. Leaf. Seen in play. Read in full. Ready. |
+| `sub_822896C0` | `ReplayTheater::Leave` | | (5, 4) and (9, 4): state 7; `SaveBuffers::Destroy`; `UiMovie::FinishAll(movie 45)`; `UiMovies::Delete(45)`; message 4 posted (for (7, 4) `Destroy`). A 112-byte frame. In the save screens' lead before (`../loops/leads.md`). Seen in play. Read in full. Ready. |
+| `sub_822894E8` | `ReplayTheater::Destroy` | | (7, 4) → 6 (the machine sets its state first, `StateMachine::Add`'s next state after): state 11 when the data's +8 is set (a replay loaded: `ModeType10::NextMode` answers the race), else 14 (the title); the three blocks `[0x828161E0]`, `[0x828161E4]`, `[0x828161E8]` freed (`VirtualFree(.., 0, MEM_RELEASE)`, no checks) and cleared. A 128-byte frame. Seen in play. Read in full. Ready. |
+| `sub_8228A560` | `ReplayTheater::BuildList` (probably) | | No arguments: movie 45; `MenuList::Init([0x828161E4], count, min(count, 9), 1, 154, 153, 155, 156)` with the stack words 159 and 158 (the count the replays' `[0x828161F0]` +20; 159 and 158 land at +52 and +56, the accept and back actions `MenuList::Accepted` and `Cancelled` read; 154, 153, 155, 156 probably the cursor actions), its selection (`MenuList::Selection`); the cursor node (sub-scene 3, child 2, its child 0) +16 = selection × 40.0; `ShowListPage`; `ShowRecord` on the record at selection × 36 of `[0x828161F0]` +12; `SetPrompts(0, 0, 1, 1, -1, -1)`. A 144-byte frame (f31 saved). From `OnDone` and `OnRetry`. Not seen in play. Read in full. |
+| `sub_82289F48` | `ReplayTheater::ShowListPage` (probably) | | No arguments: movie 45, the replays (`[0x828161F0]`: +12 the records, +20 the count), the list's scroll (+4): the nine rows (sub-scene 3, child 2's children 5 to 13) cleared (`UiMovie::ClearNodeText`), then for up to nine rows from the scroll each row's name (`SetNodeText`, text 471, the record's +28); the scroll arrows (sub-scene 3 children 7 and 8, +80 shown): both hidden with 9 replays or fewer, else up hidden at the top, down hidden at the end (scroll = count - 9), both shown between. A 176-byte frame (`__savegprlr_23`). From `BuildList` and `MoveCursor`. Not seen in play. Read in full. |
+| `sub_8228A0D8` | `ReplayTheater::ShowRecord` (probably) | | r3 = a 36-byte replay record (`../known-data.md`): with it null or its +28 0, the texts (sub-scene 3, children 9, 10, 13, 19, 20, 21, 12) cleared (`UiMovie::ClearText`) and child 17's +108 = 0; else `UiMovie::SetText` of the date (child 9, text 530, halfwords +0, +2, +6, +8, +10), the kind (child 10, text 473 + the record's +20), the time (child 13, text 528, +16's minutes, seconds and thousandths, capped at 59:59.999), three texts by +24 (children 19 to 21, texts 1646 +, 1790 +, 1718 +), child 12 by the kind (+20 0: text 4650 + the record's +32 and child 17 +108 = 0; 1 or 3: one of eight texts 395 to 404 by +32 and child 17 +108 = 1; 2: text 477, child 17 +108 = 0), and children 5 and 6's +108 the tens and units of +28. A 192-byte frame (`__savegprlr_28`). From `BuildList` and `MoveCursor`. Not seen in play. Read in outline (its calls and stores). |
+| `sub_82105228` | `Replay::SetUpRace` (probably) | | r3 = the kept replay (`[0x826C5B50]`, 0x13C8F0 bytes), r4 = the race data (`[0x826C5B2C]`), r5 = the input recordings (`[0x826C5B4C]`): 0 at once when the replay's +0x2B600 is nonzero; else `RaceData::ResetGlobal`, `Stages::Clear` on the race data's +0x59620, 20 bytes from replay +0x2B5EC to race +0xA3AE4, 32 from +52 to race +4, race +0xA3AE0 = replay +0x2B5E8; its 93 entries of 1,908 bytes from +100: each one's 1,884 bytes (from its +8) made a car on the stack with its +0 and +4 words, `Car::Refresh`, 3,904 bytes copied to the race's record (race +48 + 3,936 × i) with the entry's trailing halfwords and words; race +48 +0x595E0 to +0x595EC from replay +84 to +96; `sub_820FFB60` on race +0x59620 with seven doublewords from replay +0x2B588 (24 more bytes from +0x2B5C0 copied to the frame); a stack record (`sub_82101F68`, three 972-byte entries' first words set to `[0x82000A34]` and 0) given four words from +0x2B5D8 and added (`RacerRecords::Add` on race +0x59AE8); `RaceSnapshot::Copy(r5 + 0x20F590, replay + 0x2B610)`; the replay's input records copied into r5 (`memcpy`, 0x107AC4 bytes from +0x34E20); `[0x826C5B2C]` +0xA3AF0 = 5 (the replay's race mode, probably); returns 1. An 8,048-byte frame (`__savegprlr_23`). From `ReplayTheater::OnDone` and `sub_82287220` (no callers found; not seen in play). Not seen in play. Read in outline (calls and copies; the offsets not checked against the replay's layout). |

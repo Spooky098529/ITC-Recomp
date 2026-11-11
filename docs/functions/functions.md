@@ -693,6 +693,11 @@ Rows not yet moved stay in the table below. So far:
   data load at boot and the logo before the title), the title screen's
   machine ("press start", the main menu, the career menu, the attract
   race's set-up) (B7).
+- [`type10-mode.md`](type10-mode.md): the type 10 front-end mode, the
+  replay theater: its Init and delegate functions, the slots it shares
+  with the type 9 mode, and the theater's machine (UI movie 45: the
+  saved replays' list through the save screen, a replay's load and the
+  race set up from it) (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
