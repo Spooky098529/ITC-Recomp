@@ -673,6 +673,11 @@ Rows not yet moved stay in the table below. So far:
   the event and its variant picked, the yes/no question, the race's
   set-up (`Career::SetUpEvent`, `Race::SetUp`) and the way back to the
   hub (B7).
+- [`car-settings.md`](car-settings.md): the car settings screen (the
+  type 2 mode's machine at +0x173D0, opened by message 18, UI movie 3,
+  and the type 5 mode's): the selected garage car's gear ratios and
+  setting bytes edited page by page, applied to the garage car, and the
+  test run's set-up on routes 8 to 10 (B7; its transitions a lead).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
