@@ -76,6 +76,14 @@ When the user has reviewed a run's section, its heading gets
   `known-data.md`'s type 10 block and `[0x828161E0]`-`[0x828161E8]`;
   the save screens' lead names `sub_8228AA58` and `sub_822896C0` as the
   theater's `Start` and `Leave`; a lead for the type 9 mode.
+- The type 10 mode's port (49287852), **unchecked**: the run was ended
+  before its harness and race; `--native_type10_mode` off by default,
+  38 rows Overridden with "not yet checked", 8 plain C++ functions
+  without adapters left blank (`FindShown`, `InitStates`, `OnList`,
+  `StartPage`, `SetPrompts`, `BuildList`, `ShowListPage`,
+  `ShowRecord`). `b7_status.py` counts the 38 as ours though the flag
+  is off. `Replay::SetUpRace` `sub_82105228`'s row doesn't yet say it
+  stays recompiled (called through the guest from `OnDone`).
 
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 

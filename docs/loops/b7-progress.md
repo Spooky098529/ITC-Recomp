@@ -77,9 +77,16 @@ file's history. What's left to see in a drive, from every run:
   slots, `ReplayTheater::InitStates` `sub_8228AC48` with UI movie 45
   and 17 transitions; slot 12 and +32 slot 1 the type 9 mode's,
   mapped here as shared; 18 ready groups; one lead added, the type 9
-  mode; no subagents); map checked. Step: migration agent.
+  mode; no subagents); map checked. The user ended the run during the
+  migration (2026-11-11): its one batch 49287852 is built but
+  unchecked (no harness run, no race): `--native_type10_mode` off by
+  default, 38 rows Overridden marked "not yet checked", 8 with plain
+  C++ and no adapter left blank; no subagents. Not validated.
 
 ## Done
+
+- The replay theater: `type10-mode.md`, ported unchecked behind
+  `--native_type10_mode` (off by default), 49287852; not validated.
 
 - The title screen: `title-screen.md` 86 of 87 ours,
   `--native_title_screen`, 05cef504..216e9843; validated.
@@ -115,5 +122,16 @@ The run's section of `review.md` ("Run 2026-11-11 08:38").
   388, unknown 562).
 - After the type 10 mode's map: ours 5574, work left 1005 (wrapped 55,
   known 413, unknown 537).
+- After its unchecked port: ours 5612, work left 984 (wrapped 55,
+  known 392, unknown 537).
 
 ## Stopped
+
+2026-11-11, ended by the user ("wrap up the run now") during the third
+subsystem's migration. Done and validated: the tuning screen's update
+and the title screen. The replay theater is ported but unchecked
+(49287852, `--native_type10_mode` off by default; next: run its
+harness, fix harness faults, turn the flag on, set the eight
+adapterless functions to Native). Nothing uncommitted. Totals: ours
+5445 -> 5612 (38 of them the theater's unchecked Overridden rows),
+work left 1063 -> 984.

@@ -658,6 +658,20 @@ native (ours 5,402 -> 5,445); its first validation halted on
 list's 5, fixed f691a91e by the user's call). It stopped at its limit.
 The rest waits on the tuning screen's update `sub_821E6C50`,
 `Garage::Sell` and the leads in `docs/loops/leads.md`.
+Its forty-fourth run (`b7-loop-11-11-26`, 2026-11-11, not yet merged;
+summary `docs/loops/b7-loop-2026-11-11-0838.md`; limit 5, ended by the
+user during its third subsystem) made the tuning screen's update
+(`tuning-screen.md`, under `--native_tuning_screen`, with 40 of its 61
+callees never seen in play; its first validation stalled on a harness
+wild read, fixed 505b2a31 by the user's call, now under "Precedent
+first": harness faults found, fixed and validated again) and the title
+screen (`title-screen.md`, `--native_title_screen`, 86 of 87: the type
+4 mode, the title load and title screen machines) native, both
+validated, and ported the replay theater (`type10-mode.md`,
+`--native_type10_mode`, **off by default, unchecked**: its harness and
+race never ran) (ours 5,445 -> 5,612, counting the theater's rows).
+The rest waits on the theater's check, the type 9 mode, the sticker
+and vinyl editors and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
