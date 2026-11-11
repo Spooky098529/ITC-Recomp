@@ -213,4 +213,172 @@ uint32_t DebugPaintConfirm(uint8_t* base, uint32_t sp) {
   return 520;
 }
 
+// The handlers never seen in play (ported 2026-11-11, as the ones above).
+
+uint32_t DebugColorSelect(uint8_t* base, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821CC078 TuningScreen::DebugColorSelect");
+  Frame(base, sp, 96);
+  // The colors' lines for the aero item 4, the power train's item 3 and the
+  // interior's item 0; the cursor's line (500) alone for the others.
+  const int32_t m = int32_t(guest::LoadU32(base, screen + kCategory));
+  const uint8_t p = guest::LoadU8(base, screen + kItem);
+  if ((m == 4 && p == 4) || (m == 1 && p == 3) || (m == 6 && p == 0)) {
+    return 520;
+  }
+  return 500;
+}
+
+uint32_t DebugWarnMoney(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821CC430 TuningScreen::DebugWarnMoney");
+  Frame(base, sp, 96);
+  return 500;
+}
+
+uint32_t DebugReflectSet(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821CC510 TuningScreen::DebugReflectSet");
+  return DebugConfirm(base, sp);
+}
+
+uint32_t DebugAnnulSet(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821CC598 TuningScreen::DebugAnnulSet");
+  return DebugConfirm(base, sp);
+}
+
+namespace {
+// The yes/no pages: a 128-byte frame with the two answers' strings.
+uint32_t DebugYesNo(uint8_t* base, uint32_t sp) {
+  const uint32_t frame = Frame(base, sp, 128);
+  Words(base, frame, 80, {0x8200AB74, 0x8200AB70});
+  return 520;
+}
+}  // namespace
+
+uint32_t DebugRemoveConfirm(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821CC620 TuningScreen::DebugRemoveConfirm");
+  return DebugYesNo(base, sp);
+}
+
+uint32_t DebugBodyColor(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E8358 TuningScreen::DebugBodyColor");
+  Frame(base, sp, 112);
+  return 520;
+}
+
+uint32_t DebugNeonPart(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E8440 TuningScreen::DebugNeonPart");
+  const uint32_t frame = Frame(base, sp, 128);
+  Words(base, frame, 80, {0x8200ACEC, 0x8200B480, 0x8200ACC0, 0x8200B47C});
+  return 520;
+}
+
+uint32_t DebugNeonKind(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E84F8 TuningScreen::DebugNeonKind");
+  const uint32_t frame = Frame(base, sp, 128);
+  Words(base, frame, 80, {0x8200B4A4, 0x8200B4AC, 0x8200B49C});
+  return 520;
+}
+
+uint32_t DebugNeonEdit(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E85A0 TuningScreen::DebugNeonEdit");
+  Frame(base, sp, 112);
+  return 520;
+}
+
+uint32_t DebugLedEdit(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E8688 TuningScreen::DebugLedEdit");
+  Frame(base, sp, 112);
+  return 520;
+}
+
+uint32_t DebugCockpitTop(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E8758 TuningScreen::DebugCockpitTop");
+  const uint32_t frame = Frame(base, sp, 128);
+  Words(base, frame, 80, {0x8200B4DC, 0x8200B4E8});
+  return 520;
+}
+
+uint32_t DebugCockpitType(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E8800 TuningScreen::DebugCockpitType");
+  const uint32_t frame = Frame(base, sp, 128);
+  Words(base, frame, 80, {0x8200B50C, 0x8200B510, 0x8200B504, 0x8200B4FC});
+  return 520;
+}
+
+uint32_t DebugCockpitColor(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E88C0 TuningScreen::DebugCockpitColor");
+  const uint32_t frame = Frame(base, sp, 144);
+  Words(base, frame, 80,
+        {0x8200AAE4, 0x8200AADC, 0x8200AACC, 0x8200B520, 0x8200B518, 0x8200B528});
+  return 520;
+}
+
+uint32_t DebugMeterKind(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E8998 TuningScreen::DebugMeterKind");
+  const uint32_t frame = Frame(base, sp, 144);
+  Words(base, frame, 80, {0x8200B544, 0x8200B550, 0x8200B538, 0x8200B530, 0x8200B49C});
+  return 520;
+}
+
+uint32_t DebugMeterPoint(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E8A88 TuningScreen::DebugMeterPoint");
+  const uint32_t frame = Frame(base, sp, 144);
+  Words(base, frame, 80, {0x8200B5A4, 0x8200B5B0, 0x8200B598, 0x8200B58C, 0x8200B580});
+  return 520;
+}
+
+uint32_t DebugLayerOperate(uint8_t* base, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FDA80 TuningScreen::DebugLayerOperate");
+  const uint32_t frame = Frame(base, sp, 160);
+  // The layer list's table (three names for the stickers, five else), then
+  // the operations' four over its first.
+  if (Stickers(base, screen)) {
+    Words(base, frame, 80, {0x8200C9A0, 0x8200C9A8, 0x8200C998});
+  } else {
+    Words(base, frame, 80, {0x8200C9A0, 0x8200C9A8, 0x8200C998, 0x8200C96C, 0x8200C964});
+  }
+  Words(base, frame, 80, {0x8200C9E4, 0x8200C9F0, 0x8200C9D4, 0x8200C9C4});
+  return 720;
+}
+
+uint32_t DebugLayerOrder(uint8_t* base, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FDF10 TuningScreen::DebugLayerOrder");
+  const uint32_t frame = Frame(base, sp, 144);
+  if (Stickers(base, screen)) {
+    Words(base, frame, 80, {0x8200C9A0, 0x8200C9A8, 0x8200C998});
+  } else {
+    Words(base, frame, 80, {0x8200C9A0, 0x8200C9A8, 0x8200C998, 0x8200C96C, 0x8200C964});
+  }
+  return 520;
+}
+
+uint32_t DebugEditRotate() {
+  ITC_NATIVE_RUNNING("sub_821FE118 TuningScreen::DebugEditRotate");
+  return 500;
+}
+
+uint32_t DebugEditScale() {
+  ITC_NATIVE_RUNNING("sub_821FE130 TuningScreen::DebugEditScale");
+  return 500;
+}
+
+uint32_t DebugEditColor() {
+  ITC_NATIVE_RUNNING("sub_821FE148 TuningScreen::DebugEditColor");
+  return 500;
+}
+
+uint32_t DebugEditFlip() {
+  ITC_NATIVE_RUNNING("sub_821FE160 TuningScreen::DebugEditFlip");
+  return 500;
+}
+
+uint32_t DebugPaintCancelConfirm(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FE230 TuningScreen::DebugPaintCancelConfirm");
+  return DebugYesNo(base, sp);
+}
+
+uint32_t DebugPaintRemoveConfirm(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FE2D0 TuningScreen::DebugPaintRemoveConfirm");
+  return DebugYesNo(base, sp);
+}
+
 }  // namespace tuning_screen

@@ -528,6 +528,54 @@ void TuningScreen(Context& h) {
   }
   TuningScreenPages(h);
   TuningRefresh(h);
+
+  // The debug state handlers never seen in play (after the other groups, so
+  // theirs keep their seeds), as those above: the front-end menu at +10040,
+  // the decal layer set +30724 and the category and item shaped by
+  // ShapeScreen. DebugColorSelect: the category and item mostly one of the
+  // three pairs with the colors' lines (aero 4, power train 3, interior 0),
+  // or one of the two halves alone.
+  Group(
+      h, w, "TuningScreen::DebugColorSelect", 30,
+      [](PPCContext&, Random& r, const World& w) {
+        constexpr uint32_t kCategories[] = {4, 1, 6};
+        constexpr uint8_t kItems[] = {4, 3, 0};
+        const uint32_t k = r.Below(3);
+        const uint32_t pick = r.Below(4);
+        guest::StoreU32(w.base, w.screen() + ts::kCategory,
+                        pick == 3 ? kCategories[r.Below(3)] : kCategories[k]);
+        guest::StoreU8(w.base, w.screen() + ts::kItem,
+                       pick == 2 ? kItems[r.Below(3)] : kItems[k]);
+      },
+      __imp__sub_821CC078, hooks::TuningDebugColorSelect, 16);
+  const Handler unseen[] = {
+      {"TuningScreen::DebugWarnMoney", __imp__sub_821CC430, hooks::TuningDebugWarnMoney, 8},
+      {"TuningScreen::DebugReflectSet", __imp__sub_821CC510, hooks::TuningDebugReflectSet, 8},
+      {"TuningScreen::DebugAnnulSet", __imp__sub_821CC598, hooks::TuningDebugAnnulSet, 8},
+      {"TuningScreen::DebugRemoveConfirm", __imp__sub_821CC620, hooks::TuningDebugRemoveConfirm, 32},
+      {"TuningScreen::DebugBodyColor", __imp__sub_821E8358, hooks::TuningDebugBodyColor, 24},
+      {"TuningScreen::DebugNeonPart", __imp__sub_821E8440, hooks::TuningDebugNeonPart, 32},
+      {"TuningScreen::DebugNeonKind", __imp__sub_821E84F8, hooks::TuningDebugNeonKind, 32},
+      {"TuningScreen::DebugNeonEdit", __imp__sub_821E85A0, hooks::TuningDebugNeonEdit, 24},
+      {"TuningScreen::DebugLedEdit", __imp__sub_821E8688, hooks::TuningDebugLedEdit, 24},
+      {"TuningScreen::DebugCockpitTop", __imp__sub_821E8758, hooks::TuningDebugCockpitTop, 32},
+      {"TuningScreen::DebugCockpitType", __imp__sub_821E8800, hooks::TuningDebugCockpitType, 32},
+      {"TuningScreen::DebugCockpitColor", __imp__sub_821E88C0, hooks::TuningDebugCockpitColor, 32},
+      {"TuningScreen::DebugMeterKind", __imp__sub_821E8998, hooks::TuningDebugMeterKind, 32},
+      {"TuningScreen::DebugMeterPoint", __imp__sub_821E8A88, hooks::TuningDebugMeterPoint, 40},
+      {"TuningScreen::DebugLayerOperate", __imp__sub_821FDA80, hooks::TuningDebugLayerOperate, 48},
+      {"TuningScreen::DebugLayerOrder", __imp__sub_821FDF10, hooks::TuningDebugLayerOrder, 40},
+      {"TuningScreen::DebugEditRotate", __imp__sub_821FE118, hooks::TuningDebugEditRotate, 0},
+      {"TuningScreen::DebugEditScale", __imp__sub_821FE130, hooks::TuningDebugEditScale, 0},
+      {"TuningScreen::DebugEditColor", __imp__sub_821FE148, hooks::TuningDebugEditColor, 0},
+      {"TuningScreen::DebugEditFlip", __imp__sub_821FE160, hooks::TuningDebugEditFlip, 0},
+      {"TuningScreen::DebugPaintCancelConfirm", __imp__sub_821FE230, hooks::TuningDebugPaintCancelConfirm, 32},
+      {"TuningScreen::DebugPaintRemoveConfirm", __imp__sub_821FE2D0, hooks::TuningDebugPaintRemoveConfirm, 32},
+  };
+  for (const Handler& handler : unseen) {
+    Group(h, w, handler.name, 20, kScreenOnly, handler.recompiled, handler.native,
+          handler.saves);
+  }
 }
 
 }  // namespace harness

@@ -193,5 +193,32 @@ void TuningDebugLayerSet(PPCContext& ctx, uint8_t* base);
 void TuningDebugEditPosition(PPCContext& ctx, uint8_t* base);
 void TuningDebugEditView(PPCContext& ctx, uint8_t* base);
 void TuningDebugPaintConfirm(PPCContext& ctx, uint8_t* base);
+// The debug state handlers never seen in play, for the harness only (no
+// recompiled caller reaches them in play: the update's plain C++ calls their
+// plain C++): DebugColorSelect sub_821CC078 to DebugPaintRemoveConfirm
+// sub_821FE2D0 (tuning_screen/tuning_screen.h).
+void TuningDebugColorSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugWarnMoney(PPCContext& ctx, uint8_t* base);
+void TuningDebugReflectSet(PPCContext& ctx, uint8_t* base);
+void TuningDebugAnnulSet(PPCContext& ctx, uint8_t* base);
+void TuningDebugRemoveConfirm(PPCContext& ctx, uint8_t* base);
+void TuningDebugBodyColor(PPCContext& ctx, uint8_t* base);
+void TuningDebugNeonPart(PPCContext& ctx, uint8_t* base);
+void TuningDebugNeonKind(PPCContext& ctx, uint8_t* base);
+void TuningDebugNeonEdit(PPCContext& ctx, uint8_t* base);
+void TuningDebugLedEdit(PPCContext& ctx, uint8_t* base);
+void TuningDebugCockpitTop(PPCContext& ctx, uint8_t* base);
+void TuningDebugCockpitType(PPCContext& ctx, uint8_t* base);
+void TuningDebugCockpitColor(PPCContext& ctx, uint8_t* base);
+void TuningDebugMeterKind(PPCContext& ctx, uint8_t* base);
+void TuningDebugMeterPoint(PPCContext& ctx, uint8_t* base);
+void TuningDebugLayerOperate(PPCContext& ctx, uint8_t* base);
+void TuningDebugLayerOrder(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditRotate(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditScale(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditColor(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditFlip(PPCContext& ctx, uint8_t* base);
+void TuningDebugPaintCancelConfirm(PPCContext& ctx, uint8_t* base);
+void TuningDebugPaintRemoveConfirm(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

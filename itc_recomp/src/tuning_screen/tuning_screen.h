@@ -570,5 +570,42 @@ uint32_t DebugLayerSet(uint8_t* base, uint32_t sp);
 uint32_t DebugEditPosition();
 uint32_t DebugEditView();
 uint32_t DebugPaintConfirm(uint8_t* base, uint32_t sp);
+// The handlers never seen in play: sub_821CC078 DebugColorSelect (7; 500 or
+// 520 by the category and item), sub_821CC430 DebugWarnMoney (10),
+// sub_821CC510 DebugReflectSet (12), sub_821CC598 DebugAnnulSet (13),
+// sub_821CC620 DebugRemoveConfirm (14), sub_821E8358 DebugBodyColor (18),
+// sub_821E8440 DebugNeonPart (19), sub_821E84F8 DebugNeonKind (20),
+// sub_821E85A0 DebugNeonEdit (21), sub_821E8688 DebugLedEdit (22),
+// sub_821E8758 DebugCockpitTop (53), sub_821E8800 DebugCockpitType (54),
+// sub_821E88C0 DebugCockpitColor (55), sub_821E8998 DebugMeterKind (56),
+// sub_821E8A88 DebugMeterPoint (57, 58), sub_821FDA80 DebugLayerOperate (25,
+// 40), sub_821FDF10 DebugLayerOrder (27, 42), sub_821FE118 DebugEditRotate
+// (30, 45), sub_821FE130 DebugEditScale (31, 46), sub_821FE148
+// DebugEditColor (32, 47), sub_821FE160 DebugEditFlip (33, 48; these four
+// with no frame), sub_821FE230 DebugPaintCancelConfirm (36, 51),
+// sub_821FE2D0 DebugPaintRemoveConfirm (37, 52).
+uint32_t DebugColorSelect(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugWarnMoney(uint8_t* base, uint32_t sp);
+uint32_t DebugReflectSet(uint8_t* base, uint32_t sp);
+uint32_t DebugAnnulSet(uint8_t* base, uint32_t sp);
+uint32_t DebugRemoveConfirm(uint8_t* base, uint32_t sp);
+uint32_t DebugBodyColor(uint8_t* base, uint32_t sp);
+uint32_t DebugNeonPart(uint8_t* base, uint32_t sp);
+uint32_t DebugNeonKind(uint8_t* base, uint32_t sp);
+uint32_t DebugNeonEdit(uint8_t* base, uint32_t sp);
+uint32_t DebugLedEdit(uint8_t* base, uint32_t sp);
+uint32_t DebugCockpitTop(uint8_t* base, uint32_t sp);
+uint32_t DebugCockpitType(uint8_t* base, uint32_t sp);
+uint32_t DebugCockpitColor(uint8_t* base, uint32_t sp);
+uint32_t DebugMeterKind(uint8_t* base, uint32_t sp);
+uint32_t DebugMeterPoint(uint8_t* base, uint32_t sp);
+uint32_t DebugLayerOperate(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugLayerOrder(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugEditRotate();
+uint32_t DebugEditScale();
+uint32_t DebugEditColor();
+uint32_t DebugEditFlip();
+uint32_t DebugPaintCancelConfirm(uint8_t* base, uint32_t sp);
+uint32_t DebugPaintRemoveConfirm(uint8_t* base, uint32_t sp);
 
 }  // namespace tuning_screen

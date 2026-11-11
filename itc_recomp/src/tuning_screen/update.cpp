@@ -5,9 +5,10 @@
 // current command in r26, movie M in r29 and its 144-byte frame at r1;
 // every callee gets r3 = r31. The callees seen in play by their plain C++
 // (as their adapters run them), DrawPowerGraph through its override (its
-// adapter works through the guest), UiMovie::Run through its override, and
-// those never seen in play (the debug handlers and command runners below)
-// through the guest with the original's return addresses. The empty
+// adapter works through the guest), UiMovie::Run through its override, the
+// debug state handlers all by their plain C++ (debug.cpp), and the command
+// runners never seen in play (below) through the guest with the original's
+// return addresses. The empty
 // sub_82106540's calls (the "TUNING SHOP" print, commands 24 and 28) are
 // left out, as other native callers of it do.
 
@@ -26,46 +27,16 @@ constexpr uint32_t kQueue = 10036;      // [it]: the command queue
 constexpr uint32_t kStandDirty = 9732;  // set: put the stand back this update
 constexpr uint32_t kRun = 0x8211E1B8;   // UiMovie::Run(movie, 0)
 
-// The debug state handlers never seen in play (state - 3's 8-bit table at
-// 0x8200AA00): their address and the return address (0 for a native
-// handler, run by the switch below).
+// The command runners never seen in play (the command's 8-bit table at
+// 0x8200A9B8): their address and the return address (0 for a native
+// runner, run by the switch below).
 struct Guest {
   uint32_t function;
   uint32_t lr;
 };
 
-Guest DebugGuest(uint32_t state) {
-  switch (state) {
-    case 7: return {0x821CC078, 0x821E6D0C};   // DebugColorSelect
-    case 10: return {0x821CC430, 0x821E6E80};  // DebugWarnMoney
-    case 12: return {0x821CC510, 0x821E6E98};  // DebugReflectSet
-    case 13: return {0x821CC598, 0x821E6EA4};  // DebugAnnulSet
-    case 14: return {0x821CC620, 0x821E6EB0};  // DebugRemoveConfirm
-    case 18: return {0x821E8358, 0x821E6D48};  // DebugBodyColor
-    case 19: return {0x821E8440, 0x821E6D54};  // DebugNeonPart
-    case 20: return {0x821E84F8, 0x821E6D60};  // DebugNeonKind
-    case 21: return {0x821E85A0, 0x821E6D6C};  // DebugNeonEdit
-    case 22: return {0x821E8688, 0x821E6D78};  // DebugLedEdit
-    case 25: case 40: return {0x821FDA80, 0x821E6D9C};  // DebugLayerOperate
-    case 27: case 42: return {0x821FDF10, 0x821E6DB4};  // DebugLayerOrder
-    case 30: case 45: return {0x821FE118, 0x821E6DD8};  // DebugEditRotate
-    case 31: case 46: return {0x821FE130, 0x821E6DE4};  // DebugEditScale
-    case 32: case 47: return {0x821FE148, 0x821E6DF0};  // DebugEditColor
-    case 33: case 48: return {0x821FE160, 0x821E6DFC};  // DebugEditFlip
-    case 36: case 51: return {0x821FE230, 0x821E6E20};  // DebugPaintCancelConfirm
-    case 37: case 52: return {0x821FE2D0, 0x821E6E2C};  // DebugPaintRemoveConfirm
-    case 53: return {0x821E8758, 0x821E6E38};  // DebugCockpitTop
-    case 54: return {0x821E8800, 0x821E6E44};  // DebugCockpitType
-    case 55: return {0x821E88C0, 0x821E6E50};  // DebugCockpitColor
-    case 56: return {0x821E8998, 0x821E6E5C};  // DebugMeterKind
-    case 57: case 58: return {0x821E8A88, 0x821E6E68};  // DebugMeterPoint
-    default: return {0, 0};
-  }
-}
-
-// The command runners never seen in play (the command's 8-bit table at
-// 0x8200A9B8), as DebugGuest. Commands 20 (r4 +9644, r5 +9648) and 52 (r4
-// the dispatcher) take more arguments: the switch below passes them.
+// Commands 20 (r4 +9644, r5 +9648) and 52 (r4 the dispatcher) take more
+// arguments: the switch below passes them.
 Guest CommandGuest(uint32_t command) {
   switch (command) {
     case 5: return {0x821D4180, 0x821E6FD4};
@@ -140,30 +111,48 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
   // Block 2: the state's debug handler (states 3 to 58).
   const uint32_t state = word(kState);
   if (state - 3 <= 55) {
-    const Guest g = DebugGuest(state);
-    if (g.function != 0) {
-      guest_call(g.function, {r3}, g.lr);
-    } else {
-      switch (state) {
-        case 3: DebugMainMenu(base, frame); break;
-        case 4: DebugCategoryMenu(base, s, frame); break;
-        case 5: DebugLevelSelect(base, frame); break;
-        case 6: DebugTypeSelect(base, frame); break;
-        case 8: DebugOptionSelect(base, s, frame); break;
-        case 9: DebugConfirmBuy(base, frame); break;
-        case 11: DebugConfirmEquip(base, frame); break;
-        case 15: DebugWheelPartSelect(base, frame); break;
-        case 16: DebugWheelKindSelect(base, frame); break;
-        case 17: DebugWheelInchSelect(base, frame); break;
-        case 23: case 38: DebugDecalTopMenu(base, s, frame); break;
-        case 24: case 39: DebugLayerSelect(base, s, frame); break;
-        case 26: case 41: DebugLayerEdit(base, frame); break;
-        case 28: case 43: DebugLayerSet(base, frame); break;
-        case 29: case 44: DebugEditPosition(); break;
-        case 34: case 49: DebugEditView(); break;
-        case 35: case 50: DebugPaintConfirm(base, frame); break;
-        default: break;
-      }
+    switch (state) {
+      case 3: DebugMainMenu(base, frame); break;
+      case 4: DebugCategoryMenu(base, s, frame); break;
+      case 5: DebugLevelSelect(base, frame); break;
+      case 6: DebugTypeSelect(base, frame); break;
+      case 7: DebugColorSelect(base, s, frame); break;
+      case 8: DebugOptionSelect(base, s, frame); break;
+      case 9: DebugConfirmBuy(base, frame); break;
+      case 10: DebugWarnMoney(base, frame); break;
+      case 11: DebugConfirmEquip(base, frame); break;
+      case 12: DebugReflectSet(base, frame); break;
+      case 13: DebugAnnulSet(base, frame); break;
+      case 14: DebugRemoveConfirm(base, frame); break;
+      case 15: DebugWheelPartSelect(base, frame); break;
+      case 16: DebugWheelKindSelect(base, frame); break;
+      case 17: DebugWheelInchSelect(base, frame); break;
+      case 18: DebugBodyColor(base, frame); break;
+      case 19: DebugNeonPart(base, frame); break;
+      case 20: DebugNeonKind(base, frame); break;
+      case 21: DebugNeonEdit(base, frame); break;
+      case 22: DebugLedEdit(base, frame); break;
+      case 23: case 38: DebugDecalTopMenu(base, s, frame); break;
+      case 24: case 39: DebugLayerSelect(base, s, frame); break;
+      case 25: case 40: DebugLayerOperate(base, s, frame); break;
+      case 26: case 41: DebugLayerEdit(base, frame); break;
+      case 27: case 42: DebugLayerOrder(base, s, frame); break;
+      case 28: case 43: DebugLayerSet(base, frame); break;
+      case 29: case 44: DebugEditPosition(); break;
+      case 30: case 45: DebugEditRotate(); break;
+      case 31: case 46: DebugEditScale(); break;
+      case 32: case 47: DebugEditColor(); break;
+      case 33: case 48: DebugEditFlip(); break;
+      case 34: case 49: DebugEditView(); break;
+      case 35: case 50: DebugPaintConfirm(base, frame); break;
+      case 36: case 51: DebugPaintCancelConfirm(base, frame); break;
+      case 37: case 52: DebugPaintRemoveConfirm(base, frame); break;
+      case 53: DebugCockpitTop(base, frame); break;
+      case 54: DebugCockpitType(base, frame); break;
+      case 55: DebugCockpitColor(base, frame); break;
+      case 56: DebugMeterKind(base, frame); break;
+      case 57: case 58: DebugMeterPoint(base, frame); break;
+      default: break;
     }
   }
 

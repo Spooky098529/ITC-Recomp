@@ -39,7 +39,17 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "DebugWheelKindSelect sub_821E8128, DebugWheelInchSelect sub_821E8298, "
               "DebugDecalTopMenu sub_821FD710, DebugLayerSelect sub_821FD880, DebugLayerEdit "
               "sub_821FDCB8, DebugLayerSet sub_821FE080, DebugEditPosition sub_821FE100, "
-              "DebugEditView sub_821FE178, DebugPaintConfirm sub_821FE190; the selected garage car's "
+              "DebugEditView sub_821FE178, DebugPaintConfirm sub_821FE190, and those never seen in play, "
+              "called only by the update's plain C++: DebugColorSelect sub_821CC078, DebugWarnMoney "
+              "sub_821CC430, DebugReflectSet sub_821CC510, DebugAnnulSet sub_821CC598, "
+              "DebugRemoveConfirm sub_821CC620, DebugBodyColor sub_821E8358, DebugNeonPart "
+              "sub_821E8440, DebugNeonKind sub_821E84F8, DebugNeonEdit sub_821E85A0, DebugLedEdit "
+              "sub_821E8688, DebugCockpitTop sub_821E8758, DebugCockpitType sub_821E8800, "
+              "DebugCockpitColor sub_821E88C0, DebugMeterKind sub_821E8998, DebugMeterPoint "
+              "sub_821E8A88, DebugLayerOperate sub_821FDA80, DebugLayerOrder sub_821FDF10, "
+              "DebugEditRotate sub_821FE118, DebugEditScale sub_821FE130, DebugEditColor "
+              "sub_821FE148, DebugEditFlip sub_821FE160, DebugPaintCancelConfirm sub_821FE230, "
+              "DebugPaintRemoveConfirm sub_821FE2D0; the selected garage car's "
               "StoreToGarageCar sub_821DCC28, EquipChoice sub_821DF448 and AeroPartValue "
               "sub_821DE2D8; the part list's marks HidePartMarks sub_821EE6D0 and ShowPartMarks "
               "sub_821EE760, ShowInteriorPicture sub_821DA3F8, HideTireMarks sub_821DFB20, HideNode19 "
@@ -169,6 +179,98 @@ void TuningDebugEditView(PPCContext& ctx, uint8_t* base) {
 
 void TuningDebugPaintConfirm(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::DebugPaintConfirm(base, ctx.r1.u32);
+}
+
+void TuningDebugColorSelect(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugColorSelect(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningDebugWarnMoney(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugWarnMoney(base, ctx.r1.u32);
+}
+
+void TuningDebugReflectSet(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugReflectSet(base, ctx.r1.u32);
+}
+
+void TuningDebugAnnulSet(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugAnnulSet(base, ctx.r1.u32);
+}
+
+void TuningDebugRemoveConfirm(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugRemoveConfirm(base, ctx.r1.u32);
+}
+
+void TuningDebugBodyColor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugBodyColor(base, ctx.r1.u32);
+}
+
+void TuningDebugNeonPart(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugNeonPart(base, ctx.r1.u32);
+}
+
+void TuningDebugNeonKind(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugNeonKind(base, ctx.r1.u32);
+}
+
+void TuningDebugNeonEdit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugNeonEdit(base, ctx.r1.u32);
+}
+
+void TuningDebugLedEdit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugLedEdit(base, ctx.r1.u32);
+}
+
+void TuningDebugCockpitTop(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugCockpitTop(base, ctx.r1.u32);
+}
+
+void TuningDebugCockpitType(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugCockpitType(base, ctx.r1.u32);
+}
+
+void TuningDebugCockpitColor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugCockpitColor(base, ctx.r1.u32);
+}
+
+void TuningDebugMeterKind(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugMeterKind(base, ctx.r1.u32);
+}
+
+void TuningDebugMeterPoint(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugMeterPoint(base, ctx.r1.u32);
+}
+
+void TuningDebugLayerOperate(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugLayerOperate(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningDebugLayerOrder(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugLayerOrder(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningDebugEditRotate(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugEditRotate();
+}
+
+void TuningDebugEditScale(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugEditScale();
+}
+
+void TuningDebugEditColor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugEditColor();
+}
+
+void TuningDebugEditFlip(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugEditFlip();
+}
+
+void TuningDebugPaintCancelConfirm(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugPaintCancelConfirm(base, ctx.r1.u32);
+}
+
+void TuningDebugPaintRemoveConfirm(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugPaintRemoveConfirm(base, ctx.r1.u32);
 }
 
 void TuningStoreToGarageCar(PPCContext& ctx, uint8_t* base) {
