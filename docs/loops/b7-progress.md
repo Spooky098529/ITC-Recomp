@@ -48,7 +48,12 @@ file's history. What's left to see in a drive, from every run:
   `user-info.md` (14 rows, all in play: the player's record, UI movie
   10, at block +0x102D8), with two hub rows in `type2-screens.md`
   (ebde5050; 10 and 11 ready groups; no leads, no subagents); map
-  checked. Step: migration agent running.
+  checked. Migration fd78a046 (the user info screen, 14 of 14,
+  `--native_user_info`) and 5c818857 (the type 2 mode, 20 of 21,
+  `--native_type2_mode`; `Resume` a jump into the hub's recompiled
+  `sub_8218DE18`); race 37 s at 40, 0 errors, their harnesses and
+  `type67_modes`' 0 differing outside its recorded group; no
+  subagents. Left: none. Step: validation agent running.
 
 ## Done
 
@@ -80,6 +85,8 @@ The run's section of `review.md` ("Run 2026-11-10 23:52").
   390, unknown 649).
 - After the type 2 mode's map: ours 5409, work left 1095 (wrapped 56,
   known 420, unknown 619).
+- After its migration: ours 5443, work left 1065 (wrapped 56, known
+  390, unknown 619).
 
 ## Stopped
 

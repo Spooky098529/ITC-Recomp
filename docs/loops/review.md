@@ -50,6 +50,23 @@ When the user has reviewed a run's section, its heading gets
   the user info globals and the mode block's fields. Precedents named:
   `NextMode`'s and `ForceExit`'s 8-byte answer with leftover bytes 1 to
   3 copied as left; `SetText`'s r8-r10 passed as 0 (2026-10-30).
+- The type 2 mode's and user info screen's migration (fd78a046,
+  5c818857): 14 of 14 and 20 of 21 ours. Kept: the user info page and
+  transitions run through the tables `UpdatePage` and `Update` build on
+  their frames; `Update`'s empty debug call `sub_82106540` left out (as
+  the dialog's); `NextMode`'s and `ForceExit`'s answer built in guest
+  frame memory and read back (leftover bytes as the original). Followed:
+  `SetText`'s r8-r10 as 0 (2026-10-30), its parameter area and the
+  screen start's dead r4 not compared. Left recompiled: `Resume`
+  `sub_821970B8` (a jump into the hub's `sub_8218DE18`);
+  `WaitForLoads`' shown-3 branch calls the unseen `sub_8218F620`
+  through a guest call, not covered by the harness. Ported though never
+  seen in play: `Restart`, `Leaving`, `Interrupt`, `ForceExit`. Adapters
+  kept: the Init calls the 14 machines' Inits through their adapters so
+  each one's flag applies (`UserInfo::InitStates`' adapter could go if
+  the Init called its plain C++: a possible cleanup); `MachineOf`,
+  `AllLoaded`, `FindShown` for recompiled callers. The `type2_mode`
+  harness lives in `src/harnesses/type67_modes.cpp` (its worlds reused).
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 
