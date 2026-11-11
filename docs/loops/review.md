@@ -39,6 +39,17 @@ When the user has reviewed a run's section, its heading gets
   `SetText` read text from random ids. Fixed in the harness by the
   user's call (f691a91e: the selection one of the 5 actions, as in
   play); validated again (`itc_4813`), the loop resumed.
+- The type 2 mode's map (ebde5050): `type2-mode.md` (21 rows: the
+  Init `sub_82197278`, the mode's vtable slots and thunks, `Interrupt`
+  `sub_82197858` posting message 48, `ForceExit`, `Resume`, the
+  helpers) and `user-info.md` (14 rows: the user info screen,
+  `UserInfo::`, named after `TXR_MenuUserInfo`); two hub rows added to
+  `type2-screens.md` (`sub_8218F620`, `sub_8218DE18`, not seen in play);
+  lead mentions in `car-dealer.md`, `menu-helpers.md` and
+  `type2-dialog.md` pointed at the new files; `known-data.md` rows for
+  the user info globals and the mode block's fields. Precedents named:
+  `NextMode`'s and `ForceExit`'s 8-byte answer with leftover bytes 1 to
+  3 copied as left; `SetText`'s r8-r10 passed as 0 (2026-10-30).
 
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 

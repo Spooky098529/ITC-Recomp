@@ -42,7 +42,13 @@ file's history. What's left to see in a drive, from every run:
   machine Init it still holds, `sub_8220B408` (a front-end screen's
   transitions, with `sub_8220B070` to `sub_8220B2C0`); ready since the
   car settings' Inits (809 lines); both leads' lines deleted from
-  `leads.md`. Step: mapping agent running.
+  `leads.md`. Mapped `type2-mode.md` (21 rows, 16 in play: the Init,
+  the vtables `0x82006B9C` and `0x82006B90`, `Interrupt`
+  `sub_82197858`, `MachineOf`, `AllLoaded`, `FindShown`) and
+  `user-info.md` (14 rows, all in play: the player's record, UI movie
+  10, at block +0x102D8), with two hub rows in `type2-screens.md`
+  (ebde5050; 10 and 11 ready groups; no leads, no subagents); map
+  checked. Step: migration agent running.
 
 ## Done
 
@@ -72,6 +78,8 @@ The run's section of `review.md` ("Run 2026-11-10 23:52").
 
 - After its migration: ours 5409, work left 1095 (wrapped 56, known
   390, unknown 649).
+- After the type 2 mode's map: ours 5409, work left 1095 (wrapped 56,
+  known 420, unknown 619).
 
 ## Stopped
 
