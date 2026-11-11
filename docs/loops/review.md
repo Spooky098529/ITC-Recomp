@@ -13,6 +13,13 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 
+- The car settings' map (98f0843b): `car-settings.md`, 91 new rows (7
+  in play: both Inits, `Create`, `OpenMovie`, `WaitForMovie`, `Close`,
+  `Destroy`; 84 "Not seen in play"), `known-data.md`'s `0x826D8458` to
+  `0x826D8460` and the 764-byte data block; the type 5 mode's Init
+  `sub_821B7878` mapped here (its lead in `leads.md` notes it);
+  `Update` `sub_821B6818` and its 114-function subtree left as a lead.
+
 ## Run 2026-11-10 21:02 (`b7-loop-10-11-26`)
 
 - The race menu's migration (a65e90d7..4414719e): 38 of 38 rows ours
