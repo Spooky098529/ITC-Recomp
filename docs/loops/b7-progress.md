@@ -69,6 +69,10 @@ file's history. What's left to see in a drive, from every run:
   expected groups), 86 of 86 harness lines, no prints added; 37 ran in
   the race, 12 more in the replay `itc_4944` (ok), 37 to drive.
   Recorded.
+- Subsystem 3 of 5: the type 10 mode's Init `sub_82288940` with
+  `sub_8228AC48` (ready, 706 lines, seen in play; probably the replay
+  theater, its save screen at +9640 already native); its line deleted
+  from `leads.md`. Step: mapping agent.
 
 ## Done
 
