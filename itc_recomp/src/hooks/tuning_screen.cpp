@@ -84,7 +84,10 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "but movie 2's command runners never seen in play, called only by the update's plain C++: "
               "Command5 sub_821D4180, Command11 sub_821E9730, Command12 sub_821E9CA0, Command54 "
               "sub_821EB8E8, Command55 sub_821EBDC8, Command56 sub_821EC6A0, Command57 sub_821ECC68 "
-              "(UiMovie::NamedAnimationTime by its plain C++) and Command58 sub_821EDB70; "
+              "(UiMovie::NamedAnimationTime by its plain C++) and Command58 sub_821EDB70, and the "
+              "editors': Command17 sub_82200100, Command19 sub_82201C58, Command20 sub_82201FA0, "
+              "Command26 sub_82204980, Command27 sub_82204A78, Command32Done sub_821F7498, Command42 "
+              "sub_821F7618, Command52 sub_821F77F0 (movie 16's dialog) and Command53 sub_821F7948; "
               "its swatch color setter sub_821E7DA0, never seen in play, through the guest) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
@@ -381,6 +384,11 @@ ITC_TUNING_CALLS_STEP(Command54)
 ITC_TUNING_CALLS_STEP(Command55)
 ITC_TUNING_CALLS_STEP(Command56)
 ITC_TUNING_CALLS_STEP(Command58)
+ITC_TUNING_CALLS_STEP(Command17)
+ITC_TUNING_CALLS_STEP(Command19)
+ITC_TUNING_CALLS_STEP(Command26)
+ITC_TUNING_CALLS_STEP(Command27)
+ITC_TUNING_CALLS_STEP(Command42)
 
 #undef ITC_TUNING_CALLS_STEP
 
@@ -453,6 +461,20 @@ void TuningRefreshMenu(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void TuningCommand20(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const uint64_t a = ctx.r4.u64, b = ctx.r5.u64;
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
+    return ts::Command20(base, call, screen, sp, a, b);
+  });
+}
+
+void TuningCommand32Done(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::Command32Done(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningCommand53(PPCContext& ctx, uint8_t* base) { ts::Command53(base, ctx.r3.u32); }
+
 void TuningCommand57(PPCContext& ctx, uint8_t* base) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   std::optional<double> f1;
@@ -505,6 +527,7 @@ void TuningRefreshMovie13(PPCContext& ctx, uint8_t* base) {
 
 ITC_TUNING_DISPATCH_STEP(ShowDialog)
 ITC_TUNING_DISPATCH_STEP(Command30)
+ITC_TUNING_DISPATCH_STEP(Command52)
 
 #undef ITC_TUNING_DISPATCH_STEP
 

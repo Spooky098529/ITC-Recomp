@@ -978,11 +978,11 @@ void TuningRefresh(Context& h) {
     // The runners this world holds: the seen ones over the named
     // animations, texts and fields laid (Command7, 9, 15, 16, 18, 22, 23,
     // 25, DecalCommand 29, Command30, 31, ShowDialog 63, MarkPick 64), the
-    // never-seen ones run as their originals (Command11, 12, 17, 19, 20,
-    // 26, 27, 53, 54, 56) and the empty ones (24, 28, 59 to 62).
+    // never-seen ones (Command5, 11, 12, 17, 19, 20, 26, 27, 42, 52 to 58)
+    // and the empty ones (24, 28, 59 to 62).
     static constexpr uint32_t kRunners[] = {7,  9,  15, 16, 18, 22, 23, 25, 29, 30, 31, 63, 64,
                                             11, 12, 17, 19, 20, 26, 27, 53, 54, 56, 24, 28, 59,
-                                            60, 61, 62, 5,  55, 57, 58};
+                                            60, 61, 62, 5,  55, 57, 58, 42, 52};
     constexpr uint32_t kRunnerCount = sizeof(kRunners) / sizeof(kRunners[0]);
     constexpr int kUpdateCases = 400;
     for (int c = 0; c < kUpdateCases; c++) {
@@ -1066,6 +1066,14 @@ void TuningRefresh(Context& h) {
         field(30724, r.Below(2));
         field(30732, r.Below(3));
         field(30756, r.Below(3));
+        if (command == 42 && first == 0) {
+          // Command42's words (+33480 + 4 × the cursor -1 to 3) small, from
+          // a generator of their own (the cases' draws kept).
+          Random r42(0x34320000ull + round);
+          for (int32_t k = -1; k <= 3; k++) {
+            field(uint32_t(33480 + 4 * k), r42.Below(4));
+          }
+        }
         field(9644, r.Below(4));
         field(9648, r.Below(4));
         field(33548, r.Below(5));

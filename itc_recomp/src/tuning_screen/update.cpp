@@ -6,10 +6,11 @@
 // every callee gets r3 = r31. The callees seen in play by their plain C++
 // (as their adapters run them), DrawPowerGraph through its override (its
 // adapter works through the guest), UiMovie::Run through its override, the
-// debug state handlers all by their plain C++ (debug.cpp), movie 2's command
-// runners never seen in play 5, 11, 12 and 54 to 58 by their plain C++
-// (commands.cpp), and the other command runners never seen in play (below)
-// through the guest with the original's return addresses. The empty
+// debug state handlers all by their plain C++ (debug.cpp), the command
+// runners never seen in play 5, 11, 12, 17, 19, 20, 26, 27, 42, 52 to 58 and
+// Command32Done by their plain C++ (commands.cpp), and the other command
+// runners never seen in play (below) through the guest with the original's
+// return addresses. The empty
 // sub_82106540's calls (the "TUNING SHOP" print, commands 24 and 28) are
 // left out, as other native callers of it do.
 
@@ -36,19 +37,12 @@ struct Guest {
   uint32_t lr;
 };
 
-// Commands 20 (r4 +9644, r5 +9648) and 52 (r4 the dispatcher) take more
-// arguments: the switch below passes them.
 Guest CommandGuest(uint32_t command) {
   switch (command) {
     case 10: return {0x821F35C0, 0x821E7010};
     case 13: return {0x821EA460, 0x821E7034};
     case 14: return {0x821EAFA0, 0x821E7040};
-    case 17: return {0x82200100, 0x821E7064};
-    case 19: return {0x82201C58, 0x821E707C};
-    case 20: return {0x82201FA0, 0x821E7090};
     case 21: return {0x822087C8, 0x821E709C};
-    case 26: return {0x82204980, 0x821E70D8};
-    case 27: return {0x82204A78, 0x821E70E4};
     case 32: return {0x821FC7B8, 0x821E7124};
     case 33: return {0x821FCA80, 0x821E7130};
     case 34: return {0x821FA658, 0x821E713C};
@@ -59,7 +53,6 @@ Guest CommandGuest(uint32_t command) {
     case 39: return {0x821FB0B8, 0x821E7178};
     case 40: return {0x821FCC48, 0x821E7184};
     case 41: return {0x821FCED0, 0x821E7190};
-    case 42: return {0x821F7618, 0x821E719C};
     case 43: return {0x821FD128, 0x821E71A8};
     case 44: return {0x821FD3F8, 0x821E71B4};
     case 45: return {0x821FB1F0, 0x821E71C0};
@@ -69,13 +62,9 @@ Guest CommandGuest(uint32_t command) {
     case 49: return {0x821FB6B0, 0x821E71F0};
     case 50: return {0x821F8FC0, 0x821E71FC};
     case 51: return {0x821FB8D8, 0x821E7208};
-    case 52: return {0x821F77F0, 0x821E7218};
-    case 53: return {0x821F7948, 0x821E7224};
     default: return {0, 0};
   }
 }
-
-constexpr uint32_t kCommand32Done = 0x821F7498;
 
 }  // namespace
 
@@ -195,11 +184,7 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
       guest::StoreU32(base, queue + 24, 1);
       const uint32_t dispatcher = uint32_t(r4);
       const Guest g = CommandGuest(command);
-      if (command == 20) {
-        guest_call(g.function, {r3, word(9644), word(9648)}, g.lr);
-      } else if (command == 52) {
-        guest_call(g.function, {r3, r4}, g.lr);
-      } else if (g.function != 0) {
+      if (g.function != 0) {
         guest_call(g.function, {r3}, g.lr);
       } else {
         switch (command) {
@@ -217,10 +202,15 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
           case 12: Command12(base, call, s, frame); break;
           case 15: Command15(base, call, s, frame); break;
           case 16: Command16(base, call, s, frame); break;
+          case 17: Command17(base, call, s, frame); break;
           case 18: Command18(base, call, s, frame); break;
+          case 19: Command19(base, call, s, frame); break;
+          case 20: Command20(base, call, s, frame, word(9644), word(9648)); break;
           case 22: Command22(base, call, s, frame); break;
           case 23: Command23(base, call, s, frame); break;
           case 25: Command25(base, call, s, frame); break;
+          case 26: Command26(base, call, s, frame); break;
+          case 27: Command27(base, call, s, frame); break;
           case 29: {
             double decal_f1 = 0.0;
             DecalCommand(base, stand, s, frame, &decal_f1);
@@ -229,6 +219,9 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
           }
           case 30: Command30(base, call, r3, dispatcher, frame); break;
           case 31: Command31(base, call, s, frame); break;
+          case 42: Command42(base, call, s, frame); break;
+          case 52: Command52(base, call, r3, dispatcher, frame); break;
+          case 53: Command53(base, s); break;
           case 54: Command54(base, call, s, frame); break;
           case 55: Command55(base, call, s, frame); break;
           case 56: Command56(base, call, s, frame); break;
@@ -243,7 +236,7 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
     const uint32_t done = uint32_t(guest_call(kRun, {movie, 0}, 0x821E7288)) == 0 ? 1 : 0;
     r30 = done;
     if (done == 1 && command == 32) {
-      guest_call(kCommand32Done, {r3}, 0x821E72A8);
+      Command32Done(base, s, frame);
     }
     if (done != 0) {
       step();

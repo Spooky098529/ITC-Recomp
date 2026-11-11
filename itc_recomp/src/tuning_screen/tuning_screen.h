@@ -382,6 +382,57 @@ uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // +9724. 128-byte frame; LoopNamed's r3.
 uint64_t Command58(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
+// --- The editors' command runners never seen in play (commands.cpp) ---
+// Movies 13 and 14 (and 16 for Command52's dialog), called only by the
+// update's plain C++, as movie 2's above.
+
+// sub_82200100 TuningScreen::Command17: 221 restarted (chained) or the
+// queue's step by +9716 and +9720; node (10, 0)'s +16 = float(+30740) ×
+// 40.0; 49 + +30740 restarted and looped. 128-byte frame; LoopNamed's r3.
+uint64_t Command17(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82201C58 TuningScreen::Command19: by +9716 and +9720 the queue's step,
+// or 236 restarted and 4 × [+30732] + 201 (set +30724 0) or + 175 (set 1)
+// played chained; help text (2, 0) string 810 scrolled. 128-byte frame;
+// ScrollText's r3.
+uint64_t Command19(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82201FA0 TuningScreen::Command20 (`a`, `b` the update's +9644 and
+// +9648): by the set +30724 0 4a + 204 restarted chained then 4b + 203, or
+// 1 4a + 178 then 4b + 177; other sets nothing. 128-byte frame; the last
+// PlayNamed's r3, else the movie's entry.
+uint64_t Command20(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp, uint64_t a,
+                   uint64_t b);
+// sub_82204980 TuningScreen::Command26 and sub_82204A78 Command27: as
+// Command25 with 229 and string 821, or 230 and 822. 128-byte frame;
+// ScrollText's r3.
+uint64_t Command26(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+uint64_t Command27(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F7498 TuningScreen::Command32Done: with [+33508] set movie 14's
+// nodes (3, 11) and (3, 12) given color 1 (UiMovie::SetNodeColor's stores).
+// 112-byte frame; r3 the last node, else the movie's entry.
+uint64_t Command32Done(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_821F7618 TuningScreen::Command42: movie 14's 181, 182, ..., 197, 198
+// finished; the list position +30756 stepped toward its target (the word
+// at +33480 + 4 × position): one animation played from each end, the
+// target slid along, the position's word set to the target; node (30, 12 +
+// 5 × position) hidden; the queue's step when the position's word isn't the
+// position. 128-byte frame; r3 the hidden node.
+uint64_t Command42(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F77F0 TuningScreen::Command52: +9728 = 0; for the states 50 to 52
+// movie 16's dialog texts (strings 18, 19, 16), message 34 posted to the
+// dispatcher; movie 14's node (1, 1) shown. 144-byte frame; r3 the node.
+uint64_t Command52(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t dispatcher,
+                   uint32_t sp);
+// sub_821F7948 TuningScreen::Command53: the queue's step (a leaf; r3 left).
+void Command53(uint8_t* base, uint32_t screen);
+
+// The dialogs' helpers (pages.cpp): message `event` posted to the
+// dispatcher's ring (+204), and movie 16's three texts at `entry`'s movie
+// (string `title`, 2, 3) from the return addresses `lr`, its +40960 = 0
+// (the last SetText's r3).
+void PostDialogMessage(uint8_t* base, uint32_t dispatcher, uint32_t event);
+uint64_t DialogTexts(uint8_t* base, const GuestCall& call, uint32_t frame, uint32_t entry,
+                     uint32_t title, const uint32_t (&lr)[3]);
+
 // --- The help texts and the part list's rows (rows.cpp) ---
 
 // sub_821F1DE0 TuningScreen::SetStateTexts: by the state, 17 the wheel

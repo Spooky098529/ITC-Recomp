@@ -1,10 +1,12 @@
-// The tuning screen's movie 2 command runners never seen in play
+// The tuning screen's command runners never seen in play, movie 2's and the
+// vinyl and sticker editors' (movies 13 and 14)
 // (docs/functions/tuning-screen.md): see tuning_screen.h. Called only by the
 // update's plain C++ (update.cpp). The UI movie calls (UiMovie::Play,
 // Finish, FinishNamed, PlayNamed, LoopNamed, SetText, SetNodeText,
 // ScrollText and sub_8211C5F8) through their overrides from each original's
-// frame with its return addresses; movie 2's nodes and
-// UiMovie::NamedAnimationTime through the UI movies' plain C++; the unset
+// frame with its return addresses; the movies' nodes (with ShowNode's,
+// HideNode's and SetNodeColor's stores) and UiMovie::NamedAnimationTime
+// through the UI movies' plain C++, PlaceStateNodes by its plain C++; the unset
 // varargs of SetText and SetNodeText passed as 0 (the user's call,
 // 2026-10-30).
 
@@ -378,6 +380,210 @@ uint64_t Command58(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
                 0x821EDC48, 0x821EDC58);
   StepWith9724(base, screen);
   return r3;
+}
+
+// --- The editors' runners (movies 13 and 14) ---
+
+namespace {
+
+// The editors' +9716 set-up: with +9720 the queue's step and +9720 = 0,
+// else `named` restarted chained (and `more`); then +9716 = 0.
+template <typename More>
+void EditorSetUp(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t frame,
+                 uint32_t movie, uint64_t named, uint32_t finish_lr, uint32_t play_lr,
+                 const More& more) {
+  if (Load(base, screen + 9716) == 0) {
+    return;
+  }
+  if (Load(base, screen + 9720) != 0) {
+    Advance(base, screen);
+    Store(base, screen + 9720, 0);
+  } else {
+    FinishNamed(call, frame, finish_lr, movie, named);
+    PlayNamed(call, frame, play_lr, movie, named, 1);
+    more();
+  }
+  Store(base, screen + 9716, 0);
+}
+
+// Help text (2, 0) of movie 13 given string `id` and scrolled
+// (sub_8211C5F8, SetText, ScrollText); ScrollText's r3.
+uint64_t HelpText(const GuestCall& call, uint32_t frame, uint32_t movie, uint32_t id,
+                  const uint32_t (&lr)[3]) {
+  call(kResetTextScroll, {movie, 2, 0}, frame, lr[0]);
+  SetText(call, frame, lr[1], movie, 2, 0, id, 0);
+  return call(kScrollText, {movie, 2, 0, 1}, frame, lr[2]);
+}
+
+// Command26 and Command27: as Command25 with their animation and string.
+uint64_t PlaceCommand(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+                      uint32_t named, uint32_t id, const uint32_t (&lr)[5]) {
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, 13));
+  EditorSetUp(base, call, screen, frame, movie, named, lr[0], lr[1], [] {});
+  PlaceStateNodes(base, screen, frame);
+  return HelpText(call, frame, movie, id, {lr[2], lr[3], lr[4]});
+}
+
+// The word at +33480 + 4 × `i` (32-bit addresses, as rlwinm and lwzx).
+uint32_t SlotAt(uint32_t screen, uint32_t i) { return screen + (i + 8370u) * 4u; }
+
+}  // namespace
+
+uint64_t Command17(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82200100 TuningScreen::Command17");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, 13));
+  EditorSetUp(base, call, screen, frame, movie, 221, 0x82200190, 0x822001AC, [] {});
+  const uint32_t node = ui_movies::FindNode(base, movie, 10, 0);
+  // lwa: the word sign-extended.
+  Store(base, node + 16, Scaled(base, frame, int32_t(Load(base, screen + 30740))));
+  return Restarted(call, frame, movie, [&] { return uint64_t(Load(base, screen + 30740)) + 49; },
+                   1, 0x822001F8, 0x82200218, 0x82200228);
+}
+
+uint64_t Command19(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82201C58 TuningScreen::Command19");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, 13));
+  EditorSetUp(base, call, screen, frame, movie, 236, 0x82201CE8, 0x82201D04, [&] {
+    // By the set +30724: 4 × [+30732] + 201 (0) or + 175 (1), the word read
+    // again for each call.
+    const int32_t set = int32_t(Load(base, screen + 30724));
+    if (set != 0 && set != 1) {
+      return;
+    }
+    const uint64_t add = set == 0 ? 201 : 175;
+    auto named = [&] { return uint64_t(uint32_t(Load(base, screen + 30732) << 2)) + add; };
+    FinishNamed(call, frame, set == 0 ? 0x82201D24 : 0x82201D50, movie, named());
+    PlayNamed(call, frame, 0x82201D74, movie, named(), 1);
+  });
+  return HelpText(call, frame, movie, 810, {0x82201D88, 0x82201D9C, 0x82201DB0});
+}
+
+uint64_t Command20(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp, uint64_t a,
+                   uint64_t b) {
+  ITC_NATIVE_RUNNING("sub_82201FA0 TuningScreen::Command20");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = MovieEntry(base, frame, 13);
+  const int32_t set = int32_t(Load(base, screen + 30724));
+  const uint32_t movie = Load(base, entry);
+  uint64_t first, second;
+  uint32_t lr[2];
+  if (set == 0) {
+    first = uint32_t((a + 51) << 2);  // addi, then rlwinm
+    second = uint64_t(uint32_t(b << 2)) + 203;
+    lr[0] = 0x82201FF4;
+    lr[1] = 0x82202010;
+  } else if (set == 1) {
+    first = uint64_t(uint32_t(a << 2)) + 178;
+    second = uint64_t(uint32_t(b << 2)) + 177;
+    lr[0] = 0x82202038;
+    lr[1] = 0x82202054;
+  } else {
+    return entry;
+  }
+  FinishNamed(call, frame, lr[0], movie, first);
+  PlayNamed(call, frame, lr[1], movie, first, 1);
+  FinishNamed(call, frame, 0x82202068, movie, second);
+  return PlayNamed(call, frame, 0x82202084, movie, second, 0);
+}
+
+uint64_t Command26(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82204980 TuningScreen::Command26");
+  return PlaceCommand(base, call, screen, sp, 229, 821,
+                      {0x82204A10, 0x82204A2C, 0x82204A48, 0x82204A5C, 0x82204A70});
+}
+
+uint64_t Command27(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82204A78 TuningScreen::Command27");
+  return PlaceCommand(base, call, screen, sp, 230, 822,
+                      {0x82204B08, 0x82204B24, 0x82204B40, 0x82204B54, 0x82204B68});
+}
+
+uint64_t Command32Done(uint8_t* base, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F7498 TuningScreen::Command32Done");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t entry = MovieEntry(base, frame, 14);
+  const uint32_t movie = Load(base, entry);
+  if (Load(base, screen + 33508) == 0) {
+    return entry;
+  }
+  // UiMovie::SetNodeColor (sub_8211A5B8): the node's color; r3 the node.
+  uint32_t node = 0;
+  for (const uint32_t child : {11u, 12u}) {
+    node = ui_movies::FindNode(base, movie, 3, child);
+    ui_movies::SetColor(base, node, 1);
+  }
+  return node;
+}
+
+uint64_t Command42(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F7618 TuningScreen::Command42");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, 14));
+  for (uint32_t named = 182; named < 202; named += 4) {
+    FinishNamed(call, frame, 0x821F7654, movie, named - 1);
+    FinishNamed(call, frame, 0x821F7660, movie, named);
+  }
+  const uint32_t position = screen + 30756;
+  auto index = [&] { return Load(base, position); };
+  auto times4 = [](uint32_t x) { return uint64_t(uint32_t(x << 2)); };
+  const uint32_t at = index();
+  const uint32_t target = Load(base, SlotAt(screen, at));
+  if (int32_t(at) != int32_t(target)) {
+    // Toward the target: the word's animation from one end, the next
+    // word's from the other, then that word slid one place back.
+    const bool up = int32_t(at) < int32_t(target);
+    PlayNamed(call, frame, up ? 0x821F76A8 : 0x821F7718, movie, times4(target) + (up ? 182 : 181),
+              0);
+    const uint32_t next = index() + (up ? 1 : 0xFFFFFFFFu);
+    Store(base, position, next);
+    PlayNamed(call, frame, up ? 0x821F76E0 : 0x821F7750, movie,
+              times4(Load(base, SlotAt(screen, next))) + (up ? 181 : 182), 0);
+    const uint32_t now = index();
+    Store(base, SlotAt(screen, now + (up ? 0xFFFFFFFFu : 1u)), Load(base, SlotAt(screen, now)));
+  }
+  Store(base, SlotAt(screen, index()), target);
+  // UiMovie::HideNode (sub_8211AC48): the node's +80 = 0; r3 the node.
+  const uint32_t node = ui_movies::FindNode(base, movie, 30, index() * 5 + 12);
+  Store(base, node + 80, 0);
+  const uint32_t now = index();
+  if (int32_t(now) != int32_t(Load(base, SlotAt(screen, now)))) {
+    Advance(base, screen);
+  }
+  return node;
+}
+
+uint64_t Command52(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t dispatcher,
+                   uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F77F0 TuningScreen::Command52");
+  const uint32_t screen = uint32_t(r3);
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, 14));
+  const int32_t state = int32_t(Load(base, screen + kState));
+  Store(base, screen + 9728, 0);
+  uint32_t title = 0;
+  switch (state) {
+    case 50: title = 18; break;
+    case 51: title = 19; break;
+    case 52: title = 16; break;
+    default: break;
+  }
+  if (title != 0) {
+    const uint32_t entry = MovieEntry(base, frame, 16);
+    DialogTexts(base, call, frame, entry, title, {0x821F78AC, 0x821F78C0, 0x821F78D4});
+    PostDialogMessage(base, dispatcher, 34);
+  }
+  // UiMovie::ShowNode (sub_8211AC00): the node's +80 = 1; r3 the node.
+  const uint32_t node = ui_movies::FindNode(base, movie, 1, 1);
+  Store(base, node + 80, 1);
+  return node;
+}
+
+void Command53(uint8_t* base, uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_821F7948 TuningScreen::Command53");
+  Advance(base, screen);
 }
 
 }  // namespace tuning_screen

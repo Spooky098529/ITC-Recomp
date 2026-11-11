@@ -776,6 +776,50 @@ void CommandPage(const World& w, Random& r) {
 
 constexpr uint32_t kShowDialogStates[] = {9, 10, 11, 12, 13, 14};
 constexpr uint32_t kCommand30States[] = {35, 36, 37};
+constexpr uint32_t kCommand52States[] = {50, 51, 52};
+
+// The editors' movies: the pairs naming 2, 13, 14, 16 and 19 (sorted), when
+// they're there.
+void EditorPairs(const World& w) {
+  const uint32_t pairs = w.at(kPairsAt), movie = w.at(kMovieAt);
+  static constexpr uint32_t kIds[] = {2, 13, 14, 16, 19};
+  for (uint32_t k = 0; k < 5; k++) {
+    guest::StoreU32(w.base, pairs + 8 * k, kIds[k]);
+    guest::StoreU32(w.base, pairs + 8 * k + 4, movie);
+  }
+  if (guest::LoadU32(w.base, ui_movies::kMovieTable + 8) != 0) {
+    guest::StoreU32(w.base, ui_movies::kMovieTable + 8, 5);
+  }
+}
+
+// The editors' runners' world: the named animations, the editors' pairs,
+// the states 23 to 52 mostly.
+void EditorPage(const World& w, Random& r) {
+  NamedAnimations(w, r);
+  EditorPairs(w);
+  guest::StoreU32(w.base, w.screen() + ts::kState, r.Below(4) == 0 ? r.Below(60) : 23 + r.Below(30));
+}
+
+// Command42's world: the position +30756 0 to 6, its words (+33480 + 4 ×
+// position, -1 to 9) 0 to 7, the position's own word its target half the
+// time and its neighbors' the position now and then.
+void Command42World(const World& w, Random& r) {
+  EditorPage(w, r);
+  const uint32_t s = w.screen();
+  const uint32_t at = r.Below(7);
+  guest::StoreU32(w.base, s + 30756, at);
+  for (int32_t k = -1; k <= 9; k++) {
+    guest::StoreU32(w.base, s + 33480 + 4 * k, r.Below(8));
+  }
+  if (r.Below(2) == 0) {
+    guest::StoreU32(w.base, s + 33480 + 4 * at, at);
+  }
+  for (const int32_t d : {-1, 1}) {
+    if (r.Below(3) == 0) {
+      guest::StoreU32(w.base, s + 33480 + 4 * (int32_t(at) + d), at + d);
+    }
+  }
+}
 
 }  // namespace
 
@@ -1086,6 +1130,78 @@ void TuningScreenPages(Context& h) {
              {{-176, -176 + 40}, {-176 + 80, -88}}, command_page, true});
   Run(h, w, {"TuningScreen::Command58", 25, __imp__sub_821EDB70, hooks::TuningCommand58,
              {{-128, -40}}, command_page});
+  // The editors' runners never seen in play (movies 13 and 14; after the
+  // groups above, so they keep their seeds). Command17: r29 to r31 saved
+  // (32 bytes); +30740 mostly small, now and then to 974 (49 + it a named
+  // animation).
+  Run(h, w, {"TuningScreen::Command17", 25, __imp__sub_82200100, hooks::TuningCommand17,
+             {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
+               EditorPage(w, r);
+               guest::StoreU32(w.base, w.screen() + 30740,
+                               r.Below(4) == 0 ? r.Below(975) : r.Below(8));
+             }});
+  // Command19: the set 0 or 1 mostly, +30732 mostly small, now and then to
+  // 205; SetText's parameter area left out.
+  Run(h, w, {"TuningScreen::Command19", 30, __imp__sub_82201C58, hooks::TuningCommand19,
+             {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
+               EditorPage(w, r);
+               const uint32_t s = w.screen();
+               guest::StoreU32(w.base, s + 30724,
+                               r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+               guest::StoreU32(w.base, s + 30732, r.Below(4) == 0 ? r.Below(206) : r.Below(8));
+             }});
+  // Command20: r4 and r5 mostly small (now and then to 204), their high
+  // words now and then set; the set 0 or 1 mostly.
+  Run(h, w, {"TuningScreen::Command20", 30, __imp__sub_82201FA0, hooks::TuningCommand20,
+             {{-128, -32}}, [](PPCContext& t, Random& r, const World& w) {
+               EditorPage(w, r);
+               guest::StoreU32(w.base, w.screen() + 30724,
+                               r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+               for (PPCRegister* reg : {&t.r4, &t.r5}) {
+                 reg->u64 = r.Below(4) == 0 ? r.Below(205) : r.Below(8);
+                 if (r.Below(4) == 0) {
+                   reg->u64 |= r.Next() << 32;
+                 }
+               }
+             }});
+  // Command26 and Command27: as Command25's (PlaceStateNodes' states now and
+  // then, its rows 0 to 7).
+  const Setup place = [](PPCContext&, Random& r, const World& w) {
+    EditorPage(w, r);
+    const uint32_t s = w.screen();
+    if (r.Below(2) == 0) {
+      guest::StoreU32(w.base, s + ts::kState, 29 + r.Below(3));
+    }
+    guest::StoreU32(w.base, s + 30724, r.Below(8));
+  };
+  Run(h, w, {"TuningScreen::Command26", 20, __imp__sub_82204980, hooks::TuningCommand26,
+             {{-128, -128 + 48}, {-128 + 80, -32}}, place});
+  Run(h, w, {"TuningScreen::Command27", 20, __imp__sub_82204A78, hooks::TuningCommand27,
+             {{-128, -128 + 48}, {-128 + 80, -32}}, place});
+  // Command32Done: r31 and lr saved below the frame (16 bytes); [+33508] 0
+  // half the time.
+  Run(h, w, {"TuningScreen::Command32Done", 20, __imp__sub_821F7498,
+             hooks::TuningCommand32Done, {{-112, -16}}, [](PPCContext&, Random& r, const World& w) {
+               EditorPage(w, r);
+               if (r.Below(2) == 0) {
+                 guest::StoreU32(w.base, w.screen() + 33508, 0);
+               }
+             }});
+  // Command42: its world (above); r29 to r31 saved (32 bytes).
+  Run(h, w, {"TuningScreen::Command42", 40, __imp__sub_821F7618, hooks::TuningCommand42,
+             {{-128, -32}}, [](PPCContext&, Random& r, const World& w) { Command42World(w, r); }});
+  // Command52: the dialogs' world with the states 50 to 52 mostly and the
+  // editors' pairs; r27 to r31 saved (48 bytes), SetText's parameter area
+  // left out.
+  Run(h, w, {"TuningScreen::Command52", 25, __imp__sub_821F77F0, hooks::TuningCommand52,
+             {{-144, -144 + 48}, {-144 + 80, -48}}, [](PPCContext& t, Random& r, const World& w) {
+               Dialog(kCommand52States)(t, r, w);
+               NamedAnimations(w, r);
+               EditorPairs(w);
+             }});
+  // Command53: a leaf (the stack below r1 untouched).
+  Run(h, w, {"TuningScreen::Command53", 15, __imp__sub_821F7948, hooks::TuningCommand53,
+             {{-128, 0}}, [](PPCContext&, Random& r, const World& w) { EditorPage(w, r); }});
 }
 
 }  // namespace harness
