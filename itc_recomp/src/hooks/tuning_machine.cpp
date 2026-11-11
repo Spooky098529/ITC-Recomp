@@ -241,20 +241,20 @@ ITC_TUNING_MACHINE(821CBD40, TuningMachineDestroy)
 // Create's helpers ZeroRecord16 sub_821FE540 and DecalImages::Reset
 // sub_821FE590 have no adapters: Create, their only caller, calls their
 // plain C++ (their register steps are the harness's).
-// SavePlaceholders (from Start sub_821E7368 where Start runs the original);
-// SavePlaceholders14
-// has no adapter: SavePlaceholders, its only caller, calls its plain C++.
-ITC_TUNING_MACHINE(82208130, TuningMachineSavePlaceholders)
-// Init (from the type 2 mode's Init sub_82197278, recompiled).
+// SavePlaceholders sub_82208130 has no adapter (removed, B7 loop,
+// 2026-11-11: its only caller in play, Start, is native and calls its plain
+// C++; its register step above is the harness's); SavePlaceholders14 has
+// none either: SavePlaceholders, its only caller, calls its plain C++.
+// Init (the type 2 mode's Init sub_82197278 calls it through the guest).
 ITC_TUNING_MACHINE(821E7568, TuningMachineInit)
 // TuningScreen::SetUp's callees LoadInteriorSlots sub_821DE280, LoadCurrentChoices
 // sub_821DA4B0, LoadOwnedParts sub_821DBAB0, SetPrices sub_821DAD58 and
 // LoadUnlockedParts sub_821CFFC8: no adapters (removed, B7 loop, 2026-11-09:
 // their only caller, SetUp, is native and calls their plain C++; the register
 // steps above are the harness's).
-// TuningScreen::SetUp (from Start sub_821E7368 where Start runs the
-// original).
-ITC_TUNING_MACHINE(821E1B48, TuningMachineSetUp)
+// TuningScreen::SetUp sub_821E1B48: no adapter (removed, B7 loop,
+// 2026-11-11: its only caller in play, Start, is native and calls its plain
+// C++; its register step above is the harness's).
 // Start (a functor the machine calls): the original unless its native
 // callees' conditions hold (TuningMachineStartNative).
 extern "C" REX_FUNC(sub_821E7368) {

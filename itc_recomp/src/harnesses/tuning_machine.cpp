@@ -884,7 +884,8 @@ void DialogNo(Context& h, const World& w) {
 // ranges, as ShapeSave). The callees run as their adapters run them on both
 // sides. Compared: the text records, the globals (the fades' too), the
 // blocks, the race data, the stack below r1 but Start's register saves (r28
-// to r31 and lr, the top 40 bytes: the native one doesn't write them), the
+// to r31 and lr, the top 40 bytes: the native one doesn't write them) and
+// the original SetUp's under its frame (48 bytes, below), the
 // caller's area, r1, all of r3, lr and f1 (as a double); the torque shown
 // (+20780) as a float.
 void StartCases(Context& h) {
@@ -903,6 +904,7 @@ void StartCases(Context& h) {
   constexpr uint32_t kStartStack = 0x8000;
   constexpr uint32_t kStartCaller = 256;
   constexpr uint32_t kStartSaves = 40;
+  constexpr uint32_t kCalleeSaves = 48;
   // The stage's light points (the scene models' +5060, SetLightsOn's
   // LightValue reads the float at +176 + 27664); the stand world's models at
   // its block's +0x12000, 0x1400 apart (car_makers.cpp's kModels).
@@ -1108,6 +1110,12 @@ void StartCases(Context& h) {
       PPCContext t = start;
       t.fpscr.disableFlushModeUnconditional();
       (v == 0 ? __imp__sub_821E7368 : hooks::TuningMachineStart)(t, base);
+      // The 48 bytes under Start's frame: the original TuningScreen::SetUp's
+      // register saves (r27 to r31 and lr; DecalImages::SavePlaceholders'
+      // r30, r31 and lr before them), which the recompiled Start calls
+      // since their adapters went and the native one doesn't write (register
+      // saves aren't reproduced).
+      Fill(base, sp - tuning_machine::kStartFrame - kCalleeSaves, kCalleeSaves, 0);
       TextMovieRecords(base, movie, out[v]);
       for (const auto& [address, bytes] : globals) {
         out[v].Bytes(Read(base, address, bytes));
