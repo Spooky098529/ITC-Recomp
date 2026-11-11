@@ -20,6 +20,20 @@ When the user has reviewed a run's section, its heading gets
   strings), the intro's "The update", `known-data.md`'s state names
   and the screen's +9644 and +9648; `sub_821FA460` added to the sticker
   editor's lead.
+- The update's migration (1f7f4e8e..360b0cbc): the update Overridden
+  (its adapter stays: the tuning machine's functor), its pieces
+  Merged, 47 adapters removed (Native), 40 never-seen callees ported
+  (the garage screen's precedent, 2026-11-09), 21 left recompiled with
+  the reason in their rows (the sticker editor's commands, `Command21`,
+  `Command10`, `13`, `14`). The update's harness stands in for
+  `UiMovie::Update` inside `UiMovie::Run` (as the garage screen's) and
+  compares only the update's own frame; the tuning pages' and
+  `TuningMachine::Start`'s harnesses now leave out the originals'
+  register saves and `SetText` parameter area. A fragility left: in
+  the update's harness world, when the shared generator shifted, case
+  142 (command 26) read the wild guest address 0x70081650 in a loop;
+  worked around by giving `Command42`'s words their own seeded
+  generator, not fixed at its root.
 
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 

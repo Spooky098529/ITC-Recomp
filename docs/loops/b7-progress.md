@@ -21,8 +21,13 @@ file's history. What's left to see in a drive, from every run:
   23 debug state handlers and 38 command runners, in outline; the
   sticker editor's commands wait on its lead, `Command21` on the vinyl
   editor's; no leads added, `sub_821FA460` added to the sticker lead;
-  no subagents); map checked (0 errors, 1 ready group). Step: migration
-  agent.
+  no subagents); map checked (0 errors, 1 ready group). Migration
+  1f7f4e8e..360b0cbc (the update Overridden, its pieces Merged, 47
+  adapters removed, 40 of the 61 never-seen callees ported; 21 left
+  recompiled, blocked by the sticker and vinyl editors' leads and three
+  never-seen `tuning-pages.md` setters; under `--native_tuning_screen`;
+  race 31 s at 40, 0 errors, its harnesses 0 differing; 3 subagents,
+  one at a time). Left: none. Step: validation agent.
 
 ## Done
 
@@ -44,5 +49,7 @@ The run's section of `review.md` ("Run 2026-11-11 08:38").
   unknown 618).
 - After the update's map: ours 5445, work left 1063 (wrapped 56,
   known 392, unknown 615).
+- After its migration: ours 5488, work left 1060 (wrapped 56, known
+  389, unknown 615).
 
 ## Stopped
