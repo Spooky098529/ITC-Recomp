@@ -62,7 +62,7 @@ uint64_t LoadStart(uint8_t* base, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-uint64_t LoadDraw(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp, const Calls& calls) {
+uint64_t LoadDraw(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82221198 TitleLoad::Draw");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t page = Load(base, Load(base, kLoadBlock) + 12);

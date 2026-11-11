@@ -321,6 +321,46 @@ void Allocated(uint8_t* base, Outputs& out, uint32_t slot, uint32_t bytes) {
   guest::StoreU32(base, slot, 1);
 }
 
+// The text records the setters made (stored in movie 0's map): their
+// words and buffers compared, freed, their map words 0 (as the race menu's
+// harness does).
+void TextRecords(uint8_t* base, uint32_t movie, Outputs& out) {
+  const uint32_t map = movie + ui_movies::kMovieTexts;
+  const uint32_t pairs = guest::LoadU32(base, map + 1024);
+  for (uint32_t k = 0; k < pairs && k < 128; k++) {
+    const uint32_t value = guest::LoadU32(base, map + 8 * k + 4);
+    if (value != 0 && memory::IsHeapBlock(value)) {
+      const uint32_t buffer = guest::LoadU32(base, value);
+      out.Word(k);
+      out.Bytes(Read(base, value + 4, 24));
+      out.Word(memory::IsPages(buffer) ? 1 : 0);
+      if (memory::IsPages(buffer)) {
+        out.Bytes(Read(base, buffer, 4096));
+        memory::FreePages(buffer);
+      }
+      memory::crt::OperatorDelete(value);
+      guest::StoreU32(base, map + 8 * k + 4, 0);
+    }
+  }
+}
+
+// The getter sub_82090770 (r3 = +60), as the race menu's harness uses it.
+constexpr uint32_t kGet60 = 0x82090770;
+
+// The sound manager ([0x826C5C80], in the menus' world): IsCuePlaying (slot
+// 14) and PlayCue2D (slot 10, Sound::Play's) the getter (its +60's low byte
+// 0 half the time).
+void SoundManager(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t manager = w.at(kMenuWorldAt), vtable = manager + 0x400;
+  guest::StoreU32(base, manager, vtable);
+  guest::StoreU32(base, manager + 60,
+                  r.Below(2) == 0 ? uint32_t(r.Next()) & ~0xFFu : uint32_t(r.Next()));
+  guest::StoreU32(base, vtable + ts::kIsCuePlayingSlot, kGet60);
+  guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, kGet60);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+}
+
 // UiMovie::Run's update (sub_8211D2F8), stood in for: each call's return
 // address, stack pointer (from the case's), r3 and r4 kept and answered 0
 // or 1 from the case's generator (the update would draw the movie).
@@ -432,6 +472,7 @@ void Run(Context& h, const World& w, const Spec& spec) {
         }
       }
       g_made.clear();
+      TextRecords(h.base, w.at(kMovie0At), out[v]);
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
       }
@@ -548,6 +589,130 @@ void TitleLoad(Context& h, const World& w) {
              hooks::TitleLoadUpdate, {{-208, -72}}, Machine});
 }
 
+// The title's words: +4 (the main menu's item) 0 to 9, +16 (from the boot)
+// 0 or not.
+void Words(Random& r, const World& w) {
+  guest::StoreU32(w.base, w.at(kWordsAt) + 4, r.Below(10));
+  guest::StoreU32(w.base, w.at(kWordsAt) + 16, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+}
+
+void ScreenHandlers(Context& h, const World& w) {
+  // Create: the four blocks VirtualAlloc made compared by content.
+  Run(h, w, {"TitleScreen::Create (sub_82221D98)", 60, __imp__sub_82221D98,
+             hooks::TitleScreenCreate, {{-112, -40}}, Machine,
+             [&h](PPCContext& t, const World&, Outputs& out) {
+               // r3 the title's words' address (the last VirtualAlloc's).
+               out.Word(t.r3.u32 == guest::LoadU32(h.base, ts::kWords) ? 1 : 0);
+               t.r3.u64 = 0;
+               Allocated(h.base, out, ts::kPages, 28);
+               Allocated(h.base, out, ts::kList, 72);
+               Allocated(h.base, out, ts::kMenu, 68);
+               Allocated(h.base, out, ts::kWords, 68);
+             }});
+  // Destroy: the four blocks the layer's pages, the list's +68 0 or pages
+  // (whether each was freed compared); the item 0 to 9, the list's
+  // selection 2 or not.
+  Run(h, w, {"TitleScreen::Destroy (sub_82221EC0)", 100, __imp__sub_82221EC0,
+             hooks::TitleScreenDestroy, {{-128, -40}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               Machine(t, r, w);
+               const uint32_t list = MakePages(base, 72, r);
+               guest::StoreU32(base, list + 16, r.Below(2) == 0 ? 2 : r.Below(7));
+               guest::StoreU32(base, list + 68, r.Below(2) == 0 ? 0 : MakePages(base, 64, r));
+               const uint32_t words = MakePages(base, 68, r);
+               guest::StoreU32(base, words + 4, r.Below(10));
+               guest::StoreU32(base, ts::kPages, MakePages(base, 28, r));
+               guest::StoreU32(base, ts::kList, list);
+               guest::StoreU32(base, ts::kMenu, MakePages(base, 68, r));
+               guest::StoreU32(base, ts::kWords, words);
+             }});
+  Run(h, w, {"TitleScreen::OpenMovie (sub_82221990)", 20, __imp__sub_82221990,
+             hooks::TitleScreenOpenMovie, {}, Machine});
+  Run(h, w, {"TitleScreen::WaitForMovie (sub_82221FC8)", 100, __imp__sub_82221FC8,
+             hooks::TitleScreenWaitForMovie, {{-96, -16}}, Machine});
+  // SetUp: the movie's seven texts; its frame without SetText's parameter
+  // area (+48 to +79: r7 on, the original's leftovers) and its saves.
+  Run(h, w, {"TitleScreen::SetUp (sub_82222A50)", 100, __imp__sub_82222A50,
+             hooks::TitleScreenSetUp, {{-176, -128}, {-96, -40}},
+             [](PPCContext&, Random& r, const World& w) { Words(r, w); }});
+  // Start: how the title was entered 0 to 3, the sound manager; its frame
+  // and SetUp's below it, without SetText's parameter area and SetUp's
+  // saves.
+  Run(h, w, {"TitleScreen::Start (sub_82223AB8; sub_82222A50)", 100, __imp__sub_82223AB8,
+             hooks::TitleScreenStart, {{-112, -16}, {-288, -240}, {-208, -152}},
+             [](PPCContext&, Random& r, const World& w) {
+               Words(r, w);
+               SoundManager(r, w);
+             }});
+  Run(h, w, {"TitleScreen::Unload (sub_822224D0)", 60, __imp__sub_822224D0,
+             hooks::TitleScreenUnload, {{-112, -24}}, Machine});
+  // OpenNext: the list's selection 6 or not.
+  Run(h, w, {"TitleScreen::OpenNext (sub_82222538)", 60, __imp__sub_82222538,
+             hooks::TitleScreenOpenNext, {{-112, -24}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Machine(t, r, w);
+               guest::StoreU32(w.base, w.at(kListAt) + 16, r.Below(2) == 0 ? 6 : r.Below(8));
+             }});
+  // Leave: now and then no movie found.
+  Run(h, w, {"TitleScreen::Leave (sub_822225D8)", 60, __imp__sub_822225D8,
+             hooks::TitleScreenLeave, {{-112, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Machine(t, r, w);
+               if (r.Below(3) == 0) {
+                 guest::StoreU32(w.base, ui_movies::kMovieTable + 8, 0);
+                 guest::StoreU32(w.base, kMissingMovie, 0);
+               }
+             }});
+  Run(h, w, {"TitleScreen::OnGameDataLoaded (sub_822219A0)", 40, __imp__sub_822219A0,
+             hooks::TitleScreenOnGameDataLoaded, {}, Machine});
+  Run(h, w, {"TitleScreen::OnInterrupt (sub_82221A78)", 10, __imp__sub_82221A78,
+             hooks::TitleScreenOnInterrupt, {}, Machine});
+  Run(h, w, {"TitleScreen::OnResume (sub_82221A90)", 10, __imp__sub_82221A90,
+             hooks::TitleScreenOnResume, {}, Machine,
+             [&h](PPCContext&, const World&, Outputs& out) {
+               out.Bytes(Read(h.base, ts::kSystemChecks, 16));
+             }});
+  Run(h, w, {"TitleScreen::LoadGameData (sub_82222688)", 40, __imp__sub_82222688,
+             hooks::TitleScreenLoadGameData, {}, Mode});
+  // LeavePage: the item 0 to 9.
+  Run(h, w, {"TitleScreen::LeavePage (sub_822229D0)", 60, __imp__sub_822229D0,
+             hooks::TitleScreenLeavePage, {},
+             [](PPCContext& t, Random& r, const World& w) {
+               Words(r, w);
+               t.r3.u64 = w.mode();
+               t.r4.u64 = w.machine();
+             }});
+  // Draw: the page -1, 1 or 5 (LoadGameData, LeavePage); only its own frame
+  // compared.
+  Run(h, w, {"TitleScreen::Draw (sub_82223A18)", 100, __imp__sub_82223A18,
+             hooks::TitleScreenDraw, {{-128, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               Words(r, w);
+               t.r3.u64 = w.machine() | (uint64_t(r.Below(2)) << 32);
+               t.r4.u64 = w.mode();
+               const uint32_t pick = r.Below(3);
+               guest::StoreU32(w.base, w.at(kPagesAt), pick == 0 ? 0xFFFFFFFFu : pick == 1 ? 1 : 5);
+             }});
+  // Update: the running transition -1, another negative, 1 or 3
+  // (PressStartLoop, LeavePressStart: the movie's calls only), the queued
+  // one -1 or small, the started word 0 or not; only its own frame compared
+  // (r19 on saved).
+  Run(h, w, {"TitleScreen::Update (sub_822240B0)", 300, __imp__sub_822240B0,
+             hooks::TitleScreenUpdateTransitions, {{-288, -112}},
+             [](PPCContext&, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               const uint32_t pages = w.at(kPagesAt);
+               const uint32_t pick = r.Below(4);
+               guest::StoreU32(base, pages + 12,
+                               pick == 0   ? 0xFFFFFFFFu
+                               : pick == 1 ? uint32_t(-int32_t(2 + r.Below(5)))
+                                           : (r.Below(2) == 0 ? 1 : 3));
+               guest::StoreU32(base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(6));
+               guest::StoreU32(base, pages + 24, r.Below(3) == 0 ? 1 : 0);
+             }});
+}
+
 }  // namespace
 
 void TitleScreen(Context& h) {
@@ -559,6 +724,7 @@ void TitleScreen(Context& h) {
   Inits(h, w);
   if (hooks::NativeHeapActive()) {
     TitleLoad(h, w);
+    ScreenHandlers(h, w);
   }
 }
 

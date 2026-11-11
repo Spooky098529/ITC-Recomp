@@ -33,5 +33,24 @@ void TitleLoadDestroy(PPCContext& ctx, uint8_t* base);
 void TitleLoadInit(PPCContext& ctx, uint8_t* base);
 // TitleScreen::Init (r3 the machine).
 void TitleScreenInit(PPCContext& ctx, uint8_t* base);
+// The title screen's handlers (r3 the machine, r4 the mode where read), its
+// set-up (no arguments) and its pages LoadGameData (r3 the mode) and
+// LeavePage (r3 the mode, r4 the machine).
+void TitleScreenCreate(PPCContext& ctx, uint8_t* base);
+void TitleScreenOpenMovie(PPCContext& ctx, uint8_t* base);
+void TitleScreenWaitForMovie(PPCContext& ctx, uint8_t* base);
+void TitleScreenStart(PPCContext& ctx, uint8_t* base);
+void TitleScreenSetUp(PPCContext& ctx, uint8_t* base);
+void TitleScreenDraw(PPCContext& ctx, uint8_t* base);
+void TitleScreenUpdateTransitions(PPCContext& ctx, uint8_t* base);
+void TitleScreenOnGameDataLoaded(PPCContext& ctx, uint8_t* base);
+void TitleScreenOnInterrupt(PPCContext& ctx, uint8_t* base);
+void TitleScreenOnResume(PPCContext& ctx, uint8_t* base);
+void TitleScreenUnload(PPCContext& ctx, uint8_t* base);
+void TitleScreenOpenNext(PPCContext& ctx, uint8_t* base);
+void TitleScreenLeave(PPCContext& ctx, uint8_t* base);
+void TitleScreenDestroy(PPCContext& ctx, uint8_t* base);
+void TitleScreenLoadGameData(PPCContext& ctx, uint8_t* base);
+void TitleScreenLeavePage(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -21,7 +21,17 @@ ITC_FLAG_BOOL(native_title_screen, true, "ITC",
               "sub_822204C0, PostClose sub_82221078, Unload sub_82220EF8, OpenTitle "
               "sub_82220F60 and Leave sub_82220FC8 (UiMovie::FinishAll and UiMovies::Delete "
               "through their overrides); TitleLoad::Init sub_822213B0 and TitleScreen::Init "
-              "sub_82224270 (their step tables, StateMachine::Add's plain C++) (the same "
+              "sub_82224270 (their step tables, StateMachine::Add's plain C++); the title "
+              "screen's machine, Create sub_82221D98 and Destroy sub_82221EC0 (VirtualAlloc, "
+              "VirtualFree and MenuList::Release through their overrides, MenuList::Selection's "
+              "plain C++), OpenMovie sub_82221990, WaitForMovie sub_82221FC8, Start sub_82223AB8 "
+              "with SetUp sub_82222A50 (UiMovie::ResetPose and SetText through their overrides, "
+              "SetText's unset varargs 0; the sound manager's slot 14, Sound::Play and the fade "
+              "through their overrides), Draw sub_82223A18 and Update sub_822240B0 (the pages "
+              "and transitions through the guest from their tables, UiMovie::Run through its "
+              "override), OnGameDataLoaded sub_822219A0, OnInterrupt sub_82221A78, OnResume "
+              "sub_82221A90, Unload sub_822224D0, OpenNext sub_82222538, Leave sub_822225D8 and "
+              "the pages LoadGameData sub_82222688 and LeavePage sub_822229D0 (the same "
               "writes; checked by --run_harnesses=title_screen)");
 
 namespace hooks {
@@ -105,7 +115,7 @@ void TitleLoadStart(PPCContext& ctx, uint8_t* base) {
 }
 void TitleLoadDraw(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadDraw(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  ctx.r3.u64 = ts::LoadDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 void TitleLoadUpdate(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
@@ -142,6 +152,58 @@ void TitleScreenInit(PPCContext& ctx, uint8_t* base) {
   InitSteps(ctx, base, ts::ScreenInit, ts::kScreenInitFrame);
 }
 
+void TitleScreenCreate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenOpenMovie(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void TitleScreenWaitForMovie(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::ScreenWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+}
+void TitleScreenStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenStart(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenSetUp(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenSetUp(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+void TitleScreenUpdateTransitions(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenUpdate(base, ctx.r1.u32, guest.calls());
+}
+void TitleScreenOnGameDataLoaded(PPCContext&, uint8_t* base) { ts::ScreenOnGameDataLoaded(base); }
+void TitleScreenOnInterrupt(PPCContext&, uint8_t* base) { ts::ScreenOnInterrupt(base); }
+void TitleScreenOnResume(PPCContext&, uint8_t* base) { ts::ScreenOnResume(base); }
+void TitleScreenUnload(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenOpenNext(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::ScreenOpenNext(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+void TitleScreenLeave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenDestroy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = ts::ScreenDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TitleScreenLoadGameData(PPCContext& ctx, uint8_t* base) {
+  ts::ScreenLoadGameData(base, ctx.r3.u32);
+}
+void TitleScreenLeavePage(PPCContext& ctx, uint8_t* base) {
+  ts::ScreenLeavePage(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 }  // namespace hooks
 
 #define ITC_TITLE_SCREEN(address, step)   \
@@ -173,3 +235,23 @@ ITC_TITLE_SCREEN(822210C8, TitleLoadPlayLogo)
 // The Inits (from ModeType4::Init sub_82224C70).
 ITC_TITLE_SCREEN(822213B0, TitleLoadInit)
 ITC_TITLE_SCREEN(82224270, TitleScreenInit)
+// The title screen's handlers (functors the machine calls; no direct
+// callers), Update the (5, 0) functor (the transitions).
+ITC_TITLE_SCREEN(82221D98, TitleScreenCreate)
+ITC_TITLE_SCREEN(82221990, TitleScreenOpenMovie)
+ITC_TITLE_SCREEN(82221FC8, TitleScreenWaitForMovie)
+ITC_TITLE_SCREEN(82223AB8, TitleScreenStart)
+ITC_TITLE_SCREEN(82223A18, TitleScreenDraw)
+ITC_TITLE_SCREEN(822240B0, TitleScreenUpdateTransitions)
+ITC_TITLE_SCREEN(822219A0, TitleScreenOnGameDataLoaded)
+ITC_TITLE_SCREEN(82221A78, TitleScreenOnInterrupt)
+ITC_TITLE_SCREEN(82221A90, TitleScreenOnResume)
+ITC_TITLE_SCREEN(822224D0, TitleScreenUnload)
+ITC_TITLE_SCREEN(82222538, TitleScreenOpenNext)
+ITC_TITLE_SCREEN(822225D8, TitleScreenLeave)
+ITC_TITLE_SCREEN(82221EC0, TitleScreenDestroy)
+// Its pages (from Draw's table on its stack). SetUp sub_82222A50: no adapter
+// (its only caller, Start, is native and calls its plain C++; the register
+// step above is the harness's).
+ITC_TITLE_SCREEN(82222688, TitleScreenLoadGameData)
+ITC_TITLE_SCREEN(822229D0, TitleScreenLeavePage)
