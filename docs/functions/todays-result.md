@@ -8,7 +8,7 @@ them: **today's result** (`TodaysResult::`, the day's and the career's
 counts, the day number and the money, UI movie 27) and **today's
 event** (`TodaysEvent::`, the unlocks just made, one page each with
 their images, UI movie 0). The race's end on the career's side
-(`sub_82150E00`, a lead in `../loops/leads.md`, from
+(`RaceMode::ModeAfterRace` `sub_82150E00`, [`race-end.md`](race-end.md), from
 `RaceMode::NextMode`, [`race-loading.md`](race-loading.md)) answers type
 9 on several of its paths. The mode is 852 bytes like types 2, 4 to 7
 and 10 (made by `ModeType9::ModeType9` in [`game-modes.md`](game-modes.md)),

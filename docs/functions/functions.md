@@ -709,6 +709,9 @@ Rows not yet moved stay in the table below. So far:
   teardowns, and the mode select's machine (UI movie 35: the Live
   sign-in, the privilege check, the two items) (B7; mapped, an Xbox
   feature).
+- [`race-end.md`](race-end.md): the race's end, the mode a race goes
+  to when it's over (the career's progress asked, the boot movies queued
+  after the stages that end with them) (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

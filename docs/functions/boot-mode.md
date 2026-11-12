@@ -5,7 +5,8 @@ The **boot mode** (`BootMode::`): the game mode of type 3 (10,460 bytes,
 [`game-modes.md`](game-modes.md); vtables `0x82006B70` at +0 and
 `0x82006B64` at +32), the first mode the app makes (`Modes::Modes` with
 3) probably also the mode for the movies between other modes (five
-other functions use the table, not read: `sub_82150E00`,
+other functions use the table, not read: `sub_82150E00` (the race's
+end, `race-end.md`: movies 6 and 7 or 8 and 9, then type 9),
 `sub_82180CE8`, `sub_82188FE0`, `sub_8225A720`, `sub_8225B9B8`; the
 last two queue a movie after the career's day, [`todays-result.md`](todays-result.md)). It plays
 the movies listed in the table at `0x826C5BAC` (up to five movie ids, 11
