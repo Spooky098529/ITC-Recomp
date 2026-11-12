@@ -307,7 +307,8 @@ void TodaysEventShowImages(PPCContext& ctx, uint8_t* base) {
 // thunks) and IsLoaded (the +32 vtable 0x82006CA0's slot 0). FindShown
 // sub_8225D658 and the two InitStates: no adapters (only the mode's
 // functions, native, call them; the register steps above are the
-// harness's). Kind: today's event's Create and EndPage call it too.
+// harness's). Kind sub_8225BA48: no adapter (Init, today's event's Create
+// and EndPage, all native, call it).
 ITC_TODAYS_RESULT(8225D6D0, ModeType9Init)
 ITC_TODAYS_RESULT(8225D918, ModeType9WaitForLoads)
 ITC_TODAYS_RESULT(8225DC38, ModeType9NextMode)
@@ -315,7 +316,6 @@ ITC_TODAYS_RESULT(8225DB70, ModeType9LeaveScreen)
 ITC_TODAYS_RESULT(8225DA68, ModeType9WaitForShown)
 ITC_TODAYS_RESULT(8225DE78, ModeType9Leaving)
 ITC_TODAYS_RESULT(8225D6A8, ModeType9IsLoaded)
-ITC_TODAYS_RESULT(8225BA48, TodaysEventKind)
 // Today's result's handlers (member function functors the machine calls; no
 // direct callers), pages (from Draw's table on its stack) and transitions
 // (from Update's table). ReadDay sub_8225A520, SetUpMovie sub_8225B258,
