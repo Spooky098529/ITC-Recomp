@@ -49,7 +49,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "--native_models' lifetime and memcpy native), Scenery::Init sub_820F1360, "
               "SceneryList::ReleaseUnused sub_820F17C0 (no adapter), SceneryList::LoadAll sub_820F1598 and Stream "
               "sub_820F16C0 (no adapter) (Archive::QueueLength's plain C++ with the archive's native queue), "
-              "Scenery::StartLoad sub_820F1E00, "
+              "Scenery::StartLoad sub_820F1E00, Scenery::IsLoaded sub_820F1F68, "
               "Scenery::CollectAreas sub_820F3098 (no adapter), Scenery::CollectModels sub_820F32D0 (no adapter), "
               "Scenery::Update sub_820F4558 (CameraPass::FromViewport's plain C++, CameraPass::Update "
               "a guest call), "
@@ -270,6 +270,13 @@ ITC_COURSE_SCENERY(820F1360, Init(base, ctx.r3.u32);
 ITC_COURSE_SCENERY(820F1598, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = ListLoadAll(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                             hooks::NativeArchiveQueue()))
+// Scenery::IsLoaded: r3 = the manager; r3 = 0 or 1. From the race's
+// loading's handlers (CourseSetup::WaitCourse and EndTick, native with
+// --native_race_loading, which call its plain C++) and the front end's
+// sub_82229238 (recompiled).
+ITC_COURSE_SCENERY(820F1F68, ITC_SCENERY_CALLS;
+                   ctx.r3.u64 = SceneryIsLoaded(base, calls, ctx.r1.u32, ctx.r3.u32,
+                                                hooks::NativeArchiveQueue()))
 // r3 = the manager.
 ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))

@@ -996,6 +996,38 @@ uint32_t ListLoadAll(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
   return Load(base, list + 8) == Load(base, list + 4) ? 1 : 0;
 }
 
+uint32_t SceneryIsLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                         bool native_queue) {
+  ITC_NATIVE_RUNNING("sub_820F1F68 Scenery::IsLoaded");
+  const uint32_t frame = stack - 112;
+  Store(base, frame, stack);
+  if (Load(base, manager + 192) != 0) {
+    if (ListLoadAll(base, calls, frame, manager, manager + 116, native_queue) == 0 ||
+        ListLoadAll(base, calls, frame, manager, manager + 144, native_queue) == 0) {
+      return 0;
+    }
+  }
+  const uint32_t pool = Load(base, manager + 172);
+  if (int32_t(pool) < 0) {
+    return 0;
+  }
+  const uint32_t index = Load(base, manager + 176);
+  if (int32_t(index) < 0) {
+    return 0;
+  }
+  const uint32_t object = PoolObjectAt(base, manager, pool, index);
+  if (object == 0) {
+    return 0;
+  }
+  if (InUse(base, object) != 0 && IsLoaded(base, object) == 0) {
+    return 0;
+  }
+  if (Load(base, manager + 192) != 0) {
+    Store(base, manager + 192, 0);
+  }
+  return 1;
+}
+
 uint32_t ListStream(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
                     uint32_t list, bool native_queue) {
   ITC_NATIVE_RUNNING("sub_820F16C0 SceneryList::Stream");

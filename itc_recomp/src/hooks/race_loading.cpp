@@ -18,7 +18,9 @@ ITC_FLAG_BOOL(native_race_loading, true, "ITC",
               "+848 machine, CourseSetup::Init sub_821517D8 (the 11 transitions' words replayed "
               "in its frame, StateMachine::Add's plain C++), Start sub_82151408, Begin "
               "sub_82150DE0, OnCourseReady sub_82150DD0 and WaitDraw sub_821515A0 (the fades' "
-              "and Archive::QueueLength's plain C++); the loading screen's Show sub_822478D0 "
+              "and Archive::QueueLength's plain C++), WaitCourse sub_821514A0 and EndTick "
+              "sub_821516F0 (Scenery::IsLoaded's, Text::IsLoaded's, DataTables::IsLoading's "
+              "and CarScene::LoadsDone's plain C++, CarScene::Update a guest call); the loading screen's Show sub_822478D0 "
               "(with UiMovie::SetFrames sub_82290B30), Run sub_82247898 and Finish "
               "sub_82247A60 (the UI movie calls and GetLocalTime through their overrides); "
               "sub_82293460 (its callees through the function table; no adapter: RaceMode::NextMode "
@@ -113,6 +115,20 @@ void CourseSetupWaitDraw(PPCContext& ctx, uint8_t* base) {
        [&](const rl::Calls& c) { return rl::WaitDraw(base, r3, dispatcher, sp, c); });
 }
 
+void CourseSetupWaitCourse(PPCContext& ctx, uint8_t* base) {
+  const uint32_t machine = ctx.r3.u32, dispatcher = ctx.r4.u32, sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rl::Calls& c) {
+    return rl::WaitCourse(base, machine, dispatcher, sp, c);
+  });
+}
+
+void CourseSetupEndTick(PPCContext& ctx, uint8_t* base) {
+  const uint32_t machine = ctx.r3.u32, dispatcher = ctx.r4.u32, sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rl::Calls& c) {
+    return rl::EndTick(base, machine, dispatcher, sp, c);
+  });
+}
+
 void LoadingScreenShow(PPCContext& ctx, uint8_t* base) {
   const uint64_t tip = ctx.r3.u64;
   const uint32_t which = ctx.r4.u32, frames = ctx.r5.u32, sp = ctx.r1.u32;
@@ -155,6 +171,8 @@ ITC_RACE_LOADING(82151408, CourseSetupStart)
 ITC_RACE_LOADING(82150DE0, CourseSetupBegin)
 ITC_RACE_LOADING(82150DD0, CourseSetupOnCourseReady)
 ITC_RACE_LOADING(821515A0, CourseSetupWaitDraw)
+ITC_RACE_LOADING(821514A0, CourseSetupWaitCourse)
+ITC_RACE_LOADING(821516F0, CourseSetupEndTick)
 ITC_RACE_LOADING(822478D0, LoadingScreenShow)
 ITC_RACE_LOADING(82247898, LoadingScreenRun)
 ITC_RACE_LOADING(82247A60, LoadingScreenFinish)

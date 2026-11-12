@@ -257,6 +257,14 @@ uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32
 // +4 reached +8, else 0.
 uint32_t ListLoadAll(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
                      uint32_t list, bool native_queue);
+// Scenery::IsLoaded (sub_820F1F68; 112-byte frame below `stack`, its back
+// chain written): while +192 is set, ListLoadAll on list A (+116), then
+// list B (+144), 0 unless each answers 1; then the object last asked for
+// (+172 the pool, +176 its index, 0 if either is negative; ObjectPools::
+// Object, 0 for none) must be loaded unless it isn't in use
+// (PoolObject::InUse, IsLoaded); then +192 = 0 (when set) and 1, else 0.
+uint32_t SceneryIsLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                         bool native_queue);
 // SceneryList::Stream (sub_820F16C0): the queue length as LoadAll; for each
 // item: its object in the list's pool by its key's address (ObjectPools::
 // Find), else, when the queue is below 960, one taken (Acquire) and, when

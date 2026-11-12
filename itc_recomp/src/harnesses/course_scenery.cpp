@@ -2204,6 +2204,111 @@ void ListLoadCases(Context& h) {
   }
 }
 
+// --- Scenery::IsLoaded: ListLoadCases' world with the manager's lists A
+// (+116) and B (+144) on random pools of its three (up to 4 items each, A's
+// pointers, items and table as LoadAll's cases, B's after them), +192 0 or
+// set (both lists then loaded first: the done count at the count, or
+// below), the object last asked for (+172 the pool, +176 its index) -1 or
+// one of the pool's slots, its flags random. Cases whose pools have fewer
+// free objects than the lists' items left to load are left out (the
+// original loads object -1 then). Both with the archive's queue length
+// native and through the guest. The scratch area and r3 compared. A random
+// generator of its own. ---
+
+void IsLoadedCases(Context& h) {
+  Random r(0x49534C44);
+  constexpr uint32_t kPoolRecords = 2048;
+  constexpr uint32_t kPointers[2] = {2240, 2520}, kItems[2] = {2280, 2560},
+                     kTables[2] = {2420, 2700};
+  Results results("Scenery::IsLoaded (sub_820F1F68)");
+  int done = 0;
+  for (int c = 0; c < 400 && done < 160; c++) {
+    const uint64_t seed = r.Next();
+    const bool native_queue = r.Below(2) != 0;
+    Outputs out[2];
+    bool skip = false;
+    for (int v = 0; v < 2 && !skip; v++) {
+      Random probe(seed);
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32(h.base, h.data + kKeyVtable + 0, 0x820F1C20);
+      guest::StoreU32(h.base, h.data + kKeyVtable + 4, 0x820FB9D8);
+      guest::StoreU32(h.base, h.data + kKeyVtable + 8, 0x820FB9D8);
+      uint32_t counts[3];
+      RandomPools(h, probe, counts, true, 3, kPoolRecords, 6, kKeyVtable);
+      const uint32_t manager = h.data + kSet;
+      const bool loading = probe.Below(3) != 0;
+      guest::StoreU32(h.base, manager + 192, loading ? (probe.Below(4) == 0 ? uint32_t(probe.Next()) | 1 : 1) : 0);
+      uint32_t needed[3] = {0, 0, 0};
+      for (uint32_t l = 0; l < 2; l++) {
+        const uint32_t list = manager + 116 + 28 * l;
+        const uint32_t pool = probe.Below(3);
+        const uint32_t items = probe.Below(5);
+        const uint32_t entries = probe.Below(5);
+        const uint32_t first = h.data + kObjects + pool * 6 * kStride;
+        // Mostly loaded already (the done count at the count), as the game
+        // polls it after the loads went out.
+        const uint32_t done_count =
+            items == 0 || probe.Below(2) == 0 ? items : probe.Below(items + 1);
+        needed[pool] += items - done_count;
+        guest::StoreU32(h.base, list + 0, pool);
+        guest::StoreU32(h.base, list + 4, done_count);
+        guest::StoreU32(h.base, list + 8, items);
+        guest::StoreU32(h.base, list + 12, entries);
+        guest::StoreU32(h.base, list + 16, h.data + kPointers[l]);
+        guest::StoreU32(h.base, list + 24, h.data + kTables[l]);
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t item = h.data + kItems[l] + 16 * i;
+          guest::StoreU32(h.base, h.data + kPointers[l] + 4 * i, item);
+          guest::StoreU32(h.base, item + 8, probe.Below(4) << 16 | probe.Below(4));
+          const uint32_t entry = h.data + kTables[l] + 12 * i;
+          guest::StoreU32(h.base, entry + 0, probe.Below(4) << 16 | probe.Below(4));
+          guest::StoreU32(h.base, entry + 8,
+                          probe.Below(2) == 0 || counts[pool] == 0
+                              ? 0
+                              : first + kStride * probe.Below(counts[pool]));
+        }
+      }
+      guest::StoreU32(h.base, manager + 172, probe.Below(5) == 0 ? 0xFFFFFFFFu : probe.Below(3));
+      guest::StoreU32(h.base, manager + 176, probe.Below(5) == 0 ? 0xFFFFFFFFu : probe.Below(6));
+      if (loading) {
+        for (uint32_t p = 0; p < 3; p++) {
+          uint32_t free = 0;
+          for (uint32_t o = guest::LoadU32(h.base, h.data + kPoolRecords + 24 * p + 16);
+               o != 0 && free < 16; o = guest::LoadU32(h.base, o + 24)) {
+            free++;
+          }
+          if (free < needed[p]) {
+            skip = true;
+          }
+        }
+        if (skip) {
+          break;
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = manager;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F1F68(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            t.r3.u64 = cs::SceneryIsLoaded(h.base, calls, t.r1.u32, t.r3.u32, native_queue);
+          });
+        }
+      });
+      ScratchAndR3(h, out[v], t);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    if (skip) {
+      continue;
+    }
+    done++;
+    results.Check(out[0], out[1],
+                  fmt::format("case {} queue {}", c, native_queue ? "native" : "guest"));
+  }
+  results.Report();
+}
+
 // --- Scenery::Update: a world of its own in a block from the allocation
 // layer (the manager, its two pools of up to 8 objects with the key vtable
 // of ListLoadCases, lists A and B with their pointers and items, list A's
@@ -2523,6 +2628,7 @@ void CourseScenery(Context& h) {
   Parses(h);
   PoolSizesCases(h);
   ListLoadCases(h);
+  IsLoadedCases(h);
   PhysicalCases(h);
   CreateCases(h);
   SetupCases(h);

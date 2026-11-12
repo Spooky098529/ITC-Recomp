@@ -15,6 +15,8 @@ void CourseSetupStart(PPCContext& ctx, uint8_t* base);          // sub_82151408
 void CourseSetupBegin(PPCContext& ctx, uint8_t* base);          // sub_82150DE0
 void CourseSetupOnCourseReady(PPCContext& ctx, uint8_t* base);  // sub_82150DD0
 void CourseSetupWaitDraw(PPCContext& ctx, uint8_t* base);       // sub_821515A0
+void CourseSetupWaitCourse(PPCContext& ctx, uint8_t* base);     // sub_821514A0
+void CourseSetupEndTick(PPCContext& ctx, uint8_t* base);        // sub_821516F0
 void LoadingScreenShow(PPCContext& ctx, uint8_t* base);         // sub_822478D0
 void LoadingScreenRun(PPCContext& ctx, uint8_t* base);          // sub_82247898
 void LoadingScreenFinish(PPCContext& ctx, uint8_t* base);       // sub_82247A60

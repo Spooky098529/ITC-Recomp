@@ -115,6 +115,36 @@ void OnCourseReady(uint8_t* base, uint32_t machine);
 uint64_t WaitDraw(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls);
 
+// The globals the course's wait and end read: the course scenery's manager
+// (Scenery::IsLoaded's), the collision mesh's and the route's load states
+// (2 once loaded; the words +8 into 0x826C5B1C and 0x826C5B10), layer 0's
+// fade counts (out and in), and the guest functions they call.
+constexpr uint32_t kSceneryManager = 0x826C5514;
+constexpr uint32_t kCollisionState = 0x826C5B24;
+constexpr uint32_t kRouteState = 0x826C5B18;
+constexpr uint32_t kLayer0FadeOut = 0x826A50E4;
+constexpr uint32_t kLayer0FadeIn = 0x826A50DC;
+constexpr uint32_t kCarSceneUpdate = 0x820C9608;  // CarScene::Update, through its adapter
+
+// sub_821514A0 CourseSetup::WaitCourse ((3, 0); 112-byte frame): when
+// Scenery::IsLoaded([0x826C5514]) answers nonzero (its plain C++), the
+// collision mesh's and the route's states are both 2, Text::IsLoaded
+// answers nonzero and DataTables::IsLoading 0 (their plain C++): message 3
+// posted and the draw step (+9648) = 0; returns 0 (IsLoading's r3).
+// Otherwise the debug print "CRS SETUP WAITING." to the empty sub_82106540
+// (nothing done); returns 500.
+uint64_t WaitCourse(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+                    const Calls& calls);
+// sub_821516F0 CourseSetup::EndTick ((37, 0); 112-byte frame): the end's
+// tick count (+9644) up by 1; when Scenery::IsLoaded([0x826C5514]) answers
+// nonzero, CarScene::LoadsDone([0x826C2E44]) 1 (their plain C++, LoadsDone's
+// finishers guest calls), the archive's queue is empty, the count is above
+// 2 (unsigned) and layer 0's fade counts are both 0: message 50 posted,
+// returns 0 (the queue length's r3). Otherwise CarScene::Update (a guest
+// call with the r3 the failed test left), returning its r3.
+uint64_t EndTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+                 const Calls& calls);
+
 // --- The loading screen (race_loading.cpp) ---
 
 // sub_82290B30 UiMovie::SetFrames (probably; leaf): from the movie's live

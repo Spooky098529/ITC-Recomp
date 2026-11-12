@@ -6,7 +6,11 @@
 #include "archive/archive.h"
 #include "base/log.h"
 #include "guest.h"
+#include "course_scenery/course_scenery.h"
+#include "data_tables/data_tables.h"
 #include "mode_tick/mode_tick.h"
+#include "scene/scene.h"
+#include "strings_and_font/strings_and_font.h"
 
 namespace race_loading {
 
@@ -38,7 +42,68 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
   Store(base, slot + 8, 0);
 }
 
+// The course scenery's calls (course_scenery::Calls) through these.
+course_scenery::Calls SceneryCalls(const Calls& calls) {
+  return {const_cast<Calls*>(&calls),
+          [](void* user, uint32_t function, const uint32_t* args, int count, uint32_t frame,
+             uint32_t lr) {
+            const Calls& c = *static_cast<const Calls*>(user);
+            uint64_t registers[8] = {};
+            for (int i = 0; i < count && i < 8; i++) {
+              registers[i] = args[i];
+            }
+            return uint32_t(c.call(c.user, function, registers, count, frame, lr));
+          }};
+}
+
+// Scenery::IsLoaded([0x826C5514]) from the handler's frame.
+uint32_t SceneryLoaded(uint8_t* base, uint32_t frame, const Calls& calls) {
+  return course_scenery::SceneryIsLoaded(base, SceneryCalls(calls), frame,
+                                         Load(base, kSceneryManager), calls.native_queue);
+}
+
 }  // namespace
+
+uint64_t WaitCourse(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+                    const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821514A0 CourseSetup::WaitCourse");
+  const uint32_t frame = Frame(base, sp, 112);
+  if (SceneryLoaded(base, frame, calls) != 0 && int32_t(Load(base, kCollisionState)) == 2 &&
+      int32_t(Load(base, kRouteState)) == 2 && strings_and_font::TextIsLoaded(base) != 0 &&
+      data_tables::IsLoading(base) == 0) {
+    Post(base, dispatcher, 3);
+    Store(base, machine + kDrawStep, 0);
+    return 0;
+  }
+  // "CRS SETUP WAITING." to the empty sub_82106540 (r3 = 500, r4 = 100, r5
+  // = 0, r6 the string): nothing done.
+  return 500;
+}
+
+uint64_t EndTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821516F0 CourseSetup::EndTick");
+  const uint32_t frame = Frame(base, sp, 112);
+  Store(base, machine + kEndTicks, Load(base, machine + kEndTicks) + 1);
+  uint64_t r3 = SceneryLoaded(base, frame, calls);
+  if (r3 != 0) {
+    r3 = scene::LoadsDone(
+        base, Load(base, scene::kScene), frame,
+        [&](uint32_t function, uint32_t at, uint32_t lr, uint32_t f3, uint32_t f4) {
+          return calls.Call(function, at, lr, 2, f3, f4);
+        });
+    if (r3 == 1) {
+      r3 = calls.native_queue ? archive::QueueLength(base)
+                              : uint32_t(calls.Call(kQueueLength, frame, 0x82151744, 0));
+      if (r3 == 0 && Load(base, machine + kEndTicks) > 2 &&
+          (Load(base, kLayer0FadeOut) | Load(base, kLayer0FadeIn)) == 0) {
+        Post(base, dispatcher, 50);
+        return 0;
+      }
+    }
+  }
+  return calls.Call(kCarSceneUpdate, frame, 0x821517C0, 1, r3);
+}
 
 uint64_t Start(uint8_t* base, uint32_t dispatcher, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82151408 CourseSetup::Start");
