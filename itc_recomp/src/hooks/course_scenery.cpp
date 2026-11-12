@@ -59,6 +59,10 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "SceneryList::ReleaseUnused sub_820F17C0 (no adapter), SceneryList::LoadAll sub_820F1598 (no adapter) and Stream "
               "sub_820F16C0 (no adapter) (Archive::QueueLength's plain C++ with the archive's native queue), "
               "Scenery::StartLoad sub_820F1E00, Scenery::IsLoaded sub_820F1F68, "
+              "CourseSet::Load sub_820F2520, AreaLights::Load sub_820F22F8 and AreaModel::Load "
+              "sub_820F23C0 (with the archive's native queue and the native heap; called "
+              "directly by ObjectPools::Load), CourseSet::OnLoaded sub_820F22B8 (as the "
+              "parses, with the native heap), "
               "Scenery::Unload sub_820F2B38 with UnloadPools sub_820F1D20 (no adapter) and Destroy sub_820F2AF8 "
               "(with the native heap), "
               "Scenery::CollectAreas sub_820F3098 (no adapter), Scenery::CollectModels sub_820F32D0 (no adapter), "
@@ -124,6 +128,18 @@ uint32_t CallGuest(void* user, uint32_t function, const uint32_t* args, int coun
   return ctx.r3.u32;
 }
 
+// Archive::Load for the pools' loads' plain C++ (Calls::load), or null
+// where they may not run (the flag off, the archive's queue or the heap not
+// native).
+const archive::LoadCall* SceneryLoads(uint8_t* base) {
+  if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive() ||
+      !hooks::NativeArchiveQueue()) {
+    return nullptr;
+  }
+  static const archive::LoadCall load = hooks::NativeArchiveLoad(base);
+  return &load;
+}
+
 // -1 as the originals' li r3,-1 leaves it (64 bits).
 void SetIndex(PPCContext& ctx, uint32_t index) {
   if (index == 0xFFFFFFFFu) {
@@ -142,7 +158,8 @@ course_scenery::Calls hooks::CourseSceneryCalls(CourseSceneryGuest* guest) {
             auto* g = static_cast<CourseSceneryGuest*>(user);
             GuestCalls call{g->ctx, g->base};
             return CallGuest(&call, function, args, count, frame, lr);
-          }};
+          },
+          SceneryLoads(guest->base)};
 }
 
 bool hooks::CourseScenerySetUpNative() {
@@ -152,7 +169,7 @@ bool hooks::CourseScenerySetUpNative() {
 // The calls the plain C++ makes into code that takes the context.
 #define ITC_SCENERY_CALLS        \
   GuestCalls call{&ctx, base};   \
-  const Calls calls { &call, CallGuest }
+  const Calls calls { &call, CallGuest, SceneryLoads(base) }
 
 // --- Pool objects: r3 = the object ---
 
@@ -278,7 +295,8 @@ void hooks::CourseSceneryUpdate(PPCContext& ctx, uint8_t* base) {
                       const uint32_t r3 = CallGuest(user, function, args, count, frame, back);
                       static_cast<GuestCalls*>(user)->ctx->fpscr.disableFlushMode();
                       return r3;
-                    }};
+                    },
+                    SceneryLoads(base)};
   ctx.r3.u64 = Update(base, calls, ctx.r1.u32, ctx.r3.u32,
                       {ctx.r25.u64, ctx.r26.u64, ctx.r3.u64}, hooks::NativeArchiveQueue());
   ctx.lr = lr;
@@ -349,6 +367,53 @@ extern "C" REX_FUNC(sub_820F1CE8) {
   ctx.fpscr.disableFlushMode();
   ITC_SCENERY_CALLS;
   ctx.r3.u64 = AreaModelOnLoaded(base, calls, ctx.r1.u32, ctx.r6.u32);
+}
+
+// --- The pools' loads (slot 1; no direct callers: ObjectPools::Load calls
+// their plain C++ directly) and the course set's callback ---
+
+// CourseSet::Load: r3 = the course set; r3 as the original leaves it.
+extern "C" REX_FUNC(sub_820F2520) {
+  REX_FUNC_PROLOGUE();
+  const archive::LoadCall* load = SceneryLoads(base);
+  if (load == nullptr) {
+    __imp__sub_820F2520(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = CourseSetLoad(base, ctx.r3.u32, *load);
+}
+// AreaLights::Load and AreaModel::Load: r3 = the object; r3 as the
+// originals leave it.
+extern "C" REX_FUNC(sub_820F22F8) {
+  REX_FUNC_PROLOGUE();
+  const archive::LoadCall* load = SceneryLoads(base);
+  if (load == nullptr) {
+    __imp__sub_820F22F8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = AreaLightsLoad(base, ctx.r3.u32, *load);
+}
+extern "C" REX_FUNC(sub_820F23C0) {
+  REX_FUNC_PROLOGUE();
+  const archive::LoadCall* load = SceneryLoads(base);
+  if (load == nullptr) {
+    __imp__sub_820F23C0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = AreaModelLoad(base, ctx.r3.u32, *load);
+}
+
+// CourseSet::OnLoaded (Archive::Load's callback): r6 = the course set; r3 =
+// it. As the parses (Model::Load's native lifetime), with the native heap.
+extern "C" REX_FUNC(sub_820F22B8) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses() || !hooks::NativeHeapActive()) {
+    __imp__sub_820F22B8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = CourseSetOnLoaded(base, calls, ctx.r1.u32, ctx.r6.u32);
 }
 
 // --- The pools' objects: made and reset (as the parses' condition) ---

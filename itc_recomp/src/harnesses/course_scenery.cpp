@@ -21,6 +21,8 @@
 #include "cameras/cameras.h"
 #include "command_list/command_list.h"
 #include "course_scenery/course_scenery.h"
+#include "hooks/app_start_up.h"
+#include "hooks/archive.h"
 #include "hooks/course_scenery.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
@@ -2772,6 +2774,249 @@ void DestroyCases(Context& h) {
   results.Report();
 }
 
+// --- The pools' loads (slot 1) and CourseSet::OnLoaded ---
+
+// Archive::Load's calls, recorded by its adapter (hooks::g_start_up_recorder)
+// on the recompiled side and by hooks::NativeArchiveLoad's on the native
+// one: r3 to r8 each, answered with the next serial (-1 now and then).
+struct LoadRecord {
+  std::vector<uint32_t> calls;
+  std::vector<int64_t> serials;
+  size_t next = 0;
+};
+LoadRecord* g_loads = nullptr;
+
+bool RecordLoad(PPCContext& t, uint32_t address) {
+  if (address != 0x8209DE48 || g_loads == nullptr) {
+    return false;
+  }
+  for (const PPCRegister* reg : {&t.r3, &t.r4, &t.r5, &t.r6, &t.r7, &t.r8}) {
+    g_loads->calls.push_back(reg->u32);
+  }
+  const int64_t serial = g_loads->serials[g_loads->next++ % g_loads->serials.size()];
+  hooks::SetArchiveSerial(t, serial);
+  return true;
+}
+
+// CourseSet::Load, AreaLights::Load and AreaModel::Load: the manager in the
+// scratch area at [0x826C5514] (+36 a configuration area table with random
+// assets, some negative; list A's and B's tables of 0 to 5 entries, keys
+// matching the object's now and then), the object in a block of its own
+// (random flags and fields, its data after it). Archive::Load recorded.
+// Compared: the object's bytes (the course set's +3808 as whether a block
+// came and its size, its +3812 as an offset), the calls (destinations as
+// offsets in the object's block, the course set's first as a tag), r3 and
+// the bytes held.
+void LoadCases(Context& h) {
+  Random r(0x4C4F4144);
+  const char* names[3] = {"CourseSet::Load (sub_820F2520)", "AreaLights::Load (sub_820F22F8)",
+                          "AreaModel::Load (sub_820F23C0)"};
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_INFO("harness: the course scenery's loads: the heap or the archive's queue "
+                 "isn't native, no cases");
+    for (const char* name : names) Results(name).Report();
+    return;
+  }
+  constexpr uint32_t kMgr = 0, kConfigTable = 256, kTableA = 512, kTableB = 768;
+  constexpr uint32_t kBlockBytes = 8192, kData = 4096;
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  const auto saved_recorder = hooks::g_start_up_recorder;
+  const archive::LoadCall native_load = hooks::NativeArchiveLoad(h.base);
+  const uint32_t block = memory::Alloc(kBlockBytes, 0);
+  for (int kind = 0; kind < 3; kind++) {
+    Results results(names[kind]);
+    for (int c = 0; c < 48; c++) {
+      auto asset = [&] {
+        return r.Below(4) == 0 ? 0x80000000u | uint32_t(r.Next()) : r.Below(20000);
+      };
+      const uint32_t first = asset(), second = asset();
+      const uint32_t key = r.Below(4) << 16 | r.Below(4);
+      const uint32_t count = r.Below(6);
+      uint32_t table[5][3];
+      for (auto& entry : table) {
+        entry[0] = r.Below(3) == 0 ? key : (r.Below(4) << 16 | r.Below(4));
+        entry[1] = asset();
+        entry[2] = uint32_t(r.Next());
+      }
+      const uint32_t used = r.Below(4) == 0 ? uint32_t(r.Next()) & 0xFFF : 64 * r.Below(16);
+      const uint32_t flags = RandomFlags(r);
+      const uint32_t buffer = uint32_t(r.Next());
+      LoadRecord record;
+      for (int i = 0; i < 4; i++) {
+        record.serials.push_back(r.Below(5) == 0 ? -1 : int64_t(r.Below(0x7FFFFFFF)));
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Fill(h.base, block, kBlockBytes);
+        const uint32_t manager = h.data + kMgr;
+        guest::StoreU32(h.base, cs::kManager, manager);
+        guest::StoreU32(h.base, manager + 36, h.data + kConfigTable);
+        guest::StoreU32(h.base, h.data + kConfigTable + 12, first);
+        guest::StoreU32(h.base, h.data + kConfigTable + 8, second);
+        guest::StoreU32(h.base, manager + 128, count);
+        guest::StoreU32(h.base, manager + 140, h.data + kTableA);
+        guest::StoreU32(h.base, manager + 156, count);
+        guest::StoreU32(h.base, manager + 168, h.data + kTableB);
+        guest::StoreU32(h.base, manager + 188, buffer);
+        for (uint32_t i = 0; i < 5; i++) {
+          for (uint32_t t : {kTableA, kTableB}) {
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU32(h.base, h.data + t + 12 * i + 4 * k, table[i][k]);
+            }
+          }
+        }
+        guest::StoreU32(h.base, block + 4, block + kData);
+        guest::StoreU32(h.base, block + 8, 2048);
+        guest::StoreU32(h.base, block + 12, used);
+        guest::StoreU32(h.base, block + 32, flags);
+        guest::StoreU32(h.base, block + (kind == 1 ? 84 : 64), key);
+        guest::StoreU32(h.base, cs::kPhysicalHeld, 0x01000000u);
+        record.calls.clear();
+        record.next = 0;
+        g_loads = &record;
+        hooks::g_start_up_recorder = RecordLoad;
+        PPCContext t = CallContext(h);
+        t.r3.u64 = block;
+        With(v, [&] {
+          if (v == 0) {
+            (kind == 0 ? __imp__sub_820F2520 : kind == 1 ? __imp__sub_820F22F8
+                                                         : __imp__sub_820F23C0)(t, h.base);
+          } else if (kind == 0) {
+            t.r3.u64 = cs::CourseSetLoad(h.base, block, native_load);
+          } else if (kind == 1) {
+            t.r3.u64 = cs::AreaLightsLoad(h.base, block, native_load);
+          } else {
+            t.r3.u64 = cs::AreaModelLoad(h.base, block, native_load);
+          }
+        });
+        hooks::g_start_up_recorder = saved_recorder;
+        g_loads = nullptr;
+        const uint32_t physical = kind == 0 ? guest::LoadU32(h.base, block + 3808) : 0;
+        auto normalized = [&](uint32_t word) {
+          if (physical != 0 && word == physical) return 0xB0000000u;
+          if (word - block < kBlockBytes) return 0xC0000000u | (word - block);
+          return word;
+        };
+        if (kind == 0) {
+          out[v].Bytes(Read(h.base, block, 40));
+          out[v].Bytes(Read(h.base, block + 1056, 8));
+          out[v].Word(physical != 0);
+          out[v].Word(physical != 0 ? memory::PhysicalSize(physical) : 0);
+          out[v].Word(normalized(guest::LoadU32(h.base, block + 3812)));
+        } else {
+          out[v].Bytes(Read(h.base, block, 96));
+        }
+        out[v].Word(uint32_t(record.calls.size()));
+        for (size_t i = 0; i < record.calls.size(); i++) {
+          out[v].Word(i % 6 == 1 || i % 6 == 3 ? normalized(record.calls[i]) : record.calls[i]);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+        out[v].Bytes(Read(h.base, h.data, 1024));
+        if (physical != 0) memory::FreePhysical(physical);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} count {}", c, count));
+    }
+    results.Report();
+  }
+  memory::Free(block);
+  guest::StoreU32(h.base, cs::kManager, saved_manager);
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+}
+
+// CourseSet::OnLoaded: CourseSetParses' files, the first in a block of
+// physical memory of its own on each side (freed by the callback). Compared:
+// as CourseSetParses, with the bytes held, the flags and r3.
+void CourseSetOnLoadedCases(Context& h) {
+  Results results("CourseSet::OnLoaded (sub_820F22B8)");
+  if (!hooks::ModelsNativeLifetime() || !hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: CourseSet::OnLoaded: its plain C++ can't run here, no cases");
+    results.Report();
+    return;
+  }
+  Random r(0x4F4E4C44ull);
+  const uint32_t allocation = memory::Alloc(4096 + 16, 0);
+  const uint32_t set = (allocation + 15) & ~15u;
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  for (int c = 0; c < 12; c++) {
+    Files f;
+    std::vector<uint32_t> first;
+    first.push_back(f.Xpr(0x1000));
+    f.Container(256, {f.Part(r)});
+    first.push_back(256);
+    for (uint32_t i = 0; i < 6; i++) {
+      const uint32_t at = 512 + 64 * i;
+      std::vector<uint32_t> parts;
+      const uint32_t n = r.Below(2);
+      for (uint32_t k = 0; k < n; k++) parts.push_back(f.Part(r));
+      f.Container(at, parts);
+      first.push_back(at);
+    }
+    f.Container(0, first);
+    std::vector<uint32_t> second;
+    for (uint32_t i = 0; i < 3; i++) {
+      f.Put(128 + 16 * i, r.Below(4) == 0 ? 0 : uint32_t(r.Next()));
+      second.push_back(128 + 16 * i);
+    }
+    f.Container(64, second);
+    const uint32_t flags = RandomFlags(r);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t files = memory::AllocPhysical(Files::kBytes, 0, 0xFFFFFFFFu, 0, 4);
+      f.Write(h.base, files);
+      Fill(h.base, set, 3824, 0);
+      guest::StoreU32(h.base, set + 32, flags);
+      guest::StoreU32(h.base, set + 3808, files);
+      guest::StoreU32(h.base, set + 3812, files + 64);
+      guest::StoreU32(h.base, cs::kPhysicalHeld, 0x10000000u);
+      PPCContext t = CallContext(h);
+      t.r6.u64 = set;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F22B8(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            t.r3.u64 = cs::CourseSetOnLoaded(h.base, calls, t.r1.u32, set);
+          });
+        }
+      });
+      Regions regions;
+      regions.AddXprBlocks(h.base, set + 64);
+      regions.AddModelBlocks(h.base, set + 96);
+      constexpr uint32_t kLists[] = {528, 1064, 1596, 2124, 2652, 3180};
+      std::vector<uint32_t> list_models;
+      for (uint32_t list : kLists) {
+        for (uint32_t model : ListModels(h.base, set + list)) {
+          list_models.push_back(model);
+          regions.Add(model, scenery_lists::kSceneryModelBytes, 432);
+        }
+      }
+      for (uint32_t model : list_models) regions.AddModelBlocks(h.base, model);
+      out[v].Word(t.r3.u32 - set);
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      out[v].Word(guest::LoadU32(h.base, set + 3808) - files);
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 - 96) - t.r1.u32);
+      // The second file's entries point into the freed block: as offsets.
+      for (uint32_t at : {3808u, 3812u, 1056u, 1060u, 1592u}) {
+        const uint32_t word = guest::LoadU32(h.base, set + at);
+        guest::StoreU32(h.base, set + at, word - files < Files::kBytes ? word - files : word);
+      }
+      regions.AddBytes(out[v], h.base, set, 3824);
+      regions.AddAll(out[v], h.base);
+      for (uint32_t model : list_models) FreeModel(h.base, model, true);
+      if (guest::LoadU32(h.base, set + 96) != 0) FreeModel(h.base, set + 96, false);
+      FreeXpr(h.base, set + 64);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+  memory::Free(allocation);
+  results.Report();
+}
+
 void CourseScenery(Context& h) {
   ObjectLeaves(h);
   Keys(h);
@@ -2794,6 +3039,8 @@ void CourseScenery(Context& h) {
   UpdateCases(h);
   UnloadCases(h);
   DestroyCases(h);
+  LoadCases(h);
+  CourseSetOnLoadedCases(h);
 }
 
 namespace {

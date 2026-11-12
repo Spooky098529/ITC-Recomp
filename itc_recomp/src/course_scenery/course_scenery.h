@@ -12,6 +12,8 @@
 
 #include <cstdint>
 
+#include "archive/archive.h"
+
 namespace scenery_lists {
 struct DrawCalls;
 }  // namespace scenery_lists
@@ -29,10 +31,16 @@ constexpr uint32_t kManager = 0x826C5514;
 // are), r1 = `frame` (the native function's frame, as the original's call
 // site has it, its back chain written) and the link register `lr` (the
 // original's return address); returns its r3.
+// `load`, when set, is Archive::Load for the pools' load slots' plain C++
+// (CourseSet::Load, AreaLights::Load, AreaModel::Load), which
+// ObjectPools::Load then calls directly; the adapters set it only where
+// those may run (the archive's native queue and the native heap). Without
+// it, the slots are called through `call`.
 struct Calls {
   void* user;
   uint32_t (*call)(void* user, uint32_t function, const uint32_t* args, int count, uint32_t frame,
                    uint32_t lr);
+  const archive::LoadCall* load = nullptr;
 };
 
 // --- Pool objects (PoolObject::; 40 bytes of header) ---
@@ -110,8 +118,8 @@ uint32_t Acquire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set
 uint32_t Find(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set, uint32_t pool,
               uint32_t key);
 // ObjectPools::Load (sub_820FBFD0): the object, when not 0, loaded through
-// its vtable's slot 1 (always through `calls`: no load is native); returns
-// it.
+// its vtable's slot 1 (the native loads directly when `calls.load` is set,
+// else through `calls`); returns it.
 uint32_t LoadObject(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set,
                     uint32_t pool, uint32_t index);
 // ObjectPools::Release (sub_820FC038): the object reset through its
@@ -415,6 +423,43 @@ uint32_t AreaModelParse(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 // chain written). Each returns the object (the r3 MarkLoaded leaves).
 uint32_t AreaLightsOnLoaded(uint8_t* base, uint32_t lights);
 uint32_t AreaModelOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
+
+// --- The pools' loads (their vtables' slot 1) and the course set's
+// callback ---
+//
+// Each queues its file through `load` (Archive::Load with r7 = r8 = 0) and
+// returns the r3 the original leaves: the last load's serial (-1 as li's,
+// else zero-extended), or the asset id it skipped (lwz's, zero-extended).
+
+// CourseSet::Load (sub_820F2520, slot 1 of 0x82006784): PoolObject::
+// ClearLoadFlags, +1056 = +1060 = 0; its two assets from the configuration's
+// area table ([[0x826C5514] + 36]: +12 the first, +8 the second); each not
+// negative: the first's block from AllocPhysical (its size by Archive::
+// AssetSize) at +3808, the second's from the object's data (AllocData) at
+// +3812; a negative one's word 0. Then each not negative loaded into its
+// word's block, the last of them with CourseSet::OnLoaded (0x820F22B8) and
+// the set as its context, the other with none. Only while
+// hooks::NativeHeapActive().
+uint64_t CourseSetLoad(uint8_t* base, uint32_t set, const archive::LoadCall& load);
+// AreaLights::Load (sub_820F22F8, slot 1 of 0x8200676C): ClearLoadFlags,
+// +80 = 0; the asset of list A's table entry (the manager's +140, count
+// +128, 12-byte entries: the area and model halfwords, the asset) whose
+// halfwords are the object's +84 and +86, else -1; its size (Archive::
+// AssetSize) taken from the object's data (AllocData) and the asset loaded
+// there with AreaLights::OnLoaded (0x820F1C30) and the object.
+uint64_t AreaLightsLoad(uint8_t* base, uint32_t lights, const archive::LoadCall& load);
+// AreaModel::Load (sub_820F23C0, slot 1 of 0x82006778): ClearLoadFlags,
+// +56 = +60 = 0; the asset of list B's table entry (+168, count +156) whose
+// halfwords are the object's +64 and +66, else -1, loaded into the shared
+// load buffer (the manager's +188) with AreaModel::OnLoaded (0x820F1CE8)
+// and the object.
+uint64_t AreaModelLoad(uint8_t* base, uint32_t model, const archive::LoadCall& load);
+// CourseSet::OnLoaded (sub_820F22B8, Archive::Load's callback; its frame 96
+// bytes below `stack`, the back chain written): CourseSet::Parse, the first
+// file's block (+3808) freed (FreePhysical), PoolObject::MarkLoaded.
+// Returns the set (the r3 MarkLoaded leaves). As the parses, only where
+// Model::Load's adapter runs natively, and with the native heap.
+uint32_t CourseSetOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set);
 
 // --- The pools' objects: made and reset ---
 //

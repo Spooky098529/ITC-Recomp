@@ -45,6 +45,13 @@ constexpr uint32_t kPoolObjectKey = 0x820FB9F0;
 constexpr uint32_t kAreaLightsKey = 0x820F1C20;
 constexpr uint32_t kAreaModelKey = 0x820F1CD8;
 constexpr uint32_t kPoolObjectReset = 0x820FB9D8;
+constexpr uint32_t kCourseSetLoad = 0x820F2520;
+constexpr uint32_t kAreaLightsLoad = 0x820F22F8;
+constexpr uint32_t kAreaModelLoad = 0x820F23C0;
+// The loads' callbacks.
+constexpr uint32_t kCourseSetOnLoaded = 0x820F22B8;
+constexpr uint32_t kAreaLightsOnLoaded = 0x820F1C30;
+constexpr uint32_t kAreaModelOnLoaded = 0x820F1CE8;
 
 // memcpy (sub_825A7410), for the copies c_runtime::Memcpy leaves to it.
 constexpr uint32_t kMemcpy = 0x825A7410;
@@ -316,9 +323,26 @@ uint32_t LoadObject(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
                     uint32_t pool, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820FBFD0 ObjectPools::Load");
   const uint32_t object = ObjectAt(base, pool * 24 + Load(base, set + 4), index);
-  if (object != 0) {
-    CallGuest(base, calls, stack, 96, 0x820FC01C, Load(base, Load(base, object) + 4), {object});
+  if (object == 0) {
+    return object;
   }
+  const uint32_t slot = Load(base, Load(base, object) + 4);
+  if (calls.load != nullptr) {
+    switch (slot) {
+      case kCourseSetLoad:
+        CourseSetLoad(base, object, *calls.load);
+        return object;
+      case kAreaLightsLoad:
+        AreaLightsLoad(base, object, *calls.load);
+        return object;
+      case kAreaModelLoad:
+        AreaModelLoad(base, object, *calls.load);
+        return object;
+      default:
+        break;
+    }
+  }
+  CallGuest(base, calls, stack, 96, 0x820FC01C, slot, {object});
   return object;
 }
 
@@ -1540,6 +1564,98 @@ uint32_t SceneryModelDestruct(uint8_t* base, const Calls& calls, uint32_t stack,
     parse.Call(0x820F1238, 0x825A70E8, {model});
   }
   return model;
+}
+
+// --- The pools' loads and the course set's callback ---
+
+namespace {
+
+// r3 as Archive::Load's adapter leaves a serial (-1 as li's).
+uint64_t SerialR3(int64_t serial) {
+  return serial < 0 ? ~uint64_t(0) : uint64_t(uint32_t(serial));
+}
+
+// The asset of a list's table entry (12 bytes: the area and model
+// halfwords, the asset) whose halfwords are `key`'s, else -1.
+uint32_t TableAsset(uint8_t* base, uint32_t table, uint32_t count, uint32_t key) {
+  const uint32_t area = guest::LoadU16(base, key + 0);
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t entry = table + 12 * i;
+    if (area == guest::LoadU16(base, entry + 0) &&
+        guest::LoadU16(base, key + 2) == guest::LoadU16(base, entry + 2)) {
+      return Load(base, entry + 4);
+    }
+  }
+  return 0xFFFFFFFFu;
+}
+
+}  // namespace
+
+uint64_t CourseSetLoad(uint8_t* base, uint32_t set, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820F2520 CourseSet::Load");
+  const uint32_t manager = Load(base, kManager);
+  ClearLoadFlags(base, set);
+  Store(base, set + 1056, 0);
+  Store(base, set + 1060, 0);
+  uint32_t assets[2];
+  uint32_t last = 0;
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t table = Load(base, manager + 36);
+    assets[i] = Load(base, table + (i == 0 ? 12 : 8));
+    if (int32_t(assets[i]) < 0) {
+      Store(base, set + 3808 + 4 * i, 0);
+      continue;
+    }
+    last = i;
+    const uint32_t size = archive::AssetSize(base, assets[i]);
+    if (i == 0) {
+      Store(base, set + 3808, AllocPhysical(base, size));
+    } else {
+      Store(base, set + 3812, AllocData(base, set + 4, size));
+    }
+  }
+  uint64_t r3 = 0;
+  for (uint32_t i = 0; i < 2; i++) {
+    r3 = assets[i];
+    if (int32_t(assets[i]) < 0) {
+      continue;
+    }
+    r3 = SerialR3(load(assets[i], Load(base, set + 3808 + 4 * i),
+                       i == last ? kCourseSetOnLoaded : 0, set));
+  }
+  return r3;
+}
+
+uint64_t AreaLightsLoad(uint8_t* base, uint32_t lights, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820F22F8 AreaLights::Load");
+  const uint32_t manager = Load(base, kManager);
+  ClearLoadFlags(base, lights);
+  Store(base, lights + 80, 0);
+  const uint32_t asset =
+      TableAsset(base, Load(base, manager + 140), Load(base, manager + 128), lights + 84);
+  const uint32_t data = AllocData(base, lights + 4, archive::AssetSize(base, asset));
+  return SerialR3(load(asset, data, kAreaLightsOnLoaded, lights));
+}
+
+uint64_t AreaModelLoad(uint8_t* base, uint32_t model, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820F23C0 AreaModel::Load");
+  const uint32_t manager = Load(base, kManager);
+  ClearLoadFlags(base, model);
+  Store(base, model + 56, 0);
+  Store(base, model + 60, 0);
+  const uint32_t asset =
+      TableAsset(base, Load(base, manager + 168), Load(base, manager + 156), model + 64);
+  return SerialR3(load(asset, Load(base, manager + 188), kAreaModelOnLoaded, model));
+}
+
+uint32_t CourseSetOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_820F22B8 CourseSet::OnLoaded");
+  const uint32_t frame = stack - 96;
+  Store(base, frame, stack);
+  CourseSetParse(base, calls, frame, set);
+  FreePhysical(base, Load(base, set + 3808));
+  MarkLoaded(base, set);
+  return set;
 }
 
 }  // namespace course_scenery
