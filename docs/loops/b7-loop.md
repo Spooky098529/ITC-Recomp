@@ -548,10 +548,16 @@ Calls so far for decisions the loop meets often:
   engine under the app's start-up, 2026-10-30).
 - An Xbox Live front-end mode the player can open (the type 12 mode,
   the network battle and time attack, `network-mode.md`): its screens
-  are made native as any front-end mode's, while its Xbox Live calls
-  (sign-in, gamer card, sessions, privileges, leaderboards) stay
-  recompiled through the SDK as now (no behavior change), for the core
-  later; not skipped at its entry (2026-11-12).
+  are made native as any front-end mode's, and its Xbox Live calls
+  (sign-in, gamer card, sessions, privileges, leaderboards, the network
+  manager's functions) are answered by plugging in data: the native
+  callers use the values the SDK's XAM imports return today (one
+  signed-in local user, no Live, as B5's `Network::Update` stub), with
+  no 360-style stand-ins; calls whose results aren't read are skipped
+  (Dropped), and nothing the game shows or does changes; not skipped at
+  its entry. Asked to minimize the code left recompiled (the user's
+  call, 2026-11-12, replacing the same day's "Live calls stay
+  recompiled").
 - Register leftovers a varargs callee stores (`UiMovie::SetText`
   `sub_8211C1F8` storing r7-r10 into its caller's frame, set or not by
   the call site): native callers pass 0 for the arguments they don't

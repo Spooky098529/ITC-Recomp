@@ -58,7 +58,10 @@ file's history. What's left to see in a drive, from every run:
   (0 errors, file listed). Its `stop:`: an Xbox Live mode the player
   can open. The user's call (2026-11-12, asked): port its screens
   natively, its Live calls left recompiled (no behavior change);
-  added to "Precedent first". Migration agent running.
+  then, the same day, changed by the user to minimize the code left
+  recompiled: the Live calls answered by plugging in the data the
+  SDK's answers give today; in "Precedent first", sent to the running
+  migration agent. Migration agent running.
 
 ## Done
 

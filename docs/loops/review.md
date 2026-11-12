@@ -20,7 +20,9 @@ When the user has reviewed a run's section, its heading gets
   the network manager's callees), marked "mapping only until the
   user's call" by the map; notes added to the `sub_8227B930` and
   menu-helpers leads. The user's call (2026-11-12): its screens made
-  native, its Xbox Live calls left recompiled (no behavior change).
+  native, and its Xbox Live calls answered by plugging in the data
+  the SDK gives today (first "left recompiled", changed the same day
+  to keep as little recompiled as possible).
 - The type 9 mode's map (0752af3f): `todays-result.md`, 57 new rows
   (31 in play, 26 "Not seen in play"): the career's end of the day,
   named from the debug strings `TXR_MenuTodaysResult` and
