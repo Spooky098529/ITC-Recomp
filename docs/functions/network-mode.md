@@ -1,0 +1,346 @@
+# Known functions: the type 12 mode (the network mode)
+
+The type 12 front-end mode (`ModeType12::`, the name ours): the game's
+**Xbox Live mode**, opened from the title's main menu
+(`TitleScreen::Destroy` leaves 15, which `ModeType4::NextMode` turns into
+type 12, [`title-screen.md`](title-screen.md)). Its first screen's update
+passes the string "TXR_NetworkModeSelect" to an empty function (a debug
+print stripped from the release, probably), and two other screens'
+updates "TXR_NetworkTaCourse" and "TXR_NetworkTaRanking"; the mode
+select's debug lines name its two items "NETWORK BATTLE" and "NETWORK
+TIME ATTACK" (the words at `[0x82637BA0]`, `0x820106D8` and
+`0x820106C4`). Its code calls the Live sign-in UI (`XShowSigninUI`), the
+gamer card and player review UIs (`XShowGamerCardUI`,
+`XShowPlayerReviewUI`), `XUserGetSigninState`, the network manager's
+sessions (`Session::IsActive` and the rest in
+[`system-services.md`](system-services.md)), a privilege check (probably
+`XUserCheckPrivilege` with 254, `XPRIVILEGE_MULTIPLAYER_SESSIONS`) and a
+ranking read whose debug strings are "NOW_ACS", "SUCCESS", "NO_ROWS",
+"FILED" (`0x82011A6C` on: probably the Live leaderboards' read). An Xbox
+Live feature: CLAUDE.md's "Map Xbox features, don't port" applies; this
+file maps it, and how its migration goes is the user's call (the map's
+report). The mode is 852 bytes like types 2, 4 to 7, 9 and 10 (made by
+`ModeType12::ModeType12` in [`game-modes.md`](game-modes.md)), released
+by `ModeType12::Release` `sub_82277DB0`
+([`front-end-screen-helpers.md`](front-end-screen-helpers.md)). It sets
+up its own race for the time attack (`NextMode`, below) and leaves for
+the race (mode 1), the career's garage (mode 2), the title (mode 4) or
+itself again (mode 12).
+
+Its vtable `0x82006C6C` has 13 slots: 0 `Init` `sub_82278058`, 1
+`Release`, 2 to 5 and 9 `Mode::NoNextMode` (`sub_8222FC90`), 6
+`NextMode` `sub_8227B930`, 7 `Mode::DeletingDestructor` (`sub_82106E38`;
+both in [`boot-mode.md`](boot-mode.md)), 8 `WaitForLoads`
+`sub_8227B440`, 10 `WaitForShown` `sub_8227B770`, 11 `LeaveScreen`
+`sub_8227B868` and 12 `Teardown` `sub_8227BE10` (reached through the
+slot thunks `Mode::SlotNThunk` in [`type2-mode.md`](type2-mode.md) and
+`Mode::NextModeThunk` `sub_82235C08` in `boot-mode.md`). Its +32 vtable
+`0x82006C60` (the three words before the main one) has three:
+`Interrupt` `sub_822785E0`, `ForceExit` `sub_822788D8` and `Resume`
+`sub_82278B98` (none seen in play).
+
+`Init` allocates the mode's block (135,208 bytes at +848, `VirtualAlloc`)
+with fourteen state machines, adds them to the mode's dispatcher in
+this order and opens each on its message (+9612 = 1, +9616 = 0). The
+block's +0x2100C is the shown machine's index, as `ModeType12::Machine`
+`sub_82277E10` numbers them (indexes 0 to 14; 2 is none):
+
+| Index | Block offset | Machine (`InitStates`) | UI movie (asset) | Globals |
+|---|---|---|---|---|
+| 0 | +0 | the mode select, `NetModeSelect::` (`sub_8227D680`) | 35 (22581) | `[0x82816190]` to `[0x82816198]` |
+| 1 | +9640 | `Type12Screen1::` (`sub_82276510`) | 33 (22580) and 34 (22589) | `[0x8281616C]` to `[0x82816184]` |
+| 3 | +19280 | `Type12Screen3::` (`sub_8225F330`) | 32 (22582) | `[0x828160E0]` to `[0x828160EC]` |
+| 4 | +28920 | the time attack's ranking, `NetRanking::` (`sub_822873A0`) | 36 (22590) | `[0x828161C4]` to `[0x828161D0]` |
+| 5 | +38560 | the time attack's course pick, `NetTaCourse::` (`sub_82281858`) | 37 (22593) | `[0x828161B4]` to `[0x828161C0]` |
+| 6 | +57840 | `Type12Screen6::` (`sub_82268410`) | 38 (22594) | `[0x82816154]` to `[0x8281615C]` |
+| 7 | +67500 | `Type12Screen7::` (`sub_8226EB40`) | 39 (22596) | `[0x82816160]` to `[0x82816168]` |
+| 10 | +77232 | `Type12Dialog10::` (`sub_82288600`) | 40 (22595) | `[0x828161D4]` to `[0x828161DC]` |
+| 11 | +86880 | `Type12Dialog11::` (`sub_82277B18`) | 41 (22597) | `[0x82816188]`, `[0x8281618C]` |
+| 8 | +96524 | `Type12Screen8::` (`sub_82262A88`) | 42 (22598) | `[0x82816144]`, `[0x82816148]` |
+| 9 | +106192 | `Type12Screen9::` (`sub_822646B0`) | 43 (22599) | `[0x8281614C]`, `[0x82816150]` |
+| 12 | +115888 | `Type12Dialog12::` (`sub_8227F6C8`) | 17 (22560) | `[0x828161A8]` to `[0x828161B0]` |
+| 13 | +125536 | `Type12Dialog13::` (`sub_8227EA50`) | 16 (22559) | `[0x8281619C]` to `[0x828161A4]` |
+| 14 | +48200 | the power graph screen (`PowerGraphScreen12::InitStates` `sub_821B96B8`) | 9 (22550) | `type2-screens.md`'s |
+
+All have the type 2 mode's shape (`type2-screens.md`'s intro: keys
+(state, message, 0, 0), member function functors over vtable
+`0x82011918`, r3 the machine and r4 the mode's dispatcher (+36), whose
+message ring at +204, the mode's +240, the handlers post to): (0, 1)
+`Create` → 1 or 9, (1, 1) → 2 `OpenMovie`, (2, 1) `WaitForMovie` → 4 or
+9, a (9, n) or (8, n) open, (4, 1) → 5 `Start`, in 5 Draw (message 1)
+runs a page and Update (message 0) a transition, (5, 20 + index) →
+8 `Unload`, (8, 3), (5, 4), (9, 4) and (10, 4) `Leave` → 7, (7, 4) → 6
+`Destroy`. Machines 6 to 13 get their ten common transitions from one of
+eight base Inits (`NetScreen::InitBase` `sub_8227B3E0` picks it by the
+index) and add their own after; their machines are longer than 9,640
+bytes (words from +9640 on). Each machine's three globals (or two) are
+`VirtualAlloc`ed by its `Create` and freed by its `Destroy`: a page
+object (28 bytes, laid out as the title screen's: +0 the page `Draw`
+runs, -1 while a transition runs; +4 the page after; +8 the page before;
++12 the transition `Update` runs, -1 none; +16 the one queued after it;
++20; +24 the transition's started word), a menu (68 bytes,
+`Menu::Step`'s and `Menu::Pressed`'s, [`menu-helpers.md`](menu-helpers.md):
++0 the item, +16 the count) and the screen's data. `Destroy`'s state
+says what comes next: 14 (data +4 set, or the machine's +9624 1: back,
+to the title), 15 (+9632 1: the mode again), 11 (machine 7's +9628, the
+race) or 6. The machines' `WaitForMovie` print "Now Loading" every 15
+ticks (counters at `0x828160EC`, `0x82816184`, `0x828161C0`); machines
+3, 4 and 5 open their own movies but wait for movie 33 (machine 1's).
+
+The flow: `Init` picks the first screen from the mode before
+(`[0x826032E0]`) and the network's state: back from the race (type 1)
+with a session (`[0x82816E3C]`) whose +244 is set, the ranking (4); its
++240 set, screen 3; back from the race with `[0x8281611C]` 0, screen 9
+(probably the battle's results: its `WaitForMovie` prints "***** RESULT
+LOAD WAIT EVENT *****"); `[0x8281611C]` 1, screen 7; else the mode
+select (0). `WaitForLoads` runs the loading screen until every movie is
+loaded and the sound bank 1 isn't loading, posts the first screen's
+open message (0: 5, 3: 9, 4: 10, 7: 13, 9: 15) with a cue, and turns
+the sign-in watch's "not on Live" check on (`[0x826BAB40]` +16 = 0,
+[`mode-tick.md`](mode-tick.md)); then `NextMode` runs each tick (Draw
+and Update queued, the shown machine found by `FindShown`): its state 8
+goes through `LeaveScreen` (message 3) and `WaitForShown` back to
+`NextMode`; 10 queues message 4; screen 7, 4 or 5 in state 11 answers
+the race (screen 5's after setting up the time attack's race:
+`RaceData::ResetGlobal`, the race data's +0xA3AF0 = 6 and +0xA3AF4 = 7,
+the route at `[0x82816660]` with 48, the player's car from 1,884 bytes
+at `0x82816688`, a stage of type 1, `Race::PlaceRacers`); 13 answers 2
+(the garage), 14 and 6 answer 4 (the title), 15 answers 12; then
+`Teardown` stops the screen's cue, waits for the stand scene's teardown
+(`StandScene::PollTeardown`, [`type6-type7-modes.md`](type6-type7-modes.md))
+and hands the answer over.
+
+The mode select (`NetModeSelect::`, UI movie 35): a two-item menu
+(strings 935 and 936). Item 0 (the network battle) → page 4: with a
+signed-in Live user (`SaveSlots::State(0)` and player 1's controller bit
+in the Live mask `[0x826C795C]`), the privilege check (`sub_8214F620(…,
+254)`) passing → page 2 (leave: message 20, the mode's next screen by
+`Unload`'s (8, 3): the menu item 0 opens screen 1 with message 6) after
+the fade out; failing → message 18 with `[0x828161B0]` = 10 (dialog 12);
+not signed in → message 19 with `[0x828161A4]` = 7 (dialog 13). Item 1
+(the time attack) → `sub_822926B8` (not read), page 5: the same checks,
+the privilege's answer kept in `[0x82816E3C]` +228, then page 2 (screen 1
+with message 7). Back → `FadeOut`, page 8 (data +4 and +8 = 1, message
+4: the mode leaves for the title). Pages 6 and 7 show the Live sign-in
+UI (`XShowSigninUI(1, 2)`) and wait ten ticks for a signed-in Live user
+(none of 4 to 8 but 8 seen).
+
+In play (`../coverage.md`) the mode's Init, its load wait, `NextMode`,
+`Teardown`, every machine's `Create`, `OpenMovie`, `WaitForMovie`,
+`Leave` and `Destroy`, and the mode select's start, menu page, cursor and
+fade out with the way back to the title were seen: a session that opened
+the mode and backed out. The mode select's items, the sign-in UI, the
+other screens' pages and transitions, the dialogs and the time attack's
+race weren't (their handlers are leads in `../loops/leads.md`).
+
+Names are ours. Read 2026-11-12 by the B7 loop's mapping agent: the
+mode's functions (the helpers its +32 slot 0 calls not read), the fourteen `InitStates`
+and the eight base Inits (their transition tables extracted from their
+functor stores), every machine's set-up and teardown handlers and the
+mode select's handlers, pages and transitions in full. Not mapped here
+(the map's limit): the other machines' starts, pages, transitions and
+replies and their helpers (`8225DF98`-`82288550` without this file's
+rows; leads). Fields and globals: `../known-data.md`'s "type 12 mode
+block", `0x828160E0` to `0x828161DC` and `0x82816660` to `0x82816E3C`.
+Shared, with rows elsewhere: `ModeType12::Release`
+(`front-end-screen-helpers.md`), `ModeType12::ModeType12`
+(`game-modes.md`), `ScreenMachine::Wait` `sub_82277068` (machines 10 to
+13's (8, 3); `type6-type7-modes.md`), the power graph screen's handlers
+(`PowerGraphScreen::`, [`type2-screens.md`](type2-screens.md); its Update
+`sub_821B8F60` in [`power-graph.md`](power-graph.md)), `PanelScreen::OnNo`
+and `OnYes` (`sub_822609D0`, `sub_822609E0`, screen 8's (5, 39) and
+(5, 40); [`type67-screens.md`](type67-screens.md)), `sub_8211AD00` (a
+screen's start), `UiMovies::Open`, `Find`, `IsLoaded`, `Delete`,
+`UiMovie::Run`, `FinishAll`, `PlayNamed`, `FinishNamed`, `LoopLast`,
+`FindNode`, `ResetPose`, `SetText`, `ScrollText`, `sub_8211C5F8`,
+`SetNodeTexture`, `HideNode` ([`ui-movies-game.md`](ui-movies-game.md)),
+`Strings::Load` and `Archive::WaitIdle`
+([`files-and-saves.md`](files-and-saves.md), [`archive.md`](archive.md)),
+`VirtualAlloc` and `VirtualFree` ([`heap.md`](heap.md)),
+`ScreenFades::FadeIn` and `FadeOut` (`mode-tick.md`),
+`StateMachine::Add` and `GameMessages::Dispatch` (`game-modes.md`),
+`LoadingScreen::Show`, `Run` and `Finish`
+([`race-loading.md`](race-loading.md)), `StandScene::Create` and
+`PollTeardown` (`type6-type7-modes.md`), `GarageCar::Reset`
+([`car-makers.md`](car-makers.md)), `Menu::Step` and `Menu::Pressed`
+(`menu-helpers.md`), `MenuSound::Play` and `Sound::Play`
+([`menu-sounds.md`](menu-sounds.md)), the sound manager's
+`IsBankLoading` and `StopCue` ([`sound-cues.md`](sound-cues.md)),
+`SaveSlots::State` ([`save-interface.md`](save-interface.md)),
+`XShowSigninUI` (`system-services.md`), under `NextMode`
+`RaceData::ResetGlobal`, `Race::SetRoute`, `Stages::SetRoute`,
+`Car::Init`, `Race::AddRacer`, `Stages::AddRacer`, `Race::AddStage`,
+`Race::PlaceRacers` ([`race-setup.md`](race-setup.md)), `sub_820FF918`
+and `sub_820FF968` ([`vehicle-accessors.md`](vehicle-accessors.md)),
+`Car::Refresh` ([`car-specs.md`](car-specs.md)), `memcpy`
+([`c-runtime.md`](c-runtime.md)), the empty `sub_82106540`
+([`audio.md`](audio.md)) and the slot thunks (`type2-mode.md`,
+`boot-mode.md`). Not in a file yet (a lead): `sub_8214F620`,
+`sub_822926B8`, `sub_82292710`. Nothing in `itc_recomp/src` hooks this
+file's functions (checked 2026-11-12).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82278058` | `ModeType12::Init` | | Slot 0 of vtable `0x82006C6C`, from `Modes::Tick` once the mode is made: r3 = the mode. A 224-byte frame (`__savegprlr_21`). `sub_8211AD00` (a screen's start); `Strings::Load([0x826C5C34], 59)` (`ModeType12::Release` releases the same); `Archive::WaitIdle`; `StandScene::Create(1)`; mode +848 = `VirtualAlloc(0, 135208, 0x1000, 4)` (no check for 0); `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`; the fourteen `InitStates` on the block's +0, +9640, +19280, +28920, +38560, +57840, +67500, +77232, +86880, +96524, +106192, +115888, +125536 and +48200, then the same fourteen added to the dispatcher (+36: handler [count +200] = the machine, the count up by one each) in that order. The first screen into block +0x21010 and +0x2100C: `[0x826032E0]` (the mode before) 1 with the session `[0x82816E3C]` set and its +244 set → 4, its +240 set → 3; else 1 with `[0x8281611C]` 0 → 9; else `[0x8281611C]` 1 → 7; else 0. Every machine's +9612 = 1 and +9616 = 0 (some through frame words). `LoadingScreen::Show`; `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)` again; the delegate: mode +8 = {`0x82010FA0`, the mode, `0x8223D4B0` (`Mode::Slot8Thunk`: `WaitForLoads`), 0}, +4 = +8 (the original's null check can't fail); block +0x21024 = 0. Seen in play. Read in full. |
+| `sub_8227B440` | `ModeType12::WaitForLoads` | | Slot 8, the delegate's function set by `Init`, from `ModeDelegate::Invoke` every tick: r3 = the 8-byte answer, r4 = the mode. A 176-byte frame (`__savegprlr_27`). The answer cleared (byte +0, word +4); `LoadingScreen::Run(-1)`. When `AllLoaded(block)` answers 1 and the sound manager's (`[0x826C5C80]`) slot 6 (`IsBankLoading`, bank 1) answers 0: `LoadingScreen::Finish(-1)`; by the first screen (+0x2100C): 0 → message 5 (the mode select's (9, 5)), 3 → 9, 4 → 10, 7 → 13 (each with `Sound::Play(&1, &1)`; 7 with cue 3), 9 → 15 (no cue), then `[0x826BAB40]` +16 = 0 (the sign-in watch's "not on Live" check on; others: neither); `ScreenFades::FadeOut(1, 0, 0, 0, 0)` (r3 = 1, not a fade table); the delegate = {`0x82010FA0`, mode, `Mode::NextModeThunk` `0x82235C08`, 0}. Every call: message 1 (Draw) queued (ring at mode +240: count +600, start +604, 50 entries of (message, 0, 0)) and `GameMessages::Dispatch(mode + 36)`. Returns r3. Seen in play. Read in full. |
+| `sub_8227B930` | `ModeType12::NextMode` | | Slot 6, from `Mode::NextModeThunk` every tick once loaded: r3 = the answer, r4 = the mode. A 4,112-byte frame (`__savegprlr_20`; the time attack's car built in it). The answer cleared; `FindShown(block)`; the shown machine (`Machine(block, +0x2100C)`) in state 8 → the delegate's function = `0x8222FC60` (`Mode::Slot11Thunk`: `LeaveScreen`); in state 10 → message 4 queued. Then messages 1 (Draw) and 0 (Update) queued (no system UI check) and `GameMessages::Dispatch(mode + 36)`. After it: screen 7 (+77104) or 4 (+38524) in state 11 → the answer = {byte 1, three frame bytes, word 1} (the race); screen 5 (+48164) in state 11 → the time attack's race set up first: `RaceData::ResetGlobal`; the race data (`[0x826C5B2C]`) +0xA3AF0 = 6, +0xA3AF4 = 7; `Race::SetRoute([0x82816660], 48)`; `Stages::SetRoute(race data + 0x59620, [0x82816660], 48, -1)`; with `[0x82816680]` set, `sub_820FF918` with r3 = 2, 1 or 3 when `[0x82816684]` is 1, 2 or another value; `Car::Init(frame + 96)`, `memcpy(frame + 96, 0x82816688, 1884)`, its +3892 = `[0x82816E38]`, `Car::Refresh`, `Race::AddRacer(car, [0x82000A34], 0, 0)`, `Stages::AddRacer(race data + 0x59620, 0, 2, -1)`, `Race::AddStage(1)`, `sub_820FF968([0x82816684])`, `Race::PlaceRacers`; the session `[0x82816E3C]` +240 = 0 and +216 = `[0x82816694]`; the answer 1 (the race). Else by the shown machine's state: 13 → 2 (the garage); 14 → 4 (the title) with `[0x826364EC]` = (block +0x21024 not 0) and `sub_82292710`; 15 → 12 (the mode again); 6 → 4. Each answer at block +0x21014 (8 bytes) with the delegate's function = `0x8222FC70` (`Mode::Slot12Thunk`: `Teardown`). Returns r3. Seen in play. Read in full. |
+| `sub_8227B868` | `ModeType12::LeaveScreen` (probably) | | Slot 11, the delegate's function for one tick after `NextMode` saw the shown machine in state 8: r3 = the answer, r4 = the mode. A 128-byte frame. The answer cleared; `FindShown(block)`; message 3 queued alone, `GameMessages::Dispatch(mode + 36)`; the delegate's function = `0x8223D4A0` (`Mode::Slot10Thunk`: `WaitForShown`). Returns r3. As `ModeType10::LeaveScreen`. Not seen in play. Read in full. |
+| `sub_8227B770` | `ModeType12::WaitForShown` (probably) | | Slot 10, after `LeaveScreen`: r3 = the answer, r4 = the mode. A 112-byte frame. The answer cleared; `FindShown(block)`; when the shown machine's +9608 (its movie loaded) is 1, the delegate's function = `Mode::NextModeThunk` again; message 1 (Draw) queued and `GameMessages::Dispatch(mode + 36)`. No loading screen (unlike `ModeType10::WaitForShown`). Returns r3. Not seen in play. Read in full. |
+| `sub_8227BE10` | `ModeType12::Teardown` (probably) | | Slot 12, through `Mode::Slot12Thunk` (set by `NextMode` with its answer): r3 = the answer, r4 = the mode. A 144-byte frame (`__savegprlr_27`). The answer cleared; the sound manager's slot 13 (`StopCue`) with bank 1 and cue 3 when the shown machine is 7, else cue 1; messages 1 and 0 queued, `GameMessages::Dispatch(mode + 36)`; `StandScene::PollTeardown`; when it answers 1: the answer = block +0x21014's 8 bytes, and with `[0x82816E3C]` set and block +0x21024 set, `sub_82292710`. Returns r3. Seen in play. Read in full. |
+| `sub_822785E0` | `ModeType12::Interrupt` (probably) | | The +32 vtable's (`0x82006C60`) slot 0: r3 = the mode + 32 (its +816 the block), r4 = a reason. A 128-byte frame (`__savegprlr_27`). Until `AllLoaded` answers 1: the shown machine's +9636 = 1, 0 returned. Then `FindShown`, the mode select's data (`[0x82816198]`) +32 = 0, and by which machine is running (its state, block offset + 9604): the ranking in state 5 with its data's +12 0 → message 43 posted (ring at r3 + 208), 0 returned; dialog 10 in state 5 → the shown machine's +9636 = 1, 0 returned; dialog 13, then dialog 11 in state 5 → message 37 posted and `sub_8227E7C8(dialog 13)` or `sub_822778C0(dialog 11)` (not read); dialog 12 not in state 9 → message 37 and `sub_8227F480(dialog 12)` (not read); a helper's answer other than 1 → the shown machine's +9636 = 1 and that answer returned. Else (or with dialog 12 in state 9): with the shown screen 7 or 9 `sub_82260800` (not read); by r4: 0, 1 or 4 → the shown machine's +9624 = 1 and block +0x21024 = 1, else its +9632 = 1; its +9636 = 0; 1 returned. Not seen in play. Read in full; its helpers not read. |
+| `sub_822788D8` | `ModeType12::ForceExit` (probably) | | The +32 slot 1: r3 = the mode + 32. A 240-byte frame (`__savegprlr_25`). The sound manager (`[0x826C5C80]`): when bank 1 isn't loading (slot 6, `IsBankLoading`), for its cues 0 to 3 in turn `IsCuePlaying` (slot 14) and, when playing, `StopCue` (slot 13); with screen 9 (block +115796) in state 5 the same for bank 2's cue 0 when that bank isn't loading, then slot 5 (`ReleaseBank`) on bank 2. Then `sub_82292710`; block +57804 (the power graph screen's state) = 9; message (the shown index + 20) posted (the shown machine's `Unload`); the shown machine's state = 10. Not seen in play. Read in full. |
+| `sub_82278B98` | `ModeType12::Resume` (probably) | | The +32 slot 2: r3 = the mode + 32: the shown machine's +9632 = 0; message 44 posted (ring at r3 + 208). A 96-byte frame. Not seen in play. Read in full. |
+| `sub_82277EE0` | `ModeType12::AllLoaded` (probably) | | r3 = the block: 1 when all fourteen machines' +9608 (movie loaded) are set (+0, +9640, +19280, +28920, +38560, +57840, +67500, +77232, +86880, +96524, +106192, +115888, +125536, +48200, in that order), else 0. Leaf. From `WaitForLoads` and `Interrupt`. Seen in play. Read in full. |
+| `sub_82277FF0` | `ModeType12::FindShown` (probably) | | r3 = the block: for r4 0 to 14 the machine (`Machine`); the first in state 5 or 4 (running or starting) → block +0x2100C = r4, and the loop ends (the first wins, unlike `ModeType10::FindShown`); none: +0x2100C kept. A 96-byte frame. From `NextMode`, `LeaveScreen`, `WaitForShown` and `Interrupt`. Seen in play. Read in full. |
+| `sub_82277E10` | `ModeType12::Machine` (probably) | | r3 = the block, r4 = an index: the machine's address, by a jump table: 0 the block (through `sub_82277E44`), 1 +9640, 2 0 (none), 3 +19280, 4 +28920, 5 +38560, 6 +57840, 7 +67500, 8 +96524, 9 +106192, 10 +77232, 11 +86880, 12 +115888, 13 +125536, 14 +48200; above 14, 0. Leaf. From `NextMode`, `WaitForShown`, `FindShown`, `Interrupt` and `Resume`. Seen in play. Read in full. |
+| `sub_82277E44` | | | The jump table's case 0 of `ModeType12::Machine` (its own entry point, the address of a branch inside it): r3 (the block) returned as the machine. Leaf. From `Machine` only. Seen in play. Read in full. |
+| `sub_8227B3E0` | `NetScreen::InitBase` (probably) | | r3 = a machine, r4 = its index (6 to 13), r5 = the machine (moved into r4): tail-calls the base Init by the index from a jump table: 6 `sub_8227B41C` (a jump to `Type12Screen6::InitBase`), 7 `Type12Screen7::InitBase`, 8 `Type12Screen8::InitBase`, 9 `Type12Screen9::InitBase`, 10 `Type12Dialog10::InitBase`, 11 `Type12Dialog11::InitBase`, 12 `Type12Dialog12::InitBase`, 13 `Type12Dialog13::InitBase`; other indexes nothing. Leaf. From the eight machines' `InitStates`. Seen in play. Read in full. |
+| `sub_8227B41C` | | | Case 6 of `NetScreen::InitBase`: a jump to `Type12Screen6::InitBase` (`sub_82278C20`). Seen in play. Read in full. |
+| `sub_8227B43C` | | | An empty function (`blr`) after `NetScreen::InitBase`'s cases. No direct callers. Not seen in play. Read in full. |
+| `sub_8227D680` | `NetModeSelect::InitStates` | | r3 = the machine at the type 12 block's +0: 17 transitions (`StateMachine::Add`, functors over vtable `0x82011918`, a 1,232-byte frame): (0, 1) `Create`; (1, 1) → 2 `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) → 5 `Start`; (5, 1) `Draw`; (5, 0) `Update`; (5, 39) `OnNo`; (5, 40) and (5, 41) `OnYes`; (5, 38) `OnDialogClosed`; (5, 20) → 8 `Unload`; (8, 3) `Unloaded`; (9, 5) `Open`; (5, 4), (9, 4) and (10, 4) `Leave`; (7, 4) → 6 `Destroy`. Only caller `ModeType12::Init`. Seen in play. Read for its keys, handlers and next states. |
+| `sub_8227C398` | `NetModeSelect::Create` | | (0, 1), r3 = the machine: +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x82816190]` (the page object: +0, +4, +8, +24 = 0, +12 and +20 = -1), 68 → `[0x82816194]` (the menu: +12 0, +16 1, +20 1, the rest 0), 36 → `[0x82816198]` (the data: +0, +4, +8, +12, +16, +28 = 0, +20 and +24 = -1, +32 = 1; no checks for 0); +9624, +9628, +9632 = 0; state 1 with +9612 set, else 9. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8227C078` | `NetModeSelect::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(35, 22581)`. Leaf. Seen in play. Read in full. |
+| `sub_8227C558` | `NetModeSelect::WaitForMovie` | | (2, 1), r3 = the machine: while +9608 is 0, `UiMovies::IsLoaded(35)` nonzero sets it to 1; once set, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_8227C5C8` | `NetModeSelect::Open` | | (9, 5), r3 = the machine (`WaitForLoads` posts 5 when the mode select is first): with +9608 set, the page object: +8 = +0 unless 0, +12 = 4 when the data's +0 is set (shown before), else 0 (`Intro`), +16 = 1 (`ShowCursor` after), +4 = 0 (the menu page), +0 = -1; state 4. With +9608 0: state 1 (the movie opened again). Leaf. Seen in play. Read in full. |
+| `sub_8227D300` | `NetModeSelect::Start` | | (4, 1): `SetUp`; the data's +28 = 0; the page object reset (+0, +4, +8, +24 = 0, +12, +20 = -1), then +12 = 0 (`Intro`), +16 = 1 (`ShowCursor`), +4 = 0, +0 = -1 (+8 = +0 when it isn't 0, never here). A 96-byte frame. Seen in play. Read in full. |
+| `sub_8227CCE0` | `NetModeSelect::SetUp` | | No arguments: movie 35 (`UiMovies::Find` on `0x826C5CCC`): `UiMovie::ResetPose`; the menu (`[0x82816194]`) reset as `Create` makes it; `SetText(movie, 4, 5, 298)`, `SetText(movie, 4, 6, 299)`, `SetText(movie, 1, 0, 935)`, `ScrollText(movie, 1, 0, 1)`, `sub_8211C5F8(movie, 1, 0)`, `SetNodeTexture(movie, 0, 4, 0)`, `(0, 5, 0)`, `(0, 6, 1)`, `(0, 7, 1)`, `HideNode(movie, 0, 2)` and `(0, 10)`; the data +0 = 1, +4 = 0, +32 = 1. A 128-byte frame (`__savegprlr_29`). Only caller `Start`. Seen in play. Read in full. |
+| `sub_8227D248` | `NetModeSelect::Draw` | | (5, 1), r4 = the dispatcher: runs the page `[0x82816190]` +0 (nothing at -1) from a table built on the frame, with r3 = the dispatcher and r4 = the machine: 0 `MenuPage` `sub_8227C658`, 1 and 3 the empty `sub_82106540` (`audio.md`), 2 `LeavePage` `sub_8227C970`, 4 `BattlePage` `sub_8227C9F0`, 5 `TimeAttackPage` `sub_8227CB38`, 6 `SignInPage` `sub_8227C088`, 7 `SignInPage2` `sub_8227C210`, 8 `BackPage` `sub_8227CC78` (no bound check). A 160-byte frame; one indirect call. Seen in play. Read in full. |
+| `sub_8227D4E8` | `NetModeSelect::Update` | | (5, 0): the empty `sub_82106540(100, 30, 0, 0x82011954)` (the string "TXR_NetworkModeSelect"), then for the two words at `[0x82637BA0]` ("NETWORK BATTLE", "NETWORK TIME ATTACK") `sub_82106540(150, 50 + 15i, 0, "%s", word)` and `sub_82106540(135, 50 + 15 × the menu's item, 0, "*")` (a debug menu's lines, probably); movie 35. With the page object's +12 -1: `UiMovie::Run(movie, 0)`. Else for +12 0 to 4 the transition from a table on the frame (0 `Intro` `sub_8227CE50`, 1 `ShowCursor` `sub_8227D138`, 2 `MoveCursor` `sub_8227D380`, 3 `FadeOut` `sub_8227D088`, 4 `FadeIn` `sub_8227CFA8`; no upper bound check) with r3 = the page object + 24 (the started word); when it answers nonzero (or at once for a negative +12 other than -1): with +16 -1, +0 = +4 (the page after) and +12 = -1; else +12 = +16, +16 = -1, +20 = 0; then +24 = 0. A 160-byte frame (`__savegprlr_28`); one indirect call. Seen in play. Read in full. |
+| `sub_8227C658` | `NetModeSelect::MenuPage` (probably) | | Page 0, r3 = the dispatcher: `Menu::Step([0x82816194])`; `Menu::Pressed(menu, 159)` (accept): `MenuSound::Play(0)`; item 0 (the network battle) → `[0x82816180]` +8 = 1 (screen 1's data), jump to page 4 (+8 = the page unless 4, +0 = 4, +12 = -1); item 1 (the time attack) → `[0x82816180]` +8 = 1, `sub_822926B8` (not read), jump to page 5; else `Menu::Pressed(menu, 158)` (back): `MenuSound::Play(2)`, +8 = the page unless 8, +0 = -1, +12 = 3 (`FadeOut`), +4 = 8 (`BackPage` after). Then with the menu's +8 set (the item moved): `MenuSound::Play(4)`, +12 = 2 (`MoveCursor`), +4 = 0, +0 = -1. The jumps' and the move's +16 = -1. A 112-byte frame (`__savegprlr_29`). Menu items' strings 935 and 936 (`SetUp`, `MoveCursor`). One of the menu helpers' callers (`menu-helpers.md`). Seen in play (back only, probably). Read in full. |
+| `sub_8227C970` | `NetModeSelect::LeavePage` (probably) | | Page 2, r3 = the dispatcher: jump to page 3 (+8 = the page unless 3, +0 = 3, +12 and +16 = -1), message 20 posted (the mode select's (5, 20) `Unload`). Leaf. Not seen in play. Read in full. |
+| `sub_8227C9F0` | `NetModeSelect::BattlePage` (probably) | | Page 4, r3 = the dispatcher. With `SaveSlots::State(0)` nonzero and player 1's controller's bit (`[0x826BABA4]`) in `[0x826C795C]` (the Live mask, 0 since B5): `sub_8214F620([0x826BABA4], 254)` (probably `XUserCheckPrivilege`, 254 the multiplayer sessions privilege; not read) nonzero → +8 = the page unless 2, +12 = 3 (`FadeOut`), +0 = -1, +4 = 2 (`LeavePage` after); zero → the data (`[0x82816198]`) +16 = 1, `[0x828161B0]` = 10, message 18 posted (dialog 12's open). Without a Live user: `[0x828161A4]` = 7, message 19 posted (dialog 13's open). After either message, jump to page 3 (+8 = the page unless 3, +0 = 3, +12 = -1). +16 = -1. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8227CB38` | `NetModeSelect::TimeAttackPage` (probably) | | Page 5, r3 = the dispatcher: without `SaveSlots::State(0)` or the Live bit (as `BattlePage`): `[0x828161A4]` = 7, message 19 posted, jump to page 3. Else the session `[0x82816E3C]` +228 = 1 when `sub_8214F620([0x826BABA4], 254)` answers nonzero, else 0 (no check for a null session), then +8 = the page unless 2, +12 = 3 (`FadeOut`), +0 = -1, +4 = 2 (`LeavePage`). +16 = -1. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8227C088` | `NetModeSelect::SignInPage` (probably) | | Page 6. With neither `[0x826C7960]` nor `[0x826C7964]` set (no system UI up, probably): the first time (the data's +12 0) `XShowSigninUI(1, 2)` and +12 = 1; then with `SaveSlots::State(0)` and the Live bit (as `BattlePage`), the data's +28 counts to 10, then 10 kept and the page → 5 (`TimeAttackPage`) when the data's +32 is set, else 0 (+8 = the page unless that one, +12 and +16 = -1); without them, after 10 counts with +12 set: +12 = 0 and the page → 0. With the system UI up: +28 = 0. Reached through `OnNo` (the data's +20 = 6 or 7) and `OnDialogClosed`. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_8227C210` | `NetModeSelect::SignInPage2` (probably) | | Page 7: as `SignInPage` with page 4 (`BattlePage`) instead of 5. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_8227CC78` | `NetModeSelect::BackPage` (probably) | | Page 8, r3 = the dispatcher: the data's +8 = 1 and +4 = 1 (back to the title: `Unloaded` and `Destroy` read them), message 4 posted (leave). Leaf. Seen in play. Read in full. |
+| `sub_8227CE50` | `NetModeSelect::Intro` | | Transition 0, r3 = the started word: movie 35; the first time `UiMovie::PlayNamed(movie, 48, 0, 0, 0, 0)`, `PlayNamed(movie, 46, ...)`, `LoopLast`, `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)` and the word = 1; `UiMovie::Run(movie, 0)`; when the fades' words `[0x826A50E4]` and `[0x826A50DC]` are both 0 and `Run` answered 0: `PlayNamed(movie, 43, ...)`, `LoopLast`, the menu reset (as `Create`'s), returns 1; else 0. A 128-byte frame (`__savegprlr_29`). Seen in play. Read in full. |
+| `sub_8227D138` | `NetModeSelect::ShowCursor` (probably) | | Transition 1: the first time `PlayNamed(movie 35, the menu's item + 5, ...)`, `LoopLast` and the word = 1; `UiMovie::Run(movie, 0)`; returns 1. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8227D380` | `NetModeSelect::MoveCursor` (probably) | | Transition 2: the first time, from the menu (`[0x82816194]`: +0 the item, +4 the one before, +8 the move's direction): `FinishNamed` on the old item + 5 and the new item + 5, `PlayNamed` on the new item + 5 and `LoopLast`, `FinishNamed` 15 and 16; by the direction: -1 → `SetCursorY(20)` when going from 0 to 1, else `PlayNamed` 15; 1 → `SetCursorY(0)` when going from 1 to 0, else `PlayNamed` 16; `SetText(movie, 1, 0, 935 + the item)`, `ScrollText(movie, 1, 0, 1)`, `sub_8211C5F8(movie, 1, 0)`; the word = 1. Then `UiMovie::Run(movie, 0)`; returns 1. A 144-byte frame (`__savegprlr_26`). Not seen in play. Read in full. |
+| `sub_8227D1D8` | `NetModeSelect::SetCursorY` (probably) | | r3 = an integer: movie 35's node (`UiMovie::FindNode(movie, 4, 0)`) +16 = the integer as a float. A 112-byte frame (f31 saved). Only caller `MoveCursor`. Not seen in play. Read in full. |
+| `sub_8227D088` | `NetModeSelect::FadeOut` | | Transition 3: the first time `ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0)` and the word = 1; `UiMovie::Run(movie 35, 0)`; returns 1 when the fades' words `[0x826A50E4]` and `[0x826A50DC]` are both 0, else 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8227CFA8` | `NetModeSelect::FadeIn` (probably) | | Transition 4 (the reopen's first, `Open`): the first time `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)` and the word = 1; `UiMovie::Run(movie 35, 0)`; when the fades are done the menu reset (as `Create`'s) and 1 returned, else 0. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_8227BF80` | `NetModeSelect::OnNo` (probably) | | (5, 39), a dialog's answer: the data (`[0x82816198]`) +20 = 7 (`SignInPage2`) when the menu's item is 0, else 6 (`SignInPage`); +24 = -1 (the page to go to when the dialog closes). Leaf. Not seen in play. Read in full. |
+| `sub_8227BFB8` | `NetModeSelect::OnYes` (probably) | | (5, 40) and (5, 41): the data's +20 = 0 (the menu page), +24 = -1. Leaf. Not seen in play. Read in full. |
+| `sub_8227BFD8` | `NetModeSelect::OnDialogClosed` (probably) | | (5, 38): with the data's +16 set (the privilege dialog) and the menu's item 0: +20 = 0, +24 = -1. Then the page object from the data's +20 (the page) and +24 (a transition): +8 = +0 when +20 isn't it; +24 -1 → +0 = +20, +12 = -1; else +12 = +24, +4 = +20, +0 = -1; +16 = -1; the data's +20, +24 = -1 and +16 = 0. Leaf. Not seen in play. Read in full. |
+| `sub_8227C7A8` | `NetModeSelect::Unload` | | (5, 20) → 8, r3 = the machine: `UiMovie::FinishAll` on movie 35; with +9616 set, `UiMovies::Delete(35)` and +9608 = 0 (not in play: +9616 is 0). A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8227C810` | `NetModeSelect::Unloaded` (probably) | | (8, 3), r3 = the machine, r4 = the dispatcher: with the data's +8 set → state 14 (back to the title). Else by the menu's item: 0 → message 6, 1 → message 7 (screen 1's two opens), each with `[0x826BAB40]` +16 = 0 and state 9; above 1 a frame word left by the caller posted with the state kept (never: two items). Leaf. Not seen in play. Read in full. |
+| `sub_8227C8C0` | `NetModeSelect::Leave` | | (5, 4), (9, 4) and (10, 4), r4 = the dispatcher: state 7; `UiMovie::FinishAll` on movie 35 when found; `UiMovies::Delete(35)`; message 4 posted (its (7, 4) `Destroy`). A 112-byte frame. Seen in play. Read in full. |
+| `sub_8227C4B8` | `NetModeSelect::Destroy` | | (7, 4) → 6, r3 = the machine: state 14 when the data's +4 is set (back), or +9624 is 1; 15 when +9632 is 1; `VirtualFree(…, 0, MEM_RELEASE)` on `[0x82816190]`, `[0x82816194]` and `[0x82816198]` and all three = 0. A 128-byte frame (`__savegprlr_28`). Seen in play. Read in full. |
+| `sub_82276510` | `Type12Screen1::InitStates` | | r3 = the machine at +9640: 19 transitions (a 1,360-byte frame): (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_82275278`; (5, 1) `sub_82276248`; (5, 0) `sub_82276330`; (5, 36) `sub_82272520`; (5, 39) `sub_82271B30`; (5, 40) `sub_82271BC0`; (5, 41) `sub_82271C78`; (5, 38) `sub_82271CB0`; (5, 21) `sub_82272620`; (8, 3) `sub_822726C8`; (9, 6) `sub_82272490` and (9, 7) `sub_82272460` (its two opens: the network battle and the time attack, `NetModeSelect::Unloaded`); (5, 4), (9, 4) and (10, 4) `Leave`; (7, 4) `Destroy`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_822720A8` | `Type12Screen1::Create` | | (0, 1), r3 = the machine: +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x8281616C]` (the page object, as the mode select's), 68 → `[0x82816170]` (a menu: +16 2, +20 1), 68 → `[0x82816174]` (+16 2), 68 → `[0x82816178]` (+16 1), 68 → `[0x8281617C]` (+16 1) and 2,820 → `[0x82816180]` (the data; `ResetData`); +9624, +9628, +9632 = 0; state 1 with +9612 set, else 9. A 128-byte frame (`__savegprlr_28`). Seen in play. Read in full. |
+| `sub_82272030` | `Type12Screen1::ResetData` (probably) | | r3 = the data (2,820 bytes, `[0x82816180]`): +0, +4, +12, +16 = 0, +8 = 1; +800 to +816 = 0, +820 = 1, +824, +828 = 0; `GarageCar::Reset(+832)` (a garage car); +2800 = 1, +2804 and +2808 = -1, +2812 and +2816 = 0. A 112-byte frame. Only caller `Create`. Seen in play. Read in full. |
+| `sub_82271D18` | `Type12Screen1::OpenMovie` | | (1, 1): `UiMovies::Open(33, 22580)` and `UiMovies::Open(34, 22589)`. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82272398` | `Type12Screen1::WaitForMovie` | | (2, 1): while +9608 is 0, both `UiMovies::IsLoaded(33)` and `(34)` nonzero set it to 1; every 15 ticks the empty `sub_82106540(100, 30, 0, "Now Loading")` (the counter `[0x82816184]`, up by one each call); once set, state 9 with +9612 set, else 4. A 112-byte frame. Seen in play. Read in full. |
+| `sub_822727E0` | `Type12Screen1::Leave` | | (5, 4), (9, 4) and (10, 4), r4 = the dispatcher: state 7; `UiMovie::FinishAll` on movies 33 and 34 when found; the data's three pointer lists (at +20, count +276; +280, count +536; +540, count +796) emptied from the end, each entry `VirtualFree`d; `UiMovies::Delete(33)` and `(34)`; message 4 posted. A 128-byte frame (`__savegprlr_29`). Seen in play. Read in full. |
+| `sub_822722B0` | `Type12Screen1::Destroy` | | (7, 4): state 14 when the data's +4 is set or +9624 is 1, 15 when +9632 is 1; `VirtualFree` on `[0x8281616C]`, `[0x82816178]`, `[0x82816174]`, `[0x82816170]`, `[0x8281617C]` and `[0x82816180]`, all = 0. A 144-byte frame (`__savegprlr_25`). Seen in play. Read in full. |
+| `sub_8225F330` | `Type12Screen3::InitStates` | | r3 = the machine at +19280: 17 transitions (a 1,232-byte frame): (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_8225EBC0`; (5, 1) `sub_8225F078`; (5, 0) `sub_8225F100`; (5, 39) `sub_8225DF98`; (5, 40) `sub_8225DFB8`; (5, 38) `sub_8225E308`; (5, 23) `sub_8225E3B0`; (8, 3) `sub_8225E418`; (9, 9) `sub_8225E268` (its open, `WaitForLoads`' message 9: back from the race with the session's +240 set); (5, 4), (9, 4), (10, 4) and (14, 4) `Leave`; (7, 4) `Destroy`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_8225DFE8` | `Type12Screen3::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x828160E0]` (the page object), 68 → `[0x828160E4]` (a menu: +16 3, +20 1), 24 → `[0x828160E8]` (the data: +0, +4, +16, +20 = 0, +8 and +12 = -1); +9624, +9628, +9632 = 0; state 1 with +9612 set, else 9. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8225DFD8` | `Type12Screen3::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(32, 22582)`. Leaf. Seen in play. Read in full. |
+| `sub_8225E1B0` | `Type12Screen3::WaitForMovie` | | (2, 1): while +9608 is 0, `UiMovies::IsLoaded(33)` (not 32, the movie it opened: screen 1's) nonzero sets it to 1; "Now Loading" every 15 ticks (counter `[0x828160EC]`); once set, state 9 with +9612 set, else 4. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8225E518` | `Type12Screen3::Leave` | | (5, 4), (9, 4), (10, 4) and (14, 4): state 7; `UiMovie::FinishAll` on movie 32 when found; `UiMovies::Delete(32)`; message 4 posted. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8225E100` | `Type12Screen3::Destroy` | | (7, 4): state 14 when the data (`[0x828160E8]`, null-checked) +4 is set or +9624 is 1, 15 when +9632 is 1; `VirtualFree` on `[0x828160E0]`, `[0x828160E4]`, `[0x828160E8]`, all = 0. A 128-byte frame. Seen in play. Read in full. |
+| `sub_822873A0` | `NetRanking::InitStates` | | r3 = the machine at +28920: 19 transitions (a 1,360-byte frame): (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_82285490`; (5, 1) `sub_822872A8`; (5, 0) `sub_82286FF0` (its update, "TXR_NetworkTaRanking"); (5, 43) `sub_822826E8` (`Interrupt`'s message); (5, 44) `sub_822858D8` (`Resume`'s); (5, 39) `sub_822820A8`; (5, 40) and (5, 41) `sub_822820F8`; (5, 38) `sub_82285630`; (5, 24) `sub_82282788`; (8, 3) `sub_822827F0`; (9, 10) `sub_82282630` (its open); (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_82282358` | `NetRanking::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 108 bytes → `[0x828161D0]` (the data: +0 to +16, +28 to +36, +44, +52, +60, +64, +76, +92 to +100 = 0, +20, +24, +48, +80, +104 = -1, +40 = 1), 28 → `[0x828161C4]` (the page object), 68 → `[0x828161C8]` (a menu: +16 7, +20 1) and 68 → `[0x828161CC]` (+16 1, +20 0); +9624, +9628, +9632 = 0; state 1 with +9612 set, else 9. A 128-byte frame. Seen in play. Read in full. |
+| `sub_82282098` | `NetRanking::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(36, 22590)`. Leaf. Seen in play. Read in full. |
+| `sub_822825C0` | `NetRanking::WaitForMovie` | | (2, 1): while +9608 is 0, `UiMovies::IsLoaded(33)` (not 36: screen 1's) nonzero sets it to 1; once set, state 9 with +9612 set, else 4. No "Now Loading". A 96-byte frame. Seen in play. Read in full. |
+| `sub_82282848` | `NetRanking::Leave` | | (5, 4), (9, 4), (10, 4): state 7; `UiMovie::FinishAll` on movie 36 when found; `UiMovies::Delete(36)`; message 4 posted. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82282508` | `NetRanking::Destroy` | | (7, 4): state 14 when the data's +4 is set or +9624 is 1, 15 when +9632 is 1; `VirtualFree` on `[0x828161CC]`, `[0x828161C4]`, `[0x828161C8]` and `[0x828161D0]`, all = 0. A 128-byte frame. Seen in play. Read in full. |
+| `sub_82281858` | `NetTaCourse::InitStates` | | r3 = the machine at +38560: 17 transitions (a 1,232-byte frame): (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_82281800`; (5, 1) `sub_82280C68`; (5, 0) `sub_82281648` (its update, "TXR_NetworkTaCourse"); (5, 39) `sub_8227FB08`; (5, 40) `sub_8227FB78`; (5, 41) `sub_8227FBE8`; (5, 38) `sub_8227FC08`; (5, 25) `sub_82280058`; (8, 3) `sub_822800C0`; (9, 11) `sub_8227FFC8` (its open); (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead; the course names "ALL RIGHT" to "C1 INSIDE" at `0x820119A0` on). |
+| `sub_8227FD40` | `NetTaCourse::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 48 bytes → `[0x828161BC]` (the data: +0 to +16, +24 to +32 = 0, +20 = 1, +40 and +44 = -1), 28 → `[0x828161B4]` (the page object) and 68 → `[0x828161B8]` (a menu: +16 7, +20 1); +9624, +9628, +9632 = 0; state 1 with +9612 set, else 9. A 128-byte frame. Seen in play. Read in full. |
+| `sub_8227FC70` | `NetTaCourse::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(37, 22593)`. Leaf. Seen in play. Read in full. |
+| `sub_8227FF10` | `NetTaCourse::WaitForMovie` | | (2, 1): while +9608 is 0, `UiMovies::IsLoaded(33)` (not 37) nonzero sets it to 1; "Now Loading" every 15 ticks (counter `[0x828161C0]`); once set, state 9 with +9612 set, else 4. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82280218` | `NetTaCourse::Leave` | | (5, 4), (9, 4), (10, 4): state 7; `UiMovie::FinishAll` on movie 37 when found; `UiMovies::Delete(37)`; message 4 posted. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8227FE70` | `NetTaCourse::Destroy` | | (7, 4): state 14 when the data's +4 is set or +9624 is 1, 15 when +9632 is 1; `VirtualFree` on `[0x828161B4]`, `[0x828161B8]`, `[0x828161BC]`, all = 0. A 128-byte frame. Seen in play. Read in full. |
+| `sub_82268410` | `Type12Screen6::InitStates` | | r3 = the machine at +57840 (9,660 bytes): `NetScreen::InitBase(machine, 6, machine)`, then 6 transitions (a 528-byte frame): (5, 26) `sub_82265CA8`; (8, 3) `sub_82265CE8`; (9, 12) `sub_82265C58` (its open); (5, 38) `sub_82267EA0`; (5, 39) `sub_82263058` and (5, 40) `sub_82263068` (shared with screen 9's). Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_82278C20` | `Type12Screen6::InitBase` | | r3 = the machine (r4 too, the functors' object): 10 transitions (a 784-byte frame): (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_82267CD0`; (5, 1) `sub_82268720`; (5, 0) `sub_82267A48`; (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. From `NetScreen::InitBase` (through `sub_8227B41C`). Seen in play. Read for its keys and handlers. |
+| `sub_82265A88` | `Type12Screen6::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x82816154]` (the page object) and 68 → `[0x82816158]` (a menu: +16 2, +20 1); `[0x8281615C]` = 0; the machine's +9656 = 0; state 1 with +9612 set, else 9. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82265920` | `Type12Screen6::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(38, 22594)`. Leaf. Seen in play. Read in full. |
+| `sub_82265C00` | `Type12Screen6::WaitForMovie` | | (2, 1): +9608 = `UiMovies::IsLoaded(38)` (each call); when nonzero, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82265DC0` | `Type12Screen6::Leave` | | (5, 4), (9, 4), (10, 4): `UiMovie::FinishAll` on movie 38 when found; `UiMovies::Delete(38)`; +9608 = 0, state 7; message 4 posted. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82265B70` | `Type12Screen6::Destroy` | | (7, 4): state 14 when +9624 is 1, else 15 when +9632 is 1; `VirtualFree` on `[0x82816154]` and `[0x82816158]`, both = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8226EB40` | `Type12Screen7::InitStates` | | r3 = the machine at +67500 (9,732 bytes): `NetScreen::InitBase(machine, 7, machine)`, then 7 transitions (a 592-byte frame): (5, 27) `sub_82269710`; (8, 3) `sub_82269750`; (9, 13) `sub_82268FC8` (its open, `WaitForLoads`' message 13); (5, 38) `sub_8226D0A0`; (5, 39) `sub_822688B8`; (5, 40) `sub_822688C8`; (5, 44) `sub_822688D8`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_82279118` | `Type12Screen7::InitBase` | | As `Type12Screen6::InitBase`: (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_8226CB40`; (5, 1) `sub_822702C0`; (5, 0) `sub_82270528` (the two whose callees check a headset, `sub_8226BCB8` and `sub_8226EEC8` in `system-services.md`); (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. From `NetScreen::InitBase`. Seen in play. Read for its keys and handlers. |
+| `sub_82268D18` | `Type12Screen7::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x82816160]` (the page object), 68 → `[0x82816164]` (a menu: +16 3, +20 1) and 8 → `[0x82816168]` (+0, +4 = 0); the machine's +9624, +9628, +9636, +9640, +9648, +9656 to +9680, +9684 to +9720, +9728 = 0, +9644, +9652, +9724 = 1 (+9632 not cleared); state 1 with +9612 set, else 9. A 128-byte frame (some stores through frame words). Seen in play. Read in full. |
+| `sub_822688A8` | `Type12Screen7::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(39, 22596)`. Leaf. Seen in play. Read in full. |
+| `sub_82268F70` | `Type12Screen7::WaitForMovie` | | (2, 1): +9608 = `UiMovies::IsLoaded(39)`; when nonzero, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_822697D8` | `Type12Screen7::Leave` | | As `Type12Screen6::Leave` with movie 39. Seen in play. Read in full. |
+| `sub_82268EC8` | `Type12Screen7::Destroy` | | (7, 4): state 14 when +9624 is 1, else 11 (the race: `NextMode` answers mode 1) when +9628 is 1, else 15 when +9632 is 1; `VirtualFree` on `[0x82816160]`, `[0x82816164]`, `[0x82816168]`, all = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82262A88` | `Type12Screen8::InitStates` | | r3 = the machine at +96524 (9,668 bytes): `NetScreen::InitBase(machine, 8, machine)`, then 7 transitions (a 592-byte frame): (5, 28) `sub_822612A0`; (8, 3) `sub_822612E0`; (9, 14) `sub_82261250` (its open); (5, 38) `sub_82261E38`; (5, 39) `PanelScreen::OnNo` `sub_822609D0` and (5, 40) `PanelScreen::OnYes` `sub_822609E0` (`type67-screens.md`); (5, 44) `sub_822609F0`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_8227A000` | `Type12Screen8::InitBase` | | As `Type12Screen6::InitBase`: (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_82261CE8`; (5, 1) `sub_82262E10`; (5, 0) `sub_82262F20`; (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. From `NetScreen::InitBase`. Seen in play. Read for its keys and handlers. |
+| `sub_82261030` | `Type12Screen8::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x82816144]` (the page object) and 68 → `[0x82816148]` (a menu: +16 0, +20 1); the machine's +9624 to +9632, +9640 to +9656 = 0, +9660 and +9664 = 1; state 1 with +9612 set, else 9. A 128-byte frame. Seen in play. Read in full. |
+| `sub_822609C0` | `Type12Screen8::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(42, 22598)`. Leaf. Seen in play. Read in full. |
+| `sub_822611F8` | `Type12Screen8::WaitForMovie` | | (2, 1): +9608 = `UiMovies::IsLoaded(42)`; when nonzero, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82261358` | `Type12Screen8::Leave` | | As `Type12Screen6::Leave` with movie 42. Seen in play. Read in full. |
+| `sub_82261168` | `Type12Screen8::Destroy` | | (7, 4): state 14 when +9624 is 1, else 15 when +9632 is 1; `VirtualFree` on `[0x82816144]` and `[0x82816148]`, both = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_822646B0` | `Type12Screen9::InitStates` | | r3 = the machine at +106192 (9,696 bytes): `NetScreen::InitBase(machine, 9, machine)`, then 7 transitions (a 592-byte frame): (5, 29) `sub_82263390`; (8, 3) `sub_822633D0`; (9, 15) `sub_82263340` (its open, `WaitForLoads`' message 15: back from the race); (5, 38) `sub_82263B68`; (5, 39) `sub_82263058`; (5, 40) `sub_82263068`; (5, 44) `sub_82263078`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_8227A4F8` | `Type12Screen9::InitBase` | | As `Type12Screen6::InitBase`: (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_82264B90`; (5, 1) `sub_822657D8`; (5, 0) `sub_82264A38`; (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. From `NetScreen::InitBase`. Seen in play. Read for its keys and handlers. |
+| `sub_822630C0` | `Type12Screen9::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x8281614C]` (the page object) and 68 → `[0x82816150]` (a menu: +16 0, +20 1); the machine's +9624 to +9632, +9648 to +9676, +9684, +9692 = 0, +9640, +9644, +9680, +9688 = 1; state 1 with +9612 set, else 9. A 144-byte frame. Seen in play. Read in full. |
+| `sub_82263048` | `Type12Screen9::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(43, 22599)`. Leaf. Seen in play. Read in full. |
+| `sub_822632C8` | `Type12Screen9::WaitForMovie` | | (2, 1): +9608 = `UiMovies::IsLoaded(43)`; the empty `sub_82106540(500, 400, 0, "***** RESULT LOAD WAIT EVENT *****")` (`0x820117EC`); when +9608 is set, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82263448` | `Type12Screen9::Leave` | | As `Type12Screen6::Leave` with movie 43. Seen in play. Read in full. |
+| `sub_82263238` | `Type12Screen9::Destroy` | | (7, 4): state 14 when +9624 is 1, else 15 when +9632 is 1; `VirtualFree` on `[0x8281614C]` and `[0x82816150]`, both = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82288600` | `Type12Dialog10::InitStates` | | r3 = the machine at +77232 (9,648 bytes): `NetScreen::InitBase(machine, 10, machine)`, then 5 transitions (a 464-byte frame): (5, 30) `sub_82287FE8`; (8, 3) `ScreenMachine::Wait` `sub_82277068` (`type6-type7-modes.md`); (8, 16) and (9, 16) `sub_82287F98` (its open); (5, 37) `sub_82276E50` (shared with dialog 11's; `Interrupt`'s message). Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_82279610` | `Type12Dialog10::InitBase` | | As `Type12Screen6::InitBase`: (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_82288550`; (5, 1) `sub_82288408`; (5, 0) `sub_82288438`; (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. From `NetScreen::InitBase`. Seen in play. Read for its keys and handlers. |
+| `sub_82287DD8` | `Type12Dialog10::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x828161D4]` (the page object) and 68 → `[0x828161D8]` (a menu: +16 0, +20 1); the machine's +9640, +9644 = 0; `[0x828161DC]` = 0; state 1 with +9612 set, else 9. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82287CD0` | `Type12Dialog10::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(40, 22595)`. Leaf. Seen in play. Read in full. |
+| `sub_82287F40` | `Type12Dialog10::WaitForMovie` | | (2, 1): +9608 = `UiMovies::IsLoaded(40)`; when nonzero, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_82288028` | `Type12Dialog10::Leave` | | As `Type12Screen6::Leave` with movie 40. Seen in play. Read in full. |
+| `sub_82287EC0` | `Type12Dialog10::Destroy` | | (7, 4): state 14 when +9624 is 1; `VirtualFree` on `[0x828161D4]` and `[0x828161D8]`, both = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82277B18` | `Type12Dialog11::InitStates` | | r3 = the machine at +86880 (9,644 bytes): `NetScreen::InitBase(machine, 11, machine)`, then 5 transitions (a 464-byte frame): (5, 31) `sub_82277078`; (8, 3) `ScreenMachine::Wait`; (8, 17) and (9, 17) `sub_82277018` (its open); (5, 37) `sub_82276E50`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_82279B08` | `Type12Dialog11::InitBase` | | As `Type12Screen6::InitBase`: (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_82277A58`; (5, 1) `sub_82277928`; (5, 0) `sub_82277950`; (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. From `NetScreen::InitBase`. Seen in play. Read for its keys and handlers. |
+| `sub_82276E60` | `Type12Dialog11::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x82816188]` (the page object) and 68 → `[0x8281618C]` (a menu: +16 1, +20 1); the machine's +9624, +9628, +9640 = 0; state 1 with +9612 set, else 9. A 112-byte frame. Seen in play. Read in full. |
+| `sub_82276E40` | `Type12Dialog11::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(41, 22597)`. Leaf. Seen in play. Read in full. |
+| `sub_82276FC0` | `Type12Dialog11::WaitForMovie` | | (2, 1): +9608 = `UiMovies::IsLoaded(41)`; when nonzero, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_822770B8` | `Type12Dialog11::Leave` | | As `Type12Screen6::Leave` with movie 41. Seen in play. Read in full. |
+| `sub_82276F40` | `Type12Dialog11::Destroy` | | (7, 4): state 14 when +9624 is 1; `VirtualFree` on `[0x82816188]` and `[0x8281618C]`, both = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8227F6C8` | `Type12Dialog12::InitStates` | | r3 = the machine at +115888 (9,648 bytes): `NetScreen::InitBase(machine, 12, machine)`, then 6 transitions (a 528-byte frame): (5, 32) `sub_8227EF68`; (5, 42) `sub_8227EFA8`; (8, 3) `ScreenMachine::Wait`; (8, 18) and (9, 18) `sub_8227EF18` (its open: the mode select's message 18 with `[0x828161B0]` = 10, the privilege failed); (5, 37) `sub_8227F0F8`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_8227A9F0` | `Type12Dialog12::InitBase` | | As `Type12Screen6::InitBase`: (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_8227F618`; (5, 1) `sub_8227F4E8`; (5, 0) `sub_8227F518`; (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. From `NetScreen::InitBase`. Seen in play. Read for its keys and handlers. |
+| `sub_8227ED58` | `Type12Dialog12::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x828161A8]` (the page object) and 68 → `[0x828161AC]` (a menu: +16 0, +20 1); the machine's +9640, +9644 = 0; `[0x828161B0]` = 0 (the message to show, set by its opener); state 1 with +9612 set, else 9. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8227ECE8` | `Type12Dialog12::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(17, 22560)`. Leaf. Seen in play. Read in full. |
+| `sub_8227EEC0` | `Type12Dialog12::WaitForMovie` | | (2, 1): +9608 = `UiMovies::IsLoaded(17)`; when nonzero, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_8227F038` | `Type12Dialog12::Leave` | | As `Type12Screen6::Leave` with movie 17. Seen in play. Read in full. |
+| `sub_8227EE40` | `Type12Dialog12::Destroy` | | (7, 4): state 14 when +9624 is 1; `VirtualFree` on `[0x828161A8]` and `[0x828161AC]`, both = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8227EA50` | `Type12Dialog13::InitStates` | | r3 = the machine at +125536 (9,644 bytes): `NetScreen::InitBase(machine, 13, machine)`, then 5 transitions (a 464-byte frame): (5, 33) `sub_8227E0D8`; (8, 3) `ScreenMachine::Wait`; (8, 19) and (9, 19) `sub_8227E088` (its open: the mode select's message 19 with `[0x828161A4]` = 7, no Live user); (5, 37) `sub_8227E1D8`. Only caller `ModeType12::Init`. Seen in play. Read for its keys and handlers (the unnamed ones not read: a lead). |
+| `sub_8227AEE8` | `Type12Dialog13::InitBase` | | As `Type12Screen6::InitBase`: (0, 1) `Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForMovie`; (4, 1) `sub_8227E970`; (5, 1) `sub_8227E830`; (5, 0) `sub_8227E858`; (5, 4), (9, 4), (10, 4) `Leave`; (7, 4) `Destroy`. From `NetScreen::InitBase`. Seen in play. Read for its keys and handlers. |
+| `sub_8227DED0` | `Type12Dialog13::Create` | | (0, 1): +9608 = 0; `VirtualAlloc`s 28 bytes → `[0x8281619C]` (the page object) and 68 → `[0x828161A0]` (a menu: +16 0, +20 1); the machine's +9640 = 0; `[0x828161A4]` = 0 (the message to show, set by its opener); state 1 with +9612 set, else 9. A 112-byte frame. Seen in play. Read in full. |
+| `sub_8227DEC0` | `Type12Dialog13::OpenMovie` | | (1, 1): tail-calls `UiMovies::Open(16, 22559)`. Leaf. Seen in play. Read in full. |
+| `sub_8227E030` | `Type12Dialog13::WaitForMovie` | | (2, 1): +9608 = `UiMovies::IsLoaded(16)`; when nonzero, state 9 with +9612 set, else 4. A 96-byte frame. Seen in play. Read in full. |
+| `sub_8227E118` | `Type12Dialog13::Leave` | | As `Type12Screen6::Leave` with movie 16. Seen in play. Read in full. |
+| `sub_8227DFB0` | `Type12Dialog13::Destroy` | | (7, 4): state 14 when +9624 is 1; `VirtualFree` on `[0x8281619C]` and `[0x828161A0]`, both = 0. A 112-byte frame. Seen in play. Read in full. |
+| `sub_821B96B8` | `PowerGraphScreen12::InitStates` (probably) | | r3 = the machine at the type 12 block's +48200 (index 14): 11 transitions (an 848-byte frame), the power graph screen's handlers (`type2-screens.md`): (0, 1) `PowerGraphScreen::Create`; (1, 1) `OpenMovie`; (2, 1) `WaitForLoad`; (4, 1) the empty `sub_82106540`; (5, 1) `sub_821B88A0` (not seen, no row); (5, 0) `sub_821B8F60` (`power-graph.md`); (8, 3) `ScreenMachine::Wait`; (9, 34) `PowerGraphScreen::Open`; (5, 4) and (9, 4) `Close`; (7, 4) `Destroy`. Only caller `ModeType12::Init` (in the power graph screen's code, `821B8...`, not the mode's). Seen in play. Read for its keys and handlers. |

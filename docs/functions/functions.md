@@ -703,6 +703,12 @@ Rows not yet moved stay in the table below. So far:
   result (UI movie 27: the day's and the career's counts, the next day)
   and today's event (UI movie 0: the unlocks just made, a page each with
   their images), and the movies queued after them (B7).
+- [`network-mode.md`](network-mode.md): the type 12 front-end mode,
+  the Xbox Live mode ("NETWORK BATTLE", "NETWORK TIME ATTACK"): its Init
+  and delegate functions, its fourteen screen machines' set-ups and
+  teardowns, and the mode select's machine (UI movie 35: the Live
+  sign-in, the privilege check, the two items) (B7; mapped, an Xbox
+  feature).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
