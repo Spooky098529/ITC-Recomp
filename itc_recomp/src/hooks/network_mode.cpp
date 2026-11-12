@@ -158,7 +158,6 @@ void NetScreenInitBase(PPCContext& ctx, uint8_t* base) {
 ITC_NETWORK_MODE(82278058, ModeType12Init)
 // The fourteen InitStates: from ModeType12::Init (recompiled with the flag
 // off; the native Init calls their plain C++).
-ITC_NETWORK_MODE(822646B0, Type12Screen9InitStates)
 ITC_NETWORK_MODE(82288600, Type12Dialog10InitStates)
 ITC_NETWORK_MODE(82277B18, Type12Dialog11InitStates)
 ITC_NETWORK_MODE(8227F6C8, Type12Dialog12InitStates)
