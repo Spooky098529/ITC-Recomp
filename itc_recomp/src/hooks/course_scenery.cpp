@@ -17,7 +17,14 @@
 // became native, SceneryList::Clear (sub_820F1588), Sort (sub_820F1930),
 // Stream (sub_820F16C0), ReleaseUnused (sub_820F17C0), Scenery::
 // LimitLargeModels (sub_820F2B80), CollectAreas (sub_820F3098),
-// CollectModels (sub_820F32D0) and PoolObject::SetVisible (sub_820FB938).
+// CollectModels (sub_820F32D0) and PoolObject::SetVisible (sub_820FB938);
+// and, since Scenery::IsLoaded, Update and SetupPools are native (B7 loop,
+// 2026-11-12), PoolObject::InUse (sub_820FB8E0), IsLoaded (sub_820FB8F0) and
+// SetExpiring (sub_820FB968), ObjectPools::Object (sub_820FC0E8), Acquire
+// (sub_820FBF08), Find (sub_820FBE80), Load (sub_820FBFD0) and Init
+// (sub_820FBBE8), SceneryConfig::ModelAsset (sub_820F1530), Scenery::
+// PoolSizes (sub_820F2030) and Init (sub_820F1360) and SceneryList::LoadAll
+// (sub_820F1598).
 
 #include "guest.h"
 
@@ -32,22 +39,22 @@
 
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "Run the course scenery (docs/functions/course-scenery.md: PoolObject::AllocData "
-              "sub_820FB8B8, InUse sub_820FB8E0, IsLoaded sub_820FB8F0, IsVisible sub_820FB908, "
-              "IsExpiring sub_820FB920, SetVisible sub_820FB938 (no adapter), SetExpiring sub_820FB968, "
+              "sub_820FB8B8, InUse sub_820FB8E0 (no adapter), IsLoaded sub_820FB8F0 (no adapter), IsVisible sub_820FB908, "
+              "IsExpiring sub_820FB920, SetVisible sub_820FB938 (no adapter), SetExpiring sub_820FB968 (no adapter), "
               "ClearLoadFlags sub_820FB998, MarkLoaded sub_820FB9A8, Reset sub_820FB9D8, Key "
               "sub_820FB9F0, PoolObject sub_820FBB20 (no adapter), SetKey sub_820FBA00, KeyEquals "
               "sub_820FBA60, AreaLights::Key sub_820F1C20, AreaModel::Key sub_820F1CD8, "
-              "ObjectPools::Pool sub_820FBB10, Object sub_820FC0E8, Acquire sub_820FBF08, Find "
-              "sub_820FBE80, Load sub_820FBFD0, Release sub_820FC038, Init sub_820FBBE8, "
-              "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530, Scenery::PoolSizes "
-              "sub_820F2030 (Archive::AssetSize's plain C++), SceneryList::Clear "
+              "ObjectPools::Pool sub_820FBB10, Object sub_820FC0E8 (no adapter), Acquire sub_820FBF08 (no adapter), Find "
+              "sub_820FBE80 (no adapter), Load sub_820FBFD0 (no adapter), Release sub_820FC038, Init sub_820FBBE8 (no adapter), "
+              "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530 (no adapter), Scenery::PoolSizes "
+              "sub_820F2030 (no adapter) (Archive::AssetSize's plain C++), SceneryList::Clear "
               "sub_820F1588 (no adapter), Add sub_820F1888 (no adapter), Sort sub_820F1930 (no adapter), "
               "Scenery::LimitLargeModels sub_820F2B80 (no adapter), ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, "
               "Scenery::AllocPhysical sub_820F1490 and FreePhysical sub_820F14E8 (with the native "
               "heap; XPhysicalSize answered by the layer), Scenery::Create sub_820F2F88 and Setup "
               "sub_820F3020 with SetupPools sub_820F2720 (no adapter: only Setup calls it; with "
-              "--native_models' lifetime and memcpy native), Scenery::Init sub_820F1360, "
-              "SceneryList::ReleaseUnused sub_820F17C0 (no adapter), SceneryList::LoadAll sub_820F1598 and Stream "
+              "--native_models' lifetime and memcpy native), Scenery::Init sub_820F1360 (no adapter), "
+              "SceneryList::ReleaseUnused sub_820F17C0 (no adapter), SceneryList::LoadAll sub_820F1598 (no adapter) and Stream "
               "sub_820F16C0 (no adapter) (Archive::QueueLength's plain C++ with the archive's native queue), "
               "Scenery::StartLoad sub_820F1E00, Scenery::IsLoaded sub_820F1F68, "
               "Scenery::CollectAreas sub_820F3098 (no adapter), Scenery::CollectModels sub_820F32D0 (no adapter), "
@@ -70,7 +77,9 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "adapters, and the flag switches their callers: sub_82146B20, sub_82146AC0, "
               "sub_820FBA00, sub_820FBA60, sub_820FB908, sub_820FB920, sub_820FBB10, "
               "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20, sub_820F1588, sub_820F1930, "
-              "sub_820F16C0, sub_820F17C0, sub_820F2B80, sub_820F3098, sub_820F32D0, sub_820FB938");
+              "sub_820F16C0, sub_820F17C0, sub_820F2B80, sub_820F3098, sub_820F32D0, sub_820FB938, "
+              "sub_820FB8E0, sub_820FB8F0, sub_820FB968, sub_820FC0E8, sub_820FBF08, sub_820FBE80, "
+              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -145,9 +154,6 @@ bool hooks::CourseScenerySetUpNative() {
 
 // r3 = the object's +4, r4 = a size.
 ITC_COURSE_SCENERY(820FB8B8, ctx.r3.u64 = AllocData(base, ctx.r3.u32, ctx.r4.u32))
-ITC_COURSE_SCENERY(820FB8E0, ctx.r3.u64 = InUse(base, ctx.r3.u32))
-ITC_COURSE_SCENERY(820FB8F0, ctx.r3.u64 = IsLoaded(base, ctx.r3.u32))
-ITC_COURSE_SCENERY(820FB968, SetExpiring(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COURSE_SCENERY(820FB998, ClearLoadFlags(base, ctx.r3.u32))
 ITC_COURSE_SCENERY(820FB9A8, MarkLoaded(base, ctx.r3.u32))
 // The vtables' slots stay reached through them: the reset (slot 2 of the
@@ -164,35 +170,6 @@ ITC_COURSE_SCENERY(820F1CD8, uint32_t size = 0;
                    guest::StoreU32(base, ctx.r4.u32, size))
 
 // --- The pools: r3 = the pool set, r4 = a pool ---
-
-// r5 = an index.
-ITC_COURSE_SCENERY(820FC0E8, ctx.r3.u64 = PoolObjectAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-// r5 = a key.
-ITC_COURSE_SCENERY(820FBF08, ITC_SCENERY_CALLS;
-                   SetIndex(ctx, Acquire(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                         ctx.r5.u32)))
-ITC_COURSE_SCENERY(820FBE80, ITC_SCENERY_CALLS;
-                   SetIndex(ctx, Find(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                      ctx.r5.u32)))
-// r5 = an index.
-ITC_COURSE_SCENERY(820FBFD0, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = LoadObject(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                           ctx.r5.u32))
-
-// ObjectPools::Init: r4 = the pool count, r5 = the descriptors. The original
-// runs when the native heap isn't active.
-extern "C" REX_FUNC(sub_820FBBE8) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_course_scenery)) {
-    ITC_SCENERY_CALLS;
-    uint32_t r3 = 0;
-    if (Init(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &r3)) {
-      ctx.r3.u64 = r3;
-      return;
-    }
-  }
-  __imp__sub_820FBBE8(ctx, base);
-}
 
 // ObjectPools::Shutdown: r3 = the pool set. The original runs when the native
 // heap isn't active.
@@ -211,12 +188,6 @@ extern "C" REX_FUNC(sub_820FBDC8) {
 
 // --- The scenery's lists ---
 
-// r3 = the configuration, r4 = an area, r5 = a model.
-ITC_COURSE_SCENERY(820F1530, SetIndex(ctx, ModelAsset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)))
-// Scenery::PoolSizes: r3 = the area counts, r4 = the model counts, r5 = out,
-// r6 = the configuration; from Scenery::SetupPools (recompiled).
-ITC_COURSE_SCENERY(820F2030, ctx.r3.u64 = PoolSizes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                   ctx.r6.u32))
 ITC_COURSE_SCENERY(820F1480, ClearGlobal(base))
 // Scenery::AllocPhysical: r3 = a size; returns the block. Scenery::
 // FreePhysical: r3 = a block; r3 = 0, as XPhysicalFree leaves it. The
@@ -260,16 +231,6 @@ extern "C" REX_FUNC(sub_820F14E8) {
   FreePhysical(base, ctx.r3.u32);
   ctx.r3.u64 = 0;
 }
-// Scenery::Init: r3 = the manager; r3 comes back as the original's last
-// call (XMemSet) leaves it: its destination, [0x826C5514] + 144.
-ITC_COURSE_SCENERY(820F1360, Init(base, ctx.r3.u32);
-                   ctx.r3.u64 = guest::LoadU32(base, kManager) + 144u)
-// SceneryList::LoadAll: r3 = the manager, r4 = a list; from Scenery::
-// IsLoaded (recompiled). The queue length's plain C++ with the archive's
-// native queue, else its original through `ctx`.
-ITC_COURSE_SCENERY(820F1598, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = ListLoadAll(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                            hooks::NativeArchiveQueue()))
 // Scenery::IsLoaded: r3 = the manager; r3 = 0 or 1. From the race's
 // loading's handlers (CourseSetup::WaitCourse and EndTick, native with
 // --native_race_loading, which call its plain C++) and the front end's
