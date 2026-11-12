@@ -18,6 +18,16 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5006`, `itc_5007`, ok; the
+race's end: an unlock after a career race, an event race's end, the
+Live mode's time attack):
+
+- `sub_821162B0` Progress::CheckUnlocks
+- `sub_82111650` Career::EventLocation
+- `sub_82292710` Session::Free
+
+The type 12 mode's:
+
 Not in the attract race or the replay (`itc_5001`, `itc_5002`, ok; all
 in `network-mode.md`, the type 12 Xbox Live mode: open it from the
 title's main menu; without Live its battle and time attack pages show

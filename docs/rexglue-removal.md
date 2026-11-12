@@ -2862,6 +2862,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-11 | The replay theater (the type 10 mode: its Init, slots, its machine with UI movie 45 and 17 transitions; two of the type 9 mode's slots, shared) | `type10-mode.md` | 46 of 47 (38 Overridden, 8 Native; checked 2026-11-12 by the next run, 50318046..93b074ab, after a harness fix; `Replay::SetUpRace` stays recompiled) | `--native_type10_mode` (on by default since 2026-11-12) |
 | 2026-11-12 | The type 9 mode: the career's end of the day after a career race (today's result, UI movie 27, `Career::NextDay`; today's event, UI movie 0, the unlocks) | `todays-result.md` | 57 of 57 (38 Overridden, 19 Native) | `--native_todays_result` |
 | 2026-11-12 | The type 12 mode: the Xbox Live network mode (network battle and time attack: its mode select, 14 machines' set-ups and teardowns, the session memory; its Live calls answered with plugged-in data, the user's call) | `network-mode.md` | 130 of 130 rows (95 Overridden, 32 Native, 2 Merged, 1 Dropped) | `--native_network_mode` |
+| 2026-11-12 | The race's end (`RaceMode::ModeAfterRace`: which mode follows a race), with `RaceMode::NextMode` and `Progress::CheckUnlocks` (never seen, ported) | `race-end.md` | 1 of 1 (6 adapters removed) | `--native_race_end` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5278,3 +5279,19 @@ boundary: 449 functions (916 pairs): overridden 109, Native 36,
 Dropped 27, never called 69, live 208. Imports: 186 called, 54 with a
 live caller. B7 (`b7_status.py`): ours 5,808, work left 840 (Wrapped
 55, with a row 388, no row yet 397), from 949.
+
+**2026-11-12, the race's end (branch `b7-loop-11-11-26`, the
+forty-fifth run, its third subsystem):** `race-end.md` (1 row,
+`src/race_end/`): `RaceMode::ModeAfterRace` `sub_82150E00`, the mode a
+race goes to after it ends (by race kind and flags; movies 6 to 9 at
+the career's stages 6 and 8), with its caller `RaceMode::NextMode`
+`sub_82151EF0` (`race-loading.md`) and `Progress::CheckUnlocks`
+`sub_821162B0` (never seen, ported by the user's call to keep as little
+recompiled as possible); six adapters removed (`AfterRace`,
+`EventLocation`, `Session::Free`, `CheckSystemRequest` among them).
+`race-loading.md`'s `WaitCourse` and `EndTick` still wait on
+`Scenery::IsLoaded`. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 27, never called 69, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,811, work left 838 (Wrapped 55, with a row 387, no row yet 396),
+from 840.

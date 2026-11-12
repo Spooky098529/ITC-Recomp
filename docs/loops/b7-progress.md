@@ -92,10 +92,21 @@ file's history. What's left to see in a drive, from every run:
   `EventLocation`, `Session::Free`, `CheckSystemRequest`; harnesses 0
   differing; race 33 s at 40, 0 errors; no subagents). Left: none;
   `race-loading.md`'s `WaitCourse` and `EndTick` still wait on
-  `Scenery::IsLoaded` `sub_820F1F68` (ready itself). Validation agent
-  running.
+  `Scenery::IsLoaded` `sub_820F1F68` (ready itself). Validated:
+  `itc_5006` (race 54 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups; harnesses ~124 s), 7 of 7 harness
+  lines, no prints added; 2 ran in the race, 2 more in the replay
+  `itc_5007` (ok), 3 to drive. Recorded.
+- Next: `Scenery::IsLoaded` `sub_820F1F68` (`course-scenery.md`,
+  ready) with what it unblocks in `race-loading.md` (`WaitCourse`
+  `sub_821514A0`, `EndTick` `sub_821516F0`), a lead without mapping
+  (not counted). Migration agent running.
 
 ## Done
+
+- The race's end: `race-end.md` 1 of 1 ours, with `RaceMode::NextMode`
+  and `Progress::CheckUnlocks`, `--native_race_end`,
+  ba317c7e..fc2138de; validated.
 
 - The type 12 mode (the Xbox Live network mode): `network-mode.md` 130
   of 130 ours, `--native_network_mode`, 1b7594a1..21c8cb3b; Live calls
@@ -141,5 +152,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the race end's map: ours 5808, work left 840 (wrapped 55,
   known 389, unknown 396).
+
+- After the race end's migration: ours 5811, work left 838 (wrapped
+  55, known 387, unknown 396).
 
 ## Stopped
