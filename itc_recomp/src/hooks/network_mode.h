@@ -60,4 +60,21 @@ void ModeType12ForceExit(PPCContext& ctx, uint8_t* base);
 void ModeType12Resume(PPCContext& ctx, uint8_t* base);
 void SessionFree(PPCContext& ctx, uint8_t* base);
 
+// The machines' set-up and teardown handlers by the machine's index (0, 1
+// and 3 to 13; explicitly instantiated for those): Create, WaitForMovie and
+// Destroy (r3 the machine), OpenMovie (no arguments; a tail call) and Leave
+// (r3 the machine, r4 the dispatcher). r3 as the originals leave it.
+template <uint32_t kIndex>
+void NetMachineCreate(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
+void NetMachineOpenMovie(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
+void NetMachineWaitForMovie(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
+void NetMachineLeave(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
+void NetMachineDestroy(PPCContext& ctx, uint8_t* base);
+// Type12Screen1::ResetData (r3 the data; only Create calls it: no adapter).
+void Type12Screen1ResetData(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -217,4 +217,31 @@ uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp);
 // frames. r3 as the original leaves it.
 uint64_t SessionFree(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The machines' set-up and teardown handlers (machines.cpp) ---
+
+// Each machine's handlers by its index (Machine's: 0, 1 and 3 to 13; the
+// power graph screen's, 14, are the type 2 mode's): (0, 1) Create (r3 the
+// machine: its page object, menus and data VirtualAlloc'ed into its
+// globals, its words cleared, state 1 or 9; VirtualAlloc's r3, or
+// ResetData's), (1, 1) OpenMovie (UiMovies::Open of its movie, a tail call
+// from the caller's `sp` and `lr`; Type12Screen1 opens 33 and 34 from its
+// frame), (2, 1) WaitForMovie (r3 as the original leaves it), Leave (r3 the
+// machine, r4 the dispatcher: its movie finished and deleted, state 7,
+// message 4 posted) and (7, 4) Destroy (the next state, its globals freed
+// and cleared). The addresses and frames are in the rows; `sp` the caller's
+// r1.
+uint64_t MachineCreate(uint8_t* base, uint32_t index, uint32_t machine, uint32_t sp,
+                       const Calls& calls);
+uint64_t MachineOpenMovie(uint8_t* base, uint32_t index, uint32_t sp, uint32_t lr,
+                          const Calls& calls);
+uint64_t MachineWaitForMovie(uint8_t* base, uint32_t index, uint64_t r3, uint32_t sp);
+uint64_t MachineLeave(uint8_t* base, uint32_t index, uint32_t machine, uint32_t dispatcher,
+                      uint32_t sp, const Calls& calls);
+uint64_t MachineDestroy(uint8_t* base, uint32_t index, uint32_t machine, uint32_t sp,
+                        const Calls& calls);
+// sub_82272030 Type12Screen1::ResetData (r3 the 2,820-byte data): its
+// words, GarageCar::Reset(+832) through the guest. 112-byte frame below
+// `sp`. GarageCar::Reset's r3.
+uint64_t Screen1ResetData(uint8_t* base, uint32_t data, uint32_t sp, const Calls& calls);
+
 }  // namespace network_mode

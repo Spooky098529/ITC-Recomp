@@ -10,6 +10,7 @@
 #include "network_mode/network_mode.h"
 
 #include "base/log.h"
+#include "network_mode/internal.h"
 #include "guest.h"
 
 #include <bit>
@@ -208,33 +209,12 @@ constexpr uint32_t kLoadedOrder[14] = {kModeSelectAt, kScreen1At,  kScreen3At,  
                                        kDialog11At,   kScreen8At,  kScreen9At,  kDialog12At,
                                        kDialog13At,   kPowerGraphAt};
 
-uint32_t Load(uint8_t* base, uint32_t at) { return LoadU32(base, at); }
-void Store(uint8_t* base, uint32_t at, uint32_t value) { StoreU32(base, at, value); }
 uint64_t Load64(uint8_t* base, uint32_t at) {
   return (uint64_t(Load(base, at)) << 32) | Load(base, at + 4);
 }
 void Store64(uint8_t* base, uint32_t at, uint64_t value) {
   Store(base, at, uint32_t(value >> 32));
   Store(base, at + 4, uint32_t(value));
-}
-
-// The original's frame below `sp`, its back chain written.
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  const uint32_t frame = sp - bytes;
-  Store(base, frame, sp);
-  return frame;
-}
-
-// Posts the message (id, 0, 0) on the ring at `ring` (its count +600, start
-// +604, 50 slots of 12 bytes), as the originals do inline.
-void PostRing(uint8_t* base, uint32_t ring, uint32_t id) {
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
 }
 
 // The mode's delegate (+8, its holder +4) from the doubleword at `slot`.
