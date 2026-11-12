@@ -57,6 +57,8 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "SceneryList::ReleaseUnused sub_820F17C0 (no adapter), SceneryList::LoadAll sub_820F1598 (no adapter) and Stream "
               "sub_820F16C0 (no adapter) (Archive::QueueLength's plain C++ with the archive's native queue), "
               "Scenery::StartLoad sub_820F1E00, Scenery::IsLoaded sub_820F1F68, "
+              "Scenery::Unload sub_820F2B38 with UnloadPools sub_820F1D20 (no adapter) and Destroy sub_820F2AF8 "
+              "(with the native heap), "
               "Scenery::CollectAreas sub_820F3098 (no adapter), Scenery::CollectModels sub_820F32D0 (no adapter), "
               "Scenery::Update sub_820F4558 (CameraPass::FromViewport's plain C++, CameraPass::Update "
               "a guest call), "
@@ -79,7 +81,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20, sub_820F1588, sub_820F1930, "
               "sub_820F16C0, sub_820F17C0, sub_820F2B80, sub_820F3098, sub_820F32D0, sub_820FB938, "
               "sub_820FB8E0, sub_820FB8F0, sub_820FB968, sub_820FC0E8, sub_820FBF08, sub_820FBE80, "
-              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598");
+              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -230,6 +232,33 @@ extern "C" REX_FUNC(sub_820F14E8) {
   }
   FreePhysical(base, ctx.r3.u32);
   ctx.r3.u64 = 0;
+}
+// Scenery::Unload: r3 = the manager; r3 as the original leaves it (the
+// manager + 116). From the race scene's sub_8215AA88 and the front end's
+// sub_82229678 (recompiled). UnloadPools (sub_820F1D20) has no adapter:
+// only Unload calls it. The original runs when the native heap isn't
+// active.
+extern "C" REX_FUNC(sub_820F2B38) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_course_scenery)) {
+    ITC_SCENERY_CALLS;
+    uint32_t r3 = 0;
+    if (Unload(base, calls, ctx.r1.u32, ctx.r3.u32, &r3)) {
+      ctx.r3.u64 = r3;
+      return;
+    }
+  }
+  __imp__sub_820F2B38(ctx, base);
+}
+// Scenery::Destroy: no arguments; r3 = 0. From sub_8215AA88 and the front
+// end's sub_82228548 (recompiled).
+extern "C" REX_FUNC(sub_820F2AF8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive()) {
+    __imp__sub_820F2AF8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = Destroy(base);
 }
 // Scenery::IsLoaded: r3 = the manager; r3 = 0 or 1. From the race's
 // loading's handlers (CourseSetup::WaitCourse and EndTick, native with

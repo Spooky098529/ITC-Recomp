@@ -707,6 +707,63 @@ void FreePhysical(uint8_t* base, uint32_t block) {
   memory::FreePhysical(block);
 }
 
+bool UnloadPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                 uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820F1D20 Scenery::UnloadPools");
+  if (!hooks::NativeHeapActive()) {
+    return false;
+  }
+  const uint32_t frame = stack - 112;
+  Store(base, frame, stack);
+  uint32_t shutdown_r3 = 0;
+  Require(Shutdown(base, calls, frame, manager, &shutdown_r3), "Scenery::UnloadPools' Shutdown");
+  if (Load(base, manager + 188) != 0) {
+    Store(base, manager + 188, 0);
+  }
+  const uint32_t pool0 = Load(base, manager + 184);
+  Store(base, manager + 180, 0);
+  if (pool0 != 0) {
+    FreePhysical(base, pool0);
+    Store(base, manager + 184, 0);
+  }
+  for (uint32_t at : {168u, 164u, 160u}) {
+    if (const uint32_t block = Load(base, manager + at); block != 0) {
+      FreePhysical(base, block);
+    }
+  }
+  c_runtime::XMemSet(base, manager + 144, 0, 28);
+  for (uint32_t at : {140u, 136u, 132u}) {
+    if (const uint32_t block = Load(base, manager + at); block != 0) {
+      FreePhysical(base, block);
+    }
+  }
+  c_runtime::XMemSet(base, manager + 116, 0, 28);
+  *r3 = manager + 116;
+  return true;
+}
+
+bool Unload(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820F2B38 Scenery::Unload");
+  if (!hooks::NativeHeapActive()) {
+    return false;
+  }
+  const uint32_t frame = stack - 96;
+  Store(base, frame, stack);
+  if (const uint32_t areas = Load(base, manager + 224); areas != 0) {
+    FreePhysical(base, areas);
+    Store(base, manager + 224, 0);
+  }
+  return UnloadPools(base, calls, frame, manager, r3);
+}
+
+uint32_t Destroy(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820F2AF8 Scenery::Destroy");
+  ClearGlobal(base);
+  FreePhysical(base, Load(base, kCreated));
+  Store(base, kCreated, 0);
+  return 0;
+}
+
 uint32_t Create(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820F2F88 Scenery::Create");
   const uint32_t manager = AllocPhysical(base, 248);

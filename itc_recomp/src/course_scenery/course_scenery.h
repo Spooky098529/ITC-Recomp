@@ -196,6 +196,25 @@ uint32_t AllocPhysical(uint8_t* base, uint32_t size);
 // hooks::NativeHeapActive().
 void FreePhysical(uint8_t* base, uint32_t block);
 
+// Scenery::UnloadPools (sub_820F1D20; 112-byte frame below `stack`, its
+// back chain written): ObjectPools::Shutdown on the manager's pools; +188
+// = 0 when set, +180 = 0, pool 0's block (+184) freed (FreePhysical) and
+// +184 = 0 when there; list B's table, items and pointer array (+168,
+// +164, +160) freed when there, list B (+144, 28 bytes) cleared (XMemSet);
+// list A's (+140, +136, +132) the same, list A (+116) cleared. False, with
+// nothing done, when the native heap isn't active (the original runs).
+// `r3` is what the original leaves there (XMemSet's destination, +116).
+bool UnloadPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                 uint32_t* r3);
+// Scenery::Unload (sub_820F2B38; 96-byte frame): the visible areas' block
+// (+224) freed and +224 = 0 when there, then UnloadPools. As UnloadPools,
+// false with nothing done without the native heap; `r3` as it leaves it.
+bool Unload(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager, uint32_t* r3);
+// Scenery::Destroy (sub_820F2AF8): ClearGlobal, the manager at [0x826C551C]
+// freed (FreePhysical, whatever it holds) and the pointer cleared. Returns
+// 0 (FreePhysical's r3). Only while hooks::NativeHeapActive().
+uint32_t Destroy(uint8_t* base);
+
 // The manager's pointer Scenery::Create sets (the same object as kManager's).
 constexpr uint32_t kCreated = 0x826C551C;
 // Scenery::Create (sub_820F2F88): the 248-byte manager from physical memory

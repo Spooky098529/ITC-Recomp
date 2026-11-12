@@ -2613,6 +2613,165 @@ void UpdateCases(Context& h) {
   memory::Free(w);
 }
 
+// --- Scenery::Unload (with UnloadPools) and Destroy ---
+
+// Scenery::Unload: a manager set up by Setup's plain C++ on each side (as
+// SetupCases' configurations: up to 6 areas, pools 0 and 1 on or off), then
+// some of its blocks freed and their words cleared beforehand (the visible
+// areas, a list's table, items or pointer array), +188 set or 0, and
+// Unload run. Compared: r3 as an offset from the manager, the manager's
+// 248 bytes, the bytes held and the two frames' back chains (its r1 - 96
+// and - 208).
+void UnloadCases(Context& h) {
+  Random r(0x554E4C44);
+  Results results("Scenery::Unload (sub_820F2B38) with UnloadPools (sub_820F1D20)");
+  if (!hooks::CourseScenerySetUpNative()) {
+    ITC_LOG_INFO("harness: Scenery::Unload: Setup's plain C++ can't run here, no cases");
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kConfig = 0, kTable = 64, kAsset = 512, kWord = 520;
+  constexpr uint32_t kOptional[] = {224, 132, 136, 140, 160, 164, 168};
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  for (int c = 0; c < 32; c++) {
+    const uint32_t mode = c < 3 ? 2 : r.Below(2);
+    const uint32_t first_asset = r.Below(20000);
+    const uint32_t second_asset = r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(20000);
+    const uint32_t areas = r.Below(7);
+    const uint32_t pool0 = r.Below(2), pool1 = r.Below(2);
+    const uint32_t dropped = c < 4 ? 0 : r.Below(128);
+    const uint32_t file = r.Below(2) ? 0x40000000u | r.Below(0x10000) * 4 : 0;
+    uint32_t entries[6][3];
+    for (uint32_t i = 0; i < 6; i++) {
+      entries[i][0] = r.Below(20000);
+      entries[i][1] = r.Below(5) == 0 ? 0xFFFFFFF0u + r.Below(8) : r.Below(20000);
+      entries[i][2] = entries[i][1] + r.Below(5);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t config = h.data + kConfig, table = h.data + kTable;
+      guest::StoreU32(h.base, config + 0, mode);
+      guest::StoreU32(h.base, config + 4, 0);
+      guest::StoreU32(h.base, config + 24, h.data + kAsset);
+      guest::StoreU32(h.base, config + 28, table);
+      guest::StoreU32(h.base, config + 32, h.data + kWord);
+      guest::StoreU32(h.base, config + 36, pool0);
+      guest::StoreU32(h.base, config + 40, pool1);
+      guest::StoreU32(h.base, h.data + kWord, 1);
+      guest::StoreU32(h.base, h.data + kAsset, first_asset);
+      guest::StoreU32(h.base, table + 8, second_asset);
+      guest::StoreU32(h.base, table + 16, areas);
+      for (uint32_t i = 0; i < 6; i++) {
+        for (uint32_t k = 0; k < 3; k++) {
+          guest::StoreU32(h.base, table + 20 + 12 * i + 4 * k, entries[i][k]);
+        }
+      }
+      const uint32_t manager = memory::AllocPhysical(248, 0, 0xFFFFFFFFu, 0, 4);
+      Fill(h.base, manager, 248);
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 1024, 1024);
+      With(1, [&] {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          cs::Setup(h.base, calls, t.r1.u32, manager, config);
+        });
+      });
+      for (size_t i = 0; i < std::size(kOptional); i++) {
+        const uint32_t block = guest::LoadU32(h.base, manager + kOptional[i]);
+        if ((dropped >> i & 1) != 0 && block != 0) {
+          memory::FreePhysical(block);
+          guest::StoreU32(h.base, manager + kOptional[i], 0);
+        }
+      }
+      guest::StoreU32(h.base, manager + 188, file);
+      guest::StoreU32(h.base, cs::kPhysicalHeld, 0x10000000u);
+      Fill(h.base, t.r1.u32 - 1024, 1024);
+      t.r3.u64 = manager;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F2B38(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            uint32_t r3 = 0;
+            RequireDone(cs::Unload(h.base, calls, t.r1.u32, t.r3.u32, &r3));
+            t.r3.u64 = r3;
+          });
+        }
+      });
+      out[v].Word(t.r3.u32 - manager);
+      out[v].Bytes(Read(h.base, manager, 248));
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 - 96));
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 - 208));
+      memory::FreePhysical(manager);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} mode {} areas {} pools {}{} dropped {:#x}",
+                                              c, mode, areas, pool0, pool1, dropped));
+  }
+  guest::StoreU32(h.base, cs::kManager, saved_manager);
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+  results.Report();
+}
+
+// Scenery::Destroy: a block of physical memory at [0x826C551C] (the
+// recompiled side's from the game's own XPhysicalAlloc and freed by its
+// XPhysicalFree, under hooks::RecompiledHeapScope, as PhysicalCases: the
+// kernel's free leaves r3 0, the layer's adapter the address), [0x826C5514]
+// and the bytes held random. Compared: both pointers, the bytes held and r3.
+void DestroyCases(Context& h) {
+  Random r(0x44535452);
+  Results results("Scenery::Destroy (sub_820F2AF8)");
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: Scenery::Destroy: the native heap is off, no cases");
+    results.Report();
+    return;
+  }
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  const uint32_t saved_created = guest::LoadU32(h.base, cs::kCreated);
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  for (int c = 0; c < 8; c++) {
+    const uint32_t size = c < 4 ? 248 : 1 + r.Below(0x20000);
+    const uint32_t global = uint32_t(r.Next());
+    const uint32_t held = 0x01000000u + r.Below(0x01000000);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      uint32_t manager = 0;
+      if (v == 0) {
+        hooks::RecompiledHeapScope recompiled;
+        PPCContext a = CallContext(h);
+        a.r3.u64 = size;
+        __imp__sub_820F1490(a, h.base);
+        manager = a.r3.u32;
+      } else {
+        manager = memory::AllocPhysical(size, 0, 0xFFFFFFFFu, 0, 4);
+      }
+      guest::StoreU32(h.base, cs::kCreated, manager);
+      guest::StoreU32(h.base, cs::kManager, global);
+      guest::StoreU32(h.base, cs::kPhysicalHeld, held);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = 0x12345678;
+      With(v, [&] {
+        if (v == 0) {
+          hooks::RecompiledHeapScope recompiled;
+          __imp__sub_820F2AF8(t, h.base);
+        } else {
+          t.r3.u64 = cs::Destroy(h.base);
+        }
+      });
+      out[v].Word(guest::LoadU32(h.base, cs::kManager));
+      out[v].Word(guest::LoadU32(h.base, cs::kCreated));
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} size {}", c, size));
+  }
+  guest::StoreU32(h.base, cs::kManager, saved_manager);
+  guest::StoreU32(h.base, cs::kCreated, saved_created);
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+  results.Report();
+}
+
 void CourseScenery(Context& h) {
   ObjectLeaves(h);
   Keys(h);
@@ -2633,6 +2792,8 @@ void CourseScenery(Context& h) {
   CreateCases(h);
   SetupCases(h);
   UpdateCases(h);
+  UnloadCases(h);
+  DestroyCases(h);
 }
 
 namespace {
