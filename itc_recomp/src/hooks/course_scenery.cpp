@@ -24,7 +24,9 @@
 // (sub_820FBF08), Find (sub_820FBE80), Load (sub_820FBFD0) and Init
 // (sub_820FBBE8), SceneryConfig::ModelAsset (sub_820F1530), Scenery::
 // PoolSizes (sub_820F2030) and Init (sub_820F1360) and SceneryList::LoadAll
-// (sub_820F1598).
+// (sub_820F1598); and, since Scenery::Unload and Destroy are native (B7
+// loop, 2026-11-12), ObjectPools::Shutdown (sub_820FBDC8) and Scenery::
+// ClearGlobal (sub_820F1480).
 
 #include "guest.h"
 
@@ -46,10 +48,10 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FBA60, AreaLights::Key sub_820F1C20, AreaModel::Key sub_820F1CD8, "
               "ObjectPools::Pool sub_820FBB10, Object sub_820FC0E8 (no adapter), Acquire sub_820FBF08 (no adapter), Find "
               "sub_820FBE80 (no adapter), Load sub_820FBFD0 (no adapter), Release sub_820FC038, Init sub_820FBBE8 (no adapter), "
-              "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530 (no adapter), Scenery::PoolSizes "
+              "Shutdown sub_820FBDC8 (no adapter), SceneryConfig::ModelAsset sub_820F1530 (no adapter), Scenery::PoolSizes "
               "sub_820F2030 (no adapter) (Archive::AssetSize's plain C++), SceneryList::Clear "
               "sub_820F1588 (no adapter), Add sub_820F1888 (no adapter), Sort sub_820F1930 (no adapter), "
-              "Scenery::LimitLargeModels sub_820F2B80 (no adapter), ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, "
+              "Scenery::LimitLargeModels sub_820F2B80 (no adapter), ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480 (no adapter), "
               "Scenery::AllocPhysical sub_820F1490 and FreePhysical sub_820F14E8 (with the native "
               "heap; XPhysicalSize answered by the layer), Scenery::Create sub_820F2F88 and Setup "
               "sub_820F3020 with SetupPools sub_820F2720 (no adapter: only Setup calls it; with "
@@ -81,7 +83,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20, sub_820F1588, sub_820F1930, "
               "sub_820F16C0, sub_820F17C0, sub_820F2B80, sub_820F3098, sub_820F32D0, sub_820FB938, "
               "sub_820FB8E0, sub_820FB8F0, sub_820FB968, sub_820FC0E8, sub_820FBF08, sub_820FBE80, "
-              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20");
+              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20, sub_820FBDC8, sub_820F1480");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -173,24 +175,8 @@ ITC_COURSE_SCENERY(820F1CD8, uint32_t size = 0;
 
 // --- The pools: r3 = the pool set, r4 = a pool ---
 
-// ObjectPools::Shutdown: r3 = the pool set. The original runs when the native
-// heap isn't active.
-extern "C" REX_FUNC(sub_820FBDC8) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_course_scenery)) {
-    ITC_SCENERY_CALLS;
-    uint32_t r3 = 0;
-    if (Shutdown(base, calls, ctx.r1.u32, ctx.r3.u32, &r3)) {
-      ctx.r3.u64 = r3;
-      return;
-    }
-  }
-  __imp__sub_820FBDC8(ctx, base);
-}
-
 // --- The scenery's lists ---
 
-ITC_COURSE_SCENERY(820F1480, ClearGlobal(base))
 // Scenery::AllocPhysical: r3 = a size; returns the block. Scenery::
 // FreePhysical: r3 = a block; r3 = 0, as XPhysicalFree leaves it. The
 // originals run when the native heap isn't active (the layer answers the
