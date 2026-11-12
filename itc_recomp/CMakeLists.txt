@@ -526,6 +526,7 @@ set(ITC_SOURCES
     src/hooks/todays_result.cpp
     src/todays_result/init.cpp
     src/todays_result/mode.cpp
+    src/todays_result/result.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp

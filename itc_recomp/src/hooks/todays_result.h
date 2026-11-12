@@ -27,5 +27,27 @@ void ModeType9FindShown(PPCContext& ctx, uint8_t* base);
 void TodaysEventKind(PPCContext& ctx, uint8_t* base);
 void TodaysResultInitStates(PPCContext& ctx, uint8_t* base);
 void TodaysEventInitStates(PPCContext& ctx, uint8_t* base);
+// Today's result's handlers (r3 the machine, r4 the dispatcher where read),
+// its helpers (no arguments), pages (r3 the dispatcher) and transitions (r3
+// the started word's address).
+void TodaysResultCreate(PPCContext& ctx, uint8_t* base);
+void TodaysResultOpenMovie(PPCContext& ctx, uint8_t* base);
+void TodaysResultWaitForMovie(PPCContext& ctx, uint8_t* base);
+void TodaysResultStart(PPCContext& ctx, uint8_t* base);
+void TodaysResultReadDay(PPCContext& ctx, uint8_t* base);
+void TodaysResultSetUpMovie(PPCContext& ctx, uint8_t* base);
+void TodaysResultSetTexts(PPCContext& ctx, uint8_t* base);
+void TodaysResultDraw(PPCContext& ctx, uint8_t* base);
+void TodaysResultUpdate(PPCContext& ctx, uint8_t* base);
+void TodaysResultWaitPage(PPCContext& ctx, uint8_t* base);
+void TodaysResultLeavePage(PPCContext& ctx, uint8_t* base);
+void TodaysResultQueueMovie(PPCContext& ctx, uint8_t* base);
+void TodaysResultIntro(PPCContext& ctx, uint8_t* base);
+void TodaysResultShowLoop(PPCContext& ctx, uint8_t* base);
+void TodaysResultFadeOut(PPCContext& ctx, uint8_t* base);
+void TodaysResultUnload(PPCContext& ctx, uint8_t* base);
+void TodaysResultUnloaded(PPCContext& ctx, uint8_t* base);
+void TodaysResultLeave(PPCContext& ctx, uint8_t* base);
+void TodaysResultDestroy(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

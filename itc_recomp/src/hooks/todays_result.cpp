@@ -17,7 +17,19 @@ ITC_FLAG_BOOL(native_todays_result, true, "ITC",
               "sub_8225D918, NextMode sub_8225DC38, LeaveScreen sub_8225DB70, WaitForShown "
               "sub_8225DA68 and Leaving sub_8225DE78 (GameMessages::Dispatch through its "
               "override; FindShown sub_8225D658 their plain C++), IsLoaded sub_8225D6A8 and "
-              "TodaysEvent::Kind sub_8225BA48 (checked by --run_harnesses=todays_result)");
+              "TodaysEvent::Kind sub_8225BA48; today's result's machine, Create sub_8225A7A0 and "
+              "Destroy sub_8225A8A8 (VirtualAlloc and VirtualFree through their overrides), "
+              "OpenMovie sub_8225A510, WaitForMovie sub_8225A930, Start sub_8225B300 with "
+              "ReadDay sub_8225A520 (memcpy, DayBlock::WinStreak and Word4832 and "
+              "Career::NextDay through their overrides), SetUpMovie sub_8225B258 and SetTexts "
+              "sub_8225ADE0 (the text setters through their overrides, their unset varargs 0), "
+              "Draw sub_8225B0C8 and Update sub_8225B128 (the pages and transitions through the "
+              "guest from their tables), Unload sub_8225AA20, Unloaded sub_8225A9A0 and Leave "
+              "sub_8225AA88; its pages WaitPage sub_8225A9B0 (Menu::Pressed and MenuSound::Play "
+              "through their overrides) and LeavePage sub_8225AB30 with QueueMovie sub_8225A720 "
+              "(Progress::CheckUnlocks, recompiled, and RaceEvent::Destroy through the guest); "
+              "its transitions Intro sub_8225ABD8, ShowLoop sub_8225AC88 and FadeOut "
+              "sub_8225AD20 (checked by --run_harnesses=todays_result)");
 
 namespace hooks {
 
@@ -117,6 +129,59 @@ void TodaysEventInitStates(PPCContext& ctx, uint8_t* base) {
   InitStatesStep<tr::EventInitStates>(ctx, base);
 }
 
+void TodaysResultCreate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::ResultCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TodaysResultOpenMovie(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::ResultOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+void TodaysResultWaitForMovie(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tr::ResultWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+}
+// The handlers and helpers with no argument but the frame.
+#define ITC_TODAYS_RESULT_FRAME(name, function)                     \
+  void name(PPCContext& ctx, uint8_t* base) {                       \
+    GuestCalls guest(ctx, base);                                    \
+    ctx.r3.u64 = tr::function(base, ctx.r1.u32, guest.calls());     \
+  }
+ITC_TODAYS_RESULT_FRAME(TodaysResultStart, ResultStart)
+ITC_TODAYS_RESULT_FRAME(TodaysResultReadDay, ReadDay)
+ITC_TODAYS_RESULT_FRAME(TodaysResultSetUpMovie, SetUpMovie)
+ITC_TODAYS_RESULT_FRAME(TodaysResultSetTexts, SetTexts)
+ITC_TODAYS_RESULT_FRAME(TodaysResultUpdate, ResultUpdate)
+ITC_TODAYS_RESULT_FRAME(TodaysResultWaitPage, ResultWaitPage)
+ITC_TODAYS_RESULT_FRAME(TodaysResultQueueMovie, ResultQueueMovie)
+#undef ITC_TODAYS_RESULT_FRAME
+void TodaysResultDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::ResultDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+void TodaysResultLeavePage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::ResultLeavePage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+// The transitions (r3 the started word).
+#define ITC_TODAYS_RESULT_TRANSITION(name, function)                           \
+  void name(PPCContext& ctx, uint8_t* base) {                                  \
+    GuestCalls guest(ctx, base);                                               \
+    ctx.r3.u64 = tr::function(base, ctx.r3.u32, ctx.r1.u32, guest.calls());    \
+  }
+ITC_TODAYS_RESULT_TRANSITION(TodaysResultIntro, ResultIntro)
+ITC_TODAYS_RESULT_TRANSITION(TodaysResultShowLoop, ResultShowLoop)
+ITC_TODAYS_RESULT_TRANSITION(TodaysResultFadeOut, ResultFadeOut)
+ITC_TODAYS_RESULT_TRANSITION(TodaysResultUnload, ResultUnload)
+ITC_TODAYS_RESULT_TRANSITION(TodaysResultDestroy, ResultDestroy)
+#undef ITC_TODAYS_RESULT_TRANSITION
+void TodaysResultUnloaded(PPCContext& ctx, uint8_t* base) {
+  tr::ResultUnloaded(base, ctx.r3.u32);
+}
+void TodaysResultLeave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::ResultLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 #define ITC_TODAYS_RESULT(address, step)   \
@@ -143,3 +208,23 @@ ITC_TODAYS_RESULT(8225DA68, ModeType9WaitForShown)
 ITC_TODAYS_RESULT(8225DE78, ModeType9Leaving)
 ITC_TODAYS_RESULT(8225D6A8, ModeType9IsLoaded)
 ITC_TODAYS_RESULT(8225BA48, TodaysEventKind)
+// Today's result's handlers (member function functors the machine calls; no
+// direct callers), pages (from Draw's table on its stack) and transitions
+// (from Update's table). ReadDay sub_8225A520, SetUpMovie sub_8225B258,
+// SetTexts sub_8225ADE0 and QueueMovie sub_8225A720: no adapters (only Start
+// and LeavePage, native, call them).
+ITC_TODAYS_RESULT(8225A7A0, TodaysResultCreate)
+ITC_TODAYS_RESULT(8225A510, TodaysResultOpenMovie)
+ITC_TODAYS_RESULT(8225A930, TodaysResultWaitForMovie)
+ITC_TODAYS_RESULT(8225B300, TodaysResultStart)
+ITC_TODAYS_RESULT(8225B0C8, TodaysResultDraw)
+ITC_TODAYS_RESULT(8225B128, TodaysResultUpdate)
+ITC_TODAYS_RESULT(8225A9B0, TodaysResultWaitPage)
+ITC_TODAYS_RESULT(8225AB30, TodaysResultLeavePage)
+ITC_TODAYS_RESULT(8225ABD8, TodaysResultIntro)
+ITC_TODAYS_RESULT(8225AC88, TodaysResultShowLoop)
+ITC_TODAYS_RESULT(8225AD20, TodaysResultFadeOut)
+ITC_TODAYS_RESULT(8225AA20, TodaysResultUnload)
+ITC_TODAYS_RESULT(8225A9A0, TodaysResultUnloaded)
+ITC_TODAYS_RESULT(8225AA88, TodaysResultLeave)
+ITC_TODAYS_RESULT(8225A8A8, TodaysResultDestroy)
