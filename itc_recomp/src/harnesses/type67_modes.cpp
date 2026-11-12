@@ -3785,7 +3785,8 @@ void Type2ModeInits(Context& h) {
 // Live) or a block of the case's with its +240 and +244 each 0 or not, and
 // the network's state [0x8281611C] 0, 1 or another value. The original runs
 // with --native_network_mode as the game has it (its InitStates then the
-// adapters' or, once those are gone, the recompiled ones). Compared: the
+// adapters' or, once those are gone, the recompiled ones; the functors'
+// stack leftovers in a group of their own). Compared: the
 // recorded calls, the mode, the type 12 block (VirtualAlloc's pages) and
 // every block the stand made, with the pointers into them made offsets; the
 // session's block, the loading world, the fades, the stand's globals, the
@@ -3815,8 +3816,20 @@ void NetworkModeInits(Context& h) {
   if (!w.ok() || !mode.address || !world.address) return;
   const uint32_t session = world.address + 0x400;
   Results results("ModeType12::Init (sub_82278058)");
+  // The block's words that are stack leftovers: the InitStates copy three
+  // frame words they never write into each transition's functor (its +32
+  // to +40; the transitions 48 bytes from the machine's +0, their count at
+  // +9600), dead words; compared on their own (expected to differ: the
+  // original's InitStates run recompiled since their adapters went, and
+  // leave register saves and return addresses in the stack there, from
+  // NetScreen::InitBase's and the base Inits' calls, that later InitStates
+  // copy; the plain C++ writes neither), as Type6Mode::Init's.
+  Results leftovers(
+      "ModeType12::Init (sub_82278058), the transitions' stack leftovers (expected to differ)");
   for (int c = 0; c < 16; c++) {
     Outputs out[2];
+    std::vector<uint8_t> made[2];
+    std::vector<uint32_t> masked[2];  // the leftovers' offsets in the block
     for (int v = 0; v < 2; v++) {
       Random r(uint64_t(c) * 811 + 0x82278058);
       saved.Restore();
@@ -3829,7 +3842,8 @@ void NetworkModeInits(Context& h) {
       WriteRandom(base, mode.address, mode.bytes, r);
       WriteRandom(base, world.address, world.bytes, r);
       WriteRandom(base, sp - 0x1000, 0x1000 + 0x100, r);
-      guest::StoreU32(base, mode.address + 36 + 200, r.Below(8));
+      const uint32_t handlers = r.Below(8);
+      guest::StoreU32(base, mode.address + 36 + 200, handlers);
       const bool held = c % 3 == 2;
       guest::StoreU32(base, t67::kStandHolder, held ? world.address : 0);
       guest::StoreU32(base, scene::kScene, 0);
@@ -3886,7 +3900,19 @@ void NetworkModeInits(Context& h) {
       take.TakeBlocks(base, out[v]);
       out[v].Word(block_made);
       if (block_made) {
-        out[v].Bytes(scene_pools_take::Normalized(base, take.regions, block, nm::kBlockBytes));
+        made[v] = scene_pools_take::Normalized(base, take.regions, block, nm::kBlockBytes);
+        // The machines the Init added to the dispatcher.
+        const uint32_t added = guest::LoadU32(base, mode.address + 36 + 200);
+        for (uint32_t k = handlers; k < added && k < handlers + 16; k++) {
+          const uint32_t machine = guest::LoadU32(base, mode.address + 36 + 4 * k);
+          if (machine < block || machine - block >= nm::kBlockBytes) continue;
+          const uint32_t count = guest::LoadU32(base, machine + game_modes::kTransitionCount);
+          for (uint32_t e = 0; e < count && e < 200; e++) {
+            for (const uint32_t word : {32u, 36u, 40u}) {
+              masked[v].push_back(machine - block + 48 * e + word);
+            }
+          }
+        }
       }
       out[v].Bytes(scene_pools_take::Normalized(base, take.regions, mode.address, mode.bytes));
       out[v].Bytes(scene_pools_take::Normalized(base, take.regions, world.address, world.bytes));
@@ -3908,9 +3934,23 @@ void NetworkModeInits(Context& h) {
       loading.Restore();
       Write(base, kFades, fades.data(), kFadesBytes);
     }
+    Outputs left[2];
+    for (int v = 0; v < 2; v++) {
+      std::vector<uint8_t> kept = made[v];
+      out[v].Word(uint32_t(masked[v].size()));
+      for (const uint32_t o : masked[v]) {
+        if (o + 4 > kept.size()) continue;
+        out[v].Word(o);
+        left[v].Bytes(std::vector<uint8_t>(kept.begin() + o, kept.begin() + o + 4));
+        std::fill(kept.begin() + o, kept.begin() + o + 4, 0);
+      }
+      out[v].Bytes(kept);
+    }
     results.Check(out[0], out[1], fmt::format("case {}", c));
+    leftovers.Check(left[0], left[1], fmt::format("case {}", c));
   }
   results.Report();
+  leftovers.Report();
   saved.Restore();
   Write(base, kFades, fades.data(), kFadesBytes);
   for (size_t g = 0; g < std::size(globals); g++) guest::StoreU32(base, globals[g], kept[g]);
