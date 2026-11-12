@@ -142,6 +142,20 @@ and `ForceExit` (`type10-mode.md`), `ModeType9::Release`
 `boot-mode.md`). Nothing in `itc_recomp/src` hooks this file's functions
 (checked 2026-11-12).
 
+Native (B7 loop, 2026-11-12): all 57 rows, plain C++ in
+`itc_recomp/src/todays_result/` (the mode in `mode.cpp`, the two
+`InitStates` as step tables in `init.cpp`, today's result in `result.cpp`,
+today's event in `event.cpp`), the handlers, pages and transitions behind
+adapters in `itc_recomp/src/hooks/todays_result.cpp`
+(`--native_todays_result`, on by default), checked by
+`--run_harnesses=todays_result`; the functions never seen in play were
+ported with their callers (the garage screen's precedent, 2026-11-09).
+Found on the way: the screens' globals are `0x828160C8` to `0x828160DC`
+and the fades' counts `0x826A50E4` and `0x826A50DC` (the map first read
+them as `0x827F60..` and `0x826950..`), and `SetUpTexts` hides node
+(8, 11)'s weekday, not (10, 11). `Progress::CheckUnlocks` (`career.md`),
+which both queue functions call, stays recompiled (never seen in play).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
