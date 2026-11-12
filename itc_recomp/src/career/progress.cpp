@@ -63,6 +63,48 @@ void MergeInt(uint8_t* base, uint32_t frame, uint32_t into, int32_t value) {
   RunningMeanMerge(base, into, LoadU64(base, frame + 80), frame);
 }
 
+// The 40-byte rewards whose conditions pass Condition::Test(c, 0, entry +0)
+// granted (Rewards::Grant), as Progress::AfterRace and CheckUnlocks run them;
+// Condition::Test from `frame` (the caller's).
+void RewardsPass(uint8_t* base, uint32_t save, uint32_t frame) {
+  for (int32_t i = 0;; i++) {
+    const uint32_t entry = data_tables::Entry40(base, uint32_t(i));
+    if (int32_t(guest::LoadU32(base, entry + 16)) == -1) {
+      break;
+    }
+    if (i >= 0 && BitSet(base, save + 0x1D508, i)) {
+      continue;
+    }
+    bool grant = false;
+    const bool all = guest::LoadU32(base, entry + 12) != 0;
+    for (int32_t k = 0; k < 3; k++) {
+      const uint32_t condition = entry + 16 + 8 * uint32_t(k);
+      if (int32_t(guest::LoadU32(base, condition + 0)) == -1 ||
+          int32_t(guest::LoadU32(base, condition + 4)) == -1) {
+        break;
+      }
+      const uint32_t pass =
+          ConditionTest(base, condition, 0, guest::LoadU32(base, entry + 0), frame).value_or(0);
+      if (!all) {
+        if (pass != 0) {
+          grant = true;
+          break;
+        }
+      } else {
+        if (pass == 0) {
+          grant = false;
+          break;
+        }
+        grant = true;
+      }
+    }
+    if (grant) {
+      RewardsGrant(base, save, uint32_t(i), guest::LoadU32(base, entry + 4),
+                   guest::LoadU32(base, entry + 8));
+    }
+  }
+}
+
 }  // namespace
 
 uint32_t AnyWonKind3Stage2(uint8_t* base) {
@@ -193,42 +235,7 @@ uint32_t ProgressAfterRace(uint8_t* base, uint32_t save, uint32_t sp) {
     guest::StoreU32(base, list + 768, guest::LoadU32(base, list + 768) + 1);
   }
   // The 40-byte rewards.
-  for (int32_t i = 0;; i++) {
-    const uint32_t entry = data_tables::Entry40(base, uint32_t(i));
-    if (int32_t(guest::LoadU32(base, entry + 16)) == -1) {
-      break;
-    }
-    if (i >= 0 && BitSet(base, save + 0x1D508, i)) {
-      continue;
-    }
-    bool grant = false;
-    const bool all = guest::LoadU32(base, entry + 12) != 0;
-    for (int32_t k = 0; k < 3; k++) {
-      const uint32_t condition = entry + 16 + 8 * uint32_t(k);
-      if (int32_t(guest::LoadU32(base, condition + 0)) == -1 ||
-          int32_t(guest::LoadU32(base, condition + 4)) == -1) {
-        break;
-      }
-      const uint32_t pass =
-          ConditionTest(base, condition, 0, guest::LoadU32(base, entry + 0), frame).value_or(0);
-      if (!all) {
-        if (pass != 0) {
-          grant = true;
-          break;
-        }
-      } else {
-        if (pass == 0) {
-          grant = false;
-          break;
-        }
-        grant = true;
-      }
-    }
-    if (grant) {
-      RewardsGrant(base, save, uint32_t(i), guest::LoadU32(base, entry + 4),
-                   guest::LoadU32(base, entry + 8));
-    }
-  }
+  RewardsPass(base, save, frame);
   // The stage reached.
   uint32_t reached = 0xFFFFFFFFu;
   const auto stage_bit = [&](uint32_t bit) {
@@ -298,6 +305,84 @@ uint32_t ProgressAfterRace(uint8_t* base, uint32_t save, uint32_t sp) {
     guest::StoreU32(base, save + 6112, 48);
   }
   return reached;
+}
+
+bool CheckUnlocksNative(uint8_t* base, uint32_t sp) {
+  return ConditionTestFits(base, sp - kCheckUnlocksFrame);
+}
+
+uint32_t ProgressCheckUnlocks(uint8_t* base, uint32_t save, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821162B0 Progress::CheckUnlocks");
+  const uint32_t frame = sp - kCheckUnlocksFrame;
+  // The table-0 unlocks: the entry's flags (+4) instead of Entry56::Allows.
+  for (int32_t i = 0;; i++) {
+    const uint32_t entry = data_tables::Entry56(base, 0, uint32_t(i));
+    const int32_t kind = int32_t(guest::LoadU32(base, entry + 0));
+    if (kind == -1) {
+      break;
+    }
+    if (kind == 4 || (i >= 0 && BitSet(base, save + 0x1CA7C, i))) {
+      continue;
+    }
+    const uint32_t stage = StageOf(base, save);
+    const uint32_t flags = guest::LoadU32(base, entry + 4);
+    if ((flags & 0x40) == 0) {
+      continue;
+    }
+    if ((flags & 0x7C00) != 0) {
+      if (int32_t(stage) == 4) {
+        if ((flags & 0x2000) == 0) {
+          continue;
+        }
+      } else {
+        // slw: the shift's low six bits, 32 and above giving 0.
+        const uint32_t shift = (stage + 10) & 0x3F;
+        const uint32_t bit = (shift & 0x20) != 0 ? 0 : 1u << shift;
+        if ((flags & bit) == 0) {
+          continue;
+        }
+      }
+    }
+    bool grant = false;
+    const bool all = guest::LoadU32(base, entry + 20) != 0;
+    for (int32_t k = 0; k < 3; k++) {
+      const uint32_t condition = entry + 24 + 8 * uint32_t(k);
+      if (int32_t(guest::LoadU32(base, condition + 0)) == -1 ||
+          int32_t(guest::LoadU32(base, condition + 4)) == -1) {
+        if (k == 0) {
+          grant = true;
+        }
+        break;
+      }
+      const uint32_t pass = ConditionTest(base, condition, 0, 0, frame).value_or(0);
+      if (!all) {
+        if (pass != 0) {
+          grant = true;
+          break;
+        }
+      } else {
+        if (pass == 0) {
+          grant = false;
+          break;
+        }
+        grant = true;
+      }
+    }
+    if (!grant) {
+      continue;
+    }
+    if (i >= 0) {
+      SetBit(base, save + 0x1CA7C, i);
+    }
+    const uint32_t list = save + 0x1C778;
+    const uint32_t at = list + 12 * guest::LoadU32(base, list + 768);
+    guest::StoreU32(base, at + 0, 0);
+    guest::StoreU32(base, at + 4, 0);
+    guest::StoreU32(base, at + 8, uint32_t(i));
+    guest::StoreU32(base, list + 768, guest::LoadU32(base, list + 768) + 1);
+  }
+  RewardsPass(base, save, frame);
+  return 0;
 }
 
 uint32_t StatsCloseDay(uint8_t* base, uint32_t stats, uint32_t sp) {

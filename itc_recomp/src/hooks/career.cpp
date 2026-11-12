@@ -34,7 +34,8 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "Items::AnyWonKind3Stage2 sub_82111818, Items::AllWonKind3 sub_821118B0, "
               "Items::AllWonKind4Stage2 sub_82111940, Items::AllWonKind4Stage3 sub_821119D0, "
               "Items::AllWonKind5 sub_82111A60 and Locations::Unlock sub_82111D20 and "
-              "Unlock2 sub_82111D98 (no adapters); Career::NextDay sub_82116AF0 with "
+              "Unlock2 sub_82111D98 (no adapters); Progress::CheckUnlocks sub_821162B0 (never seen "
+              "in play, ported with the race's end); Career::NextDay sub_82116AF0 with "
               "Stats::CloseDay sub_82113898 (no adapter); no adapters either for RunningMean::Merge, "
               "Items::AnyWonKind3Stage1, ItemRecords::AddWin and AddLoss, Results::Push, "
               "Stats::StartDay, Rewards::Grant, Entry56::Allows, Condition::Test, Car::SpecWord744 "
@@ -170,6 +171,15 @@ void CareerAfterRace(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.s64 = int32_t(cr::ProgressAfterRace(base, ctx.r3.u32, ctx.r1.u32));
+}
+
+void CareerCheckUnlocks(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!cr::CheckUnlocksNative(base, ctx.r1.u32)) {
+    __imp__sub_821162B0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = cr::ProgressCheckUnlocks(base, ctx.r3.u32, ctx.r1.u32);
 }
 
 namespace {
@@ -320,6 +330,10 @@ CAREER_ADAPTER(821121F8, CareerStageOf)
 CAREER_ADAPTER(82115190, CareerAddRaceResult)
 CAREER_ADAPTER(821159B0, CareerPickNext)
 CAREER_ADAPTER(82116588, CareerAfterRace)
+// Progress::CheckUnlocks: never seen in play; its callers (the race's end,
+// sub_82150E00, and the today's result's two) reach it through the guest or
+// its plain C++.
+CAREER_ADAPTER(821162B0, CareerCheckUnlocks)
 // Career::NextDay asks the harness recorder first (the title screen's
 // harness records it: its career menu's third item).
 extern "C" REX_FUNC(sub_82116AF0) {

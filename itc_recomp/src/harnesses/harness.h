@@ -323,5 +323,7 @@ void TitleScreen(Context& h);
 void Type10Mode(Context& h);
 void TodaysResult(Context& h);
 void NetworkMode(Context& h);
+// The race's end (src/harnesses/race_end.cpp).
+void RaceEnd(Context& h);
 
 }  // namespace harness
