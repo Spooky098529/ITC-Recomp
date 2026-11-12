@@ -528,6 +528,8 @@ set(ITC_SOURCES
     src/todays_result/mode.cpp
     src/todays_result/result.cpp
     src/todays_result/event.cpp
+    src/hooks/network_mode.cpp
+    src/network_mode/init.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp
@@ -794,6 +796,7 @@ set(ITC_SOURCES
     src/harnesses/title_screen.cpp
     src/harnesses/type10_mode.cpp
     src/harnesses/todays_result.cpp
+    src/harnesses/network_mode.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
