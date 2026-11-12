@@ -7,7 +7,7 @@
 #include "base/flags.h"
 #include "type10_mode/type10_mode.h"
 
-ITC_FLAG_BOOL(native_type10_mode, false, "ITC",
+ITC_FLAG_BOOL(native_type10_mode, true, "ITC",
               "Run the type 10 front-end mode (docs/functions/type10-mode.md: the replay "
               "theater) natively instead of through the translated code: the mode, "
               "ModeType10::Init sub_82288940 (the theater's InitStates sub_8228AC48 as plain "
