@@ -11,6 +11,8 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
+
 ## Run 2026-11-11 08:38 (`b7-loop-11-11-26`)
 
 - The tuning screen's update's map (eba99e25): `tuning-screen.md`, 64
