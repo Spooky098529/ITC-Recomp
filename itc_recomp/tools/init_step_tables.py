@@ -15,6 +15,11 @@ by word, and prints, in the original's order:
   kCopy  [a] = [b]      a store of a frame word the original never wrote
                         (copied as the frame holds it)
   kAdd   StateMachine::Add(machine c, key a, functor part b)
+  kBase  NetScreen::InitBase(r3 c, index a, r5 b) (sub_8227B3E0: the type
+         12 mode's machines 6 to 13 call it first, for their base Init's
+         transitions, run as a nested call with its own frame below)
+Values: C(constant), O(offset from r3, the object), A(offset from r4, a
+second object: the base Inits' functors' object) and F(offset in the frame).
 Anything else in the function (another call, a load from outside the
 frame, a branch other than the copy loops) stops it with an error: the
 function isn't an Init of this shape. The back chain the prologue stores
@@ -28,6 +33,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 GENERATED = os.path.join(ROOT, "itc_recomp", "generated", "default")
 ADD = "sub_82106158"  # StateMachine::Add
+BASE = "sub_8227B3E0"  # NetScreen::InitBase
 
 
 def body(name):
@@ -52,7 +58,7 @@ def u32(v):
 
 def add(value, n):
     kind, v = value
-    if kind in ("C", "O", "F"):
+    if kind in ("C", "O", "A", "F"):
         return (kind, u32(v + n) if kind == "C" else v + n)
     raise ValueError("arithmetic on %r" % (value,))
 
@@ -60,7 +66,7 @@ def add(value, n):
 def decode(name):
     lines = body(name)
     labels = {l[:-1]: i for i, l in enumerate(lines) if re.fullmatch(r"loc_[0-9A-F]+:", l)}
-    regs = {"r1": ("SP", 0), "r3": ("O", 0)}
+    regs = {"r1": ("SP", 0), "r3": ("O", 0), "r4": ("A", 0)}
     frame_words = {}
     steps = []
     frame = None
@@ -112,11 +118,11 @@ def decode(name):
         elif kind == "store":
             where = add(regs[g[0]], int(g[1]))
             value = regs[g[2]]
-            if where[0] not in ("F", "O"):
+            if where[0] not in ("F", "O", "A"):
                 sys.exit("%s: a store to %r" % (name, where))
             if value[0] == "LF":
                 steps.append(("kCopy", where, ("F", value[1])))
-            elif value[0] in ("C", "O", "F"):
+            elif value[0] in ("C", "O", "A", "F"):
                 steps.append(("kStore", where, value))
             else:
                 sys.exit("%s: a store of %r" % (name, value))
@@ -131,9 +137,14 @@ def decode(name):
             if regs["ctr"][1] != 0:
                 pc = labels[g[0]]
         elif kind == "call":
-            if g[0] != ADD:
+            if g[0] == ADD:
+                steps.append(("kAdd", regs["r4"], regs["r5"], regs["r3"]))
+            elif g[0] == BASE:
+                if regs["r4"][0] != "C":
+                    sys.exit("%s: InitBase's index %r" % (name, regs["r4"]))
+                steps.append(("kBase", regs["r4"], regs["r5"], regs["r3"]))
+            else:
                 sys.exit("%s: a call to %s" % (name, g[0]))
-            steps.append(("kAdd", regs["r4"], regs["r5"], regs["r3"]))
             for r in ["r0"] + ["r%d" % i for i in range(3, 13)]:
                 regs[r] = ("X", 0)
     return frame, saved, steps
