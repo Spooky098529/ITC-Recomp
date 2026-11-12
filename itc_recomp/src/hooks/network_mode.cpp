@@ -1,7 +1,7 @@
 // The type 12 mode (the game's Xbox Live mode) natively: adapters in front
 // of src/network_mode/ (docs/functions/network-mode.md), with the register
-// steps the harness shares (hooks/network_mode.h). Its Xbox Live calls stay
-// recompiled, called through the guest (the user's call, 2026-11-12).
+// steps the harness shares (hooks/network_mode.h). Its Xbox Live calls are
+// answered by plugging in data (the user's call, 2026-11-12).
 
 #include "hooks/network_mode.h"
 
@@ -10,8 +10,10 @@
 
 ITC_FLAG_BOOL(native_network_mode, true, "ITC",
               "Run the type 12 front-end mode (docs/functions/network-mode.md: the Xbox Live "
-              "mode, its Live calls still through the translated code) natively instead of "
-              "through the translated code: the machines' set-ups NetModeSelect::InitStates "
+              "mode) natively instead of through the translated code: ModeType12::Init "
+              "sub_82278058 (the screen start, Strings::Load, Archive::WaitIdle, "
+              "StandScene::Create, VirtualAlloc, ScreenFades::FadeIn and LoadingScreen::Show "
+              "through their overrides, the InitStates their plain C++); the machines' set-ups NetModeSelect::InitStates "
               "sub_8227D680, Type12Screen1::InitStates sub_82276510, Type12Screen3::InitStates "
               "sub_8225F330, NetRanking::InitStates sub_822873A0, NetTaCourse::InitStates "
               "sub_82281858, Type12Screen6 to 9::InitStates sub_82268410, sub_8226EB40, "
@@ -27,6 +29,49 @@ namespace hooks {
 namespace {
 
 namespace nm = network_mode;
+
+// The guest calls the plain C++ makes (network_mode::Calls), through this
+// context: r1, r3 to r10, f1 when given and lr set, the function run through
+// the function table (its override when it has one), r1 put back. The
+// adapter's lr is put back when it ends.
+class GuestCalls {
+ public:
+  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  ~GuestCalls() { ctx_.lr = lr_; }
+  GuestCalls(const GuestCalls&) = delete;
+  GuestCalls& operator=(const GuestCalls&) = delete;
+  nm::Calls calls() { return {this, &GuestCalls::Call}; }
+
+ private:
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
+                       uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    PPCContext& ctx = self.ctx_;
+    uint8_t* base = self.base_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = args[0];
+    ctx.r4.u64 = args[1];
+    ctx.r5.u64 = args[2];
+    ctx.r6.u64 = args[3];
+    ctx.r7.u64 = args[4];
+    ctx.r8.u64 = args[5];
+    ctx.r9.u64 = args[6];
+    ctx.r10.u64 = args[7];
+    if (f1 != nullptr) {
+      ctx.f1.f64 = *f1;
+    }
+    ctx.lr = lr;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  PPCContext& ctx_;
+  uint8_t* base_;
+  uint64_t lr_;
+};
 
 // StateMachine::Add's r3: a new transition's address from the machine's
 // 64-bit r3, as the type 9 mode's Inits.
@@ -52,6 +97,11 @@ void InitBaseStep(PPCContext& ctx, uint8_t* base) {
 }  // namespace
 
 bool NetworkModeNative() { return ITC_FLAG(native_network_mode); }
+
+void ModeType12Init(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = nm::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
 
 #define ITC_NET_INIT_STATES(name, function, frame) \
   void name(PPCContext& ctx, uint8_t* base) { InitStatesStep<nm::function, nm::frame>(ctx, base); }
@@ -104,7 +154,10 @@ void NetScreenInitBase(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-// The fourteen InitStates: from ModeType12::Init (recompiled).
+// Init (the mode's vtable 0x82006C6C slot 0, from Modes::Tick).
+ITC_NETWORK_MODE(82278058, ModeType12Init)
+// The fourteen InitStates: from ModeType12::Init (recompiled with the flag
+// off; the native Init calls their plain C++).
 ITC_NETWORK_MODE(8227D680, NetModeSelectInitStates)
 ITC_NETWORK_MODE(82276510, Type12Screen1InitStates)
 ITC_NETWORK_MODE(8225F330, Type12Screen3InitStates)

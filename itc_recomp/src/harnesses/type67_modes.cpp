@@ -41,6 +41,7 @@
 #include "hooks/archive.h"
 #include "hooks/car_models.h"
 #include "hooks/heap.h"
+#include "hooks/network_mode.h"
 #include "hooks/type67_modes.h"
 #include "hooks/type2_mode.h"
 #include "hooks/ui_movies.h"
@@ -50,6 +51,7 @@
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
 #include "models/model.h"
+#include "network_mode/network_mode.h"
 #include "mode_tick/mode_tick.h"
 #include "race_loading/race_loading.h"
 #include "race_setup/race_setup.h"
@@ -3770,6 +3772,148 @@ void Type2ModeInits(Context& h) {
   Write(base, kSaveSlots, slots.data(), 16);
   guest::StoreU32(base, t2m::kModeBefore, mode_before);
   guest::StoreU32(base, t2m::kRaceData, race_data);
+}
+
+// --- ModeType12::Init (the type 12 mode, docs/functions/network-mode.md;
+// run by the network_mode harness), laid as ModeType2::Init's above: the
+// mode a block of random words (its dispatcher's count 0 to 7), the stand
+// made as StandScene::Create's cases have it (its holder none or held), the
+// UI movies' start and Strings::Load recorded, Archive::Load recorded,
+// LoadingScreen::Show over the loading screen's world (a made-up time for the
+// tip), the screen fades' words saved and put back; the mode before 0 to 5
+// (1, back from a race, often), the session [0x82816E3C] null (play: no
+// Live) or a block of the case's with its +240 and +244 each 0 or not, and
+// the network's state [0x8281611C] 0, 1 or another value. The original runs
+// with --native_network_mode as the game has it (its InitStates then the
+// adapters' or, once those are gone, the recompiled ones). Compared: the
+// recorded calls, the mode, the type 12 block (VirtualAlloc's pages) and
+// every block the stand made, with the pointers into them made offsets; the
+// session's block, the loading world, the fades, the stand's globals, the
+// frame's +80 to +119, the caller's +20 and r3. ---
+
+void NetworkModeInits(Context& h) {
+  namespace lw = loading_world;
+  namespace nm = network_mode;
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
+      !hooks::CarModelsSceneSetUpNative()) {
+    ITC_LOG_WARN("harness: network_mode: the allocation layer, the archive's queue, the models' "
+                 "lifetime or memcpy isn't native: ModeType12::Init's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> exits(c_runtime::ExitMutex());
+  std::lock_guard<std::recursive_mutex> blocks(models::MemoryBlocksMutex());
+  constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x40;
+  const std::vector<uint8_t> fades = Read(base, kFades, kFadesBytes);
+  const uint32_t globals[] = {nm::kModeBefore, nm::kSession, nm::kNetworkState};
+  uint32_t kept[std::size(globals)];
+  for (size_t g = 0; g < std::size(globals); g++) kept[g] = guest::LoadU32(base, globals[g]);
+  const StandSaved saved(base);
+  const lw::MovieWorld w;
+  const Block mode(kModeBytes);
+  const Block world(0x1000);
+  if (!w.ok() || !mode.address || !world.address) return;
+  const uint32_t session = world.address + 0x400;
+  Results results("ModeType12::Init (sub_82278058)");
+  for (int c = 0; c < 16; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(uint64_t(c) * 811 + 0x82278058);
+      saved.Restore();
+      const lw::SavedGlobals loading(base);
+      lw::ShapeMovieWorld(base, w, r);
+      lw::BuildStringTable(base, w);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(base, mode.address, mode.bytes, r);
+      WriteRandom(base, world.address, world.bytes, r);
+      WriteRandom(base, sp - 0x1000, 0x1000 + 0x100, r);
+      guest::StoreU32(base, mode.address + 36 + 200, r.Below(8));
+      const bool held = c % 3 == 2;
+      guest::StoreU32(base, t67::kStandHolder, held ? world.address : 0);
+      guest::StoreU32(base, scene::kScene, 0);
+      guest::StoreU32(base, scene::kFirstSet, 0);
+      guest::StoreU32(base, accessories::kSet, 0);
+      guest::StoreU32(base, race_loading::kLoadingCurrent, r.Below(3));
+      guest::StoreU32(base, race_loading::kLoadingShown, uint32_t(r.Next()));
+      for (uint32_t i = 0; i < 3; i++) {
+        guest::StoreU32(base, race_loading::kLoadingAnimations + 4 * i,
+                        r.Below(2) ? (i == 1 ? 13 : 0) : r.Below(256));
+      }
+      // The mode before, the session and the network's state.
+      guest::StoreU32(base, nm::kModeBefore, r.Below(2) == 0 ? 1 : r.Below(6));
+      const bool live = c % 2 == 1;
+      guest::StoreU32(base, nm::kSession, live ? session : 0);
+      for (const uint32_t at : {240u, 244u}) {
+        guest::StoreU32(base, session + at, r.Below(2) == 0 ? 0 : 1 + r.Below(7));
+      }
+      const uint32_t states[] = {0, 1, 2, uint32_t(r.Next())};
+      guest::StoreU32(base, nm::kNetworkState, states[r.Below(4)]);
+      const uint32_t mark = exit_table::Mark(base);
+      time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
+      std::vector<uint32_t> calls;
+      g_stand_calls = &calls;
+      g_record_mode_calls = true;
+      const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+      hooks::g_start_up_recorder = StandRecorder;
+      t.r3.u64 = mode.address;
+      if (v == 0) {
+        __imp__sub_82278058(t, base);
+      } else {
+        hooks::ModeType12Init(t, base);
+      }
+      hooks::g_start_up_recorder = saved_recorder;
+      g_record_mode_calls = false;
+      g_stand_calls = nullptr;
+      time_hooks::ClearFakeNow();
+      StandTake take;
+      take.Collect(base, held);
+      const uint32_t block = guest::LoadU32(base, mode.address + nm::kBlock);
+      const bool block_made = memory::IsPages(block);
+      if (block_made) {
+        take.regions.push_back({block, nm::kBlockBytes});
+        take.AddHeapFrom(base, block, nm::kBlockBytes);
+      }
+      // The recorded calls' frames and return addresses: r1 by its offset;
+      // the screen start's r4 (it reads r3 only: the original's caller's
+      // leftover, 0 in ours) left out.
+      for (size_t k = 0; k + 5 <= calls.size(); k += 5) {
+        if (calls[k] != 0x8209DE48) calls[k + 3] -= t.r1.u32;
+        if (calls[k] == 0x8211AD00) calls[k + 2] = 0;
+      }
+      take.TakeCalls(base, calls, out[v]);
+      take.TakeBlocks(base, out[v]);
+      out[v].Word(block_made);
+      if (block_made) {
+        out[v].Bytes(scene_pools_take::Normalized(base, take.regions, block, nm::kBlockBytes));
+      }
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, mode.address, mode.bytes));
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, world.address, world.bytes));
+      saved.Take(take.regions, out[v]);
+      for (const uint32_t g : globals) out[v].Word(guest::LoadU32(base, g));
+      out[v].Bytes(Read(base, sp - nm::kInitFrame + 80, 40));
+      out[v].Word(guest::LoadU32(base, sp + 20));
+      out[v].Bytes(Read(base, w.movies.address, w.movies.bytes));
+      out[v].Bytes(Read(base, w.texts.address, w.texts.bytes));
+      out[v].Bytes(Read(base, w.strings.address, w.strings.bytes));
+      out[v].Word(guest::LoadU32(base, race_loading::kLoadingShown));
+      out[v].Word(guest::LoadU32(base, race_loading::kLoadingCurrent));
+      out[v].Bytes(Read(base, kFades, kFadesBytes));
+      exit_table::Take(base, mark, out[v]);
+      out[v].Word(take.Word(t.r3.u32, t.r1.u32));
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      take.Free();
+      if (block_made) memory::FreePages(block);
+      loading.Restore();
+      Write(base, kFades, fades.data(), kFadesBytes);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  saved.Restore();
+  Write(base, kFades, fades.data(), kFadesBytes);
+  for (size_t g = 0; g < std::size(globals); g++) guest::StoreU32(base, globals[g], kept[g]);
 }
 
 void Type2Mode(Context& h) {

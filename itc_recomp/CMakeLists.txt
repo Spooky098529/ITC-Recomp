@@ -530,6 +530,7 @@ set(ITC_SOURCES
     src/todays_result/event.cpp
     src/hooks/network_mode.cpp
     src/network_mode/init.cpp
+    src/network_mode/mode.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp

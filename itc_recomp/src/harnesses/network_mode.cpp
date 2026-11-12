@@ -246,6 +246,10 @@ void Inits(Context& h, const World& w) {
 
 }  // namespace
 
+// ModeType12::Init's cases, in src/harnesses/type67_modes.cpp (the stand's
+// world: StandSaved, StandTake, StandRecorder).
+void NetworkModeInits(Context& h);
+
 void NetworkMode(Context& h) {
   const World w(h.base);
   if (!w.ok()) {
@@ -255,6 +259,7 @@ void NetworkMode(Context& h) {
   if (hooks::NativeHeapActive()) {
     Inits(h, w);
   }
+  NetworkModeInits(h);
 }
 
 }  // namespace harness

@@ -1,21 +1,60 @@
 // The type 12 front-end mode natively (B7 in docs/rexglue-removal.md; the
 // functions are in docs/functions/network-mode.md, the globals in
 // docs/known-data.md): the game's Xbox Live mode (the network battle and
-// time attack). Its screens are made native as any front-end mode's, while
+// time attack). Its screens are made native as any front-end mode's, and
 // its Xbox Live calls (sign-in, gamer card, sessions, privileges,
-// leaderboards, the network manager's functions) stay recompiled, called
-// through the guest exactly as the original does (the user's call,
+// leaderboards, the network manager's functions) are answered by plugging
+// in data: the values the SDK's XAM imports return today (the user's call,
 // 2026-11-12). Plain C++ over guest memory (the machines and the mode's
 // block are shared with the recompiled code), with the originals' loads and
 // stores in their order and their frames' words.
 // Adapters: src/hooks/network_mode.cpp (behind --native_network_mode),
 // register steps shared with the harness in src/hooks/network_mode.h.
+//
+// The guest calls go through `Calls` (race_hud_object::Calls) by address, to
+// the callees' overrides (the screen start, Strings::Load,
+// Archive::WaitIdle, StandScene::Create, VirtualAlloc, the fades and the
+// loading screen).
 
 #pragma once
 
 #include <cstdint>
 
+#include "race_hud_object/race_hud_object.h"
+
 namespace network_mode {
+
+using Calls = race_hud_object::Calls;
+
+// The mode's fields: the delegate's holder (+4) and the delegate (+8), the
+// dispatcher (+36: the handlers, the count +200), the type 12 block (+848).
+constexpr uint32_t kDispatcher = 36;
+constexpr uint32_t kBlock = 848;
+// The block's words: the first screen's index (+0x2100C the shown one,
+// +0x21010 the first), +0x21024 (set when the session was made here).
+constexpr uint32_t kShown = 0x2100C;
+constexpr uint32_t kFirstShown = 0x21010;
+constexpr uint32_t kSessionMade = 0x21024;
+
+// The globals the Init reads: the mode before, the session and the
+// network's state (docs/known-data.md).
+constexpr uint32_t kModeBefore = 0x826032E0;
+constexpr uint32_t kSession = 0x82816E3C;
+constexpr uint32_t kNetworkState = 0x8281611C;
+
+// The guest functions the Init calls.
+constexpr uint32_t kScreenStart = 0x8211AD00;
+constexpr uint32_t kStringsLoad = 0x8210A8D0;
+constexpr uint32_t kArchiveWaitIdle = 0x8209D730;
+constexpr uint32_t kStandSceneCreate = 0x82180B00;
+constexpr uint32_t kVirtualAlloc = 0x82295398;
+constexpr uint32_t kFadeIn = 0x8209D038;
+constexpr uint32_t kLoadingShow = 0x822478D0;
+constexpr uint32_t kStringTable = 0x826C5C34;
+constexpr uint32_t kStringFile = 59;
+constexpr uint32_t kFadesPasses = 0x82001BEC;
+constexpr uint32_t kDelegateVtable = 0x82010FA0;
+constexpr uint32_t kSlot8Thunk = 0x8223D4B0;
 
 // The type 12 block's machines (ModeType12::Init's VirtualAlloc, 135,208
 // bytes at the mode's +848), by the index ModeType12::Machine numbers them.
@@ -103,5 +142,13 @@ uint32_t Dialog13InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint
 // its last Add's (untouched when none ran).
 bool InitBase(uint8_t* base, uint32_t machine, uint32_t index, uint32_t object, uint32_t sp,
               bool* replaced, uint32_t* r3);
+
+// --- The mode's Init (mode.cpp) ---
+
+// sub_82278058 ModeType12::Init (r3 the mode): see the row; the fourteen
+// InitStates as plain C++, the other callees through their overrides. The
+// second FadeIn's r3. 224-byte frame (and the caller's +20 = the mode).
+constexpr uint32_t kInitFrame = 224;
+uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
 
 }  // namespace network_mode

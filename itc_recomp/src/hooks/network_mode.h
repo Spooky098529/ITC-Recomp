@@ -13,6 +13,9 @@ namespace hooks {
 // Whether --native_network_mode is on.
 bool NetworkModeNative();
 
+// sub_82278058 ModeType12::Init (r3 the mode): r3 the second FadeIn's.
+void ModeType12Init(PPCContext& ctx, uint8_t* base);
+
 // The machines' set-ups: the fourteen InitStates (r3 the machine), the
 // eight base Inits (r3 the machine, r4 the functors' object) and
 // NetScreen::InitBase (r3 the machine, r4 the index, r5 the object).
