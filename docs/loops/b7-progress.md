@@ -15,7 +15,14 @@ file's history. What's left to see in a drive, from every run:
 - First: the replay theater's check (the previous run's port
   49287852, unchecked: its harness, a race, `--native_type10_mode` on,
   the adapterless rows set to Native), a lead without mapping (it
-  doesn't count toward the limit). Migration agent running.
+  doesn't count toward the limit). Migration 50318046..93b074ab: a
+  harness fault fixed first (by the precedent: `MoveCursor`'s case 86
+  wrote guest 0x10 in a loop, a replay record's +28 given wild values
+  where play gives 0-99), then 46 of 46 harnesses at 0 differing,
+  `--native_type10_mode` on by default, 8 adapterless rows Native,
+  `Replay::SetUpRace` left recompiled (never ran); no adapters
+  removable (all reached through tables); race 38 s at 40, 0 errors;
+  no subagents. Validation agent running.
 
 ## Done
 
@@ -35,5 +42,7 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - At the start: ours 5612, work left 984 (wrapped 55, known 392,
   unknown 537).
+- After the theater's check: ours 5620, work left 980 (wrapped 55,
+  known 388, unknown 537).
 
 ## Stopped

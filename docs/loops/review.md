@@ -13,6 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The replay theater's check (50318046..93b074ab): the previous run's
+  unchecked port (below) now checked by its harness (46 functions, 0
+  differing) and on by default; its harness lays a replay record's +28
+  as 0-99 (play's two-digit number), after a wild value made a case
+  write guest 0x10 in a loop; `FindShown`, `OnList`, `InitStates`,
+  `StartPage`, `SetPrompts`, `BuildList`, `ShowListPage`, `ShowRecord`
+  set to Native; `Replay::SetUpRace` `sub_82105228` left recompiled
+  (never ran; the native `OnDone` calls it through the guest). The
+  attract race doesn't reach the theater: it goes to the drive.
+
 ## Run 2026-11-11 08:38 (`b7-loop-11-11-26`)
 
 - The tuning screen's update's map (eba99e25): `tuning-screen.md`, 64
