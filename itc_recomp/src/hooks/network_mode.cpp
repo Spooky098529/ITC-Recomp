@@ -121,7 +121,6 @@ ITC_NETWORK_MODE(8227EA50, Type12Dialog13InitStates)
 ITC_NETWORK_MODE(821B96B8, PowerGraphScreen12InitStates)
 // NetScreen::InitBase and its base Inits: from the InitStates above (and
 // the jump sub_8227B41C, recompiled, for case 6).
-ITC_NETWORK_MODE(8227B3E0, NetScreenInitBase)
 ITC_NETWORK_MODE(82278C20, Type12Screen6InitBase)
 ITC_NETWORK_MODE(82279118, Type12Screen7InitBase)
 ITC_NETWORK_MODE(8227A000, Type12Screen8InitBase)
