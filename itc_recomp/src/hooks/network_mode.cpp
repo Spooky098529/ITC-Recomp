@@ -156,8 +156,6 @@ void NetScreenInitBase(PPCContext& ctx, uint8_t* base) {
 
 // Init (the mode's vtable 0x82006C6C slot 0, from Modes::Tick).
 ITC_NETWORK_MODE(82278058, ModeType12Init)
-// The fourteen InitStates: from ModeType12::Init (recompiled with the flag
-// off; the native Init calls their plain C++).
-// NetScreen::InitBase sub_8227B3E0 and its eight base Inits: no adapters
-// (only the InitStates, native, call them; the register steps above are the
-// harness's).
+// The fourteen InitStates, NetScreen::InitBase sub_8227B3E0 and its eight
+// base Inits: no adapters (only the native Init and InitStates call them;
+// the register steps above are the harness's).
