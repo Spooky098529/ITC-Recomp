@@ -73,6 +73,12 @@ constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kRun = 0x8211E1B8;
+constexpr uint32_t kPlay = 0x8211D978;
+constexpr uint32_t kLoop = 0x8211DDD8;
+constexpr uint32_t kLoopLast = 0x8211DDE8;
+constexpr uint32_t kFinish = 0x8211DE38;
+constexpr uint32_t kRevealText = 0x8211D880;
+constexpr uint32_t kHasMoreText = 0x8211D8D8;
 constexpr uint32_t kSetText = 0x8211C1F8;
 constexpr uint32_t kSetNumberText = 0x8211C740;
 constexpr uint32_t kSetChildNameText = 0x8211D930;
@@ -306,5 +312,47 @@ uint64_t EventDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
 // Type2Hub::FreeImage and VirtualFree of each record. The last VirtualFree's
 // r3, else `r3`. 112-byte frame.
 uint64_t FreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& calls);
+
+// sub_8225C928 Draw (never seen in play): the two pages' addresses at the
+// frame's +80; unless the page (+0) is -1, the page called with r3 the
+// dispatcher and r4 the machine (through the guest). Its r3, else the
+// dispatcher. 96-byte frame.
+uint64_t EventDraw(uint8_t* base, uint64_t machine, uint64_t dispatcher, uint32_t sp,
+                   const Calls& calls);
+// sub_8225CDE8 Update (never seen in play): movie 0; the transition (+12)
+// from the 6-entry table at the frame's +96 called with the page object's
+// +24 (through the guest), the queued one or the page after started on a
+// nonzero answer; with none (-1), UiMovie::Run(movie, 0). The transition's
+// or Run's r3, or the movie. 144-byte frame.
+uint64_t EventUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8225C428 EventPage (never seen in play; r3 the dispatcher): on
+// Menu::Pressed, MenuSound::Play(0) and the text revealed (RevealText) or
+// the next page, unlock or end (NextUnlockEntry). See the row. 112-byte
+// frame.
+uint64_t EventPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8225C590 EndPage (never seen in play; r3 the dispatcher, r4 the
+// machine): Kind 1: message 7, the data's +408 = 0; else +9604 = 10, +408 =
+// 1, QueueEventMovies. 112-byte frame.
+uint64_t EndPage(uint8_t* base, uint32_t dispatcher, uint32_t machine, uint32_t sp,
+                 const Calls& calls);
+// sub_8225B9B8 QueueEventMovies (never seen in play): the boot movies' list
+// from the save's movie (7 after 6), this mode after;
+// Progress::CheckUnlocks through the guest. Its r3. 96-byte frame.
+uint64_t QueueEventMovies(uint8_t* base, uint32_t sp, const Calls& calls);
+// The transitions (never seen in play; r3 the started word; 112-byte
+// frames): sub_8225CB18 Intro, sub_8225C770 FadeOut, sub_8225CC80
+// NextUnlock and sub_8225CD50 NextPage.
+uint64_t EventIntro(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t EventFadeOut(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t NextUnlock(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t NextPage(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_8225CA50 ShowUnlock (never seen in play): the unlock shown's title
+// and body texts, its images, the more-text arrow. The last FindNode.
+// 128-byte frame.
+uint64_t ShowUnlock(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8225C848 ShowImages (never seen in play; r3 an image index): movie
+// 0's +28 object's +36 and +32 the texture records of the lists' first
+// records for the index (0 none). UiMovies::Find's r3. 112-byte frame.
+uint64_t ShowImages(uint8_t* base, uint32_t index, uint32_t sp);
 
 }  // namespace todays_result

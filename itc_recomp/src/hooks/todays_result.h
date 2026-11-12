@@ -68,5 +68,19 @@ void TodaysEventUnloaded(PPCContext& ctx, uint8_t* base);
 void TodaysEventLeave(PPCContext& ctx, uint8_t* base);
 void TodaysEventDestroy(PPCContext& ctx, uint8_t* base);
 void TodaysEventFreeImages(PPCContext& ctx, uint8_t* base);
+// Today's event's Draw and Update, pages (r3 the dispatcher, EndPage r4 the
+// machine), transitions (r3 the started word) and helpers (no arguments;
+// ShowImages r3 an image index).
+void TodaysEventDraw(PPCContext& ctx, uint8_t* base);
+void TodaysEventUpdate(PPCContext& ctx, uint8_t* base);
+void TodaysEventEventPage(PPCContext& ctx, uint8_t* base);
+void TodaysEventEndPage(PPCContext& ctx, uint8_t* base);
+void TodaysEventQueueEventMovies(PPCContext& ctx, uint8_t* base);
+void TodaysEventIntro(PPCContext& ctx, uint8_t* base);
+void TodaysEventFadeOut(PPCContext& ctx, uint8_t* base);
+void TodaysEventNextUnlock(PPCContext& ctx, uint8_t* base);
+void TodaysEventNextPage(PPCContext& ctx, uint8_t* base);
+void TodaysEventShowUnlock(PPCContext& ctx, uint8_t* base);
+void TodaysEventShowImages(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

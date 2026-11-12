@@ -37,8 +37,15 @@ ITC_FLAG_BOOL(native_todays_result, true, "ITC",
               "SetUpTexts sub_8225C648 and NextUnlockEntry sub_8225BB70 (Sound::Play through "
               "the guest), Unload sub_8225C1F8, Unloaded sub_8225C278 (the sound manager's "
               "slots through the guest), Leave sub_8225C348 and Destroy sub_8225BF78 with "
-              "FreeImages sub_8225BC60 (Type2Hub::FreeImage through its override) (checked by "
-              "--run_harnesses=todays_result)");
+              "FreeImages sub_8225BC60 (Type2Hub::FreeImage through its override), Draw "
+              "sub_8225C928 and Update sub_8225CDE8 (the pages and transitions, with "
+              "Type2Hub::Transition9 and Transition11, through the guest from their tables); "
+              "its pages EventPage sub_8225C428 (Menu::Pressed, MenuSound::Play, RevealText and "
+              "HasMoreText through their overrides) and EndPage sub_8225C590 with "
+              "QueueEventMovies sub_8225B9B8 (Progress::CheckUnlocks, recompiled, through the "
+              "guest); its transitions Intro sub_8225CB18, FadeOut sub_8225C770, NextUnlock "
+              "sub_8225CC80 and NextPage sub_8225CD50 with ShowUnlock sub_8225CA50 and "
+              "ShowImages sub_8225C848 (checked by --run_harnesses=todays_result)");
 
 namespace hooks {
 
@@ -251,6 +258,38 @@ void TodaysEventFreeImages(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = tr::FreeImages(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void TodaysEventDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EventDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+#define ITC_TODAYS_EVENT_FRAME(name, function)                      \
+  void name(PPCContext& ctx, uint8_t* base) {                       \
+    GuestCalls guest(ctx, base);                                    \
+    ctx.r3.u64 = tr::function(base, ctx.r1.u32, guest.calls());     \
+  }
+ITC_TODAYS_EVENT_FRAME(TodaysEventUpdate, EventUpdate)
+ITC_TODAYS_EVENT_FRAME(TodaysEventEventPage, EventPage)
+ITC_TODAYS_EVENT_FRAME(TodaysEventQueueEventMovies, QueueEventMovies)
+ITC_TODAYS_EVENT_FRAME(TodaysEventShowUnlock, ShowUnlock)
+#undef ITC_TODAYS_EVENT_FRAME
+void TodaysEventEndPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EndPage(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+#define ITC_TODAYS_EVENT_TRANSITION(name, function)                            \
+  void name(PPCContext& ctx, uint8_t* base) {                                  \
+    GuestCalls guest(ctx, base);                                               \
+    ctx.r3.u64 = tr::function(base, ctx.r3.u32, ctx.r1.u32, guest.calls());    \
+  }
+ITC_TODAYS_EVENT_TRANSITION(TodaysEventIntro, EventIntro)
+ITC_TODAYS_EVENT_TRANSITION(TodaysEventFadeOut, EventFadeOut)
+ITC_TODAYS_EVENT_TRANSITION(TodaysEventNextUnlock, NextUnlock)
+ITC_TODAYS_EVENT_TRANSITION(TodaysEventNextPage, NextPage)
+#undef ITC_TODAYS_EVENT_TRANSITION
+void TodaysEventShowImages(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tr::ShowImages(base, ctx.r3.u32, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 #define ITC_TODAYS_RESULT(address, step)   \
@@ -311,3 +350,15 @@ ITC_TODAYS_RESULT(8225C1F8, TodaysEventUnload)
 ITC_TODAYS_RESULT(8225C278, TodaysEventUnloaded)
 ITC_TODAYS_RESULT(8225C348, TodaysEventLeave)
 ITC_TODAYS_RESULT(8225BF78, TodaysEventDestroy)
+// Today's event's Draw and Update (functors), pages (from Draw's table) and
+// transitions (from Update's table). QueueEventMovies sub_8225B9B8,
+// ShowUnlock sub_8225CA50 and ShowImages sub_8225C848: no adapters (only
+// EndPage, the transitions and ShowUnlock, native, call them).
+ITC_TODAYS_RESULT(8225C928, TodaysEventDraw)
+ITC_TODAYS_RESULT(8225CDE8, TodaysEventUpdate)
+ITC_TODAYS_RESULT(8225C428, TodaysEventEventPage)
+ITC_TODAYS_RESULT(8225C590, TodaysEventEndPage)
+ITC_TODAYS_RESULT(8225CB18, TodaysEventIntro)
+ITC_TODAYS_RESULT(8225C770, TodaysEventFadeOut)
+ITC_TODAYS_RESULT(8225CC80, TodaysEventNextUnlock)
+ITC_TODAYS_RESULT(8225CD50, TodaysEventNextPage)

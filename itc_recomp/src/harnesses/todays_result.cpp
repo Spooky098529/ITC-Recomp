@@ -1008,6 +1008,78 @@ void Event(Context& h, const World& w) {
                guest::StoreU32(base, tr::kEventMenu, MakePages(base, 68, r));
                guest::StoreU32(base, tr::kEventData, data);
              }});
+  // Draw: the page -1, 0 or 1 (the table's two); only its own frame.
+  Run(h, w, {"TodaysEvent::Draw (sub_8225C928)", 150, __imp__sub_8225C928,
+             hooks::TodaysEventDraw, {{-96, -8}},
+             [](PPCContext& t, Random& r, const World& w) {
+               EventMachine(t, r, w);
+               const uint32_t pick = r.Below(3);
+               guest::StoreU32(w.base, w.at(kEventPagesAt), pick == 2 ? 0xFFFFFFFFu : pick);
+             }});
+  // Update: the running transition -1, another negative, or 0 to 5, the
+  // queued one -1 or small, the started word 0 or not; only its own frame.
+  Run(h, w, {"TodaysEvent::Update (sub_8225CDE8)", 300, __imp__sub_8225CDE8,
+             hooks::TodaysEventUpdate, {{-144, -24}},
+             [](PPCContext&, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               const uint32_t pages = w.at(kEventPagesAt);
+               const uint32_t pick = r.Below(4);
+               guest::StoreU32(base, pages + 12,
+                               pick == 0   ? 0xFFFFFFFFu
+                               : pick == 1 ? uint32_t(-int32_t(2 + r.Below(5)))
+                                           : r.Below(6));
+               guest::StoreU32(base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(6));
+               guest::StoreU32(base, pages + 24, r.Below(3) == 0 ? 1 : 0);
+             }});
+  Run(h, w, {"TodaysEvent::EventPage (sub_8225C428)", 300, __imp__sub_8225C428,
+             hooks::TodaysEventEventPage, {{-112, -24}}, Dispatcher});
+  // EndPage: QueueEventMovies' frame below without its lr save.
+  Run(h, w, {"TodaysEvent::EndPage (sub_8225C590; sub_8225B9B8)", 150, __imp__sub_8225C590,
+             hooks::TodaysEventEndPage, {{-112, -24}, {-208, -120}},
+             [](PPCContext& t, Random& r, const World& w) {
+               t.r3.u64 = w.dispatcher();
+               t.r4.u64 = w.event() | (uint64_t(r.Below(2)) << 32);
+             }});
+  Run(h, w, {"TodaysEvent::QueueEventMovies (sub_8225B9B8)", 60, __imp__sub_8225B9B8,
+             hooks::TodaysEventQueueEventMovies, {{-96, -8}}, Nothing});
+  struct Case {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Case transitions[] = {
+      {"TodaysEvent::Intro (sub_8225CB18; sub_8225CA50, sub_8225C848)", __imp__sub_8225CB18,
+       hooks::TodaysEventIntro},
+      {"TodaysEvent::FadeOut (sub_8225C770)", __imp__sub_8225C770, hooks::TodaysEventFadeOut},
+      {"TodaysEvent::NextUnlock (sub_8225CC80; sub_8225CA50, sub_8225C848)",
+       __imp__sub_8225CC80, hooks::TodaysEventNextUnlock},
+      {"TodaysEvent::NextPage (sub_8225CD50; sub_8225CA50, sub_8225C848)", __imp__sub_8225CD50,
+       hooks::TodaysEventNextPage},
+  };
+  for (const Case& c : transitions) {
+    Run(h, w, {c.name, 150, c.recompiled, c.native, {{-112, -24}},
+               [](PPCContext& t, Random& r, const World& w) {
+                 const uint32_t at = w.at(kEventPagesAt) + 24;
+                 guest::StoreU32(w.base, at,
+                                 r.Below(3) == 0   ? 1
+                                 : r.Below(5) == 0 ? uint32_t(r.Next())
+                                                   : 0);
+                 t.r3.u64 = at;
+               }});
+  }
+  // ShowUnlock: without SetText's parameter area (+48 to +79) and its
+  // saves.
+  Run(h, w, {"TodaysEvent::ShowUnlock (sub_8225CA50; sub_8225C848)", 150, __imp__sub_8225CA50,
+             hooks::TodaysEventShowUnlock, {{-128, -80}, {-48, -40}}, Nothing});
+  // ShowImages: r3 an image (one the lists hold now and then).
+  Run(h, w, {"TodaysEvent::ShowImages (sub_8225C848)", 150, __imp__sub_8225C848,
+             hooks::TodaysEventShowImages, {{-112, -16}},
+             [](PPCContext& t, Random& r, const World& w) {
+               for (uint32_t k = 0; k < 92; k++) {
+                 guest::StoreU32(w.base, w.at(kRecordsAt) + 16 * k + 4, r.Below(tr::kImages));
+               }
+               t.r3.u64 = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(tr::kImages);
+             }});
   Run(h, w, {"TodaysEvent::FreeImages (sub_8225BC60)", 100, __imp__sub_8225BC60,
              hooks::TodaysEventFreeImages, {{-112, -32}},
              [](PPCContext& t, Random& r, const World& w) {
