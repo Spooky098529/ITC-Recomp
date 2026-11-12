@@ -23,6 +23,21 @@ When the user has reviewed a run's section, its heading gets
   native, and its Xbox Live calls answered by plugging in the data
   the SDK gives today (first "left recompiled", changed the same day
   to keep as little recompiled as possible).
+- The type 12 mode's migration (1b7594a1..21c8cb3b,
+  `--native_network_mode`): 130 rows ours. How the Live calls were
+  plugged in: the Live mask `[0x826C795C]` read as data (only B5's
+  `Network::Update` stub writes it, 0), so the battle and time attack
+  pages take the "not signed in" way (dialog 13, reason 7), as now;
+  `CheckMultiplayerPrivilege` `sub_8214F620` answered 0 (what the SDK
+  answers on every path) and Dropped, with `XUserCheckPrivilege`
+  `sub_82295030` (`system-services.md`); `XShowSigninUI` left out by
+  the native sign-in pages (its answer unread). `Session::Make`,
+  `Free`, `Init`, `Release` are the game's own session memory, ported
+  as game code. `Interrupt` `sub_822785E0` stays recompiled (unread
+  helpers). `init_step_tables.py` now follows r4 and InitBase's call.
+  The time attack's race set-up shares `TrafficHoles` and
+  `SplitTraffic` with `race_setup.cpp`. Two new expected groups
+  (`expected-differences.md`).
 - The type 9 mode's map (0752af3f): `todays-result.md`, 57 new rows
   (31 in play, 26 "Not seen in play"): the career's end of the day,
   named from the debug strings `TXR_MenuTodaysResult` and

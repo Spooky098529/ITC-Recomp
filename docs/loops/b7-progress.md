@@ -61,7 +61,17 @@ file's history. What's left to see in a drive, from every run:
   then, the same day, changed by the user to minimize the code left
   recompiled: the Live calls answered by plugging in the data the
   SDK's answers give today; in "Precedent first", sent to the running
-  migration agent. Migration agent running.
+  migration agent. Migration 1b7594a1..21c8cb3b (five batches, one
+  subagent each, one at a time): 130 of 130 rows ours (95 Overridden,
+  32 Native, 2 Merged, `CheckMultiplayerPrivilege` Dropped with its
+  answer plugged in; 23 adapters removed; `XUserCheckPrivilege`
+  Dropped in `system-services.md`; `Interrupt` `sub_822785E0` left,
+  blocked by unread helpers); the Live mask `[0x826C795C]` read as the
+  data B5's stub writes, `XShowSigninUI` left out (answer unread);
+  `Session::Make`/`Free` turned out to be the game's own memory,
+  ported; `--native_network_mode`; harnesses 0 differing outside two
+  new expected groups; race 36 s at 40, 0 errors. Left: none (the
+  other screens are leads). Validation agent running.
 
 ## Done
 
@@ -99,5 +109,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the type 12 mode's map: ours 5677, work left 949 (wrapped 55,
   known 496, unknown 398).
+
+- After its migration: ours 5808, work left 840 (wrapped 55, known
+  388, unknown 397).
 
 ## Stopped
