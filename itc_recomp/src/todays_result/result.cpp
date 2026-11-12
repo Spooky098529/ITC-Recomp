@@ -4,6 +4,7 @@
 // user's call of 2026-10-30).
 
 #include "base/log.h"
+#include "career/career.h"
 #include "todays_result/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -338,6 +339,11 @@ uint64_t ResultQueueMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   Store(base, kBootMovies + 0, Load(base, movie));
   Store(base, movie, kNone);
   Store(base, kBootMovies + 20, 2);
+  // Progress::CheckUnlocks: its plain C++ where Condition::Test's copies fit,
+  // else the original through the guest.
+  if (career::CheckUnlocksNative(base, frame)) {
+    return career::ProgressCheckUnlocks(base, save, frame);
+  }
   return calls.Call(kCheckUnlocks, frame, 0x8225A790, save);
 }
 

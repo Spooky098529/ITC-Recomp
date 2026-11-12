@@ -21,7 +21,8 @@ ITC_FLAG_BOOL(native_race_loading, true, "ITC",
               "and Archive::QueueLength's plain C++); the loading screen's Show sub_822478D0 "
               "(with UiMovie::SetFrames sub_82290B30), Run sub_82247898 and Finish "
               "sub_82247A60 (the UI movie calls and GetLocalTime through their overrides); "
-              "sub_82293460 (its callees through the function table)) natively instead of "
+              "sub_82293460 (its callees through the function table; no adapter: RaceMode::NextMode "
+              "calls it)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_loading)");
 
@@ -157,4 +158,7 @@ ITC_RACE_LOADING(821515A0, CourseSetupWaitDraw)
 ITC_RACE_LOADING(822478D0, LoadingScreenShow)
 ITC_RACE_LOADING(82247898, LoadingScreenRun)
 ITC_RACE_LOADING(82247A60, LoadingScreenFinish)
-ITC_RACE_LOADING(82293460, CheckSystemRequest)
+// sub_82293460 has no adapter (removed, B7 loop, 2026-11-12): its only
+// caller in play, RaceMode::NextMode (--native_race_end), calls its plain
+// C++; the front end's callers, never seen in play, reach the original. Its
+// step is the harness's.

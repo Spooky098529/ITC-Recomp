@@ -4,6 +4,7 @@
 // garage screen's paths were (the user's call of 2026-11-09).
 
 #include "base/log.h"
+#include "career/career.h"
 #include "data_tables/data_tables.h"
 #include "todays_result/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -531,6 +532,11 @@ uint64_t QueueEventMovies(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   Store(base, queued, kNone);
   Store(base, kBootMovies + 20, 9);
+  // Progress::CheckUnlocks: its plain C++ where Condition::Test's copies fit,
+  // else the original through the guest.
+  if (career::CheckUnlocksNative(base, frame)) {
+    return career::ProgressCheckUnlocks(base, save, frame);
+  }
   return calls.Call(kCheckUnlocks, frame, 0x8225BA38, save);
 }
 

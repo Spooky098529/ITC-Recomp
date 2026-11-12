@@ -35,12 +35,13 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "Items::AllWonKind4Stage2 sub_82111940, Items::AllWonKind4Stage3 sub_821119D0, "
               "Items::AllWonKind5 sub_82111A60 and Locations::Unlock sub_82111D20 and "
               "Unlock2 sub_82111D98 (no adapters); Progress::CheckUnlocks sub_821162B0 (never seen "
-              "in play, ported with the race's end); Career::NextDay sub_82116AF0 with "
+              "in play, ported with the race's end; both with no adapters: the race's end calls them); "
+              "Career::NextDay sub_82116AF0 with "
               "Stats::CloseDay sub_82113898 (no adapter); no adapters either for RunningMean::Merge, "
               "Items::AnyWonKind3Stage1, ItemRecords::AddWin and AddLoss, Results::Push, "
               "Stats::StartDay, Rewards::Grant, Entry56::Allows, Condition::Test, Car::SpecWord744 "
               "and Garage::InsertCar: only native callers reach them in play; "
-              "Career::EventQuery sub_82111638 and Career::EventLocation sub_82111650 over the "
+              "Career::EventQuery sub_82111638 and Career::EventLocation sub_82111650 (no adapter) over the "
               "race event's plain C++ (src/race_event/), DayBlock::BestStreak sub_82110588 with "
               "no adapter: from the race event's EventCondition::SectionRival; Career::SetUpEvent "
               "sub_82114268 over the race event's RaceEvent::Make plain C++, its cases in "
@@ -329,11 +330,10 @@ CAREER_ADAPTER(82115CC0, CareerPickFromCar)
 CAREER_ADAPTER(821121F8, CareerStageOf)
 CAREER_ADAPTER(82115190, CareerAddRaceResult)
 CAREER_ADAPTER(821159B0, CareerPickNext)
-CAREER_ADAPTER(82116588, CareerAfterRace)
-// Progress::CheckUnlocks: never seen in play; its callers (the race's end,
-// sub_82150E00, and the today's result's two) reach it through the guest or
-// its plain C++.
-CAREER_ADAPTER(821162B0, CareerCheckUnlocks)
+// Progress::AfterRace and Progress::CheckUnlocks have no adapters (removed,
+// B7 loop, 2026-11-12): their callers in play, the race's end (and the
+// today's result's two for CheckUnlocks), call their plain C++; their steps
+// are the harness's.
 // Career::NextDay asks the harness recorder first (the title screen's
 // harness records it: its career menu's third item).
 extern "C" REX_FUNC(sub_82116AF0) {
@@ -348,7 +348,9 @@ extern "C" REX_FUNC(sub_82116AF0) {
   hooks::CareerNextDay(ctx, base);
 }
 CAREER_ADAPTER(82111638, CareerEventQuery)
-CAREER_ADAPTER(82111650, CareerEventLocation)
+// Career::EventLocation has no adapter (removed, B7 loop, 2026-11-12): its
+// only caller in play, the race's end, calls its plain C++; its step is the
+// race event harness's.
 CAREER_ADAPTER(82114268, CareerSetUpEvent)
 CAREER_ADAPTER(821104D8, CareerCarSetModelAndClass)
 CAREER_ADAPTER(82116CE0, CareerGarageAdd)

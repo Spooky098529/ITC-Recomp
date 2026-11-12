@@ -27,7 +27,7 @@ ITC_FLAG_BOOL(native_network_mode, true, "ITC",
               "functions WaitForLoads sub_8227B440, NextMode sub_8227B930 (with the time "
               "attack's race set-up through the race set-up's overrides), LeaveScreen "
               "sub_8227B868, WaitForShown sub_8227B770 and Teardown sub_8227BE10; the +32 slots "
-              "ForceExit sub_822788D8 and Resume sub_82278B98; Session::Free sub_82292710 with "
+              "ForceExit sub_822788D8 and Resume sub_82278B98; Session::Free sub_82292710 (no adapter) with "
               "Session::Release sub_82291670 (operator delete, VirtualFree and the sound "
               "manager's slots through the guest); the machines' set-up and teardown handlers "
               "(VirtualAlloc, VirtualFree, UiMovies::Open and Delete, UiMovie::FinishAll and "
@@ -399,9 +399,10 @@ ITC_NETWORK_MODE(8227B770, ModeType12WaitForShown)
 ITC_NETWORK_MODE(8227BE10, ModeType12Teardown)
 ITC_NETWORK_MODE(822788D8, ModeType12ForceExit)
 ITC_NETWORK_MODE(82278B98, ModeType12Resume)
-// Session::Free: also from the recompiled race's end (sub_82150E00, seen in
-// play), Type12Screen3's (8, 3) sub_8225E418 and sub_82211CF8.
-ITC_NETWORK_MODE(82292710, SessionFree)
+// Session::Free has no adapter (removed, B7 loop, 2026-11-12): its callers
+// in play (the race's end, ModeType12::NextMode and Teardown) call its plain
+// C++; Type12Screen3's (8, 3) sub_8225E418 and sub_82211CF8, never seen in
+// play, reach the original. Its step is the harness's.
 
 // The machines' set-up and teardown handlers (through their machines'
 // functors: no direct callers), by machine: Create, OpenMovie,

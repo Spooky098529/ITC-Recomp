@@ -223,9 +223,9 @@ uint64_t ResultWaitPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // r3. 96-byte frame.
 uint64_t ResultLeavePage(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls);
 // sub_8225A720 QueueMovie (never seen in play): the boot movies' list from
-// the save's movie (then -1), the garage after; Progress::CheckUnlocks
-// (recompiled, never seen in play) through the guest. Its r3. 96-byte
-// frame.
+// the save's movie (then -1), the garage after; Progress::CheckUnlocks'
+// plain C++ (the original through the guest where Condition::Test's copies
+// can't be native). Its r3. 96-byte frame.
 uint64_t ResultQueueMovie(uint8_t* base, uint32_t sp, const Calls& calls);
 // The transitions (r3 the started word, the page object's +24; 112-byte
 // frames): sub_8225ABD8 Intro (PlayNamed 5, the fade in; 1 when Run answers
@@ -337,7 +337,8 @@ uint64_t EndPage(uint8_t* base, uint32_t dispatcher, uint32_t machine, uint32_t 
                  const Calls& calls);
 // sub_8225B9B8 QueueEventMovies (never seen in play): the boot movies' list
 // from the save's movie (7 after 6), this mode after;
-// Progress::CheckUnlocks through the guest. Its r3. 96-byte frame.
+// Progress::CheckUnlocks' plain C++ (the original through the guest where
+// Condition::Test's copies can't be native). Its r3. 96-byte frame.
 uint64_t QueueEventMovies(uint8_t* base, uint32_t sp, const Calls& calls);
 // The transitions (never seen in play; r3 the started word; 112-byte
 // frames): sub_8225CB18 Intro, sub_8225C770 FadeOut, sub_8225CC80

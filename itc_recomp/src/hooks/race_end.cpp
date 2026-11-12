@@ -2,7 +2,8 @@
 // (docs/functions/race-end.md, race-loading.md), with the register steps the
 // harness shares (hooks/race_end.h). RaceMode::NextMode is the race mode's
 // slot 6, reached through Mode::NextModeThunk (no direct callers), so its
-// adapter stays; RaceMode::ModeAfterRace's only caller is NextMode.
+// adapter stays; RaceMode::ModeAfterRace's only caller is NextMode (no
+// adapter: its step is the harness's).
 
 #include "hooks/race_end.h"
 
@@ -123,7 +124,7 @@ void RaceModeNextMode(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-// RaceMode::ModeAfterRace: its only caller, RaceMode::NextMode, calls its
-// plain C++; the adapter for NextMode's fallback and the harness.
-ITC_RACE_END(82150E00, RaceModeModeAfterRace)
+// RaceMode::ModeAfterRace has no adapter (removed, B7 loop, 2026-11-12): its
+// only caller, RaceMode::NextMode, calls its plain C++; the flag switches only
+// NextMode, and the step is the harness's.
 ITC_RACE_END(82151EF0, RaceModeNextMode)
