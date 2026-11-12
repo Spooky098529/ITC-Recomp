@@ -16,6 +16,60 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
+
+Not in the attract race or the replay (`itc_4951`, `itc_4952`, ok; all
+in `type10-mode.md`, the replay theater: open Replay Theater from the
+title's main menu; the list page and a replay's load need a saved
+replay):
+
+- `sub_82288940` ModeType10::Init
+- `sub_82288B70` ModeType10::WaitForLoads
+- `sub_82288E68` ModeType10::NextMode
+- `sub_82288DA0` ModeType10::LeaveScreen
+- `sub_82288CA0` ModeType10::WaitForShown
+- `sub_822890D8` ModeType10::Leaving
+- `sub_8225D638` ModeType9::NextModeAnswer
+- `sub_82288A68` ModeType10::Interrupt
+- `sub_8225D828` ModeType9::ForceExit
+- `sub_82288B20` ModeType10::Resume
+- `sub_822888F0` ModeType10::FindShown
+- `sub_822893E8` ReplayTheater::OnList
+- `sub_8228AC48` ReplayTheater::InitStates
+- `sub_82289408` ReplayTheater::Create
+- `sub_822891F8` ReplayTheater::OpenMovie
+- `sub_82289570` ReplayTheater::WaitForMovie
+- `sub_8228AA58` ReplayTheater::Start
+- `sub_8228A508` ReplayTheater::StartPage
+- `sub_8228A868` ReplayTheater::Draw
+- `sub_8228A8F8` ReplayTheater::Update
+- `sub_82289768` ReplayTheater::ListPage
+- `sub_82289958` ReplayTheater::AskList
+- `sub_822899E0` ReplayTheater::AskLoad
+- `sub_82289A70` ReplayTheater::LeavePage
+- `sub_8228A4B0` ReplayTheater::WaitPage
+- `sub_8228A3B8` ReplayTheater::SetPrompts
+- `sub_82289AC0` ReplayTheater::Intro
+- `sub_82289BD0` ReplayTheater::FadeOut
+- `sub_82289CC0` ReplayTheater::FadeInList
+- `sub_82289D70` ReplayTheater::ShowCursor
+- `sub_8228A658` ReplayTheater::MoveCursor
+- `sub_82289E08` ReplayTheater::HideCursor
+- `sub_82289EB8` ReplayTheater::PickReplay
+- `sub_8228AAB0` ReplayTheater::OnDone
+- `sub_82289208` ReplayTheater::OnFailed
+- `sub_8228ABE0` ReplayTheater::OnRetry
+- `sub_82289308` ReplayTheater::OnBack
+- `sub_82289358` ReplayTheater::OnInterrupt
+- `sub_822893A8` ReplayTheater::OnResume
+- `sub_82289600` ReplayTheater::Unload
+- `sub_82289668` ReplayTheater::Wait
+- `sub_822896C0` ReplayTheater::Leave
+- `sub_822894E8` ReplayTheater::Destroy
+- `sub_8228A560` ReplayTheater::BuildList
+- `sub_82289F48` ReplayTheater::ShowListPage
+- `sub_8228A0D8` ReplayTheater::ShowRecord
+
 ## Run 2026-11-11 08:38 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_4926`, `itc_4920`, ok; all

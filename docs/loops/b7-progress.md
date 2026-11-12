@@ -22,9 +22,20 @@ file's history. What's left to see in a drive, from every run:
   `--native_type10_mode` on by default, 8 adapterless rows Native,
   `Replay::SetUpRace` left recompiled (never ran); no adapters
   removable (all reached through tables); race 38 s at 40, 0 errors;
-  no subagents. Validation agent running.
+  no subagents. Validated: `itc_4951` (race 57 s at 180, 0 errors,
+  every harness 0 differing outside the expected groups), 46 of 46
+  harness lines, no prints added; none ran in the race or the replay
+  `itc_4952` (ok): 46 to drive. Recorded.
+- Subsystem 1 of 5: the type 9 front-end mode (`sub_8225D6D0` its
+  Init, its slots 6, 8, 10, 11, 13, +32 slot 0; ready groups under it;
+  the previous run's "Next"; the top lead `sub_82562FF0` is inside the
+  movie library's range, skipped as before); its line deleted from
+  `leads.md`. Mapping agent running.
 
 ## Done
+
+- The replay theater's check: `type10-mode.md` 46 of 47 ours,
+  `--native_type10_mode` on, 50318046..93b074ab; validated.
 
 ## Rows to review
 

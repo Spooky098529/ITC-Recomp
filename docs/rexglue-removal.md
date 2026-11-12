@@ -2859,7 +2859,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-11 | The tuning screen's refresh (`TuningScreen::Refresh`, 3,838 lines: the header, states 3 to 8 inside, the dispatch for 15 to 58; its 5 callees never seen in play stay recompiled) with `TuningMachine::Start` it unblocked | `tuning-screen.md`, `tuning-machine.md` | 83 of 83 and 22 of 22 in play (one migration, the refresh in four parts, 5 subagents; 15 adapters removed) | (`--native_tuning_screen`, `--native_tuning_machine`) |
 | 2026-11-11 | The tuning screen's update (`TuningScreen::Update` `sub_821E6C50`, 1,601 lines with its two pieces: its state switch over the debug handlers, the command queue's runners, the movie it picks, `UiMovie::Run`; 40 of its 61 callees never seen in play ported too) | `tuning-screen.md` | 126 of 126 rows ours (the update Overridden, its pieces Merged, 47 adapters removed; 21 never-seen runners stay recompiled, blocked by the sticker and vinyl editors' leads) | (`--native_tuning_screen`) |
 | 2026-11-11 | The title screen (the type 4 front-end mode: its Init, delegates and next mode; the title load machine with the boot's data load and logo; the title screen machine with press start, the main, career and fourth menus; `TitleScreen::Update` inside the `--attract_after_s` wrap) | `title-screen.md` | 86 of 87 (one migration; 2 adapters removed; `SetUpAttractRace` stays recompiled) | `--native_title_screen` |
-| 2026-11-11 | The replay theater (the type 10 mode: its Init, slots, its machine with UI movie 45 and 17 transitions; two of the type 9 mode's slots, shared) | `type10-mode.md` | 38 of 42 rows Overridden and 8 with plain C++ and no adapter, **unchecked**: the run was ended before its harness and race | `--native_type10_mode` (off by default) |
+| 2026-11-11 | The replay theater (the type 10 mode: its Init, slots, its machine with UI movie 45 and 17 transitions; two of the type 9 mode's slots, shared) | `type10-mode.md` | 46 of 47 (38 Overridden, 8 Native; checked 2026-11-12 by the next run, 50318046..93b074ab, after a harness fix; `Replay::SetUpRace` stays recompiled) | `--native_type10_mode` (on by default since 2026-11-12) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5227,3 +5227,15 @@ turn the flag on, set the eight functions without adapters to Native.
 `Replay::SetUpRace` `sub_82105228` stays recompiled. The boundary: 449 functions, 916 pairs: overridden 109, native 36, dropped 26, never called 70, live 208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours 5,612 (counting the
 unchecked Overridden rows), work left 984 (Wrapped 55, with a row 392,
 no row yet 537), from 1,005.
+
+**2026-11-12, the replay theater checked (branch `b7-loop-11-11-26`,
+the forty-fifth run, a lead without mapping):** the previous run's
+unchecked port (`type10-mode.md`) checked by its harness (46 functions,
+0 differing, after a harness fault was fixed: a replay record's +28 laid
+as play's 0-99, 50318046) and turned on by default (93b074ab); the eight
+functions without adapters set to Native. The attract race and the pad
+replay don't reach the theater: its 46 functions are on the drive list.
+The boundary: 449 functions (916 pairs): overridden 109, Native 36,
+Dropped 26, never called 70, live 208. Imports: 186 called, 54 with a
+live caller. B7 (`b7_status.py`): ours 5,620, work left 980 (Wrapped
+55, with a row 388, no row yet 537), from 984.
