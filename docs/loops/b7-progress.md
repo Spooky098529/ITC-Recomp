@@ -107,10 +107,22 @@ file's history. What's left to see in a drive, from every run:
   Left: `LocationScreen::PollLoad` `sub_82229238` newly ready
   (`location-screen.md`), and 9 groups already ready in
   `course-scenery.md` (`Scenery::Unload`, `CourseSet::Load`,
-  `RecordHeadlightProjectors`, `Scenery::Draw` and smaller). Validation
-  agent running.
+  `RecordHeadlightProjectors`, `Scenery::Draw` and smaller). Validated:
+  `itc_5016` (race 49 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups; harnesses ~124 s), 15 of 15 harness
+  lines, no prints added; 14 ran in the race, `EndTick` in the replay
+  `itc_5017` (ok), none to drive. Recorded.
+- Next: the course scenery's ready groups (`Scenery::Unload`,
+  `UnloadPools`, `Destroy`, `CourseSet::Load`, `OnLoaded`,
+  `AreaLights::Load`, `AreaModel::Load`, `RecordHeadlightProjectors`,
+  `Scenery::Draw`, all seen in play) with `LocationScreen::PollLoad`
+  `sub_82229238`, newly ready; a lead without mapping (not counted).
+  Migration agent running.
 
 ## Done
+
+- `Scenery::IsLoaded` (no mapping): with `WaitCourse` and `EndTick`, 12
+  adapters removed, ce238773..880882d4; validated.
 
 - The race's end: `race-end.md` 1 of 1 ours, with `RaceMode::NextMode`
   and `Progress::CheckUnlocks`, `--native_race_end`,
@@ -163,5 +175,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the race end's migration: ours 5811, work left 838 (wrapped
   55, known 387, unknown 396).
+
+- After `Scenery::IsLoaded`: ours 5814, work left 835 (wrapped 55,
+  known 384, unknown 396).
 
 ## Stopped
