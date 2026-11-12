@@ -18,6 +18,141 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5001`, `itc_5002`, ok; all
+in `network-mode.md`, the type 12 Xbox Live mode: open it from the
+title's main menu; without Live its battle and time attack pages show
+the "not signed in" dialog):
+
+- `sub_82278058` ModeType12::Init
+- `sub_8227B440` ModeType12::WaitForLoads
+- `sub_8227B930` ModeType12::NextMode
+- `sub_8227B868` ModeType12::LeaveScreen` (probably)
+- `sub_8227B770` ModeType12::WaitForShown` (probably)
+- `sub_8227BE10` ModeType12::Teardown` (probably)
+- `sub_822788D8` ModeType12::ForceExit` (probably)
+- `sub_82278B98` ModeType12::Resume` (probably)
+- `sub_82277EE0` ModeType12::AllLoaded` (probably)
+- `sub_82277FF0` ModeType12::FindShown` (probably)
+- `sub_82277E10` ModeType12::Machine` (probably)
+- `sub_82292710` Session::Free` (probably)
+- `sub_822926B8` Session::Make` (probably)
+- `sub_822915C0` Session::Init` (probably)
+- `sub_82291670` Session::Release` (probably)
+- `sub_8227B3E0` NetScreen::InitBase` (probably)
+- `sub_8227D680` NetModeSelect::InitStates
+- `sub_8227C398` NetModeSelect::Create
+- `sub_8227C078` NetModeSelect::OpenMovie
+- `sub_8227C558` NetModeSelect::WaitForMovie
+- `sub_8227C5C8` NetModeSelect::Open
+- `sub_8227D300` NetModeSelect::Start
+- `sub_8227CCE0` NetModeSelect::SetUp
+- `sub_8227D248` NetModeSelect::Draw
+- `sub_8227D4E8` NetModeSelect::Update
+- `sub_8227C658` NetModeSelect::MenuPage` (probably)
+- `sub_8227C970` NetModeSelect::LeavePage` (probably)
+- `sub_8227C9F0` NetModeSelect::BattlePage` (probably)
+- `sub_8227CB38` NetModeSelect::TimeAttackPage` (probably)
+- `sub_8227C088` NetModeSelect::SignInPage` (probably)
+- `sub_8227C210` NetModeSelect::SignInPage2` (probably)
+- `sub_8227CC78` NetModeSelect::BackPage` (probably)
+- `sub_8227CE50` NetModeSelect::Intro
+- `sub_8227D138` NetModeSelect::ShowCursor` (probably)
+- `sub_8227D380` NetModeSelect::MoveCursor` (probably)
+- `sub_8227D1D8` NetModeSelect::SetCursorY` (probably)
+- `sub_8227D088` NetModeSelect::FadeOut
+- `sub_8227CFA8` NetModeSelect::FadeIn` (probably)
+- `sub_8227BF80` NetModeSelect::OnNo` (probably)
+- `sub_8227BFB8` NetModeSelect::OnYes` (probably)
+- `sub_8227BFD8` NetModeSelect::OnDialogClosed` (probably)
+- `sub_8227C7A8` NetModeSelect::Unload
+- `sub_8227C810` NetModeSelect::Unloaded` (probably)
+- `sub_8227C8C0` NetModeSelect::Leave
+- `sub_8227C4B8` NetModeSelect::Destroy
+- `sub_82276510` Type12Screen1::InitStates
+- `sub_822720A8` Type12Screen1::Create
+- `sub_82272030` Type12Screen1::ResetData` (probably)
+- `sub_82271D18` Type12Screen1::OpenMovie
+- `sub_82272398` Type12Screen1::WaitForMovie
+- `sub_822727E0` Type12Screen1::Leave
+- `sub_822722B0` Type12Screen1::Destroy
+- `sub_8225F330` Type12Screen3::InitStates
+- `sub_8225DFE8` Type12Screen3::Create
+- `sub_8225DFD8` Type12Screen3::OpenMovie
+- `sub_8225E1B0` Type12Screen3::WaitForMovie
+- `sub_8225E518` Type12Screen3::Leave
+- `sub_8225E100` Type12Screen3::Destroy
+- `sub_822873A0` NetRanking::InitStates
+- `sub_82282358` NetRanking::Create
+- `sub_82282098` NetRanking::OpenMovie
+- `sub_822825C0` NetRanking::WaitForMovie
+- `sub_82282848` NetRanking::Leave
+- `sub_82282508` NetRanking::Destroy
+- `sub_82281858` NetTaCourse::InitStates
+- `sub_8227FD40` NetTaCourse::Create
+- `sub_8227FC70` NetTaCourse::OpenMovie
+- `sub_8227FF10` NetTaCourse::WaitForMovie
+- `sub_82280218` NetTaCourse::Leave
+- `sub_8227FE70` NetTaCourse::Destroy
+- `sub_82268410` Type12Screen6::InitStates
+- `sub_82278C20` Type12Screen6::InitBase
+- `sub_82265A88` Type12Screen6::Create
+- `sub_82265920` Type12Screen6::OpenMovie
+- `sub_82265C00` Type12Screen6::WaitForMovie
+- `sub_82265DC0` Type12Screen6::Leave
+- `sub_82265B70` Type12Screen6::Destroy
+- `sub_8226EB40` Type12Screen7::InitStates
+- `sub_82279118` Type12Screen7::InitBase
+- `sub_82268D18` Type12Screen7::Create
+- `sub_822688A8` Type12Screen7::OpenMovie
+- `sub_82268F70` Type12Screen7::WaitForMovie
+- `sub_822697D8` Type12Screen7::Leave
+- `sub_82268EC8` Type12Screen7::Destroy
+- `sub_82262A88` Type12Screen8::InitStates
+- `sub_8227A000` Type12Screen8::InitBase
+- `sub_82261030` Type12Screen8::Create
+- `sub_822609C0` Type12Screen8::OpenMovie
+- `sub_822611F8` Type12Screen8::WaitForMovie
+- `sub_82261358` Type12Screen8::Leave
+- `sub_82261168` Type12Screen8::Destroy
+- `sub_822646B0` Type12Screen9::InitStates
+- `sub_8227A4F8` Type12Screen9::InitBase
+- `sub_822630C0` Type12Screen9::Create
+- `sub_82263048` Type12Screen9::OpenMovie
+- `sub_822632C8` Type12Screen9::WaitForMovie
+- `sub_82263448` Type12Screen9::Leave
+- `sub_82263238` Type12Screen9::Destroy
+- `sub_82288600` Type12Dialog10::InitStates
+- `sub_82279610` Type12Dialog10::InitBase
+- `sub_82287DD8` Type12Dialog10::Create
+- `sub_82287CD0` Type12Dialog10::OpenMovie
+- `sub_82287F40` Type12Dialog10::WaitForMovie
+- `sub_82288028` Type12Dialog10::Leave
+- `sub_82287EC0` Type12Dialog10::Destroy
+- `sub_82277B18` Type12Dialog11::InitStates
+- `sub_82279B08` Type12Dialog11::InitBase
+- `sub_82276E60` Type12Dialog11::Create
+- `sub_82276E40` Type12Dialog11::OpenMovie
+- `sub_82276FC0` Type12Dialog11::WaitForMovie
+- `sub_822770B8` Type12Dialog11::Leave
+- `sub_82276F40` Type12Dialog11::Destroy
+- `sub_8227F6C8` Type12Dialog12::InitStates
+- `sub_8227A9F0` Type12Dialog12::InitBase
+- `sub_8227ED58` Type12Dialog12::Create
+- `sub_8227ECE8` Type12Dialog12::OpenMovie
+- `sub_8227EEC0` Type12Dialog12::WaitForMovie
+- `sub_8227F038` Type12Dialog12::Leave
+- `sub_8227EE40` Type12Dialog12::Destroy
+- `sub_8227EA50` Type12Dialog13::InitStates
+- `sub_8227AEE8` Type12Dialog13::InitBase
+- `sub_8227DED0` Type12Dialog13::Create
+- `sub_8227DEC0` Type12Dialog13::OpenMovie
+- `sub_8227E030` Type12Dialog13::WaitForMovie
+- `sub_8227E118` Type12Dialog13::Leave
+- `sub_8227DFB0` Type12Dialog13::Destroy
+- `sub_821B96B8` PowerGraphScreen12::InitStates` (probably)
+
+The career's end of the day's:
+
 Not in the attract race or the replay (`itc_4967`, `itc_4968`, ok; all
 in `todays-result.md`, the career's end of the day: today's event, the
 unlocks' screen after a career race that unlocks something):

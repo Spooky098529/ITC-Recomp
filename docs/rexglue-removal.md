@@ -2861,6 +2861,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-11 | The title screen (the type 4 front-end mode: its Init, delegates and next mode; the title load machine with the boot's data load and logo; the title screen machine with press start, the main, career and fourth menus; `TitleScreen::Update` inside the `--attract_after_s` wrap) | `title-screen.md` | 86 of 87 (one migration; 2 adapters removed; `SetUpAttractRace` stays recompiled) | `--native_title_screen` |
 | 2026-11-11 | The replay theater (the type 10 mode: its Init, slots, its machine with UI movie 45 and 17 transitions; two of the type 9 mode's slots, shared) | `type10-mode.md` | 46 of 47 (38 Overridden, 8 Native; checked 2026-11-12 by the next run, 50318046..93b074ab, after a harness fix; `Replay::SetUpRace` stays recompiled) | `--native_type10_mode` (on by default since 2026-11-12) |
 | 2026-11-12 | The type 9 mode: the career's end of the day after a career race (today's result, UI movie 27, `Career::NextDay`; today's event, UI movie 0, the unlocks) | `todays-result.md` | 57 of 57 (38 Overridden, 19 Native) | `--native_todays_result` |
+| 2026-11-12 | The type 12 mode: the Xbox Live network mode (network battle and time attack: its mode select, 14 machines' set-ups and teardowns, the session memory; its Live calls answered with plugged-in data, the user's call) | `network-mode.md` | 130 of 130 rows (95 Overridden, 32 Native, 2 Merged, 1 Dropped) | `--native_network_mode` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5257,3 +5258,23 @@ today's event's 26 are on the drive list. The boundary: 449 functions
 live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 5,677, work left 949 (Wrapped 55, with a row
 388, no row yet 506), from 980.
+
+**2026-11-12, the type 12 mode (branch `b7-loop-11-11-26`, the
+forty-fifth run, its second subsystem):** `network-mode.md` (132 rows,
+108 in play, `src/network_mode/`): the game's Xbox Live mode (network
+battle and network time attack), reached from the title's main menu:
+its Init, delegates, 14 machines' InitStates and set-ups and teardowns,
+`NetScreen::InitBase`, the mode select's running screen, and the game's
+session memory (`Session::Make`, `Free`, `Init`, `Release`). By the
+user's call (2026-11-12) its Xbox Live calls are answered with
+plugged-in data, the values the SDK gives today: the Live mask
+`[0x826C795C]` read as B5's stub writes it (0), the multiplayer
+privilege check answered 0 (`sub_8214F620` and `XUserCheckPrivilege`
+Dropped), `XShowSigninUI` left out (its answer unread); nothing the
+game shows changes. `Interrupt` `sub_822785E0` stays recompiled
+(unread helpers); the other screens' pages and transitions are leads.
+The replay doesn't open the mode: its 127 are on the drive list. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36,
+Dropped 27, never called 69, live 208. Imports: 186 called, 54 with a
+live caller. B7 (`b7_status.py`): ours 5,808, work left 840 (Wrapped
+55, with a row 388, no row yet 397), from 949.

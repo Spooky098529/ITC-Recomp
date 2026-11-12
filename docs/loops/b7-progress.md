@@ -71,9 +71,21 @@ file's history. What's left to see in a drive, from every run:
   `Session::Make`/`Free` turned out to be the game's own memory,
   ported; `--native_network_mode`; harnesses 0 differing outside two
   new expected groups; race 36 s at 40, 0 errors. Left: none (the
-  other screens are leads). Validation agent running.
+  other screens are leads). Validated: `itc_5001` (race 54 s at 180,
+  0 errors, every harness 0 differing outside the expected groups;
+  harnesses ~124 s), 127 of 127 harness lines, no prints added; none
+  in the race or the replay `itc_5002` (ok): 127 to drive. Recorded.
+- Subsystem 3 of 5: the race's end on the career's side
+  (`sub_82150E00`, ready, seen at every career race's end; it blocks
+  `RaceMode::NextMode`; the network mode's other screens never ran in
+  play, so a lead run in play was taken first); its line deleted from
+  `leads.md`. Mapping agent running.
 
 ## Done
+
+- The type 12 mode (the Xbox Live network mode): `network-mode.md` 130
+  of 130 ours, `--native_network_mode`, 1b7594a1..21c8cb3b; Live calls
+  answered with plugged-in data; validated.
 
 - The type 9 mode (today's result and today's event):
   `todays-result.md` 57 of 57 ours, `--native_todays_result`,
