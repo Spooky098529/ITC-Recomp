@@ -18,6 +18,39 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_4967`, `itc_4968`, ok; all
+in `todays-result.md`, the career's end of the day: today's event, the
+unlocks' screen after a career race that unlocks something):
+
+- `sub_8225DE78` ModeType9::Leaving
+- `sub_8225D6A8` ModeType9::IsLoaded
+- `sub_8225A720` TodaysResult::QueueMovie
+- `sub_8225BAB8` TodaysEvent::MarkImages
+- `sub_8225C130` TodaysEvent::OpenMovie
+- `sub_8225C008` TodaysEvent::LoadImages
+- `sub_8225BD10` TodaysEvent::LoadImagePair
+- `sub_8225C160` TodaysEvent::WaitForMovie
+- `sub_8225C0A0` TodaysEvent::ImagesLoadedA
+- `sub_8225C0E8` TodaysEvent::ImagesLoadedB
+- `sub_8225C990` TodaysEvent::Start
+- `sub_8225C648` TodaysEvent::SetUpTexts
+- `sub_8225BB70` TodaysEvent::NextUnlockEntry
+- `sub_8225C928` TodaysEvent::Draw
+- `sub_8225CDE8` TodaysEvent::Update
+- `sub_8225C428` TodaysEvent::EventPage
+- `sub_8225C590` TodaysEvent::EndPage
+- `sub_8225B9B8` TodaysEvent::QueueEventMovies
+- `sub_8225CB18` TodaysEvent::Intro
+- `sub_8225C770` TodaysEvent::FadeOut
+- `sub_8225CC80` TodaysEvent::NextUnlock
+- `sub_8225CD50` TodaysEvent::NextPage
+- `sub_8225CA50` TodaysEvent::ShowUnlock
+- `sub_8225C848` TodaysEvent::ShowImages
+- `sub_8225C1F8` TodaysEvent::Unload
+- `sub_8225C278` TodaysEvent::Unloaded
+
+The replay theater's:
+
 Not in the attract race or the replay (`itc_4951`, `itc_4952`, ok; all
 in `type10-mode.md`, the replay theater: open Replay Theater from the
 title's main menu; the list page and a replay's load need a saved

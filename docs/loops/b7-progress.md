@@ -41,9 +41,22 @@ file's history. What's left to see in a drive, from every run:
   `--native_todays_result`; never-seen paths ported; 57 harnesses 0
   differing; race 37 s at 40, 0 errors; harness faults fixed on the
   way; three of the map's addresses corrected; no subagents). Left:
-  none. Validation agent running.
+  none. Validated: `itc_4967` (race 57 s at 180, 0 errors, every
+  harness 0 differing outside the expected groups), 57 of 57 harness
+  lines, no prints added; none in the race, 31 in the replay
+  `itc_4968` (ok; today's result's path), 26 to drive (today's event).
+  Recorded.
+- Subsystem 2 of 5: the type 12 front-end mode (its Init
+  `sub_82278058`, ready, 25 functions and 8,521 lines under it, with
+  `sub_8225F330` and the handlers after the type 9 mode's code; the
+  lead the type 9 map added; the title's main menu item that leaves
+  15); its line deleted from `leads.md`. Mapping agent running.
 
 ## Done
+
+- The type 9 mode (today's result and today's event):
+  `todays-result.md` 57 of 57 ours, `--native_todays_result`,
+  b7718efe..ba41ed1b; validated.
 
 - The replay theater's check: `type10-mode.md` 46 of 47 ours,
   `--native_type10_mode` on, 50318046..93b074ab; validated.
