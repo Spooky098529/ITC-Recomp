@@ -18,10 +18,22 @@ When the user has reviewed a run's section, its heading gets
   named from the debug strings `TXR_MenuTodaysResult` and
   `TXR_TodaysEvent`; the shared slots stay in `type10-mode.md` and
   `front-end-screen-helpers.md`; `known-data.md`'s type 9 block,
-  `0x827F60C8`-`0x827F60DC` and the save data's +0x1D524; references
+  `0x828160C8`-`0x828160DC` (the map wrote `0x827F60..`, fixed by the
+  migration with the fades' counts `0x826A50E4`, `0x826A50DC` and
+  `SetUpTexts`' node (8, 11)) and the save data's +0x1D524; references
   in `race-event.md`, `boot-mode.md`, `front-end-screen-helpers.md`;
   the type 12 mode added as a lead. Both `Create`s ask `VirtualAlloc`
   for 68 bytes and write past them (inside the page): kept as is.
+- The type 9 mode's migration (b7718efe..ba41ed1b, `--native_todays_result`):
+  57 of 57 ours (38 Overridden through vtables and functor tables, 19
+  Native; `TodaysEvent::Kind`'s adapter removed); the 26 never-seen
+  paths ported with their callers (the garage screen's precedent);
+  `Progress::CheckUnlocks` `sub_821162B0` left recompiled (never seen,
+  called through the guest by both queue functions). The harness builds
+  its own small stand-ins for the data tables and `BUILD.TOC` (not
+  loaded when harnesses run); unlock counts and image lists laid in
+  play's ranges after harness faults. A row script wiped the rows'
+  notes in two commits; put back in 70dc8fb7.
 - The replay theater's check (50318046..93b074ab): the previous run's
   unchecked port (below) now checked by its harness (46 functions, 0
   differing) and on by default; its harness lays a replay record's +28

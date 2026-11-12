@@ -36,7 +36,12 @@ file's history. What's left to see in a drive, from every run:
   event (UI movie 0, block +9640, the unlocks); leaves for the boot
   mode when a movie is queued, else the garage; 26 ready groups; one
   lead added, the type 12 mode; no subagents); map checked (0 errors,
-  file listed, 26 ready groups). Migration agent running.
+  file listed, 26 ready groups). Migration b7718efe..ba41ed1b (57 of
+  57 ours: 38 Overridden, 19 Native, `Kind`'s adapter removed;
+  `--native_todays_result`; never-seen paths ported; 57 harnesses 0
+  differing; race 37 s at 40, 0 errors; harness faults fixed on the
+  way; three of the map's addresses corrected; no subagents). Left:
+  none. Validation agent running.
 
 ## Done
 
@@ -64,5 +69,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the type 9 mode's map: ours 5620, work left 980 (wrapped 55,
   known 419, unknown 506).
+
+- After its migration: ours 5677, work left 949 (wrapped 55, known
+  388, unknown 506).
 
 ## Stopped
