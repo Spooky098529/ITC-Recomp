@@ -100,7 +100,15 @@ file's history. What's left to see in a drive, from every run:
 - Next: `Scenery::IsLoaded` `sub_820F1F68` (`course-scenery.md`,
   ready) with what it unblocks in `race-loading.md` (`WaitCourse`
   `sub_821514A0`, `EndTick` `sub_821516F0`), a lead without mapping
-  (not counted). Migration agent running.
+  (not counted). Migration ce238773..880882d4 (`IsLoaded` under
+  `--native_course_scenery`, `WaitCourse` and `EndTick` under
+  `--native_race_loading`; 12 `course-scenery.md` adapters removed;
+  harnesses 0 differing; race 38 s at 40, 0 errors; no subagents).
+  Left: `LocationScreen::PollLoad` `sub_82229238` newly ready
+  (`location-screen.md`), and 9 groups already ready in
+  `course-scenery.md` (`Scenery::Unload`, `CourseSet::Load`,
+  `RecordHeadlightProjectors`, `Scenery::Draw` and smaller). Validation
+  agent running.
 
 ## Done
 
