@@ -10,6 +10,7 @@
 #include "network_mode/network_mode.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "network_mode/internal.h"
 #include "guest.h"
 
@@ -602,6 +603,52 @@ uint64_t SessionFree(uint8_t* base, uint32_t sp, const Calls& calls) {
       calls.Call(kVirtualFree, frame, 0x82292748, Load(base, kSession), 0, kMemRelease);
   Store(base, kSession, 0);
   return r3;
+}
+
+uint64_t SessionInit(uint8_t* base, uint64_t session_r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_822915C0 Session::Init");
+  Frame(base, sp, 112);
+  const uint32_t session = uint32_t(session_r3);
+  auto store64 = [&](uint32_t at, uint64_t value) {
+    Store(base, at, uint32_t(value >> 32));
+    Store(base, at + 4, uint32_t(value));
+  };
+  constexpr uint32_t kTimeout = 0x36EE80;  // 3,600,000
+  Store(base, kSessionState, 0);
+  Store(base, session + 160, 0);
+  Store(base, kSessionBuffer, 0);
+  Store(base, session + 180, 0);
+  Store(base, session + 188, 1);
+  Store(base, session + 224, 0);
+  Store(base, session + 232, 0);
+  store64(session + 208, kTimeout);
+  store64(session + 200, kTimeout);
+  Store(base, session + 216, 0);
+  Store(base, session + 220, 0xFFFFFFFFu);
+  Store(base, session + 144, 0);
+  Store(base, session + 228, 0);
+  Store(base, session + 236, 0);
+  Store(base, session + 192, 1);
+  store64(session + 168, 0);
+  Store(base, session + 240, 0);
+  Store(base, session + 244, 0);
+  Store(base, session + kSessionRows - 4, 1);
+  Store(base, session + kSessionRows, 0);
+  // XMemSet's plain C++ (its r3 the destination, as it came).
+  c_runtime::XMemSet(base, session + 248, 0, 256);
+  return session_r3 + 248;
+}
+
+uint64_t SessionMake(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_822926B8 Session::Make");
+  const uint32_t frame = Frame(base, sp, 96);
+  if (Load(base, kSession) != 0) {
+    return r3;
+  }
+  const uint64_t session =
+      calls.Call(kVirtualAlloc, frame, 0x822926F0, 0, kSessionBytes, 0x1000, 4);
+  Store(base, kSession, uint32_t(session));
+  return SessionInit(base, session, frame);
 }
 
 }  // namespace network_mode

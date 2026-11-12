@@ -217,6 +217,23 @@ uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp);
 // frames. r3 as the original leaves it.
 uint64_t SessionFree(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// The session's pages (sub_822926B8's VirtualAlloc) and the session state
+// word Session::Init clears (0x826C6AA8, system-services.md's
+// Session::IsActive reads it).
+constexpr uint32_t kSessionBytes = 0x13CD50;
+constexpr uint32_t kSessionState = 0x826C6AA8;
+// sub_822926B8 Session::Make (the mode select's menu page, the time
+// attack): with no session ([0x82816E3C]), its pages VirtualAlloc'ed (a
+// guest call through the override) into the global and set up by
+// Session::Init. Not an Xbox Live call: the game's own memory. 96-byte
+// frame below `sp`. r3: Init's, or `r3` as it came with a session there.
+uint64_t SessionMake(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822915C0 Session::Init (r3 the session, VirtualAlloc's 64 bits): its
+// words, the session state and buffer globals cleared, +248 to +503
+// cleared with XMemSet's plain C++. 112-byte frame below `sp`. r3 the
+// session + 248.
+uint64_t SessionInit(uint8_t* base, uint64_t session_r3, uint32_t sp);
+
 // --- The machines' set-up and teardown handlers (machines.cpp) ---
 
 // Each machine's handlers by its index (Machine's: 0, 1 and 3 to 13; the
@@ -243,5 +260,97 @@ uint64_t MachineDestroy(uint8_t* base, uint32_t index, uint32_t machine, uint32_
 // words, GarageCar::Reset(+832) through the guest. 112-byte frame below
 // `sp`. GarageCar::Reset's r3.
 uint64_t Screen1ResetData(uint8_t* base, uint32_t data, uint32_t sp, const Calls& calls);
+
+// --- The mode select's running screen (mode_select.cpp) ---
+
+// The mode select's blocks (Create's): the page object (28 bytes, the
+// title screen's layout: +0 the page Draw runs, -1 while a transition
+// runs; +4 the page after; +8 the page before; +12 the transition Update
+// runs, -1 none; +16 the one queued after it; +20; +24 the transition's
+// started word), the menu (68 bytes, Menu::Step's: two items) and the data
+// (36 bytes: +0 set up, +4 and +8 back to the title, +12 the sign-in UI
+// shown, +16 the privilege dialog, +20 the page and +24 the transition the
+// dialog's close goes to, +28 the sign-in pages' count, +32 the time
+// attack's way). Movie 35.
+constexpr uint32_t kSelectPages = 0x82816190;
+constexpr uint32_t kSelectMenu = 0x82816194;
+constexpr uint32_t kSelectData = 0x82816198;
+constexpr uint32_t kSelectMovie = 35;
+// Screen 1's data (its +8 = 1 when an item is picked), dialog 13's reason
+// (7: not signed in to Live) and dialog 12's (10: no privilege).
+constexpr uint32_t kScreen1Data = 0x82816180;
+constexpr uint32_t kDialog13Reason = 0x828161A4;
+constexpr uint32_t kDialog12Reason = 0x828161B0;
+// The Live sign-in data the pages read (plain guest reads, as the
+// original): the Live users' mask (written 0 once by B5's Network::Update
+// stub, src/hooks/network.cpp: no user on Live), player 1's controller
+// (0 to 3) and the system UI's two words.
+constexpr uint32_t kLiveMask = 0x826C795C;
+constexpr uint32_t kPlayerController = 0x826BABA4;
+constexpr uint32_t kSystemUi0 = 0x826C7960;
+constexpr uint32_t kSystemUi1 = 0x826C7964;
+// sub_8214F620(user, 254)'s answer, plugged in (the user's call,
+// 2026-11-12): its XUserCheckPrivilege wrapper sub_82295030 asks
+// XamGetSystemVersion (the SDK's 0, below 0x20096B00), so a user signed in
+// locally gets 1245 with the privilege word 0, and any other the SDK's
+// XamUserCheckPrivilege (0 written for user 0, NO_SUCH_USER for 1 to 3):
+// sub_8214F620 answers 0 in every case.
+constexpr uint32_t kPrivilege = 0;
+
+// (4, 1) Start (sub_8227D300; 96-byte frame): SetUp, the data's +28 = 0,
+// the page object reset to Intro then ShowCursor over the menu page. r3
+// SetUp's.
+uint64_t SelectStart(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8227CCE0 SetUp (128): movie 35's pose reset, the menu reset, its
+// texts and nodes, the data's +0 = 1, +4 = 0, +32 = 1. r3 the last
+// HideNode's.
+uint64_t SelectSetUp(uint8_t* base, uint32_t sp, const Calls& calls);
+// (9, 5) Open (sub_8227C5C8, a leaf): the reopen's pages, state 4; or state
+// 1 (the movie not loaded).
+void SelectOpen(uint8_t* base, uint32_t machine);
+// (5, 1) Draw (sub_8227D248; 160): the page's function from its table on
+// the frame through the guest (r3 the dispatcher, r4 the machine). r3 the
+// page's, or `r3` with no page.
+uint64_t SelectDraw(uint8_t* base, uint64_t r3, uint64_t dispatcher, uint32_t sp,
+                    const Calls& calls);
+// (5, 0) Update (sub_8227D4E8; 160): the debug prints (the empty
+// sub_82106540) left out; the running transition through the guest from
+// its table, or the movie run. r3 as the original leaves it.
+uint64_t SelectUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
+// The pages (r3 the dispatcher; 112-byte frames for the first three, 96
+// for the sign-in pages): MenuPage sub_8227C658, BattlePage sub_8227C9F0,
+// TimeAttackPage sub_8227CB38, SignInPage sub_8227C088 and SignInPage2
+// sub_8227C210 (`r3` as it came, returned with the system UI up); the
+// leaves LeavePage sub_8227C970 and BackPage sub_8227CC78.
+uint64_t SelectMenuPage(uint8_t* base, uint32_t sp, const Calls& calls);
+void SelectLeavePage(uint8_t* base, uint32_t dispatcher);
+uint64_t SelectBattlePage(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls);
+uint64_t SelectTimeAttackPage(uint8_t* base, uint32_t dispatcher, uint32_t sp,
+                              const Calls& calls);
+uint64_t SelectSignInPage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t SelectSignInPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+void SelectBackPage(uint8_t* base, uint32_t dispatcher);
+// The transitions (r3 the started word): Intro sub_8227CE50 (128),
+// ShowCursor sub_8227D138 (112), MoveCursor sub_8227D380 (144), FadeOut
+// sub_8227D088 (112), FadeIn sub_8227CFA8 (128). 1 when done, else 0.
+uint64_t SelectIntro(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectShowCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectMoveCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectFadeOut(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectFadeIn(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+// sub_8227D1D8 SetCursorY (112): movie 35's node (4, 0)'s +16 = `y` (r3's
+// low word, unsigned) as a float, through the frame's +80. r3 the node.
+uint32_t SelectSetCursorY(uint8_t* base, uint32_t y, uint32_t sp);
+// The dialogs' replies (leaves): OnNo sub_8227BF80, OnYes sub_8227BFB8,
+// OnDialogClosed sub_8227BFD8.
+void SelectOnNo(uint8_t* base);
+void SelectOnYes(uint8_t* base);
+void SelectOnDialogClosed(uint8_t* base);
+// (5, 20) Unload (sub_8227C7A8; 112): movie 35 finished, deleted with
+// +9616 set. r3 as the original leaves it. (8, 3) Unloaded (sub_8227C810,
+// a leaf; r4 the dispatcher; `sp` the caller's r1: above item 1, the word
+// at sp - 16 is posted, as the original).
+uint64_t SelectUnload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+void SelectUnloaded(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp);
 
 }  // namespace network_mode

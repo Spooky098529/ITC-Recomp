@@ -47,7 +47,19 @@ ITC_FLAG_BOOL(native_network_mode, true, "ITC",
               "sub_82287EC0; Type12Dialog11's sub_82276E60, sub_82276E40, sub_82276FC0, "
               "sub_822770B8, sub_82276F40; Type12Dialog12's sub_8227ED58, sub_8227ECE8, "
               "sub_8227EEC0, sub_8227F038, sub_8227EE40; Type12Dialog13's sub_8227DED0, "
-              "sub_8227DEC0, sub_8227E030, sub_8227E118, sub_8227DFB0 (checked by "
+              "sub_8227DEC0, sub_8227E030, sub_8227E118, sub_8227DFB0; the mode select's running "
+              "screen (the movie's setters and players, the fades, Menu::Step and Pressed, "
+              "MenuSound::Play and SaveSlots::State through their overrides; the privilege "
+              "check sub_8214F620 plugged in as 0, XShowSigninUI not called): Start "
+              "sub_8227D300 with SetUp sub_8227CCE0, Open sub_8227C5C8, Draw sub_8227D248, "
+              "Update sub_8227D4E8, the pages MenuPage sub_8227C658 (with Session::Make "
+              "sub_822926B8 and Session::Init sub_822915C0), LeavePage sub_8227C970, BattlePage "
+              "sub_8227C9F0, TimeAttackPage sub_8227CB38, SignInPage sub_8227C088, SignInPage2 "
+              "sub_8227C210 and BackPage sub_8227CC78, the transitions Intro sub_8227CE50, "
+              "ShowCursor sub_8227D138, MoveCursor sub_8227D380 with SetCursorY sub_8227D1D8, "
+              "FadeOut sub_8227D088 and FadeIn sub_8227CFA8, the replies OnNo sub_8227BF80, "
+              "OnYes sub_8227BFB8 and OnDialogClosed sub_8227BFD8, Unload sub_8227C7A8 and "
+              "Unloaded sub_8227C810 (checked by "
               "--run_harnesses=network_mode)");
 
 namespace hooks {
@@ -289,6 +301,73 @@ void Type12Screen1ResetData(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+void SessionMake(PPCContext& ctx, uint8_t* base) {
+  uint64_t r3;
+  {
+    GuestCalls guest(ctx, base);
+    r3 = nm::SessionMake(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  }
+  ctx.r3.u64 = r3;
+}
+void SessionInit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = nm::SessionInit(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+// The mode select's steps: those making guest calls through GuestCalls,
+// r3 as the plain C++ answers; the leaves leave r3 as it came.
+#define ITC_NET_SELECT_CALLS(name, expression) \
+  void name(PPCContext& ctx, uint8_t* base) {  \
+    uint64_t r3;                               \
+    {                                          \
+      GuestCalls guest(ctx, base);             \
+      const nm::Calls calls = guest.calls();   \
+      r3 = expression;                         \
+    }                                          \
+    ctx.r3.u64 = r3;                           \
+  }
+ITC_NET_SELECT_CALLS(NetModeSelectStart, nm::SelectStart(base, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectSetUp, nm::SelectSetUp(base, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectDraw,
+                     nm::SelectDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectUpdate, nm::SelectUpdate(base, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectMenuPage, nm::SelectMenuPage(base, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectBattlePage,
+                     nm::SelectBattlePage(base, ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectTimeAttackPage,
+                     nm::SelectTimeAttackPage(base, ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectSignInPage,
+                     nm::SelectSignInPage(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectSignInPage2,
+                     nm::SelectSignInPage2(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectIntro, nm::SelectIntro(base, ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectShowCursor,
+                     nm::SelectShowCursor(base, ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectMoveCursor,
+                     nm::SelectMoveCursor(base, ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectFadeOut, nm::SelectFadeOut(base, ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectFadeIn, nm::SelectFadeIn(base, ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectUnload, nm::SelectUnload(base, ctx.r3.u32, ctx.r1.u32, calls))
+#undef ITC_NET_SELECT_CALLS
+
+void NetModeSelectOpen(PPCContext& ctx, uint8_t* base) { nm::SelectOpen(base, ctx.r3.u32); }
+void NetModeSelectLeavePage(PPCContext& ctx, uint8_t* base) {
+  nm::SelectLeavePage(base, ctx.r3.u32);
+}
+void NetModeSelectBackPage(PPCContext& ctx, uint8_t* base) {
+  nm::SelectBackPage(base, ctx.r3.u32);
+}
+void NetModeSelectSetCursorY(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = nm::SelectSetCursorY(base, ctx.r3.u32, ctx.r1.u32);
+}
+void NetModeSelectOnNo(PPCContext& ctx, uint8_t* base) { nm::SelectOnNo(base); }
+void NetModeSelectOnYes(PPCContext& ctx, uint8_t* base) { nm::SelectOnYes(base); }
+void NetModeSelectOnDialogClosed(PPCContext& ctx, uint8_t* base) {
+  nm::SelectOnDialogClosed(base);
+}
+void NetModeSelectUnloaded(PPCContext& ctx, uint8_t* base) {
+  nm::SelectUnloaded(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 #define ITC_NETWORK_MODE(address, step)   \
@@ -393,3 +472,30 @@ ITC_NETWORK_MODE(8227DEC0, NetMachineOpenMovie<13>)
 ITC_NETWORK_MODE(8227E030, NetMachineWaitForMovie<13>)
 ITC_NETWORK_MODE(8227E118, NetMachineLeave<13>)
 ITC_NETWORK_MODE(8227DFB0, NetMachineDestroy<13>)
+
+// The mode select's running screen (through its machine's functors and its
+// Draw's and Update's tables: no direct callers). SetUp sub_8227CCE0,
+// SetCursorY sub_8227D1D8, Session::Make sub_822926B8 and Session::Init
+// sub_822915C0: no adapters (only Start, MoveCursor, MenuPage and
+// Session::Make, native, call them).
+ITC_NETWORK_MODE(8227D300, NetModeSelectStart)
+ITC_NETWORK_MODE(8227C5C8, NetModeSelectOpen)
+ITC_NETWORK_MODE(8227D248, NetModeSelectDraw)
+ITC_NETWORK_MODE(8227D4E8, NetModeSelectUpdate)
+ITC_NETWORK_MODE(8227C658, NetModeSelectMenuPage)
+ITC_NETWORK_MODE(8227C970, NetModeSelectLeavePage)
+ITC_NETWORK_MODE(8227C9F0, NetModeSelectBattlePage)
+ITC_NETWORK_MODE(8227CB38, NetModeSelectTimeAttackPage)
+ITC_NETWORK_MODE(8227C088, NetModeSelectSignInPage)
+ITC_NETWORK_MODE(8227C210, NetModeSelectSignInPage2)
+ITC_NETWORK_MODE(8227CC78, NetModeSelectBackPage)
+ITC_NETWORK_MODE(8227CE50, NetModeSelectIntro)
+ITC_NETWORK_MODE(8227D138, NetModeSelectShowCursor)
+ITC_NETWORK_MODE(8227D380, NetModeSelectMoveCursor)
+ITC_NETWORK_MODE(8227D088, NetModeSelectFadeOut)
+ITC_NETWORK_MODE(8227CFA8, NetModeSelectFadeIn)
+ITC_NETWORK_MODE(8227BF80, NetModeSelectOnNo)
+ITC_NETWORK_MODE(8227BFB8, NetModeSelectOnYes)
+ITC_NETWORK_MODE(8227BFD8, NetModeSelectOnDialogClosed)
+ITC_NETWORK_MODE(8227C7A8, NetModeSelectUnload)
+ITC_NETWORK_MODE(8227C810, NetModeSelectUnloaded)

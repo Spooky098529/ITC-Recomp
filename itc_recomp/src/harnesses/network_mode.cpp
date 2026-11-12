@@ -823,6 +823,9 @@ void MachineHandlers(Context& h, const World& w) {
 void NetworkModeInits(Context& h);
 void NetworkModeTeardowns(Context& h);
 void NetworkModeTimeAttack(Context& h);
+// The mode select's running screen, in src/harnesses/network_mode_select.cpp
+// (its own world, the type 10 mode's harness's).
+void NetworkModeSelect(Context& h);
 
 void NetworkMode(Context& h) {
   const World w(h.base);
@@ -847,6 +850,7 @@ void NetworkMode(Context& h) {
   NetworkModeInits(h);
   NetworkModeTeardowns(h);
   NetworkModeTimeAttack(h);
+  NetworkModeSelect(h);
 }
 
 }  // namespace harness
