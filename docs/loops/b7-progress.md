@@ -79,7 +79,12 @@ file's history. What's left to see in a drive, from every run:
   (`sub_82150E00`, ready, seen at every career race's end; it blocks
   `RaceMode::NextMode`; the network mode's other screens never ran in
   play, so a lead run in play was taken first); its line deleted from
-  `leads.md`. Mapping agent running.
+  `leads.md`. Mapped `race-end.md` (c8f1147b: 1 row,
+  `RaceMode::ModeAfterRace`, read in full: the mode a race goes to
+  after it ends, by race kind and flags; its callees and caller have
+  rows elsewhere; ready with `RaceMode::NextMode` `sub_82151EF0`, 2
+  functions, 377 lines; no leads; no subagents); map checked (0
+  errors, file listed, 1 ready group). Migration agent running.
 
 ## Done
 
@@ -124,5 +129,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After its migration: ours 5808, work left 840 (wrapped 55, known
   388, unknown 397).
+
+- After the race end's map: ours 5808, work left 840 (wrapped 55,
+  known 389, unknown 396).
 
 ## Stopped

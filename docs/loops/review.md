@@ -13,6 +13,13 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The race end's map (c8f1147b): `race-end.md`, one row
+  (`RaceMode::ModeAfterRace` `sub_82150E00`: after a race, which mode
+  next by race kind; movies 6-9 queued in the boot table at the
+  career's stages 6 and 8); answer bytes +81 to +83 stack leftovers
+  (`BootMode::NextMode`'s precedent); cross-references in
+  `race-loading.md`, `career.md`, `todays-result.md`, `boot-mode.md`,
+  `known-data.md`.
 - The type 12 mode's map (89120eb9): `network-mode.md`, 127 new rows
   (108 in play): the game's Xbox Live mode (network battle, network
   time attack: `TXR_NetworkModeSelect`, `TXR_NetworkTaCourse`,
