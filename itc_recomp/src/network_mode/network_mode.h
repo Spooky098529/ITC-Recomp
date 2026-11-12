@@ -151,4 +151,70 @@ bool InitBase(uint8_t* base, uint32_t machine, uint32_t index, uint32_t object, 
 constexpr uint32_t kInitFrame = 224;
 uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
 
+// --- The mode's delegate functions and block helpers (mode.cpp) ---
+
+// The machines' words: the state, the movie loaded, back (to the title),
+// the mode again, held.
+constexpr uint32_t kMachineState = 9604;
+constexpr uint32_t kMachineLoaded = 9608;
+constexpr uint32_t kMachineBack = 9624;
+constexpr uint32_t kMachineAgain = 9632;
+// The mode's message ring (+240; the +32 object's +208) and the block's
+// next-mode answer (8 bytes, NextMode's, handed over by Teardown).
+constexpr uint32_t kRing = 240;
+constexpr uint32_t kNextAnswer = 0x21014;
+// The globals: the sound manager, the sign-in watch's "not on Live" check
+// (0x826BAB40 + 16), the title's flag NextMode sets, the session's buffer
+// Session::Release frees, the race data and the time attack's set-up (the
+// course route, whether +0x82816684 picks the race data's +0x59618, that
+// word, the car's 1,884 bytes and its +3892, the word for the session's
+// +216).
+constexpr uint32_t kSoundManager = 0x826C5C80;
+constexpr uint32_t kSignInWatch = 0x826BAB40;
+constexpr uint32_t kTitleFlag = 0x826364EC;
+constexpr uint32_t kSessionBuffer = 0x826C6AD4;
+constexpr uint32_t kSessionRows = 0x13CD34;  // the session's +1,297,716
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kTaRoute = 0x82816660;
+constexpr uint32_t kTaHasKind = 0x82816680;
+constexpr uint32_t kTaKind = 0x82816684;
+constexpr uint32_t kTaCar = 0x82816688;
+constexpr uint32_t kTaCarBytes = 1884;
+constexpr uint32_t kTaCarWord = 0x82816E38;
+constexpr uint32_t kTaSessionWord = 0x82816694;
+
+// sub_82277E10 ModeType12::Machine (with its case 0's entry sub_82277E44):
+// the machine of index `index` in the block (2 and above 14: 0).
+uint32_t Machine(uint32_t block, uint32_t index);
+// sub_82277FF0 ModeType12::FindShown: the first machine (0 to 14) in state
+// 5 or 4 becomes the shown one (+0x2100C); none: kept. The last index it
+// looked at (Machine's r3 the original leaves: the one found, else 14).
+uint32_t FindShown(uint8_t* base, uint32_t block);
+// sub_82277EE0 ModeType12::AllLoaded: 1 when all fourteen machines' movies
+// are loaded (+9608), else 0.
+uint32_t AllLoaded(uint8_t* base, uint32_t block);
+
+// The delegate functions (r3 the 8-byte answer, r4 the mode; `sp` the
+// caller's r1): sub_8227B440 WaitForLoads (176-byte frame), sub_8227B930
+// NextMode (4,112, the time attack's car in it), sub_8227B868 LeaveScreen
+// (128), sub_8227B770 WaitForShown (112), sub_8227BE10 Teardown (144).
+void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void Teardown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+
+// The +32 vtable's slots (r3 the mode + 32): sub_822788D8 ForceExit
+// (240-byte frame) and sub_82278B98 Resume (96). r3 as the originals leave
+// it (the shown machine).
+uint64_t ForceExit(uint8_t* base, uint32_t object, uint32_t sp, const Calls& calls);
+uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp);
+
+// sub_82292710 Session::Free: with a session ([0x82816E3C]), its buffers
+// released (sub_82291670 Session::Release: the session's +0x13CD34 through
+// operator delete and [0x826C6AD4] through operator delete[], each cleared)
+// and the session's pages freed (VirtualFree), the global cleared. 96-byte
+// frames. r3 as the original leaves it.
+uint64_t SessionFree(uint8_t* base, uint32_t sp, const Calls& calls);
+
 }  // namespace network_mode

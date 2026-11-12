@@ -22,7 +22,14 @@ ITC_FLAG_BOOL(native_network_mode, true, "ITC",
               "sub_821B96B8, NetScreen::InitBase sub_8227B3E0 (with its jump sub_8227B41C) and "
               "the eight base Inits sub_82278C20, sub_82279118, sub_8227A000, sub_8227A4F8, "
               "sub_82279610, sub_82279B08, sub_8227A9F0 and sub_8227AEE8 (StateMachine::Add's "
-              "plain C++) (checked by --run_harnesses=network_mode)");
+              "plain C++); the block's helpers ModeType12::Machine sub_82277E10 (with "
+              "sub_82277E44), FindShown sub_82277FF0 and AllLoaded sub_82277EE0; the delegate "
+              "functions WaitForLoads sub_8227B440, NextMode sub_8227B930 (with the time "
+              "attack's race set-up through the race set-up's overrides), LeaveScreen "
+              "sub_8227B868, WaitForShown sub_8227B770 and Teardown sub_8227BE10; the +32 slots "
+              "ForceExit sub_822788D8 and Resume sub_82278B98; Session::Free sub_82292710 with "
+              "Session::Release sub_82291670 (operator delete, VirtualFree and the sound "
+              "manager's slots through the guest) (checked by --run_harnesses=network_mode)");
 
 namespace hooks {
 
@@ -142,6 +149,57 @@ void NetScreenInitBase(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void ModeType12Machine(PPCContext& ctx, uint8_t* base) {
+  const uint32_t machine = nm::Machine(ctx.r3.u32, ctx.r4.u32);
+  // The original adds the offset to r3's 64 bits (case 0 returns r3).
+  ctx.r3.u64 = machine == 0 ? 0 : ctx.r3.u64 + (machine - ctx.r3.u32);
+}
+// r3 left as the original's last Machine call leaves it.
+void ModeType12FindShown(PPCContext& ctx, uint8_t* base) {
+  ctx.r4.u64 = nm::FindShown(base, ctx.r3.u32);
+  ModeType12Machine(ctx, base);
+}
+void ModeType12AllLoaded(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = nm::AllLoaded(base, ctx.r3.u32);
+}
+
+// The delegate functions return the answer (r3 as it came).
+#define ITC_MODE_TYPE12_DELEGATE(name)                                    \
+  void ModeType12##name(PPCContext& ctx, uint8_t* base) {                 \
+    const uint64_t answer = ctx.r3.u64;                                   \
+    {                                                                     \
+      GuestCalls guest(ctx, base);                                        \
+      nm::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());  \
+    }                                                                     \
+    ctx.r3.u64 = answer;                                                  \
+  }
+ITC_MODE_TYPE12_DELEGATE(WaitForLoads)
+ITC_MODE_TYPE12_DELEGATE(NextMode)
+ITC_MODE_TYPE12_DELEGATE(LeaveScreen)
+ITC_MODE_TYPE12_DELEGATE(WaitForShown)
+ITC_MODE_TYPE12_DELEGATE(Teardown)
+#undef ITC_MODE_TYPE12_DELEGATE
+
+void ModeType12ForceExit(PPCContext& ctx, uint8_t* base) {
+  uint64_t r3;
+  {
+    GuestCalls guest(ctx, base);
+    r3 = nm::ForceExit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  }
+  ctx.r3.u64 = r3;
+}
+void ModeType12Resume(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = nm::Resume(base, ctx.r3.u32, ctx.r1.u32);
+}
+void SessionFree(PPCContext& ctx, uint8_t* base) {
+  uint64_t r3;
+  {
+    GuestCalls guest(ctx, base);
+    r3 = nm::SessionFree(base, ctx.r1.u32, guest.calls());
+  }
+  ctx.r3.u64 = r3;
+}
+
 }  // namespace hooks
 
 #define ITC_NETWORK_MODE(address, step)   \
@@ -159,3 +217,20 @@ ITC_NETWORK_MODE(82278058, ModeType12Init)
 // The fourteen InitStates, NetScreen::InitBase sub_8227B3E0 and its eight
 // base Inits: no adapters (only the native Init and InitStates call them;
 // the register steps above are the harness's).
+// The delegate functions (the vtable's slots 8, 6, 11, 10 and 12, through
+// the slot thunks and Mode::NextModeThunk) and the +32 vtable 0x82006C60's
+// slots 1 and 2 (no direct callers). Machine sub_82277E10 (with
+// sub_82277E44), FindShown sub_82277FF0, AllLoaded sub_82277EE0 and
+// Session::Release sub_82291670: no adapters (only the mode's functions and
+// Session::Free, native, call them in play; the recompiled Interrupt
+// sub_822785E0, never seen in play, calls the originals).
+ITC_NETWORK_MODE(8227B440, ModeType12WaitForLoads)
+ITC_NETWORK_MODE(8227B930, ModeType12NextMode)
+ITC_NETWORK_MODE(8227B868, ModeType12LeaveScreen)
+ITC_NETWORK_MODE(8227B770, ModeType12WaitForShown)
+ITC_NETWORK_MODE(8227BE10, ModeType12Teardown)
+ITC_NETWORK_MODE(822788D8, ModeType12ForceExit)
+ITC_NETWORK_MODE(82278B98, ModeType12Resume)
+// Session::Free: also from the recompiled race's end (sub_82150E00, seen in
+// play), Type12Screen3's (8, 3) sub_8225E418 and sub_82211CF8.
+ITC_NETWORK_MODE(82292710, SessionFree)

@@ -72,6 +72,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_type67_modes);
+ITC_FLAG_DECLARE(bool, native_network_mode);
 ITC_FLAG_DECLARE(bool, native_type2_mode);
 
 namespace time_hooks {
@@ -3953,6 +3954,101 @@ void NetworkModeInits(Context& h) {
   leftovers.Report();
   saved.Restore();
   Write(base, kFades, fades.data(), kFadesBytes);
+  for (size_t g = 0; g < std::size(globals); g++) guest::StoreU32(base, globals[g], kept[g]);
+}
+
+// --- ModeType12::Teardown (registered under network_mode): the mode (its
+// ring's count and start small, no handlers) and the type 12 block in
+// blocks of their own (the shown index one of play's, the next answer at
+// +0x21014 random, the session made here (+0x21024) 0 or 1), the answer in
+// the world, the stand as PollTeardown's cases lay it (the teardown under
+// way with its count 1 half the time, so it answers 1), the sound manager
+// a fake (its StopCue, slot 13, the recorder of r4 and r5 at +444), the
+// session none or, now and then, the layer's pages made for the side
+// (Session::Free frees them when the poll answers 1 and +0x21024 is set).
+// Compared: the mode, the block, the answer, the stand's block, the
+// manager, the frame without its register saves, whether the session is
+// still allocated, the globals and r3. ---
+
+void NetworkModeTeardowns(Context& h) {
+  namespace nm = network_mode;
+  uint8_t* const base = h.base;
+  const Block world(0x1000);
+  const Block mode(0x400);
+  const Block block(nm::kBlockBytes);
+  const Block stand(kStandBytes);
+  if (!world.address || !mode.address || !block.address || !stand.address) return;
+  const uint32_t globals[] = {kStandGlobals[0], kStandGlobals[1],    kStandGlobals[2],
+                              kStandGlobals[3], menu_sounds::kSoundManager, nm::kSession,
+                              nm::kSessionBuffer};
+  uint32_t kept[std::size(globals)];
+  for (size_t g = 0; g < std::size(globals); g++) kept[g] = guest::LoadU32(base, globals[g]);
+  static constexpr uint32_t kShownIndexes[] = {0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+  const uint32_t sp = CallContext(h).r1.u32;
+  Results results("ModeType12::Teardown (sub_8227BE10)");
+  for (int c = 0; c < 64; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(uint64_t(c) * 7919 + 0x8227BE10);
+      WriteRandom(base, world.address, world.bytes, r);
+      WriteRandom(base, mode.address, mode.bytes, r);
+      WriteRandom(base, block.address, block.bytes, r);
+      WriteRandom(base, sp - 1024, 1024 + 256, r);
+      LayStand(base, stand.address, r);
+      if (r.Below(2) == 0) {
+        guest::StoreU32(base, stand.address + 12, 1);
+        guest::StoreU32(base, stand.address + 16, 1);
+      }
+      guest::StoreU32(base, mode.address + nm::kRing + 600, r.Below(40));
+      guest::StoreU32(base, mode.address + nm::kRing + 604, r.Below(60));
+      guest::StoreU32(base, mode.address + nm::kDispatcher + 200, 0);
+      guest::StoreU32(base, mode.address + nm::kBlock, block.address);
+      guest::StoreU32(base, block.address + nm::kShown,
+                      kShownIndexes[r.Below(std::size(kShownIndexes))]);
+      guest::StoreU32(base, block.address + nm::kSessionMade, r.Below(2));
+      const uint32_t manager = world.address + 0x800, vtable = manager + 0x100;
+      guest::StoreU32(base, manager, vtable);
+      guest::StoreU32(base, vtable + 52, 0x820CE9F8);  // r4, r5 to +444, +448
+      guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+      uint32_t session = 0;
+      if (hooks::NativeHeapActive() && r.Below(3) == 0) {
+        session = memory::AllocPages(0x13D000, 4096);
+        guest::StoreU32(base, session + nm::kSessionRows, 0);
+      }
+      guest::StoreU32(base, nm::kSession, session);
+      guest::StoreU32(base, nm::kSessionBuffer, 0);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = (world.address + 0x100) | (uint64_t(r.Below(2)) << 32);
+      t.r4.u64 = mode.address;
+      t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      if (v == 0) {
+        ITC_FLAG(native_network_mode) = false;
+        __imp__sub_8227BE10(t, base);
+        ITC_FLAG(native_network_mode) = true;
+      } else {
+        hooks::ModeType12Teardown(t, base);
+      }
+      const uint32_t now = guest::LoadU32(base, nm::kSession);
+      out[v].Word(now != 0 && now == session ? 1 : now);
+      guest::StoreU32(base, nm::kSession, 0);
+      if (session != 0) {
+        const bool pages = memory::IsPages(session);
+        out[v].Word(pages ? 1 : 0);
+        if (pages) memory::FreePages(session);
+      }
+      out[v].Bytes(Read(base, mode.address, mode.bytes));
+      out[v].Bytes(Read(base, block.address, block.bytes));
+      out[v].Bytes(Read(base, world.address, world.bytes));
+      out[v].Bytes(Read(base, stand.address, kStandBytes));
+      out[v].Bytes(Read(base, sp - 144, 144 - 48));
+      out[v].Bytes(Read(base, sp, 256));
+      for (const uint32_t g : globals) out[v].Word(guest::LoadU32(base, g));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
   for (size_t g = 0; g < std::size(globals); g++) guest::StoreU32(base, globals[g], kept[g]);
 }
 

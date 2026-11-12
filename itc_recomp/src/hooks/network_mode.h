@@ -43,4 +43,21 @@ void Type12Dialog12InitBase(PPCContext& ctx, uint8_t* base);
 void Type12Dialog13InitBase(PPCContext& ctx, uint8_t* base);
 void NetScreenInitBase(PPCContext& ctx, uint8_t* base);
 
+// The block's helpers: Machine (r3 the block, r4 the index; r3 the
+// machine, 64 bits as the original adds), FindShown and AllLoaded (r3 the
+// block).
+void ModeType12Machine(PPCContext& ctx, uint8_t* base);
+void ModeType12FindShown(PPCContext& ctx, uint8_t* base);
+void ModeType12AllLoaded(PPCContext& ctx, uint8_t* base);
+// The delegate functions (r3 the answer, r4 the mode; r3 the answer).
+void ModeType12WaitForLoads(PPCContext& ctx, uint8_t* base);
+void ModeType12NextMode(PPCContext& ctx, uint8_t* base);
+void ModeType12LeaveScreen(PPCContext& ctx, uint8_t* base);
+void ModeType12WaitForShown(PPCContext& ctx, uint8_t* base);
+void ModeType12Teardown(PPCContext& ctx, uint8_t* base);
+// The +32 slots (r3 the mode + 32) and Session::Free (no arguments).
+void ModeType12ForceExit(PPCContext& ctx, uint8_t* base);
+void ModeType12Resume(PPCContext& ctx, uint8_t* base);
+void SessionFree(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
