@@ -84,7 +84,16 @@ file's history. What's left to see in a drive, from every run:
   after it ends, by race kind and flags; its callees and caller have
   rows elsewhere; ready with `RaceMode::NextMode` `sub_82151EF0`, 2
   functions, 377 lines; no leads; no subagents); map checked (0
-  errors, file listed, 1 ready group). Migration agent running.
+  errors, file listed, 1 ready group). Migration ba317c7e..fc2138de
+  (`RaceMode::NextMode` and `ModeAfterRace` native under
+  `--native_race_end`; `Progress::CheckUnlocks` ported too, never seen,
+  by the user's call to minimize what's left recompiled; 6 adapters
+  removed: `ModeAfterRace`, `CheckUnlocks`, `AfterRace`,
+  `EventLocation`, `Session::Free`, `CheckSystemRequest`; harnesses 0
+  differing; race 33 s at 40, 0 errors; no subagents). Left: none;
+  `race-loading.md`'s `WaitCourse` and `EndTick` still wait on
+  `Scenery::IsLoaded` `sub_820F1F68` (ready itself). Validation agent
+  running.
 
 ## Done
 

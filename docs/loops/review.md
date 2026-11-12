@@ -20,6 +20,15 @@ When the user has reviewed a run's section, its heading gets
   (`BootMode::NextMode`'s precedent); cross-references in
   `race-loading.md`, `career.md`, `todays-result.md`, `boot-mode.md`,
   `known-data.md`.
+- The race end's migration (ba317c7e..fc2138de, `--native_race_end`):
+  `NextMode` Overridden (the race mode's vtable slot 6) and under the
+  new flag, not `--native_race_loading`; `Progress::CheckUnlocks`
+  ported (never seen) and its rewards pass shared with `AfterRace`
+  (`src/career/progress.cpp`); its callers, today's result's two
+  included, call the plain C++ where `Condition::Test`'s copies fit and
+  the original through the guest otherwise; 6 adapters removed. The
+  map missed that a day (+6100) above 999 gives 9 on the -1 path; now
+  in the row.
 - The type 12 mode's map (89120eb9): `network-mode.md`, 127 new rows
   (108 in play): the game's Xbox Live mode (network battle, network
   time attack: `TXR_NetworkModeSelect`, `TXR_NetworkTaCourse`,
