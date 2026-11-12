@@ -50,7 +50,15 @@ file's history. What's left to see in a drive, from every run:
   `sub_82278058`, ready, 25 functions and 8,521 lines under it, with
   `sub_8225F330` and the handlers after the type 9 mode's code; the
   lead the type 9 map added; the title's main menu item that leaves
-  15); its line deleted from `leads.md`. Mapping agent running.
+  15); its line deleted from `leads.md`. Mapped `network-mode.md`
+  (89120eb9: 127 rows, 108 in play: the Xbox Live mode, "NETWORK
+  BATTLE" and "NETWORK TIME ATTACK", its mode select, 14 InitStates, 8
+  base Inits; 97 ready groups, `NextMode` and `Teardown` blocked by
+  `sub_82292710` outside it; 5 leads added; no subagents); map checked
+  (0 errors, file listed). Its `stop:`: an Xbox Live mode the player
+  can open. The user's call (2026-11-12, asked): port its screens
+  natively, its Live calls left recompiled (no behavior change);
+  added to "Precedent first". Migration agent running.
 
 ## Done
 
@@ -85,5 +93,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After its migration: ours 5677, work left 949 (wrapped 55, known
   388, unknown 506).
+
+- After the type 12 mode's map: ours 5677, work left 949 (wrapped 55,
+  known 496, unknown 398).
 
 ## Stopped

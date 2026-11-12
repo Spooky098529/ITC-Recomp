@@ -546,6 +546,12 @@ Calls so far for decisions the loop meets often:
   made, their game-level users seen in play skipped natively with what
   they'd read with the feature absent, Status Dropped (the voice
   engine under the app's start-up, 2026-10-30).
+- An Xbox Live front-end mode the player can open (the type 12 mode,
+  the network battle and time attack, `network-mode.md`): its screens
+  are made native as any front-end mode's, while its Xbox Live calls
+  (sign-in, gamer card, sessions, privileges, leaderboards) stay
+  recompiled through the SDK as now (no behavior change), for the core
+  later; not skipped at its entry (2026-11-12).
 - Register leftovers a varargs callee stores (`UiMovie::SetText`
   `sub_8211C1F8` storing r7-r10 into its caller's frame, set or not by
   the call site): native callers pass 0 for the arguments they don't

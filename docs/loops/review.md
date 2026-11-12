@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The type 12 mode's map (89120eb9): `network-mode.md`, 127 new rows
+  (108 in play): the game's Xbox Live mode (network battle, network
+  time attack: `TXR_NetworkModeSelect`, `TXR_NetworkTaCourse`,
+  `TXR_NetworkTaRanking`); 5 leads added (its other screens, dialogs,
+  the network manager's callees), marked "mapping only until the
+  user's call" by the map; notes added to the `sub_8227B930` and
+  menu-helpers leads. The user's call (2026-11-12): its screens made
+  native, its Xbox Live calls left recompiled (no behavior change).
 - The type 9 mode's map (0752af3f): `todays-result.md`, 57 new rows
   (31 in play, 26 "Not seen in play"): the career's end of the day,
   named from the debug strings `TXR_MenuTodaysResult` and
