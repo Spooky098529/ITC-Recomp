@@ -27,6 +27,11 @@ in other files: `SaveData::Of` (`vehicle-accessors.md`),
 B7 loop's mapping agent, 2026-11-12; ready by `b7_groups.py` with its
 caller (`RaceMode::NextMode`, 2 functions, 377 lines; one callee,
 `Progress::CheckUnlocks`, never seen in play).
+Made native by the B7 loop, 2026-11-12, with its caller and
+`Progress::CheckUnlocks` (`src/race_end/`, `--native_race_end`, harness
+`race_end`), and six adapters it unblocked removed (itself,
+`Progress::AfterRace`, `Progress::CheckUnlocks`, `Career::EventLocation`,
+`Session::Free`, `sub_82293460`).
 
 Status:
 
