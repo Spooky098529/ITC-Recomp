@@ -252,8 +252,11 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
                     r.Below(3) == 0 ? uint32_t(r.Next()) : (r.Below(70) << 16) | r.Below(0x10000));
     guest::StoreU32(base, record + 20, r.Below(6));
     guest::StoreU32(base, record + 24, r.Below(70));
-    guest::StoreU32(base, record + 28,
-                    r.Below(4) == 0 ? 0 : r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(100));
+    // +28 the replay's number, shown in two digits: 0 to 99 (ShowRecord
+    // stores its tens and units into two nodes' +108, which in this pool of
+    // shared nodes are also child indices: a wild number made a later
+    // FindNode in the same case read a wild node, 2026-11-12).
+    guest::StoreU32(base, record + 28, r.Below(4) == 0 ? 0 : r.Below(100));
     guest::StoreU32(base, record + 32, r.Below(8));
   }
   // The save screen's data: +56 0, 1 or any.
