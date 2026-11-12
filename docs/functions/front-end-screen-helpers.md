@@ -19,7 +19,8 @@ were waiting only on them. Three kinds:
   The Inits (slot 0: `sub_82197278`, `sub_82224C70`, `sub_8222FD68`,
   `sub_8225D6D0`, `sub_82288940`, `sub_82278058`) aren't here (leads in
   `../loops/leads.md`; since 2026-11-11 `sub_82288940` is in
-  [`type10-mode.md`](type10-mode.md)).
+  [`type10-mode.md`](type10-mode.md), since 2026-11-12 `sub_8225D6D0` in
+  [`todays-result.md`](todays-result.md)).
 - **The save dialogs' texts and steps**: the yes/no dialog of the save
   screen (UI movie 44, its blocks `[0x826D844C]` and `[0x826D8454]`,
   `../known-data.md`; its Inits in `type6-type7-modes.md`) and of the

@@ -698,6 +698,11 @@ Rows not yet moved stay in the table below. So far:
   with the type 9 mode, and the theater's machine (UI movie 45: the
   saved replays' list through the save screen, a replay's load and the
   race set up from it) (B7).
+- [`todays-result.md`](todays-result.md): the type 9 front-end mode,
+  the career's end of the day: its Init and delegate functions, today's
+  result (UI movie 27: the day's and the career's counts, the next day)
+  and today's event (UI movie 0: the unlocks just made, a page each with
+  their images), and the movies queued after them (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
