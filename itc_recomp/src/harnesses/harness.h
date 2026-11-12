@@ -321,5 +321,6 @@ void UserInfo(Context& h);
 void Type2Mode(Context& h);
 void TitleScreen(Context& h);
 void Type10Mode(Context& h);
+void TodaysResult(Context& h);
 
 }  // namespace harness
