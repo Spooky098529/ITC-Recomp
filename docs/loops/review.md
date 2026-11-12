@@ -13,6 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The type 9 mode's map (0752af3f): `todays-result.md`, 57 new rows
+  (31 in play, 26 "Not seen in play"): the career's end of the day,
+  named from the debug strings `TXR_MenuTodaysResult` and
+  `TXR_TodaysEvent`; the shared slots stay in `type10-mode.md` and
+  `front-end-screen-helpers.md`; `known-data.md`'s type 9 block,
+  `0x827F60C8`-`0x827F60DC` and the save data's +0x1D524; references
+  in `race-event.md`, `boot-mode.md`, `front-end-screen-helpers.md`;
+  the type 12 mode added as a lead. Both `Create`s ask `VirtualAlloc`
+  for 68 bytes and write past them (inside the page): kept as is.
 - The replay theater's check (50318046..93b074ab): the previous run's
   unchecked port (below) now checked by its harness (46 functions, 0
   differing) and on by default; its harness lays a replay record's +28

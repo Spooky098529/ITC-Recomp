@@ -30,7 +30,13 @@ file's history. What's left to see in a drive, from every run:
   Init, its slots 6, 8, 10, 11, 13, +32 slot 0; ready groups under it;
   the previous run's "Next"; the top lead `sub_82562FF0` is inside the
   movie library's range, skipped as before); its line deleted from
-  `leads.md`. Mapping agent running.
+  `leads.md`. Mapped `todays-result.md` (0752af3f: 57 rows, 31 in
+  play: the career's end of the day after a career race, two machines,
+  today's result (UI movie 27, block +0, `Career::NextDay`) and today's
+  event (UI movie 0, block +9640, the unlocks); leaves for the boot
+  mode when a movie is queued, else the garage; 26 ready groups; one
+  lead added, the type 12 mode; no subagents); map checked (0 errors,
+  file listed, 26 ready groups). Migration agent running.
 
 ## Done
 
@@ -55,5 +61,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
   unknown 537).
 - After the theater's check: ours 5620, work left 980 (wrapped 55,
   known 388, unknown 537).
+
+- After the type 9 mode's map: ours 5620, work left 980 (wrapped 55,
+  known 419, unknown 506).
 
 ## Stopped
