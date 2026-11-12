@@ -20,6 +20,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "game_modes/game_modes.h"
+#include "archive/archive.h"
 #include "data_tables/data_tables.h"
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
@@ -75,9 +76,13 @@ constexpr uint32_t kAnimationsAt = 0x25000;  // 8 animations of no tracks (64 by
 constexpr uint32_t kAnimations = 8;
 constexpr uint32_t kNamed = 200;  // the movies' named animations shaped
 constexpr uint32_t kTablesAt = 0x25200;      // the data tables' object ([0x826C5CA0], 0x80)
-constexpr uint32_t kTable0At = 0x25280;      // its table 0 (56-byte entries)
-constexpr uint32_t kTable40At = 0x25300;     // its 40-byte table
-constexpr uint32_t kBlockBytes = 0x25400;
+constexpr uint32_t kTable0At = 0x25280;      // its tables 0 to 8 (32 56-byte entries)
+constexpr uint32_t kTableEntries = 32;
+constexpr uint32_t kTable40At = 0x25A00;     // its 40-byte table
+constexpr uint32_t kTocAt = 0x25A80;         // BUILD.TOC's entries for the images' assets
+constexpr uint32_t kRecordsAt = 0x26080;     // image records (16 bytes each, 92)
+constexpr uint32_t kMovieObjectAt = 0x26680; // the movies' +28 object (64 bytes)
+constexpr uint32_t kBlockBytes = 0x26800;
 
 // Player 0's save data (a block of its own): its first 0x1800 bytes (the
 // header, the stats record) and from +0x1C700 (the unlocks just made, the
@@ -112,6 +117,7 @@ constexpr Global kGlobals[] = {
     {kStringTable, 4},
     {kRaceEvent, 4},
     {data_tables::kTables, 4},
+    {archive::kBuildToc, 4},
     {tr::kBootMovies, 32},
     {menu_helpers::kMapperEntries, 32},
     {menu_helpers::kControllerEntries, 16},
@@ -200,6 +206,7 @@ void MakeMovie(uint8_t* base, const World& w, uint32_t movie, Random& r) {
   guest::StoreU32(base, movie + 0x9FCC, r.Below(7));
   guest::StoreU32(base, movie + 40960, r.Below(3));
   guest::StoreU32(base, movie + ui_movies::kMovieLoaded, r.Below(2));
+  guest::StoreU32(base, movie + 28, w.at(kMovieObjectAt));
 }
 
 // A name record (SetChildNameText's: +4 a kind, +8 a 16-bit index, +10 a
@@ -218,13 +225,11 @@ void NameRecord(uint8_t* base, uint32_t name, Random& r) {
 // The states the machines take in play (and a random word now and then).
 constexpr uint32_t kStates[] = {0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 13, 20};
 
-// The save data's words Kind reads: the unlocks just made's count (0, a
-// few, or a random word) and the movie queued (-1, 0 to 8, or a random
-// word).
+// The save data's words Kind reads: the unlocks just made's count (0 or 1
+// to 8: the save holds 64 at most, and the cases shape the first 64) and
+// the movie queued (-1, 0 to 8, or a random word).
 void ShapeSave(uint8_t* base, const World& w, Random& r) {
-  const uint32_t pick = r.Below(4);
-  guest::StoreU32(base, w.save + tr::kUnlockCount,
-                  pick == 0 ? 0 : pick == 3 ? uint32_t(r.Next()) : 1 + r.Below(20));
+  guest::StoreU32(base, w.save + tr::kUnlockCount, r.Below(3) == 0 ? 0 : 1 + r.Below(8));
   const uint32_t movie = r.Below(5);
   guest::StoreU32(base, w.save + tr::kQueuedMovie,
                   movie == 0 ? 0xFFFFFFFFu : movie == 4 ? uint32_t(r.Next()) : r.Below(9));
@@ -239,6 +244,10 @@ void SoundManager(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, manager + 60,
                   r.Below(2) == 0 ? uint32_t(r.Next()) & ~0xFFu : uint32_t(r.Next()));
   guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x82090770);
+  // StopCue (slot 13) and IsCuePlaying (slot 14, its low byte) the getter
+  // too.
+  guest::StoreU32(base, vtable + 52, 0x82090770);
+  guest::StoreU32(base, vtable + 56, 0x82090770);
 }
 
 // The menus' input, as the menu helpers' harness shapes it: each
@@ -322,6 +331,61 @@ void MakeWorld(uint8_t* base, const World& w, Random& r) {
   const int32_t day = r.Below(2) == 0 ? kDays[r.Below(11)] : int32_t(r.Below(1500));
   guest::StoreU32(base, w.save + 6100, uint32_t(day));
   NameRecord(base, w.save + 8, r);
+  // Today's event's data: the image lists (counts 0 to 46, their records in
+  // the world, loaded mostly), the images' bits (within the 46), the unlock
+  // shown (its table 0 to 3, its entry -1 or in the table), movies queued
+  // or not.
+  const uint32_t data = w.at(kEventDataAt);
+  for (const uint32_t list : {data + 4, data + 192}) {
+    const uint32_t count = r.Below(4) == 0 ? 0 : 1 + r.Below(r.Below(2) == 0 ? 4 : 46);
+    guest::StoreU32(base, list + 184, count);
+    for (uint32_t k = 0; k < count; k++) {
+      const uint32_t record = w.at(kRecordsAt) + 16 * r.Below(92);
+      guest::StoreU32(base, list + 4 * k, record);
+    }
+  }
+  for (uint32_t k = 0; k < 92; k++) {
+    guest::StoreU32(base, w.at(kRecordsAt) + 16 * k, r.Below(8) == 0 ? 0 : 1);
+  }
+  const uint32_t density = r.Below(4);
+  uint32_t bits[2] = {0, 0};
+  for (uint32_t k = 0; k < density * 2; k++) {
+    const uint32_t image = r.Below(tr::kImages);
+    bits[image >> 5] |= 1u << (image & 31);
+  }
+  guest::StoreU32(base, data + 380, bits[0]);
+  guest::StoreU32(base, data + 384, bits[1]);
+  guest::StoreU32(base, data + 392, r.Below(4));
+  guest::StoreU32(base, data + 396, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(kTableEntries));
+  guest::StoreU32(base, data + 408, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  // The save's unlocks just made (their count ShapeSave's), each shown or
+  // not, its table 0 to 3 and entry in the table.
+  const uint32_t unlocks = w.save + tr::kUnlocks;
+  for (uint32_t k = 0; k < 64; k++) {
+    guest::StoreU32(base, unlocks + 12 * k, r.Below(3) == 0 ? 1 : 0);
+    guest::StoreU32(base, unlocks + 12 * k + 4, r.Below(4));
+    guest::StoreU32(base, unlocks + 12 * k + 8, r.Below(kTableEntries));
+  }
+  // The tables' 56-byte entries: +8 the offset to the entry's next page (0
+  // mostly, forward and within the table), +12 a title, +16 an image (-1 or
+  // 0 to 45); entry 0's +0 -1 (table 0's end for Progress::CheckUnlocks).
+  for (uint32_t e = 0; e < kTableEntries; e++) {
+    const uint32_t entry = w.at(kTable0At) + 56 * e;
+    guest::StoreU32(base, entry + 8,
+                    e + 4 < kTableEntries && r.Below(3) == 0 ? 1 + r.Below(3) : 0);
+    guest::StoreU32(base, entry + 12, r.Below(60));
+    guest::StoreU32(base, entry + 16, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(tr::kImages));
+  }
+  guest::StoreU32(base, w.at(kTable0At), 0xFFFFFFFFu);
+  // BUILD.TOC's entries for the images (ids 22696 to 22786): their sizes
+  // small, unpacked (+8) or stored (+4) only.
+  for (uint32_t id = tr::kImageAssetA; id < tr::kImageAssetB + tr::kImages; id++) {
+    const uint32_t entry = w.at(kTocAt) + 16 * (id - tr::kImageAssetA);
+    const uint32_t size = 16 + 4 * r.Below(256);
+    const bool stored = r.Below(4) == 0;
+    guest::StoreU32(base, entry + 4, size);
+    guest::StoreU32(base, entry + 8, stored ? 0 : size);
+  }
   // The stats' counts (the record's +12 to +22, its day block's the same at
   // +24 + 12 to 22): 0 now and then (no percentage), the races 0 now and
   // then too.
@@ -379,9 +443,11 @@ void PointGlobals(uint8_t* base, const World& w, Random& r) {
   // 0 and the 40-byte table both empty (their first entries the ends), so
   // it walks no unlocks.
   guest::StoreU32(base, data_tables::kTables, w.at(kTablesAt));
-  guest::StoreU32(base, w.at(kTablesAt) + 20, w.at(kTable0At));
+  for (uint32_t table = 0; table < 9; table++) {
+    guest::StoreU32(base, w.at(kTablesAt) + 20 + 4 * table, w.at(kTable0At));
+  }
+  guest::StoreU32(base, archive::kBuildToc, w.at(kTocAt) - 16 * (tr::kImageAssetA + 1));
   guest::StoreU32(base, w.at(kTablesAt) + 56, w.at(kTable40At));
-  guest::StoreU32(base, w.at(kTable0At), 0xFFFFFFFFu);
   guest::StoreU32(base, w.at(kTable40At) + 16, 0xFFFFFFFFu);
   // No race event (RaceEvent::Destroy does nothing).
   guest::StoreU32(base, kRaceEvent, 0);
@@ -468,7 +534,23 @@ void SaveWords(uint8_t* base, const World& w, Outputs& out) {
 // and lr.
 std::vector<uint32_t> g_calls;
 uint32_t g_record_sp = 0;
+// Archive::Load's buffers (the layer's pages the side allocated): compared
+// and freed after the case.
+std::vector<uint32_t> g_loads;
 bool Record(PPCContext& ctx, uint32_t address) {
+  if (address == tr::kArchiveLoad) {
+    const uint32_t buffer = ctx.r4.u32, record = ctx.r6.u32;
+    const bool pages = memory::IsPages(buffer);
+    if (pages) {
+      g_loads.push_back(buffer);
+    }
+    g_calls.insert(g_calls.end(),
+                   {address, ctx.r3.u32, pages ? 1u : buffer, ctx.r5.u32,
+                    memory::IsPages(record) ? 1u : record, ctx.r7.u32, ctx.r8.u32,
+                    g_record_sp - ctx.r1.u32, uint32_t(ctx.lr)});
+    ctx.r3.u64 = 1;
+    return true;
+  }
   const bool reads_r4 = address == tr::kStringsLoad || address == tr::kMoviesOpen;
   if (address != tr::kScreenStart && address != tr::kCareerNextDay && !reads_r4 &&
       address != tr::kMoviesDelete) {
@@ -576,6 +658,11 @@ void Run(Context& h, const World& w, const Spec& spec) {
       for (const uint32_t word : g_calls) {
         out[v].Word(word);
       }
+      for (const uint32_t buffer : g_loads) {
+        out[v].Bytes(Read(h.base, buffer, 64));
+        memory::FreePages(buffer);
+      }
+      g_loads.clear();
       out[v].Word(uint32_t(g_updates.size()));
       for (const UpdateCall& call : g_updates) {
         out[v].Word(call.lr);
@@ -799,6 +886,136 @@ void Result(Context& h, const World& w) {
              hooks::TodaysResultLeave, {{-112, -16}}, ResultMachine});
 }
 
+// --- Today's event ---
+
+// r3 the machine (now and then with high bits), r4 the dispatcher.
+void EventMachine(PPCContext& t, Random& r, const World& w) {
+  t.r3.u64 = w.event() | (uint64_t(r.Below(2)) << 32);
+  t.r4.u64 = w.dispatcher();
+}
+// r3 the data.
+void EventData(PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kEventDataAt); }
+
+// The image lists' records the layer's pages (each record's +8 and +12
+// pages too, or 0 now and then), for FreeImages and Destroy.
+void PagesLists(Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t data = w.at(kEventDataAt);
+  for (const uint32_t list : {data + 4, data + 192}) {
+    const uint32_t count = r.Below(3) == 0 ? 0 : 1 + r.Below(6);
+    guest::StoreU32(base, list + 184, count);
+    for (uint32_t k = 0; k < count; k++) {
+      const uint32_t record = MakePages(base, 16, r);
+      for (const uint32_t field : {8u, 12u}) {
+        guest::StoreU32(base, record + field, r.Below(6) == 0 ? 0 : MakePages(base, 24, r));
+      }
+      guest::StoreU32(base, list + 4 * k, record);
+    }
+  }
+}
+
+// The records the side allocated in the image lists (the layer's pages):
+// compared, freed, their list words 1.
+void ImageRecords(PPCContext&, const World& w, Outputs& out) {
+  uint8_t* base = w.base;
+  const uint32_t data = w.at(kEventDataAt);
+  for (const uint32_t list : {data + 4, data + 192}) {
+    const uint32_t count = guest::LoadU32(base, list + 184);
+    for (uint32_t k = 0; k < count && k < 46; k++) {
+      const uint32_t record = guest::LoadU32(base, list + 4 * k);
+      if (memory::IsPages(record)) {
+        out.Bytes(Read(base, record, 16));
+        memory::FreePages(record);
+        guest::StoreU32(base, list + 4 * k, 1);
+      }
+    }
+  }
+}
+
+void EmptyLists(PPCContext&, Random&, const World& w) {
+  guest::StoreU32(w.base, w.at(kEventDataAt) + 188, 0);
+  guest::StoreU32(w.base, w.at(kEventDataAt) + 376, 0);
+}
+
+void Event(Context& h, const World& w) {
+  // Create: the three blocks VirtualAlloc made compared by content (the
+  // data's 412 bytes used); Kind 0 or not by the save.
+  Run(h, w, {"TodaysEvent::Create (sub_8225BE50; sub_8225BAB8)", 150, __imp__sub_8225BE50,
+             hooks::TodaysEventCreate, {{-112, -32}}, EventMachine,
+             [](PPCContext& t, const World& w, Outputs& out) {
+               out.Word(t.r3.u32 == guest::LoadU32(w.base, tr::kEventData) ? 2 : t.r3.u32);
+               t.r3.u64 = 0;
+               Allocated(w.base, out, tr::kEventPages, 28);
+               Allocated(w.base, out, tr::kEventMenu, 68);
+               Allocated(w.base, out, tr::kEventData, 412);
+             }});
+  Run(h, w, {"TodaysEvent::MarkImages (sub_8225BAB8)", 150, __imp__sub_8225BAB8,
+             hooks::TodaysEventMarkImages, {{-160, -56}}, Nothing});
+  // OpenMovie, LoadImages, LoadImagePair: the records and buffers they make
+  // compared and freed; only their own frames.
+  // (The lists empty, as Create leaves them: the images' 46 bits fill them
+  // at most.)
+  Run(h, w, {"TodaysEvent::OpenMovie (sub_8225C130; sub_8225C008, sub_8225BD10)", 60,
+             __imp__sub_8225C130, hooks::TodaysEventOpenMovie, {{-96, -8}}, EmptyLists,
+             ImageRecords});
+  Run(h, w, {"TodaysEvent::LoadImages (sub_8225C008; sub_8225BD10)", 100, __imp__sub_8225C008,
+             hooks::TodaysEventLoadImages, {{-112, -24}}, EmptyLists, ImageRecords});
+  Run(h, w, {"TodaysEvent::LoadImagePair (sub_8225BD10)", 100, __imp__sub_8225BD10,
+             hooks::TodaysEventLoadImagePair, {{-144, -56}},
+             [](PPCContext& t, Random& r, const World& w) {
+               // The lists' counts at most 45 (room for one more).
+               uint8_t* base = w.base;
+               for (const uint32_t count : {w.at(kEventDataAt) + 188, w.at(kEventDataAt) + 376}) {
+                 guest::StoreU32(base, count, r.Below(46));
+               }
+               t.r3.u64 = w.at(kEventDataAt);
+               t.r4.u64 = r.Below(tr::kImages);
+             },
+             ImageRecords});
+  Run(h, w, {"TodaysEvent::WaitForMovie (sub_8225C160)", 150, __imp__sub_8225C160,
+             hooks::TodaysEventWaitForMovie, {{-96, -16}}, EventMachine});
+  Run(h, w, {"TodaysEvent::ImagesLoadedA (sub_8225C0A0)", 100, __imp__sub_8225C0A0,
+             hooks::TodaysEventImagesLoadedA, {}, EventData});
+  Run(h, w, {"TodaysEvent::ImagesLoadedB (sub_8225C0E8)", 100, __imp__sub_8225C0E8,
+             hooks::TodaysEventImagesLoadedB, {}, EventData});
+  // Start: only its own frame (SetUpTexts' and NextUnlockEntry's have their
+  // own cases).
+  Run(h, w, {"TodaysEvent::Start (sub_8225C990; sub_8225C648, sub_8225BB70)", 150,
+             __imp__sub_8225C990, hooks::TodaysEventStart, {{-112, -16}}, EventMachine});
+  // SetUpTexts: without SetText's parameter area (+48 to +79, where its
+  // unset varargs land: the user's call of 2026-10-30) and its saves.
+  Run(h, w, {"TodaysEvent::SetUpTexts (sub_8225C648)", 100, __imp__sub_8225C648,
+             hooks::TodaysEventSetUpTexts, {{-128, -80}, {-48, -40}}, Nothing});
+  Run(h, w, {"TodaysEvent::NextUnlockEntry (sub_8225BB70)", 200, __imp__sub_8225BB70,
+             hooks::TodaysEventNextUnlockEntry, {{-96, -16}}, Nothing});
+  Run(h, w, {"TodaysEvent::Unload (sub_8225C1F8)", 100, __imp__sub_8225C1F8,
+             hooks::TodaysEventUnload, {{-128, -32}}, EventMachine});
+  Run(h, w, {"TodaysEvent::Unloaded (sub_8225C278)", 60, __imp__sub_8225C278,
+             hooks::TodaysEventUnloaded, {{-144, -48}}, EventMachine});
+  Run(h, w, {"TodaysEvent::Leave (sub_8225C348)", 100, __imp__sub_8225C348,
+             hooks::TodaysEventLeave, {{-112, -24}}, EventMachine});
+  // Destroy and FreeImages: the lists' records and their images the layer's
+  // pages (whether each was freed compared).
+  Run(h, w, {"TodaysEvent::Destroy (sub_8225BF78; sub_8225BC60)", 100, __imp__sub_8225BF78,
+             hooks::TodaysEventDestroy, {{-128, -40}},
+             [](PPCContext& t, Random& r, const World& w) {
+               uint8_t* base = w.base;
+               EventMachine(t, r, w);
+               PagesLists(r, w);
+               const uint32_t data = MakePages(base, 412, r);
+               Write(base, data, Read(base, w.at(kEventDataAt), 412).data(), 412);
+               guest::StoreU32(base, tr::kEventPages, MakePages(base, 28, r));
+               guest::StoreU32(base, tr::kEventMenu, MakePages(base, 68, r));
+               guest::StoreU32(base, tr::kEventData, data);
+             }});
+  Run(h, w, {"TodaysEvent::FreeImages (sub_8225BC60)", 100, __imp__sub_8225BC60,
+             hooks::TodaysEventFreeImages, {{-112, -32}},
+             [](PPCContext& t, Random& r, const World& w) {
+               PagesLists(r, w);
+               EventData(t, r, w);
+             }});
+}
+
 // --- ModeType9::Init: the mode random words (its dispatcher's count 0 to
 // 7), the UI movies' start and Strings::Load recorded (their adapters'
 // recorder), LoadingScreen::Show over the loading screen's world
@@ -922,6 +1139,7 @@ void TodaysResult(Context& h) {
     Mode(h, w);
     Init(h, w);
     Result(h, w);
+    Event(h, w);
   }
   g_loading = nullptr;
 }

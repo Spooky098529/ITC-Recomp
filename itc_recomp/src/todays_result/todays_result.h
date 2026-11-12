@@ -105,6 +105,32 @@ constexpr uint32_t kResultMenu = 0x828160CC;
 constexpr uint32_t kResultData = 0x828160D0;
 constexpr uint32_t kResultMovie = 27;
 constexpr uint32_t kResultAsset = 22578;
+// Today's event's blocks: the page object (28 bytes, as today's result's),
+// the menu (68 bytes) and the data (68 bytes asked, used to +411: +0 set
+// up, +4 the first image list (46 records at most) and +188 its count,
+// +192 the second and +376 its count, +380 and +384 the images' bits, +388
+// to +396 the unlock shown (+392 its table, +396 its entry, -1 none), +400
+// and +404 the movie's +28 object's +36 and +32 kept, +408 movies queued).
+constexpr uint32_t kEventPages = 0x828160D4;
+constexpr uint32_t kEventMenu = 0x828160D8;
+constexpr uint32_t kEventData = 0x828160DC;
+constexpr uint32_t kEventMovie = 0;
+constexpr uint32_t kEventAsset = 22545;
+// The save's unlocks just made: 12-byte entries (+0 shown, +4 the table,
+// +8 the entry) from +0x1C778, their count at kUnlockCount.
+constexpr uint32_t kUnlocks = 0x1C778;
+// The images' assets: 22696 + i and 22741 + i.
+constexpr uint32_t kImageAssetA = 22696;
+constexpr uint32_t kImageAssetB = 22741;
+constexpr uint32_t kImages = 46;
+constexpr uint32_t kAssetSize = 0x820A0678;
+constexpr uint32_t kXMemSet = 0x822962B0;
+constexpr uint32_t kArchiveLoad = 0x8209DE48;
+constexpr uint32_t kImageLoaded = 0x8218D8E8;
+constexpr uint32_t kFreeImage = 0x8218D650;
+constexpr uint32_t kSoundPlay = 0x82175850;
+constexpr uint32_t kSoundManager = 0x826C5C80;
+
 // The accept action Menu::Pressed is asked for.
 constexpr uint32_t kAccept = 159;
 
@@ -215,5 +241,70 @@ uint64_t ResultLeave(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint3
 // VirtualFree'd and their globals 0. The last VirtualFree's r3. 128-byte
 // frame.
 uint64_t ResultDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+
+// --- Today's event (event.cpp; r3 the machine, r4 the dispatcher where
+// read) ---
+
+// sub_8225BE50 Create: +9608 = 0; the page object (28), the menu (68) and
+// the data (68) VirtualAlloc'ed into their globals with their first words;
+// Kind not 0: MarkImages, +9604 = 1 or 9 by +9612; else +9608 = 1, +9604 =
+// 9. MarkImages' or Kind's r3. 112-byte frame.
+uint64_t EventCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8225BAB8 MarkImages (never seen in play): the images of each unlock's
+// pages marked in the data's +380 bits. Its r3 (the last Entry56's, or the
+// save). 160-byte frame.
+uint64_t MarkImages(uint8_t* base, uint32_t sp);
+// sub_8225C130 OpenMovie (never seen in play): UiMovies::Open(0, 22545),
+// LoadImages. LoadImages' r3. 96-byte frame.
+uint64_t EventOpenMovie(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8225C008 LoadImages (never seen in play): LoadImagePair for each
+// marked image. r3 the data, or as LoadImagePair leaves it. 112-byte frame.
+uint64_t LoadImages(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8225BD10 LoadImagePair (never seen in play; r3 the data, r4 an image
+// index): both images' buffers and records, Archive::Load. Its r3.
+// 144-byte frame.
+uint64_t LoadImagePair(uint8_t* base, uint32_t data, uint32_t index, uint32_t sp,
+                       const Calls& calls);
+// sub_8225C160 WaitForMovie (never seen in play): while +9608 is 0, +9608 =
+// 1 once movie 0 and both image lists are loaded; once set, +9604 = 9 or 4
+// by +9612. The last test's r3, else `r3`. 96-byte frame.
+uint64_t EventWaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_8225C0A0 ImagesLoadedA and sub_8225C0E8 ImagesLoadedB (leaves; r3 the
+// data): 1 when every record of the list has +0 set.
+uint32_t ImagesLoadedA(uint8_t* base, uint32_t data);
+uint32_t ImagesLoadedB(uint8_t* base, uint32_t data);
+// sub_8225C990 Start (never seen in play): Sound::Play(1, 2), the movie's
+// +28 object's words kept, SetUpTexts, NextUnlockEntry; unless it answers
+// 2, the page object to page 0 through transition 0. NextUnlockEntry's r3.
+// 112-byte frame.
+uint64_t EventStart(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8225C648 SetUpTexts (never seen in play): movie 0's header texts and
+// nodes. The last FindNode. 128-byte frame.
+uint64_t SetUpTexts(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8225BB70 NextUnlockEntry (never seen in play): 0 the entry's next
+// page, 1 the next unlock, 2 none left. 96-byte frame.
+uint32_t NextUnlockEntry(uint8_t* base, uint32_t sp);
+// sub_8225C1F8 Unload (never seen in play): FinishAll and the +28 object's
+// words put back when movie 0 is there; with +9616 set, UiMovies::Delete(0)
+// and +9608 = 0. The last call's r3. 128-byte frame.
+uint64_t EventUnload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8225C278 Unloaded (never seen in play): the screen's sound stopped
+// when playing (the sound manager's slots 14 and 13 through the guest);
+// message 6 posted; +9604 = 9. The last slot's r3. 144-byte frame.
+uint64_t EventUnloaded(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+                       const Calls& calls);
+// sub_8225C348 Leave: +9604 = 7; FinishAll and the +28 object's words put
+// back when movie 0 is there; UiMovies::Delete(0); message 4 posted.
+// Delete's r3. 112-byte frame.
+uint64_t EventLeave(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+                    const Calls& calls);
+// sub_8225BF78 Destroy: +9604 = 20 when movies were queued; FreeImages; the
+// three blocks VirtualFree'd and their globals 0. The last VirtualFree's
+// r3. 128-byte frame.
+uint64_t EventDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+// sub_8225BC60 FreeImages (r3 the data): each list emptied from its end,
+// Type2Hub::FreeImage and VirtualFree of each record. The last VirtualFree's
+// r3, else `r3`. 112-byte frame.
+uint64_t FreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& calls);
 
 }  // namespace todays_result

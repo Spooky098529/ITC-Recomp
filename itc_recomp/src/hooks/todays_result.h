@@ -49,5 +49,24 @@ void TodaysResultUnload(PPCContext& ctx, uint8_t* base);
 void TodaysResultUnloaded(PPCContext& ctx, uint8_t* base);
 void TodaysResultLeave(PPCContext& ctx, uint8_t* base);
 void TodaysResultDestroy(PPCContext& ctx, uint8_t* base);
+// Today's event's handlers (r3 the machine, r4 the dispatcher where read)
+// and helpers (no arguments; LoadImagePair r3 the data and r4 an index;
+// ImagesLoadedA and B and FreeImages r3 the data).
+void TodaysEventCreate(PPCContext& ctx, uint8_t* base);
+void TodaysEventMarkImages(PPCContext& ctx, uint8_t* base);
+void TodaysEventOpenMovie(PPCContext& ctx, uint8_t* base);
+void TodaysEventLoadImages(PPCContext& ctx, uint8_t* base);
+void TodaysEventLoadImagePair(PPCContext& ctx, uint8_t* base);
+void TodaysEventWaitForMovie(PPCContext& ctx, uint8_t* base);
+void TodaysEventImagesLoadedA(PPCContext& ctx, uint8_t* base);
+void TodaysEventImagesLoadedB(PPCContext& ctx, uint8_t* base);
+void TodaysEventStart(PPCContext& ctx, uint8_t* base);
+void TodaysEventSetUpTexts(PPCContext& ctx, uint8_t* base);
+void TodaysEventNextUnlockEntry(PPCContext& ctx, uint8_t* base);
+void TodaysEventUnload(PPCContext& ctx, uint8_t* base);
+void TodaysEventUnloaded(PPCContext& ctx, uint8_t* base);
+void TodaysEventLeave(PPCContext& ctx, uint8_t* base);
+void TodaysEventDestroy(PPCContext& ctx, uint8_t* base);
+void TodaysEventFreeImages(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

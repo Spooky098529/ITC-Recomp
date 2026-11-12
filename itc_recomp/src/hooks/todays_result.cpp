@@ -29,7 +29,16 @@ ITC_FLAG_BOOL(native_todays_result, true, "ITC",
               "through their overrides) and LeavePage sub_8225AB30 with QueueMovie sub_8225A720 "
               "(Progress::CheckUnlocks, recompiled, and RaceEvent::Destroy through the guest); "
               "its transitions Intro sub_8225ABD8, ShowLoop sub_8225AC88 and FadeOut "
-              "sub_8225AD20 (checked by --run_harnesses=todays_result)");
+              "sub_8225AD20; today's event's machine, Create sub_8225BE50 with MarkImages "
+              "sub_8225BAB8 (DataTables::Entry56's plain C++), OpenMovie sub_8225C130 with "
+              "LoadImages sub_8225C008 and LoadImagePair sub_8225BD10 (Archive::AssetSize, "
+              "XMemSet and Archive::Load through their overrides), WaitForMovie sub_8225C160 "
+              "with ImagesLoadedA sub_8225C0A0 and B sub_8225C0E8, Start sub_8225C990 with "
+              "SetUpTexts sub_8225C648 and NextUnlockEntry sub_8225BB70 (Sound::Play through "
+              "the guest), Unload sub_8225C1F8, Unloaded sub_8225C278 (the sound manager's "
+              "slots through the guest), Leave sub_8225C348 and Destroy sub_8225BF78 with "
+              "FreeImages sub_8225BC60 (Type2Hub::FreeImage through its override) (checked by "
+              "--run_harnesses=todays_result)");
 
 namespace hooks {
 
@@ -182,6 +191,66 @@ void TodaysResultLeave(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = tr::ResultLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
+void TodaysEventCreate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EventCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TodaysEventMarkImages(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tr::MarkImages(base, ctx.r1.u32);
+}
+void TodaysEventOpenMovie(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EventOpenMovie(base, ctx.r1.u32, guest.calls());
+}
+void TodaysEventLoadImages(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::LoadImages(base, ctx.r1.u32, guest.calls());
+}
+void TodaysEventLoadImagePair(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::LoadImagePair(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void TodaysEventWaitForMovie(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tr::EventWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+}
+void TodaysEventImagesLoadedA(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tr::ImagesLoadedA(base, ctx.r3.u32);
+}
+void TodaysEventImagesLoadedB(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tr::ImagesLoadedB(base, ctx.r3.u32);
+}
+void TodaysEventStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EventStart(base, ctx.r1.u32, guest.calls());
+}
+void TodaysEventSetUpTexts(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::SetUpTexts(base, ctx.r1.u32, guest.calls());
+}
+void TodaysEventNextUnlockEntry(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tr::NextUnlockEntry(base, ctx.r1.u32);
+}
+void TodaysEventUnload(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EventUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TodaysEventUnloaded(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EventUnloaded(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void TodaysEventLeave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EventLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+void TodaysEventDestroy(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::EventDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+void TodaysEventFreeImages(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = tr::FreeImages(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 #define ITC_TODAYS_RESULT(address, step)   \
@@ -228,3 +297,17 @@ ITC_TODAYS_RESULT(8225AA20, TodaysResultUnload)
 ITC_TODAYS_RESULT(8225A9A0, TodaysResultUnloaded)
 ITC_TODAYS_RESULT(8225AA88, TodaysResultLeave)
 ITC_TODAYS_RESULT(8225A8A8, TodaysResultDestroy)
+// Today's event's handlers (member function functors the machine calls; no
+// direct callers). MarkImages sub_8225BAB8, LoadImages sub_8225C008,
+// LoadImagePair sub_8225BD10, ImagesLoadedA sub_8225C0A0 and B sub_8225C0E8,
+// SetUpTexts sub_8225C648, NextUnlockEntry sub_8225BB70 and FreeImages
+// sub_8225BC60: no adapters (only the handlers above, native, call them, and
+// the recompiled EventPage calls the original NextUnlockEntry).
+ITC_TODAYS_RESULT(8225BE50, TodaysEventCreate)
+ITC_TODAYS_RESULT(8225C130, TodaysEventOpenMovie)
+ITC_TODAYS_RESULT(8225C160, TodaysEventWaitForMovie)
+ITC_TODAYS_RESULT(8225C990, TodaysEventStart)
+ITC_TODAYS_RESULT(8225C1F8, TodaysEventUnload)
+ITC_TODAYS_RESULT(8225C278, TodaysEventUnloaded)
+ITC_TODAYS_RESULT(8225C348, TodaysEventLeave)
+ITC_TODAYS_RESULT(8225BF78, TodaysEventDestroy)
