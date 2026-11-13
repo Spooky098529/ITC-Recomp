@@ -182,6 +182,14 @@ std::vector<std::pair<uint32_t, uint32_t>> GetBSaves(
   return more;
 }
 
+// GarageStage::FitSelectedCar (sub_8217DAC0) has no adapter since its
+// callers in play went native (B7 loop, 2026-11-13): the recompiled callers
+// run its original, which saves r29 to r31, f30, f31 and lr in the 48 bytes
+// under their r1 (logged from the recompiled runs), while the plain C++
+// writes none. Case's (bytes under r1, size) skip for it under a caller's
+// frame `at` bytes below the call's r1.
+std::vector<std::pair<uint32_t, uint32_t>> FitSaves(uint32_t at) { return {{at, 48}}; }
+
 // --- The record's setters ---
 
 void BlockOf(Context& h, uint32_t block, Random& r) {
@@ -1293,7 +1301,7 @@ void TuningStand(Context& h, Random& r) {
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
           __imp__sub_821D99A0, hooks::TuningPickCameraPreset, 24, floats,
-          fmt::format("case {}", c), 0, 0, before, blocks, 0x3000, kGarageBytes);
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x3000, kGarageBytes, FitSaves(112));
     }
     results.Report();
   }
@@ -1600,7 +1608,7 @@ void TuningStand(Context& h, Random& r) {
             with_f1(out, t);
             text.Add(out);
           },
-          0x4000, kGarageBytes);
+          0x4000, kGarageBytes, FitSaves(128));
     }
     results.Report();
   }
@@ -1657,7 +1665,7 @@ void TuningStand(Context& h, Random& r) {
             with_f1(out, t);
             text.Add(out);
           },
-          0x3000, kGarageBytes);
+          0x3000, kGarageBytes, FitSaves(112));
     }
     r = kept;
     results.Report();
@@ -2172,7 +2180,8 @@ void TuningStand(Context& h, Random& r) {
         Case(
             h, results, block, r, [&](PPCContext& t) { lay_view(t, c); },
             __imp__sub_82201B40, hooks::TuningPagesLeaveVinylView, 32, floats,
-            fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes);
+            fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes,
+            FitSaves(128));
       }
       results.Report();
       Results view("TuningScreen::InputVinylView (sub_82202928)");
@@ -2180,7 +2189,8 @@ void TuningStand(Context& h, Random& r) {
         Case(
             h, view, block, r, [&](PPCContext& t) { lay_view(t, c); },
             __imp__sub_82202928, hooks::TuningPagesInputVinylView, 32, floats,
-            fmt::format("case {}", c), 112, 32, before_view, view_out, 0x3000, kGarageBytes);
+            fmt::format("case {}", c), 112, 32, before_view, view_out, 0x3000, kGarageBytes,
+            FitSaves(112 + 128));
       }
       view.Report();
       // The sticker editor's state 49 page TuningScreen::InputStickerView
@@ -2263,7 +2273,8 @@ void TuningStand(Context& h, Random& r) {
         Case(
             h, menu, block, r, [&](PPCContext& t) { lay_pages(t, c); },
             __imp__sub_821FF3A0, hooks::TuningPagesMoveVinylMenu, 32, floats,
-            fmt::format("case {}", c), 0, 0, before_pages, pages_out, 0x3000, kGarageBytes);
+            fmt::format("case {}", c), 0, 0, before_pages, pages_out, 0x3000, kGarageBytes,
+            FitSaves(128));
       }
       menu.Report();
       Results pages("TuningScreen::InputVinylPages (sub_82204B70)");
@@ -2271,7 +2282,8 @@ void TuningStand(Context& h, Random& r) {
         Case(
             h, pages, block, r, [&](PPCContext& t) { lay_pages(t, c); },
             __imp__sub_82204B70, hooks::TuningPagesInputVinylPages, 48, floats,
-            fmt::format("case {}", c), 128, 32, before_pages, pages_out, 0x3000, kGarageBytes);
+            fmt::format("case {}", c), 128, 32, before_pages, pages_out, 0x3000, kGarageBytes,
+            FitSaves(128 + 128));
       }
       pages.Report();
       guest::StoreU32(h.base, kKeepCounter, saved_counter);

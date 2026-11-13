@@ -305,10 +305,24 @@ uint64_t FreeKept(uint8_t* base, uint64_t images, uint64_t k, const TextureFreeF
 // the native heap (hooks::NativeHeapActive(): DecalImages::UnloadAll by its
 // plain C++, else the guest's) and Texture::Free under it by car_models'
 // plain C++ (--native_car_models).
+// GarageStage::FitSelectedCar from the pages (OnDialogYes, LeaveVinylView,
+// MoveVinylMenu): its plain C++ (tuning_screen::FitSelectedCar) with
+// `calls` when set (the tuning screen's stand flags, as its adapter ran it
+// until it went, B7 loop, 2026-11-13), its f1 left in `*f1` for the
+// caller's GuestCall to put in f1 before the next guest call and at the
+// end; through the guest (its original) when `calls` is null.
+struct StandFit {
+  const front_end_car_draw::Calls* calls = nullptr;
+  std::optional<double>* f1 = nullptr;
+};
+uint64_t FitSelectedCar(uint8_t* base, const tuning_screen::GuestCall& call, const StandFit& fit,
+                        uint32_t holder, uint64_t r4, uint64_t r5, uint32_t frame, uint32_t lr);
+
 struct PageFlags {
   bool native_slots = false;
   bool native_heap = false;
   bool native_free = false;
+  StandFit fit;  // InputVinylView's and InputVinylPages' callees'
 };
 
 // sub_821CE1D0 Menu::StepList: Menu::Step for a scrolling list, r3 = the
@@ -538,12 +552,12 @@ uint64_t OnStickerDialogYes(uint8_t* base, const tuning_screen::GuestCall& call,
 // the state +9652 (its row), then OnStickerDialogYes. 112-byte frame; r3
 // OnStickerDialogYes's. `native_specs` as SetCurrentChoice's.
 uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
-                     uint32_t sp, bool native_specs);
+                     uint32_t sp, bool native_specs, const StandFit& fit = {});
 
 // --- The vinyl editor's pages (vinyl_pages.cpp) ---
 // Guest calls through `call` from the originals' frames with their return
 // addresses: MenuSound::Play, the UI movie calls, GarageStage::Command,
-// CameraCommand and FitSelectedCar (their overrides); the player's mapper's
+// CameraCommand (their overrides), FitSelectedCar (StandFit); the player's mapper's
 // slots 8, 10 and 12 by ActionMapper::Held's, Pressed's and Fired's plain
 // C++ with `native_slots` (--native_action_mappers) where the vtable holds
 // them, else through `call` (slot 11 always through `call`).
@@ -554,13 +568,13 @@ uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64
 // 41). 128-byte frame; the last call's r3 (the movie's entry or the last
 // slot's when neither is pressed).
 uint64_t LeaveVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
-                        uint32_t sp, bool native_slots);
+                        uint32_t sp, bool native_slots, const StandFit& fit = {});
 // sub_82202928 TuningScreen::InputVinylView: state 34's page (its row): A or
 // B (Pop, Go(the popped state, 18), the stand's turns cancelled and its
 // camera reset), the held buttons' stand and camera commands, then
 // LeaveVinylView. 112-byte frame; LeaveVinylView's r3.
 uint64_t InputVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
-                        uint32_t sp, bool native_slots);
+                        uint32_t sp, bool native_slots, const StandFit& fit = {});
 
 // sub_821FE498 TuningScreen::SetLastImage: +30796 the image list's last
 // index: 4 or 193 on the vinyls' pages 0 and 1 (other pages nothing), else
@@ -572,7 +586,7 @@ void SetLastImage(uint8_t* base, uint32_t screen);
 // stand's decals applied: +10012 = 5, FitSelectedCar) or B. 128-byte frame;
 // the last call's r3, else the movie's entry or the slot's r3.
 uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
-                       uint32_t sp, bool native_slots);
+                       uint32_t sp, bool native_slots, const StandFit& fit = {});
 // sub_82204B70 TuningScreen::InputVinylPages: state 23's page (its row): a
 // kept page's textures freed (FreeKept) and kept again on its third frame,
 // else up and down on the page +30724, A (layers 0 and 1 to their saved

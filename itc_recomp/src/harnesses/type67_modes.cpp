@@ -2337,6 +2337,14 @@ void Cars(Context& h, const Block& world) {
                               : t67::Screen0OpenMovie(base, f.type7, t.r1.u32, calls);
           t.lr = lr;
         }
+        // GarageStage::MakeModel has no adapter since OpenMovie's plain C++
+        // calls its own (B7 loop, 2026-11-13): the recompiled side runs its
+        // original, whose r28 to r31 and lr saves (40 bytes under
+        // OpenMovie's frame, logged from the recompiled runs) the plain C++
+        // doesn't write.
+        if (!f.set_up) {
+          Fill(base, sp - f.frame - 40, 40, 0);
+        }
         for (const uint32_t word : g_opens) out[v].Word(word);
         out[v].Bytes(Read(base, world.address, world.bytes));
         out[v].Bytes(Read(base, stage, kStageBytes + 0x100));

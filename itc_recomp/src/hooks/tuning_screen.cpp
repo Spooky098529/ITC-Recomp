@@ -2,7 +2,7 @@
 // (docs/functions/tuning-screen.md), with the register steps the harness
 // shares (hooks/tuning_screen.h). The adapters left are those recompiled
 // code still reaches (the update itself through the tuning machine's
-// functor, FitSelectedCar); the others went once their callers were native.
+// functor); the others went once their callers were native.
 
 #include "hooks/tuning_screen.h"
 
@@ -891,19 +891,13 @@ void TuningWithRefreshStand(
 
 }  // namespace hooks
 
-// The calls onto the stand: also the original unless their callees are
-// native.
-#define ITC_TUNING_STAND(address, step)                                      \
-  extern "C" REX_FUNC(sub_##address) {                                       \
-    REX_FUNC_PROLOGUE();                                                     \
-    if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningStandCalleesNative()) { \
-      __imp__sub_##address(ctx, base);                                       \
-      return;                                                                \
-    }                                                                        \
-    hooks::step(ctx, base);                                                  \
-  }
-
-ITC_TUNING_STAND(8217DAC0, TuningFitSelectedCar)
+// No adapter (removed, B7 loop, 2026-11-13, a cleanup lead): GarageStage::
+// FitSelectedCar sub_8217DAC0. Its callers in play are native and call its
+// plain C++ under the same flags (the tuning screen's PickCameraPreset,
+// ApplyAreaDecals and DecalCommand; the tuning pages' OnDialogYes,
+// LeaveVinylView and MoveVinylMenu through tuning_pages::StandFit); their
+// originals, reached only with those flags off, run the original.
+// TuningFitSelectedCar above is the harness's step.
 
 // No adapters (removed, B7 loop, 2026-11-07, the fifth migration: their
 // callers in play are native and call their plain C++; the register steps

@@ -58,9 +58,9 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "sub_820D9F40 and SceneInterior::SetRecord sub_820E38E0) and SetWheelExtras "
               "sub_821790D0 (with SceneWheels::SetWord68 sub_820E7410 and SetCaliperTexture "
               "sub_820E7428) (no adapters) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models). "
-              "Since 2026-11-13 only MakeModel keeps an adapter: the others are reached from the "
-              "tuning screen's plain C++, which the tuning screen's flags (this one among them) "
-              "switch");
+              "Since 2026-11-13 none keeps an adapter: they are reached from the tuning screen's "
+              "plain C++, which the tuning screen's flags (this one among them) switch, and "
+              "MakeModel from the type 2 hub's and the type 6 and 7 modes' plain C++");
 
 namespace hooks {
 
@@ -512,18 +512,12 @@ void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
-// Defines an adapter: the flag, else the original.
-#define ITC_STAND_MODELS(address, step)     \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_stand_models)) {   \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
-    hooks::step(ctx, base);                 \
-  }
-
-ITC_STAND_MODELS(8217FCB0, StandModelsMakeModel)
+// No adapter (removed, B7 loop, 2026-11-13, a cleanup lead):
+// GarageStage::MakeModel sub_8217FCB0. Its callers in play are native and
+// call its plain C++ (the type 2 hub's OpenMovie, the type 6 and 7 modes'
+// Screen0::OpenMovie); the recompiled ones left (sub_8223D5D8,
+// sub_8225EBC0, sub_82267CD0, sub_82275278, never seen in play) run the
+// original. StandModelsMakeModel above is the harness's step.
 // The setters' adapters (SetInteriorClass sub_82178FE8, SetWord5016
 // sub_82179598, SetWheelWord sub_82179A18, SetLightsOn sub_82179420,
 // SetDecalA sub_82179818, SetDecalB sub_821798D8, SetPart sub_82178F00,
@@ -535,8 +529,7 @@ ITC_STAND_MODELS(8217FCB0, StandModelsMakeModel)
 // caller seen in play is native (the tuning screen's, src/tuning_screen/)
 // and calls their plain C++, so the tuning screen's flags switch them; the
 // recompiled callers left (never seen in play) run the originals. Their
-// register steps above are the harness's. MakeModel's stays: the type 6
-// and 7 modes' screen 0 calls it through the guest.
+// register steps above are the harness's. MakeModel's went too (above).
 // GarageStage::SetWheel sub_8217DD38 has none: only TuningScreen::PreviewWheel
 // calls it, and its plain C++ calls SetWheel's, which calls FitAxles' and
 // SceneWheels::SetSizes' (none either; their register steps above are the

@@ -438,14 +438,14 @@ uint32_t HubStart(uint8_t* base, uint32_t sp, const Calls& calls);
 // --- The hub's set-up, teardown and notice images (hub_images.cpp) ---
 //
 // VirtualAlloc, VirtualFree, XMemSet, memcpy, Archive::Load (the load
-// queued, the callback ImageLoaded), GarageStage::MakeModel, UiMovies::Open,
-// XPR::Create, XPR::GetTexture and Texture::GetLevelDesc through their
-// overrides; Archive::AssetSize, CarModels::BlockOf, SaveData::Of and
-// DataTables::Entry56 their plain C++.
+// queued, the callback ImageLoaded), UiMovies::Open, XPR::Create,
+// XPR::GetTexture and Texture::GetLevelDesc through their overrides;
+// Archive::AssetSize, CarModels::BlockOf, SaveData::Of, DataTables::Entry56
+// and GarageStage::MakeModel (ScenePools::SetUpB under it through `calls`)
+// their plain C++.
 constexpr uint32_t kXMemSet = 0x822962B0;
 constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kArchiveLoad = 0x8209DE48;
-constexpr uint32_t kStageMakeModel = 0x8217FCB0;
 constexpr uint32_t kXprCreate = 0x82596F68;
 constexpr uint32_t kXprGetTexture = 0x82597118;
 constexpr uint32_t kGetLevelDesc = 0x822A5B78;

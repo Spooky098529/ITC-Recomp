@@ -595,8 +595,9 @@ constexpr uint32_t kType7Car = 0x826371D0;
 // sub_822338E8 Type6Screen0::OpenMovie and sub_82243E80
 // Type7Screen0::OpenMovie: UiMovies::Open(22, 22564 or 22569) (calls.open),
 // then GarageStage::MakeModel([[0x826D83E0]], CarModels::BlockOf(0), 1)
-// and GarageStage::Command(the same, 14), guest calls to their overrides.
-// r3 Command's.
+// by its plain C++ (ScenePools::SetUpB under it through calls.call_set) and
+// GarageStage::Command(the same, 14), a guest call to its override. r3
+// Command's.
 uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& calls);
 // sub_82233E80 Type6Screen0::SetUpCar and sub_822443E0
 // Type7Screen0::SetUpCar (r4 the dispatcher): with no car yet (+1972 -1),

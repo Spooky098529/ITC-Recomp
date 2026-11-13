@@ -772,6 +772,10 @@ void TuningRefresh(Context& h) {
           };
           const uint32_t pick = frame - 112, items = frame - 160;
           Fill(base, pick - 16, 16, 0);
+          // GarageStage::FitSelectedCar's original (no adapter since
+          // 2026-11-13) under PickCameraPreset's frame: its r29 to r31, f30,
+          // f31 and lr saves.
+          Fill(base, pick - 48, 48, 0);
           get_b(pick - 96);
           get_b(items - 96);
           get_b(items - 112);

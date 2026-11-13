@@ -92,7 +92,7 @@ uint64_t HandleInput(uint8_t* base, const tuning_screen::GuestCall& call, uint64
     case 29: return InputDecalPosition(base, call, screen, frame, flags);
     case 30: return InputDecalAngle(base, call, screen, frame, flags);
     case 31: return InputDecalScale(base, call, screen, frame, flags);
-    case 34: return InputVinylView(base, call, screen, frame, flags.native_slots);
+    case 34: return InputVinylView(base, call, screen, frame, flags.native_slots, flags.fit);
     case 38: return InputStickerAreas(base, call, screen, frame, flags);
     case 39: return InputStickerSlots(base, call, screen, frame, flags);
     case 40: return InputStickerOperate(base, call, screen, frame, flags);

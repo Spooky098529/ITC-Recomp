@@ -20,7 +20,8 @@ namespace hooks {
 stand_models::GuestCall StandModelsGuestCall(PPCContext& ctx, uint8_t* base);
 
 // GarageStage::MakeModel sub_8217FCB0 (r3 the holder, r4 a model block, r5
-// a draw word; with --native_vehicle_accessors and --native_scene_models).
+// a draw word; with --native_vehicle_accessors and --native_scene_models;
+// no adapter since 2026-11-13, the harness's step).
 void StandModelsMakeModel(PPCContext& ctx, uint8_t* base);
 // GarageStage::SetInteriorClass sub_82178FE8, SetWord5016 sub_82179598,
 // SetWheelWord sub_82179A18 (r3 the holder, r4 a value), SetLightsOn
