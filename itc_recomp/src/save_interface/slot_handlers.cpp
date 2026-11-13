@@ -625,4 +625,100 @@ uint32_t SlotDeleteStep(uint8_t* base, uint32_t devices, uint32_t slot, const Ca
   }
 }
 
+uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite& at,
+                       const KernelCalls& kernel, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_820A4610 SaveDevices::Update");
+  const uint32_t devices = uint32_t(self);
+  const uint32_t sp = WritePrologue(base, at, 144, 27);
+  if (Load(base, devices + 56) == 0) {
+    return self;
+  }
+  // The registers the original holds at each call: r27 to r30 as it sets
+  // them, r31 the save devices.
+  uint64_t r27 = at.r27, r28 = at.r28, r29 = at.r29, r30 = at.r30;
+  const auto site = [&](uint32_t lr) {
+    CallSite c;
+    c.sp = sp;
+    c.lr = lr;
+    c.r27 = r27;
+    c.r28 = r28;
+    c.r29 = r29;
+    c.r30 = r30;
+    c.r31 = devices;
+    return c;
+  };
+  const auto method = [&](uint32_t object, uint32_t offset) {
+    return Load(base, Load(base, object) + offset);
+  };
+  const uint32_t source = Load(base, devices + 12);
+  const uint32_t list_function = method(source, 4);
+  const uint64_t list64 = list_function == 0x820908D8
+                              ? FrameworkDeviceList(base, source)
+                              : call(list_function, source, r4, site(0x820A4640));
+  const uint32_t list = uint32_t(list64);
+  r29 = 0;
+  r30 = list64;
+  r28 = 0;
+  if (int32_t(Load(base, devices + 48)) > 0) {
+    r27 = 0;
+    do {
+      const uint32_t index = uint32_t(r28);
+      const uint32_t function = method(list, 8);
+      const uint32_t user = function == kUsersSignedIn
+                                ? uint32_t(UsersSignedIn(base, list, index))
+                                : uint32_t(call(function, list, index, site(0x820A4674)));
+      const uint32_t slot = Load(base, devices + 44) + uint32_t(r27);
+      r28++;
+      r27 += 1000;
+      Store(base, slot + 956, user);
+    } while (int32_t(r28) < int32_t(Load(base, devices + 48)));
+  }
+  // XNotifyGetNext (r1 + 80 and + 84 its outputs) left out: no notification
+  // is sent; its answer, 0, is what r3 holds next.
+  uint64_t r3 = 0;
+  r28 = r29;
+  if (int32_t(Load(base, devices + 48)) <= 0) {
+    return r3;
+  }
+  r30 = r29;
+  do {
+    const uint32_t index = uint32_t(r28);
+    const uint32_t offset = uint32_t(r30);
+    const int32_t user = int32_t(Load(base, Load(base, devices + 44) + offset + 956));
+    if (user < 0 || user > 3) {
+      const uint32_t function = method(devices, 28);
+      r3 = function == kSlotState ? SlotState(base, devices, index)
+                                  : call(function, devices, index, site(0x820A4758));
+      if (uint32_t(r3) < 5) {
+        for (uint32_t at_word : {36u, 988u, 984u, 960u, 964u, 968u, 972u}) {
+          Store(base, Load(base, devices + 44) + offset + at_word, uint32_t(r29));
+        }
+      }
+    }
+    const uint32_t slot = Load(base, devices + 44) + offset;
+    const uint32_t function = Load(base, (Load(base, slot + 988) + 19) * 4 + devices);
+    const CallSite handler_site = site(0x820A47D8);
+    switch (function) {
+      case kSlotWaitForUser: r3 = SlotWaitForUser(base, slot); break;
+      case kSlotWaitForDevice: r3 = SlotWaitForDevice(base, slot, handler_site); break;
+      case kSlotFailed: r3 = SlotFailed(base, slot); break;
+      case kSlotReady: r3 = SlotReady(base, slot, handler_site); break;
+      case kSlotWaitDeviceSelector:
+        r3 = uint64_t(int64_t(saves::slot::WaitDeviceSelector(base, slot)));
+        break;
+      case kSlotEnumerateStep: r3 = SlotEnumerateStep(base, devices, slot, handler_site); break;
+      case kSlotCheckStep: r3 = SlotCheckStep(base, devices, slot, handler_site, kernel); break;
+      case kSlotSaveStep: r3 = SlotSaveStep(base, devices, slot, handler_site, kernel); break;
+      case kSlotLoadStep: r3 = SlotLoadStep(base, devices, slot, handler_site, kernel); break;
+      case kSlotDeleteStep: r3 = SlotDeleteStep(base, devices, slot, handler_site, kernel); break;
+      default: r3 = call(function, devices, slot, handler_site); break;
+    }
+    const uint32_t stored = Load(base, devices + 44) + offset;
+    r28++;
+    r30 += 1000;
+    Store(base, stored + 988, uint32_t(r3));
+  } while (int32_t(r28) < int32_t(Load(base, devices + 48)));
+  return r3;
+}
+
 }  // namespace save_interface

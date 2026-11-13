@@ -157,4 +157,24 @@ uint32_t SlotLoadStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
 uint32_t SlotDeleteStep(uint8_t* base, uint32_t devices, uint32_t slot, const CallSite& at,
                         const KernelCalls& kernel);
 
+// A guest call through a vtable or the handler table to `function` (a
+// target that isn't ours) with r3 and r4, at `at`; its r3.
+using GuestCall =
+    std::function<uint64_t(uint32_t function, uint64_t r3, uint64_t r4, const CallSite& at)>;
+
+// sub_820A4610 SaveDevices::Update (every frame, through a member delegate):
+// `self` r3 (the save devices), `r4` the caller's (passed on to the device
+// list's call, as the original leaves it). Only with a listener (+56): each
+// slot's user (+956) from the device list (+12's slot 1, sub_820908D8, then
+// its +8, Users::SignedIn, by index); the storage devices changed
+// notification is never read (B5: no listener is made, and XNotifyGetNext
+// would answer nothing); then for each slot whose user isn't 0 to 3 the
+// save devices' +28 (SaveSlot::State) and, under 5, the slot's device,
+// state, count and requests cleared; then the slot's handler (+76 + 4 x its
+// state) gives its next state. Targets that are ours run their plain C++;
+// others are `call`'s guest calls. A 144-byte frame (__savegprlr_27).
+// Returns r3 as the original leaves it.
+uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite& at,
+                       const KernelCalls& kernel, const GuestCall& call);
+
 }  // namespace save_interface

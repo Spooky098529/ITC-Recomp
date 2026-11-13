@@ -154,4 +154,8 @@ void SlotSaveStepSteps(PPCContext& ctx, uint8_t* base);    // sub_820A5BE8
 void SlotLoadStepSteps(PPCContext& ctx, uint8_t* base);    // sub_820A5E68
 void SlotDeleteStepSteps(PPCContext& ctx, uint8_t* base);  // sub_820A6010
 
+// sub_820A4610 SaveDevices::Update: r3 = the save devices (its adapter is
+// B5's, src/hooks/notify.cpp, which runs this with --native_save_interface).
+void SaveDevicesUpdateSteps(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -195,6 +195,111 @@ void Shape(uint8_t* base, const Layout& l, Random& r) { ShapeSlot(base, l, r); }
 // its prologue and reads the key as a slot.
 constexpr uint32_t kReturnsWord24 = 0x82099BA0;
 
+// SaveDevices::Update over made-up save devices with the game's targets:
+// the device list (the framework's +56 interface's slot 1, sub_820908D8,
+// reading the users at +72), the users (Users::SignedIn, sub_820996D8),
+// SaveSlot::State (+28) and the ten handlers at +76, now and then one
+// replaced by a recompiled function that isn't ours (a guest call), and
+// three slots shaped as the machines' cases, each in a state 0 to 9.
+void UpdateCases(Context& h) {
+  const uint32_t devices = h.data + 0x000;
+  const uint32_t users = h.data + 0x080;  // to +220, and +8 + 40 x 3
+  const uint32_t object = h.data + 0x160;
+  const uint32_t records = h.data + 0x1C0;
+  const uint32_t flags = h.data + 0x300;
+  const uint32_t slots = h.data + 0x340;  // three, to 0xF18
+  const uint32_t devices_vtable = h.data + 0xF20;
+  const uint32_t object_vtable = h.data + 0xF60;
+  const uint32_t users_vtable = h.data + 0xF80;
+  constexpr uint32_t kHandlers[10] = {0x820A4870, 0x820A5878, 0x820A4890, 0x820A58D8,
+                                      0x820A48B8, 0x820A59C0, 0x820A5A88, 0x820A5BE8,
+                                      0x820A5E68, 0x820A6010};
+  constexpr uint32_t kReturns1 = 0x824457CC;
+  Results results("SaveDevices::Update (sub_820A4610) with its handlers");
+  for (int c = 0; c < 96; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random r = start;
+      WriteRandom(h.base, h.data, kScratchBytes / 4, r);
+      PPCContext t = CallContext(h);
+      const uint32_t stack = t.r1.u32;
+      WriteRandom(h.base, stack - kStackBytes, kStackBytes / 4, r);
+      const uint32_t count = c < 4 ? uint32_t(c) : 1 + r.Below(3);
+      guest::StoreU32(h.base, devices, devices_vtable);
+      guest::StoreU32(h.base, devices + 12, object);
+      guest::StoreU32(h.base, devices + 44, slots);
+      guest::StoreU32(h.base, devices + 48, count);
+      guest::StoreU32(h.base, devices + 56, c == 4 ? 0 : 0x4E4F4C53);
+      guest::StoreU32(h.base, devices + 68, Pick(r, {0, 1, 100}));
+      guest::StoreU32(h.base, devices + 72, Pick(r, {0, 0, slots, uint32_t(r.Next())}));
+      for (int k = 0; k < 10; k++) {
+        guest::StoreU32(h.base, devices + 76 + 4 * k, r.Below(12) == 0 ? kReturns1 : kHandlers[k]);
+      }
+      guest::StoreU32(h.base, devices_vtable + 28, 0x820A57F0);
+      guest::StoreU32(h.base, object, object_vtable);
+      // The device list now and then a recompiled getter (lwz r3,24(r3)).
+      guest::StoreU32(h.base, object_vtable + 4, r.Below(8) == 0 ? kReturnsWord24 : 0x820908D8);
+      guest::StoreU32(h.base, object + 24, users);
+      guest::StoreU32(h.base, object + 72, users);  // sub_82493700: (object - 20) + 92
+      guest::StoreU32(h.base, users, users_vtable);
+      guest::StoreU32(h.base, users_vtable + 8, 0x820996D8);
+      guest::StoreU32(h.base, users + 216, r.Below(5));
+      for (uint32_t i = 0; i < 4; i++) {
+        guest::StoreU32(h.base, users + 200 + 4 * i, r.Below(4));
+        guest::StoreU32(h.base, users + 8 + 40 * i, r.Below(3) == 0 ? 0 : 1);
+      }
+      for (uint32_t i = 0; i < 3; i++) {
+        Layout l = LayoutOf(h);
+        l.devices = devices;
+        l.slot = slots + 1000 * i;
+        l.records = records;
+        l.flags = flags;
+        ShapeMachine(h.base, l, r);
+        guest::StoreU32(h.base, l.slot + 984, r.Below(3));
+        guest::StoreU32(h.base, l.slot + 988, r.Below(10));
+        // A slot that may reach the delete step gets no device either
+        // (Update doesn't run a handler twice, but the ready state sets
+        // +948 for the next frame only).
+        if (guest::LoadU32(h.base, l.slot + 948) == 9 ||
+            guest::LoadU32(h.base, l.slot + 948) == 2) {
+          guest::StoreU32(h.base, l.slot + 36, 0);
+        }
+      }
+      // The users and the claim word ShapeMachine wrote over: put back.
+      guest::StoreU32(h.base, devices + 44, slots);
+      for (int r27 = 27; r27 < 32; r27++) {
+        (&t.r14)[r27 - 14].u64 = r.Next();
+      }
+      t.r3.u64 = devices;
+      t.r4.u64 = r.Next();
+      t.lr = 0x820ACE38;
+      last_error::Set(h.base, t.r13.u32, uint32_t(r.Next()));
+      after = r;
+      ITC_FLAG(native_save_interface) = v == 1;
+      (v == 0 ? __imp__sub_820A4610 : hooks::SaveDevicesUpdateSteps)(t, h.base);
+      ITC_FLAG(native_save_interface) = true;
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      // The stack but XNotifyGetNext's two outputs in Update's frame (r1 +
+      // 80 and + 84, the recompiled side's call into the SDK).
+      out[v].Bytes(Read(h.base, stack - kStackBytes, kStackBytes - 0x40));
+      out[v].Bytes(Read(h.base, stack - 0x38, 0x38));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r1.u32 - stack);
+      out[v].Word(last_error::Get(h.base, t.r13.u32));
+      for (int k = 27; k < 32; k++) {
+        out[v].Word(uint32_t((&t.r14)[k - 14].u64));
+        out[v].Word(uint32_t((&t.r14)[k - 14].u64 >> 32));
+      }
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SaveHandlers(Context& h) {
@@ -272,6 +377,7 @@ void SaveHandlers(Context& h) {
        }) {
     Run(h, {e.name, 96, e.original, e.native, ShapeMachine, NoArgs});
   }
+  UpdateCases(h);
   Run(h, {"GetOverlappedResult (sub_82295F20)", 48, __imp__sub_82295F20,
           hooks::GetOverlappedResultSteps,
           [](uint8_t* base, const Layout& l, Random& r) { ShapeOverlapped(base, l, r); },

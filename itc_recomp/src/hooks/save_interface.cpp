@@ -52,7 +52,8 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "the machines CheckStep sub_820A5A88, SaveStep sub_820A5BE8, LoadStep sub_820A5E68 "
               "and DeleteStep sub_820A6010 with the waits they poll (no adapters: WaitCloseItem "
               "sub_820A4C08, WaitDelete sub_820A5290, WaitThumbnail sub_820A5190, WaitClose "
-              "sub_820A5070, WaitWrite sub_820A4E68, WaitRead sub_820A4FF8) "
+              "sub_820A5070, WaitWrite sub_820A4E68, WaitRead sub_820A4FF8) and SaveDevices::Update "
+              "sub_820A4610 (B5's adapter in hooks/notify.cpp; without this flag B5's body) "
               "natively instead of through the "
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
@@ -668,6 +669,18 @@ void SlotDeleteStepSteps(PPCContext& ctx, uint8_t* base) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
   ctx.r3.u64 = si::SlotDeleteStep(base, devices, slot, Site(ctx), kernel);
+}
+
+void SaveDevicesUpdateSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  ctx.r3.u64 = si::DevicesUpdate(
+      base, ctx.r3.u64, ctx.r4.u64, Site(ctx), kernel,
+      [&ctx, base](uint32_t function, uint64_t r3, uint64_t r4, const si::CallSite& at) {
+        ctx.r3.u64 = r3;
+        ctx.r4.u64 = r4;
+        GuestCallAt(ctx, base, function, at);
+        return ctx.r3.u64;
+      });
 }
 
 }  // namespace hooks

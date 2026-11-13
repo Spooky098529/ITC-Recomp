@@ -10,9 +10,13 @@
 
 #include "guest.h"
 #include "guest_call.h"
+#include "base/flags.h"
+#include "hooks/save_interface.h"
 #include "user/network.h"
 
 using guest_call::InFrame;
+
+ITC_FLAG_DECLARE(bool, native_save_interface);
 
 namespace {
 
@@ -84,8 +88,15 @@ uint32_t Method(uint8_t* base, uint32_t object, uint32_t offset) {
 // device list (+12's +4, then +8 per slot); a slot whose state isn't 0-3 is
 // asked about (+28) and cleared under 5; then the slot's handler (the object's
 // +76 + 4 x its +988) gives its next state. Runs only with a listener (+56).
+// With --native_save_interface, its plain C++ instead (B7 loop,
+// save_interface/slot_handlers.h: the handlers, the device list and
+// SaveSlot::State native; its prologue written as the original's).
 extern "C" REX_FUNC(sub_820A4610) {
   REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_save_interface)) {
+    hooks::SaveDevicesUpdateSteps(ctx, base);
+    return;
+  }
   const uint32_t devices = ctx.r3.u32;
   if (!guest::LoadU32(base, devices + 56)) {
     return;
