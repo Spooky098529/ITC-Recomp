@@ -1132,6 +1132,33 @@ void StartCases(Context& h) {
         Fill(base, refresh + 40, 40, 0);
         Fill(base, refresh - 88, 88, 0);
         Fill(base, refresh - 176 - 32, 32, 0);
+        // GarageStage::SetLightsOn's original's GetB under its 112-byte
+        // frame (its adapter went, B7 loop, 2026-11-13), as the refresh's
+        // own harness leaves it out.
+        Fill(base, refresh - 112 - 24, 20, 0);
+        Fill(base, refresh - 112 - 112, 12, 0);
+        // And, since the stand's setters' adapters went (B7 loop,
+        // 2026-11-13), the originals the recompiled PickCameraPreset (its
+        // 112-byte frame) and PreviewItem (its 160-byte one) call:
+        // SetWord5016's r31 and lr saves and the setters' GetB's under their
+        // 96- and 112-byte frames (TuningScreen::SetTireGrade's
+        // GarageStage::SetTireGrade's under it), the setters' and
+        // ApplyRecord's saves and SetTireTextures' lr.
+        {
+          const auto get_b = [&](uint32_t caller) {
+            Fill(base, caller - 24, 20, 0);
+            Fill(base, caller - 112, 4, 0);
+          };
+          const uint32_t pick = refresh - 112, items = refresh - 160;
+          Fill(base, pick - 16, 16, 0);
+          get_b(pick - 96);
+          get_b(items - 96);
+          get_b(items - 112);
+          get_b(items - 224);
+          Fill(base, items - 136, 24, 0);
+          Fill(base, items - 96 - 56, 56, 0);
+          Fill(base, items - 324, 12, 0);
+        }
         const uint32_t preview = refresh - 160;
         Fill(base, preview - 32, 32, 0);
         Fill(base, preview - 112 - 56, 56, 0);

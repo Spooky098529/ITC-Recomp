@@ -720,6 +720,35 @@ void TuningRefresh(Context& h) {
         // frame (r29 to r31 and lr).
         Fill(base, frame - 88, 88, 0);
         Fill(base, frame - 176 - 32, 32, 0);
+        // Since GarageStage::SetLightsOn's adapter went (B7 loop,
+        // 2026-11-13), the recompiled refresh calls its original, whose
+        // ScenePools::GetB original under its 112-byte frame the native one
+        // doesn't run: GetB's r30, r31 and lr saves and its frame's back
+        // chain and +8 (logged from the recompiled runs).
+        Fill(base, frame - 112 - 24, 20, 0);
+        Fill(base, frame - 112 - 112, 12, 0);
+        // And, since the stand's setters' adapters went (B7 loop,
+        // 2026-11-13), the originals the recompiled PickCameraPreset (its
+        // 112-byte frame) and PreviewItem (its 160-byte one) call:
+        // SetWord5016's r31 and lr saves and the setters' GetB's under their
+        // 96- and 112-byte frames (TuningScreen::SetTireGrade's
+        // GarageStage::SetTireGrade's under it), the setters' and
+        // ApplyRecord's saves and SetTireTextures' lr.
+        {
+          const auto get_b = [&](uint32_t caller) {
+            Fill(base, caller - 24, 20, 0);
+            Fill(base, caller - 112, 4, 0);
+          };
+          const uint32_t pick = frame - 112, items = frame - 160;
+          Fill(base, pick - 16, 16, 0);
+          get_b(pick - 96);
+          get_b(items - 96);
+          get_b(items - 112);
+          get_b(items - 224);
+          Fill(base, items - 136, 24, 0);
+          Fill(base, items - 96 - 56, 56, 0);
+          Fill(base, items - 324, 12, 0);
+        }
         // States 15 to 17: the recompiled SetStateTexts' parameter area (its
         // 224-byte frame's +40 to +79, where the varargs SetText and
         // SetNodeText it calls store r7 to r10: unset ones passed 0 natively,

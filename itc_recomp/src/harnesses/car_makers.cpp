@@ -1235,7 +1235,11 @@ void TuningStand(Context& h, Random& r) {
             t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(6);
           },
           __imp__sub_821CCC50, hooks::TuningSetInteriorPair, 0, floats,
-          fmt::format("case {}", c), 0, 0, before, blocks, 0x1000, kGarageBytes);
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x1000, kGarageBytes,
+          // GarageStage::SetInteriorPair's original (its adapter removed,
+          // B7 loop, 2026-11-13): its r30, r31 and lr saves, ApplyRecord's
+          // original's under its frame and ScenePools::GetB's.
+          GetBSaves({112}, {{4, 20}, {112, 56}}));
     }
     results.Report();
   }
@@ -1351,7 +1355,12 @@ void TuningStand(Context& h, Random& r) {
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
           __imp__sub_821E0E00, hooks::TuningPreviewWheels, 16, floats,
-          fmt::format("case {}", c), 0, 0, before, with_f1, 0x5000, kGarageBytes);
+          fmt::format("case {}", c), 0, 0, before, with_f1, 0x5000, kGarageBytes,
+          // TuningScreen::PreviewWheel's original (its adapter removed, B7
+          // loop, 2026-11-13): its saves under the frame, GarageStage::SetWheel's
+          // (r14 to r31, lr, f31) under PreviewWheel's 4,016-byte frame and
+          // ScenePools::GetB's under SetWheel's 3,120-byte one.
+          GetBSaves({96 + 4016 + 3120}, {{96, 32}, {96 + 4016, 160}}));
     }
     results.Report();
   }
@@ -1386,7 +1395,13 @@ void TuningStand(Context& h, Random& r) {
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
           __imp__sub_822042D8, hooks::TuningApplyDecals, 56, floats,
-          fmt::format("case {}", c), 0, 0, before, blocks, 0x5000, kGarageBytes);
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x5000, kGarageBytes,
+          // The originals of GarageStage::SetDecalA, SetDecalB and
+          // ReloadDecals (their adapters removed, B7 loop, 2026-11-13): their
+          // saves under the frame (SetDecal's r29 to r31, lr and f28 to f31),
+          // with ScenePools::GetB's and SceneModel::ReloadDecals' under theirs
+          // (logged from the recompiled runs).
+          GetBSaves({4112 + 160, 4112 + 96}, {{4116, 60}, {4212, 20}, {4276, 20}}));
     }
     results.Report();
   }
@@ -1431,7 +1446,9 @@ void TuningStand(Context& h, Random& r) {
           },
           __imp__sub_821F7B90, hooks::TuningApplyAreaDecals, 80, floats,
           fmt::format("case {}", c), 4160, 48, before, blocks, 0x5000, kGarageBytes,
-          GetBSaves({4160 + 128}));
+          // And GarageStage::ReloadDecals' original's (its adapter removed,
+          // B7 loop, 2026-11-13) with GetB's under its 96-byte frame.
+          GetBSaves({4160 + 128, 4160 + 96}, {{4160, 16}}));
     }
     results.Report();
     r = kept;
@@ -1538,7 +1555,13 @@ void TuningStand(Context& h, Random& r) {
               out.Word(guest::LoadU32(h.base, kOpen[i]));
             }
           },
-          paint ? 144 : 0x5000, kGarageBytes);
+          paint ? 144 : 0x5000, kGarageBytes,
+          // The originals of TuningScreen::StepSecondWheels and
+          // GarageStage::SetWheelWord (their adapters removed, B7 loop,
+          // 2026-11-13): StepSecondWheels' r30, r31 and lr saves under the
+          // frame, GetB's under SetWheelWord's and SecondWheelsPending's
+          // 96-byte frames.
+          GetBSaves({144 + 96, 144 + 112 + 96}, {{144, 24}}));
     }
     for (int i = 0; i < 3; i++) {
       guest::StoreU32(h.base, kOpen[i], saved_open[i]);
@@ -1722,7 +1745,15 @@ void TuningStand(Context& h, Random& r) {
           },
           __imp__sub_821E07B0, hooks::TuningPreviewItem, 40, floats,
           fmt::format("case {}", c), 160, 32, before, with_f1, 0x5000, kGarageBytes,
-          {{160 + 112, 56}, {160 + 4000 + 16, 16}});
+          // And the stand's setters' originals' (their adapters removed, B7
+          // loop, 2026-11-13; TuningScreen::SetTireGrade's under it):
+          // ApplyRecord's and GetB's under their 96- and 112-byte frames.
+          // ApplyRecord's and GetB's under their 96- and 112-byte frames,
+          // GarageStage::SetTireGrade's under TuningScreen::SetTireGrade's,
+          // and Wheels::SetTireTextures' lr under SceneWheels::SetTireGrades'.
+          GetBSaves({160 + 96, 160 + 112, 160 + 112 + 112},
+                    {{160 + 112, 56}, {160 + 96, 56}, {160 + 4000 + 16, 16}, {272, 24},
+                     {484, 12}}));
     }
     results.Report();
   }
@@ -1858,8 +1889,14 @@ void TuningStand(Context& h, Random& r) {
           fmt::format("case {}", c), 224, 32, before, with_f1, 0x5000, kGarageBytes,
           // And GetB's under its callers' frames, at each depth the pages
           // reach it (the GarageStage functions they call).
-          GetBSaves({544, 400, 352, 336, 320},
-                    {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16}}));
+          // And the stand's setters' originals' (their adapters removed, B7
+          // loop, 2026-11-13): TuningScreen::PreviewWheel's GarageStage::SetWheel
+          // (its saves under PreviewWheel's 4,016-byte frame, GetB's under its
+          // 3,120-byte one) and SetTireGrade's callees' (logged from the
+          // recompiled runs).
+          GetBSaves({544, 400, 352, 336, 320, 224 + 4016 + 3120},
+                    {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16},
+                     {224 + 4016, 160}, {436, 8}}));
     }
     results.Report();
   }

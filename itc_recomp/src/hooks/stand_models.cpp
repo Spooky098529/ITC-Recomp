@@ -52,7 +52,10 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "GarageStage::SetSticker sub_8217B3D8 and SetDecalWord sub_821793D0 (no adapters: "
               "its native ApplyAreaDecals and ApplyDecalWord call them); the parts, GarageStage::SetParts "
               "sub_821797A8 and SetAeroSet sub_8217DBC0 (no adapters: the tuning screen's native "
-              "PreviewParts calls them; SetAeroSet with --native_car_specs) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
+              "PreviewParts calls them; SetAeroSet with --native_car_specs) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models). "
+              "Since 2026-11-13 only MakeModel keeps an adapter: the others are reached from the "
+              "tuning screen's plain C++, which the tuning screen's flags (this one among them) "
+              "switch");
 
 namespace hooks {
 
@@ -444,23 +447,19 @@ void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_STAND_MODELS(8217FCB0, StandModelsMakeModel)
-ITC_STAND_MODELS(82178FE8, StandModelsSetInteriorClass)
-ITC_STAND_MODELS(82179598, StandModelsSetWord5016)
-ITC_STAND_MODELS(82179A18, StandModelsSetWheelWord)
-ITC_STAND_MODELS(82179420, StandModelsSetLightsOn)
-ITC_STAND_MODELS(82179818, StandModelsSetDecalA)
-ITC_STAND_MODELS(821798D8, StandModelsSetDecalB)
-ITC_STAND_MODELS(82178F00, StandModelsSetPart)
-ITC_STAND_MODELS(82179050, StandModelsSetInteriorWord)
-ITC_STAND_MODELS(821791C0, StandModelsSetInteriorLevel)
-ITC_STAND_MODELS(82179250, StandModelsSetInteriorPair)
-ITC_STAND_MODELS(82179378, StandModelsClearChoice)
-ITC_STAND_MODELS(82179548, StandModelsSetAero)
-ITC_STAND_MODELS(82178EC0, StandModelsReloadDecals)
-ITC_STAND_MODELS(82179130, StandModelsSetTireGrade)
-ITC_STAND_MODELS(821CCA38, StandModelsTuningSetTireGrade)
-ITC_STAND_MODELS(821CC890, StandModelsStepSecondWheels)
-ITC_STAND_MODELS(821DFA78, StandModelsPreviewWheel)
+// The setters' adapters (SetInteriorClass sub_82178FE8, SetWord5016
+// sub_82179598, SetWheelWord sub_82179A18, SetLightsOn sub_82179420,
+// SetDecalA sub_82179818, SetDecalB sub_821798D8, SetPart sub_82178F00,
+// SetInteriorWord sub_82179050, SetInteriorLevel sub_821791C0,
+// SetInteriorPair sub_82179250, ClearChoice sub_82179378, SetAero
+// sub_82179548, ReloadDecals sub_82178EC0, SetTireGrade sub_82179130,
+// TuningScreen::SetTireGrade sub_821CCA38, StepSecondWheels sub_821CC890
+// and PreviewWheel sub_821DFA78) are removed (B7 loop, 2026-11-13): every
+// caller seen in play is native (the tuning screen's, src/tuning_screen/)
+// and calls their plain C++, so the tuning screen's flags switch them; the
+// recompiled callers left (never seen in play) run the originals. Their
+// register steps above are the harness's. MakeModel's stays: the type 6
+// and 7 modes' screen 0 calls it through the guest.
 // GarageStage::SetWheel sub_8217DD38 has none: only TuningScreen::PreviewWheel
 // calls it, and its plain C++ calls SetWheel's, which calls FitAxles' and
 // SceneWheels::SetSizes' (none either; their register steps above are the
