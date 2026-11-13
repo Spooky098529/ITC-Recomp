@@ -250,8 +250,15 @@ file's history. What's left to see in a drive, from every run:
   23 to 31, their movie-side updates, the decal images' list window and
   archive callback); 7 ready groups, the rest ready bottom up inside
   the file (`InputVinylImages`' group over 1,500 lines: split); no
-  leads; no subagents); map checked (0 errors). Migration agent
-  running.
+  leads; no subagents); map checked (0 errors). Migration
+  e989acb8..5b6f12d3 (five batches: the decal images' loads, states
+  34, 23, 29 to 31 (two never seen, ported) and 24's pages with their
+  movie sides; 18 rows ours, 7 Native without adapters; harnesses 0
+  differing, `car_makers`' too (its tuning stand world given a mapper
+  block and a recording sound manager); race 35 s at 40, 0 errors; no
+  subagents). Left: `InputVinylLayers` and `InputVinylImages` (ready;
+  the second split), the never-seen layer actions and order pages.
+  Validation agent running.
 
 ## Done
 
