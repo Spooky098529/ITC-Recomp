@@ -23,7 +23,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "handlers CameraDirector::ToView4 sub_82152400, ToView5 sub_821524B8, ToView3 "
               "sub_821524D8 and ToView3IfCourse sub_82153160; Viewports::ResetRoll sub_821524F0 (no adapter: only SetMode's plain C++ calls it), "
               "Camera::ZoomFromFov sub_82152548 (no adapter: only the views' cameras' plain C++ calls it), Quat::Rotate sub_821525F8 (no adapter: only ChaseCamera::Follow's plain C++ calls it), Matrix::FromQuat "
-              "sub_82152698 (no adapter: only CameraTarget::Track's plain C++ calls it), Matrix::FromFloats sub_82090000; the lists' List40::Link "
+              "sub_82152698 (no adapter: only CameraTarget::Track's plain C++ calls it), Matrix::FromFloats sub_82090000 (no adapter: only TrackRoute::SplinePoint's and the static matrices' plain C++ call it in play); the lists' List40::Link "
               "sub_82153228 (no adapter: only List40::Insert's plain C++ calls it), "
               "List40::Insert sub_821544E0 (no adapter: only TvCamera::Track's and Step's plain C++ calls it), List16::Insert20 sub_82154458 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it), "
               "Insert32 sub_82154378, Insert608 sub_821543E8 (no adapters: only CutsceneShot::Init's and Cutscene::Cutscene's plain C++ calls them) and Copy32 sub_82154300 (no adapter: only CutsceneShot::Init's plain C++ calls it); "
@@ -241,8 +241,10 @@ void CameraModesStep82152698(PPCContext& ctx, uint8_t* base) {
   cm::MatrixFromQuat(base, ctx.r3.u32, q, (ctx.r1.u32 - 16) & ~0xFu);
 }
 
-// Matrix::FromFloats: r3 = the matrix, r4 to r10 the first seven pointers,
-// the other nine on the caller's stack (r1 + 84, + 92, ... + 148).
+// Matrix::FromFloats (no adapter: only TrackRoute::SplinePoint's and the
+// static matrices' plain C++ call it in play; the step kept for the
+// harness): r3 = the matrix, r4 to r10 the first seven pointers, the other
+// nine on the caller's stack (r1 + 84, + 92, ... + 148).
 void CameraModesStep82090000(PPCContext& ctx, uint8_t* base) {
   uint32_t from[16] = {ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                        ctx.r8.u32, ctx.r9.u32, ctx.r10.u32};
@@ -1042,7 +1044,6 @@ ITC_CAMERA_MODES(82152400)
 ITC_CAMERA_MODES(821524B8)
 ITC_CAMERA_MODES(821524D8)
 ITC_CAMERA_MODES(82153160)
-ITC_CAMERA_MODES(82090000)
 ITC_CAMERA_MODES(82150078)
 ITC_CAMERA_MODES(82150B10)
 ITC_CAMERA_MODES(82150878)
