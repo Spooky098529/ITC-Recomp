@@ -185,7 +185,12 @@ file's history. What's left to see in a drive, from every run:
   `FitSelectedCar`'s callers direct, both adapters removed (Native);
   every harness 0 differing, races 29 and 23 s at 40 (the harnesses'
   time), 0 errors; a lead added (`sub_82208738`'s adapter); no
-  subagents. Validation agent running.
+  subagents. Validation (`itc_5322`, race 48 s, 0 errors): 10 of 10
+  harness lines, but `TuningMachine::Start`'s harness (tuning_machine,
+  which the migration didn't run) differs in 40 of 40 cases, one byte
+  (recompiled 01, native 00 at entries 47, 51, 55, 59). By "Precedent
+  first" (harness faults found with logging, fixed, validated again; a
+  real difference halts), the migration agent is diagnosing it.
 
 ## Done
 
