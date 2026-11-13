@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-11):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-13):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -304,7 +304,22 @@ goes in `src/` as overrides), American English.
   off by default (ours 5,612 by `b7_status.py`, which counts its
   Overridden rows); the rest waits on the theater's harness and race,
   the type 9 mode, the sticker and vinyl editors and the leads in
-  `docs/loops/leads.md`.
+  `docs/loops/leads.md`. Its forty-fifth run (`b7-loop-11-11-26`,
+  the same branch by the user's call, 2026-11-12 to 13, limit 5 then
+  10, not yet merged) checked the replay theater (on by default) and
+  made ten subsystems native: the type 9 mode (`todays-result.md`), the
+  Xbox Live network mode (`network-mode.md`, its Live calls answered
+  with plugged-in data, the user's call), the race's end
+  (`race-end.md`), the options' load and save (`options-load-save.md`),
+  `Type6Screen0`, the type 5 mode (`type5-mode.md`), the vinyl editor
+  (`tuning-pages.md`), the power graph screen
+  (`power-graph-screen.md`), the achievements (`achievements.md`, the
+  SDK's write kept, the user's call) and the frame driver
+  (`frame-driver.md`), with the course scenery finished and
+  `TuningScreen::HandleInput` as leads without mapping (ours 5,612 ->
+  5,989, work left 984 -> 718); the rest waits on the core's
+  `Event::` and sync, `Device::Swap` and `Resolve`, the sticker
+  editor and the leads in `docs/loops/leads.md`.
   The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2869,6 +2884,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The tuning screen's vinyl editor (its pages for states 23 to 31 and 34, the decal images' list window and loads, the sticker helpers it calls) | `tuning-pages.md` | 29 new rows ours (with `HighlightItem`, `HighlightSelected` in `tuning-screen.md`; 7 adapters removed) | (`--native_tuning_pages`) |
 | 2026-11-13 | The power graph screen (the machine the type 6 and 7 modes share: its handlers, pages, steps, texts and the members' slots) | `power-graph-screen.md` | 22 of 22 | `--native_power_graph_screen` |
 | 2026-11-13 | The achievements check after a race (`Achievements::Check`, `Write`; `XUserWriteAchievements` kept as a guest call, the user's call) | `achievements.md` | 5 of 5 | `--native_achievements` |
+| 2026-11-13 | The frame driver and the app's scene (the game's object that drives each frame across its render thread, renamed from "renderer" by the user's call; the scene's update, draw and constructor; the game's threads) | `frame-driver.md` | 19 ours of 25 in play (`Present` and the `Event::`-blocked three stay) | `--native_frame_driver` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5411,3 +5427,22 @@ boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
 27, never called 69, live 208. Imports: 186 called, 54 with a live
 caller. B7 (`b7_status.py`): ours 5,968, work left 739 (Wrapped 52,
 with a row 365, no row yet 322), from 741.
+
+**2026-11-13, the frame driver (branch `b7-loop-11-11-26`, the
+forty-fifth run, its tenth subsystem):** `frame-driver.md` (41 rows,
+`src/frame_driver/`; mapped as `renderer.md`, renamed by the user's
+call as "renderer" was confusing beside our Vulkan renderer): the
+game's object at framework + 76 that drives each frame across its
+render thread (listeners, requests, `DrawFrame`) and the app's scene
+at + 80 (`Scene::Update`, `Draw`, its constructor), with the game's
+`Thread` class and its thread imports, made native inside the frame
+state and present wraps; frame 600 pixel-identical against the
+fallback. A pre-existing bug fixed: the `set_register` helper in
+`hooks/app_states.cpp` and `framework.cpp` put register n into r(n+1)
+(c96869cc). `FrameDriver::Present` stays (its harness would run
+`Device::Swap`'s override), and `Init`, `StartFrame`, `WaitForFrame`
+wait on the core's `Event::`. The run stopped at its limit of 10. The
+boundary: 449 functions (916 pairs): overridden 110, Native 40,
+Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
+live caller. B7 (`b7_status.py`): ours 5,989, work left 718 (Wrapped
+51, with a row 361, no row yet 306), from 739.

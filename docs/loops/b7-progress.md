@@ -365,10 +365,16 @@ file's history. What's left to see in a drive, from every run:
   errors; no subagents). Found and fixed: the `set_register` helper in
   `hooks/app_states.cpp` and `framework.cpp` put register n into
   r(n+1) (c96869cc). Left: `FrameDriver::Present` (its harness would
-  run `Device::Swap`'s override), `Thread::Start`. Validation agent
-  running.
+  run `Device::Swap`'s override), `Thread::Start`. Validated:
+  `itc_5227` (race 50 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups; harnesses ~128 s), 22 of 22 harness
+  lines, no prints added; all 22 ran in the race, none to drive.
+  Recorded; subsystem 10 done: the limit.
 
 ## Done
+
+- The frame driver and the app's scene: `frame-driver.md`,
+  `--native_frame_driver`, cac0f347..e721e59a; validated.
 
 - The achievements: `achievements.md` 5 of 5 ours,
   `--native_achievements`, 7f7fce7e..848036fc; validated.
@@ -509,4 +515,14 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 - After the renderer's map: ours 5968, work left 739 (wrapped 52,
   known 381, unknown 306).
 
+- After the frame driver: ours 5989, work left 718 (wrapped 51, known
+  361, unknown 306).
+
 ## Stopped
+
+2026-11-13, at the run's limit of 10 subsystems (raised from 5 by the
+user), after the frame driver's validation. All ten validated, with
+the replay theater's check, the course scenery and `HandleInput` as
+leads without mapping. Nothing uncommitted. Totals: ours 5612 -> 5989,
+work left 984 -> 718. The summary, `review.md`, `to-drive.md`, the
+plan's status line and CLAUDE.md are up to date.

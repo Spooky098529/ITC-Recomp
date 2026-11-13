@@ -672,6 +672,26 @@ validated, and ported the replay theater (`type10-mode.md`,
 race never ran) (ours 5,445 -> 5,612, counting the theater's rows).
 The rest waits on the theater's check, the type 9 mode, the sticker
 and vinyl editors and the leads in `docs/loops/leads.md`.
+Its forty-fifth run (`b7-loop-11-11-26` again, the user's call,
+2026-11-12 to 13, not yet merged; summary
+`docs/loops/b7-loop-2026-11-12-0826.md`; limit 5, raised to 10 by the
+user) checked the replay theater (on by default) and made ten
+subsystems native: the type 9 mode (`todays-result.md`,
+`--native_todays_result`), the Xbox Live network mode
+(`network-mode.md`, `--native_network_mode`; its Live calls answered
+with plugged-in data, the user's call, to keep as little recompiled as
+possible), the race's end (`race-end.md`, `--native_race_end`), the
+options' load and save pages (`options-load-save.md`), `Type6Screen0`,
+the type 5 mode (`type5-mode.md`), the vinyl editor (`tuning-pages.md`),
+the power graph screen (`power-graph-screen.md`), the achievements
+(`achievements.md`, `XUserWriteAchievements` kept through the SDK, the
+user's call) and the frame driver (`frame-driver.md`,
+`--native_frame_driver`: the game's object driving each frame, renamed
+from "renderer" by the user's call), with the course scenery finished
+(`Scene::Draw` and its group) and `TuningScreen::HandleInput` as leads
+without mapping (ours 5,612 -> 5,989). The rest waits on the core's
+`Event::` and sync, `Device::Swap` and `Resolve`, the sticker editor
+and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
