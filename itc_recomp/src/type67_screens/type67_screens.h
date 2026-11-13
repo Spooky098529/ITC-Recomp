@@ -681,6 +681,81 @@ uint64_t TitledListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const
 uint64_t NodeListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, bool titled,
                                         uint32_t sp, const Calls& calls);
 
+// --- The color list screen (color_list.cpp; ColorListScreen, the type 7
+// list screen's base, over ListScreen: the item list +10144, the color list
+// +10216, the toggle +10288, the first list +10360, the color node table
+// +10432). The page block as the titled list's; Draw and Update build their
+// 11-entry tables on first use (the same words and guards as the
+// originals), the entries run through SlotNative. ---
+
+constexpr uint32_t kColorListScreenVtable = 0x820114E0;
+// The page table (the empty handler for pages 0, 1, 8; Page2 to Page7,
+// Page9 and ListScreen::LeavePage for 10) and the step table (Step0 to
+// Step4, RunMovie for 5 and 9, Step6 to Step8, Step10), with their guards.
+constexpr uint32_t kColorPages = 0x82815EC8;
+constexpr uint32_t kColorPageGuard = 0x82815F20;
+constexpr uint32_t kColorSteps = 0x82815F28;
+constexpr uint32_t kColorStepGuard = 0x82815F80;
+
+// sub_82255200 ColorListScreen::Reset (slot 22): page 2 after step 1, then
+// ColorNodeTable::Clear on +10432 (a tail call). Clear's r3.
+uint64_t ColorListScreenReset(uint8_t* base, uint64_t r3);
+// sub_82256CA0 ColorListScreen::Draw (slot 23; 240-byte frame): the page
+// table built on first use (its pairs left in the frame's +80 to +167), then
+// page +9644's entry with r4 unless it's -1 (then r3 left). The page's r3.
+uint64_t ColorListScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                             const Calls& calls);
+// sub_82256E08 ColorListScreen::Update (slot 24; 240): the step table built
+// on first use, then step +9656's entry (r4 passed on, or the table's sixth
+// entry when it was just built; r5 left). The step's answer.
+uint64_t ColorListScreenUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                               const Calls& calls);
+// sub_822552B8 Page2 (144): the first list's update, move (step 10),
+// accept (the item list's first info, step 2 then page 3) and cancel (page
+// 9, the fade-out), else the toggle's.
+uint64_t ColorListScreenPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82255490 Page3 (160): the item list's update, move (step 7), accept
+// (the color list from 0, step 4 then page 4) and cancel (step 3 then page
+// 2), else the toggle's.
+uint64_t ColorListScreenPage3(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82255658 Page4 (144): the color list's update and move (step 8), the
+// item list's accept (page 5) and cancel (step 6 then page 3), else the
+// toggle's.
+uint64_t ColorListScreenPage4(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82256508 Page5 (96): the list part's slot 1 (r4 left) and +9696 = 1
+// when there's one; SetScrollText(+11036, 1); page 6; ShowPartNodes(1) when
+// +9708 is set.
+uint64_t ColorListScreenPage5(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822565A0 Page6 (112; r4 passed to the part's Pick): the list part's
+// prompt. The part's answer.
+uint64_t ColorListScreenPage6(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
+// sub_822557F0 Page7: page 10. r3 left.
+uint64_t ColorListScreenPage7(uint8_t* base, uint64_t r3);
+// sub_822562E0 Page9 (96): once both fade counts are 0, page 10 and
+// UiMovie::FinishAll on the screen's movie (its r3); else r3 left.
+uint64_t ColorListScreenPage9(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822561D0 PlaceItemCursor and sub_82256258 PlaceColorCursor (128; r4 a
+// selection): the cursor's child (+9744's node and +9828, or +9736 and
+// +9808) +16 = r4 × 40 as a float, the 64-bit product left in the frame's
+// +80. The child, or r3 left when either word is negative.
+uint64_t ColorListScreenPlaceItemCursor(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
+uint64_t ColorListScreenPlaceColorCursor(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
+// sub_82256360 ShowPartNodes (128; `hide` r4): the toggle's and the color's
+// nodes finished (hide) or played and looped, then +9824 hidden or shown.
+// The last call's r3.
+uint64_t ColorListScreenShowPartNodes(uint8_t* base, uint64_t r3, uint64_t hide, uint32_t sp,
+                                      const Calls& calls);
+// sub_82255198 ColorListScreen::~ColorListScreen (96): its vtable,
+// NodeTable::~NodeTable on +10432, MenuList::Release on +10360, +10288,
+// +10216, +10144, ~ListScreen. r3 the screen.
+uint64_t ColorListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82255840 ColorListScreen::DeletingDestructor (112): the destructor,
+// operator delete (a guest call) when bit 0 of `flags` is set. r3 the
+// screen.
+uint64_t ColorListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                         const Calls& calls);
+
 // --- The type 6 list screen's own slots and destructors, and the panel and
 // node screens' leaves (type6_list.cpp) ---
 

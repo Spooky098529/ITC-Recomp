@@ -91,6 +91,22 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return TitledListScreenStep1(base, r3, sp, calls);
     case 0x822580E0:
       return TitledListScreenStep2(base, r3, sp, calls);
+    // The color list screen's slot 22 and its page table's pages
+    // (color_list.cpp).
+    case 0x82255200:
+      return ColorListScreenReset(base, r3);
+    case 0x822552B8:
+      return ColorListScreenPage2(base, r3, sp, calls);
+    case 0x82255490:
+      return ColorListScreenPage3(base, r3, sp, calls);
+    case 0x82255658:
+      return ColorListScreenPage4(base, r3, sp, calls);
+    case 0x82256508:
+      return ColorListScreenPage5(base, r3, sp, calls);
+    case 0x822557F0:
+      return ColorListScreenPage7(base, r3);
+    case 0x822562E0:
+      return ColorListScreenPage9(base, r3, sp, calls);
     default:
       break;
   }
@@ -135,6 +151,15 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return NodeListScreenDeletingDestruct(base, r3, *r4, true, sp, calls);
       case 0x82257940:
         return NodeListScreenDeletingDestruct(base, r3, *r4, false, sp, calls);
+      // The color list screen's slots 23, 24 and 0 and its page 6.
+      case 0x82256CA0:
+        return ColorListScreenDraw(base, r3, *r4, sp, calls);
+      case 0x82256E08:
+        return ColorListScreenUpdate(base, r3, *r4, sp, calls);
+      case 0x822565A0:
+        return ColorListScreenPage6(base, r3, *r4, sp, calls);
+      case 0x82255840:
+        return ColorListScreenDeletingDestruct(base, r3, *r4, sp, calls);
       // The type 6 list screen's slots 2, 6, 26 and 0, Type6PanelScreen's
       // slot 4 and the group pair's slot 0 (type6_list.cpp).
       case 0x822336C0:
@@ -264,6 +289,10 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82255818:
     case 0x82257990:
     case 0x82257940:
+    case 0x82256CA0:
+    case 0x82256E08:
+    case 0x822565A0:
+    case 0x82255840:
     case 0x82252BB8:
     case 0x82252C98:
     case 0x82252D38:
@@ -316,6 +345,13 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82257D48:
     case 0x82257FF8:
     case 0x822580E0:
+    case 0x82255200:
+    case 0x822552B8:
+    case 0x82255490:
+    case 0x82255658:
+    case 0x82256508:
+    case 0x822557F0:
+    case 0x822562E0:
       return true;
     default:
       return false;

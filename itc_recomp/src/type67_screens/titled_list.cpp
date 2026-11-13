@@ -12,6 +12,7 @@
 // Slot, the tables' entries through SlotNative where they hold one of ours.
 
 #include "type67_screens/type67_screens.h"
+#include "type67_screens/list_pages.h"
 
 #include "base/log.h"
 #include "car_list/car_list.h"
@@ -26,7 +27,8 @@
 
 namespace type67_screens {
 
-namespace {
+// The page and step helpers (list_pages.h; also the color list's).
+namespace pages {
 
 using guest::LoadU32;
 using guest::StoreU32;
@@ -48,10 +50,14 @@ uint32_t MovieOf(uint8_t* base, uint32_t screen, uint32_t frame) {
   return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
 }
 
+namespace {
+
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
                     uint32_t lr) {
   return static_cast<const Calls*>(user)->call_set(function, args, set, r1, lr);
 }
+
+}  // namespace
 
 uint64_t PlaySound(uint8_t* base, uint32_t cue, uint32_t frame, const Calls& calls) {
   return menu_sounds::PlayMenuSound(base, cue, frame,
@@ -71,6 +77,8 @@ uint64_t Play(const Calls& calls, uint32_t movie, uint32_t named, uint32_t chain
   return calls.call_set(kPlayNamed, args, 6, frame, lr);
 }
 
+namespace {
+
 // PlayNamed (chained 1) and LoopNamed of the screen's word at `field` when
 // it's >= 0 (each call reading it again).
 void PlayLoop(uint8_t* base, const Calls& calls, uint32_t screen, uint32_t movie, uint32_t field,
@@ -80,6 +88,8 @@ void PlayLoop(uint8_t* base, const Calls& calls, uint32_t screen, uint32_t movie
   Play(calls, movie, named, 1, frame, lr_play);
   calls.call(kLoopNamed, frame, lr_loop, movie, LoadU32(base, screen + field));
 }
+
+}  // namespace
 
 // The page block (+9644 the page, +9648 the page after, +9652 the page
 // before, +9656 the step, +9660 the step queued): "page P" and "page P
@@ -129,10 +139,10 @@ uint64_t CallEntry(uint8_t* base, uint32_t target, uint64_t r3, uint64_t r4,
 // A table of member functions built on first use: the entries' (function,
 // this offset 0) pairs written to the frame at +80 on, the guard's bit 0
 // set, then the pairs copied into the table (the original's order).
-void BuildTable(uint8_t* base, uint32_t frame, uint32_t guard, uint32_t table,
+bool BuildTable(uint8_t* base, uint32_t frame, uint32_t guard, uint32_t table,
                 const uint32_t* entries, uint32_t count) {
   const uint32_t word = LoadU32(base, guard);
-  if ((word & 1) != 0) return;
+  if ((word & 1) != 0) return false;
   for (uint32_t i = 0; i < count; i++) {
     StoreU32(base, frame + 80 + 8 * i, entries[i]);
     StoreU32(base, frame + 84 + 8 * i, 0);
@@ -141,9 +151,12 @@ void BuildTable(uint8_t* base, uint32_t frame, uint32_t guard, uint32_t table,
   for (uint32_t i = 0; i < 2 * count; i++) {
     StoreU32(base, table + 4 * i, LoadU32(base, frame + 80 + 4 * i));
   }
+  return true;
 }
 
-}  // namespace
+}  // namespace pages
+
+using namespace pages;
 
 // --- The page block's reset and the tables ---
 

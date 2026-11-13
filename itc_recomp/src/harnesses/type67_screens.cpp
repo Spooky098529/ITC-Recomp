@@ -54,6 +54,7 @@ void Type67ScreenTables(Context& h);
 void Type67ListPart(Context& h);
 void Type67ListHelpers(Context& h);
 void Type67TitledList(Context& h);
+void Type67ColorList(Context& h);
 // Type6ListScreen::SetUpRace's cases (src/harnesses/race_setup.cpp).
 void Type67SetUpRace(Context& h);
 
@@ -812,6 +813,7 @@ void Type67Screens(Context& h) {
   Type67ListPart(h);
   Type67ListHelpers(h);
   Type67TitledList(h);
+  Type67ColorList(h);
   Type67SetUpRace(h);
   Write(h.base, kFades, saved_fade_block.data(), kFadesBytes);
   for (int i = 0; i < 3; i++) guest::StoreU32(h.base, kFadeWords[i], saved_fades[i]);
