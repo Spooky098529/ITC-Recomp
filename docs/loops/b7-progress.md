@@ -163,7 +163,14 @@ file's history. What's left to see in a drive, from every run:
   (`SetChoice`, `SetAero2`, `SetDoorKind`, `ClearLightKit`,
   `SetAccessory`, `SetCaliper`, `RefitAxles`,
   `PreviewInteriorChoices`, the swatch setter and the rest), by the
-  2026-11-12 call. Migration agent running.
+  2026-11-12 call. Migrated abc17bc2..5db16791: 18 functions native
+  (with `SceneInterior::SetRecord`, a new row, and the refresh's
+  `RefreshPaint`, `RefreshLightKits`, `RefreshMovie14`); no adapters
+  (callers native); `RefreshInterior` and commands 10, 13, 14 blocked
+  by four `tuning-pages.md` functions (a lead added, with one for
+  `MakeModel`'s and `FitSelectedCar`'s guest callers); every harness 0
+  differing, race 33 s at 40, 0 errors; no subagents. Validation agent
+  running.
 
 ## Done
 

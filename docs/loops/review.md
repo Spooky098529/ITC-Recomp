@@ -131,6 +131,13 @@ When the user has reviewed a run's section, its heading gets
   does). `MakeModel` and `FitSelectedCar` keep adapters (native
   callers still reach them through the guest). 22 never-seen rows
   without status remain in `stand-models.md` and `tuning-screen.md`.
+- The never-seen rows' cleanup (abc17bc2..5db16791): 18 functions in
+  `stand-models.md` and `tuning-screen.md` Native, a new row
+  `SceneInterior::SetRecord` `sub_820E38E0`; `PreviewItem` and
+  `RestoreStand` now report f1 to their adapters (`RefitAxles`'
+  `FitAxles` sets it); more harness skips for the originals' dead
+  register saves; `RefreshInterior` rewritten after a full read, still
+  recompiled (blocked).
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
