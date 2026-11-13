@@ -169,10 +169,23 @@ file's history. What's left to see in a drive, from every run:
   (callers native); `RefreshInterior` and commands 10, 13, 14 blocked
   by four `tuning-pages.md` functions (a lead added, with one for
   `MakeModel`'s and `FitSelectedCar`'s guest callers); every harness 0
-  differing, race 33 s at 40, 0 errors; no subagents. Validation agent
+  differing, race 33 s at 40, 0 errors; no subagents. Validated:
+  `itc_5316` (race 48 s at 180, the harnesses ~130 s; 0 errors, every
+  harness 0 differing outside the expected groups), 19 of 19 harness
+  lines; none in the race or the replay `itc_5317` (ok): 19 to drive.
+  Recorded.
+- Next: two leads without mapping (not counted), one migration agent:
+  the four `tuning-pages.md` blockers (`IsSlotAvailable`,
+  `SetPaintGradients`, `SetLightKind0Bars`, `SetLightKind1Bar`) with
+  what they unblock (`RefreshInterior`, commands 10, 13, 14), and
+  `MakeModel`'s and `FitSelectedCar`'s native guest callers made
+  direct; their lines deleted from `leads.md`. Migration agent
   running.
 
 ## Done
+
+- Cleanup lead (no mapping): the stand's and tuning screen's never-seen
+  rows, 18 Native, abc17bc2..5db16791; validated.
 
 - The stand's setters: 9 rows in `stand-models.md` and 5 callers in
   `tuning-screen.md` ours, 17 adapters removed, 8d0e0496..0e74c60a;

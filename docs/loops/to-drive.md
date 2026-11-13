@@ -167,6 +167,28 @@ interior and tires on the stand):
 - `sub_821CCA38` TuningScreen::SetTireGrade
 - `sub_821DFA78` TuningScreen::PreviewWheel
 
+And the stand's never-seen rows (`itc_5316`, `itc_5317`, ok):
+
+- `sub_82179310` GarageStage::SetChoice
+- `sub_821794A8` GarageStage::SetAero2
+- `sub_821794F8` GarageStage::SetDoorKind
+- `sub_821795E0` GarageStage::ClearLightKit
+- `sub_821792B0` GarageStage::SetAccessory
+- `sub_820D9F40` SceneModel::ApplyInterior
+- `sub_820E38E0` SceneInterior::SetRecord
+- `sub_821790D0` GarageStage::SetWheelExtras
+- `sub_820E7410` SceneWheels::SetWord68
+- `sub_820E7428` SceneWheels::SetCaliperTexture
+- `sub_821DA330` TuningScreen::SetCaliper
+- `sub_821CCBE8` TuningScreen::SetAccessory
+- `sub_821DF9D0` TuningScreen::RefitAxles
+- `sub_821E7E48` TuningScreen::PreviewInteriorChoices
+- `sub_821CC930` TuningScreen::PreviewLightKit
+- `sub_821E7DA0` UiNode::SetRgb
+- `sub_821F2110` TuningScreen::RefreshPaint
+- `sub_821F2378` TuningScreen::RefreshLightKits
+- `sub_821F7A98` TuningScreen::RefreshMovie14
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

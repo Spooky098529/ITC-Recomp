@@ -2893,6 +2893,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | Cleanup lead (no mapping, not counted): ~30 native callers in 16 subsystems call the render manager's slots 7 and 8 and the texture provider's getters directly (`hooks/direct_slots.h`) | 16 files' notes | none new | (existing flags) |
 | 2026-11-13 | The sticker editor (the tuning screen's states 38 to 46 and 49, their helpers, and the update's sticker commands 32 to 51; none seen in play) | `sticker-editor.md` | 25 of 25 Native (and 17 commands in `tuning-screen.md`, `UiMovie::Unloop`) | (`--native_tuning_pages`, `--native_tuning_screen`) |
 | 2026-11-13 | The stand's setters the tuning screen reaches (the colors, the sticker, the decal word, the aero set), with the tuning screen's `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`, `PreviewParts` | `stand-models.md`, `tuning-screen.md` | 9 new rows and 5 callers ours, 17 adapters removed | (`--native_stand_models`, the tuning screen's) |
+| 2026-11-13 | Cleanup lead (no mapping, not counted): the never-seen rows of the stand and the tuning screen (choices, aero, doors, light kits, accessories, calipers, axles, the refresh's paint and light kit pages) | `stand-models.md`, `tuning-screen.md` | 18 Native, a new row | (existing flags) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
