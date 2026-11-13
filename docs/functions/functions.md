@@ -712,6 +712,10 @@ Rows not yet moved stay in the table below. So far:
 - [`race-end.md`](race-end.md): the race's end, the mode a race goes
   to when it's over (the career's progress asked, the boot movies queued
   after the stages that end with them) (B7).
+- [`options-load-save.md`](options-load-save.md): the options screen's
+  load and save pages (categories 5 and 6, pages 9 and 10): their
+  sub-pages over the save layer, the dialogs' setters and the closing
+  steps 41 and 42 (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
