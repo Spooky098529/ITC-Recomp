@@ -356,7 +356,17 @@ file's history. What's left to see in a drive, from every run:
   groups; `FrameDriver::Init`, `WaitForFrame` and `StartFrame` blocked by
   the core's `Event::` functions (recompiled by the user's call,
   2026-10-24); no leads; no subagents); map checked (0 errors).
-  Migration agent running.
+  Migration cac0f347..e721e59a (six batches with the rename 2a098b95:
+  `FrameDriver::` interface, requests, frame; `Scene::Update`, `Draw`
+  and its constructor; `Thread::Thread`, `Begin` with the thread
+  imports; `VideoOutput::UnbindAll`; `--native_frame_driver`; frame 600
+  pixel-identical against the fallback and a second run; harnesses 0
+  differing, `app_states`' and `framework`'s too; race 38 s at 40, 0
+  errors; no subagents). Found and fixed: the `set_register` helper in
+  `hooks/app_states.cpp` and `framework.cpp` put register n into
+  r(n+1) (c96869cc). Left: `FrameDriver::Present` (its harness would
+  run `Device::Swap`'s override), `Thread::Start`. Validation agent
+  running.
 
 ## Done
 

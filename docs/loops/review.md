@@ -25,6 +25,21 @@ When the user has reviewed a run's section, its heading gets
   call only; the status is unchanged. `sub_824960E0` inside the movie
   library's range is mapped (the game's own renderer interface calls
   it).
+- The frame driver's migration (cac0f347..e721e59a,
+  `--native_frame_driver`). **For the user:** a pre-existing bug fixed
+  (c96869cc): the `set_register` helper in `src/hooks/app_states.cpp`
+  and `framework.cpp` wrote `(&ctx.r0)[n]`, but `PPCContext` keeps r3
+  first, so register n landed in r(n+1) (r31's in the link register's
+  slot); now `guest_call::Gpr`. It sets the original's registers before
+  guest calls in `App::` and the framework; their harnesses passed
+  before and after. `sub_825BA380` (CreateThread with a processor) went
+  Dropped -> Native (`Thread::Begin` reaches it). `FrameDriver::Present`
+  stays recompiled: a harness would have to run `Device::Swap`'s
+  override (it hands the frame to our renderer and waits on the frame
+  fence). `Scene::Scene`'s harness leaks the draw globals' blocks (~12
+  MB a case, 2 cases). `FrameDriver::ApplyRequest`'s listener removal
+  (never seen) runs the original, as `RunLoop::` and `App::ApplyRequest`
+  do; the shared tree erase `sub_82093000` would be its lead.
 - The achievements' map (d06dc44a): `achievements.md`, 5 rows; the
   27-entry {kind, id} table and its companions in `known-data.md`.
   `Write` never ran in play (no achievement earned). The user's call
