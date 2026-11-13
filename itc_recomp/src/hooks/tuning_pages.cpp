@@ -1037,10 +1037,11 @@ ITC_TUNING_PAGES(821FE608, TuningPagesOnImageLoaded)
 // adapter stays.
 ITC_TUNING_PAGES(821E6950, TuningPagesHandleInput)
 
-// The sticker editor's helpers (not seen in play): the recompiled pages and
-// the update's sticker commands call them.
-ITC_TUNING_PAGES(821F7298, TuningPagesUpdateSoloHold)
-ITC_TUNING_PAGES(821F7348, TuningPagesUpdatePreviewHold)
+// The sticker editor's helpers (not seen in play): the update's recompiled
+// sticker commands call them. No adapters (B7 loop, 2026-11-13: their only
+// callers, the sticker pages, are native and call their plain C++; the
+// register steps above are the harness's): UpdateSoloHold sub_821F7298,
+// UpdatePreviewHold sub_821F7348, ShowStickerOrder sub_821FBA40.
 ITC_TUNING_PAGES(821F73F8, TuningPagesStepUnlockedSticker)
 ITC_TUNING_PAGES(821F8070, TuningPagesShowSlotNode)
 ITC_TUNING_PAGES(821F8160, TuningPagesPlaceStickerNode)
@@ -1052,7 +1053,6 @@ ITC_TUNING_PAGES(821FA508, TuningPagesAnimateStickerAreas)
 ITC_TUNING_PAGES(821F7518, TuningPagesAnimateStickerOperate)
 ITC_TUNING_PAGES(821F8A50, TuningPagesAnimateStickerSlots)
 ITC_TUNING_PAGES(821F8D68, TuningPagesAnimateStickerEditMenu)
-ITC_TUNING_PAGES(821FBA40, TuningPagesShowStickerOrder)
 ITC_TUNING_PAGES(821FBB60, TuningPagesShowStickerPicker)
 
 // No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
