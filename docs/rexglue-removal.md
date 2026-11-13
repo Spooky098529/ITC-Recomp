@@ -2864,6 +2864,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-12 | The type 12 mode: the Xbox Live network mode (network battle and time attack: its mode select, 14 machines' set-ups and teardowns, the session memory; its Live calls answered with plugged-in data, the user's call) | `network-mode.md` | 130 of 130 rows (95 Overridden, 32 Native, 2 Merged, 1 Dropped) | `--native_network_mode` |
 | 2026-11-12 | The race's end (`RaceMode::ModeAfterRace`: which mode follows a race), with `RaceMode::NextMode` and `Progress::CheckUnlocks` (never seen, ported) | `race-end.md` | 1 of 1 (6 adapters removed) | `--native_race_end` |
 | 2026-11-13 | The options screen's load and save pages (category 5, page 9, the load; category 6, page 10, the save) | `options-load-save.md` | 16 of 16 (2 never seen, ported) | `--native_options_load_save` |
+| 2026-11-13 | `Type6Screen0`: the type 6 mode's first screen (a five-item menu over the type 6 car: pages, steps, helpers), with type 7's unported steps and `PowerGraph::SetFromCar` | `type6-type7-modes.md` | 13 of 13 new rows (with 6 of type 7's and `CarList::DrawCarPowerGraph`; 10 adapters removed) | (`--native_type67_modes`, `--native_power_graph`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5332,3 +5333,17 @@ drive list. The boundary: 449 functions (916 pairs): overridden 109,
 Native 36, Dropped 27, never called 69, live 208. Imports: 186 called,
 54 with a live caller. B7 (`b7_status.py`): ours 5,847, work left 804
 (Wrapped 52, with a row 370, no row yet 382), from 818.
+
+**2026-11-13, `Type6Screen0` (branch `b7-loop-11-11-26`, the
+forty-fifth run, its fifth subsystem):** 13 new rows in
+`type6-type7-modes.md` (`src/type67_modes/screen0.cpp`): the type 6
+mode's first screen (a five-item menu over the type 6 car), its pages,
+steps and helpers, made native beside type 7's, with type 7's
+unported steps, `PowerGraph::SetFromCar` (type 7's menu page and the
+car list call its plain C++) and `CarList::DrawCarPowerGraph`
+(`power-graph.md`). Neither the attract race nor the replay opens the
+type 6 or 7 modes: 24 on the drive list. The boundary: 449 functions
+(916 pairs): overridden 109, Native 36, Dropped 27, never called 69,
+live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,866, work left 792 (Wrapped 52, with a row
+367, no row yet 373), from 804.

@@ -18,6 +18,37 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5131`, `itc_5132`, ok; the
+type 6 and 7 modes' first screens, `type6-type7-modes.md`, and the car
+list's power graph, `power-graph.md`):
+
+- `sub_82234958` Type6Screen0::MenuPage
+- `sub_82234B80` Type6Screen0::PowerGraphPage
+- `sub_82234BF0` Type6Screen0::QuitPage
+- `sub_82234190` Type6Screen0::ChosenPage
+- `sub_82234C20` Type6Screen0::OpeningStep
+- `sub_82234E38` Type6Screen0::BackStep
+- `sub_82234D50` Type6Screen0::CursorStep
+- `sub_822342F0` Type6Screen0::FadeOutStep
+- `sub_822343A8` Type6Screen0::PlayItem
+- `sub_82234428` Type6Screen0::PlaceCursor
+- `sub_822346A8` Type6Screen0::ShowHelp
+- `sub_82250488` PowerGraph::SetFromCar
+- `sub_82250700` CarList::DrawCarPowerGraph
+- `sub_82244E70` Type7Screen0::OpeningStep
+- `sub_822450A8` Type7Screen0::BackStep
+- `sub_82244FC0` Type7Screen0::CursorStep
+- `sub_82244818` Type7Screen0::PlayItem
+- `sub_82244E00` Type7Screen0::PowerGraphPage
+- `sub_822448B0` Type7Screen0::PlaceCursor
+- `sub_82244AB8` Type7Screen0::ShowHelp
+- `sub_822344A8` Type6Screen0::ShowPage
+- `sub_82244930` Type7Screen0::ShowPage
+- `sub_82233FC8` Type6Screen0::Confirm
+- `sub_82244528` Type7Screen0::Confirm
+
+The options' load page's:
+
 Not in the attract race or the replay (`itc_5125`, `itc_5126`, ok; the
 options screen's load page, `options-load-save.md`: Options, load the
 game data):

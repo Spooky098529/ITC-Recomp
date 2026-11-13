@@ -208,10 +208,22 @@ file's history. What's left to see in a drive, from every run:
   and pages, `PowerGraph::SetFromCar` (type 7's menu page and the car
   list now call it), `CarList::DrawCarPowerGraph`; 10 adapters
   removed; harnesses 0 differing; race 38 s at 40, 0 errors; no
-  subagents). Left: none ready (42 never-seen rows). Validation agent
-  running.
+  subagents). Left: none ready (42 never-seen rows). Validated:
+  `itc_5131` (race 53 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups; harnesses ~125 s), 24 of 24 harness
+  lines, no prints added; none in the race or the replay `itc_5132`
+  (ok): 24 to drive. Recorded.
+- Subsystem 6 of 10: probably the type 5 front-end mode: its delegates
+  (`sub_82230050`, `sub_82230328`, `sub_82230458` with `sub_8222FD08`,
+  ready, seen in play) with the mode set-up beside them
+  (`sub_8222FD68`, `sub_82226A10`, `sub_821B7878`, `sub_8222FC50`), two
+  leads taken together; both lines deleted from `leads.md`. Mapping
+  agent running.
 
 ## Done
+
+- `Type6Screen0`: 13 rows in `type6-type7-modes.md` ours, with type
+  7's steps and the power graph's set-up, d642e99d..3a90ef05; validated.
 
 - The options' load and save pages: `options-load-save.md` 16 of 16
   ours, `--native_options_load_save`, d2d04519..2111429c; validated.
@@ -297,5 +309,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the options' load and save: ours 5847, work left 804 (wrapped
   52, known 370, unknown 382).
+
+- After `Type6Screen0`: ours 5866, work left 792 (wrapped 52, known
+  367, unknown 373).
 
 ## Stopped
