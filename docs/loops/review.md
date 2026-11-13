@@ -138,6 +138,14 @@ When the user has reviewed a run's section, its heading gets
   `FitAxles` sets it); more harness skips for the originals' dead
   register saves; `RefreshInterior` rewritten after a full read, still
   recompiled (blocked).
+- The tuning pages' blockers and the stand's guest callers
+  (bc2ed8af..0f0b959d): `IsSlotAvailable`, `SetPaintGradients`,
+  `SetLightKind0Bars`, `SetLightKind1Bar` (`tuning-pages.md`) Native
+  without adapters: their recompiled callers (never seen) still call the
+  originals; commands 10, 13, 14 read in full; `MakeModel` and
+  `FitSelectedCar` Native, removed by reading `generated/` (no attract
+  race reaches the front end); harness masks for the originals' saves
+  in `tuning_refresh`, `car_makers`, `type67_modes`.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

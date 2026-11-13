@@ -179,8 +179,13 @@ file's history. What's left to see in a drive, from every run:
   `SetPaintGradients`, `SetLightKind0Bars`, `SetLightKind1Bar`) with
   what they unblock (`RefreshInterior`, commands 10, 13, 14), and
   `MakeModel`'s and `FitSelectedCar`'s native guest callers made
-  direct; their lines deleted from `leads.md`. Migration agent
-  running.
+  direct; their lines deleted from `leads.md`. Migrated
+  bc2ed8af..0f0b959d: the four blockers, `RefreshInterior` and commands
+  10, 13, 14 Native (no adapters); `MakeModel`'s and
+  `FitSelectedCar`'s callers direct, both adapters removed (Native);
+  every harness 0 differing, races 29 and 23 s at 40 (the harnesses'
+  time), 0 errors; a lead added (`sub_82208738`'s adapter); no
+  subagents. Validation agent running.
 
 ## Done
 
