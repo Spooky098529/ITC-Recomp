@@ -506,6 +506,10 @@ set(ITC_SOURCES
     src/type2_dialog/pages.cpp
     src/type2_dialog/handlers.cpp
     src/type2_dialog/init.cpp
+    src/hooks/power_graph_screen.cpp
+    src/power_graph_screen/handlers.cpp
+    src/power_graph_screen/pages.cpp
+    src/power_graph_screen/steps.cpp
     src/hooks/user_info.cpp
     src/user_info/handlers.cpp
     src/user_info/pages.cpp
@@ -810,6 +814,7 @@ set(ITC_SOURCES
     src/harnesses/type2_screens.cpp
     src/harnesses/save_screen.cpp
     src/harnesses/type2_dialog.cpp
+    src/harnesses/power_graph_screen.cpp
     src/harnesses/garage_screen.cpp
     src/harnesses/tuning_machine.cpp
     src/harnesses/race_menu.cpp

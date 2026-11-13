@@ -327,5 +327,6 @@ void TodaysResult(Context& h);
 void NetworkMode(Context& h);
 // The race's end (src/harnesses/race_end.cpp).
 void RaceEnd(Context& h);
+void PowerGraphScreen(Context& h);
 
 }  // namespace harness
