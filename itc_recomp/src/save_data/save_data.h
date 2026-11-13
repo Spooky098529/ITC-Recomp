@@ -68,6 +68,11 @@ uint32_t OptionsSetDefaults(uint8_t* base, uint32_t options);
 // original leaves it: the last CourseRecord::Reset's.
 uint32_t CourseRecordsReset(uint8_t* base, uint32_t records);
 
+// sub_82105BF8 CourseRecords::Of: the record of a pair of words at `pair`
+// {course, traffic}: `records` + 20 + 408 x (course x 2 + traffic), in the
+// original's 64-bit arithmetic (r3 both halves). A leaf.
+uint64_t CourseRecordsOf(uint8_t* base, uint64_t records, uint32_t pair);
+
 // The players' save data slots (SaveData::Of reads them).
 constexpr uint32_t kSlots = 0x826C5B58;
 constexpr uint32_t Slot(uint32_t player) { return kSlots + (player << 2); }

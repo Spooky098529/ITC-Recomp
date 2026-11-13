@@ -106,6 +106,37 @@ void Getter(Context& h, const Block& block, const char* name, GuestFunction reco
   results.Report();
 }
 
+// CourseRecords::Of: r3 any word (both halves), r4 a pair of words in the
+// block: course and traffic in play's ranges (0 to 10, 0 to 1) or any words.
+// r3, r10 and r11 (both halves) compared.
+void CourseRecordsOf(Context& h, const Block& block) {
+  Results results("CourseRecords::Of (sub_82105BF8)");
+  for (int c = 0; c < 8; c++) {
+    const uint32_t pair = block.address + 4 * h.random.Below(64);
+    const bool any = c >= 6;
+    const uint32_t course = any ? uint32_t(h.random.Next()) : h.random.Below(11);
+    const uint32_t traffic = any ? uint32_t(h.random.Next()) : h.random.Below(2);
+    const uint64_t records = h.random.Below(2) == 0 ? h.random.Next() : block.address;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      guest::StoreU32(h.base, pair, course);
+      guest::StoreU32(h.base, pair + 4, traffic);
+      t.r3.u64 = records;
+      t.r4.u64 = pair;
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_82105BF8 : hooks::SaveDataCourseRecordsOf)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      for (const uint64_t r : {t.r3.u64, t.r10.u64, t.r11.u64}) {
+        out[v].Word(uint32_t(r));
+        out[v].Word(uint32_t(r >> 32));
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 // SaveData::Delete on a slot in the scratch area (the player number picked so
 // that the slot's address lands there, so the game's slots aren't touched),
 // holding 0 or a block from operator new's plain C++ (each version its own).
@@ -433,6 +464,7 @@ void SaveData(Context& h) {
              hooks::SaveDataOptionsSetDefaults, 284, 12);
   OnePointer(h, block, "CourseRecords::Reset (sub_82105D08)", __imp__sub_82105D08,
              hooks::SaveDataCourseRecordsReset, 20 + 22 * 408, 12);
+  CourseRecordsOf(h, block);
   Delete(h);
   Create(h);
   MenuListInit(h);

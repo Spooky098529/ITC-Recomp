@@ -115,7 +115,14 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "SetTitle sub_822433D8, SetDetails sub_82243308 (MenuList::Init's plain C++ where "
               "it frees natively; UiMovie::ClearText guest calls), ShowMarks sub_82243448, "
               "ItemInfo sub_82242FA0 (memcpy's plain C++), ~Type7ListScreen sub_82242EC8 and "
-              "DeletingDestructor sub_82242FC8 natively instead of "
+              "DeletingDestructor sub_82242FC8; the node screen's NodeScreen::Show "
+              "sub_82259CA0, Draw sub_8225A1B8 and Update sub_8225A2C0 (their page and step "
+              "tables built in .data as the originals do), Page2 sub_82259D80, Page4 "
+              "sub_822590E8, Page5 sub_82259328, Step0 sub_82259EC0, Step1 sub_82259680, Step2 "
+              "sub_82259750, ShowSelection sub_82259A78, OnToggleMoved sub_82259B70, Refresh "
+              "sub_822599B0, ShowRecords sub_82259410 (SaveData::Of's and CourseRecords::Of's "
+              "plain C++), SetArrows sub_82259368, LoadItem sub_82259050, ~NodeScreen "
+              "sub_82259948 and DeletingDestructor sub_8225A168 natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -129,28 +136,33 @@ ts::Calls Type67ScreensCalls(PPCContext& ctx, uint8_t* base) {
   calls.native_heap = NativeHeapActive();
   calls.set_r4 = [&ctx](uint64_t r4) { ctx.r4.u64 = r4; };
   const auto call_set = calls.call_set;
-  calls.set_text = [&ctx, base, call_set](uint32_t frame, uint32_t lr, uint32_t movie,
-                                          uint32_t sub_scene, uint32_t child,
-                                          uint32_t id) -> uint64_t {
+  calls.set_text_args = [&ctx, base, call_set](uint32_t frame, uint32_t lr, uint32_t movie,
+                                               uint32_t sub_scene, uint32_t child, uint32_t id,
+                                               const uint64_t varargs[4]) -> uint64_t {
     if (Type67TextsNative(base)) {
-      static constexpr uint64_t kNoArguments[4] = {0, 0, 0, 0};
       const uint64_t stack = ctx.r1.u64, link = ctx.lr;
       ctx.fpscr.disableFlushMode();
       std::optional<uint32_t> r3;
       {
         FormatGuestCalls format(ctx, base);
-        r3 = ui_movies::SetText(base, format.get(), frame, movie, sub_scene, child, id,
-                                kNoArguments);
+        r3 = ui_movies::SetText(base, format.get(), frame, movie, sub_scene, child, id, varargs);
       }
       ctx.r1.u64 = stack;
       ctx.lr = link;
       if (r3) return *r3;
     }
-    // The original (through its adapter) with r7 to r10 0.
-    ctx.r9.u64 = 0;
-    ctx.r10.u64 = 0;
-    const uint64_t args[6] = {movie, sub_scene, child, id, 0, 0};
+    // The original (through its adapter) with r7 to r10 from `varargs`.
+    ctx.r9.u64 = varargs[2];
+    ctx.r10.u64 = varargs[3];
+    const uint64_t args[6] = {movie, sub_scene, child, id, varargs[0], varargs[1]};
     return call_set(0x8211C1F8, args, 6, frame, lr);
+  };
+  calls.set_text = [set_text_args = calls.set_text_args](uint32_t frame, uint32_t lr,
+                                                         uint32_t movie, uint32_t sub_scene,
+                                                         uint32_t child,
+                                                         uint32_t id) -> uint64_t {
+    static constexpr uint64_t kNoArguments[4] = {0, 0, 0, 0};
+    return set_text_args(frame, lr, movie, sub_scene, child, id, kNoArguments);
   };
   calls.call8 = [&ctx, call_set](uint32_t function, const uint64_t args[8], uint32_t r1,
                                  uint32_t lr) -> uint64_t {
@@ -482,6 +494,36 @@ ITC_TS_STEP(Type7ListScreenDestruct,
 ITC_TS_STEP(Type7ListScreenDeletingDestruct,
             ts::Type7ListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
+// The node screen's show handler, tables, pages, steps, helpers and
+// destructors.
+ITC_TS_STEP(NodeScreenShow, ts::NodeScreenShow(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenDraw, ts::NodeScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenUpdate, ts::NodeScreenUpdate(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenPage2, ts::NodeScreenPage2(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenPage4, ts::NodeScreenPage4(base, ctx.r3.u64))
+ITC_TS_STEP(NodeScreenPage5,
+            ts::NodeScreenPage5(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenStep0, ts::NodeScreenStep0(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenStep1, ts::NodeScreenStep1(base, ctx.r3.u64, ctx.r1.u32, calls))
+void NodeScreenStep2(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const ts::Calls calls = Type67ScreensCalls(ctx, base);
+  ctx.r3.u64 = ts::NodeScreenStep2(base, ctx.r3.u64, ctx.r1.u32, calls);
+}
+ITC_TS_STEP(NodeScreenShowSelection,
+            ts::NodeScreenShowSelection(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenOnToggleMoved,
+            ts::NodeScreenOnToggleMoved(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenRefresh, ts::NodeScreenRefresh(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenShowRecords, ts::NodeScreenShowRecords(base, ctx.r3.u64, ctx.r4.u64,
+                                                            ctx.r5.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenSetArrows,
+            ts::NodeScreenSetArrows(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+ITC_TS_STEP(NodeScreenLoadItem, ts::NodeScreenLoadItem(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenDestruct, ts::NodeScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenDeletingDestruct,
+            ts::NodeScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -741,3 +783,26 @@ ITC_TYPE67_SCREENS(82243448, Type7ListScreenShowMarks)
 ITC_TYPE67_SCREENS(82242FA0, Type7ListScreenItemInfo)
 ITC_TYPE67_SCREENS(82242EC8, Type7ListScreenDestruct)
 ITC_TYPE67_SCREENS(82242FC8, Type7ListScreenDeletingDestruct)
+// The node screen: its show, draw and update handlers (through its
+// machine's transitions), its page and step tables' entries (through the
+// tables, which the recompiled Draw and Update build with the same words),
+// the helpers (from Type6NodeScreen::SetUpMenus, recompiled, and each
+// other) and the destructors (slot 0; ~NodeScreen from
+// Type6NodeScreen's destructors, recompiled). None seen in play.
+ITC_TYPE67_SCREENS(82259CA0, NodeScreenShow)
+ITC_TYPE67_SCREENS(8225A1B8, NodeScreenDraw)
+ITC_TYPE67_SCREENS(8225A2C0, NodeScreenUpdate)
+ITC_TYPE67_SCREENS(82259D80, NodeScreenPage2)
+ITC_TYPE67_SCREENS(822590E8, NodeScreenPage4)
+ITC_TYPE67_SCREENS(82259328, NodeScreenPage5)
+ITC_TYPE67_SCREENS(82259EC0, NodeScreenStep0)
+ITC_TYPE67_SCREENS(82259680, NodeScreenStep1)
+ITC_TYPE67_SCREENS(82259750, NodeScreenStep2)
+ITC_TYPE67_SCREENS(82259A78, NodeScreenShowSelection)
+ITC_TYPE67_SCREENS(82259B70, NodeScreenOnToggleMoved)
+ITC_TYPE67_SCREENS(822599B0, NodeScreenRefresh)
+ITC_TYPE67_SCREENS(82259410, NodeScreenShowRecords)
+ITC_TYPE67_SCREENS(82259368, NodeScreenSetArrows)
+ITC_TYPE67_SCREENS(82259050, NodeScreenLoadItem)
+ITC_TYPE67_SCREENS(82259948, NodeScreenDestruct)
+ITC_TYPE67_SCREENS(8225A168, NodeScreenDeletingDestruct)

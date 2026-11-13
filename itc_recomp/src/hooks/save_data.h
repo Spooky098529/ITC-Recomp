@@ -30,6 +30,9 @@ void SaveDataOptionsSetDefaults(PPCContext& ctx, uint8_t* base);
 // CourseRecords::Reset sub_82105D08: r3 = the records; r3 = the last
 // record + 332.
 void SaveDataCourseRecordsReset(PPCContext& ctx, uint8_t* base);
+// CourseRecords::Of sub_82105BF8: r3 = the records, r4 = {course,
+// traffic}; r3 = the record, r10 and r11 as the original leaves them.
+void SaveDataCourseRecordsOf(PPCContext& ctx, uint8_t* base);
 // SaveData::Delete sub_821055D8: r3 = the player; r3 = the old block. The
 // original unless --native_heap routes the game's heap to the allocation
 // layer, or where the block isn't the layer's.

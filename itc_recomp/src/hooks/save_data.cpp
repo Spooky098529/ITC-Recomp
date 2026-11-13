@@ -16,7 +16,7 @@ ITC_FLAG_BOOL(native_save_data, true, "ITC",
               "tables' getters sub_820CCCC0, sub_820CCCD0, sub_820CCCE0, sub_820CCCF0 and "
               "sub_820CCD00, Progress::SetDefaults sub_82113E60 (its copies through memcpy's "
               "plain C++), ControlMap::SetDefault sub_821058A8, Options::SetDefaults "
-              "sub_82105940, CourseRecords::Reset sub_82105D08, Players::ResetControllers "
+              "sub_82105940, CourseRecords::Reset sub_82105D08, CourseRecords::Of sub_82105BF8, Players::ResetControllers "
               "sub_8209F5E0 and, with --native_heap, SaveData::Delete sub_821055D8, "
               "SaveData::Create sub_821057C8, MenuList::Init sub_8220BAC0 and "
               "TitleScreen::ResetPlayer sub_82221D00; no adapters for the Stats functions, "
@@ -73,6 +73,13 @@ void SaveDataOptionsSetDefaults(PPCContext& ctx, uint8_t* base) {
 
 void SaveDataCourseRecordsReset(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = sd::CourseRecordsReset(base, ctx.r3.u32);
+}
+
+void SaveDataCourseRecordsOf(PPCContext& ctx, uint8_t* base) {
+  const uint64_t records = ctx.r3.u64;
+  ctx.r10.u64 = guest::LoadU32(base, ctx.r4.u32 + 4);
+  ctx.r3.u64 = sd::CourseRecordsOf(base, records, ctx.r4.u32);
+  ctx.r11.u64 = ctx.r3.u64 - 20;
 }
 
 void SaveDataDelete(PPCContext& ctx, uint8_t* base) {
@@ -181,6 +188,9 @@ ITC_SAVE_DATA_ADAPTER(820CCCD0, SaveDataTable3044)
 ITC_SAVE_DATA_ADAPTER(82113E60, SaveDataProgressSetDefaults)
 ITC_SAVE_DATA_ADAPTER(821055D8, SaveDataDelete)
 ITC_SAVE_DATA_ADAPTER(821057C8, SaveDataCreate)
+// CourseRecords::Of: from Race::PlaceRacers' recompiled branch (its plain
+// C++ declines there) and NodeScreen::ShowRecords' plain C++ (directly).
+ITC_SAVE_DATA_ADAPTER(82105BF8, SaveDataCourseRecordsOf)
 // Players::ResetControllers' adapter written out: the app_start_up
 // harness's recorder first.
 extern "C" REX_FUNC(sub_8209F5E0) {

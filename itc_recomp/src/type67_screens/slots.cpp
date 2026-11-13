@@ -133,6 +133,16 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return ColorListScreenStep8(base, r3, sp, calls);
     case 0x82255EB0:
       return ColorListScreenStep10(base, r3, sp, calls);
+    case 0x82259D80:
+      return NodeScreenPage2(base, r3, sp, calls);
+    case 0x822590E8:
+      return NodeScreenPage4(base, r3);
+    case 0x82259EC0:
+      return NodeScreenStep0(base, r3, sp, calls);
+    case 0x82259680:
+      return NodeScreenStep1(base, r3, sp, calls);
+    case 0x82259750:
+      return NodeScreenStep2(base, r3, sp, calls);
     default:
       break;
   }
@@ -214,6 +224,10 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return Type7ListScreenShowMarks(base, r3, *r4, sp);
       case 0x82242FC8:
         return Type7ListScreenDeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x82259328:
+        return NodeScreenPage5(base, r3, *r4, sp, calls);
+      case 0x8225A168:
+        return NodeScreenDeletingDestruct(base, r3, *r4, sp, calls);
       default:
         break;
     }
@@ -313,6 +327,8 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82243308:
     case 0x82243448:
     case 0x82242FC8:
+    case 0x82259328:
+    case 0x8225A168:
       return has_r4;
     case 0x82243018:
     case 0x82243588:
@@ -419,6 +435,11 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82256AC0:
     case 0x82256030:
     case 0x82255EB0:
+    case 0x82259D80:
+    case 0x822590E8:
+    case 0x82259EC0:
+    case 0x82259680:
+    case 0x82259750:
       return true;
     default:
       return false;

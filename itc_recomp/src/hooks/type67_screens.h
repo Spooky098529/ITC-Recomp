@@ -234,4 +234,23 @@ void Type7ListScreenSetUpRace(PPCContext& ctx, uint8_t* base);
 void Type7ListScreenDestruct(PPCContext& ctx, uint8_t* base);
 void Type7ListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
+// The node screen.
+void NodeScreenShow(PPCContext& ctx, uint8_t* base);
+void NodeScreenDraw(PPCContext& ctx, uint8_t* base);
+void NodeScreenUpdate(PPCContext& ctx, uint8_t* base);
+void NodeScreenPage2(PPCContext& ctx, uint8_t* base);
+void NodeScreenPage4(PPCContext& ctx, uint8_t* base);
+void NodeScreenPage5(PPCContext& ctx, uint8_t* base);
+void NodeScreenStep0(PPCContext& ctx, uint8_t* base);
+void NodeScreenStep1(PPCContext& ctx, uint8_t* base);
+void NodeScreenStep2(PPCContext& ctx, uint8_t* base);
+void NodeScreenShowSelection(PPCContext& ctx, uint8_t* base);
+void NodeScreenOnToggleMoved(PPCContext& ctx, uint8_t* base);
+void NodeScreenRefresh(PPCContext& ctx, uint8_t* base);
+void NodeScreenShowRecords(PPCContext& ctx, uint8_t* base);
+void NodeScreenSetArrows(PPCContext& ctx, uint8_t* base);
+void NodeScreenLoadItem(PPCContext& ctx, uint8_t* base);
+void NodeScreenDestruct(PPCContext& ctx, uint8_t* base);
+void NodeScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

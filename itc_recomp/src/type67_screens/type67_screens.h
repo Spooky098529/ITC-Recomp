@@ -43,6 +43,11 @@ struct Calls : type67_modes::Calls {
   std::function<uint64_t(uint32_t frame, uint32_t lr, uint32_t movie, uint32_t sub_scene,
                          uint32_t child, uint32_t id)>
       set_text;
+  // UiMovie::SetText as set_text with r7 to r10 from `varargs` (the calls
+  // that set some of them; the user's call: 0 for those they leave unset).
+  std::function<uint64_t(uint32_t frame, uint32_t lr, uint32_t movie, uint32_t sub_scene,
+                         uint32_t child, uint32_t id, const uint64_t varargs[4])>
+      set_text_args;
   // A guest call with r3 to r10 from `args` (MenuList::Init's adapter where
   // its plain C++ can't free the old block), from the frame at `r1`
   // returning to `lr`. Its r3.
@@ -905,5 +910,62 @@ uint64_t Type7ListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const 
 // operator delete (a guest call) when bit 0 of `flags` is set. r3.
 uint64_t Type7ListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
                                          const Calls& calls);
+
+// --- The node screen (node_screen.cpp; NodeScreen, Type6NodeScreen's base:
+// state +10064, movie +10100, the page block +10104 (page, page after, page
+// before, step, step queued, +10128 the step's first-call word), the list
+// +10132 and the toggle +10204; the paired node table at +0) ---
+
+constexpr uint32_t kNodeScreenVtable = 0x820116B8;
+
+// sub_82259CA0 NodeScreen::Show ((4, 1); 128): Refresh, the title and two
+// texts on [+10100] (UiMovie::SetText with 322, 0 and 1), page 2 after step
+// 0, slot 15 (+60) with r4. Slot 15's r3.
+uint64_t NodeScreenShow(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                        const Calls& calls);
+// sub_8225A1B8 NodeScreen::Draw ((5, 1); 160): the page table at 0x82816078
+// (guard 0x828160A8) built on first use, the page +10104 called with r4
+// unless it's -1. The page's r3.
+uint64_t NodeScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                        const Calls& calls);
+// sub_8225A2C0 NodeScreen::Update ((5, 0); 144): nothing when [+10100] < 0;
+// UiMovie::Run(m, 0) when the step is -1; else the step table at 0x828160AC
+// (guard 0x828160C4) built on first use and the step +10116 called; when
+// done, the page block moves on. Its r3.
+uint64_t NodeScreenUpdate(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82259D80 NodeScreen::Page2 (112), sub_822590E8 Page4 (a leaf: page 5
+// once the screen fades' counts are 0), sub_82259328 Page5 (96: slot 6 with
+// r4, then +10064 = 9).
+uint64_t NodeScreenPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t NodeScreenPage4(uint8_t* base, uint64_t r3);
+uint64_t NodeScreenPage5(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                         const Calls& calls);
+// sub_82259EC0 NodeScreen::Step0 (128, the opening), sub_82259680 Step1
+// (112, the leaving: +10128 never set), sub_82259750 Step2 (176, the list
+// moved). Whether done.
+uint64_t NodeScreenStep0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t NodeScreenStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t NodeScreenStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82259A78 NodeScreen::ShowSelection (128), sub_82259B70 OnToggleMoved
+// (128), sub_822599B0 Refresh (112), sub_82259410 ShowRecords (160; r4 the
+// course, r5 the traffic: the ten records' times and texts from
+// CourseRecords::Of, the course's texture), sub_82259050 LoadItem (128: slot
+// 4 into its frame, the pairs at +428 to +452). Their r3.
+uint64_t NodeScreenShowSelection(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t NodeScreenOnToggleMoved(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t NodeScreenRefresh(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t NodeScreenShowRecords(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5,
+                               uint32_t sp, const Calls& calls);
+uint64_t NodeScreenLoadItem(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82259368 NodeScreen::SetArrows (128): the arrow `which` (0: +10396,
+// else +10400) on sub-scene +10276 gets +108 = +10536 (`on`) or +10540.
+uint64_t NodeScreenSetArrows(uint8_t* base, uint64_t r3, uint32_t which, uint32_t on,
+                             uint32_t sp);
+// sub_82259948 NodeScreen::~NodeScreen (96): its vtable, MenuList::Release
+// on +10204 and +10132, ~NodeTable. r3. sub_8225A168 DeletingDestructor
+// (112): the destructor, operator delete when bit 0 of `flags` is set. r3.
+uint64_t NodeScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t NodeScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                    const Calls& calls);
 
 }  // namespace type67_screens

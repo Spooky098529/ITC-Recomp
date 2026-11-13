@@ -318,6 +318,14 @@ uint32_t CourseRecordsReset(uint8_t* base, uint32_t c) {
   return r3;
 }
 
+uint64_t CourseRecordsOf(uint8_t* base, uint64_t records, uint32_t pair) {
+  ITC_NATIVE_RUNNING("sub_82105BF8 CourseRecords::Of");
+  const uint32_t course = guest::LoadU32(base, pair), traffic = guest::LoadU32(base, pair + 4);
+  // The 64-bit arithmetic of the original (course << 1 in 32 bits).
+  const uint64_t index = uint64_t(uint32_t(course << 1)) + uint64_t(traffic);
+  return records + index * 408 + 20;
+}
+
 std::optional<uint32_t> SaveDataDelete(uint8_t* base, uint32_t player) {
   ITC_NATIVE_RUNNING("sub_821055D8 SaveData::Delete");
   const uint32_t slot = Slot(player);
