@@ -52,6 +52,7 @@ StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint
 // The node tables' cases (src/harnesses/type67_screen_tables.cpp).
 void Type67ScreenTables(Context& h);
 void Type67ListPart(Context& h);
+void Type67ListHelpers(Context& h);
 
 namespace {
 
@@ -758,6 +759,7 @@ void Type67Screens(Context& h) {
   Deleting(h);
   Type67ScreenTables(h);
   Type67ListPart(h);
+  Type67ListHelpers(h);
   Write(h.base, kFades, saved_fade_block.data(), kFadesBytes);
   for (int i = 0; i < 3; i++) guest::StoreU32(h.base, kFadeWords[i], saved_fades[i]);
 }

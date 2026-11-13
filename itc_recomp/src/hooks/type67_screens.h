@@ -128,4 +128,28 @@ void ListPartInnerStep0(PPCContext& ctx, uint8_t* base);
 void ListPartInnerStep1(PPCContext& ctx, uint8_t* base);
 void ListPartInnerStep2(PPCContext& ctx, uint8_t* base);
 
+// The list screens' shared helpers, item loaders and handlers.
+void ListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void ListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void NodeListScreenItemInfo(PPCContext& ctx, uint8_t* base);
+void NodeListScreenLoadItem(PPCContext& ctx, uint8_t* base);
+void ColorListScreenLoadItem(PPCContext& ctx, uint8_t* base);
+void ListScreenShowSelection(PPCContext& ctx, uint8_t* base);
+void ListScreenLoopItemNode(PPCContext& ctx, uint8_t* base);
+void ListScreenLoopSecondNode(PPCContext& ctx, uint8_t* base);
+void ListScreenLoopThirdNode(PPCContext& ctx, uint8_t* base);
+void ListScreenSetScrollText(PPCContext& ctx, uint8_t* base);
+void ListScreenClearScrollText(PPCContext& ctx, uint8_t* base);
+void ListScreenSetArrows(PPCContext& ctx, uint8_t* base);
+void ListScreenOnToggleMoved(PPCContext& ctx, uint8_t* base);
+void ListScreenShowToggle(PPCContext& ctx, uint8_t* base);
+void ListScreenSetIcons(PPCContext& ctx, uint8_t* base);
+void ListScreenSetUpMovie(PPCContext& ctx, uint8_t* base);
+void ListScreenShow(PPCContext& ctx, uint8_t* base);
+void ListScreenDraw(PPCContext& ctx, uint8_t* base);
+void ListScreenUpdate(PPCContext& ctx, uint8_t* base);
+void ListScreenSuspend(PPCContext& ctx, uint8_t* base);
+void ListScreenResume(PPCContext& ctx, uint8_t* base);
+void ListScreenOpen(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

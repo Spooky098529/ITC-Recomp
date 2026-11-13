@@ -80,12 +80,19 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message);
 uint64_t Slot(uint8_t* base, uint64_t object_r3, uint32_t slot, std::optional<uint64_t> r4,
               uint32_t frame, uint32_t lr, const Calls& calls);
 // Whether Slot runs the plain C++ for a slot holding `target` (given
-// whether the call sets r4), and that plain C++ (from the frame at `sp`, the
-// callee's entry r1, returning to `lr`; nullopt where it isn't one of ours).
-bool SlotIsNative(uint32_t target, bool has_r4);
+// whether the call sets r4, and r5), and that plain C++ (from the frame at
+// `sp`, the callee's entry r1, returning to `lr`; nullopt where it isn't one
+// of ours).
+bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5 = false);
 std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
                                    std::optional<uint64_t> r4, uint32_t sp, uint32_t lr,
-                                   const Calls& calls);
+                                   const Calls& calls,
+                                   std::optional<uint64_t> r5 = std::nullopt);
+// Slot with r5 set too (the list screens' slot 25, ItemInfo, takes the
+// info's address in r5): the plain C++ where the target is one of ours, else
+// a guest call with r3 to r5.
+uint64_t Slot5(uint8_t* base, uint64_t object_r3, uint32_t slot, uint64_t r4, uint64_t r5,
+               uint32_t frame, uint32_t lr, const Calls& calls);
 
 // MenuList::Release on the list at `list_r3` (r3 both halves) from `frame`
 // returning to `lr`: its plain C++ where it frees natively, else its
@@ -505,5 +512,96 @@ uint64_t ListPartInnerStep1(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp
                             const Calls& calls);
 uint64_t ListPartInnerStep2(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                             const Calls& calls);
+
+// --- The list screens' shared helpers, item loaders and handlers
+// (list_helpers.cpp; r3 the screen, m its UI movie: UiMovies::Find on
+// [+9680], the id at the function's frame's +80). UiMovies::Find,
+// UiMovie::FindNode, ShowNode, HideNode, SetNodeTexture and MenuList::
+// Selection and GetPreviousSelection through their plain C++;
+// UiMovie::FinishNamed, PlayNamed, LoopNamed, ResetPose, Run, ClearText,
+// ScrollText and sub_8211C5F8 guest calls to their overrides from the
+// original's frame with its return addresses; SetText through
+// Calls::set_text (r4 set to the sub-scene before it, as the original
+// leaves it for the calls after). The helpers call each other's plain C++.
+// r3 as the originals leave it. ---
+
+constexpr uint32_t kListScreenVtable = 0x82011218;
+
+// sub_82251EB8 ListScreen::~ListScreen: +0 = ListScreen's vtable.
+uint64_t ListScreenDestruct(uint8_t* base, uint64_t r3);
+// sub_82252248 ListScreen::DeletingDestructor (96-byte frame): the same,
+// then operator delete (a guest call) when bit 0 of `flags` is set. r3 the
+// screen.
+uint64_t ListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                    const Calls& calls);
+// sub_82256FE8 NodeListScreen::ItemInfo (slot 25): the three words at
+// `info` = -1. r3 left.
+uint64_t NodeListScreenItemInfo(uint8_t* base, uint64_t r3, uint32_t info);
+// sub_82257060 NodeListScreen::LoadItem (112; r4 the item): slot 25 with
+// r5 = its frame's +80, NodeTable::SetPairs on +10360 when +9672 is set,
+// then +9700 and +9704 = bit 0 of the info's +12 word (both: the
+// original's `(1 << i) != 0` test). SetPairs' r3, else slot 25's.
+uint64_t NodeListScreenLoadItem(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                const Calls& calls);
+// sub_82255238 ColorListScreen::LoadItem (144; r4 the item, r5 an index):
+// slot 25 into its frame's +80, ColorNodeTable::Set on +10432, +10908 = the
+// info's +20 + 4 r5 word when 0 <= r5 < the info's +8, else -1. Set's r3.
+uint64_t ColorListScreenLoadItem(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5,
+                                 uint32_t sp, const Calls& calls);
+
+// sub_822518B0 ListScreen::ShowSelection (144; r4 a menu list): +9900
+// replayed (FinishNamed, PlayNamed); the +108 words of +9724's nodes +9764
+// (the previous selection), +9768 (the selection), the +9784 entries of the
+// arrays at [+9772] and [+9776], and -1's +9760 (the selection).
+uint64_t ListScreenShowSelection(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
+// sub_82251A20 ListScreen::LoopItemNode, sub_82251B80 LoopSecondNode and
+// sub_82251AD0 LoopThirdNode (112; r4 a menu list): the named animation at
+// +9936, +9976 or +10016 (`table`) + 4 × the selection finished, played and
+// looped.
+uint64_t ListScreenLoopNode(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t table, uint32_t sp,
+                            const Calls& calls);
+// sub_82251D00 ListScreen::SetScrollText (128; r4 a string id, r5
+// scrolling): unless r4 is +10140, the text +9740/+9816 reset, set and
+// scrolled when both and r4 are >= 0, then +10140 = r4.
+uint64_t ListScreenSetScrollText(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5,
+                                 uint32_t sp, const Calls& calls);
+// sub_82251DA0 ListScreen::ClearScrollText (112): ClearText(m, +9740,
+// +9816) when both are >= 0; +10136 = 0, +10140 = -1.
+uint64_t ListScreenClearScrollText(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82251E10 ListScreen::SetArrows (128; `which` 0: +9752, else +9756;
+// `on`): the node's +108 = +9800 (on) or +9804.
+uint64_t ListScreenSetArrows(uint8_t* base, uint64_t r3, uint32_t which, uint32_t on,
+                             uint32_t sp);
+// sub_82252068 ListScreen::OnToggleMoved (128; r4 the two-item list).
+uint64_t ListScreenOnToggleMoved(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
+// sub_82252198 ListScreen::ShowToggle (128; r4 the two-item list).
+uint64_t ListScreenShowToggle(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
+// sub_82251C30 ListScreen::SetIcons (112): four textures and two nodes
+// hidden at +9732/+9812 + 0 to 5.
+uint64_t ListScreenSetIcons(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_82251EC8 ListScreen::SetUpMovie (112): ResetPose, the node table's
+// slot 1, +9748 shown or hidden, SetArrows(0, 0), (1, 0), SetIcons.
+uint64_t ListScreenSetUpMovie(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// sub_82251F98 ListScreen::Show (128; r4 the dispatcher): SetUpMovie, the
+// three titles, +9696 = 0, slot 22 (+88), slot 14 (+56) with r4.
+uint64_t ListScreenShow(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82251520 ListScreen::Draw (112): slot 23 (+92), slot 10 (+40), both
+// with r4.
+uint64_t ListScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_822517B8 ListScreen::Update (112): with a step (+9656 not -1) slot 24
+// (+96, r4 its frame's +80) and the page block moved on when it answers
+// nonzero; else UiMovie::Run(m, 0) and, when +9696 is set, the list part's
+// (+9676) slot 3 (+12) with r4.
+uint64_t ListScreenUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                          const Calls& calls);
+// sub_82251580 ListScreen::Suspend, sub_82251590 Resume (tail calls of
+// slots 16 and 17, `slot` +64 or +68) and sub_822517A0 Open (+9608 = 4,
+// then slot 15, +60): from `sp` returning to `lr`, r4 passed on.
+uint64_t ListScreenTail(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t slot, uint32_t sp,
+                        uint32_t lr, const Calls& calls);
 
 }  // namespace type67_screens

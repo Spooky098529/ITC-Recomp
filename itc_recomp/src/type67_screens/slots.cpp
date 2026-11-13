@@ -26,7 +26,13 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
 // (or needs an r4 the call leaves unset).
 std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
                                    std::optional<uint64_t> r4, uint32_t sp, uint32_t lr,
-                                   const Calls& calls) {
+                                   const Calls& calls, std::optional<uint64_t> r5) {
+  // The list screens' slot 25 (list_helpers.cpp), with the info's address
+  // in r5.
+  if (target == 0x82256FE8) {
+    if (!r5) return std::nullopt;
+    return NodeListScreenItemInfo(base, r3, uint32_t(*r5));
+  }
   // The list part's and its inner part's slots, and the inner's pages and
   // steps (list_part.cpp); r5, which only the guest fallbacks see, isn't
   // passed on (the plain C++ here doesn't read it).
@@ -89,6 +95,8 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return ListPartInnerStep1(base, r3, *r4, sp, calls);
       case 0x82252D38:
         return ListPartInnerStep2(base, r3, *r4, sp, calls);
+      case 0x82252248:
+        return ListScreenDeletingDestruct(base, r3, *r4, sp, calls);
       default:
         break;
     }
@@ -154,9 +162,11 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
   }
 }
 
-// Whether SlotNative runs `target` (given whether the call sets r4).
-bool SlotIsNative(uint32_t target, bool has_r4) {
+// Whether SlotNative runs `target` (given whether the call sets r4 and r5).
+bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
   switch (target) {
+    case 0x82256FE8:
+      return has_r5;
     case 0x82252610:
     case 0x82252658:
     case 0x822529B0:
@@ -166,6 +176,7 @@ bool SlotIsNative(uint32_t target, bool has_r4) {
     case 0x82252A88:
     case 0x82252A00:
     case 0x82252DF0:
+    case 0x82252248:
     case 0x82252BB8:
     case 0x82252C98:
     case 0x82252D38:
@@ -232,6 +243,17 @@ uint64_t Slot(uint8_t* base, uint64_t object_r3, uint32_t slot, std::optional<ui
   }
   const uint64_t args[6] = {object_r3, 0, 0, 0, 0, 0};
   return calls.call_set(target, args, 1, frame, lr);
+}
+
+uint64_t Slot5(uint8_t* base, uint64_t object_r3, uint32_t slot, uint64_t r4, uint64_t r5,
+               uint32_t frame, uint32_t lr, const Calls& calls) {
+  const uint32_t target = LoadU32(base, LoadU32(base, uint32_t(object_r3)) + slot);
+  if (SlotIsNative(target, true, true)) {
+    calls.set_r4(r4);
+    return *SlotNative(base, target, object_r3, r4, frame, lr, calls, r5);
+  }
+  const uint64_t args[6] = {object_r3, r4, r5, 0, 0, 0};
+  return calls.call_set(target, args, 3, frame, lr);
 }
 
 }  // namespace type67_screens

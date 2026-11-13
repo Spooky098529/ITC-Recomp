@@ -60,7 +60,19 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "(their slots and page and step tables to the plain C++, MenuList::Init's and "
               "Release's plain C++ where they free natively, MenuList::Update, Accepted and "
               "Cancelled, UiMovie::ResetPose, Run, FinishAll and FinishNamed guest calls, "
-              "PlayNamed, LoopLast and MenuSound::Play's plain C++) natively instead of "
+              "PlayNamed, LoopLast and MenuSound::Play's plain C++); the list screens' "
+              "ListScreen::ShowSelection sub_822518B0, LoopItemNode sub_82251A20, "
+              "LoopSecondNode sub_82251B80, LoopThirdNode sub_82251AD0, SetScrollText "
+              "sub_82251D00, ClearScrollText sub_82251DA0, SetArrows sub_82251E10, OnToggleMoved "
+              "sub_82252068, ShowToggle sub_82252198, SetIcons sub_82251C30, SetUpMovie "
+              "sub_82251EC8, ~ListScreen sub_82251EB8, DeletingDestructor sub_82252248, Show "
+              "sub_82251F98, Draw sub_82251520, Update sub_822517B8, Suspend sub_82251580, Resume "
+              "sub_82251590 and Open sub_822517A0, NodeListScreen::ItemInfo sub_82256FE8 and "
+              "LoadItem sub_82257060, ColorListScreen::LoadItem sub_82255238 (UiMovie::FindNode, "
+              "ShowNode, HideNode and SetNodeTexture's plain C++, FinishNamed, PlayNamed, "
+              "LoopNamed, ResetPose, Run, ClearText, ScrollText and sub_8211C5F8 guest calls, "
+              "SetText's plain C++ where the text setters are native, their slots to the plain "
+              "C++ where a slot holds one) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -257,6 +269,44 @@ ITC_TS_STEP(ListPartInnerStep1,
 ITC_TS_STEP(ListPartInnerStep2,
             ts::ListPartInnerStep2(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
+ITC_TS_STEP(ListScreenDestruct, ts::ListScreenDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(ListScreenDeletingDestruct,
+            ts::ListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeListScreenItemInfo, ts::NodeListScreenItemInfo(base, ctx.r3.u64, ctx.r5.u32))
+ITC_TS_STEP(NodeListScreenLoadItem,
+            ts::NodeListScreenLoadItem(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenLoadItem, ts::ColorListScreenLoadItem(base, ctx.r3.u64, ctx.r4.u64,
+                                                                 ctx.r5.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenShowSelection,
+            ts::ListScreenShowSelection(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenLoopItemNode,
+            ts::ListScreenLoopNode(base, ctx.r3.u64, ctx.r4.u64, 9936, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenLoopSecondNode,
+            ts::ListScreenLoopNode(base, ctx.r3.u64, ctx.r4.u64, 9976, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenLoopThirdNode,
+            ts::ListScreenLoopNode(base, ctx.r3.u64, ctx.r4.u64, 10016, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenSetScrollText, ts::ListScreenSetScrollText(base, ctx.r3.u64, ctx.r4.u64,
+                                                                 ctx.r5.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenClearScrollText,
+            ts::ListScreenClearScrollText(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenSetArrows,
+            ts::ListScreenSetArrows(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+ITC_TS_STEP(ListScreenOnToggleMoved,
+            ts::ListScreenOnToggleMoved(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenShowToggle,
+            ts::ListScreenShowToggle(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenSetIcons, ts::ListScreenSetIcons(base, ctx.r3.u64, ctx.r1.u32))
+ITC_TS_STEP(ListScreenSetUpMovie, ts::ListScreenSetUpMovie(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenShow, ts::ListScreenShow(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenDraw, ts::ListScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenUpdate, ts::ListScreenUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenSuspend, ts::ListScreenTail(base, ctx.r3.u64, ctx.r4.u64, 64, ctx.r1.u32,
+                                                  uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListScreenResume, ts::ListScreenTail(base, ctx.r3.u64, ctx.r4.u64, 68, ctx.r1.u32,
+                                                 uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListScreenOpen, ts::ListScreenTail(base, ctx.r3.u64, ctx.r4.u64, 60, ctx.r1.u32,
+                                               uint32_t(ctx.lr), calls))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -393,3 +443,29 @@ ITC_TYPE67_SCREENS(822528A8, ListPartInnerPage2)
 ITC_TYPE67_SCREENS(82252BB8, ListPartInnerStep0)
 ITC_TYPE67_SCREENS(82252C98, ListPartInnerStep1)
 ITC_TYPE67_SCREENS(82252D38, ListPartInnerStep2)
+// The list screens' shared helpers and item loaders (from the list screens'
+// pages, steps and slots, recompiled where not yet native, and the type 8
+// mode's lists), slot 0 and slot 25 of their vtables, and their handlers
+// (through their machines' transitions); never seen in play.
+ITC_TYPE67_SCREENS(82251EB8, ListScreenDestruct)
+ITC_TYPE67_SCREENS(82252248, ListScreenDeletingDestruct)
+ITC_TYPE67_SCREENS(82256FE8, NodeListScreenItemInfo)
+ITC_TYPE67_SCREENS(82257060, NodeListScreenLoadItem)
+ITC_TYPE67_SCREENS(82255238, ColorListScreenLoadItem)
+ITC_TYPE67_SCREENS(822518B0, ListScreenShowSelection)
+ITC_TYPE67_SCREENS(82251A20, ListScreenLoopItemNode)
+ITC_TYPE67_SCREENS(82251B80, ListScreenLoopSecondNode)
+ITC_TYPE67_SCREENS(82251AD0, ListScreenLoopThirdNode)
+ITC_TYPE67_SCREENS(82251D00, ListScreenSetScrollText)
+ITC_TYPE67_SCREENS(82251DA0, ListScreenClearScrollText)
+ITC_TYPE67_SCREENS(82251E10, ListScreenSetArrows)
+ITC_TYPE67_SCREENS(82252068, ListScreenOnToggleMoved)
+ITC_TYPE67_SCREENS(82252198, ListScreenShowToggle)
+ITC_TYPE67_SCREENS(82251C30, ListScreenSetIcons)
+ITC_TYPE67_SCREENS(82251EC8, ListScreenSetUpMovie)
+ITC_TYPE67_SCREENS(82251F98, ListScreenShow)
+ITC_TYPE67_SCREENS(82251520, ListScreenDraw)
+ITC_TYPE67_SCREENS(822517B8, ListScreenUpdate)
+ITC_TYPE67_SCREENS(82251580, ListScreenSuspend)
+ITC_TYPE67_SCREENS(82251590, ListScreenResume)
+ITC_TYPE67_SCREENS(822517A0, ListScreenOpen)

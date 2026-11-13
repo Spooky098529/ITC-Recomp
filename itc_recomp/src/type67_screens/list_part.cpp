@@ -63,11 +63,11 @@ uint64_t PlaySound(uint8_t* base, uint32_t cue, uint32_t frame, const Calls& cal
 // of ours, else a guest call. Its r3.
 uint64_t CallTarget(uint8_t* base, uint32_t target, uint64_t r3, std::optional<uint64_t> r4,
                     std::optional<uint64_t> r5, uint32_t frame, uint32_t lr, const Calls& calls) {
-  if (SlotIsNative(target, r4.has_value())) {
+  if (SlotIsNative(target, r4.has_value(), r5.has_value())) {
     if (r4) {
       calls.set_r4(*r4);
     }
-    return *SlotNative(base, target, r3, r4, frame, lr, calls);
+    return *SlotNative(base, target, r3, r4, frame, lr, calls, r5);
   }
   const uint64_t args[6] = {r3, r4.value_or(0), r5.value_or(0), 0, 0, 0};
   return calls.call_set(target, args, r5 ? 3 : (r4 ? 2 : 1), frame, lr);
