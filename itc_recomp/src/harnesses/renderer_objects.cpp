@@ -18,6 +18,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "renderer_objects/renderer_objects.h"
+#include "renderer_objects/thread.h"
 
 #include <fmt/format.h>
 
@@ -511,9 +512,152 @@ void SceneDraws(Context& h) {
   results.Report();
 }
 
+// The game's Thread class and the XAPI thread wrappers, on real kernel
+// threads: each version makes its own (their handles compared only as
+// none, -1 or a handle), running the empty sub_82106540 (Thread::Start's
+// object's slot 1, or CreateThread's entry) and ending at once. The calling
+// thread's last error is set to a pattern before each case, compared, and
+// put back after. The wrappers' failures with a handle that isn't one (the
+// object reference fails) and a processor above 5.
+constexpr uint32_t kEmpty = 0x82106540;
+
+uint32_t HandleKind(uint32_t handle) {
+  return handle == 0xFFFFFFFFu ? 0xFFFFFFFFu : handle == 0 ? 0 : 1;
+}
+
+void Threads(Context& h) {
+  const uint32_t error_slot = Load(h.base, h.ctx.r13.u32 + 256) + 352;
+  const uint32_t saved_error = Load(h.base, error_slot);
+  const uint32_t thread = RendererAt(h);  // Thread::Thread's
+  auto error_out = [&](Outputs& out) { out.Word(Load(h.base, error_slot)); };
+  auto error_in = [&] { Store(h.base, error_slot, 0x5A5A5A5A); };
+  {
+    Results results("Thread::Thread (sub_8258DE88)");
+    for (int c = 0; c < 10; c++) {
+      Case(
+          h, results, [&](Blocks&) { RandomScratch(h); },
+          [&](PPCContext& t) { t.r3.u64 = thread; }, __imp__sub_8258DE88, hooks::ThreadConstruct,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32);
+            RendererOut(h, out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The thread object and r4's object in a block of their own, never
+    // freed (the threads read them after the case: Thread::Start finds the
+    // object at the thread's +8 and calls its slot 1, the empty function):
+    // the thread at +0 (its vtable that of the object at +64, whose vtable
+    // is at +96). r4 0 or the object; processor 0 to 5, or 6 now and then
+    // (XSetThreadProcessor fails); the priority index 0 to 4. The thread's
+    // words are compared with the block's address taken off.
+    Results results("Thread::Begin (sub_8258DF18)");
+    for (int c = 0; c < 16; c++) {
+      uint32_t block = 0;
+      Case(
+          h, results,
+          [&](Blocks&) {
+            RandomScratch(h);
+            block = memory::Alloc(256, 0);
+            for (uint32_t at = 0; at < 64; at += 4) {
+              Store(h.base, block + at, uint32_t(h.random.Next()));
+            }
+            Store(h.base, block + 64, block + 96);
+            for (uint32_t slot = 0; slot < 8; slot++) {
+              Store(h.base, block + 96 + 4 * slot, kEmpty);
+            }
+            Store(h.base, block + 0, block + 96);
+            Store(h.base, h.data + 96, c % 8 == 7 ? 6 : h.random.Below(6));
+            Store(h.base, h.data + 100, h.random.Below(5));
+            error_in();
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = block;
+            t.r4.u64 = c % 2 == 0 ? 0 : block + 64;
+            t.r5.u64 = h.data + 96;
+            t.r6.u64 = h.data + 100;
+          },
+          __imp__sub_8258DF18, hooks::ThreadBegin,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32);
+            for (uint32_t at = 0; at < 64; at += 4) {
+              const uint32_t word = Load(h.base, block + at);
+              out.Word(at == ro::kThreadHandle ? HandleKind(word)
+                       : word - block < 256 ? 0xB0000000u + (word - block)
+                                             : word);
+            }
+            error_out(out);
+            RendererOut(h, out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("CreateThread (sub_825BA380)");
+    for (int c = 0; c < 8; c++) {
+      Case(
+          h, results, [&](Blocks&) { RandomScratch(h); error_in(); },
+          [&](PPCContext& t) {
+            t.r3.u64 = 0;
+            t.r4.u64 = 0;
+            t.r5.u64 = kEmpty;
+            t.r6.u64 = h.random.Next();
+            t.r7.u64 = 0;  // not suspended: the thread ends at once
+            t.r8.u64 = c < 2 ? 0xFFFFFFFFu : h.random.Below(6);
+            t.r9.u64 = c % 2 == 0 ? 0 : h.data + 96;
+          },
+          __imp__sub_825BA380, hooks::CreateThreadStep,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(HandleKind(t.r3.u32));
+            out.Word(Load(h.base, h.data + 96) != 0xCDCDCDCDu ? 1 : 0);  // an id stored
+            Store(h.base, h.data + 96, 0);
+            error_out(out);
+            RendererOut(h, out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // A handle that isn't one: the object reference fails.
+  const uint32_t bad = 0x0BAD0000;
+  struct Failure {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Failure failures[] = {
+      {"SetThreadPriority (sub_822977B0)", __imp__sub_822977B0, hooks::SetThreadPriorityStep},
+      {"XSetThreadProcessor (sub_82297888)", __imp__sub_82297888, hooks::XSetThreadProcessorStep},
+      {"ResumeThread (sub_825BA118)", __imp__sub_825BA118, hooks::ResumeThreadStep},
+  };
+  for (const Failure& f : failures) {
+    Results results(f.name);
+    for (int c = 0; c < 8; c++) {
+      Case(
+          h, results, [&](Blocks&) { RandomScratch(h); error_in(); },
+          [&](PPCContext& t) {
+            t.r3.u64 = bad + 4 * c;
+            t.r4.u64 = c % 2 == 0 ? h.random.Below(6) : 6 + h.random.Below(30);
+          },
+          f.recompiled, f.native,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32);
+            error_out(out);
+            RendererOut(h, out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Store(h.base, error_slot, saved_error);
+}
+
 }  // namespace
 
 void RendererObjects(Context& h) {
+  Threads(h);
   Interface(h);
   DrawFrames(h);
   SceneUpdates(h);

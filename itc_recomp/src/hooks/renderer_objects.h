@@ -41,4 +41,21 @@ void AppSceneUpdate(PPCContext& ctx, uint8_t* base);
 // r5 = the device; from a 112-byte frame; r3 the video output.
 void AppSceneDraw(PPCContext& ctx, uint8_t* base);
 
+// Thread::Thread sub_8258DE88: r3 = the thread object, left.
+void ThreadConstruct(PPCContext& ctx, uint8_t* base);
+// Thread::Begin sub_8258DF18: r3 = the thread object, r4 = the object to
+// run (0: the thread), r5 and r6 the processor's and priority index's
+// addresses; r3 as the original leaves it.
+void ThreadBegin(PPCContext& ctx, uint8_t* base);
+// The wrappers' register steps, for the harness (no adapters: only
+// Thread::Begin's plain C++ calls them in play): CreateThread sub_825BA380
+// (r4 the stack size, r5 the entry, r6 its parameter, r7 the flags, r8 the
+// processor, r9 the id's address), SetThreadPriority sub_822977B0 (r3 a
+// handle, r4 a priority), XSetThreadProcessor sub_82297888 (r3 a handle, r4
+// a processor) and ResumeThread sub_825BA118 (r3 a handle); r3 the answer.
+void CreateThreadStep(PPCContext& ctx, uint8_t* base);
+void SetThreadPriorityStep(PPCContext& ctx, uint8_t* base);
+void XSetThreadProcessorStep(PPCContext& ctx, uint8_t* base);
+void ResumeThreadStep(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

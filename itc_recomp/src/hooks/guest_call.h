@@ -7,6 +7,19 @@
 
 namespace guest_call {
 
+// General register `reg` of `ctx`. The context doesn't keep them in number
+// order (r3 comes first, then r0 to r2, then r4 onward), so they can't be
+// indexed from r0 or r3.
+inline PPCRegister& Gpr(PPCContext& ctx, int reg) {
+  switch (reg) {
+    case 0: return ctx.r0;
+    case 1: return ctx.r1;
+    case 2: return ctx.r2;
+    case 3: return ctx.r3;
+    default: return (&ctx.r4)[reg - 4];
+  }
+}
+
 // Makes a frame of `frame_bytes` below the stack pointer (with its back
 // chain), sets the link register to `return_address` (the recompiled call's),
 // runs `call(frame)` and pops the frame.

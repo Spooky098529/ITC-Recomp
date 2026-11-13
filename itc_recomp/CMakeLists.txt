@@ -602,6 +602,7 @@ set(ITC_SOURCES
     src/scene_models/apply.cpp
     src/hooks/renderer_objects.cpp
     src/renderer_objects/renderer_objects.cpp
+    src/renderer_objects/thread.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp

@@ -12,7 +12,9 @@
 #include "hooks/app_states.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/last_error.h"
 #include "renderer_objects/renderer_objects.h"
+#include "renderer_objects/thread.h"
 
 ITC_FLAG_DECLARE(bool, native_video_output);
 ITC_FLAG_DECLARE(bool, native_device_state);
@@ -30,7 +32,10 @@ ITC_FLAG_BOOL(native_renderer_objects, true, "ITC",
               "no adapter; the render queue's slots guest calls) and Scene::Draw sub_82098940 (with "
               "VideoOutput::BeginFrame sub_8258D958, no adapter: Device::SetShaderGprAllocation's "
               "plain C++ with --native_device_state; the render queue's replay a guest call, its "
-              "wraps kept) natively "
+              "wraps kept), Thread::Thread sub_8258DE88 and Thread::Begin sub_8258DF18 (with "
+              "CreateThread sub_825BA158 and sub_825BA380, SetThreadPriority sub_822977B0, "
+              "XSetThreadProcessor sub_82297888 and ResumeThread sub_825BA118, no adapters: "
+              "the kernel imports guest calls as the original makes them) natively "
               "instead of through the translated code (the same results; checked by "
               "--run_harnesses=renderer_objects)");
 
@@ -147,6 +152,93 @@ void AppSceneDraw(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = video_output;
 }
 
+namespace {
+
+ro::ThreadCalls ThreadCallsOn(PPCContext& ctx, uint8_t* base) {
+  ro::ThreadCalls calls;
+  calls.import = [&ctx, base](ro::Import import, std::initializer_list<uint64_t> args,
+                              uint32_t return_address) {
+    int reg = 3;
+    for (uint64_t arg : args) {
+      guest_call::Gpr(ctx, reg++).u64 = arg;
+    }
+    ctx.lr = return_address;
+    switch (import) {
+      case ro::Import::kExCreateThread:
+        __imp__ExCreateThread(ctx, base);
+        break;
+      case ro::Import::kObReferenceObjectByHandle:
+        __imp__ObReferenceObjectByHandle(ctx, base);
+        break;
+      case ro::Import::kKeSetBasePriorityThread:
+        __imp__KeSetBasePriorityThread(ctx, base);
+        break;
+      case ro::Import::kObDereferenceObject:
+        __imp__ObDereferenceObject(ctx, base);
+        break;
+      case ro::Import::kKeSetAffinityThread:
+        __imp__KeSetAffinityThread(ctx, base);
+        break;
+      case ro::Import::kNtResumeThread:
+        __imp__NtResumeThread(ctx, base);
+        break;
+    }
+    return ctx.r3.u32;
+  };
+  calls.in_frame = [&ctx, base](uint32_t bytes, uint32_t return_address,
+                                const std::function<void(uint32_t)>& body) {
+    uint64_t kept[18];
+    for (int i = 0; i < 18; i++) {
+      kept[i] = (&ctx.r14)[i].u64;
+    }
+    guest_call::InFrame(ctx, base, bytes, return_address, body);
+    for (int i = 0; i < 18; i++) {
+      (&ctx.r14)[i].u64 = kept[i];
+    }
+  };
+  calls.set_last_error_from_status = [&ctx, base](uint32_t status) {
+    last_error::SetFromStatus(base, ctx.r13.u32, status);
+  };
+  return calls;
+}
+
+}  // namespace
+
+void ThreadConstruct(PPCContext& ctx, uint8_t* base) { ro::ThreadConstruct(base, ctx.r3.u32); }
+
+void ThreadBegin(PPCContext& ctx, uint8_t* base) {
+  const uint32_t thread = ctx.r3.u32, object = ctx.r4.u32, processor = ctx.r5.u32,
+                 priority = ctx.r6.u32;
+  const ro::ThreadCalls calls = ThreadCallsOn(ctx, base);
+  ctx.r3.u64 = ro::ThreadBegin(base, thread, object, processor, priority, calls);
+}
+
+void CreateThreadStep(PPCContext& ctx, uint8_t* base) {
+  const uint32_t stack = ctx.r4.u32, entry = ctx.r5.u32, parameter = ctx.r6.u32,
+                 flags = ctx.r7.u32, processor = ctx.r8.u32, id = ctx.r9.u32;
+  const ro::ThreadCalls calls = ThreadCallsOn(ctx, base);
+  ctx.r3.u64 = ro::CreateThread(base, stack, entry, parameter, flags, processor, id, calls);
+}
+
+void SetThreadPriorityStep(PPCContext& ctx, uint8_t* base) {
+  const uint32_t handle = ctx.r3.u32;
+  const int32_t priority = ctx.r4.s32;
+  const ro::ThreadCalls calls = ThreadCallsOn(ctx, base);
+  ctx.r3.u64 = ro::SetThreadPriority(base, handle, priority, calls);
+}
+
+void XSetThreadProcessorStep(PPCContext& ctx, uint8_t* base) {
+  const uint32_t handle = ctx.r3.u32, processor = ctx.r4.u32;
+  const ro::ThreadCalls calls = ThreadCallsOn(ctx, base);
+  ctx.r3.u64 = uint64_t(int64_t(int32_t(ro::XSetThreadProcessor(base, handle, processor, calls))));
+}
+
+void ResumeThreadStep(PPCContext& ctx, uint8_t* base) {
+  const uint32_t handle = ctx.r3.u32;
+  const ro::ThreadCalls calls = ThreadCallsOn(ctx, base);
+  ctx.r3.u64 = uint64_t(int64_t(int32_t(ro::ResumeThread(base, handle, calls))));
+}
+
 }  // namespace hooks
 
 #define ITC_RENDERER_OBJECTS_ADAPTER(address, step) \
@@ -164,3 +256,5 @@ ITC_RENDERER_OBJECTS_ADAPTER(820922B8, RendererAddListener)
 ITC_RENDERER_OBJECTS_ADAPTER(82091FF0, RendererApplyRequest)
 ITC_RENDERER_OBJECTS_ADAPTER(82091A98, RendererCallListener)
 ITC_RENDERER_OBJECTS_ADAPTER(82098940, AppSceneDraw)
+ITC_RENDERER_OBJECTS_ADAPTER(8258DE88, ThreadConstruct)
+ITC_RENDERER_OBJECTS_ADAPTER(8258DF18, ThreadBegin)
