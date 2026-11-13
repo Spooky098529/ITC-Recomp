@@ -140,8 +140,13 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "play) UpdateSoloHold sub_821F7298, UpdatePreviewHold sub_821F7348, "
               "StepUnlockedSticker sub_821F73F8, ShowSlotNode sub_821F8070, PlaceStickerNode "
               "sub_821F8160, DecalImages::SetSlot sub_821F8868 and SetStickerEditTexts "
-              "sub_821F7F20 (the UI movies' FindNode by its plain C++, SetText through its "
-              "override with the varargs it leaves unset passed as 0) "
+              "sub_821F7F20, ShowSlotImage sub_821FA408, ShowStickerListImage sub_821FA460 and "
+              "the movie sides AnimateStickerAreas sub_821FA508, AnimateStickerOperate "
+              "sub_821F7518, AnimateStickerSlots sub_821F8A50, AnimateStickerEditMenu "
+              "sub_821F8D68, ShowStickerOrder sub_821FBA40 and ShowStickerPicker sub_821FBB60 "
+              "(the UI movies' FindNode by its plain C++; SetText, the named animations, "
+              "UiMovie::Unloop and GarageStage::Command through their overrides, the varargs "
+              "SetText calls leave unset passed as 0) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -896,6 +901,54 @@ void TuningPagesSetStickerEditTexts(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesShowSlotImage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::ShowSlotImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
+void TuningPagesShowStickerListImage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::ShowStickerListImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
+void TuningPagesShowStickerOrder(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = tp::ShowStickerOrder(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+void TuningPagesAnimateStickerAreas(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::AnimateStickerAreas(base, call, screen, show, sp);
+  });
+}
+
+void TuningPagesAnimateStickerOperate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::AnimateStickerOperate(base, call, screen, show, sp);
+  });
+}
+
+void TuningPagesAnimateStickerSlots(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::AnimateStickerSlots(base, call, screen, show, sp);
+  });
+}
+
+void TuningPagesAnimateStickerEditMenu(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::AnimateStickerEditMenu(base, call, screen, show, sp);
+  });
+}
+
+void TuningPagesShowStickerPicker(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::ShowStickerPicker(base, call, screen, show, sp);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -928,6 +981,14 @@ ITC_TUNING_PAGES(821F8070, TuningPagesShowSlotNode)
 ITC_TUNING_PAGES(821F8160, TuningPagesPlaceStickerNode)
 ITC_TUNING_PAGES(821F8868, TuningPagesSetSlot)
 ITC_TUNING_PAGES(821F7F20, TuningPagesSetStickerEditTexts)
+ITC_TUNING_PAGES(821FA408, TuningPagesShowSlotImage)
+ITC_TUNING_PAGES(821FA460, TuningPagesShowStickerListImage)
+ITC_TUNING_PAGES(821FA508, TuningPagesAnimateStickerAreas)
+ITC_TUNING_PAGES(821F7518, TuningPagesAnimateStickerOperate)
+ITC_TUNING_PAGES(821F8A50, TuningPagesAnimateStickerSlots)
+ITC_TUNING_PAGES(821F8D68, TuningPagesAnimateStickerEditMenu)
+ITC_TUNING_PAGES(821FBA40, TuningPagesShowStickerOrder)
+ITC_TUNING_PAGES(821FBB60, TuningPagesShowStickerPicker)
 
 // No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
 // native and call their plain C++; the register steps above are the

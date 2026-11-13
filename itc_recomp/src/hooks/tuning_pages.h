@@ -240,5 +240,18 @@ void TuningPagesShowSlotNode(PPCContext& ctx, uint8_t* base);
 void TuningPagesPlaceStickerNode(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetSlot(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetStickerEditTexts(PPCContext& ctx, uint8_t* base);
+// ShowSlotImage sub_821FA408 (r4 an id, r5 a slot), ShowStickerListImage
+// sub_821FA460 (r4 an id, r5 an index); the movie sides (r4 show):
+// AnimateStickerAreas sub_821FA508, AnimateStickerOperate sub_821F7518,
+// AnimateStickerSlots sub_821F8A50, AnimateStickerEditMenu sub_821F8D68,
+// ShowStickerOrder sub_821FBA40, ShowStickerPicker sub_821FBB60.
+void TuningPagesShowSlotImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowStickerListImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateStickerAreas(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateStickerOperate(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateStickerSlots(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateStickerEditMenu(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowStickerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowStickerPicker(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

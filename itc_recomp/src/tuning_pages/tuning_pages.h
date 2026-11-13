@@ -800,5 +800,36 @@ uint32_t SetSlot(uint8_t* base, uint32_t images, uint32_t sub, uint32_t first, u
 // SetText's. Needs flush-to-zero off.
 uint64_t SetStickerEditTexts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                              uint32_t sp);
+// sub_821FA408 TuningScreen::ShowSlotImage: SetSlot(screen + 10048, -1,
+// 2j + 19, 2j + 20, 2j + 190, 2j + 191, id, T[id] 1 ? 0 : 1), a tail call
+// from the caller's `sp`; its r3. sub_821FA460 ShowStickerListImage: the
+// same in sub-scene 30 for the list's index n (its row).
+uint32_t ShowSlotImage(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j, uint32_t sp);
+uint32_t ShowStickerListImage(uint8_t* base, uint32_t screen, uint32_t id, uint32_t n,
+                              uint32_t sp);
+// The movie sides (their rows), each `show` 0 or not; the named animations
+// through `call` (their overrides) with the originals' return addresses,
+// the varargs SetText calls leave unset passed as 0. Their r3 the last
+// call's. Need flush-to-zero off (PlaceStickerNode under some).
+// sub_821FA508 AnimateStickerAreas (state 38; GarageStage::Command first,
+// 144-byte frame), sub_821F7518 AnimateStickerOperate (state 40, 144),
+// sub_821F8A50 AnimateStickerSlots (state 39, 144), sub_821F8D68
+// AnimateStickerEditMenu (state 41, 160; SetStickerEditTexts by its plain
+// C++), sub_821FBB60 ShowStickerPicker (state 43, 160; its slot images and
+// StepUnlockedSticker by their plain C++).
+uint64_t AnimateStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                             uint32_t show, uint32_t sp);
+uint64_t AnimateStickerOperate(uint8_t* base, const tuning_screen::GuestCall& call,
+                               uint32_t screen, uint32_t show, uint32_t sp);
+uint64_t AnimateStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                             uint32_t show, uint32_t sp);
+uint64_t AnimateStickerEditMenu(uint8_t* base, const tuning_screen::GuestCall& call,
+                                uint32_t screen, uint32_t show, uint32_t sp);
+uint64_t ShowStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                           uint32_t show, uint32_t sp);
+// sub_821FBA40 ShowStickerOrder: state 42's movie side (its row), no guest
+// calls. 144-byte frame; r3 the movie's entry with `show` 0, else the last
+// ShowSlotNode's node.
+uint32_t ShowStickerOrder(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp);
 
 }  // namespace tuning_pages

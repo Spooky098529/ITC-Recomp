@@ -46,6 +46,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -2030,6 +2031,50 @@ void StickerCases(Context& h, const World& w) {
   Run(h, w,
       {"TuningScreen::SetStickerEditTexts", 60, __imp__sub_821F7F20,
        hooks::TuningPagesSetStickerEditTexts, 24, {{32, 64}, {112, 152}}, StickerFields});
+  // ShowSlotImage and ShowStickerListImage: tail calls into SetSlot, whose
+  // saves (80 bytes) are the top of the stack; r4 an id -1 to 198, r5 a slot
+  // or an index 0 to 4.
+  for (const auto& [name, recompiled, native] :
+       {std::tuple{"TuningScreen::ShowSlotImage", __imp__sub_821FA408,
+                   hooks::TuningPagesShowSlotImage},
+        std::tuple{"TuningScreen::ShowStickerListImage", __imp__sub_821FA460,
+                   hooks::TuningPagesShowStickerListImage}}) {
+    Run(h, w,
+        {name, 80, recompiled, native, 80, {}, [](PPCContext& t, Random& r, const World& w) {
+           StickerFields(t, r, w);
+           t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(200)) - 1));
+           t.r5.u64 = r.Below(5);
+         }});
+  }
+  // The movie sides: r4 show (0, 1, now and then any word); their saves
+  // and, below their frames, the callees' saves (the native callees don't
+  // write them) and the varargs SetText leaves in their parameter areas.
+  auto show = [](PPCContext& t, Random& r, const World& w) {
+    StickerFields(t, r, w);
+    t.r4.u64 = r.Below(3) == 0 ? 0 : r.Below(4) == 0 ? r.Next() : 1;
+  };
+  // AnimateStickerAreas: below its frame, GarageStage::Command's callees
+  // (ApplyPreset's) save the caller's registers deep down (seen at 408 and
+  // 764 below r1: the original's k in r29), dead words the native version's
+  // registers fill differently; left out with SetSlot's saves.
+  Run(h, w,
+      {"TuningScreen::AnimateStickerAreas", 100, __imp__sub_821FA508,
+       hooks::TuningPagesAnimateStickerAreas, 56, {{144, 800}}, show});
+  Run(h, w,
+      {"TuningScreen::AnimateStickerOperate", 100, __imp__sub_821F7518,
+       hooks::TuningPagesAnimateStickerOperate, 56, {{64, 96}, {144, 184}}, show});
+  Run(h, w,
+      {"TuningScreen::AnimateStickerSlots", 100, __imp__sub_821F8A50,
+       hooks::TuningPagesAnimateStickerSlots, 56, {{144, 184}}, show});
+  Run(h, w,
+      {"TuningScreen::AnimateStickerEditMenu", 100, __imp__sub_821F8D68,
+       hooks::TuningPagesAnimateStickerEditMenu, 64, {{80, 112}, {160, 224}, {272, 312}}, show});
+  Run(h, w,
+      {"TuningScreen::ShowStickerOrder", 100, __imp__sub_821FBA40,
+       hooks::TuningPagesShowStickerOrder, 48, {{144, 224}}, show});
+  Run(h, w,
+      {"TuningScreen::ShowStickerPicker", 100, __imp__sub_821FBB60,
+       hooks::TuningPagesShowStickerPicker, 64, {{80, 112}, {160, 240}}, show});
 }
 
 void TuningPagesMovie(Context& h) {

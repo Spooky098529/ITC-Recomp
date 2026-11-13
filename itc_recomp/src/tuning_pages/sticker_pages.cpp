@@ -124,6 +124,61 @@ void StoreDoubleword(uint8_t* base, uint32_t at, int64_t value) {
   Store(base, at + 4, uint32_t(value));
 }
 
+constexpr uint32_t kStageCommand = 0x82180108;  // GarageStage::Command(holder, command)
+constexpr uint32_t kStandHolder = 0x826D83E0;   // the stand scene's holder's word
+constexpr uint32_t kUnloopNamed = 0x8211DE30;   // UiMovie::UnloopNamed(movie, named)
+constexpr uint32_t kUnloop = 0x8211DE28;        // UiMovie::Unloop(movie, sub, index)
+constexpr uint32_t kGroups = 0x8200B5E8;        // G: 6 records of 12 bytes (+0 first id, +4 last)
+
+// The sticker menu [+10044]'s cursor.
+uint32_t Cursor(uint8_t* base, uint32_t s) { return Load(base, Load(base, s + 10044)); }
+
+// id(j): the placed sticker of slot j in the area: s + 33320 + 20a + 4j.
+uint32_t PlacedId(uint8_t* base, uint32_t s, uint32_t j) {
+  return Load(base, (((Load(base, s + kArea) + 1666) * 5 + j) << 2) + s);
+}
+
+// The calls on movie 14 the movie sides make from `frame`.
+struct Movie {
+  uint8_t* base;
+  const tuning_screen::GuestCall& call;
+  uint32_t movie;
+  uint32_t frame;
+  uint64_t Finish(uint64_t named, uint32_t lr) {
+    return call(tuning_screen::kFinishNamed, {movie, named}, frame, lr);
+  }
+  uint64_t Unloop(uint64_t named, uint32_t lr) {
+    return call(kUnloopNamed, {movie, named}, frame, lr);
+  }
+  // FinishNamed then UnloopNamed.
+  uint64_t Stop(uint64_t named, uint32_t finish_lr, uint32_t unloop_lr) {
+    Finish(named, finish_lr);
+    return Unloop(named, unloop_lr);
+  }
+  uint64_t Play(uint64_t named, uint32_t lr, uint64_t r5 = 1, uint64_t r6 = 0) {
+    return call(tuning_screen::kPlayNamed, {movie, named, r5, r6, 0, 0}, frame, lr);
+  }
+  uint64_t Loop(uint64_t named, uint32_t lr) {
+    return call(tuning_screen::kLoopNamed, {movie, named}, frame, lr);
+  }
+  // PlayNamed(named, 1, 0, 0, 0) then LoopNamed.
+  uint64_t PlayLooped(uint64_t named, uint32_t play_lr, uint32_t loop_lr) {
+    Play(named, play_lr);
+    return Loop(named, loop_lr);
+  }
+  // SetText(sub, child, id, argument) with r8 to r10 0.
+  uint64_t Text(uint64_t sub, uint64_t child, uint64_t id, uint64_t argument, uint32_t lr) {
+    return call(tuning_screen::kSetText, {movie, sub, child, id, argument, 0, 0, 0}, frame, lr);
+  }
+  // The help line (sub-scene 2, child 0): its scroll reset, SetText, and
+  // ScrollText(.., 1).
+  uint64_t Help(uint64_t id, const uint32_t (&lr)[3]) {
+    call(tuning_screen::kResetTextScroll, {movie, 2, 0}, frame, lr[0]);
+    Text(2, 0, id, 0, lr[1]);
+    return call(tuning_screen::kScrollText, {movie, 2, 0, 1}, frame, lr[2]);
+  }
+};
+
 // The hold toggles: `flag` 0 -> 1 with `action` held, 1 -> 0 without.
 uint32_t UpdateHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t s,
                     uint32_t sp, bool native_slots, uint32_t action, uint32_t flag,
@@ -311,6 +366,221 @@ uint64_t SetStickerEditTexts(uint8_t* base, const tuning_screen::GuestCall& call
   Store(base, frame + 52, uint32_t(bits));
   text(39, 452, bits, 0x821F8030);
   return text(40, int32_t(Load(base, screen + 30848)) == 0 ? 1 : 0, 0, 0x821F8054);
+}
+
+uint32_t ShowSlotImage(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FA408 TuningScreen::ShowSlotImage");
+  const uint32_t flag = OnSecondNode(base, id) ? 0 : 1;
+  return SetSlot(base, screen + 10048, kAll, (j << 1) + 19, (j + 10) << 1, (j + 95) << 1,
+                 (j << 1) + 191, id, flag, sp);
+}
+
+uint32_t ShowStickerListImage(uint8_t* base, uint32_t screen, uint32_t id, uint32_t n,
+                              uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FA460 TuningScreen::ShowStickerListImage");
+  const uint32_t flag = OnSecondNode(base, id) ? 0 : 1;
+  if (int32_t(n) == 0) {
+    return SetSlot(base, screen + 10048, 30, 14, 15, 173, 174, id, flag, sp);
+  }
+  return SetSlot(base, screen + 10048, 30, n * 5 + 14, (n + 3) * 5, (n + 87) << 1,
+                 (n << 1) + 175, id, flag, sp);
+}
+
+uint64_t AnimateStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                             uint32_t show, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FA508 TuningScreen::AnimateStickerAreas");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t entry = tuning_screen::MovieEntry(base, frame, kStickerMovie);
+  const uint32_t k = Cursor(base, s);
+  Movie m{base, call, Load(base, entry), frame};
+  uint64_t r3 =
+      call(kStageCommand, {Load(base, Load(base, kStandHolder)), uint64_t(int64_t(int32_t(k)) + 42)},
+           frame, 0x821FA558);
+  for (uint32_t i = 6; i < 14; i++) {
+    r3 = m.Stop(i, 0x821FA56C, 0x821FA578);
+  }
+  if (int32_t(show) == 0) {
+    return r3;
+  }
+  if (int32_t(Load(base, s + 33508)) != 0 && (int32_t(k) == 6 || int32_t(k) == 7)) {
+    m.Play(30, 0x821FA5CC, 0, 0);
+    m.Finish(30, 0x821FA5D8);
+    m.Play(31, 0x821FA5F4, 1, 1);
+    m.Finish(31, 0x821FA600);
+  } else {
+    const uint64_t named = uint64_t(int64_t(int32_t(k)) + 6);
+    m.PlayLooped(named, 0x821FA624, 0x821FA630);
+  }
+  for (uint32_t j = 0; j < 5; j++) {
+    r3 = ShowSlotImage(base, s, kAll, j, frame);
+  }
+  return r3;
+}
+
+uint64_t AnimateStickerOperate(uint8_t* base, const tuning_screen::GuestCall& call,
+                               uint32_t screen, uint32_t show, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F7518 TuningScreen::AnimateStickerOperate");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 144);
+  Movie m{base, call, Load(base, tuning_screen::MovieEntry(base, frame, kStickerMovie)), frame};
+  const uint32_t k = Cursor(base, s);
+  for (uint32_t i = 49; i < 53; i++) {
+    m.Stop(i, 0x821F7564, 0x821F7570);
+  }
+  if (int32_t(show) == 0) {
+    // l + 173 passed as Unloop's sub-scene index, as written.
+    m.Finish(uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 0x821F7594);
+    return call(kUnloop, {m.movie, uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 1},
+                frame, 0x821F75A8);
+  }
+  const uint64_t named = uint64_t(int64_t(int32_t(k)) + 49);
+  m.PlayLooped(named, 0x821F75C8, 0x821F75D4);
+  return m.Help(uint64_t(int64_t(int32_t(k)) + 827), {0x821F75E4, 0x821F75F8, 0x821F760C});
+}
+
+uint64_t AnimateStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                             uint32_t show, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F8A50 TuningScreen::AnimateStickerSlots");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 144);
+  Movie m{base, call, Load(base, tuning_screen::MovieEntry(base, frame, kStickerMovie)), frame};
+  const uint32_t k = Cursor(base, s);
+  uint64_t r3 = 0;
+  for (uint32_t i = 168; i < 173; i++) {
+    m.Stop(i, 0x821F8A9C, 0x821F8AA8);
+  }
+  m.Stop(46, 0x821F8AC0, 0x821F8ACC);
+  m.Stop(178, 0x821F8AD8, 0x821F8AE4);
+  m.Stop(44, 0x821F8AF0, 0x821F8AFC);
+  r3 = m.Stop(45, 0x821F8B08, 0x821F8B14);
+  if (int32_t(show) == 0) {
+    return r3;
+  }
+  if (int32_t(k) < 5) {
+    m.PlayLooped(uint64_t(int64_t(int32_t(k)) + 168), 0x821F8B44, 0x821F8B50);
+    m.Play(46, 0x821F8B6C);
+    m.Loop(46, 0x821F8BF0);
+  } else if (int32_t(Load(base, s + 30732)) <= 5) {
+    m.PlayLooped(178, 0x821F8B88, 0x821F8B94);
+    m.Play(44, 0x821F8BB0);
+    m.Loop(44, 0x821F8BF0);
+  } else {
+    m.PlayLooped(178, 0x821F8BBC, 0x821F8BC8);
+    m.Play(45, 0x821F8BE4);
+    m.Loop(45, 0x821F8BF0);
+  }
+  for (uint32_t j = 0; j < 5; j++) {
+    r3 = ShowSlotNode(base, s, PlacedId(base, s, j), j, k, frame);
+  }
+  return r3;
+}
+
+uint64_t AnimateStickerEditMenu(uint8_t* base, const tuning_screen::GuestCall& call,
+                                uint32_t screen, uint32_t show, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F8D68 TuningScreen::AnimateStickerEditMenu");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 160);
+  Movie m{base, call, Load(base, tuning_screen::MovieEntry(base, frame, kStickerMovie)), frame};
+  const uint32_t k = Cursor(base, s);
+  for (uint32_t i = 130; i < 135; i++) {
+    m.Stop(i - 38, 0x821F8DB8, 0x821F8DC4);
+    m.Stop(i, 0x821F8DD0, 0x821F8DDC);
+  }
+  m.Stop(98, 0x821F8DF4, 0x821F8E00);
+  m.Stop(99, 0x821F8E0C, 0x821F8E18);
+  m.Stop(136, 0x821F8E24, 0x821F8E30);
+  uint64_t r3 = m.Stop(137, 0x821F8E3C, 0x821F8E48);
+  if (int32_t(show) == 0) {
+    m.Finish(uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 0x821F8E60);
+    return m.Unloop(uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 0x821F8E70);
+  }
+  const int64_t ks = int32_t(k);
+  if (ks < 5) {
+    m.PlayLooped(uint64_t(ks + 92), 0x821F8E98, 0x821F8EA4);
+    m.Play(uint64_t(ks + 130), 0x821F8EC4);
+    m.Loop(uint64_t(ks + 130), 0x821F8F4C);
+  } else if (int32_t(Load(base, s + 30748)) <= 5) {
+    m.PlayLooped(98, 0x821F8EE0, 0x821F8EEC);
+    m.Play(136, 0x821F8F08);
+    m.Loop(136, 0x821F8F4C);
+  } else {
+    m.PlayLooped(99, 0x821F8F18, 0x821F8F24);
+    m.Play(137, 0x821F8F40);
+    m.Loop(137, 0x821F8F4C);
+  }
+  uint64_t id;
+  if (ks < 4) {
+    id = uint64_t(ks + 833);
+  } else if (ks == 4) {
+    id = 838;
+  } else {
+    id = int32_t(Load(base, s + 30748)) > 5 ? 840 : 839;
+  }
+  m.Help(id, {0x821F8F5C, 0x821F8F9C, 0x821F8FB0});
+  r3 = SetStickerEditTexts(base, call, s, frame);
+  return r3;
+}
+
+uint32_t ShowStickerOrder(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FBA40 TuningScreen::ShowStickerOrder");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t entry = tuning_screen::MovieEntry(base, frame, kStickerMovie);
+  const uint32_t movie = Load(base, entry);
+  if (int32_t(show) == 0) {
+    return entry;
+  }
+  const uint32_t k = Cursor(base, s);
+  SetShown(base, movie, 30, (Load(base, s + 30756) << 1) + 47, int32_t(k) > 0 ? 1 : 0);
+  SetShown(base, movie, 30, (Load(base, s + 30756) + 24) << 1, int32_t(k) < 4 ? 1 : 0);
+  uint32_t r3 = 0;
+  for (uint32_t j = 0; j < 5; j++) {
+    const uint32_t order = Load(base, s + 33480 + 4 * j);
+    const uint32_t id = Load(base, (((Load(base, s + kArea) + 1666) * 5 + order) << 2) + s);
+    ShowSlotImage(base, s, id, j, frame);
+    const uint32_t record = (Load(base, s + kArea) * 5 + Load(base, s + 33480 + 4 * j)) * 24 + s +
+                            32360;
+    PlaceStickerNode(base, s, id, j, record, frame);
+    r3 = ShowSlotNode(base, s, id, j, k, frame);
+  }
+  return r3;
+}
+
+uint64_t ShowStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                           uint32_t show, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FBB60 TuningScreen::ShowStickerPicker");
+  const uint32_t s = screen;
+  const uint32_t frame = Frame(base, sp, 160);
+  Movie m{base, call, Load(base, tuning_screen::MovieEntry(base, frame, kStickerMovie)), frame};
+  if (int32_t(show) == 0) {
+    m.Stop(uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 0x821FBBA8, 0x821FBBB8);
+    return m.Stop(159, 0x821FBBC4, 0x821FBBD0);
+  }
+  const uint32_t k = Cursor(base, s);
+  ShowSlotImage(base, s, k, Load(base, s + 30732), frame);
+  PlaceStickerNode(base, s, k, Load(base, s + 30732), s + 30832, frame);
+  for (uint32_t t = 0; t < 6; t++) {
+    const uint64_t i = StepUnlockedSticker(base, s, Cursor(base, s), uint64_t(int64_t(t) - 2));
+    const uint32_t flag = OnSecondNode(base, uint32_t(i)) ? 0 : 1;
+    SetSlot(base, s + 10048, 29, 22 + 4 * t, 23 + 4 * t, 159 + 2 * t, 160 + 2 * t, uint32_t(i),
+            flag, frame);
+  }
+  const uint32_t cursor = Cursor(base, s);
+  const int64_t c = int32_t(cursor);
+  m.Text(29, 1, uint64_t(c + 1447), 0, 0x821FBCA0);
+  // +30768: the first group whose last id isn't below the cursor, else 5.
+  Store(base, s + 30768, 5);
+  for (uint32_t g = 0; g < 6; g++) {
+    if (int32_t(cursor) <= int32_t(Load(base, kGroups + 12 * g + 4))) {
+      Store(base, s + 30768, g);
+      break;
+    }
+  }
+  m.Text(29, 9, uint64_t(int64_t(int32_t(Load(base, s + 30768))) + 1242), 0, 0x821FBCF0);
+  m.Text(29, 6, 449, 0, 0x821FBD04);
+  m.Text(29, 7, 8, uint64_t(c + 1), 0x821FBD1C);
+  return m.Text(29, 8, 8, 199, 0x821FBD34);
 }
 
 }  // namespace tuning_pages
