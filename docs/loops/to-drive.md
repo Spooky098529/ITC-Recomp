@@ -201,6 +201,31 @@ And the tuning pages' blockers (`itc_5322`/`itc_5325`, `itc_5323`, ok;
 - `sub_821EA460` TuningScreen::Command13
 - `sub_821EAFA0` TuningScreen::Command14
 
+Not in the attract race or the replay (`itc_5333`, `itc_5334`, ok; the
+type 6 and 7 modes' small pieces: the controller options' pages,
+leaving the type 6 and 7 screens; `DecalImages::UnloadAll` ran in the
+replay):
+
+- `sub_821BB290` ControllerOptions::StepSliders
+- `sub_821BB3B8` ControllerOptions::StepButtons
+- `sub_821BB590` ControllerOptions::StepAnalog
+- `sub_821C0238` ControllerOptions::SetMarkY
+- `sub_82249C20` GroupPair::~GroupPair
+- `sub_82249CB0` SingleGroup::SingleGroup
+- `sub_82249CC8` SingleGroup::Reset
+- `sub_82249BE8` PanelFade::In
+- `sub_8224CB18` MachineScreen::~MachineScreen
+- `sub_82230668` Type6PanelScreen::~Type6PanelScreen
+- `sub_82240168` Type7PanelScreen::~Type7PanelScreen
+- `sub_82230B00` Type6PanelScreen::DeletingDestructor
+- `sub_82231CC0` PanelGroup::~PanelGroup
+- `sub_82240348` PanelGroup::DeletingDestructor
+- `sub_8224EF08` PanelGroupBase::~PanelGroupBase
+- `sub_8224AC98` PanelSetInterface::DeletingDestructor
+- `sub_8224FB10` ListNode::~ListNode
+- `sub_8224B708` PanelSet::~PanelSet
+- `sub_8224AE60` PanelSetBase::~PanelSetBase
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

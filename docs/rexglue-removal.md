@@ -2895,6 +2895,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The stand's setters the tuning screen reaches (the colors, the sticker, the decal word, the aero set), with the tuning screen's `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`, `PreviewParts` | `stand-models.md`, `tuning-screen.md` | 9 new rows and 5 callers ours, 17 adapters removed | (`--native_stand_models`, the tuning screen's) |
 | 2026-11-13 | Cleanup lead (no mapping, not counted): the never-seen rows of the stand and the tuning screen (choices, aero, doors, light kits, accessories, calipers, axles, the refresh's paint and light kit pages) | `stand-models.md`, `tuning-screen.md` | 18 Native, a new row | (existing flags) |
 | 2026-11-13 | Cleanup leads (no mapping, not counted): the tuning pages' blockers (`IsSlotAvailable`, the paint and light kit bars) with `RefreshInterior` and commands 10, 13, 14; `MakeModel` and `FitSelectedCar` called directly, their adapters removed | `tuning-pages.md`, `tuning-screen.md`, `stand-models.md` | 8 Native, 2 adapters removed | (existing flags) |
+| 2026-11-13 | The type 6 and 7 modes' small pieces (the controller options' steps, the group pair's, panel screens' and panel sets' destructors, `SingleGroup`), with `DecalImages::UnloadAll` Native | `type6-type7-modes.md`, `type67-screens.md`, `car-list.md`, `archive.md` | 16 new rows and 3 blockers ours | (existing flags) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5533,3 +5534,12 @@ longer calls recompiled code); 17 adapters removed. The validation's
 harnesses took ~130 s of the 180. The boundary: unchanged. B7
 (`b7_status.py`): ours 6,114, work left 676 (Wrapped 51, with a row
 354, no row yet 271).
+
+**2026-11-13, the type 6 and 7 modes' small pieces (branch
+`b7-loop-13-11-26`, the forty-sixth run, its seventh subsystem, after
+cleanup leads over the stand's and tuning screen's never-seen rows and
+the tuning pages' blockers):** 16 new rows in `type6-type7-modes.md`,
+`type67-screens.md` and `car-list.md` and three blockers, none seen in
+play, ported by the 2026-11-12 call. The validation's harnesses take
+~131 s of the 180. The boundary: unchanged. B7 (`b7_status.py`): ours
+6,160, work left 676 (Wrapped 51, with a row 354, no row yet 271).

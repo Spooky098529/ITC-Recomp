@@ -210,9 +210,20 @@ file's history. What's left to see in a drive, from every run:
   ours (adapters kept: their other callers are recompiled or vtables),
   `DecalImages::UnloadAll` `sub_82208738`'s adapter removed (Native);
   every harness 0 differing, races 30-38 s at 40, 0 errors; no
-  subagents. Validation agent running.
+  subagents. Validated: `itc_5333` (race 47 s at 180, the harnesses
+  ~131 s; 0 errors, every harness 0 differing outside the expected
+  groups), 20 of 20 harness lines; `UnloadAll` ran in the replay
+  `itc_5334` (ok), 19 to drive. Recorded; subsystem 7 done.
+- Subsystem 8 of 10: the type 6 and 7 list screens' and node screen's
+  pages and steps (called through tables built on first use,
+  `type67-screens.md`), with the screen blocks' probable destructors
+  `sub_822367C0`, `sub_82246BE0`; none seen in play; their lines
+  deleted from `leads.md`. Mapping agent running.
 
 ## Done
+
+- The type 6 and 7 modes' small pieces: 16 rows and 3 blockers ours,
+  `UnloadAll` Native, f83e3ee2..6cb9126c; validated.
 
 - Cleanup leads (no mapping): the tuning pages' blockers with
   `RefreshInterior` and commands 10, 13, 14; `MakeModel` and
@@ -288,5 +299,6 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
 - After the sticker editor: ours 6100, work left 676 (wrapped 51,
   known 354, unknown 271).
 - After the stand's setters: ours 6114, work left 676.
+- After the type 6 and 7 small pieces: ours 6160, work left 676.
 
 ## Stopped
