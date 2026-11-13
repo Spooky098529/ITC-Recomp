@@ -5295,3 +5295,26 @@ overridden 109, Native 36, Dropped 27, never called 69, live 208.
 Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
 5,811, work left 838 (Wrapped 55, with a row 387, no row yet 396),
 from 840.
+
+**2026-11-12 to 13, the course scenery finished (branch
+`b7-loop-11-11-26`, the forty-fifth run, leads without mapping):**
+`Scenery::IsLoaded` (with `CourseSetup::WaitCourse` and `EndTick`,
+`race-loading.md`), the scenery's load and unload (`CourseSet::Load`,
+the area lights and models, `Scenery::Unload`, `Destroy`),
+`LocationScreen::PollLoad`, and the whole of `Scenery::Draw`'s group
+(the headlight projectors, `DrawArea`, `DrawSetLists`, the light groups,
+the billboards' record and draw, `Minimap::Draw`, `Scenery::Draw`
+itself inside its frame-state wrap, with the per-frame wraps of the
+texture animations and the minimap kept) made native; about 50 adapters
+removed across `course-scenery.md`, `sprites.md`, `minimap.md`,
+`scenery-lists.md`, `camera-modes.md`, `model-animation.md` and others.
+Frame dumps at 30 fps without interpolation were pixel-identical against
+the fallback flags. A harness fault on the way (a removed adapter
+exposing `ScenePools::GetB`'s frame in dead stack, 1fdeb678) is now a
+note for migration agents: after removing an adapter, run its callers'
+harnesses. Nothing ready is left in `course-scenery.md`; what's left
+waits on recompiled callers (`Race::DrawStep`, `CourseView::Draw`). The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+27, never called 69, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,831, work left 818 (Wrapped 52,
+with a row 370, no row yet 396), from 838.

@@ -171,9 +171,23 @@ file's history. What's left to see in a drive, from every run:
   differing, the callers' files' too; frame 600 at 30 fps without
   interpolation pixel-identical against the fallback; race 33 s at
   40, 0 errors; no subagents). Left: none ready in
-  `course-scenery.md`. Validation agent running.
+  `course-scenery.md`. Validated: `itc_5112` (race 54 s at 180, 0
+  errors, every harness 0 differing outside the expected groups;
+  harnesses ~124 s), 12 of 12 harness lines, one print added
+  (`Lights::FindNearest`, 8aa9f2af); all 12 ran in the race, none to
+  drive. Recorded.
+- Subsystem 4 of 10: the options screen's save side (pages 9 and 10,
+  categories 5 and 6: `sub_821C6468`, `sub_821BBC10`, `sub_821BC7B0`,
+  ..., all seen in play) with what's left of the save screens' lead
+  (`821BBD18`-`821C2620`, `82217E20`-`8221E908` outside
+  `race-screens.md`), the two leads taken together as the first says;
+  both lines deleted from `leads.md`. Mapping agent running.
 
 ## Done
+
+- `Scenery::Draw` (no mapping): 11 adapters removed,
+  7bf375c1..bd6bfc88; validated. The course scenery has nothing ready
+  left.
 
 - `Scenery::Draw`'s rest, part one (no mapping): the billboards, light
   groups, `DrawArea`, `Minimap::Draw`, 12 adapters removed,
