@@ -101,7 +101,9 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821FB6B0, sub_821FB8D8; src/tuning_pages/sticker_commands.cpp); "
               "its swatch color setter UiNode::SetRgb sub_821E7DA0; the stand setters never seen in play, "
               "SetCaliper sub_821DA330, SetAccessory sub_821CCBE8, RefitAxles sub_821DF9D0, "
-              "PreviewInteriorChoices sub_821E7E48 and PreviewLightKit sub_821CC930, no adapters) natively instead of through the "
+              "PreviewInteriorChoices sub_821E7E48 and PreviewLightKit sub_821CC930, and the refresh's pages "
+              "RefreshPaint sub_821F2110, RefreshLightKits sub_821F2378 and RefreshMovie14 sub_821F7A98, "
+              "no adapters) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
 

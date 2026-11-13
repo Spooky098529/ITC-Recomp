@@ -694,6 +694,20 @@ void TuningRefresh(Context& h) {
           Fill(base, frame - 8 - saves, saves, 0);
           Fill(base, frame - size + 40, 40, 0);
         }
+        // Since RefreshLightKits is native (B7 loop, 2026-11-13), states 21
+        // and 22 run PreviewLightKit's plain C++ and, under it,
+        // GarageStage::SetLightKit's, where the recompiled side runs their
+        // originals: PreviewLightKit's lr save under RefreshLightKits' frame,
+        // SetLightKit's f29 to f31 saves under PreviewLightKit's 112-byte
+        // frame and ScenePools::GetB's under SetLightKit's 176-byte one (its
+        // r30, r31 and lr saves, its back chain).
+        if (st == 21 || st == 22) {
+          const uint32_t kits = frame - 144, preview = kits - 112, light = preview - 176;
+          Fill(base, kits - 8, 4, 0);
+          Fill(base, preview - 24, 24, 0);
+          Fill(base, light - 24, 20, 0);
+          Fill(base, light - 112, 4, 0);
+        }
         // RefreshInterior's callee PreviewInteriorChoices (sub_821E7E48,
         // state 57) saves r23, which RefreshInterior doesn't set: the
         // refresh's (0x826D83E0 in the original).
@@ -988,6 +1002,31 @@ void TuningRefresh(Context& h) {
                {{3, 0}, {5, 1}, {4, 4}, {3, 1}, {5, 1}, {4, 4}, {3, 2}, {5, 1}, {4, 4},
                 {4, 0}, {4, 3}, {5, 0}, {5, 2}, {6, 0}, {1, 3}, {0, 0}, {2, 0}, {6, 3}},
                300);
+
+  // The pages never seen in play (B7 loop, 2026-11-13: RefreshPaint,
+  // RefreshLightKits, RefreshMovie14, RefreshInterior and their callees),
+  // a group of its own after state 8's: states 18 to 22 and 38 to 58 in
+  // turn (six rounds), the world as states 7's and 8's (the list pages'
+  // sub-scenes 28 to 33 real), the category and item at random as the
+  // first group's.
+  {
+    Random rp(0x5265667265736812ull);  // "Refresh", 18
+    Results resultsp("TuningScreen::Refresh (sub_821E3AD0) pages 18 to 58");
+    static constexpr uint32_t kPages[] = {18, 19, 20, 21, 22, 38, 45, 52,
+                                          53, 54, 55, 56, 57, 58};
+    constexpr uint32_t kPageCount = sizeof(kPages) / sizeof(kPages[0]);
+    for (int c = 0; c < int(6 * kPageCount); c++) {
+      const uint32_t state = kPages[uint32_t(c) % kPageCount];
+      const uint32_t category = rp.Below(10) == 0 ? 0xFFFFFFFFu : rp.Below(7);
+      const uint32_t count = category < 7 ? kItemCounts[category] : 10;
+      const uint32_t item = rp.Below(10) == 0 ? rp.Below(256) : rp.Below(count);
+      run(rp, resultsp, c, state, category, item, [&](uint32_t movie) {
+        LayTuningStandTires(base, block, rp);
+        LaySubScenes(base, sub_scenes, movie, rp);
+      });
+    }
+    resultsp.Report();
+  }
 
   // TuningScreen::Update (sub_821E6C50, src/tuning_screen/update.cpp), a
   // group of its own after the refresh's: the same world (the refresh runs

@@ -434,6 +434,7 @@ set(ITC_SOURCES
     src/tuning_screen/rows.cpp
     src/tuning_screen/refresh_menu.cpp
     src/tuning_screen/refresh_movie13.cpp
+    src/tuning_screen/refresh_pages.cpp
     src/tuning_screen/stats.cpp
     src/tuning_screen/refresh.cpp
     src/tuning_screen/refresh_level.cpp
@@ -1051,6 +1052,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/tuning_screen/stats.cpp src/tuning_screen/refresh.cpp
     src/tuning_screen/refresh_level.cpp src/tuning_screen/refresh_type.cpp
     src/tuning_screen/refresh_choice.cpp src/tuning_screen/commands.cpp
+    src/tuning_screen/refresh_pages.cpp
     src/tuning_machine/set_up.cpp
     src/tuning_machine/start.cpp
     src/tuning_machine/prices.cpp PROPERTIES

@@ -644,6 +644,26 @@ uint64_t PreviewInteriorChoices(uint8_t* base, const GuestCall& call, uint32_t s
 // `*f1` its f1 (left in the other states).
 uint64_t PreviewLightKit(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
                          std::optional<double>* f1);
+// --- The refresh's pages never seen in play (refresh_pages.cpp) ---
+
+// sub_821F2110 TuningScreen::RefreshPaint (state 18): movie 2's header
+// textures (3, 1) 6 and (3, 2) 34 with +9716 set, node (8, 1) hidden,
+// sub-scene 21's labels (SetNodeText 221 to 229, 4 and 5), its children 3's
+// and 4's child 4 +104 = 1. 112-byte frame below `sp`; r3 the last child.
+uint64_t RefreshPaint(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F2378 TuningScreen::RefreshLightKits (states 19 to 22): r3 = the
+// screen (all 64 bits). By the state: 19 the light kits' list (sub-scene
+// 36), 20 the kinds' (37) with the help line by +30500, 21 the neon edit
+// (sub-scene 23) and 22 the LED edit (24): their labels, PreviewLightKit's
+// plain C++ (`*f1` its), the eight swatches' colors and the help line by
+// +30508 or +30544. 144-byte frame below `sp`; r3 its last call's.
+uint64_t RefreshLightKits(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                          std::optional<double>* f1);
+// sub_821F7A98 TuningScreen::RefreshMovie14: movie 14's texts (0, 9) 9 with
+// +25116 and (0, 13) 8 with +25092, texture (0, 11) +25096, nodes (1, 2),
+// (1, 10), (1, 8), (1, 9) hidden, textures (1, 6) and (1, 7) 1. 112-byte
+// frame below `sp`; SetNodeTexture's r3.
+uint64_t RefreshMovie14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 // sub_821E7DA0 UiNode::SetRgb: the node's +56, +60, +64 = `r`, `g`, `b`. A
 // leaf.
 void SetRgb(uint8_t* base, uint32_t node, uint32_t r, uint32_t g, uint32_t b);
