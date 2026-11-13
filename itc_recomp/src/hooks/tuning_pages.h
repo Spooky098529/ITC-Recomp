@@ -217,5 +217,12 @@ void TuningPagesSetImageGroup(PPCContext& ctx, uint8_t* base);
 // HandleInput sub_821E6950 (r3 the screen, r4 Leave's object; its piece
 // sub_821E69B8 merged), the screen's input handler.
 void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base);
+// The sticker editor's set-up under InputItems (no adapters: only InputItems
+// calls them in play; the harness's steps): ResetStickerEditor sub_821F8440,
+// RestoreAreaDecals sub_821F6C90 (r4 the area) and LoadStickers
+// sub_821F86C0, r3 the screen.
+void TuningPagesResetStickerEditor(PPCContext& ctx, uint8_t* base);
+void TuningPagesRestoreAreaDecals(PPCContext& ctx, uint8_t* base);
+void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

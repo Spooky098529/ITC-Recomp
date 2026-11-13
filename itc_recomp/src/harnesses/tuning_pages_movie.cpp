@@ -35,6 +35,7 @@
 #include "base/log.h"
 #include "hooks/tuning_pages.h"
 #include "hooks/tuning_screen.h"
+#include "tuning_pages/tuning_pages.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
@@ -711,6 +712,17 @@ void ItemFields(PPCContext& t, Random& world_random, const World& w) {
     guest::StoreU32(base, menu + 64, 0);
     const uint32_t first = guest::LoadU32(base, menu + 12), last = guest::LoadU32(base, menu + 16);
     guest::StoreU32(base, menu + 0, first + r.Below(last - first + 1));
+  }
+  // The garage car's sticker records (LoadStickers' GarageDecal reads)
+  // without signaling NaNs (the originals' lfs and stfs quiet them, the
+  // host's float copies may not: the kVinyls precedent in tuning_pages.cpp).
+  for (uint32_t a = 0; a < 8; a++) {
+    for (uint32_t k = 0; k < 5; k++) {
+      const uint32_t g = tuning_pages::GarageDecal(base, w.screen(), a, k);
+      if (g != 0) {
+        QuietRange(base, g, 32);
+      }
+    }
   }
   HighWord(t, r);
 }
@@ -1963,7 +1975,26 @@ void TuningPagesMovie(Context& h) {
   // recorded.
   Run(h, w,
       {"TuningScreen::InputItems", 500, __imp__sub_821DFD48, hooks::TuningPagesInputItems, 40,
-       {{128, 192}, {236, 240}, {256, 272}}, ItemFields, true});
+       {{128, 224}, {236, 240}, {256, 272}, {304, 336}}, ItemFields, true});
+  // The sticker editor's set-up under InputItems (the item fields' world:
+  // the garage list, the cars' decal records): ResetStickerEditor a leaf;
+  // RestoreAreaDecals' __savegprlr_29 (32 bytes), r4 the area 0 to 7 (now
+  // and then with a high word: the original's 64-bit adds); LoadStickers'
+  // __savegprlr_26 and __savefpr_27 (96 bytes) and RestoreAreaDecals' saves
+  // below its frame (176 to 208), which its plain C++ doesn't write.
+  Run(h, w,
+      {"TuningScreen::ResetStickerEditor", 100, __imp__sub_821F8440,
+       hooks::TuningPagesResetStickerEditor, 0, {}, ItemFields});
+  Run(h, w,
+      {"TuningScreen::RestoreAreaDecals", 100, __imp__sub_821F6C90,
+       hooks::TuningPagesRestoreAreaDecals, 32, {},
+       [](PPCContext& t, Random& r, const World& w) {
+         ItemFields(t, r, w);
+         t.r4.u64 = r.Below(8);
+       }});
+  Run(h, w,
+      {"TuningScreen::LoadStickers", 200, __imp__sub_821F86C0, hooks::TuningPagesLoadStickers, 96,
+       {{176, 208}}, ItemFields});
   // MoveOption: state 8's fields (above); __savegprlr_28: 40 bytes.
   Run(h, w,
       {"TuningScreen::MoveOption", 300, __imp__sub_821D5610, hooks::TuningPagesMoveOption, 40, {},
@@ -2163,15 +2194,22 @@ void TuningPagesMovie(Context& h) {
       {"TuningScreen::InputLayerOrder", 800, __imp__sub_8220A1C8,
        hooks::TuningPagesInputLayerOrder, 80, {{176, 224}}, LayerOrderFields});
   // TuningScreen::Command21 (tuning_screen's plain C++, the update's
-  // command 21): the layer order's fields (the layer +30732 0 to 4 and the
-  // position +30756 -1 to 3: up to five moves either way, the work list's
-  // words and the image entries inside the screen). __savegprlr_27 (48
+  // command 21): the layer order's fields with the layer +30732 and the
+  // position +30756 0 to 2 (up to two moves either way). __savegprlr_27 (48
   // bytes); its callees' saves (144 to 224 below: SwapLayerRecords',
   // SwapOrderTextures', Command20's and LayOutItems', their plain C++ not
   // writing them).
   Run(h, w,
       {"TuningScreen::Command21", 300, __imp__sub_822087C8, hooks::TuningCommand21, 48,
-       {{144, 224}}, LayerOrderFields});
+       {{144, 224}}, [](PPCContext& t, Random& r, const World& w) {
+         LayerOrderFields(t, r, w);
+         // The layer and the position 0 to 2, as play leaves them: the moves
+         // stay on the work list's three words (0 to 2), so Command20's
+         // named animations are the layers' (a position of 3 reads the
+         // sticker records past the list as ids: wild animation indices).
+         guest::StoreU32(w.base, w.screen() + 30732, r.Below(3));
+         guest::StoreU32(w.base, w.screen() + 30756, r.Below(3));
+       }});
   // TuningScreen::HandleInput (its piece sub_821E69B8 merged): the states
   // with no page, the empty ones and the piece's (with the screen's own
   // fields), then each page this world holds with its group's fields (the
@@ -2197,7 +2235,7 @@ void TuningPagesMovie(Context& h) {
                       }));
   Run(h, w,
       HandleInputSpec("TuningScreen::HandleInput (4)", 100, {4}, 40,
-                      {{128, 192}, {236, 240}, {256, 272}}, ItemFields, true));
+                      {{128, 224}, {236, 240}, {256, 272}, {304, 336}}, ItemFields, true));
   Run(h, w,
       HandleInputSpec("TuningScreen::HandleInput (5)", 100, {5}, 24, {{112, 160}},
                       LevelInputFields));

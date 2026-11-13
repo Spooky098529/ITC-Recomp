@@ -69,8 +69,8 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "PageCursor, SetEditorLimits, LoadVinyls, LoadPageLayouts, LoadDecalImages, "
               "StoreToGarageCar, ScenePools::GetB, FadeOut and the UI movies' FindNode by their "
               "plain C++ (LevelCount, TypeCount, SetEditorLimits, LoadVinyls, LoadPageLayouts and "
-              "LoadDecalImages with no adapters: only InputItems calls them in play); SceneModelRecord::Copy, UiMovie::ResetPose and, not seen in play, "
-              "ResetStickerEditor sub_821F8440 and LoadStickers sub_821F86C0 through the guest); "
+              "LoadDecalImages with no adapters: only InputItems calls them in play); SceneModelRecord::Copy and UiMovie::ResetPose "
+              "through the guest; ResetStickerEditor and LoadStickers by their plain C++, below); "
               "state 8's page InputOptions sub_821D8160 with its movie side MoveOption "
               "sub_821D5610 (no adapter: only InputOptions calls it; IsPickOwned, GetPrice, "
               "PageItemCount, PageCursor, GetCurrentChoice and the UI movies' FindNode and Child "
@@ -132,7 +132,10 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "(its piece sub_821FD5F0 merged) and SetImageGroup sub_821FD658 (no adapters: "
               "only InputVinylImages and InputLayerActions call them); the screen's input "
               "handler HandleInput sub_821E6950 (its piece sub_821E69B8 merged; the pages above "
-              "by their plain C++, the pages never seen in play through the guest)) "
+              "by their plain C++, the pages never seen in play through the guest), and under "
+              "InputItems the sticker editor's set-up ResetStickerEditor sub_821F8440, "
+              "LoadStickers sub_821F86C0 and RestoreAreaDecals sub_821F6C90 (no adapters: only "
+              "InputItems calls them in play; GarageDecal and memcpy by their plain C++)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -814,6 +817,26 @@ void TuningPagesSetGroupImage(PPCContext& ctx, uint8_t* base) {
 
 void TuningPagesSetImageGroup(PPCContext& ctx, uint8_t* base) {
   tp::SetImageGroup(base, ctx.r3.u64, ctx.r4.u64);
+}
+
+void TuningPagesResetStickerEditor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::ResetStickerEditor(base, ctx.r3.u64);
+}
+
+void TuningPagesRestoreAreaDecals(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64, area = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::RestoreAreaDecals(base, call, screen, area, sp);
+  });
+}
+
+void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::LoadStickers(base, call, screen, sp);
+  });
 }
 
 void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base) {

@@ -488,6 +488,22 @@ uint32_t GarageDecal(uint8_t* base, uint32_t screen, uint32_t area, uint64_t slo
 // +31240). 112-byte frame; r3 the last memcpy's (its destination).
 uint64_t SaveAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                         uint64_t area, uint32_t sp);
+// sub_821F6C90 TuningScreen::RestoreAreaDecals: area a's five saved decals
+// (ids +32200 + 20a, records +31240 + 120a) copied to the placed ones
+// (+33320, +32360), SaveAreaDecals' other way. 112-byte frame; r3 the last
+// memcpy's (its destination).
+uint64_t RestoreAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint64_t area, uint32_t sp);
+// sub_821F86C0 TuningScreen::LoadStickers: the garage car's sticker records
+// (GarageDecal) into the screen's saved ones (+32200 ids, +31240 records;
+// its row: mirrored areas 2 and 7), then RestoreAreaDecals for each area.
+// 176-byte frame (its saves not written); r3 the last RestoreAreaDecals'.
+uint64_t LoadStickers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                      uint32_t sp);
+// sub_821F8440 TuningScreen::ResetStickerEditor: +33508 = whether the
+// selected garage car's id (its +224) is 0, the busy icon +10016 and the
+// editor's page, layer and cursors 0 (its row). Leaf; r3 left the screen.
+uint64_t ResetStickerEditor(uint8_t* base, uint64_t screen);
 // sub_821F8598 TuningScreen::StoreStickers: the saved sticker records into
 // the garage car's (GarageDecal; its row), the int conversions' doublewords
 // at frame + 80 and + 88 as the last ones leave them. 112-byte frame; r3 the
