@@ -28,7 +28,7 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "Stats::StartDay sub_82112088 with DayLog::Push sub_82112028; Garage::InsertCar "
               "sub_821154E0 with GarageList::Insert sub_82113468; Condition::Test sub_82112950 "
               "with its case sub_821129E0 merged; Rewards::Grant sub_82114C08 with its case "
-              "sub_82114C7C merged; Stats::AddRaceResult sub_82115190 with RunningMean::MergeTwo "
+              "sub_82114C7C merged; Stats::AddRaceResult sub_82115190 (no adapter: native RaceStates::OnRaceEnd calls it) with RunningMean::MergeTwo "
               "sub_82112148 (no adapter); Career::PickNext sub_821159B0's gate (past it, never "
               "seen in play, the original); Progress::AfterRace sub_82116588 with the stage tests "
               "Items::AnyWonKind3Stage2 sub_82111818, Items::AllWonKind3 sub_821118B0, "
@@ -328,7 +328,9 @@ CAREER_ADAPTER(82110B10, CareerStatsWinStreak)
 CAREER_ADAPTER(82112860, CareerItemFlagsSet)
 CAREER_ADAPTER(82115CC0, CareerPickFromCar)
 CAREER_ADAPTER(821121F8, CareerStageOf)
-CAREER_ADAPTER(82115190, CareerAddRaceResult)
+// Stats::AddRaceResult (sub_82115190) has no adapter (removed, B7 loop,
+// 2026-11-13): its only caller, RaceStates::OnRaceEnd, calls its plain C++;
+// its step is the harness's.
 CAREER_ADAPTER(821159B0, CareerPickNext)
 // Progress::AfterRace and Progress::CheckUnlocks have no adapters (removed,
 // B7 loop, 2026-11-12): their callers in play, the race's end (and the

@@ -15,7 +15,7 @@ ITC_FLAG_BOOL(native_replay_snapshots, true, "ITC",
               "Run the replay's snapshots (docs/functions/replay-snapshots.md: a vehicle's "
               "5,232-byte record put back, Record5232::Restore sub_821044D8, and the race "
               "saved into a snapshot block, RaceSnapshot::Save sub_82104AB8, with their parts; "
-              "the race kept for its replay, Replay::Keep sub_82104F68, with the copies; "
+              "the race kept for its replay, Replay::Keep sub_82104F68, with the copies (no adapter: native RaceStates::OnRaceEnd calls it); "
               "RaceReplay::SaveStart sub_82104D40, SaveEnd sub_82104E68, RestoreStart "
               "sub_821046F8 and RestoreEnd sub_82104898, the last three only while "
               "--native_heap routes the game's heap to the allocation layer) "
@@ -139,15 +139,10 @@ bool Native() {
 // none: their callers in play, RaceReplay's four functions, are native and
 // call their plain C++.
 
-// Caller: RaceStates::OnRaceEnd (recompiled).
-extern "C" REX_FUNC(sub_82104F68) {
-  REX_FUNC_PROLOGUE();
-  if (!Native()) {
-    __imp__sub_82104F68(ctx, base);
-    return;
-  }
-  hooks::ReplayKeep(ctx, base);
-}
+// Replay::Keep (sub_82104F68) has no adapter (removed, B7 loop,
+// 2026-11-13): its only caller, RaceStates::OnRaceEnd, calls its plain C++
+// (where memcpy's plain C++ is on, else the original); its step is the
+// harness's.
 
 // Callers: RaceStates::OnCountdown (SaveStart), ReplaySetUpTick (SaveEnd,
 // RestoreStart), AfterReplayTick (RestoreEnd), sub_82168858 (RestoreStart,

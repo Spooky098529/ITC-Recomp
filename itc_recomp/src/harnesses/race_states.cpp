@@ -2132,11 +2132,14 @@ void Inits(Context& h) {
 // once, put back before each side), the game's pointers at them;
 // XUserWriteAchievements recorded (no unlock). Compared: the blocks, the
 // achievements' entries, the recorded calls, the frame's temporaries
-// (+28, +80 to +219) and its callees' (Place's and Add's at -128 + 28 and
-// + 80, -256 + 80; Replay::Keep's stage copy at -272 + 80), r3. The callees
+// (+28, +80 to +219) and Replay::Keep's stage copy (-272 + 80), r3; not
+// Place's and Add's temporaries below the frame, which the originals of
+// the callees after them (Check, Keep) overwrite with their register saves
+// (the course record's groups compare them). The callees
 // made native earlier (RacerRecords::Add, Stats::AddRaceResult,
-// Achievements::Check and Write, Replay::Keep) run as their adapters run
-// them on the original's side.
+// Achievements::Check and Write, Replay::Keep; their adapters removed) run
+// as their originals on the original's side; AddRaceResult's float words in
+// the save data compared as floats.
 
 rs::GuestCall HarnessCall(PPCContext& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, uint32_t sp, uint32_t back, uint64_t r3, uint64_t r4,
@@ -2386,6 +2389,11 @@ bool RecordAchievementWrite(PPCContext& ctx, uint32_t address) {
   return true;
 }
 
+// The save data's words Stats::AddRaceResult stores as floats (the career
+// harness's list), in order.
+constexpr uint32_t kAddRaceResultFloats[] = {4936, 4940, 5928, 5936, 5944, 5952,
+                                             5960, 5968, 6024, 6028, 6032, 6036};
+
 void RaceEnd(Context& h, const Block& progress, const Block& vehicles) {
   constexpr uint32_t kReplayBytes = 0x34E20 + 0x107AC4;
   constexpr uint32_t kRecordingsBytes = 0x20F590 + 38928;
@@ -2501,7 +2509,15 @@ void RaceEnd(Context& h, const Block& progress, const Block& vehicles) {
       out[v].Bytes(Read(h.base, machine.address, machine.bytes));
       out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
       out[v].Bytes(Read(h.base, race.address, race.bytes));
-      out[v].Bytes(Read(h.base, save.address, save.bytes));
+      // The save data, Stats::AddRaceResult's float words as floats (as
+      // the career harness compares them).
+      uint32_t from = 0;
+      for (const uint32_t at : kAddRaceResultFloats) {
+        out[v].Bytes(Read(h.base, save.address + from, at - from));
+        out[v].Float(guest::LoadU32(h.base, save.address + at));
+        from = at + 4;
+      }
+      out[v].Bytes(Read(h.base, save.address + from, save.bytes - from));
       out[v].Bytes(Read(h.base, replay.address, replay.bytes));
       out[v].Bytes(Read(h.base, recordings.address, recordings.bytes));
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -2513,9 +2529,6 @@ void RaceEnd(Context& h, const Block& progress, const Block& vehicles) {
       }
       out[v].Word(guest::LoadU32(h.base, frame + 28));
       out[v].Bytes(Read(h.base, frame + 80, 140));
-      for (const uint32_t at : {frame - 128 + 28, frame - 128 + 80, frame - 256 + 80}) {
-        out[v].Word(guest::LoadU32(h.base, at));
-      }
       out[v].Bytes(Read(h.base, frame - 272 + 80, 80));
       out[v].Word(t.r1.u32);
       out[v].Word(t.r3.u32);

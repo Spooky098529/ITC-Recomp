@@ -1,9 +1,9 @@
 // The achievements natively: adapters in front of src/achievements/
 // (docs/functions/achievements.md), with the register steps the harness
 // shares (hooks/achievements.h). AllBeaten and BeatsCourseTime have no
-// adapters: only native Check calls them. Achievements::Check's callers
-// (RaceStates::OnRaceEnd, the network battle screen) and Time::Less's other
-// callers (Time::Clamp, sub_82105EA0) are recompiled, so the adapters stay.
+// adapters: only native Check calls them; nor do Check and Write since
+// RaceStates::OnRaceEnd is native. Time::Less's adapter stays for
+// Time::Clamp (recompiled).
 
 #include "hooks/achievements.h"
 
@@ -16,8 +16,8 @@ ITC_FLAG_BOOL(native_achievements, true, "ITC",
               "sub_82290788 with AllBeaten sub_82290698, BeatsCourseTime sub_82290710 and "
               "Time::Less sub_820FF708; Achievements::Write sub_82290A30, which still calls "
               "XUserWriteAchievements sub_82294E58 through the function table, so the SDK "
-              "records unlocks) natively (AllBeaten and BeatsCourseTime only from native Check; the "
-              "flag switches Check) instead of through the translated code (the same "
+              "records unlocks) natively (no adapters but Time::Less's: native RaceStates::OnRaceEnd "
+              "calls Check and Write) instead of through the translated code (the same "
               "words; checked by --run_harnesses=achievements)");
 
 namespace hooks {
@@ -88,8 +88,11 @@ void AchievementsWriteSteps(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_ACHIEVEMENTS(820FF708, TimeLessSteps)
-ITC_ACHIEVEMENTS(82290788, AchievementsCheckSteps)
-ITC_ACHIEVEMENTS(82290A30, AchievementsWriteSteps)
+// Achievements::Check (sub_82290788) and Write (sub_82290A30) have no
+// adapters (removed, B7 loop, 2026-11-13): their caller in play,
+// RaceStates::OnRaceEnd, calls their plain C++; the network battle screen
+// (sub_82264B90, never seen in play, recompiled) runs the originals. Their
+// steps are the harness's.
 
 // XUserWriteAchievements (system-services.md) wrapped for the achievements
 // harness only: while its recorder is set (hooks::g_start_up_recorder), the
