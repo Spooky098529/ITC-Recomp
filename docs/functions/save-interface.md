@@ -72,7 +72,8 @@ and `sub_825A9EC0` (probably `wcsncpy_s`, 128 characters). Not here
 save layer (`sub_821A2C98`, `sub_821A3728`, `sub_821C6E50`,
 `sub_82217F40` and the rest), the save devices' constructor and
 destructor, and the save data's item checks after the layer
-(`sub_82290698`, `sub_82290788`). The game has no System Link mode;
+(`sub_82290698`, `sub_82290788`: the achievements' check, in
+[`achievements.md`](achievements.md) since 2026-11-13). The game has no System Link mode;
 nothing here is its. Mapped 2026-10-28 by the B7 loop from the lead
 "probably the save system's interface"; every row below was read in
 full in `generated/` unless it says otherwise (offsets are the slot's

@@ -725,6 +725,10 @@ Rows not yet moved stay in the table below. So far:
   modes' power graph screen (UI movie 9 over the picked car): the
   handlers both machines register, its pages and its open and close
   steps, the spec texts, and the members' vtable slots (B7).
+- [`achievements.md`](achievements.md): the achievements: after a
+  race, which of the 27 the race earned (items beaten, course times,
+  a count), and their write (`XUserWriteAchievements`) (B7; mapped, an
+  Xbox feature).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
