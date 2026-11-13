@@ -709,6 +709,11 @@ Rows not yet moved stay in the table below. So far:
   teardowns, and the mode select's machine (UI movie 35: the Live
   sign-in, the privilege check, the two items) (B7; mapped, an Xbox
   feature).
+- [`type5-mode.md`](type5-mode.md): the type 5 front-end mode, the
+  parking area's mode: its Init and delegate functions, its +32
+  interface, and its dialog's machine (the yes/no questions and notices
+  over UI movies 16 to 19 the parking area and the car settings open)
+  (B7).
 - [`race-end.md`](race-end.md): the race's end, the mode a race goes
   to when it's over (the career's progress asked, the boot movies queued
   after the stages that end with them) (B7).
