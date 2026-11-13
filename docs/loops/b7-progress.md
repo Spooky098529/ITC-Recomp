@@ -328,7 +328,13 @@ file's history. What's left to see in a drive, from every run:
   subagents); map checked (0 errors). Its note: skipping
   `XUserWriteAchievements` would stop the SDK's achievements file. The
   user's call (2026-11-13, asked): keep the SDK call (through the
-  guest); added to "Precedent first". Migration agent running.
+  guest); added to "Precedent first". Migration 7f7fce7e..848036fc (5
+  of 5 ours, `--native_achievements`; `AllBeaten` and
+  `BeatsCourseTime`'s adapters removed; `Write` calls
+  `XUserWriteAchievements` through the guest; harnesses 0 differing;
+  race 38 s at 40, 0 errors; no subagents). Left: none;
+  `RaceStates::OnRaceEnd` `sub_821644D8` now ready (a cleanup lead).
+  Validation agent running.
 
 ## Done
 

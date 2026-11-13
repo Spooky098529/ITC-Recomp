@@ -18,6 +18,14 @@ When the user has reviewed a run's section, its heading gets
   `Write` never ran in play (no achievement earned). The user's call
   (2026-11-13): `XUserWriteAchievements` stays a guest call, so the
   SDK keeps recording unlocks.
+- Its migration (7f7fce7e..848036fc, `--native_achievements`): 5 of 5
+  ours. **For the user:** `XUserWriteAchievements` `sub_82294E58`
+  (`system-services.md`) now has a small Wrapped override
+  (`src/hooks/achievements.cpp`) used only by the harness: while the
+  harness recorder is set it hands the call to the recorder, so test
+  cases (real ids 2 to 28) don't unlock anything in the SDK's file;
+  otherwise the original runs. The nearest call (2026-10-31) is against
+  stand-in recorders in adapters; this one exists only for the harness.
 - The power graph screen's map (4ed4704c): `power-graph-screen.md`, 22
   rows (the machine the type 6 and 7 modes share, `PowerGraphScreen67::`);
   its members' vtable slots inferred from the functions beside each
