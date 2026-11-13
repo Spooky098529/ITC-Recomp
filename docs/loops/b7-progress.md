@@ -238,7 +238,14 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 7 of 10: the front-end screens that show a car on its
   stand (`sub_821807D8`, `sub_82184B80`, ... `sub_8224CB28`, seen in
   play; ready roots `sub_82201B40`, `sub_82202928`); its line deleted
-  from `leads.md`. Mapping agent running.
+  from `leads.md`. Mapped (c2578bab): the lead was mostly stale (6
+  of its 8 already had rows); 2 new rows in `tuning-pages.md`, the
+  vinyl editor's state 34 page `TuningScreen::InputVinylView`
+  `sub_82202928` and `LeaveVinylView` `sub_82201B40` (ready). So the
+  vinyl editor's input pages lead (states 23 to 31, `sub_82204B70` and
+  more, the first five seen in play, mostly ready) is taken into the
+  same subsystem, mapped next, and both are migrated together; its
+  line deleted from `leads.md`. Mapping agent running.
 
 ## Done
 
