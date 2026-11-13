@@ -7,7 +7,7 @@
 // (as their adapters run them), DrawPowerGraph through its override (its
 // adapter works through the guest), UiMovie::Run through its override, the
 // debug state handlers all by their plain C++ (debug.cpp), the command
-// runners never seen in play 5, 11, 12, 17, 19, 20, 26, 27, 42, 52 to 58 and
+// runners never seen in play 5, 10 to 14, 17, 19, 20, 26, 27, 42, 52 to 58 and
 // Command32Done by their plain C++ (commands.cpp), the sticker commands 32
 // to 41 and 43 to 51 by theirs with native_pages (tuning_pages'
 // sticker_commands.cpp), and the other command runners never seen in play
@@ -42,9 +42,6 @@ struct Guest {
 
 Guest CommandGuest(uint32_t command) {
   switch (command) {
-    case 10: return {0x821F35C0, 0x821E7010};
-    case 13: return {0x821EA460, 0x821E7034};
-    case 14: return {0x821EAFA0, 0x821E7040};
     case 32: return {0x821FC7B8, 0x821E7124};
     case 33: return {0x821FCA80, 0x821E7130};
     case 34: return {0x821FA658, 0x821E713C};
@@ -202,8 +199,11 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
           case 7: Command7(base, call, s, frame); break;
           case 8: Command8(base, call, r3, frame); break;
           case 9: Command9(base, call, s, frame); break;
+          case 10: Command10(base, call, s, frame); break;
           case 11: Command11(base, call, s, frame); break;
           case 12: Command12(base, call, s, frame); break;
+          case 13: Command13(base, call, s, frame); break;
+          case 14: Command14(base, call, s, frame); break;
           case 15: Command15(base, call, s, frame); break;
           case 16: Command16(base, call, s, frame); break;
           case 17: Command17(base, call, s, frame); break;

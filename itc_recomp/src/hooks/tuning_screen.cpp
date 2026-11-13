@@ -82,13 +82,17 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag; GarageStage::SetColor "
               "sub_8217C6C8, ApplyAreaDecals sub_821F7B90 and ApplyDecalWord sub_821FE4E0, never "
               "seen in play, by their plain C++, no adapters); SetCarStats sub_821DF788 with the "
-              "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both and --native_car_specs, every state; "
+              "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both and --native_car_specs, every state (RefreshInterior "
+              "sub_821F2AD8 with IsSlotAvailable sub_821CE188 by their plain C++, no adapters); "
               "Update sub_821E6C50 (its pieces sub_821E6CD4 and sub_821E6F90 merged) with the refresh's and "
               "UpdateStand's checks, its callees never seen in play and DrawPowerGraph through the guest "
               "but movie 2's command runners never seen in play, called only by the update's plain C++: "
               "Command5 sub_821D4180, Command11 sub_821E9730, Command12 sub_821E9CA0, Command54 "
               "sub_821EB8E8, Command55 sub_821EBDC8, Command56 sub_821EC6A0, Command57 sub_821ECC68 "
-              "(UiMovie::NamedAnimationTime by its plain C++) and Command58 sub_821EDB70, and the "
+              "(UiMovie::NamedAnimationTime by its plain C++), Command58 sub_821EDB70 and the paint and "
+              "light kit pages' Command10 sub_821F35C0, Command13 sub_821EA460 and Command14 "
+              "sub_821EAFA0 (SetPaintGradients sub_821E9488, SetLightKind0Bars sub_821EA130 and "
+              "SetLightKind1Bar sub_821EAE68 by their plain C++, no adapters), and the "
               "editors': Command17 sub_82200100, Command19 sub_82201C58, Command20 sub_82201FA0, "
               "Command21 sub_822087C8 (SwapLayerRecords and SwapOrderTextures by their plain C++ "
               "with --native_tuning_pages), "
@@ -399,6 +403,9 @@ ITC_TUNING_CALLS_STEP(Command54)
 ITC_TUNING_CALLS_STEP(Command55)
 ITC_TUNING_CALLS_STEP(Command56)
 ITC_TUNING_CALLS_STEP(Command58)
+ITC_TUNING_CALLS_STEP(Command10)
+ITC_TUNING_CALLS_STEP(Command13)
+ITC_TUNING_CALLS_STEP(Command14)
 ITC_TUNING_CALLS_STEP(Command17)
 ITC_TUNING_CALLS_STEP(Command19)
 ITC_TUNING_CALLS_STEP(Command26)

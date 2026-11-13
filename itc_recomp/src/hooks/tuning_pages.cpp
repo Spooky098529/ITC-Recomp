@@ -293,6 +293,23 @@ void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base) {
   tp::HsvToRgb(base, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
+void TuningPagesIsSlotAvailable(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::IsSlotAvailable(base, ctx.r3.u32, ctx.r4.u64);
+}
+
+void TuningPagesSetPaintGradients(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = tp::SetPaintGradients(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningPagesSetLightKind0Bars(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::SetLightKind0Bars(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningPagesSetLightKind1Bar(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::SetLightKind1Bar(base, ctx.r3.u32, ctx.r1.u32);
+}
+
 namespace {
 
 // A step with the guest calls (hooks::StandModelsGuestCall), lr put back.

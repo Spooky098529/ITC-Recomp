@@ -678,4 +678,183 @@ void Command53(uint8_t* base, uint32_t screen) {
   Advance(base, screen);
 }
 
+namespace {
+
+constexpr uint32_t kOne = 0x82000A30;      // 1.0
+constexpr uint32_t kZero = 0x82000A34;     // 0.0
+constexpr uint32_t kDim = 0x82002A14;      // the unpicked pair's alpha
+constexpr uint32_t kHue = 0x8200B5D4;      // the paint sliders' scales
+constexpr uint32_t kByte = 0x8200B5D0;
+constexpr uint32_t kBarLong = 0x8200B5CC;  // the light kits' bars
+constexpr uint32_t kBarLength = 0x820021FC;
+
+// The screen's word at `field` made a float through frame + 80 (AsFloat),
+// times the float at `scale`, and for `length` times that too.
+uint32_t Slider(uint8_t* base, uint32_t frame, uint32_t screen, uint32_t field, uint32_t scale,
+                uint32_t length = 0) {
+  const int64_t x = int32_t(Load(base, screen + field));
+  AsFloat(base, frame, x);
+  double value = steps::Fmuls(steps::Single(double(x)), steps::Lfs(base, scale));
+  if (length != 0) {
+    value = steps::Fmuls(value, steps::Lfs(base, length));
+  }
+  return steps::Bits(value);
+}
+
+// Node (sub_scene, child)'s children `first` and `first` + 1's +12 (each
+// looked up after the store before it) from the fields `a` and `b`.
+void SliderPair(uint8_t* base, uint32_t movie, uint32_t frame, uint32_t screen,
+                uint32_t sub_scene, uint32_t child, uint32_t first, uint32_t a, uint32_t b,
+                uint32_t scale, uint32_t length = 0) {
+  const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
+  const uint32_t one = ui_movies::Child(base, node, first);
+  Store(base, one + 12, Slider(base, frame, screen, a, scale, length));
+  const uint32_t two = ui_movies::Child(base, node, first + 1);
+  Store(base, two + 12, Slider(base, frame, screen, b, scale, length));
+}
+
+// The named animation from `named` (read again for each call) restarted
+// and looped, `play_lr` and `finish_lr` as the original's.
+uint64_t Looped(const GuestCall& call, uint32_t frame, uint32_t movie, uint64_t named,
+                uint32_t finish_lr, uint32_t play_lr, uint32_t loop_lr) {
+  return Restarted(call, frame, movie, [&] { return named; }, 1, finish_lr, play_lr, loop_lr);
+}
+
+}  // namespace
+
+uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F35C0 TuningScreen::Command10");
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
+  if (Load(base, screen + 9716) != 0) {
+    FinishNamed(call, frame, 0x821F3610, movie, 979);
+    PlayNamed(call, frame, 0x821F362C, movie, 979, 1);
+    FinishNamed(call, frame, 0x821F3638, movie, 1009);
+    PlayNamed(call, frame, 0x821F3654, movie, 1009, 0);
+    ClearFlags(base, screen);
+  }
+  // The pair's alphas (node (21, 5)'s children 4 and 5) by +30456.
+  {
+    const uint32_t node = ui_movies::FindNode(base, movie, 21, 5);
+    const bool second = Load(base, screen + 30456) != 0;
+    Store(base, ui_movies::Child(base, node, 4) + 68, Load(base, second ? kDim : kOne));
+    Store(base, ui_movies::Child(base, node, 5) + 68, Load(base, second ? kOne : kDim));
+  }
+  // The three sliders (nodes (21, 2 to 4)'s children 10 and 11).
+  SliderPair(base, movie, frame, screen, 21, 2, 10, 30444, 30476, kHue);
+  SliderPair(base, movie, frame, screen, 21, 3, 10, 30448, 30480, kByte);
+  SliderPair(base, movie, frame, screen, 21, 4, 10, 30452, 30484, kByte);
+  const int32_t kind = int32_t(Load(base, screen + 30440));
+  if (kind == 0) {
+    const uint32_t row = ui_movies::Child(base, ui_movies::FindNode(base, movie, 21, 1), 1);
+    Store(base, row + 68, Load(base, kZero));
+    Looped(call, frame, movie, 212, 0x821F39A8, 0x821F39C4, 0x821F39D0);
+  } else if (kind == 4) {
+    Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 21, 1), 1) + 68,
+          Load(base, kOne));
+    for (uint32_t child = 2; child <= 4; child++) {
+      const uint32_t node = ui_movies::FindNode(base, movie, 21, child);
+      Store(base, ui_movies::Child(base, ui_movies::Child(base, node, 5), 1) + 68,
+            Load(base, kZero));
+    }
+    {
+      const uint32_t node = ui_movies::FindNode(base, movie, 21, 5);
+      Store(base, ui_movies::Child(base, ui_movies::Child(base, node, 3), 0) + 68,
+            Load(base, kZero));
+    }
+    if (Load(base, screen + 30460) == 0) {
+      Looped(call, frame, movie, 178, 0x821F3924, 0x821F3940, 0x821F39D0);
+    } else {
+      Looped(call, frame, movie, 179, 0x821F3950, 0x821F396C, 0x821F39D0);
+    }
+  }
+  call(kResetTextScroll, {movie, 10, 0}, frame, 0x821F39E0);
+  SetText(call, frame, 0x821F39F4, movie, 10, 0, 794, 0);
+  call(kScrollText, {movie, 10, 0, 1}, frame, 0x821F3A08);
+  const uint64_t r3 = tuning_pages::SetPaintGradients(base, screen, frame);
+  StepWith9724(base, screen);
+  return r3;
+}
+
+uint64_t Command13(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821EA460 TuningScreen::Command13");
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
+  if (Load(base, screen + 9716) != 0) {
+    FinishNamed(call, frame, 0x821EA4B0, movie, 985);
+    PlayNamed(call, frame, 0x821EA4CC, movie, 985, 1);
+    FinishNamed(call, frame, 0x821EA4D8, movie, 228);
+    PlayNamed(call, frame, 0x821EA4F4, movie, 228, 1);
+    FinishNamed(call, frame, 0x821EA500, movie, 238);
+    PlayNamed(call, frame, 0x821EA51C, movie, 238, 1);
+    FinishNamed(call, frame, 0x821EA528, movie, 248);
+    PlayNamed(call, frame, 0x821EA544, movie, 248, 1);
+    Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 23, 1), 1) + 68,
+          Load(base, kZero));
+    ClearFlags(base, screen);
+  }
+  // The three bars' sliders (nodes (23, 2 to 4)'s children 6 and 7).
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t field = 30512 + 4 * k;
+    SliderPair(base, movie, frame, screen, 23, 2 + k, 6, field, field, kBarLong, kBarLength);
+  }
+  const auto word = [&](uint32_t offset) { return uint64_t(Load(base, screen + offset)); };
+  switch (Load(base, screen + 30508)) {
+    case 0: Looped(call, frame, movie, 304, 0x821EA814, 0x821EA830, 0x821EA83C); break;
+    case 1: Looped(call, frame, movie, 305, 0x821EA7E4, 0x821EA800, 0x821EA83C); break;
+    case 2: Looped(call, frame, movie, 306, 0x821EA7B4, 0x821EA7D0, 0x821EA83C); break;
+    case 3:
+      Looped(call, frame, movie, 307, 0x821EA744, 0x821EA760, 0x821EA76C);
+      Restarted(call, frame, movie, [&] { return word(30524) + 294; }, 1, 0x821EA77C, 0x821EA79C,
+                0x821EA83C);
+      break;
+    case 4:
+      Restarted(call, frame, movie, [&] { return word(30528) + 219; }, 1, 0x821EA70C, 0x821EA72C,
+                0x821EA83C);
+      break;
+    default: break;
+  }
+  const uint64_t r3 = tuning_pages::SetLightKind0Bars(base, screen, frame);
+  StepWith9724(base, screen);
+  return r3;
+}
+
+uint64_t Command14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821EAFA0 TuningScreen::Command14");
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
+  if (Load(base, screen + 9716) != 0) {
+    FinishNamed(call, frame, 0x821EAFF0, movie, 987);
+    PlayNamed(call, frame, 0x821EB00C, movie, 987, 1);
+    FinishNamed(call, frame, 0x821EB018, movie, 320);
+    PlayNamed(call, frame, 0x821EB034, movie, 320, 1);
+    Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 24, 1), 1) + 68,
+          Load(base, kZero));
+    ClearFlags(base, screen);
+  }
+  // The bar's slider (node (24, 3)'s children 6 and 7), the row's number.
+  SliderPair(base, movie, frame, screen, 24, 3, 6, 30552, 30552, kBarLong, kBarLength);
+  const auto word = [&](uint32_t offset) { return uint64_t(Load(base, screen + offset)); };
+  call(kSetNodeText, {movie, ui_movies::FindNode(base, movie, 24, 14), 450, word(30548) + 1, 0, 0,
+                      0, 0},
+       frame, 0x821EB114);
+  switch (Load(base, screen + 30544)) {
+    case 0: Looped(call, frame, movie, 384, 0x821EB218, 0x821EB234, 0x821EB240); break;
+    case 1: Looped(call, frame, movie, 385, 0x821EB1E8, 0x821EB204, 0x821EB240); break;
+    case 2:
+      Looped(call, frame, movie, 386, 0x821EB178, 0x821EB194, 0x821EB1A0);
+      Restarted(call, frame, movie, [&] { return word(30556) + 366; }, 1, 0x821EB1B0, 0x821EB1D0,
+                0x821EB240);
+      break;
+    case 3:
+      Restarted(call, frame, movie, [&] { return word(30560) + 309; }, 1, 0x821EB140, 0x821EB160,
+                0x821EB240);
+      break;
+    default: break;
+  }
+  const uint64_t r3 = tuning_pages::SetLightKind1Bar(base, screen, frame);
+  StepWith9724(base, screen);
+  return r3;
+}
+
 }  // namespace tuning_screen

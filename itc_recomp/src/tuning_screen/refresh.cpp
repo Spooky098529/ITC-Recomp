@@ -9,10 +9,8 @@
 // plain C++ (EquipChoice, SetCarStats, HideNode19, GetPrice, ShowTireMarks,
 // PickCameraPreset, PreviewItem, GarageStage::SetLightsOn, SetStateTexts,
 // RefreshMovie13, and since 2026-11-13 RefreshPaint sub_821F2110,
-// RefreshLightKits sub_821F2378 and RefreshMovie14 sub_821F7A98, never seen
-// in play), the one still recompiled (RefreshInterior sub_821F2AD8) through
-// the guest with r3 the screen (all 64 bits) and the original's return
-// addresses.
+// RefreshLightKits sub_821F2378, RefreshMovie14 sub_821F7A98 and
+// RefreshInterior sub_821F2AD8, never seen in play).
 
 #include "tuning_screen/refresh.h"
 
@@ -48,9 +46,6 @@ double Lfd(uint8_t* base, uint32_t address) {
 constexpr uint32_t kHolderAt = 0x826D83E0;     // [[it]]: the stand's holder
 constexpr uint32_t kPounds = 0x82009F00;       // a double: the weight's unit
 constexpr uint32_t kTorqueUnit = 0x82009F08;   // a double: child 12's
-
-// The callees never seen in play, through the guest.
-constexpr uint32_t kRefreshInterior = 0x821F2AD8;
 
 }  // namespace
 
@@ -295,7 +290,7 @@ uint64_t Refresh(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t s
       } else if (state <= 52) {
         RefreshMovie14(base, stand.call, uint32_t(r3), frame);
       } else {
-        c.Call(refresh::kRefreshInterior, {r3}, 0x821E6934);
+        RefreshInterior(base, stand.call, uint32_t(r3), frame);
       }
       break;
   }

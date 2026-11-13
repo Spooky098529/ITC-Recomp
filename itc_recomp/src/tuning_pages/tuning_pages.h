@@ -193,6 +193,27 @@ uint32_t SetBrandLogo(uint8_t* base, uint32_t screen, uint32_t sp);
 // sector's conversions there as the original leaves them. Needs
 // flush-to-zero off. r3 left.
 void HsvToRgb(uint8_t* base, uint32_t out, uint32_t in, uint32_t sp);
+// sub_821CE188 TuningScreen::IsSlotAvailable: with the category +9656 6,
+// the item byte +9660 3 and the mode +33540 1, the word +25176 + 4 × `slot`
+// (not bound-checked; r4 all 64 bits as the original's address math);
+// else 1. A leaf.
+uint32_t IsSlotAvailable(uint8_t* base, uint32_t screen, uint64_t slot);
+// sub_821E9488 TuningScreen::SetPaintGradients: the paint's value and
+// saturation bars (node (21, 3)'s and (21, 4)'s child 4, vertices 0 to 3):
+// HsvToRgb's plain C++ on (+30444, 1.0, +30452 × 1/255) and (+30444, +30448
+// × 1/255, 1.0) on the 208-byte frame (h, s, v, alpha at +96, the answer at
+// +112; the ints made floats through +80 and +88, the colors' ints through
+// +80, as the original leaves them). r3 the last vertex. Needs
+// flush-to-zero off.
+uint32_t SetPaintGradients(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_821EA130 TuningScreen::SetLightKind0Bars: nodes (23, 2 to 4)'s child
+// 8, vertices 2 to 5's +0 = float(+30512, +30516, +30520) × [0x82002C30]
+// (2, 3) or [0x8200B5CC] (4, 5), × [0x820021FC]. 176-byte frame (the ints
+// through +80); r3 the last vertex.
+uint32_t SetLightKind0Bars(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_821EAE68 TuningScreen::SetLightKind1Bar: the same on node (24, 3)'s
+// child 8 from +30552. 144-byte frame; r3 the last vertex.
+uint32_t SetLightKind1Bar(uint8_t* base, uint32_t screen, uint32_t sp);
 
 // --- The current choices (choices.cpp) ---
 // Guest calls through `call` (tuning_screen::GuestCall) where the plain C++

@@ -73,6 +73,15 @@ void TuningPagesLoadVinyls(PPCContext& ctx, uint8_t* base);
 void TuningPagesShowPricePanel(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetBrandLogo(PPCContext& ctx, uint8_t* base);
 void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base);
+// The tuning pages' leaves never seen in play, for the harness only (no
+// adapters: only native callers reach their plain C++, RefreshInterior and
+// Command10, 13 and 14; r3 = the screen): IsSlotAvailable sub_821CE188 (r4
+// the slot), SetPaintGradients sub_821E9488 (flush-to-zero off),
+// SetLightKind0Bars sub_821EA130 and SetLightKind1Bar sub_821EAE68.
+void TuningPagesIsSlotAvailable(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetPaintGradients(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetLightKind0Bars(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetLightKind1Bar(PPCContext& ctx, uint8_t* base);
 
 // The current choices (r3 = the screen): SetAeroAvailability sub_821DE160,
 // SetCurrentChoice sub_821E1DB0 (Params::GetCarParts and AeroParts::Get82 by

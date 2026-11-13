@@ -389,6 +389,29 @@ uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // played; 111 + [+33576] restarted and looped; the queue's step with
 // +9724. 128-byte frame; LoopNamed's r3.
 uint64_t Command58(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F35C0 TuningScreen::Command10 (the paint page): 979 and 1009
+// played by +9716 and +9720; node (21, 5)'s children 4 and 5 +68 by
+// +30456; the sliders (nodes (21, 2 to 4)'s children 10 and 11 +12 from
+// +30444/+30476 × [0x8200B5D4], +30448/+30480 and +30452/+30484 ×
+// [0x8200B5D0]); by +30440 0 or 4 the rows' alphas and 212, or 178/179 by
+// +30460, restarted and looped; help (10, 0) 794 scrolled;
+// SetPaintGradients' plain C++ (tuning_pages); the queue's step with +9724.
+// 144-byte frame; SetPaintGradients' r3.
+uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EA460 TuningScreen::Command13 (the neon edit): 985, 228, 238 and
+// 248 played by +9716 and +9720 (node (23, 1)'s child 1 +68 0.0); the bars'
+// sliders (nodes (23, 2 to 4)'s children 6 and 7 +12); by the row +30508
+// 304 to 307 (with 294 + +30524) or 219 + +30528 restarted and looped;
+// SetLightKind0Bars' plain C++; the queue's step with +9724. 144-byte
+// frame; SetLightKind0Bars' r3.
+uint64_t Command13(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EAFA0 TuningScreen::Command14 (the LED edit): 987 and 320 played
+// by +9716 and +9720; node (24, 3)'s children 6 and 7 +12 from +30552;
+// SetNodeText (24, 14) 450 with +30548 + 1; by the row +30544 384 to 386
+// (with 366 + +30556) or 309 + +30560 restarted and looped;
+// SetLightKind1Bar's plain C++; the queue's step with +9724. 144-byte
+// frame; SetLightKind1Bar's r3.
+uint64_t Command14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
 // --- The editors' command runners never seen in play (commands.cpp) ---
 // Movies 13 and 14 (and 16 for Command52's dialog), called only by the
@@ -664,6 +687,16 @@ uint64_t RefreshLightKits(uint8_t* base, const StandCalls& stand, uint64_t r3, u
 // (1, 10), (1, 8), (1, 9) hidden, textures (1, 6) and (1, 7) 1. 112-byte
 // frame below `sp`; SetNodeTexture's r3.
 uint64_t RefreshMovie14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F2AD8 TuningScreen::RefreshInterior (states 53 to 58, the
+// interior item's pages; its row): 57 and 58 the slots' nodes, the help line
+// by IsSlotAvailable's plain C++ (tuning_pages), the mode +33564 and the
+// slot's code, and in 57 PreviewInteriorChoices' plain C++; 56 the pair's
+// picture and the help by the mode; 55 sub-scene 32's six swatches by the
+// kind +33548; 54 sub-scene 28's rows (SetNodeText 375 and 379, marks by
+// GetChoiceFlag) and the help by the kind; 53 the textures and help 648.
+// 176-byte frame below `sp`; r3 its last call's (the entry for other
+// states).
+uint64_t RefreshInterior(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 // sub_821E7DA0 UiNode::SetRgb: the node's +56, +60, +64 = `r`, `g`, `b`. A
 // leaf.
 void SetRgb(uint8_t* base, uint32_t node, uint32_t r, uint32_t g, uint32_t b);

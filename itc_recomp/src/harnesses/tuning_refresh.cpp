@@ -714,6 +714,23 @@ void TuningRefresh(Context& h) {
         if (size == 176) {
           Fill(base, frame - size - 80, 8, 0);
         }
+        // Since RefreshInterior is native (B7 loop, 2026-11-13), state 57
+        // runs PreviewInteriorChoices' plain C++ where the recompiled side
+        // runs its original: what its own cases leave out (car_makers.cpp),
+        // under RefreshInterior's 176-byte frame: its r22 to r31 and lr
+        // saves (88), the setters' originals' saves under its 208-byte frame
+        // (32) and ApplyRecord's and GetB's under theirs (logged from the
+        // recompiled runs).
+        if (st == 57) {
+          const uint32_t interior = frame - 176;
+          Fill(base, interior - 88, 88, 0);
+          Fill(base, interior - 208 - 32, 32, 0);
+          static constexpr std::pair<uint32_t, uint32_t> kSetters[] = {
+              {412, 4}, {308, 20}, {428, 4}, {324, 20}, {320, 56}, {304, 56}};
+          for (const auto& [at, bytes] : kSetters) {
+            Fill(base, interior - at - bytes, bytes, 0);
+          }
+        }
         // PreviewItem's (160-byte frame) as its own cases leave them out:
         // the 32 under its frame (its guest callees' saves of the caller's
         // registers), the 56 from 112 under it (the saves of a guest

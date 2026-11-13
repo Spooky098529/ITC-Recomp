@@ -125,6 +125,11 @@ void TuningCommand55(PPCContext& ctx, uint8_t* base);
 void TuningCommand56(PPCContext& ctx, uint8_t* base);
 void TuningCommand57(PPCContext& ctx, uint8_t* base);
 void TuningCommand58(PPCContext& ctx, uint8_t* base);
+// Command10 sub_821F35C0, Command13 sub_821EA460 and Command14 sub_821EAFA0
+// (the paint and light kit pages; the same way, B7 loop, 2026-11-13).
+void TuningCommand10(PPCContext& ctx, uint8_t* base);
+void TuningCommand13(PPCContext& ctx, uint8_t* base);
+void TuningCommand14(PPCContext& ctx, uint8_t* base);
 // The editors' command runners never seen in play, for the harness only
 // (the same way; r3 = the screen): Command17 sub_82200100, Command19
 // sub_82201C58, Command20 sub_82201FA0 (r4, r5 the update's +9644 and
