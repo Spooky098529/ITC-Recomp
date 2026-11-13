@@ -119,6 +119,18 @@ When the user has reviewed a run's section, its heading gets
   `SetAreaDecal` is `GarageStage::SetSticker`. `tuning-screen.md`'s
   `SetColor` question answered; the sticker record and the
   `0x82009A50` table in `known-data.md`.
+- Its migration (8d0e0496..0e74c60a): the setters and the tuning
+  screen's `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`,
+  `PreviewParts`, `SetParts` native; 17 adapters removed by reading
+  `generated/`'s call sites (attract races never reach the tuning
+  screen, so no counter); the harnesses `car_makers`, `tuning_refresh`
+  and `tuning_machine` now leave out the originals' register saves
+  below their frames. Map correction: `SetSticker` stores r8/r9 at its
+  caller's r1 + 64 and + 72. `ApplyAreaDecals` copies the sticker
+  scale as raw bits (a signaling NaN kept, as the translated code
+  does). `MakeModel` and `FitSelectedCar` keep adapters (native
+  callers still reach them through the guest). 22 never-seen rows
+  without status remain in `stand-models.md` and `tuning-screen.md`.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

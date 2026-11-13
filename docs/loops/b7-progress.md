@@ -147,7 +147,13 @@ file's history. What's left to see in a drive, from every run:
   ready groups judged by reading their callees; with them
   `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`, `UpdateStand` and
   `PreviewParts` in `tuning-screen.md` become ready; no leads added).
-  Check passed. Migration agent running.
+  Check passed. Migrated 8d0e0496..0e74c60a: the 9 setters,
+  `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`, `PreviewParts`,
+  `SetParts` native (`UpdateStand` calls them), 17 adapters removed
+  (13 more functions Native); under `--native_stand_models`; every
+  harness 0 differing, races 33 s at 40 and 84 s at 90, 0 errors; a
+  harness fault fixed on the way (new groups advanced the shared
+  random generator); no subagents. Validation agent running.
 
 ## Done
 
