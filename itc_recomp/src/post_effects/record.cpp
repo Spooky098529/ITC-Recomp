@@ -16,6 +16,7 @@
 
 #include "guest.h"
 
+#include "app_start_up/start_up.h"
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "car_scene_draw/ops.h"
@@ -89,8 +90,12 @@ class Recorder {
   }
   // The render manager's slot 8, then `byte` of its answer: the command
   // list (4) or the render queue (8).
+  // (Slot 8's plain C++ called directly where it's the game's,
+  // app_start_up::RenderManagerScene.)
   uint32_t Get(uint32_t byte, uint32_t lr1, uint32_t lr2) {
-    const uint32_t object = VtableCall(Load(base_, kRenderApp), 32, lr1);
+    const uint32_t manager = Load(base_, kRenderApp);
+    const auto scene = app_start_up::RenderManagerScene(base_, manager);
+    const uint32_t object = scene ? *scene : VtableCall(manager, 32, lr1);
     return VtableCall(object, byte, lr2);
   }
   // Whether the record may go on natively: no chunk open, room for `slots`.

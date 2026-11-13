@@ -9,6 +9,7 @@
 #include "base/flags.h"
 #include "camera_modes/camera_modes.h"
 #include "hooks/camera_modes.h"
+#include "hooks/direct_slots.h"
 #include "hooks/archive.h"
 #include "hooks/c_runtime.h"
 #include "hooks/cameras.h"
@@ -810,9 +811,13 @@ uint32_t VideoOutputFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   ctx.lr = back;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
+  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  if (!hooks::DirectSlotCall(ctx, base, slot7)) {
+    ctx.ctr.u64 = slot7;
+    REX_CALL_INDIRECT_FUNC(slot7);
+  }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = back + 16;
   REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);

@@ -2,6 +2,7 @@
 // (docs/functions/app-start-up.md).
 
 #include "hooks/app_start_up.h"
+#include "hooks/direct_slots.h"
 
 #include "app_start_up/start_up.h"
 #include "base/flags.h"
@@ -119,9 +120,13 @@ namespace {
 // the original's return addresses.
 uint32_t VideoOutput(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
   ctx.r3.u64 = guest::LoadU32(base, asu::kSceneTargetApp);
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   ctx.lr = first;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
+  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  if (!hooks::DirectSlotCall(ctx, base, slot7)) {
+    ctx.ctr.u64 = slot7;
+    REX_CALL_INDIRECT_FUNC(slot7);
+  }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = second;
   REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
