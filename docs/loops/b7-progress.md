@@ -117,7 +117,17 @@ file's history. What's left to see in a drive, from every run:
   `AreaLights::Load`, `AreaModel::Load`, `RecordHeadlightProjectors`,
   `Scenery::Draw`, all seen in play) with `LocationScreen::PollLoad`
   `sub_82229238`, newly ready; a lead without mapping (not counted).
-  Migration agent running.
+  Migration 8516e7c6..95d287ef (five batches, the last by one
+  subagent: `Unload`, `UnloadPools`, `Destroy`, `CourseSet::Load`
+  with the area lights and models, `OnLoaded`, `PollLoad`,
+  `AnimationSet::FindByTexture` (moved from `functions.md`),
+  `RecordHeadlightProjectors` (frame dump: noise only); 15 adapters
+  removed, in `course-scenery.md`, `camera-modes.md`,
+  `location-screen.md`, `ui-movies-game.md`, `vehicle-accessors.md`;
+  harnesses 0 differing; race 38 s at 40, 0 errors). Left: the rest
+  of `Scenery::Draw`'s split (`DrawArea`, `Minimap::Draw`, the
+  billboards, the light groups, `Scenery::Draw`), all ready.
+  Validation agent running.
 
 ## Done
 

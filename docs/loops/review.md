@@ -13,6 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The course scenery's ready groups (8516e7c6..95d287ef, no mapping):
+  `ObjectPools::Load` calls the three loads directly (`Calls::load`);
+  `AnimationSet::FindByTexture` moved from `functions.md`; 15 adapters
+  removed (`UiMovie::GetPictureTexture`'s register steps moved into
+  its harness). Harness notes: `PollLoad`'s seeds scrambled
+  (SplitMix64) since the shared xorshift gave ~11 distinct worlds in
+  120 cases (the other `location_screen` groups still have low variety,
+  for a later fix); `PollLoad`'s harness leaves out the stack below its
+  frame (callees' register saves); `Scenery::Destroy`'s recompiled side
+  runs under `RecompiledHeapScope` (r3 after `XPhysicalFree`). Six
+  removal candidates kept (five diagnostics wraps, `FromViewport`'s
+  guest call).
 - The race end's map (c8f1147b): `race-end.md`, one row
   (`RaceMode::ModeAfterRace` `sub_82150E00`: after a race, which mode
   next by race kind; movies 6-9 queued in the boot table at the
