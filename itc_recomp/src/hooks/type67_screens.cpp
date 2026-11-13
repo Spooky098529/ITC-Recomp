@@ -108,7 +108,14 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "OpenEmpty sub_822404D8; Type6PanelScreen::Back sub_8223E708, CarList "
               "sub_822307D0, CarEntry sub_822307E0 and CarSlot sub_822307F0; "
               "GroupPair::DeletingDestructor sub_8224ACE0 (the sound manager's slot 13 and "
-              "operator delete guest calls) natively instead of "
+              "operator delete guest calls); the type 7 list screen's "
+              "Type7ListScreen::SetItemText sub_82243238, ClearItemText sub_822432A8, Back "
+              "sub_822434C8, SetUpRace sub_82243018 (with its switch piece AddRacers "
+              "sub_822430BC; the race set-up's plain C++ as type 6's), SetUpMenus sub_82243588, "
+              "SetTitle sub_822433D8, SetDetails sub_82243308 (MenuList::Init's plain C++ where "
+              "it frees natively; UiMovie::ClearText guest calls), ShowMarks sub_82243448, "
+              "ItemInfo sub_82242FA0 (memcpy's plain C++), ~Type7ListScreen sub_82242EC8 and "
+              "DeletingDestructor sub_82242FC8 natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -447,6 +454,34 @@ ITC_TS_STEP(GroupPairDeletingDestruct,
             ts::GroupPairDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(NodeScreenOpen, ts::NodeScreenOpen(base, ctx.r3.u64))
 
+// The type 7 list screen's slots and destructors.
+ITC_TS_STEP(Type7ListScreenSetItemText,
+            ts::Type7ListScreenSetItemText(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ListScreenClearItemText,
+            ts::Type7ListScreenClearItemText(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ListScreenSetTitle,
+            ts::Type7ListScreenSetTitle(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ListScreenSetDetails,
+            ts::Type7ListScreenSetDetails(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ListScreenShowMarks,
+            ts::Type7ListScreenShowMarks(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
+ITC_TS_STEP(Type7ListScreenItemInfo,
+            ts::Type7ListScreenItemInfo(base, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
+                                        uint32_t(ctx.lr), calls))
+ITC_TS_STEP(Type7ListScreenSetUpMenus,
+            ts::Type7ListScreenSetUpMenus(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ListScreenBack,
+            ts::Type7ListScreenBack(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+void Type7ListScreenSetUpRace(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const ts::Calls calls = Type67ScreensCalls(ctx, base);
+  ctx.r3.u64 = ts::Type7ListScreenSetUpRace(base, ctx.r3.u64, ctx.r1.u32, calls);
+}
+ITC_TS_STEP(Type7ListScreenDestruct,
+            ts::Type7ListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ListScreenDeletingDestruct,
+            ts::Type7ListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -690,3 +725,19 @@ ITC_TYPE67_SCREENS(822307F0, Type6PanelScreenCarSlot)
 ITC_TYPE67_SCREENS(8224ACE0, GroupPairDeletingDestruct)
 ITC_TYPE67_SCREENS(82259318, NodeScreenOpen)
 ITC_TYPE67_SCREENS(82259998, NodeScreenItemInfo)
+// The type 7 list screen's slots 2, 3, 6, 7, 14, 25, 26, 27 and 0 and its
+// destructor (from the deleting destructor and the type 7 block's, never
+// seen in play) and SetTitle (from SetUpMenus only, kept for the recompiled
+// SetUpMenus behind the flag; Type7ListScreen::AddRacers sub_822430BC, a
+// piece of SetUpRace's switch in its frame, has no adapter).
+ITC_TYPE67_SCREENS(82243238, Type7ListScreenSetItemText)
+ITC_TYPE67_SCREENS(822432A8, Type7ListScreenClearItemText)
+ITC_TYPE67_SCREENS(822434C8, Type7ListScreenBack)
+ITC_TYPE67_SCREENS(82243018, Type7ListScreenSetUpRace)
+ITC_TYPE67_SCREENS(82243588, Type7ListScreenSetUpMenus)
+ITC_TYPE67_SCREENS(822433D8, Type7ListScreenSetTitle)
+ITC_TYPE67_SCREENS(82243308, Type7ListScreenSetDetails)
+ITC_TYPE67_SCREENS(82243448, Type7ListScreenShowMarks)
+ITC_TYPE67_SCREENS(82242FA0, Type7ListScreenItemInfo)
+ITC_TYPE67_SCREENS(82242EC8, Type7ListScreenDestruct)
+ITC_TYPE67_SCREENS(82242FC8, Type7ListScreenDeletingDestruct)

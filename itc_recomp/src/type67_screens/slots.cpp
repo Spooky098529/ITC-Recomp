@@ -43,6 +43,11 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
     if (!r5) return std::nullopt;
     return NodeScreenItemInfo(base, r3, uint32_t(*r5));
   }
+  // The type 7 list screen's slot 25 (r4 the item; type7_list.cpp).
+  if (target == 0x82242FA0) {
+    if (!r4 || !r5) return std::nullopt;
+    return Type7ListScreenItemInfo(base, *r4, *r5, sp, lr, calls);
+  }
   // The list part's and its inner part's slots, and the inner's pages and
   // steps (list_part.cpp); r5, which only the guest fallbacks see, isn't
   // passed on (the plain C++ here doesn't read it).
@@ -195,6 +200,20 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return PanelScreenPost(base, r3, *r4, target);
       case 0x8224ACE0:
         return GroupPairDeletingDestruct(base, r3, *r4, sp, calls);
+      // The type 7 list screen's slots 2, 3, 6, 26, 27 and 0
+      // (type7_list.cpp).
+      case 0x82243238:
+        return Type7ListScreenSetItemText(base, r3, *r4, sp, calls);
+      case 0x822432A8:
+        return Type7ListScreenClearItemText(base, r3, *r4, sp, calls);
+      case 0x822434C8:
+        return Type7ListScreenBack(base, r3, *r4, sp, calls);
+      case 0x82243308:
+        return Type7ListScreenSetDetails(base, r3, *r4, sp, calls);
+      case 0x82243448:
+        return Type7ListScreenShowMarks(base, r3, *r4, sp);
+      case 0x82242FC8:
+        return Type7ListScreenDeletingDestruct(base, r3, *r4, sp, calls);
       default:
         break;
     }
@@ -257,6 +276,11 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return Type6CarWord(base, 1976);
     case 0x822307F0:
       return Type6CarWord(base, 1980);
+    // The type 7 list screen's slots 7 and 14 (type7_list.cpp).
+    case 0x82243018:
+      return Type7ListScreenSetUpRace(base, r3, sp, calls);
+    case 0x82243588:
+      return Type7ListScreenSetUpMenus(base, r3, sp, calls);
     case 0x82249C30:
       return GroupPairSelectA(base, r3);
     case 0x82249C40:
@@ -281,6 +305,18 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
       return has_r4 && has_r5;
     case 0x82259998:
       return has_r5;
+    case 0x82242FA0:
+      return has_r4 && has_r5;
+    case 0x82243238:
+    case 0x822432A8:
+    case 0x822434C8:
+    case 0x82243308:
+    case 0x82243448:
+    case 0x82242FC8:
+      return has_r4;
+    case 0x82243018:
+    case 0x82243588:
+      return true;
     case 0x822336C0:
     case 0x822337B0:
     case 0x82233730:

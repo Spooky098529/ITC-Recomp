@@ -221,4 +221,17 @@ void Type6PanelScreenCarSlot(PPCContext& ctx, uint8_t* base);
 void GroupPairDeletingDestruct(PPCContext& ctx, uint8_t* base);
 void NodeScreenOpen(PPCContext& ctx, uint8_t* base);
 
+// The type 7 list screen's slots and destructors.
+void Type7ListScreenSetItemText(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenClearItemText(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenSetTitle(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenSetDetails(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenShowMarks(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenItemInfo(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenBack(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenSetUpRace(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

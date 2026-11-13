@@ -1,5 +1,6 @@
-// The color list screen (src/type67_screens/color_list.cpp,
-// docs/functions/type67-screens.md) against the recompiled functions, run
+// The color list screen (src/type67_screens/color_list.cpp) and the type 7
+// list screen over it (type7_list.cpp; docs/functions/type67-screens.md)
+// against the recompiled functions, run
 // under the type67_screens harness (Type67Screens calls Type67ColorList).
 // The originals run with --native_type67_screens off (their calls to each
 // other through the adapters, so the originals), the plain C++ through the
@@ -133,7 +134,13 @@ enum class Kind {
   kRelease,   // item blocks 0 or pages
   kSelection,  // r4 a selection, 0 to 9 (any word sometimes)
   kHide,       // r4 0 or 1 (any word sometimes)
+  kInit,       // item blocks 0 or pages, the new ones compared and freed
+  kDispatcher,  // r4 the dispatcher
+  kIndex,      // r4 0 to 9 (the +10144 list's +4 or selection)
+  kItem,       // r4 an item, 0 to 8; item blocks as kInit's
 };
+
+bool Inits(Kind kind) { return kind == Kind::kInit || kind == Kind::kItem; }
 
 // The stack ranges left out, as [sp - from, sp - to).
 using Ranges = std::vector<std::pair<uint32_t, uint32_t>>;
@@ -250,7 +257,7 @@ void LayBlock(uint8_t* base, uint32_t block, Random& r, Kind kind, std::vector<u
     guest::StoreU32(base, list + rs::kListMove, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
     guest::StoreU32(base, list + rs::kListWrapped, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
     uint32_t items = block + kItemsAt + 0x40 * k;
-    if (kind == Kind::kNoDelete || kind == Kind::kRelease) {
+    if (kind == Kind::kNoDelete || kind == Kind::kRelease || Inits(kind)) {
       items = 0;
       if (r.Below(4) != 0) {
         items = memory::AllocPages(16, 4096);
@@ -300,6 +307,23 @@ void LayBlock(uint8_t* base, uint32_t block, Random& r, Kind kind, std::vector<u
     guest::StoreU32(base, vtable + 4 * i, Pick(r, {kEmpty, kSetR4, kGetter}));
   }
   guest::StoreU32(base, vtable + 100, 0x82256FE8);
+  // The type 7 list screen's slots 2, 3 and 27 (SetItemText, ClearItemText,
+  // ShowMarks) the steps call: its own or a stand-in.
+  guest::StoreU32(base, vtable + 8, Pick(r, {0x82243238, kEmpty, kSetR4, kGetter}));
+  guest::StoreU32(base, vtable + 12, Pick(r, {0x822432A8, kEmpty, kSetR4, kGetter}));
+  guest::StoreU32(base, vtable + 108, Pick(r, {0x82243448, kEmpty, kSetR4, kGetter}));
+  // Type7ListScreen::SetUpMenus' slot 25 its own ItemInfo (play's).
+  if (kind == Kind::kInit) guest::StoreU32(base, vtable + 100, 0x82242FA0);
+  // The type 7 list screen's list part (+11040): its inner's (+20) list's
+  // (+40) block 0 or pages for the destructors.
+  if (kind == Kind::kNoDelete || kind == Kind::kRelease) {
+    uint32_t items = 0;
+    if (r.Below(2) == 0) {
+      items = memory::AllocPages(16, 4096);
+      made.push_back(items);
+    }
+    guest::StoreU32(base, s + 11040 + 20 + 40 + rs::kListBlock, items);
+  }
   // The screen fades: counts 0 mostly.
   lw::WorldRandom(base, kFades, kFadesBytes, r);
   for (const uint32_t at : {mode_tick::kFadeInCounts, mode_tick::kFadeOutCounts}) {
@@ -337,6 +361,13 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
       if (f.kind == Kind::kNoDelete) t.r4.u64 &= ~1ull;
       if (f.kind == Kind::kSelection && r.Below(6) != 0) t.r4.u64 = r.Below(10);
       if (f.kind == Kind::kHide && r.Below(6) != 0) t.r4.u64 = r.Below(2);
+      if (f.kind == Kind::kDispatcher) t.r4.u64 = block + kDispatcherAt;
+      if (f.kind == Kind::kIndex) t.r4.u64 = r.Below(10);
+      if (f.kind == Kind::kItem) t.r4.u64 = r.Below(9);
+      std::vector<uint32_t> old_items;
+      for (const uint32_t at : kLists) {
+        old_items.push_back(guest::LoadU32(base, block + at + rs::kListBlock));
+      }
       t.lr = 0x82000000 + 4 * r.Below(1024);
       g_answers = Random(r.Next());
       std::vector<Recorded> recorded;
@@ -359,6 +390,20 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
                                     uint32_t(call.r3 >> 32), uint32_t(call.r4),
                                     uint32_t(call.r4 >> 32)}) {
           out[v].Word(word);
+        }
+      }
+      // MenuList::Init's new item blocks: compared (whether one was made,
+      // its words) and freed, their words in the lists replaced.
+      if (Inits(f.kind)) {
+        for (uint32_t k = 0; k < 4; k++) {
+          const uint32_t list = block + kLists[k];
+          const uint32_t now = guest::LoadU32(base, list + rs::kListBlock);
+          out[v].Word(now == old_items[k] ? 1 : 0);
+          if (now != 0 && now != old_items[k] && memory::IsPages(now)) {
+            out[v].Bytes(Read(base, now, 4 * guest::LoadU32(base, list + rs::kListCount)));
+            memory::FreePages(now);
+            guest::StoreU32(base, list + rs::kListBlock, 0xB10C0000 + k);
+          }
         }
       }
       // The item blocks the destructors free: whether still the layer's.
@@ -391,12 +436,10 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
 // The deleting destructor with bit 0 of r4 set: a block of operator new's
 // (its lists' item blocks 0) destroyed and deleted, compared by r3 and
 // whether operator new hands the block out again.
-void Deleting(Context& h) {
+void Deleting(Context& h, const char* name, uint32_t kAddress, uint32_t kBytes,
+              GuestFunction recompiled, GuestFunction native) {
   uint8_t* const base = h.base;
-  constexpr uint32_t kBytes = 11200;
-  constexpr uint32_t kAddress = 0x82255840;
-  Results results(
-      fmt::format("ColorListScreen::DeletingDestructor, deleting (sub_{:08X})", kAddress));
+  Results results(fmt::format("{}, deleting (sub_{:08X})", name, kAddress));
   for (int c = 0; c < 4; c++) {
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
@@ -410,22 +453,58 @@ void Deleting(Context& h) {
       for (const uint32_t at : kLists) {
         guest::StoreU32(base, *object + at + rs::kListBlock, 0);
       }
+      if (kBytes > 11040 + 60 + rs::kListBlock) {
+        guest::StoreU32(base, *object + 11040 + 20 + 40 + rs::kListBlock, 0);
+      }
       PPCContext t = CallContext(h);
       t.r3.u64 = *object;
       t.r4.u64 = (r.Next() & ~3ull) | (r.Below(2) == 0 ? 1 : 3);
       t.lr = 0x82000000 + 4 * r.Below(1024);
       if (v == 0) {
         ITC_FLAG(native_type67_screens) = false;
-        __imp__sub_82255840(t, base);
+        recompiled(t, base);
         ITC_FLAG(native_type67_screens) = true;
       } else {
-        hooks::ColorListScreenDeletingDestruct(t, base);
+        native(t, base);
       }
       out[v].Word(t.r3.u32 == *object ? 1 : 0);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       const auto probe = memory::crt::OperatorNew(base, kBytes);
       out[v].Word(probe && *probe == *object ? 1 : 0);
       if (probe) memory::crt::OperatorDelete(*probe);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// Type7ListScreen::ItemInfo (r4 the item: 0 to 8 mostly, else 9 to 12 or
+// any word): r5 an info in a block of random words; the block and r3 (both
+// halves) compared.
+void ItemInfos(Context& h, uint32_t block) {
+  uint8_t* const base = h.base;
+  constexpr uint32_t kAddress = 0x82242FA0;
+  Results results(fmt::format("Type7ListScreen::ItemInfo (sub_{:08X})", kAddress));
+  for (int c = 0; c < 12; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(Seed(uint64_t(kAddress) << 16 ^ uint64_t(c)));
+      lw::WorldRandom(base, block, 0x100, r);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = r.Next();
+      t.r4.u64 = r.Below(4) == 0 ? (r.Below(2) == 0 ? 9 + r.Below(4) : r.Next()) : r.Below(9);
+      t.r5.u64 = (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0) | (block + 4 * r.Below(48));
+      t.lr = 0x82000000 + 4 * r.Below(1024);
+      if (v == 0) {
+        ITC_FLAG(native_type67_screens) = false;
+        __imp__sub_82242FA0(t, base);
+        ITC_FLAG(native_type67_screens) = true;
+      } else {
+        hooks::Type7ListScreenItemInfo(t, base);
+      }
+      out[v].Bytes(Read(base, block, 0x100));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
     }
     results.Check(out[0], out[1], fmt::format("case {}", c));
   }
@@ -493,7 +572,7 @@ void Type67ColorList(Context& h) {
        saves({{64, 0}, {288, 240}, {376, 336}, {440, 376}, {568, 512}}), __imp__sub_82256CA0,
        hooks::ColorListScreenDraw},
       {"ColorListScreen::Update", 0x82256E08, 12, K::kAny,
-       saves({{64, 0}, {288, 240}, {320, 288}, {472, 368}, {592, 496}, {672, 628}}),
+       saves({{64, 0}, {288, 240}, {320, 288}, {496, 368}, {592, 496}, {672, 628}}),
        __imp__sub_82256E08,
        hooks::ColorListScreenUpdate},
       {"ColorListScreen::Step0", 0x82258578, 8, K::kAny, saves({{24, 0}}), __imp__sub_82258578,
@@ -515,7 +594,7 @@ void Type67ColorList(Context& h) {
        saves({{32, 0}, {208, 132}, {304, 260}}), __imp__sub_82255CD0,
        hooks::ColorListScreenStep6},
       {"ColorListScreen::Step7", 0x82256AC0, 12, K::kAny,
-       saves({{80, 0}, {232, 180}, {352, 308}}), __imp__sub_82256AC0,
+       saves({{80, 0}, {256, 180}, {352, 308}}), __imp__sub_82256AC0,
        hooks::ColorListScreenStep7},
       {"ColorListScreen::Step8", 0x82256030, 12, K::kAny,
        saves({{56, 0}, {200, 148}, {320, 276}}), __imp__sub_82256030,
@@ -526,11 +605,40 @@ void Type67ColorList(Context& h) {
        __imp__sub_82255198, hooks::ColorListScreenDestruct},
       {"ColorListScreen::DeletingDestructor", 0x82255840, 4, K::kNoDelete,
        saves({{24, 0}, {128, 112}}), __imp__sub_82255840, hooks::ColorListScreenDeletingDestruct},
+      // The type 7 list screen's own slots and destructors (type7_list.cpp).
+      {"Type7ListScreen::SetItemText", 0x82243238, 8, K::kIndex, saves({{32, 0}, {80, 48}}),
+       __imp__sub_82243238, hooks::Type7ListScreenSetItemText},
+      {"Type7ListScreen::ClearItemText", 0x822432A8, 8, K::kIndex, saves({{32, 0}}),
+       __imp__sub_822432A8, hooks::Type7ListScreenClearItemText},
+      {"Type7ListScreen::ShowMarks", 0x82243448, 8, K::kIndex, saves({{32, 0}}),
+       __imp__sub_82243448, hooks::Type7ListScreenShowMarks},
+      {"Type7ListScreen::SetTitle", 0x822433D8, 4, K::kAny, saves({{40, 0}, {80, 48}}),
+       __imp__sub_822433D8, hooks::Type7ListScreenSetTitle},
+      {"Type7ListScreen::Back", 0x822434C8, 8, K::kDispatcher, saves({{16, 0}}),
+       __imp__sub_822434C8, hooks::Type7ListScreenBack},
+      {"Type7ListScreen::SetDetails", 0x82243308, 12, K::kItem, saves({{48, 0}, {112, 80}}),
+       __imp__sub_82243308, hooks::Type7ListScreenSetDetails},
+      // SetUpMenus: SetTitle's and LoadItem's saves and SetTitle's varargs
+      // words (its frame's +48 to +79, below SetUpMenus' 144 bytes).
+      {"Type7ListScreen::SetUpMenus", 0x82243588, 12, K::kInit,
+       saves({{48, 0}, {184, 144}, {224, 192}}),
+       __imp__sub_82243588, hooks::Type7ListScreenSetUpMenus},
+      // The destructors: ~ListPart's and ~ListPartInner's saves.
+      {"Type7ListScreen::~Type7ListScreen", 0x82242EC8, 8, K::kRelease,
+       saves({{16, 0}, {112, 96}, {208, 192}}),
+       __imp__sub_82242EC8, hooks::Type7ListScreenDestruct},
+      {"Type7ListScreen::DeletingDestructor", 0x82242FC8, 4, K::kNoDelete,
+       saves({{24, 0}, {128, 112}, {224, 208}, {320, 304}}),
+       __imp__sub_82242FC8, hooks::Type7ListScreenDeletingDestruct},
   };
   for (const Function& f : functions) {
     Run(h, w, block, f);
   }
-  Deleting(h);
+  Deleting(h, "ColorListScreen::DeletingDestructor", 0x82255840, 11200, __imp__sub_82255840,
+           hooks::ColorListScreenDeletingDestruct);
+  Deleting(h, "Type7ListScreen::DeletingDestructor", 0x82242FC8, 11264, __imp__sub_82242FC8,
+           hooks::Type7ListScreenDeletingDestruct);
+  ItemInfos(h, block);
   memory::Free(block);
   saved.Restore();
 }

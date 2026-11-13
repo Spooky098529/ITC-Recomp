@@ -847,4 +847,63 @@ uint64_t GroupPairDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, u
 // sub_82259318 NodeScreen::Open: +10064 = 4. r3 left.
 uint64_t NodeScreenOpen(uint8_t* base, uint64_t r3);
 
+// --- The type 7 list screen's own slots and destructors (type7_list.cpp) ---
+
+constexpr uint32_t kType7ListScreenVtable = 0x82010F18;
+
+// sub_82243238 Type7ListScreen::SetItemText (slot 2; 128-byte frame; r4 an
+// index): SetText(m, 21, 5 + i, [0x82637054 + 4 r4 + 4 i]) for i 0 to 3.
+// The last SetText's r3.
+uint64_t Type7ListScreenSetItemText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                    const Calls& calls);
+// sub_822432A8 Type7ListScreen::ClearItemText (slot 3; 128): ClearText(m,
+// 21, 5 + i) for i 0 to 2 but r4 (a guest call). The last one's r3.
+uint64_t Type7ListScreenClearItemText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                      const Calls& calls);
+// sub_822433D8 Type7ListScreen::SetTitle (128; from SetUpMenus only):
+// SetText(m, 20, 5 + i, [0x82637194 + 4 i]) for i 0 to 2. The last r3.
+uint64_t Type7ListScreenSetTitle(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82243308 Type7ListScreen::SetDetails (slot 26; 160; r4 an item, 0 to
+// 8): the item's record (0x82637098 + 28 r4): MenuList::Init on +10216 with
+// its +8 count, then for i 0 and 1, SetText(m, 9, 5 + i, [0x82637078 + 4
+// [record + 12 + 4 i]]) while i < the count, else ClearText(m, 9, 5 + i).
+// The last call's r3.
+uint64_t Type7ListScreenSetDetails(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                   const Calls& calls);
+// sub_82243448 Type7ListScreen::ShowMarks (slot 27; 128): FindNode(m, -1,
+// 18)'s +80 = (r4 != 0), FindNode(m, -1, 19)'s +80 = (r4 != 6). The second
+// node.
+uint64_t Type7ListScreenShowMarks(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
+// sub_82242FA0 Type7ListScreen::ItemInfo (slot 25; no frame): item r4 (0 to
+// 8, else nothing)'s 28-byte record from 0x82637098 to r5 (memcpy, a tail
+// call from `sp` returning to `lr`: its plain C++, else a guest call). r5.
+uint64_t Type7ListScreenItemInfo(uint8_t* base, uint64_t r4, uint64_t r5, uint32_t sp,
+                                 uint32_t lr, const Calls& calls);
+// sub_82243588 Type7ListScreen::SetUpMenus (slot 14; 144): MenuList::Init
+// on +10144, +10288 (selection 1), +10360 (selection 0) and +10216,
+// SetTitle, ColorListScreen::LoadItem(Selection(+10144), -1). LoadItem's r3.
+uint64_t Type7ListScreenSetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822434C8 Type7ListScreen::Back (slot 6; 112; r4 the dispatcher):
+// +9608 = 9, message 5 posted, the sound manager's slot 13, Sound::Play(1,
+// 2), as Type6ListScreen::Back. Its r3.
+uint64_t Type7ListScreenBack(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                             const Calls& calls);
+// sub_82243018 Type7ListScreen::SetUpRace (slot 7; 4,064-byte frame, with
+// its switch piece sub_822430BC): the race data reset, its stages cleared,
+// its +32 = the +10360 list's selection, +0xA3AF0 = 3, +0xA3AF4 = 6; the
+// route by +10148 plus the +10144 list's selection (0 to 14, else route 0)
+// set on the race (Race::SetRoute(0, route)); +0x59618 = 4 when the +10288
+// list's selection is 0; +0x5961C left; the list part's slot 5 (its answer:
+// the record's +3892 and the save data's +0x1F870); the type 7 car's racer
+// record at the frame's +80, added to the race and the stage; AddStage(4)
+// (nothing), the racers placed, +9608 = 10. PlaceRacers' r3.
+uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82242EC8 Type7ListScreen::~Type7ListScreen (96): its vtable,
+// ~ListPart on +11040, ~ColorListScreen. r3 the screen.
+uint64_t Type7ListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82242FC8 Type7ListScreen::DeletingDestructor (112): the destructor,
+// operator delete (a guest call) when bit 0 of `flags` is set. r3.
+uint64_t Type7ListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                         const Calls& calls);
+
 }  // namespace type67_screens
