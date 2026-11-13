@@ -1491,7 +1491,11 @@ void CameraModesStep8217BE98(PPCContext& ctx, uint8_t* base) {
         ctx.r3.u64 = object;
         ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
         ctx.lr = back;
-        REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+        // (The render manager's slot 8 by its plain C++ where it's the
+        // game's, hooks::DirectSlotCall.)
+        if (!hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
+          REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+        }
         return ctx.r3.u32;
       };
       const uint32_t scene = slot(guest::LoadU32(base, 0x826BABA0), 32, 0x8217BEC8);

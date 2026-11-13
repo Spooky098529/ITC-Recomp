@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "hooks/car_makers.h"
+#include "hooks/direct_slots.h"
 #include "hooks/front_end_car_draw.h"
 #include "hooks/guest_call.h"
 #include "power_graph/power_graph.h"
@@ -56,7 +57,11 @@ uint32_t VtableCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t of
   const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
   ctx.ctr.u64 = function;
   ctx.lr = back;
-  REX_CALL_INDIRECT_FUNC(function);
+  // (The render manager's slot 8 by its plain C++ where it's the game's,
+  // hooks::DirectSlotCall.)
+  if (!hooks::DirectSlotCall(ctx, base, function)) {
+    REX_CALL_INDIRECT_FUNC(function);
+  }
   return ctx.r3.u32;
 }
 

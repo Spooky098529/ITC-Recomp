@@ -14,6 +14,7 @@
 #include "car_physics/car_physics.h"
 #include "matrix_math/matrix_math.h"
 #include "models/model.h"
+#include "models/texture_provider.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
@@ -28,6 +29,27 @@ namespace scenery_lists {
 namespace {
 
 using Fpscr = rex::platform::FPSCRPlatform;
+
+// A call of the texture provider's slot `function` (args: the provider, the
+// slot, the index) from `frame` with `lr`: its plain C++ where it's the
+// game's slots 5 to 7 (models::CallXprTexture, as its adapter runs it: its
+// own guest calls from its 96-byte frame below `frame`, the back chain
+// written first), else the guest call.
+uint32_t ProviderSlotCall(uint8_t* base, const DrawCalls& calls, uint32_t function,
+                          const uint32_t (&args)[3], uint32_t frame, uint32_t lr) {
+  const auto direct = models::CallXprTexture(
+      base, function, args[0], args[1], args[2], frame,
+      [&](uint32_t target, uint32_t inner, uint32_t inner_lr, uint64_t r3,
+          uint64_t r4) -> uint64_t {
+        guest::StoreU32(base, inner, frame);
+        const uint32_t inner_args[2] = {uint32_t(r3), uint32_t(r4)};
+        return calls.call(calls.user, target, inner_args, 2, inner, inner_lr);
+      });
+  if (direct) {
+    return uint32_t(*direct);
+  }
+  return calls.call(calls.user, function, args, 3, frame, lr);
+}
 
 constexpr uint32_t kOne = 0x82000A30;    // 1.0
 constexpr uint32_t kZero = 0x82000A34;   // 0.0
@@ -719,9 +741,8 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
           if (lookup) {
             const uint32_t from = guest::LoadU32(base, model + 48);
             const uint32_t args[3] = {from, first, second_word};
-            texture = calls.call(calls.user,
-                                 guest::LoadU32(base, guest::LoadU32(base, from) + 20), args, 3,
-                                 frame, 0x821473D0);
+            texture = ProviderSlotCall(base, calls,
+                             guest::LoadU32(base, guest::LoadU32(base, from) + 20), args, frame, 0x821473D0);
           }
           slot = Take(base, list);
           guest::StoreU32(base, slot + 4, texture);
@@ -764,9 +785,8 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
         const uint32_t from = guest::LoadU32(base, model + 48);
         const uint32_t args[3] = {from, guest::LoadU32(base, material + 124),
                                   guest::LoadU32(base, material + 120)};
-        const uint32_t texture = calls.call(
-            calls.user, guest::LoadU32(base, guest::LoadU32(base, from) + function_slot), args,
-            3, frame, lr);
+        const uint32_t texture = ProviderSlotCall(base, calls,
+                             guest::LoadU32(base, guest::LoadU32(base, from) + function_slot), args, frame, lr);
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
         guest::StoreU32(base, slot + 4, texture);
@@ -1186,8 +1206,8 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
           const uint32_t args[3] = {from, guest::LoadU32(base, material + 144 + 4 * uint32_t(k)),
                                     guest::LoadU32(base, material + 176 + 4 * uint32_t(k))};
           const uint32_t texture =
-              calls.call(calls.user, guest::LoadU32(base, guest::LoadU32(base, from) + 20), args,
-                         3, frame, 0x82595CBC);
+              ProviderSlotCall(base, calls,
+                             guest::LoadU32(base, guest::LoadU32(base, from) + 20), args, frame, 0x82595CBC);
           slot = Take(base, list);
           guest::StoreU32(base, slot + 4, texture);
           guest::StoreU32(base, slot + 0, uint32_t(k));
@@ -1233,9 +1253,8 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
         }
         const uint32_t from = guest::LoadU32(base, model + 48);
         const uint32_t args[3] = {from, first, second_id};
-        const uint32_t texture = calls.call(
-            calls.user, guest::LoadU32(base, guest::LoadU32(base, from) + function_slot), args,
-            3, frame, lr);
+        const uint32_t texture = ProviderSlotCall(base, calls,
+                             guest::LoadU32(base, guest::LoadU32(base, from) + function_slot), args, frame, lr);
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
         guest::StoreU32(base, slot + 4, texture);
@@ -1565,8 +1584,8 @@ uint32_t ProviderTexture(uint8_t* base, const DrawCalls& calls, uint32_t frame, 
   const uint32_t provider = guest::LoadU32(base, model + 48);
   const uint32_t args[3] = {provider, guest::LoadU32(base, material + 144 + 4 * k),
                             guest::LoadU32(base, material + 176 + 4 * k)};
-  return calls.call(calls.user, guest::LoadU32(base, guest::LoadU32(base, provider) + 20), args,
-                    3, frame, lr);
+  return ProviderSlotCall(base, calls,
+                             guest::LoadU32(base, guest::LoadU32(base, provider) + 20), args, frame, lr);
 }
 
 void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t frame,
@@ -1863,9 +1882,8 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
           const uint32_t provider = guest::LoadU32(base, model + 48);
           const uint32_t args[3] = {provider, guest::LoadU32(base, material + 124),
                                     guest::LoadU32(base, material + 120)};
-          texture = calls.call(calls.user,
-                               guest::LoadU32(base, guest::LoadU32(base, provider) + 24), args,
-                               3, frame, 0x820CFE74);
+          texture = ProviderSlotCall(base, calls,
+                             guest::LoadU32(base, guest::LoadU32(base, provider) + 24), args, frame, 0x820CFE74);
         }
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
