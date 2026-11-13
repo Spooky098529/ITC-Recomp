@@ -114,4 +114,19 @@ void SaveDevicesDestroySteps(PPCContext& ctx, uint8_t* base);
 // adapter: only Destroy's plain C++ calls it).
 void SlotArrayResetSteps(PPCContext& ctx, uint8_t* base);
 
+// The save devices' slot handlers (save_interface/slot_handlers.h), each
+// writing its prologue's saves as the original does: r3 = the save devices,
+// r4 = a slot; r3 the slot's next state.
+void SlotWaitForUserSteps(PPCContext& ctx, uint8_t* base);    // sub_820A4870
+void SlotWaitForDeviceSteps(PPCContext& ctx, uint8_t* base);  // sub_820A5878
+void SlotFailedSteps(PPCContext& ctx, uint8_t* base);         // sub_820A4890
+void SlotReadySteps(PPCContext& ctx, uint8_t* base);          // sub_820A58D8
+void SlotEnumerateStepSteps(PPCContext& ctx, uint8_t* base);  // sub_820A59C0
+// sub_820A4800 SaveDevices::OnEvent: r3 = the save devices, r4 = the run
+// loop, r5 = the event; the run loop's slots 4 and 3 guest calls from its
+// frame.
+void DevicesOnEventSteps(PPCContext& ctx, uint8_t* base);
+// sub_820908D8, the framework's +56 interface's slot 1: r3 = the interface.
+void FrameworkDeviceListSteps(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

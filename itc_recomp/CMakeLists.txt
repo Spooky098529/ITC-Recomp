@@ -345,6 +345,7 @@ set(ITC_SOURCES
     src/save_interface/save_devices.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
+    src/save_interface/slot_handlers.cpp
     src/hooks/file_layer.cpp
     src/file_layer/file_layer.cpp
     src/hooks/texture_compression.cpp
@@ -754,6 +755,7 @@ set(ITC_SOURCES
     src/harnesses/race_states.cpp
     src/harnesses/archive.cpp
     src/harnesses/save_interface.cpp
+    src/harnesses/save_handlers.cpp
     src/harnesses/app_start_up.cpp
     src/harnesses/data_load.cpp
     src/harnesses/career.cpp

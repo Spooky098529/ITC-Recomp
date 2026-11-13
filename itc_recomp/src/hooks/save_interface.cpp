@@ -14,6 +14,7 @@
 #include "save_interface/save_devices.h"
 #include "save_interface/save_interface.h"
 #include "save_interface/save_layer.h"
+#include "save_interface/slot_handlers.h"
 
 ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "Run the save system's interface (docs/functions/save-interface.md: "
@@ -42,7 +43,11 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "adapter: only the constructor's plain C++ calls it; the notification listener "
               "stored as none without XNotifyCreateListener) and destructor sub_820A6110 with "
               "SaveDevices::Destroy sub_820A56E8 and SlotArray::Reset sub_820A55F0 (no adapters: "
-              "only the destructor's plain C++ calls them; the listener's CloseHandle left out)) "
+              "only the destructor's plain C++ calls them; the listener's CloseHandle left out)); "
+              "the save devices' slot handlers WaitForUser sub_820A4870, WaitForDevice "
+              "sub_820A5878, Failed sub_820A4890, Ready sub_820A58D8 and EnumerateStep "
+              "sub_820A59C0, the listener delegate's target sub_820A4800 and the framework's "
+              "device list sub_820908D8 "
               "natively instead of through the "
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
@@ -501,6 +506,76 @@ void SlotArrayResetSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = si::SlotArrayReset(base, ctx.r3.u32, DestroySlots(ctx, base, frame));
 }
 
+namespace {
+
+// The call into an adapter as a CallSite: its stack pointer, return address
+// and r27 to r31.
+si::CallSite Site(const PPCContext& ctx) {
+  return si::CallSite{ctx.r1.u32, uint32_t(ctx.lr), ctx.r27.u64, ctx.r28.u64,
+                      ctx.r29.u64,  ctx.r30.u64,     ctx.r31.u64};
+}
+
+// A guest call to `function` from native code at `at` (its stack pointer,
+// return address and nonvolatile registers as the original's call has
+// them); r3 and the other argument registers set by the caller. The stack
+// pointer and r27 to r31 put back after.
+void GuestCallAt(PPCContext& ctx, uint8_t* base, uint32_t function, const si::CallSite& at) {
+  const uint64_t r1 = ctx.r1.u64, r27 = ctx.r27.u64, r28 = ctx.r28.u64, r29 = ctx.r29.u64,
+                 r30 = ctx.r30.u64, r31 = ctx.r31.u64;
+  ctx.r1.u64 = at.sp;
+  ctx.r27.u64 = at.r27;
+  ctx.r28.u64 = at.r28;
+  ctx.r29.u64 = at.r29;
+  ctx.r30.u64 = at.r30;
+  ctx.r31.u64 = at.r31;
+  ctx.lr = at.lr;
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = r1;
+  ctx.r27.u64 = r27;
+  ctx.r28.u64 = r28;
+  ctx.r29.u64 = r29;
+  ctx.r30.u64 = r30;
+  ctx.r31.u64 = r31;
+}
+
+}  // namespace
+
+void SlotWaitForUserSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotWaitForUser(base, ctx.r4.u32);
+}
+
+void SlotWaitForDeviceSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotWaitForDevice(base, ctx.r4.u32, Site(ctx));
+}
+
+void SlotFailedSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotFailed(base, ctx.r4.u32);
+}
+
+void SlotReadySteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotReady(base, ctx.r4.u32, Site(ctx));
+}
+
+void SlotEnumerateStepSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotEnumerateStep(base, ctx.r3.u32, ctx.r4.u32, Site(ctx));
+}
+
+void DevicesOnEventSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t loop = ctx.r4.u32;
+  si::DevicesOnEvent(base, ctx.r3.u32, loop, ctx.r5.u32, Site(ctx),
+                     [&](uint32_t offset, uint32_t key, const si::CallSite& at) {
+                       ctx.r3.u64 = loop;
+                       ctx.r4.u64 = key;
+                       GuestCallAt(ctx, base,
+                                   guest::LoadU32(base, guest::LoadU32(base, loop) + offset), at);
+                     });
+}
+
+void FrameworkDeviceListSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::FrameworkDeviceList(base, ctx.r3.u32);
+}
+
 }  // namespace hooks
 
 // No adapter (removed 2026-10-28: in play only the request setters' plain
@@ -600,3 +675,13 @@ ITC_SAVE_INTERFACE_ADAPTER(820A6110, SaveDevicesDeleteSteps)
 // calls it), SaveDevices::Destroy sub_820A56E8 and
 // SlotArray::Reset sub_820A55F0 (only the destructor's plain C++ calls
 // them): their register steps are the harness's.
+// The save devices' slot handlers (through the save devices' +76 to +112,
+// from SaveDevices::Update) and the listener delegate's target (never in
+// play); the framework's +56 interface's slot 1 (through its vtable).
+ITC_SAVE_INTERFACE_ADAPTER(820A4870, SlotWaitForUserSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A5878, SlotWaitForDeviceSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A4890, SlotFailedSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A58D8, SlotReadySteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A59C0, SlotEnumerateStepSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A4800, DevicesOnEventSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820908D8, FrameworkDeviceListSteps)
