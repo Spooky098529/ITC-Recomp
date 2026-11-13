@@ -600,6 +600,8 @@ set(ITC_SOURCES
     src/type2_screens/build_pages.cpp
     src/type2_screens/hub_update.cpp
     src/scene_models/apply.cpp
+    src/hooks/renderer_objects.cpp
+    src/renderer_objects/renderer_objects.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp
@@ -793,6 +795,7 @@ set(ITC_SOURCES
     src/harnesses/post_effects.cpp
     src/harnesses/scene_target.cpp
     src/harnesses/frame_passes.cpp
+    src/harnesses/renderer_objects.cpp
     src/harnesses/command_buffer.cpp
     src/harnesses/single_commands.cpp
     src/harnesses/predicated_tiling.cpp

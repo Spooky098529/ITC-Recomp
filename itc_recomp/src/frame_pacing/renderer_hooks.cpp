@@ -23,6 +23,7 @@
 #include "frame_pacer.h"
 #include "game_messages.h"
 #include "guest.h"
+#include "hooks/renderer_objects.h"
 #include "hooks/title_screen.h"
 #include "interpolation/blend_state.h"
 #include "native/renderer.h"
@@ -159,7 +160,7 @@ void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   interpolation::BlendState_OnReplayFrameStart();
   native::Renderer_OnReplayStart();
   ctx.r3.u64 = renderer;
-  sub_82091E58(ctx, base);
+  hooks::RendererDrawFrame(ctx, base);  // Renderer::DrawFrame (src/renderer_objects/)
   debug::ReplayStats_OnFrame();
   native::Renderer_EndFrame();
   if (timing) {
