@@ -18,6 +18,18 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5052`, `itc_5047`, ok; the
+parking area's car pick, `location-screen.md`, and its camera animations,
+`camera-modes.md`):
+
+- `sub_82229238` LocationScreen::PollLoad
+- `sub_82228588` LocationScreen::PoseCar
+- `sub_82150300` CameraAnims::Find
+- `sub_82150960` CameraAnims::Evaluate
+- `sub_82150A10` CameraAnims::ObjectMatrix
+
+The race end's:
+
 Not in the attract race or the replay (`itc_5006`, `itc_5007`, ok; the
 race's end: an unlock after a career race, an event race's end, the
 Live mode's time attack):

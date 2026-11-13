@@ -139,9 +139,25 @@ file's history. What's left to see in a drive, from every run:
   `GarageScreen::Transition6`; no own print: `Texture::GetLevelDesc`),
   a fix agent fixes the harnesses and makes `GetPictureTexture`'s row
   Merged; then the validation again. 14 ran in the race, 5 in the
-  replay `itc_5047` (ok), 6 not in game. Fix agent running.
+  replay `itc_5047` (ok), 6 not in game. The fix (1fdeb678): logging
+  confirmed `GetB`'s back chain and saves at each caller's r1 in all
+  12 groups (no native difference); the harnesses leave out exactly
+  those words (`GetBSaves`); `GetPictureTexture` Merged into
+  `PollLoad`. Validated again by the fix agent's run `itc_5052` (race
+  54 s at 180, 0 errors, every harness 0 differing outside the
+  expected groups, checked by the lead), 24 of 24 harness lines; 5 to
+  drive. Recorded.
+- Next: the rest of `Scenery::Draw`'s split (`DrawArea` `sub_820F3B70`,
+  `Minimap::Draw` `sub_820F5740`, the billboards `sub_8209C1A0`,
+  `sub_8209CC38`, `sub_8209CDB0`, the light groups `sub_82148658`,
+  `Scenery::Draw` `sub_820F6068`), a lead without mapping (not
+  counted). Migration agent running.
 
 ## Done
+
+- The course scenery's ready groups (no mapping): 10 made native, 15
+  adapters removed, 8516e7c6..95d287ef, harness fix 1fdeb678;
+  validated.
 
 - `Scenery::IsLoaded` (no mapping): with `WaitCourse` and `EndTick`, 12
   adapters removed, ce238773..880882d4; validated.
@@ -200,5 +216,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After `Scenery::IsLoaded`: ours 5814, work left 835 (wrapped 55,
   known 384, unknown 396).
+
+- After the course scenery's ready groups: ours 5824, work left 825
+  (wrapped 55, known 374, unknown 396).
 
 ## Stopped

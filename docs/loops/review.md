@@ -25,6 +25,13 @@ When the user has reviewed a run's section, its heading gets
   runs under `RecompiledHeapScope` (r3 after `XPhysicalFree`). Six
   removal candidates kept (five diagnostics wraps, `FromViewport`'s
   guest call).
+- Its validation stopped on a harness fault (12 `front_end_car_draw`,
+  `car_makers` and `tuning_pages_movie` groups): removing `GetB`'s
+  adapter let the recompiled sides run its original, writing its frame
+  below their callers; the harnesses now leave out exactly `GetB`'s
+  back chain and saves at each caller's r1 (1fdeb678, by the harness
+  fault precedent). `UiMovie::GetPictureTexture` set to Merged into
+  `PollLoad` (no print of its own, as `Texture::GetLevelDesc`).
 - The race end's map (c8f1147b): `race-end.md`, one row
   (`RaceMode::ModeAfterRace` `sub_82150E00`: after a race, which mode
   next by race kind; movies 6-9 queued in the boot table at the
