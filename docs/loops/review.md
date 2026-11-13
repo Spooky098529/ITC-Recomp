@@ -83,6 +83,12 @@ When the user has reviewed a run's section, its heading gets
   pool thunks' precedent); `XPR::GetTexture`'s diagnostics wrap left
   out of slots 5-7 (as `CarModel::SelectedTexture`); `XPR::FindTexture`
   (not seen) stays a guest call.
+- The cleanup lead over their callers (4577728d..bc20b2d4): notes in 16
+  function files (no Status changes); `hooks::DirectSlotCall` sets r3,
+  r11 and ctr as the original leaves them; most callers' harnesses use
+  stand-in getters, so the direct path is checked by the new
+  `RenderManagerSlotDirect` and `TextureProviderSlotDirect` groups. Left
+  out of scope: `app_camera.cpp`'s guest calls to `sub_82094320`.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

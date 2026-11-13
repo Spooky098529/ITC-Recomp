@@ -103,7 +103,13 @@ file's history. What's left to see in a drive, from every run:
 - Next: the cleanup lead the migration added (no mapping, not
   counted): native callers' guest calls into the render manager's
   slots and the texture provider's getters made direct calls; its line
-  deleted from `leads.md`. Migration agent running.
+  deleted from `leads.md`. Migrated 4577728d..bc20b2d4: ~30 native
+  callers in 16 subsystems call the plain C++ directly when the vtable
+  holds the known target (`hooks/direct_slots.h`), guest call
+  otherwise; two new harness groups for the direct paths; every harness
+  0 differing, races 38, 24, 38, 23 s at 40 (the short ones the
+  harnesses' time), 0 errors; no adapters removable; no subagents.
+  Validation agent running.
 
 ## Done
 
