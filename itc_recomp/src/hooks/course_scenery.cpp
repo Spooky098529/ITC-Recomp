@@ -75,7 +75,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "Scenery::DrawSetLists sub_820F52A8 (the scenery lists' draws' plain C++ called "
               "directly, their adapters where it declines), "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
-              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, "
+              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, AnimationSet::FindByTexture sub_82146A38, "
               "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
               "sub_820F1C30; with --native_models CourseSet::Parse sub_820F1A70 (no adapter), AreaModel::Parse "
               "sub_820F1258 (no adapter: only its OnLoaded calls it) and OnLoaded sub_820F1CE8, "
@@ -278,6 +278,10 @@ void hooks::CourseSceneryUpdate(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
+
+// AnimationSet::FindByTexture: r3 = the set, r4 = a texture; r3 = the index
+// or -1. From the light groups' draw sub_82148658 (recompiled).
+ITC_COURSE_SCENERY(82146A38, ctx.r3.u64 = FindAnimationByTexture(base, ctx.r3.u32, ctx.r4.u32))
 
 // --- The course set's draws ---
 

@@ -3017,6 +3017,50 @@ void CourseSetOnLoadedCases(Context& h) {
   results.Report();
 }
 
+// AnimationSet::FindByTexture: TextureAnimationCases' sets (up to 6
+// animations, 1 to 8 frames: with none the original reads guest address 4,
+// unmapped here, and no set in play has an animation without frames), each
+// animation's texture word (+20 + 4 x frames) one of 4 values, the texture
+// asked for one of them or another. Compared: r3 (64 bits).
+void FindByTextureCases(Context& h) {
+  Random r(0x46494E44);
+  Results results("AnimationSet::FindByTexture (sub_82146A38)");
+  for (int c = 0; c < 128; c++) {
+    const uint32_t count = r.Below(5) == 0 ? 0 : r.Below(7);
+    uint32_t offsets[6], frames[6], textures[6];
+    for (uint32_t i = 0; i < 6; i++) {
+      offsets[i] = 96 * r.Below(8);
+      frames[i] = 1 + r.Below(8);
+      textures[i] = 0x30000000u + r.Below(4);
+    }
+    const uint32_t texture = 0x30000000u + r.Below(5);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t set = h.data + 256;
+      guest::StoreU32(h.base, set, count);
+      for (uint32_t i = 0; i < count; i++) {
+        guest::StoreU32(h.base, set + 4 + 4 * i, offsets[i]);
+        const uint32_t animation = set + 4 * (count + 1) + offsets[i];
+        guest::StoreU32(h.base, animation, frames[i]);
+        guest::StoreU32(h.base, animation + 20 + 4 * frames[i], textures[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = set;
+      t.r4.u64 = texture;
+      if (v == 0) {
+        __imp__sub_82146A38(t, h.base);
+      } else {
+        t.r3.u64 = cs::FindAnimationByTexture(h.base, set, texture);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} count {}", c, count));
+  }
+  results.Report();
+}
+
 void CourseScenery(Context& h) {
   ObjectLeaves(h);
   Keys(h);
@@ -3041,6 +3085,7 @@ void CourseScenery(Context& h) {
   DestroyCases(h);
   LoadCases(h);
   CourseSetOnLoadedCases(h);
+  FindByTextureCases(h);
 }
 
 namespace {

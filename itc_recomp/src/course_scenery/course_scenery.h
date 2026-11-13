@@ -516,6 +516,11 @@ uint32_t AdvanceTextureAnimations(uint8_t* base, uint32_t course_set);
 // +0, then offsets from the end of the offset table) advanced. Returns the
 // last animation, or the set when it has none.
 uint32_t AdvanceAnimationSet(uint8_t* base, uint32_t set);
+// AnimationSet::FindByTexture (sub_82146A38; probably): the index of the
+// set's first animation whose texture word (+20 + 4 x its frame count; for
+// a count not above 0 the word at guest address 4, as the original reads
+// it) equals `texture`, or -1 (the original's r3, 64 bits).
+uint64_t FindAnimationByTexture(uint8_t* base, uint32_t set, uint32_t texture);
 // Animation::Advance (sub_82146AC0): a flipbook animation (+0 the frame
 // count, +4 the current frame, +8 the tick, +12 the length, +16 each frame's
 // start tick): back to the start past its length, the next frame when its

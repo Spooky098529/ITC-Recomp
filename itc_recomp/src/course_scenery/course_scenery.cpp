@@ -1203,6 +1203,20 @@ uint32_t AdvanceAnimationSet(uint8_t* base, uint32_t set) {
   return r3;
 }
 
+uint64_t FindAnimationByTexture(uint8_t* base, uint32_t set, uint32_t texture) {
+  ITC_NATIVE_RUNNING("sub_82146A38 AnimationSet::FindByTexture");
+  const int32_t count = int32_t(Load(base, set + 0));
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t animation = uint32_t(count + 1) * 4 + set + Load(base, set + 4 + 4 * uint32_t(i));
+    const int32_t frames = int32_t(Load(base, animation + 0));
+    const uint32_t slot = frames > 0 ? uint32_t(frames + 4) * 4 + animation : 0;
+    if (Load(base, slot + 4) == texture) {
+      return uint64_t(i);
+    }
+  }
+  return ~uint64_t(0);
+}
+
 void AdvanceAnimation(uint8_t* base, uint32_t animation) {
   ITC_NATIVE_RUNNING("sub_82146AC0 Animation::Advance");
   if (int32_t(Load(base, animation + 8)) > int32_t(Load(base, animation + 12))) {
