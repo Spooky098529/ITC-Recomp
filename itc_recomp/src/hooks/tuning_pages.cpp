@@ -146,7 +146,9 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_821F8D68, ShowStickerOrder sub_821FBA40 and ShowStickerPicker sub_821FBB60 "
               "(the UI movies' FindNode by its plain C++; SetText, the named animations, "
               "UiMovie::Unloop and GarageStage::Command through their overrides, the varargs "
-              "SetText calls leave unset passed as 0), and its input pages InputStickerAreas "
+              "SetText calls leave unset passed as 0; no adapters: their callers, the pages, "
+              "the helpers and the update's sticker commands, are native), and its input pages "
+              "InputStickerAreas "
               "sub_821FBD40, InputStickerSlots sub_821F9050, InputStickerOperate sub_821F9328, "
               "InputStickerEdit sub_821F9608, InputStickerOrder sub_821FBF18, InputStickerPicker "
               "sub_821FC270, InputStickerMove sub_821F99A8, InputStickerRotate sub_821F9D30, "
@@ -1045,23 +1047,19 @@ ITC_TUNING_PAGES(821FE608, TuningPagesOnImageLoaded)
 // adapter stays.
 ITC_TUNING_PAGES(821E6950, TuningPagesHandleInput)
 
-// The sticker editor's helpers (not seen in play): the update's recompiled
-// sticker commands call them. No adapters (B7 loop, 2026-11-13: their only
-// callers, the sticker pages, are native and call their plain C++; the
-// register steps above are the harness's): UpdateSoloHold sub_821F7298,
-// UpdatePreviewHold sub_821F7348, ShowStickerOrder sub_821FBA40.
-ITC_TUNING_PAGES(821F73F8, TuningPagesStepUnlockedSticker)
-ITC_TUNING_PAGES(821F8070, TuningPagesShowSlotNode)
-ITC_TUNING_PAGES(821F8160, TuningPagesPlaceStickerNode)
-ITC_TUNING_PAGES(821F8868, TuningPagesSetSlot)
-ITC_TUNING_PAGES(821F7F20, TuningPagesSetStickerEditTexts)
-ITC_TUNING_PAGES(821FA408, TuningPagesShowSlotImage)
-ITC_TUNING_PAGES(821FA460, TuningPagesShowStickerListImage)
-ITC_TUNING_PAGES(821FA508, TuningPagesAnimateStickerAreas)
-ITC_TUNING_PAGES(821F7518, TuningPagesAnimateStickerOperate)
-ITC_TUNING_PAGES(821F8A50, TuningPagesAnimateStickerSlots)
-ITC_TUNING_PAGES(821F8D68, TuningPagesAnimateStickerEditMenu)
-ITC_TUNING_PAGES(821FBB60, TuningPagesShowStickerPicker)
+// The sticker editor's helpers (not seen in play). No adapters (B7 loop,
+// 2026-11-13: their only callers, the sticker pages, are native and call
+// their plain C++; the register steps above are the harness's):
+// UpdateSoloHold sub_821F7298, UpdatePreviewHold sub_821F7348,
+// ShowStickerOrder sub_821FBA40; and, once the update's sticker commands
+// went native (the sticker editor's second migration, 2026-11-13: every
+// caller in generated/ is native and calls their plain C++),
+// StepUnlockedSticker sub_821F73F8, ShowSlotNode sub_821F8070,
+// PlaceStickerNode sub_821F8160, DecalImages::SetSlot sub_821F8868,
+// SetStickerEditTexts sub_821F7F20, ShowSlotImage sub_821FA408,
+// ShowStickerListImage sub_821FA460, AnimateStickerAreas sub_821FA508,
+// AnimateStickerOperate sub_821F7518, AnimateStickerSlots sub_821F8A50,
+// AnimateStickerEditMenu sub_821F8D68 and ShowStickerPicker sub_821FBB60.
 
 // No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
 // native and call their plain C++; the register steps above are the

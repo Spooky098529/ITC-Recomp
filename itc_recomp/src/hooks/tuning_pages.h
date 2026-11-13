@@ -232,7 +232,8 @@ void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base);
 // slot), PlaceStickerNode sub_821F8160 (r4 an id, r5 a slot, r6 a record),
 // DecalImages::SetSlot sub_821F8868 (r3 the images, r4 a sub-scene, r5 and
 // r6 two nodes, r7 and r8 their texture slots, r9 an entry, r10 a flag),
-// SetStickerEditTexts sub_821F7F20.
+// SetStickerEditTexts sub_821F7F20 (no adapters: their callers are all
+// native; these steps and the movie sides' below are the harness's).
 void TuningPagesUpdateSoloHold(PPCContext& ctx, uint8_t* base);
 void TuningPagesUpdatePreviewHold(PPCContext& ctx, uint8_t* base);
 void TuningPagesStepUnlockedSticker(PPCContext& ctx, uint8_t* base);
