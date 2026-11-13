@@ -28,9 +28,9 @@
 // from the case's generator. Compared exactly (the one float, the cursor's
 // child +16 OnItemMoved stores, is an integer's conversion, never a NaN, and
 // is compared with the movie world): the recorded calls, the block, the movie world, the globals
-// (the tables and guards among them), the function's own frame (its
-// register saves left out: the callees' frames below it are their own
-// cases') and the stack above it, r1 and r3. The deleting destructors with
+// (the tables and guards among them), the stack below and above the call
+// (the originals' register saves left out: the function's own and those of
+// the callees the native side runs as plain C++), r1 and r3. The deleting destructors with
 // bit 0 set run on blocks of operator new's, compared by r3 and whether the
 // block is handed out again.
 
@@ -52,6 +52,7 @@
 #include <fmt/format.h>
 
 #include <tuple>
+#include <utility>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_type67_screens);
@@ -128,13 +129,15 @@ enum class Kind {
   kRelease,   // item blocks 0 or pages
 };
 
+// The stack ranges left out, as [sp - from, sp - to).
+using Ranges = std::vector<std::pair<uint32_t, uint32_t>>;
+
 struct Function {
   const char* name;
   uint32_t address;
   int cases;
   Kind kind;
-  uint32_t frame;  // the own frame's bytes compared below r1
-  uint32_t saves;  // its register saves' bytes (at its top), left out
+  Ranges skip;  // the register saves left out
   GuestFunction recompiled, native;
 };
 
@@ -350,9 +353,10 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
       out[v].Bytes(Read(base, w.movies.address, w.movies.bytes));
       out[v].Bytes(Read(base, w.texts.address, w.texts.bytes));
       for (const Global& g : kGlobals) out[v].Bytes(Read(base, g.address, g.bytes));
-      // The own frame (its register saves left out) and the stack above.
-      std::vector<uint8_t> stack = Read(base, sp - f.frame, f.frame + kAbove);
-      for (uint32_t i = f.frame - f.saves; i < f.frame; i++) stack[i] = 0;
+      std::vector<uint8_t> stack = Read(base, sp - kBelow, kBelow + kAbove);
+      for (const auto& [from, to] : f.skip) {
+        for (uint32_t i = kBelow - from; i < kBelow - to; i++) stack[i] = 0;
+      }
       out[v].Bytes(stack);
       out[v].Word(t.r1.u32);
       out[v].Word(t.r3.u32);
@@ -442,39 +446,56 @@ void Type67TitledList(Context& h) {
   const lw::SavedGlobals saved(base);
   lw::BuildStringTable(base, w);
 
+  // The register saves: the function's own (its frame's top bytes) and
+  // those of the callees the native side runs as plain C++ (at their frames'
+  // tops below it: the pages and steps, the list helpers, the node table's
+  // Refresh and theirs, ~NodeListScreen); in the frames of SetScrollText,
+  // which calls SetText, +48 to +79 (its varargs, which the native side
+  // passes 0 for).
+  auto saves = [](std::initializer_list<std::pair<uint32_t, uint32_t>> list) {
+    return Ranges(list);
+  };
   using K = Kind;
   const Function functions[] = {
-      {"TitledListScreen::Reset", 0x82257558, 4, K::kAny, 0, 0, __imp__sub_82257558,
+      {"TitledListScreen::Reset", 0x82257558, 4, K::kAny, {}, __imp__sub_82257558,
        hooks::TitledListScreenReset},
-      {"TitledListScreen::Page7", 0x82257490, 8, K::kAny, 0, 0, __imp__sub_82257490,
+      {"TitledListScreen::Page7", 0x82257490, 8, K::kAny, {}, __imp__sub_82257490,
        hooks::TitledListScreenPage7},
-      {"ListScreen::LeavePage", 0x82255818, 8, K::kAny, 0, 0, __imp__sub_82255818,
+      {"ListScreen::LeavePage", 0x82255818, 8, K::kAny, {}, __imp__sub_82255818,
        hooks::ListScreenLeavePage},
-      {"TitledListScreen::Page3", 0x822572F0, 8, K::kAny, 96, 16, __imp__sub_822572F0,
+      {"TitledListScreen::Page3", 0x822572F0, 8, K::kAny, saves({{16, 0}}), __imp__sub_822572F0,
        hooks::TitledListScreenPage3},
-      {"TitledListScreen::Page4", 0x82257360, 16, K::kAny, 112, 24, __imp__sub_82257360,
+      {"TitledListScreen::Page4", 0x82257360, 16, K::kAny, saves({{24, 0}}), __imp__sub_82257360,
        hooks::TitledListScreenPage4},
-      {"TitledListScreen::Page2", 0x82257148, 24, K::kAny, 112, 32, __imp__sub_82257148,
+      {"TitledListScreen::Page2", 0x82257148, 24, K::kAny,
+       saves({{32, 0}, {168, 112}, {280, 240}}), __imp__sub_82257148,
        hooks::TitledListScreenPage2},
-      {"TitledListScreen::OnItemMoved", 0x82257B78, 16, K::kAny, 176, 80, __imp__sub_82257B78,
+      {"TitledListScreen::OnItemMoved", 0x82257B78, 16, K::kAny,
+       saves({{80, 0}, {208, 176}, {376, 304}}), __imp__sub_82257B78,
        hooks::TitledListScreenOnItemMoved},
-      {"TitledListScreen::Step0", 0x82257D48, 16, K::kAny, 128, 32, __imp__sub_82257D48,
+      {"TitledListScreen::Step0", 0x82257D48, 16, K::kAny,
+       saves({{32, 0}, {168, 128}, {208, 176}, {328, 256}}), __imp__sub_82257D48,
        hooks::TitledListScreenStep0},
-      {"TitledListScreen::Step1", 0x82257FF8, 12, K::kAny, 112, 24, __imp__sub_82257FF8,
+      {"TitledListScreen::Step1", 0x82257FF8, 12, K::kAny, saves({{24, 0}}), __imp__sub_82257FF8,
        hooks::TitledListScreenStep1},
-      {"TitledListScreen::Step2", 0x822580E0, 12, K::kAny, 112, 24, __imp__sub_822580E0,
+      {"TitledListScreen::Step2", 0x822580E0, 12, K::kAny,
+       saves({{24, 0}, {192, 112}, {320, 288}, {488, 416}}), __imp__sub_822580E0,
        hooks::TitledListScreenStep2},
-      {"TitledListScreen::Draw", 0x822579E8, 24, K::kAny, 208, 48, __imp__sub_822579E8,
+      {"TitledListScreen::Draw", 0x822579E8, 24, K::kAny,
+       saves({{48, 0}, {240, 208}, {376, 320}, {488, 448}}), __imp__sub_822579E8,
        hooks::TitledListScreenDraw},
-      {"TitledListScreen::Update", 0x82258998, 16, K::kAny, 112, 8, __imp__sub_82258998,
+      {"TitledListScreen::Update", 0x82258998, 16, K::kAny,
+       saves({{8, 0}, {144, 112}, {320, 224}, {440, 368}, {600, 528}}), __imp__sub_82258998,
        hooks::TitledListScreenUpdate},
-      {"NodeListScreen::~NodeListScreen", 0x82257000, 8, K::kRelease, 96, 16,
+      {"NodeListScreen::~NodeListScreen", 0x82257000, 8, K::kRelease, saves({{16, 0}}),
        __imp__sub_82257000, hooks::NodeListScreenDestruct},
-      {"TitledListScreen::~TitledListScreen", 0x82257138, 8, K::kRelease, 96, 16,
+      {"TitledListScreen::~TitledListScreen", 0x82257138, 8, K::kRelease, saves({{16, 0}}),
        __imp__sub_82257138, hooks::TitledListScreenDestruct},
-      {"TitledListScreen::DeletingDestructor", 0x82257990, 4, K::kNoDelete, 112, 24,
+      {"TitledListScreen::DeletingDestructor", 0x82257990, 4, K::kNoDelete,
+       saves({{24, 0}, {128, 112}}),
        __imp__sub_82257990, hooks::TitledListScreenDeletingDestruct},
-      {"NodeListScreen::DeletingDestructor", 0x82257940, 4, K::kNoDelete, 112, 24,
+      {"NodeListScreen::DeletingDestructor", 0x82257940, 4, K::kNoDelete,
+       saves({{24, 0}, {128, 112}}),
        __imp__sub_82257940, hooks::NodeListScreenDeletingDestruct},
   };
   for (const Function& f : functions) {
