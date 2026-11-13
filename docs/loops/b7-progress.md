@@ -245,7 +245,13 @@ file's history. What's left to see in a drive, from every run:
   vinyl editor's input pages lead (states 23 to 31, `sub_82204B70` and
   more, the first five seen in play, mostly ready) is taken into the
   same subsystem, mapped next, and both are migrated together; its
-  line deleted from `leads.md`. Mapping agent running.
+  line deleted from `leads.md`. Mapped (b54839a0): 27 new rows in
+  `tuning-pages.md` (14 in play: the vinyl editor's pages for states
+  23 to 31, their movie-side updates, the decal images' list window and
+  archive callback); 7 ready groups, the rest ready bottom up inside
+  the file (`InputVinylImages`' group over 1,500 lines: split); no
+  leads; no subagents); map checked (0 errors). Migration agent
+  running.
 
 ## Done
 
@@ -349,5 +355,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the type 5 mode: ours 5899, work left 775 (wrapped 52, known
   367, unknown 356).
+
+- After the vinyl editor's map: ours 5899, work left 775 (wrapped 52,
+  known 381, unknown 342).
 
 ## Stopped

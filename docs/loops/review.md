@@ -13,6 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The stand screens' lead (c2578bab) was mostly stale: 6 of its 8 had
+  rows; 2 new rows in `tuning-pages.md` (the vinyl editor's state 34
+  free look, `InputVinylView`, and `LeaveVinylView`). The vinyl
+  editor's pages (b54839a0): 27 new rows there (states 23 to 31, their
+  movie-side updates, the decal images' window and callback); quirks
+  in the rows (A copies layers 0 and 1 only; "A pressed" asked twice;
+  `MoveVinylLayers` stores B's answer into its frame only);
+  `known-data.md`'s vinyl editor fields and the wait words
+  `0x826D84A4`-`0x826D84C0`.
 - The type 5 mode's map (4a90a16a): `type5-mode.md`, 33 rows (17 in
   play): the parking area's mode, its vtable's 15 slots (slot 14 only
   this mode's) and its +32 vtable, the new `Type5Dialog` (a copy of the
