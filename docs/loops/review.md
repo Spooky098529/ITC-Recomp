@@ -72,6 +72,11 @@ When the user has reviewed a run's section, its heading gets
   to remove them). `SaveDevices::Update`'s adapter stays B5's
   (`notify.cpp`). The enumeration, check, save, load and delete
   machines run only from the front end: harness only so far.
+- Three small leads' map (1572447f): the render manager's slots 7 and
+  8 and its +4/+8 interfaces' thunks (`app-start-up.md`; they reach the
+  framework's scene and frame driver), the texture provider's `Get`
+  and its `XPR` slots (`models.md`), the zero and identity matrices'
+  static set-ups (`matrix-math.md`; no reader of either found).
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

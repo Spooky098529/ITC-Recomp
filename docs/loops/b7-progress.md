@@ -86,7 +86,11 @@ file's history. What's left to see in a drive, from every run:
   (`sub_820944D8`, `sub_82094338`), the texture provider's getter
   (`sub_825946B8`, `sub_82594648`) and the static zero matrix at boot
   (`sub_825D8F88`, `sub_82090000`); their lines deleted from
-  `leads.md`. Mapping agent running.
+  `leads.md`. Mapped (1572447f: 13 new rows in `app-start-up.md`,
+  `models.md` and `matrix-math.md`, with the render manager's slot 7,
+  the provider's slots 5-10 and the identity matrix's set-up
+  `sub_825D9060`; 6 ready groups; no leads added). Check passed.
+  Migration agent running.
 
 ## Done
 
