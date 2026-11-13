@@ -20,7 +20,10 @@ ITC_FLAG_BOOL(native_power_graph_screen, true, "ITC",
               "SetParts sub_82250CD0, SetPartIcon sub_82250B48, SetPartRow2 sub_82250BA0 and "
               "SetPartRow1 sub_82250C40; UiMovie::SetText, Play and Run through their "
               "overrides, UiMovies::Find and UiMovie::FindNode their plain C++) and Step1 "
-              "sub_82250AA8 (the same writes; checked by "
+              "sub_82250AA8; the pages MenuPage sub_82250948 (Menu::Step, Menu::Pressed, "
+              "MenuSound::Play and the member's slot 2 through their overrides) and ClosedPage "
+              "sub_82250348 (slot 3), Leave sub_82250900 (UiMovies::Delete and slot 1) "
+              "(the same writes; checked by "
               "--run_harnesses=power_graph_screen)");
 
 namespace hooks {
@@ -172,6 +175,10 @@ ITC_POWER_GRAPH_SCREEN(82250D70, PowerGraphScreenWaitForLoad)
 ITC_POWER_GRAPH_SCREEN(82250338, PowerGraphScreenShown)
 ITC_POWER_GRAPH_SCREEN(82250890, PowerGraphScreenOpen)
 ITC_POWER_GRAPH_SCREEN(822502C0, PowerGraphScreenOnLeft)
+ITC_POWER_GRAPH_SCREEN(82250900, PowerGraphScreenLeave)
+// The pages (from Draw's table on its stack).
+ITC_POWER_GRAPH_SCREEN(82250948, PowerGraphScreenMenuPage)
+ITC_POWER_GRAPH_SCREEN(82250348, PowerGraphScreenClosedPage)
 // The steps (from Update's table on its stack).
 ITC_POWER_GRAPH_SCREEN(82251320, PowerGraphScreenStep0)
 ITC_POWER_GRAPH_SCREEN(82250AA8, PowerGraphScreenStep1)
