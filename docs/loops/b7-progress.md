@@ -56,9 +56,22 @@ file's history. What's left to see in a drive, from every run:
   (`framework.md`) so the constructor's adapter could go; under
   `--native_save_interface`; every harness 0 differing, race 38 s at
   40, 0 errors; the three ran in the game at boot; no subagents.
-  Validation agent running.
+  Validated: `itc_5250` (race 49 s at 180, 0 errors, every harness 0
+  differing outside the expected groups), 6 of 6 harness lines, no
+  prints added; the constructor, `AllocBuffers` and `Create` ran in
+  play, the teardown's 3 to drive (replay `itc_5251` ok). Recorded;
+  subsystem 2 done.
+- Subsystem 3 of 10: the save devices' slot handlers (the lead the
+  save devices' map added: the states `SaveDevices::Update` runs every
+  frame; 3 ready, state 6 blocked by `sub_82295C98` and
+  `sub_822970A0`); its line deleted from `leads.md`. Mapping agent
+  running.
 
 ## Done
+
+- The save devices' constructor: 5 rows in `save-interface.md` ours,
+  with `SaveDevices::Create`, under `--native_save_interface`,
+  f0ecffdd..32f5b0d9; validated.
 
 - The morph jobs: `morph-jobs.md` 21 of 21 ours,
   `--native_morph_jobs`, 752011b3..3123f921; validated.
@@ -92,5 +105,7 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
   360, unknown 292).
 - After the save devices' map: ours 6019, work left 703 (wrapped 51,
   known 362, unknown 290).
+- After the save devices: ours 6025, work left 700 (wrapped 51, known
+  359, unknown 290).
 
 ## Stopped

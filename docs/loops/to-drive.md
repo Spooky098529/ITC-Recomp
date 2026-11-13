@@ -56,6 +56,14 @@ morph jobs: a race with morphed wheels, `morph-jobs.md`):
 - `sub_82090E38` (the work item's +4 interface, slot 0)
 - `sub_82090DC8` (the work item's +4 interface, slot 1)
 
+Not in the attract race or the replay (`itc_5250`, `itc_5251`, ok; the
+save devices' teardown, run only when the game shuts down its
+framework):
+
+- `sub_820A6110` SaveDevices::~SaveDevices
+- `sub_820A56E8` SaveDevices::Destroy
+- `sub_820A55F0` SlotArray::Reset
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

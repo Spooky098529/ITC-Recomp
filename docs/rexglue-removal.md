@@ -2887,6 +2887,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The frame driver and the app's scene (the game's object that drives each frame across its render thread, renamed from "renderer" by the user's call; the scene's update, draw and constructor; the game's threads) | `frame-driver.md` | 19 ours of 25 in play (`Present` and the `Event::`-blocked three stay) | `--native_frame_driver` |
 | 2026-11-13 | The cleanup leads `RaceStates::OnRaceEnd` (with the course record and `Time::Add`) and `DrawEntryPowerGraph`'s r31 (no mapping, not counted) | `race-states.md`, `power-graph.md` | 9 new ours, 5 adapters removed | (`--native_race_states`) |
 | 2026-11-13 | The morph jobs (the 224-byte job the second worker pool runs for `Model::MorphShape`, the wheels' morphs) and the shared work item | `morph-jobs.md` | 21 of 21 (and `Morph::Blend` Native) | `--native_morph_jobs` |
+| 2026-11-13 | The save devices' constructor and teardown (with `SaveDevices::Create`; the notification listener a stand-in, no call) | `save-interface.md` | 5 of 5 new rows (and `Create`) | (`--native_save_interface`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5460,3 +5461,16 @@ core's sync. The boundary: 449 functions (916 pairs): overridden 110,
 Native 40, Dropped 26, never called 68, live 205. Imports: 186 called,
 49 with a live caller. B7 (`b7_status.py`): ours 6,019, work left 703
 (Wrapped 51, with a row 360, no row yet 292), from 718.
+
+**2026-11-13, the save devices' constructor (branch
+`b7-loop-13-11-26`, the forty-sixth run, its second subsystem):** 5
+rows added to `save-interface.md` (`src/save_interface/save_devices.cpp`),
+with `SaveDevices::Create` from `framework.md`: the object
+`SaveDevices::Update` runs on, its four slots and their buffers; the
+notification listener stored as `user::kNoListener` without
+`XNotifyCreateListener` (the 2026-10-30 precedent). The slot handlers
+`SaveDevices::Update` runs are the next lead. The boundary: 449
+functions (916 pairs): overridden 110, Native 40, Dropped 26, never
+called 68, live 205. Imports: 186 called, 49 with a live caller. B7
+(`b7_status.py`): ours 6,025, work left 700 (Wrapped 51, with a row
+359, no row yet 290), from 703.
