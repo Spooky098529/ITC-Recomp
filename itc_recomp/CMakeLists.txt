@@ -522,6 +522,12 @@ set(ITC_SOURCES
     src/title_screen/press_start.cpp
     src/title_screen/debug.cpp
     src/hooks/type10_mode.cpp
+    src/hooks/type5_mode.cpp
+    src/type5_mode/dialog_steps.cpp
+    src/type5_mode/dialog_pages.cpp
+    src/type5_mode/dialog_handlers.cpp
+    src/type5_mode/dialog_init.cpp
+    src/type5_mode/mode.cpp
     src/type10_mode/init.cpp
     src/type10_mode/mode.cpp
     src/type10_mode/theater.cpp
@@ -809,6 +815,7 @@ set(ITC_SOURCES
     src/harnesses/user_info.cpp
     src/harnesses/title_screen.cpp
     src/harnesses/type10_mode.cpp
+    src/harnesses/type5_mode.cpp
     src/harnesses/todays_result.cpp
     src/harnesses/network_mode.cpp
     src/harnesses/network_mode_select.cpp
