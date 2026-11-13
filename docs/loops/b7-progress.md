@@ -76,10 +76,23 @@ file's history. What's left to see in a drive, from every run:
   overlapped results (adapters removed), `Framework::DeviceList` and
   `SaveDevices::Update`'s plain C++ (B5's adapter kept), B4's 13 steps
   split into plain C++; under `--native_save_interface`; every harness
-  0 differing, race 38 s at 40, 0 errors; no subagents. Validation
-  agent running.
+  0 differing, race 38 s at 40, 0 errors; no subagents. Validated:
+  `itc_5258` (race 50 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups), 33 of 33 harness lines, 13 prints
+  added to B4's steps (319af0df); 5 ran in the race, 20 more in the
+  replay `itc_5259` (ok), 8 to drive. Recorded; subsystem 3 done.
+- Subsystem 4 of 10: three small ready leads taken together (each a
+  few functions, seen in play): the render manager's slot 8
+  (`sub_820944D8`, `sub_82094338`), the texture provider's getter
+  (`sub_825946B8`, `sub_82594648`) and the static zero matrix at boot
+  (`sub_825D8F88`, `sub_82090000`); their lines deleted from
+  `leads.md`. Mapping agent running.
 
 ## Done
+
+- The save devices' slot handlers: 14 rows in `save-interface.md` ours,
+  with `SaveDevices::Update` and 5 shared, B4's steps split, under
+  `--native_save_interface`, b41c696e..319af0df; validated.
 
 - The save devices' constructor: 5 rows in `save-interface.md` ours,
   with `SaveDevices::Create`, under `--native_save_interface`,
@@ -119,5 +132,7 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
   known 362, unknown 290).
 - After the save devices: ours 6025, work left 700 (wrapped 51, known
   359, unknown 290).
+- After the slot handlers: ours 6044, work left 686 (wrapped 51, known
+  354, unknown 281).
 
 ## Stopped

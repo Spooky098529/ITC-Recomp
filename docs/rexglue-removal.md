@@ -2888,6 +2888,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The cleanup leads `RaceStates::OnRaceEnd` (with the course record and `Time::Add`) and `DrawEntryPowerGraph`'s r31 (no mapping, not counted) | `race-states.md`, `power-graph.md` | 9 new ours, 5 adapters removed | (`--native_race_states`) |
 | 2026-11-13 | The morph jobs (the 224-byte job the second worker pool runs for `Model::MorphShape`, the wheels' morphs) and the shared work item | `morph-jobs.md` | 21 of 21 (and `Morph::Blend` Native) | `--native_morph_jobs` |
 | 2026-11-13 | The save devices' constructor and teardown (with `SaveDevices::Create`; the notification listener a stand-in, no call) | `save-interface.md` | 5 of 5 new rows (and `Create`) | (`--native_save_interface`) |
+| 2026-11-13 | The save devices' slot handlers (the states `SaveDevices::Update` runs, the save, load, check and delete steps and their waits, the overlapped results; B4's steps split into plain C++) | `save-interface.md` | 14 of 14 new rows (with `SaveDevices::Update`, `SaveStep`, `LoadStep`, both overlapped results, `Framework::DeviceList`) | (`--native_save_interface`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5474,3 +5475,19 @@ functions (916 pairs): overridden 110, Native 40, Dropped 26, never
 called 68, live 205. Imports: 186 called, 49 with a live caller. B7
 (`b7_status.py`): ours 6,025, work left 700 (Wrapped 51, with a row
 359, no row yet 290), from 703.
+
+**2026-11-13, the save devices' slot handlers (branch
+`b7-loop-13-11-26`, the forty-sixth run, its third subsystem):** 14
+rows added to `save-interface.md` (`src/save_interface/slot_handlers`),
+with `SaveDevices::Update` (`system-services.md`), `SaveStep`,
+`LoadStep`, `XGetOverlappedResult` and `GetOverlappedResult`
+(`files-and-saves.md`; their never-taken wait a guest call to
+`WaitForSingleObject`, the 2026-10-24 and 2026-10-29 calls) and
+`Framework::DeviceList`; B4's 13 content steps split into plain C++
+(`src/saves/slot_steps`) behind their adapters, which stay so the
+fallback keeps reaching `saves/`. The replay ran the enumeration, save
+and load machines as native code. The boundary: 449 functions (916
+pairs): overridden 110, Native 40, Dropped 26, never called 68, live
+205. Imports: 186 called, 49 with a live caller. B7 (`b7_status.py`):
+ours 6,044, work left 686 (Wrapped 51, with a row 354, no row yet 281),
+from 700.

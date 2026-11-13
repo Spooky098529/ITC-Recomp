@@ -64,6 +64,19 @@ framework):
 - `sub_820A56E8` SaveDevices::Destroy
 - `sub_820A55F0` SlotArray::Reset
 
+Not in the attract race or the replay (`itc_5258`, `itc_5259`, ok; the
+slot handlers: a save deleted, a device check, a failed save, the
+thumbnail):
+
+- `sub_820A45C0` SaveSlot::CheckDevice
+- `sub_820A5110` SaveSlot::SetThumbnail
+- `sub_820A51E0` SaveSlot::Delete
+- `sub_820A4890` SaveSlot::Failed
+- `sub_820A4800` SaveDevices::OnEvent
+- `sub_820A6010` SaveSlot::DeleteStep
+- `sub_820A5290` SaveSlot::WaitDelete
+- `sub_820A5190` SaveSlot::WaitThumbnail
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the
