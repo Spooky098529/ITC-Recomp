@@ -18,6 +18,15 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the
+achievements: a time attack race, an achievement earned):
+
+- `sub_82290710` Achievements::BeatsCourseTime
+- `sub_820FF708` Time::Less
+- `sub_82290A30` Achievements::Write
+
+The power graph screen's:
+
 Not in the attract race or the replay (`itc_5190`, `itc_5191`, ok; the
 type 6 and 7 modes' power graph screen, `power-graph-screen.md`):
 

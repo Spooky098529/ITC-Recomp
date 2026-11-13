@@ -2868,6 +2868,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The type 5 mode: the parking area's front-end mode (its three machines: the car settings, the parking area, and its own dialog `Type5Dialog`) | `type5-mode.md` | 33 of 33 (16 never seen, ported) | `--native_type5_mode` |
 | 2026-11-13 | The tuning screen's vinyl editor (its pages for states 23 to 31 and 34, the decal images' list window and loads, the sticker helpers it calls) | `tuning-pages.md` | 29 new rows ours (with `HighlightItem`, `HighlightSelected` in `tuning-screen.md`; 7 adapters removed) | (`--native_tuning_pages`) |
 | 2026-11-13 | The power graph screen (the machine the type 6 and 7 modes share: its handlers, pages, steps, texts and the members' slots) | `power-graph-screen.md` | 22 of 22 | `--native_power_graph_screen` |
+| 2026-11-13 | The achievements check after a race (`Achievements::Check`, `Write`; `XUserWriteAchievements` kept as a guest call, the user's call) | `achievements.md` | 5 of 5 | `--native_achievements` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5398,3 +5399,15 @@ pairs): overridden 109, Native 36, Dropped 27, never called 69, live
 208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
 ours 5,963, work left 741 (Wrapped 52, with a row 365, no row yet
 324), from 758.
+
+**2026-11-13, the achievements (branch `b7-loop-11-11-26`, the
+forty-fifth run, its ninth subsystem):** `achievements.md` (5 rows,
+`src/achievements/`): after a race, which of the 27 achievements were
+earned and their write. By the user's call (2026-11-13) the write keeps
+calling `XUserWriteAchievements` through the guest, so the SDK goes on
+recording unlocks in its achievements file; it is Wrapped for the
+harness alone. `RaceStates::OnRaceEnd` became ready (a lead). The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+27, never called 69, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,968, work left 739 (Wrapped 52,
+with a row 365, no row yet 322), from 741.

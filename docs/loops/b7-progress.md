@@ -334,9 +334,24 @@ file's history. What's left to see in a drive, from every run:
   `XUserWriteAchievements` through the guest; harnesses 0 differing;
   race 38 s at 40, 0 errors; no subagents). Left: none;
   `RaceStates::OnRaceEnd` `sub_821644D8` now ready (a cleanup lead).
-  Validation agent running.
+  Validated: `itc_5198` (race 50 s at 180, 0 errors, every harness 0
+  differing outside the expected groups; harnesses ~128 s), 5 of 5
+  harness lines, no prints added; `Check` and `AllBeaten` ran in the
+  replay `itc_5199` (ok), 3 to drive. Recorded.
+- Eight stale leads deleted from `leads.md` (every function in them
+  mapped since: the `XMemCpy` callers, the network mode's handler, the
+  career screens, the race event's destroyer, the garage car resets,
+  the stand's car makers' callers, the menu helpers' screens, the
+  `0x826364EC` readers).
+- Subsystem 10 of 10: the framework's scene constructor (`sub_82098A98`
+  and its callees, seen in play) with the renderer's constructor
+  (`sub_82092358`, `sub_820922B8`), two leads taken together; both
+  lines deleted from `leads.md`. Mapping agent running.
 
 ## Done
+
+- The achievements: `achievements.md` 5 of 5 ours,
+  `--native_achievements`, 7f7fce7e..848036fc; validated.
 
 - The power graph screen: `power-graph-screen.md` 22 of 22 ours,
   `--native_power_graph_screen`, acc7bc1a..2f90c6eb; validated.
@@ -467,5 +482,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the achievements' map: ours 5963, work left 741 (wrapped 52,
   known 367, unknown 322).
+
+- After the achievements: ours 5968, work left 739 (wrapped 52, known
+  365, unknown 322).
 
 ## Stopped
