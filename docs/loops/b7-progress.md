@@ -261,8 +261,14 @@ file's history. What's left to see in a drive, from every run:
   Validated: `itc_5150` (race 53 s at 180, 0 errors, every harness 0
   differing outside the expected groups; harnesses ~126 s), 18 of 18
   harness lines, no prints added; none in the race or the replay
-  `itc_5151` (ok): 18 to drive. Recorded. Second migration agent
-  running (the rest).
+  `itc_5151` (ok): 18 to drive. Recorded. Second migration
+  07d8cdb7..a0dc392a (two subagents, one at a time: states 24 and 28
+  with their movie sides, `InputLayerActions` (never seen) with its
+  helpers, `HighlightItem` and `HighlightSelected` (`tuning-screen.md`);
+  7 decal image adapters removed; two harness faults fixed before the
+  commits; harnesses 0 differing; race 30 s at 40, 0 errors). Left:
+  `InputLayerOrder` and the sticker helpers, never seen. Validation
+  agent running.
 
 ## Done
 
