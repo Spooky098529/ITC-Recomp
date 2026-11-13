@@ -149,6 +149,13 @@ When the user has reviewed a run's section, its heading gets
   validation differed in `TuningMachine::Start`'s harness (one byte of
   those dead saves, not left out there too): a harness fault, fixed
   edb5225e by the 2026-11-10 precedent.
+- The type 6 and 7 modes' small pieces' map (707fe4ba): 16 rows in
+  `type6-type7-modes.md`, `type67-screens.md`, `car-list.md` (the
+  controller options' steps, the group pair's and panel screens'
+  destructors, `SingleGroup`); corrections: `SingleGroup`'s only user
+  and the "type 6 two-player panel screen" `sub_822386F0` are the type
+  8 mode's; `GroupPair::DeletingDestructor`'s "slot 8" is slot 0 of
+  `0x820110A4`; settings +672 and +680 in `known-data.md`.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

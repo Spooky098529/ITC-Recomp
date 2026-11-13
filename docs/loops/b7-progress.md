@@ -202,7 +202,11 @@ file's history. What's left to see in a drive, from every run:
   `sub_821BB590`, `sub_821C0238`; the small functions beside the group
   pair and the car list `sub_82249BE8` and the rest), with the adapter
   lead `sub_82208738` for its migration; their lines deleted from
-  `leads.md`. Mapping agent running.
+  `leads.md`. Mapped (707fe4ba: 16 new rows in `type6-type7-modes.md`,
+  `type67-screens.md`, `car-list.md`, none in play; 10 ready groups
+  judged by reading their callees; six destructors wait on three small
+  recompiled blockers to take along; 2 leads added). Check passed.
+  Migration agent running.
 
 ## Done
 
