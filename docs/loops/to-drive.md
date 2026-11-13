@@ -85,6 +85,37 @@ three small leads; the two clean-ups run only at the game's exit):
 - `sub_825DACA0` ZeroMatrix's clean-up
 - `sub_825DAC98` IdentityMatrix's clean-up
 
+Not in the attract race or the replay (`itc_5289`, `itc_5290`, ok; the
+sticker editor, `sticker-editor.md`: the tuning screen's sticker pages,
+placing, moving, rotating and scaling a sticker):
+
+- `sub_821FBD40` InputStickerAreas
+- `sub_821F9050` InputStickerSlots
+- `sub_821F9328` InputStickerOperate
+- `sub_821F9608` InputStickerEdit
+- `sub_821FBF18` InputStickerOrder
+- `sub_821FC270` InputStickerPicker
+- `sub_821F99A8` InputStickerMove
+- `sub_821F9D30` InputStickerRotate
+- `sub_821F9FB8` InputStickerScale
+- `sub_821F7000` InputStickerView
+- `sub_821F7298` UpdateSoloHold
+- `sub_821F7348` UpdatePreviewHold
+- `sub_821F73F8` StepUnlockedSticker
+- `sub_821F7518` AnimateStickerOperate
+- `sub_821F7F20` SetStickerEditTexts
+- `sub_821F8070` ShowSlotNode
+- `sub_821F8160` PlaceStickerNode
+- `sub_821F8868` DecalImages::SetSlot
+- `sub_821F8A50` AnimateStickerSlots
+- `sub_821F8D68` AnimateStickerEditMenu
+- `sub_821FA408` ShowSlotImage
+- `sub_821FA460` ShowStickerListImage
+- `sub_821FA508` AnimateStickerAreas
+- `sub_821FBA40` ShowStickerOrder
+- `sub_821FBB60` ShowStickerPicker
+- `sub_8211DE28` UiMovie::Unloop
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

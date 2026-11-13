@@ -126,8 +126,11 @@ file's history. What's left to see in a drive, from every run:
   race 31 s at 40 (the harnesses' time), 0 errors; a harness fault
   fixed on the way (`InputStickerView`'s held buttons moved to the
   stand world); two subagents, one at a time. Left: the update's
-  sticker commands 32 to 51 (ready, a second migration). Validation
-  agent running.
+  sticker commands 32 to 51 (ready, a second migration). Validated:
+  `itc_5289` (race 49 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups), 26 of 26 harness lines, 1 print added
+  (3d4fc53f); none ran in the race or the replay `itc_5290` (ok): 26 to
+  drive. Second migration agent running (the sticker commands).
 
 ## Done
 
