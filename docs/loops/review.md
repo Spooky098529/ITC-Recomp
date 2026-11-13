@@ -13,7 +13,17 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
 
-(Nothing yet.)
+- Cleanup leads (98f4fe26..52b87de7): `CarList::DrawEntryPowerGraph`'s
+  adapter now sign-extends r31 as the original's `lis`
+  (`power-graph.md`). `RaceStates::OnRaceEnd` native
+  (`race-states.md`, new rows for `Time::Add` and the course record's
+  7 functions, never seen in play, ported by the 2026-11-12 call);
+  adapters removed for `RacerRecords::Add`, `Stats::AddRaceResult`,
+  `Achievements::Check`, `Write` and `Replay::Keep` (the never-seen
+  network battle screen `sub_82264B90` now runs Check's and Write's
+  originals). `OnRaceEnd`'s harness no longer compares the course
+  record's temporaries below its frame (the callees' originals write
+  register saves there); the course record's own groups do.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

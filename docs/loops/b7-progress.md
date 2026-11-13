@@ -15,8 +15,15 @@ file's history. What's left to see in a drive, from every run:
 - First: two leads without mapping (not counted toward the limit):
   `RaceStates::OnRaceEnd` `sub_821644D8` and the adapter fix of
   `CarList::DrawEntryPowerGraph` `sub_82250670`; their lines deleted
-  from `leads.md`. A migration agent runs them. Subsystems so far: 0
-  of 10.
+  from `leads.md`. Migrated 98f4fe26..52b87de7: `DrawEntryPowerGraph`'s
+  r31 sign-extended (8 new cases, differing before the fix);
+  `OnRaceEnd` native under `--native_race_states` with its 4
+  never-seen callees and theirs ported (the course record, `Time::Add`;
+  by the user's 2026-11-12 call to minimize recompiled code), 5
+  adapters removed (`RacerRecords::Add`, `Stats::AddRaceResult`,
+  `Achievements::Check`, `Write`, `Replay::Keep`); every harness 0
+  differing, race 37 s at 40, 0 errors; no subagents. Validation agent
+  running. Subsystems so far: 0 of 10.
 
 ## Done
 
