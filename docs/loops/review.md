@@ -163,6 +163,13 @@ When the user has reviewed a run's section, its heading gets
   through the screens' calls; `PanelFade::In`'s cases compare the
   screen fades' globals; `TuningMachine::Destroy` calls
   `DecalImages::UnloadAll`'s plain C++ (its adapter removed).
+- The list screens' tables' map (e3d8b9a9, `type67-screens.md`, 77 new
+  rows, 25 changed): the six tables' 31 pages and steps, the node
+  tables, `ListPartInner` (a two-item prompt defaulting from save data
+  +0x1F870), the screen blocks' destructors (probably never called:
+  `StandMode::Release` frees the blocks with `VirtualFree`). Quirks for
+  the port: the leaving steps never set their first-call word; the
+  cursor helpers leave a 64-bit product in their frames.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

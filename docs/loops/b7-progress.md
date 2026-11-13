@@ -218,7 +218,12 @@ file's history. What's left to see in a drive, from every run:
   pages and steps (called through tables built on first use,
   `type67-screens.md`), with the screen blocks' probable destructors
   `sub_822367C0`, `sub_82246BE0`; none seen in play; their lines
-  deleted from `leads.md`. Mapping agent running.
+  deleted from `leads.md`. Mapped (e3d8b9a9: 77 new rows and 25
+  changed in `type67-screens.md`, none in play; one ready piece of ~175
+  functions with the file's 97 status-less rows, judged by reading
+  callees; `CourseRecords::Of` `sub_82105BF8` to take along; 1 lead
+  added, the type 8 mode's list screens). Check passed. Migration
+  agent running (several expected).
 
 ## Done
 
