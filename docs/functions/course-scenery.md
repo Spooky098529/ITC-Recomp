@@ -56,9 +56,9 @@ load buffer `0x826A5134` and parsed from there).
 Read by the B7 loop's mapping agent, 2026-10-24, from its lead (found by
 the collision world's mapping agent: "`820FB8B8`-`820FC0E8`, called only
 from `820F1138`-`820F4558`"). The names are ours. `Scenery::Draw`,
-`Scenery::DrawArea`, `Scenery::DrawSetLists` and
-`Scenery::RecordHeadlightProjectors` are read only for their outline
-(their rows say so). Fields: `../known-data.md` (`0x826C5514`,
+`Scenery::DrawArea` and `Scenery::DrawSetLists` are read only for their
+outline (their rows say so); `Scenery::RecordHeadlightProjectors` was
+read in full when it was made native (2026-11-13). Fields: `../known-data.md` (`0x826C5514`,
 `0x826C5518`, `0x82602F80`, "scenery list", "pool object", "visible
 area", "course set").
 
