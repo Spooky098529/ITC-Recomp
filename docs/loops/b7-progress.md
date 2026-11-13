@@ -206,7 +206,11 @@ file's history. What's left to see in a drive, from every run:
   `type67-screens.md`, `car-list.md`, none in play; 10 ready groups
   judged by reading their callees; six destructors wait on three small
   recompiled blockers to take along; 2 leads added). Check passed.
-  Migration agent running.
+  Migrated f83e3ee2..6cb9126c: all 16 rows and the 3 blockers
+  ours (adapters kept: their other callers are recompiled or vtables),
+  `DecalImages::UnloadAll` `sub_82208738`'s adapter removed (Native);
+  every harness 0 differing, races 30-38 s at 40, 0 errors; no
+  subagents. Validation agent running.
 
 ## Done
 

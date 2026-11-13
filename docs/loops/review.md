@@ -156,6 +156,13 @@ When the user has reviewed a run's section, its heading gets
   and the "type 6 two-player panel screen" `sub_822386F0` are the type
   8 mode's; `GroupPair::DeletingDestructor`'s "slot 8" is slot 0 of
   `0x820110A4`; settings +672 and +680 in `known-data.md`.
+- Its migration (f83e3ee2..6cb9126c): 16 rows and the blockers
+  `ListNode::~ListNode`, `PanelSet::~PanelSet`,
+  `PanelSetBase::~PanelSetBase` ours; a bridge in
+  `type67_screens/panel_parts.cpp` lets the car list's guest calls run
+  through the screens' calls; `PanelFade::In`'s cases compare the
+  screen fades' globals; `TuningMachine::Destroy` calls
+  `DecalImages::UnloadAll`'s plain C++ (its adapter removed).
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
