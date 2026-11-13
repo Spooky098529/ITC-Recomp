@@ -81,8 +81,14 @@ void QueueDialog(uint8_t* base, const Side& s) {
   StoreU32(base, p + 0, kMinusOne);
 }
 
-// LoadPage::SetDialog and SavePage::SetDialog.
+// LoadPage::SetDialog and SavePage::SetDialog (their native-running prints
+// here, as the pages call this directly).
 void SetDialog(uint8_t* base, const Side& s, uint32_t kind, uint32_t next) {
+  if (s.page == 9) {
+    ITC_NATIVE_RUNNING("sub_821BB858 LoadPage::SetDialog");
+  } else {
+    ITC_NATIVE_RUNNING("sub_821BB708 SavePage::SetDialog");
+  }
   const uint32_t pages = LoadU32(base, s.pages_global);
   if (next == 2) {
     QueueDialog(base, s);
@@ -181,13 +187,11 @@ uint64_t Leave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls, ui
 }  // namespace
 
 uint64_t LoadPageSetDialog(uint8_t* base, uint64_t kind, uint64_t next) {
-  ITC_NATIVE_RUNNING("sub_821BB858 LoadPage::SetDialog");
   SetDialog(base, kLoad, uint32_t(kind), uint32_t(next));
   return kind;
 }
 
 uint64_t SavePageSetDialog(uint8_t* base, uint64_t kind, uint64_t next) {
-  ITC_NATIVE_RUNNING("sub_821BB708 SavePage::SetDialog");
   SetDialog(base, kSave, uint32_t(kind), uint32_t(next));
   return kind;
 }

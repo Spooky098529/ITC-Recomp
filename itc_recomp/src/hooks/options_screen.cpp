@@ -56,7 +56,7 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
 ITC_FLAG_BOOL(native_options_load_save, true, "ITC",
               "Run the options screen's load page (category 5, page 9) and save page "
               "(category 6, page 10) (docs/functions/options-load-save.md: LoadPage::SetDialog "
-              "sub_821BB858, SavePage::SetDialog sub_821BB708, LoadPage::Close sub_821B9FB0, "
+              "sub_821BB858 and SavePage::SetDialog sub_821BB708 (their callers), LoadPage::Close sub_821B9FB0, "
               "SavePage::Close sub_821BA508, OptionsSavePages::Cancel sub_821B9FF8, the sub-pages "
               "LoadPage::CheckDevice sub_821BBC10, Answer sub_821BC7B0, Note sub_821BC940, Wait "
               "sub_821C2620 and DeviceAnswer sub_821BBC68, SavePage::CheckDevice sub_821BBCC0, "
@@ -537,14 +537,6 @@ void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::CloseAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void LoadPageSetDialog(PPCContext& ctx, uint8_t* base) {
-  ctx.r3.u64 = options_screen::LoadPageSetDialog(base, ctx.r3.u64, ctx.r4.u64);
-}
-
-void SavePageSetDialog(PPCContext& ctx, uint8_t* base) {
-  ctx.r3.u64 = options_screen::SavePageSetDialog(base, ctx.r3.u64, ctx.r4.u64);
-}
-
 void LoadPageClose(PPCContext&, uint8_t* base) { options_screen::LoadPageClose(base); }
 
 void SavePageClose(PPCContext&, uint8_t* base) { options_screen::SavePageClose(base); }
@@ -710,7 +702,10 @@ extern "C" REX_FUNC(sub_821B9E70) {
   hooks::OptionsOnLeft(ctx, base);
 }
 
-// The load and save pages (docs/functions/options-load-save.md).
+// The load and save pages (docs/functions/options-load-save.md). No adapters
+// (Native: their only callers in play, the pages' sub-pages, call their plain
+// C++) for LoadPage::SetDialog and SavePage::SetDialog; the flag switches
+// only their callers.
 #define ITC_OPTIONS_LOAD_SAVE(address, step)   \
   extern "C" REX_FUNC(sub_##address) {         \
     REX_FUNC_PROLOGUE();                       \
@@ -721,8 +716,6 @@ extern "C" REX_FUNC(sub_821B9E70) {
     hooks::step(ctx, base);                    \
   }
 
-ITC_OPTIONS_LOAD_SAVE(821BB858, LoadPageSetDialog)
-ITC_OPTIONS_LOAD_SAVE(821BB708, SavePageSetDialog)
 ITC_OPTIONS_LOAD_SAVE(821B9FB0, LoadPageClose)
 ITC_OPTIONS_LOAD_SAVE(821BA508, SavePageClose)
 ITC_OPTIONS_LOAD_SAVE(821B9FF8, SavePagesCancel)

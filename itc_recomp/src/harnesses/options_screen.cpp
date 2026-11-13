@@ -1589,6 +1589,13 @@ Random CaseRandom(uint8_t* base, const PPCContext& t) {
   return Random(z ^ (z >> 31));
 }
 
+void NativeLoadPageSetDialog(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = os::LoadPageSetDialog(base, ctx.r3.u64, ctx.r4.u64);
+}
+void NativeSavePageSetDialog(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = os::SavePageSetDialog(base, ctx.r3.u64, ctx.r4.u64);
+}
+
 void OptionsLoadSaveCases(Context& h, const World& w, const SaveSide& side) {
   // The settings' words the pages read: the kinds (+628, +648) 0 to 13 (or
   // -1 or any), the counters (+632, +652) just below or at their 45 and 90
@@ -1629,6 +1636,7 @@ void OptionsLoadSaveCases(Context& h, const World& w, const SaveSide& side) {
     shape(r);
   };
   // The leaves: r3 the kind 0 to 13 (or any), r4 the next 0 to 3 (or any).
+  // The SetDialogs have no adapters (Native): their register steps here.
   const auto dialog = [&h, shape](PPCContext& t, Random&, const World&) {
     Random r = CaseRandom(h.base, t);
     shape(r);
@@ -1636,9 +1644,9 @@ void OptionsLoadSaveCases(Context& h, const World& w, const SaveSide& side) {
     t.r4.u64 = r.Below(8) == 0 ? r.Next() : (uint64_t(r.Next()) << 32) * r.Below(2) + r.Below(4);
   };
   Group(h, w, "LoadPage::SetDialog (sub_821BB858)", 100, dialog, __imp__sub_821BB858,
-        hooks::LoadPageSetDialog, {}, after);
+        NativeLoadPageSetDialog, {}, after);
   Group(h, w, "SavePage::SetDialog (sub_821BB708)", 100, dialog, __imp__sub_821BB708,
-        hooks::SavePageSetDialog, {}, after);
+        NativeSavePageSetDialog, {}, after);
   Group(h, w, "LoadPage::Close (sub_821B9FB0)", 40, plain, __imp__sub_821B9FB0,
         hooks::LoadPageClose, {}, after);
   Group(h, w, "SavePage::Close (sub_821BA508)", 40, plain, __imp__sub_821BA508,
