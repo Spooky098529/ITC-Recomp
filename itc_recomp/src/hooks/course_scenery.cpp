@@ -62,7 +62,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "--native_models' lifetime and memcpy native), Scenery::Init sub_820F1360 (no adapter), "
               "SceneryList::ReleaseUnused sub_820F17C0 (no adapter), SceneryList::LoadAll sub_820F1598 (no adapter) and Stream "
               "sub_820F16C0 (no adapter) (Archive::QueueLength's plain C++ with the archive's native queue), "
-              "Scenery::StartLoad sub_820F1E00, Scenery::IsLoaded sub_820F1F68, "
+              "Scenery::StartLoad sub_820F1E00, Scenery::IsLoaded sub_820F1F68 (no adapter), "
               "CourseSet::Load sub_820F2520, AreaLights::Load sub_820F22F8 and AreaModel::Load "
               "sub_820F23C0 (with the archive's native queue and the native heap; called "
               "directly by ObjectPools::Load), CourseSet::OnLoaded sub_820F22B8 (as the "
@@ -242,14 +242,10 @@ extern "C" REX_FUNC(sub_820F2AF8) {
   }
   ctx.r3.u64 = Destroy(base);
 }
-// Scenery::IsLoaded: r3 = the manager; r3 = 0 or 1. From the race's
-// loading's handlers (CourseSetup::WaitCourse and EndTick, native with
-// --native_race_loading, which call its plain C++) and the location
-// screen's PollLoad (sub_82229238, native with --native_location_screen,
-// which calls it too).
-ITC_COURSE_SCENERY(820F1F68, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = SceneryIsLoaded(base, calls, ctx.r1.u32, ctx.r3.u32,
-                                                hooks::NativeArchiveQueue()))
+// Scenery::IsLoaded (sub_820F1F68) has no adapter (B7 loop, 2026-11-12):
+// its callers in play, the race's loading's handlers (CourseSetup::
+// WaitCourse and EndTick, --native_race_loading) and the location screen's
+// PollLoad (sub_82229238, --native_location_screen), call its plain C++.
 // r3 = the manager.
 ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))

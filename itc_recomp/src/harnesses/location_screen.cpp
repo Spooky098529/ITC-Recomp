@@ -1764,11 +1764,13 @@ void PollLoads(Context& h, const World& w) {
     t.r3.u64 = block + kPollMachine - 9604;
   };
   constexpr int32_t kFrame = 336, kPose = int32_t(ls::kPoseCarFrame);
-  // PoseCar's frame and its callees' below, up to 736 bytes below r1: above
-  // that, CameraAnims::EvalCamera's original (called from Evaluate's frame,
-  // r1 - 480) saves its caller's registers, which hold the original
-  // PollLoad's (r30 = 0x82636518) and not the native one's (dead stack).
-  Spec spec{{{-kFrame + 80, 160}, {-kFrame - kPose - 2048, kPose + 2048 + kFrame - 736}}};
+  // PoseCar's frame and its callees' below, up to 2,048 bytes below r1:
+  // above that, the camera evaluation's guest callees (CameraAnims::
+  // EvalCamera's original, from Evaluate's frame at r1 - 480, and below it)
+  // save their callers' registers, which hold the original PollLoad's and
+  // Evaluate's values (r30 = 0x82636518, an animation's entry) and not the
+  // native ones' (dead stack).
+  Spec spec{{{-kFrame + 80, 160}, {-kFrame - kPose - 2048, kPose + kFrame}}};
   spec.texts = true;
   spec.children = true;
   const uint32_t screen = w.screen.address;

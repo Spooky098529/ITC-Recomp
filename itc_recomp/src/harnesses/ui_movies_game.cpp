@@ -303,6 +303,15 @@ std::pair<uint32_t, uint32_t> Lookup(Random& r) {
   return {r.Below(2) == 0 ? 0xFFFFFFFFu : 0u, r.Below(6)};
 }
 
+// UiMovie::GetPictureTexture's register steps (its adapter removed: its
+// only caller in play is native): r3 = the movie, r4 and r5 the lookup; r3
+// = the picture's texture.
+void NativeGetPictureTexture(PPCContext& ctx, uint8_t* base) {
+  const uint32_t movie = ctx.r3.u32;
+  const uint32_t picture = ui_movies::FindNode(base, movie, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture));
+}
+
 void NodeCases(Context& h, const Block& block) {
   struct Setter {
     const char* name;
@@ -315,7 +324,7 @@ void NodeCases(Context& h, const Block& block) {
       {"UiMovie::ShowNode (sub_8211AC00)", __imp__sub_8211AC00, sub_8211AC00},
       {"UiMovie::HideNode (sub_8211AC48)", __imp__sub_8211AC48, sub_8211AC48},
       {"UiMovie::SetPictureTexture (sub_8211AAA8)", __imp__sub_8211AAA8, sub_8211AAA8},
-      {"UiMovie::GetPictureTexture (sub_8211AB28)", __imp__sub_8211AB28, sub_8211AB28},
+      {"UiMovie::GetPictureTexture (sub_8211AB28)", __imp__sub_8211AB28, NativeGetPictureTexture},
       {"UiMovie::ResetNode (sub_8211A1E0)", __imp__sub_8211A1E0, sub_8211A1E0},
   };
   const Movie m(block.at);
@@ -326,7 +335,7 @@ void NodeCases(Context& h, const Block& block) {
       auto [sub, child] = Lookup(h.random);
       // The picture's texture: a leaf (entry 0 is the sub-scene, whose +108
       // isn't a texture entry).
-      if (s.native == sub_8211AAA8 || s.native == sub_8211AB28) {
+      if (s.native == sub_8211AAA8 || s.native == NativeGetPictureTexture) {
         child = 1 + h.random.Below(5);
       }
       const uint32_t r6 = s.native == sub_8211A5B8 || h.random.Below(3) == 0
