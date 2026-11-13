@@ -769,7 +769,9 @@ void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
 // sub_820DBE20, CockpitPoints::~CockpitPoints sub_820DC258 and
 // SceneModelBlock::Reset sub_820D9F50 (2026-11-01, their callers in play
 // native: ScenePools::ReleaseB, the destructors, the constructors and
-// SceneModel::Release).
+// SceneModel::Release); Morph::Blend sub_8258BD28 (2026-11-13, its callers
+// in play native: Model::MorphShape, Morph::Run and MorphJob::Run's
+// adapter, src/hooks/morph_jobs.cpp, which calls its step).
 ITC_SECOND_SET(820E0258, SecondSetPartsFind)
 ITC_SECOND_SET(820DBC88, SecondSetCockpitFind)
 ITC_SECOND_SET(820E3660, SecondSetInteriorFind)
@@ -778,7 +780,6 @@ ITC_SECOND_SET(820E58C8, SecondSetTrafficFind)
 ITC_SECOND_SET(820E00F0, SecondSetPartsPointsReset)
 ITC_SECOND_SET(820DA108, SecondSetSceneModelBlockConstruct)
 ITC_SECOND_SET(82594C18, SecondSetMorphSetUp)
-ITC_SECOND_SET(8258BD28, SecondSetMorphBlend)
 ITC_SECOND_SET(820E6F28, SecondSetTireFillEntries)
 ITC_SECOND_SET(820E7010, SecondSetTireReadEntry)
 ITC_SECOND_SET(820E8668, SecondSetWheelPointsSetUp)

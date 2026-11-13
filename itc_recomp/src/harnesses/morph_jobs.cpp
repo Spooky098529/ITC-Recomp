@@ -427,10 +427,10 @@ void TailCalls(Context& h) {
   }
 }
 
-// MorphJob::Run: +220 set (0 now and then any word), the record at +56: its
-// kind (+120) 6 with no targets and up to 8 vertices (a copy from +0xA00 to
-// +0xB00) or one target, or a kind that blends nothing; Blend's frame
-// compared too.
+// MorphJob::Run: +220 set (1, now and then any odd word), the record at
+// +56: its kind (+120) 6 with no targets and up to 8 vertices (a copy from
+// +0xA00 to +0xB00) or one target, or a kind that blends nothing; the
+// original's Morph::Blend against its step (its adapter is gone).
 void RunCases(Context& h) {
   Results results("MorphJob::Run (sub_820AC998)");
   int blended = 0;
@@ -462,17 +462,26 @@ void RunCases(Context& h) {
             }
             guest::StoreU32(h.base, record + 120, r.Below(2) ? r.Below(6) : kind);
           }
-          t.r3.u64 = (r.Below(4) == 0 ? (r.Next() << 32) : 0) | job;
+          // No high word: the delegate hands it a word it loaded (and
+          // Morph::Blend's step leaves the record's 32 bits in r3 for the
+          // kinds that blend nothing, where the original leaves r3 as it
+          // came).
+          t.r3.u64 = job;
         },
         __imp__sub_820AC998, hooks::MorphJobsRun,
         [&](Outputs& out, const PPCContext& t, int) {
           out.Bytes(Read(h.base, h.data, kStreamOut));
           out.Floats(h.base, h.data + kStreamOut, 0x100 / 4);
           out.Bytes(Read(h.base, h.data + kStreamOut + 0x100, kScratchBytes - kStreamOut - 0x100));
-          out.Bytes(Read(h.base, t.r1.u32 - 256, 256));
+          // Blend6's weights once a target ran (r1 - 48), as Morph::Blend's
+          // harness (second_set) compares; its other frame words and r11
+          // are the blend's leftovers (the original's saved registers and
+          // memcpy's frames), which its own harness leaves out.
+          if (blends && guest::LoadU32(h.base, h.data + kJob + 56 + 112) != 0) {
+            out.Floats(h.base, t.r1.u32 - 48, 4);
+          }
           out.Word(t.r3.u32);
           out.Word(uint32_t(t.r3.u64 >> 32));
-          out.Word(t.r11.u32);
         },
         fmt::format("case {}", c));
     blended += blends;
