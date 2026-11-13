@@ -15,6 +15,7 @@
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "harnesses/test_route.h"
+#include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "hooks/race_states.h"
 #include "memory/c_runtime_heap.h"
@@ -2113,6 +2114,422 @@ void Inits(Context& h) {
   results.Report();
 }
 
+// --- The race's end ---
+//
+// RaceStates::OnRaceEnd with the course record (never seen in play) and
+// Time::Add. The course record's functions have no adapters: their native
+// register steps here (Native<Name>, without the flag) against their
+// originals, on a list of 0 to 10 nodes linked from a shuffled order (the
+// free list the rest), its entries' times packed (now and then random
+// words). OnRaceEnd: the machine, a progress (its record at +2184 with the
+// opponents' items none, its entry index 0 to 76, packed times), the race
+// data (the replay bit now and then, the mode 0, 2, 3, 4, 7, 8, others and
+// random, the kind 1 or not, the kept results' count 0 to 60, the stage
+// list's current 0 to 9 with types 1 and 3 and racers 0 to 92 or -1, a
+// course list), player 0's save data (random: the achievements' item wins
+// mostly nonzero, so Check answers 1 and Write runs; Results::Push's count
+// 0 to 16), the seven vehicles, the kept replay and the recordings (random
+// once, put back before each side), the game's pointers at them;
+// XUserWriteAchievements recorded (no unlock). Compared: the blocks, the
+// achievements' entries, the recorded calls, the frame's temporaries
+// (+28, +80 to +219) and its callees' (Place's and Add's at -128 + 28 and
+// + 80, -256 + 80; Replay::Keep's stage copy at -272 + 80), r3. The callees
+// made native earlier (RacerRecords::Add, Stats::AddRaceResult,
+// Achievements::Check and Write, Replay::Keep) run as their adapters run
+// them on the original's side.
+
+rs::GuestCall HarnessCall(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t function, uint32_t sp, uint32_t back, uint64_t r3, uint64_t r4,
+                      uint64_t r5, uint64_t r6, uint64_t r7) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.r6.u64 = r6;
+    ctx.r7.u64 = r7;
+    ctx.lr = back;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+}
+
+void NativeCourseEntryClear(PPCContext& ctx, uint8_t* base) {
+  rs::CourseEntryClear(base, ctx.r3.u32);
+}
+void NativeCoursePlace(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rs::CourseRecordPlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+void NativeCourseLink(PPCContext& ctx, uint8_t* base) {
+  rs::CourseRecordLink(base, ctx.r3.u32, int16_t(ctx.r4.u16));
+}
+void NativeCourseUnlink(PPCContext& ctx, uint8_t* base) {
+  rs::CourseRecordUnlink(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeCourseInsert(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  rs::CourseRecordInsert(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+                         HarnessCall(ctx, base));
+  ctx.lr = lr;
+}
+void NativeCourseAdd(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = rs::CourseRecordAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+                                   HarnessCall(ctx, base));
+  ctx.lr = lr;
+}
+void NativeCourseSave(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  rs::CourseRecordsSave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, HarnessCall(ctx, base));
+  ctx.lr = lr;
+}
+
+// A packed time: minutes 0 to 9, seconds, thousandths, negative now and
+// then; or a random word.
+uint32_t PackedTime(Random& r) {
+  if (r.Below(12) == 0) {
+    return uint32_t(r.Next());
+  }
+  const uint32_t sign = r.Below(10) == 0 ? 0x80000000u : 0;
+  return sign | r.Below(10) << 16 | r.Below(60) << 10 | r.Below(1000);
+}
+
+// A course list at `list` (408 bytes): `count` nodes linked in a shuffled
+// order from +44, the others on the free list from +40, each node's entry
+// one of a shuffled ten; the entries' times packed.
+void MakeCourseList(uint8_t* base, uint32_t list, uint32_t count, Random& r) {
+  WriteRandom(base, list, 408, r);
+  uint32_t order[10], entries[10];
+  for (uint32_t i = 0; i < 10; i++) {
+    order[i] = i;
+    entries[i] = i;
+  }
+  for (uint32_t i = 9; i > 0; i--) {
+    std::swap(order[i], order[r.Below(i + 1)]);
+    std::swap(entries[i], entries[r.Below(i + 1)]);
+  }
+  const auto end = [&r]() { return uint16_t(r.Below(2) ? 0xFFFF : r.Below(11)); };
+  for (uint32_t k = 0; k < 10; k++) {
+    const uint32_t node = list + 4 * order[k];
+    const bool used = k < count;
+    const uint32_t last = used ? count : 10;
+    guest::StoreU16(base, node, k + 1 < last ? uint16_t(order[k + 1]) : end());
+    guest::StoreU16(base, node + 2, uint16_t(entries[k]));
+  }
+  guest::StoreU16(base, list + 44, count > 0 ? uint16_t(order[0]) : end());
+  guest::StoreU16(base, list + 40, count < 10 ? uint16_t(order[count]) : uint16_t(r.Below(10)));
+  guest::StoreU16(base, list + 48, uint16_t(count));
+  for (uint32_t e = 0; e < 10; e++) {
+    guest::StoreU32(base, list + 52 + 28 * e + 20, PackedTime(r));
+    guest::StoreU32(base, list + 52 + 28 * e + 24, PackedTime(r));
+  }
+}
+
+void CourseRecord(Context& h) {
+  const Block block(4096);
+  if (!block.address) {
+    ITC_LOG_ERROR("harness: race_states: no block from the allocation layer");
+    return;
+  }
+  const uint32_t list = block.address + 1024;
+  const uint32_t entry = block.address + 2048;
+  const uint32_t source = block.address + 2560;
+  {
+    Results results("Time::Add (sub_820FF458)");
+    for (int c = 0; c < 200; c++) {
+      Outputs out[2];
+      const uint64_t seed = h.random.Next();
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        guest::StoreU32(h.base, h.data, PackedTime(r));
+        guest::StoreU32(h.base, h.data + 4, PackedTime(r));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        t.r4.u64 = h.data + 4;
+        (v == 0 ? Original<__imp__sub_820FF458> : hooks::RaceStatesTimeAdd)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  struct Group {
+    const char* name;
+    GuestFunction original;
+    GuestFunction native;
+    int cases;
+  };
+  const Group groups[] = {
+      {"CourseEntry::Clear (sub_82105BC8)", __imp__sub_82105BC8, NativeCourseEntryClear, 8},
+      {"CourseRecord::Place (sub_82105EA0)", __imp__sub_82105EA0, NativeCoursePlace, 120},
+      {"CourseRecord::Link (sub_82105D60)", __imp__sub_82105D60, NativeCourseLink, 80},
+      {"CourseRecord::Unlink (sub_82105DC8)", __imp__sub_82105DC8, NativeCourseUnlink, 80},
+      {"CourseRecord::Insert (sub_82105E30)", __imp__sub_82105E30, NativeCourseInsert, 80},
+      {"CourseRecord::Add (sub_82105F50)", __imp__sub_82105F50, NativeCourseAdd, 160},
+  };
+  for (const Group& g : groups) {
+    Results results(g.name);
+    for (int c = 0; c < g.cases; c++) {
+      Outputs out[2];
+      const uint64_t seed = h.random.Next();
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        WriteRandom(h.base, block.address, block.bytes, r);
+        const uint32_t count = r.Below(4) == 0 ? 10 : r.Below(11);
+        MakeCourseList(h.base, list, count, r);
+        guest::StoreU32(h.base, entry + 20, PackedTime(r));
+        guest::StoreU32(h.base, entry + 24, PackedTime(r));
+        PPCContext t = CallContext(h);
+        const uint32_t sp = t.r1.u32;
+        WriteRandom(h.base, sp - 1024, 1024 + 64, r);
+        t.r3.u64 = g.native == NativeCourseEntryClear ? entry : list;
+        if (g.native == NativeCoursePlace) {
+          t.r4.u64 = r.Below(3) == 0 ? guest::LoadU32(h.base, list + 52 + 28 * r.Below(10) + 20)
+                                     : PackedTime(r);
+        } else if (g.native == NativeCourseLink) {
+          // A place up to the count (the free list's first linked in).
+          t.r4.u64 = count < 10 ? r.Below(count + 1) : 0;
+          if (count == 10) {
+            guest::StoreU16(h.base, list + 48, 9);
+          }
+        } else if (g.native == NativeCourseUnlink) {
+          t.r4.u64 = count > 0 ? r.Below(count) : 0;
+          if (count == 0) {
+            MakeCourseList(h.base, list, 1, r);
+          }
+        } else if (g.native == NativeCourseInsert) {
+          t.r4.u64 = entry;
+          if (count == 10) {
+            MakeCourseList(h.base, list, 9, r);
+          }
+          t.r5.u64 = r.Below(std::min<uint32_t>(count, 9) + 1);
+        } else if (g.native == NativeCourseAdd) {
+          t.r4.u64 = entry;
+          t.r5.u64 = source;
+        }
+        t.lr = 0x82000000 | r.Below(0x10000) << 2;
+        (v == 0 ? g.original : g.native)(t, h.base);
+        out[v].Bytes(Read(h.base, block.address, block.bytes));
+        out[v].Word(guest::LoadU32(h.base, sp + 28));
+        out[v].Word(guest::LoadU32(h.base, sp - 128 + 28));
+        out[v].Word(guest::LoadU32(h.base, sp - 128 + 80));
+        out[v].Word(guest::LoadU32(h.base, sp - 256 + 80));
+        out[v].Word(t.r1.u32);
+        if (g.native == NativeCoursePlace || g.native == NativeCourseAdd) {
+          out[v].Word(t.r3.u32);
+          out[v].Word(uint32_t(t.r3.u64 >> 32));
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // CourseRecords::Save: a race data's stage list (its current stage of
+    // type 1 or 3, or others) and course list, into the records at a
+    // route 0 to 7.
+    const Block race(0x5A000), records(0x2000);
+    if (!race.address || !records.address) {
+      ITC_LOG_ERROR("harness: race_states: no block from the allocation layer");
+      return;
+    }
+    Results results("CourseRecords::Save (sub_82105C18)");
+    for (int c = 0; c < 48; c++) {
+      Outputs out[2];
+      const uint64_t seed = h.random.Next();
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        WriteRandom(h.base, records.address, records.bytes, r);
+        WriteRandom(h.base, race.address, 8, r);
+        guest::StoreU32(h.base, race.address + 4, r.Below(8));
+        const uint32_t stages = race.address + 0x59620;
+        WriteRandom(h.base, stages, 812 + 408, r);
+        const uint32_t current = r.Below(10);
+        guest::StoreU32(h.base, stages + 804, current);
+        const uint32_t types[] = {1, 3, 1, 3, 0, 2, 4};
+        guest::StoreU32(h.base, stages + 80 * current, types[r.Below(7)]);
+        guest::StoreU32(h.base, race.address + 0x59618, r.Below(2) ? 0 : uint32_t(r.Next()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = records.address;
+        t.r4.u64 = race.address;
+        t.lr = 0x82000000 | r.Below(0x10000) << 2;
+        (v == 0 ? __imp__sub_82105C18 : NativeCourseSave)(t, h.base);
+        out[v].Bytes(Read(h.base, records.address, records.bytes));
+        out[v].Bytes(Read(h.base, stages, 812 + 408));
+        out[v].Word(t.r1.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// XUserWriteAchievements' calls in an OnRaceEnd case.
+std::vector<uint32_t> g_write_calls;
+uint8_t* g_write_base = nullptr;
+hooks::StartUpRecorder g_write_chained = nullptr;
+
+bool RecordAchievementWrite(PPCContext& ctx, uint32_t address) {
+  if (address != 0x82294E58) {
+    return g_write_chained != nullptr && g_write_chained(ctx, address);
+  }
+  for (const uint32_t word :
+       {ctx.r1.u32, uint32_t(ctx.lr), ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+        guest::LoadU32(g_write_base, ctx.r4.u32), guest::LoadU32(g_write_base, ctx.r4.u32 + 4)}) {
+    g_write_calls.push_back(word);
+  }
+  ctx.r3.u64 = 997;
+  return true;
+}
+
+void RaceEnd(Context& h, const Block& progress, const Block& vehicles) {
+  constexpr uint32_t kReplayBytes = 0x34E20 + 0x107AC4;
+  constexpr uint32_t kRecordingsBytes = 0x20F590 + 38928;
+  constexpr uint32_t kSaveBytes = 0x20000;
+  constexpr uint32_t kSaveData = 0x826C5B58;
+  constexpr uint32_t kReplay = 0x826C5B50;
+  constexpr uint32_t kRecordings = 0x826C5B4C;
+  constexpr uint32_t kEntries = 0x828164F0;
+  const Block machine(10240), race(0xA4000), save(kSaveBytes), replay(4096 + kReplayBytes),
+      recordings(kRecordingsBytes);
+  if (!machine.address || !race.address || !save.address || !replay.address ||
+      !recordings.address) {
+    ITC_LOG_ERROR("harness: race_states: no block from the allocation layer");
+    return;
+  }
+  // The replay (a racer -1 reads below it) and the recordings: random once.
+  {
+    Random r(0x5EEDull);
+    WriteRandom(h.base, replay.address, replay.bytes, r);
+    WriteRandom(h.base, recordings.address, recordings.bytes, r);
+  }
+  const uint32_t kept = replay.address + 4096;
+  const std::vector<uint8_t> replay_bytes = Read(h.base, replay.address, replay.bytes);
+  const std::vector<uint8_t> recordings_bytes = Read(h.base, recordings.address, recordings.bytes);
+  Results results("RaceStates::OnRaceEnd (sub_821644D8)");
+  int replays = 0, courses = 0, items = 0, writes = 0;
+  for (int c = 0; c < 64; c++) {
+    Outputs out[2];
+    const uint64_t seed = h.random.Next();
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      Globals globals(h.base, {rw::kRaceData, rs::kProgress, kVehicles, kSaveData, kReplay,
+                               kRecordings});
+      const std::vector<uint8_t> entries = Read(h.base, kEntries, 8 * 27);
+      Write(h.base, replay.address, replay_bytes.data(), replay.bytes);
+      Write(h.base, recordings.address, recordings_bytes.data(), recordings.bytes);
+      WriteRandom(h.base, h.data, kScratchBytes, r);
+      WriteRandom(h.base, machine.address, machine.bytes, r);
+      guest::StoreU32(h.base, machine.address + 9624, progress.address);
+      // The progress: its record (+2184) and the fields the end reads.
+      WriteRandom(h.base, progress.address, kProgressBytes, r);
+      const uint32_t record = progress.address + 2184;
+      guest::StoreU32(h.base, record + 4, r.Below(77));
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU32(h.base, record + 8 + 972 * k, 0xFFFFFFFFu);
+      }
+      guest::StoreU32(h.base, record + 3924, r.Below(4));
+      guest::StoreU32(h.base, record + 3920, r.Below(5));
+      guest::StoreU32(h.base, progress.address + 2204, PackedTime(r));
+      guest::StoreU32(h.base, progress.address + 2272, PackedTime(r));
+      guest::StoreU32(h.base, progress.address + 6108, r.Below(3));
+      guest::StoreU32(h.base, progress.address + 6076, r.Below(12));
+      // The race data.
+      WriteRandom(h.base, race.address, race.bytes, r);
+      guest::StoreU32(h.base, race.address + 4, r.Below(8));
+      const uint32_t flags = uint32_t(r.Next());
+      guest::StoreU32(h.base, race.address + 0x59AE4,
+                      r.Below(6) == 0 ? flags | 0x80 : flags & ~0x80u);
+      const uint32_t modes[] = {0, 4, 0, 4, 0, 4, 2, 3, 7, 8, 1, 5, 6, 0xFFFFFFFFu};
+      const uint32_t mode =
+          r.Below(16) == 0 ? uint32_t(r.Next()) : modes[r.Below(std::size(modes))];
+      guest::StoreU32(h.base, race.address + 0xA3AF4, mode);
+      guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(2) ? 1 : r.Below(8));
+      guest::StoreU32(h.base, race.address + 0x59AE8 + 0x49FE0, r.Below(61));
+      const uint32_t stages = race.address + 0x59620;
+      const uint32_t current = r.Below(10);
+      guest::StoreU32(h.base, stages + 804, current);
+      for (uint32_t s = 0; s <= 10; s++) {
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, stages + 80 * s + 44 + 8 * i,
+                          r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(93));
+        }
+      }
+      const uint32_t types[] = {1, 3, 1, 3, 0, 2};
+      guest::StoreU32(h.base, stages + 80 * current, types[r.Below(6)]);
+      guest::StoreU32(h.base, race.address + 0x59618, r.Below(2) ? 0 : 1);
+      MakeCourseList(h.base, stages + 812, r.Below(4) == 0 ? 10 : r.Below(11), r);
+      // Player 0's save data: the achievements' item wins all set, or some
+      // 0; Results::Push's count.
+      WriteRandom(h.base, save.address, save.bytes, r);
+      if (r.Below(3) == 0) {
+        guest::StoreU16(h.base, save.address + 0x199FA + 12 * (376 + r.Below(24)), 0);
+      }
+      guest::StoreU32(h.base, save.address + 4996, r.Below(17));
+      guest::StoreU32(h.base, save.address + 6104, r.Below(5));
+      guest::StoreU32(h.base, rw::kRaceData, race.address);
+      guest::StoreU32(h.base, rs::kProgress, progress.address);
+      guest::StoreU32(h.base, kVehicles, vehicles.address);
+      guest::StoreU32(h.base, kSaveData, save.address);
+      guest::StoreU32(h.base, kReplay, kept);
+      guest::StoreU32(h.base, kRecordings, recordings.address);
+      WriteRandom(h.base, vehicles.address, vehicles.bytes, r);
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      const uint32_t frame = sp - 272;
+      WriteRandom(h.base, sp - 8192, 8192 + 64, r);
+      t.r3.u64 = machine.address;
+      t.lr = 0x82000000 | r.Below(0x10000) << 2;
+      g_write_calls.clear();
+      g_write_base = h.base;
+      g_write_chained = hooks::g_start_up_recorder;
+      hooks::g_start_up_recorder = RecordAchievementWrite;
+      (v == 0 ? Original<__imp__sub_821644D8> : hooks::RaceStatesOnRaceEnd)(t, h.base);
+      hooks::g_start_up_recorder = g_write_chained;
+      g_write_chained = nullptr;
+      if (v == 1) {
+        const bool replay_bit = (guest::LoadU32(h.base, race.address + 0x59AE4) & 0x80) != 0;
+        replays += replay_bit;
+        courses += !replay_bit && (mode == 0 || mode == 4);
+        items += !replay_bit && (mode == 2 || mode == 3);
+        writes += !g_write_calls.empty();
+      }
+      out[v].Bytes(Read(h.base, machine.address, machine.bytes));
+      out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
+      out[v].Bytes(Read(h.base, race.address, race.bytes));
+      out[v].Bytes(Read(h.base, save.address, save.bytes));
+      out[v].Bytes(Read(h.base, replay.address, replay.bytes));
+      out[v].Bytes(Read(h.base, recordings.address, recordings.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Bytes(Read(h.base, kEntries, 8 * 27));
+      Write(h.base, kEntries, entries.data(), 8 * 27);
+      out[v].Word(uint32_t(g_write_calls.size()));
+      for (const uint32_t word : g_write_calls) {
+        out[v].Word(word);
+      }
+      out[v].Word(guest::LoadU32(h.base, frame + 28));
+      out[v].Bytes(Read(h.base, frame + 80, 140));
+      for (const uint32_t at : {frame - 128 + 28, frame - 128 + 80, frame - 256 + 80}) {
+        out[v].Word(guest::LoadU32(h.base, at));
+      }
+      out[v].Bytes(Read(h.base, frame - 272 + 80, 80));
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  ITC_LOG_INFO(
+      "harness: race_states: OnRaceEnd: {} replays, {} course records, {} race results, {} "
+      "achievement writes of 64",
+      replays, courses, items, writes);
+}
+
 }  // namespace
 
 void RaceStates(Context& h) {
@@ -2132,6 +2549,8 @@ void RaceStates(Context& h) {
   Handlers(h, progress, vehicles, manager);
   Racers(h, vehicles, manager);
   Inits(h);
+  CourseRecord(h);
+  RaceEnd(h, progress, vehicles);
 }
 
 }  // namespace harness

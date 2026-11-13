@@ -205,6 +205,7 @@ set(ITC_SOURCES
     src/race_states/follow_route.cpp
     src/race_states/race_states_init.cpp
     src/race_states/route_distance.cpp
+    src/race_states/race_end.cpp
     src/hooks/archive.cpp
     src/archive/archive.cpp
     src/archive/semaphores.cpp

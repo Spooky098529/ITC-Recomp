@@ -125,4 +125,11 @@ void RaceStatesStandingStartTick(PPCContext& ctx, uint8_t* base);
 // aren't native.
 void RaceStatesInit(PPCContext& ctx, uint8_t* base);
 
+// RaceStates::OnRaceEnd sub_821644D8: a handler (r3 = the machine); r3 as
+// the original leaves it. The callees' originals through the function table
+// where their plain C++ refuses. Time::Add sub_820FF458: r3, r4 = &the two
+// packed times.
+void RaceStatesOnRaceEnd(PPCContext& ctx, uint8_t* base);
+void RaceStatesTimeAdd(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
