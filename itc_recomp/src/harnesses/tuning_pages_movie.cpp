@@ -2075,6 +2075,65 @@ void StickerCases(Context& h, const World& w) {
   Run(h, w,
       {"TuningScreen::ShowStickerPicker", 100, __imp__sub_821FBB60,
        hooks::TuningPagesShowStickerPicker, 64, {{80, 112}, {160, 240}}, show});
+  // The input pages: r3 the screen (its high word now and then set). Below
+  // their frames, the helpers' register saves and holes (the native helpers
+  // write neither), shifted by the page's frame: AnimateStickerAreas' 56
+  // bytes and its {144, 800} under the 96-byte frame (RestoreAreaDecals' 32
+  // inside); UpdateSoloHold's 16, ShowSlotNode's 40, AnimateStickerSlots'
+  // 56 with its {144, 184}, AnimateStickerOperate's 56 with its {64, 96}
+  // and {144, 184}, PlaceStickerNode's 48, AnimateStickerEditMenu's 64 with
+  // its {80, 112}, {160, 224} and {272, 312} under the 112-byte frames.
+  auto page = [](PPCContext& t, Random& r, const World& w) {
+    StickerFields(t, r, w);
+    HighWord(t, r);
+  };
+  Run(h, w,
+      {"TuningScreen::InputStickerAreas", 200, __imp__sub_821FBD40,
+       hooks::TuningPagesInputStickerAreas, 16, {{96, 152}, {240, 896}}, page});
+  Run(h, w,
+      {"TuningScreen::InputStickerSlots", 200, __imp__sub_821F9050,
+       hooks::TuningPagesInputStickerSlots, 32, {{112, 168}, {256, 296}}, page});
+  Run(h, w,
+      {"TuningScreen::InputStickerOperate", 200, __imp__sub_821F9328,
+       hooks::TuningPagesInputStickerOperate, 32, {{112, 168}, {176, 208}, {256, 296}}, page});
+  Run(h, w,
+      {"TuningScreen::InputStickerEdit", 300, __imp__sub_821F9608,
+       hooks::TuningPagesInputStickerEdit, 32,
+       {{112, 176}, {192, 224}, {272, 336}, {384, 424}}, page});
+  // InputStickerView: the view's held buttons (163, 164, 171 to 174) never
+  // read set on the player's mapper (whichever slot reads them), as this
+  // world has no stand for GarageStage's commands: its A and B here, the
+  // held buttons in car_makers' stand world (beside InputVinylView's).
+  auto view = [page](PPCContext& t, Random& r, const World& w) {
+    page(t, r, w);
+    const uint32_t c = guest::LoadU32(w.base, kControllerEntries);
+    const uint32_t mapper = guest::LoadU32(w.base, kMapperEntries + 8 * c);
+    for (const uint32_t at : {448u, 456u, 464u}) {
+      guest::StoreU32(w.base, mapper + at, guest::LoadU32(w.base, mapper + at) & ~0x00FFF000u);
+    }
+  };
+  Run(h, w,
+      {"TuningScreen::InputStickerView", 150, __imp__sub_821F7000,
+       hooks::TuningPagesInputStickerView, 24, {}, view});
+  // HandleInput on those states: the pages' saves and holes 112 deeper.
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (38)", 60, {38}, 16, {{96, 152}, {240, 896}},
+                      StickerFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (39)", 60, {39}, 32, {{112, 168}, {256, 296}},
+                      StickerFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (40)", 60, {40}, 32,
+                      {{112, 168}, {176, 208}, {256, 296}}, StickerFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (41)", 80, {41}, 32,
+                      {{112, 176}, {192, 224}, {272, 336}, {384, 424}}, StickerFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (49)", 40, {49}, 24, {},
+                      [view](PPCContext& t, Random& r, const World& w) {
+                        view(t, r, w);
+                        t.r3.u64 = w.screen();
+                      }));
 }
 
 void TuningPagesMovie(Context& h) {

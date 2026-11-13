@@ -3,9 +3,10 @@
 // tuning_pages.h. The original keeps the screen in r31 (all 64 bits of r3 at
 // entry) and r4 in r30, with its 112-byte frame at r1 (r30, r31 and lr saved
 // below the frame, not written here). The pages made native by their plain
-// C++ (as their adapters run them), the pages never seen in play (state 7,
-// the paint, the light kits, the sticker editor's, the interior's) through
-// the guest with the original's return addresses; the empty sub_82106540
+// C++ (the sticker editor's states 38 to 41 and 49 too, never seen in play),
+// the other pages never seen in play (state 7, the paint, the light kits, the
+// sticker editor's states 42 to 46, the interior's) through the guest with
+// the original's return addresses; the empty sub_82106540
 // (states 35 to 37 and 50 to 52) left out, as other native callers of it do.
 
 #include "tuning_pages/tuning_pages.h"
@@ -34,16 +35,11 @@ Guest PageGuest(uint32_t state) {
     case 20: return {0x821EF5E8, 0x821E6A60};  // InputLightKinds
     case 21: return {0x821EFA78, 0x821E6A6C};  // InputLightKind0
     case 22: return {0x821F0318, 0x821E6A78};  // InputLightKind1
-    case 38: return {0x821FBD40, 0x821E6B20};  // the sticker editor's pages
-    case 39: return {0x821F9050, 0x821E6B2C};
-    case 40: return {0x821F9328, 0x821E6B38};
-    case 41: return {0x821F9608, 0x821E6B44};
-    case 42: return {0x821FBF18, 0x821E6B50};
+    case 42: return {0x821FBF18, 0x821E6B50};  // the sticker editor's pages
     case 43: return {0x821FC270, 0x821E6B5C};
     case 44: return {0x821F99A8, 0x821E6B68};
     case 45: return {0x821F9D30, 0x821E6B74};
     case 46: return {0x821F9FB8, 0x821E6B80};
-    case 49: return {0x821F7000, 0x821E6B8C};
     case 53: return {0x821F5B98, 0x821E6BBC};  // InputInteriorModes
     case 54: return {0x821F0998, 0x821E6BC8};  // InputInteriorList
     case 55: return {0x821F0D38, 0x821E6BD4};  // InputInteriorOptions
@@ -102,6 +98,11 @@ uint64_t HandleInput(uint8_t* base, const tuning_screen::GuestCall& call, uint64
     case 30: return InputDecalAngle(base, call, screen, frame, flags);
     case 31: return InputDecalScale(base, call, screen, frame, flags);
     case 34: return InputVinylView(base, call, screen, frame, flags.native_slots);
+    case 38: return InputStickerAreas(base, call, screen, frame, flags);
+    case 39: return InputStickerSlots(base, call, screen, frame, flags);
+    case 40: return InputStickerOperate(base, call, screen, frame, flags);
+    case 41: return InputStickerEdit(base, call, screen, frame, flags);
+    case 49: return InputStickerView(base, call, screen, frame, flags);
     case 35: case 36: case 37: case 50: case 51: case 52:
       return screen;  // the empty sub_82106540(screen), left out
     case 59: return Leave(base, screen, r4, frame);

@@ -253,5 +253,14 @@ void TuningPagesAnimateStickerSlots(PPCContext& ctx, uint8_t* base);
 void TuningPagesAnimateStickerEditMenu(PPCContext& ctx, uint8_t* base);
 void TuningPagesShowStickerOrder(PPCContext& ctx, uint8_t* base);
 void TuningPagesShowStickerPicker(PPCContext& ctx, uint8_t* base);
+// The sticker editor's input pages (r3 the screen; no adapters: the
+// harness's steps): InputStickerAreas sub_821FBD40, InputStickerSlots
+// sub_821F9050, InputStickerOperate sub_821F9328, InputStickerEdit
+// sub_821F9608, InputStickerView sub_821F7000.
+void TuningPagesInputStickerAreas(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerSlots(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerOperate(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerEdit(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerView(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -1861,6 +1861,18 @@ void TuningStand(Context& h, Random& r) {
             fmt::format("case {}", c), 112, 32, before_view, view_out, 0x3000, kGarageBytes);
       }
       view.Report();
+      // The sticker editor's state 49 page TuningScreen::InputStickerView
+      // (sticker_pages.cpp): InputVinylView's held buttons without its
+      // camera reset and leaving call, in the same world. The top 24 bytes:
+      // r30, r31 and lr's saves.
+      Results sticker_view("TuningScreen::InputStickerView (sub_821F7000)");
+      for (int c = 0; c < 80; c++) {
+        Case(
+            h, sticker_view, block, r, [&](PPCContext& t) { lay_view(t, c); },
+            __imp__sub_821F7000, hooks::TuningPagesInputStickerView, 24, floats,
+            fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes);
+      }
+      sticker_view.Report();
       // The vinyl editor's state 23 page InputVinylPages and its movie side
       // MoveVinylMenu: the page +30724 -1 to 3, the
       // last page +30784 0 to 2, the wrap +30728 and +9708 0 or 1; the

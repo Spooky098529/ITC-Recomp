@@ -832,4 +832,26 @@ uint64_t ShowStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, 
 // ShowSlotNode's node.
 uint32_t ShowStickerOrder(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp);
 
+// The input pages (their rows), r3 = the screen (all 64 bits), each from
+// HandleInput's frame: Menu::Step, Menu::Pressed, MenuSound::Play and the
+// stand's commands through `call` with the originals' return addresses, the
+// helpers above by their plain C++, memcpy's plain C++ where Buffers_Memcpy
+// takes it; r3 as the originals leave it. Need flush-to-zero off
+// (PlaceStickerNode under InputStickerEdit).
+// sub_821FBD40 InputStickerAreas (state 38, 96-byte frame; RestoreAreaDecals
+// and FadeOut by their plain C++), sub_821F9050 InputStickerSlots (39, 112),
+// sub_821F9328 InputStickerOperate (40, 112), sub_821F9608 InputStickerEdit
+// (41, 112), sub_821F7000 InputStickerView (49, 112; the mapper's slots by
+// their plain C++ with `flags.native_slots`, as UpdateSoloHold's).
+uint64_t InputStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, const PageFlags& flags);
+uint64_t InputStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, const PageFlags& flags);
+uint64_t InputStickerOperate(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                             uint32_t sp, const PageFlags& flags);
+uint64_t InputStickerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, const PageFlags& flags);
+uint64_t InputStickerView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, const PageFlags& flags);
+
 }  // namespace tuning_pages

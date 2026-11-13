@@ -146,7 +146,12 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_821F8D68, ShowStickerOrder sub_821FBA40 and ShowStickerPicker sub_821FBB60 "
               "(the UI movies' FindNode by its plain C++; SetText, the named animations, "
               "UiMovie::Unloop and GarageStage::Command through their overrides, the varargs "
-              "SetText calls leave unset passed as 0) "
+              "SetText calls leave unset passed as 0), and its input pages InputStickerAreas "
+              "sub_821FBD40, InputStickerSlots sub_821F9050, InputStickerOperate sub_821F9328, "
+              "InputStickerEdit sub_821F9608 and InputStickerView sub_821F7000 (no adapters: "
+              "only HandleInput calls them; the helpers, RestoreAreaDecals, FadeOut and memcpy "
+              "by their plain C++, Menu::Step, Menu::Pressed, MenuSound::Play and the stand's "
+              "commands through their overrides) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -851,6 +856,7 @@ void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base) {
 }
 
 void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();  // PlaceStickerNode under InputStickerEdit
   const uint64_t screen = ctx.r3.u64, r4 = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -858,6 +864,23 @@ void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base) {
     return tp::HandleInput(base, call, screen, r4, sp, flags);
   });
 }
+
+namespace {
+
+// A sticker page's step: r3 the screen, flush-to-zero off.
+using StickerPage = uint64_t (*)(uint8_t*, const tuning_screen::GuestCall&, uint64_t, uint32_t,
+                                 const tp::PageFlags&);
+void RunStickerPage(PPCContext& ctx, uint8_t* base, StickerPage page) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return page(base, call, screen, sp, flags);
+  });
+}
+
+}  // namespace
 
 void TuningPagesUpdateSoloHold(PPCContext& ctx, uint8_t* base) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
@@ -949,6 +972,26 @@ void TuningPagesShowStickerPicker(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesInputStickerAreas(PPCContext& ctx, uint8_t* base) {
+  RunStickerPage(ctx, base, tp::InputStickerAreas);
+}
+
+void TuningPagesInputStickerSlots(PPCContext& ctx, uint8_t* base) {
+  RunStickerPage(ctx, base, tp::InputStickerSlots);
+}
+
+void TuningPagesInputStickerOperate(PPCContext& ctx, uint8_t* base) {
+  RunStickerPage(ctx, base, tp::InputStickerOperate);
+}
+
+void TuningPagesInputStickerEdit(PPCContext& ctx, uint8_t* base) {
+  RunStickerPage(ctx, base, tp::InputStickerEdit);
+}
+
+void TuningPagesInputStickerView(PPCContext& ctx, uint8_t* base) {
+  RunStickerPage(ctx, base, tp::InputStickerView);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -1019,6 +1062,12 @@ ITC_TUNING_PAGES(821FBB60, TuningPagesShowStickerPicker)
 // harness's): DecalImages::FreeTexture sub_821FE6A0, RestoreStickerTexture
 // sub_821F89B8, BindVinylTexture sub_82204730, Reload sub_821FE960,
 // LoadWindow sub_821FEAF0, Scroll sub_821FED30, FreeKept sub_821FE740.
+
+// No adapters (B7 loop, 2026-11-13: their only caller, HandleInput, is native
+// and calls their plain C++; the register steps above are the harness's): the
+// sticker editor's pages InputStickerAreas sub_821FBD40, InputStickerSlots
+// sub_821F9050, InputStickerOperate sub_821F9328, InputStickerEdit
+// sub_821F9608 and InputStickerView sub_821F7000.
 
 // No adapter (B7 loop, 2026-11-13: its only caller, InputVinylView, is native
 // and calls its plain C++; the register step above is the harness's):
