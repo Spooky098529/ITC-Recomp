@@ -453,6 +453,7 @@ extern "C" REX_FUNC(sub_8211DE30) {
 extern "C" REX_FUNC(sub_8211DE28) {
   REX_FUNC_PROLOGUE();
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DE28);
+  ITC_NATIVE_RUNNING("sub_8211DE28 UiMovie::Unloop");
   ctx.r6.s64 = 0;
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, false),
