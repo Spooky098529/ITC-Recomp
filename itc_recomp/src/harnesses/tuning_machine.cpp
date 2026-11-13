@@ -1151,6 +1151,11 @@ void StartCases(Context& h) {
           };
           const uint32_t pick = refresh - 112, items = refresh - 160;
           Fill(base, pick - 16, 16, 0);
+          // GarageStage::FitSelectedCar's original (no adapter since
+          // 2026-11-13; PickCameraPreset's recompiled original calls it)
+          // under PickCameraPreset's frame: its r29 to r31, f30, f31 and lr
+          // saves, as the refresh's own harness leaves them out.
+          Fill(base, pick - 48, 48, 0);
           get_b(pick - 96);
           get_b(items - 96);
           get_b(items - 112);
