@@ -839,47 +839,39 @@ void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_TUNING_PAGES(821CDF98, TuningPagesTestAndSetWheelFlag)
-ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
 
 ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
 
 ITC_TUNING_PAGES(8224AB50, TuningPagesHsvToRgb)
 
-ITC_TUNING_PAGES(821FE628, TuningPagesUpdateImages)
 ITC_TUNING_PAGES(82208738, TuningPagesUnloadAll)
 
 ITC_TUNING_PAGES(821DE160, TuningPagesSetAeroAvailability)
 
-ITC_TUNING_PAGES(821D8670, TuningPagesLeaveEditor)
-ITC_TUNING_PAGES(821D6AD0, TuningPagesInputCategories)
-ITC_TUNING_PAGES(821D87C0, TuningPagesBackToItems)
-ITC_TUNING_PAGES(821EE390, TuningPagesInputWheelParts)
-ITC_TUNING_PAGES(821EEEA8, TuningPagesInputInches)
 ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
-ITC_TUNING_PAGES(821DFD48, TuningPagesInputItems)
-ITC_TUNING_PAGES(821D8160, TuningPagesInputOptions)
-ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
-ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
-ITC_TUNING_PAGES(821D6E20, TuningPagesInputLevels)
-ITC_TUNING_PAGES(821D74A0, TuningPagesInputTypes)
 
 ITC_TUNING_PAGES(821FE608, TuningPagesOnImageLoaded)
-ITC_TUNING_PAGES(82202928, TuningPagesInputVinylView)
-ITC_TUNING_PAGES(82204B70, TuningPagesInputVinylPages)
-ITC_TUNING_PAGES(82206A50, TuningPagesInputDecalPosition)
-ITC_TUNING_PAGES(82206F48, TuningPagesInputDecalAngle)
-ITC_TUNING_PAGES(82207320, TuningPagesInputDecalScale)
-ITC_TUNING_PAGES(82205110, TuningPagesInputLayerEdit)
-ITC_TUNING_PAGES(82208CE0, TuningPagesInputVinylLayers)
-ITC_TUNING_PAGES(822058F8, TuningPagesInputVinylImages)
-ITC_TUNING_PAGES(82209738, TuningPagesInputLayerActions)
-ITC_TUNING_PAGES(8220A1C8, TuningPagesInputLayerOrder)
-ITC_TUNING_PAGES(82207F38, TuningPagesSwapOrderTextures)
-ITC_TUNING_PAGES(821FD518, TuningPagesSwapLayerRecords)
 
 // The screen's input handler: a vtable slot (no direct callers), so its
 // adapter stays.
 ITC_TUNING_PAGES(821E6950, TuningPagesHandleInput)
+
+// No adapters (removed, B7 loop, 2026-11-13, after HandleInput went native:
+// their only caller, HandleInput, is native and calls their plain C++; the
+// register steps above are the harness's): the input pages InputCategories
+// sub_821D6AD0, InputItems sub_821DFD48, InputLevels sub_821D6E20,
+// InputTypes sub_821D74A0, InputOptions sub_821D8160, InputWheelParts
+// sub_821EE390, InputWheels sub_821F6688, InputInches sub_821EEEA8, Leave
+// sub_821E25B0, EnterEditor sub_821D84F8, LeaveEditor sub_821D8670,
+// BackToItems sub_821D87C0, InputVinylView sub_82202928, InputVinylPages
+// sub_82204B70, InputVinylLayers sub_82208CE0, InputLayerActions
+// sub_82209738, InputLayerEdit sub_82205110, InputLayerOrder sub_8220A1C8,
+// InputVinylImages sub_822058F8, InputDecalPosition sub_82206A50,
+// InputDecalAngle sub_82206F48, InputDecalScale sub_82207320, and
+// DecalImages::Update sub_821FE628. SwapOrderTextures sub_82207F38 and
+// SwapLayerRecords sub_821FD518: their only callers, InputLayerOrder and
+// TuningScreen::Command21, are native (Command21 calls them through the guest
+// only with --native_tuning_pages off, the original's case).
 
 // No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
 // native and call their plain C++; the register steps above are the
