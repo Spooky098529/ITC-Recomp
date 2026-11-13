@@ -286,7 +286,16 @@ file's history. What's left to see in a drive, from every run:
 - Next: `TuningScreen::HandleInput` `sub_821E6950` (ready, seen in
   play, 424 lines; 23 never-seen callees) and `Command21`
   `sub_822087C8` (ready), a lead without mapping (not counted).
-  Migration agent running.
+  Migration 2787b4aa..658969d6 (four batches: `HandleInput` (Input0
+  Merged) and `Command21`, 29 adapters removed (the pages HandleInput
+  alone called, and four helpers), the sticker set-up under
+  `InputItems` (never seen) ported; two harness faults fixed (a
+  `Command21` case with wild layer positions; a signaling NaN the
+  recompiled `lfs`/`stfs` quiet, by the `kVinyls` precedent);
+  harnesses 0 differing; race 29 s at 40, 0 errors; no subagents).
+  Left: 20 never-seen pages `HandleInput` calls through the guest
+  (state 7's option rows next, the paint, the light kits, the
+  interior; the sticker editor's own lead). Validation agent running.
 
 ## Done
 

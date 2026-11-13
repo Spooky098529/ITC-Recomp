@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- `HandleInput` and `Command21` (2787b4aa..658969d6, no mapping):
+  `HandleInput` Overridden (a vtable slot), `Input0` Merged,
+  `Command21` Native under `--native_tuning_screen`; 29 adapters
+  removed; `ResetStickerEditor`, `LoadStickers`, `RestoreAreaDecals`
+  (never seen) ported. `HandleInput` still calls 20 never-seen pages
+  through the guest (its row says why). Harness: `ItemFields` quiets
+  signaling NaNs in the sticker records, as `kVinyls` does (the
+  recompiled `lfs`/`stfs` quiet them).
 - The stand screens' lead (c2578bab) was mostly stale: 6 of its 8 had
   rows; 2 new rows in `tuning-pages.md` (the vinyl editor's state 34
   free look, `InputVinylView`, and `LeaveVinylView`). The vinyl
