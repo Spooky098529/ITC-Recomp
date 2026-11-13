@@ -13,6 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- `Scenery::Draw`'s rest, part one (f1e47061..ea8acc8f, no mapping):
+  the billboards' record (Overridden: its diagnostics wrap runs the
+  native body) and draw, the light groups, `DrawArea`, `Minimap::Draw`
+  (its blink-clock wrap kept, `per_frame_logic.cpp`); 12 adapters
+  removed (`sprites.md`, `minimap.md`, `scenery-lists.md`). The frame
+  check: deterministic dumps (`--interpolate_draw_state=false
+  --max_fps=30`) pixel-identical against each fallback. Harness
+  choices: `RecordState`'s dead frame under `Record` not compared (the
+  render queue saves a guest r26 there); `DrawArea`'s and
+  `Minimap::Draw`'s r3 not compared (`Scenery::Draw` doesn't read it).
+  `BuildVertices`' camera blend shared as
+  `BlendState_BuildBillboardVertices`.
 - The course scenery's ready groups (8516e7c6..95d287ef, no mapping):
   `ObjectPools::Load` calls the three loads directly (`Calls::load`);
   `AnimationSet::FindByTexture` moved from `functions.md`; 15 adapters

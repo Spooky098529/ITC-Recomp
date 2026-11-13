@@ -151,7 +151,14 @@ file's history. What's left to see in a drive, from every run:
   `Minimap::Draw` `sub_820F5740`, the billboards `sub_8209C1A0`,
   `sub_8209CC38`, `sub_8209CDB0`, the light groups `sub_82148658`,
   `Scenery::Draw` `sub_820F6068`), a lead without mapping (not
-  counted). Migration agent running.
+  counted). Migration f1e47061..ea8acc8f (four batches: the billboards'
+  record and draw, `LightGroups::Draw`, `DrawArea`, `Minimap::Draw`
+  inside its blink-clock wrap; 12 adapters removed (`Billboards::Draw`,
+  `Model::DrawShapeDepth`, nine under the minimap); harnesses 0
+  differing, the callers' files' too after each removal; frame dumps
+  at 30 fps without interpolation pixel-identical against each
+  fallback flag; race 35 s at 40, 0 errors; no subagents). Left:
+  `Scenery::Draw` itself (ready). Validation agent running.
 
 ## Done
 
