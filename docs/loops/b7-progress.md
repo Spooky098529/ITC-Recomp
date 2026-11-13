@@ -267,8 +267,12 @@ file's history. What's left to see in a drive, from every run:
   helpers, `HighlightItem` and `HighlightSelected` (`tuning-screen.md`);
   7 decal image adapters removed; two harness faults fixed before the
   commits; harnesses 0 differing; race 30 s at 40, 0 errors). Left:
-  `InputLayerOrder` and the sticker helpers, never seen. Validation
-  agent running.
+  `InputLayerOrder` and the sticker helpers, never seen. Validated:
+  `itc_5166` (race 52 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups; harnesses ~126 s), 16 of 16 harness
+  lines, no prints added; `RestoreStickerTexture` ran in the replay
+  `itc_5167` (ok), the other 15 to drive (11 new to the list, 4
+  already there). Recorded. Third migration agent running (the rest).
 
 ## Done
 

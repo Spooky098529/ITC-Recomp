@@ -18,9 +18,21 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
-Not in the attract race or the replay (`itc_5150`, `itc_5151`, ok; the
-tuning screen's vinyl editor, `tuning-pages.md`):
+Not in the attract race or the replays (`itc_5150`, `itc_5151`; part
+two `itc_5166`, `itc_5167`; all ok; the tuning screen's vinyl editor,
+`tuning-pages.md` and `tuning-screen.md`):
 
+- `sub_82208CE0` TuningScreen::InputVinylLayers
+- `sub_821FFB20` TuningScreen::MoveVinylLayers
+- `sub_82202530` TuningScreen::MoveVinylImages
+- `sub_822058F8` TuningScreen::InputVinylImages
+- `sub_82203400` TuningScreen::HighlightItem
+- `sub_82203570` TuningScreen::HighlightSelected
+- `sub_82209738` TuningScreen::InputLayerActions
+- `sub_82200230` TuningScreen::MoveLayerActions
+- `sub_821FE370` TuningScreen::BeginLayerOrder
+- `sub_821FE6A0` DecalImages::FreeTexture
+- `sub_82204730` DecalImages::BindVinylTexture
 - `sub_821FE960` DecalImages::Reload
 - `sub_821FEAF0` DecalImages::LoadWindow
 - `sub_821FED30` DecalImages::Scroll
