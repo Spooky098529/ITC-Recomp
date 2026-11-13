@@ -134,9 +134,22 @@ file's history. What's left to see in a drive, from every run:
   to 51 (17 functions, `tuning-screen.md`) native, called by the
   update's plain C++; the last 12 helper adapters removed (all 25
   rows Native); every harness 0 differing, race 29 s at 40 (the
-  harnesses' time), 0 errors; no subagents. Validation agent running.
+  harnesses' time), 0 errors; no subagents. Validated: `itc_5299`
+  (race 49 s at 180, 0 errors, every harness 0 differing outside the
+  expected groups), 29 of 29 harness lines, no prints added; none ran
+  in the race or the replay `itc_5300` (ok): 17 more to drive.
+  Recorded; subsystem 5 done.
+- Subsystem 6 of 10: the stand's setters the tuning screen reaches
+  (`sub_8217B078` to `sub_8217B3D8`, `sub_8217DBC0`; none seen in
+  play; `UpdateStand`'s `ApplyAreaDecals` waits on `sub_8217B3D8`); its
+  line deleted from `leads.md`. Mapping agent running.
 
 ## Done
+
+- The sticker editor: `sticker-editor.md` 25 of 25 Native, with the
+  sticker commands 32 to 51 and `UiMovie::Unloop`, under
+  `--native_tuning_pages` and `--native_tuning_screen`,
+  eb20ef60..7fbeadd2; validated.
 
 - Cleanup lead (no mapping): direct calls to the render manager's and
   texture provider's slots from ~30 native callers,
@@ -191,6 +204,8 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
 - After the slot handlers: ours 6044, work left 686 (wrapped 51, known
   354, unknown 281).
 - After the three small leads: ours 6057, work left 676 (wrapped 51,
+  known 354, unknown 271).
+- After the sticker editor: ours 6100, work left 676 (wrapped 51,
   known 354, unknown 271).
 
 ## Stopped

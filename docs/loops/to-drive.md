@@ -116,6 +116,27 @@ placing, moving, rotating and scaling a sticker):
 - `sub_821FBB60` ShowStickerPicker
 - `sub_8211DE28` UiMovie::Unloop
 
+And the sticker commands (`itc_5299`, `itc_5300`, ok; the 12 helpers
+above checked again with their adapters gone):
+
+- `sub_821FC7B8` TuningScreen::Command32
+- `sub_821FCA80` TuningScreen::Command33
+- `sub_821FA658` TuningScreen::Command34
+- `sub_821FA9C0` TuningScreen::Command35
+- `sub_821FAA28` TuningScreen::Command36
+- `sub_821F8C30` TuningScreen::Command37
+- `sub_821FAD00` TuningScreen::Command38
+- `sub_821FB0B8` TuningScreen::Command39
+- `sub_821FCC48` TuningScreen::Command40
+- `sub_821FCED0` TuningScreen::Command41
+- `sub_821FD128` TuningScreen::Command43
+- `sub_821FD3F8` TuningScreen::Command44
+- `sub_821FB1F0` TuningScreen::Command45
+- `sub_821F8FC0` TuningScreen::Command46 (48, 50)
+- `sub_821FB450` TuningScreen::Command47
+- `sub_821FB6B0` TuningScreen::Command49
+- `sub_821FB8D8` TuningScreen::Command51
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

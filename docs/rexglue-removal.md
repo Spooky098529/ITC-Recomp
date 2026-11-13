@@ -2891,6 +2891,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The save devices' slot handlers (the states `SaveDevices::Update` runs, the save, load, check and delete steps and their waits, the overlapped results; B4's steps split into plain C++) | `save-interface.md` | 14 of 14 new rows (with `SaveDevices::Update`, `SaveStep`, `LoadStep`, both overlapped results, `Framework::DeviceList`) | (`--native_save_interface`) |
 | 2026-11-13 | Three small leads: the scene's render manager's slots 7 and 8 and their thunks, the texture provider's getters, the static zero and identity matrices | `app-start-up.md`, `models.md`, `matrix-math.md` | 13 of 13 new rows (and `Matrix::FromFloats` Native) | (`--native_app_start_up`, `--native_models`, `--native_matrix_math`) |
 | 2026-11-13 | Cleanup lead (no mapping, not counted): ~30 native callers in 16 subsystems call the render manager's slots 7 and 8 and the texture provider's getters directly (`hooks/direct_slots.h`) | 16 files' notes | none new | (existing flags) |
+| 2026-11-13 | The sticker editor (the tuning screen's states 38 to 46 and 49, their helpers, and the update's sticker commands 32 to 51; none seen in play) | `sticker-editor.md` | 25 of 25 Native (and 17 commands in `tuning-screen.md`, `UiMovie::Unloop`) | (`--native_tuning_pages`, `--native_tuning_screen`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5505,3 +5506,17 @@ cleanup lead). The boundary: 449 functions (916 pairs): overridden 110,
 Native 40, Dropped 26, never called 68, live 205. Imports: 186 called,
 49 with a live caller. B7 (`b7_status.py`): ours 6,057, work left 676
 (Wrapped 51, with a row 354, no row yet 271), from 686.
+
+**2026-11-13, the sticker editor (branch `b7-loop-13-11-26`, the
+forty-sixth run, its fifth subsystem):** `sticker-editor.md` (25 rows,
+`src/tuning_pages/sticker_pages.cpp`, `sticker_commands.cpp`): the
+tuning screen's ten sticker input pages, their helpers and the
+update's sticker commands 32 to 51 (`tuning-screen.md`), none seen in
+play, ported by the user's 2026-11-12 call; two migrations, all 25
+rows Native, with `UiMovie::Unloop`. The stand's setters
+(`ApplyAreaDecals`' `sub_8217B3D8`, the next subsystem) are what
+`UpdateStand` still waits on. The boundary: unchanged (449 functions,
+overridden 110, Native 40, Dropped 26, never called 68, live 205;
+imports 186 called, 49 with a live caller). B7 (`b7_status.py`): ours
+6,100, work left 676 (Wrapped 51, with a row 354, no row yet 271);
+work left counts only functions seen in play.
