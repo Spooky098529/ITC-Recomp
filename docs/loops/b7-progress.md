@@ -272,7 +272,14 @@ file's history. What's left to see in a drive, from every run:
   outside the expected groups; harnesses ~126 s), 16 of 16 harness
   lines, no prints added; `RestoreStickerTexture` ran in the replay
   `itc_5167` (ok), the other 15 to drive (11 new to the list, 4
-  already there). Recorded. Third migration agent running (the rest).
+  already there). Recorded. Third migration 82a29244 (state 27's
+  `InputLayerOrder` with its four callees, the sticker helpers
+  `SwapLayerRecords`, `SetGroupImage`, `SetImageGroup`, all never seen;
+  a harness hang fixed before the commit (the state history laid with
+  a 24); harnesses 0 differing; race 30 s at 40, 0 errors; no
+  subagents). Left: nothing in the vinyl editor; `HandleInput`
+  `sub_821E6950` and `Command21` `sub_822087C8` now ready. Validation
+  agent running.
 
 ## Done
 
