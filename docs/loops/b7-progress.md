@@ -217,8 +217,14 @@ file's history. What's left to see in a drive, from every run:
   (`sub_82230050`, `sub_82230328`, `sub_82230458` with `sub_8222FD08`,
   ready, seen in play) with the mode set-up beside them
   (`sub_8222FD68`, `sub_82226A10`, `sub_821B7878`, `sub_8222FC50`), two
-  leads taken together; both lines deleted from `leads.md`. Mapping
-  agent running.
+  leads taken together; both lines deleted from `leads.md`. Mapped
+  `type5-mode.md` (4a90a16a: 33 rows, 17 in play: the type 5 mode, the
+  parking area's (vtable `0x82006C24`, 15 slots), its three machines,
+  the car settings at +0, the parking area at +9640, and a new dialog
+  at +19280 (`Type5Dialog`, "TXR_PaCmnWindow", the type 2 dialog's
+  design); 15 ready groups (the pages and steps before `Draw` and
+  `Update`, reached through tables); no leads; no subagents); map
+  checked (0 errors, 15 ready groups). Migration agent running.
 
 ## Done
 
@@ -312,5 +318,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After `Type6Screen0`: ours 5866, work left 792 (wrapped 52, known
   367, unknown 373).
+
+- After the type 5 mode's map: ours 5866, work left 792 (wrapped 52,
+  known 384, unknown 356).
 
 ## Stopped

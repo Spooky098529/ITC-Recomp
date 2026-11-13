@@ -13,6 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The type 5 mode's map (4a90a16a): `type5-mode.md`, 33 rows (17 in
+  play): the parking area's mode, its vtable's 15 slots (slot 14 only
+  this mode's) and its +32 vtable, the new `Type5Dialog` (a copy of the
+  type 2 dialog's design, two steps shared with `type2-dialog.md`);
+  `Leaving`'s machine check loops over ids 0 to 2 while this mode's are
+  3, 16 and 21, so it always hands over at once (the original's, kept);
+  dialog steps 5 and 9 never set; `NextMode`'s answer bytes after byte
+  1 stack leftovers (as the type 10 mode's); `known-data.md`'s block
+  and dialog globals; cross-links in `location-screen.md` and
+  `car-settings.md`.
 - `Type6Screen0`'s map (4ed5e21e): 13 new rows in
   `type6-type7-modes.md` (the type 6 mode's first screen, a five-item
   menu over the type 6 car; its pages, steps and helpers, with
