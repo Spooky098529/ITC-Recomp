@@ -198,7 +198,12 @@ file's history. What's left to see in a drive, from every run:
   to drive. Recorded.
 - Subsystem 5 of 10: `Type6Screen0`'s pages and steps (`sub_82234BF0`
   and 8 more, all seen in play, ready; called through its tables at
-  `0x826367B8`); its line deleted from `leads.md`. Mapping agent
+  `0x826367B8`); its line deleted from `leads.md`. Mapped into
+  `type6-type7-modes.md` (4ed5e21e: 13 new rows, 4 pages, 4 steps, 3
+  helpers, `PowerGraph::SetFromCar` and its split-off case; the menu
+  page `sub_82234958` taken from the menu helpers' lead; 9 ready
+  groups; one lead added (probably the type 5 mode's delegates); no
+  subagents); map checked (0 errors, 9 ready groups). Migration agent
   running.
 
 ## Done

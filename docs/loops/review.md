@@ -13,6 +13,13 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- `Type6Screen0`'s map (4ed5e21e): 13 new rows in
+  `type6-type7-modes.md` (the type 6 mode's first screen, a five-item
+  menu over the type 6 car; its pages, steps and helpers, with
+  `PowerGraph::SetFromCar` `sub_82250488`, never seen, shared with
+  `Type7Screen0::MenuPage` and the car list); `known-data.md`'s +9656
+  word, the save screen's data +56 read, the power graph record
+  `0x82815EBC`; the menu page taken from the menu helpers' lead.
 - The options' load and save map (fde73e96): `options-load-save.md`,
   16 rows. **For the user:** the names given before have load and save
   the wrong way round: category 5 calls `GameData::Load`, 6
