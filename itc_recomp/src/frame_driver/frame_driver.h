@@ -108,4 +108,29 @@ void VideoOutputBeginFrame(uint8_t* base, uint32_t video_output, const SetGpr& s
 uint32_t SceneDraw(uint8_t* base, uint32_t scene, uint32_t interface, uint32_t device,
                    const app_states::AppCalls& calls, const SetGpr& set_gpr);
 
+// VideoOutput::UnbindAll's guest calls: the device's setters through their
+// adapters (their plain C++ and wraps), returning where the original's
+// calls return.
+struct UnbindCalls {
+  // Device::SetTexture (sub_822A6008): r4 the stage, r5 0, r6 the mask.
+  std::function<void(uint32_t device, uint32_t stage, uint64_t mask)> set_texture;
+  // Device::SetStreamSource (sub_822A3758): r4 the stream, r5 to r7 0, r8
+  // the mask.
+  std::function<void(uint32_t device, uint32_t stream, uint64_t mask)> set_stream_source;
+  // Device::SetIndices (sub_822A3908), SetPixelShader (sub_822A8618) and
+  // D3DDevice_SetVertexShader (sub_822A8958) with r4 = 0.
+  std::function<void(uint32_t device)> set_indices;
+  std::function<void(uint32_t device)> set_pixel_shader;
+  std::function<void(uint32_t device)> set_vertex_shader;
+  // A nonvolatile register set as the original sets it.
+  std::function<void(int reg, uint64_t value)> set_register;
+};
+
+// sub_8258D9F8 VideoOutput::UnbindAll: on the device (+140, read again for
+// each call), every texture stage 0-15 unset (the mask bit 63 >> (stage +
+// 20)), every stream 0-3 (bit 63 >> 51, 51, 51, 50: the original's
+// (95 - stream) x 21846 >> 16, plus 20), the index buffer and both shaders;
+// r29 to r31 as the original keeps them.
+void VideoOutputUnbindAll(uint8_t* base, uint32_t video_output, const UnbindCalls& calls);
+
 }  // namespace frame_driver

@@ -58,4 +58,8 @@ void SetThreadPriorityStep(PPCContext& ctx, uint8_t* base);
 void XSetThreadProcessorStep(PPCContext& ctx, uint8_t* base);
 void ResumeThreadStep(PPCContext& ctx, uint8_t* base);
 
+// VideoOutput::UnbindAll sub_8258D9F8: r3 = the video output; from a
+// 112-byte frame; r3 as the last setter leaves it.
+void VideoOutputUnbindAll(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

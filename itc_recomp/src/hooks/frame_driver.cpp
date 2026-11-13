@@ -35,7 +35,9 @@ ITC_FLAG_BOOL(native_frame_driver, true, "ITC",
               "wraps kept), Thread::Thread sub_8258DE88 and Thread::Begin sub_8258DF18 (with "
               "CreateThread sub_825BA158 and sub_825BA380, SetThreadPriority sub_822977B0, "
               "XSetThreadProcessor sub_82297888 and ResumeThread sub_825BA118, no adapters: "
-              "the kernel imports guest calls as the original makes them) natively "
+              "the kernel imports guest calls as the original makes them) and "
+              "VideoOutput::UnbindAll sub_8258D9F8 (the setters guest calls through their "
+              "adapters) natively "
               "instead of through the translated code (the same results; checked by "
               "--run_harnesses=frame_driver)");
 
@@ -239,6 +241,52 @@ void ResumeThreadStep(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = uint64_t(int64_t(int32_t(fd::ResumeThread(base, handle, calls))));
 }
 
+void VideoOutputUnbindAll(PPCContext& ctx, uint8_t* base) {
+  const uint32_t video_output = ctx.r3.u32;
+  fd::UnbindCalls calls;
+  auto setter = [&](void (*function)(PPCContext&, uint8_t*), uint32_t device, uint32_t return_address) {
+    ctx.r3.u64 = device;
+    ctx.lr = return_address;
+    function(ctx, base);
+  };
+  calls.set_texture = [&](uint32_t device, uint32_t stage, uint64_t mask) {
+    ctx.r4.u64 = stage;
+    ctx.r5.u64 = 0;
+    ctx.r6.u64 = mask;
+    setter(sub_822A6008, device, 0x8258DA30);
+  };
+  calls.set_stream_source = [&](uint32_t device, uint32_t stream, uint64_t mask) {
+    ctx.r4.u64 = stream;
+    ctx.r5.u64 = 0;
+    ctx.r6.u64 = 0;
+    ctx.r7.u64 = 0;
+    ctx.r8.u64 = mask;
+    setter(sub_822A3758, device, 0x8258DA70);
+  };
+  calls.set_indices = [&](uint32_t device) {
+    ctx.r4.u64 = 0;
+    setter(sub_822A3908, device, 0x8258DA88);
+  };
+  calls.set_pixel_shader = [&](uint32_t device) {
+    ctx.r4.u64 = 0;
+    setter(sub_822A8618, device, 0x8258DA94);
+  };
+  calls.set_vertex_shader = [&](uint32_t device) {
+    ctx.r4.u64 = 0;
+    setter(sub_822A8958, device, 0x8258DAA0);
+  };
+  calls.set_register = [&](int reg, uint64_t value) { guest_call::Gpr(ctx, reg).u64 = value; };
+  uint64_t kept[18];
+  for (int i = 0; i < 18; i++) {
+    kept[i] = (&ctx.r14)[i].u64;
+  }
+  guest_call::InFrame(ctx, base, 112, 0x8258DA30,
+                      [&](uint32_t) { fd::VideoOutputUnbindAll(base, video_output, calls); });
+  for (int i = 0; i < 18; i++) {
+    (&ctx.r14)[i].u64 = kept[i];
+  }
+}
+
 }  // namespace hooks
 
 #define ITC_FRAME_DRIVER_ADAPTER(address, step) \
@@ -258,3 +306,4 @@ ITC_FRAME_DRIVER_ADAPTER(82091A98, FrameDriverCallListener)
 ITC_FRAME_DRIVER_ADAPTER(82098940, AppSceneDraw)
 ITC_FRAME_DRIVER_ADAPTER(8258DE88, ThreadConstruct)
 ITC_FRAME_DRIVER_ADAPTER(8258DF18, ThreadBegin)
+ITC_FRAME_DRIVER_ADAPTER(8258D9F8, VideoOutputUnbindAll)

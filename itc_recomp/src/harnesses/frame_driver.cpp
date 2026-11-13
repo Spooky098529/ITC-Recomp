@@ -654,9 +654,58 @@ void Threads(Context& h) {
   Store(h.base, error_slot, saved_error);
 }
 
+// VideoOutput::UnbindAll on a big device as Scene::Draw's cases build it,
+// with nothing bound (the index buffer, streams, textures and shaders'
+// slots, +12180 to +12559, 0: no reference to let go), so the setters
+// (each version calls the same adapters: their plain C++) only clear the
+// slots and set dirty bits. The device and the command buffer compared.
+void UnbindAlls(Context& h) {
+  const uint32_t device = memory::Alloc(kDeviceBytes, 0);
+  const uint32_t commands = memory::Alloc(kCommandBytes, 0);
+  if (device == 0 || commands == 0) {
+    memory::Free(device);
+    memory::Free(commands);
+    return;
+  }
+  Results results("VideoOutput::UnbindAll (sub_8258D9F8)");
+  for (int c = 0; c < 20; c++) {
+    const uint32_t video_output = ObjectAt(h, 2);
+    Case(
+        h, results,
+        [&](Blocks&) {
+          RandomScratch(h);
+          Store(h.base, video_output + vo::kDevice, device);
+          for (uint32_t at = 0; at < kDeviceBytes; at += 4) {
+            Store(h.base, device + at, uint32_t(h.random.Next()));
+          }
+          for (uint32_t at = 12180; at < 12560; at += 4) {
+            Store(h.base, device + at, 0);
+          }
+          Store(h.base, device + 10780, Load(h.base, device + 10780) | 1);
+          Store(h.base, device + 40, commands - 4);
+          Store(h.base, device + 44, 0xFFFFFFF0u);
+          Store(h.base, device + 48, 0xFFFFFFF0u);
+          Fill(h.base, commands, kCommandBytes);
+        },
+        [&](PPCContext& t) { t.r3.u64 = video_output; }, __imp__sub_8258D9F8,
+        hooks::VideoOutputUnbindAll,
+        [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+          out.Word(t.r3.u32);
+          out.Bytes(Read(h.base, device, kDeviceBytes));
+          out.Bytes(Read(h.base, commands, kCommandBytes));
+          DriverOut(h, out, blocks);
+        },
+        fmt::format("case {}", c));
+  }
+  memory::Free(device);
+  memory::Free(commands);
+  results.Report();
+}
+
 }  // namespace
 
 void FrameDriver(Context& h) {
+  UnbindAlls(h);
   Threads(h);
   Interface(h);
   DrawFrames(h);

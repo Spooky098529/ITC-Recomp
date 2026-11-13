@@ -146,4 +146,25 @@ uint32_t SceneDraw(uint8_t* base, uint32_t scene, uint32_t interface, uint32_t d
   return video_output;
 }
 
+void VideoOutputUnbindAll(uint8_t* base, uint32_t video_output, const UnbindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8258D9F8 VideoOutput::UnbindAll");
+  constexpr uint64_t kTop = 0x8000000000000000ull;
+  const uint32_t device_at = video_output + graphics::video_output::kDevice;
+  calls.set_register(29, video_output);
+  calls.set_register(30, kTop);
+  for (uint32_t stage = 0; stage < 16; stage++) {
+    calls.set_register(31, stage);
+    calls.set_texture(Load(base, device_at), stage, kTop >> (stage + 20));
+  }
+  for (uint32_t stream = 0; stream < 4; stream++) {
+    calls.set_register(31, stream);
+    const uint32_t shift = ((((95 - stream) * 21846u) >> 16) & 0xFFFF) + 20;
+    calls.set_stream_source(Load(base, device_at), stream, (shift & 0x40) ? 0 : kTop >> (shift & 0x3F));
+  }
+  calls.set_register(31, 4);
+  calls.set_indices(Load(base, device_at));
+  calls.set_pixel_shader(Load(base, device_at));
+  calls.set_vertex_shader(Load(base, device_at));
+}
+
 }  // namespace frame_driver
