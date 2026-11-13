@@ -8,6 +8,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/c_runtime.h"
 #include "matrix_math/matrix_math.h"
 
 ITC_FLAG_BOOL(native_matrix_math, true, "ITC",
@@ -15,7 +16,9 @@ ITC_FLAG_BOOL(native_matrix_math, true, "ITC",
               "sub_8209BD50, sub_820A0AC0 and sub_820A9988; sub_820A9BC8; Matrix::RotateX, Y and Z, "
               "sub_820A65F0, sub_820A67F8 and sub_820A2D30; Vec4::Transform, sub_820AB560; "
               "Vec3::SwapXZ, sub_820AB688; sub_8209B038; the physics' matrices and quaternions, "
-              "sub_82293988 to sub_82293F10, sub_822B8F78; SinCos, sub_820B0E10) natively "
+              "sub_82293988 to sub_82293F10, sub_822B8F78; SinCos, sub_820B0E10; with native atexit, the zero and identity matrices' static "
+              "set-ups sub_825D8F88 and sub_825D9060, and their empty clean-ups sub_825DACA0 and "
+              "sub_825DAC98) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=matrix_math)");
 
@@ -89,3 +92,43 @@ ITC_MATRIX_SCALAR(82293D78, QuaternionMultiply(base, ctx.r3.u32, ctx.r4.u32, ctx
 ITC_MATRIX_SCALAR(82293F10, QuaternionNormalizeSelf(base, ctx.r3.u32))
 // f1 = the angle, r4 = &sine, r5 = &cosine; f1 comes back as the cosine.
 ITC_MATRIX_SCALAR(820B0E10, ctx.f1.f64 = SinCos(base, ctx.f1.f64, ctx.r4.u32, ctx.r5.u32))
+
+// The static matrices' set-ups (no arguments; r3 = atexit's) and their
+// clean-ups (empty), reached through _cinit's table and atexit's.
+extern "C" REX_FUNC(sub_825D8F88) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_matrix_math) || !hooks::NativeAtexit()) {
+    __imp__sub_825D8F88(ctx, base);
+    return;
+  }
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.s64 = ZeroMatrixStaticInit(base, ctx.r1.u32, guest.Call());
+}
+
+extern "C" REX_FUNC(sub_825D9060) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_matrix_math) || !hooks::NativeAtexit()) {
+    __imp__sub_825D9060(ctx, base);
+    return;
+  }
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.s64 = IdentityMatrixStaticInit(base, ctx.r1.u32, guest.Call());
+}
+
+extern "C" REX_FUNC(sub_825DACA0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_matrix_math)) {
+    __imp__sub_825DACA0(ctx, base);
+    return;
+  }
+  ZeroMatrixExit();
+}
+
+extern "C" REX_FUNC(sub_825DAC98) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_matrix_math)) {
+    __imp__sub_825DAC98(ctx, base);
+    return;
+  }
+  IdentityMatrixExit();
+}

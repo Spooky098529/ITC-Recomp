@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "camera_modes/camera_modes.h"
 #include "interpolation/blend_state.h"
 #include "vehicle_accessors/vectors.h"
 
@@ -763,5 +764,44 @@ double SinCos(uint8_t* base, double angle, uint32_t sine, uint32_t cosine) {
   Stfs(base, cosine, double(float(c)));
   return c;
 }
+
+namespace {
+
+// The static set-ups' body: `diagonal` the word on the diagonal.
+int32_t StaticMatrixInit(uint8_t* base, uint32_t sp, uint32_t matrix, uint32_t diagonal,
+                         uint32_t exit_function, const c_runtime::AtexitCall& call) {
+  const uint32_t f = sp - 304;
+  for (uint32_t i = 0; i < 16; i++) {
+    // lfs then stfs: the bits as the translated code keeps them.
+    const bool on_diagonal = i % 5 == 0;
+    guest::StoreU32(base, f + 160 + 4 * i, guest::LoadU32(base, on_diagonal ? diagonal : kZero));
+  }
+  uint32_t from[16];
+  for (uint32_t i = 0; i < 16; i++) {
+    from[i] = f + 220 - 4 * i;
+  }
+  // The arguments past r10 (the 8th to the 16th pointers) at +84 to +148.
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, f + 84 + 8 * i, from[7 + i]);
+  }
+  camera_modes::MatrixFromFloats(base, matrix, from);
+  return c_runtime::AtexitFrom(base, exit_function, call);
+}
+
+}  // namespace
+
+int32_t ZeroMatrixStaticInit(uint8_t* base, uint32_t sp, const c_runtime::AtexitCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D8F88 ZeroMatrix::StaticInit");
+  return StaticMatrixInit(base, sp, kZeroMatrix, kZero, 0x825DACA0, call);
+}
+
+int32_t IdentityMatrixStaticInit(uint8_t* base, uint32_t sp, const c_runtime::AtexitCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D9060 IdentityMatrix::StaticInit");
+  return StaticMatrixInit(base, sp, kIdentityMatrix, kOne, 0x825DAC98, call);
+}
+
+void ZeroMatrixExit() { ITC_NATIVE_RUNNING("sub_825DACA0 ZeroMatrix's clean-up"); }
+
+void IdentityMatrixExit() { ITC_NATIVE_RUNNING("sub_825DAC98 IdentityMatrix's clean-up"); }
 
 }  // namespace matrix_math

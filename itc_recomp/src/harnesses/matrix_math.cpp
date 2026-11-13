@@ -15,8 +15,12 @@
 // subtraction; the game's matrices hold no NaNs).
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/flags.h"
+#include "base/log.h"
+#include "c_runtime/exit.h"
+#include "hooks/c_runtime.h"
 #include "matrix_math/matrix_math.h"
 
 #include <fmt/format.h>
@@ -24,6 +28,7 @@
 #include <bit>
 #include <cmath>
 #include <iterator>
+#include <mutex>
 #include <string>
 
 ITC_FLAG_DECLARE(bool, native_matrix_math);
@@ -169,6 +174,97 @@ Random Seeded(uint64_t seed) {
 constexpr uint32_t kBlockBytes = 0x400;
 constexpr uint32_t kA = 0x100, kB = 0x200, kOut = 0x300;
 
+// --- The static matrices' set-ups (on the game's two matrices and exit
+// table, each put back after a side) and their empty clean-ups ---
+//
+// The matrices start as they are or as random bytes; the original's frame
+// (304 bytes below the call's stack pointer) is filled with a pattern first,
+// and its locals (+84 to +224: the 16 floats and the pointers past r10)
+// compared with the matrices, r3 and the words added to the exit table.
+
+void NativeZeroMatrixStaticInit(PPCContext& ctx, uint8_t* base) {
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.s64 = mm::ZeroMatrixStaticInit(base, ctx.r1.u32, guest.Call());
+}
+void NativeIdentityMatrixStaticInit(PPCContext& ctx, uint8_t* base) {
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.s64 = mm::IdentityMatrixStaticInit(base, ctx.r1.u32, guest.Call());
+}
+void NativeZeroMatrixExit(PPCContext&, uint8_t*) { mm::ZeroMatrixExit(); }
+void NativeIdentityMatrixExit(PPCContext&, uint8_t*) { mm::IdentityMatrixExit(); }
+
+void StaticMatrices(Context& h) {
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: matrix_math: native atexit off: the static matrices' cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  constexpr uint32_t kFrom = mm::kZeroMatrix, kBytes = 128;  // both matrices
+  const auto saved = Read(h.base, kFrom, kBytes);
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+  } inits[] = {
+      {"sub_825D8F88 ZeroMatrix::StaticInit", __imp__sub_825D8F88, NativeZeroMatrixStaticInit},
+      {"sub_825D9060 IdentityMatrix::StaticInit", __imp__sub_825D9060,
+       NativeIdentityMatrixStaticInit},
+  };
+  for (const auto& f : inits) {
+    Results results(f.name);
+    for (int c = 0; c < 8; c++) {
+      std::vector<uint8_t> start = saved;
+      if (c > 0) {
+        for (auto& byte : start) {
+          byte = uint8_t(h.random.Next());
+        }
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, kFrom, start.data(), kBytes);
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 304;
+        Fill(h.base, frame, 304, 0x5A);
+        const uint32_t mark = exit_table::Mark(h.base);
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        out[v].Bytes(Read(h.base, kFrom, kBytes));
+        out[v].Bytes(Read(h.base, frame + 84, 224 - 84));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        exit_table::Take(h.base, mark, out[v]);
+      }
+      Write(h.base, kFrom, saved.data(), kBytes);
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+  } exits[] = {
+      {"sub_825DACA0 ZeroMatrix's clean-up", __imp__sub_825DACA0, NativeZeroMatrixExit},
+      {"sub_825DAC98 IdentityMatrix's clean-up", __imp__sub_825DAC98, NativeIdentityMatrixExit},
+  };
+  for (const auto& f : exits) {
+    Results results(f.name);
+    for (int c = 0; c < 4; c++) {
+      const uint64_t r3 = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r3;
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r1.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void MatrixMath(Context& h) {
@@ -305,6 +401,7 @@ void MatrixMath(Context& h) {
       results.Report();
     }
   }
+  StaticMatrices(h);
 }
 
 }  // namespace harness
