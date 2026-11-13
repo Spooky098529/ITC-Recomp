@@ -16,6 +16,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 
 #include <smmintrin.h>
 
@@ -240,6 +241,7 @@ namespace lights {
 std::optional<uint32_t> FindNearest(uint8_t* base, uint32_t owner, uint32_t output,
                                     uint32_t point, int32_t most, uint32_t direction, double f1,
                                     double f2, double f3) {
+  ITC_NATIVE_RUNNING("sub_820F4128 Lights::FindNearest");
   // Comparisons the original makes in double are made here in float: the
   // caller passes floats (lfs, frsp), but anything else goes to the original.
   if (!ITC_FLAG(native_nearest_lights) || !IsFloat(f2) || !IsFloat(f3)) [[unlikely]] {
