@@ -36,6 +36,7 @@
 
 #include "base/flags.h"
 #include "hooks/archive.h"
+#include "hooks/billboards.h"
 #include "hooks/car_scene_draw.h"
 #include "hooks/course_scenery.h"
 #include "hooks/heap.h"
@@ -45,6 +46,8 @@
 #include "course_scenery/course_scenery.h"
 
 ITC_FLAG_DECLARE(bool, native_cameras);
+ITC_FLAG_DECLARE(bool, native_data_files);
+ITC_FLAG_DECLARE(bool, native_post_effects);
 ITC_FLAG_DECLARE(bool, native_matrix_math);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 
@@ -84,6 +87,9 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "checks, the render manager's getters and queue guest calls; with --native_cameras, "
               "--native_matrix_math and --native_vehicle_accessors and the command list's "
               "diagnostics off, else its original), "
+              "Scenery::DrawArea sub_820F3B70 (the headlights', the scenery models' draws', the "
+              "light groups' and their callees' plain C++; with those flags, --native_billboards, "
+              "--native_post_effects and --native_data_files, else its original), "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
               "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, AnimationSet::FindByTexture sub_82146A38, "
               "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
@@ -336,6 +342,43 @@ void hooks::CourseSceneryRecordHeadlightProjectors(PPCContext& ctx, uint8_t* bas
 }
 
 ITC_COURSE_SCENERY(820F34C8, hooks::CourseSceneryRecordHeadlightProjectors(ctx, base))
+
+// Scenery::DrawArea: r3 = the manager, r4 = the pass description, r5 = the
+// area; lr put back, flush-to-zero off (r3 isn't read by its caller,
+// Scenery::Draw). The original runs where the headlights' or the light
+// groups' plain C++ may not, or without --native_post_effects,
+// --native_data_files or --native_scenery_lists. ctx's r24 is the camera
+// pass while it runs (as the original's), for SceneryModel::DrawShape's
+// adapter where its plain C++ declines.
+bool hooks::CourseSceneryDrawAreaNative() {
+  return ITC_FLAG(native_course_scenery) && ITC_FLAG(native_cameras) &&
+         ITC_FLAG(native_matrix_math) && ITC_FLAG(native_vehicle_accessors) &&
+         ITC_FLAG(native_post_effects) && ITC_FLAG(native_data_files) &&
+         hooks::LightGroupsNative() && !hooks::SceneryListsSlotDiagnostics();
+}
+
+void hooks::CourseSceneryDrawArea(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint64_t r24 = ctx.r24.u64;
+  ctx.r24.u64 = guest::LoadU32(base, ctx.r4.u32 + 20) * 592u + 0x826BAC00u;
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  DrawArea(base, draws, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r28.u32);
+  ctx.r24.u64 = r24;
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
+extern "C" REX_FUNC(sub_820F3B70) {
+  REX_FUNC_PROLOGUE();
+  if (!hooks::CourseSceneryDrawAreaNative()) {
+    __imp__sub_820F3B70(ctx, base);
+    return;
+  }
+  hooks::CourseSceneryDrawArea(ctx, base);
+}
 
 // --- The files' parses ---
 //

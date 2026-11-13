@@ -422,6 +422,32 @@ uint32_t DrawSetListsViewProjection(uint8_t* base, uint32_t pass);
 uint64_t RecordHeadlightProjectors(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
                                    uint32_t stack, uint32_t description);
 
+// Scenery::DrawArea (sub_820F3B70, draw_area.cpp): a visible area (272
+// bytes: +0 its mask, +4 the model count, +12 its lights' object, +16 the
+// models' entries) for the pass description (+8 the camera pass object,
+// +20 the camera pass, +24 and +28 the keys, +32 a mask): nothing unless
+// the description's +32, the manager's +196 and the area's +0 share a bit;
+// RecordHeadlightProjectors; in its 400-byte frame below `stack` the
+// identity (+80, +208) and the pass's view-projection (+144, Matrix::Copy
+// noted for interpolation), the view at 0x8265ECA0, the keys
+// (0x8296B908 = 163, 0x8296B90C, 0x8296B900); each model's shapes drawn
+// (the shadow passes 10, 13, 16: Model::DrawShapeDepth with the keys at
+// 0x8296B8F8 and 0x8296B8FC; else the textures set in the provider at the
+// manager's +228, SceneryModel::DrawShape, then for types 0, 1, 2 with
+// post effect 3, 7 or 11 set and its +52 0 the depth again with keys 116
+// or 119); then with +196 & 0x400 outside the shadow passes, the light
+// groups of each entry of the area's light file (its count little-endian),
+// the description made the billboard set. The draws' guest calls (and
+// their originals where their plain C++ declines) go through `draws`, the
+// headlights' and light groups' through `calls`. `caller_r28` is the
+// caller's r28 (the shadow passes' depth draws' interpolation context).
+// The original's r3 isn't given (its caller doesn't read it). Its adapter
+// sets ctx's r24 to the camera pass while it runs (SceneryModel::DrawShape's
+// adapter reads it where its plain C++ declines).
+void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
+              const car_scene_draw::SceneDrawCalls& calls, uint32_t stack, uint32_t manager,
+              uint32_t description, uint32_t area, uint32_t caller_r28);
+
 // --- The files' parses (the loads' callbacks) ---
 //
 // Model::Model, Model::Load, XPR::Create and the model lists' loads are

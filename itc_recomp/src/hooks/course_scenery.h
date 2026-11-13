@@ -23,6 +23,13 @@ void CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base);
 // off or the command list's diagnostics on.
 void CourseSceneryRecordHeadlightProjectors(PPCContext& ctx, uint8_t* base);
 
+// Scenery::DrawArea (sub_820F3B70): r3 = the manager, r4 = the pass
+// description, r5 = the area; lr put back (r3 not given: its caller doesn't
+// read it). CourseSceneryDrawAreaNative: whether its plain C++ may run (its
+// callees' flags, the command list's diagnostics off).
+bool CourseSceneryDrawAreaNative();
+void CourseSceneryDrawArea(PPCContext& ctx, uint8_t* base);
+
 // Scenery::Update (sub_820F4558): r3 = the manager; the original's register
 // saves made, then the plain C++ (its guest calls putting flush-to-zero back
 // off); r3 as the original leaves it, lr put back.

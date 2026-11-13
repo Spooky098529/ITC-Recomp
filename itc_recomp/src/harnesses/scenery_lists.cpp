@@ -1254,6 +1254,255 @@ void DrawSetListsCases(Context& h, Random& r, uint32_t block, uint32_t slots) {
   results.Report();
 }
 
+// --- Scenery::DrawArea (src/course_scenery/draw_area.cpp) ---
+//
+// An area of up to four model entries (each the model at +0x100 with up to
+// four shapes, as DrawSetLists' cases, and its own texture or none) over a
+// camera pass of each kind (0, 1, 2, the shadow passes 10, 13, 16, others),
+// the post effects 3, 7 and 11 there or not, the area's light file with up
+// to three groups of up to four lights; the headlights without vehicles
+// ([0x826C2E34] 0: their own harness has them), the viewports for
+// CameraPass::FromViewport, the render manager's command list the records'
+// and its queue the empty one. Its callees run natively on both sides
+// (their own harnesses check them). Compared besides the block and the
+// globals: the slots, the keys (0x8296B8F0 to 0x8296B920), the frame's
+// temporaries (+80 to +272), the vertex ring's window and count. r3 isn't
+// (its caller doesn't read it): both sides' set to 0.
+
+void RecompiledDrawArea(PPCContext& ctx, uint8_t* base) {
+  __imp__sub_820F3B70(ctx, base);
+  ctx.r3.u64 = 0;
+}
+void NativeDrawArea(PPCContext& ctx, uint8_t* base) {
+  hooks::CourseSceneryDrawArea(ctx, base);
+  ctx.r3.u64 = 0;
+}
+
+void DrawAreaCases(Context& h, uint32_t block, uint32_t slots) {
+  if (!hooks::CourseSceneryDrawAreaNative()) {
+    ITC_LOG_INFO("harness: Scenery::DrawArea: skipped (its flags off)");
+    return;
+  }
+  Random r(0x4452415741524541ull);  // "DRAWAREA"
+  constexpr uint32_t kSlotsBytes = 0x40000;
+  constexpr uint32_t kCameraPasses = 0x826BAC00, kCameraBytes = 21 * 592;
+  constexpr uint32_t kRingCount = 0x826A509C, kRingIndex = 0x826A5098;
+  constexpr uint32_t kRingVertices = 0x8266D098, kRingBytes = 2 * 4096 * 28;
+  struct Saved {
+    uint32_t address, bytes;
+  };
+  constexpr Saved kSaved[] = {
+      {kCameraPasses, kCameraBytes}, {0x8296B8F0, 0x30},   {0x826C5D80, 0x40},
+      {0x826C2E34, 4},               {0x826C2CE8, 4},      {0x826BABA0, 4},
+      {kRingIndex, 0x14},            {kRingVertices, kRingBytes},
+  };
+  std::vector<std::vector<uint8_t>> saved;
+  for (const Saved& s : kSaved) {
+    saved.push_back(Read(h.base, s.address, s.bytes));
+  }
+  const uint32_t model = block + 0x100;
+  const uint32_t queue = block + 0x7C0;
+  const uint32_t manager = block + 0x7000;
+  const uint32_t description = block + 0x7300;
+  const uint32_t set = block + 0x9000;
+  const uint32_t area = block + 0xA000, area_lights = block + 0xA300;
+  const uint32_t light_file = block + 0xA400;
+  const uint32_t effects = block + 0xA800;
+  const uint32_t render = block + 0xB000;
+  const uint32_t viewports = block + 0xB400, viewport = block + 0xB800;
+  const uint32_t xpr_records = block + 0xC000;
+  static constexpr int32_t kTypes[] = {0, 1, 2, 10, 13, 16, 0, 1, 2, 3, 5};
+  Results results("Scenery::DrawArea (sub_820F3B70)");
+  int drawn = 0, with_lights = 0;
+  for (int c = 0; c < 160; c++) {
+    uint32_t ring_count = 0, lights_total = 0;
+    // What each run changes outside the block and kRegions, put back before
+    // each: the camera passes (FromViewport and CameraPass::Update write the
+    // pass), the ring's count and window.
+    std::vector<uint8_t> passes;
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          g_flush_on_entry = r.Below(2) != 0;
+          RandomList(h.base, block, r, 100);
+          const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
+          guest::StoreU32(h.base, record + 32, slots);
+          guest::StoreU32(h.base, record + 44, slots);
+          guest::StoreU32(h.base, record + 8, kSlotsBytes / 16);
+          // The model's shapes, each with its materials.
+          const uint32_t shapes = r.Below(5);
+          for (uint32_t i = 0; i < 4; i++) {
+            RandomShape(h.base, block, r, i, r.Below(3) != 0);
+            RandomMaterials(h.base, block, r, i);
+          }
+          guest::StoreU32(h.base, model + 412, shapes);
+          // The animation set (block + 0xC00): frames 1 to 4, the current
+          // below them, texture ids 0 to 11 (FindByTexture and
+          // CurrentFrame read guest address 4 otherwise).
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t animation = block + 0xC00 + 20 + 0x40 * i;
+            const uint32_t frames = 1 + r.Below(4);
+            guest::StoreU32(h.base, animation, frames);
+            guest::StoreU32(h.base, animation + 4, r.Below(frames));
+            for (uint32_t e = 0; e < frames; e++) {
+              guest::StoreU32(h.base, animation + 16 + 4 * frames + 8 * e + 4, r.Below(12));
+            }
+          }
+          FiniteFloats(h.base, 0x8265ECA0, 0xA0 / 4, r);
+          FiniteFloats(h.base, 0x8296B940, 0x3A0 / 4, r);
+          RandomBytes(h.base, 0x8296B8F0, 0x20, r);  // the keys (the lists' pointers after)
+          guest::StoreU32(h.base, scenery_lists::kRenderQueue, queue);
+          guest::StoreU32(h.base, queue, queue + 0x20);
+          guest::StoreU32(h.base, queue + 0x20 + 16, kEmptyFunction);
+          // The manager, its flags and texture provider.
+          guest::StoreU32(h.base, manager + 112, set);
+          guest::StoreU32(h.base, manager + 196,
+                          (r.Below(4) == 0 ? 0u : 0x400u) | (uint32_t(r.Next()) & ~0x400u));
+          const uint32_t provider = manager + 228;
+          const uint32_t vtable = block + 0x7200;
+          guest::StoreU32(h.base, provider, vtable);
+          guest::StoreU32(h.base, vtable + 16, r.Below(6) == 0 ? kEmptyFunction : 0x82594718u);
+          guest::StoreU32(h.base, vtable + 20, kEmptyFunction);
+          guest::StoreU32(h.base, vtable + 24, kEmptyFunction);
+          const uint32_t storage = block + 0x7500;
+          guest::StoreU32(h.base, provider + 8, storage);
+          guest::StoreU32(h.base, provider + 12, storage + 4 * (3 + r.Below(3)));  // room for slot 2
+          guest::StoreU32(h.base, provider + 16, storage + 4 * 8);
+          // The set: its XPR at +64 (eight records), the animations.
+          guest::StoreU32(h.base, set + 1060, r.Below(3) ? block + 0xC00 : 0);
+          guest::StoreU32(h.base, set + 64, 0x40000000u);
+          guest::StoreU32(h.base, set + 64 + 16, xpr_records);
+          guest::StoreU32(h.base, set + 64 + 20, 8);
+          for (uint32_t k = 0; k < 8; k++) {
+            guest::StoreU32(h.base, xpr_records + 16 * k + 4, r.Below(0x10000) * 16);
+          }
+          // The camera pass, as the headlights' cases give it.
+          const uint32_t index = r.Below(21);
+          const uint32_t pass = kCameraPasses + 592 * index;
+          for (uint32_t i = 0; i < 148; i++) {
+            guest::StoreFloat(h.base, pass + 4 * i, Spread(r, 2.0f));
+          }
+          guest::StoreU32(h.base, pass, 0x82001EC0);
+          guest::StoreU32(h.base, pass + 504, 1280);
+          guest::StoreU32(h.base, pass + 508, 720);
+          guest::StoreU32(h.base, pass + 588, r.Below(3));
+          guest::StoreU32(h.base, pass + 584, uint32_t(kTypes[r.Below(11)]));
+          guest::StoreFloat(h.base, pass + 548, 1000.0f);
+          StoreFloats(h.base, pass + 144, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+          // The viewports: the eye near the origin, looking along z.
+          guest::StoreU32(h.base, 0x826C2CE8, viewports);
+          guest::StoreU32(h.base, viewports, viewport);
+          guest::StoreU32(h.base, viewports + 4, viewport);
+          const uint32_t player = r.Below(2), entry = r.Below(19);
+          const uint32_t at = viewport + 80 * entry;
+          StoreFloats(h.base, at + 16, {Spread(r, 5), Spread(r, 2), Spread(r, 5), 1});
+          StoreFloats(h.base, at + 32, {Spread(r, 5), Spread(r, 2), 30 + Spread(r, 5), 1});
+          StoreFloats(h.base, at + 48, {0, 1, 0, 0});
+          StoreFloats(h.base, at + 64, {Spread(r, 1), 666.33f, 200});
+          guest::StoreU32(h.base, 0x826C2E34, 0);  // no vehicles
+          // The pass description.
+          guest::StoreU32(h.base, description + 12, player);
+          guest::StoreU32(h.base, description + 16, entry);
+          guest::StoreU32(h.base, description + 20, index);
+          guest::StoreU32(h.base, description + 24, uint32_t(r.Next()));
+          guest::StoreU32(h.base, description + 28, r.Below(600));
+          guest::StoreU32(h.base, description + 32,
+                          r.Below(8) == 0 ? uint32_t(r.Next()) : 0xFFFFFFFFu);
+          // The post effects 3, 7 and 11.
+          for (uint32_t e : {3u, 7u, 11u}) {
+            const uint32_t effect = effects + 64 * e;
+            guest::StoreU32(h.base, 0x826C5D80 + 4 * e, r.Below(4) == 0 ? 0 : effect);
+            guest::StoreU32(h.base, effect + 52, r.Below(3) == 0 ? 1 : 0);
+          }
+          // The area: its mask, the entries (the model, its own texture or
+          // none), the lights' object and file.
+          guest::StoreU32(h.base, area, r.Below(8) == 0 ? 0 : uint32_t(r.Next()) | 1);
+          const uint32_t count = r.Below(5);
+          guest::StoreU32(h.base, area + 4, count);
+          guest::StoreU32(h.base, area + 12, area_lights);
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t e = block + 0xA100 + 64 * i;
+            guest::StoreU32(h.base, area + 16 + 4 * i, e);
+            guest::StoreU32(h.base, e + 56, model);
+            guest::StoreU32(h.base, e + 60, r.Below(2) ? 0 : block + 0xE00 + 16 * i);
+          }
+          const uint32_t groups = r.Below(4) == 0 ? 0 : 1 + r.Below(3);
+          guest::StoreU32(h.base, area_lights + 80, r.Below(6) == 0 ? 0 : light_file);
+          guest::StoreU32(h.base, light_file, __builtin_bswap32(groups));
+          uint32_t g = light_file + 16;
+          lights_total = 0;
+          for (uint32_t i = 0; i < groups; i++) {
+            guest::StoreU32(h.base, light_file + 4 + 4 * i, __builtin_bswap32(g - light_file));
+            guest::StoreU32(h.base, g, 1);  // one group in the entry
+            const uint32_t group = g + 16;
+            const uint32_t lights = r.Below(5);
+            guest::StoreU32(h.base, group + 0, uint32_t(r.Next()));
+            guest::StoreU32(h.base, group + 4, r.Below(14));
+            guest::StoreU32(h.base, group + 44, lights);
+            for (uint32_t k = 0; k < lights; k++) {
+              const uint32_t l = group + 60 + 48 * k;
+              StoreFloats(h.base, l, {Spread(r, 40), Spread(r, 5), 20 + Spread(r, 40), 1});
+              StoreFloats(h.base, l + 16, {Spread(r, 255), Spread(r, 255), Spread(r, 255),
+                                          Spread(r, 255)});
+              StoreFloats(h.base, l + 32, {r.Below(6) == 0 ? 0.0f : 1 + Spread(r, 1),
+                                          r.Below(6) == 0 ? 0.0f : 1 + Spread(r, 1)});
+            }
+            lights_total += lights;
+            g = group + 60 + 48 * lights;
+          }
+          // The render manager: its command list the records', its queue
+          // the empty one.
+          guest::StoreU32(h.base, 0x826BABA0, render);
+          guest::StoreU32(h.base, render, render + 0x100);
+          guest::StoreU32(h.base, render + 0x100 + 32, 0x8248CA78);
+          guest::StoreU32(h.base, render + 284, render + 0x200);
+          guest::StoreU32(h.base, render + 0x200, render + 0x300);
+          guest::StoreU32(h.base, render + 0x300 + 4, 0x8248CA78);
+          guest::StoreU32(h.base, render + 0x300 + 8, 0x82379320);
+          guest::StoreU32(h.base, render + 0x200 + 284, record);
+          guest::StoreU32(h.base, render + 0x200 + 124, queue);
+          ring_count = 3 + r.Below(3000);  // the window from 64 bytes before inside the ring
+          guest::StoreU32(h.base, kRingIndex, 0);
+          guest::StoreU32(h.base, kRingCount, ring_count);
+          passes = Read(h.base, kCameraPasses, kCameraBytes);
+          t.r3.u64 = manager;
+          t.r4.u64 = description;
+          t.r5.u64 = area;
+          t.r24.u64 = uint32_t(r.Next());
+          t.r28.u64 = uint32_t(r.Next());
+        },
+        RecompiledDrawArea, NativeDrawArea, {}, fmt::format("case {}", c), false,
+        [&](const PPCContext& t, Outputs& out) {
+          const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
+          const uint32_t end = guest::LoadU32(h.base, record + 44);
+          out.Word(end - slots);
+          out.Bytes(Read(h.base, slots, std::min(end - slots, kSlotsBytes)));
+          out.Bytes(Read(h.base, 0x8296B8F0, 0x30));
+          out.Floats(h.base, t.r1.u32 - 400 + 80, 48);
+          const uint32_t start = kRingVertices + ring_count * 28;
+          out.Bytes(Read(h.base, start - 64, lights_total * 4 * 28 + 128));
+          out.Word(guest::LoadU32(h.base, kRingCount));
+          out.Word(t.r24.u32);
+          out.Word(t.r28.u32);
+          drawn += end != slots;
+          with_lights += lights_total != 0;
+        },
+        [&] {
+          Fill(h.base, slots, kSlotsBytes, 0xCD);
+          Write(h.base, kCameraPasses, passes.data(), kCameraBytes);
+          guest::StoreU32(h.base, kRingIndex, 0);
+          guest::StoreU32(h.base, kRingCount, ring_count);
+          Fill(h.base, kRingVertices + ring_count * 28 - 64, lights_total * 4 * 28 + 128, 0xCD);
+        });
+  }
+  for (size_t i = 0; i < saved.size(); i++) {
+    Write(h.base, kSaved[i].address, saved[i].data(), kSaved[i].bytes);
+  }
+  ITC_LOG_INFO("harness: Scenery::DrawArea: {} of 160 cases recorded slots, {} with lights",
+               drawn / 2, with_lights / 2);
+  results.Report();
+}
+
 // --- ModelList::Load and LoadPoints ---
 
 // A word inside one of a side's blocks (or up to 16 bytes past its end) made
@@ -1419,6 +1668,7 @@ void SceneryLists(Context& h) {
   PointLists(h, r, block, (slots + 15) & ~15u);
   DrawSetListsCases(h, r, block, (slots + 15) & ~15u);
   ModelListLoads(h, r);
+  DrawAreaCases(h, block, (slots + 15) & ~15u);
   memory::Free(slots);
   memory::Free(allocation);
 }
