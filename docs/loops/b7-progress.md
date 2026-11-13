@@ -71,8 +71,13 @@ file's history. What's left to see in a drive, from every run:
   native with their never-taken wait path a guest call to
   `WaitForSingleObject`, the 2026-10-24 and 2026-10-29 precedents;
   B4's `File::`/content steps in `src/hooks/saves.cpp` to be split
-  into plain C++; no leads added). Check passed. Migration agent
-  running.
+  into plain C++; no leads added). Check passed. Migrated
+  b41c696e..796dcddf: the 14 rows, `SaveStep`, `LoadStep`, both
+  overlapped results (adapters removed), `Framework::DeviceList` and
+  `SaveDevices::Update`'s plain C++ (B5's adapter kept), B4's 13 steps
+  split into plain C++; under `--native_save_interface`; every harness
+  0 differing, race 38 s at 40, 0 errors; no subagents. Validation
+  agent running.
 
 ## Done
 

@@ -62,6 +62,16 @@ When the user has reviewed a run's section, its heading gets
   state 1 is no device and state 2 the failure state (not "2 = no
   device"); `SaveDevices::Update` checks the slot's user (+956), not
   its state.
+- The slot handlers' migration (b41c696e..796dcddf): B4's steps in
+  `src/hooks/saves.cpp` split into plain C++ (`src/saves/slot_steps`);
+  `Create`'s mode 3 takes its size from `XContentCalculateSize`'s plain
+  C++ instead of a guest call (same results). B4's step adapters
+  (`sub_820A4960` and 8 others) are listed removable but kept: with
+  `--native_save_interface` off, the recompiled handlers would reach the
+  Xbox content calls instead of `saves/` (the user's decision whether
+  to remove them). `SaveDevices::Update`'s adapter stays B5's
+  (`notify.cpp`). The enumeration, check, save, load and delete
+  machines run only from the front end: harness only so far.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
