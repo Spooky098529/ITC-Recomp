@@ -330,5 +330,7 @@ void NetworkMode(Context& h);
 void RaceEnd(Context& h);
 void PowerGraphScreen(Context& h);
 void Achievements(Context& h);
+// The morph jobs and the work item (src/harnesses/morph_jobs.cpp).
+void MorphJobs(Context& h);
 
 }  // namespace harness

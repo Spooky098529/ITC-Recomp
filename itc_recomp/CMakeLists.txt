@@ -405,6 +405,8 @@ set(ITC_SOURCES
     src/car_makers/stand.cpp
     src/hooks/menu_helpers.cpp
     src/menu_helpers/menu_helpers.cpp
+    src/hooks/morph_jobs.cpp
+    src/morph_jobs/morph_jobs.cpp
     src/hooks/race_update.cpp
     src/race_update/race_update.cpp
     src/hooks/stand_models.cpp
@@ -804,6 +806,7 @@ set(ITC_SOURCES
     src/harnesses/predicated_tiling.cpp
     src/harnesses/power_graph.cpp
     src/harnesses/menu_helpers.cpp
+    src/harnesses/morph_jobs.cpp
     src/harnesses/race_update.cpp
     src/harnesses/stand_models.cpp
     src/harnesses/build_screen.cpp

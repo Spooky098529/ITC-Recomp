@@ -11,6 +11,7 @@
 #include "base/flags.h"
 #include "frame_pacing/game_messages.h"
 #include "hooks/load_poll.h"
+#include "hooks/morph_jobs.h"
 #include "hooks/second_set.h"
 
 ITC_FLAG_DECLARE(bool, native_scenery_lists);
@@ -38,7 +39,8 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "its render-only skip, --per_tick_blink_timers), "
               "SceneModel::IsNearPlayerHeight sub_820DAB58 (inside the diagnostics' wrap), "
               "the morph Model::MorphShape sub_82595110 (no adapter: the wheels' draws call it; the job "
-              "maker a guest call), "
+              "maker PoolMaker2::MakeMorphJob's plain C++ with --native_morph_jobs, else a guest "
+              "call), "
               "WorkMem::AllocVertexBuffer sub_8258A9E8 (no adapter: MorphShape calls it), Model::QueueJobRelease sub_82594E88 (no adapter: MorphShape calls it) and "
               "XGSetVertexBufferHeader sub_8235A688 (no adapter: its caller calls it), the light "
               "kit SceneLights::Draw sub_820DDE58 (inside the diagnostics' wrap; it skips "
@@ -176,6 +178,17 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };
+  if (MorphJobsMakersNative()) {
+    calls.make_morph_job = [guest](uint32_t maker, uint32_t morph,
+                                   uint32_t sp) -> std::optional<uint32_t> {
+      PPCContext& ctx = guest->ctx;
+      uint8_t* base = guest->base;
+      const auto job = morph_jobs::MakeJob(base, morph_jobs::Kind::kMorph, maker, morph, sp,
+                                           MorphJobsConstructCalls(ctx, base));
+      ctx.fpscr.disableFlushMode();
+      return job;
+    };
+  }
   calls.call = [guest](uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                        uint32_t lr) {
     PPCContext& ctx = guest->ctx;
