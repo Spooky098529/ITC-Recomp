@@ -137,6 +137,36 @@ above checked again with their adapters gone):
 - `sub_821FB6B0` TuningScreen::Command49
 - `sub_821FB8D8` TuningScreen::Command51
 
+Not in the attract race or the replay (`itc_5306`, `itc_5307`, ok; the
+stand's setters: the tuning screen's paint, stickers, decals, aero,
+interior and tires on the stand):
+
+- `sub_8217C6C8` GarageStage::SetColor
+- `sub_8217B078` GarageStage::SetColor0
+- `sub_8217B108` GarageStage::SetColor1
+- `sub_8217B198` GarageStage::SetColor2
+- `sub_8217B228` GarageStage::SetColor3
+- `sub_8217B2B8` GarageStage::SetColor4
+- `sub_8217B348` GarageStage::SetColor5
+- `sub_8217B3D8` GarageStage::SetSticker
+- `sub_821793D0` GarageStage::SetDecalWord
+- `sub_821F7B90` TuningScreen::ApplyAreaDecals
+- `sub_821FE4E0` TuningScreen::ApplyDecalWord
+- `sub_821CCAA8` TuningScreen::PreviewParts
+- `sub_821797A8` GarageStage::SetParts
+- `sub_8217DBC0` GarageStage::SetAeroSet
+- `sub_82179818` GarageStage::SetDecalA
+- `sub_821798D8` GarageStage::SetDecalB
+- `sub_82179050` GarageStage::SetInteriorWord
+- `sub_821791C0` GarageStage::SetInteriorLevel
+- `sub_82179250` GarageStage::SetInteriorPair
+- `sub_82179378` GarageStage::ClearChoice
+- `sub_82179548` GarageStage::SetAero
+- `sub_82178EC0` GarageStage::ReloadDecals
+- `sub_82179130` GarageStage::SetTireGrade
+- `sub_821CCA38` TuningScreen::SetTireGrade
+- `sub_821DFA78` TuningScreen::PreviewWheel
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

@@ -153,9 +153,23 @@ file's history. What's left to see in a drive, from every run:
   (13 more functions Native); under `--native_stand_models`; every
   harness 0 differing, races 33 s at 40 and 84 s at 90, 0 errors; a
   harness fault fixed on the way (new groups advanced the shared
-  random generator); no subagents. Validation agent running.
+  random generator); no subagents. Validated: `itc_5306` (race 47 s
+  at 180, the harnesses ~130 s of it; 0 errors, every harness 0
+  differing outside the expected groups), 31 of 31 harness lines, no
+  prints added; 6 ran in the replay `itc_5307` (ok), 25 to drive.
+  Recorded; subsystem 6 done.
+- Next: a lead without mapping (not counted): the 22 never-seen rows
+  left without Status in `stand-models.md` and `tuning-screen.md`
+  (`SetChoice`, `SetAero2`, `SetDoorKind`, `ClearLightKit`,
+  `SetAccessory`, `SetCaliper`, `RefitAxles`,
+  `PreviewInteriorChoices`, the swatch setter and the rest), by the
+  2026-11-12 call. Migration agent running.
 
 ## Done
+
+- The stand's setters: 9 rows in `stand-models.md` and 5 callers in
+  `tuning-screen.md` ours, 17 adapters removed, 8d0e0496..0e74c60a;
+  validated.
 
 - The sticker editor: `sticker-editor.md` 25 of 25 Native, with the
   sticker commands 32 to 51 and `UiMovie::Unloop`, under
@@ -218,5 +232,6 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
   known 354, unknown 271).
 - After the sticker editor: ours 6100, work left 676 (wrapped 51,
   known 354, unknown 271).
+- After the stand's setters: ours 6114, work left 676.
 
 ## Stopped

@@ -2892,6 +2892,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | Three small leads: the scene's render manager's slots 7 and 8 and their thunks, the texture provider's getters, the static zero and identity matrices | `app-start-up.md`, `models.md`, `matrix-math.md` | 13 of 13 new rows (and `Matrix::FromFloats` Native) | (`--native_app_start_up`, `--native_models`, `--native_matrix_math`) |
 | 2026-11-13 | Cleanup lead (no mapping, not counted): ~30 native callers in 16 subsystems call the render manager's slots 7 and 8 and the texture provider's getters directly (`hooks/direct_slots.h`) | 16 files' notes | none new | (existing flags) |
 | 2026-11-13 | The sticker editor (the tuning screen's states 38 to 46 and 49, their helpers, and the update's sticker commands 32 to 51; none seen in play) | `sticker-editor.md` | 25 of 25 Native (and 17 commands in `tuning-screen.md`, `UiMovie::Unloop`) | (`--native_tuning_pages`, `--native_tuning_screen`) |
+| 2026-11-13 | The stand's setters the tuning screen reaches (the colors, the sticker, the decal word, the aero set), with the tuning screen's `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`, `PreviewParts` | `stand-models.md`, `tuning-screen.md` | 9 new rows and 5 callers ours, 17 adapters removed | (`--native_stand_models`, the tuning screen's) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5520,3 +5521,13 @@ overridden 110, Native 40, Dropped 26, never called 68, live 205;
 imports 186 called, 49 with a live caller). B7 (`b7_status.py`): ours
 6,100, work left 676 (Wrapped 51, with a row 354, no row yet 271);
 work left counts only functions seen in play.
+
+**2026-11-13, the stand's setters (branch `b7-loop-13-11-26`, the
+forty-sixth run, its sixth subsystem):** 8 new rows in `stand-models.md`
+(`src/stand_models/setters.cpp`) and `SetDecalWord`, none seen in
+play, with the tuning screen's `SetColor`, `ApplyAreaDecals`,
+`ApplyDecalWord`, `PreviewParts` and `SetParts` (`UpdateStand` no
+longer calls recompiled code); 17 adapters removed. The validation's
+harnesses took ~130 s of the 180. The boundary: unchanged. B7
+(`b7_status.py`): ours 6,114, work left 676 (Wrapped 51, with a row
+354, no row yet 271).
