@@ -112,6 +112,13 @@ When the user has reviewed a run's section, its heading gets
   frame (the native helpers don't write them); a planted fault in
   `Command44` (a `FinishNamed` argument) went unnoticed, as finishing an
   animation not playing changes nothing in the harness world.
+- The stand's setters' map (0ced7d4b, `stand-models.md`, 8 new rows):
+  `SetColor3` to `5` write the body paint slots then apply the wheel
+  paint (+112 to +207): the game's own mismatch, kept; they're
+  unreachable (`SetColor`'s callers pass only 0 to 2). The lead's
+  `SetAreaDecal` is `GarageStage::SetSticker`. `tuning-screen.md`'s
+  `SetColor` question answered; the sticker record and the
+  `0x82009A50` table in `known-data.md`.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

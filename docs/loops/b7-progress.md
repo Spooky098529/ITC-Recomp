@@ -142,7 +142,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 6 of 10: the stand's setters the tuning screen reaches
   (`sub_8217B078` to `sub_8217B3D8`, `sub_8217DBC0`; none seen in
   play; `UpdateStand`'s `ApplyAreaDecals` waits on `sub_8217B3D8`); its
-  line deleted from `leads.md`. Mapping agent running.
+  line deleted from `leads.md`. Mapped into `stand-models.md`
+  (0ced7d4b: 8 new rows and `SetDecalWord` completed, none in play; 9
+  ready groups judged by reading their callees; with them
+  `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`, `UpdateStand` and
+  `PreviewParts` in `tuning-screen.md` become ready; no leads added).
+  Check passed. Migration agent running.
 
 ## Done
 
