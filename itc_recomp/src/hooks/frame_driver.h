@@ -62,4 +62,17 @@ void ResumeThreadStep(PPCContext& ctx, uint8_t* base);
 // 112-byte frame; r3 as the last setter leaves it.
 void VideoOutputUnbindAll(PPCContext& ctx, uint8_t* base);
 
+// Scene::Scene sub_82098A98: r3 = the scene, r4 = the block; from a
+// 192-byte frame; r3 the scene. Its callees' register steps, for the
+// harness (no adapters: only Scene::Scene's plain C++ calls them in play):
+// CommandList::Init sub_8258CD28 (r3 the list, r4 the slots; r3 1),
+// ColorRect::SetTargets sub_82178B28 (r3 the queue, r4 the list),
+// DrawGlobals::Init sub_82589E78 (r4 the capacity, r5 the count) and
+// PrimitiveDecl::Init sub_82591858 (r3 1).
+void SceneConstruct(PPCContext& ctx, uint8_t* base);
+void CommandListInitStep(PPCContext& ctx, uint8_t* base);
+void ColorRectSetTargetsStep(PPCContext& ctx, uint8_t* base);
+void DrawGlobalsInitStep(PPCContext& ctx, uint8_t* base);
+void PrimitiveDeclInitStep(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

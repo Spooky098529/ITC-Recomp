@@ -603,6 +603,7 @@ set(ITC_SOURCES
     src/hooks/frame_driver.cpp
     src/frame_driver/frame_driver.cpp
     src/frame_driver/thread.cpp
+    src/frame_driver/scene_set_up.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp

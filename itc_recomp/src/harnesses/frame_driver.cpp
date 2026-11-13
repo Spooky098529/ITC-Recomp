@@ -12,6 +12,7 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "framework/run_loop.h"
 #include "graphics/video_output.h"
 #include "hooks/frame_driver.h"
@@ -19,6 +20,7 @@
 #include "memory/heap.h"
 #include "frame_driver/frame_driver.h"
 #include "frame_driver/thread.h"
+#include "frame_driver/scene_set_up.h"
 
 #include <fmt/format.h>
 
@@ -702,9 +704,256 @@ void UnbindAlls(Context& h) {
   results.Report();
 }
 
+// --- The app's scene's set-up ---
+//
+// The globals they write are saved before each harness and put back after
+// (the game's own were set at boot). Declarations and blocks each version
+// makes are compared by their contents (a declaration: its 52-byte header
+// and 12-byte elements) or as made or not (the memory blocks), then let go
+// where a free is at hand (operator new's), else left (small, or once).
+
+struct SavedGlobals {
+  struct Range {
+    uint32_t address, bytes;
+    std::vector<uint8_t> data;
+  };
+  std::vector<Range> ranges;
+  SavedGlobals(uint8_t* base, std::initializer_list<std::pair<uint32_t, uint32_t>> list) {
+    for (const auto& [address, bytes] : list) {
+      ranges.push_back({address, bytes, Read(base, address, bytes)});
+    }
+  }
+  void Restore(uint8_t* base) const {
+    for (const Range& r : ranges) {
+      Write(base, r.address, r.data.data(), r.bytes);
+    }
+  }
+};
+
+// A declaration's bytes (its count at +24).
+void DeclarationOut(uint8_t* base, Outputs& out, uint32_t declaration) {
+  if (declaration == 0) {
+    out.Word(0);
+    return;
+  }
+  const uint32_t count = std::min<uint32_t>(Load(base, declaration + 24), 64);
+  out.Bytes(Read(base, declaration, 52 + 12 * count));
+}
+
+// The draw globals: 0x8265ECA0 to 0x8265ED3F exactly; 0x8296B780 to
+// 0x8296BCDF with the declarations (+60 to +367) by contents and the work
+// memory's blocks (+12, +16, +40, +44) as made or not.
+void DrawGlobalsOut(uint8_t* base, Outputs& out) {
+  out.Bytes(Read(base, 0x8265ECA0, 0xA0));
+  for (uint32_t at = 0x8296B780; at < 0x8296BCE0; at += 4) {
+    const uint32_t offset = at - 0x8296B780;
+    const uint32_t word = Load(base, at);
+    if (offset >= 60 && offset < 368) {
+      DeclarationOut(base, out, word);
+    } else if (offset == 12 || offset == 16 || offset == 40 || offset == 44) {
+      out.Word(word != 0 ? 1 : 0);
+    } else {
+      out.Word(word);
+    }
+  }
+}
+
+void SceneSetUps(Context& h) {
+  {
+    const SavedGlobals saved(h.base, {{0x826D83D0, 8}});
+    Results results("ColorRect::SetTargets (sub_82178B28)");
+    for (int c = 0; c < 10; c++) {
+      Case(
+          h, results, [&](Blocks&) { RandomScratch(h); },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.random.Next();
+            t.r4.u64 = h.random.Next();
+          },
+          __imp__sub_82178B28, hooks::ColorRectSetTargetsStep,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32);
+            out.Bytes(Read(h.base, 0x826D83D0, 8));
+            DriverOut(h, out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    saved.Restore(h.base);
+    results.Report();
+  }
+  {
+    // A list in the scratch area (random words), its old memory a heap
+    // block or none, 0 to 300 slots; the new memory compared by number.
+    const uint32_t list = DriverAt(h);
+    Results results("CommandList::Init (sub_8258CD28)");
+    for (int c = 0; c < 40; c++) {
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            RandomScratch(h);
+            Store(h.base, list + 20, c % 3 == 0 ? 0 : blocks.New(h.base, 16 * (1 + h.random.Below(40))));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = list;
+            t.r4.u64 = h.random.Below(301);
+          },
+          __imp__sub_8258CD28, hooks::CommandListInitStep,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32);
+            const uint32_t memory = Load(h.base, list + 20);
+            if (memory != 0 && !blocks.Has(memory)) {
+              blocks.Add(memory);
+            }
+            DriverOut(h, out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    const SavedGlobals saved(h.base, {{0x82970BC8, 4}, {0x82970BDC, 4}});
+    Results results("PrimitiveDecl::Init (sub_82591858)");
+    for (int c = 0; c < 4; c++) {
+      Case(
+          h, results, [&](Blocks&) { RandomScratch(h); },
+          [&](PPCContext& t) { t.r3.u64 = h.random.Next(); }, __imp__sub_82591858,
+          hooks::PrimitiveDeclInitStep,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32);
+            DeclarationOut(h.base, out, Load(h.base, 0x82970BC8));
+            out.Word(Load(h.base, 0x82970BDC));
+            DriverOut(h, out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    saved.Restore(h.base);
+    results.Report();
+  }
+  {
+    // Small work memories (8 KiB, 0 or 4 records) in place of the scene's 2
+    // MB and 16,384.
+    const SavedGlobals saved(h.base, {{0x8265ECA0, 0xA0}, {0x8296B780, 0x560}});
+    Results results("DrawGlobals::Init (sub_82589E78)");
+    for (int c = 0; c < 2; c++) {
+      Case(
+          h, results, [&](Blocks&) { RandomScratch(h); },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.random.Next();
+            t.r4.u64 = 0x2000;
+            t.r5.u64 = c == 0 ? 0 : 4;
+          },
+          __imp__sub_82589E78, hooks::DrawGlobalsInitStep,
+          [&](Outputs& out, const PPCContext&, Blocks& blocks) {
+            DrawGlobalsOut(h.base, out);
+            DriverOut(h, out, blocks);
+          },
+          fmt::format("count {}", c == 0 ? 0 : 4));
+    }
+    saved.Restore(h.base);
+    results.Report();
+  }
+}
+
+// Scene::Scene on a scene in the scratch area, its block's run loop and
+// interface objects whose slots record (r5 and r4's +8 into the object's
+// +104 and +112, then a count), the interface's slot 1 answering a frame
+// driver interface whose slot 3 is the game's FrameDriver::GetVideoOutput
+// (a video output made by the native constructor, its device a heap block)
+// and slot 1 a recorder. The real render queue constructor and Init, and
+// the real allocations (the 8 MB list freed after; the draw globals'
+// blocks left), the globals saved and put back. Compared: the scene's
+// words (heap words as made or not), the recorders, the frame's delegate
+// words, the published globals, the draw globals.
+void SceneConstructs(Context& h) {
+  if (!ITC_FLAG(native_video_output)) {
+    return;
+  }
+  const SavedGlobals saved(h.base, {{0x8265ECA0, 0xA0},
+                                    {0x8296B780, 0x560},
+                                    {0x826D83D0, 8},
+                                    {0x82970BC4, 0x20}});
+  const uint32_t scene = h.data + 512;     // 80 bytes
+  const uint32_t block = h.data + 640;     // the run loop, the interface
+  const uint32_t loop = h.data + 1024;     // its vtable at data + 3000
+  const uint32_t interface = h.data + 1280;  // its vtable at data + 3040
+  const uint32_t driver = h.data + 1536;     // its vtable at data + 3080; the video output at +44
+  Results results("Scene::Scene (sub_82098A98)");
+  for (int c = 0; c < 2; c++) {
+    uint32_t device = 0;
+    uint32_t frame = 0;
+    Case(
+        h, results,
+        [&](Blocks& blocks) {
+          RandomScratch(h);
+          for (uint32_t slot = 0; slot < 8; slot++) {
+            Store(h.base, h.data + 3000 + 4 * slot, slot == 3 ? kCount4 : kStoreR5);
+            Store(h.base, h.data + 3040 + 4 * slot, slot == 1 ? kGetWord60 : kCount4);
+            Store(h.base, h.data + 3080 + 4 * slot,
+                  slot == 3 ? fd::kGetVideoOutput : slot == 1 ? kStoreR5 : kCount4);
+          }
+          Store(h.base, loop, h.data + 3000);
+          Store(h.base, interface, h.data + 3040);
+          Store(h.base, interface + 60, driver);
+          Store(h.base, driver, h.data + 3080);
+          Store(h.base, block + 0, loop);
+          Store(h.base, block + 4, interface);
+          vo::Construct(h.base, driver + 44);
+          device = blocks.New(h.base, vo::kDeviceThread + 8);
+          Store(h.base, driver + 44 + vo::kDevice, device);
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = scene;
+          t.r4.u64 = block;
+          frame = t.r1.u32 - 192;
+        },
+        __imp__sub_82098A98, hooks::SceneConstruct,
+        [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+          out.Word(t.r3.u32 - scene);
+          for (uint32_t at = 0; at < 80; at += 4) {
+            if (at >= 28 && at <= 40) {
+              continue;  // the list's buffers: relative to its memory below
+            }
+            const uint32_t word = Load(h.base, scene + at);
+            out.Word(word != 0 && memory::IsHeapBlock(word) ? 0xB0B0B0B0u : word);
+          }
+          const uint32_t list = scene + 8;
+          const uint32_t memory = Load(h.base, list + 20);
+          out.Word(memory != 0 && memory::IsHeapBlock(memory) ? 1 : 0);
+          for (uint32_t at : {24u, 28u, 32u}) {
+            out.Word(Load(h.base, list + at) - memory);
+          }
+          for (uint32_t object : {loop, interface, driver}) {
+            out.Word(Load(h.base, object + 4));
+            out.Word(Load(h.base, object + 104));
+            out.Word(Load(h.base, object + 112));
+          }
+          out.Bytes(Read(h.base, frame + 80, 56));
+          out.Word(Load(h.base, device + vo::kDeviceThread));
+          out.Bytes(Read(h.base, 0x826D83D0, 8));
+          out.Word(Load(h.base, 0x8296B918) - scene);
+          out.Word(Load(h.base, 0x8296B91C) - scene);
+          out.Word(Load(h.base, 0x82970BD8) - scene);
+          out.Word(Load(h.base, 0x82970BD4) - scene);
+          DeclarationOut(h.base, out, Load(h.base, 0x82970BC8));
+          out.Word(Load(h.base, 0x82970BDC));
+          DrawGlobalsOut(h.base, out);
+          if (memory != 0 && memory::IsHeapBlock(memory)) {
+            memory::crt::OperatorDelete(memory);
+          }
+          Fill(h.base, driver + 44 + vo::kLock, vo::kLockBytes);
+          Fill(h.base, scene, 80);  // compared above, its heap words as made or not
+          DriverOut(h, out, blocks);
+        },
+        fmt::format("case {}", c));
+  }
+  saved.Restore(h.base);
+  results.Report();
+}
+
 }  // namespace
 
 void FrameDriver(Context& h) {
+  SceneSetUps(h);
+  SceneConstructs(h);
   UnbindAlls(h);
   Threads(h);
   Interface(h);

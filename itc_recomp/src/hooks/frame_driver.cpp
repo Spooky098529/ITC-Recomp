@@ -14,6 +14,7 @@
 #include "hooks/heap.h"
 #include "hooks/last_error.h"
 #include "frame_driver/frame_driver.h"
+#include "frame_driver/scene_set_up.h"
 #include "frame_driver/thread.h"
 
 ITC_FLAG_DECLARE(bool, native_video_output);
@@ -37,7 +38,12 @@ ITC_FLAG_BOOL(native_frame_driver, true, "ITC",
               "XSetThreadProcessor sub_82297888 and ResumeThread sub_825BA118, no adapters: "
               "the kernel imports guest calls as the original makes them) and "
               "VideoOutput::UnbindAll sub_8258D9F8 (the setters guest calls through their "
-              "adapters) natively "
+              "adapters) and, with --native_video_output, Scene::Scene sub_82098A98 (with "
+              "CommandList::Init sub_8258CD28, ColorRect::SetTargets sub_82178B28, "
+              "DrawGlobals::Init sub_82589E78 and PrimitiveDecl::Init sub_82591858, no adapters; "
+              "the interfaces' slots, the render queue's constructor and Init, "
+              "CreateVertexDeclaration, operator new and delete and the memory blocks' makers "
+              "guest calls through their adapters) natively "
               "instead of through the translated code (the same results; checked by "
               "--run_harnesses=frame_driver)");
 
@@ -287,6 +293,110 @@ void VideoOutputUnbindAll(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+namespace {
+
+fd::SceneSetUpCalls SceneSetUpCallsOn(PPCContext& ctx, uint8_t* base) {
+  fd::SceneSetUpCalls calls;
+  auto call = [&ctx, base](void (*function)(PPCContext&, uint8_t*), uint32_t return_address) {
+    ctx.lr = return_address;
+    function(ctx, base);
+    return ctx.r3.u32;
+  };
+  calls.vcall = [&ctx, base](uint32_t object, uint32_t byte, uint64_t r4, uint64_t r5,
+                             uint32_t return_address) {
+    ctx.r3.u64 = object;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    const uint32_t target = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+    ctx.r11.u64 = target;
+    ctx.ctr.u64 = target;
+    ctx.lr = return_address;
+    REX_CALL_INDIRECT_FUNC(target);
+    return ctx.r3.u32;
+  };
+  calls.render_queue_construct = [&ctx, call](uint32_t queue) {
+    ctx.r3.u64 = queue;
+    call(sub_825915E0, 0x82098AD0);
+  };
+  calls.create_declaration = [&ctx, call](uint32_t elements, uint32_t return_address) {
+    ctx.r3.u64 = elements;
+    return call(sub_822A8980, return_address);
+  };
+  calls.operator_new = [&ctx, call](uint32_t bytes) {
+    ctx.r3.u64 = bytes;
+    return call(sub_825A6940, 0x8258CD88);
+  };
+  calls.operator_delete = [&ctx, call](uint32_t block) {
+    ctx.r3.u64 = block;
+    call(sub_825A71C0, 0x8258CD50);
+  };
+  calls.alloc_physical = [&ctx, call](uint32_t bytes, uint32_t return_address) {
+    ctx.r3.u64 = bytes;
+    ctx.r4.u64 = 0;
+    ctx.r5.u64 = 0xFFFFFFFFFFFFFFFFull;
+    ctx.r6.u64 = 4;
+    ctx.r7.u64 = 4;
+    return call(sub_8258E098, return_address);
+  };
+  calls.alloc_virtual = [&ctx, call](uint32_t bytes, uint32_t return_address) {
+    ctx.r3.u64 = bytes;
+    return call(sub_8258DFF0, return_address);
+  };
+  calls.in_frame = [&ctx, base](uint32_t bytes, uint32_t return_address,
+                                const std::function<void(uint32_t)>& body) {
+    uint64_t kept[18];
+    for (int i = 0; i < 18; i++) {
+      kept[i] = (&ctx.r14)[i].u64;
+    }
+    guest_call::InFrame(ctx, base, bytes, return_address, body);
+    for (int i = 0; i < 18; i++) {
+      (&ctx.r14)[i].u64 = kept[i];
+    }
+  };
+  calls.set_register = [&ctx](int reg, uint64_t value) { guest_call::Gpr(ctx, reg).u64 = value; };
+  return calls;
+}
+
+}  // namespace
+
+void SceneConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_video_output)) {
+    __imp__sub_82098A98(ctx, base);
+    return;
+  }
+  const uint32_t scene = ctx.r3.u32, block = ctx.r4.u32;
+  const fd::SceneSetUpCalls calls = SceneSetUpCallsOn(ctx, base);
+  calls.in_frame(192, uint32_t(ctx.lr), [&](uint32_t frame) {
+    fd::SceneConstruct(base, scene, block, frame, calls);
+  });
+  ctx.r3.u64 = scene;
+}
+
+void CommandListInitStep(PPCContext& ctx, uint8_t* base) {
+  const uint32_t list = ctx.r3.u32, slots = ctx.r4.u32;
+  const fd::SceneSetUpCalls calls = SceneSetUpCallsOn(ctx, base);
+  uint32_t r3 = 0;
+  calls.in_frame(112, uint32_t(ctx.lr), [&](uint32_t) {
+    r3 = fd::CommandListInit(base, list, slots, calls);
+  });
+  ctx.r3.u64 = r3;
+}
+
+void ColorRectSetTargetsStep(PPCContext& ctx, uint8_t* base) {
+  fd::ColorRectSetTargets(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void DrawGlobalsInitStep(PPCContext& ctx, uint8_t* base) {
+  const uint32_t capacity = ctx.r4.u32, count = ctx.r5.u32;
+  const fd::SceneSetUpCalls calls = SceneSetUpCallsOn(ctx, base);
+  fd::DrawGlobalsInit(base, capacity, count, calls);
+}
+
+void PrimitiveDeclInitStep(PPCContext& ctx, uint8_t* base) {
+  const fd::SceneSetUpCalls calls = SceneSetUpCallsOn(ctx, base);
+  ctx.r3.u64 = fd::PrimitiveDeclInit(base, calls);
+}
+
 }  // namespace hooks
 
 #define ITC_FRAME_DRIVER_ADAPTER(address, step) \
@@ -307,3 +417,4 @@ ITC_FRAME_DRIVER_ADAPTER(82098940, AppSceneDraw)
 ITC_FRAME_DRIVER_ADAPTER(8258DE88, ThreadConstruct)
 ITC_FRAME_DRIVER_ADAPTER(8258DF18, ThreadBegin)
 ITC_FRAME_DRIVER_ADAPTER(8258D9F8, VideoOutputUnbindAll)
+ITC_FRAME_DRIVER_ADAPTER(82098A98, SceneConstruct)
