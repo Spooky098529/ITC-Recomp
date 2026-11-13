@@ -5,6 +5,7 @@
 #include "hooks/location_screen.h"
 
 #include "base/flags.h"
+#include "hooks/archive.h"
 #include "hooks/career.h"
 #include "hooks/heap.h"
 #include "hooks/guest_call.h"
@@ -16,6 +17,7 @@
 
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
+ITC_FLAG_DECLARE(bool, native_course_scenery);
 
 ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "Run the career's location screen (docs/functions/location-screen.md: "
@@ -48,7 +50,9 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "sub_8222DC08, Transition24 sub_8222D2E8, Transition34 sub_8222D108 and Start "
               "sub_8222F0B0; PoseCar sub_82228588 over the cars' and the matrix math's plain "
               "C++; ShowOpponentSpecs sub_8222C188 over UiMovie::SetNodeText's plain C++ and "
-              "Transition9 sub_8222DEE0) "
+              "Transition9 sub_8222DEE0; PollLoad sub_82229238 over the camera animations', "
+              "PoseCar's, the UI movies' and Scenery::IsLoaded's plain C++, CarScene::Update, "
+              "Draw and SceneModel::PollLoad through their adapters) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen). PictureA, PictureB, Picture::Free, KindText, "
               "SetCursor, ShowUnlockEntry, ShowCard, ListNode, ShowListEntry, HidePictures, "
@@ -460,6 +464,20 @@ void LocationScreenShowOpponentPictures(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ls::ShowOpponentPictures(base, sp, calls.get());
 }
 
+// PollLoad: r3 = the machine; as the texts' functions (it reads the UI
+// movies' nodes through their plain C++).
+void LocationScreenPollLoad(PPCContext& ctx, uint8_t* base) {
+  if (!LocationScreenTextsNative(base)) {
+    __imp__sub_82229238(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32, machine = ctx.r3.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::PollLoad(base, sp, machine, calls.get(), ITC_FLAG(native_course_scenery),
+                            NativeArchiveQueue());
+}
+
 void LocationScreenUpdateView(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint32_t sp = ctx.r1.u32;
@@ -530,3 +548,5 @@ LOCATION_SCREEN_ADAPTER(8222D108, LocationScreenTransition34)
 LOCATION_SCREEN_ADAPTER(8222F0B0, LocationScreenStart)
 LOCATION_SCREEN_ADAPTER(82228588, LocationScreenPoseCar)
 LOCATION_SCREEN_ADAPTER(8222DEE0, LocationScreenTransition9)
+// State 2's handler (through the machine's table: its adapter stays).
+LOCATION_SCREEN_ADAPTER(82229238, LocationScreenPollLoad)

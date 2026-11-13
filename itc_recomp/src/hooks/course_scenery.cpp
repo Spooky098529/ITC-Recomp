@@ -244,8 +244,9 @@ extern "C" REX_FUNC(sub_820F2AF8) {
 }
 // Scenery::IsLoaded: r3 = the manager; r3 = 0 or 1. From the race's
 // loading's handlers (CourseSetup::WaitCourse and EndTick, native with
-// --native_race_loading, which call its plain C++) and the front end's
-// sub_82229238 (recompiled).
+// --native_race_loading, which call its plain C++) and the location
+// screen's PollLoad (sub_82229238, native with --native_location_screen,
+// which calls it too).
 ITC_COURSE_SCENERY(820F1F68, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = SceneryIsLoaded(base, calls, ctx.r1.u32, ctx.r3.u32,
                                                 hooks::NativeArchiveQueue()))
