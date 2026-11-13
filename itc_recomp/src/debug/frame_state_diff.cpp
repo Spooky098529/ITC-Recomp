@@ -7,6 +7,7 @@
 #include "hooks/cameras.h"
 #include "hooks/car_draw.h"
 #include "hooks/car_scene_draw.h"
+#include "hooks/course_scenery.h"
 #include "hooks/framework.h"
 #include "hooks/load_poll.h"
 #include "hooks/second_set.h"
@@ -453,7 +454,22 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
   }
 ITC_FRAME_STATE_WRAP_RECORDS(8209F8A0, hooks::CameraPassesRecordBegins)
 ITC_FRAME_STATE_WRAP_RECORDS(8209F900, hooks::CameraPassesRecordEnds)
-ITC_FRAME_STATE_WRAP(820F6068)
+// Scenery::Draw natively under --native_course_scenery
+// (src/course_scenery/draw.cpp, hooks::CourseSceneryDraw), inside the same
+// wrap.
+extern "C" REX_FUNC(sub_820F6068) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820F6068)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (hooks::CourseSceneryDrawNative()) {
+    hooks::CourseSceneryDraw(ctx, base);
+  } else {
+    __imp__sub_820F6068(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820F6068);
+}
 ITC_FRAME_STATE_WRAP(82130978)
 // The render orchestrator's (sub_820C5DE8) callees. The camera passes'
 // work natively (src/cameras/cameras.cpp, --native_cameras) or translated,

@@ -30,6 +30,16 @@ void CourseSceneryRecordHeadlightProjectors(PPCContext& ctx, uint8_t* base);
 bool CourseSceneryDrawAreaNative();
 void CourseSceneryDrawArea(PPCContext& ctx, uint8_t* base);
 
+// Scenery::Draw (sub_820F6068): r3 = the manager; lr, r24 and flush-to-zero
+// (off) put back, r3 not given (its callers don't read it). Run by its
+// frame-state wrap (src/debug/frame_state_diff.cpp) where
+// CourseSceneryDrawNative (DrawArea's condition) holds, else the original.
+// TextureAnimations::Advance and Minimap::Draw are called through their
+// per-frame wraps (src/frame_pacing/per_frame_logic.cpp), RecordClear
+// through its adapter's work.
+bool CourseSceneryDrawNative();
+void CourseSceneryDraw(PPCContext& ctx, uint8_t* base);
+
 // Scenery::Update (sub_820F4558): r3 = the manager; the original's register
 // saves made, then the plain C++ (its guest calls putting flush-to-zero back
 // off); r3 as the original leaves it, lr put back.

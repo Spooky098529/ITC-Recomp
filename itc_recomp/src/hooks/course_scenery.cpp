@@ -37,6 +37,7 @@
 #include "base/flags.h"
 #include "hooks/archive.h"
 #include "hooks/billboards.h"
+#include "hooks/cameras.h"
 #include "hooks/car_scene_draw.h"
 #include "hooks/course_scenery.h"
 #include "hooks/heap.h"
@@ -49,6 +50,7 @@ ITC_FLAG_DECLARE(bool, native_cameras);
 ITC_FLAG_DECLARE(bool, native_data_files);
 ITC_FLAG_DECLARE(bool, native_post_effects);
 ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_model_animation);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
@@ -90,6 +92,9 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "Scenery::DrawArea sub_820F3B70 (the headlights', the scenery models' draws', the "
               "light groups' and their callees' plain C++; with those flags, --native_billboards, "
               "--native_post_effects and --native_data_files, else its original), "
+              "Scenery::Draw sub_820F6068 (in its frame-state wrap; its callees' plain C++ "
+              "called directly, TextureAnimations::Advance and Minimap::Draw through their "
+              "per-frame wraps, RecordClear through its adapter's work; as DrawArea's flags), "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
               "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, AnimationSet::FindByTexture sub_82146A38, "
               "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
@@ -378,6 +383,67 @@ extern "C" REX_FUNC(sub_820F3B70) {
     return;
   }
   hooks::CourseSceneryDrawArea(ctx, base);
+}
+
+// Scenery::Draw: r3 = the manager. Its adapter is its frame-state wrap
+// (src/debug/frame_state_diff.cpp), which calls this where
+// CourseSceneryDrawNative holds. ctx's r24 is the original's (0x8265ECA0)
+// while it runs, the camera pass for DrawArea and the view-projection for
+// DrawSetLists (their callees' adapters read it where their plain C++
+// declines), then put back.
+bool hooks::CourseSceneryDrawNative() {
+  return hooks::CourseSceneryDrawAreaNative();
+}
+
+void hooks::CourseSceneryDraw(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint64_t r24 = ctx.r24.u64;
+  ctx.r24.u64 = 0x8265ECA0;
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  // A call into our own code from `frame` with the original's return
+  // address, r1 put back.
+  auto in_frame = [&](uint32_t frame, uint32_t back, auto&& run) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.lr = back;
+    run();
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+  };
+  DrawSteps steps;
+  steps.native_model_animation = ITC_FLAG(native_model_animation);
+  steps.set_r24 = [&](uint32_t value) { ctx.r24.u64 = value; };
+  steps.advance = [&](uint32_t frame, uint32_t set) {
+    in_frame(frame, 0x820F60B8, [&] {
+      ctx.r3.u64 = set;
+      sub_820F11A8(ctx, base);  // the per-frame logic's wrap
+    });
+  };
+  steps.record_clear = [&](uint32_t frame, uint32_t key, uint32_t flags, uint32_t color,
+                           uint32_t depth) {
+    in_frame(frame, 0x820F6840, [&] {
+      ctx.r3.u64 = 19;
+      ctx.r4.u64 = key;
+      ctx.r5.u64 = flags;
+      ctx.r6.u64 = color;
+      ctx.r7.u64 = depth;
+      hooks::RecordClear(ctx, base);
+    });
+  };
+  steps.minimap = [&](uint32_t frame, uint32_t manager, uint32_t description) {
+    in_frame(frame, 0x820F6888, [&] {
+      ctx.r3.u64 = manager;
+      ctx.r4.u64 = description;
+      sub_820F5740(ctx, base);  // the per-frame logic's wrap
+    });
+  };
+  Draw(base, draws, calls, steps, ctx.r1.u32, ctx.r3.u32);
+  ctx.r24.u64 = r24;
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
 }
 
 // --- The files' parses ---

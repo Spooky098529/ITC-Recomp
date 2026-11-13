@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 #include "archive/archive.h"
 
@@ -447,6 +448,62 @@ uint64_t RecordHeadlightProjectors(uint8_t* base, const car_scene_draw::SceneDra
 void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
               const car_scene_draw::SceneDrawCalls& calls, uint32_t stack, uint32_t manager,
               uint32_t description, uint32_t area, uint32_t caller_r28);
+
+// The model of a list's node `index` steps from its head (the List64 at
+// `nodes`: +260 the head, each node +0 the next and +2 its slot; the models
+// from +268), as Scenery::DrawSetLists and Draw walk the course set's lists.
+uint32_t ListModel(uint8_t* base, uint32_t nodes, uint32_t index);
+
+// Scenery::Draw's steps that run through the guest context (its adapter
+// makes them, src/hooks/course_scenery.cpp; the harness the same).
+struct DrawSteps {
+  // Model::Animate's plain C++ may run (--native_model_animation), else
+  // its original as a guest call.
+  bool native_model_animation = false;
+  // ctx's r24 while a callee runs (the draws' adapters read it where their
+  // plain C++ declines): the camera pass for DrawArea, the view-projection
+  // for DrawSetLists, 0x8265ECA0 (the original's) otherwise.
+  std::function<void(uint32_t r24)> set_r24;
+  // TextureAnimations::Advance (sub_820F11A8) inside its per-frame wrap
+  // (src/frame_pacing/per_frame_logic.cpp), r3 = the course set, from
+  // `frame`.
+  std::function<void(uint32_t frame, uint32_t set)> advance;
+  // RecordClear (sub_8209FA38) from `frame` (r3 = 19, r4 the key, r5 the
+  // flags, r6 the color, r7 the depth).
+  std::function<void(uint32_t frame, uint32_t key, uint32_t flags, uint32_t color,
+                     uint32_t depth)>
+      record_clear;
+  // Minimap::Draw (sub_820F5740) inside its per-frame wrap, from `frame`,
+  // r24 = 0x8265ECA0.
+  std::function<void(uint32_t frame, uint32_t manager, uint32_t description)> minimap;
+};
+
+// Scenery::Draw (sub_820F6068, draw.cpp): r3's manager. In its 640-byte
+// frame below `stack` (the back chain written): the texture provider
+// (+228) cleared (slot 2); unless +196 has 0x4000, the course set's texture
+// animations advanced and every visible area's (+216: count +0, the areas
+// +8, 272 bytes each) models animated; the provider's slot 0 = the set's XPR
+// (+64). Then, by the pass table at 0x82603060 (each entry's camera pass
+// enabled, +588): with +196 & 0x10, entries 0 to 2: the set's model (+96)
+// shapes (Model::DrawShape) with the identity moved to the pass's eye
+// (+400) and its view-projection (Matrix::Copy, noted for interpolation),
+// the range (0x82001FCC, 0x82006804, 0, 0); with 0x20, entries 3 to 5: the
+// list at +528's models (ResetDrawState) nearer than the viewport entry's
+// +72 (the model's shapes' +236) shape 0 (SceneryModel::DrawShape) with
+// the identity; for each visible area with models, entries 6 to 15 and
+// then 16 to 18 DrawArea; entries 16 to 18 DrawSetLists; with 0x400,
+// entries 16 to 18 outside the shadow passes the set's light groups
+// (+1592, its count little-endian; SetBillboardPass, DrawLightGroups);
+// entry 19 RecordClear (key 103, flags 49, pass 19's clear color and depth),
+// then Minimap::Draw. The description (+80) filled from the entry before
+// each, RecordHeadlightProjectors before the model draws, the light groups
+// and the minimap. The draws' guest calls (and their originals where their
+// plain C++ declines) go through `draws`, the headlights' and light groups'
+// through `calls`, the rest through `steps`. The original's r3 isn't given
+// (its callers don't read it).
+void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
+          const car_scene_draw::SceneDrawCalls& calls, const DrawSteps& steps, uint32_t stack,
+          uint32_t manager);
 
 // --- The files' parses (the loads' callbacks) ---
 //
