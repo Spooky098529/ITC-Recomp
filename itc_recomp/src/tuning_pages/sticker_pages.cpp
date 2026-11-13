@@ -340,6 +340,183 @@ void BackToButton(uint8_t* base, uint32_t s, uint32_t at) {
   Store(base, menu + 4, k);
 }
 
+// UpdateSoloHold answering 1: ShowSlotNode(s, id(j), j, l) for j 0 to 4.
+// r3 as they leave it.
+uint64_t SoloBySlot(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t s,
+                    uint32_t frame, bool native_slots) {
+  uint64_t r3 = UpdateSoloHold(base, call, s, frame, native_slots);
+  if (r3 == 0) {
+    return r3;
+  }
+  for (uint32_t j = 0; j < 5; j++) {
+    r3 = ShowSlotNode(base, s, PlacedId(base, s, j), j, Load(base, s + kSlot), frame);
+  }
+  return r3;
+}
+
+// L[i]: the order list's word i (s + 33480 + 4i).
+uint32_t OrderAt(uint32_t s, uint32_t i) { return ((i + 8370) << 2) + s; }
+
+// owned(i): i not negative and its bit set in the save data's sticker words.
+bool Owned(uint8_t* base, uint32_t s, uint32_t i) {
+  if (int32_t(i) < 0) {
+    return false;
+  }
+  const uint32_t save = Load(base, s + 18904);
+  const uint32_t word = Load(base, ((uint32_t(int32_t(i) >> 5) + 26218) << 2) + save);
+  return (word & (1u << (i & 31))) != 0;
+}
+
+// The picker's group scans (+30768 the group, G's records): from the
+// group's first id up to its last until one is owned, then owned(i) asked
+// once more for the id the scan stopped at (one past the last too), else
+// the next group. Loop forever when nothing is owned, as the original.
+uint32_t ScanGroup(uint8_t* base, uint32_t s, uint32_t i, uint32_t last) {
+  while (int32_t(i) <= int32_t(last)) {
+    if (Owned(base, s, i)) {
+      break;
+    }
+    i += 1;
+    last = Load(base, Load(base, s + 30768) * 12 + kGroups + 4);
+  }
+  return i;
+}
+
+uint32_t ScanBack(uint8_t* base, uint32_t s) {
+  for (;;) {
+    const uint32_t g = Load(base, s + 30768) - 1;
+    Store(base, s + 30768, g);
+    if (int32_t(g) < 0) {
+      Store(base, s + 30768, 5);
+    }
+    const uint32_t i = Load(base, Load(base, s + 30768) * 12 + kGroups);
+    const uint32_t found =
+        ScanGroup(base, s, i, Load(base, Load(base, s + 30768) * 12 + kGroups + 4));
+    if (Owned(base, s, found)) {
+      return found;
+    }
+  }
+}
+
+uint32_t ScanForward(uint8_t* base, uint32_t s) {
+  uint32_t group = Load(base, s + 30768);
+  for (;;) {
+    // (g + 1) mod 6 as divw leaves it (negative for a negative g + 1).
+    const uint32_t n = group + 1;
+    const uint32_t g = n - uint32_t(int32_t(n) / 6) * 6;
+    Store(base, s + 30768, g);
+    const uint32_t found = ScanGroup(base, s, Load(base, g * 12 + kGroups),
+                                     Load(base, g * 12 + kGroups + 4));
+    if (Owned(base, s, found)) {
+      return found;
+    }
+    group = g;
+  }
+}
+
+// States 44 to 46's edits of D and their calls' return addresses.
+enum class StickerEdit { kMove, kRotate, kScale };
+
+struct StickerEditCalls {
+  uint32_t moves[8];  // the fired reads, in the original's order
+  uint32_t a, a_sound, b, b_sound, memcpy;
+};
+
+constexpr StickerEditCalls kMoveCalls = {
+    {0x821F9A38, 0x821F9A64, 0x821F9A90, 0x821F9ABC, 0x821F9AE8, 0x821F9B14, 0x821F9B40,
+     0x821F9B6C},
+    0x821F9B98, 0x821F9BBC, 0x821F9C0C, 0x821F9C30, 0x821F9C44};
+constexpr StickerEditCalls kRotateCalls = {
+    {0x821F9DC0, 0x821F9DEC, 0x821F9E18, 0x821F9E44}, 0x821F9E70, 0x821F9E94, 0x821F9EE4,
+    0x821F9F08, 0x821F9F1C};
+constexpr StickerEditCalls kScaleCalls = {
+    {0x821FA048, 0x821FA074, 0x821FA0A0, 0x821FA0CC}, 0x821FA0F8, 0x821FA11C, 0x821FA16C,
+    0x821FA190, 0x821FA1A4};
+
+constexpr uint32_t kStickerBounds = 0x8200C2A8;  // 16 bytes an area: x min, x max, y min, y max
+constexpr uint32_t kAngleMax = 0x8200C54C;       // 359.0f
+constexpr uint32_t kScaleStep = 0x8200222C;
+constexpr uint32_t kScaleMin = 0x82001FBC;
+constexpr uint32_t kScaleMax = 0x820021E8;
+
+// One step of D: `move` 0 up, 1 down, 2 left, 3 right (the position, inside
+// the area's bounds), or 0 left (minus), 1 right (plus) for the angle (1.0,
+// wrapped between 0.0 and 359.0) and the scale (clamped).
+void StepSticker(uint8_t* base, uint32_t s, StickerEdit edit, uint32_t move) {
+  if (edit == StickerEdit::kMove) {
+    const uint32_t bounds = (Load(base, s + kArea) << 4) + kStickerBounds;
+    const uint32_t at = s + kDecal + (move < 2 ? 4 : 0);
+    const bool minus = move % 2 == 0;
+    const int32_t limit = int32_t(Load(base, bounds + (move < 2 ? 8 : 0) + (minus ? 0 : 4)));
+    const int32_t value = int32_t(Load(base, at));
+    if (minus ? limit < value : limit > value) {
+      Store(base, at, uint32_t(value) + (minus ? 0xFFFFFFFFu : 1u));
+    }
+    return;
+  }
+  const bool plus = move == 1;
+  const bool angle = edit == StickerEdit::kRotate;
+  const uint32_t at = s + kDecal + (angle ? 8 : 12);
+  const double old = fs::Lfs(base, at);
+  const double step = fs::Lfs(base, angle ? kResetScale : kScaleStep);
+  const double value = fs::Single(plus ? old + step : old - step);
+  fs::Stfs(base, at, value);
+  if (angle) {
+    if (plus ? value > fs::Lfs(base, kAngleMax) : value < fs::Lfs(base, kResetAngle)) {
+      fs::Stfs(base, at, fs::Lfs(base, plus ? kResetAngle : kAngleMax));
+    }
+  } else {
+    const double limit = fs::Lfs(base, plus ? kScaleMax : kScaleMin);
+    if (plus ? value > limit : value < limit) {
+      fs::Stfs(base, at, limit);
+    }
+  }
+}
+
+// InputStickerMove, InputStickerRotate and InputStickerScale.
+uint64_t InputStickerTransform(uint8_t* base, const tuning_screen::GuestCall& call,
+                               uint64_t screen, uint32_t sp, const PageFlags& flags,
+                               StickerEdit edit) {
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t entry = PlayerEntry(base);
+  Reads asked{base, call, entry, frame, flags.native_slots, 0};
+  asked.r3 = SoloBySlot(base, call, s, frame, flags.native_slots);
+  const StickerEditCalls& lr = edit == StickerEdit::kMove     ? kMoveCalls
+                               : edit == StickerEdit::kRotate ? kRotateCalls
+                                                              : kScaleCalls;
+  static constexpr uint32_t kMoves[8] = {153, 167, 154, 168, 155, 169, 156, 170};
+  static constexpr uint32_t kTurns[4] = {155, 169, 156, 170};
+  const uint32_t* moves = edit == StickerEdit::kMove ? kMoves : kTurns;
+  const uint32_t count = edit == StickerEdit::kMove ? 8 : 4;
+  for (uint32_t k = 0; k < count; k++) {
+    if (asked(48, moves[k], lr.moves[k])) {
+      // Queued moved or not: Command46, 48 or 50.
+      StepSticker(base, s, edit, k / 2);
+      const uint32_t command = edit == StickerEdit::kMove     ? 46
+                               : edit == StickerEdit::kRotate ? 48
+                                                              : 50;
+      Queue(base, s, Load(base, s + 9652), command);
+      return asked.r3;
+    }
+  }
+  const bool a = asked(40, 159, lr.a);
+  if (!a && !asked(40, 158, lr.b)) {
+    return asked.r3;
+  }
+  if (int32_t(Load(base, s + kSolo)) != 0) {
+    return asked.r3;
+  }
+  // A keeps D, B puts its backup (+33512) back; then the edit page.
+  uint64_t r3 = call(kMenuSoundPlay, {a ? 0u : 2u}, frame, a ? lr.a_sound : lr.b_sound);
+  if (!a) {
+    r3 = Memcpy(base, call, screen + kDecal, screen + 33512, 24, frame, lr.memcpy);
+  }
+  Store(base, s + 9720, 1);
+  Go(base, s, 41, 38);
+  return r3;
+}
+
 }  // namespace
 
 uint32_t UpdateSoloHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
@@ -1012,6 +1189,197 @@ uint64_t InputStickerView(uint8_t* base, const tuning_screen::GuestCall& call, u
     asked.r3 = call(kCameraCommand, {Holder(base), 1}, frame, 0x821F7280);
   }
   return asked.r3;
+}
+
+uint64_t InputStickerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821FBF18 TuningScreen::InputStickerOrder");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 272);
+  if (int32_t(Load(base, s + 9720)) != 0) {
+    // The command's end asked: the order page again while the slot isn't
+    // in its own place, else the operations (state 40).
+    const uint32_t moving = Load(base, s + 30756);
+    if (int32_t(moving) != int32_t(Load(base, OrderAt(s, moving)))) {
+      Queue(base, s, Load(base, s + 9652), 42);
+    } else {
+      Go(base, s, 40, 36);
+    }
+    return screen;
+  }
+  call(kMenuStep, {Load(base, s + 10044)}, frame, 0x821FBF94);
+  if (UpdateSoloHold(base, call, s, frame, flags.native_slots) != 0) {
+    for (uint32_t j = 0; j < 5; j++) {
+      ShowSlotNode(base, s, PlacedId(base, s, Load(base, OrderAt(s, j))), j, Cursor(base, s),
+                   frame);
+    }
+  }
+  const uint32_t menu = Load(base, s + 10044);
+  if (int32_t(Load(base, menu + 8)) != 0) {
+    // Moved: L[previous] = L[k], L[k] = the moving slot.
+    const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821FC00C);
+    uint32_t m = Load(base, s + 10044);
+    const uint32_t k = Load(base, m + 0), previous = Load(base, m + 4);
+    Store(base, OrderAt(s, previous), Load(base, OrderAt(s, k)));
+    m = Load(base, s + 10044);
+    const uint32_t moving = Load(base, s + 30756);
+    Store(base, OrderAt(s, Load(base, m + 0)), moving);
+    Queue(base, s, Load(base, s + 9652), 41);
+    return r3;
+  }
+  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821FC084);
+  if (int32_t(r3) != 0) {
+    if (int32_t(Load(base, s + kSolo)) != 0) {
+      return r3;
+    }
+    call(kMenuSoundPlay, {0}, frame, 0x821FC0A8);
+    // A: the area reordered by L, through copies of its five records (the
+    // frame's +112) and ids (+80).
+    const uint32_t area = Load(base, s + kArea);
+    const uint32_t k = Cursor(base, s);
+    Store(base, s + 30756, k);
+    Store(base, s + kSlot, k);
+    const uint32_t records = uint32_t(uint64_t(area) * 120 + screen + 32360);
+    for (uint32_t b = 0; b < 120; b += 4) {
+      Store(base, frame + 112 + b, Load(base, records + b));
+    }
+    const uint32_t ids = uint32_t((uint64_t(area) + 1666) * 20 + screen);
+    for (uint32_t b = 0; b < 20; b += 4) {
+      Store(base, frame + 80 + b, Load(base, ids + b));
+    }
+    for (uint32_t j = 0; j < 5; j++) {
+      const uint32_t id = Load(base, (Load(base, OrderAt(s, j)) << 2) + frame + 80);
+      Store(base, (((Load(base, s + kArea) + 1666) * 5 + j) << 2) + s, id);
+      const uint64_t destination = (uint64_t(Load(base, s + kArea)) * 5 + j) * 24 + screen + 32360;
+      const uint64_t source = uint64_t(Load(base, OrderAt(s, j))) * 24 + frame + 112;
+      Memcpy(base, call, destination, source, 24, frame, 0x821FC174);
+    }
+    Store(base, s + 9720, 1);
+    Go(base, s, 39, 34);
+    return ShowStickerOrder(base, s, 0, frame);
+  }
+  r3 = call(kMenuPressed, {Load(base, s + 10044), 158}, frame, 0x821FC1BC);
+  if (int32_t(r3) == 0 || int32_t(Load(base, s + kSolo)) != 0) {
+    return r3;
+  }
+  // B: the slot back at the cursor, then as the command's end.
+  call(kMenuSoundPlay, {2}, frame, 0x821FC1E0);
+  const uint32_t k = Cursor(base, s);
+  Store(base, s + 9720, 1);
+  Store(base, s + 30756, k);
+  if (int32_t(k) != int32_t(Load(base, OrderAt(s, k)))) {
+    Queue(base, s, Load(base, s + 9652), 42);
+  } else {
+    Go(base, s, 40, 36);
+  }
+  return ShowStickerOrder(base, s, 0, frame);
+}
+
+uint64_t InputStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                            uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821FC270 TuningScreen::InputStickerPicker");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t wait = s + 33536;
+  if (int32_t(Load(base, wait)) > 0) {
+    Store(base, wait, Load(base, wait) - 1);
+    return screen;
+  }
+  call(kMenuStep, {Load(base, s + 10044)}, frame, 0x821FC2C0);
+  uint64_t r3 = UpdateSoloHold(base, call, s, frame, flags.native_slots);
+  if (r3 != 0) {
+    for (uint32_t j = 0; j < 5; j++) {
+      // The slot being picked shows the cursor's sticker.
+      const uint32_t l = Load(base, s + kSlot);
+      const uint32_t id = int32_t(l) == int32_t(j) ? Cursor(base, s) : PlacedId(base, s, j);
+      r3 = ShowSlotNode(base, s, id, j, l, frame);
+    }
+  }
+  r3 = UpdatePreviewHold(base, call, s, frame, flags.native_slots);
+  if (r3 != 0) {
+    // 163 held: the slot's placed record previewed, else D reset.
+    if (int32_t(Load(base, s + kPreview)) == 1) {
+      Memcpy(base, call, screen + kDecal, SlotRecord(base, screen), 24, frame, 0x821FC370);
+    } else {
+      ResetDecal(base, s);
+    }
+    r3 = PlaceStickerNode(base, s, Cursor(base, s), Load(base, s + kSlot), s + kDecal, frame);
+  }
+  Reads asked{base, call, entry, frame, flags.native_slots, r3};
+  const bool back = asked(48, 161, 0x821FC3D8);
+  if (back || asked(48, 162, 0x821FC51C)) {
+    // The group before or after: the cursor on its first owned sticker.
+    const uint32_t i = back ? ScanBack(base, s) : ScanForward(base, s);
+    call(kMenuSoundPlay, {4}, frame, 0x821FC4C8);
+    uint32_t m = Load(base, s + 10044);
+    const uint32_t k = Load(base, m + 0);
+    Store(base, m + 0, i);
+    Store(base, m + 4, k);
+    m = Load(base, s + 10044);
+    Store(base, m + 24, 1);
+    Store(base, m + 28, 1);
+    Store(base, m + 32, 0);
+    Store(base, wait, 2);
+    return ShowStickerPicker(base, call, s, 1, frame);
+  }
+  const uint32_t menu = Load(base, s + 10044);
+  if (int32_t(Load(base, menu + 8)) != 0) {
+    r3 = call(kMenuSoundPlay, {4}, frame, 0x821FC62C);
+    const uint32_t state = Load(base, s + 9652);
+    Store(base, wait, 2);
+    Queue(base, s, state, 44);
+    return r3;
+  }
+  r3 = call(kMenuPressed, {menu, 159}, frame, 0x821FC670);
+  if (int32_t(r3) != 0) {
+    if (int32_t(Load(base, s + kSolo)) != 0) {
+      return r3;
+    }
+    // A: the sticker placed in slot l, the edit page (state 41).
+    call(kMenuSoundPlay, {0}, frame, 0x821FC694);
+    const uint32_t k = Cursor(base, s);
+    Store(base, s + 30748, 0);
+    Store(base, s + 9652, 41);
+    Store(base, s + 30764, k);
+    Queue(base, s, 41, 38);
+    Store(base, (((Load(base, s + kArea) + 1666) * 5 + Load(base, s + kSlot)) << 2) + s,
+          Load(base, s + 30764));
+    return ShowStickerPicker(base, call, s, 0, frame);
+  }
+  r3 = call(kMenuPressed, {Load(base, s + 10044), 158}, frame, 0x821FC708);
+  if (int32_t(r3) == 0 || int32_t(Load(base, s + kSolo)) != 0) {
+    return r3;
+  }
+  // B: back to the page the picker came from (q+8: 40 or 39).
+  call(kMenuSoundPlay, {2}, frame, 0x821FC72C);
+  const int32_t from = int32_t(Load(base, Load(base, s + 10036) + 8));
+  if (from == 40) {
+    Store(base, s + 9720, 1);
+    Go(base, s, 40, 36);
+  } else if (from == 39) {
+    Store(base, s + 9720, 1);
+    Go(base, s, 39, 34);
+  }
+  return ShowStickerPicker(base, call, s, 0, frame);
+}
+
+uint64_t InputStickerMove(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821F99A8 TuningScreen::InputStickerMove");
+  return InputStickerTransform(base, call, screen, sp, flags, StickerEdit::kMove);
+}
+
+uint64_t InputStickerRotate(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                            uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821F9D30 TuningScreen::InputStickerRotate");
+  return InputStickerTransform(base, call, screen, sp, flags, StickerEdit::kRotate);
+}
+
+uint64_t InputStickerScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_821F9FB8 TuningScreen::InputStickerScale");
+  return InputStickerTransform(base, call, screen, sp, flags, StickerEdit::kScale);
 }
 
 }  // namespace tuning_pages

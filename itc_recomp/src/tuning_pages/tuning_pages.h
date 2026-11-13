@@ -853,5 +853,22 @@ uint64_t InputStickerEdit(uint8_t* base, const tuning_screen::GuestCall& call, u
                           uint32_t sp, const PageFlags& flags);
 uint64_t InputStickerView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
+// sub_821FBF18 InputStickerOrder (state 42, 272-byte frame: the area's
+// records and ids copied into it at +112 and +80; ShowStickerOrder by its
+// plain C++), sub_821FC270 InputStickerPicker (43, 128; its group scans
+// loop forever when no sticker is owned, as the original), sub_821F99A8
+// InputStickerMove, sub_821F9D30 InputStickerRotate and sub_821F9FB8
+// InputStickerScale (44 to 46, 112; the mapper's slots by their plain C++
+// with `flags.native_slots`).
+uint64_t InputStickerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, const PageFlags& flags);
+uint64_t InputStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                            uint32_t sp, const PageFlags& flags);
+uint64_t InputStickerMove(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, const PageFlags& flags);
+uint64_t InputStickerRotate(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                            uint32_t sp, const PageFlags& flags);
+uint64_t InputStickerScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, const PageFlags& flags);
 
 }  // namespace tuning_pages

@@ -256,11 +256,19 @@ void TuningPagesShowStickerPicker(PPCContext& ctx, uint8_t* base);
 // The sticker editor's input pages (r3 the screen; no adapters: the
 // harness's steps): InputStickerAreas sub_821FBD40, InputStickerSlots
 // sub_821F9050, InputStickerOperate sub_821F9328, InputStickerEdit
-// sub_821F9608, InputStickerView sub_821F7000.
+// sub_821F9608, InputStickerView sub_821F7000, InputStickerOrder
+// sub_821FBF18, InputStickerPicker sub_821FC270, InputStickerMove
+// sub_821F99A8, InputStickerRotate sub_821F9D30, InputStickerScale
+// sub_821F9FB8.
 void TuningPagesInputStickerAreas(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputStickerSlots(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputStickerOperate(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputStickerEdit(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputStickerView(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerPicker(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerMove(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerRotate(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerScale(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -2134,6 +2134,68 @@ void StickerCases(Context& h, const World& w) {
                         view(t, r, w);
                         t.r3.u64 = w.screen();
                       }));
+  // States 42 to 46: the command's end +9720 0 three cases in four (state
+  // 42's input runs only then), D's angle half the time at the wrap (0.0 to
+  // 1.0, 358.0 to 360.0); most cases one of the actions they read asked
+  // alone on the player's mapper (the moves 153 to 156 and 167 to 170 and
+  // the picker's groups 161 and 162 by its fired +464 bit, A 159 and B 158
+  // by its pressed +456), the entry blocked one case in eight; else the
+  // mappers as laid.
+  auto asks = [](PPCContext& t, Random& r, const World& w) {
+    StickerFields(t, r, w);
+    const uint32_t s = w.screen();
+    guest::StoreU32(w.base, s + 9720, r.Below(4) == 0 ? (r.Below(2) == 0 ? 1 : uint32_t(r.Next())) : 0);
+    if (r.Below(2) == 0) {
+      static constexpr float kAngles[] = {0.0f, 0.25f, 1.0f, 358.0f, 358.5f, 359.0f, 359.75f, 360.0f};
+      guest::StoreFloat(w.base, s + 30832 + 8, kAngles[r.Below(8)]);
+    }
+    static constexpr uint32_t kActions[] = {153, 154, 155, 156, 167, 168,
+                                            169, 170, 161, 162, 159, 158};
+    const uint32_t pick = r.Below(15);
+    if (pick < 12) {
+      const uint32_t c = guest::LoadU32(w.base, kControllerEntries);
+      const uint32_t mapper = guest::LoadU32(w.base, kMapperEntries + 8 * c);
+      const uint32_t bit = 1u << (kActions[pick] - 151);
+      guest::StoreU32(w.base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+      guest::StoreU32(w.base, mapper + 456, pick >= 10 ? bit : 0);
+      guest::StoreU32(w.base, mapper + 464, pick < 10 ? bit : 0);
+    }
+  };
+  auto edit = [asks](PPCContext& t, Random& r, const World& w) {
+    asks(t, r, w);
+    HighWord(t, r);
+  };
+  // Their frames' helpers' saves and holes: InputStickerOrder's
+  // ShowStickerOrder (48, with its {144, 224}; UpdateSoloHold's 16 and
+  // ShowSlotNode's 40 inside) under the 272-byte frame;
+  // InputStickerPicker's ShowStickerPicker (64, with its {80, 112} and
+  // {160, 240}; UpdateSoloHold's, UpdatePreviewHold's 16, ShowSlotNode's
+  // 40 and PlaceStickerNode's 48 inside) under the 128-byte frame; the
+  // edits' ShowSlotNode (40) under their 112-byte frames.
+  Run(h, w,
+      {"TuningScreen::InputStickerOrder", 200, __imp__sub_821FBF18,
+       hooks::TuningPagesInputStickerOrder, 40, {{272, 320}, {416, 496}}, edit});
+  Run(h, w,
+      {"TuningScreen::InputStickerPicker", 300, __imp__sub_821FC270,
+       hooks::TuningPagesInputStickerPicker, 48, {{128, 192}, {208, 240}, {288, 368}}, edit});
+  Run(h, w,
+      {"TuningScreen::InputStickerMove", 200, __imp__sub_821F99A8,
+       hooks::TuningPagesInputStickerMove, 32, {{112, 152}}, edit});
+  Run(h, w,
+      {"TuningScreen::InputStickerRotate", 300, __imp__sub_821F9D30,
+       hooks::TuningPagesInputStickerRotate, 32, {{112, 152}}, edit});
+  Run(h, w,
+      {"TuningScreen::InputStickerScale", 150, __imp__sub_821F9FB8,
+       hooks::TuningPagesInputStickerScale, 32, {{112, 152}}, edit});
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (42)", 60, {42}, 40, {{272, 320}, {416, 496}},
+                      asks));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (43)", 80, {43}, 48,
+                      {{128, 192}, {208, 240}, {288, 368}}, asks));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (44 to 46)", 120, {44, 45, 46}, 32, {{112, 152}},
+                      asks));
 }
 
 void TuningPagesMovie(Context& h) {
