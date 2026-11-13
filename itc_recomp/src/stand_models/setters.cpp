@@ -5,9 +5,11 @@
 
 #include "base/log.h"
 #include "car_scene_draw/ops.h"
+#include "car_specs/car_specs.h"
 #include "debug/frame_state_diff.h"
 #include "guest.h"
 #include "load_poll/load_poll.h"
+#include "native/buffers.h"
 #include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -24,6 +26,9 @@ constexpr uint32_t kWheelsSetRecord = 0x820D8EC0;
 constexpr uint32_t kSetTexture = 0x820D17D8;
 constexpr uint32_t kApplyWheelPaint = 0x820D9C50;
 constexpr uint32_t kApplyPaint = 0x820D9B68;
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kGet82 = 0x820CBC90;      // AeroParts::Get82(out, parts, level)
+constexpr uint32_t kAeroSets = 0x82009A50;   // the aero sets' 24-byte entries
 constexpr uint32_t kDecalScale = 0x82001BE0;
 
 // Flush-to-zero off, as the callees' plain C++ expects at entry.
@@ -276,6 +281,70 @@ uint32_t SetSticker(uint8_t* base, uint32_t holder, uint32_t area, uint32_t slot
   Store64(base, e + 48, size0);
   Store64(base, e + 56, size1);
   return model;
+}
+
+uint64_t SetParts(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t a, uint32_t b,
+                  uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821797A8 GarageStage::SetParts");
+  const uint32_t frame = Frame(base, stack, 144);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, model + 3744, a);
+  Store(base, model + 3752, b);
+  Store(base, model + 3756, c);
+  Store(base, model + 3784, d);
+  Store(base, model + 3764, e);
+  Store(base, model + 3760, f);
+  Store(base, model + 3768, 0);
+  return ApplyRecord(base, call, model, frame, 0x8217980C);
+}
+
+uint64_t SetAeroSet(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_t set,
+                    uint32_t fallback5, uint32_t fallback6, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217DBC0 GarageStage::SetAeroSet");
+  const uint32_t frame = Frame(base, stack, 224);
+  const uint32_t model = StageModel(base, holder);
+  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  const uint32_t id = Load(base, SelectedGarageCar(base, save) + 12);
+  const uint32_t out = frame + 80, copy = frame + 128;
+  uint32_t parts[9];
+  car_specs::GetCarParts(base, id, parts);
+  for (uint32_t i = 0; i < 9; i++) {
+    Store(base, out + 4 * i, parts[i]);
+  }
+  if (!native::Buffers_Memcpy(base, copy, out, 36, 0x8217DC58)) {
+    call(kMemcpy, {copy, out, 36}, frame, 0x8217DC58);
+  }
+  const uint64_t level = set + 1;
+  for (uint32_t i = 0; i < 9; i++) {
+    parts[i] = Load(base, copy + 4 * i);
+  }
+  uint32_t kit = out;
+  if (!car_specs::AeroPart82(base, out, parts, int32_t(level))) {
+    kit = uint32_t(call(kGet82, {out, copy, level}, frame, 0x8217DC6C));
+  }
+  const uint32_t w = Load(base, kit + 24);
+  const uint32_t entry =
+      (uint32_t(Load(base, model + 48) << 1) + uint32_t(set)) * 24 + kAeroSets;
+  if (!native::Buffers_Memcpy(base, out, entry, 24, 0x8217DC9C)) {
+    call(kMemcpy, {out, entry, 24}, frame, 0x8217DC9C);
+  }
+  auto word = [&](uint32_t at) { return Load(base, frame + at); };
+  if (int32_t(word(80)) != -1) {
+    Store(base, model + 3744, word(80));
+  }
+  if (int32_t(word(84)) != -1) {
+    Store(base, model + 3752, word(84));
+  }
+  if (int32_t(word(88)) != -1) {
+    Store(base, model + 3756, word(88));
+  }
+  if (int32_t(word(92)) != -1) {
+    Store(base, model + 3784, word(92));
+  }
+  Store(base, model + 3764, int32_t(word(96)) != -1 ? word(96) : fallback5);
+  Store(base, model + 3760, int32_t(word(100)) != -1 ? word(100) : fallback6);
+  Store(base, model + 3768, (w & 8) != 0 ? uint32_t(level) : 0);
+  return ApplyRecord(base, call, model, frame, 0x8217DD2C);
 }
 
 uint64_t WheelsSetTireTextures(uint8_t* base, const GuestCall& call, uint32_t wheels,

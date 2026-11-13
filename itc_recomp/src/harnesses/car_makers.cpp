@@ -1727,6 +1727,56 @@ void TuningStand(Context& h, Random& r) {
     results.Report();
   }
   {
+    // PreviewParts (never seen in play) and GarageStage::SetAeroSet: the
+    // pick 0 (the parts) or 1 to 3 (an aero set; SetAeroSet's set 0 to 2),
+    // now and then 4 or 5 (the sets' table read past the car's: an entry
+    // further on in the image); +25172 set or not with +36300 0, 1 or
+    // small; +36372 and +36376 0 or 1; the parts words small or -1. The
+    // top 16 (PreviewParts: r31 and lr) or 48 bytes (SetAeroSet: r27 to
+    // r31 and lr's saves); under them the setters' and
+    // SceneModel::ApplyRecord's originals' saves (r26 to r31 and lr), and
+    // ScenePools::GetB's. The generator put back after, so the groups after
+    // it keep their cases.
+    const Random kept = r;
+    for (int which = 0; which < 2; which++) {
+      Results results(which == 0 ? "TuningScreen::PreviewParts (sub_821CCAA8)"
+                                 : "GarageStage::SetAeroSet (sub_8217DBC0)");
+      for (int c = 0; c < 40; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              field(25172, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+              field(36300, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(6));
+              field(36372, r.Below(2));
+              field(36376, r.Below(2));
+              for (const uint32_t at : {36164u, 36252u, 36208u, 36544u, 36368u}) {
+                field(at, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(8));
+              }
+              const uint64_t pick = r.Below(8) == 0 ? 4 + r.Below(2) : r.Below(4);
+              if (which == 0) {
+                t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+                t.r4.u64 = pick;
+              } else {
+                t.r3.u64 = block + kHolder;
+                t.r4.u64 = pick == 0 ? 0 : pick - 1;
+                t.r5.u64 = r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(8);
+                t.r6.u64 = r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(8);
+              }
+            },
+            which == 0 ? __imp__sub_821CCAA8 : __imp__sub_8217DBC0,
+            which == 0 ? hooks::TuningPreviewParts : hooks::StandModelsSetAeroSet,
+            which == 0 ? 16 : 48, floats, fmt::format("case {}", c),
+            which == 0 ? 96 : 224, 56, before, blocks, 0x5000, kGarageBytes,
+            which == 0 ? GetBSaves({96 + 144, 96 + 224}, {{96 + 144, 56}, {96 + 224, 56}})
+                       : GetBSaves({224}));
+      }
+      results.Report();
+    }
+    r = kept;
+  }
+  {
     // The saved values each page puts back: the tables' rows and indexes
     // small (the tire grades' below 8, read unchecked), the choice words as
     // above, the wheels' numbers 0 to 179 or any, the paint's components

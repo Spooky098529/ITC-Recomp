@@ -588,10 +588,20 @@ uint64_t ApplyDecalWord(uint8_t* base, const GuestCall& call, uint64_t r3, uint3
 // made with f1 as FitSelectedCar leaves it).
 uint64_t DecalCommand(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
                       double* f1);
+// sub_821CCAA8 TuningScreen::PreviewParts: r3 = the screen (all 64 bits),
+// `pick` (r4, all 64 bits) 0 the screen's parts set, else an aero set + 1.
+// The wing word w from +36300 (by +25172, its row); pick 0:
+// GarageStage::SetParts(holder, +36164, +36252, +36208, +36544, +36368, w),
+// else SetAeroSet(holder, pick - 1, +36368, w) (stand_models' plain C++);
+// then +10012 = 9 (parts) or 10 (aero) when +36372 is 1 and +36376 is 0.
+// 96-byte frame (r31 and lr's saves not written); the setter's r3. Never
+// seen in play; needs --native_car_specs (SetAeroSet's).
+uint64_t PreviewParts(uint8_t* base, const GuestCall& call, uint64_t r3, uint64_t pick,
+                      uint32_t sp);
 // sub_821E07B0 TuningScreen::PreviewItem: r3 = the screen (all 64 bits).
 // The highlighted item put on the stand by the state, the category and the
-// item bytes (its row): the stand's setters' plain C++, IsItemAvailable's
-// and SetInteriorPair's; SetCaliper, GarageStage::SetChoice, PreviewParts,
+// item bytes (its row): the stand's setters' plain C++, IsItemAvailable's,
+// SetInteriorPair's and PreviewParts'; SetCaliper, GarageStage::SetChoice,
 // RefitAxles, GarageStage::SetAero2, SetDoorKind and SetAccessory (never
 // seen in play) through `call` with the original's return addresses. The
 // choice tables at frame + 80 and + 96, read unchecked. 160-byte frame; r3
@@ -600,8 +610,8 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
 // sub_821E0FB0 TuningScreen::RestoreStand: r3 = the screen (all 64 bits).
 // The current page's saved values put back on the stand by the category and
 // the item (its row): the stand's setters', PreviewWheel's, SetInteriorPair's
-// and GarageStage::SetLightKit's plain C++; SetCaliper, GarageStage::SetChoice,
-// PreviewParts, RefitAxles, SetAero2, SetDoorKind, SetAccessory and
+// GarageStage::SetLightKit's and PreviewParts' plain C++; SetCaliper,
+// GarageStage::SetChoice, RefitAxles, SetAero2, SetDoorKind, SetAccessory and
 // ClearLightKit (never seen in play) through the guest (ClearLightKit with
 // f1 as it is); GarageStage::SetColor (never seen in play) by its plain C++
 // (stand_models', with `stand.calls.poll`; f1 left as its f1). The choice

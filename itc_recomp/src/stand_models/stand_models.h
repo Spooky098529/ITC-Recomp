@@ -130,6 +130,26 @@ uint64_t SetDecalWord(uint8_t* base, const GuestCall& call, uint32_t holder, uin
 uint32_t SetSticker(uint8_t* base, uint32_t holder, uint32_t area, uint32_t slot, uint32_t word,
                     uint32_t flag, uint64_t r8, uint64_t r9, double f1, uint32_t stack);
 
+// sub_821797A8 GarageStage::SetParts: the stage's model's parts record
+// words +3744 = `a`, +3752 = `b`, +3756 = `c`, +3784 = `d`, +3764 = `e`,
+// +3760 = `f`, +3768 = 0, then SceneModel::ApplyRecord (its plain C++,
+// else its adapter through `call`). 144-byte frame; ApplyRecord's r3.
+uint64_t SetParts(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t a, uint32_t b,
+                  uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t stack);
+// sub_8217DBC0 GarageStage::SetAeroSet: `set` (r4, all 64 bits) an aero set,
+// `fallback5` and `fallback6` (r5, r6) the words used where the set's are
+// -1. Its 224-byte frame below `stack`: Params::GetCarParts of
+// SaveData::Of(0)'s selected garage car into frame + 80, memcpy'd to frame
+// + 128; AeroParts::Get82(frame + 80, frame + 128, set + 1) (its plain C++,
+// else its original through `call`), its word +24 w; the 24-byte entry
+// 0x82009A50 + 24 x (2 x [model +48] + set) memcpy'd to frame + 80 (memcpy
+// natively where Buffers_Memcpy takes it); its first four words into the
+// model's +3744, +3752, +3756, +3784 unless -1, the fifth to +3764 and the
+// sixth to +3760 (-1: the fallbacks); +3768 = set + 1 when w & 8, else 0;
+// then SceneModel::ApplyRecord (its r3). Needs --native_car_specs.
+uint64_t SetAeroSet(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_t set,
+                    uint32_t fallback5, uint32_t fallback6, uint32_t stack);
+
 // --- The tire grades (src/stand_models/setters.cpp) ---
 
 // sub_820D8F18 Wheels::SetTireTextures: PartModel::SetTexture (through
@@ -198,6 +218,11 @@ uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, load_poll::Calls
                           uint32_t screen, uint32_t stack);
 
 // --- The wheel fitting (src/stand_models/wheels.cpp) ---
+
+// The selected garage car of a save data `save`: its list at +6120 walked
+// [+0x19920] steps from the head halfword +204; the car (its fields, the
+// list + 1,968 x slot + 212).
+uint32_t SelectedGarageCar(uint8_t* base, uint32_t save);
 
 // sub_82178B98 GarageStage::FitAxles: r3 = the holder, r4 = a car object.
 // Its 1,968-byte frame below `stack`: a car data at frame + 80

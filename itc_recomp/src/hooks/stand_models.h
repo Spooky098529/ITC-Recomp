@@ -107,6 +107,14 @@ void StandModelsSetColor5(PPCContext& ctx, uint8_t* base);
 // holder, r4 a word; SceneModel::ReloadDecals' plain C++); lr put back.
 void StandModelsSetSticker(PPCContext& ctx, uint8_t* base);
 void StandModelsSetDecalWord(PPCContext& ctx, uint8_t* base);
+// The parts the tuning screen's PreviewParts sets, without adapters (only
+// its plain C++ reaches them; the harness's): GarageStage::SetParts
+// sub_821797A8 (r3 the holder, r4 to r9 six words; with
+// --native_vehicle_accessors and --native_scene_models, else the original)
+// and SetAeroSet sub_8217DBC0 (r3 the holder, r4 an aero set, r5 and r6
+// the fallbacks; also with --native_car_specs); lr put back.
+void StandModelsSetParts(PPCContext& ctx, uint8_t* base);
+void StandModelsSetAeroSet(PPCContext& ctx, uint8_t* base);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 

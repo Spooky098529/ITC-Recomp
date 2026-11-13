@@ -77,7 +77,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_8217DAC0, PickCameraPreset sub_821D99A0 (its piece sub_821D9B60 merged), "
               "UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00, ApplyDecals "
               "sub_822042D8, DecalCommand sub_822019D0, PreviewItem sub_821E07B0 and RestoreStand "
-              "sub_821E0FB0 (their callees never seen in play through the guest), UpdateStand "
+              "sub_821E0FB0 (their callees never seen in play through the guest, but PreviewParts "
+              "sub_821CCAA8 and GarageStage::SetColor by their plain C++, no adapters), UpdateStand "
               "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag; GarageStage::SetColor "
               "sub_8217C6C8, ApplyAreaDecals sub_821F7B90 and ApplyDecalWord sub_821FE4E0, never "
               "seen in play, by their plain C++, no adapters); SetCarStats sub_821DF788 with the "
@@ -615,6 +616,14 @@ void TuningApplyDecalWord(PPCContext& ctx, uint8_t* base) {
   const uint32_t sp = ctx.r1.u32;
   WithStand(ctx, base,
             [&](const ts::StandCalls& stand) { return ts::ApplyDecalWord(base, stand.call, r3, sp); });
+}
+
+void TuningPreviewParts(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::PreviewParts(base, stand.call, r3, r4, sp);
+  });
 }
 
 void TuningDecalCommand(PPCContext& ctx, uint8_t* base) {

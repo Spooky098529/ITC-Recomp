@@ -622,7 +622,6 @@ namespace {
 
 constexpr uint32_t kSetCaliper = 0x821DA330;     // TuningScreen::SetCaliper
 constexpr uint32_t kSetChoice = 0x82179310;      // GarageStage::SetChoice
-constexpr uint32_t kPreviewParts = 0x821CCAA8;   // TuningScreen::PreviewParts
 constexpr uint32_t kRefitAxles = 0x821DF9D0;     // TuningScreen::RefitAxles
 constexpr uint32_t kSetAero2 = 0x821794A8;       // GarageStage::SetAero2
 constexpr uint32_t kSetDoorKind = 0x821794F8;    // GarageStage::SetDoorKind
@@ -647,6 +646,33 @@ uint64_t ApplyChoice(uint8_t* base, const GuestCall& call, uint32_t frame, uint3
 }
 
 }  // namespace
+
+uint64_t PreviewParts(uint8_t* base, const GuestCall& call, uint64_t r3, uint64_t pick,
+                      uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821CCAA8 TuningScreen::PreviewParts");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t s = uint32_t(r3);
+  auto at = [&](uint32_t offset) { return Load(base, s + offset); };
+  // The wing word: +36300, or with +25172 set 0 stays 0, 1 becomes 13 and
+  // any other value n becomes n - 1.
+  uint32_t w = at(36300);
+  if (at(25172) != 0) {
+    w = w == 0 ? 0 : w == 1 ? 13 : w - 1;
+  }
+  uint32_t kind;
+  if (int32_t(pick) == 0) {
+    r3 = stand_models::SetParts(base, call, Holder(base), at(36164), at(36252), at(36208),
+                                at(36544), at(36368), w, frame);
+    kind = 9;
+  } else {
+    r3 = stand_models::SetAeroSet(base, call, Holder(base), pick - 1, at(36368), w, frame);
+    kind = 10;
+  }
+  if (int32_t(at(36372)) == 1 && at(36376) == 0) {
+    Store(base, s + 10012, kind);
+  }
+  return r3;
+}
 
 uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821E07B0 TuningScreen::PreviewItem");
@@ -758,7 +784,7 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
       const uint32_t p = u8(kItem);
       uint64_t j = u8(kType);
       if (p == 9) {
-        guest(kPreviewParts, {screen, j}, 0x821E0C2C);
+        r3 = PreviewParts(base, call, screen, j, frame);
         guest(kRefitAxles, {screen}, 0x821E0C34);
         return r3;
       }
@@ -989,7 +1015,7 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
         refit(0x821E152C);
         break;
       case 9:
-        guest(kPreviewParts, {screen, at(36588)}, 0x821E1524);
+        r3 = PreviewParts(base, call, screen, at(36588), frame);
         refit(0x821E152C);
         break;
       default: break;

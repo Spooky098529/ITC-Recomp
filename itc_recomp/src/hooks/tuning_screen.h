@@ -162,6 +162,9 @@ void TuningApplyDecals(PPCContext& ctx, uint8_t* base);
 // harness's).
 void TuningApplyAreaDecals(PPCContext& ctx, uint8_t* base);
 void TuningApplyDecalWord(PPCContext& ctx, uint8_t* base);
+// PreviewParts sub_821CCAA8 (r3 the screen, r4 a pick), without an adapter
+// (only PreviewItem's and RestoreStand's plain C++ call it; the harness's).
+void TuningPreviewParts(PPCContext& ctx, uint8_t* base);
 // DecalCommand sub_822019D0 (r3 the screen; f1 as its last text call leaves
 // it), with TuningStandCalleesNative.
 void TuningDecalCommand(PPCContext& ctx, uint8_t* base);

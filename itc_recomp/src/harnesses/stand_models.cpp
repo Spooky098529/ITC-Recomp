@@ -354,6 +354,13 @@ void Reapplies(Context& h, uint32_t b) {
        16, [](PPCContext& t, Random& r) { t.r4.u64 = uint32_t(r.Next()); }},
       {"GarageStage::ReloadDecals (sub_82178EC0)", __imp__sub_82178EC0,
        hooks::StandModelsReloadDecals, 96, 16, [](PPCContext&, Random&) {}},
+      {"GarageStage::SetParts (sub_821797A8)", __imp__sub_821797A8, hooks::StandModelsSetParts,
+       144, 56,
+       [](PPCContext& t, Random& r) {
+         for (PPCRegister* reg : {&t.r4, &t.r5, &t.r6, &t.r7, &t.r8, &t.r9}) {
+           reg->u64 = r.Below(3) == 0 ? r.Next() : uint64_t(int64_t(r.Below(16)) - 1);
+         }
+       }},
   };
   for (const Setter& s : setters) {
     Results results(s.name);

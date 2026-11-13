@@ -50,7 +50,9 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "and RestoreStand call them; SceneModel::ApplyPaint's and ApplyWheelPaint's plain "
               "C++ with the load poll's flags); the decals the tuning screen's never-seen paths set, "
               "GarageStage::SetSticker sub_8217B3D8 and SetDecalWord sub_821793D0 (no adapters: "
-              "its native ApplyAreaDecals and ApplyDecalWord call them) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
+              "its native ApplyAreaDecals and ApplyDecalWord call them); the parts, GarageStage::SetParts "
+              "sub_821797A8 and SetAeroSet sub_8217DBC0 (no adapters: the tuning screen's native "
+              "PreviewParts calls them; SetAeroSet with --native_car_specs) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
 
 namespace hooks {
 
@@ -402,6 +404,27 @@ void StandModelsSetDecalWord(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void StandModelsSetParts(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r6 = ctx.r6.u32, r7 = ctx.r7.u32, r8 = ctx.r8.u32, r9 = ctx.r9.u32;
+  Reapplying(ctx, base, __imp__sub_821797A8, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t r5, uint32_t stack) {
+    return sm::SetParts(base, call, holder, r4, r5, r6, r7, r8, r9, stack);
+  });
+}
+
+void StandModelsSetAeroSet(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_car_specs)) {
+    __imp__sub_8217DBC0(ctx, base);
+    return;
+  }
+  const uint64_t r4 = ctx.r4.u64;
+  const uint32_t r6 = ctx.r6.u32;
+  Reapplying(ctx, base, __imp__sub_8217DBC0, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t, uint32_t r5, uint32_t stack) {
+    return sm::SetAeroSet(base, call, holder, r4, r5, r6, stack);
+  });
+}
+
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
@@ -460,6 +483,9 @@ ITC_STAND_MODELS(821DFA78, StandModelsPreviewWheel)
 // none: only the tuning screen's ApplyAreaDecals and ApplyDecalWord reach
 // them, and their plain C++ calls theirs (their register steps above are
 // the harness's).
+// GarageStage::SetParts sub_821797A8 and SetAeroSet sub_8217DBC0 have none:
+// only the tuning screen's PreviewParts reaches them, and its plain C++
+// calls theirs (their register steps above are the harness's).
 // SceneParts::LightValue sub_820DF1A0 has none: only SetLightsOn calls it,
 // and its plain C++ calls LightValue's (its register step above is the
 // harness's).
