@@ -18,6 +18,9 @@
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
+#include <bit>
+#include <optional>
+
 namespace tuning_screen {
 
 namespace {
@@ -499,6 +502,61 @@ uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint3
   return r3;
 }
 
+namespace {
+
+// Movie 13's items lit (HighlightItem, HighlightSelected): nodes 19 to 21
+// (+30724 0) or 22 to 24 (1; other pages nothing) of the live scene, +68 =
+// 1.0 ([0x82000A30]) for the item (`item`, else +30732 read again each pass)
+// and 0.0 ([0x82000A34]) for the others; with `all` not 0, +9708 = 1 and all
+// three 1.0. The floats stored as the original's lfs and stfs leave them.
+// 144-byte frame; the last FindNode's r3, else the movie's entry.
+uint64_t LightItems(uint8_t* base, uint64_t r3_in, uint64_t all, std::optional<uint64_t> item,
+                    uint32_t sp) {
+  const uint32_t screen = uint32_t(r3_in);
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t entry = MovieEntry(base, frame, 13);
+  const int32_t page = int32_t(Load(base, screen + 30724));
+  const uint32_t movie = Load(base, entry);
+  auto single = [&](uint32_t address) {
+    const float f = std::bit_cast<float>(Load(base, address));
+    return std::bit_cast<uint32_t>(float(double(f)));
+  };
+  if (int32_t(uint32_t(all)) != 0) {
+    Store(base, screen + 9708, 1);
+  }
+  if (page != 0 && page != 1) {
+    return entry;
+  }
+  const uint32_t first = page == 0 ? 19 : 22;
+  const uint32_t lit = single(0x82000A30);
+  const uint32_t unlit = single(0x82000A34);
+  uint64_t r3 = entry;
+  for (int32_t k = 0; k < 3; k++) {
+    bool on = true;
+    if (int32_t(uint32_t(all)) == 0) {
+      const int32_t selected =
+          item ? int32_t(uint32_t(*item)) : int32_t(Load(base, screen + 30732));
+      on = k == selected;
+    }
+    const uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, first + uint32_t(k));
+    Store(base, node + 68, on ? lit : unlit);
+    r3 = node;
+  }
+  return r3;
+}
+
+}  // namespace
+
+uint64_t HighlightItem(uint8_t* base, uint64_t r3, uint64_t all, uint64_t item, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82203400 TuningScreen::HighlightItem");
+  return LightItems(base, r3, all, item, sp);
+}
+
+uint64_t HighlightSelected(uint8_t* base, uint64_t r3, uint64_t all, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82203570 TuningScreen::HighlightSelected");
+  return LightItems(base, r3, all, std::nullopt, sp);
+}
+
 uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint32_t sp,
                      bool native_slots) {
   ITC_NATIVE_RUNNING("sub_822036E8 TuningScreen::UpdateItems");
@@ -512,7 +570,7 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
   auto asks = [&] { return int32_t(Load(base, mappers + 4)) != 1; };
   auto mapper = [&] { return Load(base, mappers); };
   if (state == 27) {
-    // HighlightItem (sub_82203400, recompiled: not seen in play) on +30756,
+    // HighlightItem (sub_82203400, its plain C++) on +30756,
     // r4 0 with 164 held, 1 with slot 11's 164.
     std::optional<uint64_t> all;
     if (asks()) {
@@ -531,12 +589,12 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
       }
       all = 1;
     }
-    return call(0x82203400, {r3_in, *all, Load(base, screen + 30756)}, frame, 0x82203A28);
+    return HighlightItem(base, r3_in, *all, Load(base, screen + 30756), frame);
   }
   if (state != 28) {
     return r3;
   }
-  // HighlightSelected (sub_82203570, recompiled: not seen in play), r4 0
+  // HighlightSelected (sub_82203570, its plain C++), r4 0
   // with 164 held, 1 with slot 11's 164.
   std::optional<uint64_t> all;
   if (asks()) {
@@ -552,7 +610,7 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
     }
   }
   if (all) {
-    r3 = call(0x82203570, {r3_in, *all}, frame, 0x822037AC);
+    r3 = HighlightSelected(base, r3_in, *all, frame);
   }
   if (asks()) {
     r3 = HeldSlot(base, call, mapper(), 163, frame, 0x822037D0, native_slots);

@@ -308,6 +308,14 @@ uint64_t ShowOptions(uint8_t* base, const GuestCall& call, uint32_t screen, uint
 // with +9724. 160-byte frame; the last LoopNamed's r3, else the entry.
 uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
+// sub_82203400 TuningScreen::HighlightItem and sub_82203570
+// HighlightSelected: movie 13's items lit, nodes 19 to 21 (+30724 0) or 22
+// to 24 (1) +68 = 1.0 for the item (r5 `item`, or +30732 read again each
+// pass) and 0.0 for the others; with `all` not 0, +9708 = 1 and all three
+// 1.0. 144-byte frame (saves not written); the last FindNode's r3, else the
+// movie's entry.
+uint64_t HighlightItem(uint8_t* base, uint64_t r3, uint64_t all, uint64_t item, uint32_t sp);
+uint64_t HighlightSelected(uint8_t* base, uint64_t r3, uint64_t all, uint32_t sp);
 // sub_822036E8 TuningScreen::UpdateItems: r3 = the screen (all 64 bits).
 // Movie 13's items by the state (its row): 27 TuningScreen::HighlightItem
 // and 28 HighlightSelected (both recompiled, through `call`) by the player's

@@ -1896,6 +1896,28 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputLayerEdit", 400, __imp__sub_82205110, hooks::TuningPagesInputLayerEdit,
        24, {{112, 160}}, LayerEditFields});
+  // The items' highlights (tuning_screen's plain C++): the decal edits'
+  // fields (the page 0 or 1 mostly, now and then 2 or -1; the layer 0 to
+  // 2), r4 0 or 1 (now and then any word), HighlightItem's r5 -1 to 3 (now
+  // and then any word). Their saves: r28 to r31, lr, f30 and f31 (56
+  // bytes), r29 to r31, lr, f30 and f31 (48).
+  Run(h, w,
+      {"TuningScreen::HighlightItem", 120, __imp__sub_82203400, hooks::TuningPagesHighlightItem,
+       56, {}, [](PPCContext& t, Random& r, const World& w) {
+         DecalEditFields(t, r, w);
+         t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
+         t.r5.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(r.Below(5)) - 1);
+       }});
+  Run(h, w,
+      {"TuningScreen::HighlightSelected", 120, __imp__sub_82203570,
+       hooks::TuningPagesHighlightSelected, 48, {},
+       [](PPCContext& t, Random& r, const World& w) {
+         DecalEditFields(t, r, w);
+         t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
+         if (r.Below(6) == 0) {
+           guest::StoreU32(w.base, w.screen() + 30732, uint32_t(r.Next()));
+         }
+       }});
   // The vinyl page's layers: MoveVinylLayers' __savegprlr_29 (32 bytes);
   // InputVinylLayers' __savegprlr_22 (88) with its callees' saves its
   // native version doesn't write: MoveVinylLayers', RestoreStickerTexture's

@@ -189,5 +189,10 @@ void TuningPagesMoveVinylLayers(PPCContext& ctx, uint8_t* base);
 // adapter: the harness's step).
 void TuningPagesInputVinylImages(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base);
+// TuningScreen::HighlightItem sub_82203400 and HighlightSelected
+// sub_82203570 (tuning_screen's plain C++; no adapters: the harness's
+// steps).
+void TuningPagesHighlightItem(PPCContext& ctx, uint8_t* base);
+void TuningPagesHighlightSelected(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

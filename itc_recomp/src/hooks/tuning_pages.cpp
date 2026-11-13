@@ -718,6 +718,15 @@ void TuningPagesInputVinylImages(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesHighlightItem(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 =
+      tuning_screen::HighlightItem(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
+}
+
+void TuningPagesHighlightSelected(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tuning_screen::HighlightSelected(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32);
+}
+
 void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;

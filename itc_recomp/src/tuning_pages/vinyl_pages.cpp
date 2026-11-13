@@ -477,7 +477,6 @@ namespace {
 
 namespace fs = strings_and_font::steps;
 
-constexpr uint32_t kHighlightSelected = 0x82203570;  // TuningScreen::HighlightSelected(screen, on)
 constexpr uint32_t kLimits = 0x8200C840;  // the decal's position limits, 16 bytes a page
 
 // The decal edits: state 29 (position), 30 (angle), 31 (scale).
@@ -701,9 +700,9 @@ uint64_t InputDecal(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
                                                      : kScaleInput;
   // 164 held: the selected decal highlighted (0), released: back (1).
   if (asked(32, 164, lr.held)) {
-    call(kHighlightSelected, {screen, 0}, frame, lr.highlight);
+    tuning_screen::HighlightSelected(base, screen, 0, frame);
   } else if (asked(44, 164, lr.released)) {
-    call(kHighlightSelected, {screen, 1}, frame, lr.highlight);
+    tuning_screen::HighlightSelected(base, screen, 1, frame);
   }
   // The moves: the position's up, down, left, right; the angle's and
   // scale's left, right.
@@ -907,9 +906,9 @@ uint64_t InputLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uin
   auto cursor = [&] { return int32_t(Load(base, s + 30748)); };
   auto sound = [&](uint32_t cue, uint32_t lr) { call(kMenuSoundPlay, {cue}, frame, lr); };
   if (asked(32, 164, 0x82205164)) {
-    call(kHighlightSelected, {screen, 0}, frame, 0x822051AC);
+    tuning_screen::HighlightSelected(base, screen, 0, frame);
   } else if (asked(44, 164, 0x82205198)) {
-    call(kHighlightSelected, {screen, 1}, frame, 0x822051AC);
+    tuning_screen::HighlightSelected(base, screen, 1, frame);
   }
   if (asked(48, 153, 0x822051D0) || asked(48, 167, 0x822051FC)) {
     // Up: from the buttons to the free look (4); else the row before,
