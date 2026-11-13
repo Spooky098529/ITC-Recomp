@@ -278,10 +278,22 @@ file's history. What's left to see in a drive, from every run:
   a harness hang fixed before the commit (the state history laid with
   a 24); harnesses 0 differing; race 30 s at 40, 0 errors; no
   subagents). Left: nothing in the vinyl editor; `HandleInput`
-  `sub_821E6950` and `Command21` `sub_822087C8` now ready. Validation
-  agent running.
+  `sub_821E6950` and `Command21` `sub_822087C8` now ready. Validated:
+  `itc_5173` (race 52 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups; harnesses ~126 s), 8 of 8 harness
+  lines, no prints added; none in the race or the replay `itc_5174`
+  (ok): 8 to drive. Recorded; subsystem 7 done.
+- Next: `TuningScreen::HandleInput` `sub_821E6950` (ready, seen in
+  play, 424 lines; 23 never-seen callees) and `Command21`
+  `sub_822087C8` (ready), a lead without mapping (not counted).
+  Migration agent running.
 
 ## Done
+
+- The vinyl editor (with the stand screens' lead's state 34): 29 new
+  rows in `tuning-pages.md` and 2 in `tuning-screen.md` ours, with the
+  sticker helpers, under `--native_tuning_pages`, e989acb8..82a29244;
+  validated.
 
 - The type 5 mode (the parking area's, with its dialog):
   `type5-mode.md` 33 of 33 ours, `--native_type5_mode`,
@@ -386,5 +398,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the vinyl editor's map: ours 5899, work left 775 (wrapped 52,
   known 381, unknown 342).
+
+- After the vinyl editor: ours 5935, work left 758 (wrapped 52, known
+  366, unknown 340).
 
 ## Stopped

@@ -2866,6 +2866,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The options screen's load and save pages (category 5, page 9, the load; category 6, page 10, the save) | `options-load-save.md` | 16 of 16 (2 never seen, ported) | `--native_options_load_save` |
 | 2026-11-13 | `Type6Screen0`: the type 6 mode's first screen (a five-item menu over the type 6 car: pages, steps, helpers), with type 7's unported steps and `PowerGraph::SetFromCar` | `type6-type7-modes.md` | 13 of 13 new rows (with 6 of type 7's and `CarList::DrawCarPowerGraph`; 10 adapters removed) | (`--native_type67_modes`, `--native_power_graph`) |
 | 2026-11-13 | The type 5 mode: the parking area's front-end mode (its three machines: the car settings, the parking area, and its own dialog `Type5Dialog`) | `type5-mode.md` | 33 of 33 (16 never seen, ported) | `--native_type5_mode` |
+| 2026-11-13 | The tuning screen's vinyl editor (its pages for states 23 to 31 and 34, the decal images' list window and loads, the sticker helpers it calls) | `tuning-pages.md` | 29 new rows ours (with `HighlightItem`, `HighlightSelected` in `tuning-screen.md`; 7 adapters removed) | (`--native_tuning_pages`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5362,3 +5363,23 @@ functions (916 pairs): overridden 109, Native 36, Dropped 27, never
 called 69, live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 5,899, work left 775 (Wrapped 52, with a row
 367, no row yet 356), from 792.
+
+**2026-11-13, the vinyl editor (branch `b7-loop-11-11-26`, the
+forty-fifth run, its seventh subsystem):** the stand screens' lead
+turned out mostly mapped already (6 of 8); its 2 new functions, the
+vinyl editor's state 34 free look, took the vinyl editor's lead with
+them: 29 new rows in `tuning-pages.md` (`src/tuning_pages/loads.cpp`,
+`vinyl_pages.cpp`): the editor's pages for states 23 to 31 and 34
+with their movie sides, the decal images' list window, loads and
+archive callback, and the sticker editor's helpers the pages call,
+made native in three migrations (the never-seen pages ported with
+their callers); `HighlightItem` and `HighlightSelected`
+(`tuning-screen.md`) with them. Harness faults fixed on the way (a
+recording sound manager and mapper block in the tuning stand world;
+the state history laid). `TuningScreen::HandleInput` and `Command21`
+are now ready. The replay doesn't open the vinyl editor: its functions
+are on the drive list. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 27, never called 69, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,935, work left 758 (Wrapped 52, with a row 366, no row yet 340), from
+775.

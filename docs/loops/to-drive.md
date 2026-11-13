@@ -19,9 +19,17 @@ here loses its heading.
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replays (`itc_5150`, `itc_5151`; part
-two `itc_5166`, `itc_5167`; all ok; the tuning screen's vinyl editor,
+two `itc_5166`, `itc_5167`; part three `itc_5173`, `itc_5174`; all ok; the tuning screen's vinyl editor,
 `tuning-pages.md` and `tuning-screen.md`):
 
+- `sub_8220A1C8` TuningScreen::InputLayerOrder
+- `sub_821FE3C8` TuningScreen::EndLayerOrder
+- `sub_82207F38` TuningScreen::SwapOrderTextures
+- `sub_82203A30` TuningScreen::ShowOrderNodes
+- `sub_82201DB8` TuningScreen::MoveLayerOrder
+- `sub_821FD518` TuningScreen::SwapLayerRecords
+- `sub_821FD5C0` TuningScreen::SetGroupImage
+- `sub_821FD658` TuningScreen::SetImageGroup
 - `sub_82208CE0` TuningScreen::InputVinylLayers
 - `sub_821FFB20` TuningScreen::MoveVinylLayers
 - `sub_82202530` TuningScreen::MoveVinylImages
