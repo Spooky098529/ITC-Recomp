@@ -558,6 +558,11 @@ Calls so far for decisions the loop meets often:
   its entry. Asked to minimize the code left recompiled (the user's
   call, 2026-11-12, replacing the same day's "Live calls stay
   recompiled").
+- Achievements: the game's achievement write keeps calling
+  `XUserWriteAchievements` through the guest (not skipped), so the
+  SDK goes on recording unlocks in its `achievements/<title id>.toml`;
+  the code around it is made native (`Achievements::Write`
+  `sub_82290A30`, 2026-11-13).
 - Register leftovers a varargs callee stores (`UiMovie::SetText`
   `sub_8211C1F8` storing r7-r10 into its caller's frame, set or not by
   the call site): native callers pass 0 for the arguments they don't

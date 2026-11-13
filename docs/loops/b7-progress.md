@@ -322,7 +322,13 @@ file's history. What's left to see in a drive, from every run:
   (`sub_82290788` with `sub_82290698`, seen in play, ready; its writer
   `sub_82290A30`); its two lead lines (the same functions) deleted
   from `leads.md`. An Xbox feature: its Xbox calls get plugged-in data
-  by the user's call of 2026-11-12. Mapping agent running.
+  by the user's call of 2026-11-12. Mapped `achievements.md`
+  (d06dc44a: 5 rows, 2 in play: `Achievements::Check`, `AllBeaten`,
+  `BeatsCourseTime`, `Time::Less`, `Write`; 1 ready group; no leads; no
+  subagents); map checked (0 errors). Its note: skipping
+  `XUserWriteAchievements` would stop the SDK's achievements file. The
+  user's call (2026-11-13, asked): keep the SDK call (through the
+  guest); added to "Precedent first". Migration agent running.
 
 ## Done
 
@@ -452,5 +458,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the power graph screen: ours 5963, work left 741 (wrapped 52,
   known 365, unknown 324).
+
+- After the achievements' map: ours 5963, work left 741 (wrapped 52,
+  known 367, unknown 322).
 
 ## Stopped
