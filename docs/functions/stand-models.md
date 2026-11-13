@@ -85,6 +85,24 @@ its caller's parameter area (the caller's r1 + 64 to + 79) and reads its
 24-byte table entry on its 224-byte frame. Nothing here needs a call the
 user hasn't made.
 
+Migrated 2026-11-13 (B7 loop, the forty-sixth run): the nine setters
+above, with `GarageStage::SetParts`, and their callers in
+`tuning-screen.md` (`GarageStage::SetColor`, `TuningScreen::ApplyAreaDecals`,
+`ApplyDecalWord`, `PreviewParts`), all without adapters: only the tuning
+screen's native `UpdateStand`, `PreviewItem` and `RestoreStand` reach them.
+Learned on the way: `SetSticker`'s home slots are its caller's r1 + 64 and
++ 72 (not + 56); neither `SceneModel::ApplyPaint` nor `ApplyWheelPaint`
+writes f1 (every callee in `generated/` checked), so `RestoreStand` keeps
+the hue it passed as f1 after `SetColor`; `ApplyAreaDecals` copies a
+sticker's scale with lfs and stfs, which the translated code keeps as its
+bits (a signaling NaN too), so the native copy moves the word. Then 17
+adapters went (`SetInteriorClass` to `PreviewWheel`, their rows): every
+caller seen in play calls their plain C++; `MakeModel`'s stays (the type 6
+and 7 modes' screen 0 calls it through the guest). The harnesses whose
+recompiled callers now run those originals leave their register saves and
+`ScenePools::GetB`'s out (`car_makers`, `tuning_refresh`,
+`tuning_machine`).
+
 Ready (by `b7_groups.py`, 2026-11-06): `GarageStage::MakeModel`;
 `TuningScreen::StepSecondWheels` (with `GarageStage::SecondWheelsPending`,
 `AddSecondWheels`, `ApplyWheelPaint` and the shared `sub_820D9E00`);
