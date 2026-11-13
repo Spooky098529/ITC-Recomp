@@ -186,7 +186,12 @@ file's history. What's left to see in a drive, from every run:
   category 6, page 10, the save; 6 ready groups; one lead added (the
   controller pages' callees), the in-race screens' lead extended with
   `8221BE90` on (47 never seen); no subagents); map checked (0 errors,
-  file listed, 6 ready groups). Migration agent running.
+  file listed, 6 ready groups). Migration d2d04519..2111429c (16 of 16
+  ours, `--native_options_load_save`, the two never-seen ported; the
+  `SetDialog`s' adapters removed; harness cases seeded per case
+  (`CaseRandom`) after shifted streams left accept paths unreached;
+  harnesses 0 differing, `options_screen`'s too; race 35 s at 40, 0
+  errors; no subagents). Left: none. Validation agent running.
 
 ## Done
 

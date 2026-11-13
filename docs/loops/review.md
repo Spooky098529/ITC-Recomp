@@ -21,6 +21,13 @@ When the user has reviewed a run's section, its heading gets
   not renamed, the new file's intro says so. The rest of the save
   screens' lead (`8221BE90` on, 47 never seen, kind 6's screen after
   the race) moved into the in-race screens' lead.
+- Its migration (d2d04519..2111429c, `--native_options_load_save`): 16
+  of 16 ours; the plain C++ named `LoadPage::` and `SavePage::`
+  correctly; the harness seeds each case's generator from its own stack
+  words (`CaseRandom`) and makes half the dialog answers accept, after
+  shifted random streams left kinds 0, 1 and 4's accept paths
+  unreached; `options_screen`'s harness now also saves `0x826BDC90` and
+  `0x828161F0`.
 - `Scenery::Draw` (7bf375c1..bd6bfc88, no mapping): native from the
   pass table at 0x82603060 inside its `ITC_FRAME_STATE_WRAP`, calling
   `TextureAnimations::Advance` and `Minimap::Draw` through their
