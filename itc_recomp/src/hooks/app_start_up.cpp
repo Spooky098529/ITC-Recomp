@@ -185,7 +185,11 @@ uint32_t VirtualCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t o
   ctx.r3.u64 = object;
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
   ctx.lr = return_address;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  // (The render manager's slots 8 and 7 by their plain C++ where they're the
+  // game's, hooks::DirectSlotCall.)
+  if (!hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
+    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  }
   return ctx.r3.u32;
 }
 

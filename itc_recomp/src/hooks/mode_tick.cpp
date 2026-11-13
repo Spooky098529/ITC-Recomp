@@ -9,6 +9,7 @@
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
 #include "hooks/c_runtime.h"
+#include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/mode_tick.h"
 #include "mode_tick/mode_tick.h"
@@ -118,9 +119,14 @@ namespace {
 constexpr uint32_t kScene = 0x826BABA0;
 
 // A call through slot `slot` of r3's vtable, returning to `return_address`.
+// (The render manager's slot 8 by its plain C++ where it's the game's,
+// hooks::DirectSlotCall.)
 void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
   ctx.lr = return_address;
-  REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot));
+  const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
+  if (!hooks::DirectSlotCall(ctx, base, function)) {
+    REX_CALL_INDIRECT_FUNC(function);
+  }
 }
 
 // A chunk handed to the render queue `queue` (its slot 4, sub_8258EDC8 in

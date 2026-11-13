@@ -14,6 +14,7 @@
 #include "native/buffers.h"
 #include "hooks/app_start_up.h"
 #include "hooks/archive.h"
+#include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
@@ -330,11 +331,14 @@ extern "C" REX_FUNC(sub_8211AD00) {
   ui_movies::ClearScreenFlag(base);
   const uint64_t lr = ctx.lr;
   uint32_t list = 0, renderer = 0;
-  // A call through slot `slot` of r3's vtable.
+  // A call through slot `slot` of r3's vtable (the render manager's slot 8
+  // by its plain C++ where it's the game's, hooks::DirectSlotCall).
   auto call = [&](uint32_t slot, uint32_t return_address) {
     ctx.lr = return_address;
-    REX_CALL_INDIRECT_FUNC(
-        guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot));
+    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
+    if (!hooks::DirectSlotCall(ctx, base, function)) {
+      REX_CALL_INDIRECT_FUNC(function);
+    }
   };
   guest_call::InFrame(ctx, base, 96, 0x8211AD34, [&](uint32_t) {
     ctx.r3.u64 = guest::LoadU32(base, kScene);

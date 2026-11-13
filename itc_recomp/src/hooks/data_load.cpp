@@ -8,6 +8,7 @@
 #include "hooks/archive.h"
 #include "hooks/c_runtime.h"
 #include "hooks/data_load.h"
+#include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "ui_movies/game.h"
@@ -126,9 +127,14 @@ bool BootNative() {
 
 // A call through slot `slot` of r3's vtable, with the original's return
 // address.
+// (The render manager's slot 8 by its plain C++ where it's the game's,
+// hooks::DirectSlotCall.)
 void SlotCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
   ctx.lr = return_address;
+  if (hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
+    return;
+  }
   REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
 }
 
