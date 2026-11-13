@@ -103,7 +103,10 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_82202928 with LeaveVinylView sub_82201B40 (no adapter: only InputVinylView "
               "calls it; the mappers' slots 8, 10 and 12 by their plain C++ with "
               "--native_action_mappers; MenuSound::Play, the UI movie calls and GarageStage's "
-              "Command, CameraCommand and FitSelectedCar through their overrides)) "
+              "Command, CameraCommand and FitSelectedCar through their overrides); state 23's "
+              "page InputVinylPages sub_82204B70 with SetLastImage sub_821FE498 and its movie "
+              "side MoveVinylMenu sub_821FF3A0 (no adapters: only InputVinylPages calls them; "
+              "FreeKept, StoreVinyls, FadeOut and memcpy by their plain C++)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -580,6 +583,28 @@ void TuningPagesLeaveVinylView(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesSetLastImage(PPCContext& ctx, uint8_t* base) {
+  tp::SetLastImage(base, ctx.r3.u32);
+}
+
+void TuningPagesMoveVinylMenu(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveVinylMenu(base, call, screen, sp, native_slots);
+  });
+}
+
+void TuningPagesInputVinylPages(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputVinylPages(base, call, screen, sp, flags);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -627,10 +652,15 @@ ITC_TUNING_PAGES(821FEAF0, TuningPagesLoadWindow)
 ITC_TUNING_PAGES(821FED30, TuningPagesScrollImages)
 ITC_TUNING_PAGES(821FE740, TuningPagesFreeKept)
 ITC_TUNING_PAGES(82202928, TuningPagesInputVinylView)
+ITC_TUNING_PAGES(82204B70, TuningPagesInputVinylPages)
 
 // No adapter (B7 loop, 2026-11-13: its only caller, InputVinylView, is native
 // and calls its plain C++; the register step above is the harness's):
 // LeaveVinylView sub_82201B40.
+
+// No adapters (B7 loop, 2026-11-13: their only caller, InputVinylPages, is
+// native and calls their plain C++; the register steps above are the
+// harness's): SetLastImage sub_821FE498, MoveVinylMenu sub_821FF3A0.
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above

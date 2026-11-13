@@ -525,4 +525,25 @@ uint64_t LeaveVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uin
 uint64_t InputVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots);
 
+// sub_821FE498 TuningScreen::SetLastImage: +30796 the image list's last
+// index: 4 or 193 on the vinyls' pages 0 and 1 (other pages nothing), else
+// 198. Leaf.
+void SetLastImage(uint8_t* base, uint32_t screen);
+// sub_821FF3A0 TuningScreen::MoveVinylMenu: state 23's movie side (its
+// row): movie 13's bars (16, 17) and pages (+30724 + 5 to + 7) by up, down
+// (only with +9708 set; the bar node (3, 0)'s +16 after a wrap), A (the
+// stand's decals applied: +10012 = 5, FitSelectedCar) or B. 128-byte frame;
+// the last call's r3, else the movie's entry or the slot's r3.
+uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                       uint32_t sp, bool native_slots);
+// sub_82204B70 TuningScreen::InputVinylPages: state 23's page (its row): a
+// kept page's textures freed (FreeKept) and kept again on its third frame,
+// else up and down on the page +30724, A (layers 0 and 1 to their saved
+// copies, Push(23), Go(24, 16) with the kept textures set between its
+// halves) or B (state 61, StoreVinyls, FadeOut); then MoveVinylMenu.
+// 128-byte frame; MoveVinylMenu's r3. Texture::Free as GuestTextureFree's
+// with the native heap and car models' flag.
+uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, const PageFlags& flags);
+
 }  // namespace tuning_pages

@@ -1140,6 +1140,18 @@ void TuningPages(Context& h) {
         hooks::TuningPagesSetEditorLimits);
   Group(h, w, "TuningScreen::LoadPageLayouts", 20, kScreenOnly, __imp__sub_822045F8,
         hooks::TuningPagesLoadPageLayouts);
+  // SetLastImage: category 5's item 6 (the vinyls) mostly, the page 0, 1 or
+  // another word.
+  Group(
+      h, w, "TuningScreen::SetLastImage", 30,
+      [](PPCContext&, Random& r, const World& w) {
+        const uint32_t s = w.screen();
+        const bool vinyls = r.Below(4) != 0;
+        guest::StoreU32(w.base, s + 9656, vinyls ? 5 : Around(r, -1, 7));
+        guest::StoreU8(w.base, s + 9660, uint8_t(vinyls ? 6 : r.Below(9)));
+        guest::StoreU32(w.base, s + 30724, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+      },
+      __imp__sub_821FE498, hooks::TuningPagesSetLastImage);
 
   // The decal images' textures (r30, r31 and lr's saves 24 bytes,
   // __savegprlr_29's 32, r31 and lr's 16). r3 the images (now and then with

@@ -162,5 +162,10 @@ void TuningPagesFreeKept(PPCContext& ctx, uint8_t* base);
 // and LeaveVinylView sub_82201B40 (no adapter: the harness's step).
 void TuningPagesInputVinylView(PPCContext& ctx, uint8_t* base);
 void TuningPagesLeaveVinylView(PPCContext& ctx, uint8_t* base);
+// InputVinylPages sub_82204B70 with SetLastImage sub_821FE498 and
+// MoveVinylMenu sub_821FF3A0 (no adapters: the harness's steps).
+void TuningPagesInputVinylPages(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetLastImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveVinylMenu(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
