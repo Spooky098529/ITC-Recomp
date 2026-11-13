@@ -1515,6 +1515,39 @@ void DecalEditFields(PPCContext& t, Random& r, const World& w) {
   HighWord(t, r);
 }
 
+// The layer's edit menu (InputLayerEdit, MoveLayerEdit): the decal edits'
+// fields (above), the cursor +30748 -1 to 7 (now and then any word), the
+// last row +30752 0 to 6, the flip +30848 0, 1 or any, the category and
+// item the vinyls' mostly; the history with 24 below the top and now and
+// then 28 at the top (cancel's pops find them; the walks don't go below the
+// history's start), +9708 0 or 1; the action now and then B fired (the
+// movie side's slot 12 on 158).
+void LayerEditFields(PPCContext& t, Random& r, const World& w) {
+  DecalEditFields(t, r, w);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30748,
+                  r.Below(10) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(9)) - 1));
+  guest::StoreU32(base, s + 30752, r.Below(7));
+  guest::StoreU32(base, s + 30848, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  if (r.Below(5) != 0) {
+    guest::StoreU32(base, s + 9656, 5);
+    guest::StoreU8(base, s + 9660, 6);
+  }
+  const uint32_t depth = 3 + r.Below(40);
+  guest::StoreU8(base, s + 10008, uint8_t(depth));
+  guest::StoreU32(base, s + 9756 + 4 * r.Below(depth - 2), 24);
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, s + 9756 + 4 * (depth - 1), 28);
+  }
+  guest::StoreU32(base, s + 9708, r.Below(3) == 0 ? 0 : 1);
+  if (r.Below(8) == 0) {
+    const uint32_t c = guest::LoadU32(base, kControllerEntries);
+    const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+    guest::StoreU32(base, mapper + 464, 1u << (158 - 151));
+  }
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -1708,6 +1741,15 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputDecalScale", 200, __imp__sub_82207320,
        hooks::TuningPagesInputDecalScale, 24, {{112, 160}}, DecalEditFields});
+  // The layer's edit menu: MoveLayerEdit's __savegprlr_29 (32 bytes);
+  // InputLayerEdit's r30, r31 and lr (24) with its callees' saves as the
+  // decal edits' (112 to 160 below).
+  Run(h, w,
+      {"TuningScreen::MoveLayerEdit", 300, __imp__sub_82200760, hooks::TuningPagesMoveLayerEdit,
+       32, {}, LayerEditFields});
+  Run(h, w,
+      {"TuningScreen::InputLayerEdit", 400, __imp__sub_82205110, hooks::TuningPagesInputLayerEdit,
+       24, {{112, 160}}, LayerEditFields});
 }
 
 }  // namespace harness

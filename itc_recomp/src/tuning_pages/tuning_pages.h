@@ -574,4 +574,22 @@ uint64_t MoveDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uin
 uint64_t MoveDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots);
 
+// sub_82205110 TuningScreen::InputLayerEdit: state 26's page (its row): 164
+// held or released (HighlightSelected through `call`), up and down on the
+// cursor +30748 (0 to 4, the buttons 5 and 6 back to 4 or 0), left and right
+// between the buttons, A (the edits Go(29 to 31, 25 to 27) with the decal
+// kept at +30856, the flip, the free look Go(34, 29), OK: Pop until 24,
+// Go(24, 16), the edit into the layer's saved record; cancel: Pop, from 28
+// back to 25 with 24 left pushed, Go(+9652, 17 or 36)) or B (the cursor to
+// 6); then MoveLayerEdit. 112-byte frame; MoveLayerEdit's r3.
+uint64_t InputLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, const PageFlags& flags);
+// sub_82200760 TuningScreen::MoveLayerEdit: state 26's movie side (its row):
+// movie 13's rows (130 to 134), buttons (136, 137), arrows (102, 103) and
+// the list's scroll node (Child(FindNode(11, 1), 0)'s +16) by the moves, A
+// and B asked again; last the edited decal's node +132 the flip. 128-byte
+// frame; the node, or the last call's r3.
+uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                       uint32_t sp, bool native_slots);
+
 }  // namespace tuning_pages

@@ -155,7 +155,7 @@ void GoSecondHalf(uint8_t* base, uint32_t s, uint32_t command) {
 }
 
 // Go(state, command): +9652 = state, both halves.
-[[maybe_unused]] void Go(uint8_t* base, uint32_t s, uint32_t state, uint32_t command) {
+void Go(uint8_t* base, uint32_t s, uint32_t state, uint32_t command) {
   Store(base, s + 9652, state);
   GoFirstHalf(base, s, state);
   GoSecondHalf(base, s, command);
@@ -774,6 +774,248 @@ uint64_t InputDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, ui
                          uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_82207320 TuningScreen::InputDecalScale");
   return InputDecal(base, call, screen, sp, flags, Edit::kScale);
+}
+
+uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                       uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_82200760 TuningScreen::MoveLayerEdit");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, found);
+  Reads asked{base, call, entry, frame, native_slots, found};
+  uint64_t r3 = found;
+  auto cursor = [&] { return Load(base, s + 30748); };
+  auto finish = [&](uint64_t named, uint32_t lr) {
+    return r3 = tuning_screen::FinishNamed(call, frame, lr, movie, named);
+  };
+  auto play = [&](uint64_t named, uint32_t lr) {
+    return r3 = tuning_screen::PlayNamed(call, frame, lr, movie, named, 1);
+  };
+  auto loop = [&](uint64_t named, uint32_t lr) {
+    return r3 = tuning_screen::LoopNamed(call, frame, lr, movie, named);
+  };
+  // The list's scroll node: Child(FindNode(11, 1), 0)'s +16 = [constant].
+  auto scroll = [&](uint32_t constant) {
+    const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, 11, 1), 0);
+    Store(base, node + 16, Load(base, constant));
+    r3 = node;
+  };
+  // The rows' highlights finished (130 to 134, 136, 137).
+  auto finish_rows = [&](const uint32_t (&lrs)[7]) {
+    static constexpr uint32_t kRows[7] = {130, 131, 132, 133, 134, 136, 137};
+    for (uint32_t k = 0; k < 7; k++) {
+      finish(kRows[k], lrs[k]);
+    }
+  };
+  // The buttons' highlights: 5 136, 6 137, played and looped.
+  auto button = [&](uint64_t named, uint32_t play_lr) {
+    play(named, play_lr);
+    loop(named, 0x82200D4C);
+  };
+  static constexpr uint32_t kMoves[9] = {153, 167, 154, 168, 156, 170, 155, 169, 158};
+  static constexpr uint32_t kMoveLrs[9] = {0x822007C8, 0x822007F4, 0x82200820,
+                                           0x8220084C, 0x82200878, 0x822008A4,
+                                           0x822008D0, 0x822008FC, 0x82200928};
+  bool moved = false;
+  for (uint32_t k = 0; k < 9 && !moved; k++) {
+    moved = asked(48, kMoves[k], kMoveLrs[k]);
+  }
+  r3 = asked.r3;
+  if (moved) {
+    if (Load(base, s + 9708) != 0) {
+      const int32_t c = int32_t(cursor());
+      if (c < 0 || c > 4) {
+        finish(102, 0x82200C80);
+        finish(103, 0x82200C8C);
+        scroll(0x820027A4);  // 200.0
+      } else {
+        Reads again{base, call, entry, frame, native_slots, r3};
+        if (again(48, 153, 0x82200B50) || again(48, 167, 0x82200B7C)) {
+          if (int32_t(cursor()) == 4) {
+            scroll(0x820081D8);  // 160.0
+          } else {
+            finish(102, 0x82200C54);
+            play(102, 0x82200C70);
+          }
+        } else if (again(48, 154, 0x82200BA8) || again(48, 168, 0x82200BD4)) {
+          if (int32_t(cursor()) == 0) {
+            scroll(0x82000A34);  // 0.0
+          } else {
+            finish(103, 0x82200C14);
+            play(103, 0x82200C70);
+          }
+        } else {
+          r3 = again.r3;
+        }
+      }
+      finish_rows({0x82200CBC, 0x82200CC8, 0x82200CD4, 0x82200CE0, 0x82200CEC, 0x82200CF8,
+                   0x82200D04});
+      const uint32_t c2 = cursor();
+      if (c2 < 5) {
+        play(uint64_t(c2) + 130, 0x82200D3C);
+        loop(uint64_t(cursor()) + 130, 0x82200D4C);
+      } else if (c2 == 5) {
+        button(136, 0x82200B04);
+      } else if (c2 == 6) {
+        button(137, 0x82200AE0);
+      }
+    }
+  } else if (asked(32, 164, 0x82200954) || asked(44, 164, 0x82200980)) {
+    r3 = asked.r3;
+  } else if (asked(40, 159, 0x822009AC)) {
+    r3 = asked.r3;
+    const int32_t c = int32_t(cursor());
+    if (c == 5) {
+      finish(235, 0x822009CC);
+      play(235, 0x82200A04);
+    } else if (c == 6) {
+      finish(226, 0x822009E8);
+      play(226, 0x82200A04);
+    }
+  } else if (asked(40, 158, 0x82200A2C)) {
+    scroll(0x820027A4);  // 200.0
+    finish_rows({0x82200A68, 0x82200A74, 0x82200A80, 0x82200A8C, 0x82200A98, 0x82200AA4,
+                 0x82200AB0});
+    const int32_t c = int32_t(cursor());
+    if (c == 5) {
+      button(136, 0x82200B04);
+    } else if (c == 6) {
+      button(137, 0x82200AE0);
+    }
+  } else {
+    r3 = asked.r3;
+  }
+  // The flip shown on the edited decal's node: +132 = (+30848 != 0).
+  const int32_t page = int32_t(Load(base, s + 30724));
+  if (page == 0 || page == 1) {
+    const uint32_t node = DecalNode(base, movie, s, page);
+    Store(base, node + 132, Load(base, s + 30848) != 0 ? 1 : 0);
+    r3 = node;
+  }
+  return r3;
+}
+
+uint64_t InputLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_82205110 TuningScreen::InputLayerEdit");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t entry = PlayerEntry(base);
+  Reads asked{base, call, entry, frame, flags.native_slots, 0};
+  auto cursor = [&] { return int32_t(Load(base, s + 30748)); };
+  auto sound = [&](uint32_t cue, uint32_t lr) { call(kMenuSoundPlay, {cue}, frame, lr); };
+  if (asked(32, 164, 0x82205164)) {
+    call(kHighlightSelected, {screen, 0}, frame, 0x822051AC);
+  } else if (asked(44, 164, 0x82205198)) {
+    call(kHighlightSelected, {screen, 1}, frame, 0x822051AC);
+  }
+  if (asked(48, 153, 0x822051D0) || asked(48, 167, 0x822051FC)) {
+    // Up: from the buttons to the free look (4); else the row before,
+    // below 0 to the last (+30752).
+    sound(4, 0x822058A0);
+    Store(base, s + 9708, 1);
+    const int32_t c = cursor();
+    if (c == 5 || c == 6) {
+      Store(base, s + 30748, 4);
+    } else {
+      Store(base, s + 30748, uint32_t(c - 1));
+      if (c - 1 < 0) {
+        Store(base, s + 30748, Load(base, s + 30752));
+      }
+    }
+  } else if (asked(48, 154, 0x82205228) || asked(48, 168, 0x82205254)) {
+    // Down: from the buttons to 0; else the next row, above 4 to +30752.
+    sound(4, 0x8220585C);
+    Store(base, s + 9708, 1);
+    const int32_t c = cursor();
+    if (c == 5 || c == 6) {
+      Store(base, s + 30748, 0);
+    } else {
+      Store(base, s + 30748, uint32_t(c + 1));
+      if (c + 1 > 4) {
+        Store(base, s + 30748, Load(base, s + 30752));
+      }
+    }
+  } else if (asked(48, 155, 0x82205280) || asked(48, 169, 0x822052AC)) {
+    // Left, between the buttons only (below 5 to 6); +30752 the button.
+    const int32_t c = cursor();
+    if (c == 5 || c == 6) {
+      sound(4, 0x82205830);
+      Store(base, s + 9708, 1);
+      Store(base, s + 30748, uint32_t(c - 1));
+      if (c - 1 < 5) {
+        Store(base, s + 30748, 6);
+      }
+      Store(base, s + 30752, Load(base, s + 30748));
+    }
+  } else if (asked(48, 156, 0x822052D8) || asked(48, 170, 0x82205304)) {
+    // Right, between the buttons only (above 6 to 5).
+    const int32_t c = cursor();
+    if (c == 5 || c == 6) {
+      sound(4, 0x822057E4);
+      Store(base, s + 9708, 1);
+      Store(base, s + 30748, uint32_t(c + 1));
+      if (c + 1 > 6) {
+        Store(base, s + 30748, 5);
+      }
+      Store(base, s + 30752, Load(base, s + 30748));
+    }
+  } else if (asked(32, 164, 0x82205330) || asked(44, 164, 0x8220535C)) {
+    // 164 held or released: nothing.
+  } else if (asked(40, 159, 0x82205388)) {
+    sound(0, 0x82205398);
+    Store(base, s + 9708, 1);
+    const uint32_t c = Load(base, s + 30748);
+    if (c <= 2 || c == 4) {
+      // The edits (Go(29, 25), (30, 26), (31, 27), the edited decal kept at
+      // +30856 for B) and the free look (Go(34, 29)).
+      static constexpr uint32_t kStates[5] = {29, 30, 31, 0, 34};
+      static constexpr uint32_t kCommands[5] = {25, 26, 27, 0, 29};
+      static constexpr uint32_t kMemcpyLrs[3] = {0x82205704, 0x8220567C, 0x822055FC};
+      Store(base, s + 9716, 1);
+      if (c <= 2) {
+        Memcpy(base, call, screen + 30856, screen + 30832, 24, frame, kMemcpyLrs[c]);
+      }
+      Push(base, s, 26);
+      Go(base, s, kStates[c], kCommands[c]);
+    } else if (c == 3) {
+      // The flip.
+      Store(base, s + 30848, Load(base, s + 30848) == 0 ? 1 : 0);
+    } else if (c == 5) {
+      // OK: back to the layers (Pop until 24, Go(24, 16)), the edit kept in
+      // the layer's saved record.
+      uint32_t state;
+      do {
+        state = Pop(base, s);
+      } while (int32_t(state) != 24);
+      GoFirstHalf(base, s, state);
+      GoSecondHalf(base, s, 16);
+      const uint64_t n = uint64_t(Load(base, s + 30724)) * 3 + Load(base, s + 30732);
+      Memcpy(base, call, n * 24 + screen + 31024, screen + 30832, 24, frame, 0x82205560);
+    } else if (c == 6) {
+      // Cancel: Pop; from the image picker (28) back to the layer's actions
+      // (25) with 24 left pushed.
+      if (int32_t(Pop(base, s)) == 28) {
+        uint32_t state;
+        do {
+          state = Pop(base, s);
+        } while (int32_t(state) != 24);
+        guest::StoreU8(base, s + 10008, uint8_t(Byte(base, s + 10008) + 1));
+        Store(base, s + 9652, 25);
+      }
+      const uint32_t state = Load(base, s + 9652);
+      GoFirstHalf(base, s, state);
+      const bool vinyls = int32_t(Load(base, s + 9656)) == 5 && Byte(base, s + 9660) == 6;
+      GoSecondHalf(base, s, vinyls ? 17 : 36);
+    }
+  } else if (asked(40, 158, 0x822057A4)) {
+    sound(2, 0x822057B4);
+    Store(base, s + 9708, 1);
+    Store(base, s + 30748, 6);
+  }
+  return MoveLayerEdit(base, call, screen, frame, flags.native_slots);
 }
 
 }  // namespace tuning_pages
