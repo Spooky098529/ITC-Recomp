@@ -44,9 +44,11 @@ the lead "the vinyl editor's input pages" (27 functions, 14 seen in
 play; they also call the sticker editor's `sub_821FD518`, `sub_821FD5C0`
 and `sub_821FD658`, not seen in play, given rows here and made native
 2026-11-13 with the rest of the vinyl editor; the vinyl editor's wait words `0x826D84A4` to `0x826D84C0` in
-`../known-data.md`). Left as leads (`../loops/leads.md`): the sticker
+`../known-data.md`). The sticker
 editor's (38 to 46 and 49,
-`821F7000`-`821FC270`, none seen in play), with their helpers; the
+`821F7000`-`821FC270`, none seen in play), with their helpers, are in
+[`sticker-editor.md`](sticker-editor.md) (mapped 2026-11-13). Left as
+leads (`../loops/leads.md`): the
 command runners these pages queue (commands 5, 10 to 14, 32 and 54 to
 58) stay in the update's lead; the callers outside the screen's pages
 (`sub_821CBD40`, `sub_821E1B48`, `sub_821DBAB0`, `sub_8224B248`; the first three since 2026-11-09 in [`tuning-machine.md`](tuning-machine.md)).

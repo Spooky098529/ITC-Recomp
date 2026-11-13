@@ -612,6 +612,12 @@ Rows not yet moved stay in the table below. So far:
   accessory's, leaving the screen and the editors), their movie-side
   updates, the confirm dialogs' yes answers, and the decal images the
   vinyl and sticker editors draw (B7).
+- [`sticker-editor.md`](sticker-editor.md): the tuning shop's sticker
+  editor: its input pages (the tuning screen's states 38 to 46 and 49:
+  the area, slot, operation, edit, order, picker, move, rotate, scale
+  and free look pages) and their helpers (the menus' movie sides, the
+  slots' nodes and textures, the picker over the owned stickers, the
+  held views) (B7; mapped).
 - [`screen-constructors.md`](screen-constructors.md): the
   constructors of the type 6 and 7 game modes' front-end screen blocks:
   their list, node and panel screens, the state machines with ten words
