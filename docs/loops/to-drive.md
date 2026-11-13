@@ -18,6 +18,45 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5139`, `itc_5140`, ok; the
+type 5 mode, the parking area's, and its dialog, `type5-mode.md`):
+
+- `sub_8222FD68` ModeType5::Init
+- `sub_82230050` ModeType5::WaitForLoads
+- `sub_82230458` ModeType5::NextMode
+- `sub_82230260` ModeType5::LeaveScreen` (probably)
+- `sub_82230168` ModeType5::WaitForShown` (probably)
+- `sub_82230328` ModeType5::Leaving` (probably)
+- `sub_8222FD08` ModeType5::FindShown` (probably)
+- `sub_8222FC50` Mode::Slot14Thunk
+- `sub_8222FED0` ModeType5::Interrupt` (probably)
+- `sub_8222FF60` ModeType5::ForceExit` (probably)
+- `sub_8222FC38` ModeType5::Resume` (probably)
+- `sub_82226A10` Type5Dialog::Init
+- `sub_82225878` Type5Dialog::OnEnter
+- `sub_82226978` Type5Dialog::WaitForMovies
+- `sub_822266F8` Type5Dialog::Draw
+- `sub_82226788` Type5Dialog::Update
+- `sub_82225860` Type5Dialog::OnInterrupt
+- `sub_82225A90` Type5Dialog::OpenConfirm
+- `sub_82225980` Type5Dialog::OpenNotice
+- `sub_82225B88` Type5Dialog::OpenConfirm2
+- `sub_82225A08` Type5Dialog::OpenNotice2
+- `sub_822257A8` Type5Dialog::OnLeft
+- `sub_82225D10` Type5Dialog::ConfirmPage
+- `sub_82225F30` Type5Dialog::NoticePage
+- `sub_82226088` Type5Dialog::Notice2Page
+- `sub_822261E0` Type5Dialog::OpenConfirmStep
+- `sub_822262B8` Type5Dialog::CloseConfirmStep
+- `sub_82226370` Type5Dialog::CloseNoticeStep
+- `sub_82226420` Type5Dialog::OpenConfirm2Step
+- `sub_822264B8` Type5Dialog::CloseConfirm2Step
+- `sub_82226568` Type5Dialog::CloseNotice2Step
+- `sub_82226618` Type5Dialog::MoveCursorStep
+- `sub_822266D0` Type5Dialog::Step9` (probably)
+
+The type 6 and 7 modes' first screens':
+
 Not in the attract race or the replay (`itc_5131`, `itc_5132`, ok; the
 type 6 and 7 modes' first screens, `type6-type7-modes.md`, and the car
 list's power graph, `power-graph.md`):

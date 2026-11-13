@@ -2865,6 +2865,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-12 | The race's end (`RaceMode::ModeAfterRace`: which mode follows a race), with `RaceMode::NextMode` and `Progress::CheckUnlocks` (never seen, ported) | `race-end.md` | 1 of 1 (6 adapters removed) | `--native_race_end` |
 | 2026-11-13 | The options screen's load and save pages (category 5, page 9, the load; category 6, page 10, the save) | `options-load-save.md` | 16 of 16 (2 never seen, ported) | `--native_options_load_save` |
 | 2026-11-13 | `Type6Screen0`: the type 6 mode's first screen (a five-item menu over the type 6 car: pages, steps, helpers), with type 7's unported steps and `PowerGraph::SetFromCar` | `type6-type7-modes.md` | 13 of 13 new rows (with 6 of type 7's and `CarList::DrawCarPowerGraph`; 10 adapters removed) | (`--native_type67_modes`, `--native_power_graph`) |
+| 2026-11-13 | The type 5 mode: the parking area's front-end mode (its three machines: the car settings, the parking area, and its own dialog `Type5Dialog`) | `type5-mode.md` | 33 of 33 (16 never seen, ported) | `--native_type5_mode` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5347,3 +5348,17 @@ type 6 or 7 modes: 24 on the drive list. The boundary: 449 functions
 live 208. Imports: 186 called, 54 with a live caller. B7
 (`b7_status.py`): ours 5,866, work left 792 (Wrapped 52, with a row
 367, no row yet 373), from 804.
+
+**2026-11-13, the type 5 mode (branch `b7-loop-11-11-26`, the
+forty-fifth run, its sixth subsystem):** `type5-mode.md` (33 rows, 17
+in play, `src/type5_mode/`): the parking area's front-end mode (vtable
+`0x82006C24`, 15 slots, the only one with a slot 14), its delegates and
+its dialog machine at +19280 (`Type5Dialog`, "TXR_PaCmnWindow", the
+type 2 dialog's design), all native; its quirks kept (`Leaving`'s
+machine check over ids 0 to 2, never this mode's; `NextMode`'s answer
+bytes as stack leftovers). Neither the attract race nor the replay
+enters the parking area: 33 on the drive list. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 27, never
+called 69, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,899, work left 775 (Wrapped 52, with a row
+367, no row yet 356), from 792.

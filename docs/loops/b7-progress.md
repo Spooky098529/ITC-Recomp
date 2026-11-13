@@ -230,9 +230,21 @@ file's history. What's left to see in a drive, from every run:
   adapters removed; the quirks kept; a harness fault fixed before the
   commit (`LoadingScreen::Finish` read past the three movies with the
   world's "none" index); 33 harnesses 0 differing; race 38 s at 40, 0
-  errors; no subagents). Left: none. Validation agent running.
+  errors; no subagents). Left: none. Validated: `itc_5139` (race 52 s
+  at 180, 0 errors, every harness 0 differing outside the expected
+  groups; harnesses ~126 s), 33 of 33 harness lines, no prints added;
+  none in the race or the replay `itc_5140` (ok): 33 to drive.
+  Recorded.
+- Subsystem 7 of 10: the front-end screens that show a car on its
+  stand (`sub_821807D8`, `sub_82184B80`, ... `sub_8224CB28`, seen in
+  play; ready roots `sub_82201B40`, `sub_82202928`); its line deleted
+  from `leads.md`. Mapping agent running.
 
 ## Done
+
+- The type 5 mode (the parking area's, with its dialog):
+  `type5-mode.md` 33 of 33 ours, `--native_type5_mode`,
+  33bdeaf2..d30920e0; validated.
 
 - `Type6Screen0`: 13 rows in `type6-type7-modes.md` ours, with type
   7's steps and the power graph's set-up, d642e99d..3a90ef05; validated.
@@ -327,5 +339,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the type 5 mode's map: ours 5866, work left 792 (wrapped 52,
   known 384, unknown 356).
+
+- After the type 5 mode: ours 5899, work left 775 (wrapped 52, known
+  367, unknown 356).
 
 ## Stopped
