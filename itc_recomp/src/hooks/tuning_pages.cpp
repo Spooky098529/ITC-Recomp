@@ -838,15 +838,7 @@ void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-ITC_TUNING_PAGES(821CDF98, TuningPagesTestAndSetWheelFlag)
-
-ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
-
-ITC_TUNING_PAGES(8224AB50, TuningPagesHsvToRgb)
-
 ITC_TUNING_PAGES(82208738, TuningPagesUnloadAll)
-
-ITC_TUNING_PAGES(821DE160, TuningPagesSetAeroAvailability)
 
 ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
 
@@ -855,6 +847,13 @@ ITC_TUNING_PAGES(821FE608, TuningPagesOnImageLoaded)
 // The screen's input handler: a vtable slot (no direct callers), so its
 // adapter stays.
 ITC_TUNING_PAGES(821E6950, TuningPagesHandleInput)
+
+// No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
+// native and call their plain C++; the register steps above are the
+// harness's): TestAndSetWheelFlag sub_821CDF98 (LoadOwnedParts,
+// StoreOwnedParts), StoreVinyls sub_82203F20 (OnDialogYes, InputVinylPages),
+// Color::HsvToRgb sub_8224AB50 (PanelSetBase::SetUpColors) and
+// SetAeroAvailability sub_821DE160 (TuningScreen::SetUp, SetCurrentChoice).
 
 // No adapters (removed, B7 loop, 2026-11-13, after HandleInput went native:
 // their only caller, HandleInput, is native and calls their plain C++; the
