@@ -190,7 +190,11 @@ file's history. What's left to see in a drive, from every run:
   which the migration didn't run) differs in 40 of 40 cases, one byte
   (recompiled 01, native 00 at entries 47, 51, 55, 59). By "Precedent
   first" (harness faults found with logging, fixed, validated again; a
-  real difference halts), the migration agent is diagnosing it.
+  real difference halts), the migration agent diagnosed it: a harness
+  fault (the dead register saves the original `FitSelectedCar` writes
+  under `PickCameraPreset`'s frame, left out of `tuning_refresh` in
+  0f0b959d but not of `tuning_machine`'s copy); fixed edb5225e, 40 of
+  40 at 0 differing. Validation running again.
 
 ## Done
 

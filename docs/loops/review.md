@@ -145,7 +145,10 @@ When the user has reviewed a run's section, its heading gets
   originals; commands 10, 13, 14 read in full; `MakeModel` and
   `FitSelectedCar` Native, removed by reading `generated/` (no attract
   race reaches the front end); harness masks for the originals' saves
-  in `tuning_refresh`, `car_makers`, `type67_modes`.
+  in `tuning_refresh`, `car_makers`, `type67_modes`. Its first
+  validation differed in `TuningMachine::Start`'s harness (one byte of
+  those dead saves, not left out there too): a harness fault, fixed
+  edb5225e by the 2026-11-10 precedent.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
