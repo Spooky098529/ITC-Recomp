@@ -99,6 +99,14 @@ void StandModelsSetColor2(PPCContext& ctx, uint8_t* base);
 void StandModelsSetColor3(PPCContext& ctx, uint8_t* base);
 void StandModelsSetColor4(PPCContext& ctx, uint8_t* base);
 void StandModelsSetColor5(PPCContext& ctx, uint8_t* base);
+// The decals the tuning screen's never-seen paths set, without adapters
+// (only its native ApplyAreaDecals and ApplyDecalWord reach them; the
+// harness's): GarageStage::SetSticker sub_8217B3D8 (r3 the holder, r4 an
+// area, r5 a slot, r6 a word, r7 a flag, r8 and r9 a position, f1 an
+// angle, the caller's r1 + 96 a size) and SetDecalWord sub_821793D0 (r3 the
+// holder, r4 a word; SceneModel::ReloadDecals' plain C++); lr put back.
+void StandModelsSetSticker(PPCContext& ctx, uint8_t* base);
+void StandModelsSetDecalWord(PPCContext& ctx, uint8_t* base);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 

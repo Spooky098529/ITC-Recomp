@@ -48,7 +48,9 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "GarageStage::SetColor sub_8217C6C8 and its pieces SetColor0 to SetColor5 "
               "sub_8217B078 to sub_8217B348 (no adapters: the tuning screen's native UpdateStand "
               "and RestoreStand call them; SceneModel::ApplyPaint's and ApplyWheelPaint's plain "
-              "C++ with the load poll's flags) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
+              "C++ with the load poll's flags); the decals the tuning screen's never-seen paths set, "
+              "GarageStage::SetSticker sub_8217B3D8 and SetDecalWord sub_821793D0 (no adapters: "
+              "its native ApplyAreaDecals and ApplyDecalWord call them) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
 
 namespace hooks {
 
@@ -387,6 +389,19 @@ void StandModelsSetColor3(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, b
 void StandModelsSetColor4(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 4); }
 void StandModelsSetColor5(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 5); }
 
+void StandModelsSetSticker(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = sm::SetSticker(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                              ctx.r8.u64, ctx.r9.u64, ctx.f1.f64, ctx.r1.u32);
+}
+
+void StandModelsSetDecalWord(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SetDecalWord(base, call, r3, r4, stack);
+  });
+}
+
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
@@ -441,6 +456,10 @@ ITC_STAND_MODELS(821DFA78, StandModelsPreviewWheel)
 // sub_8217B078 to sub_8217B348 have none: only the tuning screen's
 // UpdateStand and RestoreStand reach them, and their plain C++ calls
 // SetColor's (their register steps above are the harness's).
+// GarageStage::SetSticker sub_8217B3D8 and SetDecalWord sub_821793D0 have
+// none: only the tuning screen's ApplyAreaDecals and ApplyDecalWord reach
+// them, and their plain C++ calls theirs (their register steps above are
+// the harness's).
 // SceneParts::LightValue sub_820DF1A0 has none: only SetLightsOn calls it,
 // and its plain C++ calls LightValue's (its register step above is the
 // harness's).

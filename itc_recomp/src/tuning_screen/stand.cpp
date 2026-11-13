@@ -15,6 +15,7 @@
 #include "guest.h"
 #include "race_setup/race_setup.h"
 #include "stand_models/stand_models.h"
+#include "type67_modes/type67_modes.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
@@ -35,6 +36,12 @@ void Store64(uint8_t* base, uint32_t address, uint64_t value) {
 }
 double Lfs(uint8_t* base, uint32_t address) {
   return double(std::bit_cast<float>(Load(base, address)));
+}
+void Stfs(uint8_t* base, uint32_t address, double value) {
+  Store(base, address, std::bit_cast<uint32_t>(float(value)));
+}
+uint64_t Load64(uint8_t* base, uint32_t address) {
+  return uint64_t(Load(base, address)) << 32 | Load(base, address + 4);
 }
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -456,6 +463,123 @@ uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
       }
     }
     r3 = stand_models::ReloadDecals(base, stand.call, Holder(base), frame);
+  }
+  Store(base, s + 10012, 0xFFFFFFFFu);
+  return r3;
+}
+
+uint64_t ApplyAreaDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F7B90 TuningScreen::ApplyAreaDecals");
+  const uint32_t frame = Frame(base, sp, 4160);
+  const uint32_t s = uint32_t(r3);
+  const int32_t kind = int32_t(Load(base, s + 10012));
+  const double zero = Lfs(base, kZero);
+  const double one = Lfs(base, 0x82000A30);
+  // GarageStage::SetSticker for slot `k` with the size memcpy'd from `size`
+  // to frame + 96 (the caller's argument word SetSticker reads), the
+  // position the doublewords at frame + 112 and + 120 (r8, r9).
+  auto sticker = [&](uint32_t size, uint32_t lr, uint32_t area, uint32_t k, uint32_t word,
+                     uint32_t flag, double f1) {
+    front_end_car_draw::Memcpy(base, stand.calls, frame + 96, size, 16, frame, lr);
+    r3 = stand_models::SetSticker(base, Holder(base), area, k, word, flag,
+                                  Load64(base, frame + 112), Load64(base, frame + 120), f1, frame);
+  };
+  if (kind == 1) {
+    // The area's five slots cleared: (0, 0, 0, 1.0) as the position and
+    // the size, the angle 0.0.
+    Stfs(base, frame + 112, zero);
+    Stfs(base, frame + 116, zero);
+    Stfs(base, frame + 120, zero);
+    Stfs(base, frame + 144, zero);
+    Stfs(base, frame + 124, one);
+    Stfs(base, frame + 148, zero);
+    Stfs(base, frame + 152, zero);
+    Stfs(base, frame + 156, one);
+    for (uint32_t k = 0; k < 5; k++) {
+      sticker(frame + 144, 0x821F7C00, Load(base, s + 30724), k, 0xFFFFFFFFu, 0, zero);
+    }
+    r3 = stand_models::ReloadDecals(base, stand.call, Holder(base), frame);
+    double f1 = 0.0;
+    r3 = FitSelectedCar(base, stand.calls, Holder(base), 0, 0, frame, &f1);
+  } else if (kind == 2) {
+    const uint32_t g = GarageCarOf(base, Load(base, s + kSaveData)) + 212;
+    const uint32_t car = frame + 176;
+    MakeCar(base, stand.calls, car, g, 1, frame, 0x821F7CBC, 0x821F7CD0);
+    const uint64_t pick = uint64_t(int64_t(int16_t(guest::LoadU16(base, g))));
+    double f1 = 0.0;
+    r3 = car_makers::GarageStageSetCar(base, stand.calls, stand.call, Holder(base), car, pick,
+                                       frame, &f1);
+  } else if (kind == 3) {
+    front_end_car_draw::GarageStageCommand(base, stand.calls, Holder(base), 58, frame);
+    const double offset = Lfs(base, 0x82002244);  // the mirrored angle's offset
+    const double mirror = Lfs(base, 0x82001BE0);  // probably -1.0
+    const double degree = Lfs(base, kDegree);
+    Stfs(base, frame + 120, zero);
+    Stfs(base, frame + 136, zero);
+    Stfs(base, frame + 124, one);
+    Stfs(base, frame + 140, one);
+    for (uint32_t k = 0; k < 5; k++) {
+      // The edited entry (+30832), else the area's saved one.
+      const uint32_t e =
+          int32_t(k) == int32_t(Load(base, s + 30732))
+              ? s + 30832
+              : uint32_t((uint64_t(Load(base, s + 30724)) * 5 + k) * 24 + s + 32360);
+      const int64_t x = int32_t(Load(base, e + 0));
+      // The scale's lfs then two stfs: its bits.
+      const uint32_t scale = Load(base, e + 12);
+      const int64_t y = int32_t(Load(base, e + 4));
+      Store(base, frame + 128, scale);
+      Store(base, frame + 132, scale);
+      const uint32_t a = Load(base, s + 30724);
+      double angle = Lfs(base, e + 8);
+      uint32_t flag = Load(base, e + 16);
+      double f1 = double(float(angle * degree));
+      Store64(base, frame + 160, uint64_t(x));
+      Store64(base, frame + 144, uint64_t(y));
+      Stfs(base, frame + 116, ToSingle(y));
+      const double fx = ToSingle(x);
+      Stfs(base, frame + 112, fx);
+      if (int32_t(a) == 2 || int32_t(a) == 7) {
+        // The mirrored sides: x and the angle mirrored, the flag inverted.
+        angle = double(float(angle - offset));
+        Stfs(base, frame + 112, double(float(fx * mirror)));
+        flag = flag == 0 ? 1 : 0;
+        angle = double(float(angle * mirror));
+        f1 = double(float(angle * degree));
+      }
+      const uint32_t word = Load(base, uint32_t(((uint64_t(a) + 1666) * 5 + k) << 2) + s);
+      sticker(frame + 128, 0x821F7DF8, a, k, word, flag, f1);
+    }
+    r3 = stand_models::ReloadDecals(base, stand.call, Holder(base), frame);
+  } else if (kind == 4) {
+    front_end_car_draw::GarageStageCommand(base, stand.calls, Holder(base), 1, frame);
+    type67_modes::GarageStageCameraCommand(base, Holder(base), 20, frame);
+    front_end_car_draw::GarageStageCommand(base, stand.calls, Holder(base),
+                                           Load(base, s + 30724) + 42, frame);
+    Stfs(base, frame + 112, zero);
+    Stfs(base, frame + 116, zero);
+    Stfs(base, frame + 120, zero);
+    Stfs(base, frame + 128, zero);
+    Stfs(base, frame + 124, one);
+    Stfs(base, frame + 132, zero);
+    Stfs(base, frame + 136, zero);
+    Stfs(base, frame + 140, one);
+    for (uint32_t k = 0; k < 5; k++) {
+      sticker(frame + 128, 0x821F7EC8, Load(base, s + 30724), k, 0xFFFFFFFFu, 0, zero);
+    }
+    r3 = stand_models::ReloadDecals(base, stand.call, Holder(base), frame);
+  }
+  Store(base, s + 10012, 0xFFFFFFFFu);
+  return r3;
+}
+
+uint64_t ApplyDecalWord(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FE4E0 TuningScreen::ApplyDecalWord");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t s = uint32_t(r3);
+  const int32_t kind = int32_t(Load(base, s + 10012));
+  if (kind == 9 || kind == 10) {
+    r3 = stand_models::SetDecalWord(base, call, Holder(base), kind == 9 ? 1 : 0, frame);
   }
   Store(base, s + 10012, 0xFFFFFFFFu);
   return r3;
@@ -1043,8 +1167,6 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
   constexpr uint32_t kBonnetOpen = 0x826D84A0;   // the three stand animations' open states
   constexpr uint32_t kRoofOpen = 0x826D849C;
   constexpr uint32_t kDoorsOpen = 0x826D8498;
-  constexpr uint32_t kApplyAreaDecals = 0x821F7B90;  // TuningScreen::ApplyAreaDecals
-  constexpr uint32_t kApplyDecalWord = 0x821FE4E0;   // TuningScreen::ApplyDecalWord
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t s = screen;
   auto at = [&](uint32_t offset) { return Load(base, s + offset); };
@@ -1128,11 +1250,11 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
       int32_t(front_end_car_draw::GarageStageIsBusy(base, stand.calls, Holder(base), frame)) == 0) {
     const int32_t v = int32_t(at(10012));
     if (v >= 1 && v < 5) {
-      stand.call(kApplyAreaDecals, {s}, frame, 0x821DA2BC);
+      ApplyAreaDecals(base, stand, s, frame);
     } else if (v >= 5 && v < 9) {
       ApplyDecals(base, stand, s, frame);
     } else if (v >= 9 && v < 11) {
-      stand.call(kApplyDecalWord, {s}, frame, 0x821DA2F4);
+      ApplyDecalWord(base, stand.call, s, frame);
     }
   }
   // (6) The second wheels, the wheel word, the stand drawn.

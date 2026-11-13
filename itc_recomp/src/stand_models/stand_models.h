@@ -114,6 +114,22 @@ uint64_t SetAero(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t
 // C++ on the stage's model from its 96-byte frame; its r3.
 uint64_t ReloadDecals(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t stack);
 
+// sub_821793D0 GarageStage::SetDecalWord: the stage's model +3740 (the
+// record's +3708) = `word`, then SceneModel::ReloadDecals' plain C++ on the
+// model (fetched again) from its 112-byte frame; its r3.
+uint64_t SetDecalWord(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                      uint32_t stack);
+// sub_8217B3D8 GarageStage::SetSticker: r8 and r9 (a 16-byte position)
+// stored into the caller's parameter area (`stack` + 64 and + 72) and read
+// back; the record's sticker entry e = model + 32 + 64 x (`slot` + 9, 15,
+// 21, 27, 33, 39, 45 for `area` 0 to 6, else + 51): +8 = the area's code
+// (8, 2, 1, 3, 4, 7, 6, else 5), +0 = `word`, +4 = `flag`, +16 to +31 the
+// position, +32 = f1 rounded to single, +48 to +63 the size from the
+// caller's `stack` + 96 to + 111 (+12 and +36 to +47 left). 128-byte frame
+// (its back chain only: no temporaries); returns the model (r3).
+uint32_t SetSticker(uint8_t* base, uint32_t holder, uint32_t area, uint32_t slot, uint32_t word,
+                    uint32_t flag, uint64_t r8, uint64_t r9, double f1, uint32_t stack);
+
 // --- The tire grades (src/stand_models/setters.cpp) ---
 
 // sub_820D8F18 Wheels::SetTireTextures: PartModel::SetTexture (through

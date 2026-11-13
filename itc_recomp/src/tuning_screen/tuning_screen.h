@@ -562,6 +562,24 @@ uint64_t PreviewWheels(uint8_t* base, const GuestCall& call, uint64_t r3, uint32
 // GarageStage::ReloadDecals after 5, 7 and 8; then +10012 = -1. 4,112-byte
 // frame.
 uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821F7B90 TuningScreen::ApplyAreaDecals: r3 = the screen (all 64
+// bits). By +10012 (its row): 1 the area +30724's five stickers cleared
+// (GarageStage::SetSticker), ReloadDecals and FitSelectedCar(holder, 0, 0);
+// 2 the selected garage car put on the stand (as ApplyDecals' 6); 3
+// GarageStage::Command(holder, 58) and the five set from the screen's
+// records (areas 2 and 7 mirrored), ReloadDecals; 4 Commands 1, the camera
+// command 20 and a + 42, the five cleared, ReloadDecals; then +10012 = -1.
+// Each SetSticker's size memcpy'd to frame + 96 (the argument word it reads
+// from its caller's frame), its position the doublewords at frame + 112 and
+// + 120, the conversions' doublewords at + 144 and + 160 as the original
+// leaves them. 4,160-byte frame (its register and f28 to f31 saves not
+// written); r3 the last call's, else the entry. Never seen in play.
+uint64_t ApplyAreaDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821FE4E0 TuningScreen::ApplyDecalWord: r3 = the screen (all 64 bits).
+// +10012 9: GarageStage::SetDecalWord(holder, 1); 10: (holder, 0); then
+// +10012 = -1. 96-byte frame; SetDecalWord's r3, else the entry. Never seen
+// in play.
+uint64_t ApplyDecalWord(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp);
 // sub_822019D0 TuningScreen::DecalCommand: movie 13; with +9716 the queue's
 // step (+9720 set, then 0) or 240 restarted and GarageStage::Command(holder,
 // 58), +9716 = 0; then +10012 = 7, FitSelectedCar(holder, the selected
@@ -625,8 +643,8 @@ uint64_t Refresh(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t s
 // paint's three colors in state 18 (GarageStage::SetColor's plain C++,
 // stand_models', its paints as `paint_poll` decides; the conversions'
 // doublewords at frame + 80 to + 103 as the original leaves them), the decals waiting at +10012 once the stand isn't
-// busy (ApplyDecals' plain C++; ApplyAreaDecals and ApplyDecalWord, never
-// seen in play, through the guest), StepSecondWheels and SetWheelWord's
+// busy (ApplyDecals', ApplyAreaDecals' and ApplyDecalWord's plain C++, the
+// last two never seen in play), StepSecondWheels and SetWheelWord's
 // plain C++ (`paint_poll` as StepSecondWheels' adapter gives it), then
 // GarageStage::Draw's (`draw` as its adapter decides). 144-byte frame (its
 // saved registers and f31 not written); GarageStage::Draw's r3.

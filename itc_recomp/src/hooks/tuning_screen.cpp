@@ -78,7 +78,9 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "UpdateBusyIcon sub_821D6100, PreviewWheels sub_821E0E00, ApplyDecals "
               "sub_822042D8, DecalCommand sub_822019D0, PreviewItem sub_821E07B0 and RestoreStand "
               "sub_821E0FB0 (their callees never seen in play through the guest), UpdateStand "
-              "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag); SetCarStats sub_821DF788 with the "
+              "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag; GarageStage::SetColor "
+              "sub_8217C6C8, ApplyAreaDecals sub_821F7B90 and ApplyDecalWord sub_821FE4E0, never "
+              "seen in play, by their plain C++, no adapters); SetCarStats sub_821DF788 with the "
               "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both and --native_car_specs, every state; "
               "Update sub_821E6C50 (its pieces sub_821E6CD4 and sub_821E6F90 merged) with the refresh's and "
               "UpdateStand's checks, its callees never seen in play and DrawPowerGraph through the guest "
@@ -604,8 +606,16 @@ ITC_TUNING_STAND_STEP(PickCameraPreset)
 ITC_TUNING_STAND_STEP(UpdateBusyIcon)
 ITC_TUNING_STAND_STEP(ApplyDecals)
 ITC_TUNING_STAND_STEP(PreviewItem)
+ITC_TUNING_STAND_STEP(ApplyAreaDecals)
 
 #undef ITC_TUNING_STAND_STEP
+
+void TuningApplyDecalWord(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithStand(ctx, base,
+            [&](const ts::StandCalls& stand) { return ts::ApplyDecalWord(base, stand.call, r3, sp); });
+}
 
 void TuningDecalCommand(PPCContext& ctx, uint8_t* base) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;

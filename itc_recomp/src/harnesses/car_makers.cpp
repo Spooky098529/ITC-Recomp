@@ -1391,6 +1391,74 @@ void TuningStand(Context& h, Random& r) {
     results.Report();
   }
   {
+    // ApplyAreaDecals (never seen in play): +10012 1 to 4 mostly (now and
+    // then 0 or 5: nothing but the reset); the area +30724 0 to 7 (its
+    // commands 42 to 49 and its records' rows; never any word: the records'
+    // reads would leave the screen); the edited slot +30732 0 to 5; the
+    // records' x and y small, their scales and angles any floats, their
+    // flags 0, 1 or any; the sticker words +33320 on small or -1; the
+    // stage's animation list short (GarageAnims::Add scans it with no
+    // bound). The top 80 bytes: r27 to r31, lr and f28 to f31's saves; the
+    // 48 under the frame: SetSticker's original's saves (the original's r28
+    // to r31, lr and f31), with ScenePools::GetB's under it. The generator
+    // put back after (with ApplyDecalWord's), so the groups after them keep
+    // their cases.
+    const Random kept = r;
+    Results results("TuningScreen::ApplyAreaDecals (sub_821F7B90)");
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const uint32_t kind = r.Below(8) == 0 ? r.Below(6) : 1 + r.Below(4);
+            lay(c, kind == 2);
+            field(10012, kind);
+            field(30724, r.Below(8));
+            field(30732, r.Below(6));
+            auto record = [&](uint32_t e) {
+              field(e + 0, uint32_t(int32_t(r.Below(1000)) - 500));
+              field(e + 4, uint32_t(int32_t(r.Below(1000)) - 500));
+              field(e + 8, RandomFloat(r));
+              field(e + 12, RandomFloat(r));
+              field(e + 16, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
+            };
+            record(30832);
+            for (uint32_t k = 0; k < 40; k++) {
+              record(32360 + 24 * k);
+              field(33320 + 4 * k, r.Below(3) == 0 ? 0xFFFFFFFFu : small(30));
+            }
+            guest::StoreU32(h.base, block + kStage + 5600 + 448, r.Below(4));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821F7B90, hooks::TuningApplyAreaDecals, 80, floats,
+          fmt::format("case {}", c), 4160, 48, before, blocks, 0x5000, kGarageBytes,
+          GetBSaves({4160 + 128}));
+    }
+    results.Report();
+    r = kept;
+  }
+  {
+    // ApplyDecalWord (never seen in play): +10012 9 or 10 mostly, else
+    // any. The top 16 bytes: r31 and lr's saves; the 32 under the frame:
+    // SetDecalWord's original's r29 to r31 and lr, with ScenePools::GetB's
+    // under it.
+    const Random kept = r;
+    Results results("TuningScreen::ApplyDecalWord (sub_821FE4E0)");
+    for (int c = 0; c < 30; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            field(10012, r.Below(6) == 0 ? uint32_t(r.Next()) : 9 + r.Below(2));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821FE4E0, hooks::TuningApplyDecalWord, 16, floats,
+          fmt::format("case {}", c), 96, 32, before, blocks, 0x1000, kGarageBytes,
+          GetBSaves({96 + 112}));
+    }
+    results.Report();
+    r = kept;
+  }
+  {
     // UpdateStand: the pages that open or close the stand's animations
     // (categories 0 and 5, items 0, 1 and 4, states 5 and 8 to 11, 18 the
     // paint) mostly, their open states (0x826D84A0, 0x826D849C,

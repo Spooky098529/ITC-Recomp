@@ -31,6 +31,15 @@ void FlushOff() {
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
 }
 
+// A doubleword (ld, std): its high word first.
+uint64_t Load64(uint8_t* base, uint32_t address) {
+  return uint64_t(Load(base, address)) << 32 | Load(base, address + 4);
+}
+void Store64(uint8_t* base, uint32_t address, uint64_t value) {
+  Store(base, address, uint32_t(value >> 32));
+  Store(base, address + 4, uint32_t(value));
+}
+
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
   Store(base, frame, stack);
@@ -227,6 +236,46 @@ uint64_t ReloadDecals(uint8_t* base, const GuestCall& call, uint32_t holder, uin
   ITC_NATIVE_RUNNING("sub_82178EC0 GarageStage::ReloadDecals");
   const uint32_t frame = Frame(base, stack, 96);
   return scene_models::SceneModelReloadDecals(base, call, StageModel(base, holder), frame);
+}
+
+uint64_t SetDecalWord(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                      uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821793D0 GarageStage::SetDecalWord");
+  const uint32_t frame = Frame(base, stack, 112);
+  Store(base, StageModel(base, holder) + 3740, word);
+  return scene_models::SceneModelReloadDecals(base, call, StageModel(base, holder), frame);
+}
+
+uint32_t SetSticker(uint8_t* base, uint32_t holder, uint32_t area, uint32_t slot, uint32_t word,
+                    uint32_t flag, uint64_t r8, uint64_t r9, double f1, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217B3D8 GarageStage::SetSticker");
+  Frame(base, stack, 128);
+  // r8 and r9 into the caller's parameter area (their home slots), read
+  // back from there below.
+  Store64(base, stack + 64, r8);
+  Store64(base, stack + 72, r9);
+  const uint32_t model = StageModel(base, holder);
+  // The record index's base and the code by the area (signed; any other
+  // area 51 and 5).
+  static constexpr uint32_t kIndex[7] = {9, 15, 21, 27, 33, 39, 45};
+  static constexpr uint32_t kCode[7] = {8, 2, 1, 3, 4, 7, 6};
+  const int32_t a = int32_t(area);
+  const bool known = a >= 0 && a <= 6;
+  const uint32_t index = slot + (known ? kIndex[a] : 51);
+  const uint32_t e = model + 32 + (index << 6);
+  Store(base, e + 8, known ? kCode[a] : 5);
+  const uint64_t position0 = Load64(base, stack + 64);
+  const uint64_t position1 = Load64(base, stack + 72);
+  Store(base, e + 0, word);
+  Store(base, e + 4, flag);
+  const uint64_t size0 = Load64(base, stack + 96);
+  const uint64_t size1 = Load64(base, stack + 104);
+  Store64(base, e + 16, position0);
+  Store64(base, e + 24, position1);
+  Stfs(base, e + 32, f1);
+  Store64(base, e + 48, size0);
+  Store64(base, e + 56, size1);
+  return model;
 }
 
 uint64_t WheelsSetTireTextures(uint8_t* base, const GuestCall& call, uint32_t wheels,

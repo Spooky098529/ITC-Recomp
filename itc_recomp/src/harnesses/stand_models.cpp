@@ -575,6 +575,55 @@ void Colors(Context& h, uint32_t b) {
   }
 }
 
+// The decals the tuning screen's never-seen paths set. SetSticker: the
+// area -1 to 8 or any word, the slot 0 to 7 (its caller's 0 to 4 and a few
+// past them; unchecked), any word and flag, r8 and r9 any doublewords, f1 a
+// single, the size in the caller's parameter area at random; the top 48
+// bytes: r28 to r31, lr and f31's saves. SetDecalWord: the stage's world as
+// the re-applies' (ReloadDecals' model not ready, or traffic); the top 32
+// bytes: r29 to r31 and lr's saves.
+void Decals(Context& h, uint32_t b) {
+  {
+    Results results("GarageStage::SetSticker (sub_8217B3D8)");
+    for (int c = 0; c < 64; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             t.r3.u64 = b + kHolderAt;
+             t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(r.Below(10)) - 1);
+             t.r5.u64 = r.Below(8);
+             t.r6.u64 = r.Next();
+             t.r7.u64 = r.Below(2) == 0 ? r.Below(2) : r.Next();
+             t.r8.u64 = r.Next();
+             t.r9.u64 = r.Next();
+             t.f1.f64 = RandomDouble(r);
+           },
+           __imp__sub_8217B3D8, hooks::StandModelsSetSticker, 128, 48, true,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::SetDecalWord (sub_821793D0)");
+    for (int c = 0; c < 48; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             for (const uint32_t m : {kModel, kModel2}) {
+               const bool traffic = r.Below(3) == 0;
+               Put(h.base, b + m + 32, traffic ? 3 : r.Below(3));
+               Put(h.base, b + m + 5036, traffic ? r.Below(2) : 0);
+             }
+             t.r3.u64 = b + kHolderAt;
+             t.r4.u64 = r.Below(2) == 0 ? r.Below(2) : r.Next();
+           },
+           __imp__sub_821793D0, hooks::StandModelsSetDecalWord, 112, 32, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 // SceneWheels::SetSizes: the wheels as LayWheels lays them; r4, r5 any
 // words; r6 and r8 any doublewords, r7 and r9 as GarageStage::SetWheel
 // passes them (a word in the high half, 0 below), or any doubleword now and
@@ -618,6 +667,7 @@ void StandModels(Context& h) {
     SecondWheels(h, b);
     Sizes(h, b);
     Colors(h, b);
+    Decals(h, b);
   }
   memory::Free(allocation);
 }

@@ -157,6 +157,11 @@ void TuningPickCameraPreset(PPCContext& ctx, uint8_t* base);
 void TuningUpdateBusyIcon(PPCContext& ctx, uint8_t* base);
 void TuningPreviewWheels(PPCContext& ctx, uint8_t* base);
 void TuningApplyDecals(PPCContext& ctx, uint8_t* base);
+// ApplyAreaDecals sub_821F7B90 and ApplyDecalWord sub_821FE4E0 (r3 the
+// screen), without adapters (only UpdateStand's plain C++ calls them; the
+// harness's).
+void TuningApplyAreaDecals(PPCContext& ctx, uint8_t* base);
+void TuningApplyDecalWord(PPCContext& ctx, uint8_t* base);
 // DecalCommand sub_822019D0 (r3 the screen; f1 as its last text call leaves
 // it), with TuningStandCalleesNative.
 void TuningDecalCommand(PPCContext& ctx, uint8_t* base);
