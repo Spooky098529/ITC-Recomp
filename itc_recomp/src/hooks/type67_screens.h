@@ -186,6 +186,16 @@ void ColorListScreenPlaceColorCursor(PPCContext& ctx, uint8_t* base);
 void ColorListScreenShowPartNodes(PPCContext& ctx, uint8_t* base);
 void ColorListScreenDestruct(PPCContext& ctx, uint8_t* base);
 void ColorListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep0(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep1(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep2(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep3(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep4(PPCContext& ctx, uint8_t* base);
+void ColorListScreenRunMovie(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep6(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep7(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep8(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep10(PPCContext& ctx, uint8_t* base);
 
 // The type 6 list screen's slots and destructors, the panel and node
 // screens' leaves.

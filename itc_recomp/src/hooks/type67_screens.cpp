@@ -88,7 +88,10 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "sub_822552B8, Page3 sub_82255490, Page4 sub_82255658, Page5 sub_82256508, Page6 "
               "sub_822565A0, Page7 sub_822557F0, Page9 sub_822562E0, PlaceItemCursor "
               "sub_822561D0, PlaceColorCursor sub_82256258, ShowPartNodes sub_82256360, "
-              "~ColorListScreen sub_82255198 and DeletingDestructor sub_82255840 (the same "
+              "~ColorListScreen sub_82255198 and DeletingDestructor sub_82255840, its steps "
+              "Step0 sub_82258578, Step1 sub_82255890, Step2 sub_82256740, Step3 sub_82255B58, "
+              "Step4 sub_82256908, RunMovie sub_82255C88, Step6 sub_82255CD0, Step7 "
+              "sub_82256AC0, Step8 sub_82256030 and Step10 sub_82255EB0 (the same "
               "callees, with MenuList::SetSelection, UiMovie::ShowNode and HideNode's plain "
               "C++); the type 6 "
               "list screen's Type6ListScreen::SetItemTexts sub_822336C0, Back sub_822337B0, "
@@ -394,6 +397,16 @@ ITC_TS_STEP(ColorListScreenDestruct,
             ts::ColorListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ColorListScreenDeletingDestruct,
             ts::ColorListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep0, ts::ColorListScreenStep0(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep1, ts::ColorListScreenStep1(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep2, ts::ColorListScreenStep2(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep3, ts::ColorListScreenStep3(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep4, ts::ColorListScreenStep4(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenRunMovie, ts::ColorListScreenRunMovie(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep6, ts::ColorListScreenStep6(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep7, ts::ColorListScreenStep7(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep8, ts::ColorListScreenStep8(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep10, ts::ColorListScreenStep10(base, ctx.r3.u64, ctx.r1.u32, calls))
 
 // The type 6 list screen's slots and destructors, the panel and node
 // screens' leaves.
@@ -638,6 +651,18 @@ ITC_TYPE67_SCREENS(82256258, ColorListScreenPlaceColorCursor)
 ITC_TYPE67_SCREENS(82256360, ColorListScreenShowPartNodes)
 ITC_TYPE67_SCREENS(82255198, ColorListScreenDestruct)
 ITC_TYPE67_SCREENS(82255840, ColorListScreenDeletingDestruct)
+// Its step table's steps (through the table, which the recompiled Update
+// builds with the same words).
+ITC_TYPE67_SCREENS(82258578, ColorListScreenStep0)
+ITC_TYPE67_SCREENS(82255890, ColorListScreenStep1)
+ITC_TYPE67_SCREENS(82256740, ColorListScreenStep2)
+ITC_TYPE67_SCREENS(82255B58, ColorListScreenStep3)
+ITC_TYPE67_SCREENS(82256908, ColorListScreenStep4)
+ITC_TYPE67_SCREENS(82255C88, ColorListScreenRunMovie)
+ITC_TYPE67_SCREENS(82255CD0, ColorListScreenStep6)
+ITC_TYPE67_SCREENS(82256AC0, ColorListScreenStep7)
+ITC_TYPE67_SCREENS(82256030, ColorListScreenStep8)
+ITC_TYPE67_SCREENS(82255EB0, ColorListScreenStep10)
 // The type 6 list screen's slots 2, 6, 7, 14, 25, 26 and 0 and its
 // destructor (from the deleting destructor and the type 6 block's, never
 // seen in play; Type6ListScreen::AddRacers sub_8223356C, a piece of

@@ -207,7 +207,9 @@ void LayBlock(uint8_t* base, uint32_t block, Random& r, Kind kind, std::vector<u
     guest::StoreU32(base, s + at, r.Below(6) == 0 ? kNone : r.Below(60));
   }
   for (uint32_t at = 9832; at <= 9932; at += 4) guest::StoreU32(base, s + at, named());
-  for (uint32_t i = 0; i < 30; i++) guest::StoreU32(base, s + 9936 + 4 * i, named());
+  // The node tables' named animations, +9936 to +10132 (the steps index
+  // +10056 and +10096 by the item list's selection, 0 to 9).
+  for (uint32_t i = 0; i < 50; i++) guest::StoreU32(base, s + 9936 + 4 * i, named());
   for (uint32_t i = 0; i < 6; i++) guest::StoreU32(base, s + 11016 + 4 * i, text());
   guest::StoreU32(base, s + 10820, text());
   if (r.Below(4) == 0) guest::StoreU32(base, s + 10140, guest::LoadU32(base, s + 11016));
@@ -479,7 +481,7 @@ void Type67ColorList(Context& h) {
        saves({{24, 0}, {152, 112}, {192, 160}}), __imp__sub_822565A0,
        hooks::ColorListScreenPage6},
       {"ColorListScreen::Page2", 0x822552B8, 16, K::kAny,
-       saves({{32, 0}, {224, 144}}), __imp__sub_822552B8,
+       saves({{32, 0}, {224, 144}, {312, 276}}), __imp__sub_822552B8,
        hooks::ColorListScreenPage2},
       {"ColorListScreen::Page3", 0x82255490, 16, K::kAny,
        saves({{48, 0}, {200, 160}, {328, 288}}), __imp__sub_82255490,
@@ -488,11 +490,38 @@ void Type67ColorList(Context& h) {
        saves({{32, 0}, {184, 144}, {312, 272}}), __imp__sub_82255658,
        hooks::ColorListScreenPage4},
       {"ColorListScreen::Draw", 0x82256CA0, 16, K::kAny,
-       saves({{64, 0}, {280, 240}, {376, 336}, {424, 384}, {552, 512}}), __imp__sub_82256CA0,
+       saves({{64, 0}, {288, 240}, {376, 336}, {440, 376}, {568, 512}}), __imp__sub_82256CA0,
        hooks::ColorListScreenDraw},
       {"ColorListScreen::Update", 0x82256E08, 12, K::kAny,
-       saves({{64, 0}, {288, 240}, {320, 288}, {440, 368}, {560, 496}}), __imp__sub_82256E08,
+       saves({{64, 0}, {288, 240}, {320, 288}, {472, 368}, {592, 496}, {672, 628}}),
+       __imp__sub_82256E08,
        hooks::ColorListScreenUpdate},
+      {"ColorListScreen::Step0", 0x82258578, 8, K::kAny, saves({{24, 0}}), __imp__sub_82258578,
+       hooks::ColorListScreenStep0},
+      {"ColorListScreen::Step1", 0x82255890, 12, K::kAny,
+       saves({{40, 0}, {208, 132}, {296, 260}}), __imp__sub_82255890,
+       hooks::ColorListScreenStep1},
+      {"ColorListScreen::Step2", 0x82256740, 12, K::kAny,
+       saves({{32, 0}, {208, 132}, {312, 260}, {432, 388}}), __imp__sub_82256740,
+       hooks::ColorListScreenStep2},
+      {"ColorListScreen::Step3", 0x82255B58, 12, K::kAny, saves({{32, 0}, {208, 132}}), __imp__sub_82255B58,
+       hooks::ColorListScreenStep3},
+      {"ColorListScreen::Step4", 0x82256908, 12, K::kAny,
+       saves({{40, 0}, {208, 132}, {304, 260}}), __imp__sub_82256908,
+       hooks::ColorListScreenStep4},
+      {"ColorListScreen::RunMovie", 0x82255C88, 4, K::kAny, saves({{8, 0}}), __imp__sub_82255C88,
+       hooks::ColorListScreenRunMovie},
+      {"ColorListScreen::Step6", 0x82255CD0, 12, K::kAny,
+       saves({{32, 0}, {208, 132}, {304, 260}}), __imp__sub_82255CD0,
+       hooks::ColorListScreenStep6},
+      {"ColorListScreen::Step7", 0x82256AC0, 12, K::kAny,
+       saves({{80, 0}, {232, 180}, {352, 308}}), __imp__sub_82256AC0,
+       hooks::ColorListScreenStep7},
+      {"ColorListScreen::Step8", 0x82256030, 12, K::kAny,
+       saves({{56, 0}, {200, 148}, {320, 276}}), __imp__sub_82256030,
+       hooks::ColorListScreenStep8},
+      {"ColorListScreen::Step10", 0x82255EB0, 12, K::kAny, saves({{48, 0}}), __imp__sub_82255EB0,
+       hooks::ColorListScreenStep10},
       {"ColorListScreen::~ColorListScreen", 0x82255198, 8, K::kRelease, saves({{16, 0}}),
        __imp__sub_82255198, hooks::ColorListScreenDestruct},
       {"ColorListScreen::DeletingDestructor", 0x82255840, 4, K::kNoDelete,

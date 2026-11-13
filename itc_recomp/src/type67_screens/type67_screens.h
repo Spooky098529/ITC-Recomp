@@ -746,6 +746,25 @@ uint64_t ColorListScreenPlaceColorCursor(uint8_t* base, uint64_t r3, uint64_t r4
 // The last call's r3.
 uint64_t ColorListScreenShowPartNodes(uint8_t* base, uint64_t r3, uint64_t hide, uint32_t sp,
                                       const Calls& calls);
+// The step table's steps (the page block's +9668 the first-call word),
+// each answering whether it's done: sub_82258578 Step0 (112; the leaving,
+// the first-call quirk kept), sub_82255890 Step1 (128; the opening),
+// sub_82256740 Step2 (128; page 2 to 3), sub_82255B58 Step3 (128; page 3
+// back to 2), sub_82256908 Step4 (128; page 3 to 4), sub_82255C88 RunMovie
+// (96; steps 5 and 9: UiMovie::Run's answer), sub_82255CD0 Step6 (128; page
+// 4 back to 3), sub_82256AC0 Step7 (176; the item list moved, 1),
+// sub_82256030 Step8 (144; the color list moved, 1) and sub_82255EB0 Step10
+// (144; the first list moved, 1).
+uint64_t ColorListScreenStep0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenStep3(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenStep4(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenRunMovie(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenStep6(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenStep7(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenStep8(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorListScreenStep10(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 // sub_82255198 ColorListScreen::~ColorListScreen (96): its vtable,
 // NodeTable::~NodeTable on +10432, MenuList::Release on +10360, +10288,
 // +10216, +10144, ~ListScreen. r3 the screen.
