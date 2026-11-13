@@ -109,9 +109,19 @@ file's history. What's left to see in a drive, from every run:
   otherwise; two new harness groups for the direct paths; every harness
   0 differing, races 38, 24, 38, 23 s at 40 (the short ones the
   harnesses' time), 0 errors; no adapters removable; no subagents.
-  Validation agent running.
+  Validated: `itc_5274` (race 49 s at 180, 0 errors, every harness 0
+  differing outside the expected groups), 4 of 4 harness lines, all
+  four ran in the race. Recorded.
+- Subsystem 5 of 10: the sticker editor's input pages (the tuning
+  screen's states 38 to 46 and 49, `tuning-pages.md`; none seen in
+  play, ported by the 2026-11-12 call; the previous run's "Next"); its
+  line deleted from `leads.md`. Mapping agent running.
 
 ## Done
+
+- Cleanup lead (no mapping): direct calls to the render manager's and
+  texture provider's slots from ~30 native callers,
+  4577728d..bc20b2d4; validated.
 
 - Three small leads: 13 rows in `app-start-up.md`, `models.md`,
   `matrix-math.md` ours, `Matrix::FromFloats` Native,

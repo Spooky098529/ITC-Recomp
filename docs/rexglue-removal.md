@@ -2890,6 +2890,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The save devices' constructor and teardown (with `SaveDevices::Create`; the notification listener a stand-in, no call) | `save-interface.md` | 5 of 5 new rows (and `Create`) | (`--native_save_interface`) |
 | 2026-11-13 | The save devices' slot handlers (the states `SaveDevices::Update` runs, the save, load, check and delete steps and their waits, the overlapped results; B4's steps split into plain C++) | `save-interface.md` | 14 of 14 new rows (with `SaveDevices::Update`, `SaveStep`, `LoadStep`, both overlapped results, `Framework::DeviceList`) | (`--native_save_interface`) |
 | 2026-11-13 | Three small leads: the scene's render manager's slots 7 and 8 and their thunks, the texture provider's getters, the static zero and identity matrices | `app-start-up.md`, `models.md`, `matrix-math.md` | 13 of 13 new rows (and `Matrix::FromFloats` Native) | (`--native_app_start_up`, `--native_models`, `--native_matrix_math`) |
+| 2026-11-13 | Cleanup lead (no mapping, not counted): ~30 native callers in 16 subsystems call the render manager's slots 7 and 8 and the texture provider's getters directly (`hooks/direct_slots.h`) | 16 files' notes | none new | (existing flags) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
