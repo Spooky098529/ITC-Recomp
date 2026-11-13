@@ -705,6 +705,15 @@ void TuningPagesMoveVinylLayers(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveVinylImages(base, call, screen, sp, native_slots);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.

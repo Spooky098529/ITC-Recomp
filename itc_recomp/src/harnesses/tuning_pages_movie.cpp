@@ -1612,6 +1612,19 @@ void VinylLayerFields(PPCContext& t, Random& r, const World& w) {
   HighWord(t, r);
 }
 
+// The image picker (MoveVinylImages; InputVinylImages): the layers' fields
+// (above), with 164 now and then held and the mappers' slot 11 (+44) the
+// read slot sub_8210BFA8 (as the decal edits').
+void VinylImageFields(PPCContext& t, Random& r, const World& w) {
+  VinylLayerFields(t, r, w);
+  for (uint32_t c = 0; c < 4; c++) {
+    guest::StoreU32(w.base, w.at(kVtablesAt) + 0x40 * c + 44, 0x8210BFA8);
+  }
+  const uint32_t c = guest::LoadU32(w.base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(w.base, kMapperEntries + 8 * c);
+  guest::StoreU32(w.base, mapper + 448, r.Below(4) == 0 ? 1u << (164 - 151) : 0);
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -1825,6 +1838,10 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputVinylLayers", 400, __imp__sub_82208CE0,
        hooks::TuningPagesInputVinylLayers, 88, {{176, 232}, {320, 336}}, VinylLayerFields, true});
+  // The image picker's movie side: __savegprlr_29 (32 bytes).
+  Run(h, w,
+      {"TuningScreen::MoveVinylImages", 200, __imp__sub_82202530,
+       hooks::TuningPagesMoveVinylImages, 32, {}, VinylImageFields});
 }
 
 }  // namespace harness

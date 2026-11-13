@@ -616,5 +616,12 @@ uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, ui
 // flag.
 uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
+// sub_82202530 TuningScreen::MoveVinylImages: state 28's movie side (its
+// row): nothing while 164 is held or released or on a move left or right;
+// else on B the window's arrows (167 and 166, or 162 and 161 on page 1)
+// finished and the layer's row (234 an empty layer, else 224) restarted.
+// 128-byte frame; the last call's r3, else the movie's entry or the slot's.
+uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, bool native_slots);
 
 }  // namespace tuning_pages

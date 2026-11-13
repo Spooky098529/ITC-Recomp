@@ -1332,4 +1332,36 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
   return MoveVinylLayers(base, call, screen, frame, flags.native_slots);
 }
 
+uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_82202530 TuningScreen::MoveVinylImages");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, found);
+  Reads asked{base, call, entry, frame, native_slots, found};
+  // Nothing while 164 is held or released, or on a move left or right.
+  if (asked(32, 164, 0x82202598) || asked(44, 164, 0x822025C4) || asked(48, 155, 0x822025F0) ||
+      asked(48, 169, 0x8220261C) || asked(48, 156, 0x82202648) ||
+      asked(48, 170, 0x82202674) || !asked(40, 158, 0x822026A0)) {
+    return asked.r3;
+  }
+  // B: the window's arrows finished, then the layer's row (234 an empty
+  // layer, else 224) restarted.
+  const int32_t page = int32_t(Load(base, s + 30724));
+  if (page == 0) {
+    tuning_screen::FinishNamed(call, frame, 0x822026C0, movie, 167);
+    tuning_screen::FinishNamed(call, frame, 0x822026E8, movie, 166);
+  } else if (page == 1) {
+    tuning_screen::FinishNamed(call, frame, 0x822026DC, movie, 162);
+    tuning_screen::FinishNamed(call, frame, 0x822026E8, movie, 161);
+  }
+  const uint32_t n = Load(base, s + 30724) * 3 + Load(base, s + 30732);
+  const bool empty = int32_t(Load(base, ((n + 7798) << 2) + s)) == -1;
+  const uint64_t named = empty ? 234 : 224;
+  tuning_screen::FinishNamed(call, frame, empty ? 0x82202718 : 0x82202728, movie, named);
+  return tuning_screen::PlayNamed(call, frame, 0x82202744, movie, named, 1);
+}
+
 }  // namespace tuning_pages
