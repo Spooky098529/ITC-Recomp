@@ -90,7 +90,13 @@ file's history. What's left to see in a drive, from every run:
   `models.md` and `matrix-math.md`, with the render manager's slot 7,
   the provider's slots 5-10 and the identity matrix's set-up
   `sub_825D9060`; 6 ready groups; no leads added). Check passed.
-  Migration agent running.
+  Migrated 87dda153..ee595da5: 13 of 13 ours (3 not seen, ported),
+  `Matrix::FromFloats`' adapter removed (`camera-modes.md`), under the
+  existing `--native_app_start_up`, `--native_models`,
+  `--native_matrix_math`; every harness 0 differing, race 38 s at 40,
+  0 errors; a cleanup lead added to `leads.md` (native callers'
+  guest calls into these slots); no subagents. Validation agent
+  running.
 
 ## Done
 

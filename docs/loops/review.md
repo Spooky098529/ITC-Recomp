@@ -77,6 +77,12 @@ When the user has reviewed a run's section, its heading gets
   framework's scene and frame driver), the texture provider's `Get`
   and its `XPR` slots (`models.md`), the zero and identity matrices'
   static set-ups (`matrix-math.md`; no reader of either found).
+- Their migration (87dda153..ee595da5): 13 of 13 ours,
+  `Matrix::FromFloats` Native; the render manager's slots return the
+  object and target and the adapter makes the tail call (the worker
+  pool thunks' precedent); `XPR::GetTexture`'s diagnostics wrap left
+  out of slots 5-7 (as `CarModel::SelectedTexture`); `XPR::FindTexture`
+  (not seen) stays a guest call.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
