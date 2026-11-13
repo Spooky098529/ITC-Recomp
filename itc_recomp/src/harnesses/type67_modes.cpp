@@ -366,6 +366,71 @@ void Handlers(Context& h, const Block& world) {
           },
           [](PPCContext& t, uint32_t w) { t.r4.u64 = w + 0x3200; }, __imp__sub_821BFB48,
           hooks::ControllerOptionsLeave);
+  // The controller pages' steps: the menu (+0x3000) with its side -1, 1, 0
+  // or any and its cursor 0 to 13 (now and then any), the settings
+  // ([0x826D8494], +0x1000) with page 0's sliders around their bounds; the
+  // settings' global put back after.
+  {
+    const uint32_t saved_settings = guest::LoadU32(base, t67::kControllerSettings);
+    const HandlerSetup steps = [base](Random& r, uint32_t w) {
+      guest::StoreU32(base, t67::kControllerData, w + kMenu);
+      guest::StoreU32(base, t67::kControllerSettings, w + 0x1000);
+      const uint32_t sides[4] = {0xFFFFFFFFu, 1, 0, uint32_t(r.Next())};
+      guest::StoreU32(base, w + kMenu + 36, sides[r.Below(4)]);
+      guest::StoreU32(base, w + kMenu + 0, r.Below(8) ? r.Below(14) : uint32_t(r.Next()));
+      for (uint32_t i = 0; i < 3; i++) {
+        guest::StoreU32(base, w + 0x1000 + 272 + 4 * i, uint32_t(int32_t(r.Below(23)) - 11));
+      }
+    };
+    Handler(h, world, "ControllerOptions::StepSliders", 0x821BB290, 32, steps, plain,
+            __imp__sub_821BB290, hooks::ControllerOptionsStepSliders);
+    Handler(h, world, "ControllerOptions::StepButtons", 0x821BB3B8, 16, steps, plain,
+            __imp__sub_821BB3B8, hooks::ControllerOptionsStepButtons);
+    Handler(h, world, "ControllerOptions::StepAnalog", 0x821BB590, 16, steps, plain,
+            __imp__sub_821BB590, hooks::ControllerOptionsStepAnalog);
+    guest::StoreU32(base, t67::kControllerSettings, saved_settings);
+  }
+  // SetMarkY: movie 7 (missing from the table, so UiMovies::Find answers
+  // the word at 0x826C5CDC) a movie in the world (+0x1000) whose live scene
+  // leads through children at small random indexes to the node it writes;
+  // r3 an int (any, small or negative); the frame's words below the
+  // original's register saves compared too.
+  if (ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 7) == Globals::kMissingMovie) {
+    const HandlerSetup marks = [base](Random& r, uint32_t w) {
+      const uint32_t m = w + 0x1000;
+      guest::StoreU32(base, Globals::kMissingMovie, m);
+      guest::StoreU32(base, m + 16, m + 0x100);
+      // Each step: the node's index word (+108) i and its entry (+128 + 8 (i
+      // + child)) the next node.
+      const uint32_t path[4][2] = {{0x100, 8}, {0x300, 5}, {0x500, 0}, {0x700, 0}};
+      for (int k = 0; k < 4; k++) {
+        const uint32_t node = m + path[k][0], index = r.Below(3);
+        guest::StoreU32(base, node + 108, index);
+        guest::StoreU32(base, node + 128 + 8 * (index + path[k][1]),
+                        k < 3 ? m + path[k + 1][0] : m + 0x900);
+      }
+    };
+    // r3: 0, 80, a small negative or any word (the setup's at +0x1F00 and
+    // +0x1F04, the high half).
+    const HandlerArgs mark_y = [base](PPCContext& t, uint32_t w) {
+      t.r3.u64 = (uint64_t(guest::LoadU32(base, w + 0x1F04)) << 32) |
+                 guest::LoadU32(base, w + 0x1F00);
+    };
+    const HandlerSetup marks_y = [base, marks](Random& r, uint32_t w) {
+      marks(r, w);
+      const uint32_t picks[4] = {0, 80, uint32_t(-37 - int32_t(r.Below(100))),
+                                 uint32_t(r.Next())};
+      guest::StoreU32(base, w + 0x1F00, picks[r.Below(4)]);
+      guest::StoreU32(base, w + 0x1F04, r.Below(2) ? 0 : uint32_t(r.Next()));
+    };
+    Handler(h, world, "ControllerOptions::SetMarkY", 0x821C0238, 16, marks_y, mark_y,
+            __imp__sub_821C0238, hooks::ControllerOptionsSetMarkY,
+            [base](Side& side, PPCContext& t, uint32_t) {
+              side.out.Bytes(Read(base, t.r1.u32 - 112, 88));
+            });
+  } else {
+    ITC_LOG_ERROR("harness: type67_modes: movie 7 is in the table; SetMarkY skipped");
+  }
   Handler(h, world, "Type6Dialog::Shown", 0x82231F48, 4, none, plain, __imp__sub_82231F48,
           hooks::Type6DialogShown);
   Handler(h, world, "Type7Dialog::Shown", 0x822419C0, 4, none, plain, __imp__sub_822419C0,

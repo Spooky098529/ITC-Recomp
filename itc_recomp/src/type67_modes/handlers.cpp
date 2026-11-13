@@ -11,6 +11,7 @@
 #include "guest.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
 
 #include <bit>
 #include <initializer_list>
@@ -269,6 +270,60 @@ uint64_t ControllerOptionsLeave(uint8_t* base, uint64_t r3, uint32_t dispatcher)
   StoreU32(base, slot + 4, 0);
   StoreU32(base, slot + 0, message);
   return r3;
+}
+
+uint64_t ControllerOptionsStepSliders(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_821BB290 ControllerOptions::StepSliders");
+  const uint32_t menu = LoadU32(base, kControllerData);
+  const int32_t side = int32_t(LoadU32(base, menu + 36));
+  const uint32_t cursor = LoadU32(base, menu + 0);
+  if ((side != -1 && side != 1) || cursor >= 3) {
+    return 0;
+  }
+  // The sliders (-10 to 10) at +272 to +280: no change at a bound.
+  const uint32_t settings = LoadU32(base, kControllerSettings);
+  const uint32_t field = settings + 272 + 4 * cursor;
+  const int32_t value = int32_t(LoadU32(base, field));
+  if (side == -1 ? value <= -10 : value >= 10) {
+    return 0;
+  }
+  StoreU32(base, field, uint32_t(value + side));
+  return 1;
+}
+
+uint64_t ControllerOptionsStepSide(uint8_t* base, uint32_t offset, uint32_t last) {
+  if (offset == 672) {
+    ITC_NATIVE_RUNNING("sub_821BB3B8 ControllerOptions::StepButtons");
+  } else {
+    ITC_NATIVE_RUNNING("sub_821BB590 ControllerOptions::StepAnalog");
+  }
+  const uint32_t menu = LoadU32(base, kControllerData);
+  const uint32_t side = LoadU32(base, menu + 36);
+  const uint32_t cursor = LoadU32(base, menu + 0);
+  StoreU32(base, LoadU32(base, kControllerSettings) + offset, 0);
+  if (side != kMinusOne && side != 1) {
+    return 0;
+  }
+  StoreU32(base, LoadU32(base, kControllerSettings) + offset, side);
+  return cursor == last ? 0 : 1;
+}
+
+uint64_t ControllerOptionsSetMarkY(uint8_t* base, uint64_t y, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821C0238 ControllerOptions::SetMarkY");
+  const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);
+  StoreU32(base, frame + 80, 7);
+  const uint32_t movie =
+      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  const uint32_t node = ui_movies::FindNode(base, movie, 8, 5);
+  const uint32_t child = ui_movies::Child(base, ui_movies::Child(base, node, 0), 0);
+  // The int's doubleword stored over the key for the conversion (std, lfd,
+  // fcfid, frsp).
+  const int64_t value = int32_t(uint32_t(y));
+  StoreU32(base, frame + 80, uint32_t(uint64_t(value) >> 32));
+  StoreU32(base, frame + 84, uint32_t(uint64_t(value)));
+  guest::StoreFloat(base, child + 16, float(double(value)));
+  return child;
 }
 
 // --- The screens' and dialogs' leaves ---

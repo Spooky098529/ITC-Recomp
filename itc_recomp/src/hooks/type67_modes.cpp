@@ -39,7 +39,8 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "CameraPreset::Copy sub_8217D7D0, GarageCamera::FreePresets sub_8217D760, "
               "GarageCamera::OnPresetsLoaded sub_8217FBE8, StandSlot::Free sub_821800B0, "
               "ControllerOptions::OnEnter sub_821BB120, OnLeft sub_821BB1F8, Show sub_821BB260, "
-              "Open sub_821BC660 and Leave sub_821BFB48, PanelScreen::InitWords sub_82230740, "
+              "Open sub_821BC660, Leave sub_821BFB48, StepSliders sub_821BB290, StepButtons "
+              "sub_821BB3B8, StepAnalog sub_821BB590 and SetMarkY sub_821C0238, PanelScreen::InitWords sub_82230740, "
               "ScreenMachine::Wait sub_82277068, Screen::Reenter sub_8223B740, the dialogs' "
               "Shown sub_82231F48 and sub_822419C0, OnEnter sub_82231F98 and sub_82241A08 and "
               "WaitForMovies sub_82232910 and sub_82242388, the first screens' OnEnter "
@@ -188,6 +189,18 @@ void ControllerOptionsOpen(PPCContext& ctx, uint8_t* base) {
 }
 void ControllerOptionsLeave(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::ControllerOptionsLeave(base, ctx.r3.u64, ctx.r4.u32);
+}
+void ControllerOptionsStepSliders(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::ControllerOptionsStepSliders(base);
+}
+void ControllerOptionsStepButtons(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::ControllerOptionsStepSide(base, 672, 12);
+}
+void ControllerOptionsStepAnalog(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::ControllerOptionsStepSide(base, 680, 6);
+}
+void ControllerOptionsSetMarkY(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::ControllerOptionsSetMarkY(base, ctx.r3.u64, ctx.r1.u32);
 }
 void PanelScreenInitWords(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::PanelScreenInitWords(base, ctx.r3.u64);
@@ -923,6 +936,12 @@ ITC_TYPE67_FREES(821BB1F8, ControllerOptionsOnLeft)
 ITC_TYPE67_MODES(821BB260, ControllerOptionsShow)
 ITC_TYPE67_MODES(821BC660, ControllerOptionsOpen)
 ITC_TYPE67_MODES(821BFB48, ControllerOptionsLeave)
+// The controller pages' steps and SetMarkY (from the pages and
+// MovePage0Cursor, recompiled; never seen in play).
+ITC_TYPE67_MODES(821BB290, ControllerOptionsStepSliders)
+ITC_TYPE67_MODES(821BB3B8, ControllerOptionsStepButtons)
+ITC_TYPE67_MODES(821BB590, ControllerOptionsStepAnalog)
+ITC_TYPE67_MODES(821C0238, ControllerOptionsSetMarkY)
 ITC_TYPE67_MODES(82230740, PanelScreenInitWords)
 ITC_TYPE67_MODES(82277068, ScreenMachineWait)
 ITC_TYPE67_MODES(8223B740, ScreenReenter)

@@ -118,6 +118,22 @@ uint64_t ControllerOptionsOpen(uint8_t* base, uint64_t r3);
 // message 4 (types 2, 4, 6, 8) or 3 (type 7) queued in the dispatcher's
 // ring (`dispatcher` +204).
 uint64_t ControllerOptionsLeave(uint8_t* base, uint64_t r3, uint32_t dispatcher);
+// The settings the controller pages edit ([0x826D8494], the options'
+// settings block).
+constexpr uint32_t kControllerSettings = 0x826D8494;
+// sub_821BB290 ControllerOptions::StepSliders: the menu's side (+36) -1 or 1
+// steps the slider at the cursor (0 to 2: the settings' +272 to +280, -10 to
+// 10); 1 when one changed, else 0.
+uint64_t ControllerOptionsStepSliders(uint8_t* base);
+// sub_821BB3B8 ControllerOptions::StepButtons (`offset` 672, `last` 12) and
+// sub_821BB590 ControllerOptions::StepAnalog (680, 6): the settings'
+// +`offset` = 0, then the menu's side when it's -1 or 1, answering 1 unless
+// the cursor is `last`; 0 with no side.
+uint64_t ControllerOptionsStepSide(uint8_t* base, uint32_t offset, uint32_t last);
+// sub_821C0238 ControllerOptions::SetMarkY: movie 7's node (8, 5)'s child
+// (0)'s child (0) +16 = (float) the int `y` (its 112-byte frame below `sp`:
+// the key 7, then the int's doubleword, at +80). r3 that child.
+uint64_t ControllerOptionsSetMarkY(uint8_t* base, uint64_t y, uint32_t sp);
 
 // sub_82230740 PanelScreen::InitWords: +11672 = 4, +11680 = 9.
 uint64_t PanelScreenInitWords(uint8_t* base, uint64_t r3);
