@@ -48,7 +48,11 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "sub_820A5878, Failed sub_820A4890, Ready sub_820A58D8 and EnumerateStep "
               "sub_820A59C0, the listener delegate's target sub_820A4800 and the framework's "
               "device list sub_820908D8, XGetOverlappedResult sub_82295C98 and GetOverlappedResult "
-              "sub_82295F20 (their waits, never taken here, WaitForSingleObject through the guest) "
+              "sub_82295F20 (their waits, never taken here, WaitForSingleObject through the guest), "
+              "the machines CheckStep sub_820A5A88, SaveStep sub_820A5BE8, LoadStep sub_820A5E68 "
+              "and DeleteStep sub_820A6010 with the waits they poll (no adapters: WaitCloseItem "
+              "sub_820A4C08, WaitDelete sub_820A5290, WaitThumbnail sub_820A5190, WaitClose "
+              "sub_820A5070, WaitWrite sub_820A4E68, WaitRead sub_820A4FF8) "
               "natively instead of through the "
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
@@ -606,6 +610,66 @@ void GetOverlappedResultSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = si::GetOverlappedResult(base, handle, overlapped, bytes, wait, Site(ctx), kernel);
 }
 
+void SlotWaitCloseItemSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitCloseItem(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitDeleteSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitDelete(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitThumbnailSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitThumbnail(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitCloseSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitClose(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitWriteSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitWrite(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitReadSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitRead(base, slot, Site(ctx), kernel);
+}
+
+void SlotCheckStepSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
+  ctx.r3.u64 = si::SlotCheckStep(base, devices, slot, Site(ctx), kernel);
+}
+
+void SlotSaveStepSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
+  ctx.r3.u64 = si::SlotSaveStep(base, devices, slot, Site(ctx), kernel);
+}
+
+void SlotLoadStepSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
+  ctx.r3.u64 = si::SlotLoadStep(base, devices, slot, Site(ctx), kernel);
+}
+
+void SlotDeleteStepSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
+  ctx.r3.u64 = si::SlotDeleteStep(base, devices, slot, Site(ctx), kernel);
+}
+
 }  // namespace hooks
 
 // No adapter (removed 2026-10-28: in play only the request setters' plain
@@ -719,3 +783,10 @@ ITC_SAVE_INTERFACE_ADAPTER(820908D8, FrameworkDeviceListSteps)
 // their other callers Dropped or never in play).
 ITC_SAVE_INTERFACE_ADAPTER(82295C98, XGetOverlappedResultSteps)
 ITC_SAVE_INTERFACE_ADAPTER(82295F20, GetOverlappedResultSteps)
+// The save devices' machines (states 6 to 9); the waits they poll have no
+// adapters (only their plain C++ calls them; the steps above are the
+// harness's).
+ITC_SAVE_INTERFACE_ADAPTER(820A5A88, SlotCheckStepSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A5BE8, SlotSaveStepSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A5E68, SlotLoadStepSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A6010, SlotDeleteStepSteps)

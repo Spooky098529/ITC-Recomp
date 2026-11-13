@@ -105,4 +105,56 @@ uint32_t XGetOverlappedResult(uint8_t* base, uint32_t overlapped, uint32_t resul
 uint32_t GetOverlappedResult(uint8_t* base, uint32_t handle, uint32_t overlapped, uint32_t bytes,
                              uint32_t wait, const CallSite& at, const KernelCalls& kernel);
 
+// The waits the machines below poll (r4 = slot; no adapters: only the
+// handlers' plain C++ calls them). Each polls its step's overlapped with no
+// wait and answers 1 done, 0 pending (996), else its error.
+// sub_820A4C08 SaveSlot::WaitCloseItem: +100 (the open's), -8. 96-byte
+// frame, no saves.
+int32_t SlotWaitCloseItem(uint8_t* base, uint32_t slot, const CallSite& at,
+                          const KernelCalls& kernel);
+// sub_820A5290 SaveSlot::WaitDelete: +136, -12. As WaitCloseItem.
+int32_t SlotWaitDelete(uint8_t* base, uint32_t slot, const CallSite& at,
+                       const KernelCalls& kernel);
+// sub_820A5190 SaveSlot::WaitThumbnail: +136, -9. As WaitCloseItem.
+int32_t SlotWaitThumbnail(uint8_t* base, uint32_t slot, const CallSite& at,
+                          const KernelCalls& kernel);
+// sub_820A5070 SaveSlot::WaitClose: +136 (the content's close); done or an
+// error closes the file handle (+496, unless -1) and the event (+492,
+// unless 0): 1, or -8. 96-byte frame (r31 saved).
+int32_t SlotWaitClose(uint8_t* base, uint32_t slot, const CallSite& at,
+                      const KernelCalls& kernel);
+// sub_820A4E68 SaveSlot::WaitWrite and sub_820A4FF8 SaveSlot::WaitRead:
+// GetOverlappedResult on the file handle (+496) and overlapped (+472),
+// bytes into +500, no wait, then the last error: 1 when it answered
+// nonzero; else 0 for a last error of 996 or 997, the write -10 for 112
+// (the disk full) and -9, the read -11. 112-byte frames (r30, r31 saved).
+int32_t SlotWaitWrite(uint8_t* base, uint32_t slot, const CallSite& at,
+                      const KernelCalls& kernel);
+int32_t SlotWaitRead(uint8_t* base, uint32_t slot, const CallSite& at, const KernelCalls& kernel);
+
+// The machines (r3 = the save devices, r4 = slot): each claims the save
+// devices' +72 first (another slot holding it: their state, nothing done).
+// 112-byte frames (__savegprlr_29).
+constexpr uint32_t kSlotCheckStep = 0x820A5A88;   // 6
+constexpr uint32_t kSlotSaveStep = 0x820A5BE8;    // 7
+constexpr uint32_t kSlotLoadStep = 0x820A5E68;    // 8
+constexpr uint32_t kSlotDeleteStep = 0x820A6010;  // 9
+// sub_820A5A88 SaveSlot::CheckStep (state 6): the enumerated saves opened
+// one by one (sub-step +128, item +132), each one's flag at [+84] cleared
+// when it opens.
+uint32_t SlotCheckStep(uint8_t* base, uint32_t devices, uint32_t slot, const CallSite& at,
+                       const KernelCalls& kernel);
+// sub_820A5BE8 SaveSlot::SaveStep (state 7, files-and-saves.md): by +948,
+// create, write, its wait, close, its wait, the thumbnail and its wait.
+uint32_t SlotSaveStep(uint8_t* base, uint32_t devices, uint32_t slot, const CallSite& at,
+                      const KernelCalls& kernel);
+// sub_820A5E68 SaveSlot::LoadStep (state 8, files-and-saves.md): by +948,
+// open, read, its wait, close and its wait.
+uint32_t SlotLoadStep(uint8_t* base, uint32_t devices, uint32_t slot, const CallSite& at,
+                      const KernelCalls& kernel);
+// sub_820A6010 SaveSlot::DeleteStep (state 9): by +948, the delete and its
+// wait.
+uint32_t SlotDeleteStep(uint8_t* base, uint32_t devices, uint32_t slot, const CallSite& at,
+                        const KernelCalls& kernel);
+
 }  // namespace save_interface

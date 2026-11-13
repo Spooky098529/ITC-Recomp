@@ -140,4 +140,18 @@ void GetOverlappedResultSteps(PPCContext& ctx, uint8_t* base);
 // C++, through `ctx`.
 save_interface::KernelCalls KernelCallsOf(PPCContext& ctx, uint8_t* base);
 
+// The waits the machines poll (r4 = slot; no adapters: only the machines'
+// plain C++ calls them; for the harness).
+void SlotWaitCloseItemSteps(PPCContext& ctx, uint8_t* base);  // sub_820A4C08
+void SlotWaitDeleteSteps(PPCContext& ctx, uint8_t* base);     // sub_820A5290
+void SlotWaitThumbnailSteps(PPCContext& ctx, uint8_t* base);  // sub_820A5190
+void SlotWaitCloseSteps(PPCContext& ctx, uint8_t* base);      // sub_820A5070
+void SlotWaitWriteSteps(PPCContext& ctx, uint8_t* base);      // sub_820A4E68
+void SlotWaitReadSteps(PPCContext& ctx, uint8_t* base);       // sub_820A4FF8
+// The machines: r3 = the save devices, r4 = slot; r3 the next state.
+void SlotCheckStepSteps(PPCContext& ctx, uint8_t* base);   // sub_820A5A88
+void SlotSaveStepSteps(PPCContext& ctx, uint8_t* base);    // sub_820A5BE8
+void SlotLoadStepSteps(PPCContext& ctx, uint8_t* base);    // sub_820A5E68
+void SlotDeleteStepSteps(PPCContext& ctx, uint8_t* base);  // sub_820A6010
+
 }  // namespace hooks

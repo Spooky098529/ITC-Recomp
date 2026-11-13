@@ -154,6 +154,38 @@ void ShapeOverlapped(uint8_t* base, const Layout& l, Random& r) {
   guest::StoreU32(base, l.overlapped + 16, 0);
 }
 
+// The machines' and waits' words: the claim (+72: free, this slot's or
+// another's), the sub-steps, the error words, the thumbnail, the
+// overlappeds, and the handles (none mostly, as B4's steps leave them). No
+// save file is touched: a write or read step (+948 2) gets a create (+136)
+// not done, and a delete (+948 9) no device.
+void ShapeMachine(uint8_t* base, const Layout& l, Random& r) {
+  ShapeSlot(base, l, r);
+  const uint32_t s = l.slot;
+  guest::StoreU32(base, l.devices + 72, Pick(r, {0, 0, s, s, uint32_t(r.Next())}));
+  guest::StoreU32(base, s + 128, r.Below(6));
+  guest::StoreU32(base, s + 132, r.Below(4));
+  guest::StoreU32(base, s + 984, r.Below(4));
+  const uint32_t step = Pick(r, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, uint32_t(r.Next())});
+  guest::StoreU32(base, s + 948, step);
+  guest::StoreU32(base, s + 952, Pick(r, {0, 0, 1, 2, uint32_t(r.Next())}));
+  guest::StoreU32(base, s + 940, Pick(r, {0, 0, uint32_t(r.Next())}));
+  guest::StoreU32(base, s + 100, Status(r));
+  guest::StoreU32(base, s + 136, Pick(r, {0, 0, 997, 996, 2, 0xC0000034}));
+  guest::StoreU32(base, s + 472, Pick(r, {0, 0, 259, 997, 0xC0000034, uint32_t(r.Next())}));
+  const bool handles = r.Below(8) == 0;
+  guest::StoreU32(base, s + 496, handles ? uint32_t(r.Next()) : 0xFFFFFFFF);
+  guest::StoreU32(base, s + 492, handles ? uint32_t(r.Next()) : 0);
+  guest::StoreU32(base, s + 504, 0x00410000);  // a display name "A"
+  guest::StoreU32(base, s + 760, 0x41000000);  // a file name "A"
+  if (step == 2) {
+    guest::StoreU32(base, s + 136, Pick(r, {997, 996, 2}));
+  }
+  if (step == 9) {
+    guest::StoreU32(base, s + 36, 0);
+  }
+}
+
 void NoArgs(PPCContext&, const Layout&) {}
 
 void Shape(uint8_t* base, const Layout& l, Random& r) { ShapeSlot(base, l, r); }
@@ -207,6 +239,39 @@ void SaveHandlers(Context& h) {
             t.r4.u64 = pick == 0 ? 0 : l.result;
             t.r5.u64 = pick == 1 ? 1 : 0;
           }});
+  // The waits (r4 = slot) and the machines (r3 = the save devices).
+  struct Entry {
+    const char* name;
+    GuestFunction original, native;
+  };
+  for (const Entry& e : {
+           Entry{"SaveSlot::WaitCloseItem (sub_820A4C08)", __imp__sub_820A4C08,
+                 hooks::SlotWaitCloseItemSteps},
+           Entry{"SaveSlot::WaitDelete (sub_820A5290)", __imp__sub_820A5290,
+                 hooks::SlotWaitDeleteSteps},
+           Entry{"SaveSlot::WaitThumbnail (sub_820A5190)", __imp__sub_820A5190,
+                 hooks::SlotWaitThumbnailSteps},
+           Entry{"SaveSlot::WaitClose (sub_820A5070)", __imp__sub_820A5070,
+                 hooks::SlotWaitCloseSteps},
+           Entry{"SaveSlot::WaitWrite (sub_820A4E68)", __imp__sub_820A4E68,
+                 hooks::SlotWaitWriteSteps},
+           Entry{"SaveSlot::WaitRead (sub_820A4FF8)", __imp__sub_820A4FF8,
+                 hooks::SlotWaitReadSteps},
+       }) {
+    Run(h, {e.name, 32, e.original, e.native, ShapeMachine, NoArgs});
+  }
+  for (const Entry& e : {
+           Entry{"SaveSlot::CheckStep (sub_820A5A88)", __imp__sub_820A5A88,
+                 hooks::SlotCheckStepSteps},
+           Entry{"SaveSlot::SaveStep (sub_820A5BE8)", __imp__sub_820A5BE8,
+                 hooks::SlotSaveStepSteps},
+           Entry{"SaveSlot::LoadStep (sub_820A5E68)", __imp__sub_820A5E68,
+                 hooks::SlotLoadStepSteps},
+           Entry{"SaveSlot::DeleteStep (sub_820A6010)", __imp__sub_820A6010,
+                 hooks::SlotDeleteStepSteps},
+       }) {
+    Run(h, {e.name, 96, e.original, e.native, ShapeMachine, NoArgs});
+  }
   Run(h, {"GetOverlappedResult (sub_82295F20)", 48, __imp__sub_82295F20,
           hooks::GetOverlappedResultSteps,
           [](uint8_t* base, const Layout& l, Random& r) { ShapeOverlapped(base, l, r); },
