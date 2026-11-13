@@ -158,9 +158,20 @@ file's history. What's left to see in a drive, from every run:
   differing, the callers' files' too after each removal; frame dumps
   at 30 fps without interpolation pixel-identical against each
   fallback flag; race 35 s at 40, 0 errors; no subagents). Left:
-  `Scenery::Draw` itself (ready). Validation agent running.
+  `Scenery::Draw` itself (ready). Validated: `itc_5101` (race 54 s at
+  180, 0 errors, every harness 0 differing outside the expected
+  groups; harnesses ~124 s), 16 of 16 harness lines, no prints added;
+  13 ran in the race, 1 in the replay `itc_5102` (ok), 2 to drive.
+  Recorded.
+- Next: `Scenery::Draw` `sub_820F6068` (ready, 678 lines, its
+  frame-state wrap kept), the group's last, no mapping (not counted).
+  Migration agent running.
 
 ## Done
+
+- `Scenery::Draw`'s rest, part one (no mapping): the billboards, light
+  groups, `DrawArea`, `Minimap::Draw`, 12 adapters removed,
+  f1e47061..ea8acc8f; validated.
 
 - The course scenery's ready groups (no mapping): 10 made native, 15
   adapters removed, 8516e7c6..95d287ef, harness fix 1fdeb678;
@@ -226,5 +237,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the course scenery's ready groups: ours 5824, work left 825
   (wrapped 55, known 374, unknown 396).
+
+- After `Scenery::Draw`'s rest, part one: ours 5830, work left 819
+  (wrapped 53, known 370, unknown 396).
 
 ## Stopped

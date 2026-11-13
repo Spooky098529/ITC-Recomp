@@ -18,6 +18,14 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5101`, `itc_5102`, ok; the
+minimap's point markers, `minimap.md`):
+
+- `sub_82147D18` SetList::Point
+- `sub_820F4BA8` Minimap::DrawPointMarker
+
+The parking area's:
+
 Not in the attract race or the replay (`itc_5052`, `itc_5047`, ok; the
 parking area's car pick, `location-screen.md`, and its camera animations,
 `camera-modes.md`):
