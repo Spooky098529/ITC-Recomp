@@ -90,7 +90,12 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Command21 sub_822087C8 (SwapLayerRecords and SwapOrderTextures by their plain C++ "
               "with --native_tuning_pages), "
               "Command26 sub_82204980, Command27 sub_82204A78, Command32Done sub_821F7498, Command42 "
-              "sub_821F7618, Command52 sub_821F77F0 (movie 16's dialog) and Command53 sub_821F7948; "
+              "sub_821F7618, Command52 sub_821F77F0 (movie 16's dialog) and Command53 sub_821F7948, "
+              "and with --native_tuning_pages the sticker commands Command32 to Command41 "
+              "(sub_821FC7B8, sub_821FCA80, sub_821FA658, sub_821FA9C0, sub_821FAA28, sub_821F8C30, "
+              "sub_821FAD00, sub_821FB0B8, sub_821FCC48, sub_821FCED0) and Command43 to Command51 "
+              "(sub_821FD128, sub_821FD3F8, sub_821FB1F0, sub_821F8FC0 for 46, 48 and 50, sub_821FB450, "
+              "sub_821FB6B0, sub_821FB8D8; src/tuning_pages/sticker_commands.cpp); "
               "its swatch color setter sub_821E7DA0, never seen in play, through the guest) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");

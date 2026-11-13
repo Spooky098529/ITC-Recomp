@@ -1964,6 +1964,104 @@ void StickerFields(PPCContext&, Random& r, const World& w) {
   }
 }
 
+// The update's sticker commands' register steps (no adapters: the native
+// update calls their plain C++).
+template <uint32_t kCommand>
+void StickerCommandStep(PPCContext& ctx, uint8_t* base) {
+  hooks::TuningPagesStickerCommand(ctx, base, kCommand);
+}
+
+// The update's sticker commands (sticker_commands.cpp) over StickerFields'
+// world, with the fields they read as play gives them: the command's end
+// +9720 (0 or 1, now and then any word), the queue's previous state q+8
+// (the editor's states 38 to 49, now and then another), the operation
+// +30740 0 to 3, the edit row +30748 0 to 6, the order position +30756 0 to
+// 4, the pick +30764 0 to 198, and the sticker menu's cursor m+0 and its
+// previous m+4 in the command's page's range (`rows`). Left out below r1
+// (the holes): the varargs SetText and SetNodeText leave in the frames'
+// parameter areas (F - 80 to F - 48 below r1 for a frame of F bytes,
+// SetNodeText's F - 80 to F - 40: the original leaves the varargs registers
+// as the calls before left them, the native version passes 0), and below
+// the frames the helpers' register saves (SetSlot's 80 under ShowSlotImage and ShowStickerListImage the deepest, then the movie sides'
+// 56 or 64, PlaceStickerNode's 48, ShowSlotNode's 40, SetStickerEditTexts'
+// 24) with the helpers' own holes shifted by F (their harnesses' above):
+// the native helpers write neither.
+void StickerCommandCases(Context& h, const World& w) {
+  struct Command {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t saves;
+    uint32_t rows;  // the cursor's range: 0 to rows - 1
+    std::vector<std::pair<uint32_t, uint32_t>> holes;
+  };
+  const Command commands[] = {
+      {"TuningScreen::Command32", __imp__sub_821FC7B8, StickerCommandStep<32>, 48, 8,
+       {{64, 96}, {144, 224}, {288, 944}}},
+      {"TuningScreen::Command33", __imp__sub_821FCA80, StickerCommandStep<33>, 64, 8,
+       {{80, 112}, {160, 240}, {304, 960}}},
+      {"TuningScreen::Command34", __imp__sub_821FA658, StickerCommandStep<34>, 64, 7,
+       {{80, 112}, {160, 240}, {304, 344}}},
+      {"TuningScreen::Command35", __imp__sub_821FA9C0, StickerCommandStep<35>, 16, 7,
+       {{96, 152}, {240, 280}}},
+      {"TuningScreen::Command36", __imp__sub_821FAA28, StickerCommandStep<36>, 40, 4,
+       {{48, 80}, {128, 208}, {192, 224}, {272, 312}}},
+      {"TuningScreen::Command37", __imp__sub_821F8C30, StickerCommandStep<37>, 56, 4,
+       {{144, 200}, {208, 240}, {288, 328}}},
+      {"TuningScreen::Command38", __imp__sub_821FAD00, StickerCommandStep<38>, 48, 7,
+       {{64, 104}, {144, 256}, {304, 368}, {416, 456}}},
+      {"TuningScreen::Command39", __imp__sub_821FB0B8, StickerCommandStep<39>, 56, 7,
+       {{144, 208}, {224, 256}, {304, 368}, {416, 456}}},
+      {"TuningScreen::Command40", __imp__sub_821FCC48, StickerCommandStep<40>, 56, 5,
+       {{144, 224}}},
+      {"TuningScreen::Command41", __imp__sub_821FCED0, StickerCommandStep<41>, 72, 5,
+       {{160, 240}}},
+      {"TuningScreen::Command43", __imp__sub_821FD128, StickerCommandStep<43>, 40, 199,
+       {{48, 80}, {128, 240}, {288, 368}}},
+      {"TuningScreen::Command44", __imp__sub_821FD3F8, StickerCommandStep<44>, 48, 199,
+       {{144, 208}, {224, 256}, {304, 384}}},
+      {"TuningScreen::Command45", __imp__sub_821FB1F0, StickerCommandStep<45>, 56, 7,
+       {{80, 112}, {160, 240}, {272, 312}}},
+      {"TuningScreen::Command46", __imp__sub_821F8FC0, StickerCommandStep<46>, 16, 7,
+       {{96, 160}, {208, 248}}},
+      {"TuningScreen::Command47", __imp__sub_821FB450, StickerCommandStep<47>, 56, 7,
+       {{80, 112}, {160, 240}, {272, 312}}},
+      {"TuningScreen::Command49", __imp__sub_821FB6B0, StickerCommandStep<49>, 32, 7,
+       {{48, 80}, {128, 208}, {240, 280}}},
+      {"TuningScreen::Command51", __imp__sub_821FB8D8, StickerCommandStep<51>, 32, 7,
+       {{48, 80}, {128, 208}}},
+  };
+  for (const Command& c : commands) {
+    const uint32_t rows = c.rows;
+    Run(h, w,
+        {c.name, 100, c.recompiled, c.native, c.saves, c.holes,
+         [rows](PPCContext& t, Random& r, const World& w) {
+           StickerFields(t, r, w);
+           uint8_t* base = w.base;
+           const uint32_t s = w.screen();
+           guest::StoreU32(base, s + 9720,
+                           r.Below(2) == 0 ? 0 : r.Below(6) == 0 ? uint32_t(r.Next()) : 1);
+           static constexpr uint32_t kStates[] = {38, 39, 40, 41, 42, 43, 44, 45, 46, 49};
+           guest::StoreU32(base, w.at(kQueueAt) + 8,
+                           r.Below(8) == 0 ? r.Below(63) : kStates[r.Below(10)]);
+           guest::StoreU32(base, s + 30740, r.Below(4));
+           guest::StoreU32(base, s + 30748, r.Below(7));
+           guest::StoreU32(base, s + 30756, r.Below(5));
+           guest::StoreU32(base, s + 30764, r.Below(199));
+           const uint32_t k = r.Below(rows);
+           // The previous cursor one step away (either way, wrapping) most
+           // of the time, else anywhere in the range.
+           uint32_t previous = r.Below(rows);
+           if (r.Below(3) != 0) {
+             previous = r.Below(2) == 0 ? (k + 1) % rows : (k + rows - 1) % rows;
+           }
+           guest::StoreU32(base, w.menu() + 0, k);
+           guest::StoreU32(base, w.menu() + 4, previous);
+           HighWord(t, r);
+         }});
+  }
+}
+
 // The sticker editor's cases (sticker_pages.cpp): its helpers over
 // StickerFields' world.
 void StickerCases(Context& h, const World& w) {
@@ -2196,6 +2294,7 @@ void StickerCases(Context& h, const World& w) {
   Run(h, w,
       HandleInputSpec("TuningScreen::HandleInput (44 to 46)", 120, {44, 45, 46}, 32, {{112, 152}},
                       asks));
+  StickerCommandCases(h, w);
 }
 
 void TuningPagesMovie(Context& h) {

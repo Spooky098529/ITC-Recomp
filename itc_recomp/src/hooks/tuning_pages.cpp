@@ -1014,6 +1014,14 @@ void TuningPagesInputStickerScale(PPCContext& ctx, uint8_t* base) {
   RunStickerPage(ctx, base, tp::InputStickerScale);
 }
 
+void TuningPagesStickerCommand(PPCContext& ctx, uint8_t* base, uint32_t command) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::StickerCommand(base, call, command, r3, sp).value_or(r3);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.

@@ -832,6 +832,42 @@ uint64_t ShowStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, 
 // ShowSlotNode's node.
 uint32_t ShowStickerOrder(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp);
 
+// --- The update's sticker commands (sticker_commands.cpp) ---
+// TuningScreen::Update's command runners 32 to 41 and 43 to 51 (their rows
+// in docs/functions/tuning-screen.md), none seen in play: r3 the screen (all
+// 64 bits), each from the update's frame `sp`, the UI movie calls through
+// `call` with the originals' return addresses, the helpers above by their
+// plain C++. Each returns r3 as the original leaves it.
+// sub_821FC7B8 Command32 (144-byte frame), sub_821FCA80 Command33 (160),
+// sub_821FA658 Command34 (160), sub_821FA9C0 Command35 (96), sub_821FAA28
+// Command36 (128), sub_821F8C30 Command37 (144), sub_821FAD00 Command38
+// (144), sub_821FB0B8 Command39 (144), sub_821FCC48 Command40 (144),
+// sub_821FCED0 Command41 (160), sub_821FD128 Command43 (128), sub_821FD3F8
+// Command44 (144), sub_821FB1F0 Command45 (160), sub_821F8FC0 Command46
+// (commands 46, 48 and 50; 96), sub_821FB450 Command47 (160), sub_821FB6B0
+// Command49 (128), sub_821FB8D8 Command51 (128). Need flush-to-zero off
+// (PlaceStickerNode under most).
+bool IsStickerCommand(uint32_t command);
+std::optional<uint64_t> StickerCommand(uint8_t* base, const tuning_screen::GuestCall& call,
+                                       uint32_t command, uint64_t r3, uint32_t sp);
+uint64_t Command32(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command33(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command34(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command35(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command36(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command37(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command38(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command39(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command40(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command41(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command43(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command44(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command45(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command46(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command47(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command49(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command51(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+
 // The input pages (their rows), r3 = the screen (all 64 bits), each from
 // HandleInput's frame: Menu::Step, Menu::Pressed, MenuSound::Play and the
 // stand's commands through `call` with the originals' return addresses, the

@@ -654,7 +654,8 @@ struct UpdateCalls {
   load_poll::Calls* paint_poll;  // as UpdateStand's adapter gives it
   bool native_slots;             // --native_action_mappers
   bool native_specs;             // --native_car_specs
-  bool native_pages;             // --native_tuning_pages (Command21's callees)
+  bool native_pages;             // --native_tuning_pages (Command21's callees and the
+                                 // sticker commands)
   // TuningScreen::DrawPowerGraph (sub_821DF350) through its override from
   // `frame` with r3 and r31 = `r3`, r30 = `r30` (its adapter saves them) and
   // the original's return address; f1 left in the guest's.

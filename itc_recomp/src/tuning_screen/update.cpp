@@ -8,9 +8,10 @@
 // adapter works through the guest), UiMovie::Run through its override, the
 // debug state handlers all by their plain C++ (debug.cpp), the command
 // runners never seen in play 5, 11, 12, 17, 19, 20, 26, 27, 42, 52 to 58 and
-// Command32Done by their plain C++ (commands.cpp), and the other command
-// runners never seen in play (below) through the guest with the original's
-// return addresses. The empty
+// Command32Done by their plain C++ (commands.cpp), the sticker commands 32
+// to 41 and 43 to 51 by theirs with native_pages (tuning_pages'
+// sticker_commands.cpp), and the other command runners never seen in play
+// (below) through the guest with the original's return addresses. The empty
 // sub_82106540's calls (the "TUNING SHOP" print, commands 24 and 28) are
 // left out, as other native callers of it do.
 
@@ -18,6 +19,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "tuning_pages/tuning_pages.h"
 
 namespace tuning_screen {
 
@@ -31,7 +33,8 @@ constexpr uint32_t kRun = 0x8211E1B8;   // UiMovie::Run(movie, 0)
 
 // The command runners never seen in play (the command's 8-bit table at
 // 0x8200A9B8): their address and the return address (0 for a native
-// runner, run by the switch below).
+// runner, run by the switch below; the sticker commands 32 to 51 natively
+// with native_pages, else through the guest).
 struct Guest {
   uint32_t function;
   uint32_t lr;
@@ -183,7 +186,9 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
       guest::StoreU32(base, queue + 24, 1);
       const uint32_t dispatcher = uint32_t(r4);
       const Guest g = CommandGuest(command);
-      if (g.function != 0) {
+      if (g.function != 0 && calls.native_pages && tuning_pages::IsStickerCommand(command)) {
+        tuning_pages::StickerCommand(base, call, command, r3, frame);
+      } else if (g.function != 0) {
         guest_call(g.function, {r3}, g.lr);
       } else {
         switch (command) {

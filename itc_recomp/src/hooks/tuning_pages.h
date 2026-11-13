@@ -270,5 +270,9 @@ void TuningPagesInputStickerPicker(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputStickerMove(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputStickerRotate(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputStickerScale(PPCContext& ctx, uint8_t* base);
+// The update's sticker commands 32 to 41 and 43 to 51 (r3 the screen;
+// `command` picks the runner, 46, 48 and 50 the same; no adapters: the
+// native update calls their plain C++, these steps are the harness's).
+void TuningPagesStickerCommand(PPCContext& ctx, uint8_t* base, uint32_t command);
 
 }  // namespace hooks
