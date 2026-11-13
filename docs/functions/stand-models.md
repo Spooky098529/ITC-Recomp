@@ -102,6 +102,23 @@ recompiled callers now run those originals leave their register saves and
 `ScenePools::GetB`'s out (`car_makers`, `tuning_refresh`,
 `tuning_machine`).
 
+The rows left blank, all never seen in play, migrated 2026-11-13 (B7
+loop, a cleanup lead, by the user's 2026-11-12 call): `SetChoice`,
+`SetAero2`, `SetDoorKind`, `ClearLightKit` (beside `SetLightKit` in
+`src/front_end_car_draw/garage_stage.cpp`, as it needs
+`SceneModel::ApplyLightKit`'s calls), `SetAccessory` with
+`SceneModel::ApplyInterior` and the interior's record copy below it
+(`SceneInterior::SetRecord` `sub_820E38E0`, given a row: two 120-byte
+memcpys), and `SetWheelExtras` with `SceneWheels::SetWord68` and
+`SetCaliperTexture` (the load poll's `Wheels::SetRecord` and
+`SetCaliperTexture` plain C++ with its flags), all without adapters: the
+tuning screen's native `PreviewItem`, `RestoreStand`, `SetCaliper`,
+`SetAccessory` and `PreviewInteriorChoices` call their plain C++.
+`ClearLightKit`, like `SetLightKit`, leaves f1 as it is. Their harness
+cases are in `stand_models` and `front_end_car_draw`; the callers'
+harnesses (`car_makers`) leave the originals' register saves the
+recompiled side writes under the frames out.
+
 Ready (by `b7_groups.py`, 2026-11-06): `GarageStage::MakeModel`;
 `TuningScreen::StepSecondWheels` (with `GarageStage::SecondWheelsPending`,
 `AddSecondWheels`, `ApplyWheelPaint` and the shared `sub_820D9E00`);
