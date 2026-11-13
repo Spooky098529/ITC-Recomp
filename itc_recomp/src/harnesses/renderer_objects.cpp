@@ -395,11 +395,129 @@ void DrawFrames(Context& h) {
   results.Report();
 }
 
+// The app's scene at data + 1024 (its command list at +8, random; its
+// render queue at +64 with a vtable at data + 2600 whose slots count or
+// record). The globals they write are set for the case and put back.
+constexpr uint32_t kQueueVtable = 2600;
+
+void SceneQueue(Context& h, uint32_t scene, uint32_t slot5) {
+  const uint32_t vtable = h.data + kQueueVtable;
+  for (uint32_t slot = 0; slot < 8; slot++) {
+    Store(h.base, vtable + 4 * slot, slot == 5 ? slot5 : kCount4);
+  }
+  Store(h.base, scene + ro::kSceneRenderQueue, vtable);
+  Store(h.base, scene + ro::kSceneRenderQueue + 4, 0);
+}
+
+void SceneUpdates(Context& h) {
+  const uint32_t scene = RendererAt(h);
+  const uint32_t saved = Load(h.base, ro::kPrimitiveFlip);
+  Results results("Scene::Update (sub_820988C8)");
+  for (int c = 0; c < 40; c++) {
+    Case(
+        h, results,
+        [&](Blocks&) {
+          RandomScratch(h);
+          SceneQueue(h, scene, kCount4);
+          const uint32_t list = scene + ro::kSceneCommandList;
+          Store(h.base, list + 4, h.random.Below(2));
+          Store(h.base, list + 12, h.random.Below(5000));
+          const uint32_t flips[] = {0, 1, 1, 2, uint32_t(h.random.Next())};
+          Store(h.base, ro::kPrimitiveFlip, flips[h.random.Below(5)]);
+        },
+        [&](PPCContext& t) { t.r3.u64 = scene; }, __imp__sub_820988C8, hooks::AppSceneUpdate,
+        [&](Outputs& out, const PPCContext&, Blocks& blocks) {
+          out.Word(Load(h.base, ro::kPrimitiveFlip));
+          RendererOut(h, out, blocks);
+        },
+        fmt::format("case {}", c));
+  }
+  Store(h.base, ro::kPrimitiveFlip, saved);
+  results.Report();
+}
+
+// Scene::Draw: r4 an interface at the first object whose slot 3 is the
+// game's Renderer::GetVideoOutput (the video output at its +44) or a getter
+// of its +60 (the video output there), the video output's device (+140) a
+// big block as the device state's harness builds it for its packet writers
+// (random, but the command buffer at a block of its own with no segment
+// end, and +10809 bit 6 set: Device::SetShaderGprAllocation's dummy draws
+// fail their reservation at once), the render queue's slot 5 recording r5
+// and the device's +8 and counting. Both versions run the same
+// SetShaderGprAllocation (its adapter's plain C++ under the recompiled
+// VideoOutput::BeginFrame), so the command buffer is compared too.
+constexpr uint32_t kDeviceBytes = 15360;
+constexpr uint32_t kCommandBytes = 65536;
+
+void SceneDraws(Context& h) {
+  const uint32_t device = memory::Alloc(kDeviceBytes, 0);
+  const uint32_t commands = memory::Alloc(kCommandBytes, 0);
+  if (device == 0 || commands == 0) {
+    memory::Free(device);
+    memory::Free(commands);
+    return;
+  }
+  const uint32_t scene = RendererAt(h);
+  const uint32_t saved = Load(h.base, ro::kVblankCount);
+  Results results("Scene::Draw (sub_82098940)");
+  for (int c = 0; c < 40; c++) {
+    const bool game_getter = c % 4 != 3;
+    uint32_t video_output = 0;
+    Case(
+        h, results,
+        [&](Blocks&) {
+          RandomScratch(h);
+          SceneQueue(h, scene, kStoreR5);
+          const uint32_t interface = ObjectAt(h, 0);
+          Objects(h, 1, kCount4);
+          Store(h.base, interface + 32 + 12, game_getter ? ro::kGetVideoOutput : kGetWord60);
+          video_output = game_getter ? interface + 44 : ObjectAt(h, 2);
+          Store(h.base, interface + 60, video_output);
+          Store(h.base, video_output + vo::kDevice, device);
+          for (uint32_t at = 0; at < kDeviceBytes; at += 4) {
+            Store(h.base, device + at, uint32_t(h.random.Next()));
+          }
+          // No dirty register block (the flushes are the device state's
+          // harness's): its +0 to +39 masks 0.
+          for (uint32_t at = 0; at < 40; at += 4) {
+            Store(h.base, device + at, 0);
+          }
+          Store(h.base, device + 10780, Load(h.base, device + 10780) | 1);
+          Store(h.base, device + 40, commands - 4);
+          Store(h.base, device + 44, 0xFFFFFFF0u);
+          Store(h.base, device + 48, 0xFFFFFFF0u);
+          guest::StoreU8(h.base, device + 10809, guest::LoadU8(h.base, device + 10809) | 0x40);
+          Fill(h.base, commands, kCommandBytes);
+          Store(h.base, ro::kVblankCount, uint32_t(h.random.Next()));
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = scene;
+          t.r4.u64 = ObjectAt(h, 0);
+          t.r5.u64 = device;
+        },
+        __imp__sub_82098940, hooks::AppSceneDraw,
+        [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+          out.Word(t.r3.u32);
+          out.Word(Load(h.base, ro::kVblankCount));
+          out.Bytes(Read(h.base, device, kDeviceBytes));
+          out.Bytes(Read(h.base, commands, kCommandBytes));
+          RendererOut(h, out, blocks);
+        },
+        fmt::format("{} case {}", game_getter ? "GetVideoOutput" : "another getter", c));
+  }
+  Store(h.base, ro::kVblankCount, saved);
+  memory::Free(device);
+  memory::Free(commands);
+  results.Report();
+}
+
 }  // namespace
 
 void RendererObjects(Context& h) {
   Interface(h);
   DrawFrames(h);
+  SceneUpdates(h);
+  SceneDraws(h);
 }
 
 }  // namespace harness

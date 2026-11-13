@@ -8,6 +8,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "command_list/command_list.h"
 #include "framework/run_loop.h"
 #include "graphics/video_output.h"
 
@@ -99,6 +100,50 @@ void DrawFrame(uint8_t* base, uint32_t renderer, uint32_t frame,
     app_states::HandlerMapForEach(base, frame + 96, first, last, functor, adjust, inner, calls);
   });
   vo::UnlockDevice(base, video_output, renderer + kRendererDevice);
+}
+
+void FlipPrimitiveWord(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82591838 the primitive word's flip");
+  Store(base, kPrimitiveFlip, Load(base, kPrimitiveFlip) == 1 ? 0 : 1);
+}
+
+void SceneUpdate(uint8_t* base, uint32_t scene, const app_states::AppCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820988C8 Scene::Update");
+  const uint32_t list = scene + kSceneCommandList;
+  command_list::Flip(base, list);
+  command_list::BeginTick(base, list);
+  FlipPrimitiveWord(base);
+  const uint32_t queue = scene + kSceneRenderQueue;
+  calls.set_register(30, list);
+  calls.set_register(31, queue);
+  calls.call(app_states::VirtualTarget(base, queue, 24), queue, std::nullopt, std::nullopt,
+             0x82098910);
+  calls.call(app_states::VirtualTarget(base, queue, 8), queue, std::nullopt, std::nullopt,
+             0x82098924);
+}
+
+void VideoOutputBeginFrame(uint8_t* base, uint32_t video_output, const SetGpr& set_gpr) {
+  ITC_NATIVE_RUNNING("sub_8258D958 VideoOutput::BeginFrame");
+  set_gpr(Load(base, video_output + graphics::video_output::kDevice), 32, 96);
+  Store(base, kVblankCount, 0);
+}
+
+uint32_t SceneDraw(uint8_t* base, uint32_t scene, uint32_t interface, uint32_t device,
+                   const app_states::AppCalls& calls, const SetGpr& set_gpr) {
+  ITC_NATIVE_RUNNING("sub_82098940 Scene::Draw");
+  calls.set_register(29, device);
+  calls.set_register(30, scene);
+  const uint32_t target = app_states::VirtualTarget(base, interface, 12);
+  const uint32_t video_output =
+      target == kGetVideoOutput
+          ? GetVideoOutput(interface)
+          : calls.call(target, interface, std::nullopt, std::nullopt, 0x82098968);
+  calls.set_register(31, video_output);
+  VideoOutputBeginFrame(base, video_output, set_gpr);
+  const uint32_t queue = scene + kSceneRenderQueue;
+  calls.call(app_states::VirtualTarget(base, queue, 20), queue, uint64_t(device),
+             uint64_t(video_output), 0x82098994);
+  return video_output;
 }
 
 }  // namespace renderer_objects

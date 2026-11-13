@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 #include "app_states/app.h"
@@ -66,5 +67,45 @@ uint32_t CallListener(uint8_t* base, uint32_t renderer, uint64_t entry, uint32_t
 // unlocked with the word at +384.
 void DrawFrame(uint8_t* base, uint32_t renderer, uint32_t frame,
                const app_states::AppCalls& calls);
+
+// The app's scene (80 bytes, vtable 0x82000F3C).
+constexpr uint32_t kSceneCommandList = 8;
+constexpr uint32_t kSceneRenderQueue = 64;
+// The word sub_82591838 flips once a tick.
+constexpr uint32_t kPrimitiveFlip = 0x82970BC4;
+// The vblank count VideoOutput::BeginFrame clears.
+constexpr uint32_t kVblankCount = 0x8296BD30;
+constexpr uint32_t kGetVideoOutput = 0x824960E0;
+
+// Device::SetShaderGprAllocation on a device (its plain C++ or original, in
+// the frames the original call makes), for VideoOutput::BeginFrame.
+using SetGpr = std::function<void(uint32_t device, uint32_t vertex, uint32_t pixel)>;
+
+// sub_82591838: [0x82970BC4] = 0 when it was 1, else 1.
+void FlipPrimitiveWord(uint8_t* base);
+
+// sub_820988C8 Scene::Update (tick handler 18): the command list (+8)
+// flipped and its tick begun (CommandList::Flip and BeginTick's plain C++),
+// sub_82591838, then the render queue's (+64) slots 6 (RenderQueue::Flip,
+// returning to 0x82098910) and 2 (ClearRecording, 0x82098924) as guest
+// calls, r30 and r31 as the original sets them.
+void SceneUpdate(uint8_t* base, uint32_t scene, const app_states::AppCalls& calls);
+
+// sub_8258D958 VideoOutput::BeginFrame (probably): `set_gpr` on the device
+// (+140) with 32 vertex and 96 pixel registers, then the vblank count
+// [0x8296BD30] = 0.
+void VideoOutputBeginFrame(uint8_t* base, uint32_t video_output, const SetGpr& set_gpr);
+
+// sub_82098940 Scene::Draw (the renderer's listener 1): the video output
+// from `interface`'s slot 3 (Renderer::GetVideoOutput's plain C++ where the
+// slot is it, else a guest call returning to 0x82098968),
+// VideoOutput::BeginFrame on it (from a 96-byte frame, through `set_gpr`),
+// the empty sub_82106540 left out, then the render queue's slot 5
+// (RenderQueue::Replay with the device and the video output, a guest call
+// returning to 0x82098994: its per-frame replay wrap kept). r29 to r31 as
+// the original sets them. Returns the video output (the original's r3, as
+// the empty call leaves it).
+uint32_t SceneDraw(uint8_t* base, uint32_t scene, uint32_t interface, uint32_t device,
+                   const app_states::AppCalls& calls, const SetGpr& set_gpr);
 
 }  // namespace renderer_objects

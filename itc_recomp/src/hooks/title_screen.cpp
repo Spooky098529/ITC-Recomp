@@ -10,6 +10,7 @@
 #include "title_screen.h"
 
 #include "hooks/boot_mode.h"
+#include "hooks/renderer_objects.h"
 #include "hooks/title_screen_native.h"
 
 #include "guest.h"
@@ -86,7 +87,8 @@ extern "C" REX_FUNC(sub_822221A0) {
   }
 }
 
-// Scene::Update: r3 = scene. Hooked for --log_boot_modes: logs the front
+// Scene::Update: r3 = scene (its plain C++ with --native_renderer_objects,
+// src/renderer_objects/). Hooked for --log_boot_modes: logs the front
 // end's state objects at [0x82814E2C] and [0x82814E34] as they change.
 extern "C" REX_FUNC(sub_820988C8) {
   REX_FUNC_PROLOGUE();
@@ -105,7 +107,11 @@ extern "C" REX_FUNC(sub_820988C8) {
       last = now;
     }
   }
-  __imp__sub_820988C8(ctx, base);
+  if (hooks::NativeRendererObjects()) {
+    hooks::AppSceneUpdate(ctx, base);  // src/renderer_objects/
+  } else {
+    __imp__sub_820988C8(ctx, base);
+  }
 }
 
 // Boot::WaitForMovie, the boot's movie step, run every tick while a movie

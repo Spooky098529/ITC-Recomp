@@ -7,12 +7,15 @@
 #include "app_states/app.h"
 #include "base/flags.h"
 #include "framework/run_loop.h"
+#include "graphics/device_state.h"
+#include "hooks/device_state_calls.h"
 #include "hooks/app_states.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "renderer_objects/renderer_objects.h"
 
 ITC_FLAG_DECLARE(bool, native_video_output);
+ITC_FLAG_DECLARE(bool, native_device_state);
 
 ITC_FLAG_BOOL(native_renderer_objects, true, "ITC",
               "Run the renderer at framework + 76 and the app's scene at framework + 80 "
@@ -22,7 +25,12 @@ ITC_FLAG_BOOL(native_renderer_objects, true, "ITC",
               "--native_heap; a removal, never seen in play, the original), "
               "Renderer::CallListener sub_82091A98 (the delegate a guest call) and, with "
               "--native_video_output, Renderer::DrawFrame sub_82091E58 (no adapter: "
-              "Renderer::ThreadLoop's override calls it; the listeners guest calls) natively "
+              "Renderer::ThreadLoop's override calls it; the listeners guest calls), "
+              "Scene::Update sub_820988C8 (inside its --log_boot_modes wrap; with sub_82591838, "
+              "no adapter; the render queue's slots guest calls) and Scene::Draw sub_82098940 (with "
+              "VideoOutput::BeginFrame sub_8258D958, no adapter: Device::SetShaderGprAllocation's "
+              "plain C++ with --native_device_state; the render queue's replay a guest call, its "
+              "wraps kept) natively "
               "instead of through the translated code (the same results; checked by "
               "--run_harnesses=renderer_objects)");
 
@@ -103,6 +111,42 @@ void RendererDrawFrame(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void AppSceneUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t scene = ctx.r3.u32;
+  const app_states::AppCalls calls = AppStatesCalls(ctx, base);
+  calls.in_frame(112, uint32_t(ctx.lr), [&](uint32_t) { ro::SceneUpdate(base, scene, calls); });
+}
+
+void AppSceneDraw(PPCContext& ctx, uint8_t* base) {
+  const uint32_t scene = ctx.r3.u32, interface = ctx.r4.u32, device = ctx.r5.u32;
+  const app_states::AppCalls calls = AppStatesCalls(ctx, base);
+  // Device::SetShaderGprAllocation from VideoOutput::BeginFrame's 96-byte
+  // frame (its call returning to 0x8258D978), in its own 112-byte frame as
+  // its adapter makes it; its original without --native_device_state.
+  const ro::SetGpr set_gpr = [&](uint32_t gpr_device, uint32_t vertex, uint32_t pixel) {
+    calls.in_frame(96, 0x8258D978, [&](uint32_t) {
+      if (!ITC_FLAG(native_device_state)) {
+        ctx.r3.u64 = gpr_device;
+        ctx.r4.u64 = 0;
+        ctx.r5.u64 = vertex;
+        ctx.r6.u64 = pixel;
+        ctx.lr = 0x8258D978;
+        __imp__sub_822A8A60(ctx, base);
+        return;
+      }
+      guest_call::InFrame(ctx, base, 112, 0x822A8AF4, [&](uint32_t) {
+        graphics::device_state::SetShaderGprAllocation(
+            base, gpr_device, vertex, pixel, hooks::DeviceStateCalls(ctx, base, gpr_device));
+      });
+    });
+  };
+  uint32_t video_output = 0;
+  calls.in_frame(112, uint32_t(ctx.lr), [&](uint32_t) {
+    video_output = ro::SceneDraw(base, scene, interface, device, calls, set_gpr);
+  });
+  ctx.r3.u64 = video_output;
+}
+
 }  // namespace hooks
 
 #define ITC_RENDERER_OBJECTS_ADAPTER(address, step) \
@@ -119,3 +163,4 @@ ITC_RENDERER_OBJECTS_ADAPTER(824960E0, RendererGetVideoOutput)
 ITC_RENDERER_OBJECTS_ADAPTER(820922B8, RendererAddListener)
 ITC_RENDERER_OBJECTS_ADAPTER(82091FF0, RendererApplyRequest)
 ITC_RENDERER_OBJECTS_ADAPTER(82091A98, RendererCallListener)
+ITC_RENDERER_OBJECTS_ADAPTER(82098940, AppSceneDraw)

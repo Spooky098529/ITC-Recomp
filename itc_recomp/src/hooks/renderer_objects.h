@@ -33,4 +33,12 @@ void RendererCallListener(PPCContext& ctx, uint8_t* base);
 // original without the flags.
 void RendererDrawFrame(PPCContext& ctx, uint8_t* base);
 
+// Scene::Update sub_820988C8: r3 = the scene; from a 112-byte frame. No
+// adapter of its own: its wrap (--log_boot_modes, src/hooks/title_screen.cpp)
+// calls this with the flag, else the original.
+void AppSceneUpdate(PPCContext& ctx, uint8_t* base);
+// Scene::Draw sub_82098940: r3 = the scene, r4 = the renderer's interface,
+// r5 = the device; from a 112-byte frame; r3 the video output.
+void AppSceneDraw(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
