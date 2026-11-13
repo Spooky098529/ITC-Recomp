@@ -5,6 +5,7 @@
 
 #include "models/xpr.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
@@ -12,6 +13,8 @@
 #include "memory/heap.h"
 
 #include <cstdlib>
+
+ITC_FLAG_DECLARE(bool, native_models);
 
 namespace models {
 
@@ -328,6 +331,22 @@ uint64_t TextureProviderFindXprTexture(uint8_t* base, uint32_t provider, uint32_
     return 0;
   }
   return call(kXprFindTexture, frame, 0x82594264, xpr, name);
+}
+
+std::optional<uint32_t> CallGet(uint8_t* base, uint32_t provider, uint32_t slot) {
+  if (!ITC_FLAG(native_models) || Load(base, Load(base, provider) + 12) != kTextureProviderGet) {
+    return std::nullopt;
+  }
+  return TextureProviderGet(base, provider, slot);
+}
+
+std::optional<uint64_t> CallXprTexture(uint8_t* base, uint32_t function, uint32_t provider,
+                                       uint32_t slot, uint32_t index, uint32_t sp,
+                                       const ProviderCall& call) {
+  if (!ITC_FLAG(native_models) || function != kTextureProviderXprTexture) {
+    return std::nullopt;
+  }
+  return TextureProviderXprTexture(base, provider, slot, index, sp, call);
 }
 
 }  // namespace models

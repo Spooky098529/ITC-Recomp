@@ -117,4 +117,18 @@ uint64_t TextureProviderXprTexture(uint8_t* base, uint32_t provider, uint32_t sl
 uint64_t TextureProviderFindXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
                                        uint32_t name, uint32_t sp, const ProviderCall& call);
 
+// Native callers of the provider's slot 3 and slots 5 to 7, calling the
+// plain C++ above directly instead of through a guest call of the slot:
+// TextureProviderGet when --native_models is on and `provider`'s vtable slot
+// 3 holds it (as its adapter does), else nullopt (the caller makes its guest
+// call).
+std::optional<uint32_t> CallGet(uint8_t* base, uint32_t provider, uint32_t slot);
+// TextureProviderXprTexture when `function` (the slot's target) is
+// sub_825941D0 and --native_models is on (as its adapter does, `sp` the r1
+// the guest call would have had, `call` its inner guest calls), else nullopt.
+constexpr uint32_t kTextureProviderXprTexture = 0x825941D0;  // slots 5 to 7
+std::optional<uint64_t> CallXprTexture(uint8_t* base, uint32_t function, uint32_t provider,
+                                       uint32_t slot, uint32_t index, uint32_t sp,
+                                       const ProviderCall& call);
+
 }  // namespace models

@@ -393,6 +393,22 @@ void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = models::SharedPixelShader(base, ctx.r3.u32);
 }
 
+bool TextureProviderSlotDirect(PPCContext& ctx, uint8_t* base, uint32_t function) {
+  if (!ITC_FLAG(native_models)) {
+    return false;
+  }
+  if (function == models::kTextureProviderGet) {
+    ctx.r3.u64 = models::TextureProviderGet(base, ctx.r3.u32, ctx.r4.u32);
+    return true;
+  }
+  if (function == models::kTextureProviderXprTexture) {
+    ctx.r3.u64 = models::TextureProviderXprTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r1.u32, ProviderGuestCall(ctx, base));
+    return true;
+  }
+  return false;
+}
+
 }  // namespace hooks
 
 #define ITC_MODELS_ACCESSOR(address, steps)  \

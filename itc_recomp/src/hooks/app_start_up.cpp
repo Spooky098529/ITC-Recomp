@@ -976,3 +976,14 @@ ITC_APP_SLOT(820944D8, SceneSlotFromInterface16)
 ITC_APP_SLOT(82094320, FrameDriverSlot)
 ITC_APP_SLOT(82094498, FrameDriverSlotFromInterface16)
 ITC_APP_SLOT(82094480, FrameDriverSlotFromInterface8)
+
+bool hooks::RenderManagerSlotDirect(PPCContext& ctx, uint8_t* base, uint32_t function) {
+  const auto slot = asu::RenderManagerCall(base, function, ctx.r3.u32);
+  if (!slot) {
+    return false;
+  }
+  ctx.r3.u64 = slot->r3;
+  ctx.r11.u64 = slot->target;
+  ctx.ctr.u64 = slot->target;
+  return true;
+}

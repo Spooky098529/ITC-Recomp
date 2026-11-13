@@ -3,9 +3,14 @@
 
 #include "app_start_up/start_up.h"
 
+#include "base/flags.h"
 #include "base/log.h"
+#include "framework/framework.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+
+ITC_FLAG_DECLARE(bool, native_app_start_up);
+ITC_FLAG_DECLARE(bool, native_framework);
 
 namespace app_start_up {
 
@@ -108,6 +113,44 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   Store(base, app + 124, sound);
   calls.call(kStartUp, app + 16, {}, 0x820947D4, movie, {});
   return app;
+}
+
+std::optional<DirectSlot> RenderManagerCall(uint8_t* base, uint32_t function, uint32_t manager) {
+  constexpr uint32_t kSceneFrom36 = 0x82090908, kRendererFrom36 = 0x820908E0;
+  if (!ITC_FLAG(native_app_start_up) || !ITC_FLAG(native_framework)) {
+    return std::nullopt;
+  }
+  if (function == kRenderManagerScene) {
+    const SlotCall call = SceneSlotFromInterface16(base, manager);
+    if (call.target != kSceneFrom36) {
+      return std::nullopt;
+    }
+    return DirectSlot{framework::SceneFrom36(base, call.object), call.target};
+  }
+  if (function == kRenderManagerFrameDriver) {
+    const SlotCall call = FrameDriverSlotFromInterface16(base, manager);
+    if (call.target != kRendererFrom36) {
+      return std::nullopt;
+    }
+    return DirectSlot{framework::RendererFrom36(base, call.object), call.target};
+  }
+  return std::nullopt;
+}
+
+std::optional<uint32_t> RenderManagerScene(uint8_t* base, uint32_t manager) {
+  const auto slot = RenderManagerCall(base, Load(base, Load(base, manager) + 32), manager);
+  if (!slot) {
+    return std::nullopt;
+  }
+  return slot->r3;
+}
+
+std::optional<uint32_t> RenderManagerFrameDriver(uint8_t* base, uint32_t manager) {
+  const auto slot = RenderManagerCall(base, Load(base, Load(base, manager) + 28), manager);
+  if (!slot) {
+    return std::nullopt;
+  }
+  return slot->r3;
 }
 
 }  // namespace app_start_up

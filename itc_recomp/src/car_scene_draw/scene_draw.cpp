@@ -15,12 +15,14 @@
 #include "car_scene_draw/ops.h"
 #include "guest.h"
 
+#include "app_start_up/start_up.h"
 #include "base/log.h"
 #include "cameras/cameras.h"
 #include "command_list/command_list.h"
 #include "debug/frame_state_diff.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "native/buffers.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -154,9 +156,19 @@ class SceneDraw {
   // The render manager's getters (slot 8, then `slot` of its answer) with
   // the return addresses x and x + 16: the command list (1) or the render
   // queue (2).
+  // Slot 8's plain C++ called directly where it's the game's
+  // (app_start_up::RenderManagerScene).
   uint32_t Get(uint32_t slot, uint32_t x) {
-    const uint32_t object = VtableCall(Load(base_, kRenderApp), 8, x);
+    const uint32_t manager = Load(base_, kRenderApp);
+    const auto scene = app_start_up::RenderManagerScene(base_, manager);
+    const uint32_t object = scene ? *scene : VtableCall(manager, 8, x);
     return VtableCall(object, slot, x + 16);
+  }
+  // The texture provider's slot 3 (r4 = 0), its plain C++ called directly
+  // where it's the game's (models::CallGet).
+  uint32_t ProviderGet(uint32_t provider, uint32_t lr) {
+    const auto got = models::CallGet(base_, provider, 0);
+    return got ? *got : VtableCall(provider, 3, lr, {0});
   }
 
   // --- The command list (each step's getters at x, x + 16; the call at
@@ -652,14 +664,14 @@ void SceneDraw::SharedTextures(uint32_t record) {
     Command(0x820C6EF4, sampler, 16, 1);
     Command(0x820C6F30, sampler, 24, 1);
     const uint32_t textures = Load(base_, f_ + 80);
-    if (textures != 0 && VtableCall(textures, 3, 0x820C6F7C, {0}) != 0) {
-      const uint32_t xpr = VtableCall(Load(base_, f_ + 80), 3, 0x820C6F9C, {0});
+    if (textures != 0 && ProviderGet(textures, 0x820C6F7C) != 0) {
+      const uint32_t xpr = ProviderGet(Load(base_, f_ + 80), 0x820C6F9C);
       if (uint32_t(XprTexture(xpr)) != 0) {
         Command(0x820C6FC0, 4, 1, 0);
         const uint32_t slot = Allocate(1, 0x820C6FF8);
         Store(base_, f_ + 92, slot);
         Store(base_, slot + 0, Load(base_, f_ + 84));
-        const uint32_t again = VtableCall(Load(base_, f_ + 80), 3, 0x820C7038, {0});
+        const uint32_t again = ProviderGet(Load(base_, f_ + 80), 0x820C7038);
         Store(base_, Load(base_, f_ + 92) + 4, uint32_t(XprTexture(again)));
       }
     }

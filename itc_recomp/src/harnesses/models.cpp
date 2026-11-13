@@ -906,6 +906,55 @@ void ProviderGetterCases(Context& h) {
     }
     results.Report();
   }
+  // Native callers' direct calls (hooks::TextureProviderSlotDirect, given the
+  // slot's function as a caller loads it, r1 the caller's frame): slot 3 and
+  // slots 5 to 7 against the recompiled originals (slot 3 the game's Get, or
+  // in some cases of slots 5 to 7 the getter of +60, through the guest).
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "TextureProviderSlotDirect (slot 3, sub_825946B8)"
+                               : "TextureProviderSlotDirect (slots 5 to 7, sub_825941D0)");
+    for (int c = 0; c < 32; c++) {
+      const uint32_t size = c % 8 == 0 ? 0 : 1 + h.random.Below(15);
+      const uint32_t first = c % 13 == 0 ? 0 : elements;
+      const uint32_t slot = c % 11 == 0 ? 0xFFFFFFF0u + h.random.Below(16) : h.random.Below(18);
+      const uint32_t get =
+          which == 1 && c % 9 == 4 ? 0x82090770 : models::kTextureProviderGet;
+      uint32_t words[16];
+      for (uint32_t& w : words) {
+        const uint32_t pick = h.random.Below(5);
+        w = pick == 0 ? 0 : pick == 3 ? uint32_t(h.random.Next()) : xprs[pick & 1];
+        if (which == 1 && pick == 3) w = xprs[0];
+      }
+      const uint32_t counts[2] = {h.random.Below(5), h.random.Below(5)};
+      const uint32_t index = c % 7 == 0 ? 0xFFFFFFF0u + h.random.Below(16) : h.random.Below(6);
+      const uint32_t function =
+          which == 0 ? models::kTextureProviderGet : models::kTextureProviderXprTexture;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        world(get, first, first + 4 * size, words, counts);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = provider;
+        t.r4.u64 = slot;
+        t.r5.u64 = index;
+        Side(v, [&] {
+          if (v == 0) {
+            (which == 0 ? __imp__sub_825946B8 : __imp__sub_825941D0)(t, h.base);
+            out[v].Word(1);
+          } else {
+            out[v].Word(hooks::TextureProviderSlotDirect(t, h.base, function));
+          }
+        });
+        out[v].Bytes(Read(h.base, b, block.bytes));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {} (size {}, slot {:#x}, get {:#x})", c, size, slot, get));
+    }
+    results.Report();
+  }
 }
 
 // --- The model ---
