@@ -2863,6 +2863,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-12 | The type 9 mode: the career's end of the day after a career race (today's result, UI movie 27, `Career::NextDay`; today's event, UI movie 0, the unlocks) | `todays-result.md` | 57 of 57 (38 Overridden, 19 Native) | `--native_todays_result` |
 | 2026-11-12 | The type 12 mode: the Xbox Live network mode (network battle and time attack: its mode select, 14 machines' set-ups and teardowns, the session memory; its Live calls answered with plugged-in data, the user's call) | `network-mode.md` | 130 of 130 rows (95 Overridden, 32 Native, 2 Merged, 1 Dropped) | `--native_network_mode` |
 | 2026-11-12 | The race's end (`RaceMode::ModeAfterRace`: which mode follows a race), with `RaceMode::NextMode` and `Progress::CheckUnlocks` (never seen, ported) | `race-end.md` | 1 of 1 (6 adapters removed) | `--native_race_end` |
+| 2026-11-13 | The options screen's load and save pages (category 5, page 9, the load; category 6, page 10, the save) | `options-load-save.md` | 16 of 16 (2 never seen, ported) | `--native_options_load_save` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5318,3 +5319,16 @@ boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
 27, never called 69, live 208. Imports: 186 called, 54 with a live
 caller. B7 (`b7_status.py`): ours 5,831, work left 818 (Wrapped 52,
 with a row 370, no row yet 396), from 838.
+
+**2026-11-13, the options' load and save pages (branch
+`b7-loop-11-11-26`, the forty-fifth run, its fourth subsystem):**
+`options-load-save.md` (16 rows, 14 in play, `src/options_screen/load_save.cpp`):
+the options screen's category 5 (page 9, the load) and 6 (page 10, the
+save): their sub-page tables, device checks, dialog answers, waits and
+leaves. The map found that the names given before in other files have
+load and save swapped (category 5 calls `GameData::Load`); left for the
+user's review. The replay ran the save page; the load page is on the
+drive list. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 27, never called 69, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,847, work left 804
+(Wrapped 52, with a row 370, no row yet 382), from 818.

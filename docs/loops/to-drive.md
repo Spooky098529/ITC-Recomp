@@ -18,6 +18,22 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5125`, `itc_5126`, ok; the
+options screen's load page, `options-load-save.md`: Options, load the
+game data):
+
+- `sub_821BB858` LoadPage::SetDialog
+- `sub_821BBC10` LoadPage::CheckDevice
+- `sub_821BC7B0` LoadPage::Answer
+- `sub_821BC940` LoadPage::Note
+- `sub_821C2620` LoadPage::Wait
+- `sub_821B9FB0` LoadPage::Close
+- `sub_821C6468` LoadPage::Leave
+- `sub_821B9FF8` OptionsSavePages::Cancel
+- `sub_821BBC68` LoadPage::DeviceAnswer
+
+The minimap's:
+
 Not in the attract race or the replay (`itc_5101`, `itc_5102`, ok; the
 minimap's point markers, `minimap.md`):
 

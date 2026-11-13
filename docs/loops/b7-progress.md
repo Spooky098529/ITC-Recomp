@@ -191,9 +191,20 @@ file's history. What's left to see in a drive, from every run:
   `SetDialog`s' adapters removed; harness cases seeded per case
   (`CaseRandom`) after shifted streams left accept paths unreached;
   harnesses 0 differing, `options_screen`'s too; race 35 s at 40, 0
-  errors; no subagents). Left: none. Validation agent running.
+  errors; no subagents). Left: none. Validated: `itc_5125` (race 53 s
+  at 180, 0 errors, every harness 0 differing outside the expected
+  groups; harnesses ~125 s), 16 of 16 harness lines, no prints added;
+  none in the race, the save page's 7 in the replay `itc_5126` (ok), 9
+  to drive. Recorded.
+- Subsystem 5 of 10: `Type6Screen0`'s pages and steps (`sub_82234BF0`
+  and 8 more, all seen in play, ready; called through its tables at
+  `0x826367B8`); its line deleted from `leads.md`. Mapping agent
+  running.
 
 ## Done
+
+- The options' load and save pages: `options-load-save.md` 16 of 16
+  ours, `--native_options_load_save`, d2d04519..2111429c; validated.
 
 - `Scenery::Draw` (no mapping): 11 adapters removed,
   7bf375c1..bd6bfc88; validated. The course scenery has nothing ready
@@ -273,5 +284,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the options' load and save map: ours 5831, work left 818
   (wrapped 52, known 386, unknown 380).
+
+- After the options' load and save: ours 5847, work left 804 (wrapped
+  52, known 370, unknown 382).
 
 ## Stopped
