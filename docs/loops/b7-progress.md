@@ -223,7 +223,14 @@ file's history. What's left to see in a drive, from every run:
   functions with the file's 97 status-less rows, judged by reading
   callees; `CourseRecords::Of` `sub_82105BF8` to take along; 1 lead
   added, the type 8 mode's list screens). Check passed. Migration
-  agent running (several expected).
+  part 1 a15c7b09..87d4c82e: 102 rows ours (101 Overridden, `AddRacers`
+  Merged), five batches by subagents one at a time; every harness 0
+  differing but one new expected group (`Type6ListScreen::SetUpRace`'s
+  traffic records' unwritten bytes, 11 of 16, as `Race::SetUp`'s;
+  `expected-differences.md`); races 34-38 s at 40, 0 errors. Left: 72
+  rows (the color list, `Type7ListScreen`, the node screen, the panel
+  leftovers, the screen blocks' destructors). Validation agent running
+  on part 1.
 
 ## Done
 

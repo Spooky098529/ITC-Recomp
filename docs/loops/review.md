@@ -170,6 +170,13 @@ When the user has reviewed a run's section, its heading gets
   `StandMode::Release` frees the blocks with `VirtualFree`). Quirks for
   the port: the leaving steps never set their first-call word; the
   cursor helpers leave a 64-bit product in their frames.
+- Its migration, part 1 (a15c7b09..87d4c82e): 102 rows ours (the node
+  tables, the list part, the list helpers, the titled list,
+  `Type6ListScreen` and the panel leaves); `Type6ListScreen::AddRacers`
+  Merged into `SetUpRace`; row corrections (`NodeListScreen::LoadItem`'s
+  +9700/+9704 bit, `ListScreen::Update`'s slot r4s, the titled deleting
+  destructor's vtable store); a new expected group
+  (`expected-differences.md`); ~1,100 new harness cases.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

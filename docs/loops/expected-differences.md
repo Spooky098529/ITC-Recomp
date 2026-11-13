@@ -299,6 +299,12 @@ were at 0.
 |---|---|---|---|---|
 | `sub_82236880` Type6Mode::Init | the transitions' stack leftovers | 6 of 6 | Unwritten stack bytes copied (the members' state machine Inits copy three frame words they never write into each 48-byte transition's functor, +32 to +40; the screen block's constructor, recompiled under the original, leaves other words there than the plain C++'s back chains; dead words; type 7's same group matches) | for review (2026-11-07 22:22 run) |
 
+### `type67-screens.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822334C8` Type6ListScreen::SetUpRace | the traffic records' unwritten bytes | 11 of 16 | Unwritten stack bytes copied (the recompiled race set-up's register saves, `Racers::SetStart`'s 16 records on its stack; seen 0x826C0000 at a record's +3932; as `Race::SetUp`'s group) | for review (2026-11-13 12:31 run) |
+
 ### `network-mode.md`
 
 | Function | Group | Differ | Reason | Review |
