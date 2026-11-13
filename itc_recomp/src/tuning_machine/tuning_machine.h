@@ -112,10 +112,18 @@ uint64_t OnNoticeClosed(uint8_t* base, uint64_t screen, uint32_t sp);
 // sub_821D6A78 TuningMachine::Close (r3 the machine, r4 the mode): +9604 =
 // 7, message 4 posted. A leaf (r3 left).
 void Close(uint8_t* base, uint32_t machine, uint32_t mode);
+// DecalImages::UnloadAll by its plain C++ (with the native heap): its
+// guest calls and whether Texture::Free goes by car_models' plain C++.
+struct UnloadAllNative {
+  const tuning_screen::GuestCall* call;
+  bool native_free;
+};
 // sub_821CBD40 TuningMachine::Destroy (r3 the screen):
-// DecalImages::UnloadAll(+10048), VirtualFree of the queue and the two
-// menus. The last VirtualFree's r3. 112-byte frame.
-uint64_t Destroy(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// DecalImages::UnloadAll(+10048) (its plain C++ with `unload`, else a guest
+// call), VirtualFree of the queue and the two menus. The last VirtualFree's
+// r3. 112-byte frame.
+uint64_t Destroy(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls,
+                 const UnloadAllNative* unload = nullptr);
 // sub_821F8950 DecalImages::SavePlaceholders14 (r3 the decal images): movie
 // 14's placeholder textures ([[[m +28] +640]], [[[m +28] +636]]) into
 // +8844 and +8848. r3 Find's (the pair's address). 112-byte frame.

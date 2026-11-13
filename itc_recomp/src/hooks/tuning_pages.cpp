@@ -1102,7 +1102,10 @@ void TuningPagesStickerCommand(PPCContext& ctx, uint8_t* base, uint32_t command)
     hooks::step(ctx, base);               \
   }
 
-ITC_TUNING_PAGES(82208738, TuningPagesUnloadAll)
+// DecalImages::UnloadAll sub_82208738 has no adapter (removed, B7 loop,
+// 2026-11-13): in play only native callers reach it (TuningScreen::
+// InputCategories and BackToItems, TuningMachine::Destroy), calling its
+// plain C++ with the native heap; its step above is the harness's.
 
 ITC_TUNING_PAGES(821E2660, TuningPagesOnDialogYes)
 
