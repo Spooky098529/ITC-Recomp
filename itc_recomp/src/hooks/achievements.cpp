@@ -1,6 +1,7 @@
 // The achievements natively: adapters in front of src/achievements/
 // (docs/functions/achievements.md), with the register steps the harness
-// shares (hooks/achievements.h). Achievements::Check's callers
+// shares (hooks/achievements.h). AllBeaten and BeatsCourseTime have no
+// adapters: only native Check calls them. Achievements::Check's callers
 // (RaceStates::OnRaceEnd, the network battle screen) and Time::Less's other
 // callers (Time::Clamp, sub_82105EA0) are recompiled, so the adapters stay.
 
@@ -15,7 +16,8 @@ ITC_FLAG_BOOL(native_achievements, true, "ITC",
               "sub_82290788 with AllBeaten sub_82290698, BeatsCourseTime sub_82290710 and "
               "Time::Less sub_820FF708; Achievements::Write sub_82290A30, which still calls "
               "XUserWriteAchievements sub_82294E58 through the function table, so the SDK "
-              "records unlocks) natively instead of through the translated code (the same "
+              "records unlocks) natively (AllBeaten and BeatsCourseTime only from native Check; the "
+              "flag switches Check) instead of through the translated code (the same "
               "words; checked by --run_harnesses=achievements)");
 
 namespace hooks {
@@ -63,14 +65,6 @@ void TimeLessSteps(PPCContext& ctx, uint8_t* base) {
                                       guest::LoadU32(base, ctx.r4.u32));
 }
 
-void AchievementsAllBeatenSteps(PPCContext& ctx, uint8_t* base) {
-  ctx.r3.u64 = achievements::AllBeaten(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
-}
-
-void AchievementsBeatsCourseTimeSteps(PPCContext& ctx, uint8_t* base) {
-  ctx.r3.u64 = achievements::BeatsCourseTime(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
-}
-
 void AchievementsCheckSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = achievements::Check(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
@@ -94,8 +88,6 @@ void AchievementsWriteSteps(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_ACHIEVEMENTS(820FF708, TimeLessSteps)
-ITC_ACHIEVEMENTS(82290698, AchievementsAllBeatenSteps)
-ITC_ACHIEVEMENTS(82290710, AchievementsBeatsCourseTimeSteps)
 ITC_ACHIEVEMENTS(82290788, AchievementsCheckSteps)
 ITC_ACHIEVEMENTS(82290A30, AchievementsWriteSteps)
 

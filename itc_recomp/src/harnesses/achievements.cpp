@@ -123,6 +123,15 @@ void MakeWorld(uint8_t* base, uint32_t data, Random& r) {
   WriteRandomBytes(base, ach::kEntries, 8 * ach::kCount, r);
 }
 
+// AllBeaten's and BeatsCourseTime's register steps (no adapters: only
+// native Check calls them).
+void NativeAllBeaten(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ach::AllBeaten(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+void NativeBeatsCourseTime(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ach::BeatsCourseTime(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
 // XUserWriteAchievements' calls in a case.
 struct WriteCall {
   uint32_t r1, lr, r3, r4, r5, user, id, answer;
@@ -239,7 +248,7 @@ void Achievements(Context& h) {
   // AllBeaten: r29 to r31 and lr saved in [sp - 32, sp).
   Group(
       h, "Achievements::AllBeaten (sub_82290698)", 400, __imp__sub_82290698,
-      hooks::AchievementsAllBeatenSteps, 112, 32, [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
+      NativeAllBeaten, 112, 32, [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
         const uint32_t count = Pick(r, {0, 1, 1, 1, 3, 9, 12});
         for (uint32_t i = 0; i < count; i++) {
           guest::StoreU32(base, data + kList + 4 * i, 376 + r.Below(24));
@@ -250,7 +259,7 @@ void Achievements(Context& h) {
   // BeatsCourseTime: r31 and lr saved in [sp - 16, sp).
   Group(
       h, "Achievements::BeatsCourseTime (sub_82290710)", 400, __imp__sub_82290710,
-      hooks::AchievementsBeatsCourseTimeSteps, 96, 16, [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
+      NativeBeatsCourseTime, 96, 16, [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
         guest::StoreU32(base, data + kTimes, Pick(r, {0, 1, 2, 3, 4, 5, 6, 7, 8, 0xFFFFFFFFu}));
         guest::StoreU32(base, data + kTimes + 4, PackedTime(r));
         t.r3.u64 = data + kTimes;
