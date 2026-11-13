@@ -1625,6 +1625,75 @@ void VinylImageFields(PPCContext& t, Random& r, const World& w) {
   guest::StoreU32(w.base, mapper + 448, r.Below(4) == 0 ? 1u << (164 - 151) : 0);
 }
 
+// The image picker's page (InputVinylImages): the image picker's fields
+// (above) with the layer +30732 -1 to 5 (it indexes the entries freed and
+// the movie's texture table), entries 0 to 50 with no texture (0 header and
+// data) or held by the kept slot of their index (each distinct: two
+// entries sharing a kept slot would leave one unheld and Texture::Free run
+// on random words), and the kept slots 6 to 14 FreeKept frees held or with
+// no texture; the four wait words [0x826D84B4], [0x826D84B0], [0x826D84A8]
+// and [0x826D84AC] 0 most of the time, else small; the picked image +30764
+// around 0, the list's end +30796 (4, 193 or 198) and between, the group
+// +30768 -1 to 12, the state +9652 24 to 26 mostly; the action one of the
+// moves, 164 held, the group's 161 and 162, A (159 pressed, now and then
+// with 163 fired) or B, now and then none.
+void VinylPickFields(PPCContext& t, Random& r, const World& w) {
+  VinylImageFields(t, r, w);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30732, uint32_t(int32_t(r.Below(7)) - 1));
+  const uint32_t images = s + 10048;
+  for (uint32_t i = 0; i < 51; i++) {
+    const uint32_t e = images + 36 * i;
+    if (r.Below(2) == 0) {
+      guest::StoreU32(base, e + 28, 0);
+      guest::StoreU32(base, e + 32, 0);
+      guest::StoreU32(base, images + 7236 + 8 * i, 0);
+      guest::StoreU32(base, images + 7240 + 8 * i, 0);
+    } else {
+      guest::StoreU32(base, images + 7236 + 8 * i, guest::LoadU32(base, e + 28));
+    }
+  }
+  static constexpr uint32_t kWaits[] = {0x826D84B4, 0x826D84B0, 0x826D84A8, 0x826D84AC};
+  for (const uint32_t at : kWaits) {
+    guest::StoreU32(base, at, r.Below(3) != 0 ? 0 : r.Below(8) == 0 ? 0xFFFFFFFFu : 1 + r.Below(3));
+  }
+  static constexpr uint32_t kLasts[] = {4, 193, 198};
+  const uint32_t last = kLasts[r.Below(3)];
+  guest::StoreU32(base, s + 30796, last);
+  int32_t pick;
+  switch (r.Below(5)) {
+    case 0: pick = int32_t(r.Below(3)) - 1; break;
+    case 1: pick = int32_t(last) + int32_t(r.Below(3)) - 1; break;
+    case 2: pick = int32_t(r.Below(last + 1)); break;
+    case 3: pick = int32_t(r.Below(210)) - 8; break;
+    default: pick = int32_t(r.Below(5)); break;
+  }
+  guest::StoreU32(base, s + 30764, uint32_t(pick));
+  guest::StoreU32(base, s + 30768, uint32_t(int32_t(r.Below(14)) - 1));
+  guest::StoreU32(base, s + 9652, r.Below(5) == 0 ? r.Below(63) : 24 + r.Below(3));
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  static constexpr uint32_t kFired[] = {155, 169, 156, 170, 161, 162};
+  const uint32_t action = r.Below(12);
+  uint32_t pressed = 0, fired = 0;
+  if (action < 6) {
+    fired = 1u << (kFired[action] - 151);
+  } else if (action < 9) {
+    pressed = 1u << (159 - 151);
+    if (r.Below(2) == 0) {
+      fired = 1u << (163 - 151);
+    }
+  } else if (action < 11) {
+    pressed = 1u << (158 - 151);
+  }
+  if (action < 11) {
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, pressed);
+    guest::StoreU32(base, mapper + 464, fired);
+  }
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -1842,6 +1911,14 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::MoveVinylImages", 200, __imp__sub_82202530,
        hooks::TuningPagesMoveVinylImages, 32, {}, VinylImageFields});
+  // Its page: __savegprlr_14 (152 bytes) with its callees' saves its native
+  // version doesn't write: MoveVinylImages' (32), Scroll's (40),
+  // LoadWindow's (56), Reload's (16) and BindVinylTexture's (32) below its
+  // 240-byte frame (240 to 296 below), Reload's under Scroll's and
+  // LoadWindow's frames (368 to 400); Archive::Load recorded.
+  Run(h, w,
+      {"TuningScreen::InputVinylImages", 500, __imp__sub_822058F8,
+       hooks::TuningPagesInputVinylImages, 152, {{240, 296}, {368, 400}}, VinylPickFields, true});
 }
 
 }  // namespace harness

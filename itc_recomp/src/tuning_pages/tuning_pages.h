@@ -623,5 +623,24 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
 // 128-byte frame; the last call's r3, else the movie's entry or the slot's.
 uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, bool native_slots);
+// sub_822058F8 TuningScreen::InputVinylImages: state 28's page (its row):
+// with its wait words [0x826D84B4], [0x826D84B0] and [0x826D84A8] 0, left
+// and right on the picked image +30764 (wrapped by +30796; the window
+// scrolled by DecalImages::Scroll, the scroll wait started), the group (page
+// 0's window swapped with the kept textures; page 1's group +30768 stepped
+// and its window loaded by LoadWindow), A (the edited decal from the layer's
+// saved record or reset, the layer's entries freed and reloaded with the
+// pick, the A wait started) or B (Pop, the layer's texture bound again,
+// command 16 or 17); then each wait set: A's once nothing loads (to state
+// +9652's page, the saved id the pick, the window's middle entries swapped
+// into the layer's through the scratch entry at images + 7200), the
+// scroll's (command 23 the way it went), the group's (the kept textures
+// freed and kept again, or page 1's windows swapped and freed); the layer's
+// node shown or hidden by [0x82636358]; MoveVinylImages with no wait set.
+// 240-byte frame; the last call's r3, else the movie's entry or the slot's.
+// Texture::Free as GuestTextureFree's with the native heap and car models'
+// flag; the sticker editor's sub_821FD5C0 and sub_821FD658 through the guest.
+uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, const PageFlags& flags);
 
 }  // namespace tuning_pages

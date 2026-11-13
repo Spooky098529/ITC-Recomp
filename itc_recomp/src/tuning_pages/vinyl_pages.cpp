@@ -1364,4 +1364,365 @@ uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
   return tuning_screen::PlayNamed(call, frame, 0x82202744, movie, named, 1);
 }
 
+namespace {
+
+// InputVinylImages' wait words.
+constexpr uint32_t kPickWait = 0x826D84B4;    // A's: the pick's loads awaited
+constexpr uint32_t kScrollWait = 0x826D84B0;  // a scroll's loads awaited
+constexpr uint32_t kGroupWait = 0x826D84A8;   // a group change's frame count
+constexpr uint32_t kScrollWay = 0x826D84AC;   // the scroll's direction (1 left, 2 right)
+constexpr uint32_t kShowPickerNode = 0x82636358;  // the layer's node shown when set
+constexpr uint32_t kShowNode = 0x8211AC00;    // UiMovie::ShowNode(movie, sub, node)
+constexpr uint32_t kHideNode = 0x8211AC48;    // UiMovie::HideNode(movie, sub, node)
+constexpr uint32_t kSetGroupImage = 0x821FD5C0;  // +30764 = the group's first image
+constexpr uint32_t kSetImageGroup = 0x821FD658;  // +30768 = the image's group
+constexpr uint32_t kResetAngle = 0x82000A34;  // 0.0f
+constexpr uint32_t kResetScale = 0x82000A30;  // 1.0f
+
+// once(y): y brought into 0 to 4 by one step of 5.
+uint64_t Wrap5(uint64_t y) {
+  return int32_t(y) >= 5 ? y - 5 : int32_t(y) < 0 ? y + 5 : y;
+}
+
+}  // namespace
+
+uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_822058F8 TuningScreen::InputVinylImages");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 240);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, found);
+  const uint32_t entry = PlayerEntry(base);
+  const uint64_t images = screen + 10048;
+  const uint32_t im = uint32_t(images);
+  const bool native_free = flags.native_heap && flags.native_free;
+  Reads asked{base, call, entry, frame, flags.native_slots, found};
+  // r3 as the original leaves it: the last call's (the reads' too).
+  uint64_t r3 = found;
+  auto read = [&](uint32_t offset, uint64_t action, uint32_t lr) {
+    asked.r3 = r3;
+    const bool answer = asked(offset, action, lr);
+    r3 = asked.r3;
+    return answer;
+  };
+  auto sound = [&](uint64_t cue, uint32_t lr) { r3 = call(kMenuSoundPlay, {cue}, frame, lr); };
+  auto free_texture = [&](uint64_t i, uint32_t lr) {
+    r3 = FreeTexture(base, images, i, GuestTextureFree(base, call, frame, lr, native_free));
+  };
+  auto bind = [&](uint64_t i, uint32_t group) {
+    r3 = BindVinylTexture(base, images, uint32_t(i), group, frame);
+  };
+  auto memcpy36 = [&](uint64_t destination, uint64_t source, uint32_t lr) {
+    r3 = Memcpy(base, call, destination, source, 36, frame, lr);
+  };
+  auto loading = [&] {
+    bool any = false;
+    for (uint32_t i = 0; i < 200; i++) {
+      if (int32_t(Load(base, im + 36 * i + 8)) == 1) {
+        any = true;
+      }
+    }
+    return any;
+  };
+  auto layer = [&] { return uint64_t(Load(base, s + 30732)); };
+  auto picked = [&] { return uint64_t(Load(base, s + 30764)); };
+  auto page = [&] { return int32_t(Load(base, s + 30724)); };
+  // The saved id word of the layer: ((page × 3 + l) + 7798) × 4 + s.
+  auto saved_id = [&] {
+    return ((Load(base, s + 30724) * 3 + Load(base, s + 30732) + 7798) << 2) + s;
+  };
+  // Movie 13's texture slot n (by the movie first looked up) = the word at
+  // s + `header`.
+  auto set_slot = [&](uint32_t n, uint32_t header) {
+    const uint32_t value = Load(base, s + header);
+    Store(base, Load(base, Load(base, movie + 28) + (n << 2)), value);
+  };
+  if (Load(base, kPickWait) == 0 && Load(base, kScrollWait) == 0 &&
+      Load(base, kGroupWait) == 0) {
+    if (read(48, 155, 0x822059B0) || read(48, 169, 0x822059DC)) {
+      // Left: the previous image (wrapped to +30796), the window scrolled.
+      sound(4, 0x822061A8);
+      const uint64_t x = picked() - 1;
+      Store(base, kScrollWait, 1);
+      Store(base, s + 9708, 1);
+      Store(base, s + 30764, uint32_t(x));
+      if (int32_t(x) < 0) {
+        Store(base, s + 30764, Load(base, s + 30796));
+      }
+      const int32_t p = page();
+      if (p == 0) {
+        const uint64_t id = Wrap5(Wrap5(picked() - 4)) + 163;
+        r3 = ScrollImages(base, call, images, 0, 12, 9, id, frame, native_free);
+        set_slot(Load(base, s + 30732) + 191, 10652);
+      } else if (p == 1) {
+        r3 = call(kSetImageGroup, {screen, picked()}, frame, 0x822062DC);
+        const uint64_t v = picked();
+        const uint64_t y = v - 4;
+        const uint64_t id = (int32_t(y) >= 194 ? v - 198 : int32_t(y) < 0 ? v + 190 : y) + 189;
+        r3 = ScrollImages(base, call, images, 0, 33, 9, id, frame, native_free);
+        set_slot(Load(base, s + 30732) + 194, 11408);
+      }
+      Store(base, kScrollWay, 1);
+    } else if (read(48, 156, 0x82205A08) || read(48, 170, 0x82205A34)) {
+      // Right: the next image (wrapped to 0), the window scrolled.
+      sound(4, 0x8220600C);
+      const uint64_t x = picked() + 1;
+      const uint32_t last = Load(base, s + 30796);
+      Store(base, kScrollWait, 1);
+      Store(base, s + 9708, 1);
+      Store(base, s + 30764, uint32_t(x));
+      if (int32_t(x) > int32_t(last)) {
+        Store(base, s + 30764, 0);
+      }
+      const int32_t p = page();
+      if (p == 0) {
+        const uint64_t id = Wrap5(Wrap5(picked() + 4)) + 163;
+        r3 = ScrollImages(base, call, images, 1, 12, 9, id, frame, native_free);
+        set_slot(Load(base, s + 30732) + 191, 10652);
+      } else if (p == 1) {
+        r3 = call(kSetImageGroup, {screen, picked()}, frame, 0x8220613C);
+        const uint64_t v = picked();
+        const uint64_t y = v + 4;
+        const uint64_t id = (int32_t(y) >= 194 ? v - 190 : int32_t(y) < 0 ? v + 198 : y) + 189;
+        r3 = ScrollImages(base, call, images, 1, 33, 9, id, frame, native_free);
+        set_slot(Load(base, s + 30732) + 194, 11408);
+      }
+      Store(base, kScrollWay, 2);
+    } else if (read(32, 164, 0x82205A60) || read(44, 164, 0x82205A8C)) {
+      // 164 held or released: nothing.
+    } else if (read(48, 161, 0x82205AB8) || read(48, 162, 0x82205AE4)) {
+      // The group: page 0's window swapped with the kept textures; page 1's
+      // group stepped and its window loaded.
+      sound(4, 0x82205E6C);
+      const int32_t p = page();
+      Store(base, kGroupWait, 1);
+      Store(base, s + 9708, 1);
+      if (p == 0) {
+        Store(base, s + 30764, 0);
+        for (uint32_t k = 0; k < 9; k++) {
+          const uint32_t e = im + 36 * (12 + k), kept = im + 7236 + 8 * (6 + k);
+          const uint32_t kept_header = Load(base, kept);
+          const uint32_t header = Load(base, e + 28);
+          const uint32_t data = Load(base, e + 32);
+          Store(base, e + 28, kept_header);
+          Store(base, e + 32, Load(base, kept + 4));
+          Store(base, kept, header);
+          Store(base, kept + 4, data);
+          bind(12 + k, 0);
+        }
+        set_slot(Load(base, s + 30732) + 191, 10652);
+      } else if (p == 1) {
+        if (read(48, 162, 0x82205F30)) {
+          const uint32_t g = Load(base, s + 30768) + 1;
+          Store(base, s + 30768, g);
+          if (int32_t(g) > 11) {
+            Store(base, s + 30768, 0);
+          }
+        } else if (read(48, 161, 0x82205F78)) {
+          const uint32_t g = Load(base, s + 30768) - 1;
+          Store(base, s + 30768, g);
+          if (int32_t(g) < 0) {
+            Store(base, s + 30768, 11);
+          }
+        }
+        r3 = call(kSetGroupImage, {screen, Load(base, s + 30768)}, frame, 0x82205FA4);
+        for (uint32_t j = 0; j < 9; j++) {
+          free_texture(42 + j, 0x82205FB8);
+        }
+        const uint64_t v = picked();
+        const uint64_t y = v - 4;
+        const uint64_t first = (int32_t(y) >= 194 ? v - 198 : int32_t(y) < 0 ? v + 190 : y) + 189;
+        r3 = LoadWindow(base, call, images, first, 42, 9, 1, frame);
+      }
+    } else if (read(40, 159, 0x82205B10) ||
+               (read(40, 159, 0x82205B3C) && read(48, 163, 0x82205B68))) {
+      // A: the image picked (163 fired too: the layer's saved record back
+      // into the edited decal; else the edited decal and the saved record
+      // reset), the layer's two entries freed and reloaded with it.
+      sound(0, 0x82205C8C);
+      Store(base, kPickWait, 1);
+      if (read(40, 159, 0x82205CB4) && read(48, 163, 0x82205CE0)) {
+        const uint64_t n = uint64_t(Load(base, s + 30724)) * 3 + Load(base, s + 30732);
+        Store(base, s + 9652, 26);
+        r3 = Memcpy(base, call, screen + 30832, n * 24 + screen + 31024, 24, frame, 0x82205D18);
+      } else if (read(40, 159, 0x82205D40)) {
+        const uint32_t angle = Load(base, kResetAngle);
+        Store(base, s + 9652, 26);
+        Store(base, s + 30840, angle);
+        Store(base, s + 30832, 0);
+        Store(base, s + 30836, 0);
+        Store(base, s + 30848, 0);
+        const uint32_t scale = Load(base, kResetScale);
+        Store(base, s + 30852, 0);
+        Store(base, s + 30844, scale);
+        const uint32_t record =
+            (Load(base, s + 30724) * 3 + Load(base, s + 30732)) * 24 + s;
+        Store(base, record + 31032, angle);
+        Store(base, record + 31024, 0);
+        Store(base, record + 31036, scale);
+        Store(base, record + 31028, 0);
+        Store(base, record + 31040, 0);
+        Store(base, record + 31044, 0);
+      }
+      const int32_t p = page();
+      if (p == 0 || p == 1) {
+        const uint64_t a = p == 0 ? 3 : 24, b = p == 0 ? 9 : 30, list = p == 0 ? 163 : 189;
+        free_texture(layer() + a, p == 0 ? 0x82205DC8 : 0x82205E20);
+        free_texture(layer() + b, p == 0 ? 0x82205DD8 : 0x82205E30);
+        const uint64_t i = layer() + a;
+        r3 = ReloadImage(base, call, images, picked() + list, i, frame);
+        const uint64_t j = layer() + b;
+        r3 = ReloadImage(base, call, images, picked() + list, j, frame);
+      }
+    } else if (read(40, 158, 0x82205B94)) {
+      // B: back to the state before, the layer's texture bound again.
+      sound(2, 0x82205BA4);
+      Store(base, s + 9708, 1);
+      const uint32_t popped = Pop(base, s);
+      GoFirstHalf(base, s, popped);
+      const int32_t p = page();
+      if (p == 0) {
+        bind(layer() + 6, 0);
+      } else if (p == 1) {
+        bind(layer() + 27, 1);
+      }
+      const bool empty = int32_t(Load(base, saved_id())) == -1;
+      GoSecondHalf(base, s, empty ? 16 : 17);
+    }
+  }
+  if (Load(base, kPickWait) != 0 && !loading()) {
+    // The pick's loads done: to the state +9652 (26 the layer's edit menu,
+    // 25 its actions, 24 the layers), the saved id = the picked image, the
+    // window's middle entries swapped into the layer's.
+    Store(base, kPickWait, 0);
+    Store(base, s + 9708, 1);
+    const int32_t state = int32_t(Load(base, s + 9652));
+    if (state == 26) {
+      Store(base, s + 9716, 1);
+      Push(base, s, 28);
+      Store(base, s + 30748, 0);
+      Store(base, s + 30752, 5);
+      GoFirstHalf(base, s, Load(base, s + 9652));
+      GoSecondHalf(base, s, 18);
+    } else if (state == 25) {
+      r3 = tuning_screen::FinishNamed(call, frame, 0x82206410, movie, 224);
+      r3 = tuning_screen::PlayNamed(call, frame, 0x8220642C, movie, 224, 1);
+      GoFirstHalf(base, s, Load(base, s + 9652));
+      GoSecondHalf(base, s, 17);
+    } else if (state == 24) {
+      if (int32_t(Load(base, saved_id())) == -1) {
+        r3 = tuning_screen::FinishNamed(call, frame, 0x822064A4, movie, 234);
+        r3 = tuning_screen::PlayNamed(call, frame, 0x822064C0, movie, 234, 1);
+      }
+      GoFirstHalf(base, s, Load(base, s + 9652));
+      GoSecondHalf(base, s, 16);
+    }
+    Store(base, saved_id(), Load(base, s + 30764));
+    const int32_t p = page();
+    if (p == 0 || p == 1) {
+      // Entries (a + l, b + l) and (c + l, d + l) swapped through the scratch
+      // entry at images + 7200.
+      static constexpr uint32_t kLrs[2][6] = {
+          {0x8220655C, 0x82206574, 0x82206584, 0x822065AC, 0x822065C4, 0x822065D4},
+          {0x82206628, 0x82206640, 0x82206650, 0x82206678, 0x82206690, 0x822066A0}};
+      const uint32_t(&lrs)[6] = kLrs[p];
+      const uint64_t scratch = images + 7200;
+      const uint64_t first[2] = {p == 0 ? 3u : 24u, p == 0 ? 9u : 30u};
+      const uint64_t second[2] = {p == 0 ? 0u : 21u, p == 0 ? 6u : 27u};
+      for (uint32_t k = 0; k < 2; k++) {
+        const uint64_t l = layer();
+        const uint64_t from = (l + first[k]) * 36 + images;
+        const uint64_t to = (l + second[k]) * 36 + images;
+        memcpy36(scratch, from, lrs[3 * k]);
+        memcpy36(from, to, lrs[3 * k + 1]);
+        memcpy36(to, scratch, lrs[3 * k + 2]);
+      }
+      const uint32_t group = p == 0 ? 0 : 1;
+      bind(layer() + second[0], group);
+      bind(layer() + second[1], group);
+    }
+  }
+  if (Load(base, kScrollWait) != 0 && !loading() && Load(base, kScrollWay) != 0) {
+    // The scroll's loads done: command 23 (the window's move) the way it
+    // went.
+    const uint32_t way = Load(base, kScrollWay);
+    const uint32_t queue = Load(base, s + 10036);
+    Store(base, kScrollWait, 0);
+    Store(base, s + 9640, way);
+    const uint32_t current = Load(base, queue + 0);
+    if (int32_t(current) != 28) {
+      Store(base, queue + 8, current);
+    }
+    Store(base, queue + 16, kNone);
+    Store(base, queue + 4, 28);
+    Store(base, queue + 0, kNone);
+    Store(base, queue + 12, 23);
+    Store(base, kScrollWay, 0);
+  }
+  if (Load(base, kGroupWait) != 0) {
+    const int32_t p = page();
+    if (p == 0) {
+      // On the third frame the kept textures freed and kept again from the
+      // window.
+      const uint32_t count = Load(base, kGroupWait) + 1;
+      Store(base, kGroupWait, count);
+      if (int32_t(count) == 3) {
+        Store(base, kGroupWait, 0);
+        for (uint32_t k = 0; k < 9; k++) {
+          r3 = FreeKept(base, images, 6 + k,
+                        GuestTextureFree(base, call, frame, 0x822067A0, native_free));
+          KeepTexture(base, images, 12 + k, 6 + k);
+        }
+      }
+    } else if (p == 1 && !loading()) {
+      if (int32_t(Load(base, kGroupWait)) == 1) {
+        // The group's window (42 to 50) swapped with the list's (33 to 41),
+        // movie 13's slots +640 to +660 = entries 35 to 40's headers.
+        for (uint32_t j = 0; j < 9; j++) {
+          const uint32_t a = im + 36 * (42 + j), b = im + 36 * (33 + j);
+          const uint32_t a_header = Load(base, a + 28);
+          const uint32_t b_header = Load(base, b + 28);
+          const uint32_t a_data = Load(base, a + 32);
+          Store(base, a + 28, b_header);
+          Store(base, a + 32, Load(base, b + 32));
+          Store(base, b + 28, a_header);
+          Store(base, b + 32, a_data);
+        }
+        for (uint32_t k = 0; k < 6; k++) {
+          const uint32_t again = tuning_screen::MovieEntry(base, frame, 13);
+          r3 = again;
+          const uint32_t value = Load(base, s + 11336 + 36 * k);
+          Store(base, Load(base, Load(base, Load(base, again) + 28) + 640 + 4 * k), value);
+        }
+        set_slot(Load(base, s + 30732) + 194, 11408);
+      }
+      const uint32_t count = Load(base, kGroupWait) + 1;
+      Store(base, kGroupWait, count);
+      if (int32_t(count) == 3) {
+        Store(base, kGroupWait, 0);
+        for (uint32_t j = 0; j < 9; j++) {
+          free_texture(42 + j, 0x82206998);
+          const uint32_t a = im + 36 * (42 + j), b = im + 36 * (33 + j);
+          Store(base, a + 28, Load(base, b + 28));
+          Store(base, a + 32, Load(base, b + 32));
+        }
+      }
+    }
+  }
+  // The layer's node shown or hidden.
+  const int32_t p = page();
+  if (p == 0 || p == 1) {
+    const bool shown = Load(base, kShowPickerNode) != 0;
+    const uint64_t node = layer() + (p == 0 ? 19 : 22);
+    r3 = call(shown ? kShowNode : kHideNode, {movie, ~0ull, node}, frame,
+              shown ? 0x82206A10 : 0x82206A18);
+  }
+  if (Load(base, kPickWait) == 0 && Load(base, kScrollWait) == 0 &&
+      Load(base, kGroupWait) == 0) {
+    r3 = MoveVinylImages(base, call, screen, frame, flags.native_slots);
+  }
+  return r3;
+}
+
 }  // namespace tuning_pages

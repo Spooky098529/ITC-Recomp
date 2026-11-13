@@ -185,7 +185,9 @@ void TuningPagesMoveLayerEdit(PPCContext& ctx, uint8_t* base);
 // adapter: the harness's step).
 void TuningPagesInputVinylLayers(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveVinylLayers(PPCContext& ctx, uint8_t* base);
-// MoveVinylImages sub_82202530 (no adapter: the harness's step).
+// InputVinylImages sub_822058F8 and MoveVinylImages sub_82202530 (no
+// adapter: the harness's step).
+void TuningPagesInputVinylImages(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

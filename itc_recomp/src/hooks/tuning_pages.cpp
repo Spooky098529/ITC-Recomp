@@ -116,7 +116,11 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "adapter: only InputLayerEdit calls it); state 24's page InputVinylLayers "
               "sub_82208CE0 with its movie side MoveVinylLayers sub_821FFB20 (no adapter: only "
               "InputVinylLayers calls it; FreeTexture, LoadWindow and RestoreStickerTexture by "
-              "their plain C++)) "
+              "their plain C++); state 28's page InputVinylImages sub_822058F8 with its movie "
+              "side MoveVinylImages sub_82202530 (no adapter: only InputVinylImages calls it; "
+              "Scroll, LoadWindow, Reload, FreeTexture, FreeKept and BindVinylTexture by their "
+              "plain C++, the sticker editor's sub_821FD5C0 and sub_821FD658 through the "
+              "guest)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -705,6 +709,15 @@ void TuningPagesMoveVinylLayers(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesInputVinylImages(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputVinylImages(base, call, screen, sp, flags);
+  });
+}
+
 void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -767,6 +780,7 @@ ITC_TUNING_PAGES(82206F48, TuningPagesInputDecalAngle)
 ITC_TUNING_PAGES(82207320, TuningPagesInputDecalScale)
 ITC_TUNING_PAGES(82205110, TuningPagesInputLayerEdit)
 ITC_TUNING_PAGES(82208CE0, TuningPagesInputVinylLayers)
+ITC_TUNING_PAGES(822058F8, TuningPagesInputVinylImages)
 
 // No adapter (B7 loop, 2026-11-13: its only caller, InputVinylView, is native
 // and calls its plain C++; the register step above is the harness's):
@@ -781,7 +795,8 @@ ITC_TUNING_PAGES(82208CE0, TuningPagesInputVinylLayers)
 // call their plain C++; the register steps above are the harness's):
 // MoveDecalPosition sub_82200DC0, MoveDecalAngle sub_822012E8, MoveDecalScale
 // sub_82201620; MoveLayerEdit sub_82200760 (InputLayerEdit); MoveVinylLayers
-// sub_821FFB20 (InputVinylLayers).
+// sub_821FFB20 (InputVinylLayers); MoveVinylImages sub_82202530
+// (InputVinylImages).
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
