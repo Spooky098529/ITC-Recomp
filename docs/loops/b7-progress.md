@@ -302,7 +302,12 @@ file's history. What's left to see in a drive, from every run:
   (the new ones added to the drive list). Recorded.
 - Subsystem 8 of 10: a front-end screen that lists cars (`sub_8224BDC0`
   and `sub_82250778`, `sub_82250890`, `sub_82250AA8`, `sub_82251320`,
-  seen in play, ready); its line deleted from `leads.md`. Mapping agent
+  seen in play, ready); its line deleted from `leads.md`. Mapped
+  `power-graph-screen.md` (4ed4704c: 22 rows, 16 in play: the type 6
+  and 7 modes' power graph screen machine, its handlers, pages, steps,
+  texts and the members' slots (inferred, "probably"); 15 ready groups;
+  pages, steps and slots before their table callers; no leads; no
+  subagents); map checked (0 errors, 15 ready groups). Migration agent
   running.
 
 ## Done
@@ -424,5 +429,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After `HandleInput`: ours 5941, work left 757 (wrapped 52, known
   365, unknown 340).
+
+- After the power graph screen's map: ours 5941, work left 757
+  (wrapped 52, known 381, unknown 324).
 
 ## Stopped

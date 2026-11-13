@@ -13,6 +13,12 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The power graph screen's map (4ed4704c): `power-graph-screen.md`, 22
+  rows (the machine the type 6 and 7 modes share, `PowerGraphScreen67::`);
+  its members' vtable slots inferred from the functions beside each
+  Init (no image read), marked "probably"; `power-graph.md`'s
+  `0x82815EC0` writers corrected (four write 0); `known-data.md`'s
+  `0x82815EB4`, `0x82815EB8` added.
 - `HandleInput` and `Command21` (2787b4aa..658969d6, no mapping):
   `HandleInput` Overridden (a vtable slot), `Input0` Merged,
   `Command21` Native under `--native_tuning_screen`; 29 adapters
