@@ -1407,7 +1407,7 @@ void Dialogs(Context& h, const Block& world) {
   const Block mappers(0x1000);
   if (!mappers.address) return;
   const uint32_t dispatcher = world.address + 0x3200;
-  enum Kind { kStep, kPage, kUpdate, kScreen7 };
+  enum Kind { kStep, kPage, kUpdate, kScreen7, kScreen6 };
   struct Function {
     const char* name;
     uint32_t address, frame, saves;
@@ -1427,6 +1427,10 @@ void Dialogs(Context& h, const Block& world) {
        hooks::Type7Screen0FadeOutStep, kScreen7},
       {"Type7Screen0::ChosenPage", 0x82244610, 112, 16, __imp__sub_82244610,
        hooks::Type7Screen0ChosenPage, kScreen7},
+      {"Type6Screen0::FadeOutStep", 0x822342F0, 112, 24, __imp__sub_822342F0,
+       hooks::Type6Screen0FadeOutStep, kScreen6},
+      {"Type6Screen0::ChosenPage", 0x82234190, 112, 16, __imp__sub_82234190,
+       hooks::Type6Screen0ChosenPage, kScreen6},
       {"Type6Dialog::OpenConfirm", 0x822320D8, 112, 24, __imp__sub_822320D8,
        hooks::Type6DialogOpenConfirm},
       {"Type7Dialog::OpenConfirm", 0x82241B40, 112, 24, __imp__sub_82241B40,
@@ -1571,12 +1575,15 @@ void Dialogs(Context& h, const Block& world) {
         // The type 7 first screen's: its page state (+9648) and menu
         // (+9652) blocks, the step's started word and the item; the screen
         // fades' words (their counts mostly 0).
-        if (f.kind == kScreen7) {
+        if (f.kind == kScreen7 || f.kind == kScreen6) {
+          // Type 6's: the page state at +9644 and the menu at +9648, five
+          // items.
+          const uint32_t d = f.kind == kScreen7 ? 4 : 0;
           const uint32_t page = world.address + 0x3800, menu7 = world.address + 0x3900;
-          guest::StoreU32(base, dialog + 9648, page);
-          guest::StoreU32(base, dialog + 9652, menu7);
+          guest::StoreU32(base, dialog + 9644 + d, page);
+          guest::StoreU32(base, dialog + 9648 + d, menu7);
           guest::StoreU32(base, page + 24, r.Below(2));
-          guest::StoreU32(base, menu7, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(5));
+          guest::StoreU32(base, menu7, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(d ? 5 : 6));
         }
         WriteRandom(base, kFades, kFadesBytes, r);
         guest::StoreU32(base, mode_tick::kFadeOutCounts, r.Below(3) == 0 ? r.Below(40) : 0);
@@ -1743,6 +1750,21 @@ void Screen0Helpers(Context& h, const Block& world) {
     int show = 0;
     bool type7 = false;
     uint32_t below = 0;
+    // The first screens' steps, PlayItem and the pages without a world of
+    // their own above: kAnimated adds movie 22's animations (its lists,
+    // named animations 0 to 48 over the live scene, slots queued and
+    // looping, UiMovie::Run's update and ApplyAnimation recorded through the
+    // dialogs' stand-in) and the screen fades' words (counts mostly 0), the
+    // page state (+9644, type 7 +9648; its started word 0 or 1) and the menu
+    // (+9648, +9652; the item and the previous one 0 to 5, a wrap now and
+    // then); kQuit the save screen's data (+56 0, 1 or another); kGraph the
+    // pick and page blocks as the closes' (the pick 2 or not) with the car
+    // list's graph not shown ([0x82815EC0] 0: CarList::DrawCarPowerGraph
+    // does nothing). The type 6 help's text node (sub-scene 2, child 0: node
+    // 14) a TXT node for kAnimated and `help6`.
+    enum Extra { kNone, kAnimated, kQuit, kGraph };
+    Extra extra = kNone;
+    bool help6 = false;
   };
   const Function functions[] = {
       {"Type6Screen0::Confirm", 0x82233FC8, true, __imp__sub_82233FC8,
@@ -1765,7 +1787,36 @@ void Screen0Helpers(Context& h, const Block& world) {
       {"Type7Screen0::OnDialogClosed", 0x82244B60, false, __imp__sub_82244B60,
        hooks::Type7Screen0OnDialogClosed, 112, 24, 7},
       {"Type7Screen0::MenuPage", 0x82244BF8, true, __imp__sub_82244BF8,
-       hooks::Type7Screen0MenuPage, 112, 24, 0, true},
+       hooks::Type7Screen0MenuPage, 112, 24, 0, true, 0, true},
+      {"Type6Screen0::MenuPage", 0x82234958, true, __imp__sub_82234958,
+       hooks::Type6Screen0MenuPage, 112, 24, 0, true, 0, false},
+      {"Type6Screen0::PlaceCursor", 0x82234428, false, __imp__sub_82234428,
+       hooks::Type6Screen0PlaceCursor},
+      {"Type6Screen0::ShowHelp", 0x822346A8, false, __imp__sub_822346A8,
+       hooks::Type6Screen0ShowHelp, 128, 32, 0, false, 0, false, 0, Function::kNone, true},
+      {"Type6Screen0::PlayItem", 0x822343A8, false, __imp__sub_822343A8,
+       hooks::Type6Screen0PlayItem, 112, 24, 0, false, 0, false, 0, Function::kAnimated},
+      {"Type7Screen0::PlayItem", 0x82244818, false, __imp__sub_82244818,
+       hooks::Type7Screen0PlayItem, 112, 24, 0, false, 0, true, 0, Function::kAnimated},
+      {"Type6Screen0::OpeningStep", 0x82234C20, false, __imp__sub_82234C20,
+       hooks::Type6Screen0OpeningStep, 128, 32, 0, false, 0, false, 0, Function::kAnimated},
+      {"Type7Screen0::OpeningStep", 0x82244E70, false, __imp__sub_82244E70,
+       hooks::Type7Screen0OpeningStep, 128, 32, 0, false, 0, true, 0, Function::kAnimated},
+      {"Type6Screen0::BackStep", 0x82234E38, false, __imp__sub_82234E38,
+       hooks::Type6Screen0BackStep, 128, 32, 0, false, 0, false, 0, Function::kAnimated},
+      {"Type7Screen0::BackStep", 0x822450A8, false, __imp__sub_822450A8,
+       hooks::Type7Screen0BackStep, 128, 32, 0, false, 0, true, 0, Function::kAnimated},
+      {"Type6Screen0::CursorStep", 0x82234D50, false, __imp__sub_82234D50,
+       hooks::Type6Screen0CursorStep, 144, 48, 0, false, 0, false, 0, Function::kAnimated},
+      {"Type7Screen0::CursorStep", 0x82244FC0, false, __imp__sub_82244FC0,
+       hooks::Type7Screen0CursorStep, 144, 48, 0, false, 0, true, 0, Function::kAnimated},
+      // A leaf with tail calls; ShowPage's frame compared.
+      {"Type6Screen0::QuitPage", 0x82234BF0, false, __imp__sub_82234BF0,
+       hooks::Type6Screen0QuitPage, 112, 0, 0, false, 0, false, 0, Function::kQuit},
+      {"Type6Screen0::PowerGraphPage", 0x82234B80, false, __imp__sub_82234B80,
+       hooks::Type6Screen0PowerGraphPage, 96, 16, 0, false, 0, false, 0, Function::kGraph},
+      {"Type7Screen0::PowerGraphPage", 0x82244E00, false, __imp__sub_82244E00,
+       hooks::Type7Screen0PowerGraphPage, 96, 16, 0, false, 0, true, 0, Function::kGraph},
       {"Type6Screen0::ShowCarInfo", 0x82233B70, false, __imp__sub_82233B70,
        hooks::Type6Screen0ShowCarInfo, 4064, 32, 0, false, 2, false},
       {"Type7Screen0::ShowCarInfo", 0x822440D8, false, __imp__sub_822440D8,
@@ -1794,9 +1845,22 @@ void Screen0Helpers(Context& h, const Block& world) {
   const std::vector<uint8_t> saved_controllers = Read(base, menu_helpers::kControllerEntries, 16);
   constexpr uint32_t kTagTxt = 0x54585400;
   static constexpr uint32_t kTags[] = {0x50494300, 0x50524D00, kTagTxt, 0x12345678};
+  // The steps' animations (8 of 64 bytes), the screen fades' words, the save
+  // screen's data's global and the car list graph's shown word.
+  const Block anims(8 * 64);
+  if (!anims.address) return;
+  constexpr uint32_t kFades = mode_tick::kFadeOutDurations, kFadesBytes = 64;
+  constexpr uint32_t kSaveScreenData = 0x826D8454, kGraphShown = 0x82815EC0;
+  const std::vector<uint8_t> saved_fades = Read(base, kFades, kFadesBytes);
+  const uint32_t saved_save_screen = guest::LoadU32(base, kSaveScreenData);
+  const uint32_t saved_graph_shown = guest::LoadU32(base, kGraphShown);
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
-    for (int c = 0; c < (f.menu ? 96 : f.closed != 0 || f.show != 0 ? 48 : 16); c++) {
+    const int cases = f.menu ? 96
+                      : f.closed != 0 || f.show != 0 || f.extra == Function::kAnimated ? 48
+                      : f.extra != Function::kNone                                    ? 24
+                                                                                      : 16;
+    for (int c = 0; c < cases; c++) {
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
         Random r(uint64_t(c) * 977 + f.address);
@@ -1807,6 +1871,10 @@ void Screen0Helpers(Context& h, const Block& world) {
         WriteRandom(base, sp - 1024, 1024 + 256, r);
         BuildLetterStrings(base, strings.address, kStringsBytes);
         guest::StoreU32(base, kStringTable, strings.address);
+        const bool animated = f.extra == Function::kAnimated;
+        if (animated) {
+          ui_movies::InitAnimationLists(base, movie);  // before the scenes: it clears +0 to +24
+        }
         // The scene: node 0 live; its children 0 (TXT node 1), 1 (sub-scene
         // node 2: children 3, 4 TXT nodes 3, 4) and 3 (sub-scene node 5:
         // children 4 to 14 nodes 6 to 15 and 3, tagged at random).
@@ -1821,6 +1889,7 @@ void Screen0Helpers(Context& h, const Block& world) {
         child(node(0), 1, node(2));
         child(node(0), 2, node(5));
         child(node(0), 3, node(5));
+        child(node(0), 4, node(5));  // Type6Screen0::PlaceCursor's (-1, 4)
         child(node(2), 0, node(1));
         child(node(2), 3, node(3));
         child(node(2), 4, node(4));
@@ -1932,9 +2001,11 @@ void Screen0Helpers(Context& h, const Block& world) {
           guest::StoreU32(base, world.address + 0x3A00, kPages[r.Below(5)]);
         }
         if (f.menu) {
+          // Type 6's: the page state at +9644, the menu at +9648, five items.
           const uint32_t menu = world.address + 0x3900, page = world.address + 0x3A00;
-          guest::StoreU32(base, world.address + 9648, page);
-          guest::StoreU32(base, world.address + 9652, menu);
+          const uint32_t md = f.type7 ? 4 : 0, quit = f.type7 ? 3 : 4;
+          guest::StoreU32(base, world.address + 9644 + md, page);
+          guest::StoreU32(base, world.address + 9648 + md, menu);
           static constexpr uint32_t kPages[] = {0, 1, 2, 3, 0xFFFFFFFFu};
           guest::StoreU32(base, page, kPages[r.Below(5)]);
           WriteRandom(base, mappers.address, mappers.bytes, r);
@@ -1971,8 +2042,8 @@ void Screen0Helpers(Context& h, const Block& world) {
           }
           guest::StoreU32(base, menu + menu_helpers::kPlayer, r.Below(4));
           guest::StoreU32(base, menu + menu_helpers::kFirst, 0);
-          guest::StoreU32(base, menu + menu_helpers::kLast, 3);
-          guest::StoreU32(base, menu + menu_helpers::kCursor, r.Below(2) ? 3 : r.Below(5));
+          guest::StoreU32(base, menu + menu_helpers::kLast, quit);
+          guest::StoreU32(base, menu + menu_helpers::kCursor, r.Below(2) ? quit : r.Below(quit + 2));
           for (const uint32_t o : {menu_helpers::kWraps, menu_helpers::kUpDownLocked,
                                    menu_helpers::kSidesStep, menu_helpers::kShouldersStep}) {
             guest::StoreU32(base, menu + o, r.Below(2));
@@ -1985,19 +2056,113 @@ void Screen0Helpers(Context& h, const Block& world) {
           guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
           guest::StoreU32(base, menu_sounds::kSoundManager, manager);
         }
+        if (animated || f.help6) {
+          guest::StoreU32(base, node(14), kTagTxt);
+          guest::StoreU32(base, node(14) + 108, r.Below(15));
+        }
+        const uint32_t d = f.type7 ? 4 : 0;
+        if (animated) {
+          for (uint32_t k = 0; k < 8; k++) {
+            for (uint32_t i = 0; i < 64; i += 4) guest::StoreU32(base, anims.address + 64 * k + i, 0);
+            guest::StoreFloat(base, anims.address + 64 * k + 12, float(r.Below(40)) / 4.0f);
+          }
+          for (uint32_t k = 0; k < 49; k++) {
+            guest::StoreU32(base, movie + 176 + 36 * k + 28, node(0));
+            guest::StoreU32(base, movie + 176 + 36 * k + 32, anims.address + 64 * r.Below(8));
+          }
+          guest::StoreU32(base, node(0) + 116, r.Below(4));
+          for (uint32_t k = r.Below(4); k > 0; k--) {
+            ui_movies::Slot slot{};
+            slot[0] = r.Below(2);
+            slot[1] = 0xFFFFFFFFu;
+            static constexpr uint32_t kNamed[] = {5, 6, 7, 9, 15, 16, 43, 48, 0, 0xFFFFFFFFu};
+            slot[2] = kNamed[r.Below(10)];
+            slot[3] = node(0);
+            slot[4] = anims.address + 64 * r.Below(8);
+            slot[5] = std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f);
+            slot[6] = r.Below(2);
+            slot[7] = r.Below(2);
+            ui_movies::Append(base, movie + (r.Below(2) ? ui_movies::kMovieQueue
+                                                        : ui_movies::kMovieLooping),
+                              slot);
+          }
+          WriteRandom(base, kFades, kFadesBytes, r);
+          guest::StoreU32(base, mode_tick::kFadeOutCounts, r.Below(3) == 0 ? r.Below(40) : 0);
+          guest::StoreU32(base, mode_tick::kFadeInCounts, r.Below(3) == 0 ? r.Below(40) : 0);
+          // The page state and the menu: the item and the previous one in
+          // the menu's range (type 6: 0 to 4, type 7: 0 to 3) or one past.
+          const uint32_t page = world.address + 0x3A00, menu = world.address + 0x3900;
+          guest::StoreU32(base, world.address + 9644 + d, page);
+          guest::StoreU32(base, world.address + 9648 + d, menu);
+          guest::StoreU32(base, page + 24, r.Below(2));
+          const uint32_t items = f.type7 ? 5 : 6;
+          const uint32_t item = r.Below(items);
+          uint32_t old = item;
+          switch (r.Below(4)) {
+            case 0: old = r.Below(items); break;  // a wrap, mostly
+            case 1: old = item + 1 < items ? item + 1 : item; break;
+            case 2: old = item > 0 ? item - 1 : item; break;
+            default: break;
+          }
+          guest::StoreU32(base, menu + 0, item);
+          guest::StoreU32(base, menu + 4, old);
+        }
+        if (f.extra == Function::kQuit) {
+          const uint32_t data = world.address + 0x3B00;
+          guest::StoreU32(base, kSaveScreenData, data);
+          static constexpr uint32_t kWords[] = {0, 1, 2, 0xFFFFFFFFu};
+          guest::StoreU32(base, data + 56, kWords[r.Below(4)]);
+        }
+        if (f.extra == Function::kGraph) {
+          const uint32_t picks = world.address + 0x3900, page = world.address + 0x3A00;
+          guest::StoreU32(base, world.address + 9640 + d, picks);
+          guest::StoreU32(base, world.address + 9644 + d, page);
+          static constexpr uint32_t kPicks[] = {2, 2, 0, 1, 0xFFFFFFFFu};
+          guest::StoreU32(base, picks + 72, kPicks[r.Below(5)]);
+          static constexpr uint32_t kPages[] = {0, 1, 2, 3, 0xFFFFFFFFu};
+          guest::StoreU32(base, page, kPages[r.Below(5)]);
+          guest::StoreU32(base, kGraphShown, 0);
+        }
         PPCContext t = CallContext(h);
-        t.r3.u64 = f.closed != 0 || f.menu || f.show == 1
+        t.r3.u64 = f.closed != 0 || f.menu || f.show == 1 || animated ||
+                           f.extra == Function::kGraph
                        ? world.address | (uint64_t(r.Below(2)) << 32)
                        : uint32_t(r.Next());
         t.r4.u64 = f.confirm ? world.address + 0x3200
                              : (r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(5));
         t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        std::vector<DialogCall> calls;
+        const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+            ui_movies_hooks::g_update_callee_stand_in;
+        if (animated) {
+          g_dialog_answers = Random(r.Next());
+          g_dialog_calls = &calls;
+          ui_movies_hooks::g_update_callee_stand_in = DialogStandIn;
+        }
         if (v == 0) {
-          ITC_FLAG(native_type67_modes) = f.closed != 0 || f.menu;
+          ITC_FLAG(native_type67_modes) = f.closed != 0 || f.menu || f.extra != Function::kNone;
           f.recompiled(t, base);
           ITC_FLAG(native_type67_modes) = true;
         } else {
           f.native(t, base);
+        }
+        if (animated) {
+          ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
+          g_dialog_calls = nullptr;
+          out[v].Word(uint32_t(calls.size()));
+          for (const DialogCall& call : calls) {
+            for (const uint32_t w : {call.function, call.lr, call.r1, uint32_t(call.r3),
+                                     uint32_t(call.r3 >> 32), uint32_t(call.r4),
+                                     uint32_t(call.r4 >> 32)}) {
+              out[v].Word(w);
+            }
+          }
+          out[v].Bytes(Read(base, anims.address, anims.bytes));
+          out[v].Bytes(Read(base, kFades, kFadesBytes));
+        }
+        if (f.extra == Function::kQuit || f.extra == Function::kGraph) {
+          out[v].Word(guest::LoadU32(base, kSaveScreenData));
+          out[v].Word(guest::LoadU32(base, kGraphShown));
         }
         out[v].Bytes(Read(base, world.address, world.bytes));
         out[v].Bytes(Read(base, movie, kMovieBlockBytes));
@@ -2042,6 +2207,9 @@ void Screen0Helpers(Context& h, const Block& world) {
   guest::StoreU32(base, car_specs::kParams, saved_params);
   Write(base, t67::kType6Car, saved_cars[0].data(), kCarBytes);
   Write(base, t67::kType7Car, saved_cars[1].data(), kCarBytes);
+  Write(base, kFades, saved_fades.data(), kFadesBytes);
+  guest::StoreU32(base, kSaveScreenData, saved_save_screen);
+  guest::StoreU32(base, kGraphShown, saved_graph_shown);
 }
 
 // --- The first screens' OpenMovie and SetUpCar: the stand's holder

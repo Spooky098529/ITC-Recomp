@@ -8,6 +8,7 @@
 #include "front_end_car_draw/front_end_car_draw.h"
 #include "guest.h"
 #include "memory/heap.h"
+#include "power_graph/power_graph.h"
 #include "race_setup/race_setup.h"
 #include "tuning_pages/tuning_pages.h"
 #include "type67_modes/type67_modes.h"
@@ -1319,7 +1320,10 @@ uint64_t CarPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) 
         const uint32_t tab = LoadU32(base, b + 232);
         if (tab == 2) {
           const uint64_t record = garage_record(steps);
-          calls.Call(kGaragePowerGraphRecord, frame, 0x8224BA90, record, LoadU32(base, b + 232));
+          power_graph::SetFromCar(
+              base, uint32_t(record), LoadU32(base, b + 232), frame,
+              [&calls](uint32_t function, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t at,
+                       uint32_t lr) { calls.Call(function, at, lr, r3, r4, r5); });
         } else {
           PowerGraphSetEntry(base, entry_at(steps), tab);
         }

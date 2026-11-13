@@ -490,20 +490,74 @@ uint64_t Type6Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp);
 // shown, 8 and 9 hidden, then by `page` (0, 1, else) their textures set
 // (page 1 hides 6 and 7). r3 the last node.
 uint64_t Type7Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp);
-// sub_822448B0 Type7Screen0::PlaceCursor: movie 22's node (-1, 3)'s child
-// 0's +16 = float(40 * item) (the doubleword through the frame's +80). r3
-// the child.
-uint64_t Type7Screen0PlaceCursor(uint8_t* base, uint64_t item, uint32_t sp);
-// sub_82244AB8 Type7Screen0::ShowHelp: movie 22's text (1, 0) scrolled back
-// (sub_8211C5F8), set to string 916 to 919 by `item` (UiMovie::SetText,
-// r7 to r10 0) and scrolled (UiMovie::ScrollText). r3 ScrollText's.
-uint64_t Type7Screen0ShowHelp(uint8_t* base, uint32_t item, uint32_t sp,
-                              const strings_and_font::FormatCalls& calls);
-// sub_82244760 Type7Screen0::FadeOutStep: the screen fades' fade out on the
-// step's first frame (the page state's +24), UiMovie::Run on movie 22 (a
-// guest call); done (1, after UiMovie::FinishAll) when both fades' counts
-// are 0, else 0.
-uint64_t Type7Screen0FadeOutStep(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+// sub_82234428 Type6Screen0::PlaceCursor and sub_822448B0
+// Type7Screen0::PlaceCursor: movie 22's node (-1, 4) (type 7: (-1, 3))'s
+// child 0's +16 = float(40 * item) (the doubleword through the frame's
+// +80). r3 the child.
+uint64_t Screen0PlaceCursor(uint8_t* base, bool type7, uint64_t item, uint32_t sp);
+// sub_822346A8 Type6Screen0::ShowHelp and sub_82244AB8
+// Type7Screen0::ShowHelp: movie 22's text (2, 0) (type 7: (1, 0)) scrolled
+// back (sub_8211C5F8), set to its string by `item` (type 6: 920, 921, 916,
+// 917, 918, else 919; type 7: 919, 916, 917, 918, else 919;
+// UiMovie::SetText, r7 to r10 0) and scrolled (UiMovie::ScrollText). r3
+// ScrollText's.
+uint64_t Screen0ShowHelp(uint8_t* base, bool type7, uint32_t item, uint32_t sp,
+                         const strings_and_font::FormatCalls& calls);
+// sub_822342F0 Type6Screen0::FadeOutStep and sub_82244760
+// Type7Screen0::FadeOutStep: the screen fades' fade out on the step's first
+// frame (the page state's (+9644, type 7 +9648) +24), UiMovie::Run on movie
+// 22 (a guest call); done (1, after UiMovie::FinishAll) when both fades'
+// counts are 0, else 0.
+uint64_t Screen0FadeOutStep(uint8_t* base, bool type7, uint32_t screen, uint32_t sp,
+                            const Calls& calls);
+// sub_822343A8 Type6Screen0::PlayItem and sub_82244818
+// Type7Screen0::PlayItem: movie 22's named animation item + 5 (the menu's
+// +0; type 6's menu at +9648, type 7's +9652; type 7 finishes and unloops
+// it first) played (1) and looped. Guest calls to UiMovie::FinishNamed,
+// UnloopNamed, PlayNamed and LoopNamed. r3 LoopNamed's.
+uint64_t Screen0PlayItem(uint8_t* base, bool type7, uint32_t screen, uint32_t sp,
+                         const Calls& calls);
+// The first screens' steps 0 to 2 (r3 the screen; the UI movie calls guest
+// calls, PlaceCursor, ShowPage, ShowHelp and PlayItem their plain C++,
+// ScreenFades::FadeIn its plain C++). sub_82234C20 Type6Screen0::OpeningStep
+// and sub_82244E70 Type7Screen0::OpeningStep: on the step's first frame
+// (+24 of the page state) movie 22's animations finished, named 48 and 0
+// played (0 looped), the fade in, the cursor, page 0 and the help shown
+// (type 7 also the item played), the started word set; then UiMovie::Run;
+// once it answers 0 the item (type 6) and named 43 played and looped. 1 then,
+// else 0.
+uint64_t Screen0OpeningStep(uint8_t* base, bool type7, uint32_t screen, uint32_t sp,
+                            const Calls& calls, const strings_and_font::FormatCalls& format);
+// sub_82234E38 Type6Screen0::BackStep and sub_822450A8 Type7Screen0::BackStep:
+// the items' animations (5 to 9, type 7 5 to 8) and 15, 16 finished, the
+// cursor placed, the item played and the help shown (type 7: the help, then
+// the item), UiMovie::Run. 1.
+uint64_t Screen0BackStep(uint8_t* base, bool type7, uint32_t screen, uint32_t sp,
+                         const Calls& calls, const strings_and_font::FormatCalls& format);
+// sub_82234D50 Type6Screen0::CursorStep and sub_82244FC0
+// Type7Screen0::CursorStep: the old item's animation finished and unlooped,
+// 15 and 16 finished; a move of one item plays 16 (down) or 15 (up) (r5 0,
+// type 7 1), a wrap places the cursor at once; the item played and the help
+// shown (type 7: the help, then the item), UiMovie::Run. 1.
+uint64_t Screen0CursorStep(uint8_t* base, bool type7, uint32_t screen, uint32_t sp,
+                           const Calls& calls, const strings_and_font::FormatCalls& format);
+// sub_82234BF0 Type6Screen0::QuitPage: by the save screen's data's +56
+// ([0x826D8454] +56): 0 ShowPage(4), 1 ShowPage(3) (tail calls from `sp`),
+// else nothing (r3 left).
+uint64_t Type6Screen0QuitPage(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_82234190 Type6Screen0::ChosenPage (r4 the dispatcher): by the menu's
+// item, state (+9604) 9 and message 14 (with the music changed: the sound
+// manager's slot 13 on bank 1's cue 2, Sound::Play's plain C++ on bank 1's
+// cue 0), 16, 18 or 26 posted; 4: state 10. r3 as the original leaves it.
+uint64_t Type6Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+                                const Calls& calls);
+// sub_82234B80 Type6Screen0::PowerGraphPage and sub_82244E00
+// Type7Screen0::PowerGraphPage: with the pick (+9640's, type 7 +9644's +72)
+// 2, page 0 and ShowPage(0) (its plain C++), the pick -1; then
+// CarList::DrawCarPowerGraph(the mode's car) (a guest call to its override).
+// r3 its.
+uint64_t Screen0PowerGraphPage(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, uint32_t sp,
+                               const Calls& calls);
 // sub_82244610 Type7Screen0::ChosenPage (r4 the dispatcher): by the menu's
 // item, state 9 and message 13 (with the music changed: the sound
 // manager's slot 13 on bank 1's cue 2, Sound::Play's plain C++ on bank 1's
@@ -514,14 +568,22 @@ uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher,
 // sub_82244BF8 Type7Screen0::MenuPage (r3 the screen, r4 the dispatcher):
 // Menu::Step and Menu::Pressed's plain C++ on the menu (+9652), then by
 // what happened: the cursor moved (MenuSound 4, the cursor step 2); 163
-// (MenuSound 0, the power graph's set-up sub_82250488, never seen in play,
-// a guest call to the recompiled original, message 18, page 1 shown);
+// (MenuSound 0, PowerGraph::SetFromCar's plain C++ (power_graph), message
+// 18, page 1 shown);
 // accept 159 (MenuSound 0, the item to +9656: items 0 to 2 the fade out
 // step 3 to page 2, item 3 Type7Screen0::Confirm (a guest call to its
 // override) and page 2 shown); back 158 (MenuSound 2, the cursor on the
 // quit item, the back step 1). MenuSound::Play's plain C++. r3 as the
 // original leaves it.
 uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
+// sub_82234958 Type6Screen0::MenuPage (r3 the screen, r4 the dispatcher):
+// type 7's with the menu at +9648, the page state at +9644, five items (the
+// quit item 4: Type6Screen0::Confirm, a guest call to its override, +9656 =
+// 0, +9664 = 4, page 2 shown), the accepted item to +9652, the fade out to
+// page 3 and message 21 for 163. PowerGraph::SetFromCar's plain C++ (its
+// fallbacks through `calls`).
+uint64_t Type6Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                               const Calls& calls);
 
 // The two modes' cars (1,968-byte garage cars, then +1968 the model made,

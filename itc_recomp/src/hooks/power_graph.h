@@ -28,5 +28,10 @@ void TuningScreenDrawPowerGraph(PPCContext& ctx, uint8_t* base);
 // its callees run natively (CarListDrawEntryCalleesNative).
 bool CarListDrawEntryCalleesNative();
 void CarListDrawEntryPowerGraph(PPCContext& ctx, uint8_t* base);
+// CarList::DrawCarPowerGraph (sub_82250700): r3 = a garage car. As
+// DrawEntryPowerGraph's without making the car (its 1,952-byte frame). The
+// original unless the car makers' callees run natively
+// (CarMakersGarageCalleesNative with --native_car_makers).
+void CarListDrawCarPowerGraph(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

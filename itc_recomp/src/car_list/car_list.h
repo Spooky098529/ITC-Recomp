@@ -305,8 +305,8 @@ uint64_t ShowStandCar(uint8_t* base, uint64_t b, uint64_t color, uint32_t sp,
 
 // The pages' guest calls: MenuList::Update, Accepted, Cancelled, SetEnabled
 // and IsEnabled through their overrides, MenuSound::Play through its
-// override, the power graphs' set-ups (sub_82250670 through its override;
-// sub_82250700, the garage tab's, never seen in play, the original).
+// override, the power graphs' set-ups (sub_82250670 and sub_82250700, the
+// garage tab's, through their overrides).
 constexpr uint32_t kMenuListUpdate = 0x8220C1E0;
 constexpr uint32_t kMenuListAccepted = 0x8220BD50;
 constexpr uint32_t kMenuListCancelled = 0x8220BDE0;
@@ -338,9 +338,6 @@ uint64_t SetUpColors(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls)
 // C's StopArrows, D's Show (each when there), SetUpColors, the word = 1.
 // Answers D's IsShown (1 without D).
 uint64_t Step17(uint8_t* base, uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
-// The garage tab's power graph record (sub_82250488, never seen in play:
-// the original), from the car's page.
-constexpr uint32_t kGaragePowerGraphRecord = 0x82250488;
 // sub_8224B8D8 PanelSetBase::CarPage (page 2, the car's actions; menu +60,
 // the rows' menu +132): moved, accepted (C's Pick; action 1 the power graph:
 // C's stats with two players, else the power graph's record and C's
@@ -348,9 +345,10 @@ constexpr uint32_t kGaragePowerGraphRecord = 0x82250488;
 // ShowStandCar's plain C++ for tab 0 without the confirm panel), cancelled
 // (E's Unhighlight), else the rows' menu (moved: C's stats, +244 the
 // entry's color). The menu lists, MenuSound::Play, CarPanel::ShowCarStats
-// and the garage tab's power graph record (both never seen in play: the
-// originals) guest calls; C's Pick, ShowStats and SetButtons, E's
-// Unhighlight, PowerGraph::SetEntry and SaveData their plain C++. Its
+// (never seen in play: the original) guest calls; C's Pick, ShowStats and
+// SetButtons, E's Unhighlight, PowerGraph::SetEntry, the garage tab's power
+// graph record (PowerGraph::SetFromCar, power_graph) and SaveData their
+// plain C++. Its
 // 112-byte frame.
 uint64_t CarPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 

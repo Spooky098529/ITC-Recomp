@@ -94,8 +94,16 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "ScenePools::GetB's plain C++, CarScene::Update, Draw and StartTeardown guest "
               "calls); the modes' Type6Mode::TearDown sub_82235C18 and Type7Mode::TearDown "
               "sub_82246098 (the sound manager's slots guest calls); Type7Screen0::MenuPage "
-              "sub_82244BF8 (Menu::Step, Pressed and MenuSound::Play's plain C++; the power "
-              "graph's set-up sub_82250488 and Type7Screen0::Confirm guest calls); the first "
+              "sub_82244BF8 and Type6Screen0::MenuPage sub_82234958 (Menu::Step, Pressed, "
+              "MenuSound::Play's and PowerGraph::SetFromCar sub_82250488's plain C++; the "
+              "confirms guest calls); the first screens' other pages Type6Screen0::QuitPage "
+              "sub_82234BF0, ChosenPage sub_82234190 and PowerGraphPage sub_82234B80 and "
+              "sub_82244E00 (CarList::DrawCarPowerGraph a guest call), their steps OpeningStep "
+              "sub_82234C20 and sub_82244E70, BackStep sub_82234E38 and sub_822450A8, CursorStep "
+              "sub_82234D50 and sub_82244FC0 (with the text setters native) and Type6Screen0's "
+              "FadeOutStep sub_822342F0, their helpers PlayItem sub_822343A8 and sub_82244818, "
+              "Type6Screen0's PlaceCursor sub_82234428 and ShowHelp sub_822346A8 (the UI movie "
+              "calls guest calls); the first "
               "screens' Show sub_82233C80 and sub_822441D8 with their ShowCarInfo sub_82233B70 "
               "and sub_822440D8 (with the text setters native; Car::Init, SetModel, Refresh and "
               "SetModelAndClass's plain C++, GarageCar::Reset a guest call); the first screens' "
@@ -566,23 +574,102 @@ void Type6Screen0ShowPage(PPCContext& ctx, uint8_t* base) {
 void Type7Screen0ShowPage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::Type7Screen0ShowPage(base, ctx.r4.u32, ctx.r1.u32);
 }
-void Type7Screen0PlaceCursor(PPCContext& ctx, uint8_t* base) {
-  ctx.r3.u64 = t67::Type7Screen0PlaceCursor(base, ctx.r4.u64, ctx.r1.u32);
+namespace {
+
+void PlaceCursor(PPCContext& ctx, uint8_t* base, bool type7) {
+  ctx.r3.u64 = t67::Screen0PlaceCursor(base, type7, ctx.r4.u64, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
-void Type7Screen0ShowHelp(PPCContext& ctx, uint8_t* base) {
+void ShowHelp(PPCContext& ctx, uint8_t* base, bool type7) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32, item = ctx.r4.u32;
   FormatGuestCalls format(ctx, base);
-  ctx.r3.u64 = t67::Type7Screen0ShowHelp(base, item, sp, format.get());
+  ctx.r3.u64 = t67::Screen0ShowHelp(base, type7, item, sp, format.get());
   ctx.lr = lr;
 }
-void Type7Screen0FadeOutStep(PPCContext& ctx, uint8_t* base) {
+void FadeOutStep(PPCContext& ctx, uint8_t* base, bool type7) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 =
-      t67::Type7Screen0FadeOutStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+      t67::Screen0FadeOutStep(base, type7, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
+}
+void PlayItem(PPCContext& ctx, uint8_t* base, bool type7) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Screen0PlayItem(base, type7, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+// The steps 0 to 2 (they call ShowHelp: the text setters native).
+enum class Step { kOpening, kBack, kCursor };
+void Screen0Step(PPCContext& ctx, uint8_t* base, bool type7, Step step) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32;
+  const t67::Calls calls = Type67Calls(ctx, base);
+  FormatGuestCalls format(ctx, base);
+  switch (step) {
+    case Step::kOpening:
+      ctx.r3.u64 = t67::Screen0OpeningStep(base, type7, screen, sp, calls, format.get());
+      break;
+    case Step::kBack:
+      ctx.r3.u64 = t67::Screen0BackStep(base, type7, screen, sp, calls, format.get());
+      break;
+    case Step::kCursor:
+      ctx.r3.u64 = t67::Screen0CursorStep(base, type7, screen, sp, calls, format.get());
+      break;
+  }
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+void PowerGraphPage(PPCContext& ctx, uint8_t* base, bool type7) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Screen0PowerGraphPage(base, type7, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                          Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+
+}  // namespace
+
+void Type6Screen0PlaceCursor(PPCContext& ctx, uint8_t* base) { PlaceCursor(ctx, base, false); }
+void Type7Screen0PlaceCursor(PPCContext& ctx, uint8_t* base) { PlaceCursor(ctx, base, true); }
+void Type6Screen0ShowHelp(PPCContext& ctx, uint8_t* base) { ShowHelp(ctx, base, false); }
+void Type7Screen0ShowHelp(PPCContext& ctx, uint8_t* base) { ShowHelp(ctx, base, true); }
+void Type6Screen0FadeOutStep(PPCContext& ctx, uint8_t* base) { FadeOutStep(ctx, base, false); }
+void Type7Screen0FadeOutStep(PPCContext& ctx, uint8_t* base) { FadeOutStep(ctx, base, true); }
+void Type6Screen0PlayItem(PPCContext& ctx, uint8_t* base) { PlayItem(ctx, base, false); }
+void Type7Screen0PlayItem(PPCContext& ctx, uint8_t* base) { PlayItem(ctx, base, true); }
+void Type6Screen0OpeningStep(PPCContext& ctx, uint8_t* base) {
+  Screen0Step(ctx, base, false, Step::kOpening);
+}
+void Type7Screen0OpeningStep(PPCContext& ctx, uint8_t* base) {
+  Screen0Step(ctx, base, true, Step::kOpening);
+}
+void Type6Screen0BackStep(PPCContext& ctx, uint8_t* base) {
+  Screen0Step(ctx, base, false, Step::kBack);
+}
+void Type7Screen0BackStep(PPCContext& ctx, uint8_t* base) {
+  Screen0Step(ctx, base, true, Step::kBack);
+}
+void Type6Screen0CursorStep(PPCContext& ctx, uint8_t* base) {
+  Screen0Step(ctx, base, false, Step::kCursor);
+}
+void Type7Screen0CursorStep(PPCContext& ctx, uint8_t* base) {
+  Screen0Step(ctx, base, true, Step::kCursor);
+}
+void Type6Screen0QuitPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::Type6Screen0QuitPage(base, ctx.r3.u64, ctx.r1.u32);
+}
+void Type6Screen0ChosenPage(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Type6Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
+                                           Type67Calls(ctx, base));
+  ctx.lr = lr;
+}
+void Type6Screen0PowerGraphPage(PPCContext& ctx, uint8_t* base) {
+  PowerGraphPage(ctx, base, false);
+}
+void Type7Screen0PowerGraphPage(PPCContext& ctx, uint8_t* base) {
+  PowerGraphPage(ctx, base, true);
 }
 void Type6Screen0OpenMovie(PPCContext& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
@@ -718,10 +805,20 @@ void Type6Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base) { Show(ctx, base, f
 void Type7Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base) { Show(ctx, base, true, true); }
 
 void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Type7Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                          Type67Calls(ctx, base));
   ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+void Type6Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = t67::Type6Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                         Type67Calls(ctx, base));
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
 }
 namespace {
 
@@ -906,6 +1003,27 @@ ITC_TYPE67_TEXTS(82233C80, Type6Screen0Show)
 ITC_TYPE67_TEXTS(822441D8, Type7Screen0Show)
 ITC_TYPE67_MODES(82244760, Type7Screen0FadeOutStep)
 ITC_TYPE67_MODES(82244610, Type7Screen0ChosenPage)
+// The type 6 first screen's helpers (from its steps and pages, recompiled
+// with the flag off, and the Draw's and Update's tables): ShowHelp and the
+// steps that call it while the UI movies' text setters are native.
+ITC_TYPE67_MODES(82234428, Type6Screen0PlaceCursor)
+ITC_TYPE67_TEXTS(822346A8, Type6Screen0ShowHelp)
+ITC_TYPE67_MODES(822343A8, Type6Screen0PlayItem)
+ITC_TYPE67_MODES(82244818, Type7Screen0PlayItem)
+ITC_TYPE67_MODES(822342F0, Type6Screen0FadeOutStep)
+// The first screens' steps 0 to 2 (from the Update's tables).
+ITC_TYPE67_TEXTS(82234C20, Type6Screen0OpeningStep)
+ITC_TYPE67_TEXTS(82244E70, Type7Screen0OpeningStep)
+ITC_TYPE67_TEXTS(82234E38, Type6Screen0BackStep)
+ITC_TYPE67_TEXTS(822450A8, Type7Screen0BackStep)
+ITC_TYPE67_TEXTS(82234D50, Type6Screen0CursorStep)
+ITC_TYPE67_TEXTS(82244FC0, Type7Screen0CursorStep)
+// The first screens' pages (from the Draw's tables).
+ITC_TYPE67_MODES(82234BF0, Type6Screen0QuitPage)
+ITC_TYPE67_MODES(82234190, Type6Screen0ChosenPage)
+ITC_TYPE67_MODES(82234B80, Type6Screen0PowerGraphPage)
+ITC_TYPE67_MODES(82244E00, Type7Screen0PowerGraphPage)
+ITC_TYPE67_MODES(82234958, Type6Screen0MenuPage)
 // The first screens' OpenMovie and SetUpCar (through the machines'
 // transitions).
 ITC_TYPE67_MODES(822338E8, Type6Screen0OpenMovie)

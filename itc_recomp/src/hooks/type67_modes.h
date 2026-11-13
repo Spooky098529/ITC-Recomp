@@ -148,6 +148,33 @@ void Type7Screen0PlaceCursor(PPCContext& ctx, uint8_t* base);
 void Type7Screen0ShowHelp(PPCContext& ctx, uint8_t* base);
 void Type7Screen0FadeOutStep(PPCContext& ctx, uint8_t* base);
 void Type7Screen0ChosenPage(PPCContext& ctx, uint8_t* base);
+// The type 6 first screen's PlaceCursor sub_82234428 (r4 the item),
+// ShowHelp sub_822346A8 (r4 the item; needs Type67TextsNative), PlayItem
+// sub_822343A8 and type 7's sub_82244818 (r3 the screen), FadeOutStep
+// sub_822342F0 (r3 the screen).
+void Type6Screen0PlaceCursor(PPCContext& ctx, uint8_t* base);
+void Type6Screen0ShowHelp(PPCContext& ctx, uint8_t* base);
+void Type6Screen0PlayItem(PPCContext& ctx, uint8_t* base);
+void Type7Screen0PlayItem(PPCContext& ctx, uint8_t* base);
+void Type6Screen0FadeOutStep(PPCContext& ctx, uint8_t* base);
+// The first screens' steps 0 to 2 (r3 the screen; need Type67TextsNative):
+// OpeningStep sub_82234C20 and sub_82244E70, BackStep sub_82234E38 and
+// sub_822450A8, CursorStep sub_82234D50 and sub_82244FC0.
+void Type6Screen0OpeningStep(PPCContext& ctx, uint8_t* base);
+void Type7Screen0OpeningStep(PPCContext& ctx, uint8_t* base);
+void Type6Screen0BackStep(PPCContext& ctx, uint8_t* base);
+void Type7Screen0BackStep(PPCContext& ctx, uint8_t* base);
+void Type6Screen0CursorStep(PPCContext& ctx, uint8_t* base);
+void Type7Screen0CursorStep(PPCContext& ctx, uint8_t* base);
+// The first screens' pages (r3 the screen, r4 the dispatcher):
+// Type6Screen0::QuitPage sub_82234BF0, ChosenPage sub_82234190,
+// MenuPage sub_82234958, and PowerGraphPage sub_82234B80 and type 7's
+// sub_82244E00.
+void Type6Screen0QuitPage(PPCContext& ctx, uint8_t* base);
+void Type6Screen0ChosenPage(PPCContext& ctx, uint8_t* base);
+void Type6Screen0MenuPage(PPCContext& ctx, uint8_t* base);
+void Type6Screen0PowerGraphPage(PPCContext& ctx, uint8_t* base);
+void Type7Screen0PowerGraphPage(PPCContext& ctx, uint8_t* base);
 // The first screens' OpenMovie (Type6 sub_822338E8, Type7 sub_82243E80) and
 // SetUpCar (Type6 sub_82233E80, Type7 sub_822443E0; r4 the dispatcher).
 void Type6Screen0OpenMovie(PPCContext& ctx, uint8_t* base);
