@@ -721,6 +721,10 @@ Rows not yet moved stay in the table below. So far:
   load and save pages (categories 5 and 6, pages 9 and 10): their
   sub-pages over the save layer, the dialogs' setters and the closing
   steps 41 and 42 (B7).
+- [`power-graph-screen.md`](power-graph-screen.md): the type 6 and 7
+  modes' power graph screen (UI movie 9 over the picked car): the
+  handlers both machines register, its pages and its open and close
+  steps, the spec texts, and the members' vtable slots (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
