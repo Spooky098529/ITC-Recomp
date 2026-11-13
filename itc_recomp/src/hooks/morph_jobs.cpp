@@ -9,6 +9,7 @@
 #include "hooks/morph_jobs.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "hooks/heap.h"
 #include "hooks/second_set.h"
 #include "memory/c_runtime_heap.h"
@@ -154,11 +155,13 @@ void MorphJobsWorkItemDestroy(PPCContext& ctx, uint8_t* base) {
 }
 
 void MorphJobsWorkItemInterfaceDestroy(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82090E38 WorkItem::Interface::~WorkItem");
   ctx.r3.s64 = ctx.r3.s64 - 4;
   MorphJobsWorkItemDestroy(ctx, base);
 }
 
 void MorphJobsWait(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820AC9B8 MorphJob::Wait");
   ctx.r3.s64 = ctx.r3.s64 + mj::kItem;
   sub_82094B10(ctx, base);  // Job::Wait (--find_menu_selection's wrap)
 }
@@ -214,6 +217,7 @@ void MorphJobsWorkItemIsSkipped(PPCContext& ctx, uint8_t* base) {
 }
 
 void MorphJobsWorkItemInterfaceIsSkipped(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82090DC8 WorkItem::Interface::IsSkipped");
   ctx.r3.u64 = mj::WorkItemIsSkipped(base, ctx.r3.u32 - 4);
 }
 
