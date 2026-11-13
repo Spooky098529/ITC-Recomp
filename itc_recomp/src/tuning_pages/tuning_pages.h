@@ -503,4 +503,26 @@ uint64_t OnStickerDialogYes(uint8_t* base, const tuning_screen::GuestCall& call,
 uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                      uint32_t sp, bool native_specs);
 
+// --- The vinyl editor's pages (vinyl_pages.cpp) ---
+// Guest calls through `call` from the originals' frames with their return
+// addresses: MenuSound::Play, the UI movie calls, GarageStage::Command,
+// CameraCommand and FitSelectedCar (their overrides); the player's mapper's
+// slots 8, 10 and 12 by ActionMapper::Held's, Pressed's and Fired's plain
+// C++ with `native_slots` (--native_action_mappers) where the vtable holds
+// them, else through `call` (slot 11 always through `call`).
+
+// sub_82201B40 TuningScreen::LeaveVinylView: state 34's leaving (its row):
+// movie 13 looked up; with A or B pressed +10012 = 8, FitSelectedCar, 241
+// finished and played, the camera preset by the area +30724 (Command 40 or
+// 41). 128-byte frame; the last call's r3 (the movie's entry or the last
+// slot's when neither is pressed).
+uint64_t LeaveVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, bool native_slots);
+// sub_82202928 TuningScreen::InputVinylView: state 34's page (its row): A or
+// B (Pop, Go(the popped state, 18), the stand's turns cancelled and its
+// camera reset), the held buttons' stand and camera commands, then
+// LeaveVinylView. 112-byte frame; LeaveVinylView's r3.
+uint64_t InputVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, bool native_slots);
+
 }  // namespace tuning_pages

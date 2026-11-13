@@ -158,4 +158,9 @@ void TuningPagesLoadWindow(PPCContext& ctx, uint8_t* base);
 void TuningPagesScrollImages(PPCContext& ctx, uint8_t* base);
 void TuningPagesFreeKept(PPCContext& ctx, uint8_t* base);
 
+// The vinyl editor's pages (r3 = the screen): InputVinylView sub_82202928
+// and LeaveVinylView sub_82201B40 (no adapter: the harness's step).
+void TuningPagesInputVinylView(PPCContext& ctx, uint8_t* base);
+void TuningPagesLeaveVinylView(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

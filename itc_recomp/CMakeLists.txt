@@ -445,6 +445,7 @@ set(ITC_SOURCES
     src/tuning_pages/loads.cpp
     src/tuning_pages/pages.cpp
     src/tuning_pages/dialogs.cpp
+    src/tuning_pages/vinyl_pages.cpp
     src/hooks/screen_constructors.cpp
     src/screen_constructors/screen_constructors.cpp
     src/hooks/options_screen.cpp

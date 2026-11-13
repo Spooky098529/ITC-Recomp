@@ -1744,6 +1744,109 @@ void TuningStand(Context& h, Random& r) {
     }
     results.Report();
   }
+  {
+    // The vinyl editor's state 34 page TuningScreen::InputVinylView and its
+    // leaving LeaveVinylView (tuning_pages' plain C++; LeaveVinylView's A
+    // and B fit the selected car on the stand, so their world is this one):
+    // movie 13 the text world's; the four players' mapper entries naming one
+    // mapper of a block of its own (its vtable's slot 8 ActionMapper::Held
+    // and 10 Pressed, now and then another read slot; its pressed and held
+    // words with one action set most of the time: A, B or the view's held
+    // buttons, the entries' +4 1 now and then); the stage's animation list
+    // (+6048) 0 to 15 entries of types 0 to 7 and its camera's moved word
+    // (+384) 0, 1, 2 or any; the area +30724 0, 1 or any; the history at
+    // least 1 deep; the command queue in the screen. The top 32 bytes:
+    // __savegprlr_29's; LeaveVinylView's (32 from 112 below
+    // InputVinylView's r1) left out.
+    const Random kept = r;
+    TextWorld text(h.base);
+    const uint32_t mappers = memory::Alloc(0x400, 0);
+    constexpr uint32_t kEntries = 0x826BAB80, kIndices = 0x826BABA4;
+    const std::vector<uint8_t> saved_entries = Read(h.base, kEntries, 32);
+    const std::vector<uint8_t> saved_indices = Read(h.base, kIndices, 16);
+    std::vector<uint8_t> mapper_inputs(0x400);
+    std::vector<uint8_t> entry_inputs(48);
+    constexpr uint32_t kQueue = 0x9380;
+    const auto lay_view = [&](PPCContext& t, int c) {
+      lay(c, false);
+      text.Lay(r);
+      field(10036, screen + kQueue);
+      field(kQueue + 16, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(65));
+      field(30724, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+      byte(10008, 1 + r.Below(50));
+      const uint32_t stage = block + kStage;
+      const uint32_t count = r.Below(16);
+      guest::StoreU32(h.base, stage + 6048, count);
+      for (uint32_t i = 0; i < count; i++) {
+        guest::StoreU32(h.base, stage + 5600 + 28 * i, r.Below(8));
+      }
+      const uint32_t moved[4] = {0, 1, 2, uint32_t(r.Next())};
+      guest::StoreU32(h.base, stage + 384, moved[r.Below(4)]);
+      // The mapper: its vtable at +0, the mapper at +0x40.
+      for (uint32_t i = 0; i < 0x400; i += 4) {
+        guest::StoreU32(mapper_inputs.data(), i, uint32_t(r.Next()));
+      }
+      constexpr uint32_t kHeld = 0x8210BE70, kPressed = 0x8210BF40, kFired = 0x8210C010;
+      const uint32_t slots[3] = {kHeld, kPressed, kFired};
+      guest::StoreU32(mapper_inputs.data(), 32, r.Below(6) == 0 ? slots[r.Below(3)] : kHeld);
+      guest::StoreU32(mapper_inputs.data(), 40, r.Below(6) == 0 ? slots[r.Below(3)] : kPressed);
+      guest::StoreU32(mapper_inputs.data(), 0x40, mappers);
+      static constexpr uint32_t kActions[] = {159, 158, 163, 164, 171, 172, 173, 174};
+      uint32_t held = 0, pressed = 0;
+      if (r.Below(6) != 0) {
+        const uint32_t action = kActions[r.Below(8)];
+        (action >= 160 ? held : pressed) |= 1u << (action - 151);
+        if (r.Below(3) == 0) {
+          held |= 1u << (kActions[2 + r.Below(6)] - 151);
+        }
+      } else if (r.Below(2) == 0) {
+        held = uint32_t(r.Next());
+        pressed = uint32_t(r.Next());
+      }
+      guest::StoreU32(mapper_inputs.data(), 0x40 + 448, held);
+      guest::StoreU32(mapper_inputs.data(), 0x40 + 456, pressed);
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU32(entry_inputs.data(), 8 * k, mappers + 0x40);
+        guest::StoreU32(entry_inputs.data(), 8 * k + 4, r.Below(8) == 0 ? 1 : r.Below(3) == 0 ? 2 : 0);
+        guest::StoreU32(entry_inputs.data(), 32 + 4 * k, r.Below(4));
+      }
+      t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+    };
+    const auto before_view = [&] {
+      before();
+      text.Before();
+      Write(h.base, mappers, mapper_inputs.data(), 0x400);
+      Write(h.base, kEntries, entry_inputs.data(), 32);
+      Write(h.base, kIndices, entry_inputs.data() + 32, 16);
+    };
+    const auto view_out = [&](Outputs& out, const PPCContext& t) {
+      blocks(out, t);
+      text.Add(out);
+      out.Bytes(Read(h.base, mappers, 0x400));
+    };
+    if (text.ok() && mappers != 0) {
+      Results results("TuningScreen::LeaveVinylView (sub_82201B40)");
+      for (int c = 0; c < 40; c++) {
+        Case(
+            h, results, block, r, [&](PPCContext& t) { lay_view(t, c); },
+            __imp__sub_82201B40, hooks::TuningPagesLeaveVinylView, 32, floats,
+            fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes);
+      }
+      results.Report();
+      Results view("TuningScreen::InputVinylView (sub_82202928)");
+      for (int c = 0; c < 60; c++) {
+        Case(
+            h, view, block, r, [&](PPCContext& t) { lay_view(t, c); },
+            __imp__sub_82202928, hooks::TuningPagesInputVinylView, 32, floats,
+            fmt::format("case {}", c), 112, 32, before_view, view_out, 0x3000, kGarageBytes);
+      }
+      view.Report();
+    }
+    Write(h.base, kEntries, saved_entries.data(), 32);
+    Write(h.base, kIndices, saved_indices.data(), 16);
+    memory::Free(mappers);
+    r = kept;
+  }
   for (int i = 0; i < 4; i++) {
     guest::StoreU32(h.base, globals[i], saved[i]);
   }
