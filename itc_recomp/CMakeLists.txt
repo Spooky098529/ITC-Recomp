@@ -510,6 +510,8 @@ set(ITC_SOURCES
     src/power_graph_screen/handlers.cpp
     src/power_graph_screen/pages.cpp
     src/power_graph_screen/steps.cpp
+    src/hooks/achievements.cpp
+    src/achievements/achievements.cpp
     src/hooks/user_info.cpp
     src/user_info/handlers.cpp
     src/user_info/pages.cpp
@@ -815,6 +817,7 @@ set(ITC_SOURCES
     src/harnesses/save_screen.cpp
     src/harnesses/type2_dialog.cpp
     src/harnesses/power_graph_screen.cpp
+    src/harnesses/achievements.cpp
     src/harnesses/garage_screen.cpp
     src/harnesses/tuning_machine.cpp
     src/harnesses/race_menu.cpp
