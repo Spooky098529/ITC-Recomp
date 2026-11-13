@@ -6,9 +6,11 @@
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
 #include "native/buffers.h"
+#include "save_interface/save_devices.h"
 #include "save_interface/save_interface.h"
 #include "save_interface/save_layer.h"
 
@@ -33,7 +35,13 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "sub_821109B8 and PlayTime::Update sub_82112838; GameData::Save sub_8228FB00 (GetLocalTime "
               "through the guest), Load sub_8228FBC0 and the game data's check sub_8228FC50; the replays' Count sub_822902A0, "
               "ReadEntry sub_822900E0 (its parse of a replay's name, never in play, on the translated "
-              "code) and, with --native_heap, BuildList sub_82290378) natively instead of through the "
+              "code) and, with --native_heap, BuildList sub_82290378; with --native_heap, the save "
+              "devices' constructor sub_820A6160 with SaveSlot::AllocBuffers sub_820A4560 (no "
+              "adapter: only the constructor's plain C++ calls it; the notification listener "
+              "stored as none without XNotifyCreateListener) and destructor sub_820A6110 with "
+              "SaveDevices::Destroy sub_820A56E8 and SlotArray::Reset sub_820A55F0 (no adapters: "
+              "only the destructor's plain C++ calls them; the listener's CloseHandle left out)) "
+              "natively instead of through the "
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
 
@@ -303,6 +311,156 @@ void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = si::PlayTimeUpdate(base, ctx.r3.u32, ctx.r1.u32 - 96 + 80);
 }
 
+namespace {
+
+void Store64(uint8_t* base, uint32_t address, uint64_t value) {
+  guest::StoreU32(base, address, uint32_t(value >> 32));
+  guest::StoreU32(base, address + 4, uint32_t(value));
+}
+
+// A prologue's saves above the stack pointer `sp`: the return address at
+// sp - 8, the 64-bit registers r`first` to r31 from sp - 8 x (33 - first)
+// (where __savegprlr_N and the inline saves put them), and the back chain of
+// its `frame_bytes`-byte frame.
+void Prologue(uint8_t* base, uint32_t sp, uint32_t lr, uint32_t frame_bytes, int first,
+              const uint64_t* regs) {
+  guest::StoreU32(base, sp - 8, lr);
+  for (int n = first; n < 32; n++) {
+    Store64(base, sp - 8 * (32 - n) - 8, regs[n - first]);
+  }
+  guest::StoreU32(base, sp - frame_bytes, sp);
+}
+
+// r`first` to r31 of `ctx` (r14 to r31 are consecutive in PPCContext).
+std::vector<uint64_t> Regs(const PPCContext& ctx, int first) {
+  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(PPCRegister));
+  std::vector<uint64_t> regs;
+  for (int n = first; n < 32; n++) {
+    regs.push_back((&ctx.r14)[n - 14].u64);
+  }
+  return regs;
+}
+
+// The first slot's vtable slot 0 with r4 = 3 (the slots' vector deleting
+// destructor), a guest call from SlotArray::Reset's frame at `sp` (its
+// return address 0x820A5638); r3 its answer.
+std::function<uint32_t(uint32_t)> DestroySlots(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+  return [&ctx, base, sp](uint32_t slots) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = slots;
+    ctx.r4.u64 = 3;
+    ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, slots));
+    ctx.lr = 0x820A5638;
+    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  };
+}
+
+// SlotArray::Reset's prologue at `sp` (lr, r31 as the caller's r31 was:
+// `r31`), and its frame's stack pointer.
+uint32_t ResetPrologue(uint8_t* base, uint32_t sp, uint32_t lr, uint64_t r31) {
+  Prologue(base, sp, lr, 96, 31, &r31);
+  return sp - 96;
+}
+
+// SaveDevices::Destroy's prologue at `sp` (r31 its caller's), and Reset's
+// under it when Destroy calls it; the stack pointer the slots' destructor is
+// called from.
+uint32_t DestroyPrologues(uint8_t* base, uint32_t sp, uint32_t lr, uint64_t r31,
+                          uint32_t devices) {
+  Prologue(base, sp, lr, 96, 31, &r31);
+  const uint32_t frame = sp - 96;
+  if (guest::LoadU32(base, devices + 44) != 0) {
+    return ResetPrologue(base, frame, 0x820A572C, devices);
+  }
+  return frame;
+}
+
+}  // namespace
+
+void SaveDevicesConstructSteps(PPCContext& ctx, uint8_t* base) {
+  const uint64_t self = ctx.r3.u64;
+  const uint32_t devices = ctx.r3.u32;
+  const uint32_t block = ctx.r4.u32;
+  const uint32_t saves = ctx.r5.u32;
+  if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, saves)) {
+    __imp__sub_820A6160(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  // The original's prologue (__savegprlr_26): lr and r26 to r31.
+  const auto regs = Regs(ctx, 26);
+  Prologue(base, ctx.r1.u32, uint32_t(lr), 176, 26, regs.data());
+  // CanAllocBuffers checked above: the plain C++ doesn't refuse.
+  guest_call::InFrame(ctx, base, 176, 0x820A61D8, [&](uint32_t frame) {
+    si::SaveDevicesConstruct(
+        base, devices, block, saves, frame,
+        [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate) {
+          ctx.r3.u64 = loop;
+          ctx.r4.u64 = key;
+          ctx.r5.u64 = delegate;
+          ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, loop) + offset);
+          ctx.lr = offset == 8 ? 0x820A61D8 : 0x820A621C;
+          REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+        });
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = self;  // the original's mr r3,r31
+}
+
+void SaveSlotAllocBuffersSteps(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, ctx.r4.u32)) {
+    __imp__sub_820A4560(ctx, base);
+    return;
+  }
+  const auto regs = Regs(ctx, 29);
+  Prologue(base, ctx.r1.u32, uint32_t(ctx.lr), 112, 29, regs.data());
+  const uint32_t slot = ctx.r3.u32;
+  si::SlotAllocBuffers(base, slot, ctx.r4.u32);
+  ctx.r3.u64 = guest::LoadU32(base, slot + 84);  // the second operator new[]'s answer
+}
+
+void SaveDevicesDeleteSteps(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820A6110(ctx, base);
+    return;
+  }
+  const uint32_t devices = ctx.r3.u32;
+  const uint32_t flags = ctx.r4.u32;
+  const uint32_t sp = ctx.r1.u32;
+  // The original's prologue: lr, r30 and r31, a 112-byte frame; Destroy's
+  // (and Reset's) under it (r31 the save devices, as the original's mr
+  // r31,r3 leaves it).
+  const auto regs = Regs(ctx, 30);
+  Prologue(base, sp, uint32_t(ctx.lr), 112, 30, regs.data());
+  const uint64_t self = ctx.r3.u64;
+  const uint32_t slots_sp = DestroyPrologues(base, sp - 112, 0x820A6130, self, devices);
+  si::SaveDevicesDelete(base, devices, flags, DestroySlots(ctx, base, slots_sp));
+  ctx.r3.u64 = self;  // the original's mr r3,r31
+}
+
+void SaveDevicesDestroySteps(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820A56E8(ctx, base);
+    return;
+  }
+  const uint32_t devices = ctx.r3.u32;
+  const uint32_t slots_sp =
+      DestroyPrologues(base, ctx.r1.u32, uint32_t(ctx.lr), ctx.r31.u64, devices);
+  ctx.r3.u64 = si::SaveDevicesDestroy(base, devices, DestroySlots(ctx, base, slots_sp));
+}
+
+void SlotArrayResetSteps(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820A55F0(ctx, base);
+    return;
+  }
+  const uint32_t frame = ResetPrologue(base, ctx.r1.u32, uint32_t(ctx.lr), ctx.r31.u64);
+  ctx.r3.u64 = si::SlotArrayReset(base, ctx.r3.u32, DestroySlots(ctx, base, frame));
+}
+
 }  // namespace hooks
 
 // No adapter (removed 2026-10-28: in play only the request setters' plain
@@ -392,3 +550,11 @@ ITC_SAVE_INTERFACE_ADAPTER(8228FB00, SaveInterfaceGameDataSave)
 ITC_SAVE_INTERFACE_ADAPTER(8228FBC0, SaveInterfaceGameDataLoad)
 ITC_SAVE_INTERFACE_ADAPTER(8228FC50, SaveInterfaceGameDataCheck)
 ITC_SAVE_INTERFACE_ADAPTER(82290378, SaveInterfaceReplaysBuildList)
+// The save devices' constructor (from SaveDevices::Create, once at boot) and
+// destructor (vtable slot 0, never in play).
+ITC_SAVE_INTERFACE_ADAPTER(820A6160, SaveDevicesConstructSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A6110, SaveDevicesDeleteSteps)
+// No adapters for SaveSlot::AllocBuffers sub_820A4560 (only the
+// constructor's plain C++ calls it), SaveDevices::Destroy sub_820A56E8 and
+// SlotArray::Reset sub_820A55F0 (only the destructor's plain C++ calls
+// them): their register steps are the harness's.

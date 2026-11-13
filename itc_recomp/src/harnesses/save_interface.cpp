@@ -17,8 +17,11 @@
 #include "base/log.h"
 #include "hooks/save_interface.h"
 #include "memory/heap.h"
+#include "memory/c_runtime_heap.h"
+#include "save_interface/save_devices.h"
 #include "save_interface/save_interface.h"
 #include "save_interface/save_layer.h"
+#include "user/network.h"
 
 #include <fmt/format.h>
 
@@ -430,6 +433,326 @@ void Enumerated(uint8_t* base, uint32_t b, uint32_t c, Random& random, bool reps
   }
 }
 
+// --- The save devices' construction and teardown ---
+//
+// Each version gets the same random stack and objects; heap blocks each
+// version makes (the slot array, the slots' buffers, a deleted object) are
+// compared as whether they're set and live, and as offsets where an address
+// is kept. The recompiled side runs with --native_save_interface off (its
+// callees the originals, the listener wrapper and operator new the same
+// adapters as in play).
+
+constexpr uint32_t kStoreR4At4 = 0x820A70A8;  // r3 + 4 = r4
+constexpr uint32_t kCount4 = 0x8245F860;      // r3 + 4 up by one
+
+bool Live(uint32_t block) { return block != 0 && memory::IsHeapBlock(block); }
+
+void FreeArray(uint32_t block) {
+  if (Live(block)) {
+    memory::crt::OperatorDeleteArray(block);
+  }
+}
+
+// A slot array of `count` 1,000-byte slots made by operator new[] (its
+// count header `header_count`), the first slot's vtable `vtable`; returns
+// the slots (header + 8).
+uint32_t MakeSlots(uint8_t* base, uint32_t count, uint32_t header_count, uint32_t vtable,
+                   Random& random) {
+  const auto header = memory::crt::OperatorNewArray(base, 8 + 1000 * count);
+  if (!header || *header == 0) {
+    return 0;
+  }
+  WriteRandom(base, *header, (8 + 1000 * count) / 4, random);
+  guest::StoreU32(base, *header, header_count);
+  guest::StoreU32(base, *header + 8, vtable);
+  return *header + 8;
+}
+
+void SaveDevicesCases(Context& h, const Block& block) {
+  const uint32_t devices = block.address + 0x1800;  // 116 bytes
+  const uint32_t init = h.data + 0x100;               // the constructor's block
+  const uint32_t loop = h.data + 0x140;
+  const uint32_t loop_vtable = h.data + 0x180;
+  const uint32_t slot_vtable = h.data + 0x1C0;
+  const uint32_t holder = h.data + 0x200;
+  {
+    Results results("SaveDevices::SaveDevices (sub_820A6160) with SaveSlot::AllocBuffers (sub_820A4560)");
+    for (int c = 0; c < 12; c++) {
+      static constexpr uint32_t kSaves[] = {100, 0, 1, 7};
+      const uint32_t saves = c < 4 ? kSaves[c] : (c % 2 == 0 ? 100 : h.random.Below(300));
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+        WriteRandom(h.base, devices, 116 / 4, random);
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        WriteRandom(h.base, stack - 512, 512 / 4, random);
+        guest::StoreU32(h.base, init + 0, loop);
+        guest::StoreU32(h.base, loop + 0, loop_vtable);
+        guest::StoreU32(h.base, loop_vtable + 4, kStoreR4At4);
+        guest::StoreU32(h.base, loop_vtable + 8, kCount4);
+        for (int r = 26; r < 32; r++) {
+          (&t.r14)[r - 14].u64 = random.Next();
+        }
+        t.r3.u64 = devices;
+        t.r4.u64 = init;
+        t.r5.u64 = saves;
+        t.lr = 0x820A6400;
+        after = random;
+        ITC_FLAG(native_save_interface) = v == 1;
+        (v == 0 ? __imp__sub_820A6160 : hooks::SaveDevicesConstructSteps)(t, h.base);
+        ITC_FLAG(native_save_interface) = true;
+        const uint32_t slots = guest::LoadU32(h.base, devices + 44);
+        out[v].Bytes(Read(h.base, devices, 44));
+        out[v].Word(slots != 0 && Live(slots - 8) ? 1 : 0);
+        out[v].Bytes(Read(h.base, devices + 48, 116 - 48));
+        if (slots != 0) {
+          out[v].Word(guest::LoadU32(h.base, slots - 8));
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t slot = slots + 1000 * i;
+            out[v].Word(guest::LoadU32(h.base, slot + 0));
+            out[v].Bytes(Read(h.base, slot + 36, 12));
+            out[v].Word(guest::LoadU32(h.base, slot + 96));
+            out[v].Word(guest::LoadU32(h.base, slot + 948));
+            out[v].Bytes(Read(h.base, slot + 960, 36));
+            const uint32_t records = guest::LoadU32(h.base, slot + 80);
+            const uint32_t words = guest::LoadU32(h.base, slot + 84);
+            out[v].Word(Live(records) ? 1 : 0);
+            out[v].Word(Live(words) ? 1 : 0);
+            out[v].Word(records != 0 && records == words ? 1 : 0);
+            FreeArray(records);
+            FreeArray(words);
+          }
+          FreeArray(slots - 8);
+        }
+        out[v].Bytes(Read(h.base, init, 16));
+        out[v].Bytes(Read(h.base, loop, 8));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r1.u32 - stack);
+        out[v].Word(uint32_t(t.lr));
+        // The frame's delegates, the prologue's saves, AllocBuffers' saves
+        // and back chain below the frame.
+        out[v].Bytes(Read(h.base, stack - 176, 4));
+        out[v].Bytes(Read(h.base, stack - 176 + 80, 32));
+        out[v].Bytes(Read(h.base, stack - 56, 56));
+        out[v].Bytes(Read(h.base, stack - 176 - 32, 32));
+        out[v].Bytes(Read(h.base, stack - 176 - 112, 4));
+        for (int r = 26; r < 32; r++) {
+          out[v].Word(uint32_t((&t.r14)[r - 14].u64));
+        }
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {} ({} saves)", c, saves));
+    }
+    results.Report();
+  }
+  {
+    Results results("SaveSlot::AllocBuffers (sub_820A4560)");
+    const uint32_t slot = block.address + 0x400;
+    for (int c = 0; c < 12; c++) {
+      static constexpr uint32_t kSaves[] = {100, 0, 1, 1000};
+      const uint32_t saves = c < 4 ? kSaves[c] : h.random.Below(2000);
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        WriteRandom(h.base, slot, 1000 / 4, random);
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        WriteRandom(h.base, stack - 256, 256 / 4, random);
+        for (int r = 29; r < 32; r++) {
+          (&t.r14)[r - 14].u64 = random.Next();
+        }
+        t.r3.u64 = slot;
+        t.r4.u64 = saves;
+        t.lr = 0x820A62F8;
+        after = random;
+        ITC_FLAG(native_save_interface) = v == 1;
+        (v == 0 ? __imp__sub_820A4560 : hooks::SaveSlotAllocBuffersSteps)(t, h.base);
+        ITC_FLAG(native_save_interface) = true;
+        const uint32_t records = guest::LoadU32(h.base, slot + 80);
+        const uint32_t words = guest::LoadU32(h.base, slot + 84);
+        out[v].Bytes(Read(h.base, slot, 80));
+        out[v].Word(Live(records) ? 1 : 0);
+        out[v].Word(Live(words) ? 1 : 0);
+        out[v].Bytes(Read(h.base, slot + 88, 1000 - 88));
+        out[v].Word(t.r3.u32 == words ? 1 : 0);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r1.u32 - stack);
+        out[v].Bytes(Read(h.base, stack - 32, 32));
+        out[v].Bytes(Read(h.base, stack - 112, 4));
+        FreeArray(records);
+        FreeArray(words);
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {} ({} saves)", c, saves));
+    }
+    results.Report();
+  }
+  // The teardown: the slots none (0), a header count of 0 (operator
+  // delete[]) or not (the first slot's vtable slot 0, here sub_820A70A8:
+  // the slot's +4 = 3).
+  auto make_slots = [&](uint32_t kind, Random& random) -> uint32_t {
+    if (kind == 0) {
+      return 0;
+    }
+    guest::StoreU32(h.base, slot_vtable, kStoreR4At4);
+    return MakeSlots(h.base, 1 + random.Below(4), kind == 1 ? 0 : 1 + random.Below(4),
+                     slot_vtable, random);
+  };
+  // What's left of a slot array after: freed, or the first slot's +4.
+  auto slots_after = [&](Outputs& out, uint32_t slots) {
+    if (slots == 0) {
+      return;
+    }
+    const bool live = Live(slots - 8);
+    out.Word(live ? 1 : 0);
+    if (live) {
+      out.Word(guest::LoadU32(h.base, slots + 4));
+      FreeArray(slots - 8);
+    }
+  };
+  {
+    Results results("SlotArray::Reset (sub_820A55F0)");
+    for (int c = 0; c < 12; c++) {
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        WriteRandom(h.base, stack - 256, 256 / 4, random);
+        t.r31.u64 = random.Next();
+        const uint32_t slots = make_slots(uint32_t(c % 3), random);
+        guest::StoreU32(h.base, holder, slots);
+        t.r3.u64 = holder;
+        t.lr = 0x820A572C;
+        after = random;
+        ITC_FLAG(native_save_interface) = v == 1;
+        (v == 0 ? __imp__sub_820A55F0 : hooks::SlotArrayResetSteps)(t, h.base);
+        ITC_FLAG(native_save_interface) = true;
+        out[v].Word(guest::LoadU32(h.base, holder));
+        out[v].Word(t.r3.u32 - (slots != 0 ? slots : holder));
+        out[v].Word(t.r1.u32 - stack);
+        out[v].Bytes(Read(h.base, stack - 16, 16));
+        out[v].Bytes(Read(h.base, stack - 96, 4));
+        slots_after(out[v], slots);
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("SaveDevices::Destroy (sub_820A56E8)");
+    for (int c = 0; c < 12; c++) {
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+        WriteRandom(h.base, devices, 116 / 4, random);
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        WriteRandom(h.base, stack - 256, 256 / 4, random);
+        t.r31.u64 = random.Next();
+        // The listener: none, or what the native constructor stores (the
+        // recompiled side's CloseHandle on it fails; its last error isn't
+        // compared).
+        guest::StoreU32(h.base, devices + 56, c % 2 == 0 ? 0 : user::kNoListener);
+        const uint32_t slots = make_slots(uint32_t(c % 3), random);
+        guest::StoreU32(h.base, devices + 44, slots);
+        t.r3.u64 = devices;
+        t.lr = 0x820A6130;
+        after = random;
+        ITC_FLAG(native_save_interface) = v == 1;
+        (v == 0 ? __imp__sub_820A56E8 : hooks::SaveDevicesDestroySteps)(t, h.base);
+        ITC_FLAG(native_save_interface) = true;
+        out[v].Bytes(Read(h.base, devices, 116));
+        out[v].Word(t.r3.u32 - (slots != 0 ? slots : devices));
+        out[v].Word(t.r1.u32 - stack);
+        out[v].Bytes(Read(h.base, stack - 16, 16));
+        out[v].Bytes(Read(h.base, stack - 96, 4));
+        if (slots != 0) {
+          out[v].Bytes(Read(h.base, stack - 96 - 16, 16));
+          out[v].Bytes(Read(h.base, stack - 192, 4));
+        }
+        slots_after(out[v], slots);
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("SaveDevices::~SaveDevices (sub_820A6110)");
+    for (int c = 0; c < 12; c++) {
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        WriteRandom(h.base, stack - 384, 384 / 4, random);
+        t.r30.u64 = random.Next();
+        t.r31.u64 = random.Next();
+        const auto object = memory::crt::OperatorNew(h.base, 116);
+        if (!object || *object == 0) {
+          ITC_LOG_ERROR("harness: save_interface: operator new refused 116 bytes");
+          return;
+        }
+        WriteRandom(h.base, *object, 116 / 4, random);
+        guest::StoreU32(h.base, *object + 56, c % 2 == 0 ? 0 : user::kNoListener);
+        const uint32_t slots = make_slots(uint32_t(c % 3), random);
+        guest::StoreU32(h.base, *object + 44, slots);
+        const uint32_t flags = uint32_t(random.Next()) & ~1u;
+        const bool free = (c / 3) % 2 == 0;
+        t.r3.u64 = *object;
+        t.r4.u64 = flags | (free ? 1 : 0);
+        t.lr = 0x82090000;
+        after = random;
+        ITC_FLAG(native_save_interface) = v == 1;
+        (v == 0 ? __imp__sub_820A6110 : hooks::SaveDevicesDeleteSteps)(t, h.base);
+        ITC_FLAG(native_save_interface) = true;
+        const bool live = Live(*object);
+        out[v].Word(live ? 1 : 0);
+        if (live) {
+          out[v].Bytes(Read(h.base, *object, 116));
+          memory::crt::OperatorDelete(*object);
+        }
+        out[v].Word(t.r3.u32 - *object);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r1.u32 - stack);
+        out[v].Bytes(Read(h.base, stack - 24, 24));
+        out[v].Bytes(Read(h.base, stack - 112, 4));
+        // Destroy's saves: its return address and r31 (the object, as an
+        // offset), and Reset's when it ran.
+        out[v].Word(guest::LoadU32(h.base, stack - 112 - 8));
+        out[v].Word(guest::LoadU32(h.base, stack - 112 - 12) - *object);
+        out[v].Word(guest::LoadU32(h.base, stack - 112 - 16));
+        if (slots != 0) {
+          out[v].Word(guest::LoadU32(h.base, stack - 208 - 8));
+          out[v].Word(guest::LoadU32(h.base, stack - 208 - 12) - *object);
+        }
+        slots_after(out[v], slots);
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void SaveInterface(Context& h) {
@@ -814,6 +1137,7 @@ void SaveInterface(Context& h) {
         }
         t.r3.u64 = PlayerAt(h.base, data + 0x400 + 4 * random.Below(16), random);
       });
+  SaveDevicesCases(h, block);
 }
 
 }  // namespace harness

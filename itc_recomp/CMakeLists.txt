@@ -341,6 +341,7 @@ set(ITC_SOURCES
     src/hooks/scene.cpp
     src/scene/scene.cpp
     src/scene/lighting.cpp
+    src/save_interface/save_devices.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

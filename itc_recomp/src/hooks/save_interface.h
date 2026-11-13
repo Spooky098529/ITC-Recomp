@@ -91,4 +91,22 @@ void SaveInterfaceReplaysReadEntry(PPCContext& ctx, uint8_t* base);
 // r1 - 144 (ReadEntry's original a guest call from it).
 void SaveInterfaceReplaysBuildList(PPCContext& ctx, uint8_t* base);
 
+// The save devices' construction and teardown (save_interface/save_devices.h),
+// each writing its prologue's saves as the original does; the original
+// without the native heap (or where the plain C++ refuses).
+// sub_820A6160 SaveDevices::SaveDevices: r3 = it, r4 = the block, r5 = the
+// saves to enumerate; the run loop's slots from its 176-byte frame.
+void SaveDevicesConstructSteps(PPCContext& ctx, uint8_t* base);
+// sub_820A4560 SaveSlot::AllocBuffers: r3 = a slot, r4 = the saves (no
+// adapter: only the constructor's plain C++ calls it).
+void SaveSlotAllocBuffersSteps(PPCContext& ctx, uint8_t* base);
+// sub_820A6110 SaveDevices::~SaveDevices: r3 = it, r4 = the flags.
+void SaveDevicesDeleteSteps(PPCContext& ctx, uint8_t* base);
+// sub_820A56E8 SaveDevices::Destroy: r3 = it (no adapter: only the
+// destructor's plain C++ calls it).
+void SaveDevicesDestroySteps(PPCContext& ctx, uint8_t* base);
+// sub_820A55F0 SlotArray::Reset: r3 = the word holding the slots (no
+// adapter: only Destroy's plain C++ calls it).
+void SlotArrayResetSteps(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
