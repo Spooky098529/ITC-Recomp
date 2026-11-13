@@ -27,8 +27,8 @@ Shared, with rows elsewhere: `Sprite::ResetStyle2` (`sub_82123A00`,
 `command-list.md`); `Primitive::RecordTransform` (`sub_8217AEA8`,
 `minimap.md`); `CarData::CarData` (`sub_820AEF80`, `car-physics.md`);
 `Car::SetModelAndClass` (`sub_821104D8`, `career.md`). Reached through
-vtables, without rows: the app's interface `[0x826BABA0]` (slot 8
-`sub_820944D8`, its answer's slot 1 the command list and slot 2 the
+vtables: the app's interface `[0x826BABA0]` (slot 8 `sub_820944D8`,
+its row in `app-start-up.md`; its answer's slot 1 the command list and slot 2 the
 render queue, whose slot 4 is `RenderQueue::Add`, `device-shaders.md`).
 In the car objects' makers lead (`../loops/leads.md`), not here:
 `sub_82179A60` (sets up a racer and its vehicle from a car into a car

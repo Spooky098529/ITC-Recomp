@@ -50,12 +50,13 @@ loops, arguments). `TextureProjection::Fit` read in full by the migration (part 
 (`vehicle-accessors.md`); `XPR::GetTexture` (`functions.md`); `memcpy`
 and `tan` (`c-runtime.md`); `operator new` and `operator delete`
 (`heap.md`); `Car::DrawUpdate` (`car-draw.md`); the beam color table
-`sub_820D35D0` (`material-passes.md`). Reached through vtables, without
-rows: the scene's render manager `[0x826BABA0]` (slot 8 `sub_820944D8`,
-then the command list from its answer's slot 1 and the render queue from
+`sub_820D35D0` (`material-passes.md`). Reached through vtables, with
+rows elsewhere: the scene's render manager `[0x826BABA0]` (slot 8
+`sub_820944D8`, `app-start-up.md`, then the command list from its answer's slot 1 and the render queue from
 slot 2, whose slot 4 takes each chunk; `RenderQueue::Add` in
 `device-shaders.md`), and the shared assets' texture provider at the
-scene's +432 (its slot 3, probably `sub_825946B8`, a getter; both leads).
+scene's +432 (its slot 3, `TextureProvider::Get` `sub_825946B8`,
+`models.md`).
 Never seen in play, without rows (as in `models.md`): `std::vector`'s
 `_Xlen` (`sub_825981C8`) and `bad_alloc`'s copy (`sub_82091200`,
 `std-string.md`). Fields: `../known-data.md` ("scene pass description",

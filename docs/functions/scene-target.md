@@ -41,7 +41,7 @@ nothing here is Dropped; EDRAM isn't emulated, but these are the binds and
 resolves the renderer works from. Chunks are queued with
 `RenderQueue::Add` (`device-shaders.md`; r5 the bucket, f1 0.0 from
 `0x82000A34`) through the scene's render manager `[0x826BABA0]` (slot 8
-`sub_820944D8`, no row; its answer's slot 2 the render queue), and the
+`sub_820944D8`, `app-start-up.md`; its answer's slot 2 the render queue), and the
 textured rectangle's on the list at `[0x826D83D0 + 4]` with the queue at
 `+0` (the color rectangles' and the minimap's, `mode-tick.md`,
 `minimap.md`). `0x82000A30` is 1.0, `0x82001070` 0.8 (1024 / 1280 and

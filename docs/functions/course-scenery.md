@@ -78,11 +78,11 @@ native since): the pools'
 slots (key, load, reset; each row names its targets seen in play), the
 pool set's factory (`Scenery::MakePoolObject` only), the texture provider
 at the manager's +228 (vtable `0x8206CCB4`, made by `sub_82594850`; slot 2
-`sub_82594328` and slot 4 `sub_82594718`, both seen in play, no rows),
+`sub_82594328` and slot 4 `sub_82594718`, rows in `scenery-lists.md`),
 and the scene's render manager `[0x826BABA0]` (slot 8 `sub_820944D8`,
-seen in play, no row, which calls through `sub_82094338` to another
-object's slot 3; the command list and render queue behind it are found
-at run time, as for `CameraPass::RecordBegin`, `cameras.md`).
+which calls through `sub_82094338` to the framework's +36 interface's
+slot 3, the scene; rows in `app-start-up.md`; the command list and
+render queue behind it are found at run time, as for `CameraPass::RecordBegin`, `cameras.md`).
 
 Shared with other files, without rows here: `Archive::Load`
 (`sub_8209DE48`), the asset's size (`sub_820A0678`) and

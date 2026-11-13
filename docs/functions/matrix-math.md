@@ -55,6 +55,19 @@ depends on the operand order the compiler chose (LLVM treats `dpps`,
 in `cameras.md`) and the other functions in that range (files,
 saves, billboards, the graphics library's objects): not math.
 
+Two static matrices (the B7 loop's mapping agent, 2026-11-13, from a
+lead): C runtime static set-ups at the end of XACT's range (`_cinit`'s
+initializer table, `c-runtime.md`; no direct callers, once at boot)
+build a 4x4 matrix of zeros at `0x8266D000` (`sub_825D8F88`) and the
+identity right after it at `0x8266D040` (`sub_825D9060`), each through
+`Matrix::FromFloats` (`sub_82090000`, its row in `camera-modes.md`)
+from 16 floats on its stack, and register an empty clean-up with
+`atexit` (`sub_825A7068`, `c-runtime.md`). Probably the constants of
+a math library linked into the game (D3DX's or XNA math's), not
+XACT's. No reader of either address was found by a search of the
+generated code for their `lis`/`addi` forms (`0x82670000` − 12288 and
+− 12224); one built from another base wasn't looked for.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
@@ -129,3 +142,7 @@ run it after changing either, on any branch.
 | `sub_82293E68` | `Quaternion::FromAxisAngle` | Native | r3 = out, r4 = an axis, f1 = an angle: (0, 0, 0, 1) when the angle is exactly 0.0; otherwise `SinCos`(angle × 0.5) (`sub_820B0E10`, the float at `0x82001BE4`) and out = (axis.x s, axis.y s, axis.z s, c). The axis isn't normalized here. 4 callers (4 seen): the car physics (`sub_820AF1C0`, `sub_820B0EE8`, `sub_820B1B00`, `sub_820B7658`). f1 comes back as the angle (0.0 branch) or the cosine's double (left by `SinCos`). Native: `matrix_math::QuaternionFromAxisAngle` (`--native_matrix_math`, adapter `src/hooks/matrix_math.cpp`, which sets f1; calls `matrix_math::SinCos` directly with the sine and cosine where the original keeps them, its stack at r1 - 32; harness `matrix_math`, f1 compared). Runs in attract races. Its adapter removed (B7 loop, 2026-10-26): its callers in play, CarData::Derive, are native and call its plain C++ directly (`--native_matrix_math` now switches only them). |
 | `sub_82293F10` | `Quaternion::NormalizeSelf` | Overridden | r3 = a quaternion: all four floats × 1.0 / `fsqrts`(x² + y² + z² + w²) (no check for 0.0). Leaf. From `sub_820B71E8` (the car physics) only. Native: `matrix_math::QuaternionNormalizeSelf` (`--native_matrix_math`, adapter `src/hooks/matrix_math.cpp`; harness `matrix_math`). |
 | `sub_820B0E10` | `SinCos` | Overridden | f1 = an angle, r4 = &sine, r5 = &cosine: `sin` (`sub_825A88A0`) and `cos` (`sub_825A8978`, both in `c-runtime.md`) of it, each rounded to a float. 2 callers (2 seen): `sub_820B1B00` (the car physics), `sub_82293E68`. In the car physics' address range, but math. f1 comes back as the cosine's double. Native: `matrix_math::SinCos` (`--native_matrix_math`, adapter `src/hooks/matrix_math.cpp`), calling `c_runtime::Sin` and `Cos` directly; harness `matrix_math`. |
+| `sub_825D8F88` | `ZeroMatrix::StaticInit` (probably) | | No arguments, no direct callers: a C runtime static set-up (`_cinit`'s initializer table), once at boot. A 304-byte frame (`__savegprlr_23`): the float at `0x82000A34` (0.0) stored to its 16 words at +160 to +220, their addresses passed in r4 to r10 and at +84 to +148 (every 8 bytes), then `Matrix::FromFloats(0x8266D000, ...)` (`sub_82090000`, `camera-modes.md`), then `atexit(0x825DACA0)` (`sub_825A7068`, `c-runtime.md`); r3 = atexit's. Seen in play. Read in full (the B7 loop's mapping agent, 2026-11-13, from a lead). |
+| `sub_825D9060` | `IdentityMatrix::StaticInit` (probably) | | The same for the identity at `0x8266D040`: the float at `0x82000A30` (1.0) at +160, +180, +200 and +220 (the diagonal), `0x82000A34` (0.0) elsewhere, then `Matrix::FromFloats(0x8266D040, ...)` and `atexit(0x825DAC98)`. Seen in play. Read in full (the B7 loop's mapping agent, 2026-11-13). |
+| `sub_825DACA0` | | | `ZeroMatrix::StaticInit`'s clean-up (registered with `atexit`): returns (a lone `blr`). Not seen in play (the exit's, never reached in play). Read in full. |
+| `sub_825DAC98` | | | `IdentityMatrix::StaticInit`'s clean-up: the same empty function. Not seen in play. Read in full. |
