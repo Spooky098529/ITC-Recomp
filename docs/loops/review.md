@@ -55,6 +55,13 @@ When the user has reviewed a run's section, its heading gets
   sets the last error); the slots' vector deleting destructor stays a
   guest call (teardown only); save counts malloc would refuse run the
   original.
+- The slot handlers' map (2c70e8c8): 14 rows in `save-interface.md`;
+  `files-and-saves.md`'s `SaveStep`, `LoadStep`,
+  `XGetOverlappedResult`, `GetOverlappedResult` and
+  `system-services.md`'s `SaveDevices::Update` updated. Correction:
+  state 1 is no device and state 2 the failure state (not "2 = no
+  device"); `SaveDevices::Update` checks the slot's user (+956), not
+  its state.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

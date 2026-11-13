@@ -64,7 +64,14 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 10: the save devices' slot handlers (the lead the
   save devices' map added: the states `SaveDevices::Update` runs every
   frame; 3 ready, state 6 blocked by `sub_82295C98` and
-  `sub_822970A0`); its line deleted from `leads.md`. Mapping agent
+  `sub_822970A0`); its line deleted from `leads.md`. Mapped into
+  `save-interface.md` (2c70e8c8: 14 new rows, shared rows updated in
+  `files-and-saves.md` and `system-services.md`; 6 ready groups; the
+  overlapped-result waits `sub_82295C98`, `sub_82295F20` to be made
+  native with their never-taken wait path a guest call to
+  `WaitForSingleObject`, the 2026-10-24 and 2026-10-29 precedents;
+  B4's `File::`/content steps in `src/hooks/saves.cpp` to be split
+  into plain C++; no leads added). Check passed. Migration agent
   running.
 
 ## Done
