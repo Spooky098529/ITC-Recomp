@@ -3,6 +3,8 @@
 
 #include "models/texture_provider.h"
 
+#include "models/xpr.h"
+
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
@@ -267,6 +269,65 @@ std::optional<uint32_t> TextureProviderDestruct(uint8_t* base, uint32_t provider
   Store(base, vector + kVectorLast, 0);
   Store(base, vector + kVectorEnd, 0);
   return storage;
+}
+
+std::optional<uint32_t> PointersAt(uint8_t* base, uint32_t vector, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_82594648 TextureProvider::At");
+  const uint32_t first = Load(base, vector + kVectorFirst);
+  if (first == 0 || !(Count(first, Load(base, vector + kVectorLast)) > index)) {
+    return std::nullopt;  // _Xran (sub_825944B0)
+  }
+  return first + (index << 2);
+}
+
+uint32_t TextureProviderGet(uint8_t* base, uint32_t provider, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_825946B8 TextureProvider::Get");
+  const uint32_t vector = provider + kTextureProviderVector;
+  const uint32_t first = Load(base, vector + kVectorFirst);
+  if (first == 0 || !(slot < Count(first, Load(base, vector + kVectorLast)))) {
+    return 0;
+  }
+  const auto at = PointersAt(base, vector, slot);
+  Require(at.has_value(), "TextureProvider::At");
+  return Load(base, *at);
+}
+
+namespace {
+
+// The provider's slot 3 with `slot`, as slots 5 to 10 call it (from their
+// frame, the return address `lr`).
+uint64_t SlotGet(uint8_t* base, uint32_t provider, uint32_t slot, uint32_t frame, uint32_t lr,
+                 const ProviderCall& call) {
+  const uint32_t target = Load(base, Load(base, provider) + 12);
+  if (target == kTextureProviderGet) {
+    return TextureProviderGet(base, provider, slot);
+  }
+  return call(target, frame, lr, provider, slot);
+}
+
+}  // namespace
+
+uint64_t TextureProviderXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
+                                   uint32_t index, uint32_t sp, const ProviderCall& call) {
+  ITC_NATIVE_RUNNING("sub_825941D0 TextureProvider::GetXprTexture");
+  const uint32_t frame = sp - 96;
+  const uint64_t xpr = SlotGet(base, provider, slot, frame, 0x825941F4, call);
+  if (uint32_t(xpr) == 0) {
+    return 0;
+  }
+  return XprGetTexture(base, uint32_t(xpr), index);
+}
+
+uint64_t TextureProviderFindXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
+                                       uint32_t name, uint32_t sp, const ProviderCall& call) {
+  ITC_NATIVE_RUNNING("sub_82594230 TextureProvider::FindXprTexture");
+  constexpr uint32_t kXprFindTexture = 0x82596E88;
+  const uint32_t frame = sp - 96;
+  const uint64_t xpr = SlotGet(base, provider, slot, frame, 0x82594254, call);
+  if (uint32_t(xpr) == 0) {
+    return 0;
+  }
+  return call(kXprFindTexture, frame, 0x82594264, xpr, name);
 }
 
 }  // namespace models

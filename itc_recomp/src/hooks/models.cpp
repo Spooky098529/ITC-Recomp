@@ -51,7 +51,10 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "UninitializedCopy sub_82594380 (no adapters: only Reserve and InsertN call "
               "them), Reserve sub_82594570 (no adapter: only the constructor's plain C++ calls it in play), InsertN sub_82590EF0 and Assign sub_825947D0 (no "
               "adapter: only the constructor calls it), TextureProvider::TextureProvider "
-              "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
+              "sub_82594850 and ~TextureProvider sub_825943E0; its getters TextureProvider::Get "
+              "sub_825946B8 with At sub_82594648 (no adapter: only Get calls it; _Xran's path the "
+              "original's), slots 5 to 7 sub_825941D0 and 8 to 10 sub_82594230 (XPR::FindTexture "
+              "a guest call); Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
               "plain C++ called directly, and the car part model's sub_820CE928 and "
               "sub_820CE990 over them; the part model's sub_820CE9C8 and Model::SetVinylTextures sub_820CE9F8; Skeleton::ResetPose "
@@ -214,6 +217,60 @@ extern "C" REX_FUNC(sub_82590D68) {
     return;
   }
   ctx.r3.u64 = models::PointersClear(base, ctx.r3.u32);
+}
+
+// The provider's getters (vtable slots). TextureProvider::At (sub_82594648)
+// has no adapter: only Get calls it.
+namespace {
+
+models::ProviderCall ProviderGuestCall(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t function, uint32_t frame, uint32_t lr, uint64_t r3,
+                      uint64_t r4) -> uint64_t {
+    const uint64_t stack = ctx.r1.u64;
+    guest::StoreU32(base, frame, ctx.r1.u32);
+    ctx.r1.u64 = frame;
+    ctx.lr = lr;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u64;
+  };
+}
+
+}  // namespace
+
+// TextureProvider::Get: r3 = the provider, r4 = the slot; r3 the texture set.
+extern "C" REX_FUNC(sub_825946B8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_825946B8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = models::TextureProviderGet(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// Slots 5 to 7 and 8 to 10: r3 = the provider, r4 = the slot, r5 = the
+// index (or the name).
+extern "C" REX_FUNC(sub_825941D0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_825941D0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = models::TextureProviderXprTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r1.u32, ProviderGuestCall(ctx, base));
+}
+
+extern "C" REX_FUNC(sub_82594230) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_82594230(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = models::TextureProviderFindXprTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r1.u32, ProviderGuestCall(ctx, base));
 }
 
 // TextureProvider::TextureProvider: r3 = the provider (left), r4 = the slot

@@ -779,6 +779,135 @@ void Providers(Context& h) {
   }
 }
 
+// --- The texture provider's getters (slots 3, 5 to 7 and 8 to 10) ---
+//
+// A provider at the block's start (its vtable a copy at +64 whose slot 3 is
+// Get, or the getter of +60 sub_82090770 in some cases: the guest path),
+// its elements at +128 (none, past the slot, or null and two XPRs at +200
+// and +232 whose records at +256 name strings at +512), the slot and index
+// below and past the counts. The recompiled side runs with --native_models
+// off (its callees the originals); compared: the block, the scratch area
+// and r3.
+
+void NativeProviderGet(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = models::TextureProviderGet(base, t.r3.u32, t.r4.u32);
+}
+
+void ProviderGetterCases(Context& h) {
+  const Block block(1024);
+  const uint32_t b = block.address;
+  const uint32_t provider = b, vtable = b + 64, elements = b + 128;
+  const uint32_t xprs[2] = {b + 200, b + 232};
+  const uint32_t records = b + 256, names = b + 512, lookup = b + 768;
+  const char* const kNames[] = {"alpha", "Beta", "gamma", "DELTA", "eps", "zeta", "eta", "theta"};
+  // Writes the provider, its vtable, the XPRs, their records and names.
+  auto world = [&](uint32_t get, uint32_t first, uint32_t last, const uint32_t words[16],
+                   const uint32_t counts[2]) {
+    Fill(h.base, b, block.bytes);
+    Store(h.base, provider, vtable);
+    Store(h.base, provider + 4 + models::kVectorFirst, first);
+    Store(h.base, provider + 4 + models::kVectorLast, last);
+    Store(h.base, provider + 4 + models::kVectorEnd, elements + 64);
+    for (uint32_t i = 0; i < 12; i++) {
+      Store(h.base, vtable + 4 * i, 0x8206CCB4 + 4 * i);
+    }
+    Store(h.base, vtable + 12, get);
+    Store(h.base, provider + 60, words[15]);
+    for (uint32_t i = 0; i < 16; i++) {
+      Store(h.base, elements + 4 * i, words[i]);
+    }
+    for (uint32_t x = 0; x < 2; x++) {
+      Store(h.base, xprs[x] + models::kXprHeader, 0x10000000u * (x + 1));
+      Store(h.base, xprs[x] + 16, x == 0 ? records : records + 64);
+      Store(h.base, xprs[x] + 20, counts[x]);
+    }
+    for (uint32_t r = 0; r < 8; r++) {
+      Store(h.base, records + 16 * r + 4, 0x100u * (r + 1));
+      Store(h.base, records + 16 * r + 12, names + 32 * r);
+      for (uint32_t i = 0; i <= std::char_traits<char>::length(kNames[r]); i++) {
+        guest::StoreU8(h.base, names + 32 * r + i, uint8_t(kNames[r][i]));
+      }
+    }
+  };
+  // Get on any elements: no storage, the end before or past the first.
+  {
+    Results results("TextureProvider::Get (sub_825946B8, with At sub_82594648)");
+    for (int c = 0; c < 48; c++) {
+      const uint32_t first = c % 6 == 0 ? 0 : elements + 4 * h.random.Below(4);
+      const uint32_t last = first + 4 * h.random.Below(20) - 16;
+      const uint32_t slot = c % 11 == 0 ? 0xFFFFFFF0u + h.random.Below(16) : h.random.Below(20);
+      uint32_t words[16];
+      for (uint32_t& w : words) w = uint32_t(h.random.Next());
+      const uint32_t counts[2] = {0, 0};
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        world(models::kTextureProviderGet, first, last, words, counts);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = provider;
+        t.r4.u64 = slot;
+        Side(v, [&] { (v == 0 ? __imp__sub_825946B8 : NativeProviderGet)(t, h.base); });
+        out[v].Bytes(Read(h.base, b, block.bytes));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {} (slot {:#x})", c, slot));
+    }
+    results.Report();
+  }
+  // Slots 5 to 7 and 8 to 10 (the adapters, v == 1 with the flag on).
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "TextureProvider::GetXprTexture (sub_825941D0)"
+                               : "TextureProvider::FindXprTexture (sub_82594230)");
+    for (int c = 0; c < 48; c++) {
+      const uint32_t size = c % 8 == 0 ? 0 : 1 + h.random.Below(15);
+      const uint32_t first = c % 13 == 0 ? 0 : elements;
+      const uint32_t slot = h.random.Below(18);
+      const uint32_t get = c % 9 == 4 ? 0x82090770 : models::kTextureProviderGet;
+      uint32_t words[16];
+      for (uint32_t& w : words) {
+        const uint32_t pick = h.random.Below(5);
+        w = pick == 0 ? 0 : xprs[pick & 1];
+      }
+      const uint32_t counts[2] = {h.random.Below(5), h.random.Below(5)};
+      const uint32_t index = c % 7 == 0 ? 0xFFFFFFF0u + h.random.Below(16) : h.random.Below(6);
+      const uint32_t name = c % 10 == 0 ? 0 : h.random.Below(9);  // 8: matches none
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        world(get, first, first + 4 * size, words, counts);
+        const char* text = name == 0 ? "" : name == 8 ? "none" : kNames[name - 1];
+        const uint32_t length = uint32_t(std::char_traits<char>::length(text));
+        for (uint32_t i = 0; i <= length; i++) {
+          // Upper case some letters: _stricmp folds them.
+          char ch = i < length ? text[i] : 0;
+          if (c % 3 == 0 && ch >= 'a' && ch <= 'z') ch = char(ch - 32);
+          guest::StoreU8(h.base, lookup + i, uint8_t(ch));
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = provider;
+        t.r4.u64 = slot;
+        t.r5.u64 = which == 0 ? index : (name == 0 ? 0 : lookup);
+        Side(v, [&] {
+          if (which == 0) {
+            (v == 0 ? __imp__sub_825941D0 : sub_825941D0)(t, h.base);
+          } else {
+            (v == 0 ? __imp__sub_82594230 : sub_82594230)(t, h.base);
+          }
+        });
+        out[v].Bytes(Read(h.base, b, block.bytes));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {} (size {}, slot {}, get {:#x})", c, size, slot, get));
+    }
+    results.Report();
+  }
+}
+
 // --- The model ---
 
 void NativeModelConstruct(PPCContext& t, uint8_t* base) {
@@ -1462,6 +1591,7 @@ void Models(Context& h) {
     Assigns(h);
     Clears(h);
     Providers(h);
+    ProviderGetterCases(h);
     ITC_LOG_INFO("harness: models: {} InsertN cases handed to the original (a tail at least "
                  "the count long, its copy_backward never seen in play)",
                  handed);

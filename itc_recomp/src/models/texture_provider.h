@@ -21,6 +21,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace models {
@@ -82,5 +83,38 @@ std::optional<uint32_t> TextureProviderConstruct(uint8_t* base, uint32_t provide
 // cleared, its storage freed, its three words = 0. Returns r3 (the storage);
 // nullopt where the original must run.
 std::optional<uint32_t> TextureProviderDestruct(uint8_t* base, uint32_t provider);
+
+// --- The getters (the vtable's slots 3 and 5 to 10) ---
+
+constexpr uint32_t kTextureProviderGet = 0x825946B8;  // slot 3, at vtable + 12
+
+// sub_82594648 TextureProvider::At (std::vector<T*>::at): the address of
+// element `index` (+4 + 4 x index); nullopt for _Xran's path (no storage, or
+// the index not below the size: it throws, never seen in play), where the
+// caller runs the original.
+std::optional<uint32_t> PointersAt(uint8_t* base, uint32_t vector, uint32_t index);
+
+// sub_825946B8 TextureProvider::Get (slot 3): 0 when the vector has no
+// storage or `slot` isn't below its size, else the element (through At).
+uint32_t TextureProviderGet(uint8_t* base, uint32_t provider, uint32_t slot);
+
+// A guest call of `function` (r3, r4) from the frame at `frame` with the
+// return address `lr`; its r3.
+using ProviderCall = std::function<uint64_t(uint32_t function, uint32_t frame, uint32_t lr,
+                                            uint64_t r3, uint64_t r4)>;
+
+// sub_825941D0 TextureProvider::GetXprTexture (slots 5 to 7): the provider's
+// slot 3 with `slot` (TextureProviderGet when it's the game's, else through
+// `call`); 0 gives 0, else XPR::GetTexture(it, `index`) (models::XprGetTexture;
+// its diagnostics' wrap left out: a leaf). `sp` is the caller's r1 (the
+// original's frame is 96 bytes below it).
+uint64_t TextureProviderXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
+                                   uint32_t index, uint32_t sp, const ProviderCall& call);
+
+// sub_82594230 TextureProvider::FindXprTexture (slots 8 to 10, never seen in
+// play): the same with XPR::FindTexture(it, `name`) (sub_82596E88, recompiled,
+// through `call`).
+uint64_t TextureProviderFindXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
+                                       uint32_t name, uint32_t sp, const ProviderCall& call);
 
 }  // namespace models
