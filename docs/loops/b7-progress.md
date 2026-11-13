@@ -127,7 +127,19 @@ file's history. What's left to see in a drive, from every run:
   harnesses 0 differing; race 38 s at 40, 0 errors). Left: the rest
   of `Scenery::Draw`'s split (`DrawArea`, `Minimap::Draw`, the
   billboards, the light groups, `Scenery::Draw`), all ready.
-  Validation agent running.
+  Validation failed: `itc_5046` (race 54 s at 180, 0 errors), 12
+  `front_end_car_draw` and `tuning_screen` groups differing (all at 0
+  before), all in dead stack bytes below the caller's frame: removing
+  `ScenePools::GetB`'s adapter (3c822092) lets recompiled callers'
+  calls run the recompiled `GetB`, which writes its frame there, while
+  the native side writes nothing; and 24 of 25 harness lines,
+  `UiMovie::GetPictureTexture` `sub_8211AB28` with no print (its work
+  inlined in `PollLoad`'s plain C++, its harness passing). By the
+  precedents (harness faults: `RaceMenu::Transition3`,
+  `GarageScreen::Transition6`; no own print: `Texture::GetLevelDesc`),
+  a fix agent fixes the harnesses and makes `GetPictureTexture`'s row
+  Merged; then the validation again. 14 ran in the race, 5 in the
+  replay `itc_5047` (ok), 6 not in game. Fix agent running.
 
 ## Done
 
