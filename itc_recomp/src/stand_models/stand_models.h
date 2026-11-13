@@ -154,6 +154,24 @@ uint64_t AddSecondWheels(uint8_t* base, const GuestCall& call, uint32_t holder, 
 // frame.
 uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
                          uint32_t holder, uint32_t stack);
+// --- The paint (src/stand_models/setters.cpp) ---
+
+// sub_8217B078 to sub_8217B348 GarageStage::SetColor0 to SetColor5 (`piece`
+// 0 to 5): (f1, f2, f3, 1.0) rounded to single at frame + 80 (its 128-byte
+// frame below `stack`; f29 to f31 and lr's saves not written), copied to
+// the stage's model +64 + 16 x (piece % 3); then SceneModel::ApplyPaint for
+// 0 to 2, ApplyWheelPaint for 3 to 5 (the original's: the wheels' values it
+// reads aren't the ones written), as ApplyWheelPaint's `poll` decides; its
+// r3. None of them changes f1.
+uint64_t SetColorPiece(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                       uint32_t holder, uint32_t piece, double f1, double f2, double f3,
+                       uint32_t stack);
+// sub_8217C6C8 GarageStage::SetColor: r3 the holder (all 64 bits), `which`
+// unsigned: above 5 nothing (r3 returned), else the piece's tail call from
+// `stack`.
+uint64_t SetColor(uint8_t* base, const GuestCall& call, load_poll::Calls* poll, uint64_t r3,
+                  uint32_t which, double f1, double f2, double f3, uint32_t stack);
+
 // sub_821CC890 TuningScreen::StepSecondWheels: with the holder [[kHolder]]
 // (loaded again for each call): not pending and the screen's +25244 1:
 // AddSecondWheels, +25244 = 2 (its r3); else (Pending asked again) not

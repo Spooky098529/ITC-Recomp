@@ -44,7 +44,11 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "SceneWheels::SetSizes sub_820E7380 (no adapters: only it reaches them; with "
               "--native_vehicle_accessors, --native_car_specs, --native_car_physics, --native_math "
               "and --native_race_setup; Car::Refresh, memcpy, Car::SetupVehicle and "
-              "Wheels::SetRecord through their adapters where their plain C++ declines) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
+              "Wheels::SetRecord through their adapters where their plain C++ declines); the paint, "
+              "GarageStage::SetColor sub_8217C6C8 and its pieces SetColor0 to SetColor5 "
+              "sub_8217B078 to sub_8217B348 (no adapters: the tuning screen's native UpdateStand "
+              "and RestoreStand call them; SceneModel::ApplyPaint's and ApplyWheelPaint's plain "
+              "C++ with the load poll's flags) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models)");
 
 namespace hooks {
 
@@ -351,6 +355,38 @@ void StandModelsPreviewWheel(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void StandModelsSetColor(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t r4 = ctx.r4.u32, stack = ctx.r1.u32;
+  const double f1 = ctx.f1.f64, f2 = ctx.f2.f64, f3 = ctx.f3.f64;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  load_poll::Calls* native_poll = ApplyWheelPaintNative() ? &poll : nullptr;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SetColor(base, call, native_poll, r3, r4, f1, f2, f3, stack);
+  });
+}
+
+namespace {
+
+void SetColorPiece(PPCContext& ctx, uint8_t* base, uint32_t piece) {
+  const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  const double f1 = ctx.f1.f64, f2 = ctx.f2.f64, f3 = ctx.f3.f64;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  load_poll::Calls* native_poll = ApplyWheelPaintNative() ? &poll : nullptr;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SetColorPiece(base, call, native_poll, r3, piece, f1, f2, f3, stack);
+  });
+}
+
+}  // namespace
+
+void StandModelsSetColor0(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 0); }
+void StandModelsSetColor1(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 1); }
+void StandModelsSetColor2(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 2); }
+void StandModelsSetColor3(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 3); }
+void StandModelsSetColor4(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 4); }
+void StandModelsSetColor5(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 5); }
+
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
@@ -401,6 +437,10 @@ ITC_STAND_MODELS(821DFA78, StandModelsPreviewWheel)
 // its plain C++ calls theirs (their register steps above are the harness's).
 // sub_82178F68 (SetPart's case 0, split off by the recompiler) needs no
 // adapter: only the original SetPart reaches it, as a tail call.
+// GarageStage::SetColor sub_8217C6C8 and its pieces SetColor0 to SetColor5
+// sub_8217B078 to sub_8217B348 have none: only the tuning screen's
+// UpdateStand and RestoreStand reach them, and their plain C++ calls
+// SetColor's (their register steps above are the harness's).
 // SceneParts::LightValue sub_820DF1A0 has none: only SetLightsOn calls it,
 // and its plain C++ calls LightValue's (its register step above is the
 // harness's).

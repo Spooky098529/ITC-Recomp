@@ -85,6 +85,20 @@ void StandModelsSetSizes(PPCContext& ctx, uint8_t* base);
 // FitAxles leaves it.
 void StandModelsPreviewWheel(PPCContext& ctx, uint8_t* base);
 void StandModelsSetWheel(PPCContext& ctx, uint8_t* base);
+// The paint, without adapters (only native callers reach them: the tuning
+// screen's UpdateStand and RestoreStand; the harness's):
+// GarageStage::SetColor sub_8217C6C8 (r3 the holder, r4 which, f1 to f3)
+// and its pieces SetColor0 to SetColor5 sub_8217B078, sub_8217B108,
+// sub_8217B198, sub_8217B228, sub_8217B2B8, sub_8217B348 (r3 the holder,
+// f1 to f3); SceneModel::ApplyPaint's and ApplyWheelPaint's plain C++ with
+// the load poll's flags, else their originals; lr put back.
+void StandModelsSetColor(PPCContext& ctx, uint8_t* base);
+void StandModelsSetColor0(PPCContext& ctx, uint8_t* base);
+void StandModelsSetColor1(PPCContext& ctx, uint8_t* base);
+void StandModelsSetColor2(PPCContext& ctx, uint8_t* base);
+void StandModelsSetColor3(PPCContext& ctx, uint8_t* base);
+void StandModelsSetColor4(PPCContext& ctx, uint8_t* base);
+void StandModelsSetColor5(PPCContext& ctx, uint8_t* base);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 

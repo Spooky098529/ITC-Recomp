@@ -503,7 +503,6 @@ constexpr uint32_t kRefitAxles = 0x821DF9D0;     // TuningScreen::RefitAxles
 constexpr uint32_t kSetAero2 = 0x821794A8;       // GarageStage::SetAero2
 constexpr uint32_t kSetDoorKind = 0x821794F8;    // GarageStage::SetDoorKind
 constexpr uint32_t kSetAccessory = 0x821CCBE8;   // TuningScreen::SetAccessory
-constexpr uint32_t kSetColor = 0x8217C6C8;       // GarageStage::SetColor
 constexpr uint32_t kClearLightKit = 0x821795E0;  // GarageStage::ClearLightKit
 
 // The choice tables both write: A = (3, 2, 1, 0) at `a`, B = (2, 1, 0, 4, 3)
@@ -745,6 +744,14 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
     *f1 = left;
   };
   auto refit = [&](uint32_t lr) { guest(kRefitAxles, {screen}, lr); };
+  // GarageStage::SetColor's plain C++ (ApplyPaint's and ApplyWheelPaint's
+  // with the load poll's calls); f1 left as given (neither paint changes
+  // it).
+  auto set_color = [&](uint32_t color, const double floats[3]) {
+    r3 = stand_models::SetColor(base, call, stand.calls.poll, Holder(base), color, floats[0],
+                                floats[1], floats[2], frame);
+    *f1 = floats[0];
+  };
   const int32_t m = int32_t(at(kCategory));
   const uint32_t p = guest::LoadU8(base, s + kItem);
   if (m == 0) {
@@ -905,13 +912,13 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
         }
         const double floats[3] = {ToSingle(red), double(float(ToSingle(g) * scale)),
                                   double(float(ToSingle(blue) * scale))};
-        with_floats(kSetColor, color, floats, 3, color == 0 ? 0x821E17A4 : 0x821E17FC);
+        set_color(color, floats);
       }
       const int32_t x = int32_t(at(30488));
       if (x == 0) {
         const double zero = Lfs(base, kZero);
         const double floats[3] = {zero, zero, Lfs(base, 0x82001FBC)};
-        with_floats(kSetColor, 2, floats, 3, 0x821E187C);
+        set_color(2, floats);
       } else if (x == 1) {
         const int64_t red = int32_t(at(30476)), g = int32_t(at(30480));
         Store64(base, frame + 96, uint64_t(red));
@@ -919,7 +926,7 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
         const double floats[3] = {ToSingle(red),
                                   double(float(ToSingle(g) * Lfs(base, 0x8200AD48))),
                                   Lfs(base, 0x82001070)};
-        with_floats(kSetColor, 2, floats, 3, 0x821E187C);
+        set_color(2, floats);
       }
     } else if (p == 5) {
       // The light kits: each group from the first kit (+30580 on) or the
@@ -1077,9 +1084,9 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
   toggle(int32_t(at(kCategory)) == 5 && item() == 1 && in({8, 9, 10, 11}), kDoorsOpen, 4);
   // (4) The paint: exterior, item 4, state 18.
   if (int32_t(at(kCategory)) == 5 && item() == 4 && int32_t(at(kState)) == 18) {
-    auto set_color = [&](uint64_t color, const double floats[3], uint32_t lr) {
-      const uint64_t regs[2] = {Holder(base), color};
-      stand.calls.call(kSetColor, regs, 2, floats, 3, frame, lr, nullptr);
+    auto set_color = [&](uint32_t color, const double floats[3], uint32_t) {
+      stand_models::SetColor(base, stand.call, paint_poll, Holder(base), color, floats[0],
+                             floats[1], floats[2], frame);
     };
     const double scale = Lfs(base, 0x82002200);  // 1/255
     {

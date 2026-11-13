@@ -583,9 +583,10 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
 // The current page's saved values put back on the stand by the category and
 // the item (its row): the stand's setters', PreviewWheel's, SetInteriorPair's
 // and GarageStage::SetLightKit's plain C++; SetCaliper, GarageStage::SetChoice,
-// PreviewParts, RefitAxles, SetAero2, SetDoorKind, SetAccessory,
-// GarageStage::SetColor and ClearLightKit (never seen in play) through the
-// guest (SetColor with f1 to f3, ClearLightKit with f1 as it is). The choice
+// PreviewParts, RefitAxles, SetAero2, SetDoorKind, SetAccessory and
+// ClearLightKit (never seen in play) through the guest (ClearLightKit with
+// f1 as it is); GarageStage::SetColor (never seen in play) by its plain C++
+// (stand_models', with `stand.calls.poll`; f1 left as its f1). The choice
 // tables at frame + 112 and + 128, the tire grades' at + 128, the
 // conversions' doublewords at + 80 to + 112 as the original leaves them.
 // 224-byte frame; r3 the last call's, else the entry; `*f1` set where the
@@ -621,9 +622,9 @@ uint64_t Refresh(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t s
 // onto the stand (its row): the bonnet's, the roof's (cars 14 and 15) and
 // the doors' animations opened or closed by the page (the open states at
 // 0x826D84A0, 0x826D849C, 0x826D8498; GarageStage::Command's plain C++), the
-// paint's three colors in state 18 (GarageStage::SetColor through the guest
-// with f1 to f3; the conversions' doublewords at frame + 80 to + 103 as the
-// original leaves them), the decals waiting at +10012 once the stand isn't
+// paint's three colors in state 18 (GarageStage::SetColor's plain C++,
+// stand_models', its paints as `paint_poll` decides; the conversions'
+// doublewords at frame + 80 to + 103 as the original leaves them), the decals waiting at +10012 once the stand isn't
 // busy (ApplyDecals' plain C++; ApplyAreaDecals and ApplyDecalWord, never
 // seen in play, through the guest), StepSecondWheels and SetWheelWord's
 // plain C++ (`paint_poll` as StepSecondWheels' adapter gives it), then

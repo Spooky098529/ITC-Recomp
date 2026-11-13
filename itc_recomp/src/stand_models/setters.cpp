@@ -23,6 +23,7 @@ constexpr uint32_t kApplyRecord = 0x820DA758;
 constexpr uint32_t kWheelsSetRecord = 0x820D8EC0;
 constexpr uint32_t kSetTexture = 0x820D17D8;
 constexpr uint32_t kApplyWheelPaint = 0x820D9C50;
+constexpr uint32_t kApplyPaint = 0x820D9B68;
 constexpr uint32_t kDecalScale = 0x82001BE0;
 
 // Flush-to-zero off, as the callees' plain C++ expects at entry.
@@ -295,25 +296,77 @@ uint64_t AddSecondWheels(uint8_t* base, const GuestCall& call, uint32_t holder, 
   return scene_models::SceneModelAddSecondWheels(base, call, StageModel(base, holder), frame);
 }
 
+namespace {
+
+// SceneModel::ApplyPaint (`wheels` false) or ApplyWheelPaint on `model`
+// from `frame` with r3 the model: with `poll` (the load poll's flags on),
+// its plain C++ inside its diagnostics' wrap (--debug_hide, nothing then,
+// r3 the model as set for the call; --find_per_frame_state, as
+// src/debug/frame_state_diff.cpp wrapped it); else its original through
+// `call` with `lr`.
+uint64_t Paint(uint8_t* base, const GuestCall& call, load_poll::Calls* poll, uint32_t model,
+               bool wheels, uint32_t frame, uint32_t lr) {
+  const uint32_t function = wheels ? kApplyWheelPaint : kApplyPaint;
+  if (poll == nullptr) {
+    return call(function, {model}, frame, lr);
+  }
+  if (debug::IsHidden(function)) {
+    return model;
+  }
+  debug::FrameStateDiff_Before(base);
+  FlushOff();
+  const uint64_t r3 =
+      wheels ? load_poll::SceneModelApplyWheelPaint(base, model, model, frame, *poll)
+             : load_poll::SceneModelApplyPaint(base, model, model, frame);
+  FlushOff();
+  debug::FrameStateDiff_After(base, "draw step part", function);
+  return r3;
+}
+
+}  // namespace
+
 uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
                          uint32_t holder, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_821799D8 GarageStage::ApplyWheelPaint");
   const uint32_t frame = Frame(base, stack, 96);
   const uint32_t model = StageModel(base, holder);
-  if (poll == nullptr) {
-    return call(kApplyWheelPaint, {model}, frame, 0x82179A04);
+  return Paint(base, call, poll, model, true, frame, 0x82179A04);
+}
+
+uint64_t SetColorPiece(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                       uint32_t holder, uint32_t piece, double f1, double f2, double f3,
+                       uint32_t stack) {
+  switch (piece) {
+    case 0: ITC_NATIVE_RUNNING("sub_8217B078 GarageStage::SetColor0"); break;
+    case 1: ITC_NATIVE_RUNNING("sub_8217B108 GarageStage::SetColor1"); break;
+    case 2: ITC_NATIVE_RUNNING("sub_8217B198 GarageStage::SetColor2"); break;
+    case 3: ITC_NATIVE_RUNNING("sub_8217B228 GarageStage::SetColor3"); break;
+    case 4: ITC_NATIVE_RUNNING("sub_8217B2B8 GarageStage::SetColor4"); break;
+    default: ITC_NATIVE_RUNNING("sub_8217B348 GarageStage::SetColor5"); break;
   }
-  // The wrap: nothing when --debug_hide names it (r3 the model, as set for
-  // the call), else the plain C++ between FrameStateDiff_Before and After.
-  if (debug::IsHidden(kApplyWheelPaint)) {
-    return model;
+  const uint32_t frame = Frame(base, stack, 128);
+  const uint32_t model = StageModel(base, holder);
+  Stfs(base, frame + 80, f1);
+  Stfs(base, frame + 84, f2);
+  Stfs(base, frame + 88, f3);
+  Stfs(base, frame + 92, Lfs(base, kOne));
+  // The record's paint value 0 to 2 (+64, +80, +96): pieces 3 to 5 write
+  // the same body values as 0 to 2, then apply the wheels' paint, which
+  // reads +112 on (the original's, kept).
+  Copy16(base, model + 64 + 16 * (piece % 3), frame + 80);
+  const uint32_t lr = 0x8217B0E8 + 0x90 * piece;  // each piece's call + 4
+  return Paint(base, call, poll, model, piece >= 3, frame, lr);
+}
+
+uint64_t SetColor(uint8_t* base, const GuestCall& call, load_poll::Calls* poll, uint64_t r3,
+                  uint32_t which, double f1, double f2, double f3, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217C6C8 GarageStage::SetColor");
+  // Unsigned: above 5 nothing (r3 left); else the piece's tail call from
+  // the same stack pointer.
+  if (which > 5) {
+    return r3;
   }
-  debug::FrameStateDiff_Before(base);
-  FlushOff();
-  const uint64_t r3 = load_poll::SceneModelApplyWheelPaint(base, model, model, frame, *poll);
-  FlushOff();
-  debug::FrameStateDiff_After(base, "draw step part", kApplyWheelPaint);
-  return r3;
+  return SetColorPiece(base, call, poll, uint32_t(r3), which, f1, f2, f3, stack);
 }
 
 uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,

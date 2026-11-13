@@ -1401,9 +1401,10 @@ void TuningStand(Context& h, Random& r) {
     // second wheels' step +25244 0 or 3, the paint's values small. The
     // garage camera isn't set up (+112 0), so GarageStage::Draw returns at
     // once (its own cases draw). The top 40 bytes: r29 to r31, lr and f31's
-    // saves; in the paint's cases (GarageStage::SetColor, never seen in
-    // play, runs its original on both sides, saving UpdateStand's registers,
-    // which differ) only the stack from UpdateStand's frame up.
+    // saves; in the paint's cases (GarageStage::SetColor's original, never
+    // seen in play, on the recompiled side saves UpdateStand's registers,
+    // which differ; its plain C++ on the native side) only the stack from
+    // UpdateStand's frame up.
     // The generator put back after, so the groups after it keep their
     // cases.
     const Random kept = r;

@@ -524,6 +524,57 @@ void SecondWheels(Context& h, uint32_t b) {
   }
 }
 
+// The paint: GarageStage::SetColor's pieces and SetColor itself (r4 0 to 7,
+// now and then any word: unsigned, above 5 nothing), f1 to f3 singles (NaNs,
+// infinities and denormals among them); the model not ready (+5036 0: the
+// paints do nothing; load_poll's and car_makers' cases take them further)
+// or, for the wheels' paint, traffic (+32 3, ready or not: nothing either). The top 32
+// bytes of the 128-byte frame: f29 to f31 and lr's saves.
+void Colors(Context& h, uint32_t b) {
+  struct Piece {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Piece pieces[] = {
+      {"GarageStage::SetColor0 (sub_8217B078)", __imp__sub_8217B078, hooks::StandModelsSetColor0},
+      {"GarageStage::SetColor1 (sub_8217B108)", __imp__sub_8217B108, hooks::StandModelsSetColor1},
+      {"GarageStage::SetColor2 (sub_8217B198)", __imp__sub_8217B198, hooks::StandModelsSetColor2},
+      {"GarageStage::SetColor3 (sub_8217B228)", __imp__sub_8217B228, hooks::StandModelsSetColor3},
+      {"GarageStage::SetColor4 (sub_8217B2B8)", __imp__sub_8217B2B8, hooks::StandModelsSetColor4},
+      {"GarageStage::SetColor5 (sub_8217B348)", __imp__sub_8217B348, hooks::StandModelsSetColor5},
+      {"GarageStage::SetColor (sub_8217C6C8)", __imp__sub_8217C6C8, hooks::StandModelsSetColor},
+  };
+  for (const Piece& p : pieces) {
+    Results results(p.name);
+    const bool dispatch = p.native == hooks::StandModelsSetColor;
+    for (int c = 0; c < (dispatch ? 64 : 32); c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             for (const uint32_t m : {kModel, kModel2}) {
+               const bool traffic = r.Below(3) == 0;
+               Put(h.base, b + m + 32, traffic ? 3 : r.Below(3));
+               Put(h.base, b + m + 5036, traffic ? r.Below(2) : 0);
+             }
+             t.r3.u64 = b + kHolderAt;
+             t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(8);
+             t.f1.f64 = RandomDouble(r);
+             t.f2.f64 = RandomDouble(r);
+             t.f3.f64 = RandomDouble(r);
+             // The body paint (pieces 0 to 2) on a ready model would run
+             // SceneTraffic::ApplyPaint for traffic on a random body, or
+             // the parts' paints on random parts: not ready.
+             const uint32_t piece = dispatch ? t.r4.u32 : uint32_t(&p - pieces);
+             if (piece < 3) {
+               Put(h.base, sm::StageModel(h.base, b + kHolderAt) + 5036, 0);
+             }
+           },
+           p.recompiled, p.native, 128, 32, true, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 // SceneWheels::SetSizes: the wheels as LayWheels lays them; r4, r5 any
 // words; r6 and r8 any doublewords, r7 and r9 as GarageStage::SetWheel
 // passes them (a word in the high half, 0 below), or any doubleword now and
@@ -566,6 +617,7 @@ void StandModels(Context& h) {
     TireGrades(h, b);
     SecondWheels(h, b);
     Sizes(h, b);
+    Colors(h, b);
   }
   memory::Free(allocation);
 }
