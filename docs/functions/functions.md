@@ -729,6 +729,12 @@ Rows not yet moved stay in the table below. So far:
   race, which of the 27 the race earned (items beaten, course times,
   a count), and their write (`XUserWriteAchievements`) (B7; mapped, an
   Xbox feature).
+- [`renderer.md`](renderer.md): the renderer (framework + 76: its
+  constructor, the render thread's frame and listeners, the `Thread`
+  class and its kernel wrappers) and the app's scene (framework + 80:
+  its constructor setting up the command list, the render queue and
+  the graphics library's draw globals, `Scene::Update` and `Draw`)
+  (B7; mapped).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -739,16 +745,7 @@ old performance notes to the end of `../native-renderer.md`.
 
 | Address | Name | Status | Notes |
 |---|---|---|---|
-| `sub_8258DE50` | `Thread::Start` | | Entry point of the game's threads: calls vtable slot 1 of the object at start context + 8. |
 | `sub_82095AF0` | | | A worker thread's loop (started through `sub_8258DE50`): waits on an event, runs jobs through function pointers, signals events; it opens the game's data files at boot. On the Steam Deck it spiked to 66-82% of a core with 15-32% in the kernel around race loads; here (2026-10-14) ~29% with ~68,000 minor page faults in 2 s while a race loads. On the Deck (`itc_041.log`) the kernel time is page faults: 37-69% of a core (19-24% kernel) with 27,000-52,000 minor faults and no major ones per 2 s, its system call samples all `running` (in a fault, not a call) but once `202` (futex: waiting). Only around loads (2-4 s each); in a race it's at 0-15%. The fix, if worth it: populate the guest memory's pages in advance (e.g. `MADV_POPULATE_WRITE` on the views), moving the cost to startup. |
-| `sub_82092358` | `Renderer::Init` | | Sets the vblank interval (2 = 30 fps) via `sub_8258D568`, then subscribes renderer callbacks to numbered events (2, 3, 5, 6, 16). |
-| `sub_820920D8` | `Renderer::WaitForFrame` | Wrapped | Tick handler on the main thread. Blocks until the render thread signals the frame is done (event at this+392), swaps, and starts the next frame. Frame pacing runs after it (`src/frame_pacing/renderer_hooks.cpp`). |
-| `sub_82091EF8` | `Renderer::ThreadLoop` | Overridden | Render thread loop; started through `sub_8258DE50`. Draws one frame each time the main thread asks, as the game did, without the 2-vblank wait. |
-| `sub_82091A60` | `Renderer::Present` | Wrapped | Flushes, waits for the vblank interval (`sub_8258DC58` → `sub_8258DAA8`), then swaps buffers. Event 5. Wrapped only to time it (`--log_frame_times`). |
-| `sub_82091E58` | `Renderer::DrawFrame` | | Render thread: calls each draw listener in the list at renderer+28. |
-| `sub_82091BC0` | | | Draw listener between the scene draw and present: resolves the frame into a front buffer (`sub_8258D998`) and waits for the GPU to go idle (`sub_8229F1B0`). See "The end of a frame" in `gpu-functions.md`. |
-| `sub_820988C8` | `Scene::Update` | Wrapped | Tick handler on the scene object (0x40026FE0 at the menu). Calls the current mode object at +64 (vtable slots 6 and 2). Wrapped for `--log_boot_modes` (logs the front end's state objects at `[0x82814E2C]` and `[0x82814E34]` as they change). |
-| `sub_82098940` | `Scene::Draw` | | Draw listener on the same object. Calls the mode object's draw (vtable slot 5), reading live game state. |
 | `sub_8223A3F0` | `Delegate::Invoke` | | Calls the function at +8 with the argument at +4. Used for tick and draw listeners. |
 | `sub_82233460` | `MemberDelegate::Invoke` | | Calls the member function at +8 on the object at +4, adjusted by +12. |
 | `sub_8258D4D8` | `VideoOutput::OnVblank` | | The vblank callback (device +15144): adds 1 to `8296BD2C` and `8296BD30` and signals the event at `8296BD34` (`Event::Signal`). Only `sub_8229DEA0` calls it, which is never called now. Its counts and event were read and waited on only by the original `VideoOutput::WaitForVblank`, which our override replaced. Never called. |

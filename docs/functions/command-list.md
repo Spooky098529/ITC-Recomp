@@ -15,7 +15,7 @@ in `../native-renderer.md`. Mapped by the B7 loop
 The list the game records into is made once at boot by the scene's
 constructor `sub_82098A98` (scene + 8, its pointer kept at `0x8296B918`
 and `0x82970BD8`), and flipped each tick by `Scene::Update`
-(`sub_820988C8`), both in [`functions.md`](functions.md). The ~40
+(`sub_820988C8`), both in [`renderer.md`](renderer.md). The ~40
 recorders that call it (seen in play: `sub_82096030`, `sub_82096360`,
 `sub_82096418`, `sub_8209AE48`, `sub_8209AF40`, `sub_8209B3D0`,
 `sub_8209FA38`, `sub_820A0978`, `sub_820A0CC0`, `sub_820A0D38`,
