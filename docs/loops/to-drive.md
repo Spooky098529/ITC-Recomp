@@ -226,6 +226,111 @@ replay):
 - `sub_8224B708` PanelSet::~PanelSet
 - `sub_8224AE60` PanelSetBase::~PanelSetBase
 
+The type 6 and 7 list screens, part 1 (`itc_5349`, `itc_5350`, ok; the
+type 6 and 7 modes' list, panel and node screens):
+
+- `sub_82251F98` ListScreen::Show
+- `sub_82251520` ListScreen::Draw
+- `sub_822517B8` ListScreen::Update
+- `sub_82251580` ListScreen::Suspend
+- `sub_82251590` ListScreen::Resume
+- `sub_822517A0` ListScreen::Open
+- `sub_82251EC8` ListScreen::SetUpMovie
+- `sub_82251E10` ListScreen::SetArrows` (probably)
+- `sub_82251C30` ListScreen::SetIcons` (probably)
+- `sub_822336C0` Type6ListScreen::SetItemTexts` (probably)
+- `sub_822337B0` Type6ListScreen::Back
+- `sub_822334C8` Type6ListScreen::SetUpRace
+- `sub_82233378` Type6ListScreen::SetUpMenus
+- `sub_82233730` Type6ListScreen::ShowMarks` (probably)
+- `sub_82237008` Type6ListScreen::ItemInfo
+- `sub_822332D8` Type6ListScreen::~Type6ListScreen
+- `sub_82233478` Type6ListScreen::DeletingDestructor
+- `sub_82257558` TitledListScreen::Reset
+- `sub_822579E8` TitledListScreen::Draw
+- `sub_82258998` TitledListScreen::Update
+- `sub_82257148` TitledListScreen::Page2
+- `sub_822572F0` TitledListScreen::Page3
+- `sub_82257360` TitledListScreen::Page4
+- `sub_82257490` TitledListScreen::Page7
+- `sub_82255818` ListScreen::LeavePage
+- `sub_82257D48` TitledListScreen::Step0
+- `sub_82257FF8` TitledListScreen::Step1
+- `sub_822580E0` TitledListScreen::Step2
+- `sub_82257B78` TitledListScreen::OnItemMoved
+- `sub_82257138` TitledListScreen::~TitledListScreen
+- `sub_82257990` TitledListScreen::DeletingDestructor
+- `sub_82257060` NodeListScreen::LoadItem` (probably)
+- `sub_82256FE8` NodeListScreen::ItemInfo
+- `sub_82257000` NodeListScreen::~NodeListScreen
+- `sub_82257940` NodeListScreen::DeletingDestructor
+- `sub_82255238` ColorListScreen::LoadItem` (probably)
+- `sub_82251EB8` ListScreen::~ListScreen
+- `sub_82252248` ListScreen::DeletingDestructor
+- `sub_822518B0` ListScreen::ShowSelection` (probably)
+- `sub_82251A20` ListScreen::LoopItemNode
+- `sub_82251B80` ListScreen::LoopSecondNode
+- `sub_82251AD0` ListScreen::LoopThirdNode
+- `sub_82251D00` ListScreen::SetScrollText` (probably)
+- `sub_82251DA0` ListScreen::ClearScrollText` (probably)
+- `sub_82252068` ListScreen::OnToggleMoved` (probably)
+- `sub_82252198` ListScreen::ShowToggle` (probably)
+- `sub_82247DC0` NodeTable::~NodeTable
+- `sub_82247CB8` NodeTable::SetPairs` (probably)
+- `sub_82247DD0` ColorNodeTable::Clear` (probably)
+- `sub_82247E00` ColorNodeTable::Set` (probably)
+- `sub_82247E88` NodeTable::DeletingDestructor
+- `sub_82248300` NodeTable::Show
+- `sub_82247ED0` NodeTable::ShowNode
+- `sub_822480F0` NodeTable::SetMarks
+- `sub_82247CE0` PairedNodeTable::SavePairs
+- `sub_82248800` PairedNodeTable::Refresh
+- `sub_82247E50` ColorNodeTable::SavePairs
+- `sub_82248650` ColorNodeTable::Reset
+- `sub_822483B0` ColorNodeTable::Refresh
+- `sub_822487B8` ColorNodeTable::MarkSelected` (probably)
+- `sub_82248198` ColorNodeTable::SetColors
+- `sub_82248260` ColorNodeTable::ClearColors
+- `sub_82252430` ListPartBase::Open` (probably)
+- `sub_82252490` ListPartBase::Pick` (probably)
+- `sub_82252500` ListPartBase::Input` (probably)
+- `sub_82252530` ListPartBase::Close` (probably)
+- `sub_82252590` ListPartBase::IsIdle` (probably)
+- `sub_822525B8` ListPartBase::CanLeave` (probably)
+- `sub_82252968` ListPart::~ListPart
+- `sub_82252A38` ListPart::DeletingDestructor
+- `sub_822526F8` ListPartInner::~ListPartInner
+- `sub_82252600` ListPartInnerBase::~ListPartInnerBase
+- `sub_82252420` ListPartBase::~ListPartBase
+- `sub_82252610` ListPartBase::DeletingDestructor
+- `sub_82252658` ListPartInnerBase::DeletingDestructor
+- `sub_822529B0` ListPartInner::DeletingDestructor
+- `sub_82252A88` ListPartInner::Open
+- `sub_82252A00` ListPartInner::Pick
+- `sub_82252DF0` ListPartInner::Input
+- `sub_82252748` ListPartInner::IsIdle` (probably)
+- `sub_82252740` ListPartInner::Close
+- `sub_822528C8` ListPartInner::CanLeave` (probably)
+- `sub_82252778` ListPartInner::Page0
+- `sub_82252878` ListPartInner::Page1
+- `sub_822528A8` ListPartInner::Page2
+- `sub_82252BB8` ListPartInner::Step0
+- `sub_82252C98` ListPartInner::Step1
+- `sub_82252D38` ListPartInner::Step2
+- `sub_822404D8` PanelScreen::OpenEmpty` (probably)
+- `sub_822609E0` PanelScreen::OnYes
+- `sub_822609D0` PanelScreen::OnNo
+- `sub_822306D0` PanelScreen::OnBack
+- `sub_822306E0` PanelScreen::OnDialogClosed
+- `sub_82248DE0` PanelScreen::Suspend
+- `sub_8223E708` Type6PanelScreen::Back
+- `sub_822307D0` Type6PanelScreen::CarList
+- `sub_822307E0` Type6PanelScreen::CarEntry
+- `sub_822307F0` Type6PanelScreen::CarSlot
+- `sub_8224ACE0` GroupPair::DeletingDestructor
+- `sub_82259318` NodeScreen::Open
+- `sub_82259998` NodeScreen::ItemInfo
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

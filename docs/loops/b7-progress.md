@@ -229,8 +229,11 @@ file's history. What's left to see in a drive, from every run:
   traffic records' unwritten bytes, 11 of 16, as `Race::SetUp`'s;
   `expected-differences.md`); races 34-38 s at 40, 0 errors. Left: 72
   rows (the color list, `Type7ListScreen`, the node screen, the panel
-  leftovers, the screen blocks' destructors). Validation agent running
-  on part 1.
+  leftovers, the screen blocks' destructors). Part 1 validated:
+  `itc_5349` (race 47 s at 180, the harnesses 131 s; 0 errors, every
+  harness 0 differing outside the expected groups), 101 of 101 harness
+  lines; none in the race or the replay `itc_5350` (ok): 101 to drive.
+  Migration part 2 running (the 72 rows left).
 
 ## Done
 
