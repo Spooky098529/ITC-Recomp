@@ -44,7 +44,7 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "src/interpolation/blend_state.cpp), Recorder::RecordSceneLights sub_82595490 "
               "(with SceneLights::RecordDirections sub_8258B980 and RecordProjectors "
               "sub_82589B58, no adapters: only it calls them), Model::RecordShapeDepth "
-              "sub_825960D0, Model::DrawShapeDepth sub_82596D48 (RecordObject with the "
+              "sub_825960D0, Model::DrawShapeDepth sub_82596D48 (no adapter; RecordObject with the "
               "interpolation's hooks; the render queue's slot 4 a guest call), "
               "SceneryModel::RecordShape sub_82146BD0, SceneryModel::DrawShape sub_82147D88 and "
               "Model::DrawShape sub_82596B18 (with Model::RecordShape sub_82595550's plain C++; "
@@ -599,7 +599,9 @@ ITC_SCENERY_LISTS(82148650, SceneryListsSetBillboardPass)
 ITC_SCENERY_LISTS(825951E0, SceneryListsIsShapeVisible)
 ITC_SCENERY_LISTS(82595490, SceneryListsRecordSceneLights)
 ITC_SCENERY_LISTS(825960D0, SceneryListsRecordShapeDepth)
-ITC_SCENERY_LISTS(82596D48, SceneryListsDrawShapeDepth)
+// Model::DrawShapeDepth (sub_82596D48) has no adapter (removed 2026-11-13, B7
+// loop): its callers in play (the car draw's, Scenery::DrawArea) call its
+// plain C++; SceneryListsDrawShapeDepth stays as the harness's steps.
 ITC_SCENERY_LISTS(82146BD0, SceneryListsRecordShape)
 ITC_SCENERY_LISTS(82147D88, SceneryListsDrawShape)
 ITC_SCENERY_LISTS(82148058, SceneryListsPointListDraw)
