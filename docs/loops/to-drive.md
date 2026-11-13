@@ -18,6 +18,30 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5150`, `itc_5151`, ok; the
+tuning screen's vinyl editor, `tuning-pages.md`):
+
+- `sub_821FE960` DecalImages::Reload
+- `sub_821FEAF0` DecalImages::LoadWindow
+- `sub_821FED30` DecalImages::Scroll
+- `sub_821FE608` DecalImages::OnLoaded
+- `sub_821FE740` DecalImages::FreeKept
+- `sub_82202928` TuningScreen::InputVinylView
+- `sub_82201B40` TuningScreen::LeaveVinylView
+- `sub_82204B70` TuningScreen::InputVinylPages
+- `sub_821FE498` TuningScreen::SetLastImage
+- `sub_821FF3A0` TuningScreen::MoveVinylMenu
+- `sub_82206A50` TuningScreen::InputDecalPosition
+- `sub_82200DC0` TuningScreen::MoveDecalPosition
+- `sub_82206F48` TuningScreen::InputDecalAngle
+- `sub_822012E8` TuningScreen::MoveDecalAngle
+- `sub_82207320` TuningScreen::InputDecalScale
+- `sub_82201620` TuningScreen::MoveDecalScale
+- `sub_82205110` TuningScreen::InputLayerEdit
+- `sub_82200760` TuningScreen::MoveLayerEdit
+
+The type 5 mode's:
+
 Not in the attract race or the replay (`itc_5139`, `itc_5140`, ok; the
 type 5 mode, the parking area's, and its dialog, `type5-mode.md`):
 

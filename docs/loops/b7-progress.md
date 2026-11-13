@@ -258,7 +258,11 @@ file's history. What's left to see in a drive, from every run:
   block and a recording sound manager); race 35 s at 40, 0 errors; no
   subagents). Left: `InputVinylLayers` and `InputVinylImages` (ready;
   the second split), the never-seen layer actions and order pages.
-  Validation agent running.
+  Validated: `itc_5150` (race 53 s at 180, 0 errors, every harness 0
+  differing outside the expected groups; harnesses ~126 s), 18 of 18
+  harness lines, no prints added; none in the race or the replay
+  `itc_5151` (ok): 18 to drive. Recorded. Second migration agent
+  running (the rest).
 
 ## Done
 
