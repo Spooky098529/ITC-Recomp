@@ -92,6 +92,7 @@ constexpr uint32_t kCarScene = 0x826C2E44;
 constexpr uint32_t kStandHolder = 0x826D83E0;
 constexpr uint32_t kVinylWaits = 0x826D84A4;  // to 0x826D84C0
 constexpr uint32_t kLayersWait = 0x826D84B8;  // InputVinylLayers' load wait
+constexpr uint32_t kActionsWait = 0x826D84BC;  // InputLayerActions' load wait
 // A leaf that stores r4's low byte, r5 and r6 at r3 + 320, 332 and 336 (the
 // menu sounds' harness's recorder): the sound manager's slot 10, PlayCue2D.
 constexpr uint32_t kRecordR4R6 = 0x820A8420;
@@ -1694,6 +1695,58 @@ void VinylPickFields(PPCContext& t, Random& r, const World& w) {
   }
 }
 
+// The operate select (InputLayerActions, MoveLayerActions,
+// BeginLayerOrder): the image picker's fields (above: the page -1 to 2, the
+// layers' saved ids, the picked image, the picker windows' entries with no
+// texture or held by a distinct kept slot, now and then none loading, the
+// mappers' slot 11 laid) with the layer +30732 0 to 2 (it indexes the
+// movie's texture table), the cursor +30740 -1 to 4 (now and then any word;
+// 2 half the time with the wait set), the wrap +30744 0 or 1, the vinyls
+// (+9656 5, byte +9660 6) most of the time; the load wait [0x826D84BC] 0
+// mostly, else 2 (its loads) or 1 to 5 or -1, now and then an entry
+// loading; the action now and then one of up, down, A, B
+// or 164 held (held now and then with the others too).
+void LayerActionFields(PPCContext& t, Random& r, const World& w) {
+  VinylImageFields(t, r, w);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30732, r.Below(3));
+  const uint32_t wait = r.Below(3) != 0   ? 0
+                        : r.Below(8) == 0 ? 0xFFFFFFFFu
+                        : r.Below(2) == 0 ? 2
+                                          : 1 + r.Below(5);
+  guest::StoreU32(base, kActionsWait, wait);
+  if (r.Below(3) == 0) {
+    // An entry loading (the wait's end waits for it).
+    guest::StoreU32(base, s + 10048 + 36 * r.Below(200) + 8, 1);
+  }
+  uint32_t cursor = uint32_t(int32_t(r.Below(6)) - 1);
+  if (r.Below(10) == 0) {
+    cursor = uint32_t(r.Next());
+  } else if (wait != 0 && r.Below(2) == 0) {
+    cursor = 2;
+  }
+  guest::StoreU32(base, s + 30740, cursor);
+  guest::StoreU32(base, s + 30744, r.Below(2));
+  if (r.Below(5) != 0) {
+    guest::StoreU32(base, s + 9656, 5);
+    guest::StoreU8(base, s + 9660, 6);
+  }
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 159, 159, 159, 158, 158, 164};
+  const uint32_t pick = r.Below(12);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (pick < 10) {
+    const uint32_t action = kActions[pick];
+    const uint32_t bit = 1u << (action - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 448,
+                    action == 164 || r.Below(8) == 0 ? 1u << (164 - 151) : 0);
+    guest::StoreU32(base, mapper + 456, action == 159 || action == 158 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, action < 158 || action > 159 ? bit : 0);
+  }
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -1941,6 +1994,22 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputVinylImages", 500, __imp__sub_822058F8,
        hooks::TuningPagesInputVinylImages, 152, {{240, 296}, {368, 400}}, VinylPickFields, true});
+  // The operate select: BeginLayerOrder a leaf (no saves);
+  // MoveLayerActions' __savegprlr_29 (32 bytes); InputLayerActions'
+  // __savegprlr_22 (88) with its callees' saves its native version doesn't
+  // write: MoveLayerActions', HighlightSelected's, RestoreStickerTexture's
+  // and LoadWindow's (176 to 232 below), Reload's under LoadWindow (320 to
+  // 336); Archive::Load recorded.
+  Run(h, w,
+      {"TuningScreen::BeginLayerOrder", 100, __imp__sub_821FE370,
+       hooks::TuningPagesBeginLayerOrder, 0, {}, LayerActionFields});
+  Run(h, w,
+      {"TuningScreen::MoveLayerActions", 300, __imp__sub_82200230,
+       hooks::TuningPagesMoveLayerActions, 32, {}, LayerActionFields});
+  Run(h, w,
+      {"TuningScreen::InputLayerActions", 500, __imp__sub_82209738,
+       hooks::TuningPagesInputLayerActions, 88, {{176, 232}, {320, 336}}, LayerActionFields,
+       true});
 }
 
 }  // namespace harness

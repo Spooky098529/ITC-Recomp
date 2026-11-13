@@ -643,4 +643,38 @@ uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
 uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
 
+// sub_821FE370 TuningScreen::BeginLayerOrder: r3 = the screen (its row).
+// Only on the vinyls (+9656 5, byte +9660 6): the work list's ids +31216 +
+// 4k = the page's saved ids (+31192 + 12 x +30724 + 4k, the page read again
+// each pass) and its indices +31228 + 4k = k, k 0 to 2. Leaf, no frame; r3
+// left the screen.
+void BeginLayerOrder(uint8_t* base, uint64_t screen);
+// sub_82200230 TuningScreen::MoveLayerActions: state 25's movie side (its
+// row): on up or down with +9708 set, a wrap (+30744) placing the cursor's
+// bar (FindNode(10, 0)'s +16 = +30740 x 40.0) with both arrows finished,
+// else the arrow restarted; the row left finished and the cursor's row
+// (49 + +30740) restarted and looped; on A the rows and arrows finished, on
+// B the same and 222 restarted. 128-byte frame; the last call's r3, else
+// the movie's entry or the slot's.
+uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, bool native_slots);
+// sub_82209738 TuningScreen::InputLayerActions: state 25's page (its row):
+// 164 held or released HighlightSelected; with the load wait [0x826D84BC]
+// 0, up and down on the cursor +30740 (0 to 3, wrapping with +30744 = 1), A
+// (0 the edit: the layer's saved record into the edited decal, Push(25),
+// Go(26, 18); 1 the order: Push(25), Go(27, 19), BeginLayerOrder; 2
+// another image: the wait started from the layer's saved id, the sticker
+// editor's sub_821FD658 through the guest, the page's six picker textures
+// put back; 3 remove: Push(25), Go(37, 30)) or B (Pop, Go(the popped
+// state, 16)), then MoveLayerActions unless the wait started; with the
+// wait set, its count, used only with +30740 2: on 3 the picker's window
+// freed (FreeTexture) and loaded (LoadWindow) from +30764, past 3 once
+// nothing loads the window's middle texture bound to the layer's movie
+// texture and Push(25), Go(28, 22), then MoveLayerActions (also when the
+// count comes to 0). 176-byte frame; MoveLayerActions', LoadWindow's or
+// the last call's r3. Texture::Free as GuestTextureFree's with the native
+// heap and car models' flag.
+uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, const PageFlags& flags);
+
 }  // namespace tuning_pages

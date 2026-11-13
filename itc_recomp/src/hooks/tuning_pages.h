@@ -194,5 +194,10 @@ void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base);
 // steps).
 void TuningPagesHighlightItem(PPCContext& ctx, uint8_t* base);
 void TuningPagesHighlightSelected(PPCContext& ctx, uint8_t* base);
+// InputLayerActions sub_82209738 with MoveLayerActions sub_82200230 and
+// BeginLayerOrder sub_821FE370 (no adapters: the harness's steps).
+void TuningPagesInputLayerActions(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveLayerActions(PPCContext& ctx, uint8_t* base);
+void TuningPagesBeginLayerOrder(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
