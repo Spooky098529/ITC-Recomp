@@ -1,7 +1,7 @@
-// The renderer's and the app's scene's register steps
-// (src/renderer_objects/, docs/functions/renderer.md), shared by the
-// adapters (src/hooks/renderer_objects.cpp, behind
-// --native_renderer_objects) and the harness (without the flag). Each
+// The frame driver's and the app's scene's register steps
+// (src/frame_driver/, docs/functions/frame-driver.md), shared by the
+// adapters (src/hooks/frame_driver.cpp, behind
+// --native_frame_driver) and the harness (without the flag). Each
 // leaves r3 as the original does and runs the original where the plain C++
 // refuses.
 
@@ -11,33 +11,33 @@
 
 namespace hooks {
 
-// Whether --native_renderer_objects is on.
-bool NativeRendererObjects();
+// Whether --native_frame_driver is on.
+bool NativeFrameDriver();
 
-// Renderer::GetVideoOutput sub_824960E0: r3 += 44.
-void RendererGetVideoOutput(PPCContext& ctx, uint8_t* base);
-// Renderer::AddListener sub_820922B8: r3 = the interface, r4 = the key's
+// FrameDriver::GetVideoOutput sub_824960E0: r3 += 44.
+void FrameDriverGetVideoOutput(PPCContext& ctx, uint8_t* base);
+// FrameDriver::AddListener sub_820922B8: r3 = the interface, r4 = the key's
 // address, r5 = the delegate; from a 112-byte frame (the request at its
 // +80); r3 as PushBack leaves it.
-void RendererAddListener(PPCContext& ctx, uint8_t* base);
-// Renderer::ApplyRequest sub_82091FF0: r3 = the renderer, r4 the type
+void FrameDriverAddListener(PPCContext& ctx, uint8_t* base);
+// FrameDriver::ApplyRequest sub_82091FF0: r3 = the frame driver, r4 the type
 // (high word) and key, r5 the delegate (high word); stored at the caller's
 // r1 + 32 and + 40; r3 r1 - 32 after an insert, else left.
-void RendererApplyRequest(PPCContext& ctx, uint8_t* base);
-// Renderer::CallListener sub_82091A98: r3 = the renderer, r4 = the entry
+void FrameDriverApplyRequest(PPCContext& ctx, uint8_t* base);
+// FrameDriver::CallListener sub_82091A98: r3 = the frame driver, r4 = the entry
 // (key, delegate); the delegate's slot 1 from a 96-byte frame; its r3.
-void RendererCallListener(PPCContext& ctx, uint8_t* base);
-// Renderer::DrawFrame sub_82091E58: r3 = the renderer; from a 144-byte
-// frame. No adapter: its one caller, Renderer::ThreadLoop's override
+void FrameDriverCallListener(PPCContext& ctx, uint8_t* base);
+// FrameDriver::DrawFrame sub_82091E58: r3 = the frame driver; from a 144-byte
+// frame. No adapter: its one caller, FrameDriver::ThreadLoop's override
 // (src/frame_pacing/renderer_hooks.cpp), calls this, which runs the
 // original without the flags.
-void RendererDrawFrame(PPCContext& ctx, uint8_t* base);
+void FrameDriverDrawFrame(PPCContext& ctx, uint8_t* base);
 
 // Scene::Update sub_820988C8: r3 = the scene; from a 112-byte frame. No
 // adapter of its own: its wrap (--log_boot_modes, src/hooks/title_screen.cpp)
 // calls this with the flag, else the original.
 void AppSceneUpdate(PPCContext& ctx, uint8_t* base);
-// Scene::Draw sub_82098940: r3 = the scene, r4 = the renderer's interface,
+// Scene::Draw sub_82098940: r3 = the scene, r4 = the frame driver's interface,
 // r5 = the device; from a 112-byte frame; r3 the video output.
 void AppSceneDraw(PPCContext& ctx, uint8_t* base);
 

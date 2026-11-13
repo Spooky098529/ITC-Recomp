@@ -1,11 +1,11 @@
 // The game's Thread class (vtable 0x8206CB30: the render thread, the worker
 // pools' threads, the dirty-disc report) and the XAPI thread wrappers it
-// starts its threads with, as plain C++ (docs/functions/renderer.md, the
-// wrappers in docs/functions/renderer.md and app-start-up.md). The kernel's
+// starts its threads with, as plain C++ (docs/functions/frame-driver.md, the
+// wrappers in docs/functions/frame-driver.md and app-start-up.md). The kernel's
 // threads are the core's: by the user's call (2026-10-29, XAudio's threads;
 // 2026-11-06, the predicated tiling's workers) native code calls the kernel
 // imports exactly as the original does, through ThreadCalls (guest calls
-// made by the adapters, src/hooks/renderer_objects.cpp), from frames like
+// made by the adapters, src/hooks/frame_driver.cpp), from frames like
 // the originals' (their locals there). The last error is the game's
 // (hooks/last_error.h).
 
@@ -15,7 +15,7 @@
 #include <functional>
 #include <initializer_list>
 
-namespace renderer_objects {
+namespace frame_driver {
 
 constexpr uint32_t kThreadVtable = 0x8206CB30;
 constexpr uint32_t kThreadHandle = 4;     // -1 for none
@@ -92,4 +92,4 @@ uint32_t ResumeThread(uint8_t* base, uint32_t handle, const ThreadCalls& calls);
 uint32_t ThreadBegin(uint8_t* base, uint32_t thread, uint32_t object, uint32_t processor,
                      uint32_t priority, const ThreadCalls& calls);
 
-}  // namespace renderer_objects
+}  // namespace frame_driver

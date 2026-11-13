@@ -287,7 +287,7 @@ void ReplaySnapshots(Context& h);
 void RaceLoading(Context& h);
 void SceneTarget(Context& h);
 void FramePasses(Context& h);
-void RendererObjects(Context& h);
+void FrameDriver(Context& h);
 void CommandBuffer(Context& h);
 // The render command replay's single commands (src/harnesses/single_commands.cpp).
 void SingleCommands(Context& h);

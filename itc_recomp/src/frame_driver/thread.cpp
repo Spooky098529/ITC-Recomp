@@ -1,14 +1,14 @@
 // The game's Thread class and the XAPI thread wrappers (thread.h,
-// docs/functions/renderer.md): step for step as the recompiled functions,
+// docs/functions/frame-driver.md): step for step as the recompiled functions,
 // the kernel imports guest calls.
 
-#include "renderer_objects/thread.h"
+#include "frame_driver/thread.h"
 
 #include "guest.h"
 
 #include "base/log.h"
 
-namespace renderer_objects {
+namespace frame_driver {
 
 namespace {
 
@@ -151,4 +151,4 @@ uint32_t ThreadBegin(uint8_t* base, uint32_t thread, uint32_t object, uint32_t p
   return r3;
 }
 
-}  // namespace renderer_objects
+}  // namespace frame_driver

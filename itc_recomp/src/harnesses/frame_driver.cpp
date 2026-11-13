@@ -1,8 +1,8 @@
-// The renderer and the app's scene (src/renderer_objects/,
-// docs/functions/renderer.md) against the recompiled functions. The
-// originals run with --native_renderer_objects off (so their callees that
+// The frame driver and the app's scene (src/frame_driver/,
+// docs/functions/frame-driver.md) against the recompiled functions. The
+// originals run with --native_frame_driver off (so their callees that
 // are ours run as the originals too), the plain C++ through the register
-// steps (hooks/renderer_objects.h). Inputs go in the scratch area; map nodes
+// steps (hooks/frame_driver.h). Inputs go in the scratch area; map nodes
 // and the blocks the allocators give come from the allocation layer
 // (operator new's plain C++), each version building its own, and words
 // pointing into them are compared by the block's number and the offset (as
@@ -14,11 +14,11 @@
 #include "base/flags.h"
 #include "framework/run_loop.h"
 #include "graphics/video_output.h"
-#include "hooks/renderer_objects.h"
+#include "hooks/frame_driver.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
-#include "renderer_objects/renderer_objects.h"
-#include "renderer_objects/thread.h"
+#include "frame_driver/frame_driver.h"
+#include "frame_driver/thread.h"
 
 #include <fmt/format.h>
 
@@ -27,21 +27,21 @@
 #include <string>
 #include <vector>
 
-ITC_FLAG_DECLARE(bool, native_renderer_objects);
+ITC_FLAG_DECLARE(bool, native_frame_driver);
 ITC_FLAG_DECLARE(bool, native_video_output);
 
 namespace harness {
 
 namespace {
 
-namespace ro = renderer_objects;
+namespace fd = frame_driver;
 namespace vo = graphics::video_output;
 
 struct FlagOff {
-  FlagOff() : saved_(ITC_FLAG(native_renderer_objects)) {
-    ITC_FLAG(native_renderer_objects) = false;
+  FlagOff() : saved_(ITC_FLAG(native_frame_driver)) {
+    ITC_FLAG(native_frame_driver) = false;
   }
-  ~FlagOff() { ITC_FLAG(native_renderer_objects) = saved_; }
+  ~FlagOff() { ITC_FLAG(native_frame_driver) = saved_; }
   bool saved_;
 };
 
@@ -62,12 +62,12 @@ constexpr uint32_t kGetWord60 = 0x82090770;
 
 // The scratch area's layout.
 constexpr uint32_t kKey = 96;
-constexpr uint32_t kRenderer = 1024;  // 400 bytes
+constexpr uint32_t kDriver = 1024;  // 400 bytes
 constexpr uint32_t kObjects = 1536;   // 8 objects of 128 bytes
 constexpr uint32_t kCompared = 3072;  // the bytes compared
 constexpr uint32_t kValue = 4000;     // BuildHandlerMap's value and result
 
-uint32_t RendererAt(const Context& h) { return h.data + kRenderer; }
+uint32_t DriverAt(const Context& h) { return h.data + kDriver; }
 uint32_t ObjectAt(const Context& h, uint32_t i) { return h.data + kObjects + 128 * i; }
 
 // Objects with their vtables at their + 32: slot 1 `slot1`, slot 2 `slot2`,
@@ -210,8 +210,8 @@ void MeetTree(uint8_t* base, Blocks& blocks, const std::vector<uint32_t>& maps) 
 // The scratch area's first kCompared bytes by number, the listener map's
 // nodes (links, key, delegate; the color and isnil bytes) by number, then
 // the blocks.
-void RendererOut(Context& h, Outputs& out, Blocks& blocks) {
-  MeetTree(h.base, blocks, {RendererAt(h) + ro::kRendererListeners});
+void DriverOut(Context& h, Outputs& out, Blocks& blocks) {
+  MeetTree(h.base, blocks, {DriverAt(h) + fd::kDriverListeners});
   blocks.Words(h.base, out, h.data, kCompared);
   for (uint32_t block : blocks.list) {
     if (block != 0 && memory::IsHeapBlock(block) &&
@@ -233,14 +233,14 @@ void RandomScratch(Context& h) {
 }
 
 void Interface(Context& h) {
-  const uint32_t renderer = RendererAt(h);
+  const uint32_t driver = DriverAt(h);
   {
-    Results results("Renderer::GetVideoOutput (sub_824960E0)");
+    Results results("FrameDriver::GetVideoOutput (sub_824960E0)");
     for (int c = 0; c < 20; c++) {
       Case(
           h, results, [&](Blocks&) {},
-          [&](PPCContext& t) { t.r3.u64 = c < 4 ? renderer + ro::kRendererInterface : h.random.Next(); },
-          __imp__sub_824960E0, hooks::RendererGetVideoOutput,
+          [&](PPCContext& t) { t.r3.u64 = c < 4 ? driver + fd::kDriverInterface : h.random.Next(); },
+          __imp__sub_824960E0, hooks::FrameDriverGetVideoOutput,
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             blocks.Out(out);
@@ -250,10 +250,10 @@ void Interface(Context& h) {
     results.Report();
   }
   {
-    // The interface at renderer + 20 (its request vector at +40, in a heap
+    // The interface at driver + 20 (its request vector at +40, in a heap
     // block), the key at data + 96, the delegate an object whose slot 2 is
     // the game's Delegate::Clone or a getter (a word for a copy).
-    Results results("Renderer::AddListener (sub_820922B8)");
+    Results results("FrameDriver::AddListener (sub_820922B8)");
     for (int c = 0; c < 60; c++) {
       Case(
           h, results,
@@ -262,7 +262,7 @@ void Interface(Context& h) {
             Objects(h, 1, kCount4, c % 4 == 3 ? kGetWord60 : kDelegateClone);
             const uint32_t size = h.random.Below(5);
             const uint32_t capacity = size + h.random.Below(3);
-            const uint32_t vector = renderer + ro::kRendererRequests;
+            const uint32_t vector = driver + fd::kDriverRequests;
             uint32_t block = 0;
             if (capacity != 0) {
               block = blocks.New(h.base, 12 * capacity);
@@ -275,13 +275,13 @@ void Interface(Context& h) {
             Store(h.base, vector + 12, block + 12 * capacity);
           },
           [&](PPCContext& t) {
-            t.r3.u64 = renderer + ro::kRendererInterface;
+            t.r3.u64 = driver + fd::kDriverInterface;
             t.r4.u64 = h.data + kKey;
             t.r5.u64 = ObjectAt(h, 0);
           },
-          __imp__sub_820922B8, hooks::RendererAddListener,
+          __imp__sub_820922B8, hooks::FrameDriverAddListener,
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
-            const uint32_t vector = renderer + ro::kRendererRequests;
+            const uint32_t vector = driver + fd::kDriverRequests;
             const uint32_t first = Load(h.base, vector + 4);
             const uint32_t last = Load(h.base, vector + 8);
             if (first != 0 && !blocks.Has(first)) {
@@ -299,7 +299,7 @@ void Interface(Context& h) {
               blocks.Words(h.base, out, first, last - first);
             }
             out.Word(t.r3.u32 == vector ? 1 : t.r3.u32 - t.r1.u32);
-            RendererOut(h, out, blocks);
+            DriverOut(h, out, blocks);
           },
           fmt::format("case {}", c));
     }
@@ -308,26 +308,26 @@ void Interface(Context& h) {
   {
     // Types 0 (an insert, into a map of 0 to 5 keys), 2 and others (nothing
     // done); 1, a removal, runs the original in both.
-    Results results("Renderer::ApplyRequest (sub_82091FF0)");
+    Results results("FrameDriver::ApplyRequest (sub_82091FF0)");
     for (int c = 0; c < 120; c++) {
       uint32_t type = 0;
       Case(
           h, results,
           [&](Blocks&) {
             RandomScratch(h);
-            BuildHandlerMap(h, renderer + ro::kRendererListeners, h.random.Below(6), 0);
+            BuildHandlerMap(h, driver + fd::kDriverListeners, h.random.Below(6), 0);
             const uint32_t types[] = {0, 0, 0, 2, 7, 0xFFFFFFFF};
             type = types[h.random.Below(6)];
           },
           [&](PPCContext& t) {
-            t.r3.u64 = renderer;
+            t.r3.u64 = driver;
             t.r4.u64 = (uint64_t(type) << 32) | h.random.Below(8);
             t.r5.u64 = h.random.Next();
           },
-          __imp__sub_82091FF0, hooks::RendererApplyRequest,
+          __imp__sub_82091FF0, hooks::FrameDriverApplyRequest,
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
-            RendererOut(h, out, blocks);
+            DriverOut(h, out, blocks);
           },
           fmt::format("type {} case {}", int32_t(type), c));
     }
@@ -336,7 +336,7 @@ void Interface(Context& h) {
   {
     // The delegate's slot 1 records r5 (+104), r4's +8 word (+112) and
     // counts (+4), or records r4.
-    Results results("Renderer::CallListener (sub_82091A98)");
+    Results results("FrameDriver::CallListener (sub_82091A98)");
     for (int c = 0; c < 40; c++) {
       Case(
           h, results,
@@ -345,13 +345,13 @@ void Interface(Context& h) {
             Objects(h, 2, c % 2 == 0 ? kStoreR5 : kStoreR4At4);
           },
           [&](PPCContext& t) {
-            t.r3.u64 = renderer;
+            t.r3.u64 = driver;
             t.r4.u64 = (uint64_t(h.random.Below(8)) << 32) | ObjectAt(h, h.random.Below(2));
           },
-          __imp__sub_82091A98, hooks::RendererCallListener,
+          __imp__sub_82091A98, hooks::FrameDriverCallListener,
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
-            RendererOut(h, out, blocks);
+            DriverOut(h, out, blocks);
           },
           fmt::format("case {}", c));
     }
@@ -359,7 +359,7 @@ void Interface(Context& h) {
   }
 }
 
-// Renderer::DrawFrame over a renderer whose video output (+64) is made by
+// FrameDriver::DrawFrame over a driver whose video output (+64) is made by
 // the native constructor (the device lock shared by both versions while
 // --native_video_output is on) with a device in a heap block (its thread
 // word at +10760), and a listener map of 0 to 6 keys whose delegates' slot
@@ -368,8 +368,8 @@ void DrawFrames(Context& h) {
   if (!ITC_FLAG(native_video_output)) {
     return;
   }
-  const uint32_t renderer = RendererAt(h);
-  Results results("Renderer::DrawFrame (sub_82091E58)");
+  const uint32_t driver = DriverAt(h);
+  Results results("FrameDriver::DrawFrame (sub_82091E58)");
   for (int c = 0; c < 40; c++) {
     uint32_t device = 0;
     Case(
@@ -377,19 +377,19 @@ void DrawFrames(Context& h) {
         [&](Blocks& blocks) {
           RandomScratch(h);
           Objects(h, 4, c % 3 == 0 ? kStoreR4At4 : kStoreR5);
-          vo::Construct(h.base, renderer + ro::kRendererVideoOutput);
+          vo::Construct(h.base, driver + fd::kDriverVideoOutput);
           device = blocks.New(h.base, vo::kDeviceThread + 8);
           Store(h.base, device + vo::kDeviceThread, uint32_t(h.random.Next()));
-          Store(h.base, renderer + ro::kRendererVideoOutput + vo::kDevice, device);
-          BuildHandlerMap(h, renderer + ro::kRendererListeners, h.random.Below(7), 4);
+          Store(h.base, driver + fd::kDriverVideoOutput + vo::kDevice, device);
+          BuildHandlerMap(h, driver + fd::kDriverListeners, h.random.Below(7), 4);
         },
-        [&](PPCContext& t) { t.r3.u64 = renderer; },
-        __imp__sub_82091E58, hooks::RendererDrawFrame,
+        [&](PPCContext& t) { t.r3.u64 = driver; },
+        __imp__sub_82091E58, hooks::FrameDriverDrawFrame,
         [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
           out.Word(Load(h.base, device + vo::kDeviceThread));
           // The lock's guest bytes aren't written by the native lock.
-          Fill(h.base, renderer + ro::kRendererVideoOutput + vo::kLock, vo::kLockBytes);
-          RendererOut(h, out, blocks);
+          Fill(h.base, driver + fd::kDriverVideoOutput + vo::kLock, vo::kLockBytes);
+          DriverOut(h, out, blocks);
         },
         fmt::format("case {}", c));
   }
@@ -406,13 +406,13 @@ void SceneQueue(Context& h, uint32_t scene, uint32_t slot5) {
   for (uint32_t slot = 0; slot < 8; slot++) {
     Store(h.base, vtable + 4 * slot, slot == 5 ? slot5 : kCount4);
   }
-  Store(h.base, scene + ro::kSceneRenderQueue, vtable);
-  Store(h.base, scene + ro::kSceneRenderQueue + 4, 0);
+  Store(h.base, scene + fd::kSceneRenderQueue, vtable);
+  Store(h.base, scene + fd::kSceneRenderQueue + 4, 0);
 }
 
 void SceneUpdates(Context& h) {
-  const uint32_t scene = RendererAt(h);
-  const uint32_t saved = Load(h.base, ro::kPrimitiveFlip);
+  const uint32_t scene = DriverAt(h);
+  const uint32_t saved = Load(h.base, fd::kPrimitiveFlip);
   Results results("Scene::Update (sub_820988C8)");
   for (int c = 0; c < 40; c++) {
     Case(
@@ -420,25 +420,25 @@ void SceneUpdates(Context& h) {
         [&](Blocks&) {
           RandomScratch(h);
           SceneQueue(h, scene, kCount4);
-          const uint32_t list = scene + ro::kSceneCommandList;
+          const uint32_t list = scene + fd::kSceneCommandList;
           Store(h.base, list + 4, h.random.Below(2));
           Store(h.base, list + 12, h.random.Below(5000));
           const uint32_t flips[] = {0, 1, 1, 2, uint32_t(h.random.Next())};
-          Store(h.base, ro::kPrimitiveFlip, flips[h.random.Below(5)]);
+          Store(h.base, fd::kPrimitiveFlip, flips[h.random.Below(5)]);
         },
         [&](PPCContext& t) { t.r3.u64 = scene; }, __imp__sub_820988C8, hooks::AppSceneUpdate,
         [&](Outputs& out, const PPCContext&, Blocks& blocks) {
-          out.Word(Load(h.base, ro::kPrimitiveFlip));
-          RendererOut(h, out, blocks);
+          out.Word(Load(h.base, fd::kPrimitiveFlip));
+          DriverOut(h, out, blocks);
         },
         fmt::format("case {}", c));
   }
-  Store(h.base, ro::kPrimitiveFlip, saved);
+  Store(h.base, fd::kPrimitiveFlip, saved);
   results.Report();
 }
 
 // Scene::Draw: r4 an interface at the first object whose slot 3 is the
-// game's Renderer::GetVideoOutput (the video output at its +44) or a getter
+// game's FrameDriver::GetVideoOutput (the video output at its +44) or a getter
 // of its +60 (the video output there), the video output's device (+140) a
 // big block as the device state's harness builds it for its packet writers
 // (random, but the command buffer at a block of its own with no segment
@@ -458,8 +458,8 @@ void SceneDraws(Context& h) {
     memory::Free(commands);
     return;
   }
-  const uint32_t scene = RendererAt(h);
-  const uint32_t saved = Load(h.base, ro::kVblankCount);
+  const uint32_t scene = DriverAt(h);
+  const uint32_t saved = Load(h.base, fd::kVblankCount);
   Results results("Scene::Draw (sub_82098940)");
   for (int c = 0; c < 40; c++) {
     const bool game_getter = c % 4 != 3;
@@ -471,7 +471,7 @@ void SceneDraws(Context& h) {
           SceneQueue(h, scene, kStoreR5);
           const uint32_t interface = ObjectAt(h, 0);
           Objects(h, 1, kCount4);
-          Store(h.base, interface + 32 + 12, game_getter ? ro::kGetVideoOutput : kGetWord60);
+          Store(h.base, interface + 32 + 12, game_getter ? fd::kGetVideoOutput : kGetWord60);
           video_output = game_getter ? interface + 44 : ObjectAt(h, 2);
           Store(h.base, interface + 60, video_output);
           Store(h.base, video_output + vo::kDevice, device);
@@ -489,7 +489,7 @@ void SceneDraws(Context& h) {
           Store(h.base, device + 48, 0xFFFFFFF0u);
           guest::StoreU8(h.base, device + 10809, guest::LoadU8(h.base, device + 10809) | 0x40);
           Fill(h.base, commands, kCommandBytes);
-          Store(h.base, ro::kVblankCount, uint32_t(h.random.Next()));
+          Store(h.base, fd::kVblankCount, uint32_t(h.random.Next()));
         },
         [&](PPCContext& t) {
           t.r3.u64 = scene;
@@ -499,14 +499,14 @@ void SceneDraws(Context& h) {
         __imp__sub_82098940, hooks::AppSceneDraw,
         [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
           out.Word(t.r3.u32);
-          out.Word(Load(h.base, ro::kVblankCount));
+          out.Word(Load(h.base, fd::kVblankCount));
           out.Bytes(Read(h.base, device, kDeviceBytes));
           out.Bytes(Read(h.base, commands, kCommandBytes));
-          RendererOut(h, out, blocks);
+          DriverOut(h, out, blocks);
         },
         fmt::format("{} case {}", game_getter ? "GetVideoOutput" : "another getter", c));
   }
-  Store(h.base, ro::kVblankCount, saved);
+  Store(h.base, fd::kVblankCount, saved);
   memory::Free(device);
   memory::Free(commands);
   results.Report();
@@ -528,7 +528,7 @@ uint32_t HandleKind(uint32_t handle) {
 void Threads(Context& h) {
   const uint32_t error_slot = Load(h.base, h.ctx.r13.u32 + 256) + 352;
   const uint32_t saved_error = Load(h.base, error_slot);
-  const uint32_t thread = RendererAt(h);  // Thread::Thread's
+  const uint32_t thread = DriverAt(h);  // Thread::Thread's
   auto error_out = [&](Outputs& out) { out.Word(Load(h.base, error_slot)); };
   auto error_in = [&] { Store(h.base, error_slot, 0x5A5A5A5A); };
   {
@@ -539,7 +539,7 @@ void Threads(Context& h) {
           [&](PPCContext& t) { t.r3.u64 = thread; }, __imp__sub_8258DE88, hooks::ThreadConstruct,
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
-            RendererOut(h, out, blocks);
+            DriverOut(h, out, blocks);
           },
           fmt::format("case {}", c));
     }
@@ -584,12 +584,12 @@ void Threads(Context& h) {
             out.Word(t.r3.u32);
             for (uint32_t at = 0; at < 64; at += 4) {
               const uint32_t word = Load(h.base, block + at);
-              out.Word(at == ro::kThreadHandle ? HandleKind(word)
+              out.Word(at == fd::kThreadHandle ? HandleKind(word)
                        : word - block < 256 ? 0xB0000000u + (word - block)
                                              : word);
             }
             error_out(out);
-            RendererOut(h, out, blocks);
+            DriverOut(h, out, blocks);
           },
           fmt::format("case {}", c));
     }
@@ -615,7 +615,7 @@ void Threads(Context& h) {
             out.Word(Load(h.base, h.data + 96) != 0xCDCDCDCDu ? 1 : 0);  // an id stored
             Store(h.base, h.data + 96, 0);
             error_out(out);
-            RendererOut(h, out, blocks);
+            DriverOut(h, out, blocks);
           },
           fmt::format("case {}", c));
     }
@@ -645,7 +645,7 @@ void Threads(Context& h) {
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             error_out(out);
-            RendererOut(h, out, blocks);
+            DriverOut(h, out, blocks);
           },
           fmt::format("case {}", c));
     }
@@ -656,7 +656,7 @@ void Threads(Context& h) {
 
 }  // namespace
 
-void RendererObjects(Context& h) {
+void FrameDriver(Context& h) {
   Threads(h);
   Interface(h);
   DrawFrames(h);

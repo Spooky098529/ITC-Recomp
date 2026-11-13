@@ -4,7 +4,7 @@ The car scene: the 5,536-byte object at `[0x826C2E44]` that holds the
 cars' models wherever cars are shown (the race, the front end's garage
 and shops, the career's parking area), with the first set of object
 pools at `[0x826C2E40]` beside it (`../known-data.md`). Named
-`CarScene::` here, as `Scene::Update` (`sub_820988C8`, `renderer.md`)
+`CarScene::` here, as `Scene::Update` (`sub_820988C8`, `frame-driver.md`)
 is the app's scene object, another class. `CarScene::Create` makes it
 (`VirtualAlloc`), with the first set (`ScenePools::MakeA`), its lighting
 block, the scene's shared assets reset, the paint palette and the
