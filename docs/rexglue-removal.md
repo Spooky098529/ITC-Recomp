@@ -2889,6 +2889,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The morph jobs (the 224-byte job the second worker pool runs for `Model::MorphShape`, the wheels' morphs) and the shared work item | `morph-jobs.md` | 21 of 21 (and `Morph::Blend` Native) | `--native_morph_jobs` |
 | 2026-11-13 | The save devices' constructor and teardown (with `SaveDevices::Create`; the notification listener a stand-in, no call) | `save-interface.md` | 5 of 5 new rows (and `Create`) | (`--native_save_interface`) |
 | 2026-11-13 | The save devices' slot handlers (the states `SaveDevices::Update` runs, the save, load, check and delete steps and their waits, the overlapped results; B4's steps split into plain C++) | `save-interface.md` | 14 of 14 new rows (with `SaveDevices::Update`, `SaveStep`, `LoadStep`, both overlapped results, `Framework::DeviceList`) | (`--native_save_interface`) |
+| 2026-11-13 | Three small leads: the scene's render manager's slots 7 and 8 and their thunks, the texture provider's getters, the static zero and identity matrices | `app-start-up.md`, `models.md`, `matrix-math.md` | 13 of 13 new rows (and `Matrix::FromFloats` Native) | (`--native_app_start_up`, `--native_models`, `--native_matrix_math`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5491,3 +5492,15 @@ pairs): overridden 110, Native 40, Dropped 26, never called 68, live
 205. Imports: 186 called, 49 with a live caller. B7 (`b7_status.py`):
 ours 6,044, work left 686 (Wrapped 51, with a row 354, no row yet 281),
 from 700.
+
+**2026-11-13, three small leads (branch `b7-loop-13-11-26`, the
+forty-sixth run, its fourth subsystem):** 13 rows in `app-start-up.md`
+(the render manager `[0x826BABA0]`'s slots 7 and 8, through which the
+scene and the frame driver are reached), `models.md` (the texture
+provider's `Get` and its `XPR` slots) and `matrix-math.md` (the zero
+and identity matrices' `_cinit` set-ups); `Matrix::FromFloats` Native.
+About 30 native callers still reach these slots through guest calls (a
+cleanup lead). The boundary: 449 functions (916 pairs): overridden 110,
+Native 40, Dropped 26, never called 68, live 205. Imports: 186 called,
+49 with a live caller. B7 (`b7_status.py`): ours 6,057, work left 676
+(Wrapped 51, with a row 354, no row yet 271), from 686.

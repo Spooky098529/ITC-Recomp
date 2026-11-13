@@ -95,10 +95,21 @@ file's history. What's left to see in a drive, from every run:
   existing `--native_app_start_up`, `--native_models`,
   `--native_matrix_math`; every harness 0 differing, race 38 s at 40,
   0 errors; a cleanup lead added to `leads.md` (native callers'
-  guest calls into these slots); no subagents. Validation agent
-  running.
+  guest calls into these slots); no subagents. Validated: `itc_5265`
+  (race 49 s at 180, 0 errors, every harness 0 differing outside the
+  expected groups), 14 of 14 harness lines, no prints added; 10 ran in
+  the race, 4 to drive (replay `itc_5266` ok). Recorded; subsystem 4
+  done.
+- Next: the cleanup lead the migration added (no mapping, not
+  counted): native callers' guest calls into the render manager's
+  slots and the texture provider's getters made direct calls; its line
+  deleted from `leads.md`. Migration agent running.
 
 ## Done
+
+- Three small leads: 13 rows in `app-start-up.md`, `models.md`,
+  `matrix-math.md` ours, `Matrix::FromFloats` Native,
+  87dda153..ee595da5; validated.
 
 - The save devices' slot handlers: 14 rows in `save-interface.md` ours,
   with `SaveDevices::Update` and 5 shared, B4's steps split, under
@@ -144,5 +155,7 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
   359, unknown 290).
 - After the slot handlers: ours 6044, work left 686 (wrapped 51, known
   354, unknown 281).
+- After the three small leads: ours 6057, work left 676 (wrapped 51,
+  known 354, unknown 271).
 
 ## Stopped

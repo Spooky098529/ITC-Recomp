@@ -77,6 +77,14 @@ thumbnail):
 - `sub_820A5290` SaveSlot::WaitDelete
 - `sub_820A5190` SaveSlot::WaitThumbnail
 
+Not in the attract race or the replay (`itc_5265`, `itc_5266`, ok; the
+three small leads; the two clean-ups run only at the game's exit):
+
+- `sub_82094480` App::FrameDriverFromInterface8
+- `sub_82594230` TextureProvider::FindXprTexture
+- `sub_825DACA0` ZeroMatrix's clean-up
+- `sub_825DAC98` IdentityMatrix's clean-up
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the
