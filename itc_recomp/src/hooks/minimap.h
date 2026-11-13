@@ -46,6 +46,14 @@ void MinimapTriangleRecord(PPCContext& ctx, uint8_t* base);
 // plain C++ declines.
 void MinimapTriangleRecordFlat(PPCContext& ctx, uint8_t* base);
 
+// Minimap::Draw (sub_820F5740): r3 = the manager, r4 = the pass
+// description (r24 the map's draws' context); lr put back, r3 not given
+// (its caller doesn't read it). Run by frame interpolation's wrap when
+// MinimapDrawNative: --native_minimap with native atexit, its callees'
+// flags and the command list's diagnostics off.
+bool MinimapDrawNative();
+void MinimapDraw(PPCContext& ctx, uint8_t* base);
+
 void MinimapDrawCarMarker(PPCContext& ctx, uint8_t* base);
 void MinimapDrawPointMarker(PPCContext& ctx, uint8_t* base);
 

@@ -29,6 +29,8 @@
 
 namespace harness {
 
+void MinimapDrawCases(Context& h);
+
 namespace {
 
 namespace mm = minimap;
@@ -593,6 +595,7 @@ void Minimap(Context& h) {
   Triangles(h, r, block);
   Markers(h, r, block);
   memory::Free(allocation);
+  MinimapDrawCases(h);
 }
 
 }  // namespace harness

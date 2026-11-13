@@ -1,13 +1,17 @@
 // The minimap's parts natively: adapters in front of src/minimap/
 // (docs/functions/minimap.md), with the register steps the harness shares
-// (hooks/minimap.h). Minimap::Draw (sub_820F5740) itself stays recompiled,
-// Wrapped by frame interpolation (src/frame_pacing/per_frame_logic.cpp).
+// (hooks/minimap.h). Minimap::Draw's (sub_820F5740) register steps are here;
+// its override is frame interpolation's wrap
+// (src/frame_pacing/per_frame_logic.cpp), which runs them.
 
 #include "hooks/minimap.h"
 
 #include "base/flags.h"
+#include "car_scene_draw/car_scene_draw.h"
 #include "hooks/c_runtime.h"
+#include "hooks/car_scene_draw.h"
 #include "hooks/guest_call.h"
+#include "hooks/scenery_lists.h"
 #include "minimap/minimap.h"
 
 ITC_FLAG_BOOL(native_minimap, true, "ITC",
@@ -21,7 +25,10 @@ ITC_FLAG_BOOL(native_minimap, true, "ITC",
               "it; the render queue's submit a guest call; sub_8217C4C0, never seen in play, the "
               "original's), Minimap::DrawCarMarker sub_820F4888 and Minimap::DrawPointMarker "
               "sub_820F4BA8 (with native atexit; Triangle::Record from their frames, through "
-              "its adapter)) natively instead "
+              "its adapter), Minimap::Draw sub_820F5740 (inside frame interpolation's wrap; with "
+              "--native_scenery_lists, --native_matrix_math, --native_vehicle_accessors, "
+              "--native_car_physics, --native_math and --native_c_runtime and the command list's "
+              "diagnostics off, else its original)) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=minimap)");
 
@@ -30,6 +37,12 @@ ITC_FLAG_BOOL(native_minimap, true, "ITC",
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
 ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+ITC_FLAG_DECLARE(bool, native_car_physics);
+ITC_FLAG_DECLARE(bool, native_c_runtime);
+ITC_FLAG_DECLARE(bool, native_math);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_scenery_lists);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 
 namespace hooks {
 
@@ -192,6 +205,44 @@ void DrawMarker(PPCContext& ctx, uint8_t* base, MarkerDraw draw, uint32_t frame_
 }
 
 }  // namespace
+
+bool MinimapDrawNative() {
+  return ITC_FLAG(native_minimap) && hooks::NativeAtexit() && ITC_FLAG(native_scenery_lists) &&
+         ITC_FLAG(native_matrix_math) && ITC_FLAG(native_vehicle_accessors) &&
+         ITC_FLAG(native_car_physics) && ITC_FLAG(native_math) && ITC_FLAG(native_c_runtime) &&
+         !hooks::SceneryListsSlotDiagnostics();
+}
+
+void MinimapDraw(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  constexpr uint32_t kFrame = 28336;
+  const uint32_t f = ctx.r1.u32 - kFrame;
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  // The marker draws' guest calls from their frames below Minimap::Draw's.
+  MarkerContext car{ctx, base, f - minimap::kCarMarkerFrame, 0x820F4B94, 0x820F4B84, {ctx, base}};
+  MarkerContext point{ctx,        base,       f - minimap::kPointMarkerFrame,
+                      0x820F5188, 0x820F5178, {ctx, base}};
+  minimap::MarkerCalls car_calls, point_calls;
+  for (auto [m, c] : {std::pair{&car, &car_calls}, std::pair{&point, &point_calls}}) {
+    c->atexit = m->atexit.Call();
+    c->record = &MarkerContext::Record;
+    c->memcpy = &MarkerContext::Memcpy;
+    c->user = m;
+  }
+  GuestAtexit atexit{ctx, base};
+  minimap::DrawCalls all;
+  all.draws = &draws;
+  all.calls = &calls;
+  all.car_marker = &car_calls;
+  all.point_marker = &point_calls;
+  all.atexit = atexit.Call();
+  minimap::Draw(base, all, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r24.u32);
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
 
 // r3 = the camera pass, r4 = the color, r5 = the matrix; r3 as the last
 // Triangle::Record leaves it.

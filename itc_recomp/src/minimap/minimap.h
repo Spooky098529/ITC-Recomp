@@ -2,9 +2,8 @@
 // the functions are in docs/functions/minimap.md, the fields and globals in
 // docs/known-data.md): the race manager's lookups, the course set's points,
 // the markers' 80-slot lists, their triangles and the transform they're
-// recorded with. Minimap::Draw (sub_820F5740) stays recompiled (Wrapped by
-// frame interpolation, src/frame_pacing/per_frame_logic.cpp, and blocked by
-// the course set's lists). The data is guest data shared with
+// recorded with, and Minimap::Draw (sub_820F5740, draw.cpp) inside frame
+// interpolation's wrap (src/frame_pacing/per_frame_logic.cpp). The data is guest data shared with
 // the recompiled code, so these work on guest memory, with the originals'
 // loads and stores in their order. The originals' stack temporaries aren't
 // written, except where the interpolation reads them (the transform's
@@ -16,6 +15,13 @@
 
 #include <cstdint>
 #include <optional>
+
+namespace car_scene_draw {
+struct SceneDrawCalls;
+}
+namespace scenery_lists {
+struct DrawCalls;
+}
 
 namespace minimap {
 
@@ -159,5 +165,31 @@ void DrawCarMarker(uint8_t* base, uint32_t pass, uint32_t color, uint32_t matrix
 // the color.
 void DrawPointMarker(uint8_t* base, uint32_t pass, uint32_t color, uint32_t matrix,
                      uint32_t frame, const MarkerCalls& calls);
+
+// --- The draw (draw.cpp) ---
+
+// What Minimap::Draw's plain C++ can't do itself: the scenery models'
+// draws' guest calls, any guest function (the originals where the plain C++
+// declines) and memcpy's original from its frame, the marker draws' calls
+// (their frames' Triangle::Record, memcpy and atexit) and atexit.
+struct DrawCalls {
+  const scenery_lists::DrawCalls* draws = nullptr;
+  const car_scene_draw::SceneDrawCalls* calls = nullptr;
+  const MarkerCalls* car_marker = nullptr;
+  const MarkerCalls* point_marker = nullptr;
+  c_runtime::AtexitCall atexit;
+};
+
+// Minimap::Draw (sub_820F5740): in its 28,336-byte frame below `stack` (its
+// back chain written, the stack probe left out), nothing more than the
+// compiler's dead stores when the course set's (the manager's +112) list at
+// +1064 is empty; else the keys and the pass's view-projection and view
+// copies (noted for interpolation), the map (the list's first models' shapes,
+// SceneryModel::DrawShape with r24 = `caller_r24`), the point markers, the
+// car markers in their five pools (their colors made once, with atexit),
+// and the blink clock's step (0x826C5AA4, 0x826C5AA8). r3 isn't given (its
+// caller doesn't read it). Leaves flush-to-zero off.
+void Draw(uint8_t* base, const DrawCalls& calls, uint32_t stack, uint32_t manager,
+          uint32_t description, uint32_t caller_r24);
 
 }  // namespace minimap

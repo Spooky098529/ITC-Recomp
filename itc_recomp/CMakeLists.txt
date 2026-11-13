@@ -602,6 +602,7 @@ set(ITC_SOURCES
     src/hooks/minimap.cpp
     src/mode_tick/mode_tick.cpp
     src/minimap/minimap.cpp
+    src/minimap/draw.cpp
     src/hooks/scenery_lists.cpp
     src/scenery_lists/scenery_lists.cpp
     src/scenery_lists/model_draws.cpp
@@ -816,6 +817,7 @@ set(ITC_SOURCES
     src/harnesses/game_modes.cpp
     src/harnesses/mode_tick.cpp
     src/harnesses/minimap.cpp
+    src/harnesses/minimap_draw.cpp
     src/harnesses/scene_models.cpp
     src/harnesses/scenery_lists.cpp
     src/harnesses/shader_objects.cpp
@@ -943,7 +945,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
     src/models/model_load.cpp src/course_scenery/collect.cpp src/course_scenery/headlights.cpp
-    src/sprites/billboard_record.cpp src/course_scenery/draw_area.cpp
+    src/sprites/billboard_record.cpp src/course_scenery/draw_area.cpp src/minimap/draw.cpp
     src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
     src/race_setup/set_up.cpp src/vehicle/vehicle.cpp src/race_world/race_world.cpp
     src/race_world/race_world_reset.cpp
