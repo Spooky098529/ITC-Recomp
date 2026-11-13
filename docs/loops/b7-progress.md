@@ -51,7 +51,12 @@ file's history. What's left to see in a drive, from every run:
   `leads.md`. Mapped into `save-interface.md` (1edd6e03: 5 new rows,
   2 in play; 1 ready group; the listener stored as
   `user::kNoListener` with no call, the 2026-10-30 precedent; 1 lead
-  added, the slot handlers). Check passed. Migration agent running.
+  added, the slot handlers). Check passed. Migrated f0ecffdd..32f5b0d9:
+  all 5 rows ours (3 never-seen ported), with `SaveDevices::Create`
+  (`framework.md`) so the constructor's adapter could go; under
+  `--native_save_interface`; every harness 0 differing, race 38 s at
+  40, 0 errors; the three ran in the game at boot; no subagents.
+  Validation agent running.
 
 ## Done
 

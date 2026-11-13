@@ -48,6 +48,13 @@ When the user has reviewed a run's section, its heading gets
   `user::kNoListener` without `XNotifyCreateListener` (the
   `SignIn::SetUp` precedent; it must not be 0, as `SaveDevices::Update`
   runs only with a listener).
+- The save devices' migration (f0ecffdd..32f5b0d9): 5 of 5 ours and
+  `SaveDevices::Create` (`framework.md`, under `--native_save_interface`,
+  not `--native_framework`); the destructor's `CloseHandle` on the
+  stand-in listener left out (on the recompiled side it fails and only
+  sets the last error); the slots' vector deleting destructor stays a
+  guest call (teardown only); save counts malloc would refuse run the
+  original.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
