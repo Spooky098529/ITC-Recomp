@@ -107,6 +107,7 @@ set(ITC_SOURCES
     src/sprites/sprites.cpp
     src/hooks/billboards.cpp
     src/sprites/billboards.cpp
+    src/sprites/billboard_record.cpp
     src/hooks/ui_movies.cpp
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
@@ -691,6 +692,7 @@ set(ITC_SOURCES
     src/harnesses/xma.cpp
     src/harnesses/sprites.cpp
     src/harnesses/billboards.cpp
+    src/harnesses/billboards_record.cpp
     src/harnesses/command_list.cpp
     src/harnesses/c_runtime.cpp
     src/harnesses/heap.cpp
@@ -940,6 +942,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
     src/models/model_load.cpp src/course_scenery/collect.cpp src/course_scenery/headlights.cpp
+    src/sprites/billboard_record.cpp
     src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
     src/race_setup/set_up.cpp src/vehicle/vehicle.cpp src/race_world/race_world.cpp
     src/race_world/race_world_reset.cpp

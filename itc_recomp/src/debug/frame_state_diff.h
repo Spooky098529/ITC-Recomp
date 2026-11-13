@@ -35,4 +35,9 @@ bool IsHidden(uint32_t function);
 // C++ alone.
 void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v);
 
+// --watch_lights (with --find_per_frame_state): watches the first two
+// lights' words of a light list Billboards::Record (sub_8209CC38) draws, the
+// first 64 lists seen. Called by its wrap and by its native callers.
+void WatchLights(uint8_t* base, uint32_t list);
+
 }  // namespace debug

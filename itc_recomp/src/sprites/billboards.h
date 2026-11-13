@@ -10,6 +10,10 @@
 
 #include <cstdint>
 
+namespace car_scene_draw {
+struct SceneDrawCalls;
+}
+
 namespace sprites {
 
 // BillboardMaterial::Init (sub_8209F5A0): alpha mode +0 = 1, blend mode
@@ -46,5 +50,33 @@ struct SlotAllocator {
 // translated code's do.
 uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
                                 const SlotAllocator& slots);
+
+// The recording (src/sprites/billboard_record.cpp). Each takes `stack`, the
+// guest r1 at entry, and keeps the original's frame below it (its back chain
+// and temporaries; its guest calls made from it through `calls` with the
+// original's return addresses). Flush-to-zero off at entry and exit. The
+// adapters (src/hooks/billboards.cpp, the wrap in
+// src/debug/frame_state_diff.cpp) run them only with --native_billboards and
+// --native_matrix_math on and the command list's diagnostics off.
+
+// Billboards::RecordState (sub_8209C1A0): the material's render states by
+// its alpha mode (+0) and blend mode (+4), command 7 with vertex c0 x4 = the
+// camera pass's (`[set]`) view (+16) x projection (+80) through an identity
+// on its 368-byte frame (both multiplies noted for frame interpolation), the
+// shaders at 0x826A50A0 and 0x826A50A4, the texture (+12) in stage 0 or none
+// in stages 0 to 3. Returns the last slot (the original's r3).
+uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+                              uint32_t stack, uint32_t set, uint32_t list, uint32_t material);
+// Billboards::Record (sub_8209CC38): a chunk on the render manager's command
+// list with RecordState's states, the vertices (BuildVertices inside frame
+// interpolation's camera blend), three render states and command 36,
+// handed to the render queue (layer `set` + 4, depth 0.0) when any vertex
+// was counted. Returns the original's r3 (the list, or the queue call's).
+uint64_t RecordBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+                          uint32_t stack, uint32_t set, uint32_t material);
+// Billboards::Draw (sub_8209CDB0): 0 when the material has no lights (+32),
+// else Record (inside its wrap's checks) and 1.
+uint64_t DrawBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+                        uint32_t stack, uint32_t set, uint32_t material);
 
 }  // namespace sprites
