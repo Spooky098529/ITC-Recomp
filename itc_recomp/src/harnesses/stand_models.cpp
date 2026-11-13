@@ -352,6 +352,18 @@ void Reapplies(Context& h, uint32_t b) {
        [](PPCContext& t, Random& r) { t.r4.u64 = r.Below(4) == 0 ? r.Below(40) : r.Below(6); }},
       {"GarageStage::SetAero (sub_82179548)", __imp__sub_82179548, hooks::StandModelsSetAero, 96,
        16, [](PPCContext& t, Random& r) { t.r4.u64 = uint32_t(r.Next()); }},
+      {"GarageStage::SetChoice (sub_82179310)", __imp__sub_82179310,
+       hooks::StandModelsSetChoice, 112, 32,
+       [](PPCContext& t, Random& r) {
+         t.r4.u64 = r.Below(6) == 0 ? r.Below(40) : r.Below(7);
+         t.r5.u64 = r.Below(2) == 0 ? r.Below(5) : uint32_t(r.Next());
+         t.r6.u64 = r.Below(2) == 0 ? r.Below(5) : uint32_t(r.Next());
+       }},
+      {"GarageStage::SetAero2 (sub_821794A8)", __imp__sub_821794A8, hooks::StandModelsSetAero2,
+       96, 16, [](PPCContext& t, Random& r) { t.r4.u64 = uint32_t(r.Next()); }},
+      {"GarageStage::SetDoorKind (sub_821794F8)", __imp__sub_821794F8,
+       hooks::StandModelsSetDoorKind, 96, 16,
+       [](PPCContext& t, Random& r) { t.r4.u64 = r.Below(2) == 0 ? r.Below(2) : r.Next(); }},
       {"GarageStage::ReloadDecals (sub_82178EC0)", __imp__sub_82178EC0,
        hooks::StandModelsReloadDecals, 96, 16, [](PPCContext&, Random&) {}},
       {"GarageStage::SetParts (sub_821797A8)", __imp__sub_821797A8, hooks::StandModelsSetParts,
@@ -656,6 +668,95 @@ void Sizes(Context& h, uint32_t b) {
   results.Report();
 }
 
+// The setters the tuning screen's never-seen paths reach. The interior
+// (SetAccessory, ApplyInterior, SceneInterior::SetRecord): the models'
+// +5068 an interior in the block, its +36 a first-set object (the record
+// copied into both, 120 bytes from the model's +3804, or a random record
+// for SetRecord); the top 24 bytes of the 112-byte frames: r30, r31 and lr's
+// saves. The wheels (SetWheelExtras with SceneWheels::SetWord68 and
+// SetCaliperTexture): the wheels as LayWheels lays them, with the calipers'
+// part models (+2336, +2800); the texture 0 to 6 or any word; the top 32
+// bytes of SetWheelExtras' 112-byte frame (r29 to r31, lr), 16 of
+// SetCaliperTexture's 96 (r31, lr); SetWord68 has no frame.
+void Extras(Context& h, uint32_t b) {
+  constexpr uint32_t kInterior = 0xCE00, kInteriorFirst = 0xCF00;
+  auto lay_interior = [&](Random& r) {
+    LayStage(h.base, b, r);
+    for (const uint32_t m : {kModel, kModel2}) {
+      Put(h.base, b + m + 5068, b + kInterior);
+    }
+    Put(h.base, b + kInterior + 36, b + kInteriorFirst);
+  };
+  auto lay_wheels = [&](Random& r) {
+    LayWheels(h.base, b, r);
+    PartModel(h.base, b, b + kFirstWheels + 2336, 2, r);
+    PartModel(h.base, b, b + kFirstWheels + 2800, 3, r);
+  };
+  auto word = [](Random& r) { return r.Below(2) == 0 ? r.Below(7) : uint32_t(r.Next()); };
+  struct Item {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::function<void(PPCContext&, Random&)> setup;
+  };
+  const Item items[] = {
+      {"SceneInterior::SetRecord (sub_820E38E0)", __imp__sub_820E38E0,
+       hooks::StandModelsSceneInteriorSetRecord, 112, 24,
+       [&](PPCContext& t, Random& r) {
+         lay_interior(r);
+         t.r3.u64 = b + kInterior;
+         t.r4.u64 = b + 0x8000 + 4 * r.Below(64);
+       }},
+      {"SceneModel::ApplyInterior (sub_820D9F40)", __imp__sub_820D9F40,
+       hooks::StandModelsApplyInterior, 0, 0,
+       [&](PPCContext& t, Random& r) {
+         lay_interior(r);
+         t.r3.u64 = b + (r.Below(2) == 0 ? kModel : kModel2);
+       }},
+      {"GarageStage::SetAccessory (sub_821792B0)", __imp__sub_821792B0,
+       hooks::StandModelsSetAccessory, 112, 24,
+       [&](PPCContext& t, Random& r) {
+         lay_interior(r);
+         t.r3.u64 = b + kHolderAt;
+         t.r4.u64 = r.Below(2) == 0 ? r.Below(4) : r.Next();
+         t.r5.u64 = r.Below(2) == 0 ? r.Below(5) : r.Next();
+       }},
+      {"SceneWheels::SetWord68 (sub_820E7410)", __imp__sub_820E7410, hooks::StandModelsSetWord68,
+       0, 0,
+       [&](PPCContext& t, Random& r) {
+         lay_wheels(r);
+         t.r3.u64 = b + kWheels;
+         t.r4.u64 = r.Below(2) == 0 ? r.Below(7) : r.Next();
+       }},
+      {"SceneWheels::SetCaliperTexture (sub_820E7428)", __imp__sub_820E7428,
+       hooks::StandModelsSceneSetCaliperTexture, 96, 16,
+       [&](PPCContext& t, Random& r) {
+         lay_wheels(r);
+         t.r3.u64 = b + kWheels;
+         t.r4.u64 = word(r);
+       }},
+      {"GarageStage::SetWheelExtras (sub_821790D0)", __imp__sub_821790D0,
+       hooks::StandModelsSetWheelExtras, 112, 32,
+       [&](PPCContext& t, Random& r) {
+         LayStage(h.base, b, r);
+         lay_wheels(r);
+         t.r3.u64 = b + kHolderAt;
+         t.r4.u64 = r.Below(2) == 0 ? r.Below(30) : r.Next();
+         t.r5.u64 = word(r);
+       }},
+  };
+  for (const Item& item : items) {
+    Results results(item.name);
+    for (int c = 0; c < 32; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) { item.setup(t, r); },
+           item.recompiled, item.native, item.frame, item.saves, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void StandModels(Context& h) {
@@ -675,6 +776,7 @@ void StandModels(Context& h) {
     Sizes(h, b);
     Colors(h, b);
     Decals(h, b);
+    Extras(h, b);
   }
   memory::Free(allocation);
 }

@@ -115,6 +115,30 @@ void StandModelsSetDecalWord(PPCContext& ctx, uint8_t* base);
 // the fallbacks; also with --native_car_specs); lr put back.
 void StandModelsSetParts(PPCContext& ctx, uint8_t* base);
 void StandModelsSetAeroSet(PPCContext& ctx, uint8_t* base);
+// The setters the tuning screen's never-seen paths reach, without adapters
+// (only its plain C++ reaches them; the harness's; lr put back):
+// GarageStage::SetChoice sub_82179310 (r3 the holder, r4 a choice, r5, r6),
+// SetAero2 sub_821794A8 and SetDoorKind sub_821794F8 (r4 a word; with
+// --native_vehicle_accessors and --native_scene_models, else the originals),
+// SetAccessory sub_821792B0 (r4, r5), SceneModel::ApplyInterior
+// sub_820D9F40 (r3 a scene model), SceneInterior::SetRecord sub_820E38E0
+// (r3 an interior, r4 a record), GarageStage::SetWheelExtras sub_821790D0
+// (r3 the holder, r4, r5), SceneWheels::SetWord68 sub_820E7410 and
+// SetCaliperTexture sub_820E7428 (r3 a wheels object, r4 a word; the load
+// poll's plain C++ with its flags, else Wheels::SetRecord's adapter and
+// SetCaliperTexture's original).
+void StandModelsSetChoice(PPCContext& ctx, uint8_t* base);
+void StandModelsSetAero2(PPCContext& ctx, uint8_t* base);
+void StandModelsSetDoorKind(PPCContext& ctx, uint8_t* base);
+void StandModelsSetAccessory(PPCContext& ctx, uint8_t* base);
+void StandModelsApplyInterior(PPCContext& ctx, uint8_t* base);
+void StandModelsSceneInteriorSetRecord(PPCContext& ctx, uint8_t* base);
+void StandModelsSetWheelExtras(PPCContext& ctx, uint8_t* base);
+void StandModelsSetWord68(PPCContext& ctx, uint8_t* base);
+void StandModelsSceneSetCaliperTexture(PPCContext& ctx, uint8_t* base);
+// The load poll's calls when its flags are on (as ApplyWheelPaint's
+// callers pass them), else null.
+load_poll::Calls* StandModelsPoll(load_poll::Calls& poll);
 // SceneParts::LightValue sub_820DF1A0 (r3 the parts' point block; f1).
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base);
 

@@ -150,6 +150,56 @@ uint64_t SetParts(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_
 uint64_t SetAeroSet(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_t set,
                     uint32_t fallback5, uint32_t fallback6, uint32_t stack);
 
+// --- The setters the tuning screen's never-seen paths reach
+// (src/stand_models/setters.cpp) ---
+
+// sub_82179310 GarageStage::SetChoice: the stage's model's choice `choice`
+// (+3812 + 12 x choice, wrapping, unchecked) = 1, its +4 = `a`, +8 = `b`;
+// then SceneModel::ApplyRecord. 112-byte frame; its r3.
+uint64_t SetChoice(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t choice,
+                   uint32_t a, uint32_t b, uint32_t stack);
+// sub_821794A8 GarageStage::SetAero2 (+3732) and sub_821794F8 SetDoorKind
+// (+3736): the stage's model's word = `word`, then SceneModel::ApplyRecord.
+// 96-byte frames; its r3.
+uint64_t SetAero2(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                  uint32_t stack);
+uint64_t SetDoorKind(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                     uint32_t stack);
+// sub_820E38E0 SceneInterior::SetRecord: memcpy(interior + 40, record, 120),
+// then memcpy([interior + 36] + 28, record, 120) (natively where
+// Buffers_Memcpy takes them, else the original's through `call`). 112-byte
+// frame; the second memcpy's r3 (its destination).
+uint64_t SceneInteriorSetRecord(uint8_t* base, const GuestCall& call, uint32_t interior,
+                                uint32_t record, uint32_t stack);
+// sub_820D9F40 SceneModel::ApplyInterior: SceneInterior::SetRecord([model +
+// 5068], model + 3804) (a tail call from `stack`); its r3.
+uint64_t SceneModelApplyInterior(uint8_t* base, const GuestCall& call, uint32_t model,
+                                 uint32_t stack);
+// sub_821792B0 GarageStage::SetAccessory: the stage's model +3916 = `a`,
+// +3920 = `b`, then ApplyInterior. 112-byte frame; its r3.
+uint64_t SetAccessory(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t a,
+                      uint32_t b, uint32_t stack);
+// sub_820E7410 SceneWheels::SetWord68: a pool 5 wheels object: +100 =
+// `word` ([+28] loaded first), then Wheels::SetRecord([+28], +32) (a tail
+// call from `stack`, `lr` its caller's return address): with `poll` (the
+// load poll's flags on) its plain C++, else its adapter through `call`.
+// Its r3.
+uint64_t SceneWheelsSetWord68(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                              uint32_t wheels, uint32_t word, uint32_t stack, uint32_t lr);
+// sub_820E7428 SceneWheels::SetCaliperTexture: +120 = `texture`, then
+// Wheels::SetRecord([+28], +32) and Wheels::SetCaliperTexture([+28]) (each
+// [+28] loaded again; their plain C++ with `poll`, else through `call`).
+// 96-byte frame; the last's r3.
+uint64_t SceneWheelsSetCaliperTexture(uint8_t* base, const GuestCall& call,
+                                      load_poll::Calls* poll, uint32_t wheels,
+                                      uint32_t texture, uint32_t stack);
+// sub_821790D0 GarageStage::SetWheelExtras: the stage's model +4136 = `a`,
+// +4156 = `b`; SceneWheels::SetWord68([+5100], a), then
+// SceneWheels::SetCaliperTexture([+5100], [+4156]). 112-byte frame; the
+// last's r3.
+uint64_t SetWheelExtras(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                        uint32_t holder, uint32_t a, uint32_t b, uint32_t stack);
+
 // --- The tire grades (src/stand_models/setters.cpp) ---
 
 // sub_820D8F18 Wheels::SetTireTextures: PartModel::SetTexture (through

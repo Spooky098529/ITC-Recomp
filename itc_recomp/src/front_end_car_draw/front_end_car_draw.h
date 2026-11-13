@@ -135,6 +135,11 @@ uint64_t SceneModelApplyLightKit(uint8_t* base, const Calls& calls, uint32_t mod
 uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t holder,
                                 uint32_t group, uint32_t word, uint32_t index, double f1,
                                 double f2, double f3, uint32_t stack);
+// sub_821795E0 GarageStage::ClearLightKit: the light kit's group `group`'s
+// word (0 +4228, 1 +4244, 2 +4260, 3 all three; signed, none for others) =
+// 0, then ApplyLightKit from its 96-byte frame (its r3; f1 left).
+uint64_t GarageStageClearLightKit(uint8_t* base, const Calls& calls, uint32_t holder,
+                                  uint32_t group, uint32_t stack);
 // sub_820C8480 Floor::Draw: with `word` set and the scene's +4 0, the
 // matrix's last row (0, 0, 0, 1) (built at its 144-byte frame's +80) and
 // each shape of the part model at scene + 4160 drawn

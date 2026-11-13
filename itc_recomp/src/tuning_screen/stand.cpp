@@ -621,18 +621,14 @@ uint64_t DecalCommand(uint8_t* base, const StandCalls& stand, uint32_t screen, u
 namespace {
 
 constexpr uint32_t kSetCaliper = 0x821DA330;     // TuningScreen::SetCaliper
-constexpr uint32_t kSetChoice = 0x82179310;      // GarageStage::SetChoice
 constexpr uint32_t kRefitAxles = 0x821DF9D0;     // TuningScreen::RefitAxles
-constexpr uint32_t kSetAero2 = 0x821794A8;       // GarageStage::SetAero2
-constexpr uint32_t kSetDoorKind = 0x821794F8;    // GarageStage::SetDoorKind
 constexpr uint32_t kSetAccessory = 0x821CCBE8;   // TuningScreen::SetAccessory
-constexpr uint32_t kClearLightKit = 0x821795E0;  // GarageStage::ClearLightKit
 
 // The choice tables both write: A = (3, 2, 1, 0) at `a`, B = (2, 1, 0, 4, 3)
 // at `b`. Choice `k` from the word `v`: -1 GarageStage::ClearChoice, else
 // GarageStage::SetChoice(holder, k, A[v / 10], B[v % 10]) (signed, the
-// indexes unchecked: read as the original reads them) through the guest
-// with `lr`. Returns its r3.
+// indexes unchecked: read as the original reads them), its plain C++ (`lr`
+// the call's return address in the original). Returns its r3.
 uint64_t ApplyChoice(uint8_t* base, const GuestCall& call, uint32_t frame, uint32_t a,
                      uint32_t b, uint32_t k, uint32_t v, uint32_t lr) {
   if (int32_t(v) == -1) {
@@ -642,7 +638,8 @@ uint64_t ApplyChoice(uint8_t* base, const GuestCall& call, uint32_t frame, uint3
   const uint32_t d = v - uint32_t(q) * 10;
   const uint32_t first = Load(base, uint32_t(q) * 4 + a);
   const uint32_t second = Load(base, d * 4 + b);
-  return call(kSetChoice, {Holder(base), k, first, second}, frame, lr);
+  (void)lr;
+  return stand_models::SetChoice(base, call, Holder(base), k, first, second, frame);
 }
 
 }  // namespace
@@ -829,9 +826,9 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
   } else if (m == 5) {
     const int32_t p = int32_t(u8(kItem));
     if (p == 1) {
-      guest(kSetDoorKind, {Holder(base), u8(kOption)}, 0x821E0D00);
+      r3 = stand_models::SetDoorKind(base, call, Holder(base), u8(kOption), frame);
     } else if (p == 2) {
-      guest(kSetAero2, {Holder(base), u8(kType)}, 0x821E0CEC);
+      r3 = stand_models::SetAero2(base, call, Holder(base), u8(kType), frame);
     }
   } else if (m == 6) {
     const uint32_t p = u8(kItem);
@@ -878,22 +875,13 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
     r3 = call(function, args, frame, lr);
     f1->reset();  // as the guest call left it
   };
-  // A guest call with f1 to f3 (`count` of them), or with f1 as it is now
-  // (the value a native callee left it, when there is one).
-  auto with_floats = [&](uint32_t function, uint64_t r4, const double* floats, int count,
-                         uint32_t lr) {
-    const uint64_t regs[2] = {Holder(base), r4};
-    double now = 0.0;
-    if (count == 0 && f1->has_value()) {
-      now = **f1;
-      floats = &now;
-      count = 1;
-    }
-    double left = 0.0;
-    r3 = stand.calls.call(function, regs, 2, floats, count, frame, lr, &left);
-    *f1 = left;
-  };
   auto refit = [&](uint32_t lr) { guest(kRefitAxles, {screen}, lr); };
+  // GarageStage::ClearLightKit's plain C++ (f1 left as it is: neither it nor
+  // SceneModel::ApplyLightKit changes it).
+  auto clear_kit = [&](uint32_t group) {
+    r3 = front_end_car_draw::GarageStageClearLightKit(base, stand.calls, Holder(base), group,
+                                                      frame);
+  };
   // GarageStage::SetColor's plain C++ (ApplyPaint's and ApplyWheelPaint's
   // with the load poll's calls); f1 left as given (neither paint changes
   // it).
@@ -947,9 +935,6 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
     }
     const uint32_t v = at(33816);
     r3 = ApplyChoice(base, call, frame, a, b, k, v, 0x821E1ACC);
-    if (int32_t(v) != -1) {
-      f1->reset();
-    }
   } else if (m == 3) {
     if (p < 3) {
       // T = (0, 1, 1, 2, 2) at frame + 128, indexed unchecked.
@@ -1041,9 +1026,9 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
       }
       Store(base, s + 25244, 1);
     } else if (p == 1) {
-      guest(kSetDoorKind, {Holder(base), at(36612)}, 0x821E18BC);
+      r3 = stand_models::SetDoorKind(base, call, Holder(base), at(36612), frame);
     } else if (p == 2) {
-      guest(kSetAero2, {Holder(base), at(36636)}, 0x821E189C);
+      r3 = stand_models::SetAero2(base, call, Holder(base), at(36636), frame);
     } else if (p == 4) {
       // The paint: colors 0 and 1 from the halfword-sized fields as ints,
       // their conversions' doublewords at +88, +96 and +112.
@@ -1122,7 +1107,7 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
           } else if (int32_t(at(30660 + 4 * g)) != 0) {
             second(g);
           } else {
-            with_floats(kClearLightKit, g, nullptr, 0, 0x821E1634);
+            clear_kit(g);
           }
         }
       } else if (x == 1) {
@@ -1132,11 +1117,11 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
           } else if (int32_t(at(30580 + 4 * g)) != 0) {
             first(g, true);
           } else {
-            with_floats(kClearLightKit, g, nullptr, 0, 0x821E1718);
+            clear_kit(g);
           }
         }
       } else {
-        with_floats(kClearLightKit, at(30492), nullptr, 0, 0x821E1740);
+        clear_kit(at(30492));
       }
     }
   } else if (m == 6) {
@@ -1177,9 +1162,6 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
         }
         const uint32_t v = Load(base, (c + 8450) * 4 + s);
         r3 = ApplyChoice(base, call, frame, frame + 112, frame + 128, k, v, 0x821E1ACC);
-        if (int32_t(v) != -1) {
-          f1->reset();
-        }
       }
     }
   }

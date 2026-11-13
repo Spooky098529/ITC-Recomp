@@ -52,7 +52,12 @@ ITC_FLAG_BOOL(native_stand_models, true, "ITC",
               "GarageStage::SetSticker sub_8217B3D8 and SetDecalWord sub_821793D0 (no adapters: "
               "its native ApplyAreaDecals and ApplyDecalWord call them); the parts, GarageStage::SetParts "
               "sub_821797A8 and SetAeroSet sub_8217DBC0 (no adapters: the tuning screen's native "
-              "PreviewParts calls them; SetAeroSet with --native_car_specs) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models). "
+              "PreviewParts calls them; SetAeroSet with --native_car_specs); the setters the tuning screen's "
+              "never-seen paths reach, GarageStage::SetChoice sub_82179310, SetAero2 sub_821794A8, "
+              "SetDoorKind sub_821794F8, SetAccessory sub_821792B0 (with SceneModel::ApplyInterior "
+              "sub_820D9F40 and SceneInterior::SetRecord sub_820E38E0) and SetWheelExtras "
+              "sub_821790D0 (with SceneWheels::SetWord68 sub_820E7410 and SetCaliperTexture "
+              "sub_820E7428) (no adapters) natively instead of through the translated code (the same writes; checked by --run_harnesses=stand_models). "
               "Since 2026-11-13 only MakeModel keeps an adapter: the others are reached from the "
               "tuning screen's plain C++, which the tuning screen's flags (this one among them) "
               "switch");
@@ -428,6 +433,78 @@ void StandModelsSetAeroSet(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void StandModelsSetChoice(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r6 = ctx.r6.u32;
+  Reapplying(ctx, base, __imp__sub_82179310, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t r5, uint32_t stack) {
+    return sm::SetChoice(base, call, holder, r4, r5, r6, stack);
+  });
+}
+
+void StandModelsSetAero2(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_821794A8, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t, uint32_t stack) {
+    return sm::SetAero2(base, call, holder, r4, stack);
+  });
+}
+
+void StandModelsSetDoorKind(PPCContext& ctx, uint8_t* base) {
+  Reapplying(ctx, base, __imp__sub_821794F8, [&](const sm::GuestCall& call, uint32_t holder,
+                                                uint32_t r4, uint32_t, uint32_t stack) {
+    return sm::SetDoorKind(base, call, holder, r4, stack);
+  });
+}
+
+void StandModelsSetAccessory(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SetAccessory(base, call, r3, r4, r5, stack);
+  });
+}
+
+void StandModelsApplyInterior(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SceneModelApplyInterior(base, call, r3, stack);
+  });
+}
+
+void StandModelsSceneInteriorSetRecord(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SceneInteriorSetRecord(base, call, r3, r4, stack);
+  });
+}
+
+load_poll::Calls* StandModelsPoll(load_poll::Calls& poll) {
+  return ApplyWheelPaintNative() ? &poll : nullptr;
+}
+
+void StandModelsSetWheelExtras(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SetWheelExtras(base, call, StandModelsPoll(poll), r3, r4, r5, stack);
+  });
+}
+
+void StandModelsSetWord68(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
+  const uint32_t lr = uint32_t(ctx.lr);
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SceneWheelsSetWord68(base, call, StandModelsPoll(poll), r3, r4, stack, lr);
+  });
+}
+
+void StandModelsSceneSetCaliperTexture(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  WithCalls(ctx, base, [&](const sm::GuestCall& call) {
+    return sm::SceneWheelsSetCaliperTexture(base, call, StandModelsPoll(poll), r3, r4, stack);
+  });
+}
+
 void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
@@ -485,6 +562,14 @@ ITC_STAND_MODELS(8217FCB0, StandModelsMakeModel)
 // GarageStage::SetParts sub_821797A8 and SetAeroSet sub_8217DBC0 have none:
 // only the tuning screen's PreviewParts reaches them, and its plain C++
 // calls theirs (their register steps above are the harness's).
+// GarageStage::SetChoice sub_82179310, SetAero2 sub_821794A8, SetDoorKind
+// sub_821794F8, SetAccessory sub_821792B0 (with SceneModel::ApplyInterior
+// sub_820D9F40 and SceneInterior::SetRecord sub_820E38E0), SetWheelExtras
+// sub_821790D0 (with SceneWheels::SetWord68 sub_820E7410 and
+// SetCaliperTexture sub_820E7428) have none: never seen in play, reached
+// only from the tuning screen's plain C++ (its PreviewItem, RestoreStand,
+// SetCaliper, SetAccessory and PreviewInteriorChoices; B7 loop, 2026-11-13);
+// their register steps above are the harness's.
 // SceneParts::LightValue sub_820DF1A0 has none: only SetLightsOn calls it,
 // and its plain C++ calls LightValue's (its register step above is the
 // harness's).

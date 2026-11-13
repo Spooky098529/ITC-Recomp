@@ -690,6 +690,26 @@ void LightKit(Context& h, uint32_t block, Random& r) {
     }
     results.Report();
   }
+  {
+    // GarageStage::ClearLightKit: the group -1 to 4, or any word now and
+    // then; the top 16 bytes of its 96-byte frame its r31 and lr saves.
+    Results results("GarageStage::ClearLightKit (sub_821795E0)");
+    for (int c = 0; c < 48; c++) {
+      World w{block};
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            LayKit(h.base, w, r);
+            t.r3.u64 = w.holder();
+            t.r4.u64 = r.Below(8) == 0 ? r.Next() : uint64_t(int64_t(r.Below(6)) - 1);
+            t.f1.f64 = double(std::bit_cast<float>(RandomFloat(r)));
+          },
+          __imp__sub_821795E0, hooks::FrontEndCarDrawClearLightKit, 16, KitFloats(w),
+          fmt::format("case {}", c), nullptr, GetBSaves(h, {96}));
+    }
+    results.Report();
+  }
 }
 
 // GarageStage::SetLights: the stage's lights (stage + 4512, 1,088 bytes)
