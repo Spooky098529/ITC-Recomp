@@ -21,14 +21,18 @@
 // call's r3 and r4 show, except slot 20, called with the r4 SetArrows
 // leaves, which SetIcons doesn't read; sub_82090780, which answers r3's
 // +80; slot 4 Type6ListScreen::ItemInfo or NodeScreen::ItemInfo, so the info
-// LoadItem reads is written), a fake sound manager, the screen fades' words
-// (counts 0 or small), the page and step tables' .data words (each guard's
+// LoadItem reads is written; slots 1, 2, 20, 21 and 22, and 15 where the
+// lists' item blocks are 0 or pages, sometimes Type6NodeScreen's own: the
+// native side runs them as plain C++), a fake sound manager, the screen
+// fades' words (counts 0 or small), the page and step tables' .data words (each guard's
 // bit 0 clear, the table random, or set with the table holding its
 // entries), and player 0's save data pointed so that its course records
 // (+0x1D52C) are a block of ours: 22 records of random words with their
 // entry chains (+44 the first node, +48 the count, 0 to 10) in range.
-// UiMovie::Run's update (sub_8211D2F8) and ApplyAnimation (sub_825A08E0)
-// are stood in for, recorded and answered from the case's generator.
+// Movie 15 (the id Type6NodeScreen's icons, scroll text and marks find)
+// must not be in the movie table either. UiMovie::Run's update
+// (sub_8211D2F8) and ApplyAnimation (sub_825A08E0) are stood in for,
+// recorded and answered from the case's generator.
 // Compared exactly (the cursor's child +16 is an integer's conversion,
 // never a NaN): the recorded calls, the block, the records, the movie
 // world, the globals (the tables and guards among them), the stack below
@@ -139,7 +143,12 @@ enum class Kind {
   kRelease,   // item blocks 0 or pages
   kRecords,   // r4 a course (0 to 10), r5 the traffic (0 or 1)
   kArrows,    // r4 0 or 1 (any word sometimes), r5 0, 1 or any word
+  kInit,      // item blocks 0 or pages, the new ones compared and freed
+  kDispatcher,  // r4 the dispatcher
+  kIndex,     // r4 0 to 9
 };
+
+bool Inits(Kind kind) { return kind == Kind::kInit; }
 
 // The stack ranges left out, as [sp - from, sp - to).
 using Ranges = std::vector<std::pair<uint32_t, uint32_t>>;
@@ -263,7 +272,7 @@ void LayBlock(uint8_t* base, uint32_t block, uint32_t records, Random& r, Kind k
     guest::StoreU32(base, list + rs::kListMove, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
     guest::StoreU32(base, list + rs::kListWrapped, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
     uint32_t items = block + kItemsAt + 0x40 * k;
-    if (kind == Kind::kNoDelete || kind == Kind::kRelease) {
+    if (kind == Kind::kNoDelete || kind == Kind::kRelease || Inits(kind)) {
       items = 0;
       if (r.Below(4) != 0) {
         items = memory::AllocPages(16, 4096);
@@ -303,6 +312,18 @@ void LayBlock(uint8_t* base, uint32_t block, uint32_t records, Random& r, Kind k
   }
   guest::StoreU32(base, vtable + 16, Pick(r, {0x82237008, 0x82259998}));
   guest::StoreU32(base, vtable + 80, Pick(r, {kEmpty, kGetter}));
+  // Type6NodeScreen's own slots the node screen calls, or a stand-in: 1
+  // (NodeScreen::SetUpTexts), 2 (SetText), 20 (SetIcons, which doesn't read
+  // r4), 21 (SetScrollText), 22 (ShowMarks); 15 (SetUpMenus) only where the
+  // lists' item blocks are 0 or pages (its MenuList::Init frees the old).
+  guest::StoreU32(base, vtable + 4, Pick(r, {0x82247FE0, kEmpty, kSetR4, kGetter}));
+  guest::StoreU32(base, vtable + 8, Pick(r, {0x822370A0, kEmpty, kSetR4, kGetter}));
+  guest::StoreU32(base, vtable + 80, Pick(r, {0x82237160, kEmpty, kGetter}));
+  guest::StoreU32(base, vtable + 84, Pick(r, {0x82237228, kEmpty, kSetR4, kGetter}));
+  guest::StoreU32(base, vtable + 88, Pick(r, {0x822372A0, kEmpty, kSetR4, kGetter}));
+  if (Inits(kind)) {
+    guest::StoreU32(base, vtable + 60, Pick(r, {0x82236F00, kEmpty, kSetR4, kGetter}));
+  }
   // The screen fades: counts 0 mostly.
   lw::WorldRandom(base, kFades, kFadesBytes, r);
   for (const uint32_t at : {mode_tick::kFadeInCounts, mode_tick::kFadeOutCounts}) {
@@ -345,6 +366,12 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, uint32_t records,
         t.r4.u64 = r.Below(11);
         t.r5.u64 = r.Below(2);
       }
+      if (f.kind == Kind::kDispatcher) t.r4.u64 = block + kDispatcherAt;
+      if (f.kind == Kind::kIndex) t.r4.u64 = r.Below(10);
+      std::vector<uint32_t> old_items;
+      for (const uint32_t at : kLists) {
+        old_items.push_back(guest::LoadU32(base, block + at + rs::kListBlock));
+      }
       if (f.kind == Kind::kArrows) {
         t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
         t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
@@ -371,6 +398,20 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, uint32_t records,
                                     uint32_t(call.r3 >> 32), uint32_t(call.r4),
                                     uint32_t(call.r4 >> 32)}) {
           out[v].Word(word);
+        }
+      }
+      // MenuList::Init's new item blocks: compared (whether one was made,
+      // its words) and freed, their words in the lists replaced.
+      if (Inits(f.kind)) {
+        for (uint32_t k = 0; k < 2; k++) {
+          const uint32_t list = block + kLists[k];
+          const uint32_t now = guest::LoadU32(base, list + rs::kListBlock);
+          out[v].Word(now == old_items[k] ? 1 : 0);
+          if (now != 0 && now != old_items[k] && memory::IsPages(now)) {
+            out[v].Bytes(Read(base, now, 4 * guest::LoadU32(base, list + rs::kListCount)));
+            memory::FreePages(now);
+            guest::StoreU32(base, list + rs::kListBlock, 0xB10C0000 + k);
+          }
         }
       }
       // The item blocks the destructors free: whether still the layer's.
@@ -404,10 +445,10 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, uint32_t records,
 // The deleting destructor with bit 0 of r4 set: a block of operator new's
 // (its lists' item blocks 0) destroyed and deleted, compared by r3 and
 // whether operator new hands the block out again.
-void Deleting(Context& h) {
+void Deleting(Context& h, const char* name, uint32_t kAddress, GuestFunction recompiled,
+              GuestFunction native) {
   uint8_t* const base = h.base;
-  constexpr uint32_t kAddress = 0x8225A168;
-  Results results(fmt::format("NodeScreen::DeletingDestructor, deleting (sub_{:08X})", kAddress));
+  Results results(fmt::format("{}, deleting (sub_{:08X})", name, kAddress));
   for (int c = 0; c < 4; c++) {
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
@@ -427,10 +468,10 @@ void Deleting(Context& h) {
       t.lr = 0x82000000 + 4 * r.Below(1024);
       if (v == 0) {
         ITC_FLAG(native_type67_screens) = false;
-        __imp__sub_8225A168(t, base);
+        recompiled(t, base);
         ITC_FLAG(native_type67_screens) = true;
       } else {
-        hooks::NodeScreenDeletingDestruct(t, base);
+        native(t, base);
       }
       out[v].Word(t.r3.u32 == *object ? 1 : 0);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -447,7 +488,8 @@ void Deleting(Context& h) {
 
 void Type67NodeScreen(Context& h) {
   uint8_t* const base = h.base;
-  for (const uint32_t id : {16u, 17u, 18u, 19u}) {
+  // 15: Type6NodeScreen's slots that find movie 15 itself.
+  for (const uint32_t id : {15u, 16u, 17u, 18u, 19u}) {
     if (ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id) != kMissingMovie) {
       ITC_LOG_ERROR(
           "harness: type67_screens: movie {} is in the table; the node screen skipped", id);
@@ -490,37 +532,61 @@ void Type67NodeScreen(Context& h) {
       {"NodeScreen::OnToggleMoved", 0x82259B70, 8, K::kAny, saves({{40, 0}, {168, 128}}),
        __imp__sub_82259B70, hooks::NodeScreenOnToggleMoved},
       {"NodeScreen::Refresh", 0x822599B0, 8, K::kAny,
-       saves({{24, 0}, {168, 112}, {224, 192}, {312, 272}}), __imp__sub_822599B0,
+       saves({{24, 0}, {188, 112}, {224, 192}, {312, 272}}), __imp__sub_822599B0,
        hooks::NodeScreenRefresh},
-      {"NodeScreen::Show", 0x82259CA0, 8, K::kAny,
-       saves({{32, 0}, {80, 48}, {152, 128}, {296, 240}, {352, 320}, {440, 400}}),
+      {"NodeScreen::Show", 0x82259CA0, 8, K::kInit,
+       saves({{32, 0}, {80, 48}, {176, 128}, {320, 240}, {380, 320}, {468, 400}}),
        __imp__sub_82259CA0, hooks::NodeScreenShow},
       {"NodeScreen::Page2", 0x82259D80, 12, K::kAny,
        saves({{32, 0}, {168, 112}, {224, 192}, {280, 240}, {312, 272}}), __imp__sub_82259D80,
        hooks::NodeScreenPage2},
       {"NodeScreen::Step0", 0x82259EC0, 8, K::kAny,
-       saves({{32, 0}, {160, 128}, {328, 256}}), __imp__sub_82259EC0,
+       saves({{32, 0}, {172, 128}, {328, 256}}), __imp__sub_82259EC0,
        hooks::NodeScreenStep0},
       {"NodeScreen::Step1", 0x82259680, 6, K::kAny, saves({{24, 0}}), __imp__sub_82259680,
        hooks::NodeScreenStep1},
       {"NodeScreen::Step2", 0x82259750, 8, K::kAny,
-       saves({{80, 0}, {208, 176}, {376, 304}}), __imp__sub_82259750,
+       saves({{80, 0}, {208, 176}, {236, 224}, {376, 304}}), __imp__sub_82259750,
        hooks::NodeScreenStep2},
       {"NodeScreen::Draw", 0x8225A1B8, 10, K::kAny,
        saves({{24, 0}, {192, 160}, {328, 272}, {384, 352}, {472, 400}}), __imp__sub_8225A1B8,
        hooks::NodeScreenDraw},
       {"NodeScreen::Update", 0x8225A2C0, 10, K::kAny,
-       saves({{32, 0}, {224, 144}, {352, 272}, {520, 400}}), __imp__sub_8225A2C0,
+       saves({{32, 0}, {224, 144}, {352, 272}, {380, 368}, {520, 400}}), __imp__sub_8225A2C0,
        hooks::NodeScreenUpdate},
       {"NodeScreen::~NodeScreen", 0x82259948, 6, K::kRelease, saves({{16, 0}}),
        __imp__sub_82259948, hooks::NodeScreenDestruct},
       {"NodeScreen::DeletingDestructor", 0x8225A168, 4, K::kNoDelete,
        saves({{24, 0}, {128, 112}}), __imp__sub_8225A168, hooks::NodeScreenDeletingDestruct},
+      {"Type6NodeScreen::SetUpMenus", 0x82236F00, 12, K::kInit,
+       saves({{48, 0}, {208, 144}, {256, 192}, {344, 304}}),
+       __imp__sub_82236F00, hooks::Type6NodeScreenSetUpMenus},
+      {"Type6NodeScreen::SetText", 0x822370A0, 8, K::kIndex, saves({{32, 0}, {80, 48}}),
+       __imp__sub_822370A0, hooks::Type6NodeScreenSetText},
+      {"Type6NodeScreen::Back", 0x82237110, 4, K::kDispatcher, {}, __imp__sub_82237110,
+       hooks::Type6NodeScreenBack},
+      {"Type6NodeScreen::SetIcons", 0x82237160, 6, K::kAny, saves({{16, 0}, {136, 112}}),
+       __imp__sub_82237160, hooks::Type6NodeScreenSetIcons},
+      {"Type6NodeScreen::SetScrollText", 0x82237228, 6, K::kAny, saves({{16, 0}, {64, 32}}),
+       __imp__sub_82237228, hooks::Type6NodeScreenSetScrollText},
+      {"Type6NodeScreen::ShowMarks", 0x822372A0, 8, K::kIndex, saves({{32, 0}}),
+       __imp__sub_822372A0, hooks::Type6NodeScreenShowMarks},
+      {"NodeScreen::SetUpTexts", 0x82247FE0, 12, K::kAny,
+       saves({{40, 0}, {80, 48}, {144, 128}}), __imp__sub_82247FE0,
+       hooks::NodeScreenSetUpTexts},
+      {"Type6NodeScreen::~Type6NodeScreen", 0x82236EA0, 6, K::kRelease, saves({{16, 0}}),
+       __imp__sub_82236EA0, hooks::Type6NodeScreenDestruct},
+      {"Type6NodeScreen::DeletingDestructor", 0x82237048, 4, K::kNoDelete,
+       saves({{24, 0}, {128, 112}}), __imp__sub_82237048,
+       hooks::Type6NodeScreenDeletingDestruct},
   };
   for (const Function& f : functions) {
     Run(h, w, block, records, f);
   }
-  Deleting(h);
+  Deleting(h, "NodeScreen::DeletingDestructor", 0x8225A168, __imp__sub_8225A168,
+           hooks::NodeScreenDeletingDestruct);
+  Deleting(h, "Type6NodeScreen::DeletingDestructor", 0x82237048, __imp__sub_82237048,
+           hooks::Type6NodeScreenDeletingDestruct);
   memory::Free(block);
   memory::Free(records);
   saved.Restore();

@@ -143,6 +143,16 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return NodeScreenStep1(base, r3, sp, calls);
     case 0x82259750:
       return NodeScreenStep2(base, r3, sp, calls);
+    // Type6NodeScreen's slots that set r4 before reading it (or don't read
+    // it): SetUpMenus, SetIcons, SetScrollText, and NodeScreen::SetUpTexts.
+    case 0x82236F00:
+      return Type6NodeScreenSetUpMenus(base, r3, sp, calls);
+    case 0x82237160:
+      return Type6NodeScreenSetIcons(base, sp);
+    case 0x82237228:
+      return Type6NodeScreenSetScrollText(base, sp, calls);
+    case 0x82247FE0:
+      return NodeScreenSetUpTexts(base, r3, sp, calls);
     default:
       break;
   }
@@ -228,6 +238,14 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return NodeScreenPage5(base, r3, *r4, sp, calls);
       case 0x8225A168:
         return NodeScreenDeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x822370A0:
+        return Type6NodeScreenSetText(base, r3, *r4, sp, calls);
+      case 0x822372A0:
+        return Type6NodeScreenShowMarks(base, *r4, sp);
+      case 0x82237110:
+        return Type6NodeScreenBack(base, r3, *r4);
+      case 0x82237048:
+        return Type6NodeScreenDeletingDestruct(base, r3, *r4, sp, calls);
       default:
         break;
     }
@@ -329,7 +347,16 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82242FC8:
     case 0x82259328:
     case 0x8225A168:
+    case 0x822370A0:
+    case 0x822372A0:
+    case 0x82237110:
+    case 0x82237048:
       return has_r4;
+    case 0x82236F00:
+    case 0x82237160:
+    case 0x82237228:
+    case 0x82247FE0:
+      return true;
     case 0x82243018:
     case 0x82243588:
       return true;

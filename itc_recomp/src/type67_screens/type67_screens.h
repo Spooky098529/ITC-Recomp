@@ -968,4 +968,43 @@ uint64_t NodeScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls
 uint64_t NodeScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
                                     const Calls& calls);
 
+// --- The type 6 node screen's own slots and destructors (type6_node.cpp) ---
+
+constexpr uint32_t kType6NodeScreenVtable = 0x82010A80;
+
+// sub_82236F00 Type6NodeScreen::SetUpMenus (slot 15; r4 not read):
+// MenuList::Init on +10132 (8, 6) and +10204 (2, 2), +10204's selection 1,
+// slot 2 (SetText) with r4 = 0, NodeScreen::LoadItem, then
+// NodeScreen::ShowRecords([+10136] + +10132's selection, +10204's).
+uint64_t Type6NodeScreenSetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822370A0 Type6NodeScreen::SetText (slot 2): UiMovie::SetText(m, 5,
+// 5 + i, [0x826366FC + 4 × (r4 + i)]) for i 0 to 6.
+uint64_t Type6NodeScreenSetText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                const Calls& calls);
+// sub_82237110 Type6NodeScreen::Back (slot 6, r4 the dispatcher): message 6
+// posted. A leaf; r3 left.
+uint64_t Type6NodeScreenBack(uint8_t* base, uint64_t r3, uint64_t r4);
+// sub_82237160 Type6NodeScreen::SetIcons (slot 20; r3 and r4 not read):
+// movie 15's (2, 4) and (2, 5) textures 0 and 1, (2, 6 to 9, 13, 14)
+// hidden. The last node.
+uint64_t Type6NodeScreenSetIcons(uint8_t* base, uint32_t sp);
+// sub_82237228 Type6NodeScreen::SetScrollText (slot 21; r3 and r4 not
+// read): movie 15's (1, 0): sub_8211C5F8, SetText 934, ScrollText 1.
+uint64_t Type6NodeScreenSetScrollText(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_822372A0 Type6NodeScreen::ShowMarks (slot 22): movie 15's nodes 13
+// and 14 shown by r4 != 0 and r4 != 2. The second node.
+uint64_t Type6NodeScreenShowMarks(uint8_t* base, uint64_t r4, uint32_t sp);
+// sub_82247FE0 NodeScreen::SetUpTexts (slot 1 of NodeScreen and
+// PairedNodeTable; r3 the node table): the table's nodes hidden, the texts
+// 402, 401, 407, 408 set at +424 to +427 when +424 is set.
+uint64_t NodeScreenSetUpTexts(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82236EA0 Type6NodeScreen::~Type6NodeScreen: +0 = 0x82010A80, a tail
+// call of ~NodeScreen.
+uint64_t Type6NodeScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82237048 Type6NodeScreen::DeletingDestructor (slot 0): +0 =
+// 0x82010A80, ~NodeScreen, operator delete when bit 0 of `flags` is set.
+// r3.
+uint64_t Type6NodeScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                         const Calls& calls);
+
 }  // namespace type67_screens

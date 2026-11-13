@@ -122,7 +122,11 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "sub_82259750, ShowSelection sub_82259A78, OnToggleMoved sub_82259B70, Refresh "
               "sub_822599B0, ShowRecords sub_82259410 (SaveData::Of's and CourseRecords::Of's "
               "plain C++), SetArrows sub_82259368, LoadItem sub_82259050, ~NodeScreen "
-              "sub_82259948 and DeletingDestructor sub_8225A168 natively instead of "
+              "sub_82259948 and DeletingDestructor sub_8225A168; the type 6 node screen's "
+              "Type6NodeScreen::SetUpMenus sub_82236F00, SetText sub_822370A0, Back "
+              "sub_82237110, SetIcons sub_82237160, SetScrollText sub_82237228, ShowMarks "
+              "sub_822372A0, ~Type6NodeScreen sub_82236EA0 and DeletingDestructor "
+              "sub_82237048, NodeScreen::SetUpTexts sub_82247FE0 natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -524,6 +528,23 @@ ITC_TS_STEP(NodeScreenDestruct, ts::NodeScreenDestruct(base, ctx.r3.u64, ctx.r1.
 ITC_TS_STEP(NodeScreenDeletingDestruct,
             ts::NodeScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
+// The type 6 node screen's own slots and destructors.
+ITC_TS_STEP(Type6NodeScreenSetUpMenus,
+            ts::Type6NodeScreenSetUpMenus(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6NodeScreenSetText,
+            ts::Type6NodeScreenSetText(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6NodeScreenBack, ts::Type6NodeScreenBack(base, ctx.r3.u64, ctx.r4.u64))
+ITC_TS_STEP(Type6NodeScreenSetIcons, ts::Type6NodeScreenSetIcons(base, ctx.r1.u32))
+ITC_TS_STEP(Type6NodeScreenSetScrollText,
+            ts::Type6NodeScreenSetScrollText(base, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6NodeScreenShowMarks,
+            ts::Type6NodeScreenShowMarks(base, ctx.r4.u64, ctx.r1.u32))
+ITC_TS_STEP(NodeScreenSetUpTexts, ts::NodeScreenSetUpTexts(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6NodeScreenDestruct,
+            ts::Type6NodeScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6NodeScreenDeletingDestruct,
+            ts::Type6NodeScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -806,3 +827,13 @@ ITC_TYPE67_SCREENS(82259368, NodeScreenSetArrows)
 ITC_TYPE67_SCREENS(82259050, NodeScreenLoadItem)
 ITC_TYPE67_SCREENS(82259948, NodeScreenDestruct)
 ITC_TYPE67_SCREENS(8225A168, NodeScreenDeletingDestruct)
+// The type 6 node screen's own slots and destructors.
+ITC_TYPE67_SCREENS(82236F00, Type6NodeScreenSetUpMenus)
+ITC_TYPE67_SCREENS(822370A0, Type6NodeScreenSetText)
+ITC_TYPE67_SCREENS(82237110, Type6NodeScreenBack)
+ITC_TYPE67_SCREENS(82237160, Type6NodeScreenSetIcons)
+ITC_TYPE67_SCREENS(82237228, Type6NodeScreenSetScrollText)
+ITC_TYPE67_SCREENS(822372A0, Type6NodeScreenShowMarks)
+ITC_TYPE67_SCREENS(82247FE0, NodeScreenSetUpTexts)
+ITC_TYPE67_SCREENS(82236EA0, Type6NodeScreenDestruct)
+ITC_TYPE67_SCREENS(82237048, Type6NodeScreenDeletingDestruct)

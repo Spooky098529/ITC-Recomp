@@ -253,4 +253,15 @@ void NodeScreenLoadItem(PPCContext& ctx, uint8_t* base);
 void NodeScreenDestruct(PPCContext& ctx, uint8_t* base);
 void NodeScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
+// The type 6 node screen's own slots and destructors.
+void Type6NodeScreenSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenSetText(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenBack(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenSetIcons(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenSetScrollText(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenShowMarks(PPCContext& ctx, uint8_t* base);
+void NodeScreenSetUpTexts(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenDestruct(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -11,7 +11,7 @@
 // Accepted and Cancelled guest calls to their overrides; UiMovie::SetText
 // through Calls::set_text; the node table's Refresh and destructor by their
 // plain C++; the screen's slots through Slot and Slot5 (Type6NodeScreen's
-// own are recompiled: their guest calls), the tables' entries through
+// own, in type6_node.cpp, as plain C++), the tables' entries through
 // SlotNative where they hold one of ours.
 
 #include "type67_screens/list_pages.h"
