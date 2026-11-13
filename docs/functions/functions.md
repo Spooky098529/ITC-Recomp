@@ -348,8 +348,10 @@ Rows not yet moved stay in the table below. So far:
   over the app at `0x826BDC90` and the save devices' and users' slots it
   reaches (the slots' request setters and getters), and the front end's
   save layer: the save buffers, the game data's save and load and the
-  replays' list, save, load and delete, with the play time update (B7;
-  the save slots' steps stay in `files-and-saves.md`).
+  replays' list, save, load and delete, with the play time update; the
+  save devices' constructor and their slot handlers (the states
+  `SaveDevices::Update` runs, with their waits) (B7; the save slots'
+  B4 steps and the save and load steps stay in `files-and-saves.md`).
 - [`car-sounds.md`](car-sounds.md): the car sounds, the game's own
   sounds for each racer played straight through XAudio's voices (the
   engine's two layers, the tires, hits, wind, road noise, pass by and
