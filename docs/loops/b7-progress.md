@@ -130,7 +130,11 @@ file's history. What's left to see in a drive, from every run:
   `itc_5289` (race 49 s at 180, 0 errors, every harness 0 differing
   outside the expected groups), 26 of 26 harness lines, 1 print added
   (3d4fc53f); none ran in the race or the replay `itc_5290` (ok): 26 to
-  drive. Second migration agent running (the sticker commands).
+  drive. Second migration 662861e6..7fbeadd2: the sticker commands 32
+  to 51 (17 functions, `tuning-screen.md`) native, called by the
+  update's plain C++; the last 12 helper adapters removed (all 25
+  rows Native); every harness 0 differing, race 29 s at 40 (the
+  harnesses' time), 0 errors; no subagents. Validation agent running.
 
 ## Done
 

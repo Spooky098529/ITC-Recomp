@@ -104,6 +104,14 @@ When the user has reviewed a run's section, its heading gets
   flush-to-zero (`PlaceStickerNode` runs under it); 3 adapters removed
   by reading `generated/`'s call sites (the tool can't judge never-run
   functions).
+- Its second migration (662861e6..7fbeadd2): the tuning screen's sticker
+  commands 32 to 51 (17 rows in `tuning-screen.md`, read in full, Native,
+  under `--native_tuning_screen` with `--native_tuning_pages`); the 12
+  remaining helpers Native. The harness leaves out the varargs
+  parameter words and the helpers' register saves below each command's
+  frame (the native helpers don't write them); a planted fault in
+  `Command44` (a `FinishNamed` argument) went unnoticed, as finishing an
+  animation not playing changes nothing in the harness world.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
