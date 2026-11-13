@@ -11,7 +11,7 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-11-12 on `b7-loop-11-11-26` (the previous run's
   branch, kept by the user's call for this run), from 575b2b9a;
   summary `b7-loop-2026-11-12-0826.md`. Limit: 5 subsystems (the
-  user's call for this run).
+  user's call for this run), raised to 10 by the user on 2026-11-13.
 - First: the replay theater's check (the previous run's port
   49287852, unchecked: its harness, a race, `--native_type10_mode` on,
   the adapterless rows set to Native), a lead without mapping (it
