@@ -164,4 +164,31 @@ void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base);
 // sub_821C8578, Type4ControllerOptions::Init sub_821C8A60 by `address`.
 void OptionsInit(PPCContext& ctx, uint8_t* base, uint32_t address);
 
+// The load and save pages (docs/functions/options-load-save.md; behind
+// --native_options_load_save): LoadPage::SetDialog sub_821BB858 and
+// SavePage::SetDialog sub_821BB708 (r3 the kind, r4 the next state);
+// LoadPage::Close sub_821B9FB0, SavePage::Close sub_821BA508,
+// OptionsSavePages::Cancel sub_821B9FF8, the sub-pages LoadPage::CheckDevice
+// sub_821BBC10, Answer sub_821BC7B0, Note sub_821BC940, Wait sub_821C2620,
+// DeviceAnswer sub_821BBC68, SavePage::CheckDevice sub_821BBCC0, Answer
+// sub_821BCA60, Note sub_821BCC10, Wait sub_821BBD18 (no arguments read); the
+// steps LoadPage::Leave sub_821C6468 and SavePage::Leave sub_821C6550 (r3 the
+// step word).
+void LoadPageSetDialog(PPCContext& ctx, uint8_t* base);
+void SavePageSetDialog(PPCContext& ctx, uint8_t* base);
+void LoadPageClose(PPCContext& ctx, uint8_t* base);
+void SavePageClose(PPCContext& ctx, uint8_t* base);
+void SavePagesCancel(PPCContext& ctx, uint8_t* base);
+void LoadPageCheckDevice(PPCContext& ctx, uint8_t* base);
+void LoadPageAnswer(PPCContext& ctx, uint8_t* base);
+void LoadPageNote(PPCContext& ctx, uint8_t* base);
+void LoadPageWait(PPCContext& ctx, uint8_t* base);
+void LoadPageDeviceAnswer(PPCContext& ctx, uint8_t* base);
+void SavePageCheckDevice(PPCContext& ctx, uint8_t* base);
+void SavePageAnswer(PPCContext& ctx, uint8_t* base);
+void SavePageNote(PPCContext& ctx, uint8_t* base);
+void SavePageWait(PPCContext& ctx, uint8_t* base);
+void LoadPageLeave(PPCContext& ctx, uint8_t* base);
+void SavePageLeave(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

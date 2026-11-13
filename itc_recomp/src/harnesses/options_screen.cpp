@@ -13,6 +13,7 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/hash.h"
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "hooks/app_start_up.h"
@@ -35,6 +36,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_options_screen);
+ITC_FLAG_DECLARE(bool, native_options_load_save);
 
 namespace harness {
 
@@ -198,7 +200,9 @@ const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
     {0x826367E8 + 1972, 4},
     {0x826371D0 + 1972, 4},
     {0x826364EC, 4},
-    {0x826A50AC, 64}};  // the screen fades' words (Options::FadeIn's)
+    {0x826A50AC, 64},  // the screen fades' words (Options::FadeIn's)
+    {0x826BDC90, 4},   // the save system's interface (the load and save pages')
+    {0x828161F0, 4}};  // the save buffers' header
 
 // Whether a case's movie table leaves movie 7 out (its pair's id 9): for
 // the functions that delete it (UiMovies::Delete would free our block).
@@ -435,8 +439,10 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
         ui_movies_hooks::g_update_callee_stand_in;
     ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
     ITC_FLAG(native_options_screen) = v == 1;
+    ITC_FLAG(native_options_load_save) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_options_screen) = true;
+    ITC_FLAG(native_options_load_save) = true;
     ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
     g_updates = nullptr;
     hooks::g_start_up_recorder = saved_recorder;
@@ -1442,6 +1448,268 @@ void Inits(Context& h) {
   }
 }
 
+// --- The load and save pages (options_load_save,
+// docs/functions/options-load-save.md) ---
+//
+// Beside the options' world: the save system's interface linked over random
+// words (as the save screen's harness lays it: the users, six slots and four
+// enumerated saves), the save buffers' header and its game data's buffer.
+// The callees run for real on both sides (the save layer, Menu::Step and
+// Pressed, MenuSound::Play, the UI movie calls, Settings::Reload). Compared
+// beyond the options' world: the interface, the header, the game data's
+// buffer and all of player 0's save data (their hashes for the big ones).
+
+constexpr uint32_t kSaveObject36 = 0x40, kSaveDevices = 0x100, kSaveUsers = 0x200;
+constexpr uint32_t kSaveSlots = 0x800, kSaveRecords = 0x2000, kSaveWorldBytes = 0x2800;
+
+struct SaveSide {
+  SaveSide() : save(kSaveWorldBytes), header(0x100), game_data(os::kGameDataBytes) {}
+  bool ok() const { return save.address != 0 && header.address != 0 && game_data.address != 0; }
+  Block save;
+  Block header;
+  Block game_data;
+};
+
+// A pick below `n` from the generator's high bits (its low bits follow
+// one another too closely for the joint picks the pages test).
+uint32_t Hi(Random& r, uint32_t n) { return uint32_t((r.Next() >> 32) % n); }
+
+uint32_t Small(Random& r, uint32_t n) { return Hi(r, 8) == 0 ? uint32_t(r.Next()) : Hi(r, n); }
+uint32_t OneOf(Random& r, std::initializer_list<uint32_t> values) {
+  const uint32_t* list = values.begin();
+  return Hi(r, 8) == 0 ? uint32_t(r.Next()) : list[r.Below(uint32_t(values.size()))];
+}
+
+void ShapeSaveSide(uint8_t* base, const SaveSide& s, Random& r) {
+  const uint32_t block = s.save.address;
+  WriteRandom(base, block, kSaveWorldBytes, r);
+  guest::StoreU32(base, block, 0x82000E38);
+  guest::StoreU32(base, block + 8, block + kSaveObject36);
+  guest::StoreU32(base, block + kSaveObject36, 0x82000AFC);
+  guest::StoreU32(base, block + kSaveObject36 + 88, block + kSaveDevices);
+  guest::StoreU32(base, block + kSaveObject36 + 92, block + kSaveUsers);
+  guest::StoreU32(base, block + kSaveDevices, 0x82002198);
+  guest::StoreU32(base, block + kSaveDevices + 44, block + kSaveSlots);
+  guest::StoreU32(base, block + kSaveUsers, 0x82000FA0);
+  guest::StoreU32(base, block + kSaveUsers + 216, Hi(r, 6));
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, block + kSaveUsers + 200 + 4 * i, Hi(r, 4));
+    guest::StoreU32(base, block + kSaveUsers + 8 + 40 * i, Hi(r, 3) == 0 ? 0 : Hi(r, 5));
+  }
+  const bool idle = Hi(r, 2) == 0;
+  for (uint32_t k = 0; k < 6; k++) {
+    const uint32_t slot = block + kSaveSlots + 1000 * k;
+    guest::StoreU32(base, slot + 988, Hi(r, 4) == 0 ? Small(r, 12) : OneOf(r, {1, 2, 3, 4, 7, 8}));
+    guest::StoreU32(base, slot + 36, Hi(r, 2) == 0 ? 0 : uint32_t(r.Next()));
+    guest::StoreU32(base, slot + 992, Small(r, 6));
+    if (Hi(r, 2) == 0) {  // the free bytes: a little or a lot
+      guest::StoreU32(base, slot + 40, 0);
+      guest::StoreU32(base, slot + 44, Hi(r, 2) == 0 ? Hi(r, 0x40000) : 0x100000);
+    }
+    for (uint32_t word = 960; word <= 980; word += 4) {
+      guest::StoreU32(base, slot + word, idle ? 0 : Hi(r, 2));
+    }
+    guest::StoreU32(base, slot + 80, block + kSaveRecords);
+    guest::StoreU32(base, slot + 984, Hi(r, 5));
+  }
+  for (uint32_t e = 0; e < 4; e++) {
+    const uint32_t save = block + kSaveRecords + 308 * e;
+    const uint32_t pick = Hi(r, 3);
+    if (pick == 2) {
+      for (uint32_t i = 0; i < 20; i++) {
+        guest::StoreU8(base, save + 264 + i, uint8_t('a' + Hi(r, 26)));
+      }
+      guest::StoreU8(base, save + 284, 0);
+    } else {
+      const char* name = pick == 0 ? "SystemData.bin" : "rex";
+      Write(base, save + 264, name, uint32_t(std::strlen(name)) + 1);
+    }
+  }
+  guest::StoreU32(base, 0x826BDC90, block);
+  // The header: +0 the game data's buffer (its halfword +6328 0 now and
+  // then: the load's check), the others 0.
+  WriteRandom(base, s.header.address, s.header.bytes, r);
+  for (uint32_t f = 0; f < 24; f += 4) {
+    guest::StoreU32(base, s.header.address + f, 0);
+  }
+  guest::StoreU32(base, s.header.address, s.game_data.address);
+  WriteRandom(base, s.game_data.address, 0x2000, r);
+  if (Hi(r, 3) == 0) {
+    guest::StoreU16(base, s.game_data.address + 6328, 0);
+  }
+  guest::StoreU32(base, os::kSaveBuffers, s.header.address);
+}
+
+// The dialog's menu ([0x826D8484], two items) for Menu::Step and Pressed:
+// the mappers as ShapeMappers makes them, each one's moves and presses one,
+// both, none or any (accept 159, back 158); the menu's player, flags and
+// cursor; half the time the player's mapper made to accept (not blocked, no
+// move, 159 pressed) so the answers' kinds are reached.
+void ShapeDialogMenu(uint8_t* base, const World& w, Random& r) {
+  ShapeMappers(base, w, r);
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t mapper = w.mappers.address + 0x200 + 0x200 * k;
+    const uint32_t fired[6] = {0, 1u << 2, 1u << 3, 1u << 18, 1u << 19,
+                               uint32_t(r.Next() & r.Next())};
+    const uint32_t pressed[5] = {0, 1u << 7, 1u << 8, (1u << 7) | (1u << 8), uint32_t(r.Next())};
+    guest::StoreU32(base, mapper + 464, Hi(r, 2) == 0 ? 0 : fired[Hi(r, 6)]);
+    guest::StoreU32(base, mapper + 456, pressed[Hi(r, 5)]);
+  }
+  const uint32_t m = w.block(os::kDialogMenu);
+  const uint32_t player = Hi(r, 4);
+  guest::StoreU32(base, m + menu_helpers::kPlayer, player);
+  guest::StoreU32(base, m + menu_helpers::kFirst, 0);
+  guest::StoreU32(base, m + menu_helpers::kLast, 1);
+  guest::StoreU32(base, m + menu_helpers::kCursor, Hi(r, 2));
+  for (const uint32_t o : {menu_helpers::kWraps, menu_helpers::kUpDownLocked,
+                           menu_helpers::kSidesStep, menu_helpers::kShouldersStep}) {
+    guest::StoreU32(base, m + o, Hi(r, 2));
+  }
+  if (Hi(r, 2) == 0) {
+    const uint32_t entry = guest::LoadU32(base, menu_helpers::kControllerEntries + 4 * player);
+    const uint32_t at = menu_helpers::kMapperEntries + 8 * entry;
+    guest::StoreU32(base, at + 4, 0);
+    const uint32_t mapper = guest::LoadU32(base, at);
+    guest::StoreU32(base, mapper + 464, 0);
+    guest::StoreU32(base, mapper + 456, 1u << 8);
+  }
+}
+
+// A case's own generator for the load and save pages' shaping: the cases'
+// streams are one stream shifted (their seeds follow one another), so after
+// ShapeWorld's varying use two cases can stand at the same place in it;
+// the first two stack words below the call's (the stream's first two
+// words, one place apart for each case) mixed instead.
+Random CaseRandom(uint8_t* base, const PPCContext& t) {
+  const uint32_t at = t.r1.u32 - kStackBytes;
+  uint64_t z = ((uint64_t(guest::LoadU32(base, at)) << 32) | guest::LoadU32(base, at + 4)) +
+               0x9E3779B97F4A7C15ull;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return Random(z ^ (z >> 31));
+}
+
+void OptionsLoadSaveCases(Context& h, const World& w, const SaveSide& side) {
+  // The settings' words the pages read: the kinds (+628, +648) 0 to 13 (or
+  // -1 or any), the counters (+632, +652) just below or at their 45 and 90
+  // (or any), the next states; the context 0 to 4 (Settings::Reload's), the
+  // save's records codes 0 to 33 (Settings::Read's).
+  const auto shape = [&h, &w, &side](Random& r) {
+    ShapeDialogMenu(h.base, w, r);
+    ShapeSaveSide(h.base, side, r);
+    const uint32_t o = w.settings();
+    for (const uint32_t f : {628u, 648u}) {
+      guest::StoreU32(h.base, o + f, Hi(r, 10) == 0 ? OneOf(r, {0xFFFFFFFFu, 13}) : Hi(r, 13));
+    }
+    const uint32_t counts[6] = {0, 43, 44, 45, 88, 89};
+    for (const uint32_t f : {632u, 652u}) {
+      guest::StoreU32(h.base, o + f, Hi(r, 10) == 0 ? uint32_t(r.Next()) : counts[Hi(r, 6)]);
+    }
+    guest::StoreU32(h.base, o + 4, r.Below(5));
+    for (uint32_t f = 44; f < 284; f += 4) {
+      guest::StoreU32(h.base, w.options() + f, r.Below(34));
+    }
+    // The page blocks' pages: the options' around 9 and 10, the sub-pages'
+    // 0 to 6 or -1.
+    static constexpr int32_t kPages[5] = {9, 10, -1, 0, 3};
+    guest::StoreU32(h.base, w.page() + 0, uint32_t(kPages[r.Below(5)]));
+    for (const uint32_t g : {os::kLoadPages, os::kSavePages}) {
+      guest::StoreU32(h.base, w.block(g) + 0, uint32_t(int32_t(r.Below(8)) - 1));
+    }
+  };
+  // After: the save side's blocks, player 0's whole save data.
+  const AfterFn after = [&h, &w, &side](PPCContext&, const World&, Outputs& out) {
+    out.Bytes(Read(h.base, side.save.address, side.save.bytes));
+    out.Bytes(Read(h.base, side.header.address, side.header.bytes));
+    out.Word(uint32_t(base::Hash64(h.base + side.game_data.address, side.game_data.bytes)));
+    out.Word(uint32_t(base::Hash64(h.base + w.save.address, w.save.bytes)));
+  };
+  const auto plain = [&h, shape](PPCContext& t, Random&, const World&) {
+    Random r = CaseRandom(h.base, t);
+    shape(r);
+  };
+  // The leaves: r3 the kind 0 to 13 (or any), r4 the next 0 to 3 (or any).
+  const auto dialog = [&h, shape](PPCContext& t, Random&, const World&) {
+    Random r = CaseRandom(h.base, t);
+    shape(r);
+    t.r3.u64 = r.Below(8) == 0 ? r.Next() : r.Below(14);
+    t.r4.u64 = r.Below(8) == 0 ? r.Next() : (uint64_t(r.Next()) << 32) * r.Below(2) + r.Below(4);
+  };
+  Group(h, w, "LoadPage::SetDialog (sub_821BB858)", 100, dialog, __imp__sub_821BB858,
+        hooks::LoadPageSetDialog, {}, after);
+  Group(h, w, "SavePage::SetDialog (sub_821BB708)", 100, dialog, __imp__sub_821BB708,
+        hooks::SavePageSetDialog, {}, after);
+  Group(h, w, "LoadPage::Close (sub_821B9FB0)", 40, plain, __imp__sub_821B9FB0,
+        hooks::LoadPageClose, {}, after);
+  Group(h, w, "SavePage::Close (sub_821BA508)", 40, plain, __imp__sub_821BA508,
+        hooks::SavePageClose, {}, after);
+  Group(h, w, "OptionsSavePages::Cancel (sub_821B9FF8)", 20, plain, __imp__sub_821B9FF8,
+        hooks::SavePagesCancel, {}, after);
+  // The sub-pages.
+  Group(h, w, "LoadPage::CheckDevice (sub_821BBC10)", 150, plain, __imp__sub_821BBC10,
+        hooks::LoadPageCheckDevice, {{96, 8}}, after);
+  Group(h, w, "SavePage::CheckDevice (sub_821BBCC0)", 150, plain, __imp__sub_821BBCC0,
+        hooks::SavePageCheckDevice, {{96, 8}}, after);
+  Group(h, w, "LoadPage::DeviceAnswer (sub_821BBC68)", 150, plain, __imp__sub_821BBC68,
+        hooks::LoadPageDeviceAnswer, {{96, 8}}, after);
+  Group(h, w, "LoadPage::Answer (sub_821BC7B0)", 400, plain, __imp__sub_821BC7B0,
+        hooks::LoadPageAnswer, {{112, 24}}, after);
+  Group(h, w, "SavePage::Answer (sub_821BCA60)", 400, plain, __imp__sub_821BCA60,
+        hooks::SavePageAnswer, {{96, 16}}, after);
+  Group(h, w, "LoadPage::Note (sub_821BC940)", 300, plain, __imp__sub_821BC940,
+        hooks::LoadPageNote, {{112, 24}}, after);
+  Group(h, w, "SavePage::Note (sub_821BCC10)", 300, plain, __imp__sub_821BCC10,
+        hooks::SavePageNote, {{112, 24}}, after);
+  // The waits: the kind 0, 1 to 8 or the others; the counter at 89 most
+  // of the time (the checks run).
+  const auto wait = [&h, &w, shape](PPCContext& t, Random&, const World&) {
+    Random r = CaseRandom(h.base, t);
+    shape(r);
+    for (const uint32_t f : {632u, 652u}) {
+      if (Hi(r, 4) != 0) guest::StoreU32(h.base, w.settings() + f, 89);
+    }
+    for (const uint32_t f : {628u, 648u}) {
+      const uint32_t kinds[5] = {0, 0, 8, Hi(r, 9), Hi(r, 14)};
+      guest::StoreU32(h.base, w.settings() + f, kinds[Hi(r, 5)]);
+    }
+  };
+  Group(h, w, "LoadPage::Wait (sub_821C2620)", 400, wait, __imp__sub_821C2620,
+        hooks::LoadPageWait, {{96, 16}}, after);
+  Group(h, w, "SavePage::Wait (sub_821BBD18)", 400, wait, __imp__sub_821BBD18,
+        hooks::SavePageWait, {{96, 16}}, after);
+  // The leaves: r3 the step word (0 or 1); the dialog menu's cursor 0 to 3;
+  // the category page's set-up as the closes' cases shape it; the header the
+  // layer's pages with no buffers (SaveBuffers::Destroy frees it: whether
+  // it's still there compared, then freed).
+  const auto leave = [&h, &w, shape](PPCContext& t, Random&, const World&) {
+    Random r = CaseRandom(h.base, t);
+    shape(r);
+    guest::StoreU32(h.base, w.page() + 24, r.Below(2));
+    t.r3.u64 = w.page() + 24;
+    guest::StoreU32(h.base, w.block(os::kDialogMenu) + 0, r.Below(4));
+    guest::StoreU32(h.base, w.settings() + 664, r.Below(7));
+    guest::StoreU32(h.base, w.settings() + 8, r.Below(2));
+    const uint32_t header = memory::AllocPages(24, 4096);
+    for (uint32_t f = 0; header != 0 && f < 24; f += 4) {
+      guest::StoreU32(h.base, header + f, 0);
+    }
+    guest::StoreU32(h.base, os::kSaveBuffers, header);
+  };
+  const AfterFn leave_after = [&h, after](PPCContext& t, const World& w, Outputs& out) {
+    const uint32_t header = guest::LoadU32(h.base, os::kSaveBuffers);
+    out.Word(header == 0 ? 0 : 1);
+    if (header != 0 && memory::IsPages(header)) {
+      memory::FreePages(header);
+    }
+    guest::StoreU32(h.base, os::kSaveBuffers, 0);
+    after(t, w, out);
+  };
+  Group(h, w, "LoadPage::Leave (sub_821C6468)", 150, leave, __imp__sub_821C6468,
+        hooks::LoadPageLeave, {{128, 32}}, leave_after);
+  Group(h, w, "SavePage::Leave (sub_821C6550)", 150, leave, __imp__sub_821C6550,
+        hooks::SavePageLeave, {{128, 32}}, leave_after);
+}
+
 }  // namespace
 
 void OptionsScreen(Context& h) {
@@ -1460,6 +1728,21 @@ void OptionsScreen(Context& h) {
   CursorSteps(h, w);
   CategoryPages(h, w);
   Inits(h);
+}
+
+void OptionsLoadSave(Context& h) {
+  World w;
+  SaveSide side;
+  if (!w.ok() || !side.ok()) {
+    ITC_LOG_ERROR("harness: options_load_save: no memory for the world");
+    return;
+  }
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_ERROR("harness: options_load_save: the native heap isn't active");
+    return;
+  }
+  BuildStringTable(h.base, w);
+  OptionsLoadSaveCases(h, w, side);
 }
 
 }  // namespace harness

@@ -452,6 +452,7 @@ set(ITC_SOURCES
     src/options_screen/controls.cpp
     src/options_screen/handlers.cpp
     src/options_screen/inits.cpp
+    src/options_screen/load_save.cpp
     src/options_screen/nodes.cpp
     src/options_screen/pages.cpp
     src/options_screen/settings.cpp
