@@ -189,6 +189,18 @@ And the stand's never-seen rows (`itc_5316`, `itc_5317`, ok):
 - `sub_821F2378` TuningScreen::RefreshLightKits
 - `sub_821F7A98` TuningScreen::RefreshMovie14
 
+And the tuning pages' blockers (`itc_5322`/`itc_5325`, `itc_5323`, ok;
+`MakeModel` and `FitSelectedCar` ran in the replay):
+
+- `sub_821CE188` TuningScreen::IsSlotAvailable
+- `sub_821E9488` TuningScreen::SetPaintGradients
+- `sub_821EA130` TuningScreen::SetLightKind0Bars
+- `sub_821EAE68` TuningScreen::SetLightKind1Bar
+- `sub_821F2AD8` TuningScreen::RefreshInterior
+- `sub_821F35C0` TuningScreen::Command10
+- `sub_821EA460` TuningScreen::Command13
+- `sub_821EAFA0` TuningScreen::Command14
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

@@ -194,9 +194,22 @@ file's history. What's left to see in a drive, from every run:
   fault (the dead register saves the original `FitSelectedCar` writes
   under `PickCameraPreset`'s frame, left out of `tuning_refresh` in
   0f0b959d but not of `tuning_machine`'s copy); fixed edb5225e, 40 of
-  40 at 0 differing. Validation running again.
+  40 at 0 differing. Validated again: `itc_5325` (race 48 s at 180,
+  the harnesses ~130 s; 0 errors, every harness 0 differing outside
+  the expected groups), 10 of 10 harness lines; 8 to drive. Recorded.
+- Subsystem 7 of 10: the type 6 and 7 modes' small never-seen pieces
+  (the controller pages' callees `sub_821BB290`, `sub_821BB3B8`,
+  `sub_821BB590`, `sub_821C0238`; the small functions beside the group
+  pair and the car list `sub_82249BE8` and the rest), with the adapter
+  lead `sub_82208738` for its migration; their lines deleted from
+  `leads.md`. Mapping agent running.
 
 ## Done
+
+- Cleanup leads (no mapping): the tuning pages' blockers with
+  `RefreshInterior` and commands 10, 13, 14; `MakeModel` and
+  `FitSelectedCar` direct, bc2ed8af..edb5225e; validated (a harness
+  fault fixed).
 
 - Cleanup lead (no mapping): the stand's and tuning screen's never-seen
   rows, 18 Native, abc17bc2..5db16791; validated.
