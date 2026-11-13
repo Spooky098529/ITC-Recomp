@@ -1612,6 +1612,48 @@ void InterfaceSlotCases(Context& h) {
     }
     results.Report();
   }
+  // The render manager's slot 8 and the frame driver's slots: the interface
+  // (r3 adjusted back by each thunk) at +16 or +20 holding an object whose
+  // vtable's slot +12 is the getter of +60 (sub_82090770) or slot +8 the
+  // getter of +68 (sub_8248F030).
+  struct Slot {
+    const char* name;
+    void (*thunk)(PPCContext&, uint8_t*);
+    uint32_t adjust;  // added to the interface for r3
+    bool scene;       // +16 and slot +12 (else +20 and slot +8)
+  };
+  const Slot slots[] = {
+      {"sub_82094338 App::SceneFromInterface8", sub_82094338, 0, true},
+      {"sub_820944D8 App::SceneFromInterface16", sub_820944D8, 8, true},
+      {"sub_82094320 App::FrameDriver", sub_82094320, 0, false},
+      {"sub_82094498 App::FrameDriverFromInterface16", sub_82094498, 12, false},
+      {"sub_82094480 App::FrameDriverFromInterface8", sub_82094480, 4, false},
+  };
+  for (const Slot& slot : slots) {
+    Results results(slot.name);
+    for (int c = 0; c < 8; c++) {
+      const uint32_t word = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        const uint32_t interface = h.data + 64, object = h.data + 256, vtable = h.data + 512;
+        guest::StoreU32(h.base, interface + (slot.scene ? 16 : 20), object);
+        guest::StoreU32(h.base, object, vtable);
+        guest::StoreU32(h.base, object + (slot.scene ? 60 : 68), word);
+        guest::StoreU32(h.base, vtable + (slot.scene ? 12 : 8),
+                        slot.scene ? kGetter60 : 0x8248F030);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = interface + slot.adjust;
+        StartUpSide(v, [&] { slot.thunk(t, h.base); });
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r11.u32);
+        out[v].Word(t.ctr.u32);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
 }
 
 }  // namespace

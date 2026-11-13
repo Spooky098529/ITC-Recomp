@@ -147,4 +147,31 @@ SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16) {
   return AppPoolSlot(base, interface16 - 8);
 }
 
+SlotCall SceneSlot(uint8_t* base, uint32_t interface8) {
+  ITC_NATIVE_RUNNING("sub_82094338 App::SceneFromInterface8");
+  const uint32_t object = Load(base, interface8 + 16);
+  return {object, Load(base, Load(base, object) + 12)};
+}
+
+SlotCall SceneSlotFromInterface16(uint8_t* base, uint32_t interface16) {
+  ITC_NATIVE_RUNNING("sub_820944D8 App::SceneFromInterface16");
+  return SceneSlot(base, interface16 - 8);
+}
+
+SlotCall FrameDriverSlot(uint8_t* base, uint32_t interface4) {
+  ITC_NATIVE_RUNNING("sub_82094320 App::FrameDriver");
+  const uint32_t object = Load(base, interface4 + 20);
+  return {object, Load(base, Load(base, object) + 8)};
+}
+
+SlotCall FrameDriverSlotFromInterface16(uint8_t* base, uint32_t interface16) {
+  ITC_NATIVE_RUNNING("sub_82094498 App::FrameDriverFromInterface16");
+  return FrameDriverSlot(base, interface16 - 12);
+}
+
+SlotCall FrameDriverSlotFromInterface8(uint8_t* base, uint32_t interface8) {
+  ITC_NATIVE_RUNNING("sub_82094480 App::FrameDriverFromInterface8");
+  return FrameDriverSlot(base, interface8 - 4);
+}
+
 }  // namespace app_start_up

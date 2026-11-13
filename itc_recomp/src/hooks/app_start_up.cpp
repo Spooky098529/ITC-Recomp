@@ -37,7 +37,10 @@ ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "and sub_820A8F80 merged) and entry sub_820A75E8, no adapters of their own; App::App "
               "sub_82094590, its callees through their adapters; App::Create sub_82094AB8; the app's "
               "interface slots sub_82379338, sub_82379350 (the getters of +108 and +112), "
-              "sub_82094368 and sub_820944A8 (the framework's first worker pool, tail calls)) "
+              "sub_82094368 and sub_820944A8 (the framework's first worker pool, tail calls); the "
+              "scene's render manager's slot 8 sub_820944D8 with sub_82094338 and the frame "
+              "driver's slots sub_82094498 and sub_82094480 with sub_82094320 (tail calls through the "
+              "framework's +36 interface)) "
               "natively instead of through the translated code (the same reads and writes; "
               "checked by --run_harnesses=app_start_up)");
 
@@ -955,3 +958,21 @@ extern "C" REX_FUNC(sub_820944A8) {
   }
   TailCall(ctx, base, asu::AppPoolSlotFromInterface16(base, ctx.r3.u32));
 }
+
+// The scene's render manager's slot 8 and the frame driver's slots (vtable
+// slots; tail calls through the framework's +36 interface).
+#define ITC_APP_SLOT(address, plain)                    \
+  extern "C" REX_FUNC(sub_##address) {                  \
+    REX_FUNC_PROLOGUE();                                \
+    if (!ITC_FLAG(native_app_start_up)) {               \
+      __imp__sub_##address(ctx, base);                  \
+      return;                                           \
+    }                                                   \
+    TailCall(ctx, base, asu::plain(base, ctx.r3.u32));  \
+  }
+
+ITC_APP_SLOT(82094338, SceneSlot)
+ITC_APP_SLOT(820944D8, SceneSlotFromInterface16)
+ITC_APP_SLOT(82094320, FrameDriverSlot)
+ITC_APP_SLOT(82094498, FrameDriverSlotFromInterface16)
+ITC_APP_SLOT(82094480, FrameDriverSlotFromInterface8)

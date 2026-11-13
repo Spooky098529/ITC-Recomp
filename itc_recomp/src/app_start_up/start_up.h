@@ -234,6 +234,24 @@ SlotCall AppPoolSlot(uint8_t* base, uint32_t interface8);
 // sub_820944A8 (the app's +16 interface's slot +16): this - 8, then
 // sub_82094368.
 SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16);
+// The scene's render manager [0x826BABA0] (the app's +16 interface) and the
+// frame driver: tail calls through the framework's +36 interface (app + 24;
+// docs/functions/app-start-up.md).
+// sub_82094338 App::SceneFromInterface8 (the app's +8 interface's slot +12):
+// the word at +16 (app + 24) and its slot +12 (the scene in play,
+// sub_82090908), tail-called.
+SlotCall SceneSlot(uint8_t* base, uint32_t interface8);
+// sub_820944D8 App::SceneFromInterface16 (the +16 interface's slot +32, the
+// render manager's slot 8): this - 8, then sub_82094338.
+SlotCall SceneSlotFromInterface16(uint8_t* base, uint32_t interface16);
+// sub_82094320 App::FrameDriver (the app's +4 interface's slot +4): the word
+// at +20 (app + 24) and its slot +8 (the frame driver in play,
+// sub_820908E0), tail-called.
+SlotCall FrameDriverSlot(uint8_t* base, uint32_t interface4);
+// sub_82094498 (the +16 interface's slot +28): this - 12, then sub_82094320.
+SlotCall FrameDriverSlotFromInterface16(uint8_t* base, uint32_t interface16);
+// sub_82094480 (the +8 interface's slot +16): this - 4, then sub_82094320.
+SlotCall FrameDriverSlotFromInterface8(uint8_t* base, uint32_t interface8);
 
 // --- The app's start-up ---
 
