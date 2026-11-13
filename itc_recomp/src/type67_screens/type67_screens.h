@@ -43,6 +43,11 @@ struct Calls : type67_modes::Calls {
   std::function<uint64_t(uint32_t frame, uint32_t lr, uint32_t movie, uint32_t sub_scene,
                          uint32_t child, uint32_t id)>
       set_text;
+  // A guest call with r3 to r10 from `args` (MenuList::Init's adapter where
+  // its plain C++ can't free the old block), from the frame at `r1`
+  // returning to `lr`. Its r3.
+  std::function<uint64_t(uint32_t function, const uint64_t args[8], uint32_t r1, uint32_t lr)>
+      call8;
 };
 
 // The guest functions called: UiMovie::ResetPose, FinishAll and Run, and
@@ -74,6 +79,19 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message);
 // for a call the original makes without setting r4. Its r3.
 uint64_t Slot(uint8_t* base, uint64_t object_r3, uint32_t slot, std::optional<uint64_t> r4,
               uint32_t frame, uint32_t lr, const Calls& calls);
+// Whether Slot runs the plain C++ for a slot holding `target` (given
+// whether the call sets r4), and that plain C++ (from the frame at `sp`, the
+// callee's entry r1, returning to `lr`; nullopt where it isn't one of ours).
+bool SlotIsNative(uint32_t target, bool has_r4);
+std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
+                                   std::optional<uint64_t> r4, uint32_t sp, uint32_t lr,
+                                   const Calls& calls);
+
+// MenuList::Release on the list at `list_r3` (r3 both halves) from `frame`
+// returning to `lr`: its plain C++ where it frees natively, else its
+// adapter (the original where it declines). Its r3.
+uint64_t ReleaseList(uint8_t* base, uint64_t list_r3, uint32_t frame, uint32_t lr,
+                     const Calls& calls);
 
 // --- The list screens (list_screens.cpp; state +9608, loaded +9612, open
 // +9616) ---
@@ -373,5 +391,119 @@ uint64_t ColorNodeTableReset(uint8_t* base, uint64_t r3, uint32_t sp, const Call
 // sub_82248800 PairedNodeTable::Refresh (128): the pairs' old items shown
 // off, the new ones shown with their animations replayed.
 uint64_t PairedNodeTableRefresh(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// --- The list part (list_part.cpp): ListPart (140 bytes; +4 yes, +8 back,
+// +12 its UI movie's id, +16 the inner part, +20 the inner part in place)
+// over ListPartBase, and its inner part ListPartInner (120 bytes; +4 the
+// page, +8 the page after, +12 the page before, +16 the step, +20 the step
+// queued, +24, +28 the step's first-call word, +32 yes, +36 back, +40 a
+// two-item MenuList, +112 the prompt's state: 0 opening, 1 shown, 2
+// closing, 3 closed, 4 asked to leave; +116 leave asked) over
+// ListPartInnerBase. The part's and the inner's slot calls, and the inner's
+// page and step tables in .data, run the plain C++ here where the target is
+// one of these (SlotNative), else guest calls (r4 and r5 as the original
+// sets them). r3 as the originals leave it. ---
+
+constexpr uint32_t kListPartVtable = 0x82011314;
+constexpr uint32_t kListPartBaseVtable = 0x8201127C;
+constexpr uint32_t kListPartInnerVtable = 0x820112F8;
+constexpr uint32_t kListPartInnerBaseVtable = 0x820112CC;
+// The inner's page table (Page0 to Page2), step table (Step0 to Step2) and
+// the named animations of its two items (1 and 2).
+constexpr uint32_t kListPartPages = 0x82637A20;
+constexpr uint32_t kListPartSteps = 0x82637A2C;
+constexpr uint32_t kListPartNamed = 0x820112F0;
+
+// sub_82252420 ListPartBase::~ListPartBase and sub_82252600
+// ListPartInnerBase::~ListPartInnerBase: +0 = the base's vtable.
+uint64_t ListPartBaseDestruct(uint8_t* base, uint64_t r3);
+uint64_t ListPartInnerBaseDestruct(uint8_t* base, uint64_t r3);
+// sub_82252610 ListPartBase::DeletingDestructor and sub_82252658
+// ListPartInnerBase::DeletingDestructor (96-byte frames): the same, then
+// operator delete (a guest call) when bit 0 of `flags` is set.
+uint64_t ListPartBaseDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                      const Calls& calls);
+uint64_t ListPartInnerBaseDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags,
+                                           uint32_t sp, const Calls& calls);
+// sub_822526F8 ListPartInner::~ListPartInner (96): +0 = its vtable,
+// MenuList::Release on +40, ~ListPartInnerBase.
+uint64_t ListPartInnerDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822529B0 ListPartInner::DeletingDestructor (112): the destructor,
+// operator delete when bit 0 of `flags` is set.
+uint64_t ListPartInnerDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                       const Calls& calls);
+// sub_82252968 ListPart::~ListPart (96): +0 = its vtable, ~ListPartInner on
+// +20, ~ListPartBase.
+uint64_t ListPartDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82252A38 ListPart::DeletingDestructor (112).
+uint64_t ListPartDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                  const Calls& calls);
+
+// sub_82252430 ListPartBase::Open (96): the inner's slot 1 (r4 = +12), then
+// its own slot 9 (+36). Slot 9's r3.
+uint64_t ListPartOpen(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82252490 ListPartBase::Pick (96): 1 without an inner part; else the
+// inner's slot 2 (r4 = +12, r5 = `r4`) and, when it answers nonzero, +4 =
+// the inner's +32 and +8 = its +36. The slot's r3.
+uint64_t ListPartPick(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82252500 ListPartBase::Input: the inner's slot 3 (r4 = +12, r5 =
+// `r4`), a tail call from `sp` returning to `lr`; r3 left without one.
+uint64_t ListPartInput(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
+                       const Calls& calls);
+// sub_82252530 ListPartBase::Close (96): the inner's slot 5, then its own
+// slot 10 (+40). Slot 10's r3.
+uint64_t ListPartClose(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82252590 ListPartBase::IsIdle and sub_822525B8 CanLeave: the inner's
+// slot 4 or 6 (a tail call), or 1 without one.
+uint64_t ListPartIsIdle(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                        const Calls& calls);
+uint64_t ListPartCanLeave(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                          const Calls& calls);
+
+// sub_82252A88 ListPartInner::Open (144; r4 the movie's id): the page
+// block reset to step 0, the movie's pose reset and its three texts set,
+// its +40960 = 1, the two-item MenuList made (MenuList::Init's plain C++
+// where it can free the old block, else a guest call), its selection 1
+// when player 0's options' +20 (save data +0x1F870) is 0, else 0; +112 and
+// +116 = 0. r3 + 40.
+uint64_t ListPartInnerOpen(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                           const Calls& calls);
+// sub_82252A00 ListPartInner::Pick: 0 when the page (+4) is -1, else the
+// page table's entry (a tail call from `sp` returning to `lr`, r4 and r5
+// passed on).
+uint64_t ListPartInnerPick(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t sp,
+                           uint32_t lr, const Calls& calls);
+// sub_82252DF0 ListPartInner::Input (128; r4 the movie's id): UiMovie::Run
+// without a step (+16 -1), else the step table's entry and, when it answers
+// nonzero, the page block moved on. Its r3.
+uint64_t ListPartInnerInput(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                            const Calls& calls);
+// sub_82252748 ListPartInner::IsIdle (96): 1 when the list's selection is
+// 0.
+uint64_t ListPartInnerIsIdle(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_82252740 ListPartInner::Close: MenuList::Release on +40 (a tail
+// call).
+uint64_t ListPartInnerClose(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                            const Calls& calls);
+// sub_822528C8 ListPartInner::CanLeave: +116 = 1; 1 when +112 is 3, else
+// +112 = 4 unless it's 2 or 4, and 0.
+uint64_t ListPartInnerCanLeave(uint8_t* base, uint64_t r3);
+// sub_82252778 ListPartInner::Page0 (128): the asked-to-leave check, then
+// MenuList::Update, its move, accept and cancel (MenuSound::Play's plain
+// C++). 0.
+uint64_t ListPartInnerPage0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82252878 ListPartInner::Page1 and sub_822528A8 Page2: +32 and +36.
+// 1.
+uint64_t ListPartInnerPage1(uint8_t* base, uint64_t r3);
+uint64_t ListPartInnerPage2(uint8_t* base, uint64_t r3);
+// sub_82252BB8 ListPartInner::Step0, sub_82252C98 Step1 and sub_82252D38
+// Step2 (128-byte frames; r4 the movie's id): the opening, the closing and
+// the list moved. Done (Step2: 1).
+uint64_t ListPartInnerStep0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                            const Calls& calls);
+uint64_t ListPartInnerStep1(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                            const Calls& calls);
+uint64_t ListPartInnerStep2(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                            const Calls& calls);
 
 }  // namespace type67_screens

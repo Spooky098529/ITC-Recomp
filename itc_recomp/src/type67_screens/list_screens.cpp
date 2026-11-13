@@ -18,9 +18,14 @@ using guest::StoreU32;
 // UiMovies::IsLoaded(id) as 0 or 1 (the originals' cntlzw, rlwinm, xori).
 uint64_t Loaded(uint8_t* base, uint32_t id) { return ui_movies::IsLoaded(base, id) != 0 ? 1 : 0; }
 
-// MenuList::Release on the list at `list_r3` (r3 both halves) from `frame`
-// returning to `lr`: its plain C++ where it frees natively, else its
-// adapter (the original where it declines).
+// A handler's frame (`bytes` below `sp`) with its back chain.
+uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+  StoreU32(base, sp - bytes, sp);
+  return sp - bytes;
+}
+
+}  // namespace
+
 uint64_t ReleaseList(uint8_t* base, uint64_t list_r3, uint32_t frame, uint32_t lr,
                      const Calls& calls) {
   const uint32_t list = uint32_t(list_r3);
@@ -30,14 +35,6 @@ uint64_t ReleaseList(uint8_t* base, uint64_t list_r3, uint32_t frame, uint32_t l
   const uint64_t args[6] = {list_r3, 0, 0, 0, 0, 0};
   return calls.call_set(kMenuListRelease, args, 1, frame, lr);
 }
-
-// A handler's frame (`bytes` below `sp`) with its back chain.
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  StoreU32(base, sp - bytes, sp);
-  return sp - bytes;
-}
-
-}  // namespace
 
 // --- The list screens ---
 

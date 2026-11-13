@@ -100,4 +100,32 @@ void ColorNodeTableRefresh(PPCContext& ctx, uint8_t* base);
 void ColorNodeTableReset(PPCContext& ctx, uint8_t* base);
 void PairedNodeTableRefresh(PPCContext& ctx, uint8_t* base);
 
+// The list part and its inner part.
+void ListPartBaseDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartInnerBaseDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartBaseDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartInnerBaseDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartInnerDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartInnerDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartOpen(PPCContext& ctx, uint8_t* base);
+void ListPartPick(PPCContext& ctx, uint8_t* base);
+void ListPartInput(PPCContext& ctx, uint8_t* base);
+void ListPartClose(PPCContext& ctx, uint8_t* base);
+void ListPartIsIdle(PPCContext& ctx, uint8_t* base);
+void ListPartCanLeave(PPCContext& ctx, uint8_t* base);
+void ListPartInnerOpen(PPCContext& ctx, uint8_t* base);
+void ListPartInnerPick(PPCContext& ctx, uint8_t* base);
+void ListPartInnerInput(PPCContext& ctx, uint8_t* base);
+void ListPartInnerIsIdle(PPCContext& ctx, uint8_t* base);
+void ListPartInnerClose(PPCContext& ctx, uint8_t* base);
+void ListPartInnerCanLeave(PPCContext& ctx, uint8_t* base);
+void ListPartInnerPage0(PPCContext& ctx, uint8_t* base);
+void ListPartInnerPage1(PPCContext& ctx, uint8_t* base);
+void ListPartInnerPage2(PPCContext& ctx, uint8_t* base);
+void ListPartInnerStep0(PPCContext& ctx, uint8_t* base);
+void ListPartInnerStep1(PPCContext& ctx, uint8_t* base);
+void ListPartInnerStep2(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

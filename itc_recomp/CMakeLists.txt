@@ -478,6 +478,7 @@ set(ITC_SOURCES
     src/type67_modes/screen0.cpp
     src/type67_modes/screens.cpp
     src/hooks/type67_screens.cpp
+    src/type67_screens/list_part.cpp
     src/type67_screens/list_screens.cpp
     src/type67_screens/node_tables.cpp
     src/type67_screens/panel_parts.cpp
@@ -827,6 +828,7 @@ set(ITC_SOURCES
     src/harnesses/options_screen.cpp
     src/harnesses/type67_modes.cpp
     src/harnesses/type67_screens.cpp
+    src/harnesses/type67_list_part.cpp
     src/harnesses/type67_screen_tables.cpp
     src/harnesses/car_list.cpp
     src/harnesses/front_end_screen_helpers.cpp

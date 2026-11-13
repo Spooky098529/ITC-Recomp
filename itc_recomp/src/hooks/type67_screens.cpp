@@ -47,7 +47,20 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "SavePairs sub_82247E50, Reset sub_82248650 (UiMovie::SetText's plain C++ where the "
               "text setters are native), Refresh sub_822483B0, MarkSelected sub_822487B8, "
               "SetColors sub_82248198 and ClearColors sub_82248260, UiMovie::FinishNamed, "
-              "PlayNamed and LoopNamed guest calls) natively instead of "
+              "PlayNamed and LoopNamed guest calls; the list part's ListPartBase::Open "
+              "sub_82252430, Pick sub_82252490, Input sub_82252500, Close sub_82252530, IsIdle "
+              "sub_82252590, CanLeave sub_822525B8, ~ListPartBase sub_82252420 and "
+              "DeletingDestructor sub_82252610, ListPart::~ListPart sub_82252968 and "
+              "DeletingDestructor sub_82252A38, ListPartInnerBase::~ListPartInnerBase "
+              "sub_82252600 and DeletingDestructor sub_82252658, and its inner part's "
+              "ListPartInner::~ListPartInner sub_822526F8, DeletingDestructor sub_822529B0, Open "
+              "sub_82252A88, Pick sub_82252A00, Input sub_82252DF0, IsIdle sub_82252748, Close "
+              "sub_82252740, CanLeave sub_822528C8, Page0 sub_82252778, Page1 sub_82252878, Page2 "
+              "sub_822528A8, Step0 sub_82252BB8, Step1 sub_82252C98 and Step2 sub_82252D38 "
+              "(their slots and page and step tables to the plain C++, MenuList::Init's and "
+              "Release's plain C++ where they free natively, MenuList::Update, Accepted and "
+              "Cancelled, UiMovie::ResetPose, Run, FinishAll and FinishNamed guest calls, "
+              "PlayNamed, LoopLast and MenuSound::Play's plain C++) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -83,6 +96,12 @@ ts::Calls Type67ScreensCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r10.u64 = 0;
     const uint64_t args[6] = {movie, sub_scene, child, id, 0, 0};
     return call_set(0x8211C1F8, args, 6, frame, lr);
+  };
+  calls.call8 = [&ctx, call_set](uint32_t function, const uint64_t args[8], uint32_t r1,
+                                 uint32_t lr) -> uint64_t {
+    ctx.r9.u64 = args[6];
+    ctx.r10.u64 = args[7];
+    return call_set(function, args, 6, r1, lr);
   };
   return calls;
 }
@@ -197,6 +216,47 @@ ITC_TS_STEP(ColorNodeTableReset, ts::ColorNodeTableReset(base, ctx.r3.u64, ctx.r
 ITC_TS_STEP(PairedNodeTableRefresh,
             ts::PairedNodeTableRefresh(base, ctx.r3.u64, ctx.r1.u32, calls))
 
+ITC_TS_STEP(ListPartBaseDestruct, ts::ListPartBaseDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(ListPartInnerBaseDestruct, ts::ListPartInnerBaseDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(ListPartBaseDeletingDestruct,
+            ts::ListPartBaseDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerBaseDeletingDestruct,
+            ts::ListPartInnerBaseDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerDestruct, ts::ListPartInnerDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerDeletingDestruct,
+            ts::ListPartInnerDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartDestruct, ts::ListPartDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartDeletingDestruct,
+            ts::ListPartDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartOpen, ts::ListPartOpen(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartPick, ts::ListPartPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInput,
+            ts::ListPartInput(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListPartClose, ts::ListPartClose(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartIsIdle,
+            ts::ListPartIsIdle(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListPartCanLeave,
+            ts::ListPartCanLeave(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListPartInnerOpen,
+            ts::ListPartInnerOpen(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerPick, ts::ListPartInnerPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64,
+                                                     ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListPartInnerInput,
+            ts::ListPartInnerInput(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerIsIdle, ts::ListPartInnerIsIdle(base, ctx.r3.u64, ctx.r1.u32))
+ITC_TS_STEP(ListPartInnerClose,
+            ts::ListPartInnerClose(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListPartInnerCanLeave, ts::ListPartInnerCanLeave(base, ctx.r3.u64))
+ITC_TS_STEP(ListPartInnerPage0, ts::ListPartInnerPage0(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerPage1, ts::ListPartInnerPage1(base, ctx.r3.u64))
+ITC_TS_STEP(ListPartInnerPage2, ts::ListPartInnerPage2(base, ctx.r3.u64))
+ITC_TS_STEP(ListPartInnerStep0,
+            ts::ListPartInnerStep0(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerStep1,
+            ts::ListPartInnerStep1(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerStep2,
+            ts::ListPartInnerStep2(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -304,3 +364,32 @@ ITC_TYPE67_SCREENS(822487B8, ColorNodeTableMarkSelected)
 ITC_TYPE67_SCREENS(822483B0, ColorNodeTableRefresh)
 ITC_TYPE67_SCREENS(82248650, ColorNodeTableReset)
 ITC_TYPE67_SCREENS(82248800, PairedNodeTableRefresh)
+// The list part and its inner part (the list screens' slots and
+// destructors, recompiled where not yet native, and the part's and the
+// inner's vtables and the inner's page and step tables; never seen in play).
+ITC_TYPE67_SCREENS(82252420, ListPartBaseDestruct)
+ITC_TYPE67_SCREENS(82252600, ListPartInnerBaseDestruct)
+ITC_TYPE67_SCREENS(82252610, ListPartBaseDeletingDestruct)
+ITC_TYPE67_SCREENS(82252658, ListPartInnerBaseDeletingDestruct)
+ITC_TYPE67_SCREENS(822526F8, ListPartInnerDestruct)
+ITC_TYPE67_SCREENS(822529B0, ListPartInnerDeletingDestruct)
+ITC_TYPE67_SCREENS(82252968, ListPartDestruct)
+ITC_TYPE67_SCREENS(82252A38, ListPartDeletingDestruct)
+ITC_TYPE67_SCREENS(82252430, ListPartOpen)
+ITC_TYPE67_SCREENS(82252490, ListPartPick)
+ITC_TYPE67_SCREENS(82252500, ListPartInput)
+ITC_TYPE67_SCREENS(82252530, ListPartClose)
+ITC_TYPE67_SCREENS(82252590, ListPartIsIdle)
+ITC_TYPE67_SCREENS(822525B8, ListPartCanLeave)
+ITC_TYPE67_SCREENS(82252A88, ListPartInnerOpen)
+ITC_TYPE67_SCREENS(82252A00, ListPartInnerPick)
+ITC_TYPE67_SCREENS(82252DF0, ListPartInnerInput)
+ITC_TYPE67_SCREENS(82252748, ListPartInnerIsIdle)
+ITC_TYPE67_SCREENS(82252740, ListPartInnerClose)
+ITC_TYPE67_SCREENS(822528C8, ListPartInnerCanLeave)
+ITC_TYPE67_SCREENS(82252778, ListPartInnerPage0)
+ITC_TYPE67_SCREENS(82252878, ListPartInnerPage1)
+ITC_TYPE67_SCREENS(822528A8, ListPartInnerPage2)
+ITC_TYPE67_SCREENS(82252BB8, ListPartInnerStep0)
+ITC_TYPE67_SCREENS(82252C98, ListPartInnerStep1)
+ITC_TYPE67_SCREENS(82252D38, ListPartInnerStep2)
