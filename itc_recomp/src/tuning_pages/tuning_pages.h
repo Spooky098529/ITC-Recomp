@@ -592,4 +592,29 @@ uint64_t InputLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uin
 uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                        uint32_t sp, bool native_slots);
 
+// sub_821FFB20 TuningScreen::MoveVinylLayers: state 24's movie side (its
+// row): on a move with +9708 set, a layer's row (195 + c, or 169 + c past
+// page 0) restarted and looped with 44 to 46 finished and 46 played, or a
+// button's (44, 45) with the layers' rows and 213 (189) finished; on A over
+// a layer the rows finished and the picker's row (198 + c or 172 + c)
+// played; else B asked, its answer's low byte stored into the frame's +80.
+// 128-byte frame; the last call's r3, else the movie's entry or the slot's.
+uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, bool native_slots);
+// sub_82208CE0 TuningScreen::InputVinylLayers: state 24's page (its row):
+// with the load wait [0x826D84B8] 0, up, down, left and right on the cursor
+// +30732 (the layers 0 to 2, the buttons 3 and 4), A (an empty layer: the
+// wait started, the picker's row played, the page's six picker textures put
+// back to their placeholder; a layer with an image: Push(24), Go(25, 17);
+// the buttons Go(35, 30) or Go(36, 30)) or B (the cursor to 4), then
+// MoveVinylLayers unless the wait started; with the wait set, its count: on
+// 3 the picker's window freed (FreeTexture) and loaded (LoadWindow) from
+// +30764, past 3 once nothing loads the window's middle texture bound to
+// the layer's movie texture and Push(24), Go(28, 22), then MoveVinylLayers.
+// 176-byte frame; MoveVinylLayers', LoadWindow's or the last call's r3.
+// Texture::Free as GuestTextureFree's with the native heap and car models'
+// flag.
+uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, const PageFlags& flags);
+
 }  // namespace tuning_pages

@@ -113,7 +113,10 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "sub_82201620 (no adapters: only their pages call them; HighlightSelected "
               "through the guest, the UI movies' FindNode by its plain C++); state 26's page "
               "InputLayerEdit sub_82205110 with its movie side MoveLayerEdit sub_82200760 (no "
-              "adapter: only InputLayerEdit calls it)) "
+              "adapter: only InputLayerEdit calls it); state 24's page InputVinylLayers "
+              "sub_82208CE0 with its movie side MoveVinylLayers sub_821FFB20 (no adapter: only "
+              "InputVinylLayers calls it; FreeTexture, LoadWindow and RestoreStickerTexture by "
+              "their plain C++)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -684,6 +687,24 @@ void TuningPagesMoveLayerEdit(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesInputVinylLayers(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputVinylLayers(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesMoveVinylLayers(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveVinylLayers(base, call, screen, sp, native_slots);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -736,6 +757,7 @@ ITC_TUNING_PAGES(82206A50, TuningPagesInputDecalPosition)
 ITC_TUNING_PAGES(82206F48, TuningPagesInputDecalAngle)
 ITC_TUNING_PAGES(82207320, TuningPagesInputDecalScale)
 ITC_TUNING_PAGES(82205110, TuningPagesInputLayerEdit)
+ITC_TUNING_PAGES(82208CE0, TuningPagesInputVinylLayers)
 
 // No adapter (B7 loop, 2026-11-13: its only caller, InputVinylView, is native
 // and calls its plain C++; the register step above is the harness's):
@@ -749,7 +771,8 @@ ITC_TUNING_PAGES(82205110, TuningPagesInputLayerEdit)
 // InputDecalPosition, InputDecalAngle and InputDecalScale, are native and
 // call their plain C++; the register steps above are the harness's):
 // MoveDecalPosition sub_82200DC0, MoveDecalAngle sub_822012E8, MoveDecalScale
-// sub_82201620; MoveLayerEdit sub_82200760 (InputLayerEdit).
+// sub_82201620; MoveLayerEdit sub_82200760 (InputLayerEdit); MoveVinylLayers
+// sub_821FFB20 (InputVinylLayers).
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above

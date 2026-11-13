@@ -1018,4 +1018,318 @@ uint64_t InputLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uin
   return MoveLayerEdit(base, call, screen, frame, flags.native_slots);
 }
 
+namespace {
+
+constexpr uint32_t kLayersWait = 0x826D84B8;  // InputVinylLayers' load wait (a frame count)
+
+}  // namespace
+
+uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_821FFB20 TuningScreen::MoveVinylLayers");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, found);
+  Reads asked{base, call, entry, frame, native_slots, found};
+  auto finish = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::FinishNamed(call, frame, lr, movie, named);
+  };
+  auto play = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::PlayNamed(call, frame, lr, movie, named, 1);
+  };
+  auto loop = [&](uint64_t named, uint32_t lr) {
+    return tuning_screen::LoopNamed(call, frame, lr, movie, named);
+  };
+  static constexpr uint32_t kMoves[9] = {153, 167, 154, 168, 156, 170, 155, 169, 158};
+  static constexpr uint32_t kMoveLrs[9] = {0x821FFB88, 0x821FFBB4, 0x821FFBE0,
+                                           0x821FFC0C, 0x821FFC38, 0x821FFC64,
+                                           0x821FFC90, 0x821FFCBC, 0x821FFCE8};
+  bool moved = false;
+  for (uint32_t k = 0; k < 9 && !moved; k++) {
+    moved = asked(48, kMoves[k], kMoveLrs[k]);
+  }
+  if (moved) {
+    if (Load(base, s + 9708) == 0) {
+      return asked.r3;
+    }
+    const uint32_t c = Load(base, s + 30732);
+    const bool page0 = int32_t(Load(base, s + 30724)) == 0;
+    if (c >= 5) {
+      return asked.r3;
+    }
+    if (c == 3 || c == 4) {
+      // A button: the layers' rows and the other button finished, the
+      // button's row restarted and looped.
+      static constexpr uint32_t kLrs3[2][4] = {{0x821FFECC, 0x821FFED8, 0x821FFEE4, 0x821FFEF0},
+                                               {0x821FFF00, 0x821FFF0C, 0x821FFF18, 0x821FFF24}};
+      static constexpr uint32_t kLrs4[2][4] = {{0x821FFE10, 0x821FFE1C, 0x821FFE28, 0x821FFE34},
+                                               {0x821FFE44, 0x821FFE50, 0x821FFE5C, 0x821FFE68}};
+      const uint32_t(&lrs)[4] = c == 3 ? kLrs3[page0 ? 0 : 1] : kLrs4[page0 ? 0 : 1];
+      const uint64_t first = page0 ? 195 : 169, bar = page0 ? 213 : 189;
+      for (uint32_t k = 0; k < 3; k++) {
+        finish(first + k, lrs[k]);
+      }
+      finish(bar, lrs[3]);
+      const uint64_t button = c == 3 ? 44 : 45;
+      play(bar, c == 3 ? 0x821FFF40 : 0x821FFE84);
+      finish(button, c == 3 ? 0x821FFF4C : 0x821FFE90);
+      play(button, c == 3 ? 0x821FFF68 : 0x821FFEAC);
+      return loop(button, 0x821FFF74);
+    }
+    // A layer's row restarted and looped, the buttons finished, 46 played.
+    static constexpr uint32_t kFinishLrs[3][2] = {
+        {0x82200060, 0x8220008C}, {0x821FFFF8, 0x82200024}, {0x821FFF90, 0x821FFFBC}};
+    static constexpr uint32_t kPlayLrs[3][2] = {
+        {0x8220007C, 0x822000A8}, {0x82200014, 0x82200040}, {0x821FFFAC, 0x821FFFD8}};
+    const uint64_t row = (page0 ? 195 : 169) + c;
+    finish(row, kFinishLrs[c][page0 ? 0 : 1]);
+    play(row, kPlayLrs[c][page0 ? 0 : 1]);
+    loop(row, 0x822000B4);
+    finish(44, 0x822000C0);
+    finish(45, 0x822000CC);
+    finish(46, 0x822000D8);
+    return play(46, 0x822000F4);
+  }
+  if (asked(40, 159, 0x821FFD14)) {
+    // A: on a layer, the rows finished and the layer's picker row played.
+    const int32_t c = int32_t(Load(base, s + 30732));
+    if (c < 0 || c > 2) {
+      return asked.r3;
+    }
+    const bool page0 = int32_t(Load(base, s + 30724)) == 0;
+    if (page0) {
+      finish(195, 0x821FFD48);
+      finish(196, 0x821FFD54);
+      finish(197, 0x821FFD60);
+    } else {
+      finish(169, 0x821FFD74);
+      finish(170, 0x821FFD80);
+      finish(171, 0x821FFD8C);
+    }
+    const uint64_t named = uint64_t(Load(base, s + 30732)) + (page0 ? 198 : 172);
+    return play(named, 0x822000F4);
+  }
+  // B asked; its answer's low byte stored into the frame (nothing else).
+  if (int32_t(Load(base, entry + 4)) == 1) {
+    return asked.r3;
+  }
+  asked(40, 158, 0x821FFDBC);
+  Store(base, frame + 80, uint32_t(asked.r3 & 0xFF));
+  return asked.r3;
+}
+
+uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_82208CE0 TuningScreen::InputVinylLayers");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 176);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, found);
+  const uint64_t images = screen + 10048;
+  const bool native_free = flags.native_heap && flags.native_free;
+  Reads asked{base, call, entry, frame, flags.native_slots, found};
+  // r3 as the original leaves it: the last call's (the reads' while no
+  // other call follows them).
+  uint64_t r3 = found;
+  bool called = false;
+  auto sound = [&](uint64_t cue, uint32_t lr) {
+    r3 = call(kMenuSoundPlay, {cue}, frame, lr);
+    called = true;
+  };
+  auto finish = [&](uint64_t named, uint32_t lr) {
+    r3 = tuning_screen::FinishNamed(call, frame, lr, movie, named);
+    called = true;
+  };
+  auto cursor = [&] { return int32_t(Load(base, s + 30732)); };
+  // Push(24), then Go(state, command).
+  auto go = [&](uint32_t state, uint32_t command) {
+    Push(base, s, 24);
+    Go(base, s, state, command);
+  };
+  if (Load(base, kLayersWait) == 0) {
+    bool answered = true;
+    if (asked(48, 153, 0x82208D6C) || asked(48, 167, 0x82208D98)) {
+      // Up: from the first layer to the button last left (+30736), from the
+      // buttons to the last layer.
+      sound(4, 0x82209464);
+      const int32_t c = cursor();
+      if (c == 0) {
+        Store(base, s + 30732, Load(base, s + 30736));
+      } else if (c > 0 && c < 3) {
+        Store(base, s + 30732, uint32_t(c - 1));
+      } else if (c == 3 || c == 4) {
+        Store(base, s + 30732, 2);
+      } else {
+        answered = false;
+      }
+      if (answered) {
+        Store(base, s + 9708, 1);
+      }
+    } else if (asked(48, 154, 0x82208DC4) || asked(48, 168, 0x82208DF0)) {
+      // Down: from the last layer to the button, from the buttons to the
+      // first layer.
+      sound(4, 0x82209418);
+      const int32_t c = cursor();
+      if (c == 2) {
+        Store(base, s + 30732, Load(base, s + 30736));
+      } else if (c >= 0 && c < 2) {
+        Store(base, s + 30732, uint32_t(c + 1));
+      } else if (c == 3 || c == 4) {
+        Store(base, s + 30732, 0);
+      } else {
+        answered = false;
+      }
+      if (answered) {
+        Store(base, s + 9708, 1);
+      }
+    } else if (asked(48, 155, 0x82208E1C) || asked(48, 169, 0x82208E48)) {
+      // Left: between the buttons only.
+      const int32_t c = cursor();
+      if (c == 3 || c == 4) {
+        sound(4, 0x822093F0);
+        const int32_t next = cursor() - 1;
+        Store(base, s + 9708, 1);
+        Store(base, s + 30732, uint32_t(next));
+        if (next < 3) {
+          Store(base, s + 30732, 4);
+        }
+        Store(base, s + 30736, Load(base, s + 30732));
+      }
+    } else if (asked(48, 156, 0x82208E74) || asked(48, 170, 0x82208EA0)) {
+      // Right: the same the other way.
+      const int32_t c = cursor();
+      if (c == 3 || c == 4) {
+        sound(4, 0x822093A8);
+        const int32_t next = cursor() + 1;
+        Store(base, s + 9708, 1);
+        Store(base, s + 30732, uint32_t(next));
+        if (next > 4) {
+          Store(base, s + 30732, 3);
+        }
+        Store(base, s + 30736, Load(base, s + 30732));
+      }
+    } else if (asked(40, 159, 0x82208ECC)) {
+      sound(0, 0x82208EDC);
+      const int32_t c = cursor();
+      Store(base, s + 9708, 1);
+      Store(base, s + 9716, 1);
+      if (c >= 0 && c <= 2) {
+        const uint32_t page = Load(base, s + 30724);
+        const uint32_t id = Load(base, ((page * 3 + uint32_t(c) + 7798) << 2) + s);
+        if (int32_t(id) == -1) {
+          // An empty layer: the image picker's wait started, the picker's
+          // row played, the page's six picker textures put back to their
+          // placeholder.
+          Store(base, s + 30764, 0);
+          Store(base, s + 30768, 0);
+          Store(base, kLayersWait, 1);
+          const bool page0 = int32_t(page) == 0;
+          if (page0) {
+            finish(195, 0x82208F3C);
+            finish(196, 0x82208F48);
+            finish(197, 0x82208F54);
+          } else {
+            finish(169, 0x82208F68);
+            finish(170, 0x82208F74);
+            finish(171, 0x82208F80);
+          }
+          const uint64_t named = uint64_t(Load(base, s + 30732)) + (page0 ? 198 : 172);
+          r3 = tuning_screen::PlayNamed(call, frame, 0x82208FA0, movie, named, 1);
+          const int32_t now = int32_t(Load(base, s + 30724));
+          if (now == 0 || now == 1) {
+            const uint32_t slots = now == 0 ? 672 : 640;
+            const uint32_t placeholder = now == 0 ? 8836 : 8840;
+            const uint32_t first = now == 0 ? 168 : 160;
+            for (uint32_t k = 0; k < 6; k++) {
+              const uint32_t again = Load(base, tuning_screen::MovieEntry(base, frame, 13));
+              const uint32_t value = Load(base, uint32_t(images) + placeholder);
+              const uint32_t slot = Load(base, Load(base, again + 28) + slots + 4 * k);
+              Store(base, slot, value);
+              r3 = RestoreStickerTexture(base, images, uint32_t(now), first + k, frame);
+            }
+          }
+        } else {
+          // A layer with an image: its actions.
+          Store(base, s + 30740, 0);
+          go(25, 17);
+        }
+      } else if (c == 3) {
+        Store(base, s + 30772, 0);
+        go(35, 30);
+      } else if (c == 4) {
+        Store(base, s + 30776, 0);
+        go(36, 30);
+      }
+    } else if (asked(40, 158, 0x82209370)) {
+      // B: to the second button.
+      sound(2, 0x82209380);
+      Store(base, s + 30736, 4);
+      Store(base, s + 30732, 4);
+      Store(base, s + 9708, 1);
+    }
+    if (!called) {
+      r3 = asked.r3;
+    }
+    if (Load(base, kLayersWait) == 0) {
+      return MoveVinylLayers(base, call, screen, frame, flags.native_slots);
+    }
+  }
+  // The wait: on its third frame the picker's window freed and loaded from
+  // the picked image; after it, once nothing loads, the window's middle
+  // texture bound to the layer and the image picker.
+  const uint32_t count = Load(base, kLayersWait) + 1;
+  Store(base, kLayersWait, count);
+  if (int32_t(count) == 3) {
+    const int32_t page = int32_t(Load(base, s + 30724));
+    if (page != 0 && page != 1) {
+      return r3;
+    }
+    const uint32_t first = page == 0 ? 12 : 33;
+    for (uint32_t k = 0; k < 9; k++) {
+      FreeTexture(base, images, first + k,
+                  GuestTextureFree(base, call, frame, page == 0 ? 0x822094E4 : 0x822095E0,
+                                   native_free));
+    }
+    const uint64_t picked = Load(base, s + 30764);
+    const uint64_t x = picked - 4;
+    uint64_t v;
+    if (page == 0) {
+      // Brought into 0 to 4, twice at most.
+      auto once = [](uint64_t y) {
+        return int32_t(y) < 5 ? (int32_t(y) >= 0 ? y : y + 5) : y - 5;
+      };
+      v = once(once(x)) + 163;
+    } else {
+      v = (int32_t(x) >= 194 ? x - 194 : int32_t(x) < 0 ? x + 194 : x) + 189;
+    }
+    return LoadWindow(base, call, images, v, first, 9, uint32_t(page), frame);
+  }
+  if (int32_t(count) < 3) {
+    // (A wait of -1 comes to 0 here: the movie side runs.)
+    if (count == 0) {
+      return MoveVinylLayers(base, call, screen, frame, flags.native_slots);
+    }
+    return r3;
+  }
+  for (uint32_t i = 0; i < 200; i++) {
+    if (int32_t(Load(base, uint32_t(images) + 36 * i + 8)) == 1) {
+      return r3;
+    }
+  }
+  const int32_t page = int32_t(Load(base, s + 30724));
+  if (page == 0 || page == 1) {
+    const uint32_t header = Load(base, s + (page == 0 ? 10652 : 11408));
+    const uint32_t n = Load(base, s + 30732) + (page == 0 ? 191 : 194);
+    Store(base, Load(base, Load(base, movie + 28) + (n << 2)), header);
+  }
+  Store(base, s + 9708, 1);
+  Store(base, s + 9716, 1);
+  Store(base, kLayersWait, 0);
+  go(28, 22);
+  return MoveVinylLayers(base, call, screen, frame, flags.native_slots);
+}
+
 }  // namespace tuning_pages

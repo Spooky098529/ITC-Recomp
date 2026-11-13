@@ -90,6 +90,8 @@ constexpr uint32_t kFadeOut = 0x826A50E4;
 constexpr uint32_t kSoundManager = 0x826C5C80;
 constexpr uint32_t kCarScene = 0x826C2E44;
 constexpr uint32_t kStandHolder = 0x826D83E0;
+constexpr uint32_t kVinylWaits = 0x826D84A4;  // to 0x826D84C0
+constexpr uint32_t kLayersWait = 0x826D84B8;  // InputVinylLayers' load wait
 // A leaf that stores r4's low byte, r5 and r6 at r3 + 320, 332 and 336 (the
 // menu sounds' harness's recorder): the sound manager's slot 10, PlayCue2D.
 constexpr uint32_t kRecordR4R6 = 0x820A8420;
@@ -115,6 +117,7 @@ constexpr Global kGlobals[] = {
     {kSoundManager, 4},
     {kCarScene, 4},
     {kStandHolder, 4},
+    {kVinylWaits, 32},  // the vinyl editor's wait words
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -1548,6 +1551,67 @@ void LayerEditFields(PPCContext& t, Random& r, const World& w) {
   }
 }
 
+// The vinyl page's layers (InputVinylLayers, MoveVinylLayers): the page
+// +30724 -1 to 2 (the layer ids index it unchecked), the cursor +30732 -1 to
+// 5 (now and then any word without the wait), the button left +30736 3 or 4 (now and then
+// 0 to 2), the layers' saved ids +31192 + 12 x page + 4c -1 half the time,
+// the picked image +30764 around both lists, +9708 0 or 1; the load wait 0
+// half the time, else 1 to 5 (now and then -1); the picker windows'
+// entries (12 to 20, 33 to 41) with no texture (0 header and data:
+// Texture::Free frees nothing) or held by the kept slot of their index; now and then no
+// entry loading (the wait's end); the action now and then one move, A or
+// B.
+void VinylLayerFields(PPCContext& t, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30724, uint32_t(int32_t(r.Below(4)) - 1));
+  const uint32_t cursor = uint32_t(int32_t(r.Below(7)) - 1);
+  const uint32_t any = uint32_t(r.Next());
+  guest::StoreU32(base, s + 30736, r.Below(5) == 0 ? r.Below(3) : 3 + r.Below(2));
+  for (uint32_t k = 0; k < 12; k++) {
+    guest::StoreU32(base, s + 31180 + 4 * k, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(200));
+  }
+  guest::StoreU32(base, s + 30764, uint32_t(int32_t(r.Below(210)) - 8));
+  guest::StoreU32(base, s + 9708, r.Below(3) == 0 ? 0 : 1);
+  const uint32_t wait = r.Below(2) == 0 ? 0 : r.Below(10) == 0 ? 0xFFFFFFFFu : 1 + r.Below(5);
+  guest::StoreU32(base, kLayersWait, wait);
+  // (Past the wait the cursor indexes the movie's textures: any word only
+  // without it.)
+  guest::StoreU32(base, s + 30732, wait == 0 && r.Below(10) == 0 ? any : cursor);
+  const uint32_t images = s + 10048;
+  for (const uint32_t first : {12u, 33u}) {
+    for (uint32_t i = first; i < first + 9; i++) {
+      const uint32_t e = images + 36 * i;
+      if (r.Below(2) == 0) {
+        guest::StoreU32(base, e + 28, 0);
+        guest::StoreU32(base, e + 32, 0);
+      } else {
+        // Kept slot i (distinct: a slot taken twice would leave an entry
+        // unheld, its random texture freed).
+        guest::StoreU32(base, images + 7236 + 8 * i, guest::LoadU32(base, e + 28));
+      }
+    }
+  }
+  if (r.Below(2) == 0) {
+    for (uint32_t i = 0; i < 200; i++) {
+      if (guest::LoadU32(base, images + 36 * i + 8) == 1) {
+        guest::StoreU32(base, images + 36 * i + 8, 0);
+      }
+    }
+  }
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 155, 169, 156, 170, 159, 159, 158, 158};
+  const uint32_t pick = r.Below(15);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (pick < 12) {
+    const uint32_t bit = 1u << (kActions[pick] - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, pick >= 8 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, pick < 8 ? bit : 0);
+  }
+  HighWord(t, r);
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -1750,6 +1814,17 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputLayerEdit", 400, __imp__sub_82205110, hooks::TuningPagesInputLayerEdit,
        24, {{112, 160}}, LayerEditFields});
+  // The vinyl page's layers: MoveVinylLayers' __savegprlr_29 (32 bytes);
+  // InputVinylLayers' __savegprlr_22 (88) with its callees' saves its
+  // native version doesn't write: MoveVinylLayers', RestoreStickerTexture's
+  // and LoadWindow's (176 to 232 below), Reload's under LoadWindow (320 to
+  // 336); Archive::Load recorded.
+  Run(h, w,
+      {"TuningScreen::MoveVinylLayers", 300, __imp__sub_821FFB20,
+       hooks::TuningPagesMoveVinylLayers, 32, {}, VinylLayerFields});
+  Run(h, w,
+      {"TuningScreen::InputVinylLayers", 400, __imp__sub_82208CE0,
+       hooks::TuningPagesInputVinylLayers, 88, {{176, 232}, {320, 336}}, VinylLayerFields, true});
 }
 
 }  // namespace harness
