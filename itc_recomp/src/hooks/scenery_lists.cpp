@@ -594,7 +594,9 @@ ITC_SCENERY_LISTS(82147FB8, SceneryListsModelListRelease)
 ITC_SCENERY_LISTS(82146AA8, SceneryListsResetDrawState)
 ITC_SCENERY_LISTS(82146B80, SceneryListsAnimationCurrentFrame)
 ITC_SCENERY_LISTS(8228F408, SceneryListsCourseLayout)
-ITC_SCENERY_LISTS(82147B18, SceneryListsPointListIsEntryOn)
+// PointList::IsEntryOn (sub_82147B18) has no adapter (removed 2026-11-13, B7
+// loop): its callers in play, Scenery::DrawSetLists and Minimap::Draw, call
+// its plain C++.
 ITC_SCENERY_LISTS(82148650, SceneryListsSetBillboardPass)
 ITC_SCENERY_LISTS(825951E0, SceneryListsIsShapeVisible)
 ITC_SCENERY_LISTS(82595490, SceneryListsRecordSceneLights)

@@ -28,7 +28,9 @@ ITC_FLAG_BOOL(native_minimap, true, "ITC",
               "its adapter), Minimap::Draw sub_820F5740 (inside frame interpolation's wrap; with "
               "--native_scenery_lists, --native_matrix_math, --native_vehicle_accessors, "
               "--native_car_physics, --native_math and --native_c_runtime and the command list's "
-              "diagnostics off, else its original)) natively instead "
+              "diagnostics off, else its original); since it is native, RacerVehicle, SetList::Point, "
+              "RacerMarkerType, Scaling, List80::Insert and Copy and the marker draws have no "
+              "adapters: the flag switches their callers) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=minimap)");
 
@@ -278,25 +280,14 @@ void MinimapDrawPointMarker(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_MINIMAP(82170608, MinimapFindPlayerEntry)
-ITC_MINIMAP(82170578, MinimapRacerVehicle)
-ITC_MINIMAP(82147D18, MinimapSetListPoint)
-ITC_MINIMAP(820F2D28, MinimapRacerMarkerType)
-ITC_MINIMAP(820F2EF8, MinimapScaling)
-ITC_MINIMAP(820F5238, MinimapList80Insert)
-ITC_MINIMAP(820F51A8, MinimapList80Copy)
 ITC_MINIMAP(8217AEA8, MinimapRecordTransform)
 ITC_MINIMAP(8217DAA0, MinimapTriangleRecord)
 
-// The marker draws: also only with native atexit (their tables' first use).
-#define ITC_MINIMAP_MARKER(address, step)                        \
-  extern "C" REX_FUNC(sub_##address) {                           \
-    REX_FUNC_PROLOGUE();                                         \
-    if (!ITC_FLAG(native_minimap) || !hooks::NativeAtexit()) {   \
-      __imp__sub_##address(ctx, base);                           \
-      return;                                                    \
-    }                                                            \
-    hooks::step(ctx, base);                                      \
-  }
-
-ITC_MINIMAP_MARKER(820F4888, MinimapDrawCarMarker)
-ITC_MINIMAP_MARKER(820F4BA8, MinimapDrawPointMarker)
+// No adapters (removed 2026-11-13, B7 loop, once Minimap::Draw, their only
+// caller in play, was native and calls their plain C++; a temporary counter
+// showed none called in an attract race): Race::RacerVehicle (sub_82170578,
+// also from Racers::NearestHumanVehicle's plain C++), SetList::Point
+// (sub_82147D18), Minimap::RacerMarkerType (sub_820F2D28), Minimap::Scaling
+// (sub_820F2EF8), List80::Insert (sub_820F5238), List80::Copy (sub_820F51A8),
+// Minimap::DrawCarMarker (sub_820F4888) and DrawPointMarker (sub_820F4BA8).
+// Their register steps above stay for the harness.
