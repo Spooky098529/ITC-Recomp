@@ -119,12 +119,18 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "their plain C++); state 28's page InputVinylImages sub_822058F8 with its movie "
               "side MoveVinylImages sub_82202530 (no adapter: only InputVinylImages calls it; "
               "Scroll, LoadWindow, Reload, FreeTexture, FreeKept and BindVinylTexture by their "
-              "plain C++, the sticker editor's sub_821FD5C0 and sub_821FD658 through the "
-              "guest); state 25's page InputLayerActions sub_82209738 (not seen in play) with "
+              "plain C++, the sticker editor's sub_821FD5C0 and sub_821FD658 by their plain "
+              "C++); state 25's page InputLayerActions sub_82209738 (not seen in play) with "
               "its movie side MoveLayerActions sub_82200230 and BeginLayerOrder sub_821FE370 "
               "(no adapters: only InputLayerActions calls them; HighlightSelected, FreeTexture, "
-              "LoadWindow, RestoreStickerTexture and memcpy by their plain C++, the sticker "
-              "editor's sub_821FD658 through the guest)) "
+              "LoadWindow, RestoreStickerTexture and memcpy by their plain C++); state 27's page "
+              "InputLayerOrder sub_8220A1C8 (not seen in play) with SwapOrderTextures "
+              "sub_82207F38 and SwapLayerRecords sub_821FD518 (adapters: the recompiled "
+              "TuningScreen::Command21 calls them too), EndLayerOrder sub_821FE3C8, "
+              "ShowOrderNodes sub_82203A30 and MoveLayerOrder sub_82201DB8 (no adapters: only "
+              "InputLayerOrder calls them); the sticker editor's SetGroupImage sub_821FD5C0 "
+              "(its piece sub_821FD5F0 merged) and SetImageGroup sub_821FD658 (no adapters: "
+              "only InputVinylImages and InputLayerActions call them)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -762,6 +768,52 @@ void TuningPagesBeginLayerOrder(PPCContext& ctx, uint8_t* base) {
   tp::BeginLayerOrder(base, ctx.r3.u64);
 }
 
+void TuningPagesInputLayerOrder(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputLayerOrder(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesSwapOrderTextures(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::SwapOrderTextures(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void TuningPagesSwapLayerRecords(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64, first = ctx.r4.u64, second = ctx.r5.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::SwapLayerRecords(base, call, screen, first, second, sp);
+  });
+}
+
+void TuningPagesEndLayerOrder(PPCContext& ctx, uint8_t* base) {
+  tp::EndLayerOrder(base, ctx.r3.u64);
+}
+
+void TuningPagesShowOrderNodes(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::ShowOrderNodes(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void TuningPagesMoveLayerOrder(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveLayerOrder(base, call, screen, sp, native_slots);
+  });
+}
+
+void TuningPagesSetGroupImage(PPCContext& ctx, uint8_t* base) {
+  tp::SetGroupImage(base, ctx.r3.u64, ctx.r4.u64);
+}
+
+void TuningPagesSetImageGroup(PPCContext& ctx, uint8_t* base) {
+  tp::SetImageGroup(base, ctx.r3.u64, ctx.r4.u64);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -810,6 +862,9 @@ ITC_TUNING_PAGES(82205110, TuningPagesInputLayerEdit)
 ITC_TUNING_PAGES(82208CE0, TuningPagesInputVinylLayers)
 ITC_TUNING_PAGES(822058F8, TuningPagesInputVinylImages)
 ITC_TUNING_PAGES(82209738, TuningPagesInputLayerActions)
+ITC_TUNING_PAGES(8220A1C8, TuningPagesInputLayerOrder)
+ITC_TUNING_PAGES(82207F38, TuningPagesSwapOrderTextures)
+ITC_TUNING_PAGES(821FD518, TuningPagesSwapLayerRecords)
 
 // No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
 // native and call their plain C++; the register steps above are the
@@ -828,6 +883,13 @@ ITC_TUNING_PAGES(82209738, TuningPagesInputLayerActions)
 // No adapters (B7 loop, 2026-11-13: their only caller, InputLayerActions, is
 // native and calls their plain C++; the register steps above are the
 // harness's): MoveLayerActions sub_82200230, BeginLayerOrder sub_821FE370.
+
+// No adapters (B7 loop, 2026-11-13: their only caller, InputLayerOrder, is
+// native and calls their plain C++; the register steps above are the
+// harness's): EndLayerOrder sub_821FE3C8, ShowOrderNodes sub_82203A30,
+// MoveLayerOrder sub_82201DB8. The sticker editor's SetGroupImage
+// sub_821FD5C0 (its piece sub_821FD5F0 merged) and SetImageGroup sub_821FD658:
+// their only callers, InputVinylImages and InputLayerActions, are native.
 
 // No adapters (B7 loop, 2026-11-13: their only callers, the decal edit pages
 // InputDecalPosition, InputDecalAngle and InputDecalScale, are native and

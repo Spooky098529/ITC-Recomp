@@ -200,4 +200,18 @@ void TuningPagesInputLayerActions(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveLayerActions(PPCContext& ctx, uint8_t* base);
 void TuningPagesBeginLayerOrder(PPCContext& ctx, uint8_t* base);
 
+// InputLayerOrder sub_8220A1C8, SwapOrderTextures sub_82207F38 and
+// SwapLayerRecords sub_821FD518 (adapters: TuningScreen::Command21, recompiled,
+// calls the last two); EndLayerOrder sub_821FE3C8, ShowOrderNodes
+// sub_82203A30, MoveLayerOrder sub_82201DB8, SetGroupImage sub_821FD5C0 and
+// SetImageGroup sub_821FD658 (no adapters: the harness's steps).
+void TuningPagesInputLayerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesSwapOrderTextures(PPCContext& ctx, uint8_t* base);
+void TuningPagesSwapLayerRecords(PPCContext& ctx, uint8_t* base);
+void TuningPagesEndLayerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowOrderNodes(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveLayerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetGroupImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetImageGroup(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -93,6 +93,7 @@ constexpr uint32_t kStandHolder = 0x826D83E0;
 constexpr uint32_t kVinylWaits = 0x826D84A4;  // to 0x826D84C0
 constexpr uint32_t kLayersWait = 0x826D84B8;  // InputVinylLayers' load wait
 constexpr uint32_t kActionsWait = 0x826D84BC;  // InputLayerActions' load wait
+constexpr uint32_t kOrderCount = 0x826D84C0;   // InputLayerOrder's frame count
 // A leaf that stores r4's low byte, r5 and r6 at r3 + 320, 332 and 336 (the
 // menu sounds' harness's recorder): the sound manager's slot 10, PlayCue2D.
 constexpr uint32_t kRecordR4R6 = 0x820A8420;
@@ -1747,6 +1748,89 @@ void LayerActionFields(PPCContext& t, Random& r, const World& w) {
   }
 }
 
+// The layer order (InputLayerOrder, MoveLayerOrder, ShowOrderNodes,
+// SwapOrderTextures, SwapLayerRecords, EndLayerOrder): the image picker's
+// fields (above: the page -1 to 2, the vinyls most of the time, 164 now and
+// then held) with the history's depth 3 to 42 and a 24 below its top, the
+// layer +30732 0 to 2 (now and then 3 or 4: the named animations' index), the position
+// +30756 -1 to 3 and the last +30792 0 to 3 (the work list's words they
+// index stay inside the screen), the move's way +30760 0 to 3, the work
+// list's ids +31216 + 4k -1 or an image and indices +31228 + 4k 0 to 2
+// (they index the image entries), the frame count [0x826D84C0] 0 half the
+// time, else 9, 12 (their next frames the work), 1 to 14 or -1; the action
+// now and then one of up, down, A, B or 164 held (held now and then with
+// the others too); SwapLayerRecords' r4 and r5 -1 to 3 (now and then with
+// a high word).
+void LayerOrderFields(PPCContext& t, Random& r, const World& w) {
+  VinylImageFields(t, r, w);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30732, r.Below(6) == 0 ? 3 + r.Below(2) : r.Below(3));
+  // The history: a 24 below its top (the count's end pops down to it; the
+  // original loops until it finds one), now and then 28 on top.
+  const uint32_t depth = 3 + r.Below(40);
+  guest::StoreU8(base, s + 10008, uint8_t(depth));
+  guest::StoreU32(base, s + 9756 + 4 * r.Below(depth - 2), 24);
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, s + 9756 + 4 * (depth - 1), 28);
+  }
+  guest::StoreU32(base, s + 30756, uint32_t(int32_t(r.Below(5)) - 1));
+  guest::StoreU32(base, s + 30792, r.Below(4));
+  guest::StoreU32(base, s + 30760, r.Below(4));
+  for (uint32_t k = 0; k < 3; k++) {
+    guest::StoreU32(base, s + 31216 + 4 * k, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(200));
+    guest::StoreU32(base, s + 31228 + 4 * k, r.Below(3));
+  }
+  static constexpr uint32_t kCounts[] = {9, 12, 9, 12, 0xFFFFFFFFu};
+  const uint32_t count = r.Below(2) == 0 ? 0
+                         : r.Below(3) == 0 ? 1 + r.Below(14)
+                                           : kCounts[r.Below(5)];
+  guest::StoreU32(base, kOrderCount, count);
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 159, 159, 158, 158, 164};
+  const uint32_t pick = r.Below(11);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (pick < 9) {
+    const uint32_t action = kActions[pick];
+    const uint32_t bit = 1u << (action - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 448,
+                    action == 164 || r.Below(8) == 0 ? 1u << (164 - 151) : 0);
+    guest::StoreU32(base, mapper + 456, action == 159 || action == 158 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, action < 158 || action > 159 ? bit : 0);
+  }
+  auto around = [&r] {
+    uint64_t v = uint64_t(int64_t(int32_t(r.Below(5)) - 1));
+    if (r.Below(2) == 0) {
+      v &= 0xFFFFFFFFu;
+    }
+    if (r.Below(6) == 0) {
+      v += r.Next() << 32;
+    }
+    return v;
+  };
+  t.r4.u64 = around();
+  t.r5.u64 = around();
+}
+
+// The sticker editor's group helpers (SetGroupImage, SetImageGroup): r4 the
+// group -2 to 13 or the image -5 to 200 around the bounds, now and then any
+// doubleword.
+void GroupFields(PPCContext& t, Random& r, const World& w) {
+  (void)w;
+  HighWord(t, r);
+  switch (r.Below(4)) {
+    case 0: t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(16)) - 2)); break;
+    case 1: t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(206)) - 5)); break;
+    case 2: {
+      static constexpr int32_t kBounds[] = {43, 78, 106, 114, 142, 156, 165, 175, 180, 187, 192};
+      t.r4.u64 = uint64_t(int64_t(kBounds[r.Below(11)] + int32_t(r.Below(3)) - 1));
+      break;
+    }
+    default: t.r4.u64 = r.Next(); break;
+  }
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -2010,6 +2094,38 @@ void TuningPagesMovie(Context& h) {
       {"TuningScreen::InputLayerActions", 500, __imp__sub_82209738,
        hooks::TuningPagesInputLayerActions, 88, {{176, 232}, {320, 336}}, LayerActionFields,
        true});
+  // The sticker editor's group helpers: leaves.
+  Run(h, w,
+      {"TuningScreen::SetGroupImage", 100, __imp__sub_821FD5C0, hooks::TuningPagesSetGroupImage,
+       0, {}, GroupFields});
+  Run(h, w,
+      {"TuningScreen::SetImageGroup", 100, __imp__sub_821FD658, hooks::TuningPagesSetImageGroup,
+       0, {}, GroupFields});
+  // The layer order: EndLayerOrder a leaf; SwapLayerRecords' and
+  // SwapOrderTextures' __savegprlr_29 (32 bytes); ShowOrderNodes'
+  // __savegprlr_28 (48); MoveLayerOrder's r30, r31 and lr (24);
+  // InputLayerOrder's __savegprlr_23 (80) with its callees' saves its native
+  // version doesn't write (176 to 224 below: ShowOrderNodes',
+  // MoveLayerOrder's, SwapLayerRecords', SwapOrderTextures' and
+  // ShowOptionMarks').
+  Run(h, w,
+      {"TuningScreen::EndLayerOrder", 100, __imp__sub_821FE3C8, hooks::TuningPagesEndLayerOrder,
+       0, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::SwapLayerRecords", 150, __imp__sub_821FD518,
+       hooks::TuningPagesSwapLayerRecords, 32, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::SwapOrderTextures", 150, __imp__sub_82207F38,
+       hooks::TuningPagesSwapOrderTextures, 32, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::ShowOrderNodes", 150, __imp__sub_82203A30, hooks::TuningPagesShowOrderNodes,
+       48, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::MoveLayerOrder", 200, __imp__sub_82201DB8, hooks::TuningPagesMoveLayerOrder,
+       24, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::InputLayerOrder", 800, __imp__sub_8220A1C8,
+       hooks::TuningPagesInputLayerOrder, 80, {{176, 224}}, LayerOrderFields});
 }
 
 }  // namespace harness

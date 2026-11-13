@@ -1373,8 +1373,6 @@ constexpr uint32_t kScrollWay = 0x826D84AC;   // the scroll's direction (1 left,
 constexpr uint32_t kShowPickerNode = 0x82636358;  // the layer's node shown when set
 constexpr uint32_t kShowNode = 0x8211AC00;    // UiMovie::ShowNode(movie, sub, node)
 constexpr uint32_t kHideNode = 0x8211AC48;    // UiMovie::HideNode(movie, sub, node)
-constexpr uint32_t kSetGroupImage = 0x821FD5C0;  // +30764 = the group's first image
-constexpr uint32_t kSetImageGroup = 0x821FD658;  // +30768 = the image's group
 constexpr uint32_t kResetAngle = 0x82000A34;  // 0.0f
 constexpr uint32_t kResetScale = 0x82000A30;  // 1.0f
 
@@ -1455,7 +1453,8 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
         r3 = ScrollImages(base, call, images, 0, 12, 9, id, frame, native_free);
         set_slot(Load(base, s + 30732) + 191, 10652);
       } else if (p == 1) {
-        r3 = call(kSetImageGroup, {screen, picked()}, frame, 0x822062DC);
+        SetImageGroup(base, screen, picked());
+        r3 = screen;
         const uint64_t v = picked();
         const uint64_t y = v - 4;
         const uint64_t id = (int32_t(y) >= 194 ? v - 198 : int32_t(y) < 0 ? v + 190 : y) + 189;
@@ -1480,7 +1479,8 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
         r3 = ScrollImages(base, call, images, 1, 12, 9, id, frame, native_free);
         set_slot(Load(base, s + 30732) + 191, 10652);
       } else if (p == 1) {
-        r3 = call(kSetImageGroup, {screen, picked()}, frame, 0x8220613C);
+        SetImageGroup(base, screen, picked());
+        r3 = screen;
         const uint64_t v = picked();
         const uint64_t y = v + 4;
         const uint64_t id = (int32_t(y) >= 194 ? v - 190 : int32_t(y) < 0 ? v + 198 : y) + 189;
@@ -1525,7 +1525,8 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
             Store(base, s + 30768, 11);
           }
         }
-        r3 = call(kSetGroupImage, {screen, Load(base, s + 30768)}, frame, 0x82205FA4);
+        SetGroupImage(base, screen, Load(base, s + 30768));
+        r3 = screen;
         for (uint32_t j = 0; j < 9; j++) {
           free_texture(42 + j, 0x82205FB8);
         }
@@ -1918,7 +1919,8 @@ uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, 
         const uint32_t id = Load(base, ((page * 3 + layer + 7798) << 2) + s);
         Store(base, s + 30768, 0);
         Store(base, s + 30764, id);
-        r3 = call(kSetImageGroup, {screen, id}, frame, 0x82209A4C);
+        SetImageGroup(base, screen, id);
+        r3 = screen;
         const int32_t now = int32_t(Load(base, s + 30724));
         if (now == 0 || now == 1) {
           const uint32_t slots = now == 0 ? 672 : 640;
@@ -2007,6 +2009,364 @@ uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, 
   Store(base, kActionsWait, 0);
   go(28, 22);
   return move();
+}
+
+
+void SetGroupImage(uint8_t* base, uint64_t screen, uint64_t group) {
+  ITC_NATIVE_RUNNING("sub_821FD5C0 TuningScreen::SetGroupImage");
+  // The jump table over the group (its case 0 the piece sub_821FD5F0).
+  static constexpr uint32_t kFirst[12] = {0, 43, 78, 106, 114, 142, 156, 165, 175, 180, 187, 192};
+  const uint32_t g = uint32_t(group);
+  if (g > 11) {
+    return;
+  }
+  Store(base, uint32_t(screen) + 30764, kFirst[g]);
+}
+
+void SetImageGroup(uint8_t* base, uint64_t screen, uint64_t image) {
+  ITC_NATIVE_RUNNING("sub_821FD658 TuningScreen::SetImageGroup");
+  static constexpr int32_t kBounds[11] = {43, 78, 106, 114, 142, 156, 165, 175, 180, 187, 192};
+  const int32_t i = int32_t(uint32_t(image));
+  uint32_t group = 0;
+  while (group < 11 && i >= kBounds[group]) {
+    group++;
+  }
+  Store(base, uint32_t(screen) + 30768, group);
+}
+
+uint64_t SwapLayerRecords(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint64_t first, uint64_t second, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FD518 TuningScreen::SwapLayerRecords");
+  const uint32_t frame = Frame(base, sp, 144);
+  const int32_t page = int32_t(Load(base, uint32_t(screen) + 30724));
+  if (page != 0 && page != 1) {
+    return screen;
+  }
+  const uint64_t records = page == 0 ? 31024 : 31096;
+  const uint64_t a = first * 24 + screen + records;
+  const uint64_t b = second * 24 + screen + records;
+  const uint64_t temp = uint64_t(frame) + 80;
+  Memcpy(base, call, temp, a, 24, frame, page == 0 ? 0x821FD554 : 0x821FD588);
+  Memcpy(base, call, a, b, 24, frame, 0x821FD5A4);
+  return Memcpy(base, call, b, temp, 24, frame, 0x821FD5B4);
+}
+
+void EndLayerOrder(uint8_t* base, uint64_t screen) {
+  ITC_NATIVE_RUNNING("sub_821FE3C8 TuningScreen::EndLayerOrder");
+  const uint32_t s = uint32_t(screen);
+  if (int32_t(Load(base, s + 9656)) != 5 || Byte(base, s + 9660) != 6) {
+    return;
+  }
+  // The page read again each pass, the id stored before the index.
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t page = Load(base, s + 30724);
+    const uint32_t id = Load(base, s + 31216 + 4 * k);
+    Store(base, ((page * 3 + k + 7798) << 2) + s, id);
+    Store(base, s + 31228 + 4 * k, k);
+  }
+}
+
+uint64_t SwapOrderTextures(uint8_t* base, uint64_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82207F38 TuningScreen::SwapOrderTextures");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 128);
+  const int32_t page = int32_t(Load(base, s + 30724));
+  if (page != 0 && page != 1) {
+    return screen;
+  }
+  // The two entries the move swapped (+30760 1 up, 2 down; other values
+  // none), their texture words (+28, +32) exchanged.
+  const int32_t way = int32_t(Load(base, s + 30760));
+  if (way == 1 || way == 2) {
+    const uint64_t p = Load(base, s + 30756);
+    const uint64_t at = (page == 0 ? 7 : 28) - uint64_t(way - 1);
+    const uint32_t a = uint32_t((p + at) * 36 + screen + 10048);
+    const uint32_t b = uint32_t((p + at - 1) * 36 + screen + 10048);
+    const uint32_t a_header = Load(base, a + 28);
+    Store(base, a + 28, Load(base, b + 28));
+    const uint32_t b_data = Load(base, b + 32);
+    const uint32_t a_data = Load(base, a + 32);
+    Store(base, a + 32, b_data);
+    Store(base, b + 32, a_data);
+    Store(base, b + 28, a_header);
+  }
+  // The movie's slots for entries 6 to 8 (page 0) or 27 to 29 (page 1), the
+  // movie looked up again each time.
+  const uint32_t first = page == 0 ? 10292 : 11048;
+  const uint32_t slots = page == 0 ? 764 : 776;
+  uint32_t entry = 0;
+  for (uint32_t k = 0; k < 3; k++) {
+    entry = tuning_screen::MovieEntry(base, frame, 13);
+    const uint32_t header = Load(base, s + first + 36 * k);
+    const uint32_t slot = Load(base, Load(base, Load(base, entry) + 28) + slots + 4 * k);
+    Store(base, slot, header);
+  }
+  return entry;
+}
+
+uint64_t ShowOrderNodes(uint8_t* base, uint64_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82203A30 TuningScreen::ShowOrderNodes");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, entry);
+  const int32_t page = int32_t(Load(base, s + 30724));
+  if (page != 0 && page != 1) {
+    return entry;
+  }
+  // UiMovie::ShowNode and HideNode (sub_8211AC00, sub_8211AC48) of the
+  // scene's node: its +80 set; r3 the node.
+  uint32_t node = 0;
+  for (uint32_t k = 0; k < 3; k++) {
+    const bool empty = int32_t(Load(base, s + 31216 + 4 * k)) == -1;
+    node = ui_movies::FindNode(base, movie, kNone, (page == 0 ? 19 : 22) + k);
+    Store(base, node + 80, empty ? 0 : 1);
+  }
+  return node;
+}
+
+uint64_t MoveLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_82201DB8 TuningScreen::MoveLayerOrder");
+  (void)screen;
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, found);
+  Reads asked{base, call, entry, frame, native_slots, found};
+  // Nothing on 164 held or released, a move or A.
+  if (asked(32, 164, 0x82201E24) || asked(44, 164, 0x82201E50) ||
+      asked(48, 153, 0x82201E7C) || asked(48, 167, 0x82201EA8) ||
+      asked(48, 154, 0x82201ED4) || asked(48, 168, 0x82201F00) ||
+      asked(40, 159, 0x82201F2C) || !asked(40, 158, 0x82201F58)) {
+    return asked.r3;
+  }
+  // B: 238 restarted.
+  tuning_screen::FinishNamed(call, frame, 0x82201F6C, movie, 238);
+  return tuning_screen::PlayNamed(call, frame, 0x82201F88, movie, 238, 1);
+}
+
+namespace {
+
+constexpr uint32_t kOrderCount = 0x826D84C0;  // InputLayerOrder's frame count
+
+// A float constant's single loaded and stored (lfs, stfs) at `to`.
+void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) {
+  const float value = float(double(std::bit_cast<float>(Load(base, from))));
+  Store(base, to, std::bit_cast<uint32_t>(value));
+}
+
+// The image entry `index` of the decal images at `images` (36 bytes each):
+// its address (the product in 64 bits).
+uint32_t ImageEntry(uint64_t images, uint32_t index) {
+  return uint32_t(uint64_t(index) * 36 + images);
+}
+
+// An address in the screen's word array: (x << 2) + s, low 32 bits.
+uint32_t WordAt(uint32_t s, uint64_t x) { return (uint32_t(x) << 2) + s; }
+
+}  // namespace
+
+uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_8220A1C8 TuningScreen::InputLayerOrder");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 176);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, found);
+  const uint64_t images = screen + 10048;
+  Reads asked{base, call, entry, frame, flags.native_slots, found};
+  auto sound = [&](uint64_t cue, uint32_t lr) { call(kMenuSoundPlay, {cue}, frame, lr); };
+  Store(base, s + 30760, 0);
+  bool counting = Load(base, kOrderCount) != 0;
+  if (!counting) {
+    // A move: the work list's ids (+31216 + 4k, words 7804 on) and indices
+    // (+31228 + 4k, words 7807 on) at the position and the one it moves to
+    // swapped, each word's index read again from +30756 as the original
+    // does; then the records and textures swapped and command 20 queued.
+    auto moved = [&](uint64_t r4, uint64_t r5, uint64_t at, uint64_t before) {
+      Store(base, s + 9644, Load(base, WordAt(s, at)));
+      Store(base, s + 9648, Load(base, WordAt(s, before)));
+      SwapLayerRecords(base, call, screen, r4, r5, frame);
+      SwapOrderTextures(base, screen, frame);
+      const uint32_t queue = Load(base, s + 10036);
+      const uint32_t current = Load(base, queue + 0);
+      if (int32_t(current) != 27) {
+        Store(base, queue + 8, current);
+      }
+      Store(base, queue + 16, kNone);
+      Store(base, queue + 0, kNone);
+      Store(base, queue + 4, 27);
+      Store(base, queue + 12, 20);
+    };
+    auto position = [&] { return uint64_t(Load(base, s + 30756)); };
+    if (asked(48, 153, 0x8220A254) || asked(48, 167, 0x8220A280)) {
+      // Up, from a position above 0.
+      if (int32_t(Load(base, s + 30756)) > 0) {
+        sound(4, 0x8220A578);
+        const uint64_t p = position();
+        Store(base, s + 9708, 1);
+        Store(base, s + 30760, 1);
+        const uint32_t id = Load(base, WordAt(s, p + 7804));
+        Store(base, s + 30756, uint32_t(p - 1));
+        const uint32_t other = Load(base, WordAt(s, p - 1 + 7804));
+        Store(base, WordAt(s, p - 1 + 7804), id);
+        Store(base, WordAt(s, position() + 7805), other);
+        const uint64_t q = position();
+        const uint32_t index = Load(base, WordAt(s, q + 7808));
+        const uint32_t before = Load(base, WordAt(s, q + 7807));
+        Store(base, WordAt(s, q + 7807), index);
+        Store(base, WordAt(s, position() + 7808), before);
+        const uint64_t r5 = position();
+        moved(r5 + 1, r5, r5 + 7808, r5 + 7807);
+      }
+    } else if (asked(48, 154, 0x8220A2AC) || asked(48, 168, 0x8220A2D8)) {
+      // Down, from a position below the last (+30792).
+      if (int32_t(Load(base, s + 30756)) < int32_t(Load(base, s + 30792))) {
+        sound(4, 0x8220A4D8);
+        const uint64_t p = position();
+        Store(base, s + 9708, 1);
+        Store(base, s + 30760, 2);
+        const uint32_t id = Load(base, WordAt(s, p + 7804));
+        Store(base, s + 30756, uint32_t(p + 1));
+        const uint32_t other = Load(base, WordAt(s, p + 1 + 7804));
+        Store(base, WordAt(s, p + 1 + 7804), id);
+        Store(base, WordAt(s, position() + 7803), other);
+        const uint64_t q = position();
+        const uint32_t before = Load(base, WordAt(s, q + 7806));
+        const uint32_t index = Load(base, WordAt(s, q + 7807));
+        Store(base, WordAt(s, q + 7807), before);
+        Store(base, WordAt(s, position() + 7806), index);
+        const uint64_t r4 = position();
+        moved(r4, r4 - 1, r4 + 7807, r4 + 7806);
+      }
+    } else if (asked(32, 164, 0x8220A304) || asked(44, 164, 0x8220A330)) {
+      // 164 held or released: nothing.
+    } else if (asked(40, 159, 0x8220A35C)) {
+      // A: the order kept, the count started; the layer's animations.
+      sound(0, 0x8220A36C);
+      const int32_t page = int32_t(Load(base, s + 30724));
+      Store(base, kOrderCount, 1);
+      Store(base, s + 9708, 1);
+      if (page == 0 || page == 1) {
+        auto named = [&] {
+          const uint64_t layer = Load(base, s + 30732);
+          return page == 0 ? uint64_t(uint32_t(layer << 2)) + 202
+                           : uint64_t(uint32_t((layer + 44) << 2));
+        };
+        tuning_screen::PlayNamed(call, frame, page == 0 ? 0x8220A39C : 0x8220A3E4, movie,
+                                 page == 0 ? 213 : 189, 1);
+        tuning_screen::FinishNamed(call, frame, page == 0 ? 0x8220A3B0 : 0x8220A3F8, movie,
+                                   named());
+        tuning_screen::PlayNamed(call, frame, 0x8220A41C, movie, named(), 0);
+      }
+    } else if (asked(40, 158, 0x8220A444)) {
+      // B: back to the state popped, command 21 with 17 next.
+      sound(2, 0x8220A454);
+      Store(base, s + 9708, 1);
+      const uint32_t popped = Pop(base, s);
+      GoFirstHalf(base, s, popped);
+      const uint32_t queue = Load(base, s + 10036);
+      const uint32_t state = Load(base, s + 9652);
+      const uint32_t current = Load(base, queue + 0);
+      if (int32_t(state) != int32_t(current)) {
+        Store(base, queue + 8, current);
+      }
+      Store(base, queue + 16, 17);
+      Store(base, queue + 0, kNone);
+      Store(base, queue + 4, state);
+      Store(base, queue + 12, 21);
+    }
+    counting = Load(base, kOrderCount) != 0;
+  }
+  if (counting) {
+    const uint32_t count = Load(base, kOrderCount) + 1;
+    Store(base, kOrderCount, count);
+    if (count == 10) {
+      // The marks hidden, the three layers' nodes placed and their textures
+      // and movie slots set in the new order.
+      tuning_screen::ShowOptionMarks(base, s, 0, frame);
+      const int32_t page = int32_t(Load(base, s + 30724));
+      if (page == 0 || page == 1) {
+        const uint32_t sub_scene = page == 0 ? 28 : 27;
+        const uint32_t constants[3] = {0x82000A34, page == 0 ? 0x8200CAFCu : 0x82001E8Cu,
+                                       page == 0 ? 0x8200CAF8u : 0x820081D8u};
+        for (uint32_t k = 0; k < 3; k++) {
+          const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, 2 + k);
+          CopyFloat(base, constants[k], node + 16);
+        }
+        Store(base, frame + 80, 13);
+        const uint32_t first = page == 0 ? 0 : 21;
+        const uint32_t i0 = Load(base, s + 31232);
+        const uint32_t i1 = Load(base, s + 31228);
+        const uint32_t i2 = Load(base, s + 31236);
+        const uint32_t a = ImageEntry(images + 36 * first, i1);
+        const uint32_t b = ImageEntry(images + 36 * first, i0);
+        const uint32_t c = ImageEntry(images + 36 * first, i2);
+        const uint32_t a_header = Load(base, a + 28);
+        const uint32_t b_header = Load(base, b + 28);
+        const uint32_t c_header = Load(base, c + 28);
+        const uint32_t a_data = Load(base, a + 32);
+        const uint32_t b_data = Load(base, b + 32);
+        const uint32_t c_data = Load(base, c + 32);
+        const uint32_t to = ImageEntry(images, first);
+        Store(base, to + 28, a_header);
+        Store(base, to + 32, a_data);
+        Store(base, to + 64, b_header);
+        Store(base, to + 68, b_data);
+        Store(base, to + 100, c_header);
+        Store(base, to + 104, c_data);
+        static constexpr uint32_t kSlots[2][3] = {{724, 732, 736}, {700, 708, 712}};
+        for (uint32_t k = 0; k < 3; k++) {
+          const uint32_t again = tuning_screen::MovieEntry(base, frame, 13);
+          const uint32_t header = Load(base, ImageEntry(images, first + k) + 28);
+          const uint32_t slot = Load(base, Load(base, Load(base, again) + 28) + kSlots[page][k]);
+          Store(base, slot, header);
+        }
+      }
+    } else if (count == 13) {
+      // The end: 237 restarted, the history popped down to state 24,
+      // Go(24, 16), the layer the position moved to, the order stored.
+      Store(base, kOrderCount, 0);
+      tuning_screen::FinishNamed(call, frame, 0x8220A904, movie, 237);
+      tuning_screen::PlayNamed(call, frame, 0x8220A920, movie, 237, 1);
+      uint32_t depth = Byte(base, s + 10008);
+      Store(base, s + 9708, 1);
+      uint32_t popped;
+      do {
+        depth = (depth + 255) & 0xFF;
+        guest::StoreU8(base, s + 10008, uint8_t(depth));
+        popped = Load(base, WordAt(s, depth + 2439));
+        Store(base, s + 9652, popped);
+      } while (int32_t(popped) != 24);
+      uint32_t queue = Load(base, s + 10036);
+      Store(base, queue + 4, popped);
+      Store(base, queue + 0, popped);
+      Store(base, queue + 8, popped);
+      Store(base, queue + 20, kNone);
+      Store(base, queue + 12, kNone);
+      Store(base, queue + 24, 0);
+      queue = Load(base, s + 10036);
+      const uint32_t state = Load(base, s + 9652);
+      const uint32_t current = Load(base, queue + 0);
+      if (int32_t(state) != int32_t(current)) {
+        Store(base, queue + 8, current);
+      }
+      Store(base, queue + 16, kNone);
+      Store(base, queue + 4, state);
+      Store(base, queue + 0, kNone);
+      Store(base, queue + 12, 16);
+      Store(base, s + 30732, Load(base, s + 30756));
+      EndLayerOrder(base, screen);
+      Store(base, s + 30732, Load(base, s + 30756));
+    }
+  }
+  uint64_t r3 = ShowOrderNodes(base, screen, frame);
+  if (Load(base, kOrderCount) == 0) {
+    r3 = MoveLayerOrder(base, call, screen, frame, flags.native_slots);
+  }
+  return r3;
 }
 
 }  // namespace tuning_pages

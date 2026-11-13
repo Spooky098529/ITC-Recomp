@@ -639,7 +639,8 @@ uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
 // node shown or hidden by [0x82636358]; MoveVinylImages with no wait set.
 // 240-byte frame; the last call's r3, else the movie's entry or the slot's.
 // Texture::Free as GuestTextureFree's with the native heap and car models'
-// flag; the sticker editor's sub_821FD5C0 and sub_821FD658 through the guest.
+// flag; the sticker editor's SetGroupImage and SetImageGroup by their plain
+// C++.
 uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
 
@@ -664,7 +665,7 @@ uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, u
 // (0 the edit: the layer's saved record into the edited decal, Push(25),
 // Go(26, 18); 1 the order: Push(25), Go(27, 19), BeginLayerOrder; 2
 // another image: the wait started from the layer's saved id, the sticker
-// editor's sub_821FD658 through the guest, the page's six picker textures
+// editor's SetImageGroup by its plain C++, the page's six picker textures
 // put back; 3 remove: Push(25), Go(37, 30)) or B (Pop, Go(the popped
 // state, 16)), then MoveLayerActions unless the wait started; with the
 // wait set, its count, used only with +30740 2: on 3 the picker's window
@@ -676,5 +677,53 @@ uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, u
 // heap and car models' flag.
 uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, const PageFlags& flags);
+
+// sub_821FD5C0 TuningScreen::SetGroupImage: +30764 = group `group`'s first
+// image (0, 43, 78, 106, 114, 142, 156, 165, 175, 180, 187, 192 for 0 to 11;
+// above 11 unsigned nothing; case 0 the piece sub_821FD5F0, merged). Leaf; r3
+// left the screen.
+void SetGroupImage(uint8_t* base, uint64_t screen, uint64_t group);
+// sub_821FD658 TuningScreen::SetImageGroup: +30768 = image `image`'s group
+// by the same bounds (signed; 11 from 192 up). Leaf; r3 left the screen.
+void SetImageGroup(uint8_t* base, uint64_t screen, uint64_t image);
+// sub_821FD518 TuningScreen::SwapLayerRecords: the page's (+30724 0: +31024,
+// 1: +31096) 24-byte layer records `first` and `second` exchanged through
+// frame + 80 (memcpy three times; its plain C++ where Buffers_Memcpy takes
+// it); other pages nothing. 144-byte frame; the last memcpy's r3, else the
+// screen.
+uint64_t SwapLayerRecords(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                          uint64_t first, uint64_t second, uint32_t sp);
+// sub_821FE3C8 TuningScreen::EndLayerOrder: only on the vinyls (+9656 5,
+// byte +9660 6): the page's saved ids (+31192 + 12 x +30724 + 4k, the page
+// read again each pass) = the work list's ids +31216 + 4k, its indices
+// +31228 + 4k = k, k 0 to 2. Leaf; r3 left the screen.
+void EndLayerOrder(uint8_t* base, uint64_t screen);
+// sub_82207F38 TuningScreen::SwapOrderTextures: on page 0 or 1 the two
+// entries a move swapped exchange their textures (+30760 1: 7 + p and 6 + p,
+// 2: one lower; page 1 21 higher), then movie 13's slots +764 to +772 (page
+// 1 +776 to +784) = entries 6 to 8's (27 to 29's) headers, the movie looked
+// up again each time. 128-byte frame; the last lookup's entry, else the
+// screen.
+uint64_t SwapOrderTextures(uint8_t* base, uint64_t screen, uint32_t sp);
+// sub_82203A30 TuningScreen::ShowOrderNodes: on page 0 or 1 movie 13's nodes
+// 19 to 21 (22 to 24) hidden where the work list's id is -1, else shown
+// (UiMovie::HideNode and ShowNode inline: FindNode, +80). 128-byte frame;
+// the last node, else the movie's entry.
+uint64_t ShowOrderNodes(uint8_t* base, uint64_t screen, uint32_t sp);
+// sub_82201DB8 TuningScreen::MoveLayerOrder: state 27's movie side: nothing
+// on 164 held or released, a move or A; on B 238 restarted. 112-byte frame;
+// PlayNamed's r3, else the last slot read's or the movie's entry.
+uint64_t MoveLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, bool native_slots);
+// sub_8220A1C8 TuningScreen::InputLayerOrder: state 27's page (its row): with
+// the count [0x826D84C0] 0, up or down moving the layer through the work
+// list (SwapLayerRecords, SwapOrderTextures, command 20), A starting the
+// count with the layer's animations, B Pop and command 21 with 17 next; the
+// count's frame 10 placing the layers' nodes, textures and slots in the new
+// order, 13 popping down to state 24 with command 16 and EndLayerOrder; then
+// ShowOrderNodes, and MoveLayerOrder with the count 0. 176-byte frame;
+// MoveLayerOrder's r3, else ShowOrderNodes'.
+uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, const PageFlags& flags);
 
 }  // namespace tuning_pages
