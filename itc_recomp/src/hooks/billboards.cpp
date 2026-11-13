@@ -21,7 +21,7 @@ ITC_FLAG_BOOL(native_billboards, true, "ITC",
               "Run the light glows' billboard functions (the material's set-up, "
               "sub_8209F5A0 and sub_8209F5C8; the vertices, sub_8209C6E0; the recording, "
               "Billboards::RecordState sub_8209C1A0 (no adapter), Record sub_8209CC38 (in its "
-              "wrap) and Draw sub_8209CDB0; the light groups' draw sub_82148658) natively instead of through the "
+              "wrap) and Draw sub_8209CDB0 (no adapter); the light groups' draw sub_82148658) natively instead of through the "
               "translated code (same results; checked by --run_harnesses=billboards)");
 
 // BillboardMaterial::Init: r3 = the material.
@@ -72,16 +72,8 @@ void hooks::BillboardsDraw(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
-// Billboards::Draw: r3 = the set, r4 = the material; r3 = 0 or 1. From the
-// light groups' draw (sub_82148658).
-extern "C" REX_FUNC(sub_8209CDB0) {
-  REX_FUNC_PROLOGUE();
-  if (!hooks::BillboardsNative()) {
-    __imp__sub_8209CDB0(ctx, base);
-    return;
-  }
-  hooks::BillboardsDraw(ctx, base);
-}
+// Billboards::Draw (sub_8209CDB0) has no adapter (removed 2026-11-13, B7
+// loop): its only caller in play, the light groups' draw, calls its plain C++.
 
 bool hooks::LightGroupsNative() {
   return hooks::BillboardsNative() && ITC_FLAG(native_models) &&

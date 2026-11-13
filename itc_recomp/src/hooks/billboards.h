@@ -17,8 +17,9 @@ bool BillboardsNative();
 // only (its wrap makes the checks).
 void BillboardsRecord(PPCContext& ctx, uint8_t* base);
 
-// Billboards::Draw (sub_8209CDB0): r3 = the set, r4 = the material; r3 = 0
-// or 1. The plain C++ (Record inside its wrap's checks).
+// Billboards::Draw (sub_8209CDB0, no adapter: the harness's steps): r3 =
+// the set, r4 = the material; r3 = 0 or 1. The plain C++ (Record inside its
+// wrap's checks).
 void BillboardsDraw(PPCContext& ctx, uint8_t* base);
 
 // Whether the light groups' plain C++ may run: the recording's flags with
