@@ -106,6 +106,18 @@ waits native, `SaveDevices::Update` (B5's override in
 `src/hooks/notify.cpp`, still calling the handlers, the users and
 `sub_820908D8` through the guest) can become plain C++ behind its
 adapter (it's reached through a member delegate, so the adapter stays).
+Done by the B7 loop (2026-11-13, `--native_save_interface`): the
+handlers, their waits, both overlapped results and `SaveDevices::Update`
+are plain C++ in `src/save_interface/slot_handlers.cpp`, each writing its
+prologue's saves (and its callees' nested frames) as the original leaves
+them from the call site its caller gives (`CallSite`: the stack pointer,
+return address and r27 to r31); the guest calls left (`WaitForSingleObject`
+and `CloseHandle`, never reached here; targets that aren't ours) are made
+with the registers the original holds there. B4's steps were split into
+plain C++ (`src/saves/slot_steps.cpp`) for them, their adapters kept: with
+the flag off the recompiled handlers still reach them, and without the
+adapters that fallback would go to the Xbox content calls instead of
+`saves/`. Harness `save_handlers`.
 
 Shared, with their rows elsewhere: `sub_8228FC50` (the game data's
 check, `files-and-saves.md`); `sub_820943C8` (`system-services.md`),

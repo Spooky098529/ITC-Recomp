@@ -48,7 +48,8 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "sub_820A5878, Failed sub_820A4890, Ready sub_820A58D8 and EnumerateStep "
               "sub_820A59C0, the listener delegate's target sub_820A4800 and the framework's "
               "device list sub_820908D8, XGetOverlappedResult sub_82295C98 and GetOverlappedResult "
-              "sub_82295F20 (their waits, never taken here, WaitForSingleObject through the guest), "
+              "sub_82295F20 (no adapters: only the waits' plain C++ calls them; their waits, never "
+              "taken here, WaitForSingleObject through the guest), "
               "the machines CheckStep sub_820A5A88, SaveStep sub_820A5BE8, LoadStep sub_820A5E68 "
               "and DeleteStep sub_820A6010 with the waits they poll (no adapters: WaitCloseItem "
               "sub_820A4C08, WaitDelete sub_820A5290, WaitThumbnail sub_820A5190, WaitClose "
@@ -792,10 +793,10 @@ ITC_SAVE_INTERFACE_ADAPTER(820A58D8, SlotReadySteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A59C0, SlotEnumerateStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A4800, DevicesOnEventSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820908D8, FrameworkDeviceListSteps)
-// XGetOverlappedResult and GetOverlappedResult (from the save slots' waits;
-// their other callers Dropped or never in play).
-ITC_SAVE_INTERFACE_ADAPTER(82295C98, XGetOverlappedResultSteps)
-ITC_SAVE_INTERFACE_ADAPTER(82295F20, GetOverlappedResultSteps)
+// No adapters (removed 2026-11-13: in play only the save slots' waits'
+// plain C++ calls them; their other callers are Dropped or never in play)
+// for XGetOverlappedResult sub_82295C98 and GetOverlappedResult
+// sub_82295F20: their register steps above are the harness's.
 // The save devices' machines (states 6 to 9); the waits they poll have no
 // adapters (only their plain C++ calls them; the steps above are the
 // harness's).
