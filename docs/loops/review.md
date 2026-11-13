@@ -41,6 +41,13 @@ When the user has reviewed a run's section, its heading gets
   now bypasses it. Harness: `MorphJob::Run`'s cases compare the frame
   window `Morph::Blend`'s own cases do, and r3 without a high word;
   `MorphShape`'s cases use a stand-in maker.
+- The save devices' constructor's map (1edd6e03): 5 rows added to
+  `save-interface.md` (not a new file), `framework.md`'s
+  `SaveDevices::Create` row and `known-data.md`'s save owner and slot
+  rows updated; the listener at +56 to be stored as
+  `user::kNoListener` without `XNotifyCreateListener` (the
+  `SignIn::SetUp` precedent; it must not be 0, as `SaveDevices::Update`
+  runs only with a listener).
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

@@ -48,7 +48,10 @@ file's history. What's left to see in a drive, from every run:
   done.
 - Subsystem 2 of 10: the save devices' constructor (`sub_820A6160`,
   `sub_820A4560`, run at boot, ready); its line deleted from
-  `leads.md`. Mapping agent running.
+  `leads.md`. Mapped into `save-interface.md` (1edd6e03: 5 new rows,
+  2 in play; 1 ready group; the listener stored as
+  `user::kNoListener` with no call, the 2026-10-30 precedent; 1 lead
+  added, the slot handlers). Check passed. Migration agent running.
 
 ## Done
 
@@ -82,5 +85,7 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
   known 374, unknown 292).
 - After the morph jobs: ours 6019, work left 703 (wrapped 51, known
   360, unknown 292).
+- After the save devices' map: ours 6019, work left 703 (wrapped 51,
+  known 362, unknown 290).
 
 ## Stopped
