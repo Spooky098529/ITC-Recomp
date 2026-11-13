@@ -96,7 +96,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "called directly, TextureAnimations::Advance and Minimap::Draw through their "
               "per-frame wraps, RecordClear through its adapter's work; as DrawArea's flags), "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
-              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, AnimationSet::FindByTexture sub_82146A38, "
+              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, AnimationSet::FindByTexture sub_82146A38 (no adapter), "
               "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
               "sub_820F1C30; with --native_models CourseSet::Parse sub_820F1A70 (no adapter), AreaModel::Parse "
               "sub_820F1258 (no adapter: only its OnLoaded calls it) and OnLoaded sub_820F1CE8, "
@@ -112,7 +112,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20, sub_820F1588, sub_820F1930, "
               "sub_820F16C0, sub_820F17C0, sub_820F2B80, sub_820F3098, sub_820F32D0, sub_820FB938, "
               "sub_820FB8E0, sub_820FB8F0, sub_820FB968, sub_820FC0E8, sub_820FBF08, sub_820FBE80, "
-              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20, sub_820FBDC8, sub_820F1480, sub_820FB8B8, sub_820FB998, sub_820FB9A8, sub_820F1490, sub_820F14E8, sub_820F1A70, sub_820F52A8, sub_820F34C8, sub_820F3B70");
+              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20, sub_820FBDC8, sub_820F1480, sub_820FB8B8, sub_820FB998, sub_820FB9A8, sub_820F1490, sub_820F14E8, sub_820F1A70, sub_820F52A8, sub_820F34C8, sub_820F3B70, sub_82146A38");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -300,9 +300,9 @@ void hooks::CourseSceneryUpdate(PPCContext& ctx, uint8_t* base) {
 }
 ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
 
-// AnimationSet::FindByTexture: r3 = the set, r4 = a texture; r3 = the index
-// or -1. From the light groups' draw sub_82148658 (recompiled).
-ITC_COURSE_SCENERY(82146A38, ctx.r3.u64 = FindAnimationByTexture(base, ctx.r3.u32, ctx.r4.u32))
+// AnimationSet::FindByTexture (sub_82146A38) has no adapter (removed
+// 2026-11-13, B7 loop): its only caller in play, LightGroups::Draw, calls
+// its plain C++.
 
 // --- The course set's draws ---
 
