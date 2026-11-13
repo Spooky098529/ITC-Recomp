@@ -17,6 +17,9 @@
 namespace scenery_lists {
 struct DrawCalls;
 }  // namespace scenery_lists
+namespace car_scene_draw {
+struct SceneDrawCalls;
+}  // namespace car_scene_draw
 
 namespace course_scenery {
 
@@ -389,6 +392,35 @@ uint32_t DrawSetLists(uint8_t* base, const scenery_lists::DrawCalls& calls, uint
 // The view-projection's address DrawSetLists draws with (the camera pass's
 // +144), its r24.
 uint32_t DrawSetListsViewProjection(uint8_t* base, uint32_t pass);
+
+// Scenery::RecordHeadlightProjectors (sub_820F34C8, headlights.cpp): r4's
+// pass description (+12 the player, +16 the viewport entry, +20 the camera
+// pass, +24 and +28 the render queue's keys). In its 640-byte frame below
+// `stack` (its back chain written; the original's temporaries at their
+// offsets): +8 = the camera pass, set by cameras::FromViewport, then
+// CameraPass::Update through `calls` from FromViewport's 112-byte frame (as
+// its adapter). With Vehicle::Get(0): the six 8-slot headlight arrays
+// (0x8296B9E0 position, 0x8296BA60 BeamShape, 0x8296BAE0 and 0x8296BB60 the
+// colors, 0x8296BBE0 the direction, 0x8296BC60 the scene's +5424), the
+// colors cleared first; for each of the scene's first 8 models (List::At on
+// [0x826C2E44] + 5028, count +5036) of type 3 with a car (+5048) and +32 1
+// or 2, the next slot (0 and 1 swapped for pass 2; at most 8) from its
+// matrix (+4304, memcpy) and the scene's lights (+5248 on), and for slots 0
+// to 4 a projector (Projector::Build, its multiplies noted for frame
+// interpolation) recorded on the scene's command list (header 5, command 7
+// vertex c(0x77 + 4 x slot) x4 = the matrix, copied as Matrix::Copy with
+// its interpolation note, command 36) and handed to the render queue (key
+// 371 for pass 2, else 150; f1 0.0), the render manager's getters called
+// before every command list call as the original's; then 0x8265ED00 = the
+// scene's +5328. Always: [0x8296B90C] = +24, [0x8296B900] = +28, 0x8265ECE0
+// = the camera pass's eye (+400). Its callees' plain C++ runs inside the
+// checks of their diagnostics' wraps; guest calls (the getters, the queue,
+// CameraPass::Update, the originals of Projector::Build where Perspective
+// declines, of memcpy and of the command list's calls where theirs do) go
+// through `calls` with the original's return addresses. Leaves
+// flush-to-zero off. Returns the r3 the original leaves (its last call's).
+uint64_t RecordHeadlightProjectors(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+                                   uint32_t stack, uint32_t description);
 
 // --- The files' parses (the loads' callbacks) ---
 //

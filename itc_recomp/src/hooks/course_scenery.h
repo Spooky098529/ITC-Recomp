@@ -17,6 +17,12 @@ namespace hooks {
 // where their plain C++ declines), then put back.
 void CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base);
 
+// Scenery::RecordHeadlightProjectors (sub_820F34C8): r4 = the pass
+// description; r3 as the original leaves it, lr put back. The original
+// with --native_cameras, --native_matrix_math or --native_vehicle_accessors
+// off or the command list's diagnostics on.
+void CourseSceneryRecordHeadlightProjectors(PPCContext& ctx, uint8_t* base);
+
 // Scenery::Update (sub_820F4558): r3 = the manager; the original's register
 // saves made, then the plain C++ (its guest calls putting flush-to-zero back
 // off); r3 as the original leaves it, lr put back.

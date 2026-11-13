@@ -36,12 +36,17 @@
 
 #include "base/flags.h"
 #include "hooks/archive.h"
+#include "hooks/car_scene_draw.h"
 #include "hooks/course_scenery.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "hooks/scenery_lists.h"
 #include "native/buffers.h"
 #include "course_scenery/course_scenery.h"
+
+ITC_FLAG_DECLARE(bool, native_cameras);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "Run the course scenery (docs/functions/course-scenery.md: PoolObject::AllocData "
@@ -74,6 +79,11 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "a guest call), "
               "Scenery::DrawSetLists sub_820F52A8 (the scenery lists' draws' plain C++ called "
               "directly, their adapters where it declines), "
+              "Scenery::RecordHeadlightProjectors sub_820F34C8 (the headlight slots and "
+              "projectors' chunks, its callees' plain C++ called directly inside their wraps' "
+              "checks, the render manager's getters and queue guest calls; with --native_cameras, "
+              "--native_matrix_math and --native_vehicle_accessors and the command list's "
+              "diagnostics off, else its original), "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
               "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, AnimationSet::FindByTexture sub_82146A38, "
               "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
@@ -304,6 +314,28 @@ void hooks::CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base) {
 }
 
 ITC_COURSE_SCENERY(820F52A8, hooks::CourseSceneryDrawSetLists(ctx, base))
+
+// Scenery::RecordHeadlightProjectors: r4 = the pass description; r3 as the
+// original leaves it, lr put back, flush-to-zero off. From Scenery::DrawArea
+// (sub_820F3B70) and Scenery::Draw (sub_820F6068), recompiled. The original
+// runs where its callees' plain C++ may not (their flags) or with the
+// command list's diagnostics on (as the car scene's draw).
+void hooks::CourseSceneryRecordHeadlightProjectors(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_cameras) || !ITC_FLAG(native_matrix_math) ||
+      !ITC_FLAG(native_vehicle_accessors) || hooks::SceneryListsSlotDiagnostics()) {
+    __imp__sub_820F34C8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  const uint64_t r3 = RecordHeadlightProjectors(base, calls, ctx.r1.u32, ctx.r4.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
+}
+
+ITC_COURSE_SCENERY(820F34C8, hooks::CourseSceneryRecordHeadlightProjectors(ctx, base))
 
 // --- The files' parses ---
 //

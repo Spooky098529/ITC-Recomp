@@ -629,6 +629,7 @@ set(ITC_SOURCES
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
     src/course_scenery/collect.cpp
+    src/course_scenery/headlights.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -768,6 +769,7 @@ set(ITC_SOURCES
     src/harnesses/device_shaders.cpp
     src/harnesses/render_queue.cpp
     src/harnesses/course_scenery.cpp
+    src/harnesses/course_scenery_headlights.cpp
     src/harnesses/post_effects.cpp
     src/harnesses/scene_target.cpp
     src/harnesses/frame_passes.cpp
@@ -937,7 +939,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
-    src/models/model_load.cpp src/course_scenery/collect.cpp
+    src/models/model_load.cpp src/course_scenery/collect.cpp src/course_scenery/headlights.cpp
     src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
     src/race_setup/set_up.cpp src/vehicle/vehicle.cpp src/race_world/race_world.cpp
     src/race_world/race_world_reset.cpp

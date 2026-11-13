@@ -3061,6 +3061,9 @@ void FindByTextureCases(Context& h) {
   results.Report();
 }
 
+// Scenery::RecordHeadlightProjectors' cases (course_scenery_headlights.cpp).
+void HeadlightProjectorCases(Context& h);
+
 void CourseScenery(Context& h) {
   ObjectLeaves(h);
   Keys(h);
@@ -3086,6 +3089,7 @@ void CourseScenery(Context& h) {
   LoadCases(h);
   CourseSetOnLoadedCases(h);
   FindByTextureCases(h);
+  HeadlightProjectorCases(h);
 }
 
 namespace {
