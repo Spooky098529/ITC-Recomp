@@ -22,10 +22,23 @@ file's history. What's left to see in a drive, from every run:
   by the user's 2026-11-12 call to minimize recompiled code), 5
   adapters removed (`RacerRecords::Add`, `Stats::AddRaceResult`,
   `Achievements::Check`, `Write`, `Replay::Keep`); every harness 0
-  differing, race 37 s at 40, 0 errors; no subagents. Validation agent
-  running. Subsystems so far: 0 of 10.
+  differing, race 37 s at 40, 0 errors; no subagents. Validated:
+  `itc_5235` (race 50 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups), 15 of 15 harness lines, no prints
+  added; none ran in the race or the replay `itc_5236` (ok): 15 to
+  drive. Recorded.
+- Subsystem 1 of 10: the morph jobs (`sub_820ACC08` and the
+  `820AC998`-`820ACC08` vtable slots: the 224-byte job the second
+  worker pool runs for `Model::MorphShape`, the wheels' per-draw
+  morphs; ready, run every frame); its line deleted from `leads.md`.
+  Mapping agent running.
 
 ## Done
+
+- Cleanup leads (no mapping): `RaceStates::OnRaceEnd` with the course
+  record (`race-states.md`), `DrawEntryPowerGraph`'s r31
+  (`power-graph.md`), 5 adapters removed, 98f4fe26..52b87de7;
+  validated.
 
 ## Rows to review
 
@@ -43,5 +56,7 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
 
 - At the start: ours 5989, work left 718 (wrapped 51, known 361,
   unknown 306).
+- After the cleanup leads: ours 5998, work left 717 (wrapped 51,
+  known 360, unknown 306).
 
 ## Stopped

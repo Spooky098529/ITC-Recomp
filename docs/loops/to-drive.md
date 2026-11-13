@@ -16,6 +16,27 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
+
+Not in the attract race or the replay (`itc_5235`, `itc_5236`, ok; the
+cleanup leads: a race that ends, a car list with the power graph;
+`Achievements::Write` is listed under the run before):
+
+- `sub_82250670` CarList::DrawEntryPowerGraph
+- `sub_821644D8` RaceStates::OnRaceEnd
+- `sub_820FF458` Time::Add
+- `sub_82105BC8` CourseEntry::Clear
+- `sub_82105EA0` CourseRecord::Place
+- `sub_82105D60` CourseRecord::Link
+- `sub_82105DC8` CourseRecord::Unlink
+- `sub_82105E30` CourseRecord::Insert
+- `sub_82105F50` CourseRecord::Add
+- `sub_82105C18` CourseRecords::Save
+- `sub_820FFE08` RacerRecords::Add
+- `sub_82115190` Stats::AddRaceResult
+- `sub_82290788` Achievements::Check
+- `sub_82104F68` Replay::Keep
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the
