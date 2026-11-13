@@ -34,12 +34,14 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/tuning_pages.h"
+#include "hooks/tuning_screen.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <functional>
 #include <optional>
 #include <string>
@@ -1833,6 +1835,40 @@ void GroupFields(PPCContext& t, Random& r, const World& w) {
 
 }  // namespace
 
+// TuningScreen::HandleInput's cases for one of `states`' page: the page's
+// own fields (`fields`, as its group lays them), then +9728 set (0 one case
+// in eight: DecalImages::Update only) and the queue's +0 the state. Its r30,
+// r31 and lr (24 bytes); DecalImages::Update's saves (112 to 136 below, the
+// decal images unloaded: nothing made) and the page's own saves and holes
+// (`page_saves`, `page_holes`) 112 deeper, which the native versions don't
+// write.
+Spec HandleInputSpec(const char* name, int cases, std::vector<uint32_t> states,
+                     uint32_t page_saves,
+                     const std::vector<std::pair<uint32_t, uint32_t>>& page_holes,
+                     const Setup& fields, bool loads = false) {
+  std::vector<std::pair<uint32_t, uint32_t>> holes = {{112, 112 + std::max(24u, page_saves)}};
+  for (const auto& [from, to] : page_holes) {
+    holes.push_back({from + 112, to + 112});
+  }
+  return {name,
+          cases,
+          __imp__sub_821E6950,
+          hooks::TuningPagesHandleInput,
+          24,
+          holes,
+          [fields, states](PPCContext& t, Random& r, const World& w) {
+            if (fields) {
+              fields(t, r, w);
+            }
+            const uint32_t state = states[r.Below(uint32_t(states.size()))];
+            const uint32_t s = w.screen();
+            guest::StoreU32(w.base, s + 9728,
+                            r.Below(8) == 0 ? 0 : (r.Below(2) == 0 ? 1 : uint32_t(r.Next()) | 1));
+            guest::StoreU32(w.base, guest::LoadU32(w.base, s + 10036), state);
+          },
+          loads};
+}
+
 void TuningPagesMovie(Context& h) {
   World w(h.base);
   if (!w.ok()) {
@@ -2126,6 +2162,111 @@ void TuningPagesMovie(Context& h) {
   Run(h, w,
       {"TuningScreen::InputLayerOrder", 800, __imp__sub_8220A1C8,
        hooks::TuningPagesInputLayerOrder, 80, {{176, 224}}, LayerOrderFields});
+  // TuningScreen::Command21 (tuning_screen's plain C++, the update's
+  // command 21): the layer order's fields (the layer +30732 0 to 4 and the
+  // position +30756 -1 to 3: up to five moves either way, the work list's
+  // words and the image entries inside the screen). __savegprlr_27 (48
+  // bytes); its callees' saves (144 to 224 below: SwapLayerRecords',
+  // SwapOrderTextures', Command20's and LayOutItems', their plain C++ not
+  // writing them).
+  Run(h, w,
+      {"TuningScreen::Command21", 300, __imp__sub_822087C8, hooks::TuningCommand21, 48,
+       {{144, 224}}, LayerOrderFields});
+  // TuningScreen::HandleInput (its piece sub_821E69B8 merged): the states
+  // with no page, the empty ones and the piece's (with the screen's own
+  // fields), then each page this world holds with its group's fields (the
+  // pages' saves and holes as their groups give them). Not here: the pages
+  // never seen in play it calls through the guest (7, 18 to 22, 38 to 46,
+  // 49, 53 to 58: the same function on both sides) and the vinyl view, the
+  // vinyl editor's menu and EnterEditor (23, 34, 60: their worlds are
+  // car_makers' and tuning_pages.cpp's; HandleInput only calls them).
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (no page)", 120,
+                      {0, 0, 0, 1, 2, 9, 10, 11, 12, 13, 14, 32, 33, 35, 36, 37, 47, 48, 50, 51,
+                       52, 63, 64, 200, 0xFFFFFFFFu, 0x80000000u},
+                      0, {}, [](PPCContext& t, Random& r, const World&) {
+                        t.r4.u64 = r.Next();
+                        HighWord(t, r);
+                      }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (3)", 40, {3}, 24,
+                      {{112, 144}, {224, 256}, {320, 376}, {432, 456}},
+                      [](PPCContext& t, Random& r, const World&) {
+                        t.r4.u64 = r.Next();
+                        HighWord(t, r);
+                      }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (4)", 100, {4}, 40,
+                      {{128, 192}, {236, 240}, {256, 272}}, ItemFields, true));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (5)", 100, {5}, 24, {{112, 160}},
+                      LevelInputFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (6)", 100, {6}, 24, {{112, 160}},
+                      TypeInputFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (8)", 100, {8}, 24, {{112, 152}}, OptionFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (15)", 50, {15}, 48, {{128, 160}},
+                      [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, false); }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (16)", 100, {16}, 32,
+                      {{48, 80}, {128, 160}, {256, 336}, {432, 472}, {1024, 1056}},
+                      [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, true); }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (17)", 50, {17}, 24, {{112, 144}},
+                      [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, false); }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (24)", 80, {24}, 88, {{176, 232}, {320, 336}},
+                      VinylLayerFields, true));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (25)", 80, {25}, 88, {{176, 232}, {320, 336}},
+                      LayerActionFields, true));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (26)", 80, {26}, 24, {{112, 160}},
+                      LayerEditFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (27)", 100, {27}, 80, {{176, 224}},
+                      LayerOrderFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (28)", 80, {28}, 152, {{240, 296}, {368, 400}},
+                      VinylPickFields, true));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (29)", 60, {29}, 24, {{112, 160}},
+                      DecalEditFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (30)", 40, {30}, 24, {{112, 160}},
+                      DecalEditFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (31)", 40, {31}, 24, {{112, 160}},
+                      DecalEditFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (59)", 80, {59}, 24, {{112, 144}, {160, 176}},
+                      OwnedFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (61)", 40, {61}, 40, {},
+                      [](PPCContext& t, Random& r, const World& w) {
+                        if (r.Below(4) == 0) {
+                          guest::StoreU32(w.base, r.Below(2) == 0 ? kFadeIn : kFadeOut,
+                                          1 + r.Below(30));
+                        }
+                        HighWord(t, r);
+                      }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (62)", 40, {62}, 16,
+                      {{96, 120}, {208, 240}, {304, 360}, {416, 440}},
+                      [](PPCContext& t, Random& r, const World& w) {
+                        const uint32_t s = w.screen();
+                        const uint32_t depth = guest::LoadU8(w.base, s + 10008);
+                        const uint32_t at = depth == 0 ? 64 + r.Below(6) : r.Below(depth);
+                        guest::StoreU32(w.base, s + (at + 2439) * 4, 4);
+                        if (r.Below(6) == 0) {
+                          guest::StoreU32(w.base, r.Below(2) == 0 ? kFadeIn : kFadeOut,
+                                          1 + r.Below(30));
+                        }
+                        t.r4.u64 = r.Next();
+                        HighWord(t, r);
+                      }));
 }
 
 }  // namespace harness

@@ -42,7 +42,6 @@ Guest CommandGuest(uint32_t command) {
     case 10: return {0x821F35C0, 0x821E7010};
     case 13: return {0x821EA460, 0x821E7034};
     case 14: return {0x821EAFA0, 0x821E7040};
-    case 21: return {0x822087C8, 0x821E709C};
     case 32: return {0x821FC7B8, 0x821E7124};
     case 33: return {0x821FCA80, 0x821E7130};
     case 34: return {0x821FA658, 0x821E713C};
@@ -206,6 +205,7 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
           case 18: Command18(base, call, s, frame); break;
           case 19: Command19(base, call, s, frame); break;
           case 20: Command20(base, call, s, frame, word(9644), word(9648)); break;
+          case 21: Command21(base, call, r3, frame, calls.native_pages); break;
           case 22: Command22(base, call, s, frame); break;
           case 23: Command23(base, call, s, frame); break;
           case 25: Command25(base, call, s, frame); break;

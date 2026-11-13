@@ -130,7 +130,9 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "ShowOrderNodes sub_82203A30 and MoveLayerOrder sub_82201DB8 (no adapters: only "
               "InputLayerOrder calls them); the sticker editor's SetGroupImage sub_821FD5C0 "
               "(its piece sub_821FD5F0 merged) and SetImageGroup sub_821FD658 (no adapters: "
-              "only InputVinylImages and InputLayerActions call them)) "
+              "only InputVinylImages and InputLayerActions call them); the screen's input "
+              "handler HandleInput sub_821E6950 (its piece sub_821E69B8 merged; the pages above "
+              "by their plain C++, the pages never seen in play through the guest)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -814,6 +816,15 @@ void TuningPagesSetImageGroup(PPCContext& ctx, uint8_t* base) {
   tp::SetImageGroup(base, ctx.r3.u64, ctx.r4.u64);
 }
 
+void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64, r4 = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::HandleInput(base, call, screen, r4, sp, flags);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -865,6 +876,10 @@ ITC_TUNING_PAGES(82209738, TuningPagesInputLayerActions)
 ITC_TUNING_PAGES(8220A1C8, TuningPagesInputLayerOrder)
 ITC_TUNING_PAGES(82207F38, TuningPagesSwapOrderTextures)
 ITC_TUNING_PAGES(821FD518, TuningPagesSwapLayerRecords)
+
+// The screen's input handler: a vtable slot (no direct callers), so its
+// adapter stays.
+ITC_TUNING_PAGES(821E6950, TuningPagesHandleInput)
 
 // No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
 // native and call their plain C++; the register steps above are the

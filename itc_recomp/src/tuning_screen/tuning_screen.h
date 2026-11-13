@@ -409,6 +409,18 @@ uint64_t Command19(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // PlayNamed's r3, else the movie's entry.
 uint64_t Command20(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp, uint64_t a,
                    uint64_t b);
+// sub_822087C8 TuningScreen::Command21 (r3 the screen, all 64 bits): the
+// layer order's move, the layer +30756 stepped to the cursor +30732 one at a
+// time (either way): the work list's ids (+31228 + 4i) exchanged, +9644 and
+// +9648 the two ids, SwapLayerRecords and SwapOrderTextures (tuning_pages'
+// plain C++ with `native_pages`, else through the guest), on page +30724 0
+// or 1 the decal images' two entries' textures exchanged and movie 13's
+// slots +764 to +772 (+776 to +784) set from entries 6 to 8 (27 to 29),
+// Command20; then the layer's row finished and played chained (4 x layer +
+// 202, or 4 x (layer + 44)), LayOutItems, the queue's step. 144-byte frame
+// (the movie's id at + 80); r3 LayOutItems'.
+uint64_t Command21(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp,
+                   bool native_pages);
 // sub_82204980 TuningScreen::Command26 and sub_82204A78 Command27: as
 // Command25 with 229 and string 821, or 230 and 822. 128-byte frame;
 // ScrollText's r3.
@@ -642,6 +654,7 @@ struct UpdateCalls {
   load_poll::Calls* paint_poll;  // as UpdateStand's adapter gives it
   bool native_slots;             // --native_action_mappers
   bool native_specs;             // --native_car_specs
+  bool native_pages;             // --native_tuning_pages (Command21's callees)
   // TuningScreen::DrawPowerGraph (sub_821DF350) through its override from
   // `frame` with r3 and r31 = `r3`, r30 = `r30` (its adapter saves them) and
   // the original's return address; f1 left in the guest's.

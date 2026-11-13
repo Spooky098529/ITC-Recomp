@@ -726,4 +726,17 @@ uint64_t MoveLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uin
 uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags);
 
+// sub_821E6950 TuningScreen::HandleInput (handle_input.cpp; its state 0 the
+// split piece sub_821E69B8, merged: +9652 = 3, +9656 = 0): r3 = the screen
+// (all 64 bits), r4 passed to Leave (state 59). DecalImages::Update on the
+// screen's +10048 (its plain C++ with the native heap, else the guest's);
+// then, with +9728 set, the page of the state [[+10036]+0] (above 62
+// unsigned, -1 among them, none): the native pages by their plain C++ with
+// `flags`, the pages never seen in play (7, 18 to 22, 38 to 46, 49, 53 to
+// 58) through the guest, the empty sub_82106540 (35 to 37, 50 to 52) left
+// out. 112-byte frame (its saves not written); r3 the page's, the screen for
+// the empty ones, else DecalImages::Update's.
+uint64_t HandleInput(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                     uint64_t r4, uint32_t sp, const PageFlags& flags);
+
 }  // namespace tuning_pages

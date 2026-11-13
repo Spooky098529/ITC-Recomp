@@ -15,6 +15,7 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "tuning_pages/tuning_pages.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -487,6 +488,97 @@ uint64_t Command20(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   PlayNamed(call, frame, lr[1], movie, first, 1);
   FinishNamed(call, frame, 0x82202068, movie, second);
   return PlayNamed(call, frame, 0x82202084, movie, second, 0);
+}
+
+uint64_t Command21(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp,
+                   bool native_pages) {
+  ITC_NATIVE_RUNNING("sub_822087C8 TuningScreen::Command21");
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t s = uint32_t(r3);
+  const auto word = [&](uint32_t offset) { return Load(base, s + offset); };
+  // The work list's words +31228 + 4i (the original's (i + 7807) << 2).
+  const auto list = [&](uint32_t i) { return s + uint32_t((i + 7807) << 2); };
+  const uint32_t movie = Load(base, MovieEntry(base, frame, 13));
+  int32_t n = int32_t(word(30732) - word(30756));
+  // One move of the layer: the two records and textures swapped, the decal
+  // images' entries a and a - 1 exchanged with movie 13's slots, Command20.
+  const auto move = [&](uint64_t first, uint64_t second, const uint32_t lr[2], uint32_t up) {
+    if (native_pages) {
+      tuning_pages::SwapLayerRecords(base, call, r3, first, second, frame);
+      tuning_pages::SwapOrderTextures(base, r3, frame);
+    } else {
+      call(0x821FD518, {r3, first, second}, frame, lr[0]);
+      call(0x82207F38, {r3}, frame, lr[1]);
+    }
+    const int32_t set = int32_t(word(30724));
+    if (set == 0 || set == 1) {
+      const uint32_t c = word(30756);
+      const uint32_t images = s + 10048;
+      const uint32_t shift = (set == 0 ? 5 : 26) + up;
+      const uint32_t e1 = images + 36 * (c + shift + 1);
+      const uint32_t e2 = images + 36 * (c + shift);
+      const uint32_t h1 = Load(base, e1 + 28);
+      const uint32_t h2 = Load(base, e2 + 28);
+      const uint32_t d1 = Load(base, e1 + 32);
+      Store(base, e1 + 28, h2);
+      Store(base, e1 + 32, Load(base, e2 + 32));
+      Store(base, e2 + 28, h1);
+      Store(base, e2 + 32, d1);
+      const uint32_t slot = set == 0 ? 764 : 776;
+      const uint32_t from = set == 0 ? 10292 : 11048;
+      for (uint32_t k = 0; k < 3; k++) {
+        const uint32_t entry = MovieEntry(base, frame, 13);
+        const uint32_t value = word(from + 36 * k);
+        Store(base, Load(base, Load(base, Load(base, entry) + 28) + slot + 4 * k), value);
+      }
+    }
+    Command20(base, call, s, frame, word(9644), word(9648));
+  };
+  if (n > 0) {
+    static constexpr uint32_t kLr[2] = {0x82208878, 0x82208880};
+    do {
+      const uint32_t c = word(30756);
+      n--;
+      const uint32_t moved = Load(base, list(c));
+      Store(base, s + 30756, c + 1);
+      const uint32_t other = Load(base, list(c + 1));
+      Store(base, list(c + 1), moved);
+      Store(base, list(word(30756) - 1), other);
+      const uint32_t a = word(30756);
+      Store(base, s + 9644, Load(base, list(a)));
+      Store(base, s + 9648, Load(base, list(a - 1)));
+      move(uint64_t(a), uint64_t(a) - 1, kLr, 0);
+    } while (n != 0);
+  } else if (n < 0) {
+    static constexpr uint32_t kLr[2] = {0x82208A8C, 0x82208A94};
+    uint32_t count = uint32_t(-int64_t(n));
+    do {
+      const uint32_t c = word(30756);
+      const uint32_t moved = Load(base, list(c));
+      Store(base, s + 30756, c - 1);
+      const uint32_t other = Load(base, list(c - 1));
+      Store(base, list(c - 1), moved);
+      Store(base, list(word(30756) + 1), other);
+      const uint32_t a = word(30756);
+      Store(base, s + 9644, Load(base, list(a + 1)));
+      Store(base, s + 9648, Load(base, list(a)));
+      move(uint64_t(a) + 1, uint64_t(a), kLr, 1);
+      count--;
+    } while (count != 0);
+  }
+  // The layer's row: 4 x layer + 202 (set 0) or 4 x (layer + 44) (set 1)
+  // finished and played chained.
+  const int32_t set = int32_t(word(30724));
+  if (set == 0) {
+    FinishNamed(call, frame, 0x82208C48, movie, uint64_t(uint32_t(word(30732) << 2)) + 202);
+    PlayNamed(call, frame, 0x82208C98, movie, uint64_t(uint32_t(word(30732) << 2)) + 202, 1);
+  } else if (set == 1) {
+    FinishNamed(call, frame, 0x82208C74, movie, uint32_t((word(30732) + 44) << 2));
+    PlayNamed(call, frame, 0x82208C98, movie, uint32_t((word(30732) + 44) << 2), 1);
+  }
+  const uint64_t answer = LayOutItems(base, s, frame);
+  Advance(base, s);
+  return answer;
 }
 
 uint64_t Command26(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {

@@ -26,6 +26,7 @@ ITC_FLAG_DECLARE(bool, native_vehicle);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_scene_models);
 ITC_FLAG_DECLARE(bool, native_load_poll);
+ITC_FLAG_DECLARE(bool, native_tuning_pages);
 
 ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Run the tuning screen's functions (docs/functions/tuning-screen.md: the part "
@@ -86,6 +87,8 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821EB8E8, Command55 sub_821EBDC8, Command56 sub_821EC6A0, Command57 sub_821ECC68 "
               "(UiMovie::NamedAnimationTime by its plain C++) and Command58 sub_821EDB70, and the "
               "editors': Command17 sub_82200100, Command19 sub_82201C58, Command20 sub_82201FA0, "
+              "Command21 sub_822087C8 (SwapLayerRecords and SwapOrderTextures by their plain C++ "
+              "with --native_tuning_pages), "
               "Command26 sub_82204980, Command27 sub_82204A78, Command32Done sub_821F7498, Command42 "
               "sub_821F7618, Command52 sub_821F77F0 (movie 16's dialog) and Command53 sub_821F7948; "
               "its swatch color setter sub_821E7DA0, never seen in play, through the guest) natively instead of through the "
@@ -469,6 +472,15 @@ void TuningCommand20(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningCommand21(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_pages = ITC_FLAG(native_tuning_pages);
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
+    return ts::Command21(base, call, screen, sp, native_pages);
+  });
+}
+
 void TuningCommand32Done(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::Command32Done(base, ctx.r3.u32, ctx.r1.u32);
 }
@@ -732,6 +744,7 @@ void TuningUpdate(PPCContext& ctx, uint8_t* base) {
       paint_poll,
       ITC_FLAG(native_action_mappers),
       ITC_FLAG(native_car_specs),
+      ITC_FLAG(native_tuning_pages),
       [&](uint32_t frame, uint64_t screen, uint64_t r30) {
         apply_f1();
         const uint64_t stack = ctx.r1.u64;

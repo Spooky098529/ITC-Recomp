@@ -214,4 +214,8 @@ void TuningPagesMoveLayerOrder(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetGroupImage(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetImageGroup(PPCContext& ctx, uint8_t* base);
 
+// HandleInput sub_821E6950 (r3 the screen, r4 Leave's object; its piece
+// sub_821E69B8 merged), the screen's input handler.
+void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

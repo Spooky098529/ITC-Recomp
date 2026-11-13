@@ -128,12 +128,14 @@ void TuningCommand58(PPCContext& ctx, uint8_t* base);
 // The editors' command runners never seen in play, for the harness only
 // (the same way; r3 = the screen): Command17 sub_82200100, Command19
 // sub_82201C58, Command20 sub_82201FA0 (r4, r5 the update's +9644 and
-// +9648), Command26 sub_82204980, Command27 sub_82204A78, Command32Done
-// sub_821F7498, Command42 sub_821F7618, Command52 sub_821F77F0 (r3 all 64
-// bits, r4 the update's dispatcher) and Command53 sub_821F7948 (r3 left).
+// +9648), Command21 sub_822087C8 (r3 all 64 bits), Command26 sub_82204980,
+// Command27 sub_82204A78, Command32Done sub_821F7498, Command42
+// sub_821F7618, Command52 sub_821F77F0 (r3 all 64 bits, r4 the update's
+// dispatcher) and Command53 sub_821F7948 (r3 left).
 void TuningCommand17(PPCContext& ctx, uint8_t* base);
 void TuningCommand19(PPCContext& ctx, uint8_t* base);
 void TuningCommand20(PPCContext& ctx, uint8_t* base);
+void TuningCommand21(PPCContext& ctx, uint8_t* base);
 void TuningCommand26(PPCContext& ctx, uint8_t* base);
 void TuningCommand27(PPCContext& ctx, uint8_t* base);
 void TuningCommand32Done(PPCContext& ctx, uint8_t* base);
