@@ -300,6 +300,10 @@ file's history. What's left to see in a drive, from every run:
   expected groups; harnesses ~127 s), 34 of 34 harness lines, no
   prints added; 9 ran in the replay `itc_5182` (ok), 25 not in game
   (the new ones added to the drive list). Recorded.
+- Subsystem 8 of 10: a front-end screen that lists cars (`sub_8224BDC0`
+  and `sub_82250778`, `sub_82250890`, `sub_82250AA8`, `sub_82251320`,
+  seen in play, ready); its line deleted from `leads.md`. Mapping agent
+  running.
 
 ## Done
 
