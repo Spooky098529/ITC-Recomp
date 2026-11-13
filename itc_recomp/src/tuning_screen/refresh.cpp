@@ -154,7 +154,7 @@ void Context::Header() {
   Shown(kAll, 17, 0);
   Shown(kAll, 0, 0);
   PickCameraPreset(base, stand, self, frame);
-  PreviewItem(base, stand, self, frame);
+  PreviewItem(base, stand, self, frame, f1);
   {
     const int32_t state = State();
     const bool headlights = (state == 6 || state == 9 || state == 10 || state == 11) &&

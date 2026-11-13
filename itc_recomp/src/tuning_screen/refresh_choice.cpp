@@ -24,11 +24,9 @@
 // r6 and r10 passed where the original's own code sets them (state 8's door
 // rows: r6 31, left from the second texture call; the bonnet's rows in both
 // states: r10 the item byte, left from its category test), the others 0 (the
-// user's call, 2026-10-30). The swatches' color setter sub_821E7DA0 (never
-// seen in play: a leaf storing r5, r6 and r7 into the node's +56, +60 and
-// +64) stays recompiled, called through the guest with r3 the screen (all 64
-// bits), r4 the node, r5 to r7 the color and the original's return
-// addresses; it takes no floats. GarageStage::Command by its plain C++, as
+// user's call, 2026-10-30). The swatches' color setter UiNode::SetRgb
+// sub_821E7DA0 (never seen in play: a leaf storing r5, r6 and r7 into the
+// node's +56, +60 and +64) by its plain C++ (since 2026-11-13). GarageStage::Command by its plain C++, as
 // UpdateStand and PickCameraPreset call it (f1 left as its adapter leaves
 // it: see State8).
 
@@ -45,7 +43,6 @@ namespace {
 
 constexpr uint32_t kChoiceRows = 9679;  // a byte: the bonnet's list's rows (state 7)
 constexpr uint32_t kOptionRows = 9680;  // a byte: the option list's rows (state 8)
-constexpr uint32_t kSetSwatch = 0x821E7DA0;  // (screen, node, r, g, b): +56, +60, +64
 constexpr uint32_t kHolderAt = 0x826D83E0;   // [[it]]: the stand's holder
 
 }  // namespace
@@ -98,9 +95,9 @@ void Context::State7() {
     }
   }
 
-  // A swatch: the node's color through the guest (sub_821E7DA0).
-  const auto swatch = [&](uint32_t node, uint64_t r, uint64_t g, uint64_t b, uint32_t lr) {
-    Call(kSetSwatch, {self, node, r, g, b}, lr);
+  // A swatch: the node's color (UiNode::SetRgb sub_821E7DA0's plain C++).
+  const auto swatch = [&](uint32_t node, uint64_t r, uint64_t g, uint64_t b, uint32_t) {
+    SetRgb(base, node, uint32_t(r), uint32_t(g), uint32_t(b));
   };
   if (Category() == 1 && Item() == 3) {
     // Sub-scene 32's child 2: its children 2 to 5's child 2.

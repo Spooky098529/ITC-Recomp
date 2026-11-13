@@ -99,7 +99,9 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821FAD00, sub_821FB0B8, sub_821FCC48, sub_821FCED0) and Command43 to Command51 "
               "(sub_821FD128, sub_821FD3F8, sub_821FB1F0, sub_821F8FC0 for 46, 48 and 50, sub_821FB450, "
               "sub_821FB6B0, sub_821FB8D8; src/tuning_pages/sticker_commands.cpp); "
-              "its swatch color setter sub_821E7DA0, never seen in play, through the guest) natively instead of through the "
+              "its swatch color setter UiNode::SetRgb sub_821E7DA0; the stand setters never seen in play, "
+              "SetCaliper sub_821DA330, SetAccessory sub_821CCBE8, RefitAxles sub_821DF9D0, "
+              "PreviewInteriorChoices sub_821E7E48 and PreviewLightKit sub_821CC930, no adapters) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
 
@@ -575,6 +577,29 @@ void WithStand(PPCContext& ctx, uint8_t* base, Body body) {
   ctx.fpscr.disableFlushMode();
 }
 
+// WithStand with f1 tracked RefreshMenu's way: `body(stand, &f1)`, the f1
+// the native code left put in f1 before each later guest call and at the
+// end.
+template <typename Body>
+void WithStandF1(PPCContext& ctx, uint8_t* base, Body body) {
+  std::optional<double> f1;
+  WithStand(ctx, base, [&](const ts::StandCalls& inner) {
+    const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
+                                   uint32_t frame, uint32_t lr) {
+      if (f1) {
+        ctx.f1.f64 = *f1;
+        f1.reset();
+      }
+      return inner.call(function, args, frame, lr);
+    };
+    const ts::StandCalls stand{call, inner.calls};
+    return body(stand, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+}
+
 }  // namespace
 
 void TuningSetInteriorPair(PPCContext& ctx, uint8_t* base) {
@@ -606,7 +631,6 @@ void TuningFitSelectedCar(PPCContext& ctx, uint8_t* base) {
 ITC_TUNING_STAND_STEP(PickCameraPreset)
 ITC_TUNING_STAND_STEP(UpdateBusyIcon)
 ITC_TUNING_STAND_STEP(ApplyDecals)
-ITC_TUNING_STAND_STEP(PreviewItem)
 ITC_TUNING_STAND_STEP(ApplyAreaDecals)
 
 #undef ITC_TUNING_STAND_STEP
@@ -635,16 +659,60 @@ void TuningDecalCommand(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = f1;
 }
 
+void TuningPreviewItem(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithStandF1(ctx, base, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
+    return ts::PreviewItem(base, stand, r3, sp, f1);
+  });
+}
+
 void TuningRestoreStand(PPCContext& ctx, uint8_t* base) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  std::optional<double> f1;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::RestoreStand(base, stand, r3, sp, &f1);
+  WithStandF1(ctx, base, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
+    return ts::RestoreStand(base, stand, r3, sp, f1);
   });
-  if (f1) {
-    ctx.f1.f64 = *f1;
-  }
+}
+
+void TuningSetCaliper(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, sp = ctx.r1.u32;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::SetCaliper(base, stand, screen, r4, r5, sp);
+  });
+}
+
+void TuningSetAccessory(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r4 = ctx.r4.u32, r5 = ctx.r5.u32, sp = ctx.r1.u32;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::SetAccessory(base, stand.call, r4, r5, sp);
+  });
+}
+
+void TuningRefitAxles(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  WithStandF1(ctx, base, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
+    return ts::RefitAxles(base, stand, screen, sp, f1);
+  });
+}
+
+void TuningPreviewInteriorChoices(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
+    return ts::PreviewInteriorChoices(base, stand.call, screen, sp);
+  });
+}
+
+void TuningPreviewLightKit(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithStandF1(ctx, base, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
+    return ts::PreviewLightKit(base, stand, r3, sp, f1);
+  });
+}
+
+void TuningSetRgb(PPCContext& ctx, uint8_t* base) {
+  ts::SetRgb(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
 }
 
 // UpdateStand: its callees' plain C++ where their adapters would run it

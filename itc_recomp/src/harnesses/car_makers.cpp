@@ -1753,9 +1753,172 @@ void TuningStand(Context& h, Random& r) {
           // and Wheels::SetTireTextures' lr under SceneWheels::SetTireGrades'.
           GetBSaves({160 + 96, 160 + 112, 160 + 112 + 112},
                     {{160 + 112, 56}, {160 + 96, 56}, {160 + 4000 + 16, 16}, {272, 24},
-                     {484, 12}}));
+                     {484, 12},
+                     // Since TuningScreen::SetCaliper and RefitAxles are native
+                     // (B7 loop, 2026-11-13): Wheels::SetCaliperTexture's
+                     // original's saves under SceneWheels::SetCaliperTexture's
+                     // frame, and GarageStage::FitAxles' under RefitAxles'.
+                     {160 + 208, 16}, {160 + 4000, 16}}));
     }
     results.Report();
+  }
+  {
+    // The stand setters never seen in play the pages above reach (B7 loop,
+    // 2026-11-13): each with the world PreviewItem's cases lay. The
+    // recompiled side runs their callees' originals (the stand's setters'
+    // adapters removed), whose register saves under the frames are left
+    // out (bytes under r1, size), as PreviewItem's.
+    const Random kept = r;
+    {
+      // SetCaliper (no frame): the choice 0 to 6 or any word, the selected
+      // garage car's id 0 to 24 or any; r4 any word. Under it,
+      // GarageStage::SetWheelExtras' original's saves (r29 to r31, lr),
+      // SceneWheels::SetCaliperTexture's under its 112-byte frame and
+      // Wheels::SetCaliperTexture's (r31, lr) under that one's 96.
+      Results results("TuningScreen::SetCaliper (sub_821DA330)");
+      for (int c = 0; c < 32; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              Write(h.base, screen, screen_inputs.data(), kTuningScreenBytes);
+              const uint32_t car = tuning_screen::SelectedGarageCar(h.base, screen);
+              guest::StoreU32(h.base, car + 224, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(25));
+              t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+              t.r4.u64 = r.Below(2) == 0 ? r.Below(8) : r.Next();
+              t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(7);
+            },
+            __imp__sub_821DA330, hooks::TuningSetCaliper, 0, floats, fmt::format("case {}", c),
+            0, 0, before, blocks, 0x1000, kGarageBytes,
+            GetBSaves({112}, {{0, 32}, {112, 16}, {208, 16}}));
+      }
+      results.Report();
+    }
+    {
+      // SetAccessory (no frame): the kind 0 to 4 or any, the choice 0 to 5
+      // or any. Under it, GarageStage::SetAccessory's original's saves (r30,
+      // r31, lr) and SceneInterior::SetRecord's under its 112-byte frame.
+      Results results("TuningScreen::SetAccessory (sub_821CCBE8)");
+      for (int c = 0; c < 32; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              t.r3.u64 = r.Next();
+              t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(5);
+              t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(6);
+            },
+            __imp__sub_821CCBE8, hooks::TuningSetAccessory, 0, floats, fmt::format("case {}", c),
+            0, 0, before, blocks, 0x1000, kGarageBytes,
+            GetBSaves({112}, {{0, 24}, {112, 24}}));
+      }
+      results.Report();
+    }
+    {
+      // RefitAxles: the selected garage car as the world lays it; f1
+      // compared. The top 16 bytes: r31 and lr's saves; under its 4,000-byte
+      // frame GarageStage::FitAxles' original's saves (r31, lr) and the 16
+      // from 16 (its callee's save, as PreviewItem's).
+      Results results("TuningScreen::RefitAxles (sub_821DF9D0)");
+      for (int c = 0; c < 24; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+            },
+            __imp__sub_821DF9D0, hooks::TuningRefitAxles, 16, floats, fmt::format("case {}", c),
+            0, 0, before, with_f1, 0x3000, kGarageBytes, {{4000, 16}, {4000 + 16, 16}});
+      }
+      results.Report();
+    }
+    {
+      // PreviewInteriorChoices: the five choice words and the slot's pair
+      // as the pages leave them (-1, or tens 0 to 9 and ones 0 to 4: the
+      // tables read stay below the frame's saves), the interior level
+      // +35708 0 to 6 or any, the slot +33576 0 to 6. The top 88 bytes: r22
+      // to r31 and lr's saves; under its 208-byte frame the setters'
+      // originals' saves and ApplyRecord's and GetB's under theirs.
+      Results results("TuningScreen::PreviewInteriorChoices (sub_821E7E48)");
+      for (int c = 0; c < 32; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              for (uint32_t at = 33800; at < 33820; at += 4) {
+                field(at, r.Below(4) == 0 ? 0xFFFFFFFFu : 10 * r.Below(10) + r.Below(5));
+              }
+              field(35708, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(7));
+              field(33576, r.Below(7));
+              field(33564, r.Below(9));
+              field(33572, r.Below(5));
+              t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+            },
+            __imp__sub_821E7E48, hooks::TuningPreviewInteriorChoices, 88, floats,
+            fmt::format("case {}", c), 208, 32, before, blocks, 0x1000, kGarageBytes,
+            GetBSaves({208 + 96, 208 + 112}, {{208 + 112, 56}, {208 + 96, 56}}));
+      }
+      results.Report();
+    }
+    {
+      // PreviewLightKit: the state 21, 22 or another, the group 0 to 4, the
+      // light kits' words small (the index below 8: SetLightKit's table read
+      // unchecked); f1 compared. The top 8 bytes: lr's save; under its
+      // 112-byte frame GarageStage::SetLightKit's original's saves and
+      // GetB's under its 176-byte frame.
+      Results results("TuningScreen::PreviewLightKit (sub_821CC930)");
+      for (int c = 0; c < 32; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              const uint32_t pick = r.Below(5);
+              field(tuning_screen::kState, pick < 2 ? 21 : pick < 4 ? 22 : r.Below(64));
+              field(30492, r.Below(5));
+              for (const uint32_t at : {30512u, 30516u, 30520u, 30552u}) {
+                field(at, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(360));
+              }
+              field(30524, r.Below(8));
+              field(30556, r.Below(8));
+              field(30548, r.Below(4));
+              for (uint32_t g = 0; g < 5; g++) {
+                field(30596 + 4 * g, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(360));
+                field(30612 + 4 * g, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(360));
+              }
+              t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+              t.f1.f64 = double(std::bit_cast<float>(RandomFloat(r)));
+            },
+            __imp__sub_821CC930, hooks::TuningPreviewLightKit, 8, floats,
+            fmt::format("case {}", c), 112, 32, before, with_f1, 0x1000, kGarageBytes,
+            GetBSaves({112 + 176}, {{112 + 32, 24}}));
+      }
+      results.Report();
+    }
+    {
+      // UiNode::SetRgb: a node in the screen's block, any words.
+      Results results("UiNode::SetRgb (sub_821E7DA0)");
+      for (int c = 0; c < 16; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              t.r3.u64 = r.Next();
+              t.r4.u64 = screen + 4 * r.Below(1024);
+              t.r5.u64 = r.Below(256);
+              t.r6.u64 = r.Below(256);
+              t.r7.u64 = r.Next();
+            },
+            __imp__sub_821E7DA0, hooks::TuningSetRgb, 0, floats, fmt::format("case {}", c), 0,
+            0, before, blocks, 0x100, kGarageBytes);
+      }
+      results.Report();
+    }
+    r = kept;
   }
   {
     // PreviewParts (never seen in play) and GarageStage::SetAeroSet: the
@@ -1896,7 +2059,10 @@ void TuningStand(Context& h, Random& r) {
           // recompiled runs).
           GetBSaves({544, 400, 352, 336, 320, 224 + 4016 + 3120},
                     {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16},
-                     {224 + 4016, 160}, {436, 8}}));
+                     {224 + 4016, 160}, {436, 8},
+                     // Since TuningScreen::SetCaliper and RefitAxles are native
+                     // (B7 loop, 2026-11-13), as PreviewItem's.
+                     {224 + 208, 16}, {224 + 4000, 16}}));
     }
     results.Report();
   }

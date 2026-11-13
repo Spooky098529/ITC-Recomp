@@ -173,6 +173,20 @@ void TuningDecalCommand(PPCContext& ctx, uint8_t* base);
 // TuningStandCalleesNative.
 void TuningPreviewItem(PPCContext& ctx, uint8_t* base);
 void TuningRestoreStand(PPCContext& ctx, uint8_t* base);
+// The tuning screen's stand setters never seen in play, without adapters
+// (only PreviewItem's, RestoreStand's and the refresh's plain C++ reach
+// them; the harness's; lr put back): SetCaliper sub_821DA330 (r3 the
+// screen, r4, r5 a choice), SetAccessory sub_821CCBE8 (r4 a kind, r5 a
+// choice), RefitAxles sub_821DF9D0 (r3 the screen; f1 FitAxles'),
+// PreviewInteriorChoices sub_821E7E48 (r3 the screen), PreviewLightKit
+// sub_821CC930 (r3 the screen; f1 SetLightKit's) and UiNode::SetRgb
+// sub_821E7DA0 (r4 a node, r5 to r7 the color; r3 left).
+void TuningSetCaliper(PPCContext& ctx, uint8_t* base);
+void TuningSetAccessory(PPCContext& ctx, uint8_t* base);
+void TuningRefitAxles(PPCContext& ctx, uint8_t* base);
+void TuningPreviewInteriorChoices(PPCContext& ctx, uint8_t* base);
+void TuningPreviewLightKit(PPCContext& ctx, uint8_t* base);
+void TuningSetRgb(PPCContext& ctx, uint8_t* base);
 // SetCarStats sub_821DF788 (r3 the screen; f1 its last SetText's), only with
 // TuningCarStatsCalleesNative: CarMakersGarageCalleesNative and
 // --native_vehicle.

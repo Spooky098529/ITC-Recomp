@@ -601,19 +601,59 @@ uint64_t PreviewParts(uint8_t* base, const GuestCall& call, uint64_t r3, uint64_
 // sub_821E07B0 TuningScreen::PreviewItem: r3 = the screen (all 64 bits).
 // The highlighted item put on the stand by the state, the category and the
 // item bytes (its row): the stand's setters' plain C++, IsItemAvailable's,
-// SetInteriorPair's and PreviewParts'; SetCaliper, GarageStage::SetChoice,
-// RefitAxles, GarageStage::SetAero2, SetDoorKind and SetAccessory (never
-// seen in play) through `call` with the original's return addresses. The
-// choice tables at frame + 80 and + 96, read unchecked. 160-byte frame; r3
-// the last call's, else the entry (nothing in states 3 and 4).
-uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// SetInteriorPair's, PreviewParts', SetCaliper's, RefitAxles' and
+// SetAccessory's (the last three and GarageStage::SetChoice, SetAero2 and
+// SetDoorKind never seen in play). The choice tables at frame + 80 and + 96,
+// read unchecked. 160-byte frame; r3 the last call's, else the entry
+// (nothing in states 3 and 4); `*f1` set where RefitAxles leaves f1 (nullopt
+// where its FitAxles ran the original), else left.
+uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                     std::optional<double>* f1);
+// sub_821DA330 TuningScreen::SetCaliper: the calipers' texture w by
+// `choice` (unsigned; 0 by the selected garage car's id +224: 4 gives 6, 7,
+// 12 and 14 give 5, others 4; 1 gives 4, 2 gives 6, 3 gives 0, 4 gives 5,
+// 5 and up 0), then the tail call GarageStage::SetWheelExtras(holder, r4,
+// w) from `sp` (with `stand.calls.poll`); its r3.
+uint64_t SetCaliper(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t r4,
+                    uint32_t choice, uint32_t sp);
+// sub_821CCBE8 TuningScreen::SetAccessory: the kind turned around (0 gives
+// 3 with the choice 0; 1 gives 2 with the choices 3 and 4 swapped; 2 gives
+// 1; 3 and up 0), then the tail call GarageStage::SetAccessory(holder, kind,
+// choice) from `sp`; its r3.
+uint64_t SetAccessory(uint8_t* base, const GuestCall& call, uint32_t kind, uint32_t choice,
+                      uint32_t sp);
+// sub_821DF9D0 TuningScreen::RefitAxles: a car object at frame + 80 from the
+// selected garage car (Car::Init, memcpy 1,884 bytes, +3888 |= 1,
+// Car::Refresh), then GarageStage::FitAxles(holder, car). 4,000-byte frame;
+// its r3, `*f1` its f1 (nullopt where it ran the original).
+uint64_t RefitAxles(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
+                    std::optional<double>* f1);
+// sub_821E7E48 TuningScreen::PreviewInteriorChoices: the tables A (3, 2, 1,
+// 0) and B (2, 1, 0, 4, 3) at frame + 80 and + 96; for the five choice codes
+// +33800 + 4i the stand's choice (6, 5, 4, then 0 or 2 and 1 or 3 by
+// +35708, the other cleared), cleared for -1, else
+// GarageStage::SetChoice(holder, c, A[w / 10], B[w % 10]); then the slot
+// +33576's choice with (A[+33564], B[+33572]) (indexes unchecked). 208-byte
+// frame; the last SetChoice's r3.
+uint64_t PreviewInteriorChoices(uint8_t* base, const GuestCall& call, uint32_t screen,
+                                uint32_t sp);
+// sub_821CC930 TuningScreen::PreviewLightKit: in state 21 or 22 (+9652),
+// GarageStage::SetLightKit(holder, +30492, ...) with the group's floats
+// (each word times [0x820021FC], their conversions' doublewords at frame +
+// 80 to + 96), else nothing (r3 left). 112-byte frame; SetLightKit's r3,
+// `*f1` its f1 (left in the other states).
+uint64_t PreviewLightKit(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                         std::optional<double>* f1);
+// sub_821E7DA0 UiNode::SetRgb: the node's +56, +60, +64 = `r`, `g`, `b`. A
+// leaf.
+void SetRgb(uint8_t* base, uint32_t node, uint32_t r, uint32_t g, uint32_t b);
 // sub_821E0FB0 TuningScreen::RestoreStand: r3 = the screen (all 64 bits).
 // The current page's saved values put back on the stand by the category and
 // the item (its row): the stand's setters', PreviewWheel's, SetInteriorPair's
 // GarageStage::SetLightKit's and PreviewParts' plain C++; SetCaliper,
-// GarageStage::SetChoice, RefitAxles, SetAero2, SetDoorKind, SetAccessory and
-// ClearLightKit (never seen in play) through the guest (ClearLightKit with
-// f1 as it is); GarageStage::SetColor (never seen in play) by its plain C++
+// SetCaliper's, RefitAxles', SetAccessory's, GarageStage::SetChoice's,
+// SetAero2's, SetDoorKind's and ClearLightKit's (never seen in play; f1 left
+// by all but RefitAxles); GarageStage::SetColor (never seen in play) by its plain C++
 // (stand_models', with `stand.calls.poll`; f1 left as its f1). The choice
 // tables at frame + 112 and + 128, the tire grades' at + 128, the
 // conversions' doublewords at + 80 to + 112 as the original leaves them.

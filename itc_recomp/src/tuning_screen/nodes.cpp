@@ -162,4 +162,11 @@ uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp) {
   return r3;
 }
 
+void SetRgb(uint8_t* base, uint32_t node, uint32_t r, uint32_t g, uint32_t b) {
+  ITC_NATIVE_RUNNING("sub_821E7DA0 UiNode::SetRgb");
+  Store(base, node + 56, r);
+  Store(base, node + 60, g);
+  Store(base, node + 64, b);
+}
+
 }  // namespace tuning_screen
