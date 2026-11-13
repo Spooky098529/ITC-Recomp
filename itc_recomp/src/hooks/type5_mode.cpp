@@ -246,14 +246,13 @@ ITC_TYPE5_MODE(82225980, Type5DialogOpenNotice)
 ITC_TYPE5_MODE(82225B88, Type5DialogOpenConfirm2)
 ITC_TYPE5_MODE(82225A08, Type5DialogOpenNotice2)
 ITC_TYPE5_MODE(822257A8, Type5DialogOnLeft)
-// The dialog's Init (from the mode's Init).
-ITC_TYPE5_MODE(82226A10, Type5DialogInit)
-// The mode: Init (vtable 0x82006C24's slot 0, from Modes::Tick), FindShown
-// (from the delegate functions), the delegate functions (through the slot
-// thunks and Mode::NextModeThunk), the slot 14 thunk (the delegate's
-// function) and the +32 interface (vtable 0x82006C18).
+// The mode: Init (vtable 0x82006C24's slot 0, from Modes::Tick), the
+// delegate functions (through the slot thunks and Mode::NextModeThunk), the
+// slot 14 thunk (the delegate's function) and the +32 interface (vtable
+// 0x82006C18). Type5Dialog::Init sub_82226A10 and FindShown sub_8222FD08: no
+// adapters (only the mode's functions, native, call them; the register
+// steps above are the harness's).
 ITC_TYPE5_MODE(8222FD68, ModeType5Init)
-ITC_TYPE5_MODE(8222FD08, ModeType5FindShown)
 ITC_TYPE5_MODE(82230050, ModeType5WaitForLoads)
 ITC_TYPE5_MODE(82230458, ModeType5NextMode)
 ITC_TYPE5_MODE(82230260, ModeType5LeaveScreen)
