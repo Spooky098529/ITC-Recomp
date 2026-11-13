@@ -54,6 +54,8 @@ void Type67ScreenTables(Context& h);
 void Type67ListPart(Context& h);
 void Type67ListHelpers(Context& h);
 void Type67TitledList(Context& h);
+// Type6ListScreen::SetUpRace's cases (src/harnesses/race_setup.cpp).
+void Type67SetUpRace(Context& h);
 
 namespace {
 
@@ -309,6 +311,10 @@ void ListAndNodeScreens(Context& h, const Block& world, uint32_t movie) {
         __imp__sub_82259298, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenOnLeft(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
+  Cases(h, world, "NodeScreen::Open", 0x82259318, 4, targets, {}, node, __imp__sub_82259318,
+        [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+          return ts::NodeScreenOpen(b, t.r3.u64);
+        });
   Cases(h, world, "Type6NodeScreen::IsLoaded", 0x82236FD8, 8, targets, {}, node,
         __imp__sub_82236FD8, [](PPCContext& t, uint8_t* b, const ts::Calls&) {
           return ts::NodeScreenIsLoaded(b, t.r3.u64, t.r1.u32);
@@ -347,9 +353,10 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
   const std::vector<uint32_t> screen_targets = {
       ts::kEmpty, kSetR4,     kGetter,    ts::kEmpty, kSetR4,     kGetter,    0x82230790,
       0x82230758, 0x822401D0, 0x82240208, 0x82240860, 0x82247058, 0x822408B8, 0x82240238,
-      0x82240248, 0x82240258};
-  const std::vector<uint32_t> no_posts = {ts::kEmpty, kSetR4,     kGetter,   0x82240238,
-                                          0x82240248, 0x82240258, 0x82230790};
+      0x82240248, 0x82240258, 0x8223E708, 0x822307D0, 0x822307E0, 0x822307F0};
+  const std::vector<uint32_t> no_posts = {ts::kEmpty, kSetR4,     kGetter,    0x82240238,
+                                          0x82240248, 0x82240258, 0x82230790, 0x822307D0,
+                                          0x822307E0, 0x822307F0};
   const std::vector<uint32_t> pair_targets = {ts::kEmpty, kSetR4,     kGetter,    0x82249C30,
                                               0x82249C40, 0x82249BE0, 0x82249BA8, 0x82249C70};
   // Update and DrawList test their pointers; the other handlers read them
@@ -479,6 +486,45 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
        [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1976); }},
       {"Type7PanelScreen::CarSlot", 0x82240258, 2, 0, __imp__sub_82240258,
        [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1980); }},
+      // The type 6 list batch's leaves (type6_list.cpp).
+      {"PanelScreen::OnYes", 0x822609E0, 2, 0, __imp__sub_822609E0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenSetAnswer(b, t.r3.u64, 0);
+       }},
+      {"PanelScreen::OnNo", 0x822609D0, 2, 0, __imp__sub_822609D0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenSetAnswer(b, t.r3.u64, 1);
+       }},
+      {"PanelScreen::OnBack", 0x822306D0, 2, 0, __imp__sub_822306D0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenSetAnswer(b, t.r3.u64, 2);
+       }},
+      {"PanelScreen::OnDialogClosed", 0x822306E0, 12, 0, __imp__sub_822306E0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOnDialogClosed(b, t.r3.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::Suspend", 0x82248DE0, 8, 0, __imp__sub_82248DE0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenSuspend(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"PanelScreen::OpenEmpty", 0x822404D8, 8, 0, __imp__sub_822404D8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOpenEmpty(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"Type6PanelScreen::Back", 0x8223E708, 8, 0, __imp__sub_8223E708,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x8223E708);
+       }},
+      {"Type6PanelScreen::CarList", 0x822307D0, 2, 0, __imp__sub_822307D0,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1972); }},
+      {"Type6PanelScreen::CarEntry", 0x822307E0, 2, 0, __imp__sub_822307E0,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1976); }},
+      {"Type6PanelScreen::CarSlot", 0x822307F0, 2, 0, __imp__sub_822307F0,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1980); }},
+      {"GroupPair::DeletingDestructor", 0x8224ACE0, 4, kPair, __imp__sub_8224ACE0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::GroupPairDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
       {"PanelScreen::OnEnter", 0x82249D18, n, 0, __imp__sub_82249D18,
        [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOnEnter(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
@@ -689,6 +735,10 @@ void Deleting(Context& h) {
        [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelGroupDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
+      {"GroupPair::DeletingDestructor, deleting (sub_8224ACE0)", 64, __imp__sub_8224ACE0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::GroupPairDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
       {"Type6PanelScreen::DeletingDestructor, deleting (sub_82230B00)", 11744,
        __imp__sub_82230B00,
        [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
@@ -762,6 +812,7 @@ void Type67Screens(Context& h) {
   Type67ListPart(h);
   Type67ListHelpers(h);
   Type67TitledList(h);
+  Type67SetUpRace(h);
   Write(h.base, kFades, saved_fade_block.data(), kFadesBytes);
   for (int i = 0; i < 3; i++) guest::StoreU32(h.base, kFadeWords[i], saved_fades[i]);
 }

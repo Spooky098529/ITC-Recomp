@@ -170,4 +170,28 @@ void NodeListScreenDestruct(PPCContext& ctx, uint8_t* base);
 void TitledListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
 void NodeListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
+// The type 6 list screen's slots and destructors, the panel and node
+// screens' leaves.
+void Type6ListScreenSetItemTexts(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenShowMarks(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenItemInfo(PPCContext& ctx, uint8_t* base);
+void NodeScreenItemInfo(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenBack(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenSetUpRace(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnYes(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnNo(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnBack(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnDialogClosed(PPCContext& ctx, uint8_t* base);
+void PanelScreenSuspend(PPCContext& ctx, uint8_t* base);
+void PanelScreenOpenEmpty(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenBack(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenCarList(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenCarEntry(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenCarSlot(PPCContext& ctx, uint8_t* base);
+void GroupPairDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void NodeScreenOpen(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

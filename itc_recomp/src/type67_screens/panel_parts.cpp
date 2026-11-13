@@ -220,6 +220,11 @@ uint64_t PanelScreenPost(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t funct
       StoreU32(base, uint32_t(r3) + 9608, 9);
       message = 5;
       break;
+    case 0x8223E708:
+      ITC_NATIVE_RUNNING("sub_8223E708 Type6PanelScreen::Back");
+      StoreU32(base, uint32_t(r3) + 9608, 9);
+      message = 6;
+      break;
     case 0x82247058:
       ITC_NATIVE_RUNNING("sub_82247058 Type6PanelScreen::OpenPowerGraph");
       message = 21;

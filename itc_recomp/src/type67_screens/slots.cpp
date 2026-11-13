@@ -33,6 +33,16 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
     if (!r5) return std::nullopt;
     return NodeListScreenItemInfo(base, r3, uint32_t(*r5));
   }
+  // The type 6 list screen's slot 25 (also the node screen's slot 4; r4 the
+  // item) and the node screen's own (type6_list.cpp).
+  if (target == 0x82237008) {
+    if (!r4 || !r5) return std::nullopt;
+    return Type6ListScreenItemInfo(base, r3, *r4, uint32_t(*r5));
+  }
+  if (target == 0x82259998) {
+    if (!r5) return std::nullopt;
+    return NodeScreenItemInfo(base, r3, uint32_t(*r5));
+  }
   // The list part's and its inner part's slots, and the inner's pages and
   // steps (list_part.cpp); r5, which only the guest fallbacks see, isn't
   // passed on (the plain C++ here doesn't read it).
@@ -125,6 +135,20 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return NodeListScreenDeletingDestruct(base, r3, *r4, true, sp, calls);
       case 0x82257940:
         return NodeListScreenDeletingDestruct(base, r3, *r4, false, sp, calls);
+      // The type 6 list screen's slots 2, 6, 26 and 0, Type6PanelScreen's
+      // slot 4 and the group pair's slot 0 (type6_list.cpp).
+      case 0x822336C0:
+        return Type6ListScreenSetItemTexts(base, r3, *r4, sp, calls);
+      case 0x822337B0:
+        return Type6ListScreenBack(base, r3, *r4, sp, calls);
+      case 0x82233730:
+        return Type6ListScreenShowMarks(base, r3, *r4, sp);
+      case 0x82233478:
+        return Type6ListScreenDeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x8223E708:
+        return PanelScreenPost(base, r3, *r4, target);
+      case 0x8224ACE0:
+        return GroupPairDeletingDestruct(base, r3, *r4, sp, calls);
       default:
         break;
     }
@@ -175,6 +199,18 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return Type7CarWord(base, 1976);
     case 0x82240258:
       return Type7CarWord(base, 1980);
+    // The type 6 list screen's slots 7 and 14 and Type6PanelScreen's slots 6
+    // to 8 (type6_list.cpp).
+    case 0x822334C8:
+      return Type6ListScreenSetUpRace(base, r3, sp, calls);
+    case 0x82233378:
+      return Type6ListScreenSetUpMenus(base, r3, sp, calls);
+    case 0x822307D0:
+      return Type6CarWord(base, 1972);
+    case 0x822307E0:
+      return Type6CarWord(base, 1976);
+    case 0x822307F0:
+      return Type6CarWord(base, 1980);
     case 0x82249C30:
       return GroupPairSelectA(base, r3);
     case 0x82249C40:
@@ -195,6 +231,23 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
   switch (target) {
     case 0x82256FE8:
       return has_r5;
+    case 0x82237008:
+      return has_r4 && has_r5;
+    case 0x82259998:
+      return has_r5;
+    case 0x822336C0:
+    case 0x822337B0:
+    case 0x82233730:
+    case 0x82233478:
+    case 0x8223E708:
+    case 0x8224ACE0:
+      return has_r4;
+    case 0x822334C8:
+    case 0x82233378:
+    case 0x822307D0:
+    case 0x822307E0:
+    case 0x822307F0:
+      return true;
     case 0x82252610:
     case 0x82252658:
     case 0x822529B0:

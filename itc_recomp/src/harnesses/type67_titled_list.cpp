@@ -127,6 +127,10 @@ enum class Kind {
   kAny,       // r4 the dispatcher (or the caller's word), item blocks ours
   kNoDelete,  // r4 flags with bit 0 clear, item blocks 0 or pages
   kRelease,   // item blocks 0 or pages
+  kInit,      // item blocks 0 or pages, the new ones compared and freed
+  kDispatcher,  // r4 the dispatcher
+  kRow,       // r4 0 to 2 (the +10144 list's selection)
+  kMarks,     // r4 0 to 3
 };
 
 // The stack ranges left out, as [sp - from, sp - to).
@@ -235,7 +239,7 @@ void LayBlock(uint8_t* base, uint32_t block, Random& r, Kind kind, std::vector<u
     guest::StoreU32(base, list + rs::kListMove, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
     guest::StoreU32(base, list + rs::kListWrapped, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
     uint32_t items = block + kItemsAt + 0x40 * k;
-    if (kind != Kind::kAny) {
+    if (kind == Kind::kNoDelete || kind == Kind::kRelease || kind == Kind::kInit) {
       items = 0;
       if (r.Below(4) != 0) {
         items = memory::AllocPages(16, 4096);
@@ -284,6 +288,23 @@ void LayBlock(uint8_t* base, uint32_t block, Random& r, Kind kind, std::vector<u
     guest::StoreU32(base, vtable + 4 * i, Pick(r, {kEmpty, kSetR4, kGetter}));
   }
   guest::StoreU32(base, vtable + 100, Pick(r, {0x82256FE8, 0x82237008, kSetR4}));
+  // Type6ListScreen::SetUpMenus' slot 2 (SetItemTexts or a stand-in).
+  // Its slot 25 the screen's own ItemInfo (play's: the info LoadItem reads
+  // filled, not its frame's leftovers).
+  if (kind == Kind::kInit) {
+    guest::StoreU32(base, vtable + 8, Pick(r, {0x822336C0, kEmpty, kSetR4}));
+    guest::StoreU32(base, vtable + 100, 0x82237008);
+  }
+  // The type 6 list screen's list part (+10824): its inner's (+20) list's
+  // (+40) block 0 or pages for the destructors.
+  if (kind == Kind::kNoDelete || kind == Kind::kRelease) {
+    uint32_t items = 0;
+    if (r.Below(2) == 0) {
+      items = memory::AllocPages(16, 4096);
+      made.push_back(items);
+    }
+    guest::StoreU32(base, s + 10824 + 20 + 40 + rs::kListBlock, items);
+  }
   // The screen fades: counts 0 mostly.
   lw::WorldRandom(base, kFades, kFadesBytes, r);
   for (const uint32_t at : {mode_tick::kFadeInCounts, mode_tick::kFadeOutCounts}) {
@@ -319,6 +340,13 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
       t.r5.u64 = r.Next();
       t.r6.u64 = r.Next();
       if (f.kind == Kind::kNoDelete) t.r4.u64 &= ~1ull;
+      if (f.kind == Kind::kDispatcher) t.r4.u64 = block + kDispatcherAt;
+      if (f.kind == Kind::kRow) t.r4.u64 = r.Below(3);
+      if (f.kind == Kind::kMarks) t.r4.u64 = r.Below(4);
+      std::vector<uint32_t> old_items;
+      for (const uint32_t at : kLists) {
+        old_items.push_back(guest::LoadU32(base, block + at + rs::kListBlock));
+      }
       t.lr = 0x82000000 + 4 * r.Below(1024);
       g_answers = Random(r.Next());
       std::vector<Recorded> recorded;
@@ -341,6 +369,20 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
                                     uint32_t(call.r3 >> 32), uint32_t(call.r4),
                                     uint32_t(call.r4 >> 32)}) {
           out[v].Word(word);
+        }
+      }
+      // MenuList::Init's new item blocks: compared (whether one was made,
+      // its words) and freed, their words in the lists replaced.
+      if (f.kind == Kind::kInit) {
+        for (uint32_t k = 0; k < 3; k++) {
+          const uint32_t list = block + kLists[k];
+          const uint32_t now = guest::LoadU32(base, list + rs::kListBlock);
+          out[v].Word(now == old_items[k] ? 1 : 0);
+          if (now != 0 && now != old_items[k] && memory::IsPages(now)) {
+            out[v].Bytes(Read(base, now, 4 * guest::LoadU32(base, list + rs::kListCount)));
+            memory::FreePages(now);
+            guest::StoreU32(base, list + rs::kListBlock, 0xB10C0000 + k);
+          }
         }
       }
       // The item blocks the destructors free: whether still the layer's.
@@ -386,6 +428,8 @@ void Deleting(Context& h) {
        hooks::TitledListScreenDeletingDestruct},
       {"NodeListScreen::DeletingDestructor, deleting", 0x82257940, __imp__sub_82257940,
        hooks::NodeListScreenDeletingDestruct},
+      {"Type6ListScreen::DeletingDestructor, deleting", 0x82233478, __imp__sub_82233478,
+       hooks::Type6ListScreenDeletingDestruct},
   };
   for (const Case& k : cases) {
     Results results(fmt::format("{} (sub_{:08X})", k.name, k.address));
@@ -402,6 +446,7 @@ void Deleting(Context& h) {
         for (const uint32_t at : kLists) {
           guest::StoreU32(base, *object + at + rs::kListBlock, 0);
         }
+        guest::StoreU32(base, *object + 10824 + 20 + 40 + rs::kListBlock, 0);
         PPCContext t = CallContext(h);
         t.r3.u64 = *object;
         t.r4.u64 = (r.Next() & ~3ull) | (r.Below(2) == 0 ? 1 : 3);
@@ -418,6 +463,49 @@ void Deleting(Context& h) {
         const auto probe = memory::crt::OperatorNew(base, kBytes);
         out[v].Word(probe && *probe == *object ? 1 : 0);
         if (probe) memory::crt::OperatorDelete(*probe);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// Type6ListScreen::ItemInfo (r4 the item: 0 to 7 mostly, else 8 to 11 or
+// any word) and NodeScreen::ItemInfo: r5 an info in a block of random words;
+// the block and r3 (both halves, random) compared.
+void ItemInfos(Context& h, uint32_t block) {
+  uint8_t* const base = h.base;
+  struct Case {
+    const char* name;
+    uint32_t address;
+    GuestFunction recompiled, native;
+  };
+  const Case cases[] = {
+      {"Type6ListScreen::ItemInfo", 0x82237008, __imp__sub_82237008,
+       hooks::Type6ListScreenItemInfo},
+      {"NodeScreen::ItemInfo", 0x82259998, __imp__sub_82259998, hooks::NodeScreenItemInfo},
+  };
+  for (const Case& k : cases) {
+    Results results(fmt::format("{} (sub_{:08X})", k.name, k.address));
+    for (int c = 0; c < 12; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(Seed(uint64_t(k.address) << 16 ^ uint64_t(c)));
+        lw::WorldRandom(base, block, 0x100, r);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r.Next();
+        t.r4.u64 = r.Below(4) == 0 ? (r.Below(2) == 0 ? 8 + r.Below(4) : r.Next()) : r.Below(8);
+        t.r5.u64 = block + 4 * r.Below(48);
+        if (v == 0) {
+          ITC_FLAG(native_type67_screens) = false;
+          k.recompiled(t, base);
+          ITC_FLAG(native_type67_screens) = true;
+        } else {
+          k.native(t, base);
+        }
+        out[v].Bytes(Read(base, block, 0x100));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
       }
       results.Check(out[0], out[1], fmt::format("case {}", c));
     }
@@ -497,11 +585,30 @@ void Type67TitledList(Context& h) {
       {"NodeListScreen::DeletingDestructor", 0x82257940, 4, K::kNoDelete,
        saves({{24, 0}, {128, 112}}),
        __imp__sub_82257940, hooks::NodeListScreenDeletingDestruct},
+      // The type 6 list screen's own slots and destructors (type6_list.cpp).
+      {"Type6ListScreen::SetItemTexts", 0x822336C0, 8, K::kRow, saves({{32, 0}, {80, 48}}),
+       __imp__sub_822336C0, hooks::Type6ListScreenSetItemTexts},
+      {"Type6ListScreen::ShowMarks", 0x82233730, 8, K::kMarks, saves({{32, 0}}),
+       __imp__sub_82233730, hooks::Type6ListScreenShowMarks},
+      {"Type6ListScreen::Back", 0x822337B0, 8, K::kDispatcher, saves({{16, 0}, {120, 112}}),
+       __imp__sub_822337B0, hooks::Type6ListScreenBack},
+      // SetUpMenus: LoadItem's saves, and SetItemTexts' varargs words (its
+      // frame's +48 to +79, below SetUpMenus' 144 bytes).
+      {"Type6ListScreen::SetUpMenus", 0x82233378, 12, K::kInit,
+       saves({{40, 0}, {160, 144}, {224, 192}}),
+       __imp__sub_82233378, hooks::Type6ListScreenSetUpMenus},
+      // The destructors: ~NodeListScreen's and ~ListPartInner's saves.
+      {"Type6ListScreen::~Type6ListScreen", 0x822332D8, 8, K::kRelease,
+       saves({{16, 0}, {112, 96}, {208, 192}}),
+       __imp__sub_822332D8, hooks::Type6ListScreenDestruct},
+      {"Type6ListScreen::DeletingDestructor", 0x82233478, 4, K::kNoDelete,
+       saves({{24, 0}, {128, 112}, {224, 208}, {320, 304}}), __imp__sub_82233478, hooks::Type6ListScreenDeletingDestruct},
   };
   for (const Function& f : functions) {
     Run(h, w, block, f);
   }
   Deleting(h);
+  ItemInfos(h, block);
   memory::Free(block);
   saved.Restore();
 }

@@ -48,6 +48,11 @@ struct Calls : type67_modes::Calls {
   // returning to `lr`. Its r3.
   std::function<uint64_t(uint32_t function, const uint64_t args[8], uint32_t r1, uint32_t lr)>
       call8;
+  // A guest call with r3 to r6 from `args` and f1 (Race::AddRacer's where its
+  // plain C++ declines), from the frame at `r1` returning to `lr`. Its r3.
+  std::function<uint64_t(uint32_t function, const uint64_t args[4], double f1, uint32_t r1,
+                         uint32_t lr)>
+      call_f1;
 };
 
 // The guest functions called: UiMovie::ResetPose, FinishAll and Run, and
@@ -256,6 +261,7 @@ uint64_t PanelScreenOpenMovies(uint8_t* base, uint32_t sp, bool type7, const Cal
 // sub_82240208 PanelScreen::DeleteMovies: UiMovies::Delete of 4 and 28.
 uint64_t PanelScreenDeleteMovies(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_82240860 Type7PanelScreen::Back (+9608 = 9, message 5),
+// sub_8223E708 Type6PanelScreen::Back (+9608 = 9, message 6),
 // sub_82247058 Type6PanelScreen::OpenPowerGraph (message 21) and
 // sub_822408B8 Type7PanelScreen::OpenPowerGraph (18), by `function`: the
 // message queued in r4's ring. r3 left.
@@ -674,5 +680,77 @@ uint64_t TitledListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const
 // delete (a guest call) when bit 0 of `flags` is set. r3 the screen.
 uint64_t NodeListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, bool titled,
                                         uint32_t sp, const Calls& calls);
+
+// --- The type 6 list screen's own slots and destructors, and the panel and
+// node screens' leaves (type6_list.cpp) ---
+
+constexpr uint32_t kType6ListScreenVtable = 0x820109A8;
+
+// sub_822336C0 Type6ListScreen::SetItemTexts (slot 2; 128-byte frame; r4 a
+// row): SetText(m, 8, 5 + i, [0x826366FC + 4 r4 + 4 i]) for i 0 to 6. The
+// last SetText's r3.
+uint64_t Type6ListScreenSetItemTexts(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                     const Calls& calls);
+// sub_82233730 Type6ListScreen::ShowMarks (slot 26; 128): FindNode(m, -1,
+// 17)'s +80 = (r4 != 0), FindNode(m, -1, 18)'s +80 = (r4 != 2). The second
+// node.
+uint64_t Type6ListScreenShowMarks(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
+// sub_82237008 Type6ListScreen::ItemInfo (slot 25, and slot 4 of the node
+// screen): item r4 (0 to 7, else nothing)'s 16 bytes from 0x82636720 to
+// `info`. r3 left.
+uint64_t Type6ListScreenItemInfo(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t info);
+// sub_82259998 NodeScreen::ItemInfo: the four words at `info` = -1. r3
+// left.
+uint64_t NodeScreenItemInfo(uint8_t* base, uint64_t r3, uint32_t info);
+// sub_82233378 Type6ListScreen::SetUpMenus (slot 14; 144): MenuList::Init
+// on +10216, +10288 (selection 1) and +10144 (selection 0), slot 2 with r4
+// 0, NodeListScreen::LoadItem(0). LoadItem's r3.
+uint64_t Type6ListScreenSetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822337B0 Type6ListScreen::Back (slot 6; 112; r4 the dispatcher):
+// +9608 = 9, message 6 posted, the sound manager's slot 13 (r4, r5 = the
+// frame's +84 (1) and +80 (0)), Sound::Play(+92 (1), +88 (2)). Its r3.
+uint64_t Type6ListScreenBack(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                             const Calls& calls);
+// sub_822334C8 Type6ListScreen::SetUpRace (slot 7; 4,080-byte frame, with
+// its switch piece sub_8223356C): the race data reset, its stages cleared,
+// its +32 = the +10144 list's selection, +0xA3AF0 = 2, +0xA3AF4 = 4; the
+// route (the +10216 list's +4 plus its selection, 0 to 7, else the frame's
+// unset +80) set on the stages and the race; the race data's +0x59618 from
+// the +10144 list's selection when the +10288 list's is 0; the list part's
+// slot 5 (its answer: the record's +3892 and the save data's +0x1F870); the
+// type 6 car's racer record at the frame's +96 (RacerRecord::Init,
+// Car::SetModel, memcpy of 1,884 bytes, Car::Refresh), added to the race and
+// the stage; stage 1 added, the racers placed, +9608 = 10. PlaceRacers' r3.
+uint64_t Type6ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822332D8 Type6ListScreen::~Type6ListScreen (96): its vtable,
+// ~ListPart on +10824, ~TitledListScreen. r3 the screen.
+uint64_t Type6ListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82233478 Type6ListScreen::DeletingDestructor (112): the destructor,
+// operator delete (a guest call) when bit 0 of `flags` is set. r3.
+uint64_t Type6ListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                         const Calls& calls);
+// sub_822609E0 PanelScreen::OnYes, sub_822609D0 OnNo and sub_822306D0
+// OnBack: +9660 = `answer` (0, 1, 2). r3 left.
+uint64_t PanelScreenSetAnswer(uint8_t* base, uint64_t r3, uint32_t answer);
+// sub_822306E0 PanelScreen::OnDialogClosed (96): with +9660 0,
+// ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0) and +9656 = 2, else +9656
+// = 0. FadeOut's r3, else r3 left.
+uint64_t PanelScreenOnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82248DE0 PanelScreen::Suspend: a tail call of the pair's (+9648) slot
+// 7 (+28).
+uint64_t PanelScreenSuspend(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                            const Calls& calls);
+// sub_822404D8 PanelScreen::OpenEmpty: PanelScreen::Open with r4 = 0.
+uint64_t PanelScreenOpenEmpty(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                              const Calls& calls);
+// sub_822307D0 Type6PanelScreen::CarList, sub_822307E0 CarEntry,
+// sub_822307F0 CarSlot: the type 6 car's +1972, +1976 or +1980.
+uint64_t Type6CarWord(uint8_t* base, uint32_t offset);
+// sub_8224ACE0 GroupPair::DeletingDestructor (96): +0 = the base's vtable,
+// operator delete when bit 0 of `flags` is set. r3.
+uint64_t GroupPairDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                   const Calls& calls);
+// sub_82259318 NodeScreen::Open: +10064 = 4. r3 left.
+uint64_t NodeScreenOpen(uint8_t* base, uint64_t r3);
 
 }  // namespace type67_screens

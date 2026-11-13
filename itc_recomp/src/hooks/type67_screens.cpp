@@ -82,7 +82,22 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "sub_82257940 (ScreenFades::FadeIn and FadeOut, MenuSound::Play, UiMovie::FindNode "
               "and Child's plain C++, MenuList::Update, Accepted and Cancelled, UiMovie::Run, "
               "FinishAll, FinishNamed, PlayNamed, LoopNamed and UnloopNamed guest calls, the "
-              "table entries and slots to the plain C++ where they hold one) natively instead of "
+              "table entries and slots to the plain C++ where they hold one); the type 6 "
+              "list screen's Type6ListScreen::SetItemTexts sub_822336C0, Back sub_822337B0, "
+              "SetUpRace sub_822334C8 (with its switch piece AddRacers sub_8223356C; the race "
+              "set-up's plain C++: RaceData::ResetGlobal, Stages::Clear, SetRoute and AddRacer, "
+              "Race::SetRoute, AddRacer, AddStage and PlaceRacers, RacerRecord::Init, "
+              "Car::SetModel and Refresh, memcpy, the race data's setters; guest calls where "
+              "they decline), SetUpMenus sub_82233378 (MenuList::Init's plain C++ where it "
+              "frees natively), ShowMarks sub_82233730, ItemInfo sub_82237008, "
+              "~Type6ListScreen sub_822332D8 and DeletingDestructor sub_82233478; "
+              "NodeScreen::Open sub_82259318 and ItemInfo sub_82259998; PanelScreen::OnYes "
+              "sub_822609E0, OnNo sub_822609D0, OnBack sub_822306D0, OnDialogClosed "
+              "sub_822306E0 (ScreenFades::FadeOut's plain C++), Suspend sub_82248DE0 and "
+              "OpenEmpty sub_822404D8; Type6PanelScreen::Back sub_8223E708, CarList "
+              "sub_822307D0, CarEntry sub_822307E0 and CarSlot sub_822307F0; "
+              "GroupPair::DeletingDestructor sub_8224ACE0 (the sound manager's slot 13 and "
+              "operator delete guest calls) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -124,6 +139,12 @@ ts::Calls Type67ScreensCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r9.u64 = args[6];
     ctx.r10.u64 = args[7];
     return call_set(function, args, 6, r1, lr);
+  };
+  calls.call_f1 = [&ctx, call_set](uint32_t function, const uint64_t args[4], double f1,
+                                   uint32_t r1, uint32_t lr) -> uint64_t {
+    ctx.f1.f64 = f1;
+    const uint64_t set[6] = {args[0], args[1], args[2], args[3], 0, 0};
+    return call_set(function, set, 4, r1, lr);
   };
   return calls;
 }
@@ -343,6 +364,45 @@ ITC_TS_STEP(NodeListScreenDeletingDestruct,
             ts::NodeListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, false, ctx.r1.u32,
                                                calls))
 
+// The type 6 list screen's slots and destructors, the panel and node
+// screens' leaves.
+ITC_TS_STEP(Type6ListScreenSetItemTexts,
+            ts::Type6ListScreenSetItemTexts(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6ListScreenShowMarks,
+            ts::Type6ListScreenShowMarks(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
+ITC_TS_STEP(Type6ListScreenItemInfo,
+            ts::Type6ListScreenItemInfo(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u32))
+ITC_TS_STEP(NodeScreenItemInfo, ts::NodeScreenItemInfo(base, ctx.r3.u64, ctx.r5.u32))
+ITC_TS_STEP(Type6ListScreenSetUpMenus,
+            ts::Type6ListScreenSetUpMenus(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6ListScreenBack,
+            ts::Type6ListScreenBack(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+void Type6ListScreenSetUpRace(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const ts::Calls calls = Type67ScreensCalls(ctx, base);
+  ctx.r3.u64 = ts::Type6ListScreenSetUpRace(base, ctx.r3.u64, ctx.r1.u32, calls);
+}
+ITC_TS_STEP(Type6ListScreenDestruct,
+            ts::Type6ListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6ListScreenDeletingDestruct,
+            ts::Type6ListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenOnYes, ts::PanelScreenSetAnswer(base, ctx.r3.u64, 0))
+ITC_TS_STEP(PanelScreenOnNo, ts::PanelScreenSetAnswer(base, ctx.r3.u64, 1))
+ITC_TS_STEP(PanelScreenOnBack, ts::PanelScreenSetAnswer(base, ctx.r3.u64, 2))
+ITC_TS_STEP(PanelScreenOnDialogClosed,
+            ts::PanelScreenOnDialogClosed(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenSuspend,
+            ts::PanelScreenSuspend(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(PanelScreenOpenEmpty,
+            ts::PanelScreenOpenEmpty(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(Type6PanelScreenBack, ts::PanelScreenPost(base, ctx.r3.u64, ctx.r4.u64, 0x8223E708))
+ITC_TS_STEP(Type6PanelScreenCarList, ts::Type6CarWord(base, 1972))
+ITC_TS_STEP(Type6PanelScreenCarEntry, ts::Type6CarWord(base, 1976))
+ITC_TS_STEP(Type6PanelScreenCarSlot, ts::Type6CarWord(base, 1980))
+ITC_TS_STEP(GroupPairDeletingDestruct,
+            ts::GroupPairDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenOpen, ts::NodeScreenOpen(base, ctx.r3.u64))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -526,3 +586,30 @@ ITC_TYPE67_SCREENS(82257138, TitledListScreenDestruct)
 ITC_TYPE67_SCREENS(82257990, TitledListScreenDeletingDestruct)
 ITC_TYPE67_SCREENS(82257000, NodeListScreenDestruct)
 ITC_TYPE67_SCREENS(82257940, NodeListScreenDeletingDestruct)
+// The type 6 list screen's slots 2, 6, 7, 14, 25, 26 and 0 and its
+// destructor (from the deleting destructor and the type 6 block's, never
+// seen in play; Type6ListScreen::AddRacers sub_8223356C, a piece of
+// SetUpRace's switch in its frame, has no adapter), the node screen's slot 4
+// and its open handler, the panel screens' dialog handlers, Suspend and
+// OpenEmpty, Type6PanelScreen's slots 4 and 6 to 8, the group pair's slot 0.
+ITC_TYPE67_SCREENS(822336C0, Type6ListScreenSetItemTexts)
+ITC_TYPE67_SCREENS(822337B0, Type6ListScreenBack)
+ITC_TYPE67_SCREENS(822334C8, Type6ListScreenSetUpRace)
+ITC_TYPE67_SCREENS(82233378, Type6ListScreenSetUpMenus)
+ITC_TYPE67_SCREENS(82233730, Type6ListScreenShowMarks)
+ITC_TYPE67_SCREENS(82237008, Type6ListScreenItemInfo)
+ITC_TYPE67_SCREENS(822332D8, Type6ListScreenDestruct)
+ITC_TYPE67_SCREENS(82233478, Type6ListScreenDeletingDestruct)
+ITC_TYPE67_SCREENS(822609E0, PanelScreenOnYes)
+ITC_TYPE67_SCREENS(822609D0, PanelScreenOnNo)
+ITC_TYPE67_SCREENS(822306D0, PanelScreenOnBack)
+ITC_TYPE67_SCREENS(822306E0, PanelScreenOnDialogClosed)
+ITC_TYPE67_SCREENS(82248DE0, PanelScreenSuspend)
+ITC_TYPE67_SCREENS(822404D8, PanelScreenOpenEmpty)
+ITC_TYPE67_SCREENS(8223E708, Type6PanelScreenBack)
+ITC_TYPE67_SCREENS(822307D0, Type6PanelScreenCarList)
+ITC_TYPE67_SCREENS(822307E0, Type6PanelScreenCarEntry)
+ITC_TYPE67_SCREENS(822307F0, Type6PanelScreenCarSlot)
+ITC_TYPE67_SCREENS(8224ACE0, GroupPairDeletingDestruct)
+ITC_TYPE67_SCREENS(82259318, NodeScreenOpen)
+ITC_TYPE67_SCREENS(82259998, NodeScreenItemInfo)

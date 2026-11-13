@@ -487,6 +487,7 @@ set(ITC_SOURCES
     src/type67_screens/pick_car.cpp
     src/type67_screens/slots.cpp
     src/type67_screens/titled_list.cpp
+    src/type67_screens/type6_list.cpp
     src/hooks/car_list.cpp
     src/car_list/panels.cpp
     src/car_list/set.cpp
