@@ -8,9 +8,10 @@
 // from the same inputs, and compares the block, the stack below the call
 // (the frames' temporaries, the top function's saved registers left out:
 // the adapters don't save them) and r3. The callees (this subsystem's under
-// its flag, and ScenePools::GetB, SceneModel::PollLoad, tan and memcpy) run
-// as their adapters run them on both sides (their own cases check them), so
-// the original's callees' frames are the plain C++'s too. Floats are compared as
+// its flag, and SceneModel::PollLoad, tan and memcpy) run as their adapters
+// run them on both sides (their own cases check them), so the original's
+// callees' frames are the plain C++'s too; ScenePools::GetB has no adapter
+// (its original runs on the recompiled side), its saves left out (GetBSaves). Floats are compared as
 // floats where the originals compute or copy them with float instructions,
 // everything else exactly. The globals are put back after each case.
 
@@ -182,6 +183,23 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
   results.Check(out[0], out[1], what);
 }
 
+// ScenePools::GetB (sub_820C5C20) has no adapter since LocationScreen::
+// PollLoad is native (B7 loop, 2026-11-12): the recompiled side runs its
+// original, which writes its back chain (r1 - 112) and its r30, r31 and lr
+// saves (r1 - 24 to r1) under its caller's frame, while the plain C++ calls
+// ScenePoolsGetB, which writes none (dead stack, its own cases check it).
+// Those words left out where it runs: `below` the callers' r1 (bytes under
+// the call's r1) at each call (logged from the recompiled runs).
+FloatRanges GetBSaves(Context& h, std::initializer_list<uint32_t> below,
+                      FloatRanges more = {}) {
+  const uint32_t sp = CallContext(h).r1.u32 & ~0xFu;
+  for (const uint32_t b : below) {
+    more.push_back({sp - b - 112, 4});
+    more.push_back({sp - b - 24, 20});
+  }
+  return more;
+}
+
 // --- The world ---
 
 struct World {
@@ -329,7 +347,8 @@ void Small(Context& h, uint32_t block, Random& r) {
             const World w = Lay(h.base, block, r, false);
             t.r3.u64 = w.holder();
           },
-          __imp__sub_82179BE0, hooks::FrontEndCarDrawIsBusy, 16, {}, fmt::format("case {}", c));
+          __imp__sub_82179BE0, hooks::FrontEndCarDrawIsBusy, 16, {}, fmt::format("case {}", c),
+          nullptr, GetBSaves(h, {96}));
     }
     results.Report();
   }
@@ -343,7 +362,7 @@ void Small(Context& h, uint32_t block, Random& r) {
             t.r3.u64 = w.holder();
           },
           __imp__sub_8217AFE8, hooks::FrontEndCarDrawSyncPlates, 24, {},
-          fmt::format("case {}", c));
+          fmt::format("case {}", c), nullptr, GetBSaves(h, {112}));
     }
     results.Report();
   }
@@ -358,7 +377,7 @@ void Small(Context& h, uint32_t block, Random& r) {
             t.r4.u64 = r.Next();
           },
           __imp__sub_82178B40, hooks::FrontEndCarDrawSetDrawWord, 24, {},
-          fmt::format("case {}", c));
+          fmt::format("case {}", c), nullptr, GetBSaves(h, {112}));
     }
     results.Report();
   }
@@ -516,15 +535,15 @@ void Anims(Context& h, uint32_t block, Random& r) {
   struct Runner {
     const char* name;
     GuestFunction recompiled, native;
-    uint32_t type, saves, count;
+    uint32_t type, saves, count, get_b;  // get_b: GetB's caller's r1 under sp
   };
   const Runner runners[] = {
       {"GarageAnims::Turn (sub_82179D78)", __imp__sub_82179D78, hooks::FrontEndCarDrawAnimsTurn,
-       0, 0, 150},
+       0, 0, 150, 0},
       {"GarageAnims::Open (sub_82179DF0)", __imp__sub_82179DF0, hooks::FrontEndCarDrawAnimsOpen,
-       2, 40, 150},
+       2, 40, 150, 128},
       {"GarageAnims::Close (sub_82179EA8)", __imp__sub_82179EA8,
-       hooks::FrontEndCarDrawAnimsClose, 3, 24, 150},
+       hooks::FrontEndCarDrawAnimsClose, 3, 24, 150, 112},
   };
   for (const Runner& runner : runners) {
     Results results(runner.name);
@@ -549,7 +568,8 @@ void Anims(Context& h, uint32_t block, Random& r) {
             floats.insert(floats.end(), values.begin(), values.end());
             return floats;
           }(),
-          fmt::format("case {}", c));
+          fmt::format("case {}", c), nullptr,
+          runner.get_b != 0 ? GetBSaves(h, {runner.get_b}) : FloatRanges{});
     }
     results.Report();
   }
@@ -595,8 +615,9 @@ void Anims(Context& h, uint32_t block, Random& r) {
           }(),
           fmt::format("case {}", c), &floor_of,
           // GarageAnims::Open's and Close's saved registers (their
-          // originals run on the recompiled side: no adapters).
-          {{sp - 624 - 40, 40}});
+          // originals run on the recompiled side: no adapters), and GetB's
+          // under Open's, Close's and the doors' runners' frames.
+          GetBSaves(h, {752, 736}, {{sp - 624 - 40, 40}}));
     }
     results.Report();
   }
@@ -665,7 +686,7 @@ void LightKit(Context& h, uint32_t block, Random& r) {
             t.f3.f64 = double(std::bit_cast<float>(RandomFloat(r)));
           },
           __imp__sub_82179678, hooks::FrontEndCarDrawSetLightKit, 56, KitFloats(w),
-          fmt::format("case {}", c));
+          fmt::format("case {}", c), nullptr, GetBSaves(h, {176}));
     }
     results.Report();
   }
@@ -788,7 +809,7 @@ void Pose(Context& h, uint32_t block, Random& r) {
           t.r6.u64 = 1 + r.Below(2);
         },
         __imp__sub_8217CAB8, hooks::FrontEndCarDrawPoseCar, 128, floats,
-        fmt::format("case {}", c));
+        fmt::format("case {}", c), nullptr, GetBSaves(h, {800}));
   }
   results.Report();
 }
@@ -997,8 +1018,11 @@ void Draws(Context& h, uint32_t block, Random& r) {
         // (GarageStage::SetLights' r18 to r31, f25 to f31, v126 and v127 the
         // most; PoseCar's, ApplyPreset's and the others' inside them), whose
         // originals run on the recompiled side since their adapters went (B7
-        // loop, 2026-11-07); the plain C++ doesn't save them.
-        {{sp - 256 - 208, 208}},
+        // loop, 2026-11-07); the plain C++ doesn't save them. And GetB's
+        // under its callers' frames: PoseCar's (1,056), Open's and Close's
+        // in Run (1,008, 992), SetLightKit's (432), ApplyPreset's (384),
+        // SyncPlates' (368) and its own (256).
+        GetBSaves(h, {1056, 1008, 992, 432, 384, 368, 256}, {{sp - 256 - 208, 208}}),
         [&](Outputs& o) {
           o.Bytes(Read(h.base, kAmbient, 16));
           o.Bytes(Read(h.base, kLights, kLightBytes));

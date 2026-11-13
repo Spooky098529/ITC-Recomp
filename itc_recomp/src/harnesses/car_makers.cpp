@@ -166,6 +166,22 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
   results.Check(out[0], out[1], what);
 }
 
+// ScenePools::GetB (sub_820C5C20) has no adapter since LocationScreen::
+// PollLoad is native (B7 loop, 2026-11-12): the recompiled side runs its
+// original, which writes its back chain (r1 - 112) and its r30, r31 and lr
+// saves (r1 - 24 to r1) under its caller's frame, while the plain C++ calls
+// ScenePoolsGetB, which writes none (dead stack). Case's (bytes under r1,
+// size) skips for them, `below` the callers' r1 under the call's at each
+// call (logged from the recompiled runs).
+std::vector<std::pair<uint32_t, uint32_t>> GetBSaves(
+    std::initializer_list<uint32_t> below, std::vector<std::pair<uint32_t, uint32_t>> more = {}) {
+  for (const uint32_t b : below) {
+    more.push_back({b + 108, 4});
+    more.push_back({b + 4, 20});
+  }
+  return more;
+}
+
 // --- The record's setters ---
 
 void BlockOf(Context& h, uint32_t block, Random& r) {
@@ -850,7 +866,7 @@ void Stand(Context& h, Random& r) {
           },
           __imp__sub_8217FC60, hooks::CarMakersCopyRecord, 16, {}, fmt::format("case {}", c),
           104, 8, [&] { guest::StoreU32(h.base, kScenePointer, block + kCarScene); }, {},
-          kStackBytes, kGarageBytes);
+          kStackBytes, kGarageBytes, GetBSaves({96}));
     }
     guest::StoreU32(h.base, kScenePointer, scene_global);
     results.Report();
@@ -1721,7 +1737,10 @@ void TuningStand(Context& h, Random& r) {
           },
           __imp__sub_821E0FB0, hooks::TuningRestoreStand, 64, floats,
           fmt::format("case {}", c), 224, 32, before, with_f1, 0x5000, kGarageBytes,
-          {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16}});
+          // And GetB's under its callers' frames, at each depth the pages
+          // reach it (the GarageStage functions they call).
+          GetBSaves({544, 400, 352, 336, 320},
+                    {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16}}));
     }
     results.Report();
   }

@@ -1545,11 +1545,13 @@ void TuningPagesMovie(Context& h) {
   // write them, LoadDecalImages' too) and LoadDecalImages' Request's or
   // Load's (r31 and lr, 256 to 272 below); StoreToGarageCar's
   // (__savegprlr_25, 128 to 192 below: its adapter went, B7 loop,
-  // 2026-11-11, so the recompiled side runs its original); Archive::Load
+  // 2026-11-11, so the recompiled side runs its original); ScenePools::
+  // GetB's back chain (236 to 240 below: its adapter went, B7 loop,
+  // 2026-11-12; its saves fall in StoreToGarageCar's); Archive::Load
   // recorded.
   Run(h, w,
       {"TuningScreen::InputItems", 500, __imp__sub_821DFD48, hooks::TuningPagesInputItems, 40,
-       {{128, 192}, {256, 272}}, ItemFields, true});
+       {{128, 192}, {236, 240}, {256, 272}}, ItemFields, true});
   // MoveOption: state 8's fields (above); __savegprlr_28: 40 bytes.
   Run(h, w,
       {"TuningScreen::MoveOption", 300, __imp__sub_821D5610, hooks::TuningPagesMoveOption, 40, {},
