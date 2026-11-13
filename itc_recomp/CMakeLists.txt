@@ -94,6 +94,7 @@ set(ITC_SOURCES
     src/hooks/profile.cpp
     src/hooks/saves.cpp
     src/saves/saves.cpp
+    src/saves/slot_steps.cpp
     src/hooks/file_class.cpp
     src/hooks/movie_files.cpp
     src/hooks/archive_streaming.cpp
