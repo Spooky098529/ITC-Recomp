@@ -106,7 +106,12 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "Command, CameraCommand and FitSelectedCar through their overrides); state 23's "
               "page InputVinylPages sub_82204B70 with SetLastImage sub_821FE498 and its movie "
               "side MoveVinylMenu sub_821FF3A0 (no adapters: only InputVinylPages calls them; "
-              "FreeKept, StoreVinyls, FadeOut and memcpy by their plain C++)) "
+              "FreeKept, StoreVinyls, FadeOut and memcpy by their plain C++); states 29 to "
+              "31's pages InputDecalPosition sub_82206A50, InputDecalAngle sub_82206F48 and "
+              "InputDecalScale sub_82207320 (these two not seen in play) with their movie sides "
+              "MoveDecalPosition sub_82200DC0, MoveDecalAngle sub_822012E8 and MoveDecalScale "
+              "sub_82201620 (no adapters: only their pages call them; HighlightSelected "
+              "through the guest, the UI movies' FindNode by its plain C++)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -605,6 +610,60 @@ void TuningPagesInputVinylPages(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesInputDecalPosition(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputDecalPosition(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesInputDecalAngle(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputDecalAngle(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesInputDecalScale(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const tp::PageFlags flags = Flags();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::InputDecalScale(base, call, screen, sp, flags);
+  });
+}
+
+void TuningPagesMoveDecalPosition(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveDecalPosition(base, call, screen, sp, native_slots);
+  });
+}
+
+void TuningPagesMoveDecalAngle(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveDecalAngle(base, call, screen, sp, native_slots);
+  });
+}
+
+void TuningPagesMoveDecalScale(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::MoveDecalScale(base, call, screen, sp, native_slots);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -653,6 +712,9 @@ ITC_TUNING_PAGES(821FED30, TuningPagesScrollImages)
 ITC_TUNING_PAGES(821FE740, TuningPagesFreeKept)
 ITC_TUNING_PAGES(82202928, TuningPagesInputVinylView)
 ITC_TUNING_PAGES(82204B70, TuningPagesInputVinylPages)
+ITC_TUNING_PAGES(82206A50, TuningPagesInputDecalPosition)
+ITC_TUNING_PAGES(82206F48, TuningPagesInputDecalAngle)
+ITC_TUNING_PAGES(82207320, TuningPagesInputDecalScale)
 
 // No adapter (B7 loop, 2026-11-13: its only caller, InputVinylView, is native
 // and calls its plain C++; the register step above is the harness's):
@@ -661,6 +723,12 @@ ITC_TUNING_PAGES(82204B70, TuningPagesInputVinylPages)
 // No adapters (B7 loop, 2026-11-13: their only caller, InputVinylPages, is
 // native and calls their plain C++; the register steps above are the
 // harness's): SetLastImage sub_821FE498, MoveVinylMenu sub_821FF3A0.
+
+// No adapters (B7 loop, 2026-11-13: their only callers, the decal edit pages
+// InputDecalPosition, InputDecalAngle and InputDecalScale, are native and
+// call their plain C++; the register steps above are the harness's):
+// MoveDecalPosition sub_82200DC0, MoveDecalAngle sub_822012E8, MoveDecalScale
+// sub_82201620.
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above

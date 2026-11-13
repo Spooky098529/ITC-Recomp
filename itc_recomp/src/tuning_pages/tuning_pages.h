@@ -546,4 +546,32 @@ uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint
 uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags);
 
+// sub_82206A50 TuningScreen::InputDecalPosition, sub_82206F48
+// InputDecalAngle and sub_82207320 InputDecalScale: states 29 to 31's pages
+// (their rows): 164 held or released (TuningScreen::HighlightSelected
+// through `call`), the moves (x and y +30832, +30836 clamped to the page's
+// limits at 0x8200C840; the angle +30840 by 1.0 wrapped to 0.0 to 359.0;
+// the scale +30844 by 0.01 clamped to 0.1 to 2.0), A or B with 164 neither
+// held nor released (Pop, Go(the popped state, 18); B puts the decal back
+// from +30856 between Go's halves), then the movie side. 112-byte frame;
+// the movie side's r3.
+uint64_t InputDecalPosition(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                            uint32_t sp, const PageFlags& flags);
+uint64_t InputDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, const PageFlags& flags);
+uint64_t InputDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, const PageFlags& flags);
+// sub_82200DC0 TuningScreen::MoveDecalPosition, sub_822012E8 MoveDecalAngle
+// and sub_82201620 MoveDecalScale: their movie sides (their rows): on a
+// move the decal's node (movie 13's (-1, 19 + layer) or (-1, 22 + layer))
+// placed, turned or sized; on A or B (164 neither held nor released) B's
+// the same, then 228 finished and played. 128-byte frame; the last call's
+// r3, the node, or the slot's.
+uint64_t MoveDecalPosition(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, bool native_slots);
+uint64_t MoveDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, bool native_slots);
+uint64_t MoveDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, bool native_slots);
+
 }  // namespace tuning_pages

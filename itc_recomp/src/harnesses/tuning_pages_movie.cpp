@@ -1455,6 +1455,66 @@ void WheelsFields(PPCContext& t, Random& world_random, const World& w, bool page
   HighWord(t, r);
 }
 
+// The vinyl editor's decal edits (states 29 to 31, InputDecalPosition,
+// Angle, Scale and their movie sides): the mappers' slot 11 (+44) the read
+// slot sub_8210BFA8 (TuningScreen::HighlightSelected's release check; the
+// world's random word otherwise); the page +30724 0 or 1 mostly (now and then
+// 2 or -1: nothing placed), the layer +30732 0 to 2; x and y (+30832,
+// +30836) at, beside or inside the page's limits; the angle +30840 and the
+// scale +30844 at, beside or between their ends, now and then any word; the
+// pages' layouts (+30800 to +30828: int origins, float scales) small; the
+// history at least 1 deep; one action most of the time (a move fired, A or
+// B pressed), with 164 held now and then.
+void DecalEditFields(PPCContext& t, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  for (uint32_t c = 0; c < 4; c++) {
+    guest::StoreU32(base, w.at(kVtablesAt) + 0x40 * c + 44, 0x8210BFA8);
+  }
+  const int32_t pages[] = {0, 0, 1, 1, 2, -1};
+  guest::StoreU32(base, s + 30724, uint32_t(pages[r.Below(6)]));
+  guest::StoreU32(base, s + 30732, r.Below(3));
+  static constexpr int32_t kEnds[] = {-512, -256, -128, 128, 256, 512};
+  auto coordinate = [&] {
+    switch (r.Below(4)) {
+      case 0: return kEnds[r.Below(6)];
+      case 1: return kEnds[r.Below(6)] + int32_t(r.Below(3)) - 1;
+      case 2: return int32_t(r.Below(1025)) - 512;
+      default: return int32_t(r.Next());
+    }
+  };
+  guest::StoreU32(base, s + 30832, uint32_t(coordinate()));
+  guest::StoreU32(base, s + 30836, uint32_t(coordinate()));
+  static constexpr float kAngles[] = {0.0f, 0.5f, 1.0f, 358.0f, 358.5f, 359.0f, 180.0f, -1.0f};
+  static constexpr float kScales[] = {0.1f, 0.105f, 0.11f, 1.0f, 1.995f, 2.0f, 1.99f, 0.05f};
+  guest::StoreFloat(base, s + 30840, r.Below(8) == 0 ? float(r.Below(36000)) / 100.0f
+                                                     : kAngles[r.Below(8)]);
+  guest::StoreFloat(base, s + 30844, r.Below(8) == 0 ? float(r.Below(250)) / 100.0f
+                                                     : kScales[r.Below(8)]);
+  if (r.Below(10) == 0) {
+    guest::StoreU32(base, s + (r.Below(2) == 0 ? 30840 : 30844), uint32_t(r.Next()));
+  }
+  for (const uint32_t at : {30800u, 30804u, 30816u, 30820u}) {
+    guest::StoreU32(base, s + at, uint32_t(int32_t(r.Below(1000)) - 500));
+  }
+  for (const uint32_t at : {30808u, 30812u, 30824u, 30828u}) {
+    guest::StoreFloat(base, s + at, float(r.Below(400)) / 100.0f);
+  }
+  guest::StoreU8(base, s + 10008, uint8_t(1 + r.Below(58)));
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 155, 169, 156, 170, 159, 159, 158, 158};
+  const uint32_t pick = r.Below(14);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (pick < 12) {
+    const uint32_t bit = 1u << (kActions[pick] - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, pick >= 8 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, pick < 8 ? bit : 0);
+  }
+  guest::StoreU32(base, mapper + 448, r.Below(4) == 0 ? 1u << (164 - 151) : 0);
+  HighWord(t, r);
+}
+
 }  // namespace
 
 void TuningPagesMovie(Context& h) {
@@ -1624,6 +1684,30 @@ void TuningPagesMovie(Context& h) {
       {"TuningScreen::InputWheels", 600, __imp__sub_821F6688, hooks::TuningPagesInputWheels, 32,
        {{48, 80}, {128, 160}, {256, 336}, {432, 472}, {1024, 1056}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, true); }});
+  // The decal edits' movie sides: __savegprlr_29 (32 bytes).
+  Run(h, w,
+      {"TuningScreen::MoveDecalPosition", 200, __imp__sub_82200DC0,
+       hooks::TuningPagesMoveDecalPosition, 32, {}, DecalEditFields});
+  Run(h, w,
+      {"TuningScreen::MoveDecalAngle", 150, __imp__sub_822012E8, hooks::TuningPagesMoveDecalAngle,
+       32, {}, DecalEditFields});
+  Run(h, w,
+      {"TuningScreen::MoveDecalScale", 150, __imp__sub_82201620, hooks::TuningPagesMoveDecalScale,
+       32, {}, DecalEditFields});
+  // Their pages: r30, r31 and lr (24 bytes); the movie side's saves and
+  // HighlightSelected's (its r29 to r31, lr, f30, f31: 48 bytes) and
+  // memcpy's r3 (112 to 160 below: the guest's hold the original's
+  // registers, which the native version doesn't set; the movie side's plain
+  // C++ doesn't write them).
+  Run(h, w,
+      {"TuningScreen::InputDecalPosition", 300, __imp__sub_82206A50,
+       hooks::TuningPagesInputDecalPosition, 24, {{112, 160}}, DecalEditFields});
+  Run(h, w,
+      {"TuningScreen::InputDecalAngle", 200, __imp__sub_82206F48,
+       hooks::TuningPagesInputDecalAngle, 24, {{112, 160}}, DecalEditFields});
+  Run(h, w,
+      {"TuningScreen::InputDecalScale", 200, __imp__sub_82207320,
+       hooks::TuningPagesInputDecalScale, 24, {{112, 160}}, DecalEditFields});
 }
 
 }  // namespace harness

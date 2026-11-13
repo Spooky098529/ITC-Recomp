@@ -10,11 +10,14 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "native/buffers.h"
+#include "strings_and_font/steps.h"
 #include "tuning_screen/tuning_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
 #include <bit>
+#include <cmath>
+#include <optional>
 
 namespace tuning_pages {
 
@@ -468,6 +471,309 @@ uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, ui
     }
   }
   return MoveVinylMenu(base, call, screen, frame, flags.native_slots);
+}
+
+namespace {
+
+namespace fs = strings_and_font::steps;
+
+constexpr uint32_t kHighlightSelected = 0x82203570;  // TuningScreen::HighlightSelected(screen, on)
+constexpr uint32_t kLimits = 0x8200C840;  // the decal's position limits, 16 bytes a page
+
+// The decal edits: state 29 (position), 30 (angle), 31 (scale).
+enum class Edit { kPosition, kAngle, kScale };
+
+// The return addresses of an edit page's calls, in the order the original
+// makes them.
+struct EditInputCalls {
+  uint32_t held, released, highlight;
+  uint32_t moves[8];
+  uint32_t a, a_held, a_released, a_sound;
+  uint32_t b, b_held, b_released, b_sound, b_memcpy;
+  uint32_t move;
+};
+// And of its movie side's.
+struct EditMoveCalls {
+  uint32_t moves[8];
+  uint32_t a, b, held, released, b_again, finish, play;
+};
+
+constexpr EditInputCalls kPositionInput = {
+    0x82206AA4, 0x82206AD8, 0x82206AEC,
+    {0x82206B10, 0x82206B3C, 0x82206B68, 0x82206B94, 0x82206BC0, 0x82206BEC, 0x82206C18,
+     0x82206C44},
+    0x82206C70, 0x82206C9C, 0x82206CC8, 0x82206CD8,
+    0x82206D50, 0x82206D7C, 0x82206DA8, 0x82206DB8, 0x82206E18,
+    0x82206F30};
+constexpr EditInputCalls kAngleInput = {
+    0x82206F9C, 0x82206FD0, 0x82206FE4,
+    {0x82207008, 0x82207034, 0x82207060, 0x8220708C},
+    0x822070B8, 0x822070E4, 0x82207110, 0x82207120,
+    0x82207198, 0x822071C4, 0x822071F0, 0x82207200, 0x82207260,
+    0x82207308};
+constexpr EditInputCalls kScaleInput = {
+    0x82207374, 0x822073A8, 0x822073BC,
+    {0x822073E0, 0x8220740C, 0x82207438, 0x82207464},
+    0x82207490, 0x822074BC, 0x822074E8, 0x822074F8,
+    0x82207570, 0x8220759C, 0x822075C8, 0x822075D8, 0x82207638,
+    0x822076D0};
+constexpr EditMoveCalls kPositionMove = {
+    {0x82200E28, 0x82200E54, 0x82200E80, 0x82200EAC, 0x82200ED8, 0x82200F04, 0x82200F30,
+     0x82200F5C},
+    0x82200F88, 0x82200FB4, 0x82200FE0, 0x8220100C, 0x82201038, 0x82201184, 0x822011A0};
+constexpr EditMoveCalls kAngleMove = {
+    {0x82201350, 0x8220137C, 0x822013A8, 0x822013D4},
+    0x82201400, 0x8220142C, 0x82201458, 0x82201484, 0x822014B0, 0x8220155C, 0x82201578};
+constexpr EditMoveCalls kScaleMove = {
+    {0x82201688, 0x822016B4, 0x822016E0, 0x8220170C},
+    0x82201738, 0x82201764, 0x82201790, 0x822017BC, 0x822017E8, 0x822018D0, 0x822018EC};
+
+// The edited decal's node: movie 13's (-1, 19 + layer) on page 0, (-1, 22 +
+// layer) on page 1; 0 on other pages.
+uint32_t DecalNode(uint8_t* base, uint32_t movie, uint32_t s, int32_t page) {
+  const uint32_t layer = Load(base, s + 30732);
+  return ui_movies::FindNode(base, movie, 0xFFFFFFFFu, layer + (page == 0 ? 19 : 22));
+}
+
+// A doubleword at `at` (an int sign-extended through the stack for fcfid).
+void StoreDoubleword(uint8_t* base, uint32_t at, int64_t value) {
+  Store(base, at, uint32_t(uint64_t(value) >> 32));
+  Store(base, at + 4, uint32_t(value));
+}
+
+// Place: the node's +12 and +16 from the decal's x and y (+30832, +30836)
+// times the page's scale plus its origin (single-precision multiply-adds)
+// plus the page's offsets; the conversions' doublewords at frame + 80
+// (the y origin) and + 88 (y) as they're left. The node, or nullopt on
+// other pages.
+std::optional<uint32_t> Place(uint8_t* base, uint32_t movie, uint32_t s, uint32_t frame) {
+  const int32_t page = int32_t(Load(base, s + 30724));
+  if (page != 0 && page != 1) {
+    return std::nullopt;
+  }
+  const uint32_t node = DecalNode(base, movie, s, page);
+  const uint32_t scale_at = page == 0 ? 30812 : 30828;
+  const uint32_t origin_at = page == 0 ? 30800 : 30816;
+  const uint32_t x_offset = page == 0 ? 0x8200CAF4 : 0x8200CAEC;
+  const uint32_t y_offset = page == 0 ? 0x8200CAF0 : 0x8200CAE8;
+  auto coordinate = [&](uint32_t at, uint32_t origin, uint32_t offset) {
+    const double scale = fs::Lfs(base, s + scale_at);
+    const int64_t v = int32_t(Load(base, s + at));
+    const int64_t o = int32_t(Load(base, s + origin));
+    const double f13 = fs::ToSingle(v), f12 = fs::ToSingle(o);
+    const double sum = fs::Single(std::fma(f13, scale, f12));
+    StoreDoubleword(base, frame + 80, o);
+    StoreDoubleword(base, frame + 88, v);
+    return fs::Single(sum + fs::Lfs(base, offset));
+  };
+  fs::Stfs(base, node + 12, coordinate(30832, origin_at, x_offset));
+  fs::Stfs(base, node + 16, coordinate(30836, origin_at + 4, y_offset));
+  return node;
+}
+
+// The node's pivot: +20 and +24 the first lookup's +100 and +104 times 0.5
+// (fctiwz) into the second's.
+void Pivot(uint8_t* base, uint32_t first, uint32_t second) {
+  const double half = fs::Lfs(base, 0x82001BE4);
+  Store(base, second + 20, uint32_t(fs::Fctiwz(fs::Single(fs::Lfs(base, first + 100) * half))));
+  Store(base, second + 24, uint32_t(fs::Fctiwz(fs::Single(fs::Lfs(base, first + 104) * half))));
+}
+
+// Turn: the node (looked up twice) pivoted, its +36 the angle +30840.
+std::optional<uint32_t> Turn(uint8_t* base, uint32_t movie, uint32_t s) {
+  const int32_t page = int32_t(Load(base, s + 30724));
+  if (page != 0 && page != 1) {
+    return std::nullopt;
+  }
+  const uint32_t first = DecalNode(base, movie, s, page);
+  const uint32_t second = DecalNode(base, movie, s, page);
+  Pivot(base, first, second);
+  fs::Stfs(base, second + 36, fs::Lfs(base, s + 30840));
+  return second;
+}
+
+// Size: the node (looked up twice): +28 and +32 the scale +30844 times the
+// page's (+30808 or +30824), then pivoted.
+std::optional<uint32_t> Size(uint8_t* base, uint32_t movie, uint32_t s) {
+  const int32_t page = int32_t(Load(base, s + 30724));
+  if (page != 0 && page != 1) {
+    return std::nullopt;
+  }
+  const uint32_t first = DecalNode(base, movie, s, page);
+  const uint32_t second = DecalNode(base, movie, s, page);
+  const uint32_t factor = s + (page == 0 ? 30808 : 30824);
+  fs::Stfs(base, second + 28, fs::Single(fs::Lfs(base, s + 30844) * fs::Lfs(base, factor)));
+  fs::Stfs(base, second + 32, fs::Single(fs::Lfs(base, s + 30844) * fs::Lfs(base, factor)));
+  Pivot(base, first, second);
+  return second;
+}
+
+uint64_t MoveDecal(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                   uint32_t sp, bool native_slots, Edit edit) {
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t entry = PlayerEntry(base);
+  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
+  const uint32_t movie = Load(base, found);
+  Reads asked{base, call, entry, frame, native_slots, found};
+  const EditMoveCalls& lr = edit == Edit::kPosition ? kPositionMove
+                            : edit == Edit::kAngle  ? kAngleMove
+                                                    : kScaleMove;
+  auto apply = [&]() -> std::optional<uint32_t> {
+    switch (edit) {
+      case Edit::kPosition: return Place(base, movie, s, frame);
+      case Edit::kAngle: return Turn(base, movie, s);
+      default: return Size(base, movie, s);
+    }
+  };
+  static constexpr uint32_t kPositionMoves[8] = {153, 167, 154, 168, 156, 170, 155, 169};
+  static constexpr uint32_t kTurnMoves[4] = {156, 170, 155, 169};
+  const uint32_t* moves = edit == Edit::kPosition ? kPositionMoves : kTurnMoves;
+  const uint32_t count = edit == Edit::kPosition ? 8 : 4;
+  for (uint32_t k = 0; k < count; k++) {
+    if (asked(48, moves[k], lr.moves[k])) {
+      const std::optional<uint32_t> node = apply();
+      return node ? *node : asked.r3;
+    }
+  }
+  if (!asked(40, 159, lr.a) && !asked(40, 158, lr.b)) {
+    return asked.r3;
+  }
+  if (asked(32, 164, lr.held) || asked(44, 164, lr.released)) {
+    return asked.r3;
+  }
+  if (asked(40, 158, lr.b_again)) {
+    apply();
+  }
+  tuning_screen::FinishNamed(call, frame, lr.finish, movie, 228);
+  return tuning_screen::PlayNamed(call, frame, lr.play, movie, 228, 1);
+}
+
+// An edit page's move: the field at `at` stepped and clamped (the
+// position's ints) or the float stepped by [step] and wrapped or clamped
+// (the angle's and scale's); +9708 = 1 first.
+void Step(uint8_t* base, uint32_t s, Edit edit, uint32_t move) {
+  Store(base, s + 9708, 1);
+  if (edit == Edit::kPosition) {
+    // 0 up (y - 1, y min), 1 down (y + 1, y max), 2 left (x - 1, x min), 3
+    // right (x + 1, x max).
+    const uint32_t at = move < 2 ? 30836 : 30832;
+    const int32_t delta = (move % 2 == 0) ? -1 : 1;
+    const uint32_t limits = (Load(base, s + 30724) << 4) + kLimits;
+    const uint32_t limit_at = limits + (move < 2 ? 8 : 0) + (move % 2 == 0 ? 0 : 4);
+    const int32_t value = int32_t(Load(base, s + at) + uint32_t(delta));
+    Store(base, s + at, uint32_t(value));
+    const int32_t limit = int32_t(Load(base, limit_at));
+    if (delta < 0 ? value < limit : value > limit) {
+      Store(base, s + at, uint32_t(limit));
+    }
+    return;
+  }
+  // 0 left (minus), 1 right (plus).
+  const bool plus = move == 1;
+  const uint32_t at = s + (edit == Edit::kAngle ? 30840 : 30844);
+  const uint32_t step = edit == Edit::kAngle ? 0x82000A30 : 0x8200222C;
+  const double old = fs::Lfs(base, at);
+  const double value = fs::Single(plus ? old + fs::Lfs(base, step) : old - fs::Lfs(base, step));
+  fs::Stfs(base, at, value);
+  if (edit == Edit::kAngle) {
+    // 0.0 to 359.0, wrapped.
+    if (plus ? value > fs::Lfs(base, 0x8200C54C) : value < fs::Lfs(base, 0x82000A34)) {
+      fs::Stfs(base, at, fs::Lfs(base, plus ? 0x82000A34 : 0x8200C54C));
+    }
+  } else {
+    // 0.1 to 2.0, clamped.
+    const double limit = fs::Lfs(base, plus ? 0x820021E8 : 0x82001FBC);
+    if (plus ? value > limit : value < limit) {
+      fs::Stfs(base, at, limit);
+    }
+  }
+}
+
+uint64_t InputDecal(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                    uint32_t sp, const PageFlags& flags, Edit edit) {
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t entry = PlayerEntry(base);
+  Reads asked{base, call, entry, frame, flags.native_slots, 0};
+  const EditInputCalls& lr = edit == Edit::kPosition ? kPositionInput
+                             : edit == Edit::kAngle  ? kAngleInput
+                                                     : kScaleInput;
+  // 164 held: the selected decal highlighted (0), released: back (1).
+  if (asked(32, 164, lr.held)) {
+    call(kHighlightSelected, {screen, 0}, frame, lr.highlight);
+  } else if (asked(44, 164, lr.released)) {
+    call(kHighlightSelected, {screen, 1}, frame, lr.highlight);
+  }
+  // The moves: the position's up, down, left, right; the angle's and
+  // scale's left, right.
+  static constexpr uint32_t kPositionMoves[8] = {153, 167, 154, 168, 155, 169, 156, 170};
+  static constexpr uint32_t kTurnMoves[4] = {155, 169, 156, 170};
+  const uint32_t* moves = edit == Edit::kPosition ? kPositionMoves : kTurnMoves;
+  const uint32_t count = edit == Edit::kPosition ? 8 : 4;
+  bool moved = false;
+  for (uint32_t k = 0; k < count && !moved; k++) {
+    if (asked(48, moves[k], lr.moves[k])) {
+      Step(base, s, edit, k / 2);
+      moved = true;
+    }
+  }
+  if (!moved) {
+    // A or B, with 164 neither held nor released: Pop, Go(the popped
+    // state, 18); B first puts the decal back as it was (+30856).
+    bool a = false, b = false;
+    if (asked(40, 159, lr.a) && !asked(32, 164, lr.a_held) &&
+        !asked(44, 164, lr.a_released)) {
+      a = true;
+    } else if (asked(40, 158, lr.b) && !asked(32, 164, lr.b_held) &&
+               !asked(44, 164, lr.b_released)) {
+      b = true;
+    }
+    if (a || b) {
+      call(kMenuSoundPlay, {a ? 0u : 2u}, frame, a ? lr.a_sound : lr.b_sound);
+      Store(base, s + 9708, 1);
+      const uint32_t popped = Pop(base, s);
+      GoFirstHalf(base, s, popped);
+      if (b) {
+        Memcpy(base, call, screen + 30832, screen + 30856, 24, frame, lr.b_memcpy);
+      }
+      GoSecondHalf(base, s, 18);
+    }
+  }
+  return MoveDecal(base, call, screen, frame, flags.native_slots, edit);
+}
+
+}  // namespace
+
+uint64_t MoveDecalPosition(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_82200DC0 TuningScreen::MoveDecalPosition");
+  return MoveDecal(base, call, screen, sp, native_slots, Edit::kPosition);
+}
+uint64_t MoveDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_822012E8 TuningScreen::MoveDecalAngle");
+  return MoveDecal(base, call, screen, sp, native_slots, Edit::kAngle);
+}
+uint64_t MoveDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                        uint32_t sp, bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_82201620 TuningScreen::MoveDecalScale");
+  return MoveDecal(base, call, screen, sp, native_slots, Edit::kScale);
+}
+uint64_t InputDecalPosition(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                            uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_82206A50 TuningScreen::InputDecalPosition");
+  return InputDecal(base, call, screen, sp, flags, Edit::kPosition);
+}
+uint64_t InputDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_82206F48 TuningScreen::InputDecalAngle");
+  return InputDecal(base, call, screen, sp, flags, Edit::kAngle);
+}
+uint64_t InputDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                         uint32_t sp, const PageFlags& flags) {
+  ITC_NATIVE_RUNNING("sub_82207320 TuningScreen::InputDecalScale");
+  return InputDecal(base, call, screen, sp, flags, Edit::kScale);
 }
 
 }  // namespace tuning_pages

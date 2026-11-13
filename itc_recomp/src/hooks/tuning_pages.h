@@ -167,5 +167,15 @@ void TuningPagesLeaveVinylView(PPCContext& ctx, uint8_t* base);
 void TuningPagesInputVinylPages(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetLastImage(PPCContext& ctx, uint8_t* base);
 void TuningPagesMoveVinylMenu(PPCContext& ctx, uint8_t* base);
+// The decal edits: InputDecalPosition sub_82206A50, InputDecalAngle
+// sub_82206F48, InputDecalScale sub_82207320, and their movie sides
+// MoveDecalPosition sub_82200DC0, MoveDecalAngle sub_822012E8,
+// MoveDecalScale sub_82201620 (no adapters: the harness's steps).
+void TuningPagesInputDecalPosition(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputDecalAngle(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputDecalScale(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveDecalPosition(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveDecalAngle(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveDecalScale(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
