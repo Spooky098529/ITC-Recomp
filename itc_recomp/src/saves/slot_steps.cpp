@@ -153,10 +153,12 @@ int32_t WaitForCreate(uint8_t* base, uint32_t slot) {
 }  // namespace
 
 uint32_t CheckDevice(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A45C0 SaveSlot::CheckDevice");
   return guest::LoadU32(base, slot + 36);
 }
 
 int32_t WaitDeviceSelector(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A48B8 SaveSlot::WaitDeviceSelector");
   if (guest::LoadU32(base, slot + 8) == kPending) {
     return 4;
   }
@@ -175,6 +177,7 @@ int32_t WaitDeviceSelector(uint8_t* base, uint32_t slot) {
 }
 
 int32_t ShowDeviceSelector(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A4960 SaveSlot::ShowDeviceSelector");
   Clear(base, slot + 8, kOverlappedBytes);
   guest::StoreU32(base, slot + 36, kDevice);
   Finish(base, slot + 8, 0);
@@ -182,6 +185,7 @@ int32_t ShowDeviceSelector(uint8_t* base, uint32_t slot) {
 }
 
 int32_t Enumerate(uint8_t* base, uint32_t owner, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A49D0 SaveSlot::Enumerate");
   if (!guest::LoadU32(base, slot + 36)) {
     return -2;
   }
@@ -199,6 +203,7 @@ int32_t Enumerate(uint8_t* base, uint32_t owner, uint32_t slot) {
 }
 
 int32_t WaitEnumerate(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A4A88 SaveSlot::WaitEnumerate");
   uint32_t result = OverlappedResult(base, slot + 48, slot + 92);
   if (result == 0) {
     guest::StoreU32(base, slot + 984, guest::LoadU32(base, slot + 92));
@@ -211,6 +216,7 @@ int32_t WaitEnumerate(uint8_t* base, uint32_t slot) {
 }
 
 int32_t OpenItem(uint8_t* base, uint32_t slot, uint32_t item_index) {
+  ITC_NATIVE_RUNNING("sub_820A4B18 SaveSlot::OpenItem");
   if (!guest::LoadU32(base, slot + 36)) {
     return -2;
   }
@@ -224,11 +230,13 @@ int32_t OpenItem(uint8_t* base, uint32_t slot, uint32_t item_index) {
 }
 
 int32_t WaitOpenItem(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A4B98 SaveSlot::WaitOpenItem");
   uint32_t result = OverlappedResult(base, slot + 100);
   return result == 0 ? 1 : result == kIncomplete ? 0 : -7;
 }
 
 int32_t Create(uint8_t* base, uint32_t owner, uint32_t slot, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_820A4C58 SaveSlot::Create");
   if (!guest::LoadU32(base, slot + 36)) {
     return -2;
   }
@@ -249,6 +257,7 @@ int32_t Create(uint8_t* base, uint32_t owner, uint32_t slot, uint32_t mode) {
 }
 
 int32_t WriteFile(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A4D68 SaveSlot::WriteFile");
   if (int32_t waited = WaitForCreate(base, slot); waited != 1) {
     return waited;
   }
@@ -269,6 +278,7 @@ int32_t WriteFile(uint8_t* base, uint32_t slot) {
 }
 
 int32_t ReadFile(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A4EF8 SaveSlot::ReadFile");
   if (int32_t waited = WaitForCreate(base, slot); waited != 1) {
     return waited;
   }
@@ -289,6 +299,7 @@ int32_t ReadFile(uint8_t* base, uint32_t slot) {
 }
 
 int32_t SetThumbnail(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A5110 SaveSlot::SetThumbnail");
   if (!guest::LoadU32(base, slot + 36)) {
     return -2;
   }
@@ -298,6 +309,7 @@ int32_t SetThumbnail(uint8_t* base, uint32_t slot) {
 }
 
 int32_t Delete(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A51E0 SaveSlot::Delete");
   if (!guest::LoadU32(base, slot + 36)) {
     return -2;
   }
@@ -309,6 +321,7 @@ int32_t Delete(uint8_t* base, uint32_t slot) {
 }
 
 uint32_t ContentClose(uint8_t* base, uint32_t overlapped) {
+  ITC_NATIVE_RUNNING("sub_82295BF0 XContentClose");
   if (overlapped) {
     Finish(base, overlapped, 0);
     return kPending;
