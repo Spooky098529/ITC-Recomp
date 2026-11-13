@@ -541,6 +541,14 @@ void PowerGraphScreen(Context& h) {
        Kind::kStep, {{32, 0}, {168, 128}, {208, 176}, {272, 256}, {448, 400}}},
       {"PowerGraphScreen67::Step1", 0x82250AA8, __imp__sub_82250AA8, hooks::PowerGraphScreenStep1,
        Kind::kStep, {{24, 0}}},
+      // Draw and Update: the pages and steps recompiled below (their saves of
+      // the caller's registers; Step0's SetTexts' varargs words, SetParts'
+      // and its helpers' saves).
+      {"PowerGraphScreen67::Draw", 0x82250A20, __imp__sub_82250A20, hooks::PowerGraphScreenDraw,
+       Kind::kDraw, {{8, 0}}},
+      {"PowerGraphScreen67::Update", 0x822513B8, __imp__sub_822513B8,
+       hooks::PowerGraphScreenUpdate, Kind::kUpdate,
+       {{32, 0}, {176, 144}, {352, 320}, {416, 400}, {592, 544}}},
   };
   for (const Function& f : functions) {
     Run(h, block, w, f, f.kind == Kind::kSlot ? 32 : 96);
