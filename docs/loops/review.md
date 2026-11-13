@@ -13,6 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- `Scenery::Draw` (7bf375c1..bd6bfc88, no mapping): native from the
+  pass table at 0x82603060 inside its `ITC_FRAME_STATE_WRAP`, calling
+  `TextureAnimations::Advance` and `Minimap::Draw` through their
+  per-frame wraps; ctx's r24 follows the original's; 11 adapters
+  removed; `Matrix::Copy`'s adapter (frame interpolation's copy wrap)
+  kept though listed removable. The frame check's first native run
+  differed from the fallback in its resolve textures; the second and
+  third matched it pixel for pixel (left unexplained; probably the
+  first run's start-up).
 - `Scenery::Draw`'s rest, part one (f1e47061..ea8acc8f, no mapping):
   the billboards' record (Overridden: its diagnostics wrap runs the
   native body) and draw, the light groups, `DrawArea`, `Minimap::Draw`

@@ -165,7 +165,13 @@ file's history. What's left to see in a drive, from every run:
   Recorded.
 - Next: `Scenery::Draw` `sub_820F6068` (ready, 678 lines, its
   frame-state wrap kept), the group's last, no mapping (not counted).
-  Migration agent running.
+  Migration 7bf375c1..bd6bfc88 (`Scenery::Draw` native inside its
+  frame-state wrap, `TextureAnimations::Advance` and `Minimap::Draw`
+  through their per-frame wraps; 11 adapters removed; harnesses 0
+  differing, the callers' files' too; frame 600 at 30 fps without
+  interpolation pixel-identical against the fallback; race 33 s at
+  40, 0 errors; no subagents). Left: none ready in
+  `course-scenery.md`. Validation agent running.
 
 ## Done
 
