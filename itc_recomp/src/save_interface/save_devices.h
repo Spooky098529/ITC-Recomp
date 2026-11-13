@@ -48,6 +48,14 @@ std::optional<uint32_t> SaveDevicesConstruct(
     const std::function<void(uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate)>&
         add);
 
+// sub_820A63C8 SaveDevices::Create: operator new(116) and `construct` on
+// it (SaveDevices::SaveDevices with the block and `saves`, through the
+// constructor's register step) unless it's 0. Returns the save devices or
+// 0; nullopt, with nothing done, where operator new or CanAllocBuffers
+// would refuse.
+std::optional<uint32_t> SaveDevicesCreate(uint8_t* base, uint32_t saves,
+                                          const std::function<void(uint32_t devices)>& construct);
+
 // sub_820A55F0 SlotArray::Reset: `holder` the word holding a slot array.
 // When not 0: with the count header (array - 8) 0, operator delete[] on the
 // header; else `destroy` (the first slot's vtable slot 0 with r4 = 3, a

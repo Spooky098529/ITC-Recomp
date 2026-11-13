@@ -551,6 +551,78 @@ void SaveDevicesCases(Context& h, const Block& block) {
     results.Report();
   }
   {
+    // Create: the object its operator new gives each version, compared as
+    // offsets where its address is kept (the delegates' this, the slots
+    // freed after).
+    Results results("SaveDevices::Create (sub_820A63C8)");
+    for (int c = 0; c < 8; c++) {
+      const uint32_t saves = c % 2 == 0 ? 100 : h.random.Below(300);
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        WriteRandom(h.base, stack - 640, 640 / 4, random);
+        guest::StoreU32(h.base, init + 0, loop);
+        guest::StoreU32(h.base, loop + 0, loop_vtable);
+        guest::StoreU32(h.base, loop_vtable + 4, kStoreR4At4);
+        guest::StoreU32(h.base, loop_vtable + 8, kCount4);
+        for (int r = 26; r < 32; r++) {
+          (&t.r14)[r - 14].u64 = random.Next();
+        }
+        t.r3.u64 = init;
+        t.r4.u64 = saves;
+        t.lr = 0x82090B00;
+        after = random;
+        ITC_FLAG(native_save_interface) = v == 1;
+        (v == 0 ? __imp__sub_820A63C8 : hooks::SaveDevicesCreateSteps)(t, h.base);
+        ITC_FLAG(native_save_interface) = true;
+        const uint32_t object = t.r3.u32;
+        out[v].Word(Live(object) ? 1 : 0);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (Live(object)) {
+          const uint32_t slots = guest::LoadU32(h.base, object + 44);
+          out[v].Bytes(Read(h.base, object, 44));
+          out[v].Bytes(Read(h.base, object + 48, 116 - 48));
+          out[v].Word(slots != 0 && Live(slots - 8) ? 1 : 0);
+          if (slots != 0) {
+            for (uint32_t i = 0; i < 4; i++) {
+              FreeArray(guest::LoadU32(h.base, slots + 1000 * i + 80));
+              FreeArray(guest::LoadU32(h.base, slots + 1000 * i + 84));
+            }
+            FreeArray(slots - 8);
+          }
+          const uint32_t frame = stack - 112 - 176;
+          for (uint32_t at = 80; at < 112; at += 4) {
+            const uint32_t word = guest::LoadU32(h.base, frame + at);
+            out[v].Word(at == 84 || at == 100 ? word - object : word);
+          }
+          out[v].Bytes(Read(h.base, frame - 32, 8));  // AllocBuffers' lr and r29
+          out[v].Bytes(Read(h.base, frame - 24, 8));  // its r30
+          out[v].Word(guest::LoadU32(h.base, frame - 12) - object);  // its r31
+          memory::crt::OperatorDelete(object);
+        }
+        out[v].Bytes(Read(h.base, init, 16));
+        out[v].Bytes(Read(h.base, loop, 8));
+        out[v].Word(t.r1.u32 - stack);
+        out[v].Word(uint32_t(t.lr));
+        out[v].Bytes(Read(h.base, stack - 24, 24));
+        out[v].Bytes(Read(h.base, stack - 112, 4));
+        out[v].Bytes(Read(h.base, stack - 112 - 56, 56));  // the constructor's saves
+        out[v].Bytes(Read(h.base, stack - 112 - 176, 4));
+        for (int r = 26; r < 32; r++) {
+          out[v].Word(uint32_t((&t.r14)[r - 14].u64));
+        }
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {} ({} saves)", c, saves));
+    }
+    results.Report();
+  }
+  {
     Results results("SaveSlot::AllocBuffers (sub_820A4560)");
     const uint32_t slot = block.address + 0x400;
     for (int c = 0; c < 12; c++) {

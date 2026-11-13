@@ -8,6 +8,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "native/buffers.h"
 #include "save_interface/save_devices.h"
@@ -35,8 +36,9 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "sub_821109B8 and PlayTime::Update sub_82112838; GameData::Save sub_8228FB00 (GetLocalTime "
               "through the guest), Load sub_8228FBC0 and the game data's check sub_8228FC50; the replays' Count sub_822902A0, "
               "ReadEntry sub_822900E0 (its parse of a replay's name, never in play, on the translated "
-              "code) and, with --native_heap, BuildList sub_82290378; with --native_heap, the save "
-              "devices' constructor sub_820A6160 with SaveSlot::AllocBuffers sub_820A4560 (no "
+              "code) and, with --native_heap, BuildList sub_82290378; with --native_heap, "
+              "SaveDevices::Create sub_820A63C8 and the save devices' constructor sub_820A6160 (no "
+              "adapter: only Create's step calls it) with SaveSlot::AllocBuffers sub_820A4560 (no "
               "adapter: only the constructor's plain C++ calls it; the notification listener "
               "stored as none without XNotifyCreateListener) and destructor sub_820A6110 with "
               "SaveDevices::Destroy sub_820A56E8 and SlotArray::Reset sub_820A55F0 (no adapters: "
@@ -410,6 +412,44 @@ void SaveDevicesConstructSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = self;  // the original's mr r3,r31
 }
 
+void SaveDevicesCreateSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t block = ctx.r3.u32;
+  const uint32_t saves = ctx.r4.u32;
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820A63C8(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  const uint64_t r30 = ctx.r30.u64;
+  const uint64_t r31 = ctx.r31.u64;
+  const auto regs = Regs(ctx, 30);
+  const auto devices = si::SaveDevicesCreate(base, saves, [&](uint32_t devices) {
+    // The original's prologue: lr, r30 and r31 above its 112-byte frame.
+    Prologue(base, ctx.r1.u32, uint32_t(lr), 112, 30, regs.data());
+    guest_call::InFrame(ctx, base, 112, 0x820A6400, [&](uint32_t) {
+      // The constructor from Create's frame, with the registers Create
+      // holds there (mr r31,r3 and mr r30,r4), which its prologue saves.
+      ctx.r30.u64 = ctx.r4.u64;
+      ctx.r31.u64 = ctx.r3.u64;
+      ctx.r3.u64 = devices;
+      ctx.r4.u64 = block;
+      ctx.r5.u64 = saves;
+      SaveDevicesConstructSteps(ctx, base);
+    });
+    ctx.r30.u64 = r30;
+    ctx.r31.u64 = r31;
+    ctx.lr = lr;
+  });
+  if (!devices) {
+    __imp__sub_820A63C8(ctx, base);
+    return;
+  }
+  if (*devices == 0) {
+    Prologue(base, ctx.r1.u32, uint32_t(lr), 112, 30, regs.data());
+  }
+  ctx.r3.u64 = *devices;
+}
+
 void SaveSlotAllocBuffersSteps(PPCContext& ctx, uint8_t* base) {
   if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, ctx.r4.u32)) {
     __imp__sub_820A4560(ctx, base);
@@ -550,11 +590,13 @@ ITC_SAVE_INTERFACE_ADAPTER(8228FB00, SaveInterfaceGameDataSave)
 ITC_SAVE_INTERFACE_ADAPTER(8228FBC0, SaveInterfaceGameDataLoad)
 ITC_SAVE_INTERFACE_ADAPTER(8228FC50, SaveInterfaceGameDataCheck)
 ITC_SAVE_INTERFACE_ADAPTER(82290378, SaveInterfaceReplaysBuildList)
-// The save devices' constructor (from SaveDevices::Create, once at boot) and
+// The save devices' creation (from Framework::Init, once at boot) and
 // destructor (vtable slot 0, never in play).
-ITC_SAVE_INTERFACE_ADAPTER(820A6160, SaveDevicesConstructSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A63C8, SaveDevicesCreateSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A6110, SaveDevicesDeleteSteps)
-// No adapters for SaveSlot::AllocBuffers sub_820A4560 (only the
-// constructor's plain C++ calls it), SaveDevices::Destroy sub_820A56E8 and
+// No adapter (removed 2026-11-13: only SaveDevices::Create's step calls it in
+// play) for SaveDevices::SaveDevices sub_820A6160. None for
+// SaveSlot::AllocBuffers sub_820A4560 (only the constructor's plain C++
+// calls it), SaveDevices::Destroy sub_820A56E8 and
 // SlotArray::Reset sub_820A55F0 (only the destructor's plain C++ calls
 // them): their register steps are the harness's.

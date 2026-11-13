@@ -138,6 +138,22 @@ std::optional<uint32_t> SaveDevicesConstruct(
   return devices;
 }
 
+std::optional<uint32_t> SaveDevicesCreate(
+    uint8_t* base, uint32_t saves, const std::function<void(uint32_t devices)>& construct) {
+  if (!CanAllocBuffers(base, saves)) {
+    return std::nullopt;
+  }
+  const auto devices = memory::crt::OperatorNew(base, 116);
+  if (!devices) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_820A63C8 SaveDevices::Create");
+  if (*devices != 0) {
+    construct(*devices);
+  }
+  return *devices;
+}
+
 uint32_t SlotArrayReset(uint8_t* base, uint32_t holder,
                         const std::function<uint32_t(uint32_t slot)>& destroy) {
   ITC_NATIVE_RUNNING("sub_820A55F0 SlotArray::Reset");
