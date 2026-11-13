@@ -313,10 +313,21 @@ file's history. What's left to see in a drive, from every run:
   adapter removable (all reached through tables and vtables); harness
   fixes on the way (movie 9 given 21 text records after a mutation
   test went unseen; sub-scene 3 kept a leaf); harnesses 0 differing;
-  race 38 s at 40, 0 errors; no subagents). Left: none. Validation
-  agent running.
+  race 38 s at 40, 0 errors; no subagents). Left: none. Validated:
+  `itc_5190` (race 48 s at 180, 0 errors, every harness 0 differing
+  outside the expected groups; harnesses ~130 s), 22 of 22 harness
+  lines, no prints added; none in the race or the replay `itc_5191`
+  (ok): 22 to drive. Recorded.
+- Subsystem 9 of 10: after a race, which achievements were earned
+  (`sub_82290788` with `sub_82290698`, seen in play, ready; its writer
+  `sub_82290A30`); its two lead lines (the same functions) deleted
+  from `leads.md`. An Xbox feature: its Xbox calls get plugged-in data
+  by the user's call of 2026-11-12. Mapping agent running.
 
 ## Done
+
+- The power graph screen: `power-graph-screen.md` 22 of 22 ours,
+  `--native_power_graph_screen`, acc7bc1a..2f90c6eb; validated.
 
 - `HandleInput` and `Command21` (no mapping): 29 adapters removed, the
   sticker set-up ported, 2787b4aa..658969d6; validated.
@@ -438,5 +449,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the power graph screen's map: ours 5941, work left 757
   (wrapped 52, known 381, unknown 324).
+
+- After the power graph screen: ours 5963, work left 741 (wrapped 52,
+  known 365, unknown 324).
 
 ## Stopped

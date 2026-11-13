@@ -18,6 +18,34 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5190`, `itc_5191`, ok; the
+type 6 and 7 modes' power graph screen, `power-graph-screen.md`):
+
+- `sub_82250778` PowerGraphScreen67::OnEnter
+- `sub_82250D70` PowerGraphScreen67::WaitForLoad
+- `sub_82250338` PowerGraphScreen67::Shown
+- `sub_82250890` PowerGraphScreen67::Open
+- `sub_82250A20` PowerGraphScreen67::Draw
+- `sub_82250948` PowerGraphScreen67::MenuPage
+- `sub_82250348` PowerGraphScreen67::ClosedPage
+- `sub_822513B8` PowerGraphScreen67::Update
+- `sub_82251320` PowerGraphScreen67::Step0
+- `sub_82250DD8` PowerGraphScreen67::SetTexts
+- `sub_82250CD0` PowerGraphScreen67::SetParts
+- `sub_82250B48` PowerGraphScreen67::SetPartIcon` (probably)
+- `sub_82250BA0` PowerGraphScreen67::SetPartRow2` (probably)
+- `sub_82250C40` PowerGraphScreen67::SetPartRow1` (probably)
+- `sub_82250AA8` PowerGraphScreen67::Step1
+- `sub_82250900` PowerGraphScreen67::Leave
+- `sub_822502C0` PowerGraphScreen67::OnLeft
+- `sub_82237A88` PowerGraphScreen6::PostLeave` (probably)
+- `sub_82237AD8` PowerGraphScreen6::PostClosing` (probably)
+- `sub_82237B28` PowerGraphScreen6::PostClosed` (probably)
+- `sub_82246FB8` PowerGraphScreen7::PostLeave` (probably)
+- `sub_82247008` PowerGraphScreen7::PostClosing` (probably)
+
+The tuning screen's:
+
 Not in the attract race or the replay (`itc_5181`, `itc_5182`, ok; the
 tuning screen's pages and commands, `tuning-pages.md` and
 `tuning-screen.md`; the vinyl editor's pages already listed below):

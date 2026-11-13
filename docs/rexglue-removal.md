@@ -2867,6 +2867,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | `Type6Screen0`: the type 6 mode's first screen (a five-item menu over the type 6 car: pages, steps, helpers), with type 7's unported steps and `PowerGraph::SetFromCar` | `type6-type7-modes.md` | 13 of 13 new rows (with 6 of type 7's and `CarList::DrawCarPowerGraph`; 10 adapters removed) | (`--native_type67_modes`, `--native_power_graph`) |
 | 2026-11-13 | The type 5 mode: the parking area's front-end mode (its three machines: the car settings, the parking area, and its own dialog `Type5Dialog`) | `type5-mode.md` | 33 of 33 (16 never seen, ported) | `--native_type5_mode` |
 | 2026-11-13 | The tuning screen's vinyl editor (its pages for states 23 to 31 and 34, the decal images' list window and loads, the sticker helpers it calls) | `tuning-pages.md` | 29 new rows ours (with `HighlightItem`, `HighlightSelected` in `tuning-screen.md`; 7 adapters removed) | (`--native_tuning_pages`) |
+| 2026-11-13 | The power graph screen (the machine the type 6 and 7 modes share: its handlers, pages, steps, texts and the members' slots) | `power-graph-screen.md` | 22 of 22 | `--native_power_graph_screen` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5383,3 +5384,17 @@ overridden 109, Native 36, Dropped 27, never called 69, live 208.
 Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
 5,935, work left 758 (Wrapped 52, with a row 366, no row yet 340), from
 775.
+
+**2026-11-13, the power graph screen and `HandleInput` (branch
+`b7-loop-11-11-26`, the forty-fifth run, its eighth subsystem and a
+lead without mapping):** `TuningScreen::HandleInput` and `Command21`
+made native with 29 adapters removed (the tuning screen's pages it
+alone called); 20 never-seen pages it calls stay recompiled (the
+option rows, paint, light kits, interior, the sticker editor).
+`power-graph-screen.md` (22 rows, `src/power_graph_screen/`): the power
+graph screen machine the type 6 and 7 modes share, all native. Neither
+runs in the replay: on the drive list. The boundary: 449 functions (916
+pairs): overridden 109, Native 36, Dropped 27, never called 69, live
+208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
+ours 5,963, work left 741 (Wrapped 52, with a row 365, no row yet
+324), from 758.
