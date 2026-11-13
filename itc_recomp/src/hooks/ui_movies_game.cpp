@@ -49,7 +49,7 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "between the animation lists UiMovie::MoveAnimation sub_8211DBE0, "
               "UiMovie::MoveNamedAnimation sub_8211DCE8 (no adapter), UiMovie::Loop sub_8211DDD8, "
               "UiMovie::LoopNamed sub_8211DDE0, UiMovie::LoopLast sub_8211DDE8, "
-              "UiMovie::UnloopNamed sub_8211DE30, the "
+              "UiMovie::UnloopNamed sub_8211DE30, UiMovie::Unloop sub_8211DE28 (not seen in play), the "
               "stops UiMovie::Finish sub_8211DE38, UiMovie::FinishNamed sub_8211DF20 and "
               "UiMovie::FinishAll sub_8211DFF8 (UiMovie::ApplyAnimation through its override), "
               "and the "
@@ -446,6 +446,17 @@ extern "C" REX_FUNC(sub_8211DE30) {
   ctx.r5.s64 = 0;
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(ui_movies::UnloopNamed(base, movie, ctx.r4.u32), ctx.r1.u32, movie);
+}
+
+// UiMovie::Unloop (not seen in play): sub_8211DBE0 with r6 = 0 (a tail
+// call: the frame where its caller's ends).
+extern "C" REX_FUNC(sub_8211DE28) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DE28);
+  ctx.r6.s64 = 0;
+  const uint32_t movie = ctx.r3.u32;
+  ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, false),
+                       ctx.r1.u32, movie);
 }
 
 // UiMovie::LoopLast: r3 = movie (its tail calls make their frames where

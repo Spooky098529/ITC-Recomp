@@ -1881,6 +1881,157 @@ Spec HandleInputSpec(const char* name, int cases, std::vector<uint32_t> states,
           loads};
 }
 
+// The sticker editor's world (docs/functions/sticker-editor.md), over the
+// pages' world: the sticker menu [+10044] the front-end menu; the area
+// +30724 0 to 7 and the slot +30732 0 to 6; the placed stickers' ids (+33320,
+// 40 words) -1 to 198 (-1 a fifth of the time) and records (+32360, 40 of 24
+// bytes), the edited decal D (+30832) and its backup (+33512): x and y small
+// ints, the angle and the scale floats (now and then any word), the flip 0
+// or 1, a word; the solo and preview holds (+33500, +33504) and the garage
+// car's flag +33508 0 or 1; the save data's owned bits (+0x199A8, 7 words)
+// with at least one of the 199 stickers owned (the steps over them loop
+// forever otherwise, which play never gives), few or many; the garage list
+// as ItemFields lays it (the cars' ids below 26: the layouts' table); the
+// editor's other words (+30740, +30748, +30756, +30764, +30768, the order
+// list +33480, the picker's wait +33536) small; the holds 163 and 164 now
+// and then held on the player's mapper.
+void StickerFields(PPCContext&, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 10044, w.menu());
+  guest::StoreU32(base, s + 30724, r.Below(8));
+  guest::StoreU32(base, s + 30732, r.Below(7));
+  auto id = [&] { return r.Below(5) == 0 ? 0xFFFFFFFFu : r.Below(199); };
+  for (uint32_t k = 0; k < 40; k++) {
+    guest::StoreU32(base, s + 33320 + 4 * k, id());
+  }
+  auto record = [&](uint32_t at) {
+    guest::StoreU32(base, at + 0, uint32_t(int32_t(r.Below(601)) - 300));
+    guest::StoreU32(base, at + 4, uint32_t(int32_t(r.Below(601)) - 300));
+    guest::StoreFloat(base, at + 8, float(r.Below(36000)) / 100.0f);
+    guest::StoreFloat(base, at + 12, float(r.Below(250)) / 100.0f);
+    if (r.Below(10) == 0) {
+      guest::StoreU32(base, at + 8 + 4 * r.Below(2), uint32_t(r.Next()));
+    }
+    guest::StoreU32(base, at + 16, r.Below(2));
+    guest::StoreU32(base, at + 20, uint32_t(r.Next()));
+  };
+  for (uint32_t k = 0; k < 40; k++) {
+    record(s + 32360 + 24 * k);
+  }
+  record(s + 30832);
+  record(s + 33512);
+  QuietRange(base, s + 32360, 40 * 24);
+  QuietRange(base, s + 30832, 24);
+  QuietRange(base, s + 33512, 24);
+  for (const uint32_t at : {33500u, 33504u, 33508u}) {
+    guest::StoreU32(base, s + at, r.Below(2));
+  }
+  const uint32_t density = r.Below(3);
+  for (uint32_t k = 0; k < 7; k++) {
+    uint32_t bits = uint32_t(r.Next());
+    for (uint32_t d = 0; d < density; d++) {
+      bits &= uint32_t(r.Next());
+    }
+    guest::StoreU32(base, w.save + 0x199A8 + 4 * k, bits);
+  }
+  const uint32_t owned = r.Below(199);
+  const uint32_t word = w.save + 0x199A8 + 4 * (owned >> 5);
+  guest::StoreU32(base, word, guest::LoadU32(base, word) | (1u << (owned & 31)));
+  const uint32_t nodes = w.save + 6120;
+  for (uint32_t k = 0; k < 51; k++) {
+    guest::StoreU16(base, nodes + 4 * k, uint16_t(r.Below(51)));
+    guest::StoreU16(base, nodes + 4 * k + 2, uint16_t(r.Below(4)));
+  }
+  guest::StoreU16(base, nodes + 204, uint16_t(r.Below(51)));
+  guest::StoreU32(base, w.save + 0x19920, r.Below(6));
+  for (uint32_t k = 0; k < 4; k++) {
+    guest::StoreU32(base, nodes + 1968 * k + 224, r.Below(26));
+  }
+  for (const uint32_t at : {30740u, 30748u, 30756u, 30764u, 30768u}) {
+    guest::StoreU32(base, s + at, r.Below(8));
+  }
+  for (uint32_t k = 0; k < 5; k++) {
+    guest::StoreU32(base, s + 33480 + 4 * k, r.Below(4) == 0 ? r.Below(5) : k);
+  }
+  guest::StoreU32(base, s + 33536, r.Below(3) == 0 ? r.Below(4) : 0);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (r.Below(2) == 0) {
+    const uint32_t bit = 1u << ((r.Below(2) == 0 ? 163 : 164) - 151);
+    guest::StoreU32(base, mapper + 448, guest::LoadU32(base, mapper + 448) | bit);
+  }
+}
+
+// The sticker editor's cases (sticker_pages.cpp): its helpers over
+// StickerFields' world.
+void StickerCases(Context& h, const World& w) {
+  // UpdateSoloHold and UpdatePreviewHold: r31 and lr saved (16 bytes).
+  Run(h, w,
+      {"TuningScreen::UpdateSoloHold", 60, __imp__sub_821F7298, hooks::TuningPagesUpdateSoloHold,
+       16, {}, StickerFields});
+  Run(h, w,
+      {"TuningScreen::UpdatePreviewHold", 60, __imp__sub_821F7348,
+       hooks::TuningPagesUpdatePreviewHold, 16, {}, StickerFields});
+  // StepUnlockedSticker: r4 an id (-1 to 198, now and then any word), r5 a
+  // step count -8 to 8 (now and then 0); leaf.
+  Run(h, w,
+      {"TuningScreen::StepUnlockedSticker", 150, __imp__sub_821F73F8,
+       hooks::TuningPagesStepUnlockedSticker, 0, {},
+       [](PPCContext& t, Random& r, const World& w) {
+         StickerFields(t, r, w);
+         t.r4.u64 = r.Below(8) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(200)) - 1));
+         t.r5.u64 = uint64_t(int64_t(int32_t(r.Below(17)) - 8));
+         HighWord(t, r);
+       }});
+  // ShowSlotNode: r4 an id (-1 to 198), r5 a slot 0 to 4, r6 the current 0
+  // to 6; __savegprlr_28: 40 bytes.
+  Run(h, w,
+      {"TuningScreen::ShowSlotNode", 100, __imp__sub_821F8070, hooks::TuningPagesShowSlotNode, 40,
+       {}, [](PPCContext& t, Random& r, const World& w) {
+         StickerFields(t, r, w);
+         t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(200)) - 1));
+         t.r5.u64 = r.Below(5);
+         t.r6.u64 = r.Below(7);
+       }});
+  // PlaceStickerNode: r4 an id (-1 to 198), r5 a slot 0 to 4, r6 a placed
+  // record or D; __savegprlr_27: 48 bytes.
+  Run(h, w,
+      {"TuningScreen::PlaceStickerNode", 150, __imp__sub_821F8160,
+       hooks::TuningPagesPlaceStickerNode, 48, {}, [](PPCContext& t, Random& r, const World& w) {
+         StickerFields(t, r, w);
+         t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(200)) - 1));
+         t.r5.u64 = r.Below(5);
+         t.r6.u64 = r.Below(4) == 0 ? w.screen() + 30832 : w.screen() + 32360 + 24 * r.Below(40);
+       }});
+  // DecalImages::SetSlot: r3 the images, r4 the sub-scene (-1, 29 or 30), r5
+  // and r6 nodes, r7 and r8 texture slots below 200, r9 an entry -1 to 198,
+  // r10 a flag (0, 1, now and then any word); __savegprlr_23: 80 bytes.
+  Run(h, w,
+      {"DecalImages::SetSlot", 100, __imp__sub_821F8868, hooks::TuningPagesSetSlot, 80, {},
+       [](PPCContext& t, Random& r, const World& w) {
+         StickerFields(t, r, w);
+         static constexpr uint32_t kSubs[] = {0xFFFFFFFFu, 29, 30};
+         t.r3.u64 = w.screen() + 10048;
+         t.r4.u64 = int64_t(int32_t(kSubs[r.Below(3)]));
+         t.r5.u64 = r.Below(40);
+         t.r6.u64 = r.Below(40);
+         t.r7.u64 = r.Below(200);
+         t.r8.u64 = r.Below(200);
+         t.r9.u64 = uint64_t(int64_t(int32_t(r.Below(200)) - 1));
+         t.r10.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
+       }});
+  // SetStickerEditTexts: r30, r31 and lr saved (24 bytes); the frame's
+  // parameter area (+48 to +79, the varargs SetText stores) left out: the
+  // original leaves r7 to r10 as the calls before left them, the native
+  // version passes 0 (the precedent: only dead frame words differ); and
+  // SetText's saves of r28 to r31 below the frame (where it runs the
+  // original), the native version's registers not the original's.
+  Run(h, w,
+      {"TuningScreen::SetStickerEditTexts", 60, __imp__sub_821F7F20,
+       hooks::TuningPagesSetStickerEditTexts, 24, {{32, 64}, {112, 152}}, StickerFields});
+}
+
 void TuningPagesMovie(Context& h) {
   World w(h.base);
   if (!w.ok()) {
@@ -2305,6 +2456,7 @@ void TuningPagesMovie(Context& h) {
                         t.r4.u64 = r.Next();
                         HighWord(t, r);
                       }));
+  StickerCases(h, w);
 }
 
 }  // namespace harness

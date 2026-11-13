@@ -1002,6 +1002,7 @@ void MoveCases(Context& h, const Block& block) {
       {"UiMovie::LoopNamed (sub_8211DDE0)", __imp__sub_8211DDE0, sub_8211DDE0},
       {"UiMovie::LoopLast (sub_8211DDE8)", __imp__sub_8211DDE8, sub_8211DDE8},
       {"UiMovie::UnloopNamed (sub_8211DE30)", __imp__sub_8211DE30, sub_8211DE30},
+      {"UiMovie::Unloop (sub_8211DE28)", __imp__sub_8211DE28, sub_8211DE28},
   };
   const uint32_t movie = block.at;
   for (const Move& f : moves) {

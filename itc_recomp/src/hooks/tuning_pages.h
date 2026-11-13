@@ -225,4 +225,20 @@ void TuningPagesResetStickerEditor(PPCContext& ctx, uint8_t* base);
 void TuningPagesRestoreAreaDecals(PPCContext& ctx, uint8_t* base);
 void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base);
 
+// The sticker editor's helpers (docs/functions/sticker-editor.md; r3 the
+// screen unless said): UpdateSoloHold sub_821F7298, UpdatePreviewHold
+// sub_821F7348, StepUnlockedSticker sub_821F73F8 (r4 an id, r5 a step
+// count), ShowSlotNode sub_821F8070 (r4 an id, r5 a slot, r6 the current
+// slot), PlaceStickerNode sub_821F8160 (r4 an id, r5 a slot, r6 a record),
+// DecalImages::SetSlot sub_821F8868 (r3 the images, r4 a sub-scene, r5 and
+// r6 two nodes, r7 and r8 their texture slots, r9 an entry, r10 a flag),
+// SetStickerEditTexts sub_821F7F20.
+void TuningPagesUpdateSoloHold(PPCContext& ctx, uint8_t* base);
+void TuningPagesUpdatePreviewHold(PPCContext& ctx, uint8_t* base);
+void TuningPagesStepUnlockedSticker(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowSlotNode(PPCContext& ctx, uint8_t* base);
+void TuningPagesPlaceStickerNode(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetSlot(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetStickerEditTexts(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

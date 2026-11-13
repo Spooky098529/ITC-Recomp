@@ -755,4 +755,50 @@ uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, ui
 uint64_t HandleInput(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                      uint64_t r4, uint32_t sp, const PageFlags& flags);
 
+// --- The sticker editor (sticker_pages.cpp; docs/functions/sticker-editor.md) ---
+// Its pages (states 38 to 46 and 49), their movie sides and helpers, none
+// seen in play. Movie 14's id at frame + 80 (UiMovies::Find), the nodes
+// through the UI movies' plain C++ (FindNode, ShowNode's and HideNode's
+// stores); guest calls through `call` from the originals' frames with their
+// return addresses. Sticker ids index the table T at 0x8200B630 (61 words)
+// below 61, negative ones too, as the originals do.
+
+// sub_821F7298 TuningScreen::UpdateSoloHold: with 164 held on the player's
+// mapper (its entry's +4 not 1), +33500 0 -> 1, else 1 -> 0; 1 when it
+// changed, else 0. 96-byte frame. sub_821F7348 UpdatePreviewHold: the same
+// for 163 and +33504.
+uint32_t UpdateSoloHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                        uint32_t sp, bool native_slots);
+uint32_t UpdatePreviewHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                           uint32_t sp, bool native_slots);
+// sub_821F73F8 TuningScreen::StepUnlockedSticker: the sticker `n` owned
+// stickers away from `id` (all 64 bits each; the save data's bits), mod 199
+// (signed). Leaf. Loops forever when none is owned (as the original).
+uint64_t StepUnlockedSticker(uint8_t* base, uint32_t screen, uint64_t id, uint64_t n);
+// sub_821F8070 TuningScreen::ShowSlotNode: slot j's nodes (-1, 2j + 19 and
+// 2j + 20) shown or hidden by the sticker `id`'s T word, both hidden while
+// solo for a slot other than `current` (below 5). 128-byte frame; r3 the
+// last node.
+uint32_t ShowSlotNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j, uint32_t current,
+                      uint32_t sp);
+// sub_821F8160 TuningScreen::PlaceStickerNode: slot j's node for the sticker
+// `id` placed from the 24-byte record `record` and the garage car's layout
+// (its row). 176-byte frame (the conversions' doublewords at frame + 80 to
+// + 103 and the layout at + 112 as the original leaves them); r3 the node.
+// Needs flush-to-zero off.
+uint32_t PlaceStickerNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j,
+                          uint32_t record, uint32_t sp);
+// sub_821F8868 DecalImages::SetSlot: movie 14's nodes (sub, first) and (sub,
+// second) shown and hidden by the entry i and `flag`, and the texture slot's
+// word the entry's texture header (or entry 199's for i negative; its row).
+// 176-byte frame; r3 the last node.
+uint32_t SetSlot(uint8_t* base, uint32_t images, uint32_t sub, uint32_t first, uint32_t second,
+                 uint32_t first_slot, uint32_t second_slot, uint32_t i, uint32_t flag, uint32_t sp);
+// sub_821F7F20 TuningScreen::SetStickerEditTexts: movie 14's edit texts
+// (its row; the varargs SetText leaves unset passed as 0, the scale's double
+// in r7). 112-byte frame (the angle's fctiwz at frame + 80); r3 the last
+// SetText's. Needs flush-to-zero off.
+uint64_t SetStickerEditTexts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+                             uint32_t sp);
+
 }  // namespace tuning_pages

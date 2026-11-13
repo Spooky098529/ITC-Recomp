@@ -135,7 +135,13 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "by their plain C++, the pages never seen in play through the guest), and under "
               "InputItems the sticker editor's set-up ResetStickerEditor sub_821F8440, "
               "LoadStickers sub_821F86C0 and RestoreAreaDecals sub_821F6C90 (no adapters: only "
-              "InputItems calls them in play; GarageDecal and memcpy by their plain C++)) "
+              "InputItems calls them in play; GarageDecal and memcpy by their plain C++)); "
+              "the sticker editor's helpers (docs/functions/sticker-editor.md, not seen in "
+              "play) UpdateSoloHold sub_821F7298, UpdatePreviewHold sub_821F7348, "
+              "StepUnlockedSticker sub_821F73F8, ShowSlotNode sub_821F8070, PlaceStickerNode "
+              "sub_821F8160, DecalImages::SetSlot sub_821F8868 and SetStickerEditTexts "
+              "sub_821F7F20 (the UI movies' FindNode by its plain C++, SetText through its "
+              "override with the varargs it leaves unset passed as 0) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -848,6 +854,48 @@ void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesUpdateSoloHold(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) -> uint64_t {
+    return tp::UpdateSoloHold(base, call, screen, sp, native_slots);
+  });
+}
+
+void TuningPagesUpdatePreviewHold(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const bool native_slots = ITC_FLAG(native_action_mappers);
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) -> uint64_t {
+    return tp::UpdatePreviewHold(base, call, screen, sp, native_slots);
+  });
+}
+
+void TuningPagesStepUnlockedSticker(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::StepUnlockedSticker(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64);
+}
+
+void TuningPagesShowSlotNode(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::ShowSlotNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+}
+
+void TuningPagesPlaceStickerNode(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 =
+      tp::PlaceStickerNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+}
+
+void TuningPagesSetSlot(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tp::SetSlot(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                           ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.r1.u32);
+}
+
+void TuningPagesSetStickerEditTexts(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::SetStickerEditTexts(base, call, screen, sp);
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -870,6 +918,16 @@ ITC_TUNING_PAGES(821FE608, TuningPagesOnImageLoaded)
 // The screen's input handler: a vtable slot (no direct callers), so its
 // adapter stays.
 ITC_TUNING_PAGES(821E6950, TuningPagesHandleInput)
+
+// The sticker editor's helpers (not seen in play): the recompiled pages and
+// the update's sticker commands call them.
+ITC_TUNING_PAGES(821F7298, TuningPagesUpdateSoloHold)
+ITC_TUNING_PAGES(821F7348, TuningPagesUpdatePreviewHold)
+ITC_TUNING_PAGES(821F73F8, TuningPagesStepUnlockedSticker)
+ITC_TUNING_PAGES(821F8070, TuningPagesShowSlotNode)
+ITC_TUNING_PAGES(821F8160, TuningPagesPlaceStickerNode)
+ITC_TUNING_PAGES(821F8868, TuningPagesSetSlot)
+ITC_TUNING_PAGES(821F7F20, TuningPagesSetStickerEditTexts)
 
 // No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
 // native and call their plain C++; the register steps above are the
