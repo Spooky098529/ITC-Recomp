@@ -72,7 +72,17 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "ShowNode, HideNode and SetNodeTexture's plain C++, FinishNamed, PlayNamed, "
               "LoopNamed, ResetPose, Run, ClearText, ScrollText and sub_8211C5F8 guest calls, "
               "SetText's plain C++ where the text setters are native, their slots to the plain "
-              "C++ where a slot holds one) natively instead of "
+              "C++ where a slot holds one); the titled list screen's TitledListScreen::Reset "
+              "sub_82257558, Draw sub_822579E8 and Update sub_82258998 (their page and step "
+              "tables built on first use, the same words and guards), Page2 sub_82257148, Page3 "
+              "sub_822572F0, Page4 sub_82257360, Page7 sub_82257490, Step0 sub_82257D48, Step1 "
+              "sub_82257FF8, Step2 sub_822580E0, OnItemMoved sub_82257B78, ~TitledListScreen "
+              "sub_82257138 and DeletingDestructor sub_82257990, ListScreen::LeavePage "
+              "sub_82255818, NodeListScreen::~NodeListScreen sub_82257000 and DeletingDestructor "
+              "sub_82257940 (ScreenFades::FadeIn and FadeOut, MenuSound::Play, UiMovie::FindNode "
+              "and Child's plain C++, MenuList::Update, Accepted and Cancelled, UiMovie::Run, "
+              "FinishAll, FinishNamed, PlayNamed, LoopNamed and UnloopNamed guest calls, the "
+              "table entries and slots to the plain C++ where they hold one) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -306,6 +316,32 @@ ITC_TS_STEP(ListScreenResume, ts::ListScreenTail(base, ctx.r3.u64, ctx.r4.u64, 6
                                                  uint32_t(ctx.lr), calls))
 ITC_TS_STEP(ListScreenOpen, ts::ListScreenTail(base, ctx.r3.u64, ctx.r4.u64, 60, ctx.r1.u32,
                                                uint32_t(ctx.lr), calls))
+ITC_TS_STEP(TitledListScreenReset, ts::TitledListScreenReset(base, ctx.r3.u64))
+ITC_TS_STEP(TitledListScreenDraw,
+            ts::TitledListScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenUpdate,
+            ts::TitledListScreenUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenPage2, ts::TitledListScreenPage2(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenPage3, ts::TitledListScreenPage3(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenPage4,
+            ts::TitledListScreenPage4(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenPage7, ts::TitledListScreenPage7(base, ctx.r3.u64))
+ITC_TS_STEP(ListScreenLeavePage, ts::ListScreenLeavePage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                                         uint32_t(ctx.lr), calls))
+ITC_TS_STEP(TitledListScreenStep0, ts::TitledListScreenStep0(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenStep1, ts::TitledListScreenStep1(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenStep2, ts::TitledListScreenStep2(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenOnItemMoved,
+            ts::TitledListScreenOnItemMoved(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenDestruct,
+            ts::TitledListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeListScreenDestruct, ts::NodeListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenDeletingDestruct,
+            ts::NodeListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, true, ctx.r1.u32,
+                                               calls))
+ITC_TS_STEP(NodeListScreenDeletingDestruct,
+            ts::NodeListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, false, ctx.r1.u32,
+                                               calls))
 
 #undef ITC_TS_STEP
 
@@ -469,3 +505,24 @@ ITC_TYPE67_SCREENS(822517B8, ListScreenUpdate)
 ITC_TYPE67_SCREENS(82251580, ListScreenSuspend)
 ITC_TYPE67_SCREENS(82251590, ListScreenResume)
 ITC_TYPE67_SCREENS(822517A0, ListScreenOpen)
+// The titled list screen (TitledListScreen, the type 6 list screen's base):
+// its slots 22 to 24 and 0, its tables' pages and steps (through the tables,
+// which the recompiled Draw and Update build with the same words),
+// OnItemMoved (from Step2) and the destructors (from ~Type6ListScreen and the
+// deleting destructors, recompiled; never seen in play).
+ITC_TYPE67_SCREENS(82257558, TitledListScreenReset)
+ITC_TYPE67_SCREENS(822579E8, TitledListScreenDraw)
+ITC_TYPE67_SCREENS(82258998, TitledListScreenUpdate)
+ITC_TYPE67_SCREENS(82257148, TitledListScreenPage2)
+ITC_TYPE67_SCREENS(822572F0, TitledListScreenPage3)
+ITC_TYPE67_SCREENS(82257360, TitledListScreenPage4)
+ITC_TYPE67_SCREENS(82257490, TitledListScreenPage7)
+ITC_TYPE67_SCREENS(82255818, ListScreenLeavePage)
+ITC_TYPE67_SCREENS(82257D48, TitledListScreenStep0)
+ITC_TYPE67_SCREENS(82257FF8, TitledListScreenStep1)
+ITC_TYPE67_SCREENS(822580E0, TitledListScreenStep2)
+ITC_TYPE67_SCREENS(82257B78, TitledListScreenOnItemMoved)
+ITC_TYPE67_SCREENS(82257138, TitledListScreenDestruct)
+ITC_TYPE67_SCREENS(82257990, TitledListScreenDeletingDestruct)
+ITC_TYPE67_SCREENS(82257000, NodeListScreenDestruct)
+ITC_TYPE67_SCREENS(82257940, NodeListScreenDeletingDestruct)

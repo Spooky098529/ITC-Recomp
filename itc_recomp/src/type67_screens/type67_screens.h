@@ -604,4 +604,75 @@ uint64_t ListScreenUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
 uint64_t ListScreenTail(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t slot, uint32_t sp,
                         uint32_t lr, const Calls& calls);
 
+// --- The titled list screen (titled_list.cpp; TitledListScreen, the type 6
+// list screen's base, over NodeListScreen). The page block: +9644 the page,
+// +9648 the page after, +9652 the page before, +9656 the step, +9660 the
+// step queued, +9668 the step's first-call word. Draw and Update build
+// their tables of member functions (8 bytes an entry: the function, the
+// this offset) on first use, the guard's bit 0 set as the originals do, so
+// the recompiled and native sides share them; the entries run the plain
+// C++ through SlotNative. ---
+
+constexpr uint32_t kTitledListScreenVtable = 0x820115C8;
+constexpr uint32_t kNodeListScreenVtable = 0x82011558;
+// The page table (9 entries: the empty handler for pages 0, 1, 5, 6; Page2,
+// Page3, Page4, Page7 and ListScreen::LeavePage for 2, 3, 4, 7, 8) and the
+// step table (Step0 to Step2), with their guards.
+constexpr uint32_t kTitledPages = 0x82815F88;
+constexpr uint32_t kTitledPageGuard = 0x82815FD0;
+constexpr uint32_t kTitledSteps = 0x82815FD4;
+constexpr uint32_t kTitledStepGuard = 0x82815FEC;
+
+// sub_82257558 TitledListScreen::Reset (slot 22): page 2 after step 0. r3
+// left.
+uint64_t TitledListScreenReset(uint8_t* base, uint64_t r3);
+// sub_822579E8 TitledListScreen::Draw (slot 23; 208-byte frame): the page
+// table built on first use (its pairs left in the frame's +80 to +151), then
+// page +9644's entry with r4 unless it's -1 (then r3 left). The page's r3.
+uint64_t TitledListScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
+// sub_82258998 TitledListScreen::Update (slot 24; 112): the step table built
+// on first use (the frame's +80 to +103), then step +9656's entry (r4
+// passed on, r5 the step). The step's answer.
+uint64_t TitledListScreenUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                const Calls& calls);
+// sub_82257148 TitledListScreen::Page2 (112): the item list's update, move,
+// accept and cancel, then the two other lists'.
+uint64_t TitledListScreenPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822572F0 Page3 (96): the list part's slot 1 (r4 left) and +9696 = 1
+// when there's one; page 4. Slot 1's r3, else 0.
+uint64_t TitledListScreenPage3(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82257360 Page4 (112; r4 passed to the part's Pick): the part's answer.
+uint64_t TitledListScreenPage4(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                               const Calls& calls);
+// sub_82257490 Page7: page 8 once both fade counts are 0. r3 left.
+uint64_t TitledListScreenPage7(uint8_t* base, uint64_t r3);
+// sub_82255818 ListScreen::LeavePage (the titled list's page 8, the color
+// list's page 10): a tail call (from `sp`, returning to `lr`) of slot 7
+// (+28) when +9688 is set, else slot 6 (+24), r4 passed on.
+uint64_t ListScreenLeavePage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
+                             const Calls& calls);
+// sub_82257D48 Step0 (128; the opening), sub_82257FF8 Step1 (112; the
+// leaving, its first-call quirk kept) and sub_822580E0 Step2 (112; the item
+// moved, always 1). Done.
+uint64_t TitledListScreenStep0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t TitledListScreenStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t TitledListScreenStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82257B78 TitledListScreen::OnItemMoved (176): the item nodes'
+// animations, the arrows or the cursor, the scroll, slot 26. Slot 26's r3.
+uint64_t TitledListScreenOnItemMoved(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82257000 NodeListScreen::~NodeListScreen (96): its vtable,
+// NodeTable::~NodeTable on +10360, MenuList::Release on +10288, +10216,
+// +10144, ~ListScreen. r3 the screen.
+uint64_t NodeListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82257138 TitledListScreen::~TitledListScreen: its vtable, then
+// ~NodeListScreen (a tail call from `sp`).
+uint64_t TitledListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82257990 TitledListScreen::DeletingDestructor (`titled`) and
+// sub_82257940 NodeListScreen::DeletingDestructor (112): the destructor
+// (TitledListScreen's vtable stored first, then ~NodeListScreen), operator
+// delete (a guest call) when bit 0 of `flags` is set. r3 the screen.
+uint64_t NodeListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, bool titled,
+                                        uint32_t sp, const Calls& calls);
+
 }  // namespace type67_screens

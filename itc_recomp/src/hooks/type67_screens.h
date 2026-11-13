@@ -152,4 +152,22 @@ void ListScreenSuspend(PPCContext& ctx, uint8_t* base);
 void ListScreenResume(PPCContext& ctx, uint8_t* base);
 void ListScreenOpen(PPCContext& ctx, uint8_t* base);
 
+// The titled list screen.
+void TitledListScreenReset(PPCContext& ctx, uint8_t* base);
+void TitledListScreenDraw(PPCContext& ctx, uint8_t* base);
+void TitledListScreenUpdate(PPCContext& ctx, uint8_t* base);
+void TitledListScreenPage2(PPCContext& ctx, uint8_t* base);
+void TitledListScreenPage3(PPCContext& ctx, uint8_t* base);
+void TitledListScreenPage4(PPCContext& ctx, uint8_t* base);
+void TitledListScreenPage7(PPCContext& ctx, uint8_t* base);
+void ListScreenLeavePage(PPCContext& ctx, uint8_t* base);
+void TitledListScreenStep0(PPCContext& ctx, uint8_t* base);
+void TitledListScreenStep1(PPCContext& ctx, uint8_t* base);
+void TitledListScreenStep2(PPCContext& ctx, uint8_t* base);
+void TitledListScreenOnItemMoved(PPCContext& ctx, uint8_t* base);
+void TitledListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void NodeListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void TitledListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void NodeListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -192,6 +192,11 @@ void Deleting(Context& h) {
 
 }  // namespace
 
+// The table's words, for the titled list's cases (type67_titled_list.cpp).
+void LayNodeTable(uint8_t* base, uint32_t table, Random& r, bool paired) {
+  LayTable(base, table, r, paired);
+}
+
 void Type67ScreenTables(Context& h) {
   uint8_t* const base = h.base;
   for (const uint32_t id : {16u, 17u, 18u, 19u}) {
