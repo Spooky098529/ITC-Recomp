@@ -203,7 +203,12 @@ file's history. What's left to see in a drive, from every run:
   helpers, `PowerGraph::SetFromCar` and its split-off case; the menu
   page `sub_82234958` taken from the menu helpers' lead; 9 ready
   groups; one lead added (probably the type 5 mode's delegates); no
-  subagents); map checked (0 errors, 9 ready groups). Migration agent
+  subagents); map checked (0 errors, 9 ready groups). Migration
+  d642e99d..3a90ef05 (the 13 rows ours, with type 7's 5 unported steps
+  and pages, `PowerGraph::SetFromCar` (type 7's menu page and the car
+  list now call it), `CarList::DrawCarPowerGraph`; 10 adapters
+  removed; harnesses 0 differing; race 38 s at 40, 0 errors; no
+  subagents). Left: none ready (42 never-seen rows). Validation agent
   running.
 
 ## Done

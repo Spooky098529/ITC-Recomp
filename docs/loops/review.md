@@ -20,6 +20,15 @@ When the user has reviewed a run's section, its heading gets
   `Type7Screen0::MenuPage` and the car list); `known-data.md`'s +9656
   word, the save screen's data +56 read, the power graph record
   `0x82815EBC`; the menu page taken from the menu helpers' lead.
+- Its migration (d642e99d..3a90ef05): the 13 rows ours, with type 7's
+  `OpeningStep`, `BackStep`, `CursorStep`, `PlayItem`,
+  `PowerGraphPage` and `CarList::DrawCarPowerGraph` (`power-graph.md`)
+  native; the menu pages call the confirms' plain C++ while the UI
+  movies' text setters are native, else the original. **Found, not
+  fixed:** `CarList::DrawEntryPowerGraph`'s adapter (`sub_82250670`)
+  sets r31 = 0x826E0000 zero-extended where the original's `lis`
+  sign-extends it (0xFFFFFFFF826E0000); it matters only above 32
+  segments; added as a cleanup lead.
 - The options' load and save map (fde73e96): `options-load-save.md`,
   16 rows. **For the user:** the names given before have load and save
   the wrong way round: category 5 calls `GameData::Load`, 6
