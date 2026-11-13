@@ -31,7 +31,11 @@ file's history. What's left to see in a drive, from every run:
   `820AC998`-`820ACC08` vtable slots: the 224-byte job the second
   worker pool runs for `Model::MorphShape`, the wheels' per-draw
   morphs; ready, run every frame); its line deleted from `leads.md`.
-  Mapping agent running.
+  Mapped `morph-jobs.md` (3b635fc5: 21 rows, 14 in play, with the
+  shared 36-byte work item class at vtable `0x820066DC`; 13 ready
+  groups; the pool's post `sub_82095A28` a guest call by the
+  `DebugText`/`FramePasses` precedent; no leads added). Check passed.
+  Migration agent running.
 
 ## Done
 
@@ -58,5 +62,7 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
   unknown 306).
 - After the cleanup leads: ours 5998, work left 717 (wrapped 51,
   known 360, unknown 306).
+- After the morph jobs' map: ours 5998, work left 717 (wrapped 51,
+  known 374, unknown 292).
 
 ## Stopped

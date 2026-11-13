@@ -24,6 +24,13 @@ When the user has reviewed a run's section, its heading gets
   originals). `OnRaceEnd`'s harness no longer compares the course
   record's temporaries below its frame (the callees' originals write
   register saves there); the course record's own groups do.
+- The morph jobs' map (3b635fc5, `morph-jobs.md`, 21 rows): also the
+  shared work item class (vtable `0x820066DC`, every pool job holds
+  one). Corrections: `sub_820ACA30` is that vtable's slot 7, not a
+  vtable `0x820066F8` of its own (the lead); `app-states.md`'s "slot 3
+  `sub_820AC9E8`" of `0x82002850` is slot 0 of the overlapping job base
+  vtable `0x8200285C` (noted in the new row only); `known-data.md`'s
+  `0x8296B910`/`B914`: `MorphShape` reads `0x8296B914` too.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
