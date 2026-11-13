@@ -98,6 +98,15 @@ ITC_TS_STEP(SingleGroupConstruct, ts::SingleGroupConstruct(base, ctx.r3.u64, ctx
 ITC_TS_STEP(SingleGroupReset, ts::SingleGroupReset(base, ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(PanelFadeIn, ts::PanelFadeIn(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(MachineScreenDestruct, ts::MachineScreenDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(PanelGroupDestruct, ts::PanelGroupDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(PanelGroupDeletingDestruct,
+            ts::PanelGroupDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6PanelScreenDestruct,
+            ts::PanelScreenDestruct(base, ctx.r3.u64, false, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7PanelScreenDestruct,
+            ts::PanelScreenDestruct(base, ctx.r3.u64, true, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6PanelScreenDeletingDestruct,
+            ts::Type6PanelScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
 ITC_TS_STEP(PanelScreenIsLoaded, ts::PanelScreenIsLoaded(base, ctx.r1.u32))
 ITC_TS_STEP(Type6PanelScreenOpenMovies, ts::PanelScreenOpenMovies(base, ctx.r1.u32, false, calls))
@@ -180,6 +189,15 @@ ITC_TYPE67_SCREENS(82249CB0, SingleGroupConstruct)
 ITC_TYPE67_SCREENS(82249CC8, SingleGroupReset)
 ITC_TYPE67_SCREENS(82249BE8, PanelFadeIn)
 ITC_TYPE67_SCREENS(8224CB18, MachineScreenDestruct)
+// The panel screens' destructors and their panel groups' (from the type 6
+// and 7 blocks' destructors and the vtables' slot 0, recompiled; never seen
+// in play): the car list's PanelSet::~PanelSet and PanelGroupBase's by
+// their plain C++.
+ITC_TYPE67_SCREENS(82231CC0, PanelGroupDestruct)
+ITC_TYPE67_SCREENS(82240348, PanelGroupDeletingDestruct)
+ITC_TYPE67_SCREENS(82230668, Type6PanelScreenDestruct)
+ITC_TYPE67_SCREENS(82240168, Type7PanelScreenDestruct)
+ITC_TYPE67_SCREENS(82230B00, Type6PanelScreenDeletingDestruct)
 // The panel screens' vtable slots.
 ITC_TYPE67_SCREENS(82230790, PanelScreenIsLoaded)
 ITC_TYPE67_SCREENS(82230758, Type6PanelScreenOpenMovies)

@@ -5,6 +5,7 @@
 #include "type67_screens/type67_screens.h"
 
 #include "base/log.h"
+#include "car_list/car_list.h"
 #include "guest.h"
 #include "ui_movies/game.h"
 
@@ -18,6 +19,19 @@ using guest::StoreU32;
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   StoreU32(base, sp - bytes, sp);
   return sp - bytes;
+}
+
+// The car list's plain C++ guest calls through these calls (r3 to r6 set,
+// as car_list::Calls::Call sets them).
+uint64_t ThroughCalls(void* user, uint32_t function, const uint64_t args[8], const double*,
+                      uint32_t r1, uint32_t lr) {
+  const Calls& calls = *static_cast<const Calls*>(user);
+  const uint64_t set[6] = {args[0], args[1], args[2], args[3], 0, 0};
+  return calls.call_set(function, set, 4, r1, lr);
+}
+
+car_list::Calls CarListCalls(const Calls& calls) {
+  return {const_cast<Calls*>(&calls), &ThroughCalls};
 }
 
 }  // namespace
@@ -118,6 +132,54 @@ uint64_t MachineScreenDestruct(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8224CB18 MachineScreen::~MachineScreen");
   StoreU32(base, uint32_t(r3), kMachineScreenVtable);
   return r3;
+}
+
+uint64_t PanelGroupDestruct(uint8_t* base, uint64_t group) {
+  ITC_NATIVE_RUNNING("sub_82231CC0 PanelGroup::~PanelGroup");
+  StoreU32(base, uint32_t(group), kPanelGroupVtable);
+  return car_list::GroupBaseDestruct(base, group);
+}
+
+uint64_t PanelGroupDeletingDestruct(uint8_t* base, uint64_t group, uint64_t flags, uint32_t sp,
+                                    const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82240348 PanelGroup::DeletingDestructor");
+  const uint32_t frame = Frame(base, sp, 112);
+  StoreU32(base, uint32_t(group), kPanelGroupVtable);
+  car_list::GroupBaseDestruct(base, group);
+  if (flags & 1) {
+    const uint64_t args[6] = {group, flags, 0, 0, 0, 0};
+    calls.call_set(car_list::kOperatorDelete, args, 2, frame, 0x82240384);
+  }
+  return group;
+}
+
+uint64_t PanelScreenDestruct(uint8_t* base, uint64_t screen, bool type7, uint32_t sp,
+                             const Calls& calls) {
+  if (type7) {
+    ITC_NATIVE_RUNNING("sub_82240168 Type7PanelScreen::~Type7PanelScreen");
+  } else {
+    ITC_NATIVE_RUNNING("sub_82230668 Type6PanelScreen::~Type6PanelScreen");
+  }
+  const uint32_t frame = Frame(base, sp, 96);
+  StoreU32(base, uint32_t(screen), type7 ? kType7PanelScreenVtable : kType6PanelScreenVtable);
+  GroupPairDestruct(base, screen + 11728);
+  car_list::SetDestruct(base, screen + 9752, frame, CarListCalls(calls));
+  PanelGroupDestruct(base, screen + 9708);
+  StoreU32(base, uint32_t(screen) + 9664, kPanelGroupVtable);
+  car_list::GroupBaseDestruct(base, screen + 9664);
+  return MachineScreenDestruct(base, screen);
+}
+
+uint64_t Type6PanelScreenDeletingDestruct(uint8_t* base, uint64_t screen, uint64_t flags,
+                                          uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82230B00 Type6PanelScreen::DeletingDestructor");
+  const uint32_t frame = Frame(base, sp, 112);
+  PanelScreenDestruct(base, screen, false, frame, calls);
+  if (flags & 1) {
+    const uint64_t args[6] = {screen, flags, 0, 0, 0, 0};
+    calls.call_set(car_list::kOperatorDelete, args, 2, frame, 0x82230B30);
+  }
+  return screen;
 }
 
 // --- The panel screens' slots ---

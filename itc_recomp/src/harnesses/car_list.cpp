@@ -32,6 +32,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "hooks/car_list.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "stand_car_world.h"
 #include "ui_movies/game.h"
@@ -1153,6 +1154,63 @@ void Steps(Context& h, const World& w) {
         t.r3.u64 -= 4;
       },
       __imp__sub_8224B880, hooks::CarListSetFree, settle);
+  // The destructors: PanelSetBase's and PanelSet's over the set's menus
+  // (their blocks pages or 0, released through MenuList::Release's
+  // adapter), PanelGroupBase's on the panel, the interface's deleting
+  // destructor with bit 0 of r4 clear (the deleting cases below).
+  const auto menus = [base, set](PPCContext& t, Random& r, const World& w) {
+    set(t, r, w);
+    for (const uint32_t menu : {60u, 132u}) {
+      if (r.Below(2) == 0) TrackBlock(base, w.b() + menu + 68);
+    }
+  };
+  Group(h, w, "PanelSetBase::~PanelSetBase (sub_8224AE60)", 8, {96, 16}, menus,
+        __imp__sub_8224AE60, hooks::CarListSetBaseDestruct, settle);
+  Group(
+      h, w, "PanelSet::~PanelSet (sub_8224B708)", 8, {96, 16},
+      [menus](PPCContext& t, Random& r, const World& w) {
+        menus(t, r, w);
+        t.r3.u64 -= 4;
+      },
+      __imp__sub_8224B708, hooks::CarListSetDestruct, settle);
+  Group(h, w, "PanelGroupBase::~PanelGroupBase (sub_8224EF08)", 4, {0, 0},
+        [](PPCContext&, Random&, const World&) {}, __imp__sub_8224EF08,
+        hooks::CarListGroupBaseDestruct);
+  Group(
+      h, w, "PanelSetInterface::DeletingDestructor (sub_8224AC98)", 4, {96, 16},
+      [](PPCContext& t, Random&, const World&) { t.r4.u64 &= ~1ull; }, __imp__sub_8224AC98,
+      hooks::CarListSetInterfaceDeletingDestruct);
+  {
+    // With bit 0 set: a block of operator new's (64 bytes of random words)
+    // deleted, compared by whether operator new hands it out again.
+    Results results("PanelSetInterface::DeletingDestructor, deleting (sub_8224AC98)");
+    for (int c = 0; c < 4; c++) {
+      Outputs out[2];
+      const uint64_t seed = h.random.Next();
+      for (int v = 0; v < 2; v++) {
+        Random r = Mixed(seed);
+        const auto block = memory::crt::OperatorNew(base, 64);
+        if (!block) {
+          ITC_LOG_ERROR("harness: car_list: operator new failed");
+          return;
+        }
+        WriteRandom(base, *block, 64, r);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = *block;
+        t.r4.u64 = (r.Next() & ~3ull) | (r.Below(2) == 0 ? 1 : 3);
+        ITC_FLAG(native_car_list) = v == 1;
+        (v == 0 ? __imp__sub_8224AC98 : hooks::CarListSetInterfaceDeletingDestruct)(t, base);
+        ITC_FLAG(native_car_list) = true;
+        out[v].Word(t.r3.u32 == *block ? 1 : 0);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        const auto probe = memory::crt::OperatorNew(base, 64);
+        out[v].Word(probe && *probe == *block ? 1 : 0);
+        if (probe) memory::crt::OperatorDelete(*probe);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
   // HandleInput: the pages -1, 5, 7 (BackPage7, the original through the
   // table) and 8.
   const auto input = [base, set](PPCContext& t, Random& r, const World& w) {

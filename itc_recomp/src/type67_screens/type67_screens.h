@@ -185,6 +185,32 @@ uint64_t PanelFadeIn(uint8_t* base, uint64_t passes, uint32_t sp, uint32_t lr,
 // r3 left.
 uint64_t MachineScreenDestruct(uint8_t* base, uint64_t r3);
 
+// The panel screens' destructors (panel_parts.cpp): the vtables they store.
+constexpr uint32_t kPanelGroupVtable = 0x82010E8C;
+constexpr uint32_t kType6PanelScreenVtable = 0x82010920;
+constexpr uint32_t kType7PanelScreenVtable = 0x82010E90;
+// sub_82231CC0 PanelGroup::~PanelGroup: +0 = PanelGroup's vtable, then
+// PanelGroupBase::~PanelGroupBase (its plain C++, a tail call). r3 left.
+uint64_t PanelGroupDestruct(uint8_t* base, uint64_t group);
+// sub_82240348 PanelGroup::DeletingDestructor: the same from a 112-byte
+// frame, then operator delete (a guest call) when bit 0 of `flags` is set.
+// r3 left.
+uint64_t PanelGroupDeletingDestruct(uint8_t* base, uint64_t group, uint64_t flags, uint32_t sp,
+                                    const Calls& calls);
+// sub_82230668 Type6PanelScreen::~Type6PanelScreen and sub_82240168
+// Type7PanelScreen::~Type7PanelScreen (96-byte frame): +0 = the screen's
+// vtable; GroupPair::~GroupPair on +11728, PanelSet::~PanelSet on +9752 (the
+// car list's plain C++, its MenuList::Release guest calls through `calls`),
+// PanelGroup::~PanelGroup on +9708, +9664 the same inline, then
+// MachineScreen::~MachineScreen. r3 the screen.
+uint64_t PanelScreenDestruct(uint8_t* base, uint64_t screen, bool type7, uint32_t sp,
+                             const Calls& calls);
+// sub_82230B00 Type6PanelScreen::DeletingDestructor (112-byte frame): the
+// destructor, then operator delete (a guest call) when bit 0 of `flags` is
+// set. r3 the screen.
+uint64_t Type6PanelScreenDeletingDestruct(uint8_t* base, uint64_t screen, uint64_t flags,
+                                          uint32_t sp, const Calls& calls);
+
 // --- The panel screens' slots (panel_parts.cpp) ---
 
 // sub_82230790 PanelScreen::IsLoaded: bit 0 of UiMovies::IsLoaded(4) AND

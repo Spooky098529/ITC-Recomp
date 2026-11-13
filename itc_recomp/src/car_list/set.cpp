@@ -2,6 +2,7 @@
 
 #include "car_list/car_list.h"
 
+#include "archive/archive.h"
 #include "base/log.h"
 #include "guest.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -80,6 +81,46 @@ uint64_t SaveData(uint8_t* base, uint32_t b, uint32_t sp) {
   // mullw: the low words' signed product, 64 bits; add.
   const int64_t offset = int64_t(int32_t(LoadU32(base, b + 1952))) * int64_t(120108);
   return uint64_t(LoadU32(base, kPairSaveData)) + uint64_t(offset);
+}
+
+// --- The destructors ---
+
+uint64_t GroupBaseDestruct(uint8_t* base, uint64_t group) {
+  ITC_NATIVE_RUNNING("sub_8224EF08 PanelGroupBase::~PanelGroupBase");
+  StoreU32(base, uint32_t(group), kPanelGroupBaseVtable);
+  archive::NodeDestruct(base, uint32_t(group));
+  return group;
+}
+
+uint64_t SetBaseDestruct(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224AE60 PanelSetBase::~PanelSetBase");
+  const uint32_t frame = sp - 96;
+  StoreU32(base, frame, sp);
+  StoreU32(base, uint32_t(b), kPanelSetBaseVtable);
+  calls.Call(kMenuListRelease, frame, 0x8224AE88, b + 132);
+  return calls.Call(kMenuListRelease, frame, 0x8224AE90, b + 60);
+}
+
+uint64_t SetDestruct(uint8_t* base, uint64_t set, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224B708 PanelSet::~PanelSet");
+  const uint32_t frame = sp - 96;
+  StoreU32(base, frame, sp);
+  StoreU32(base, uint32_t(set), kPanelSetVtable);
+  const uint64_t r3 = SetBaseDestruct(base, set + 4, frame, calls);
+  StoreU32(base, uint32_t(set), kPanelSetInterfaceVtable);
+  return r3;
+}
+
+uint64_t SetInterfaceDeletingDestruct(uint8_t* base, uint64_t set, uint64_t flags, uint32_t sp,
+                                      const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224AC98 PanelSetInterface::DeletingDestructor");
+  const uint32_t frame = sp - 96;
+  StoreU32(base, frame, sp);
+  StoreU32(base, uint32_t(set), kPanelSetInterfaceVtable);
+  if (flags & 1) {
+    calls.Call(kOperatorDelete, frame, 0x8224ACC4, set, flags);
+  }
+  return set;
 }
 
 }  // namespace car_list

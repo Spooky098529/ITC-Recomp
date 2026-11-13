@@ -195,6 +195,33 @@ uint64_t PickedPage(uint8_t* base, uint64_t b);
 // ported) + 120,108 x +1952, else SaveData::Of(0).
 uint64_t SaveData(uint8_t* base, uint32_t b, uint32_t sp);
 
+// --- The destructors (set.cpp) ---
+
+// The vtables they store: PanelGroupBase's, PanelSetBase's, PanelSet's and
+// the interface's PanelSet leaves.
+constexpr uint32_t kPanelGroupBaseVtable = 0x82010974;
+constexpr uint32_t kPanelSetBaseVtable = 0x820110C4;
+constexpr uint32_t kPanelSetVtable = 0x820110C8;
+constexpr uint32_t kPanelSetInterfaceVtable = 0x82011018;
+// operator delete (its override).
+constexpr uint32_t kOperatorDelete = 0x825A70E8;
+
+// sub_8224EF08 PanelGroupBase::~PanelGroupBase: +0 = its vtable, then
+// ListNode::~ListNode (a tail call). r3 left.
+uint64_t GroupBaseDestruct(uint8_t* base, uint64_t group);
+// sub_8224AE60 PanelSetBase::~PanelSetBase (r3 = b): +0 = its vtable,
+// MenuList::Release on +132 and +60 (guest calls, from its 96-byte frame).
+// The last Release's r3.
+uint64_t SetBaseDestruct(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224B708 PanelSet::~PanelSet: +0 = its vtable, ~PanelSetBase on +4,
+// then +0 = the interface's vtable. r3 as ~PanelSetBase leaves it.
+uint64_t SetDestruct(uint8_t* base, uint64_t set, uint32_t sp, const Calls& calls);
+// sub_8224AC98 PanelSetInterface::DeletingDestructor: +0 = the interface's
+// vtable, operator delete (a guest call) when bit 0 of `flags` is set. r3
+// left.
+uint64_t SetInterfaceDeletingDestruct(uint8_t* base, uint64_t set, uint64_t flags, uint32_t sp,
+                                      const Calls& calls);
+
 // --- PanelSet's pages and steps (pages.cpp; r3 = b, a step's r4 its
 // first-pass word b + 56) ---
 

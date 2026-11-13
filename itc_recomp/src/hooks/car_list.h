@@ -79,6 +79,11 @@ void CarListToTabs(PPCContext& ctx, uint8_t* base);
 void CarListOpen(PPCContext& ctx, uint8_t* base);
 void CarListBaseFree(PPCContext& ctx, uint8_t* base);
 void CarListSetFree(PPCContext& ctx, uint8_t* base);
+// The destructors (r3 the object; r4 the flags for the deleting one).
+void CarListGroupBaseDestruct(PPCContext& ctx, uint8_t* base);
+void CarListSetBaseDestruct(PPCContext& ctx, uint8_t* base);
+void CarListSetDestruct(PPCContext& ctx, uint8_t* base);
+void CarListSetInterfaceDeletingDestruct(PPCContext& ctx, uint8_t* base);
 void CarListBaseHandleInput(PPCContext& ctx, uint8_t* base);
 void CarListSetHandleInput(PPCContext& ctx, uint8_t* base);
 void CarListBackPage8(PPCContext& ctx, uint8_t* base);

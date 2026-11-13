@@ -11,7 +11,11 @@
 
 ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "Run the type 6 and 7 panel screens' car list (docs/functions/car-list.md: "
-              "PanelGroup::SetCaption sub_8224EF18, PanelPart::FinishAll sub_82249CF0; the tabs' "
+              "PanelGroup::SetCaption sub_8224EF18, PanelPart::FinishAll sub_82249CF0; the "
+              "destructors PanelGroupBase::~PanelGroupBase sub_8224EF08, PanelSetBase::~PanelSetBase "
+              "sub_8224AE60 (MenuList::Release guest calls), PanelSet::~PanelSet sub_8224B708 and "
+              "PanelSetInterface::DeletingDestructor sub_8224AC98 (operator delete a guest call); "
+              "the tabs' "
               "TabPanel::SetCursorY sub_8224FD20 and SetButtons sub_8224FD90; the rows' "
               "RowPanel::SetRow sub_8224F018, SetArrows sub_8224F680, Unhighlight sub_8224F558 "
               "and Hide sub_8224F4C8; the colors' ColorPanel::Show sub_8224D010, Select "
@@ -147,6 +151,11 @@ ITC_CL_STEP(CarListCarPlaceCursor, cl::CarPlaceCursor(base, ctx.r3.u64, ctx.r4.u
 ITC_CL_STEP(CarListCarSelect, cl::CarSelect(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
 ITC_CL_STEP(CarListCarStopArrows, cl::CarStopArrows(base, ctx.r3.u32, sp, calls))
 ITC_CL_STEP(CarListCarSetName, cl::CarSetName(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListGroupBaseDestruct, cl::GroupBaseDestruct(base, ctx.r3.u64))
+ITC_CL_STEP(CarListSetBaseDestruct, cl::SetBaseDestruct(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetDestruct, cl::SetDestruct(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetInterfaceDeletingDestruct,
+            cl::SetInterfaceDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_CL_STEP(CarListCarSetStats, cl::CarSetStats(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListCarSetCarName,
             cl::CarSetCarName(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp, calls))
@@ -318,6 +327,12 @@ ITC_CAR_LIST(82249730, CarListOpen)
 ITC_CAR_LIST(8224B880, CarListSetFree)
 ITC_CAR_LIST(8224CA28, CarListSetHandleInput)
 ITC_CAR_LIST(8224A3F8, CarListBackPage8)
+// The destructors (from the panel screens' destructors, PanelSetPair's and
+// the vtables' slot 0, recompiled; never seen in play).
+ITC_CAR_LIST(8224EF08, CarListGroupBaseDestruct)
+ITC_CAR_LIST(8224AE60, CarListSetBaseDestruct)
+ITC_CAR_LIST(8224B708, CarListSetDestruct)
+ITC_CAR_LIST(8224AC98, CarListSetInterfaceDeletingDestruct)
 ITC_CAR_LIST(82248F00, CarListStep2)
 ITC_CAR_LIST(8224A718, CarListStep3)
 ITC_CAR_LIST(82249098, CarListStep7)
