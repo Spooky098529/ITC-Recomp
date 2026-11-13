@@ -112,6 +112,10 @@ bool RecordUpdate(uint32_t function, PPCContext& ctx, uint8_t*) {
 uint32_t g_movie = 0;  // the harness's movie block (kMovieBytes)
 constexpr uint32_t kMovieBytes = 0xA100;
 constexpr uint32_t kFadeWords[3] = {ts::kFadeWait, ts::kFadeCountA, ts::kFadeCountB};
+// The screen fades' globals (ScreenFades::FadeIn writes them under
+// PanelFade::In): the durations, colors, alphas and counts, compared and put
+// back after.
+constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x3C;
 
 // The plain C++ with the recording calls.
 using NativeCall = std::function<uint64_t(PPCContext&, uint8_t*, const ts::Calls&)>;
@@ -197,6 +201,7 @@ void Cases(Context& h, const Block& world, const char* name, uint32_t address, i
       out[v].Bytes(Read(base, w, world.bytes));
       out[v].Bytes(Read(base, g_movie, kMovieBytes));
       for (const uint32_t g : kFadeWords) out[v].Word(guest::LoadU32(base, g));
+      out[v].Bytes(Read(base, kFades, kFadesBytes));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
     }
@@ -414,6 +419,26 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
        [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
          return ts::GroupPairFinishAll(b, t.r3.u64, t.r1.u32, c);
        }},
+      {"GroupPair::~GroupPair", 0x82249C20, 4, kPair, __imp__sub_82249C20,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::GroupPairDestruct(b, t.r3.u64);
+       }},
+      {"SingleGroup::SingleGroup", 0x82249CB0, 4, kPair, __imp__sub_82249CB0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::SingleGroupConstruct(b, t.r3.u64, t.r4.u32);
+       }},
+      {"SingleGroup::Reset", 0x82249CC8, 8, kPair, __imp__sub_82249CC8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::SingleGroupReset(b, t.r3.u64, t.r1.u32, c);
+       }},
+      {"PanelFade::In", 0x82249BE8, 8, 0, __imp__sub_82249BE8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelFadeIn(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"MachineScreen::~MachineScreen", 0x8224CB18, 4, 0, __imp__sub_8224CB18,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::MachineScreenDestruct(b, t.r3.u64);
+       }},
       {"PanelScreen::IsLoaded", 0x82230790, 8, 0, __imp__sub_82230790,
        [](PPCContext& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenIsLoaded(b, t.r1.u32);
@@ -628,9 +653,11 @@ void Type67Screens(Context& h) {
   }
   uint32_t saved_fades[3];
   for (int i = 0; i < 3; i++) saved_fades[i] = guest::LoadU32(h.base, kFadeWords[i]);
+  const std::vector<uint8_t> saved_fade_block = Read(h.base, kFades, kFadesBytes);
   ListAndNodeScreens(h, world, movie.address);
   PanelScreens(h, world, movie.address);
   PickCar(h, world);
+  Write(h.base, kFades, saved_fade_block.data(), kFadesBytes);
   for (int i = 0; i < 3; i++) guest::StoreU32(h.base, kFadeWords[i], saved_fades[i]);
 }
 

@@ -160,6 +160,31 @@ uint64_t GroupPairWaitForFade(uint8_t* base, uint64_t r3);
 // group B's movie.
 uint64_t GroupPairFinishAll(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
+// The vtables the destructors and the one-group holder's constructor store:
+// the group pair's base's, the one-group holder's, MachineScreen's.
+constexpr uint32_t kGroupPairBaseVtable = 0x82011064;
+constexpr uint32_t kSingleGroupVtable = 0x820110A4;
+constexpr uint32_t kMachineScreenVtable = 0x82011168;
+// ScreenFades::FadeIn (its override).
+constexpr uint32_t kScreenFadeIn = 0x8209D038;
+
+// sub_82249C20 GroupPair::~GroupPair: +0 = the base's vtable. r3 left.
+uint64_t GroupPairDestruct(uint8_t* base, uint64_t r3);
+// sub_82249CB0 SingleGroup::SingleGroup (r4 the group): +4 = it, +0 =
+// 0x820110A4. r3 left.
+uint64_t SingleGroupConstruct(uint8_t* base, uint64_t r3, uint32_t group);
+// sub_82249CC8 SingleGroup::Reset: UiMovie::ResetPose on the movie of the
+// group at +4.
+uint64_t SingleGroupReset(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82249BE8 PanelFade::In (r3 the passes): [0x82815EB0] = 1, then a tail
+// call of ScreenFades::FadeIn(passes, 0, 0, 0, 0) from `sp` returning to
+// `lr`.
+uint64_t PanelFadeIn(uint8_t* base, uint64_t passes, uint32_t sp, uint32_t lr,
+                     const Calls& calls);
+// sub_8224CB18 MachineScreen::~MachineScreen: +0 = MachineScreen's vtable.
+// r3 left.
+uint64_t MachineScreenDestruct(uint8_t* base, uint64_t r3);
+
 // --- The panel screens' slots (panel_parts.cpp) ---
 
 // sub_82230790 PanelScreen::IsLoaded: bit 0 of UiMovies::IsLoaded(4) AND

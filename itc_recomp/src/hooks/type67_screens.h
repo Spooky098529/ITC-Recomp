@@ -47,6 +47,11 @@ void GroupPairReset(PPCContext& ctx, uint8_t* base);
 void GroupPairRun(PPCContext& ctx, uint8_t* base);
 void GroupPairWaitForFade(PPCContext& ctx, uint8_t* base);
 void GroupPairFinishAll(PPCContext& ctx, uint8_t* base);
+void GroupPairDestruct(PPCContext& ctx, uint8_t* base);
+void SingleGroupConstruct(PPCContext& ctx, uint8_t* base);
+void SingleGroupReset(PPCContext& ctx, uint8_t* base);
+void PanelFadeIn(PPCContext& ctx, uint8_t* base);
+void MachineScreenDestruct(PPCContext& ctx, uint8_t* base);
 
 // The panel screens' slots and handlers (Type7PanelScreen::DrawList
 // sub_82240908 has no adapter: only Type7PanelScreen::Draw calls it).

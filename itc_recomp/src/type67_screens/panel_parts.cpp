@@ -83,6 +83,43 @@ uint64_t GroupPairFinishAll(uint8_t* base, uint64_t r3, uint32_t sp, const Calls
   return calls.call(kFinishAll, frame, 0x82249C9C, movie_b, frame - 96 + 80);
 }
 
+uint64_t GroupPairDestruct(uint8_t* base, uint64_t r3) {
+  ITC_NATIVE_RUNNING("sub_82249C20 GroupPair::~GroupPair");
+  StoreU32(base, uint32_t(r3), kGroupPairBaseVtable);
+  return r3;
+}
+
+uint64_t SingleGroupConstruct(uint8_t* base, uint64_t r3, uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_82249CB0 SingleGroup::SingleGroup");
+  StoreU32(base, uint32_t(r3) + 4, group);
+  StoreU32(base, uint32_t(r3), kSingleGroupVtable);
+  return r3;
+}
+
+uint64_t SingleGroupReset(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82249CC8 SingleGroup::Reset");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t movie =
+      uint32_t(PanelGroupMovie(base, LoadU32(base, uint32_t(r3) + 4), frame));
+  // r4 as PanelGroup::Movie leaves it (its frame's +80).
+  return calls.call(kResetPose, frame, 0x82249CE0, movie, frame - 96 + 80);
+}
+
+uint64_t PanelFadeIn(uint8_t* base, uint64_t passes, uint32_t sp, uint32_t lr,
+                     const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82249BE8 PanelFade::In");
+  StoreU32(base, kFadeWait, 1);
+  // A tail call of ScreenFades::FadeIn(passes, 0, 0, 0, 0).
+  const uint64_t args[6] = {passes, 0, 0, 0, 0, 0};
+  return calls.call_set(kScreenFadeIn, args, 5, sp, lr);
+}
+
+uint64_t MachineScreenDestruct(uint8_t* base, uint64_t r3) {
+  ITC_NATIVE_RUNNING("sub_8224CB18 MachineScreen::~MachineScreen");
+  StoreU32(base, uint32_t(r3), kMachineScreenVtable);
+  return r3;
+}
+
 // --- The panel screens' slots ---
 
 uint64_t PanelScreenIsLoaded(uint8_t* base, uint32_t sp) {

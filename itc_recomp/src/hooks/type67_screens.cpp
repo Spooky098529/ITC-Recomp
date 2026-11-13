@@ -31,7 +31,9 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "OpenPowerGraph sub_822408B8, CarList sub_82240238, CarEntry sub_82240248 and "
               "CarSlot sub_82240258; the group pair's GroupPair::SelectA sub_82249C30, Reset "
               "sub_82249C40, Run sub_82249BE0, WaitForFade sub_82249BA8 and FinishAll "
-              "sub_82249C70, PanelGroup::Movie sub_82258FC8 and Run sub_82259008 "
+              "sub_82249C70, GroupPair::~GroupPair sub_82249C20, SingleGroup::SingleGroup "
+              "sub_82249CB0 and Reset sub_82249CC8, PanelFade::In sub_82249BE8 (ScreenFades::FadeIn "
+              "a guest call), MachineScreen::~MachineScreen sub_8224CB18, PanelGroup::Movie sub_82258FC8 and Run sub_82259008 "
               "(UiMovie::ResetPose, FinishAll and Run guest calls to their overrides); their "
               "vtable calls to the plain C++ where a slot holds one, else guest calls (the car "
               "list's); UiMovies::Open and Delete natively where their adapters would, "
@@ -91,6 +93,11 @@ ITC_TS_STEP(GroupPairReset, ts::GroupPairReset(base, ctx.r3.u64, ctx.r1.u32, cal
 ITC_TS_STEP(GroupPairRun, ts::GroupPairRun(base, ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(GroupPairWaitForFade, ts::GroupPairWaitForFade(base, ctx.r3.u64))
 ITC_TS_STEP(GroupPairFinishAll, ts::GroupPairFinishAll(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(GroupPairDestruct, ts::GroupPairDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(SingleGroupConstruct, ts::SingleGroupConstruct(base, ctx.r3.u64, ctx.r4.u32))
+ITC_TS_STEP(SingleGroupReset, ts::SingleGroupReset(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelFadeIn, ts::PanelFadeIn(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(MachineScreenDestruct, ts::MachineScreenDestruct(base, ctx.r3.u64))
 
 ITC_TS_STEP(PanelScreenIsLoaded, ts::PanelScreenIsLoaded(base, ctx.r1.u32))
 ITC_TS_STEP(Type6PanelScreenOpenMovies, ts::PanelScreenOpenMovies(base, ctx.r1.u32, false, calls))
@@ -164,6 +171,15 @@ ITC_TYPE67_SCREENS(82249C40, GroupPairReset)
 ITC_TYPE67_SCREENS(82249BE0, GroupPairRun)
 ITC_TYPE67_SCREENS(82249BA8, GroupPairWaitForFade)
 ITC_TYPE67_SCREENS(82249C70, GroupPairFinishAll)
+// The group pair's destructor, the one-group holder's constructor and
+// Reset (its vtable's slot 5), the panel fade in and MachineScreen's
+// destructor (from the type 6, 7 and 8 panel screens' functions,
+// recompiled; never seen in play).
+ITC_TYPE67_SCREENS(82249C20, GroupPairDestruct)
+ITC_TYPE67_SCREENS(82249CB0, SingleGroupConstruct)
+ITC_TYPE67_SCREENS(82249CC8, SingleGroupReset)
+ITC_TYPE67_SCREENS(82249BE8, PanelFadeIn)
+ITC_TYPE67_SCREENS(8224CB18, MachineScreenDestruct)
 // The panel screens' vtable slots.
 ITC_TYPE67_SCREENS(82230790, PanelScreenIsLoaded)
 ITC_TYPE67_SCREENS(82230758, Type6PanelScreenOpenMovies)
