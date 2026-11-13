@@ -26,7 +26,11 @@
 // PoolSizes (sub_820F2030) and Init (sub_820F1360) and SceneryList::LoadAll
 // (sub_820F1598); and, since Scenery::Unload and Destroy are native (B7
 // loop, 2026-11-12), ObjectPools::Shutdown (sub_820FBDC8) and Scenery::
-// ClearGlobal (sub_820F1480).
+// ClearGlobal (sub_820F1480); and, since the pools' loads and CourseSet::
+// OnLoaded are native (B7 loop, 2026-11-12), PoolObject::AllocData
+// (sub_820FB8B8), ClearLoadFlags (sub_820FB998) and MarkLoaded
+// (sub_820FB9A8), Scenery::AllocPhysical (sub_820F1490) and FreePhysical
+// (sub_820F14E8) and CourseSet::Parse (sub_820F1A70).
 
 #include "guest.h"
 
@@ -41,9 +45,9 @@
 
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "Run the course scenery (docs/functions/course-scenery.md: PoolObject::AllocData "
-              "sub_820FB8B8, InUse sub_820FB8E0 (no adapter), IsLoaded sub_820FB8F0 (no adapter), IsVisible sub_820FB908, "
+              "sub_820FB8B8 (no adapter), InUse sub_820FB8E0 (no adapter), IsLoaded sub_820FB8F0 (no adapter), IsVisible sub_820FB908, "
               "IsExpiring sub_820FB920, SetVisible sub_820FB938 (no adapter), SetExpiring sub_820FB968 (no adapter), "
-              "ClearLoadFlags sub_820FB998, MarkLoaded sub_820FB9A8, Reset sub_820FB9D8, Key "
+              "ClearLoadFlags sub_820FB998 (no adapter), MarkLoaded sub_820FB9A8 (no adapter), Reset sub_820FB9D8, Key "
               "sub_820FB9F0, PoolObject sub_820FBB20 (no adapter), SetKey sub_820FBA00, KeyEquals "
               "sub_820FBA60, AreaLights::Key sub_820F1C20, AreaModel::Key sub_820F1CD8, "
               "ObjectPools::Pool sub_820FBB10, Object sub_820FC0E8 (no adapter), Acquire sub_820FBF08 (no adapter), Find "
@@ -52,7 +56,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820F2030 (no adapter) (Archive::AssetSize's plain C++), SceneryList::Clear "
               "sub_820F1588 (no adapter), Add sub_820F1888 (no adapter), Sort sub_820F1930 (no adapter), "
               "Scenery::LimitLargeModels sub_820F2B80 (no adapter), ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480 (no adapter), "
-              "Scenery::AllocPhysical sub_820F1490 and FreePhysical sub_820F14E8 (with the native "
+              "Scenery::AllocPhysical sub_820F1490 and FreePhysical sub_820F14E8 (no adapters; with the native "
               "heap; XPhysicalSize answered by the layer), Scenery::Create sub_820F2F88 and Setup "
               "sub_820F3020 with SetupPools sub_820F2720 (no adapter: only Setup calls it; with "
               "--native_models' lifetime and memcpy native), Scenery::Init sub_820F1360 (no adapter), "
@@ -73,7 +77,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
               "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, "
               "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
-              "sub_820F1C30; with --native_models CourseSet::Parse sub_820F1A70, AreaModel::Parse "
+              "sub_820F1C30; with --native_models CourseSet::Parse sub_820F1A70 (no adapter), AreaModel::Parse "
               "sub_820F1258 (no adapter: only its OnLoaded calls it) and OnLoaded sub_820F1CE8, "
               "Scenery::MakePoolObject sub_820F2638 (with CourseSet::CourseSet sub_820F2478, "
               "CourseSet::InitParts sub_820F2230 and AreaModel::AreaModel sub_820F1C68, no "
@@ -87,7 +91,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20, sub_820F1588, sub_820F1930, "
               "sub_820F16C0, sub_820F17C0, sub_820F2B80, sub_820F3098, sub_820F32D0, sub_820FB938, "
               "sub_820FB8E0, sub_820FB8F0, sub_820FB968, sub_820FC0E8, sub_820FBF08, sub_820FBE80, "
-              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20, sub_820FBDC8, sub_820F1480");
+              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20, sub_820FBDC8, sub_820F1480, sub_820FB8B8, sub_820FB998, sub_820FB9A8, sub_820F1490, sub_820F14E8, sub_820F1A70");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -173,10 +177,6 @@ bool hooks::CourseScenerySetUpNative() {
 
 // --- Pool objects: r3 = the object ---
 
-// r3 = the object's +4, r4 = a size.
-ITC_COURSE_SCENERY(820FB8B8, ctx.r3.u64 = AllocData(base, ctx.r3.u32, ctx.r4.u32))
-ITC_COURSE_SCENERY(820FB998, ClearLoadFlags(base, ctx.r3.u32))
-ITC_COURSE_SCENERY(820FB9A8, MarkLoaded(base, ctx.r3.u32))
 // The vtables' slots stay reached through them: the reset (slot 2 of the
 // base and pool 3's) and the keys (slot 0), r4 = &the size.
 ITC_COURSE_SCENERY(820FB9D8, ResetObject(base, ctx.r3.u32))
@@ -194,18 +194,6 @@ ITC_COURSE_SCENERY(820F1CD8, uint32_t size = 0;
 
 // --- The scenery's lists ---
 
-// Scenery::AllocPhysical: r3 = a size; returns the block. Scenery::
-// FreePhysical: r3 = a block; r3 = 0, as XPhysicalFree leaves it. The
-// originals run when the native heap isn't active (the layer answers the
-// blocks' sizes only for blocks it gave).
-extern "C" REX_FUNC(sub_820F1490) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive()) {
-    __imp__sub_820F1490(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = AllocPhysical(base, ctx.r3.u32);
-}
 // Scenery::Create: no arguments; r3 as Init leaves it. Scenery::Setup: r3 =
 // the manager, r4 = the configuration; r3 = the visible areas' block. The
 // originals run where their plain C++ may not (CourseScenerySetUpNative).
@@ -226,15 +214,6 @@ extern "C" REX_FUNC(sub_820F3020) {
   }
   ITC_SCENERY_CALLS;
   ctx.r3.u64 = Setup(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
-}
-extern "C" REX_FUNC(sub_820F14E8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive()) {
-    __imp__sub_820F14E8(ctx, base);
-    return;
-  }
-  FreePhysical(base, ctx.r3.u32);
-  ctx.r3.u64 = 0;
 }
 // Scenery::Unload: r3 = the manager; r3 as the original leaves it (the
 // manager + 116). From the race scene's sub_8215AA88 and the front end's
@@ -338,18 +317,6 @@ bool NativeParses() {
 }
 
 }  // namespace
-
-// CourseSet::Parse: r3 = the course set; r3 as the original leaves it.
-extern "C" REX_FUNC(sub_820F1A70) {
-  REX_FUNC_PROLOGUE();
-  if (!NativeParses()) {
-    __imp__sub_820F1A70(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ITC_SCENERY_CALLS;
-  ctx.r3.u64 = CourseSetParse(base, calls, ctx.r1.u32, ctx.r3.u32);
-}
 
 // AreaLights::OnLoaded (Archive::Load's callback): r6 = the area's lights;
 // r3 = them, as PoolObject::MarkLoaded leaves it.
