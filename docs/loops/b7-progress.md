@@ -307,8 +307,14 @@ file's history. What's left to see in a drive, from every run:
   and 7 modes' power graph screen machine, its handlers, pages, steps,
   texts and the members' slots (inferred, "probably"); 15 ready groups;
   pages, steps and slots before their table callers; no leads; no
-  subagents); map checked (0 errors, 15 ready groups). Migration agent
-  running.
+  subagents); map checked (0 errors, 15 ready groups). Migration
+  acc7bc1a..2f90c6eb (three batches: 22 of 22 ours,
+  `--native_power_graph_screen`, the never-seen helpers ported; no
+  adapter removable (all reached through tables and vtables); harness
+  fixes on the way (movie 9 given 21 text records after a mutation
+  test went unseen; sub-scene 3 kept a leaf); harnesses 0 differing;
+  race 38 s at 40, 0 errors; no subagents). Left: none. Validation
+  agent running.
 
 ## Done
 

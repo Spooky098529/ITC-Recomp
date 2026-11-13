@@ -19,6 +19,12 @@ When the user has reviewed a run's section, its heading gets
   Init (no image read), marked "probably"; `power-graph.md`'s
   `0x82815EC0` writers corrected (four write 0); `known-data.md`'s
   `0x82815EB4`, `0x82815EB8` added.
+- Its migration (acc7bc1a..2f90c6eb, `--native_power_graph_screen`):
+  22 of 22 ours; `SetTexts`' multiplier addresses corrected in the map
+  (0x6000 off); the empty `sub_82106540` call in `Update` left out, as
+  the type 2 dialog's; the harness checked with a temporary mutation
+  (first unseen, then 14 of 96 differing once movie 9 had 21 text
+  records).
 - `HandleInput` and `Command21` (2787b4aa..658969d6, no mapping):
   `HandleInput` Overridden (a vtable slot), `Input0` Merged,
   `Command21` Native under `--native_tuning_screen`; 29 adapters
