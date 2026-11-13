@@ -741,9 +741,6 @@ void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_TUNING_PAGES(821CDF98, TuningPagesTestAndSetWheelFlag)
-ITC_TUNING_PAGES(821FE6A0, TuningPagesFreeTexture)
-ITC_TUNING_PAGES(821F89B8, TuningPagesRestoreStickerTexture)
-ITC_TUNING_PAGES(82204730, TuningPagesBindVinylTexture)
 ITC_TUNING_PAGES(821D84F8, TuningPagesEnterEditor)
 
 ITC_TUNING_PAGES(82203F20, TuningPagesStoreVinyls)
@@ -769,10 +766,6 @@ ITC_TUNING_PAGES(821D6E20, TuningPagesInputLevels)
 ITC_TUNING_PAGES(821D74A0, TuningPagesInputTypes)
 
 ITC_TUNING_PAGES(821FE608, TuningPagesOnImageLoaded)
-ITC_TUNING_PAGES(821FE960, TuningPagesReloadImage)
-ITC_TUNING_PAGES(821FEAF0, TuningPagesLoadWindow)
-ITC_TUNING_PAGES(821FED30, TuningPagesScrollImages)
-ITC_TUNING_PAGES(821FE740, TuningPagesFreeKept)
 ITC_TUNING_PAGES(82202928, TuningPagesInputVinylView)
 ITC_TUNING_PAGES(82204B70, TuningPagesInputVinylPages)
 ITC_TUNING_PAGES(82206A50, TuningPagesInputDecalPosition)
@@ -781,6 +774,12 @@ ITC_TUNING_PAGES(82207320, TuningPagesInputDecalScale)
 ITC_TUNING_PAGES(82205110, TuningPagesInputLayerEdit)
 ITC_TUNING_PAGES(82208CE0, TuningPagesInputVinylLayers)
 ITC_TUNING_PAGES(822058F8, TuningPagesInputVinylImages)
+
+// No adapters (removed, B7 loop, 2026-11-13: their callers in play are all
+// native and call their plain C++; the register steps above are the
+// harness's): DecalImages::FreeTexture sub_821FE6A0, RestoreStickerTexture
+// sub_821F89B8, BindVinylTexture sub_82204730, Reload sub_821FE960,
+// LoadWindow sub_821FEAF0, Scroll sub_821FED30, FreeKept sub_821FE740.
 
 // No adapter (B7 loop, 2026-11-13: its only caller, InputVinylView, is native
 // and calls its plain C++; the register step above is the harness's):
