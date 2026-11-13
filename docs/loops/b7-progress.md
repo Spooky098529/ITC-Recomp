@@ -115,7 +115,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 5 of 10: the sticker editor's input pages (the tuning
   screen's states 38 to 46 and 49, `tuning-pages.md`; none seen in
   play, ported by the 2026-11-12 call; the previous run's "Next"); its
-  line deleted from `leads.md`. Mapping agent running.
+  line deleted from `leads.md`. Mapped `sticker-editor.md` (680da961:
+  25 rows, none in play, so `b7_status.py` doesn't list it, as for the
+  never-seen files of the last run; 23 ready groups judged by reading
+  their callees, `UiMovie::Unloop` `sub_8211DE28` to port with them;
+  the update's sticker commands 32 to 51 ready after; no leads added).
+  Check passed. Migration agent running.
 
 ## Done
 

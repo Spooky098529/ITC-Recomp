@@ -89,6 +89,13 @@ When the user has reviewed a run's section, its heading gets
   stand-in getters, so the direct path is checked by the new
   `RenderManagerSlotDirect` and `TextureProviderSlotDirect` groups. Left
   out of scope: `app_camera.cpp`'s guest calls to `sub_82094320`.
+- The sticker editor's map (680da961, `sticker-editor.md`, 25 rows,
+  none seen in play): the ten input pages (states 38 to 46 and 49) and
+  their helpers; mentions in `tuning-screen.md`, `tuning-pages.md`,
+  `ui-movies-game.md` updated; the owned-sticker bits at save data
+  +0x199A8 and four tables in `known-data.md`. Original quirks noted
+  for the port: a -1 index reading the word before the T table, loops
+  that never end when no sticker is owned.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
