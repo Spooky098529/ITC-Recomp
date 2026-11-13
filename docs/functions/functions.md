@@ -593,7 +593,9 @@ Rows not yet moved stay in the table below. So far:
   record, the wheels and tire grades the tuning screen picks (their
   numbers, colors and sizes in the record, the axles refitted, the second
   wheels), and the record setters for the parts, the interior, the decal
-  placements and the lights, each followed by the model's re-apply (B7).
+  placements and the lights, each followed by the model's re-apply, and
+  the setters the tuning screen reaches for the paint, the stickers and
+  the aero sets (B7).
 - [`build-screen.md`](build-screen.md): the 21 transitions of the
   front-end screen whose update is `sub_821A1380` (probably a car shop):
   its groups by category, a group's builds, one build put on the stand

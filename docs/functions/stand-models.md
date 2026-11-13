@@ -42,7 +42,11 @@ Shared, with rows elsewhere: `SceneModel::ApplyRecord`,
 `sub_820CD5C8`, `race-setup.md`); `CarData::CarData` (`sub_820AEF80`,
 `car-physics.md`); `memcpy` (`sub_825A7410`, `c-runtime.md`);
 `GarageStage::ReapplyRecord`, `ReapplyRecordNoDecals`, `FitCar`
-(`sub_82178DF8`, `sub_82178E60`, `sub_82178C40`, `car-makers.md`).
+(`sub_82178DF8`, `sub_82178E60`, `sub_82178C40`, `car-makers.md`); `SceneModel::ApplyPaint` (`sub_820D9B68`, `load-poll.md`);
+`Params::GetCarParts`, `AeroParts::Get82` (`sub_820C9E00`,
+`sub_820CBC90`, `car-specs.md`); `GarageStage::SetColor`
+(`sub_8217C6C8`, `tuning-screen.md`: it picks one of the six
+`SetColor` pieces below by r4).
 
 Not here: the screens that call these (the tuning screen's handlers
 `sub_821E0E00`, `sub_821E07B0`, `sub_821E0FB0`, `sub_821D9F10`,
@@ -50,6 +54,36 @@ Not here: the screens that call these (the tuning screen's handlers
 `sub_8218E368`, `sub_822338E8`, `sub_82243E80`, `sub_822042D8`; leads in
 `../loops/leads.md`); the interior's set-up `sub_820E38E0` under
 `SceneModel::ApplyInterior` (not seen in play, not read).
+
+The stand's setters the tuning screen reaches (mapped 2026-11-13 by the
+B7 loop's mapping agent, the forty-sixth run; none seen in play, rows
+written by the user's 2026-11-12 call): `GarageStage::SetColor`'s six
+pieces, `GarageStage::SetSticker` (`TuningScreen::ApplyAreaDecals`'
+callee) and `GarageStage::SetAeroSet` (`TuningScreen::PreviewParts`'),
+with `GarageStage::SetDecalWord` (`TuningScreen::ApplyDecalWord`'s,
+mapped before). Ready (judged by reading, as `b7_groups.py` refuses
+roots that never ran): each calls only functions with plain C++ of ours
+(`ScenePools::GetB`, `SaveData::Of`, `SceneModel::ApplyPaint`,
+`ApplyWheelPaint`, `ReloadDecals`, `ApplyRecord`, `Params::GetCarParts`,
+`AeroParts::Get82`, `memcpy`), so all nine are ready, each its own group
+(the six pieces under `GarageStage::SetColor`, which is then ready too).
+Once they are ours, `TuningScreen::UpdateStand`'s last three recompiled
+callees (`GarageStage::SetColor`, `TuningScreen::ApplyAreaDecals`,
+`TuningScreen::ApplyDecalWord`, `tuning-screen.md`) and
+`TuningScreen::PreviewParts` (with `GarageStage::SetParts`, ready since
+its callee `ApplyRecord` is ours) call only native code: every other
+callee of theirs (`GarageStage::ReloadDecals`, `FitSelectedCar`,
+`SetCar`, `Command`, `GarageStage::CameraCommand` `sub_821808F0`,
+`Car::Init`, `Car::Refresh`, `memcpy`) already has plain C++. Notes for
+the migration: `SetColor` is called only with r4 0, 1 and 2 (both
+callers pass constants), so the pieces for 3 to 5 are unreachable in
+the game's code (their rows say so; porting them with `SetColor`'s
+switch keeps the original's shape); `SetSticker` stores r8 and r9 into
+its caller's parameter area (the caller's r1 + 56 to + 71) and reads its
+16-byte size argument from the caller's r1 + 96 (`ApplyAreaDecals`
+`memcpy`s it there); `SetAeroSet` builds its parts pointers and a
+24-byte table entry on its 224-byte frame. Nothing here needs a call the
+user hasn't made.
 
 Ready (by `b7_groups.py`, 2026-11-06): `GarageStage::MakeModel`;
 `TuningScreen::StepSecondWheels` (with `GarageStage::SecondWheelsPending`,
@@ -149,7 +183,15 @@ Status:
 | `sub_821792B0` | `GarageStage::SetAccessory` (probably) | | Not seen in play. r3 = the holder, r4, r5 = two words: the stage's scene model +3916 = r4 (the interior record's +112, the accessory, 3 none), +3920 = r5 (+116); `SceneModel::ApplyInterior` (a tail call). Read in full. |
 | `sub_820D9F40` | `SceneModel::ApplyInterior` (probably) | | Not seen in play. r3 = a scene model: `sub_820E38E0([+5068], r3 + 3804)` (the interior, its record; not read; a tail call). Only caller `GarageStage::SetAccessory`. Read in full. |
 | `sub_82179310` | `GarageStage::SetChoice` (probably) | | Not seen in play. r3 = the holder, r4 = a choice (0 to 5), r5, r6 = two words: the record's choice r4 (+3780 + 12 × r4) = (1, r5, r6); then `SceneModel::ApplyRecord`. Callers `sub_821E07B0` (3 calls), `sub_821E0FB0` (both seen; this call's path not taken). Read in full. |
-| `sub_821793D0` | `GarageStage::SetDecalWord` (probably) | | Not seen in play. r3 = the holder, r4 = a word: the stage's scene model +3740 (the record's +3708) = r4; `SceneModel::ReloadDecals` on the model (fetched again). Read in full. |
+| `sub_821793D0` | `GarageStage::SetDecalWord` (probably) | | Not seen in play. r3 = the holder, r4 = a word: the stage's scene model +3740 (the record's +3708) = r4; `SceneModel::ReloadDecals` on the model (fetched again with `ScenePools::GetB`). A 112-byte frame (`__savegprlr_29`). Only caller `TuningScreen::ApplyDecalWord` (`sub_821FE4E0`, `tuning-screen.md`: 1 for +10012 9, 0 for 10). Read in full. Ready (2026-11-13, by reading: `GetB` and `ReloadDecals` have plain C++). |
+| `sub_8217B078` | `GarageStage::SetColor0` (probably) | | Not seen in play. r3 = the holder, f1 to f3 = three floats. A 128-byte frame (f29 to f31 saved at -32 to -16, lr at -8). m = the stage's scene model (`ScenePools::GetB([0x826C2E44], 7, [holder] +8)`); (f1, f2, f3, `[0x82000A30]` 1.0) rounded to single and written to frame +80 to +95, then copied as two doublewords to m +64 to +79 (the record's +32, the car record's +16, the first paint value); then `SceneModel::ApplyPaint(m)` (`load-poll.md`), its r3 returned. Only caller `GarageStage::SetColor` (`sub_8217C6C8`, `tuning-screen.md`, r4 0, by a tail branch). Read in full. |
+| `sub_8217B108` | `GarageStage::SetColor1` (probably) | | Not seen in play. As `GarageStage::SetColor0` on m +80 to +95 (the second paint value), then `SceneModel::ApplyPaint(m)`. Only caller `GarageStage::SetColor` (r4 1). Read in full. |
+| `sub_8217B198` | `GarageStage::SetColor2` (probably) | | Not seen in play. As `GarageStage::SetColor0` on m +96 to +111 (the third paint value), then `SceneModel::ApplyPaint(m)`. Only caller `GarageStage::SetColor` (r4 2). Read in full. |
+| `sub_8217B228` | `GarageStage::SetColor3` (probably) | | Not seen in play. As `GarageStage::SetColor0` on m +64 to +79 (the first body paint value, not a wheel one), then `SceneModel::ApplyWheelPaint(m)` (`load-poll.md`), which reads the wheels' values at m +112 to +207: so the color written isn't the one applied (it shows only at the next `ApplyPaint`); the original's, kept (B7 changes no behavior). Only caller `GarageStage::SetColor` (r4 3), which no caller passes (`TuningScreen::UpdateStand` and `RestoreStand` pass 0 to 2 as constants): unreachable in the game's code. Read in full (2026-11-13, the store offsets checked against `SetColor0`'s). |
+| `sub_8217B2B8` | `GarageStage::SetColor4` (probably) | | Not seen in play. As `GarageStage::SetColor3` on m +80 to +95, then `SceneModel::ApplyWheelPaint(m)`. Only caller `GarageStage::SetColor` (r4 4, which no caller passes: unreachable). Read in full. |
+| `sub_8217B348` | `GarageStage::SetColor5` (probably) | | Not seen in play. As `GarageStage::SetColor3` on m +96 to +111, then `SceneModel::ApplyWheelPaint(m)`. Only caller `GarageStage::SetColor` (r4 5, which no caller passes: unreachable). Read in full. |
+| `sub_8217B3D8` | `GarageStage::SetSticker` (probably) | | Not seen in play. r3 = the holder, r4 = a sticker area a (0 to 7), r5 = a slot k (0 to 4 from its caller; not checked), r6 = a word (the sticker id, -1 for none), r7 = a flag (probably the flip), r8:r9 = a 16-byte position (x, y, 0, 1.0) in two registers, f1 = an angle (radians), the caller's stack word at r1 + 96 = a 16-byte size (s, s, 0, 1.0). A 128-byte frame (`__savegprlr_28`, f31 at -48); r8 and r9 stored first into the caller's parameter area (its r1 + 56 and + 64), the home slots, and read back from there. m = the stage's scene model (`ScenePools::GetB([0x826C2E44], 7, [holder] +8)`). By a: the record index i = k + 9, 15, 21, 27, 33, 39, 45 for a 0 to 6, k + 51 for any other a; a code c = 8, 2, 1, 3, 4, 7, 6 for a 0 to 6, else 5. e = m + 32 + 64 × i (the car record's sticker records at its +560 + 384a + 64k, eight groups of six, `../known-data.md`'s "car model"): e +0 = r6, +4 = r7, +8 = c, +16 to +31 = the position, +32 = f1 rounded to single, +48 to +63 = the size; e +12 and +36 to +47 are left as they were. No apply (its caller runs `GarageStage::ReloadDecals` after its five calls). r3 returned: m. Only caller `TuningScreen::ApplyAreaDecals` (`sub_821F7B90`, `tuning-screen.md`: clearing an area's five slots with (-1, 0, (0, 0, 0, 1), 0.0, (0, 0, 0, 1)), or setting them from the screen's sticker records, mirrored for areas 2 and 7). The lead's `GarageStage::SetAreaDecal`; renamed after the car model's sticker records. Read in full. |
+| `sub_8217DBC0` | `GarageStage::SetAeroSet` (probably) | | Not seen in play. r3 = the holder, r4 = an aero set s (0 or more; its caller passes its pick - 1), r5, r6 = two words used when the set's own are -1. A 224-byte frame (`__savegprlr_27`). m = the stage's scene model (`ScenePools::GetB`); g = `SaveData::Of(0)`; the selected garage car as `TuningScreen::SetUpCarData` finds it (`car-makers.md`: the halfword list from g + 6120 + 204 walked `[g + 0x19920]` steps, slot = the last node's halfword +2), its car id the word at g + 6120 + 1,968 × slot + 224. `Params::GetCarParts(frame + 80, id)` (`car-specs.md`), the nine pointers `memcpy`d to frame + 128 (36 bytes); `AeroParts::Get82(frame + 80, frame + 128, s + 1)` (table 82's record s + 1 of the car into frame + 80), w = its word +24 (read from the returned r3 before the next copy). Then `memcpy(frame + 80, 0x82009A50 + 24 × (2 × [m + 48] + s), 24)`: six words from a table in the image, two 24-byte entries per model block (m +48, the car record's +0; s not checked). The first four words go to m +3744, +3752, +3756, +3784 when not -1 (else those are left; the parts record words, as `GarageStage::SetParts`); the fifth to m +3764 and the sixth to m +3760, each replaced by r5 and r6 when -1. m +3768 = s + 1 when w & 8, else 0. Then `SceneModel::ApplyRecord(m)` (`scene-models.md`), its r3 returned. Only caller `TuningScreen::PreviewParts` (`sub_821CCAA8`, `tuning-screen.md`, for picks above 0, with r5 = +36368 and r6 its w). Read in full. |
 | `sub_821794A8` | `GarageStage::SetAero2` (probably) | | Not seen in play. As `GarageStage::SetAero` on the model's +3732 (the record's +3700). Callers `sub_821E07B0`, `sub_821E0FB0`. Read in full. |
 | `sub_821794F8` | `GarageStage::SetDoorKind` (probably) | | Not seen in play. As `GarageStage::SetAero` on the model's +3736 (the record's +3704; picks the door animations, `../known-data.md`'s "scene model"). Callers `sub_821E07B0`, `sub_821E0FB0`. Read in full. |
 | `sub_821795E0` | `GarageStage::ClearLightKit` (probably) | | Not seen in play. r3 = the holder, r4 = a group: the stage's scene model's pool 4 record words (`GarageStage::SetLightKit`, `front-end-car-draw.md`) = 0: 0 +4228, 1 +4244, 2 +4260, 3 all three; then `SceneModel::ApplyLightKit` (a tail call; also for other r4). Only caller `sub_821E0FB0`. Read in full. |
