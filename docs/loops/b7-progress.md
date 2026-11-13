@@ -120,7 +120,14 @@ file's history. What's left to see in a drive, from every run:
   never-seen files of the last run; 23 ready groups judged by reading
   their callees, `UiMovie::Unloop` `sub_8211DE28` to port with them;
   the update's sticker commands 32 to 51 ready after; no leads added).
-  Check passed. Migration agent running.
+  Check passed. Migrated eb20ef60..d84fa8b8: 25 of 25 ours (13
+  Native), with `UiMovie::Unloop`; `HandleInput` calls the pages'
+  plain C++; under `--native_tuning_pages`; every harness 0 differing,
+  race 31 s at 40 (the harnesses' time), 0 errors; a harness fault
+  fixed on the way (`InputStickerView`'s held buttons moved to the
+  stand world); two subagents, one at a time. Left: the update's
+  sticker commands 32 to 51 (ready, a second migration). Validation
+  agent running.
 
 ## Done
 

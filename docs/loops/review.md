@@ -96,6 +96,14 @@ When the user has reviewed a run's section, its heading gets
   +0x199A8 and four tables in `known-data.md`. Original quirks noted
   for the port: a -1 index reading the word before the T table, loops
   that never end when no sticker is owned.
+- Its migration (eb20ef60..d84fa8b8): 25 of 25 ours, under
+  `--native_tuning_pages` (`Unloop` under `--native_ui_movies_game`);
+  `InputStickerRotate`'s max angle corrected to `0x8200C54C` (359.0);
+  harness holes for callee register saves in dead stack and the
+  varargs `SetText` areas; `HandleInput`'s register step now disables
+  flush-to-zero (`PlaceStickerNode` runs under it); 3 adapters removed
+  by reading `generated/`'s call sites (the tool can't judge never-run
+  functions).
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
