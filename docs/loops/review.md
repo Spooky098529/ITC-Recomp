@@ -31,6 +31,16 @@ When the user has reviewed a run's section, its heading gets
   `sub_820AC9E8`" of `0x82002850` is slot 0 of the overlapping job base
   vtable `0x8200285C` (noted in the new row only); `known-data.md`'s
   `0x8296B910`/`B914`: `MorphShape` reads `0x8296B914` too.
+- The morph jobs' migration (752011b3..63bc5ef5): 21 of 21 ours,
+  `--native_morph_jobs` (the makers also need
+  `--native_c_runtime_heap`); `Model::MorphShape` calls the maker's
+  plain C++ when the maker's slot 1 is `0x820AC7F0`, the guest call
+  otherwise; the pool's post stays a guest call; `Morph::Blend`
+  (`second-set.md`) Native. `PoolMaker2::MakeMorphJob`'s adapter is kept
+  (reached through the maker's vtable) though its only caller in play
+  now bypasses it. Harness: `MorphJob::Run`'s cases compare the frame
+  window `Morph::Blend`'s own cases do, and r3 without a high word;
+  `MorphShape`'s cases use a stand-in maker.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

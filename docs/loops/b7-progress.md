@@ -35,7 +35,12 @@ file's history. What's left to see in a drive, from every run:
   shared 36-byte work item class at vtable `0x820066DC`; 13 ready
   groups; the pool's post `sub_82095A28` a guest call by the
   `DebugText`/`FramePasses` precedent; no leads added). Check passed.
-  Migration agent running.
+  Migrated 752011b3..63bc5ef5: all 21 rows ours (13 ready groups and 7
+  never-seen functions in one batch), `--native_morph_jobs`;
+  `Model::MorphShape` calls the maker's plain C++; `Morph::Blend`'s
+  adapter removed; 19 adapters kept (vtable slots); two harness faults
+  fixed on the way (r3's high word); every harness 0 differing, race
+  33 s at 40, 0 errors; no subagents. Validation agent running.
 
 ## Done
 
