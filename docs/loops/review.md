@@ -13,6 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The renderer's map (6d9bc131): `renderer.md`, 41 rows (9 moved from
+  `functions.md`). Corrections: the object at the scene's + 64 is the
+  render queue (`Scene::Update` calls `RenderQueue::Flip`; `Draw`'s
+  "slot 5" is `RenderQueue::Replay`). **For the user:** `sub_825BA380`
+  (CreateThread with a processor, `app-start-up.md`) is Dropped but
+  still runs in play through `Thread::Begin` (the render thread, the
+  worker pools); its row now says Dropped holds for `Voice::Init`'s
+  call only; the status is unchanged. `sub_824960E0` inside the movie
+  library's range is mapped (the game's own renderer interface calls
+  it).
 - The achievements' map (d06dc44a): `achievements.md`, 5 rows; the
   27-entry {kind, id} table and its companions in `known-data.md`.
   `Write` never ran in play (no achievement earned). The user's call
