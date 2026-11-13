@@ -1746,7 +1746,11 @@ void Screen0Helpers(Context& h, const Block& world) {
     // scene's children 4 (the menu's sub-scene) and 10 to 14 (the car's
     // texts) laid, the TXT nodes' text ids small; the screen's loading
     // word, page and menu blocks. `below`: the callee's register saves under
-    // the frame (ShowCarInfo's under Show's), left out.
+    // the frame (ShowCarInfo's under Show's), left out; since 2026-11-13
+    // also the recompiled callees' saves under a caller's frame where those
+    // callees have no adapters (ShowPage, the confirms, PlaceCursor,
+    // ShowHelp, PlayItem: the original runs them, the native their plain
+    // C++).
     int show = 0;
     bool type7 = false;
     uint32_t below = 0;
@@ -1782,14 +1786,14 @@ void Screen0Helpers(Context& h, const Block& world) {
       {"Type7Screen0::ShowHelp", 0x82244AB8, false, __imp__sub_82244AB8,
        hooks::Type7Screen0ShowHelp, 128, 32},
       {"Type6Screen0::OnDialogClosed", 0x82234768, true, __imp__sub_82234768,
-       hooks::Type6Screen0OnDialogClosed, 96, 16, 6},
+       hooks::Type6Screen0OnDialogClosed, 96, 16, 6, false, 0, false, 24},
       // A leaf; its tail call's (ShowPage's) frame compared.
       {"Type7Screen0::OnDialogClosed", 0x82244B60, false, __imp__sub_82244B60,
        hooks::Type7Screen0OnDialogClosed, 112, 24, 7},
       {"Type7Screen0::MenuPage", 0x82244BF8, true, __imp__sub_82244BF8,
-       hooks::Type7Screen0MenuPage, 112, 24, 0, true, 0, true},
+       hooks::Type7Screen0MenuPage, 112, 24, 0, true, 0, true, 24},
       {"Type6Screen0::MenuPage", 0x82234958, true, __imp__sub_82234958,
-       hooks::Type6Screen0MenuPage, 112, 24, 0, true, 0, false},
+       hooks::Type6Screen0MenuPage, 112, 24, 0, true, 0, false, 24},
       {"Type6Screen0::PlaceCursor", 0x82234428, false, __imp__sub_82234428,
        hooks::Type6Screen0PlaceCursor},
       {"Type6Screen0::ShowHelp", 0x822346A8, false, __imp__sub_822346A8,
@@ -1799,24 +1803,24 @@ void Screen0Helpers(Context& h, const Block& world) {
       {"Type7Screen0::PlayItem", 0x82244818, false, __imp__sub_82244818,
        hooks::Type7Screen0PlayItem, 112, 24, 0, false, 0, true, 0, Function::kAnimated},
       {"Type6Screen0::OpeningStep", 0x82234C20, false, __imp__sub_82234C20,
-       hooks::Type6Screen0OpeningStep, 128, 32, 0, false, 0, false, 0, Function::kAnimated},
+       hooks::Type6Screen0OpeningStep, 128, 32, 0, false, 0, false, 32, Function::kAnimated},
       {"Type7Screen0::OpeningStep", 0x82244E70, false, __imp__sub_82244E70,
-       hooks::Type7Screen0OpeningStep, 128, 32, 0, false, 0, true, 0, Function::kAnimated},
+       hooks::Type7Screen0OpeningStep, 128, 32, 0, false, 0, true, 32, Function::kAnimated},
       {"Type6Screen0::BackStep", 0x82234E38, false, __imp__sub_82234E38,
-       hooks::Type6Screen0BackStep, 128, 32, 0, false, 0, false, 0, Function::kAnimated},
+       hooks::Type6Screen0BackStep, 128, 32, 0, false, 0, false, 32, Function::kAnimated},
       {"Type7Screen0::BackStep", 0x822450A8, false, __imp__sub_822450A8,
-       hooks::Type7Screen0BackStep, 128, 32, 0, false, 0, true, 0, Function::kAnimated},
+       hooks::Type7Screen0BackStep, 128, 32, 0, false, 0, true, 32, Function::kAnimated},
       {"Type6Screen0::CursorStep", 0x82234D50, false, __imp__sub_82234D50,
-       hooks::Type6Screen0CursorStep, 144, 48, 0, false, 0, false, 0, Function::kAnimated},
+       hooks::Type6Screen0CursorStep, 144, 48, 0, false, 0, false, 32, Function::kAnimated},
       {"Type7Screen0::CursorStep", 0x82244FC0, false, __imp__sub_82244FC0,
-       hooks::Type7Screen0CursorStep, 144, 48, 0, false, 0, true, 0, Function::kAnimated},
+       hooks::Type7Screen0CursorStep, 144, 48, 0, false, 0, true, 32, Function::kAnimated},
       // A leaf with tail calls; ShowPage's frame compared.
       {"Type6Screen0::QuitPage", 0x82234BF0, false, __imp__sub_82234BF0,
-       hooks::Type6Screen0QuitPage, 112, 0, 0, false, 0, false, 0, Function::kQuit},
+       hooks::Type6Screen0QuitPage, 112, 24, 0, false, 0, false, 0, Function::kQuit},
       {"Type6Screen0::PowerGraphPage", 0x82234B80, false, __imp__sub_82234B80,
-       hooks::Type6Screen0PowerGraphPage, 96, 16, 0, false, 0, false, 0, Function::kGraph},
+       hooks::Type6Screen0PowerGraphPage, 96, 16, 0, false, 0, false, 24, Function::kGraph},
       {"Type7Screen0::PowerGraphPage", 0x82244E00, false, __imp__sub_82244E00,
-       hooks::Type7Screen0PowerGraphPage, 96, 16, 0, false, 0, true, 0, Function::kGraph},
+       hooks::Type7Screen0PowerGraphPage, 96, 16, 0, false, 0, true, 24, Function::kGraph},
       {"Type6Screen0::ShowCarInfo", 0x82233B70, false, __imp__sub_82233B70,
        hooks::Type6Screen0ShowCarInfo, 4064, 32, 0, false, 2, false},
       {"Type7Screen0::ShowCarInfo", 0x822440D8, false, __imp__sub_822440D8,
@@ -2183,7 +2187,22 @@ void Screen0Helpers(Context& h, const Block& world) {
         }
         const uint32_t frame = sp - f.frame;
         if (f.frame <= 1024) {
-          out[v].Bytes(Read(base, sp - 1024, frame - f.below - (sp - 1024)));
+          // Without the confirm's (MenuPage) or ShowHelp's (the steps)
+          // frame's +48 to +79 under this one, when the original runs it:
+          // UiMovie::SetText's unset varargs' words (r7 to r10 as the
+          // original leaves them, 0 from the plain C++: the user's call,
+          // 2026-10-30).
+          const uint32_t callee = f.menu                         ? 112
+                                  : f.extra == Function::kAnimated ? 128
+                                                                   : 0;
+          const uint32_t end = frame - f.below;
+          if (callee != 0) {
+            const uint32_t dead = frame - callee + 48;
+            out[v].Bytes(Read(base, sp - 1024, dead - (sp - 1024)));
+            out[v].Bytes(Read(base, dead + 32, end - (dead + 32)));
+          } else {
+            out[v].Bytes(Read(base, sp - 1024, end - (sp - 1024)));
+          }
         }
         out[v].Bytes(Read(base, frame + 4, 44));
         out[v].Bytes(Read(base, frame + 80, f.frame - 80 - f.saves));

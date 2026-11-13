@@ -163,6 +163,7 @@ uint64_t Screen0Confirm(uint8_t* base, const ConfirmKind& kind, uint32_t dispatc
     ITC_NATIVE_RUNNING("sub_82244528 Type7Screen0::Confirm");
   }
   const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);  // the back chain (stwu)
   const uint32_t movie = MovieAt(base, frame, 16);
   SetText(base, calls, frame, movie, 0xFFFFFFFF, 0, kind.text);
   SetText(base, calls, frame, movie, 1, 3, 2);
@@ -174,6 +175,7 @@ uint64_t Screen0Confirm(uint8_t* base, const ConfirmKind& kind, uint32_t dispatc
 
 uint64_t Type6Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822344A8 Type6Screen0::ShowPage");
+  StoreU32(base, sp - 112, sp);  // the back chain (stwu)
   const uint32_t movie = MovieAt(base, sp - 112, 22);
   Show(base, movie, 4, 1);
   Show(base, movie, 5, 1);
@@ -212,6 +214,7 @@ uint64_t Type6Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp) {
 
 uint64_t Type7Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82244930 Type7Screen0::ShowPage");
+  StoreU32(base, sp - 112, sp);  // the back chain (stwu)
   const uint32_t movie = MovieAt(base, sp - 112, 22);
   for (const uint32_t child : {4u, 5u, 6u, 7u}) {
     Show(base, movie, child, 1, 2);
@@ -244,6 +247,7 @@ uint64_t Screen0PlaceCursor(uint8_t* base, bool type7, uint64_t item, uint32_t s
     ITC_NATIVE_RUNNING("sub_82234428 Type6Screen0::PlaceCursor");
   }
   const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);  // the back chain (stwu)
   const uint32_t movie = MovieAt(base, frame, 22);
   const uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFF, type7 ? 3 : 4);
   // mulli and extsw, the doubleword through the frame's +80 (std, lfd,
@@ -264,6 +268,7 @@ uint64_t Screen0ShowHelp(uint8_t* base, bool type7, uint32_t item, uint32_t sp,
     ITC_NATIVE_RUNNING("sub_822346A8 Type6Screen0::ShowHelp");
   }
   const uint32_t frame = sp - 128;
+  StoreU32(base, frame, sp);  // the back chain (stwu)
   const uint32_t movie = MovieAt(base, frame, 22);
   static constexpr uint32_t kType6Texts[5] = {920, 921, 916, 917, 918};
   static constexpr uint32_t kType7Texts[4] = {919, 916, 917, 918};
@@ -336,6 +341,7 @@ uint64_t Screen0PlayItem(uint8_t* base, bool type7, uint32_t screen, uint32_t sp
     ITC_NATIVE_RUNNING("sub_822343A8 Type6Screen0::PlayItem");
   }
   const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);  // the back chain (stwu)
   const uint32_t movie = MovieAt(base, frame, 22);
   const uint64_t named = uint64_t(LoadU32(base, MenuOf(base, type7, screen))) + 5;
   if (type7) {
@@ -768,9 +774,9 @@ uint64_t ControllerOptionsUpdate(uint8_t* base, uint32_t sp, const Calls& calls)
 }
 
 uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
-                              const Calls& calls) {
+                              const Calls& calls, const strings_and_font::FormatCalls* format) {
   ITC_NATIVE_RUNNING("sub_82244BF8 Type7Screen0::MenuPage");
-  constexpr uint32_t kConfirm = 0x82244528;          // Type7Screen0::Confirm's override
+  constexpr uint32_t kConfirm = 0x82244528;  // Type7Screen0::Confirm (the original)
   const uint32_t screen = uint32_t(r3), dispatcher = uint32_t(r4);
   const uint32_t frame = sp - 112;
   const bool slots = calls.native_action_slots;
@@ -824,7 +830,11 @@ uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
     if (item != 3) {
       return answer;
     }
-    calls.call(kConfirm, frame, 0x82244D44, r3, r4);
+    if (format != nullptr) {
+      Screen0Confirm(base, kType7Confirm, dispatcher, frame, *format);
+    } else {
+      calls.call(kConfirm, frame, 0x82244D44, r3, r4);  // the original
+    }
     const uint32_t p = LoadU32(base, screen + 9648);
     const uint32_t page = LoadU32(base, p);
     if (int32_t(page) != -1) StoreU32(base, p + 8, page);
@@ -846,9 +856,9 @@ uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
 }
 
 uint64_t Type6Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
-                              const Calls& calls) {
+                              const Calls& calls, const strings_and_font::FormatCalls* format) {
   ITC_NATIVE_RUNNING("sub_82234958 Type6Screen0::MenuPage");
-  constexpr uint32_t kConfirm = 0x82233FC8;  // Type6Screen0::Confirm's override
+  constexpr uint32_t kConfirm = 0x82233FC8;  // Type6Screen0::Confirm (the original)
   const uint32_t screen = uint32_t(r3), dispatcher = uint32_t(r4);
   const uint32_t frame = sp - 112;
   const bool slots = calls.native_action_slots;
@@ -901,7 +911,11 @@ uint64_t Type6Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
     if (item != 4) {
       return answer;
     }
-    calls.call(kConfirm, frame, 0x82234AA4, r3, r4);
+    if (format != nullptr) {
+      Screen0Confirm(base, kType6Confirm, dispatcher, frame, *format);
+    } else {
+      calls.call(kConfirm, frame, 0x82234AA4, r3, r4);  // the original
+    }
     to_page(kMinusOne);
     StoreU32(base, screen + 9656, 0);
     StoreU32(base, screen + 9664, 4);

@@ -465,7 +465,7 @@ uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type
 
 // --- The first screens' helpers (screen0.cpp) ---
 
-// The confirms: movie 16's texts (-1, 0) = `text`, (1, 3) = 2 and (1, 4) =
+// The confirms (their back chain written, as the helpers below): movie 16's texts (-1, 0) = `text`, (1, 3) = 2 and (1, 4) =
 // 3 (UiMovie::SetText from the 112-byte frame below `sp`, r7 to r10 0), its
 // +40960 (the default choice) = `choice`, then message (`message`, 0, 0)
 // queued in the dispatcher's ring. r3 the last SetText's.
@@ -571,20 +571,21 @@ uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher,
 // (MenuSound 0, PowerGraph::SetFromCar's plain C++ (power_graph), message
 // 18, page 1 shown);
 // accept 159 (MenuSound 0, the item to +9656: items 0 to 2 the fade out
-// step 3 to page 2, item 3 Type7Screen0::Confirm (a guest call to its
-// override) and page 2 shown); back 158 (MenuSound 2, the cursor on the
+// step 3 to page 2, item 3 Type7Screen0::Confirm (its plain C++ with
+// `format`, given while the UI movies' text setters are native; else a
+// guest call to the original) and page 2 shown); back 158 (MenuSound 2, the cursor on the
 // quit item, the back step 1). MenuSound::Play's plain C++. r3 as the
 // original leaves it.
 uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
-                              const Calls& calls);
+                              const Calls& calls, const strings_and_font::FormatCalls* format);
 // sub_82234958 Type6Screen0::MenuPage (r3 the screen, r4 the dispatcher):
 // type 7's with the menu at +9648, the page state at +9644, five items (the
-// quit item 4: Type6Screen0::Confirm, a guest call to its override, +9656 =
+// quit item 4: Type6Screen0::Confirm, as type 7's, +9656 =
 // 0, +9664 = 4, page 2 shown), the accepted item to +9652, the fade out to
 // page 3 and message 21 for 163. PowerGraph::SetFromCar's plain C++ (its
 // fallbacks through `calls`).
 uint64_t Type6Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
-                              const Calls& calls);
+                              const Calls& calls, const strings_and_font::FormatCalls* format);
 
 // The two modes' cars (1,968-byte garage cars, then +1968 the model made,
 // +1972 where from (-1 none, 0 stock, 2 the garage), +1976 the garage index,

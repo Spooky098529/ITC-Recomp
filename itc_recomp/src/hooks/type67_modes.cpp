@@ -807,16 +807,28 @@ void Type7Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base) { Show(ctx, base, t
 void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Type7Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                         Type67Calls(ctx, base));
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const t67::Calls calls = Type67Calls(ctx, base);
+  // The confirm's plain C++ while the UI movies' text setters are native.
+  std::optional<FormatGuestCalls> format;
+  if (Type67TextsNative(base)) format.emplace(ctx, base);
+  ctx.r3.u64 = t67::Type7Screen0MenuPage(base, r3, r4, sp, calls,
+                                         format ? &format->get() : nullptr);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
 void Type6Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Type6Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                         Type67Calls(ctx, base));
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const t67::Calls calls = Type67Calls(ctx, base);
+  // The confirm's plain C++ while the UI movies' text setters are native.
+  std::optional<FormatGuestCalls> format;
+  if (Type67TextsNative(base)) format.emplace(ctx, base);
+  ctx.r3.u64 = t67::Type6Screen0MenuPage(base, r3, r4, sp, calls,
+                                         format ? &format->get() : nullptr);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
@@ -978,9 +990,8 @@ ITC_TYPE67_MODES(82241EF8, Type7DialogConfirmPage)
 ITC_TYPE67_MODES(82232798, Type6DialogUpdate)
 ITC_TYPE67_MODES(82242218, Type7DialogUpdate)
 
-// The first screens' confirms (from their recompiled callers): natively
-// while the UI movies' text setters are. Type6Screen0::ShowPage (from
-// recompiled page handlers).
+// Type6Screen0::ConfirmAgain (a guest call from OnDialogClosed, native):
+// natively while the UI movies' text setters are.
 #define ITC_TYPE67_TEXTS(address, step)                                         \
   extern "C" REX_FUNC(sub_##address) {                                          \
     REX_FUNC_PROLOGUE();                                                        \
@@ -990,26 +1001,22 @@ ITC_TYPE67_MODES(82242218, Type7DialogUpdate)
     }                                                                           \
     hooks::step(ctx, base);                                                     \
   }
-ITC_TYPE67_TEXTS(82233FC8, Type6Screen0Confirm)
 ITC_TYPE67_TEXTS(822340B0, Type6Screen0ConfirmAgain)
-ITC_TYPE67_TEXTS(82244528, Type7Screen0Confirm)
-ITC_TYPE67_MODES(822344A8, Type6Screen0ShowPage)
-// The type 7 first screen's helpers (from recompiled steps and pages, and
-// the Draw's table): ShowHelp while the UI movies' text setters are native.
-ITC_TYPE67_MODES(82244930, Type7Screen0ShowPage)
-ITC_TYPE67_MODES(822448B0, Type7Screen0PlaceCursor)
-ITC_TYPE67_TEXTS(82244AB8, Type7Screen0ShowHelp)
+// The first screens' Show (the machines' transitions), FadeOutStep (the
+// Update's table) and type 7's ChosenPage (the Draw's table).
 ITC_TYPE67_TEXTS(82233C80, Type6Screen0Show)
 ITC_TYPE67_TEXTS(822441D8, Type7Screen0Show)
 ITC_TYPE67_MODES(82244760, Type7Screen0FadeOutStep)
 ITC_TYPE67_MODES(82244610, Type7Screen0ChosenPage)
-// The type 6 first screen's helpers (from its steps and pages, recompiled
-// with the flag off, and the Draw's and Update's tables): ShowHelp and the
-// steps that call it while the UI movies' text setters are native.
-ITC_TYPE67_MODES(82234428, Type6Screen0PlaceCursor)
-ITC_TYPE67_TEXTS(822346A8, Type6Screen0ShowHelp)
-ITC_TYPE67_MODES(822343A8, Type6Screen0PlayItem)
-ITC_TYPE67_MODES(82244818, Type7Screen0PlayItem)
+// No adapters for the first screens' confirms sub_82233FC8 and sub_82244528,
+// ShowPage sub_822344A8 and sub_82244930, PlaceCursor sub_82234428 and
+// sub_822448B0, ShowHelp sub_822346A8 and sub_82244AB8 and PlayItem
+// sub_822343A8 and sub_82244818 (removed, B7 loop, 2026-11-13): only native
+// callers reach them in play (the pages, steps and OnDialogClosed), calling
+// their plain C++; their steps above are the harness's.
+// The first screens' FadeOutStep and steps 0 to 2 (from the Update's
+// tables): the steps that call ShowHelp while the UI movies' text setters are
+// native.
 ITC_TYPE67_MODES(822342F0, Type6Screen0FadeOutStep)
 // The first screens' steps 0 to 2 (from the Update's tables).
 ITC_TYPE67_TEXTS(82234C20, Type6Screen0OpeningStep)
