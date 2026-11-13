@@ -478,16 +478,18 @@ constexpr Global kEntryGlobals[] = {{pg::kEntryShown, 4},
 // (or a NaN: none), the words Car::SetModel copies from the spec (+788,
 // +792: the car's +1700 and +1704; +884 to +896: its tires' types and
 // grades) in the ranges the case writer gives them; the spec made of the
-// car's blocks for stage 0 and those tires.
-void LayEntryGarage(uint8_t* base, uint32_t garage, Random& r, int c) {
+// car's blocks for stage 0 and those tires. `points_forced`, when not
+// negative, sets the points (the count is points + 1) instead of the random pick.
+void LayEntryGarage(uint8_t* base, uint32_t garage, Random& r, int c, int points_forced = -1) {
   const uint32_t car = garage + kTemplateCar, spec = garage + kSpec;
   WriteSetupFromCarCase(base, garage + kWriterData, car, garage + kWriterStack,
                         garage + kWriterStack, uint64_t(c) * 11 + 5, c % 2);
   const uint32_t engine = car + 2880;
-  if (r.Below(10) == 0) {
+  if (r.Below(10) == 0 && points_forced < 0) {
     guest::StoreU32(base, engine + 20, 0x7FC00000u);
   } else {
-    const int32_t points = int32_t(r.Below(35)) - 1;
+    const int32_t pick = int32_t(r.Below(35)) - 1;
+    const int32_t points = points_forced >= 0 ? points_forced : pick;
     const double scale = double(guest::LoadFloat(base, 0x82002CE8));
     guest::StoreU32(base, engine + 20,
                     std::bit_cast<uint32_t>(float((double(points) + 0.5) / scale)));
@@ -521,9 +523,13 @@ void LayEntryGarage(uint8_t* base, uint32_t garage, Random& r, int c) {
   guest::StoreU32(base, garage + kEntry + 8432, kCarId);
 }
 
+// Cases 48 to 55 have the graph shown with 33 or 34 segments: past 32,
+// PowerGraph::Draw's lines read its saved registers as sprites, r31 (the
+// original's lis, sign-extended) among them.
 void EntryCases(Context& h, uint32_t block, uint32_t garage, uint32_t race) {
   Results results("CarList::DrawEntryPowerGraph (sub_82250670)");
-  for (int c = 0; c < 48; c++) {
+  for (int c = 0; c < 56; c++) {
+    const bool past_32 = c >= 48;
     std::vector<std::vector<uint8_t>> saved;
     for (const Global& g : kGlobals) {
       saved.push_back(Read(h.base, g.address, g.bytes));
@@ -541,10 +547,10 @@ void EntryCases(Context& h, uint32_t block, uint32_t garage, uint32_t race) {
       for (uint32_t at = 0; at < kGarageBytes; at += 4) {
         guest::StoreU32(h.base, garage + at, uint32_t(r.Next()));
       }
-      LayEntryGarage(h.base, garage, r, c);
+      LayEntryGarage(h.base, garage, r, c, past_32 ? 32 + c % 2 : -1);
       const int32_t count =
           pg::SegmentCount(h.base, garage + kTemplateCar + 2880 + 20 - 1280);
-      const bool shown = r.Below(8) != 0;
+      const bool shown = r.Below(8) != 0 || past_32;
       uint32_t lines = 0;
       const bool float_slots = MakeLists(h, block, r, shown ? count : 0, &lines);
       guest::StoreU32(h.base, pg::kEntryShown, shown ? 1 + r.Below(3) : 0);

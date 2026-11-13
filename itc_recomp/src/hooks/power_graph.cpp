@@ -182,8 +182,9 @@ void hooks::CarListDrawEntryPowerGraph(PPCContext& ctx, uint8_t* base) {
     ctx.r6.u64 = draw.car;
     ctx.f1.f64 = draw.x;
     ctx.f2.f64 = draw.y;
-    // r31 as the original holds it (PowerGraph::Draw saves it in its frame).
-    ctx.r31.u64 = pg::kEntryR31;
+    // r31 as the original holds it (lis: sign-extended; PowerGraph::Draw
+    // saves it in its frame, where a count above 32 reads it back).
+    ctx.r31.u64 = 0xFFFFFFFF00000000ull | pg::kEntryR31;
     ctx.lr = pg::kEntryDrawReturn;
     sub_8217C708(ctx, base);
   });
