@@ -295,9 +295,16 @@ file's history. What's left to see in a drive, from every run:
   harnesses 0 differing; race 29 s at 40, 0 errors; no subagents).
   Left: 20 never-seen pages `HandleInput` calls through the guest
   (state 7's option rows next, the paint, the light kits, the
-  interior; the sticker editor's own lead). Validation agent running.
+  interior; the sticker editor's own lead). Validated: `itc_5181`
+  (race 51 s at 180, 0 errors, every harness 0 differing outside the
+  expected groups; harnesses ~127 s), 34 of 34 harness lines, no
+  prints added; 9 ran in the replay `itc_5182` (ok), 25 not in game
+  (the new ones added to the drive list). Recorded.
 
 ## Done
+
+- `HandleInput` and `Command21` (no mapping): 29 adapters removed, the
+  sticker set-up ported, 2787b4aa..658969d6; validated.
 
 - The vinyl editor (with the stand screens' lead's state 34): 29 new
   rows in `tuning-pages.md` and 2 in `tuning-screen.md` ours, with the
@@ -410,5 +417,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After the vinyl editor: ours 5935, work left 758 (wrapped 52, known
   366, unknown 340).
+
+- After `HandleInput`: ours 5941, work left 757 (wrapped 52, known
+  365, unknown 340).
 
 ## Stopped

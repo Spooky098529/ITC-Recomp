@@ -18,6 +18,17 @@ here loses its heading.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+Not in the attract race or the replay (`itc_5181`, `itc_5182`, ok; the
+tuning screen's pages and commands, `tuning-pages.md` and
+`tuning-screen.md`; the vinyl editor's pages already listed below):
+
+- `sub_822087C8` TuningScreen::Command21
+- `sub_821F8440` TuningScreen::ResetStickerEditor
+- `sub_821F86C0` TuningScreen::LoadStickers
+- `sub_821F6C90` TuningScreen::RestoreAreaDecals
+
+The vinyl editor's:
+
 Not in the attract race or the replays (`itc_5150`, `itc_5151`; part
 two `itc_5166`, `itc_5167`; part three `itc_5173`, `itc_5174`; all ok; the tuning screen's vinyl editor,
 `tuning-pages.md` and `tuning-screen.md`):
