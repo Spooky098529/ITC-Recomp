@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
+- The options' load and save map (fde73e96): `options-load-save.md`,
+  16 rows. **For the user:** the names given before have load and save
+  the wrong way round: category 5 calls `GameData::Load`, 6
+  `GameData::Save`, so `Options::SavePage`, `SetUpSavePage`,
+  `ShowSaveDialog` and `ChangeSaveDialog` (other files) are the load's;
+  not renamed, the new file's intro says so. The rest of the save
+  screens' lead (`8221BE90` on, 47 never seen, kind 6's screen after
+  the race) moved into the in-race screens' lead.
 - `Scenery::Draw` (7bf375c1..bd6bfc88, no mapping): native from the
   pass table at 0x82603060 inside its `ITC_FRAME_STATE_WRAP`, calling
   `TextureAnimations::Advance` and `Minimap::Draw` through their

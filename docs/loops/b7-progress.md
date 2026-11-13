@@ -181,7 +181,12 @@ file's history. What's left to see in a drive, from every run:
   ..., all seen in play) with what's left of the save screens' lead
   (`821BBD18`-`821C2620`, `82217E20`-`8221E908` outside
   `race-screens.md`), the two leads taken together as the first says;
-  both lines deleted from `leads.md`. Mapping agent running.
+  both lines deleted from `leads.md`. Mapped `options-load-save.md`
+  (fde73e96: 16 rows, 14 in play: category 5, page 9, is the load,
+  category 6, page 10, the save; 6 ready groups; one lead added (the
+  controller pages' callees), the in-race screens' lead extended with
+  `8221BE90` on (47 never seen); no subagents); map checked (0 errors,
+  file listed, 6 ready groups). Migration agent running.
 
 ## Done
 
@@ -260,5 +265,8 @@ The run's section of `review.md` ("Run 2026-11-12 08:26").
 
 - After `Scenery::Draw`'s rest, part one: ours 5830, work left 819
   (wrapped 53, known 370, unknown 396).
+
+- After the options' load and save map: ours 5831, work left 818
+  (wrapped 52, known 386, unknown 380).
 
 ## Stopped
