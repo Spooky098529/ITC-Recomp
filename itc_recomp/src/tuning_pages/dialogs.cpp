@@ -8,10 +8,12 @@
 #include "base/log.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "strings_and_font/steps.h"
 #include "tuning_screen/tuning_screen.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
+#include <cmath>
 
 namespace tuning_pages {
 
@@ -43,6 +45,7 @@ constexpr uint32_t kOne = 0x82000A30;         // 1.0
 constexpr uint32_t kMinusOne = 0x82001BE0;    // probably -1.0
 constexpr uint32_t kMirror = 0x82002244;      // StoreStickers' mirrored angle's offset
 constexpr uint32_t kStoreScale = 0x82002948;  // the angle's scale
+constexpr uint32_t kLoadScale = 0x8200294C;   // LoadStickers' angle scale
 constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kPickNext = 0x821159B0;        // Career::PickNext (its adapter)
 constexpr uint32_t kFitSelectedCar = 0x8217DAC0;  // GarageStage::FitSelectedCar (its adapter)
@@ -212,6 +215,94 @@ uint64_t SaveAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uin
     record += 24;
   }
   return r3;
+}
+
+uint64_t RestoreAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                           uint64_t area, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F6C90 TuningScreen::RestoreAreaDecals");
+  const uint32_t frame = sp - 112;
+  Store(base, frame, sp);
+  uint32_t id = uint32_t((area + 1666) * 20 + screen);
+  uint64_t record = area * 120 + screen + 32360;
+  uint64_t r3 = screen;
+  for (int k = 0; k < 5; k++) {
+    Store(base, id, Load(base, id - 1120));
+    r3 = Copy24(base, call, record, record - 1120, frame, 0x821F6CD0);
+    id += 4;
+    record += 24;
+  }
+  return r3;
+}
+
+uint64_t LoadStickers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+                      uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F86C0 TuningScreen::LoadStickers");
+  namespace steps = strings_and_font::steps;
+  const uint32_t s = uint32_t(screen);
+  const uint32_t frame = sp - 176;
+  Store(base, frame, sp);
+  const double offset = Lfs(base, kMirror);
+  const double scale = Lfs(base, kLoadScale);
+  const double minus = Lfs(base, kMinusOne);
+  const uint32_t one = Load(base, kOne);
+  const double zero = Lfs(base, kZero);
+  const uint32_t zero_word = Load(base, kZero);
+  uint32_t ids = s + 32200;
+  uint32_t r = s + 31240;  // the record (the original's r31 its +8)
+  uint64_t r3 = screen;
+  for (uint32_t a = 0; a < 8; a++) {
+    const bool mirrored = a == 2 || a == 7;
+    for (uint32_t k = 0; k < 5; k++) {
+      const uint32_t g = GarageDecal(base, s, a, k);
+      Store(base, ids, Load(base, g + 24));
+      Store(base, r + 8, zero_word);  // stfs of lfs: 0.0 and 1.0 as they are
+      Store(base, r + 12, one);
+      Store(base, r + 0, 0);
+      Store(base, r + 4, 0);
+      Store(base, r + 16, 0);
+      Store(base, r + 20, 0);
+      if (int32_t(Load(base, g + 24)) > -1) {
+        double x = Lfs(base, g + 8);
+        if (mirrored) {
+          x = double(float(x * minus));
+        }
+        Store(base, r + 0, uint32_t(steps::Fctiwz(x)));
+        Store(base, r + 4, uint32_t(steps::Fctiwz(Lfs(base, g + 12))));
+        const double first = Lfs(base, g + 0);
+        uint32_t flag;
+        double angle;
+        if (mirrored) {
+          flag = first < zero ? 0 : 1;
+          angle = double(float(Lfs(base, g + 16) * scale));
+          angle = double(float(std::fma(angle, minus, offset)));
+        } else {
+          flag = first < zero ? 1 : 0;
+          angle = double(float(Lfs(base, g + 16) * scale));
+        }
+        Stfs(base, r + 8, angle);
+        // The original stores g+0 (times -1 with the flag) at +12 first and
+        // then g+4 over it.
+        Stfs(base, r + 12, flag == 1 ? double(float(Lfs(base, g + 0) * minus)) : Lfs(base, g + 0));
+        Store(base, r + 16, flag);
+        Stfs(base, r + 12, Lfs(base, g + 4));
+      }
+      ids += 4;
+      r += 24;
+    }
+    r3 = RestoreAreaDecals(base, call, screen, a, frame);
+  }
+  return r3;
+}
+
+uint64_t ResetStickerEditor(uint8_t* base, uint64_t screen) {
+  ITC_NATIVE_RUNNING("sub_821F8440 TuningScreen::ResetStickerEditor");
+  const uint32_t s = uint32_t(screen);
+  const uint32_t id = Load(base, tuning_screen::SelectedGarageCar(base, s) + 224);
+  for (const uint32_t offset : {10016u, 30724u, 30732u, 30740u, 30748u, 30756u, 30768u, 30764u}) {
+    Store(base, s + offset, 0);
+  }
+  Store(base, s + 33508, id == 0 ? 1 : 0);
+  return screen;
 }
 
 uint64_t StoreStickers(uint8_t* base, uint64_t screen, uint32_t sp) {

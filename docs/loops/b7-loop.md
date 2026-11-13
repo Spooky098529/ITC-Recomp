@@ -546,6 +546,23 @@ Calls so far for decisions the loop meets often:
   made, their game-level users seen in play skipped natively with what
   they'd read with the feature absent, Status Dropped (the voice
   engine under the app's start-up, 2026-10-30).
+- An Xbox Live front-end mode the player can open (the type 12 mode,
+  the network battle and time attack, `network-mode.md`): its screens
+  are made native as any front-end mode's, and its Xbox Live calls
+  (sign-in, gamer card, sessions, privileges, leaderboards, the network
+  manager's functions) are answered by plugging in data: the native
+  callers use the values the SDK's XAM imports return today (one
+  signed-in local user, no Live, as B5's `Network::Update` stub), with
+  no 360-style stand-ins; calls whose results aren't read are skipped
+  (Dropped), and nothing the game shows or does changes; not skipped at
+  its entry. Asked to minimize the code left recompiled (the user's
+  call, 2026-11-12, replacing the same day's "Live calls stay
+  recompiled").
+- Achievements: the game's achievement write keeps calling
+  `XUserWriteAchievements` through the guest (not skipped), so the
+  SDK goes on recording unlocks in its `achievements/<title id>.toml`;
+  the code around it is made native (`Achievements::Write`
+  `sub_82290A30`, 2026-11-13).
 - Register leftovers a varargs callee stores (`UiMovie::SetText`
   `sub_8211C1F8` storing r7-r10 into its caller's frame, set or not by
   the call site): native callers pass 0 for the arguments they don't
@@ -568,6 +585,13 @@ Calls so far for decisions the loop meets often:
   are ours, and the harness built the bigger way, with the callees'
   world as their own harnesses build it; no stand-in recorders in
   adapters (the race HUD machine, 2026-10-31).
+- A validation that fails on a harness fault (a harness case reading
+  a wild guest address, or giving a case inputs play never does) rather
+  than a native difference: an agent finds the cause with logging and
+  fixes the harness, the validation is run again, and the loop goes on
+  (`RaceMenu::Transition3`, 2026-11-10; `GarageScreen::Transition6` and
+  `TuningScreen::Update`'s debug handlers, 2026-11-11). A real
+  difference between native and recompiled still halts.
 - The C runtime's per-thread data over the kernel's TLS (`_mtinit`
   `sub_825AA708`, `_getptd` and the rest in `c-runtime.md`'s "Not
   here"): left for the core, not taken (2026-10-25). Only when it

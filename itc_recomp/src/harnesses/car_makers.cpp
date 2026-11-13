@@ -166,6 +166,22 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
   results.Check(out[0], out[1], what);
 }
 
+// ScenePools::GetB (sub_820C5C20) has no adapter since LocationScreen::
+// PollLoad is native (B7 loop, 2026-11-12): the recompiled side runs its
+// original, which writes its back chain (r1 - 112) and its r30, r31 and lr
+// saves (r1 - 24 to r1) under its caller's frame, while the plain C++ calls
+// ScenePoolsGetB, which writes none (dead stack). Case's (bytes under r1,
+// size) skips for them, `below` the callers' r1 under the call's at each
+// call (logged from the recompiled runs).
+std::vector<std::pair<uint32_t, uint32_t>> GetBSaves(
+    std::initializer_list<uint32_t> below, std::vector<std::pair<uint32_t, uint32_t>> more = {}) {
+  for (const uint32_t b : below) {
+    more.push_back({b + 108, 4});
+    more.push_back({b + 4, 20});
+  }
+  return more;
+}
+
 // --- The record's setters ---
 
 void BlockOf(Context& h, uint32_t block, Random& r) {
@@ -850,7 +866,7 @@ void Stand(Context& h, Random& r) {
           },
           __imp__sub_8217FC60, hooks::CarMakersCopyRecord, 16, {}, fmt::format("case {}", c),
           104, 8, [&] { guest::StoreU32(h.base, kScenePointer, block + kCarScene); }, {},
-          kStackBytes, kGarageBytes);
+          kStackBytes, kGarageBytes, GetBSaves({96}));
     }
     guest::StoreU32(h.base, kScenePointer, scene_global);
     results.Report();
@@ -1721,9 +1737,217 @@ void TuningStand(Context& h, Random& r) {
           },
           __imp__sub_821E0FB0, hooks::TuningRestoreStand, 64, floats,
           fmt::format("case {}", c), 224, 32, before, with_f1, 0x5000, kGarageBytes,
-          {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16}});
+          // And GetB's under its callers' frames, at each depth the pages
+          // reach it (the GarageStage functions they call).
+          GetBSaves({544, 400, 352, 336, 320},
+                    {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16}}));
     }
     results.Report();
+  }
+  {
+    // The vinyl editor's state 34 page TuningScreen::InputVinylView and its
+    // leaving LeaveVinylView (tuning_pages' plain C++; LeaveVinylView's A
+    // and B fit the selected car on the stand, so their world is this one):
+    // movie 13 the text world's; the four players' mapper entries naming one
+    // mapper of a block of its own (its vtable's slot 8 ActionMapper::Held
+    // and 10 Pressed, now and then another read slot; its pressed and held
+    // words with one action set most of the time: A, B or the view's held
+    // buttons, the entries' +4 1 now and then); the stage's animation list
+    // (+6048) 0 to 15 entries of types 0 to 7 and its camera's moved word
+    // (+384) 0, 1, 2 or any; the area +30724 0, 1 or any; the history at
+    // least 1 deep; the command queue in the screen; the menu sounds'
+    // manager a recorder (below). The top 32 bytes:
+    // __savegprlr_29's; LeaveVinylView's (32 from 112 below
+    // InputVinylView's r1) left out.
+    const Random kept = r;
+    TextWorld text(h.base);
+    // The mappers' block also holds a sound manager (+0x400) whose vtable
+    // (+0x600) slot 10, PlayCue2D, is a recording leaf (MenuSound::Play's:
+    // the menu sounds' harness's recorder storing r4's low byte, r5 and r6 at
+    // r3 + 320, 332 and 336), [0x826C5C80] pointed at it.
+    constexpr uint32_t kMappersBytes = 0x800;
+    const uint32_t mappers = memory::Alloc(kMappersBytes, 0);
+    constexpr uint32_t kEntries = 0x826BAB80, kIndices = 0x826BABA4;
+    constexpr uint32_t kSoundManager = 0x826C5C80, kRecordR4R6 = 0x820A8420;
+    const std::vector<uint8_t> saved_entries = Read(h.base, kEntries, 32);
+    const std::vector<uint8_t> saved_indices = Read(h.base, kIndices, 16);
+    const uint32_t saved_manager = guest::LoadU32(h.base, kSoundManager);
+    std::vector<uint8_t> mapper_inputs(kMappersBytes);
+    std::vector<uint8_t> entry_inputs(48);
+    constexpr uint32_t kQueue = 0x9380;
+    const auto lay_view = [&](PPCContext& t, int c) {
+      lay(c, false);
+      text.Lay(r);
+      field(10036, screen + kQueue);
+      field(kQueue + 16, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(65));
+      field(30724, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+      byte(10008, 1 + r.Below(50));
+      const uint32_t stage = block + kStage;
+      const uint32_t count = r.Below(16);
+      guest::StoreU32(h.base, stage + 6048, count);
+      for (uint32_t i = 0; i < count; i++) {
+        guest::StoreU32(h.base, stage + 5600 + 28 * i, r.Below(8));
+      }
+      const uint32_t moved[4] = {0, 1, 2, uint32_t(r.Next())};
+      guest::StoreU32(h.base, stage + 384, moved[r.Below(4)]);
+      // The mapper: its vtable at +0, the mapper at +0x40.
+      for (uint32_t i = 0; i < kMappersBytes; i += 4) {
+        guest::StoreU32(mapper_inputs.data(), i, uint32_t(r.Next()));
+      }
+      guest::StoreU32(mapper_inputs.data(), 0x400, mappers + 0x600);
+      guest::StoreU32(mapper_inputs.data(), 0x600 + 40, kRecordR4R6);
+      constexpr uint32_t kHeld = 0x8210BE70, kPressed = 0x8210BF40, kFired = 0x8210C010;
+      const uint32_t slots[3] = {kHeld, kPressed, kFired};
+      guest::StoreU32(mapper_inputs.data(), 32, r.Below(6) == 0 ? slots[r.Below(3)] : kHeld);
+      guest::StoreU32(mapper_inputs.data(), 40, r.Below(6) == 0 ? slots[r.Below(3)] : kPressed);
+      guest::StoreU32(mapper_inputs.data(), 0x40, mappers);
+      static constexpr uint32_t kActions[] = {159, 158, 163, 164, 171, 172, 173, 174};
+      static constexpr uint32_t kMoves[] = {153, 167, 154, 168};
+      uint32_t held = 0, pressed = 0, fired = 0;
+      if (r.Below(6) != 0) {
+        const uint32_t pick = r.Below(12);
+        if (pick >= 8) {
+          fired |= 1u << (kMoves[pick - 8] - 151);
+        } else {
+          const uint32_t action = kActions[pick];
+          (action >= 160 ? held : pressed) |= 1u << (action - 151);
+        }
+        if (r.Below(3) == 0) {
+          held |= 1u << (kActions[2 + r.Below(6)] - 151);
+        }
+      } else if (r.Below(2) == 0) {
+        held = uint32_t(r.Next());
+        pressed = uint32_t(r.Next());
+        fired = uint32_t(r.Next());
+      }
+      guest::StoreU32(mapper_inputs.data(), 48, r.Below(6) == 0 ? slots[r.Below(3)] : kFired);
+      guest::StoreU32(mapper_inputs.data(), 0x40 + 448, held);
+      guest::StoreU32(mapper_inputs.data(), 0x40 + 456, pressed);
+      guest::StoreU32(mapper_inputs.data(), 0x40 + 464, fired);
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU32(entry_inputs.data(), 8 * k, mappers + 0x40);
+        guest::StoreU32(entry_inputs.data(), 8 * k + 4, r.Below(8) == 0 ? 1 : r.Below(3) == 0 ? 2 : 0);
+        guest::StoreU32(entry_inputs.data(), 32 + 4 * k, r.Below(4));
+      }
+      t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+    };
+    const auto before_view = [&] {
+      before();
+      text.Before();
+      Write(h.base, mappers, mapper_inputs.data(), kMappersBytes);
+      guest::StoreU32(h.base, kSoundManager, mappers + 0x400);
+      Write(h.base, kEntries, entry_inputs.data(), 32);
+      Write(h.base, kIndices, entry_inputs.data() + 32, 16);
+    };
+    const auto view_out = [&](Outputs& out, const PPCContext& t) {
+      blocks(out, t);
+      text.Add(out);
+      out.Bytes(Read(h.base, mappers, kMappersBytes));
+    };
+    if (text.ok() && mappers != 0) {
+      Results results("TuningScreen::LeaveVinylView (sub_82201B40)");
+      for (int c = 0; c < 40; c++) {
+        Case(
+            h, results, block, r, [&](PPCContext& t) { lay_view(t, c); },
+            __imp__sub_82201B40, hooks::TuningPagesLeaveVinylView, 32, floats,
+            fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes);
+      }
+      results.Report();
+      Results view("TuningScreen::InputVinylView (sub_82202928)");
+      for (int c = 0; c < 60; c++) {
+        Case(
+            h, view, block, r, [&](PPCContext& t) { lay_view(t, c); },
+            __imp__sub_82202928, hooks::TuningPagesInputVinylView, 32, floats,
+            fmt::format("case {}", c), 112, 32, before_view, view_out, 0x3000, kGarageBytes);
+      }
+      view.Report();
+      // The vinyl editor's state 23 page InputVinylPages and its movie side
+      // MoveVinylMenu: the page +30724 -1 to 3, the
+      // last page +30784 0 to 2, the wrap +30728 and +9708 0 or 1; the
+      // vinyls (category 5's item 6) mostly; now and then a kept page
+      // (+18900 set) with the counter [0x826D84A4] 0 to 3 and the kept
+      // textures 0 to 5 and 15 to 20 either an entry's (+28 held: no free)
+      // or empty (0 header and data: Texture::Free frees nothing); the
+      // vinyl records without signaling NaNs (memcpy and StoreVinyls copy
+      // them). The top 32 or 48 bytes: __savegprlr_29's or _27's;
+      // InputVinylPages' callees' saves (MoveVinylMenu's 32 from 128 below
+      // its r1) left out.
+      constexpr uint32_t kKeepCounter = 0x826D84A4;
+      const uint32_t saved_counter = guest::LoadU32(h.base, kKeepCounter);
+      uint32_t counter_input = 0;
+      // The screen fades' words (B's FadeOut writes them): random, the
+      // counts 0 most of the time; compared, put back after.
+      constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x3C;
+      const std::vector<uint8_t> saved_fades = Read(h.base, kFades, kFadesBytes);
+      std::vector<uint8_t> fade_inputs(kFadesBytes);
+      const auto lay_pages = [&](PPCContext& t, int c) {
+        lay_view(t, c);
+        const uint32_t images = screen + 10048;
+        if (r.Below(5) != 0) {
+          field(tuning_screen::kCategory, 5);
+          byte(tuning_screen::kItem, 6);
+        }
+        // (A's copies index the page unchecked: kept to -1 to 3.)
+        field(30724, uint32_t(int32_t(r.Below(5)) - 1));
+        field(30784, r.Below(3));
+        field(30728, r.Below(2));
+        field(9708, r.Below(3) == 0 ? 0 : 1);
+        field(18900, r.Below(3) == 0 ? (r.Below(4) == 0 ? uint32_t(r.Next()) : 1) : 0);
+        counter_input = r.Below(4);
+        for (uint32_t i = 0; i < kFadesBytes; i += 4) {
+          guest::StoreU32(fade_inputs.data(), i, r.Below(4) == 0 ? uint32_t(r.Next()) : 0);
+        }
+        for (uint32_t k = 0; k < 21; k++) {
+          const uint32_t kept = images + 7236 + 8 * k - screen;
+          if (r.Below(2) == 0) {
+            field(kept, 0);
+            field(kept + 4, 0);
+          } else {
+            const uint32_t e = images + 36 * r.Below(200) + 28 - screen;
+            field(kept, guest::LoadU32(screen_inputs.data(), e));
+          }
+        }
+        for (uint32_t at = 30880; at < 31220; at += 4) {
+          const uint32_t word = guest::LoadU32(screen_inputs.data(), at);
+          if ((word & 0x7F800000u) == 0x7F800000u && (word & 0x007FFFFFu) != 0) {
+            field(at, word | 0x00400000u);
+          }
+        }
+      };
+      const auto before_pages = [&] {
+        before_view();
+        guest::StoreU32(h.base, kKeepCounter, counter_input);
+        Write(h.base, kFades, fade_inputs.data(), kFadesBytes);
+      };
+      const auto pages_out = [&](Outputs& out, const PPCContext& t) {
+        view_out(out, t);
+        out.Word(guest::LoadU32(h.base, kKeepCounter));
+        out.Bytes(Read(h.base, kFades, kFadesBytes));
+      };
+      Results menu("TuningScreen::MoveVinylMenu (sub_821FF3A0)");
+      for (int c = 0; c < 60; c++) {
+        Case(
+            h, menu, block, r, [&](PPCContext& t) { lay_pages(t, c); },
+            __imp__sub_821FF3A0, hooks::TuningPagesMoveVinylMenu, 32, floats,
+            fmt::format("case {}", c), 0, 0, before_pages, pages_out, 0x3000, kGarageBytes);
+      }
+      menu.Report();
+      Results pages("TuningScreen::InputVinylPages (sub_82204B70)");
+      for (int c = 0; c < 80; c++) {
+        Case(
+            h, pages, block, r, [&](PPCContext& t) { lay_pages(t, c); },
+            __imp__sub_82204B70, hooks::TuningPagesInputVinylPages, 48, floats,
+            fmt::format("case {}", c), 128, 32, before_pages, pages_out, 0x3000, kGarageBytes);
+      }
+      pages.Report();
+      guest::StoreU32(h.base, kKeepCounter, saved_counter);
+      Write(h.base, kFades, saved_fades.data(), kFadesBytes);
+    }
+    Write(h.base, kEntries, saved_entries.data(), 32);
+    Write(h.base, kIndices, saved_indices.data(), 16);
+    guest::StoreU32(h.base, kSoundManager, saved_manager);
+    memory::Free(mappers);
+    r = kept;
   }
   for (int i = 0; i < 4; i++) {
     guest::StoreU32(h.base, globals[i], saved[i]);
@@ -1817,6 +2041,12 @@ uint32_t TuningStandWorldBytes() { return kGarageBytes; }
 uint32_t LayTuningStandWorld(uint8_t* base, uint32_t block, Random& r, int c) {
   LayTuningStandBlock(base, block, r, c, false);
   return block + kSaveData;
+}
+
+// The stage's animation list (+5600, its count +448) short, as the
+// UpdateStand cases lay it (GarageAnims::Add scans it with no bound).
+void ShortTuningStandAnimations(uint8_t* base, uint32_t block, Random& r) {
+  guest::StoreU32(base, block + kStage + 5600 + 448, r.Below(4));
 }
 
 void PointTuningStandWorld(uint8_t* base, uint32_t block) {

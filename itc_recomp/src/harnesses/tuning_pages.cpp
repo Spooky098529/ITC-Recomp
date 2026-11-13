@@ -983,6 +983,92 @@ void LoadCases(Context& h, const World& w) {
             hooks::TuningPagesRequestImage, 16, {});
   LoadGroup(h, w, "DecalImages::Load", 30, request, __imp__sub_821F6D40,
             hooks::TuningPagesLoadImage, 16, {});
+  // Reload: as Request (the same entries and ids), with no state check:
+  // the entry's buffer +12 any word (passed to Archive::Load as it is).
+  LoadGroup(h, w, "DecalImages::Reload", 80, request, __imp__sub_821FE960,
+            hooks::TuningPagesReloadImage, 16, {});
+  // LoadWindow: the list 0 to 2 (now and then 3 or any word), the first id
+  // around the list's range (so each move happens), the first entry 0 to
+  // 41, the count 0 to 9 (now and then -1). __savegprlr_26 (56 bytes);
+  // Reload's saves (144 to 160 below).
+  LoadGroup(
+      h, w, "DecalImages::LoadWindow", 80,
+      [](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.screen() + 10048;
+        const uint32_t list = r.Below(10) == 0 ? (r.Below(2) == 0 ? 3 : uint32_t(r.Next()))
+                                               : r.Below(3);
+        static constexpr int32_t kLow[] = {153, 180, 375}, kSpan[] = {20, 211, 216};
+        const uint32_t which = list < 3 ? list : r.Below(3);
+        t.r4.u64 = uint64_t(int64_t(kLow[which] + int32_t(r.Below(uint32_t(kSpan[which])))));
+        t.r5.u64 = r.Below(42);
+        t.r6.u64 = r.Below(10) == 0 ? ~0ull : r.Below(10);
+        t.r7.u64 = list;
+        if (r.Below(8) == 0) {
+          t.r3.u64 |= r.Next() << 32;
+        }
+      },
+      __imp__sub_821FEAF0, hooks::TuningPagesLoadWindow, 56, {{144, 160}});
+  // Scroll: the direction 1 or 0 (now and then another word), a window of
+  // 9 at 12, 33 or 42 (now and then another first entry and count), an id
+  // in the lists' ranges; the entry FreeTexture frees with its texture held
+  // by a kept slot or with no texture (0 header and data: Texture::Free
+  // frees nothing). __savegprlr_28 (40 bytes); Reload's saves (128 to 144).
+  LoadGroup(
+      h, w, "DecalImages::Scroll", 80,
+      [](PPCContext& t, Random& r, const World& w) {
+        const uint32_t images = w.screen() + 10048;
+        t.r3.u64 = images;
+        const uint32_t way = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(2);
+        static constexpr uint32_t kFirst[] = {12, 33, 42};
+        const uint32_t first = r.Below(6) == 0 ? r.Below(60) : kFirst[r.Below(3)];
+        const uint32_t count = r.Below(6) == 0 ? 1 + r.Below(11) : 9;
+        t.r4.u64 = way;
+        t.r5.u64 = first;
+        t.r6.u64 = count;
+        t.r7.u64 = 163 + r.Below(419);
+        const uint32_t freed = way == 0 ? first + count - 1 : first;
+        const uint32_t e = images + 36 * (freed % 200);
+        if (r.Below(2) == 0) {
+          guest::StoreU32(w.base, e + 28, 0);
+          guest::StoreU32(w.base, e + 32, 0);
+        } else {
+          guest::StoreU32(w.base, images + 7236 + 8 * r.Below(200),
+                          guest::LoadU32(w.base, e + 28));
+        }
+        if (r.Below(8) == 0) {
+          t.r3.u64 |= r.Next() << 32;
+        }
+      },
+      __imp__sub_821FED30, hooks::TuningPagesScrollImages, 40, {{128, 144}});
+  // FreeKept: a kept texture 0 to 199 whose header an entry's +28 holds,
+  // or a 0 header and data (Texture::Free frees nothing). No frame.
+  LoadGroup(
+      h, w, "DecalImages::FreeKept", 60,
+      [](PPCContext& t, Random& r, const World& w) {
+        const uint32_t images = w.screen() + 10048;
+        t.r3.u64 = images;
+        const uint32_t k = r.Below(200);
+        t.r4.u64 = k;
+        const uint32_t kept = images + 7236 + 8 * k;
+        if (r.Below(2) == 0) {
+          guest::StoreU32(w.base, kept, 0);
+          guest::StoreU32(w.base, kept + 4, 0);
+        } else {
+          guest::StoreU32(w.base, kept,
+                          guest::LoadU32(w.base, images + 36 * r.Below(200) + 28));
+        }
+      },
+      __imp__sub_821FE740, hooks::TuningPagesFreeKept, 0, {});
+  // OnLoaded: r3 the entry's handle +4 half the time, else another word;
+  // r6 an entry.
+  LoadGroup(
+      h, w, "DecalImages::OnLoaded", 40,
+      [](PPCContext& t, Random& r, const World& w) {
+        const uint32_t e = w.screen() + 10048 + 36 * r.Below(200);
+        t.r6.u64 = e;
+        t.r3.u64 = r.Below(2) == 0 ? guest::LoadU32(w.base, e + 4) : uint32_t(r.Next());
+      },
+      __imp__sub_821FE608, hooks::TuningPagesOnImageLoaded, 0, {});
 }
 
 }  // namespace
@@ -1054,6 +1140,18 @@ void TuningPages(Context& h) {
         hooks::TuningPagesSetEditorLimits);
   Group(h, w, "TuningScreen::LoadPageLayouts", 20, kScreenOnly, __imp__sub_822045F8,
         hooks::TuningPagesLoadPageLayouts);
+  // SetLastImage: category 5's item 6 (the vinyls) mostly, the page 0, 1 or
+  // another word.
+  Group(
+      h, w, "TuningScreen::SetLastImage", 30,
+      [](PPCContext&, Random& r, const World& w) {
+        const uint32_t s = w.screen();
+        const bool vinyls = r.Below(4) != 0;
+        guest::StoreU32(w.base, s + 9656, vinyls ? 5 : Around(r, -1, 7));
+        guest::StoreU8(w.base, s + 9660, uint8_t(vinyls ? 6 : r.Below(9)));
+        guest::StoreU32(w.base, s + 30724, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+      },
+      __imp__sub_821FE498, hooks::TuningPagesSetLastImage);
 
   // The decal images' textures (r30, r31 and lr's saves 24 bytes,
   // __savegprlr_29's 32, r31 and lr's 16). r3 the images (now and then with

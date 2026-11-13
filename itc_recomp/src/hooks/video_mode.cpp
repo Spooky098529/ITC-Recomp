@@ -46,7 +46,7 @@ constexpr float kAspect16x9 = 16.0f / 9.0f;
 
 }  // namespace
 
-// The graphics library's display set-up, once from Renderer::Init: r3 = the
+// The graphics library's display set-up, once from FrameDriver::Init: r3 = the
 // video output, r6 = the vblank interval (2). Fills the presentation
 // parameters, makes the device and the two front buffers, sets the viewport
 // and a few states, gives the device its vblank callback, and works out

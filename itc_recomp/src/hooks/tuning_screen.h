@@ -111,6 +111,37 @@ void TuningCommand8(PPCContext& ctx, uint8_t* base);
 void TuningRefreshMenu(PPCContext& ctx, uint8_t* base);
 // RefreshMovie13 sub_822076E8 (r3 the screen; f1 as the original leaves it).
 void TuningRefreshMovie13(PPCContext& ctx, uint8_t* base);
+// Movie 2's command runners never seen in play, for the harness only (no
+// recompiled caller reaches them: the update's plain C++ calls their plain
+// C++; r3 = the screen): Command5 sub_821D4180, Command11 sub_821E9730,
+// Command12 sub_821E9CA0, Command54 sub_821EB8E8, Command55 sub_821EBDC8,
+// Command56 sub_821EC6A0, Command57 sub_821ECC68 (f1 as the original leaves
+// it, RefreshMenu's way) and Command58 sub_821EDB70.
+void TuningCommand5(PPCContext& ctx, uint8_t* base);
+void TuningCommand11(PPCContext& ctx, uint8_t* base);
+void TuningCommand12(PPCContext& ctx, uint8_t* base);
+void TuningCommand54(PPCContext& ctx, uint8_t* base);
+void TuningCommand55(PPCContext& ctx, uint8_t* base);
+void TuningCommand56(PPCContext& ctx, uint8_t* base);
+void TuningCommand57(PPCContext& ctx, uint8_t* base);
+void TuningCommand58(PPCContext& ctx, uint8_t* base);
+// The editors' command runners never seen in play, for the harness only
+// (the same way; r3 = the screen): Command17 sub_82200100, Command19
+// sub_82201C58, Command20 sub_82201FA0 (r4, r5 the update's +9644 and
+// +9648), Command21 sub_822087C8 (r3 all 64 bits), Command26 sub_82204980,
+// Command27 sub_82204A78, Command32Done sub_821F7498, Command42
+// sub_821F7618, Command52 sub_821F77F0 (r3 all 64 bits, r4 the update's
+// dispatcher) and Command53 sub_821F7948 (r3 left).
+void TuningCommand17(PPCContext& ctx, uint8_t* base);
+void TuningCommand19(PPCContext& ctx, uint8_t* base);
+void TuningCommand20(PPCContext& ctx, uint8_t* base);
+void TuningCommand21(PPCContext& ctx, uint8_t* base);
+void TuningCommand26(PPCContext& ctx, uint8_t* base);
+void TuningCommand27(PPCContext& ctx, uint8_t* base);
+void TuningCommand32Done(PPCContext& ctx, uint8_t* base);
+void TuningCommand42(PPCContext& ctx, uint8_t* base);
+void TuningCommand52(PPCContext& ctx, uint8_t* base);
+void TuningCommand53(PPCContext& ctx, uint8_t* base);
 
 // The calls onto the stand (src/tuning_screen/stand.cpp; the adapters only
 // with TuningStandCalleesNative: --native_stand_models, --native_race_setup
@@ -158,6 +189,15 @@ void TuningWithRefreshStand(
 bool TuningUpdateStandCalleesNative();
 void TuningUpdateStand(PPCContext& ctx, uint8_t* base);
 
+// Update sub_821E6C50 (r3 the screen, r4 the mode's dispatcher, both all
+// 64 bits; r3 UpdateStand's or RestoreStand's; f1 as the original leaves
+// it, RefreshMenu's way), with TuningUpdateCalleesNative:
+// TuningUpdateStandCalleesNative, TuningCarStatsCalleesNative and
+// --native_car_specs (the refresh's and its other callees' adapters'
+// checks).
+bool TuningUpdateCalleesNative();
+void TuningUpdate(PPCContext& ctx, uint8_t* base);
+
 // The debug state handlers (r3 = the screen): DebugMainMenu sub_821CBE08,
 // DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
 // DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,
@@ -184,5 +224,32 @@ void TuningDebugLayerSet(PPCContext& ctx, uint8_t* base);
 void TuningDebugEditPosition(PPCContext& ctx, uint8_t* base);
 void TuningDebugEditView(PPCContext& ctx, uint8_t* base);
 void TuningDebugPaintConfirm(PPCContext& ctx, uint8_t* base);
+// The debug state handlers never seen in play, for the harness only (no
+// recompiled caller reaches them in play: the update's plain C++ calls their
+// plain C++): DebugColorSelect sub_821CC078 to DebugPaintRemoveConfirm
+// sub_821FE2D0 (tuning_screen/tuning_screen.h).
+void TuningDebugColorSelect(PPCContext& ctx, uint8_t* base);
+void TuningDebugWarnMoney(PPCContext& ctx, uint8_t* base);
+void TuningDebugReflectSet(PPCContext& ctx, uint8_t* base);
+void TuningDebugAnnulSet(PPCContext& ctx, uint8_t* base);
+void TuningDebugRemoveConfirm(PPCContext& ctx, uint8_t* base);
+void TuningDebugBodyColor(PPCContext& ctx, uint8_t* base);
+void TuningDebugNeonPart(PPCContext& ctx, uint8_t* base);
+void TuningDebugNeonKind(PPCContext& ctx, uint8_t* base);
+void TuningDebugNeonEdit(PPCContext& ctx, uint8_t* base);
+void TuningDebugLedEdit(PPCContext& ctx, uint8_t* base);
+void TuningDebugCockpitTop(PPCContext& ctx, uint8_t* base);
+void TuningDebugCockpitType(PPCContext& ctx, uint8_t* base);
+void TuningDebugCockpitColor(PPCContext& ctx, uint8_t* base);
+void TuningDebugMeterKind(PPCContext& ctx, uint8_t* base);
+void TuningDebugMeterPoint(PPCContext& ctx, uint8_t* base);
+void TuningDebugLayerOperate(PPCContext& ctx, uint8_t* base);
+void TuningDebugLayerOrder(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditRotate(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditScale(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditColor(PPCContext& ctx, uint8_t* base);
+void TuningDebugEditFlip(PPCContext& ctx, uint8_t* base);
+void TuningDebugPaintCancelConfirm(PPCContext& ctx, uint8_t* base);
+void TuningDebugPaintRemoveConfirm(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

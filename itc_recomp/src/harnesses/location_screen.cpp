@@ -86,6 +86,15 @@ constexpr uint32_t kMissingMovie = 0x826C5CDC;  // UiMovies::Find's answer when 
 constexpr uint32_t kAnimsBytes = 0x6000;
 constexpr uint32_t kSpecs = 4;
 constexpr uint32_t kParamsBytes = 64 + kSpecs * car_specs::kSpecBytes;
+// PollLoad's block: an opponents' scene model (16-byte aligned, 0x1800
+// bytes), the car scene at +0x1800, the scenery manager at +0x2C00 (its
+// pool records at +0x2D00, an object at +0x2D80), the machine's +9604 and
+// +9608 at +0x2F00.
+constexpr uint32_t kPollBytes = 0x3010;
+constexpr uint32_t kPollScene = 0x1800, kPollManager = 0x2C00, kPollRecords = 0x2D00,
+                   kPollObject = 0x2D80, kPollMachine = 0x2F00;
+// The car scene's pointers (the first set's, then the scene's).
+constexpr uint32_t kSceneSets = 0x826C2E40;
 
 struct Block {
   explicit Block(uint32_t bytes) : bytes(bytes), address(memory::Alloc(bytes, 0)) {}
@@ -140,11 +149,12 @@ struct World {
         strings(kStringsBytes),
         anims(kAnimsBytes),
         params(kParamsBytes),
-        model(0x400) {}
+        model(0x400),
+        poll(kPollBytes) {}
   bool ok() const {
     return save.address && tables.address && race.address && screen.address && event.address &&
            movies.address && texts.address && strings.address && anims.address &&
-           params.address && model.address;
+           params.address && model.address && poll.address;
   }
   uint32_t items() const { return tables.address + 0x40; }
   uint32_t item(uint32_t id) const { return items() + kItemBytes * id; }
@@ -164,6 +174,7 @@ struct World {
   Block anims;    // the camera animations' objects (Transition4, Transition5)
   Block params;   // the parameters' object and its specs (Start, PoseCar)
   Block model;    // an opponent's scene model's +4288 on (PoseCar)
+  Block poll;     // PollLoad's scene, scene model and scenery manager
 };
 
 struct Spec {
@@ -429,7 +440,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {camera_modes::kAnims, 6 * camera_modes::kAnimBytes},
                               {camera_modes::kAnimCount, 4},
                               {car_specs::kParams, 4},
-                              {race_setup::kRandSeed, 4}});
+                              {race_setup::kRandSeed, 4},
+                              {kSceneSets, 8}});
     PPCContext t = CallContext(h);
     WriteRandom(h.base, h.data, kScratchBytes, r);
     WriteRandom(h.base, t.r1.u32, h.data - t.r1.u32, r);
@@ -1675,6 +1687,130 @@ void Poses(Context& h, const World& w) {
         hooks::LocationScreenPoseCar, spec);
 }
 
+// PollLoad: the screen, the opponents, PoseCar's world (Poses') and the
+// camera animations (with the location's third animation now and then);
+// the car scene in its teardown's countdown (+0 = 4, +48 large: Update only
+// counts down, Draw does nothing; the first set gone), its pool 7 one
+// scene model in use for every index (traffic or a car with no parts, so
+// SceneModel::PollLoad answers 1, or loading: 0), PoseCar's floats copied
+// to its +4288; movies 21 and 30 loaded or not; the scenery manager at
+// +552 not loading (+192 0), its last object (+172, +176) none, not in
+// use, or in use and loaded or not. Compared: the frame's locals (the
+// view's floats as floats), PoseCar's frame and its callees' below (its
+// float slots as floats), the model's matrices as floats, the block. The
+// location screen's harness seeds are scrambled here (below).
+int g_poll_done = 0;
+
+void PollLoads(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const uint32_t block = w.poll.address;
+  const uint32_t model = (block + 15) & ~15u;
+  const uint32_t scene = block + kPollScene, manager = block + kPollManager;
+  const SetupFn setup = [base, block, model, scene, manager](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    ShapeOpponents(base, w, r);
+    ShapePose(base, w, r);
+    ShapeAnims(base, w, r);
+    const uint32_t screen = w.screen.address;
+    guest::StoreU32(base, screen + 808, r.Below(4) == 0 ? 0 : 1 + r.Below(3));
+    // The location's third animation in the table (an entry not its own).
+    const uint32_t location = guest::LoadU32(base, screen + 852);
+    const uint32_t count = guest::LoadU32(base, camera_modes::kAnimCount);
+    if (count >= 2 && r.Below(5) != 0) {
+      uint32_t j = r.Below(count);
+      if (j == location) j = (j + 1) % count;
+      guest::StoreU32(base, camera_modes::kAnims + camera_modes::kAnimBytes * j,
+                      guest::LoadU32(base, 0x82636518 + 16 * location + 8));
+    }
+    WriteRandom(base, block, kPollBytes, r);
+    // The scene model: in use, alone on pool 7's list.
+    guest::StoreU32(base, model + 8, 0);
+    guest::StoreU32(base, model + 16, 3);
+    guest::StoreU32(base, model + 32, r.Below(2) == 0 ? 3 : r.Below(3));
+    guest::StoreU32(base, model + 5028, r.Below(5) == 0 ? 1 : 0);
+    for (uint32_t at : {5040u, 5048u, 5060u, 5068u, 5076u, 5084u, 5092u, 5100u}) {
+      guest::StoreU32(base, model + at, 0);
+    }
+    const uint32_t posed = (w.model.address + 15) & ~15u;
+    for (uint32_t i = 0; i < 0x300; i += 4) {
+      guest::StoreU32(base, model + 4288 + i, guest::LoadU32(base, posed + i));
+    }
+    guest::StoreU32(base, scene + 0, 4);
+    guest::StoreU32(base, scene + 48, 1000 + r.Below(1000));
+    guest::StoreU32(base, scene + 5028, model);
+    guest::StoreU32(base, kSceneSets, 0);
+    guest::StoreU32(base, kSceneSets + 4, scene);
+    for (uint32_t i = 0; i < 6; i++) {
+      guest::StoreU32(base, screen + 824 + 4 * i, r.Below(3));
+    }
+    // The movies' loaded flags.
+    for (uint32_t m : {0u, kMovie30At}) {
+      guest::StoreU32(base, w.movies.address + m + 0x9FD0, r.Below(5) == 0 ? 0 : 1);
+    }
+    // The scenery manager.
+    guest::StoreU32(base, screen + 552, manager);
+    guest::StoreU32(base, manager + 192, 0);
+    guest::StoreU32(base, manager + 172, r.Below(5) == 0 ? 0xFFFFFFFFu : 0);
+    guest::StoreU32(base, manager + 176, 0);
+    guest::StoreU32(base, manager + 4, block + kPollRecords);
+    guest::StoreU32(base, block + kPollRecords + 12,
+                    r.Below(6) == 0 ? 0 : block + kPollObject);
+    static constexpr uint32_t kFlags[] = {0, 1, 9, 9};
+    guest::StoreU32(base, block + kPollObject + 32, kFlags[r.Below(4)]);
+    guest::StoreU32(base, screen + 896, r.Below(2));
+  };
+  const ArgsFn args = [block](PPCContext& t, Random&, const World&) {
+    t.fpscr.disableFlushModeUnconditional();
+    t.r3.u64 = block + kPollMachine - 9604;
+  };
+  constexpr int32_t kFrame = 336, kPose = int32_t(ls::kPoseCarFrame);
+  // PoseCar's frame and its callees' below, up to 2,048 bytes below r1:
+  // above that, the camera evaluation's guest callees (CameraAnims::
+  // EvalCamera's original, from Evaluate's frame at r1 - 480, and below it)
+  // save their callers' registers, which hold the original PollLoad's and
+  // Evaluate's values (r30 = 0x82636518, an animation's entry) and not the
+  // native ones' (dead stack).
+  Spec spec{{{-kFrame + 80, 160}, {-kFrame - kPose - 2048, kPose + kFrame}}};
+  spec.texts = true;
+  spec.children = true;
+  const uint32_t screen = w.screen.address;
+  spec.after = [base, screen, model, block](PPCContext& t, Outputs& out) {
+    auto floats = [&](uint32_t at, uint32_t words) {
+      out.Floats(base, at, words);
+      for (uint32_t i = 0; i < words; i++) {
+        guest::StoreU32(base, at + 4 * i, 0);
+      }
+    };
+    const uint32_t frame = t.r1.u32 - uint32_t(kFrame);
+    floats(frame + 96, 18);
+    floats(screen + 592, 8);
+    floats(screen + 664, 2);
+    const uint32_t pose = frame - uint32_t(kPose);
+    floats(pose + 80, 2);
+    floats(pose + 160, 16);
+    floats(pose + 288, 48);
+    floats(model + 4288 + 16, 144);
+    if (guest::LoadU32(base, block + kPollMachine) == 4) g_poll_done++;
+    out.Bytes(Read(base, block, kPollBytes));
+  };
+  // Each case's seed scrambled (SplitMix64's finalizer): Group's seeds are
+  // consecutive outputs of one xorshift generator, the same stream a case's
+  // generator then follows one step later, so cases whose shaping takes a
+  // varying number of steps fall into step with each other and repeat.
+  Results results("LocationScreen::PollLoad (sub_82229238)");
+  for (int c = 0; c < 160; c++) {
+    uint64_t seed = h.random.Next() + 0x9E3779B97F4A7C15ull;
+    seed = (seed ^ (seed >> 30)) * 0xBF58476D1CE4E5B9ull;
+    seed = (seed ^ (seed >> 27)) * 0x94D049BB133111EBull;
+    seed ^= seed >> 31;
+    Case(h, results, w, seed, setup, args, __imp__sub_82229238, hooks::LocationScreenPollLoad,
+         spec, fmt::format("case {}", c));
+  }
+  ITC_LOG_INFO("harness: location_screen: PollLoad's runs that reached the end: {} of {}",
+               g_poll_done, 2 * 160);
+  results.Report();
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -1701,6 +1837,7 @@ void LocationScreen(Context& h) {
   ViewPages(h, w);
   Poses(h, w);
   OpponentView(h, w);
+  PollLoads(h, w);
 }
 
 }  // namespace harness

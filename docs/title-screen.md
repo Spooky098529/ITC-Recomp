@@ -14,11 +14,14 @@ From launch, with no input (times as measured here):
 
 `sub_822221A0` (the title screen's update) checks four controllers for a
 button (152) and otherwise adds one to +36 of the object at `[0x82814E34]`.
-At 600 ticks (20 s) it sets the state at +4 to 5 (via 8), which starts an
+At 600 ticks (20 s) it sets the object's +4 to 8 and the title's page
+object `[0x82814E2C]` to page 5 (leaving), which starts an
 attract-mode race (AI cars, no input). After the race (~60 s) the game goes
 back to the title screen, and the next race follows ~22 s later. The front
 end's state objects are at `[0x82814E2C]`, `[0x82814E30]` and
-`[0x82814E34]`, created when the movie ends.
+`[0x82814E34]`, created when the movie ends. The title screen's functions
+(the type 4 mode, the title load and the title screen's machine) are in
+[`functions/title-screen.md`](functions/title-screen.md).
 
 Options for automated runs (both off by default):
 
@@ -35,6 +38,16 @@ Options for automated runs (both off by default):
 
 With `--skip_intro --attract_after_s=1` the attract race starts about 1 s
 after launch (21 s with only `--attract_after_s=1`, 39 s with neither).
+
+Since the B7 loop's migration (2026-11-11) the type 4 mode, the title load
+and the title screen are native (`--native_title_screen`,
+`itc_recomp/src/title_screen/`): `--attract_after_s`'s wrap of
+`TitleScreen::Update` now surrounds its plain C++ (`PressStart`), and
+`SetUpAttractRace` stays recompiled (called through the guest). The
+harnesses run before the boot's data load, so the `title_screen` harness
+records `BootData::Load`, `CarDealer::StartFirstRace` and
+`Career::NextDay` through their adapters' harness recorder check, and keeps
+the idle count below 600.
 
 How these were found: `--find_idle_timer` (`src/debug/idle_timer_scan.cpp`)
 compares guest memory every 30 logic passes outside races, logs words that

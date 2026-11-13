@@ -13,7 +13,9 @@
 #include "base/log.h"
 #include "car_specs/car_specs.h"
 #include "data_tables/data_tables.h"
+#include "hooks/network_mode.h"
 #include "hooks/race_setup.h"
+#include "network_mode/network_mode.h"
 #include "race_setup/race_setup.h"
 #include "memory/heap.h"
 
@@ -26,6 +28,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_race_setup);
+ITC_FLAG_DECLARE(bool, native_network_mode);
 
 namespace harness {
 
@@ -1254,6 +1257,58 @@ void Rivals(Context& h) {
   results.Report();
 }
 
+// The bytes of a traffic racer record (Racers::SetStart's) its makers
+// (RacerRecord::Init, Car::SetModel, Car::Refresh) never write, found by
+// running them natively over two fills (see Race::SetUp's cases).
+std::vector<uint32_t> TrafficHoles(Context& h, const MadeUpSpecs& specs) {
+  std::vector<uint32_t> holes;
+  {
+    const uint32_t params = guest::LoadU32(h.base, car_specs::kParams);
+    const uint32_t seed = guest::LoadU32(h.base, race_setup::kRandSeed);
+    guest::StoreU32(h.base, car_specs::kParams, specs.params);
+    const Block record(race_setup::kRacerRecordBytes);
+    std::vector<uint8_t> after[2];
+    for (int f = 0; f < 2; f++) {
+      guest::ForEachHostPart(h.base, record.address, record.bytes,
+                             [f](uint8_t* host, uint32_t, uint32_t bytes) {
+                               std::memset(host, f ? 0x55 : 0xAA, bytes);
+                             });
+      race_setup::RacerRecordInit(h.base, record.address);
+      race_setup::SetModel(h.base, record.address, 55);
+      uint32_t r3;
+      car_specs::CarRefresh(h.base, record.address, &r3);
+      after[f] = Read(h.base, record.address, record.bytes);
+    }
+    for (uint32_t i = 0; i < race_setup::kRacerRecordBytes; i++) {
+      if (after[0][i] == 0xAA && after[1][i] == 0x55 && (i < 3904 || i >= 3912)) {
+        holes.push_back(i);  // (+3904 to +3911 Racers::SetStart writes itself)
+      }
+    }
+    guest::StoreU32(h.base, car_specs::kParams, params);
+    guest::StoreU32(h.base, race_setup::kRandSeed, seed);
+    ITC_LOG_INFO("harness: race_setup: Racers::SetStart's record leaves {} bytes unwritten",
+                 holes.size());
+  }
+  return holes;
+}
+
+// The last 16 racer records' unwritten bytes (`holes`) of the race data at
+// `data` moved into `tails` and cleared.
+void SplitTraffic(uint8_t* base, uint32_t data, const std::vector<uint32_t>& holes,
+                  Outputs& tails) {
+  const uint32_t records = data + 48;
+  const uint32_t count = guest::LoadU32(base, records + race_setup::kRacersCount);
+  for (uint32_t k = count >= 16 ? count - 16 : 0; k < count && k < 93; k++) {
+    const uint32_t record = records + race_setup::kRacerRecordBytes * k;
+    std::vector<uint8_t> bytes;
+    for (uint32_t i : holes) {
+      bytes.push_back(guest::LoadU8(base, record + i));
+      guest::StoreU8(base, record + i, 0);
+    }
+    tails.Bytes(bytes);
+  }
+}
+
 // Race::SetUp over made-up data: the save data (the garage's list and
 // cars: each car's id one of the made-up specs', its tuning words 0 and its
 // float +1892 a normal value; the event 1, others, above 999 or random; the
@@ -1286,50 +1341,11 @@ void SetUps(Context& h) {
   // the earlier calls left them: the originals' register saves there (Stack
   // leftovers), which the plain C++ doesn't write. Compared on their own,
   // left out of the case's other outputs.
-  std::vector<uint32_t> holes;
-  {
-    const uint32_t params = guest::LoadU32(h.base, car_specs::kParams);
-    const uint32_t seed = guest::LoadU32(h.base, race_setup::kRandSeed);
-    guest::StoreU32(h.base, car_specs::kParams, specs.params);
-    const Block record(race_setup::kRacerRecordBytes);
-    std::vector<uint8_t> after[2];
-    for (int f = 0; f < 2; f++) {
-      guest::ForEachHostPart(h.base, record.address, record.bytes,
-                             [f](uint8_t* host, uint32_t, uint32_t bytes) {
-                               std::memset(host, f ? 0x55 : 0xAA, bytes);
-                             });
-      race_setup::RacerRecordInit(h.base, record.address);
-      race_setup::SetModel(h.base, record.address, 55);
-      uint32_t r3;
-      car_specs::CarRefresh(h.base, record.address, &r3);
-      after[f] = Read(h.base, record.address, record.bytes);
-    }
-    for (uint32_t i = 0; i < race_setup::kRacerRecordBytes; i++) {
-      if (after[0][i] == 0xAA && after[1][i] == 0x55 && (i < 3904 || i >= 3912)) {
-        holes.push_back(i);  // (+3904 to +3911 Racers::SetStart writes itself)
-      }
-    }
-    guest::StoreU32(h.base, car_specs::kParams, params);
-    guest::StoreU32(h.base, race_setup::kRandSeed, seed);
-    ITC_LOG_INFO("harness: race_setup: Racers::SetStart's record leaves {} bytes unwritten",
-                 holes.size());
-  }
+  const std::vector<uint32_t> holes = TrafficHoles(h, specs);
   Results leftovers("Race::SetUp, the traffic records' unwritten bytes (expected to differ)");
   for (int c = 0; c < 48; c++) {
     harness::Outputs tails[2];
-    auto split = [&](int v) {
-      const uint32_t records = data.address + 48;
-      const uint32_t count = guest::LoadU32(h.base, records + race_setup::kRacersCount);
-      for (uint32_t k = count >= 16 ? count - 16 : 0; k < count && k < 93; k++) {
-        const uint32_t record = records + race_setup::kRacerRecordBytes * k;
-        std::vector<uint8_t> bytes;
-        for (uint32_t i : holes) {
-          bytes.push_back(guest::LoadU8(h.base, record + i));
-          guest::StoreU8(h.base, record + i, 0);
-        }
-        tails[v].Bytes(bytes);
-      }
-    };
+    auto split = [&](int v) { SplitTraffic(h.base, data.address, holes, tails[v]); };
     const uint64_t rival = c % 3 == 1 ? h.random.Below(4) : 0xFFFFFFFFFFFFFFFFull;
     const uint32_t kind = c % 16 == 15 ? uint32_t(h.random.Next()) : uint32_t(c % 7);
     FramesCase(
@@ -1438,6 +1454,105 @@ void SetupVehicles(Context& h) {
     }
     results.Report();
   }
+}
+
+// ModeType12::NextMode's time attack (registered under network_mode: the
+// type 12 mode's harness): the time attack's course screen (5) in state 11
+// (the others' machines 0 to 20, screens 7 and 4 not 11; the shown index
+// one of play's), its race set up over the race data and the made-up specs
+// as Race::SetUp's cases have them: the course route ([0x82816660]) 0 to
+// 22, [0x82816680] 0 or 1 and [0x82816684] 0 to 3 or any word, the car's
+// 1,884 bytes at 0x82816688 random with its id (+12) one of the made-up
+// specs' and its tuning words 0, [0x82816E38] 0 to 3, the session
+// ([0x82816E3C]) a block of the world. The mode (its ring's count and start
+// small, no handlers), the type 12 block, the session and the answer
+// compared whole, with the race data, NextMode's frame up to its register
+// saves (its callees' frames not: their register saves; their copies are
+// compared in their own cases), the globals (the time attack's and the
+// session's words) and r3; f1 not (a volatile register the callees leave).
+// The traffic records' unwritten bytes as Race::SetUp's (expected to
+// differ, the same reason).
+void RecompiledNextMode(PPCContext& ctx, uint8_t* base) {
+  ITC_FLAG(native_network_mode) = false;
+  __imp__sub_8227B930(ctx, base);
+  ITC_FLAG(native_network_mode) = true;
+}
+
+void NetworkModeTimeAttack(Context& h) {
+  namespace nm = network_mode;
+  const MadeUpSpecs specs(h, 0, 72);
+  const Block data(0xA4000);
+  const Block mode(0x400);
+  const Block block(nm::kBlockBytes);
+  const Block session(0x400);
+  const Block answer(0x40);
+  if (!specs.params || !data.address || !mode.address || !block.address || !session.address ||
+      !answer.address) {
+    ITC_LOG_ERROR("harness: network_mode: no blocks for NextMode's time attack");
+    return;
+  }
+  const std::vector<uint32_t> holes = TrafficHoles(h, specs);
+  std::vector<uint32_t> globals = {race_setup::kRandSeed, race_setup::kRaceData,
+                                   car_specs::kParams};
+  for (uint32_t g = nm::kTaRoute; g <= nm::kSession; g += 4) {
+    globals.push_back(g);
+  }
+  static constexpr uint32_t kShownIndexes[] = {0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+  Results results("ModeType12::NextMode (sub_8227B930), the time attack");
+  Results leftovers(
+      "ModeType12::NextMode (sub_8227B930), the time attack's traffic records' unwritten bytes "
+      "(expected to differ)");
+  for (int c = 0; c < 32; c++) {
+    harness::Outputs tails[2];
+    FramesCase(
+        h, results, data, {{4112, 104}}, globals,
+        [&](Random& r) {
+          uint8_t* const base = h.base;
+          guest::StoreU32(base, race_setup::kRandSeed, uint32_t(r.Next()));
+          guest::StoreU32(base, race_setup::kRaceData, data.address);
+          guest::StoreU32(base, car_specs::kParams, specs.params);
+          WriteRandom(base, mode.address, mode.bytes / 4, r);
+          WriteRandom(base, block.address, block.bytes / 4, r);
+          WriteRandom(base, session.address, session.bytes / 4, r);
+          WriteRandom(base, answer.address, answer.bytes / 4, r);
+          guest::StoreU32(base, mode.address + nm::kBlock, block.address);
+          guest::StoreU32(base, mode.address + nm::kRing + 600, r.Below(40));
+          guest::StoreU32(base, mode.address + nm::kRing + 604, r.Below(60));
+          guest::StoreU32(base, mode.address + nm::kDispatcher + 200, 0);
+          for (const uint32_t index : kShownIndexes) {
+            guest::StoreU32(base, nm::Machine(block.address, index) + nm::kMachineState,
+                            r.Below(21));
+          }
+          for (const uint32_t at : {nm::kScreen7At, nm::kRankingAt}) {
+            if (guest::LoadU32(base, block.address + at + nm::kMachineState) == 11) {
+              guest::StoreU32(base, block.address + at + nm::kMachineState, 12);
+            }
+          }
+          guest::StoreU32(base, block.address + nm::kTaCourseAt + nm::kMachineState, 11);
+          guest::StoreU32(base, block.address + nm::kShown,
+                          kShownIndexes[r.Below(std::size(kShownIndexes))]);
+          WriteRandom(base, nm::kTaRoute, (nm::kSession + 4 - nm::kTaRoute) / 4, r);
+          guest::StoreU32(base, nm::kTaRoute, r.Below(23));
+          guest::StoreU32(base, nm::kTaHasKind, r.Below(2));
+          guest::StoreU32(base, nm::kTaKind, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(4));
+          guest::StoreU32(base, nm::kTaCar + 12, 55 + r.Below(16));
+          for (uint32_t offset = 1656; offset <= 1812; offset += 4) {
+            guest::StoreU32(base, nm::kTaCar + offset, 0);
+          }
+          guest::StoreU32(base, nm::kTaCarWord, r.Below(4));
+          guest::StoreU32(base, nm::kSession, session.address);
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = answer.address;
+          t.r4.u64 = mode.address;
+        },
+        RecompiledNextMode, hooks::ModeType12NextMode, {}, fmt::format("case {}", c), false,
+        false, {&mode, &block, &session, &answer},
+        [&](int v) { SplitTraffic(h.base, data.address, holes, tails[v]); });
+    leftovers.Check(tails[0], tails[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  leftovers.Report();
 }
 
 void RaceSetup(Context& h) {

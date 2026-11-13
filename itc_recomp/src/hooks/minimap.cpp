@@ -1,13 +1,17 @@
 // The minimap's parts natively: adapters in front of src/minimap/
 // (docs/functions/minimap.md), with the register steps the harness shares
-// (hooks/minimap.h). Minimap::Draw (sub_820F5740) itself stays recompiled,
-// Wrapped by frame interpolation (src/frame_pacing/per_frame_logic.cpp).
+// (hooks/minimap.h). Minimap::Draw's (sub_820F5740) register steps are here;
+// its override is frame interpolation's wrap
+// (src/frame_pacing/per_frame_logic.cpp), which runs them.
 
 #include "hooks/minimap.h"
 
 #include "base/flags.h"
+#include "car_scene_draw/car_scene_draw.h"
 #include "hooks/c_runtime.h"
+#include "hooks/car_scene_draw.h"
 #include "hooks/guest_call.h"
+#include "hooks/scenery_lists.h"
 #include "minimap/minimap.h"
 
 ITC_FLAG_BOOL(native_minimap, true, "ITC",
@@ -21,7 +25,12 @@ ITC_FLAG_BOOL(native_minimap, true, "ITC",
               "it; the render queue's submit a guest call; sub_8217C4C0, never seen in play, the "
               "original's), Minimap::DrawCarMarker sub_820F4888 and Minimap::DrawPointMarker "
               "sub_820F4BA8 (with native atexit; Triangle::Record from their frames, through "
-              "its adapter)) natively instead "
+              "its adapter), Minimap::Draw sub_820F5740 (inside frame interpolation's wrap; with "
+              "--native_scenery_lists, --native_matrix_math, --native_vehicle_accessors, "
+              "--native_car_physics, --native_math and --native_c_runtime and the command list's "
+              "diagnostics off, else its original); since it is native, RacerVehicle, SetList::Point, "
+              "RacerMarkerType, Scaling, List80::Insert and Copy and the marker draws have no "
+              "adapters: the flag switches their callers) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=minimap)");
 
@@ -30,6 +39,12 @@ ITC_FLAG_BOOL(native_minimap, true, "ITC",
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
 ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+ITC_FLAG_DECLARE(bool, native_car_physics);
+ITC_FLAG_DECLARE(bool, native_c_runtime);
+ITC_FLAG_DECLARE(bool, native_math);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_scenery_lists);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 
 namespace hooks {
 
@@ -193,6 +208,44 @@ void DrawMarker(PPCContext& ctx, uint8_t* base, MarkerDraw draw, uint32_t frame_
 
 }  // namespace
 
+bool MinimapDrawNative() {
+  return ITC_FLAG(native_minimap) && hooks::NativeAtexit() && ITC_FLAG(native_scenery_lists) &&
+         ITC_FLAG(native_matrix_math) && ITC_FLAG(native_vehicle_accessors) &&
+         ITC_FLAG(native_car_physics) && ITC_FLAG(native_math) && ITC_FLAG(native_c_runtime) &&
+         !hooks::SceneryListsSlotDiagnostics();
+}
+
+void MinimapDraw(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  constexpr uint32_t kFrame = 28336;
+  const uint32_t f = ctx.r1.u32 - kFrame;
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  // The marker draws' guest calls from their frames below Minimap::Draw's.
+  MarkerContext car{ctx, base, f - minimap::kCarMarkerFrame, 0x820F4B94, 0x820F4B84, {ctx, base}};
+  MarkerContext point{ctx,        base,       f - minimap::kPointMarkerFrame,
+                      0x820F5188, 0x820F5178, {ctx, base}};
+  minimap::MarkerCalls car_calls, point_calls;
+  for (auto [m, c] : {std::pair{&car, &car_calls}, std::pair{&point, &point_calls}}) {
+    c->atexit = m->atexit.Call();
+    c->record = &MarkerContext::Record;
+    c->memcpy = &MarkerContext::Memcpy;
+    c->user = m;
+  }
+  GuestAtexit atexit{ctx, base};
+  minimap::DrawCalls all;
+  all.draws = &draws;
+  all.calls = &calls;
+  all.car_marker = &car_calls;
+  all.point_marker = &point_calls;
+  all.atexit = atexit.Call();
+  minimap::Draw(base, all, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r24.u32);
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
 // r3 = the camera pass, r4 = the color, r5 = the matrix; r3 as the last
 // Triangle::Record leaves it.
 void MinimapDrawCarMarker(PPCContext& ctx, uint8_t* base) {
@@ -227,25 +280,14 @@ void MinimapDrawPointMarker(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_MINIMAP(82170608, MinimapFindPlayerEntry)
-ITC_MINIMAP(82170578, MinimapRacerVehicle)
-ITC_MINIMAP(82147D18, MinimapSetListPoint)
-ITC_MINIMAP(820F2D28, MinimapRacerMarkerType)
-ITC_MINIMAP(820F2EF8, MinimapScaling)
-ITC_MINIMAP(820F5238, MinimapList80Insert)
-ITC_MINIMAP(820F51A8, MinimapList80Copy)
 ITC_MINIMAP(8217AEA8, MinimapRecordTransform)
 ITC_MINIMAP(8217DAA0, MinimapTriangleRecord)
 
-// The marker draws: also only with native atexit (their tables' first use).
-#define ITC_MINIMAP_MARKER(address, step)                        \
-  extern "C" REX_FUNC(sub_##address) {                           \
-    REX_FUNC_PROLOGUE();                                         \
-    if (!ITC_FLAG(native_minimap) || !hooks::NativeAtexit()) {   \
-      __imp__sub_##address(ctx, base);                           \
-      return;                                                    \
-    }                                                            \
-    hooks::step(ctx, base);                                      \
-  }
-
-ITC_MINIMAP_MARKER(820F4888, MinimapDrawCarMarker)
-ITC_MINIMAP_MARKER(820F4BA8, MinimapDrawPointMarker)
+// No adapters (removed 2026-11-13, B7 loop, once Minimap::Draw, their only
+// caller in play, was native and calls their plain C++; a temporary counter
+// showed none called in an attract race): Race::RacerVehicle (sub_82170578,
+// also from Racers::NearestHumanVehicle's plain C++), SetList::Point
+// (sub_82147D18), Minimap::RacerMarkerType (sub_820F2D28), Minimap::Scaling
+// (sub_820F2EF8), List80::Insert (sub_820F5238), List80::Copy (sub_820F51A8),
+// Minimap::DrawCarMarker (sub_820F4888) and DrawPointMarker (sub_820F4BA8).
+// Their register steps above stay for the harness.

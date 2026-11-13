@@ -287,6 +287,7 @@ void ReplaySnapshots(Context& h);
 void RaceLoading(Context& h);
 void SceneTarget(Context& h);
 void FramePasses(Context& h);
+void FrameDriver(Context& h);
 void CommandBuffer(Context& h);
 // The render command replay's single commands (src/harnesses/single_commands.cpp).
 void SingleCommands(Context& h);
@@ -306,6 +307,7 @@ void TuningPages(Context& h);
 void ScreenConstructors(Context& h);
 void Type67Modes(Context& h);
 void OptionsScreen(Context& h);
+void OptionsLoadSave(Context& h);
 void Type67Screens(Context& h);
 void CarList(Context& h);
 void FrontEndScreenHelpers(Context& h);
@@ -319,5 +321,14 @@ void RaceMenu(Context& h);
 void CarSettings(Context& h);
 void UserInfo(Context& h);
 void Type2Mode(Context& h);
+void TitleScreen(Context& h);
+void Type10Mode(Context& h);
+void Type5Mode(Context& h);
+void TodaysResult(Context& h);
+void NetworkMode(Context& h);
+// The race's end (src/harnesses/race_end.cpp).
+void RaceEnd(Context& h);
+void PowerGraphScreen(Context& h);
+void Achievements(Context& h);
 
 }  // namespace harness

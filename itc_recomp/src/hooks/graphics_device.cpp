@@ -516,7 +516,7 @@ constexpr uint32_t kDeviceFenceBefore = 13544;      // the one before
 
 }  // namespace
 
-// Device::Swap (once a frame, from Renderer::Present's 8258DCA4; also from
+// Device::Swap (once a frame, from FrameDriver::Present's 8258DCA4; also from
 // the movies' sub_822A0E50, the tiling worker and sub_8209ACB8): r3 device,
 // r4 the front buffer (a texture header), r5 parameters (0, or the device's
 // own +13284). Keeps the front buffer's header (sub_822A0718 reads its

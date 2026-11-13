@@ -34,12 +34,15 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/tuning_pages.h"
+#include "hooks/tuning_screen.h"
+#include "tuning_pages/tuning_pages.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <functional>
 #include <optional>
 #include <string>
@@ -90,6 +93,10 @@ constexpr uint32_t kFadeOut = 0x826A50E4;
 constexpr uint32_t kSoundManager = 0x826C5C80;
 constexpr uint32_t kCarScene = 0x826C2E44;
 constexpr uint32_t kStandHolder = 0x826D83E0;
+constexpr uint32_t kVinylWaits = 0x826D84A4;  // to 0x826D84C0
+constexpr uint32_t kLayersWait = 0x826D84B8;  // InputVinylLayers' load wait
+constexpr uint32_t kActionsWait = 0x826D84BC;  // InputLayerActions' load wait
+constexpr uint32_t kOrderCount = 0x826D84C0;   // InputLayerOrder's frame count
 // A leaf that stores r4's low byte, r5 and r6 at r3 + 320, 332 and 336 (the
 // menu sounds' harness's recorder): the sound manager's slot 10, PlayCue2D.
 constexpr uint32_t kRecordR4R6 = 0x820A8420;
@@ -115,6 +122,7 @@ constexpr Global kGlobals[] = {
     {kSoundManager, 4},
     {kCarScene, 4},
     {kStandHolder, 4},
+    {kVinylWaits, 32},  // the vinyl editor's wait words
 };
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -704,6 +712,17 @@ void ItemFields(PPCContext& t, Random& world_random, const World& w) {
     guest::StoreU32(base, menu + 64, 0);
     const uint32_t first = guest::LoadU32(base, menu + 12), last = guest::LoadU32(base, menu + 16);
     guest::StoreU32(base, menu + 0, first + r.Below(last - first + 1));
+  }
+  // The garage car's sticker records (LoadStickers' GarageDecal reads)
+  // without signaling NaNs (the originals' lfs and stfs quiet them, the
+  // host's float copies may not: the kVinyls precedent in tuning_pages.cpp).
+  for (uint32_t a = 0; a < 8; a++) {
+    for (uint32_t k = 0; k < 5; k++) {
+      const uint32_t g = tuning_pages::GarageDecal(base, w.screen(), a, k);
+      if (g != 0) {
+        QuietRange(base, g, 32);
+      }
+    }
   }
   HighWord(t, r);
 }
@@ -1455,7 +1474,412 @@ void WheelsFields(PPCContext& t, Random& world_random, const World& w, bool page
   HighWord(t, r);
 }
 
+// The vinyl editor's decal edits (states 29 to 31, InputDecalPosition,
+// Angle, Scale and their movie sides): the mappers' slot 11 (+44) the read
+// slot sub_8210BFA8 (TuningScreen::HighlightSelected's release check; the
+// world's random word otherwise); the page +30724 0 or 1 mostly (now and then
+// 2 or -1: nothing placed), the layer +30732 0 to 2; x and y (+30832,
+// +30836) at, beside or inside the page's limits; the angle +30840 and the
+// scale +30844 at, beside or between their ends, now and then any word; the
+// pages' layouts (+30800 to +30828: int origins, float scales) small; the
+// history at least 1 deep; one action most of the time (a move fired, A or
+// B pressed), with 164 held now and then.
+void DecalEditFields(PPCContext& t, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  for (uint32_t c = 0; c < 4; c++) {
+    guest::StoreU32(base, w.at(kVtablesAt) + 0x40 * c + 44, 0x8210BFA8);
+  }
+  const int32_t pages[] = {0, 0, 1, 1, 2, -1};
+  guest::StoreU32(base, s + 30724, uint32_t(pages[r.Below(6)]));
+  guest::StoreU32(base, s + 30732, r.Below(3));
+  static constexpr int32_t kEnds[] = {-512, -256, -128, 128, 256, 512};
+  auto coordinate = [&] {
+    switch (r.Below(4)) {
+      case 0: return kEnds[r.Below(6)];
+      case 1: return kEnds[r.Below(6)] + int32_t(r.Below(3)) - 1;
+      case 2: return int32_t(r.Below(1025)) - 512;
+      default: return int32_t(r.Next());
+    }
+  };
+  guest::StoreU32(base, s + 30832, uint32_t(coordinate()));
+  guest::StoreU32(base, s + 30836, uint32_t(coordinate()));
+  static constexpr float kAngles[] = {0.0f, 0.5f, 1.0f, 358.0f, 358.5f, 359.0f, 180.0f, -1.0f};
+  static constexpr float kScales[] = {0.1f, 0.105f, 0.11f, 1.0f, 1.995f, 2.0f, 1.99f, 0.05f};
+  guest::StoreFloat(base, s + 30840, r.Below(8) == 0 ? float(r.Below(36000)) / 100.0f
+                                                     : kAngles[r.Below(8)]);
+  guest::StoreFloat(base, s + 30844, r.Below(8) == 0 ? float(r.Below(250)) / 100.0f
+                                                     : kScales[r.Below(8)]);
+  if (r.Below(10) == 0) {
+    guest::StoreU32(base, s + (r.Below(2) == 0 ? 30840 : 30844), uint32_t(r.Next()));
+  }
+  for (const uint32_t at : {30800u, 30804u, 30816u, 30820u}) {
+    guest::StoreU32(base, s + at, uint32_t(int32_t(r.Below(1000)) - 500));
+  }
+  for (const uint32_t at : {30808u, 30812u, 30824u, 30828u}) {
+    guest::StoreFloat(base, s + at, float(r.Below(400)) / 100.0f);
+  }
+  guest::StoreU8(base, s + 10008, uint8_t(1 + r.Below(58)));
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 155, 169, 156, 170, 159, 159, 158, 158};
+  const uint32_t pick = r.Below(14);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (pick < 12) {
+    const uint32_t bit = 1u << (kActions[pick] - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, pick >= 8 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, pick < 8 ? bit : 0);
+  }
+  guest::StoreU32(base, mapper + 448, r.Below(4) == 0 ? 1u << (164 - 151) : 0);
+  HighWord(t, r);
+}
+
+// The layer's edit menu (InputLayerEdit, MoveLayerEdit): the decal edits'
+// fields (above), the cursor +30748 -1 to 7 (now and then any word), the
+// last row +30752 0 to 6, the flip +30848 0, 1 or any, the category and
+// item the vinyls' mostly; the history with 24 below the top and now and
+// then 28 at the top (cancel's pops find them; the walks don't go below the
+// history's start), +9708 0 or 1; the action now and then B fired (the
+// movie side's slot 12 on 158).
+void LayerEditFields(PPCContext& t, Random& r, const World& w) {
+  DecalEditFields(t, r, w);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30748,
+                  r.Below(10) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(9)) - 1));
+  guest::StoreU32(base, s + 30752, r.Below(7));
+  guest::StoreU32(base, s + 30848, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  if (r.Below(5) != 0) {
+    guest::StoreU32(base, s + 9656, 5);
+    guest::StoreU8(base, s + 9660, 6);
+  }
+  const uint32_t depth = 3 + r.Below(40);
+  guest::StoreU8(base, s + 10008, uint8_t(depth));
+  guest::StoreU32(base, s + 9756 + 4 * r.Below(depth - 2), 24);
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, s + 9756 + 4 * (depth - 1), 28);
+  }
+  guest::StoreU32(base, s + 9708, r.Below(3) == 0 ? 0 : 1);
+  if (r.Below(8) == 0) {
+    const uint32_t c = guest::LoadU32(base, kControllerEntries);
+    const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+    guest::StoreU32(base, mapper + 464, 1u << (158 - 151));
+  }
+}
+
+// The vinyl page's layers (InputVinylLayers, MoveVinylLayers): the page
+// +30724 -1 to 2 (the layer ids index it unchecked), the cursor +30732 -1 to
+// 5 (now and then any word without the wait), the button left +30736 3 or 4 (now and then
+// 0 to 2), the layers' saved ids +31192 + 12 x page + 4c -1 half the time,
+// the picked image +30764 around both lists, +9708 0 or 1; the load wait 0
+// half the time, else 1 to 5 (now and then -1); the picker windows'
+// entries (12 to 20, 33 to 41) with no texture (0 header and data:
+// Texture::Free frees nothing) or held by the kept slot of their index; now and then no
+// entry loading (the wait's end); the action now and then one move, A or
+// B.
+void VinylLayerFields(PPCContext& t, Random& r, const World& w) {
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30724, uint32_t(int32_t(r.Below(4)) - 1));
+  const uint32_t cursor = uint32_t(int32_t(r.Below(7)) - 1);
+  const uint32_t any = uint32_t(r.Next());
+  guest::StoreU32(base, s + 30736, r.Below(5) == 0 ? r.Below(3) : 3 + r.Below(2));
+  for (uint32_t k = 0; k < 12; k++) {
+    guest::StoreU32(base, s + 31180 + 4 * k, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(200));
+  }
+  guest::StoreU32(base, s + 30764, uint32_t(int32_t(r.Below(210)) - 8));
+  guest::StoreU32(base, s + 9708, r.Below(3) == 0 ? 0 : 1);
+  const uint32_t wait = r.Below(2) == 0 ? 0 : r.Below(10) == 0 ? 0xFFFFFFFFu : 1 + r.Below(5);
+  guest::StoreU32(base, kLayersWait, wait);
+  // (Past the wait the cursor indexes the movie's textures: any word only
+  // without it.)
+  guest::StoreU32(base, s + 30732, wait == 0 && r.Below(10) == 0 ? any : cursor);
+  const uint32_t images = s + 10048;
+  for (const uint32_t first : {12u, 33u}) {
+    for (uint32_t i = first; i < first + 9; i++) {
+      const uint32_t e = images + 36 * i;
+      if (r.Below(2) == 0) {
+        guest::StoreU32(base, e + 28, 0);
+        guest::StoreU32(base, e + 32, 0);
+      } else {
+        // Kept slot i (distinct: a slot taken twice would leave an entry
+        // unheld, its random texture freed).
+        guest::StoreU32(base, images + 7236 + 8 * i, guest::LoadU32(base, e + 28));
+      }
+    }
+  }
+  if (r.Below(2) == 0) {
+    for (uint32_t i = 0; i < 200; i++) {
+      if (guest::LoadU32(base, images + 36 * i + 8) == 1) {
+        guest::StoreU32(base, images + 36 * i + 8, 0);
+      }
+    }
+  }
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 155, 169, 156, 170, 159, 159, 158, 158};
+  const uint32_t pick = r.Below(15);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (pick < 12) {
+    const uint32_t bit = 1u << (kActions[pick] - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, pick >= 8 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, pick < 8 ? bit : 0);
+  }
+  HighWord(t, r);
+}
+
+// The image picker (MoveVinylImages; InputVinylImages): the layers' fields
+// (above), with 164 now and then held and the mappers' slot 11 (+44) the
+// read slot sub_8210BFA8 (as the decal edits').
+void VinylImageFields(PPCContext& t, Random& r, const World& w) {
+  VinylLayerFields(t, r, w);
+  for (uint32_t c = 0; c < 4; c++) {
+    guest::StoreU32(w.base, w.at(kVtablesAt) + 0x40 * c + 44, 0x8210BFA8);
+  }
+  const uint32_t c = guest::LoadU32(w.base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(w.base, kMapperEntries + 8 * c);
+  guest::StoreU32(w.base, mapper + 448, r.Below(4) == 0 ? 1u << (164 - 151) : 0);
+}
+
+// The image picker's page (InputVinylImages): the image picker's fields
+// (above) with the layer +30732 -1 to 5 (it indexes the entries freed and
+// the movie's texture table), entries 0 to 50 with no texture (0 header and
+// data) or held by the kept slot of their index (each distinct: two
+// entries sharing a kept slot would leave one unheld and Texture::Free run
+// on random words), and the kept slots 6 to 14 FreeKept frees held or with
+// no texture; the four wait words [0x826D84B4], [0x826D84B0], [0x826D84A8]
+// and [0x826D84AC] 0 most of the time, else small; the picked image +30764
+// around 0, the list's end +30796 (4, 193 or 198) and between, the group
+// +30768 -1 to 12, the state +9652 24 to 26 mostly; the action one of the
+// moves, 164 held, the group's 161 and 162, A (159 pressed, now and then
+// with 163 fired) or B, now and then none.
+void VinylPickFields(PPCContext& t, Random& r, const World& w) {
+  VinylImageFields(t, r, w);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30732, uint32_t(int32_t(r.Below(7)) - 1));
+  const uint32_t images = s + 10048;
+  for (uint32_t i = 0; i < 51; i++) {
+    const uint32_t e = images + 36 * i;
+    if (r.Below(2) == 0) {
+      guest::StoreU32(base, e + 28, 0);
+      guest::StoreU32(base, e + 32, 0);
+      guest::StoreU32(base, images + 7236 + 8 * i, 0);
+      guest::StoreU32(base, images + 7240 + 8 * i, 0);
+    } else {
+      guest::StoreU32(base, images + 7236 + 8 * i, guest::LoadU32(base, e + 28));
+    }
+  }
+  static constexpr uint32_t kWaits[] = {0x826D84B4, 0x826D84B0, 0x826D84A8, 0x826D84AC};
+  for (const uint32_t at : kWaits) {
+    guest::StoreU32(base, at, r.Below(3) != 0 ? 0 : r.Below(8) == 0 ? 0xFFFFFFFFu : 1 + r.Below(3));
+  }
+  static constexpr uint32_t kLasts[] = {4, 193, 198};
+  const uint32_t last = kLasts[r.Below(3)];
+  guest::StoreU32(base, s + 30796, last);
+  int32_t pick;
+  switch (r.Below(5)) {
+    case 0: pick = int32_t(r.Below(3)) - 1; break;
+    case 1: pick = int32_t(last) + int32_t(r.Below(3)) - 1; break;
+    case 2: pick = int32_t(r.Below(last + 1)); break;
+    case 3: pick = int32_t(r.Below(210)) - 8; break;
+    default: pick = int32_t(r.Below(5)); break;
+  }
+  guest::StoreU32(base, s + 30764, uint32_t(pick));
+  guest::StoreU32(base, s + 30768, uint32_t(int32_t(r.Below(14)) - 1));
+  guest::StoreU32(base, s + 9652, r.Below(5) == 0 ? r.Below(63) : 24 + r.Below(3));
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  static constexpr uint32_t kFired[] = {155, 169, 156, 170, 161, 162};
+  const uint32_t action = r.Below(12);
+  uint32_t pressed = 0, fired = 0;
+  if (action < 6) {
+    fired = 1u << (kFired[action] - 151);
+  } else if (action < 9) {
+    pressed = 1u << (159 - 151);
+    if (r.Below(2) == 0) {
+      fired = 1u << (163 - 151);
+    }
+  } else if (action < 11) {
+    pressed = 1u << (158 - 151);
+  }
+  if (action < 11) {
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 456, pressed);
+    guest::StoreU32(base, mapper + 464, fired);
+  }
+}
+
+// The operate select (InputLayerActions, MoveLayerActions,
+// BeginLayerOrder): the image picker's fields (above: the page -1 to 2, the
+// layers' saved ids, the picked image, the picker windows' entries with no
+// texture or held by a distinct kept slot, now and then none loading, the
+// mappers' slot 11 laid) with the layer +30732 0 to 2 (it indexes the
+// movie's texture table), the cursor +30740 -1 to 4 (now and then any word;
+// 2 half the time with the wait set), the wrap +30744 0 or 1, the vinyls
+// (+9656 5, byte +9660 6) most of the time; the load wait [0x826D84BC] 0
+// mostly, else 2 (its loads) or 1 to 5 or -1, now and then an entry
+// loading; the action now and then one of up, down, A, B
+// or 164 held (held now and then with the others too).
+void LayerActionFields(PPCContext& t, Random& r, const World& w) {
+  VinylImageFields(t, r, w);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30732, r.Below(3));
+  const uint32_t wait = r.Below(3) != 0   ? 0
+                        : r.Below(8) == 0 ? 0xFFFFFFFFu
+                        : r.Below(2) == 0 ? 2
+                                          : 1 + r.Below(5);
+  guest::StoreU32(base, kActionsWait, wait);
+  if (r.Below(3) == 0) {
+    // An entry loading (the wait's end waits for it).
+    guest::StoreU32(base, s + 10048 + 36 * r.Below(200) + 8, 1);
+  }
+  uint32_t cursor = uint32_t(int32_t(r.Below(6)) - 1);
+  if (r.Below(10) == 0) {
+    cursor = uint32_t(r.Next());
+  } else if (wait != 0 && r.Below(2) == 0) {
+    cursor = 2;
+  }
+  guest::StoreU32(base, s + 30740, cursor);
+  guest::StoreU32(base, s + 30744, r.Below(2));
+  if (r.Below(5) != 0) {
+    guest::StoreU32(base, s + 9656, 5);
+    guest::StoreU8(base, s + 9660, 6);
+  }
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 159, 159, 159, 158, 158, 164};
+  const uint32_t pick = r.Below(12);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (pick < 10) {
+    const uint32_t action = kActions[pick];
+    const uint32_t bit = 1u << (action - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 448,
+                    action == 164 || r.Below(8) == 0 ? 1u << (164 - 151) : 0);
+    guest::StoreU32(base, mapper + 456, action == 159 || action == 158 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, action < 158 || action > 159 ? bit : 0);
+  }
+}
+
+// The layer order (InputLayerOrder, MoveLayerOrder, ShowOrderNodes,
+// SwapOrderTextures, SwapLayerRecords, EndLayerOrder): the image picker's
+// fields (above: the page -1 to 2, the vinyls most of the time, 164 now and
+// then held) with the history's depth 3 to 42 and a 24 below its top, the
+// layer +30732 0 to 2 (now and then 3 or 4: the named animations' index), the position
+// +30756 -1 to 3 and the last +30792 0 to 3 (the work list's words they
+// index stay inside the screen), the move's way +30760 0 to 3, the work
+// list's ids +31216 + 4k -1 or an image and indices +31228 + 4k 0 to 2
+// (they index the image entries), the frame count [0x826D84C0] 0 half the
+// time, else 9, 12 (their next frames the work), 1 to 14 or -1; the action
+// now and then one of up, down, A, B or 164 held (held now and then with
+// the others too); SwapLayerRecords' r4 and r5 -1 to 3 (now and then with
+// a high word).
+void LayerOrderFields(PPCContext& t, Random& r, const World& w) {
+  VinylImageFields(t, r, w);
+  uint8_t* base = w.base;
+  const uint32_t s = w.screen();
+  guest::StoreU32(base, s + 30732, r.Below(6) == 0 ? 3 + r.Below(2) : r.Below(3));
+  // The history: a 24 below its top (the count's end pops down to it; the
+  // original loops until it finds one), now and then 28 on top.
+  const uint32_t depth = 3 + r.Below(40);
+  guest::StoreU8(base, s + 10008, uint8_t(depth));
+  guest::StoreU32(base, s + 9756 + 4 * r.Below(depth - 2), 24);
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, s + 9756 + 4 * (depth - 1), 28);
+  }
+  guest::StoreU32(base, s + 30756, uint32_t(int32_t(r.Below(5)) - 1));
+  guest::StoreU32(base, s + 30792, r.Below(4));
+  guest::StoreU32(base, s + 30760, r.Below(4));
+  for (uint32_t k = 0; k < 3; k++) {
+    guest::StoreU32(base, s + 31216 + 4 * k, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(200));
+    guest::StoreU32(base, s + 31228 + 4 * k, r.Below(3));
+  }
+  static constexpr uint32_t kCounts[] = {9, 12, 9, 12, 0xFFFFFFFFu};
+  const uint32_t count = r.Below(2) == 0 ? 0
+                         : r.Below(3) == 0 ? 1 + r.Below(14)
+                                           : kCounts[r.Below(5)];
+  guest::StoreU32(base, kOrderCount, count);
+  static constexpr uint32_t kActions[] = {153, 167, 154, 168, 159, 159, 158, 158, 164};
+  const uint32_t pick = r.Below(11);
+  const uint32_t c = guest::LoadU32(base, kControllerEntries);
+  const uint32_t mapper = guest::LoadU32(base, kMapperEntries + 8 * c);
+  if (pick < 9) {
+    const uint32_t action = kActions[pick];
+    const uint32_t bit = 1u << (action - 151);
+    guest::StoreU32(base, kMapperEntries + 8 * c + 4, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper + 448,
+                    action == 164 || r.Below(8) == 0 ? 1u << (164 - 151) : 0);
+    guest::StoreU32(base, mapper + 456, action == 159 || action == 158 ? bit : 0);
+    guest::StoreU32(base, mapper + 464, action < 158 || action > 159 ? bit : 0);
+  }
+  auto around = [&r] {
+    uint64_t v = uint64_t(int64_t(int32_t(r.Below(5)) - 1));
+    if (r.Below(2) == 0) {
+      v &= 0xFFFFFFFFu;
+    }
+    if (r.Below(6) == 0) {
+      v += r.Next() << 32;
+    }
+    return v;
+  };
+  t.r4.u64 = around();
+  t.r5.u64 = around();
+}
+
+// The sticker editor's group helpers (SetGroupImage, SetImageGroup): r4 the
+// group -2 to 13 or the image -5 to 200 around the bounds, now and then any
+// doubleword.
+void GroupFields(PPCContext& t, Random& r, const World& w) {
+  (void)w;
+  HighWord(t, r);
+  switch (r.Below(4)) {
+    case 0: t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(16)) - 2)); break;
+    case 1: t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(206)) - 5)); break;
+    case 2: {
+      static constexpr int32_t kBounds[] = {43, 78, 106, 114, 142, 156, 165, 175, 180, 187, 192};
+      t.r4.u64 = uint64_t(int64_t(kBounds[r.Below(11)] + int32_t(r.Below(3)) - 1));
+      break;
+    }
+    default: t.r4.u64 = r.Next(); break;
+  }
+}
+
 }  // namespace
+
+// TuningScreen::HandleInput's cases for one of `states`' page: the page's
+// own fields (`fields`, as its group lays them), then +9728 set (0 one case
+// in eight: DecalImages::Update only) and the queue's +0 the state. Its r30,
+// r31 and lr (24 bytes); DecalImages::Update's saves (112 to 136 below, the
+// decal images unloaded: nothing made) and the page's own saves and holes
+// (`page_saves`, `page_holes`) 112 deeper, which the native versions don't
+// write.
+Spec HandleInputSpec(const char* name, int cases, std::vector<uint32_t> states,
+                     uint32_t page_saves,
+                     const std::vector<std::pair<uint32_t, uint32_t>>& page_holes,
+                     const Setup& fields, bool loads = false) {
+  std::vector<std::pair<uint32_t, uint32_t>> holes = {{112, 112 + std::max(24u, page_saves)}};
+  for (const auto& [from, to] : page_holes) {
+    holes.push_back({from + 112, to + 112});
+  }
+  return {name,
+          cases,
+          __imp__sub_821E6950,
+          hooks::TuningPagesHandleInput,
+          24,
+          holes,
+          [fields, states](PPCContext& t, Random& r, const World& w) {
+            if (fields) {
+              fields(t, r, w);
+            }
+            const uint32_t state = states[r.Below(uint32_t(states.size()))];
+            const uint32_t s = w.screen();
+            guest::StoreU32(w.base, s + 9728,
+                            r.Below(8) == 0 ? 0 : (r.Below(2) == 0 ? 1 : uint32_t(r.Next()) | 1));
+            guest::StoreU32(w.base, guest::LoadU32(w.base, s + 10036), state);
+          },
+          loads};
+}
 
 void TuningPagesMovie(Context& h) {
   World w(h.base);
@@ -1486,11 +1910,12 @@ void TuningPagesMovie(Context& h) {
   // word (not read). Its r30, r31 and lr (24 bytes); with B, UnloadAll's
   // (112 to 136 below) and its callees' (RestoreVinylMovie's and
   // RestoreStickerMovie's, Unload's) saves, which their plain C++ doesn't
-  // write.
+  // write; MoveCategory's (r29 to r31 and lr, 112 to 144 below: its adapter
+  // went, B7 loop, 2026-11-11, so the recompiled side runs its original).
   Run(h, w,
       {"TuningScreen::InputCategories", 80, __imp__sub_821D6AD0,
        hooks::TuningPagesInputCategories, 24,
-       {{112, 136}, {224, 256}, {320, 376}, {432, 456}},
+       {{112, 144}, {224, 256}, {320, 376}, {432, 456}},
        [](PPCContext& t, Random& r, const World&) {
          t.r4.u64 = r.Next();
          HighWord(t, r);
@@ -1542,10 +1967,34 @@ void TuningPagesMovie(Context& h) {
   // InputItems: its saves (__savegprlr_28: 40 bytes); StepList's,
   // MoveItem's and LoadVinyls' (128 to 176 below: their plain C++ doesn't
   // write them, LoadDecalImages' too) and LoadDecalImages' Request's or
-  // Load's (r31 and lr, 256 to 272 below); Archive::Load recorded.
+  // Load's (r31 and lr, 256 to 272 below); StoreToGarageCar's
+  // (__savegprlr_25, 128 to 192 below: its adapter went, B7 loop,
+  // 2026-11-11, so the recompiled side runs its original); ScenePools::
+  // GetB's back chain (236 to 240 below: its adapter went, B7 loop,
+  // 2026-11-12; its saves fall in StoreToGarageCar's); Archive::Load
+  // recorded.
   Run(h, w,
       {"TuningScreen::InputItems", 500, __imp__sub_821DFD48, hooks::TuningPagesInputItems, 40,
-       {{128, 176}, {256, 272}}, ItemFields, true});
+       {{128, 224}, {236, 240}, {256, 272}, {304, 336}}, ItemFields, true});
+  // The sticker editor's set-up under InputItems (the item fields' world:
+  // the garage list, the cars' decal records): ResetStickerEditor a leaf;
+  // RestoreAreaDecals' __savegprlr_29 (32 bytes), r4 the area 0 to 7 (now
+  // and then with a high word: the original's 64-bit adds); LoadStickers'
+  // __savegprlr_26 and __savefpr_27 (96 bytes) and RestoreAreaDecals' saves
+  // below its frame (176 to 208), which its plain C++ doesn't write.
+  Run(h, w,
+      {"TuningScreen::ResetStickerEditor", 100, __imp__sub_821F8440,
+       hooks::TuningPagesResetStickerEditor, 0, {}, ItemFields});
+  Run(h, w,
+      {"TuningScreen::RestoreAreaDecals", 100, __imp__sub_821F6C90,
+       hooks::TuningPagesRestoreAreaDecals, 32, {},
+       [](PPCContext& t, Random& r, const World& w) {
+         ItemFields(t, r, w);
+         t.r4.u64 = r.Below(8);
+       }});
+  Run(h, w,
+      {"TuningScreen::LoadStickers", 200, __imp__sub_821F86C0, hooks::TuningPagesLoadStickers, 96,
+       {{176, 208}}, ItemFields});
   // MoveOption: state 8's fields (above); __savegprlr_28: 40 bytes.
   Run(h, w,
       {"TuningScreen::MoveOption", 300, __imp__sub_821D5610, hooks::TuningPagesMoveOption, 40, {},
@@ -1618,6 +2067,244 @@ void TuningPagesMovie(Context& h) {
       {"TuningScreen::InputWheels", 600, __imp__sub_821F6688, hooks::TuningPagesInputWheels, 32,
        {{48, 80}, {128, 160}, {256, 336}, {432, 472}, {1024, 1056}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, true); }});
+  // The decal edits' movie sides: __savegprlr_29 (32 bytes).
+  Run(h, w,
+      {"TuningScreen::MoveDecalPosition", 200, __imp__sub_82200DC0,
+       hooks::TuningPagesMoveDecalPosition, 32, {}, DecalEditFields});
+  Run(h, w,
+      {"TuningScreen::MoveDecalAngle", 150, __imp__sub_822012E8, hooks::TuningPagesMoveDecalAngle,
+       32, {}, DecalEditFields});
+  Run(h, w,
+      {"TuningScreen::MoveDecalScale", 150, __imp__sub_82201620, hooks::TuningPagesMoveDecalScale,
+       32, {}, DecalEditFields});
+  // Their pages: r30, r31 and lr (24 bytes); the movie side's saves and
+  // HighlightSelected's (its r29 to r31, lr, f30, f31: 48 bytes) and
+  // memcpy's r3 (112 to 160 below: the guest's hold the original's
+  // registers, which the native version doesn't set; the movie side's plain
+  // C++ doesn't write them).
+  Run(h, w,
+      {"TuningScreen::InputDecalPosition", 300, __imp__sub_82206A50,
+       hooks::TuningPagesInputDecalPosition, 24, {{112, 160}}, DecalEditFields});
+  Run(h, w,
+      {"TuningScreen::InputDecalAngle", 200, __imp__sub_82206F48,
+       hooks::TuningPagesInputDecalAngle, 24, {{112, 160}}, DecalEditFields});
+  Run(h, w,
+      {"TuningScreen::InputDecalScale", 200, __imp__sub_82207320,
+       hooks::TuningPagesInputDecalScale, 24, {{112, 160}}, DecalEditFields});
+  // The layer's edit menu: MoveLayerEdit's __savegprlr_29 (32 bytes);
+  // InputLayerEdit's r30, r31 and lr (24) with its callees' saves as the
+  // decal edits' (112 to 160 below).
+  Run(h, w,
+      {"TuningScreen::MoveLayerEdit", 300, __imp__sub_82200760, hooks::TuningPagesMoveLayerEdit,
+       32, {}, LayerEditFields});
+  Run(h, w,
+      {"TuningScreen::InputLayerEdit", 400, __imp__sub_82205110, hooks::TuningPagesInputLayerEdit,
+       24, {{112, 160}}, LayerEditFields});
+  // The items' highlights (tuning_screen's plain C++): the decal edits'
+  // fields (the page 0 or 1 mostly, now and then 2 or -1; the layer 0 to
+  // 2), r4 0 or 1 (now and then any word), HighlightItem's r5 -1 to 3 (now
+  // and then any word). Their saves: r28 to r31, lr, f30 and f31 (56
+  // bytes), r29 to r31, lr, f30 and f31 (48).
+  Run(h, w,
+      {"TuningScreen::HighlightItem", 120, __imp__sub_82203400, hooks::TuningPagesHighlightItem,
+       56, {}, [](PPCContext& t, Random& r, const World& w) {
+         DecalEditFields(t, r, w);
+         t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
+         t.r5.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(r.Below(5)) - 1);
+       }});
+  Run(h, w,
+      {"TuningScreen::HighlightSelected", 120, __imp__sub_82203570,
+       hooks::TuningPagesHighlightSelected, 48, {},
+       [](PPCContext& t, Random& r, const World& w) {
+         DecalEditFields(t, r, w);
+         t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
+         if (r.Below(6) == 0) {
+           guest::StoreU32(w.base, w.screen() + 30732, uint32_t(r.Next()));
+         }
+       }});
+  // The vinyl page's layers: MoveVinylLayers' __savegprlr_29 (32 bytes);
+  // InputVinylLayers' __savegprlr_22 (88) with its callees' saves its
+  // native version doesn't write: MoveVinylLayers', RestoreStickerTexture's
+  // and LoadWindow's (176 to 232 below), Reload's under LoadWindow (320 to
+  // 336); Archive::Load recorded.
+  Run(h, w,
+      {"TuningScreen::MoveVinylLayers", 300, __imp__sub_821FFB20,
+       hooks::TuningPagesMoveVinylLayers, 32, {}, VinylLayerFields});
+  Run(h, w,
+      {"TuningScreen::InputVinylLayers", 400, __imp__sub_82208CE0,
+       hooks::TuningPagesInputVinylLayers, 88, {{176, 232}, {320, 336}}, VinylLayerFields, true});
+  // The image picker's movie side: __savegprlr_29 (32 bytes).
+  Run(h, w,
+      {"TuningScreen::MoveVinylImages", 200, __imp__sub_82202530,
+       hooks::TuningPagesMoveVinylImages, 32, {}, VinylImageFields});
+  // Its page: __savegprlr_14 (152 bytes) with its callees' saves its native
+  // version doesn't write: MoveVinylImages' (32), Scroll's (40),
+  // LoadWindow's (56), Reload's (16) and BindVinylTexture's (32) below its
+  // 240-byte frame (240 to 296 below), Reload's under Scroll's and
+  // LoadWindow's frames (368 to 400); Archive::Load recorded.
+  Run(h, w,
+      {"TuningScreen::InputVinylImages", 500, __imp__sub_822058F8,
+       hooks::TuningPagesInputVinylImages, 152, {{240, 296}, {368, 400}}, VinylPickFields, true});
+  // The operate select: BeginLayerOrder a leaf (no saves);
+  // MoveLayerActions' __savegprlr_29 (32 bytes); InputLayerActions'
+  // __savegprlr_22 (88) with its callees' saves its native version doesn't
+  // write: MoveLayerActions', HighlightSelected's, RestoreStickerTexture's
+  // and LoadWindow's (176 to 232 below), Reload's under LoadWindow (320 to
+  // 336); Archive::Load recorded.
+  Run(h, w,
+      {"TuningScreen::BeginLayerOrder", 100, __imp__sub_821FE370,
+       hooks::TuningPagesBeginLayerOrder, 0, {}, LayerActionFields});
+  Run(h, w,
+      {"TuningScreen::MoveLayerActions", 300, __imp__sub_82200230,
+       hooks::TuningPagesMoveLayerActions, 32, {}, LayerActionFields});
+  Run(h, w,
+      {"TuningScreen::InputLayerActions", 500, __imp__sub_82209738,
+       hooks::TuningPagesInputLayerActions, 88, {{176, 232}, {320, 336}}, LayerActionFields,
+       true});
+  // The sticker editor's group helpers: leaves.
+  Run(h, w,
+      {"TuningScreen::SetGroupImage", 100, __imp__sub_821FD5C0, hooks::TuningPagesSetGroupImage,
+       0, {}, GroupFields});
+  Run(h, w,
+      {"TuningScreen::SetImageGroup", 100, __imp__sub_821FD658, hooks::TuningPagesSetImageGroup,
+       0, {}, GroupFields});
+  // The layer order: EndLayerOrder a leaf; SwapLayerRecords' and
+  // SwapOrderTextures' __savegprlr_29 (32 bytes); ShowOrderNodes'
+  // __savegprlr_28 (48); MoveLayerOrder's r30, r31 and lr (24);
+  // InputLayerOrder's __savegprlr_23 (80) with its callees' saves its native
+  // version doesn't write (176 to 224 below: ShowOrderNodes',
+  // MoveLayerOrder's, SwapLayerRecords', SwapOrderTextures' and
+  // ShowOptionMarks').
+  Run(h, w,
+      {"TuningScreen::EndLayerOrder", 100, __imp__sub_821FE3C8, hooks::TuningPagesEndLayerOrder,
+       0, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::SwapLayerRecords", 150, __imp__sub_821FD518,
+       hooks::TuningPagesSwapLayerRecords, 32, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::SwapOrderTextures", 150, __imp__sub_82207F38,
+       hooks::TuningPagesSwapOrderTextures, 32, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::ShowOrderNodes", 150, __imp__sub_82203A30, hooks::TuningPagesShowOrderNodes,
+       48, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::MoveLayerOrder", 200, __imp__sub_82201DB8, hooks::TuningPagesMoveLayerOrder,
+       24, {}, LayerOrderFields});
+  Run(h, w,
+      {"TuningScreen::InputLayerOrder", 800, __imp__sub_8220A1C8,
+       hooks::TuningPagesInputLayerOrder, 80, {{176, 224}}, LayerOrderFields});
+  // TuningScreen::Command21 (tuning_screen's plain C++, the update's
+  // command 21): the layer order's fields with the layer +30732 and the
+  // position +30756 0 to 2 (up to two moves either way). __savegprlr_27 (48
+  // bytes); its callees' saves (144 to 224 below: SwapLayerRecords',
+  // SwapOrderTextures', Command20's and LayOutItems', their plain C++ not
+  // writing them).
+  Run(h, w,
+      {"TuningScreen::Command21", 300, __imp__sub_822087C8, hooks::TuningCommand21, 48,
+       {{144, 224}}, [](PPCContext& t, Random& r, const World& w) {
+         LayerOrderFields(t, r, w);
+         // The layer and the position 0 to 2, as play leaves them: the moves
+         // stay on the work list's three words (0 to 2), so Command20's
+         // named animations are the layers' (a position of 3 reads the
+         // sticker records past the list as ids: wild animation indices).
+         guest::StoreU32(w.base, w.screen() + 30732, r.Below(3));
+         guest::StoreU32(w.base, w.screen() + 30756, r.Below(3));
+       }});
+  // TuningScreen::HandleInput (its piece sub_821E69B8 merged): the states
+  // with no page, the empty ones and the piece's (with the screen's own
+  // fields), then each page this world holds with its group's fields (the
+  // pages' saves and holes as their groups give them). Not here: the pages
+  // never seen in play it calls through the guest (7, 18 to 22, 38 to 46,
+  // 49, 53 to 58: the same function on both sides) and the vinyl view, the
+  // vinyl editor's menu and EnterEditor (23, 34, 60: their worlds are
+  // car_makers' and tuning_pages.cpp's; HandleInput only calls them).
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (no page)", 120,
+                      {0, 0, 0, 1, 2, 9, 10, 11, 12, 13, 14, 32, 33, 35, 36, 37, 47, 48, 50, 51,
+                       52, 63, 64, 200, 0xFFFFFFFFu, 0x80000000u},
+                      0, {}, [](PPCContext& t, Random& r, const World&) {
+                        t.r4.u64 = r.Next();
+                        HighWord(t, r);
+                      }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (3)", 40, {3}, 24,
+                      {{112, 144}, {224, 256}, {320, 376}, {432, 456}},
+                      [](PPCContext& t, Random& r, const World&) {
+                        t.r4.u64 = r.Next();
+                        HighWord(t, r);
+                      }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (4)", 100, {4}, 40,
+                      {{128, 224}, {236, 240}, {256, 272}, {304, 336}}, ItemFields, true));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (5)", 100, {5}, 24, {{112, 160}},
+                      LevelInputFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (6)", 100, {6}, 24, {{112, 160}},
+                      TypeInputFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (8)", 100, {8}, 24, {{112, 152}}, OptionFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (15)", 50, {15}, 48, {{128, 160}},
+                      [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, false); }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (16)", 100, {16}, 32,
+                      {{48, 80}, {128, 160}, {256, 336}, {432, 472}, {1024, 1056}},
+                      [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, true); }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (17)", 50, {17}, 24, {{112, 144}},
+                      [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, false); }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (24)", 80, {24}, 88, {{176, 232}, {320, 336}},
+                      VinylLayerFields, true));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (25)", 80, {25}, 88, {{176, 232}, {320, 336}},
+                      LayerActionFields, true));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (26)", 80, {26}, 24, {{112, 160}},
+                      LayerEditFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (27)", 100, {27}, 80, {{176, 224}},
+                      LayerOrderFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (28)", 80, {28}, 152, {{240, 296}, {368, 400}},
+                      VinylPickFields, true));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (29)", 60, {29}, 24, {{112, 160}},
+                      DecalEditFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (30)", 40, {30}, 24, {{112, 160}},
+                      DecalEditFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (31)", 40, {31}, 24, {{112, 160}},
+                      DecalEditFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (59)", 80, {59}, 24, {{112, 144}, {160, 176}},
+                      OwnedFields));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (61)", 40, {61}, 40, {},
+                      [](PPCContext& t, Random& r, const World& w) {
+                        if (r.Below(4) == 0) {
+                          guest::StoreU32(w.base, r.Below(2) == 0 ? kFadeIn : kFadeOut,
+                                          1 + r.Below(30));
+                        }
+                        HighWord(t, r);
+                      }));
+  Run(h, w,
+      HandleInputSpec("TuningScreen::HandleInput (62)", 40, {62}, 16,
+                      {{96, 120}, {208, 240}, {304, 360}, {416, 440}},
+                      [](PPCContext& t, Random& r, const World& w) {
+                        const uint32_t s = w.screen();
+                        const uint32_t depth = guest::LoadU8(w.base, s + 10008);
+                        const uint32_t at = depth == 0 ? 64 + r.Below(6) : r.Below(depth);
+                        guest::StoreU32(w.base, s + (at + 2439) * 4, 4);
+                        if (r.Below(6) == 0) {
+                          guest::StoreU32(w.base, r.Below(2) == 0 ? kFadeIn : kFadeOut,
+                                          1 + r.Below(30));
+                        }
+                        t.r4.u64 = r.Next();
+                        HighWord(t, r);
+                      }));
 }
 
 }  // namespace harness

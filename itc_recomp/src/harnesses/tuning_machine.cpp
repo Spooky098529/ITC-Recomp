@@ -1116,6 +1116,27 @@ void StartCases(Context& h) {
       // since their adapters went and the native one doesn't write (register
       // saves aren't reproduced).
       Fill(base, sp - tuning_machine::kStartFrame - kCalleeSaves, kCalleeSaves, 0);
+      // Since the refresh's adapter went (B7 loop, 2026-11-11, after the
+      // update went native), the recompiled Start calls the original refresh
+      // (state 3 here), whose leftovers the native one doesn't write, left out
+      // as the refresh's own harness leaves them (tuning_refresh.cpp): its
+      // register saves (r22 to r31, lr and f31: the 96 bytes under Start's
+      // frame), its parameter area (its 368-byte frame's +40 to +79, the
+      // varargs SetText's r7 to r10: the user's call of 2026-10-30), its
+      // callees' originals' saves (the 88 under its frame, HideTireMarks' 32
+      // under ShowTireMarks' 176-byte frame) and PreviewItem's callees' (as
+      // its cases leave them out).
+      {
+        const uint32_t refresh = sp - tuning_machine::kStartFrame - 368;
+        Fill(base, sp - tuning_machine::kStartFrame - 96, 96, 0);
+        Fill(base, refresh + 40, 40, 0);
+        Fill(base, refresh - 88, 88, 0);
+        Fill(base, refresh - 176 - 32, 32, 0);
+        const uint32_t preview = refresh - 160;
+        Fill(base, preview - 32, 32, 0);
+        Fill(base, preview - 112 - 56, 56, 0);
+        Fill(base, preview - 4000 - 16 - 16, 16, 0);
+      }
       TextMovieRecords(base, movie, out[v]);
       for (const auto& [address, bytes] : globals) {
         out[v].Bytes(Read(base, address, bytes));

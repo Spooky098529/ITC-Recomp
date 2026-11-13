@@ -1017,6 +1017,17 @@ void Progress(Context& h, const World& w) {
                          2976},
                         {-272 + 4, 12},
                         {-256 + 4, 12}}});
+  // Condition::Test's last item copy (3,008 bytes from r1 - 144 - 3,168 +
+  // 80), without the word at r1 - 240: the back chain the original's
+  // Stage::Of (96 bytes) stores below Progress::CheckUnlocks' frame, which
+  // native code doesn't.
+  const int32_t copy = -int32_t(cr::kCheckUnlocksFrame) - int32_t(cr::kConditionTestFrame) + 80;
+  Group(
+      h, w, "Progress::CheckUnlocks (sub_821162B0)", 160,
+      [base](Random& r, const World& w) { ShapeAfterRace(base, w, r); },
+      [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.save.address; },
+      __imp__sub_821162B0, hooks::CareerCheckUnlocks,
+      {.frame_ranges = {{copy, uint32_t(-240 - copy)}, {-240 + 4, 12}}});
 }
 
 }  // namespace

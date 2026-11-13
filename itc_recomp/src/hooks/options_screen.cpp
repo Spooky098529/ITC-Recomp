@@ -53,6 +53,19 @@ ITC_FLAG_BOOL(native_options_screen, true, "ITC",
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=options_screen)");
 
+ITC_FLAG_BOOL(native_options_load_save, true, "ITC",
+              "Run the options screen's load page (category 5, page 9) and save page "
+              "(category 6, page 10) (docs/functions/options-load-save.md: LoadPage::SetDialog "
+              "sub_821BB858 and SavePage::SetDialog sub_821BB708 (their callers), LoadPage::Close sub_821B9FB0, "
+              "SavePage::Close sub_821BA508, OptionsSavePages::Cancel sub_821B9FF8, the sub-pages "
+              "LoadPage::CheckDevice sub_821BBC10, Answer sub_821BC7B0, Note sub_821BC940, Wait "
+              "sub_821C2620 and DeviceAnswer sub_821BBC68, SavePage::CheckDevice sub_821BBCC0, "
+              "Answer sub_821BCA60, Note sub_821BCC10 and Wait sub_821BBD18, and the steps "
+              "LoadPage::Leave sub_821C6468 and SavePage::Leave sub_821C6550; the save layer, "
+              "Menu::Step and Pressed, MenuSound::Play, the UI movie calls and memcpy where its "
+              "plain C++ declines through their overrides) natively instead of through the "
+              "translated code (the same writes; checked by --run_harnesses=options_load_save)");
+
 namespace hooks {
 
 namespace {
@@ -524,6 +537,38 @@ void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = options_screen::CloseAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void LoadPageClose(PPCContext&, uint8_t* base) { options_screen::LoadPageClose(base); }
+
+void SavePageClose(PPCContext&, uint8_t* base) { options_screen::SavePageClose(base); }
+
+void SavePagesCancel(PPCContext&, uint8_t* base) { options_screen::SavePagesCancel(base); }
+
+#define ITC_LOAD_SAVE_PAGE(name)                                                \
+  void name(PPCContext& ctx, uint8_t* base) {                                   \
+    GuestCalls guest(ctx, base);                                                \
+    ctx.r3.u64 = options_screen::name(base, ctx.r1.u32, guest.calls());         \
+  }
+ITC_LOAD_SAVE_PAGE(LoadPageCheckDevice)
+ITC_LOAD_SAVE_PAGE(LoadPageAnswer)
+ITC_LOAD_SAVE_PAGE(LoadPageNote)
+ITC_LOAD_SAVE_PAGE(LoadPageWait)
+ITC_LOAD_SAVE_PAGE(LoadPageDeviceAnswer)
+ITC_LOAD_SAVE_PAGE(SavePageCheckDevice)
+ITC_LOAD_SAVE_PAGE(SavePageAnswer)
+ITC_LOAD_SAVE_PAGE(SavePageNote)
+ITC_LOAD_SAVE_PAGE(SavePageWait)
+#undef ITC_LOAD_SAVE_PAGE
+
+void LoadPageLeave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::LoadPageLeave(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void SavePageLeave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = options_screen::SavePageLeave(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 void OptionsInit(PPCContext& ctx, uint8_t* base, uint32_t address) {
   const uint64_t object_r3 = ctx.r3.u64;
   const options_screen::InitResult result =
@@ -656,3 +701,32 @@ extern "C" REX_FUNC(sub_821B9E70) {
   }
   hooks::OptionsOnLeft(ctx, base);
 }
+
+// The load and save pages (docs/functions/options-load-save.md). No adapters
+// (Native: their only callers in play, the pages' sub-pages, call their plain
+// C++) for LoadPage::SetDialog and SavePage::SetDialog; the flag switches
+// only their callers.
+#define ITC_OPTIONS_LOAD_SAVE(address, step)   \
+  extern "C" REX_FUNC(sub_##address) {         \
+    REX_FUNC_PROLOGUE();                       \
+    if (!ITC_FLAG(native_options_load_save)) { \
+      __imp__sub_##address(ctx, base);         \
+      return;                                  \
+    }                                          \
+    hooks::step(ctx, base);                    \
+  }
+
+ITC_OPTIONS_LOAD_SAVE(821B9FB0, LoadPageClose)
+ITC_OPTIONS_LOAD_SAVE(821BA508, SavePageClose)
+ITC_OPTIONS_LOAD_SAVE(821B9FF8, SavePagesCancel)
+ITC_OPTIONS_LOAD_SAVE(821BBC10, LoadPageCheckDevice)
+ITC_OPTIONS_LOAD_SAVE(821BC7B0, LoadPageAnswer)
+ITC_OPTIONS_LOAD_SAVE(821BC940, LoadPageNote)
+ITC_OPTIONS_LOAD_SAVE(821C2620, LoadPageWait)
+ITC_OPTIONS_LOAD_SAVE(821BBC68, LoadPageDeviceAnswer)
+ITC_OPTIONS_LOAD_SAVE(821BBCC0, SavePageCheckDevice)
+ITC_OPTIONS_LOAD_SAVE(821BCA60, SavePageAnswer)
+ITC_OPTIONS_LOAD_SAVE(821BCC10, SavePageNote)
+ITC_OPTIONS_LOAD_SAVE(821BBD18, SavePageWait)
+ITC_OPTIONS_LOAD_SAVE(821C6468, LoadPageLeave)
+ITC_OPTIONS_LOAD_SAVE(821C6550, SavePageLeave)

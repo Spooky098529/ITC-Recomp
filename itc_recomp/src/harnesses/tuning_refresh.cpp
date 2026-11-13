@@ -24,12 +24,23 @@
 // refresh's callees went, 2026-11-11, also their originals' register saves
 // and SetStateTexts' parameter area, which the recompiled refresh now
 // writes), the caller's area, r1, all of r3, lr and f1 (as a double).
+//
+// TuningScreen::Update (sub_821E6C50, src/tuning_screen/update.cpp) has a
+// group of its own here, last: the same world with the update's fields (its
+// command queue, menu and dispatcher in a block of their own, the busy
+// icon, the lists', UpdateStand's and RestoreStand's fields as their cases
+// lay them), UiMovie::Run's update stood in for (as the garage screen's
+// harness does: each call recorded, answered 0 or 1 from the case), and
+// compared as above but for the stack: only the update's frame without its
+// register saves (its callees' frames, holding the original's registers in
+// their saves, are their own harnesses'), with the stage's open states.
 
 #include "harness.h"
 
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/tuning_screen.h"
+#include "hooks/ui_movies.h"
 #include "memory/heap.h"
 #include "tuning_screen/tuning_screen.h"
 #include "ui_movies/game.h"
@@ -52,6 +63,7 @@ uint32_t TuningStandWorldBytes();
 uint32_t LayTuningStandWorld(uint8_t* base, uint32_t block, Random& r, int c);
 void PointTuningStandWorld(uint8_t* base, uint32_t block);
 void LayTuningStandTires(uint8_t* base, uint32_t block, Random& r);
+void ShortTuningStandAnimations(uint8_t* base, uint32_t block, Random& r);
 void LayTuningStandEngines(uint8_t* base, uint32_t block);
 const std::vector<uint32_t>& TuningStandWorldGlobals();
 uint32_t RaceDataBytes();
@@ -65,6 +77,7 @@ void MakeTextStrings(uint8_t* base, uint32_t strings);
 const std::vector<std::pair<uint32_t, uint32_t>>& TextMovieGlobals();
 void PointTextMovieGlobals(uint8_t* base, uint32_t block, uint32_t strings);
 void TextMovieRecords(uint8_t* base, uint32_t movie, Outputs& out);
+void TextMovieListAnimations(uint8_t* base, uint32_t block, Random& r);
 
 namespace {
 
@@ -84,6 +97,27 @@ struct Region {
   uint32_t bytes;
   std::vector<uint8_t> inputs;
 };
+
+// The update's cases: UiMovie::Run's update (sub_8211D2F8), stood in for
+// as the garage screen's harness does (the update would draw the movie,
+// which this world's text movie can't be): each call's return address,
+// stack pointer (from the case's), r3 and r4 kept and answered 0 or 1 from
+// the case's generator.
+struct UpdateCall {
+  uint32_t lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<UpdateCall> g_updates;
+Random g_answers;
+uint32_t g_case_sp = 0;
+bool UpdateStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (function != 0x8211D2F8) {
+    return false;
+  }
+  g_updates.push_back({uint32_t(ctx.lr), g_case_sp - ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = g_answers.Below(2);
+  return true;
+}
 
 uint32_t Small(Random& r, uint32_t below) {
   return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(below);
@@ -406,11 +440,27 @@ void TuningRefresh(Context& h) {
     saved.push_back(Read(base, address, bytes));
   }
 
+  // The update's cases' own block (TuningUpdate below): the command queue,
+  // the front-end menu, the dispatcher.
+  constexpr uint32_t kExtraBytes = 0x1000;
+  constexpr uint32_t kQueueAt = 0x0, kMenuAt = 0x100, kDispatcherAt = 0x400;
+  const uint32_t extra = memory::Alloc(kExtraBytes, 0);
+  // The stage's open states UpdateStand reads and writes (car_makers.cpp's
+  // UpdateStand cases): saved and put back, compared in the update's cases.
+  constexpr uint32_t kOpen[3] = {0x826D84A0, 0x826D849C, 0x826D8498};
+  uint32_t saved_open[3];
+  for (int i = 0; i < 3; i++) {
+    saved_open[i] = guest::LoadU32(base, kOpen[i]);
+  }
+
   // One case: the world for `state`, `category` and `item` (the rest from
   // `r`), `shape` (when given) run on it after the text movie is laid,
-  // then both versions run and compared.
-  const auto run = [&](Random& r, Results& results, int c, uint32_t state, uint32_t category,
-                       uint32_t item, const std::function<void(uint32_t movie)>& shape) {
+  // then both versions run and compared: the refresh, or with `update` the
+  // update (`update` laying its own fields after `shape`).
+  const auto run_case = [&](Random& r, Results& results, int c, uint32_t state,
+                            uint32_t category, uint32_t item,
+                            const std::function<void(uint32_t movie)>& shape,
+                            const std::function<void(PPCContext& start)>& update) {
     // The stand's world.
     const uint32_t save = LayTuningStandWorld(base, block, r, c);
     PointTuningStandWorld(base, block);
@@ -543,6 +593,16 @@ void TuningRefresh(Context& h) {
     if (shape) {
       shape(movie);
     }
+    PPCContext update_start{};
+    uint32_t open[3] = {};
+    uint64_t answers = 0;
+    if (update) {
+      update(update_start);
+      answers = r.Next();
+      for (uint32_t& o : open) {
+        o = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2);
+      }
+    }
     const uint32_t race_count = r.Below(6), race_added = r.Below(3);
 
     std::vector<Region> regions = {{block, stand_bytes, {}},
@@ -550,6 +610,9 @@ void TuningRefresh(Context& h) {
                                    {text, kRefreshTextBytes, {}},
                                    {misc, kMiscBytes, {}},
                                    {sub_scenes, kSubScenesBytes, {}}};
+    if (update) {
+      regions.push_back({extra, kExtraBytes, {}});
+    }
     for (Region& region : regions) {
       region.inputs = Read(base, region.address, region.bytes);
     }
@@ -558,7 +621,15 @@ void TuningRefresh(Context& h) {
     start.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
     start.lr = 0x82000000 | (r.Below(0x10000) << 2);
     start.f1.f64 = double(int32_t(r.Below(2000)) - 1000) / 8.0;
+    if (update) {
+      start.r3.u64 = (start.r3.u64 & ~0xFFFFFFFFull) | screen;
+      start.r4.u64 = update_start.r4.u64;
+    }
     const uint32_t sp = start.r1.u32;
+    // The refresh's own frame: below the call's r1, or the update's 144-byte
+    // frame.
+    const uint32_t call_sp = update ? sp - 144 : sp;
+    const bool refreshes = !update || int32_t(guest::LoadU32(base, screen + 9708)) == 1;
 
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
@@ -569,9 +640,34 @@ void TuningRefresh(Context& h) {
       PointTuningStandWorld(base, block);
       PointTextMovieGlobals(base, text, strings);
       ResetRaceData(base, race, race_count, race_added);
+      if (update) {
+        for (int i = 0; i < 3; i++) {
+          guest::StoreU32(base, kOpen[i], open[i]);
+        }
+      }
       PPCContext t = start;
       t.fpscr.disableFlushModeUnconditional();
-      (v == 0 ? __imp__sub_821E3AD0 : hooks::TuningRefresh)(t, base);
+      if (update) {
+        g_updates.clear();
+        g_answers = Random(answers);
+        g_case_sp = sp;
+        const ui_movies_hooks::UpdateCalleeStandIn stand_in =
+            ui_movies_hooks::g_update_callee_stand_in;
+        ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
+        (v == 0 ? __imp__sub_821E6C50 : hooks::TuningUpdate)(t, base);
+        ui_movies_hooks::g_update_callee_stand_in = stand_in;
+        out[v].Word(uint32_t(g_updates.size()));
+        for (const UpdateCall& call : g_updates) {
+          out[v].Word(call.lr);
+          out[v].Word(call.r1);
+          out[v].Word(uint32_t(call.r3 >> 32));
+          out[v].Word(uint32_t(call.r3));
+          out[v].Word(uint32_t(call.r4 >> 32));
+          out[v].Word(uint32_t(call.r4));
+        }
+      } else {
+        (v == 0 ? __imp__sub_821E3AD0 : hooks::TuningRefresh)(t, base);
+      }
       // The recompiled callee's frame (RefreshPaint's and RefreshMovie14's
       // 112 bytes with r30 and r31 saved inline, RefreshLightKits' 144 with
       // r27 to r31, RefreshInterior's 176 with r22 to r31): its saves of
@@ -580,9 +676,10 @@ void TuningRefresh(Context& h) {
       // registers it inherits unset from its caller) left out: the native
       // refresh doesn't hold the original's registers (register saves
       // aren't reproduced, and the varargs leftovers are the user's call of
-      // 2026-10-30).
-      {
-        const uint32_t frame = sp - kFrame;
+      // 2026-10-30). In the update's cases, under its frame when it ran
+      // the refresh.
+      if (refreshes) {
+        const uint32_t frame = call_sp - kFrame;
         const int32_t st = int32_t(state);
         const bool movie13 = st <= 37 && int32_t(category) == 5 && item == 6;
         uint32_t size = 0, saves = 0;
@@ -642,11 +739,22 @@ void TuningRefresh(Context& h) {
       for (const auto& [address, bytes] : globals) {
         out[v].Bytes(Read(base, address, bytes));
       }
-      // The stack: below the frame's parameter area, then from it to the
-      // register saves.
-      const uint32_t frame = sp - kFrame;
-      out[v].Bytes(Read(base, sp - kStackBytes, kStackBytes - kFrame + 40));
-      out[v].Bytes(Read(base, frame + 80, kFrame - 80 - kSaves));
+      if (update) {
+        // The update's frame without its register saves (r26 to r31 and lr,
+        // its top 56 bytes), as the pages' harnesses compare their
+        // functions' frames (its callees' frames are their harnesses'); the
+        // open states.
+        out[v].Bytes(Read(base, sp - 144, 144 - 56));
+        for (const uint32_t o : kOpen) {
+          out[v].Word(guest::LoadU32(base, o));
+        }
+      } else {
+        // The stack: below the frame's parameter area, then from it to the
+        // register saves.
+        const uint32_t frame = sp - kFrame;
+        out[v].Bytes(Read(base, sp - kStackBytes, kStackBytes - kFrame + 40));
+        out[v].Bytes(Read(base, frame + 80, kFrame - 80 - kSaves));
+      }
       out[v].Bytes(Read(base, sp, kCallerBytes));
       out[v].Word(t.r1.u32);
       out[v].Word(t.r3.u32);
@@ -661,6 +769,10 @@ void TuningRefresh(Context& h) {
     results.Check(out[0], out[1],
                   fmt::format("case {} (state {}, category {}, item {})", c, int32_t(state),
                               int32_t(category), item));
+  };
+  const auto run = [&](Random& r, Results& results, int c, uint32_t state, uint32_t category,
+                       uint32_t item, const std::function<void(uint32_t movie)>& shape) {
+    run_case(r, results, c, state, category, item, shape, nullptr);
   };
 
   Random r(0x5265667265736800ull);  // "Refresh"
@@ -848,6 +960,233 @@ void TuningRefresh(Context& h) {
                 {4, 0}, {4, 3}, {5, 0}, {5, 2}, {6, 0}, {1, 3}, {0, 0}, {2, 0}, {6, 3}},
                300);
 
+  // TuningScreen::Update (sub_821E6C50, src/tuning_screen/update.cpp), a
+  // group of its own after the refresh's: the same world (the refresh runs
+  // in it while +9708 is 1: then the states its first group covers, not 5
+  // to 8), with the update's fields laid (below). Its callees run as their
+  // adapters run them on both sides, their own harnesses covering their
+  // paths; here kept on the paths this world holds: no states 27 and 28
+  // (UpdateItems' mappers, not laid), no category 0 in states 5 and 6
+  // (DrawPowerGraph's draw), the decals waiting +10012 -1, 0, 5, 8 or 11
+  // and the second wheels' step +25244 0 or 3 (UpdateStand's, as its
+  // cases), the busy icon's movie -1, 2 or 13 (the text movie), and the
+  // command runners on a first update (q's +24 0) only those this world
+  // holds (any command when +24 is 1: no runner, the run and the step).
+  if (extra != 0 && hooks::TuningUpdateCalleesNative()) {
+    Random ru(0x5570646174650000ull);  // "Update"
+    Results resultsu("TuningScreen::Update (sub_821E6C50)");
+    // The runners this world holds: the seen ones over the named
+    // animations, texts and fields laid (Command7, 9, 15, 16, 18, 22, 23,
+    // 25, DecalCommand 29, Command30, 31, ShowDialog 63, MarkPick 64), the
+    // never-seen ones (Command5, 11, 12, 17, 19, 20, 26, 27, 42, 52 to 58)
+    // and the empty ones (24, 28, 59 to 62).
+    static constexpr uint32_t kRunners[] = {7,  9,  15, 16, 18, 22, 23, 25, 29, 30, 31, 63, 64,
+                                            11, 12, 17, 19, 20, 26, 27, 53, 54, 56, 24, 28, 59,
+                                            60, 61, 62, 5,  55, 57, 58, 42, 52};
+    constexpr uint32_t kRunnerCount = sizeof(kRunners) / sizeof(kRunners[0]);
+    constexpr int kUpdateCases = 400;
+    for (int c = 0; c < kUpdateCases; c++) {
+      // The state: 3 to 58 in turn (but 27 and 28) for the first 108 cases,
+      // then any of them, now and then 59 to 63 or outside.
+      uint32_t state;
+      if (c < 108) {
+        state = 3 + uint32_t(c % 54);
+        if (state >= 27) {
+          state += 2;
+        }
+      } else if (ru.Below(8) == 0) {
+        static constexpr uint32_t kOutside[] = {0, 1, 2, 59, 60, 61, 61, 63, 0xFFFFFFFFu};
+        state = kOutside[ru.Below(9)];
+      } else {
+        state = 3 + ru.Below(54);
+        if (state >= 27) {
+          state += 2;
+        }
+      }
+      uint32_t category = ru.Below(10) == 0 ? 7 : ru.Below(7);
+      if ((state == 61 || (state >= 23 && state <= 37)) && ru.Below(2) == 0) {
+        category = 5;
+      }
+      if ((state == 5 || state == 6) && category == 0) {
+        category = 1 + ru.Below(6);
+      }
+      const uint32_t count = category < 7 ? kItemCounts[category] : 10;
+      const uint32_t item = category == 5 && ru.Below(2) == 0 ? 6 : ru.Below(count);
+      // The command: -1, above 64, or 0 to 64 (a runner from the list on a
+      // first update, else any with +24 1).
+      const uint32_t kind = ru.Below(8);
+      uint32_t command, first;
+      if (kind == 0) {
+        command = 0xFFFFFFFFu, first = ru.Below(2);
+      } else if (kind == 1) {
+        command = 65 + (ru.Below(2) == 0 ? ru.Below(4) : uint32_t(ru.Next()) >> 1);
+        first = ru.Below(2);
+      } else if (kind < 5) {
+        command = ru.Below(65), first = 1;
+      } else {
+        command = kRunners[ru.Below(kRunnerCount)], first = 0;
+      }
+      const bool refresh = !(state >= 5 && state <= 8) && ru.Below(3) == 0;
+      const bool restore = ru.Below(3) == 0;
+      const uint32_t round = uint32_t(c);
+      run_case(ru, resultsu, c, state, category, item, nullptr, [&](PPCContext& start) {
+        Random& r = ru;
+        const auto field = [&](uint32_t at, uint32_t value) {
+          guest::StoreU32(base, screen + at, value);
+        };
+        for (uint32_t i = 0; i < kExtraBytes; i += 4) {
+          guest::StoreU32(base, extra + i, uint32_t(r.Next()));
+        }
+        field(9708, refresh ? 1 : (r.Below(2) == 0 ? 0 : 2 + r.Below(4)));
+        // The queue: its next +16 -1 or a command; its +0 and +4 words.
+        const uint32_t queue = extra + kQueueAt;
+        field(10036, queue);
+        guest::StoreU32(base, queue + 12, command);
+        guest::StoreU32(base, queue + 16, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(65));
+        guest::StoreU32(base, queue + 24, first != 0 ? (r.Below(4) == 0 ? uint32_t(r.Next()) | 1 : 1)
+                                                     : 0);
+        // The front-end menu (DebugColorSelect's [[+10040]]): small words.
+        const uint32_t menu = extra + kMenuAt;
+        field(10040, menu);
+        for (uint32_t i = 0; i < 0x100; i += 4) {
+          guest::StoreU32(base, menu + i, r.Below(4));
+        }
+        // The busy icon: no movie (-1), or the text movie (2, 13), its
+        // named animations below 1,024.
+        static constexpr uint32_t kIcons[] = {0xFFFFFFFFu, 0xFFFFFFFEu, 2, 13};
+        field(10020, kIcons[r.Below(4)]);
+        field(10016, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+        for (const uint32_t at : {10024u, 10028u, 10032u}) {
+          field(at, r.Below(1024));
+        }
+        // The runners' fields small (named animations by them): the wheel
+        // pick +25196, the set and item +30724 and +30732, the cursor
+        // +30756, the animation pair +9644 and +9648.
+        field(25196, r.Below(4));
+        field(30724, r.Below(2));
+        field(30732, r.Below(3));
+        field(30756, r.Below(3));
+        if (command == 42 && first == 0) {
+          // Command42's words (+33480 + 4 × the cursor -1 to 3) small, from
+          // a generator of their own (the cases' draws kept).
+          Random r42(0x34320000ull + round);
+          for (int32_t k = -1; k <= 3; k++) {
+            field(uint32_t(33480 + 4 * k), r42.Below(4));
+          }
+        }
+        field(9644, r.Below(4));
+        field(9648, r.Below(4));
+        field(33548, r.Below(5));
+        // Command22's and Command23's set words through the movie's +28
+        // table (in the misc block, as their cases lay it).
+        for (uint32_t k = 0; k < 6; k++) {
+          guest::StoreU32(base, misc + 640 + 4 * k, misc + 0x800 + 4 * r.Below(64));
+          guest::StoreU32(base, misc + 672 + 4 * k, misc + 0x800 + 4 * r.Below(64));
+        }
+        // The lists' (UpdateListDots' and RefreshMenu's, as their cases lay
+        // them): the scene's animations by index, the list's last index -1
+        // to 10 and the cursor in it, the group tabs, the rows and their
+        // words, the interior's picks; RefreshMenu's animations' times left
+        // as the world has them (its own cases reach its menus).
+        TextMovieListAnimations(base, text, r);
+        {
+          const int32_t n = r.Below(8) == 0 ? -1 : int32_t(r.Below(11));
+          field(25224, uint32_t(n));
+          field(25220, n >= 0 ? r.Below(uint32_t(n) + 1) : 3 + r.Below(5));
+          const uint32_t group = r.Below(3) == 0 ? (r.Below(2) == 0 ? 0 : 16) : 1 + r.Below(15);
+          field(25204, r.Below(4) == 0 ? 11 : group);
+          field(25212, uint32_t(int32_t(guest::LoadU32(base, screen + 25204)) -
+                                int32_t(r.Below(17)) + 3));
+          field(25100, r.Below(4));
+          guest::StoreU8(base, screen + 9676, uint8_t(r.Below(11)));
+          field(36588, r.Below(2) == 0 ? 0 : 1 + r.Below(3));
+          for (int32_t k = -4; k < 18; k++) {
+            field(uint32_t(25128 + 4 * k), r.Below(3) == 0 ? 0 : 1 + r.Below(2));
+          }
+          field(25228, r.Below(8));
+          field(25232, r.Below(4) == 0 ? uint32_t(-int32_t(r.Below(3))) : r.Below(7));
+          field(33576, r.Below(5));
+          field(33564, r.Below(2) == 0 ? 4 : r.Below(5));
+          field(33540, r.Below(3));
+          for (uint32_t k = 0; k < 5; k++) {
+            field(25176 + 4 * k, r.Below(2));
+          }
+        }
+        // UpdateStand's (as its cases): the decals waiting, the second
+        // wheels' step, the stage's animation list short.
+        static constexpr uint32_t kDecals[] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0, 5, 8, 11};
+        field(10012, kDecals[r.Below(7)]);
+        field(25244, r.Below(2) == 0 ? 0 : 3);
+        ShortTuningStandAnimations(base, block, r);
+        // +9732: the stand put back (StoreToGarageCar, SetCarStats,
+        // RestoreStand) a third of the time, with RestoreStand's values as
+        // its cases lay them.
+        field(9732, restore ? (r.Below(2) == 0 ? 1 : uint32_t(r.Next()) | 1) : 0);
+        if (restore) {
+          LayTuningStandTires(base, block, r);
+          field(35496, r.Below(7));
+          field(35708, r.Below(7));
+          field(35948, r.Below(5));
+          field(36076, r.Below(5));
+          field(36300, r.Below(6));
+          field(36372, round % 4);
+          field(36376, (round / 4) % 2);
+          field(36588, r.Below(4));
+          field(25240, r.Below(2) == 0 ? 0 : uint32_t(r.Next()) | 1);
+          for (const uint32_t at : {27832u, 27836u, 27840u}) {
+            field(at, r.Below(180));
+          }
+          field(36612, r.Below(4));
+          field(36636, r.Below(4));
+          for (const uint32_t at : {30476u, 30480u, 30484u}) {
+            field(at, r.Below(256));
+          }
+          field(30488, r.Below(3));
+          for (uint32_t g = 0; g < 3; g++) {
+            field(30580 + 4 * g, r.Below(2));
+            field(30660 + 4 * g, r.Below(2));
+            for (const uint32_t at : {30596u, 30612u, 30628u, 30692u}) {
+              field(at + 4 * g, r.Below(360));
+            }
+            field(30644 + 4 * g, r.Below(8));
+            field(30708 + 4 * g, r.Below(8));
+            field(30676 + 4 * g, r.Below(4));
+          }
+          field(36708, r.Below(6));
+          field(36712, r.Below(5));
+          field(33616, r.Below(6));
+          field(33620, r.Below(6));
+          // StoreToGarageCar's spec indexes as play gives them (from a
+          // generator of their own, the cases' draws kept): the engine
+          // stages +34304 + 4 x the part set 0 to 9 over the world's engine
+          // records (LayTuningStandEngines; SetCarStats' Car::Refresh copies
+          // the spec's record at the stage, unchecked, and a random record's
+          // torque curve count ran Vehicle::SetupFromCar's copy off the
+          // memory, past the stack's top at 0x700D0000, as the refresh's
+          // state 5 did), the tire types +35952 and +36080 0 to 3 (the
+          // spec's 21 tire records by type and grade).
+          Random rs(0x5374616765000000ull + round);  // "Stage"
+          for (uint32_t k = 0; k < 4; k++) {
+            field(34304 + 4 * k, rs.Below(10));
+          }
+          field(35952, rs.Below(4));
+          field(36080, rs.Below(4));
+          LayTuningStandEngines(base, block);
+        }
+        // r4 the dispatcher (its ring the block's random words), its high
+        // word now and then set.
+        start.r4.u64 = (extra + kDispatcherAt) | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+      });
+    }
+    resultsu.Report();
+  }
+
+  for (int i = 0; i < 3; i++) {
+    guest::StoreU32(base, kOpen[i], saved_open[i]);
+  }
+  if (extra != 0) {
+    memory::Free(extra);
+  }
   for (size_t i = 0; i < globals.size(); i++) {
     Write(base, globals[i].first, saved[i].data(), globals[i].second);
   }

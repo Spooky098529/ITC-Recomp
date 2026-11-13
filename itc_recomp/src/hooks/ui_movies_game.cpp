@@ -30,7 +30,7 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "UiMovie::SetNodeColor sub_8211A5B8, sub_8211A630, sub_8211A660, sub_8211A6C0, "
               "UiMovie::SetNodeTexture sub_8211A708, UiMovie::ShowNode sub_8211AC00, "
               "UiMovie::HideNode sub_8211AC48, UiMovie::SetPictureTexture sub_8211AAA8, "
-              "UiMovie::GetPictureTexture sub_8211AB28, UiMovie::SwapTexture sub_8211AB90; "
+              "UiMovie::GetPictureTexture sub_8211AB28 (no adapter), UiMovie::SwapTexture sub_8211AB90; "
               "the pose resets UiMovie::ResetPose sub_8211ABA8 and UiMovie::ResetNode "
               "sub_8211A1E0 (these two with --native_ui_movies and without --log_pause_movie); "
               "the quads' and text items' set-up Quad::Quad sub_8211A948, TextItem::TextItem "
@@ -173,14 +173,9 @@ extern "C" REX_FUNC(sub_8211AAA8) {
   ctx.r3.u64 = old;
 }
 
-// UiMovie::GetPictureTexture: the lookup, then that texture.
-extern "C" REX_FUNC(sub_8211AB28) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211AB28);
-  const uint32_t movie = ctx.r3.u32;
-  const uint32_t picture = ui_movies::FindNode(base, movie, ctx.r4.u32, ctx.r5.u32);
-  ctx.r3.u64 = guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture));
-}
+// UiMovie::GetPictureTexture (sub_8211AB28) has no adapter (B7 loop,
+// 2026-11-12): its only caller in play, LocationScreen::PollLoad, is native
+// (FindNode and PictureTextureSlot's plain C++; the harness keeps its steps).
 
 // UiMovie::SwapTexture: r3 = movie, r4 = i, r5 = a texture; the old one.
 extern "C" REX_FUNC(sub_8211AB90) {

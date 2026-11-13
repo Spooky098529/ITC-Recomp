@@ -45,6 +45,13 @@ constexpr uint32_t kPoolObjectKey = 0x820FB9F0;
 constexpr uint32_t kAreaLightsKey = 0x820F1C20;
 constexpr uint32_t kAreaModelKey = 0x820F1CD8;
 constexpr uint32_t kPoolObjectReset = 0x820FB9D8;
+constexpr uint32_t kCourseSetLoad = 0x820F2520;
+constexpr uint32_t kAreaLightsLoad = 0x820F22F8;
+constexpr uint32_t kAreaModelLoad = 0x820F23C0;
+// The loads' callbacks.
+constexpr uint32_t kCourseSetOnLoaded = 0x820F22B8;
+constexpr uint32_t kAreaLightsOnLoaded = 0x820F1C30;
+constexpr uint32_t kAreaModelOnLoaded = 0x820F1CE8;
 
 // memcpy (sub_825A7410), for the copies c_runtime::Memcpy leaves to it.
 constexpr uint32_t kMemcpy = 0x825A7410;
@@ -316,9 +323,26 @@ uint32_t LoadObject(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
                     uint32_t pool, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820FBFD0 ObjectPools::Load");
   const uint32_t object = ObjectAt(base, pool * 24 + Load(base, set + 4), index);
-  if (object != 0) {
-    CallGuest(base, calls, stack, 96, 0x820FC01C, Load(base, Load(base, object) + 4), {object});
+  if (object == 0) {
+    return object;
   }
+  const uint32_t slot = Load(base, Load(base, object) + 4);
+  if (calls.load != nullptr) {
+    switch (slot) {
+      case kCourseSetLoad:
+        CourseSetLoad(base, object, *calls.load);
+        return object;
+      case kAreaLightsLoad:
+        AreaLightsLoad(base, object, *calls.load);
+        return object;
+      case kAreaModelLoad:
+        AreaModelLoad(base, object, *calls.load);
+        return object;
+      default:
+        break;
+    }
+  }
+  CallGuest(base, calls, stack, 96, 0x820FC01C, slot, {object});
   return object;
 }
 
@@ -707,6 +731,63 @@ void FreePhysical(uint8_t* base, uint32_t block) {
   memory::FreePhysical(block);
 }
 
+bool UnloadPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                 uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820F1D20 Scenery::UnloadPools");
+  if (!hooks::NativeHeapActive()) {
+    return false;
+  }
+  const uint32_t frame = stack - 112;
+  Store(base, frame, stack);
+  uint32_t shutdown_r3 = 0;
+  Require(Shutdown(base, calls, frame, manager, &shutdown_r3), "Scenery::UnloadPools' Shutdown");
+  if (Load(base, manager + 188) != 0) {
+    Store(base, manager + 188, 0);
+  }
+  const uint32_t pool0 = Load(base, manager + 184);
+  Store(base, manager + 180, 0);
+  if (pool0 != 0) {
+    FreePhysical(base, pool0);
+    Store(base, manager + 184, 0);
+  }
+  for (uint32_t at : {168u, 164u, 160u}) {
+    if (const uint32_t block = Load(base, manager + at); block != 0) {
+      FreePhysical(base, block);
+    }
+  }
+  c_runtime::XMemSet(base, manager + 144, 0, 28);
+  for (uint32_t at : {140u, 136u, 132u}) {
+    if (const uint32_t block = Load(base, manager + at); block != 0) {
+      FreePhysical(base, block);
+    }
+  }
+  c_runtime::XMemSet(base, manager + 116, 0, 28);
+  *r3 = manager + 116;
+  return true;
+}
+
+bool Unload(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820F2B38 Scenery::Unload");
+  if (!hooks::NativeHeapActive()) {
+    return false;
+  }
+  const uint32_t frame = stack - 96;
+  Store(base, frame, stack);
+  if (const uint32_t areas = Load(base, manager + 224); areas != 0) {
+    FreePhysical(base, areas);
+    Store(base, manager + 224, 0);
+  }
+  return UnloadPools(base, calls, frame, manager, r3);
+}
+
+uint32_t Destroy(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820F2AF8 Scenery::Destroy");
+  ClearGlobal(base);
+  FreePhysical(base, Load(base, kCreated));
+  Store(base, kCreated, 0);
+  return 0;
+}
+
 uint32_t Create(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820F2F88 Scenery::Create");
   const uint32_t manager = AllocPhysical(base, 248);
@@ -996,6 +1077,38 @@ uint32_t ListLoadAll(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
   return Load(base, list + 8) == Load(base, list + 4) ? 1 : 0;
 }
 
+uint32_t SceneryIsLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                         bool native_queue) {
+  ITC_NATIVE_RUNNING("sub_820F1F68 Scenery::IsLoaded");
+  const uint32_t frame = stack - 112;
+  Store(base, frame, stack);
+  if (Load(base, manager + 192) != 0) {
+    if (ListLoadAll(base, calls, frame, manager, manager + 116, native_queue) == 0 ||
+        ListLoadAll(base, calls, frame, manager, manager + 144, native_queue) == 0) {
+      return 0;
+    }
+  }
+  const uint32_t pool = Load(base, manager + 172);
+  if (int32_t(pool) < 0) {
+    return 0;
+  }
+  const uint32_t index = Load(base, manager + 176);
+  if (int32_t(index) < 0) {
+    return 0;
+  }
+  const uint32_t object = PoolObjectAt(base, manager, pool, index);
+  if (object == 0) {
+    return 0;
+  }
+  if (InUse(base, object) != 0 && IsLoaded(base, object) == 0) {
+    return 0;
+  }
+  if (Load(base, manager + 192) != 0) {
+    Store(base, manager + 192, 0);
+  }
+  return 1;
+}
+
 uint32_t ListStream(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
                     uint32_t list, bool native_queue) {
   ITC_NATIVE_RUNNING("sub_820F16C0 SceneryList::Stream");
@@ -1088,6 +1201,20 @@ uint32_t AdvanceAnimationSet(uint8_t* base, uint32_t set) {
     AdvanceAnimation(base, r3);
   }
   return r3;
+}
+
+uint64_t FindAnimationByTexture(uint8_t* base, uint32_t set, uint32_t texture) {
+  ITC_NATIVE_RUNNING("sub_82146A38 AnimationSet::FindByTexture");
+  const int32_t count = int32_t(Load(base, set + 0));
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t animation = uint32_t(count + 1) * 4 + set + Load(base, set + 4 + 4 * uint32_t(i));
+    const int32_t frames = int32_t(Load(base, animation + 0));
+    const uint32_t slot = frames > 0 ? uint32_t(frames + 4) * 4 + animation : 0;
+    if (Load(base, slot + 4) == texture) {
+      return uint64_t(i);
+    }
+  }
+  return ~uint64_t(0);
 }
 
 void AdvanceAnimation(uint8_t* base, uint32_t animation) {
@@ -1451,6 +1578,98 @@ uint32_t SceneryModelDestruct(uint8_t* base, const Calls& calls, uint32_t stack,
     parse.Call(0x820F1238, 0x825A70E8, {model});
   }
   return model;
+}
+
+// --- The pools' loads and the course set's callback ---
+
+namespace {
+
+// r3 as Archive::Load's adapter leaves a serial (-1 as li's).
+uint64_t SerialR3(int64_t serial) {
+  return serial < 0 ? ~uint64_t(0) : uint64_t(uint32_t(serial));
+}
+
+// The asset of a list's table entry (12 bytes: the area and model
+// halfwords, the asset) whose halfwords are `key`'s, else -1.
+uint32_t TableAsset(uint8_t* base, uint32_t table, uint32_t count, uint32_t key) {
+  const uint32_t area = guest::LoadU16(base, key + 0);
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t entry = table + 12 * i;
+    if (area == guest::LoadU16(base, entry + 0) &&
+        guest::LoadU16(base, key + 2) == guest::LoadU16(base, entry + 2)) {
+      return Load(base, entry + 4);
+    }
+  }
+  return 0xFFFFFFFFu;
+}
+
+}  // namespace
+
+uint64_t CourseSetLoad(uint8_t* base, uint32_t set, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820F2520 CourseSet::Load");
+  const uint32_t manager = Load(base, kManager);
+  ClearLoadFlags(base, set);
+  Store(base, set + 1056, 0);
+  Store(base, set + 1060, 0);
+  uint32_t assets[2];
+  uint32_t last = 0;
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t table = Load(base, manager + 36);
+    assets[i] = Load(base, table + (i == 0 ? 12 : 8));
+    if (int32_t(assets[i]) < 0) {
+      Store(base, set + 3808 + 4 * i, 0);
+      continue;
+    }
+    last = i;
+    const uint32_t size = archive::AssetSize(base, assets[i]);
+    if (i == 0) {
+      Store(base, set + 3808, AllocPhysical(base, size));
+    } else {
+      Store(base, set + 3812, AllocData(base, set + 4, size));
+    }
+  }
+  uint64_t r3 = 0;
+  for (uint32_t i = 0; i < 2; i++) {
+    r3 = assets[i];
+    if (int32_t(assets[i]) < 0) {
+      continue;
+    }
+    r3 = SerialR3(load(assets[i], Load(base, set + 3808 + 4 * i),
+                       i == last ? kCourseSetOnLoaded : 0, set));
+  }
+  return r3;
+}
+
+uint64_t AreaLightsLoad(uint8_t* base, uint32_t lights, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820F22F8 AreaLights::Load");
+  const uint32_t manager = Load(base, kManager);
+  ClearLoadFlags(base, lights);
+  Store(base, lights + 80, 0);
+  const uint32_t asset =
+      TableAsset(base, Load(base, manager + 140), Load(base, manager + 128), lights + 84);
+  const uint32_t data = AllocData(base, lights + 4, archive::AssetSize(base, asset));
+  return SerialR3(load(asset, data, kAreaLightsOnLoaded, lights));
+}
+
+uint64_t AreaModelLoad(uint8_t* base, uint32_t model, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820F23C0 AreaModel::Load");
+  const uint32_t manager = Load(base, kManager);
+  ClearLoadFlags(base, model);
+  Store(base, model + 56, 0);
+  Store(base, model + 60, 0);
+  const uint32_t asset =
+      TableAsset(base, Load(base, manager + 168), Load(base, manager + 156), model + 64);
+  return SerialR3(load(asset, Load(base, manager + 188), kAreaModelOnLoaded, model));
+}
+
+uint32_t CourseSetOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_820F22B8 CourseSet::OnLoaded");
+  const uint32_t frame = stack - 96;
+  Store(base, frame, stack);
+  CourseSetParse(base, calls, frame, set);
+  FreePhysical(base, Load(base, set + 3808));
+  MarkLoaded(base, set);
+  return set;
 }
 
 }  // namespace course_scenery

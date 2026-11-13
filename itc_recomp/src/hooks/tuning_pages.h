@@ -145,4 +145,84 @@ void TuningPagesFillPartRowsLeft(PPCContext& ctx, uint8_t* base);
 void TuningPagesOnDialogYes(PPCContext& ctx, uint8_t* base);
 void TuningPagesOnStickerDialogYes(PPCContext& ctx, uint8_t* base);
 
+// The vinyl editor's loads: DecalImages::OnLoaded sub_821FE608 (r3 a
+// handle, r6 an entry), Reload sub_821FE960 (r4 an id, r5 an entry),
+// LoadWindow sub_821FEAF0 (r4 the first id, r5 the first entry, r6 the
+// count, r7 the list), Scroll sub_821FED30 (r4 the direction, r5 the first
+// entry, r6 the count, r7 the id) and FreeKept sub_821FE740 (r4 a kept
+// texture; Texture::Free by car_models' plain C++ with --native_car_models
+// and the native heap); r3 the images.
+void TuningPagesOnImageLoaded(PPCContext& ctx, uint8_t* base);
+void TuningPagesReloadImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesLoadWindow(PPCContext& ctx, uint8_t* base);
+void TuningPagesScrollImages(PPCContext& ctx, uint8_t* base);
+void TuningPagesFreeKept(PPCContext& ctx, uint8_t* base);
+
+// The vinyl editor's pages (r3 = the screen): InputVinylView sub_82202928
+// and LeaveVinylView sub_82201B40 (no adapter: the harness's step).
+void TuningPagesInputVinylView(PPCContext& ctx, uint8_t* base);
+void TuningPagesLeaveVinylView(PPCContext& ctx, uint8_t* base);
+// InputVinylPages sub_82204B70 with SetLastImage sub_821FE498 and
+// MoveVinylMenu sub_821FF3A0 (no adapters: the harness's steps).
+void TuningPagesInputVinylPages(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetLastImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveVinylMenu(PPCContext& ctx, uint8_t* base);
+// The decal edits: InputDecalPosition sub_82206A50, InputDecalAngle
+// sub_82206F48, InputDecalScale sub_82207320, and their movie sides
+// MoveDecalPosition sub_82200DC0, MoveDecalAngle sub_822012E8,
+// MoveDecalScale sub_82201620 (no adapters: the harness's steps).
+void TuningPagesInputDecalPosition(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputDecalAngle(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputDecalScale(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveDecalPosition(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveDecalAngle(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveDecalScale(PPCContext& ctx, uint8_t* base);
+// InputLayerEdit sub_82205110 and MoveLayerEdit sub_82200760 (no adapter:
+// the harness's step).
+void TuningPagesInputLayerEdit(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveLayerEdit(PPCContext& ctx, uint8_t* base);
+// InputVinylLayers sub_82208CE0 and MoveVinylLayers sub_821FFB20 (no
+// adapter: the harness's step).
+void TuningPagesInputVinylLayers(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveVinylLayers(PPCContext& ctx, uint8_t* base);
+// InputVinylImages sub_822058F8 and MoveVinylImages sub_82202530 (no
+// adapter: the harness's step).
+void TuningPagesInputVinylImages(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base);
+// TuningScreen::HighlightItem sub_82203400 and HighlightSelected
+// sub_82203570 (tuning_screen's plain C++; no adapters: the harness's
+// steps).
+void TuningPagesHighlightItem(PPCContext& ctx, uint8_t* base);
+void TuningPagesHighlightSelected(PPCContext& ctx, uint8_t* base);
+// InputLayerActions sub_82209738 with MoveLayerActions sub_82200230 and
+// BeginLayerOrder sub_821FE370 (no adapters: the harness's steps).
+void TuningPagesInputLayerActions(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveLayerActions(PPCContext& ctx, uint8_t* base);
+void TuningPagesBeginLayerOrder(PPCContext& ctx, uint8_t* base);
+
+// InputLayerOrder sub_8220A1C8, SwapOrderTextures sub_82207F38 and
+// SwapLayerRecords sub_821FD518 (adapters: TuningScreen::Command21, recompiled,
+// calls the last two); EndLayerOrder sub_821FE3C8, ShowOrderNodes
+// sub_82203A30, MoveLayerOrder sub_82201DB8, SetGroupImage sub_821FD5C0 and
+// SetImageGroup sub_821FD658 (no adapters: the harness's steps).
+void TuningPagesInputLayerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesSwapOrderTextures(PPCContext& ctx, uint8_t* base);
+void TuningPagesSwapLayerRecords(PPCContext& ctx, uint8_t* base);
+void TuningPagesEndLayerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowOrderNodes(PPCContext& ctx, uint8_t* base);
+void TuningPagesMoveLayerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetGroupImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetImageGroup(PPCContext& ctx, uint8_t* base);
+
+// HandleInput sub_821E6950 (r3 the screen, r4 Leave's object; its piece
+// sub_821E69B8 merged), the screen's input handler.
+void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base);
+// The sticker editor's set-up under InputItems (no adapters: only InputItems
+// calls them in play; the harness's steps): ResetStickerEditor sub_821F8440,
+// RestoreAreaDecals sub_821F6C90 (r4 the area) and LoadStickers
+// sub_821F86C0, r3 the screen.
+void TuningPagesResetStickerEditor(PPCContext& ctx, uint8_t* base);
+void TuningPagesRestoreAreaDecals(PPCContext& ctx, uint8_t* base);
+void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

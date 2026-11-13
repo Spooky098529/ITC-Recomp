@@ -240,10 +240,11 @@ extern "C" REX_FUNC(sub_82593FC0) {
 
 // The scene's pools: r3 = the scene (or the list, or an object).
 // ScenePools::ClaimA (sub_820C42C8) and GetA (sub_820C4420) have no adapters:
-// their callers in play (the second set's set-ups) are native.
+// their callers in play (the second set's set-ups) are native. Neither has
+// GetB (sub_820C5C20) since LocationScreen::PollLoad is native (B7 loop,
+// 2026-11-12): every caller in play calls its plain C++.
 ITC_ACCESSOR_VOID(82593FB0, ListInit(base, ctx.r3.u32))
 ITC_ACCESSOR_SIGNED(820C5AB0, ScenePoolsClaimB(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820C5C20, ScenePoolsGetB(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(820C5D70, ScenePoolsFindModel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(820C4550, ObjectRecord1888(ctx.r3.u32))
 

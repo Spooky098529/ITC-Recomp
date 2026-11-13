@@ -107,6 +107,7 @@ set(ITC_SOURCES
     src/sprites/sprites.cpp
     src/hooks/billboards.cpp
     src/sprites/billboards.cpp
+    src/sprites/billboard_record.cpp
     src/hooks/ui_movies.cpp
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
@@ -298,6 +299,8 @@ set(ITC_SOURCES
     src/hooks/race_flow.cpp
     src/race_flow/race_flow_init.cpp
     src/hooks/race_loading.cpp
+    src/hooks/race_end.cpp
+    src/race_end/race_end.cpp
     src/race_loading/race_loading.cpp
     src/race_loading/race_loading_init.cpp
     src/hooks/car_scene_draw.cpp
@@ -430,6 +433,8 @@ set(ITC_SOURCES
     src/tuning_screen/refresh_level.cpp
     src/tuning_screen/refresh_type.cpp
     src/tuning_screen/refresh_choice.cpp
+    src/tuning_screen/update.cpp
+    src/tuning_screen/commands.cpp
     src/hooks/tuning_pages.cpp
     src/tuning_pages/tables.cpp
     src/tuning_pages/editor.cpp
@@ -440,6 +445,8 @@ set(ITC_SOURCES
     src/tuning_pages/loads.cpp
     src/tuning_pages/pages.cpp
     src/tuning_pages/dialogs.cpp
+    src/tuning_pages/vinyl_pages.cpp
+    src/tuning_pages/handle_input.cpp
     src/hooks/screen_constructors.cpp
     src/screen_constructors/screen_constructors.cpp
     src/hooks/options_screen.cpp
@@ -447,6 +454,7 @@ set(ITC_SOURCES
     src/options_screen/controls.cpp
     src/options_screen/handlers.cpp
     src/options_screen/inits.cpp
+    src/options_screen/load_save.cpp
     src/options_screen/nodes.cpp
     src/options_screen/pages.cpp
     src/options_screen/settings.cpp
@@ -498,6 +506,12 @@ set(ITC_SOURCES
     src/type2_dialog/pages.cpp
     src/type2_dialog/handlers.cpp
     src/type2_dialog/init.cpp
+    src/hooks/power_graph_screen.cpp
+    src/power_graph_screen/handlers.cpp
+    src/power_graph_screen/pages.cpp
+    src/power_graph_screen/steps.cpp
+    src/hooks/achievements.cpp
+    src/achievements/achievements.cpp
     src/hooks/user_info.cpp
     src/user_info/handlers.cpp
     src/user_info/pages.cpp
@@ -506,6 +520,37 @@ set(ITC_SOURCES
     src/type2_mode/block.cpp
     src/type2_mode/delegates.cpp
     src/type2_mode/init.cpp
+    src/hooks/title_screen_native.cpp
+    src/title_screen/title_load.cpp
+    src/title_screen/init.cpp
+    src/title_screen/screen_handlers.cpp
+    src/title_screen/transitions.cpp
+    src/title_screen/pages.cpp
+    src/title_screen/mode.cpp
+    src/title_screen/press_start.cpp
+    src/title_screen/debug.cpp
+    src/hooks/type10_mode.cpp
+    src/hooks/type5_mode.cpp
+    src/type5_mode/dialog_steps.cpp
+    src/type5_mode/dialog_pages.cpp
+    src/type5_mode/dialog_handlers.cpp
+    src/type5_mode/dialog_init.cpp
+    src/type5_mode/mode.cpp
+    src/type10_mode/init.cpp
+    src/type10_mode/mode.cpp
+    src/type10_mode/theater.cpp
+    src/type10_mode/pages.cpp
+    src/type10_mode/transitions.cpp
+    src/hooks/todays_result.cpp
+    src/todays_result/init.cpp
+    src/todays_result/mode.cpp
+    src/todays_result/result.cpp
+    src/todays_result/event.cpp
+    src/hooks/network_mode.cpp
+    src/network_mode/init.cpp
+    src/network_mode/machines.cpp
+    src/network_mode/mode.cpp
+    src/network_mode/mode_select.cpp
     src/hooks/garage_screen.cpp
     src/garage_screen/helpers.cpp
     src/garage_screen/transitions.cpp
@@ -555,6 +600,10 @@ set(ITC_SOURCES
     src/type2_screens/build_pages.cpp
     src/type2_screens/hub_update.cpp
     src/scene_models/apply.cpp
+    src/hooks/frame_driver.cpp
+    src/frame_driver/frame_driver.cpp
+    src/frame_driver/thread.cpp
+    src/frame_driver/scene_set_up.cpp
     src/hooks/frame_passes.cpp
     src/frame_passes/frame_passes.cpp
     src/frame_passes/record.cpp
@@ -572,6 +621,7 @@ set(ITC_SOURCES
     src/hooks/minimap.cpp
     src/mode_tick/mode_tick.cpp
     src/minimap/minimap.cpp
+    src/minimap/draw.cpp
     src/hooks/scenery_lists.cpp
     src/scenery_lists/scenery_lists.cpp
     src/scenery_lists/model_draws.cpp
@@ -600,6 +650,9 @@ set(ITC_SOURCES
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
     src/course_scenery/collect.cpp
+    src/course_scenery/headlights.cpp
+    src/course_scenery/draw_area.cpp
+    src/course_scenery/draw.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -661,6 +714,7 @@ set(ITC_SOURCES
     src/harnesses/xma.cpp
     src/harnesses/sprites.cpp
     src/harnesses/billboards.cpp
+    src/harnesses/billboards_record.cpp
     src/harnesses/command_list.cpp
     src/harnesses/c_runtime.cpp
     src/harnesses/heap.cpp
@@ -708,6 +762,7 @@ set(ITC_SOURCES
     src/harnesses/race_hud_machine.cpp
     src/harnesses/race_flow.cpp
     src/harnesses/race_loading.cpp
+    src/harnesses/race_end.cpp
     src/harnesses/car_scene_draw.cpp
     src/harnesses/car_scene_draw_root.cpp
     src/harnesses/front_end_car_draw.cpp
@@ -738,9 +793,11 @@ set(ITC_SOURCES
     src/harnesses/device_shaders.cpp
     src/harnesses/render_queue.cpp
     src/harnesses/course_scenery.cpp
+    src/harnesses/course_scenery_headlights.cpp
     src/harnesses/post_effects.cpp
     src/harnesses/scene_target.cpp
     src/harnesses/frame_passes.cpp
+    src/harnesses/frame_driver.cpp
     src/harnesses/command_buffer.cpp
     src/harnesses/single_commands.cpp
     src/harnesses/predicated_tiling.cpp
@@ -764,11 +821,19 @@ set(ITC_SOURCES
     src/harnesses/type2_screens.cpp
     src/harnesses/save_screen.cpp
     src/harnesses/type2_dialog.cpp
+    src/harnesses/power_graph_screen.cpp
+    src/harnesses/achievements.cpp
     src/harnesses/garage_screen.cpp
     src/harnesses/tuning_machine.cpp
     src/harnesses/race_menu.cpp
     src/harnesses/car_settings.cpp
     src/harnesses/user_info.cpp
+    src/harnesses/title_screen.cpp
+    src/harnesses/type10_mode.cpp
+    src/harnesses/type5_mode.cpp
+    src/harnesses/todays_result.cpp
+    src/harnesses/network_mode.cpp
+    src/harnesses/network_mode_select.cpp
     src/harnesses/car_makers.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
@@ -776,6 +841,7 @@ set(ITC_SOURCES
     src/harnesses/game_modes.cpp
     src/harnesses/mode_tick.cpp
     src/harnesses/minimap.cpp
+    src/harnesses/minimap_draw.cpp
     src/harnesses/scene_models.cpp
     src/harnesses/scenery_lists.cpp
     src/harnesses/shader_objects.cpp
@@ -902,7 +968,9 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
-    src/models/model_load.cpp src/course_scenery/collect.cpp
+    src/models/model_load.cpp src/course_scenery/collect.cpp src/course_scenery/headlights.cpp
+    src/sprites/billboard_record.cpp src/course_scenery/draw_area.cpp src/course_scenery/draw.cpp
+    src/minimap/draw.cpp
     src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
     src/race_setup/set_up.cpp src/vehicle/vehicle.cpp src/race_world/race_world.cpp
     src/race_world/race_world_reset.cpp
@@ -972,7 +1040,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/tuning_screen/stand.cpp src/tuning_screen/menus.cpp src/tuning_screen/rows.cpp
     src/tuning_screen/stats.cpp src/tuning_screen/refresh.cpp
     src/tuning_screen/refresh_level.cpp src/tuning_screen/refresh_type.cpp
-    src/tuning_screen/refresh_choice.cpp
+    src/tuning_screen/refresh_choice.cpp src/tuning_screen/commands.cpp
     src/tuning_machine/set_up.cpp
     src/tuning_machine/start.cpp
     src/tuning_machine/prices.cpp PROPERTIES

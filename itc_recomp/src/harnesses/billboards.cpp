@@ -12,6 +12,8 @@
 
 namespace harness {
 
+void BillboardRecordCases(Context& h);
+
 namespace {
 
 // The vertex ring and its globals (the vertex builder's outputs outside the
@@ -217,6 +219,7 @@ void Billboards(Context& h) {
     Write(base, kRingVertices, saved_ring.data(), kRingBytes);
     results.Report();
   }
+  BillboardRecordCases(h);
 }
 
 }  // namespace harness

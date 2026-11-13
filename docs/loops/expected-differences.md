@@ -298,3 +298,10 @@ were at 0.
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_82236880` Type6Mode::Init | the transitions' stack leftovers | 6 of 6 | Unwritten stack bytes copied (the members' state machine Inits copy three frame words they never write into each 48-byte transition's functor, +32 to +40; the screen block's constructor, recompiled under the original, leaves other words there than the plain C++'s back chains; dead words; type 7's same group matches) | for review (2026-11-07 22:22 run) |
+
+### `network-mode.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82278058` ModeType12::Init | the transitions' stack leftovers | 16 of 16 | Unwritten stack bytes copied (the recompiled InitStates, under the recompiled Init, copy three frame words they never write into each transition, +32 to +40, holding `NetScreen::InitBase`'s return address 0x8228861C and back chains; dead words; as `Type6Mode::Init`'s group) | for review (2026-11-12 08:26 run) |
+| `sub_8227B930` ModeType12::NextMode | the time attack's traffic records' unwritten bytes | 16 of 32 (17 in another run) | Unwritten stack bytes copied (the recompiled race set-up's register saves; as `Race::SetUp`'s group) | for review (2026-11-12 08:26 run) |

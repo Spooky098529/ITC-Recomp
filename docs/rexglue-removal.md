@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-11):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-13):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -293,7 +293,33 @@ goes in `src/` as overrides), American English.
   and the tuning screen's refresh with `TuningMachine::Start` (ours
   5,445), and stopped at its limit; the rest waits on the tuning
   screen's update `sub_821E6C50`, `Garage::Sell`, the car settings'
-  `Update` and the leads in `docs/loops/leads.md`.
+  `Update` and the leads in `docs/loops/leads.md`. Its forty-fourth
+  run (`b7-loop-11-11-26`, 2026-11-11, limit 5, ended by the user
+  during its third subsystem) made the tuning screen's update (with 40
+  of its 61 callees never seen in play; ours 5,488) and the title
+  screen (`title-screen.md`, 86 of 87; ours 5,574) native, both
+  validated (the update's first validation stalled on a harness wild
+  read, fixed, 505b2a31, the user's call), and ported the replay
+  theater (`type10-mode.md`) unchecked behind `--native_type10_mode`,
+  off by default (ours 5,612 by `b7_status.py`, which counts its
+  Overridden rows); the rest waits on the theater's harness and race,
+  the type 9 mode, the sticker and vinyl editors and the leads in
+  `docs/loops/leads.md`. Its forty-fifth run (`b7-loop-11-11-26`,
+  the same branch by the user's call, 2026-11-12 to 13, limit 5 then
+  10, not yet merged) checked the replay theater (on by default) and
+  made ten subsystems native: the type 9 mode (`todays-result.md`), the
+  Xbox Live network mode (`network-mode.md`, its Live calls answered
+  with plugged-in data, the user's call), the race's end
+  (`race-end.md`), the options' load and save (`options-load-save.md`),
+  `Type6Screen0`, the type 5 mode (`type5-mode.md`), the vinyl editor
+  (`tuning-pages.md`), the power graph screen
+  (`power-graph-screen.md`), the achievements (`achievements.md`, the
+  SDK's write kept, the user's call) and the frame driver
+  (`frame-driver.md`), with the course scenery finished and
+  `TuningScreen::HandleInput` as leads without mapping (ours 5,612 ->
+  5,989, work left 984 -> 718); the rest waits on the core's
+  `Event::` and sync, `Device::Swap` and `Resolve`, the sticker
+  editor and the leads in `docs/loops/leads.md`.
   The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2846,6 +2872,19 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-11 | The car settings screen (the type 2 mode's +0x173D0 machine, UI movie 3, also set up by the type 5 mode: the garage car's gear ratios and settings, a test run; only its Inits and five handlers seen in play) | `car-settings.md` | 7 of 7 in play (one migration; no adapter removable: functors and recompiled callers); 84 never seen in play stay recompiled | `--native_car_settings` |
 | 2026-11-11 | The type 2 mode (its Init over the 14 machines' Inits, its vtable's delegates and slot thunks, `Interrupt`, `ForceExit`) and its user info screen (the player's record, UI movie 10, at the mode's block +0x102D8) | `type2-mode.md`, `user-info.md` | 20 of 21 and 14 of 14 (one migration; no adapter removable) | `--native_type2_mode`, `--native_user_info` |
 | 2026-11-11 | The tuning screen's refresh (`TuningScreen::Refresh`, 3,838 lines: the header, states 3 to 8 inside, the dispatch for 15 to 58; its 5 callees never seen in play stay recompiled) with `TuningMachine::Start` it unblocked | `tuning-screen.md`, `tuning-machine.md` | 83 of 83 and 22 of 22 in play (one migration, the refresh in four parts, 5 subagents; 15 adapters removed) | (`--native_tuning_screen`, `--native_tuning_machine`) |
+| 2026-11-11 | The tuning screen's update (`TuningScreen::Update` `sub_821E6C50`, 1,601 lines with its two pieces: its state switch over the debug handlers, the command queue's runners, the movie it picks, `UiMovie::Run`; 40 of its 61 callees never seen in play ported too) | `tuning-screen.md` | 126 of 126 rows ours (the update Overridden, its pieces Merged, 47 adapters removed; 21 never-seen runners stay recompiled, blocked by the sticker and vinyl editors' leads) | (`--native_tuning_screen`) |
+| 2026-11-11 | The title screen (the type 4 front-end mode: its Init, delegates and next mode; the title load machine with the boot's data load and logo; the title screen machine with press start, the main, career and fourth menus; `TitleScreen::Update` inside the `--attract_after_s` wrap) | `title-screen.md` | 86 of 87 (one migration; 2 adapters removed; `SetUpAttractRace` stays recompiled) | `--native_title_screen` |
+| 2026-11-11 | The replay theater (the type 10 mode: its Init, slots, its machine with UI movie 45 and 17 transitions; two of the type 9 mode's slots, shared) | `type10-mode.md` | 46 of 47 (38 Overridden, 8 Native; checked 2026-11-12 by the next run, 50318046..93b074ab, after a harness fix; `Replay::SetUpRace` stays recompiled) | `--native_type10_mode` (on by default since 2026-11-12) |
+| 2026-11-12 | The type 9 mode: the career's end of the day after a career race (today's result, UI movie 27, `Career::NextDay`; today's event, UI movie 0, the unlocks) | `todays-result.md` | 57 of 57 (38 Overridden, 19 Native) | `--native_todays_result` |
+| 2026-11-12 | The type 12 mode: the Xbox Live network mode (network battle and time attack: its mode select, 14 machines' set-ups and teardowns, the session memory; its Live calls answered with plugged-in data, the user's call) | `network-mode.md` | 130 of 130 rows (95 Overridden, 32 Native, 2 Merged, 1 Dropped) | `--native_network_mode` |
+| 2026-11-12 | The race's end (`RaceMode::ModeAfterRace`: which mode follows a race), with `RaceMode::NextMode` and `Progress::CheckUnlocks` (never seen, ported) | `race-end.md` | 1 of 1 (6 adapters removed) | `--native_race_end` |
+| 2026-11-13 | The options screen's load and save pages (category 5, page 9, the load; category 6, page 10, the save) | `options-load-save.md` | 16 of 16 (2 never seen, ported) | `--native_options_load_save` |
+| 2026-11-13 | `Type6Screen0`: the type 6 mode's first screen (a five-item menu over the type 6 car: pages, steps, helpers), with type 7's unported steps and `PowerGraph::SetFromCar` | `type6-type7-modes.md` | 13 of 13 new rows (with 6 of type 7's and `CarList::DrawCarPowerGraph`; 10 adapters removed) | (`--native_type67_modes`, `--native_power_graph`) |
+| 2026-11-13 | The type 5 mode: the parking area's front-end mode (its three machines: the car settings, the parking area, and its own dialog `Type5Dialog`) | `type5-mode.md` | 33 of 33 (16 never seen, ported) | `--native_type5_mode` |
+| 2026-11-13 | The tuning screen's vinyl editor (its pages for states 23 to 31 and 34, the decal images' list window and loads, the sticker helpers it calls) | `tuning-pages.md` | 29 new rows ours (with `HighlightItem`, `HighlightSelected` in `tuning-screen.md`; 7 adapters removed) | (`--native_tuning_pages`) |
+| 2026-11-13 | The power graph screen (the machine the type 6 and 7 modes share: its handlers, pages, steps, texts and the members' slots) | `power-graph-screen.md` | 22 of 22 | `--native_power_graph_screen` |
+| 2026-11-13 | The achievements check after a race (`Achievements::Check`, `Write`; `XUserWriteAchievements` kept as a guest call, the user's call) | `achievements.md` | 5 of 5 | `--native_achievements` |
+| 2026-11-13 | The frame driver and the app's scene (the game's object that drives each frame across its render thread, renamed from "renderer" by the user's call; the scene's update, draw and constructor; the game's threads) | `frame-driver.md` | 19 ours of 25 in play (`Present` and the `Event::`-blocked three stay) | `--native_frame_driver` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5162,3 +5201,248 @@ of the 17. The boundary: 449 functions (916 pairs): overridden 109,
 Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
 54 with a live caller. B7 (`b7_status.py`): ours 5,445, work left 1,063
 (Wrapped 56, with a row 389, no row yet 618), from 1,065.
+
+**2026-11-11, the tuning screen's update (branch `b7-loop-11-11-26`,
+the forty-fourth run, its first subsystem):** `TuningScreen::Update`
+`sub_821E6C50` (rows in `tuning-screen.md`, under
+`--native_tuning_screen`; `src/tuning_screen/`), its pieces
+`sub_821E6CD4` and `sub_821E6F90` merged into it; 47 adapters removed;
+40 of its 61 callees never seen in play ported (the 23 debug state
+handlers, movie 2's and some of movies 13 and 14's command runners);
+21 stay recompiled behind guest calls: the sticker editor's commands
+and `Command21` wait on the sticker and vinyl editors' leads,
+`Command10`, `13` and `14` on three never-seen `tuning-pages.md`
+setters. Its validation first stalled on a harness wild read (the
+restore path's random engine stage indexing the spec's engine records
+past their end; fixed, 505b2a31, by the user's call), then passed. The
+replay ran 20 of the 88. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 26, never called 70, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,488, work left 1,060 (Wrapped 56, with a row 389, no row yet 615),
+from 1,063.
+
+**2026-11-11, the title screen (branch `b7-loop-11-11-26`, the
+forty-fourth run, its second subsystem):** `title-screen.md` (87 rows,
+`--native_title_screen`, `src/title_screen/`): the type 4 front-end
+mode (vtable `0x82006BE0`, Init `sub_82224C70`), its title load machine
+at +28920 (`TitleLoad::Init`, the boot's data load, the logo movie, a
+debug sequence never seen in play) and its title screen machine at
++38560 (`TitleScreen::Init`, press start, the main, career and fourth
+menus), with `Players::AssignController`; `TitleScreen::Update` runs
+natively inside the `--attract_after_s` wrap. `SetUpAttractRace`
+`sub_82222038` stays recompiled: its harness needs the race data and
+car specs, which aren't loaded when the harnesses run. Three existing
+adapters (`BootData::Load`, `Career::NextDay`,
+`CarDealer::StartFirstRace`) now check the harness recorder first. The
+attract race ran 37 of them, the replay 12 more. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,574, work left 1,005 (Wrapped 55, with a row
+388, no row yet 562), from 1,060.
+
+**2026-11-11, the replay theater, unchecked (branch `b7-loop-11-11-26`,
+the forty-fourth run, its third subsystem; the run was ended by the
+user during its migration):** `type10-mode.md` (47 rows, 25 in play,
+`src/type10_mode/`): the type 10 mode's Init `sub_82288940`, its slots,
+`ReplayTheater::InitStates` `sub_8228AC48` and its transitions, ported
+in one batch (49287852) whose harness and race never ran:
+`--native_type10_mode` is off by default and the rows say "not yet
+checked". Left: run the `type10_mode` harness, fix any harness fault,
+turn the flag on, set the eight functions without adapters to Native.
+`Replay::SetUpRace` `sub_82105228` stays recompiled. The boundary: 449 functions, 916 pairs: overridden 109, native 36, dropped 26, never called 70, live 208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours 5,612 (counting the
+unchecked Overridden rows), work left 984 (Wrapped 55, with a row 392,
+no row yet 537), from 1,005.
+
+**2026-11-12, the replay theater checked (branch `b7-loop-11-11-26`,
+the forty-fifth run, a lead without mapping):** the previous run's
+unchecked port (`type10-mode.md`) checked by its harness (46 functions,
+0 differing, after a harness fault was fixed: a replay record's +28 laid
+as play's 0-99, 50318046) and turned on by default (93b074ab); the eight
+functions without adapters set to Native. The attract race and the pad
+replay don't reach the theater: its 46 functions are on the drive list.
+The boundary: 449 functions (916 pairs): overridden 109, Native 36,
+Dropped 26, never called 70, live 208. Imports: 186 called, 54 with a
+live caller. B7 (`b7_status.py`): ours 5,620, work left 980 (Wrapped
+55, with a row 388, no row yet 537), from 984.
+
+**2026-11-12, the type 9 mode (branch `b7-loop-11-11-26`, the
+forty-fifth run, its first subsystem):** `todays-result.md` (57 rows,
+31 in play, `src/todays_result/`): the career's end of the day after a
+career race, its two machines, today's result (block +0, UI movie 27,
+the day's and career's counts, `Career::NextDay`) and today's event
+(block +9640, UI movie 0, a page per unlock with its images), leaving
+for the boot mode when a movie is queued, else the garage. All 57 ours
+(never-seen paths ported with their callers); `Progress::CheckUnlocks`
+`sub_821162B0` stays recompiled (never seen). The harness builds its
+own stand-ins for the data tables and `BUILD.TOC`, which aren't loaded
+when the harnesses run. The replay ran today's result's path (31);
+today's event's 26 are on the drive list. The boundary: 449 functions
+(916 pairs): overridden 109, Native 36, Dropped 26, never called 70,
+live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,677, work left 949 (Wrapped 55, with a row
+388, no row yet 506), from 980.
+
+**2026-11-12, the type 12 mode (branch `b7-loop-11-11-26`, the
+forty-fifth run, its second subsystem):** `network-mode.md` (132 rows,
+108 in play, `src/network_mode/`): the game's Xbox Live mode (network
+battle and network time attack), reached from the title's main menu:
+its Init, delegates, 14 machines' InitStates and set-ups and teardowns,
+`NetScreen::InitBase`, the mode select's running screen, and the game's
+session memory (`Session::Make`, `Free`, `Init`, `Release`). By the
+user's call (2026-11-12) its Xbox Live calls are answered with
+plugged-in data, the values the SDK gives today: the Live mask
+`[0x826C795C]` read as B5's stub writes it (0), the multiplayer
+privilege check answered 0 (`sub_8214F620` and `XUserCheckPrivilege`
+Dropped), `XShowSigninUI` left out (its answer unread); nothing the
+game shows changes. `Interrupt` `sub_822785E0` stays recompiled
+(unread helpers); the other screens' pages and transitions are leads.
+The replay doesn't open the mode: its 127 are on the drive list. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36,
+Dropped 27, never called 69, live 208. Imports: 186 called, 54 with a
+live caller. B7 (`b7_status.py`): ours 5,808, work left 840 (Wrapped
+55, with a row 388, no row yet 397), from 949.
+
+**2026-11-12, the race's end (branch `b7-loop-11-11-26`, the
+forty-fifth run, its third subsystem):** `race-end.md` (1 row,
+`src/race_end/`): `RaceMode::ModeAfterRace` `sub_82150E00`, the mode a
+race goes to after it ends (by race kind and flags; movies 6 to 9 at
+the career's stages 6 and 8), with its caller `RaceMode::NextMode`
+`sub_82151EF0` (`race-loading.md`) and `Progress::CheckUnlocks`
+`sub_821162B0` (never seen, ported by the user's call to keep as little
+recompiled as possible); six adapters removed (`AfterRace`,
+`EventLocation`, `Session::Free`, `CheckSystemRequest` among them).
+`race-loading.md`'s `WaitCourse` and `EndTick` still wait on
+`Scenery::IsLoaded`. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 27, never called 69, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,811, work left 838 (Wrapped 55, with a row 387, no row yet 396),
+from 840.
+
+**2026-11-12 to 13, the course scenery finished (branch
+`b7-loop-11-11-26`, the forty-fifth run, leads without mapping):**
+`Scenery::IsLoaded` (with `CourseSetup::WaitCourse` and `EndTick`,
+`race-loading.md`), the scenery's load and unload (`CourseSet::Load`,
+the area lights and models, `Scenery::Unload`, `Destroy`),
+`LocationScreen::PollLoad`, and the whole of `Scenery::Draw`'s group
+(the headlight projectors, `DrawArea`, `DrawSetLists`, the light groups,
+the billboards' record and draw, `Minimap::Draw`, `Scenery::Draw`
+itself inside its frame-state wrap, with the per-frame wraps of the
+texture animations and the minimap kept) made native; about 50 adapters
+removed across `course-scenery.md`, `sprites.md`, `minimap.md`,
+`scenery-lists.md`, `camera-modes.md`, `model-animation.md` and others.
+Frame dumps at 30 fps without interpolation were pixel-identical against
+the fallback flags. A harness fault on the way (a removed adapter
+exposing `ScenePools::GetB`'s frame in dead stack, 1fdeb678) is now a
+note for migration agents: after removing an adapter, run its callers'
+harnesses. Nothing ready is left in `course-scenery.md`; what's left
+waits on recompiled callers (`Race::DrawStep`, `CourseView::Draw`). The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+27, never called 69, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,831, work left 818 (Wrapped 52,
+with a row 370, no row yet 396), from 838.
+
+**2026-11-13, the options' load and save pages (branch
+`b7-loop-11-11-26`, the forty-fifth run, its fourth subsystem):**
+`options-load-save.md` (16 rows, 14 in play, `src/options_screen/load_save.cpp`):
+the options screen's category 5 (page 9, the load) and 6 (page 10, the
+save): their sub-page tables, device checks, dialog answers, waits and
+leaves. The map found that the names given before in other files have
+load and save swapped (category 5 calls `GameData::Load`); left for the
+user's review. The replay ran the save page; the load page is on the
+drive list. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 27, never called 69, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,847, work left 804
+(Wrapped 52, with a row 370, no row yet 382), from 818.
+
+**2026-11-13, `Type6Screen0` (branch `b7-loop-11-11-26`, the
+forty-fifth run, its fifth subsystem):** 13 new rows in
+`type6-type7-modes.md` (`src/type67_modes/screen0.cpp`): the type 6
+mode's first screen (a five-item menu over the type 6 car), its pages,
+steps and helpers, made native beside type 7's, with type 7's
+unported steps, `PowerGraph::SetFromCar` (type 7's menu page and the
+car list call its plain C++) and `CarList::DrawCarPowerGraph`
+(`power-graph.md`). Neither the attract race nor the replay opens the
+type 6 or 7 modes: 24 on the drive list. The boundary: 449 functions
+(916 pairs): overridden 109, Native 36, Dropped 27, never called 69,
+live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,866, work left 792 (Wrapped 52, with a row
+367, no row yet 373), from 804.
+
+**2026-11-13, the type 5 mode (branch `b7-loop-11-11-26`, the
+forty-fifth run, its sixth subsystem):** `type5-mode.md` (33 rows, 17
+in play, `src/type5_mode/`): the parking area's front-end mode (vtable
+`0x82006C24`, 15 slots, the only one with a slot 14), its delegates and
+its dialog machine at +19280 (`Type5Dialog`, "TXR_PaCmnWindow", the
+type 2 dialog's design), all native; its quirks kept (`Leaving`'s
+machine check over ids 0 to 2, never this mode's; `NextMode`'s answer
+bytes as stack leftovers). Neither the attract race nor the replay
+enters the parking area: 33 on the drive list. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 27, never
+called 69, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,899, work left 775 (Wrapped 52, with a row
+367, no row yet 356), from 792.
+
+**2026-11-13, the vinyl editor (branch `b7-loop-11-11-26`, the
+forty-fifth run, its seventh subsystem):** the stand screens' lead
+turned out mostly mapped already (6 of 8); its 2 new functions, the
+vinyl editor's state 34 free look, took the vinyl editor's lead with
+them: 29 new rows in `tuning-pages.md` (`src/tuning_pages/loads.cpp`,
+`vinyl_pages.cpp`): the editor's pages for states 23 to 31 and 34
+with their movie sides, the decal images' list window, loads and
+archive callback, and the sticker editor's helpers the pages call,
+made native in three migrations (the never-seen pages ported with
+their callers); `HighlightItem` and `HighlightSelected`
+(`tuning-screen.md`) with them. Harness faults fixed on the way (a
+recording sound manager and mapper block in the tuning stand world;
+the state history laid). `TuningScreen::HandleInput` and `Command21`
+are now ready. The replay doesn't open the vinyl editor: its functions
+are on the drive list. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 27, never called 69, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,935, work left 758 (Wrapped 52, with a row 366, no row yet 340), from
+775.
+
+**2026-11-13, the power graph screen and `HandleInput` (branch
+`b7-loop-11-11-26`, the forty-fifth run, its eighth subsystem and a
+lead without mapping):** `TuningScreen::HandleInput` and `Command21`
+made native with 29 adapters removed (the tuning screen's pages it
+alone called); 20 never-seen pages it calls stay recompiled (the
+option rows, paint, light kits, interior, the sticker editor).
+`power-graph-screen.md` (22 rows, `src/power_graph_screen/`): the power
+graph screen machine the type 6 and 7 modes share, all native. Neither
+runs in the replay: on the drive list. The boundary: 449 functions (916
+pairs): overridden 109, Native 36, Dropped 27, never called 69, live
+208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
+ours 5,963, work left 741 (Wrapped 52, with a row 365, no row yet
+324), from 758.
+
+**2026-11-13, the achievements (branch `b7-loop-11-11-26`, the
+forty-fifth run, its ninth subsystem):** `achievements.md` (5 rows,
+`src/achievements/`): after a race, which of the 27 achievements were
+earned and their write. By the user's call (2026-11-13) the write keeps
+calling `XUserWriteAchievements` through the guest, so the SDK goes on
+recording unlocks in its achievements file; it is Wrapped for the
+harness alone. `RaceStates::OnRaceEnd` became ready (a lead). The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+27, never called 69, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,968, work left 739 (Wrapped 52,
+with a row 365, no row yet 322), from 741.
+
+**2026-11-13, the frame driver (branch `b7-loop-11-11-26`, the
+forty-fifth run, its tenth subsystem):** `frame-driver.md` (41 rows,
+`src/frame_driver/`; mapped as `renderer.md`, renamed by the user's
+call as "renderer" was confusing beside our Vulkan renderer): the
+game's object at framework + 76 that drives each frame across its
+render thread (listeners, requests, `DrawFrame`) and the app's scene
+at + 80 (`Scene::Update`, `Draw`, its constructor), with the game's
+`Thread` class and its thread imports, made native inside the frame
+state and present wraps; frame 600 pixel-identical against the
+fallback. A pre-existing bug fixed: the `set_register` helper in
+`hooks/app_states.cpp` and `framework.cpp` put register n into r(n+1)
+(c96869cc). `FrameDriver::Present` stays (its harness would run
+`Device::Swap`'s override), and `Init`, `StartFrame`, `WaitForFrame`
+wait on the core's `Event::`. The run stopped at its limit of 10. The
+boundary: 449 functions (916 pairs): overridden 110, Native 40,
+Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
+live caller. B7 (`b7_status.py`): ours 5,989, work left 718 (Wrapped
+51, with a row 361, no row yet 306), from 739.

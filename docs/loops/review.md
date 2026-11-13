@@ -11,6 +11,310 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
+
+- The frame driver's map (6d9bc131; mapped as `renderer.md`, renamed
+  `frame-driver.md` and `FrameDriver::` by the user's call, 2026-11-13,
+  as "renderer" was confusing beside our Vulkan renderer): 41 rows (9 moved from
+  `functions.md`). Corrections: the object at the scene's + 64 is the
+  render queue (`Scene::Update` calls `RenderQueue::Flip`; `Draw`'s
+  "slot 5" is `RenderQueue::Replay`). **For the user:** `sub_825BA380`
+  (CreateThread with a processor, `app-start-up.md`) is Dropped but
+  still runs in play through `Thread::Begin` (the render thread, the
+  worker pools); its row now says Dropped holds for `Voice::Init`'s
+  call only; the status is unchanged. `sub_824960E0` inside the movie
+  library's range is mapped (the game's own renderer interface calls
+  it).
+- The frame driver's migration (cac0f347..e721e59a,
+  `--native_frame_driver`). **For the user:** a pre-existing bug fixed
+  (c96869cc): the `set_register` helper in `src/hooks/app_states.cpp`
+  and `framework.cpp` wrote `(&ctx.r0)[n]`, but `PPCContext` keeps r3
+  first, so register n landed in r(n+1) (r31's in the link register's
+  slot); now `guest_call::Gpr`. It sets the original's registers before
+  guest calls in `App::` and the framework; their harnesses passed
+  before and after. `sub_825BA380` (CreateThread with a processor) went
+  Dropped -> Native (`Thread::Begin` reaches it). `FrameDriver::Present`
+  stays recompiled: a harness would have to run `Device::Swap`'s
+  override (it hands the frame to our renderer and waits on the frame
+  fence). `Scene::Scene`'s harness leaks the draw globals' blocks (~12
+  MB a case, 2 cases). `FrameDriver::ApplyRequest`'s listener removal
+  (never seen) runs the original, as `RunLoop::` and `App::ApplyRequest`
+  do; the shared tree erase `sub_82093000` would be its lead.
+- The achievements' map (d06dc44a): `achievements.md`, 5 rows; the
+  27-entry {kind, id} table and its companions in `known-data.md`.
+  `Write` never ran in play (no achievement earned). The user's call
+  (2026-11-13): `XUserWriteAchievements` stays a guest call, so the
+  SDK keeps recording unlocks.
+- Its migration (7f7fce7e..848036fc, `--native_achievements`): 5 of 5
+  ours. **For the user:** `XUserWriteAchievements` `sub_82294E58`
+  (`system-services.md`) now has a small Wrapped override
+  (`src/hooks/achievements.cpp`) used only by the harness: while the
+  harness recorder is set it hands the call to the recorder, so test
+  cases (real ids 2 to 28) don't unlock anything in the SDK's file;
+  otherwise the original runs. The nearest call (2026-10-31) is against
+  stand-in recorders in adapters; this one exists only for the harness.
+- The power graph screen's map (4ed4704c): `power-graph-screen.md`, 22
+  rows (the machine the type 6 and 7 modes share, `PowerGraphScreen67::`);
+  its members' vtable slots inferred from the functions beside each
+  Init (no image read), marked "probably"; `power-graph.md`'s
+  `0x82815EC0` writers corrected (four write 0); `known-data.md`'s
+  `0x82815EB4`, `0x82815EB8` added.
+- Its migration (acc7bc1a..2f90c6eb, `--native_power_graph_screen`):
+  22 of 22 ours; `SetTexts`' multiplier addresses corrected in the map
+  (0x6000 off); the empty `sub_82106540` call in `Update` left out, as
+  the type 2 dialog's; the harness checked with a temporary mutation
+  (first unseen, then 14 of 96 differing once movie 9 had 21 text
+  records).
+- `HandleInput` and `Command21` (2787b4aa..658969d6, no mapping):
+  `HandleInput` Overridden (a vtable slot), `Input0` Merged,
+  `Command21` Native under `--native_tuning_screen`; 29 adapters
+  removed; `ResetStickerEditor`, `LoadStickers`, `RestoreAreaDecals`
+  (never seen) ported. `HandleInput` still calls 20 never-seen pages
+  through the guest (its row says why). Harness: `ItemFields` quiets
+  signaling NaNs in the sticker records, as `kVinyls` does (the
+  recompiled `lfs`/`stfs` quiet them).
+- The stand screens' lead (c2578bab) was mostly stale: 6 of its 8 had
+  rows; 2 new rows in `tuning-pages.md` (the vinyl editor's state 34
+  free look, `InputVinylView`, and `LeaveVinylView`). The vinyl
+  editor's pages (b54839a0): 27 new rows there (states 23 to 31, their
+  movie-side updates, the decal images' window and callback); quirks
+  in the rows (A copies layers 0 and 1 only; "A pressed" asked twice;
+  `MoveVinylLayers` stores B's answer into its frame only);
+  `known-data.md`'s vinyl editor fields and the wait words
+  `0x826D84A4`-`0x826D84C0`.
+- The type 5 mode's map (4a90a16a): `type5-mode.md`, 33 rows (17 in
+  play): the parking area's mode, its vtable's 15 slots (slot 14 only
+  this mode's) and its +32 vtable, the new `Type5Dialog` (a copy of the
+  type 2 dialog's design, two steps shared with `type2-dialog.md`);
+  `Leaving`'s machine check loops over ids 0 to 2 while this mode's are
+  3, 16 and 21, so it always hands over at once (the original's, kept);
+  dialog steps 5 and 9 never set; `NextMode`'s answer bytes after byte
+  1 stack leftovers (as the type 10 mode's); `known-data.md`'s block
+  and dialog globals; cross-links in `location-screen.md` and
+  `car-settings.md`.
+- Its migration (33bdeaf2..d30920e0, `--native_type5_mode`): 33 of 33
+  ours (31 Overridden, reached through tables and vtables); the map's
+  rows for `OpenConfirmStep` and `MoveCursorStep` corrected (the
+  highlight's `PlayNamed` gets r5 = 0). The `type10_mode` harness makes
+  the same "3 = none" loading-movie assumption that hung this one (it
+  stands in `Run`, so it doesn't hang there).
+- `Type6Screen0`'s map (4ed5e21e): 13 new rows in
+  `type6-type7-modes.md` (the type 6 mode's first screen, a five-item
+  menu over the type 6 car; its pages, steps and helpers, with
+  `PowerGraph::SetFromCar` `sub_82250488`, never seen, shared with
+  `Type7Screen0::MenuPage` and the car list); `known-data.md`'s +9656
+  word, the save screen's data +56 read, the power graph record
+  `0x82815EBC`; the menu page taken from the menu helpers' lead.
+- Its migration (d642e99d..3a90ef05): the 13 rows ours, with type 7's
+  `OpeningStep`, `BackStep`, `CursorStep`, `PlayItem`,
+  `PowerGraphPage` and `CarList::DrawCarPowerGraph` (`power-graph.md`)
+  native; the menu pages call the confirms' plain C++ while the UI
+  movies' text setters are native, else the original. **Found, not
+  fixed:** `CarList::DrawEntryPowerGraph`'s adapter (`sub_82250670`)
+  sets r31 = 0x826E0000 zero-extended where the original's `lis`
+  sign-extends it (0xFFFFFFFF826E0000); it matters only above 32
+  segments; added as a cleanup lead.
+- The options' load and save map (fde73e96): `options-load-save.md`,
+  16 rows. **For the user:** the names given before have load and save
+  the wrong way round: category 5 calls `GameData::Load`, 6
+  `GameData::Save`, so `Options::SavePage`, `SetUpSavePage`,
+  `ShowSaveDialog` and `ChangeSaveDialog` (other files) are the load's;
+  not renamed, the new file's intro says so. The rest of the save
+  screens' lead (`8221BE90` on, 47 never seen, kind 6's screen after
+  the race) moved into the in-race screens' lead.
+- Its migration (d2d04519..2111429c, `--native_options_load_save`): 16
+  of 16 ours; the plain C++ named `LoadPage::` and `SavePage::`
+  correctly; the harness seeds each case's generator from its own stack
+  words (`CaseRandom`) and makes half the dialog answers accept, after
+  shifted random streams left kinds 0, 1 and 4's accept paths
+  unreached; `options_screen`'s harness now also saves `0x826BDC90` and
+  `0x828161F0`.
+- `Scenery::Draw` (7bf375c1..bd6bfc88, no mapping): native from the
+  pass table at 0x82603060 inside its `ITC_FRAME_STATE_WRAP`, calling
+  `TextureAnimations::Advance` and `Minimap::Draw` through their
+  per-frame wraps; ctx's r24 follows the original's; 11 adapters
+  removed; `Matrix::Copy`'s adapter (frame interpolation's copy wrap)
+  kept though listed removable. The frame check's first native run
+  differed from the fallback in its resolve textures; the second and
+  third matched it pixel for pixel (left unexplained; probably the
+  first run's start-up).
+- `Scenery::Draw`'s rest, part one (f1e47061..ea8acc8f, no mapping):
+  the billboards' record (Overridden: its diagnostics wrap runs the
+  native body) and draw, the light groups, `DrawArea`, `Minimap::Draw`
+  (its blink-clock wrap kept, `per_frame_logic.cpp`); 12 adapters
+  removed (`sprites.md`, `minimap.md`, `scenery-lists.md`). The frame
+  check: deterministic dumps (`--interpolate_draw_state=false
+  --max_fps=30`) pixel-identical against each fallback. Harness
+  choices: `RecordState`'s dead frame under `Record` not compared (the
+  render queue saves a guest r26 there); `DrawArea`'s and
+  `Minimap::Draw`'s r3 not compared (`Scenery::Draw` doesn't read it).
+  `BuildVertices`' camera blend shared as
+  `BlendState_BuildBillboardVertices`.
+- The course scenery's ready groups (8516e7c6..95d287ef, no mapping):
+  `ObjectPools::Load` calls the three loads directly (`Calls::load`);
+  `AnimationSet::FindByTexture` moved from `functions.md`; 15 adapters
+  removed (`UiMovie::GetPictureTexture`'s register steps moved into
+  its harness). Harness notes: `PollLoad`'s seeds scrambled
+  (SplitMix64) since the shared xorshift gave ~11 distinct worlds in
+  120 cases (the other `location_screen` groups still have low variety,
+  for a later fix); `PollLoad`'s harness leaves out the stack below its
+  frame (callees' register saves); `Scenery::Destroy`'s recompiled side
+  runs under `RecompiledHeapScope` (r3 after `XPhysicalFree`). Six
+  removal candidates kept (five diagnostics wraps, `FromViewport`'s
+  guest call).
+- Its validation stopped on a harness fault (12 `front_end_car_draw`,
+  `car_makers` and `tuning_pages_movie` groups): removing `GetB`'s
+  adapter let the recompiled sides run its original, writing its frame
+  below their callers; the harnesses now leave out exactly `GetB`'s
+  back chain and saves at each caller's r1 (1fdeb678, by the harness
+  fault precedent). `UiMovie::GetPictureTexture` set to Merged into
+  `PollLoad` (no print of its own, as `Texture::GetLevelDesc`).
+- The race end's map (c8f1147b): `race-end.md`, one row
+  (`RaceMode::ModeAfterRace` `sub_82150E00`: after a race, which mode
+  next by race kind; movies 6-9 queued in the boot table at the
+  career's stages 6 and 8); answer bytes +81 to +83 stack leftovers
+  (`BootMode::NextMode`'s precedent); cross-references in
+  `race-loading.md`, `career.md`, `todays-result.md`, `boot-mode.md`,
+  `known-data.md`.
+- The race end's migration (ba317c7e..fc2138de, `--native_race_end`):
+  `NextMode` Overridden (the race mode's vtable slot 6) and under the
+  new flag, not `--native_race_loading`; `Progress::CheckUnlocks`
+  ported (never seen) and its rewards pass shared with `AfterRace`
+  (`src/career/progress.cpp`); its callers, today's result's two
+  included, call the plain C++ where `Condition::Test`'s copies fit and
+  the original through the guest otherwise; 6 adapters removed. The
+  map missed that a day (+6100) above 999 gives 9 on the -1 path; now
+  in the row.
+- The type 12 mode's map (89120eb9): `network-mode.md`, 127 new rows
+  (108 in play): the game's Xbox Live mode (network battle, network
+  time attack: `TXR_NetworkModeSelect`, `TXR_NetworkTaCourse`,
+  `TXR_NetworkTaRanking`); 5 leads added (its other screens, dialogs,
+  the network manager's callees), marked "mapping only until the
+  user's call" by the map; notes added to the `sub_8227B930` and
+  menu-helpers leads. The user's call (2026-11-12): its screens made
+  native, and its Xbox Live calls answered by plugging in the data
+  the SDK gives today (first "left recompiled", changed the same day
+  to keep as little recompiled as possible).
+- The type 12 mode's migration (1b7594a1..21c8cb3b,
+  `--native_network_mode`): 130 rows ours. How the Live calls were
+  plugged in: the Live mask `[0x826C795C]` read as data (only B5's
+  `Network::Update` stub writes it, 0), so the battle and time attack
+  pages take the "not signed in" way (dialog 13, reason 7), as now;
+  `CheckMultiplayerPrivilege` `sub_8214F620` answered 0 (what the SDK
+  answers on every path) and Dropped, with `XUserCheckPrivilege`
+  `sub_82295030` (`system-services.md`); `XShowSigninUI` left out by
+  the native sign-in pages (its answer unread). `Session::Make`,
+  `Free`, `Init`, `Release` are the game's own session memory, ported
+  as game code. `Interrupt` `sub_822785E0` stays recompiled (unread
+  helpers). `init_step_tables.py` now follows r4 and InitBase's call.
+  The time attack's race set-up shares `TrafficHoles` and
+  `SplitTraffic` with `race_setup.cpp`. Two new expected groups
+  (`expected-differences.md`).
+- The type 9 mode's map (0752af3f): `todays-result.md`, 57 new rows
+  (31 in play, 26 "Not seen in play"): the career's end of the day,
+  named from the debug strings `TXR_MenuTodaysResult` and
+  `TXR_TodaysEvent`; the shared slots stay in `type10-mode.md` and
+  `front-end-screen-helpers.md`; `known-data.md`'s type 9 block,
+  `0x828160C8`-`0x828160DC` (the map wrote `0x827F60..`, fixed by the
+  migration with the fades' counts `0x826A50E4`, `0x826A50DC` and
+  `SetUpTexts`' node (8, 11)) and the save data's +0x1D524; references
+  in `race-event.md`, `boot-mode.md`, `front-end-screen-helpers.md`;
+  the type 12 mode added as a lead. Both `Create`s ask `VirtualAlloc`
+  for 68 bytes and write past them (inside the page): kept as is.
+- The type 9 mode's migration (b7718efe..ba41ed1b, `--native_todays_result`):
+  57 of 57 ours (38 Overridden through vtables and functor tables, 19
+  Native; `TodaysEvent::Kind`'s adapter removed); the 26 never-seen
+  paths ported with their callers (the garage screen's precedent);
+  `Progress::CheckUnlocks` `sub_821162B0` left recompiled (never seen,
+  called through the guest by both queue functions). The harness builds
+  its own small stand-ins for the data tables and `BUILD.TOC` (not
+  loaded when harnesses run); unlock counts and image lists laid in
+  play's ranges after harness faults. A row script wiped the rows'
+  notes in two commits; put back in 70dc8fb7.
+- The replay theater's check (50318046..93b074ab): the previous run's
+  unchecked port (below) now checked by its harness (46 functions, 0
+  differing) and on by default; its harness lays a replay record's +28
+  as 0-99 (play's two-digit number), after a wild value made a case
+  write guest 0x10 in a loop; `FindShown`, `OnList`, `InitStates`,
+  `StartPage`, `SetPrompts`, `BuildList`, `ShowListPage`, `ShowRecord`
+  set to Native; `Replay::SetUpRace` `sub_82105228` left recompiled
+  (never ran; the native `OnDone` calls it through the guest). The
+  attract race doesn't reach the theater: it goes to the drive.
+
+## Run 2026-11-11 08:38 (`b7-loop-11-11-26`)
+
+- The tuning screen's update's map (eba99e25): `tuning-screen.md`, 64
+  new rows (the update `sub_821E6C50` and its pieces `sub_821E6CD4`,
+  `sub_821E6F90`, in play; 23 debug state handlers and 38 command
+  runners, "Not seen in play", read in outline and named from their
+  strings), the intro's "The update", `known-data.md`'s state names
+  and the screen's +9644 and +9648; `sub_821FA460` added to the sticker
+  editor's lead.
+- The update's migration (1f7f4e8e..360b0cbc): the update Overridden
+  (its adapter stays: the tuning machine's functor), its pieces
+  Merged, 47 adapters removed (Native), 40 never-seen callees ported
+  (the garage screen's precedent, 2026-11-09), 21 left recompiled with
+  the reason in their rows (the sticker editor's commands, `Command21`,
+  `Command10`, `13`, `14`). The update's harness stands in for
+  `UiMovie::Update` inside `UiMovie::Run` (as the garage screen's) and
+  compares only the update's own frame; the tuning pages' and
+  `TuningMachine::Start`'s harnesses now leave out the originals'
+  register saves and `SetText` parameter area. A fragility left: in
+  the update's harness world, when the shared generator shifted, case
+  142 (command 26) read the wild guest address 0x70081650 in a loop;
+  worked around by giving `Command42`'s words their own seeded
+  generator, not fixed at its root.
+- The update's validation stalled (`itc_4919`) on another wild read in
+  the same harness (case 11's restore path: a random engine stage
+  indexing the spec's engine records past their end); fixed by the
+  user's call (505b2a31: the engine stages and tire types laid in
+  range from their own generator), validated again (`itc_4926`). The
+  user's call to find, fix and go on is now under "Precedent first".
+
+- The title screen's map (de062dec): `title-screen.md`, 87 rows (the
+  type 4 mode, its title load and title screen machines; `sub_822221A0`
+  `TitleScreen::Update` and `sub_8209F6B8`, now `Players::AssignController`
+  (probably), moved from `functions.md`), `known-data.md`'s four title
+  blocks and `0x826364EC`. A correction: at 600 idle ticks the title
+  object's +4 becomes 8 and the page object `[0x82814E2C]` goes to page
+  5 (the old text said +4 became 5; fixed in `../title-screen.md` and
+  `known-data.md`). `sub_82222038` (the attract race's set-up from 6
+  picked by `rand() % 6`) is marked "Not seen in play" though attract
+  races reach it: missing from the coverage list.
+- The title screen's migration (05cef504..216e9843): 86 of 87 ours
+  under `--native_title_screen`; `SetUpAttractRace` stays recompiled
+  (its harness needs the race data, tables and car specs, absent before
+  the boot's data load). `TitleScreen::Update`'s native body runs
+  inside the existing `--attract_after_s` wrap. Three existing adapters
+  (`BootData::Load` `sub_82106618`, `Career::NextDay` `sub_82116AF0`,
+  `CarDealer::StartFirstRace` `sub_82180CE8`) now check
+  `hooks::StartUpRecorded` first, the `data_load` harness's pattern, so
+  the title screen's harness records those calls instead of running
+  them (`Career::NextDay` looped forever on the harness's save); say if
+  this pattern isn't wanted (the race HUD machine's call, 2026-10-31,
+  was against stand-in recorders in adapters made as hooks). Kept from
+  the originals: `TitleLoad::Update`'s return of its table's eighth
+  entry, `MenuSound::Play`'s r3 into `StartFirstRace`, `MenuList::Init`'s
+  r7 154 and r8 153, the frame doubleword under the `NextMode` and
+  `ForceExit` answers.
+- The type 10 mode's map (1375de82): `type10-mode.md`, 47 new rows (25
+  in play): the replay theater (named by the "TXR_ReplayTheater" string
+  its update passes to an empty function), its Init, slots, and its
+  own machine (`ReplayTheater::InitStates`, UI movie 45); the type 9
+  mode's slot 12 `sub_8225D638` and +32 slot 1 `sub_8225D828` mapped
+  here as shared (`ModeType9::NextModeAnswer`, `ForceExit`);
+  `known-data.md`'s type 10 block and `[0x828161E0]`-`[0x828161E8]`;
+  the save screens' lead names `sub_8228AA58` and `sub_822896C0` as the
+  theater's `Start` and `Leave`; a lead for the type 9 mode.
+- The type 10 mode's port (49287852), **unchecked**: the run was ended
+  before its harness and race; `--native_type10_mode` off by default,
+  38 rows Overridden with "not yet checked", 8 plain C++ functions
+  without adapters left blank (`FindShown`, `InitStates`, `OnList`,
+  `StartPage`, `SetPrompts`, `BuildList`, `ShowListPage`,
+  `ShowRecord`). `b7_status.py` counts the 38 as ours though the flag
+  is off. `Replay::SetUpRace` `sub_82105228`'s row doesn't yet say it
+  stays recompiled (called through the guest from `OnDone`).
+
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 
 - The car settings' map (98f0843b): `car-settings.md`, 91 new rows (7

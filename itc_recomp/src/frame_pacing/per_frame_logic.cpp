@@ -14,6 +14,7 @@
 #include "hooks/camera_modes.h"
 #include "hooks/cameras.h"
 #include "hooks/car_draw.h"
+#include "hooks/minimap.h"
 #include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
 #include "interpolation/blend_state.h"
@@ -102,16 +103,28 @@ extern "C" REX_FUNC(sub_820F11A8) {
 // player's triangle flashing where it overlaps other cars' on the minimap.
 // On a render-only pass, both are put back after the call, so it draws with
 // the logic pass's phase and the clock advances once per tick.
+// Minimap::Draw's body is native under --native_minimap (src/minimap/draw.cpp,
+// hooks::MinimapDraw), inside the same wrap.
+namespace {
+void MinimapDrawBody(PPCContext& ctx, uint8_t* base) {
+  if (hooks::MinimapDrawNative()) {
+    hooks::MinimapDraw(ctx, base);
+  } else {
+    __imp__sub_820F5740(ctx, base);
+  }
+}
+}  // namespace
+
 extern "C" REX_FUNC(sub_820F5740) {
   REX_FUNC_PROLOGUE();
   constexpr uint32_t kBlinkFrames = 0x826C5AA4, kBlinkPhase = 0x826C5AA8;
   if (!frame_pacing::GameMessages_IsRenderOnlyPass() || !ITC_FLAG(per_tick_minimap_blink)) {
-    __imp__sub_820F5740(ctx, base);
+    MinimapDrawBody(ctx, base);
     return;
   }
   uint32_t frames = guest::LoadU32(base, kBlinkFrames);
   uint32_t phase = guest::LoadU32(base, kBlinkPhase);
-  __imp__sub_820F5740(ctx, base);
+  MinimapDrawBody(ctx, base);
   guest::StoreU32(base, kBlinkFrames, frames);
   guest::StoreU32(base, kBlinkPhase, phase);
 }

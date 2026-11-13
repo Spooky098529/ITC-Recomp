@@ -5,6 +5,7 @@
 #include "hooks/location_screen.h"
 
 #include "base/flags.h"
+#include "hooks/archive.h"
 #include "hooks/career.h"
 #include "hooks/heap.h"
 #include "hooks/guest_call.h"
@@ -16,6 +17,7 @@
 
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
+ITC_FLAG_DECLARE(bool, native_course_scenery);
 
 ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "Run the career's location screen (docs/functions/location-screen.md: "
@@ -46,9 +48,11 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "ShowCard sub_8222BBD0 and Transition17 sub_8222EAD0; Transition4 sub_8222D828 and "
               "Transition5 sub_8222DA10 over CameraAnims::Evaluate's plain C++, Transition8 "
               "sub_8222DC08, Transition24 sub_8222D2E8, Transition34 sub_8222D108 and Start "
-              "sub_8222F0B0; PoseCar sub_82228588 over the cars' and the matrix math's plain "
+              "sub_8222F0B0; PoseCar sub_82228588 (no adapter) over the cars' and the matrix math's plain "
               "C++; ShowOpponentSpecs sub_8222C188 over UiMovie::SetNodeText's plain C++ and "
-              "Transition9 sub_8222DEE0) "
+              "Transition9 sub_8222DEE0; PollLoad sub_82229238 over the camera animations', "
+              "PoseCar's, the UI movies' and Scenery::IsLoaded's plain C++, CarScene::Update, "
+              "Draw and SceneModel::PollLoad through their adapters) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen). PictureA, PictureB, Picture::Free, KindText, "
               "SetCursor, ShowUnlockEntry, ShowCard, ListNode, ShowListEntry, HidePictures, "
@@ -460,6 +464,20 @@ void LocationScreenShowOpponentPictures(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ls::ShowOpponentPictures(base, sp, calls.get());
 }
 
+// PollLoad: r3 = the machine; as the texts' functions (it reads the UI
+// movies' nodes through their plain C++).
+void LocationScreenPollLoad(PPCContext& ctx, uint8_t* base) {
+  if (!LocationScreenTextsNative(base)) {
+    __imp__sub_82229238(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32, machine = ctx.r3.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::PollLoad(base, sp, machine, calls.get(), ITC_FLAG(native_course_scenery),
+                            NativeArchiveQueue());
+}
+
 void LocationScreenUpdateView(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint32_t sp = ctx.r1.u32;
@@ -502,7 +520,8 @@ LOCATION_SCREEN_ADAPTER(8222F258, LocationScreenInitStates)
 // sub_8222BBD0, ListNode sub_8222C058, ShowListEntry sub_8222B048,
 // HidePictures sub_8222A150, SetCarColor sub_8222AC18, ShowArrows
 // sub_8222C0C8, ShowOpponentSpecs sub_8222C188, ResetMovie sub_8222CD60,
-// ShowOpponentPictures sub_8222B200, ShowOpponentInfo sub_8222B438.
+// ShowOpponentPictures sub_8222B200, ShowOpponentInfo sub_8222B438; and,
+// since PollLoad is native (2026-11-12), PoseCar sub_82228588.
 LOCATION_SCREEN_ADAPTER(822280D8, LocationScreenPage9)
 LOCATION_SCREEN_ADAPTER(82228138, LocationScreenPage11)
 LOCATION_SCREEN_ADAPTER(82227430, LocationScreenNextOpponentText)
@@ -528,5 +547,6 @@ LOCATION_SCREEN_ADAPTER(8222DC08, LocationScreenTransition8)
 LOCATION_SCREEN_ADAPTER(8222D2E8, LocationScreenTransition24)
 LOCATION_SCREEN_ADAPTER(8222D108, LocationScreenTransition34)
 LOCATION_SCREEN_ADAPTER(8222F0B0, LocationScreenStart)
-LOCATION_SCREEN_ADAPTER(82228588, LocationScreenPoseCar)
 LOCATION_SCREEN_ADAPTER(8222DEE0, LocationScreenTransition9)
+// State 2's handler (through the machine's table: its adapter stays).
+LOCATION_SCREEN_ADAPTER(82229238, LocationScreenPollLoad)

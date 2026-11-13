@@ -376,6 +376,26 @@ uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls);
 // the original's r3).
 uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// sub_82229238 LocationScreen::PollLoad (r3 = `machine`; state 2's
+// handler), from its 336-byte frame below `sp`: nothing (0) until the
+// location's camera animation 0 is loaded (CameraAnims::Find); then it
+// evaluated into the view (as Transition4's, at time 0), CarScene::Update
+// and CarScene::Draw(scene, 0) through `calls`; for each opponent (+808)
+// its scene model (ScenePools::GetB(scene, 7, +824 + 4i)): 0 unless the
+// third animation is loaded, the model's matrix (+4304) the identity
+// (memcpy from the frame) and the animation's object at 0x82010780 + 4i
+// (CameraAnims::ObjectMatrix, the original through `calls` where the frame
+// isn't 16-byte aligned), PoseCar (its original where its frame isn't
+// aligned), and SceneModel::PollLoad through `calls`, its 0 returned. Then
+// every list A picture's +0 set, UiMovies::IsLoaded(21) and (30), and
+// Scenery::IsLoaded([+552]) (its plain C++ with `native_scenery`, the
+// queue length by `native_queue`; else through `calls`); with all of
+// them: ScreenFades::FadeOut(30) once (+896 = 1), +544 and +548 = movie
+// 21's node (6, 1) and (6, 0) picture textures, the machine's +9608 = 1 and
+// +9604 = 4. Returns the r3 the original leaves.
+uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& calls,
+                  bool native_scenery, bool native_queue);
+
 // --- The opponents (src/location_screen/opponents.cpp) ---
 //
 // sub_8222B438 LocationScreen::ShowOpponentInfo: the picked opponent's item

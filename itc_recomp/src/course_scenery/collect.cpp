@@ -334,9 +334,8 @@ uint32_t GuestCall(const scenery_lists::DrawCalls& calls, uint32_t frame, uint32
   return calls.call(calls.user, function, args.begin(), int(args.size()), frame, lr);
 }
 
-// The model of a list's node `index` steps from its head (the List64 at
-// `nodes`: +260 the head, each node +0 the next and +2 its slot; the models
-// from +268).
+}  // namespace
+
 uint32_t ListModel(uint8_t* base, uint32_t nodes, uint32_t index) {
   auto node_at = [&](uint32_t at) {
     return (uint32_t(int32_t(int16_t(guest::LoadU16(base, at)))) << 2) + nodes;
@@ -348,8 +347,6 @@ uint32_t ListModel(uint8_t* base, uint32_t nodes, uint32_t index) {
   const int32_t slot = int16_t(guest::LoadU16(base, node + 2));
   return Load(base, (uint32_t(slot + 67) << 2) + nodes);
 }
-
-}  // namespace
 
 uint32_t DrawSetListsViewProjection(uint8_t* base, uint32_t pass) {
   return Load(base, pass + 20) * 592u + kCameraPasses + 144;

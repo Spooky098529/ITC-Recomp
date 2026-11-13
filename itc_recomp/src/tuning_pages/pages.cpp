@@ -800,8 +800,6 @@ namespace {
 
 constexpr uint32_t kResetPose = 0x8211ABA8;         // UiMovie::ResetPose(movie)
 constexpr uint32_t kRecordCopy = 0x820DB290;        // SceneModelRecord::Copy(to, from)
-constexpr uint32_t kResetStickerEditor = 0x821F8440;  // not seen in play: recompiled
-constexpr uint32_t kLoadStickers = 0x821F86C0;        // not seen in play: recompiled
 constexpr uint32_t kCarScene = 0x826C2E44;          // the car scene (its second set's pools)
 constexpr uint32_t kStandHolder = 0x826D83E0;       // [[[it]]] + 8: the stand car's model
 
@@ -1235,8 +1233,8 @@ uint64_t InputItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
             LoadVinyls(base, call, screen, frame);
             LoadPageLayouts(base, s);
           } else {
-            call(kResetStickerEditor, {screen}, frame, 0x821E0280);
-            call(kLoadStickers, {screen}, frame, 0x821E0288);
+            ResetStickerEditor(base, screen);
+            LoadStickers(base, call, screen, frame);
           }
           LoadDecalImages(base, call, screen, frame);
           uint32_t queue = Load(base, s + 10036);

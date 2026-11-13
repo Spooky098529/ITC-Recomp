@@ -46,6 +46,9 @@
 #include "hooks/race_loading.h"
 #include "memory/heap.h"
 #include "race_loading/race_loading.h"
+#include "data_tables/data_tables.h"
+#include "scene/scene.h"
+#include "strings_and_font/strings_and_font.h"
 
 #include <fmt/format.h>
 
@@ -286,6 +289,163 @@ void Handlers(Context& h, const Block& machine, const Block& dispatcher) {
   }
 }
 
+// --- CourseSetup::WaitCourse and EndTick: r3 the machine, r4 the
+// dispatcher. The course scenery's manager ([0x826C5514]) a block of the
+// case's: one pool of two objects whose flags are random, the object last
+// asked for (+172, +176) one of them or -1, +192 0 or set with lists A and B
+// loaded (the done count at the count) or not (below it, with no table, so
+// nothing is acquired). The car scene ([0x826C2E44]) a block of the case's,
+// its eight asset slots loading (2) now and then, its second set's lists
+// empty and its state not a teardown (CarScene::Update then only sets
+// [0x8260185C] to 3: no first set, [0x826C2E40] = 0). The collision mesh's
+// and route's states 2 or not, layer 0's fade counts 0 or not, the end's
+// tick count small or any word. Text::IsLoaded's string table and font and
+// DataTables::IsLoading's tables made-up words in the manager's block, their
+// globals pointed there for the case and put back. The archive's queue as
+// WaitDraw's cases set it (QueueControl); skipped when it isn't native.
+// Compared: the machine, the dispatcher, the fades' words, both blocks, the
+// states, [0x8260185C], the frame's back chain and r3. ---
+
+constexpr uint32_t kSceneCountdown = 0x8260185C;
+
+void CourseWaits(Context& h, const Block& machine, const Block& dispatcher) {
+  if (!hooks::NativeArchiveQueue()) {
+    ITC_LOG_INFO("harness: race_loading: the archive's queue isn't native: WaitCourse's and "
+                 "EndTick's cases skipped");
+    return;
+  }
+  const Block manager_block(2048);
+  const Block scene_block(0x1600);
+  if (!manager_block.address || !scene_block.address) {
+    ITC_LOG_ERROR("harness: race_loading: no block from the allocation layer");
+    return;
+  }
+  struct Handler {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Handler handlers[] = {
+      {"CourseSetup::WaitCourse (sub_821514A0)", __imp__sub_821514A0,
+       hooks::CourseSetupWaitCourse},
+      {"CourseSetup::EndTick (sub_821516F0)", __imp__sub_821516F0, hooks::CourseSetupEndTick},
+  };
+  constexpr uint32_t kGlobals[] = {rl::kSceneryManager, scene::kScene,
+                                   scene::kFirstSet,      rl::kCollisionState,
+                                   rl::kRouteState,       kSceneCountdown,
+                                   strings_and_font::kStrings, strings_and_font::kFont,
+                                   data_tables::kTables};
+  uint32_t saved[std::size(kGlobals)];
+  for (size_t i = 0; i < std::size(kGlobals); i++) {
+    saved[i] = guest::LoadU32(h.base, kGlobals[i]);
+  }
+  const auto saved_fades = Read(h.base, kFades, kFadesBytes);
+  for (const Handler& handler : handlers) {
+    Results results(handler.name);
+    QueueControl queue(h);
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 7919 + 101);
+        PPCContext t = CallContext(h);
+        const uint32_t sp = t.r1.u32;
+        WriteRandom(h.base, sp - kStackBytes, kStackBytes, r);
+        WriteRandom(h.base, machine.address, machine.bytes, r);
+        WriteRandom(h.base, dispatcher.address, dispatcher.bytes, r);
+        WriteRandom(h.base, kFades, kFadesBytes, r);
+        WriteRandom(h.base, manager_block.address, manager_block.bytes, r);
+        WriteRandom(h.base, scene_block.address, scene_block.bytes, r);
+        ShapeRing(h.base, dispatcher.address, r);
+        // The manager: one pool (records at +512) of two 64-byte objects at
+        // +600; lists' pointers at +700, items at +720.
+        const uint32_t m = manager_block.address;
+        guest::StoreU32(h.base, m + 0, 1);
+        guest::StoreU32(h.base, m + 4, m + 512);
+        guest::StoreU32(h.base, m + 512 + 0, 2);
+        guest::StoreU32(h.base, m + 512 + 4, 64);
+        guest::StoreU32(h.base, m + 512 + 8, 0);
+        guest::StoreU32(h.base, m + 512 + 12, m + 600);
+        static constexpr uint32_t kFlags[5] = {0, 1, 9, 8, 0x19};
+        for (uint32_t o = 0; o < 2; o++) {
+          guest::StoreU32(h.base, m + 600 + 64 * o + 32,
+                          r.Below(6) == 0 ? uint32_t(r.Next()) : kFlags[r.Below(5)]);
+        }
+        const bool loading = r.Below(3) == 0;
+        guest::StoreU32(h.base, m + 192, loading ? 1 : 0);
+        for (uint32_t l = 0; l < 2; l++) {
+          const uint32_t list = m + 116 + 28 * l;
+          const uint32_t items = r.Below(3);
+          guest::StoreU32(h.base, list + 0, 0);
+          guest::StoreU32(h.base, list + 4, r.Below(3) == 0 ? r.Below(items + 1) : items);
+          guest::StoreU32(h.base, list + 8, items);
+          guest::StoreU32(h.base, list + 12, 0);
+          guest::StoreU32(h.base, list + 16, m + 700);
+          for (uint32_t i = 0; i < 3; i++) {
+            guest::StoreU32(h.base, m + 700 + 4 * i, m + 720 + 16 * i);
+          }
+        }
+        guest::StoreU32(h.base, m + 172, r.Below(5) == 0 ? 0xFFFFFFFFu : 0);
+        guest::StoreU32(h.base, m + 176, r.Below(5) == 0 ? 0xFFFFFFFFu : r.Below(2));
+        guest::StoreU32(h.base, rl::kSceneryManager, m);
+        // Text::IsLoaded's string table (+1024: file 0 asked for, +136, and
+        // loaded, +68), its font (+1200: page 0 asked for, +12, its page at
+        // +1300 loaded, +24) and DataTables::IsLoading's tables (+1400: +4
+        // the pending loads), each now and then not ready.
+        const uint32_t strings = m + 1024, font = m + 1200, tables = m + 1400;
+        guest::StoreU32(h.base, strings + 136, r.Below(8) == 0 ? 0 : 1);
+        guest::StoreU32(h.base, strings + 68, r.Below(8) == 0 ? 0 : 1);
+        guest::StoreU32(h.base, font + 12, r.Below(8) == 0 ? 0 : 1);
+        guest::StoreU32(h.base, font + 20, m + 1300);
+        guest::StoreU32(h.base, m + 1300 + 24, r.Below(8) == 0 ? 0 : 1);
+        guest::StoreU32(h.base, tables + 4, r.Below(6) == 0 ? 1 + r.Below(3) : 0);
+        guest::StoreU32(h.base, strings_and_font::kStrings, strings);
+        guest::StoreU32(h.base, strings_and_font::kFont, font);
+        guest::StoreU32(h.base, data_tables::kTables, tables);
+        // The car scene.
+        const uint32_t sc = scene_block.address;
+        static constexpr uint32_t kSlots[8] = {84, 132, 156, 268, 472, 964, 4156, 4764};
+        for (const uint32_t slot : kSlots) {
+          guest::StoreU32(h.base, sc + slot, r.Below(12) == 0 ? 2 : r.Below(2));
+        }
+        for (uint32_t i = 4944; i < 5040; i += 4) {
+          guest::StoreU32(h.base, sc + i, 0);
+        }
+        guest::StoreU32(h.base, sc + 0, r.Below(4));
+        guest::StoreU32(h.base, scene::kScene, sc);
+        guest::StoreU32(h.base, scene::kFirstSet, 0);
+        guest::StoreU32(h.base, kSceneCountdown, uint32_t(r.Next()));
+        // The states, the fades' counts, the tick count.
+        guest::StoreU32(h.base, rl::kCollisionState, r.Below(4) == 0 ? r.Below(3) : 2);
+        guest::StoreU32(h.base, rl::kRouteState, r.Below(4) == 0 ? r.Below(3) : 2);
+        guest::StoreU32(h.base, rl::kLayer0FadeOut, r.Below(3) == 0 ? 1 + r.Below(15) : 0);
+        guest::StoreU32(h.base, rl::kLayer0FadeIn, r.Below(3) == 0 ? 1 + r.Below(15) : 0);
+        guest::StoreU32(h.base, machine.address + rl::kEndTicks,
+                        r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(5));
+        queue.Set(r.Below(3) == 0 ? 1 + r.Below(20) : 0);
+        t.r3.u64 = machine.address;
+        t.r4.u64 = dispatcher.address;
+        Run(v, handler.recompiled, handler.native, t, h.base);
+        out[v].Bytes(Read(h.base, machine.address, machine.bytes));
+        out[v].Bytes(Read(h.base, dispatcher.address, dispatcher.bytes));
+        out[v].Bytes(Read(h.base, kFades, kFadesBytes));
+        out[v].Bytes(Read(h.base, manager_block.address, manager_block.bytes));
+        out[v].Bytes(Read(h.base, scene_block.address, scene_block.bytes));
+        for (const uint32_t address : kGlobals) {
+          out[v].Word(guest::LoadU32(h.base, address));
+        }
+        out[v].Word(guest::LoadU32(h.base, sp - 112));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        for (size_t i = 0; i < std::size(kGlobals); i++) {
+          guest::StoreU32(h.base, kGlobals[i], saved[i]);
+        }
+        Write(h.base, kFades, saved_fades.data(), kFadesBytes);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 // --- The loading screen ---
 
 // UiMovie::Run's update calls, kept and answered.
@@ -484,6 +644,7 @@ void RaceLoading(Context& h) {
   }
   Inits(h, machine);
   Handlers(h, machine, dispatcher);
+  CourseWaits(h, machine, dispatcher);
   const MovieWorld world;
   if (!world.ok()) {
     ITC_LOG_ERROR("harness: race_loading: no movie world from the allocation layer");

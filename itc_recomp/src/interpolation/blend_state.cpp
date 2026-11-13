@@ -4322,22 +4322,31 @@ uint32_t AllocateBillboardSlots(void* user, uint32_t count, uint32_t return_addr
 }
 }  // namespace
 
+uint32_t interpolation::BlendState_BuildBillboardVertices(uint8_t* base, uint32_t set,
+                                                          uint32_t material,
+                                                          const sprites::SlotAllocator& slots) {
+  GetDrawState().BeforeBillboards(base, guest::LoadU32(base, set));
+  const uint32_t counted = sprites::BuildBillboardVertices(base, set, material, slots);
+  GetDrawState().AfterBillboards(base);
+  return counted;
+}
+
 extern "C" REX_FUNC(sub_8209C6E0) {
   REX_FUNC_PROLOGUE();
-  uint32_t pass = guest::LoadU32(base, ctx.r3.u32);
-  interpolation::GetDrawState().BeforeBillboards(base, pass);
   if (ITC_FLAG(native_billboards)) {
     const uint32_t set = ctx.r3.u32, material = ctx.r5.u32;
     const uint64_t lr = ctx.lr;
     BillboardSlots user{ctx, base, ctx.r4.u32};
     ctx.fpscr.disableFlushMode();
-    uint32_t counted =
-        sprites::BuildBillboardVertices(base, set, material, {AllocateBillboardSlots, &user});
+    uint32_t counted = interpolation::BlendState_BuildBillboardVertices(
+        base, set, material, {AllocateBillboardSlots, &user});
     ctx.lr = lr;
     ctx.r3.u64 = counted;
-  } else {
-    __imp__sub_8209C6E0(ctx, base);
+    return;
   }
+  uint32_t pass = guest::LoadU32(base, ctx.r3.u32);
+  interpolation::GetDrawState().BeforeBillboards(base, pass);
+  __imp__sub_8209C6E0(ctx, base);
   interpolation::GetDrawState().AfterBillboards(base);
 }
 

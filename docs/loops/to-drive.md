@@ -16,6 +16,553 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
+
+Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the
+achievements: a time attack race, an achievement earned):
+
+- `sub_82290710` Achievements::BeatsCourseTime
+- `sub_820FF708` Time::Less
+- `sub_82290A30` Achievements::Write
+
+The power graph screen's:
+
+Not in the attract race or the replay (`itc_5190`, `itc_5191`, ok; the
+type 6 and 7 modes' power graph screen, `power-graph-screen.md`):
+
+- `sub_82250778` PowerGraphScreen67::OnEnter
+- `sub_82250D70` PowerGraphScreen67::WaitForLoad
+- `sub_82250338` PowerGraphScreen67::Shown
+- `sub_82250890` PowerGraphScreen67::Open
+- `sub_82250A20` PowerGraphScreen67::Draw
+- `sub_82250948` PowerGraphScreen67::MenuPage
+- `sub_82250348` PowerGraphScreen67::ClosedPage
+- `sub_822513B8` PowerGraphScreen67::Update
+- `sub_82251320` PowerGraphScreen67::Step0
+- `sub_82250DD8` PowerGraphScreen67::SetTexts
+- `sub_82250CD0` PowerGraphScreen67::SetParts
+- `sub_82250B48` PowerGraphScreen67::SetPartIcon` (probably)
+- `sub_82250BA0` PowerGraphScreen67::SetPartRow2` (probably)
+- `sub_82250C40` PowerGraphScreen67::SetPartRow1` (probably)
+- `sub_82250AA8` PowerGraphScreen67::Step1
+- `sub_82250900` PowerGraphScreen67::Leave
+- `sub_822502C0` PowerGraphScreen67::OnLeft
+- `sub_82237A88` PowerGraphScreen6::PostLeave` (probably)
+- `sub_82237AD8` PowerGraphScreen6::PostClosing` (probably)
+- `sub_82237B28` PowerGraphScreen6::PostClosed` (probably)
+- `sub_82246FB8` PowerGraphScreen7::PostLeave` (probably)
+- `sub_82247008` PowerGraphScreen7::PostClosing` (probably)
+
+The tuning screen's:
+
+Not in the attract race or the replay (`itc_5181`, `itc_5182`, ok; the
+tuning screen's pages and commands, `tuning-pages.md` and
+`tuning-screen.md`; the vinyl editor's pages already listed below):
+
+- `sub_822087C8` TuningScreen::Command21
+- `sub_821F8440` TuningScreen::ResetStickerEditor
+- `sub_821F86C0` TuningScreen::LoadStickers
+- `sub_821F6C90` TuningScreen::RestoreAreaDecals
+
+The vinyl editor's:
+
+Not in the attract race or the replays (`itc_5150`, `itc_5151`; part
+two `itc_5166`, `itc_5167`; part three `itc_5173`, `itc_5174`; all ok; the tuning screen's vinyl editor,
+`tuning-pages.md` and `tuning-screen.md`):
+
+- `sub_8220A1C8` TuningScreen::InputLayerOrder
+- `sub_821FE3C8` TuningScreen::EndLayerOrder
+- `sub_82207F38` TuningScreen::SwapOrderTextures
+- `sub_82203A30` TuningScreen::ShowOrderNodes
+- `sub_82201DB8` TuningScreen::MoveLayerOrder
+- `sub_821FD518` TuningScreen::SwapLayerRecords
+- `sub_821FD5C0` TuningScreen::SetGroupImage
+- `sub_821FD658` TuningScreen::SetImageGroup
+- `sub_82208CE0` TuningScreen::InputVinylLayers
+- `sub_821FFB20` TuningScreen::MoveVinylLayers
+- `sub_82202530` TuningScreen::MoveVinylImages
+- `sub_822058F8` TuningScreen::InputVinylImages
+- `sub_82203400` TuningScreen::HighlightItem
+- `sub_82203570` TuningScreen::HighlightSelected
+- `sub_82209738` TuningScreen::InputLayerActions
+- `sub_82200230` TuningScreen::MoveLayerActions
+- `sub_821FE370` TuningScreen::BeginLayerOrder
+- `sub_821FE6A0` DecalImages::FreeTexture
+- `sub_82204730` DecalImages::BindVinylTexture
+- `sub_821FE960` DecalImages::Reload
+- `sub_821FEAF0` DecalImages::LoadWindow
+- `sub_821FED30` DecalImages::Scroll
+- `sub_821FE608` DecalImages::OnLoaded
+- `sub_821FE740` DecalImages::FreeKept
+- `sub_82202928` TuningScreen::InputVinylView
+- `sub_82201B40` TuningScreen::LeaveVinylView
+- `sub_82204B70` TuningScreen::InputVinylPages
+- `sub_821FE498` TuningScreen::SetLastImage
+- `sub_821FF3A0` TuningScreen::MoveVinylMenu
+- `sub_82206A50` TuningScreen::InputDecalPosition
+- `sub_82200DC0` TuningScreen::MoveDecalPosition
+- `sub_82206F48` TuningScreen::InputDecalAngle
+- `sub_822012E8` TuningScreen::MoveDecalAngle
+- `sub_82207320` TuningScreen::InputDecalScale
+- `sub_82201620` TuningScreen::MoveDecalScale
+- `sub_82205110` TuningScreen::InputLayerEdit
+- `sub_82200760` TuningScreen::MoveLayerEdit
+
+The type 5 mode's:
+
+Not in the attract race or the replay (`itc_5139`, `itc_5140`, ok; the
+type 5 mode, the parking area's, and its dialog, `type5-mode.md`):
+
+- `sub_8222FD68` ModeType5::Init
+- `sub_82230050` ModeType5::WaitForLoads
+- `sub_82230458` ModeType5::NextMode
+- `sub_82230260` ModeType5::LeaveScreen` (probably)
+- `sub_82230168` ModeType5::WaitForShown` (probably)
+- `sub_82230328` ModeType5::Leaving` (probably)
+- `sub_8222FD08` ModeType5::FindShown` (probably)
+- `sub_8222FC50` Mode::Slot14Thunk
+- `sub_8222FED0` ModeType5::Interrupt` (probably)
+- `sub_8222FF60` ModeType5::ForceExit` (probably)
+- `sub_8222FC38` ModeType5::Resume` (probably)
+- `sub_82226A10` Type5Dialog::Init
+- `sub_82225878` Type5Dialog::OnEnter
+- `sub_82226978` Type5Dialog::WaitForMovies
+- `sub_822266F8` Type5Dialog::Draw
+- `sub_82226788` Type5Dialog::Update
+- `sub_82225860` Type5Dialog::OnInterrupt
+- `sub_82225A90` Type5Dialog::OpenConfirm
+- `sub_82225980` Type5Dialog::OpenNotice
+- `sub_82225B88` Type5Dialog::OpenConfirm2
+- `sub_82225A08` Type5Dialog::OpenNotice2
+- `sub_822257A8` Type5Dialog::OnLeft
+- `sub_82225D10` Type5Dialog::ConfirmPage
+- `sub_82225F30` Type5Dialog::NoticePage
+- `sub_82226088` Type5Dialog::Notice2Page
+- `sub_822261E0` Type5Dialog::OpenConfirmStep
+- `sub_822262B8` Type5Dialog::CloseConfirmStep
+- `sub_82226370` Type5Dialog::CloseNoticeStep
+- `sub_82226420` Type5Dialog::OpenConfirm2Step
+- `sub_822264B8` Type5Dialog::CloseConfirm2Step
+- `sub_82226568` Type5Dialog::CloseNotice2Step
+- `sub_82226618` Type5Dialog::MoveCursorStep
+- `sub_822266D0` Type5Dialog::Step9` (probably)
+
+The type 6 and 7 modes' first screens':
+
+Not in the attract race or the replay (`itc_5131`, `itc_5132`, ok; the
+type 6 and 7 modes' first screens, `type6-type7-modes.md`, and the car
+list's power graph, `power-graph.md`):
+
+- `sub_82234958` Type6Screen0::MenuPage
+- `sub_82234B80` Type6Screen0::PowerGraphPage
+- `sub_82234BF0` Type6Screen0::QuitPage
+- `sub_82234190` Type6Screen0::ChosenPage
+- `sub_82234C20` Type6Screen0::OpeningStep
+- `sub_82234E38` Type6Screen0::BackStep
+- `sub_82234D50` Type6Screen0::CursorStep
+- `sub_822342F0` Type6Screen0::FadeOutStep
+- `sub_822343A8` Type6Screen0::PlayItem
+- `sub_82234428` Type6Screen0::PlaceCursor
+- `sub_822346A8` Type6Screen0::ShowHelp
+- `sub_82250488` PowerGraph::SetFromCar
+- `sub_82250700` CarList::DrawCarPowerGraph
+- `sub_82244E70` Type7Screen0::OpeningStep
+- `sub_822450A8` Type7Screen0::BackStep
+- `sub_82244FC0` Type7Screen0::CursorStep
+- `sub_82244818` Type7Screen0::PlayItem
+- `sub_82244E00` Type7Screen0::PowerGraphPage
+- `sub_822448B0` Type7Screen0::PlaceCursor
+- `sub_82244AB8` Type7Screen0::ShowHelp
+- `sub_822344A8` Type6Screen0::ShowPage
+- `sub_82244930` Type7Screen0::ShowPage
+- `sub_82233FC8` Type6Screen0::Confirm
+- `sub_82244528` Type7Screen0::Confirm
+
+The options' load page's:
+
+Not in the attract race or the replay (`itc_5125`, `itc_5126`, ok; the
+options screen's load page, `options-load-save.md`: Options, load the
+game data):
+
+- `sub_821BB858` LoadPage::SetDialog
+- `sub_821BBC10` LoadPage::CheckDevice
+- `sub_821BC7B0` LoadPage::Answer
+- `sub_821BC940` LoadPage::Note
+- `sub_821C2620` LoadPage::Wait
+- `sub_821B9FB0` LoadPage::Close
+- `sub_821C6468` LoadPage::Leave
+- `sub_821B9FF8` OptionsSavePages::Cancel
+- `sub_821BBC68` LoadPage::DeviceAnswer
+
+The minimap's:
+
+Not in the attract race or the replay (`itc_5101`, `itc_5102`, ok; the
+minimap's point markers, `minimap.md`):
+
+- `sub_82147D18` SetList::Point
+- `sub_820F4BA8` Minimap::DrawPointMarker
+
+The parking area's:
+
+Not in the attract race or the replay (`itc_5052`, `itc_5047`, ok; the
+parking area's car pick, `location-screen.md`, and its camera animations,
+`camera-modes.md`):
+
+- `sub_82229238` LocationScreen::PollLoad
+- `sub_82228588` LocationScreen::PoseCar
+- `sub_82150300` CameraAnims::Find
+- `sub_82150960` CameraAnims::Evaluate
+- `sub_82150A10` CameraAnims::ObjectMatrix
+
+The race end's:
+
+Not in the attract race or the replay (`itc_5006`, `itc_5007`, ok; the
+race's end: an unlock after a career race, an event race's end, the
+Live mode's time attack):
+
+- `sub_821162B0` Progress::CheckUnlocks
+- `sub_82111650` Career::EventLocation
+- `sub_82292710` Session::Free
+
+The type 12 mode's:
+
+Not in the attract race or the replay (`itc_5001`, `itc_5002`, ok; all
+in `network-mode.md`, the type 12 Xbox Live mode: open it from the
+title's main menu; without Live its battle and time attack pages show
+the "not signed in" dialog):
+
+- `sub_82278058` ModeType12::Init
+- `sub_8227B440` ModeType12::WaitForLoads
+- `sub_8227B930` ModeType12::NextMode
+- `sub_8227B868` ModeType12::LeaveScreen` (probably)
+- `sub_8227B770` ModeType12::WaitForShown` (probably)
+- `sub_8227BE10` ModeType12::Teardown` (probably)
+- `sub_822788D8` ModeType12::ForceExit` (probably)
+- `sub_82278B98` ModeType12::Resume` (probably)
+- `sub_82277EE0` ModeType12::AllLoaded` (probably)
+- `sub_82277FF0` ModeType12::FindShown` (probably)
+- `sub_82277E10` ModeType12::Machine` (probably)
+- `sub_82292710` Session::Free` (probably)
+- `sub_822926B8` Session::Make` (probably)
+- `sub_822915C0` Session::Init` (probably)
+- `sub_82291670` Session::Release` (probably)
+- `sub_8227B3E0` NetScreen::InitBase` (probably)
+- `sub_8227D680` NetModeSelect::InitStates
+- `sub_8227C398` NetModeSelect::Create
+- `sub_8227C078` NetModeSelect::OpenMovie
+- `sub_8227C558` NetModeSelect::WaitForMovie
+- `sub_8227C5C8` NetModeSelect::Open
+- `sub_8227D300` NetModeSelect::Start
+- `sub_8227CCE0` NetModeSelect::SetUp
+- `sub_8227D248` NetModeSelect::Draw
+- `sub_8227D4E8` NetModeSelect::Update
+- `sub_8227C658` NetModeSelect::MenuPage` (probably)
+- `sub_8227C970` NetModeSelect::LeavePage` (probably)
+- `sub_8227C9F0` NetModeSelect::BattlePage` (probably)
+- `sub_8227CB38` NetModeSelect::TimeAttackPage` (probably)
+- `sub_8227C088` NetModeSelect::SignInPage` (probably)
+- `sub_8227C210` NetModeSelect::SignInPage2` (probably)
+- `sub_8227CC78` NetModeSelect::BackPage` (probably)
+- `sub_8227CE50` NetModeSelect::Intro
+- `sub_8227D138` NetModeSelect::ShowCursor` (probably)
+- `sub_8227D380` NetModeSelect::MoveCursor` (probably)
+- `sub_8227D1D8` NetModeSelect::SetCursorY` (probably)
+- `sub_8227D088` NetModeSelect::FadeOut
+- `sub_8227CFA8` NetModeSelect::FadeIn` (probably)
+- `sub_8227BF80` NetModeSelect::OnNo` (probably)
+- `sub_8227BFB8` NetModeSelect::OnYes` (probably)
+- `sub_8227BFD8` NetModeSelect::OnDialogClosed` (probably)
+- `sub_8227C7A8` NetModeSelect::Unload
+- `sub_8227C810` NetModeSelect::Unloaded` (probably)
+- `sub_8227C8C0` NetModeSelect::Leave
+- `sub_8227C4B8` NetModeSelect::Destroy
+- `sub_82276510` Type12Screen1::InitStates
+- `sub_822720A8` Type12Screen1::Create
+- `sub_82272030` Type12Screen1::ResetData` (probably)
+- `sub_82271D18` Type12Screen1::OpenMovie
+- `sub_82272398` Type12Screen1::WaitForMovie
+- `sub_822727E0` Type12Screen1::Leave
+- `sub_822722B0` Type12Screen1::Destroy
+- `sub_8225F330` Type12Screen3::InitStates
+- `sub_8225DFE8` Type12Screen3::Create
+- `sub_8225DFD8` Type12Screen3::OpenMovie
+- `sub_8225E1B0` Type12Screen3::WaitForMovie
+- `sub_8225E518` Type12Screen3::Leave
+- `sub_8225E100` Type12Screen3::Destroy
+- `sub_822873A0` NetRanking::InitStates
+- `sub_82282358` NetRanking::Create
+- `sub_82282098` NetRanking::OpenMovie
+- `sub_822825C0` NetRanking::WaitForMovie
+- `sub_82282848` NetRanking::Leave
+- `sub_82282508` NetRanking::Destroy
+- `sub_82281858` NetTaCourse::InitStates
+- `sub_8227FD40` NetTaCourse::Create
+- `sub_8227FC70` NetTaCourse::OpenMovie
+- `sub_8227FF10` NetTaCourse::WaitForMovie
+- `sub_82280218` NetTaCourse::Leave
+- `sub_8227FE70` NetTaCourse::Destroy
+- `sub_82268410` Type12Screen6::InitStates
+- `sub_82278C20` Type12Screen6::InitBase
+- `sub_82265A88` Type12Screen6::Create
+- `sub_82265920` Type12Screen6::OpenMovie
+- `sub_82265C00` Type12Screen6::WaitForMovie
+- `sub_82265DC0` Type12Screen6::Leave
+- `sub_82265B70` Type12Screen6::Destroy
+- `sub_8226EB40` Type12Screen7::InitStates
+- `sub_82279118` Type12Screen7::InitBase
+- `sub_82268D18` Type12Screen7::Create
+- `sub_822688A8` Type12Screen7::OpenMovie
+- `sub_82268F70` Type12Screen7::WaitForMovie
+- `sub_822697D8` Type12Screen7::Leave
+- `sub_82268EC8` Type12Screen7::Destroy
+- `sub_82262A88` Type12Screen8::InitStates
+- `sub_8227A000` Type12Screen8::InitBase
+- `sub_82261030` Type12Screen8::Create
+- `sub_822609C0` Type12Screen8::OpenMovie
+- `sub_822611F8` Type12Screen8::WaitForMovie
+- `sub_82261358` Type12Screen8::Leave
+- `sub_82261168` Type12Screen8::Destroy
+- `sub_822646B0` Type12Screen9::InitStates
+- `sub_8227A4F8` Type12Screen9::InitBase
+- `sub_822630C0` Type12Screen9::Create
+- `sub_82263048` Type12Screen9::OpenMovie
+- `sub_822632C8` Type12Screen9::WaitForMovie
+- `sub_82263448` Type12Screen9::Leave
+- `sub_82263238` Type12Screen9::Destroy
+- `sub_82288600` Type12Dialog10::InitStates
+- `sub_82279610` Type12Dialog10::InitBase
+- `sub_82287DD8` Type12Dialog10::Create
+- `sub_82287CD0` Type12Dialog10::OpenMovie
+- `sub_82287F40` Type12Dialog10::WaitForMovie
+- `sub_82288028` Type12Dialog10::Leave
+- `sub_82287EC0` Type12Dialog10::Destroy
+- `sub_82277B18` Type12Dialog11::InitStates
+- `sub_82279B08` Type12Dialog11::InitBase
+- `sub_82276E60` Type12Dialog11::Create
+- `sub_82276E40` Type12Dialog11::OpenMovie
+- `sub_82276FC0` Type12Dialog11::WaitForMovie
+- `sub_822770B8` Type12Dialog11::Leave
+- `sub_82276F40` Type12Dialog11::Destroy
+- `sub_8227F6C8` Type12Dialog12::InitStates
+- `sub_8227A9F0` Type12Dialog12::InitBase
+- `sub_8227ED58` Type12Dialog12::Create
+- `sub_8227ECE8` Type12Dialog12::OpenMovie
+- `sub_8227EEC0` Type12Dialog12::WaitForMovie
+- `sub_8227F038` Type12Dialog12::Leave
+- `sub_8227EE40` Type12Dialog12::Destroy
+- `sub_8227EA50` Type12Dialog13::InitStates
+- `sub_8227AEE8` Type12Dialog13::InitBase
+- `sub_8227DED0` Type12Dialog13::Create
+- `sub_8227DEC0` Type12Dialog13::OpenMovie
+- `sub_8227E030` Type12Dialog13::WaitForMovie
+- `sub_8227E118` Type12Dialog13::Leave
+- `sub_8227DFB0` Type12Dialog13::Destroy
+- `sub_821B96B8` PowerGraphScreen12::InitStates` (probably)
+
+The career's end of the day's:
+
+Not in the attract race or the replay (`itc_4967`, `itc_4968`, ok; all
+in `todays-result.md`, the career's end of the day: today's event, the
+unlocks' screen after a career race that unlocks something):
+
+- `sub_8225DE78` ModeType9::Leaving
+- `sub_8225D6A8` ModeType9::IsLoaded
+- `sub_8225A720` TodaysResult::QueueMovie
+- `sub_8225BAB8` TodaysEvent::MarkImages
+- `sub_8225C130` TodaysEvent::OpenMovie
+- `sub_8225C008` TodaysEvent::LoadImages
+- `sub_8225BD10` TodaysEvent::LoadImagePair
+- `sub_8225C160` TodaysEvent::WaitForMovie
+- `sub_8225C0A0` TodaysEvent::ImagesLoadedA
+- `sub_8225C0E8` TodaysEvent::ImagesLoadedB
+- `sub_8225C990` TodaysEvent::Start
+- `sub_8225C648` TodaysEvent::SetUpTexts
+- `sub_8225BB70` TodaysEvent::NextUnlockEntry
+- `sub_8225C928` TodaysEvent::Draw
+- `sub_8225CDE8` TodaysEvent::Update
+- `sub_8225C428` TodaysEvent::EventPage
+- `sub_8225C590` TodaysEvent::EndPage
+- `sub_8225B9B8` TodaysEvent::QueueEventMovies
+- `sub_8225CB18` TodaysEvent::Intro
+- `sub_8225C770` TodaysEvent::FadeOut
+- `sub_8225CC80` TodaysEvent::NextUnlock
+- `sub_8225CD50` TodaysEvent::NextPage
+- `sub_8225CA50` TodaysEvent::ShowUnlock
+- `sub_8225C848` TodaysEvent::ShowImages
+- `sub_8225C1F8` TodaysEvent::Unload
+- `sub_8225C278` TodaysEvent::Unloaded
+
+The replay theater's:
+
+Not in the attract race or the replay (`itc_4951`, `itc_4952`, ok; all
+in `type10-mode.md`, the replay theater: open Replay Theater from the
+title's main menu; the list page and a replay's load need a saved
+replay):
+
+- `sub_82288940` ModeType10::Init
+- `sub_82288B70` ModeType10::WaitForLoads
+- `sub_82288E68` ModeType10::NextMode
+- `sub_82288DA0` ModeType10::LeaveScreen
+- `sub_82288CA0` ModeType10::WaitForShown
+- `sub_822890D8` ModeType10::Leaving
+- `sub_8225D638` ModeType9::NextModeAnswer
+- `sub_82288A68` ModeType10::Interrupt
+- `sub_8225D828` ModeType9::ForceExit
+- `sub_82288B20` ModeType10::Resume
+- `sub_822888F0` ModeType10::FindShown
+- `sub_822893E8` ReplayTheater::OnList
+- `sub_8228AC48` ReplayTheater::InitStates
+- `sub_82289408` ReplayTheater::Create
+- `sub_822891F8` ReplayTheater::OpenMovie
+- `sub_82289570` ReplayTheater::WaitForMovie
+- `sub_8228AA58` ReplayTheater::Start
+- `sub_8228A508` ReplayTheater::StartPage
+- `sub_8228A868` ReplayTheater::Draw
+- `sub_8228A8F8` ReplayTheater::Update
+- `sub_82289768` ReplayTheater::ListPage
+- `sub_82289958` ReplayTheater::AskList
+- `sub_822899E0` ReplayTheater::AskLoad
+- `sub_82289A70` ReplayTheater::LeavePage
+- `sub_8228A4B0` ReplayTheater::WaitPage
+- `sub_8228A3B8` ReplayTheater::SetPrompts
+- `sub_82289AC0` ReplayTheater::Intro
+- `sub_82289BD0` ReplayTheater::FadeOut
+- `sub_82289CC0` ReplayTheater::FadeInList
+- `sub_82289D70` ReplayTheater::ShowCursor
+- `sub_8228A658` ReplayTheater::MoveCursor
+- `sub_82289E08` ReplayTheater::HideCursor
+- `sub_82289EB8` ReplayTheater::PickReplay
+- `sub_8228AAB0` ReplayTheater::OnDone
+- `sub_82289208` ReplayTheater::OnFailed
+- `sub_8228ABE0` ReplayTheater::OnRetry
+- `sub_82289308` ReplayTheater::OnBack
+- `sub_82289358` ReplayTheater::OnInterrupt
+- `sub_822893A8` ReplayTheater::OnResume
+- `sub_82289600` ReplayTheater::Unload
+- `sub_82289668` ReplayTheater::Wait
+- `sub_822896C0` ReplayTheater::Leave
+- `sub_822894E8` ReplayTheater::Destroy
+- `sub_8228A560` ReplayTheater::BuildList
+- `sub_82289F48` ReplayTheater::ShowListPage
+- `sub_8228A0D8` ReplayTheater::ShowRecord
+
+## Run 2026-11-11 08:38 (`b7-loop-11-11-26`)
+
+Not in the attract race or the replay (`itc_4926`, `itc_4920`, ok; all
+in `tuning-screen.md`, the tuning shop; the 40 never-seen callees,
+first 40 here, may never run in play):
+
+- `sub_821CC078` TuningScreen::DebugColorSelect (probably)
+- `sub_821CC430` TuningScreen::DebugWarnMoney (probably)
+- `sub_821CC510` TuningScreen::DebugReflectSet (probably)
+- `sub_821CC598` TuningScreen::DebugAnnulSet (probably)
+- `sub_821CC620` TuningScreen::DebugRemoveConfirm (probably)
+- `sub_821E8358` TuningScreen::DebugBodyColor (probably)
+- `sub_821E8440` TuningScreen::DebugNeonPart (probably)
+- `sub_821E84F8` TuningScreen::DebugNeonKind (probably)
+- `sub_821E85A0` TuningScreen::DebugNeonEdit (probably)
+- `sub_821E8688` TuningScreen::DebugLedEdit (probably)
+- `sub_821E8758` TuningScreen::DebugCockpitTop (probably)
+- `sub_821E8800` TuningScreen::DebugCockpitType (probably)
+- `sub_821E88C0` TuningScreen::DebugCockpitColor (probably)
+- `sub_821E8998` TuningScreen::DebugMeterKind (probably)
+- `sub_821E8A88` TuningScreen::DebugMeterPoint (probably)
+- `sub_821FDA80` TuningScreen::DebugLayerOperate (probably)
+- `sub_821FDF10` TuningScreen::DebugLayerOrder (probably)
+- `sub_821FE118` TuningScreen::DebugEditRotate (probably)
+- `sub_821FE130` TuningScreen::DebugEditScale (probably)
+- `sub_821FE148` TuningScreen::DebugEditColor (probably)
+- `sub_821FE160` TuningScreen::DebugEditFlip (probably)
+- `sub_821FE230` TuningScreen::DebugPaintCancelConfirm (probably)
+- `sub_821FE2D0` TuningScreen::DebugPaintRemoveConfirm (probably)
+- `sub_821D4180` TuningScreen::Command5 (probably)
+- `sub_821E9730` TuningScreen::Command11 (probably)
+- `sub_821E9CA0` TuningScreen::Command12 (probably)
+- `sub_821EB8E8` TuningScreen::Command54 (probably)
+- `sub_821EBDC8` TuningScreen::Command55 (probably)
+- `sub_821EC6A0` TuningScreen::Command56 (probably)
+- `sub_821ECC68` TuningScreen::Command57 (probably)
+- `sub_821EDB70` TuningScreen::Command58 (probably)
+- `sub_82200100` TuningScreen::Command17 (probably)
+- `sub_82201C58` TuningScreen::Command19 (probably)
+- `sub_82201FA0` TuningScreen::Command20 (probably)
+- `sub_82204980` TuningScreen::Command26 (probably)
+- `sub_82204A78` TuningScreen::Command27 (probably)
+- `sub_821F7498` TuningScreen::Command32Done (probably)
+- `sub_821F7618` TuningScreen::Command42 (probably)
+- `sub_821F77F0` TuningScreen::Command52 (probably)
+- `sub_821F7948` TuningScreen::Command53 (probably)
+- `sub_821CC248` TuningScreen::DebugOptionSelect (probably)
+- `sub_821CC3A8` TuningScreen::DebugConfirmBuy (probably)
+- `sub_821CC488` TuningScreen::DebugConfirmEquip (probably)
+- `sub_821E8068` TuningScreen::DebugWheelPartSelect (probably)
+- `sub_821E8128` TuningScreen::DebugWheelKindSelect (probably)
+- `sub_821E8298` TuningScreen::DebugWheelInchSelect (probably)
+- `sub_821FD710` TuningScreen::DebugDecalTopMenu (probably)
+- `sub_821FD880` TuningScreen::DebugLayerSelect (probably)
+- `sub_821FDCB8` TuningScreen::DebugLayerEdit (probably)
+- `sub_821FE080` TuningScreen::DebugLayerSet (probably)
+- `sub_821FE100` TuningScreen::DebugEditPosition (probably)
+- `sub_821FE178` TuningScreen::DebugEditView (probably)
+- `sub_821FE190` TuningScreen::DebugPaintConfirm (probably)
+- `sub_821D5028` TuningScreen::ShowOptions (probably)
+- `sub_821D6230` TuningScreen::ShowDialog (probably)
+- `sub_821D6420` TuningScreen::MarkPick (probably)
+- `sub_821E8B68` TuningScreen::Command7 (probably)
+- `sub_821F5F70` TuningScreen::Command8 (probably)
+- `sub_821E9050` TuningScreen::Command9 (probably)
+- `sub_821FF1D0` TuningScreen::Command15 (probably)
+- `sub_821FF6F0` TuningScreen::Command16 (probably)
+- `sub_82200600` TuningScreen::Command18 (probably)
+- `sub_822019D0` TuningScreen::DecalCommand (probably)
+- `sub_82202090` TuningScreen::Command22 (probably)
+- `sub_82202368` TuningScreen::Command23 (probably)
+- `sub_82204888` TuningScreen::Command25 (probably)
+- `sub_82202750` TuningScreen::Command30 (probably)
+- `sub_82202880` TuningScreen::Command31 (probably)
+
+Not in the attract race or the replay (`itc_4943`, `itc_4944`, ok; all
+in `title-screen.md`, the title screen and its menus; the debug pages
+and steps may never run in play):
+
+- `sub_82225698` ModeType4::Leaving
+- `sub_82224E20` ModeType4::Interrupt
+- `sub_82224ED0` ModeType4::ForceExit
+- `sub_82225048` ModeType4::Resume
+- `sub_82220CD8` TitleLoad::DebugPage0
+- `sub_82220D60` TitleLoad::DebugPage1
+- `sub_82220DE8` TitleLoad::DebugPage2
+- `sub_82220E70` TitleLoad::DebugPage3
+- `sub_822204F8` TitleLoad::DebugStep0
+- `sub_82220580` TitleLoad::DebugStep1
+- `sub_82220610` TitleLoad::DebugStep2
+- `sub_82220698` TitleLoad::DebugStep3
+- `sub_82220720` TitleLoad::DebugStep4
+- `sub_822207B0` TitleLoad::DebugStep5
+- `sub_82220840` TitleLoad::DebugStep6
+- `sub_822208D0` TitleLoad::DebugStep7
+- `sub_82220960` TitleLoad::DebugStep8
+- `sub_822209F0` TitleLoad::DebugStep9
+- `sub_82220A80` TitleLoad::DebugStep10
+- `sub_82220B10` TitleLoad::DebugStep11
+- `sub_822219E0` TitleScreen::OnControllerPicked
+- `sub_82221A78` TitleScreen::OnInterrupt
+- `sub_82221A90` TitleScreen::OnResume
+- `sub_822224D0` TitleScreen::Unload
+- `sub_82222538` TitleScreen::OpenNext
+- `sub_82222378` TitleScreen::Menu4
+- `sub_82223940` TitleScreen::SetUpMenu4
+- `sub_82222C90` TitleScreen::Transition2
+- `sub_82223C38` TitleScreen::ShowMainMenuAtOnce
+- `sub_82222E88` TitleScreen::MoveMainCursor
+- `sub_82223050` TitleScreen::Transition9
+- `sub_822231B0` TitleScreen::Transition10
+- `sub_82223428` TitleScreen::MoveCareerCursor
+- `sub_82223E58` TitleScreen::BackFromCareer
+- `sub_82223F30` TitleScreen::ShowMenu4
+- `sub_82223FD8` TitleScreen::BackFromMenu4
+- `sub_822235D0` TitleScreen::MoveMenu4Cursor
+
 ## Run 2026-11-10 23:52 (`b7-loop-10-11-26-2`)
 
 Not in the attract race or the replay (`itc_4810`, `itc_4811`, ok):

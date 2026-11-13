@@ -688,6 +688,53 @@ Rows not yet moved stay in the table below. So far:
 - [`user-info.md`](user-info.md): the type 2 mode's user info screen
   (its machine at +0x102D8, opened by message 27, UI movie 10): the
   player's record, its texts and its way back to the hub (B7).
+- [`title-screen.md`](title-screen.md): the type 4 front-end mode, the
+  title screen: its Init and delegate functions, the title load (the
+  data load at boot and the logo before the title), the title screen's
+  machine ("press start", the main menu, the career menu, the attract
+  race's set-up) (B7).
+- [`type10-mode.md`](type10-mode.md): the type 10 front-end mode, the
+  replay theater: its Init and delegate functions, the slots it shares
+  with the type 9 mode, and the theater's machine (UI movie 45: the
+  saved replays' list through the save screen, a replay's load and the
+  race set up from it) (B7).
+- [`todays-result.md`](todays-result.md): the type 9 front-end mode,
+  the career's end of the day: its Init and delegate functions, today's
+  result (UI movie 27: the day's and the career's counts, the next day)
+  and today's event (UI movie 0: the unlocks just made, a page each with
+  their images), and the movies queued after them (B7).
+- [`network-mode.md`](network-mode.md): the type 12 front-end mode,
+  the Xbox Live mode ("NETWORK BATTLE", "NETWORK TIME ATTACK"): its Init
+  and delegate functions, its fourteen screen machines' set-ups and
+  teardowns, and the mode select's machine (UI movie 35: the Live
+  sign-in, the privilege check, the two items) (B7; mapped, an Xbox
+  feature).
+- [`type5-mode.md`](type5-mode.md): the type 5 front-end mode, the
+  parking area's mode: its Init and delegate functions, its +32
+  interface, and its dialog's machine (the yes/no questions and notices
+  over UI movies 16 to 19 the parking area and the car settings open)
+  (B7).
+- [`race-end.md`](race-end.md): the race's end, the mode a race goes
+  to when it's over (the career's progress asked, the boot movies queued
+  after the stages that end with them) (B7).
+- [`options-load-save.md`](options-load-save.md): the options screen's
+  load and save pages (categories 5 and 6, pages 9 and 10): their
+  sub-pages over the save layer, the dialogs' setters and the closing
+  steps 41 and 42 (B7).
+- [`power-graph-screen.md`](power-graph-screen.md): the type 6 and 7
+  modes' power graph screen (UI movie 9 over the picked car): the
+  handlers both machines register, its pages and its open and close
+  steps, the spec texts, and the members' vtable slots (B7).
+- [`achievements.md`](achievements.md): the achievements: after a
+  race, which of the 27 the race earned (items beaten, course times,
+  a count), and their write (`XUserWriteAchievements`) (B7; mapped, an
+  Xbox feature).
+- [`frame-driver.md`](frame-driver.md): the frame driver (framework + 76: its
+  constructor, the render thread's frame and listeners, the `Thread`
+  class and its kernel wrappers) and the app's scene (framework + 80:
+  its constructor setting up the command list, the render queue and
+  the graphics library's draw globals, `Scene::Update` and `Draw`)
+  (B7; mapped).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -698,16 +745,7 @@ old performance notes to the end of `../native-renderer.md`.
 
 | Address | Name | Status | Notes |
 |---|---|---|---|
-| `sub_8258DE50` | `Thread::Start` | | Entry point of the game's threads: calls vtable slot 1 of the object at start context + 8. |
 | `sub_82095AF0` | | | A worker thread's loop (started through `sub_8258DE50`): waits on an event, runs jobs through function pointers, signals events; it opens the game's data files at boot. On the Steam Deck it spiked to 66-82% of a core with 15-32% in the kernel around race loads; here (2026-10-14) ~29% with ~68,000 minor page faults in 2 s while a race loads. On the Deck (`itc_041.log`) the kernel time is page faults: 37-69% of a core (19-24% kernel) with 27,000-52,000 minor faults and no major ones per 2 s, its system call samples all `running` (in a fault, not a call) but once `202` (futex: waiting). Only around loads (2-4 s each); in a race it's at 0-15%. The fix, if worth it: populate the guest memory's pages in advance (e.g. `MADV_POPULATE_WRITE` on the views), moving the cost to startup. |
-| `sub_82092358` | `Renderer::Init` | | Sets the vblank interval (2 = 30 fps) via `sub_8258D568`, then subscribes renderer callbacks to numbered events (2, 3, 5, 6, 16). |
-| `sub_820920D8` | `Renderer::WaitForFrame` | Wrapped | Tick handler on the main thread. Blocks until the render thread signals the frame is done (event at this+392), swaps, and starts the next frame. Frame pacing runs after it (`src/frame_pacing/renderer_hooks.cpp`). |
-| `sub_82091EF8` | `Renderer::ThreadLoop` | Overridden | Render thread loop; started through `sub_8258DE50`. Draws one frame each time the main thread asks, as the game did, without the 2-vblank wait. |
-| `sub_82091A60` | `Renderer::Present` | Wrapped | Flushes, waits for the vblank interval (`sub_8258DC58` → `sub_8258DAA8`), then swaps buffers. Event 5. Wrapped only to time it (`--log_frame_times`). |
-| `sub_82091E58` | `Renderer::DrawFrame` | | Render thread: calls each draw listener in the list at renderer+28. |
-| `sub_82091BC0` | | | Draw listener between the scene draw and present: resolves the frame into a front buffer (`sub_8258D998`) and waits for the GPU to go idle (`sub_8229F1B0`). See "The end of a frame" in `gpu-functions.md`. |
-| `sub_820988C8` | `Scene::Update` | Wrapped | Tick handler on the scene object (0x40026FE0 at the menu). Calls the current mode object at +64 (vtable slots 6 and 2). Wrapped for `--log_boot_modes` (logs the front end's state objects at `[0x82814E2C]` and `[0x82814E34]` as they change). |
-| `sub_82098940` | `Scene::Draw` | | Draw listener on the same object. Calls the mode object's draw (vtable slot 5), reading live game state. |
 | `sub_8223A3F0` | `Delegate::Invoke` | | Calls the function at +8 with the argument at +4. Used for tick and draw listeners. |
 | `sub_82233460` | `MemberDelegate::Invoke` | | Calls the member function at +8 on the object at +4, adjusted by +12. |
 | `sub_8258D4D8` | `VideoOutput::OnVblank` | | The vblank callback (device +15144): adds 1 to `8296BD2C` and `8296BD30` and signals the event at `8296BD34` (`Event::Signal`). Only `sub_8229DEA0` calls it, which is never called now. Its counts and event were read and waited on only by the original `VideoOutput::WaitForVblank`, which our override replaced. Never called. |
@@ -720,7 +758,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. The plain C++ (`Vehicle_GetSpeedKmh`, `src/hooks/vehicle.h`) is also called directly by the native `OverlayView::SpeedKmh` (`sub_821268C0`, [`race-overlays.md`](race-overlays.md)); the adapter also tells the state capture (`--capture_dir`) about the vehicle. Checked against the original by the `race_overlays` harness. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
-| `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
 | `sub_82296270` | `OutputDebugStringA` | Overridden | r3 = text: puts it in an `ANSI_STRING` (`RtlInitAnsiString`) and passes the text to `sub_822972D0`, which ends in `sub_82297DC0`, an empty function (the retail game drops its debug output). Called from 19 files. Ours (`src/hooks/debug_output.cpp`, in front of `helpers::DebugOutput`, `src/helpers/debug_output.cpp`) does nothing. See B6 in `docs/rexglue-removal.md`. |
 | `sub_822970A8` | `InitNamedObjectAttributes` | Overridden | r3 = attributes (12 bytes), r4 = an `ANSI_STRING` (8 bytes), r5 = the name's text; returns r3. Fills the string by `RtlInitAnsiString`'s rule and the attributes as root directory -4 (the named objects' root; -3 is `ObDosDevices`), name, attributes `0x80` (probably `OBJ_OPENIF`). Callers: named event and timer creation (`sub_82295E78`, `sub_825BA2B0`), only when given a name; a boot and an attract race make none. Plain C++ in `src/helpers/object_attributes.cpp` behind `src/hooks/object_attributes.cpp`; a temporary self-test (5 strings: a name, empty, none, 300 characters, one character) gave the same 20 bytes as the recompiled version. See B6 in `docs/rexglue-removal.md`. |
 | `sub_825BA4A0` | `OutputDebugStringW` | Overridden | r3 = UTF-16 text: converts it to ANSI on the kernel's heap (`RtlInitUnicodeString`, `RtlUnicodeStringToAnsiString`), passes it to `OutputDebugStringA` (`sub_82296270`, which drops it) and frees it. Ours (`src/hooks/debug_output.cpp`) does nothing. See B6 in `docs/rexglue-removal.md`. |
@@ -753,7 +790,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_824846D8` | | | Vtable function (no direct callers), seen in play. Makes a vertex shader (`sub_822AA018`) and pixel shaders (`sub_822A9EE8`, twice) without compiling: probably where the game's precompiled shaders are made. Not read. |
 | `sub_8248FBE0` | | | A method that isn't implemented: `DbgPrint` and `0x80004001` (E_NOTIMPL). No direct caller (a vtable). Never called in play (two attract races and two sessions the user played, 2026-10-21). |
 | `sub_8229B7B0` | | | Copies four words of the device's presentation parameters (+13188 width, +13192 height, +13236, +13196) to r5. r3 device, r4 unused (0). From `sub_82482B18`. |
-| `sub_822221A0` | `TitleScreen::Update` | Wrapped | Counts idle ticks and starts the attract race at 600 (see "The title screen" in `../title-screen.md`). `--attract_after_s` shortens the wait. |
 | `sub_820E42E8` | `Dash::PoseTachometer` | Overridden | `src/hooks/cockpit_dials.cpp` (`--native_cockpit_dials`; `docs/cockpit-dial-interpolation.md`). r3 = the dash, r4 = the car, r5 = the camera passes. Gets two angles from `sub_820D3740([dash + 2896], car, [dash])`: `a` the speedometer, `b` the tachometer. Each needle's world matrix is `(B * RotZ(angle)) * A * car + 16`, with A, B at dash + 32/+96 for `a` and + 272/+336 for `b`; drawn with `sub_820D06F0(dash + 496 / + 736, r5 + 144, world, 0, 0)`, both part `...06A0`. |
 | `sub_820E45A8` | `Dash::PoseDials` | Overridden | Same file. r3 = the dash, r4 = the car, r5 = the camera passes. Seven needle slots k = 0-6, each drawn if `[[dash] + 8 + 12k]` and its model (`[dash + 1700]`, `1940`, `2660`, `2900`, `3620`, `3860`, `4100`) are set: stores `[dash + 5296 + 4k]` into the model + 48, angle `sub_820D3688([dash + 5328 + 4k], [[dash] + 12 + 12k], car)`, world `(B * RotZ(angle)) * A * car + 16` with A at dash + 32 + 240k and B 64 bytes on, drawn with `sub_820D06F0` (dash + 2176, 2416, 3136, 3376, 4336, 4576, 4816). In mode 5 (`[dash + 4]`) slot 1 is the turbo gauge: `[dash + 5324]` into the model, angle from car + 704: above 0, `[0x820062E0]` times it, capped at `[0x820062E0]` above 1; below the double at `0x820062D8`, `[0x820062D0]`; else value * `[0x820062CC]` * `[0x820062D0]`. |
 | `sub_820D3688` | `Dial::Angle` | Native | `DialAngle` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E45A8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = range, r4 = gauge (0-3: car + 704, 712, 716, 720), r5 = the car; returns f1, no state. `[0x82000A34]` with no range. Else from = range + 0, to = + 4, angles + 8, + 12: below from the first angle, above to the second, between `(v - from) / (to - from) * (a1 - a0)` (without `+ a0`, the game's own), all times `[0x82002948]`. |
@@ -773,7 +809,7 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822A3AA8` | | | Calls `ComputeGammaRampPwl`; from `Device::SetDisplayMode` for formats 7 and 54. Not read. |
 | `sub_822B0E08` | | | Fill a ramp (r3, r4 = 0) before `Device::SetDisplayMode` runs it through the gamma functions; also called by `sub_822A05A8`. Probably the default (identity) ramps. Not read. |
 | `sub_822B0E60` | | | Fill a ramp (r3, r4 = 0) before `Device::SetDisplayMode` runs it through the gamma functions; also called by `sub_822A05A8`. Probably the default (identity) ramps. Not read. |
-| `sub_822A08A0` | `Device::Swap` | Overridden | `src/hooks/graphics_device.cpp`, without its kernel video calls. r3 device, r4 the front buffer (a texture header), r5 parameters; r3 returned as `sub_822A3B90` leaves it (`Renderer::Present` and `sub_8209ACB8` ignore it, `sub_822A0E50` returns it). Once a frame, only from `Renderer::Present` (`sub_8258DC58`, `8258DCA4`) in play; also from `sub_822A0E50` (r5 = device +13284), the tiling worker `sub_822B69A8` (r4 = device +13444, never: needs +10810 bit 2) and `sub_8209ACB8` (r5 0). Kept: the header's 52 bytes copied to +13444 (the game's memcpy); `Device::SetDisplayMode` with +10809 bit 4 (first Swap), then the bit cleared; with +10810 bit 5 (first Swap) +13312 (56 bytes) and the bit cleared; +10811 bit 7 cleared; ends the segment (`sub_8229EF48`), `sub_8229EC00(device, +13512 >> 2)`, clears +10809 bit 5, fences +13540 (the position before the segment end) and +13544 (old +13540), `sub_822A3B90(device, 0)`. Left out (each step in "Swap, step by step" under B3 in `docs/rexglue-removal.md`): the timestamps `sub_822B1F68` (+20080, never), the segment end with `829537C0` (never), the capture check `sub_822B5C58`, `VdGetSystemCommandBuffer` and `VdSwap` with their 64 words (`sub_8229F148`; +20120, +20432), `sub_822B42D0` when r5 differs from +13284 (never), `Device::SetUpScaler` and its 10 words, `sub_822A05A8` (never), register `0x1844` and +20004 (every Swap), the `7FC86110` write (+10809 bit 1, never), REG_RMW, `VdPersistDisplay` and `MmFreePhysicalMemory` (first Swap), `RetrainEdram` and the frame statistics `sub_822B20D8`. Checked against the recompiled Swap: the same fields but +20004, +20024 and +20028, and one segment fewer at the first Swap (the gamma ramp's packets fit without `VdSwap`'s words). |
+| `sub_822A08A0` | `Device::Swap` | Overridden | `src/hooks/graphics_device.cpp`, without its kernel video calls. r3 device, r4 the front buffer (a texture header), r5 parameters; r3 returned as `sub_822A3B90` leaves it (`FrameDriver::Present` and `sub_8209ACB8` ignore it, `sub_822A0E50` returns it). Once a frame, only from `FrameDriver::Present` (`sub_8258DC58`, `8258DCA4`) in play; also from `sub_822A0E50` (r5 = device +13284), the tiling worker `sub_822B69A8` (r4 = device +13444, never: needs +10810 bit 2) and `sub_8209ACB8` (r5 0). Kept: the header's 52 bytes copied to +13444 (the game's memcpy); `Device::SetDisplayMode` with +10809 bit 4 (first Swap), then the bit cleared; with +10810 bit 5 (first Swap) +13312 (56 bytes) and the bit cleared; +10811 bit 7 cleared; ends the segment (`sub_8229EF48`), `sub_8229EC00(device, +13512 >> 2)`, clears +10809 bit 5, fences +13540 (the position before the segment end) and +13544 (old +13540), `sub_822A3B90(device, 0)`. Left out (each step in "Swap, step by step" under B3 in `docs/rexglue-removal.md`): the timestamps `sub_822B1F68` (+20080, never), the segment end with `829537C0` (never), the capture check `sub_822B5C58`, `VdGetSystemCommandBuffer` and `VdSwap` with their 64 words (`sub_8229F148`; +20120, +20432), `sub_822B42D0` when r5 differs from +13284 (never), `Device::SetUpScaler` and its 10 words, `sub_822A05A8` (never), register `0x1844` and +20004 (every Swap), the `7FC86110` write (+10809 bit 1, never), REG_RMW, `VdPersistDisplay` and `MmFreePhysicalMemory` (first Swap), `RetrainEdram` and the frame statistics `sub_822B20D8`. Checked against the recompiled Swap: the same fields but +20004, +20024 and +20028, and one segment fewer at the first Swap (the gamma ramp's packets fit without `VdSwap`'s words). |
 | `sub_822B2388` | `RetrainEdram` | Dropped | `src/hooks/graphics_drops.cpp`: returns 1 (Swap ignores it). r3 device, r4 and r5 (0, 0 from Swap; 1, 1 from `Device::Init`, which no longer calls it). Under a critical section, `VdRetrainEDRAMWorker` (if r5), then `VdRetrainEDRAM` in a loop writing into the command buffer while it returns non-zero; the SDK returns 0, so it only took and released the lock. Once a frame. |
 | `sub_8229B848` | `Device::SetClockGating` | | r3 device, r4 on. If changed: waits, `VdEnableDisableClockGating`, and when off two REG_RMW packets (registers 129, 130, from `829537E4` and `829537E8`); +10810 bit 1. From `sub_822B1788` and `sub_822B20D8`. Never called in an attract race. Not needed to draw: never called (attract race and play). |
 | `sub_822B2470` | `ComputeScalerRect` | Dropped | r3 device, r4 and r5 front buffer size, r6 parameters, r7 output (56 bytes). The scaler's rectangle and output height (`VdQueryVideoFlags`). Twice at boot. No longer called: their only callers (`sub_822B2610`, `sub_822B3FE0`) are dropped. |
@@ -882,7 +918,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822ADC08` | | Wrapped | The draw's packet writers (r3 the device: shader constants, register blocks, fetch constants, HiZ and surface set-up; `NATIVE_CHECKED_HELPER`, `src/native/draw_packets.cpp`): what they change marked for the native renderer; checked with `--native_renderer_check_draw_writes`. |
 | `sub_825BE300` | `DrawVertices` | Wrapped | Logged when called outside the commands known to make them (`LOG_OUTSIDE_WRAPPER`). |
 | `sub_825BDDC0` | `BeginIndexedVertices` | Wrapped | Logged when called outside the commands known to make them (`LOG_OUTSIDE_WRAPPER`). |
-| `sub_8209F6B8` | | | Puts controller r4 on player r3 in `826BABA4` (swapping with the player that had it) and asks for the profile read (`826C7938` = 1). From `sub_8209E698`, `sub_822219E0` and `sub_822221A0`. |
 | `sub_8210BA68` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210BED8` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210BFA8` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |

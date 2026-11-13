@@ -11,6 +11,7 @@
 #include "base/log.h"
 #include "camera_modes/camera_modes.h"
 #include "car_specs/car_specs.h"
+#include "course_scenery/course_scenery.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "location_screen/internal.h"
@@ -35,8 +36,8 @@ namespace {
 // frame's +144 (16 bytes), +608 = +128, +664 and +668 = +160 and +164
 // (through a float). The floats go through a float register as lfs and
 // stfs leave them.
-void EvaluateView(uint8_t* base, uint32_t frame, uint32_t which, uint32_t time,
-                  const Calls& calls) {
+uint32_t EvaluateView(uint8_t* base, uint32_t frame, uint32_t which, uint32_t time,
+                      const Calls& calls) {
   const uint32_t zero = ThroughFloat(base, 0x82000A34);
   const uint32_t one = ThroughFloat(base, 0x82000A30);
   for (uint32_t v : {96u, 112u}) {
@@ -57,7 +58,7 @@ void EvaluateView(uint8_t* base, uint32_t frame, uint32_t which, uint32_t time,
       guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + 0x82636518 + 4 * which);
   const uint32_t out = frame + 128;
   std::optional<double> f1;
-  camera_modes::AnimsEvaluate(
+  const uint32_t evaluated = camera_modes::AnimsEvaluate(
       base, out, id, time,
       [&](uint32_t object) {
         calls.Call(0x82150350, frame - 144, 0x821509C4, object, object, out, time);
@@ -72,6 +73,7 @@ void EvaluateView(uint8_t* base, uint32_t frame, uint32_t which, uint32_t time,
   const uint32_t screen = Screen(base);
   guest::StoreU32(base, screen + 664, ThroughFloat(base, frame + 160));
   guest::StoreU32(base, screen + 668, ThroughFloat(base, frame + 164));
+  return evaluated;
 }
 
 }  // namespace
@@ -323,6 +325,126 @@ uint32_t Transition9(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     SetCarColor(base, frame);
   }
   return done;
+}
+
+namespace {
+
+// The course scenery's calls (course_scenery::Calls) through `calls`.
+course_scenery::Calls SceneryCalls(const Calls& calls) {
+  return {const_cast<Calls*>(&calls),
+          [](void* user, uint32_t function, const uint32_t* args, int count, uint32_t frame,
+             uint32_t lr) {
+            const Calls& c = *static_cast<const Calls*>(user);
+            uint64_t registers[4] = {};
+            for (int i = 0; i < count && i < 4; i++) {
+              registers[i] = args[i];
+            }
+            return uint32_t(c.call(c.user, function, registers, frame, lr));
+          }};
+}
+
+// The location's camera animation `which`'s id (0x82636518 + 16 x the
+// location + 4 x which).
+uint32_t AnimId(uint8_t* base, uint32_t which) {
+  const uint32_t location = guest::LoadU32(base, Screen(base) + 852);
+  return guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + 0x82636518 + 4 * which);
+}
+
+constexpr uint32_t kCarScene = 0x826C2E44;
+constexpr uint32_t kCarSceneUpdate = 0x820C9608;
+constexpr uint32_t kCarSceneDraw = 0x820C5DE8;
+constexpr uint32_t kSceneModelPollLoad = 0x820DA318;
+constexpr uint32_t kSceneryIsLoaded = 0x820F1F68;
+
+}  // namespace
+
+uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& calls,
+                  bool native_scenery, bool native_queue) {
+  ITC_NATIVE_RUNNING("sub_82229238 LocationScreen::PollLoad");
+  const uint32_t frame = sp - 336;
+  guest::StoreU32(base, frame, sp);
+  if (camera_modes::AnimsFind(base, AnimId(base, 0)) == 0) {
+    return 0;
+  }
+  const uint32_t evaluated = EvaluateView(base, frame, 0, 0, calls);
+  const uint32_t scene = guest::LoadU32(base, kCarScene);
+  calls.Call(kCarSceneUpdate, frame, 0x82229350, evaluated);
+  uint64_t r3 = calls.Call(kCarSceneDraw, frame, 0x8222935C, scene, 0);
+  for (uint32_t i = 0; i < guest::LoadU32(base, Screen(base) + 808); i++) {
+    const uint32_t index = guest::LoadU32(base, Screen(base) + 824 + 4 * i);
+    const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, scene, 7, index);
+    if (camera_modes::AnimsFind(base, AnimId(base, 2)) == 0) {
+      return 0;
+    }
+    // The identity the original builds in vector registers and stores
+    // (stvx: each row's address rounded down to 16), then copies to the
+    // model's matrix (+4304) from the unrounded address.
+    for (uint32_t row = 0; row < 4; row++) {
+      const uint32_t at = (frame + 176 + 16 * row) & ~15u;
+      for (uint32_t column = 0; column < 4; column++) {
+        guest::StoreU32(base, at + 4 * column, row == column ? 0x3F800000u : 0);
+      }
+    }
+    const uint32_t matrix = model + 4304;
+    Copy(base, calls, frame, 0x82229404, matrix, frame + 176, 64);
+    // The third animation's object at the opponent's time (0x82010780 + 4i).
+    const uint32_t time = guest::LoadU32(base, 0x82010780 + 4 * i);
+    if ((frame & 0xF) != 0) {
+      calls.Call(0x82150A10, frame, 0x82229424, matrix, AnimId(base, 2), time);
+    } else {
+      const uint32_t inner = frame - 96 - 320;
+      camera_modes::AnimsObjectMatrix(base, matrix, AnimId(base, 2), time, inner,
+                                      [&](uint32_t to, uint32_t from, uint32_t size) {
+                                        calls.Call(kMemcpy, inner, 0x82150600, to, from, size);
+                                      });
+    }
+    if (!PoseCar(base, frame, model + 4288, i, calls)) {
+      calls.Call(0x82228588, frame, 0x82229430, model + 4288, i);
+    }
+    r3 = calls.Call(kSceneModelPollLoad, frame, 0x82229438, model);
+    if (uint32_t(r3) == 0) {
+      return r3;
+    }
+  }
+  // Every picture of list A loaded (its +0).
+  const uint32_t screen = Screen(base);
+  for (uint32_t i = 0; i < guest::LoadU32(base, screen + 136); i++) {
+    if (guest::LoadU32(base, guest::LoadU32(base, screen + 8 + 4 * i)) == 0) {
+      return r3;
+    }
+  }
+  uint32_t movies = 0;
+  r3 = ui_movies::IsLoaded(base, 21);
+  if (uint32_t(r3) != 0) {
+    r3 = ui_movies::IsLoaded(base, 30);
+    if (uint32_t(r3) != 0) {
+      movies = 1;
+    }
+  }
+  const uint32_t manager = guest::LoadU32(base, Screen(base) + 552);
+  if (native_scenery) {
+    r3 = course_scenery::SceneryIsLoaded(base, SceneryCalls(calls), frame, manager, native_queue);
+  } else {
+    r3 = calls.Call(kSceneryIsLoaded, frame, 0x822294C0, manager);
+  }
+  if (uint32_t(r3) == 0 || movies == 0) {
+    return r3;
+  }
+  if (guest::LoadU32(base, Screen(base) + 896) == 0) {
+    mode_tick::ScreenFadesFadeOut(base, 30, 0, 0, 0, 0);
+    guest::StoreU32(base, Screen(base) + 896, 1);
+  }
+  uint32_t movie = Movie(base, frame, kMenusMovie);
+  uint32_t picture = ui_movies::FindNode(base, movie, 6, 1);
+  guest::StoreU32(base, Screen(base) + 544,
+                  guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture)));
+  movie = Movie(base, frame, kMenusMovie);
+  picture = ui_movies::FindNode(base, movie, 6, 0);
+  const uint32_t texture = guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture));
+  guest::StoreU32(base, Screen(base) + 548, texture);
+  guest::StoreU32(base, machine + 9608, 1);
+  guest::StoreU32(base, machine + 9604, 4);
+  return texture;
 }
 
 }  // namespace location_screen

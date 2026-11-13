@@ -31,7 +31,7 @@ calls an Xbox service. Shared, with their rows elsewhere:
 the save data (`sub_82111780` and the rest, their own lead), the data
 load at boot (`sub_82105868`), and the front end's title menu and menu
 lists (`sub_82222B60`, `sub_82221AC0`, `sub_8220BC20` and the rest, added
-by this map; `MenuList::Init` is here, as only the title's reset needed
+by this map; since mapped in `title-screen.md` and `race-screens.md`; `MenuList::Init` is here, as only the title's reset needed
 it so far). Mapped 2026-10-28 by the B7 loop from the lead "a player's
 save data made"; every row below was read in full in `generated/`
 (offsets are the save data's unless said). Made native the same day by the B7 loop

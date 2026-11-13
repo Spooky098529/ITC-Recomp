@@ -284,6 +284,9 @@ extern "C" REX_FUNC(sub_82105868) {
 // BootData::Load: r3 not read; r3 as the original leaves it.
 extern "C" REX_FUNC(sub_82106618) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82106618)) {  // the title screen's harness
+    return;
+  }
   if (!BootNative()) {
     __imp__sub_82106618(ctx, base);
     return;

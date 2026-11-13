@@ -5,6 +5,7 @@
 
 #include "archive/archive.h"
 #include "base/log.h"
+#include "car_models/vinyl.h"
 #include "guest.h"
 #include "tuning_screen/tuning_screen.h"
 
@@ -26,6 +27,7 @@ constexpr uint32_t kVirtualAlloc = 0x82295398;
 constexpr uint32_t kArchiveLoad = 0x8209DE48;
 constexpr uint32_t kMemCommit = 0x1000;
 constexpr uint32_t kOnImageLoaded = 0x821FE608;  // the entry's load callback
+constexpr uint32_t kTextureFree = 0x820ECFC8;   // Texture::Free(header_in, data_in)
 
 // The load both functions end with, for the entry `e` (all 64 bits, as
 // Archive::Load's context) whose +0 holds the id (`size` its asset size
@@ -51,6 +53,16 @@ uint64_t LoadEntry(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t
 }
 
 }  // namespace
+
+TextureFreeFn GuestTextureFree(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t frame,
+                               uint32_t lr, bool native_free) {
+  return [base, &call, frame, lr, native_free](uint32_t header_in, uint32_t data_in) -> uint64_t {
+    if (native_free && car_models::TextureFreeable(base, header_in)) {
+      return car_models::TextureFree(base, header_in, data_in);
+    }
+    return call(kTextureFree, {header_in, data_in}, frame, lr);
+  };
+}
 
 uint64_t RequestImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
                       uint64_t id, uint64_t i, uint32_t sp) {
@@ -128,6 +140,148 @@ uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
     r3 = RequestImage(base, call, images, uint64_t(k + 43 + 189), uint64_t(k + 46), frame);
   }
   return r3;
+}
+
+void OnImageLoaded(uint8_t* base, uint32_t handle, uint32_t e) {
+  ITC_NATIVE_RUNNING("sub_821FE608 DecalImages::OnLoaded");
+  if (int32_t(handle) != int32_t(Load(base, e + 4))) {
+    return;
+  }
+  Store(base, e + 8, 2);
+  Store(base, e + 20, 1);
+}
+
+uint64_t ReloadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                     uint64_t id, uint64_t i, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FE960 DecalImages::Reload");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t n = uint32_t(i), wanted = uint32_t(id);
+  const uint32_t at = uint32_t(i * 36) + uint32_t(images);
+  // A "none" id swapped for the group's stand-in (Request's swap); entries
+  // above 108 (or negative) keep their old id.
+  auto swap = [&](uint32_t none, uint32_t stand_in) {
+    Store(base, at, wanted == none ? stand_in : wanted);
+  };
+  if (n <= 20) {
+    swap(162, 22601);
+  } else if ((int32_t(n) >= 21 && int32_t(n) <= 41) || n - 42 <= 8) {
+    swap(188, 22602);
+  } else if (n - 51 <= 28) {
+    swap(382, 22603);
+  } else if (n - 80 <= 28) {
+    swap(382, 22604);
+  }
+  // The file into the entry's buffer as it is (no new pages, no state check).
+  const uint64_t e = i * 36 + images;
+  const uint32_t entry = uint32_t(e);
+  const uint32_t buffer = Load(base, entry + 12);
+  const uint32_t asset = Load(base, entry + 0);
+  const uint64_t serial =
+      call(kArchiveLoad, {asset, buffer, kOnImageLoaded, e, 0, 0}, frame, 0x821FEA2C);
+  const uint32_t again = Load(base, entry + 0);
+  Store(base, entry + 4, uint32_t(serial));
+  Store(base, entry + 8, 1);
+  Store(base, entry + 24, 1);
+  const uint32_t asked = archive::AssetSize(base, again);
+  Store(base, entry + 16, asked);
+  Store(base, entry + 20, 0);
+  return asked;
+}
+
+uint64_t LoadWindow(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                    uint64_t first, uint64_t i, uint64_t n, uint64_t list, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FEAF0 DecalImages::LoadWindow");
+  const uint32_t frame = Frame(base, sp, 144);
+  const int32_t count = int32_t(uint32_t(n));
+  const uint32_t which = uint32_t(list);
+  uint64_t r3 = images;
+  if (which >= 3 || count <= 0) {
+    return r3;
+  }
+  if (which == 2 || which == 1) {
+    // The stickers' 199 (383 to 581) or the vinyls' second list's 194 (189
+    // to 382): the id moved once into the list.
+    const int64_t low = which == 2 ? 383 : 189, size = which == 2 ? 199 : 194;
+    for (int64_t k = 0; int32_t(k) < count; k++) {
+      const int64_t v = int64_t(first) - low + k;
+      int64_t id;
+      if (int32_t(v) >= int32_t(size)) {
+        id = int64_t(first) + k - size;
+      } else if (int32_t(v) < 0) {
+        id = int64_t(first) + k + size;
+      } else {
+        id = int64_t(first) + k;
+      }
+      r3 = ReloadImage(base, call, images, uint64_t(id), uint64_t(k) + i, frame);
+    }
+    return r3;
+  }
+  // The first list's 5 (163 to 167): moved by 5 twice at most.
+  uint64_t entry = i;
+  for (int64_t k = 0; int32_t(k) < count; k++) {
+    const int64_t v = int64_t(first) + k - 163;
+    auto once = [](int64_t x) { return int32_t(x) < 5 ? (int32_t(x) >= 0 ? x : x + 5) : x - 5; };
+    const int64_t a = once(v);
+    const int64_t b = int32_t(a) >= 5 ? a - 5 : int32_t(a) < 0 ? a + 5 : a;
+    r3 = ReloadImage(base, call, images, uint64_t(b + 163), entry, frame);
+    entry++;
+  }
+  return r3;
+}
+
+uint64_t ScrollImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                      uint64_t direction, uint64_t i, uint64_t n, uint64_t id, uint32_t sp,
+                      bool native_free) {
+  ITC_NATIVE_RUNNING("sub_821FED30 DecalImages::Scroll");
+  const uint32_t frame = Frame(base, sp, 128);
+  const int32_t way = int32_t(uint32_t(direction));
+  uint64_t into;
+  if (way == 1) {
+    FreeTexture(base, images, i, GuestTextureFree(base, call, frame, 0x821FED5C, native_free));
+    into = i + n - 1;
+    if (int32_t(uint32_t(i)) < int32_t(uint32_t(into))) {
+      uint64_t at = i * 36 + images + 28;
+      for (uint32_t c = uint32_t(into - i); c != 0; c--) {
+        const uint32_t a = uint32_t(at);
+        Store(base, a + 4, Load(base, a + 40));
+        Store(base, a + 0, Load(base, a + 36));
+        at += 36;
+      }
+    }
+  } else if (way == 0) {
+    const uint64_t last = i + n - 1;
+    FreeTexture(base, images, last, GuestTextureFree(base, call, frame, 0x821FEDBC, native_free));
+    if (int32_t(uint32_t(last)) > int32_t(uint32_t(i))) {
+      uint64_t at = last * 36 + images + 28;
+      for (uint32_t c = uint32_t(last - i); c != 0; c--) {
+        const uint32_t a = uint32_t(at);
+        Store(base, a + 4, Load(base, a - 32));
+        Store(base, a + 0, Load(base, a - 36));
+        at -= 36;
+      }
+    }
+    into = i;
+  } else {
+    return images;
+  }
+  return ReloadImage(base, call, images, id, into, frame);
+}
+
+uint64_t FreeKept(uint8_t* base, uint64_t images, uint64_t k, const TextureFreeFn& free) {
+  ITC_NATIVE_RUNNING("sub_821FE740 DecalImages::FreeKept");
+  const uint64_t kept = uint64_t(uint32_t(k) << 3) + images + 7236;
+  const uint32_t header = Load(base, uint32_t(kept));
+  bool held = false;
+  for (uint32_t e = 0; e < 200; e++) {
+    if (Load(base, uint32_t(images) + 28 + 36 * e) == header) {
+      held = true;
+    }
+  }
+  if (held) {
+    return kept;
+  }
+  const uint32_t data = uint32_t(uint64_t(uint32_t(k + 905) << 3) + images);
+  return free(uint32_t(kept), data);
 }
 
 }  // namespace tuning_pages

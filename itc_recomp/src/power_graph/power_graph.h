@@ -151,4 +151,47 @@ bool CarListEntrySetUp(uint8_t* base, const front_end_car_draw::Calls& calls, ui
 // the car data at `frame` + 80.
 TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame);
 
+// CarList::DrawCarPowerGraph's frame (its r1 less this, below its caller's),
+// its car data at +80 (as the entry's: CarListEntryDraw gives the draw's
+// arguments), and where its PowerGraph::Draw returns (r31 kEntryR31 there
+// too).
+constexpr uint32_t kCarFrame = 1952;
+constexpr uint32_t kCarDrawReturn = 0x82250764;
+// sub_82250700 CarList::DrawCarPowerGraph's set-up, r3 = `car` (a garage
+// car), its frame at `frame`: false (nothing done) when [kEntryShown] is 0;
+// else the car data at frame + 80 (CarData::CarData, then
+// CarData::FromGarageCar from the car), each callee's frame below `frame`
+// as the original's (FromGarageCar's callees through `calls` where their
+// plain C++ declines); true: PowerGraph::Draw is then called with
+// CarListEntryDraw's arguments.
+bool CarListCarSetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t car,
+                     uint32_t frame);
+
+// A guest call PowerGraph::SetFromCar makes where a callee's plain C++
+// declines (memcpy, Car::Refresh, Vehicle::SetupFromCar): r3 to r5, from
+// the frame `frame`, returning to `lr`.
+using SetFromCarCall = std::function<void(uint32_t function, uint64_t r3, uint64_t r4,
+                                          uint64_t r5, uint32_t frame, uint32_t lr)>;
+// SetFromCar's frame (below its caller's r1) and its record's global.
+constexpr uint32_t kSetFromCarFrame = 6960;
+constexpr uint32_t kPowerGraphScreen = 0x82815EBC;  // [it] + 8: the record
+// sub_82250488 PowerGraph::SetFromCar (r3 `car`, a garage car; r4 `tab`):
+// the power graph screen's record ([0x82815EBC] + 8) filled from the car,
+// as PowerGraph::SetEntry fills it from a car list entry. In its frame
+// (`sp` - 6960, its back chain written): a car object at +3008 (Car::Init,
+// the car's 1,884 bytes copied, Car::Refresh; its spec s = +3008 + 1888), a
+// car data at +1152 (CarData::CarData, Vehicle::SetupFromCar) and a power
+// curve at +80 (PowerCurve::FromEngine on the car data's +1268, ShiftPeak
+// 0), each callee's frame below as the original's. The record: +80 = tab;
+// +60 to +76 the car's +1568 to +1584; +0 = fctiwz(car +1892); +4 =
+// fctiwz(data +0 + (data +400 + data +672) x [0x820021E8]); +8, +12, +16 = s
+// +76, +84, +80; +20 = the car's id; +24, +28 = s bytes +129, +130; +32 by s
+// byte +68 (0 and 4: 6 (its split-off case sub_822505CC), 1 to 3: 2 to 4,
+// 5: 0, 6: 1, 7: 5; above 7 not written); +36 = s byte +69 set; +40 = s +8;
+// +44, +48 = fctiwz(curve +1056, +1060); +52 = curve +1048 x [0x82009EC0];
+// +56 = fctiwz(curve +1052). Returns the curve's address (+80: r3 as
+// ShiftPeak leaves it).
+uint32_t SetFromCar(uint8_t* base, uint32_t car, uint32_t tab, uint32_t sp,
+                    const SetFromCarCall& call);
+
 }  // namespace power_graph

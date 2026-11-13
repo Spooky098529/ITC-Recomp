@@ -14,8 +14,14 @@
 #include "guest.h"
 #include "minimap/minimap.h"
 #include "race_overlays/race_overlays.h"
+#include "c_runtime/strings.h"
+#include "car_specs/car_specs.h"
+#include "race_setup/race_setup.h"
 #include "strings_and_font/steps.h"
 #include "ui_movies/game.h"
+#include "vehicle/vehicle.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+#include "xaudio/ppc_float.h"
 
 #include <bit>
 #include <cmath>
@@ -300,6 +306,93 @@ TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame) {
   draw.y = Lfs(base, kEntryY);
   draw.car = frame + kEntryCarData;
   return draw;
+}
+
+bool CarListCarSetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t car,
+                     uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82250700 CarList::DrawCarPowerGraph");
+  if (guest::LoadU32(base, kEntryShown) == 0) {
+    return false;
+  }
+  const uint32_t data = frame + kEntryCarData;
+  car_physics::CarDataConstruct(base, data, frame - kCarDataFrame);
+  double f1 = 0.0;
+  car_makers::FromGarageCar(base, calls, car, data, frame, &f1);
+  return true;
+}
+
+namespace {
+
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kRefresh = 0x820C4998;       // Car::Refresh
+constexpr uint32_t kSetupFromCar = 0x820C27E8;  // Vehicle::SetupFromCar
+constexpr uint32_t kSumScale = 0x820021E8;
+// Flush-to-zero off, as the car's plain C++ expects at entry.
+void FlushOff() {
+  using Fpscr = rex::platform::FPSCRPlatform;
+  Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+}
+uint32_t Fctiwz32(double value) {
+  return uint32_t(Fctiwz(value));
+}
+
+}  // namespace
+
+uint32_t SetFromCar(uint8_t* base, uint32_t car, uint32_t tab, uint32_t sp,
+                    const SetFromCarCall& call) {
+  ITC_NATIVE_RUNNING("sub_82250488 PowerGraph::SetFromCar");
+  const uint32_t frame = sp - kSetFromCarFrame;
+  guest::StoreU32(base, frame, sp);  // the back chain (stwu)
+  const uint32_t record = guest::LoadU32(base, kPowerGraphScreen) + 8;
+  const uint32_t object = frame + 3008, data = frame + 1152, curve = frame + 80;
+  FlushOff();
+  race_setup::CarInit(base, object);
+  if (!c_runtime::Memcpy(base, object, car, 1884)) {
+    call(kMemcpy, object, car, 1884, frame, 0x822504C4);
+  }
+  FlushOff();
+  uint32_t refreshed = 0;
+  if (!car_specs::CarRefresh(base, object, &refreshed)) {
+    call(kRefresh, object, 0, 0, frame, 0x822504CC);
+  }
+  FlushOff();
+  const uint32_t spec = vehicle_accessors::ObjectRecord1888(object);
+  car_physics::CarDataConstruct(base, data, frame - kCarDataFrame);
+  double f1 = 0.0;
+  if (!car_physics::VehicleSetupFromCar(base, data, object, frame - 368, &f1)) {
+    call(kSetupFromCar, data, object, 0, frame, 0x822504EC);
+  }
+  FlushOff();
+  vehicle::PowerCurveFromEngine(base, curve, data + 1268, frame - 112);
+  vehicle::PowerCurveShiftPeak(base, curve, 0, frame);
+  FlushOff();
+  guest::StoreU32(base, record + 80, tab);
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(base, record + 60 + 4 * i, guest::LoadU32(base, car + 1568 + 4 * i));
+  }
+  guest::StoreU32(base, record + 0, Fctiwz32(Lfs(base, car + 1892)));
+  const double sum = double(float(Lfs(base, data + 400) + Lfs(base, data + 672)));
+  guest::StoreU32(base, record + 4,
+                  Fctiwz32(double(float(std::fma(sum, Lfs(base, kSumScale), Lfs(base, data))))));
+  guest::StoreU32(base, record + 8, guest::LoadU32(base, spec + 76));
+  guest::StoreU32(base, record + 12, guest::LoadU32(base, spec + 84));
+  guest::StoreU32(base, record + 16, guest::LoadU32(base, spec + 80));
+  guest::StoreU32(base, record + 20, guest::LoadU32(base, car + 12));
+  guest::StoreU32(base, record + 24, guest::LoadU8(base, spec + 129));
+  guest::StoreU32(base, record + 28, guest::LoadU8(base, spec + 130));
+  // The switch on s byte +68 (cases 0 and 4 the split-off sub_822505CC).
+  static constexpr uint32_t kKinds[8] = {6, 2, 3, 4, 6, 0, 1, 5};
+  const uint8_t kind = guest::LoadU8(base, spec + 68);
+  if (kind <= 7) {
+    guest::StoreU32(base, record + 32, kKinds[kind]);
+  }
+  guest::StoreU32(base, record + 36, guest::LoadU8(base, spec + 69) != 0 ? 1 : 0);
+  guest::StoreU32(base, record + 40, guest::LoadU32(base, spec + 8));
+  guest::StoreU32(base, record + 44, Fctiwz32(Lfs(base, curve + 1056)));
+  guest::StoreU32(base, record + 48, Fctiwz32(Lfs(base, curve + 1060)));
+  Stfs(base, record + 52, double(float(Lfs(base, curve + 1048) * Lfs(base, kToKgfM))));
+  guest::StoreU32(base, record + 56, Fctiwz32(Lfs(base, curve + 1052)));
+  return curve;
 }
 
 }  // namespace power_graph

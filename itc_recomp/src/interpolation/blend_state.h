@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <functional>
 
+#include "sprites/billboards.h"
+
 namespace interpolation {
 
 // Main thread, before a logic pass (one that runs game logic) starts.
@@ -31,6 +33,13 @@ void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
 // thread: only the main thread's are noted). Not for the motion blur's copy
 // (caller 0x8213653C), which the wrapper notes under another source.
 void BlendState_OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller);
+
+// Billboards::BuildVertices (sub_8209C6E0) for a native caller
+// (Billboards::Record): sprites::BuildBillboardVertices between the frame's
+// camera blend and its undoing, as the vertex builder's adapter runs it.
+// Returns the vertices counted. Flush-to-zero off at entry.
+uint32_t BlendState_BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
+                                           const sprites::SlotAllocator& slots);
 
 // The motion blur's copy of its previous view-projection (Matrix::Copy at
 // return 0x8213653C in MotionBlur::Record, `view` the motion blur) done by

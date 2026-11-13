@@ -1,8 +1,8 @@
 // The tuning screen natively: adapters in front of src/tuning_screen/
 // (docs/functions/tuning-screen.md), with the register steps the harness
-// shares (hooks/tuning_screen.h). The screen's update and refresh, and other
-// front-end screens, are still recompiled and call these, so the adapters
-// stay.
+// shares (hooks/tuning_screen.h). The adapters left are those recompiled
+// code still reaches (the update itself through the tuning machine's
+// functor, FitSelectedCar); the others went once their callers were native.
 
 #include "hooks/tuning_screen.h"
 
@@ -26,6 +26,7 @@ ITC_FLAG_DECLARE(bool, native_vehicle);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_scene_models);
 ITC_FLAG_DECLARE(bool, native_load_poll);
+ITC_FLAG_DECLARE(bool, native_tuning_pages);
 
 ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "Run the tuning screen's functions (docs/functions/tuning-screen.md: the part "
@@ -39,7 +40,17 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "DebugWheelKindSelect sub_821E8128, DebugWheelInchSelect sub_821E8298, "
               "DebugDecalTopMenu sub_821FD710, DebugLayerSelect sub_821FD880, DebugLayerEdit "
               "sub_821FDCB8, DebugLayerSet sub_821FE080, DebugEditPosition sub_821FE100, "
-              "DebugEditView sub_821FE178, DebugPaintConfirm sub_821FE190; the selected garage car's "
+              "DebugEditView sub_821FE178, DebugPaintConfirm sub_821FE190, and those never seen in play, "
+              "called only by the update's plain C++: DebugColorSelect sub_821CC078, DebugWarnMoney "
+              "sub_821CC430, DebugReflectSet sub_821CC510, DebugAnnulSet sub_821CC598, "
+              "DebugRemoveConfirm sub_821CC620, DebugBodyColor sub_821E8358, DebugNeonPart "
+              "sub_821E8440, DebugNeonKind sub_821E84F8, DebugNeonEdit sub_821E85A0, DebugLedEdit "
+              "sub_821E8688, DebugCockpitTop sub_821E8758, DebugCockpitType sub_821E8800, "
+              "DebugCockpitColor sub_821E88C0, DebugMeterKind sub_821E8998, DebugMeterPoint "
+              "sub_821E8A88, DebugLayerOperate sub_821FDA80, DebugLayerOrder sub_821FDF10, "
+              "DebugEditRotate sub_821FE118, DebugEditScale sub_821FE130, DebugEditColor "
+              "sub_821FE148, DebugEditFlip sub_821FE160, DebugPaintCancelConfirm sub_821FE230, "
+              "DebugPaintRemoveConfirm sub_821FE2D0; the selected garage car's "
               "StoreToGarageCar sub_821DCC28, EquipChoice sub_821DF448 and AeroPartValue "
               "sub_821DE2D8; the part list's marks HidePartMarks sub_821EE6D0 and ShowPartMarks "
               "sub_821EE760, ShowInteriorPicture sub_821DA3F8, HideTireMarks sub_821DFB20, HideNode19 "
@@ -69,6 +80,17 @@ ITC_FLAG_BOOL(native_tuning_screen, true, "ITC",
               "sub_821E0FB0 (their callees never seen in play through the guest), UpdateStand "
               "sub_821D9F10 (with GarageStage::Draw's plain C++ under its flag); SetCarStats sub_821DF788 with the "
               "car makers' and --native_vehicle; Refresh sub_821E3AD0 with both and --native_car_specs, every state; "
+              "Update sub_821E6C50 (its pieces sub_821E6CD4 and sub_821E6F90 merged) with the refresh's and "
+              "UpdateStand's checks, its callees never seen in play and DrawPowerGraph through the guest "
+              "but movie 2's command runners never seen in play, called only by the update's plain C++: "
+              "Command5 sub_821D4180, Command11 sub_821E9730, Command12 sub_821E9CA0, Command54 "
+              "sub_821EB8E8, Command55 sub_821EBDC8, Command56 sub_821EC6A0, Command57 sub_821ECC68 "
+              "(UiMovie::NamedAnimationTime by its plain C++) and Command58 sub_821EDB70, and the "
+              "editors': Command17 sub_82200100, Command19 sub_82201C58, Command20 sub_82201FA0, "
+              "Command21 sub_822087C8 (SwapLayerRecords and SwapOrderTextures by their plain C++ "
+              "with --native_tuning_pages), "
+              "Command26 sub_82204980, Command27 sub_82204A78, Command32Done sub_821F7498, Command42 "
+              "sub_821F7618, Command52 sub_821F77F0 (movie 16's dialog) and Command53 sub_821F7948; "
               "its swatch color setter sub_821E7DA0, never seen in play, through the guest) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=tuning_screen and "
               "car_makers)");
@@ -169,6 +191,98 @@ void TuningDebugPaintConfirm(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::DebugPaintConfirm(base, ctx.r1.u32);
 }
 
+void TuningDebugColorSelect(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugColorSelect(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningDebugWarnMoney(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugWarnMoney(base, ctx.r1.u32);
+}
+
+void TuningDebugReflectSet(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugReflectSet(base, ctx.r1.u32);
+}
+
+void TuningDebugAnnulSet(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugAnnulSet(base, ctx.r1.u32);
+}
+
+void TuningDebugRemoveConfirm(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugRemoveConfirm(base, ctx.r1.u32);
+}
+
+void TuningDebugBodyColor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugBodyColor(base, ctx.r1.u32);
+}
+
+void TuningDebugNeonPart(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugNeonPart(base, ctx.r1.u32);
+}
+
+void TuningDebugNeonKind(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugNeonKind(base, ctx.r1.u32);
+}
+
+void TuningDebugNeonEdit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugNeonEdit(base, ctx.r1.u32);
+}
+
+void TuningDebugLedEdit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugLedEdit(base, ctx.r1.u32);
+}
+
+void TuningDebugCockpitTop(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugCockpitTop(base, ctx.r1.u32);
+}
+
+void TuningDebugCockpitType(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugCockpitType(base, ctx.r1.u32);
+}
+
+void TuningDebugCockpitColor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugCockpitColor(base, ctx.r1.u32);
+}
+
+void TuningDebugMeterKind(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugMeterKind(base, ctx.r1.u32);
+}
+
+void TuningDebugMeterPoint(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugMeterPoint(base, ctx.r1.u32);
+}
+
+void TuningDebugLayerOperate(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugLayerOperate(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningDebugLayerOrder(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugLayerOrder(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningDebugEditRotate(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugEditRotate();
+}
+
+void TuningDebugEditScale(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugEditScale();
+}
+
+void TuningDebugEditColor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugEditColor();
+}
+
+void TuningDebugEditFlip(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugEditFlip();
+}
+
+void TuningDebugPaintCancelConfirm(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugPaintCancelConfirm(base, ctx.r1.u32);
+}
+
+void TuningDebugPaintRemoveConfirm(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::DebugPaintRemoveConfirm(base, ctx.r1.u32);
+}
+
 void TuningStoreToGarageCar(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = ts::StoreToGarageCar(base, ctx.r3.u64, ctx.r1.u32);
@@ -266,6 +380,18 @@ ITC_TUNING_CALLS_STEP(MarkPick)
 ITC_TUNING_CALLS_STEP(Command16)
 ITC_TUNING_CALLS_STEP(ShowOptions)
 ITC_TUNING_CALLS_STEP(ShowLevels)
+ITC_TUNING_CALLS_STEP(Command5)
+ITC_TUNING_CALLS_STEP(Command11)
+ITC_TUNING_CALLS_STEP(Command12)
+ITC_TUNING_CALLS_STEP(Command54)
+ITC_TUNING_CALLS_STEP(Command55)
+ITC_TUNING_CALLS_STEP(Command56)
+ITC_TUNING_CALLS_STEP(Command58)
+ITC_TUNING_CALLS_STEP(Command17)
+ITC_TUNING_CALLS_STEP(Command19)
+ITC_TUNING_CALLS_STEP(Command26)
+ITC_TUNING_CALLS_STEP(Command27)
+ITC_TUNING_CALLS_STEP(Command42)
 
 #undef ITC_TUNING_CALLS_STEP
 
@@ -338,6 +464,49 @@ void TuningRefreshMenu(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void TuningCommand20(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  const uint64_t a = ctx.r4.u64, b = ctx.r5.u64;
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
+    return ts::Command20(base, call, screen, sp, a, b);
+  });
+}
+
+void TuningCommand21(PPCContext& ctx, uint8_t* base) {
+  const uint64_t screen = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_pages = ITC_FLAG(native_tuning_pages);
+  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
+    return ts::Command21(base, call, screen, sp, native_pages);
+  });
+}
+
+void TuningCommand32Done(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ts::Command32Done(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void TuningCommand53(PPCContext& ctx, uint8_t* base) { ts::Command53(base, ctx.r3.u32); }
+
+void TuningCommand57(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  std::optional<double> f1;
+  WithCalls(ctx, base, [&](const ts::GuestCall& inner) {
+    const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
+                                   uint32_t frame, uint32_t lr) {
+      if (f1) {
+        ctx.f1.f64 = *f1;
+        f1.reset();
+      }
+      return inner(function, args, frame, lr);
+    };
+    return ts::Command57(base, call, screen, sp, &f1);
+  });
+  if (f1) {
+    ctx.f1.f64 = *f1;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
 void TuningRefreshMovie13(PPCContext& ctx, uint8_t* base) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   std::optional<double> f1;
@@ -370,6 +539,7 @@ void TuningRefreshMovie13(PPCContext& ctx, uint8_t* base) {
 
 ITC_TUNING_DISPATCH_STEP(ShowDialog)
 ITC_TUNING_DISPATCH_STEP(Command30)
+ITC_TUNING_DISPATCH_STEP(Command52)
 
 #undef ITC_TUNING_DISPATCH_STEP
 
@@ -534,6 +704,69 @@ void TuningRefresh(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+bool TuningUpdateCalleesNative() {
+  return TuningUpdateStandCalleesNative() && TuningCarStatsCalleesNative() &&
+         ITC_FLAG(native_car_specs);
+}
+
+void TuningUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  ctx.fpscr.disableFlushMode();
+  std::optional<double> f1;
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  SceneryDrawGuest guest{ctx, base};
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  calls.draw = SceneryListsDrawCalls(&guest);
+  const ts::GuestCall inner = StandModelsGuestCall(ctx, base);
+  // RefreshMenu's f1 wrapper: the f1 the native code left put in f1 before
+  // the next guest call.
+  const auto apply_f1 = [&] {
+    if (f1) {
+      ctx.f1.f64 = *f1;
+      f1.reset();
+    }
+  };
+  const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
+                                 uint32_t frame, uint32_t back) {
+    apply_f1();
+    return inner(function, args, frame, back);
+  };
+  const ts::StandCalls stand{call, calls};
+  const front_end_car_draw::DrawCallees draw = FrontEndCarDrawDrawCallees(ctx);
+  load_poll::Calls* paint_poll =
+      ITC_FLAG(native_load_poll) && LoadPollCalleesNative() ? &poll : nullptr;
+  const ts::UpdateCalls update{
+      stand,
+      draw,
+      paint_poll,
+      ITC_FLAG(native_action_mappers),
+      ITC_FLAG(native_car_specs),
+      ITC_FLAG(native_tuning_pages),
+      [&](uint32_t frame, uint64_t screen, uint64_t r30) {
+        apply_f1();
+        const uint64_t stack = ctx.r1.u64;
+        const uint64_t r30_was = ctx.r30.u64, r31_was = ctx.r31.u64;
+        ctx.r1.u64 = frame;
+        ctx.r3.u64 = screen;
+        ctx.r30.u64 = r30;
+        ctx.r31.u64 = screen;
+        ctx.lr = 0x821E7318;
+        sub_821DF350(ctx, base);
+        ctx.r1.u64 = stack;
+        ctx.r30.u64 = r30_was;
+        ctx.r31.u64 = r31_was;
+        ctx.fpscr.disableFlushMode();
+      }};
+  const uint64_t answer = ts::Update(base, update, r3, r4, sp, &f1);
+  apply_f1();
+  ctx.lr = lr;
+  ctx.r3.u64 = answer;
+  ctx.fpscr.disableFlushMode();
+}
+
 void TuningWithRefreshStand(
     PPCContext& ctx, uint8_t* base, std::optional<double>* f1,
     const std::function<uint64_t(const ts::StandCalls&)>& body) {
@@ -557,62 +790,6 @@ void TuningWithRefreshStand(
 
 }  // namespace hooks
 
-// Defines an adapter: the flag, else the original. HideTireMarks sub_821DFB20
-// and PlaceStateNodes sub_82202C08 have none: only native callers
-// (ShowTireMarks, Command25) reach them, and the flag switches those; their
-// register steps are the harness's.
-#define ITC_TUNING_SCREEN(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {     \
-    REX_FUNC_PROLOGUE();                   \
-    if (!ITC_FLAG(native_tuning_screen)) { \
-      __imp__sub_##address(ctx, base);     \
-      return;                              \
-    }                                      \
-    hooks::step(ctx, base);                \
-  }
-
-ITC_TUNING_SCREEN(821CBE08, TuningDebugMainMenu)
-ITC_TUNING_SCREEN(821CBEE8, TuningDebugLevelSelect)
-ITC_TUNING_SCREEN(821CBFC0, TuningDebugTypeSelect)
-ITC_TUNING_SCREEN(821CC248, TuningDebugOptionSelect)
-ITC_TUNING_SCREEN(821CC3A8, TuningDebugConfirmBuy)
-ITC_TUNING_SCREEN(821CC488, TuningDebugConfirmEquip)
-ITC_TUNING_SCREEN(821CFCE8, TuningDebugCategoryMenu)
-ITC_TUNING_SCREEN(821E8068, TuningDebugWheelPartSelect)
-ITC_TUNING_SCREEN(821E8128, TuningDebugWheelKindSelect)
-ITC_TUNING_SCREEN(821E8298, TuningDebugWheelInchSelect)
-ITC_TUNING_SCREEN(821FD710, TuningDebugDecalTopMenu)
-ITC_TUNING_SCREEN(821FD880, TuningDebugLayerSelect)
-ITC_TUNING_SCREEN(821FDCB8, TuningDebugLayerEdit)
-ITC_TUNING_SCREEN(821FE080, TuningDebugLayerSet)
-ITC_TUNING_SCREEN(821FE100, TuningDebugEditPosition)
-ITC_TUNING_SCREEN(821FE178, TuningDebugEditView)
-ITC_TUNING_SCREEN(821FE190, TuningDebugPaintConfirm)
-ITC_TUNING_SCREEN(821DCC28, TuningStoreToGarageCar)
-ITC_TUNING_SCREEN(821EED00, TuningUpdateListCounter)
-ITC_TUNING_SCREEN(82202880, TuningCommand31)
-ITC_TUNING_SCREEN(821E9050, TuningCommand9)
-ITC_TUNING_SCREEN(821EE9B0, TuningUpdateListDots)
-ITC_TUNING_SCREEN(821D6230, TuningShowDialog)
-ITC_TUNING_SCREEN(82202750, TuningCommand30)
-ITC_TUNING_SCREEN(821E8B68, TuningCommand7)
-ITC_TUNING_SCREEN(82202368, TuningCommand23)
-ITC_TUNING_SCREEN(82200600, TuningCommand18)
-ITC_TUNING_SCREEN(82204888, TuningCommand25)
-ITC_TUNING_SCREEN(821D06B0, TuningPlayIntro)
-ITC_TUNING_SCREEN(821D0A48, TuningOpenItems)
-ITC_TUNING_SCREEN(821FF1D0, TuningCommand15)
-ITC_TUNING_SCREEN(82202090, TuningCommand22)
-ITC_TUNING_SCREEN(821D07D8, TuningMoveCategory)
-ITC_TUNING_SCREEN(821D6420, TuningMarkPick)
-ITC_TUNING_SCREEN(821FF6F0, TuningCommand16)
-ITC_TUNING_SCREEN(821D5028, TuningShowOptions)
-ITC_TUNING_SCREEN(821D12C0, TuningShowLevels)
-ITC_TUNING_SCREEN(822036E8, TuningUpdateItems)
-ITC_TUNING_SCREEN(821D2A80, TuningShowTypes)
-ITC_TUNING_SCREEN(821F5F70, TuningCommand8)
-ITC_TUNING_SCREEN(821D8978, TuningRefreshMenu)
-
 // The calls onto the stand: also the original unless their callees are
 // native.
 #define ITC_TUNING_STAND(address, step)                                      \
@@ -626,10 +803,6 @@ ITC_TUNING_SCREEN(821D8978, TuningRefreshMenu)
   }
 
 ITC_TUNING_STAND(8217DAC0, TuningFitSelectedCar)
-ITC_TUNING_STAND(821D6100, TuningUpdateBusyIcon)
-ITC_TUNING_STAND(822019D0, TuningDecalCommand)
-
-ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 
 // No adapters (removed, B7 loop, 2026-11-07, the fifth migration: their
 // callers in play are native and call their plain C++; the register steps
@@ -667,36 +840,40 @@ ITC_TUNING_STAND(821E0FB0, TuningRestoreStand)
 // its callers in play, PreviewItem and RestoreStand, are native and call its
 // plain C++ (its register step above is the harness's).
 
-// UpdateStand: the original unless its callees are native.
-extern "C" REX_FUNC(sub_821D9F10) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningUpdateStandCalleesNative()) {
-    __imp__sub_821D9F10(ctx, base);
-    return;
-  }
-  hooks::TuningUpdateStand(ctx, base);
-}
+// No adapters (removed, B7 loop, 2026-11-11, after the update went native:
+// their callers in play, the update sub_821E6C50 and its pieces, merged, and
+// the other native callers named, call their plain C++; the register steps
+// above are the harness's; HideTireMarks sub_821DFB20 and PlaceStateNodes
+// sub_82202C08 never had one): the debug handlers DebugMainMenu
+// sub_821CBE08, DebugLevelSelect sub_821CBEE8, DebugTypeSelect sub_821CBFC0,
+// DebugOptionSelect sub_821CC248, DebugConfirmBuy sub_821CC3A8,
+// DebugConfirmEquip sub_821CC488, DebugCategoryMenu sub_821CFCE8,
+// DebugWheelPartSelect sub_821E8068, DebugWheelKindSelect sub_821E8128,
+// DebugWheelInchSelect sub_821E8298, DebugDecalTopMenu sub_821FD710,
+// DebugLayerSelect sub_821FD880, DebugLayerEdit sub_821FDCB8, DebugLayerSet
+// sub_821FE080, DebugEditPosition sub_821FE100, DebugEditView sub_821FE178,
+// DebugPaintConfirm sub_821FE190; the runners PlayIntro sub_821D06B0,
+// MoveCategory sub_821D07D8 (with tuning_pages' InputCategories), OpenItems
+// sub_821D0A48, ShowLevels sub_821D12C0, ShowTypes sub_821D2A80, ShowOptions
+// sub_821D5028, Command7 sub_821E8B68, Command8 sub_821F5F70, Command9
+// sub_821E9050, Command15 sub_821FF1D0, Command16 sub_821FF6F0, Command18
+// sub_82200600, DecalCommand sub_822019D0, Command22 sub_82202090,
+// Command23 sub_82202368, Command25 sub_82204888, Command30 sub_82202750,
+// Command31 sub_82202880, ShowDialog sub_821D6230, MarkPick sub_821D6420;
+// UpdateBusyIcon sub_821D6100, UpdateItems sub_822036E8, RefreshMenu
+// sub_821D8978, UpdateListDots sub_821EE9B0, UpdateListCounter sub_821EED00,
+// UpdateStand sub_821D9F10, StoreToGarageCar sub_821DCC28 (with tuning_pages'
+// InputItems and Leave), SetCarStats sub_821DF788 (with the refresh),
+// RestoreStand sub_821E0FB0 and the refresh sub_821E3AD0 (with
+// TuningMachine::Start).
 
-// SetCarStats: the original unless the car data's and the power curve's
-// callees are native.
-extern "C" REX_FUNC(sub_821DF788) {
+// Update: the original unless its callees' adapters would run their plain
+// C++ (the refresh's, UpdateStand's and SetCarStats' checks).
+extern "C" REX_FUNC(sub_821E6C50) {
   REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningCarStatsCalleesNative()) {
-    __imp__sub_821DF788(ctx, base);
+  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningUpdateCalleesNative()) {
+    __imp__sub_821E6C50(ctx, base);
     return;
   }
-  hooks::TuningSetCarStats(ctx, base);
-}
-
-// Refresh: the original unless its callees onto the stand, SetCarStats' and
-// the car specs (state 6's rear spoiler: Params::GetCarParts, the aero parts)
-// are native.
-extern "C" REX_FUNC(sub_821E3AD0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningStandCalleesNative() ||
-      !hooks::TuningCarStatsCalleesNative() || !ITC_FLAG(native_car_specs)) {
-    __imp__sub_821E3AD0(ctx, base);
-    return;
-  }
-  hooks::TuningRefresh(ctx, base);
+  hooks::TuningUpdate(ctx, base);
 }

@@ -16,6 +16,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 
 #include <smmintrin.h>
 
@@ -24,7 +25,7 @@
 #include <utility>
 
 ITC_FLAG_BOOL(native_nearest_lights, true, "ITC",
-              "Find the lights nearest a point (sub_820F4128) natively, four lights "
+              "Find the lights nearest a point (sub_820F4128, no adapter: for its native caller) natively, four lights "
               "tested at once, instead of through the translated code (same results)");
 
 namespace {
@@ -240,6 +241,7 @@ namespace lights {
 std::optional<uint32_t> FindNearest(uint8_t* base, uint32_t owner, uint32_t output,
                                     uint32_t point, int32_t most, uint32_t direction, double f1,
                                     double f2, double f3) {
+  ITC_NATIVE_RUNNING("sub_820F4128 Lights::FindNearest");
   // Comparisons the original makes in double are made here in float: the
   // caller passes floats (lfs, frsp), but anything else goes to the original.
   if (!ITC_FLAG(native_nearest_lights) || !IsFloat(f2) || !IsFloat(f3)) [[unlikely]] {
@@ -268,19 +270,7 @@ std::optional<uint32_t> FindNearest(uint8_t* base, uint32_t owner, uint32_t outp
 
 }  // namespace lights
 
-// Lights_FindNearest: r3 = the light sets' owner, r4 = output (32 bytes a
-// light), r5 = the point, r6 = most lights (at most 32), r9 = the direction,
-// f1 = merge distance, f2 = farthest squared distance, f3 = least dot product
-// with the direction; returns r3 = lights written. The caller reads only r3
-// after the call (checked at 0x820C92F8), so no other register is set.
-extern "C" REX_FUNC(sub_820F4128) {
-  REX_FUNC_PROLOGUE();
-  ctx.fpscr.disableFlushMode();
-  const auto found = lights::FindNearest(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32,
-                                         ctx.r9.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64);
-  if (!found) [[unlikely]] {
-    __imp__sub_820F4128(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = int32_t(*found);
-}
+// Lights::FindNearest (sub_820F4128) has no adapter (removed 2026-11-13, B7
+// loop): its only caller in play, the car draw's lighting (sub_820C9170,
+// src/car_draw/lighting.cpp), calls lights::FindNearest above (its original
+// where that declines).

@@ -251,6 +251,16 @@ void LocationsUnlock2(uint8_t* base, uint32_t save, uint32_t bit);
 constexpr uint32_t kAfterRaceFrame = 160;
 bool AfterRaceNative(uint8_t* base, uint32_t sp);
 uint32_t ProgressAfterRace(uint8_t* base, uint32_t save, uint32_t sp);
+// sub_821162B0 Progress::CheckUnlocks: Progress::AfterRace's two unlock
+// passes alone (no totals, no stage): table 0's entries by their flags (+4:
+// 0x40 needed; with one of 0x400 to 0x4000, 0x2000 at stage 4, else bit
+// Stage::Of + 10) instead of Entry56::Allows, then the 40-byte rewards;
+// Condition::Test from its 144-byte frame below `sp`. Returns 0.
+// CheckUnlocksNative: whether Condition::Test's copies are native (else the
+// original runs; nothing written).
+constexpr uint32_t kCheckUnlocksFrame = 144;
+bool CheckUnlocksNative(uint8_t* base, uint32_t sp);
+uint32_t ProgressCheckUnlocks(uint8_t* base, uint32_t save, uint32_t sp);
 // sub_82113898 Stats::CloseDay: +6028 (days) up; running means from its
 // 128-byte frame below `sp` (+80, the conversions at +88, as the original):
 // +5936 from +5960, +5944 from +5964, +5928 from +5952 x 100 / +5956 (a

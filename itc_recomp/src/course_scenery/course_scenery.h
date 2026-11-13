@@ -11,10 +11,16 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+
+#include "archive/archive.h"
 
 namespace scenery_lists {
 struct DrawCalls;
 }  // namespace scenery_lists
+namespace car_scene_draw {
+struct SceneDrawCalls;
+}  // namespace car_scene_draw
 
 namespace course_scenery {
 
@@ -29,10 +35,16 @@ constexpr uint32_t kManager = 0x826C5514;
 // are), r1 = `frame` (the native function's frame, as the original's call
 // site has it, its back chain written) and the link register `lr` (the
 // original's return address); returns its r3.
+// `load`, when set, is Archive::Load for the pools' load slots' plain C++
+// (CourseSet::Load, AreaLights::Load, AreaModel::Load), which
+// ObjectPools::Load then calls directly; the adapters set it only where
+// those may run (the archive's native queue and the native heap). Without
+// it, the slots are called through `call`.
 struct Calls {
   void* user;
   uint32_t (*call)(void* user, uint32_t function, const uint32_t* args, int count, uint32_t frame,
                    uint32_t lr);
+  const archive::LoadCall* load = nullptr;
 };
 
 // --- Pool objects (PoolObject::; 40 bytes of header) ---
@@ -110,8 +122,8 @@ uint32_t Acquire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set
 uint32_t Find(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set, uint32_t pool,
               uint32_t key);
 // ObjectPools::Load (sub_820FBFD0): the object, when not 0, loaded through
-// its vtable's slot 1 (always through `calls`: no load is native); returns
-// it.
+// its vtable's slot 1 (the native loads directly when `calls.load` is set,
+// else through `calls`); returns it.
 uint32_t LoadObject(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set,
                     uint32_t pool, uint32_t index);
 // ObjectPools::Release (sub_820FC038): the object reset through its
@@ -196,6 +208,25 @@ uint32_t AllocPhysical(uint8_t* base, uint32_t size);
 // hooks::NativeHeapActive().
 void FreePhysical(uint8_t* base, uint32_t block);
 
+// Scenery::UnloadPools (sub_820F1D20; 112-byte frame below `stack`, its
+// back chain written): ObjectPools::Shutdown on the manager's pools; +188
+// = 0 when set, +180 = 0, pool 0's block (+184) freed (FreePhysical) and
+// +184 = 0 when there; list B's table, items and pointer array (+168,
+// +164, +160) freed when there, list B (+144, 28 bytes) cleared (XMemSet);
+// list A's (+140, +136, +132) the same, list A (+116) cleared. False, with
+// nothing done, when the native heap isn't active (the original runs).
+// `r3` is what the original leaves there (XMemSet's destination, +116).
+bool UnloadPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                 uint32_t* r3);
+// Scenery::Unload (sub_820F2B38; 96-byte frame): the visible areas' block
+// (+224) freed and +224 = 0 when there, then UnloadPools. As UnloadPools,
+// false with nothing done without the native heap; `r3` as it leaves it.
+bool Unload(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager, uint32_t* r3);
+// Scenery::Destroy (sub_820F2AF8): ClearGlobal, the manager at [0x826C551C]
+// freed (FreePhysical, whatever it holds) and the pointer cleared. Returns
+// 0 (FreePhysical's r3). Only while hooks::NativeHeapActive().
+uint32_t Destroy(uint8_t* base);
+
 // The manager's pointer Scenery::Create sets (the same object as kManager's).
 constexpr uint32_t kCreated = 0x826C551C;
 // Scenery::Create (sub_820F2F88): the 248-byte manager from physical memory
@@ -257,6 +288,14 @@ uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32
 // +4 reached +8, else 0.
 uint32_t ListLoadAll(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
                      uint32_t list, bool native_queue);
+// Scenery::IsLoaded (sub_820F1F68; 112-byte frame below `stack`, its back
+// chain written): while +192 is set, ListLoadAll on list A (+116), then
+// list B (+144), 0 unless each answers 1; then the object last asked for
+// (+172 the pool, +176 its index, 0 if either is negative; ObjectPools::
+// Object, 0 for none) must be loaded unless it isn't in use
+// (PoolObject::InUse, IsLoaded); then +192 = 0 (when set) and 1, else 0.
+uint32_t SceneryIsLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                         bool native_queue);
 // SceneryList::Stream (sub_820F16C0): the queue length as LoadAll; for each
 // item: its object in the list's pool by its key's address (ObjectPools::
 // Find), else, when the queue is below 960, one taken (Acquire) and, when
@@ -355,6 +394,117 @@ uint32_t DrawSetLists(uint8_t* base, const scenery_lists::DrawCalls& calls, uint
 // +144), its r24.
 uint32_t DrawSetListsViewProjection(uint8_t* base, uint32_t pass);
 
+// Scenery::RecordHeadlightProjectors (sub_820F34C8, headlights.cpp): r4's
+// pass description (+12 the player, +16 the viewport entry, +20 the camera
+// pass, +24 and +28 the render queue's keys). In its 640-byte frame below
+// `stack` (its back chain written; the original's temporaries at their
+// offsets): +8 = the camera pass, set by cameras::FromViewport, then
+// CameraPass::Update through `calls` from FromViewport's 112-byte frame (as
+// its adapter). With Vehicle::Get(0): the six 8-slot headlight arrays
+// (0x8296B9E0 position, 0x8296BA60 BeamShape, 0x8296BAE0 and 0x8296BB60 the
+// colors, 0x8296BBE0 the direction, 0x8296BC60 the scene's +5424), the
+// colors cleared first; for each of the scene's first 8 models (List::At on
+// [0x826C2E44] + 5028, count +5036) of type 3 with a car (+5048) and +32 1
+// or 2, the next slot (0 and 1 swapped for pass 2; at most 8) from its
+// matrix (+4304, memcpy) and the scene's lights (+5248 on), and for slots 0
+// to 4 a projector (Projector::Build, its multiplies noted for frame
+// interpolation) recorded on the scene's command list (header 5, command 7
+// vertex c(0x77 + 4 x slot) x4 = the matrix, copied as Matrix::Copy with
+// its interpolation note, command 36) and handed to the render queue (key
+// 371 for pass 2, else 150; f1 0.0), the render manager's getters called
+// before every command list call as the original's; then 0x8265ED00 = the
+// scene's +5328. Always: [0x8296B90C] = +24, [0x8296B900] = +28, 0x8265ECE0
+// = the camera pass's eye (+400). Its callees' plain C++ runs inside the
+// checks of their diagnostics' wraps; guest calls (the getters, the queue,
+// CameraPass::Update, the originals of Projector::Build where Perspective
+// declines, of memcpy and of the command list's calls where theirs do) go
+// through `calls` with the original's return addresses. Leaves
+// flush-to-zero off. Returns the r3 the original leaves (its last call's).
+uint64_t RecordHeadlightProjectors(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+                                   uint32_t stack, uint32_t description);
+
+// Scenery::DrawArea (sub_820F3B70, draw_area.cpp): a visible area (272
+// bytes: +0 its mask, +4 the model count, +12 its lights' object, +16 the
+// models' entries) for the pass description (+8 the camera pass object,
+// +20 the camera pass, +24 and +28 the keys, +32 a mask): nothing unless
+// the description's +32, the manager's +196 and the area's +0 share a bit;
+// RecordHeadlightProjectors; in its 400-byte frame below `stack` the
+// identity (+80, +208) and the pass's view-projection (+144, Matrix::Copy
+// noted for interpolation), the view at 0x8265ECA0, the keys
+// (0x8296B908 = 163, 0x8296B90C, 0x8296B900); each model's shapes drawn
+// (the shadow passes 10, 13, 16: Model::DrawShapeDepth with the keys at
+// 0x8296B8F8 and 0x8296B8FC; else the textures set in the provider at the
+// manager's +228, SceneryModel::DrawShape, then for types 0, 1, 2 with
+// post effect 3, 7 or 11 set and its +52 0 the depth again with keys 116
+// or 119); then with +196 & 0x400 outside the shadow passes, the light
+// groups of each entry of the area's light file (its count little-endian),
+// the description made the billboard set. The draws' guest calls (and
+// their originals where their plain C++ declines) go through `draws`, the
+// headlights' and light groups' through `calls`. `caller_r28` is the
+// caller's r28 (the shadow passes' depth draws' interpolation context).
+// The original's r3 isn't given (its caller doesn't read it). Its adapter
+// sets ctx's r24 to the camera pass while it runs (SceneryModel::DrawShape's
+// adapter reads it where its plain C++ declines).
+void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
+              const car_scene_draw::SceneDrawCalls& calls, uint32_t stack, uint32_t manager,
+              uint32_t description, uint32_t area, uint32_t caller_r28);
+
+// The model of a list's node `index` steps from its head (the List64 at
+// `nodes`: +260 the head, each node +0 the next and +2 its slot; the models
+// from +268), as Scenery::DrawSetLists and Draw walk the course set's lists.
+uint32_t ListModel(uint8_t* base, uint32_t nodes, uint32_t index);
+
+// Scenery::Draw's steps that run through the guest context (its adapter
+// makes them, src/hooks/course_scenery.cpp; the harness the same).
+struct DrawSteps {
+  // Model::Animate's plain C++ may run (--native_model_animation), else
+  // its original as a guest call.
+  bool native_model_animation = false;
+  // ctx's r24 while a callee runs (the draws' adapters read it where their
+  // plain C++ declines): the camera pass for DrawArea, the view-projection
+  // for DrawSetLists, 0x8265ECA0 (the original's) otherwise.
+  std::function<void(uint32_t r24)> set_r24;
+  // TextureAnimations::Advance (sub_820F11A8) inside its per-frame wrap
+  // (src/frame_pacing/per_frame_logic.cpp), r3 = the course set, from
+  // `frame`.
+  std::function<void(uint32_t frame, uint32_t set)> advance;
+  // RecordClear (sub_8209FA38) from `frame` (r3 = 19, r4 the key, r5 the
+  // flags, r6 the color, r7 the depth).
+  std::function<void(uint32_t frame, uint32_t key, uint32_t flags, uint32_t color,
+                     uint32_t depth)>
+      record_clear;
+  // Minimap::Draw (sub_820F5740) inside its per-frame wrap, from `frame`,
+  // r24 = 0x8265ECA0.
+  std::function<void(uint32_t frame, uint32_t manager, uint32_t description)> minimap;
+};
+
+// Scenery::Draw (sub_820F6068, draw.cpp): r3's manager. In its 640-byte
+// frame below `stack` (the back chain written): the texture provider
+// (+228) cleared (slot 2); unless +196 has 0x4000, the course set's texture
+// animations advanced and every visible area's (+216: count +0, the areas
+// +8, 272 bytes each) models animated; the provider's slot 0 = the set's XPR
+// (+64). Then, by the pass table at 0x82603060 (each entry's camera pass
+// enabled, +588): with +196 & 0x10, entries 0 to 2: the set's model (+96)
+// shapes (Model::DrawShape) with the identity moved to the pass's eye
+// (+400) and its view-projection (Matrix::Copy, noted for interpolation),
+// the range (0x82001FCC, 0x82006804, 0, 0); with 0x20, entries 3 to 5: the
+// list at +528's models (ResetDrawState) nearer than the viewport entry's
+// +72 (the model's shapes' +236) shape 0 (SceneryModel::DrawShape) with
+// the identity; for each visible area with models, entries 6 to 15 and
+// then 16 to 18 DrawArea; entries 16 to 18 DrawSetLists; with 0x400,
+// entries 16 to 18 outside the shadow passes the set's light groups
+// (+1592, its count little-endian; SetBillboardPass, DrawLightGroups);
+// entry 19 RecordClear (key 103, flags 49, pass 19's clear color and depth),
+// then Minimap::Draw. The description (+80) filled from the entry before
+// each, RecordHeadlightProjectors before the model draws, the light groups
+// and the minimap. The draws' guest calls (and their originals where their
+// plain C++ declines) go through `draws`, the headlights' and light groups'
+// through `calls`, the rest through `steps`. The original's r3 isn't given
+// (its callers don't read it).
+void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
+          const car_scene_draw::SceneDrawCalls& calls, const DrawSteps& steps, uint32_t stack,
+          uint32_t manager);
+
 // --- The files' parses (the loads' callbacks) ---
 //
 // Model::Model, Model::Load, XPR::Create and the model lists' loads are
@@ -388,6 +538,43 @@ uint32_t AreaModelParse(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 // chain written). Each returns the object (the r3 MarkLoaded leaves).
 uint32_t AreaLightsOnLoaded(uint8_t* base, uint32_t lights);
 uint32_t AreaModelOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
+
+// --- The pools' loads (their vtables' slot 1) and the course set's
+// callback ---
+//
+// Each queues its file through `load` (Archive::Load with r7 = r8 = 0) and
+// returns the r3 the original leaves: the last load's serial (-1 as li's,
+// else zero-extended), or the asset id it skipped (lwz's, zero-extended).
+
+// CourseSet::Load (sub_820F2520, slot 1 of 0x82006784): PoolObject::
+// ClearLoadFlags, +1056 = +1060 = 0; its two assets from the configuration's
+// area table ([[0x826C5514] + 36]: +12 the first, +8 the second); each not
+// negative: the first's block from AllocPhysical (its size by Archive::
+// AssetSize) at +3808, the second's from the object's data (AllocData) at
+// +3812; a negative one's word 0. Then each not negative loaded into its
+// word's block, the last of them with CourseSet::OnLoaded (0x820F22B8) and
+// the set as its context, the other with none. Only while
+// hooks::NativeHeapActive().
+uint64_t CourseSetLoad(uint8_t* base, uint32_t set, const archive::LoadCall& load);
+// AreaLights::Load (sub_820F22F8, slot 1 of 0x8200676C): ClearLoadFlags,
+// +80 = 0; the asset of list A's table entry (the manager's +140, count
+// +128, 12-byte entries: the area and model halfwords, the asset) whose
+// halfwords are the object's +84 and +86, else -1; its size (Archive::
+// AssetSize) taken from the object's data (AllocData) and the asset loaded
+// there with AreaLights::OnLoaded (0x820F1C30) and the object.
+uint64_t AreaLightsLoad(uint8_t* base, uint32_t lights, const archive::LoadCall& load);
+// AreaModel::Load (sub_820F23C0, slot 1 of 0x82006778): ClearLoadFlags,
+// +56 = +60 = 0; the asset of list B's table entry (+168, count +156) whose
+// halfwords are the object's +64 and +66, else -1, loaded into the shared
+// load buffer (the manager's +188) with AreaModel::OnLoaded (0x820F1CE8)
+// and the object.
+uint64_t AreaModelLoad(uint8_t* base, uint32_t model, const archive::LoadCall& load);
+// CourseSet::OnLoaded (sub_820F22B8, Archive::Load's callback; its frame 96
+// bytes below `stack`, the back chain written): CourseSet::Parse, the first
+// file's block (+3808) freed (FreePhysical), PoolObject::MarkLoaded.
+// Returns the set (the r3 MarkLoaded leaves). As the parses, only where
+// Model::Load's adapter runs natively, and with the native heap.
+uint32_t CourseSetOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set);
 
 // --- The pools' objects: made and reset ---
 //
@@ -444,6 +631,11 @@ uint32_t AdvanceTextureAnimations(uint8_t* base, uint32_t course_set);
 // +0, then offsets from the end of the offset table) advanced. Returns the
 // last animation, or the set when it has none.
 uint32_t AdvanceAnimationSet(uint8_t* base, uint32_t set);
+// AnimationSet::FindByTexture (sub_82146A38; probably): the index of the
+// set's first animation whose texture word (+20 + 4 x its frame count; for
+// a count not above 0 the word at guest address 4, as the original reads
+// it) equals `texture`, or -1 (the original's r3, 64 bits).
+uint64_t FindAnimationByTexture(uint8_t* base, uint32_t set, uint32_t texture);
 // Animation::Advance (sub_82146AC0): a flipbook animation (+0 the frame
 // count, +4 the current frame, +8 the tick, +12 the length, +16 each frame's
 // start tick): back to the start past its length, the next frame when its

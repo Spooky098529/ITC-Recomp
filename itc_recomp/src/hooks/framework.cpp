@@ -541,7 +541,9 @@ fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
       (&ctx.r14)[i].u64 = kept[i];
     }
   };
-  calls.set_register = [&ctx](int reg, uint64_t value) { (&ctx.r0)[reg].u64 = value; };
+  calls.set_register = [&ctx](int reg, uint64_t value) {
+    guest_call::Gpr(ctx, reg).u64 = value;
+  };
   calls.increment = [&ctx, base](uint32_t iterator) {
     ctx.r3.u64 = iterator;
     ctx.lr = 0x82099DFC;

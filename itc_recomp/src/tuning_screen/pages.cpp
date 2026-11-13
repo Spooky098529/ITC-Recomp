@@ -36,10 +36,12 @@ void Store64(uint8_t* base, uint32_t address, uint64_t value) {
   Store(base, address + 4, uint32_t(value));
 }
 
+}  // namespace
+
 // The dialogs' message: the count at ring + 600 (the dispatcher's +804)
 // incremented, then the record (start +604 + count - 1) mod 50 of 12 bytes
 // = (event, 0, 0), stored +8, +4, +0.
-void Post(uint8_t* base, uint32_t dispatcher, uint32_t event) {
+void PostDialogMessage(uint8_t* base, uint32_t dispatcher, uint32_t event) {
   const uint32_t ring = dispatcher + 204;
   const uint32_t count = Load(base, ring + 600) + 1;
   const uint32_t index = Load(base, ring + 604) + count - 1;
@@ -62,6 +64,8 @@ uint64_t DialogTexts(uint8_t* base, const GuestCall& call, uint32_t frame, uint3
   Store(base, movie + 40960, 0);
   return r3;
 }
+
+namespace {
 
 // Command22's and Command23's copy: by the set (+30724) 0 or 1, its six
 // words 36 bytes apart (from +10580 or +11336) into the pointers of the
@@ -233,11 +237,11 @@ uint64_t ShowDialog(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t 
   if (title != 0) {
     const uint32_t entry = MovieEntry(base, frame, 16);
     r3 = DialogTexts(base, call, frame, entry, title, {0x821D6364, 0x821D6378, 0x821D638C});
-    Post(base, dispatcher, 34);
+    PostDialogMessage(base, dispatcher, 34);
   } else if (state == 10) {
     const uint32_t movie = Load(base, MovieEntry(base, frame, 19));
     r3 = SetText(call, frame, 0x821D62AC, movie, kAll, 1, 23, 0);
-    Post(base, dispatcher, 37);
+    PostDialogMessage(base, dispatcher, 37);
   }
   Advance(base, screen);
   return r3;
@@ -259,7 +263,7 @@ uint64_t Command30(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t d
   }
   const uint32_t entry = MovieEntry(base, frame, 16);
   r3 = DialogTexts(base, call, frame, entry, title, {0x822027F4, 0x82202808, 0x8220281C});
-  Post(base, dispatcher, 34);
+  PostDialogMessage(base, dispatcher, 34);
   return r3;
 }
 

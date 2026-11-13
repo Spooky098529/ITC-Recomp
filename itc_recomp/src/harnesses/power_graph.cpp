@@ -40,7 +40,10 @@
 
 #include "command_list/command_list.h"
 #include "graphics/render_queue.h"
+#include "car_makers/car_makers.h"
 #include "car_specs/car_specs.h"
+#include "career/career.h"
+#include "hooks/front_end_car_draw.h"
 #include "hooks/heap.h"
 #include "hooks/power_graph.h"
 #include "memory/heap.h"
@@ -597,6 +600,154 @@ void EntryCases(Context& h, uint32_t block, uint32_t garage, uint32_t race) {
   results.Report();
 }
 
+// CarList::DrawCarPowerGraph (sub_82250700) and PowerGraph::SetFromCar
+// (sub_82250488) on the entry's world: the garage car (at the garage
+// block's +0xE800) made as DrawEntryPowerGraph makes its own
+// (GarageCar::Reset and Car::SetModelAndClass with the entry's id, their
+// plain C++), then passed in r3. DrawCarPowerGraph: as the entry's cases,
+// the original with --native_power_graph off. SetFromCar: the power graph
+// screen's record ([0x82815EBC] + 8, in the garage block at +0xF000) filled
+// with r4 a tab word; the original's callees through their adapters, the
+// native's through their plain C++ (Native<Name> below: it has no
+// adapter); compared: the record's block, its frame (the car object's
+// bytes, the car data and the curve's tables as floats), the stack below
+// it, the garage block, rand's seed and r3.
+constexpr uint32_t kGarageCar = 0xE800;  // 1,968 bytes
+constexpr uint32_t kScreenBlock = 0xF000;
+constexpr uint32_t kRecordBytes = 92;
+
+void NativeSetFromCar(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const front_end_car_draw::Calls calls = hooks::FrontEndCarDrawCalls(ctx, base);
+  const uint32_t curve = pg::SetFromCar(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+      [&calls](uint32_t function, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t frame,
+               uint32_t back) {
+        const uint64_t regs[3] = {r3, r4, r5};
+        calls.call(function, regs, 3, nullptr, 0, frame, back, nullptr);
+      });
+  ctx.r3.u64 = (ctx.r1.u64 & 0xFFFFFFFF00000000ull) + curve;
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
+// The garage car made from the entry's id (the entry's world laid).
+void MakeGarageCar(Context& h, uint32_t garage, uint32_t sp) {
+  PPCContext t = CallContext(h);
+  const front_end_car_draw::Calls calls = hooks::FrontEndCarDrawCalls(t, h.base);
+  const uint32_t car = garage + kGarageCar;
+  car_makers::GarageCarReset(h.base, calls, car, sp);
+  career::CarSetModelAndClass(h.base, car, kCarId, sp);
+}
+
+void CarCases(Context& h, uint32_t block, uint32_t garage, uint32_t race, bool set_from_car) {
+  Results results(set_from_car ? "PowerGraph::SetFromCar (sub_82250488)"
+                               : "CarList::DrawCarPowerGraph (sub_82250700)");
+  constexpr uint32_t kScreen = pg::kPowerGraphScreen;
+  for (int c = 0; c < 32; c++) {
+    std::vector<std::vector<uint8_t>> saved;
+    for (const Global& g : kGlobals) {
+      saved.push_back(Read(h.base, g.address, g.bytes));
+    }
+    for (const Global& g : kEntryGlobals) {
+      saved.push_back(Read(h.base, g.address, g.bytes));
+    }
+    saved.push_back(Read(h.base, kScreen, 4));
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random r = start;
+      Fill(h.base, h.data, kScratchBytes);
+      MakeWorld(h, block, r);
+      for (uint32_t at = 0; at < kGarageBytes; at += 4) {
+        guest::StoreU32(h.base, garage + at, uint32_t(r.Next()));
+      }
+      LayEntryGarage(h.base, garage, r, c);
+      const int32_t count =
+          pg::SegmentCount(h.base, garage + kTemplateCar + 2880 + 20 - 1280);
+      const bool shown = r.Below(8) != 0;
+      uint32_t lines = 0;
+      const bool float_slots =
+          MakeLists(h, block, r, shown && !set_from_car ? count : 0, &lines);
+      guest::StoreU32(h.base, pg::kEntryShown, shown ? 1 + r.Below(3) : 0);
+      guest::StoreU32(h.base, kFrontEndCars, garage + kEntryHolder);
+      guest::StoreU32(h.base, car_specs::kParams, garage + kGarageParams);
+      guest::StoreU32(h.base, kScreen, garage + kScreenBlock);
+      Fill(h.base, race, kRaceDataBytes, 0);
+      guest::StoreU32(h.base, race + 48 + 0x595E0, r.Below(6));
+      guest::StoreU32(h.base, race + 48 + 0x595E4, r.Below(3));
+      guest::StoreU32(h.base, kRaceData, race);
+      guest::StoreU32(h.base, race_setup::kRandSeed, uint32_t(r.Next()));
+      const uint64_t r31 = r.Next();
+      const uint32_t tab = r.Below(4) == 0 ? uint32_t(r.Next()) : 2 + r.Below(4);
+      after = r;
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      const uint32_t sp = t.r1.u32;
+      Fill(h.base, sp - 16384, 16384 + 64, 0xA5);
+      MakeGarageCar(h, garage, sp - 8192);
+      Fill(h.base, sp - 16384, 16384 + 64, 0xA5);
+      t.r3.u64 = garage + kGarageCar;
+      t.r4.u64 = tab;
+      t.r31.u64 = r31;
+      t.fpscr.disableFlushModeUnconditional();
+      if (set_from_car) {
+        (v == 0 ? __imp__sub_82250488 : NativeSetFromCar)(t, h.base);
+        const uint32_t frame = sp - pg::kSetFromCarFrame;
+        out[v].Bytes(Read(h.base, sp - 16384, frame - (sp - 16384)));
+        out[v].Bytes(Read(h.base, frame, 80));
+        out[v].Floats(h.base, frame + 80, 1024 / 4);  // the curve's tables
+        out[v].Bytes(Read(h.base, frame + 80 + 1024, 8));
+        out[v].Floats(h.base, frame + 80 + 1032, 8);
+        out[v].Bytes(Read(h.base, frame + 80 + 1064, 1152 - 80 - 1064));
+        out[v].Floats(h.base, frame + 1152, kCarDataBytes / 4);
+        out[v].Bytes(Read(h.base, frame + 3008, pg::kSetFromCarFrame - 3008 - 40));
+        const uint32_t record = garage + kScreenBlock + 8;
+        out[v].Bytes(Read(h.base, record, 52));
+        out[v].Floats(h.base, record + 52, 1);
+        out[v].Bytes(Read(h.base, record + 56, kRecordBytes - 56));
+      } else {
+        ITC_FLAG(native_power_graph) = v == 1;
+        (v == 0 ? __imp__sub_82250700 : hooks::CarListDrawCarPowerGraph)(t, h.base);
+        ITC_FLAG(native_power_graph) = true;
+        const uint32_t frame = sp - pg::kCarFrame;
+        Collect(h, block, frame - pg::kDrawFrame, lines, float_slots, out[v]);
+        out[v].Bytes(Read(h.base, frame, pg::kEntryCarData));
+        out[v].Floats(h.base, frame + pg::kEntryCarData, kCarDataBytes / 4);
+        out[v].Bytes(Read(h.base, frame + pg::kEntryCarData + kCarDataBytes,
+                          pg::kCarFrame - pg::kEntryCarData - kCarDataBytes - 16));
+        out[v].Bytes(Read(h.base, sp - 16, 80));
+        out[v].Bytes(Read(h.base, race, kRaceDataBytes));
+        out[v].Word(uint32_t(t.r31.u64));
+        out[v].Word(uint32_t(t.r31.u64 >> 32));
+      }
+      out[v].Bytes(Read(h.base, garage, kGarageBytes));
+      for (const Global& g : kGlobals) {
+        out[v].Bytes(Read(h.base, g.address, g.bytes));
+      }
+      for (const Global& g : kEntryGlobals) {
+        out[v].Bytes(Read(h.base, g.address, g.bytes));
+      }
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    size_t k = 0;
+    for (const Global& g : kGlobals) {
+      Write(h.base, g.address, saved[k++].data(), g.bytes);
+    }
+    for (const Global& g : kEntryGlobals) {
+      Write(h.base, g.address, saved[k++].data(), g.bytes);
+    }
+    Write(h.base, kScreen, saved[k++].data(), 4);
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void PowerGraph(Context& h) {
@@ -617,6 +768,8 @@ void PowerGraph(Context& h) {
   const uint32_t race = memory::Alloc(kRaceDataBytes, memory::kHeapZeroMemory);
   if (garage != 0 && race != 0) {
     EntryCases(h, block, garage, race);
+    CarCases(h, block, garage, race, false);
+    CarCases(h, block, garage, race, true);
   }
   if (race != 0) {
     memory::Free(race);

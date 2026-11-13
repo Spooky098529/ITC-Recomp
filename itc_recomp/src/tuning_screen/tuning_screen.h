@@ -308,6 +308,14 @@ uint64_t ShowOptions(uint8_t* base, const GuestCall& call, uint32_t screen, uint
 // with +9724. 160-byte frame; the last LoopNamed's r3, else the entry.
 uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
+// sub_82203400 TuningScreen::HighlightItem and sub_82203570
+// HighlightSelected: movie 13's items lit, nodes 19 to 21 (+30724 0) or 22
+// to 24 (1) +68 = 1.0 for the item (r5 `item`, or +30732 read again each
+// pass) and 0.0 for the others; with `all` not 0, +9708 = 1 and all three
+// 1.0. 144-byte frame (saves not written); the last FindNode's r3, else the
+// movie's entry.
+uint64_t HighlightItem(uint8_t* base, uint64_t r3, uint64_t all, uint64_t item, uint32_t sp);
+uint64_t HighlightSelected(uint8_t* base, uint64_t r3, uint64_t all, uint32_t sp);
 // sub_822036E8 TuningScreen::UpdateItems: r3 = the screen (all 64 bits).
 // Movie 13's items by the state (its row): 27 TuningScreen::HighlightItem
 // and 28 HighlightSelected (both recompiled, through `call`) by the player's
@@ -328,6 +336,122 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t
 // else the entry.
 uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
                    bool native_specs);
+
+// --- Movie 2's command runners never seen in play (commands.cpp) ---
+// Called only by the update's plain C++. Each with the original's frame
+// below `sp` (its back chain, the movie id at +80, then the doubleword the
+// ints are made floats through) and r3 as the original leaves it.
+
+// sub_821D4180 TuningScreen::Command5: the color pages (its row): body's
+// item 3 (scene animation 28, node (32, 1) at float(+9663) × 40.0, 734 +
+// +9663), aero's item 4 (32; node (30, 0)'s child 2 by GetCurrentChoice,
+// marked when [+36368] is the byte +9662; (30, 1)'s child 0; 571 and 632 +
+// +9663) and interior's item 0 (36; node (32, 1); 771 + +9663); the queue's
+// step with +9724. 128-byte frame; the last LoopNamed's r3, else the entry.
+uint64_t Command5(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821E9730 TuningScreen::Command11: 980 snapped (with the queue's
+// step) or 980 and 1009 played by +9716 and +9720; node (36, 0)'s +16 =
+// float(+30492 × 40); 887 + +30492 restarted and looped; help text (10, 0)
+// string 642 scrolled; the queue's step with +9724. 128-byte frame;
+// ScrollText's r3.
+uint64_t Command11(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821E9CA0 TuningScreen::Command12: 983 restarted with +9716; node (37,
+// 0)'s +16 = float(+30500 × 40); 926 + +30500 restarted and looped; the
+// queue's step with +9724. 128-byte frame; LoopNamed's r3.
+uint64_t Command12(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EB8E8 TuningScreen::Command54: 1001 snapped (with the queue's
+// step) or played by +9716 and +9720; the queue's step with +9724. 128-byte
+// frame; the last call's r3, else the entry.
+uint64_t Command54(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EBDC8 TuningScreen::Command55: with +9716 1002 played and node
+// (28, 0)'s child 2 shown at the current choice (80.0 for 3, else float(c
+// × 40)); node (28, 1)'s child 0 at the pick [+33548] the same way; 428 +
+// pick (430 for 3) restarted and looped, 489 + pick (491) played and
+// looped; the queue's step with +9724. 144-byte frame; LoopNamed's r3.
+uint64_t Command55(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EC6A0 TuningScreen::Command56: with +9716 999 played and node (32,
+// 1)'s +16 = float([+33556] × 40); 771 + [+33556] restarted and looped; the
+// queue's step with +9724. 128-byte frame; LoopNamed's r3.
+uint64_t Command56(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821ECC68 TuningScreen::Command57: the meter pages (its row): with
+// neither 1005 nor 144 playing (UiMovie::NamedAnimationTime -1.0) and +9720
+// 0, 79 or 74 + the page [+33564] restarted and looped; 144 and 1011
+// snapped (the queue's step, +9720 = 0 on page 4) or 1005 played by +9716
+// and +9720; the point [+33572] 0 to 4's pair (118/116 to 138/136); off
+// page 4 sub-scene 2's rows 9 to 13 named (string 379, the row's number),
+// marked by GetChoiceFlag and pictured (child 6's +108 = 5 × page + row);
+// the queue's step with +9724. 176-byte frame; r3 the last call's or the
+// movie; `*f1` the last NamedAnimationTime's (the caller applies it before
+// each later guest call).
+uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+                   std::optional<double>* f1);
+// sub_821EDB70 TuningScreen::Command58: with +9716 143 restarted and 1012
+// played; 111 + [+33576] restarted and looped; the queue's step with
+// +9724. 128-byte frame; LoopNamed's r3.
+uint64_t Command58(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+
+// --- The editors' command runners never seen in play (commands.cpp) ---
+// Movies 13 and 14 (and 16 for Command52's dialog), called only by the
+// update's plain C++, as movie 2's above.
+
+// sub_82200100 TuningScreen::Command17: 221 restarted (chained) or the
+// queue's step by +9716 and +9720; node (10, 0)'s +16 = float(+30740) ×
+// 40.0; 49 + +30740 restarted and looped. 128-byte frame; LoopNamed's r3.
+uint64_t Command17(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82201C58 TuningScreen::Command19: by +9716 and +9720 the queue's step,
+// or 236 restarted and 4 × [+30732] + 201 (set +30724 0) or + 175 (set 1)
+// played chained; help text (2, 0) string 810 scrolled. 128-byte frame;
+// ScrollText's r3.
+uint64_t Command19(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82201FA0 TuningScreen::Command20 (`a`, `b` the update's +9644 and
+// +9648): by the set +30724 0 4a + 204 restarted chained then 4b + 203, or
+// 1 4a + 178 then 4b + 177; other sets nothing. 128-byte frame; the last
+// PlayNamed's r3, else the movie's entry.
+uint64_t Command20(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp, uint64_t a,
+                   uint64_t b);
+// sub_822087C8 TuningScreen::Command21 (r3 the screen, all 64 bits): the
+// layer order's move, the layer +30756 stepped to the cursor +30732 one at a
+// time (either way): the work list's ids (+31228 + 4i) exchanged, +9644 and
+// +9648 the two ids, SwapLayerRecords and SwapOrderTextures (tuning_pages'
+// plain C++ with `native_pages`, else through the guest), on page +30724 0
+// or 1 the decal images' two entries' textures exchanged and movie 13's
+// slots +764 to +772 (+776 to +784) set from entries 6 to 8 (27 to 29),
+// Command20; then the layer's row finished and played chained (4 x layer +
+// 202, or 4 x (layer + 44)), LayOutItems, the queue's step. 144-byte frame
+// (the movie's id at + 80); r3 LayOutItems'.
+uint64_t Command21(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp,
+                   bool native_pages);
+// sub_82204980 TuningScreen::Command26 and sub_82204A78 Command27: as
+// Command25 with 229 and string 821, or 230 and 822. 128-byte frame;
+// ScrollText's r3.
+uint64_t Command26(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+uint64_t Command27(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F7498 TuningScreen::Command32Done: with [+33508] set movie 14's
+// nodes (3, 11) and (3, 12) given color 1 (UiMovie::SetNodeColor's stores).
+// 112-byte frame; r3 the last node, else the movie's entry.
+uint64_t Command32Done(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_821F7618 TuningScreen::Command42: movie 14's 181, 182, ..., 197, 198
+// finished; the list position +30756 stepped toward its target (the word
+// at +33480 + 4 × position): one animation played from each end, the
+// target slid along, the position's word set to the target; node (30, 12 +
+// 5 × position) hidden; the queue's step when the position's word isn't the
+// position. 128-byte frame; r3 the hidden node.
+uint64_t Command42(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F77F0 TuningScreen::Command52: +9728 = 0; for the states 50 to 52
+// movie 16's dialog texts (strings 18, 19, 16), message 34 posted to the
+// dispatcher; movie 14's node (1, 1) shown. 144-byte frame; r3 the node.
+uint64_t Command52(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t dispatcher,
+                   uint32_t sp);
+// sub_821F7948 TuningScreen::Command53: the queue's step (a leaf; r3 left).
+void Command53(uint8_t* base, uint32_t screen);
+
+// The dialogs' helpers (pages.cpp): message `event` posted to the
+// dispatcher's ring (+204), and movie 16's three texts at `entry`'s movie
+// (string `title`, 2, 3) from the return addresses `lr`, its +40960 = 0
+// (the last SetText's r3).
+void PostDialogMessage(uint8_t* base, uint32_t dispatcher, uint32_t event);
+uint64_t DialogTexts(uint8_t* base, const GuestCall& call, uint32_t frame, uint32_t entry,
+                     uint32_t title, const uint32_t (&lr)[3]);
 
 // --- The help texts and the part list's rows (rows.cpp) ---
 
@@ -509,6 +633,36 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
                      const front_end_car_draw::DrawCallees& draw, load_poll::Calls* paint_poll,
                      uint32_t screen, uint32_t sp);
 
+// sub_821E6C50 TuningScreen::Update (update.cpp; its pieces sub_821E6CD4 and
+// sub_821E6F90 merged): r3 = the screen (all 64 bits), r4 = the mode's
+// dispatcher (all 64 bits; commands 30, 52 and 63). The refresh while +9708
+// is 1 (+9708 = whether it answered 0), the state's debug handler, movie
+// 2, 13 or 14 by the state (UiMovies::Find, the id at frame + 80),
+// UpdateBusyIcon, the queue [+10036]'s current command's runner on its first
+// update (+24), UiMovie::Run and the queue's step when it stops
+// (Command32Done after command 32), then UpdateItems, DrawPowerGraph,
+// RefreshMenu, UpdateListDots, UpdateListCounter, UpdateStand, and while
+// +9732 is set StoreToGarageCar, SetCarStats and RestoreStand (+9732 = 0).
+// The callees seen in play by their plain C++; DrawPowerGraph, UiMovie::Run
+// and those never seen in play (16 debug handlers, 39 command runners,
+// Command32Done) through the guest. 144-byte frame (movie's id at + 80);
+// r3 UpdateStand's or RestoreStand's; `*f1` as Refresh's (the caller applies
+// it before each later guest call and at the end).
+struct UpdateCalls {
+  const StandCalls& stand;
+  const front_end_car_draw::DrawCallees& draw;
+  load_poll::Calls* paint_poll;  // as UpdateStand's adapter gives it
+  bool native_slots;             // --native_action_mappers
+  bool native_specs;             // --native_car_specs
+  bool native_pages;             // --native_tuning_pages (Command21's callees)
+  // TuningScreen::DrawPowerGraph (sub_821DF350) through its override from
+  // `frame` with r3 and r31 = `r3`, r30 = `r30` (its adapter saves them) and
+  // the original's return address; f1 left in the guest's.
+  std::function<void(uint32_t frame, uint64_t r3, uint64_t r30)> draw_power_graph;
+};
+uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r4, uint32_t sp,
+                std::optional<double>* f1);
+
 // --- The debug state handlers (debug.cpp) ---
 // Each only prints a debug menu through the empty sub_82106540, left out:
 // its frame's back chain and string tables written as the original leaves
@@ -541,5 +695,42 @@ uint32_t DebugLayerSet(uint8_t* base, uint32_t sp);
 uint32_t DebugEditPosition();
 uint32_t DebugEditView();
 uint32_t DebugPaintConfirm(uint8_t* base, uint32_t sp);
+// The handlers never seen in play: sub_821CC078 DebugColorSelect (7; 500 or
+// 520 by the category and item), sub_821CC430 DebugWarnMoney (10),
+// sub_821CC510 DebugReflectSet (12), sub_821CC598 DebugAnnulSet (13),
+// sub_821CC620 DebugRemoveConfirm (14), sub_821E8358 DebugBodyColor (18),
+// sub_821E8440 DebugNeonPart (19), sub_821E84F8 DebugNeonKind (20),
+// sub_821E85A0 DebugNeonEdit (21), sub_821E8688 DebugLedEdit (22),
+// sub_821E8758 DebugCockpitTop (53), sub_821E8800 DebugCockpitType (54),
+// sub_821E88C0 DebugCockpitColor (55), sub_821E8998 DebugMeterKind (56),
+// sub_821E8A88 DebugMeterPoint (57, 58), sub_821FDA80 DebugLayerOperate (25,
+// 40), sub_821FDF10 DebugLayerOrder (27, 42), sub_821FE118 DebugEditRotate
+// (30, 45), sub_821FE130 DebugEditScale (31, 46), sub_821FE148
+// DebugEditColor (32, 47), sub_821FE160 DebugEditFlip (33, 48; these four
+// with no frame), sub_821FE230 DebugPaintCancelConfirm (36, 51),
+// sub_821FE2D0 DebugPaintRemoveConfirm (37, 52).
+uint32_t DebugColorSelect(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugWarnMoney(uint8_t* base, uint32_t sp);
+uint32_t DebugReflectSet(uint8_t* base, uint32_t sp);
+uint32_t DebugAnnulSet(uint8_t* base, uint32_t sp);
+uint32_t DebugRemoveConfirm(uint8_t* base, uint32_t sp);
+uint32_t DebugBodyColor(uint8_t* base, uint32_t sp);
+uint32_t DebugNeonPart(uint8_t* base, uint32_t sp);
+uint32_t DebugNeonKind(uint8_t* base, uint32_t sp);
+uint32_t DebugNeonEdit(uint8_t* base, uint32_t sp);
+uint32_t DebugLedEdit(uint8_t* base, uint32_t sp);
+uint32_t DebugCockpitTop(uint8_t* base, uint32_t sp);
+uint32_t DebugCockpitType(uint8_t* base, uint32_t sp);
+uint32_t DebugCockpitColor(uint8_t* base, uint32_t sp);
+uint32_t DebugMeterKind(uint8_t* base, uint32_t sp);
+uint32_t DebugMeterPoint(uint8_t* base, uint32_t sp);
+uint32_t DebugLayerOperate(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugLayerOrder(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t DebugEditRotate();
+uint32_t DebugEditScale();
+uint32_t DebugEditColor();
+uint32_t DebugEditFlip();
+uint32_t DebugPaintCancelConfirm(uint8_t* base, uint32_t sp);
+uint32_t DebugPaintRemoveConfirm(uint8_t* base, uint32_t sp);
 
 }  // namespace tuning_screen

@@ -3,7 +3,7 @@
 //
 // Each pass, the game posts an Update and a Draw message (see
 // game_messages.h), then waits for the render thread in
-// Renderer::WaitForFrame, swaps buffers and has the render thread draw the
+// FrameDriver::WaitForFrame, swaps buffers and has the render thread draw the
 // new recording. That wait is replaced to pace the passes: when the next
 // 30 Hz tick is due, the coming pass runs normally (a logic pass);
 // otherwise it waits for the next frame slot (per --max_fps) and the coming
@@ -23,6 +23,7 @@
 #include "frame_pacer.h"
 #include "game_messages.h"
 #include "guest.h"
+#include "hooks/frame_driver.h"
 #include "hooks/title_screen.h"
 #include "interpolation/blend_state.h"
 #include "native/renderer.h"
@@ -54,7 +55,7 @@ class FrameTimes {
     kPacing,          // main thread: held back by the frame cap
     kDraw,            // render thread: drawing a frame, present included
     kDrawCpu,         // render thread: CPU time used while drawing (kDraw less waits)
-    kPresent,         // render thread: present (Renderer::Present)
+    kPresent,         // render thread: present (FrameDriver::Present)
     kParts
   };
 
@@ -124,7 +125,7 @@ FrameTimes& GetFrameTimes() {
   return times;
 }
 
-// Renderer object (see Renderer::Init, sub_82092358).
+// The frame driver object (see FrameDriver::Init, sub_82092358).
 constexpr uint32_t kRendererTickDoneEventOffset = 388;   // set by logic after a tick
 constexpr uint32_t kRendererFrameDoneEventOffset = 392;  // set to let logic tick
 constexpr uint32_t kRendererRunningOffset = 396;         // u8
@@ -159,7 +160,7 @@ void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   interpolation::BlendState_OnReplayFrameStart();
   native::Renderer_OnReplayStart();
   ctx.r3.u64 = renderer;
-  sub_82091E58(ctx, base);
+  hooks::FrameDriverDrawFrame(ctx, base);  // FrameDriver::DrawFrame (src/frame_driver/)
   debug::ReplayStats_OnFrame();
   native::Renderer_EndFrame();
   if (timing) {
@@ -264,7 +265,7 @@ extern "C" REX_FUNC(sub_820920D8) {
   ctx.r1.u32 = r1;
 }
 
-// Renderer::Present: r3 = renderer. Wrapped only to time it
+// FrameDriver::Present: r3 = the frame driver. Wrapped only to time it
 // (--log_frame_times).
 extern "C" REX_FUNC(sub_82091A60) {
   REX_FUNC_PROLOGUE();

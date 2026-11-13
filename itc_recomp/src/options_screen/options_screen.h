@@ -496,4 +496,70 @@ uint64_t CloseSliders(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
 uint64_t CloseButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t CloseAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+// --- The load and save pages (load_save.cpp; docs/functions/
+// options-load-save.md): category 5 (page 9) loads the game data, category 6
+// (page 10) saves it. Adapters behind --native_options_load_save. ---
+
+// The dialog's menu, page 9's and page 10's sub-page blocks.
+constexpr uint32_t kDialogMenu = 0x826D8484;
+constexpr uint32_t kLoadPages = 0x826D847C;
+constexpr uint32_t kSavePages = 0x826D8488;
+// The save layer, through its overrides (save-interface.md): SaveSlots::State,
+// Device, RequestDevice, GameData::Check, Load and Save, SaveBuffers::Destroy;
+// never seen in play (the originals): sub_8228FA20 (Word992), sub_8228FA58
+// (Request980) and sub_8228FD50 (the look-up's answer).
+constexpr uint32_t kSlotState = 0x8228F9E8;
+constexpr uint32_t kSlotDevice = 0x8228FA90;
+constexpr uint32_t kRequestDevice = 0x8228F9B0;
+constexpr uint32_t kGameDataCheck = 0x8228FC50;
+constexpr uint32_t kGameDataLoad = 0x8228FBC0;
+constexpr uint32_t kGameDataSave = 0x8228FB00;
+constexpr uint32_t kWord992 = 0x8228FA20;
+constexpr uint32_t kRequest980 = 0x8228FA58;
+constexpr uint32_t kLookUp = 0x8228FD50;
+constexpr uint32_t kSaveBuffersDestroy = 0x8228F8F8;
+// The save buffers' header (+0 the game data's buffer) and the game data's
+// size.
+constexpr uint32_t kSaveBuffers = 0x828161F0;
+constexpr uint32_t kGameDataBytes = 0x1F978;
+
+// sub_821BB858 LoadPage::SetDialog and sub_821BB708 SavePage::SetDialog
+// (leaves): `next` (unsigned) 0 or 1 the sub-page block to next + 1 then the
+// options' page block to step 44 then 43 (47 then 46) with page 9 (10)
+// after, 2 those in the other order with the sub-page 3; for those the
+// settings' +624 (+644) = `next`; always +628 (+648) = `kind`. r3 `kind`.
+uint64_t LoadPageSetDialog(uint8_t* base, uint64_t kind, uint64_t next);
+uint64_t SavePageSetDialog(uint8_t* base, uint64_t kind, uint64_t next);
+// sub_821B9FB0 LoadPage::Close and sub_821BA508 SavePage::Close (sub-page 4,
+// leaves): the page block to step 41 (42), the settings' +712 = 1.
+void LoadPageClose(uint8_t* base);
+void SavePageClose(uint8_t* base);
+// sub_821B9FF8 OptionsSavePages::Cancel (sub-page 5 of both, a leaf, never
+// seen in play): the settings' +712 = 1.
+void SavePagesCancel(uint8_t* base);
+// The sub-pages (r3 not read; from their frames below `sp`; r3 as the
+// originals leave it): sub_821BBC10 LoadPage::CheckDevice and sub_821BBCC0
+// SavePage::CheckDevice (0, 96 bytes), sub_821BC7B0 LoadPage::Answer (1, 112)
+// and sub_821BCA60 SavePage::Answer (1, 96), sub_821BC940 LoadPage::Note and
+// sub_821BCC10 SavePage::Note (2, 112), sub_821C2620 LoadPage::Wait and
+// sub_821BBD18 SavePage::Wait (3, 96), sub_821BBC68 LoadPage::DeviceAnswer (6,
+// 96, never seen in play).
+uint64_t LoadPageCheckDevice(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SavePageCheckDevice(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t LoadPageAnswer(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SavePageAnswer(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t LoadPageNote(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SavePageNote(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t LoadPageWait(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SavePageWait(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t LoadPageDeviceAnswer(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_821C6468 LoadPage::Leave (step 41) and sub_821C6550 SavePage::Leave
+// (step 42): r3 the step word; first pass the dialog's animations finished
+// (841 and 843 + the cursor, or 857 and 859 + it), the close (10 or 11)
+// played, Options::SetUpCategoryPage; every pass UiMovie::Run, and once it
+// answers 0 step 5 with the categories after and SaveBuffers::Destroy.
+// 128-byte frames. 0.
+uint64_t LoadPageLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t SavePageLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
 }  // namespace options_screen
