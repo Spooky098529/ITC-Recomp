@@ -23,6 +23,12 @@ When the user has reviewed a run's section, its heading gets
   1 stack leftovers (as the type 10 mode's); `known-data.md`'s block
   and dialog globals; cross-links in `location-screen.md` and
   `car-settings.md`.
+- Its migration (33bdeaf2..d30920e0, `--native_type5_mode`): 33 of 33
+  ours (31 Overridden, reached through tables and vtables); the map's
+  rows for `OpenConfirmStep` and `MoveCursorStep` corrected (the
+  highlight's `PlayNamed` gets r5 = 0). The `type10_mode` harness makes
+  the same "3 = none" loading-movie assumption that hung this one (it
+  stands in `Run`, so it doesn't hang there).
 - `Type6Screen0`'s map (4ed5e21e): 13 new rows in
   `type6-type7-modes.md` (the type 6 mode's first screen, a five-item
   menu over the type 6 car; its pages, steps and helpers, with

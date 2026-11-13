@@ -224,7 +224,13 @@ file's history. What's left to see in a drive, from every run:
   at +19280 (`Type5Dialog`, "TXR_PaCmnWindow", the type 2 dialog's
   design); 15 ready groups (the pages and steps before `Draw` and
   `Update`, reached through tables); no leads; no subagents); map
-  checked (0 errors, 15 ready groups). Migration agent running.
+  checked (0 errors, 15 ready groups). Migration 33bdeaf2..d30920e0
+  (one batch: 33 of 33 ours, `--native_type5_mode`, the 16 never seen
+  ported with their callers; `FindShown` and `Type5Dialog::Init`'s
+  adapters removed; the quirks kept; a harness fault fixed before the
+  commit (`LoadingScreen::Finish` read past the three movies with the
+  world's "none" index); 33 harnesses 0 differing; race 38 s at 40, 0
+  errors; no subagents). Left: none. Validation agent running.
 
 ## Done
 
