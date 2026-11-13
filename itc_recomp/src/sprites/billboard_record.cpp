@@ -18,10 +18,13 @@
 
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "course_scenery/course_scenery.h"
 #include "debug/frame_state_diff.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "models/xpr.h"
 #include "native/buffers.h"
+#include "scenery_lists/scenery_lists.h"
 
 #include <initializer_list>
 
@@ -34,6 +37,8 @@ using namespace car_scene_draw::ops;
 constexpr uint32_t kStateFrame = 368;
 constexpr uint32_t kRecordFrame = 160;
 constexpr uint32_t kDrawFrame = 96;
+constexpr uint32_t kGroupsFrame = 192;
+constexpr uint32_t kXprGetTexture = 0x82597118;
 constexpr uint32_t kVerticesFrame = 304;  // Billboards::BuildVertices's
 
 constexpr uint32_t kRenderApp = 0x826BABA0;   // the render manager
@@ -291,6 +296,55 @@ uint64_t DrawBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& cal
     debug::FrameStateDiff_After(base, "draw step part", 0x8209CC38);
   }
   return 1;
+}
+
+uint64_t DrawLightGroups(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+                         uint32_t stack, uint32_t set, uint32_t groups, uint32_t xpr,
+                         uint32_t animations) {
+  ITC_NATIVE_RUNNING("sub_82148658 LightGroups::Draw");
+  const uint32_t f = stack - kGroupsFrame;
+  Store(base, f, stack);  // the back chain, as stwu
+  const uint32_t material = f + 80;
+  uint64_t r3 = set;
+  uint32_t group = groups + 16;  // the original's r31
+  if (Load(base, groups) == 0) {
+    return r3;
+  }
+  for (uint32_t i = 0;;) {
+    const uint32_t count_at = group + 44;  // r29
+    const uint32_t lights = count_at + 16;  // r27
+    InitBillboardMaterial(base, material);
+    const uint32_t flags = Load(base, group);
+    Store(base, material + 0, (flags & 0x200) ? 1024u : (flags & 0x10) ? 64u : 32u);
+    Store(base, material + 4, (Load(base, group) & 0x40) ? 2u : 4u);
+    if (xpr != 0) {
+      uint32_t texture = Load(base, group + 4);
+      if (animations != 0) {
+        const uint64_t index = course_scenery::FindAnimationByTexture(base, animations, texture);
+        if (int32_t(index) >= 0) {
+          texture = Load(base, scenery_lists::AnimationCurrentFrame(base, animations,
+                                                                    uint32_t(index)) + 4);
+        }
+      }
+      // XPR::GetTexture inside its wrap's checks (r3 left as the XPR when
+      // --debug_hide names it).
+      uint64_t got = xpr;
+      if (!debug::IsHidden(kXprGetTexture)) {
+        debug::FrameStateDiff_Before(base);
+        got = models::XprGetTexture(base, xpr, texture);
+        debug::FrameStateDiff_After(base, "draw step part", kXprGetTexture);
+      }
+      Store(base, material + 12, uint32_t(got));
+    }
+    SetBillboardLights(base, material, Load(base, count_at), lights);
+    r3 = DrawBillboards(base, calls, f, set, material);
+    i++;
+    group = Load(base, count_at) * 48 + lights;
+    if (i >= Load(base, groups)) {
+      break;
+    }
+  }
+  return r3;
 }
 
 }  // namespace sprites

@@ -21,4 +21,13 @@ void BillboardsRecord(PPCContext& ctx, uint8_t* base);
 // or 1. The plain C++ (Record inside its wrap's checks).
 void BillboardsDraw(PPCContext& ctx, uint8_t* base);
 
+// Whether the light groups' plain C++ may run: the recording's flags with
+// --native_models, --native_course_scenery and --native_scenery_lists (its
+// callees' plain C++).
+bool LightGroupsNative();
+
+// LightGroups::Draw (sub_82148658): r3 = the set, r4 = the groups, r5 = the
+// XPR, r6 = the animation set; r3 as the original leaves it.
+void LightGroupsDraw(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

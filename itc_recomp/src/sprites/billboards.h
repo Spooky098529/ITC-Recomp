@@ -79,4 +79,15 @@ uint64_t RecordBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& c
 uint64_t DrawBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
                         uint32_t stack, uint32_t set, uint32_t material);
 
+// The light groups' draw (sub_82148658, LightGroups::Draw): for each of the
+// groups (`groups` + 0 the count, the first at +16: its flags +0, texture id
+// +4, light count +44, lights from +60, 48 bytes each), a material on its
+// 192-byte frame (+80): alpha mode 1024 (flag 0x200), else 64 (0x10) or 32;
+// blend mode 2 (0x40) or 4; with `xpr`, the texture from the XPR by the id or
+// its animation's current frame in `animations`; Draw. Returns the last
+// Draw's r3 (`set` with no groups).
+uint64_t DrawLightGroups(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+                         uint32_t stack, uint32_t set, uint32_t groups, uint32_t xpr,
+                         uint32_t animations);
+
 }  // namespace sprites

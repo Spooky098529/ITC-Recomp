@@ -66,6 +66,10 @@ constexpr uint32_t kList = 0x400;
 constexpr uint32_t kQueue = 0x500, kState = 0x540, kListA = 0x5C0, kListB = 0x600;
 constexpr uint32_t kSet = 0x700, kMaterial = 0x740, kPass = 0x800, kLights = 0xB00;
 constexpr uint32_t kMostLights = 40;
+// The light groups' cases: the groups, the XPR (its records at +64) and
+// the animation set.
+constexpr uint32_t kGroups = 0x1300, kXpr = 0x1E00, kAnimations = 0x1EC0;
+constexpr uint32_t kMostGroups = 5, kMostGroupLights = 8;
 constexpr uint32_t kSlots = 0x2000, kSlotCount = 2048;
 constexpr uint32_t kItemsA = 0xA000, kItemsB = 0xC800, kItemCount = 512;
 constexpr uint32_t kBucketsA = 0xF000, kBucketsB = 0x17100, kBucketCount = 2057;
@@ -88,6 +92,7 @@ constexpr uint32_t kRingBytes = 2 * 4096 * 28;
 constexpr uint32_t kStateFrame = 368, kStateTemps = 288;
 constexpr uint32_t kRecordFrame = 160, kRecordTemps = 88;
 constexpr uint32_t kDrawFrame = 96, kDrawTemps = 88;
+constexpr uint32_t kGroupsFrame = 192, kGroupsTemps = 120;
 
 class Saved {
  public:
@@ -251,6 +256,64 @@ void Build(Context& h, const World& w) {
   guest::StoreU32(base, kRingHandle, uint32_t(r.Next()));
 }
 
+// The light groups, the XPR and the animation set over a built world;
+// returns the groups' light count. Every animation has frames and a current
+// frame below its count (the originals read guest address 4 otherwise).
+uint32_t BuildGroups(Context& h, uint32_t b, uint64_t seed, uint32_t groups) {
+  uint8_t* base = h.base;
+  Random r(seed);
+  auto at = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, b + offset, value); };
+  // The XPR: eight records, their +4 the texture's offset from the header.
+  at(kXpr + 0, 0x40000000u + r.Below(0x1000) * 16);
+  at(kXpr + 16, b + kXpr + 64);
+  at(kXpr + 20, r.Below(10) == 0 ? 0 : 8);
+  for (uint32_t k = 0; k < 8; k++) {
+    at(kXpr + 64 + 16 * k + 4, r.Below(0x10000) * 16);
+  }
+  // The animation set: four animations of 1 to 4 frames, their entries'
+  // texture ids from 0 to 11.
+  at(kAnimations, 4);
+  uint32_t offset = 0;
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t frames = 1 + r.Below(4);
+    at(kAnimations + 4 + 4 * k, offset);
+    const uint32_t animation = kAnimations + 20 + offset;
+    at(animation + 0, frames);
+    at(animation + 4, r.Below(frames));
+    for (uint32_t e = 0; e < frames; e++) {
+      at(animation + 16 + 4 * frames + 8 * e + 0, uint32_t(r.Next()));
+      at(animation + 16 + 4 * frames + 8 * e + 4, r.Below(12));
+    }
+    offset += 16 + 12 * frames;
+  }
+  // The groups.
+  const float ex = guest::LoadFloat(base, b + kPass + 400);
+  const float ey = guest::LoadFloat(base, b + kPass + 404);
+  const float ez = guest::LoadFloat(base, b + kPass + 408);
+  at(kGroups, groups);
+  uint32_t group = kGroups + 16, total = 0;
+  for (uint32_t g = 0; g < groups; g++) {
+    const uint32_t lights = r.Below(5) == 0 ? 0 : 1 + r.Below(kMostGroupLights);
+    at(group + 0, uint32_t(r.Next()));
+    at(group + 4, r.Below(14));
+    at(group + 44, lights);
+    for (uint32_t k = 0; k < lights; k++) {
+      const uint32_t l = group + 60 + 48 * k;
+      StoreFloat(base, b + l + 0, ex + Uniform(r, -300, 300));
+      StoreFloat(base, b + l + 4, ey + Uniform(r, -20, 20));
+      StoreFloat(base, b + l + 8, ez + Uniform(r, -300, 300));
+      for (uint32_t c = 16; c < 32; c += 4) {
+        StoreFloat(base, b + l + c, Uniform(r, 0, 255));
+      }
+      StoreFloat(base, b + l + 32, r.Below(6) == 0 ? 0.0f : Uniform(r, 0, 5));
+      StoreFloat(base, b + l + 36, r.Below(6) == 0 ? 0.0f : Uniform(r, 0, 5));
+    }
+    total += lights;
+    group += 60 + 48 * lights;
+  }
+  return total;
+}
+
 template <typename IsFloat>
 void Compare(uint8_t* base, Outputs& out, uint32_t from, uint32_t bytes, IsFloat is_float) {
   uint32_t run = 0;
@@ -389,6 +452,51 @@ void BillboardRecordCases(Context& h) {
                                 w.ring_count));
     }
     ITC_LOG_INFO("harness: {}: {} cases with lights", names[kind], submitted);
+    results.Report();
+  }
+
+  // LightGroups::Draw: its recompiled side with --native_matrix_math off
+  // (Billboards::Draw's adapter and Record's wrap run the originals).
+  if (hooks::LightGroupsNative()) {
+    Results results("LightGroups::Draw (sub_82148658)");
+    for (int c = 0; c < 200; c++) {
+      World w = Draw(r, b);
+      const uint32_t groups = c % 10 == 0 ? 0 : 1 + r.Below(kMostGroups);
+      const uint64_t seed = r.Next();
+      const bool xpr = r.Below(6) != 0, animations = r.Below(4) != 0;
+      w.ring_index = 0;
+      w.ring_count = r.Below(4096 - kMostGroups * kMostGroupLights * 4);
+      std::vector<uint8_t> stack_fill(kStackBytes + 64);
+      for (uint8_t& byte : stack_fill) byte = uint8_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        const uint32_t stack = t.r1.u32;
+        Write(h.base, stack - kStackBytes, stack_fill.data(), kStackBytes + 64);
+        Build(h, w);
+        guest::StoreU32(h.base, kRingIndex, w.ring_index);
+        guest::StoreU32(h.base, kRingCount, w.ring_count);
+        BuildGroups(h, b, seed, groups);
+        t.r3.u64 = b + kSet;
+        t.r4.u64 = b + kGroups;
+        t.r5.u64 = xpr ? b + kXpr : 0;
+        t.r6.u64 = animations ? b + kAnimations : 0;
+        t.lr = 0x820F3D20;
+        if (v == 0) {
+          MatrixMathOff off;
+          __imp__sub_82148658(t, h.base);
+        } else {
+          hooks::LightGroupsDraw(t, h.base);
+        }
+        const uint32_t f = stack - kGroupsFrame;
+        Collect(h.base, w, t, {{f, kGroupsTemps, false}, {f - kDrawFrame, kDrawTemps, false}},
+                out[v]);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: groups {} xpr {} animations {} ring at {}", c, groups,
+                                xpr, animations, w.ring_count));
+    }
     results.Report();
   }
   memory::FreePages(b);
