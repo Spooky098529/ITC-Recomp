@@ -47,7 +47,8 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "the save devices' slot handlers WaitForUser sub_820A4870, WaitForDevice "
               "sub_820A5878, Failed sub_820A4890, Ready sub_820A58D8 and EnumerateStep "
               "sub_820A59C0, the listener delegate's target sub_820A4800 and the framework's "
-              "device list sub_820908D8 "
+              "device list sub_820908D8, XGetOverlappedResult sub_82295C98 and GetOverlappedResult "
+              "sub_82295F20 (their waits, never taken here, WaitForSingleObject through the guest) "
               "natively instead of through the "
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
@@ -576,6 +577,35 @@ void FrameworkDeviceListSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = si::FrameworkDeviceList(base, ctx.r3.u32);
 }
 
+save_interface::KernelCalls KernelCallsOf(PPCContext& ctx, uint8_t* base) {
+  si::KernelCalls kernel;
+  kernel.pcr = ctx.r13.u32;
+  kernel.wait = [&ctx, base](uint32_t handle, const si::CallSite& at) {
+    ctx.r3.u64 = handle;
+    ctx.r4.s64 = -1;
+    GuestCallAt(ctx, base, 0x822970A0, at);  // WaitForSingleObject
+    return ctx.r3.u32;
+  };
+  kernel.close = [&ctx, base](uint32_t handle, const si::CallSite& at) {
+    ctx.r3.u64 = handle;
+    GuestCallAt(ctx, base, 0x82294E20, at);  // CloseHandle
+  };
+  return kernel;
+}
+
+void XGetOverlappedResultSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t overlapped = ctx.r3.u32, result = ctx.r4.u32, wait = ctx.r5.u32;
+  ctx.r3.u64 = si::XGetOverlappedResult(base, overlapped, result, wait, Site(ctx), kernel);
+}
+
+void GetOverlappedResultSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t handle = ctx.r3.u32, overlapped = ctx.r4.u32, bytes = ctx.r5.u32,
+                 wait = ctx.r6.u32;
+  ctx.r3.u64 = si::GetOverlappedResult(base, handle, overlapped, bytes, wait, Site(ctx), kernel);
+}
+
 }  // namespace hooks
 
 // No adapter (removed 2026-10-28: in play only the request setters' plain
@@ -685,3 +715,7 @@ ITC_SAVE_INTERFACE_ADAPTER(820A58D8, SlotReadySteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A59C0, SlotEnumerateStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A4800, DevicesOnEventSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820908D8, FrameworkDeviceListSteps)
+// XGetOverlappedResult and GetOverlappedResult (from the save slots' waits;
+// their other callers Dropped or never in play).
+ITC_SAVE_INTERFACE_ADAPTER(82295C98, XGetOverlappedResultSteps)
+ITC_SAVE_INTERFACE_ADAPTER(82295F20, GetOverlappedResultSteps)

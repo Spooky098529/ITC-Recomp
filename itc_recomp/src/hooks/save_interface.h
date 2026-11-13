@@ -8,6 +8,7 @@
 #pragma once
 
 #include "guest.h"
+#include "save_interface/slot_handlers.h"
 
 namespace hooks {
 
@@ -128,5 +129,15 @@ void SlotEnumerateStepSteps(PPCContext& ctx, uint8_t* base);  // sub_820A59C0
 void DevicesOnEventSteps(PPCContext& ctx, uint8_t* base);
 // sub_820908D8, the framework's +56 interface's slot 1: r3 = the interface.
 void FrameworkDeviceListSteps(PPCContext& ctx, uint8_t* base);
+
+// sub_82295C98 XGetOverlappedResult: r3 = the overlapped, r4 = the result
+// (out), r5 = wait; sub_82295F20 GetOverlappedResult: r3 = a handle, r4 = the
+// overlapped, r5 = the bytes (out), r6 = wait. Their waits
+// (WaitForSingleObject sub_822970A0) guest calls from their frames.
+void XGetOverlappedResultSteps(PPCContext& ctx, uint8_t* base);
+void GetOverlappedResultSteps(PPCContext& ctx, uint8_t* base);
+// The kernel's guest calls (WaitForSingleObject, CloseHandle) for the plain
+// C++, through `ctx`.
+save_interface::KernelCalls KernelCallsOf(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

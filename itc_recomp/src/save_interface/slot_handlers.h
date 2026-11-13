@@ -76,4 +76,33 @@ void DevicesOnEvent(uint8_t* base, uint32_t devices, uint32_t loop, uint32_t eve
 // `object` - 20 (the word at object + 72).
 uint32_t FrameworkDeviceList(uint8_t* base, uint32_t object);
 
+// The kernel's calls the overlapped results and the close's wait make
+// through the guest (never in play: every overlapped here is done at once
+// and B4's steps make no handles). `pcr` is r13, for the thread's last
+// error (last_error.h).
+struct KernelCalls {
+  uint32_t pcr = 0;
+  // WaitForSingleObject (sub_822970A0, kept recompiled: the user's call,
+  // 2026-10-24) with r3 = `handle`, r4 = -1, at `at`; its r3.
+  std::function<uint32_t(uint32_t handle, const CallSite& at)> wait;
+  // CloseHandle (sub_82294E20) on `handle` at `at`.
+  std::function<void(uint32_t handle, const CallSite& at)> close;
+};
+
+// sub_82295C98 XGetOverlappedResult: `overlapped`, `result` (out, from +4;
+// 0 none), `wait`: while +0 is 997 (pending), with `wait` and an event
+// (+12) WaitForSingleObject on it (258 a timeout: 996; another nonzero
+// answer: GetLastError), without, 996. Else +4 into `result` and +0. A
+// 112-byte frame (r30, r31 saved).
+uint32_t XGetOverlappedResult(uint8_t* base, uint32_t overlapped, uint32_t result, uint32_t wait,
+                              const CallSite& at, const KernelCalls& kernel);
+// sub_82295F20 GetOverlappedResult: `handle`, `overlapped`, `bytes` (out),
+// `wait`: while +0 is 259 (STATUS_PENDING), with `wait` WaitForSingleObject
+// on the event (+16) or the handle (258: SetLastError(996) and 0; another
+// nonzero answer: 0), without, SetLastError(996) and 0. Else +4 into
+// `bytes` and 1, or for a failing status (negative) SetLastErrorFromStatus
+// and 0. A 112-byte frame (r30, r31 saved).
+uint32_t GetOverlappedResult(uint8_t* base, uint32_t handle, uint32_t overlapped, uint32_t bytes,
+                             uint32_t wait, const CallSite& at, const KernelCalls& kernel);
+
 }  // namespace save_interface

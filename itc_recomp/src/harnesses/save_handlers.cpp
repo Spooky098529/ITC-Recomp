@@ -18,6 +18,7 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "hooks/last_error.h"
 #include "hooks/save_interface.h"
 #include "save_interface/slot_handlers.h"
 
@@ -46,11 +47,14 @@ struct Layout {
   uint32_t loop_vtable;
   uint32_t event;
   uint32_t object;  // the framework's +56 interface
+  uint32_t overlapped;  // 28 bytes
+  uint32_t result;
 };
 
 Layout LayoutOf(const Context& h) {
   return Layout{h.data + 0x000, h.data + 0x100, h.data + 0x600, h.data + 0x880,
-                h.data + 0x900, h.data + 0x940, h.data + 0x980, h.data + 0x9C0};
+                h.data + 0x900, h.data + 0x940, h.data + 0x980, h.data + 0x9C0,
+                h.data + 0xA00, h.data + 0xA40};
 }
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t words, Random& random) {
@@ -119,6 +123,7 @@ void Run(Context& h, const Handler& handler) {
       t.r4.u64 = l.slot;
       handler.args(t, l);
       t.lr = 0x820A47D8;  // SaveDevices::Update's call
+      last_error::Set(h.base, t.r13.u32, uint32_t(random.Next()));
       after = random;
       ITC_FLAG(native_save_interface) = v == 1;
       (v == 0 ? handler.original : handler.native)(t, h.base);
@@ -128,6 +133,7 @@ void Run(Context& h, const Handler& handler) {
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(t.r1.u32 - stack);
+      out[v].Word(last_error::Get(h.base, t.r13.u32));
       for (int r = 27; r < 32; r++) {
         out[v].Word(uint32_t((&t.r14)[r - 14].u64));
         out[v].Word(uint32_t((&t.r14)[r - 14].u64 >> 32));
@@ -137,6 +143,15 @@ void Run(Context& h, const Handler& handler) {
     results.Check(out[0], out[1], fmt::format("case {}", c));
   }
   results.Report();
+}
+
+// An overlapped: its status (+0) one of the waits' cases, its information
+// (+4), its event (+12) and +16 0 (no wait is made: the waits aren't taken
+// in play, and a real one would block).
+void ShapeOverlapped(uint8_t* base, const Layout& l, Random& r) {
+  guest::StoreU32(base, l.overlapped, Pick(r, {0, 997, 259, 996, 2, 0xC0000034, uint32_t(r.Next())}));
+  guest::StoreU32(base, l.overlapped + 12, 0);
+  guest::StoreU32(base, l.overlapped + 16, 0);
 }
 
 void NoArgs(PPCContext&, const Layout&) {}
@@ -180,6 +195,27 @@ void SaveHandlers(Context& h) {
   Run(h, {"Framework::DeviceList (sub_820908D8)", 8, __imp__sub_820908D8,
           hooks::FrameworkDeviceListSteps, Shape,
           [](PPCContext& t, const Layout& l) { t.r3.u64 = l.object; }});
+  // The overlapped results: no wait, or a wait asked for without an event
+  // (XGetOverlappedResult only: GetOverlappedResult would wait on the
+  // handle). Their wait paths are never taken in play.
+  Run(h, {"XGetOverlappedResult (sub_82295C98)", 48, __imp__sub_82295C98,
+          hooks::XGetOverlappedResultSteps,
+          [](uint8_t* base, const Layout& l, Random& r) { ShapeOverlapped(base, l, r); },
+          [](PPCContext& t, const Layout& l) {
+            const uint32_t pick = uint32_t(t.r27.u64) % 4;
+            t.r3.u64 = l.overlapped;
+            t.r4.u64 = pick == 0 ? 0 : l.result;
+            t.r5.u64 = pick == 1 ? 1 : 0;
+          }});
+  Run(h, {"GetOverlappedResult (sub_82295F20)", 48, __imp__sub_82295F20,
+          hooks::GetOverlappedResultSteps,
+          [](uint8_t* base, const Layout& l, Random& r) { ShapeOverlapped(base, l, r); },
+          [](PPCContext& t, const Layout& l) {
+            t.r3.u64 = uint32_t(t.r28.u64);
+            t.r4.u64 = l.overlapped;
+            t.r5.u64 = l.result;
+            t.r6.u64 = 0;
+          }});
 }
 
 }  // namespace harness

@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "hooks/last_error.h"
 #include "save_interface/save_interface.h"
 #include "saves/slot_steps.h"
 
@@ -144,6 +145,68 @@ void DevicesOnEvent(uint8_t* base, uint32_t devices, uint32_t loop, uint32_t eve
 uint32_t FrameworkDeviceList(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_820908D8 Framework::DeviceList");
   return FrameworkUsers(base, object - 20);
+}
+
+uint32_t XGetOverlappedResult(uint8_t* base, uint32_t overlapped, uint32_t result, uint32_t wait,
+                              const CallSite& at, const KernelCalls& kernel) {
+  ITC_NATIVE_RUNNING("sub_82295C98 XGetOverlappedResult");
+  const uint32_t sp = WritePrologue(base, at, 112, 30);
+  if (Load(base, overlapped) == 997) {
+    uint32_t r3 = 258;
+    if (wait != 0) {
+      const uint32_t event = Load(base, overlapped + 12);
+      if (event != 0) {
+        CallSite site = at;
+        site.sp = sp;
+        site.lr = 0x82295CDC;
+        site.r30 = result;
+        site.r31 = overlapped;
+        r3 = kernel.wait(event, site);
+      }
+    }
+    if (r3 == 258) {
+      return 996;
+    }
+    if (r3 != 0) {
+      return last_error::Get(base, kernel.pcr);
+    }
+  }
+  if (result != 0) {
+    Store(base, result, Load(base, overlapped + 4));
+  }
+  return Load(base, overlapped);
+}
+
+uint32_t GetOverlappedResult(uint8_t* base, uint32_t handle, uint32_t overlapped, uint32_t bytes,
+                             uint32_t wait, const CallSite& at, const KernelCalls& kernel) {
+  ITC_NATIVE_RUNNING("sub_82295F20 GetOverlappedResult");
+  const uint32_t sp = WritePrologue(base, at, 112, 30);
+  if (Load(base, overlapped) == 259) {
+    uint32_t r3 = 258;
+    if (wait != 0) {
+      const uint32_t event = Load(base, overlapped + 16);
+      CallSite site = at;
+      site.sp = sp;
+      site.lr = 0x82295F68;
+      site.r30 = bytes;
+      site.r31 = overlapped;
+      r3 = kernel.wait(event != 0 ? event : handle, site);
+    }
+    if (r3 == 258) {
+      last_error::Set(base, kernel.pcr, 996);
+      return 0;
+    }
+    if (r3 != 0) {
+      return 0;
+    }
+  }
+  Store(base, bytes, Load(base, overlapped + 4));
+  const uint32_t status = Load(base, overlapped);
+  if (int32_t(status) < 0) {
+    last_error::SetFromStatus(base, kernel.pcr, status);
+    return 0;
+  }
+  return 1;
 }
 
 }  // namespace save_interface
