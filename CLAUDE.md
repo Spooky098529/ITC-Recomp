@@ -658,7 +658,8 @@ native (ours 5,402 -> 5,445); its first validation halted on
 list's 5, fixed f691a91e by the user's call). It stopped at its limit.
 The rest waits on the tuning screen's update `sub_821E6C50`,
 `Garage::Sell` and the leads in `docs/loops/leads.md`.
-Its forty-fourth run (`b7-loop-11-11-26`, 2026-11-11, not yet merged;
+Its forty-fourth run (`b7-loop-11-11-26`, 2026-11-11, merged into
+`rexglue-removal-project` with the forty-fifth, 2026-11-13;
 summary `docs/loops/b7-loop-2026-11-11-0838.md`; limit 5, ended by the
 user during its third subsystem) made the tuning screen's update
 (`tuning-screen.md`, under `--native_tuning_screen`, with 40 of its 61
@@ -673,7 +674,7 @@ race never ran) (ours 5,445 -> 5,612, counting the theater's rows).
 The rest waits on the theater's check, the type 9 mode, the sticker
 and vinyl editors and the leads in `docs/loops/leads.md`.
 Its forty-fifth run (`b7-loop-11-11-26` again, the user's call,
-2026-11-12 to 13, not yet merged; summary
+2026-11-12 to 13, merged into `rexglue-removal-project` 2026-11-13; summary
 `docs/loops/b7-loop-2026-11-12-0826.md`; limit 5, raised to 10 by the
 user) checked the replay theater (on by default) and made ten
 subsystems native: the type 9 mode (`todays-result.md`,
