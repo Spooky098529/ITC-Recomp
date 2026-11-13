@@ -37,6 +37,25 @@ cleanup leads: a race that ends, a car list with the power graph;
 - `sub_82290788` Achievements::Check
 - `sub_82104F68` Replay::Keep
 
+Not in the attract race or the replay (`itc_5244`, `itc_5245`, ok; the
+morph jobs: a race with morphed wheels, `morph-jobs.md`):
+
+- `sub_820AC7F0` PoolMaker2::MakeMorphJob
+- `sub_820ACC08` MorphJob::MorphJob
+- `sub_820ACB90` MorphJob::~MorphJob
+- `sub_820AC9B8` MorphJob::Wait
+- `sub_820AC9D0` MorphJob::IsReleased
+- `sub_820AC9D8` MorphJob::SetReleased
+- `sub_820AC998` MorphJob::Run
+- `sub_820AC9C0` MorphJob::RunThunk
+- `sub_820AC8A0` PoolMaker::MakeSkinJob
+- `sub_820ACAA8` SkinJob::SkinJob
+- `sub_820AC9E8` Job::~Job
+- `sub_82090E08` WorkItem::Skip
+- `sub_82090E40` WorkItem::~WorkItem
+- `sub_82090E38` (the work item's +4 interface, slot 0)
+- `sub_82090DC8` (the work item's +4 interface, slot 1)
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

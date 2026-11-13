@@ -2885,6 +2885,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The power graph screen (the machine the type 6 and 7 modes share: its handlers, pages, steps, texts and the members' slots) | `power-graph-screen.md` | 22 of 22 | `--native_power_graph_screen` |
 | 2026-11-13 | The achievements check after a race (`Achievements::Check`, `Write`; `XUserWriteAchievements` kept as a guest call, the user's call) | `achievements.md` | 5 of 5 | `--native_achievements` |
 | 2026-11-13 | The frame driver and the app's scene (the game's object that drives each frame across its render thread, renamed from "renderer" by the user's call; the scene's update, draw and constructor; the game's threads) | `frame-driver.md` | 19 ours of 25 in play (`Present` and the `Event::`-blocked three stay) | `--native_frame_driver` |
+| 2026-11-13 | The cleanup leads `RaceStates::OnRaceEnd` (with the course record and `Time::Add`) and `DrawEntryPowerGraph`'s r31 (no mapping, not counted) | `race-states.md`, `power-graph.md` | 9 new ours, 5 adapters removed | (`--native_race_states`) |
+| 2026-11-13 | The morph jobs (the 224-byte job the second worker pool runs for `Model::MorphShape`, the wheels' morphs) and the shared work item | `morph-jobs.md` | 21 of 21 (and `Morph::Blend` Native) | `--native_morph_jobs` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5446,3 +5448,15 @@ boundary: 449 functions (916 pairs): overridden 110, Native 40,
 Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
 live caller. B7 (`b7_status.py`): ours 5,989, work left 718 (Wrapped
 51, with a row 361, no row yet 306), from 739.
+
+**2026-11-13, the morph jobs (branch `b7-loop-13-11-26`, the
+forty-sixth run, its first subsystem, after the cleanup leads
+`RaceStates::OnRaceEnd` and `DrawEntryPowerGraph`):** `morph-jobs.md`
+(21 rows, `src/morph_jobs/`): the 224-byte job `Model::MorphShape`
+builds through the second pool maker's slot 1 and the 36-byte work
+item every pool job holds; the post to the worker pool stays a guest
+call (the `DebugText` precedent), and the pools themselves wait on the
+core's sync. The boundary: 449 functions (916 pairs): overridden 110,
+Native 40, Dropped 26, never called 68, live 205. Imports: 186 called,
+49 with a live caller. B7 (`b7_status.py`): ours 6,019, work left 703
+(Wrapped 51, with a row 360, no row yet 292), from 718.

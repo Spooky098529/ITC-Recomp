@@ -40,9 +40,20 @@ file's history. What's left to see in a drive, from every run:
   `Model::MorphShape` calls the maker's plain C++; `Morph::Blend`'s
   adapter removed; 19 adapters kept (vtable slots); two harness faults
   fixed on the way (r3's high word); every harness 0 differing, race
-  33 s at 40, 0 errors; no subagents. Validation agent running.
+  33 s at 40, 0 errors; no subagents. Validated: `itc_5244` (race
+  50 s at 180, 0 errors, every harness 0 differing outside the
+  expected groups), 22 of 22 harness lines, 3 prints added (3123f921);
+  the work item's slots and `Morph::Blend` ran in the race, none in
+  the replay `itc_5245` (ok): 15 to drive. Recorded; subsystem 1
+  done.
+- Subsystem 2 of 10: the save devices' constructor (`sub_820A6160`,
+  `sub_820A4560`, run at boot, ready); its line deleted from
+  `leads.md`. Mapping agent running.
 
 ## Done
+
+- The morph jobs: `morph-jobs.md` 21 of 21 ours,
+  `--native_morph_jobs`, 752011b3..3123f921; validated.
 
 - Cleanup leads (no mapping): `RaceStates::OnRaceEnd` with the course
   record (`race-states.md`), `DrawEntryPowerGraph`'s r31
@@ -69,5 +80,7 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
   known 360, unknown 306).
 - After the morph jobs' map: ours 5998, work left 717 (wrapped 51,
   known 374, unknown 292).
+- After the morph jobs: ours 6019, work left 703 (wrapped 51, known
+  360, unknown 292).
 
 ## Stopped
