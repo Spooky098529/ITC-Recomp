@@ -82,4 +82,22 @@ void PanelScreenOnLeft(PPCContext& ctx, uint8_t* base);
 void Type7PanelScreenDraw(PPCContext& ctx, uint8_t* base);
 void Type7PanelScreenPickCar(PPCContext& ctx, uint8_t* base);
 
+// The node tables.
+void NodeTableDestruct(PPCContext& ctx, uint8_t* base);
+void NodeTableDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void NodeTableSetPairs(PPCContext& ctx, uint8_t* base);
+void PairedNodeTableSavePairs(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableClear(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableSet(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableSavePairs(PPCContext& ctx, uint8_t* base);
+void NodeTableShow(PPCContext& ctx, uint8_t* base);
+void NodeTableShowNode(PPCContext& ctx, uint8_t* base);
+void NodeTableSetMarks(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableSetColors(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableClearColors(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableMarkSelected(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableRefresh(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableReset(PPCContext& ctx, uint8_t* base);
+void PairedNodeTableRefresh(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

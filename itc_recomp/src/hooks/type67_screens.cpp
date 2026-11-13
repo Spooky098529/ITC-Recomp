@@ -8,7 +8,9 @@
 
 #include "base/flags.h"
 #include "hooks/heap.h"
+#include "hooks/strings_and_font.h"
 #include "hooks/type67_modes.h"
+#include "ui_movies/game.h"
 
 ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "Run the type 6 and 7 modes' list, panel and node screens "
@@ -37,7 +39,15 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "(UiMovie::ResetPose, FinishAll and Run guest calls to their overrides); their "
               "vtable calls to the plain C++ where a slot holds one, else guest calls (the car "
               "list's); UiMovies::Open and Delete natively where their adapters would, "
-              "MenuList::Release's plain C++ over the allocation layer) natively instead of "
+              "MenuList::Release's plain C++ over the allocation layer; the node tables' "
+              "NodeTable::~NodeTable sub_82247DC0, DeletingDestructor sub_82247E88 (operator "
+              "delete a guest call), SetPairs sub_82247CB8, Show sub_82248300, ShowNode "
+              "sub_82247ED0 and SetMarks sub_822480F0, PairedNodeTable::SavePairs sub_82247CE0 and "
+              "Refresh sub_82248800, ColorNodeTable::Clear sub_82247DD0, Set sub_82247E00, "
+              "SavePairs sub_82247E50, Reset sub_82248650 (UiMovie::SetText's plain C++ where the "
+              "text setters are native), Refresh sub_822483B0, MarkSelected sub_822487B8, "
+              "SetColors sub_82248198 and ClearColors sub_82248260, UiMovie::FinishNamed, "
+              "PlayNamed and LoopNamed guest calls) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -50,6 +60,30 @@ ts::Calls Type67ScreensCalls(PPCContext& ctx, uint8_t* base) {
   static_cast<type67_modes::Calls&>(calls) = Type67Calls(ctx, base);
   calls.native_heap = NativeHeapActive();
   calls.set_r4 = [&ctx](uint64_t r4) { ctx.r4.u64 = r4; };
+  const auto call_set = calls.call_set;
+  calls.set_text = [&ctx, base, call_set](uint32_t frame, uint32_t lr, uint32_t movie,
+                                          uint32_t sub_scene, uint32_t child,
+                                          uint32_t id) -> uint64_t {
+    if (Type67TextsNative(base)) {
+      static constexpr uint64_t kNoArguments[4] = {0, 0, 0, 0};
+      const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+      ctx.fpscr.disableFlushMode();
+      std::optional<uint32_t> r3;
+      {
+        FormatGuestCalls format(ctx, base);
+        r3 = ui_movies::SetText(base, format.get(), frame, movie, sub_scene, child, id,
+                                kNoArguments);
+      }
+      ctx.r1.u64 = stack;
+      ctx.lr = link;
+      if (r3) return *r3;
+    }
+    // The original (through its adapter) with r7 to r10 0.
+    ctx.r9.u64 = 0;
+    ctx.r10.u64 = 0;
+    const uint64_t args[6] = {movie, sub_scene, child, id, 0, 0};
+    return call_set(0x8211C1F8, args, 6, frame, lr);
+  };
   return calls;
 }
 
@@ -136,6 +170,32 @@ ITC_TS_STEP(Type7PanelScreenPickCar,
             ts::Type7PanelScreenPickCar(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7PanelScreenDraw,
             ts::Type7PanelScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+
+ITC_TS_STEP(NodeTableDestruct, ts::NodeTableDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(NodeTableDeletingDestruct,
+            ts::NodeTableDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeTableSetPairs, ts::NodeTableSetPairs(base, ctx.r3.u64, ctx.r4.u32))
+ITC_TS_STEP(PairedNodeTableSavePairs, ts::PairedNodeTableSavePairs(base, ctx.r3.u64))
+ITC_TS_STEP(ColorNodeTableClear, ts::ColorNodeTableClear(base, ctx.r3.u64))
+ITC_TS_STEP(ColorNodeTableSet, ts::ColorNodeTableSet(base, ctx.r3.u64, ctx.r4.u32))
+ITC_TS_STEP(ColorNodeTableSavePairs, ts::ColorNodeTableSavePairs(base, ctx.r3.u64))
+ITC_TS_STEP(NodeTableShow,
+            ts::NodeTableShow(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+ITC_TS_STEP(NodeTableShowNode, ts::NodeTableShowNode(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r6.u32, ctx.r1.u32))
+ITC_TS_STEP(NodeTableSetMarks,
+            ts::NodeTableSetMarks(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+ITC_TS_STEP(ColorNodeTableSetColors,
+            ts::ColorNodeTableSetColors(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+ITC_TS_STEP(ColorNodeTableClearColors,
+            ts::ColorNodeTableClearColors(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32))
+ITC_TS_STEP(ColorNodeTableMarkSelected,
+            ts::ColorNodeTableMarkSelected(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32))
+ITC_TS_STEP(ColorNodeTableRefresh,
+            ts::ColorNodeTableRefresh(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorNodeTableReset, ts::ColorNodeTableReset(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PairedNodeTableRefresh,
+            ts::PairedNodeTableRefresh(base, ctx.r3.u64, ctx.r1.u32, calls))
 
 #undef ITC_TS_STEP
 
@@ -225,3 +285,22 @@ ITC_TYPE67_SCREENS(82248DF8, PanelScreenOnMessage24)
 ITC_TYPE67_SCREENS(82249E38, PanelScreenLeave)
 ITC_TYPE67_SCREENS(82248B08, PanelScreenOnLeft)
 ITC_TYPE67_SCREENS(82240958, Type7PanelScreenDraw)
+// The node tables (from the list and node screens' functions, recompiled
+// where not yet native, and slots 0 and 1 of their vtables; never seen in
+// play).
+ITC_TYPE67_SCREENS(82247DC0, NodeTableDestruct)
+ITC_TYPE67_SCREENS(82247E88, NodeTableDeletingDestruct)
+ITC_TYPE67_SCREENS(82247CB8, NodeTableSetPairs)
+ITC_TYPE67_SCREENS(82247CE0, PairedNodeTableSavePairs)
+ITC_TYPE67_SCREENS(82247DD0, ColorNodeTableClear)
+ITC_TYPE67_SCREENS(82247E00, ColorNodeTableSet)
+ITC_TYPE67_SCREENS(82247E50, ColorNodeTableSavePairs)
+ITC_TYPE67_SCREENS(82248300, NodeTableShow)
+ITC_TYPE67_SCREENS(82247ED0, NodeTableShowNode)
+ITC_TYPE67_SCREENS(822480F0, NodeTableSetMarks)
+ITC_TYPE67_SCREENS(82248198, ColorNodeTableSetColors)
+ITC_TYPE67_SCREENS(82248260, ColorNodeTableClearColors)
+ITC_TYPE67_SCREENS(822487B8, ColorNodeTableMarkSelected)
+ITC_TYPE67_SCREENS(822483B0, ColorNodeTableRefresh)
+ITC_TYPE67_SCREENS(82248650, ColorNodeTableReset)
+ITC_TYPE67_SCREENS(82248800, PairedNodeTableRefresh)

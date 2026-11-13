@@ -35,6 +35,14 @@ namespace type67_screens {
 struct Calls : type67_modes::Calls {
   bool native_heap = false;
   std::function<void(uint64_t r4)> set_r4;
+  // UiMovie::SetText(movie, sub_scene, child, id) with r7 to r10 0 (the
+  // user's call for its unset varargs, 2026-10-30) from the frame at `frame`
+  // (its varargs stored in that frame's +48 to +79) returning to `lr`: its
+  // plain C++ while the UI movies' text setters are native and it doesn't
+  // decline, else a guest call. Its r3.
+  std::function<uint64_t(uint32_t frame, uint32_t lr, uint32_t movie, uint32_t sub_scene,
+                         uint32_t child, uint32_t id)>
+      set_text;
 };
 
 // The guest functions called: UiMovie::ResetPose, FinishAll and Run, and
@@ -295,5 +303,75 @@ uint64_t Type7PanelScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
 // call's r3.
 uint64_t Type7PanelScreenPickCar(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                                  const Calls& calls);
+
+// --- The node tables (node_tables.cpp): the list and node screens' tables
+// of their items' nodes in a UI movie (the table's +4 the movie's id, +8 and
+// +12 the node sets, +16 + 4i item i's named animation, +156 + 4i its node,
+// +296 to +308 the four children, +312 + 4i its marks, +420 and +424 extra
+// nodes, +428 to +476 the pairs (now, before), +480 and +516 the color
+// pairs' animations, +552 and +568 two colors). The functions that call
+// none of the UI movie functions leave r3; the others leave the r3 of the
+// last call the original makes (UiMovies::Find's address when nothing
+// else ran). UiMovies::Find, FindNode, ShowNode, HideNode and Child by
+// their plain C++; FinishNamed, PlayNamed and LoopNamed guest calls from
+// the original's frame with its return addresses; SetText through
+// Calls::set_text. Each takes the r1 the original is entered with. ---
+
+// The base's vtable (NodeTable::~NodeTable and the deleting destructor
+// store it).
+constexpr uint32_t kNodeTableVtable = 0x82010FF0;
+
+// sub_82247DC0 NodeTable::~NodeTable: +0 = the base's vtable.
+uint64_t NodeTableDestruct(uint8_t* base, uint64_t r3);
+// sub_82247E88 NodeTable::DeletingDestructor (slot 0 of the three
+// vtables; 96-byte frame): +0 = the base's vtable, operator delete (a guest
+// call) when bit 0 of `flags` is set. r3 the table.
+uint64_t NodeTableDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                   const Calls& calls);
+// sub_82247CB8 NodeTable::SetPairs: +428, +436, +444, +452 = the 16-byte
+// info's +4, +8, +0, +12.
+uint64_t NodeTableSetPairs(uint8_t* base, uint64_t r3, uint32_t info);
+// sub_82247CE0 PairedNodeTable::SavePairs: +432, +440, +448, +456 = +428,
+// +436, +444, +452.
+uint64_t PairedNodeTableSavePairs(uint8_t* base, uint64_t r3);
+// sub_82247DD0 ColorNodeTable::Clear: the pairs 0 now and -1 before, +476
+// -1.
+uint64_t ColorNodeTableClear(uint8_t* base, uint64_t r3);
+// sub_82247E00 ColorNodeTable::Set: from the 28-byte info at `info`.
+uint64_t ColorNodeTableSet(uint8_t* base, uint64_t r3, uint32_t info);
+// sub_82247E50 ColorNodeTable::SavePairs: the six pairs' previous values.
+uint64_t ColorNodeTableSavePairs(uint8_t* base, uint64_t r3);
+// sub_82248300 NodeTable::Show (128-byte frame): item `item`'s node (and
+// +420's) shown or hidden.
+uint64_t NodeTableShow(uint8_t* base, uint64_t r3, uint32_t item, uint32_t on, uint32_t sp);
+// sub_82247ED0 NodeTable::ShowNode (160): as Show, and when on the four
+// children's +80 = the bits of `mask`.
+uint64_t NodeTableShowNode(uint8_t* base, uint64_t r3, uint32_t item, uint32_t on, uint32_t mask,
+                           uint32_t sp);
+// sub_822480F0 NodeTable::SetMarks (144): the four children's +80 = the
+// bits of `mask`.
+uint64_t NodeTableSetMarks(uint8_t* base, uint64_t r3, uint32_t item, uint32_t mask, uint32_t sp);
+// sub_82248198 ColorNodeTable::SetColors (144) and sub_82248260
+// ClearColors (128): the four children's colors.
+uint64_t ColorNodeTableSetColors(uint8_t* base, uint64_t r3, uint32_t item, uint32_t k,
+                                 uint32_t sp);
+uint64_t ColorNodeTableClearColors(uint8_t* base, uint64_t r3, uint32_t item, uint32_t sp);
+// sub_822487B8 ColorNodeTable::MarkSelected (no frame: a tail call of
+// SetMarks from `sp`): +428's marks by `which` (0: bit +460, 1: bit +468,
+// else the item's own mask).
+uint64_t ColorNodeTableMarkSelected(uint8_t* base, uint64_t r3, uint32_t which, uint32_t sp);
+// sub_822483B0 ColorNodeTable::Refresh (128): the old and new items, the
+// color pair, +424's four nodes; `finish` finishes the played animations
+// again.
+uint64_t ColorNodeTableRefresh(uint8_t* base, uint64_t r3, uint32_t finish, uint32_t sp,
+                               const Calls& calls);
+// sub_82248650 ColorNodeTable::Reset (slot 1 of 0x82011000; 128): every
+// item hidden, marked and uncolored, +264's eight nodes hidden, Refresh(1),
+// the pairs saved, +424's four texts (strings 402, 401, 407, 408) set and
+// their nodes hidden.
+uint64_t ColorNodeTableReset(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82248800 PairedNodeTable::Refresh (128): the pairs' old items shown
+// off, the new ones shown with their animations replayed.
+uint64_t PairedNodeTableRefresh(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
 }  // namespace type67_screens
