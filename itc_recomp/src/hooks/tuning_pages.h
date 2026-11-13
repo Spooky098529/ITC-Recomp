@@ -145,4 +145,17 @@ void TuningPagesFillPartRowsLeft(PPCContext& ctx, uint8_t* base);
 void TuningPagesOnDialogYes(PPCContext& ctx, uint8_t* base);
 void TuningPagesOnStickerDialogYes(PPCContext& ctx, uint8_t* base);
 
+// The vinyl editor's loads: DecalImages::OnLoaded sub_821FE608 (r3 a
+// handle, r6 an entry), Reload sub_821FE960 (r4 an id, r5 an entry),
+// LoadWindow sub_821FEAF0 (r4 the first id, r5 the first entry, r6 the
+// count, r7 the list), Scroll sub_821FED30 (r4 the direction, r5 the first
+// entry, r6 the count, r7 the id) and FreeKept sub_821FE740 (r4 a kept
+// texture; Texture::Free by car_models' plain C++ with --native_car_models
+// and the native heap); r3 the images.
+void TuningPagesOnImageLoaded(PPCContext& ctx, uint8_t* base);
+void TuningPagesReloadImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesLoadWindow(PPCContext& ctx, uint8_t* base);
+void TuningPagesScrollImages(PPCContext& ctx, uint8_t* base);
+void TuningPagesFreeKept(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

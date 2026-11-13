@@ -237,6 +237,40 @@ uint64_t LoadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t
 uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp);
 
+// Texture::Free for FreeTexture's and FreeKept's tail calls from `frame`
+// returning to `lr`: car_models' plain C++ with `native_free` (the native
+// heap and --native_car_models) where TextureFreeable, else the guest's.
+TextureFreeFn GuestTextureFree(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t frame,
+                               uint32_t lr, bool native_free);
+// sub_821FE608 DecalImages::OnLoaded: the archive's callback, r3 = a
+// finished request's handle, r6 = the entry e: when the handle is e+4's,
+// e+8 = 2 (loaded) and e+20 = 1 (a texture to make). Leaf.
+void OnImageLoaded(uint8_t* base, uint32_t handle, uint32_t e);
+// sub_821FE960 DecalImages::Reload: Request's id swap, then with no state
+// check and no new pages the file into the entry's buffer +12
+// (Archive::Load into +4), +8 = +24 = 1, +16 the size, +20 = 0. 96-byte
+// frame; r3 AssetSize's.
+uint64_t ReloadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                     uint64_t id, uint64_t i, uint32_t sp);
+// sub_821FEAF0 DecalImages::LoadWindow: Reload for n entries from i with the
+// ids from `first` moved into the list `list` (0 163 to 167, 1 189 to 382, 2
+// 383 to 581; 3 or more nothing; its row). 144-byte frame; r3 the last
+// Reload's, else `images`.
+uint64_t LoadWindow(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                    uint64_t first, uint64_t i, uint64_t n, uint64_t list, uint32_t sp);
+// sub_821FED30 DecalImages::Scroll: direction 1 (FreeTexture(i), entries i
+// to i + n - 2 take the next one's texture, Reload into i + n - 1) or 0 (the
+// other way, Reload into i); other directions nothing. 128-byte frame; r3
+// Reload's, else `images`. `native_free` as GuestTextureFree's.
+uint64_t ScrollImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+                      uint64_t direction, uint64_t i, uint64_t n, uint64_t id, uint32_t sp,
+                      bool native_free);
+// sub_821FE740 DecalImages::FreeKept: the kept texture k (images + 7236 +
+// 8k) freed (the tail call Texture::Free(kept, kept + 4)) unless an entry's
+// +28 holds its header; then r3 = the kept word's address (64 bits). No
+// frame; the kept words aren't cleared.
+uint64_t FreeKept(uint8_t* base, uint64_t images, uint64_t k, const TextureFreeFn& free);
+
 // --- The input pages and the list menu's step (pages.cpp) ---
 // Guest calls through `call` from the originals' frames with their return
 // addresses: Menu::Step, MenuSound::Play, UiMovie::Finish, Play and Loop

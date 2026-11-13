@@ -95,7 +95,11 @@ ITC_FLAG_BOOL(native_tuning_pages, true, "ITC",
               "state 6's page InputTypes sub_821D74A0 with its movie side MoveType "
               "sub_821D32C8 (no adapter: only InputTypes calls it; IsItemAvailable, IsPickOwned, GetPrice, PageItemCount, PageCursor, "
               "GetCurrentChoice and the UI movies' FindNode and Child by their plain C++; "
-              "Menu::Step, MenuSound::Play and the UI movie calls through their overrides)) "
+              "Menu::Step, MenuSound::Play and the UI movie calls through their overrides); "
+              "the vinyl editor's loads DecalImages::OnLoaded sub_821FE608, Reload sub_821FE960, "
+              "LoadWindow sub_821FEAF0, Scroll sub_821FED30 and FreeKept sub_821FE740 "
+              "(Archive::Load through its override, Texture::Free by its plain C++ with "
+              "--native_car_models and the native heap)) "
               "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=tuning_pages)");
@@ -512,6 +516,48 @@ void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void TuningPagesOnImageLoaded(PPCContext& ctx, uint8_t* base) {
+  tp::OnImageLoaded(base, ctx.r3.u32, ctx.r6.u32);
+}
+
+void TuningPagesReloadImage(PPCContext& ctx, uint8_t* base) {
+  const uint64_t images = ctx.r3.u64, id = ctx.r4.u64, i = ctx.r5.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::ReloadImage(base, call, images, id, i, sp);
+  });
+}
+
+void TuningPagesLoadWindow(PPCContext& ctx, uint8_t* base) {
+  const uint64_t images = ctx.r3.u64, first = ctx.r4.u64, i = ctx.r5.u64, n = ctx.r6.u64,
+                 list = ctx.r7.u64;
+  const uint32_t sp = ctx.r1.u32;
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::LoadWindow(base, call, images, first, i, n, list, sp);
+  });
+}
+
+void TuningPagesScrollImages(PPCContext& ctx, uint8_t* base) {
+  const uint64_t images = ctx.r3.u64, direction = ctx.r4.u64, i = ctx.r5.u64, n = ctx.r6.u64,
+                 id = ctx.r7.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_free = ITC_FLAG(native_car_models) && NativeHeapActive();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    return tp::ScrollImages(base, call, images, direction, i, n, id, sp, native_free);
+  });
+}
+
+void TuningPagesFreeKept(PPCContext& ctx, uint8_t* base) {
+  const uint64_t images = ctx.r3.u64, k = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_free = ITC_FLAG(native_car_models) && NativeHeapActive();
+  WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
+    // The tail call runs from the caller's frame, returning to its caller.
+    return tp::FreeKept(base, images, k,
+                        tp::GuestTextureFree(base, call, sp, uint32_t(ctx.lr), native_free));
+  });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -552,6 +598,12 @@ ITC_TUNING_PAGES(821E25B0, TuningPagesLeave)
 ITC_TUNING_PAGES(821F6688, TuningPagesInputWheels)
 ITC_TUNING_PAGES(821D6E20, TuningPagesInputLevels)
 ITC_TUNING_PAGES(821D74A0, TuningPagesInputTypes)
+
+ITC_TUNING_PAGES(821FE608, TuningPagesOnImageLoaded)
+ITC_TUNING_PAGES(821FE960, TuningPagesReloadImage)
+ITC_TUNING_PAGES(821FEAF0, TuningPagesLoadWindow)
+ITC_TUNING_PAGES(821FED30, TuningPagesScrollImages)
+ITC_TUNING_PAGES(821FE740, TuningPagesFreeKept)
 
 // No adapters (removed, B7 loop, 2026-11-07: their only caller in play,
 // EnterEditor, is native and calls their plain C++; the register steps above
