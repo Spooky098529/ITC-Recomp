@@ -33,11 +33,11 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "and the models' vtable slot 0 guest calls), ModelList::Load "
               "sub_82148428 and ModelList::LoadPoints sub_82148528 (no adapters: only "
               "CourseSet::Parse's plain C++ calls them, src/course_scenery/), SceneryModel::ResetDrawState "
-              "sub_82146AA8, AnimationSet::CurrentFrame sub_82146B80, ModelList::IsBEntryOn "
+              "sub_82146AA8 (no adapter), AnimationSet::CurrentFrame sub_82146B80, ModelList::IsBEntryOn "
               "sub_82147850 and ModelList::IsCEntryOn sub_82147958 (with sub_82147A20) (no adapters: "
               "Scenery::DrawSetLists' plain C++ calls them, src/course_scenery/), "
               "Race::CourseLayout sub_8228F408 (with sub_8228F484), PointList::IsEntryOn "
-              "sub_82147B18, PassDescription::SetBillboardPass sub_82148650 (with sub_8209BD40), "
+              "sub_82147B18, PassDescription::SetBillboardPass sub_82148650 (with sub_8209BD40; no adapter), "
               "VertexDeclarations::ForDepth sub_82589970 (no adapter: only RecordShapeDepth's plain "
               "C++ calls it), Model::IsShapeVisible sub_825951E0, "
               "Recorder::RecordObject sub_825953D0 (inside its interpolation wrapper, "
@@ -46,8 +46,8 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "sub_82589B58, no adapters: only it calls them), Model::RecordShapeDepth "
               "sub_825960D0, Model::DrawShapeDepth sub_82596D48 (no adapter; RecordObject with the "
               "interpolation's hooks; the render queue's slot 4 a guest call), "
-              "SceneryModel::RecordShape sub_82146BD0, SceneryModel::DrawShape sub_82147D88 and "
-              "Model::DrawShape sub_82596B18 (with Model::RecordShape sub_82595550's plain C++; "
+              "SceneryModel::RecordShape sub_82146BD0, SceneryModel::DrawShape sub_82147D88 (no adapter) and "
+              "Model::DrawShape sub_82596B18 (no adapter; with Model::RecordShape sub_82595550's plain C++; "
               "that one's adapter under --native_models) "
               "(the model's slot 1, the texture provider's slots 5 and 6 and the render "
               "queue's slot 4 guest calls; the material animation, never seen in play, the "
@@ -591,13 +591,17 @@ void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_SCENERY_LISTS(82147FB8, SceneryListsModelListRelease)
-ITC_SCENERY_LISTS(82146AA8, SceneryListsResetDrawState)
+// SceneryModel::ResetDrawState (sub_82146AA8), PassDescription::
+// SetBillboardPass (sub_82148650), SceneryModel::DrawShape (sub_82147D88)
+// and Model::DrawShape (sub_82596B18) have no adapters (removed 2026-11-13,
+// B7 loop): their callers in play (Scenery::Draw, DrawArea, DrawSetLists,
+// Minimap::Draw, PointList::Draw, Floor::Draw) call their plain C++; their
+// register steps stay as the harness's.
 ITC_SCENERY_LISTS(82146B80, SceneryListsAnimationCurrentFrame)
 ITC_SCENERY_LISTS(8228F408, SceneryListsCourseLayout)
 // PointList::IsEntryOn (sub_82147B18) has no adapter (removed 2026-11-13, B7
 // loop): its callers in play, Scenery::DrawSetLists and Minimap::Draw, call
 // its plain C++.
-ITC_SCENERY_LISTS(82148650, SceneryListsSetBillboardPass)
 ITC_SCENERY_LISTS(825951E0, SceneryListsIsShapeVisible)
 ITC_SCENERY_LISTS(82595490, SceneryListsRecordSceneLights)
 ITC_SCENERY_LISTS(825960D0, SceneryListsRecordShapeDepth)
@@ -605,9 +609,7 @@ ITC_SCENERY_LISTS(825960D0, SceneryListsRecordShapeDepth)
 // loop): its callers in play (the car draw's, Scenery::DrawArea) call its
 // plain C++; SceneryListsDrawShapeDepth stays as the harness's steps.
 ITC_SCENERY_LISTS(82146BD0, SceneryListsRecordShape)
-ITC_SCENERY_LISTS(82147D88, SceneryListsDrawShape)
 ITC_SCENERY_LISTS(82148058, SceneryListsPointListDraw)
-ITC_SCENERY_LISTS(82596B18, SceneryListsModelDrawShape)
 ITC_SCENERY_LISTS(82594328, SceneryListsTextureProviderClearAll)
 ITC_SCENERY_LISTS(82594718, SceneryListsTextureProviderSet)
 

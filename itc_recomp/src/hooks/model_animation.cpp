@@ -21,7 +21,7 @@
 
 ITC_FLAG_BOOL(native_model_animation, true, "ITC",
               "Run the model animation (docs/functions/model-animation.md: Model::Animate, "
-              "sub_82594B60; the track sets' constructor, release and set-ups, sub_825A1B70, "
+              "sub_82594B60 (no adapter); the track sets' constructor, release and set-ups, sub_825A1B70, "
               "sub_825A11D0, sub_825A1BA8, sub_825A1E08, sub_825A1BE8, sub_825A1218 and "
               "sub_825A1A38; their accessors, sampling and stepping, from sub_825A6670 to "
               "sub_825A10A8; the skeleton's constructors, destructors and frees, sub_82599758, "
@@ -50,12 +50,9 @@ bool NativeLifetime() {
     return;                                   \
   }
 
-// Model::Animate: r3 = the model; r3 comes back as the original leaves it.
-extern "C" REX_FUNC(sub_82594B60) {
-  ITC_MODEL_ANIMATION_FALLBACK(82594B60)
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ModelAnimate(base, ctx.r3.u32);
-}
+// Model::Animate (sub_82594B60) has no adapter (removed 2026-11-13, B7
+// loop): its only caller in play, Scenery::Draw, calls its plain C++ under
+// this file's flag.
 
 // TrackSet::TrackSet: r3 = the set, returned.
 extern "C" REX_FUNC(sub_825A1B70) {

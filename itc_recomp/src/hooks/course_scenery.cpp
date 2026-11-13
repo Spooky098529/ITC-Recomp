@@ -82,14 +82,14 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "Scenery::CollectAreas sub_820F3098 (no adapter), Scenery::CollectModels sub_820F32D0 (no adapter), "
               "Scenery::Update sub_820F4558 (CameraPass::FromViewport's plain C++, CameraPass::Update "
               "a guest call), "
-              "Scenery::DrawSetLists sub_820F52A8 (the scenery lists' draws' plain C++ called "
+              "Scenery::DrawSetLists sub_820F52A8 (no adapter; the scenery lists' draws' plain C++ called "
               "directly, their adapters where it declines), "
-              "Scenery::RecordHeadlightProjectors sub_820F34C8 (the headlight slots and "
+              "Scenery::RecordHeadlightProjectors sub_820F34C8 (no adapter; the headlight slots and "
               "projectors' chunks, its callees' plain C++ called directly inside their wraps' "
               "checks, the render manager's getters and queue guest calls; with --native_cameras, "
               "--native_matrix_math and --native_vehicle_accessors and the command list's "
               "diagnostics off, else its original), "
-              "Scenery::DrawArea sub_820F3B70 (the headlights', the scenery models' draws', the "
+              "Scenery::DrawArea sub_820F3B70 (no adapter; the headlights', the scenery models' draws', the "
               "light groups' and their callees' plain C++; with those flags, --native_billboards, "
               "--native_post_effects and --native_data_files, else its original), "
               "Scenery::Draw sub_820F6068 (in its frame-state wrap; its callees' plain C++ "
@@ -112,7 +112,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20, sub_820F1588, sub_820F1930, "
               "sub_820F16C0, sub_820F17C0, sub_820F2B80, sub_820F3098, sub_820F32D0, sub_820FB938, "
               "sub_820FB8E0, sub_820FB8F0, sub_820FB968, sub_820FC0E8, sub_820FBF08, sub_820FBE80, "
-              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20, sub_820FBDC8, sub_820F1480, sub_820FB8B8, sub_820FB998, sub_820FB9A8, sub_820F1490, sub_820F14E8, sub_820F1A70");
+              "sub_820FBFD0, sub_820FBBE8, sub_820F1530, sub_820F2030, sub_820F1360, sub_820F1598, sub_820F1D20, sub_820FBDC8, sub_820F1480, sub_820FB8B8, sub_820FB998, sub_820FB9A8, sub_820F1490, sub_820F14E8, sub_820F1A70, sub_820F52A8, sub_820F34C8, sub_820F3B70");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -324,11 +324,14 @@ void hooks::CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
-ITC_COURSE_SCENERY(820F52A8, hooks::CourseSceneryDrawSetLists(ctx, base))
+// Scenery::DrawSetLists (sub_820F52A8) has no adapter (removed 2026-11-13, B7
+// loop): its only caller in play, Scenery::Draw, calls its plain C++;
+// CourseSceneryDrawSetLists stays as the harness's steps.
 
 // Scenery::RecordHeadlightProjectors: r4 = the pass description; r3 as the
-// original leaves it, lr put back, flush-to-zero off. From Scenery::DrawArea
-// (sub_820F3B70) and Scenery::Draw (sub_820F6068), recompiled. The original
+// original leaves it, lr put back, flush-to-zero off (the harness's steps:
+// its callers in play, Scenery::DrawArea and Scenery::Draw, call its plain
+// C++, and its adapter is removed, 2026-11-13). The original
 // runs where its callees' plain C++ may not (their flags) or with the
 // command list's diagnostics on (as the car scene's draw).
 void hooks::CourseSceneryRecordHeadlightProjectors(PPCContext& ctx, uint8_t* base) {
@@ -346,7 +349,6 @@ void hooks::CourseSceneryRecordHeadlightProjectors(PPCContext& ctx, uint8_t* bas
   ctx.fpscr.disableFlushMode();
 }
 
-ITC_COURSE_SCENERY(820F34C8, hooks::CourseSceneryRecordHeadlightProjectors(ctx, base))
 
 // Scenery::DrawArea: r3 = the manager, r4 = the pass description, r5 = the
 // area; lr put back, flush-to-zero off (r3 isn't read by its caller,
@@ -376,14 +378,9 @@ void hooks::CourseSceneryDrawArea(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
-extern "C" REX_FUNC(sub_820F3B70) {
-  REX_FUNC_PROLOGUE();
-  if (!hooks::CourseSceneryDrawAreaNative()) {
-    __imp__sub_820F3B70(ctx, base);
-    return;
-  }
-  hooks::CourseSceneryDrawArea(ctx, base);
-}
+// Scenery::DrawArea (sub_820F3B70) has no adapter (removed 2026-11-13, B7
+// loop): its only caller in play, Scenery::Draw, calls its plain C++;
+// CourseSceneryDrawArea stays as the harness's steps.
 
 // Scenery::Draw: r3 = the manager. Its adapter is its frame-state wrap
 // (src/debug/frame_state_diff.cpp), which calls this where
