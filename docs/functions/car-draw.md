@@ -58,7 +58,8 @@ matrix math (`matrix-math.md`), `memcpy` and `cos` (`c-runtime.md`),
 interior's race draw). Not here: the scene's draw `sub_820C5DE8` and the
 pass description's set-up `sub_820C4EB8` (`car-scene-draw.md` since 2026-11-04), the morph's worker job
 (`sub_820AC7F0`, the second pool maker's slot 1, and the job's methods
-at `820AC998`-`820ACC08`; a lead). Fields: `../known-data.md` ("scene
+at `820AC998`-`820ACC08`; [`morph-jobs.md`](morph-jobs.md) since
+2026-11-13). Fields: `../known-data.md` ("scene
 model", "scene model block", "scene pass description", "second set
 objects", "car draw records", "work memory").
 
@@ -124,7 +125,7 @@ dials call; `BlinkTimers::Advance`'s is its render-only skip. Left as
 guest calls from the native frames, never seen in play: the light kit's
 LEDs and spots with `LightKit::ChaseLevel`, `Accessory::Draw`, and
 `Model::SkinShape` (an accessory's skin, not reached from here); the
-morph's worker job (`sub_820AC7F0`, a lead) and the cockpit dials'
+morph's worker job (`sub_820AC7F0`, `morph-jobs.md`) and the cockpit dials'
 `Dash::PoseTachometer` and `Dash::PoseDials` (native under
 `--native_cockpit_dials`) are also called from the original's frames.
 

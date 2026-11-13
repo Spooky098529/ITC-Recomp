@@ -67,7 +67,7 @@ delete` (`heap.md`); `Delegate::Invoke` (`functions.md`); the empty
 start-up (`sub_82094590`, `sub_82106548`, `../loops/leads.md`), the
 app's other interface slots (the removes, slots +20, +24, +28, +32,
 never ran) and the functions near this code at `820AC998`-`820ACC08` (the
-worker pool makers' objects, a lead). One function here is a piece of
+worker pool makers' objects: `morph-jobs.md` since 2026-11-13). One function here is a piece of
 a switch the recompiler split off (`sub_82093C2C`): it runs in its
 parent's frame and goes with it.
 

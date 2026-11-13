@@ -735,6 +735,10 @@ Rows not yet moved stay in the table below. So far:
   its constructor setting up the command list, the render queue and
   the graphics library's draw globals, `Scene::Update` and `Draw`)
   (B7; mapped).
+- [`morph-jobs.md`](morph-jobs.md): the morph jobs (the 224-byte job
+  `Model::MorphShape` posts to the second worker pool for each per-draw
+  wheel morph, its maker, slots and release) and the worker pools' work
+  item class every pool job holds (B7; mapped).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
