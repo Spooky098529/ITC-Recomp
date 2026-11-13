@@ -13,7 +13,9 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
-- The renderer's map (6d9bc131): `renderer.md`, 41 rows (9 moved from
+- The frame driver's map (6d9bc131; mapped as `renderer.md`, renamed
+  `frame-driver.md` and `FrameDriver::` by the user's call, 2026-11-13,
+  as "renderer" was confusing beside our Vulkan renderer): 41 rows (9 moved from
   `functions.md`). Corrections: the object at the scene's + 64 is the
   render queue (`Scene::Update` calls `RenderQueue::Flip`; `Draw`'s
   "slot 5" is `RenderQueue::Replay`). **For the user:** `sub_825BA380`

@@ -346,12 +346,14 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 10 of 10: the framework's scene constructor (`sub_82098A98`
   and its callees, seen in play) with the renderer's constructor
   (`sub_82092358`, `sub_820922B8`), two leads taken together; both
-  lines deleted from `leads.md`. Mapped `renderer.md` (6d9bc131: 41
+  lines deleted from `leads.md`. Mapped `renderer.md`, renamed
+  `frame-driver.md` by the user's call (2026-11-13: "renderer" was
+  confusing beside our Vulkan renderer) (6d9bc131: 41
   rows, 9 moved from `functions.md`: the renderer at framework + 76
   and the app's scene at + 80, their constructors, `Thread::Thread` and
   `Begin` with the kernel thread imports, the renderer's frame and
   listener calls, `Scene::Update` and `Draw` (Wrapped); 11 ready
-  groups; `Renderer::Init`, `WaitForFrame` and `StartFrame` blocked by
+  groups; `FrameDriver::Init`, `WaitForFrame` and `StartFrame` blocked by
   the core's `Event::` functions (recompiled by the user's call,
   2026-10-24); no leads; no subagents); map checked (0 errors).
   Migration agent running.
