@@ -66,7 +66,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_mtinitlocks, CloseHandle (its caller, SaveSlot::WaitClose), SetFilePointer (sub_825B9DD8, "
               "its caller _lseeki64_nolock), _write_nolock and WriteFile (sub_825B0F48, sub_82295D50, "
               "their caller _write), _close_nolock (sub_825B0C28, its caller _close), fclose and "
-              "_fclose_nolock (their callers _fcloseall and fclose)");
+              "_fclose_nolock (their callers _fcloseall and fclose), _close, _freebuf and "
+              "fclose's __finally (sub_825B0D10, sub_825B0EE0, sub_825A9664, their caller "
+              "_fclose_nolock or fclose) and _fcloseall's __finally (sub_825B4F38)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -649,9 +651,9 @@ ITC_C_RUNTIME_CORE(822979D0, CoreGetCommandLineA)
 ITC_C_RUNTIME_CORE(825ADE90, CorePositive)
 // _NMSG_WRITE: r3 = a run-time error number.
 ITC_C_RUNTIME_CORE(825AEDA0, CoreNmsgWrite)
-// _getbuf, _freebuf: r3 = a stream.
+// _getbuf: r3 = a stream. (_freebuf, sub_825B0EE0, has no adapter: its only
+// caller, _fclose_nolock, is native.)
 ITC_C_RUNTIME_CORE(825B4790, CoreGetbuf)
-ITC_C_RUNTIME_CORE(825B0EE0, CoreFreebuf)
 // ResetEvent: r3 = an event; r3 = 1 or 0. (CloseHandle, sub_82294E20, has no
 // adapter: its caller in play, SaveSlot::WaitClose, calls the plain C++.)
 ITC_C_RUNTIME_CORE(825BA168, CoreResetEvent)
@@ -706,8 +708,8 @@ ITC_C_RUNTIME_CORE(825B77E8, CoreFreeOsfhnd)
 ITC_C_RUNTIME_CORE(825B7880, CoreGetOsfhandle)
 // raise's __finally: r28 = whether raise took lock 0.
 ITC_C_RUNTIME_CORE(825B4C8C, CoreRaiseFinally)
-// _fcloseall's and flsall's outer __finally: _unlock(1).
-ITC_C_RUNTIME_CORE(825B4F38, CoreUnlockStreamsFinally)
+// flsall's outer __finally: _unlock(1). (_fcloseall's, sub_825B4F38, has no
+// adapter: _fcloseall is native.)
 ITC_C_RUNTIME_CORE(825ACEB4, CoreUnlockStreamsFinally)
 // flsall's inner __finally: r28 = the slot, r29 = __piob's address, r12 =
 // flsall's frame end; r27, r10 and r11 set as the original leaves them.
@@ -730,15 +732,14 @@ ITC_C_RUNTIME_CORE(825B0E88, CoreFileno)
 ITC_C_RUNTIME_CORE(825B0E50, CoreCloseFinally)
 ITC_C_RUNTIME_CORE(825B1304, CoreCloseFinally)
 ITC_C_RUNTIME_CORE(825B4978, CoreCommitFinally)
-// fclose's __finally: r30 = the stream.
-ITC_C_RUNTIME_CORE(825A9664, CoreFcloseFinally)
+// (fclose's __finally, sub_825A9664, has no adapter: fclose is native.)
 // doexit's unwind funclet: r28 = whether doexit took the exit lock.
 ITC_C_RUNTIME_CORE(825AA338, CoreExitUnlockFinally)
 // terminate: no registers; ends in KeBugCheck(0xC0000144).
 ITC_C_RUNTIME_CORE(825B3498, CoreTerminate)
-// _close: r3 = a file handle; r3 = 0, or -1. (_close_nolock, sub_825B0C28,
-// has no adapter: _close is its only caller.)
-ITC_C_RUNTIME_CORE(825B0D10, CoreClose)
+// (_close, sub_825B0D10, and _close_nolock, sub_825B0C28, have no adapters:
+// _fclose_nolock, _close's only caller, is native, and _close is
+// _close_nolock's.)
 // FlushFileBuffers: r3 = an OS handle; r3 = 1, or 0.
 ITC_C_RUNTIME_CORE(825BA510, CoreFlushFileBuffers)
 // _commit: r3 = a file handle; r3 = 0, or -1.
