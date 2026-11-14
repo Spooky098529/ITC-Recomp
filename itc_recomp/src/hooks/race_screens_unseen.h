@@ -84,4 +84,47 @@ void RaceScreensUnseenSplitResultsIntro(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenSplitResultsShow(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenSplitResultsClose(PPCContext& ctx, uint8_t* base);
 
+// Kind 6's screen after the race. Adapters (recompiled code reaches them):
+// Close sub_8221C168 (the race HUD machine's CloseResults fallback), Open
+// sub_8221EC48 (r3 the screen, r4 the block; ShowKind6Results), Draw
+// sub_8221EF60 (r3 the screen; AfterRaceDraw's fallback), ShowPanelA
+// sub_8221D050 and SetUpList sub_8221DF70 (also called by the recompiled
+// pages of Kind6Menu::Update). Without adapters (only the native Open and
+// Draw reach them): SetUpTexts sub_8221E038 (r3 the screen), ShowCourse
+// sub_8221D1A8, ShowHelp sub_8221D130, HidePanels sub_8221CFC0, SetCursorX
+// sub_8221D7B0 (r3), ShowList sub_8221D4E8, ShowReplay sub_8221CBD8 (r3 the
+// record), and the transitions (r3 the step word) Intro sub_8221C438, Show
+// sub_8221C550, RunToEnd sub_8221C5D8, MoveMain sub_8221DB48, BackToQuit
+// sub_8221DC88, OpenList sub_8221EB98, CloseList sub_8221C628, MoveList
+// sub_8221DD78, OpenQuestion sub_8221C6C8, CloseQuestion sub_8221C7D8,
+// MoveQuestion sub_8221C888, OpenMessage sub_8221CAB8, CloseMessage
+// sub_8221CB50, OpenWaiting sub_8221C920, CloseWaiting sub_8221CA20.
+void RaceScreensUnseenKind6Close(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6Open(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6Draw(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ShowPanelA(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6SetUpList(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6SetUpTexts(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ShowCourse(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ShowHelp(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6HidePanels(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6SetCursorX(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ShowList(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ShowReplay(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6Intro(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6Show(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6RunToEnd(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6MoveMain(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6BackToQuit(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6OpenList(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6CloseList(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6MoveList(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6OpenQuestion(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6CloseQuestion(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6MoveQuestion(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6OpenMessage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6CloseMessage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6OpenWaiting(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6CloseWaiting(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

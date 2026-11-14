@@ -216,4 +216,119 @@ uint64_t SplitResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Call
 uint64_t SplitResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t SplitResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+// --- Kind 6's screen after the race (kind6_menu.cpp) ---
+//
+// The screen [0x82814E10] (360 bytes: +24 to +36 UI movies 17, 20, 21 and
+// 14; +40 page object A with its step word +64, the menu and the steps; +68
+// the cursor, +72 the cursor before, +76 the last move; +136 the replay
+// slots' menu list; +208 page object B with its step word +232, a message
+// box over A; +236 B's selection; +316 to +356 the screen's flags and
+// message ids), read again before each use as the originals do; the word
+// beside it [0x82814E14] (the answer); the network session [0x82816E3C]
+// (+200 the race's time in milliseconds, +236 the upload's state); the
+// replay list [0x828161F0] (+12 the 36-byte records, +20 their count); the
+// course [0x82816660] and [0x82816680]. The UI movie calls (PlayNamed,
+// LoopNamed, LoopLast, FinishNamed, FinishAll, Run, SetText, SetNodeText,
+// ClearText, ClearNodeText, ShowNode, HideNode, ResetPose, the scroll
+// setters), MenuList::Init, memcpy where its plain C++ refuses and
+// MenuSound::Play through their overrides (`calls`); UiMovies::Find,
+// UiMovie::FindNode and Child, ScreenPages::Init, Go and Finish,
+// MenuList::Selection and the confirm dialog's draw by their plain C++.
+// SetText's and SetNodeText's unset varargs are passed as 0 (the user's
+// call for the parking area, 2026-10-30).
+constexpr uint32_t kKind6Session = 0x82816E3C;
+constexpr uint32_t kKind6Course = 0x82816660;
+constexpr uint32_t kKind6CourseFlag = 0x82816680;
+constexpr uint32_t kKind6Replays = 0x828161F0;
+
+// sub_8221C168 Kind6Menu::Close: UiMovie::FinishAll on each of the screen's
+// four movies (+24 to +36) that isn't 0. The last call's r3 (or the last
+// movie word, 0).
+uint64_t Kind6Close(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8221EC48 Kind6Menu::Open (r3 the screen, r4 the 24-byte block), from
+// a 160-byte frame: the block copied in (memcpy), +4 capped at 59:59.999;
+// UI movies 17, 20, 21 and 14 found (the id at the frame's +96) into +24 to
+// +36, their poses reset when [0x82814E14] is 0 to 2; page objects A (+40)
+// and B (+208) ScreenPages::Init(0); [0x82814E10]'s +336 = 0; with the word
+// 0 to 2 +324 = 44, Go(A, 12, transition 0, then 1) and Go(B, 5, 5), else
+// Go(A, 0); the fields cleared, MenuList::Init(+136, 4, 4, 1, 154, 153,
+// 155, 156; 159, 158), more fields set; with the word 0 to 2 the session's
+// +200 = +4 in milliseconds and the result's fields cleared (+348 = 3);
+// +340 = 1, SetUpTexts, and with the word 0 to 2 HidePanels. The last
+// call's r3.
+uint64_t Kind6Open(uint8_t* base, uint32_t screen, uint32_t block, uint32_t sp,
+                   const Calls& calls);
+// sub_8221EF60 Kind6Menu::Draw (r3 the screen), from a 144-byte frame: A's
+// transition (+52; 8 handlers stored at the frame's +80) with +64, then
+// ScreenPages::Finish(A, its answer), or with none and [0x82814E10]'s +336
+// set UiMovie::Run(+24, 0); the confirm dialog's draw on A's pages 3 to 5
+// and 13; then B's transition (+220; its 7 handlers stored over the first
+// 7, the eighth left) with +232 and Finish(B) (a negative one other than
+// -1 Finish(B, 1)); with none, by B's page (+208) the run of movie 20 (1,
+// 2), 21 (3, 4) or 14 (5) when +336 is set, then with [0x82814E10]'s +344
+// set: the session's +236 = 3, +344 = 0, and by +348 (0 to 3) Go(B, 0,
+// transition 1, 3 or 6) and Go(A, 11). r3 as the original leaves it.
+uint64_t Kind6Draw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+
+// The helpers. sub_8221E038 SetUpTexts (r3 the screen; its jump table's
+// case 0, sub_8221E0FC, merged): movie 17's type-3 items 5 to 8 strings
+// 1965, 1961, 1962 and 115; nodes -1/23 to 27 hidden (+80 = 0); ShowPanelA;
+// the course's name (string 395, 396, 397, 398, 401, 402, 404 or 403 by
+// [0x82816660] 0 to 7, else 0) at -1/21 and -1/22 by [0x82816680] (1 when
+// it's 0); nodes -1/17 and -1/16 hidden; ShowCourse; ShowHelp. ShowHelp's
+// r3. sub_8221D1A8 ShowCourse (its case 0, sub_8221D2B4, merged): the
+// type-9 texts 55 to 58, the course's two marks of nodes 9/6 to 32 (two
+// tables in its 240-byte frame), the named animations 47 to 65 finished
+// and the course's (47 + its row) finished and played. PlayNamed's r3.
+// sub_8221D130 ShowHelp: the type-2 text 0 string 967, its scroll speed
+// (sub_8211C4F0: 300, the float at 0x82000A30) and ScrollText(1); the
+// last's r3. sub_8221D050 ShowPanelA: type-1 nodes 4 and 5 shown, and when
+// both exist their +108 = 0 and nodes 6 to 9 hidden. sub_8221CFC0
+// HidePanels: type-1 nodes 4 to 9 hidden. Each the last call's r3.
+uint64_t Kind6SetUpTexts(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowCourse(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowHelp(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowPanelA(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6HidePanels(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8221D7B0 SetCursorX (r3, unsigned): movie 17's type-3 node 0's float
+// +16 = r3 (its doubleword left at the frame's +80). The node.
+uint32_t Kind6SetCursorX(uint8_t* base, uint64_t value, uint32_t sp);
+// sub_8221DF70 SetUpList: MenuList::Init(+136, the replays' count, at most
+// 9 shown, 1, ..), movie 17's type-14 node 2's child 0's +16 = 40 x the
+// selection (its doubleword at the frame's +96), ShowList, ShowReplay of
+// the selected record; ShowReplay's r3. sub_8221D4E8 ShowList: the type-14
+// node 2's children 5 to 13 cleared, string 472 (empty) or 471 (used) by
+// each shown record's +28 from the scroll on, the scroll marks (nodes 7 and
+// 8's +80); node 8. sub_8221CBD8 ShowReplay (r3 a record or 0): with +28
+// set the date and time, kind, course, time and result texts and the
+// counts' marks (nodes 5 and 6's +108), else the texts cleared and node 0
+// hidden; the last call's r3 or node 6.
+uint64_t Kind6SetUpList(uint8_t* base, uint32_t sp, const Calls& calls);
+uint32_t Kind6ShowList(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowReplay(uint8_t* base, uint32_t record, uint32_t sp, const Calls& calls);
+
+// The transitions (r3 the step word: their first call's work when it's 0,
+// the word 1, then the movie run), answering whether they're done (1, or
+// the run's answer 0). A's: sub_8221C438 Intro, sub_8221C550 Show,
+// sub_8221C5D8 RunToEnd, sub_8221DB48 MoveMain, sub_8221DC88 BackToQuit,
+// sub_8221EB98 OpenList, sub_8221C628 CloseList, sub_8221DD78 MoveList. B's:
+// sub_8221C6C8 OpenQuestion, sub_8221C7D8 CloseQuestion, sub_8221C888
+// MoveQuestion, sub_8221CAB8 OpenMessage, sub_8221CB50 CloseMessage,
+// sub_8221C920 OpenWaiting, sub_8221CA20 CloseWaiting. See the rows.
+uint64_t Kind6Intro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6Show(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6RunToEnd(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6MoveMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6BackToQuit(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6OpenList(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6CloseList(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6MoveList(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6OpenQuestion(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6CloseQuestion(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6MoveQuestion(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6OpenMessage(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6CloseMessage(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6OpenWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6CloseWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
 }  // namespace race_screens

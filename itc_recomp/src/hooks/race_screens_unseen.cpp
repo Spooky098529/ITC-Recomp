@@ -18,7 +18,11 @@ ITC_FLAG_BOOL(native_race_screens_unseen, true, "ITC",
               "sub_8221F990, Update sub_8221F930 and Draw sub_8221F7D0 with SetTexts, MainPage, "
               "Intro, Show and Close; the results at +1032, SplitResults::Open sub_82220050 and "
               "Update sub_8221FFF0 with MainPage, Intro, Show and Close (Draw sub_822200E0 "
-              "stays recompiled) (the UI movie calls through their "
+              "stays recompiled); kind 6's screen after the race, Kind6Menu::Open sub_8221EC48, "
+              "Draw sub_8221EF60 and Close sub_8221C168 with SetUpTexts, ShowCourse, ShowHelp, "
+              "ShowPanelA, HidePanels, SetCursorX, SetUpList, ShowList, ShowReplay and the "
+              "transitions of its two page objects (Update sub_8221F1E8 and its pages stay "
+              "recompiled) (the UI movie calls through their "
               "overrides, SetText's and SetNodeText's unset varargs 0), instead of through the "
               "translated code (the same writes; checked by "
               "--run_harnesses=race_screens_unseen)");
@@ -216,6 +220,68 @@ ITC_UNSEEN_RESULTS_TRANSITION(SplitResultsShow)
 ITC_UNSEEN_RESULTS_TRANSITION(SplitResultsClose)
 #undef ITC_UNSEEN_RESULTS_TRANSITION
 
+void RaceScreensUnseenKind6Open(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::Kind6Open(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenKind6Draw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::Kind6Draw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenKind6SetUpTexts(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::Kind6SetUpTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenKind6SetCursorX(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = race_screens::Kind6SetCursorX(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void RaceScreensUnseenKind6ShowReplay(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::Kind6ShowReplay(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+#define ITC_UNSEEN_KIND6(name)                                                \
+  void RaceScreensUnseenKind6##name(PPCContext& ctx, uint8_t* base) {         \
+    GuestCalls guest(ctx, base);                                              \
+    ctx.r3.u64 = race_screens::Kind6##name(base, ctx.r1.u32, guest.calls());  \
+  }
+ITC_UNSEEN_KIND6(Close)
+ITC_UNSEEN_KIND6(ShowPanelA)
+ITC_UNSEEN_KIND6(SetUpList)
+ITC_UNSEEN_KIND6(ShowCourse)
+ITC_UNSEEN_KIND6(ShowHelp)
+ITC_UNSEEN_KIND6(HidePanels)
+ITC_UNSEEN_KIND6(ShowList)
+#undef ITC_UNSEEN_KIND6
+
+#define ITC_UNSEEN_KIND6_TRANSITION(name)                                                    \
+  void RaceScreensUnseenKind6##name(PPCContext& ctx, uint8_t* base) {                        \
+    GuestCalls guest(ctx, base);                                                             \
+    ctx.r3.u64 = race_screens::Kind6##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls());     \
+  }
+ITC_UNSEEN_KIND6_TRANSITION(Intro)
+ITC_UNSEEN_KIND6_TRANSITION(Show)
+ITC_UNSEEN_KIND6_TRANSITION(RunToEnd)
+ITC_UNSEEN_KIND6_TRANSITION(MoveMain)
+ITC_UNSEEN_KIND6_TRANSITION(BackToQuit)
+ITC_UNSEEN_KIND6_TRANSITION(OpenList)
+ITC_UNSEEN_KIND6_TRANSITION(CloseList)
+ITC_UNSEEN_KIND6_TRANSITION(MoveList)
+ITC_UNSEEN_KIND6_TRANSITION(OpenQuestion)
+ITC_UNSEEN_KIND6_TRANSITION(CloseQuestion)
+ITC_UNSEEN_KIND6_TRANSITION(MoveQuestion)
+ITC_UNSEEN_KIND6_TRANSITION(OpenMessage)
+ITC_UNSEEN_KIND6_TRANSITION(CloseMessage)
+ITC_UNSEEN_KIND6_TRANSITION(OpenWaiting)
+ITC_UNSEEN_KIND6_TRANSITION(CloseWaiting)
+#undef ITC_UNSEEN_KIND6_TRANSITION
+
 }  // namespace hooks
 
 #define ITC_RACE_SCREENS_UNSEEN(address, step)    \
@@ -241,3 +307,11 @@ ITC_RACE_SCREENS_UNSEEN(8221FFF0, RaceScreensUnseenSplitResultsUpdate)
 ITC_RACE_SCREENS_UNSEEN(8221FAC8, RaceScreensUnseenSplitResultsIntro)
 ITC_RACE_SCREENS_UNSEEN(8221FBE8, RaceScreensUnseenSplitResultsShow)
 ITC_RACE_SCREENS_UNSEEN(8221FD98, RaceScreensUnseenSplitResultsClose)
+// Kind 6's screen after the race: its opener, draw and close (the race HUD
+// machine's recompiled fallbacks reach them), and ShowPanelA and SetUpList
+// (the recompiled pages of Kind6Menu::Update call them too).
+ITC_RACE_SCREENS_UNSEEN(8221C168, RaceScreensUnseenKind6Close)
+ITC_RACE_SCREENS_UNSEEN(8221EC48, RaceScreensUnseenKind6Open)
+ITC_RACE_SCREENS_UNSEEN(8221EF60, RaceScreensUnseenKind6Draw)
+ITC_RACE_SCREENS_UNSEEN(8221D050, RaceScreensUnseenKind6ShowPanelA)
+ITC_RACE_SCREENS_UNSEEN(8221DF70, RaceScreensUnseenKind6SetUpList)
