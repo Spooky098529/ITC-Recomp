@@ -1,0 +1,271 @@
+# Known functions: the in-race screens never seen in play
+
+The four **in-race screens never seen in play**, beside the other
+in-race screens ([`race-screens.md`](race-screens.md), which maps their
+makers and teardowns, the page object `ScreenPages::` and the menu list
+`MenuList::` they all use, and the confirm dialog `RaceDialog::`), run by
+the race HUD machine's handlers ([`race-hud-machine.md`](race-hud-machine.md))
+through the in-race screens' holder (`[0x826D84F0]`,
+[`race-hud-object.md`](race-hud-object.md)). Names are ours. None of
+their functions was seen in play (`docs/coverage.md`); by the user's
+call (2026-11-12, to minimize recompiled code) they still get rows and
+are mapped and ported like any others.
+
+- **Kind 4's pause menu** (`[0x826D84E0]` to `[0x826D84EC]`, the
+  holder's +1016, `PauseMenu4::`, UI movie 5; probably the split
+  screen's, race kind 4): laid out as the pause menu's (`PauseMenu::`)
+  with fewer items and pages: opened by `RaceHudMachine::OpenPause` and
+  `OpenRacePause` (kind 4) with the player who paused and a kind (the
+  replay bit: kind 0 (0, 2, 8, 4), kind 1 (0, 2, 10); the table at
+  `0x8200CD08`, six words a kind, -1 ends them; item 0 resumes, 2 opens
+  the volume page, 4, 8 and 10 end the race after the confirm dialog),
+  four pages (0 the main list, 1 the music and effects volume, 2 the
+  confirm dialog, 3 the answer) and 11 transitions, updated by
+  `PauseUpdate` (its answer: the data's +56) and drawn by `PauseDraw`
+  and `CountdownPauseDraw`. Its data (`[0x826D84E4]`, 80 bytes): +0 and
+  +4 the music and effects volume (player 0's save data's bytes
+  +0x1F878 and +0x1F879, that is +0x1F85C's +28 and +29), +8 and +12
+  their edits, +16 and +20 = 15 (the defaults), +52 the item count, +56
+  the answer, +60 the volume page's last-item choice, +64 the main
+  list's selection kept, +68 a counter, +72 the player (0 or 1), +76
+  the kind.
+- **The results at +1028** (`[0x82814E18]`, 52 bytes, `RaceResults::`,
+  UI movie 7): a single page of texts (the time, a result, the course,
+  a place) from a 20-byte block `RaceHudMachine::ShowResults` passes,
+  closed by accept or back. Its block: +0 to +16 the block (+0 1, +4
+  the result's +20, a time packed as minutes << 16 | seconds << 10 |
+  thousandths, +8 its +3892, +12 the race data's +60, +16
+  `[0x826D82E8]` + 2196), +20 the movie, +24 the page object, +48 the
+  transitions' step word.
+- **The results at +1032** (`[0x82814E1C]`, 40 bytes, `SplitResults::`,
+  UI movie 8): the results of kinds 4 and 6 (`ShowSplitResults`,
+  `ShowKind6Results`): +0 the outcome (0 to 2), +4 a mode (0 to 2),
+  +8 the movie, +12 the page object, +36 the step word; two globals
+  beside it, `[0x82814E20]` (a tick count) and `[0x82814E24]` (set once
+  the other console's result came). In the network battle (race kind 6
+  with a stage whose first word isn't 1) its draw exchanges the result
+  with the other console (the sends `sub_8214AB48` and `sub_8214AA70`,
+  rows in [`system-services.md`](system-services.md)) before the screen
+  shows.
+- **Kind 6's screen after the race** (`[0x82814E10]`, 360 bytes,
+  `Kind6Menu::`, UI movies 17, 20, 21 and 14): race kind 6 is the Xbox
+  Live mode's race (the type 12 mode, [`network-mode.md`](network-mode.md):
+  its time attack sets the race data's +0xA3AF0 to 6; the "system link"
+  in `race-states.md`'s note on kind 6 is probably this mode's network
+  battle). A four-item menu (strings 1965, 1961, 1962 and 115; its
+  answer, `[0x82814E14]` 1 to 3, is what `AfterRaceUpdate` reads), the
+  replay's save (the replay list as the menu after the race's, nine
+  rows, over the save layer and `RaceDialog::`), and the time attack's
+  ranking over Xbox Live: the race's time compared with the stored
+  best, written, and the leaderboard read around the player and shown
+  (five rows: rank, gamer tag, a logo, the time). The Live work goes
+  through the network manager's functions (`sub_822927B0` with 4109,
+  4111 or 4112, `sub_82292CC0`, `sub_822914A8`; leads in
+  `../loops/leads.md`), the network session object `[0x82816E3C]`
+  (+144 a read started, +160, +168 the player's XUID, +180 the read's
+  state: 2 done, 3 a write, 4 and up an error; +200 the race's time in
+  milliseconds, +208 the best, +224, +228, +232, +236 the upload's
+  state, +240) and the leaderboard read's results `[0x826C6AD4]` (an
+  XUSER_STATS_READ_RESULTS: +4 the view, whose +4 is the total row count,
+  +8 the rows read, +12 the 48-byte rows: +0 the XUID, +8 the rank, +24
+  the gamer tag, +44 the columns, column 0's +16 the time in
+  milliseconds, column 1's the car). By the user's call (2026-11-12,
+  "Precedent first" in `../loops/b7-loop.md`), these screens are made
+  native as any mode's, their Live calls answered by plugging in data
+  (one signed-in local user, no Live). Two page objects run together:
+  A (+40) the menu and the steps, B (+208) a message box over it.
+
+Shared, with rows elsewhere: `ScreenPages::`, `MenuList::`,
+`RaceDialog::` and `Kind6Menu::Create`, `PauseMenu4::Create`,
+`RaceResults::Create`, `SplitResults::Create` and their `Destroy`s in
+`race-screens.md`; `MenuList::Init` in `save-data.md`; the UI movie
+calls in `ui-movies-game.md` and `ui-movies.md`; `MenuSound::Play`,
+`SoundOptions::SetEffectsVolume` and `SetMusicVolume` in
+`menu-sounds.md`; `Options::ShowVolumeBar` in `options-screen.md`;
+`Menu::Step` and `Menu::Pressed` in `menu-helpers.md`; `SaveBuffers::`
+and `SaveSlots::State` in `save-interface.md`; `Stages::Copy`,
+`RacerRecords::At`, `SaveData::Of` and the shared "returns 0" and
+"returns 1" (`sub_825C8388`, `sub_825C8390`) in `vehicle-accessors.md`;
+`RaceTime::FromTicks` in `ai-drivers.md`; `GetLocalTime` in
+`functions.md`; `memcpy` in `c-runtime.md`; `VirtualAlloc` in
+`heap.md`. Not here (leads or other files): the network manager's
+`sub_822927B0`, `sub_822914A8` (the player's rank in the rows read, -1
+without results) and `sub_8225FFC8` (in the type 12 mode's leads), and
+`sub_82292CC0` (the leaderboard read's start, a lead added with this
+map). Mapped by the B7 loop's mapping agent (2026-11-14, from the lead
+in `../loops/leads.md`).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+## Kind 4's pause menu
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82211390` | `PauseMenu4::Open` | | r3 = the screen (`[0x826D84E0]`), r4 = the player who paused (the race HUD machine's +9616 != 0), r5 = the kind (the replay bit): UI movie 5 found (`UiMovies::Find`) into +0, its pose reset; the type-3 and type-5 groups' nodes (`UiMovie::FindNode(movie, -1, 3)` and `(-1, 5)`) +108 = r4; the list's +60 (the player) and the data's +72 = r4 != 0; +76 = the kind; `ScreenPages::Go(page 0, transition 1, then 2)`, `MenuSound::Play(6)`, `PauseMenu4::LoadVolumes` (a tail call through the register restore). From `RaceHudMachine::OpenPause` and `OpenRacePause` (kind 4). Not seen in play. Read in full. |
+| `sub_82211458` | `PauseMenu4::Update` | | r3 not read: the page's handler (`[[0x826D84E8]]`: 0 `MainPage`, 1 `VolumePage`, 2 `ConfirmPage`, 3 `AnswerPage`; a table on the stack), its result returned; 0 while a transition runs (page -1). From `RaceHudMachine::PauseUpdate` (kind 4). Not seen in play. Read in full. |
+| `sub_82211590` | `PauseMenu4::Draw` | | r3 = the screen: with a transition running (`[0x826D84E8]` +12), its handler (11, a table on the stack: 0 `RunTen`, 1 `OpenMain`, 2 `ShowMain`, 3 `BackToMain`, 4 `MoveMain`, 5 `CloseMain`, 6 `OpenVolume`, 7 `ShowVolumeRow`, 8 `MoveVolume`, 9 `SetVolume`, 10 `CloseVolume`) with r3 = the page object + 24, then `ScreenPages::Finish` with its result (1 for a negative transition, r3 the page object); else `UiMovie::Run(screen +0, 0)`. Then `RaceDialog::Draw` when the page is 2. From `RaceHudMachine::PauseDraw` and `CountdownPauseDraw` (kind 4). Not seen in play. Read in full. |
+| `sub_8220FD48` | `PauseMenu4::MainPage` | | Page 0: `MenuList::Update` on `[0x826D84EC]`; a move (the selection against the previous) → `Go(0, transition 4)`, `MenuSound::Play(4)`; else back or action 152 (`MenuList::Pressed152`) → +56 = 1, `Go(3, 5)`, sound 2. On accept: sound 0 and by the item's id (`0x8200CD08` + 4 × (6 × kind + selection), a jump table): 0 → `sub_8220FE3C` (the resume); 2 → `Go(1, transition 6, then 7)`; 4 → +56 = 4 (5 with +72 set), `RaceDialog::Open(4, +72)` and `Go(2)`; 5 → +56 = 2, dialog mode 1; 6 → 3, mode 3; 7 → 6, mode 2; 8 → 7, mode 2; 10 → 4, mode 5 (each with `Go(2)`); 1, 3 nothing; 9 and above 10 → +56 = 0. Returns 0. Not seen in play. Read in full. |
+| `sub_8220FE3C` | | | Case 0 of `PauseMenu4::MainPage`'s jump table (the resume item: +56 = 1, `ScreenPages::Go(3, transition 5)`, returns 0), split into a function of its own by the recompiler (it uses MainPage's r11 and r30). Not seen in play. Read in full. |
+| `sub_82210E58` | `PauseMenu4::VolumePage` | | Page 1 (the music and effects volume, 0 to 15, by left and right, and a last item): `MenuList::Update`; a move (the list's +24) → `Go(1, transition 8)`, sound 4; a change (`StepVolume`) → `Go(1, 9)`, the volumes set live (`SoundOptions::SetEffectsVolume(+12)`, `SetMusicVolume(+8)`), sound 4; accept on item 2 with +60 = 0 → the saved (+0, +4) from the edits, `ShowVolumesB`, `Go(-1, transition 0, then 10)`, the saved volumes set; with +60 = 1 → the edits from the defaults (+16, +20), `ShowVolumes`, set; other items → selection 2, +60 = 0, `Go(1, 8)` (each accept then sound 0); back → the edits from the saved, `ShowVolumes`, `Go(-1, 0, 10)`, the saved set, sound 2. Returns 0. Not seen in play. Read in full. As `PauseMenu::VolumePage`. |
+| `sub_8220FF30` | `PauseMenu4::ConfirmPage` | | Page 2: `RaceDialog::Update`; 1 (yes) → `Go(3, transition 5)`, 2 (no) → `Go(0)` at once. Returns 0. Not seen in play. Read in full. |
+| `sub_82210910` | `PauseMenu4::AnswerPage` | | Page 3: `SaveVolumes`, then returns the data's +56 (the answer). Not seen in play. Read in full. |
+| `sub_82210488` | `PauseMenu4::StepVolume` | | No arguments: by the list's +28 (-1 or 1) the selected volume (item 0 +8, item 1 +12) stepped within 0 to 15, or item 2's +60 toggled (0 to 1 on 1, 1 to 0 on -1); returns 1 when it changed (a step past a bound stores the bound and answers 0). Only caller `VolumePage`. Not seen in play. Read in full. |
+| `sub_822107B8` | `PauseMenu4::LoadVolumes` | | No arguments: `SaveData::Of(0)`'s bytes +0x1F878 and +0x1F879 (sign-extended) into the data's +0 and +4; +16 and +20 = 15. Only caller `Open`. Not seen in play. Read in full. |
+| `sub_82210820` | `PauseMenu4::SaveVolumes` | | No arguments: the data's +0 and +4 stored back as `SaveData::Of(0)`'s bytes +0x1F878 and +0x1F879. Only caller `AnswerPage`. Not seen in play. Read in full. |
+| `sub_82210C00` | `PauseMenu4::SetUpMain` | | No arguments: the item count (+52, the kind's items up to the first -1, at most 6), `MenuList::Init([0x826D84EC], count, count, 1, 154, 153, 155, 156, 159 accept, 158 back)`, the selection from +64, `ShowItems`. From `OpenMain`, `CloseVolume`. Not seen in play. Read in full. |
+| `sub_82210360` | `PauseMenu4::ShowItems` | | No arguments: for each child of the type-4 node 0 (its +100 the first, +104 the count): the kind's item id from `0x8200CD08` set as the child's text (`UiMovie::SetText(movie, 4, first + i, 1989 + id)`) while below 6 items and not -1, else the child's +80 = 0. Only caller `SetUpMain`. Not seen in play. Read in full. |
+| `sub_82210CD0` | `PauseMenu4::ColorItems` | | No arguments: for each child of the type-4 node 0, its +56, +60 and +64 = 205, 235 and 67 when `MenuList::IsEnabled` answers nonzero for it, else 255 each. Only caller `OpenMain`. Not seen in play. Read in full. |
+| `sub_82211250` | `PauseMenu4::SetUpVolume` | | No arguments: `MenuList::Init(.., 3, 3, 1, ..)`, the edits (+8, +12) from the saved (+0, +4), +60 = 0, `RestoreNodes(-1, 6)`, the labels (the type-6 node 0's children 5 and 6 strings 2004, 2005; node 1's children 3 and 4 strings 4, 7; `UiMovie::Child`, `SetNodeText`), `ShowVolumes`, `ShowVolumesB`. Only caller `OpenVolume`. Not seen in play. Read in full. |
+| `sub_822106E8` | `PauseMenu4::RestoreNodes` | | r3 = a child index or -1, r4 = another: the movie's +24, +16 and +20 node lists' child r3's child r4 (or child r4 when r3 is -1), then `UiMovie::RestorePose(movie, +16's, +24's, 0, 0)` and `(movie, +20's, +24's, 0, 0)`. Only caller `SetUpVolume`. Not seen in play. Read in full. As `PauseMenu::RestoreNodes`. |
+| `sub_82210670` | `PauseMenu4::ShowVolumes` | | No arguments: `ShowVolume` on the type-6 nodes 5 (with +8) and 6 (with +12). From `VolumePage`, `SetUpVolume`. Not seen in play. Read in full. |
+| `sub_822105F8` | `PauseMenu4::ShowVolume` | | r3 = a volume node, r4 = the volume: `UiMovie::SetNodeText(movie, child 2, 8, r4)`, then children 4 to 18's +80 = 1 for the one at the volume, else 0 (the bar's marks). From `ShowVolumes`, `SetVolume`. Not seen in play. Read in full. As `PauseMenu::ShowVolume`. |
+| `sub_82210DE0` | `PauseMenu4::ShowVolumesB` | | No arguments: the type-6 nodes 5 and 6 through `Options::ShowVolumeBar` with +8 and +12. From `VolumePage`, `SetUpVolume`. Not seen in play. Read in full. |
+| `sub_82210420` | `PauseMenu4::SetArrow` (probably) | | r3 = a value (0 or 40): the type-6 node 0's child 0's float +16 = r3 (probably the row arrow's position). Only caller `MoveVolume`. Not seen in play. Read in full. |
+| `sub_8220FF88` | `PauseMenu4::RunTen` | | Transition 0: on its first call the data's +68 = 0; `UiMovie::Run(movie, 0)`, +68 counted; done (1) from the tenth call. Not seen in play. Read in full. |
+| `sub_82211098` | `PauseMenu4::OpenMain` | | Transition 1: on its first call animation 1 played (`UiMovie::Play(movie, -1, 1, ..)`), +64 = 0, `SetUpMain`, `ColorItems`; done when `UiMovie::Run` answers 0. Not seen in play. Read in full. |
+| `sub_82210010` | `PauseMenu4::ShowMain` | | Transition 2: on its first call animation 0 played and looped (group -1), and the type-4 animation selection + 1 played and looped; `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_822100D8` | `PauseMenu4::BackToMain` | | Transition 3: on its first call the type-4 animation selection + 1 played and looped; `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_82210228` | `PauseMenu4::MoveMain` | | Transition 4: on its first call the previous row's type-4 animation finished (`MenuList::GetPreviousSelection` + 1), the new one's played and looped; `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_82210170` | `PauseMenu4::CloseMain` | | Transition 5: on its first call the row's type-4 animation and animation 0 finished, animation 2 played; done when `Run` answers 0. Not seen in play. Read in full. |
+| `sub_822114D8` | `PauseMenu4::OpenVolume` | | Transition 6: on its first call +64 = the selection, its row's type-4 animation finished, `SetUpVolume`, animation 3 played; done when `Run` answers 0. Not seen in play. Read in full. |
+| `sub_822102D8` | `PauseMenu4::ShowVolumeRow` | | Transition 7: on its first call the type-6 animation 1 played and looped (`UiMovie::LoopLast`); `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_82210940` | `PauseMenu4::MoveVolume` | | Transition 8: on its first call the previous row's type-6 animation finished (rows: items 0 and 1 rows 1 and 2, item 2 by +60 4 (1) or 3); leaving item 2: `SetArrow(0)` for item 0, `SetArrow(40)` for item 1, +60 = 0; the new row's played and looped; named animations 19 and 20 finished, and unless item 2 is either end, named 20 (a move down, the list's +24 1) or 19 (up, -1) played. `Run`; returns 1. A 176-byte frame. Not seen in play. Read in full. |
+| `sub_82210B08` | `PauseMenu4::SetVolume` | | Transition 9: on its first call, on item 2 the type-6 row 3 or 4 finished and the other played and looped (by +60); else `ShowVolume` on nodes 6 (+12) and 5 (+8). `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_82211138` | `PauseMenu4::CloseVolume` | | Transition 10: on its first call the row's type-6 animation finished (items 0 and 1 rows 1 and 2, item 2 by +60 4 (1) or 3; none from item 3 on), animation 4 played, `SetUpMain`; when `Run` answers 0, `ScreenPages::Go(0, transition 3)` and the step word = 0. Returns 0 (the chained transition ends it). Not seen in play. Read in full. |
+
+## The results at +1028
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8221F990` | `RaceResults::Open` | | r3 = the screen (`[0x82814E18]`), r4 = a 20-byte block (`RaceHudMachine::ShowResults`'s): copied into +0 to +16; UI movie 7 found into +20, its pose reset; the page object (+24) `ScreenPages::Init(0)` and `Go(0, transition 0, then 1)`; `SetTexts`. Only caller `RaceHudMachine::ShowResults`. Not seen in play. Read in full. |
+| `sub_8221F930` | `RaceResults::Update` | | r3 = the screen: the page's handler (+24: 0 `MainPage`, 1 the shared "returns 1" `sub_825C8390`; a table on the stack), its result returned; 0 while a transition runs. From `RaceHudMachine::ResultsUpdate`. Not seen in play. Read in full. |
+| `sub_8221F7D0` | `RaceResults::Draw` | | r3 = the screen: with a transition running (+36 = the page object's +12, 0 or more), its handler (0 `Intro`, 1 `Show`, 2 `Close`) with r3 = +48, then `ScreenPages::Finish(+24, result)`; with none (any negative value: the -1 test after it is never reached), `UiMovie::Run(+20, 0)`. From `RaceHudMachine::ResultsDraw`. Not seen in play. Read in full. |
+| `sub_8221F870` | `RaceResults::MainPage` | | Page 0: the player's mapper entry (`0x826BAB80` + 8 × `[0x826BABA4]`), unless blocked (+4 1): its slot 10 (`ActionMapper::Pressed`) for 159 (accept), then 158 (back); either → `MenuSound::Play(0)`, `ScreenPages::Go(1, transition 2)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221F628` | `RaceResults::SetTexts` | | r3 = the screen: the type-5 texts (`UiMovie::SetText`): items 2 to 5 strings 1976 to 1979; item 6 string 528 with +4's time (minutes, seconds, thousandths; capped at 59:59.999); item 7 a string from a table on the stack by +8 (395, 396, 397, 398, 401, 402, 404, 403, 409, 410, 411); item 8 string 1718 + (+12); item 9 by +16: 0 → 1985, 1 → 1986, 2 → 1987, 3 to 9 → 1984 with +16 + 1, 10 → 1988, above 10 nothing. Only caller `Open`. Not seen in play. Read in full. |
+| `sub_8221F428` | `RaceResults::Intro` | | Transition 0: on its first call named animation 2 played (3 when the block's +0 is 0); done when `Run` answers 0. Not seen in play. Read in full. |
+| `sub_8221F4B0` | `RaceResults::Show` | | Transition 1: on its first call named animation 4 played and looped, then 6 (the block's +0 set) or 7 played and looped; `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_8221F580` | `RaceResults::Close` | | Transition 2: on its first call named animations 6, 7 and 4 finished, 5 played; done when `Run` answers 0. Not seen in play. Read in full. |
+
+## The results at +1032
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82220050` | `SplitResults::Open` | | r3 = the screen (`[0x82814E1C]`), r4 = the outcome (+0), r5 = the mode (+4): UI movie 8 found into +8, its pose reset; the page object (+12) `ScreenPages::Init(0)` and `Go(0, transition 0, then 1)`; `[0x82814E20]` and `[0x82814E24]` = 0. From `RaceHudMachine::ShowSplitResults` and `ShowKind6Results`. Not seen in play. Read in full. |
+| `sub_8221FFF0` | `SplitResults::Update` | | r3 = the screen: the page's handler (+12: 0 `MainPage`, 1 `sub_825C8390`, "returns 1"), its result returned; 0 while a transition runs. From `RaceHudMachine::ResultsUpdate` (kinds 4 and 6). Not seen in play. Read in full. |
+| `sub_822200E0` | `SplitResults::Draw` | | r3 = the screen. The stage (`Stages::Copy(frame, race data + 0x59620, -1)`): race kind 6 (+0xA3AF0) with the stage's +0 not 1 and `[0x82814E24]` 0 (the network battle, its result not yet exchanged): past 900 ticks (`[0x82814E20]`) the sign-in watch's state `[0x826BAB3C]` = 1 with the reason `[0x826BAB5C]` = 6 when it was 0 (probably the connection lost); else a packet built in the frame (type 23, the outcome, an id from `[[0x826D82E8]` + 7244] split into bytes) and sent to each peer in the list at `0x826C7308` (+4 to +8, 384-byte entries, +8 the address; when `[0x826C7824]` is set) or to `[0x826C7320]`: `sub_8214AB48` on the first tick, `sub_8214AA70` (a bigger packet) after; the tick counted; once `[0x826C6B0C]` (a byte) isn't 255 (the answer came) and `[0x826C7824]` is 0: the last racer record (`RacerRecords::At(race data + 0x59AE8, count - 1)`) by it: 0 → +3924 = 1, outcome 1; 1 → +3924 = 2, outcome 0; else +3920 = 0, outcome 2; then `[0x82814E24]` = 1, `[0x82814E20]` = 0, `[0x826C6B04]` = 0. Otherwise the page object's transition (0 `Intro`, 1 `Show`, 2 `Close`, r3 = +36) and `ScreenPages::Finish`, or `UiMovie::Run(+8, 0)` (any negative transition). A 1,856-byte frame (`__savegprlr_24`). From `RaceHudMachine::ResultsDraw`. Not seen in play. Read in full; the bounds traps (`twi`) of the peer list's iterator are kept. The network battle's branch is an Xbox Live feature: by the user's call (2026-11-12) native with its Live calls answered by plugging in data. |
+| `sub_8221FE70` | `SplitResults::MainPage` | | Page 0: the stage as in `Draw`; in the network battle (kind 6, the stage's +0 not 1): once `[0x82814E24]` is 1, `[0x82814E20]` counted, and past 210 `Go(1, transition 2)` (no sound); else accept (159) or back (158) on either player's mapper entry (`[0x826BABA4]` and `[0x826BABA8]`, unless blocked) → `MenuSound::Play(0)`, `Go(1, 2)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221FAC8` | `SplitResults::Intro` | | Transition 0: on its first call, by the mode (+4): 0 → the group -1 node 0's +80 = 1, named animation by the outcome (0, 1, 2; none from 3); 1 → its +80 = 0, by the outcome 3, 4, 2; 2 → +80 = 1, named 5; played (`PlayNamed`); done when `Run` answers 0. Not seen in play. Read in full. |
+| `sub_8221FBE8` | `SplitResults::Show` | | Transition 1: on its first call named animation 6 played and looped, then by the mode and outcome: mode 0 8, 9, 10; mode 1 11, 12, 10; mode 2 13; played and looped. `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_8221FD98` | `SplitResults::Close` | | Transition 2: on its first call named animations 8, 9, 10, 6, 11, 12 and 13 finished, 7 played; done when `Run` answers 0. Not seen in play. Read in full. |
+
+## Kind 6's screen after the race
+
+Its block (`[0x82814E10]`, 360 bytes): +0 to +20 the 24-byte block
+`RaceHudMachine::ShowKind6Results` passes (+4 the result's +20, a
+packed time, capped at 59:59.999 by `Open`; +12 its +4); +24, +28, +32,
++36 UI movies 17 (the menu), 20 (a question box), 21 (a message box) and
+14 (a waiting box); +40 page object A (its +12 the transition, +24 the
+step word at +64); +68 the main menu (68 bytes, a front-end menu,
+`Menu::Step`: +68 the cursor, +72 the cursor before, +76 the last move,
+4 items); +136 the replay slots' menu list (72 bytes); +208 page object
+B (step word +232); +236 the question box's menu (68 bytes: +236 the
+cursor, +244 moved); +308 the player's rank, +312 the rows read, +316 a
+flag (the time attack's rows or record shown), +320 a leaderboard read
+started, +324 the box's message (string id: 44, 48 to 52, 57), +328 and
++332 which message or question (0 to 3, 1 or 2), +336 the menu's movie
+running, +340 the menu's input on (0 while a box opens or shows), +344
+a request from `sub_82211E90`, +348 the box shown (0 the question, 1
+the message, 2 the waiting box, 3 none), +352 a request from
+`sub_82211F18` (to page 7 with message 44), +356 the ranking skipped.
+`[0x82814E14]` the answer (1 to 3, 0 to 2 also open it with its
+movies' poses reset).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8221EC48` | `Kind6Menu::Open` | | r3 = the screen, r4 = a 24-byte block: copied in (`memcpy`), +4 capped at 59:59.999; UI movies 17, 20, 21 and 14 found into +24 to +36, their poses reset when `[0x82814E14]` is 0 to 2; page objects A and B `ScreenPages::Init(0)`; `[0x82814E10]` +336 = 0; with `[0x82814E14]` 0 to 2: +324 = 44, `Go(A, 12, transition 0, then 1)`, `Go(B, 5, transition 5)`, else `Go(A, 0)`; +68 to +132 the menu's words (+84 = 3, +88 = 1, the rest 0), `MenuList::Init(+136, 4, 4, 1, 154, 153, 155, 156, 159, 158)`, +236 to +300 the question box's menu (+252 and +256 = 1); with 0 to 2: the time in milliseconds (minutes × 60,000 + seconds × 1,000 + thousandths) into `[0x82816E3C]` +200 (a doubleword), +304 to +356 cleared (+348 = 3); +340 = 1, `SetUpTexts`; with 0 to 2 `HidePanels`. A 160-byte frame. From `RaceHudMachine::ShowKind6Results`. Not seen in play. Read in full. |
+| `sub_8221F1E8` | `Kind6Menu::Update` | | r3 = the screen: with +352 set: +324 = 44, `Go(A, 7)`, `Go(B, 5, transition 5)`, +352 and +320 = 0. Then B's page handler (0 and 5 `sub_825C8388`, "returns 0"; 1 `QuestionPage`, 2 `QuestionAnswerPage`, 3 `MessagePage`, 4 `WaitingPage`) and A's (0 `MainPage`, 1 `AnswerPage`, 2 `SlotPage`, 3 `SavePage`, 4 `OverwritePage`, 5 `SavingPage`, 6 `CheckRecordPage`, 7 `RankingReadPage`, 8 `UploadPage`, 9 `MenuBackPage`, 10 `UploadResultPage`, 11 `sub_825C8388`, 12 `RankingPage`, 13 `QuitPage`, 14 `MessageBackPage`; tables on the stack), A's result returned (0 with no page). A 256-byte frame (`__savegprlr_17`). From `RaceHudMachine::AfterRaceUpdate` (kind 6). Not seen in play. Read in full. |
+| `sub_8221EF60` | `Kind6Menu::Draw` | | r3 = the screen: A's transition (0 `Intro`, 1 `Show`, 2 `RunToEnd`, 3 `MoveMain`, 4 `OpenList`, 5 `CloseList`, 6 `MoveList`, 7 `BackToQuit`; r3 = +64) and `ScreenPages::Finish(A)`, or with none and `[0x82814E10]` +336 set `UiMovie::Run(+24, 0)`; `RaceDialog::Draw` when A's page is 3 to 5 or 13. Then B's transition (0 `OpenQuestion`, 1 `CloseQuestion`, 2 `OpenMessage`, 3 `CloseMessage`, 4 `MoveQuestion`, 5 `OpenWaiting`, 6 `CloseWaiting`; r3 = +232) and `Finish(B)`, or with +336 set the box's movie run by B's page (1 and 2 +28, 3 and 4 +32, 5 +36). Then with +344 set: `[0x82816E3C]` +236 = 3, +344 = 0, and by +348: 0 → `Go(B, 0, transition 1)`, 1 → `Go(B, 0, 3)`, 2 → `Go(B, 0, 6)`, 3 → none; then (0 to 3) `Go(A, 11)`. From `RaceHudMachine::AfterRaceDraw` (kind 6, the last result's +3916 1 or 3): every Draw, render-only passes too. Not seen in play. Read in full. |
+| `sub_8221C168` | `Kind6Menu::Close` | | No arguments: `UiMovie::FinishAll` on each of `[0x82814E10]`'s four movies (+24 to +36) that isn't 0. From `RaceHudMachine::CloseResults` (kind 6). Not seen in play. Read in full. |
+| `sub_8221E788` | `Kind6Menu::MainPage` | | A's page 0, with +340 set: `Menu::Step(+68)`; accept (`Menu::Pressed(+68, 159)`) → `sub_822927B0(4109)`, `MenuSound::Play(0)`, by the cursor: 0, 1 → `Go(B, 0)`, `Go(A, 1)` (the answer); 2 → `Go(A, 3)`, `Go(B, 0)`, `SaveBuffers::Create`, `RaceDialog::StartSave` (the replay's save); 3 → `RaceDialog::Open(2, 0)`, `Go(A, 13)`, `Go(B, 0)`; back (158) → `Go(A, 0, transition 7)`; else a move (+76) → `Go(A, 0, transition 3)`, sound 4. Returns 0. Not seen in play. Read in full. |
+| `sub_8221C1E0` | `Kind6Menu::AnswerPage` | | A's page 1: by the cursor: 0 → 1, 1 → 2, 3 → 3 (with `[0x82816E3C]` +240 = 0, 0 and 1), 2 and others → 3 (+240 left); stored in `[0x82814E14]` and returned (the answer). Leaf. Not seen in play. Read in full. |
+| `sub_8221DA60` | `Kind6Menu::SlotPage` | | A's page 2 (the replay slots): `SaveSlots::State(0)` 1 → `RaceDialog::ShowSaving`, `Go(A, 5)`; `MenuList::Update(+136)`; accept → `Go(A, 4)`, `SaveReplay`; back → `Go(A, 0, transition 5)`; else a move (the list's +24) or a scroll (+4 against +8) → `Go(A, 2, transition 6)`. Returns 0. Not seen in play. Read in full. As `AfterRaceMenu::ListPage`, probably. |
+| `sub_8221C238` | `Kind6Menu::SavePage` | | A's page 3: `RaceDialog::Update`; 1 → `Go(A, 2, transition 4)` (the slot list); 2 → +340 = 1, `Go(A, 0)`, `SaveBuffers::Destroy`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221E908` | `Kind6Menu::OverwritePage` | | A's page 4: `RaceDialog::Update`; 1 → `Go(A, 2)`, `SetUpList`; 2 → `SaveBuffers::Destroy`, `Go(A, 0, transition 5)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221C2B8` | `Kind6Menu::SavingPage` | | A's page 5: `RaceDialog::Update`; any answer → `SaveBuffers::Destroy`, `Go(A, 0, transition 5)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221C308` | `Kind6Menu::QuitPage` | | A's page 13: `RaceDialog::Update`; 1 → `Go(A, 1)` (the answer), 2 → `Go(A, 0)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221E510` | `Kind6Menu::CheckRecordPage` (probably) | | A's page 6: with `[0x82816E3C]` +208 above +200 (doublewords, unsigned): `sub_822927B0(4111)`, +160 = 1, +236 = 0, `Go(A, 8)`, `[0x82814E10]` +316 = 1; else +316 = 0, `Go(A, 9)`, `Go(B, 0, transition 6)`, `ShowRanking`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221C008` | `Kind6Menu::RankingReadPage` (probably) | | A's page 7, unless +356: when no read is started (+320 0): `sub_822927B0(4112)`, `sub_82292CC0(session, 0, session +168)` (the leaderboard read around the player's XUID), with +340 set +324 = 44 and `Go(B, 5, transition 5)`; +320 = 1. Then by the session's +180: 2 → (+340 0: `Go(B, 0, 6)`), `Go(A, 9)`, +320 = 0; 3 and up → (+340 0: `Go(B, 3, transition 6, then 2)`), `Go(A, 11)`, +320 = 0, +324 = 57, +328 = 1; 0 and 1 nothing. Returns 0. Not seen in play. Read in full. |
+| `sub_8221E5E8` | `Kind6Menu::UploadPage` (probably) | | A's page 8: with the session's +224 set and +236 1: the rank (`sub_822914A8`) up to 19 → with +228 set: `Go(A, 11)`, +316 = 1, +324 = 48, +332 = 1, `Go(B, 4, transition 6)`, `ShowPanelB`; else `Go(A, 11)`, +316 = 1, +328 = 3, +324 = 49, `Go(B, 3, 6, then 2)`, the session's +236 = 2, `ShowPanelA`; above 19 → +236 = 3, +316 = 1, `Go(A, 9)`, `Go(B, 0, 6)`; then `ShowRanking`. Then with +232 set: +236 = 3, +316 = 0, +328 = 1, +324 = 57, `Go(B, 3, 6, then 2)`, `Go(A, 11)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221D898` | `Kind6Menu::MenuBackPage` (probably) | | A's page 9: with +340 set, `Go(A, 0)`, `Go(B, 0)`, `ShowPanelA`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221D908` | `Kind6Menu::UploadResultPage` (probably) | | A's page 10, by the session's +236: 0 → `Go(A, 14)`, `Go(B, 4, transition 6)`; 4 → `Go(A, 11)`, `Go(B, 3, 6, then 2)`, +324 = 52, +328 = 2, `ShowPanelA`; others nothing. Returns 0. Not seen in play. Read in full. |
+| `sub_8221BE90` | `Kind6Menu::RankingPage` (probably) | | A's page 12 (the first after the race): with the session's +144 0 and no read started: `sub_822927B0(4112)`, `sub_82292CC0(session, 0, session +168)`, +320 = 1. Then by the session's +180: 2 → `Go(A, 6)`, +308 = the rank (`sub_822914A8`), +312 = the view's rows read (`[0x826C6AD4]` +4's +8, -1 without results), +320 = 0; 3 → `sub_822927B0(4111)`, the session's +160 = 1, `Go(A, 8)`, +316 = 1, +320 = 0; 4 and up → `Go(A, 11)`, `Go(B, 3, transition 6, then 2)`, +320 = 0, +324 = 57, +328 = 1; 0 and 1 nothing. Returns 0. Not seen in play. Read in full. |
+| `sub_8221D9D8` | `Kind6Menu::MessageBackPage` (probably) | | A's page 14: with +340 set, `Go(A, 11)`, `Go(B, 3, transition 2)`, +324 = 51, +328 = 0, `ShowPanelA`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221E980` | `Kind6Menu::QuestionPage` | | B's page 1 (a yes or no box): `Menu::Step(+236)`; accept (159, sound 0) on item 0 → `Go(A, 11)`, `Go(B, 2, transition 1)`, +324 = 50, +332 = 2; on item 1, and back (158, sound 2) → +320 = 0, `Go(A, 9)`, `Go(B, 0, 1)`, the session's +236 = 3, +356 = 1. Then a move (+244) → sound 4, `Go(B, 1, transition 4)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221C360` | `Kind6Menu::QuestionAnswerPage` | | B's page 2, by +332: 1 → `Go(B, 1, transition 0)`; 2 → the session's +236 = 2, `Go(A, 10)`, `Go(B, 5, transition 5)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221EAE8` | `Kind6Menu::MessagePage` | | B's page 3: accept (`Menu::Pressed(+236, 159)`, sound 0), by +328: 0, 2, 3 → +320 = 0, `Go(A, 9)`, `Go(B, 0, transition 3)`; 1 → `ShowTimeOnly`, `Go(A, 0)`, `Go(B, 0, 3)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221C3F0` | `Kind6Menu::WaitingPage` | | B's page 4: with +332 1, `Go(B, 1, transition 0)`. Returns 0. Not seen in play. Read in full. |
+| `sub_8221C438` | `Kind6Menu::Intro` | | A's transition 0: on its first call movie 17's `FinishAll`, named animation 123 played, +336 = 1; when `Run` answers 0, named 124, 0, 68 and 47 played and looped (`LoopLast`), done. Not seen in play. Read in full. |
+| `sub_8221C550` | `Kind6Menu::Show` | | A's transition 1: on its first call named animation 7 played and looped; `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_8221C5D8` | `Kind6Menu::RunToEnd` | | A's transition 2: done when movie 17's `Run` answers 0. Not seen in play. Read in full. |
+| `sub_8221DB48` | `Kind6Menu::MoveMain` | | A's transition 3: on its first call named 17, 18 and the previous item's (7 + it) finished, the item's (7 + the cursor) played and looped; a wrap (0 to 3 or 3 to 0) moves the cursor (`SetCursorX(0)` or `(120)`), else named 17 (the move -1) or 18 (1) played; the help text (`UiMovie::SetText(2, 0, 967 + the cursor)`, `sub_8211C5F8`). `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_8221DC88` | `Kind6Menu::BackToQuit` | | A's transition 7 (back on the menu): on its first call the cursor before (+72) = the cursor, the cursor = 3; named 17, 18 and 7 to 10 finished, 10 played and looped, `SetCursorX(120)`, the help text 970, `sub_8211C5F8`. `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_8221EB98` | `Kind6Menu::OpenList` | | A's transition 4: on its first call named 126 played, `SetUpList`; when `Run` answers 0, the row's named animation (72 + the selection) played and looped, done. Not seen in play. Read in full. |
+| `sub_8221C628` | `Kind6Menu::CloseList` | | A's transition 5: on its first call the row's named animation (72 + the selection) finished, 127 played; done when `Run` answers 0. Not seen in play. Read in full. |
+| `sub_8221DD78` | `Kind6Menu::MoveList` | | A's transition 6: on its first call the previous row's named animation finished and the new one's played and looped, `ShowReplay` of the record (the scroll + the selection), named 82 and 83 finished; without a wrap (the list's +32 0) the type-14 node 2's child 0's +16 = 40 × the selection; with one, the first or last record's text (child 15 or 14, string 471 with the record's +28 or +352) and named 82 or 83 played; on a scroll, named 94 and 95 finished, `ShowList`, 95 (down) or 94 played. `Run`; returns 1. Not seen in play. Read in full. As `AfterRaceMenu::MoveList`, probably. |
+| `sub_8221C6C8` | `Kind6Menu::OpenQuestion` | | B's transition 0: on its first call movie 20's texts (`SetText(1, 3, 2)`, `(1, 4, 3)`, `(-1, 0, +324)`), named 5 played, +340 and +348 = 0, `MenuSound::Play(5)`; when `Run` answers 0, named 1 and 2 finished and the question's item (+236 + 1) played and looped, done. Not seen in play. Read in full. |
+| `sub_8221C7D8` | `Kind6Menu::CloseQuestion` | | B's transition 1: on its first call named 1 and 2 finished, 6 played, sound 5; when `Run` answers 0, +348 = 3, +340 = 1, +356 = 0, done. Not seen in play. Read in full. |
+| `sub_8221C888` | `Kind6Menu::MoveQuestion` | | B's transition 4: on its first call named 1 and 2 finished, the item's (+236 + 1) played and looped; `Run`; returns 1. Not seen in play. Read in full. |
+| `sub_8221CAB8` | `Kind6Menu::OpenMessage` | | B's transition 2: on its first call movie 21's text (`SetText(-1, 1, +324)`), named 2 played, +340 = 0, +348 = 1, sound 5; done when `Run` answers 0. Not seen in play. Read in full. |
+| `sub_8221CB50` | `Kind6Menu::CloseMessage` | | B's transition 3: on its first call named 3 played, sound 5; when `Run` answers 0, +348 = 3, +340 = 1, done. Not seen in play. Read in full. |
+| `sub_8221C920` | `Kind6Menu::OpenWaiting` | | B's transition 5: on its first call movie 14's type-0 node 2: child 1's text +324 (`SetNodeText`), child 0's +80 = 0; named 13 played, 0 finished, played and looped; +348 = 2, +340 = 0, sound 5; done when `Run` answers 0. Not seen in play. Read in full. |
+| `sub_8221CA20` | `Kind6Menu::CloseWaiting` | | B's transition 6: on its first call named 15 played, sound 5; when `Run` answers 0, +348 = 3, +340 = 1, named 0 finished, done. Not seen in play. Read in full. |
+| `sub_8221E038` | `Kind6Menu::SetUpTexts` | | r3 = the screen: movie 17's type-3 items 5 to 8 strings 1965, 1961, 1962, 115 (the menu); nodes 23 to 27 (the ranking's rows) +80 = 0; `ShowPanelA`; the course's name (`[0x82816660]` 0 to 7: strings 395, 396, 397, 398, 401, 402, 404, 403; a jump table, case 0 split off as `sub_8221E0FC`) as text 21; text 22 = 1 when `[0x82816680]` is 0, else 0; nodes 17 and 16 hidden (`UiMovie::HideNode`); `ShowCourse`, `ShowHelp`. From `Open`. Not seen in play. Read in full. |
+| `sub_8221E0FC` | | | Case 0 of `Kind6Menu::SetUpTexts`' jump table (string 395, then the shared tail to the end of SetUpTexts), split into a function of its own by the recompiler (it uses SetUpTexts' r29 and frame). Not seen in play. Read in full. |
+| `sub_8221D1A8` | `Kind6Menu::ShowCourse` | | No arguments: movie 17's type-9 items 55 to 58 strings 402, 401, 407, 408; by the course (`[0x82816660]` 0 to 7, a jump table, case 0 split off as `sub_8221D2B4`), two tables on the stack (node 6 + (0, 0, 2, 2, 5, 6, 3, 4) and 6 + (-1, -1, -1, -1, 25, 26, -1, -1)): the type-9 nodes 6 to 32's +80 = 0, the course's two nodes' = 1; named 47 to 65 finished, the course's (47 + (1, 0, 2, 3, 4, 5, 6, 7)) played. A 208-byte frame. From `SetUpTexts`. Not seen in play. Read in full. Probably the course's map. |
+| `sub_8221D2B4` | | | Case 0 of `Kind6Menu::ShowCourse`'s jump table (the course 0, then the shared tail to the end of ShowCourse), split into a function of its own by the recompiler (it uses ShowCourse's registers and frame). Not seen in play. Read in full. |
+| `sub_8221D130` | `Kind6Menu::ShowHelp` | | No arguments: movie 17's type-2 text 0 = string 967, its scroll speed set (`sub_8211C4F0(.., 300, f1 = [0x82000A30])`) and scrolled (`UiMovie::ScrollText(.., 1)`). From `SetUpTexts`. Not seen in play. Read in full. |
+| `sub_8221D7B0` | `Kind6Menu::SetCursorX` (probably) | | r3 = a value (0 or 120, unsigned): movie 17's type-3 node 0's float +16 = r3. From `MoveMain`, `BackToQuit`. Not seen in play. Read in full. |
+| `sub_8221D050` | `Kind6Menu::ShowPanelA` | | No arguments: movie 17's type-1 nodes 4 and 5 shown (`UiMovie::ShowNode`), and when both exist their +108 = 0 and nodes 6 to 9 hidden. From `SetUpTexts`, `MenuBackPage`, `UploadResultPage`, `UploadPage`, `MessageBackPage`. Not seen in play. Read in full. |
+| `sub_8221CEA0` | `Kind6Menu::ShowPanelB` | | No arguments: movie 17's type-1 nodes 4 and 5 shown, +108 = 0 when both exist; then nodes 6 and 7 shown, +108 = 1 when both exist, and nodes 8 and 9 hidden. Only caller `UploadPage`. Not seen in play. Read in full. |
+| `sub_8221CFC0` | `Kind6Menu::HidePanels` | | No arguments: movie 17's type-1 nodes 4 to 9 hidden. Only caller `Open`. Not seen in play. Read in full. |
+| `sub_8221D3D0` | `Kind6Menu::ShowTimeOnly` (probably) | | No arguments: with +316 set node 16 hidden; node 17 shown with the race's time (string 528, +4's minutes, seconds, thousandths); the ranking's rows (nodes 23 to 27) shown with placeholders (children 0, 1 and 6 strings 533, 534, 531; child 2's child 0's +108 = 0). Only caller `MessagePage`. Not seen in play. Read in full. |
+| `sub_8221E1A0` | `Kind6Menu::ShowRanking` | | No arguments: the rank (`sub_822914A8`) and the view's total rows (`[0x826C6AD4]` +4's +4, -1 without results); the first row shown at the rank - 2 (0 below 2), the first slot by the total and the rank (fewer than 5 rows: 2 for 1, 1 or 2 for 2, 0 or 1 for 3 and 4); node 16 shown with +316 set, node 17 with the race's time (528); then each slot up to 5 (nodes 23 to 27; the player's first two places skipped by rank): +80 = 1, child 0 the row's rank (`SetNodeText` 8), child 1 its gamer tag (`UiMovie::SetNodeCharText`, row +24), child 2's child 0's +108 = `sub_8225FFC8`(column 1's value) (probably the car's logo), child 6 the row's time (string 528, `RankingTime`) when not all 0; stops at a row missing. A 240-byte frame. From `CheckRecordPage`, `UploadPage`. Not seen in play. Read in full. |
+| `sub_8221D808` | `Kind6Menu::RankingTime` | | r3 = a row, r4, r5, r6 = minutes, seconds and thousandths out: row r3's column 0 value (`[0x826C6AD4]` +4's +12 + 48 × r3, its +44, the doubleword +16; 0 without results) in milliseconds split; nothing written when 0; 60 minutes and up → 59:59.999. Leaf. Only caller `ShowRanking`. Not seen in play. Read in full. |
+| `sub_8221DF70` | `Kind6Menu::SetUpList` | | No arguments: the replay list (`[0x828161F0]`: +12 the 36-byte records, +20 the count) as `MenuList::Init(+136, count, at most 9, 1, ..)`; movie 17's type-14 node 2's child 0's +16 = 40 × the selection; `ShowList`, `ShowReplay` of the selected record. From `OverwritePage`, `OpenList`. Not seen in play. Read in full. As `AfterRaceMenu::SetUpList` with nine rows. |
+| `sub_8221D4E8` | `Kind6Menu::ShowList` | | No arguments: movie 17's type-14 node 2's children 5 to 13 cleared (`UiMovie::ClearNodeText`), then string 472 (empty) or 471 (used) by each record's +28 from the scroll on; the scroll marks (nodes 7 and 8's +80) by the scroll against the count. A 176-byte frame. From `SetUpList`, `MoveList`. Not seen in play. Read in full. As `AfterRaceMenu::ShowList` with nine rows. |
+| `sub_8221CBD8` | `Kind6Menu::ShowReplay` | | r3 = a replay record: as `AfterRaceMenu::ShowReplay` on movie 17's type-14 texts (10, 12, 13, 17, 19 to 21): with +28 set, the date and time (string 530 with the halfwords +0 to +10), kind (473 + +20), course (1646, 1790, 1718 + +24), time (528) and a result by +20 (strings by +32, 477, or 4650 + +32); else the texts cleared (`UiMovie::ClearText`). From `SetUpList`, `MoveList`. Not seen in play. Read in outline. |
+| `sub_8221D678` | `Kind6Menu::SaveReplay` | | No arguments: a record in the frame for the selected slot (the list's scroll + selection): the date (`GetLocalTime`, +32 = 0), +24 the race data's +60, +16 the last racer record's +3932 as a time (`RaceTime::FromTicks`), and by the race kind: 1 → +20 = 0, +32 its +980; 2 → +20 = 1, +32 its +3892; 4 → 2, +32 = 0; 6 → 3, +32 its +3892; then `RaceDialog::AskSlot(slot, record, [0x826C5B50])`. Only caller `SlotPage`. Not seen in play. Read in full. As `AfterRaceMenu::SaveReplay`. |

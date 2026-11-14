@@ -761,6 +761,12 @@ Rows not yet moved stay in the table below. So far:
   screen (the five-item menu over the two players' cars on the stand,
   with the stand's model updates) and its yes/no dialog (B7; mapped,
   none seen in play).
+- [`race-screens-unseen.md`](race-screens-unseen.md): the four in-race
+  screens never seen in play: kind 4's pause menu (probably the split
+  screen's), the results at the holder's +1028 and +1032 (with the
+  network battle's result exchange) and kind 6's screen after the race
+  (the Xbox Live mode's race: its menu, the replay's save and the time
+  attack's leaderboard) (B7; mapped, none seen in play).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
