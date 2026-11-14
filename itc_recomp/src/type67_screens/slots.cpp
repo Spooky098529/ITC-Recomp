@@ -285,6 +285,9 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
     case 0x822405F8:
       if (!r4) return std::nullopt;
       return Type7PanelScreenPickCar(base, r3, *r4, sp, calls);
+    case 0x82230C88:
+      if (!r4) return std::nullopt;
+      return Type6PanelScreenPickCar(base, r3, *r4, sp, calls);
     case 0x82247E88:
       if (!r4) return std::nullopt;
       return NodeTableDeletingDestruct(base, r3, *r4, sp, calls);
@@ -400,6 +403,7 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82247058:
     case 0x822408B8:
     case 0x822405F8:
+    case 0x82230C88:
     case 0x82247E88:
       return has_r4;
     case kEmpty:

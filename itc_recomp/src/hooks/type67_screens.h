@@ -264,4 +264,10 @@ void NodeScreenSetUpTexts(PPCContext& ctx, uint8_t* base);
 void Type6NodeScreenDestruct(PPCContext& ctx, uint8_t* base);
 void Type6NodeScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
+// The type 6 panel screen's Draw and PickCar (its DrawList and both panel
+// screens' AskQuit have no adapters: only the native Draws and DrawLists
+// call them).
+void Type6PanelScreenDraw(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenPickCar(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

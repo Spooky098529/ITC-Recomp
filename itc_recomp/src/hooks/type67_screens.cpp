@@ -126,7 +126,9 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "Type6NodeScreen::SetUpMenus sub_82236F00, SetText sub_822370A0, Back "
               "sub_82237110, SetIcons sub_82237160, SetScrollText sub_82237228, ShowMarks "
               "sub_822372A0, ~Type6NodeScreen sub_82236EA0 and DeletingDestructor "
-              "sub_82237048, NodeScreen::SetUpTexts sub_82247FE0 natively instead of "
+              "sub_82237048, NodeScreen::SetUpTexts sub_82247FE0; Type6PanelScreen::Draw "
+              "sub_82230F40 (with DrawList sub_82230EF0 and AskQuit sub_82230BA8) and PickCar "
+              "sub_82230C88, Type7PanelScreen::AskQuit sub_82240518 natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -545,6 +547,12 @@ ITC_TS_STEP(Type6NodeScreenDestruct,
 ITC_TS_STEP(Type6NodeScreenDeletingDestruct,
             ts::Type6NodeScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
+// The type 6 panel screen's Draw and PickCar.
+ITC_TS_STEP(Type6PanelScreenDraw,
+            ts::Type6PanelScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6PanelScreenPickCar,
+            ts::Type6PanelScreenPickCar(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -837,3 +845,6 @@ ITC_TYPE67_SCREENS(822372A0, Type6NodeScreenShowMarks)
 ITC_TYPE67_SCREENS(82247FE0, NodeScreenSetUpTexts)
 ITC_TYPE67_SCREENS(82236EA0, Type6NodeScreenDestruct)
 ITC_TYPE67_SCREENS(82237048, Type6NodeScreenDeletingDestruct)
+// The type 6 panel screen's Draw ((5, 1), a transition) and PickCar (slot 3).
+ITC_TYPE67_SCREENS(82230F40, Type6PanelScreenDraw)
+ITC_TYPE67_SCREENS(82230C88, Type6PanelScreenPickCar)

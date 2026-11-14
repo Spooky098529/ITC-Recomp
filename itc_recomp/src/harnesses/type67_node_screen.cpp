@@ -41,6 +41,11 @@
 // C++; in frames that call SetText, +48 to +79), r1 and r3. The deleting
 // destructor with bit 0 set runs on blocks of operator new's, compared by
 // r3 and whether the block is handed out again.
+//
+// The panel screens' quit dialog (Type6PanelScreen's Draw, DrawList and
+// AskQuit, Type7PanelScreen's AskQuit and its Draw and DrawList with it)
+// runs in this file too, for the movie world's text nodes: a panel world
+// laid over the same block (LayPanel).
 
 #include "harness.h"
 
@@ -73,6 +78,7 @@ namespace {
 
 namespace lw = loading_world;
 namespace rs = race_screens;
+namespace ts = type67_screens;
 
 constexpr uint32_t kMissingMovie = 0x826C5CDC;
 constexpr uint32_t kNone = 0xFFFFFFFFu;
@@ -146,6 +152,7 @@ enum class Kind {
   kInit,      // item blocks 0 or pages, the new ones compared and freed
   kDispatcher,  // r4 the dispatcher
   kIndex,     // r4 0 to 9
+  kPanel,     // the panel screen's world (LayPanel), r4 the dispatcher
 };
 
 bool Inits(Kind kind) { return kind == Kind::kInit; }
@@ -216,9 +223,44 @@ void LayRecords(uint8_t* base, uint32_t records, Random& r) {
   }
 }
 
+// The panel screens' world (Type6PanelScreen's Draw, DrawList and AskQuit,
+// Type7PanelScreen's with AskQuit): the screen a block of random words, its
+// vtable stand-ins, the quit dialog's state +9656 (0 to 3, mostly 0) and
+// +11700 (0 or 1), its car list (+9644) at +0x3600 with stand-ins for its
+// vtable (+0x3A00) and its +80 0 or random (the getter's answers), the
+// dispatcher's ring's count and start small, the fade counts 0 or small.
+void LayPanel(uint8_t* base, uint32_t block, Random& r) {
+  constexpr uint32_t kListAt = 0x3600, kListVtableAt = 0x3A00;
+  const uint32_t s = block;
+  guest::StoreU32(base, s + 9656, r.Below(2) == 0 ? 0 : r.Below(4));
+  guest::StoreU32(base, s + 11700, r.Below(2));
+  guest::StoreU32(base, s + 9644, block + kListAt);
+  guest::StoreU32(base, block + kListAt, block + kListVtableAt);
+  guest::StoreU32(base, block + kListAt + 80, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  for (uint32_t i = 0; i < 32; i++) {
+    guest::StoreU32(base, block + kListVtableAt + 4 * i, Pick(r, {kEmpty, kSetR4, kGetter}));
+  }
+  guest::StoreU32(base, s, block + kVtableAt);
+  for (uint32_t i = 0; i < 32; i++) {
+    guest::StoreU32(base, block + kVtableAt + 4 * i, Pick(r, {kEmpty, kSetR4, kGetter}));
+  }
+  guest::StoreU32(base, block + kDispatcherAt + 204 + 600, r.Below(50));
+  guest::StoreU32(base, block + kDispatcherAt + 204 + 604, r.Below(60));
+  lw::WorldRandom(base, kFades, kFadesBytes, r);
+  for (const uint32_t at : {mode_tick::kFadeInCounts, mode_tick::kFadeOutCounts}) {
+    for (uint32_t layer = 0; layer < 2; layer++) {
+      guest::StoreU32(base, at + 4 * layer, r.Below(2) == 0 ? 0 : 1 + r.Below(5));
+    }
+  }
+}
+
 void LayBlock(uint8_t* base, uint32_t block, uint32_t records, Random& r, Kind kind,
               std::vector<uint32_t>& made) {
   lw::WorldRandom(base, block, kBlockBytes, r);
+  if (kind == Kind::kPanel) {
+    LayPanel(base, block, r);
+    return;
+  }
   const uint32_t s = block;
   auto sub = [&r] { return r.Below(3) == 0 ? kNone : r.Below(20); };
   auto child = [&r] { return r.Below(6) == 0 ? kNone : r.Below(60); };
@@ -366,7 +408,9 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, uint32_t records,
         t.r4.u64 = r.Below(11);
         t.r5.u64 = r.Below(2);
       }
-      if (f.kind == Kind::kDispatcher) t.r4.u64 = block + kDispatcherAt;
+      if (f.kind == Kind::kDispatcher || f.kind == Kind::kPanel) {
+        t.r4.u64 = block + kDispatcherAt;
+      }
       if (f.kind == Kind::kIndex) t.r4.u64 = r.Below(10);
       std::vector<uint32_t> old_items;
       for (const uint32_t at : kLists) {
@@ -484,6 +528,25 @@ void Deleting(Context& h, const char* name, uint32_t kAddress, GuestFunction rec
   results.Report();
 }
 
+// The panel functions without adapters (only the native Draws and DrawLists
+// call them): their plain C++ with the adapters' calls.
+void NativeType6DrawList(PPCContext& t, uint8_t* b) {
+  const ts::Calls c = hooks::Type67ScreensCalls(t, b);
+  t.r3.u64 = ts::Type6PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+}
+void NativeType6AskQuit(PPCContext& t, uint8_t* b) {
+  const ts::Calls c = hooks::Type67ScreensCalls(t, b);
+  t.r3.u64 = ts::Type6PanelScreenAskQuit(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+}
+void NativeType7AskQuit(PPCContext& t, uint8_t* b) {
+  const ts::Calls c = hooks::Type67ScreensCalls(t, b);
+  t.r3.u64 = ts::Type7PanelScreenAskQuit(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+}
+void NativeType7DrawList(PPCContext& t, uint8_t* b) {
+  const ts::Calls c = hooks::Type67ScreensCalls(t, b);
+  t.r3.u64 = ts::Type7PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+}
+
 }  // namespace
 
 void Type67NodeScreen(Context& h) {
@@ -579,6 +642,23 @@ void Type67NodeScreen(Context& h) {
       {"Type6NodeScreen::DeletingDestructor", 0x82237048, 4, K::kNoDelete,
        saves({{24, 0}, {128, 112}}), __imp__sub_82237048,
        hooks::Type6NodeScreenDeletingDestruct},
+      // The panel screens' quit dialog (the panel world, LayPanel).
+      {"Type6PanelScreen::AskQuit", 0x82230BA8, 6, K::kPanel, saves({{32, 0}, {80, 48}}),
+       __imp__sub_82230BA8, NativeType6AskQuit},
+      {"Type7PanelScreen::AskQuit", 0x82240518, 6, K::kPanel, saves({{32, 0}, {80, 48}}),
+       __imp__sub_82240518, NativeType7AskQuit},
+      {"Type6PanelScreen::DrawList", 0x82230EF0, 8, K::kPanel,
+       saves({{24, 0}, {144, 112}, {192, 160}}),
+       __imp__sub_82230EF0, NativeType6DrawList},
+      {"Type6PanelScreen::Draw", 0x82230F40, 12, K::kPanel,
+       saves({{24, 0}, {144, 112}, {192, 160}}),
+       __imp__sub_82230F40, hooks::Type6PanelScreenDraw},
+      {"Type7PanelScreen::DrawList, with AskQuit", 0x82240908, 8, K::kPanel,
+       saves({{24, 0}, {144, 112}, {192, 160}}),
+       __imp__sub_82240908, NativeType7DrawList},
+      {"Type7PanelScreen::Draw, with AskQuit", 0x82240958, 8, K::kPanel,
+       saves({{24, 0}, {144, 112}, {192, 160}}),
+       __imp__sub_82240958, hooks::Type7PanelScreenDraw},
   };
   for (const Function& f : functions) {
     Run(h, w, block, records, f);

@@ -62,14 +62,12 @@ struct Calls : type67_modes::Calls {
 
 // The guest functions called: UiMovie::ResetPose, FinishAll and Run, and
 // MenuList::Release where its plain C++ declines (their overrides); the
-// empty handler; Type7PanelScreen::AskQuit (never seen in play: the
-// original).
+// empty handler.
 constexpr uint32_t kResetPose = 0x8211ABA8;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kMenuListRelease = 0x8220BBB0;
 constexpr uint32_t kEmpty = 0x82106540;
-constexpr uint32_t kAskQuit = 0x82240518;
 
 // The screen fades' counts (GroupPair::WaitForFade and Type7PanelScreen::Draw
 // wait on both being 0) and the car list's step wait word.
@@ -320,8 +318,8 @@ uint64_t PanelScreenOnLeft(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
 uint64_t PanelScreenDrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                              const Calls& calls);
 // sub_82240908 Type7PanelScreen::DrawList: PanelScreen::DrawList, then
-// Type7PanelScreen::AskQuit (sub_82240518, never seen in play: the
-// original) when +11700 is set.
+// Type7PanelScreen::AskQuit (sub_82240518, never seen in play) when +11700
+// is set.
 uint64_t Type7PanelScreenDrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                                   const Calls& calls);
 // sub_82240958 Type7PanelScreen::Draw: DrawList (a tail call) while the
@@ -339,6 +337,28 @@ uint64_t Type7PanelScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
 // call's r3.
 uint64_t Type7PanelScreenPickCar(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                                  const Calls& calls);
+// sub_82230C88 Type6PanelScreen::PickCar (slot 3, r4 the dispatcher): as
+// Type7PanelScreen::PickCar on the type 6 car (0x826367E8), message 6.
+uint64_t Type6PanelScreenPickCar(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
+// sub_82240518 Type7PanelScreen::AskQuit and sub_82230BA8
+// Type6PanelScreen::AskQuit (r4 the dispatcher; from the DrawLists when
+// +11700 is set): movie 16's texts (-1, 0) 27, (1, 3) 2 and (1, 4) 3, its
+// +40960 = 1, message 6 (type 7) or 7 (type 6) posted, +9656 = 1, +9660 =
+// -1. Answers -1.
+uint64_t Type7PanelScreenAskQuit(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
+uint64_t Type6PanelScreenAskQuit(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
+// sub_82230EF0 Type6PanelScreen::DrawList: PanelScreen::DrawList, then
+// AskQuit when +11700 is set.
+uint64_t Type6PanelScreenDrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                  const Calls& calls);
+// sub_82230F40 Type6PanelScreen::Draw ((5, 1)): DrawList (a tail call) when
+// +9656 is 0; +9608 = 10 when it's 2 and both fade counts are 0. r3 left
+// otherwise.
+uint64_t Type6PanelScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
 
 // --- The node tables (node_tables.cpp): the list and node screens' tables
 // of their items' nodes in a UI movie (the table's +4 the movie's id, +8 and

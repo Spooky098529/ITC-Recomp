@@ -337,8 +337,9 @@ void ListAndNodeScreens(Context& h, const Block& world, uint32_t movie) {
 // The panel screens: the car list at the world's +0x3600 (its vtable at
 // +0x3900), the group pair at +0x3A00 (vtable +0x3B00; its groups at
 // +0x3C00 and +0x3C40, their ids 16 to 19), the fade words random (their
-// counts mostly 0) and put back after; +11700 0 (Type7PanelScreen::AskQuit
-// never ran in play: its branch is the original's, not taken here).
+// counts mostly 0) and put back after; +11700 0 (the quit dialog's
+// AskQuit, which needs a movie with text nodes, is checked through the
+// DrawLists in type67_node_screen.cpp's panel world).
 void PanelScreens(Context& h, const Block& world, uint32_t movie) {
   uint8_t* const base = h.base;
   for (const uint32_t id : {4u, 28u, 16u, 17u, 18u, 19u}) {
@@ -618,7 +619,8 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
   guest::StoreU32(base, kMissingMovie, saved_missing);
 }
 
-// Type7PanelScreen::PickCar: the car list at the world's +0x3600 with its
+// Type7PanelScreen::PickCar and Type6PanelScreen::PickCar (the same code on
+// the type 6 car, 0x826367E8): the car list at the world's +0x3600 with its
 // real slot 18 (sub_820B67D8, the list + 208: the selection), the
 // selection's tab (+28) 2 (the garage) or not, its steps (+32, +36) small,
 // its +40 and +44 random, its entry table (+1616) at the world's +0x3E00
@@ -627,11 +629,14 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
 // case for Car::SetModel's picks); the save data a
 // harness block ([0x826C5B58]) with a garage list (the type 6 and 7 modes'
 // harness's shape) walked the selection's steps to a slot of random words;
-// the type 7 car random, its +4 0xFFFF now and then. GarageCar::Reset runs
+// the mode's car random, its +4 0xFFFF now and then. GarageCar::Reset runs
 // through its adapter on both sides. Compared: the world, the save block,
-// the type 7 car, the stack below the call (but the original's register
+// the mode's car, the stack below the call (but the original's register
 // saves) and r3 (both halves); the globals put back after.
-void PickCar(Context& h, const Block& world) {
+using PickCarCall = uint64_t (*)(uint8_t*, uint64_t, uint64_t, uint32_t, const ts::Calls&);
+
+void PickCar(Context& h, const Block& world, const char* name, uint32_t address, uint32_t car,
+             int cases, GuestFunction recompiled, PickCarCall native) {
   uint8_t* const base = h.base;
   constexpr uint32_t kSaveBytes = 0x1A000, kSavePointer = 0x826C5B58, kParams = 0x826C2E48;
   constexpr uint32_t kCarBytes = 1984, kFrame = 128, kSaves = 48;
@@ -644,12 +649,12 @@ void PickCar(Context& h, const Block& world) {
   // rand's seed (Car::SetModel's picks), set per case and put back after.
   constexpr uint32_t kRandSeed = 0x82638188;
   const uint32_t saved_seed = guest::LoadU32(base, kRandSeed);
-  const std::vector<uint8_t> saved_car = Read(base, ts::kType7Car, kCarBytes);
-  Results results("Type7PanelScreen::PickCar (sub_822405F8)");
-  for (int c = 0; c < 32; c++) {
+  const std::vector<uint8_t> saved_car = Read(base, car, kCarBytes);
+  Results results(fmt::format("{} (sub_{:08X})", name, address));
+  for (int c = 0; c < cases; c++) {
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
-      Random r(SplitMix(0x822405F8ull << 16 ^ uint64_t(c)));
+      Random r(SplitMix(uint64_t(address) << 16 ^ uint64_t(c)));
       const uint32_t w = world.address;
       WriteRandom(base, w, world.bytes, r);
       WriteRandom(base, save, 0x400, r);
@@ -686,8 +691,8 @@ void PickCar(Context& h, const Block& world) {
       guest::StoreU16(base, nodes + 4 * node + 2, uint16_t(slot));
       WriteRandom(base, nodes + 212 + 1968 * slot, 1968, r);
       guest::StoreU32(base, kSavePointer, save);
-      WriteRandom(base, ts::kType7Car, kCarBytes, r);
-      if (r.Below(2) == 0) guest::StoreU16(base, ts::kType7Car + 4, 0xFFFF);
+      WriteRandom(base, car, kCarBytes, r);
+      if (r.Below(2) == 0) guest::StoreU16(base, car + 4, 0xFFFF);
       guest::StoreU32(base, kRandSeed, uint32_t(r.Next()));
       guest::StoreU32(base, w + kDispatcher + 204 + 600, r.Below(50));
       guest::StoreU32(base, w + kDispatcher + 204 + 604, r.Below(60));
@@ -697,15 +702,15 @@ void PickCar(Context& h, const Block& world) {
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
       if (v == 0) {
         ITC_FLAG(native_type67_screens) = false;
-        __imp__sub_822405F8(t, base);
+        recompiled(t, base);
         ITC_FLAG(native_type67_screens) = true;
       } else {
         const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
-        t.r3.u64 = ts::Type7PanelScreenPickCar(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
+        t.r3.u64 = native(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
       }
       out[v].Bytes(Read(base, w, world.bytes));
       out[v].Bytes(Read(base, save, kSaveBytes));
-      out[v].Bytes(Read(base, ts::kType7Car, kCarBytes));
+      out[v].Bytes(Read(base, car, kCarBytes));
       out[v].Word(guest::LoadU32(base, kRandSeed));
       out[v].Bytes(Read(base, sp - 2048, 2048 - kFrame));
       out[v].Bytes(Read(base, sp - kFrame, kFrame - kSaves));
@@ -718,7 +723,7 @@ void PickCar(Context& h, const Block& world) {
   guest::StoreU32(base, kSavePointer, saved_save);
   guest::StoreU32(base, kParams, saved_params);
   guest::StoreU32(base, kRandSeed, saved_seed);
-  Write(base, ts::kType7Car, saved_car.data(), kCarBytes);
+  Write(base, car, saved_car.data(), kCarBytes);
 }
 
 // The deleting destructors with bit 0 of r4 set: a block of operator new's
@@ -809,7 +814,10 @@ void Type67Screens(Context& h) {
   const std::vector<uint8_t> saved_fade_block = Read(h.base, kFades, kFadesBytes);
   ListAndNodeScreens(h, world, movie.address);
   PanelScreens(h, world, movie.address);
-  PickCar(h, world);
+  PickCar(h, world, "Type7PanelScreen::PickCar", 0x822405F8, ts::kType7Car, 32,
+          __imp__sub_822405F8, ts::Type7PanelScreenPickCar);
+  PickCar(h, world, "Type6PanelScreen::PickCar", 0x82230C88, type67_modes::kType6Car, 16,
+          __imp__sub_82230C88, ts::Type6PanelScreenPickCar);
   Deleting(h);
   Type67ScreenTables(h);
   Type67ListPart(h);
