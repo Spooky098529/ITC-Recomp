@@ -23,7 +23,14 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "call); Type8PanelScreen::InitWords sub_82238420, IsLoaded sub_82238418, "
               "OpenMovies sub_82238440, DeleteMovies sub_82238450, OnMessage2 sub_82238458, "
               "OnSaveLoaded sub_82238530, OnAnswer0 to 2 sub_82238540, sub_82238550 and "
-              "sub_82238560, Leave sub_82238B10) natively instead of through the translated "
+              "sub_82238560, Leave sub_82238B10, FadeInGroup sub_82238468 (PanelFade::In's plain "
+              "C++, UiMovie::FinishNamed, PlayNamed and LoopNamed guest calls), UpdateOpening "
+              "sub_82238A00, Show sub_82238928, Draw sub_82238E78 with DrawList sub_82238DC8 "
+              "and AskQuit sub_82238BA0 (UiMovie::SetText's plain C++ where the text setters "
+              "are native), OnDialogClosed sub_82238990 and ShowPlayerNodes sub_82238570 "
+              "(UiMovie::FindNode, ShowNode, HideNode and SetNodeTexture's and ScreenFades' "
+              "plain C++; the shared panel handlers' and the holder's slots through "
+              "type67_screens::Slot)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=type8_screens)");
 
 namespace hooks {
@@ -69,6 +76,11 @@ ITC_T8_STEP(Type8OnAnswer0, t8::SetWord(base, ctx.r3.u64, 0x82238540))
 ITC_T8_STEP(Type8OnAnswer1, t8::SetWord(base, ctx.r3.u64, 0x82238550))
 ITC_T8_STEP(Type8OnAnswer2, t8::SetWord(base, ctx.r3.u64, 0x82238560))
 ITC_T8_STEP(Type8Leave, t8::Leave(base, ctx.r3.u64, ctx.r4.u64))
+ITC_T8_STEP(Type8FadeInGroup, t8::FadeInGroup(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8UpdateOpening, t8::UpdateOpening(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8Show, t8::Show(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8Draw, t8::Draw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8OnDialogClosed, t8::OnDialogClosed(base, ctx.r3.u64, sp, calls))
 
 #undef ITC_T8_STEP
 
@@ -107,3 +119,12 @@ ITC_TYPE8_SCREENS(82238540, Type8OnAnswer0)
 ITC_TYPE8_SCREENS(82238550, Type8OnAnswer1)
 ITC_TYPE8_SCREENS(82238560, Type8OnAnswer2)
 ITC_TYPE8_SCREENS(82238B10, Type8Leave)
+// The machine's other handlers. ShowPlayerNodes sub_82238570, AskQuit
+// sub_82238BA0 and DrawList sub_82238DC8 have no adapters: their only
+// callers are these handlers, native (with the flag off, the originals call
+// the originals).
+ITC_TYPE8_SCREENS(82238468, Type8FadeInGroup)
+ITC_TYPE8_SCREENS(82238A00, Type8UpdateOpening)
+ITC_TYPE8_SCREENS(82238928, Type8Show)
+ITC_TYPE8_SCREENS(82238E78, Type8Draw)
+ITC_TYPE8_SCREENS(82238990, Type8OnDialogClosed)

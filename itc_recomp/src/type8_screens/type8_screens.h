@@ -128,4 +128,50 @@ uint64_t SetWord(uint8_t* base, uint64_t r3, uint32_t function);
 // message 6; then +9656 = 0. r3 left.
 uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4);
 
+// --- The screen's handlers (panel_screen.cpp; r4 the dispatcher where the
+// original reads it) ---
+
+// sub_82238570 Type8PanelScreen::ShowPlayerNodes (128-byte frame; r4, r5
+// two flags): on the group's movie, the node +11256 shown with either flag,
+// its children +11260 and the next shown with SetNodeTexture 0 with the
+// first, the two after with texture 1 with the second, else hidden, the
+// two after those hidden (UiMovie::FindNode, ShowNode, HideNode and
+// SetNodeTexture's plain C++). The last node.
+uint64_t ShowPlayerNodes(uint8_t* base, uint64_t r3, uint64_t first, uint64_t second,
+                         uint32_t sp);
+// sub_82238468 Type8PanelScreen::FadeInGroup ((3, 1); 112-byte frame):
+// once +15228 is set and +15236 isn't, PanelFade::In, the group's named
+// animations +11264 restarted and +11268 played and looped unless active
+// (FinishNamed, PlayNamed and LoopNamed guest calls), +15236 = 1.
+uint64_t FadeInGroup(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82238A00 Type8PanelScreen::UpdateOpening ((3, 0); 112-byte frame):
+// with +15228 set, ShowPlayerNodes(1, 0), the holder's slots 2 and 1; then
+// once +15232 is 0, +11264 isn't active and [0x82815EB0] is 0: message 29
+// posted and +15232 = +15240 = 1, or +9608 = 9 and +15240 = 0 after the
+// race.
+uint64_t UpdateOpening(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                       const Calls& calls);
+// sub_82238928 Type8PanelScreen::Show ((4, 1); 96-byte frame):
+// PanelScreen::Show, ScreenFades::FadeIn unless +15240 is set,
+// ShowPlayerNodes(0, 0).
+uint64_t Show(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82238BA0 Type8PanelScreen::AskQuit (128-byte frame; r5 the player):
+// movie 16's texts (-1, 0) 27, (1, 3) 2 and (1, 4) 3 (Calls::set_text), its
+// +40960 = 1, [0x82814E6C] = the player, message 7 posted, +9656 = 1,
+// +15244 = -1. Answers -1.
+uint64_t AskQuit(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t player, uint32_t sp,
+                 const Calls& calls);
+// sub_82238DC8 Type8PanelScreen::DrawList (112-byte frame):
+// PanelScreen::DrawList, then for the first player whose car list base's
+// +1944 is set: AskQuit and ShowPlayerNodes(1, 1) with +15240 set, else
+// ScreenFades::FadeOut and +9656 = 2.
+uint64_t DrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82238E78 Type8PanelScreen::Draw ((5, 1)): DrawList at +9656 0, Leave
+// at 2 (tail calls), else r3 left.
+uint64_t Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82238990 Type8PanelScreen::OnDialogClosed ((5, 13); 96-byte frame):
+// +9656 = 0 when +15244 is set, else ScreenFades::FadeOut and +9656 = 2;
+// then ShowPlayerNodes(0, 0).
+uint64_t OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
 }  // namespace type8_screens

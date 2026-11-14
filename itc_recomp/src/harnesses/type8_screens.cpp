@@ -24,13 +24,16 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "harnesses/loading_world.h"
 #include "hooks/app_start_up.h"
 #include "hooks/type67_screens.h"
 #include "hooks/type8_screens.h"
+#include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "type67_screens/type67_screens.h"
 #include "type8_screens/type8_screens.h"
+#include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
@@ -44,6 +47,7 @@ namespace harness {
 
 namespace {
 
+namespace lw = loading_world;
 namespace t8 = type8_screens;
 namespace ts = type67_screens;
 
@@ -65,6 +69,26 @@ uint64_t Seed(uint64_t z) {
   z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
   z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
   return z ^ (z >> 31);
+}
+
+// The UI movie world of the handlers' cases (none for the others), shaped
+// for each case as the node screen's harness shapes it, and UiMovie::Run's
+// update (sub_8211D2F8) and ApplyAnimation (sub_825A08E0) stood in for,
+// recorded and answered from the case's generator.
+const lw::MovieWorld* g_movies = nullptr;
+struct Recorded {
+  uint32_t function, lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<Recorded> g_recorded;
+Random g_answers;
+bool StandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (function != 0x8211D2F8 && function != 0x825A08E0) {
+    return false;
+  }
+  g_recorded.push_back({function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = function == 0x8211D2F8 ? g_answers.Below(2) : g_answers.Next();
+  return true;
 }
 
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -128,6 +152,13 @@ void Group(Context& h, uint32_t world, const char* name, uint32_t address, int c
       WriteRandom(base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
       WriteRandom(base, world, kWorldBytes, r);
       for (const auto& [at, bytes] : kGlobals) WriteRandom(base, at, bytes, r);
+      if (g_movies != nullptr) {
+        lw::ShapeMovieWorld(base, *g_movies, r);
+        for (uint32_t k = 0; k < lw::kLeaves; k++) {
+          guest::StoreU32(base, g_movies->leaf(k) + 108, 1 + r.Below(7));
+        }
+        guest::StoreU32(base, 0x826C5CDC, g_movies->movie(0));
+      }
       // The fade counts 0 mostly (Leave waits on both).
       for (const uint32_t at : {ts::kFadeCountA, ts::kFadeCountB}) {
         guest::StoreU32(base, at, r.Below(2) == 0 ? 0 : r.Below(4));
@@ -141,6 +172,11 @@ void Group(Context& h, uint32_t world, const char* name, uint32_t address, int c
       setup(t, r, world);
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
       g_records.clear();
+      g_recorded.clear();
+      g_answers = Random(r.Next());
+      const ui_movies_hooks::UpdateCalleeStandIn stand_in =
+          ui_movies_hooks::g_update_callee_stand_in;
+      ui_movies_hooks::g_update_callee_stand_in = StandIn;
       if (v == 0) {
         const hooks::StartUpRecorder recorder = hooks::g_start_up_recorder;
         hooks::g_start_up_recorder = Record;
@@ -151,8 +187,21 @@ void Group(Context& h, uint32_t world, const char* name, uint32_t address, int c
       } else {
         native(t, base);
       }
+      ui_movies_hooks::g_update_callee_stand_in = stand_in;
       out[v].Word(uint32_t(g_records.size()));
       for (const uint32_t word : g_records) out[v].Word(word);
+      out[v].Word(uint32_t(g_recorded.size()));
+      for (const Recorded& call : g_recorded) {
+        for (const uint32_t word : {call.function, call.lr, call.r1, uint32_t(call.r3),
+                                    uint32_t(call.r3 >> 32), uint32_t(call.r4),
+                                    uint32_t(call.r4 >> 32)}) {
+          out[v].Word(word);
+        }
+      }
+      if (g_movies != nullptr) {
+        out[v].Bytes(Read(base, g_movies->movies.address, g_movies->movies.bytes));
+        out[v].Bytes(Read(base, g_movies->texts.address, g_movies->texts.bytes));
+      }
       out[v].Bytes(Read(base, world, kWorldBytes));
       for (const auto& [at, bytes] : kGlobals) out[v].Bytes(Read(base, at, bytes));
       if (frame.size != 0) {
@@ -296,6 +345,119 @@ void Leaves(Context& h, uint32_t world) {
       __imp__sub_82238B10, hooks::Type8Leave);
 }
 
+// --- The handlers (the screen's world and the UI movie world) ---
+
+constexpr uint32_t kListAt = 0x4000, kListVtableAt = 0x4400, kVtableAt = 0x4800,
+                   kHolderVtableAt = 0x4C00;
+constexpr uint32_t kEmpty = 0x82106540, kSetR4 = 0x820CC470, kGetter = 0x82090780;
+
+uint32_t Pick(Random& r, std::initializer_list<uint32_t> targets) {
+  return *(targets.begin() + r.Below(uint32_t(targets.size())));
+}
+
+// The screen at the world's +0x100: its vtable, the car list's (+9644,
+// +0x4000) and the holder's (+9648 and +15220) vtables from stand-ins (the
+// empty handler; sub_820CC470, which stores r4 at r3 + 20; sub_82090780,
+// which answers r3's +80) and, for the holder, now and then the one-group
+// holder's own (GroupPair::WaitForFade and Run: UiMovie::Run's update stood
+// in for); the group's movie id 16 to 19 (not in the movie table: movie
+// 0 of the world), the nodes +11256 (0 to 19) and +11260 (0 to 53), the
+// named animations +11264 and +11268 (0 to 255), the flags +9652, +15228 to
+// +15240 and the bases' +1944 0 or 1, +15244 0, 1 or -1, the dialog's state
+// +9656 0 to 3 (mostly 0), the mode before 0 to 2 and the fade wait 0 or 1;
+// r4 the dispatcher.
+void LayScreen(uint8_t* base, Random& r, uint32_t w, PPCContext& t) {
+  const uint32_t s = w + kObjectAt;
+  guest::StoreU32(base, s, w + kVtableAt);
+  for (uint32_t i = 0; i < 32; i++) {
+    guest::StoreU32(base, w + kVtableAt + 4 * i, Pick(r, {kEmpty, kSetR4, kGetter}));
+    guest::StoreU32(base, w + kListVtableAt + 4 * i, Pick(r, {kEmpty, kSetR4, kGetter}));
+    guest::StoreU32(base, w + kHolderVtableAt + 4 * i, Pick(r, {kEmpty, kSetR4, kGetter}));
+  }
+  guest::StoreU32(base, s + 9644, w + kListAt);
+  guest::StoreU32(base, w + kListAt, w + kListVtableAt);
+  guest::StoreU32(base, w + kListAt + 80, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  const uint32_t holder_vtable = r.Below(3) == 0 ? ts::kSingleGroupVtable : w + kHolderVtableAt;
+  guest::StoreU32(base, s + t8::kHolder, holder_vtable);
+  guest::StoreU32(base, s + t8::kHolder + 4, s + t8::kGroup);
+  guest::StoreU32(base, s + 9648, s + t8::kHolder);
+  guest::StoreU32(base, s + t8::kGroup + 4, 16 + r.Below(4));
+  guest::StoreU32(base, s + 11256, r.Below(20));
+  guest::StoreU32(base, s + 11260, r.Below(54));
+  guest::StoreU32(base, s + 11264, r.Below(256));
+  guest::StoreU32(base, s + 11268, r.Below(256));
+  for (const uint32_t at : {9652u, 15228u, 15232u, 15236u, 15240u, 13220u, 15192u}) {
+    guest::StoreU32(base, s + at, r.Below(2));
+  }
+  guest::StoreU32(base, s + 15244, Pick(r, {0, 1, 0xFFFFFFFFu}));
+  guest::StoreU32(base, s + 9656, r.Below(2) == 0 ? 0 : r.Below(4));
+  guest::StoreU32(base, t8::kModeBefore, r.Below(3));
+  guest::StoreU32(base, ts::kFadeWait, r.Below(2));
+  t.r4.u64 = w + kDispatcherAt;
+}
+
+// The functions without adapters: their plain C++ with the adapters' calls.
+void NativeShowPlayerNodes(PPCContext& t, uint8_t* b) {
+  t.r3.u64 = t8::ShowPlayerNodes(b, t.r3.u64, t.r4.u64, t.r5.u64, t.r1.u32);
+}
+void NativeAskQuit(PPCContext& t, uint8_t* b) {
+  const t8::Calls c = hooks::Type67ScreensCalls(t, b);
+  t.r3.u64 = t8::AskQuit(b, t.r3.u64, t.r4.u64, t.r5.u32, t.r1.u32, c);
+}
+void NativeDrawList(PPCContext& t, uint8_t* b) {
+  const t8::Calls c = hooks::Type67ScreensCalls(t, b);
+  t.r3.u64 = t8::DrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+}
+
+void Handlers(Context& h, uint32_t world) {
+  for (const uint32_t id : {16u, 17u, 18u, 19u}) {
+    if (ui_movies::PairsFindKey(h.base, ui_movies::kMovieTable, id) != 0x826C5CDC) {
+      ITC_LOG_ERROR("harness: type8_screens: movie {} is in the table; the handlers skipped",
+                    id);
+      return;
+    }
+  }
+  const lw::MovieWorld w;
+  if (!w.ok()) {
+    ITC_LOG_ERROR("harness: type8_screens: no movie world");
+    return;
+  }
+  const lw::SavedGlobals saved(h.base);
+  lw::BuildStringTable(h.base, w);
+  g_movies = &w;
+  uint8_t* const base = h.base;
+  const auto screen = [base](PPCContext& t, Random& r, uint32_t w) { LayScreen(base, r, w, t); };
+  Group(
+      h, world, "Type8PanelScreen::ShowPlayerNodes", 0x82238570, 8, {128, 40},
+      [base](PPCContext& t, Random& r, uint32_t w) {
+        LayScreen(base, r, w, t);
+        t.r4.u64 = r.Below(4) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : r.Below(2);
+        t.r5.u64 = r.Below(2);
+      },
+      __imp__sub_82238570, NativeShowPlayerNodes);
+  Group(h, world, "Type8PanelScreen::FadeInGroup", 0x82238468, 10, {112, 24}, screen,
+        __imp__sub_82238468, hooks::Type8FadeInGroup);
+  Group(h, world, "Type8PanelScreen::UpdateOpening", 0x82238A00, 12, {112, 32}, screen,
+        __imp__sub_82238A00, hooks::Type8UpdateOpening);
+  Group(h, world, "Type8PanelScreen::Show", 0x82238928, 8, {96, 16}, screen,
+        __imp__sub_82238928, hooks::Type8Show);
+  Group(
+      h, world, "Type8PanelScreen::AskQuit", 0x82238BA0, 6, {128, 40},
+      [base](PPCContext& t, Random& r, uint32_t w) {
+        LayScreen(base, r, w, t);
+        t.r5.u64 = r.Below(2);
+      },
+      __imp__sub_82238BA0, NativeAskQuit);
+  Group(h, world, "Type8PanelScreen::DrawList", 0x82238DC8, 10, {112, 24}, screen,
+        __imp__sub_82238DC8, NativeDrawList);
+  Group(h, world, "Type8PanelScreen::Draw", 0x82238E78, 10, {112, 24}, screen,
+        __imp__sub_82238E78, hooks::Type8Draw);
+  Group(h, world, "Type8PanelScreen::OnDialogClosed", 0x82238990, 8, {96, 16}, screen,
+        __imp__sub_82238990, hooks::Type8OnDialogClosed);
+  g_movies = nullptr;
+  saved.Restore();
+}
+
 }  // namespace
 
 void Type8Screens(Context& h) {
@@ -306,6 +468,7 @@ void Type8Screens(Context& h) {
   }
   Panels(h, world);
   Leaves(h, world);
+  Handlers(h, world);
   memory::Free(world);
 }
 

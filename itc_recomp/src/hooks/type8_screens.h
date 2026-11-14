@@ -36,4 +36,12 @@ void Type8OnAnswer1(PPCContext& ctx, uint8_t* base);
 void Type8OnAnswer2(PPCContext& ctx, uint8_t* base);
 void Type8Leave(PPCContext& ctx, uint8_t* base);
 
+// The screen's handlers (ShowPlayerNodes, AskQuit and DrawList have no
+// adapters: only the native handlers call them).
+void Type8FadeInGroup(PPCContext& ctx, uint8_t* base);
+void Type8UpdateOpening(PPCContext& ctx, uint8_t* base);
+void Type8Show(PPCContext& ctx, uint8_t* base);
+void Type8Draw(PPCContext& ctx, uint8_t* base);
+void Type8OnDialogClosed(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
