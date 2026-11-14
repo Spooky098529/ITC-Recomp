@@ -21,7 +21,7 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825B35A0, sub_825B3570), XRegisterThreadNotifyRoutine and "
               "XapiCallThreadNotifyRoutines (sub_82297B98, sub_82297B38) (checked by --run_harnesses=c_runtime_core). "
               "Those reached only from native callers have no adapters, and the flag switches "
-              "their callers: __set_flsgetvalue, _mtdeletelocks");
+              "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -191,12 +191,10 @@ void hooks::CoreCallThreadNotifyRoutines(PPCContext& ctx, uint8_t* base) {
 ITC_C_RUNTIME_CORE(825AA3F8, CoreCrtTlsAlloc)
 // _getptd_noexit: r3 = the calling thread's data, or 0.
 ITC_C_RUNTIME_CORE(825AA4C0, CoreGetptdNoexit)
-// _freefls: r3 = a thread's data (0: nothing).
-ITC_C_RUNTIME_CORE(825AA5C0, CoreFreeFls)
 // _mtterm: no registers.
 ITC_C_RUNTIME_CORE(825AA448, CoreMtTerm)
-// _errno, __doserrno: r3 = the address.
-ITC_C_RUNTIME_CORE(825A81E0, CoreErrno)
+// __doserrno: r3 = the address. (_errno, sub_825A81E0, and _freefls,
+// sub_825AA5C0, have no adapters: their callers in play are native.)
 ITC_C_RUNTIME_CORE(825A8218, CoreDosErrno)
 // _get_errno_from_oserr: r3 = a Windows error; r3 = its errno.
 ITC_C_RUNTIME_CORE(825A8178, CoreGetErrnoFromOsErr)
