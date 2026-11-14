@@ -26,7 +26,10 @@ data (`sub_825AA580` `_getptd`, `sub_825AA4C0`, `sub_825AA400`,
 `sub_825AA708`, `sub_825AA670`, `sub_825B3650`: TLS), the lock and stream
 tables' set-up (`sub_825B31D8`, `sub_825B35A0`, `sub_825AD4D0`,
 `sub_825B4668`), and `_controlfp` (`sub_825AB400`,
-KeEnableFpuExceptions). Shared with other files: `sub_82106540` (an
+KeEnableFpuExceptions). Since 2026-11-14 the per-thread data, the lock
+table's set-up, the stream and handle locks and the rest of what calls
+kernel imports are mapped in [`c-runtime-core.md`](c-runtime-core.md)
+(B7's goal: ported too, calling the imports). Shared with other files: `sub_82106540` (an
 empty function, in [`audio.md`](audio.md)), called by `_init_pointers`.
 The game's own wrappers that jump here (`sub_82295D48` to `wcscpy`) stay
 in their files.

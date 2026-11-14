@@ -767,6 +767,14 @@ Rows not yet moved stay in the table below. So far:
   network battle's result exchange) and kind 6's screen after the race
   (the Xbox Live mode's race: its menu, the replay's save and the time
   attack's leaderboard) (B7; mapped, none seen in play).
+- [`c-runtime-core.md`](c-runtime-core.md): the C runtime's parts over
+  kernel imports: the per-thread data over the kernel's TLS (`_mtinit`,
+  `_getptd`), the lock table and the stream and file handle locks,
+  `errno` and the shared error paths, the exit, abort and C++ exception
+  paths with the unhandled exception filters, the streams and the
+  low-level I/O under them, the %e, %a and %g helpers, `_cinit` and
+  XAPI's thread notify routines, thread start and `CloseHandle` (B7;
+  mapped, almost none seen in play).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -808,7 +816,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82296E70` | `SetLastError` | Overridden | r3 = the error: stored in the current thread's last error, `[[r13+256]+352]` (r13 = the PCR, +256 its current thread), unless `[r13+336]` is set (probably: in a DPC). Ours: `last_error::Set` (`src/hooks/last_error.cpp`), a thin adapter for the recompiled callers; our adapters call it directly. 2,000 cases the same as the recompiled one (with `sub_82296FD0`). |
 | `sub_82296FD0` | `SetLastError` | Overridden | Jumps to `sub_82296E70`. Ours: the same as `sub_82296E70`. |
 | `sub_82296EC0` | `GetLastError` | Native | The thread's last error (`[[r13+256]+352]`), or 0 while `[r13+336]` is set. Called by `sub_82294ED8` after its XMsg call (Dropped, never runs), and through `sub_82295F18`. Ours (B7 loop, 2026-10-30, a ready group under the car models' `LoadSlot::Load`): `last_error::Get` (`src/hooks/last_error.cpp`, as `SetLastError`'s, no flag), reached by `sub_82295F18`'s adapter and `car_models::LoadSlotLoad`; its own adapter removed (its only caller in play is `sub_82295F18`'s, a temporary counter saw no call in an attract race). Harness `last_error` (64 cases, both entry points against this one; its register steps, r11 as the original leaves it, in the harness file).
-| `sub_82294E20` | `CloseHandle` | | r3 = handle: `NtClose`; 1, or 0 with the last error. Called for files, events and enumerators (the file class's close, the save slot's close wait, the enumeration's wait, `Archive::Shutdown`). |
 | `sub_82294DA0` | `GlobalMemoryStatus` | Dropped | r3 = a MEMORYSTATUS (32 bytes) filled from `MmQueryStatistics`. From `sub_82106548`, `sub_82106618` and `sub_82107910` (25 calls in a session), each with a buffer in its frame that it never reads. Ours (`src/hooks/memory_status.cpp`): writes nothing. `BootData::Load`'s plain C++ (`src/data_load/boot.cpp`, 2026-10-30) leaves both its calls out, as `App::StartUp`'s does. |
 | `sub_82295F18` | `GetLastError` | Overridden | Jumps to `sub_82296EC0`. Called after failed file calls (GetDiskFreeSpaceEx, XGetOverlappedResult, the C runtime's I/O), and on free's and realloc's failure paths (`heap.md`, never ran), and `LoadSlot::Load`'s (`car-models.md`) when its VirtualAlloc fails (the result not read). Ours: the same as `sub_82296EC0` (`last_error::Get`). |
 | `sub_82296E88` | `SetLastErrorFromStatus` | Overridden | r3 = an NTSTATUS: `SetLastError(RtlNtStatusToDosError(r3))` (the same check of `[r13+336]`), returning the DOS error. Called after failed kernel calls (27 files). Ours: `last_error::SetFromStatus`, the mapping from the SDK's `xeRtlNtStatusToDosError` (C++, no guest call) until the import's last recompiled caller, `sub_822953E8`, is native and the table is ours. 1,000 statuses across the mapping's branches the same as the recompiled one. |
