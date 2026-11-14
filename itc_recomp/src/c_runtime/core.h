@@ -71,6 +71,8 @@ struct Calls {
   std::function<void(uint32_t block)> free;
   // The calling guest thread's id (sub_825B9A60).
   std::function<uint32_t()> thread_id;
+  // SetLastErrorFromStatus (sub_82296E88) on the calling thread.
+  std::function<void(uint32_t status)> set_last_error_from_status;
 };
 
 // sub_825AA3F8 __crtTlsAlloc (probably): KeTlsAlloc (the FLS callback in r3
@@ -160,5 +162,63 @@ void ThreadNotify(uint8_t* base, uint32_t starting, const Calls& calls);
 // _getptd_noexit does, the notify routine registered. 1, or 0 (after
 // _mtterm once the getter's slot is set).
 uint32_t MtInit(uint8_t* base, const Calls& calls);
+
+// sub_825A85C0 strtol: strtoxl (c_runtime::StrToXl) signed with the global
+// locale; false where that leaves the original's path to the caller (its
+// errno paths, a multibyte locale): the caller runs the original.
+bool Strtol(uint8_t* base, uint32_t string, uint32_t end_out, int32_t radix, uint64_t* result);
+
+// sub_825A8630 strrchr: the last `c` in `string` (compared as a 32-bit int
+// with each byte), or 0; for 0, the terminator.
+uint32_t Strrchr(uint8_t* base, uint32_t string, uint32_t c);
+
+// sub_825AA1B8 _initterm: each nonzero word from `begin` up to `end`
+// called (a guest call).
+void Initterm(uint8_t* base, uint32_t begin, uint32_t end, const Calls& calls);
+
+// sub_825AD120 _set_abort_behavior: __abort_behavior ([0x8266B7C4]) =
+// (old & ~mask) | (flags & mask); the old value.
+uint32_t SetAbortBehavior(uint8_t* base, uint32_t flags, uint32_t mask);
+
+// sub_825B49B0 __get_sigabrt (probably): [0x82971340].
+uint32_t GetSigabrt(uint8_t* base);
+
+// sub_825B68B8 _crt_debugger_hook: [0x8297820C] = 0.
+void CrtDebuggerHook(uint8_t* base);
+
+// sub_825B8910 _ValidateExecute (probably, a stub): `pointer` != 0.
+uint32_t ValidateExecute(uint32_t pointer);
+
+// sub_82297870 SetUnhandledExceptionFilter: [0x829714A0] swapped with
+// `filter`; the old one.
+uint32_t SetUnhandledExceptionFilter(uint8_t* base, uint32_t filter);
+
+// sub_822979D0 GetCommandLineA (probably): [0x820007EC].
+uint32_t GetCommandLineA(uint8_t* base);
+
+// sub_825ADE90 _positive: 1 unless the double at `number` is below the
+// constant at 0x82002258 (0.0), as the original's compare (NaN gives 1).
+uint32_t Positive(uint8_t* base, uint32_t number);
+
+// sub_825AEDA0 _NMSG_WRITE: the run-time error `number`'s message (the
+// 23-entry table at 0x8266BA88) to OutputDebugStringA, which drops it
+// (helpers::DebugOutput); nothing for a number not in it.
+void NmsgWrite(uint8_t* base, uint32_t number);
+
+// sub_825B4790 _getbuf: _cflush ([0x82971174]) counted; malloc(4096) into
+// +8 with +24 = 4096 and _IOMYBUF, else the 2-byte buffer at +20, +24 = 2,
+// _IONBF; +4 = 0, +0 = +8.
+void Getbuf(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_825B0EE0 _freebuf: when in use (+12 & 0x83) with _IOMYBUF, frees +8
+// and clears +0, +4, +8 and the _IOMYBUF and _IOSETVBUF bits.
+void Freebuf(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_82294E20 CloseHandle: NtClose; 1, or 0 with the last error set from
+// the status.
+uint32_t CloseHandle(uint32_t handle, const Calls& calls);
+
+// sub_825BA168 ResetEvent: NtClearEvent; 1, or 0 as CloseHandle's.
+uint32_t ResetEvent(uint32_t event, const Calls& calls);
 
 }  // namespace c_runtime::core

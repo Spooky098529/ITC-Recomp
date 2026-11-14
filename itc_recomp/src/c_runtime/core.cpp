@@ -6,6 +6,10 @@
 #include "base/log.h"
 #include "guest.h"
 #include "c_runtime/start_up.h"
+#include "c_runtime/strings.h"
+#include "helpers/debug_output.h"
+
+#include <bit>
 
 namespace c_runtime::core {
 
@@ -276,6 +280,149 @@ uint32_t MtInit(uint8_t* base, const Calls& calls) {
   Store(base, data + 4, 0xFFFFFFFFu);
   Store(base, kCrtNotifyBlock + 8, kCrtNotifyRoutine);
   RegisterThreadNotifyRoutine(base, kCrtNotifyBlock, 1, calls);
+  return 1;
+}
+
+bool Strtol(uint8_t* base, uint32_t string, uint32_t end_out, int32_t radix, uint64_t* result) {
+  ITC_NATIVE_RUNNING("sub_825A85C0 strtol");
+  uint32_t end = 0;
+  if (!c_runtime::StrToXl(base, string, radix, 0, end_out != 0, &end, result)) {
+    return false;
+  }
+  if (end_out != 0) {
+    Store(base, end_out, end);
+  }
+  return true;
+}
+
+uint32_t Strrchr(uint8_t* base, uint32_t string, uint32_t c) {
+  ITC_NATIVE_RUNNING("sub_825A8630 strrchr");
+  uint32_t found = 0;
+  for (uint32_t p = string;; p++) {
+    const uint32_t b = guest::LoadU8(base, p);
+    if (b == c) {
+      if (c == 0) {
+        return p;
+      }
+      found = p;
+    }
+    if (b == 0) {
+      return found;
+    }
+  }
+}
+
+void Initterm(uint8_t* base, uint32_t begin, uint32_t end, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AA1B8 _initterm");
+  for (uint32_t p = begin; p < end; p += 4) {
+    if (const uint32_t function = Load(base, p); function != 0) {
+      calls.guest(function, {});
+    }
+  }
+}
+
+uint32_t SetAbortBehavior(uint8_t* base, uint32_t flags, uint32_t mask) {
+  ITC_NATIVE_RUNNING("sub_825AD120 _set_abort_behavior");
+  const uint32_t old = Load(base, 0x8266B7C4);
+  Store(base, 0x8266B7C4, (old & ~mask) | (flags & mask));
+  return old;
+}
+
+uint32_t GetSigabrt(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825B49B0 __get_sigabrt");
+  return Load(base, 0x82971340);
+}
+
+void CrtDebuggerHook(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825B68B8 _crt_debugger_hook");
+  Store(base, 0x8297820C, 0);
+}
+
+uint32_t ValidateExecute(uint32_t pointer) {
+  ITC_NATIVE_RUNNING("sub_825B8910 _ValidateExecute");
+  return pointer != 0 ? 1 : 0;
+}
+
+uint32_t SetUnhandledExceptionFilter(uint8_t* base, uint32_t filter) {
+  ITC_NATIVE_RUNNING("sub_82297870 SetUnhandledExceptionFilter");
+  const uint32_t old = Load(base, 0x829714A0);
+  Store(base, 0x829714A0, filter);
+  return old;
+}
+
+uint32_t GetCommandLineA(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_822979D0 GetCommandLineA");
+  return Load(base, 0x820007EC);
+}
+
+uint32_t Positive(uint8_t* base, uint32_t number) {
+  ITC_NATIVE_RUNNING("sub_825ADE90 _positive");
+  auto load = [&](uint32_t address) {
+    return std::bit_cast<double>(uint64_t(Load(base, address)) << 32 | Load(base, address + 4));
+  };
+  const double x = load(number);
+  const double zero = load(0x82002258);
+  return x < zero ? 0 : 1;
+}
+
+void NmsgWrite(uint8_t* base, uint32_t number) {
+  ITC_NATIVE_RUNNING("sub_825AEDA0 _NMSG_WRITE");
+  for (uint32_t i = 0; i < 23; i++) {
+    if (Load(base, 0x8266BA88 + 8 * i) == number) {
+      helpers::DebugOutput(nullptr);
+      return;
+    }
+  }
+}
+
+void Getbuf(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B4790 _getbuf");
+  Store(base, 0x82971174, Load(base, 0x82971174) + 1);
+  const uint32_t buffer = calls.malloc(4096);
+  Store(base, stream + 8, buffer);
+  if (buffer != 0) {
+    Store(base, stream + 24, 4096);
+    Store(base, stream + 12, Load(base, stream + 12) | 8);
+  } else {
+    Store(base, stream + 8, stream + 20);
+    Store(base, stream + 24, 2);
+    Store(base, stream + 12, Load(base, stream + 12) | 4);
+  }
+  Store(base, stream + 4, 0);
+  Store(base, stream + 0, Load(base, stream + 8));
+}
+
+void Freebuf(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B0EE0 _freebuf");
+  const uint32_t flags = Load(base, stream + 12);
+  if ((flags & 0x83) == 0 || (flags & 8) == 0) {
+    return;
+  }
+  calls.free(Load(base, stream + 8));
+  const uint32_t after = Load(base, stream + 12) & ~0x8u & ~0x400u;
+  Store(base, stream + 0, 0);
+  Store(base, stream + 8, 0);
+  Store(base, stream + 4, 0);
+  Store(base, stream + 12, after);
+}
+
+uint32_t CloseHandle(uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82294E20 CloseHandle");
+  const uint32_t status = uint32_t(calls.import(Import::kNtClose, {handle}));
+  if (int32_t(status) < 0) {
+    calls.set_last_error_from_status(status);
+    return 0;
+  }
+  return 1;
+}
+
+uint32_t ResetEvent(uint32_t event, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825BA168 ResetEvent");
+  const uint32_t status = uint32_t(calls.import(Import::kNtClearEvent, {event}));
+  if (int32_t(status) < 0) {
+    calls.set_last_error_from_status(status);
+    return 0;
+  }
   return 1;
 }
 

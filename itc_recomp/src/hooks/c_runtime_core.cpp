@@ -5,6 +5,7 @@
 #include "hooks/c_runtime_core.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "graphics/video_output.h"
 #include "hooks/heap.h"
 #include "hooks/last_error.h"
@@ -21,7 +22,14 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825B35A0, sub_825B3570), XRegisterThreadNotifyRoutine and "
               "XapiCallThreadNotifyRoutines (sub_82297B98, sub_82297B38), _mtinitlocks "
               "(sub_825B31D8), the C runtime's thread notify routine (sub_825B3650) and _mtinit "
-              "(sub_825AA708, with _init_pointers' plain C++) (checked by --run_harnesses=c_runtime_core). "
+              "(sub_825AA708, with _init_pointers' plain C++), atol and strtol (sub_825AAF08, "
+              "sub_825A85C0; strtoxl's errno paths the originals'), strrchr (sub_825A8630), "
+              "_initterm (sub_825AA1B8), _set_abort_behavior (sub_825AD120), __get_sigabrt "
+              "(sub_825B49B0), _crt_debugger_hook (sub_825B68B8), _ValidateExecute (sub_825B8910), "
+              "SetUnhandledExceptionFilter (sub_82297870), GetCommandLineA (sub_822979D0), "
+              "_positive (sub_825ADE90), _NMSG_WRITE (sub_825AEDA0), _getbuf and _freebuf "
+              "(sub_825B4790, sub_825B0EE0), CloseHandle (sub_82294E20) and ResetEvent "
+              "(sub_825BA168) (checked by --run_harnesses=c_runtime_core). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
@@ -117,6 +125,9 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
     ctx.lr = lr;
   };
   calls.thread_id = []() { return graphics::video_output::CurrentThreadId(); };
+  calls.set_last_error_from_status = [&ctx, base](uint32_t status) {
+    last_error::SetFromStatus(base, ctx.r13.u32, status);
+  };
   return calls;
 }
 
@@ -193,6 +204,75 @@ void hooks::CoreMtInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::MtInit(base, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreStrtol(PPCContext& ctx, uint8_t* base) {
+  uint64_t result = 0;
+  if (!cc::Strtol(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, &result)) {
+    __imp__sub_825A85C0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
+}
+
+void hooks::CoreAtol(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825AAF08 atol");
+  ctx.r4.u64 = 0;
+  ctx.r5.u64 = 10;
+  CoreStrtol(ctx, base);
+}
+
+void hooks::CoreStrrchr(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Strrchr(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void hooks::CoreInitterm(PPCContext& ctx, uint8_t* base) {
+  cc::Initterm(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreSetAbortBehavior(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::SetAbortBehavior(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void hooks::CoreGetSigabrt(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::GetSigabrt(base);
+}
+
+void hooks::CoreCrtDebuggerHook(PPCContext&, uint8_t* base) { cc::CrtDebuggerHook(base); }
+
+void hooks::CoreValidateExecute(PPCContext& ctx, uint8_t*) {
+  ctx.r3.u64 = cc::ValidateExecute(ctx.r3.u32);
+}
+
+void hooks::CoreSetUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::SetUnhandledExceptionFilter(base, ctx.r3.u32);
+}
+
+void hooks::CoreGetCommandLineA(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::GetCommandLineA(base);
+}
+
+void hooks::CorePositive(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cc::Positive(base, ctx.r3.u32);
+}
+
+void hooks::CoreNmsgWrite(PPCContext& ctx, uint8_t* base) { cc::NmsgWrite(base, ctx.r3.u32); }
+
+void hooks::CoreGetbuf(PPCContext& ctx, uint8_t* base) {
+  cc::Getbuf(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreFreebuf(PPCContext& ctx, uint8_t* base) {
+  cc::Freebuf(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreCloseHandle(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::CloseHandle(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreResetEvent(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::ResetEvent(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -226,3 +306,32 @@ ITC_C_RUNTIME_CORE(82297B38, CoreCallThreadNotifyRoutines)
 ITC_C_RUNTIME_CORE(825B3650, CoreThreadNotify)
 // _mtinit: r3 = 1, or 0.
 ITC_C_RUNTIME_CORE(825AA708, CoreMtInit)
+// atol: r3 = a string; strtol(r3, 0, 10) (strtol, sub_825A85C0, has no
+// adapter: atol is its only caller).
+ITC_C_RUNTIME_CORE(825AAF08, CoreAtol)
+// strrchr: r3 = a string, r4 = a character; r3 = the last one, or 0.
+ITC_C_RUNTIME_CORE(825A8630, CoreStrrchr)
+// _initterm: r3 = begin, r4 = end.
+ITC_C_RUNTIME_CORE(825AA1B8, CoreInitterm)
+// _set_abort_behavior: r3 = flags, r4 = mask; r3 = the old value.
+ITC_C_RUNTIME_CORE(825AD120, CoreSetAbortBehavior)
+// __get_sigabrt: r3 = SIGABRT's action.
+ITC_C_RUNTIME_CORE(825B49B0, CoreGetSigabrt)
+// _crt_debugger_hook: r3 ignored.
+ITC_C_RUNTIME_CORE(825B68B8, CoreCrtDebuggerHook)
+// _ValidateExecute: r3 = a pointer; r3 = 1 when it isn't 0.
+ITC_C_RUNTIME_CORE(825B8910, CoreValidateExecute)
+// SetUnhandledExceptionFilter: r3 = the new filter; r3 = the old one.
+ITC_C_RUNTIME_CORE(82297870, CoreSetUnhandledExceptionFilter)
+// GetCommandLineA: r3 = the command line.
+ITC_C_RUNTIME_CORE(822979D0, CoreGetCommandLineA)
+// _positive: r3 = a double's address; r3 = 1 or 0.
+ITC_C_RUNTIME_CORE(825ADE90, CorePositive)
+// _NMSG_WRITE: r3 = a run-time error number.
+ITC_C_RUNTIME_CORE(825AEDA0, CoreNmsgWrite)
+// _getbuf, _freebuf: r3 = a stream.
+ITC_C_RUNTIME_CORE(825B4790, CoreGetbuf)
+ITC_C_RUNTIME_CORE(825B0EE0, CoreFreebuf)
+// CloseHandle: r3 = a handle; ResetEvent: r3 = an event; r3 = 1 or 0.
+ITC_C_RUNTIME_CORE(82294E20, CoreCloseHandle)
+ITC_C_RUNTIME_CORE(825BA168, CoreResetEvent)

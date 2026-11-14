@@ -35,6 +35,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -828,6 +829,325 @@ void MtInitCases(Context& h) {
   results.Report();
 }
 
+std::string RandomText(Context& h, uint32_t length, const char* alphabet) {
+  std::string text;
+  const size_t n = std::strlen(alphabet);
+  for (uint32_t i = 0; i < length; i++) {
+    text.push_back(alphabet[h.random.Below(uint32_t(n))]);
+  }
+  return text;
+}
+
+void WriteText(Context& h, uint32_t address, const std::string& text) {
+  Write(h.base, address, text.data(), uint32_t(text.size()));
+  guest::StoreU8(h.base, address + uint32_t(text.size()), 0);
+}
+
+void StrtolCases(Context& h) {
+  Results results("strtol (sub_825A85C0) and atol (sub_825AAF08)");
+  ThreadSlots slots(h);  // errno paths write the main thread's errno
+  const uint32_t errno_word = slots.data != 0 ? Load(h.base, slots.data + 8) : 0;
+  const uint32_t text = h.data + 128, end_out = h.data + 64;
+  static const char* kPrefixes[] = {"", " ", "  \t", "-", "+", "0x", "-0x", "0X", "0", " -0"};
+  for (int c = 0; c < 600; c++) {
+    std::string s = kPrefixes[h.random.Below(10)];
+    s += RandomText(h, h.random.Below(c % 50 == 0 ? 30 : 12),
+                    c % 3 == 0 ? "0123456789" : "0123456789abcdefxyzABCZ -+");
+    const bool atol = c % 4 == 0;
+    // Bases out of range go to _invalid_parameter's trap: left out.
+    static const int32_t kRadixes[] = {0, 2, 8, 10, 16, 36};
+    const int32_t radix =
+        c % 7 == 0 ? int32_t(2 + h.random.Below(35)) : kRadixes[h.random.Below(6)];
+    const bool want_end = h.random.Below(2) != 0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      WriteText(h, text, s);
+      Store(h.base, end_out, 0xCDCDCDCDu);
+      if (slots.data != 0) {
+        Store(h.base, slots.data + 8, 0);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = text;
+      t.r4.u64 = want_end ? end_out : 0;
+      t.r5.u64 = uint64_t(int64_t(radix));
+      if (atol) {
+        (v == 0 ? __imp__sub_825AAF08 : hooks::CoreAtol)(t, h.base);
+      } else {
+        (v == 0 ? __imp__sub_825A85C0 : hooks::CoreStrtol)(t, h.base);
+      }
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, end_out));
+      out[v].Word(slots.data != 0 ? Load(h.base, slots.data + 8) : 0);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c) + " \"" + s + "\"");
+  }
+  if (slots.data != 0) {
+    Store(h.base, slots.data + 8, errno_word);
+  }
+  results.Report();
+}
+
+void StrrchrCases(Context& h) {
+  Results results("strrchr (sub_825A8630)");
+  const uint32_t text = h.data + 128;
+  for (int c = 0; c < 400; c++) {
+    const std::string s = RandomText(h, h.random.Below(40), "aab.c.\xff\x80x");
+    uint32_t ch;
+    switch (c % 5) {
+      case 0: ch = 0; break;
+      case 1: ch = uint8_t(".ax\xff\x80"[h.random.Below(5)]); break;
+      case 2: ch = uint32_t(int32_t(int8_t("\xff\x80"[h.random.Below(2)]))); break;
+      case 3: ch = 0x100 | uint8_t('a'); break;
+      default: ch = uint32_t(h.random.Next()); break;
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      WriteText(h, text, s);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = text;
+      t.r4.u64 = ch;
+      (v == 0 ? __imp__sub_825A8630 : hooks::CoreStrrchr)(t, h.base);
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void InittermCases(Context& h) {
+  Results results("_initterm (sub_825AA1B8)");
+  const uint32_t table = h.data + 128;
+  const uint32_t filter = Load(h.base, kFilter);
+  for (int c = 0; c < 40; c++) {
+    const uint32_t count = h.random.Below(8);
+    std::vector<uint32_t> entries;
+    for (uint32_t i = 0; i < count; i++) {
+      const uint32_t k = h.random.Below(3);
+      entries.push_back(k == 0 ? 0 : k == 1 ? kEmptyFunction : kFilterSetter);
+    }
+    const uint32_t end = c % 9 == 8 ? table - 4 : table + 4 * count;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < count; i++) {
+        Store(h.base, table + 4 * i, entries[i]);
+      }
+      Store(h.base, kFilter, 0x5EB71E11);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = table;
+      t.r4.u64 = end;
+      (v == 0 ? __imp__sub_825AA1B8 : hooks::CoreInitterm)(t, h.base);
+      out[v].Word(Load(h.base, kFilter));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  Store(h.base, kFilter, filter);
+  results.Report();
+}
+
+// A function over one global word: the word set to `before`, r3 and r4 set,
+// both versions run; r3 and the word compared, the word put back.
+void GlobalCases(Context& h, const char* name, uint32_t global, GuestFunction recompiled,
+                 GuestFunction native, bool writable = true) {
+  Results results(name);
+  const uint32_t saved = Load(h.base, global);
+  for (int c = 0; c < 40; c++) {
+    const uint32_t before = c == 0 ? saved : uint32_t(h.random.Next());
+    const uint32_t r3 = c % 5 == 0 ? 0 : uint32_t(h.random.Next());
+    const uint32_t r4 = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      if (writable) {
+        Store(h.base, global, before);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = r3;
+      t.r4.u64 = r4;
+      (v == 0 ? recompiled : native)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, global));
+    }
+    if (writable) {
+      Store(h.base, global, saved);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void PositiveCases(Context& h) {
+  Results results("_positive (sub_825ADE90)");
+  const uint32_t number = h.data + 128;
+  static const uint64_t kEdges[] = {0, 0x8000000000000000ull, 1, 0x8000000000000001ull,
+                                    0x7FF0000000000000ull, 0xFFF0000000000000ull,
+                                    0x7FF8000000000000ull, 0xFFF8000000000001ull,
+                                    0x3FF0000000000000ull, 0xBFF0000000000000ull};
+  for (int c = 0; c < 200; c++) {
+    const uint64_t bits = c < 10 ? kEdges[c] : h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      StoreU64(h.base, number, bits);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = number;
+      (v == 0 ? __imp__sub_825ADE90 : hooks::CorePositive)(t, h.base);
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void NmsgWriteCases(Context& h) {
+  Results results("_NMSG_WRITE (sub_825AEDA0)");
+  // Its message goes to OutputDebugStringA, which drops it: compared, the
+  // scratch area after (nothing written) for numbers in and out of the table.
+  for (int c = 0; c < 46; c++) {
+    const uint32_t number =
+        c < 23 ? Load(h.base, 0x8266BA88 + 8 * c) : uint32_t(h.random.Below(300));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, 256);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = number;
+      (v == 0 ? __imp__sub_825AEDA0 : hooks::CoreNmsgWrite)(t, h.base);
+      out[v].Bytes(Read(h.base, h.data, 256));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void BufferCases(Context& h) {
+  Results getbuf("_getbuf (sub_825B4790)");
+  Results freebuf("_freebuf (sub_825B0EE0)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _getbuf: the heap isn't on the layer");
+    return;
+  }
+  const uint32_t stream = h.data + 128;
+  const uint32_t cflush = Load(h.base, 0x82971174);
+  for (int c = 0; c < 40; c++) {
+    std::vector<uint32_t> words(8);
+    for (auto& w : words) {
+      w = uint32_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < 8; i++) {
+        Store(h.base, stream + 4 * i, words[i]);
+      }
+      Store(h.base, 0x82971174, 7);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = stream;
+      (v == 0 ? __imp__sub_825B4790 : hooks::CoreGetbuf)(t, h.base);
+      const uint32_t buffer = Load(h.base, stream + 8);
+      const bool held = buffer != 0 && memory::IsHeapBlock(buffer);
+      out[v].Word(held ? 1 : buffer == stream + 20 ? 2 : buffer);
+      out[v].Word(Load(h.base, stream + 0) == buffer);
+      for (uint32_t offset : {4u, 12u, 16u, 20u, 24u, 28u}) {
+        out[v].Word(Load(h.base, stream + offset));
+      }
+      out[v].Word(Load(h.base, 0x82971174));
+      if (held) {
+        out[v].Word(memory::Size(buffer));
+        memory::crt::Free(buffer);
+      }
+    }
+    getbuf.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  Store(h.base, 0x82971174, cflush);
+  for (int c = 0; c < 60; c++) {
+    std::vector<uint32_t> words(8);
+    for (auto& w : words) {
+      w = uint32_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < 8; i++) {
+        Store(h.base, stream + 4 * i, words[i]);
+      }
+      uint32_t block = 0;
+      const uint32_t flags = words[3];
+      if ((flags & 0x83) != 0 && (flags & 8) != 0) {
+        block = Block(h.base, 64);
+        Store(h.base, stream + 8, block);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = stream;
+      (v == 0 ? __imp__sub_825B0EE0 : hooks::CoreFreebuf)(t, h.base);
+      std::vector<uint8_t> after = Read(h.base, stream, 32);
+      if (block != 0 && Load(h.base, stream + 8) == block) {
+        Store(h.base, stream + 8, 1);  // kept: the same on both sides
+      }
+      out[v].Bytes(Read(h.base, stream, 32));
+      if (block != 0) {
+        HeldOutputs(out[v], {block});
+      }
+    }
+    freebuf.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  getbuf.Report();
+  freebuf.Report();
+}
+
+uint32_t MakeEvent(Context& h, uint32_t type, uint32_t state) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = h.data + 32;
+  t.r4.u64 = 0;
+  t.r5.u64 = type;
+  t.r6.u64 = state;
+  __imp__NtCreateEvent(t, h.base);
+  return int32_t(t.r3.u32) < 0 ? 0 : Load(h.base, h.data + 32);
+}
+
+void HandleCases(Context& h) {
+  Results close("CloseHandle (sub_82294E20)");
+  Results reset("ResetEvent (sub_825BA168)");
+  const uint32_t error = GuestLastError(h);
+  for (int c = 0; c < 30; c++) {
+    // 0: an event of its own; 1: 0; 2: a word that's no handle.
+    const int kind = c % 3;
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const uint32_t type = h.random.Below(2), state = h.random.Below(2);
+    for (int which = 0; which < 2; which++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        SetLastError(h, 0xABCD);
+        const uint32_t event = kind == 0 ? MakeEvent(h, type, state) : kind == 1 ? 0 : junk;
+        PPCContext t = CallContext(h);
+        t.r3.u64 = event;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_82294E20 : hooks::CoreCloseHandle)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825BA168 : hooks::CoreResetEvent)(t, h.base);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(GuestLastError(h));
+        if (kind == 0 && event != 0) {
+          // Signaled after? (a wait with a 0 timeout)
+          StoreU64(h.base, h.data + 40, 0);
+          PPCContext w = CallContext(h);
+          w.r3.u64 = event;
+          w.r4.u64 = 1;
+          w.r5.u64 = 0;
+          w.r6.u64 = h.data + 40;
+          __imp__NtWaitForSingleObjectEx(w, h.base);
+          out[v].Word(which == 1 ? w.r3.u32 : int32_t(w.r3.u32) < 0);
+          if (which == 1) {
+            PPCContext k = CallContext(h);
+            k.r3.u64 = event;
+            __imp__NtClose(k, h.base);
+          }
+        }
+      }
+      (which == 0 ? close : reset).Check(out[0], out[1], "case " + std::to_string(c));
+    }
+  }
+  SetLastError(h, error);
+  close.Report();
+  reset.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -847,6 +1167,25 @@ void CRuntimeCore(Context& h) {
   MtInitLocksCases(h);
   ThreadNotifyCases(h);
   MtInitCases(h);
+  StrtolCases(h);
+  StrrchrCases(h);
+  InittermCases(h);
+  GlobalCases(h, "_set_abort_behavior (sub_825AD120)", 0x8266B7C4, __imp__sub_825AD120,
+              hooks::CoreSetAbortBehavior);
+  GlobalCases(h, "__get_sigabrt (sub_825B49B0)", 0x82971340, __imp__sub_825B49B0,
+              hooks::CoreGetSigabrt);
+  GlobalCases(h, "_crt_debugger_hook (sub_825B68B8)", 0x8297820C, __imp__sub_825B68B8,
+              hooks::CoreCrtDebuggerHook);
+  GlobalCases(h, "_ValidateExecute (sub_825B8910)", h.data + 64, __imp__sub_825B8910,
+              hooks::CoreValidateExecute);
+  GlobalCases(h, "SetUnhandledExceptionFilter (sub_82297870)", kFilter, __imp__sub_82297870,
+              hooks::CoreSetUnhandledExceptionFilter);
+  GlobalCases(h, "GetCommandLineA (sub_822979D0)", 0x820007EC, __imp__sub_822979D0,
+              hooks::CoreGetCommandLineA, false);
+  PositiveCases(h);
+  NmsgWriteCases(h);
+  BufferCases(h);
+  HandleCases(h);
 }
 
 }  // namespace harness

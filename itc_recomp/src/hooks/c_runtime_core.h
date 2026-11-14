@@ -34,5 +34,21 @@ void CoreCallThreadNotifyRoutines(PPCContext& ctx, uint8_t* base);     // sub_82
 void CoreMtInitLocks(PPCContext& ctx, uint8_t* base);   // sub_825B31D8
 void CoreThreadNotify(PPCContext& ctx, uint8_t* base);  // sub_825B3650
 void CoreMtInit(PPCContext& ctx, uint8_t* base);        // sub_825AA708
+void CoreAtol(PPCContext& ctx, uint8_t* base);                // sub_825AAF08
+void CoreStrtol(PPCContext& ctx, uint8_t* base);              // sub_825A85C0 (no adapter)
+void CoreStrrchr(PPCContext& ctx, uint8_t* base);             // sub_825A8630
+void CoreInitterm(PPCContext& ctx, uint8_t* base);            // sub_825AA1B8
+void CoreSetAbortBehavior(PPCContext& ctx, uint8_t* base);    // sub_825AD120
+void CoreGetSigabrt(PPCContext& ctx, uint8_t* base);          // sub_825B49B0
+void CoreCrtDebuggerHook(PPCContext& ctx, uint8_t* base);     // sub_825B68B8
+void CoreValidateExecute(PPCContext& ctx, uint8_t* base);     // sub_825B8910
+void CoreSetUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base);  // sub_82297870
+void CoreGetCommandLineA(PPCContext& ctx, uint8_t* base);     // sub_822979D0
+void CorePositive(PPCContext& ctx, uint8_t* base);            // sub_825ADE90
+void CoreNmsgWrite(PPCContext& ctx, uint8_t* base);           // sub_825AEDA0
+void CoreGetbuf(PPCContext& ctx, uint8_t* base);              // sub_825B4790
+void CoreFreebuf(PPCContext& ctx, uint8_t* base);             // sub_825B0EE0
+void CoreCloseHandle(PPCContext& ctx, uint8_t* base);         // sub_82294E20
+void CoreResetEvent(PPCContext& ctx, uint8_t* base);          // sub_825BA168
 
 }  // namespace hooks
