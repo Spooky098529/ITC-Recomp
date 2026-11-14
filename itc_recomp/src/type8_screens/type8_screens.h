@@ -174,4 +174,41 @@ uint64_t Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls&
 // then ShowPlayerNodes(0, 0).
 uint64_t OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
+// --- The screen's constructor, destructors, machine and pick (screen.cpp,
+// init_machine.cpp) ---
+
+// sub_822386F0 Type8PanelScreen::Type8PanelScreen (224-byte frame):
+// MachineScreen::MachineScreen, its vtable, the ten panels (players 0 then
+// 1) and the group, PanelSetPair's constructor (its stack words at the
+// frame's +84 to +108), the holder, then its words. r3 left.
+uint64_t Construct(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_82238368 Type8PanelScreen::~Type8PanelScreen (112-byte frame): its
+// vtable, the holder's, PanelSetPair's and the group's destructors, the
+// panels' (the confirm panels' vtables, ListNode::~ListNode on the F and D
+// panels, CarPanelBase::~CarPanelBase on the C panels), then
+// MachineScreen::~MachineScreen. r3 left.
+uint64_t Destruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822388D8 Type8PanelScreen::DeletingDestructor (slot 20; 112-byte
+// frame): the destructor, then operator delete (a guest call) when bit 0 of
+// `flags` is set. r3 left.
+uint64_t DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                          const Calls& calls);
+// sub_82238C88 Type8PanelScreen::PickCar (slot 3; 160-byte frame): for both
+// players, GarageCar::Reset (a guest call) on the player's garage car, then
+// by the car list base's tab (+232): the two-player save block's garage car
+// at the entry's step copied in (memcpy's plain C++, or a guest call where
+// it declines) at 2, Car::SetModelAndClass's plain C++ with the entry's car
+// id and the car's halfwords at 0 or 1; then ScreenFades::FadeOut, +15240 =
+// 0, +9656 = 2. FadeOut's r3.
+uint64_t PickCar(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// sub_82238E98 Type8PanelScreen::InitMachine (slot 1; a 1712-byte frame):
+// its 24 transitions on the machine at +4, the frame's words as the
+// original leaves them, from its step table (init_table.h). `machine` gets
+// the machine, `replaced` whether the last StateMachine::Add replaced a
+// transition; the last Add's answer.
+constexpr uint32_t kInitMachineFrame = 1712;
+uint32_t InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* machine,
+                     bool* replaced);
+
 }  // namespace type8_screens

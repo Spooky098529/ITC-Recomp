@@ -334,6 +334,9 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return type8_screens::OpenMovies(sp, lr, calls);
     case 0x82238450:
       return type8_screens::DeleteMovies(sp, lr, calls);
+    // Its slot 3 (PickCar; r4, the dispatcher, not read).
+    case 0x82238C88:
+      return type8_screens::PickCar(base, r3, sp, calls);
     default:
       return std::nullopt;
   }
@@ -438,6 +441,7 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82238418:
     case 0x82238440:
     case 0x82238450:
+    case 0x82238C88:
     case 0x82248650:
     case 0x82252420:
     case 0x82252600:

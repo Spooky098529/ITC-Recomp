@@ -30,7 +30,14 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "are native), OnDialogClosed sub_82238990 and ShowPlayerNodes sub_82238570 "
               "(UiMovie::FindNode, ShowNode, HideNode and SetNodeTexture's and ScreenFades' "
               "plain C++; the shared panel handlers' and the holder's slots through "
-              "type67_screens::Slot)) natively instead of through the translated "
+              "type67_screens::Slot), Type8PanelScreen::Type8PanelScreen sub_822386F0 "
+              "(MachineScreen's, the panels', PanelSetPair's and the holder's constructors by "
+              "their plain C++), ~Type8PanelScreen sub_82238368 and DeletingDestructor "
+              "sub_822388D8 (the members' destructors by their plain C++, operator delete and "
+              "the car list's MenuList::Release guest calls), InitMachine sub_82238E98 (its "
+              "step table, StateMachine::Add's plain C++) and PickCar sub_82238C88 "
+              "(GarageCar::Reset a guest call, memcpy's, Car::SetModelAndClass's, "
+              "SaveData::TwoPlayerBlock's and ScreenFades::FadeOut's plain C++)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=type8_screens)");
 
 namespace hooks {
@@ -81,8 +88,24 @@ ITC_T8_STEP(Type8UpdateOpening, t8::UpdateOpening(base, ctx.r3.u64, ctx.r4.u64, 
 ITC_T8_STEP(Type8Show, t8::Show(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8Draw, t8::Draw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8OnDialogClosed, t8::OnDialogClosed(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8Construct, t8::Construct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8Destruct, t8::Destruct(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8DeletingDestruct, t8::DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8PickCar, t8::PickCar(base, ctx.r3.u64, sp, calls))
 
 #undef ITC_T8_STEP
+
+void Type8InitMachine(PPCContext& ctx, uint8_t* base) {
+  const uint64_t object_r3 = ctx.r3.u64;
+  uint32_t machine = 0;
+  bool replaced = false;
+  const uint32_t r3 = t8::InitMachine(base, ctx.r3.u32, ctx.r1.u32 - t8::kInitMachineFrame,
+                                      &machine, &replaced);
+  // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
+  // transition's address from the machine's 64-bit r3.
+  const uint64_t machine_r3 = object_r3 + (machine - ctx.r3.u32);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
 
 }  // namespace hooks
 
@@ -128,3 +151,10 @@ ITC_TYPE8_SCREENS(82238A00, Type8UpdateOpening)
 ITC_TYPE8_SCREENS(82238928, Type8Show)
 ITC_TYPE8_SCREENS(82238E78, Type8Draw)
 ITC_TYPE8_SCREENS(82238990, Type8OnDialogClosed)
+// The screen's constructor and destructor (from the type 8 mode's member's,
+// recompiled: a lead) and its vtable's slots 1, 3 and 20.
+ITC_TYPE8_SCREENS(822386F0, Type8Construct)
+ITC_TYPE8_SCREENS(82238368, Type8Destruct)
+ITC_TYPE8_SCREENS(822388D8, Type8DeletingDestruct)
+ITC_TYPE8_SCREENS(82238E98, Type8InitMachine)
+ITC_TYPE8_SCREENS(82238C88, Type8PickCar)

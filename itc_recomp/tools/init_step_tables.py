@@ -20,6 +20,9 @@ by word, and prints, in the original's order:
          transitions, run as a nested call with its own frame below)
 Values: C(constant), O(offset from r3, the object), A(offset from r4, a
 second object: the base Inits' functors' object) and F(offset in the frame).
+A doubleword loaded from the frame (ld, as Type8PanelScreen::InitMachine
+reloads each functor's two words) gives its high word through the rotate
+that takes it and its low word where it is stored as a word.
 Anything else in the function (another call, a load from outside the
 frame, a branch other than the copy loops) stops it with an error: the
 function isn't an Init of this shape. The back chain the prologue stores
@@ -78,6 +81,9 @@ def decode(name):
         (r"ctx\.(r\d+|ctr)\.u64 = ctx\.(r\d+)\.u64;", "move"),
         (r"REX_STORE_U32\(ctx\.(r\d+)\.u32 \+ (-?\d+), ctx\.(r\d+)\.u32\);", "store"),
         (r"ctx\.(r\d+)\.u64 = REX_LOAD_U32\(ctx\.(r\d+)\.u32 \+ (-?\d+)\);", "load"),
+        (r"ctx\.(r\d+)\.u64 = REX_LOAD_U64\(ctx\.(r\d+)\.u32 \+ (-?\d+)\);", "load64"),
+        (r"ctx\.(r\d+)\.u64 = __builtin_rotateleft64\(ctx\.(r\d+)\.u64, 32\) & 0xFFFFFFFF;",
+         "high"),
         (r"ea = -(\d+) \+ ctx\.r1\.u32;", "frame"),
         (r"__savegprlr_(\d+)\(ctx, base\);", "saved"),
         (r"if \(ctx\.ctr\.u32 != 0\) goto (loc_[0-9A-F]+);", "loop"),
@@ -118,6 +124,8 @@ def decode(name):
         elif kind == "store":
             where = add(regs[g[0]], int(g[1]))
             value = regs[g[2]]
+            if value[0] == "P":
+                value = value[1][1]  # a doubleword's low word
             if where[0] not in ("F", "O", "A"):
                 sys.exit("%s: a store to %r" % (name, where))
             if value[0] == "LF":
@@ -133,6 +141,17 @@ def decode(name):
             if where[0] != "F":
                 sys.exit("%s: a load from %r" % (name, where))
             regs[g[0]] = frame_words.get(where[1], ("LF", where[1]))
+        elif kind == "load64":
+            # A doubleword from the frame (ld): its high and low words.
+            where = add(regs[g[1]], int(g[2]))
+            if where[0] != "F":
+                sys.exit("%s: a load from %r" % (name, where))
+            words = tuple(frame_words.get(where[1] + k, ("LF", where[1] + k)) for k in (0, 4))
+            regs[g[0]] = ("P", words)
+        elif kind == "high":
+            if regs[g[1]][0] != "P":
+                sys.exit("%s: the high word of %r" % (name, regs[g[1]]))
+            regs[g[0]] = regs[g[1]][1][0]
         elif kind == "loop":
             if regs["ctr"][1] != 0:
                 pc = labels[g[0]]

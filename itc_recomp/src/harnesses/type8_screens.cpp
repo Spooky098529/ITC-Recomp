@@ -30,6 +30,7 @@
 #include "hooks/type8_screens.h"
 #include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
+#include "game_modes/game_modes.h"
 #include "memory/heap.h"
 #include "type67_screens/type67_screens.h"
 #include "type8_screens/type8_screens.h"
@@ -44,6 +45,14 @@
 ITC_FLAG_DECLARE(bool, native_type8_screens);
 
 namespace harness {
+
+// The stand's car world (src/harnesses/car_makers.cpp): a spec and
+// parameters for one car id in a 0x10000-byte block. (The same definition
+// is in car_makers.cpp.)
+struct StandWorld {
+  uint32_t params, holder_word, list;
+};
+StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint32_t holder);
 
 namespace {
 
@@ -62,6 +71,7 @@ const std::vector<std::pair<uint32_t, uint32_t>> kGlobals = {
     {0x826A50AC, 0x40},  // the screen fades' words (the counts among them)
     {ts::kFadeWait, 4},       {t8::kDialogPlayer, 4}, {t8::kModeBefore, 4},
     {0x826C5CDC, 4},  // UiMovies::Find's answer for a missing id
+    {0x82815EAC, 4},  // the car list's two-player word (PanelSetPair's constructor)
 };
 
 uint64_t Seed(uint64_t z) {
@@ -136,9 +146,12 @@ struct Frame {
 
 using Setup = std::function<void(PPCContext&, Random&, uint32_t world)>;
 using Native = std::function<void(PPCContext&, uint8_t*)>;
+// Run after the function, before the outputs are read.
+using After = std::function<void(Outputs&)>;
 
 void Group(Context& h, uint32_t world, const char* name, uint32_t address, int cases,
-           Frame frame, const Setup& setup, GuestFunction recompiled, const Native& native) {
+           Frame frame, const Setup& setup, GuestFunction recompiled, const Native& native,
+           const After& after = {}) {
   uint8_t* const base = h.base;
   Results results(fmt::format("{} (sub_{:08X})", name, address));
   for (int c = 0; c < cases; c++) {
@@ -188,6 +201,7 @@ void Group(Context& h, uint32_t world, const char* name, uint32_t address, int c
         native(t, base);
       }
       ui_movies_hooks::g_update_callee_stand_in = stand_in;
+      if (after) after(out[v]);
       out[v].Word(uint32_t(g_records.size()));
       for (const uint32_t word : g_records) out[v].Word(word);
       out[v].Word(uint32_t(g_recorded.size()));
@@ -458,6 +472,171 @@ void Handlers(Context& h, uint32_t world) {
   saved.Restore();
 }
 
+// --- The constructor, the destructors, the machine and the pick ---
+
+// The car list's menus MenuList::Release frees (each base's +60 and +132):
+// their item blocks (+68) 0 or pages of the allocation layer's, compared by
+// whether they're still pages after (and freed).
+std::vector<uint32_t> g_made;
+void Menus(uint8_t* base, uint32_t screen, Random& r) {
+  for (const uint32_t b : {screen + 11276, screen + 11276 + 1972}) {
+    for (const uint32_t list : {b + 60, b + 132}) {
+      uint32_t block = 0;
+      if (r.Below(2) == 0) {
+        block = memory::AllocPages(64, 4096);
+        g_made.push_back(block);
+      }
+      guest::StoreU32(base, list + 68, block);
+    }
+  }
+}
+void Released(Outputs& out) {
+  for (const uint32_t block : g_made) {
+    const bool still = memory::IsPages(block);
+    out.Word(still ? 1 : 0);
+    if (still) memory::FreePages(block);
+  }
+  g_made.clear();
+}
+
+void NativeInitMachine(PPCContext& t, uint8_t* b) { hooks::Type8InitMachine(t, b); }
+
+void Screen(Context& h, uint32_t world) {
+  uint8_t* const base = h.base;
+  Group(h, world, "Type8PanelScreen::Type8PanelScreen", 0x822386F0, 6, {224, 112}, NoSetup,
+        __imp__sub_822386F0, hooks::Type8Construct);
+  const auto menus = [base](PPCContext& t, Random& r, uint32_t w) {
+    Menus(base, w + kObjectAt, r);
+    t.r4.u64 = r.Next() & ~1ull;
+  };
+  Group(h, world, "Type8PanelScreen::~Type8PanelScreen", 0x82238368, 6, {112, 24}, menus,
+        __imp__sub_82238368, hooks::Type8Destruct, Released);
+  Group(h, world, "Type8PanelScreen::DeletingDestructor", 0x822388D8, 4, {112, 24}, menus,
+        __imp__sub_822388D8, hooks::Type8DeletingDestruct, Released);
+  Deleting(
+      h, "Type8PanelScreen::DeletingDestructor", 0x822388D8, t8::kScreenBytes,
+      [base](uint32_t object, Random&) {
+        for (const uint32_t b : {object + 11276, object + 11276 + 1972}) {
+          guest::StoreU32(base, b + 60 + 68, 0);
+          guest::StoreU32(base, b + 132 + 68, 0);
+        }
+      },
+      __imp__sub_822388D8, hooks::Type8DeletingDestruct);
+  // The machine (+4) empty, or holding transitions whose keys are small
+  // numbers (states below 12, messages below 36, so some match the
+  // Init's: Add replaces those).
+  Group(
+      h, world, "Type8PanelScreen::InitMachine", 0x82238E98, 12, {1712, 80},
+      [base](PPCContext&, Random& r, uint32_t w) {
+        namespace gm = game_modes;
+        const uint32_t machine = w + kObjectAt + 4;
+        if (r.Below(2) == 0) {
+          gm::StateMachineConstruct(base, machine);
+          guest::StoreU32(base, machine + gm::kTransitionCount, 0);
+          return;
+        }
+        guest::StoreU32(base, machine + gm::kTransitionCount, 8 + r.Below(160));
+        for (uint32_t i = 0; i < gm::kTransitions; i++) {
+          const uint32_t at = machine + gm::kTransitionBytes * i;
+          guest::StoreU32(base, at, r.Below(12));
+          guest::StoreU32(base, at + 4, r.Below(36));
+          guest::StoreU32(base, at + 8, r.Below(8) == 0 ? 1 : 0);
+          guest::StoreU32(base, at + 12, 0);
+        }
+      },
+      __imp__sub_82238E98, NativeInitMachine);
+}
+
+// PickCar: both car list bases' words (+232 the tab 0 to 3, +236 to +248
+// small steps, +1820 an entry table at the world's +0x5000 naming one entry
+// whose car id (+8432) is LayShowCarWorld's: the case's spec and
+// parameters, [0x826C2E48] pointed at them; rand's seed set per case for
+// Car::SetModel's picks), the two-player save block ([0x826C5B5C]) a
+// harness block whose halves' garage lists are walked the steps to a slot
+// of random words, the garage cars random (+4 0xFFFF now and then).
+// GarageCar::Reset runs through its adapter on both sides. Compared: the
+// world, the save block's garages, the garage cars, the rand seed, the
+// frame (but the register saves) and r3; the globals put back after.
+void PickCar(Context& h, uint32_t world) {
+  uint8_t* const base = h.base;
+  constexpr uint32_t kBlockBytes = 0x3AB80, kParams = 0x826C2E48, kRandSeed = 0x82638188;
+  constexpr uint32_t kHalf = 120108, kCarsBytes = 2 * 1972;
+  const uint32_t block = memory::Alloc(kBlockBytes, 0);
+  const uint32_t stand = memory::Alloc(0x10000, 0);
+  const uint32_t entry = memory::Alloc(0x2100, 0);
+  if (block == 0 || stand == 0 || entry == 0) {
+    ITC_LOG_ERROR("harness: type8_screens: no blocks for PickCar");
+    for (const uint32_t b : {block, stand, entry}) {
+      if (b != 0) memory::Free(b);
+    }
+    return;
+  }
+  const uint32_t saved_block = guest::LoadU32(base, car_list::kPairSaveData);
+  const uint32_t saved_params = guest::LoadU32(base, kParams);
+  const uint32_t saved_seed = guest::LoadU32(base, kRandSeed);
+  const std::vector<uint8_t> saved_cars = Read(base, t8::kGarageCars, kCarsBytes);
+  Group(
+      h, world, "Type8PanelScreen::PickCar", 0x82238C88, 16, {160, 72},
+      [base, block, stand, entry](PPCContext& t, Random& r, uint32_t w) {
+        const StandWorld stand_world = LayShowCarWorld(base, stand, r, int(r.Below(64)), 0);
+        const uint32_t array = guest::LoadU32(base, stand_world.list + 1136);
+        const uint32_t at = guest::LoadU32(base, stand_world.list + 48) +
+                            guest::LoadU32(base, stand_world.list + 52);
+        const uint32_t car_id =
+            guest::LoadU32(base, guest::LoadU32(base, array + 4 * at) + 8432);
+        guest::StoreU32(base, 0x826C2E48, stand_world.params);
+        WriteRandom(base, entry + 8400, 64, r);
+        guest::StoreU32(base, entry + 8432, car_id);
+        guest::StoreU32(base, car_list::kPairSaveData, block);
+        const uint32_t s = w + kObjectAt;
+        for (uint32_t player = 0; player < 2; player++) {
+          const uint32_t words = s + 11512 + 1972 * player;
+          guest::StoreU32(base, words - 4, r.Below(4));
+          const uint32_t a = r.Below(3), b = r.Below(3);
+          guest::StoreU32(base, words + 0, a);
+          guest::StoreU32(base, words + 4, b);
+          guest::StoreU32(base, words + 8, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(3));
+          guest::StoreU32(base, words + 12, r.Below(3));
+          guest::StoreU32(base, words + 1584, w + 0x5000 + 0x40 * player);
+          guest::StoreU32(base, w + 0x5000 + 0x40 * player + 4 * (a + b), entry);
+          // The half's garage list: from +204, a + b steps through distinct
+          // nodes, to a slot of random words.
+          const uint32_t nodes = block + kHalf * player + 6120;
+          WriteRandom(base, nodes, 0x400, r);
+          uint16_t node = uint16_t(r.Below(10));
+          guest::StoreU16(base, nodes + 204, node);
+          for (uint32_t i = 0; i < a + b; i++) {
+            const uint16_t next = uint16_t(10 * (i + 1) + r.Below(10));
+            guest::StoreU16(base, nodes + 4 * node, next);
+            node = next;
+          }
+          const uint32_t slot = r.Below(3);
+          guest::StoreU16(base, nodes + 4 * node + 2, uint16_t(slot));
+          WriteRandom(base, nodes + 212 + 1968 * slot, 1968, r);
+          const uint32_t car = t8::kGarageCars + 1972 * player;
+          WriteRandom(base, car, 1972, r);
+          if (r.Below(2) == 0) guest::StoreU16(base, car + 4, 0xFFFF);
+        }
+        guest::StoreU32(base, kRandSeed, uint32_t(r.Next()));
+        t.r4.u64 = w + kDispatcherAt;
+      },
+      __imp__sub_82238C88, hooks::Type8PickCar,
+      [base, block](Outputs& out) {
+        for (uint32_t player = 0; player < 2; player++) {
+          out.Bytes(Read(base, block + kHalf * player + 6120, 0x400 + 3 * 1968));
+        }
+        out.Bytes(Read(base, t8::kGarageCars, kCarsBytes));
+        out.Word(guest::LoadU32(base, kRandSeed));
+      });
+  guest::StoreU32(base, car_list::kPairSaveData, saved_block);
+  guest::StoreU32(base, kParams, saved_params);
+  guest::StoreU32(base, kRandSeed, saved_seed);
+  Write(base, t8::kGarageCars, saved_cars.data(), kCarsBytes);
+  memory::Free(block);
+  memory::Free(stand);
+  memory::Free(entry);
+}
+
 }  // namespace
 
 void Type8Screens(Context& h) {
@@ -469,6 +648,8 @@ void Type8Screens(Context& h) {
   Panels(h, world);
   Leaves(h, world);
   Handlers(h, world);
+  Screen(h, world);
+  PickCar(h, world);
   memory::Free(world);
 }
 

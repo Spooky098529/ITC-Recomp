@@ -44,4 +44,11 @@ void Type8Show(PPCContext& ctx, uint8_t* base);
 void Type8Draw(PPCContext& ctx, uint8_t* base);
 void Type8OnDialogClosed(PPCContext& ctx, uint8_t* base);
 
+// The screen's constructor, destructors, machine and pick.
+void Type8Construct(PPCContext& ctx, uint8_t* base);
+void Type8Destruct(PPCContext& ctx, uint8_t* base);
+void Type8DeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type8InitMachine(PPCContext& ctx, uint8_t* base);
+void Type8PickCar(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
