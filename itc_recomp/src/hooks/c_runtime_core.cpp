@@ -81,7 +81,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_fclose_nolock or fclose), _fcloseall's __finally (sub_825B4F38), _fflush_nolock, "
               "flsall and _flushall (their callers fflush, flsall and _endstdio), the __finally "
               "funclets of flsall and fflush (sub_825ACEB4, sub_825ACF04, sub_825AD02C), doexit "
-              "(sub_825AA218, its callers _exit and _cexit) and its unwind funclet (sub_825AA338), raise "
+              "(sub_825AA218, its callers _exit and _cexit) and its unwind funclet (sub_825AA338), "
+              "raise's __finally (sub_825B4C8C, its caller raise), raise "
               "(sub_825B49C8, its caller abort; checked by --run_harnesses=c_runtime_core but "
               "for its default action, _exit)");
 
@@ -807,8 +808,7 @@ ITC_C_RUNTIME_CORE(825B7A20, CoreLockFhandleFinally)
 // _free_osfhnd, _get_osfhandle: r3 = a file handle.
 ITC_C_RUNTIME_CORE(825B77E8, CoreFreeOsfhnd)
 ITC_C_RUNTIME_CORE(825B7880, CoreGetOsfhandle)
-// raise's __finally: r28 = whether raise took lock 0.
-ITC_C_RUNTIME_CORE(825B4C8C, CoreRaiseFinally)
+// (raise's __finally, sub_825B4C8C, has no adapter: raise is native.)
 // (flsall's outer and inner __finally, sub_825ACEB4 and sub_825ACF04, and
 // _fcloseall's, sub_825B4F38, have no adapters: flsall and _fcloseall are
 // native.)
