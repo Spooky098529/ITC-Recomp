@@ -107,7 +107,10 @@ file's history. What's left to see in a drive, from every run:
   -> Native), `_close_nolock`'s adapter removed; every harness 0
   differing, race 38 s, 0 errors. Left: fclose, `_fcloseall`, the
   stream buffer helpers, `bsearch`, and `_fflush_nolock`/flsall's pair
-  with what's above it. Step: validation, then a fourth migration.
+  with what's above it. Validated `itc_5504` (race 36 s at 180, 0
+  errors, every harness 0 differing outside the expected groups), 21
+  of 21; replay `itc_5505` ok; none ran in game: 21 to drive. Step:
+  fourth migration.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads

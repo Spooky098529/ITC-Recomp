@@ -31,6 +31,11 @@ sub_825A85C0, sub_825AAF08, sub_825A8630, sub_825ABE30, sub_825ADD38,
 sub_825ADDD8, sub_825ADE90, sub_825ADEB0, sub_825B6098, sub_825B6140,
 sub_825B70D0 (most are error, exit and stream paths a drive won't
 take either).
+Its third migration (replay `itc_5505` ok): sub_825B0E88,
+sub_825B0E50, sub_825B1304, sub_825B4978, sub_825B6730, sub_825A9664,
+sub_825AD02C, sub_825AD488, sub_825AA338, sub_825B0D10, sub_825B0C28,
+sub_825B4828, sub_825BA510, sub_825B65D0, sub_825B6500, sub_825B9DD8,
+sub_825B11A8, sub_825B0F48, sub_82295D50, sub_825ACC78, sub_825B4CD0.
 
 The in-race screens never seen (`race-screens-unseen.md`; replay ok):
 all 94 Overridden and Native rows there (PauseMenu4, RaceResults,
