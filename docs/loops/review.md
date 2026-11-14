@@ -94,6 +94,16 @@ When the user has reviewed a run's section, its heading gets
   and `_unlock` called as guest functions). `CloseHandle`'s adapter
   stays while `SaveSlot::WaitClose` (`src/hooks/save_interface.cpp`)
   calls it as a guest function.
+- The C runtime core's second migration (b66014dd..cade1fbb): 27
+  rows; checked by reading with no harness (the 2026-11-14 call):
+  `XapiThreadStartup` (seen running in game), the `KeBugCheck` stub,
+  `RaiseException`, `_CxxThrowException`, `_invoke_watson`,
+  `_invalid_parameter`'s trap path. In the SDK, `RtlRaiseException`
+  returns for thread-name exceptions and breaks for the rest, and
+  `ppc_trap` type 22 only logs and returns (in the rows). `_getptd`'s
+  adapter stays for `rand`'s never-seen no-data guest call. The shared
+  `Ld12Convert` (`src/c_runtime/format.cpp`) was refactored, its
+  harnesses (12,280 and 1,595 cases) 0 differing.
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a

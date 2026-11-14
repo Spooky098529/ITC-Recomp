@@ -87,8 +87,14 @@ file's history. What's left to see in a drive, from every run:
   (the `KeBugCheck` stub `sub_825AA1A0`, `_CxxThrowException`,
   `RaiseException`, `XapiThreadStartup`, `_invalid_parameter`'s trap;
   they block `_getptd` and `_amsg_exit`). The user's call: ported and
-  checked by reading, no harness (in "Precedent first"). Step: second
-  migration.
+  checked by reading, no harness (in "Precedent first"). Second
+  migration b66014dd..cade1fbb: 27 rows ours (`_getptd`, `_amsg_exit`,
+  `XapiThreadStartup`, the raisers, the file handle locks, the
+  funclets, `exp`, `_fassign_l`), `CloseHandle`'s adapter removed;
+  every harness 0 differing, races 38 s, 0 errors; 6 checked by
+  reading (no harness). Ready groups left (`_close`, `_commit`,
+  `_lseeki64_nolock`, `_fileno`, `terminate` and the rest). Step:
+  validation of both migrations, then a third.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
