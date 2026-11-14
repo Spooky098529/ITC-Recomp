@@ -84,7 +84,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "funclets of flsall and fflush (sub_825ACEB4, sub_825ACF04, sub_825AD02C), doexit "
               "(sub_825AA218, its callers _exit and _cexit) and its unwind funclet (sub_825AA338), "
               "raise's __finally (sub_825B4C8C, its caller raise), _fwrite_nolock (sub_825A96A0, its "
-              "caller fputs; checked by --run_harnesses=c_runtime_core), raise "
+              "caller fputs; checked by --run_harnesses=c_runtime_core), fputs's __finally "
+              "(sub_825AD488, its caller fputs), raise "
               "(sub_825B49C8, its caller abort; checked by --run_harnesses=c_runtime_core but "
               "for its default action, _exit)");
 
@@ -863,9 +864,8 @@ ITC_C_RUNTIME_CORE(825B6730, CoreCloseFinally)
 // sub_82295D50, have no adapters: _write is _write_nolock's only caller, and
 // WriteFile's caller in play, SaveSlot::WriteFile, leaves it out.)
 ITC_C_RUNTIME_CORE(825B11A8, CoreWrite)
-// fputs's __finally: r30 = the stream. (fflush's, sub_825AD02C, has no
-// adapter: fflush is native.)
-ITC_C_RUNTIME_CORE(825AD488, CoreFcloseFinally)
+// (fputs's and fflush's __finally, sub_825AD488 and sub_825AD02C, have no
+// adapters: fputs and fflush are native.)
 // _flush: r3 = a stream; r3 = 0, or -1.
 ITC_C_RUNTIME_CORE(825ACC78, CoreFlush)
 // __CxxUnhandledExceptionFilter: r3 = the exception pointers; r3 = the
