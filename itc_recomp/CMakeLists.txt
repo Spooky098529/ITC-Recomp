@@ -506,6 +506,7 @@ set(ITC_SOURCES
     src/hooks/type8_mode.cpp
     src/type8_mode/dialog.cpp
     src/type8_mode/screen0.cpp
+    src/type8_mode/screen0_update.cpp
     src/car_list/panels.cpp
     src/car_list/set.cpp
     src/car_list/pages.cpp

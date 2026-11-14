@@ -151,9 +151,54 @@ uint64_t Screen0PlaceCursor(uint8_t* base, uint64_t item, uint32_t sp);
 // sub_8223C888 Type8Screen0::Draw (128): the page table at 0x82814E94
 // built on first use (its guard bit 0 at 0x82814EB4; the pairs in the
 // frame's +80 to +111), then page +9652's entry on the screen plus its
-// adjustment and r4 (ConfirmPage's and ChosenPage's plain C++, others guest
+// adjustment and r4 (MenuPage's, ConfirmPage's and ChosenPage's plain C++, others guest
 // calls), nothing for page -1. The page's r3, or r3 left.
 uint64_t Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                      const ScreenCalls& calls);
+
+// --- The menu page, steps, update and show (screen0_update.cpp) ---
+
+// sub_8223C6B8 Type8Screen0::MenuPage (144; r4 the dispatcher): while the
+// menu takes input (+9644), MenuList::Update, then accepted (MenuSound 0;
+// item 4 Confirm and page 1, else the fade out step 3 to page 3), cancelled
+// (MenuSound 2; unless on item 4, the cursor there and step 2) or moved
+// (+9704: MenuSound 4, step 2); then the item's help (SetText(24, 5, 0,
+// 914 + item), ScrollText, and the scroll reset when moved). The last call's
+// r3, or r3 left.
+uint64_t Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                         const ScreenCalls& calls);
+// The steps (r3 the screen plus its adjustment): sub_8223C1A0 OpeningStep
+// (128; done once Run answers 0 and both fades' counts are 0),
+// sub_8223BBC8 ItemStep (128; 1), sub_8223C330 CursorStep (128; 1),
+// sub_8223BAF0 FadeOutStep (112; 0 while the menu is off, else done once
+// both fades' counts are 0).
+uint64_t Screen0OpeningStep(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+uint64_t Screen0ItemStep(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+uint64_t Screen0CursorStep(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+uint64_t Screen0FadeOutStep(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+// sub_8223B808 Type8Screen0::UpdateStand (4,096-byte frame): the two
+// players' stage models (at most one GarageStage::ReloadModel a call, then a
+// Car at the frame's +96 set on the stage), their loading animations and
+// stage commands, GarageStages::DrawAll's plain C++ (its r3).
+uint64_t Screen0UpdateStand(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+// sub_8223C588 Type8Screen0::Update (160): the step table at 0x82814E70
+// built on first use (its guard bit 0 at 0x82814E90), the step (+9664) run
+// (the steps' plain C++, others guest calls) and the page block moved on
+// when it answers nonzero, else UiMovie::Run; then UpdateStand (its r3).
+uint64_t Screen0Update(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+// sub_8223B760 Type8Screen0::SetTexts (160; r3 not read): movie 24 reset,
+// the menu's five labels (SetText(m, 0, 5 + i, ...)), named 2 to 6
+// finished. The last FinishNamed's r3.
+uint64_t Screen0SetTexts(uint8_t* base, uint32_t sp, const ScreenCalls& calls);
+// sub_8223BC68 Type8Screen0::CarCard (144; r3 not read; r4 the player, r5
+// the car's model id, r6 its spec's byte +769): three SetNodeText on the
+// player's node's children 6, 10 and 8. The last one's r3.
+uint64_t Screen0CarCard(uint8_t* base, uint64_t player, uint64_t model, uint64_t maker,
+                        uint32_t sp, const ScreenCalls& calls);
+// sub_8223BF18 Type8Screen0::Show (176): SetTexts, the page block to step 0
+// with step 1 queued, both stand blocks' words cleared and their animations
+// finished, the car cards, the music (the sound manager's slots 14 and 13,
+// Sound::Play's plain C++). The last call's r3.
+uint64_t Screen0Show(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
 
 }  // namespace type8_mode

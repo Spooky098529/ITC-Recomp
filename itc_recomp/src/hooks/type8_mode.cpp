@@ -29,8 +29,16 @@ ITC_FLAG_BOOL(native_type8_mode, true, "ITC",
               "sub_8223BD20, PlaceCursor sub_8223BE88 and Draw sub_8223C888 (ScreenMachine's "
               "constructor, MenuList::Init, SetSelection, Selection and Release, UiMovie::SetText, "
               "FindNode and the node setters by their plain C++ where they run natively; "
-              "UiMovies::Open and Delete, FinishAll, operator delete and MenuPage as guest "
-              "calls)) natively instead of through the "
+              "UiMovies::Open and Delete, FinishAll and operator delete as guest calls); "
+              "MenuPage sub_8223C6B8, OpeningStep sub_8223C1A0, ItemStep sub_8223BBC8, "
+              "CursorStep sub_8223C330, FadeOutStep sub_8223BAF0, Update sub_8223C588 with "
+              "UpdateStand sub_8223B808, Show sub_8223BF18 with SetTexts sub_8223B760 and "
+              "CarCard sub_8223BC68 (MenuList::Selection, SetSelection, UiMovie::IsNamedActive, "
+              "ScreenFades, MenuSound::Play, Sound::Play, CarModels::BlockOf, "
+              "Params::GetCarSpec, Car::Init, memcpy, Car::Refresh, GarageStage::SetPlates and "
+              "GarageStages::DrawAll by their plain C++; the named animations, Run, ScrollText, "
+              "SetNodeText, the menu list's Update, Accepted and Cancelled, the stand's "
+              "GarageStage calls and the sound manager's slots as guest calls)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=type8_mode)");
 
 namespace hooks {
@@ -93,6 +101,18 @@ ITC_T8M_SCREEN(Type8Screen0ShowPage,
                t8m::Screen0ShowPage(base, ctx.r4.u64, ctx.r5.u64, sp))
 ITC_T8M_SCREEN(Type8Screen0PlaceCursor, t8m::Screen0PlaceCursor(base, ctx.r4.u64, sp))
 ITC_T8M_SCREEN(Type8Screen0Draw, t8m::Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0MenuPage,
+               t8m::Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0OpeningStep, t8m::Screen0OpeningStep(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0ItemStep, t8m::Screen0ItemStep(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0CursorStep, t8m::Screen0CursorStep(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0FadeOutStep, t8m::Screen0FadeOutStep(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0UpdateStand, t8m::Screen0UpdateStand(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0Update, t8m::Screen0Update(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0SetTexts, t8m::Screen0SetTexts(base, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0CarCard,
+               t8m::Screen0CarCard(base, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0Show, t8m::Screen0Show(base, ctx.r3.u64, sp, calls))
 
 #undef ITC_T8M_SCREEN
 #undef ITC_T8M_STEP
@@ -145,3 +165,15 @@ ITC_TYPE8_MODE(8223C0C0, Type8Screen0ChosenPage)
 ITC_TYPE8_MODE(8223BD20, Type8Screen0ShowPage)
 ITC_TYPE8_MODE(8223BE88, Type8Screen0PlaceCursor)
 ITC_TYPE8_MODE(8223C888, Type8Screen0Draw)
+// The menu page (Draw's table), the steps (Update's table), Update and
+// Show (the machine's transitions). UpdateStand, SetTexts and CarCard have
+// no adapters: their only callers (Update, Show) are these, native (with
+// the flag off, the originals call the originals); their register steps
+// stay for the harness.
+ITC_TYPE8_MODE(8223C6B8, Type8Screen0MenuPage)
+ITC_TYPE8_MODE(8223C1A0, Type8Screen0OpeningStep)
+ITC_TYPE8_MODE(8223BBC8, Type8Screen0ItemStep)
+ITC_TYPE8_MODE(8223C330, Type8Screen0CursorStep)
+ITC_TYPE8_MODE(8223BAF0, Type8Screen0FadeOutStep)
+ITC_TYPE8_MODE(8223C588, Type8Screen0Update)
+ITC_TYPE8_MODE(8223BF18, Type8Screen0Show)

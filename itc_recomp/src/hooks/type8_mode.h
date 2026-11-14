@@ -44,5 +44,15 @@ void Type8Screen0ChosenPage(PPCContext& ctx, uint8_t* base);
 void Type8Screen0ShowPage(PPCContext& ctx, uint8_t* base);
 void Type8Screen0PlaceCursor(PPCContext& ctx, uint8_t* base);
 void Type8Screen0Draw(PPCContext& ctx, uint8_t* base);
+void Type8Screen0MenuPage(PPCContext& ctx, uint8_t* base);
+void Type8Screen0OpeningStep(PPCContext& ctx, uint8_t* base);
+void Type8Screen0ItemStep(PPCContext& ctx, uint8_t* base);
+void Type8Screen0CursorStep(PPCContext& ctx, uint8_t* base);
+void Type8Screen0FadeOutStep(PPCContext& ctx, uint8_t* base);
+void Type8Screen0UpdateStand(PPCContext& ctx, uint8_t* base);
+void Type8Screen0Update(PPCContext& ctx, uint8_t* base);
+void Type8Screen0SetTexts(PPCContext& ctx, uint8_t* base);
+void Type8Screen0CarCard(PPCContext& ctx, uint8_t* base);
+void Type8Screen0Show(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

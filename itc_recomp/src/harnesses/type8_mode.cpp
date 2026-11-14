@@ -37,6 +37,8 @@
 #include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "menu_sounds/menu_sounds.h"
+#include "race_screens/race_screens.h"
 #include "type8_mode/type8_mode.h"
 #include "ui_movies/game.h"
 
@@ -74,6 +76,14 @@ const std::vector<std::pair<uint32_t, uint32_t>> kGlobals = {
     {kModeBefore, 4},
     {0x826C5CDC, 4},  // UiMovies::Find's answer for a missing id
     {kPageTable, 0x24},  // Type8Screen0::Draw's table and its guard
+    {0x82814E70, 0x24},  // Type8Screen0::Update's step table and its guard
+    {race_screens::kMapperEntries, 32},
+    {race_screens::kControllerEntries, 16},
+    {menu_sounds::kSoundManager, 4},
+    {0x826D83E0, 8},     // the stand's holder and the reload count
+    {0x826C2E40, 8},     // the car scene's first word and the scene
+    {0x82814EB8, 3944},  // the two players' garage cars
+    {0x826C2E48, 4},     // the parameters (Params::GetCarSpec)
 };
 
 uint64_t Seed(uint64_t z) {
@@ -319,6 +329,225 @@ Native WithRecording(uint64_t (*step)(uint8_t*, uint64_t, uint32_t, const t8m::S
   };
 }
 
+// --- The menu page, the steps, Update, UpdateStand and Show ---
+//
+// The menu list (+9680) laid as the type 8 list part's harness lays its
+// menus (five items, its player 0 to 3, its actions mostly the menus', the
+// move word 0 mostly, its item block at the world's +0x2800), the four
+// players' action mappers (+0x2900 their vtables, +0x2A00 the mappers) and a
+// fake sound manager (+0x3200; PlayCue2D the recorder sub_820A8420, StopCue
+// sub_820CE9F8, IsCuePlaying the getter sub_82090770 answering its +60, 0
+// or 1). The stand in a block of its own as Type6Screen0::Update's cases lay
+// it (type67_modes.cpp), with three stages (slots 1 and 2 the players'):
+// their garage cameras not set up (GarageStage::Draw does nothing, Command's
+// presets kept at +6088), +4 -1 or not, +8 0, the car scene's one pool 7
+// model, the reload count 0 to 2 (GarageStage::ReloadModel answers 0: its
+// later branch, the car object and GarageStage::SetCar, isn't laid, as
+// there). The garage cars' model ids below 80 (Params::GetCarSpec's table),
+// the stand blocks' named animations below 256 (the movie world's). The
+// stand block compared after each case.
+
+constexpr uint32_t kItemsAt = 0x2800, kMapperVtablesAt = 0x2900, kMappersAt = 0x2A00;
+constexpr uint32_t kManagerAt = 0x3200, kManagerVtableAt = 0x3280;
+constexpr uint32_t kStandBytes = 0x8000;
+constexpr uint32_t kStepTable = 0x82814E70, kStepGuard = 0x82814E90;
+constexpr uint32_t kGarageCars = 0x82814EB8;
+
+uint32_t g_stand = 0;
+
+void LayMenuWorld(uint8_t* base, uint32_t w, Random& r) {
+  namespace rs = race_screens;
+  const uint32_t list = w + kObjectAt + kList;
+  guest::StoreU32(base, list + rs::kListPlayer, r.Below(4));
+  guest::StoreU32(base, list + rs::kListCount, 5);
+  guest::StoreU32(base, list + rs::kListShown, 5);
+  guest::StoreU32(base, list + rs::kListScroll, r.Below(4) == 0 ? 0xFFFFFFFFu : 0);
+  guest::StoreU32(base, list + rs::kListSelection, r.Below(5));
+  guest::StoreU32(base, list + rs::kListSelectionBefore, r.Below(5));
+  for (uint32_t field = rs::kListDown; field <= rs::kListBack; field += 4) {
+    guest::StoreU32(base, list + field,
+                    r.Below(8) == 0 ? uint32_t(r.Next()) : 151 + r.Below(30));
+  }
+  guest::StoreU32(base, list + rs::kListWraps, r.Below(2));
+  guest::StoreU32(base, list + rs::kListMove, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
+  guest::StoreU32(base, list + rs::kListBlock, w + kItemsAt);
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t vtable = w + kMapperVtablesAt + 0x40 * c;
+    const uint32_t mapper = w + kMappersAt + 0x200 * c;
+    guest::StoreU32(base, rs::kControllerEntries + 4 * c, r.Below(4));
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c, mapper);
+    guest::StoreU32(base, rs::kMapperEntries + 8 * c + 4, r.Below(5) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper, vtable);
+    guest::StoreU32(base, vtable + 40, rs::kPressedSlot);
+    guest::StoreU32(base, vtable + 48, rs::kFiredSlot);
+    for (uint32_t k = 0; k < 6; k++) {
+      guest::StoreU32(base, mapper + 448 + 4 * k,
+                      uint32_t(r.Next()) & uint32_t(r.Next()) & uint32_t(r.Next()));
+    }
+  }
+}
+
+void LaySoundManager(uint8_t* base, uint32_t w, Random& r) {
+  const uint32_t manager = w + kManagerAt, vtable = w + kManagerVtableAt;
+  guest::StoreU32(base, manager, vtable);
+  guest::StoreU32(base, manager + 60, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
+  guest::StoreU32(base, vtable + 52, 0x820CE9F8);
+  guest::StoreU32(base, vtable + 56, 0x82090770);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+}
+
+// The page block (+9652 to +9676): small pages and steps.
+void LayPages(uint8_t* base, uint32_t screen, Random& r) {
+  const auto small = [&r](uint32_t n) { return r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(n); };
+  guest::StoreU32(base, screen + 9644, r.Below(3) == 0 ? 0 : 1);
+  guest::StoreU32(base, screen + 9652, small(4));
+  guest::StoreU32(base, screen + 9656, small(4));
+  guest::StoreU32(base, screen + 9664, small(4));
+  guest::StoreU32(base, screen + 9668, small(4));
+  guest::StoreU32(base, screen + 9676, r.Below(2));
+}
+
+void LayCars(uint8_t* base, Random& r) {
+  for (uint32_t p = 0; p < 2; p++) {
+    const uint32_t car = kGarageCars + 1972 * p;
+    guest::StoreU32(base, car + 12, r.Below(80));
+  }
+}
+
+// The two players' stand blocks (+9752, +9772): the shown word, the named
+// animations, the model made.
+void LayStandBlocks(uint8_t* base, uint32_t screen, Random& r) {
+  for (uint32_t p = 0; p < 2; p++) {
+    const uint32_t b = screen + 9752 + 20 * p;
+    guest::StoreU32(base, b + 0, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    for (const uint32_t at : {4u, 8u, 12u}) guest::StoreU32(base, b + at, r.Below(256));
+    guest::StoreU32(base, b + 16, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
+  }
+}
+
+void LayStand(uint8_t* base, Random& r) {
+  constexpr uint32_t kSceneAt = 0x4C00, kModel = 0x6000;
+  const uint32_t b = g_stand;
+  WriteRandom(base, b, kStandBytes, r);
+  const uint32_t scene = b + kSceneAt, model = b + kModel;
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t slot = b + 0x40 + 4 * i;
+    const uint32_t stage = b + 0x100 + 0x1900 * i;
+    guest::StoreU32(base, b + 4 * i, slot);
+    guest::StoreU32(base, slot, stage);
+    guest::StoreU32(base, stage + 4, r.Below(2) ? 0xFFFFFFFFu : uint32_t(r.Next()));
+    guest::StoreU32(base, stage + 8, 0);
+    guest::StoreU32(base, stage + 16, r.Below(2));
+    guest::StoreU32(base, stage + 112, 0);
+  }
+  guest::StoreU32(base, 0x826D83E0, b);
+  guest::StoreU32(base, 0x826C2E44, scene);
+  guest::StoreU32(base, 0x826C2E40, 0);
+  guest::StoreU32(base, 0x826D83E4, r.Below(3));
+  guest::StoreU32(base, scene + 0, r.Below(2) == 0 ? 4 : r.Below(4));
+  guest::StoreU32(base, scene + 48, 3 + r.Below(4));
+  guest::StoreU32(base, scene + 4, 0);
+  guest::StoreU32(base, scene + 5048, 1);
+  guest::StoreU32(base, scene + 5028, model);
+  guest::StoreU32(base, scene + 5036, 1);
+  guest::StoreU32(base, model + 8, 0);
+  guest::StoreU32(base, model + 16, 3);
+  guest::StoreU32(base, model + 20, r.Below(6));
+  guest::StoreU32(base, model + 32, 1);
+  guest::StoreU32(base, model + 5028, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5040, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 5044, 3 + r.Below(3));
+  for (const uint32_t word : {5048u, 5060u, 5068u, 5076u, 5084u, 5100u}) {
+    guest::StoreU32(base, model + word, 0);
+  }
+  guest::StoreU32(base, model + 5116, scene);
+}
+
+void StandOutputs(uint8_t* base, Outputs& out) { out.Bytes(Read(base, g_stand, kStandBytes)); }
+
+// Update's step table not built yet, or built as the original builds it.
+void LaySteps(uint8_t* base, Random& r) {
+  guest::StoreU32(base, kStepGuard, r.Below(2) == 0 ? 0 : uint32_t(r.Next()) | 1);
+  if ((guest::LoadU32(base, kStepGuard) & 1) != 0) {
+    const uint32_t table[8] = {0x8223C1A0, 0, 0x8223BBC8, 0, 0x8223C330, 0, 0x8223BAF0, 0};
+    for (uint32_t i = 0; i < 8; i++) guest::StoreU32(base, kStepTable + 4 * i, table[i]);
+  }
+}
+
+void Type8Screen0Updates(Context& h, uint32_t world) {
+  uint8_t* const base = h.base;
+  g_stand = memory::Alloc(kStandBytes, 0);
+  if (g_stand == 0) {
+    ITC_LOG_ERROR("harness: type8_mode: no stand block");
+    return;
+  }
+  const auto menu = [base](PPCContext& t, Random& r, uint32_t w) {
+    LayMenuWorld(base, w, r);
+    LaySoundManager(base, w, r);
+    LayPages(base, w + kObjectAt, r);
+    t.r4.u64 = w + kDispatcherAt;
+  };
+  Group(h, world, "Type8Screen0::MenuPage", 0x8223C6B8, 12, {144, 48}, menu, __imp__sub_8223C6B8,
+        hooks::Type8Screen0MenuPage);
+  const auto steps = [base](PPCContext&, Random& r, uint32_t w) {
+    LayMenuWorld(base, w, r);
+    LayPages(base, w + kObjectAt, r);
+  };
+  Group(h, world, "Type8Screen0::OpeningStep", 0x8223C1A0, 8, {128, 32}, steps,
+        __imp__sub_8223C1A0, hooks::Type8Screen0OpeningStep);
+  Group(h, world, "Type8Screen0::ItemStep", 0x8223BBC8, 6, {128, 32}, steps, __imp__sub_8223BBC8,
+        hooks::Type8Screen0ItemStep);
+  Group(h, world, "Type8Screen0::CursorStep", 0x8223C330, 8, {128, 40}, steps,
+        __imp__sub_8223C330, hooks::Type8Screen0CursorStep);
+  Group(h, world, "Type8Screen0::FadeOutStep", 0x8223BAF0, 8, {112, 24}, steps,
+        __imp__sub_8223BAF0, hooks::Type8Screen0FadeOutStep);
+  const auto stands = [base](PPCContext&, Random& r, uint32_t w) {
+    LayCars(base, r);
+    LayStandBlocks(base, w + kObjectAt, r);
+    LayStand(base, r);
+  };
+  const auto stand_outputs = [base](Outputs& out) { StandOutputs(base, out); };
+  Group(h, world, "Type8Screen0::UpdateStand", 0x8223B808, 10, {4096, 96}, stands,
+        __imp__sub_8223B808, hooks::Type8Screen0UpdateStand, stand_outputs);
+  Group(
+      h, world, "Type8Screen0::Update", 0x8223C588, 12, {160, 40},
+      [base, steps, stands](PPCContext& t, Random& r, uint32_t w) {
+        steps(t, r, w);
+        LaySteps(base, r);
+        stands(t, r, w);
+      },
+      __imp__sub_8223C588, hooks::Type8Screen0Update, stand_outputs);
+  Group(h, world, "Type8Screen0::SetTexts", 0x8223B760, 4, {160, 32}, NoSetup,
+        __imp__sub_8223B760, hooks::Type8Screen0SetTexts);
+  Group(
+      h, world, "Type8Screen0::CarCard", 0x8223BC68, 6, {144, 40},
+      [](PPCContext& t, Random& r, uint32_t) {
+        t.r4.u64 = r.Below(2);
+        t.r5.u64 = r.Below(80);
+        t.r6.u64 = r.Below(256);
+      },
+      __imp__sub_8223BC68, hooks::Type8Screen0CarCard);
+  Group(
+      h, world, "Type8Screen0::Show", 0x8223BF18, 8, {176, 64},
+      [base](PPCContext&, Random& r, uint32_t w) {
+        LaySoundManager(base, w, r);
+        // The parameters in the stand block: the specs from +0x100, the
+        // cars' ids 0 to 2 (each spec 8,432 bytes of random words).
+        WriteRandom(base, g_stand, kStandBytes, r);
+        guest::StoreU32(base, 0x826C2E48, g_stand);
+        guest::StoreU32(base, g_stand + 12, g_stand + 0x100);
+        for (uint32_t p = 0; p < 2; p++) {
+          guest::StoreU32(base, kGarageCars + 1972 * p + 12, r.Below(3));
+        }
+        LayStandBlocks(base, w + kObjectAt, r);
+        guest::StoreU32(base, w + kObjectAt + 9652, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(4));
+      },
+      __imp__sub_8223BF18, hooks::Type8Screen0Show);
+  memory::Free(g_stand);
+  g_stand = 0;
+}
+
 void Type8Screen0s(Context& h, uint32_t world) {
   uint8_t* const base = h.base;
   for (const uint32_t id : {16u, 24u}) {
@@ -457,6 +686,7 @@ void Type8Screen0s(Context& h, uint32_t world) {
         guest::StoreU32(base, w + kObjectAt + 9648, kAnswers[r.Below(4)]);
       },
       __imp__sub_8223C888, hooks::Type8Screen0Draw);
+  Type8Screen0Updates(h, world);
   g_movies = nullptr;
   saved.Restore();
 }

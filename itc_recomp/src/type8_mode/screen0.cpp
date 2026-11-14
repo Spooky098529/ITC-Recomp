@@ -367,6 +367,8 @@ uint64_t Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   const uint32_t adjustment = LoadU32(base, kTable + 4 + (page << 3));
   const uint64_t object = uint64_t(adjustment) + r3;
   switch (target) {
+    case 0x8223C6B8:
+      return Screen0MenuPage(base, object, r4, frame, calls);
     case 0x8223B5C0:
       return Screen0ConfirmPage(base, object);
     case 0x8223C0C0:
