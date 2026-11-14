@@ -703,4 +703,118 @@ void InvokeWatson(uint8_t* base, uint32_t return_address, const Calls& calls) {
   });
 }
 
+namespace {
+
+uint32_t HandleEntry(uint8_t* base, uint32_t handle) {
+  return Load(base, kPioinfo + 4 * uint32_t(int32_t(handle) >> 5)) + 44 * (handle & 31);
+}
+
+}  // namespace
+
+uint64_t LockFhandleFinally(const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B7A20 __lock_fhandle's __finally");
+  uint64_t result = 0;
+  calls.in_frame(96, [&](uint32_t) { result = calls.guest(kUnlock, {10}); });
+  return result;
+}
+
+uint32_t LockFhandle(uint8_t* base, uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B7958 __lock_fhandle");
+  uint32_t result = 1;
+  calls.in_frame(128, [&](uint32_t frame) {
+    Store(base, frame + 148, handle);
+    Store(base, frame + 80, 1);
+    const uint32_t entry = HandleEntry(base, handle);
+    if (Load(base, entry + 8) == 0) {
+      calls.guest(kLock, {10});
+      if (Load(base, entry + 8) == 0) {
+        if (InitCritSecAndSpinCount(base, entry + 12, 4000, calls) == 0) {
+          Store(base, frame + 80, 0);
+        }
+        Store(base, entry + 8, Load(base, entry + 8) + 1);
+      }
+      LockFhandleFinally(calls);
+      handle = Load(base, frame + 148);
+      result = Load(base, frame + 80);
+    }
+    if (result != 0) {
+      calls.import(Import::kRtlEnterCriticalSection, {HandleEntry(base, handle) + 12});
+    }
+  });
+  return result;
+}
+
+uint32_t FreeOsfhnd(uint8_t* base, uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B77E8 _free_osfhnd");
+  uint32_t result = 0;
+  calls.in_frame(96, [&](uint32_t) {
+    if (int32_t(handle) >= 0 && handle < Load(base, kNhandle)) {
+      const uint32_t entry = HandleEntry(base, handle);
+      if ((guest::LoadU8(base, entry + 4) & 1) != 0 && Load(base, entry + 0) != 0xFFFFFFFFu) {
+        Store(base, entry + 0, 0xFFFFFFFFu);
+        result = 0;
+        return;
+      }
+    }
+    Store(base, Errno(base, calls), 9);
+    Store(base, DosErrno(base, calls), 0);
+    result = 0xFFFFFFFFu;
+  });
+  return result;
+}
+
+uint32_t GetOsfhandle(uint8_t* base, uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B7880 _get_osfhandle");
+  uint32_t result = 0xFFFFFFFFu;
+  calls.in_frame(96, [&](uint32_t) {
+    if (handle == 0xFFFFFFFEu) {
+      Store(base, DosErrno(base, calls), 0);
+      Store(base, Errno(base, calls), 9);
+      return;
+    }
+    if (int32_t(handle) >= 0 && handle < Load(base, kNhandle)) {
+      const uint32_t entry = HandleEntry(base, handle);
+      if ((guest::LoadU8(base, entry + 4) & 1) != 0) {
+        result = Load(base, entry + 0);
+        return;
+      }
+    }
+    Store(base, DosErrno(base, calls), 0);
+    Store(base, Errno(base, calls), 9);
+    InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+  });
+  return result;
+}
+
+uint64_t RaiseFinally(uint32_t locked, bool* called, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B4C8C raise's __finally");
+  uint64_t result = 0;
+  *called = false;
+  calls.in_frame(112, [&](uint32_t) {
+    if (locked != 0) {
+      result = calls.guest(kUnlock, {0});
+      *called = true;
+    }
+  });
+  return result;
+}
+
+uint64_t UnlockStreamsFinally(const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B4F38 _fcloseall's and sub_825ACEB4 flsall's __finally");
+  uint64_t result = 0;
+  calls.in_frame(96, [&](uint32_t) { result = calls.guest(kUnlock, {1}); });
+  return result;
+}
+
+uint64_t FlsallInnerFinally(uint8_t* base, uint32_t index, uint32_t piob_word,
+                            const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825ACF04 flsall's inner __finally");
+  uint64_t result = 0;
+  calls.in_frame(112, [&](uint32_t) {
+    const uint32_t stream = Load(base, Load(base, piob_word) + 4 * index);
+    result = LockFile2(index, stream, false, calls);
+  });
+  return result;
+}
+
 }  // namespace c_runtime::core

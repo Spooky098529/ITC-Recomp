@@ -348,4 +348,39 @@ uint32_t CxxRestoreUnhandledExceptionFilter(uint8_t* base);
 // the process (the user's call, 2026-11-14).
 void InvokeWatson(uint8_t* base, uint32_t return_address, const Calls& calls);
 
+// sub_825B7958 __lock_fhandle: in its 128-byte frame (the handle stored at
+// +148, the caller's frame + 20; +80 the result, 1), the handle's entry's
+// critical section (+12) made under _lock(10) when +8 reads 0 (read again
+// under the lock; __crtInitCritSecAndSpinCount with 4000, +80 = 0 when it
+// fails, +8 counted up either way), then the __finally (_unlock(10)); entered
+// when the result is 1. The result.
+uint32_t LockFhandle(uint8_t* base, uint32_t handle, const Calls& calls);
+
+// sub_825B7A20 __lock_fhandle's __finally: from a 96-byte frame, _unlock(10);
+// its r3 (the adapter reloads the handle and result from the frame).
+uint64_t LockFhandleFinally(const Calls& calls);
+
+// sub_825B77E8 _free_osfhnd: a handle below _nhandle that's open (+4 bit 0)
+// with an OS handle (+0 not -1): +0 = -1, 0; else errno 9, _doserrno 0, -1.
+// From a 96-byte frame.
+uint32_t FreeOsfhnd(uint8_t* base, uint32_t handle, const Calls& calls);
+
+// sub_825B7880 _get_osfhandle: -2: _doserrno 0, errno 9, -1; out of range
+// or not open: the same, then _invalid_parameter(0, 0, 0, 0, 0), -1; else
+// its OS handle (+0). From a 96-byte frame.
+uint32_t GetOsfhandle(uint8_t* base, uint32_t handle, const Calls& calls);
+
+// sub_825B4C8C raise's __finally: from a 112-byte frame, _unlock(0) when
+// raise took the lock (`locked`, its r28); _unlock's r3, or nullopt-like
+// `called` false.
+uint64_t RaiseFinally(uint32_t locked, bool* called, const Calls& calls);
+
+// sub_825B4F38 _fcloseall's and sub_825ACEB4 flsall's outer __finally: from a
+// 96-byte frame, _unlock(1); its r3.
+uint64_t UnlockStreamsFinally(const Calls& calls);
+
+// sub_825ACF04 flsall's inner __finally: from a 112-byte frame,
+// _unlock_file2(index, [[piob_word] + 4 index]); its r3.
+uint64_t FlsallInnerFinally(uint8_t* base, uint32_t index, uint32_t piob_word, const Calls& calls);
+
 }  // namespace c_runtime::core

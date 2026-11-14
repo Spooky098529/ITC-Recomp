@@ -60,6 +60,13 @@ void CoreUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base);            //
 void CoreDebugMonitorNotify(PPCContext& ctx, uint8_t* base);                  // sub_825B9BA8
 void CoreCxxRestoreUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base);  // sub_825B4D90
 void CoreInvokeWatson(PPCContext& ctx, uint8_t* base);                        // sub_825AFD10
+void CoreLockFhandle(PPCContext& ctx, uint8_t* base);           // sub_825B7958
+void CoreLockFhandleFinally(PPCContext& ctx, uint8_t* base);    // sub_825B7A20
+void CoreFreeOsfhnd(PPCContext& ctx, uint8_t* base);            // sub_825B77E8
+void CoreGetOsfhandle(PPCContext& ctx, uint8_t* base);          // sub_825B7880
+void CoreRaiseFinally(PPCContext& ctx, uint8_t* base);          // sub_825B4C8C
+void CoreUnlockStreamsFinally(PPCContext& ctx, uint8_t* base);  // sub_825B4F38, sub_825ACEB4
+void CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base);    // sub_825ACF04
 void CoreCloseHandle(PPCContext& ctx, uint8_t* base);         // sub_82294E20
 void CoreResetEvent(PPCContext& ctx, uint8_t* base);          // sub_825BA168
 void CoreInittermE(PPCContext& ctx, uint8_t* base);    // sub_82297AC0

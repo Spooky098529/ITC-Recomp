@@ -37,7 +37,10 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825AFCC8), _amsg_exit (sub_825AA158), _getptd (sub_825AA580), _fptrap "
               "(sub_825B64F8), UnhandledExceptionFilter (sub_82297940), the debug monitor "
               "notification (sub_825B9BA8) and __CxxRestoreUnhandledExceptionFilter "
-              "(sub_825B4D90) (checked by --run_harnesses=c_runtime_core); checked by reading, as "
+              "(sub_825B4D90), __lock_fhandle with its __finally (sub_825B7958, sub_825B7A20), "
+              "_free_osfhnd and _get_osfhandle (sub_825B77E8, sub_825B7880), and the __finally "
+              "funclets of raise, _fcloseall and flsall (sub_825B4C8C, sub_825B4F38, "
+              "sub_825ACEB4, sub_825ACF04) (checked by --run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
               "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
@@ -377,6 +380,57 @@ void hooks::CoreInvokeWatson(PPCContext& ctx, uint8_t* base) {
   cc::InvokeWatson(base, uint32_t(ctx.lr), CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreLockFhandle(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::LockFhandle(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+// The __finally funclets: r12 the parent's frame end (r31 = its frame), and
+// the parent's registers they reload or keep, as the originals leave them.
+void hooks::CoreLockFhandleFinally(PPCContext& ctx, uint8_t* base) {
+  cc::LockFhandleFinally(CRuntimeCoreCalls(ctx, base));
+  ctx.r11.u64 = cc::kPioinfo;
+  ctx.r3.u64 = guest::LoadU32(base, ctx.r31.u32 + 148);
+  ctx.r29.u64 = guest::LoadU32(base, ctx.r31.u32 + 80);
+}
+
+void hooks::CoreFreeOsfhnd(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = int32_t(cc::FreeOsfhnd(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base)));
+}
+
+void hooks::CoreGetOsfhandle(PPCContext& ctx, uint8_t* base) {
+  const uint32_t handle = ctx.r3.u32;
+  const uint32_t result = cc::GetOsfhandle(base, handle, CRuntimeCoreCalls(ctx, base));
+  // The OS handle as loaded (lwz, zero-extended); -1 as `li` (sign-extended).
+  const bool loaded = int32_t(handle) >= 0 && handle != 0xFFFFFFFEu &&
+                      handle < guest::LoadU32(base, cc::kNhandle) &&
+                      (guest::LoadU8(base, guest::LoadU32(base, cc::kPioinfo +
+                                                                   4 * uint32_t(int32_t(handle) >> 5)) +
+                                               44 * (handle & 31) + 4) &
+                       1) != 0;
+  ctx.r3.u64 = loaded ? uint64_t(result) : uint64_t(int64_t(int32_t(result)));
+}
+
+void hooks::CoreRaiseFinally(PPCContext& ctx, uint8_t* base) {
+  bool called = false;
+  const uint64_t r3 = cc::RaiseFinally(ctx.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
+  if (called) {
+    ctx.r3.u64 = r3;
+  }
+}
+
+void hooks::CoreUnlockStreamsFinally(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::UnlockStreamsFinally(CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base) {
+  const uint32_t index = ctx.r28.u32, piob_word = ctx.r29.u32;
+  ctx.r4.u64 = guest::LoadU32(base, guest::LoadU32(base, piob_word) + 4 * index);
+  ctx.r3.u64 = cc::FlsallInnerFinally(base, index, piob_word, CRuntimeCoreCalls(ctx, base));
+  ctx.r11.u64 = 0x82980000u;
+  ctx.r10.u64 = cc::kNstream;
+  ctx.r27.u64 = guest::LoadU32(base, ctx.r12.u32 + 20);
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -481,3 +535,18 @@ ITC_C_RUNTIME_CORE(825B9BA8, CoreDebugMonitorNotify)
 ITC_C_RUNTIME_CORE(825B4D90, CoreCxxRestoreUnhandledExceptionFilter)
 // _invoke_watson: no registers; ends in KeBugCheck(30).
 ITC_C_RUNTIME_CORE(825AFD10, CoreInvokeWatson)
+// __lock_fhandle: r3 = a file handle; r3 = 1, or 0.
+ITC_C_RUNTIME_CORE(825B7958, CoreLockFhandle)
+// __lock_fhandle's __finally: r31 = its frame; r3, r29 and r11 reloaded.
+ITC_C_RUNTIME_CORE(825B7A20, CoreLockFhandleFinally)
+// _free_osfhnd, _get_osfhandle: r3 = a file handle.
+ITC_C_RUNTIME_CORE(825B77E8, CoreFreeOsfhnd)
+ITC_C_RUNTIME_CORE(825B7880, CoreGetOsfhandle)
+// raise's __finally: r28 = whether raise took lock 0.
+ITC_C_RUNTIME_CORE(825B4C8C, CoreRaiseFinally)
+// _fcloseall's and flsall's outer __finally: _unlock(1).
+ITC_C_RUNTIME_CORE(825B4F38, CoreUnlockStreamsFinally)
+ITC_C_RUNTIME_CORE(825ACEB4, CoreUnlockStreamsFinally)
+// flsall's inner __finally: r28 = the slot, r29 = __piob's address, r12 =
+// flsall's frame end; r27, r10 and r11 set as the original leaves them.
+ITC_C_RUNTIME_CORE(825ACF04, CoreFlsallInnerFinally)
