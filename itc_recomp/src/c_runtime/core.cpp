@@ -10,6 +10,9 @@
 #include "helpers/debug_output.h"
 
 #include <bit>
+#include <climits>
+#include <cmath>
+#include <emmintrin.h>
 #include <cstring>
 
 namespace c_runtime::core {
@@ -815,6 +818,143 @@ uint64_t FlsallInnerFinally(uint8_t* base, uint32_t index, uint32_t piob_word,
     result = LockFile2(index, stream, false, calls);
   });
   return result;
+}
+
+namespace {
+
+double LoadDouble(uint8_t* base, uint32_t address) {
+  return std::bit_cast<double>(uint64_t(Load(base, address)) << 32 | Load(base, address + 4));
+}
+void StoreDouble(uint8_t* base, uint32_t address, double value) {
+  const uint64_t bits = std::bit_cast<uint64_t>(value);
+  Store(base, address, uint32_t(bits >> 32));
+  Store(base, address + 4, uint32_t(bits));
+}
+
+}  // namespace
+
+double Exp(uint8_t* base, uint32_t sp, double x) {
+  ITC_NATIVE_RUNNING("sub_825ABE30 exp");
+  const uint32_t c = 0x820726F0;  // the constants
+  double f13 = LoadDouble(base, 0x82072750);
+  double f0 = x * LoadDouble(base, c + 24);
+  double f12 = LoadDouble(base, c + 64);
+  double f11 = LoadDouble(base, c + 88);
+  // fctid (the current rounding) and fcfid.
+  const int64_t rounded = std::isnan(f0) ? int64_t(0x8000000000000000ULL)
+                          : f0 > double(LLONG_MAX) ? LLONG_MAX
+                                                   : _mm_cvtsd_si64(_mm_load_sd(&f0));
+  f0 = double(rounded);
+  f13 = -std::fma(f0, f13, -x);
+  // fctiwz, stored as a word.
+  const int32_t exponent = std::isnan(f0) ? int32_t(0x80000000U)
+                           : f0 >= double(INT_MAX) ? INT_MAX
+                                                   : _mm_cvttsd_si32(_mm_load_sd(&f0));
+  Store(base, sp - 32, uint32_t(exponent));
+  double f10 = LoadDouble(base, c + 56);
+  f0 = f13 * f13;
+  f10 = std::fma(f0, f12, f10);
+  f12 = LoadDouble(base, c + 80);
+  f11 = std::fma(f0, f11, f12);
+  f12 = LoadDouble(base, c + 48);
+  f10 = std::fma(f10, f0, f12);
+  f12 = LoadDouble(base, c + 72);
+  f11 = std::fma(f11, f0, f12);
+  f0 = f10 * f13;
+  f13 = f11 - f0;
+  uint32_t r10 = Load(base, sp - 32) + 1;
+  f0 = f0 / f13;
+  f0 = f0 + f12;
+  if (r10 != 0) {
+    StoreDouble(base, sp - 24, f0);
+    StoreDouble(base, sp - 16, f0);
+    StoreDouble(base, sp - 32, f0);
+    uint32_t r9 = guest::LoadU16(base, sp - 24);
+    uint32_t r8 = guest::LoadU16(base, sp - 16);
+    r9 = (r9 >> 4) & 0x7FF;
+    r9 = uint32_t(int32_t(int16_t(uint16_t(r9 - 1022))));
+    r10 = r9 + r10 + 1022;
+    r10 = (r10 << 4) & 0xFFFFFFF0u;
+    r8 &= 0x800F;
+    r10 |= r8;
+    guest::StoreU16(base, sp - 32, uint16_t(r10));
+    f0 = LoadDouble(base, sp - 32);
+  }
+  const double f10b = x - LoadDouble(base, c + 0);
+  const double f11b = LoadDouble(base, c + 8) - x;
+  f0 = f10b >= 0.0 ? LoadDouble(base, 0x8266BC30) : f0;
+  return f11b >= 0.0 ? LoadDouble(base, 0x82002258) : f0;
+}
+
+namespace {
+
+int32_t ToLower(int32_t c) { return c + c_runtime::ToLowerStep(c); }
+
+}  // namespace
+
+uint32_t Forcdecpt(uint8_t* base, uint32_t text) {
+  ITC_NATIVE_RUNNING("sub_825ADD38 _forcdecpt_l");
+  uint32_t p = text;
+  if (ToLower(int8_t(guest::LoadU8(base, p))) != 101) {
+    do {
+      p++;
+    } while (c_runtime::CTypeC(base, guest::LoadU8(base, p), 4) != 0);
+  }
+  const int32_t last = ToLower(int8_t(guest::LoadU8(base, p)));
+  if (last == 120) {
+    p += 2;
+  }
+  uint8_t carried = guest::LoadU8(base, p);
+  guest::StoreU8(base, p, guest::LoadU8(base, Load(base, Load(base, kDecimalPoint))));
+  for (uint32_t q = p + 1;; q++) {
+    const uint8_t next = guest::LoadU8(base, q);
+    guest::StoreU8(base, q, carried);
+    if (carried == 0) {
+      break;
+    }
+    carried = next;
+  }
+  return uint32_t(last);
+}
+
+uint32_t Cropzeros(uint8_t* base, uint32_t text) {
+  ITC_NATIVE_RUNNING("sub_825ADDD8 _cropzeros_l");
+  auto byte = [&](uint32_t a) { return guest::LoadU8(base, a); };
+  auto point = [&]() { return byte(Load(base, Load(base, kDecimalPoint))); };
+  uint32_t p = text;
+  int32_t c = int8_t(byte(p));
+  if (c != 0) {
+    const int32_t dp = int8_t(point());
+    while (c != dp) {
+      p++;
+      c = int8_t(byte(p));
+      if (c == 0) {
+        break;
+      }
+    }
+  }
+  if (byte(p) == 0) {
+    return p;
+  }
+  uint32_t q = p + 1;
+  for (int32_t d = int8_t(byte(q)); d != 0 && d != 101 && d != 69; d = int8_t(byte(q))) {
+    q++;
+  }
+  uint32_t from = q;
+  do {
+    q--;
+  } while (byte(q) == 48);
+  if (byte(q) == point()) {
+    q--;
+  }
+  uint8_t moved;
+  do {
+    moved = byte(from);
+    q++;
+    from++;
+    guest::StoreU8(base, q, moved);
+  } while (moved != 0);
+  return p;
 }
 
 }  // namespace c_runtime::core

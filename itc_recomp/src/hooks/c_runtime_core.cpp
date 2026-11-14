@@ -40,7 +40,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825B4D90), __lock_fhandle with its __finally (sub_825B7958, sub_825B7A20), "
               "_free_osfhnd and _get_osfhandle (sub_825B77E8, sub_825B7880), and the __finally "
               "funclets of raise, _fcloseall and flsall (sub_825B4C8C, sub_825B4F38, "
-              "sub_825ACEB4, sub_825ACF04) (checked by --run_harnesses=c_runtime_core); checked by reading, as "
+              "sub_825ACEB4, sub_825ACF04), exp (sub_825ABE30), _forcdecpt_l and _cropzeros_l "
+              "(sub_825ADD38, sub_825ADDD8) (checked by --run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
               "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
@@ -48,7 +49,7 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
-              "_mtinitlocks");
+              "_mtinitlocks, CloseHandle (its caller, SaveSlot::WaitClose)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -431,6 +432,19 @@ void hooks::CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base) {
   ctx.r27.u64 = guest::LoadU32(base, ctx.r12.u32 + 20);
 }
 
+void hooks::CoreExp(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = cc::Exp(base, ctx.r1.u32, ctx.f1.f64);
+}
+
+void hooks::CoreForcdecpt(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = int32_t(cc::Forcdecpt(base, ctx.r3.u32));
+}
+
+void hooks::CoreCropzeros(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Cropzeros(base, ctx.r3.u32);
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -490,8 +504,8 @@ ITC_C_RUNTIME_CORE(825AEDA0, CoreNmsgWrite)
 // _getbuf, _freebuf: r3 = a stream.
 ITC_C_RUNTIME_CORE(825B4790, CoreGetbuf)
 ITC_C_RUNTIME_CORE(825B0EE0, CoreFreebuf)
-// CloseHandle: r3 = a handle; ResetEvent: r3 = an event; r3 = 1 or 0.
-ITC_C_RUNTIME_CORE(82294E20, CoreCloseHandle)
+// ResetEvent: r3 = an event; r3 = 1 or 0. (CloseHandle, sub_82294E20, has no
+// adapter: its caller in play, SaveSlot::WaitClose, calls the plain C++.)
 ITC_C_RUNTIME_CORE(825BA168, CoreResetEvent)
 // _initterm_e: r3 = the first nonzero result, or 0.
 ITC_C_RUNTIME_CORE(82297AC0, CoreInittermE)
@@ -550,3 +564,8 @@ ITC_C_RUNTIME_CORE(825ACEB4, CoreUnlockStreamsFinally)
 // flsall's inner __finally: r28 = the slot, r29 = __piob's address, r12 =
 // flsall's frame end; r27, r10 and r11 set as the original leaves them.
 ITC_C_RUNTIME_CORE(825ACF04, CoreFlsallInnerFinally)
+// exp: f1 = x; f1 = e^x.
+ITC_C_RUNTIME_CORE(825ABE30, CoreExp)
+// _forcdecpt_l, _cropzeros_l: r3 = a number's text.
+ITC_C_RUNTIME_CORE(825ADD38, CoreForcdecpt)
+ITC_C_RUNTIME_CORE(825ADDD8, CoreCropzeros)

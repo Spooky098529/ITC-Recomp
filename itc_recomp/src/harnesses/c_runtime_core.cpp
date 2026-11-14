@@ -36,6 +36,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
+#include <bit>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -1825,6 +1826,122 @@ void OsHandleCases(Context& h) {
   }
 }
 
+// exp: f1 edges (the overflow and underflow bounds, infinities, NaNs,
+// denormals) and random doubles, small and any; compared: f1 and its scratch
+// words below the stack pointer (-32 a word, or a double when scaled; -24 and
+// -16 doubles), set to 0xCD first.
+void ExpCases(Context& h) {
+  Results results("exp (sub_825ABE30)");
+  static const uint64_t kEdges[] = {
+      0, 0x8000000000000000ull, 0x3FF0000000000000ull, 0xBFF0000000000000ull,
+      0x7FF0000000000000ull, 0xFFF0000000000000ull, 0x7FF8000000000000ull,
+      0xFFF8000000000123ull, 0x0000000000000001ull, 0x8010000000000000ull,
+      0x40862E42FEFA39EFull, 0x40862E42FEFA39F0ull, 0x40862E42FEFA39EEull,
+      0xC086232BDD7ABCD2ull, 0xC086232BDD7ABCD3ull, 0xC0874910D52D3051ull,
+      0x4090000000000000ull, 0xC090000000000000ull, 0x3FE62E42FEFA39EFull,
+      0x43E0000000000000ull, 0xC3E0000000000000ull, 0x41E0000000000000ull};
+  constexpr int kEdgeCount = int(sizeof(kEdges) / sizeof(kEdges[0]));
+  for (int c = 0; c < 400; c++) {
+    uint64_t bits;
+    if (c < kEdgeCount) {
+      bits = kEdges[c];
+    } else if (c % 3 == 0) {
+      bits = h.random.Next();
+    } else {
+      const double x = (double(h.random.Below(1u << 30)) / double(1u << 30) - 0.5) *
+                       (c % 3 == 1 ? 1500.0 : 8.0);
+      bits = std::bit_cast<uint64_t>(x);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 32, 24);
+      t.f1.u64 = bits;
+      (v == 0 ? __imp__sub_825ABE30 : hooks::CoreExp)(t, h.base);
+      out[v].Double(t.f1.u64);
+      out[v].Word(Load(h.base, t.r1.u32 - 32));
+      out[v].Word(Load(h.base, t.r1.u32 - 28));
+      out[v].Double(uint64_t(Load(h.base, t.r1.u32 - 24)) << 32 | Load(h.base, t.r1.u32 - 20));
+      out[v].Double(uint64_t(Load(h.base, t.r1.u32 - 16)) << 32 | Load(h.base, t.r1.u32 - 12));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// A number's text as the float conversions write it: an optional sign,
+// digits, maybe a point and more digits (zeros often), maybe an exponent
+// ('e' or 'E', a sign, digits), or a hex form ("0x" digits "p" exponent);
+// sometimes a bare 'e' first or empty.
+std::string NumberText(Context& h) {
+  std::string text;
+  const uint32_t kind = h.random.Below(10);
+  if (kind == 0) {
+    return h.random.Below(2) ? "" : "e+05";
+  }
+  if (h.random.Below(4) == 0) {
+    text += '-';
+  }
+  if (kind == 1) {
+    text += "0x1";
+  }
+  const uint32_t digits = 1 + h.random.Below(8);
+  for (uint32_t i = 0; i < digits; i++) {
+    text += char('0' + (h.random.Below(3) == 0 ? 0 : h.random.Below(10)));
+  }
+  if (h.random.Below(3) != 0) {
+    text += '.';
+    const uint32_t fraction = h.random.Below(8);
+    for (uint32_t i = 0; i < fraction; i++) {
+      text += char('0' + (h.random.Below(2) == 0 ? 0 : h.random.Below(10)));
+    }
+  }
+  if (h.random.Below(2) != 0) {
+    text += kind == 1 ? 'p' : (h.random.Below(2) ? 'e' : 'E');
+    text += h.random.Below(2) ? '+' : '-';
+    text += std::to_string(h.random.Below(400));
+  }
+  return text;
+}
+
+// _forcdecpt_l and _cropzeros_l: such texts in the scratch area (0xCD after
+// them); compared: r3 and the 64 bytes.
+void NumberTextCases(Context& h) {
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool no_point;  // _forcdecpt_l's texts have no point yet
+  };
+  for (const Fn& fn : {Fn{"_forcdecpt_l (sub_825ADD38)", __imp__sub_825ADD38, hooks::CoreForcdecpt, true},
+                       Fn{"_cropzeros_l (sub_825ADDD8)", __imp__sub_825ADDD8, hooks::CoreCropzeros, false}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 300; c++) {
+      std::string text = NumberText(h);
+      if (fn.no_point) {
+        // (an empty text would send it past its terminator: never given)
+        std::erase(text, '.');
+        if (text.empty()) {
+          text = "0";
+        }
+      }
+      const uint32_t at = h.data + 1;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, 64);
+        WriteText(h, at, text);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = at;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, h.data, 64));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c) + " \"" + text + "\"");
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -1878,6 +1995,8 @@ void CRuntimeCore(Context& h) {
   LockFhandleCases(h);
   FinallyCases(h);
   OsHandleCases(h);
+  ExpCases(h);
+  NumberTextCases(h);
 }
 
 }  // namespace harness

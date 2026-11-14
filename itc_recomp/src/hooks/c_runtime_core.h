@@ -67,6 +67,9 @@ void CoreGetOsfhandle(PPCContext& ctx, uint8_t* base);          // sub_825B7880
 void CoreRaiseFinally(PPCContext& ctx, uint8_t* base);          // sub_825B4C8C
 void CoreUnlockStreamsFinally(PPCContext& ctx, uint8_t* base);  // sub_825B4F38, sub_825ACEB4
 void CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base);    // sub_825ACF04
+void CoreExp(PPCContext& ctx, uint8_t* base);                   // sub_825ABE30
+void CoreForcdecpt(PPCContext& ctx, uint8_t* base);             // sub_825ADD38
+void CoreCropzeros(PPCContext& ctx, uint8_t* base);             // sub_825ADDD8
 void CoreCloseHandle(PPCContext& ctx, uint8_t* base);         // sub_82294E20
 void CoreResetEvent(PPCContext& ctx, uint8_t* base);          // sub_825BA168
 void CoreInittermE(PPCContext& ctx, uint8_t* base);    // sub_82297AC0

@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
+#include "hooks/c_runtime_core.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
@@ -59,6 +60,7 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
 
+ITC_FLAG_DECLARE(bool, native_c_runtime_core);
 namespace hooks {
 
 namespace si = save_interface;
@@ -593,6 +595,12 @@ save_interface::KernelCalls KernelCallsOf(PPCContext& ctx, uint8_t* base) {
     return ctx.r3.u32;
   };
   kernel.close = [&ctx, base](uint32_t handle, const si::CallSite& at) {
+    if (ITC_FLAG(native_c_runtime_core)) {
+      // CloseHandle's plain C++ (docs/functions/c-runtime-core.md): NtClose,
+      // no guest stack used; its r3 as the guest call left it.
+      ctx.r3.u64 = c_runtime::core::CloseHandle(handle, hooks::CRuntimeCoreCalls(ctx, base));
+      return;
+    }
     ctx.r3.u64 = handle;
     GuestCallAt(ctx, base, 0x82294E20, at);  // CloseHandle
   };

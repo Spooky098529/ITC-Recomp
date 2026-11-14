@@ -383,4 +383,24 @@ uint64_t UnlockStreamsFinally(const Calls& calls);
 // _unlock_file2(index, [[piob_word] + 4 index]); its r3.
 uint64_t FlsallInnerFinally(uint8_t* base, uint32_t index, uint32_t piob_word, const Calls& calls);
 
+constexpr uint32_t kDecimalPoint = 0x8266C024;  // [[it]]: the locale's decimal point
+
+// sub_825ABE30 exp (probably, without error reporting): step for step as the
+// translated code, its scratch words below the stack pointer `sp` written
+// as the original leaves them (-32 the rounded exponent, then the result's
+// doubles at -24, -16 and -32 when it's scaled). The result.
+double Exp(uint8_t* base, uint32_t sp, double x);
+
+// sub_825ADD38 _forcdecpt_l: the locale's decimal point inserted after the
+// digits (or the 'e', or an 'x' and the character after it), the rest moved
+// up a byte through its terminator. r3 as the original leaves it (the last
+// tolower's).
+uint32_t Forcdecpt(uint8_t* base, uint32_t text);
+
+// sub_825ADDD8 _cropzeros_l: from the decimal point, the zeros before the
+// exponent (and the point itself when nothing else is left) dropped, the
+// exponent moved down. r3 as the original leaves it (where it found the
+// point, or the terminator).
+uint32_t Cropzeros(uint8_t* base, uint32_t text);
+
 }  // namespace c_runtime::core
