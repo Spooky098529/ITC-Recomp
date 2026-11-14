@@ -15,6 +15,7 @@
 #pragma once
 
 #include "type67_modes/type67_modes.h"
+#include "type67_screens/type67_screens.h"
 
 #include <cstdint>
 
@@ -72,5 +73,87 @@ uint64_t DialogNoticePage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint3
 // with a UiMovie::ResetPose before the cursor's highlight. 1 when done,
 // else 0.
 uint64_t DialogOpenConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls);
+
+// --- The first screen (screen0.cpp): r3 the screen (the member's +0, its
+// machine at +4: the state +9608); r4 the dispatcher where read. The
+// functions taking ScreenCalls set texts through its set_text and free the
+// menu list through type67_screens::ReleaseList ---
+
+using ScreenCalls = type67_screens::Calls;
+
+// sub_8223D2F0 Type8Screen0::Type8Screen0 (96-byte frame):
+// ScreenMachine::ScreenMachine's plain C++ on +4, the vtable 0x82010B74, the
+// two players' stand blocks (+9752, +9772) and their animation ids, +9644 =
+// 1. r3 left.
+uint64_t Screen0Construct(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_8223BF00 ~Type8Screen0: the vtable, then MenuList::Release(+9680) (a
+// tail call from `sp` returning to `lr`). Its r3.
+uint64_t Screen0Destruct(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                         const ScreenCalls& calls);
+// sub_8223C528 Type8Screen0::DeletingDestructor (112): the vtable,
+// MenuList::Release(+9680), operator delete (a guest call) when bit 0 of
+// `flags` is set. r3 left.
+uint64_t Screen0DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                 const ScreenCalls& calls);
+// sub_8223B630 Type8Screen0::OnEnter (144): its words reset, MenuList::Init
+// on +9680 (5, 5, 1, 154, 153, 155, 156, 159, 158; its plain C++ where it
+// frees natively, else a guest call) and SetSelection(0), the state 1 when
+// +9616 is set, else 9. r3 the list (r3 + 9680).
+uint64_t Screen0OnEnter(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+// sub_8223B530 Type8Screen0::OpenMovie: UiMovies::Open(24, 22583), a tail
+// call from `sp` returning to `lr`. Its r3.
+uint64_t Screen0OpenMovie(uint32_t sp, uint32_t lr, const ScreenCalls& calls);
+// sub_8223B6D8 Type8Screen0::WaitForMovie (96): with +9612 0, once movie 24
+// is loaded, +9612 = 1 and the state 4 after the race (the mode before 1),
+// else 9. IsLoaded's r3, else r3 left.
+uint64_t Screen0WaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_8223B540 Type8Screen0::Suspend (96): with +9620 set, movie 24
+// deleted and +9612 = 0. Delete's r3, else r3 left.
+uint64_t Screen0Suspend(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+// sub_8223B590 PickYes, sub_8223B5A0 PickNo, sub_8223B5B0 PickBack (leaves):
+// +9648 = 1, 0, 2. r3 left.
+uint64_t Screen0Pick(uint8_t* base, uint64_t r3, uint32_t answer);
+// sub_8223BD20 Type8Screen0::ShowPage (128; `a`, `b`): movie 24's
+// sub-scene 6 nodes shown, hidden and their textures set by the two flags.
+// The last node.
+uint64_t Screen0ShowPage(uint8_t* base, uint64_t a, uint64_t b, uint32_t sp);
+// sub_8223C098 Type8Screen0::OnDialogClosed (a leaf): +9644 = 1; unless the
+// answer (+9648) is 1, ShowPage(1, 0) (a tail call from `sp`). Its r3, else
+// r3 left.
+uint64_t Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_8223BA48 Type8Screen0::Leave (112): movie 24 finished
+// (UiMovie::FinishAll, a guest call) and deleted when found, message 4
+// posted. Delete's r3, or 0 with no movie.
+uint64_t Screen0Leave(uint8_t* base, uint32_t dispatcher, uint32_t sp,
+                      const ScreenCalls& calls);
+// sub_8223B588 Type8Screen0::OnLeft: MenuList::Release(+9680), a tail call
+// from `sp` returning to `lr`. Its r3.
+uint64_t Screen0OnLeft(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                       const ScreenCalls& calls);
+// sub_8223C430 Type8Screen0::Confirm (128; r5 the dispatcher): movie 16's
+// texts (-1, 0) 27, (1, 3) 2, (1, 4) 3 (set_text, r7 to r10 0), its +40960
+// = 1, the asking player 0, message 7 posted, +9648 = -1, +9644 = 0, then
+// ShowPage(1, 1). ShowPage's r3.
+uint64_t Screen0Confirm(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+                        const ScreenCalls& calls);
+// sub_8223B5C0 Type8Screen0::ConfirmPage (a leaf): by the answer (+9648):
+// 0 or 2 back to page 0, 1 the fade out step 3 to page 3, else nothing. r3
+// left.
+uint64_t Screen0ConfirmPage(uint8_t* base, uint64_t r3);
+// sub_8223C0C0 Type8Screen0::ChosenPage (112): by the menu's selection,
+// state 9 and message 16, 14, 19 or 21 posted (the selection's r3), else
+// ShowPage(0, 0) and state 6 (ShowPage's r3).
+uint64_t Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp);
+// sub_8223BE88 Type8Screen0::PlaceCursor (112; r4 an item): movie 24's node
+// (0, 0) +16 = float(40 * item) (the doubleword through the frame's +80).
+// The node.
+uint64_t Screen0PlaceCursor(uint8_t* base, uint64_t item, uint32_t sp);
+// sub_8223C888 Type8Screen0::Draw (128): the page table at 0x82814E94
+// built on first use (its guard bit 0 at 0x82814EB4; the pairs in the
+// frame's +80 to +111), then page +9652's entry on the screen plus its
+// adjustment and r4 (ConfirmPage's and ChosenPage's plain C++, others guest
+// calls), nothing for page -1. The page's r3, or r3 left.
+uint64_t Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                     const ScreenCalls& calls);
 
 }  // namespace type8_mode

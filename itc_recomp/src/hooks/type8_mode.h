@@ -24,4 +24,25 @@ void Type8DialogConfirmPage(PPCContext& ctx, uint8_t* base);
 void Type8DialogNoticePage(PPCContext& ctx, uint8_t* base);
 void Type8DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base);
 
+// The first screen.
+void Type8Screen0Construct(PPCContext& ctx, uint8_t* base);
+void Type8Screen0Destruct(PPCContext& ctx, uint8_t* base);
+void Type8Screen0DeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type8Screen0OnEnter(PPCContext& ctx, uint8_t* base);
+void Type8Screen0OpenMovie(PPCContext& ctx, uint8_t* base);
+void Type8Screen0WaitForMovie(PPCContext& ctx, uint8_t* base);
+void Type8Screen0Suspend(PPCContext& ctx, uint8_t* base);
+void Type8Screen0PickYes(PPCContext& ctx, uint8_t* base);
+void Type8Screen0PickNo(PPCContext& ctx, uint8_t* base);
+void Type8Screen0PickBack(PPCContext& ctx, uint8_t* base);
+void Type8Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base);
+void Type8Screen0Leave(PPCContext& ctx, uint8_t* base);
+void Type8Screen0OnLeft(PPCContext& ctx, uint8_t* base);
+void Type8Screen0Confirm(PPCContext& ctx, uint8_t* base);
+void Type8Screen0ConfirmPage(PPCContext& ctx, uint8_t* base);
+void Type8Screen0ChosenPage(PPCContext& ctx, uint8_t* base);
+void Type8Screen0ShowPage(PPCContext& ctx, uint8_t* base);
+void Type8Screen0PlaceCursor(PPCContext& ctx, uint8_t* base);
+void Type8Screen0Draw(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

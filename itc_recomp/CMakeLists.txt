@@ -505,6 +505,7 @@ set(ITC_SOURCES
     src/type8_screens/color_list_screen.cpp
     src/hooks/type8_mode.cpp
     src/type8_mode/dialog.cpp
+    src/type8_mode/screen0.cpp
     src/car_list/panels.cpp
     src/car_list/set.cpp
     src/car_list/pages.cpp
