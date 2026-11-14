@@ -746,4 +746,17 @@ uint64_t FwriteNolock(uint8_t* base, uint32_t buffer, uint32_t size, uint64_t co
 // (sub_825AD488): 0 when all were written, else -1 (both sign-extended).
 uint64_t Fputs(uint8_t* base, uint32_t string, uint32_t stream, const Calls& calls);
 
+// sub_825A6948 _Debug_message (probably, Dinkumware's): from a 112-byte
+// frame, fflush(0), then fputs to stderr (_iob + 64) of `message`, `detail`
+// ("unknown" at 0x82000CF4 for 0) and "\n" (0x82013A84), then abort (return
+// address 0x825A69BC). No harness: ends the process (the user's call,
+// 2026-11-14).
+void DebugMessage(uint8_t* base, uint32_t message, uint32_t detail, const Calls& calls);
+
+// sub_825A69D8 std::_Throw (probably): from a 96-byte frame, the exception's
+// what() (its vtable's slot 1, a guest call with r3 the exception), then
+// _Debug_message("exception: " at 0x820722BC, what). No harness: ends the
+// process.
+void Throw(uint8_t* base, uint32_t exception, const Calls& calls);
+
 }  // namespace c_runtime::core

@@ -70,7 +70,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
               "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
-              "_invalid_parameter's trap, terminate (sub_825B3498), _exit (sub_825AA378), abort (sub_825AD070), _purecall (sub_825A7098). "
+              "_invalid_parameter's trap, terminate (sub_825B3498), _exit (sub_825AA378), abort (sub_825AD070), _purecall (sub_825A7098), "
+              "std::_Throw (sub_825A69D8) and _Debug_message (sub_825A6948, no adapter: its caller "
+              "std::_Throw). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
@@ -707,6 +709,9 @@ void hooks::CoreFwriteNolock(PPCContext& ctx, uint8_t* base) {
 void hooks::CoreFputs(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fputs(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
+void hooks::CoreThrow(PPCContext& ctx, uint8_t* base) {
+  cc::Throw(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -914,3 +919,6 @@ ITC_C_RUNTIME_CORE(825A7098, CorePurecall)
 // fputs: r3 = a string, r4 = a stream; r3 = 0, or -1. (_fwrite_nolock,
 // sub_825A96A0, has no adapter: fputs is its only caller.)
 ITC_C_RUNTIME_CORE(825AD280, CoreFputs)
+// std::_Throw: r3 = an exception object; ends the process. (_Debug_message,
+// sub_825A6948, has no adapter: std::_Throw is its only caller.)
+ITC_C_RUNTIME_CORE(825A69D8, CoreThrow)

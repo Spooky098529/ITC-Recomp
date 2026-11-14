@@ -2289,4 +2289,24 @@ uint64_t Fputs(uint8_t* base, uint32_t string, uint32_t stream, const Calls& cal
   return result;
 }
 
+void DebugMessage(uint8_t* base, uint32_t message, uint32_t detail, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A6948 _Debug_message");
+  calls.in_frame(112, [&](uint32_t) {
+    constexpr uint32_t kStderr = c_runtime::kStreams + 64;
+    Fflush(base, 0, calls);
+    Fputs(base, message, kStderr, calls);
+    Fputs(base, detail != 0 ? detail : 0x82000CF4u, kStderr, calls);
+    Fputs(base, 0x82013A84u, kStderr, calls);
+    Abort(base, 0x825A69BC, calls);
+  });
+}
+
+void Throw(uint8_t* base, uint32_t exception, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A69D8 std::_Throw");
+  calls.in_frame(96, [&](uint32_t) {
+    const uint32_t what = uint32_t(calls.guest(Load(base, Load(base, exception) + 4), {exception}));
+    DebugMessage(base, 0x820722BCu, what, calls);
+  });
+}
+
 }  // namespace c_runtime::core
