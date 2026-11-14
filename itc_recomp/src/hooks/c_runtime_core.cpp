@@ -64,7 +64,7 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
               "_mtinitlocks, CloseHandle (its caller, SaveSlot::WaitClose), SetFilePointer (sub_825B9DD8, "
               "its caller _lseeki64_nolock), _write_nolock and WriteFile (sub_825B0F48, sub_82295D50, "
-              "their caller _write)");
+              "their caller _write), _close_nolock (sub_825B0C28, its caller _close)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -725,8 +725,8 @@ ITC_C_RUNTIME_CORE(825A9664, CoreFcloseFinally)
 ITC_C_RUNTIME_CORE(825AA338, CoreExitUnlockFinally)
 // terminate: no registers; ends in KeBugCheck(0xC0000144).
 ITC_C_RUNTIME_CORE(825B3498, CoreTerminate)
-// _close_nolock, _close: r3 = a file handle; r3 = 0, or -1.
-ITC_C_RUNTIME_CORE(825B0C28, CoreCloseNolock)
+// _close: r3 = a file handle; r3 = 0, or -1. (_close_nolock, sub_825B0C28,
+// has no adapter: _close is its only caller.)
 ITC_C_RUNTIME_CORE(825B0D10, CoreClose)
 // FlushFileBuffers: r3 = an OS handle; r3 = 1, or 0.
 ITC_C_RUNTIME_CORE(825BA510, CoreFlushFileBuffers)
