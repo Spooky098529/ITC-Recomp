@@ -138,4 +138,7 @@ void CoreRaise(PPCContext& ctx, uint8_t* base);     // sub_825B49C8 (no adapter)
 void CoreAbort(PPCContext& ctx, uint8_t* base);     // sub_825AD070
 void CorePurecall(PPCContext& ctx, uint8_t* base);  // sub_825A7098
 
+void CoreFwriteNolock(PPCContext& ctx, uint8_t* base);  // sub_825A96A0 (no adapter)
+void CoreFputs(PPCContext& ctx, uint8_t* base);         // sub_825AD280
+
 }  // namespace hooks

@@ -3881,6 +3881,164 @@ void RaiseCases(Context& h) {
   results.Report();
 }
 
+// _fwrite_nolock and fputs: a test stream (TestStream, its flags from
+// BufferFlags; its pointer within 16 bytes of the buffer, the buffer size
+// +24 random, small or 0) in a block of the harness's, or stdout or stderr
+// (put back after; for fputs only when their locks were made at boot); a
+// handle below 32 (_flsbuf, which they call, reads a handle's entry without
+// a range check), or -1 or -2 (the bad entry) now and then; its entry as
+// fclose's (writes to the null device's file take no bytes), its text mode
+// byte (+40) 0, 1 or random. The text in the
+// scratch area, 0 to 32 bytes (_fwrite_nolock: sizes 0 to 4 and counts to 8
+// within it); a null string or stream for fputs. errno, _doserrno and the
+// last error random before, the invalid parameter handler the shared
+// "returns 0". Compared: r3 (64 bits), the stream (its blocks as markers, a
+// buffer _getbuf made, then freed), its entry, errno, _doserrno, the last
+// error, _cflush, the scratch buffer's first 64 bytes (and a block
+// buffer's), the blocks held, the files left open, and for fputs the caller's
+// frame + 28.
+void FputsCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(64, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || own == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: fputs: no handle block, thread data, lock 10, "
+                  "block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  const bool standard_locks = BootLock(h, 17) && BootLock(h, 18);
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t cflush = Load(h.base, 0x82971174);
+  const uint32_t scratch = h.data + 3072;
+  const uint32_t text = h.data;
+  for (const bool fputs : {false, true}) {
+    Results results(fputs ? "fputs (sub_825AD280)" : "_fwrite_nolock (sub_825A96A0)");
+    for (int c = 0; c < 128; c++) {
+      const uint32_t where = h.random.Below(8);
+      const bool null_stream = fputs && where == 0;
+      const bool standard = !null_stream && where < 3 && (!fputs || standard_locks);
+      const uint32_t stream =
+          null_stream ? 0 : standard ? cc::kIob + 32 * (1 + h.random.Below(2)) : own;
+      TestStream s = TestStream::Pick(h, nhandle);
+      s.flags = BufferFlags(h);
+      if (s.handle >= 32) {
+        s.handle -= nhandle - 3;
+      }
+      const uint32_t bad = h.random.Below(10);
+      if (bad == 0) {
+        s.handle = 0xFFFFFFFFu;
+      } else if (bad == 1) {
+        s.handle = 0xFFFFFFFEu;
+      }
+      s.used = h.random.Below(16);
+      const uint32_t size_kind = h.random.Below(3);
+      s.bufsiz = size_kind == 0 ? uint32_t(h.random.Next()) : size_kind == 1 ? h.random.Below(40) : 0;
+      if (h.random.Below(3) == 0) {
+        s.count = h.random.Below(40);
+      }
+      const uint32_t length = h.random.Below(33);
+      std::vector<uint8_t> bytes(64);
+      for (auto& b : bytes) {
+        b = uint8_t(1 + h.random.Below(255));
+      }
+      bytes[length] = 0;
+      const bool null_string = fputs && h.random.Below(12) == 0;
+      const uint32_t mode_pick = h.random.Below(6);
+      const uint8_t mode = mode_pick == 0 ? 1 : mode_pick == 1 ? uint8_t(h.random.Next()) : 0;
+      const uint32_t size = h.random.Below(5), count = h.random.Below(9);
+      const uint32_t item_size = size * count <= 32 ? size : 1;
+      const uint64_t count_word = (uint64_t(h.random.Next()) << 32) | count;
+      const uint32_t entry = handles + 44 * (s.handle & 31);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      std::vector<uint8_t> scratch_bytes(64);
+      for (auto& b : scratch_bytes) {
+        b = uint8_t(h.random.Next());
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}, {standard ? stream : own, 32}});
+        StreamWorld world(h, handles);
+        TestStream set = s;
+        if (set.handle >= 32) {
+          set.handle = 0x7FFFFFFFu;  // no entry made by Set
+        }
+        if (stream != 0) {
+          world.Set(stream, set, !standard);
+          Store(h.base, stream + 16, s.handle);
+        }
+        if (s.handle < 32) {
+          guest::StoreU8(h.base, entry + 40, mode);
+        }
+        Write(h.base, text, bytes.data(), 64);
+        Write(h.base, scratch, scratch_bytes.data(), 64);
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        Store(h.base, 0x82971174, 5);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 28, 0xCDCDCDCDu);
+        if (fputs) {
+          t.r3.u64 = null_string ? 0 : text;
+          t.r4.u64 = stream;
+          (v == 0 ? __imp__sub_825AD280 : hooks::CoreFputs)(t, h.base);
+        } else {
+          t.r3.u64 = text;
+          t.r4.u64 = item_size;
+          t.r5.u64 = count_word;
+          t.r6.u64 = stream;
+          (v == 0 ? __imp__sub_825A96A0 : hooks::CoreFwriteNolock)(t, h.base);
+        }
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (stream != 0) {
+          const uint32_t buffer = Load(h.base, stream + 8);
+          const bool made = buffer != scratch && buffer != stream + 20 &&
+                            std::find(world.blocks.begin(), world.blocks.end(), buffer) ==
+                                world.blocks.end() &&
+                            memory::IsHeapBlock(buffer);
+          if (made) {
+            out[v].Word(memory::Size(buffer));
+            out[v].Word(Load(h.base, stream + 0) - buffer);
+            out[v].Bytes(Read(h.base, buffer, 64));
+            Store(h.base, stream + 0, 0x0D000000u);
+            Store(h.base, stream + 8, 0x0D000000u);
+            memory::crt::Free(buffer);
+          }
+          world.StreamOutputs(out[v], stream);
+          for (uint32_t block : world.blocks) {
+            if (memory::IsHeapBlock(block)) {
+              out[v].Bytes(Read(h.base, block, 64));
+            }
+          }
+        }
+        out[v].Bytes(Read(h.base, scratch, 64));
+        out[v].Bytes(Read(h.base, text, 64));
+        if (s.handle < 32) {
+          world.EntryOutputs(out[v], entry);
+        }
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        out[v].Word(Load(h.base, 0x82971174));
+        if (fputs) {
+          out[v].Word(Load(h.base, t.r1.u32 + 28));
+        }
+        world.Release(out[v]);
+        Store(h.base, 0x82971174, cflush);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -3957,6 +4115,7 @@ void CRuntimeCore(Context& h) {
   FlushAllCases(h);
   DoexitCases(h);
   RaiseCases(h);
+  FputsCases(h);
 }
 
 }  // namespace harness

@@ -64,7 +64,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825DAC58), fflush with _fflush_nolock and flsall (sub_825ACF70, sub_825ACD10, "
               "sub_825ACD90), _flushall and _endstdio (sub_825AD068, sub_825AD5F8), doexit and _cexit "
               "(sub_825AA218, sub_825AA388; only the path where _C_Exit_Done is set: the others "
-              "run the game's exit functions or end the process, checked by reading) (checked by "
+              "run the game's exit functions or end the process, checked by reading), fputs "
+              "(sub_825AD280) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -82,7 +83,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "flsall and _flushall (their callers fflush, flsall and _endstdio), the __finally "
               "funclets of flsall and fflush (sub_825ACEB4, sub_825ACF04, sub_825AD02C), doexit "
               "(sub_825AA218, its callers _exit and _cexit) and its unwind funclet (sub_825AA338), "
-              "raise's __finally (sub_825B4C8C, its caller raise), raise "
+              "raise's __finally (sub_825B4C8C, its caller raise), _fwrite_nolock (sub_825A96A0, its "
+              "caller fputs; checked by --run_harnesses=c_runtime_core), raise "
               "(sub_825B49C8, its caller abort; checked by --run_harnesses=c_runtime_core but "
               "for its default action, _exit)");
 
@@ -697,6 +699,13 @@ void hooks::CoreAbort(PPCContext& ctx, uint8_t* base) {
 void hooks::CorePurecall(PPCContext& ctx, uint8_t* base) {
   cc::Purecall(base, CRuntimeCoreCalls(ctx, base));
 }
+void hooks::CoreFwriteNolock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::FwriteNolock(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64, ctx.r6.u32,
+                                CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreFputs(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Fputs(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -902,3 +911,6 @@ ITC_C_RUNTIME_CORE(825AA388, CoreCexit)
 ITC_C_RUNTIME_CORE(825AD070, CoreAbort)
 // _purecall: no registers (a vtable's empty slot); ends the process.
 ITC_C_RUNTIME_CORE(825A7098, CorePurecall)
+// fputs: r3 = a string, r4 = a stream; r3 = 0, or -1. (_fwrite_nolock,
+// sub_825A96A0, has no adapter: fputs is its only caller.)
+ITC_C_RUNTIME_CORE(825AD280, CoreFputs)

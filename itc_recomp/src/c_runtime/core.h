@@ -721,4 +721,29 @@ void Abort(uint8_t* base, uint32_t return_address, const Calls& calls);
 // 1), abort (return address 0x825A70D4). No harness: ends the process.
 void Purecall(uint8_t* base, const Calls& calls);
 
+// sub_825A96A0 _fwrite_nolock: in its 416-byte frame, `size` x `count` bytes
+// (the low word; 0: 0) from `buffer` to `stream`. stdout and stderr (_iob +
+// 32, + 64): copied to +80 255 bytes at a time with a terminator and given
+// to OutputDebugStringA (which drops them; the buffer isn't advanced between
+// pieces, as the original). Else, in a loop: a buffered stream (+12 & 0x108)
+// with room (+4 above 0) gets min(room, left) bytes copied in (memcpy; room
+// below 0 is an error); left at least the buffer size (+24 when +12 & 0x10C,
+// else 4096): _flush first for a buffered stream (failing: the items done),
+// then _write of the whole buffer sizes (all when that's 0) to its _fileno,
+// short or -1 an error; less: _flsbuf of one byte (sign-extended; -1 returns
+// the items done), the buffer size then +24 (1 when not above 0). An error
+// sets _IOERR (0x20) and returns the items done; the items done are (the
+// bytes asked less those left) / size. All written: `count` as given.
+uint64_t FwriteNolock(uint8_t* base, uint32_t buffer, uint32_t size, uint64_t count,
+                      uint32_t stream, const Calls& calls);
+
+// sub_825AD280 fputs: in its 144-byte frame (the stream at +172, the
+// caller's frame + 28; +80 the length, +84 the bytes written): a null string
+// or stream, or a file stream (+12 bit 0x40 clear) whose handle's entry
+// (__badioinfo for -1 and -2) has +40 bits other than bit 0 or bit 0 set:
+// errno 22, _invalid_parameter(0, 0, 0, 0, 0), -1. Else under _lock_file,
+// _stbuf, _fwrite_nolock(string, 1, strlen), _ftbuf, its __finally
+// (sub_825AD488): 0 when all were written, else -1 (both sign-extended).
+uint64_t Fputs(uint8_t* base, uint32_t string, uint32_t stream, const Calls& calls);
+
 }  // namespace c_runtime::core

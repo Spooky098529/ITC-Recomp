@@ -2156,4 +2156,137 @@ void Purecall(uint8_t* base, const Calls& calls) {
   });
 }
 
+namespace {
+
+void CopyBytes(uint8_t* base, uint32_t to, uint32_t from, uint32_t size, const Calls& calls) {
+  if (!c_runtime::Memcpy(base, to, from, size)) {
+    calls.guest(0x825A7410, {to, from, size});
+  }
+}
+
+}  // namespace
+
+uint64_t FwriteNolock(uint8_t* base, uint32_t buffer, uint32_t size, uint64_t count,
+                      uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A96A0 _fwrite_nolock");
+  uint64_t result = 0;
+  calls.in_frame(416, [&](uint32_t frame) {
+    const uint32_t total = size * uint32_t(count);
+    if (total == 0) {
+      result = 0;
+      return;
+    }
+    uint32_t left = total;
+    if (stream == c_runtime::kStreams + 32 || stream == c_runtime::kStreams + 64) {
+      do {
+        const uint32_t piece = left < 255 ? left : 255;
+        CopyBytes(base, frame + 80, buffer, piece, calls);
+        guest::StoreU8(base, frame + 80 + piece, 0);
+        helpers::DebugOutput(nullptr);
+        left -= piece;
+      } while (left != 0);
+      result = count;
+      return;
+    }
+    const auto done = [&] { return uint64_t((total - left) / size); };
+    const auto fail = [&] {
+      Store(base, stream + 12, Load(base, stream + 12) | 0x20);
+      result = done();
+    };
+    uint32_t buffer_size = (Load(base, stream + 12) & 0x10C) != 0 ? Load(base, stream + 24) : 4096;
+    do {
+      const uint32_t buffered = Load(base, stream + 12) & 0x108;
+      const uint32_t room = buffered != 0 ? Load(base, stream + 4) : 0;
+      if (buffered != 0 && room != 0) {
+        if (int32_t(room) < 0) {
+          fail();
+          return;
+        }
+        const uint32_t n = left < room ? left : room;
+        CopyBytes(base, Load(base, stream + 0), buffer, n, calls);
+        Store(base, stream + 4, Load(base, stream + 4) - n);
+        Store(base, stream + 0, Load(base, stream + 0) + n);
+        left -= n;
+        buffer += n;
+      } else if (left >= buffer_size) {
+        if (buffered != 0 && uint32_t(Flush(base, stream, calls)) != 0) {
+          result = done();
+          return;
+        }
+        const uint32_t n = buffer_size != 0 ? left / buffer_size * buffer_size : left;
+        const uint32_t handle = uint32_t(Fileno(base, stream, calls));
+        const uint32_t written = uint32_t(Write(base, handle, buffer, n, calls));
+        if (int32_t(written) == -1) {
+          fail();
+          return;
+        }
+        const uint32_t took = written > n ? n : written;
+        left -= took;
+        buffer += took;
+        if (written < n) {
+          fail();
+          return;
+        }
+      } else {
+        const int8_t byte = int8_t(guest::LoadU8(base, buffer));
+        if (int32_t(Flsbuf(base, uint32_t(int32_t(byte)), stream, calls)) == -1) {
+          result = done();
+          return;
+        }
+        buffer++;
+        left--;
+        buffer_size = Load(base, stream + 24);
+        if (int32_t(buffer_size) <= 0) {
+          buffer_size = 1;
+        }
+      }
+    } while (left != 0);
+    result = count;
+  });
+  return result;
+}
+
+uint64_t Fputs(uint8_t* base, uint32_t string, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AD280 fputs");
+  uint64_t result = ~uint64_t(0);
+  calls.in_frame(144, [&](uint32_t frame) {
+    Store(base, frame + 172, stream);
+    const auto invalid = [&] {
+      Store(base, Errno(base, calls), 22);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+      result = ~uint64_t(0);
+    };
+    if (string == 0 || stream == 0) {
+      invalid();
+      return;
+    }
+    if ((Load(base, stream + 12) & 0x40) == 0) {
+      const auto entry = [&] {
+        const int32_t handle = int32_t(uint32_t(Fileno(base, stream, calls)));
+        if (handle == -1 || handle == -2) {
+          return kBadIoInfo;
+        }
+        return Load(base, kPioinfo + 4 * uint32_t(handle >> 5)) + 44 * (uint32_t(handle) & 31);
+      };
+      if ((guest::LoadU8(base, entry() + 40) & 0xFE) != 0 ||
+          (guest::LoadU8(base, entry() + 40) & 1) != 0) {
+        invalid();
+        return;
+      }
+    }
+    uint32_t length = 0;
+    while (guest::LoadU8(base, string + length) != 0) {
+      length++;
+    }
+    Store(base, frame + 80, length);
+    LockFile(base, stream, true, calls);
+    const uint32_t buffering = Stbuf(base, stream, calls);
+    Store(base, frame + 84, uint32_t(FwriteNolock(base, string, 1, length, stream, calls)));
+    Ftbuf(base, buffering, stream, calls);
+    UnlockFileFinally(base, stream, calls);
+    result = Load(base, frame + 80) == Load(base, frame + 84) ? 0 : ~uint64_t(0);
+  });
+  return result;
+}
+
 }  // namespace c_runtime::core
