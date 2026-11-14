@@ -17,6 +17,19 @@ know lives in the repo (this file, `docs/loops/b7-progress.md`,
 `docs/loops/leads.md`, the function files, commits), not in the session's
 memory.
 
+## B7's goal (the user's call, 2026-11-14)
+
+A translation of the game that still calls into the SDK to function
+(its kernel and XAM imports), but runs no PPC code for anything: every
+`sub_` function reachable from `main` ours, except the libraries
+replaced wholesale and System Link ("Rules that still hold"). Only the
+imports themselves wait for the core; the game's wrappers over them
+(the critical section wrappers, `_mtinit`, `_getptd` and the like) are
+PPC code, so they are ported too, calling the imports as the original
+does. Never-seen functions count the same as seen ones. The static map
+(`docs/loops/static-map.md`) measures how far there is to go and feeds
+`leads.md`.
+
 ## Settings (set by the user, 2026-10-22)
 
 - **Branch:** the branch the user made for the run and checked out
@@ -41,10 +54,11 @@ memory.
 ## The cycle
 
 1. **Pick a subsystem.** The first is the top of `docs/loops/leads.md`;
-   after that, the lead picks from `leads.md`: the lead whose functions
-   run most often or are closest to being ready
-   (`itc_recomp/tools/b7_groups.py <its functions>`), not one that needs
-   a decision only the user can make. Its line is deleted from `leads.md`
+   after that, the lead picks from `leads.md`: the lead that unblocks
+   the most (the static map's blocker ranking, below), seen in play or
+   not (the user's call, 2026-11-14, replacing "runs most often or
+   closest to being ready"), not one that needs a decision only the
+   user can make. Its line is deleted from `leads.md`
    when picked. A lead marked "no mapping" (cleanup in files
    already mapped, such as adapters to remove) goes straight to a
    migration agent (step 6) with the files it names, and doesn't count as
@@ -505,8 +519,10 @@ Calls so far for decisions the loop meets often:
 - A kernel critical section a subsystem's code locks: a host
   `std::mutex` for that lock, taken by every user of it, native and
   recompiled (`Edram::Alloc`, 2026-10-24; the memory blocks' lock
-  `0x8296BD38`, 2026-10-25). The generic wrappers and `ScopedLock` stay
-  recompiled for the other critical sections. A device-wide lock over a
+  `0x8296BD38`, 2026-10-25). The generic wrappers and `ScopedLock` stayed
+  recompiled for the other critical sections until 2026-11-14; since
+  "B7's goal" above they are ported too, calling the
+  `Rtl*CriticalSection` imports as the original does. A device-wide lock over a
   host semaphore: the device lock (2026-10-24).
 - A kernel critical section or a game-built recursive spin lock whose
   depth the code reads, or which is entered again on purpose: a host
@@ -609,6 +625,10 @@ Calls so far for decisions the loop meets often:
   through the guest TLS as the original does (the original's results,
   one state for recompiled and native callers), while `_getptd` and
   `_mtinit` stay for the core (`rand`, 2026-11-04).
+  Since 2026-11-14 ("B7's goal" above), `_mtinit`, `_getptd` and the
+  rest are ported too, as plain C++ over the same guest words, calling
+  the kernel's TLS imports as the original does; only the imports wait
+  for the core.
 
 Only something new (no call covers it, or it's unclear whether one
 does) goes to the user. Then the lead asks the user directly
