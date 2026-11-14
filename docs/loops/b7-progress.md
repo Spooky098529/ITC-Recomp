@@ -270,7 +270,11 @@ file's history. What's left to see in a drive, from every run:
   group waits on four ready never-seen callees in `options-screen.md`,
   `save-screen.md`, `save-data.md`, and four shared handlers in
   `type6-type7-modes.md`, all to take along; no leads added). Check
-  passed. Migration agent running.
+  passed. Migrated ab9d75d1..00c9f8e1: all 52 rows ours (45
+  Overridden, 7 Native), with the 8 callees taken along;
+  `--native_type8_mode`; every harness 0 differing (no new expected
+  group), races 29-38 s at 40, 0 errors; harness faults fixed on the
+  way; five subagents one at a time. Validation agent running.
 
 ## Done
 

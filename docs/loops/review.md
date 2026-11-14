@@ -209,6 +209,16 @@ When the user has reviewed a run's section, its heading gets
   are type 8's +32 vtable); `car-list.md` called two type 8 functions
   "type 6". `NextMode`'s answer carries three unwritten stack bytes and
   `ForceExit`'s the low bytes of `Mode::Slot9Thunk`'s address (to copy).
+- Its migration (ab9d75d1..00c9f8e1): 52 rows ours, with
+  `Type8Options::Init`, `Type8ControllerOptions::Init`,
+  `Type8SaveScreen::Init`, `SaveData::CreateTwoPlayerBlock` (probably)
+  and four shared dialog handlers; map corrections (`MenuPage`'s scroll
+  reset only after a cursor move; `UpdateStand`'s reload sends both
+  players through the busy branch). Harness gap: `UpdateStand`'s reload
+  branch (building the car, `GarageStage::SetCar`) never runs in its
+  cases, as in `Type6Screen0::Update`'s. Type 8's delegates aren't in
+  `type2_mode::SlotThunk`'s native switch (reached through their
+  adapters, which run the plain C++).
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
