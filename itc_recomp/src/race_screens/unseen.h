@@ -341,8 +341,9 @@ uint64_t Kind6CloseWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // word [0x826C72F4]. Menu::Step and Pressed, MenuList::Update, Accepted and
 // Cancelled, MenuSound::Play, the UI movie calls, SaveSlots::State and
 // SaveBuffers::Create and Destroy through their overrides (`calls`);
-// RaceDialog::StartSave, ShowSaving, Kind6Menu::SaveReplay (with
-// RaceDialog::AskSlot), UiMovie::SetNodeCharText and the Xbox Live work
+// RaceDialog::StartSave and ShowSaving by their plain C++;
+// Kind6Menu::SaveReplay (with RaceDialog::AskSlot),
+// UiMovie::SetNodeCharText and the Xbox Live work
 // (the network manager's sub_8214B330 and sub_822917B8, the leaderboard
 // read sub_82292CC0) the originals through `calls`; ScreenPages::Go,
 // RaceDialog::Update and Open, ShowPanelA, SetUpList, FindNode and Child by

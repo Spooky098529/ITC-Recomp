@@ -29,7 +29,6 @@ constexpr uint32_t kMenuStep = 0x82186568;
 constexpr uint32_t kMenuPressed = 0x821864C8;
 constexpr uint32_t kSlotState = 0x8228F9E8;
 constexpr uint32_t kSaveBuffersDestroy = 0x8228F8F8;
-constexpr uint32_t kShowSaving = 0x82218AB0;
 constexpr uint32_t kSaveReplay = 0x8221D678;
 constexpr uint32_t kNetSetState = 0x8214B330;
 constexpr uint32_t kSessionStart = 0x822917B8;
@@ -339,7 +338,7 @@ uint64_t Kind6MainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
       GoA(base, 3);
       GoB(base, 0);
       calls.Call(kSaveBuffersCreate, frame, 0x8221E864);
-      calls.Call(kStartSave, frame, 0x8221E868);
+      RaceDialogStartSave(base, frame, calls);
     } else if (cursor == 3) {
       RaceDialogOpen(base, 2, 0, frame, calls);
       GoA(base, 13);
@@ -370,7 +369,7 @@ uint64_t Kind6SlotPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221DA60 Kind6Menu::SlotPage");
   const uint32_t frame = Frame(base, sp, 96);
   if (int32_t(uint32_t(calls.Call(kSlotState, frame, 0x8221DA78, 0))) == 1) {
-    calls.Call(kShowSaving, frame, 0x8221DA88);
+    RaceDialogShowSaving(base, frame, calls);
     GoA(base, 5);
   }
   calls.Call(kListUpdate, frame, 0x8221DAAC, Screen(base) + 136);

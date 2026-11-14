@@ -2136,6 +2136,60 @@ void Draws(Context& h, const MovieWorld& w) {
       __imp__sub_8221A2F8, hooks::RaceScreensCareerResultsDraw, {144, 24});
 }
 
+// The confirm dialog's save notes (never seen in play): StartSave (its
+// SaveSlots::State through the save world, its dialog list's block 0 for
+// MenuList::Init: the new one compared and freed), ShowSaving and SetNote
+// (r3 the id, r4 to r10 any: the original stores them as varargs; the
+// strings have no argument codes). Their callers' unset varargs, which
+// SetNote stores in their frames (+24 to +79), are 0 in ours (the user's
+// call for the parking area, 2026-10-30): those words left out.
+void DialogSave(Context& h, const MovieWorld& w) {
+  const Block save(kSaveWorldBytes);
+  if (save.address == 0) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  auto shape = [&](PPCContext&, Random& r, const MovieWorld& w) {
+    ShapeSaveWorld(h.base, save.address, r);
+    guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
+    if (r.Below(2) == 0) guest::StoreU32(h.base, w.movies.address + kPairsAt + 8, 14);
+  };
+  auto outputs = [&](Outputs& out) {
+    out.Bytes(Read(h.base, save.address, kSaveWorldBytes));
+    const uint32_t list = w.block(rs::kDialogList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  FrameSpec start{128, 24, {24, 80}};
+  start.after = outputs;
+  MovieGroup(h, w, "RaceDialog::StartSave (sub_822189B8)", 200, shape, __imp__sub_822189B8,
+             hooks::RaceScreensRaceDialogStartSave, start);
+  FrameSpec saving{112, 24, {24, 80}};
+  saving.after = outputs;
+  MovieGroup(h, w, "RaceDialog::ShowSaving (sub_82218AB0)", 150, shape, __imp__sub_82218AB0,
+             hooks::RaceScreensRaceDialogShowSaving, saving);
+  FrameSpec note{112, 24};
+  note.after = outputs;
+  MovieGroup(
+      h, w, "RaceDialog::SetNote (sub_82218918)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(t, r, w);
+        const uint32_t ids[4] = {69, 70, 98, r.Below(2000)};
+        t.r3.u64 = ids[r.Below(4)];
+        t.r6.u64 = r.Next();
+        t.r7.u64 = r.Next();
+        t.r8.u64 = r.Next();
+        t.r9.u64 = r.Next();
+        t.r10.u64 = r.Next();
+      },
+      __imp__sub_82218918, hooks::RaceScreensRaceDialogSetNote, note);
+}
+
 void Transitions(Context& h) {
   const MovieWorld w;
   if (!w.ok()) {
@@ -2311,6 +2365,7 @@ void Transitions(Context& h) {
   Results(h, w);
   AfterRace(h, w);
   Dialog(h, w);
+  DialogSave(h, w);
   Draws(h, w);
   MainPages(h, w);
 }

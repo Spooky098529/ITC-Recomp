@@ -35,7 +35,8 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "SetUpOptions and SetAdjust, the menu after the race's ConfirmPage, Intro, Show, "
               "CloseMain, Move, ShowItems, SetUpItems, ColorItems, Start, Open and MainPage (the "
               "replay's save flow, never seen in play, the original), "
-              "the confirm dialog's Question, OpenAnim, Move, ShowMessage (its messages 0 to 11, "
+              "the confirm dialog's StartSave, ShowSaving and SetNote (never seen in play; "
+              "SetNote's unset varargs 0), Question, OpenAnim, Move, ShowMessage (its messages 0 to 11, "
               "never seen in play, the original), Draw, SetText (its UI movie "
               "setters' unset varargs 0) and Open (SetText's plain C++, its unset varargs 0), "
               "PauseMenu::OpenOptions, "
@@ -431,6 +432,23 @@ void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base) {
                                                ctx.r1.u32, guest.calls());
 }
 
+void RaceScreensRaceDialogShowSaving(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceDialogShowSaving(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensRaceDialogStartSave(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceDialogStartSave(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensRaceDialogSetNote(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  const uint64_t varargs[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+                               ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  ctx.r3.u64 = race_screens::RaceDialogSetNote(base, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+}
+
 void RaceScreensRaceDialogQuestion(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogQuestion(base, ctx.r1.u32, guest.calls());
@@ -622,6 +640,9 @@ ITC_RACE_SCREENS(8221B860, RaceScreensAfterRaceMenuStart)
 // AfterRaceMenu::Open has no adapter (removed, 2026-11-08): its caller in
 // play, the race HUD machine's AwardPrize, calls its plain C++ (the unseen
 // ShowSplitResults and ShowResults the original).
+// RaceDialog::ShowSaving: the recompiled AfterRaceMenu::ListPage (never
+// seen in play) reaches it.
+ITC_RACE_SCREENS(82218AB0, RaceScreensRaceDialogShowSaving)
 ITC_RACE_SCREENS(82217F40, RaceScreensRaceDialogQuestion)
 ITC_RACE_SCREENS(822186A8, RaceScreensRaceDialogOpenAnim)
 ITC_RACE_SCREENS(82218788, RaceScreensRaceDialogMove)

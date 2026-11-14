@@ -84,12 +84,13 @@ uint64_t AfterRaceMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
       return close(2);
     case 2: {
       // The replay's save: page 2 at once, the save buffers made and the
-      // dialog's save flow started (no arguments: the registers the calls
-      // leave are passed on, as the original's).
+      // dialog's save flow started (RaceDialog::StartSave's plain C++; the
+      // registers the calls leave, which its SetNote stores as varargs, 0).
       const uint64_t r3 =
           calls.Call(kPagesGo, frame, 0x8221A59C, Get(base, kAfterPages), 2, kNone, kNone);
       const uint64_t buffers = calls.Call(kSaveBuffersCreate, frame, 0x8221A5A0, r3, 2, kNone, kNone);
-      calls.Call(kStartSave, frame, 0x8221A5A4, buffers);
+      (void)buffers;  // StartSave doesn't read its registers
+      RaceDialogStartSave(base, frame, calls);
       return 0;
     }
     case 3:

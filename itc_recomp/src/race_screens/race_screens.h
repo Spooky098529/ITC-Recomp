@@ -487,6 +487,27 @@ uint64_t PauseMenuSetAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Cal
 // each call as the originals do. The items by kind: four words a kind at
 // 0x82010428, -1 ends them.
 constexpr uint32_t kAfterItems = 0x82010428;
+// sub_82218918 RaceDialog::SetNote (never seen in play): the varargs (r4
+// to r10) stored in the caller's area (`sp` + 24 to + 79), then from a
+// 112-byte frame UI movie 14's type-0 node 2's child 1 set to string `id`
+// with them (UiMovie::SetNodeTextV through its override, the va_list sp +
+// 24 at the frame's +80). Its r3. No adapter: the native StartSave and
+// ShowSaving call it (the recompiled ShowMessage's messages the original).
+uint64_t RaceDialogSetNote(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+                           const Calls& calls);
+// sub_822189B8 RaceDialog::StartSave (never seen in play), from a 128-byte
+// frame: by SaveSlots::State(0) (through its override) the note 70 (the
+// data's +12 = 3, +24 = 0) or 69 (+12 = 2), SetNote's varargs 0 (the
+// user's call for the parking area); +16 = 0, ScreenPages::Go(0, 0, -1),
+// MenuList::Init(dialog list, 1, 1, 1, 154, 153, 155, 156; 159, 158) (both
+// through their overrides), +0 = 0, +32 = 1, +36 = 0. Init's r3.
+// sub_82218AB0 RaceDialog::ShowSaving (never seen in play), from a 112-byte
+// frame: note 98, +12 = 12, +16 = 0, Go(0, 0, -1), +32 = 1, +36 = 0. Go's
+// r3. No adapters: their callers (AfterRaceMenu::MainPage and SavePage...
+// see the rows) call the plain C++ where native.
+uint64_t RaceDialogStartSave(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t RaceDialogShowSaving(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // sub_8221A6C8 AfterRaceMenu::ConfirmPage (page 6): RaceDialog::Update (r4
 // the caller's); its 1 Go(7, transition 4), its 2 Go(1) at once. Returns 0.
 uint64_t AfterRaceMenuConfirmPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);

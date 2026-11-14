@@ -255,6 +255,62 @@ uint64_t RaceDialogOpen(uint8_t* base, uint32_t mode, uint64_t player, uint32_t 
   return r3;
 }
 
+uint64_t RaceDialogSetNote(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+                           const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82218918 RaceDialog::SetNote");
+  constexpr uint32_t kSetNodeTextV = 0x8211CBD8;
+  for (uint32_t i = 0; i < 7; i++) {
+    guest::StoreU32(base, sp + 24 + 8 * i, uint32_t(varargs[i] >> 32));
+    guest::StoreU32(base, sp + 28 + 8 * i, uint32_t(varargs[i]));
+  }
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t movie = DialogMovie(base, frame + 80);
+  const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, 0, 2), 1);
+  guest::StoreU32(base, frame + 80, sp + 24);
+  return calls.Call(kSetNodeTextV, frame, 0x822189A0, movie, node, id,
+                    guest::LoadU32(base, frame + 80));
+}
+
+uint64_t RaceDialogStartSave(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_822189B8 RaceDialog::StartSave");
+  constexpr uint32_t kSlotState = 0x8228F9E8;
+  const uint32_t frame = Frame(base, sp, 128);
+  // SetNote's varargs (r4 to r10, unset by the original) passed as 0, as
+  // the user's call for the parking area (2026-10-30): only dead frame words.
+  const uint64_t varargs[7] = {0, 0, 0, 0, 0, 0, 0};
+  if (int32_t(uint32_t(calls.Call(kSlotState, frame, 0x822189D4, 0))) != 0) {
+    RaceDialogSetNote(base, 70, varargs, frame, calls);
+    guest::StoreU32(base, Get(base, kDialogData) + 12, 3);
+    guest::StoreU32(base, Get(base, kDialogData) + 24, 0);
+  } else {
+    RaceDialogSetNote(base, 69, varargs, frame, calls);
+    guest::StoreU32(base, Get(base, kDialogData) + 12, 2);
+  }
+  guest::StoreU32(base, Get(base, kDialogData) + 16, 0);
+  Go(calls, frame, 0x82218A44, Get(base, kDialogPages), 0, 0, kNone);
+  guest::StoreU32(base, frame + 92, 158);
+  guest::StoreU32(base, frame + 84, 159);
+  const uint64_t init[8] = {Get(base, kDialogList), 1, 1, 1, 154, 153, 155, 156};
+  const uint64_t r3 = calls.CallArgs(kListInit, frame, 0x82218A7C, init);
+  guest::StoreU32(base, Get(base, kDialogData) + 0, 0);
+  guest::StoreU32(base, Get(base, kDialogData) + 32, 1);
+  guest::StoreU32(base, Get(base, kDialogData) + 36, 0);
+  return r3;
+}
+
+uint64_t RaceDialogShowSaving(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82218AB0 RaceDialog::ShowSaving");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint64_t varargs[7] = {0, 0, 0, 0, 0, 0, 0};
+  RaceDialogSetNote(base, 98, varargs, frame, calls);
+  guest::StoreU32(base, Get(base, kDialogData) + 12, 12);
+  guest::StoreU32(base, Get(base, kDialogData) + 16, 0);
+  const uint64_t r3 = Go(calls, frame, 0x82218B00, Get(base, kDialogPages), 0, 0, kNone);
+  guest::StoreU32(base, Get(base, kDialogData) + 32, 1);
+  guest::StoreU32(base, Get(base, kDialogData) + 36, 0);
+  return r3;
+}
+
 std::optional<uint64_t> RaceDialogShowMessage(uint8_t* base, uint32_t step, uint32_t sp,
                                               const Calls& calls) {
   const bool first = guest::LoadU32(base, step) == 0;
