@@ -729,6 +729,8 @@ set(ITC_SOURCES
     src/c_runtime/arrays.cpp
     src/c_runtime/exit.cpp
     src/c_runtime/random.cpp
+    src/hooks/c_runtime_core.cpp
+    src/c_runtime/core.cpp
     src/game_data/game_data.cpp
     src/game_data/data_file.cpp
     src/hooks/data_file.cpp
@@ -912,6 +914,7 @@ set(ITC_SOURCES
     src/harnesses/xact_tracks.cpp
     src/harnesses/input.cpp
     src/harnesses/c_runtime_exit.cpp
+    src/harnesses/c_runtime_core.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
