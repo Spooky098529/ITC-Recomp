@@ -109,8 +109,14 @@ file's history. What's left to see in a drive, from every run:
   stream buffer helpers, `bsearch`, and `_fflush_nolock`/flsall's pair
   with what's above it. Validated `itc_5504` (race 36 s at 180, 0
   errors, every harness 0 differing outside the expected groups), 21
-  of 21; replay `itc_5505` ok; none ran in game: 21 to drive. Step:
-  fourth migration.
+  of 21; replay `itc_5505` ok; none ran in game: 21 to drive. Fourth
+  migration cd2b4ad4..27483366: fclose, `_fcloseall`, the stream
+  buffers, `bsearch`, the flush pair with `fflush`, `_flushall`,
+  `_endstdio`, doexit, `_exit` (by reading), `_cexit`; 8 adapters
+  removed; every harness 0 differing, races 38 s, 0 errors. Left:
+  abort with raise, fputs, vsprintf, `_cftoe_l`, `_cftog_l` (need a
+  guest-memory `_fltout2`). Step: fifth migration, then one
+  validation for the fourth and fifth.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
