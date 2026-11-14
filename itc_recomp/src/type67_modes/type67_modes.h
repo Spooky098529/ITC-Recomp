@@ -141,6 +141,11 @@ uint64_t PanelScreenInitWords(uint8_t* base, uint64_t r3);
 // +9608 = 4 when +9612 is set, else 1.
 uint64_t ScreenMachineWait(uint8_t* base, uint64_t r3);
 uint64_t ScreenReenter(uint8_t* base, uint64_t r3);
+// sub_822508F0 Screen::Wait: +9608 = 9 (the type 7 and 8 first screens'
+// machine at +4). sub_822419D0 Type7Dialog::QueueReopen: +9748 = 1 (a
+// reopen for Dialog::DrawWaiting). Leaves; r3 left.
+uint64_t ScreenWait(uint8_t* base, uint64_t r3);
+uint64_t DialogQueueReopen(uint8_t* base, uint64_t r3);
 
 // sub_82231F48 Type6Dialog::Shown, sub_822419C0 Type7Dialog::Shown: +`shown`
 // (9756, 9760) = 0.
@@ -462,6 +467,13 @@ uint64_t DialogCloseConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, con
 // highlight finished (UiMovie::FinishNamed), the cursor's played and looped,
 // +9664 = 1; UiMovie::Run. Returns 1.
 uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls);
+// sub_822326A8 Dialog::OpenNoticeStep (`close` false) and sub_8223AAA8
+// Dialog::CloseNoticeStep (true): movie 19; on the first frame (+9664 0)
+// MenuSound::Play(5), named animation 2 (the close: 3) and +9664 = 1;
+// UiMovie::Run(movie, 0) (a guest call); done when it answers 0 (the close
+// then +9740 = 9). 1 when done, else 0.
+uint64_t DialogNoticeStep(uint8_t* base, uint32_t dialog, bool close, uint32_t sp,
+                          const Calls& calls);
 // sub_82232328 Type6Dialog::ConfirmPage and sub_82241EF8
 // Type7Dialog::ConfirmPage (r3 the dialog, `dispatcher` r4): with the shown
 // word (+9756, +9760) 4, it = 1 and nothing else; else it = 1, Menu::Step

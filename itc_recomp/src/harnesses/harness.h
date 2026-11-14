@@ -335,5 +335,6 @@ void Achievements(Context& h);
 void MorphJobs(Context& h);
 // The type 8 mode's panel screen (src/harnesses/type8_screens.cpp).
 void Type8Screens(Context& h);
+void Type8Mode(Context& h);
 
 }  // namespace harness

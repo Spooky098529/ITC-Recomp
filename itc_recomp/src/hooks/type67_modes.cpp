@@ -41,7 +41,8 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "ControllerOptions::OnEnter sub_821BB120, OnLeft sub_821BB1F8, Show sub_821BB260, "
               "Open sub_821BC660, Leave sub_821BFB48, StepSliders sub_821BB290, StepButtons "
               "sub_821BB3B8, StepAnalog sub_821BB590 and SetMarkY sub_821C0238, PanelScreen::InitWords sub_82230740, "
-              "ScreenMachine::Wait sub_82277068, Screen::Reenter sub_8223B740, the dialogs' "
+              "ScreenMachine::Wait sub_82277068, Screen::Reenter sub_8223B740, Screen::Wait "
+              "sub_822508F0, Type7Dialog::QueueReopen sub_822419D0, the dialogs' "
               "Shown sub_82231F48 and sub_822419C0, OnEnter sub_82231F98 and sub_82241A08 and "
               "WaitForMovies sub_82232910 and sub_82242388, the first screens' OnEnter "
               "sub_822339F0 and sub_82243F58, OnLeft sub_82233870 and sub_82243E08, "
@@ -74,7 +75,8 @@ ITC_FLAG_BOOL(native_type67_modes, true, "ITC",
               "GarageStage::Init sub_82180968 and GarageCamera::Init sub_82180918; the dialogs' "
               "Type6Dialog::OpenConfirm sub_822320D8, Type7Dialog::OpenConfirm sub_82241B40, "
               "Dialog::DrawWaiting sub_82241C18, Dialog::OpenConfirmStep sub_822325E0, "
-              "CloseConfirmStep sub_8223AA10 and MoveCursorStep sub_8223AB50, UiMovie::Run, "
+              "CloseConfirmStep sub_8223AA10, MoveCursorStep sub_8223AB50, OpenNoticeStep "
+              "sub_822326A8 and CloseNoticeStep sub_8223AAA8, UiMovie::Run, "
               "FinishAll and FinishNamed guest calls; the dialogs' pages "
               "Type6Dialog::ConfirmPage sub_82232328 and Type7Dialog::ConfirmPage sub_82241EF8 "
               "(Menu::Step, Menu::Pressed and MenuSound::Play's plain C++) and their Updates "
@@ -210,6 +212,12 @@ void ScreenMachineWait(PPCContext& ctx, uint8_t* base) {
 }
 void ScreenReenter(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::ScreenReenter(base, ctx.r3.u64);
+}
+void ScreenWait(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::ScreenWait(base, ctx.r3.u64);
+}
+void DialogQueueReopen(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogQueueReopen(base, ctx.r3.u64);
 }
 void Type6DialogShown(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::DialogShown(base, ctx.r3.u64, 9756);
@@ -528,6 +536,13 @@ void DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base) {
 }
 void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = t67::DialogMoveCursorStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+}
+void DialogOpenNoticeStep(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 =
+      t67::DialogNoticeStep(base, ctx.r3.u32, false, ctx.r1.u32, Type67Calls(ctx, base));
+}
+void DialogCloseNoticeStep(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = t67::DialogNoticeStep(base, ctx.r3.u32, true, ctx.r1.u32, Type67Calls(ctx, base));
 }
 
 namespace {
@@ -945,6 +960,10 @@ ITC_TYPE67_MODES(821C0238, ControllerOptionsSetMarkY)
 ITC_TYPE67_MODES(82230740, PanelScreenInitWords)
 ITC_TYPE67_MODES(82277068, ScreenMachineWait)
 ITC_TYPE67_MODES(8223B740, ScreenReenter)
+// Screen::Wait and Type7Dialog::QueueReopen (the type 7 and 8 first
+// screens' and dialogs' transitions; never seen in play).
+ITC_TYPE67_MODES(822508F0, ScreenWait)
+ITC_TYPE67_MODES(822419D0, DialogQueueReopen)
 ITC_TYPE67_MODES(82231F48, Type6DialogShown)
 ITC_TYPE67_MODES(822419C0, Type7DialogShown)
 ITC_TYPE67_MODES(82231F98, Type6DialogOnEnter)
@@ -1002,6 +1021,10 @@ ITC_TYPE67_MODES(82241C18, DialogDrawWaiting)
 ITC_TYPE67_MODES(822325E0, DialogOpenConfirmStep)
 ITC_TYPE67_MODES(8223AA10, DialogCloseConfirmStep)
 ITC_TYPE67_MODES(8223AB50, DialogMoveCursorStep)
+// The notice's steps (the dialogs' Update step tables 2 and 3; never seen
+// in play).
+ITC_TYPE67_MODES(822326A8, DialogOpenNoticeStep)
+ITC_TYPE67_MODES(8223AAA8, DialogCloseNoticeStep)
 // The dialogs' page 0 (from their Draw's table, a guest call) and Update
 // (through the machines' transitions).
 ITC_TYPE67_MODES(82232328, Type6DialogConfirmPage)

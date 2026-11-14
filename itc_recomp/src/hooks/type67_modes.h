@@ -43,6 +43,8 @@ void ControllerOptionsSetMarkY(PPCContext& ctx, uint8_t* base);
 void PanelScreenInitWords(PPCContext& ctx, uint8_t* base);
 void ScreenMachineWait(PPCContext& ctx, uint8_t* base);
 void ScreenReenter(PPCContext& ctx, uint8_t* base);
+void ScreenWait(PPCContext& ctx, uint8_t* base);
+void DialogQueueReopen(PPCContext& ctx, uint8_t* base);
 void Type6DialogShown(PPCContext& ctx, uint8_t* base);
 void Type7DialogShown(PPCContext& ctx, uint8_t* base);
 void Type6DialogOnEnter(PPCContext& ctx, uint8_t* base);
@@ -125,6 +127,9 @@ void DialogDrawWaiting(PPCContext& ctx, uint8_t* base);
 void DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base);
 void DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base);
 void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base);
+// Dialog::OpenNoticeStep sub_822326A8 and CloseNoticeStep sub_8223AAA8.
+void DialogOpenNoticeStep(PPCContext& ctx, uint8_t* base);
+void DialogCloseNoticeStep(PPCContext& ctx, uint8_t* base);
 // The dialogs' page 0 and Update (r3 the dialog, r4 the dispatcher):
 // Type6Dialog::ConfirmPage sub_82232328, Type7Dialog::ConfirmPage
 // sub_82241EF8, Type6Dialog::Update sub_82232798 and Type7Dialog::Update

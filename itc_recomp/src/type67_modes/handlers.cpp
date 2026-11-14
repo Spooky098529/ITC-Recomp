@@ -341,6 +341,18 @@ uint64_t ScreenMachineWait(uint8_t* base, uint64_t r3) {
   return r3;
 }
 
+uint64_t ScreenWait(uint8_t* base, uint64_t r3) {
+  ITC_NATIVE_RUNNING("sub_822508F0 Screen::Wait");
+  StoreU32(base, uint32_t(r3) + 9608, 9);
+  return r3;
+}
+
+uint64_t DialogQueueReopen(uint8_t* base, uint64_t r3) {
+  ITC_NATIVE_RUNNING("sub_822419D0 Type7Dialog::QueueReopen");
+  StoreU32(base, uint32_t(r3) + 9748, 1);
+  return r3;
+}
+
 uint64_t ScreenReenter(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8223B740 Screen::Reenter");
   const uint32_t screen = uint32_t(r3);
