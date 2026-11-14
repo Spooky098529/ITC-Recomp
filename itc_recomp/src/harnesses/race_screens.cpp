@@ -19,6 +19,7 @@
 #include "hooks/race_screens.h"
 #include "hooks/race_screens_unseen.h"
 #include "hooks/ui_movies.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_screens/race_screens.h"
@@ -34,6 +35,7 @@
 #include <functional>
 #include <initializer_list>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -1113,6 +1115,9 @@ struct FrameSpec {
   // Run after the function, before the outputs are read (frees, and words
   // made comparable), with the case's outputs to add to.
   std::function<void(Outputs&)> after;
+  // r3 compared (left out where it differs on purpose and no caller reads
+  // it: the leaderboard read's no-Live answer).
+  bool compare_r3 = true;
 };
 
 void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
@@ -1204,8 +1209,10 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
       }
       out[v].Bytes(Read(h.base, sp, kCallerBytes));
       out[v].Word(t.r1.u32);
-      out[v].Word(t.r3.u32);
-      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      if (spec.compare_r3) {
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
     }
     results.Check(out[0], out[1], fmt::format("case {}", c));
   }
@@ -3508,6 +3515,103 @@ void UnseenKind6Pages(Context& h, const MovieWorld& w) {
     spec.list_world = &list_world;
     spec.after = outputs;
     MovieGroup(h, w, sp.name, sp.cases, *sp.setup, sp.recompiled, sp.native, spec);
+  }
+
+  // The leaderboard read (sub_82292CC0, answered as no Live: the user's
+  // call, 2026-11-14) and its spec's set-up (sub_82292648). The spec's view
+  // word ([0x826C72F4]) 0 to 17 or any. The read's world: the old results
+  // ([0x826C6AD4]) none or a 64-byte block of the C runtime heap (each
+  // version's own: the read frees it), the player's controller 0 to 3, r4 0
+  // or a rank, r5 any XUID; the read's frame words +80 (the buffer's size the
+  // SDK's stub leaves unwritten) 64 and +84 (the enumerator's handle) 0, so
+  // the original allocates 64 bytes and XEnumerate fails on the handle. The
+  // original's buffer, when it made one, is freed after the case. Its
+  // overlapped (0x826C6080, 28 bytes) and the spec saved and put back.
+  constexpr uint32_t kOverlapped = 0x826C6080;
+  SavedBytes read_saved(h.base, {{kOverlapped, 28}, {rs::kKind6StatsSpec, 16}});
+  auto spec_view = [&](Random& r) {
+    guest::StoreU32(h.base, rs::kKind6ReadSpec,
+                    r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(18));
+    WriteRandom(h.base, rs::kKind6StatsSpec, 16, r);
+  };
+  auto read_world = [&](Random& r, uint32_t frame) {
+    spec_view(r);
+    guest::StoreU32(h.base, rs::kKind6Results,
+                    r.Below(2) == 0 ? 0 : memory::crt::OperatorNewArray(h.base, 64).value_or(0));
+    guest::StoreU32(h.base, rs::kControllerEntries, r.Below(4));
+    WriteRandom(h.base, kOverlapped, 28, r);
+    guest::StoreU32(h.base, frame + 80, 64);
+    guest::StoreU32(h.base, frame + 84, 0);
+  };
+  const MovieSetupFn spec_setup = setup([&](PPCContext&, Random& r, const MovieWorld&) {
+    spec_view(r);
+  });
+  const MovieSetupFn read_setup = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    read_world(r, t.r1.u32 - 144);
+    t.r3.u64 = s;
+    t.r4.u64 = r.Below(2) == 0 ? 0 : r.Below(100);
+    t.r5.u64 = r.Next();
+  });
+  // The read's start in the two pages that make it (+320 0; RankingPage's
+  // session +144 0, RankingReadPage's +356 0): their read frame below
+  // theirs (128 bytes) and the 4112 state's call.
+  const MovieSetupFn read_page = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    guest::StoreU32(h.base, k + 320, 0);
+    guest::StoreU32(h.base, k + 356, 0);
+    guest::StoreU32(h.base, s + 144, 0);
+    read_world(r, t.r1.u32 - 128 - 144);
+  });
+  // The original's buffer freed (the native makes none); `all` adds what
+  // differs on purpose: whether there was one, and the overlapped.
+  auto read_after = [&](bool all) {
+    return [&, all](Outputs& out) {
+      const uint32_t now = guest::LoadU32(h.base, rs::kKind6Results);
+      if (all) {
+        out.Word(now != 0 ? 1 : 0);
+        out.Bytes(Read(h.base, kOverlapped, 28));
+      }
+      if (now != 0) {
+        memory::crt::OperatorDeleteArray(now);
+        guest::StoreU32(h.base, rs::kKind6Results, 0);
+      }
+      outputs(out);
+      out.Bytes(Read(h.base, rs::kKind6StatsSpec, 16));
+    };
+  };
+  FrameSpec spec_frame{0, 0};
+  spec_frame.list_world = &list_world;
+  spec_frame.after = [&](Outputs& out) {
+    outputs(out);
+    out.Bytes(Read(h.base, rs::kKind6StatsSpec, 16));
+  };
+  MovieGroup(h, w, "Leaderboard::SetUpSpec (sub_82292648)", 150, spec_setup, __imp__sub_82292648,
+             hooks::RaceScreensUnseenKind6ReadSpecSetUp, spec_frame);
+  FrameSpec read_frame{144, 48};
+  read_frame.list_world = &list_world;
+  read_frame.after = read_after(false);
+  read_frame.compare_r3 = false;  // XEnumerate's answer in the original, 0 in ours
+  MovieGroup(h, w, "Leaderboard::Read (sub_82292CC0)", 40, read_setup, __imp__sub_82292CC0,
+             hooks::RaceScreensUnseenKind6LeaderboardRead, read_frame);
+  // Expected to differ (the user's call, 2026-11-14): the SDK's stub of
+  // XamUserCreateStatsEnumerator answers success without writing the size,
+  // so the original allocates a buffer of whatever its frame word holds into
+  // [0x826C6AD4] and clears the overlapped at 0x826C6080 before XEnumerate
+  // fails; ours answers no Live: the read failed, no buffer, the overlapped
+  // untouched. Its frame (the original's enumerator words) and r3 differ too.
+  FrameSpec read_all{144, 48};
+  read_all.list_world = &list_world;
+  read_all.after = read_after(true);
+  MovieGroup(h, w, "Leaderboard::Read (sub_82292CC0) (expected to differ)", 20, read_setup,
+             __imp__sub_82292CC0, hooks::RaceScreensUnseenKind6LeaderboardRead, read_all);
+  for (const auto& [name, recompiled, native] :
+       {std::tuple{"Kind6Menu::RankingReadPage with the read (sub_8221C008)", __imp__sub_8221C008,
+                   hooks::RaceScreensUnseenKind6RankingReadPage},
+        std::tuple{"Kind6Menu::RankingPage with the read (sub_8221BE90)", __imp__sub_8221BE90,
+                   hooks::RaceScreensUnseenKind6RankingPage}}) {
+    FrameSpec page{128, 40};
+    page.list_world = &list_world;
+    page.after = read_after(false);
+    MovieGroup(h, w, name, 60, read_page, recompiled, native, page);
   }
 }
 

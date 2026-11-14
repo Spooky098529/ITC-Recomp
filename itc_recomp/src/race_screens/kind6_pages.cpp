@@ -3,16 +3,19 @@
 // objects, the helpers only they reach, and the network manager's small
 // functions they call; see unseen.h. Read from the generated code; never
 // seen in play (ported by the user's call, 2026-11-12). The Xbox Live work
-// (the network manager's state machine sub_8214B330, the session's start
-// sub_822917B8 and the leaderboard read sub_82292CC0) stays recompiled,
-// called through `calls`.
+// (the network manager's state machine sub_8214B330 and the session's
+// start sub_822917B8) stays recompiled, called through `calls`; the
+// leaderboard read sub_82292CC0 is answered as no Live (the user's call,
+// 2026-11-14).
 
 #include "race_screens/unseen.h"
 
 #include "base/log.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
+#include "user/user.h"
 
 namespace race_screens {
 
@@ -32,7 +35,7 @@ constexpr uint32_t kSaveBuffersDestroy = 0x8228F8F8;
 constexpr uint32_t kSaveReplay = 0x8221D678;
 constexpr uint32_t kNetSetState = 0x8214B330;
 constexpr uint32_t kSessionStart = 0x822917B8;
-constexpr uint32_t kRankingRead = 0x82292CC0;
+constexpr uint32_t kOperatorDeleteArray = 0x825A71C0;
 // The "returns 0" stub in the pages' tables (vehicle-accessors.md).
 constexpr uint32_t kReturns0 = 0x825C8388;
 
@@ -153,6 +156,46 @@ uint64_t Kind6NetState(uint8_t* base, uint64_t state, uint32_t sp, const Calls& 
     default:
       return state;
   }
+}
+
+uint32_t Kind6ReadSpecSetUp(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82292648 Leaderboard::SetUpSpec");
+  // The spec's view id from [0x826C72F4]; for ids 1 to 16 (their sixteen
+  // jump table cases, each sub_82292690) three columns, ids 1, 2 and 3.
+  const uint32_t view = guest::LoadU32(base, kKind6ReadSpec);
+  guest::StoreU32(base, kKind6StatsSpec, view);
+  if (view - 1 <= 15) {
+    guest::StoreU32(base, kKind6StatsSpec + 4, 3);
+    guest::StoreU16(base, kKind6StatsSpec + 8, 1);
+    guest::StoreU16(base, kKind6StatsSpec + 10, 2);
+    guest::StoreU16(base, kKind6StatsSpec + 12, 3);
+  }
+  return kKind6StatsSpec;
+}
+
+uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82292CC0 Leaderboard::Read");
+  const uint32_t frame = Frame(base, sp, 144);
+  // Not signed in to Xbox Live (XUserGetSigninState of the player's
+  // controller isn't 2 for any user today): the read's state 4.
+  if (user::SigninState(Get(base, kControllerEntries)) != 2) {
+    guest::StoreU32(base, session + 180, 4);
+  }
+  // The old results freed (operator delete[]).
+  const uint32_t results = Get(base, kKind6Results);
+  if (results != 0) {
+    if (!memory::crt::OperatorDeleteArray(results)) {
+      calls.Call(kOperatorDeleteArray, frame, 0x82292D08, results);
+    }
+    guest::StoreU32(base, kKind6Results, 0);
+  }
+  Kind6ReadSpecSetUp(base);
+  // The stats enumerator (XUserCreateStatsEnumeratorByRank or ByXuid), its
+  // buffer into [0x826C6AD4] and XEnumerate: answered as no Live (the
+  // user's call, 2026-11-14): the read failed, no buffer, the state 4. The
+  // original's r3 there isn't read by its callers.
+  guest::StoreU32(base, session + 180, 4);
+  return 0;
 }
 
 // --- The helpers ---
@@ -461,8 +504,7 @@ uint64_t Kind6RankingReadPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (int32_t(Field(base, 356)) != 0) return 0;
   if (int32_t(Field(base, 320)) == 0) {
     Kind6NetState(base, 4112, frame, calls);
-    calls.Call(kRankingRead, frame, 0x8221C05C, session, 0,
-               LoadU64(base, Session(base) + 168));
+    Kind6LeaderboardRead(base, session, frame, calls);
     if (int32_t(Field(base, 340)) != 0) {
       SetField(base, 324, 44);
       GoB(base, 5, 5);
@@ -563,8 +605,7 @@ uint64_t Kind6RankingPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   uint32_t session = Session(base);
   if (int32_t(guest::LoadU32(base, session + 144)) == 0 && int32_t(Field(base, 320)) == 0) {
     Kind6NetState(base, 4112, frame, calls);
-    calls.Call(kRankingRead, frame, 0x8221BEE4, session, 0,
-               LoadU64(base, Session(base) + 168));
+    Kind6LeaderboardRead(base, session, frame, calls);
     SetField(base, 320, 1);
     session = Session(base);
   }

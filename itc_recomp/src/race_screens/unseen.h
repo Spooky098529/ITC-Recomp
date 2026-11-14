@@ -372,8 +372,9 @@ uint64_t Kind6CloseWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // RaceDialog::StartSave and ShowSaving by their plain C++;
 // UiMovie::SetNodeCharText through its override; Kind6Menu::SaveReplay
 // (with RaceDialog::AskSlot) and the Xbox Live work
-// (the network manager's sub_8214B330 and sub_822917B8, the leaderboard
-// read sub_82292CC0) the originals through `calls`; ScreenPages::Go,
+// (the network manager's sub_8214B330 and sub_822917B8) the originals
+// through `calls`; the leaderboard read sub_82292CC0 answered as no Live
+// (Kind6LeaderboardRead); ScreenPages::Go,
 // RaceDialog::Update and Open, ShowPanelA, SetUpList, FindNode and Child by
 // their plain C++.
 constexpr uint32_t kKind6Results = 0x826C6AD4;
@@ -391,6 +392,24 @@ constexpr uint32_t kKind6ReadSpec = 0x826C72F4;
 uint64_t Kind6Rank(uint8_t* base);
 uint32_t Kind6CarLogo(uint32_t car);
 uint64_t Kind6NetState(uint8_t* base, uint64_t state, uint32_t sp, const Calls& calls);
+
+// The leaderboard read's spec (XUSER_STATS_SPEC: +0 the view id, +4 the
+// column count, +8 the column ids as halfwords).
+constexpr uint32_t kKind6StatsSpec = 0x826C6410;
+// sub_82292648 Leaderboard::SetUpSpec (no arguments; its jump table's
+// sixteen cases sub_82292690 merged): the spec's +0 = [0x826C72F4]; for 1
+// to 16, +4 = 3 and the columns 1, 2, 3. Returns the spec (r11 in the
+// original; its r3 is the caller's, kept by the adapter).
+uint32_t Kind6ReadSpecSetUp(uint8_t* base);
+// sub_82292CC0 Leaderboard::Read (r3 the session; r4 a rank and r5 a XUID
+// the enumerator would take), from a 144-byte frame: the session's +180 = 4
+// unless XUserGetSigninState of [0x826BABA4] answers 2 (never today); the
+// old results [0x826C6AD4] freed (operator delete[]) and cleared;
+// SetUpSpec; then the stats enumerator, its buffer and XEnumerate answered
+// as no Live (the user's call, 2026-11-14): the read failed, +180 = 4, no
+// buffer. Returns 0 (the original's r3 there is an error code or
+// XEnumerate's answer, read by no caller).
+uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, const Calls& calls);
 
 // The helpers: sub_8221CEA0 ShowPanelB (type-1 nodes 4 and 5 shown with
 // +108 0, then 6 and 7 with +108 1, 8 and 9 hidden), sub_8221D3D0

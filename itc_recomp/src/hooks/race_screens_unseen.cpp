@@ -25,8 +25,8 @@ ITC_FLAG_BOOL(native_race_screens_unseen, true, "ITC",
               "transitions of its two page objects, and Update sub_8221F1E8 with its 19 pages, "
               "ShowPanelB, ShowTimeOnly, ShowRanking and RankingTime and the network "
               "manager's sub_822914A8, sub_8225FFC8 and sub_822927B0 (the Xbox Live work, "
-              "sub_8214B330, sub_822917B8 and the leaderboard read sub_82292CC0, the "
-              "originals; SaveReplay the original too, UiMovie::SetNodeCharText through its "
+              "sub_8214B330 and sub_822917B8, the originals; the leaderboard read "
+              "sub_82292CC0 with its spec's set-up sub_82292648 answered as no Live; SaveReplay the original too, UiMovie::SetNodeCharText through its "
               "override; "
               "RaceDialog::StartSave and ShowSaving by their plain C++) (the UI movie calls through their "
               "overrides, SetText's and SetNodeText's unset varargs 0), instead of through the "
@@ -322,6 +322,17 @@ void RaceScreensUnseenKind6CarLogo(PPCContext& ctx, uint8_t*) {
   ctx.r3.u64 = race_screens::Kind6CarLogo(ctx.r3.u32);
 }
 
+void RaceScreensUnseenKind6LeaderboardRead(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::Kind6LeaderboardRead(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenKind6ReadSpecSetUp(PPCContext& ctx, uint8_t* base) {
+  // r3 the caller's (the original works in r9 to r11).
+  ctx.r11.u64 = race_screens::Kind6ReadSpecSetUp(base);
+}
+
 void RaceScreensUnseenKind6NetState(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::Kind6NetState(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
@@ -391,6 +402,11 @@ ITC_RACE_SCREENS_UNSEEN(8221EF60, RaceScreensUnseenKind6Draw)
 // Kind6Menu::Update (the race HUD machine's AfterRaceUpdate fallback reaches
 // it); its pages and their helpers have no adapters.
 ITC_RACE_SCREENS_UNSEEN(8221F1E8, RaceScreensUnseenKind6Update)
+// The leaderboard read (answered as no Live, the user's call, 2026-11-14)
+// and its spec's set-up: the recompiled race loading sub_82293288 reaches
+// the read, the stats calls sub_82292A48 and sub_82292DB8 the set-up.
+ITC_RACE_SCREENS_UNSEEN(82292CC0, RaceScreensUnseenKind6LeaderboardRead)
+ITC_RACE_SCREENS_UNSEEN(82292648, RaceScreensUnseenKind6ReadSpecSetUp)
 
 // The network battle's sends (docs/functions/system-services.md): sendto on
 // the system link socket B5 no longer makes, their results unread: Dropped

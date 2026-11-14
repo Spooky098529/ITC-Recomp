@@ -170,6 +170,10 @@ void RaceScreensUnseenKind6ShowRanking(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenKind6RankingTime(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenKind6Rank(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenKind6CarLogo(PPCContext& ctx, uint8_t* base);
+// The leaderboard read sub_82292CC0 (r3 the session; answered as no Live)
+// and its spec's set-up sub_82292648 (no arguments, r3 kept): adapters.
+void RaceScreensUnseenKind6LeaderboardRead(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ReadSpecSetUp(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenKind6NetState(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
