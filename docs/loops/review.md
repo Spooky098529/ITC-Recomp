@@ -58,6 +58,23 @@ When the user has reviewed a run's section, its heading gets
   hand kinds 4 and 6 back to the recompiled handler (moot under the
   bypass); `AskSlot`'s stays for the recompiled
   `AfterRaceMenu::SaveReplay` `sub_8221B0C0`.
+- The multiplayer bypass (b77b4b39..23d07ac8): `TitleScreen::MainMenu`
+  items 3 and 4 silent (r3 0, as an ignored input), behind
+  `--multiplayer_menu_items`; `Mode::Create` leaves type 12 to the
+  original without the flag; `RaceHudMachine::OnRaceEnd`'s kinds 4
+  and 6 show no screen without it (as the original does for a kind it
+  doesn't handle). Left unguarded: data-only kind 4/6 branches in
+  seven subsystems (no map effect); 21 `PauseMenu4::` rows stay
+  reachable through the unported `CountdownPauseDraw` `sub_8216D0C8`
+  until it's ported with its kind 4 branch under the flag. Open: the
+  save screen's "kind 6" pages (`sub_821A2070`, `sub_821A2208` to
+  `sub_821A4EF8`) may or may not be the race kind.
+- The static map's reading of our C++ (18fa8e23): namespace aliases,
+  `case`/address-picked parts as their function's own, `extern`
+  tables, lookup order; hand-written `KEY_TABLES` (three `kInits`
+  tables) and `CPP_TABLES` (the device's render and sampler state
+  setters); definitions shared by an argument still give callers all
+  their owners (the literal rule cut 102 functions that run).
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a

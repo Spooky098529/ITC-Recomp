@@ -65,13 +65,23 @@ file's history. What's left to see in a drive, from every run:
   harnesses 0 differing outside the two bypass groups; race 34 s at
   40, 0 errors; a synthetic pad replay checked both items, flag off
   and on. Static map: reachable 11,617 -> 11,011, unported 3,703 ->
-  3,232 (never seen 3,059 -> 2,588). Four questions for the user.
+  3,232 (never seen 3,059 -> 2,588). The user's answers: the items
+  silent (c66d07b1), not greyed; `Mode::Create`'s guard kept; the race
+  HUD's kinds 4 and 6 under the flag (23d07ac8). The static map's six
+  gaps in reading our C++ fixed (18fa8e23): type 8 no longer
+  reachable. Subsystem 1 finished and recorded.
+- Subsystem 2 of 10: the C runtime's per-thread data and critical
+  section wrappers (`825A`-`825B`, the static map's top blockers and
+  frontier clusters, unmapped; ported since B7's goal). Step: map.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
   are picked from it once this subsystem is done.
 
 ## Done
+
+- The in-race screens never seen (`race-screens-unseen.md`): 99 rows
+  ours, `--native_race_screens_unseen`, d71b917e..23d07ac8.
 
 ## Rows to review
 
@@ -89,5 +99,7 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 6537, work left 676 (wrapped 51, known 354,
   unknown 271).
+- After the in-race screens: ours 6651, work left 676; static map
+  unported 3,227 (644 seen, 2,583 never seen).
 
 ## Stopped

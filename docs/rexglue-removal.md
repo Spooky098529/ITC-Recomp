@@ -2921,6 +2921,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-14 | The type 6 and 7 list screens' and node screen's pages and steps (the six tables built on first use, the list part, the node tables, the color list, the panel screens, the screen blocks' destructors; none seen in play) | `type67-screens.md` | 174 rows ours (2 Merged), with `CourseRecords::Of` | (`--native_type67_screens`) |
 | 2026-11-14 | The type 8 mode's screens (probably the two-player mode's panel screen and list screens, built on the type 6 and 7 bases; none seen in play) | `type8-screens.md` | 128 of 128 (2 Merged), with 13 `car-list.md` rows and `TwoPlayerBlock` | `--native_type8_screens` |
 | 2026-11-14 | The type 8 mode itself (its Init, slots and teardown, its first screen and dialog), with the options', controller options' and save screen's type 8 Inits, the two-player save block's maker and four shared dialog handlers | `type8-mode.md` | 52 of 52 | `--native_type8_mode` |
+| 2026-11-14 | The in-race screens never seen in play (the split screen pause menu, the two results screens, the Live time attack's menu after the race), with the network manager's leaderboard helpers, the race dialog's save calls and `UiMovie::SetNodeCharText`; since the multiplayer bypass the same day, mostly unreachable | `race-screens-unseen.md` | 99 rows ours (3 Merged), the network battle's sends Dropped | `--native_race_screens_unseen` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5602,3 +5603,20 @@ boundary: 449 functions (916 pairs): overridden 110, Native 40,
 Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
 live caller. B7 (`b7_status.py`): ours 6,537, work left 676 (Wrapped
 51, with a row 354, no row yet 271), from 718 at the run's start.
+
+**2026-11-14, the in-race screens never seen (branch
+`b7-loop-13-11-26`, the forty-seventh run, its first subsystem):**
+`race-screens-unseen.md` (99 rows, `src/race_screens/`): the race's
+kind 4 (split screen) pause menu, the two results screens and kind
+6's (the Live time attack's) menu after the race, none seen in play.
+The same day, by the user's calls: B7's goal is no PPC code reachable
+from `main`, measured by the static map (`docs/loops/static-map.md`,
+`itc_recomp/tools/static_map.py`); multiplayer is bypassed (the main
+menu's Xbox Live and split screen items do nothing,
+`--multiplayer_menu_items`, off by default), so most of these screens
+are unreachable now. The boundary: 449 functions (916 pairs):
+overridden 110, Native 40, Dropped 26, never called 68, live 205.
+Imports: 186 called, 49 with a live caller. B7 (`b7_status.py`): ours
+6,651, work left 676 (Wrapped 51, with a row 354, no row yet 271).
+Static map: reachable 10,853, ours 6,027, unported 3,227 (644 seen in
+play, 2,583 never seen).
