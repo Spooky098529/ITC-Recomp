@@ -11,7 +11,7 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-11-14 on `b7-loop-13-11-26` (the previous run's
   branch, the user's call), from c6de612c; summary
   `b7-loop-2026-11-14-0501.md`. Limit: 10 subsystems (the user's call
-  for this run).
+  for this run), lowered to 3 by the user the same day.
 - Dropped from `leads.md`: `sub_82562FF0` (inside the movie library's
   range `82481A70`-`82575B07`, reached only through a pointer, no
   direct caller in the game's own code: not mapped, "Rules that still
