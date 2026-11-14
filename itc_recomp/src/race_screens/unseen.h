@@ -331,4 +331,88 @@ uint64_t Kind6CloseMessage(uint8_t* base, uint32_t step, uint32_t sp, const Call
 uint64_t Kind6OpenWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t Kind6CloseWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+
+// --- Kind 6's update and pages (kind6_pages.cpp) ---
+//
+// The leaderboard read's results [0x826C6AD4] (an XUSER_STATS_READ_RESULTS:
+// +4 the view, whose +4 is the total row count, +8 the rows read, +12 the
+// 48-byte rows: +0 the XUID, +8 the rank, +24 the gamer tag, +44 the
+// columns: +16 the time in milliseconds, +40 the car) and the read's spec
+// word [0x826C72F4]. Menu::Step and Pressed, MenuList::Update, Accepted and
+// Cancelled, MenuSound::Play, the UI movie calls, SaveSlots::State and
+// SaveBuffers::Create and Destroy through their overrides (`calls`);
+// RaceDialog::StartSave, ShowSaving, Kind6Menu::SaveReplay (with
+// RaceDialog::AskSlot), UiMovie::SetNodeCharText and the Xbox Live work
+// (the network manager's sub_8214B330 and sub_822917B8, the leaderboard
+// read sub_82292CC0) the originals through `calls`; ScreenPages::Go,
+// RaceDialog::Update and Open, ShowPanelA, SetUpList, FindNode and Child by
+// their plain C++.
+constexpr uint32_t kKind6Results = 0x826C6AD4;
+constexpr uint32_t kKind6ReadSpec = 0x826C72F4;
+
+// sub_822914A8 (the network manager's, the player's rank): the rows read
+// searched for the session's XUID (+168, a doubleword); its rank (+8) less
+// one, -1 without results or when it isn't there (64 bits, as the
+// original's r3). sub_8225FFC8: a car's logo index (the leaderboard's car
+// column: 25 cars to 1 to 25, others 0). sub_822927B0 (the network
+// manager's state, r3 4109, 4111 or 4112; others nothing, r3 kept), from a
+// 96-byte frame: sub_8214B330(state) (the original); 4111 then
+// sub_822917B8(session) (the original, the session's start over Xbox
+// Live); 4112 then [0x826C72F4] = the session's +188 and its +180 = 0.
+uint64_t Kind6Rank(uint8_t* base);
+uint32_t Kind6CarLogo(uint32_t car);
+uint64_t Kind6NetState(uint8_t* base, uint64_t state, uint32_t sp, const Calls& calls);
+
+// The helpers: sub_8221CEA0 ShowPanelB (type-1 nodes 4 and 5 shown with
+// +108 0, then 6 and 7 with +108 1, 8 and 9 hidden), sub_8221D3D0
+// ShowTimeOnly (node 16 hidden with +316 set, node 17 shown with the time
+// (string 528), the ranking's rows 23 to 27 shown with placeholders 533,
+// 534 and 531), sub_8221E1A0 ShowRanking (the rows read around the player,
+// from a 192-byte frame), sub_8221D808 RankingTime (a leaf: row `row`'s
+// time split into the words at `minutes`, `seconds` and `thousandths`,
+// capped at 59:59.999, nothing written for 0; returns `row`). Each the r3
+// the original leaves.
+uint64_t Kind6ShowPanelB(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowTimeOnly(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6RankingTime(uint8_t* base, uint64_t row, uint32_t minutes, uint32_t seconds,
+                          uint32_t thousandths);
+
+// The pages (see the rows; each returns 0 but AnswerPage). A's: sub_8221E788
+// MainPage, sub_8221C1E0 AnswerPage (a leaf), sub_8221DA60 SlotPage,
+// sub_8221C238 SavePage, sub_8221E908 OverwritePage, sub_8221C2B8
+// SavingPage, sub_8221C308 QuitPage (the four with `r4` passed to
+// RaceDialog::Update), sub_8221E510 CheckRecordPage, sub_8221C008
+// RankingReadPage, sub_8221E5E8 UploadPage, sub_8221D898 MenuBackPage,
+// sub_8221D908 UploadResultPage, sub_8221BE90 RankingPage, sub_8221D9D8
+// MessageBackPage. B's: sub_8221E980 QuestionPage, sub_8221C360
+// QuestionAnswerPage, sub_8221EAE8 MessagePage, sub_8221C3F0 WaitingPage.
+uint64_t Kind6MainPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6AnswerPage(uint8_t* base);
+uint64_t Kind6SlotPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6SavePage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Kind6OverwritePage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Kind6SavingPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Kind6QuitPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Kind6CheckRecordPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6RankingReadPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6UploadPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6MenuBackPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6UploadResultPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6RankingPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6MessageBackPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6QuestionPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6QuestionAnswerPage(uint8_t* base, uint32_t sp);
+uint64_t Kind6MessagePage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6WaitingPage(uint8_t* base, uint32_t sp);
+
+// sub_8221F1E8 Kind6Menu::Update (r3 the screen), from a 304-byte frame: the
+// pages' tables stored (B's 6 at +80, A's 15 at +112); A's and B's pages
+// read; with +352 set: +324 = 44, Go(A, 7), Go(B, 5, transition 5), +352
+// and +320 = 0; then B's page's handler, then A's (r4 passed on to the
+// dialog pages); A's r3, 0 with A's page -1. A page past its table runs the
+// frame's word through `calls`, as the original's bctrl would.
+uint64_t Kind6Update(uint8_t* base, uint32_t screen, uint64_t r4, uint32_t sp,
+                     const Calls& calls);
+
 }  // namespace race_screens

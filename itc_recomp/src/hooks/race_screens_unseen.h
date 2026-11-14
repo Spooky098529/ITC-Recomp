@@ -127,4 +127,47 @@ void RaceScreensUnseenKind6CloseMessage(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenKind6OpenWaiting(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenKind6CloseWaiting(PPCContext& ctx, uint8_t* base);
 
+
+// Kind 6's update: an adapter for Update sub_8221F1E8 (r3 the screen, r4
+// passed to the dialog pages; the race HUD machine's AfterRaceUpdate
+// fallback reaches it). Without adapters (only the native Update reaches
+// them): the pages (MainPage sub_8221E788, AnswerPage sub_8221C1E0,
+// SlotPage sub_8221DA60, SavePage sub_8221C238, OverwritePage sub_8221E908,
+// SavingPage sub_8221C2B8, QuitPage sub_8221C308 (the four with r4),
+// CheckRecordPage sub_8221E510, RankingReadPage sub_8221C008, UploadPage
+// sub_8221E5E8, MenuBackPage sub_8221D898, UploadResultPage sub_8221D908,
+// RankingPage sub_8221BE90, MessageBackPage sub_8221D9D8, QuestionPage
+// sub_8221E980, QuestionAnswerPage sub_8221C360, MessagePage sub_8221EAE8,
+// WaitingPage sub_8221C3F0), ShowPanelB sub_8221CEA0, ShowTimeOnly
+// sub_8221D3D0, ShowRanking sub_8221E1A0, RankingTime sub_8221D808 (r3 the
+// row, r4 to r6 the out words), and the network manager's sub_822914A8
+// (Rank), sub_8225FFC8 (CarLogo, r3 the car) and sub_822927B0 (NetState, r3
+// the state).
+void RaceScreensUnseenKind6Update(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6MainPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6AnswerPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6SlotPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6SavePage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6OverwritePage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6SavingPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6QuitPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6CheckRecordPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6RankingReadPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6UploadPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6MenuBackPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6UploadResultPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6RankingPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6MessageBackPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6QuestionPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6QuestionAnswerPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6MessagePage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6WaitingPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ShowPanelB(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ShowTimeOnly(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6ShowRanking(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6RankingTime(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6Rank(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6CarLogo(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenKind6NetState(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

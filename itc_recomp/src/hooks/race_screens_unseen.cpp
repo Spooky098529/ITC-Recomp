@@ -21,8 +21,12 @@ ITC_FLAG_BOOL(native_race_screens_unseen, true, "ITC",
               "stays recompiled); kind 6's screen after the race, Kind6Menu::Open sub_8221EC48, "
               "Draw sub_8221EF60 and Close sub_8221C168 with SetUpTexts, ShowCourse, ShowHelp, "
               "ShowPanelA, HidePanels, SetCursorX, SetUpList, ShowList, ShowReplay and the "
-              "transitions of its two page objects (Update sub_8221F1E8 and its pages stay "
-              "recompiled) (the UI movie calls through their "
+              "transitions of its two page objects, and Update sub_8221F1E8 with its 19 pages, "
+              "ShowPanelB, ShowTimeOnly, ShowRanking and RankingTime and the network "
+              "manager's sub_822914A8, sub_8225FFC8 and sub_822927B0 (the Xbox Live work, "
+              "sub_8214B330, sub_822917B8 and the leaderboard read sub_82292CC0, the "
+              "originals; SaveReplay, RaceDialog::StartSave, ShowSaving and "
+              "UiMovie::SetNodeCharText the originals too) (the UI movie calls through their "
               "overrides, SetText's and SetNodeText's unset varargs 0), instead of through the "
               "translated code (the same writes; checked by "
               "--run_harnesses=race_screens_unseen)");
@@ -282,6 +286,72 @@ ITC_UNSEEN_KIND6_TRANSITION(OpenWaiting)
 ITC_UNSEEN_KIND6_TRANSITION(CloseWaiting)
 #undef ITC_UNSEEN_KIND6_TRANSITION
 
+void RaceScreensUnseenKind6Update(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::Kind6Update(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenKind6AnswerPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::Kind6AnswerPage(base);
+}
+
+void RaceScreensUnseenKind6QuestionAnswerPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::Kind6QuestionAnswerPage(base, ctx.r1.u32);
+}
+
+void RaceScreensUnseenKind6WaitingPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::Kind6WaitingPage(base, ctx.r1.u32);
+}
+
+void RaceScreensUnseenKind6RankingTime(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::Kind6RankingTime(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+
+void RaceScreensUnseenKind6Rank(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::Kind6Rank(base);
+}
+
+void RaceScreensUnseenKind6CarLogo(PPCContext& ctx, uint8_t*) {
+  ctx.r3.u64 = race_screens::Kind6CarLogo(ctx.r3.u32);
+}
+
+void RaceScreensUnseenKind6NetState(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::Kind6NetState(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+}
+
+#define ITC_UNSEEN_KIND6_DIALOG_PAGE(name)                                                   \
+  void RaceScreensUnseenKind6##name(PPCContext& ctx, uint8_t* base) {                        \
+    GuestCalls guest(ctx, base);                                                             \
+    ctx.r3.u64 = race_screens::Kind6##name(base, ctx.r4.u64, ctx.r1.u32, guest.calls());     \
+  }
+ITC_UNSEEN_KIND6_DIALOG_PAGE(SavePage)
+ITC_UNSEEN_KIND6_DIALOG_PAGE(OverwritePage)
+ITC_UNSEEN_KIND6_DIALOG_PAGE(SavingPage)
+ITC_UNSEEN_KIND6_DIALOG_PAGE(QuitPage)
+#undef ITC_UNSEEN_KIND6_DIALOG_PAGE
+
+#define ITC_UNSEEN_KIND6_PAGE(name)                                           \
+  void RaceScreensUnseenKind6##name(PPCContext& ctx, uint8_t* base) {         \
+    GuestCalls guest(ctx, base);                                              \
+    ctx.r3.u64 = race_screens::Kind6##name(base, ctx.r1.u32, guest.calls());  \
+  }
+ITC_UNSEEN_KIND6_PAGE(MainPage)
+ITC_UNSEEN_KIND6_PAGE(SlotPage)
+ITC_UNSEEN_KIND6_PAGE(CheckRecordPage)
+ITC_UNSEEN_KIND6_PAGE(RankingReadPage)
+ITC_UNSEEN_KIND6_PAGE(UploadPage)
+ITC_UNSEEN_KIND6_PAGE(MenuBackPage)
+ITC_UNSEEN_KIND6_PAGE(UploadResultPage)
+ITC_UNSEEN_KIND6_PAGE(RankingPage)
+ITC_UNSEEN_KIND6_PAGE(MessageBackPage)
+ITC_UNSEEN_KIND6_PAGE(QuestionPage)
+ITC_UNSEEN_KIND6_PAGE(MessagePage)
+ITC_UNSEEN_KIND6_PAGE(ShowPanelB)
+ITC_UNSEEN_KIND6_PAGE(ShowTimeOnly)
+ITC_UNSEEN_KIND6_PAGE(ShowRanking)
+#undef ITC_UNSEEN_KIND6_PAGE
+
 }  // namespace hooks
 
 #define ITC_RACE_SCREENS_UNSEEN(address, step)    \
@@ -315,3 +385,6 @@ ITC_RACE_SCREENS_UNSEEN(8221EC48, RaceScreensUnseenKind6Open)
 ITC_RACE_SCREENS_UNSEEN(8221EF60, RaceScreensUnseenKind6Draw)
 ITC_RACE_SCREENS_UNSEEN(8221D050, RaceScreensUnseenKind6ShowPanelA)
 ITC_RACE_SCREENS_UNSEEN(8221DF70, RaceScreensUnseenKind6SetUpList)
+// Kind6Menu::Update (the race HUD machine's AfterRaceUpdate fallback reaches
+// it); its pages and their helpers have no adapters.
+ITC_RACE_SCREENS_UNSEEN(8221F1E8, RaceScreensUnseenKind6Update)

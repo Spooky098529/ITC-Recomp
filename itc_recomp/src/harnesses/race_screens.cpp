@@ -3051,6 +3051,352 @@ void UnseenKind6(Context& h, const MovieWorld& w) {
   }
 }
 
+// Kind 6's update and pages, the helpers only they reach and the network
+// manager's small functions (kind6_pages.cpp), in this file's UI movie
+// world with Kind6Menu's screen, the session, the leaderboard's results
+// and a replay header of the allocation layer's pages (SaveBuffers::
+// Destroy frees it natively; the records too). The screen's two menus
+// (+68, +236) and the replay slots' list (+136) read the menu list world's
+// mappers (FrameSpec::list_world). The network state ([0x826C6AA8]) is one
+// sub_8214B330's set-up leaves alone (0, 2, 4109 or 4112). Left out, as
+// inputs that would run Xbox Live work on both sides (the originals,
+// through `calls` in ours): the leaderboard read's start (RankingPage's
+// with the session's +144 and the screen's +320 0, RankingReadPage's with
+// +320 0) and the network manager's 4111 (CheckRecordPage's better time,
+// RankingPage's state 3); and SlotPage's accept (SaveReplay with
+// RaceDialog::AskSlot's replay copy): its list's player's mappers are
+// blocked, so its update, accept and back don't fire there. The confirm
+// dialog's pages as the other confirm pages' cases shape them (its answer
+// page 5 directly or after the Go to it), its list's block 0 where
+// RaceDialog::StartSave's MenuList::Init runs (the new one compared and
+// freed).
+void UnseenKind6Pages(Context& h, const MovieWorld& w) {
+  constexpr uint32_t kScreenBytes = 0x280, kRecords = 64, kRecordBytes = 36;
+  constexpr uint32_t kNetState = 0x826C6AA8;
+  constexpr uint32_t kRows = 24, kResultsBytes = 0x2000;
+  const Block screen(kScreenBytes);
+  const Block session(0x200);
+  const Block results(kResultsBytes);
+  const Block save(kSaveWorldBytes);
+  const World list_world;
+  if (!screen.address || !session.address || !results.address || !save.address ||
+      !list_world.ok()) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes saved(h.base, {{rs::kKind6Session, 4},
+                            {rs::kKind6Course, 4},
+                            {rs::kKind6CourseFlag, 4},
+                            {rs::kKind6Replays, 4},
+                            {rs::kKind6Results, 4},
+                            {rs::kKind6ReadSpec, 4},
+                            {kNetState, 4},
+                            {kSaveInterfaceGlobal, 4}});
+  const uint32_t k = screen.address, s = session.address, res = results.address;
+  uint64_t count = 0;  // the setups run (Fresh)
+  // The replay header and records of this run (the layer's pages).
+  uint32_t header = 0, records = 0;
+  auto any = [](Random& r, uint32_t n) { return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(n); };
+  auto shape = [&](Random& r, const MovieWorld& w) {
+    WriteRandom(h.base, k, kScreenBytes, r);
+    WriteRandom(h.base, s, session.bytes, r);
+    WriteRandom(h.base, res, kResultsBytes, r);
+    ShapeSaveWorld(h.base, save.address, r);
+    guest::StoreU32(h.base, rs::kKind6Menu, k);
+    guest::StoreU32(h.base, rs::kKind6Word, any(r, 4));
+    guest::StoreU32(h.base, rs::kKind6Session, s);
+    guest::StoreU32(h.base, rs::kKind6Course, any(r, 9));
+    guest::StoreU32(h.base, rs::kKind6CourseFlag, r.Below(2));
+    const uint32_t states[4] = {0, 2, 4109, 4112};
+    guest::StoreU32(h.base, kNetState, states[r.Below(4)]);
+    for (uint32_t i = 0; i < 4; i++) {
+      guest::StoreU32(h.base, k + 24 + 4 * i, w.movie(r.Below(kMovieCount)));
+    }
+    // The page objects: A's and B's pages any of theirs, now and then -1;
+    // no transition queued.
+    guest::StoreU32(h.base, k + 40, r.Below(10) == 0 ? 0xFFFFFFFFu : r.Below(15));
+    guest::StoreU32(h.base, k + 208, r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(6));
+    for (const uint32_t pages : {40u, 208u}) {
+      guest::StoreU32(h.base, k + pages + 12, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(8));
+      guest::StoreU32(h.base, k + pages + 16, 0xFFFFFFFFu);
+    }
+    // The two menus: their players 0 to 3, cursors 0 to 4 (now and then
+    // any), first and last items, the switches and the last step.
+    for (const uint32_t menu : {68u, 236u}) {
+      guest::StoreU32(h.base, k + menu + 0, any(r, 5));
+      guest::StoreU32(h.base, k + menu + 4, any(r, 5));
+      guest::StoreU32(h.base, k + menu + 8, r.Below(3) == 0 ? uint32_t(int32_t(r.Below(3)) - 1) : 0);
+      guest::StoreU32(h.base, k + menu + 12, 0);
+      guest::StoreU32(h.base, k + menu + 16, menu == 68 ? 3 : 1);
+      for (uint32_t field = 20; field <= 32; field += 4) {
+        guest::StoreU32(h.base, k + menu + field, r.Below(2));
+      }
+      guest::StoreU32(h.base, k + menu + 36, r.Below(3) == 0 ? uint32_t(int32_t(r.Below(3)) - 1) : 0);
+      guest::StoreU32(h.base, k + menu + 64, r.Below(4));
+    }
+    guest::StoreU32(h.base, k + 4, (r.Below(70) << 16) | (r.Below(64) << 10) | r.Below(1024));
+    for (uint32_t field = 308; field <= 356; field += 4) {
+      guest::StoreU32(h.base, k + field, r.Below(3) == 0 ? any(r, 5) : r.Below(2));
+    }
+    guest::StoreU32(h.base, k + 328, any(r, 5));
+    guest::StoreU32(h.base, k + 332, any(r, 4));
+    // The replay slots' list.
+    const uint32_t list = k + 136;
+    const uint32_t replay_count = r.Below(21);
+    guest::StoreU32(h.base, list + rs::kListCount, replay_count);
+    guest::StoreU32(h.base, list + rs::kListScroll, r.Below(replay_count + 1));
+    guest::StoreU32(h.base, list + rs::kListScrollBefore, r.Below(replay_count + 1));
+    guest::StoreU32(h.base, list + rs::kListShown, std::min<uint32_t>(replay_count, 9));
+    guest::StoreU32(h.base, list + rs::kListSelection, r.Below(9));
+    guest::StoreU32(h.base, list + rs::kListSelectionBefore, r.Below(9));
+    guest::StoreU32(h.base, list + rs::kListPlayer, r.Below(4));
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+    for (uint32_t field = rs::kListDown; field <= rs::kListBack; field += 4) {
+      guest::StoreU32(h.base, list + field, 151 + r.Below(10));
+    }
+    // The replay header and its records (the layer's pages, this run's).
+    header = memory::AllocPages(0x1000, 0x1000);
+    records = memory::AllocPages(kRecords * kRecordBytes, 0x1000);
+    WriteRandom(h.base, header, 0x40, r);
+    for (const uint32_t offset : {0u, 4u, 8u}) guest::StoreU32(h.base, header + offset, 0);
+    guest::StoreU32(h.base, header + 12, records);
+    guest::StoreU32(h.base, header + 20, replay_count);
+    WriteRandom(h.base, records, kRecords * kRecordBytes, r);
+    for (uint32_t i = 0; i < kRecords; i++) {
+      const uint32_t record = records + kRecordBytes * i;
+      guest::StoreU32(h.base, record + 28, r.Below(3) == 0 ? 0 : r.Below(31));
+      guest::StoreU32(h.base, record + 20, r.Below(5));
+      guest::StoreU32(h.base, record + 24, r.Below(21));
+      guest::StoreU32(h.base, record + 32, r.Below(8));
+    }
+    guest::StoreU32(h.base, rs::kKind6Replays, header);
+    // The session: the times (+200, +208 doublewords) with the best never
+    // better (no 4111), the read's state (+180) 0 to 2 or 4 to 6 (no 3),
+    // the flags 0 or 1, the XUID (+168) one of the rows' now and then.
+    const uint32_t race_time = r.Below(4000000);
+    StoreU64(h.base, s + 200, race_time);
+    StoreU64(h.base, s + 208, r.Below(2) == 0 ? race_time : r.Below(race_time + 1));
+    const uint32_t read_states[6] = {0, 1, 2, 4, 5, uint32_t(r.Next()) | 4};
+    guest::StoreU32(h.base, s + 180, read_states[r.Below(6)]);
+    for (const uint32_t field : {144u, 160u, 224u, 228u, 232u, 236u, 240u}) {
+      guest::StoreU32(h.base, s + field, r.Below(3) == 0 ? any(r, 5) : r.Below(2));
+    }
+    // The results: none now and then; else a view of up to kRows rows (the
+    // total -1 to 30), each with an XUID (the session's now and then), a
+    // rank, a short gamer tag and its columns (a time, now and then 0 or
+    // past an hour, and a car among the logos' ids).
+    const uint32_t view = res + 0x40, rows = res + 0x100, columns = res + 0x1000;
+    guest::StoreU32(h.base, res + 4, view);
+    const uint32_t read = r.Below(kRows + 1);
+    guest::StoreU32(h.base, view + 4, r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(31));
+    guest::StoreU32(h.base, view + 8, read);
+    guest::StoreU32(h.base, view + 12, rows);
+    const uint32_t mine = r.Below(read + 2);
+    for (uint32_t i = 0; i < kRows; i++) {
+      const uint32_t row = rows + 48 * i;
+      if (i == mine) {
+        StoreU64(h.base, row, (uint64_t(guest::LoadU32(h.base, s + 168)) << 32) |
+                                  guest::LoadU32(h.base, s + 172));
+      }
+      guest::StoreU32(h.base, row + 8, r.Below(10) == 0 ? 0xFFFFFFFFu : r.Below(40));
+      const uint32_t length = r.Below(16);
+      for (uint32_t c = 0; c < length; c++) {
+        guest::StoreU8(h.base, row + 24 + c, uint8_t('A' + r.Below(26)));
+      }
+      guest::StoreU8(h.base, row + 24 + length, 0);
+      const uint32_t column = columns + 64 * i;
+      guest::StoreU32(h.base, row + 44, column);
+      const uint32_t ms[4] = {0, r.Below(600000), r.Below(4000000), 3600000 + r.Below(100000)};
+      StoreU64(h.base, column + 16, ms[r.Below(4)]);
+      const uint32_t cars[6] = {5, 53, 103, 0xFFFFFFFFu, r.Below(110), 39};
+      guest::StoreU32(h.base, column + 40, cars[r.Below(6)]);
+    }
+    guest::StoreU32(h.base, rs::kKind6Results, r.Below(6) == 0 ? 0 : res);
+    // Every child of the root a TXT leaf.
+    for (uint32_t i = 0; i < 60; i++) {
+      guest::StoreU32(h.base, w.root() + 128 + 8 * i, w.leaf(r.Below(kLeaves)));
+    }
+    const uint32_t ids[4] = {17, 20, 21, 14};
+    for (uint32_t m = 0; m < 4; m++) {
+      guest::StoreU32(h.base, w.movies.address + kPairsAt + 8 * m, ids[m]);
+    }
+  };
+  // The confirm dialog: its page -1, 5 or another with +36 1 (the Go to 5),
+  // its answer's +0 0 to 2.
+  auto dialog = [&](Random& r, const MovieWorld& w) {
+    const uint32_t pages = w.block(rs::kDialogPages);
+    const uint32_t data = w.block(rs::kDialogData);
+    const int32_t choices[7] = {-1, 5, 0, 1, 2, 3, 4};
+    const int32_t page = choices[r.Below(7)];
+    guest::StoreU32(h.base, pages, uint32_t(page));
+    guest::StoreU32(h.base, pages + 12, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
+    guest::StoreU32(h.base, data + 36, page != -1 && page != 5 ? 1 : r.Below(2));
+    guest::StoreU32(h.base, data + 0, r.Below(3));
+    guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
+  };
+  // The outputs: the replay header (freed by SaveBuffers::Destroy or not:
+  // its words and records compared, then freed), the dialog list's and the
+  // slots' list's new blocks (compared, freed), the blocks and globals.
+  auto outputs = [&](Outputs& out) {
+    const bool kept = header != 0 && memory::IsPages(header);
+    out.Word(kept ? 1 : 0);
+    out.Word(guest::LoadU32(h.base, rs::kKind6Replays) == header ? 1 : 0);
+    if (kept) {
+      out.Bytes(Read(h.base, header + 16, 0x30));
+      out.Word(guest::LoadU32(h.base, header + 12) == records ? 1 : 0);
+      for (const uint32_t offset : {0u, 4u, 8u}) out.Word(guest::LoadU32(h.base, header + offset));
+      memory::FreePages(header);
+    }
+    if (memory::IsPages(records)) {
+      out.Bytes(Read(h.base, records, kRecords * kRecordBytes));
+      memory::FreePages(records);
+    }
+    header = records = 0;
+    guest::StoreU32(h.base, rs::kKind6Replays, 0);
+    for (const uint32_t list : {k + 136, w.block(rs::kDialogList)}) {
+      const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+      out.Word(block != 0 ? 1 : 0);
+      if (block != 0 && memory::IsPages(block)) {
+        const uint32_t n = std::min<uint32_t>(guest::LoadU32(h.base, list + rs::kListCount), 20);
+        out.Bytes(Read(h.base, block, n * 4));
+        memory::FreePages(block);
+      }
+      guest::StoreU32(h.base, list + rs::kListBlock, 0);
+    }
+    out.Bytes(Read(h.base, k, kScreenBytes));
+    out.Bytes(Read(h.base, s, session.bytes));
+    out.Bytes(Read(h.base, res, kResultsBytes));
+    out.Bytes(Read(h.base, save.address, kSaveWorldBytes));
+    for (const uint32_t global : {rs::kKind6Word, rs::kKind6Results, rs::kKind6ReadSpec, kNetState}) {
+      out.Word(guest::LoadU32(h.base, global));
+    }
+  };
+  auto setup = [&](auto&& more) {
+    return MovieSetupFn([&, more](PPCContext& t, Random& rr, const MovieWorld& w) {
+      Random r = Fresh(rr, count);
+      shape(r, w);
+      dialog(r, w);
+      more(t, r, w);
+    });
+  };
+  const MovieSetupFn plain = setup([](PPCContext&, Random&, const MovieWorld&) {});
+  // Pages that call the leaderboard read or the network's 4111: a read
+  // already started (+320 1) and the session's +144 set.
+  const MovieSetupFn no_live = setup([&](PPCContext&, Random&, const MovieWorld&) {
+    guest::StoreU32(h.base, k + 320, 1);
+    guest::StoreU32(h.base, s + 144, 1);
+  });
+  // SlotPage: the list's player's mappers blocked (no SaveReplay).
+  const MovieSetupFn slots = setup([&](PPCContext&, Random&, const MovieWorld&) {
+    for (uint32_t c = 0; c < 4; c++) guest::StoreU32(h.base, rs::kMapperEntries + 8 * c + 4, 1);
+  });
+  const MovieSetupFn dialog_r4 = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r4.u64 = r.Below(2) == 0 ? 0 : r.Next();
+  });
+  const MovieSetupFn update = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r3.u64 = k;
+    guest::StoreU32(h.base, k + 320, 1);
+    guest::StoreU32(h.base, s + 144, 1);
+    guest::StoreU32(h.base, k + 352, r.Below(4) == 0 ? 1 : 0);
+    // B's QuestionPage and MessagePage and the +352 block may clear +320:
+    // not before A's read pages (their read's start left out). A's SlotPage with blocked
+    // mappers; others as they come.
+    const uint32_t a = guest::LoadU32(h.base, k + 40);
+    const uint32_t b = guest::LoadU32(h.base, k + 208);
+    if (a == 7 || a == 12) {
+      if (b == 1 || b == 3) guest::StoreU32(h.base, k + 208, 4);
+      guest::StoreU32(h.base, k + 352, 0);  // its block clears +320 too
+    }
+    if (a == 2) {
+      for (uint32_t c = 0; c < 4; c++) guest::StoreU32(h.base, rs::kMapperEntries + 8 * c + 4, 1);
+    }
+  });
+  const MovieSetupFn net = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    const uint64_t states[5] = {4109, 4112, 4110, 0, r.Next()};
+    t.r3.u64 = states[r.Below(5)];
+    if (uint32_t(t.r3.u64) == 4111) t.r3.u64 = 4112;
+  });
+  const MovieSetupFn car = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r3.u64 = r.Below(4) == 0 ? r.Next() : r.Below(110);
+  });
+  const MovieSetupFn time = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r3.u64 = r.Below(kRows);
+    const uint32_t out = k + 0x200;
+    t.r4.u64 = out;
+    t.r5.u64 = out + 4;
+    t.r6.u64 = out + 8;
+  });
+  struct Spec {
+    const char* name;
+    int cases;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+  };
+  constexpr std::pair<uint32_t, uint32_t> kText = {48, 80}, kNodeText = {40, 80}, kNo = {0, 0};
+  const Spec specs[] = {
+      {"Leaderboard::Rank (sub_822914A8)", 200, &plain, __imp__sub_822914A8,
+       hooks::RaceScreensUnseenKind6Rank, 0, 0, kNo},
+      {"Leaderboard::CarLogo (sub_8225FFC8)", 200, &car, __imp__sub_8225FFC8,
+       hooks::RaceScreensUnseenKind6CarLogo, 0, 0, kNo},
+      {"Network::SetLiveState (sub_822927B0)", 150, &net, __imp__sub_822927B0,
+       hooks::RaceScreensUnseenKind6NetState, 96, 8, kNo},
+      {"Kind6Menu::RankingTime (sub_8221D808)", 200, &time, __imp__sub_8221D808,
+       hooks::RaceScreensUnseenKind6RankingTime, 0, 0, kNo},
+      {"Kind6Menu::ShowPanelB (sub_8221CEA0)", 100, &plain, __imp__sub_8221CEA0,
+       hooks::RaceScreensUnseenKind6ShowPanelB, 112, 24, kNo},
+      {"Kind6Menu::ShowTimeOnly (sub_8221D3D0)", 150, &plain, __imp__sub_8221D3D0,
+       hooks::RaceScreensUnseenKind6ShowTimeOnly, 112, 32, kNodeText},
+      {"Kind6Menu::ShowRanking (sub_8221E1A0)", 400, &plain, __imp__sub_8221E1A0,
+       hooks::RaceScreensUnseenKind6ShowRanking, 192, 96, kNodeText},
+      {"Kind6Menu::AnswerPage (sub_8221C1E0)", 100, &plain, __imp__sub_8221C1E0,
+       hooks::RaceScreensUnseenKind6AnswerPage, 0, 0, kNo},
+      {"Kind6Menu::WaitingPage (sub_8221C3F0)", 100, &plain, __imp__sub_8221C3F0,
+       hooks::RaceScreensUnseenKind6WaitingPage, 96, 8, kNo},
+      {"Kind6Menu::QuestionAnswerPage (sub_8221C360)", 100, &plain, __imp__sub_8221C360,
+       hooks::RaceScreensUnseenKind6QuestionAnswerPage, 96, 16, kNo},
+      {"Kind6Menu::MenuBackPage (sub_8221D898)", 100, &plain, __imp__sub_8221D898,
+       hooks::RaceScreensUnseenKind6MenuBackPage, 96, 16, kNo},
+      {"Kind6Menu::MessageBackPage (sub_8221D9D8)", 100, &plain, __imp__sub_8221D9D8,
+       hooks::RaceScreensUnseenKind6MessageBackPage, 96, 16, kNo},
+      {"Kind6Menu::UploadResultPage (sub_8221D908)", 150, &plain, __imp__sub_8221D908,
+       hooks::RaceScreensUnseenKind6UploadResultPage, 96, 16, kNo},
+      {"Kind6Menu::QuitPage (sub_8221C308)", 150, &dialog_r4, __imp__sub_8221C308,
+       hooks::RaceScreensUnseenKind6QuitPage, 96, 8, kNo},
+      {"Kind6Menu::SavePage (sub_8221C238)", 150, &dialog_r4, __imp__sub_8221C238,
+       hooks::RaceScreensUnseenKind6SavePage, 96, 8, kNo},
+      {"Kind6Menu::OverwritePage (sub_8221E908)", 150, &dialog_r4, __imp__sub_8221E908,
+       hooks::RaceScreensUnseenKind6OverwritePage, 96, 8, kNo},
+      {"Kind6Menu::SavingPage (sub_8221C2B8)", 150, &dialog_r4, __imp__sub_8221C2B8,
+       hooks::RaceScreensUnseenKind6SavingPage, 96, 8, kNo},
+      {"Kind6Menu::SlotPage (sub_8221DA60)", 150, &slots, __imp__sub_8221DA60,
+       hooks::RaceScreensUnseenKind6SlotPage, 96, 16, kNo},
+      {"Kind6Menu::CheckRecordPage (sub_8221E510)", 200, &plain, __imp__sub_8221E510,
+       hooks::RaceScreensUnseenKind6CheckRecordPage, 112, 24, kNo},
+      {"Kind6Menu::RankingReadPage (sub_8221C008)", 200, &no_live, __imp__sub_8221C008,
+       hooks::RaceScreensUnseenKind6RankingReadPage, 128, 40, kNo},
+      {"Kind6Menu::RankingPage (sub_8221BE90)", 200, &no_live, __imp__sub_8221BE90,
+       hooks::RaceScreensUnseenKind6RankingPage, 128, 40, kNo},
+      {"Kind6Menu::UploadPage (sub_8221E5E8)", 300, &plain, __imp__sub_8221E5E8,
+       hooks::RaceScreensUnseenKind6UploadPage, 128, 40, kNo},
+      {"Kind6Menu::QuestionPage (sub_8221E980)", 300, &plain, __imp__sub_8221E980,
+       hooks::RaceScreensUnseenKind6QuestionPage, 96, 16, kNo},
+      {"Kind6Menu::MessagePage (sub_8221EAE8)", 300, &plain, __imp__sub_8221EAE8,
+       hooks::RaceScreensUnseenKind6MessagePage, 96, 16, kNo},
+      {"Kind6Menu::MainPage (sub_8221E788)", 400, &plain, __imp__sub_8221E788,
+       hooks::RaceScreensUnseenKind6MainPage, 96, 16, kNo},
+      {"Kind6Menu::Update (sub_8221F1E8)", 600, &update, __imp__sub_8221F1E8,
+       hooks::RaceScreensUnseenKind6Update, 304, 128, kNo},
+  };
+  for (const Spec& sp : specs) {
+    FrameSpec spec{sp.frame, sp.saves, sp.skip};
+    spec.list_world = &list_world;
+    spec.after = outputs;
+    MovieGroup(h, w, sp.name, sp.cases, *sp.setup, sp.recompiled, sp.native, spec);
+  }
+}
+
 }  // namespace
 
 void RaceScreens(Context& h) {
@@ -3081,6 +3427,7 @@ void RaceScreensUnseen(Context& h) {
   Pause4(h, w);
   UnseenResults(h, w);
   UnseenKind6(h, w);
+  UnseenKind6Pages(h, w);
 }
 
 }  // namespace harness
