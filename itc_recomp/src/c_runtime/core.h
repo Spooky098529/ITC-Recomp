@@ -415,4 +415,31 @@ std::optional<uint32_t> AtoNumber(uint8_t* base, uint32_t out, uint32_t string, 
 // `out` through AtoNumber; its result (r3 as the original leaves it).
 std::optional<uint32_t> Fassign(uint8_t* base, bool is_double, uint32_t out, uint32_t string);
 
+
+// sub_825B0E88 _fileno: from a 96-byte frame, a stream's handle (+16, as
+// loaded); a null stream: errno 22, _invalid_parameter(0, 0, 0, 0, 0), -1
+// (sign-extended). r3 as the original leaves it.
+uint64_t Fileno(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// The __finally funclets giving back a file handle's lock: _close's
+// (sub_825B0E50, its r30), _commit's (sub_825B4978, its r27) and _write's
+// (sub_825B1304, its r30): from a 112-byte frame, _unlock_fhandle(handle);
+// its r3.
+uint64_t UnlockFhandleFinally(uint8_t* base, uint32_t handle, const Calls& calls);
+
+// sub_825A9664 fclose's __finally: from a 112-byte frame,
+// _unlock_file(stream) (its r30); its r3.
+uint64_t UnlockFileFinally(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_825AA338 doexit's unwind funclet: from a 112-byte frame, _unlock(8)
+// (a guest call: the exit lock's host mutex is routed there) when `locked`
+// (its r28) isn't 0; `called` says whether r3 was set.
+uint64_t ExitUnlockFinally(uint32_t locked, bool* called, const Calls& calls);
+
+// sub_825B3498 terminate: from a 96-byte frame, the thread's terminate
+// handler (_getptd's +108) called (r3 the data) when set, then
+// KeBugCheck(0xC0000144). No harness: ends the process (the user's call,
+// 2026-11-14).
+void Terminate(uint8_t* base, const Calls& calls);
+
 }  // namespace c_runtime::core

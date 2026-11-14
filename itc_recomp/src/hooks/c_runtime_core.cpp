@@ -45,11 +45,14 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "sub_825ACEB4, sub_825ACF04), exp (sub_825ABE30), _forcdecpt_l and _cropzeros_l "
               "(sub_825ADD38, sub_825ADDD8), _fassign_l, _atodbl_l, _atoflt_l and _ld12tof "
               "(sub_825ADEB0, sub_825B6098, sub_825B6140, sub_825B70D0; __strgtold12_l's and "
-              "_ld12tod's plain C++) (checked by --run_harnesses=c_runtime_core); checked by reading, as "
+              "_ld12tod's plain C++), _fileno (sub_825B0E88), the __finally funclets of _close, _write, "
+              "_commit and fclose and doexit's unwind funclet (sub_825B0E50, sub_825B1304, "
+              "sub_825B4978, sub_825A9664, sub_825AA338) (checked by "
+              "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
               "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
-              "_invalid_parameter's trap. "
+              "_invalid_parameter's trap, terminate (sub_825B3498). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
@@ -486,6 +489,36 @@ void hooks::CoreLd12ToFloat(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = status;
 }
 
+void hooks::CoreFileno(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Fileno(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+// The __finally funclets over a file handle's lock: the handle in r30
+// (_close's, _write's) or r27 (_commit's).
+void hooks::CoreCloseFinally(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::UnlockFhandleFinally(base, ctx.r30.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreCommitFinally(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::UnlockFhandleFinally(base, ctx.r27.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreFcloseFinally(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::UnlockFileFinally(base, ctx.r30.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base) {
+  bool called = false;
+  const uint64_t r3 = cc::ExitUnlockFinally(ctx.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
+  if (called) {
+    ctx.r3.u64 = r3;
+  }
+}
+
+void hooks::CoreTerminate(PPCContext& ctx, uint8_t* base) {
+  cc::Terminate(base, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -617,3 +650,15 @@ ITC_C_RUNTIME_CORE(825B6098, CoreAtodbl)
 ITC_C_RUNTIME_CORE(825B6140, CoreAtoflt)
 // _ld12tof: r3 = a 12-byte long double, r4 = the float out; r3 = 0, 1 or 2.
 ITC_C_RUNTIME_CORE(825B70D0, CoreLd12ToFloat)
+// _fileno: r3 = a stream; r3 = its handle, or -1.
+ITC_C_RUNTIME_CORE(825B0E88, CoreFileno)
+// _close's and _write's __finally: r30 = the handle; _commit's: r27.
+ITC_C_RUNTIME_CORE(825B0E50, CoreCloseFinally)
+ITC_C_RUNTIME_CORE(825B1304, CoreCloseFinally)
+ITC_C_RUNTIME_CORE(825B4978, CoreCommitFinally)
+// fclose's __finally: r30 = the stream.
+ITC_C_RUNTIME_CORE(825A9664, CoreFcloseFinally)
+// doexit's unwind funclet: r28 = whether doexit took the exit lock.
+ITC_C_RUNTIME_CORE(825AA338, CoreExitUnlockFinally)
+// terminate: no registers; ends in KeBugCheck(0xC0000144).
+ITC_C_RUNTIME_CORE(825B3498, CoreTerminate)

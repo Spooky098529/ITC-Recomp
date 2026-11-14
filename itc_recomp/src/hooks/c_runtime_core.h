@@ -86,4 +86,11 @@ void CoreLockFile2(PPCContext& ctx, uint8_t* base);    // sub_825AD670
 void CoreUnlockFile2(PPCContext& ctx, uint8_t* base);  // sub_825AD6C0
 void CoreUnlockFhandle(PPCContext& ctx, uint8_t* base);  // sub_825B7A58
 
+void CoreFileno(PPCContext& ctx, uint8_t* base);             // sub_825B0E88
+void CoreCloseFinally(PPCContext& ctx, uint8_t* base);       // sub_825B0E50, sub_825B1304
+void CoreCommitFinally(PPCContext& ctx, uint8_t* base);      // sub_825B4978
+void CoreFcloseFinally(PPCContext& ctx, uint8_t* base);      // sub_825A9664
+void CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base);  // sub_825AA338
+void CoreTerminate(PPCContext& ctx, uint8_t* base);          // sub_825B3498
+
 }  // namespace hooks

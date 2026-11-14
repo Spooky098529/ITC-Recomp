@@ -988,4 +988,57 @@ std::optional<uint32_t> Fassign(uint8_t* base, bool is_double, uint32_t out, uin
   return AtoNumber(base, out, string, is_double);
 }
 
+uint64_t Fileno(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B0E88 _fileno");
+  uint64_t result = 0;
+  calls.in_frame(96, [&](uint32_t) {
+    if (stream != 0) {
+      result = Load(base, stream + 16);
+      return;
+    }
+    Store(base, Errno(base, calls), 22);
+    InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+    result = uint64_t(int64_t(-1));
+  });
+  return result;
+}
+
+uint64_t UnlockFhandleFinally(uint8_t* base, uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B0E50, sub_825B4978, sub_825B1304 _close's, _commit's, _write's __finally");
+  uint64_t result = 0;
+  calls.in_frame(112, [&](uint32_t) { result = UnlockFhandle(base, handle, calls); });
+  return result;
+}
+
+uint64_t UnlockFileFinally(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A9664 fclose's __finally");
+  uint64_t result = 0;
+  calls.in_frame(112, [&](uint32_t) { result = LockFile(base, stream, false, calls); });
+  return result;
+}
+
+uint64_t ExitUnlockFinally(uint32_t locked, bool* called, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AA338 doexit's unwind funclet");
+  uint64_t result = 0;
+  *called = false;
+  calls.in_frame(112, [&](uint32_t) {
+    if (locked != 0) {
+      result = calls.guest(kUnlock, {8});
+      *called = true;
+    }
+  });
+  return result;
+}
+
+void Terminate(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B3498 terminate");
+  calls.in_frame(96, [&](uint32_t) {
+    const uint32_t data = Getptd(base, calls);
+    if (const uint32_t handler = Load(base, data + 108); handler != 0) {
+      calls.guest(handler, {data});
+    }
+    calls.import(Import::kKeBugCheck, {0xC0000144u});
+  });
+}
+
 }  // namespace c_runtime::core

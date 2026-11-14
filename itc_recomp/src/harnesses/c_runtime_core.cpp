@@ -2064,6 +2064,157 @@ void AtoNumberCases(Context& h) {
   }
 }
 
+
+// _fileno: a null stream or one in the scratch area with a random handle
+// word (+16); errno random before, the invalid parameter handler the shared
+// "returns 0"; compared: r3 (64 bits) and errno.
+void FilenoCases(Context& h) {
+  Results results("_fileno (sub_825B0E88)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _fileno: no thread data");
+    return;
+  }
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t stream = h.data + 256;
+  for (int c = 0; c < 24; c++) {
+    const bool null = c % 3 == 0;
+    const uint32_t word = uint32_t(h.random.Next()), err = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{slots.data + 8, 4}});
+      Store(h.base, stream + 16, word);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = null ? 0 : stream;
+      (v == 0 ? __imp__sub_825B0E88 : hooks::CoreFileno)(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, slots.data + 8));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The __finally funclets of the stream and handle functions, each after the
+// lock it gives back was taken: a handle's entry in the first block (its
+// section made and entered for the case, put back after) for _close's,
+// _write's and _commit's; for fclose's, a stream outside _iob (its own
+// section at +32) or one of _iob's whose lock was made at boot; for doexit's,
+// the exit lock (the host mutex, through _lock) when r28 isn't 0. Compared:
+// r3, the section and the registers the funclets keep.
+void StreamFinallyCases(Context& h) {
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    int reg;  // 30 or 27: the handle's register
+  };
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  for (const Fn& fn : {Fn{"_close's __finally (sub_825B0E50)", __imp__sub_825B0E50,
+                          hooks::CoreCloseFinally, 30},
+                       Fn{"_write's __finally (sub_825B1304)", __imp__sub_825B1304,
+                          hooks::CoreCloseFinally, 30},
+                       Fn{"_commit's __finally (sub_825B4978)", __imp__sub_825B4978,
+                          hooks::CoreCommitFinally, 27}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 16 && handles != 0; c++) {
+      const uint32_t handle = h.random.Below(32);
+      const uint32_t entry = handles + 44 * handle;
+      const int depth = 1 + int(h.random.Below(3));
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}});
+        InitSection(h, entry + 12);
+        for (int d = 0; d < depth; d++) {
+          PPCContext e = CallContext(h);
+          e.r3.u64 = entry + 12;
+          __imp__RtlEnterCriticalSection(e, h.base);
+        }
+        PPCContext t = CallContext(h);
+        (fn.reg == 30 ? t.r30 : t.r27).u64 = handle;
+        t.r31.u64 = 0x1234;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r27.u32);
+        out[v].Word(t.r30.u32);
+        out[v].Word(t.r31.u32);
+        out[v].Bytes(Read(h.base, entry, 44));
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  {
+    Results results("fclose's __finally (sub_825A9664)");
+    std::vector<uint32_t> boot_streams;
+    for (uint32_t i = 0; i < 20; i++) {
+      if (BootLock(h, 16 + i)) {
+        boot_streams.push_back(i);
+      }
+    }
+    const uint32_t own = h.data + 256;
+    for (int c = 0; c < 16; c++) {
+      const bool in_iob = !boot_streams.empty() && c % 2 == 1;
+      const uint32_t index = in_iob ? boot_streams[h.random.Below(uint32_t(boot_streams.size()))] : 0;
+      const uint32_t stream = in_iob ? cc::kIob + 32 * index : own;
+      const uint32_t section =
+          in_iob ? Load(h.base, cc::kLockTable + 8 * (16 + index)) : own + 32;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        if (in_iob) {
+          GuestLock(h, 16 + index, true);
+        } else {
+          InitSection(h, section);
+          PPCContext e = CallContext(h);
+          e.r3.u64 = section;
+          __imp__RtlEnterCriticalSection(e, h.base);
+        }
+        PPCContext t = CallContext(h);
+        t.r30.u64 = stream;
+        t.r31.u64 = 0x5678;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? __imp__sub_825A9664 : hooks::CoreFcloseFinally)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r30.u32);
+        out[v].Word(t.r31.u32);
+        out[v].Bytes(Section(h, section));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  {
+    Results results("doexit's unwind funclet (sub_825AA338)");
+    for (int c = 0; c < 16; c++) {
+      const uint32_t locked = c % 2 == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+      const uint32_t r3 = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        if (locked != 0) {
+          GuestLock(h, 8, true);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r3;
+        t.r28.u64 = locked;
+        t.r31.u64 = 0x9ABC;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? __imp__sub_825AA338 : hooks::CoreExitUnlockFinally)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r28.u32);
+        out[v].Word(t.r31.u32);
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -2121,6 +2272,8 @@ void CRuntimeCore(Context& h) {
   NumberTextCases(h);
   Ld12ToFloatCases(h);
   AtoNumberCases(h);
+  FilenoCases(h);
+  StreamFinallyCases(h);
 }
 
 }  // namespace harness
