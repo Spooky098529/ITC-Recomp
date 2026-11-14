@@ -23,7 +23,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825B31D8), the C runtime's thread notify routine (sub_825B3650) and _mtinit "
               "(sub_825AA708, with _init_pointers' plain C++) (checked by --run_harnesses=c_runtime_core). "
               "Those reached only from native callers have no adapters, and the flag switches "
-              "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno");
+              "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
+              "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
+              "_mtinitlocks");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -205,27 +207,20 @@ void hooks::CoreMtInit(PPCContext& ctx, uint8_t* base) {
 ITC_C_RUNTIME_CORE(825AA3F8, CoreCrtTlsAlloc)
 // _getptd_noexit: r3 = the calling thread's data, or 0.
 ITC_C_RUNTIME_CORE(825AA4C0, CoreGetptdNoexit)
-// _mtterm: no registers.
-ITC_C_RUNTIME_CORE(825AA448, CoreMtTerm)
-// __doserrno: r3 = the address. (_errno, sub_825A81E0, and _freefls,
-// sub_825AA5C0, have no adapters: their callers in play are native.)
+// __doserrno: r3 = the address. (_errno sub_825A81E0, _freefls
+// sub_825AA5C0, __crtInitCritSecAndSpinCount sub_825B35A0,
+// XRegisterThreadNotifyRoutine sub_82297B98, _freeptd sub_825AA670, _mtterm
+// sub_825AA448 and _mtinitlocks sub_825B31D8 have no adapters: their
+// callers in play are native.)
 ITC_C_RUNTIME_CORE(825A8218, CoreDosErrno)
 // _get_errno_from_oserr: r3 = a Windows error; r3 = its errno.
 ITC_C_RUNTIME_CORE(825A8178, CoreGetErrnoFromOsErr)
 // _dosmaperr: r3 = a Windows error.
 ITC_C_RUNTIME_CORE(825A8250, CoreDosMapErr)
-// _freeptd: r3 = a thread's data, or 0 for the calling thread's.
-ITC_C_RUNTIME_CORE(825AA670, CoreFreePtd)
 // __crtInitCritSecNoSpinCount: r3 = a critical section; r3 = 1.
 ITC_C_RUNTIME_CORE(825B3570, CoreCritSecNoSpinCount)
-// __crtInitCritSecAndSpinCount: r3 = a critical section, r4 = a spin count.
-ITC_C_RUNTIME_CORE(825B35A0, CoreInitCritSecAndSpinCount)
-// XRegisterThreadNotifyRoutine: r3 = a notify block, r4 = 1 to add, 0 to remove.
-ITC_C_RUNTIME_CORE(82297B98, CoreRegisterThreadNotifyRoutine)
 // XapiCallThreadNotifyRoutines: r3 = 1 at a thread's start, 0 at its end.
 ITC_C_RUNTIME_CORE(82297B38, CoreCallThreadNotifyRoutines)
-// _mtinitlocks: r3 = 1, or 0 when a critical section couldn't be made.
-ITC_C_RUNTIME_CORE(825B31D8, CoreMtInitLocks)
 // The C runtime's thread notify routine: r3 = 1 at a thread's start, 0 at
 // its end.
 ITC_C_RUNTIME_CORE(825B3650, CoreThreadNotify)
