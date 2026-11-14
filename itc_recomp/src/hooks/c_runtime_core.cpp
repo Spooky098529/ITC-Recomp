@@ -4,6 +4,8 @@
 
 #include "hooks/c_runtime_core.h"
 
+#include "c_runtime/format.h"
+
 #include "base/flags.h"
 #include "base/log.h"
 #include "graphics/video_output.h"
@@ -41,7 +43,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_free_osfhnd and _get_osfhandle (sub_825B77E8, sub_825B7880), and the __finally "
               "funclets of raise, _fcloseall and flsall (sub_825B4C8C, sub_825B4F38, "
               "sub_825ACEB4, sub_825ACF04), exp (sub_825ABE30), _forcdecpt_l and _cropzeros_l "
-              "(sub_825ADD38, sub_825ADDD8) (checked by --run_harnesses=c_runtime_core); checked by reading, as "
+              "(sub_825ADD38, sub_825ADDD8), _fassign_l, _atodbl_l, _atoflt_l and _ld12tof "
+              "(sub_825ADEB0, sub_825B6098, sub_825B6140, sub_825B70D0; __strgtold12_l's and "
+              "_ld12tod's plain C++) (checked by --run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
               "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
@@ -445,6 +449,43 @@ void hooks::CoreCropzeros(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Cropzeros(base, ctx.r3.u32);
 }
 
+void hooks::CoreAtodbl(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = cc::AtoNumber(base, ctx.r3.u32, ctx.r4.u32, true);
+  if (!r3) {
+    __imp__sub_825B6098(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void hooks::CoreAtoflt(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = cc::AtoNumber(base, ctx.r3.u32, ctx.r4.u32, false);
+  if (!r3) {
+    __imp__sub_825B6140(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void hooks::CoreFassign(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = cc::Fassign(base, ctx.r3.s32 != 0, ctx.r4.u32, ctx.r5.u32);
+  if (!r3) {
+    __imp__sub_825ADEB0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void hooks::CoreLd12ToFloat(PPCContext& ctx, uint8_t* base) {
+  const uint32_t from = ctx.r3.u32;
+  const c_runtime::LongDouble12 value{guest::LoadU16(base, from), guest::LoadU32(base, from + 2),
+                                      guest::LoadU32(base, from + 6)};
+  int32_t status = 0;
+  guest::StoreU32(base, ctx.r4.u32,
+                  c_runtime::Ld12ToFloat(value, guest::LoadU16(base, from + 10), &status));
+  ctx.r3.s64 = status;
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -569,3 +610,10 @@ ITC_C_RUNTIME_CORE(825ABE30, CoreExp)
 // _forcdecpt_l, _cropzeros_l: r3 = a number's text.
 ITC_C_RUNTIME_CORE(825ADD38, CoreForcdecpt)
 ITC_C_RUNTIME_CORE(825ADDD8, CoreCropzeros)
+// _fassign_l: r3 = 1 for a double, r4 = out, r5 = a string; r3 = 0, 3 or 4.
+ITC_C_RUNTIME_CORE(825ADEB0, CoreFassign)
+// _atodbl_l, _atoflt_l: r3 = out, r4 = a string; r3 = 0, 3 or 4.
+ITC_C_RUNTIME_CORE(825B6098, CoreAtodbl)
+ITC_C_RUNTIME_CORE(825B6140, CoreAtoflt)
+// _ld12tof: r3 = a 12-byte long double, r4 = the float out; r3 = 0, 1 or 2.
+ITC_C_RUNTIME_CORE(825B70D0, CoreLd12ToFloat)

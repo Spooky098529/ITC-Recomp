@@ -36,6 +36,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
+#include <algorithm>
 #include <bit>
 #include <cstring>
 #include <mutex>
@@ -1942,6 +1943,127 @@ void NumberTextCases(Context& h) {
   }
 }
 
+// _ld12tof: 12-byte long doubles around the float's range (exponents
+// 16383 - 160 to 16383 + 140, so rounding, denormals, underflow and overflow
+// come up), zeros and long double denormals (exponent 0), 32767 and random
+// bits, with random extra bits; compared: r3 and 8 bytes at the output (the
+// float, and the word after it, which it leaves alone).
+void Ld12ToFloatCases(Context& h) {
+  Results results("_ld12tof (sub_825B70D0)");
+  const uint32_t from = h.data + 64, to = h.data + 96;
+  for (int c = 0; c < 400; c++) {
+    const uint32_t kind = h.random.Below(8);
+    uint16_t sign_exponent;
+    if (kind == 0) {
+      sign_exponent = 0;
+    } else if (kind == 1) {
+      sign_exponent = 0x7FFF;
+    } else if (kind == 2) {
+      sign_exponent = uint16_t(h.random.Next());
+    } else {
+      sign_exponent = uint16_t(16383 - 160 + h.random.Below(300));
+    }
+    if (h.random.Below(2) != 0) {
+      sign_exponent |= 0x8000;
+    }
+    uint32_t high = uint32_t(h.random.Next()), low = uint32_t(h.random.Next());
+    uint16_t extra = uint16_t(h.random.Next());
+    const uint32_t shape = h.random.Below(6);
+    if (shape == 0) {
+      high = low = 0;
+      extra = 0;
+    } else if (shape == 1) {
+      high |= 0x80000000u;
+      low &= 0xFFFFFF00u;  // near a float's halfway point
+      high = (high & 0xFFFFFF00u) | (h.random.Below(2) ? 0x80 : 0x7F);
+      extra = 0;
+    } else if (shape < 5) {
+      high |= 0x80000000u;  // normalized, as the parse leaves it
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU16(h.base, from + 0, sign_exponent);
+      Store(h.base, from + 2, high);
+      Store(h.base, from + 6, low);
+      guest::StoreU16(h.base, from + 10, extra);
+      Fill(h.base, to, 8);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = from;
+      t.r4.u64 = to;
+      (v == 0 ? __imp__sub_825B70D0 : hooks::CoreLd12ToFloat)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Float(Load(h.base, to));
+      out[v].Word(Load(h.base, to + 4));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _atodbl_l, _atoflt_l and _fassign_l: number strings (fixed edges: the
+// float's and double's limits, under- and overflow, signs, spaces, junk,
+// hex, nothing) and random ones; compared: r3 and 12 bytes at the output.
+void AtoNumberCases(Context& h) {
+  static const char* kTexts[] = {
+      "0", "1", "-1", "1.5", "  12.25", "\t-0.0", "3.4028234e38", "3.4028236e38", "1e39",
+      "-1e39", "1.17549435e-38", "1.4e-45", "7e-46", "1e-46", "1.7976931348623157e308",
+      "1.8e308", "1e309", "4.9e-324", "2e-324", "1e-400", "abc", "", "+", ".", "1e", "1e+",
+      "0x10", "123456789012345678901234567890", ".5e-3", "5.e2", "1d10", "-.0001E-2"};
+  constexpr int kTextCount = int(sizeof(kTexts) / sizeof(kTexts[0]));
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    int kind;  // 0 _atodbl_l, 1 _atoflt_l, 2 _fassign_l
+  };
+  const uint32_t at = h.data + 128, to = h.data + 64;
+  for (const Fn& fn : {Fn{"_atodbl_l (sub_825B6098)", __imp__sub_825B6098, hooks::CoreAtodbl, 0},
+                       Fn{"_atoflt_l (sub_825B6140)", __imp__sub_825B6140, hooks::CoreAtoflt, 1},
+                       Fn{"_fassign_l (sub_825ADEB0)", __imp__sub_825ADEB0, hooks::CoreFassign, 2}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 200; c++) {
+      std::string text;
+      if (c < kTextCount) {
+        text = kTexts[c];
+      } else {
+        text = NumberText(h);
+        std::replace(text.begin(), text.end(), 'x', '1');
+        std::replace(text.begin(), text.end(), 'p', 'e');
+      }
+      const uint32_t is_double = h.random.Below(3) == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, to, 12);
+        WriteText(h, at, text);
+        PPCContext t = CallContext(h);
+        if (fn.kind == 2) {
+          t.r3.u64 = c % 2 == 0 ? 0 : is_double;
+          t.r4.u64 = to;
+          t.r5.u64 = at;
+          t.r6.u64 = uint32_t(h.random.Next());
+        } else {
+          t.r3.u64 = to;
+          t.r4.u64 = at;
+          t.r5.u64 = uint32_t(h.random.Next());
+        }
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        const bool doubled = fn.kind == 0 || (fn.kind == 2 && c % 2 == 1);
+        if (doubled) {
+          out[v].Double(uint64_t(Load(h.base, to)) << 32 | Load(h.base, to + 4));
+        } else {
+          out[v].Float(Load(h.base, to));
+          out[v].Word(Load(h.base, to + 4));
+        }
+        out[v].Word(Load(h.base, to + 8));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c) + " \"" + text + "\"");
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -1997,6 +2119,8 @@ void CRuntimeCore(Context& h) {
   OsHandleCases(h);
   ExpCases(h);
   NumberTextCases(h);
+  Ld12ToFloatCases(h);
+  AtoNumberCases(h);
 }
 
 }  // namespace harness

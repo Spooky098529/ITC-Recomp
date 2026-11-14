@@ -70,6 +70,10 @@ void CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base);    // sub_825ACF04
 void CoreExp(PPCContext& ctx, uint8_t* base);                   // sub_825ABE30
 void CoreForcdecpt(PPCContext& ctx, uint8_t* base);             // sub_825ADD38
 void CoreCropzeros(PPCContext& ctx, uint8_t* base);             // sub_825ADDD8
+void CoreFassign(PPCContext& ctx, uint8_t* base);               // sub_825ADEB0
+void CoreAtodbl(PPCContext& ctx, uint8_t* base);                // sub_825B6098
+void CoreAtoflt(PPCContext& ctx, uint8_t* base);                // sub_825B6140
+void CoreLd12ToFloat(PPCContext& ctx, uint8_t* base);           // sub_825B70D0
 void CoreCloseHandle(PPCContext& ctx, uint8_t* base);         // sub_82294E20
 void CoreResetEvent(PPCContext& ctx, uint8_t* base);          // sub_825BA168
 void CoreInittermE(PPCContext& ctx, uint8_t* base);    // sub_82297AC0

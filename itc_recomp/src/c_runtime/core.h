@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <optional>
 
 namespace c_runtime::core {
 
@@ -402,5 +403,16 @@ uint32_t Forcdecpt(uint8_t* base, uint32_t text);
 // exponent moved down. r3 as the original leaves it (where it found the
 // point, or the terminator).
 uint32_t Cropzeros(uint8_t* base, uint32_t text);
+
+// sub_825B6098 _atodbl_l and sub_825B6140 _atoflt_l: `string` through
+// __strgtold12_l (no scaling) and _ld12tod or _ld12tof into the double or
+// float at `out`; 3 (overflow) or 4 (underflow) from the parse's flags or
+// the conversion's status, else 0. nullopt, with nothing written, where the
+// parse's plain C++ leaves it to the original (never: c_runtime::Strgtold12).
+std::optional<uint32_t> AtoNumber(uint8_t* base, uint32_t out, uint32_t string, bool is_double);
+
+// sub_825ADEB0 _fassign_l: `string` into the double (`is_double`) or float at
+// `out` through AtoNumber; its result (r3 as the original leaves it).
+std::optional<uint32_t> Fassign(uint8_t* base, bool is_double, uint32_t out, uint32_t string);
 
 }  // namespace c_runtime::core

@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "c_runtime/format.h"
+#include "c_runtime/parse.h"
 #include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
 #include "helpers/debug_output.h"
@@ -955,6 +957,35 @@ uint32_t Cropzeros(uint8_t* base, uint32_t text) {
     guest::StoreU8(base, q, moved);
   } while (moved != 0);
   return p;
+}
+
+std::optional<uint32_t> AtoNumber(uint8_t* base, uint32_t out, uint32_t string, bool is_double) {
+  if (is_double) {
+    ITC_NATIVE_RUNNING("sub_825B6098 _atodbl_l");
+  } else {
+    ITC_NATIVE_RUNNING("sub_825B6140 _atoflt_l");
+  }
+  c_runtime::Strgtold12Result parsed;
+  if (!c_runtime::Strgtold12(base, string, 0, 0, 0, 0, &parsed)) {
+    return std::nullopt;
+  }
+  int32_t status = 0;
+  if (is_double) {
+    const uint64_t bits = c_runtime::Ld12ToDouble(parsed.value.value, parsed.value.extra, &status);
+    Store(base, out + 4, uint32_t(bits));
+    Store(base, out + 0, uint32_t(bits >> 32));
+  } else {
+    Store(base, out, c_runtime::Ld12ToFloat(parsed.value.value, parsed.value.extra, &status));
+  }
+  if ((parsed.flags & 3) == 0) {
+    return status == 1 ? 3u : status == 2 ? 4u : 0u;
+  }
+  return (parsed.flags & 1) != 0 ? 4u : 3u;
+}
+
+std::optional<uint32_t> Fassign(uint8_t* base, bool is_double, uint32_t out, uint32_t string) {
+  ITC_NATIVE_RUNNING("sub_825ADEB0 _fassign_l");
+  return AtoNumber(base, out, string, is_double);
 }
 
 }  // namespace c_runtime::core

@@ -113,8 +113,20 @@ void ShrMan(uint32_t man[3], int32_t count) {
 
 }  // namespace
 
-uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status) {
-  ITC_NATIVE_RUNNING("sub_825B69B8 _ld12tod");
+namespace {
+
+// _ld12cvt's format descriptor: the double's above, the float's at
+// 0x8266C52C (128, -127, 24, 8, 32 bits, 127).
+struct Ld12Format {
+  int32_t max_exp, min_exp, precision, exponent_width, bias;
+};
+constexpr Ld12Format kDoubleFormat{kMaxExp, kMinExp, kPrecision, kExponentWidth, kBias};
+constexpr Ld12Format kFloatFormat{128, -127, 24, 8, 127};
+
+// _ld12cvt: the 12-byte form rounded to `format`; the result's top word
+// (sign, exponent, mantissa) and the next.
+void Ld12Convert(const LongDouble12& value, uint16_t extra, const Ld12Format& format,
+                 int32_t* status, uint32_t* high_out, uint32_t* low_out) {
   uint32_t man[3] = {value.mantissa_high, value.mantissa_low, uint32_t(extra) << 16};
   const bool negative = (value.sign_exponent & 0x8000) != 0;
   int32_t exponent = int32_t(value.sign_exponent & 0x7FFF) - 16383;
@@ -129,38 +141,54 @@ uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status
   } else {
     const uint32_t saved[3] = {man[0], man[1], man[2]};
     const int32_t unrounded = exponent;
-    if (RoundMan(man, kPrecision)) {
+    if (RoundMan(man, format.precision)) {
       exponent++;
     }
-    if (exponent < kMinExp - kPrecision) {
+    if (exponent < format.min_exp - format.precision) {
       man[0] = man[1] = man[2] = 0;  // underflow to zero
       *status = 2;
-    } else if (exponent <= kMinExp) {
+    } else if (exponent <= format.min_exp) {
       // A denormal: the unrounded mantissa shifted by the unrounded
       // exponent's distance, rounded again, and room made for the exponent.
       man[0] = saved[0];
       man[1] = saved[1];
       man[2] = saved[2];
-      ShrMan(man, kMinExp - unrounded);
-      RoundMan(man, kPrecision);
-      ShrMan(man, kExponentWidth + 1);
+      ShrMan(man, format.min_exp - unrounded);
+      RoundMan(man, format.precision);
+      ShrMan(man, format.exponent_width + 1);
       *status = 2;
-    } else if (exponent >= kMaxExp) {
+    } else if (exponent >= format.max_exp) {
       man[0] = 0x80000000u;  // overflow: infinity
       man[1] = man[2] = 0;
-      ShrMan(man, kExponentWidth);
-      biased = kBias + kMaxExp;
+      ShrMan(man, format.exponent_width);
+      biased = format.bias + format.max_exp;
       *status = 1;
     } else {
       man[0] &= 0x7FFFFFFFu;  // the leading bit left out
-      ShrMan(man, kExponentWidth);
-      biased = kBias + exponent;
+      ShrMan(man, format.exponent_width);
+      biased = format.bias + exponent;
       *status = 0;
     }
   }
-  const uint32_t high = Slw(uint32_t(biased), 31 - kExponentWidth) |
-                        (negative ? 0x80000000u : 0) | man[0];
-  return (uint64_t(high) << 32) | man[1];
+  *high_out = Slw(uint32_t(biased), 31 - format.exponent_width) | (negative ? 0x80000000u : 0) |
+              man[0];
+  *low_out = man[1];
+}
+
+}  // namespace
+
+uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status) {
+  ITC_NATIVE_RUNNING("sub_825B69B8 _ld12tod");
+  uint32_t high = 0, low = 0;
+  Ld12Convert(value, extra, kDoubleFormat, status, &high, &low);
+  return (uint64_t(high) << 32) | low;
+}
+
+uint32_t Ld12ToFloat(const LongDouble12& value, uint16_t extra, int32_t* status) {
+  ITC_NATIVE_RUNNING("sub_825B70D0 _ld12tof");
+  uint32_t high = 0, low = 0;
+  Ld12Convert(value, extra, kFloatFormat, status, &high, &low);
+  return high;
 }
 
 int32_t WriteChar(uint8_t* base, uint32_t character, uint32_t stream, uint32_t count) {
