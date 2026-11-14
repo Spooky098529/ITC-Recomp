@@ -191,6 +191,15 @@ void FrontEndCarDrawSetLightKit(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void FrontEndCarDrawClearLightKit(PPCContext& ctx, uint8_t* base) {
+  ITC_FRONT_END_ORIGINAL(821795E0)
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  ctx.r3.u64 = fe::GarageStageClearLightKit(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
 void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base) {
   // Model::DrawShape's plain C++ only with its flag and without the command
   // list's diagnostics (as its adapter).

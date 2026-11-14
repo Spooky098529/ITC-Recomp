@@ -17,6 +17,7 @@
 #include "hooks/cameras.h"
 #include "hooks/app_start_up.h"
 #include "hooks/c_runtime.h"
+#include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 
@@ -181,9 +182,13 @@ namespace {
 // return addresses. r3 = the video output after.
 uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
   ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   ctx.lr = first;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
+  if (!hooks::DirectSlotCall(ctx, base, slot7)) {
+    ctx.ctr.u64 = slot7;
+    REX_CALL_INDIRECT_FUNC(slot7);
+  }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = second;
   REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
@@ -482,9 +487,15 @@ namespace {
 constexpr uint32_t kScene = 0x826BABA0;
 
 // A call through slot `slot` of r3's vtable, returning to `return_address`.
+// The render manager's slots 8 and 7 by their plain C++ where they're the
+// game's (hooks::DirectSlotCall).
 void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
   ctx.lr = return_address;
-  REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot));
+  const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
+  if (hooks::DirectSlotCall(ctx, base, function)) {
+    return;
+  }
+  REX_CALL_INDIRECT_FUNC(function);
 }
 
 // A chunk recorded and handed to the render queue, as RecordViewport and

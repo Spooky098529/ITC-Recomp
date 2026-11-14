@@ -12,13 +12,16 @@
 // (the native version declines: the original runs), and _vsnprintf's sizes:
 // none with no buffer (only counted), too small (the original's _flsbuf),
 // exact, and above INT_MAX. Not %n or null buffers and formats (the
-// original's _invalid_parameter). Compared: the output block, the scratch
+// original's _invalid_parameter), but for vsprintf (sub_825A71B0, with
+// _vsprintf_l; c_runtime_core's), whose null cases are native. Compared: the output block, the scratch
 // area, the caller's parameter area and stack arguments, r3.
 
 #include "harness.h"
 
 #include "base/flags.h"
+#include "c_runtime/core.h"
 #include "c_runtime/format.h"
+#include "hooks/c_runtime_core.h"
 #include "guest.h"
 #include "memory/heap.h"
 
@@ -315,6 +318,46 @@ void VsnprintfCase(Context& h, Results& results, const Block& block, const Forma
   results.Check(out[0], out[1], what);
 }
 
+// vsprintf (sub_825A71B0, with _vsprintf_l; c_runtime_core's adapter step):
+// as _vsnprintf's cases, and a null buffer or format (errno 22 and
+// _invalid_parameter, its handler the shared "returns 0" for the case; errno
+// random before and compared).
+void VsprintfCase(Context& h, Results& results, const Block& block, const FormatCase& c,
+                  int null_kind, const std::string& what) {
+  const uint32_t handler = guest::LoadU32(h.base, c_runtime::core::kInvalidParameterHandler);
+  const uint32_t err = uint32_t(h.random.Next());
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Fill(h.base, h.data, kScratchBytes);
+    Fill(h.base, block.address, block.bytes);
+    WriteInputs(h.base, h.data);
+    Write(h.base, h.data + kFormat, c.format.data(), uint32_t(c.format.size()));
+    guest::StoreU8(h.base, h.data + kFormat + uint32_t(c.format.size()), 0);
+    for (uint32_t k = 0; k < c.slots.size() && k < 40; k++) {
+      StoreU64(h.base, h.data + kVaList + 8 * k, c.slots[k]);
+    }
+    PPCContext e = CallContext(h);
+    __imp__sub_825A81E0(e, h.base);
+    const uint32_t errno_word = e.r3.u32;
+    const uint32_t saved_errno = guest::LoadU32(h.base, errno_word);
+    guest::StoreU32(h.base, errno_word, err);
+    guest::StoreU32(h.base, c_runtime::core::kInvalidParameterHandler, 0x825C8388);
+    PPCContext t = CallContext(h);
+    t.r3.u64 = null_kind == 1 ? 0 : block.address;
+    t.r4.u64 = null_kind == 2 ? 0 : h.data + kFormat;
+    t.r5.u64 = h.data + kVaList;
+    Run(v, __imp__sub_825A71B0, hooks::CoreVsprintf, t, h.base);
+    guest::StoreU32(h.base, c_runtime::core::kInvalidParameterHandler, handler);
+    out[v].Bytes(Read(h.base, block.address, block.bytes));
+    out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    out[v].Word(guest::LoadU32(h.base, errno_word));
+    guest::StoreU32(h.base, errno_word, saved_errno);
+  }
+  results.Check(out[0], out[1], what);
+}
+
 std::string Printable(const std::string& s) {
   std::string n;
   for (char ch : s) n += uint8_t(ch) < 128 && uint8_t(ch) >= 32 ? ch : '?';
@@ -445,11 +488,25 @@ void VsnprintfCases(Context& h) {
   results.Report();
 }
 
+void VsprintfCases(Context& h) {
+  Results results("sub_825A71B0 vsprintf");
+  const Block block(16384);
+  for (int i = 0; i < 1500; i++) {
+    const FormatCase c = MakeFormat(h.random, h.data);
+    const int null_kind = h.random.Below(20) == 0 ? 1 + int(h.random.Below(2)) : 0;
+    VsprintfCase(h, results, block, c, null_kind,
+                 fmt::format("\"{}\" case {}{}", Printable(c.format), i,
+                             null_kind == 1 ? " no buffer" : null_kind == 2 ? " no format" : ""));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeFormat(Context& h) {
   SprintfCases(h);
   VsnprintfCases(h);
+  VsprintfCases(h);
 }
 
 }  // namespace harness

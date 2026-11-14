@@ -595,6 +595,32 @@ uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t hold
   return SceneModelApplyLightKit(base, calls, m, f);
 }
 
+uint64_t GarageStageClearLightKit(uint8_t* base, const Calls& calls, uint32_t holder,
+                                  uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821795E0 GarageStage::ClearLightKit");
+  const uint32_t f = Frame(base, stack, 96);
+  const uint32_t m = StageModel(base, holder);
+  switch (int32_t(group)) {
+    case 0:
+      Store(base, m + 4228, 0);
+      break;
+    case 1:
+      Store(base, m + 4244, 0);
+      break;
+    case 2:
+      Store(base, m + 4260, 0);
+      break;
+    case 3:
+      Store(base, m + 4244, 0);
+      Store(base, m + 4260, 0);
+      Store(base, m + 4228, 0);
+      break;
+    default:
+      break;
+  }
+  return SceneModelApplyLightKit(base, calls, m, f);
+}
+
 uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t matrix,
                    uint32_t word, uint32_t caller_r24, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820C8480 Floor::Draw");

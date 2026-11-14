@@ -48,6 +48,9 @@ void FrontEndCarDrawAnimsRun(PPCContext& ctx, uint8_t* base);
 // scene, r4 the matrix, r5 the draw word; r24 handed to Model::DrawShape).
 void FrontEndCarDrawApplyLightKit(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawSetLightKit(PPCContext& ctx, uint8_t* base);
+// GarageStage::ClearLightKit sub_821795E0 (r3 the holder, r4 a group; no
+// adapter: only the tuning screen's plain C++ reaches it; the harness's).
+void FrontEndCarDrawClearLightKit(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base);
 // GarageStage::SetLights sub_8217BA20 (r3 the stage's lights, r4 mirrored).
 void FrontEndCarDrawSetLights(PPCContext& ctx, uint8_t* base);

@@ -73,6 +73,15 @@ void TuningPagesLoadVinyls(PPCContext& ctx, uint8_t* base);
 void TuningPagesShowPricePanel(PPCContext& ctx, uint8_t* base);
 void TuningPagesSetBrandLogo(PPCContext& ctx, uint8_t* base);
 void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base);
+// The tuning pages' leaves never seen in play, for the harness only (no
+// adapters: only native callers reach their plain C++, RefreshInterior and
+// Command10, 13 and 14; r3 = the screen): IsSlotAvailable sub_821CE188 (r4
+// the slot), SetPaintGradients sub_821E9488 (flush-to-zero off),
+// SetLightKind0Bars sub_821EA130 and SetLightKind1Bar sub_821EAE68.
+void TuningPagesIsSlotAvailable(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetPaintGradients(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetLightKind0Bars(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetLightKind1Bar(PPCContext& ctx, uint8_t* base);
 
 // The current choices (r3 = the screen): SetAeroAvailability sub_821DE160,
 // SetCurrentChoice sub_821E1DB0 (Params::GetCarParts and AeroParts::Get82 by
@@ -224,5 +233,56 @@ void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base);
 void TuningPagesResetStickerEditor(PPCContext& ctx, uint8_t* base);
 void TuningPagesRestoreAreaDecals(PPCContext& ctx, uint8_t* base);
 void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base);
+
+// The sticker editor's helpers (docs/functions/sticker-editor.md; r3 the
+// screen unless said): UpdateSoloHold sub_821F7298, UpdatePreviewHold
+// sub_821F7348, StepUnlockedSticker sub_821F73F8 (r4 an id, r5 a step
+// count), ShowSlotNode sub_821F8070 (r4 an id, r5 a slot, r6 the current
+// slot), PlaceStickerNode sub_821F8160 (r4 an id, r5 a slot, r6 a record),
+// DecalImages::SetSlot sub_821F8868 (r3 the images, r4 a sub-scene, r5 and
+// r6 two nodes, r7 and r8 their texture slots, r9 an entry, r10 a flag),
+// SetStickerEditTexts sub_821F7F20 (no adapters: their callers are all
+// native; these steps and the movie sides' below are the harness's).
+void TuningPagesUpdateSoloHold(PPCContext& ctx, uint8_t* base);
+void TuningPagesUpdatePreviewHold(PPCContext& ctx, uint8_t* base);
+void TuningPagesStepUnlockedSticker(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowSlotNode(PPCContext& ctx, uint8_t* base);
+void TuningPagesPlaceStickerNode(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetSlot(PPCContext& ctx, uint8_t* base);
+void TuningPagesSetStickerEditTexts(PPCContext& ctx, uint8_t* base);
+// ShowSlotImage sub_821FA408 (r4 an id, r5 a slot), ShowStickerListImage
+// sub_821FA460 (r4 an id, r5 an index); the movie sides (r4 show):
+// AnimateStickerAreas sub_821FA508, AnimateStickerOperate sub_821F7518,
+// AnimateStickerSlots sub_821F8A50, AnimateStickerEditMenu sub_821F8D68,
+// ShowStickerOrder sub_821FBA40, ShowStickerPicker sub_821FBB60.
+void TuningPagesShowSlotImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowStickerListImage(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateStickerAreas(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateStickerOperate(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateStickerSlots(PPCContext& ctx, uint8_t* base);
+void TuningPagesAnimateStickerEditMenu(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowStickerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesShowStickerPicker(PPCContext& ctx, uint8_t* base);
+// The sticker editor's input pages (r3 the screen; no adapters: the
+// harness's steps): InputStickerAreas sub_821FBD40, InputStickerSlots
+// sub_821F9050, InputStickerOperate sub_821F9328, InputStickerEdit
+// sub_821F9608, InputStickerView sub_821F7000, InputStickerOrder
+// sub_821FBF18, InputStickerPicker sub_821FC270, InputStickerMove
+// sub_821F99A8, InputStickerRotate sub_821F9D30, InputStickerScale
+// sub_821F9FB8.
+void TuningPagesInputStickerAreas(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerSlots(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerOperate(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerEdit(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerView(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerOrder(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerPicker(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerMove(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerRotate(PPCContext& ctx, uint8_t* base);
+void TuningPagesInputStickerScale(PPCContext& ctx, uint8_t* base);
+// The update's sticker commands 32 to 41 and 43 to 51 (r3 the screen;
+// `command` picks the runner, 46, 48 and 50 the same; no adapters: the
+// native update calls their plain C++, these steps are the harness's).
+void TuningPagesStickerCommand(PPCContext& ctx, uint8_t* base, uint32_t command);
 
 }  // namespace hooks

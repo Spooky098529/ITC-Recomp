@@ -389,6 +389,29 @@ uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
 // played; 111 + [+33576] restarted and looped; the queue's step with
 // +9724. 128-byte frame; LoopNamed's r3.
 uint64_t Command58(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F35C0 TuningScreen::Command10 (the paint page): 979 and 1009
+// played by +9716 and +9720; node (21, 5)'s children 4 and 5 +68 by
+// +30456; the sliders (nodes (21, 2 to 4)'s children 10 and 11 +12 from
+// +30444/+30476 × [0x8200B5D4], +30448/+30480 and +30452/+30484 ×
+// [0x8200B5D0]); by +30440 0 or 4 the rows' alphas and 212, or 178/179 by
+// +30460, restarted and looped; help (10, 0) 794 scrolled;
+// SetPaintGradients' plain C++ (tuning_pages); the queue's step with +9724.
+// 144-byte frame; SetPaintGradients' r3.
+uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EA460 TuningScreen::Command13 (the neon edit): 985, 228, 238 and
+// 248 played by +9716 and +9720 (node (23, 1)'s child 1 +68 0.0); the bars'
+// sliders (nodes (23, 2 to 4)'s children 6 and 7 +12); by the row +30508
+// 304 to 307 (with 294 + +30524) or 219 + +30528 restarted and looped;
+// SetLightKind0Bars' plain C++; the queue's step with +9724. 144-byte
+// frame; SetLightKind0Bars' r3.
+uint64_t Command13(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EAFA0 TuningScreen::Command14 (the LED edit): 987 and 320 played
+// by +9716 and +9720; node (24, 3)'s children 6 and 7 +12 from +30552;
+// SetNodeText (24, 14) 450 with +30548 + 1; by the row +30544 384 to 386
+// (with 366 + +30556) or 309 + +30560 restarted and looped;
+// SetLightKind1Bar's plain C++; the queue's step with +9724. 144-byte
+// frame; SetLightKind1Bar's r3.
+uint64_t Command14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
 
 // --- The editors' command runners never seen in play (commands.cpp) ---
 // Movies 13 and 14 (and 16 for Command52's dialog), called only by the
@@ -562,6 +585,24 @@ uint64_t PreviewWheels(uint8_t* base, const GuestCall& call, uint64_t r3, uint32
 // GarageStage::ReloadDecals after 5, 7 and 8; then +10012 = -1. 4,112-byte
 // frame.
 uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821F7B90 TuningScreen::ApplyAreaDecals: r3 = the screen (all 64
+// bits). By +10012 (its row): 1 the area +30724's five stickers cleared
+// (GarageStage::SetSticker), ReloadDecals and FitSelectedCar(holder, 0, 0);
+// 2 the selected garage car put on the stand (as ApplyDecals' 6); 3
+// GarageStage::Command(holder, 58) and the five set from the screen's
+// records (areas 2 and 7 mirrored), ReloadDecals; 4 Commands 1, the camera
+// command 20 and a + 42, the five cleared, ReloadDecals; then +10012 = -1.
+// Each SetSticker's size memcpy'd to frame + 96 (the argument word it reads
+// from its caller's frame), its position the doublewords at frame + 112 and
+// + 120, the conversions' doublewords at + 144 and + 160 as the original
+// leaves them. 4,160-byte frame (its register and f28 to f31 saves not
+// written); r3 the last call's, else the entry. Never seen in play.
+uint64_t ApplyAreaDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821FE4E0 TuningScreen::ApplyDecalWord: r3 = the screen (all 64 bits).
+// +10012 9: GarageStage::SetDecalWord(holder, 1); 10: (holder, 0); then
+// +10012 = -1. 96-byte frame; SetDecalWord's r3, else the entry. Never seen
+// in play.
+uint64_t ApplyDecalWord(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp);
 // sub_822019D0 TuningScreen::DecalCommand: movie 13; with +9716 the queue's
 // step (+9720 set, then 0) or 240 restarted and GarageStage::Command(holder,
 // 58), +9716 = 0; then +10012 = 7, FitSelectedCar(holder, the selected
@@ -570,22 +611,103 @@ uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
 // made with f1 as FitSelectedCar leaves it).
 uint64_t DecalCommand(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
                       double* f1);
+// sub_821CCAA8 TuningScreen::PreviewParts: r3 = the screen (all 64 bits),
+// `pick` (r4, all 64 bits) 0 the screen's parts set, else an aero set + 1.
+// The wing word w from +36300 (by +25172, its row); pick 0:
+// GarageStage::SetParts(holder, +36164, +36252, +36208, +36544, +36368, w),
+// else SetAeroSet(holder, pick - 1, +36368, w) (stand_models' plain C++);
+// then +10012 = 9 (parts) or 10 (aero) when +36372 is 1 and +36376 is 0.
+// 96-byte frame (r31 and lr's saves not written); the setter's r3. Never
+// seen in play; needs --native_car_specs (SetAeroSet's).
+uint64_t PreviewParts(uint8_t* base, const GuestCall& call, uint64_t r3, uint64_t pick,
+                      uint32_t sp);
 // sub_821E07B0 TuningScreen::PreviewItem: r3 = the screen (all 64 bits).
 // The highlighted item put on the stand by the state, the category and the
-// item bytes (its row): the stand's setters' plain C++, IsItemAvailable's
-// and SetInteriorPair's; SetCaliper, GarageStage::SetChoice, PreviewParts,
-// RefitAxles, GarageStage::SetAero2, SetDoorKind and SetAccessory (never
-// seen in play) through `call` with the original's return addresses. The
-// choice tables at frame + 80 and + 96, read unchecked. 160-byte frame; r3
-// the last call's, else the entry (nothing in states 3 and 4).
-uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp);
+// item bytes (its row): the stand's setters' plain C++, IsItemAvailable's,
+// SetInteriorPair's, PreviewParts', SetCaliper's, RefitAxles' and
+// SetAccessory's (the last three and GarageStage::SetChoice, SetAero2 and
+// SetDoorKind never seen in play). The choice tables at frame + 80 and + 96,
+// read unchecked. 160-byte frame; r3 the last call's, else the entry
+// (nothing in states 3 and 4); `*f1` set where RefitAxles leaves f1 (nullopt
+// where its FitAxles ran the original), else left.
+uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                     std::optional<double>* f1);
+// sub_821DA330 TuningScreen::SetCaliper: the calipers' texture w by
+// `choice` (unsigned; 0 by the selected garage car's id +224: 4 gives 6, 7,
+// 12 and 14 give 5, others 4; 1 gives 4, 2 gives 6, 3 gives 0, 4 gives 5,
+// 5 and up 0), then the tail call GarageStage::SetWheelExtras(holder, r4,
+// w) from `sp` (with `stand.calls.poll`); its r3.
+uint64_t SetCaliper(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t r4,
+                    uint32_t choice, uint32_t sp);
+// sub_821CCBE8 TuningScreen::SetAccessory: the kind turned around (0 gives
+// 3 with the choice 0; 1 gives 2 with the choices 3 and 4 swapped; 2 gives
+// 1; 3 and up 0), then the tail call GarageStage::SetAccessory(holder, kind,
+// choice) from `sp`; its r3.
+uint64_t SetAccessory(uint8_t* base, const GuestCall& call, uint32_t kind, uint32_t choice,
+                      uint32_t sp);
+// sub_821DF9D0 TuningScreen::RefitAxles: a car object at frame + 80 from the
+// selected garage car (Car::Init, memcpy 1,884 bytes, +3888 |= 1,
+// Car::Refresh), then GarageStage::FitAxles(holder, car). 4,000-byte frame;
+// its r3, `*f1` its f1 (nullopt where it ran the original).
+uint64_t RefitAxles(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
+                    std::optional<double>* f1);
+// sub_821E7E48 TuningScreen::PreviewInteriorChoices: the tables A (3, 2, 1,
+// 0) and B (2, 1, 0, 4, 3) at frame + 80 and + 96; for the five choice codes
+// +33800 + 4i the stand's choice (6, 5, 4, then 0 or 2 and 1 or 3 by
+// +35708, the other cleared), cleared for -1, else
+// GarageStage::SetChoice(holder, c, A[w / 10], B[w % 10]); then the slot
+// +33576's choice with (A[+33564], B[+33572]) (indexes unchecked). 208-byte
+// frame; the last SetChoice's r3.
+uint64_t PreviewInteriorChoices(uint8_t* base, const GuestCall& call, uint32_t screen,
+                                uint32_t sp);
+// sub_821CC930 TuningScreen::PreviewLightKit: in state 21 or 22 (+9652),
+// GarageStage::SetLightKit(holder, +30492, ...) with the group's floats
+// (each word times [0x820021FC], their conversions' doublewords at frame +
+// 80 to + 96), else nothing (r3 left). 112-byte frame; SetLightKit's r3,
+// `*f1` its f1 (left in the other states).
+uint64_t PreviewLightKit(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                         std::optional<double>* f1);
+// --- The refresh's pages never seen in play (refresh_pages.cpp) ---
+
+// sub_821F2110 TuningScreen::RefreshPaint (state 18): movie 2's header
+// textures (3, 1) 6 and (3, 2) 34 with +9716 set, node (8, 1) hidden,
+// sub-scene 21's labels (SetNodeText 221 to 229, 4 and 5), its children 3's
+// and 4's child 4 +104 = 1. 112-byte frame below `sp`; r3 the last child.
+uint64_t RefreshPaint(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F2378 TuningScreen::RefreshLightKits (states 19 to 22): r3 = the
+// screen (all 64 bits). By the state: 19 the light kits' list (sub-scene
+// 36), 20 the kinds' (37) with the help line by +30500, 21 the neon edit
+// (sub-scene 23) and 22 the LED edit (24): their labels, PreviewLightKit's
+// plain C++ (`*f1` its), the eight swatches' colors and the help line by
+// +30508 or +30544. 144-byte frame below `sp`; r3 its last call's.
+uint64_t RefreshLightKits(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                          std::optional<double>* f1);
+// sub_821F7A98 TuningScreen::RefreshMovie14: movie 14's texts (0, 9) 9 with
+// +25116 and (0, 13) 8 with +25092, texture (0, 11) +25096, nodes (1, 2),
+// (1, 10), (1, 8), (1, 9) hidden, textures (1, 6) and (1, 7) 1. 112-byte
+// frame below `sp`; SetNodeTexture's r3.
+uint64_t RefreshMovie14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F2AD8 TuningScreen::RefreshInterior (states 53 to 58, the
+// interior item's pages; its row): 57 and 58 the slots' nodes, the help line
+// by IsSlotAvailable's plain C++ (tuning_pages), the mode +33564 and the
+// slot's code, and in 57 PreviewInteriorChoices' plain C++; 56 the pair's
+// picture and the help by the mode; 55 sub-scene 32's six swatches by the
+// kind +33548; 54 sub-scene 28's rows (SetNodeText 375 and 379, marks by
+// GetChoiceFlag) and the help by the kind; 53 the textures and help 648.
+// 176-byte frame below `sp`; r3 its last call's (the entry for other
+// states).
+uint64_t RefreshInterior(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821E7DA0 UiNode::SetRgb: the node's +56, +60, +64 = `r`, `g`, `b`. A
+// leaf.
+void SetRgb(uint8_t* base, uint32_t node, uint32_t r, uint32_t g, uint32_t b);
 // sub_821E0FB0 TuningScreen::RestoreStand: r3 = the screen (all 64 bits).
 // The current page's saved values put back on the stand by the category and
 // the item (its row): the stand's setters', PreviewWheel's, SetInteriorPair's
-// and GarageStage::SetLightKit's plain C++; SetCaliper, GarageStage::SetChoice,
-// PreviewParts, RefitAxles, SetAero2, SetDoorKind, SetAccessory,
-// GarageStage::SetColor and ClearLightKit (never seen in play) through the
-// guest (SetColor with f1 to f3, ClearLightKit with f1 as it is). The choice
+// GarageStage::SetLightKit's and PreviewParts' plain C++; SetCaliper,
+// SetCaliper's, RefitAxles', SetAccessory's, GarageStage::SetChoice's,
+// SetAero2's, SetDoorKind's and ClearLightKit's (never seen in play; f1 left
+// by all but RefitAxles); GarageStage::SetColor (never seen in play) by its plain C++
+// (stand_models', with `stand.calls.poll`; f1 left as its f1). The choice
 // tables at frame + 112 and + 128, the tire grades' at + 128, the
 // conversions' doublewords at + 80 to + 112 as the original leaves them.
 // 224-byte frame; r3 the last call's, else the entry; `*f1` set where the
@@ -621,11 +743,11 @@ uint64_t Refresh(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t s
 // onto the stand (its row): the bonnet's, the roof's (cars 14 and 15) and
 // the doors' animations opened or closed by the page (the open states at
 // 0x826D84A0, 0x826D849C, 0x826D8498; GarageStage::Command's plain C++), the
-// paint's three colors in state 18 (GarageStage::SetColor through the guest
-// with f1 to f3; the conversions' doublewords at frame + 80 to + 103 as the
-// original leaves them), the decals waiting at +10012 once the stand isn't
-// busy (ApplyDecals' plain C++; ApplyAreaDecals and ApplyDecalWord, never
-// seen in play, through the guest), StepSecondWheels and SetWheelWord's
+// paint's three colors in state 18 (GarageStage::SetColor's plain C++,
+// stand_models', its paints as `paint_poll` decides; the conversions'
+// doublewords at frame + 80 to + 103 as the original leaves them), the decals waiting at +10012 once the stand isn't
+// busy (ApplyDecals', ApplyAreaDecals' and ApplyDecalWord's plain C++, the
+// last two never seen in play), StepSecondWheels and SetWheelWord's
 // plain C++ (`paint_poll` as StepSecondWheels' adapter gives it), then
 // GarageStage::Draw's (`draw` as its adapter decides). 144-byte frame (its
 // saved registers and f31 not written); GarageStage::Draw's r3.
@@ -654,7 +776,8 @@ struct UpdateCalls {
   load_poll::Calls* paint_poll;  // as UpdateStand's adapter gives it
   bool native_slots;             // --native_action_mappers
   bool native_specs;             // --native_car_specs
-  bool native_pages;             // --native_tuning_pages (Command21's callees)
+  bool native_pages;             // --native_tuning_pages (Command21's callees and the
+                                 // sticker commands)
   // TuningScreen::DrawPowerGraph (sub_821DF350) through its override from
   // `frame` with r3 and r31 = `r3`, r30 = `r30` (its adapter saves them) and
   // the original's return address; f1 left in the guest's.

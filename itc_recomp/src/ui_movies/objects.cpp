@@ -549,6 +549,22 @@ std::optional<uint32_t> SetNodeTextV(uint8_t* base, const strings_and_font::Form
   });
 }
 
+std::optional<uint32_t> SetNodeCharText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                        uint32_t stack, uint32_t movie, uint32_t node,
+                                        uint32_t text) {
+  constexpr uint32_t kCharsToText = 0x82108A70;  // the 8-bit string's conversion
+  constexpr uint32_t kFont = 0x826C5C00;
+  if (Load(base, node) != kTxtTag) {
+    return std::nullopt;
+  }
+  return ChangeNodeText(base, movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C8A0 UiMovie::SetNodeCharText");
+    Zero(base, Load(base, record), 4096);
+    calls.call(calls.user, kCharsToText, Load(base, kFont), Load(base, record), text, stack - 128,
+               0x8211C908);
+  });
+}
+
 std::optional<uint32_t> SetNameText(uint8_t* base, const strings_and_font::FormatCalls& calls,
                                     uint32_t stack, uint32_t movie, uint32_t node, uint32_t name) {
   ITC_NATIVE_RUNNING("sub_8211CAA0 UiMovie::SetNameText");

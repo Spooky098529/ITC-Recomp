@@ -129,8 +129,9 @@ struct InitInfo {
 };
 // sub_821A6E18 Type2SaveScreen::Init, sub_821A7470 Type4SaveScreen::Init
 // (the title's) and sub_821A7AC8 Type10SaveScreen::Init (the replays').
-// Type8SaveScreen::Init sub_821A87F0 is never seen in play (recompiled).
-constexpr int kInitCount = 3;
+// sub_821A87F0 Type8SaveScreen::Init (never seen in play; no adapter: only
+// ModeType8::Init's plain C++ calls it).
+constexpr int kInitCount = 4;
 extern const InitInfo kInits[kInitCount];
 // The Init at `address` (one of kInits) on `object`, its frame at `frame`
 // (its back chain written).

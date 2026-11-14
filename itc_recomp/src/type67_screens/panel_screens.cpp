@@ -6,6 +6,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "ui_movies/game.h"
 
 namespace type67_screens {
 
@@ -15,6 +16,8 @@ using guest::LoadU32;
 using guest::StoreU32;
 
 constexpr uint32_t kCarList = 9644, kGroupPair = 9648;
+// The dialog's UI movie and its default cursor word.
+constexpr uint32_t kDialogMovie = 16, kDialogCursor = 40960;
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   StoreU32(base, sp - bytes, sp);
@@ -174,7 +177,7 @@ uint64_t Type7PanelScreenDrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint3
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
   uint64_t result = PanelScreenDrawList(base, r3, r4, frame, calls);
   if (LoadU32(base, screen + 11700) != 0) {
-    result = calls.call(kAskQuit, frame, 0x82240940, r3, r4);
+    result = Type7PanelScreenAskQuit(base, r3, r4, frame, calls);
   }
   return result;
 }
@@ -186,6 +189,67 @@ uint64_t Type7PanelScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   const int32_t quit = int32_t(LoadU32(base, screen + 9656));
   if (quit == 0) {
     return Type7PanelScreenDrawList(base, r3, r4, sp, calls);
+  }
+  if (quit == 2 && (LoadU32(base, kFadeCountA) | LoadU32(base, kFadeCountB)) == 0) {
+    StoreU32(base, screen + 9608, 10);
+  }
+  return r3;
+}
+
+namespace {
+
+// The panel screens' AskQuit: the dialog's texts (movie 16: 27, then 2 and
+// 3), its cursor word 1, message `message` posted, +9656 = 1, +9660 = -1;
+// the return addresses type 7's less `delta`. -1 (the r3 it leaves).
+uint64_t AskQuit(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls,
+                 uint32_t message, uint32_t delta) {
+  const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
+  StoreU32(base, frame + 80, kDialogMovie);
+  const uint32_t movie =
+      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  calls.set_text(frame, 0x8224055C - delta, movie, 0xFFFFFFFFu, 0, 27);
+  calls.set_text(frame, 0x82240570 - delta, movie, 1, 3, 2);
+  calls.set_text(frame, 0x82240584 - delta, movie, 1, 4, 3);
+  StoreU32(base, movie + kDialogCursor, 1);
+  Post(base, uint32_t(r4), message);
+  StoreU32(base, screen + 9656, 1);
+  StoreU32(base, screen + 9660, 0xFFFFFFFFu);
+  return ~uint64_t(0);
+}
+
+}  // namespace
+
+uint64_t Type7PanelScreenAskQuit(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82240518 Type7PanelScreen::AskQuit");
+  return AskQuit(base, r3, r4, sp, calls, 6, 0);
+}
+
+uint64_t Type6PanelScreenAskQuit(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82230BA8 Type6PanelScreen::AskQuit");
+  return AskQuit(base, r3, r4, sp, calls, 7, 0x82240518 - 0x82230BA8);
+}
+
+uint64_t Type6PanelScreenDrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                  const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82230EF0 Type6PanelScreen::DrawList");
+  const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
+  uint64_t result = PanelScreenDrawList(base, r3, r4, frame, calls);
+  if (LoadU32(base, screen + 11700) != 0) {
+    result = Type6PanelScreenAskQuit(base, r3, r4, frame, calls);
+  }
+  return result;
+}
+
+uint64_t Type6PanelScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82230F40 Type6PanelScreen::Draw");
+  const uint32_t screen = uint32_t(r3);
+  const int32_t quit = int32_t(LoadU32(base, screen + 9656));
+  if (quit == 0) {
+    // A tail call.
+    return Type6PanelScreenDrawList(base, r3, r4, sp, calls);
   }
   if (quit == 2 && (LoadU32(base, kFadeCountA) | LoadU32(base, kFadeCountB)) == 0) {
     StoreU32(base, screen + 9608, 10);

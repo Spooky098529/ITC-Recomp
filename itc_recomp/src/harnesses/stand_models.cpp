@@ -352,8 +352,27 @@ void Reapplies(Context& h, uint32_t b) {
        [](PPCContext& t, Random& r) { t.r4.u64 = r.Below(4) == 0 ? r.Below(40) : r.Below(6); }},
       {"GarageStage::SetAero (sub_82179548)", __imp__sub_82179548, hooks::StandModelsSetAero, 96,
        16, [](PPCContext& t, Random& r) { t.r4.u64 = uint32_t(r.Next()); }},
+      {"GarageStage::SetChoice (sub_82179310)", __imp__sub_82179310,
+       hooks::StandModelsSetChoice, 112, 32,
+       [](PPCContext& t, Random& r) {
+         t.r4.u64 = r.Below(6) == 0 ? r.Below(40) : r.Below(7);
+         t.r5.u64 = r.Below(2) == 0 ? r.Below(5) : uint32_t(r.Next());
+         t.r6.u64 = r.Below(2) == 0 ? r.Below(5) : uint32_t(r.Next());
+       }},
+      {"GarageStage::SetAero2 (sub_821794A8)", __imp__sub_821794A8, hooks::StandModelsSetAero2,
+       96, 16, [](PPCContext& t, Random& r) { t.r4.u64 = uint32_t(r.Next()); }},
+      {"GarageStage::SetDoorKind (sub_821794F8)", __imp__sub_821794F8,
+       hooks::StandModelsSetDoorKind, 96, 16,
+       [](PPCContext& t, Random& r) { t.r4.u64 = r.Below(2) == 0 ? r.Below(2) : r.Next(); }},
       {"GarageStage::ReloadDecals (sub_82178EC0)", __imp__sub_82178EC0,
        hooks::StandModelsReloadDecals, 96, 16, [](PPCContext&, Random&) {}},
+      {"GarageStage::SetParts (sub_821797A8)", __imp__sub_821797A8, hooks::StandModelsSetParts,
+       144, 56,
+       [](PPCContext& t, Random& r) {
+         for (PPCRegister* reg : {&t.r4, &t.r5, &t.r6, &t.r7, &t.r8, &t.r9}) {
+           reg->u64 = r.Below(3) == 0 ? r.Next() : uint64_t(int64_t(r.Below(16)) - 1);
+         }
+       }},
   };
   for (const Setter& s : setters) {
     Results results(s.name);
@@ -524,6 +543,106 @@ void SecondWheels(Context& h, uint32_t b) {
   }
 }
 
+// The paint: GarageStage::SetColor's pieces and SetColor itself (r4 0 to 7,
+// now and then any word: unsigned, above 5 nothing), f1 to f3 singles (NaNs,
+// infinities and denormals among them); the model not ready (+5036 0: the
+// paints do nothing; load_poll's and car_makers' cases take them further)
+// or, for the wheels' paint, traffic (+32 3, ready or not: nothing either). The top 32
+// bytes of the 128-byte frame: f29 to f31 and lr's saves.
+void Colors(Context& h, uint32_t b) {
+  struct Piece {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Piece pieces[] = {
+      {"GarageStage::SetColor0 (sub_8217B078)", __imp__sub_8217B078, hooks::StandModelsSetColor0},
+      {"GarageStage::SetColor1 (sub_8217B108)", __imp__sub_8217B108, hooks::StandModelsSetColor1},
+      {"GarageStage::SetColor2 (sub_8217B198)", __imp__sub_8217B198, hooks::StandModelsSetColor2},
+      {"GarageStage::SetColor3 (sub_8217B228)", __imp__sub_8217B228, hooks::StandModelsSetColor3},
+      {"GarageStage::SetColor4 (sub_8217B2B8)", __imp__sub_8217B2B8, hooks::StandModelsSetColor4},
+      {"GarageStage::SetColor5 (sub_8217B348)", __imp__sub_8217B348, hooks::StandModelsSetColor5},
+      {"GarageStage::SetColor (sub_8217C6C8)", __imp__sub_8217C6C8, hooks::StandModelsSetColor},
+  };
+  for (const Piece& p : pieces) {
+    Results results(p.name);
+    const bool dispatch = p.native == hooks::StandModelsSetColor;
+    for (int c = 0; c < (dispatch ? 64 : 32); c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             for (const uint32_t m : {kModel, kModel2}) {
+               const bool traffic = r.Below(3) == 0;
+               Put(h.base, b + m + 32, traffic ? 3 : r.Below(3));
+               Put(h.base, b + m + 5036, traffic ? r.Below(2) : 0);
+             }
+             t.r3.u64 = b + kHolderAt;
+             t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(8);
+             t.f1.f64 = RandomDouble(r);
+             t.f2.f64 = RandomDouble(r);
+             t.f3.f64 = RandomDouble(r);
+             // The body paint (pieces 0 to 2) on a ready model would run
+             // SceneTraffic::ApplyPaint for traffic on a random body, or
+             // the parts' paints on random parts: not ready.
+             const uint32_t piece = dispatch ? t.r4.u32 : uint32_t(&p - pieces);
+             if (piece < 3) {
+               Put(h.base, sm::StageModel(h.base, b + kHolderAt) + 5036, 0);
+             }
+           },
+           p.recompiled, p.native, 128, 32, true, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// The decals the tuning screen's never-seen paths set. SetSticker: the
+// area -1 to 8 or any word, the slot 0 to 7 (its caller's 0 to 4 and a few
+// past them; unchecked), any word and flag, r8 and r9 any doublewords, f1 a
+// single, the size in the caller's parameter area at random; the top 48
+// bytes: r28 to r31, lr and f31's saves. SetDecalWord: the stage's world as
+// the re-applies' (ReloadDecals' model not ready, or traffic); the top 32
+// bytes: r29 to r31 and lr's saves.
+void Decals(Context& h, uint32_t b) {
+  {
+    Results results("GarageStage::SetSticker (sub_8217B3D8)");
+    for (int c = 0; c < 64; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             t.r3.u64 = b + kHolderAt;
+             t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(r.Below(10)) - 1);
+             t.r5.u64 = r.Below(8);
+             t.r6.u64 = r.Next();
+             t.r7.u64 = r.Below(2) == 0 ? r.Below(2) : r.Next();
+             t.r8.u64 = r.Next();
+             t.r9.u64 = r.Next();
+             t.f1.f64 = RandomDouble(r);
+           },
+           __imp__sub_8217B3D8, hooks::StandModelsSetSticker, 128, 48, true,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::SetDecalWord (sub_821793D0)");
+    for (int c = 0; c < 48; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
+             LayStage(h.base, b, r);
+             for (const uint32_t m : {kModel, kModel2}) {
+               const bool traffic = r.Below(3) == 0;
+               Put(h.base, b + m + 32, traffic ? 3 : r.Below(3));
+               Put(h.base, b + m + 5036, traffic ? r.Below(2) : 0);
+             }
+             t.r3.u64 = b + kHolderAt;
+             t.r4.u64 = r.Below(2) == 0 ? r.Below(2) : r.Next();
+           },
+           __imp__sub_821793D0, hooks::StandModelsSetDecalWord, 112, 32, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 // SceneWheels::SetSizes: the wheels as LayWheels lays them; r4, r5 any
 // words; r6 and r8 any doublewords, r7 and r9 as GarageStage::SetWheel
 // passes them (a word in the high half, 0 below), or any doubleword now and
@@ -549,6 +668,95 @@ void Sizes(Context& h, uint32_t b) {
   results.Report();
 }
 
+// The setters the tuning screen's never-seen paths reach. The interior
+// (SetAccessory, ApplyInterior, SceneInterior::SetRecord): the models'
+// +5068 an interior in the block, its +36 a first-set object (the record
+// copied into both, 120 bytes from the model's +3804, or a random record
+// for SetRecord); the top 24 bytes of the 112-byte frames: r30, r31 and lr's
+// saves. The wheels (SetWheelExtras with SceneWheels::SetWord68 and
+// SetCaliperTexture): the wheels as LayWheels lays them, with the calipers'
+// part models (+2336, +2800); the texture 0 to 6 or any word; the top 32
+// bytes of SetWheelExtras' 112-byte frame (r29 to r31, lr), 16 of
+// SetCaliperTexture's 96 (r31, lr); SetWord68 has no frame.
+void Extras(Context& h, uint32_t b) {
+  constexpr uint32_t kInterior = 0xCE00, kInteriorFirst = 0xCF00;
+  auto lay_interior = [&](Random& r) {
+    LayStage(h.base, b, r);
+    for (const uint32_t m : {kModel, kModel2}) {
+      Put(h.base, b + m + 5068, b + kInterior);
+    }
+    Put(h.base, b + kInterior + 36, b + kInteriorFirst);
+  };
+  auto lay_wheels = [&](Random& r) {
+    LayWheels(h.base, b, r);
+    PartModel(h.base, b, b + kFirstWheels + 2336, 2, r);
+    PartModel(h.base, b, b + kFirstWheels + 2800, 3, r);
+  };
+  auto word = [](Random& r) { return r.Below(2) == 0 ? r.Below(7) : uint32_t(r.Next()); };
+  struct Item {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::function<void(PPCContext&, Random&)> setup;
+  };
+  const Item items[] = {
+      {"SceneInterior::SetRecord (sub_820E38E0)", __imp__sub_820E38E0,
+       hooks::StandModelsSceneInteriorSetRecord, 112, 24,
+       [&](PPCContext& t, Random& r) {
+         lay_interior(r);
+         t.r3.u64 = b + kInterior;
+         t.r4.u64 = b + 0x8000 + 4 * r.Below(64);
+       }},
+      {"SceneModel::ApplyInterior (sub_820D9F40)", __imp__sub_820D9F40,
+       hooks::StandModelsApplyInterior, 0, 0,
+       [&](PPCContext& t, Random& r) {
+         lay_interior(r);
+         t.r3.u64 = b + (r.Below(2) == 0 ? kModel : kModel2);
+       }},
+      {"GarageStage::SetAccessory (sub_821792B0)", __imp__sub_821792B0,
+       hooks::StandModelsSetAccessory, 112, 24,
+       [&](PPCContext& t, Random& r) {
+         lay_interior(r);
+         t.r3.u64 = b + kHolderAt;
+         t.r4.u64 = r.Below(2) == 0 ? r.Below(4) : r.Next();
+         t.r5.u64 = r.Below(2) == 0 ? r.Below(5) : r.Next();
+       }},
+      {"SceneWheels::SetWord68 (sub_820E7410)", __imp__sub_820E7410, hooks::StandModelsSetWord68,
+       0, 0,
+       [&](PPCContext& t, Random& r) {
+         lay_wheels(r);
+         t.r3.u64 = b + kWheels;
+         t.r4.u64 = r.Below(2) == 0 ? r.Below(7) : r.Next();
+       }},
+      {"SceneWheels::SetCaliperTexture (sub_820E7428)", __imp__sub_820E7428,
+       hooks::StandModelsSceneSetCaliperTexture, 96, 16,
+       [&](PPCContext& t, Random& r) {
+         lay_wheels(r);
+         t.r3.u64 = b + kWheels;
+         t.r4.u64 = word(r);
+       }},
+      {"GarageStage::SetWheelExtras (sub_821790D0)", __imp__sub_821790D0,
+       hooks::StandModelsSetWheelExtras, 112, 32,
+       [&](PPCContext& t, Random& r) {
+         LayStage(h.base, b, r);
+         lay_wheels(r);
+         t.r3.u64 = b + kHolderAt;
+         t.r4.u64 = r.Below(2) == 0 ? r.Below(30) : r.Next();
+         t.r5.u64 = word(r);
+       }},
+  };
+  for (const Item& item : items) {
+    Results results(item.name);
+    for (int c = 0; c < 32; c++) {
+      Case(h, results, b, h.random.Next(),
+           [&](PPCContext& t, Random& r, std::vector<uint32_t>&) { item.setup(t, r); },
+           item.recompiled, item.native, item.frame, item.saves, false,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void StandModels(Context& h) {
@@ -566,6 +774,9 @@ void StandModels(Context& h) {
     TireGrades(h, b);
     SecondWheels(h, b);
     Sizes(h, b);
+    Colors(h, b);
+    Decals(h, b);
+    Extras(h, b);
   }
   memory::Free(allocation);
 }

@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "hooks/car_makers.h"
+#include "hooks/direct_slots.h"
 #include "hooks/front_end_car_draw.h"
 #include "hooks/guest_call.h"
 #include "power_graph/power_graph.h"
@@ -56,7 +57,11 @@ uint32_t VtableCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t of
   const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
   ctx.ctr.u64 = function;
   ctx.lr = back;
-  REX_CALL_INDIRECT_FUNC(function);
+  // (The render manager's slot 8 by its plain C++ where it's the game's,
+  // hooks::DirectSlotCall.)
+  if (!hooks::DirectSlotCall(ctx, base, function)) {
+    REX_CALL_INDIRECT_FUNC(function);
+  }
   return ctx.r3.u32;
 }
 
@@ -182,8 +187,9 @@ void hooks::CarListDrawEntryPowerGraph(PPCContext& ctx, uint8_t* base) {
     ctx.r6.u64 = draw.car;
     ctx.f1.f64 = draw.x;
     ctx.f2.f64 = draw.y;
-    // r31 as the original holds it (PowerGraph::Draw saves it in its frame).
-    ctx.r31.u64 = pg::kEntryR31;
+    // r31 as the original holds it (lis: sign-extended; PowerGraph::Draw
+    // saves it in its frame, where a count above 32 reads it back).
+    ctx.r31.u64 = 0xFFFFFFFF00000000ull | pg::kEntryR31;
     ctx.lr = pg::kEntryDrawReturn;
     sub_8217C708(ctx, base);
   });

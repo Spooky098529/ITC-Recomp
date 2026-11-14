@@ -1386,6 +1386,8 @@ GuestFunction RecompiledInit(uint32_t address) {
     case 0x821CA458: return __imp__sub_821CA458;
     case 0x821C8578: return __imp__sub_821C8578;
     case 0x821C8A60: return __imp__sub_821C8A60;
+    case 0x821CAAB0: return __imp__sub_821CAAB0;
+    case 0x821C8F48: return __imp__sub_821C8F48;
     default: return nullptr;
   }
 }

@@ -106,6 +106,67 @@ void Getter(Context& h, const Block& block, const char* name, GuestFunction reco
   results.Report();
 }
 
+// CourseRecords::Of: r3 any word (both halves), r4 a pair of words in the
+// block: course and traffic in play's ranges (0 to 10, 0 to 1) or any words.
+// r3, r10 and r11 (both halves) compared.
+void CourseRecordsOf(Context& h, const Block& block) {
+  Results results("CourseRecords::Of (sub_82105BF8)");
+  for (int c = 0; c < 8; c++) {
+    const uint32_t pair = block.address + 4 * h.random.Below(64);
+    const bool any = c >= 6;
+    const uint32_t course = any ? uint32_t(h.random.Next()) : h.random.Below(11);
+    const uint32_t traffic = any ? uint32_t(h.random.Next()) : h.random.Below(2);
+    const uint64_t records = h.random.Below(2) == 0 ? h.random.Next() : block.address;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      guest::StoreU32(h.base, pair, course);
+      guest::StoreU32(h.base, pair + 4, traffic);
+      t.r3.u64 = records;
+      t.r4.u64 = pair;
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_82105BF8 : hooks::SaveDataCourseRecordsOf)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      for (const uint64_t r : {t.r3.u64, t.r10.u64, t.r11.u64}) {
+        out[v].Word(uint32_t(r));
+        out[v].Word(uint32_t(r >> 32));
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// SaveData::TwoPlayerBlock: the word at 0x826C5B5C (put back after) 0, a
+// block's address or any word, r3 and r11 any words before; r3 and r11 (both
+// halves) compared.
+void TwoPlayerBlock(Context& h, const Block& block) {
+  Results results("SaveData::TwoPlayerBlock (sub_82105678)");
+  const uint32_t saved = guest::LoadU32(h.base, save_data::kTwoPlayerBlock);
+  for (int c = 0; c < 4; c++) {
+    const uint32_t word = c == 0 ? 0 : c == 1 ? block.address : uint32_t(h.random.Next());
+    const uint64_t r3 = h.random.Next(), r11 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      guest::StoreU32(h.base, save_data::kTwoPlayerBlock, word);
+      t.r3.u64 = r3;
+      t.r11.u64 = r11;
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_82105678 : hooks::SaveDataTwoPlayerBlock)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      for (const uint64_t r : {t.r3.u64, t.r11.u64}) {
+        out[v].Word(uint32_t(r));
+        out[v].Word(uint32_t(r >> 32));
+      }
+      out[v].Word(guest::LoadU32(h.base, save_data::kTwoPlayerBlock));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, save_data::kTwoPlayerBlock, saved);
+  results.Report();
+}
+
 // SaveData::Delete on a slot in the scratch area (the player number picked so
 // that the slot's address lands there, so the game's slots aren't touched),
 // holding 0 or a block from operator new's plain C++ (each version its own).
@@ -202,6 +263,49 @@ void Create(Context& h) {
     results.Check(out[0], out[1], fmt::format("case {}: slot +{:X}", c, slot - h.data));
   }
   ITC_LOG_INFO("harness: SaveData::Create: {} of 12 runs got the prefilled block back", reused);
+  results.Report();
+}
+
+// SaveData::CreateTwoPlayerBlock (sub_82105740) on the two-player slot
+// (saved and put back): as Create's cases, the block prefilled with random
+// words through the first fit, compared by its bytes, whether it's the
+// prefilled one and r3 against it; then freed.
+void CreateTwoPlayerBlock(Context& h) {
+  Results results("SaveData::CreateTwoPlayerBlock (sub_82105740)");
+  const uint32_t saved = guest::LoadU32(h.base, save_data::kTwoPlayerBlock);
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+      uint32_t prefilled = 0;
+      if (const auto block = memory::crt::OperatorNew(h.base, save_data::kTwoPlayerBlockBytes);
+          block && *block != 0) {
+        WriteRandom(h.base, *block, save_data::kTwoPlayerBlockBytes / 4, random);
+        memory::crt::OperatorDelete(*block);
+        prefilled = *block;
+      }
+      after = random;
+      guest::StoreU32(h.base, save_data::kTwoPlayerBlock, uint32_t(random.Next()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = random.Next();
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_82105740 : hooks::SaveDataCreateTwoPlayerBlock)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      const uint32_t block = guest::LoadU32(h.base, save_data::kTwoPlayerBlock);
+      out[v].Word(block == prefilled && block != 0 ? 1 : 0);
+      out[v].Bytes(Read(h.base, block, save_data::kTwoPlayerBlockBytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32 - block);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      memory::crt::OperatorDelete(block);
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, save_data::kTwoPlayerBlock, saved);
   results.Report();
 }
 
@@ -433,8 +537,11 @@ void SaveData(Context& h) {
              hooks::SaveDataOptionsSetDefaults, 284, 12);
   OnePointer(h, block, "CourseRecords::Reset (sub_82105D08)", __imp__sub_82105D08,
              hooks::SaveDataCourseRecordsReset, 20 + 22 * 408, 12);
+  CourseRecordsOf(h, block);
+  TwoPlayerBlock(h, block);
   Delete(h);
   Create(h);
+  CreateTwoPlayerBlock(h);
   MenuListInit(h);
   ResetControllers(h);
   ResetPlayer(h);

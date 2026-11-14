@@ -17,6 +17,7 @@
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
+#include "hooks/direct_slots.h"
 #include "hooks/heap.h"
 #include "hooks/screen_objects.h"
 #include "screen_objects/screen_objects.h"
@@ -100,9 +101,13 @@ namespace {
 // the original's return addresses.
 uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
   ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   ctx.lr = first;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
+  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  if (!hooks::DirectSlotCall(ctx, base, slot7)) {
+    ctx.ctr.u64 = slot7;
+    REX_CALL_INDIRECT_FUNC(slot7);
+  }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = second;
   REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);

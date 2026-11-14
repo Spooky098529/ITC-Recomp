@@ -8,6 +8,7 @@
 #include "build_screen/build_screen.h"
 #include "car_makers/car_makers.h"
 #include "data_tables/data_tables.h"
+#include "stand_models/stand_models.h"
 #include "type2_screens/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -184,8 +185,20 @@ uint32_t HubOpenMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
                1968);
     block = car_makers::BlockOf(Load(base, frame + 92));
   }
-  calls.Call(kStageMakeModel, frame, 0x8218E3FC, Load(base, Load(base, build_screen::kStandHolder)),
-             block, 1);
+  // GarageStage::MakeModel by its plain C++ (its adapter went, B7 loop,
+  // 2026-11-13), ScenePools::SetUpB under it through `calls`.
+  const stand_models::GuestCall call = [&](uint32_t function,
+                                           std::initializer_list<uint64_t> args, uint32_t r1,
+                                           uint32_t lr) {
+    uint64_t regs[4] = {};
+    size_t n = 0;
+    for (const uint64_t v : args) {
+      regs[n++] = v;
+    }
+    return calls.Call(function, r1, lr, regs[0], regs[1], regs[2], regs[3]);
+  };
+  stand_models::MakeModel(base, call, Load(base, Load(base, build_screen::kStandHolder)), block, 1,
+                          frame);
   calls.Call(kMoviesOpen, frame, 0x8218E408, kHubMovie, 22545);
   return HubLoadNoticeImages(base, frame, calls);
 }

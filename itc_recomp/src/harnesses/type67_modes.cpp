@@ -44,6 +44,7 @@
 #include "hooks/network_mode.h"
 #include "hooks/type67_modes.h"
 #include "hooks/type2_mode.h"
+#include "hooks/type8_mode.h"
 #include "hooks/ui_movies.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
@@ -59,6 +60,7 @@
 #include "scene_loaders/pools.h"
 #include "type67_modes/type67_modes.h"
 #include "type2_mode/type2_mode.h"
+#include "type8_mode/type8_mode.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -74,6 +76,7 @@
 ITC_FLAG_DECLARE(bool, native_type67_modes);
 ITC_FLAG_DECLARE(bool, native_network_mode);
 ITC_FLAG_DECLARE(bool, native_type2_mode);
+ITC_FLAG_DECLARE(bool, native_type8_mode);
 
 namespace time_hooks {
 void SetFakeNow(uint64_t now);
@@ -114,6 +117,7 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
 uint32_t MachineOffset(uint32_t address) {
   switch (address) {
     case 0x822454B8:  // Type7Screen0::Init
+    case 0x8223C950:  // Type8Screen0::Init
     case 0x8223F9A8:
     case 0x822436A0:
     case 0x82230F80:
@@ -146,6 +150,8 @@ GuestFunction Recompiled(uint32_t address) {
     case 0x82237320: return __imp__sub_82237320;
     case 0x82237B78: return __imp__sub_82237B78;
     case 0x822470A8: return __imp__sub_822470A8;
+    case 0x8223C950: return __imp__sub_8223C950;
+    case 0x8223AE60: return __imp__sub_8223AE60;
     default: return nullptr;
   }
 }
@@ -268,9 +274,13 @@ using HandlerSetup = std::function<void(Random&, uint32_t)>;
 using HandlerArgs = std::function<void(PPCContext&, uint32_t)>;
 using HandlerCollect = std::function<void(Side&, PPCContext&, uint32_t)>;
 
+// The flag a Handler's recompiled side turns off (type 6 and 7's when null).
+bool* g_handler_flag = nullptr;
+
 void Handler(Context& h, const Block& world, const char* name, uint32_t address, int cases,
              const HandlerSetup& setup, const HandlerArgs& args, GuestFunction recompiled,
              const Native& native, const HandlerCollect& collect = {}) {
+  bool& flag = g_handler_flag != nullptr ? *g_handler_flag : ITC_FLAG(native_type67_modes);
   Results results(fmt::format("{} (sub_{:08X})", name, address));
   const Globals globals(h.base);
   for (int c = 0; c < cases; c++) {
@@ -292,9 +302,9 @@ void Handler(Context& h, const Block& world, const char* name, uint32_t address,
       t.r3.u64 = world.address;
       args(t, world.address);
       if (v == 0) {
-        ITC_FLAG(native_type67_modes) = false;
+        flag = false;
         recompiled(t, h.base);
-        ITC_FLAG(native_type67_modes) = true;
+        flag = true;
       } else {
         native(t, h.base);
       }
@@ -347,6 +357,10 @@ void Handlers(Context& h, const Block& world) {
           hooks::PanelScreenInitWords);
   Handler(h, world, "ScreenMachine::Wait", 0x82277068, 4, none, plain, __imp__sub_82277068,
           hooks::ScreenMachineWait);
+  Handler(h, world, "Screen::Wait", 0x822508F0, 4, none, plain, __imp__sub_822508F0,
+          hooks::ScreenWait);
+  Handler(h, world, "Type7Dialog::QueueReopen", 0x822419D0, 4, none, plain,
+          __imp__sub_822419D0, hooks::DialogQueueReopen);
   Handler(h, world, "Screen::Reenter", 0x8223B740, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9612); }, plain, __imp__sub_8223B740,
           hooks::ScreenReenter);
@@ -366,6 +380,71 @@ void Handlers(Context& h, const Block& world) {
           },
           [](PPCContext& t, uint32_t w) { t.r4.u64 = w + 0x3200; }, __imp__sub_821BFB48,
           hooks::ControllerOptionsLeave);
+  // The controller pages' steps: the menu (+0x3000) with its side -1, 1, 0
+  // or any and its cursor 0 to 13 (now and then any), the settings
+  // ([0x826D8494], +0x1000) with page 0's sliders around their bounds; the
+  // settings' global put back after.
+  {
+    const uint32_t saved_settings = guest::LoadU32(base, t67::kControllerSettings);
+    const HandlerSetup steps = [base](Random& r, uint32_t w) {
+      guest::StoreU32(base, t67::kControllerData, w + kMenu);
+      guest::StoreU32(base, t67::kControllerSettings, w + 0x1000);
+      const uint32_t sides[4] = {0xFFFFFFFFu, 1, 0, uint32_t(r.Next())};
+      guest::StoreU32(base, w + kMenu + 36, sides[r.Below(4)]);
+      guest::StoreU32(base, w + kMenu + 0, r.Below(8) ? r.Below(14) : uint32_t(r.Next()));
+      for (uint32_t i = 0; i < 3; i++) {
+        guest::StoreU32(base, w + 0x1000 + 272 + 4 * i, uint32_t(int32_t(r.Below(23)) - 11));
+      }
+    };
+    Handler(h, world, "ControllerOptions::StepSliders", 0x821BB290, 32, steps, plain,
+            __imp__sub_821BB290, hooks::ControllerOptionsStepSliders);
+    Handler(h, world, "ControllerOptions::StepButtons", 0x821BB3B8, 16, steps, plain,
+            __imp__sub_821BB3B8, hooks::ControllerOptionsStepButtons);
+    Handler(h, world, "ControllerOptions::StepAnalog", 0x821BB590, 16, steps, plain,
+            __imp__sub_821BB590, hooks::ControllerOptionsStepAnalog);
+    guest::StoreU32(base, t67::kControllerSettings, saved_settings);
+  }
+  // SetMarkY: movie 7 (missing from the table, so UiMovies::Find answers
+  // the word at 0x826C5CDC) a movie in the world (+0x1000) whose live scene
+  // leads through children at small random indexes to the node it writes;
+  // r3 an int (any, small or negative); the frame's words below the
+  // original's register saves compared too.
+  if (ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 7) == Globals::kMissingMovie) {
+    const HandlerSetup marks = [base](Random& r, uint32_t w) {
+      const uint32_t m = w + 0x1000;
+      guest::StoreU32(base, Globals::kMissingMovie, m);
+      guest::StoreU32(base, m + 16, m + 0x100);
+      // Each step: the node's index word (+108) i and its entry (+128 + 8 (i
+      // + child)) the next node.
+      const uint32_t path[4][2] = {{0x100, 8}, {0x300, 5}, {0x500, 0}, {0x700, 0}};
+      for (int k = 0; k < 4; k++) {
+        const uint32_t node = m + path[k][0], index = r.Below(3);
+        guest::StoreU32(base, node + 108, index);
+        guest::StoreU32(base, node + 128 + 8 * (index + path[k][1]),
+                        k < 3 ? m + path[k + 1][0] : m + 0x900);
+      }
+    };
+    // r3: 0, 80, a small negative or any word (the setup's at +0x1F00 and
+    // +0x1F04, the high half).
+    const HandlerArgs mark_y = [base](PPCContext& t, uint32_t w) {
+      t.r3.u64 = (uint64_t(guest::LoadU32(base, w + 0x1F04)) << 32) |
+                 guest::LoadU32(base, w + 0x1F00);
+    };
+    const HandlerSetup marks_y = [base, marks](Random& r, uint32_t w) {
+      marks(r, w);
+      const uint32_t picks[4] = {0, 80, uint32_t(-37 - int32_t(r.Below(100))),
+                                 uint32_t(r.Next())};
+      guest::StoreU32(base, w + 0x1F00, picks[r.Below(4)]);
+      guest::StoreU32(base, w + 0x1F04, r.Below(2) ? 0 : uint32_t(r.Next()));
+    };
+    Handler(h, world, "ControllerOptions::SetMarkY", 0x821C0238, 16, marks_y, mark_y,
+            __imp__sub_821C0238, hooks::ControllerOptionsSetMarkY,
+            [base](Side& side, PPCContext& t, uint32_t) {
+              side.out.Bytes(Read(base, t.r1.u32 - 112, 88));
+            });
+  } else {
+    ITC_LOG_ERROR("harness: type67_modes: movie 7 is in the table; SetMarkY skipped");
+  }
   Handler(h, world, "Type6Dialog::Shown", 0x82231F48, 4, none, plain, __imp__sub_82231F48,
           hooks::Type6DialogShown);
   Handler(h, world, "Type7Dialog::Shown", 0x822419C0, 4, none, plain, __imp__sub_822419C0,
@@ -1391,29 +1470,25 @@ bool DialogStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
   return true;
 }
 
+// What a dialog case runs: its kind (kDraw: a Draw, its pages run
+// recompiled on both sides as an Update's steps), whether the movie table
+// holds ids 16, 19, 20 and 22 (kWide; else 16 and 22), and the flag its
+// recompiled side turns off (type 8's also give the asking player
+// [0x82814E6C] random words, compared).
+enum DialogKind { kStep, kPage, kUpdate, kScreen7, kScreen6, kDraw };
+struct DialogFunction {
+  const char* name;
+  uint32_t address, frame, saves;
+  GuestFunction recompiled, native;
+  DialogKind kind = kStep;
+  bool wide = false;
+  bool type8 = false;
+};
+
+void RunDialogs(Context& h, const Block& world, const DialogFunction* functions, size_t count);
+
 void Dialogs(Context& h, const Block& world) {
-  uint8_t* const base = h.base;
-  constexpr uint32_t kMovieBlockBytes = 0xA100, kNodeBytes = 0x800, kNodes = 8;
-  const Block movie_block(kMovieBlockBytes);
-  const Block nodes(kNodeBytes * kNodes + 8 * 64);
-  const Block misc(0x1000);  // the pairs (+0), the fake manager (+0x400), its vtable (+0x800)
-  if (!movie_block.address || !nodes.address || !misc.address) return;
-  const uint32_t movie = movie_block.address;
-  auto node = [&](uint32_t i) { return nodes.address + kNodeBytes * i; };
-  const uint32_t animations = nodes.address + kNodeBytes * kNodes;
-  const uint32_t sp = CallContext(h).r1.u32;
-  // The pages' and Updates' worlds: the players' mappers (their vtables at
-  // +0x100, the mappers at +0x200) and the dispatcher at the world's +0x3200.
-  const Block mappers(0x1000);
-  if (!mappers.address) return;
-  const uint32_t dispatcher = world.address + 0x3200;
-  enum Kind { kStep, kPage, kUpdate, kScreen7, kScreen6 };
-  struct Function {
-    const char* name;
-    uint32_t address, frame, saves;
-    GuestFunction recompiled, native;
-    Kind kind = kStep;
-  };
+  using Function = DialogFunction;
   const Function functions[] = {
       {"Type6Dialog::ConfirmPage", 0x82232328, 128, 48, __imp__sub_82232328,
        hooks::Type6DialogConfirmPage, kPage},
@@ -1442,16 +1517,45 @@ void Dialogs(Context& h, const Block& world) {
        hooks::DialogCloseConfirmStep},
       {"Dialog::MoveCursorStep", 0x8223AB50, 128, 32, __imp__sub_8223AB50,
        hooks::DialogMoveCursorStep},
+      {"Dialog::OpenNoticeStep", 0x822326A8, 112, 24, __imp__sub_822326A8,
+       hooks::DialogOpenNoticeStep, kStep, true},
+      {"Dialog::CloseNoticeStep", 0x8223AAA8, 112, 24, __imp__sub_8223AAA8,
+       hooks::DialogCloseNoticeStep, kStep, true},
   };
+  RunDialogs(h, world, functions, std::size(functions));
+}
+
+void RunDialogs(Context& h, const Block& world, const DialogFunction* functions, size_t count) {
+  using Function = DialogFunction;
+  uint8_t* const base = h.base;
+  constexpr uint32_t kMovieBlockBytes = 0xA100, kNodeBytes = 0x800, kNodes = 8;
+  const Block movie_block(kMovieBlockBytes);
+  const Block nodes(kNodeBytes * kNodes + 8 * 64);
+  const Block misc(0x1000);  // the pairs (+0), the fake manager (+0x400), its vtable (+0x800)
+  if (!movie_block.address || !nodes.address || !misc.address) return;
+  const uint32_t movie = movie_block.address;
+  auto node = [&](uint32_t i) { return nodes.address + kNodeBytes * i; };
+  const uint32_t animations = nodes.address + kNodeBytes * kNodes;
+  const uint32_t sp = CallContext(h).r1.u32;
+  // The pages' and Updates' worlds: the players' mappers (their vtables at
+  // +0x100, the mappers at +0x200) and the dispatcher at the world's +0x3200.
+  const Block mappers(0x1000);
+  if (!mappers.address) return;
+  const uint32_t dispatcher = world.address + 0x3200;
+  constexpr uint32_t kPlayer = 0x82814E6C;
+  const uint32_t saved_player = guest::LoadU32(base, kPlayer);
   const std::vector<uint8_t> table = Read(base, ui_movies::kMovieTable, 12);
   const uint32_t saved_manager = guest::LoadU32(base, menu_sounds::kSoundManager);
   const std::vector<uint8_t> saved_mappers = Read(base, menu_helpers::kMapperEntries, 32);
   const std::vector<uint8_t> saved_controllers = Read(base, menu_helpers::kControllerEntries, 16);
   constexpr uint32_t kFades = mode_tick::kFadeOutDurations, kFadesBytes = 64;
   const std::vector<uint8_t> saved_fades = Read(base, kFades, kFadesBytes);
-  for (const Function& f : functions) {
+  for (size_t fi = 0; fi < count; fi++) {
+    const Function& f = functions[fi];
+    bool& flag = f.type8 ? ITC_FLAG(native_type8_mode) : ITC_FLAG(native_type67_modes);
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
-    for (int c = 0; c < (f.kind == kStep ? 24 : 48); c++) {
+    const int cases = f.type8 || f.wide ? 12 : f.kind == kStep ? 24 : 48;
+    for (int c = 0; c < cases; c++) {
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
         Random r(uint64_t(c) * 811 + f.address);
@@ -1511,16 +1615,34 @@ void Dialogs(Context& h, const Block& world) {
         // The movie table: movies 16 and 22 (the type 7 first screen's)
         // the movie, among a few others, in a random place.
         const uint32_t pairs = misc.address;
-        const uint32_t count = 2 + r.Below(4);
-        const uint32_t at = r.Below(count - 1);
-        for (uint32_t i = 0; i < count; i++) {
-          const bool ours = i == at || i == at + 1;
-          guest::StoreU32(base, pairs + 8 * i, i == at ? 16 : i == at + 1 ? 22 : 30 + i);
-          guest::StoreU32(base, pairs + 8 * i + 4, ours ? movie : uint32_t(r.Next()));
+        uint32_t pair_count;
+        if (f.wide) {
+          // Movies 16, 19, 20 and 22 the movie (20 now and then missing).
+          pair_count = 4 + r.Below(3);
+          const uint32_t at = r.Below(pair_count - 3);
+          const bool no20 = r.Below(4) == 0;
+          static constexpr uint32_t kIds[] = {16, 19, 20, 22};
+          for (uint32_t i = 0; i < pair_count; i++) {
+            const bool ours = i >= at && i < at + 4 && !(no20 && i == at + 2);
+            const uint32_t id = ours ? kIds[i - at] : 30 + i;
+            guest::StoreU32(base, pairs + 8 * i, id);
+            guest::StoreU32(base, pairs + 8 * i + 4, ours ? movie : uint32_t(r.Next()));
+          }
+        } else {
+          pair_count = 2 + r.Below(4);
+          const uint32_t at = r.Below(pair_count - 1);
+          for (uint32_t i = 0; i < pair_count; i++) {
+            const bool ours = i == at || i == at + 1;
+            guest::StoreU32(base, pairs + 8 * i, i == at ? 16 : i == at + 1 ? 22 : 30 + i);
+            guest::StoreU32(base, pairs + 8 * i + 4, ours ? movie : uint32_t(r.Next()));
+          }
         }
         guest::StoreU32(base, ui_movies::kMovieTable, pairs);
         guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
-        guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+        guest::StoreU32(base, ui_movies::kMovieTable + 8, pair_count);
+        if (f.type8) {
+          guest::StoreU32(base, kPlayer, uint32_t(r.Next()));
+        }
         // The fake sound manager.
         const uint32_t manager = misc.address + 0x400, vtable = misc.address + 0x800;
         guest::StoreU32(base, manager, vtable);
@@ -1563,7 +1685,22 @@ void Dialogs(Context& h, const Block& world) {
         static constexpr uint32_t kShown[] = {4, 1, 5, 3};
         guest::StoreU32(base, dialog + 9756, kShown[r.Below(4)]);
         guest::StoreU32(base, dialog + 9760, kShown[r.Below(4)]);
-        if (f.kind == kUpdate) {
+        if (f.kind == kDraw) {
+          // The page: none, ConfirmPage or NoticePage.
+          static constexpr uint32_t kPages[] = {0xFFFFFFFFu, 0, 1};
+          guest::StoreU32(base, dialog + 9640, kPages[r.Below(3)]);
+        }
+        if (f.kind == kUpdate && f.type8) {
+          // Type 8's: its five steps (the notice's too), none, another
+          // negative; movie 16 or 19.
+          static constexpr uint32_t kSteps8[] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0, 1, 2, 3, 4,
+                                                 0xFFFFFFFEu};
+          guest::StoreU32(base, dialog + 9652, kSteps8[r.Below(8)]);
+          guest::StoreU32(base, dialog + 9656, r.Below(2) ? 0xFFFFFFFFu : r.Below(5));
+          static constexpr uint32_t kStates[] = {21, 21, 9, 4, 5, 6};
+          guest::StoreU32(base, dialog + 9740, kStates[r.Below(6)]);
+          guest::StoreU32(base, dialog + 9744, r.Below(2) ? 16 : 19);
+        } else if (f.kind == kUpdate) {
           static constexpr uint32_t kStepsSeen[] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0, 1, 4,
                                                     0xFFFFFFFEu};
           guest::StoreU32(base, dialog + 9652, kStepsSeen[r.Below(6)]);
@@ -1601,14 +1738,18 @@ void Dialogs(Context& h, const Block& world) {
             ui_movies_hooks::g_update_callee_stand_in;
         ui_movies_hooks::g_update_callee_stand_in = DialogStandIn;
         if (v == 0) {
-          ITC_FLAG(native_type67_modes) = false;
+          flag = false;
+          if (f.kind == kUpdate || f.kind == kDraw) ITC_FLAG(native_type67_modes) = false;
           f.recompiled(t, base);
           ITC_FLAG(native_type67_modes) = true;
-        } else if (f.kind == kUpdate) {
-          // The steps the Update calls through its table recompiled on both
-          // sides (their own cases are above).
+          flag = true;
+        } else if (f.kind == kUpdate || f.kind == kDraw) {
+          // The steps (pages) the Update (Draw) calls through its table
+          // recompiled on both sides (their own cases are above).
           ITC_FLAG(native_type67_modes) = false;
+          ITC_FLAG(native_type8_mode) = false;
           f.native(t, base);
+          ITC_FLAG(native_type8_mode) = true;
           ITC_FLAG(native_type67_modes) = true;
         } else {
           f.native(t, base);
@@ -1631,7 +1772,8 @@ void Dialogs(Context& h, const Block& world) {
         out[v].Bytes(Read(base, menu_helpers::kMapperEntries, 32));
         out[v].Bytes(Read(base, menu_helpers::kControllerEntries, 16));
         out[v].Bytes(Read(base, kFades, kFadesBytes));
-        if (f.kind == kUpdate) {
+        if (f.type8) out[v].Word(guest::LoadU32(base, kPlayer));
+        if (f.kind == kUpdate || f.kind == kDraw) {
           // But the step's register saves (40 bytes below the Update's
           // frame): the Update's registers there, the native one's not.
           out[v].Bytes(Read(base, sp - 1024, 1024 - f.frame - 40));
@@ -1652,6 +1794,7 @@ void Dialogs(Context& h, const Block& world) {
   Write(base, menu_helpers::kMapperEntries, saved_mappers.data(), 32);
   Write(base, menu_helpers::kControllerEntries, saved_controllers.data(), 16);
   Write(base, kFades, saved_fades.data(), kFadesBytes);
+  guest::StoreU32(base, kPlayer, saved_player);
 }
 
 // --- The first screens' confirms, Type6Screen0::ShowPage and the type 7
@@ -2336,6 +2479,14 @@ void Cars(Context& h, const Block& world) {
           t.r3.u64 = f.set_up ? t67::Screen0SetUpCar(base, f.type7, t.r4.u64, t.r1.u32, calls)
                               : t67::Screen0OpenMovie(base, f.type7, t.r1.u32, calls);
           t.lr = lr;
+        }
+        // GarageStage::MakeModel has no adapter since OpenMovie's plain C++
+        // calls its own (B7 loop, 2026-11-13): the recompiled side runs its
+        // original, whose r28 to r31 and lr saves (40 bytes under
+        // OpenMovie's frame, logged from the recompiled runs) the plain C++
+        // doesn't write.
+        if (!f.set_up) {
+          Fill(base, sp - f.frame - 40, 40, 0);
         }
         for (const uint32_t word : g_opens) out[v].Word(word);
         out[v].Bytes(Read(base, world.address, world.bytes));
@@ -4248,6 +4399,252 @@ void Type2Mode(Context& h) {
   Type2Blocks(h);
   Type2Delegates(h, world);
   Type2ModeInits(h);
+}
+
+
+// --- The type 8 mode's dialog (src/type8_mode/, docs/functions/type8-mode.md;
+// called by the type8_mode harness, here for the dialogs' worlds this file
+// lays): its leaves as the type 6 and 7 dialogs' Handler cases, OpenMovies
+// with the opens recorded, and its pages, Update, Draw, opens and step 0 as
+// the Dialogs cases (movies 16, 19, 20 and 22 in the table). ---
+
+void Type8Dialogs(Context& h) {
+  uint8_t* const base = h.base;
+  const Block world(kWorldBytes);
+  const Block movie(0xA000);
+  if (!world.address || !movie.address) {
+    ITC_LOG_ERROR("harness: type8_mode: no block from the allocation layer");
+    return;
+  }
+  const uint32_t saved_movie = g_movie;
+  g_movie = movie.address;
+  g_handler_flag = &ITC_FLAG(native_type8_mode);
+  const HandlerArgs plain = [](PPCContext&, uint32_t) {};
+  auto maybe = [base](Random& r, uint32_t address) {
+    guest::StoreU32(base, address, r.Below(2) ? 0 : 1 + r.Below(5));
+  };
+  Handler(h, world, "Type8Dialog::OnEnter", 0x8223A408, 8,
+          [maybe](Random& r, uint32_t w) { maybe(r, w + 9612); }, plain, __imp__sub_8223A408,
+          hooks::Type8DialogOnEnter);
+  Handler(h, world, "Type8Dialog::WaitForMovies", 0x8223ADC0, 8,
+          [maybe](Random& r, uint32_t w) { maybe(r, w + 9608); }, plain, __imp__sub_8223ADC0,
+          hooks::Type8DialogWaitForMovies);
+  Handler(h, world, "Type8Dialog::OpenNotice", 0x8223A4A0, 8,
+          [maybe](Random& r, uint32_t w) { maybe(r, w + 9608); }, plain, __imp__sub_8223A4A0,
+          hooks::Type8DialogOpenNotice);
+  g_handler_flag = nullptr;
+  g_movie = saved_movie;
+  {
+    // OpenMovies: the five opens recorded.
+    Results results("Type8Dialog::OpenMovies (sub_8223A398)");
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      g_opens.clear();
+      PPCContext t = CallContext(h);
+      if (v == 0) {
+        const hooks::StartUpRecorder saved = hooks::g_start_up_recorder;
+        hooks::g_start_up_recorder = RecordOpen;
+        ITC_FLAG(native_type8_mode) = false;
+        __imp__sub_8223A398(t, base);
+        ITC_FLAG(native_type8_mode) = true;
+        hooks::g_start_up_recorder = saved;
+      } else {
+        t67::Calls calls = hooks::Type67Calls(t, base);
+        calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
+          g_opens.insert(g_opens.end(), {id, asset, frame, lr});
+          return 1;
+        };
+        t.r3.u64 = type8_mode::DialogOpenMovies(base, t.r1.u32, calls);
+      }
+      for (const uint32_t word : g_opens) out[v].Word(word);
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], "the five opens");
+    results.Report();
+  }
+  const DialogFunction functions[] = {
+      {"Type8Dialog::ConfirmPage", 0x8223A6B8, 112, 32, __imp__sub_8223A6B8,
+       hooks::Type8DialogConfirmPage, kPage, true, true},
+      {"Type8Dialog::NoticePage", 0x8223A858, 112, 32, __imp__sub_8223A858,
+       hooks::Type8DialogNoticePage, kPage, true, true},
+      {"Type8Dialog::Update", 0x8223AC58, 160, 32, __imp__sub_8223AC58,
+       hooks::Type8DialogUpdate, kUpdate, true, true},
+      {"Type8Dialog::Draw", 0x8223AC00, 96, 8, __imp__sub_8223AC00, hooks::Type8DialogDraw,
+       kDraw, true, true},
+      {"Type8Dialog::OpenConfirm", 0x8223A510, 112, 24, __imp__sub_8223A510,
+       hooks::Type8DialogOpenConfirm, kStep, true, true},
+      {"Type8Dialog::DrawWaiting", 0x8223A5F0, 128, 32, __imp__sub_8223A5F0,
+       hooks::Type8DialogDrawWaiting, kStep, true, true},
+      {"Type8Dialog::OpenConfirmStep", 0x8223A940, 128, 40, __imp__sub_8223A940,
+       hooks::Type8DialogOpenConfirmStep, kStep, true, true},
+  };
+  RunDialogs(h, world, functions, std::size(functions));
+}
+
+// --- ModeType8::Init (sub_8223D5D8; called by the type8_mode harness), laid
+// as the type 6 and 7 modes' slot 0 (ModeInits above): the mode a block of
+// random words (87,768 bytes, its member inline) made by ModeType8::ModeType8
+// (its dispatcher's count then 0 to 7), the stand held (a holder of the
+// case's whose players' stages have their models made: MakeModel's own work
+// is its harness's, stand_models; a model made here would leave blocks the
+// take can't name), the two players' garage cars (0x82814EB8) random words
+// with model ids 0 to 71, player 0's save data a block of random words, the
+// two-player save block none (made by operator new: compared by content,
+// then freed) or a block of random words; the loading world, fades and
+// stand globals as ModeInits'. The original runs with the flag on (its
+// callees' adapters native, as in the game); its members' Inits have no
+// adapters, so they run recompiled under it and natively under ours. The
+// transitions' functor words copied from their frames (Type6Mode::Init's
+// "expected to differ" group) matched here, so the mode is compared whole,
+// those words with it. ---
+
+void Type8ModeInits(Context& h) {
+  namespace lw = loading_world;
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
+      !hooks::CarModelsSceneSetUpNative()) {
+    ITC_LOG_WARN("harness: type8_mode: the allocation layer, the archive's queue, the models' "
+                 "lifetime or memcpy isn't native: ModeType8::Init's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> exits(c_runtime::ExitMutex());
+  std::lock_guard<std::recursive_mutex> blocks(models::MemoryBlocksMutex());
+  constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x40;
+  constexpr uint32_t kCars = 0x82814EB8, kCarsBytes = 2 * 1972;
+  constexpr uint32_t kSlots = 0x826C5B58;  // player 0's save data, the two-player block
+  constexpr uint32_t kModeType8Bytes = 87768;
+  const std::vector<uint8_t> fades = Read(base, kFades, kFadesBytes);
+  const std::vector<uint8_t> cars = Read(base, kCars, kCarsBytes);
+  const std::vector<uint8_t> slots = Read(base, kSlots, 8);
+  const StandSaved saved(base);
+  const lw::MovieWorld w;
+  const Block mode(kModeType8Bytes);
+  const Block save(0x20000);
+  const Block given(0x3AB80);
+  const Block stand(0x6000);
+  if (!w.ok() || !mode.address || !save.address || !given.address || !stand.address) return;
+  Results results("ModeType8::Init (sub_8223D5D8)");
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(uint64_t(c) * 811 + 0x8223D5D8);
+      saved.Restore();
+      const lw::SavedGlobals loading(base);
+      lw::ShapeMovieWorld(base, w, r);
+      lw::BuildStringTable(base, w);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      WriteRandom(base, mode.address, mode.bytes, r);
+      WriteRandom(base, save.address, save.bytes, r);
+      WriteRandom(base, given.address, given.bytes, r);
+      WriteRandom(base, t.r1.u32 - 0x1000, 0x1000, r);
+      WriteRandom(base, kCars, kCarsBytes, r);
+      for (uint32_t p = 0; p < 2; p++) guest::StoreU32(base, kCars + 1972 * p + 12, r.Below(72));
+      const bool made = c % 2 == 0;
+      guest::StoreU32(base, kSlots, save.address);
+      guest::StoreU32(base, kSlots + 4, made ? 0 : given.address);
+      {
+        // The mode made as Mode::Create makes it (ModeType8::ModeType8: the
+        // member's screens' vtables the Inits call through).
+        PPCContext m = CallContext(h);
+        m.r3.u64 = mode.address;
+        sub_82107670(m, base);
+      }
+      const uint32_t handlers = r.Below(8);
+      guest::StoreU32(base, mode.address + 36 + 200, handlers);
+      // The stand held (a holder of the case's: its three slots (4-byte
+      // blocks naming the stages) with the stages'
+      // models made, +16 1, but slot 0's, which ModeType8::Init
+      // never names: a MakeModel there would make one), so GarageStage::
+      // MakeModel finds the players' stages' models made.
+      WriteRandom(base, stand.address, stand.bytes, r);
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t slot = stand.address + 0x40 + 4 * i;
+        const uint32_t stage = stand.address + 0x100 + 0x1A00 * i;
+        guest::StoreU32(base, stand.address + 4 * i, slot);
+        guest::StoreU32(base, slot, stage);
+        guest::StoreU32(base, stage + 16, i == 0 ? 0 : 1);
+      }
+      guest::StoreU32(base, t67::kStandHolder, stand.address);
+      guest::StoreU32(base, scene::kScene, 0);
+      guest::StoreU32(base, scene::kFirstSet, 0);
+      guest::StoreU32(base, accessories::kSet, 0);
+      guest::StoreU32(base, race_loading::kLoadingCurrent, r.Below(3));
+      guest::StoreU32(base, race_loading::kLoadingShown, uint32_t(r.Next()));
+      for (uint32_t i = 0; i < 3; i++) {
+        guest::StoreU32(base, race_loading::kLoadingAnimations + 4 * i,
+                        r.Below(2) ? (i == 1 ? 13 : 0) : r.Below(256));
+      }
+      const uint32_t mark = exit_table::Mark(base);
+      time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
+      std::vector<uint32_t> calls;
+      g_stand_calls = &calls;
+      g_record_mode_calls = true;
+      const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+      hooks::g_start_up_recorder = StandRecorder;
+      t.r3.u64 = mode.address;
+      if (v == 0) {
+        __imp__sub_8223D5D8(t, base);
+      } else {
+        hooks::Type8ModeInit(t, base);
+      }
+      hooks::g_start_up_recorder = saved_recorder;
+      g_record_mode_calls = false;
+      g_stand_calls = nullptr;
+      time_hooks::ClearFakeNow();
+      StandTake take;
+      take.Collect(base, true);
+      const uint32_t block = guest::LoadU32(base, kSlots + 4);
+      const bool heap_block = made && block != 0 && memory::IsHeapBlock(block);
+      out[v].Word(heap_block);
+      if (heap_block) {
+        take.heap.push_back(block);
+        take.regions.push_back({block, memory::Size(block)});
+      } else {
+        out[v].Word(block - given.address);
+      }
+      take.regions.push_back({mode.address, mode.bytes});
+      // The harness's own blocks aren't the Init's: kept off the take's
+      // lists (the mode named once, as itself).
+      for (const uint32_t own : {mode.address, save.address, given.address, stand.address}) {
+        take.heap.erase(std::remove(take.heap.begin(), take.heap.end(), own), take.heap.end());
+        take.regions.erase(std::remove_if(take.regions.begin(), take.regions.end(),
+                                          [&](const auto& g) { return g.start == own; }),
+                           take.regions.end());
+      }
+      take.regions.push_back({mode.address, mode.bytes});
+      for (size_t k = 0; k + 5 <= calls.size(); k += 5) {
+        if (calls[k] != 0x8209DE48) calls[k + 3] -= t.r1.u32;
+      }
+      take.TakeCalls(base, calls, out[v]);
+      take.TakeBlocks(base, out[v]);
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, mode.address, mode.bytes));
+      out[v].Bytes(Read(base, save.address, save.bytes));
+      if (!made) out[v].Bytes(Read(base, given.address, given.bytes));
+      out[v].Bytes(Read(base, kCars, kCarsBytes));
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, stand.address, stand.bytes));
+      saved.Take(take.regions, out[v]);
+      out[v].Bytes(Read(base, t.r1.u32 - type8_mode::kModeInitFrame + 80, 8));
+      out[v].Bytes(Read(base, w.movies.address, w.movies.bytes));
+      out[v].Bytes(Read(base, w.texts.address, w.texts.bytes));
+      out[v].Bytes(Read(base, w.strings.address, w.strings.bytes));
+      out[v].Word(guest::LoadU32(base, race_loading::kLoadingShown));
+      out[v].Word(guest::LoadU32(base, race_loading::kLoadingCurrent));
+      out[v].Bytes(Read(base, kFades, kFadesBytes));
+      exit_table::Take(base, mark, out[v]);
+      out[v].Word(take.Word(t.r3.u32, t.r1.u32));
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      take.Free();
+      loading.Restore();
+      Write(base, kFades, fades.data(), kFadesBytes);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  saved.Restore();
+  Write(base, kFades, fades.data(), kFadesBytes);
+  Write(base, kCars, cars.data(), kCarsBytes);
+  Write(base, kSlots, slots.data(), 8);
 }
 
 }  // namespace harness

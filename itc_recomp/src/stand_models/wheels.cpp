@@ -98,6 +98,8 @@ void Colors(uint8_t* base, uint32_t to, const Wheel& wheel, double scale, uint32
   }
 }
 
+}  // namespace
+
 // The selected garage car of a save data: its list at +6120 walked
 // [+0x19920] steps from the head halfword +204; the car's address.
 uint32_t SelectedGarageCar(uint8_t* base, uint32_t save) {
@@ -111,8 +113,6 @@ uint32_t SelectedGarageCar(uint8_t* base, uint32_t save) {
   const int64_t slot = int16_t(guest::LoadU16(base, node + 2));
   return uint32_t(uint64_t(slot) * 1968) + nodes + 212;
 }
-
-}  // namespace
 
 uint64_t FitAxles(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t car,
                   uint32_t stack, std::optional<double>* f1) {

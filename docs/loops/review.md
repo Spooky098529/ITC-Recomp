@@ -11,6 +11,340 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-14 05:01 (`b7-loop-13-11-26`)
+
+- `sub_82562FF0` dropped from `leads.md` (the movie library's range,
+  reached only through a pointer).
+- The user's calls (2026-11-14): the worker pools follow XAudio's
+  call; `Device::Clear`'s worker by the graphics rule (both in
+  "Precedent first").
+- The in-race screens never seen's map (d71b917e,
+  `race-screens-unseen.md`, 99 new rows): race kind 6 is the Live time
+  attack's race (its screen after the race is the leaderboard), so
+  `race-states.md`'s "system link" note on kind 6 is probably the
+  network battle (not edited); three jump-table cases split off by the
+  recompiler (`sub_8220FE3C`, `sub_8221E0FC`, `sub_8221D2B4`);
+  `known-data.md` (the screens' globals, `[0x826C6AD4]`, the session
+  object `[0x82816E3C]`'s fields); `race-screens.md`'s makers point to
+  the new file. Groups worked out by hand: `b7_groups.py` doesn't read
+  functions never seen in play.
+- The in-race screens' migration (fdd8b61e..55b1f75c): rows in
+  `race-screens-unseen.md`, three new Native rows in `network-mode.md`
+  (`Network::SetLiveState`, `Leaderboard::Rank`, `CarLogo`), the race
+  dialog's `StartSave`, `ShowSaving`, `SetNote` (`race-screens.md`),
+  `UiMovie::SetNodeCharText` (`ui-movies-game.md`). Left recompiled:
+  `SplitResults::Draw` (the network battle's sends), `SaveReplay`
+  (`AskSlot`), and, called as originals from native code, the Live
+  work `sub_8214B330`, `sub_822917B8`, `sub_82292CC0`; branches the
+  harness can't cover are named in the rows. The race HUD machine's
+  kind 4 and 6 paths still reach the recompiled roots (a cleanup
+  lead). The older `race_screens` harness groups repeat inputs (about
+  17 distinct sets in 300); not rewritten (old harnesses stay).
+- The user's calls (2026-11-14): the network battle's sends Dropped;
+  the leaderboard read answered as no Live (in "Precedent first").
+- The user's call (2026-11-14): no multiplayer; the main menu's Xbox
+  Live and split screen items do nothing, their modes bypassed (in
+  "Precedent first"). The native code already made for them
+  (`network-mode.md`, `type8-mode.md`, `type8-screens.md`, this run's
+  `race-screens-unseen.md`) stays until the user decides.
+- The in-race screens' second migration (ea049be0..589a55a1):
+  `race-screens-unseen.md` (SplitResults, the read's pages,
+  `SaveReplay`), `system-services.md` (the sends Dropped),
+  `network-mode.md` (`Leaderboard::Read`, `SetUpSpec`, merged
+  `sub_82292690`), `race-screens.md` (`AskSlot`, `StoreReplay`),
+  `save-screen.md` (`Replay::CopyFrom`). The send drops are overrides
+  that do nothing with the flag on, so recompiled callers skip them
+  too. 10 root adapters stay because the race HUD machine's handlers
+  hand kinds 4 and 6 back to the recompiled handler (moot under the
+  bypass); `AskSlot`'s stays for the recompiled
+  `AfterRaceMenu::SaveReplay` `sub_8221B0C0`.
+- The multiplayer bypass (b77b4b39..23d07ac8): `TitleScreen::MainMenu`
+  items 3 and 4 silent (r3 0, as an ignored input), behind
+  `--multiplayer_menu_items`; `Mode::Create` leaves type 12 to the
+  original without the flag; `RaceHudMachine::OnRaceEnd`'s kinds 4
+  and 6 show no screen without it (as the original does for a kind it
+  doesn't handle). Left unguarded: data-only kind 4/6 branches in
+  seven subsystems (no map effect); 21 `PauseMenu4::` rows stay
+  reachable through the unported `CountdownPauseDraw` `sub_8216D0C8`
+  until it's ported with its kind 4 branch under the flag. Open: the
+  save screen's "kind 6" pages (`sub_821A2070`, `sub_821A2208` to
+  `sub_821A4EF8`) may or may not be the race kind.
+- The static map's reading of our C++ (18fa8e23): namespace aliases,
+  `case`/address-picked parts as their function's own, `extern`
+  tables, lookup order; hand-written `KEY_TABLES` (three `kInits`
+  tables) and `CPP_TABLES` (the device's render and sampler state
+  setters); definitions shared by an argument still give callers all
+  their owners (the literal rule cut 102 functions that run).
+- The C runtime's core map (552e90f8, `c-runtime-core.md`, 118
+  rows: the per-thread data, the lock table, `errno`, exit and
+  exceptions, the streams and low-level I/O, the float formatting,
+  the start-up, XAPI's thread notify list; matched to Visual C++
+  2005's runtime names). Corrections noted in its rows, not yet in
+  the other files: `files-and-saves.md`'s `sub_825B0F48` is
+  `_write_nolock` and `sub_825B6500` `_lseeki64_nolock`;
+  `c-runtime.md`'s `sub_825A6E48` gives `_cinit`'s tables at
+  `0x8263xxxx`, the image has them at `0x8260xxxx`. Never-seen paths
+  call `KeBugCheck` and `RtlRaiseException` (a native caller raising a
+  guest C++ exception through the import): followed B7's goal (the
+  imports called as the original does).
+- The C runtime core's migration (67da37a3..4708b65b): 43 rows of
+  `c-runtime-core.md`, `--native_c_runtime_core` (a new flag, not
+  `--native_c_runtime`); imports called through
+  `c_runtime::core::Calls`; lock 8's host mutex routing kept (`_lock`
+  and `_unlock` called as guest functions). `CloseHandle`'s adapter
+  stays while `SaveSlot::WaitClose` (`src/hooks/save_interface.cpp`)
+  calls it as a guest function.
+- The C runtime core's second migration (b66014dd..cade1fbb): 27
+  rows; checked by reading with no harness (the 2026-11-14 call):
+  `XapiThreadStartup` (seen running in game), the `KeBugCheck` stub,
+  `RaiseException`, `_CxxThrowException`, `_invoke_watson`,
+  `_invalid_parameter`'s trap path. In the SDK, `RtlRaiseException`
+  returns for thread-name exceptions and breaks for the rest, and
+  `ppc_trap` type 22 only logs and returns (in the rows). `_getptd`'s
+  adapter stays for `rand`'s never-seen no-data guest call. The shared
+  `Ld12Convert` (`src/c_runtime/format.cpp`) was refactored, its
+  harnesses (12,280 and 1,595 cases) 0 differing.
+- The C runtime core's validation differed in `save_handlers`
+  (`CloseHandle`'s back chain and saved lr below WaitClose's sp, which
+  the native close doesn't write): a harness fault, masked in
+  `save_handlers.cpp` (`MaskCloseHandleSaves`, 9bfdc4b1) for WaitClose,
+  SaveStep, LoadStep and `SaveDevices::Update`'s cases.
+- The C runtime core's third migration (eb65b4c4..26c6db34):
+  `files-and-saves.md`'s `SetFilePointer` `sub_825B9DD8` and `WriteFile`
+  `sub_82295D50` go from Dropped to Native (now called by native
+  `_lseeki64_nolock` and `_write_nolock`; renamed rows
+  `sub_825B0F48` `_write_nolock`, `sub_825B6500` `_lseeki64_nolock`);
+  `_flush`'s path where every byte is written checked by reading (no
+  SDK file the harness can safely write); `_fileno`'s adapter stays
+  (native `_output_l` hands file streams to the original).
+- The C runtime core's fourth and fifth migrations (cd2b4ad4..1360b0f8):
+  fclose to `_cftog_l`; `_fltout2` `sub_825B6458` Merged -> Native
+  (plain C++ over guest memory, `c_runtime::core::Fltout2`); checked by
+  reading (they end the process): `_exit`, abort, `_purecall`,
+  `_Debug_message`, `std::_Throw`, raise's default action. Not run
+  through an all-harness validation (the user ended the run).
+- The static map's report, for the user: 73 ours functions still
+  reach their original body through `__imp__` fallbacks taken when the
+  native code declines (`operator delete` when `memory::Free` refuses a
+  block, `VirtualFree`, `memcpy`, the vehicle's physics): reachable PPC,
+  so B7 work; `movies.md`'s end of the movie library (`8257FFFF`)
+  should be `82575B07` (154 functions past it are reached from the
+  game's Live and XAM wrappers, the network sessions and
+  `sub_8245A410`); the network manager's state machine `sub_8214B330`
+  (`NetDll_socket`, `bind`, `listen`) is reached statically through the
+  race loading states (`sub_821511B8` -> `sub_82260800`); 740
+  "originals no longer called" listed in `static-map.md`, candidates
+  for Dropped rows (no rows written).
+
+## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
+
+- Cleanup leads (98f4fe26..52b87de7): `CarList::DrawEntryPowerGraph`'s
+  adapter now sign-extends r31 as the original's `lis`
+  (`power-graph.md`). `RaceStates::OnRaceEnd` native
+  (`race-states.md`, new rows for `Time::Add` and the course record's
+  7 functions, never seen in play, ported by the 2026-11-12 call);
+  adapters removed for `RacerRecords::Add`, `Stats::AddRaceResult`,
+  `Achievements::Check`, `Write` and `Replay::Keep` (the never-seen
+  network battle screen `sub_82264B90` now runs Check's and Write's
+  originals). `OnRaceEnd`'s harness no longer compares the course
+  record's temporaries below its frame (the callees' originals write
+  register saves there); the course record's own groups do.
+- The morph jobs' map (3b635fc5, `morph-jobs.md`, 21 rows): also the
+  shared work item class (vtable `0x820066DC`, every pool job holds
+  one). Corrections: `sub_820ACA30` is that vtable's slot 7, not a
+  vtable `0x820066F8` of its own (the lead); `app-states.md`'s "slot 3
+  `sub_820AC9E8`" of `0x82002850` is slot 0 of the overlapping job base
+  vtable `0x8200285C` (noted in the new row only); `known-data.md`'s
+  `0x8296B910`/`B914`: `MorphShape` reads `0x8296B914` too.
+- The morph jobs' migration (752011b3..63bc5ef5): 21 of 21 ours,
+  `--native_morph_jobs` (the makers also need
+  `--native_c_runtime_heap`); `Model::MorphShape` calls the maker's
+  plain C++ when the maker's slot 1 is `0x820AC7F0`, the guest call
+  otherwise; the pool's post stays a guest call; `Morph::Blend`
+  (`second-set.md`) Native. `PoolMaker2::MakeMorphJob`'s adapter is kept
+  (reached through the maker's vtable) though its only caller in play
+  now bypasses it. Harness: `MorphJob::Run`'s cases compare the frame
+  window `Morph::Blend`'s own cases do, and r3 without a high word;
+  `MorphShape`'s cases use a stand-in maker.
+- The save devices' constructor's map (1edd6e03): 5 rows added to
+  `save-interface.md` (not a new file), `framework.md`'s
+  `SaveDevices::Create` row and `known-data.md`'s save owner and slot
+  rows updated; the listener at +56 to be stored as
+  `user::kNoListener` without `XNotifyCreateListener` (the
+  `SignIn::SetUp` precedent; it must not be 0, as `SaveDevices::Update`
+  runs only with a listener).
+- The save devices' migration (f0ecffdd..32f5b0d9): 5 of 5 ours and
+  `SaveDevices::Create` (`framework.md`, under `--native_save_interface`,
+  not `--native_framework`); the destructor's `CloseHandle` on the
+  stand-in listener left out (on the recompiled side it fails and only
+  sets the last error); the slots' vector deleting destructor stays a
+  guest call (teardown only); save counts malloc would refuse run the
+  original.
+- The slot handlers' map (2c70e8c8): 14 rows in `save-interface.md`;
+  `files-and-saves.md`'s `SaveStep`, `LoadStep`,
+  `XGetOverlappedResult`, `GetOverlappedResult` and
+  `system-services.md`'s `SaveDevices::Update` updated. Correction:
+  state 1 is no device and state 2 the failure state (not "2 = no
+  device"); `SaveDevices::Update` checks the slot's user (+956), not
+  its state.
+- The slot handlers' migration (b41c696e..796dcddf): B4's steps in
+  `src/hooks/saves.cpp` split into plain C++ (`src/saves/slot_steps`);
+  `Create`'s mode 3 takes its size from `XContentCalculateSize`'s plain
+  C++ instead of a guest call (same results). B4's step adapters
+  (`sub_820A4960` and 8 others) are listed removable but kept: with
+  `--native_save_interface` off, the recompiled handlers would reach the
+  Xbox content calls instead of `saves/` (the user's decision whether
+  to remove them). `SaveDevices::Update`'s adapter stays B5's
+  (`notify.cpp`). The enumeration, check, save, load and delete
+  machines run only from the front end: harness only so far.
+- Three small leads' map (1572447f): the render manager's slots 7 and
+  8 and its +4/+8 interfaces' thunks (`app-start-up.md`; they reach the
+  framework's scene and frame driver), the texture provider's `Get`
+  and its `XPR` slots (`models.md`), the zero and identity matrices'
+  static set-ups (`matrix-math.md`; no reader of either found).
+- Their migration (87dda153..ee595da5): 13 of 13 ours,
+  `Matrix::FromFloats` Native; the render manager's slots return the
+  object and target and the adapter makes the tail call (the worker
+  pool thunks' precedent); `XPR::GetTexture`'s diagnostics wrap left
+  out of slots 5-7 (as `CarModel::SelectedTexture`); `XPR::FindTexture`
+  (not seen) stays a guest call.
+- The cleanup lead over their callers (4577728d..bc20b2d4): notes in 16
+  function files (no Status changes); `hooks::DirectSlotCall` sets r3,
+  r11 and ctr as the original leaves them; most callers' harnesses use
+  stand-in getters, so the direct path is checked by the new
+  `RenderManagerSlotDirect` and `TextureProviderSlotDirect` groups. Left
+  out of scope: `app_camera.cpp`'s guest calls to `sub_82094320`.
+- The sticker editor's map (680da961, `sticker-editor.md`, 25 rows,
+  none seen in play): the ten input pages (states 38 to 46 and 49) and
+  their helpers; mentions in `tuning-screen.md`, `tuning-pages.md`,
+  `ui-movies-game.md` updated; the owned-sticker bits at save data
+  +0x199A8 and four tables in `known-data.md`. Original quirks noted
+  for the port: a -1 index reading the word before the T table, loops
+  that never end when no sticker is owned.
+- Its migration (eb20ef60..d84fa8b8): 25 of 25 ours, under
+  `--native_tuning_pages` (`Unloop` under `--native_ui_movies_game`);
+  `InputStickerRotate`'s max angle corrected to `0x8200C54C` (359.0);
+  harness holes for callee register saves in dead stack and the
+  varargs `SetText` areas; `HandleInput`'s register step now disables
+  flush-to-zero (`PlaceStickerNode` runs under it); 3 adapters removed
+  by reading `generated/`'s call sites (the tool can't judge never-run
+  functions).
+- Its second migration (662861e6..7fbeadd2): the tuning screen's sticker
+  commands 32 to 51 (17 rows in `tuning-screen.md`, read in full, Native,
+  under `--native_tuning_screen` with `--native_tuning_pages`); the 12
+  remaining helpers Native. The harness leaves out the varargs
+  parameter words and the helpers' register saves below each command's
+  frame (the native helpers don't write them); a planted fault in
+  `Command44` (a `FinishNamed` argument) went unnoticed, as finishing an
+  animation not playing changes nothing in the harness world.
+- The stand's setters' map (0ced7d4b, `stand-models.md`, 8 new rows):
+  `SetColor3` to `5` write the body paint slots then apply the wheel
+  paint (+112 to +207): the game's own mismatch, kept; they're
+  unreachable (`SetColor`'s callers pass only 0 to 2). The lead's
+  `SetAreaDecal` is `GarageStage::SetSticker`. `tuning-screen.md`'s
+  `SetColor` question answered; the sticker record and the
+  `0x82009A50` table in `known-data.md`.
+- Its migration (8d0e0496..0e74c60a): the setters and the tuning
+  screen's `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`,
+  `PreviewParts`, `SetParts` native; 17 adapters removed by reading
+  `generated/`'s call sites (attract races never reach the tuning
+  screen, so no counter); the harnesses `car_makers`, `tuning_refresh`
+  and `tuning_machine` now leave out the originals' register saves
+  below their frames. Map correction: `SetSticker` stores r8/r9 at its
+  caller's r1 + 64 and + 72. `ApplyAreaDecals` copies the sticker
+  scale as raw bits (a signaling NaN kept, as the translated code
+  does). `MakeModel` and `FitSelectedCar` keep adapters (native
+  callers still reach them through the guest). 22 never-seen rows
+  without status remain in `stand-models.md` and `tuning-screen.md`.
+- The never-seen rows' cleanup (abc17bc2..5db16791): 18 functions in
+  `stand-models.md` and `tuning-screen.md` Native, a new row
+  `SceneInterior::SetRecord` `sub_820E38E0`; `PreviewItem` and
+  `RestoreStand` now report f1 to their adapters (`RefitAxles`'
+  `FitAxles` sets it); more harness skips for the originals' dead
+  register saves; `RefreshInterior` rewritten after a full read, still
+  recompiled (blocked).
+- The tuning pages' blockers and the stand's guest callers
+  (bc2ed8af..0f0b959d): `IsSlotAvailable`, `SetPaintGradients`,
+  `SetLightKind0Bars`, `SetLightKind1Bar` (`tuning-pages.md`) Native
+  without adapters: their recompiled callers (never seen) still call the
+  originals; commands 10, 13, 14 read in full; `MakeModel` and
+  `FitSelectedCar` Native, removed by reading `generated/` (no attract
+  race reaches the front end); harness masks for the originals' saves
+  in `tuning_refresh`, `car_makers`, `type67_modes`. Its first
+  validation differed in `TuningMachine::Start`'s harness (one byte of
+  those dead saves, not left out there too): a harness fault, fixed
+  edb5225e by the 2026-11-10 precedent.
+- The type 6 and 7 modes' small pieces' map (707fe4ba): 16 rows in
+  `type6-type7-modes.md`, `type67-screens.md`, `car-list.md` (the
+  controller options' steps, the group pair's and panel screens'
+  destructors, `SingleGroup`); corrections: `SingleGroup`'s only user
+  and the "type 6 two-player panel screen" `sub_822386F0` are the type
+  8 mode's; `GroupPair::DeletingDestructor`'s "slot 8" is slot 0 of
+  `0x820110A4`; settings +672 and +680 in `known-data.md`.
+- Its migration (f83e3ee2..6cb9126c): 16 rows and the blockers
+  `ListNode::~ListNode`, `PanelSet::~PanelSet`,
+  `PanelSetBase::~PanelSetBase` ours; a bridge in
+  `type67_screens/panel_parts.cpp` lets the car list's guest calls run
+  through the screens' calls; `PanelFade::In`'s cases compare the
+  screen fades' globals; `TuningMachine::Destroy` calls
+  `DecalImages::UnloadAll`'s plain C++ (its adapter removed).
+- The list screens' tables' map (e3d8b9a9, `type67-screens.md`, 77 new
+  rows, 25 changed): the six tables' 31 pages and steps, the node
+  tables, `ListPartInner` (a two-item prompt defaulting from save data
+  +0x1F870), the screen blocks' destructors (probably never called:
+  `StandMode::Release` frees the blocks with `VirtualFree`). Quirks for
+  the port: the leaving steps never set their first-call word; the
+  cursor helpers leave a 64-bit product in their frames.
+- Its migration, part 1 (a15c7b09..87d4c82e): 102 rows ours (the node
+  tables, the list part, the list helpers, the titled list,
+  `Type6ListScreen` and the panel leaves); `Type6ListScreen::AddRacers`
+  Merged into `SetUpRace`; row corrections (`NodeListScreen::LoadItem`'s
+  +9700/+9704 bit, `ListScreen::Update`'s slot r4s, the titled deleting
+  destructor's vtable store); a new expected group
+  (`expected-differences.md`); ~1,100 new harness cases.
+- Part 2 (9bd91f77..a29897be): the color list, `Type7ListScreen` (its
+  `AddRacers` Merged; its `SetUpRace` traffic records expected to
+  differ as type 6's), the node screen with `CourseRecords::Of`
+  (`save-data.md`), the panel leftovers, the screen blocks'
+  destructors; the titled list's page helpers moved to
+  `list_pages.h`; harness faults fixed on the way (inputs kept in the
+  ranges play gives).
+- The type 8 mode's screens' map (ab62fef5, `type8-screens.md`, 128
+  rows; `SaveData::TwoPlayerBlock` in `save-data.md`): the type 8 mode
+  is the title's main menu item 4 (string 251, state 18), built for two
+  players: probably the two-player split-screen mode (the user may know
+  its name). Corrections: `car-list.md` notes that called the type 8
+  callers "type 6"; `screen-constructors.md`'s "get no rows" list.
+- Its migration (138f7c8c..c7628060): 128 rows ours, 13 `car-list.md`
+  rows (`PanelSetPair` and its slots, the panels' base), `TwoPlayerBlock`;
+  map corrections in the rows (`OnDialogClosed`'s branches,
+  `Type8PlayerBlock::Input`'s items, `UpdateSecond`/`UpdateThird`'s
+  menus, `Type8ListBase::Step1`'s frame); two new expected groups.
+  Unchecked: `PanelSetBase::HandleInput`'s native default page call
+  passes r4 = 0 to pages 4 and 7 where the originals pass their own r4
+  (from `PanelSet`'s earlier port; neither page seems to read it). The
+  `SetUpRace` switches trap past their last case, as the recompiled
+  switch does. The intros of `car-list.md` and `type8-screens.md` still
+  call the five car-list rows blockers.
+- The type 8 mode's map (9bf9d97e, `type8-mode.md`, 52 rows): close to
+  the type 6 and 7 modes (the member inside the mode, the delegates as
+  vtable slots, the teardown over slots 9 and 10, three cars and the
+  two-player save block). Corrections: `race-loading.md` had
+  `sub_8223D960`/`sub_8223DA00` as the race mode's slots 8 and 9 (they
+  are type 8's +32 vtable); `car-list.md` called two type 8 functions
+  "type 6". `NextMode`'s answer carries three unwritten stack bytes and
+  `ForceExit`'s the low bytes of `Mode::Slot9Thunk`'s address (to copy).
+- Its migration (ab9d75d1..00c9f8e1): 52 rows ours, with
+  `Type8Options::Init`, `Type8ControllerOptions::Init`,
+  `Type8SaveScreen::Init`, `SaveData::CreateTwoPlayerBlock` (probably)
+  and four shared dialog handlers; map corrections (`MenuPage`'s scroll
+  reset only after a cursor move; `UpdateStand`'s reload sends both
+  players through the busy branch). Harness gap: `UpdateStand`'s reload
+  branch (building the car, `GarageStage::SetCar`) never runs in its
+  cases, as in `Type6Screen0::Update`'s. Type 8's delegates aren't in
+  `type2_mode::SlotThunk`'s native switch (reached through their
+  adapters, which run the plain C++).
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 - The frame driver's map (6d9bc131; mapped as `renderer.md`, renamed

@@ -89,6 +89,11 @@ void NodeConstruct(uint8_t* base, uint32_t node, uint32_t link) {
   StoreU32(base, node + 0, kNodeVtable);
 }
 
+void NodeDestruct(uint8_t* base, uint32_t node) {
+  ITC_NATIVE_RUNNING("sub_8224FB10 ListNode::~ListNode");
+  StoreU32(base, node + 0, kNodeVtable);
+}
+
 uint32_t FindSlot(uint8_t* base, uint32_t serial) {
   ITC_NATIVE_RUNNING("sub_8209D818 Archive::FindSlot");
   for (uint32_t i = 0; i < kSlotCount; i++) {

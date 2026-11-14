@@ -8,6 +8,7 @@
 #pragma once
 
 #include "guest.h"
+#include "save_interface/slot_handlers.h"
 
 namespace hooks {
 
@@ -90,5 +91,71 @@ void SaveInterfaceReplaysReadEntry(PPCContext& ctx, uint8_t* base);
 // sub_82290378 Replays::BuildList: r3 = add an empty first entry; its frame
 // r1 - 144 (ReadEntry's original a guest call from it).
 void SaveInterfaceReplaysBuildList(PPCContext& ctx, uint8_t* base);
+
+// The save devices' construction and teardown (save_interface/save_devices.h),
+// each writing its prologue's saves as the original does; the original
+// without the native heap (or where the plain C++ refuses).
+// sub_820A63C8 SaveDevices::Create: r3 = the block, r4 = the saves:
+// operator new(116) and the constructor from its 112-byte frame (r3 the
+// save devices or 0).
+void SaveDevicesCreateSteps(PPCContext& ctx, uint8_t* base);
+// sub_820A6160 SaveDevices::SaveDevices (no adapter: only Create's step
+// calls it): r3 = it, r4 = the block, r5 = the
+// saves to enumerate; the run loop's slots from its 176-byte frame.
+void SaveDevicesConstructSteps(PPCContext& ctx, uint8_t* base);
+// sub_820A4560 SaveSlot::AllocBuffers: r3 = a slot, r4 = the saves (no
+// adapter: only the constructor's plain C++ calls it).
+void SaveSlotAllocBuffersSteps(PPCContext& ctx, uint8_t* base);
+// sub_820A6110 SaveDevices::~SaveDevices: r3 = it, r4 = the flags.
+void SaveDevicesDeleteSteps(PPCContext& ctx, uint8_t* base);
+// sub_820A56E8 SaveDevices::Destroy: r3 = it (no adapter: only the
+// destructor's plain C++ calls it).
+void SaveDevicesDestroySteps(PPCContext& ctx, uint8_t* base);
+// sub_820A55F0 SlotArray::Reset: r3 = the word holding the slots (no
+// adapter: only Destroy's plain C++ calls it).
+void SlotArrayResetSteps(PPCContext& ctx, uint8_t* base);
+
+// The save devices' slot handlers (save_interface/slot_handlers.h), each
+// writing its prologue's saves as the original does: r3 = the save devices,
+// r4 = a slot; r3 the slot's next state.
+void SlotWaitForUserSteps(PPCContext& ctx, uint8_t* base);    // sub_820A4870
+void SlotWaitForDeviceSteps(PPCContext& ctx, uint8_t* base);  // sub_820A5878
+void SlotFailedSteps(PPCContext& ctx, uint8_t* base);         // sub_820A4890
+void SlotReadySteps(PPCContext& ctx, uint8_t* base);          // sub_820A58D8
+void SlotEnumerateStepSteps(PPCContext& ctx, uint8_t* base);  // sub_820A59C0
+// sub_820A4800 SaveDevices::OnEvent: r3 = the save devices, r4 = the run
+// loop, r5 = the event; the run loop's slots 4 and 3 guest calls from its
+// frame.
+void DevicesOnEventSteps(PPCContext& ctx, uint8_t* base);
+// sub_820908D8, the framework's +56 interface's slot 1: r3 = the interface.
+void FrameworkDeviceListSteps(PPCContext& ctx, uint8_t* base);
+
+// sub_82295C98 XGetOverlappedResult: r3 = the overlapped, r4 = the result
+// (out), r5 = wait; sub_82295F20 GetOverlappedResult: r3 = a handle, r4 = the
+// overlapped, r5 = the bytes (out), r6 = wait. Their waits
+// (WaitForSingleObject sub_822970A0) guest calls from their frames.
+void XGetOverlappedResultSteps(PPCContext& ctx, uint8_t* base);
+void GetOverlappedResultSteps(PPCContext& ctx, uint8_t* base);
+// The kernel's guest calls (WaitForSingleObject, CloseHandle) for the plain
+// C++, through `ctx`.
+save_interface::KernelCalls KernelCallsOf(PPCContext& ctx, uint8_t* base);
+
+// The waits the machines poll (r4 = slot; no adapters: only the machines'
+// plain C++ calls them; for the harness).
+void SlotWaitCloseItemSteps(PPCContext& ctx, uint8_t* base);  // sub_820A4C08
+void SlotWaitDeleteSteps(PPCContext& ctx, uint8_t* base);     // sub_820A5290
+void SlotWaitThumbnailSteps(PPCContext& ctx, uint8_t* base);  // sub_820A5190
+void SlotWaitCloseSteps(PPCContext& ctx, uint8_t* base);      // sub_820A5070
+void SlotWaitWriteSteps(PPCContext& ctx, uint8_t* base);      // sub_820A4E68
+void SlotWaitReadSteps(PPCContext& ctx, uint8_t* base);       // sub_820A4FF8
+// The machines: r3 = the save devices, r4 = slot; r3 the next state.
+void SlotCheckStepSteps(PPCContext& ctx, uint8_t* base);   // sub_820A5A88
+void SlotSaveStepSteps(PPCContext& ctx, uint8_t* base);    // sub_820A5BE8
+void SlotLoadStepSteps(PPCContext& ctx, uint8_t* base);    // sub_820A5E68
+void SlotDeleteStepSteps(PPCContext& ctx, uint8_t* base);  // sub_820A6010
+
+// sub_820A4610 SaveDevices::Update: r3 = the save devices (its adapter is
+// B5's, src/hooks/notify.cpp, which runs this with --native_save_interface).
+void SaveDevicesUpdateSteps(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

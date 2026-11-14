@@ -78,7 +78,13 @@ struct Calls {
   // original caller's registers hold them).
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr, uint64_t r24, uint64_t r28)>
-      call_r24_r28;
+      call_r24_r28;  // PoolMaker2::MakeMorphJob's plain C++ (sub_820AC7F0, the second pool
+  // maker's slot 1; morph_jobs::MakeJob) for `maker` and the morph record,
+  // from the frame at `sp`: the job (0 when operator new gives 0). nullopt,
+  // with nothing done, where it doesn't run natively (--native_morph_jobs
+  // off, operator new not native) and the maker's slot is called instead.
+  std::function<std::optional<uint32_t>(uint32_t maker, uint32_t morph, uint32_t sp)>
+      make_morph_job;
 };
 
 // What a function leaves in r3: in the context already (`in_ctx`, the last

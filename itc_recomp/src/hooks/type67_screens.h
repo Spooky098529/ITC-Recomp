@@ -47,6 +47,16 @@ void GroupPairReset(PPCContext& ctx, uint8_t* base);
 void GroupPairRun(PPCContext& ctx, uint8_t* base);
 void GroupPairWaitForFade(PPCContext& ctx, uint8_t* base);
 void GroupPairFinishAll(PPCContext& ctx, uint8_t* base);
+void GroupPairDestruct(PPCContext& ctx, uint8_t* base);
+void SingleGroupConstruct(PPCContext& ctx, uint8_t* base);
+void SingleGroupReset(PPCContext& ctx, uint8_t* base);
+void PanelFadeIn(PPCContext& ctx, uint8_t* base);
+void MachineScreenDestruct(PPCContext& ctx, uint8_t* base);
+void PanelGroupDestruct(PPCContext& ctx, uint8_t* base);
+void PanelGroupDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenDestruct(PPCContext& ctx, uint8_t* base);
+void Type7PanelScreenDestruct(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
 // The panel screens' slots and handlers (Type7PanelScreen::DrawList
 // sub_82240908 has no adapter: only Type7PanelScreen::Draw calls it).
@@ -71,5 +81,199 @@ void PanelScreenLeave(PPCContext& ctx, uint8_t* base);
 void PanelScreenOnLeft(PPCContext& ctx, uint8_t* base);
 void Type7PanelScreenDraw(PPCContext& ctx, uint8_t* base);
 void Type7PanelScreenPickCar(PPCContext& ctx, uint8_t* base);
+
+// The node tables.
+void NodeTableDestruct(PPCContext& ctx, uint8_t* base);
+void NodeTableDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void NodeTableSetPairs(PPCContext& ctx, uint8_t* base);
+void PairedNodeTableSavePairs(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableClear(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableSet(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableSavePairs(PPCContext& ctx, uint8_t* base);
+void NodeTableShow(PPCContext& ctx, uint8_t* base);
+void NodeTableShowNode(PPCContext& ctx, uint8_t* base);
+void NodeTableSetMarks(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableSetColors(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableClearColors(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableMarkSelected(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableRefresh(PPCContext& ctx, uint8_t* base);
+void ColorNodeTableReset(PPCContext& ctx, uint8_t* base);
+void PairedNodeTableRefresh(PPCContext& ctx, uint8_t* base);
+
+// The list part and its inner part.
+void ListPartBaseDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartInnerBaseDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartBaseDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartInnerBaseDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartInnerDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartInnerDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ListPartOpen(PPCContext& ctx, uint8_t* base);
+void ListPartPick(PPCContext& ctx, uint8_t* base);
+void ListPartInput(PPCContext& ctx, uint8_t* base);
+void ListPartClose(PPCContext& ctx, uint8_t* base);
+void ListPartIsIdle(PPCContext& ctx, uint8_t* base);
+void ListPartCanLeave(PPCContext& ctx, uint8_t* base);
+void ListPartInnerOpen(PPCContext& ctx, uint8_t* base);
+void ListPartInnerPick(PPCContext& ctx, uint8_t* base);
+void ListPartInnerInput(PPCContext& ctx, uint8_t* base);
+void ListPartInnerIsIdle(PPCContext& ctx, uint8_t* base);
+void ListPartInnerClose(PPCContext& ctx, uint8_t* base);
+void ListPartInnerCanLeave(PPCContext& ctx, uint8_t* base);
+void ListPartInnerPage0(PPCContext& ctx, uint8_t* base);
+void ListPartInnerPage1(PPCContext& ctx, uint8_t* base);
+void ListPartInnerPage2(PPCContext& ctx, uint8_t* base);
+void ListPartInnerStep0(PPCContext& ctx, uint8_t* base);
+void ListPartInnerStep1(PPCContext& ctx, uint8_t* base);
+void ListPartInnerStep2(PPCContext& ctx, uint8_t* base);
+
+// The list screens' shared helpers, item loaders and handlers.
+void ListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void ListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void NodeListScreenItemInfo(PPCContext& ctx, uint8_t* base);
+void NodeListScreenLoadItem(PPCContext& ctx, uint8_t* base);
+void ColorListScreenLoadItem(PPCContext& ctx, uint8_t* base);
+void ListScreenShowSelection(PPCContext& ctx, uint8_t* base);
+void ListScreenLoopItemNode(PPCContext& ctx, uint8_t* base);
+void ListScreenLoopSecondNode(PPCContext& ctx, uint8_t* base);
+void ListScreenLoopThirdNode(PPCContext& ctx, uint8_t* base);
+void ListScreenSetScrollText(PPCContext& ctx, uint8_t* base);
+void ListScreenClearScrollText(PPCContext& ctx, uint8_t* base);
+void ListScreenSetArrows(PPCContext& ctx, uint8_t* base);
+void ListScreenOnToggleMoved(PPCContext& ctx, uint8_t* base);
+void ListScreenShowToggle(PPCContext& ctx, uint8_t* base);
+void ListScreenSetIcons(PPCContext& ctx, uint8_t* base);
+void ListScreenSetUpMovie(PPCContext& ctx, uint8_t* base);
+void ListScreenShow(PPCContext& ctx, uint8_t* base);
+void ListScreenDraw(PPCContext& ctx, uint8_t* base);
+void ListScreenUpdate(PPCContext& ctx, uint8_t* base);
+void ListScreenSuspend(PPCContext& ctx, uint8_t* base);
+void ListScreenResume(PPCContext& ctx, uint8_t* base);
+void ListScreenOpen(PPCContext& ctx, uint8_t* base);
+
+// The titled list screen.
+void TitledListScreenReset(PPCContext& ctx, uint8_t* base);
+void TitledListScreenDraw(PPCContext& ctx, uint8_t* base);
+void TitledListScreenUpdate(PPCContext& ctx, uint8_t* base);
+void TitledListScreenPage2(PPCContext& ctx, uint8_t* base);
+void TitledListScreenPage3(PPCContext& ctx, uint8_t* base);
+void TitledListScreenPage4(PPCContext& ctx, uint8_t* base);
+void TitledListScreenPage7(PPCContext& ctx, uint8_t* base);
+void ListScreenLeavePage(PPCContext& ctx, uint8_t* base);
+void TitledListScreenStep0(PPCContext& ctx, uint8_t* base);
+void TitledListScreenStep1(PPCContext& ctx, uint8_t* base);
+void TitledListScreenStep2(PPCContext& ctx, uint8_t* base);
+void TitledListScreenOnItemMoved(PPCContext& ctx, uint8_t* base);
+void TitledListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void NodeListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void TitledListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void NodeListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
+// The color list screen.
+void ColorListScreenReset(PPCContext& ctx, uint8_t* base);
+void ColorListScreenDraw(PPCContext& ctx, uint8_t* base);
+void ColorListScreenUpdate(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPage2(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPage3(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPage4(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPage5(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPage6(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPage7(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPage9(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPlaceItemCursor(PPCContext& ctx, uint8_t* base);
+void ColorListScreenPlaceColorCursor(PPCContext& ctx, uint8_t* base);
+void ColorListScreenShowPartNodes(PPCContext& ctx, uint8_t* base);
+void ColorListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void ColorListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep0(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep1(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep2(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep3(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep4(PPCContext& ctx, uint8_t* base);
+void ColorListScreenRunMovie(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep6(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep7(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep8(PPCContext& ctx, uint8_t* base);
+void ColorListScreenStep10(PPCContext& ctx, uint8_t* base);
+
+// The type 6 list screen's slots and destructors, the panel and node
+// screens' leaves.
+void Type6ListScreenSetItemTexts(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenShowMarks(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenItemInfo(PPCContext& ctx, uint8_t* base);
+void NodeScreenItemInfo(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenBack(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenSetUpRace(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void Type6ListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnYes(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnNo(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnBack(PPCContext& ctx, uint8_t* base);
+void PanelScreenOnDialogClosed(PPCContext& ctx, uint8_t* base);
+void PanelScreenSuspend(PPCContext& ctx, uint8_t* base);
+void PanelScreenOpenEmpty(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenBack(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenCarList(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenCarEntry(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenCarSlot(PPCContext& ctx, uint8_t* base);
+void GroupPairDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void NodeScreenOpen(PPCContext& ctx, uint8_t* base);
+
+// The type 7 list screen's slots and destructors.
+void Type7ListScreenSetItemText(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenClearItemText(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenSetTitle(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenSetDetails(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenShowMarks(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenItemInfo(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenBack(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenSetUpRace(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenDestruct(PPCContext& ctx, uint8_t* base);
+void Type7ListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
+// The node screen.
+void NodeScreenShow(PPCContext& ctx, uint8_t* base);
+void NodeScreenDraw(PPCContext& ctx, uint8_t* base);
+void NodeScreenUpdate(PPCContext& ctx, uint8_t* base);
+void NodeScreenPage2(PPCContext& ctx, uint8_t* base);
+void NodeScreenPage4(PPCContext& ctx, uint8_t* base);
+void NodeScreenPage5(PPCContext& ctx, uint8_t* base);
+void NodeScreenStep0(PPCContext& ctx, uint8_t* base);
+void NodeScreenStep1(PPCContext& ctx, uint8_t* base);
+void NodeScreenStep2(PPCContext& ctx, uint8_t* base);
+void NodeScreenShowSelection(PPCContext& ctx, uint8_t* base);
+void NodeScreenOnToggleMoved(PPCContext& ctx, uint8_t* base);
+void NodeScreenRefresh(PPCContext& ctx, uint8_t* base);
+void NodeScreenShowRecords(PPCContext& ctx, uint8_t* base);
+void NodeScreenSetArrows(PPCContext& ctx, uint8_t* base);
+void NodeScreenLoadItem(PPCContext& ctx, uint8_t* base);
+void NodeScreenDestruct(PPCContext& ctx, uint8_t* base);
+void NodeScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
+// The type 6 node screen's own slots and destructors.
+void Type6NodeScreenSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenSetText(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenBack(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenSetIcons(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenSetScrollText(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenShowMarks(PPCContext& ctx, uint8_t* base);
+void NodeScreenSetUpTexts(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenDestruct(PPCContext& ctx, uint8_t* base);
+void Type6NodeScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
+// The type 6 panel screen's Draw and PickCar (its DrawList and both panel
+// screens' AskQuit have no adapters: only the native Draws and DrawLists
+// call them).
+void Type6PanelScreenDraw(PPCContext& ctx, uint8_t* base);
+void Type6PanelScreenPickCar(PPCContext& ctx, uint8_t* base);
+
+// The screen blocks' destructors.
+void Type6ScreensDestruct(PPCContext& ctx, uint8_t* base);
+void Type7ScreensDestruct(PPCContext& ctx, uint8_t* base);
+void Type6ScreensDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type7ScreensDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

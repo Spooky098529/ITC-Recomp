@@ -5,6 +5,8 @@
 #include "hooks/tuning_machine.h"
 
 #include "base/flags.h"
+#include "hooks/heap.h"
+#include "hooks/stand_models.h"
 #include "hooks/tuning_screen.h"
 #include "tuning_machine/tuning_machine.h"
 #include "tuning_screen/tuning_screen.h"
@@ -25,8 +27,9 @@ ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "override, the varargs it leaves unset passed as 0), Unload sub_821D69A0, Close "
               "sub_821D6A78, OnDialogNo sub_821CEA88 with StickerDialogNo sub_821F7988 and OnNoticeClosed "
               "sub_821CF8B8 (never seen in play; PageItemCount and PageCursor by their plain C++, "
-              "UiMovie::HideNode through its override) and Destroy sub_821CBD40 (DecalImages::UnloadAll and VirtualFree "
-              "through their overrides); DecalImages::SavePlaceholders sub_82208130 with "
+              "UiMovie::HideNode through its override) and Destroy sub_821CBD40 (DecalImages::UnloadAll by its "
+              "plain C++ with the native heap, VirtualFree "
+              "through its override); DecalImages::SavePlaceholders sub_82208130 with "
               "SavePlaceholders14 sub_821F8950 (the same writes); TuningScreen::SetUp's callees "
               "LoadInteriorSlots sub_821DE280, LoadCurrentChoices sub_821DA4B0 "
               "(Params::GetCarSpec by its plain C++), LoadOwnedParts sub_821DBAB0 "
@@ -39,6 +42,8 @@ ITC_FLAG_BOOL(native_tuning_machine, true, "ITC",
               "TuningScreen::SetUpCarData, PowerCurve::FromEngine and ShiftPeak, SavePlaceholders, "
               "SetUp, UiMovies::Find, UiMovie::ResetPose, TuningScreen::Refresh and "
               "ScreenFades::FadeIn by their plain C++) (checked by --run_harnesses=tuning_machine)");
+
+ITC_FLAG_DECLARE(bool, native_car_models);
 
 namespace hooks {
 
@@ -139,7 +144,15 @@ void TuningMachineClose(PPCContext& ctx, uint8_t* base) {
 }
 void TuningMachineDestroy(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tm::Destroy(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  if (!NativeHeapActive()) {
+    ctx.r3.u64 = tm::Destroy(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+    return;
+  }
+  // DecalImages::UnloadAll by its plain C++ (its adapter removed, B7 loop,
+  // 2026-11-13), as the tuning pages' callers run it.
+  const tuning_screen::GuestCall call = StandModelsGuestCall(ctx, base);
+  const tm::UnloadAllNative unload{&call, ITC_FLAG(native_car_models)};
+  ctx.r3.u64 = tm::Destroy(base, ctx.r3.u64, ctx.r1.u32, guest.calls(), &unload);
 }
 void TuningMachineSavePlaceholders(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = tm::SavePlaceholders(base, ctx.r3.u32, ctx.r1.u32);

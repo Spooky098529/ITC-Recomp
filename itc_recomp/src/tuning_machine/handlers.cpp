@@ -4,6 +4,7 @@
 #include "tuning_machine/tuning_machine.h"
 
 #include "base/log.h"
+#include "tuning_pages/tuning_pages.h"
 #include "guest.h"
 #include "ui_movies/game.h"
 
@@ -302,11 +303,16 @@ void Close(uint8_t* base, uint32_t machine, uint32_t mode) {
   Post(base, mode, 4);
 }
 
-uint64_t Destroy(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Destroy(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls,
+                 const UnloadAllNative* unload) {
   ITC_NATIVE_RUNNING("sub_821CBD40 TuningMachine::Destroy");
   const uint32_t s = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kUnloadAll, frame, 0x821CBD60, r3 + kImages);
+  if (unload != nullptr) {
+    tuning_pages::UnloadAll(base, *unload->call, r3 + kImages, frame, unload->native_free);
+  } else {
+    calls.Call(kUnloadAll, frame, 0x821CBD60, r3 + kImages);
+  }
   calls.Call(kVirtualFree, frame, 0x821CBD78, Load(base, s + kQueue), 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x821CBD88, Load(base, s + kMenu), 0, kMemRelease);
   return calls.Call(kVirtualFree, frame, 0x821CBD98, Load(base, s + kMenu2), 0, kMemRelease);

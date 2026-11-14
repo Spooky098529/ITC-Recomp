@@ -1,0 +1,238 @@
+// The type 8 mode natively: adapters in front of src/type8_mode/
+// (docs/functions/type8-mode.md), with the register steps the harness
+// shares (hooks/type8_mode.h). Never seen in play (ported by the user's
+// 2026-11-12 call); the handlers are reached through the machines'
+// transitions and the dialog's page and step tables, so their adapters
+// stay.
+
+#include "hooks/type8_mode.h"
+
+#include "base/flags.h"
+#include "hooks/type67_modes.h"
+#include "hooks/type67_screens.h"
+#include "type8_mode/type8_mode.h"
+
+ITC_FLAG_BOOL(native_type8_mode, true, "ITC",
+              "Run the type 8 mode (docs/functions/type8-mode.md: Type8Dialog::OnEnter "
+              "sub_8223A408, OpenMovies sub_8223A398, WaitForMovies sub_8223ADC0, Draw "
+              "sub_8223AC00, Update sub_8223AC58, OpenConfirm sub_8223A510, OpenNotice "
+              "sub_8223A4A0, DrawWaiting sub_8223A5F0, ConfirmPage sub_8223A6B8, NoticePage "
+              "sub_8223A858 and OpenConfirmStep sub_8223A940 (UiMovies::Find, IsLoaded, "
+              "UiMovie::ResetPose, PlayNamed, LoopLast, Menu::Step, Menu::Pressed and "
+              "MenuSound::Play's plain C++; UiMovies::Open, UiMovie::Run and the pages and "
+              "steps the tables name through their overrides); Type8Screen0::Type8Screen0 "
+              "sub_8223D2F0, ~Type8Screen0 sub_8223BF00, DeletingDestructor sub_8223C528, "
+              "OnEnter sub_8223B630, OpenMovie sub_8223B530, WaitForMovie sub_8223B6D8, Suspend "
+              "sub_8223B540, PickYes sub_8223B590, PickNo sub_8223B5A0, PickBack sub_8223B5B0, "
+              "OnDialogClosed sub_8223C098, Leave sub_8223BA48, OnLeft sub_8223B588, Confirm "
+              "sub_8223C430, ConfirmPage sub_8223B5C0, ChosenPage sub_8223C0C0, ShowPage "
+              "sub_8223BD20, PlaceCursor sub_8223BE88 and Draw sub_8223C888 (ScreenMachine's "
+              "constructor, MenuList::Init, SetSelection, Selection and Release, UiMovie::SetText, "
+              "FindNode and the node setters by their plain C++ where they run natively; "
+              "UiMovies::Open and Delete, FinishAll and operator delete as guest calls); "
+              "MenuPage sub_8223C6B8, OpeningStep sub_8223C1A0, ItemStep sub_8223BBC8, "
+              "CursorStep sub_8223C330, FadeOutStep sub_8223BAF0, Update sub_8223C588 with "
+              "UpdateStand sub_8223B808, Show sub_8223BF18 with SetTexts sub_8223B760 and "
+              "CarCard sub_8223BC68 (MenuList::Selection, SetSelection, UiMovie::IsNamedActive, "
+              "ScreenFades, MenuSound::Play, Sound::Play, CarModels::BlockOf, "
+              "Params::GetCarSpec, Car::Init, memcpy, Car::Refresh, GarageStage::SetPlates and "
+              "GarageStages::DrawAll by their plain C++; the named animations, Run, ScrollText, "
+              "SetNodeText, the menu list's Update, Accepted and Cancelled, the stand's "
+              "GarageStage calls and the sound manager's slots as guest calls); "
+              "ModeType8::Release sub_8223D3B8 (StandScene::Release's plain C++, else a guest "
+              "call), WaitForLoads sub_8223DBC0 with AllLoaded sub_8223D3C0, NextMode "
+              "sub_8223DD90 with SaveData::FreeTwoPlayerBlock sub_82105638, PollTeardown "
+              "sub_8223D8E8, TearDown sub_8223D4D0, Interrupt sub_8223D960 and ForceExit "
+              "sub_8223DA00 (StandScene::PollTeardown, SaveData::TwoPlayerBlock, memcpy, "
+              "Sound::Play and GarageStages::DrawAll by their plain C++; GameMessages::Dispatch, "
+              "LoadingScreen::Run and Finish, GarageStage::Command and SetDrawWord, "
+              "Strings::Release, UiMovies::DeleteAll's jump, operator delete and the sound "
+              "manager's slots as guest calls); ModeType8::Init sub_8223D5D8 with Type8Screen0::Init "
+              "sub_8223C950 and Type8Dialog::Init sub_8223AE60 (step tables, StateMachine::Add's "
+              "plain C++; the options', controller options' and save screen's Inits, "
+              "SaveData::CreateTwoPlayerBlock, GarageStage::MakeModel, CarModels::BlockOf, "
+              "memcpy, the panel and list screens' Inits and ScreenFades::FadeIn by their plain "
+              "C++; the UI movies' start, Strings::Load, StandScene::Create and "
+              "LoadingScreen::Show through their overrides)) natively instead of through the "
+              "translated code (the same writes; checked by --run_harnesses=type8_mode)");
+
+namespace hooks {
+
+namespace t8m = type8_mode;
+
+#define ITC_T8M_STEP(name, expression)                       \
+  void name(PPCContext& ctx, uint8_t* base) {                \
+    const t8m::Calls calls = Type67Calls(ctx, base);         \
+    (void)calls;                                             \
+    const uint32_t sp = ctx.r1.u32;                          \
+    (void)sp;                                                \
+    ctx.r3.u64 = (expression);                               \
+  }
+
+ITC_T8M_STEP(Type8DialogOnEnter, t8m::DialogOnEnter(base, ctx.r3.u64))
+ITC_T8M_STEP(Type8DialogOpenMovies, t8m::DialogOpenMovies(base, sp, calls))
+ITC_T8M_STEP(Type8DialogWaitForMovies, t8m::DialogWaitForMovies(base, ctx.r3.u64, sp))
+ITC_T8M_STEP(Type8DialogDraw, t8m::DialogDraw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_STEP(Type8DialogUpdate, t8m::DialogUpdate(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_STEP(Type8DialogOpenConfirm, t8m::DialogOpenConfirm(base, ctx.r3.u32, sp))
+ITC_T8M_STEP(Type8DialogOpenNotice, t8m::DialogOpenNotice(base, ctx.r3.u64))
+ITC_T8M_STEP(Type8DialogDrawWaiting, t8m::DialogDrawWaiting(base, ctx.r3.u64, sp))
+ITC_T8M_STEP(Type8DialogConfirmPage,
+             t8m::DialogConfirmPage(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_STEP(Type8DialogNoticePage, t8m::DialogNoticePage(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_STEP(Type8DialogOpenConfirmStep, t8m::DialogOpenConfirmStep(base, ctx.r3.u32, sp, calls))
+
+#define ITC_T8M_SCREEN(name, expression)                     \
+  void name(PPCContext& ctx, uint8_t* base) {                \
+    const t8m::ScreenCalls calls = Type67ScreensCalls(ctx, base); \
+    (void)calls;                                             \
+    const uint32_t sp = ctx.r1.u32;                          \
+    (void)sp;                                                \
+    const uint32_t lr = uint32_t(ctx.lr);                    \
+    (void)lr;                                                \
+    ctx.r3.u64 = (expression);                               \
+  }
+
+ITC_T8M_SCREEN(Type8Screen0Construct, t8m::Screen0Construct(base, ctx.r3.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0Destruct, t8m::Screen0Destruct(base, ctx.r3.u64, sp, lr, calls))
+ITC_T8M_SCREEN(Type8Screen0DeletingDestruct,
+               t8m::Screen0DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0OnEnter, t8m::Screen0OnEnter(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0OpenMovie, t8m::Screen0OpenMovie(sp, lr, calls))
+ITC_T8M_SCREEN(Type8Screen0WaitForMovie, t8m::Screen0WaitForMovie(base, ctx.r3.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0Suspend, t8m::Screen0Suspend(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0PickYes, t8m::Screen0Pick(base, ctx.r3.u64, 1))
+ITC_T8M_SCREEN(Type8Screen0PickNo, t8m::Screen0Pick(base, ctx.r3.u64, 0))
+ITC_T8M_SCREEN(Type8Screen0PickBack, t8m::Screen0Pick(base, ctx.r3.u64, 2))
+ITC_T8M_SCREEN(Type8Screen0OnDialogClosed, t8m::Screen0OnDialogClosed(base, ctx.r3.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0Leave, t8m::Screen0Leave(base, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0OnLeft, t8m::Screen0OnLeft(base, ctx.r3.u64, sp, lr, calls))
+ITC_T8M_SCREEN(Type8Screen0Confirm,
+               t8m::Screen0Confirm(base, ctx.r3.u64, ctx.r5.u32, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0ConfirmPage, t8m::Screen0ConfirmPage(base, ctx.r3.u64))
+ITC_T8M_SCREEN(Type8Screen0ChosenPage,
+               t8m::Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, sp))
+ITC_T8M_SCREEN(Type8Screen0ShowPage,
+               t8m::Screen0ShowPage(base, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0PlaceCursor, t8m::Screen0PlaceCursor(base, ctx.r4.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0Draw, t8m::Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0MenuPage,
+               t8m::Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0OpeningStep, t8m::Screen0OpeningStep(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0ItemStep, t8m::Screen0ItemStep(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0CursorStep, t8m::Screen0CursorStep(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0FadeOutStep, t8m::Screen0FadeOutStep(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0UpdateStand, t8m::Screen0UpdateStand(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0Update, t8m::Screen0Update(base, ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0SetTexts, t8m::Screen0SetTexts(base, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0CarCard,
+               t8m::Screen0CarCard(base, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0Show, t8m::Screen0Show(base, ctx.r3.u64, sp, calls))
+
+ITC_T8M_SCREEN(Type8ModeAllLoaded, t8m::ModeAllLoaded(base, ctx.r3.u32))
+ITC_T8M_SCREEN(Type8FreeTwoPlayerBlock, t8m::FreeTwoPlayerBlock(base, sp, calls))
+ITC_T8M_SCREEN(Type8ModeRelease,
+               t8m::ModeRelease(base, ctx.r3.u64, ctx.r4.u64, sp, lr, calls))
+ITC_T8M_SCREEN(Type8ModeWaitForLoads,
+               t8m::ModeWaitForLoads(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeNextMode, t8m::ModeNextMode(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModePollTeardown,
+               t8m::ModePollTeardown(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeTearDown, t8m::ModeTearDown(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeInterrupt, t8m::ModeInterrupt(base, ctx.r3.u32, sp))
+ITC_T8M_SCREEN(Type8ModeForceExit,
+               t8m::ModeForceExit(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+
+#undef ITC_T8M_SCREEN
+#undef ITC_T8M_STEP
+
+void Type8ModeInit(PPCContext& ctx, uint8_t* base) {
+  const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+  const t8m::ScreenCalls calls = Type67ScreensCalls(ctx, base);
+  ctx.fpscr.disableFlushMode();
+  const uint64_t r3 = t8m::ModeInit(base, ctx.r3.u32, ctx.r1.u32, calls);
+  ctx.r1.u64 = stack;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace hooks
+
+#define ITC_TYPE8_MODE(address, step)    \
+  extern "C" REX_FUNC(sub_##address) {   \
+    REX_FUNC_PROLOGUE();                 \
+    if (!ITC_FLAG(native_type8_mode)) {  \
+      __imp__sub_##address(ctx, base);   \
+      return;                            \
+    }                                    \
+    hooks::step(ctx, base);              \
+  }
+
+// The dialog's handlers (its machine's transitions), pages (its Draw's
+// table) and step 0 (its Update's table): no direct callers.
+ITC_TYPE8_MODE(8223A408, Type8DialogOnEnter)
+ITC_TYPE8_MODE(8223A398, Type8DialogOpenMovies)
+ITC_TYPE8_MODE(8223ADC0, Type8DialogWaitForMovies)
+ITC_TYPE8_MODE(8223AC00, Type8DialogDraw)
+ITC_TYPE8_MODE(8223AC58, Type8DialogUpdate)
+ITC_TYPE8_MODE(8223A510, Type8DialogOpenConfirm)
+ITC_TYPE8_MODE(8223A4A0, Type8DialogOpenNotice)
+ITC_TYPE8_MODE(8223A5F0, Type8DialogDrawWaiting)
+ITC_TYPE8_MODE(8223A6B8, Type8DialogConfirmPage)
+ITC_TYPE8_MODE(8223A858, Type8DialogNoticePage)
+ITC_TYPE8_MODE(8223A940, Type8DialogOpenConfirmStep)
+// The first screen's constructor and destructor (from the member's,
+// recompiled), its vtable's slot 0, its machine's handlers, its Draw's pages
+// and its helpers with recompiled callers (Confirm from MenuPage, ShowPage
+// and PlaceCursor from the steps).
+ITC_TYPE8_MODE(8223D2F0, Type8Screen0Construct)
+ITC_TYPE8_MODE(8223BF00, Type8Screen0Destruct)
+ITC_TYPE8_MODE(8223C528, Type8Screen0DeletingDestruct)
+ITC_TYPE8_MODE(8223B630, Type8Screen0OnEnter)
+ITC_TYPE8_MODE(8223B530, Type8Screen0OpenMovie)
+ITC_TYPE8_MODE(8223B6D8, Type8Screen0WaitForMovie)
+ITC_TYPE8_MODE(8223B540, Type8Screen0Suspend)
+ITC_TYPE8_MODE(8223B590, Type8Screen0PickYes)
+ITC_TYPE8_MODE(8223B5A0, Type8Screen0PickNo)
+ITC_TYPE8_MODE(8223B5B0, Type8Screen0PickBack)
+ITC_TYPE8_MODE(8223C098, Type8Screen0OnDialogClosed)
+ITC_TYPE8_MODE(8223BA48, Type8Screen0Leave)
+ITC_TYPE8_MODE(8223B588, Type8Screen0OnLeft)
+ITC_TYPE8_MODE(8223C430, Type8Screen0Confirm)
+ITC_TYPE8_MODE(8223B5C0, Type8Screen0ConfirmPage)
+ITC_TYPE8_MODE(8223C0C0, Type8Screen0ChosenPage)
+ITC_TYPE8_MODE(8223BD20, Type8Screen0ShowPage)
+ITC_TYPE8_MODE(8223BE88, Type8Screen0PlaceCursor)
+ITC_TYPE8_MODE(8223C888, Type8Screen0Draw)
+// The menu page (Draw's table), the steps (Update's table), Update and
+// Show (the machine's transitions). UpdateStand, SetTexts and CarCard have
+// no adapters: their only callers (Update, Show) are these, native (with
+// the flag off, the originals call the originals); their register steps
+// stay for the harness.
+ITC_TYPE8_MODE(8223C6B8, Type8Screen0MenuPage)
+ITC_TYPE8_MODE(8223C1A0, Type8Screen0OpeningStep)
+ITC_TYPE8_MODE(8223BBC8, Type8Screen0ItemStep)
+ITC_TYPE8_MODE(8223C330, Type8Screen0CursorStep)
+ITC_TYPE8_MODE(8223BAF0, Type8Screen0FadeOutStep)
+ITC_TYPE8_MODE(8223C588, Type8Screen0Update)
+ITC_TYPE8_MODE(8223BF18, Type8Screen0Show)
+// The mode's vtable 0x82006D60 slots 1 (Release), 6 (NextMode, through
+// Mode::NextModeThunk) and 8 to 10 (WaitForLoads, PollTeardown, TearDown,
+// through the slot thunks), and its +32 vtable 0x82006D54's slots 0 and 1.
+// AllLoaded and SaveData::FreeTwoPlayerBlock have no adapters: their only
+// callers (WaitForLoads, Interrupt; NextMode) are these, native.
+ITC_TYPE8_MODE(8223D3B8, Type8ModeRelease)
+ITC_TYPE8_MODE(8223DBC0, Type8ModeWaitForLoads)
+ITC_TYPE8_MODE(8223DD90, Type8ModeNextMode)
+ITC_TYPE8_MODE(8223D8E8, Type8ModePollTeardown)
+ITC_TYPE8_MODE(8223D4D0, Type8ModeTearDown)
+ITC_TYPE8_MODE(8223D960, Type8ModeInterrupt)
+ITC_TYPE8_MODE(8223DA00, Type8ModeForceExit)
+// Slot 0 (Init, from Modes::Tick). The members' Inits it calls
+// (Type8Screen0::Init sub_8223C950, Type8Dialog::Init sub_8223AE60,
+// Type8Options::Init sub_821CAAB0, Type8ControllerOptions::Init
+// sub_821C8F48, Type8SaveScreen::Init sub_821A87F0) and
+// SaveData::CreateTwoPlayerBlock sub_82105740 have no adapters: it's their
+// only caller, and it runs their plain C++ (with the flag off, the
+// original calls the originals).
+ITC_TYPE8_MODE(8223D5D8, Type8ModeInit)

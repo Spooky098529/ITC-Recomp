@@ -142,7 +142,7 @@ variable set, with their repeat base and ramp helpers, 28 functions at
 and XACT's random generator `sub_825D8F18` are in a lead in
 `../loops/leads.md` (this map's limit of about 150 functions); the
 static set-up `sub_825D8F88` at the end of the range (a zero 4×4
-matrix at `0x8266D000`, not XACT's) too.
+matrix at `0x8266D000`, not XACT's) has its row in `matrix-math.md`.
 
 **The lock.** One function here enters XACT's lock: the track
 instance's `CancelEvents` (`sub_825D5520`), which takes the engine's

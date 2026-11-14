@@ -221,6 +221,7 @@ void GameModes(Context& h);
 void ModeTick(Context& h);
 void Minimap(Context& h);
 void CRuntimeExit(Context& h);
+void CRuntimeCore(Context& h);
 void Models(Context& h);
 void SceneModels(Context& h);
 void RaceHud(Context& h);
@@ -240,6 +241,7 @@ void RaceWorld(Context& h);
 void RaceStates(Context& h);
 void TextureCompression(Context& h);
 void SaveInterface(Context& h);
+void SaveHandlers(Context& h);
 void CarSounds(Context& h);
 void X3DAudioMath(Context& h);
 void XAudio(Context& h);
@@ -268,6 +270,8 @@ void Accessories(Context& h);
 // The race HUD machine (src/harnesses/race_hud_machine.cpp).
 void RaceHudMachine(Context& h);
 void RaceScreens(Context& h);
+// The in-race screens never seen in play (src/harnesses/race_screens.cpp).
+void RaceScreensUnseen(Context& h);
 void Scene(Context& h);
 // The second set's objects (src/harnesses/second_set.cpp).
 void SecondSet(Context& h);
@@ -330,5 +334,10 @@ void NetworkMode(Context& h);
 void RaceEnd(Context& h);
 void PowerGraphScreen(Context& h);
 void Achievements(Context& h);
+// The morph jobs and the work item (src/harnesses/morph_jobs.cpp).
+void MorphJobs(Context& h);
+// The type 8 mode's panel screen (src/harnesses/type8_screens.cpp).
+void Type8Screens(Context& h);
+void Type8Mode(Context& h);
 
 }  // namespace harness

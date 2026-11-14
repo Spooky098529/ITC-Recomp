@@ -3,9 +3,14 @@
 
 #include "app_start_up/start_up.h"
 
+#include "base/flags.h"
 #include "base/log.h"
+#include "framework/framework.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+
+ITC_FLAG_DECLARE(bool, native_app_start_up);
+ITC_FLAG_DECLARE(bool, native_framework);
 
 namespace app_start_up {
 
@@ -110,6 +115,44 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   return app;
 }
 
+std::optional<DirectSlot> RenderManagerCall(uint8_t* base, uint32_t function, uint32_t manager) {
+  constexpr uint32_t kSceneFrom36 = 0x82090908, kRendererFrom36 = 0x820908E0;
+  if (!ITC_FLAG(native_app_start_up) || !ITC_FLAG(native_framework)) {
+    return std::nullopt;
+  }
+  if (function == kRenderManagerScene) {
+    const SlotCall call = SceneSlotFromInterface16(base, manager);
+    if (call.target != kSceneFrom36) {
+      return std::nullopt;
+    }
+    return DirectSlot{framework::SceneFrom36(base, call.object), call.target};
+  }
+  if (function == kRenderManagerFrameDriver) {
+    const SlotCall call = FrameDriverSlotFromInterface16(base, manager);
+    if (call.target != kRendererFrom36) {
+      return std::nullopt;
+    }
+    return DirectSlot{framework::RendererFrom36(base, call.object), call.target};
+  }
+  return std::nullopt;
+}
+
+std::optional<uint32_t> RenderManagerScene(uint8_t* base, uint32_t manager) {
+  const auto slot = RenderManagerCall(base, Load(base, Load(base, manager) + 32), manager);
+  if (!slot) {
+    return std::nullopt;
+  }
+  return slot->r3;
+}
+
+std::optional<uint32_t> RenderManagerFrameDriver(uint8_t* base, uint32_t manager) {
+  const auto slot = RenderManagerCall(base, Load(base, Load(base, manager) + 28), manager);
+  if (!slot) {
+    return std::nullopt;
+  }
+  return slot->r3;
+}
+
 }  // namespace app_start_up
 
 namespace app_start_up {
@@ -145,6 +188,33 @@ SlotCall AppPoolSlot(uint8_t* base, uint32_t interface8) {
 SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16) {
   ITC_NATIVE_RUNNING("sub_820944A8 (this - 8, then sub_82094368)");
   return AppPoolSlot(base, interface16 - 8);
+}
+
+SlotCall SceneSlot(uint8_t* base, uint32_t interface8) {
+  ITC_NATIVE_RUNNING("sub_82094338 App::SceneFromInterface8");
+  const uint32_t object = Load(base, interface8 + 16);
+  return {object, Load(base, Load(base, object) + 12)};
+}
+
+SlotCall SceneSlotFromInterface16(uint8_t* base, uint32_t interface16) {
+  ITC_NATIVE_RUNNING("sub_820944D8 App::SceneFromInterface16");
+  return SceneSlot(base, interface16 - 8);
+}
+
+SlotCall FrameDriverSlot(uint8_t* base, uint32_t interface4) {
+  ITC_NATIVE_RUNNING("sub_82094320 App::FrameDriver");
+  const uint32_t object = Load(base, interface4 + 20);
+  return {object, Load(base, Load(base, object) + 8)};
+}
+
+SlotCall FrameDriverSlotFromInterface16(uint8_t* base, uint32_t interface16) {
+  ITC_NATIVE_RUNNING("sub_82094498 App::FrameDriverFromInterface16");
+  return FrameDriverSlot(base, interface16 - 12);
+}
+
+SlotCall FrameDriverSlotFromInterface8(uint8_t* base, uint32_t interface8) {
+  ITC_NATIVE_RUNNING("sub_82094480 App::FrameDriverFromInterface8");
+  return FrameDriverSlot(base, interface8 - 4);
 }
 
 }  // namespace app_start_up

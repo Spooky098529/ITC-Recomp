@@ -9,3 +9,7 @@
 /itc_recomp/generated/default/codegen.d
 /itc_recomp/generated/default/codegen.stamp
 /itc_recomp/generated/default/codegen.build.stamp
+
+# static_map.py's full dump (made again on every run; docs/loops/static-map.md
+# is the committed summary)
+/itc_recomp/coverage/static_map.tsv

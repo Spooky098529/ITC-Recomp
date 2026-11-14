@@ -40,4 +40,11 @@ void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base);
 // sub_825896C0 (r3, r4 the tables; r3 left).
 void ModelsSetSharedShaders(PPCContext& ctx, uint8_t* base);
 
+// A guest call of `function` (r3 the provider, r4 the slot, r5 the index;
+// lr the caller's, r1 its frame) made natively when it's the texture
+// provider's slot 3 (TextureProvider::Get) or slots 5 to 7 and
+// models::CallGet or CallXprTexture answers: r3 as the adapter leaves it.
+// False where the caller makes the guest call.
+bool TextureProviderSlotDirect(PPCContext& ctx, uint8_t* base, uint32_t function);
+
 }  // namespace hooks

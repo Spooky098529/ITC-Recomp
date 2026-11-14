@@ -48,7 +48,6 @@ constexpr uint32_t kStoreScale = 0x82002948;  // the angle's scale
 constexpr uint32_t kLoadScale = 0x8200294C;   // LoadStickers' angle scale
 constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kPickNext = 0x821159B0;        // Career::PickNext (its adapter)
-constexpr uint32_t kFitSelectedCar = 0x8217DAC0;  // GarageStage::FitSelectedCar (its adapter)
 constexpr uint32_t kHolderPointer = 0x826D83E0;   // the garage stage's holder
 
 constexpr uint32_t kState = 9652;
@@ -415,7 +414,7 @@ uint64_t OnStickerDialogYes(uint8_t* base, const tuning_screen::GuestCall& call,
 }
 
 uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
-                     uint32_t sp, bool native_specs) {
+                     uint32_t sp, bool native_specs, const StandFit& fit) {
   ITC_NATIVE_RUNNING("sub_821E2660 TuningScreen::OnDialogYes");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = sp - 112;
@@ -755,7 +754,7 @@ uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64
     const uint32_t holder = Load(base, Load(base, kHolderPointer));
     const int64_t a = int8_t(Byte(base, c + 300));
     const int64_t b = int8_t(Byte(base, c + 301));
-    call(kFitSelectedCar, {holder, uint64_t(a), uint64_t(b)}, frame, 0x821E3984);
+    FitSelectedCar(base, call, fit, holder, uint64_t(a), uint64_t(b), frame, 0x821E3984);
   } else if (state == 37) {
     // Delete a vinyl layer (item 6) or leave the sticker list (item 7).
     if (category() == 5) {

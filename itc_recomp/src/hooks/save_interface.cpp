@@ -6,11 +6,16 @@
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
+#include "hooks/c_runtime_core.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "native/buffers.h"
+#include "save_interface/save_devices.h"
 #include "save_interface/save_interface.h"
 #include "save_interface/save_layer.h"
+#include "save_interface/slot_handlers.h"
 
 ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "Run the save system's interface (docs/functions/save-interface.md: "
@@ -33,10 +38,29 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "sub_821109B8 and PlayTime::Update sub_82112838; GameData::Save sub_8228FB00 (GetLocalTime "
               "through the guest), Load sub_8228FBC0 and the game data's check sub_8228FC50; the replays' Count sub_822902A0, "
               "ReadEntry sub_822900E0 (its parse of a replay's name, never in play, on the translated "
-              "code) and, with --native_heap, BuildList sub_82290378) natively instead of through the "
+              "code) and, with --native_heap, BuildList sub_82290378; with --native_heap, "
+              "SaveDevices::Create sub_820A63C8 and the save devices' constructor sub_820A6160 (no "
+              "adapter: only Create's step calls it) with SaveSlot::AllocBuffers sub_820A4560 (no "
+              "adapter: only the constructor's plain C++ calls it; the notification listener "
+              "stored as none without XNotifyCreateListener) and destructor sub_820A6110 with "
+              "SaveDevices::Destroy sub_820A56E8 and SlotArray::Reset sub_820A55F0 (no adapters: "
+              "only the destructor's plain C++ calls them; the listener's CloseHandle left out)); "
+              "the save devices' slot handlers WaitForUser sub_820A4870, WaitForDevice "
+              "sub_820A5878, Failed sub_820A4890, Ready sub_820A58D8 and EnumerateStep "
+              "sub_820A59C0, the listener delegate's target sub_820A4800 and the framework's "
+              "device list sub_820908D8, XGetOverlappedResult sub_82295C98 and GetOverlappedResult "
+              "sub_82295F20 (no adapters: only the waits' plain C++ calls them; their waits, never "
+              "taken here, WaitForSingleObject through the guest), "
+              "the machines CheckStep sub_820A5A88, SaveStep sub_820A5BE8, LoadStep sub_820A5E68 "
+              "and DeleteStep sub_820A6010 with the waits they poll (no adapters: WaitCloseItem "
+              "sub_820A4C08, WaitDelete sub_820A5290, WaitThumbnail sub_820A5190, WaitClose "
+              "sub_820A5070, WaitWrite sub_820A4E68, WaitRead sub_820A4FF8) and SaveDevices::Update "
+              "sub_820A4610 (B5's adapter in hooks/notify.cpp; without this flag B5's body) "
+              "natively instead of through the "
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
 
+ITC_FLAG_DECLARE(bool, native_c_runtime_core);
 namespace hooks {
 
 namespace si = save_interface;
@@ -303,6 +327,371 @@ void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = si::PlayTimeUpdate(base, ctx.r3.u32, ctx.r1.u32 - 96 + 80);
 }
 
+namespace {
+
+void Store64(uint8_t* base, uint32_t address, uint64_t value) {
+  guest::StoreU32(base, address, uint32_t(value >> 32));
+  guest::StoreU32(base, address + 4, uint32_t(value));
+}
+
+// A prologue's saves above the stack pointer `sp`: the return address at
+// sp - 8, the 64-bit registers r`first` to r31 from sp - 8 x (33 - first)
+// (where __savegprlr_N and the inline saves put them), and the back chain of
+// its `frame_bytes`-byte frame.
+void Prologue(uint8_t* base, uint32_t sp, uint32_t lr, uint32_t frame_bytes, int first,
+              const uint64_t* regs) {
+  guest::StoreU32(base, sp - 8, lr);
+  for (int n = first; n < 32; n++) {
+    Store64(base, sp - 8 * (32 - n) - 8, regs[n - first]);
+  }
+  guest::StoreU32(base, sp - frame_bytes, sp);
+}
+
+// r`first` to r31 of `ctx` (r14 to r31 are consecutive in PPCContext).
+std::vector<uint64_t> Regs(const PPCContext& ctx, int first) {
+  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(PPCRegister));
+  std::vector<uint64_t> regs;
+  for (int n = first; n < 32; n++) {
+    regs.push_back((&ctx.r14)[n - 14].u64);
+  }
+  return regs;
+}
+
+// The first slot's vtable slot 0 with r4 = 3 (the slots' vector deleting
+// destructor), a guest call from SlotArray::Reset's frame at `sp` (its
+// return address 0x820A5638); r3 its answer.
+std::function<uint32_t(uint32_t)> DestroySlots(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+  return [&ctx, base, sp](uint32_t slots) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = slots;
+    ctx.r4.u64 = 3;
+    ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, slots));
+    ctx.lr = 0x820A5638;
+    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  };
+}
+
+// SlotArray::Reset's prologue at `sp` (lr, r31 as the caller's r31 was:
+// `r31`), and its frame's stack pointer.
+uint32_t ResetPrologue(uint8_t* base, uint32_t sp, uint32_t lr, uint64_t r31) {
+  Prologue(base, sp, lr, 96, 31, &r31);
+  return sp - 96;
+}
+
+// SaveDevices::Destroy's prologue at `sp` (r31 its caller's), and Reset's
+// under it when Destroy calls it; the stack pointer the slots' destructor is
+// called from.
+uint32_t DestroyPrologues(uint8_t* base, uint32_t sp, uint32_t lr, uint64_t r31,
+                          uint32_t devices) {
+  Prologue(base, sp, lr, 96, 31, &r31);
+  const uint32_t frame = sp - 96;
+  if (guest::LoadU32(base, devices + 44) != 0) {
+    return ResetPrologue(base, frame, 0x820A572C, devices);
+  }
+  return frame;
+}
+
+}  // namespace
+
+void SaveDevicesConstructSteps(PPCContext& ctx, uint8_t* base) {
+  const uint64_t self = ctx.r3.u64;
+  const uint32_t devices = ctx.r3.u32;
+  const uint32_t block = ctx.r4.u32;
+  const uint32_t saves = ctx.r5.u32;
+  if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, saves)) {
+    __imp__sub_820A6160(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  // The original's prologue (__savegprlr_26): lr and r26 to r31.
+  const auto regs = Regs(ctx, 26);
+  Prologue(base, ctx.r1.u32, uint32_t(lr), 176, 26, regs.data());
+  // CanAllocBuffers checked above: the plain C++ doesn't refuse.
+  guest_call::InFrame(ctx, base, 176, 0x820A61D8, [&](uint32_t frame) {
+    si::SaveDevicesConstruct(
+        base, devices, block, saves, frame,
+        [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate) {
+          ctx.r3.u64 = loop;
+          ctx.r4.u64 = key;
+          ctx.r5.u64 = delegate;
+          ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, loop) + offset);
+          ctx.lr = offset == 8 ? 0x820A61D8 : 0x820A621C;
+          REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+        });
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = self;  // the original's mr r3,r31
+}
+
+void SaveDevicesCreateSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t block = ctx.r3.u32;
+  const uint32_t saves = ctx.r4.u32;
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820A63C8(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  const uint64_t r30 = ctx.r30.u64;
+  const uint64_t r31 = ctx.r31.u64;
+  const auto regs = Regs(ctx, 30);
+  const auto devices = si::SaveDevicesCreate(base, saves, [&](uint32_t devices) {
+    // The original's prologue: lr, r30 and r31 above its 112-byte frame.
+    Prologue(base, ctx.r1.u32, uint32_t(lr), 112, 30, regs.data());
+    guest_call::InFrame(ctx, base, 112, 0x820A6400, [&](uint32_t) {
+      // The constructor from Create's frame, with the registers Create
+      // holds there (mr r31,r3 and mr r30,r4), which its prologue saves.
+      ctx.r30.u64 = ctx.r4.u64;
+      ctx.r31.u64 = ctx.r3.u64;
+      ctx.r3.u64 = devices;
+      ctx.r4.u64 = block;
+      ctx.r5.u64 = saves;
+      SaveDevicesConstructSteps(ctx, base);
+    });
+    ctx.r30.u64 = r30;
+    ctx.r31.u64 = r31;
+    ctx.lr = lr;
+  });
+  if (!devices) {
+    __imp__sub_820A63C8(ctx, base);
+    return;
+  }
+  if (*devices == 0) {
+    Prologue(base, ctx.r1.u32, uint32_t(lr), 112, 30, regs.data());
+  }
+  ctx.r3.u64 = *devices;
+}
+
+void SaveSlotAllocBuffersSteps(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, ctx.r4.u32)) {
+    __imp__sub_820A4560(ctx, base);
+    return;
+  }
+  const auto regs = Regs(ctx, 29);
+  Prologue(base, ctx.r1.u32, uint32_t(ctx.lr), 112, 29, regs.data());
+  const uint32_t slot = ctx.r3.u32;
+  si::SlotAllocBuffers(base, slot, ctx.r4.u32);
+  ctx.r3.u64 = guest::LoadU32(base, slot + 84);  // the second operator new[]'s answer
+}
+
+void SaveDevicesDeleteSteps(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820A6110(ctx, base);
+    return;
+  }
+  const uint32_t devices = ctx.r3.u32;
+  const uint32_t flags = ctx.r4.u32;
+  const uint32_t sp = ctx.r1.u32;
+  // The original's prologue: lr, r30 and r31, a 112-byte frame; Destroy's
+  // (and Reset's) under it (r31 the save devices, as the original's mr
+  // r31,r3 leaves it).
+  const auto regs = Regs(ctx, 30);
+  Prologue(base, sp, uint32_t(ctx.lr), 112, 30, regs.data());
+  const uint64_t self = ctx.r3.u64;
+  const uint32_t slots_sp = DestroyPrologues(base, sp - 112, 0x820A6130, self, devices);
+  si::SaveDevicesDelete(base, devices, flags, DestroySlots(ctx, base, slots_sp));
+  ctx.r3.u64 = self;  // the original's mr r3,r31
+}
+
+void SaveDevicesDestroySteps(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820A56E8(ctx, base);
+    return;
+  }
+  const uint32_t devices = ctx.r3.u32;
+  const uint32_t slots_sp =
+      DestroyPrologues(base, ctx.r1.u32, uint32_t(ctx.lr), ctx.r31.u64, devices);
+  ctx.r3.u64 = si::SaveDevicesDestroy(base, devices, DestroySlots(ctx, base, slots_sp));
+}
+
+void SlotArrayResetSteps(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820A55F0(ctx, base);
+    return;
+  }
+  const uint32_t frame = ResetPrologue(base, ctx.r1.u32, uint32_t(ctx.lr), ctx.r31.u64);
+  ctx.r3.u64 = si::SlotArrayReset(base, ctx.r3.u32, DestroySlots(ctx, base, frame));
+}
+
+namespace {
+
+// The call into an adapter as a CallSite: its stack pointer, return address
+// and r27 to r31.
+si::CallSite Site(const PPCContext& ctx) {
+  return si::CallSite{ctx.r1.u32, uint32_t(ctx.lr), ctx.r27.u64, ctx.r28.u64,
+                      ctx.r29.u64,  ctx.r30.u64,     ctx.r31.u64};
+}
+
+// A guest call to `function` from native code at `at` (its stack pointer,
+// return address and nonvolatile registers as the original's call has
+// them); r3 and the other argument registers set by the caller. The stack
+// pointer and r27 to r31 put back after.
+void GuestCallAt(PPCContext& ctx, uint8_t* base, uint32_t function, const si::CallSite& at) {
+  const uint64_t r1 = ctx.r1.u64, r27 = ctx.r27.u64, r28 = ctx.r28.u64, r29 = ctx.r29.u64,
+                 r30 = ctx.r30.u64, r31 = ctx.r31.u64;
+  ctx.r1.u64 = at.sp;
+  ctx.r27.u64 = at.r27;
+  ctx.r28.u64 = at.r28;
+  ctx.r29.u64 = at.r29;
+  ctx.r30.u64 = at.r30;
+  ctx.r31.u64 = at.r31;
+  ctx.lr = at.lr;
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = r1;
+  ctx.r27.u64 = r27;
+  ctx.r28.u64 = r28;
+  ctx.r29.u64 = r29;
+  ctx.r30.u64 = r30;
+  ctx.r31.u64 = r31;
+}
+
+}  // namespace
+
+void SlotWaitForUserSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotWaitForUser(base, ctx.r4.u32);
+}
+
+void SlotWaitForDeviceSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotWaitForDevice(base, ctx.r4.u32, Site(ctx));
+}
+
+void SlotFailedSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotFailed(base, ctx.r4.u32);
+}
+
+void SlotReadySteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotReady(base, ctx.r4.u32, Site(ctx));
+}
+
+void SlotEnumerateStepSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::SlotEnumerateStep(base, ctx.r3.u32, ctx.r4.u32, Site(ctx));
+}
+
+void DevicesOnEventSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t loop = ctx.r4.u32;
+  si::DevicesOnEvent(base, ctx.r3.u32, loop, ctx.r5.u32, Site(ctx),
+                     [&](uint32_t offset, uint32_t key, const si::CallSite& at) {
+                       ctx.r3.u64 = loop;
+                       ctx.r4.u64 = key;
+                       GuestCallAt(ctx, base,
+                                   guest::LoadU32(base, guest::LoadU32(base, loop) + offset), at);
+                     });
+}
+
+void FrameworkDeviceListSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = si::FrameworkDeviceList(base, ctx.r3.u32);
+}
+
+save_interface::KernelCalls KernelCallsOf(PPCContext& ctx, uint8_t* base) {
+  si::KernelCalls kernel;
+  kernel.pcr = ctx.r13.u32;
+  kernel.wait = [&ctx, base](uint32_t handle, const si::CallSite& at) {
+    ctx.r3.u64 = handle;
+    ctx.r4.s64 = -1;
+    GuestCallAt(ctx, base, 0x822970A0, at);  // WaitForSingleObject
+    return ctx.r3.u32;
+  };
+  kernel.close = [&ctx, base](uint32_t handle, const si::CallSite& at) {
+    if (ITC_FLAG(native_c_runtime_core)) {
+      // CloseHandle's plain C++ (docs/functions/c-runtime-core.md): NtClose,
+      // no guest stack used; its r3 as the guest call left it.
+      ctx.r3.u64 = c_runtime::core::CloseHandle(handle, hooks::CRuntimeCoreCalls(ctx, base));
+      return;
+    }
+    ctx.r3.u64 = handle;
+    GuestCallAt(ctx, base, 0x82294E20, at);  // CloseHandle
+  };
+  return kernel;
+}
+
+void XGetOverlappedResultSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t overlapped = ctx.r3.u32, result = ctx.r4.u32, wait = ctx.r5.u32;
+  ctx.r3.u64 = si::XGetOverlappedResult(base, overlapped, result, wait, Site(ctx), kernel);
+}
+
+void GetOverlappedResultSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t handle = ctx.r3.u32, overlapped = ctx.r4.u32, bytes = ctx.r5.u32,
+                 wait = ctx.r6.u32;
+  ctx.r3.u64 = si::GetOverlappedResult(base, handle, overlapped, bytes, wait, Site(ctx), kernel);
+}
+
+void SlotWaitCloseItemSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitCloseItem(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitDeleteSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitDelete(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitThumbnailSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitThumbnail(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitCloseSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitClose(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitWriteSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitWrite(base, slot, Site(ctx), kernel);
+}
+
+void SlotWaitReadSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t slot = ctx.r4.u32;
+  ctx.r3.s64 = si::SlotWaitRead(base, slot, Site(ctx), kernel);
+}
+
+void SlotCheckStepSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
+  ctx.r3.u64 = si::SlotCheckStep(base, devices, slot, Site(ctx), kernel);
+}
+
+void SlotSaveStepSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
+  ctx.r3.u64 = si::SlotSaveStep(base, devices, slot, Site(ctx), kernel);
+}
+
+void SlotLoadStepSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
+  ctx.r3.u64 = si::SlotLoadStep(base, devices, slot, Site(ctx), kernel);
+}
+
+void SlotDeleteStepSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
+  ctx.r3.u64 = si::SlotDeleteStep(base, devices, slot, Site(ctx), kernel);
+}
+
+void SaveDevicesUpdateSteps(PPCContext& ctx, uint8_t* base) {
+  const auto kernel = KernelCallsOf(ctx, base);
+  ctx.r3.u64 = si::DevicesUpdate(
+      base, ctx.r3.u64, ctx.r4.u64, Site(ctx), kernel,
+      [&ctx, base](uint32_t function, uint64_t r3, uint64_t r4, const si::CallSite& at) {
+        ctx.r3.u64 = r3;
+        ctx.r4.u64 = r4;
+        GuestCallAt(ctx, base, function, at);
+        return ctx.r3.u64;
+      });
+}
+
 }  // namespace hooks
 
 // No adapter (removed 2026-10-28: in play only the request setters' plain
@@ -392,3 +781,34 @@ ITC_SAVE_INTERFACE_ADAPTER(8228FB00, SaveInterfaceGameDataSave)
 ITC_SAVE_INTERFACE_ADAPTER(8228FBC0, SaveInterfaceGameDataLoad)
 ITC_SAVE_INTERFACE_ADAPTER(8228FC50, SaveInterfaceGameDataCheck)
 ITC_SAVE_INTERFACE_ADAPTER(82290378, SaveInterfaceReplaysBuildList)
+// The save devices' creation (from Framework::Init, once at boot) and
+// destructor (vtable slot 0, never in play).
+ITC_SAVE_INTERFACE_ADAPTER(820A63C8, SaveDevicesCreateSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A6110, SaveDevicesDeleteSteps)
+// No adapter (removed 2026-11-13: only SaveDevices::Create's step calls it in
+// play) for SaveDevices::SaveDevices sub_820A6160. None for
+// SaveSlot::AllocBuffers sub_820A4560 (only the constructor's plain C++
+// calls it), SaveDevices::Destroy sub_820A56E8 and
+// SlotArray::Reset sub_820A55F0 (only the destructor's plain C++ calls
+// them): their register steps are the harness's.
+// The save devices' slot handlers (through the save devices' +76 to +112,
+// from SaveDevices::Update) and the listener delegate's target (never in
+// play); the framework's +56 interface's slot 1 (through its vtable).
+ITC_SAVE_INTERFACE_ADAPTER(820A4870, SlotWaitForUserSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A5878, SlotWaitForDeviceSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A4890, SlotFailedSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A58D8, SlotReadySteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A59C0, SlotEnumerateStepSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A4800, DevicesOnEventSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820908D8, FrameworkDeviceListSteps)
+// No adapters (removed 2026-11-13: in play only the save slots' waits'
+// plain C++ calls them; their other callers are Dropped or never in play)
+// for XGetOverlappedResult sub_82295C98 and GetOverlappedResult
+// sub_82295F20: their register steps above are the harness's.
+// The save devices' machines (states 6 to 9); the waits they poll have no
+// adapters (only their plain C++ calls them; the steps above are the
+// harness's).
+ITC_SAVE_INTERFACE_ADAPTER(820A5A88, SlotCheckStepSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A5BE8, SlotSaveStepSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A5E68, SlotLoadStepSteps)
+ITC_SAVE_INTERFACE_ADAPTER(820A6010, SlotDeleteStepSteps)

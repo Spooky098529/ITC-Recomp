@@ -68,6 +68,7 @@ ITC_NATIVE_STEP(NativeListAppend,
 ITC_NATIVE_STEP(NativeListRemove,
                 ctx.r3.u64 = archive::ListRemove(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeNodeConstruct, archive::NodeConstruct(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeNodeDestruct, archive::NodeDestruct(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeFindSlot, ctx.r3.s64 = int32_t(archive::FindSlot(base, ctx.r3.u32)))
 ITC_NATIVE_STEP(NativeFindLooseFile, ctx.r3.u64 = archive::FindLooseFile(base, ctx.r3.u32))
 
@@ -249,6 +250,19 @@ void Lists(Context& h) {
             t.r4.u64 = i < 10 ? 0 : h.random.Next();
           },
           __imp__sub_82294B68, NativeNodeConstruct, AreaOutputs(h), fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8224FB10 ListNode::~ListNode");
+    for (int i = 0; i < 8; i++) {
+      Case(
+          h, results, NoSetup,
+          [&](PPCContext& t) {
+            t.r3.u64 = (h.data + 4 * h.random.Below(32)) |
+                       (i % 4 == 0 ? 0xFFFFFFFF00000000ull : 0);
+          },
+          __imp__sub_8224FB10, NativeNodeDestruct, AreaOutputs(h), fmt::format("case {}", i));
     }
     results.Report();
   }

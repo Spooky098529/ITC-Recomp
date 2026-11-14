@@ -299,9 +299,26 @@ were at 0.
 |---|---|---|---|---|
 | `sub_82236880` Type6Mode::Init | the transitions' stack leftovers | 6 of 6 | Unwritten stack bytes copied (the members' state machine Inits copy three frame words they never write into each 48-byte transition's functor, +32 to +40; the screen block's constructor, recompiled under the original, leaves other words there than the plain C++'s back chains; dead words; type 7's same group matches) | for review (2026-11-07 22:22 run) |
 
+### `type67-screens.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822334C8` Type6ListScreen::SetUpRace | the traffic records' unwritten bytes | 11 of 16 | Unwritten stack bytes copied (the recompiled race set-up's register saves, `Racers::SetStart`'s 16 records on its stack; seen 0x826C0000 at a record's +3932; as `Race::SetUp`'s group) | for review (2026-11-13 12:31 run) |
+| `sub_82243018` Type7ListScreen::SetUpRace | the traffic records' unwritten bytes | 7 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s and `Race::SetUp`'s: `Racers::SetStart`'s records built on its stack over the recompiled callees' register saves) | for review (2026-11-13 b7-loop-13-11-26 run, part 2c) |
+| `sub_8223F778` Type8ListScreen::SetUpRace | the traffic records' unwritten bytes | 2 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s; the same words) | for review (2026-11-13 12:31 run) |
+| `sub_8223E760` Type8ColorListScreen::SetUpRace | the traffic records' unwritten bytes | 5 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s) | for review (2026-11-13 12:31 run) |
+
+### `title-screen.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82222700` TitleScreen::MainMenu | multiplayer items bypassed (expected to differ) | 4 of 400 | The multiplayer bypass on purpose (the user's call, 2026-11-14): items 3 and 4 are silent, answered as an input the menu ignores (no `MenuSound::Play`, r3 0; the user's call, 2026-11-14, replacing the refusal cue played at first); the original's page-object writes, stored item word, message and sound are left out | for review (2026-11-14 05:01 run; silent since the 15:19 run, the same counts) |
+| `sub_82222700` TitleScreen::MainMenu | item 3 or 4 accepted, bypassed (expected to differ) | 100 of 100 | The same bypass, with every case accepting item 3 or 4 | for review (2026-11-14 05:01 run; silent since the 15:19 run, the same counts) |
+
 ### `network-mode.md`
 
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_82278058` ModeType12::Init | the transitions' stack leftovers | 16 of 16 | Unwritten stack bytes copied (the recompiled InitStates, under the recompiled Init, copy three frame words they never write into each transition, +32 to +40, holding `NetScreen::InitBase`'s return address 0x8228861C and back chains; dead words; as `Type6Mode::Init`'s group) | for review (2026-11-12 08:26 run) |
 | `sub_8227B930` ModeType12::NextMode | the time attack's traffic records' unwritten bytes | 16 of 32 (17 in another run) | Unwritten stack bytes copied (the recompiled race set-up's register saves; as `Race::SetUp`'s group) | for review (2026-11-12 08:26 run) |
+| `sub_82292CC0` Leaderboard::Read | (expected to differ) | 20 of 20 | No Live on purpose (the user's call, 2026-11-14): the SDK's `XamUserCreateStatsEnumerator` stub reports success without the size or handle, so the original allocates a garbage-size buffer into `[0x826C6AD4]` and clears the overlapped at `0x826C6080`, then `XEnumerate` fails; ours fails the read (+180 = 4, no buffer). r3 differs too (unread) | for review (2026-11-14 05:01 run) |

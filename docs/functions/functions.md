@@ -348,8 +348,10 @@ Rows not yet moved stay in the table below. So far:
   over the app at `0x826BDC90` and the save devices' and users' slots it
   reaches (the slots' request setters and getters), and the front end's
   save layer: the save buffers, the game data's save and load and the
-  replays' list, save, load and delete, with the play time update (B7;
-  the save slots' steps stay in `files-and-saves.md`).
+  replays' list, save, load and delete, with the play time update; the
+  save devices' constructor and their slot handlers (the states
+  `SaveDevices::Update` runs, with their waits) (B7; the save slots'
+  B4 steps and the save and load steps stay in `files-and-saves.md`).
 - [`car-sounds.md`](car-sounds.md): the car sounds, the game's own
   sounds for each racer played straight through XAudio's voices (the
   engine's two layers, the tires, hits, wind, road noise, pass by and
@@ -591,7 +593,9 @@ Rows not yet moved stay in the table below. So far:
   record, the wheels and tire grades the tuning screen picks (their
   numbers, colors and sizes in the record, the axles refitted, the second
   wheels), and the record setters for the parts, the interior, the decal
-  placements and the lights, each followed by the model's re-apply (B7).
+  placements and the lights, each followed by the model's re-apply, and
+  the setters the tuning screen reaches for the paint, the stickers and
+  the aero sets (B7).
 - [`build-screen.md`](build-screen.md): the 21 transitions of the
   front-end screen whose update is `sub_821A1380` (probably a car shop):
   its groups by category, a group's builds, one build put on the stand
@@ -610,6 +614,12 @@ Rows not yet moved stay in the table below. So far:
   accessory's, leaving the screen and the editors), their movie-side
   updates, the confirm dialogs' yes answers, and the decal images the
   vinyl and sticker editors draw (B7).
+- [`sticker-editor.md`](sticker-editor.md): the tuning shop's sticker
+  editor: its input pages (the tuning screen's states 38 to 46 and 49:
+  the area, slot, operation, edit, order, picker, move, rotate, scale
+  and free look pages) and their helpers (the menus' movie sides, the
+  slots' nodes and textures, the picker over the owned stickers, the
+  held views) (B7; mapped).
 - [`screen-constructors.md`](screen-constructors.md): the
   constructors of the type 6 and 7 game modes' front-end screen blocks:
   their list, node and panel screens, the state machines with ten words
@@ -735,6 +745,36 @@ Rows not yet moved stay in the table below. So far:
   its constructor setting up the command list, the render queue and
   the graphics library's draw globals, `Scene::Update` and `Draw`)
   (B7; mapped).
+- [`morph-jobs.md`](morph-jobs.md): the morph jobs (the 224-byte job
+  `Model::MorphShape` posts to the second worker pool for each per-draw
+  wheel morph, its maker, slots and release) and the worker pools' work
+  item class every pool job holds (B7; mapped).
+- [`type8-screens.md`](type8-screens.md): the type 8 mode's (probably
+  the two-player mode's) panel screen, the two players' car pick over
+  `PanelSetPair`, with its inline panels, and its two list screens (the
+  race kind and course, and the color list), their list parts with a
+  settings block a player, pages, steps and race set-ups for two cars
+  (B7; mapped, none seen in play).
+- [`type8-mode.md`](type8-mode.md): the type 8 mode itself (probably
+  the two-player mode): its Init, its delegate slots (the loads' wait,
+  the next-mode query, the teardown), its +32 interface, its first
+  screen (the five-item menu over the two players' cars on the stand,
+  with the stand's model updates) and its yes/no dialog (B7; mapped,
+  none seen in play).
+- [`race-screens-unseen.md`](race-screens-unseen.md): the four in-race
+  screens never seen in play: kind 4's pause menu (probably the split
+  screen's), the results at the holder's +1028 and +1032 (with the
+  network battle's result exchange) and kind 6's screen after the race
+  (the Xbox Live mode's race: its menu, the replay's save and the time
+  attack's leaderboard) (B7; mapped, none seen in play).
+- [`c-runtime-core.md`](c-runtime-core.md): the C runtime's parts over
+  kernel imports: the per-thread data over the kernel's TLS (`_mtinit`,
+  `_getptd`), the lock table and the stream and file handle locks,
+  `errno` and the shared error paths, the exit, abort and C++ exception
+  paths with the unhandled exception filters, the streams and the
+  low-level I/O under them, the %e, %a and %g helpers, `_cinit` and
+  XAPI's thread notify routines, thread start and `CloseHandle` (B7;
+  mapped, almost none seen in play).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -776,7 +816,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82296E70` | `SetLastError` | Overridden | r3 = the error: stored in the current thread's last error, `[[r13+256]+352]` (r13 = the PCR, +256 its current thread), unless `[r13+336]` is set (probably: in a DPC). Ours: `last_error::Set` (`src/hooks/last_error.cpp`), a thin adapter for the recompiled callers; our adapters call it directly. 2,000 cases the same as the recompiled one (with `sub_82296FD0`). |
 | `sub_82296FD0` | `SetLastError` | Overridden | Jumps to `sub_82296E70`. Ours: the same as `sub_82296E70`. |
 | `sub_82296EC0` | `GetLastError` | Native | The thread's last error (`[[r13+256]+352]`), or 0 while `[r13+336]` is set. Called by `sub_82294ED8` after its XMsg call (Dropped, never runs), and through `sub_82295F18`. Ours (B7 loop, 2026-10-30, a ready group under the car models' `LoadSlot::Load`): `last_error::Get` (`src/hooks/last_error.cpp`, as `SetLastError`'s, no flag), reached by `sub_82295F18`'s adapter and `car_models::LoadSlotLoad`; its own adapter removed (its only caller in play is `sub_82295F18`'s, a temporary counter saw no call in an attract race). Harness `last_error` (64 cases, both entry points against this one; its register steps, r11 as the original leaves it, in the harness file).
-| `sub_82294E20` | `CloseHandle` | | r3 = handle: `NtClose`; 1, or 0 with the last error. Called for files, events and enumerators (the file class's close, the save slot's close wait, the enumeration's wait, `Archive::Shutdown`). |
 | `sub_82294DA0` | `GlobalMemoryStatus` | Dropped | r3 = a MEMORYSTATUS (32 bytes) filled from `MmQueryStatistics`. From `sub_82106548`, `sub_82106618` and `sub_82107910` (25 calls in a session), each with a buffer in its frame that it never reads. Ours (`src/hooks/memory_status.cpp`): writes nothing. `BootData::Load`'s plain C++ (`src/data_load/boot.cpp`, 2026-10-30) leaves both its calls out, as `App::StartUp`'s does. |
 | `sub_82295F18` | `GetLastError` | Overridden | Jumps to `sub_82296EC0`. Called after failed file calls (GetDiskFreeSpaceEx, XGetOverlappedResult, the C runtime's I/O), and on free's and realloc's failure paths (`heap.md`, never ran), and `LoadSlot::Load`'s (`car-models.md`) when its VirtualAlloc fails (the result not read). Ours: the same as `sub_82296EC0` (`last_error::Get`). |
 | `sub_82296E88` | `SetLastErrorFromStatus` | Overridden | r3 = an NTSTATUS: `SetLastError(RtlNtStatusToDosError(r3))` (the same check of `[r13+336]`), returning the DOS error. Called after failed kernel calls (27 files). Ours: `last_error::SetFromStatus`, the mapping from the SDK's `xeRtlNtStatusToDosError` (C++, no guest call) until the import's last recompiled caller, `sub_822953E8`, is native and the table is ours. 1,000 statuses across the mapping's branches the same as the recompiled one. |

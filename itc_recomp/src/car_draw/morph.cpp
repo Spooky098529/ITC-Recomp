@@ -33,6 +33,7 @@ constexpr uint32_t kHeadersPerBuffer = 1280;
 constexpr uint32_t kRecordList = 0x8296B918;
 constexpr uint32_t kReleaseBucket = 0x8296B904;
 constexpr uint32_t kPoolMaker = 0x8296B914;
+constexpr uint32_t kMakeMorphJob = 0x820AC7F0;  // the second pool maker's slot 1
 constexpr uint32_t kZero = 0x82000A34;  // 0.0
 
 uint32_t Load(uint8_t* base, uint32_t address) {
@@ -207,10 +208,19 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
   Left left;
   if (maker != 0) {
     // The maker's slot 1 (sub_820AC7F0 in play: a job blending on a worker
-    // thread).
-    const uint64_t regs[2] = {maker, morph};
-    const uint32_t job = uint32_t(
-        calls.call(Load(base, Load(base, maker) + 4), regs, 2, frame, 0x825951A4));
+    // thread), its plain C++ where it runs natively.
+    const uint32_t slot = Load(base, Load(base, maker) + 4);
+    std::optional<uint32_t> made;
+    if (slot == kMakeMorphJob && calls.make_morph_job) {
+      made = calls.make_morph_job(maker, morph, frame);
+    }
+    uint32_t job;
+    if (made) {
+      job = *made;
+    } else {
+      const uint64_t regs[2] = {maker, morph};
+      job = uint32_t(calls.call(slot, regs, 2, frame, 0x825951A4));
+    }
     Store(base, weights + 20, job);
     const auto release = ModelQueueJobRelease(base, calls, job, frame);
     if (!release) {

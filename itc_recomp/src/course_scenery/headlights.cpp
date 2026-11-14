@@ -15,6 +15,7 @@
 #include "car_scene_draw/ops.h"
 #include "guest.h"
 
+#include "app_start_up/start_up.h"
 #include "base/log.h"
 #include "cameras/cameras.h"
 #include "command_list/command_list.h"
@@ -115,8 +116,14 @@ class Recorder {
   // the return addresses x and x + 16: the command list (1) or the render
   // queue (2).
   uint32_t Get(uint32_t slot, uint32_t x) {
-    const uint32_t object = uint32_t(VtableCall(Load(base_, kRenderApp), 8, x));
-    return uint32_t(VtableCall(object, slot, x + 16));
+    return uint32_t(VtableCall(Scene(x), slot, x + 16));
+  }
+  // The render manager's slot 8 (return address x): its plain C++ called
+  // directly where it's the game's (app_start_up::RenderManagerScene).
+  uint32_t Scene(uint32_t x) {
+    const uint32_t manager = Load(base_, kRenderApp);
+    const auto scene = app_start_up::RenderManagerScene(base_, manager);
+    return scene ? *scene : uint32_t(VtableCall(manager, 8, x));
   }
   void Open(uint32_t x) {
     const uint32_t list = Get(1, x);
@@ -326,7 +333,7 @@ uint64_t Recorder::Run(uint32_t description) {
       command_list::CloseChunk(base_, Get(1, 0x820F3A80));
       const bool second = Load(base_, description + 20) == 2;
       const uint32_t x = second ? 0x820F3AB4 : 0x820F3AD0;
-      const uint32_t object = uint32_t(VtableCall(Load(base_, kRenderApp), 8, x));
+      const uint32_t object = Scene(x);
       const uint32_t queue = uint32_t(VtableCall(object, 2, x + 16));
       r3 = VtableCall(queue, 4, 0x820F3AFC, {chunk, second ? 371u : 150u}, {zero});
     }

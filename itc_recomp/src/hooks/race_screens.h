@@ -171,6 +171,12 @@ void RaceScreensAfterRaceMenuStart(PPCContext& ctx, uint8_t* base);
 void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base);
 // The confirm dialog: Question sub_82217F40, the transitions OpenAnim
 // sub_822186A8 and Move sub_82218788 (r3 the step word), Draw sub_82218F30.
+// RaceDialog::ShowSaving sub_82218AB0 (an adapter: the recompiled
+// AfterRaceMenu::ListPage reaches it), StartSave sub_822189B8 and SetNote
+// sub_82218918 (r3 the id, r4 to r10 the varargs; no adapters).
+void RaceScreensRaceDialogShowSaving(PPCContext& ctx, uint8_t* base);
+void RaceScreensRaceDialogStartSave(PPCContext& ctx, uint8_t* base);
+void RaceScreensRaceDialogSetNote(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogQuestion(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogOpenAnim(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogMove(PPCContext& ctx, uint8_t* base);

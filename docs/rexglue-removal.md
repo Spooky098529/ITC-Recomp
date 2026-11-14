@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-13):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-14):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -319,7 +319,43 @@ goes in `src/` as overrides), American English.
   `TuningScreen::HandleInput` as leads without mapping (ours 5,612 ->
   5,989, work left 984 -> 718); the rest waits on the core's
   `Event::` and sync, `Device::Swap` and `Resolve`, the sticker
-  editor and the leads in `docs/loops/leads.md`.
+  editor and the leads in `docs/loops/leads.md`. Its forty-sixth run
+  (`b7-loop-13-11-26`, 2026-11-13 to 14, limit 10, the user's call;
+  not yet merged) made ten subsystems native, most never seen in play
+  and ported by the 2026-11-12 call: the morph jobs
+  (`morph-jobs.md`), the save devices' constructor and slot handlers
+  (`save-interface.md`, with `SaveDevices::Update`; B4's steps split
+  into plain C++), the render manager's and texture provider's slots
+  with the static matrices, the sticker editor (`sticker-editor.md`),
+  the stand's setters (`stand-models.md`), the type 6 and 7 modes'
+  small pieces and list screens (`type67-screens.md`), and the type 8
+  mode (probably the two-player mode) with its screens
+  (`type8-screens.md`, `type8-mode.md`), with cleanup leads between
+  (`OnRaceEnd`, direct slot calls, the stand's and tuning screen's
+  never-seen rows, the tuning pages' blockers) (ours 5,989 -> 6,537,
+  work left 718 -> 676); the rest waits on the core's `Event::` and
+  sync (the worker pools, `Device::Clear`'s worker), `Device::Resolve`
+  and the never-seen leads in `docs/loops/leads.md`. Since 2026-11-14
+  (the user's call: no multiplayer) the main menu's Xbox Live and split
+  screen items do nothing (`title-screen.md`, "Multiplayer bypassed";
+  `--multiplayer_menu_items=true` restores them): the type 12 and type
+  8 modes made native above are out of reach, their code kept until the
+  user decides (static map: reachable 11,617 -> 11,011, unported 3,703
+  -> 3,232). Its forty-seventh run (`b7-loop-13-11-26` again,
+  2026-11-14, limit 10 lowered to 3, ended by the user after two
+  subsystems; merged into `rexglue-removal-project` the same day) made
+  the in-race screens never seen in play (`race-screens-unseen.md`,
+  99 rows, mostly unreachable since the bypass) and the C runtime's
+  core (`c-runtime-core.md`, `--native_c_runtime_core`, 115 of 118:
+  the per-thread data over the kernel's TLS, the lock table, `errno`,
+  exit, the streams and low-level I/O, the float formatting) native
+  (ours 6,537 -> 6,772, work left 676 -> 656). B7's goal is now no PPC
+  code reachable from `main` (the user's call, 2026-11-14), measured
+  by the static map (`docs/loops/static-map.md`,
+  `itc_recomp/tools/static_map.py`: reachable 10,845, unported 3,106,
+  624 of them seen in play); leads are picked by what they unblock.
+  The rest of the C runtime waits on `_cftoa_l` and the static
+  initializers `_cinit` runs.
   The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2885,6 +2921,22 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The power graph screen (the machine the type 6 and 7 modes share: its handlers, pages, steps, texts and the members' slots) | `power-graph-screen.md` | 22 of 22 | `--native_power_graph_screen` |
 | 2026-11-13 | The achievements check after a race (`Achievements::Check`, `Write`; `XUserWriteAchievements` kept as a guest call, the user's call) | `achievements.md` | 5 of 5 | `--native_achievements` |
 | 2026-11-13 | The frame driver and the app's scene (the game's object that drives each frame across its render thread, renamed from "renderer" by the user's call; the scene's update, draw and constructor; the game's threads) | `frame-driver.md` | 19 ours of 25 in play (`Present` and the `Event::`-blocked three stay) | `--native_frame_driver` |
+| 2026-11-13 | The cleanup leads `RaceStates::OnRaceEnd` (with the course record and `Time::Add`) and `DrawEntryPowerGraph`'s r31 (no mapping, not counted) | `race-states.md`, `power-graph.md` | 9 new ours, 5 adapters removed | (`--native_race_states`) |
+| 2026-11-13 | The morph jobs (the 224-byte job the second worker pool runs for `Model::MorphShape`, the wheels' morphs) and the shared work item | `morph-jobs.md` | 21 of 21 (and `Morph::Blend` Native) | `--native_morph_jobs` |
+| 2026-11-13 | The save devices' constructor and teardown (with `SaveDevices::Create`; the notification listener a stand-in, no call) | `save-interface.md` | 5 of 5 new rows (and `Create`) | (`--native_save_interface`) |
+| 2026-11-13 | The save devices' slot handlers (the states `SaveDevices::Update` runs, the save, load, check and delete steps and their waits, the overlapped results; B4's steps split into plain C++) | `save-interface.md` | 14 of 14 new rows (with `SaveDevices::Update`, `SaveStep`, `LoadStep`, both overlapped results, `Framework::DeviceList`) | (`--native_save_interface`) |
+| 2026-11-13 | Three small leads: the scene's render manager's slots 7 and 8 and their thunks, the texture provider's getters, the static zero and identity matrices | `app-start-up.md`, `models.md`, `matrix-math.md` | 13 of 13 new rows (and `Matrix::FromFloats` Native) | (`--native_app_start_up`, `--native_models`, `--native_matrix_math`) |
+| 2026-11-13 | Cleanup lead (no mapping, not counted): ~30 native callers in 16 subsystems call the render manager's slots 7 and 8 and the texture provider's getters directly (`hooks/direct_slots.h`) | 16 files' notes | none new | (existing flags) |
+| 2026-11-13 | The sticker editor (the tuning screen's states 38 to 46 and 49, their helpers, and the update's sticker commands 32 to 51; none seen in play) | `sticker-editor.md` | 25 of 25 Native (and 17 commands in `tuning-screen.md`, `UiMovie::Unloop`) | (`--native_tuning_pages`, `--native_tuning_screen`) |
+| 2026-11-13 | The stand's setters the tuning screen reaches (the colors, the sticker, the decal word, the aero set), with the tuning screen's `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`, `PreviewParts` | `stand-models.md`, `tuning-screen.md` | 9 new rows and 5 callers ours, 17 adapters removed | (`--native_stand_models`, the tuning screen's) |
+| 2026-11-13 | Cleanup lead (no mapping, not counted): the never-seen rows of the stand and the tuning screen (choices, aero, doors, light kits, accessories, calipers, axles, the refresh's paint and light kit pages) | `stand-models.md`, `tuning-screen.md` | 18 Native, a new row | (existing flags) |
+| 2026-11-13 | Cleanup leads (no mapping, not counted): the tuning pages' blockers (`IsSlotAvailable`, the paint and light kit bars) with `RefreshInterior` and commands 10, 13, 14; `MakeModel` and `FitSelectedCar` called directly, their adapters removed | `tuning-pages.md`, `tuning-screen.md`, `stand-models.md` | 8 Native, 2 adapters removed | (existing flags) |
+| 2026-11-13 | The type 6 and 7 modes' small pieces (the controller options' steps, the group pair's, panel screens' and panel sets' destructors, `SingleGroup`), with `DecalImages::UnloadAll` Native | `type6-type7-modes.md`, `type67-screens.md`, `car-list.md`, `archive.md` | 16 new rows and 3 blockers ours | (existing flags) |
+| 2026-11-14 | The type 6 and 7 list screens' and node screen's pages and steps (the six tables built on first use, the list part, the node tables, the color list, the panel screens, the screen blocks' destructors; none seen in play) | `type67-screens.md` | 174 rows ours (2 Merged), with `CourseRecords::Of` | (`--native_type67_screens`) |
+| 2026-11-14 | The type 8 mode's screens (probably the two-player mode's panel screen and list screens, built on the type 6 and 7 bases; none seen in play) | `type8-screens.md` | 128 of 128 (2 Merged), with 13 `car-list.md` rows and `TwoPlayerBlock` | `--native_type8_screens` |
+| 2026-11-14 | The type 8 mode itself (its Init, slots and teardown, its first screen and dialog), with the options', controller options' and save screen's type 8 Inits, the two-player save block's maker and four shared dialog handlers | `type8-mode.md` | 52 of 52 | `--native_type8_mode` |
+| 2026-11-14 | The in-race screens never seen in play (the split screen pause menu, the two results screens, the Live time attack's menu after the race), with the network manager's leaderboard helpers, the race dialog's save calls and `UiMovie::SetNodeCharText`; since the multiplayer bypass the same day, mostly unreachable | `race-screens-unseen.md` | 99 rows ours (3 Merged), the network battle's sends Dropped | `--native_race_screens_unseen` |
+| 2026-11-14 | The C runtime's core: the per-thread data over the kernel's TLS, the lock table and critical sections, `errno`, exit and C++ exceptions, the streams and low-level I/O, the float formatting, XAPI's thread notify list (functions that end the process checked by reading) | `c-runtime-core.md` | 115 of 118 | `--native_c_runtime_core` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5446,3 +5498,154 @@ boundary: 449 functions (916 pairs): overridden 110, Native 40,
 Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
 live caller. B7 (`b7_status.py`): ours 5,989, work left 718 (Wrapped
 51, with a row 361, no row yet 306), from 739.
+
+**2026-11-13, the morph jobs (branch `b7-loop-13-11-26`, the
+forty-sixth run, its first subsystem, after the cleanup leads
+`RaceStates::OnRaceEnd` and `DrawEntryPowerGraph`):** `morph-jobs.md`
+(21 rows, `src/morph_jobs/`): the 224-byte job `Model::MorphShape`
+builds through the second pool maker's slot 1 and the 36-byte work
+item every pool job holds; the post to the worker pool stays a guest
+call (the `DebugText` precedent), and the pools themselves wait on the
+core's sync. The boundary: 449 functions (916 pairs): overridden 110,
+Native 40, Dropped 26, never called 68, live 205. Imports: 186 called,
+49 with a live caller. B7 (`b7_status.py`): ours 6,019, work left 703
+(Wrapped 51, with a row 360, no row yet 292), from 718.
+
+**2026-11-13, the save devices' constructor (branch
+`b7-loop-13-11-26`, the forty-sixth run, its second subsystem):** 5
+rows added to `save-interface.md` (`src/save_interface/save_devices.cpp`),
+with `SaveDevices::Create` from `framework.md`: the object
+`SaveDevices::Update` runs on, its four slots and their buffers; the
+notification listener stored as `user::kNoListener` without
+`XNotifyCreateListener` (the 2026-10-30 precedent). The slot handlers
+`SaveDevices::Update` runs are the next lead. The boundary: 449
+functions (916 pairs): overridden 110, Native 40, Dropped 26, never
+called 68, live 205. Imports: 186 called, 49 with a live caller. B7
+(`b7_status.py`): ours 6,025, work left 700 (Wrapped 51, with a row
+359, no row yet 290), from 703.
+
+**2026-11-13, the save devices' slot handlers (branch
+`b7-loop-13-11-26`, the forty-sixth run, its third subsystem):** 14
+rows added to `save-interface.md` (`src/save_interface/slot_handlers`),
+with `SaveDevices::Update` (`system-services.md`), `SaveStep`,
+`LoadStep`, `XGetOverlappedResult` and `GetOverlappedResult`
+(`files-and-saves.md`; their never-taken wait a guest call to
+`WaitForSingleObject`, the 2026-10-24 and 2026-10-29 calls) and
+`Framework::DeviceList`; B4's 13 content steps split into plain C++
+(`src/saves/slot_steps`) behind their adapters, which stay so the
+fallback keeps reaching `saves/`. The replay ran the enumeration, save
+and load machines as native code. The boundary: 449 functions (916
+pairs): overridden 110, Native 40, Dropped 26, never called 68, live
+205. Imports: 186 called, 49 with a live caller. B7 (`b7_status.py`):
+ours 6,044, work left 686 (Wrapped 51, with a row 354, no row yet 281),
+from 700.
+
+**2026-11-13, three small leads (branch `b7-loop-13-11-26`, the
+forty-sixth run, its fourth subsystem):** 13 rows in `app-start-up.md`
+(the render manager `[0x826BABA0]`'s slots 7 and 8, through which the
+scene and the frame driver are reached), `models.md` (the texture
+provider's `Get` and its `XPR` slots) and `matrix-math.md` (the zero
+and identity matrices' `_cinit` set-ups); `Matrix::FromFloats` Native.
+About 30 native callers still reach these slots through guest calls (a
+cleanup lead). The boundary: 449 functions (916 pairs): overridden 110,
+Native 40, Dropped 26, never called 68, live 205. Imports: 186 called,
+49 with a live caller. B7 (`b7_status.py`): ours 6,057, work left 676
+(Wrapped 51, with a row 354, no row yet 271), from 686.
+
+**2026-11-13, the sticker editor (branch `b7-loop-13-11-26`, the
+forty-sixth run, its fifth subsystem):** `sticker-editor.md` (25 rows,
+`src/tuning_pages/sticker_pages.cpp`, `sticker_commands.cpp`): the
+tuning screen's ten sticker input pages, their helpers and the
+update's sticker commands 32 to 51 (`tuning-screen.md`), none seen in
+play, ported by the user's 2026-11-12 call; two migrations, all 25
+rows Native, with `UiMovie::Unloop`. The stand's setters
+(`ApplyAreaDecals`' `sub_8217B3D8`, the next subsystem) are what
+`UpdateStand` still waits on. The boundary: unchanged (449 functions,
+overridden 110, Native 40, Dropped 26, never called 68, live 205;
+imports 186 called, 49 with a live caller). B7 (`b7_status.py`): ours
+6,100, work left 676 (Wrapped 51, with a row 354, no row yet 271);
+work left counts only functions seen in play.
+
+**2026-11-13, the stand's setters (branch `b7-loop-13-11-26`, the
+forty-sixth run, its sixth subsystem):** 8 new rows in `stand-models.md`
+(`src/stand_models/setters.cpp`) and `SetDecalWord`, none seen in
+play, with the tuning screen's `SetColor`, `ApplyAreaDecals`,
+`ApplyDecalWord`, `PreviewParts` and `SetParts` (`UpdateStand` no
+longer calls recompiled code); 17 adapters removed. The validation's
+harnesses took ~130 s of the 180. The boundary: unchanged. B7
+(`b7_status.py`): ours 6,114, work left 676 (Wrapped 51, with a row
+354, no row yet 271).
+
+**2026-11-13, the type 6 and 7 modes' small pieces (branch
+`b7-loop-13-11-26`, the forty-sixth run, its seventh subsystem, after
+cleanup leads over the stand's and tuning screen's never-seen rows and
+the tuning pages' blockers):** 16 new rows in `type6-type7-modes.md`,
+`type67-screens.md` and `car-list.md` and three blockers, none seen in
+play, ported by the 2026-11-12 call. The validation's harnesses take
+~131 s of the 180. The boundary: unchanged. B7 (`b7_status.py`): ours
+6,160, work left 676 (Wrapped 51, with a row 354, no row yet 271).
+
+**2026-11-14, the type 6 and 7 list screens (branch
+`b7-loop-13-11-26`, the forty-sixth run, its eighth subsystem):**
+`type67-screens.md`'s 77 new rows and every row left without Status
+(~174 functions, `src/type67_screens/`), none seen in play, ported by
+the 2026-11-12 call in two migrations of five and seven batches; two
+traffic-records groups expected to differ (`Type6ListScreen::SetUpRace`
+and `Type7ListScreen::SetUpRace`, as `Race::SetUp`'s). The validation's
+harnesses now take ~132 s of the 180. The boundary: unchanged. B7
+(`b7_status.py`): ours 6,335, work left 676 (Wrapped 51, with a row
+354, no row yet 271).
+
+**2026-11-14, the type 8 mode's screens (branch `b7-loop-13-11-26`,
+the forty-sixth run, its ninth subsystem):** `type8-screens.md` (128
+rows, `src/type8_screens/`): the type 8 mode (the title's main menu
+item 4, built for two players: probably the two-player mode) and its
+panel screen and list screens, none seen in play, in one migration of
+eight batches, with 13 `car-list.md` rows (`PanelSetPair`, the panels'
+base); two more traffic-records groups expected to differ. The
+validation's harnesses take ~133 s of the 180. The boundary:
+unchanged. B7 (`b7_status.py`): ours 6,477, work left 676 (Wrapped 51,
+with a row 354, no row yet 271).
+
+**2026-11-14, the type 8 mode (branch `b7-loop-13-11-26`, the
+forty-sixth run, its tenth subsystem):** `type8-mode.md` (52 rows,
+`src/type8_mode/`): the type 8 mode's Init, slots, teardown, first
+screen and dialog, none seen in play, with the type 8 options',
+controller options' and save screen's Inits, the two-player save
+block's maker and four shared dialog handlers. The run stopped at its
+limit of 10. The validation's harnesses take ~133 s of the 180. The
+boundary: 449 functions (916 pairs): overridden 110, Native 40,
+Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
+live caller. B7 (`b7_status.py`): ours 6,537, work left 676 (Wrapped
+51, with a row 354, no row yet 271), from 718 at the run's start.
+
+**2026-11-14, the in-race screens never seen (branch
+`b7-loop-13-11-26`, the forty-seventh run, its first subsystem):**
+`race-screens-unseen.md` (99 rows, `src/race_screens/`): the race's
+kind 4 (split screen) pause menu, the two results screens and kind
+6's (the Live time attack's) menu after the race, none seen in play.
+The same day, by the user's calls: B7's goal is no PPC code reachable
+from `main`, measured by the static map (`docs/loops/static-map.md`,
+`itc_recomp/tools/static_map.py`); multiplayer is bypassed (the main
+menu's Xbox Live and split screen items do nothing,
+`--multiplayer_menu_items`, off by default), so most of these screens
+are unreachable now. The boundary: 449 functions (916 pairs):
+overridden 110, Native 40, Dropped 26, never called 68, live 205.
+Imports: 186 called, 49 with a live caller. B7 (`b7_status.py`): ours
+6,651, work left 676 (Wrapped 51, with a row 354, no row yet 271).
+Static map: reachable 10,853, ours 6,027, unported 3,227 (644 seen in
+play, 2,583 never seen).
+
+**2026-11-14, the C runtime's core (branch `b7-loop-13-11-26`, the
+forty-seventh run, its second subsystem; the run ended there by the
+user's call):** `c-runtime-core.md` (118 rows, `src/c_runtime/core.cpp`):
+the C runtime's wrappers over the kernel imports, ported by B7's new
+goal (the imports called as the original does); five migrations, the
+first three validated, the last two (fclose to `_cftog_l`) checked by
+their own harnesses only (the user ended the run). Left: `_cftoa_l`,
+`_cfltcvt` and `_cinit`. The boundary: 449 functions (916 pairs):
+overridden 128, Native 48, Dropped 24, never called 67, live 182.
+Imports: 186 called, 45 with a live caller. B7 (`b7_status.py`): ours
+6,772, work left 656 (Wrapped 51, with a row 354, no row yet 251).
+Static map: reachable 10,845, ours 6,138, unported 3,106 (624 seen in
+play, 2,482 never seen).

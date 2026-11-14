@@ -182,6 +182,14 @@ std::vector<std::pair<uint32_t, uint32_t>> GetBSaves(
   return more;
 }
 
+// GarageStage::FitSelectedCar (sub_8217DAC0) has no adapter since its
+// callers in play went native (B7 loop, 2026-11-13): the recompiled callers
+// run its original, which saves r29 to r31, f30, f31 and lr in the 48 bytes
+// under their r1 (logged from the recompiled runs), while the plain C++
+// writes none. Case's (bytes under r1, size) skip for it under a caller's
+// frame `at` bytes below the call's r1.
+std::vector<std::pair<uint32_t, uint32_t>> FitSaves(uint32_t at) { return {{at, 48}}; }
+
 // --- The record's setters ---
 
 void BlockOf(Context& h, uint32_t block, Random& r) {
@@ -1235,7 +1243,11 @@ void TuningStand(Context& h, Random& r) {
             t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(6);
           },
           __imp__sub_821CCC50, hooks::TuningSetInteriorPair, 0, floats,
-          fmt::format("case {}", c), 0, 0, before, blocks, 0x1000, kGarageBytes);
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x1000, kGarageBytes,
+          // GarageStage::SetInteriorPair's original (its adapter removed,
+          // B7 loop, 2026-11-13): its r30, r31 and lr saves, ApplyRecord's
+          // original's under its frame and ScenePools::GetB's.
+          GetBSaves({112}, {{4, 20}, {112, 56}}));
     }
     results.Report();
   }
@@ -1289,7 +1301,7 @@ void TuningStand(Context& h, Random& r) {
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
           __imp__sub_821D99A0, hooks::TuningPickCameraPreset, 24, floats,
-          fmt::format("case {}", c), 0, 0, before, blocks, 0x3000, kGarageBytes);
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x3000, kGarageBytes, FitSaves(112));
     }
     results.Report();
   }
@@ -1351,7 +1363,12 @@ void TuningStand(Context& h, Random& r) {
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
           __imp__sub_821E0E00, hooks::TuningPreviewWheels, 16, floats,
-          fmt::format("case {}", c), 0, 0, before, with_f1, 0x5000, kGarageBytes);
+          fmt::format("case {}", c), 0, 0, before, with_f1, 0x5000, kGarageBytes,
+          // TuningScreen::PreviewWheel's original (its adapter removed, B7
+          // loop, 2026-11-13): its saves under the frame, GarageStage::SetWheel's
+          // (r14 to r31, lr, f31) under PreviewWheel's 4,016-byte frame and
+          // ScenePools::GetB's under SetWheel's 3,120-byte one.
+          GetBSaves({96 + 4016 + 3120}, {{96, 32}, {96 + 4016, 160}}));
     }
     results.Report();
   }
@@ -1386,9 +1403,85 @@ void TuningStand(Context& h, Random& r) {
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
           __imp__sub_822042D8, hooks::TuningApplyDecals, 56, floats,
-          fmt::format("case {}", c), 0, 0, before, blocks, 0x5000, kGarageBytes);
+          fmt::format("case {}", c), 0, 0, before, blocks, 0x5000, kGarageBytes,
+          // The originals of GarageStage::SetDecalA, SetDecalB and
+          // ReloadDecals (their adapters removed, B7 loop, 2026-11-13): their
+          // saves under the frame (SetDecal's r29 to r31, lr and f28 to f31),
+          // with ScenePools::GetB's and SceneModel::ReloadDecals' under theirs
+          // (logged from the recompiled runs).
+          GetBSaves({4112 + 160, 4112 + 96}, {{4116, 60}, {4212, 20}, {4276, 20}}));
     }
     results.Report();
+  }
+  {
+    // ApplyAreaDecals (never seen in play): +10012 1 to 4 mostly (now and
+    // then 0 or 5: nothing but the reset); the area +30724 0 to 7 (its
+    // commands 42 to 49 and its records' rows; never any word: the records'
+    // reads would leave the screen); the edited slot +30732 0 to 5; the
+    // records' x and y small, their scales and angles any floats, their
+    // flags 0, 1 or any; the sticker words +33320 on small or -1; the
+    // stage's animation list short (GarageAnims::Add scans it with no
+    // bound). The top 80 bytes: r27 to r31, lr and f28 to f31's saves; the
+    // 48 under the frame: SetSticker's original's saves (the original's r28
+    // to r31, lr and f31), with ScenePools::GetB's under it. The generator
+    // put back after (with ApplyDecalWord's), so the groups after them keep
+    // their cases.
+    const Random kept = r;
+    Results results("TuningScreen::ApplyAreaDecals (sub_821F7B90)");
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const uint32_t kind = r.Below(8) == 0 ? r.Below(6) : 1 + r.Below(4);
+            lay(c, kind == 2);
+            field(10012, kind);
+            field(30724, r.Below(8));
+            field(30732, r.Below(6));
+            auto record = [&](uint32_t e) {
+              field(e + 0, uint32_t(int32_t(r.Below(1000)) - 500));
+              field(e + 4, uint32_t(int32_t(r.Below(1000)) - 500));
+              field(e + 8, RandomFloat(r));
+              field(e + 12, RandomFloat(r));
+              field(e + 16, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
+            };
+            record(30832);
+            for (uint32_t k = 0; k < 40; k++) {
+              record(32360 + 24 * k);
+              field(33320 + 4 * k, r.Below(3) == 0 ? 0xFFFFFFFFu : small(30));
+            }
+            guest::StoreU32(h.base, block + kStage + 5600 + 448, r.Below(4));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821F7B90, hooks::TuningApplyAreaDecals, 80, floats,
+          fmt::format("case {}", c), 4160, 48, before, blocks, 0x5000, kGarageBytes,
+          // And GarageStage::ReloadDecals' original's (its adapter removed,
+          // B7 loop, 2026-11-13) with GetB's under its 96-byte frame.
+          GetBSaves({4160 + 128, 4160 + 96}, {{4160, 16}}));
+    }
+    results.Report();
+    r = kept;
+  }
+  {
+    // ApplyDecalWord (never seen in play): +10012 9 or 10 mostly, else
+    // any. The top 16 bytes: r31 and lr's saves; the 32 under the frame:
+    // SetDecalWord's original's r29 to r31 and lr, with ScenePools::GetB's
+    // under it.
+    const Random kept = r;
+    Results results("TuningScreen::ApplyDecalWord (sub_821FE4E0)");
+    for (int c = 0; c < 30; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            lay(c, false);
+            field(10012, r.Below(6) == 0 ? uint32_t(r.Next()) : 9 + r.Below(2));
+            t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+          },
+          __imp__sub_821FE4E0, hooks::TuningApplyDecalWord, 16, floats,
+          fmt::format("case {}", c), 96, 32, before, blocks, 0x1000, kGarageBytes,
+          GetBSaves({96 + 112}));
+    }
+    results.Report();
+    r = kept;
   }
   {
     // UpdateStand: the pages that open or close the stand's animations
@@ -1401,9 +1494,10 @@ void TuningStand(Context& h, Random& r) {
     // second wheels' step +25244 0 or 3, the paint's values small. The
     // garage camera isn't set up (+112 0), so GarageStage::Draw returns at
     // once (its own cases draw). The top 40 bytes: r29 to r31, lr and f31's
-    // saves; in the paint's cases (GarageStage::SetColor, never seen in
-    // play, runs its original on both sides, saving UpdateStand's registers,
-    // which differ) only the stack from UpdateStand's frame up.
+    // saves; in the paint's cases (GarageStage::SetColor's original, never
+    // seen in play, on the recompiled side saves UpdateStand's registers,
+    // which differ; its plain C++ on the native side) only the stack from
+    // UpdateStand's frame up.
     // The generator put back after, so the groups after it keep their
     // cases.
     const Random kept = r;
@@ -1469,7 +1563,13 @@ void TuningStand(Context& h, Random& r) {
               out.Word(guest::LoadU32(h.base, kOpen[i]));
             }
           },
-          paint ? 144 : 0x5000, kGarageBytes);
+          paint ? 144 : 0x5000, kGarageBytes,
+          // The originals of TuningScreen::StepSecondWheels and
+          // GarageStage::SetWheelWord (their adapters removed, B7 loop,
+          // 2026-11-13): StepSecondWheels' r30, r31 and lr saves under the
+          // frame, GetB's under SetWheelWord's and SecondWheelsPending's
+          // 96-byte frames.
+          GetBSaves({144 + 96, 144 + 112 + 96}, {{144, 24}}));
     }
     for (int i = 0; i < 3; i++) {
       guest::StoreU32(h.base, kOpen[i], saved_open[i]);
@@ -1508,7 +1608,7 @@ void TuningStand(Context& h, Random& r) {
             with_f1(out, t);
             text.Add(out);
           },
-          0x4000, kGarageBytes);
+          0x4000, kGarageBytes, FitSaves(128));
     }
     results.Report();
   }
@@ -1565,7 +1665,7 @@ void TuningStand(Context& h, Random& r) {
             with_f1(out, t);
             text.Add(out);
           },
-          0x3000, kGarageBytes);
+          0x3000, kGarageBytes, FitSaves(112));
     }
     r = kept;
     results.Report();
@@ -1653,9 +1753,230 @@ void TuningStand(Context& h, Random& r) {
           },
           __imp__sub_821E07B0, hooks::TuningPreviewItem, 40, floats,
           fmt::format("case {}", c), 160, 32, before, with_f1, 0x5000, kGarageBytes,
-          {{160 + 112, 56}, {160 + 4000 + 16, 16}});
+          // And the stand's setters' originals' (their adapters removed, B7
+          // loop, 2026-11-13; TuningScreen::SetTireGrade's under it):
+          // ApplyRecord's and GetB's under their 96- and 112-byte frames.
+          // ApplyRecord's and GetB's under their 96- and 112-byte frames,
+          // GarageStage::SetTireGrade's under TuningScreen::SetTireGrade's,
+          // and Wheels::SetTireTextures' lr under SceneWheels::SetTireGrades'.
+          GetBSaves({160 + 96, 160 + 112, 160 + 112 + 112},
+                    {{160 + 112, 56}, {160 + 96, 56}, {160 + 4000 + 16, 16}, {272, 24},
+                     {484, 12},
+                     // Since TuningScreen::SetCaliper and RefitAxles are native
+                     // (B7 loop, 2026-11-13): Wheels::SetCaliperTexture's
+                     // original's saves under SceneWheels::SetCaliperTexture's
+                     // frame, and GarageStage::FitAxles' under RefitAxles'.
+                     {160 + 208, 16}, {160 + 4000, 16}}));
     }
     results.Report();
+  }
+  {
+    // The stand setters never seen in play the pages above reach (B7 loop,
+    // 2026-11-13): each with the world PreviewItem's cases lay. The
+    // recompiled side runs their callees' originals (the stand's setters'
+    // adapters removed), whose register saves under the frames are left
+    // out (bytes under r1, size), as PreviewItem's.
+    const Random kept = r;
+    {
+      // SetCaliper (no frame): the choice 0 to 6 or any word, the selected
+      // garage car's id 0 to 24 or any; r4 any word. Under it,
+      // GarageStage::SetWheelExtras' original's saves (r29 to r31, lr),
+      // SceneWheels::SetCaliperTexture's under its 112-byte frame and
+      // Wheels::SetCaliperTexture's (r31, lr) under that one's 96.
+      Results results("TuningScreen::SetCaliper (sub_821DA330)");
+      for (int c = 0; c < 32; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              Write(h.base, screen, screen_inputs.data(), kTuningScreenBytes);
+              const uint32_t car = tuning_screen::SelectedGarageCar(h.base, screen);
+              guest::StoreU32(h.base, car + 224, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(25));
+              t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+              t.r4.u64 = r.Below(2) == 0 ? r.Below(8) : r.Next();
+              t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(7);
+            },
+            __imp__sub_821DA330, hooks::TuningSetCaliper, 0, floats, fmt::format("case {}", c),
+            0, 0, before, blocks, 0x1000, kGarageBytes,
+            GetBSaves({112}, {{0, 32}, {112, 16}, {208, 16}}));
+      }
+      results.Report();
+    }
+    {
+      // SetAccessory (no frame): the kind 0 to 4 or any, the choice 0 to 5
+      // or any. Under it, GarageStage::SetAccessory's original's saves (r30,
+      // r31, lr) and SceneInterior::SetRecord's under its 112-byte frame.
+      Results results("TuningScreen::SetAccessory (sub_821CCBE8)");
+      for (int c = 0; c < 32; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              t.r3.u64 = r.Next();
+              t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(5);
+              t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(6);
+            },
+            __imp__sub_821CCBE8, hooks::TuningSetAccessory, 0, floats, fmt::format("case {}", c),
+            0, 0, before, blocks, 0x1000, kGarageBytes,
+            GetBSaves({112}, {{0, 24}, {112, 24}}));
+      }
+      results.Report();
+    }
+    {
+      // RefitAxles: the selected garage car as the world lays it; f1
+      // compared. The top 16 bytes: r31 and lr's saves; under its 4,000-byte
+      // frame GarageStage::FitAxles' original's saves (r31, lr) and the 16
+      // from 16 (its callee's save, as PreviewItem's).
+      Results results("TuningScreen::RefitAxles (sub_821DF9D0)");
+      for (int c = 0; c < 24; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+            },
+            __imp__sub_821DF9D0, hooks::TuningRefitAxles, 16, floats, fmt::format("case {}", c),
+            0, 0, before, with_f1, 0x3000, kGarageBytes, {{4000, 16}, {4000 + 16, 16}});
+      }
+      results.Report();
+    }
+    {
+      // PreviewInteriorChoices: the five choice words and the slot's pair
+      // as the pages leave them (-1, or tens 0 to 9 and ones 0 to 4: the
+      // tables read stay below the frame's saves), the interior level
+      // +35708 0 to 6 or any, the slot +33576 0 to 6. The top 88 bytes: r22
+      // to r31 and lr's saves; under its 208-byte frame the setters'
+      // originals' saves and ApplyRecord's and GetB's under theirs.
+      Results results("TuningScreen::PreviewInteriorChoices (sub_821E7E48)");
+      for (int c = 0; c < 32; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              for (uint32_t at = 33800; at < 33820; at += 4) {
+                field(at, r.Below(4) == 0 ? 0xFFFFFFFFu : 10 * r.Below(10) + r.Below(5));
+              }
+              field(35708, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(7));
+              field(33576, r.Below(7));
+              field(33564, r.Below(9));
+              field(33572, r.Below(5));
+              t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+            },
+            __imp__sub_821E7E48, hooks::TuningPreviewInteriorChoices, 88, floats,
+            fmt::format("case {}", c), 208, 32, before, blocks, 0x1000, kGarageBytes,
+            GetBSaves({208 + 96, 208 + 112}, {{208 + 112, 56}, {208 + 96, 56}}));
+      }
+      results.Report();
+    }
+    {
+      // PreviewLightKit: the state 21, 22 or another, the group 0 to 4, the
+      // light kits' words small (the index below 8: SetLightKit's table read
+      // unchecked); f1 compared. The top 8 bytes: lr's save; under its
+      // 112-byte frame GarageStage::SetLightKit's original's saves and
+      // GetB's under its 176-byte frame.
+      Results results("TuningScreen::PreviewLightKit (sub_821CC930)");
+      for (int c = 0; c < 32; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              const uint32_t pick = r.Below(5);
+              field(tuning_screen::kState, pick < 2 ? 21 : pick < 4 ? 22 : r.Below(64));
+              field(30492, r.Below(5));
+              for (const uint32_t at : {30512u, 30516u, 30520u, 30552u}) {
+                field(at, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(360));
+              }
+              field(30524, r.Below(8));
+              field(30556, r.Below(8));
+              field(30548, r.Below(4));
+              for (uint32_t g = 0; g < 5; g++) {
+                field(30596 + 4 * g, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(360));
+                field(30612 + 4 * g, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(360));
+              }
+              t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+              t.f1.f64 = double(std::bit_cast<float>(RandomFloat(r)));
+            },
+            __imp__sub_821CC930, hooks::TuningPreviewLightKit, 8, floats,
+            fmt::format("case {}", c), 112, 32, before, with_f1, 0x1000, kGarageBytes,
+            GetBSaves({112 + 176}, {{112 + 32, 24}}));
+      }
+      results.Report();
+    }
+    {
+      // UiNode::SetRgb: a node in the screen's block, any words.
+      Results results("UiNode::SetRgb (sub_821E7DA0)");
+      for (int c = 0; c < 16; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              t.r3.u64 = r.Next();
+              t.r4.u64 = screen + 4 * r.Below(1024);
+              t.r5.u64 = r.Below(256);
+              t.r6.u64 = r.Below(256);
+              t.r7.u64 = r.Next();
+            },
+            __imp__sub_821E7DA0, hooks::TuningSetRgb, 0, floats, fmt::format("case {}", c), 0,
+            0, before, blocks, 0x100, kGarageBytes);
+      }
+      results.Report();
+    }
+    r = kept;
+  }
+  {
+    // PreviewParts (never seen in play) and GarageStage::SetAeroSet: the
+    // pick 0 (the parts) or 1 to 3 (an aero set; SetAeroSet's set 0 to 2),
+    // now and then 4 or 5 (the sets' table read past the car's: an entry
+    // further on in the image); +25172 set or not with +36300 0, 1 or
+    // small; +36372 and +36376 0 or 1; the parts words small or -1. The
+    // top 16 (PreviewParts: r31 and lr) or 48 bytes (SetAeroSet: r27 to
+    // r31 and lr's saves); under them the setters' and
+    // SceneModel::ApplyRecord's originals' saves (r26 to r31 and lr), and
+    // ScenePools::GetB's. The generator put back after, so the groups after
+    // it keep their cases.
+    const Random kept = r;
+    for (int which = 0; which < 2; which++) {
+      Results results(which == 0 ? "TuningScreen::PreviewParts (sub_821CCAA8)"
+                                 : "GarageStage::SetAeroSet (sub_8217DBC0)");
+      for (int c = 0; c < 40; c++) {
+        Case(
+            h, results, block, r,
+            [&](PPCContext& t) {
+              lay(c, false);
+              lay_tires();
+              field(25172, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+              field(36300, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(6));
+              field(36372, r.Below(2));
+              field(36376, r.Below(2));
+              for (const uint32_t at : {36164u, 36252u, 36208u, 36544u, 36368u}) {
+                field(at, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(8));
+              }
+              const uint64_t pick = r.Below(8) == 0 ? 4 + r.Below(2) : r.Below(4);
+              if (which == 0) {
+                t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
+                t.r4.u64 = pick;
+              } else {
+                t.r3.u64 = block + kHolder;
+                t.r4.u64 = pick == 0 ? 0 : pick - 1;
+                t.r5.u64 = r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(8);
+                t.r6.u64 = r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(8);
+              }
+            },
+            which == 0 ? __imp__sub_821CCAA8 : __imp__sub_8217DBC0,
+            which == 0 ? hooks::TuningPreviewParts : hooks::StandModelsSetAeroSet,
+            which == 0 ? 16 : 48, floats, fmt::format("case {}", c),
+            which == 0 ? 96 : 224, 56, before, blocks, 0x5000, kGarageBytes,
+            which == 0 ? GetBSaves({96 + 144, 96 + 224}, {{96 + 144, 56}, {96 + 224, 56}})
+                       : GetBSaves({224}));
+      }
+      results.Report();
+    }
+    r = kept;
   }
   {
     // The saved values each page puts back: the tables' rows and indexes
@@ -1739,8 +2060,17 @@ void TuningStand(Context& h, Random& r) {
           fmt::format("case {}", c), 224, 32, before, with_f1, 0x5000, kGarageBytes,
           // And GetB's under its callers' frames, at each depth the pages
           // reach it (the GarageStage functions they call).
-          GetBSaves({544, 400, 352, 336, 320},
-                    {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16}}));
+          // And the stand's setters' originals' (their adapters removed, B7
+          // loop, 2026-11-13): TuningScreen::PreviewWheel's GarageStage::SetWheel
+          // (its saves under PreviewWheel's 4,016-byte frame, GetB's under its
+          // 3,120-byte one) and SetTireGrade's callees' (logged from the
+          // recompiled runs).
+          GetBSaves({544, 400, 352, 336, 320, 224 + 4016 + 3120},
+                    {{224 + 32, 24}, {224 + 112, 56}, {224 + 4000 + 16, 16},
+                     {224 + 4016, 160}, {436, 8},
+                     // Since TuningScreen::SetCaliper and RefitAxles are native
+                     // (B7 loop, 2026-11-13), as PreviewItem's.
+                     {224 + 208, 16}, {224 + 4000, 16}}));
     }
     results.Report();
   }
@@ -1850,7 +2180,8 @@ void TuningStand(Context& h, Random& r) {
         Case(
             h, results, block, r, [&](PPCContext& t) { lay_view(t, c); },
             __imp__sub_82201B40, hooks::TuningPagesLeaveVinylView, 32, floats,
-            fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes);
+            fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes,
+            FitSaves(128));
       }
       results.Report();
       Results view("TuningScreen::InputVinylView (sub_82202928)");
@@ -1858,9 +2189,22 @@ void TuningStand(Context& h, Random& r) {
         Case(
             h, view, block, r, [&](PPCContext& t) { lay_view(t, c); },
             __imp__sub_82202928, hooks::TuningPagesInputVinylView, 32, floats,
-            fmt::format("case {}", c), 112, 32, before_view, view_out, 0x3000, kGarageBytes);
+            fmt::format("case {}", c), 112, 32, before_view, view_out, 0x3000, kGarageBytes,
+            FitSaves(112 + 128));
       }
       view.Report();
+      // The sticker editor's state 49 page TuningScreen::InputStickerView
+      // (sticker_pages.cpp): InputVinylView's held buttons without its
+      // camera reset and leaving call, in the same world. The top 24 bytes:
+      // r30, r31 and lr's saves.
+      Results sticker_view("TuningScreen::InputStickerView (sub_821F7000)");
+      for (int c = 0; c < 80; c++) {
+        Case(
+            h, sticker_view, block, r, [&](PPCContext& t) { lay_view(t, c); },
+            __imp__sub_821F7000, hooks::TuningPagesInputStickerView, 24, floats,
+            fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes);
+      }
+      sticker_view.Report();
       // The vinyl editor's state 23 page InputVinylPages and its movie side
       // MoveVinylMenu: the page +30724 -1 to 3, the
       // last page +30784 0 to 2, the wrap +30728 and +9708 0 or 1; the
@@ -1929,7 +2273,8 @@ void TuningStand(Context& h, Random& r) {
         Case(
             h, menu, block, r, [&](PPCContext& t) { lay_pages(t, c); },
             __imp__sub_821FF3A0, hooks::TuningPagesMoveVinylMenu, 32, floats,
-            fmt::format("case {}", c), 0, 0, before_pages, pages_out, 0x3000, kGarageBytes);
+            fmt::format("case {}", c), 0, 0, before_pages, pages_out, 0x3000, kGarageBytes,
+            FitSaves(128));
       }
       menu.Report();
       Results pages("TuningScreen::InputVinylPages (sub_82204B70)");
@@ -1937,7 +2282,8 @@ void TuningStand(Context& h, Random& r) {
         Case(
             h, pages, block, r, [&](PPCContext& t) { lay_pages(t, c); },
             __imp__sub_82204B70, hooks::TuningPagesInputVinylPages, 48, floats,
-            fmt::format("case {}", c), 128, 32, before_pages, pages_out, 0x3000, kGarageBytes);
+            fmt::format("case {}", c), 128, 32, before_pages, pages_out, 0x3000, kGarageBytes,
+            FitSaves(128 + 128));
       }
       pages.Report();
       guest::StoreU32(h.base, kKeepCounter, saved_counter);

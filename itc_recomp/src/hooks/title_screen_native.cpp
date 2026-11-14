@@ -52,6 +52,18 @@ ITC_FLAG_BOOL(native_title_screen, true, "ITC",
               "sub_8209F6B8; the title load's debug sequence, never seen in play, its pages "
               "sub_82220CD8 to sub_82220E70 and steps sub_822204F8 to sub_82220B10 (the same writes; checked by --run_harnesses=title_screen)");
 
+ITC_FLAG_BOOL(multiplayer_menu_items, false, "ITC",
+              "Let the title screen's main menu open its two multiplayer items, Xbox Live (the "
+              "type 12 mode, docs/functions/network-mode.md) and split screen (the controller "
+              "pick, then the type 8 mode, docs/functions/type8-mode.md), as the original does. "
+              "Off by default (the user's call, 2026-11-14: no multiplayer in this port): "
+              "selecting either is silent, answered as an input the menu ignores: no sound, and "
+              "the cursor, page and mode stay (the items aren't greyed out). Applies to the "
+              "native main menu (TitleScreen::MainMenu sub_82222700, --native_title_screen). "
+              "Off, Mode::Create's plain C++ also leaves type 12 to the original (nothing asks "
+              "for it then), so the static map sees the mode unreachable; see "
+              "docs/functions/title-screen.md");
+
 namespace hooks {
 
 namespace {
@@ -312,7 +324,8 @@ void TitleScreenMenu4(PPCContext& ctx, uint8_t* base) {
 }
 void TitleScreenMainMenu(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::MainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  ctx.r3.u64 = ts::MainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls(),
+                            ITC_FLAG(multiplayer_menu_items));
 }
 
 void ModeType4Init(PPCContext& ctx, uint8_t* base) {

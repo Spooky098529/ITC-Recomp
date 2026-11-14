@@ -23,6 +23,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_app_start_up);
+ITC_FLAG_DECLARE(bool, native_framework);
 
 namespace harness {
 
@@ -1607,6 +1608,109 @@ void InterfaceSlotCases(Context& h) {
         out[v].Word(t.r3.u32);
         out[v].Word(t.r11.u32);
         out[v].Word(t.ctr.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // The render manager's slot 8 and the frame driver's slots: the interface
+  // (r3 adjusted back by each thunk) at +16 or +20 holding an object whose
+  // vtable's slot +12 is the getter of +60 (sub_82090770) or slot +8 the
+  // getter of +68 (sub_8248F030).
+  struct Slot {
+    const char* name;
+    void (*thunk)(PPCContext&, uint8_t*);
+    uint32_t adjust;  // added to the interface for r3
+    bool scene;       // +16 and slot +12 (else +20 and slot +8)
+  };
+  const Slot slots[] = {
+      {"sub_82094338 App::SceneFromInterface8", sub_82094338, 0, true},
+      {"sub_820944D8 App::SceneFromInterface16", sub_820944D8, 8, true},
+      {"sub_82094320 App::FrameDriver", sub_82094320, 0, false},
+      {"sub_82094498 App::FrameDriverFromInterface16", sub_82094498, 12, false},
+      {"sub_82094480 App::FrameDriverFromInterface8", sub_82094480, 4, false},
+  };
+  for (const Slot& slot : slots) {
+    Results results(slot.name);
+    for (int c = 0; c < 8; c++) {
+      const uint32_t word = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        const uint32_t interface = h.data + 64, object = h.data + 256, vtable = h.data + 512;
+        guest::StoreU32(h.base, interface + (slot.scene ? 16 : 20), object);
+        guest::StoreU32(h.base, object, vtable);
+        guest::StoreU32(h.base, object + (slot.scene ? 60 : 68), word);
+        guest::StoreU32(h.base, vtable + (slot.scene ? 12 : 8),
+                        slot.scene ? kGetter60 : 0x8248F030);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = interface + slot.adjust;
+        StartUpSide(v, [&] { slot.thunk(t, h.base); });
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r11.u32);
+        out[v].Word(t.ctr.u32);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // Native callers' direct calls of slots 8 and 7
+  // (hooks::RenderManagerSlotDirect over app_start_up::RenderManagerCall):
+  // the render manager (its vtable's +32 and +28 the game's), its +8 the
+  // framework's +36 interface (the object), whose vtable's +12 and +8 are the game's
+  // sub_82090908 and sub_820908E0 (case & 3 == 3: a stand-in there, the
+  // getter of +60 or +68, where the direct call declines). The recompiled
+  // slot called with --native_app_start_up and --native_framework off
+  // against the direct call (or, where it declines, the guest call it falls
+  // back to); compared: r3, r11, ctr, the scratch area.
+  for (int which = 0; which < 2; which++) {
+    const bool scene = which == 0;
+    Results results(scene ? "RenderManagerSlotDirect (slot 8, sub_820944D8)"
+                          : "RenderManagerSlotDirect (slot 7, sub_82094498)");
+    for (int c = 0; c < 16; c++) {
+      const uint32_t word = uint32_t(h.random.Next());
+      const bool stand_in = (c & 3) == 3;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        const uint32_t manager = h.data + 64, manager_vtable = h.data + 768;
+        const uint32_t object = h.data + 256, vtable = h.data + 512;
+        const uint32_t function = scene ? 0x820944D8 : 0x82094498;
+        guest::StoreU32(h.base, manager, manager_vtable);
+        guest::StoreU32(h.base, manager_vtable + (scene ? 32 : 28), function);
+        // The +36 interface: at (this - 8) + 16 and (this - 12) + 20.
+        guest::StoreU32(h.base, manager + 8, object);
+        guest::StoreU32(h.base, object, vtable);
+        // SceneFrom36: the word at object - 16 + 60; RendererFrom36: object - 28 + 68.
+        guest::StoreU32(h.base, object + 44, word);
+        guest::StoreU32(h.base, object + 40, ~word);
+        guest::StoreU32(h.base, vtable + (scene ? 12 : 8),
+                        stand_in ? (scene ? kGetter60 : 0x8248F030)
+                                 : (scene ? 0x82090908 : 0x820908E0));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager;
+        const bool framework_flag = ITC_FLAG(native_framework);
+        ITC_FLAG(native_framework) = v == 1;
+        StartUpSide(v, [&] {
+          if (v == 0) {
+            (scene ? __imp__sub_820944D8 : __imp__sub_82094498)(t, h.base);
+          } else {
+            const bool direct = hooks::RenderManagerSlotDirect(t, h.base, function);
+            out[v].Word(direct == !stand_in);
+            if (!direct) {
+              (scene ? sub_820944D8 : sub_82094498)(t, h.base);
+            }
+          }
+        });
+        ITC_FLAG(native_framework) = framework_flag;
+        if (v == 0) {
+          out[v].Word(1);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r11.u32);
+        out[v].Word(t.ctr.u32);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       }
       results.Check(out[0], out[1], fmt::format("case {}", c));
     }

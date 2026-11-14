@@ -29,6 +29,7 @@
 ITC_FLAG_DECLARE(bool, native_game_modes);
 ITC_FLAG_DECLARE(bool, native_models);
 ITC_FLAG_DECLARE(bool, native_race_overlays);
+ITC_FLAG_DECLARE(bool, multiplayer_menu_items);
 
 namespace harness {
 
@@ -871,8 +872,14 @@ void GameModes(Context& h) {
   Member13360(h);
   RaceModeMembers(h);
   RaceModeConstructors(h);
+  // The type 12 mode's constructor as before: with --multiplayer_menu_items
+  // off (the bypass, 2026-11-14) Mode::Create's plain C++ declines type 12
+  // to the original and ModeTypeConstruct leaves it unmade.
+  const bool multiplayer = ITC_FLAG(multiplayer_menu_items);
+  ITC_FLAG(multiplayer_menu_items) = true;
   ModeConstructors(h);
   ModeCreates(h);
+  ITC_FLAG(multiplayer_menu_items) = multiplayer;
   ModesConstructors(h);
   Write(h.base, kDefault, saved_default.data(), kDefaultBytes);
 }

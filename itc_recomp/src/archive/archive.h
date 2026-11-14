@@ -66,6 +66,8 @@ uint32_t ListAppend(uint8_t* base, uint32_t list, uint32_t node);
 uint32_t ListRemove(uint8_t* base, uint32_t list, uint32_t node);
 // ListNode::ListNode (sub_82294B68): the vtable 0x82010B5C, the link `link`.
 void NodeConstruct(uint8_t* base, uint32_t node, uint32_t link);
+// ListNode::~ListNode (sub_8224FB10): +0 = the vtable 0x82010B5C.
+void NodeDestruct(uint8_t* base, uint32_t node);
 
 // The slot lookup (sub_8209D818): the first of the 960 slots whose serial
 // (+8) is `serial` (-1 for a free one), or 0.

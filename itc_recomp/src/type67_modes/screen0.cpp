@@ -18,6 +18,7 @@
 #include "mode_tick/mode_tick.h"
 #include "power_graph/power_graph.h"
 #include "race_setup/race_setup.h"
+#include "stand_models/stand_models.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -126,7 +127,6 @@ power_graph::SetFromCarCall SetFromCarCalls(const Calls& calls) {
 
 constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
-constexpr uint32_t kMakeModel = 0x8217FCB0;    // GarageStage::MakeModel
 constexpr uint32_t kCommand = 0x82180108;      // GarageStage::Command
 constexpr uint32_t kGarageCarReset = 0x82110448;
 constexpr uint32_t kMemcpy = 0x825A7410;
@@ -589,8 +589,19 @@ uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& c
   calls.open(22, type7 ? 22569 : 22564, frame, lr);
   const uint32_t block = car_makers::BlockOf(0);
   const uint32_t holder = LoadU32(base, LoadU32(base, kStandHolder));
-  const uint64_t args[4] = {holder, block, 1, 0};
-  calls.call_set(kMakeModel, args, 3, frame, lr + 0x20);
+  // GarageStage::MakeModel by its plain C++ (its adapter went, B7 loop,
+  // 2026-11-13), ScenePools::SetUpB under it through call_set.
+  const stand_models::GuestCall call = [&](uint32_t function,
+                                           std::initializer_list<uint64_t> args, uint32_t r1,
+                                           uint32_t call_lr) {
+    uint64_t regs[6] = {};
+    int set = 0;
+    for (const uint64_t v : args) {
+      regs[set++] = v;
+    }
+    return calls.call_set(function, regs, set, r1, call_lr);
+  };
+  stand_models::MakeModel(base, call, holder, block, 1, frame);
   return calls.call(kCommand, frame, lr + 0x30, LoadU32(base, LoadU32(base, kStandHolder)), 14);
 }
 

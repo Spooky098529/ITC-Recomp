@@ -5,9 +5,11 @@
 
 #include "base/log.h"
 #include "car_scene_draw/ops.h"
+#include "car_specs/car_specs.h"
 #include "debug/frame_state_diff.h"
 #include "guest.h"
 #include "load_poll/load_poll.h"
+#include "native/buffers.h"
 #include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -21,13 +23,27 @@ using namespace car_scene_draw::ops;
 constexpr uint32_t kSetUpB = 0x820C5B28;
 constexpr uint32_t kApplyRecord = 0x820DA758;
 constexpr uint32_t kWheelsSetRecord = 0x820D8EC0;
+constexpr uint32_t kWheelsSetCaliperTexture = 0x820D8ED0;
 constexpr uint32_t kSetTexture = 0x820D17D8;
 constexpr uint32_t kApplyWheelPaint = 0x820D9C50;
+constexpr uint32_t kApplyPaint = 0x820D9B68;
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kGet82 = 0x820CBC90;      // AeroParts::Get82(out, parts, level)
+constexpr uint32_t kAeroSets = 0x82009A50;   // the aero sets' 24-byte entries
 constexpr uint32_t kDecalScale = 0x82001BE0;
 
 // Flush-to-zero off, as the callees' plain C++ expects at entry.
 void FlushOff() {
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+}
+
+// A doubleword (ld, std): its high word first.
+uint64_t Load64(uint8_t* base, uint32_t address) {
+  return uint64_t(Load(base, address)) << 32 | Load(base, address + 4);
+}
+void Store64(uint8_t* base, uint32_t address, uint64_t value) {
+  Store(base, address, uint32_t(value >> 32));
+  Store(base, address + 4, uint32_t(value));
 }
 
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
@@ -228,6 +244,228 @@ uint64_t ReloadDecals(uint8_t* base, const GuestCall& call, uint32_t holder, uin
   return scene_models::SceneModelReloadDecals(base, call, StageModel(base, holder), frame);
 }
 
+uint64_t SetDecalWord(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                      uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821793D0 GarageStage::SetDecalWord");
+  const uint32_t frame = Frame(base, stack, 112);
+  Store(base, StageModel(base, holder) + 3740, word);
+  return scene_models::SceneModelReloadDecals(base, call, StageModel(base, holder), frame);
+}
+
+uint32_t SetSticker(uint8_t* base, uint32_t holder, uint32_t area, uint32_t slot, uint32_t word,
+                    uint32_t flag, uint64_t r8, uint64_t r9, double f1, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217B3D8 GarageStage::SetSticker");
+  Frame(base, stack, 128);
+  // r8 and r9 into the caller's parameter area (their home slots), read
+  // back from there below.
+  Store64(base, stack + 64, r8);
+  Store64(base, stack + 72, r9);
+  const uint32_t model = StageModel(base, holder);
+  // The record index's base and the code by the area (signed; any other
+  // area 51 and 5).
+  static constexpr uint32_t kIndex[7] = {9, 15, 21, 27, 33, 39, 45};
+  static constexpr uint32_t kCode[7] = {8, 2, 1, 3, 4, 7, 6};
+  const int32_t a = int32_t(area);
+  const bool known = a >= 0 && a <= 6;
+  const uint32_t index = slot + (known ? kIndex[a] : 51);
+  const uint32_t e = model + 32 + (index << 6);
+  Store(base, e + 8, known ? kCode[a] : 5);
+  const uint64_t position0 = Load64(base, stack + 64);
+  const uint64_t position1 = Load64(base, stack + 72);
+  Store(base, e + 0, word);
+  Store(base, e + 4, flag);
+  const uint64_t size0 = Load64(base, stack + 96);
+  const uint64_t size1 = Load64(base, stack + 104);
+  Store64(base, e + 16, position0);
+  Store64(base, e + 24, position1);
+  Stfs(base, e + 32, f1);
+  Store64(base, e + 48, size0);
+  Store64(base, e + 56, size1);
+  return model;
+}
+
+uint64_t SetParts(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t a, uint32_t b,
+                  uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821797A8 GarageStage::SetParts");
+  const uint32_t frame = Frame(base, stack, 144);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, model + 3744, a);
+  Store(base, model + 3752, b);
+  Store(base, model + 3756, c);
+  Store(base, model + 3784, d);
+  Store(base, model + 3764, e);
+  Store(base, model + 3760, f);
+  Store(base, model + 3768, 0);
+  return ApplyRecord(base, call, model, frame, 0x8217980C);
+}
+
+uint64_t SetAeroSet(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_t set,
+                    uint32_t fallback5, uint32_t fallback6, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217DBC0 GarageStage::SetAeroSet");
+  const uint32_t frame = Frame(base, stack, 224);
+  const uint32_t model = StageModel(base, holder);
+  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  const uint32_t id = Load(base, SelectedGarageCar(base, save) + 12);
+  const uint32_t out = frame + 80, copy = frame + 128;
+  uint32_t parts[9];
+  car_specs::GetCarParts(base, id, parts);
+  for (uint32_t i = 0; i < 9; i++) {
+    Store(base, out + 4 * i, parts[i]);
+  }
+  if (!native::Buffers_Memcpy(base, copy, out, 36, 0x8217DC58)) {
+    call(kMemcpy, {copy, out, 36}, frame, 0x8217DC58);
+  }
+  const uint64_t level = set + 1;
+  for (uint32_t i = 0; i < 9; i++) {
+    parts[i] = Load(base, copy + 4 * i);
+  }
+  uint32_t kit = out;
+  if (!car_specs::AeroPart82(base, out, parts, int32_t(level))) {
+    kit = uint32_t(call(kGet82, {out, copy, level}, frame, 0x8217DC6C));
+  }
+  const uint32_t w = Load(base, kit + 24);
+  const uint32_t entry =
+      (uint32_t(Load(base, model + 48) << 1) + uint32_t(set)) * 24 + kAeroSets;
+  if (!native::Buffers_Memcpy(base, out, entry, 24, 0x8217DC9C)) {
+    call(kMemcpy, {out, entry, 24}, frame, 0x8217DC9C);
+  }
+  auto word = [&](uint32_t at) { return Load(base, frame + at); };
+  if (int32_t(word(80)) != -1) {
+    Store(base, model + 3744, word(80));
+  }
+  if (int32_t(word(84)) != -1) {
+    Store(base, model + 3752, word(84));
+  }
+  if (int32_t(word(88)) != -1) {
+    Store(base, model + 3756, word(88));
+  }
+  if (int32_t(word(92)) != -1) {
+    Store(base, model + 3784, word(92));
+  }
+  Store(base, model + 3764, int32_t(word(96)) != -1 ? word(96) : fallback5);
+  Store(base, model + 3760, int32_t(word(100)) != -1 ? word(100) : fallback6);
+  Store(base, model + 3768, (w & 8) != 0 ? uint32_t(level) : 0);
+  return ApplyRecord(base, call, model, frame, 0x8217DD2C);
+}
+
+uint64_t SetChoice(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t choice,
+                   uint32_t a, uint32_t b, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179310 GarageStage::SetChoice");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t model = StageModel(base, holder);
+  const uint32_t record = model + 32;
+  // The choice's three words, the index unchecked (wrapping).
+  Store(base, (choice + 315) * 12 + record, 1);
+  const uint32_t e = choice * 12 + record;
+  Store(base, e + 3784, a);
+  Store(base, e + 3788, b);
+  return ApplyRecord(base, call, model, frame, 0x8217936C);
+}
+
+uint64_t SetAero2(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                  uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821794A8 GarageStage::SetAero2");
+  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, model + 3732, word);
+  return ApplyRecord(base, call, model, frame, 0x821794E0);
+}
+
+uint64_t SetDoorKind(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t word,
+                     uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821794F8 GarageStage::SetDoorKind");
+  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, model + 3736, word);
+  return ApplyRecord(base, call, model, frame, 0x82179530);
+}
+
+uint64_t SceneInteriorSetRecord(uint8_t* base, const GuestCall& call, uint32_t interior,
+                                uint32_t record, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E38E0 SceneInterior::SetRecord");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t first = interior + 40;
+  if (!native::Buffers_Memcpy(base, first, record, 120, 0x820E3908)) {
+    call(kMemcpy, {first, record, 120}, frame, 0x820E3908);
+  }
+  const uint32_t second = Load(base, interior + 36) + 28;
+  if (!native::Buffers_Memcpy(base, second, record, 120, 0x820E391C)) {
+    return call(kMemcpy, {second, record, 120}, frame, 0x820E391C);
+  }
+  return second;
+}
+
+uint64_t SceneModelApplyInterior(uint8_t* base, const GuestCall& call, uint32_t model,
+                                 uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D9F40 SceneModel::ApplyInterior");
+  return SceneInteriorSetRecord(base, call, Load(base, model + 5068), model + 3804, stack);
+}
+
+uint64_t SetAccessory(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t a,
+                      uint32_t b, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821792B0 GarageStage::SetAccessory");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, model + 3916, a);
+  Store(base, model + 3920, b);
+  return SceneModelApplyInterior(base, call, model, frame);
+}
+
+namespace {
+
+// Wheels::SetRecord(wheels, record) from `frame`: with `poll` its plain
+// C++, else its adapter through `call` with `lr`.
+uint64_t WheelsSetRecord(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                         uint32_t wheels, uint32_t record, uint32_t frame, uint32_t lr) {
+  if (poll != nullptr) {
+    FlushOff();
+    const uint64_t r3 = load_poll::WheelsSetRecord(base, wheels, record, frame, *poll);
+    FlushOff();
+    return r3;
+  }
+  return call(kWheelsSetRecord, {wheels, record}, frame, lr);
+}
+
+}  // namespace
+
+uint64_t SceneWheelsSetWord68(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                              uint32_t wheels, uint32_t word, uint32_t stack, uint32_t lr) {
+  ITC_NATIVE_RUNNING("sub_820E7410 SceneWheels::SetWord68");
+  const uint32_t first = Load(base, wheels + 28);
+  Store(base, wheels + 100, word);
+  return WheelsSetRecord(base, call, poll, first, wheels + 32, stack, lr);
+}
+
+uint64_t SceneWheelsSetCaliperTexture(uint8_t* base, const GuestCall& call,
+                                      load_poll::Calls* poll, uint32_t wheels,
+                                      uint32_t texture, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E7428 SceneWheels::SetCaliperTexture");
+  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t first = Load(base, wheels + 28);
+  Store(base, wheels + 120, texture);
+  WheelsSetRecord(base, call, poll, first, wheels + 32, frame, 0x820E7450);
+  const uint32_t again = Load(base, wheels + 28);
+  if (poll != nullptr) {
+    FlushOff();
+    const uint64_t r3 = load_poll::WheelsSetCaliperTexture(base, again, frame);
+    FlushOff();
+    return r3;
+  }
+  return call(kWheelsSetCaliperTexture, {again}, frame, 0x820E7458);
+}
+
+uint64_t SetWheelExtras(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                        uint32_t holder, uint32_t a, uint32_t b, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_821790D0 GarageStage::SetWheelExtras");
+  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t model = StageModel(base, holder);
+  Store(base, model + 4136, a);
+  Store(base, model + 4156, b);
+  SceneWheelsSetWord68(base, call, poll, Load(base, model + 5100), a, frame, 0x82179118);
+  return SceneWheelsSetCaliperTexture(base, call, poll, Load(base, model + 5100),
+                                      Load(base, model + 4156), frame);
+}
+
 uint64_t WheelsSetTireTextures(uint8_t* base, const GuestCall& call, uint32_t wheels,
                                uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D8F18 Wheels::SetTireTextures");
@@ -295,25 +533,77 @@ uint64_t AddSecondWheels(uint8_t* base, const GuestCall& call, uint32_t holder, 
   return scene_models::SceneModelAddSecondWheels(base, call, StageModel(base, holder), frame);
 }
 
+namespace {
+
+// SceneModel::ApplyPaint (`wheels` false) or ApplyWheelPaint on `model`
+// from `frame` with r3 the model: with `poll` (the load poll's flags on),
+// its plain C++ inside its diagnostics' wrap (--debug_hide, nothing then,
+// r3 the model as set for the call; --find_per_frame_state, as
+// src/debug/frame_state_diff.cpp wrapped it); else its original through
+// `call` with `lr`.
+uint64_t Paint(uint8_t* base, const GuestCall& call, load_poll::Calls* poll, uint32_t model,
+               bool wheels, uint32_t frame, uint32_t lr) {
+  const uint32_t function = wheels ? kApplyWheelPaint : kApplyPaint;
+  if (poll == nullptr) {
+    return call(function, {model}, frame, lr);
+  }
+  if (debug::IsHidden(function)) {
+    return model;
+  }
+  debug::FrameStateDiff_Before(base);
+  FlushOff();
+  const uint64_t r3 =
+      wheels ? load_poll::SceneModelApplyWheelPaint(base, model, model, frame, *poll)
+             : load_poll::SceneModelApplyPaint(base, model, model, frame);
+  FlushOff();
+  debug::FrameStateDiff_After(base, "draw step part", function);
+  return r3;
+}
+
+}  // namespace
+
 uint64_t ApplyWheelPaint(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
                          uint32_t holder, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_821799D8 GarageStage::ApplyWheelPaint");
   const uint32_t frame = Frame(base, stack, 96);
   const uint32_t model = StageModel(base, holder);
-  if (poll == nullptr) {
-    return call(kApplyWheelPaint, {model}, frame, 0x82179A04);
+  return Paint(base, call, poll, model, true, frame, 0x82179A04);
+}
+
+uint64_t SetColorPiece(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,
+                       uint32_t holder, uint32_t piece, double f1, double f2, double f3,
+                       uint32_t stack) {
+  switch (piece) {
+    case 0: ITC_NATIVE_RUNNING("sub_8217B078 GarageStage::SetColor0"); break;
+    case 1: ITC_NATIVE_RUNNING("sub_8217B108 GarageStage::SetColor1"); break;
+    case 2: ITC_NATIVE_RUNNING("sub_8217B198 GarageStage::SetColor2"); break;
+    case 3: ITC_NATIVE_RUNNING("sub_8217B228 GarageStage::SetColor3"); break;
+    case 4: ITC_NATIVE_RUNNING("sub_8217B2B8 GarageStage::SetColor4"); break;
+    default: ITC_NATIVE_RUNNING("sub_8217B348 GarageStage::SetColor5"); break;
   }
-  // The wrap: nothing when --debug_hide names it (r3 the model, as set for
-  // the call), else the plain C++ between FrameStateDiff_Before and After.
-  if (debug::IsHidden(kApplyWheelPaint)) {
-    return model;
+  const uint32_t frame = Frame(base, stack, 128);
+  const uint32_t model = StageModel(base, holder);
+  Stfs(base, frame + 80, f1);
+  Stfs(base, frame + 84, f2);
+  Stfs(base, frame + 88, f3);
+  Stfs(base, frame + 92, Lfs(base, kOne));
+  // The record's paint value 0 to 2 (+64, +80, +96): pieces 3 to 5 write
+  // the same body values as 0 to 2, then apply the wheels' paint, which
+  // reads +112 on (the original's, kept).
+  Copy16(base, model + 64 + 16 * (piece % 3), frame + 80);
+  const uint32_t lr = 0x8217B0E8 + 0x90 * piece;  // each piece's call + 4
+  return Paint(base, call, poll, model, piece >= 3, frame, lr);
+}
+
+uint64_t SetColor(uint8_t* base, const GuestCall& call, load_poll::Calls* poll, uint64_t r3,
+                  uint32_t which, double f1, double f2, double f3, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217C6C8 GarageStage::SetColor");
+  // Unsigned: above 5 nothing (r3 left); else the piece's tail call from
+  // the same stack pointer.
+  if (which > 5) {
+    return r3;
   }
-  debug::FrameStateDiff_Before(base);
-  FlushOff();
-  const uint64_t r3 = load_poll::SceneModelApplyWheelPaint(base, model, model, frame, *poll);
-  FlushOff();
-  debug::FrameStateDiff_After(base, "draw step part", kApplyWheelPaint);
-  return r3;
+  return SetColorPiece(base, call, poll, uint32_t(r3), which, f1, f2, f3, stack);
 }
 
 uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, load_poll::Calls* poll,

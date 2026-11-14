@@ -318,6 +318,14 @@ uint32_t CourseRecordsReset(uint8_t* base, uint32_t c) {
   return r3;
 }
 
+uint64_t CourseRecordsOf(uint8_t* base, uint64_t records, uint32_t pair) {
+  ITC_NATIVE_RUNNING("sub_82105BF8 CourseRecords::Of");
+  const uint32_t course = guest::LoadU32(base, pair), traffic = guest::LoadU32(base, pair + 4);
+  // The 64-bit arithmetic of the original (course << 1 in 32 bits).
+  const uint64_t index = uint64_t(uint32_t(course << 1)) + uint64_t(traffic);
+  return records + index * 408 + 20;
+}
+
 std::optional<uint32_t> SaveDataDelete(uint8_t* base, uint32_t player) {
   ITC_NATIVE_RUNNING("sub_821055D8 SaveData::Delete");
   const uint32_t slot = Slot(player);
@@ -439,6 +447,32 @@ uint32_t DefaultsTable3C24() {
 uint32_t DefaultsTable50E4() {
   ITC_NATIVE_RUNNING("sub_820CCD00 Defaults::Table50E4");
   return kTable50E4;
+}
+
+uint32_t TwoPlayerBlock(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82105678 SaveData::TwoPlayerBlock");
+  return guest::LoadU32(base, kTwoPlayerBlock);
+}
+
+std::optional<uint32_t> CreateTwoPlayerBlock(uint8_t* base) {
+  if (!CreateNative()) {
+    return std::nullopt;
+  }
+  const auto made = memory::crt::OperatorNew(base, kTwoPlayerBlockBytes);
+  if (!made) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82105740 SaveData::CreateTwoPlayerBlock");
+  constexpr uint32_t kHalf = 0x1D52C;
+  const uint32_t block = *made;
+  if (block != 0) {
+    StatsConstruct(base, block + kStats);
+    StatsConstruct(base, block + kStats + kHalf);
+  }
+  guest::StoreU32(base, kTwoPlayerBlock, block);
+  ProgressSetDefaults(base, guest::LoadU32(base, kTwoPlayerBlock));
+  ProgressSetDefaults(base, guest::LoadU32(base, kTwoPlayerBlock) + kHalf);
+  return OptionsSetDefaults(base, guest::LoadU32(base, kTwoPlayerBlock) + 0x3AA58);
 }
 
 }  // namespace save_data

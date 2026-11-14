@@ -310,4 +310,61 @@ uint32_t PositionNotAfter(uint8_t* base, uint32_t a, uint32_t b);
 // without a frame; its register saves at -16 and -8 not written).
 uint32_t MapToSection(uint8_t* base, uint32_t section, uint32_t position, uint32_t sp);
 
+// --- The race's end (src/race_states/race_end.cpp) ---
+
+// A guest function `function` called with r3 to r7 from r1 = `sp`,
+// returning to `lr` (the original's return address), through the function
+// table (its override when it has one); its r3. The adapter's job.
+using GuestCall = std::function<uint64_t(uint32_t function, uint32_t sp, uint32_t lr,
+                                         uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6,
+                                         uint64_t r7)>;
+
+// Time::Add (sub_820FF458): two packed times (`a`, `b`) unpacked to signed
+// milliseconds, added in 64 bits and packed again (Time::Pack, a tail
+// call). Returns its r3.
+uint64_t TimeAdd(uint32_t a, uint32_t b);
+// The course record (never seen in play): a list of ten nodes of two
+// signed halfwords (+0 the next node, +2 an entry index) at +0 to +39, +40
+// the free list's first node, +44 the list's first, +48 the count
+// (halfwords), ten 28-byte entries from +52 (+20 and +24 two packed times
+// added for the entry's total), 76 bytes at +332 (the best's details).
+// CourseEntry::Clear (sub_82105BC8): +0 to +16 = 0, +20 and +24 = the
+// word at 0x82006924.
+void CourseEntryClear(uint8_t* base, uint32_t entry);
+// CourseRecord::Place (sub_82105EA0): the first node (from 0) whose
+// entry's total is above `time` (Time::Less), else the count; 0 for an
+// empty list. `time` is stored at `sp` + 28 (its caller's frame), each
+// total at its frame's (`sp` - 128) +80, as the original.
+uint32_t CourseRecordPlace(uint8_t* base, uint32_t list, uint32_t time, uint32_t sp);
+// CourseRecord::Link (sub_82105D60): the free list's first node linked in
+// at position `n` (a signed halfword); the count up by one.
+void CourseRecordLink(uint8_t* base, uint32_t list, int32_t n);
+// CourseRecord::Unlink (sub_82105DC8): the node at position `n` unlinked
+// onto the free list; the count down by one.
+void CourseRecordUnlink(uint8_t* base, uint32_t list, uint32_t n);
+// CourseRecord::Insert (sub_82105E30): Link at `n`, then the 28 bytes at
+// `entry` copied into node n's entry (memcpy; its original through `call`
+// from its frame `sp` - 112 where the plain C++ refuses).
+void CourseRecordInsert(uint8_t* base, uint32_t list, uint32_t entry, uint32_t n, uint32_t sp,
+                        const GuestCall& call);
+// CourseRecord::Add (sub_82105F50): the entry's place (Place of its total,
+// the total at its frame's (`sp` - 128) +80); place 0: the 76 bytes at
+// `source` to +332; below 10: the tenth unlinked when the list is full,
+// then Insert at the place. Returns the place.
+uint32_t CourseRecordAdd(uint8_t* base, uint32_t list, uint32_t entry, uint32_t source,
+                         uint32_t sp, const GuestCall& call);
+// CourseRecords::Save (sub_82105C18): for the current stage of types 1 and
+// 3, the race data's course record (its stage list +812, 408 bytes) to
+// `records` + 20 + 408 x (2 x the race data's +4 + 1 when +0x59618 is 0).
+void CourseRecordsSave(uint8_t* base, uint32_t records, uint32_t race, uint32_t sp,
+                       const GuestCall& call);
+// RaceStates::OnRaceEnd (sub_821644D8): see the row. `frame`: its 272
+// bytes (the course entry at +80, the achievements' words at +112; the
+// callees' frames below it); the callees' originals through `call` where
+// their plain C++ refuses (Replay::Keep's unless `keep_native`, memcpy's
+// plain C++ there). Returns r3 as the original leaves it (`machine_r3` in
+// a replay, else Replay::Keep's).
+uint64_t OnRaceEnd(uint8_t* base, uint64_t machine_r3, uint32_t frame, const GuestCall& call,
+                   bool keep_native);
+
 }  // namespace race_states

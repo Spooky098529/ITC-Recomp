@@ -17,6 +17,19 @@ know lives in the repo (this file, `docs/loops/b7-progress.md`,
 `docs/loops/leads.md`, the function files, commits), not in the session's
 memory.
 
+## B7's goal (the user's call, 2026-11-14)
+
+A translation of the game that still calls into the SDK to function
+(its kernel and XAM imports), but runs no PPC code for anything: every
+`sub_` function reachable from `main` ours, except the libraries
+replaced wholesale and System Link ("Rules that still hold"). Only the
+imports themselves wait for the core; the game's wrappers over them
+(the critical section wrappers, `_mtinit`, `_getptd` and the like) are
+PPC code, so they are ported too, calling the imports as the original
+does. Never-seen functions count the same as seen ones. The static map
+(`docs/loops/static-map.md`) measures how far there is to go and feeds
+`leads.md`.
+
 ## Settings (set by the user, 2026-10-22)
 
 - **Branch:** the branch the user made for the run and checked out
@@ -41,10 +54,11 @@ memory.
 ## The cycle
 
 1. **Pick a subsystem.** The first is the top of `docs/loops/leads.md`;
-   after that, the lead picks from `leads.md`: the lead whose functions
-   run most often or are closest to being ready
-   (`itc_recomp/tools/b7_groups.py <its functions>`), not one that needs
-   a decision only the user can make. Its line is deleted from `leads.md`
+   after that, the lead picks from `leads.md`: the lead that unblocks
+   the most (the static map's blocker ranking, below), seen in play or
+   not (the user's call, 2026-11-14, replacing "runs most often or
+   closest to being ready"), not one that needs a decision only the
+   user can make. Its line is deleted from `leads.md`
    when picked. A lead marked "no mapping" (cleanup in files
    already mapped, such as adapters to remove) goes straight to a
    migration agent (step 6) with the files it names, and doesn't count as
@@ -107,7 +121,7 @@ nothing runs and there's work, about a minute.
 ## The tooling (what the agents use)
 
 - `itc_recomp/coverage/seen_in_play.txt`: the functions seen in play
-  (`docs/coverage.md`). Functions that never ran get no rows.
+  (`docs/coverage.md`). Functions that never ran get rows too, marked "Not seen in play" (2026-10-23), and count as work toward B7's goal (2026-11-14).
 - `itc_recomp/tools/b7_status.py`: B7's measure (ours, wrapped, known,
   unknown), by function file; checks rows that say "never called" whose
   function ran.
@@ -118,6 +132,15 @@ nothing runs and there's work, about a minute.
   may go (see "Removing an adapter"). Groups are made native from the
   bottom up, as native code can
   only call what's already ours.
+- `itc_recomp/tools/static_map.py`: the static call graph from `main`
+  (direct calls, address constants, vtables and tables read from the
+  image; an ours function's edges from our C++, `src_edges.py`),
+  writing `docs/loops/static-map.md` (made fresh each run): the
+  totals toward B7's goal, the blockers ranked by how many functions
+  wait on them (what leads are picked by), the frontier's clusters,
+  the unmapped areas and the originals no longer called; `b7_groups.py --static [root ...]` gives groups
+  and blockers for never-seen functions from it (`../coverage.md`, "The
+  static map").
 - `itc_recomp/tools/check_function_statuses.py`: the Status column
   against `src/` (run after any row change); a function in rows of two
   files is an error.
@@ -505,8 +528,10 @@ Calls so far for decisions the loop meets often:
 - A kernel critical section a subsystem's code locks: a host
   `std::mutex` for that lock, taken by every user of it, native and
   recompiled (`Edram::Alloc`, 2026-10-24; the memory blocks' lock
-  `0x8296BD38`, 2026-10-25). The generic wrappers and `ScopedLock` stay
-  recompiled for the other critical sections. A device-wide lock over a
+  `0x8296BD38`, 2026-10-25). The generic wrappers and `ScopedLock` stayed
+  recompiled for the other critical sections until 2026-11-14; since
+  "B7's goal" above they are ported too, calling the
+  `Rtl*CriticalSection` imports as the original does. A device-wide lock over a
   host semaphore: the device lock (2026-10-24).
 - A kernel critical section or a game-built recursive spin lock whose
   depth the code reads, or which is entered again on purpose: a host
@@ -524,6 +549,9 @@ Calls so far for decisions the loop meets often:
   `KeWaitFor*`, `KeReleaseSemaphore` and the rest) exactly as the
   original does; host objects later, once every user is native
   (2026-10-29).
+  The game's own framework worker pools (`WorkerPool::Create`
+  `sub_82094F30` and the rest: their event, critical sections and
+  threads) follow the same call (the user's call, 2026-11-14).
 - The kernel's clocks a subsystem waits on: answered from the host's
   steady clock, no flag, recompiled and native callers sharing one
   clock (GetTickCount, 2026-10-23; QueryPerformanceCounter at the
@@ -534,6 +562,10 @@ Calls so far for decisions the loop meets often:
   class itself stays recompiled for the others.
 - The graphics: native if the renderer needs it, else Dropped (fence
   waits, cache flushes, packets nothing reads).
+  `Device::Clear`'s worker `sub_8229FC40` too: native, its packets
+  Dropped, the device state it updates (the bound surfaces, the dirty
+  flags) kept exactly as the original leaves it (the user's call,
+  2026-11-14).
 - XACT is translated (2026-10-23), the music too: it is XACT banks
   loaded through the sound manager (`Music::Play`,
   `AudioManager::LoadBank`), not a separate player to replace with a
@@ -546,7 +578,21 @@ Calls so far for decisions the loop meets often:
   made, their game-level users seen in play skipped natively with what
   they'd read with the feature absent, Status Dropped (the voice
   engine under the app's start-up, 2026-10-30).
-- An Xbox Live front-end mode the player can open (the type 12 mode,
+- Multiplayer is bypassed, not ported (the user's call, 2026-11-14,
+  replacing the 2026-11-12 call below for these modes): selecting the
+  Xbox Live item (the type 12 mode) or the split screen item (the type
+  8 mode) on the main menu does nothing. The cut is made there, in
+  native code; the modes' code, the race's kind 4 (split screen) and
+  kind 6 (Live time attack) screens and the network battle become
+  unreachable and get Dropped rows, not ports. Native code already
+  made for them stays until the user says otherwise.
+  Where our native code still names the multiplayer code on a branch
+  play can't take now (the mode factory's type 12, the race HUD
+  machine's kind 4 and 6 branches), that branch goes under the same
+  flag, so the static map stops counting it (`Mode::Create`'s guard
+  kept; the race screens' to follow; the user's call, 2026-11-14). The
+  items are silent (no refusal cue) and look as they did.
+- (Superseded for the Live modes by the bypass above.) An Xbox Live front-end mode the player can open (the type 12 mode,
   the network battle and time attack, `network-mode.md`): its screens
   are made native as any front-end mode's, and its Xbox Live calls
   (sign-in, gamer card, sessions, privileges, leaderboards, the network
@@ -558,6 +604,12 @@ Calls so far for decisions the loop meets often:
   its entry. Asked to minimize the code left recompiled (the user's
   call, 2026-11-12, replacing the same day's "Live calls stay
   recompiled").
+  The network battle's sends (`sub_8214AB48`, `sub_8214AA70`, on the
+  system link socket B5 no longer makes): Dropped. A Live read the
+  SDK's stub answers with "success" and garbage (the leaderboard read
+  `sub_82292CC0`, `XamUserCreateStatsEnumerator`): answered natively as
+  no Live (the read failed, no buffer), though memory differs from
+  today's garbage (both the user's calls, 2026-11-14).
 - Achievements: the game's achievement write keeps calling
   `XUserWriteAchievements` through the guest (not skipped), so the
   SDK goes on recording unlocks in its `achievements/<title id>.toml`;
@@ -585,6 +637,15 @@ Calls so far for decisions the loop meets often:
   are ours, and the harness built the bigger way, with the callees'
   world as their own harnesses build it; no stand-in recorders in
   adapters (the race HUD machine, 2026-10-31).
+- Functions that end the process or the thread, which a harness
+  can't run on its thread (the C runtime's `KeBugCheck` stub
+  `sub_825AA1A0`, `_CxxThrowException`, `RaiseException`,
+  `XapiThreadStartup`'s `ExTerminateThread`, `_invalid_parameter`'s
+  trap): ported, calling the import exactly as the original, checked
+  by reading against `generated/` instead of a harness; their rows say
+  "no harness: ends the process" (or the thread), and the validation
+  agent counts them like Merged rows. Their callers' other paths are
+  harnessed as usual (the user's call, 2026-11-14).
 - A validation that fails on a harness fault (a harness case reading
   a wild guest address, or giving a case inputs play never does) rather
   than a native difference: an agent finds the cause with logging and
@@ -602,6 +663,10 @@ Calls so far for decisions the loop meets often:
   through the guest TLS as the original does (the original's results,
   one state for recompiled and native callers), while `_getptd` and
   `_mtinit` stay for the core (`rand`, 2026-11-04).
+  Since 2026-11-14 ("B7's goal" above), `_mtinit`, `_getptd` and the
+  rest are ported too, as plain C++ over the same guest words, calling
+  the kernel's TLS imports as the original does; only the imports wait
+  for the core.
 
 Only something new (no call covers it, or it's unclear whether one
 does) goes to the user. Then the lead asks the user directly

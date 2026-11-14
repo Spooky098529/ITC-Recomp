@@ -25,6 +25,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/tuning_pages.h"
 #include "hooks/tuning_screen.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -821,6 +822,38 @@ void Command42World(const World& w, Random& r) {
   }
 }
 
+// The paint and light kit pages' world (Command10, 13, 14 and their bars'
+// setters, B7 loop, 2026-11-13): the named animations, the pool's nodes'
+// texture counts (+112) 40 to 42, so their vertices (from +768) lie past
+// the child entries read; the sliders' words mostly small (now and then
+// any), the pair +30456 and +30460 0 half the time, the paint kind +30440
+// mostly 0 or 4, the rows +30508 and +30544 mostly in their ranges (5 and 4
+// none), the fields named animations are made from small (now and then to
+// 650, so the names stay below 1,024).
+void PaintPage(const World& w, Random& r) {
+  NamedAnimations(w, r);
+  for (uint32_t n = 0; n < kNodeCount; n++) {
+    guest::StoreU32(w.base, w.node(n) + 112, 40 + r.Below(3));
+  }
+  const uint32_t s = w.screen();
+  for (const uint32_t f : {30444u, 30448u, 30452u, 30476u, 30480u, 30484u, 30512u, 30516u,
+                           30520u, 30552u}) {
+    const uint32_t v = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(8) == 0 ? 0 : r.Below(256);
+    guest::StoreU32(w.base, s + f, v);
+  }
+  for (const uint32_t f : {30456u, 30460u}) {
+    guest::StoreU32(w.base, s + f, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  }
+  static constexpr uint32_t kKinds[] = {0, 4, 0, 4, 1, 2, 3, 5, 0xFFFFFFFFu};
+  guest::StoreU32(w.base, s + 30440, kKinds[r.Below(9)]);
+  guest::StoreU32(w.base, s + 30508, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(6));
+  guest::StoreU32(w.base, s + 30544, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(5));
+  for (const uint32_t f : {30524u, 30528u, 30556u, 30560u}) {
+    guest::StoreU32(w.base, s + f, r.Below(4) == 0 ? r.Below(650) : r.Below(8));
+  }
+  guest::StoreU32(w.base, s + 30548, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(8));
+}
+
 }  // namespace
 
 uint32_t LayTextMovie(uint8_t* base, uint32_t block, Random& r) {
@@ -1202,6 +1235,48 @@ void TuningScreenPages(Context& h) {
   // Command53: a leaf (the stack below r1 untouched).
   Run(h, w, {"TuningScreen::Command53", 15, __imp__sub_821F7948, hooks::TuningCommand53,
              {{-128, 0}}, [](PPCContext&, Random& r, const World& w) { EditorPage(w, r); }});
+  // The paint and light kit pages' runners and their callees, never seen in
+  // play (B7 loop, 2026-11-13; after the groups above, so they keep their
+  // seeds): PaintPage's world (above), the set-up (+9716) half the time.
+  const Setup paint_page = [](PPCContext&, Random& r, const World& w) {
+    PaintPage(w, r);
+    guest::StoreU32(w.base, w.screen() + 9716, r.Below(2));
+  };
+  // Command10: f30, f31 and r28 to r31 saved (56 bytes), SetText's
+  // parameter area left out.
+  Run(h, w, {"TuningScreen::Command10", 20, __imp__sub_821F35C0, hooks::TuningCommand10,
+             {{-144, -144 + 48}, {-144 + 80, -56}}, paint_page});
+  // Command13: the same saves.
+  Run(h, w, {"TuningScreen::Command13", 20, __imp__sub_821EA460, hooks::TuningCommand13,
+             {{-144, -56}}, paint_page});
+  // Command14: the same, SetNodeText's parameter area (+40 to +79) left
+  // out.
+  Run(h, w, {"TuningScreen::Command14", 20, __imp__sub_821EAFA0, hooks::TuningCommand14,
+             {{-144, -144 + 40}, {-144 + 80, -56}}, paint_page});
+  // SetPaintGradients: r26 to r31 and f29 to f31 saved (80 bytes);
+  // HsvToRgb's 16 bytes under the frame compared.
+  Run(h, w, {"TuningScreen::SetPaintGradients", 15, __imp__sub_821E9488,
+             hooks::TuningPagesSetPaintGradients, {{-208 - 16, -80}}, paint_page});
+  // SetLightKind0Bars: the same saves; SetLightKind1Bar: r27 to r31 (48).
+  Run(h, w, {"TuningScreen::SetLightKind0Bars", 10, __imp__sub_821EA130,
+             hooks::TuningPagesSetLightKind0Bars, {{-176, -80}}, paint_page});
+  Run(h, w, {"TuningScreen::SetLightKind1Bar", 10, __imp__sub_821EAE68,
+             hooks::TuningPagesSetLightKind1Bar, {{-144, -48}}, paint_page});
+  // IsSlotAvailable: a leaf; the category 6, item 3 and mode 1 each half
+  // the time, the slot 0 to 4 mostly (now and then to 255, r4's high word
+  // set).
+  Run(h, w, {"TuningScreen::IsSlotAvailable", 20, __imp__sub_821CE188,
+             hooks::TuningPagesIsSlotAvailable, {{-128, 0}},
+             [](PPCContext& t, Random& r, const World& w) {
+               const uint32_t s = w.screen();
+               guest::StoreU32(w.base, s + ts::kCategory, r.Below(2) == 0 ? 6 : r.Below(8));
+               guest::StoreU8(w.base, s + ts::kItem, uint8_t(r.Below(2) == 0 ? 3 : r.Below(8)));
+               guest::StoreU32(w.base, s + 33540, r.Below(2) == 0 ? 1 : r.Below(3));
+               t.r4.u64 = r.Below(4) == 0 ? r.Below(256) : r.Below(5);
+               if (r.Below(8) == 0) {
+                 t.r4.u64 |= uint64_t(r.Below(4)) << 32;
+               }
+             }});
 }
 
 }  // namespace harness

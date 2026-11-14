@@ -30,6 +30,9 @@ void SaveDataOptionsSetDefaults(PPCContext& ctx, uint8_t* base);
 // CourseRecords::Reset sub_82105D08: r3 = the records; r3 = the last
 // record + 332.
 void SaveDataCourseRecordsReset(PPCContext& ctx, uint8_t* base);
+// CourseRecords::Of sub_82105BF8: r3 = the records, r4 = {course,
+// traffic}; r3 = the record, r10 and r11 as the original leaves them.
+void SaveDataCourseRecordsOf(PPCContext& ctx, uint8_t* base);
 // SaveData::Delete sub_821055D8: r3 = the player; r3 = the old block. The
 // original unless --native_heap routes the game's heap to the allocation
 // layer, or where the block isn't the layer's.
@@ -38,6 +41,10 @@ void SaveDataDelete(PPCContext& ctx, uint8_t* base);
 // holder. With --native_heap; the original where memcpy's plain C++ can't
 // copy or operator new's plain C++ refuses.
 void SaveDataCreate(PPCContext& ctx, uint8_t* base);
+// sub_82105740 SaveData::CreateTwoPlayerBlock (no adapter: only
+// ModeType8::Init's plain C++ calls it; the harness's step): its plain C++
+// over the allocation layer, else the original.
+void SaveDataCreateTwoPlayerBlock(PPCContext& ctx, uint8_t* base);
 // Players::ResetControllers sub_8209F5E0: r3 left; r9 to r11 as the
 // original leaves them.
 void SaveDataResetControllers(PPCContext& ctx, uint8_t* base);
@@ -56,5 +63,8 @@ void SaveDataTable3044(PPCContext& ctx, uint8_t* base);
 void SaveDataTable3E34(PPCContext& ctx, uint8_t* base);
 void SaveDataTable3C24(PPCContext& ctx, uint8_t* base);
 void SaveDataTable50E4(PPCContext& ctx, uint8_t* base);
+// SaveData::TwoPlayerBlock (no arguments; r3 the block, r11 as its lis
+// leaves it).
+void SaveDataTwoPlayerBlock(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

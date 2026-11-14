@@ -68,6 +68,11 @@ uint32_t OptionsSetDefaults(uint8_t* base, uint32_t options);
 // original leaves it: the last CourseRecord::Reset's.
 uint32_t CourseRecordsReset(uint8_t* base, uint32_t records);
 
+// sub_82105BF8 CourseRecords::Of: the record of a pair of words at `pair`
+// {course, traffic}: `records` + 20 + 408 x (course x 2 + traffic), in the
+// original's 64-bit arithmetic (r3 both halves). A leaf.
+uint64_t CourseRecordsOf(uint8_t* base, uint64_t records, uint32_t pair);
+
 // The players' save data slots (SaveData::Of reads them).
 constexpr uint32_t kSlots = 0x826C5B58;
 constexpr uint32_t Slot(uint32_t player) { return kSlots + (player << 2); }
@@ -127,5 +132,21 @@ uint32_t DefaultsTable3044();
 uint32_t DefaultsTable3E34();
 uint32_t DefaultsTable3C24();
 uint32_t DefaultsTable50E4();
+
+// sub_82105678 SaveData::TwoPlayerBlock (probably): [0x826C5B5C], the two
+// players' save block (player 1's slot; 0x3AB74 bytes, a player's half
+// 0x1D52C). A leaf.
+constexpr uint32_t kTwoPlayerBlock = 0x826C5B5C;
+uint32_t TwoPlayerBlock(uint8_t* base);
+// sub_82105740 SaveData::CreateTwoPlayerBlock (probably): 0x3AB74 bytes from
+// operator new's plain C++, Stats::Stats at +48 and +48 + 0x1D52C when not
+// 0, the block into [0x826C5B5C], then Progress::SetDefaults on the word
+// and the word + 0x1D52C, and Options::SetDefaults on the word + 0x3AA58
+// (each read again). Returns r3 as the original leaves it (Options::
+// SetDefaults'). nullopt, with nothing done, where the original must run
+// (operator new's error paths, memcpy not native: as SaveData::Create).
+// No adapter: only ModeType8::Init's plain C++ calls it.
+constexpr uint32_t kTwoPlayerBlockBytes = 0x3AB74;
+std::optional<uint32_t> CreateTwoPlayerBlock(uint8_t* base);
 
 }  // namespace save_data

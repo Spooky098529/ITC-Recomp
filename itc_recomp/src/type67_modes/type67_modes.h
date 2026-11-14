@@ -54,8 +54,10 @@ struct InitInfo {
 // Type6ListScreen, sub_822436A0 Type7ListScreen, sub_82230F80
 // Type6PanelScreen, sub_82240998 Type7PanelScreen, sub_82237320
 // Type6NodeScreen, sub_82237B78 PowerGraphScreen6, sub_822470A8
-// PowerGraphScreen7.
-constexpr int kInitCount = 16;
+// PowerGraphScreen7; and the type 8 mode's sub_8223C950 Type8Screen0::Init
+// (machine at +4) and sub_8223AE60 Type8Dialog::Init (docs/functions/
+// type8-mode.md; no adapters: only ModeType8::Init's plain C++ calls them).
+constexpr int kInitCount = 18;
 extern const InitInfo kInits[kInitCount];
 // The Init at `address` (one of kInits) on `object`, its frame at `frame`.
 InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t frame);
@@ -118,6 +120,22 @@ uint64_t ControllerOptionsOpen(uint8_t* base, uint64_t r3);
 // message 4 (types 2, 4, 6, 8) or 3 (type 7) queued in the dispatcher's
 // ring (`dispatcher` +204).
 uint64_t ControllerOptionsLeave(uint8_t* base, uint64_t r3, uint32_t dispatcher);
+// The settings the controller pages edit ([0x826D8494], the options'
+// settings block).
+constexpr uint32_t kControllerSettings = 0x826D8494;
+// sub_821BB290 ControllerOptions::StepSliders: the menu's side (+36) -1 or 1
+// steps the slider at the cursor (0 to 2: the settings' +272 to +280, -10 to
+// 10); 1 when one changed, else 0.
+uint64_t ControllerOptionsStepSliders(uint8_t* base);
+// sub_821BB3B8 ControllerOptions::StepButtons (`offset` 672, `last` 12) and
+// sub_821BB590 ControllerOptions::StepAnalog (680, 6): the settings'
+// +`offset` = 0, then the menu's side when it's -1 or 1, answering 1 unless
+// the cursor is `last`; 0 with no side.
+uint64_t ControllerOptionsStepSide(uint8_t* base, uint32_t offset, uint32_t last);
+// sub_821C0238 ControllerOptions::SetMarkY: movie 7's node (8, 5)'s child
+// (0)'s child (0) +16 = (float) the int `y` (its 112-byte frame below `sp`:
+// the key 7, then the int's doubleword, at +80). r3 that child.
+uint64_t ControllerOptionsSetMarkY(uint8_t* base, uint64_t y, uint32_t sp);
 
 // sub_82230740 PanelScreen::InitWords: +11672 = 4, +11680 = 9.
 uint64_t PanelScreenInitWords(uint8_t* base, uint64_t r3);
@@ -125,6 +143,11 @@ uint64_t PanelScreenInitWords(uint8_t* base, uint64_t r3);
 // +9608 = 4 when +9612 is set, else 1.
 uint64_t ScreenMachineWait(uint8_t* base, uint64_t r3);
 uint64_t ScreenReenter(uint8_t* base, uint64_t r3);
+// sub_822508F0 Screen::Wait: +9608 = 9 (the type 7 and 8 first screens'
+// machine at +4). sub_822419D0 Type7Dialog::QueueReopen: +9748 = 1 (a
+// reopen for Dialog::DrawWaiting). Leaves; r3 left.
+uint64_t ScreenWait(uint8_t* base, uint64_t r3);
+uint64_t DialogQueueReopen(uint8_t* base, uint64_t r3);
 
 // sub_82231F48 Type6Dialog::Shown, sub_822419C0 Type7Dialog::Shown: +`shown`
 // (9756, 9760) = 0.
@@ -446,6 +469,13 @@ uint64_t DialogCloseConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, con
 // highlight finished (UiMovie::FinishNamed), the cursor's played and looped,
 // +9664 = 1; UiMovie::Run. Returns 1.
 uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls);
+// sub_822326A8 Dialog::OpenNoticeStep (`close` false) and sub_8223AAA8
+// Dialog::CloseNoticeStep (true): movie 19; on the first frame (+9664 0)
+// MenuSound::Play(5), named animation 2 (the close: 3) and +9664 = 1;
+// UiMovie::Run(movie, 0) (a guest call); done when it answers 0 (the close
+// then +9740 = 9). 1 when done, else 0.
+uint64_t DialogNoticeStep(uint8_t* base, uint32_t dialog, bool close, uint32_t sp,
+                          const Calls& calls);
 // sub_82232328 Type6Dialog::ConfirmPage and sub_82241EF8
 // Type7Dialog::ConfirmPage (r3 the dialog, `dispatcher` r4): with the shown
 // word (+9756, +9760) 4, it = 1 and nothing else; else it = 1, Menu::Step
@@ -595,8 +625,9 @@ constexpr uint32_t kType7Car = 0x826371D0;
 // sub_822338E8 Type6Screen0::OpenMovie and sub_82243E80
 // Type7Screen0::OpenMovie: UiMovies::Open(22, 22564 or 22569) (calls.open),
 // then GarageStage::MakeModel([[0x826D83E0]], CarModels::BlockOf(0), 1)
-// and GarageStage::Command(the same, 14), guest calls to their overrides.
-// r3 Command's.
+// by its plain C++ (ScenePools::SetUpB under it through calls.call_set) and
+// GarageStage::Command(the same, 14), a guest call to its override. r3
+// Command's.
 uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& calls);
 // sub_82233E80 Type6Screen0::SetUpCar and sub_822443E0
 // Type7Screen0::SetUpCar (r4 the dispatcher): with no car yet (+1972 -1),

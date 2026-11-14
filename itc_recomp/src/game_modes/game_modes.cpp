@@ -3,6 +3,7 @@
 
 #include "game_modes/game_modes.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
@@ -12,6 +13,8 @@
 #include "race_overlays/race_overlays.h"
 
 #include <cstdlib>
+
+ITC_FLAG_DECLARE(bool, multiplayer_menu_items);
 
 namespace game_modes {
 
@@ -570,7 +573,14 @@ void ModeTypeConstruct(uint8_t* base, uint32_t type, uint32_t mode) {
     case 7: ModeType7Construct(base, mode); break;
     case 9: ModeType9Construct(base, mode); break;
     case 10: ModeType10Construct(base, mode); break;
-    case 12: ModeType12Construct(base, mode); break;
+    case 12:
+      // Not made without --multiplayer_menu_items (the bypass, 2026-11-14:
+      // only the main menu's Xbox Live item opened it; ModeCreate declines
+      // it then).
+      if (ITC_FLAG(multiplayer_menu_items)) {
+        ModeType12Construct(base, mode);
+      }
+      break;
     default: break;
   }
 }
@@ -593,6 +603,13 @@ std::optional<uint32_t> ModeCreate(uint8_t* base, uint32_t type) {
   }
   if (type == 8) {
     return std::nullopt;  // sub_82107670, never seen in play
+  }
+  if (type == 12 && !ITC_FLAG(multiplayer_menu_items)) {
+    // The Xbox Live mode, bypassed at the main menu since 2026-11-14 (the
+    // user's call): nothing asks for it, so the original's (the fallback)
+    // would make it if anything did.
+    ITC_LOG_ERROR("Mode::Create: type 12 (Xbox Live) asked for with --multiplayer_menu_items off");
+    return std::nullopt;
   }
   const auto mode = memory::crt::OperatorNew(base, bytes);
   if (!mode) {

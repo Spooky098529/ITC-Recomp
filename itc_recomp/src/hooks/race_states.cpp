@@ -8,6 +8,7 @@
 #include "base/log.h"
 #include "hooks/heap.h"
 #include "hooks/race_world.h"
+#include "native/buffers.h"
 #include "race_states/race_states.h"
 
 ITC_FLAG_BOOL(native_race_states, true, "ITC",
@@ -22,7 +23,11 @@ ITC_FLAG_BOOL(native_race_states, true, "ITC",
               "RaceProgress::FollowRoute sub_82163C50 with sub_82163000, RaceTick sub_82167610, OnGo sub_82164458; "
               "RaceProgress::StartRoute sub_821635D0 with RouteDistance sub_82162330, the "
               "original where memcpy's copies of the course route aren't native; RaceStates::Init "
-              "sub_82169920) natively instead of through the translated "
+              "sub_82169920; RaceStates::OnRaceEnd sub_821644D8 with the course record, "
+              "CourseEntry::Clear sub_82105BC8, CourseRecord::Place sub_82105EA0, Link "
+              "sub_82105D60, Unlink sub_82105DC8, Insert sub_82105E30, Add sub_82105F50 and "
+              "CourseRecords::Save sub_82105C18, never seen in play, and Time::Add "
+              "sub_820FF458) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=race_states)");
 
 namespace hooks {
@@ -318,6 +323,35 @@ void RaceStatesInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? *r3 : machine_r3 + (*r3 - machine);
 }
 
+void RaceStatesOnRaceEnd(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const rs::GuestCall call = [&ctx, base](uint32_t function, uint32_t sp, uint32_t back,
+                                          uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6,
+                                          uint64_t r7) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.r6.u64 = r6;
+    ctx.r7.u64 = r7;
+    ctx.lr = back;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  ctx.r3.u64 = rs::OnRaceEnd(base, ctx.r3.u64, ctx.r1.u32 - 272, call,
+                             native::Buffers_NativeMemcpy());
+  ctx.lr = lr;
+}
+
+void RaceStatesTimeAdd(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rs::TimeAdd(guest::LoadU32(base, ctx.r3.u32), guest::LoadU32(base, ctx.r4.u32));
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -360,6 +394,15 @@ ITC_RACE_STATES(82167610, RaceStatesRaceTick)
 ITC_RACE_STATES(82164458, RaceStatesOnGo)
 ITC_RACE_STATES(821635D0, RaceStatesStartRoute)
 ITC_RACE_STATES(82169920, RaceStatesInit)
+ITC_RACE_STATES(821644D8, RaceStatesOnRaceEnd)
+// Time::Add (sub_820FF458) keeps an adapter: the race HUD's splits
+// (sub_82214BA8, sub_82214E78) and sub_820FF4D0, sub_820FF628 are recompiled.
+ITC_RACE_STATES(820FF458, RaceStatesTimeAdd)
+// The course record's CourseEntry::Clear (sub_82105BC8), Place
+// (sub_82105EA0), Link (sub_82105D60), Unlink (sub_82105DC8), Insert
+// (sub_82105E30), Add (sub_82105F50) and CourseRecords::Save (sub_82105C18)
+// have no adapters: their only callers are OnRaceEnd and each other, native;
+// --native_race_states switches OnRaceEnd.
 // RaceProgress::RouteDistance (sub_82162330) has no adapter: its only
 // caller, RaceProgress::StartRoute, is native; --native_race_states switches
 // it. Its register step stays for the harness.

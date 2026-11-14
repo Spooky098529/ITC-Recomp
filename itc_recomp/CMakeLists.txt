@@ -94,6 +94,7 @@ set(ITC_SOURCES
     src/hooks/profile.cpp
     src/hooks/saves.cpp
     src/saves/saves.cpp
+    src/saves/slot_steps.cpp
     src/hooks/file_class.cpp
     src/hooks/movie_files.cpp
     src/hooks/archive_streaming.cpp
@@ -205,6 +206,7 @@ set(ITC_SOURCES
     src/race_states/follow_route.cpp
     src/race_states/race_states_init.cpp
     src/race_states/route_distance.cpp
+    src/race_states/race_end.cpp
     src/hooks/archive.cpp
     src/archive/archive.cpp
     src/archive/semaphores.cpp
@@ -319,6 +321,7 @@ set(ITC_SOURCES
     src/replay_snapshots/records.cpp
     src/replay_snapshots/race_replay.cpp
     src/hooks/race_screens.cpp
+    src/hooks/race_screens_unseen.cpp
     src/race_screens/menu_list.cpp
     src/race_screens/screens.cpp
     src/race_screens/pages.cpp
@@ -328,6 +331,10 @@ set(ITC_SOURCES
     src/race_screens/dialog.cpp
     src/race_screens/career.cpp
     src/race_screens/draws.cpp
+    src/race_screens/pause_menu4.cpp
+    src/race_screens/results.cpp
+    src/race_screens/kind6_menu.cpp
+    src/race_screens/kind6_pages.cpp
     src/hooks/menu_sounds.cpp
     src/menu_sounds/menu_sounds.cpp
     src/hooks/race_sounds.cpp
@@ -340,8 +347,10 @@ set(ITC_SOURCES
     src/hooks/scene.cpp
     src/scene/scene.cpp
     src/scene/lighting.cpp
+    src/save_interface/save_devices.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
+    src/save_interface/slot_handlers.cpp
     src/hooks/file_layer.cpp
     src/file_layer/file_layer.cpp
     src/hooks/texture_compression.cpp
@@ -404,6 +413,8 @@ set(ITC_SOURCES
     src/car_makers/stand.cpp
     src/hooks/menu_helpers.cpp
     src/menu_helpers/menu_helpers.cpp
+    src/hooks/morph_jobs.cpp
+    src/morph_jobs/morph_jobs.cpp
     src/hooks/race_update.cpp
     src/race_update/race_update.cpp
     src/hooks/stand_models.cpp
@@ -428,6 +439,7 @@ set(ITC_SOURCES
     src/tuning_screen/rows.cpp
     src/tuning_screen/refresh_menu.cpp
     src/tuning_screen/refresh_movie13.cpp
+    src/tuning_screen/refresh_pages.cpp
     src/tuning_screen/stats.cpp
     src/tuning_screen/refresh.cpp
     src/tuning_screen/refresh_level.cpp
@@ -446,6 +458,8 @@ set(ITC_SOURCES
     src/tuning_pages/pages.cpp
     src/tuning_pages/dialogs.cpp
     src/tuning_pages/vinyl_pages.cpp
+    src/tuning_pages/sticker_pages.cpp
+    src/tuning_pages/sticker_commands.cpp
     src/tuning_pages/handle_input.cpp
     src/hooks/screen_constructors.cpp
     src/screen_constructors/screen_constructors.cpp
@@ -469,12 +483,36 @@ set(ITC_SOURCES
     src/type67_modes/screen0.cpp
     src/type67_modes/screens.cpp
     src/hooks/type67_screens.cpp
+    src/type67_screens/list_helpers.cpp
+    src/type67_screens/list_part.cpp
     src/type67_screens/list_screens.cpp
+    src/type67_screens/node_tables.cpp
     src/type67_screens/panel_parts.cpp
     src/type67_screens/panel_screens.cpp
     src/type67_screens/pick_car.cpp
     src/type67_screens/slots.cpp
+    src/type67_screens/titled_list.cpp
+    src/type67_screens/color_list.cpp
+    src/type67_screens/node_screen.cpp
+    src/type67_screens/type6_list.cpp
+    src/type67_screens/type7_list.cpp
+    src/type67_screens/type6_node.cpp
+    src/type67_screens/screen_blocks.cpp
     src/hooks/car_list.cpp
+    src/hooks/type8_screens.cpp
+    src/type8_screens/panels.cpp
+    src/type8_screens/panel_screen.cpp
+    src/type8_screens/screen.cpp
+    src/type8_screens/init_machine.cpp
+    src/type8_screens/list_part.cpp
+    src/type8_screens/color_part.cpp
+    src/type8_screens/list_screen.cpp
+    src/type8_screens/color_list_screen.cpp
+    src/hooks/type8_mode.cpp
+    src/type8_mode/dialog.cpp
+    src/type8_mode/screen0.cpp
+    src/type8_mode/screen0_update.cpp
+    src/type8_mode/mode.cpp
     src/car_list/panels.cpp
     src/car_list/set.cpp
     src/car_list/pages.cpp
@@ -691,6 +729,8 @@ set(ITC_SOURCES
     src/c_runtime/arrays.cpp
     src/c_runtime/exit.cpp
     src/c_runtime/random.cpp
+    src/hooks/c_runtime_core.cpp
+    src/c_runtime/core.cpp
     src/game_data/game_data.cpp
     src/game_data/data_file.cpp
     src/hooks/data_file.cpp
@@ -749,6 +789,7 @@ set(ITC_SOURCES
     src/harnesses/race_states.cpp
     src/harnesses/archive.cpp
     src/harnesses/save_interface.cpp
+    src/harnesses/save_handlers.cpp
     src/harnesses/app_start_up.cpp
     src/harnesses/data_load.cpp
     src/harnesses/career.cpp
@@ -803,6 +844,7 @@ set(ITC_SOURCES
     src/harnesses/predicated_tiling.cpp
     src/harnesses/power_graph.cpp
     src/harnesses/menu_helpers.cpp
+    src/harnesses/morph_jobs.cpp
     src/harnesses/race_update.cpp
     src/harnesses/stand_models.cpp
     src/harnesses/build_screen.cpp
@@ -815,7 +857,16 @@ set(ITC_SOURCES
     src/harnesses/options_screen.cpp
     src/harnesses/type67_modes.cpp
     src/harnesses/type67_screens.cpp
+    src/harnesses/type67_list_helpers.cpp
+    src/harnesses/type67_list_part.cpp
+    src/harnesses/type67_titled_list.cpp
+    src/harnesses/type67_color_list.cpp
+    src/harnesses/type67_node_screen.cpp
+    src/harnesses/type67_screen_tables.cpp
     src/harnesses/car_list.cpp
+    src/harnesses/type8_screens.cpp
+    src/harnesses/type8_mode.cpp
+    src/harnesses/type8_list_screen.cpp
     src/harnesses/front_end_screen_helpers.cpp
     src/harnesses/car_dealer.cpp
     src/harnesses/type2_screens.cpp
@@ -863,6 +914,7 @@ set(ITC_SOURCES
     src/harnesses/xact_tracks.cpp
     src/harnesses/input.cpp
     src/harnesses/c_runtime_exit.cpp
+    src/harnesses/c_runtime_core.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -1041,6 +1093,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/tuning_screen/stats.cpp src/tuning_screen/refresh.cpp
     src/tuning_screen/refresh_level.cpp src/tuning_screen/refresh_type.cpp
     src/tuning_screen/refresh_choice.cpp src/tuning_screen/commands.cpp
+    src/tuning_screen/refresh_pages.cpp
     src/tuning_machine/set_up.cpp
     src/tuning_machine/start.cpp
     src/tuning_machine/prices.cpp PROPERTIES

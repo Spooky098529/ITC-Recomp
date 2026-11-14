@@ -81,6 +81,8 @@ const InitInfo kInits[kInitCount] = {
     {0x821CA458, "Type4Options::Init", 992, 26},
     {0x821C8578, "Type2ControllerOptions::Init", 800, 26},
     {0x821C8A60, "Type4ControllerOptions::Init", 800, 26},
+    {0x821CAAB0, "Type8Options::Init", 912, 27},
+    {0x821C8F48, "Type8ControllerOptions::Init", 800, 26},
 };
 
 #define ITC_OPTIONS_INIT(address, name, bytes)            \
@@ -95,6 +97,16 @@ InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t sp
     ITC_OPTIONS_INIT(821CA458, "Type4Options::Init", 992)
     ITC_OPTIONS_INIT(821C8578, "Type2ControllerOptions::Init", 800)
     ITC_OPTIONS_INIT(821C8A60, "Type4ControllerOptions::Init", 800)
+    // The type 8 mode's (no adapters; spelled out so the status check
+    // doesn't take the adapters' macro name for an override).
+    case 0x821CAAB0: {
+      ITC_NATIVE_RUNNING("sub_821CAAB0 Type8Options::Init");
+      return Run(base, k821CAAB0, object, sp, 912);
+    }
+    case 0x821C8F48: {
+      ITC_NATIVE_RUNNING("sub_821C8F48 Type8ControllerOptions::Init");
+      return Run(base, k821C8F48, object, sp, 800);
+    }
     default:
       break;
   }

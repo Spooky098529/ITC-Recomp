@@ -32,6 +32,11 @@ LongDouble12 DoubleToLd12(uint64_t bits);
 // left as it is), as the original.
 uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status);
 
+// _ld12tof (sub_825B70D0): the same with the float's format descriptor
+// (0x8266C52C: max_exp 128, min_exp -127, precision 24, exponent width 8,
+// bias 127): the float's bits.
+uint32_t Ld12ToFloat(const LongDouble12& value, uint16_t extra, int32_t* status);
+
 // write_char (sub_825AF000): printf's output of one character to a string
 // stream (+0 the pointer, +4 room left, +8 the buffer, +12 flags) with the
 // count at `count`: a string stream with no buffer (flag 0x40, +8 = 0)

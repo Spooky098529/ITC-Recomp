@@ -16,6 +16,459 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-14 05:01 (`b7-loop-13-11-26`)
+
+The C runtime core (`c-runtime-core.md`; replay `itc_5493` ok):
+sub_825AA400, sub_825AA448, sub_825AA4C0, sub_825AA580, sub_825B3260,
+sub_825A81E0, sub_825A8218, sub_825A8250, sub_825A8178, sub_825AFCC8,
+sub_825B68B8, sub_825AA158, sub_825AEDA0, sub_825AEDE8, sub_825B64F8,
+sub_825AA1B8, sub_825AD120, sub_825B49B0, sub_825B4C8C, sub_825B4D90,
+sub_825B8910, sub_82297940, sub_822979D0, sub_825B9BA8, sub_82294E20,
+sub_825BA168, sub_825AD638, sub_825AD670, sub_825AD688, sub_825AD6C0,
+sub_825B7958, sub_825B7A20, sub_825B7A58, sub_825B7880, sub_825B77E8,
+sub_825B4F38, sub_825ACF04, sub_825ACEB4, sub_825B4790, sub_825B0EE0,
+sub_825A85C0, sub_825AAF08, sub_825A8630, sub_825ABE30, sub_825ADD38,
+sub_825ADDD8, sub_825ADE90, sub_825ADEB0, sub_825B6098, sub_825B6140,
+sub_825B70D0 (most are error, exit and stream paths a drive won't
+take either).
+Its third migration (replay `itc_5505` ok): sub_825B0E88,
+sub_825B0E50, sub_825B1304, sub_825B4978, sub_825B6730, sub_825A9664,
+sub_825AD02C, sub_825AD488, sub_825AA338, sub_825B0D10, sub_825B0C28,
+sub_825B4828, sub_825BA510, sub_825B65D0, sub_825B6500, sub_825B9DD8,
+sub_825B11A8, sub_825B0F48, sub_82295D50, sub_825ACC78, sub_825B4CD0.
+Its fourth and fifth migrations (not validated with all harnesses;
+no game lines checked): the rows of `c-runtime-core.md` and
+`c-runtime.md` changed in cd2b4ad4..1360b0f8.
+
+The in-race screens never seen (`race-screens-unseen.md`; replay ok):
+all 94 Overridden and Native rows there (PauseMenu4, RaceResults,
+SplitResults, Kind6Menu), with `sub_822927B0` Network::SetLiveState,
+`sub_822914A8` Leaderboard::Rank, `sub_8225FFC8` Leaderboard::CarLogo,
+`sub_822189B8` RaceDialog::StartSave, `sub_82218AB0`
+RaceDialog::ShowSaving, `sub_82218918` RaceDialog::SetNote,
+`sub_8211C8A0` UiMovie::SetNodeCharText.
+
+## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
+
+Not in the attract race or the replay (`itc_5235`, `itc_5236`, ok; the
+cleanup leads: a race that ends, a car list with the power graph;
+`Achievements::Write` is listed under the run before):
+
+- `sub_82250670` CarList::DrawEntryPowerGraph
+- `sub_821644D8` RaceStates::OnRaceEnd
+- `sub_820FF458` Time::Add
+- `sub_82105BC8` CourseEntry::Clear
+- `sub_82105EA0` CourseRecord::Place
+- `sub_82105D60` CourseRecord::Link
+- `sub_82105DC8` CourseRecord::Unlink
+- `sub_82105E30` CourseRecord::Insert
+- `sub_82105F50` CourseRecord::Add
+- `sub_82105C18` CourseRecords::Save
+- `sub_820FFE08` RacerRecords::Add
+- `sub_82115190` Stats::AddRaceResult
+- `sub_82290788` Achievements::Check
+- `sub_82104F68` Replay::Keep
+
+Not in the attract race or the replay (`itc_5244`, `itc_5245`, ok; the
+morph jobs: a race with morphed wheels, `morph-jobs.md`):
+
+- `sub_820AC7F0` PoolMaker2::MakeMorphJob
+- `sub_820ACC08` MorphJob::MorphJob
+- `sub_820ACB90` MorphJob::~MorphJob
+- `sub_820AC9B8` MorphJob::Wait
+- `sub_820AC9D0` MorphJob::IsReleased
+- `sub_820AC9D8` MorphJob::SetReleased
+- `sub_820AC998` MorphJob::Run
+- `sub_820AC9C0` MorphJob::RunThunk
+- `sub_820AC8A0` PoolMaker::MakeSkinJob
+- `sub_820ACAA8` SkinJob::SkinJob
+- `sub_820AC9E8` Job::~Job
+- `sub_82090E08` WorkItem::Skip
+- `sub_82090E40` WorkItem::~WorkItem
+- `sub_82090E38` (the work item's +4 interface, slot 0)
+- `sub_82090DC8` (the work item's +4 interface, slot 1)
+
+Not in the attract race or the replay (`itc_5250`, `itc_5251`, ok; the
+save devices' teardown, run only when the game shuts down its
+framework):
+
+- `sub_820A6110` SaveDevices::~SaveDevices
+- `sub_820A56E8` SaveDevices::Destroy
+- `sub_820A55F0` SlotArray::Reset
+
+Not in the attract race or the replay (`itc_5258`, `itc_5259`, ok; the
+slot handlers: a save deleted, a device check, a failed save, the
+thumbnail):
+
+- `sub_820A45C0` SaveSlot::CheckDevice
+- `sub_820A5110` SaveSlot::SetThumbnail
+- `sub_820A51E0` SaveSlot::Delete
+- `sub_820A4890` SaveSlot::Failed
+- `sub_820A4800` SaveDevices::OnEvent
+- `sub_820A6010` SaveSlot::DeleteStep
+- `sub_820A5290` SaveSlot::WaitDelete
+- `sub_820A5190` SaveSlot::WaitThumbnail
+
+Not in the attract race or the replay (`itc_5265`, `itc_5266`, ok; the
+three small leads; the two clean-ups run only at the game's exit):
+
+- `sub_82094480` App::FrameDriverFromInterface8
+- `sub_82594230` TextureProvider::FindXprTexture
+- `sub_825DACA0` ZeroMatrix's clean-up
+- `sub_825DAC98` IdentityMatrix's clean-up
+
+Not in the attract race or the replay (`itc_5289`, `itc_5290`, ok; the
+sticker editor, `sticker-editor.md`: the tuning screen's sticker pages,
+placing, moving, rotating and scaling a sticker):
+
+- `sub_821FBD40` InputStickerAreas
+- `sub_821F9050` InputStickerSlots
+- `sub_821F9328` InputStickerOperate
+- `sub_821F9608` InputStickerEdit
+- `sub_821FBF18` InputStickerOrder
+- `sub_821FC270` InputStickerPicker
+- `sub_821F99A8` InputStickerMove
+- `sub_821F9D30` InputStickerRotate
+- `sub_821F9FB8` InputStickerScale
+- `sub_821F7000` InputStickerView
+- `sub_821F7298` UpdateSoloHold
+- `sub_821F7348` UpdatePreviewHold
+- `sub_821F73F8` StepUnlockedSticker
+- `sub_821F7518` AnimateStickerOperate
+- `sub_821F7F20` SetStickerEditTexts
+- `sub_821F8070` ShowSlotNode
+- `sub_821F8160` PlaceStickerNode
+- `sub_821F8868` DecalImages::SetSlot
+- `sub_821F8A50` AnimateStickerSlots
+- `sub_821F8D68` AnimateStickerEditMenu
+- `sub_821FA408` ShowSlotImage
+- `sub_821FA460` ShowStickerListImage
+- `sub_821FA508` AnimateStickerAreas
+- `sub_821FBA40` ShowStickerOrder
+- `sub_821FBB60` ShowStickerPicker
+- `sub_8211DE28` UiMovie::Unloop
+
+And the sticker commands (`itc_5299`, `itc_5300`, ok; the 12 helpers
+above checked again with their adapters gone):
+
+- `sub_821FC7B8` TuningScreen::Command32
+- `sub_821FCA80` TuningScreen::Command33
+- `sub_821FA658` TuningScreen::Command34
+- `sub_821FA9C0` TuningScreen::Command35
+- `sub_821FAA28` TuningScreen::Command36
+- `sub_821F8C30` TuningScreen::Command37
+- `sub_821FAD00` TuningScreen::Command38
+- `sub_821FB0B8` TuningScreen::Command39
+- `sub_821FCC48` TuningScreen::Command40
+- `sub_821FCED0` TuningScreen::Command41
+- `sub_821FD128` TuningScreen::Command43
+- `sub_821FD3F8` TuningScreen::Command44
+- `sub_821FB1F0` TuningScreen::Command45
+- `sub_821F8FC0` TuningScreen::Command46 (48, 50)
+- `sub_821FB450` TuningScreen::Command47
+- `sub_821FB6B0` TuningScreen::Command49
+- `sub_821FB8D8` TuningScreen::Command51
+
+Not in the attract race or the replay (`itc_5306`, `itc_5307`, ok; the
+stand's setters: the tuning screen's paint, stickers, decals, aero,
+interior and tires on the stand):
+
+- `sub_8217C6C8` GarageStage::SetColor
+- `sub_8217B078` GarageStage::SetColor0
+- `sub_8217B108` GarageStage::SetColor1
+- `sub_8217B198` GarageStage::SetColor2
+- `sub_8217B228` GarageStage::SetColor3
+- `sub_8217B2B8` GarageStage::SetColor4
+- `sub_8217B348` GarageStage::SetColor5
+- `sub_8217B3D8` GarageStage::SetSticker
+- `sub_821793D0` GarageStage::SetDecalWord
+- `sub_821F7B90` TuningScreen::ApplyAreaDecals
+- `sub_821FE4E0` TuningScreen::ApplyDecalWord
+- `sub_821CCAA8` TuningScreen::PreviewParts
+- `sub_821797A8` GarageStage::SetParts
+- `sub_8217DBC0` GarageStage::SetAeroSet
+- `sub_82179818` GarageStage::SetDecalA
+- `sub_821798D8` GarageStage::SetDecalB
+- `sub_82179050` GarageStage::SetInteriorWord
+- `sub_821791C0` GarageStage::SetInteriorLevel
+- `sub_82179250` GarageStage::SetInteriorPair
+- `sub_82179378` GarageStage::ClearChoice
+- `sub_82179548` GarageStage::SetAero
+- `sub_82178EC0` GarageStage::ReloadDecals
+- `sub_82179130` GarageStage::SetTireGrade
+- `sub_821CCA38` TuningScreen::SetTireGrade
+- `sub_821DFA78` TuningScreen::PreviewWheel
+
+And the stand's never-seen rows (`itc_5316`, `itc_5317`, ok):
+
+- `sub_82179310` GarageStage::SetChoice
+- `sub_821794A8` GarageStage::SetAero2
+- `sub_821794F8` GarageStage::SetDoorKind
+- `sub_821795E0` GarageStage::ClearLightKit
+- `sub_821792B0` GarageStage::SetAccessory
+- `sub_820D9F40` SceneModel::ApplyInterior
+- `sub_820E38E0` SceneInterior::SetRecord
+- `sub_821790D0` GarageStage::SetWheelExtras
+- `sub_820E7410` SceneWheels::SetWord68
+- `sub_820E7428` SceneWheels::SetCaliperTexture
+- `sub_821DA330` TuningScreen::SetCaliper
+- `sub_821CCBE8` TuningScreen::SetAccessory
+- `sub_821DF9D0` TuningScreen::RefitAxles
+- `sub_821E7E48` TuningScreen::PreviewInteriorChoices
+- `sub_821CC930` TuningScreen::PreviewLightKit
+- `sub_821E7DA0` UiNode::SetRgb
+- `sub_821F2110` TuningScreen::RefreshPaint
+- `sub_821F2378` TuningScreen::RefreshLightKits
+- `sub_821F7A98` TuningScreen::RefreshMovie14
+
+And the tuning pages' blockers (`itc_5322`/`itc_5325`, `itc_5323`, ok;
+`MakeModel` and `FitSelectedCar` ran in the replay):
+
+- `sub_821CE188` TuningScreen::IsSlotAvailable
+- `sub_821E9488` TuningScreen::SetPaintGradients
+- `sub_821EA130` TuningScreen::SetLightKind0Bars
+- `sub_821EAE68` TuningScreen::SetLightKind1Bar
+- `sub_821F2AD8` TuningScreen::RefreshInterior
+- `sub_821F35C0` TuningScreen::Command10
+- `sub_821EA460` TuningScreen::Command13
+- `sub_821EAFA0` TuningScreen::Command14
+
+Not in the attract race or the replay (`itc_5333`, `itc_5334`, ok; the
+type 6 and 7 modes' small pieces: the controller options' pages,
+leaving the type 6 and 7 screens; `DecalImages::UnloadAll` ran in the
+replay):
+
+- `sub_821BB290` ControllerOptions::StepSliders
+- `sub_821BB3B8` ControllerOptions::StepButtons
+- `sub_821BB590` ControllerOptions::StepAnalog
+- `sub_821C0238` ControllerOptions::SetMarkY
+- `sub_82249C20` GroupPair::~GroupPair
+- `sub_82249CB0` SingleGroup::SingleGroup
+- `sub_82249CC8` SingleGroup::Reset
+- `sub_82249BE8` PanelFade::In
+- `sub_8224CB18` MachineScreen::~MachineScreen
+- `sub_82230668` Type6PanelScreen::~Type6PanelScreen
+- `sub_82240168` Type7PanelScreen::~Type7PanelScreen
+- `sub_82230B00` Type6PanelScreen::DeletingDestructor
+- `sub_82231CC0` PanelGroup::~PanelGroup
+- `sub_82240348` PanelGroup::DeletingDestructor
+- `sub_8224EF08` PanelGroupBase::~PanelGroupBase
+- `sub_8224AC98` PanelSetInterface::DeletingDestructor
+- `sub_8224FB10` ListNode::~ListNode
+- `sub_8224B708` PanelSet::~PanelSet
+- `sub_8224AE60` PanelSetBase::~PanelSetBase
+
+The type 6 and 7 list screens, part 1 (`itc_5349`, `itc_5350`, ok; the
+type 6 and 7 modes' list, panel and node screens):
+
+- `sub_82251F98` ListScreen::Show
+- `sub_82251520` ListScreen::Draw
+- `sub_822517B8` ListScreen::Update
+- `sub_82251580` ListScreen::Suspend
+- `sub_82251590` ListScreen::Resume
+- `sub_822517A0` ListScreen::Open
+- `sub_82251EC8` ListScreen::SetUpMovie
+- `sub_82251E10` ListScreen::SetArrows` (probably)
+- `sub_82251C30` ListScreen::SetIcons` (probably)
+- `sub_822336C0` Type6ListScreen::SetItemTexts` (probably)
+- `sub_822337B0` Type6ListScreen::Back
+- `sub_822334C8` Type6ListScreen::SetUpRace
+- `sub_82233378` Type6ListScreen::SetUpMenus
+- `sub_82233730` Type6ListScreen::ShowMarks` (probably)
+- `sub_82237008` Type6ListScreen::ItemInfo
+- `sub_822332D8` Type6ListScreen::~Type6ListScreen
+- `sub_82233478` Type6ListScreen::DeletingDestructor
+- `sub_82257558` TitledListScreen::Reset
+- `sub_822579E8` TitledListScreen::Draw
+- `sub_82258998` TitledListScreen::Update
+- `sub_82257148` TitledListScreen::Page2
+- `sub_822572F0` TitledListScreen::Page3
+- `sub_82257360` TitledListScreen::Page4
+- `sub_82257490` TitledListScreen::Page7
+- `sub_82255818` ListScreen::LeavePage
+- `sub_82257D48` TitledListScreen::Step0
+- `sub_82257FF8` TitledListScreen::Step1
+- `sub_822580E0` TitledListScreen::Step2
+- `sub_82257B78` TitledListScreen::OnItemMoved
+- `sub_82257138` TitledListScreen::~TitledListScreen
+- `sub_82257990` TitledListScreen::DeletingDestructor
+- `sub_82257060` NodeListScreen::LoadItem` (probably)
+- `sub_82256FE8` NodeListScreen::ItemInfo
+- `sub_82257000` NodeListScreen::~NodeListScreen
+- `sub_82257940` NodeListScreen::DeletingDestructor
+- `sub_82255238` ColorListScreen::LoadItem` (probably)
+- `sub_82251EB8` ListScreen::~ListScreen
+- `sub_82252248` ListScreen::DeletingDestructor
+- `sub_822518B0` ListScreen::ShowSelection` (probably)
+- `sub_82251A20` ListScreen::LoopItemNode
+- `sub_82251B80` ListScreen::LoopSecondNode
+- `sub_82251AD0` ListScreen::LoopThirdNode
+- `sub_82251D00` ListScreen::SetScrollText` (probably)
+- `sub_82251DA0` ListScreen::ClearScrollText` (probably)
+- `sub_82252068` ListScreen::OnToggleMoved` (probably)
+- `sub_82252198` ListScreen::ShowToggle` (probably)
+- `sub_82247DC0` NodeTable::~NodeTable
+- `sub_82247CB8` NodeTable::SetPairs` (probably)
+- `sub_82247DD0` ColorNodeTable::Clear` (probably)
+- `sub_82247E00` ColorNodeTable::Set` (probably)
+- `sub_82247E88` NodeTable::DeletingDestructor
+- `sub_82248300` NodeTable::Show
+- `sub_82247ED0` NodeTable::ShowNode
+- `sub_822480F0` NodeTable::SetMarks
+- `sub_82247CE0` PairedNodeTable::SavePairs
+- `sub_82248800` PairedNodeTable::Refresh
+- `sub_82247E50` ColorNodeTable::SavePairs
+- `sub_82248650` ColorNodeTable::Reset
+- `sub_822483B0` ColorNodeTable::Refresh
+- `sub_822487B8` ColorNodeTable::MarkSelected` (probably)
+- `sub_82248198` ColorNodeTable::SetColors
+- `sub_82248260` ColorNodeTable::ClearColors
+- `sub_82252430` ListPartBase::Open` (probably)
+- `sub_82252490` ListPartBase::Pick` (probably)
+- `sub_82252500` ListPartBase::Input` (probably)
+- `sub_82252530` ListPartBase::Close` (probably)
+- `sub_82252590` ListPartBase::IsIdle` (probably)
+- `sub_822525B8` ListPartBase::CanLeave` (probably)
+- `sub_82252968` ListPart::~ListPart
+- `sub_82252A38` ListPart::DeletingDestructor
+- `sub_822526F8` ListPartInner::~ListPartInner
+- `sub_82252600` ListPartInnerBase::~ListPartInnerBase
+- `sub_82252420` ListPartBase::~ListPartBase
+- `sub_82252610` ListPartBase::DeletingDestructor
+- `sub_82252658` ListPartInnerBase::DeletingDestructor
+- `sub_822529B0` ListPartInner::DeletingDestructor
+- `sub_82252A88` ListPartInner::Open
+- `sub_82252A00` ListPartInner::Pick
+- `sub_82252DF0` ListPartInner::Input
+- `sub_82252748` ListPartInner::IsIdle` (probably)
+- `sub_82252740` ListPartInner::Close
+- `sub_822528C8` ListPartInner::CanLeave` (probably)
+- `sub_82252778` ListPartInner::Page0
+- `sub_82252878` ListPartInner::Page1
+- `sub_822528A8` ListPartInner::Page2
+- `sub_82252BB8` ListPartInner::Step0
+- `sub_82252C98` ListPartInner::Step1
+- `sub_82252D38` ListPartInner::Step2
+- `sub_822404D8` PanelScreen::OpenEmpty` (probably)
+- `sub_822609E0` PanelScreen::OnYes
+- `sub_822609D0` PanelScreen::OnNo
+- `sub_822306D0` PanelScreen::OnBack
+- `sub_822306E0` PanelScreen::OnDialogClosed
+- `sub_82248DE0` PanelScreen::Suspend
+- `sub_8223E708` Type6PanelScreen::Back
+- `sub_822307D0` Type6PanelScreen::CarList
+- `sub_822307E0` Type6PanelScreen::CarEntry
+- `sub_822307F0` Type6PanelScreen::CarSlot
+- `sub_8224ACE0` GroupPair::DeletingDestructor
+- `sub_82259318` NodeScreen::Open
+- `sub_82259998` NodeScreen::ItemInfo
+
+And part 2 (`itc_5377`, `itc_5378`, ok; the color list, the type 7
+list, the node screen, the panel screens):
+
+- `sub_82105BF8` CourseRecords::Of
+- `sub_82243238` Type7ListScreen::SetItemText
+- `sub_822432A8` Type7ListScreen::ClearItemText
+- `sub_822434C8` Type7ListScreen::Back
+- `sub_82243018` Type7ListScreen::SetUpRace
+- `sub_82243588` Type7ListScreen::SetUpMenus
+- `sub_822433D8` Type7ListScreen::SetTitle
+- `sub_82243308` Type7ListScreen::SetDetails
+- `sub_82243448` Type7ListScreen::ShowMarks
+- `sub_82242FA0` Type7ListScreen::ItemInfo
+- `sub_82242EC8` Type7ListScreen::~Type7ListScreen
+- `sub_82242FC8` Type7ListScreen::DeletingDestructor
+- `sub_82255200` ColorListScreen::Reset
+- `sub_82256CA0` ColorListScreen::Draw
+- `sub_82256E08` ColorListScreen::Update
+- `sub_822552B8` ColorListScreen::Page2
+- `sub_82255490` ColorListScreen::Page3
+- `sub_82255658` ColorListScreen::Page4
+- `sub_82256508` ColorListScreen::Page5
+- `sub_822565A0` ColorListScreen::Page6
+- `sub_822557F0` ColorListScreen::Page7
+- `sub_822562E0` ColorListScreen::Page9
+- `sub_82258578` ColorListScreen::Step0
+- `sub_82255890` ColorListScreen::Step1
+- `sub_82256740` ColorListScreen::Step2
+- `sub_82255B58` ColorListScreen::Step3
+- `sub_82256908` ColorListScreen::Step4
+- `sub_82255C88` ColorListScreen::RunMovie
+- `sub_82255CD0` ColorListScreen::Step6
+- `sub_82256AC0` ColorListScreen::Step7
+- `sub_82256030` ColorListScreen::Step8
+- `sub_82255EB0` ColorListScreen::Step10
+- `sub_822561D0` ColorListScreen::PlaceItemCursor
+- `sub_82256258` ColorListScreen::PlaceColorCursor
+- `sub_82256360` ColorListScreen::ShowPartNodes
+- `sub_82255198` ColorListScreen::~ColorListScreen
+- `sub_82255840` ColorListScreen::DeletingDestructor
+- `sub_82230F40` Type6PanelScreen::Draw
+- `sub_82240958` Type7PanelScreen::Draw
+- `sub_82230EF0` Type6PanelScreen::DrawList
+- `sub_82240908` Type7PanelScreen::DrawList
+- `sub_82230BA8` Type6PanelScreen::AskQuit (probably)
+- `sub_82240518` Type7PanelScreen::AskQuit (probably)
+- `sub_82230C88` Type6PanelScreen::PickCar
+- `sub_82259CA0` NodeScreen::Show
+- `sub_8225A1B8` NodeScreen::Draw
+- `sub_8225A2C0` NodeScreen::Update
+- `sub_82259D80` NodeScreen::Page2
+- `sub_822590E8` NodeScreen::Page4
+- `sub_82259328` NodeScreen::Page5
+- `sub_82259EC0` NodeScreen::Step0
+- `sub_82259680` NodeScreen::Step1
+- `sub_82259750` NodeScreen::Step2
+- `sub_82259A78` NodeScreen::ShowSelection
+- `sub_82259B70` NodeScreen::OnToggleMoved
+- `sub_822599B0` NodeScreen::Refresh
+- `sub_82259410` NodeScreen::ShowRecords
+- `sub_82259368` NodeScreen::SetArrows
+- `sub_82259050` NodeScreen::LoadItem
+- `sub_82236F00` Type6NodeScreen::SetUpMenus
+- `sub_822370A0` Type6NodeScreen::SetText (probably)
+- `sub_82237110` Type6NodeScreen::Back
+- `sub_82237160` Type6NodeScreen::SetIcons (probably)
+- `sub_82237228` Type6NodeScreen::SetScrollText (probably)
+- `sub_822372A0` Type6NodeScreen::ShowMarks (probably)
+- `sub_82247FE0` NodeScreen::SetUpTexts (probably)
+- `sub_82259948` NodeScreen::~NodeScreen
+- `sub_8225A168` NodeScreen::DeletingDestructor
+- `sub_82237048` Type6NodeScreen::DeletingDestructor
+- `sub_82236EA0` Type6NodeScreen::~Type6NodeScreen
+- `sub_822367C0` Type6Screens::~Type6Screens
+- `sub_82236830` Type6Screens::DeletingDestructor
+- `sub_82246BE0` Type7Screens::~Type7Screens
+- `sub_82246C40` Type7Screens::DeletingDestructor
+
+The type 8 mode's screens (`itc_5394`, `itc_5395`, ok; the type 8 mode,
+probably the two-player mode, the title's main menu item 4): every
+function in `type8-screens.md` with Status Overridden or Native (126,
+listed there), and:
+
+- `sub_8224E878` CarPanelBase::SetCarName
+- `sub_8224E490` Panel6C::SetStats
+- `sub_8224D7E0` CarPanelBase::~CarPanelBase
+- `sub_8224EBB0` ConfirmPanel::ConfirmPanel
+- `sub_8224B750` PanelSetPair::PanelSetPair
+- `sub_8224B830` PanelSetPair::~PanelSetPair
+- `sub_8224CA30` PanelSetPair::DeletingDestructor
+- `sub_8224CAE0` PanelSetPair::Build
+- `sub_822498C0` PanelSetPair::Reset
+- `sub_822499F0` PanelSetPair::Open
+- `sub_8224CA80` PanelSetPair::HandleInput
+- `sub_8224CF20` PanelSetPair::Update
+- `sub_82249B60` PanelSetPair::Picked
+- `sub_82105678` SaveData::TwoPlayerBlock
+
+The type 8 mode (`itc_5425`, `itc_5426`, ok): every function in
+`type8-mode.md` (52), and `sub_822508F0` Screen::Wait, `sub_822419D0`
+Type7Dialog::QueueReopen, `sub_822326A8` Dialog::OpenNoticeStep,
+`sub_8223AAA8` Dialog::CloseNoticeStep, `sub_821CAAB0`
+Type8Options::Init, `sub_821C8F48` Type8ControllerOptions::Init,
+`sub_821A87F0` Type8SaveScreen::Init, `sub_82105740`
+SaveData::CreateTwoPlayerBlock.
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

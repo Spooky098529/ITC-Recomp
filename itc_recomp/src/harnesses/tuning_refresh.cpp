@@ -694,11 +694,42 @@ void TuningRefresh(Context& h) {
           Fill(base, frame - 8 - saves, saves, 0);
           Fill(base, frame - size + 40, 40, 0);
         }
+        // Since RefreshLightKits is native (B7 loop, 2026-11-13), states 21
+        // and 22 run PreviewLightKit's plain C++ and, under it,
+        // GarageStage::SetLightKit's, where the recompiled side runs their
+        // originals: PreviewLightKit's lr save under RefreshLightKits' frame,
+        // SetLightKit's f29 to f31 saves under PreviewLightKit's 112-byte
+        // frame and ScenePools::GetB's under SetLightKit's 176-byte one (its
+        // r30, r31 and lr saves, its back chain).
+        if (st == 21 || st == 22) {
+          const uint32_t kits = frame - 144, preview = kits - 112, light = preview - 176;
+          Fill(base, kits - 8, 4, 0);
+          Fill(base, preview - 24, 24, 0);
+          Fill(base, light - 24, 20, 0);
+          Fill(base, light - 112, 4, 0);
+        }
         // RefreshInterior's callee PreviewInteriorChoices (sub_821E7E48,
         // state 57) saves r23, which RefreshInterior doesn't set: the
         // refresh's (0x826D83E0 in the original).
         if (size == 176) {
           Fill(base, frame - size - 80, 8, 0);
+        }
+        // Since RefreshInterior is native (B7 loop, 2026-11-13), state 57
+        // runs PreviewInteriorChoices' plain C++ where the recompiled side
+        // runs its original: what its own cases leave out (car_makers.cpp),
+        // under RefreshInterior's 176-byte frame: its r22 to r31 and lr
+        // saves (88), the setters' originals' saves under its 208-byte frame
+        // (32) and ApplyRecord's and GetB's under theirs (logged from the
+        // recompiled runs).
+        if (st == 57) {
+          const uint32_t interior = frame - 176;
+          Fill(base, interior - 88, 88, 0);
+          Fill(base, interior - 208 - 32, 32, 0);
+          static constexpr std::pair<uint32_t, uint32_t> kSetters[] = {
+              {412, 4}, {308, 20}, {428, 4}, {324, 20}, {320, 56}, {304, 56}};
+          for (const auto& [at, bytes] : kSetters) {
+            Fill(base, interior - at - bytes, bytes, 0);
+          }
         }
         // PreviewItem's (160-byte frame) as its own cases leave them out:
         // the 32 under its frame (its guest callees' saves of the caller's
@@ -720,6 +751,39 @@ void TuningRefresh(Context& h) {
         // frame (r29 to r31 and lr).
         Fill(base, frame - 88, 88, 0);
         Fill(base, frame - 176 - 32, 32, 0);
+        // Since GarageStage::SetLightsOn's adapter went (B7 loop,
+        // 2026-11-13), the recompiled refresh calls its original, whose
+        // ScenePools::GetB original under its 112-byte frame the native one
+        // doesn't run: GetB's r30, r31 and lr saves and its frame's back
+        // chain and +8 (logged from the recompiled runs).
+        Fill(base, frame - 112 - 24, 20, 0);
+        Fill(base, frame - 112 - 112, 12, 0);
+        // And, since the stand's setters' adapters went (B7 loop,
+        // 2026-11-13), the originals the recompiled PickCameraPreset (its
+        // 112-byte frame) and PreviewItem (its 160-byte one) call:
+        // SetWord5016's r31 and lr saves and the setters' GetB's under their
+        // 96- and 112-byte frames (TuningScreen::SetTireGrade's
+        // GarageStage::SetTireGrade's under it), the setters' and
+        // ApplyRecord's saves and SetTireTextures' lr.
+        {
+          const auto get_b = [&](uint32_t caller) {
+            Fill(base, caller - 24, 20, 0);
+            Fill(base, caller - 112, 4, 0);
+          };
+          const uint32_t pick = frame - 112, items = frame - 160;
+          Fill(base, pick - 16, 16, 0);
+          // GarageStage::FitSelectedCar's original (no adapter since
+          // 2026-11-13) under PickCameraPreset's frame: its r29 to r31, f30,
+          // f31 and lr saves.
+          Fill(base, pick - 48, 48, 0);
+          get_b(pick - 96);
+          get_b(items - 96);
+          get_b(items - 112);
+          get_b(items - 224);
+          Fill(base, items - 136, 24, 0);
+          Fill(base, items - 96 - 56, 56, 0);
+          Fill(base, items - 324, 12, 0);
+        }
         // States 15 to 17: the recompiled SetStateTexts' parameter area (its
         // 224-byte frame's +40 to +79, where the varargs SetText and
         // SetNodeText it calls store r7 to r10: unset ones passed 0 natively,
@@ -959,6 +1023,31 @@ void TuningRefresh(Context& h) {
                {{3, 0}, {5, 1}, {4, 4}, {3, 1}, {5, 1}, {4, 4}, {3, 2}, {5, 1}, {4, 4},
                 {4, 0}, {4, 3}, {5, 0}, {5, 2}, {6, 0}, {1, 3}, {0, 0}, {2, 0}, {6, 3}},
                300);
+
+  // The pages never seen in play (B7 loop, 2026-11-13: RefreshPaint,
+  // RefreshLightKits, RefreshMovie14, RefreshInterior and their callees),
+  // a group of its own after state 8's: states 18 to 22 and 38 to 58 in
+  // turn (six rounds), the world as states 7's and 8's (the list pages'
+  // sub-scenes 28 to 33 real), the category and item at random as the
+  // first group's.
+  {
+    Random rp(0x5265667265736812ull);  // "Refresh", 18
+    Results resultsp("TuningScreen::Refresh (sub_821E3AD0) pages 18 to 58");
+    static constexpr uint32_t kPages[] = {18, 19, 20, 21, 22, 38, 45, 52,
+                                          53, 54, 55, 56, 57, 58};
+    constexpr uint32_t kPageCount = sizeof(kPages) / sizeof(kPages[0]);
+    for (int c = 0; c < int(6 * kPageCount); c++) {
+      const uint32_t state = kPages[uint32_t(c) % kPageCount];
+      const uint32_t category = rp.Below(10) == 0 ? 0xFFFFFFFFu : rp.Below(7);
+      const uint32_t count = category < 7 ? kItemCounts[category] : 10;
+      const uint32_t item = rp.Below(10) == 0 ? rp.Below(256) : rp.Below(count);
+      run(rp, resultsp, c, state, category, item, [&](uint32_t movie) {
+        LayTuningStandTires(base, block, rp);
+        LaySubScenes(base, sub_scenes, movie, rp);
+      });
+    }
+    resultsp.Report();
+  }
 
   // TuningScreen::Update (sub_821E6C50, src/tuning_screen/update.cpp), a
   // group of its own after the refresh's: the same world (the refresh runs

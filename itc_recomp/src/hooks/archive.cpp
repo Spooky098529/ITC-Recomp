@@ -28,7 +28,7 @@ ITC_FLAG_BOOL(native_archive, true, "ITC",
               "sub_82294BA8 and sub_82294C00; the slot lookup, sub_8209D818; "
               "Archive::FindLooseFile, sub_8209D8D8; the queue's and the slots' static "
               "set-ups, sub_825D9160 and sub_825D91B0, with List::List, sub_82294B80, and "
-              "ListNode::ListNode, sub_82294B68; the request finish, sub_8209D688; "
+              "ListNode::ListNode, sub_82294B68; ListNode::~ListNode, sub_8224FB10; the request finish, sub_8209D688; "
               "LoaderFunctor::Invoke, sub_8209DD80; Ucl::Unpack, sub_82294610, with its "
               "block's NRV2B unpacking, sub_822947F8; Archive::Load, sub_8209DE48, with the "
               "queueing, sub_8209DC18; Archive::WaitIdle, QueueLength and CancelQueued, "
@@ -102,6 +102,12 @@ ITC_ARCHIVE_WORD(8209D868, archive::Toc(base, ctx.r3.u32))
 // Archive::AssetSize: r3 = an asset id. Its r31 is restored and r11 read by
 // no caller.
 ITC_ARCHIVE_WORD(820A0678, archive::AssetSize(base, ctx.r3.u32))
+// ListNode::~ListNode (from the panel screens' and the slots' clean-ups,
+// recompiled; never seen in play): r3 left.
+extern "C" REX_FUNC(sub_8224FB10) {
+  ITC_ARCHIVE_FALLBACK(8224FB10)
+  archive::NodeDestruct(base, ctx.r3.u32);
+}
 
 // The static set-ups: no arguments; r3 = atexit's. The original runs when
 // the native atexit can't (c_runtime's flags), as SignInWatch::StaticInit's.

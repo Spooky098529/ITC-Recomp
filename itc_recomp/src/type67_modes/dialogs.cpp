@@ -201,6 +201,31 @@ uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const
   return 1;
 }
 
+uint64_t DialogNoticeStep(uint8_t* base, uint32_t dialog, bool close, uint32_t sp,
+                          const Calls& calls) {
+  if (close) {
+    ITC_NATIVE_RUNNING("sub_8223AAA8 Dialog::CloseNoticeStep");
+  } else {
+    ITC_NATIVE_RUNNING("sub_822326A8 Dialog::OpenNoticeStep");
+  }
+  const uint32_t frame = sp - 112;
+  StoreU32(base, frame, sp);
+  StoreU32(base, frame + 80, 19);
+  const uint32_t movie =
+      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  if (LoadU32(base, dialog + 9664) == 0) {
+    menu_sounds::PlayMenuSound(base, 5, frame, Sounds(calls));
+    ui_movies::PlayNamed(base, movie, close ? 3 : 2, 0, 0, 0, 0);
+    StoreU32(base, dialog + 9664, 1);
+  }
+  const bool done =
+      uint32_t(calls.call(kRun, frame, close ? 0x8223AB20 : 0x82232720, movie, 0)) == 0;
+  if (done && close) {
+    StoreU32(base, dialog + 9740, 9);
+  }
+  return done ? 1 : 0;
+}
+
 uint64_t DialogConfirmPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type7,
                            uint32_t sp, const Calls& calls) {
   if (type7) {

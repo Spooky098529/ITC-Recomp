@@ -48,7 +48,8 @@ void Through(uint8_t* base, uint32_t transition, uint32_t page) {
 
 }  // namespace
 
-uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
+uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
+                  bool multiplayer_items) {
   ITC_NATIVE_RUNNING("sub_82222700 TitleScreen::MainMenu");
   const uint32_t frame = Frame(base, sp, 144);
   for (uint32_t k = 0; k < 7; k++) {
@@ -70,6 +71,14 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
       return s;
     }
     bool leave = false;  // items 1, 2 and 5: the item kept, then the page
+    if (!multiplayer_items && (s == 3 || s == 4)) {
+      // Multiplayer bypassed (the user's calls, 2026-11-14): Xbox Live (3,
+      // the type 12 mode) and split screen (4, the controller pick, then the
+      // type 8 mode) are silent, answered as an input the menu ignores (no
+      // accept): no sound, the item, page and cursor left as they are, and
+      // r3 0, MenuList::Accepted's r3 on that path.
+      return 0;
+    }
     switch (s) {
       case 0:
         Through(base, 11, 3);

@@ -107,9 +107,10 @@ screens' helpers `sub_82211CE0`, `sub_82211CF8`, `sub_82211E90`,
 `sub_82211F18` (`race-hud-object.md`). Not here: `sub_82150E00` (the
 race's end, `RaceMode::ModeAfterRace` in [`race-end.md`](race-end.md)), `sub_82293358` and
 `sub_82292828` under `sub_82293460` (a lead), `sub_82260800` (under the
-race mode's +32 slot 0, never run; not read), and the race mode's slots
-8 and 9 (`sub_8223D960`, `sub_8223DA00`, in the front end's range, not
-seen in play; not read).
+race mode's +32 slot 0, never run; not read), and `sub_8223D960`, `sub_8223DA00`
+(taken here for the race mode's slots 8 and 9: they are the type 8
+mode's +32 vtable `0x82006D54`, which follows the race mode's eight
+slots; `ModeType8::Interrupt` and `ForceExit` in [`type8-mode.md`](type8-mode.md)).
 
 Ready (by `b7_groups.py`, 2026-11-04): `Init`, `Start`, `Begin`,
 `OnCourseReady`, `WaitDraw`, `LoadingScreen::Show` (with

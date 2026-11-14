@@ -197,8 +197,19 @@ uint32_t Holder(uint8_t* base) { return Load(base, Load(base, kStandHolder)); }
 
 }  // namespace
 
+uint64_t FitSelectedCar(uint8_t* base, const tuning_screen::GuestCall& call, const StandFit& fit,
+                        uint32_t holder, uint64_t r4, uint64_t r5, uint32_t frame, uint32_t lr) {
+  if (fit.calls == nullptr) {
+    return call(kFitSelectedCar, {holder, r4, r5}, frame, lr);
+  }
+  double f1 = 0.0;
+  const uint64_t r3 = tuning_screen::FitSelectedCar(base, *fit.calls, holder, r4, r5, frame, &f1);
+  *fit.f1 = f1;
+  return r3;
+}
+
 uint64_t LeaveVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
-                        uint32_t sp, bool native_slots) {
+                        uint32_t sp, bool native_slots, const StandFit& fit) {
   ITC_NATIVE_RUNNING("sub_82201B40 TuningScreen::LeaveVinylView");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 128);
@@ -210,7 +221,7 @@ uint64_t LeaveVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uin
     return asked.r3;
   }
   Store(base, s + 10012, 8);
-  call(kFitSelectedCar, {Holder(base), 0, 0}, frame, 0x82201BFC);
+  FitSelectedCar(base, call, fit, Holder(base), 0, 0, frame, 0x82201BFC);
   tuning_screen::FinishNamed(call, frame, 0x82201C08, movie, 241);
   uint64_t r3 = tuning_screen::PlayNamed(call, frame, 0x82201C24, movie, 241, 1);
   const int32_t area = int32_t(Load(base, s + 30724));
@@ -223,7 +234,7 @@ uint64_t LeaveVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uin
 }
 
 uint64_t InputVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
-                        uint32_t sp, bool native_slots) {
+                        uint32_t sp, bool native_slots, const StandFit& fit) {
   ITC_NATIVE_RUNNING("sub_82202928 TuningScreen::InputVinylView");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 112);
@@ -263,7 +274,7 @@ uint64_t InputVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uin
     call(kStageCommand, {Holder(base), 1}, frame, 0x82202BE8);
     call(kCameraCommand, {Holder(base), 1}, frame, 0x82202BF8);
   }
-  return LeaveVinylView(base, call, screen, frame, native_slots);
+  return LeaveVinylView(base, call, screen, frame, native_slots, fit);
 }
 
 void SetLastImage(uint8_t* base, uint32_t screen) {
@@ -285,7 +296,7 @@ void SetLastImage(uint8_t* base, uint32_t screen) {
 }
 
 uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
-                       uint32_t sp, bool native_slots) {
+                       uint32_t sp, bool native_slots, const StandFit& fit) {
   ITC_NATIVE_RUNNING("sub_821FF3A0 TuningScreen::MoveVinylMenu");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 128);
@@ -343,7 +354,7 @@ uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint
     finish(17, 0x821FF4D8);
     finish(page() + 6, 0x821FF4E8);
     Store(base, s + 10012, 5);
-    return call(kFitSelectedCar, {Holder(base), 0, 0}, frame, 0x821FF508);
+    return FitSelectedCar(base, call, fit, Holder(base), 0, 0, frame, 0x821FF508);
   } else if (asked(40, 158, 0x821FF530)) {
     // B: the same, nothing applied.
     finish(16, 0x821FF544);
@@ -470,7 +481,7 @@ uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, ui
       mode_tick::ScreenFadesFadeOut(base, Load(base, kFadeOutPasses), 0, 0, 0, 0);
     }
   }
-  return MoveVinylMenu(base, call, screen, frame, flags.native_slots);
+  return MoveVinylMenu(base, call, screen, frame, flags.native_slots, flags.fit);
 }
 
 namespace {

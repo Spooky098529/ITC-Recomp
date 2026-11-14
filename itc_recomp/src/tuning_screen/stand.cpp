@@ -15,6 +15,7 @@
 #include "guest.h"
 #include "race_setup/race_setup.h"
 #include "stand_models/stand_models.h"
+#include "type67_modes/type67_modes.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
@@ -35,6 +36,12 @@ void Store64(uint8_t* base, uint32_t address, uint64_t value) {
 }
 double Lfs(uint8_t* base, uint32_t address) {
   return double(std::bit_cast<float>(Load(base, address)));
+}
+void Stfs(uint8_t* base, uint32_t address, double value) {
+  Store(base, address, std::bit_cast<uint32_t>(float(value)));
+}
+uint64_t Load64(uint8_t* base, uint32_t address) {
+  return uint64_t(Load(base, address)) << 32 | Load(base, address + 4);
 }
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -461,6 +468,123 @@ uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
   return r3;
 }
 
+uint64_t ApplyAreaDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821F7B90 TuningScreen::ApplyAreaDecals");
+  const uint32_t frame = Frame(base, sp, 4160);
+  const uint32_t s = uint32_t(r3);
+  const int32_t kind = int32_t(Load(base, s + 10012));
+  const double zero = Lfs(base, kZero);
+  const double one = Lfs(base, 0x82000A30);
+  // GarageStage::SetSticker for slot `k` with the size memcpy'd from `size`
+  // to frame + 96 (the caller's argument word SetSticker reads), the
+  // position the doublewords at frame + 112 and + 120 (r8, r9).
+  auto sticker = [&](uint32_t size, uint32_t lr, uint32_t area, uint32_t k, uint32_t word,
+                     uint32_t flag, double f1) {
+    front_end_car_draw::Memcpy(base, stand.calls, frame + 96, size, 16, frame, lr);
+    r3 = stand_models::SetSticker(base, Holder(base), area, k, word, flag,
+                                  Load64(base, frame + 112), Load64(base, frame + 120), f1, frame);
+  };
+  if (kind == 1) {
+    // The area's five slots cleared: (0, 0, 0, 1.0) as the position and
+    // the size, the angle 0.0.
+    Stfs(base, frame + 112, zero);
+    Stfs(base, frame + 116, zero);
+    Stfs(base, frame + 120, zero);
+    Stfs(base, frame + 144, zero);
+    Stfs(base, frame + 124, one);
+    Stfs(base, frame + 148, zero);
+    Stfs(base, frame + 152, zero);
+    Stfs(base, frame + 156, one);
+    for (uint32_t k = 0; k < 5; k++) {
+      sticker(frame + 144, 0x821F7C00, Load(base, s + 30724), k, 0xFFFFFFFFu, 0, zero);
+    }
+    r3 = stand_models::ReloadDecals(base, stand.call, Holder(base), frame);
+    double f1 = 0.0;
+    r3 = FitSelectedCar(base, stand.calls, Holder(base), 0, 0, frame, &f1);
+  } else if (kind == 2) {
+    const uint32_t g = GarageCarOf(base, Load(base, s + kSaveData)) + 212;
+    const uint32_t car = frame + 176;
+    MakeCar(base, stand.calls, car, g, 1, frame, 0x821F7CBC, 0x821F7CD0);
+    const uint64_t pick = uint64_t(int64_t(int16_t(guest::LoadU16(base, g))));
+    double f1 = 0.0;
+    r3 = car_makers::GarageStageSetCar(base, stand.calls, stand.call, Holder(base), car, pick,
+                                       frame, &f1);
+  } else if (kind == 3) {
+    front_end_car_draw::GarageStageCommand(base, stand.calls, Holder(base), 58, frame);
+    const double offset = Lfs(base, 0x82002244);  // the mirrored angle's offset
+    const double mirror = Lfs(base, 0x82001BE0);  // probably -1.0
+    const double degree = Lfs(base, kDegree);
+    Stfs(base, frame + 120, zero);
+    Stfs(base, frame + 136, zero);
+    Stfs(base, frame + 124, one);
+    Stfs(base, frame + 140, one);
+    for (uint32_t k = 0; k < 5; k++) {
+      // The edited entry (+30832), else the area's saved one.
+      const uint32_t e =
+          int32_t(k) == int32_t(Load(base, s + 30732))
+              ? s + 30832
+              : uint32_t((uint64_t(Load(base, s + 30724)) * 5 + k) * 24 + s + 32360);
+      const int64_t x = int32_t(Load(base, e + 0));
+      // The scale's lfs then two stfs: its bits.
+      const uint32_t scale = Load(base, e + 12);
+      const int64_t y = int32_t(Load(base, e + 4));
+      Store(base, frame + 128, scale);
+      Store(base, frame + 132, scale);
+      const uint32_t a = Load(base, s + 30724);
+      double angle = Lfs(base, e + 8);
+      uint32_t flag = Load(base, e + 16);
+      double f1 = double(float(angle * degree));
+      Store64(base, frame + 160, uint64_t(x));
+      Store64(base, frame + 144, uint64_t(y));
+      Stfs(base, frame + 116, ToSingle(y));
+      const double fx = ToSingle(x);
+      Stfs(base, frame + 112, fx);
+      if (int32_t(a) == 2 || int32_t(a) == 7) {
+        // The mirrored sides: x and the angle mirrored, the flag inverted.
+        angle = double(float(angle - offset));
+        Stfs(base, frame + 112, double(float(fx * mirror)));
+        flag = flag == 0 ? 1 : 0;
+        angle = double(float(angle * mirror));
+        f1 = double(float(angle * degree));
+      }
+      const uint32_t word = Load(base, uint32_t(((uint64_t(a) + 1666) * 5 + k) << 2) + s);
+      sticker(frame + 128, 0x821F7DF8, a, k, word, flag, f1);
+    }
+    r3 = stand_models::ReloadDecals(base, stand.call, Holder(base), frame);
+  } else if (kind == 4) {
+    front_end_car_draw::GarageStageCommand(base, stand.calls, Holder(base), 1, frame);
+    type67_modes::GarageStageCameraCommand(base, Holder(base), 20, frame);
+    front_end_car_draw::GarageStageCommand(base, stand.calls, Holder(base),
+                                           Load(base, s + 30724) + 42, frame);
+    Stfs(base, frame + 112, zero);
+    Stfs(base, frame + 116, zero);
+    Stfs(base, frame + 120, zero);
+    Stfs(base, frame + 128, zero);
+    Stfs(base, frame + 124, one);
+    Stfs(base, frame + 132, zero);
+    Stfs(base, frame + 136, zero);
+    Stfs(base, frame + 140, one);
+    for (uint32_t k = 0; k < 5; k++) {
+      sticker(frame + 128, 0x821F7EC8, Load(base, s + 30724), k, 0xFFFFFFFFu, 0, zero);
+    }
+    r3 = stand_models::ReloadDecals(base, stand.call, Holder(base), frame);
+  }
+  Store(base, s + 10012, 0xFFFFFFFFu);
+  return r3;
+}
+
+uint64_t ApplyDecalWord(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FE4E0 TuningScreen::ApplyDecalWord");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t s = uint32_t(r3);
+  const int32_t kind = int32_t(Load(base, s + 10012));
+  if (kind == 9 || kind == 10) {
+    r3 = stand_models::SetDecalWord(base, call, Holder(base), kind == 9 ? 1 : 0, frame);
+  }
+  Store(base, s + 10012, 0xFFFFFFFFu);
+  return r3;
+}
+
 uint64_t DecalCommand(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
                       double* f1) {
   ITC_NATIVE_RUNNING("sub_822019D0 TuningScreen::DecalCommand");
@@ -496,21 +620,12 @@ uint64_t DecalCommand(uint8_t* base, const StandCalls& stand, uint32_t screen, u
 
 namespace {
 
-constexpr uint32_t kSetCaliper = 0x821DA330;     // TuningScreen::SetCaliper
-constexpr uint32_t kSetChoice = 0x82179310;      // GarageStage::SetChoice
-constexpr uint32_t kPreviewParts = 0x821CCAA8;   // TuningScreen::PreviewParts
-constexpr uint32_t kRefitAxles = 0x821DF9D0;     // TuningScreen::RefitAxles
-constexpr uint32_t kSetAero2 = 0x821794A8;       // GarageStage::SetAero2
-constexpr uint32_t kSetDoorKind = 0x821794F8;    // GarageStage::SetDoorKind
-constexpr uint32_t kSetAccessory = 0x821CCBE8;   // TuningScreen::SetAccessory
-constexpr uint32_t kSetColor = 0x8217C6C8;       // GarageStage::SetColor
-constexpr uint32_t kClearLightKit = 0x821795E0;  // GarageStage::ClearLightKit
 
 // The choice tables both write: A = (3, 2, 1, 0) at `a`, B = (2, 1, 0, 4, 3)
 // at `b`. Choice `k` from the word `v`: -1 GarageStage::ClearChoice, else
 // GarageStage::SetChoice(holder, k, A[v / 10], B[v % 10]) (signed, the
-// indexes unchecked: read as the original reads them) through the guest
-// with `lr`. Returns its r3.
+// indexes unchecked: read as the original reads them), its plain C++ (`lr`
+// the call's return address in the original). Returns its r3.
 uint64_t ApplyChoice(uint8_t* base, const GuestCall& call, uint32_t frame, uint32_t a,
                      uint32_t b, uint32_t k, uint32_t v, uint32_t lr) {
   if (int32_t(v) == -1) {
@@ -520,12 +635,203 @@ uint64_t ApplyChoice(uint8_t* base, const GuestCall& call, uint32_t frame, uint3
   const uint32_t d = v - uint32_t(q) * 10;
   const uint32_t first = Load(base, uint32_t(q) * 4 + a);
   const uint32_t second = Load(base, d * 4 + b);
-  return call(kSetChoice, {Holder(base), k, first, second}, frame, lr);
+  (void)lr;
+  return stand_models::SetChoice(base, call, Holder(base), k, first, second, frame);
 }
 
 }  // namespace
 
-uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp) {
+uint64_t SetCaliper(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t r4,
+                    uint32_t choice, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821DA330 TuningScreen::SetCaliper");
+  // The calipers' texture by the choice (unsigned), choice 0 by the
+  // selected garage car's id (its jump table: 4 gives 6; 7, 12 and 14 give
+  // 5; the others, and any above 22, 4).
+  uint32_t w;
+  switch (choice) {
+    case 0: {
+      const uint32_t id = Load(base, GarageCarOf(base, Load(base, screen + kSaveData)) + 224);
+      w = id == 4 ? 6 : id == 7 || id == 12 || id == 14 ? 5 : 4;
+      break;
+    }
+    case 1: w = 4; break;
+    case 2: w = 6; break;
+    case 3: w = 0; break;
+    case 4: w = 5; break;
+    default: w = 0; break;
+  }
+  return stand_models::SetWheelExtras(base, stand.call, stand.calls.poll, Holder(base), r4, w,
+                                      sp);
+}
+
+uint64_t SetAccessory(uint8_t* base, const GuestCall& call, uint32_t kind, uint32_t choice,
+                      uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821CCBE8 TuningScreen::SetAccessory");
+  // The kind turned around (unsigned): 0 becomes 3 with the choice 0, 1
+  // becomes 2 with the choices 3 and 4 swapped, 2 becomes 1, 3 and up 0.
+  uint32_t k;
+  switch (kind) {
+    case 0:
+      k = 3;
+      choice = 0;
+      break;
+    case 1:
+      k = 2;
+      if (int32_t(choice) == 3) {
+        choice = 4;
+      } else if (int32_t(choice) == 4) {
+        choice = 3;
+      }
+      break;
+    case 2: k = 1; break;
+    default: k = 0; break;
+  }
+  return stand_models::SetAccessory(base, call, Holder(base), k, choice, sp);
+}
+
+uint64_t RefitAxles(uint8_t* base, const StandCalls& stand, uint32_t screen, uint32_t sp,
+                    std::optional<double>* f1) {
+  ITC_NATIVE_RUNNING("sub_821DF9D0 TuningScreen::RefitAxles");
+  const uint32_t frame = Frame(base, sp, 4000);
+  const uint32_t garage = GarageCarOf(base, Load(base, screen + kSaveData)) + 212;
+  const uint32_t car = frame + 80;
+  MakeCar(base, stand.calls, car, garage, 1, frame, 0x821DFA3C, 0x821DFA50);
+  return stand_models::FitAxles(base, stand.call, Holder(base), car, frame, f1);
+}
+
+uint64_t PreviewInteriorChoices(uint8_t* base, const GuestCall& call, uint32_t screen,
+                                uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821E7E48 TuningScreen::PreviewInteriorChoices");
+  const uint32_t frame = Frame(base, sp, 208);
+  // A = (3, 2, 1, 0) at +80, B = (2, 1, 0, 4, 3) at +96 (A[4] is B[0]).
+  static constexpr uint32_t kTables[9] = {3, 2, 1, 0, 2, 1, 0, 4, 3};
+  for (uint32_t i = 0; i < 9; i++) {
+    Store(base, frame + 80 + 4 * i, kTables[i]);
+  }
+  const uint32_t a = frame + 80, b = frame + 96;
+  const auto low = [&] { return int32_t(Load(base, screen + 35708)) < 3; };
+  uint64_t r3 = 0;
+  uint32_t c = 0;
+  for (uint32_t i = 0; i < 5; i++) {
+    // The stand's choice for the code: 6, 5, 4; then the pairs by the
+    // interior level (+35708), the other of the pair cleared.
+    switch (i) {
+      case 0: c = 6; break;
+      case 1: c = 5; break;
+      case 2: c = 4; break;
+      case 3: {
+        const bool l = low();
+        stand_models::ClearChoice(base, call, Holder(base), l ? 2 : 0, frame);
+        c = l ? 0 : 2;
+        break;
+      }
+      default: {
+        const bool l = low();
+        stand_models::ClearChoice(base, call, Holder(base), l ? 3 : 1, frame);
+        c = l ? 1 : 3;
+        break;
+      }
+    }
+    const uint32_t w = Load(base, (i + 8450) * 4 + screen);
+    if (int32_t(w) == -1) {
+      r3 = stand_models::ClearChoice(base, call, Holder(base), c, frame);
+      continue;
+    }
+    const int32_t q = int32_t(w) / 10;
+    const uint32_t d = w - uint32_t(q) * 10;
+    const uint32_t first = Load(base, (uint32_t(q) << 2) + a);
+    const uint32_t second = Load(base, (d << 2) + b);
+    r3 = stand_models::SetChoice(base, call, Holder(base), c, first, second, frame);
+  }
+  // The slot +33576 picks the choice the same way (5 and up: the loop's
+  // last).
+  switch (Load(base, screen + 33576)) {
+    case 0: c = 6; break;
+    case 1: c = 5; break;
+    case 2: c = 4; break;
+    case 3: c = low() ? 0 : 2; break;
+    case 4: c = low() ? 1 : 3; break;
+    default: break;
+  }
+  const uint32_t second = Load(base, (Load(base, screen + 33572) << 2) + b);
+  const uint32_t first = Load(base, (Load(base, screen + 33564) << 2) + a);
+  (void)r3;
+  return stand_models::SetChoice(base, call, Holder(base), c, first, second, frame);
+}
+
+uint64_t PreviewLightKit(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                         std::optional<double>* f1) {
+  ITC_NATIVE_RUNNING("sub_821CC930 TuningScreen::PreviewLightKit");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t s = uint32_t(r3);
+  const int32_t state = int32_t(Load(base, s + kState));
+  const auto word = [&](uint32_t offset) { return int64_t(int32_t(Load(base, s + offset))); };
+  double f1v, f2, f3;
+  uint32_t group, kit_word, index;
+  if (state == 21) {
+    const int64_t c = word(30520), b = word(30516), a = word(30512);
+    index = Load(base, s + 30524);
+    group = Load(base, s + 30492);
+    Store64(base, frame + 80, uint64_t(c));
+    Store64(base, frame + 88, uint64_t(b));
+    Store64(base, frame + 96, uint64_t(a));
+    const double scale = Lfs(base, 0x820021FC);
+    f3 = double(float(ToSingle(c) * scale));
+    f2 = double(float(ToSingle(b) * scale));
+    f1v = double(float(ToSingle(a) * scale));
+    kit_word = 1;
+  } else if (state == 22) {
+    const int64_t c = word(30552);
+    group = Load(base, s + 30492);
+    kit_word = Load(base, s + 30548) + 2;
+    index = Load(base, s + 30556);
+    Store64(base, frame + 96, uint64_t(c));
+    const int64_t b = int64_t(int32_t(Load(base, (group + 7653) * 4 + s)));
+    const int64_t a = int64_t(int32_t(Load(base, (group + 7649) * 4 + s)));
+    Store64(base, frame + 88, uint64_t(a));
+    Store64(base, frame + 96, uint64_t(b));
+    const double scale = Lfs(base, 0x820021FC);
+    f3 = double(float(ToSingle(c) * scale));
+    f2 = double(float(ToSingle(b) * scale));
+    f1v = double(float(ToSingle(a) * scale));
+  } else {
+    return r3;
+  }
+  const uint64_t left = front_end_car_draw::GarageStageSetLightKit(
+      base, stand.calls, Holder(base), group, kit_word, index, f1v, f2, f3, frame);
+  *f1 = f1v;  // SetLightKit leaves f1 as given
+  return left;
+}
+
+uint64_t PreviewParts(uint8_t* base, const GuestCall& call, uint64_t r3, uint64_t pick,
+                      uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821CCAA8 TuningScreen::PreviewParts");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t s = uint32_t(r3);
+  auto at = [&](uint32_t offset) { return Load(base, s + offset); };
+  // The wing word: +36300, or with +25172 set 0 stays 0, 1 becomes 13 and
+  // any other value n becomes n - 1.
+  uint32_t w = at(36300);
+  if (at(25172) != 0) {
+    w = w == 0 ? 0 : w == 1 ? 13 : w - 1;
+  }
+  uint32_t kind;
+  if (int32_t(pick) == 0) {
+    r3 = stand_models::SetParts(base, call, Holder(base), at(36164), at(36252), at(36208),
+                                at(36544), at(36368), w, frame);
+    kind = 9;
+  } else {
+    r3 = stand_models::SetAeroSet(base, call, Holder(base), pick - 1, at(36368), w, frame);
+    kind = 10;
+  }
+  if (int32_t(at(36372)) == 1 && at(36376) == 0) {
+    Store(base, s + 10012, kind);
+  }
+  return r3;
+}
+
+uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t sp,
+                     std::optional<double>* f1) {
   ITC_NATIVE_RUNNING("sub_821E07B0 TuningScreen::PreviewItem");
   const uint32_t frame = Frame(base, sp, 160);
   const uint64_t screen = r3;
@@ -541,8 +847,9 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
   auto set_part = [&](uint32_t slot, uint32_t word) {
     r3 = stand_models::SetPart(base, call, Holder(base), slot, word, frame);
   };
-  auto guest = [&](uint32_t function, std::initializer_list<uint64_t> args, uint32_t lr) {
-    r3 = call(function, args, frame, lr);
+  auto refit = [&] { r3 = RefitAxles(base, stand, s, frame, f1); };
+  auto accessory = [&](uint32_t choice) {
+    r3 = SetAccessory(base, call, at(33548), choice, frame);
   };
   const int32_t state = int32_t(at(kState));
   if (state == 3 || state == 4) {
@@ -577,11 +884,11 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
     const int32_t now = int32_t(at(kState));
     if (now == 5) {
       if (available(i)) {
-        guest(kSetCaliper, {screen, i, 0}, 0x821E08DC);
+        r3 = SetCaliper(base, stand, s, i, 0, frame);
       }
     } else if (now == 7) {
       if (available(i)) {
-        guest(kSetCaliper, {screen, i, u8(kType2)}, 0x821E08DC);
+        r3 = SetCaliper(base, stand, s, i, u8(kType2), frame);
       }
     }
   } else if (m == 0) {
@@ -635,8 +942,8 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
       const uint32_t p = u8(kItem);
       uint64_t j = u8(kType);
       if (p == 9) {
-        guest(kPreviewParts, {screen, j}, 0x821E0C2C);
-        guest(kRefitAxles, {screen}, 0x821E0C34);
+        r3 = PreviewParts(base, call, screen, j, frame);
+        refit();
         return r3;
       }
       switch (p) {
@@ -661,7 +968,7 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
         case 7: set(25076, 11); break;
         case 8:
           set(25076, 12);
-          guest(kRefitAxles, {screen}, 0x821E0C14);
+          refit();
           break;
         default: break;
       }
@@ -680,19 +987,18 @@ uint64_t PreviewItem(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
   } else if (m == 5) {
     const int32_t p = int32_t(u8(kItem));
     if (p == 1) {
-      guest(kSetDoorKind, {Holder(base), u8(kOption)}, 0x821E0D00);
+      r3 = stand_models::SetDoorKind(base, call, Holder(base), u8(kOption), frame);
     } else if (p == 2) {
-      guest(kSetAero2, {Holder(base), u8(kType)}, 0x821E0CEC);
+      r3 = stand_models::SetAero2(base, call, Holder(base), u8(kType), frame);
     }
   } else if (m == 6) {
     const uint32_t p = u8(kItem);
     if (p == 3) {
       const int32_t now = int32_t(at(kState));
       if (now == 54) {
-        guest(kSetAccessory, {screen, at(33548), 0}, 0x821E0DF4);
+        accessory(0);
       } else if (now == 55) {
-        const uint32_t choice = at(33556);
-        guest(kSetAccessory, {screen, at(33548), choice}, 0x821E0DF4);
+        accessory(at(33556));
       }
       return r3;
     }
@@ -725,26 +1031,21 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
   auto set_part = [&](uint32_t slot, uint32_t word) {
     r3 = stand_models::SetPart(base, call, Holder(base), slot, word, frame);
   };
-  auto guest = [&](uint32_t function, std::initializer_list<uint64_t> args, uint32_t lr) {
-    r3 = call(function, args, frame, lr);
-    f1->reset();  // as the guest call left it
+  auto refit = [&](uint32_t) { r3 = RefitAxles(base, stand, s, frame, f1); };
+  // GarageStage::ClearLightKit's plain C++ (f1 left as it is: neither it nor
+  // SceneModel::ApplyLightKit changes it).
+  auto clear_kit = [&](uint32_t group) {
+    r3 = front_end_car_draw::GarageStageClearLightKit(base, stand.calls, Holder(base), group,
+                                                      frame);
   };
-  // A guest call with f1 to f3 (`count` of them), or with f1 as it is now
-  // (the value a native callee left it, when there is one).
-  auto with_floats = [&](uint32_t function, uint64_t r4, const double* floats, int count,
-                         uint32_t lr) {
-    const uint64_t regs[2] = {Holder(base), r4};
-    double now = 0.0;
-    if (count == 0 && f1->has_value()) {
-      now = **f1;
-      floats = &now;
-      count = 1;
-    }
-    double left = 0.0;
-    r3 = stand.calls.call(function, regs, 2, floats, count, frame, lr, &left);
-    *f1 = left;
+  // GarageStage::SetColor's plain C++ (ApplyPaint's and ApplyWheelPaint's
+  // with the load poll's calls); f1 left as given (neither paint changes
+  // it).
+  auto set_color = [&](uint32_t color, const double floats[3]) {
+    r3 = stand_models::SetColor(base, call, stand.calls.poll, Holder(base), color, floats[0],
+                                floats[1], floats[2], frame);
+    *f1 = floats[0];
   };
-  auto refit = [&](uint32_t lr) { guest(kRefitAxles, {screen}, lr); };
   const int32_t m = int32_t(at(kCategory));
   const uint32_t p = guest::LoadU8(base, s + kItem);
   if (m == 0) {
@@ -761,7 +1062,7 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
   } else if (m == 1) {
     if (p == 3) {
       const uint32_t choice = at(35496);
-      guest(kSetCaliper, {screen, at(35492), choice}, 0x821E10B0);
+      r3 = SetCaliper(base, stand, s, at(35492), choice, frame);
     }
   } else if (m == 2) {
     r3 = stand_models::SetInteriorLevel(base, call, Holder(base), at(35708), frame);
@@ -790,9 +1091,6 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
     }
     const uint32_t v = at(33816);
     r3 = ApplyChoice(base, call, frame, a, b, k, v, 0x821E1ACC);
-    if (int32_t(v) != -1) {
-      f1->reset();
-    }
   } else if (m == 3) {
     if (p < 3) {
       // T = (0, 1, 1, 2, 2) at frame + 128, indexed unchecked.
@@ -858,7 +1156,7 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
         refit(0x821E152C);
         break;
       case 9:
-        guest(kPreviewParts, {screen, at(36588)}, 0x821E1524);
+        r3 = PreviewParts(base, call, screen, at(36588), frame);
         refit(0x821E152C);
         break;
       default: break;
@@ -884,9 +1182,9 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
       }
       Store(base, s + 25244, 1);
     } else if (p == 1) {
-      guest(kSetDoorKind, {Holder(base), at(36612)}, 0x821E18BC);
+      r3 = stand_models::SetDoorKind(base, call, Holder(base), at(36612), frame);
     } else if (p == 2) {
-      guest(kSetAero2, {Holder(base), at(36636)}, 0x821E189C);
+      r3 = stand_models::SetAero2(base, call, Holder(base), at(36636), frame);
     } else if (p == 4) {
       // The paint: colors 0 and 1 from the halfword-sized fields as ints,
       // their conversions' doublewords at +88, +96 and +112.
@@ -905,13 +1203,13 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
         }
         const double floats[3] = {ToSingle(red), double(float(ToSingle(g) * scale)),
                                   double(float(ToSingle(blue) * scale))};
-        with_floats(kSetColor, color, floats, 3, color == 0 ? 0x821E17A4 : 0x821E17FC);
+        set_color(color, floats);
       }
       const int32_t x = int32_t(at(30488));
       if (x == 0) {
         const double zero = Lfs(base, kZero);
         const double floats[3] = {zero, zero, Lfs(base, 0x82001FBC)};
-        with_floats(kSetColor, 2, floats, 3, 0x821E187C);
+        set_color(2, floats);
       } else if (x == 1) {
         const int64_t red = int32_t(at(30476)), g = int32_t(at(30480));
         Store64(base, frame + 96, uint64_t(red));
@@ -919,7 +1217,7 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
         const double floats[3] = {ToSingle(red),
                                   double(float(ToSingle(g) * Lfs(base, 0x8200AD48))),
                                   Lfs(base, 0x82001070)};
-        with_floats(kSetColor, 2, floats, 3, 0x821E187C);
+        set_color(2, floats);
       }
     } else if (p == 5) {
       // The light kits: each group from the first kit (+30580 on) or the
@@ -965,7 +1263,7 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
           } else if (int32_t(at(30660 + 4 * g)) != 0) {
             second(g);
           } else {
-            with_floats(kClearLightKit, g, nullptr, 0, 0x821E1634);
+            clear_kit(g);
           }
         }
       } else if (x == 1) {
@@ -975,11 +1273,11 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
           } else if (int32_t(at(30580 + 4 * g)) != 0) {
             first(g, true);
           } else {
-            with_floats(kClearLightKit, g, nullptr, 0, 0x821E1718);
+            clear_kit(g);
           }
         }
       } else {
-        with_floats(kClearLightKit, at(30492), nullptr, 0, 0x821E1740);
+        clear_kit(at(30492));
       }
     }
   } else if (m == 6) {
@@ -994,7 +1292,7 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
       const int32_t kind = int32_t(at(33540));
       if (kind == 0) {
         const uint32_t choice = at(33620);
-        guest(kSetAccessory, {screen, at(33616), choice}, 0x821E199C);
+        r3 = SetAccessory(base, call, at(33616), choice, frame);
       } else if (kind == 1) {
         const uint32_t c = at(33576);
         Store(base, frame + 124, 0);
@@ -1020,9 +1318,6 @@ uint64_t RestoreStand(uint8_t* base, const StandCalls& stand, uint64_t r3, uint3
         }
         const uint32_t v = Load(base, (c + 8450) * 4 + s);
         r3 = ApplyChoice(base, call, frame, frame + 112, frame + 128, k, v, 0x821E1ACC);
-        if (int32_t(v) != -1) {
-          f1->reset();
-        }
       }
     }
   }
@@ -1036,8 +1331,6 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
   constexpr uint32_t kBonnetOpen = 0x826D84A0;   // the three stand animations' open states
   constexpr uint32_t kRoofOpen = 0x826D849C;
   constexpr uint32_t kDoorsOpen = 0x826D8498;
-  constexpr uint32_t kApplyAreaDecals = 0x821F7B90;  // TuningScreen::ApplyAreaDecals
-  constexpr uint32_t kApplyDecalWord = 0x821FE4E0;   // TuningScreen::ApplyDecalWord
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t s = screen;
   auto at = [&](uint32_t offset) { return Load(base, s + offset); };
@@ -1077,9 +1370,9 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
   toggle(int32_t(at(kCategory)) == 5 && item() == 1 && in({8, 9, 10, 11}), kDoorsOpen, 4);
   // (4) The paint: exterior, item 4, state 18.
   if (int32_t(at(kCategory)) == 5 && item() == 4 && int32_t(at(kState)) == 18) {
-    auto set_color = [&](uint64_t color, const double floats[3], uint32_t lr) {
-      const uint64_t regs[2] = {Holder(base), color};
-      stand.calls.call(kSetColor, regs, 2, floats, 3, frame, lr, nullptr);
+    auto set_color = [&](uint32_t color, const double floats[3], uint32_t) {
+      stand_models::SetColor(base, stand.call, paint_poll, Holder(base), color, floats[0],
+                             floats[1], floats[2], frame);
     };
     const double scale = Lfs(base, 0x82002200);  // 1/255
     {
@@ -1121,11 +1414,11 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
       int32_t(front_end_car_draw::GarageStageIsBusy(base, stand.calls, Holder(base), frame)) == 0) {
     const int32_t v = int32_t(at(10012));
     if (v >= 1 && v < 5) {
-      stand.call(kApplyAreaDecals, {s}, frame, 0x821DA2BC);
+      ApplyAreaDecals(base, stand, s, frame);
     } else if (v >= 5 && v < 9) {
       ApplyDecals(base, stand, s, frame);
     } else if (v >= 9 && v < 11) {
-      stand.call(kApplyDecalWord, {s}, frame, 0x821DA2F4);
+      ApplyDecalWord(base, stand.call, s, frame);
     }
   }
   // (6) The second wheels, the wheel word, the stand drawn.

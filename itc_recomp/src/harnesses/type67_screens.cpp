@@ -28,6 +28,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/type67_screens.h"
 #include "hooks/ui_movies.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "type67_screens/type67_screens.h"
 #include "ui_movies/game.h"
@@ -48,6 +49,16 @@ struct StandWorld {
   uint32_t params, holder_word, list;
 };
 StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint32_t holder);
+// The node tables' cases (src/harnesses/type67_screen_tables.cpp).
+void Type67ScreenTables(Context& h);
+void Type67ListPart(Context& h);
+void Type67ListHelpers(Context& h);
+void Type67TitledList(Context& h);
+void Type67ColorList(Context& h);
+void Type67NodeScreen(Context& h);
+// Type6ListScreen::SetUpRace's cases (src/harnesses/race_setup.cpp).
+void Type67SetUpRace(Context& h);
+void Type67Type7SetUpRace(Context& h);
 
 namespace {
 
@@ -112,6 +123,10 @@ bool RecordUpdate(uint32_t function, PPCContext& ctx, uint8_t*) {
 uint32_t g_movie = 0;  // the harness's movie block (kMovieBytes)
 constexpr uint32_t kMovieBytes = 0xA100;
 constexpr uint32_t kFadeWords[3] = {ts::kFadeWait, ts::kFadeCountA, ts::kFadeCountB};
+// The screen fades' globals (ScreenFades::FadeIn writes them under
+// PanelFade::In): the durations, colors, alphas and counts, compared and put
+// back after.
+constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x3C;
 
 // The plain C++ with the recording calls.
 using NativeCall = std::function<uint64_t(PPCContext&, uint8_t*, const ts::Calls&)>;
@@ -197,6 +212,7 @@ void Cases(Context& h, const Block& world, const char* name, uint32_t address, i
       out[v].Bytes(Read(base, w, world.bytes));
       out[v].Bytes(Read(base, g_movie, kMovieBytes));
       for (const uint32_t g : kFadeWords) out[v].Word(guest::LoadU32(base, g));
+      out[v].Bytes(Read(base, kFades, kFadesBytes));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
     }
@@ -298,6 +314,10 @@ void ListAndNodeScreens(Context& h, const Block& world, uint32_t movie) {
         __imp__sub_82259298, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenOnLeft(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
+  Cases(h, world, "NodeScreen::Open", 0x82259318, 4, targets, {}, node, __imp__sub_82259318,
+        [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+          return ts::NodeScreenOpen(b, t.r3.u64);
+        });
   Cases(h, world, "Type6NodeScreen::IsLoaded", 0x82236FD8, 8, targets, {}, node,
         __imp__sub_82236FD8, [](PPCContext& t, uint8_t* b, const ts::Calls&) {
           return ts::NodeScreenIsLoaded(b, t.r3.u64, t.r1.u32);
@@ -317,8 +337,9 @@ void ListAndNodeScreens(Context& h, const Block& world, uint32_t movie) {
 // The panel screens: the car list at the world's +0x3600 (its vtable at
 // +0x3900), the group pair at +0x3A00 (vtable +0x3B00; its groups at
 // +0x3C00 and +0x3C40, their ids 16 to 19), the fade words random (their
-// counts mostly 0) and put back after; +11700 0 (Type7PanelScreen::AskQuit
-// never ran in play: its branch is the original's, not taken here).
+// counts mostly 0) and put back after; +11700 0 (the quit dialog's
+// AskQuit, which needs a movie with text nodes, is checked through the
+// DrawLists in type67_node_screen.cpp's panel world).
 void PanelScreens(Context& h, const Block& world, uint32_t movie) {
   uint8_t* const base = h.base;
   for (const uint32_t id : {4u, 28u, 16u, 17u, 18u, 19u}) {
@@ -336,9 +357,10 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
   const std::vector<uint32_t> screen_targets = {
       ts::kEmpty, kSetR4,     kGetter,    ts::kEmpty, kSetR4,     kGetter,    0x82230790,
       0x82230758, 0x822401D0, 0x82240208, 0x82240860, 0x82247058, 0x822408B8, 0x82240238,
-      0x82240248, 0x82240258};
-  const std::vector<uint32_t> no_posts = {ts::kEmpty, kSetR4,     kGetter,   0x82240238,
-                                          0x82240248, 0x82240258, 0x82230790};
+      0x82240248, 0x82240258, 0x8223E708, 0x822307D0, 0x822307E0, 0x822307F0};
+  const std::vector<uint32_t> no_posts = {ts::kEmpty, kSetR4,     kGetter,    0x82240238,
+                                          0x82240248, 0x82240258, 0x82230790, 0x822307D0,
+                                          0x822307E0, 0x822307F0};
   const std::vector<uint32_t> pair_targets = {ts::kEmpty, kSetR4,     kGetter,    0x82249C30,
                                               0x82249C40, 0x82249BE0, 0x82249BA8, 0x82249C70};
   // Update and DrawList test their pointers; the other handlers read them
@@ -414,6 +436,26 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
        [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
          return ts::GroupPairFinishAll(b, t.r3.u64, t.r1.u32, c);
        }},
+      {"GroupPair::~GroupPair", 0x82249C20, 4, kPair, __imp__sub_82249C20,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::GroupPairDestruct(b, t.r3.u64);
+       }},
+      {"SingleGroup::SingleGroup", 0x82249CB0, 4, kPair, __imp__sub_82249CB0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::SingleGroupConstruct(b, t.r3.u64, t.r4.u32);
+       }},
+      {"SingleGroup::Reset", 0x82249CC8, 8, kPair, __imp__sub_82249CC8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::SingleGroupReset(b, t.r3.u64, t.r1.u32, c);
+       }},
+      {"PanelFade::In", 0x82249BE8, 8, 0, __imp__sub_82249BE8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelFadeIn(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"MachineScreen::~MachineScreen", 0x8224CB18, 4, 0, __imp__sub_8224CB18,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::MachineScreenDestruct(b, t.r3.u64);
+       }},
       {"PanelScreen::IsLoaded", 0x82230790, 8, 0, __imp__sub_82230790,
        [](PPCContext& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenIsLoaded(b, t.r1.u32);
@@ -448,6 +490,45 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
        [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1976); }},
       {"Type7PanelScreen::CarSlot", 0x82240258, 2, 0, __imp__sub_82240258,
        [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1980); }},
+      // The type 6 list batch's leaves (type6_list.cpp).
+      {"PanelScreen::OnYes", 0x822609E0, 2, 0, __imp__sub_822609E0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenSetAnswer(b, t.r3.u64, 0);
+       }},
+      {"PanelScreen::OnNo", 0x822609D0, 2, 0, __imp__sub_822609D0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenSetAnswer(b, t.r3.u64, 1);
+       }},
+      {"PanelScreen::OnBack", 0x822306D0, 2, 0, __imp__sub_822306D0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenSetAnswer(b, t.r3.u64, 2);
+       }},
+      {"PanelScreen::OnDialogClosed", 0x822306E0, 12, 0, __imp__sub_822306E0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOnDialogClosed(b, t.r3.u64, t.r1.u32, c);
+       }},
+      {"PanelScreen::Suspend", 0x82248DE0, 8, 0, __imp__sub_82248DE0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenSuspend(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"PanelScreen::OpenEmpty", 0x822404D8, 8, 0, __imp__sub_822404D8,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenOpenEmpty(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+       }},
+      {"Type6PanelScreen::Back", 0x8223E708, 8, 0, __imp__sub_8223E708,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x8223E708);
+       }},
+      {"Type6PanelScreen::CarList", 0x822307D0, 2, 0, __imp__sub_822307D0,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1972); }},
+      {"Type6PanelScreen::CarEntry", 0x822307E0, 2, 0, __imp__sub_822307E0,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1976); }},
+      {"Type6PanelScreen::CarSlot", 0x822307F0, 2, 0, __imp__sub_822307F0,
+       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1980); }},
+      {"GroupPair::DeletingDestructor", 0x8224ACE0, 4, kPair, __imp__sub_8224ACE0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::GroupPairDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
       {"PanelScreen::OnEnter", 0x82249D18, n, 0, __imp__sub_82249D18,
        [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOnEnter(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
@@ -503,10 +584,43 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
     Cases(h, world, f.name, f.address, f.cases, screen_targets, {}, panel, f.recompiled, f.native,
           f.r3_offset);
   }
+  // The destructors (r4 the dispatcher: bit 0 clear, nothing deleted; the
+  // deleting cases are in Deleting): the car list's two menus (+9752 + 4 +
+  // 132 and + 60) with their blocks pages or 0.
+  nulls = false;
+  const std::vector<uint32_t> menus = {9888, 9816};
+  const Function destructors[] = {
+      {"PanelGroup::~PanelGroup", 0x82231CC0, 4, 0x3C00, __imp__sub_82231CC0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+         return ts::PanelGroupDestruct(b, t.r3.u64);
+       }},
+      {"PanelGroup::DeletingDestructor", 0x82240348, 4, 0x3C00, __imp__sub_82240348,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelGroupDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"Type6PanelScreen::~Type6PanelScreen", 0x82230668, 8, 0, __imp__sub_82230668,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenDestruct(b, t.r3.u64, false, t.r1.u32, c);
+       }},
+      {"Type7PanelScreen::~Type7PanelScreen", 0x82240168, 8, 0, __imp__sub_82240168,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelScreenDestruct(b, t.r3.u64, true, t.r1.u32, c);
+       }},
+      {"Type6PanelScreen::DeletingDestructor", 0x82230B00, 4, 0, __imp__sub_82230B00,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::Type6PanelScreenDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+  };
+  for (const Function& f : destructors) {
+    Cases(h, world, f.name, f.address, f.cases, screen_targets,
+          f.r3_offset == 0 ? menus : std::vector<uint32_t>{}, panel, f.recompiled, f.native,
+          f.r3_offset);
+  }
   guest::StoreU32(base, kMissingMovie, saved_missing);
 }
 
-// Type7PanelScreen::PickCar: the car list at the world's +0x3600 with its
+// Type7PanelScreen::PickCar and Type6PanelScreen::PickCar (the same code on
+// the type 6 car, 0x826367E8): the car list at the world's +0x3600 with its
 // real slot 18 (sub_820B67D8, the list + 208: the selection), the
 // selection's tab (+28) 2 (the garage) or not, its steps (+32, +36) small,
 // its +40 and +44 random, its entry table (+1616) at the world's +0x3E00
@@ -515,11 +629,14 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
 // case for Car::SetModel's picks); the save data a
 // harness block ([0x826C5B58]) with a garage list (the type 6 and 7 modes'
 // harness's shape) walked the selection's steps to a slot of random words;
-// the type 7 car random, its +4 0xFFFF now and then. GarageCar::Reset runs
+// the mode's car random, its +4 0xFFFF now and then. GarageCar::Reset runs
 // through its adapter on both sides. Compared: the world, the save block,
-// the type 7 car, the stack below the call (but the original's register
+// the mode's car, the stack below the call (but the original's register
 // saves) and r3 (both halves); the globals put back after.
-void PickCar(Context& h, const Block& world) {
+using PickCarCall = uint64_t (*)(uint8_t*, uint64_t, uint64_t, uint32_t, const ts::Calls&);
+
+void PickCar(Context& h, const Block& world, const char* name, uint32_t address, uint32_t car,
+             int cases, GuestFunction recompiled, PickCarCall native) {
   uint8_t* const base = h.base;
   constexpr uint32_t kSaveBytes = 0x1A000, kSavePointer = 0x826C5B58, kParams = 0x826C2E48;
   constexpr uint32_t kCarBytes = 1984, kFrame = 128, kSaves = 48;
@@ -532,12 +649,12 @@ void PickCar(Context& h, const Block& world) {
   // rand's seed (Car::SetModel's picks), set per case and put back after.
   constexpr uint32_t kRandSeed = 0x82638188;
   const uint32_t saved_seed = guest::LoadU32(base, kRandSeed);
-  const std::vector<uint8_t> saved_car = Read(base, ts::kType7Car, kCarBytes);
-  Results results("Type7PanelScreen::PickCar (sub_822405F8)");
-  for (int c = 0; c < 32; c++) {
+  const std::vector<uint8_t> saved_car = Read(base, car, kCarBytes);
+  Results results(fmt::format("{} (sub_{:08X})", name, address));
+  for (int c = 0; c < cases; c++) {
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
-      Random r(SplitMix(0x822405F8ull << 16 ^ uint64_t(c)));
+      Random r(SplitMix(uint64_t(address) << 16 ^ uint64_t(c)));
       const uint32_t w = world.address;
       WriteRandom(base, w, world.bytes, r);
       WriteRandom(base, save, 0x400, r);
@@ -574,8 +691,8 @@ void PickCar(Context& h, const Block& world) {
       guest::StoreU16(base, nodes + 4 * node + 2, uint16_t(slot));
       WriteRandom(base, nodes + 212 + 1968 * slot, 1968, r);
       guest::StoreU32(base, kSavePointer, save);
-      WriteRandom(base, ts::kType7Car, kCarBytes, r);
-      if (r.Below(2) == 0) guest::StoreU16(base, ts::kType7Car + 4, 0xFFFF);
+      WriteRandom(base, car, kCarBytes, r);
+      if (r.Below(2) == 0) guest::StoreU16(base, car + 4, 0xFFFF);
       guest::StoreU32(base, kRandSeed, uint32_t(r.Next()));
       guest::StoreU32(base, w + kDispatcher + 204 + 600, r.Below(50));
       guest::StoreU32(base, w + kDispatcher + 204 + 604, r.Below(60));
@@ -585,15 +702,15 @@ void PickCar(Context& h, const Block& world) {
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
       if (v == 0) {
         ITC_FLAG(native_type67_screens) = false;
-        __imp__sub_822405F8(t, base);
+        recompiled(t, base);
         ITC_FLAG(native_type67_screens) = true;
       } else {
         const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
-        t.r3.u64 = ts::Type7PanelScreenPickCar(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
+        t.r3.u64 = native(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
       }
       out[v].Bytes(Read(base, w, world.bytes));
       out[v].Bytes(Read(base, save, kSaveBytes));
-      out[v].Bytes(Read(base, ts::kType7Car, kCarBytes));
+      out[v].Bytes(Read(base, car, kCarBytes));
       out[v].Word(guest::LoadU32(base, kRandSeed));
       out[v].Bytes(Read(base, sp - 2048, 2048 - kFrame));
       out[v].Bytes(Read(base, sp - kFrame, kFrame - kSaves));
@@ -606,7 +723,155 @@ void PickCar(Context& h, const Block& world) {
   guest::StoreU32(base, kSavePointer, saved_save);
   guest::StoreU32(base, kParams, saved_params);
   guest::StoreU32(base, kRandSeed, saved_seed);
-  Write(base, ts::kType7Car, saved_car.data(), kCarBytes);
+  Write(base, car, saved_car.data(), kCarBytes);
+}
+
+// The deleting destructors with bit 0 of r4 set: a block of operator new's
+// (random words; a screen's menus' blocks 0, so MenuList::Release frees
+// nothing) destroyed and deleted, compared by r3 and whether operator new
+// hands the block out again.
+void Deleting(Context& h) {
+  uint8_t* const base = h.base;
+  struct Kind {
+    const char* name;
+    uint32_t bytes;
+    GuestFunction recompiled;
+    NativeCall native;
+  };
+  const Kind kinds[] = {
+      {"PanelGroup::DeletingDestructor, deleting (sub_82240348)", 64, __imp__sub_82240348,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::PanelGroupDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"GroupPair::DeletingDestructor, deleting (sub_8224ACE0)", 64, __imp__sub_8224ACE0,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::GroupPairDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+      {"Type6PanelScreen::DeletingDestructor, deleting (sub_82230B00)", 11744,
+       __imp__sub_82230B00,
+       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+         return ts::Type6PanelScreenDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+       }},
+  };
+  for (const Kind& kind : kinds) {
+    Results results(kind.name);
+    for (int c = 0; c < 4; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(SplitMix(0xDE1E7Eull << 16 ^ uint64_t(c) ^ kind.bytes));
+        const auto block = memory::crt::OperatorNew(base, kind.bytes);
+        if (!block) {
+          ITC_LOG_ERROR("harness: type67_screens: operator new failed");
+          return;
+        }
+        WriteRandom(base, *block, kind.bytes, r);
+        for (const uint32_t list : {9888u, 9816u}) {
+          if (list + 72 <= kind.bytes) guest::StoreU32(base, *block + list + 68, 0);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = *block;
+        t.r4.u64 = (r.Next() & ~3ull) | (r.Below(2) == 0 ? 1 : 3);
+        t.lr = 0x82000000 + 4 * r.Below(1024);
+        if (v == 0) {
+          ITC_FLAG(native_type67_screens) = false;
+          kind.recompiled(t, base);
+          ITC_FLAG(native_type67_screens) = true;
+        } else {
+          const ts::Calls calls = RecordingCalls(t, base);
+          t.r3.u64 = kind.native(t, base, calls);
+        }
+        out[v].Word(t.r3.u32 == *block ? 1 : 0);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        const auto probe = memory::crt::OperatorNew(base, kind.bytes);
+        out[v].Word(probe && *probe == *block ? 1 : 0);
+        if (probe) memory::crt::OperatorDelete(*probe);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// The screen blocks' destructors (Type6Screens and Type7Screens): blocks of
+// operator new's of random words with every menu list's item block the
+// screens' destructors release 0 (the list screen's lists and its list
+// part's, the node screen's, the panel screen's car list menus), so
+// MenuList::Release frees nothing; r4 bit 0 clear (the block compared after)
+// or set for the deleting destructors (compared by whether operator new
+// hands the block out again). Compared too: r3 (both halves).
+void ScreenBlocks(Context& h) {
+  uint8_t* const base = h.base;
+  constexpr uint32_t kType6Bytes = 52696, kType7Bytes = 42356;
+  static constexpr uint32_t kType6Lists[] = {
+      19432 + 10144, 19432 + 10216, 19432 + 10288, 19432 + 10824 + 60,
+      30396 + 10132, 30396 + 10204, 40948 + 9888,  40948 + 9816};
+  static constexpr uint32_t kType7Lists[] = {19428 + 10144, 19428 + 10216, 19428 + 10288,
+                                             19428 + 10360, 19428 + 11040 + 60, 30608 + 9888,
+                                             30608 + 9816};
+  struct Function {
+    const char* name;
+    uint32_t address;
+    bool type7;
+    bool deleting;  // a deleting destructor (r4 its flags)
+    int cases;
+    GuestFunction recompiled, native;
+  };
+  const Function functions[] = {
+      {"Type6Screens::~Type6Screens", 0x822367C0, false, false, 4, __imp__sub_822367C0,
+       hooks::Type6ScreensDestruct},
+      {"Type6Screens::DeletingDestructor", 0x82236830, false, true, 6, __imp__sub_82236830,
+       hooks::Type6ScreensDeletingDestruct},
+      {"Type7Screens::~Type7Screens", 0x82246BE0, true, false, 4, __imp__sub_82246BE0,
+       hooks::Type7ScreensDestruct},
+      {"Type7Screens::DeletingDestructor", 0x82246C40, true, true, 6, __imp__sub_82246C40,
+       hooks::Type7ScreensDeletingDestruct},
+  };
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    const uint32_t bytes = f.type7 ? kType7Bytes : kType6Bytes;
+    for (int c = 0; c < f.cases; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(SplitMix(uint64_t(f.address) << 16 ^ uint64_t(c)));
+        const auto block = memory::crt::OperatorNew(base, bytes);
+        if (!block) {
+          ITC_LOG_ERROR("harness: type67_screens: operator new failed");
+          return;
+        }
+        WriteRandom(base, *block, bytes, r);
+        if (f.type7) {
+          for (const uint32_t list : kType7Lists) guest::StoreU32(base, *block + list + 68, 0);
+        } else {
+          for (const uint32_t list : kType6Lists) guest::StoreU32(base, *block + list + 68, 0);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = *block | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+        t.r4.u64 = r.Next() & ~1ull;
+        const bool deletes = f.deleting && r.Below(2) == 0;
+        if (deletes) t.r4.u64 |= 1;
+        t.lr = 0x82000000 + 4 * r.Below(1024);
+        if (v == 0) {
+          ITC_FLAG(native_type67_screens) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_screens) = true;
+        } else {
+          f.native(t, base);
+        }
+        out[v].Word(uint32_t(t.r3.u64 - *block));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (deletes) {
+          const auto probe = memory::crt::OperatorNew(base, bytes);
+          out[v].Word(probe && *probe == *block ? 1 : 0);
+          if (probe) memory::crt::OperatorDelete(*probe);
+        } else {
+          out[v].Bytes(Read(base, *block, bytes));
+          memory::crt::OperatorDelete(*block);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
 }
 
 }  // namespace
@@ -628,9 +893,24 @@ void Type67Screens(Context& h) {
   }
   uint32_t saved_fades[3];
   for (int i = 0; i < 3; i++) saved_fades[i] = guest::LoadU32(h.base, kFadeWords[i]);
+  const std::vector<uint8_t> saved_fade_block = Read(h.base, kFades, kFadesBytes);
   ListAndNodeScreens(h, world, movie.address);
   PanelScreens(h, world, movie.address);
-  PickCar(h, world);
+  PickCar(h, world, "Type7PanelScreen::PickCar", 0x822405F8, ts::kType7Car, 32,
+          __imp__sub_822405F8, ts::Type7PanelScreenPickCar);
+  PickCar(h, world, "Type6PanelScreen::PickCar", 0x82230C88, type67_modes::kType6Car, 16,
+          __imp__sub_82230C88, ts::Type6PanelScreenPickCar);
+  Deleting(h);
+  ScreenBlocks(h);
+  Type67ScreenTables(h);
+  Type67ListPart(h);
+  Type67ListHelpers(h);
+  Type67TitledList(h);
+  Type67ColorList(h);
+  Type67NodeScreen(h);
+  Type67SetUpRace(h);
+  Type67Type7SetUpRace(h);
+  Write(h.base, kFades, saved_fade_block.data(), kFadesBytes);
   for (int i = 0; i < 3; i++) guest::StoreU32(h.base, kFadeWords[i], saved_fades[i]);
 }
 

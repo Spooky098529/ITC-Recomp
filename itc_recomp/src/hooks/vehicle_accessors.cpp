@@ -186,18 +186,9 @@ ITC_ACCESSOR_WORD(820FFC98, StagesRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32
 ITC_ACCESSOR_WORD(820FFCC8, StagesWord48(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_VOID(820FFD48, StagesCopy24(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_VOID(820FFDD8, EntriesAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-// RacerRecords::Add: r3 comes back as where the record went (memcpy's
-// result). Where the native version declines, the original runs.
-extern "C" REX_FUNC(sub_820FFE08) {
-  REX_FUNC_PROLOGUE();
-  uint32_t added = 0;
-  if (!ITC_FLAG(native_vehicle_accessors) ||
-      !RacerRecordsAdd(base, ctx.r3.u32, ctx.r4.u32, &added)) {
-    __imp__sub_820FFE08(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = added;
-}
+// RacerRecords::Add (sub_820FFE08) has no adapter (removed, B7 loop,
+// 2026-11-13): its only caller in play, RaceStates::OnRaceEnd, calls its
+// plain C++ (the original through the function table where it declines).
 ITC_ACCESSOR_WORD(820FFE58, RacerRecordsAt(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_VOID(820FFE98, PairCopy(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_VOID(820FFEB0, PairsLast(base, ctx.r3.u32, ctx.r4.u32))

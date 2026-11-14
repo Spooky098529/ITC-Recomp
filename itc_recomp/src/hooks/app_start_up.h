@@ -64,4 +64,10 @@ void FontConstructSteps(PPCContext& ctx, uint8_t* base);
 // Whether Text::Init's and Font::Font's native steps can run.
 bool TextInitNative();
 
+// A guest call of `function` (r3 set, lr the caller's) made natively when
+// it's the render manager's slot 8 or 7 and app_start_up::RenderManagerCall
+// answers: r3, r11 and ctr left as the original's (and its adapter's).
+// False where the caller makes the guest call.
+bool RenderManagerSlotDirect(PPCContext& ctx, uint8_t* base, uint32_t function);
+
 }  // namespace hooks

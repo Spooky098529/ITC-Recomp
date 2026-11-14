@@ -16,6 +16,7 @@
 #include "car_scene_draw/ops.h"
 #include "guest.h"
 
+#include "app_start_up/start_up.h"
 #include "base/log.h"
 #include "command_list/command_list.h"
 #include "course_scenery/course_scenery.h"
@@ -223,8 +224,15 @@ uint64_t RecordBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& c
     FlushOff();
     return r3;
   };
+  // The render manager's slot 8 (its plain C++ called directly where it's
+  // the game's, app_start_up::RenderManagerScene).
+  auto scene_of = [&](uint32_t lr) {
+    const uint32_t manager = Load(base, kRenderApp);
+    const auto scene = app_start_up::RenderManagerScene(base, manager);
+    return scene ? *scene : uint32_t(vtable_call(manager, 8, lr));
+  };
   // The render manager's command list (its slot 8, then slot 1).
-  const uint32_t object = uint32_t(vtable_call(Load(base, kRenderApp), 8, 0x8209CC68));
+  const uint32_t object = scene_of(0x8209CC68);
   const uint32_t list = uint32_t(vtable_call(object, 1, 0x8209CC78));
   Writer w(base, calls, f, list);
   if (command_list::OpenChunk(base, list) == command_list::OpenResult::kNested) {
@@ -272,7 +280,7 @@ uint64_t RecordBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& c
   }
   // Handed to the render queue (slot 8, its slot 2, then slot 4: the chunk,
   // the set's layer, depth 0.0).
-  const uint32_t object2 = uint32_t(vtable_call(Load(base, kRenderApp), 8, 0x8209CD70));
+  const uint32_t object2 = scene_of(0x8209CD70);
   const uint32_t queue = uint32_t(vtable_call(object2, 2, 0x8209CD80));
   return vtable_call(queue, 4, 0x8209CD9C, {chunk, Load(base, set + 4)}, {zero});
 }

@@ -17,10 +17,13 @@
 #include "hooks/race_hud_machine.h"
 #include "hooks/race_hud_object.h"
 #include "hooks/race_screens.h"
+#include "hooks/race_screens_unseen.h"
 #include "hooks/ui_movies.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_screens/race_screens.h"
+#include "race_screens/unseen.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -32,11 +35,17 @@
 #include <functional>
 #include <initializer_list>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_race_screens);
 ITC_FLAG_DECLARE(bool, native_race_hud_machine);
+
+namespace time_hooks {
+void SetFakeNow(uint64_t now);
+void ClearFakeNow();
+}  // namespace time_hooks
 
 namespace harness {
 
@@ -1111,6 +1120,9 @@ struct FrameSpec {
   // Run after the function, before the outputs are read (frees, and words
   // made comparable), with the case's outputs to add to.
   std::function<void(Outputs&)> after;
+  // r3 compared (left out where it differs on purpose and no caller reads
+  // it: the leaderboard read's no-Live answer).
+  bool compare_r3 = true;
 };
 
 void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
@@ -1202,8 +1214,10 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
       }
       out[v].Bytes(Read(h.base, sp, kCallerBytes));
       out[v].Word(t.r1.u32);
-      out[v].Word(t.r3.u32);
-      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      if (spec.compare_r3) {
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
     }
     results.Check(out[0], out[1], fmt::format("case {}", c));
   }
@@ -2134,6 +2148,60 @@ void Draws(Context& h, const MovieWorld& w) {
       __imp__sub_8221A2F8, hooks::RaceScreensCareerResultsDraw, {144, 24});
 }
 
+// The confirm dialog's save notes (never seen in play): StartSave (its
+// SaveSlots::State through the save world, its dialog list's block 0 for
+// MenuList::Init: the new one compared and freed), ShowSaving and SetNote
+// (r3 the id, r4 to r10 any: the original stores them as varargs; the
+// strings have no argument codes). Their callers' unset varargs, which
+// SetNote stores in their frames (+24 to +79), are 0 in ours (the user's
+// call for the parking area, 2026-10-30): those words left out.
+void DialogSave(Context& h, const MovieWorld& w) {
+  const Block save(kSaveWorldBytes);
+  if (save.address == 0) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  auto shape = [&](PPCContext&, Random& r, const MovieWorld& w) {
+    ShapeSaveWorld(h.base, save.address, r);
+    guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
+    if (r.Below(2) == 0) guest::StoreU32(h.base, w.movies.address + kPairsAt + 8, 14);
+  };
+  auto outputs = [&](Outputs& out) {
+    out.Bytes(Read(h.base, save.address, kSaveWorldBytes));
+    const uint32_t list = w.block(rs::kDialogList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  FrameSpec start{128, 24, {24, 80}};
+  start.after = outputs;
+  MovieGroup(h, w, "RaceDialog::StartSave (sub_822189B8)", 200, shape, __imp__sub_822189B8,
+             hooks::RaceScreensRaceDialogStartSave, start);
+  FrameSpec saving{112, 24, {24, 80}};
+  saving.after = outputs;
+  MovieGroup(h, w, "RaceDialog::ShowSaving (sub_82218AB0)", 150, shape, __imp__sub_82218AB0,
+             hooks::RaceScreensRaceDialogShowSaving, saving);
+  FrameSpec note{112, 24};
+  note.after = outputs;
+  MovieGroup(
+      h, w, "RaceDialog::SetNote (sub_82218918)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(t, r, w);
+        const uint32_t ids[4] = {69, 70, 98, r.Below(2000)};
+        t.r3.u64 = ids[r.Below(4)];
+        t.r6.u64 = r.Next();
+        t.r7.u64 = r.Next();
+        t.r8.u64 = r.Next();
+        t.r9.u64 = r.Next();
+        t.r10.u64 = r.Next();
+      },
+      __imp__sub_82218918, hooks::RaceScreensRaceDialogSetNote, note);
+}
+
 void Transitions(Context& h) {
   const MovieWorld w;
   if (!w.ok()) {
@@ -2309,8 +2377,1354 @@ void Transitions(Context& h) {
   Results(h, w);
   AfterRace(h, w);
   Dialog(h, w);
+  DialogSave(h, w);
   Draws(h, w);
   MainPages(h, w);
+}
+
+// --- The in-race screens never seen in play (race_screens_unseen) ---
+//
+// docs/functions/race-screens-unseen.md, ported though never seen in play
+// (the user's call, 2026-11-12): the originals (__imp__, which reach only
+// recompiled callees: the plain C++'s callees have no adapters) against the
+// register steps of hooks/race_screens_unseen.h, in this file's UI movie
+// world. Kind 4's pause menu: its screen word ([0x826D84E0]'s block +0) one
+// of the world's movies; its data's volumes (+0 to +12) -2 to 17 or any,
+// the defaults (+16, +20) 0 to 15, the item count (+52) 0 to 6, the toggle
+// (+60) 0 to 2, the kept selection (+64) 0 to 7, the counter (+68) around 0
+// to 12, the player (+72) 0, 1 or any, the kind (+76) 0 or 1, now and then
+// up to 7 (the item table's rows past 1 are other rodata words); its list's
+// selections 0 to 3 (now and then up to 8), its last move and side -1, 0, 1
+// or any, its item block the world's words (0 where MenuList::Init runs: it
+// frees the old block; the new one compared and freed); the step word 0 or
+// 1. The pages that run MenuList::Update have the list moved to a menu list
+// world (FrameSpec::list_world). Compared as MovieGroup does (the world,
+// the update calls, the frame without its register saves, SetText's and
+// SetNodeText's varargs stores left out: their unset words are 0 in ours,
+// the user's call for the parking area, 2026-10-30).
+// A generator of the case's own: MovieGroup seeds its cases with
+// successive states of one xorshift sequence, so their streams are the same
+// shifted by one, and after the world's shaping (which draws a varying
+// number of words) many cases fall onto the same state and get the same
+// inputs. Mixed with `count` / 2 (the setup runs once for each version of a
+// case, in turn), each case's inputs are its own.
+Random Fresh(Random& r, uint64_t& count) {
+  const uint64_t salt = count++ / 2;
+  uint64_t x = r.Next() + 0x9E3779B97F4A7C15ull * (salt + 1);
+  x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
+  x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
+  return Random(x ^ (x >> 31));
+}
+
+// MovieGroup with each case's setup given a generator of its own (Fresh).
+void FreshGroup(Context& h, const MovieWorld& w, uint64_t& count, const char* name, int cases,
+                const MovieSetupFn& setup, GuestFunction recompiled, GuestFunction native,
+                const FrameSpec& spec) {
+  const MovieSetupFn fresh = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    setup(t, r, w);
+  };
+  MovieGroup(h, w, name, cases, fresh, recompiled, native, spec);
+}
+
+void Pause4(Context& h, const MovieWorld& w) {
+  const World list_world;
+  if (!list_world.ok()) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  uint64_t count = 0;  // the setups run (Fresh)
+  auto shape = [&h](Random& r, const MovieWorld& w, bool no_block) {
+    guest::StoreU32(h.base, w.block(rs::kPause4Screen), w.movie(r.Below(kMovieCount)));
+    const uint32_t data = w.block(rs::kPause4Data);
+    for (const uint32_t field : {0u, 4u, 8u, 12u}) {
+      guest::StoreU32(h.base, data + field,
+                      r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(20)) - 2));
+    }
+    guest::StoreU32(h.base, data + 16, r.Below(16));
+    guest::StoreU32(h.base, data + 20, r.Below(16));
+    guest::StoreU32(h.base, data + 52, r.Below(7));
+    guest::StoreU32(h.base, data + 60, r.Below(3));
+    guest::StoreU32(h.base, data + 64, r.Below(8));
+    guest::StoreU32(h.base, data + 68, Around(r, -1, 12));
+    guest::StoreU32(h.base, data + 72, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    guest::StoreU32(h.base, data + 76, r.Below(6) == 0 ? r.Below(8) : r.Below(2));
+    const uint32_t list = w.block(rs::kPause4List);
+    for (const uint32_t field : {rs::kListSelection, rs::kListSelectionBefore}) {
+      guest::StoreU32(h.base, list + field, r.Below(6) == 0 ? r.Below(9) : r.Below(4));
+    }
+    const uint32_t moves[4] = {0xFFFFFFFFu, 0, 1, uint32_t(r.Next())};
+    guest::StoreU32(h.base, list + rs::kListMove, moves[r.Below(4)]);
+    guest::StoreU32(h.base, list + rs::kListSide, moves[r.Below(4)]);
+    guest::StoreU32(h.base, list + rs::kListBlock, no_block ? 0 : w.misc.address + 0x800);
+    guest::StoreU32(h.base, w.block(rs::kPause4Pages) + 24, r.Below(2));
+  };
+  const MovieSetupFn plain = [&](PPCContext&, Random& r, const MovieWorld& w) {
+    shape(r, w, false);
+  };
+  const MovieSetupFn no_block = [&](PPCContext&, Random& r, const MovieWorld& w) {
+    shape(r, w, true);
+  };
+  const MovieSetupFn step = [&](PPCContext& t, Random& r, const MovieWorld& w) {
+    shape(r, w, false);
+    StepWord(t, r, w, rs::kPause4Pages);
+  };
+  const MovieSetupFn step_no_block = [&](PPCContext& t, Random& r, const MovieWorld& w) {
+    shape(r, w, true);
+    StepWord(t, r, w, rs::kPause4Pages);
+  };
+  // MenuList::Init's new block: its item words (the count, at most 6)
+  // compared, then freed and +68 put to 0.
+  auto list_block = [&](Outputs& out) {
+    const uint32_t list = w.block(rs::kPause4List);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      const uint32_t count = std::min<uint32_t>(guest::LoadU32(h.base, list + rs::kListCount), 6);
+      out.Bytes(Read(h.base, block, count * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  // Player 0's options' volume bytes (+0x1F878, +0x1F879).
+  auto save_bytes = [&](Outputs& out) {
+    out.Bytes(Read(h.base, w.save.address + 0x1F85C + 24, 8));
+  };
+  using Native = GuestFunction;
+  struct Simple {
+    const char* name;
+    int cases;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled;
+    Native native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+    bool init;  // MenuList::Init runs: its block compared and freed
+  };
+  const Simple simple[] = {
+      {"PauseMenu4::StepVolume (sub_82210488)", 200, &plain, __imp__sub_82210488,
+       hooks::RaceScreensUnseenPause4StepVolume, 96, 16, {0, 0}, false},
+      {"PauseMenu4::ShowItems (sub_82210360)", 150, &plain, __imp__sub_82210360,
+       hooks::RaceScreensUnseenPause4ShowItems, 128, 48, {48, 80}, false},
+      {"PauseMenu4::ColorItems (sub_82210CD0)", 150, &plain, __imp__sub_82210CD0,
+       hooks::RaceScreensUnseenPause4ColorItems, 128, 48, {0, 0}, false},
+      {"PauseMenu4::SetUpMain (sub_82210C00)", 150, &no_block, __imp__sub_82210C00,
+       hooks::RaceScreensUnseenPause4SetUpMain, 128, 24, {0, 0}, true},
+      {"PauseMenu4::SetUpVolume (sub_82211250)", 150, &no_block, __imp__sub_82211250,
+       hooks::RaceScreensUnseenPause4SetUpVolume, 128, 24, {40, 80}, true},
+      {"PauseMenu4::ShowVolumes (sub_82210670)", 100, &plain, __imp__sub_82210670,
+       hooks::RaceScreensUnseenPause4ShowVolumes, 112, 24, {0, 0}, false},
+      {"PauseMenu4::ShowVolumesB (sub_82210DE0)", 100, &plain, __imp__sub_82210DE0,
+       hooks::RaceScreensUnseenPause4ShowVolumesB, 112, 24, {0, 0}, false},
+      {"PauseMenu4::RunTen (sub_8220FF88)", 100, &step, __imp__sub_8220FF88,
+       hooks::RaceScreensUnseenPause4RunTen, 96, 16, {0, 0}, false},
+      {"PauseMenu4::OpenMain (sub_82211098)", 150, &step_no_block, __imp__sub_82211098,
+       hooks::RaceScreensUnseenPause4OpenMain, 112, 24, {0, 0}, true},
+      {"PauseMenu4::ShowMain (sub_82210010)", 100, &step, __imp__sub_82210010,
+       hooks::RaceScreensUnseenPause4ShowMain, 112, 32, {0, 0}, false},
+      {"PauseMenu4::BackToMain (sub_822100D8)", 100, &step, __imp__sub_822100D8,
+       hooks::RaceScreensUnseenPause4BackToMain, 112, 32, {0, 0}, false},
+      {"PauseMenu4::MoveMain (sub_82210228)", 100, &step, __imp__sub_82210228,
+       hooks::RaceScreensUnseenPause4MoveMain, 112, 32, {0, 0}, false},
+      {"PauseMenu4::CloseMain (sub_82210170)", 100, &step, __imp__sub_82210170,
+       hooks::RaceScreensUnseenPause4CloseMain, 112, 24, {0, 0}, false},
+      {"PauseMenu4::OpenVolume (sub_822114D8)", 150, &step_no_block, __imp__sub_822114D8,
+       hooks::RaceScreensUnseenPause4OpenVolume, 112, 24, {0, 0}, true},
+      {"PauseMenu4::ShowVolumeRow (sub_822102D8)", 100, &step, __imp__sub_822102D8,
+       hooks::RaceScreensUnseenPause4ShowVolumeRow, 112, 24, {0, 0}, false},
+      {"PauseMenu4::MoveVolume (sub_82210940)", 200, &step, __imp__sub_82210940,
+       hooks::RaceScreensUnseenPause4MoveVolume, 144, 56, {0, 0}, false},
+      {"PauseMenu4::SetVolume (sub_82210B08)", 150, &step, __imp__sub_82210B08,
+       hooks::RaceScreensUnseenPause4SetVolume, 128, 40, {0, 0}, false},
+      {"PauseMenu4::CloseVolume (sub_82211138)", 150, &step_no_block, __imp__sub_82211138,
+       hooks::RaceScreensUnseenPause4CloseVolume, 112, 24, {0, 0}, true},
+  };
+  for (const Simple& f : simple) {
+    FrameSpec spec{f.frame, f.saves, f.skip};
+    if (f.init) spec.after = list_block;
+    FreshGroup(h, w, count, f.name, f.cases, *f.setup, f.recompiled, f.native, spec);
+  }
+  FrameSpec saving{96, 8};
+  saving.after = save_bytes;
+  FreshGroup(h, w, count, "PauseMenu4::LoadVolumes (sub_822107B8)", 100, plain, __imp__sub_822107B8,
+             hooks::RaceScreensUnseenPause4LoadVolumes, saving);
+  FreshGroup(h, w, count, "PauseMenu4::SaveVolumes (sub_82210820)", 100, plain, __imp__sub_82210820,
+             hooks::RaceScreensUnseenPause4SaveVolumes, saving);
+  FreshGroup(h, w, count, "PauseMenu4::AnswerPage (sub_82210910)", 100, plain, __imp__sub_82210910,
+             hooks::RaceScreensUnseenPause4AnswerPage, saving);
+  // RestoreNodes: the group (r3) -1 or 0 to 3, the child (r4) 0 to 8.
+  FreshGroup(
+      h, w, count, "PauseMenu4::RestoreNodes (sub_822106E8)", 100,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        t.r3.u64 = r.Below(3) == 0 ? ~uint64_t(0) : r.Below(4);
+        t.r4.u64 = r.Below(9);
+      },
+      __imp__sub_822106E8, hooks::RaceScreensUnseenPause4RestoreNodes, {128, 40});
+  // ShowVolume: the node (r3) one of the world's sub-scenes or leaves, the
+  // volume (r4) -2 to 17 or any.
+  FreshGroup(
+      h, w, count, "PauseMenu4::ShowVolume (sub_822105F8)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        t.r3.u64 = r.Below(2) == 0 ? w.sub(r.Below(kSubScenes)) : w.leaf(r.Below(kLeaves));
+        t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(20)) - 2));
+      },
+      __imp__sub_822105F8, hooks::RaceScreensUnseenPause4ShowVolume, {112, 32, {40, 80}});
+  // SetArrow: r3 0, 40 or any.
+  FreshGroup(
+      h, w, count, "PauseMenu4::SetArrow (sub_82210420)", 100,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        const uint64_t values[3] = {0, 40, r.Next()};
+        t.r3.u64 = values[r.Below(3)];
+      },
+      __imp__sub_82210420, hooks::RaceScreensUnseenPause4SetArrow, {112, 24});
+  // The confirm dialog's page object and data, as AfterRaceMenu::
+  // ConfirmPage's cases shape them.
+  auto dialog = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t pages = w.block(rs::kDialogPages);
+    const uint32_t data = w.block(rs::kDialogData);
+    const int32_t choices[7] = {-1, 5, 0, 1, 2, 3, 4};
+    const int32_t page = choices[r.Below(7)];
+    guest::StoreU32(h.base, pages, uint32_t(page));
+    guest::StoreU32(h.base, pages + 12, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
+    guest::StoreU32(h.base, data + 36, page != -1 && page != 5 ? 1 : r.Below(2));
+    guest::StoreU32(h.base, data + 0, r.Below(3));
+  };
+  FreshGroup(
+      h, w, count, "PauseMenu4::ConfirmPage (sub_8220FF30)", 150,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        dialog(r, w);
+      },
+      __imp__sub_8220FF30, hooks::RaceScreensUnseenPause4ConfirmPage, {96, 8});
+  // MainPage: the list in the menu list world (5 items, selections 0 to 4).
+  FrameSpec main_page{112, 24};
+  main_page.list_world = &list_world;
+  main_page.list_global = rs::kPause4List;
+  FreshGroup(h, w, count, "PauseMenu4::MainPage (sub_8220FD48)", 400, plain, __imp__sub_8220FD48,
+             hooks::RaceScreensUnseenPause4MainPage, main_page);
+  // VolumePage: the sound manager's slots 29 and 30 (GetCategory,
+  // SetCategoryVolume) the getter sub_82090770 (r3 = +60) and the recorder
+  // sub_820CE9F8, as PauseMenu::VolumePage's cases lay them; the volume
+  // globals the setters write compared as floats and put back.
+  constexpr uint32_t kRecordR4 = 0x820CE9F8, kGet60 = 0x82090770;
+  constexpr uint32_t kVolumes[3] = {menu_sounds::kEffectsVolume, menu_sounds::kEffectsVolume2,
+                                    menu_sounds::kMusicVolume};
+  uint32_t saved_volumes[3];
+  for (int i = 0; i < 3; i++) saved_volumes[i] = guest::LoadU32(h.base, kVolumes[i]);
+  auto sound_slots = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t vtable = w.misc.address + 0x400;
+    guest::StoreU32(h.base, vtable + menu_sounds::kGetCategorySlot,
+                    r.Below(4) == 0 ? kRecordR4 : kGet60);
+    guest::StoreU32(h.base, vtable + menu_sounds::kSetCategoryVolumeSlot, kRecordR4);
+    guest::StoreU32(h.base, w.misc.address + 60,
+                    r.Below(3) == 0 ? 0xFFFFFFFFu
+                                    : (r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(4)));
+  };
+  FrameSpec volume_page{112, 24};
+  volume_page.list_world = &list_world;
+  volume_page.list_global = rs::kPause4List;
+  volume_page.after = [&](Outputs& out) {
+    for (int i = 0; i < 3; i++) {
+      out.Float(guest::LoadU32(h.base, kVolumes[i]));
+      guest::StoreU32(h.base, kVolumes[i], saved_volumes[i]);
+    }
+  };
+  FreshGroup(
+      h, w, count, "PauseMenu4::VolumePage (sub_82210E58)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        sound_slots(r, w);
+      },
+      __imp__sub_82210E58, hooks::RaceScreensUnseenPause4VolumePage, volume_page);
+  // Update: the page -1 to 3 (ConfirmPage's r4 the case's), the list in the
+  // menu list world, the dialog and the sound slots shaped.
+  FrameSpec update{112, 8};
+  update.list_world = &list_world;
+  update.list_global = rs::kPause4List;
+  update.after = [&](Outputs& out) {
+    save_bytes(out);
+    for (int i = 0; i < 3; i++) {
+      out.Float(guest::LoadU32(h.base, kVolumes[i]));
+      guest::StoreU32(h.base, kVolumes[i], saved_volumes[i]);
+    }
+  };
+  FreshGroup(
+      h, w, count, "PauseMenu4::Update (sub_82211458)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        sound_slots(r, w);
+        dialog(r, w);
+        guest::StoreU32(h.base, w.block(rs::kPause4Pages), uint32_t(int32_t(r.Below(5)) - 1));
+      },
+      __imp__sub_82211458, hooks::RaceScreensUnseenPause4Update, update);
+  // Open: r3 the screen's block, r4 the player 0, 1 or any, r5 the kind;
+  // UI movie 5 in the movie table half the time (the second pair's id), the
+  // missing movie's answer otherwise.
+  FrameSpec open{128, 40};
+  open.after = save_bytes;
+  FreshGroup(
+      h, w, count, "PauseMenu4::Open (sub_82211390)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        if (r.Below(2) == 0) {
+          guest::StoreU32(h.base, w.movies.address + kPairsAt + 8, 5);
+        }
+        t.r3.u64 = w.block(rs::kPause4Screen);
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
+        t.r5.u64 = r.Next();
+      },
+      __imp__sub_82211390, hooks::RaceScreensUnseenPause4Open, open);
+  // Draw: the running transition (+12) none (-1), another negative one or 0
+  // to 10, the queued one (+16) -1 or 0 to 10, the page (+0) 0 to 3; the
+  // list's block 0 where the transition runs MenuList::Init (1, 6 and 10).
+  FrameSpec draw{192, 64};
+  draw.after = list_block;
+  FreshGroup(
+      h, w, count, "PauseMenu4::Draw (sub_82211590)", 400,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        const uint32_t pages = w.block(rs::kPause4Pages);
+        const uint32_t pick = r.Below(14);
+        const uint32_t transition = pick == 0 || pick == 1 ? 0xFFFFFFFFu
+                                    : pick == 2           ? uint32_t(-2 - int32_t(r.Below(9)))
+                                                          : pick - 3;
+        shape(r, w, transition == 1 || transition == 6 || transition == 10);
+        guest::StoreU32(h.base, pages + 12, transition);
+        guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(11));
+        guest::StoreU32(h.base, pages + 4, r.Below(4));
+        guest::StoreU32(h.base, pages + 0, r.Below(4));
+        ShapeDialogPages(h.base, r, w);
+        t.r3.u64 = w.block(rs::kPause4Screen);
+      },
+      __imp__sub_82211590, hooks::RaceScreensUnseenPause4Draw, draw);
+}
+
+// The results at +1028 and +1032 (RaceResults::, SplitResults::): the
+// screens' globals ([0x82814E18], [0x82814E1C]) a block of the case's own
+// (RaceResults' 52 bytes at +0, SplitResults' 40 at +0x80, the rest
+// random), the two globals beside them ([0x82814E20] the tick count around
+// 0 to 4 or 207 to 212, [0x82814E24] 0, 1 or any). RaceResults: the block's
+// +0 0, 1 or any, +4 a packed time (minutes 0 to 70, now and then any
+// word), +8 the place 0 to 10 (the original indexes its frame's table
+// unchecked), +12 small or any, +16 0 to 12 or any, +20 one of the world's
+// movies, the page object (+24: page -1 to 1, transition -9 to 2, queued -1
+// to 2), the step word (+48) 0 or 1. SplitResults: the outcome (+0) and
+// mode (+4) 0 to 3 or any, +8 a movie, the page object (+12) and step word
+// (+36) the same. The pages with the mapper entries of the menu list world
+// (FrameSpec::list_world: controllers 0 and 1, their mappers' slot 10
+// Pressed or Held, the entries' +4 now and then 1); SplitResults::MainPage
+// with a race data block of the case's own (its kind +0xA3AF0 6 two times
+// in three, else 0 to 5; the stage list at +0x59620, the current stage +804 0
+// to 9, the stages' first word 1 half the time). Compared as MovieGroup
+// does, with the screens' block and the two globals; SetTexts' varargs
+// stores (its frame's +48 to +79) left out (unset words 0 in ours, the
+// user's call for the parking area, 2026-10-30). SplitResults::Draw's
+// world below, before the openers.
+void UnseenResults(Context& h, const MovieWorld& w) {
+  constexpr uint32_t kRaceDataGlobal = 0x826C5B2C;
+  constexpr uint32_t kSplitBytes = 0x80;
+  const World list_world;
+  const Block screens(0x100);
+  const Block race(0xA3B00);
+  if (!list_world.ok() || !screens.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes saved(h.base, {{rs::kSplitTicks, 8}, {kRaceDataGlobal, 4}});
+  const uint32_t results = screens.address, split = screens.address + kSplitBytes;
+  uint64_t count = 0;  // the setups run (Fresh)
+  auto pages = [&h](Random& r, uint32_t at) {
+    const int32_t transitions[13] = {-1, -1, -1, -2, -5, -9, 0, 0, 1, 1, 2, 2, 2};
+    guest::StoreU32(h.base, at + 0, uint32_t(int32_t(r.Below(3)) - 1));
+    guest::StoreU32(h.base, at + 4, r.Below(3));
+    guest::StoreU32(h.base, at + 12, uint32_t(transitions[r.Below(13)]));
+    guest::StoreU32(h.base, at + 16, uint32_t(int32_t(r.Below(4)) - 1));
+    guest::StoreU32(h.base, at + 24, r.Below(2));
+  };
+  auto shape = [&](Random& r, const MovieWorld& w) {
+    WriteRandom(h.base, screens.address, screens.bytes, r);
+    guest::StoreU32(h.base, rs::kRaceResults, results);
+    guest::StoreU32(h.base, rs::kSplitResults, split);
+    guest::StoreU32(h.base, rs::kSplitTicks,
+                    r.Below(3) == 0 ? r.Below(5) : 207 + r.Below(6));
+    guest::StoreU32(h.base, rs::kSplitExchanged,
+                    r.Below(6) == 0 ? uint32_t(r.Next()) : (r.Below(3) == 0 ? 0 : 1));
+    // RaceResults.
+    guest::StoreU32(h.base, results + 0, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    const uint32_t time = (r.Below(71) << 16) | (r.Below(64) << 10) | r.Below(1024) |
+                          (r.Below(4) == 0 ? 0x80000000u : 0);
+    guest::StoreU32(h.base, results + 4, r.Below(8) == 0 ? uint32_t(r.Next()) : time);
+    guest::StoreU32(h.base, results + 8, r.Below(11));
+    guest::StoreU32(h.base, results + 12, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(40));
+    guest::StoreU32(h.base, results + 16, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(13));
+    guest::StoreU32(h.base, results + 20, w.movie(r.Below(kMovieCount)));
+    pages(r, results + 24);
+    // SplitResults.
+    for (const uint32_t field : {0u, 4u}) {
+      guest::StoreU32(h.base, split + field, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));
+    }
+    guest::StoreU32(h.base, split + 8, w.movie(r.Below(kMovieCount)));
+    pages(r, split + 12);
+  };
+  auto shape_race = [&](Random& r) {
+    guest::StoreU32(h.base, kRaceDataGlobal, race.address);
+    guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(3) != 0 ? 6 : r.Below(6));
+    const uint32_t stages = race.address + 0x59620;
+    WriteRandom(h.base, stages, 816, r);
+    guest::StoreU32(h.base, stages + 804, r.Below(10));
+    for (uint32_t k = 0; k < 10; k++) {
+      guest::StoreU32(h.base, stages + 80 * k, r.Below(2) == 0 ? 1 : r.Below(3));
+    }
+  };
+  auto outputs = [&](Outputs& out) {
+    out.Bytes(Read(h.base, screens.address, screens.bytes));
+    out.Bytes(Read(h.base, rs::kSplitTicks, 8));
+  };
+  const MovieSetupFn on_results = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    t.r3.u64 = results;
+  };
+  const MovieSetupFn on_split = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    t.r3.u64 = split;
+  };
+  const MovieSetupFn results_step = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    t.r3.u64 = results + 48;
+  };
+  const MovieSetupFn split_step = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    t.r3.u64 = split + 36;
+  };
+  const MovieSetupFn split_race = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    shape_race(r);
+    t.r3.u64 = split;
+  };
+  struct Spec {
+    const char* name;
+    int cases;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+    bool mappers;
+  };
+  const Spec specs[] = {
+      {"RaceResults::SetTexts (sub_8221F628)", 200, &on_results, __imp__sub_8221F628,
+       hooks::RaceScreensUnseenRaceResultsSetTexts, 160, 32, {48, 80}, false},
+      {"RaceResults::Intro (sub_8221F428)", 100, &results_step, __imp__sub_8221F428,
+       hooks::RaceScreensUnseenRaceResultsIntro, 96, 16, {0, 0}, false},
+      {"RaceResults::Show (sub_8221F4B0)", 100, &results_step, __imp__sub_8221F4B0,
+       hooks::RaceScreensUnseenRaceResultsShow, 112, 24, {0, 0}, false},
+      {"RaceResults::Close (sub_8221F580)", 100, &results_step, __imp__sub_8221F580,
+       hooks::RaceScreensUnseenRaceResultsClose, 112, 24, {0, 0}, false},
+      {"RaceResults::MainPage (sub_8221F870)", 200, &on_results, __imp__sub_8221F870,
+       hooks::RaceScreensUnseenRaceResultsMainPage, 96, 16, {0, 0}, true},
+      {"RaceResults::Update (sub_8221F930)", 200, &on_results, __imp__sub_8221F930,
+       hooks::RaceScreensUnseenRaceResultsUpdate, 96, 8, {0, 0}, true},
+      {"RaceResults::Draw (sub_8221F7D0)", 300, &on_results, __imp__sub_8221F7D0,
+       hooks::RaceScreensUnseenRaceResultsDraw, 112, 16, {0, 0}, false},
+      {"SplitResults::Intro (sub_8221FAC8)", 400, &split_step, __imp__sub_8221FAC8,
+       hooks::RaceScreensUnseenSplitResultsIntro, 112, 32, {0, 0}, false},
+      {"SplitResults::Show (sub_8221FBE8)", 400, &split_step, __imp__sub_8221FBE8,
+       hooks::RaceScreensUnseenSplitResultsShow, 112, 24, {0, 0}, false},
+      {"SplitResults::Close (sub_8221FD98)", 100, &split_step, __imp__sub_8221FD98,
+       hooks::RaceScreensUnseenSplitResultsClose, 112, 24, {0, 0}, false},
+      {"SplitResults::MainPage (sub_8221FE70)", 300, &split_race, __imp__sub_8221FE70,
+       hooks::RaceScreensUnseenSplitResultsMainPage, 192, 32, {0, 0}, true},
+      {"SplitResults::Update (sub_8221FFF0)", 300, &split_race, __imp__sub_8221FFF0,
+       hooks::RaceScreensUnseenSplitResultsUpdate, 96, 8, {0, 0}, true},
+  };
+  for (const Spec& s : specs) {
+    FrameSpec spec{s.frame, s.saves, s.skip};
+    if (s.mappers) spec.list_world = &list_world;
+    spec.after = outputs;
+    MovieGroup(h, w, s.name, s.cases, *s.setup, s.recompiled, s.native, spec);
+  }
+  // SplitResults::Draw (sub_822200E0): the race data as MainPage's, with
+  // its racer records (+0x59AE8: the count +0x49FE0 1 to 5, the records
+  // random); [0x82814E24] 0 half the time (the network battle's branch), the
+  // tick count 0, 1 to 4 or 895 to 904; the sign-in watch's state 0 half the
+  // time, else any, and its reason; the answer byte 255 a third of the time,
+  // else 0 to 3, and the word beside it; the peer list (+4, +8) 0 to 3
+  // entries of 384 bytes in a block of its own (the iterator's trap left
+  // out), the one address beside it random; the peer mode word 0 half the
+  // time; the id's pointer ([0x826D82E8]) a block of its own. The sends are
+  // Dropped by their overrides on both sides (the user's call, 2026-11-14).
+  // Compared with the screens, the globals and the records.
+  constexpr uint32_t kNetGlobalsA = 0x826BAB3C, kNetGlobalsABytes = 0x24;  // to +0x5C
+  constexpr uint32_t kNetAnswerWords = 0x826C6B04, kNetPeersBytes = 0x20;
+  const Block peers(384 * 3), players(0x2000);
+  if (!peers.address || !players.address) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes net_saved(h.base, {{kNetGlobalsA, kNetGlobalsABytes},
+                                {kNetAnswerWords, 12},
+                                {rs::kNetPeers, kNetPeersBytes},
+                                {rs::kNetPeerMode, 4},
+                                {rs::kNetPlayers, 4}});
+  const uint32_t records = race.address + 0x59AE8;
+  const MovieSetupFn split_draw = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    shape_race(r);
+    if (r.Below(2) == 0) guest::StoreU32(h.base, rs::kSplitExchanged, 0);
+    const uint32_t ticks[3] = {0, 1 + r.Below(4), 895 + r.Below(10)};
+    guest::StoreU32(h.base, rs::kSplitTicks, ticks[r.Below(3)]);
+    WriteRandom(h.base, kNetGlobalsA, kNetGlobalsABytes, r);
+    if (r.Below(2) == 0) guest::StoreU32(h.base, rs::kSignInWatchState, 0);
+    WriteRandom(h.base, kNetAnswerWords, 12, r);
+    guest::StoreU8(h.base, rs::kNetAnswer, r.Below(3) == 0 ? 255 : uint8_t(r.Below(4)));
+    WriteRandom(h.base, rs::kNetPeers, kNetPeersBytes, r);
+    WriteRandom(h.base, peers.address, peers.bytes, r);
+    guest::StoreU32(h.base, rs::kNetPeers + 4, peers.address);
+    guest::StoreU32(h.base, rs::kNetPeers + 8, peers.address + 384 * r.Below(4));
+    guest::StoreU32(h.base, rs::kNetPeerMode, r.Below(2) == 0 ? 0 : uint32_t(r.Next()) | 1);
+    WriteRandom(h.base, players.address, players.bytes, r);
+    guest::StoreU32(h.base, rs::kNetPlayers, players.address);
+    WriteRandom(h.base, records, 5 * 3936, r);
+    guest::StoreU32(h.base, records + 0x49FE0, 1 + r.Below(5));
+    t.r3.u64 = split;
+  };
+  FrameSpec draw{2816, 72};
+  draw.own_stack = true;
+  draw.after = [&](Outputs& out) {
+    outputs(out);
+    out.Bytes(Read(h.base, kNetGlobalsA, kNetGlobalsABytes));
+    out.Bytes(Read(h.base, kNetAnswerWords, 12));
+    out.Bytes(Read(h.base, rs::kNetPeers, kNetPeersBytes));
+    out.Word(guest::LoadU32(h.base, rs::kNetPeerMode));
+    out.Bytes(Read(h.base, records, 5 * 3936));
+    out.Word(guest::LoadU32(h.base, records + 0x49FE0));
+  };
+  MovieGroup(h, w, "SplitResults::Draw (sub_822200E0)", 600, split_draw, __imp__sub_822200E0,
+             hooks::RaceScreensUnseenSplitResultsDraw, draw);
+  // The openers: UI movie 7 or 8 in the movie table half the time (the
+  // second pair's id), the missing movie's answer otherwise.
+  FrameSpec open{112, 24};
+  open.after = outputs;
+  MovieGroup(
+      h, w, "RaceResults::Open (sub_8221F990)", 200,
+      [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+        Random r = Fresh(rr, count);
+        shape(r, w);
+        if (r.Below(2) == 0) guest::StoreU32(h.base, w.movies.address + kPairsAt + 8, 7);
+        t.r3.u64 = results;
+        t.r4.u64 = screens.address + 0xC0;  // the block: the screens block's random words
+      },
+      __imp__sub_8221F990, hooks::RaceScreensUnseenRaceResultsOpen, open);
+  FrameSpec split_open{112, 16};
+  split_open.after = outputs;
+  MovieGroup(
+      h, w, "SplitResults::Open (sub_82220050)", 150,
+      [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+        Random r = Fresh(rr, count);
+        shape(r, w);
+        if (r.Below(2) == 0) guest::StoreU32(h.base, w.movies.address + kPairsAt + 8, 8);
+        t.r3.u64 = split;
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(3);
+        t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(3);
+      },
+      __imp__sub_82220050, hooks::RaceScreensUnseenSplitResultsOpen, split_open);
+}
+
+// Kind 6's screen after the race (Kind6Menu::): its globals each a block
+// or word of the case's own (saved and put back): the screen
+// ([0x82814E10], 0x200 bytes of random words, Open's 24-byte source block
+// after it) with its four movies (+24 to +36) the world's (each 0 now and
+// then for Close), page object A (+40: page 0 to 5 or 13, transition -2 to 7,
+// queued -1 to 7, step word +64 0 or 1), the cursor and the one before
+// (+68, +72) 0 to 3, now and then any, the last move (+76) -1, 0, 1 or any,
+// the replay slots' list (+136: count, scroll 0 to the count, selections 0
+// to 8, move -1, 0, 1 or any, wrapped 0 or 1, its item block 0: MenuList::
+// Init's new one compared and freed), page object B (+208: page -1 to 5,
+// transition -2 to 7, step word +232), B's selection (+236) 0 or 1, the
+// message id (+324) 40 to 59, the flags +336 to +356 0 to 4 or any; the
+// answer word [0x82814E14] 0 to 3 or any; the session ([0x82816E3C], random
+// words); the replay list ([0x828161F0]: +12 its 64 records of 36 bytes,
+// their +28 0 or 1 to 30 (ShowReplay stores its tens and ones as two
+// nodes' child index +108, which the world's leaves share: a wild word there
+// sends later lookups to wild addresses), their kind +20 0 to 4, course +24 0 to 20,
+// +32 0 to 7, the rest random; +20 the count 0 to 20); the course
+// ([0x82816660] 0 to 8 or any) and its flag ([0x82816680] 0 or 1). The
+// world's root's children are all TXT leaves (SetText on -1's children
+// loops forever on a scene, the original's assert), and half the time the
+// movie table's ids 17, 20, 21 and 14 (Open's). Compared as MovieGroup does,
+// with the screen, the session, the replay list and records, the course
+// words and the answer word.
+void UnseenKind6(Context& h, const MovieWorld& w) {
+  constexpr uint32_t kScreenBytes = 0x280, kRecords = 64, kRecordBytes = 36;
+  const Block screen(kScreenBytes);
+  const Block session(0x200);
+  const Block replays(0x40 + kRecords * kRecordBytes);
+  if (!screen.address || !session.address || !replays.address) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes saved(h.base, {{rs::kKind6Session, 4},
+                            {rs::kKind6Course, 4},
+                            {rs::kKind6CourseFlag, 4},
+                            {rs::kKind6Replays, 4}});
+  const uint32_t k = screen.address, records = replays.address + 0x40;
+  uint64_t count = 0;  // the setups run (Fresh)
+  auto any = [](Random& r, uint32_t n) { return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(n); };
+  auto shape = [&](Random& r, const MovieWorld& w) {
+    WriteRandom(h.base, k, kScreenBytes, r);
+    WriteRandom(h.base, session.address, session.bytes, r);
+    WriteRandom(h.base, replays.address, replays.bytes, r);
+    guest::StoreU32(h.base, rs::kKind6Menu, k);
+    guest::StoreU32(h.base, rs::kKind6Word, any(r, 4));
+    guest::StoreU32(h.base, rs::kKind6Session, session.address);
+    guest::StoreU32(h.base, rs::kKind6Replays, replays.address);
+    guest::StoreU32(h.base, rs::kKind6Course, any(r, 9));
+    guest::StoreU32(h.base, rs::kKind6CourseFlag, r.Below(2));
+    for (uint32_t i = 0; i < 4; i++) {
+      guest::StoreU32(h.base, k + 24 + 4 * i, w.movie(r.Below(kMovieCount)));
+    }
+    const uint32_t pages[7] = {0, 1, 2, 3, 4, 5, 13};
+    guest::StoreU32(h.base, k + 40, pages[r.Below(7)]);
+    guest::StoreU32(h.base, k + 44, r.Below(14));
+    guest::StoreU32(h.base, k + 52, uint32_t(int32_t(r.Below(10)) - 2));
+    guest::StoreU32(h.base, k + 56, uint32_t(int32_t(r.Below(9)) - 1));
+    guest::StoreU32(h.base, k + 64, r.Below(2));
+    guest::StoreU32(h.base, k + 68, any(r, 4));
+    guest::StoreU32(h.base, k + 72, any(r, 4));
+    const uint32_t moves[4] = {0xFFFFFFFFu, 0, 1, uint32_t(r.Next())};
+    guest::StoreU32(h.base, k + 76, moves[r.Below(4)]);
+    // The replay slots' list.
+    const uint32_t replay_count = r.Below(21);
+    const uint32_t list = k + 136;
+    guest::StoreU32(h.base, list + rs::kListCount, replay_count);
+    guest::StoreU32(h.base, list + rs::kListScroll, r.Below(replay_count + 1));
+    guest::StoreU32(h.base, list + rs::kListScrollBefore, r.Below(replay_count + 1));
+    guest::StoreU32(h.base, list + rs::kListSelection, r.Below(9));
+    guest::StoreU32(h.base, list + rs::kListSelectionBefore, r.Below(9));
+    guest::StoreU32(h.base, list + rs::kListMove, moves[r.Below(4)]);
+    guest::StoreU32(h.base, list + rs::kListWrapped, r.Below(2));
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+    guest::StoreU32(h.base, k + 208, uint32_t(int32_t(r.Below(7)) - 1));
+    guest::StoreU32(h.base, k + 212, r.Below(6));
+    guest::StoreU32(h.base, k + 220, uint32_t(int32_t(r.Below(10)) - 2));
+    guest::StoreU32(h.base, k + 224, uint32_t(int32_t(r.Below(9)) - 1));
+    guest::StoreU32(h.base, k + 232, r.Below(2));
+    guest::StoreU32(h.base, k + 236, r.Below(2));
+    guest::StoreU32(h.base, k + 324, 40 + r.Below(20));
+    for (uint32_t field = 336; field <= 356; field += 4) {
+      guest::StoreU32(h.base, k + field, r.Below(3) == 0 ? any(r, 5) : r.Below(2));
+    }
+    guest::StoreU32(h.base, replays.address + 12, records);
+    guest::StoreU32(h.base, replays.address + 20, replay_count);
+    for (uint32_t i = 0; i < kRecords; i++) {
+      const uint32_t record = records + kRecordBytes * i;
+      guest::StoreU32(h.base, record + 28, r.Below(3) == 0 ? 0 : r.Below(31));
+      guest::StoreU32(h.base, record + 20, r.Below(5));
+      guest::StoreU32(h.base, record + 24, r.Below(21));
+      guest::StoreU32(h.base, record + 32, r.Below(8));
+    }
+    // Every child of the root a TXT leaf.
+    for (uint32_t i = 0; i < 60; i++) {
+      guest::StoreU32(h.base, w.root() + 128 + 8 * i, w.leaf(r.Below(kLeaves)));
+    }
+    if (r.Below(2) == 0) {
+      const uint32_t ids[4] = {17, 20, 21, 14};
+      for (uint32_t m = 0; m < 4; m++) {
+        guest::StoreU32(h.base, w.movies.address + kPairsAt + 8 * m, ids[m]);
+      }
+    }
+  };
+  // MenuList::Init's new block: its item words (the count's, at most 20)
+  // compared, then freed and +68 put back to 0; then the blocks and words.
+  auto outputs = [&](Outputs& out) {
+    const uint32_t list = k + 136;
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      const uint32_t n = std::min<uint32_t>(guest::LoadU32(h.base, list + rs::kListCount), 20);
+      out.Bytes(Read(h.base, block, n * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+    out.Bytes(Read(h.base, k, kScreenBytes));
+    out.Bytes(Read(h.base, session.address, session.bytes));
+    out.Bytes(Read(h.base, replays.address, replays.bytes));
+    out.Word(guest::LoadU32(h.base, rs::kKind6Word));
+    out.Word(guest::LoadU32(h.base, rs::kKind6Course));
+    out.Word(guest::LoadU32(h.base, rs::kKind6CourseFlag));
+  };
+  auto setup = [&](auto&& more) {
+    return MovieSetupFn([&, more](PPCContext& t, Random& rr, const MovieWorld& w) {
+      Random r = Fresh(rr, count);
+      shape(r, w);
+      more(t, r, w);
+    });
+  };
+  const MovieSetupFn plain = setup([](PPCContext&, Random&, const MovieWorld&) {});
+  // Close: each movie 0 now and then (the others' movies are never 0: they
+  // read through them).
+  const MovieSetupFn close = setup([&](PPCContext&, Random& r, const MovieWorld&) {
+    for (uint32_t i = 0; i < 4; i++) {
+      if (r.Below(4) == 0) guest::StoreU32(h.base, k + 24 + 4 * i, 0);
+    }
+  });
+  const MovieSetupFn on_screen = setup([&](PPCContext& t, Random&, const MovieWorld&) {
+    t.r3.u64 = k;
+  });
+  const MovieSetupFn step = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r3.u64 = k + (r.Below(2) == 0 ? 64 : 232);
+  });
+  const MovieSetupFn cursor = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    const uint64_t values[3] = {0, 120, r.Next()};
+    t.r3.u64 = values[r.Below(3)];
+  });
+  const MovieSetupFn record = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r3.u64 = r.Below(8) == 0 ? 0 : records + kRecordBytes * r.Below(kRecords);
+  });
+  const MovieSetupFn open = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    // The source block: 24 bytes after the screen, its time (+4) minutes 0
+    // to 70 now and then any word.
+    const uint32_t block = k + 0x200;
+    const uint32_t time = (r.Below(71) << 16) | (r.Below(64) << 10) | r.Below(1024) |
+                          (r.Below(4) == 0 ? 0x80000000u : 0);
+    guest::StoreU32(h.base, block + 4, r.Below(8) == 0 ? uint32_t(r.Next()) : time);
+    t.r3.u64 = k;
+    t.r4.u64 = block;
+  });
+  const MovieSetupFn draw = setup([&](PPCContext& t, Random& r, const MovieWorld& w) {
+    ShapeDialogPages(h.base, r, w);
+    t.r3.u64 = k;
+  });
+  struct Spec {
+    const char* name;
+    int cases;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+  };
+  // SetText's varargs stores (the frame's +48 to +79) and SetNodeText's
+  // (+40 to +79) left out: their unset words are 0 in ours (the user's call
+  // for the parking area, 2026-10-30).
+  constexpr std::pair<uint32_t, uint32_t> kText = {48, 80}, kNodeText = {40, 80}, kNo = {0, 0};
+  const Spec specs[] = {
+      {"Kind6Menu::Close (sub_8221C168)", 100, &close, __imp__sub_8221C168,
+       hooks::RaceScreensUnseenKind6Close, 96, 16, kNo},
+      {"Kind6Menu::HidePanels (sub_8221CFC0)", 100, &plain, __imp__sub_8221CFC0,
+       hooks::RaceScreensUnseenKind6HidePanels, 96, 16, kNo},
+      {"Kind6Menu::ShowPanelA (sub_8221D050)", 100, &plain, __imp__sub_8221D050,
+       hooks::RaceScreensUnseenKind6ShowPanelA, 112, 24, kNo},
+      {"Kind6Menu::ShowHelp (sub_8221D130)", 100, &plain, __imp__sub_8221D130,
+       hooks::RaceScreensUnseenKind6ShowHelp, 96, 16, kText},
+      {"Kind6Menu::ShowCourse (sub_8221D1A8)", 200, &plain, __imp__sub_8221D1A8,
+       hooks::RaceScreensUnseenKind6ShowCourse, 240, 88, kText},
+      {"Kind6Menu::SetUpTexts (sub_8221E038)", 200, &on_screen, __imp__sub_8221E038,
+       hooks::RaceScreensUnseenKind6SetUpTexts, 128, 32, kText},
+      {"Kind6Menu::SetCursorX (sub_8221D7B0)", 100, &cursor, __imp__sub_8221D7B0,
+       hooks::RaceScreensUnseenKind6SetCursorX, 112, 16, kNo},
+      {"Kind6Menu::ShowReplay (sub_8221CBD8)", 300, &record, __imp__sub_8221CBD8,
+       hooks::RaceScreensUnseenKind6ShowReplay, 176, 40, kText},
+      {"Kind6Menu::ShowList (sub_8221D4E8)", 200, &plain, __imp__sub_8221D4E8,
+       hooks::RaceScreensUnseenKind6ShowList, 160, 80, kNodeText},
+      {"Kind6Menu::SetUpList (sub_8221DF70)", 200, &plain, __imp__sub_8221DF70,
+       hooks::RaceScreensUnseenKind6SetUpList, 160, 48, kNo},
+      {"Kind6Menu::Intro (sub_8221C438)", 100, &step, __imp__sub_8221C438,
+       hooks::RaceScreensUnseenKind6Intro, 112, 32, kNo},
+      {"Kind6Menu::Show (sub_8221C550)", 100, &step, __imp__sub_8221C550,
+       hooks::RaceScreensUnseenKind6Show, 112, 24, kNo},
+      {"Kind6Menu::RunToEnd (sub_8221C5D8)", 100, &step, __imp__sub_8221C5D8,
+       hooks::RaceScreensUnseenKind6RunToEnd, 96, 8, kNo},
+      {"Kind6Menu::MoveMain (sub_8221DB48)", 200, &step, __imp__sub_8221DB48,
+       hooks::RaceScreensUnseenKind6MoveMain, 128, 40, kText},
+      {"Kind6Menu::BackToQuit (sub_8221DC88)", 100, &step, __imp__sub_8221DC88,
+       hooks::RaceScreensUnseenKind6BackToQuit, 128, 48, kText},
+      {"Kind6Menu::OpenList (sub_8221EB98)", 200, &step, __imp__sub_8221EB98,
+       hooks::RaceScreensUnseenKind6OpenList, 112, 32, kNo},
+      {"Kind6Menu::CloseList (sub_8221C628)", 100, &step, __imp__sub_8221C628,
+       hooks::RaceScreensUnseenKind6CloseList, 112, 24, kNo},
+      {"Kind6Menu::MoveList (sub_8221DD78)", 300, &step, __imp__sub_8221DD78,
+       hooks::RaceScreensUnseenKind6MoveList, 176, 88, kNodeText},
+      {"Kind6Menu::OpenQuestion (sub_8221C6C8)", 100, &step, __imp__sub_8221C6C8,
+       hooks::RaceScreensUnseenKind6OpenQuestion, 112, 32, kText},
+      {"Kind6Menu::CloseQuestion (sub_8221C7D8)", 100, &step, __imp__sub_8221C7D8,
+       hooks::RaceScreensUnseenKind6CloseQuestion, 128, 40, kNo},
+      {"Kind6Menu::MoveQuestion (sub_8221C888)", 100, &step, __imp__sub_8221C888,
+       hooks::RaceScreensUnseenKind6MoveQuestion, 112, 32, kNo},
+      {"Kind6Menu::OpenMessage (sub_8221CAB8)", 100, &step, __imp__sub_8221CAB8,
+       hooks::RaceScreensUnseenKind6OpenMessage, 128, 40, kText},
+      {"Kind6Menu::CloseMessage (sub_8221CB50)", 100, &step, __imp__sub_8221CB50,
+       hooks::RaceScreensUnseenKind6CloseMessage, 128, 40, kNo},
+      {"Kind6Menu::OpenWaiting (sub_8221C920)", 100, &step, __imp__sub_8221C920,
+       hooks::RaceScreensUnseenKind6OpenWaiting, 128, 40, kNodeText},
+      {"Kind6Menu::CloseWaiting (sub_8221CA20)", 100, &step, __imp__sub_8221CA20,
+       hooks::RaceScreensUnseenKind6CloseWaiting, 128, 40, kNo},
+      {"Kind6Menu::Open (sub_8221EC48)", 300, &open, __imp__sub_8221EC48,
+       hooks::RaceScreensUnseenKind6Open, 160, 48, kNo},
+      {"Kind6Menu::Draw (sub_8221EF60)", 500, &draw, __imp__sub_8221EF60,
+       hooks::RaceScreensUnseenKind6Draw, 144, 24, kNo},
+  };
+  for (const Spec& s : specs) {
+    FrameSpec spec{s.frame, s.saves, s.skip};
+    spec.after = outputs;
+    MovieGroup(h, w, s.name, s.cases, *s.setup, s.recompiled, s.native, spec);
+  }
+}
+
+// Kind 6's update and pages, the helpers only they reach and the network
+// manager's small functions (kind6_pages.cpp), in this file's UI movie
+// world with Kind6Menu's screen, the session, the leaderboard's results
+// and a replay header of the allocation layer's pages (SaveBuffers::
+// Destroy frees it natively; the records too). The screen's two menus
+// (+68, +236) and the replay slots' list (+136) read the menu list world's
+// mappers (FrameSpec::list_world). The network state ([0x826C6AA8]) is one
+// sub_8214B330's set-up leaves alone (0, 2, 4109 or 4112). Left out, as
+// inputs that would run Xbox Live work on both sides (the originals,
+// through `calls` in ours): the leaderboard read's start (RankingPage's
+// with the session's +144 and the screen's +320 0, RankingReadPage's with
+// +320 0) and the network manager's 4111 (CheckRecordPage's better time,
+// RankingPage's state 3); and SlotPage's accept (SaveReplay with
+// RaceDialog::AskSlot's replay copy): its list's player's mappers are
+// blocked, so its update, accept and back don't fire there. The confirm
+// dialog's pages as the other confirm pages' cases shape them (its answer
+// page 5 directly or after the Go to it), its list's block 0 where
+// RaceDialog::StartSave's MenuList::Init runs (the new one compared and
+// freed).
+void UnseenKind6Pages(Context& h, const MovieWorld& w) {
+  constexpr uint32_t kScreenBytes = 0x280, kRecords = 64, kRecordBytes = 36;
+  constexpr uint32_t kNetState = 0x826C6AA8;
+  constexpr uint32_t kRows = 24, kResultsBytes = 0x2000;
+  const Block screen(kScreenBytes);
+  const Block session(0x200);
+  const Block results(kResultsBytes);
+  const Block save(kSaveWorldBytes);
+  const World list_world;
+  if (!screen.address || !session.address || !results.address || !save.address ||
+      !list_world.ok()) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes saved(h.base, {{rs::kKind6Session, 4},
+                            {rs::kKind6Course, 4},
+                            {rs::kKind6CourseFlag, 4},
+                            {rs::kKind6Replays, 4},
+                            {rs::kKind6Results, 4},
+                            {rs::kKind6ReadSpec, 4},
+                            {kNetState, 4},
+                            {kSaveInterfaceGlobal, 4}});
+  const uint32_t k = screen.address, s = session.address, res = results.address;
+  uint64_t count = 0;  // the setups run (Fresh)
+  // The replay header and records of this run (the layer's pages).
+  uint32_t header = 0, records = 0;
+  auto any = [](Random& r, uint32_t n) { return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(n); };
+  auto shape = [&](Random& r, const MovieWorld& w) {
+    WriteRandom(h.base, k, kScreenBytes, r);
+    WriteRandom(h.base, s, session.bytes, r);
+    WriteRandom(h.base, res, kResultsBytes, r);
+    ShapeSaveWorld(h.base, save.address, r);
+    guest::StoreU32(h.base, rs::kKind6Menu, k);
+    guest::StoreU32(h.base, rs::kKind6Word, any(r, 4));
+    guest::StoreU32(h.base, rs::kKind6Session, s);
+    guest::StoreU32(h.base, rs::kKind6Course, any(r, 9));
+    guest::StoreU32(h.base, rs::kKind6CourseFlag, r.Below(2));
+    const uint32_t states[4] = {0, 2, 4109, 4112};
+    guest::StoreU32(h.base, kNetState, states[r.Below(4)]);
+    for (uint32_t i = 0; i < 4; i++) {
+      guest::StoreU32(h.base, k + 24 + 4 * i, w.movie(r.Below(kMovieCount)));
+    }
+    // The page objects: A's and B's pages any of theirs, now and then -1;
+    // no transition queued.
+    guest::StoreU32(h.base, k + 40, r.Below(10) == 0 ? 0xFFFFFFFFu : r.Below(15));
+    guest::StoreU32(h.base, k + 208, r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(6));
+    for (const uint32_t pages : {40u, 208u}) {
+      guest::StoreU32(h.base, k + pages + 12, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(8));
+      guest::StoreU32(h.base, k + pages + 16, 0xFFFFFFFFu);
+    }
+    // The two menus: their players 0 to 3, cursors 0 to 4 (now and then
+    // any), first and last items, the switches and the last step.
+    for (const uint32_t menu : {68u, 236u}) {
+      guest::StoreU32(h.base, k + menu + 0, any(r, 5));
+      guest::StoreU32(h.base, k + menu + 4, any(r, 5));
+      guest::StoreU32(h.base, k + menu + 8, r.Below(3) == 0 ? uint32_t(int32_t(r.Below(3)) - 1) : 0);
+      guest::StoreU32(h.base, k + menu + 12, 0);
+      guest::StoreU32(h.base, k + menu + 16, menu == 68 ? 3 : 1);
+      for (uint32_t field = 20; field <= 32; field += 4) {
+        guest::StoreU32(h.base, k + menu + field, r.Below(2));
+      }
+      guest::StoreU32(h.base, k + menu + 36, r.Below(3) == 0 ? uint32_t(int32_t(r.Below(3)) - 1) : 0);
+      guest::StoreU32(h.base, k + menu + 64, r.Below(4));
+    }
+    guest::StoreU32(h.base, k + 4, (r.Below(70) << 16) | (r.Below(64) << 10) | r.Below(1024));
+    for (uint32_t field = 308; field <= 356; field += 4) {
+      guest::StoreU32(h.base, k + field, r.Below(3) == 0 ? any(r, 5) : r.Below(2));
+    }
+    guest::StoreU32(h.base, k + 328, any(r, 5));
+    guest::StoreU32(h.base, k + 332, any(r, 4));
+    // The replay slots' list.
+    const uint32_t list = k + 136;
+    const uint32_t replay_count = r.Below(21);
+    guest::StoreU32(h.base, list + rs::kListCount, replay_count);
+    guest::StoreU32(h.base, list + rs::kListScroll, r.Below(replay_count + 1));
+    guest::StoreU32(h.base, list + rs::kListScrollBefore, r.Below(replay_count + 1));
+    guest::StoreU32(h.base, list + rs::kListShown, std::min<uint32_t>(replay_count, 9));
+    guest::StoreU32(h.base, list + rs::kListSelection, r.Below(9));
+    guest::StoreU32(h.base, list + rs::kListSelectionBefore, r.Below(9));
+    guest::StoreU32(h.base, list + rs::kListPlayer, r.Below(4));
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+    for (uint32_t field = rs::kListDown; field <= rs::kListBack; field += 4) {
+      guest::StoreU32(h.base, list + field, 151 + r.Below(10));
+    }
+    // The replay header and its records (the layer's pages, this run's).
+    header = memory::AllocPages(0x1000, 0x1000);
+    records = memory::AllocPages(kRecords * kRecordBytes, 0x1000);
+    WriteRandom(h.base, header, 0x40, r);
+    for (const uint32_t offset : {0u, 4u, 8u}) guest::StoreU32(h.base, header + offset, 0);
+    guest::StoreU32(h.base, header + 12, records);
+    guest::StoreU32(h.base, header + 20, replay_count);
+    WriteRandom(h.base, records, kRecords * kRecordBytes, r);
+    for (uint32_t i = 0; i < kRecords; i++) {
+      const uint32_t record = records + kRecordBytes * i;
+      guest::StoreU32(h.base, record + 28, r.Below(3) == 0 ? 0 : r.Below(31));
+      guest::StoreU32(h.base, record + 20, r.Below(5));
+      guest::StoreU32(h.base, record + 24, r.Below(21));
+      guest::StoreU32(h.base, record + 32, r.Below(8));
+    }
+    guest::StoreU32(h.base, rs::kKind6Replays, header);
+    // The session: the times (+200, +208 doublewords) with the best never
+    // better (no 4111), the read's state (+180) 0 to 2 or 4 to 6 (no 3),
+    // the flags 0 or 1, the XUID (+168) one of the rows' now and then.
+    const uint32_t race_time = r.Below(4000000);
+    StoreU64(h.base, s + 200, race_time);
+    StoreU64(h.base, s + 208, r.Below(2) == 0 ? race_time : r.Below(race_time + 1));
+    const uint32_t read_states[6] = {0, 1, 2, 4, 5, uint32_t(r.Next()) | 4};
+    guest::StoreU32(h.base, s + 180, read_states[r.Below(6)]);
+    for (const uint32_t field : {144u, 160u, 224u, 228u, 232u, 236u, 240u}) {
+      guest::StoreU32(h.base, s + field, r.Below(3) == 0 ? any(r, 5) : r.Below(2));
+    }
+    // The results: none now and then; else a view of up to kRows rows (the
+    // total -1 to 30), each with an XUID (the session's now and then), a
+    // rank, a short gamer tag and its columns (a time, now and then 0 or
+    // past an hour, and a car among the logos' ids).
+    const uint32_t view = res + 0x40, rows = res + 0x100, columns = res + 0x1000;
+    guest::StoreU32(h.base, res + 4, view);
+    const uint32_t read = r.Below(kRows + 1);
+    guest::StoreU32(h.base, view + 4, r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(31));
+    guest::StoreU32(h.base, view + 8, read);
+    guest::StoreU32(h.base, view + 12, rows);
+    const uint32_t mine = r.Below(read + 2);
+    for (uint32_t i = 0; i < kRows; i++) {
+      const uint32_t row = rows + 48 * i;
+      if (i == mine) {
+        StoreU64(h.base, row, (uint64_t(guest::LoadU32(h.base, s + 168)) << 32) |
+                                  guest::LoadU32(h.base, s + 172));
+      }
+      guest::StoreU32(h.base, row + 8, r.Below(10) == 0 ? 0xFFFFFFFFu : r.Below(40));
+      const uint32_t length = r.Below(16);
+      for (uint32_t c = 0; c < length; c++) {
+        guest::StoreU8(h.base, row + 24 + c, uint8_t('A' + r.Below(26)));
+      }
+      guest::StoreU8(h.base, row + 24 + length, 0);
+      const uint32_t column = columns + 64 * i;
+      guest::StoreU32(h.base, row + 44, column);
+      const uint32_t ms[4] = {0, r.Below(600000), r.Below(4000000), 3600000 + r.Below(100000)};
+      StoreU64(h.base, column + 16, ms[r.Below(4)]);
+      const uint32_t cars[6] = {5, 53, 103, 0xFFFFFFFFu, r.Below(110), 39};
+      guest::StoreU32(h.base, column + 40, cars[r.Below(6)]);
+    }
+    guest::StoreU32(h.base, rs::kKind6Results, r.Below(6) == 0 ? 0 : res);
+    // Every child of the root a TXT leaf.
+    for (uint32_t i = 0; i < 60; i++) {
+      guest::StoreU32(h.base, w.root() + 128 + 8 * i, w.leaf(r.Below(kLeaves)));
+    }
+    const uint32_t ids[4] = {17, 20, 21, 14};
+    for (uint32_t m = 0; m < 4; m++) {
+      guest::StoreU32(h.base, w.movies.address + kPairsAt + 8 * m, ids[m]);
+    }
+  };
+  // The confirm dialog: its page -1, 5 or another with +36 1 (the Go to 5),
+  // its answer's +0 0 to 2.
+  auto dialog = [&](Random& r, const MovieWorld& w) {
+    const uint32_t pages = w.block(rs::kDialogPages);
+    const uint32_t data = w.block(rs::kDialogData);
+    const int32_t choices[7] = {-1, 5, 0, 1, 2, 3, 4};
+    const int32_t page = choices[r.Below(7)];
+    guest::StoreU32(h.base, pages, uint32_t(page));
+    guest::StoreU32(h.base, pages + 12, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
+    guest::StoreU32(h.base, data + 36, page != -1 && page != 5 ? 1 : r.Below(2));
+    guest::StoreU32(h.base, data + 0, r.Below(3));
+    guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
+  };
+  // The outputs: the replay header (freed by SaveBuffers::Destroy or not:
+  // its words and records compared, then freed), the dialog list's and the
+  // slots' list's new blocks (compared, freed), the blocks and globals.
+  auto outputs = [&](Outputs& out) {
+    const bool kept = header != 0 && memory::IsPages(header);
+    out.Word(kept ? 1 : 0);
+    out.Word(guest::LoadU32(h.base, rs::kKind6Replays) == header ? 1 : 0);
+    if (kept) {
+      out.Bytes(Read(h.base, header + 16, 0x30));
+      out.Word(guest::LoadU32(h.base, header + 12) == records ? 1 : 0);
+      for (const uint32_t offset : {0u, 4u, 8u}) out.Word(guest::LoadU32(h.base, header + offset));
+      memory::FreePages(header);
+    }
+    if (memory::IsPages(records)) {
+      out.Bytes(Read(h.base, records, kRecords * kRecordBytes));
+      memory::FreePages(records);
+    }
+    header = records = 0;
+    guest::StoreU32(h.base, rs::kKind6Replays, 0);
+    for (const uint32_t list : {k + 136, w.block(rs::kDialogList)}) {
+      const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+      out.Word(block != 0 ? 1 : 0);
+      if (block != 0 && memory::IsPages(block)) {
+        const uint32_t n = std::min<uint32_t>(guest::LoadU32(h.base, list + rs::kListCount), 20);
+        out.Bytes(Read(h.base, block, n * 4));
+        memory::FreePages(block);
+      }
+      guest::StoreU32(h.base, list + rs::kListBlock, 0);
+    }
+    out.Bytes(Read(h.base, k, kScreenBytes));
+    out.Bytes(Read(h.base, s, session.bytes));
+    out.Bytes(Read(h.base, res, kResultsBytes));
+    out.Bytes(Read(h.base, save.address, kSaveWorldBytes));
+    for (const uint32_t global : {rs::kKind6Word, rs::kKind6Results, rs::kKind6ReadSpec, kNetState}) {
+      out.Word(guest::LoadU32(h.base, global));
+    }
+  };
+  auto setup = [&](auto&& more) {
+    return MovieSetupFn([&, more](PPCContext& t, Random& rr, const MovieWorld& w) {
+      Random r = Fresh(rr, count);
+      shape(r, w);
+      dialog(r, w);
+      more(t, r, w);
+    });
+  };
+  const MovieSetupFn plain = setup([](PPCContext&, Random&, const MovieWorld&) {});
+  // Pages that call the leaderboard read or the network's 4111: a read
+  // already started (+320 1) and the session's +144 set.
+  const MovieSetupFn no_live = setup([&](PPCContext&, Random&, const MovieWorld&) {
+    guest::StoreU32(h.base, k + 320, 1);
+    guest::StoreU32(h.base, s + 144, 1);
+  });
+  // SlotPage: the list's player's mappers blocked (no SaveReplay).
+  const MovieSetupFn slots = setup([&](PPCContext&, Random&, const MovieWorld&) {
+    for (uint32_t c = 0; c < 4; c++) guest::StoreU32(h.base, rs::kMapperEntries + 8 * c + 4, 1);
+  });
+  const MovieSetupFn dialog_r4 = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r4.u64 = r.Below(2) == 0 ? 0 : r.Next();
+  });
+  const MovieSetupFn update = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r3.u64 = k;
+    guest::StoreU32(h.base, k + 320, 1);
+    guest::StoreU32(h.base, s + 144, 1);
+    guest::StoreU32(h.base, k + 352, r.Below(4) == 0 ? 1 : 0);
+    // B's QuestionPage and MessagePage and the +352 block may clear +320
+    // before A's read pages: half the time not (the read's start left
+    // out), else the read's start allowed (the leaderboard read is native
+    // on both sides, answered as no Live: the old results none or a block
+    // of the C runtime heap, which it frees).
+    // A's SlotPage with blocked mappers; others as they come.
+    const uint32_t a = guest::LoadU32(h.base, k + 40);
+    const uint32_t b = guest::LoadU32(h.base, k + 208);
+    if (a == 7 || a == 12) {
+      if (r.Below(2) == 0) {
+        if (b == 1 || b == 3) guest::StoreU32(h.base, k + 208, 4);
+        guest::StoreU32(h.base, k + 352, 0);  // its block clears +320 too
+      } else {
+        if (r.Below(2) == 0) guest::StoreU32(h.base, k + 320, 0);
+        guest::StoreU32(h.base, s + 144, r.Below(2));
+        guest::StoreU32(h.base, rs::kKind6Results,
+                        r.Below(2) == 0 ? 0 : memory::crt::OperatorNewArray(h.base, 64).value_or(0));
+      }
+    }
+    if (a == 2) {
+      for (uint32_t c = 0; c < 4; c++) guest::StoreU32(h.base, rs::kMapperEntries + 8 * c + 4, 1);
+    }
+  });
+  const MovieSetupFn net = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    const uint64_t states[5] = {4109, 4112, 4110, 0, r.Next()};
+    t.r3.u64 = states[r.Below(5)];
+    if (uint32_t(t.r3.u64) == 4111) t.r3.u64 = 4112;
+  });
+  const MovieSetupFn car = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r3.u64 = r.Below(4) == 0 ? r.Next() : r.Below(110);
+  });
+  const MovieSetupFn time = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    t.r3.u64 = r.Below(kRows);
+    const uint32_t out = k + 0x200;
+    t.r4.u64 = out;
+    t.r5.u64 = out + 4;
+    t.r6.u64 = out + 8;
+  });
+  struct Spec {
+    const char* name;
+    int cases;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+  };
+  constexpr std::pair<uint32_t, uint32_t> kText = {48, 80}, kNodeText = {40, 80}, kNo = {0, 0};
+  const Spec specs[] = {
+      {"Leaderboard::Rank (sub_822914A8)", 200, &plain, __imp__sub_822914A8,
+       hooks::RaceScreensUnseenKind6Rank, 0, 0, kNo},
+      {"Leaderboard::CarLogo (sub_8225FFC8)", 200, &car, __imp__sub_8225FFC8,
+       hooks::RaceScreensUnseenKind6CarLogo, 0, 0, kNo},
+      {"Network::SetLiveState (sub_822927B0)", 150, &net, __imp__sub_822927B0,
+       hooks::RaceScreensUnseenKind6NetState, 96, 8, kNo},
+      {"Kind6Menu::RankingTime (sub_8221D808)", 200, &time, __imp__sub_8221D808,
+       hooks::RaceScreensUnseenKind6RankingTime, 0, 0, kNo},
+      {"Kind6Menu::ShowPanelB (sub_8221CEA0)", 100, &plain, __imp__sub_8221CEA0,
+       hooks::RaceScreensUnseenKind6ShowPanelB, 112, 24, kNo},
+      {"Kind6Menu::ShowTimeOnly (sub_8221D3D0)", 150, &plain, __imp__sub_8221D3D0,
+       hooks::RaceScreensUnseenKind6ShowTimeOnly, 112, 32, kNodeText},
+      {"Kind6Menu::ShowRanking (sub_8221E1A0)", 400, &plain, __imp__sub_8221E1A0,
+       hooks::RaceScreensUnseenKind6ShowRanking, 192, 96, kNodeText},
+      {"Kind6Menu::AnswerPage (sub_8221C1E0)", 100, &plain, __imp__sub_8221C1E0,
+       hooks::RaceScreensUnseenKind6AnswerPage, 0, 0, kNo},
+      {"Kind6Menu::WaitingPage (sub_8221C3F0)", 100, &plain, __imp__sub_8221C3F0,
+       hooks::RaceScreensUnseenKind6WaitingPage, 96, 8, kNo},
+      {"Kind6Menu::QuestionAnswerPage (sub_8221C360)", 100, &plain, __imp__sub_8221C360,
+       hooks::RaceScreensUnseenKind6QuestionAnswerPage, 96, 16, kNo},
+      {"Kind6Menu::MenuBackPage (sub_8221D898)", 100, &plain, __imp__sub_8221D898,
+       hooks::RaceScreensUnseenKind6MenuBackPage, 96, 16, kNo},
+      {"Kind6Menu::MessageBackPage (sub_8221D9D8)", 100, &plain, __imp__sub_8221D9D8,
+       hooks::RaceScreensUnseenKind6MessageBackPage, 96, 16, kNo},
+      {"Kind6Menu::UploadResultPage (sub_8221D908)", 150, &plain, __imp__sub_8221D908,
+       hooks::RaceScreensUnseenKind6UploadResultPage, 96, 16, kNo},
+      {"Kind6Menu::QuitPage (sub_8221C308)", 150, &dialog_r4, __imp__sub_8221C308,
+       hooks::RaceScreensUnseenKind6QuitPage, 96, 8, kNo},
+      {"Kind6Menu::SavePage (sub_8221C238)", 150, &dialog_r4, __imp__sub_8221C238,
+       hooks::RaceScreensUnseenKind6SavePage, 96, 8, kNo},
+      {"Kind6Menu::OverwritePage (sub_8221E908)", 150, &dialog_r4, __imp__sub_8221E908,
+       hooks::RaceScreensUnseenKind6OverwritePage, 96, 8, kNo},
+      {"Kind6Menu::SavingPage (sub_8221C2B8)", 150, &dialog_r4, __imp__sub_8221C2B8,
+       hooks::RaceScreensUnseenKind6SavingPage, 96, 8, kNo},
+      {"Kind6Menu::SlotPage (sub_8221DA60)", 150, &slots, __imp__sub_8221DA60,
+       hooks::RaceScreensUnseenKind6SlotPage, 96, 16, kNo},
+      {"Kind6Menu::CheckRecordPage (sub_8221E510)", 200, &plain, __imp__sub_8221E510,
+       hooks::RaceScreensUnseenKind6CheckRecordPage, 112, 24, kNo},
+      {"Kind6Menu::RankingReadPage (sub_8221C008)", 200, &no_live, __imp__sub_8221C008,
+       hooks::RaceScreensUnseenKind6RankingReadPage, 128, 40, kNo},
+      {"Kind6Menu::RankingPage (sub_8221BE90)", 200, &no_live, __imp__sub_8221BE90,
+       hooks::RaceScreensUnseenKind6RankingPage, 128, 40, kNo},
+      {"Kind6Menu::UploadPage (sub_8221E5E8)", 300, &plain, __imp__sub_8221E5E8,
+       hooks::RaceScreensUnseenKind6UploadPage, 128, 40, kNo},
+      {"Kind6Menu::QuestionPage (sub_8221E980)", 300, &plain, __imp__sub_8221E980,
+       hooks::RaceScreensUnseenKind6QuestionPage, 96, 16, kNo},
+      {"Kind6Menu::MessagePage (sub_8221EAE8)", 300, &plain, __imp__sub_8221EAE8,
+       hooks::RaceScreensUnseenKind6MessagePage, 96, 16, kNo},
+      {"Kind6Menu::MainPage (sub_8221E788)", 400, &plain, __imp__sub_8221E788,
+       hooks::RaceScreensUnseenKind6MainPage, 96, 16, kNo},
+      {"Kind6Menu::Update (sub_8221F1E8)", 600, &update, __imp__sub_8221F1E8,
+       hooks::RaceScreensUnseenKind6Update, 304, 128, kNo},
+  };
+  // Update's cases may leave a results block of the heap the read didn't
+  // free (its read not started): compared as kept, freed, the word 0.
+  auto update_outputs = [&](Outputs& out) {
+    const uint32_t now = guest::LoadU32(h.base, rs::kKind6Results);
+    const bool heap = now != 0 && now != res;
+    out.Word(heap ? 1 : 0);
+    if (heap) {
+      memory::crt::OperatorDeleteArray(now);
+      guest::StoreU32(h.base, rs::kKind6Results, 0);
+    }
+    outputs(out);
+  };
+  for (const Spec& sp : specs) {
+    FrameSpec spec{sp.frame, sp.saves, sp.skip};
+    spec.list_world = &list_world;
+    spec.after = sp.setup == &update ? std::function<void(Outputs&)>(update_outputs)
+                                     : std::function<void(Outputs&)>(outputs);
+    MovieGroup(h, w, sp.name, sp.cases, *sp.setup, sp.recompiled, sp.native, spec);
+  }
+
+  // The leaderboard read (sub_82292CC0, answered as no Live: the user's
+  // call, 2026-11-14) and its spec's set-up (sub_82292648). The spec's view
+  // word ([0x826C72F4]) 0 to 17 or any. The read's world: the old results
+  // ([0x826C6AD4]) none or a 64-byte block of the C runtime heap (each
+  // version's own: the read frees it), the player's controller 0 to 3, r4 0
+  // or a rank, r5 any XUID; the read's frame words +80 (the buffer's size the
+  // SDK's stub leaves unwritten) 64 and +84 (the enumerator's handle) 0, so
+  // the original allocates 64 bytes and XEnumerate fails on the handle. The
+  // original's buffer, when it made one, is freed after the case. Its
+  // overlapped (0x826C6080, 28 bytes) and the spec saved and put back.
+  constexpr uint32_t kOverlapped = 0x826C6080;
+  SavedBytes read_saved(h.base, {{kOverlapped, 28}, {rs::kKind6StatsSpec, 16}});
+  auto spec_view = [&](Random& r) {
+    guest::StoreU32(h.base, rs::kKind6ReadSpec,
+                    r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(18));
+    WriteRandom(h.base, rs::kKind6StatsSpec, 16, r);
+  };
+  auto read_world = [&](Random& r, uint32_t frame) {
+    spec_view(r);
+    guest::StoreU32(h.base, rs::kKind6Results,
+                    r.Below(2) == 0 ? 0 : memory::crt::OperatorNewArray(h.base, 64).value_or(0));
+    guest::StoreU32(h.base, rs::kControllerEntries, r.Below(4));
+    WriteRandom(h.base, kOverlapped, 28, r);
+    guest::StoreU32(h.base, frame + 80, 64);
+    guest::StoreU32(h.base, frame + 84, 0);
+  };
+  const MovieSetupFn spec_setup = setup([&](PPCContext&, Random& r, const MovieWorld&) {
+    spec_view(r);
+  });
+  const MovieSetupFn read_setup = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    read_world(r, t.r1.u32 - 144);
+    t.r3.u64 = s;
+    t.r4.u64 = r.Below(2) == 0 ? 0 : r.Below(100);
+    t.r5.u64 = r.Next();
+  });
+  // The read's start in the two pages that make it (+320 0; RankingPage's
+  // session +144 0, RankingReadPage's +356 0): their read frame below
+  // theirs (128 bytes) and the 4112 state's call.
+  const MovieSetupFn read_page = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    guest::StoreU32(h.base, k + 320, 0);
+    guest::StoreU32(h.base, k + 356, 0);
+    guest::StoreU32(h.base, s + 144, 0);
+    read_world(r, t.r1.u32 - 128 - 144);
+  });
+  // The original's buffer freed (the native makes none); `all` adds what
+  // differs on purpose: whether there was one, and the overlapped.
+  auto read_after = [&](bool all) {
+    return [&, all](Outputs& out) {
+      const uint32_t now = guest::LoadU32(h.base, rs::kKind6Results);
+      if (all) {
+        out.Word(now != 0 ? 1 : 0);
+        out.Bytes(Read(h.base, kOverlapped, 28));
+      }
+      if (now != 0) {
+        memory::crt::OperatorDeleteArray(now);
+        guest::StoreU32(h.base, rs::kKind6Results, 0);
+      }
+      outputs(out);
+      out.Bytes(Read(h.base, rs::kKind6StatsSpec, 16));
+    };
+  };
+  FrameSpec spec_frame{0, 0};
+  spec_frame.list_world = &list_world;
+  spec_frame.after = [&](Outputs& out) {
+    outputs(out);
+    out.Bytes(Read(h.base, rs::kKind6StatsSpec, 16));
+  };
+  MovieGroup(h, w, "Leaderboard::SetUpSpec (sub_82292648)", 150, spec_setup, __imp__sub_82292648,
+             hooks::RaceScreensUnseenKind6ReadSpecSetUp, spec_frame);
+  FrameSpec read_frame{144, 48};
+  read_frame.list_world = &list_world;
+  read_frame.after = read_after(false);
+  read_frame.compare_r3 = false;  // XEnumerate's answer in the original, 0 in ours
+  MovieGroup(h, w, "Leaderboard::Read (sub_82292CC0)", 40, read_setup, __imp__sub_82292CC0,
+             hooks::RaceScreensUnseenKind6LeaderboardRead, read_frame);
+  // Expected to differ (the user's call, 2026-11-14): the SDK's stub of
+  // XamUserCreateStatsEnumerator answers success without writing the size,
+  // so the original allocates a buffer of whatever its frame word holds into
+  // [0x826C6AD4] and clears the overlapped at 0x826C6080 before XEnumerate
+  // fails; ours answers no Live: the read failed, no buffer, the overlapped
+  // untouched. Its frame (the original's enumerator words) and r3 differ too.
+  FrameSpec read_all{144, 48};
+  read_all.list_world = &list_world;
+  read_all.after = read_after(true);
+  MovieGroup(h, w, "Leaderboard::Read (sub_82292CC0) (expected to differ)", 20, read_setup,
+             __imp__sub_82292CC0, hooks::RaceScreensUnseenKind6LeaderboardRead, read_all);
+  for (const auto& [name, recompiled, native] :
+       {std::tuple{"Kind6Menu::RankingReadPage with the read (sub_8221C008)", __imp__sub_8221C008,
+                   hooks::RaceScreensUnseenKind6RankingReadPage},
+        std::tuple{"Kind6Menu::RankingPage with the read (sub_8221BE90)", __imp__sub_8221BE90,
+                   hooks::RaceScreensUnseenKind6RankingPage}}) {
+    FrameSpec page{128, 40};
+    page.list_world = &list_world;
+    page.after = read_after(false);
+    MovieGroup(h, w, name, 60, read_page, recompiled, native, page);
+  }
+
+  // The replay's save from kind 6's slot list: Kind6Menu::SaveReplay
+  // (sub_8221D678), RaceDialog::AskSlot (sub_82219058) and StoreReplay
+  // (sub_82218FF8), Replay::CopyFrom (sub_821A66A8). The world: the race's
+  // replay ([0x826C5B50]) and the header's kept replay (+4) two blocks of
+  // 0x13C8F0 random bytes (NaN words as they come: CopyFrom's copies and
+  // RaceSnapshot::Copy's lfs and stfs pairs keep the bits); the header's +8
+  // a 36-byte record block in its page (+0x200); the race data (+60 any,
+  // the race kind 0 to 6, its racer records' count 1 to 5, the records
+  // random); GetLocalTime a made-up time (time_hooks::SetFakeNow) while a
+  // case runs. Compared with the kept replay and the record block too; the
+  // frames without the words SetText stores from r6 on (AskSlot's +40 to
+  // +79: unset, 0 in ours, the user's call for the parking area).
+  constexpr uint32_t kReplayBytes = 0x13C8F0, kRaceDataGlobal = 0x826C5B2C;
+  const Block replay_to(kReplayBytes), replay_from(kReplayBytes), race(0xA3B00);
+  if (!replay_to.address || !replay_from.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes save_saved(h.base, {{rs::kRaceReplay, 4}, {kRaceDataGlobal, 4}});
+  const uint32_t race_records = race.address + 0x59AE8;
+  const uint32_t record_source = k + 0x240;
+  auto save_world = [&](Random& r) {
+    WriteRandom(h.base, replay_to.address, kReplayBytes, r);
+    WriteRandom(h.base, replay_from.address, kReplayBytes, r);
+    guest::StoreU32(h.base, rs::kRaceReplay, replay_from.address);
+    guest::StoreU32(h.base, header + 4, replay_to.address);
+    guest::StoreU32(h.base, header + 8, header + 0x200);
+    WriteRandom(h.base, header + 0x200, 36, r);
+    guest::StoreU32(h.base, kRaceDataGlobal, race.address);
+    guest::StoreU32(h.base, race.address + 60, uint32_t(r.Next()));
+    guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(7));
+    WriteRandom(h.base, race_records, 5 * 3936, r);
+    guest::StoreU32(h.base, race_records + 0x49FE0, 1 + r.Below(5));
+    time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
+  };
+  auto save_after = [&](Outputs& out) {
+    time_hooks::ClearFakeNow();
+    out.Bytes(Read(h.base, replay_to.address, kReplayBytes));
+    if (header != 0) out.Bytes(Read(h.base, header + 0x200, 36));
+    outputs(out);
+  };
+  const MovieSetupFn copy_from = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    save_world(r);
+    t.r3.u64 = replay_to.address;
+    t.r4.u64 = replay_from.address;
+  });
+  const MovieSetupFn store_replay = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    save_world(r);
+    t.r3.u64 = record_source;
+    t.r4.u64 = replay_from.address;
+  });
+  const MovieSetupFn ask_slot = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    save_world(r);
+    t.r3.u64 = r.Below(3) == 0 ? 0 : r.Below(21);
+    t.r4.u64 = record_source;
+    t.r5.u64 = replay_from.address;
+  });
+  const MovieSetupFn save_replay = setup([&](PPCContext&, Random& r, const MovieWorld&) {
+    save_world(r);
+  });
+  struct SaveSpec {
+    const char* name;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+  };
+  const SaveSpec save_specs[] = {
+      {"Replay::CopyFrom (sub_821A66A8)", &copy_from, __imp__sub_821A66A8,
+       hooks::RaceScreensUnseenReplayCopyFrom, 112, 24, kNo},
+      {"RaceDialog::StoreReplay (sub_82218FF8)", &store_replay, __imp__sub_82218FF8,
+       hooks::RaceScreensUnseenStoreReplay, 112, 24, kNo},
+      {"RaceDialog::AskSlot (sub_82219058)", &ask_slot, __imp__sub_82219058,
+       hooks::RaceScreensUnseenAskSlot, 144, 40, {40, 80}},
+      {"Kind6Menu::SaveReplay (sub_8221D678)", &save_replay, __imp__sub_8221D678,
+       hooks::RaceScreensUnseenKind6SaveReplay, 176, 48, kNo},
+  };
+  for (const SaveSpec& sp : save_specs) {
+    FrameSpec spec{sp.frame, sp.saves, sp.skip};
+    spec.list_world = &list_world;
+    spec.after = save_after;
+    MovieGroup(h, w, sp.name, 25, *sp.setup, sp.recompiled, sp.native, spec);
+  }
 }
 
 }  // namespace
@@ -2327,6 +3741,23 @@ void RaceScreens(Context& h) {
   Data(h);
   Pages(h);
   Transitions(h);
+}
+
+}  // namespace harness
+
+namespace harness {
+
+void RaceScreensUnseen(Context& h) {
+  const MovieWorld w;
+  if (!w.ok()) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  BuildStringTable(h.base, w);
+  Pause4(h, w);
+  UnseenResults(h, w);
+  UnseenKind6(h, w);
+  UnseenKind6Pages(h, w);
 }
 
 }  // namespace harness

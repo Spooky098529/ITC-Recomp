@@ -13,6 +13,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/scene_target.h"
 #include "scene_target/scene_target.h"
@@ -84,7 +85,10 @@ void hooks::SceneTargetRecordPasses(PPCContext& ctx, uint8_t* base) {
           const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + byte);
           ctx.ctr.u64 = function;
           ctx.lr = return_address;
-          REX_CALL_INDIRECT_FUNC(function);
+          // Slot 8's plain C++ where it's the game's (hooks::DirectSlotCall).
+          if (!hooks::DirectSlotCall(ctx, base, function)) {
+            REX_CALL_INDIRECT_FUNC(function);
+          }
         };
         scene_target::PassCalls calls;
         // The render manager's slot 8, its answer's slot 2 (the render

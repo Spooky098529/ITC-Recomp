@@ -234,6 +234,46 @@ SlotCall AppPoolSlot(uint8_t* base, uint32_t interface8);
 // sub_820944A8 (the app's +16 interface's slot +16): this - 8, then
 // sub_82094368.
 SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16);
+// The scene's render manager [0x826BABA0] (the app's +16 interface) and the
+// frame driver: tail calls through the framework's +36 interface (app + 24;
+// docs/functions/app-start-up.md).
+// sub_82094338 App::SceneFromInterface8 (the app's +8 interface's slot +12):
+// the word at +16 (app + 24) and its slot +12 (the scene in play,
+// sub_82090908), tail-called.
+SlotCall SceneSlot(uint8_t* base, uint32_t interface8);
+// sub_820944D8 App::SceneFromInterface16 (the +16 interface's slot +32, the
+// render manager's slot 8): this - 8, then sub_82094338.
+SlotCall SceneSlotFromInterface16(uint8_t* base, uint32_t interface16);
+// sub_82094320 App::FrameDriver (the app's +4 interface's slot +4): the word
+// at +20 (app + 24) and its slot +8 (the frame driver in play,
+// sub_820908E0), tail-called.
+SlotCall FrameDriverSlot(uint8_t* base, uint32_t interface4);
+// sub_82094498 (the +16 interface's slot +28): this - 12, then sub_82094320.
+SlotCall FrameDriverSlotFromInterface16(uint8_t* base, uint32_t interface16);
+// sub_82094480 (the +8 interface's slot +16): this - 4, then sub_82094320.
+SlotCall FrameDriverSlotFromInterface8(uint8_t* base, uint32_t interface8);
+
+// Native callers of the render manager's slots 8 and 7 (its vtable's +32 and
+// +28), calling the plain C++ above directly instead of through a guest call
+// of the slot: the slot's function `function` on `manager` (r3), with the
+// tail call's target the game's (the framework's +36 interface's slot 3
+// sub_82090908 for slot 8, slot 2 sub_820908E0 for slot 7: their plain C++,
+// framework::SceneFrom36 and RendererFrom36). `target` is the tail call's
+// (r11 and ctr as the original leaves them). nullopt where the guest call is
+// made instead: `function` not sub_820944D8 or sub_82094498,
+// --native_app_start_up or --native_framework off, or the target not the
+// game's (only loads come before, so the guest call reads the same).
+constexpr uint32_t kRenderManagerScene = 0x820944D8;        // slot 8 (vtable + 32)
+constexpr uint32_t kRenderManagerFrameDriver = 0x82094498;  // slot 7 (vtable + 28)
+struct DirectSlot {
+  uint32_t r3;
+  uint32_t target;
+};
+std::optional<DirectSlot> RenderManagerCall(uint8_t* base, uint32_t function, uint32_t manager);
+// The same from `manager`'s vtable: slot 8 (the scene) and slot 7 (the frame
+// driver); nullopt where the caller makes its guest call.
+std::optional<uint32_t> RenderManagerScene(uint8_t* base, uint32_t manager);
+std::optional<uint32_t> RenderManagerFrameDriver(uint8_t* base, uint32_t manager);
 
 // --- The app's start-up ---
 

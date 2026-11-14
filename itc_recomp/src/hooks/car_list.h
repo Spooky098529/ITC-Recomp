@@ -79,6 +79,11 @@ void CarListToTabs(PPCContext& ctx, uint8_t* base);
 void CarListOpen(PPCContext& ctx, uint8_t* base);
 void CarListBaseFree(PPCContext& ctx, uint8_t* base);
 void CarListSetFree(PPCContext& ctx, uint8_t* base);
+// The destructors (r3 the object; r4 the flags for the deleting one).
+void CarListGroupBaseDestruct(PPCContext& ctx, uint8_t* base);
+void CarListSetBaseDestruct(PPCContext& ctx, uint8_t* base);
+void CarListSetDestruct(PPCContext& ctx, uint8_t* base);
+void CarListSetInterfaceDeletingDestruct(PPCContext& ctx, uint8_t* base);
 void CarListBaseHandleInput(PPCContext& ctx, uint8_t* base);
 void CarListSetHandleInput(PPCContext& ctx, uint8_t* base);
 void CarListBackPage8(PPCContext& ctx, uint8_t* base);
@@ -114,5 +119,22 @@ void CarListTabsPage(PPCContext& ctx, uint8_t* base);
 void CarListRowsPage(PPCContext& ctx, uint8_t* base);
 void CarListColorsPage(PPCContext& ctx, uint8_t* base);
 void CarListPowerGraphPage(PPCContext& ctx, uint8_t* base);
+// PanelSetPair (r3 the pair; the constructor's r4 to r10 and stack words,
+// the deleting destructor's r4 the flags), the C panels' base (r3 the panel;
+// SetCarName's r4 the car's id, r5 its kind), Panel6C::SetStats (r4 the
+// record) and the confirm panel's constructor.
+void CarListBaseSetCarName(PPCContext& ctx, uint8_t* base);
+void CarListPanel6CSetStats(PPCContext& ctx, uint8_t* base);
+void CarListCarPanelBaseDestruct(PPCContext& ctx, uint8_t* base);
+void CarListConfirmPanelConstruct(PPCContext& ctx, uint8_t* base);
+void CarListPairConstruct(PPCContext& ctx, uint8_t* base);
+void CarListPairDestruct(PPCContext& ctx, uint8_t* base);
+void CarListPairDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void CarListPairReset(PPCContext& ctx, uint8_t* base);
+void CarListPairOpen(PPCContext& ctx, uint8_t* base);
+void CarListPairHandleInput(PPCContext& ctx, uint8_t* base);
+void CarListPairUpdate(PPCContext& ctx, uint8_t* base);
+void CarListPairBuild(PPCContext& ctx, uint8_t* base);
+void CarListPairPicked(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
