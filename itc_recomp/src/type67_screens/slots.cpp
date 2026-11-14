@@ -268,6 +268,25 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return type8_screens::PartInnerStep1(base, r3, *r4, sp, calls);
       case 0x82253838:
         return type8_screens::PartInnerPage2(base, r3, *r4, sp);
+      // The type 8 color list part's (src/type8_screens/color_part.cpp).
+      case 0x822532B8:
+        return type8_screens::ColorPartDeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x82253268:
+        return type8_screens::ColorInnerDeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x822537A0:
+        return type8_screens::ColorInnerOpen(base, r3, *r4, sp, calls);
+      case 0x82254280:
+        return type8_screens::ColorInnerPick(base, r3, *r4, r5.value_or(*r4), sp, lr, calls);
+      case 0x82253FC0:
+        return type8_screens::ColorInnerInput(base, r3, *r4, sp, calls);
+      case 0x82253E48:
+        return type8_screens::ColorInnerStep0(base, r3, *r4, sp, calls);
+      case 0x82254178:
+        return type8_screens::ColorInnerPage0(base, r3, *r4, sp, calls);
+      case 0x82253238:
+        return type8_screens::ColorPartIsFirstChoice(base, r3, *r4, sp);
+      case 0x82253240:
+        return type8_screens::ColorPartThirdChoice(base, r3, *r4);
       default:
         break;
     }
@@ -398,6 +417,15 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82254FB8:
     case 0x822538A8:
     case 0x82253838:
+    case 0x822532B8:
+    case 0x82253268:
+    case 0x822537A0:
+    case 0x82254280:
+    case 0x82253FC0:
+    case 0x82253E48:
+    case 0x82254178:
+    case 0x82253238:
+    case 0x82253240:
       return has_r4;
     case 0x82253108:
       return true;

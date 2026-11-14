@@ -80,4 +80,37 @@ void Type8PartInnerStep1(PPCContext& ctx, uint8_t* base);
 void Type8PartInnerPage1(PPCContext& ctx, uint8_t* base);
 void Type8PartInnerPage2(PPCContext& ctx, uint8_t* base);
 
+// The color list screen's list part: the color block and the inner
+// part's constructor, destructor and IsFirstChoice have no adapters (only
+// native callers).
+void Type8ColorBlockConstruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockSetUp(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockPlaceCursorA(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockPlaceCursorB(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockPlaceCursorC(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockPlayOpening(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockShowSelections(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockShowMenuMove(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockPlayReady(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockSecondMoved(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockUpdateSecond(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockThirdMoved(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockUpdateThird(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockWhileReady(PPCContext& ctx, uint8_t* base);
+void Type8ColorBlockInput(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerConstruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorPartConstruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerDestruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorPartDestruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorPartDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerIsFirstChoice(PPCContext& ctx, uint8_t* base);
+void Type8ColorPartIsFirstChoice(PPCContext& ctx, uint8_t* base);
+void Type8ColorPartThirdChoice(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerOpen(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerPick(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerInput(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerStep0(PPCContext& ctx, uint8_t* base);
+void Type8ColorInnerPage0(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

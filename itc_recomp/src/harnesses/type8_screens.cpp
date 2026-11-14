@@ -21,7 +21,7 @@
 // again. The list screen's list part runs in a world of its own (the part,
 // its inner part, both players' blocks with their menus, the players'
 // action mappers and a fake sound manager, as type67_list_part.cpp makes
-// them; the menus' item blocks the allocation layer's pages where the
+// them; the color list part's the same with its three-menu blocks; the menus' item blocks the allocation layer's pages where the
 // function makes or frees them), with the movie world.
 
 #include "harness.h"
@@ -721,16 +721,37 @@ void LayPlayerBlock(uint8_t* base, uint32_t block, uint32_t items, Random& r) {
   guest::StoreU32(base, block + 228, r.Below(16));
 }
 
-// The list part's world: the part, its inner part (the page -1 or 0 to 2,
-// the step -1, 0 or 1, the queued step, the first-call word) and both
-// blocks; the mappers, the controllers and the sound manager.
-void LayListPart(uint8_t* base, uint32_t w, Random& r) {
+// A color block: the player, the ready and backed-out words, the three
+// menus (the +156 one of five items mostly), its node and string ids small
+// (+228 a sub-scene and a child of the live scene, never -1) and its named
+// animations 0 to 255.
+void LayColorBlock(uint8_t* base, uint32_t block, uint32_t items, Random& r) {
+  guest::StoreU32(base, block + 0, r.Below(2));
+  guest::StoreU32(base, block + 4, r.Below(5) == 0 ? 2 : r.Below(2));
+  guest::StoreU32(base, block + 8, r.Below(2));
+  LayMenu(base, block + 12, items, r);
+  guest::StoreU32(base, block + 12 + race_screens::kListSelection, r.Below(4));
+  guest::StoreU32(base, block + 12 + race_screens::kListSelectionBefore, r.Below(4));
+  LayMenu(base, block + 84, items + 0x40, r);
+  LayMenu(base, block + 156, items + 0x80, r);
+  guest::StoreU32(base, block + 156 + race_screens::kListSelection, r.Below(5));
+  for (uint32_t at = 228; at <= 276; at += 4) guest::StoreU32(base, block + at, r.Below(16));
+  for (uint32_t at = 280; at <= 348; at += 4) guest::StoreU32(base, block + at, r.Below(256));
+  guest::StoreU32(base, block + 356, r.Below(16));
+  guest::StoreU32(base, block + 360, r.Below(16));
+}
+
+// The list part's world (or the color list part's): the part, its inner
+// part (the page -1 or 0 to 2, the step -1, 0 or 1, the queued step, the
+// first-call word) and both blocks; the mappers, the controllers and the
+// sound manager.
+void LayListPart(uint8_t* base, uint32_t w, Random& r, bool color) {
   g_items.clear();
   const uint32_t part = w + kPartAt, inner = w + kInnerAt;
-  guest::StoreU32(base, part, t8::kListPartVtable);
+  guest::StoreU32(base, part, color ? t8::kColorPartVtable : t8::kListPartVtable);
   guest::StoreU32(base, part + 12, 16 + r.Below(4));
   guest::StoreU32(base, part + 16, inner);
-  guest::StoreU32(base, inner, t8::kListInnerVtable);
+  guest::StoreU32(base, inner, color ? t8::kColorInnerVtable : t8::kListInnerVtable);
   auto small = [&r](uint32_t n) { return r.Below(4) == 0 ? kNone : r.Below(n); };
   guest::StoreU32(base, inner + 4, small(3));
   guest::StoreU32(base, inner + 8, small(3));
@@ -739,8 +760,13 @@ void LayListPart(uint8_t* base, uint32_t w, Random& r) {
   guest::StoreU32(base, inner + 20, small(2));
   guest::StoreU32(base, inner + 24, small(2));
   guest::StoreU32(base, inner + 28, r.Below(2));
-  LayPlayerBlock(base, inner + 40, w + kItemsAt, r);
-  LayPlayerBlock(base, inner + 272, w + kItemsAt + 0x80, r);
+  if (color) {
+    LayColorBlock(base, inner + 40, w + kItemsAt, r);
+    LayColorBlock(base, inner + 404, w + kItemsAt + 0x100, r);
+  } else {
+    LayPlayerBlock(base, inner + 40, w + kItemsAt, r);
+    LayPlayerBlock(base, inner + 272, w + kItemsAt + 0x80, r);
+  }
   for (uint32_t c = 0; c < 4; c++) {
     const uint32_t vtable = w + kMapperVtablesAt + 0x40 * c;
     const uint32_t mapper = w + kMappersAt + 0x200 * c;
@@ -813,12 +839,14 @@ void ListPart(Context& h, uint32_t world) {
   // the player for the block's constructor, flags with bit 0 clear for the
   // deleting destructors), r5 the setting for PlaceCursor.
   enum class R4 { kMovie, kPlayer, kNoDelete };
-  const auto setup = [base](Object object, R4 r4) {
-    return [base, object, r4](PPCContext& t, Random& r, uint32_t wb) {
-      LayListPart(base, wb, r);
+  const auto setup = [base](Object object, R4 r4, bool color) {
+    return [base, object, r4, color](PPCContext& t, Random& r, uint32_t wb) {
+      LayListPart(base, wb, r, color);
       uint32_t at = wb + kPartAt;
       if (object == Object::kInner) at = wb + kInnerAt;
-      if (object == Object::kBlock) at = wb + kInnerAt + (r.Below(2) == 0 ? 40 : 272);
+      if (object == Object::kBlock) {
+        at = wb + kInnerAt + (r.Below(2) == 0 ? 40 : (color ? 404 : 272));
+      }
       t.r3.u64 = (t.r3.u64 & 0xFFFFFFFF00000000ull) | at;
       switch (r4) {
         case R4::kMovie:
@@ -845,6 +873,7 @@ void ListPart(Context& h, uint32_t world) {
     bool pages;
     GuestFunction recompiled;
     void (*native)(PPCContext&, uint8_t*);
+    bool color = false;
   };
   const Object part = Object::kPart, inner = Object::kInner, block = Object::kBlock;
   const R4 movie = R4::kMovie;
@@ -899,23 +928,85 @@ void ListPart(Context& h, uint32_t world) {
        __imp__sub_822550C0, hooks::Type8ListInnerPick},
       {"Type8ListPartInner::Input", 0x82254E18, 12, {128, 32}, inner, movie, false,
        __imp__sub_82254E18, hooks::Type8ListInnerInput},
+      // The color list part.
+      {"Type8ColorBlock::Type8ColorBlock", 0x82252EA0, 4, {0, 0, false}, block, R4::kPlayer,
+       false, __imp__sub_82252EA0, hooks::Type8ColorBlockConstruct, true},
+      {"Type8ColorBlock::SetUp", 0x82253308, 8, {176, 72}, block, movie, true,
+       __imp__sub_82253308, hooks::Type8ColorBlockSetUp, true},
+      {"Type8ColorBlock::PlaceCursorA", 0x82253728, 6, {112, 24}, block, movie, false,
+       __imp__sub_82253728, hooks::Type8ColorBlockPlaceCursorA, true},
+      {"Type8ColorBlock::PlaceCursorB", 0x82253690, 4, {144, 48}, block, movie, false,
+       __imp__sub_82253690, hooks::Type8ColorBlockPlaceCursorB, true},
+      {"Type8ColorBlock::PlaceCursorC", 0x82253600, 6, {128, 32}, block, movie, false,
+       __imp__sub_82253600, hooks::Type8ColorBlockPlaceCursorC, true},
+      {"Type8ColorBlock::PlayOpening", 0x822539A8, 4, {128, 32}, block, movie, false,
+       __imp__sub_822539A8, hooks::Type8ColorBlockPlayOpening, true},
+      {"Type8ColorBlock::ShowSelections", 0x82253A50, 6, {128, 40}, block, movie, false,
+       __imp__sub_82253A50, hooks::Type8ColorBlockShowSelections, true},
+      {"Type8ColorBlock::ShowMenuMove", 0x82253BF8, 12, {144, 56}, block, movie, false,
+       __imp__sub_82253BF8, hooks::Type8ColorBlockShowMenuMove, true},
+      {"Type8ColorBlock::PlayReady", 0x82253570, 4, {112, 24}, block, movie, false,
+       __imp__sub_82253570, hooks::Type8ColorBlockPlayReady, true},
+      {"Type8ColorBlock::SecondMoved", 0x822534F0, 6, {128, 32}, block, movie, false,
+       __imp__sub_822534F0, hooks::Type8ColorBlockSecondMoved, true},
+      {"Type8ColorBlock::UpdateSecond", 0x82253948, 8, {112, 24}, block, movie, false,
+       __imp__sub_82253948, hooks::Type8ColorBlockUpdateSecond, true},
+      {"Type8ColorBlock::ThirdMoved", 0x82253D90, 6, {144, 48}, block, movie, false,
+       __imp__sub_82253D90, hooks::Type8ColorBlockThirdMoved, true},
+      {"Type8ColorBlock::UpdateThird", 0x82253F60, 8, {112, 24}, block, movie, false,
+       __imp__sub_82253F60, hooks::Type8ColorBlockUpdateThird, true},
+      {"Type8ColorBlock::WhileReady", 0x82253EF8, 8, {112, 24}, block, movie, false,
+       __imp__sub_82253EF8, hooks::Type8ColorBlockWhileReady, true},
+      {"Type8ColorBlock::Input", 0x82254070, 16, {128, 40}, block, movie, false,
+       __imp__sub_82254070, hooks::Type8ColorBlockInput, true},
+      {"Type8ColorPartInner::Type8ColorPartInner", 0x82253030, 4, {96, 16}, inner, movie, false,
+       __imp__sub_82253030, hooks::Type8ColorInnerConstruct, true},
+      {"Type8ColorListPart::Type8ColorListPart", 0x82253190, 4, {112, 24}, part, movie, false,
+       __imp__sub_82253190, hooks::Type8ColorPartConstruct, true},
+      {"Type8ColorPartInner::~Type8ColorPartInner", 0x82253088, 6, {112, 24}, inner, movie,
+       true, __imp__sub_82253088, hooks::Type8ColorInnerDestruct, true},
+      {"Type8ColorPartInner::DeletingDestructor", 0x82253268, 4, {112, 24}, inner,
+       R4::kNoDelete, true, __imp__sub_82253268, hooks::Type8ColorInnerDeletingDestruct, true},
+      {"Type8ColorListPart::~Type8ColorListPart", 0x822531F0, 6, {96, 16}, part, movie, true,
+       __imp__sub_822531F0, hooks::Type8ColorPartDestruct, true},
+      {"Type8ColorListPart::DeletingDestructor", 0x822532B8, 4, {112, 24}, part, R4::kNoDelete,
+       true, __imp__sub_822532B8, hooks::Type8ColorPartDeletingDestruct, true},
+      {"Type8ColorPartInner::IsFirstChoice", 0x82253148, 4, {96, 8}, inner, R4::kPlayer, false,
+       __imp__sub_82253148, hooks::Type8ColorInnerIsFirstChoice, true},
+      {"Type8ColorListPart::IsFirstChoice", 0x82253238, 4, {96, 8}, part, R4::kPlayer, false,
+       __imp__sub_82253238, hooks::Type8ColorPartIsFirstChoice, true},
+      {"Type8ColorListPart::ThirdChoice", 0x82253240, 4, {0, 0}, part, R4::kPlayer, false,
+       __imp__sub_82253240, hooks::Type8ColorPartThirdChoice, true},
+      {"Type8ColorPartInner::Open", 0x822537A0, 8, {128, 32}, inner, movie, true,
+       __imp__sub_822537A0, hooks::Type8ColorInnerOpen, true},
+      {"Type8ColorPartInner::Step0", 0x82253E48, 8, {128, 32}, inner, movie, false,
+       __imp__sub_82253E48, hooks::Type8ColorInnerStep0, true},
+      {"Type8ColorPartInner::Page0", 0x82254178, 16, {128, 40}, inner, movie, false,
+       __imp__sub_82254178, hooks::Type8ColorInnerPage0, true},
+      {"Type8ColorPartInner::Pick", 0x82254280, 10, {0, 0, false}, inner, movie, false,
+       __imp__sub_82254280, hooks::Type8ColorInnerPick, true},
+      {"Type8ColorPartInner::Input", 0x82253FC0, 12, {128, 32}, inner, movie, false,
+       __imp__sub_82253FC0, hooks::Type8ColorInnerInput, true},
   };
   for (const Function& f : functions) {
     g_pages = f.pages;
-    Group(h, world, f.name, f.address, f.cases, f.frame, setup(f.object, f.r4), f.recompiled,
-          f.native, after);
+    Group(h, world, f.name, f.address, f.cases, f.frame, setup(f.object, f.r4, f.color),
+          f.recompiled, f.native, after);
   }
   g_pages = false;
   g_movies = nullptr;
   // The deleting destructors with bit 0 set (the menus' item blocks 0).
-  const auto shape = [base](bool whole) {
-    return [base, whole](uint32_t object, Random&) {
+  const auto shape = [base](bool whole, bool color = false) {
+    return [base, whole, color](uint32_t object, Random&) {
       const uint32_t in = whole ? object + 20 : object;
-      if (whole) guest::StoreU32(base, object, t8::kListPartVtable);
-      guest::StoreU32(base, in, t8::kListInnerVtable);
-      for (const uint32_t b : {in + 40, in + 272}) {
+      if (whole) {
+        guest::StoreU32(base, object, color ? t8::kColorPartVtable : t8::kListPartVtable);
+      }
+      guest::StoreU32(base, in, color ? t8::kColorInnerVtable : t8::kListInnerVtable);
+      for (const uint32_t b : {in + 40, in + (color ? 404 : 272)}) {
         guest::StoreU32(base, b + 12 + race_screens::kListBlock, 0);
         guest::StoreU32(base, b + 84 + race_screens::kListBlock, 0);
+        if (color) guest::StoreU32(base, b + 156 + race_screens::kListBlock, 0);
       }
     };
   };
@@ -923,6 +1014,10 @@ void ListPart(Context& h, uint32_t world) {
            __imp__sub_82254530, hooks::Type8ListInnerDeletingDestruct);
   Deleting(h, "Type8ListPart::DeletingDestructor", 0x82254580, 524, shape(true),
            __imp__sub_82254580, hooks::Type8ListPartDeletingDestruct);
+  Deleting(h, "Type8ColorPartInner::DeletingDestructor", 0x82253268, 768, shape(false, true),
+           __imp__sub_82253268, hooks::Type8ColorInnerDeletingDestruct);
+  Deleting(h, "Type8ColorListPart::DeletingDestructor", 0x822532B8, 788, shape(true, true),
+           __imp__sub_822532B8, hooks::Type8ColorPartDeletingDestruct);
   for (size_t i = 0; i < kMenuGlobals.size(); i++) {
     Write(base, kMenuGlobals[i].first, menu_globals[i].data(), kMenuGlobals[i].second);
   }

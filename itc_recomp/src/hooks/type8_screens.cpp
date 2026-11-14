@@ -47,7 +47,17 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "sub_822548B8, PlaceCursor sub_82254948, ShowSelections sub_82254AD8, WhileReady "
               "sub_82254A70, Input sub_82254EC8, UpdateSetting sub_82254DB8 and SettingMoved "
               "sub_82254C50, Type8PartInner::Step1 sub_822538A8, Page1 sub_82253108 and Page2 "
-              "sub_82253838 (UiMovie::FinishNamed, LoopNamed, SetNodeText, Run, ResetPose and "
+              "sub_82253838, Type8ColorListPart::Type8ColorListPart sub_82253190, "
+              "~Type8ColorListPart sub_822531F0, DeletingDestructor sub_822532B8, IsFirstChoice "
+              "sub_82253238 and ThirdChoice sub_82253240, Type8ColorPartInner "
+              "sub_82253030, ~Type8ColorPartInner sub_82253088, DeletingDestructor sub_82253268, "
+              "IsFirstChoice sub_82253148, Open sub_822537A0, Pick sub_82254280, Input "
+              "sub_82253FC0, Step0 sub_82253E48 and Page0 sub_82254178, Type8ColorBlock "
+              "sub_82252EA0, SetUp sub_82253308, PlaceCursorA to C sub_82253728, sub_82253690 "
+              "and sub_82253600, PlayOpening sub_822539A8, ShowSelections sub_82253A50, "
+              "ShowMenuMove sub_82253BF8, PlayReady sub_82253570, UpdateSecond sub_82253948, "
+              "SecondMoved sub_822534F0, UpdateThird sub_82253F60, ThirdMoved sub_82253D90, "
+              "WhileReady sub_82253EF8 and Input sub_82254070 (UiMovie::FinishNamed, LoopNamed, SetNodeText, ClearNodeText, Run, ResetPose and "
               "the menus' guest calls, MenuList::Init and Release by their plain C++ where they "
               "free natively)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=type8_screens)");
@@ -140,6 +150,36 @@ ITC_T8_STEP(Type8PartInnerStep1, t8::PartInnerStep1(base, ctx.r3.u64, ctx.r4.u64
 ITC_T8_STEP(Type8PartInnerPage1, t8::PartInnerPage1(base, ctx.r3.u64))
 ITC_T8_STEP(Type8PartInnerPage2, t8::PartInnerPage2(base, ctx.r3.u64, ctx.r4.u64, sp))
 
+ITC_T8_STEP(Type8ColorBlockConstruct, t8::ColorBlockConstruct(base, ctx.r3.u64, ctx.r4.u64))
+ITC_T8_STEP(Type8ColorBlockSetUp, t8::ColorBlockSetUp(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockPlaceCursorA, t8::ColorBlockPlaceCursorA(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_T8_STEP(Type8ColorBlockPlaceCursorB, t8::ColorBlockPlaceCursorB(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ColorBlockPlaceCursorC, t8::ColorBlockPlaceCursorC(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_T8_STEP(Type8ColorBlockPlayOpening, t8::ColorBlockPlayOpening(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ColorBlockShowSelections, t8::ColorBlockShowSelections(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockShowMenuMove, t8::ColorBlockShowMenuMove(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockPlayReady, t8::ColorBlockPlayReady(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockSecondMoved, t8::ColorBlockSecondMoved(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockUpdateSecond, t8::ColorBlockUpdateSecond(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockThirdMoved, t8::ColorBlockThirdMoved(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockUpdateThird, t8::ColorBlockUpdateThird(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockWhileReady, t8::ColorBlockWhileReady(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockInput, t8::ColorBlockInput(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerConstruct, t8::ColorInnerConstruct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ColorPartConstruct, t8::ColorPartConstruct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ColorInnerDestruct, t8::ColorInnerDestruct(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerDeletingDestruct, t8::ColorInnerDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorPartDestruct, t8::ColorPartDestruct(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ColorPartDeletingDestruct, t8::ColorPartDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerIsFirstChoice, t8::ColorInnerIsFirstChoice(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ColorPartIsFirstChoice, t8::ColorPartIsFirstChoice(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ColorPartThirdChoice, t8::ColorPartThirdChoice(base, ctx.r3.u64, ctx.r4.u64))
+ITC_T8_STEP(Type8ColorInnerOpen, t8::ColorInnerOpen(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerPick, t8::ColorInnerPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp, uint32_t(ctx.lr), calls))
+ITC_T8_STEP(Type8ColorInnerInput, t8::ColorInnerInput(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerStep0, t8::ColorInnerStep0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerPage0, t8::ColorInnerPage0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+
 #undef ITC_T8_STEP
 
 void Type8InitMachine(PPCContext& ctx, uint8_t* base) {
@@ -222,3 +262,18 @@ ITC_TYPE8_SCREENS(82254FB8, Type8ListInnerPage0)
 ITC_TYPE8_SCREENS(822538A8, Type8PartInnerStep1)
 ITC_TYPE8_SCREENS(82253108, Type8PartInnerPage1)
 ITC_TYPE8_SCREENS(82253838, Type8PartInnerPage2)
+// The color list screen's list part: its constructor and destructor (from
+// the color list screen's and the member's, recompiled), the vtables' and
+// tables' slots, and the part's slots 11 and 12 (from the color list
+// screen's SetUpRace, recompiled).
+ITC_TYPE8_SCREENS(82253190, Type8ColorPartConstruct)
+ITC_TYPE8_SCREENS(822531F0, Type8ColorPartDestruct)
+ITC_TYPE8_SCREENS(822532B8, Type8ColorPartDeletingDestruct)
+ITC_TYPE8_SCREENS(82253268, Type8ColorInnerDeletingDestruct)
+ITC_TYPE8_SCREENS(822537A0, Type8ColorInnerOpen)
+ITC_TYPE8_SCREENS(82254280, Type8ColorInnerPick)
+ITC_TYPE8_SCREENS(82253FC0, Type8ColorInnerInput)
+ITC_TYPE8_SCREENS(82253E48, Type8ColorInnerStep0)
+ITC_TYPE8_SCREENS(82254178, Type8ColorInnerPage0)
+ITC_TYPE8_SCREENS(82253238, Type8ColorPartIsFirstChoice)
+ITC_TYPE8_SCREENS(82253240, Type8ColorPartThirdChoice)

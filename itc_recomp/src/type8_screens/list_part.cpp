@@ -14,6 +14,8 @@
 
 #include "type8_screens/type8_screens.h"
 
+#include "type8_screens/part_helpers.h"
+
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
@@ -62,8 +64,8 @@ void Delete(uint64_t object, uint64_t flags, uint32_t frame, uint32_t lr, const 
 }
 
 uint64_t SetNodeText(uint32_t movie, uint32_t node, uint32_t id, uint32_t frame, uint32_t lr,
-                     const Calls& calls) {
-  const uint64_t args[8] = {movie, node, id, 0, 0, 0, 0, 0};
+                     const Calls& calls, uint64_t r6) {
+  const uint64_t args[8] = {movie, node, id, r6, 0, 0, 0, 0};
   return calls.call8(kSetNodeText, args, frame, lr);
 }
 
@@ -79,8 +81,6 @@ void InitList(uint8_t* base, uint32_t list, const save_data::MenuListArgs& a, ui
   calls.call8(rs::kListInit, args, frame, lr);
 }
 
-// FinishNamed, PlayNamed(chained 1) and LoopNamed on `named`: the named
-// animation restarted and looped. LoopNamed's r3.
 uint64_t Restart(uint8_t* base, uint32_t movie, uint32_t named_word, uint32_t frame,
                  uint32_t lr_finish, uint32_t lr_loop, const Calls& calls) {
   calls.call(kFinishNamed, frame, lr_finish, movie, LoadU32(base, named_word));
@@ -128,8 +128,6 @@ uint64_t InnerPick(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_
   return CallTarget(base, target, r3, r4, r5, sp, lr, calls);
 }
 
-// The inner part's Open up to its blocks' set-ups: its page block reset,
-// the movie's pose reset. The movie.
 void OpenBegin(uint8_t* base, uint32_t inner, uint32_t id, uint32_t frame, uint32_t lr,
                const Calls& calls) {
   StoreU32(base, inner + 8, 0);
@@ -146,9 +144,6 @@ void OpenBegin(uint8_t* base, uint32_t inner, uint32_t id, uint32_t frame, uint3
   calls.call(ts::kResetPose, frame, lr, movie, frame + 80);
 }
 
-// Page 0's ending (both answers in): both players ready, page 1 with the
-// screen faded out; else player 0 backed out (`backed`), page 2 after step
-// 1.
 void Page0End(uint8_t* base, uint32_t inner, uint64_t first, uint64_t second, uint32_t backed,
               const Calls& calls) {
   if (int32_t(uint32_t(first)) != 0 && int32_t(uint32_t(second)) != 0) {

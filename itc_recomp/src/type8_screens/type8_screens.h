@@ -333,4 +333,119 @@ uint64_t PartInnerPage1(uint8_t* base, uint64_t r3);
 // active, +32 = 0, +36 = 1, answers 1; else 0.
 uint64_t PartInnerPage2(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
 
+
+// --- The color list screen's list part (color_part.cpp): Type8ColorListPart
+// (788 bytes, +20 its inner part) over ListPartBase, Type8ColorPartInner
+// (768 bytes, a Type8ColorBlock of 364 bytes a player at +40 and +404: +0
+// the player, +4 ready, +8 backed out, +12 (3 items), +84 (2) and +156 (5)
+// MenuLists, +228 to +360 node, string and named animation ids) over
+// ListPartInnerBase. Its step 1 and pages 1 and 2 are the shared ones ---
+
+constexpr uint32_t kColorPartVtable = 0x820113F4;
+constexpr uint32_t kColorInnerVtable = 0x820113D8;
+constexpr uint32_t kColorInnerPages = 0x82637A4C;
+constexpr uint32_t kColorInnerSteps = 0x82637A44;
+
+// sub_82252EA0 Type8ColorBlock::Type8ColorBlock (a leaf; r4 the player, 0
+// or 1: its ids from the tables at 0x82011348 to 0x820113D4). r3 left.
+uint64_t ColorBlockConstruct(uint8_t* base, uint64_t r3, uint64_t player);
+// sub_82253308 Type8ColorBlock::SetUp (176): the three menus' Init and
+// selections (0, 0, 2), their pad player ({0, 1} on the frame, by the
+// player), two SetText and three SetNodeText (the last with r6 the +156
+// menu's selection + 1), the movie's +40960 = 1, +4 = +8 = 0. The last
+// SetNodeText's r3.
+uint64_t ColorBlockSetUp(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                         const Calls& calls);
+// sub_82253728 Type8ColorBlock::PlaceCursorA (112; r5 0 shows): the live
+// scene's child +228, its +236, its +240: +80 = (r5 == 0). That node.
+uint64_t ColorBlockPlaceCursorA(uint8_t* base, uint64_t r3, uint64_t id, uint64_t shown,
+                                uint32_t sp);
+// sub_82253690 Type8ColorBlock::PlaceCursorB (144): the live scene's child
+// +228, its +232: children +244 and +248's +68 = 0.0, +252 and +256's +108
+// = 1. The last.
+uint64_t ColorBlockPlaceCursorB(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp);
+// sub_82253600 Type8ColorBlock::PlaceCursorC (128; r5 the +84 menu's
+// item): as PlayerBlockPlaceCursor over (+228, +232) and +356, +360.
+uint64_t ColorBlockPlaceCursorC(uint8_t* base, uint64_t r3, uint64_t id, uint64_t selection,
+                                uint32_t sp);
+// sub_822539A8 Type8ColorBlock::PlayOpening (128): PlayNamed on +304, +308,
+// +312, PlaceCursorA(1), PlaceCursorB (its r3).
+uint64_t ColorBlockPlayOpening(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp);
+// sub_82253A50 Type8ColorBlock::ShowSelections (128): the +12 item's
+// (+280), +332's, +344's, +336's and +348's animations restarted and
+// looped, PlaceCursorC, the +84 item's (+316). The last LoopNamed's r3.
+uint64_t ColorBlockShowSelections(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                                  const Calls& calls);
+// sub_82253BF8 Type8ColorBlock::ShowMenuMove (144): as
+// PlayerBlockShowMenuMove over +280, with +324 at item 1 (PlaceCursorA)
+// and +328 at item 2. The last call's r3.
+uint64_t ColorBlockShowMenuMove(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                                const Calls& calls);
+// sub_82253570 Type8ColorBlock::PlayReady (112): FinishNamed on +328,
+// +312, +300, PlayNamed +300.
+uint64_t ColorBlockPlayReady(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                             const Calls& calls);
+// sub_822534F0 Type8ColorBlock::SecondMoved (128): the node (+228, +236)'s
+// child +276: UiMovie::ClearNodeText, SetNodeText 8 with the +156 menu's
+// item + 1 (its r3).
+uint64_t ColorBlockSecondMoved(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                               const Calls& calls);
+// sub_82253948 Type8ColorBlock::UpdateSecond (112): MenuList::Update on
+// +156; moved: sound 4, SecondMoved.
+uint64_t ColorBlockUpdateSecond(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                                const Calls& calls);
+// sub_82253D90 Type8ColorBlock::ThirdMoved (144): the +84 menu's previous
+// item's (+316) animation finished, its item's restarted and looped,
+// PlaceCursorC (its r3).
+uint64_t ColorBlockThirdMoved(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                              const Calls& calls);
+// sub_82253F60 Type8ColorBlock::UpdateThird (112): MenuList::Update on
+// +84; moved: sound 4, ThirdMoved.
+uint64_t ColorBlockUpdateThird(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                               const Calls& calls);
+// sub_82253EF8 Type8ColorBlock::WhileReady (112): as PlayerBlockWhileReady.
+uint64_t ColorBlockWhileReady(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                              const Calls& calls);
+// sub_82254070 Type8ColorBlock::Input (128): MenuList::Update on +12;
+// accepted: sound 0, items 0 and 1 → item 2 and ShowMenuMove, item 2
+// ready (+4 = 1, PlayReady); cancelled: sound 2 or 3, +8 = 1; moved: sound
+// 4, ShowMenuMove; else item 0 UpdateThird, item 1 UpdateSecond. Answers 0.
+uint64_t ColorBlockInput(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                         const Calls& calls);
+
+// sub_82253030 Type8ColorPartInner::Type8ColorPartInner (96), sub_82253190
+// Type8ColorListPart::Type8ColorListPart (112), sub_82253088
+// ~Type8ColorPartInner (112; the six menus released), sub_822531F0
+// ~Type8ColorListPart (96), their deleting destructors sub_82253268 and
+// sub_822532B8 (112). r3 left.
+uint64_t ColorInnerConstruct(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t ColorPartConstruct(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t ColorInnerDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorInnerDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                    const Calls& calls);
+uint64_t ColorPartDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ColorPartDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                   const Calls& calls);
+// sub_82253148 Type8ColorPartInner::IsFirstChoice (96; r4 the player): 1
+// when the player's block's +84 menu is at item 0. sub_82253238
+// Type8ColorListPart::IsFirstChoice (slot 11): its tail call on +20.
+// sub_82253240 Type8ColorListPart::ThirdChoice (slot 12): the player's
+// block's +156 menu's item.
+uint64_t ColorInnerIsFirstChoice(uint8_t* base, uint64_t r3, uint64_t player, uint32_t sp);
+uint64_t ColorPartIsFirstChoice(uint8_t* base, uint64_t r3, uint64_t player, uint32_t sp);
+uint64_t ColorPartThirdChoice(uint8_t* base, uint64_t r3, uint64_t player);
+// sub_822537A0 Open (128), sub_82254280 Pick, sub_82253FC0 Input (128),
+// sub_82253E48 Step0 (128; named 46) and sub_82254178 Page0 (128): as the
+// list part's inner part's, over the color blocks and tables.
+uint64_t ColorInnerOpen(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                        const Calls& calls);
+uint64_t ColorInnerPick(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t sp,
+                        uint32_t lr, const Calls& calls);
+uint64_t ColorInnerInput(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                         const Calls& calls);
+uint64_t ColorInnerStep0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                         const Calls& calls);
+uint64_t ColorInnerPage0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                         const Calls& calls);
+
 }  // namespace type8_screens
