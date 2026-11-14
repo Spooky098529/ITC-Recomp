@@ -55,7 +55,10 @@ file's history. What's left to see in a drive, from every run:
   `Kind6Menu::SaveReplay` with `RaceDialog::AskSlot`, `StoreReplay`,
   `Replay::CopyFrom`; 3 adapters removed); every harness 0 differing
   but the read's expected group (20 of 20); races 21-28 s at 40, 0
-  errors; nothing uncommitted. Step: validation, then the bypass.
+  errors; nothing uncommitted. Its validation skipped (the user's
+  call, 2026-11-14: straight to the bypass; its 10 functions are
+  Live or split screen work the bypass makes unreachable). Step: the
+  bypass (a lead without mapping).
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
