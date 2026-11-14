@@ -109,6 +109,14 @@ When the user has reviewed a run's section, its heading gets
   the native close doesn't write): a harness fault, masked in
   `save_handlers.cpp` (`MaskCloseHandleSaves`, 9bfdc4b1) for WaitClose,
   SaveStep, LoadStep and `SaveDevices::Update`'s cases.
+- The C runtime core's third migration (eb65b4c4..26c6db34):
+  `files-and-saves.md`'s `SetFilePointer` `sub_825B9DD8` and `WriteFile`
+  `sub_82295D50` go from Dropped to Native (now called by native
+  `_lseeki64_nolock` and `_write_nolock`; renamed rows
+  `sub_825B0F48` `_write_nolock`, `sub_825B6500` `_lseeki64_nolock`);
+  `_flush`'s path where every byte is written checked by reading (no
+  SDK file the harness can safely write); `_fileno`'s adapter stays
+  (native `_output_l` hands file streams to the original).
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a

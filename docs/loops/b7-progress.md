@@ -101,7 +101,13 @@ file's history. What's left to see in a drive, from every run:
   a harness fault by the 2026-11-10 precedent, masked 9bfdc4b1 (logged
   first). Validated again `itc_5495` (race 35 s at 180, 0 errors,
   every harness 0 differing outside the expected groups, 65 of 65).
-  Step: third migration.
+  Third migration eb65b4c4..26c6db34: 22 rows ours (`_close`,
+  `_commit`, `_lseeki64`, `_write`, `_flush`, `_fileno`, `terminate`
+  by reading, the funclets, `SetFilePointer` and `WriteFile` Dropped
+  -> Native), `_close_nolock`'s adapter removed; every harness 0
+  differing, race 38 s, 0 errors. Left: fclose, `_fcloseall`, the
+  stream buffer helpers, `bsearch`, and `_fflush_nolock`/flsall's pair
+  with what's above it. Step: validation, then a fourth migration.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
