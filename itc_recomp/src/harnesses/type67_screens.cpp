@@ -792,6 +792,88 @@ void Deleting(Context& h) {
   }
 }
 
+// The screen blocks' destructors (Type6Screens and Type7Screens): blocks of
+// operator new's of random words with every menu list's item block the
+// screens' destructors release 0 (the list screen's lists and its list
+// part's, the node screen's, the panel screen's car list menus), so
+// MenuList::Release frees nothing; r4 bit 0 clear (the block compared after)
+// or set for the deleting destructors (compared by whether operator new
+// hands the block out again). Compared too: r3 (both halves).
+void ScreenBlocks(Context& h) {
+  uint8_t* const base = h.base;
+  constexpr uint32_t kType6Bytes = 52696, kType7Bytes = 42356;
+  static constexpr uint32_t kType6Lists[] = {
+      19432 + 10144, 19432 + 10216, 19432 + 10288, 19432 + 10824 + 60,
+      30396 + 10132, 30396 + 10204, 40948 + 9888,  40948 + 9816};
+  static constexpr uint32_t kType7Lists[] = {19428 + 10144, 19428 + 10216, 19428 + 10288,
+                                             19428 + 10360, 19428 + 11040 + 60, 30608 + 9888,
+                                             30608 + 9816};
+  struct Function {
+    const char* name;
+    uint32_t address;
+    bool type7;
+    bool deleting;  // a deleting destructor (r4 its flags)
+    int cases;
+    GuestFunction recompiled, native;
+  };
+  const Function functions[] = {
+      {"Type6Screens::~Type6Screens", 0x822367C0, false, false, 4, __imp__sub_822367C0,
+       hooks::Type6ScreensDestruct},
+      {"Type6Screens::DeletingDestructor", 0x82236830, false, true, 6, __imp__sub_82236830,
+       hooks::Type6ScreensDeletingDestruct},
+      {"Type7Screens::~Type7Screens", 0x82246BE0, true, false, 4, __imp__sub_82246BE0,
+       hooks::Type7ScreensDestruct},
+      {"Type7Screens::DeletingDestructor", 0x82246C40, true, true, 6, __imp__sub_82246C40,
+       hooks::Type7ScreensDeletingDestruct},
+  };
+  for (const Function& f : functions) {
+    Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));
+    const uint32_t bytes = f.type7 ? kType7Bytes : kType6Bytes;
+    for (int c = 0; c < f.cases; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(SplitMix(uint64_t(f.address) << 16 ^ uint64_t(c)));
+        const auto block = memory::crt::OperatorNew(base, bytes);
+        if (!block) {
+          ITC_LOG_ERROR("harness: type67_screens: operator new failed");
+          return;
+        }
+        WriteRandom(base, *block, bytes, r);
+        if (f.type7) {
+          for (const uint32_t list : kType7Lists) guest::StoreU32(base, *block + list + 68, 0);
+        } else {
+          for (const uint32_t list : kType6Lists) guest::StoreU32(base, *block + list + 68, 0);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = *block | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+        t.r4.u64 = r.Next() & ~1ull;
+        const bool deletes = f.deleting && r.Below(2) == 0;
+        if (deletes) t.r4.u64 |= 1;
+        t.lr = 0x82000000 + 4 * r.Below(1024);
+        if (v == 0) {
+          ITC_FLAG(native_type67_screens) = false;
+          f.recompiled(t, base);
+          ITC_FLAG(native_type67_screens) = true;
+        } else {
+          f.native(t, base);
+        }
+        out[v].Word(uint32_t(t.r3.u64 - *block));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (deletes) {
+          const auto probe = memory::crt::OperatorNew(base, bytes);
+          out[v].Word(probe && *probe == *block ? 1 : 0);
+          if (probe) memory::crt::OperatorDelete(*probe);
+        } else {
+          out[v].Bytes(Read(base, *block, bytes));
+          memory::crt::OperatorDelete(*block);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Type67Screens(Context& h) {
@@ -819,6 +901,7 @@ void Type67Screens(Context& h) {
   PickCar(h, world, "Type6PanelScreen::PickCar", 0x82230C88, type67_modes::kType6Car, 16,
           __imp__sub_82230C88, ts::Type6PanelScreenPickCar);
   Deleting(h);
+  ScreenBlocks(h);
   Type67ScreenTables(h);
   Type67ListPart(h);
   Type67ListHelpers(h);

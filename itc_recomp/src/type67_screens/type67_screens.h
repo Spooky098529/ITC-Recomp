@@ -1027,4 +1027,21 @@ uint64_t Type6NodeScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const 
 uint64_t Type6NodeScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
                                          const Calls& calls);
 
+// --- The screen blocks' destructors (screen_blocks.cpp) ---
+
+// sub_822367C0 Type6Screens::~Type6Screens: +0 = 0x82010A78, +52692 =
+// 0x82010A2C, ~Type6PanelScreen on +40948, ~Type6NodeScreen on +30396,
+// ~Type6ListScreen on +19432, the empty handler on +4. r3 + 4.
+uint64_t Type6ScreensDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82246BE0 Type7Screens::~Type7Screens: +0 = 0x82010FE0, +42352 =
+// 0x82010A2C, ~Type7PanelScreen on +30608, ~Type7ListScreen on +19428,
+// ListNode::~ListNode on +4. r3 + 4.
+uint64_t Type7ScreensDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82236830 and sub_82246C40, the blocks' DeletingDestructors (slot 0):
+// the destructor, then operator delete when bit 0 of `flags` is set. r3.
+uint64_t Type6ScreensDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                      const Calls& calls);
+uint64_t Type7ScreensDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                      const Calls& calls);
+
 }  // namespace type67_screens

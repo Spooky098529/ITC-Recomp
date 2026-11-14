@@ -270,4 +270,10 @@ void Type6NodeScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
 void Type6PanelScreenDraw(PPCContext& ctx, uint8_t* base);
 void Type6PanelScreenPickCar(PPCContext& ctx, uint8_t* base);
 
+// The screen blocks' destructors.
+void Type6ScreensDestruct(PPCContext& ctx, uint8_t* base);
+void Type7ScreensDestruct(PPCContext& ctx, uint8_t* base);
+void Type6ScreensDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type7ScreensDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

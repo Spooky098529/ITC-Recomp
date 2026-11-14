@@ -128,7 +128,10 @@ ITC_FLAG_BOOL(native_type67_screens, true, "ITC",
               "sub_822372A0, ~Type6NodeScreen sub_82236EA0 and DeletingDestructor "
               "sub_82237048, NodeScreen::SetUpTexts sub_82247FE0; Type6PanelScreen::Draw "
               "sub_82230F40 (with DrawList sub_82230EF0 and AskQuit sub_82230BA8) and PickCar "
-              "sub_82230C88, Type7PanelScreen::AskQuit sub_82240518 natively instead of "
+              "sub_82230C88, Type7PanelScreen::AskQuit sub_82240518; the screen blocks' "
+              "Type6Screens::~Type6Screens sub_822367C0 and DeletingDestructor sub_82236830, "
+              "Type7Screens::~Type7Screens sub_82246BE0 and DeletingDestructor sub_82246C40 "
+              "natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=type67_screens)");
 
@@ -553,6 +556,14 @@ ITC_TS_STEP(Type6PanelScreenDraw,
 ITC_TS_STEP(Type6PanelScreenPickCar,
             ts::Type6PanelScreenPickCar(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
+// The screen blocks' destructors.
+ITC_TS_STEP(Type6ScreensDestruct, ts::Type6ScreensDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ScreensDestruct, ts::Type7ScreensDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6ScreensDeletingDestruct,
+            ts::Type6ScreensDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ScreensDeletingDestruct,
+            ts::Type7ScreensDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+
 #undef ITC_TS_STEP
 
 }  // namespace hooks
@@ -848,3 +859,9 @@ ITC_TYPE67_SCREENS(82237048, Type6NodeScreenDeletingDestruct)
 // The type 6 panel screen's Draw ((5, 1), a transition) and PickCar (slot 3).
 ITC_TYPE67_SCREENS(82230F40, Type6PanelScreenDraw)
 ITC_TYPE67_SCREENS(82230C88, Type6PanelScreenPickCar)
+// The screen blocks' destructors (no callers found: StandMode::Release frees
+// the blocks without them).
+ITC_TYPE67_SCREENS(822367C0, Type6ScreensDestruct)
+ITC_TYPE67_SCREENS(82236830, Type6ScreensDeletingDestruct)
+ITC_TYPE67_SCREENS(82246BE0, Type7ScreensDestruct)
+ITC_TYPE67_SCREENS(82246C40, Type7ScreensDeletingDestruct)

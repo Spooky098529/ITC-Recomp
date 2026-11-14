@@ -492,6 +492,7 @@ set(ITC_SOURCES
     src/type67_screens/type6_list.cpp
     src/type67_screens/type7_list.cpp
     src/type67_screens/type6_node.cpp
+    src/type67_screens/screen_blocks.cpp
     src/hooks/car_list.cpp
     src/car_list/panels.cpp
     src/car_list/set.cpp
