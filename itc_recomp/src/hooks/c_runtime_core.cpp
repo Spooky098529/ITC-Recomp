@@ -81,7 +81,7 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_fclose_nolock or fclose), _fcloseall's __finally (sub_825B4F38), _fflush_nolock, "
               "flsall and _flushall (their callers fflush, flsall and _endstdio), the __finally "
               "funclets of flsall and fflush (sub_825ACEB4, sub_825ACF04, sub_825AD02C), doexit "
-              "(sub_825AA218, its callers _exit and _cexit)");
+              "(sub_825AA218, its callers _exit and _cexit) and its unwind funclet (sub_825AA338)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -820,8 +820,7 @@ ITC_C_RUNTIME_CORE(825B0E50, CoreCloseFinally)
 ITC_C_RUNTIME_CORE(825B1304, CoreCloseFinally)
 ITC_C_RUNTIME_CORE(825B4978, CoreCommitFinally)
 // (fclose's __finally, sub_825A9664, has no adapter: fclose is native.)
-// doexit's unwind funclet: r28 = whether doexit took the exit lock.
-ITC_C_RUNTIME_CORE(825AA338, CoreExitUnlockFinally)
+// (doexit's unwind funclet, sub_825AA338, has no adapter: doexit is native.)
 // terminate: no registers; ends in KeBugCheck(0xC0000144).
 ITC_C_RUNTIME_CORE(825B3498, CoreTerminate)
 // (_close, sub_825B0D10, and _close_nolock, sub_825B0C28, have no adapters:
