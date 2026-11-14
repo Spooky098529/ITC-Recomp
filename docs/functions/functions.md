@@ -749,6 +749,12 @@ Rows not yet moved stay in the table below. So far:
   `Model::MorphShape` posts to the second worker pool for each per-draw
   wheel morph, its maker, slots and release) and the worker pools' work
   item class every pool job holds (B7; mapped).
+- [`type8-screens.md`](type8-screens.md): the type 8 mode's (probably
+  the two-player mode's) panel screen, the two players' car pick over
+  `PanelSetPair`, with its inline panels, and its two list screens (the
+  race kind and course, and the color list), their list parts with a
+  settings block a player, pages, steps and race set-ups for two cars
+  (B7; mapped, none seen in play).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

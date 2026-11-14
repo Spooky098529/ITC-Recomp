@@ -37,14 +37,17 @@ chain. The panel word is `0x82815EAC` (the map first had `0x82805EAC`):
 the word the car list screen reads (`../loops/leads.md`). None of these
 run in an attract race (the front end's modes).
 
-Other constructors of the same member classes never ran in play and get
-no rows: `sub_822386F0` (`MachineScreen`), `sub_8223A100`
+Other constructors of the same member classes never ran in play:
+`sub_822386F0` (`MachineScreen`), `sub_8223A100`
 (`PanelDBase`), `sub_82239E78` (`PanelCBase`), `sub_82239C10`
 (`PanelGroupBase`), `sub_82239D58` (`PanelEBase`), `sub_82239C70`
 (`PanelFBase`), `sub_8224B750` (`PanelSetBase`), `sub_82253190` and
 `sub_82254488` (`ListPartBase`), `sub_82253030` and `sub_822543C0`
 (`ListPartInnerBase`), `sub_822574D0` (`NodeListScreen`) and
-`sub_8223DFC0` (`ColorListScreen`).
+`sub_8223DFC0` (`ColorListScreen`): the type 8 mode's screens', with rows
+in [`type8-screens.md`](type8-screens.md) since 2026-11-14
+(`sub_8224B750`, `PanelSetPair::PanelSetPair`, in
+[`car-list.md`](car-list.md)).
 
 Shared, with rows in other files: `ScreenMachine::ScreenMachine`
 (`sub_82107358`, Overridden) in [`boot-mode.md`](boot-mode.md);

@@ -46,7 +46,9 @@ and the step table its update builds, about 130 functions; the panel
 handlers call it through its vtable: slots 1 to 3, 5 to 11, 13, 15 to 18;
 mapped since in [`car-list.md`](car-list.md)), and the type 8 mode's own
 list screens, built on the same `NodeListScreen` and `ColorListScreen`
-bases, whose pages also call the helpers here. Fields worked out are in
+bases, whose pages also call the helpers here (mapped since in
+[`type8-screens.md`](type8-screens.md) with the type 8 panel screen, 2026-11-14:
+the rows here that name their functions as leads mean those). Fields worked out are in
 `../known-data.md` ("type 6 and 7 list, panel and node screens", "group
 pair"). Read by the B7 loop's mapping agent, 2026-11-08, from the lead
 "the type 6 and 7 modes' list, panel and node screens' transition
