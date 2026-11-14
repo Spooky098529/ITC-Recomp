@@ -1970,4 +1970,50 @@ void Endstdio(uint8_t* base, const Calls& calls) {
   });
 }
 
+
+uint64_t Doexit(uint8_t* base, uint32_t code, uint32_t quick, uint32_t ret, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AA218 doexit");
+  uint64_t result = code;
+  calls.in_frame(128, [&](uint32_t frame) {
+    Store(base, frame + 164, ret);
+    result = calls.guest(kLock, {8});
+    if (int32_t(Load(base, kCExitDone)) != 1) {
+      if (int32_t(Load(base, kCTerminationDone)) == 1) {
+        result = calls.import(Import::kKeBugCheck, {0});
+      }
+      Store(base, kCTerminationDone, 1);
+      guest::StoreU8(base, kExitFlag, uint8_t(ret));
+      if (int32_t(quick) == 0) {
+        constexpr uint32_t kExitBegin = 0x82978334, kExitEnd = 0x82978330;
+        const uint32_t begin = Load(base, kExitBegin);
+        uint32_t end = Load(base, kExitEnd);
+        Store(base, frame + 80, end);
+        if (begin != 0) {
+          while (true) {
+            end -= 4;
+            Store(base, frame + 80, end);
+            if (end < begin) {
+              break;
+            }
+            if (const uint32_t function = Load(base, end); function != 0) {
+              result = calls.guest(function, {});
+            }
+          }
+        }
+        Initterm(base, 0x82600294, 0x8260029C, calls);
+      }
+      Initterm(base, 0x826002A0, 0x826002A4, calls);
+    }
+    bool called = false;
+    const uint64_t unlocked = ExitUnlockFinally(ret, &called, calls);
+    if (called) {
+      result = unlocked;
+    }
+    if (int32_t(Load(base, frame + 164)) == 0) {
+      result = calls.import(Import::kKeBugCheck, {0});
+    }
+  });
+  return result;
+}
+
 }  // namespace c_runtime::core

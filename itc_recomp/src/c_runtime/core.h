@@ -668,4 +668,21 @@ uint32_t Flushall(uint8_t* base, const Calls& calls);
 // __piob freed.
 void Endstdio(uint8_t* base, const Calls& calls);
 
+constexpr uint32_t kCExitDone = 0x8297114C;         // _C_Exit_Done
+constexpr uint32_t kCTerminationDone = 0x82971148;  // _C_Termination_Done
+constexpr uint32_t kExitFlag = 0x82971144;          // _exitflag (a byte)
+
+// sub_825AA218 doexit (probably): in its 128-byte frame (`ret` at +164, the
+// caller's frame + 20; +80 the exit table's walk), _lock(8) (a guest call:
+// the exit lock's host mutex is routed there). Unless _C_Exit_Done is 1:
+// KeBugCheck(0) when _C_Termination_Done is already 1; it set to 1,
+// _exitflag = `ret`'s low byte; unless `quick`, the exit table's functions
+// (atexit's, guest calls) from its end down to its begin (read once; none
+// for a null begin) and _initterm over the C terminators
+// (0x82600294-0x8260029C); then _initterm over 0x826002A0-0x826002A4. Then
+// its unwind funclet (sub_825AA338: _unlock(8) when `ret` is set), and
+// KeBugCheck(0) when `ret` is 0 (it ends the process). r3 as the original
+// leaves it when it returns (_unlock's).
+uint64_t Doexit(uint8_t* base, uint32_t code, uint32_t quick, uint32_t ret, const Calls& calls);
+
 }  // namespace c_runtime::core

@@ -62,12 +62,14 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_invoke_watson path checked by reading), _fassign, _forcdecpt and _cropzeros "
               "(sub_825ADF10, sub_825ADF18, sub_825ADF20) and __CxxSetUnhandledExceptionFilter "
               "(sub_825DAC58), fflush with _fflush_nolock and flsall (sub_825ACF70, sub_825ACD10, "
-              "sub_825ACD90), _flushall and _endstdio (sub_825AD068, sub_825AD5F8) (checked by "
+              "sub_825ACD90), _flushall and _endstdio (sub_825AD068, sub_825AD5F8), doexit and _cexit "
+              "(sub_825AA218, sub_825AA388; only the path where _C_Exit_Done is set: the others "
+              "run the game's exit functions or end the process, checked by reading) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
               "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
-              "_invalid_parameter's trap, terminate (sub_825B3498). "
+              "_invalid_parameter's trap, terminate (sub_825B3498), _exit (sub_825AA378). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
@@ -78,7 +80,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "fclose's __finally (sub_825B0D10, sub_825B0EE0, sub_825A9664, their caller "
               "_fclose_nolock or fclose), _fcloseall's __finally (sub_825B4F38), _fflush_nolock, "
               "flsall and _flushall (their callers fflush, flsall and _endstdio), the __finally "
-              "funclets of flsall and fflush (sub_825ACEB4, sub_825ACF04, sub_825AD02C)");
+              "funclets of flsall and fflush (sub_825ACEB4, sub_825ACF04, sub_825AD02C), doexit "
+              "(sub_825AA218, its callers _exit and _cexit)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -664,6 +667,24 @@ void hooks::CoreFlushall(PPCContext& ctx, uint8_t* base) {
 void hooks::CoreEndstdio(PPCContext& ctx, uint8_t* base) {
   cc::Endstdio(base, CRuntimeCoreCalls(ctx, base));
 }
+void hooks::CoreDoexit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Doexit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
+}
+// _exit and _cexit: doexit with (code, 1, 0) and (0, 0, 1), as the
+// originals' tail calls.
+void hooks::CoreExit(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825AA378 _exit");
+  ctx.r5.u64 = 0;
+  ctx.r4.u64 = 1;
+  CoreDoexit(ctx, base);
+}
+void hooks::CoreCexit(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825AA388 _cexit");
+  ctx.r5.u64 = 1;
+  ctx.r4.u64 = 0;
+  ctx.r3.u64 = 0;
+  CoreDoexit(ctx, base);
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -862,3 +883,7 @@ ITC_C_RUNTIME_CORE(825DAC58, CoreCxxSetUnhandledExceptionFilter)
 ITC_C_RUNTIME_CORE(825ACF70, CoreFflush)
 // _endstdio: no registers (an exit table entry).
 ITC_C_RUNTIME_CORE(825AD5F8, CoreEndstdio)
+// _exit: r3 = the exit code; ends the process. _cexit: no registers. (doexit,
+// sub_825AA218, has no adapter: they are its only callers.)
+ITC_C_RUNTIME_CORE(825AA378, CoreExit)
+ITC_C_RUNTIME_CORE(825AA388, CoreCexit)

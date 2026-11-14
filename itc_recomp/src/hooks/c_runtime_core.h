@@ -130,4 +130,8 @@ void CoreFflush(PPCContext& ctx, uint8_t* base);        // sub_825ACF70
 void CoreFlushall(PPCContext& ctx, uint8_t* base);      // sub_825AD068 (no adapter)
 void CoreEndstdio(PPCContext& ctx, uint8_t* base);      // sub_825AD5F8
 
+void CoreDoexit(PPCContext& ctx, uint8_t* base);  // sub_825AA218 (no adapter)
+void CoreExit(PPCContext& ctx, uint8_t* base);    // sub_825AA378
+void CoreCexit(PPCContext& ctx, uint8_t* base);   // sub_825AA388
+
 }  // namespace hooks

@@ -3727,6 +3727,58 @@ void FlushAllCases(Context& h) {
   SetLastError(h, slots.error);
 }
 
+
+// doexit and _cexit, only on the path where _C_Exit_Done (0x8297114C) is 1
+// (set for the case, put back after): the exit lock taken and given back,
+// nothing run. Its other paths call the game's exit functions and
+// terminators or end the process (KeBugCheck): checked by reading. doexit's
+// r3 and r4 random, r5 (return to the caller) random but not 0;
+// _C_Termination_Done and _exitflag random (put back after). Compared: r3
+// (64 bits), both words, _exitflag and the caller's frame + 20.
+void DoexitCases(Context& h) {
+  const uint32_t exit_done = Load(h.base, cc::kCExitDone);
+  const uint32_t termination_done = Load(h.base, cc::kCTerminationDone);
+  const uint8_t exitflag = guest::LoadU8(h.base, cc::kExitFlag);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  for (const Fn& fn : {Fn{"doexit (sub_825AA218)", __imp__sub_825AA218, hooks::CoreDoexit},
+                       Fn{"_cexit (sub_825AA388)", __imp__sub_825AA388, hooks::CoreCexit}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 24; c++) {
+      const uint32_t code = uint32_t(h.random.Next());
+      const uint32_t quick = h.random.Below(2) == 0 ? 0 : uint32_t(h.random.Next());
+      const uint32_t ret = uint32_t(h.random.Next()) | 1;
+      const uint32_t termination = h.random.Below(2) == 0 ? 1 : uint32_t(h.random.Next());
+      const uint8_t flag = uint8_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Store(h.base, cc::kCExitDone, 1);
+        Store(h.base, cc::kCTerminationDone, termination);
+        guest::StoreU8(h.base, cc::kExitFlag, flag);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = code;
+        t.r4.u64 = quick;
+        t.r5.u64 = ret;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(Load(h.base, cc::kCExitDone));
+        out[v].Word(Load(h.base, cc::kCTerminationDone));
+        out[v].Word(guest::LoadU8(h.base, cc::kExitFlag));
+        out[v].Word(Load(h.base, t.r1.u32 + 20));
+        Store(h.base, cc::kCExitDone, exit_done);
+        Store(h.base, cc::kCTerminationDone, termination_done);
+        guest::StoreU8(h.base, cc::kExitFlag, exitflag);
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -3801,6 +3853,7 @@ void CRuntimeCore(Context& h) {
   Cftoe2Cases(h);
   CxxSetFilterCases(h);
   FlushAllCases(h);
+  DoexitCases(h);
 }
 
 }  // namespace harness
