@@ -62,13 +62,13 @@ void RaceScreensUnseenPause4CloseVolume(PPCContext& ctx, uint8_t* base);
 // handlers reach them from recompiled code): RaceResults::Open sub_8221F990
 // (r3 the screen, r4 the block), Update sub_8221F930 (r3, r4 passed on),
 // Draw sub_8221F7D0 (r3 the screen); SplitResults::Open sub_82220050 (r3
-// the screen, r4 the outcome, r5 the mode), Update sub_8221FFF0, and
-// SplitResults' transitions (r3 the step word) Intro sub_8221FAC8, Show
-// sub_8221FBE8 and Close sub_8221FD98 (the recompiled SplitResults::Draw
-// reaches them through its table). Without adapters (only the native Open,
-// Update and Draw reach them): SetTexts sub_8221F628 (r3 the screen), the
-// MainPages sub_8221F870 and sub_8221FE70, RaceResults' transitions Intro
-// sub_8221F428, Show sub_8221F4B0 and Close sub_8221F580.
+// the screen, r4 the outcome, r5 the mode), Update sub_8221FFF0 and Draw
+// sub_822200E0. Without adapters (only the native Open, Update and Draw
+// reach them): SetTexts sub_8221F628 (r3 the screen), the MainPages
+// sub_8221F870 and sub_8221FE70, the transitions (r3 the step word)
+// RaceResults' Intro sub_8221F428, Show sub_8221F4B0 and Close
+// sub_8221F580, and SplitResults' Intro sub_8221FAC8, Show sub_8221FBE8 and
+// Close sub_8221FD98.
 void RaceScreensUnseenRaceResultsOpen(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenRaceResultsUpdate(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenRaceResultsDraw(PPCContext& ctx, uint8_t* base);

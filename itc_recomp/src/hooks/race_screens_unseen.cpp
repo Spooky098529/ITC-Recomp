@@ -380,11 +380,8 @@ ITC_RACE_SCREENS_UNSEEN(8221F7D0, RaceScreensUnseenRaceResultsDraw)
 ITC_RACE_SCREENS_UNSEEN(82220050, RaceScreensUnseenSplitResultsOpen)
 ITC_RACE_SCREENS_UNSEEN(8221FFF0, RaceScreensUnseenSplitResultsUpdate)
 ITC_RACE_SCREENS_UNSEEN(822200E0, RaceScreensUnseenSplitResultsDraw)
-// SplitResults' transitions: the recompiled SplitResults::Draw (sub_822200E0,
-// kept for its network battle's sends) reaches them through its table.
-ITC_RACE_SCREENS_UNSEEN(8221FAC8, RaceScreensUnseenSplitResultsIntro)
-ITC_RACE_SCREENS_UNSEEN(8221FBE8, RaceScreensUnseenSplitResultsShow)
-ITC_RACE_SCREENS_UNSEEN(8221FD98, RaceScreensUnseenSplitResultsClose)
+// SplitResults' transitions have no adapters since Draw is native (only its
+// table reached them).
 // Kind 6's screen after the race: its opener, draw and close (the race HUD
 // machine's recompiled fallbacks reach them). ShowPanelA and SetUpList have
 // no adapters since Update's pages are native (all their callers are).
