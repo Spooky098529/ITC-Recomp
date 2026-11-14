@@ -321,6 +321,7 @@ set(ITC_SOURCES
     src/replay_snapshots/records.cpp
     src/replay_snapshots/race_replay.cpp
     src/hooks/race_screens.cpp
+    src/hooks/race_screens_unseen.cpp
     src/race_screens/menu_list.cpp
     src/race_screens/screens.cpp
     src/race_screens/pages.cpp
@@ -330,6 +331,7 @@ set(ITC_SOURCES
     src/race_screens/dialog.cpp
     src/race_screens/career.cpp
     src/race_screens/draws.cpp
+    src/race_screens/pause_menu4.cpp
     src/hooks/menu_sounds.cpp
     src/menu_sounds/menu_sounds.cpp
     src/hooks/race_sounds.cpp

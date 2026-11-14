@@ -631,7 +631,8 @@ ITC_RACE_SCREENS(82218C10, RaceScreensRaceDialogShowMessage)
 // ShowMessage's messages, never seen in play, the original).
 // RaceDialog::Open has no adapter (removed, 2026-11-08): its callers in
 // play, PauseMenu::MainPage's and AfterRaceMenu::MainPage's plain C++, call
-// its plain C++ (the unseen sub_8220FD48 and sub_8221E788 the original).
+// its plain C++ (PauseMenu4::MainPage sub_8220FD48's too, never seen in play,
+// race_screens_unseen; the unseen sub_8221E788 the original).
 ITC_RACE_SCREENS(8220EEF0, RaceScreensPauseMenuOpenOptions)
 ITC_RACE_SCREENS(82219210, RaceScreensCareerResultsIntro)
 ITC_RACE_SCREENS(822192B0, RaceScreensCareerResultsShow)

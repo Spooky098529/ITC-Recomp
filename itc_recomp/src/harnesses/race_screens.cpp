@@ -17,10 +17,12 @@
 #include "hooks/race_hud_machine.h"
 #include "hooks/race_hud_object.h"
 #include "hooks/race_screens.h"
+#include "hooks/race_screens_unseen.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_screens/race_screens.h"
+#include "race_screens/unseen.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -2313,6 +2315,299 @@ void Transitions(Context& h) {
   MainPages(h, w);
 }
 
+// --- The in-race screens never seen in play (race_screens_unseen) ---
+//
+// docs/functions/race-screens-unseen.md, ported though never seen in play
+// (the user's call, 2026-11-12): the originals (__imp__, which reach only
+// recompiled callees: the plain C++'s callees have no adapters) against the
+// register steps of hooks/race_screens_unseen.h, in this file's UI movie
+// world. Kind 4's pause menu: its screen word ([0x826D84E0]'s block +0) one
+// of the world's movies; its data's volumes (+0 to +12) -2 to 17 or any,
+// the defaults (+16, +20) 0 to 15, the item count (+52) 0 to 6, the toggle
+// (+60) 0 to 2, the kept selection (+64) 0 to 7, the counter (+68) around 0
+// to 12, the player (+72) 0, 1 or any, the kind (+76) 0 or 1, now and then
+// up to 7 (the item table's rows past 1 are other rodata words); its list's
+// selections 0 to 3 (now and then up to 8), its last move and side -1, 0, 1
+// or any, its item block the world's words (0 where MenuList::Init runs: it
+// frees the old block; the new one compared and freed); the step word 0 or
+// 1. The pages that run MenuList::Update have the list moved to a menu list
+// world (FrameSpec::list_world). Compared as MovieGroup does (the world,
+// the update calls, the frame without its register saves, SetText's and
+// SetNodeText's varargs stores left out: their unset words are 0 in ours,
+// the user's call for the parking area, 2026-10-30).
+void Pause4(Context& h, const MovieWorld& w) {
+  const World list_world;
+  if (!list_world.ok()) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  auto shape = [&h](Random& r, const MovieWorld& w, bool no_block) {
+    guest::StoreU32(h.base, w.block(rs::kPause4Screen), w.movie(r.Below(kMovieCount)));
+    const uint32_t data = w.block(rs::kPause4Data);
+    for (const uint32_t field : {0u, 4u, 8u, 12u}) {
+      guest::StoreU32(h.base, data + field,
+                      r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(20)) - 2));
+    }
+    guest::StoreU32(h.base, data + 16, r.Below(16));
+    guest::StoreU32(h.base, data + 20, r.Below(16));
+    guest::StoreU32(h.base, data + 52, r.Below(7));
+    guest::StoreU32(h.base, data + 60, r.Below(3));
+    guest::StoreU32(h.base, data + 64, r.Below(8));
+    guest::StoreU32(h.base, data + 68, Around(r, -1, 12));
+    guest::StoreU32(h.base, data + 72, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    guest::StoreU32(h.base, data + 76, r.Below(6) == 0 ? r.Below(8) : r.Below(2));
+    const uint32_t list = w.block(rs::kPause4List);
+    for (const uint32_t field : {rs::kListSelection, rs::kListSelectionBefore}) {
+      guest::StoreU32(h.base, list + field, r.Below(6) == 0 ? r.Below(9) : r.Below(4));
+    }
+    const uint32_t moves[4] = {0xFFFFFFFFu, 0, 1, uint32_t(r.Next())};
+    guest::StoreU32(h.base, list + rs::kListMove, moves[r.Below(4)]);
+    guest::StoreU32(h.base, list + rs::kListSide, moves[r.Below(4)]);
+    guest::StoreU32(h.base, list + rs::kListBlock, no_block ? 0 : w.misc.address + 0x800);
+    guest::StoreU32(h.base, w.block(rs::kPause4Pages) + 24, r.Below(2));
+  };
+  const MovieSetupFn plain = [&](PPCContext&, Random& r, const MovieWorld& w) {
+    shape(r, w, false);
+  };
+  const MovieSetupFn no_block = [&](PPCContext&, Random& r, const MovieWorld& w) {
+    shape(r, w, true);
+  };
+  const MovieSetupFn step = [&](PPCContext& t, Random& r, const MovieWorld& w) {
+    shape(r, w, false);
+    StepWord(t, r, w, rs::kPause4Pages);
+  };
+  const MovieSetupFn step_no_block = [&](PPCContext& t, Random& r, const MovieWorld& w) {
+    shape(r, w, true);
+    StepWord(t, r, w, rs::kPause4Pages);
+  };
+  // MenuList::Init's new block: its item words (the count, at most 6)
+  // compared, then freed and +68 put to 0.
+  auto list_block = [&](Outputs& out) {
+    const uint32_t list = w.block(rs::kPause4List);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      const uint32_t count = std::min<uint32_t>(guest::LoadU32(h.base, list + rs::kListCount), 6);
+      out.Bytes(Read(h.base, block, count * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  // Player 0's options' volume bytes (+0x1F878, +0x1F879).
+  auto save_bytes = [&](Outputs& out) {
+    out.Bytes(Read(h.base, w.save.address + 0x1F85C + 24, 8));
+  };
+  using Native = GuestFunction;
+  struct Simple {
+    const char* name;
+    int cases;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled;
+    Native native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+    bool init;  // MenuList::Init runs: its block compared and freed
+  };
+  const Simple simple[] = {
+      {"PauseMenu4::StepVolume (sub_82210488)", 200, &plain, __imp__sub_82210488,
+       hooks::RaceScreensUnseenPause4StepVolume, 96, 16, {0, 0}, false},
+      {"PauseMenu4::ShowItems (sub_82210360)", 150, &plain, __imp__sub_82210360,
+       hooks::RaceScreensUnseenPause4ShowItems, 128, 48, {48, 80}, false},
+      {"PauseMenu4::ColorItems (sub_82210CD0)", 150, &plain, __imp__sub_82210CD0,
+       hooks::RaceScreensUnseenPause4ColorItems, 128, 48, {0, 0}, false},
+      {"PauseMenu4::SetUpMain (sub_82210C00)", 150, &no_block, __imp__sub_82210C00,
+       hooks::RaceScreensUnseenPause4SetUpMain, 128, 24, {0, 0}, true},
+      {"PauseMenu4::SetUpVolume (sub_82211250)", 150, &no_block, __imp__sub_82211250,
+       hooks::RaceScreensUnseenPause4SetUpVolume, 128, 24, {40, 80}, true},
+      {"PauseMenu4::ShowVolumes (sub_82210670)", 100, &plain, __imp__sub_82210670,
+       hooks::RaceScreensUnseenPause4ShowVolumes, 112, 24, {0, 0}, false},
+      {"PauseMenu4::ShowVolumesB (sub_82210DE0)", 100, &plain, __imp__sub_82210DE0,
+       hooks::RaceScreensUnseenPause4ShowVolumesB, 112, 24, {0, 0}, false},
+      {"PauseMenu4::RunTen (sub_8220FF88)", 100, &step, __imp__sub_8220FF88,
+       hooks::RaceScreensUnseenPause4RunTen, 96, 16, {0, 0}, false},
+      {"PauseMenu4::OpenMain (sub_82211098)", 150, &step_no_block, __imp__sub_82211098,
+       hooks::RaceScreensUnseenPause4OpenMain, 112, 24, {0, 0}, true},
+      {"PauseMenu4::ShowMain (sub_82210010)", 100, &step, __imp__sub_82210010,
+       hooks::RaceScreensUnseenPause4ShowMain, 112, 32, {0, 0}, false},
+      {"PauseMenu4::BackToMain (sub_822100D8)", 100, &step, __imp__sub_822100D8,
+       hooks::RaceScreensUnseenPause4BackToMain, 112, 32, {0, 0}, false},
+      {"PauseMenu4::MoveMain (sub_82210228)", 100, &step, __imp__sub_82210228,
+       hooks::RaceScreensUnseenPause4MoveMain, 112, 32, {0, 0}, false},
+      {"PauseMenu4::CloseMain (sub_82210170)", 100, &step, __imp__sub_82210170,
+       hooks::RaceScreensUnseenPause4CloseMain, 112, 24, {0, 0}, false},
+      {"PauseMenu4::OpenVolume (sub_822114D8)", 150, &step_no_block, __imp__sub_822114D8,
+       hooks::RaceScreensUnseenPause4OpenVolume, 112, 24, {0, 0}, true},
+      {"PauseMenu4::ShowVolumeRow (sub_822102D8)", 100, &step, __imp__sub_822102D8,
+       hooks::RaceScreensUnseenPause4ShowVolumeRow, 112, 24, {0, 0}, false},
+      {"PauseMenu4::MoveVolume (sub_82210940)", 200, &step, __imp__sub_82210940,
+       hooks::RaceScreensUnseenPause4MoveVolume, 144, 56, {0, 0}, false},
+      {"PauseMenu4::SetVolume (sub_82210B08)", 150, &step, __imp__sub_82210B08,
+       hooks::RaceScreensUnseenPause4SetVolume, 128, 40, {0, 0}, false},
+      {"PauseMenu4::CloseVolume (sub_82211138)", 150, &step_no_block, __imp__sub_82211138,
+       hooks::RaceScreensUnseenPause4CloseVolume, 112, 24, {0, 0}, true},
+  };
+  for (const Simple& f : simple) {
+    FrameSpec spec{f.frame, f.saves, f.skip};
+    if (f.init) spec.after = list_block;
+    MovieGroup(h, w, f.name, f.cases, *f.setup, f.recompiled, f.native, spec);
+  }
+  FrameSpec saving{96, 8};
+  saving.after = save_bytes;
+  MovieGroup(h, w, "PauseMenu4::LoadVolumes (sub_822107B8)", 100, plain, __imp__sub_822107B8,
+             hooks::RaceScreensUnseenPause4LoadVolumes, saving);
+  MovieGroup(h, w, "PauseMenu4::SaveVolumes (sub_82210820)", 100, plain, __imp__sub_82210820,
+             hooks::RaceScreensUnseenPause4SaveVolumes, saving);
+  MovieGroup(h, w, "PauseMenu4::AnswerPage (sub_82210910)", 100, plain, __imp__sub_82210910,
+             hooks::RaceScreensUnseenPause4AnswerPage, saving);
+  // RestoreNodes: the group (r3) -1 or 0 to 3, the child (r4) 0 to 8.
+  MovieGroup(
+      h, w, "PauseMenu4::RestoreNodes (sub_822106E8)", 100,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        t.r3.u64 = r.Below(3) == 0 ? ~uint64_t(0) : r.Below(4);
+        t.r4.u64 = r.Below(9);
+      },
+      __imp__sub_822106E8, hooks::RaceScreensUnseenPause4RestoreNodes, {128, 40});
+  // ShowVolume: the node (r3) one of the world's sub-scenes or leaves, the
+  // volume (r4) -2 to 17 or any.
+  MovieGroup(
+      h, w, "PauseMenu4::ShowVolume (sub_822105F8)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        t.r3.u64 = r.Below(2) == 0 ? w.sub(r.Below(kSubScenes)) : w.leaf(r.Below(kLeaves));
+        t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(20)) - 2));
+      },
+      __imp__sub_822105F8, hooks::RaceScreensUnseenPause4ShowVolume, {112, 32, {40, 80}});
+  // SetArrow: r3 0, 40 or any.
+  MovieGroup(
+      h, w, "PauseMenu4::SetArrow (sub_82210420)", 100,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        const uint64_t values[3] = {0, 40, r.Next()};
+        t.r3.u64 = values[r.Below(3)];
+      },
+      __imp__sub_82210420, hooks::RaceScreensUnseenPause4SetArrow, {112, 24});
+  // The confirm dialog's page object and data, as AfterRaceMenu::
+  // ConfirmPage's cases shape them.
+  auto dialog = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t pages = w.block(rs::kDialogPages);
+    const uint32_t data = w.block(rs::kDialogData);
+    const int32_t choices[7] = {-1, 5, 0, 1, 2, 3, 4};
+    const int32_t page = choices[r.Below(7)];
+    guest::StoreU32(h.base, pages, uint32_t(page));
+    guest::StoreU32(h.base, pages + 12, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
+    guest::StoreU32(h.base, data + 36, page != -1 && page != 5 ? 1 : r.Below(2));
+    guest::StoreU32(h.base, data + 0, r.Below(3));
+  };
+  MovieGroup(
+      h, w, "PauseMenu4::ConfirmPage (sub_8220FF30)", 150,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        dialog(r, w);
+      },
+      __imp__sub_8220FF30, hooks::RaceScreensUnseenPause4ConfirmPage, {96, 8});
+  // MainPage: the list in the menu list world (5 items, selections 0 to 4).
+  FrameSpec main_page{112, 24};
+  main_page.list_world = &list_world;
+  main_page.list_global = rs::kPause4List;
+  MovieGroup(h, w, "PauseMenu4::MainPage (sub_8220FD48)", 400, plain, __imp__sub_8220FD48,
+             hooks::RaceScreensUnseenPause4MainPage, main_page);
+  // VolumePage: the sound manager's slots 29 and 30 (GetCategory,
+  // SetCategoryVolume) the getter sub_82090770 (r3 = +60) and the recorder
+  // sub_820CE9F8, as PauseMenu::VolumePage's cases lay them; the volume
+  // globals the setters write compared as floats and put back.
+  constexpr uint32_t kRecordR4 = 0x820CE9F8, kGet60 = 0x82090770;
+  constexpr uint32_t kVolumes[3] = {menu_sounds::kEffectsVolume, menu_sounds::kEffectsVolume2,
+                                    menu_sounds::kMusicVolume};
+  uint32_t saved_volumes[3];
+  for (int i = 0; i < 3; i++) saved_volumes[i] = guest::LoadU32(h.base, kVolumes[i]);
+  auto sound_slots = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t vtable = w.misc.address + 0x400;
+    guest::StoreU32(h.base, vtable + menu_sounds::kGetCategorySlot,
+                    r.Below(4) == 0 ? kRecordR4 : kGet60);
+    guest::StoreU32(h.base, vtable + menu_sounds::kSetCategoryVolumeSlot, kRecordR4);
+    guest::StoreU32(h.base, w.misc.address + 60,
+                    r.Below(3) == 0 ? 0xFFFFFFFFu
+                                    : (r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(4)));
+  };
+  FrameSpec volume_page{112, 24};
+  volume_page.list_world = &list_world;
+  volume_page.list_global = rs::kPause4List;
+  volume_page.after = [&](Outputs& out) {
+    for (int i = 0; i < 3; i++) {
+      out.Float(guest::LoadU32(h.base, kVolumes[i]));
+      guest::StoreU32(h.base, kVolumes[i], saved_volumes[i]);
+    }
+  };
+  MovieGroup(
+      h, w, "PauseMenu4::VolumePage (sub_82210E58)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        sound_slots(r, w);
+      },
+      __imp__sub_82210E58, hooks::RaceScreensUnseenPause4VolumePage, volume_page);
+  // Update: the page -1 to 3 (ConfirmPage's r4 the case's), the list in the
+  // menu list world, the dialog and the sound slots shaped.
+  FrameSpec update{112, 8};
+  update.list_world = &list_world;
+  update.list_global = rs::kPause4List;
+  update.after = [&](Outputs& out) {
+    save_bytes(out);
+    for (int i = 0; i < 3; i++) {
+      out.Float(guest::LoadU32(h.base, kVolumes[i]));
+      guest::StoreU32(h.base, kVolumes[i], saved_volumes[i]);
+    }
+  };
+  MovieGroup(
+      h, w, "PauseMenu4::Update (sub_82211458)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        sound_slots(r, w);
+        dialog(r, w);
+        guest::StoreU32(h.base, w.block(rs::kPause4Pages), uint32_t(int32_t(r.Below(5)) - 1));
+      },
+      __imp__sub_82211458, hooks::RaceScreensUnseenPause4Update, update);
+  // Open: r3 the screen's block, r4 the player 0, 1 or any, r5 the kind;
+  // UI movie 5 in the movie table half the time (the second pair's id), the
+  // missing movie's answer otherwise.
+  FrameSpec open{128, 40};
+  open.after = save_bytes;
+  MovieGroup(
+      h, w, "PauseMenu4::Open (sub_82211390)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        shape(r, w, false);
+        if (r.Below(2) == 0) {
+          guest::StoreU32(h.base, w.movies.address + kPairsAt + 8, 5);
+        }
+        t.r3.u64 = w.block(rs::kPause4Screen);
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
+        t.r5.u64 = r.Next();
+      },
+      __imp__sub_82211390, hooks::RaceScreensUnseenPause4Open, open);
+  // Draw: the running transition (+12) none (-1), another negative one or 0
+  // to 10, the queued one (+16) -1 or 0 to 10, the page (+0) 0 to 3; the
+  // list's block 0 where the transition runs MenuList::Init (1, 6 and 10).
+  FrameSpec draw{192, 64};
+  draw.after = list_block;
+  MovieGroup(
+      h, w, "PauseMenu4::Draw (sub_82211590)", 400,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        const uint32_t pages = w.block(rs::kPause4Pages);
+        const uint32_t pick = r.Below(14);
+        const uint32_t transition = pick == 0 || pick == 1 ? 0xFFFFFFFFu
+                                    : pick == 2           ? uint32_t(-2 - int32_t(r.Below(9)))
+                                                          : pick - 3;
+        shape(r, w, transition == 1 || transition == 6 || transition == 10);
+        guest::StoreU32(h.base, pages + 12, transition);
+        guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(11));
+        guest::StoreU32(h.base, pages + 4, r.Below(4));
+        guest::StoreU32(h.base, pages + 0, r.Below(4));
+        ShapeDialogPages(h.base, r, w);
+        t.r3.u64 = w.block(rs::kPause4Screen);
+      },
+      __imp__sub_82211590, hooks::RaceScreensUnseenPause4Draw, draw);
+}
+
 }  // namespace
 
 void RaceScreens(Context& h) {
@@ -2327,6 +2622,20 @@ void RaceScreens(Context& h) {
   Data(h);
   Pages(h);
   Transitions(h);
+}
+
+}  // namespace harness
+
+namespace harness {
+
+void RaceScreensUnseen(Context& h) {
+  const MovieWorld w;
+  if (!w.ok()) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  BuildStringTable(h.base, w);
+  Pause4(h, w);
 }
 
 }  // namespace harness

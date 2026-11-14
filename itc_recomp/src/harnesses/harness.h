@@ -269,6 +269,8 @@ void Accessories(Context& h);
 // The race HUD machine (src/harnesses/race_hud_machine.cpp).
 void RaceHudMachine(Context& h);
 void RaceScreens(Context& h);
+// The in-race screens never seen in play (src/harnesses/race_screens.cpp).
+void RaceScreensUnseen(Context& h);
 void Scene(Context& h);
 // The second set's objects (src/harnesses/second_set.cpp).
 void SecondSet(Context& h);
