@@ -113,4 +113,8 @@ void CoreFcloseNolock(PPCContext& ctx, uint8_t* base);  // sub_825A94C0 (no adap
 void CoreFclose(PPCContext& ctx, uint8_t* base);        // sub_825A9580 (no adapter)
 void CoreFcloseall(PPCContext& ctx, uint8_t* base);     // sub_825B4E78
 
+void CoreFlsbuf(PPCContext& ctx, uint8_t* base);  // sub_825AEE28
+void CoreStbuf(PPCContext& ctx, uint8_t* base);   // sub_825B40B8
+void CoreFtbuf(PPCContext& ctx, uint8_t* base);   // sub_825B41A0
+
 }  // namespace hooks

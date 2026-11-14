@@ -54,7 +54,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "sub_82295D50), the __finally funclets of fflush and fputs (sub_825AD02C, sub_825AD488), "
               "_flush (sub_825ACC78), __CxxUnhandledExceptionFilter (sub_825B4CD0; its "
               "terminate path checked by reading), _fcloseall with fclose and _fclose_nolock "
-              "(sub_825B4E78, sub_825A9580, sub_825A94C0) (checked by "
+              "(sub_825B4E78, sub_825A9580, sub_825A94C0), _flsbuf, _stbuf and _ftbuf "
+              "(sub_825AEE28, sub_825B40B8, sub_825B41A0; _stbuf's path past the _isatty stub "
+              "checked by reading) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -595,6 +597,15 @@ void hooks::CoreFclose(PPCContext& ctx, uint8_t* base) {
 void hooks::CoreFcloseall(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fcloseall(base, CRuntimeCoreCalls(ctx, base));
 }
+void hooks::CoreFlsbuf(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Flsbuf(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreStbuf(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Stbuf(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreFtbuf(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Ftbuf(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -769,3 +780,10 @@ ITC_C_RUNTIME_CORE(825B4CD0, CoreCxxUnhandledExceptionFilter)
 // _fclose_nolock, sub_825A94C0, have no adapters: _fcloseall is fclose's
 // only caller, fclose _fclose_nolock's.)
 ITC_C_RUNTIME_CORE(825B4E78, CoreFcloseall)
+// _flsbuf: r3 = a character, r4 = a stream; r3 = the character's low byte,
+// or -1.
+ITC_C_RUNTIME_CORE(825AEE28, CoreFlsbuf)
+// _stbuf: r3 = a stream; r3 = 0 (1 past the _isatty stub, never).
+ITC_C_RUNTIME_CORE(825B40B8, CoreStbuf)
+// _ftbuf: r3 = a flag, r4 = a stream.
+ITC_C_RUNTIME_CORE(825B41A0, CoreFtbuf)

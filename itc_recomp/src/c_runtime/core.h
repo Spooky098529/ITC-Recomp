@@ -577,4 +577,32 @@ uint64_t Fclose(uint8_t* base, uint32_t stream, const Calls& calls);
 // 20 freed and cleared; then its __finally (sub_825B4F38). The count.
 uint32_t Fcloseall(uint8_t* base, const Calls& calls);
 
+// sub_825AEE28 _flsbuf: in its 128-byte frame (the character at +148, the
+// caller's frame + 20): _fileno; a stream not writable (+12 & 0x82 0): errno
+// 9, a string stream (0x40): errno 34, each with _IOERR (0x20) set and -1. A
+// read stream (bit 0) not at its end (0x10) gets _IOERR and -1, else its
+// pointer reset to the buffer and bit 0 cleared; then +4 = 0, _IOEOF
+// cleared, _IOWRT set; no buffer yet (+12 & 0x10C 0): _getbuf, unless it's
+// stdout or stderr and _isatty (the "returns 0" stub) says a terminal. With a
+// buffer: +4 = its size - 1, +0 = the buffer + 1, the bytes before written
+// (_write) when there are any, else an append handle (+4 bit 5) seeked to
+// its end (_lseeki64; -1 is an error), then the character's low byte stored
+// at the buffer; without: _write of the character's word's first byte (its
+// high byte, as the original's address). Written short of the count: _IOERR,
+// -1 (sign-extended); else the character's low byte.
+uint64_t Flsbuf(uint8_t* base, uint32_t character, uint32_t stream, const Calls& calls);
+
+// sub_825B40B8 _stbuf: from a 112-byte frame, _fileno, then _isatty (the
+// "returns 0" stub): 0. Past it (never taken): stdout or stderr only,
+// _cflush counted, none for a stream with a buffer (+12 & 0x10C); the shared
+// buffer at 0x82971330 + 4 x n (malloc(4096) when 0; the 2-byte one at +20
+// when that fails) as +8 and +0, its size at +24 and +4, +12 |= 0x1102; 1.
+uint32_t Stbuf(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_825B41A0 _ftbuf: from a 96-byte frame, `flag` not 0 and the stream's
+// temporary buffer bit (+12 & 0x1000): _flush, then +24, +0, +8 = 0 and
+// 0x100 and 0x1000 cleared. r3 as the original leaves it (`flag`, or
+// _flush's).
+uint64_t Ftbuf(uint8_t* base, uint32_t flag, uint32_t stream, const Calls& calls);
+
 }  // namespace c_runtime::core

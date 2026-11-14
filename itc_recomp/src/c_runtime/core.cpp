@@ -10,6 +10,7 @@
 #include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
 #include "helpers/debug_output.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
 #include <climits>
@@ -1570,6 +1571,149 @@ uint32_t Fcloseall(uint8_t* base, const Calls& calls) {
     }
     UnlockStreamsFinally(calls);
     result = Load(base, frame + 80);
+  });
+  return result;
+}
+
+
+namespace {
+
+constexpr uint32_t kBadIoInfo = 0x8266BFB8;  // __badioinfo
+constexpr uint32_t kCflush = 0x82971174;     // _cflush
+constexpr uint32_t kStdBuffers = 0x82971330;  // _stbuf's two shared buffers
+
+// _isatty, compiled to the shared "returns 0" (sub_825C8388).
+uint32_t Isatty(uint32_t) { return vehicle_accessors::DebugSwitchOff(); }
+
+}  // namespace
+
+uint64_t Flsbuf(uint8_t* base, uint32_t character, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AEE28 _flsbuf");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(128, [&](uint32_t frame) {
+    Store(base, frame + 148, character);
+    const uint32_t handle = uint32_t(Fileno(base, stream, calls));
+    const uint32_t flags = Load(base, stream + 12);
+    const auto fail = [&](uint32_t error) {
+      if (error != 0) {
+        Store(base, Errno(base, calls), error);
+      }
+      Store(base, stream + 12, Load(base, stream + 12) | 32);
+    };
+    if ((flags & 130) == 0) {
+      fail(9);
+      return;
+    }
+    if ((flags & 0x40) != 0) {
+      fail(34);
+      return;
+    }
+    if ((flags & 1) != 0) {
+      Store(base, stream + 4, 0);
+      if ((flags & 0x10) == 0) {
+        Store(base, stream + 12, flags | 32);
+        return;
+      }
+      Store(base, stream + 0, Load(base, stream + 8));
+      Store(base, stream + 12, flags & ~1u);
+    }
+    uint32_t written = 0, count = 0;
+    Store(base, stream + 4, 0);
+    const uint32_t now = (Load(base, stream + 12) & ~0x10u) | 2;
+    Store(base, stream + 12, now);
+    if ((now & 268) == 0) {
+      const bool standard = stream == c_runtime::kStreams + 32 || stream == c_runtime::kStreams + 64;
+      if (!standard || Isatty(handle) == 0) {
+        Getbuf(base, stream, calls);
+      }
+    }
+    if ((Load(base, stream + 12) & 264) != 0) {
+      const uint32_t buffer = Load(base, stream + 8);
+      count = Load(base, stream + 0) - buffer;
+      Store(base, stream + 4, Load(base, stream + 24) - 1);
+      Store(base, stream + 0, buffer + 1);
+      if (int32_t(count) > 0) {
+        written = uint32_t(Write(base, handle, buffer, count, calls));
+      } else {
+        const uint32_t entry =
+            handle == 0xFFFFFFFFu || handle == 0xFFFFFFFEu
+                ? kBadIoInfo
+                : Load(base, kPioinfo + 4 * uint32_t(int32_t(handle) >> 5)) + 44 * (handle & 31);
+        if ((guest::LoadU8(base, entry + 4) & 0x20) != 0 &&
+            int64_t(Lseek(base, handle, 0, 2, calls)) == -1) {
+          fail(0);
+          return;
+        }
+      }
+      guest::StoreU8(base, Load(base, stream + 8), uint8_t(Load(base, frame + 148)));
+    } else {
+      count = 1;
+      written = uint32_t(Write(base, handle, frame + 148, 1, calls));
+    }
+    if (int32_t(written) != int32_t(count)) {
+      fail(0);
+      return;
+    }
+    result = Load(base, frame + 148) & 0xFF;
+  });
+  return result;
+}
+
+uint32_t Stbuf(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B40B8 _stbuf");
+  uint32_t result = 0;
+  calls.in_frame(112, [&](uint32_t) {
+    if (Isatty(uint32_t(Fileno(base, stream, calls))) == 0) {
+      return;
+    }
+    uint32_t index;
+    if (stream == c_runtime::kStreams + 32) {
+      index = 0;
+    } else if (stream == c_runtime::kStreams + 64) {
+      index = 1;
+    } else {
+      return;
+    }
+    Store(base, kCflush, Load(base, kCflush) + 1);
+    if ((Load(base, stream + 12) & 268) != 0) {
+      return;
+    }
+    const uint32_t slot = kStdBuffers + 4 * index;
+    uint32_t buffer = Load(base, slot);
+    if (buffer == 0) {
+      buffer = calls.malloc(4096);
+      Store(base, slot, buffer);
+    }
+    if (buffer == 0) {
+      Store(base, stream + 8, stream + 20);
+      Store(base, stream + 24, 2);
+      Store(base, stream + 4, 2);
+      Store(base, stream + 0, stream + 20);
+    } else {
+      Store(base, stream + 8, buffer);
+      Store(base, stream + 0, buffer);
+      Store(base, stream + 24, 4096);
+      Store(base, stream + 4, 4096);
+    }
+    Store(base, stream + 12, Load(base, stream + 12) | 4354);
+    result = 1;
+  });
+  return result;
+}
+
+uint64_t Ftbuf(uint8_t* base, uint32_t flag, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B41A0 _ftbuf");
+  uint64_t result = flag;
+  calls.in_frame(96, [&](uint32_t) {
+    if (flag == 0 || (Load(base, stream + 12) & 0x1000) == 0) {
+      return;
+    }
+    result = Flush(base, stream, calls);
+    const uint32_t flags = Load(base, stream + 12) & ~0x100u & ~0x1000u;
+    Store(base, stream + 24, 0);
+    Store(base, stream + 0, 0);
+    Store(base, stream + 8, 0);
+    Store(base, stream + 12, flags);
   });
   return result;
 }
