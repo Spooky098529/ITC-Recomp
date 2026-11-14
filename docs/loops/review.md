@@ -75,6 +75,18 @@ When the user has reviewed a run's section, its heading gets
   tables) and `CPP_TABLES` (the device's render and sampler state
   setters); definitions shared by an argument still give callers all
   their owners (the literal rule cut 102 functions that run).
+- The C runtime's core map (552e90f8, `c-runtime-core.md`, 118
+  rows: the per-thread data, the lock table, `errno`, exit and
+  exceptions, the streams and low-level I/O, the float formatting,
+  the start-up, XAPI's thread notify list; matched to Visual C++
+  2005's runtime names). Corrections noted in its rows, not yet in
+  the other files: `files-and-saves.md`'s `sub_825B0F48` is
+  `_write_nolock` and `sub_825B6500` `_lseeki64_nolock`;
+  `c-runtime.md`'s `sub_825A6E48` gives `_cinit`'s tables at
+  `0x8263xxxx`, the image has them at `0x8260xxxx`. Never-seen paths
+  call `KeBugCheck` and `RtlRaiseException` (a native caller raising a
+  guest C++ exception through the import): followed B7's goal (the
+  imports called as the original does).
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a

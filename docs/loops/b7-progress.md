@@ -72,7 +72,13 @@ file's history. What's left to see in a drive, from every run:
   reachable. Subsystem 1 finished and recorded.
 - Subsystem 2 of 10: the C runtime's per-thread data and critical
   section wrappers (`825A`-`825B`, the static map's top blockers and
-  frontier clusters, unmapped; ported since B7's goal). Step: map.
+  frontier clusters, unmapped; ported since B7's goal). Mapped
+  552e90f8: `c-runtime-core.md`, 118 rows (1 moved, 117 new; 21 seen
+  in play), 56 ready groups; only `_cinit` `sub_822979E0` blocked (the
+  static initializers, a lead); 2 leads added; check passed. The
+  never-seen paths ending in `KeBugCheck` and `_CxxThrowException`'s
+  `RtlRaiseException` are imports called as the original does (B7's
+  goal). Step: migration.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
