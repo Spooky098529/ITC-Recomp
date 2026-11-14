@@ -69,7 +69,7 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
               "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
-              "_invalid_parameter's trap, terminate (sub_825B3498), _exit (sub_825AA378). "
+              "_invalid_parameter's trap, terminate (sub_825B3498), _exit (sub_825AA378), abort (sub_825AD070), _purecall (sub_825A7098). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
@@ -81,7 +81,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_fclose_nolock or fclose), _fcloseall's __finally (sub_825B4F38), _fflush_nolock, "
               "flsall and _flushall (their callers fflush, flsall and _endstdio), the __finally "
               "funclets of flsall and fflush (sub_825ACEB4, sub_825ACF04, sub_825AD02C), doexit "
-              "(sub_825AA218, its callers _exit and _cexit) and its unwind funclet (sub_825AA338)");
+              "(sub_825AA218, its callers _exit and _cexit) and its unwind funclet (sub_825AA338), raise "
+              "(sub_825B49C8, its caller abort; checked by --run_harnesses=c_runtime_core but "
+              "for its default action, _exit)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -685,6 +687,15 @@ void hooks::CoreCexit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
   CoreDoexit(ctx, base);
 }
+void hooks::CoreRaise(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Raise(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreAbort(PPCContext& ctx, uint8_t* base) {
+  cc::Abort(base, uint32_t(ctx.lr), CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CorePurecall(PPCContext& ctx, uint8_t* base) {
+  cc::Purecall(base, CRuntimeCoreCalls(ctx, base));
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -886,3 +897,8 @@ ITC_C_RUNTIME_CORE(825AD5F8, CoreEndstdio)
 // sub_825AA218, has no adapter: they are its only callers.)
 ITC_C_RUNTIME_CORE(825AA378, CoreExit)
 ITC_C_RUNTIME_CORE(825AA388, CoreCexit)
+// abort: no registers; ends the process. (raise, sub_825B49C8, has no
+// adapter: abort is its only caller.)
+ITC_C_RUNTIME_CORE(825AD070, CoreAbort)
+// _purecall: no registers (a vtable's empty slot); ends the process.
+ITC_C_RUNTIME_CORE(825A7098, CorePurecall)

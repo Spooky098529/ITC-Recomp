@@ -2016,4 +2016,144 @@ uint64_t Doexit(uint8_t* base, uint32_t code, uint32_t quick, uint32_t ret, cons
   return result;
 }
 
+uint64_t Raise(uint8_t* base, uint32_t signal, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B49C8 raise");
+  uint64_t result = 0;
+  calls.in_frame(160, [&](uint32_t frame) {
+    Store(base, frame + 180, signal);
+    Store(base, frame + 84, 0);
+    Store(base, frame + 88, 0);
+    const int32_t sig = int32_t(signal);
+    uint32_t locked = 0, data = 0, slot = 0;
+    switch (sig) {
+      case 2: slot = kSignalActions; locked = 1; break;
+      case 21: slot = kSignalActions + 4; locked = 1; break;
+      case 6:
+      case 22: slot = kSignalActions + 8; locked = 1; break;
+      case 15: slot = kSignalActions + 12; locked = 1; break;
+      case 4:
+      case 8:
+      case 11: {
+        data = GetptdNoexit(base, calls);
+        Store(base, frame + 88, data);
+        if (data == 0) {
+          result = ~uint64_t(0);
+          return;
+        }
+        const uint32_t table = Load(base, data + 92);
+        const uint32_t count = Load(base, kXcptActTabCount);
+        uint32_t entry = table;
+        do {
+          if (int32_t(Load(base, entry + 4)) == sig) {
+            break;
+          }
+          entry += 12;
+        } while (entry < count * 12 + table);
+        if (!(entry < count * 12 + table) || int32_t(Load(base, entry + 4)) != sig) {
+          entry = 0;
+        }
+        slot = entry + 8;
+        break;
+      }
+      default:
+        Store(base, Errno(base, calls), 22);
+        InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+        result = ~uint64_t(0);
+        return;
+    }
+    if (locked != 0) {
+      Store(base, frame + 84, 1);
+    }
+    const uint32_t action = Load(base, slot);
+    Store(base, frame + 80, action);
+    if (action == 1) {
+      return;
+    }
+    if (action == 0) {
+      Doexit(base, 3, 1, 0, calls);  // _exit(3): ends the process
+    }
+    if (locked != 0) {
+      calls.guest(kLock, {0});
+    }
+    if (sig == 8 || sig == 11 || sig == 4) {
+      Store(base, frame + 96, Load(base, data + 96));
+      Store(base, data + 96, 0);
+      if (sig == 8) {
+        Store(base, frame + 100, Load(base, data + 100));
+        Store(base, data + 100, 140);
+      }
+    }
+    if (sig == 8) {
+      uint32_t i = Load(base, kFirstFpe);
+      Store(base, frame + 92, i);
+      while (int32_t(i) < int32_t(Load(base, kFpeCount) + Load(base, kFirstFpe))) {
+        Store(base, Load(base, data + 92) + 12 * i + 8, 0);
+        i++;
+        Store(base, frame + 92, i);
+      }
+    } else {
+      Store(base, slot, 0);
+    }
+    bool called = false;
+    RaiseFinally(locked, &called, calls);
+    const uint32_t again = Load(base, frame + 180);
+    const uint32_t handler = Load(base, frame + 80);
+    data = Load(base, frame + 88);
+    if (int32_t(again) == 8) {
+      calls.guest(handler, {8, Load(base, data + 100)});
+    } else {
+      calls.guest(handler, {again});
+    }
+    if (int32_t(again) == 8 || int32_t(again) == 11 || int32_t(again) == 4) {
+      Store(base, data + 96, Load(base, frame + 96));
+      if (int32_t(again) == 8) {
+        Store(base, data + 100, Load(base, frame + 100));
+      }
+    }
+    result = 0;
+  });
+  return result;
+}
+
+void Abort(uint8_t* base, uint32_t return_address, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AD070 abort");
+  calls.in_frame(2816, [&](uint32_t frame) {
+    Store(base, frame + 2808, return_address);
+    if ((Load(base, kAbortBehavior) & 1) != 0) {
+      NmsgWrite(base, 10);
+    }
+    if (GetSigabrt(base) != 0) {
+      Raise(base, 22, calls);
+    }
+    if ((Load(base, kAbortBehavior) & 2) != 0) {
+      guest::ForEachHostPart(base, frame + 176, 2624,
+                             [](uint8_t* host, uint32_t, uint32_t bytes) {
+                               std::memset(host, 0, bytes);
+                             });
+      for (uint32_t offset = 96; offset < 176; offset += 4) {
+        Store(base, frame + offset, 0);
+      }
+      Store(base, frame + 96, 0x40000015u);
+      Store(base, frame + 108, Load(base, frame + 2808));
+      Store(base, frame + 80, frame + 96);
+      Store(base, frame + 84, frame + 176);
+      SetUnhandledExceptionFilter(base, 0);
+      UnhandledExceptionFilter(base, frame + 80, calls);
+    }
+    Doexit(base, 3, 1, 0, calls);  // _exit(3): ends the process
+  });
+}
+
+void Purecall(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A7098 _purecall");
+  calls.in_frame(96, [&](uint32_t) {
+    if (const uint32_t handler = Load(base, kPurecallHandler); handler != 0) {
+      calls.guest(handler, {});
+    }
+    NmsgWrite(base, 25);
+    SetAbortBehavior(base, 0, 1);
+    Abort(base, 0x825A70D4, calls);
+  });
+}
+
 }  // namespace c_runtime::core

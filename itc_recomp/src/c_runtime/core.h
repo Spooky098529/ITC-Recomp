@@ -685,4 +685,40 @@ constexpr uint32_t kExitFlag = 0x82971144;          // _exitflag (a byte)
 // leaves it when it returns (_unlock's).
 uint64_t Doexit(uint8_t* base, uint32_t code, uint32_t quick, uint32_t ret, const Calls& calls);
 
+constexpr uint32_t kAbortBehavior = 0x8266B7C4;    // __abort_behavior
+constexpr uint32_t kSignalActions = 0x82971338;    // SIGINT, SIGBREAK, SIGABRT, SIGTERM
+constexpr uint32_t kXcptActTabCount = 0x8266BEE4;  // _XcptActTabCount
+constexpr uint32_t kFirstFpe = 0x8266BED8;         // _First_FPE_Indx
+constexpr uint32_t kFpeCount = 0x8266BEDC;         // _Num_FPE
+constexpr uint32_t kPurecallHandler = 0x82971178;  // __pPurecall
+
+// sub_825B49C8 raise: in its 160-byte frame (`signal` at +180, the caller's
+// frame + 20; +80 the action, +84 whether lock 0 is taken, +88 the thread's
+// data, +92 the FPE walk, +96 and +100 the saved pointers): SIGINT (2),
+// SIGBREAK (21), SIGABRT (6, 22) and SIGTERM (15) from kSignalActions under
+// _lock(0); SIGFPE (8), SIGILL (4) and SIGSEGV (11) from the thread's action
+// table (its data's +92, _XcptActTabCount entries of 12 bytes; not found:
+// the word at 8, as the original), -1 without thread data; another signal:
+// errno 22, _invalid_parameter(0, 0, 0, 0, 0), -1. An action of 1 (ignored):
+// 0. 0 (the default): _exit(3) (doexit, which ends the process). Else the
+// action reset to 0 (for SIGFPE every FPE entry's from _First_FPE_Indx, and
+// the data's +96 cleared and +100 = 140 around the call; +96 for SIGILL and
+// SIGSEGV), the lock's __finally, the action called (with the signal, and
+// +100 for SIGFPE), the data's words put back; 0. r3 in 64 bits.
+uint64_t Raise(uint8_t* base, uint32_t signal, const Calls& calls);
+
+// sub_825AD070 abort: in its 2,816-byte frame (the caller's return address
+// at +2808): _NMSG_WRITE(10) when __abort_behavior's bit 0 is set; raise(22)
+// when SIGABRT's action (__get_sigabrt) isn't 0; with bit 1, a zeroed
+// 2,624-byte context at +176 and an 80-byte record at +96 (code 0x40000015,
+// +108 the return address), the pointers at +80, SetUnhandledExceptionFilter(0)
+// and UnhandledExceptionFilter(+80); then _exit(3). No harness: ends the
+// process (the user's call, 2026-11-14).
+void Abort(uint8_t* base, uint32_t return_address, const Calls& calls);
+
+// sub_825A7098 _purecall: from a 96-byte frame, the handler at
+// kPurecallHandler called when set, _NMSG_WRITE(25), _set_abort_behavior(0,
+// 1), abort (return address 0x825A70D4). No harness: ends the process.
+void Purecall(uint8_t* base, const Calls& calls);
+
 }  // namespace c_runtime::core

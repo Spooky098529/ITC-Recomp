@@ -3779,6 +3779,108 @@ void DoexitCases(Context& h) {
   }
 }
 
+// raise on every path but the default action's (0: _exit, which ends the
+// process; checked by reading): SIGINT, SIGBREAK, SIGABRT (6 and 22) and
+// SIGTERM with their action words (put back after) 1 (ignored), the shared
+// "returns 0" or SetUnhandledExceptionFilter (which leaves the signal it's
+// called with in its word, put back after); SIGILL, SIGFPE and SIGSEGV through
+// a copy of the thread's action table in the scratch area (its data's +92
+// pointed there, the data's words put back after), the signal's entry given
+// one of those actions and the others random words; or without thread data
+// (the store failing: -1); and signals raise doesn't take (errno 22 and
+// _invalid_parameter, its handler the shared "returns 0"). Compared: r3 (64
+// bits), the copy, the four action words, the data's +92 to +104, errno, the
+// filter word and the caller's frame + 20.
+void RaiseCases(Context& h) {
+  Results results("raise (sub_825B49C8)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: raise: no thread data");
+    return;
+  }
+  const uint32_t count = Load(h.base, cc::kXcptActTabCount);
+  const uint32_t table = Load(h.base, slots.data + 92);
+  const uint32_t first = Load(h.base, cc::kFirstFpe), fpes = Load(h.base, cc::kFpeCount);
+  if (count == 0 || count > 40 || first + fpes > count) {
+    ITC_LOG_ERROR("harness: c_runtime_core: raise: unexpected action table ({} entries, FPE {} + {})",
+                  count, first, fpes);
+    return;
+  }
+  const std::vector<uint8_t> original = Read(h.base, table, 12 * count);
+  const uint32_t copy = h.data + 2048;
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const int32_t signals[] = {2, 21, 6, 22, 15, 4, 8, 11, 0, 1, 3, 5, 7, 9, 10, 12, 14, 16, 20, 23, -1};
+  const uint32_t actions[] = {1, kReturnsZero, 0x82297870};
+  for (int c = 0; c < 96; c++) {
+    const int32_t sig = c < 63 ? signals[c % 21]
+                               : int32_t(h.random.Below(3) == 0 ? h.random.Next() : h.random.Below(30));
+    const uint32_t action = actions[h.random.Below(3)];
+    const bool thread = sig == 4 || sig == 8 || sig == 11;
+    const int kind = thread && h.random.Below(4) == 0 ? 2 : 0;
+    std::vector<uint8_t> fill = original;
+    for (uint32_t e = 0; e < count; e++) {
+      const uint32_t word = uint32_t(h.random.Next());
+      for (int b = 0; b < 4; b++) {
+        fill[12 * e + 8 + b] = uint8_t(word >> (24 - 8 * b));
+      }
+    }
+    // The signal's first entry gets the action (as the original's walk finds it).
+    for (uint32_t e = 0; e < count; e++) {
+      const uint32_t entry_signal = (uint32_t(fill[12 * e + 4]) << 24) | (uint32_t(fill[12 * e + 5]) << 16) |
+                                    (uint32_t(fill[12 * e + 6]) << 8) | fill[12 * e + 7];
+      if (int32_t(entry_signal) == sig) {
+        for (int b = 0; b < 4; b++) {
+          fill[12 * e + 8 + b] = uint8_t(action >> (24 - 8 * b));
+        }
+        break;
+      }
+    }
+    const uint32_t globals[4] = {uint32_t(h.random.Next()), uint32_t(h.random.Next()),
+                                 uint32_t(h.random.Next()), uint32_t(h.random.Next())};
+    const uint32_t data_words[2] = {uint32_t(h.random.Next()), uint32_t(h.random.Next())};
+    const uint32_t err = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kSignalActions, 16}, {kFilter, 4}, {slots.data + 8, 4},
+                      {slots.data + 92, 12}});
+      Write(h.base, copy, fill.data(), uint32_t(fill.size()));
+      for (int i = 0; i < 4; i++) {
+        Store(h.base, cc::kSignalActions + 4 * i, globals[i]);
+      }
+      if (!thread) {
+        const uint32_t slot = sig == 2    ? 0
+                              : sig == 21 ? 4
+                              : sig == 15 ? 12
+                                          : 8;
+        Store(h.base, cc::kSignalActions + slot, action);
+      }
+      Store(h.base, slots.data + 92, copy);
+      Store(h.base, slots.data + 96, data_words[0]);
+      Store(h.base, slots.data + 100, data_words[1]);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      WithThreadData(h, slots, kind, [&] {
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = uint32_t(sig);
+        (v == 0 ? __imp__sub_825B49C8 : hooks::CoreRaise)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(Load(h.base, t.r1.u32 + 20));
+      });
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      out[v].Bytes(Read(h.base, copy, 12 * count));
+      out[v].Bytes(Read(h.base, cc::kSignalActions, 16));
+      out[v].Bytes(Read(h.base, slots.data + 92, 12));
+      out[v].Word(Load(h.base, slots.data + 8));
+      out[v].Word(Load(h.base, kFilter));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -3854,6 +3956,7 @@ void CRuntimeCore(Context& h) {
   CxxSetFilterCases(h);
   FlushAllCases(h);
   DoexitCases(h);
+  RaiseCases(h);
 }
 
 }  // namespace harness
