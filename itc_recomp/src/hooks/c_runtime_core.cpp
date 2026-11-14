@@ -51,7 +51,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "sub_825B0D10), FlushFileBuffers and _commit (sub_825BA510, sub_825B4828), "
               "_lseeki64_nolock and _lseeki64 with its __finally (sub_825B6500, sub_825B65D0, "
               "sub_825B6730), _write with _write_nolock and WriteFile (sub_825B11A8, sub_825B0F48, "
-              "sub_82295D50) (checked by "
+              "sub_82295D50), the __finally funclets of fflush and fputs (sub_825AD02C, sub_825AD488), "
+              "_flush (sub_825ACC78) and __CxxUnhandledExceptionFilter (sub_825B4CD0; its "
+              "terminate path checked by reading) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -572,6 +574,14 @@ void hooks::CoreWrite(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Write(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreFlush(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Flush(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreCxxUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::CxxUnhandledExceptionFilter(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -735,3 +745,11 @@ ITC_C_RUNTIME_CORE(825B6730, CoreCloseFinally)
 // sub_82295D50, have no adapters: _write is _write_nolock's only caller, and
 // WriteFile's caller in play, SaveSlot::WriteFile, leaves it out.)
 ITC_C_RUNTIME_CORE(825B11A8, CoreWrite)
+// fflush's and fputs's __finally: r30 = the stream.
+ITC_C_RUNTIME_CORE(825AD02C, CoreFcloseFinally)
+ITC_C_RUNTIME_CORE(825AD488, CoreFcloseFinally)
+// _flush: r3 = a stream; r3 = 0, or -1.
+ITC_C_RUNTIME_CORE(825ACC78, CoreFlush)
+// __CxxUnhandledExceptionFilter: r3 = the exception pointers; r3 = the
+// previous filter's answer, or 0.
+ITC_C_RUNTIME_CORE(825B4CD0, CoreCxxUnhandledExceptionFilter)

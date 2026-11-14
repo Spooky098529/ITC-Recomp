@@ -2150,8 +2150,11 @@ void StreamFinallyCases(Context& h) {
     }
     results.Report();
   }
-  {
-    Results results("fclose's __finally (sub_825A9664)");
+  for (const auto& [name, recompiled] :
+       {std::pair<const char*, GuestFunction>{"fclose's __finally (sub_825A9664)", __imp__sub_825A9664},
+        {"fflush's __finally (sub_825AD02C)", __imp__sub_825AD02C},
+        {"fputs's __finally (sub_825AD488)", __imp__sub_825AD488}}) {
+    Results results(name);
     std::vector<uint32_t> boot_streams;
     for (uint32_t i = 0; i < 20; i++) {
       if (BootLock(h, 16 + i)) {
@@ -2179,7 +2182,7 @@ void StreamFinallyCases(Context& h) {
         t.r30.u64 = stream;
         t.r31.u64 = 0x5678;
         t.r12.u64 = h.data + 640;
-        (v == 0 ? __imp__sub_825A9664 : hooks::CoreFcloseFinally)(t, h.base);
+        (v == 0 ? recompiled : hooks::CoreFcloseFinally)(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(t.r30.u32);
         out[v].Word(t.r31.u32);
@@ -2800,6 +2803,129 @@ void WriteCases(Context& h) {
   SetLastError(h, slots.error);
 }
 
+
+// _flush: a stream in the scratch area (+0 its pointer, +4 its count, +8 its
+// buffer, a heap block, +12 its flags: the read and write bits, the buffer
+// bits, _IORW and random ones, +16 its handle) whose handle is in the first
+// block, open on the null device's file (writes fail: 0 bytes), the
+// read-only file or a word that's no handle, or closed, or out of range;
+// pointers from below the buffer to 2,000 bytes past it. errno, _doserrno
+// and the last error random, the invalid parameter handler the shared
+// "returns 0". Compared: r3 (64 bits), the stream, the entry, errno,
+// _doserrno and the last error. (No file of the SDK's takes bytes without
+// being the user's, so the path where all are written is checked by
+// reading.)
+void FlushStreamCases(Context& h) {
+  Results results("_flush (sub_825ACC78)");
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  WriteFiles files(h);
+  const uint32_t block = memory::Alloc(4096, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || files.sink.handle == 0 ||
+      files.xex.handle == 0 || block == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _flush: no handle block, thread data, lock 10, "
+                  "files or buffer");
+    memory::Free(block);
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t stream = h.data + 256;
+  for (int c = 0; c < 64; c++) {
+    const uint32_t handle = h.random.Below(8) == 0 ? nhandle + h.random.Below(8) : h.random.Below(32);
+    const uint32_t entry = handles + 44 * (handle & 31);
+    const uint32_t os_kind = h.random.Below(3);
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const uint8_t entry_flags = uint8_t(h.random.Next()) | (h.random.Below(6) != 0 ? 1 : 0);
+    const uint32_t flags = (uint32_t(h.random.Next()) & ~0x10Bu) | h.random.Below(4) |
+                           (h.random.Below(4) != 0 ? (h.random.Below(2) == 0 ? 8 : 256) : 0);
+    const int32_t used = h.random.Below(6) == 0 ? -int32_t(h.random.Below(8))
+                                                : int32_t(h.random.Below(2000));
+    const uint32_t count = uint32_t(h.random.Next());
+    const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+    const uint32_t last = uint32_t(h.random.Next());
+    WriteBytes(h, block, 2048);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{entry, 44}, {slots.data + 8, 8}});
+      files.xex.Set(0);
+      guest::StoreU8(h.base, entry + 4, entry_flags);
+      Store(h.base, entry + 0,
+            os_kind == 0 ? files.sink.handle : os_kind == 1 ? files.xex.handle : junk);
+      Store(h.base, entry + 8, 1);
+      InitSection(h, entry + 12);
+      Store(h.base, stream + 0, block + 16 + uint32_t(used));
+      Store(h.base, stream + 4, count);
+      Store(h.base, stream + 8, block + 16);
+      Store(h.base, stream + 12, flags);
+      Store(h.base, stream + 16, handle);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, slots.data + 12, doserr);
+      SetLastError(h, last);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = stream;
+      (v == 0 ? __imp__sub_825ACC78 : hooks::CoreFlush)(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Bytes(Read(h.base, stream, 20));
+      out[v].Bytes(Read(h.base, entry, 44));
+      out[v].Bytes(Read(h.base, slots.data + 8, 8));
+      out[v].Word(GuestLastError(h));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  memory::Free(block);
+  SetLastError(h, slots.error);
+  results.Report();
+}
+
+// __CxxUnhandledExceptionFilter: exception records (in the scratch area)
+// near a C++ exception's but never one (its code, parameter count and
+// magic each right or off; a match would end the process through
+// terminate: that path is checked by reading), the previous filter
+// (kCxxPreviousFilter) 0, the shared "returns 0" or _ValidateExecute (1 for
+// the nonzero pointers), put back after. Compared: r3 (64 bits).
+void CxxUnhandledFilterCases(Context& h) {
+  Results results("__CxxUnhandledExceptionFilter (sub_825B4CD0)");
+  const uint32_t previous = Load(h.base, cc::kCxxPreviousFilter);
+  const uint32_t pointers = h.data + 512, record = h.data + 544;
+  for (int c = 0; c < 48; c++) {
+    bool code = h.random.Below(3) != 0, params = h.random.Below(3) != 0,
+         magic = h.random.Below(3) != 0;
+    if (code && params && magic) {
+      magic = false;
+    }
+    const uint32_t magic_word = magic ? 0x19930520u + h.random.Below(3)
+                                      : (h.random.Below(2) == 0 ? 0x1993051Fu + 4 * h.random.Below(2)
+                                                                : uint32_t(h.random.Next()));
+    const uint32_t filter_pick = h.random.Below(3);
+    const uint32_t filter = filter_pick == 0 ? 0 : filter_pick == 1 ? kReturnsZero : kValidateExecute;
+    const uint32_t context = uint32_t(h.random.Next()) | 1;
+    const uint32_t code_word = code ? 0xE06D7363u : uint32_t(h.random.Next());
+    const uint32_t params_word = params ? 3 : h.random.Below(16) + 4;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Store(h.base, pointers, record);
+      Store(h.base, pointers + 4, context);
+      Store(h.base, record + 0, code_word);
+      Store(h.base, record + 16, params_word);
+      Store(h.base, record + 20, magic_word);
+      Store(h.base, cc::kCxxPreviousFilter, filter);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = pointers;
+      (v == 0 ? __imp__sub_825B4CD0 : hooks::CoreCxxUnhandledExceptionFilter)(t, h.base);
+      Store(h.base, cc::kCxxPreviousFilter, previous);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -2865,6 +2991,8 @@ void CRuntimeCore(Context& h) {
   LseekCases(h);
   WriteFileCases(h);
   WriteCases(h);
+  FlushStreamCases(h);
+  CxxUnhandledFilterCases(h);
 }
 
 }  // namespace harness

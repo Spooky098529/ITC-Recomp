@@ -1011,7 +1011,7 @@ uint64_t UnlockFhandleFinally(uint8_t* base, uint32_t handle, const Calls& calls
 }
 
 uint64_t UnlockFileFinally(uint8_t* base, uint32_t stream, const Calls& calls) {
-  ITC_NATIVE_RUNNING("sub_825A9664 fclose's __finally");
+  ITC_NATIVE_RUNNING("sub_825A9664, sub_825AD02C, sub_825AD488 fclose's, fflush's, fputs's __finally");
   uint64_t result = 0;
   calls.in_frame(112, [&](uint32_t) { result = LockFile(base, stream, false, calls); });
   return result;
@@ -1442,6 +1442,53 @@ uint64_t Write(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t size,
     }
     UnlockFhandleFinally(base, handle, calls);
     result = Load(base, frame + 80);
+  });
+  return result;
+}
+
+uint64_t Flush(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825ACC78 _flush");
+  uint64_t result = 0;
+  calls.in_frame(112, [&](uint32_t) {
+    const uint32_t flags = Load(base, stream + 12);
+    if ((flags & 3) == 2 && (flags & 264) != 0) {
+      const uint32_t count = Load(base, stream + 0) - Load(base, stream + 8);
+      if (int32_t(count) > 0) {
+        const uint32_t handle = uint32_t(Fileno(base, stream, calls));
+        const uint32_t wrote =
+            uint32_t(Write(base, handle, Load(base, stream + 8), count, calls));
+        const uint32_t now = Load(base, stream + 12);
+        if (wrote == count) {
+          if ((now & 0x80) != 0) {
+            Store(base, stream + 12, now & ~2u);
+          }
+        } else {
+          result = uint64_t(int64_t(-1));
+          Store(base, stream + 12, now | 32);
+        }
+      }
+    }
+    Store(base, stream + 0, Load(base, stream + 8));
+    Store(base, stream + 4, 0);
+  });
+  return result;
+}
+
+uint64_t CxxUnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B4CD0 __CxxUnhandledExceptionFilter");
+  uint64_t result = 0;
+  calls.in_frame(112, [&](uint32_t) {
+    const uint32_t record = Load(base, pointers + 0);
+    if (Load(base, record + 0) == 0xE06D7363u && Load(base, record + 16) == 3) {
+      const uint32_t magic = Load(base, record + 20);
+      if (magic == 0x19930520u || magic == 0x19930521u || magic == 0x19930522u) {
+        Terminate(base, calls);
+      }
+    }
+    if (Load(base, kCxxPreviousFilter) != 0 &&
+        ValidateExecute(Load(base, kCxxPreviousFilter)) != 0) {
+      result = calls.guest(Load(base, kCxxPreviousFilter), {pointers});
+    }
   });
   return result;
 }

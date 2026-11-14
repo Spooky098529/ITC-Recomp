@@ -89,7 +89,7 @@ void CoreUnlockFhandle(PPCContext& ctx, uint8_t* base);  // sub_825B7A58
 void CoreFileno(PPCContext& ctx, uint8_t* base);             // sub_825B0E88
 void CoreCloseFinally(PPCContext& ctx, uint8_t* base);  // sub_825B0E50, sub_825B1304, sub_825B6730
 void CoreCommitFinally(PPCContext& ctx, uint8_t* base);      // sub_825B4978
-void CoreFcloseFinally(PPCContext& ctx, uint8_t* base);      // sub_825A9664
+void CoreFcloseFinally(PPCContext& ctx, uint8_t* base);  // sub_825A9664, sub_825AD02C, sub_825AD488
 void CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base);  // sub_825AA338
 void CoreTerminate(PPCContext& ctx, uint8_t* base);          // sub_825B3498
 
@@ -105,5 +105,8 @@ void CoreLseek(PPCContext& ctx, uint8_t* base);           // sub_825B65D0
 void CoreWriteFile(PPCContext& ctx, uint8_t* base);    // sub_82295D50 (no adapter)
 void CoreWriteNolock(PPCContext& ctx, uint8_t* base);  // sub_825B0F48 (no adapter)
 void CoreWrite(PPCContext& ctx, uint8_t* base);        // sub_825B11A8
+
+void CoreFlush(PPCContext& ctx, uint8_t* base);                        // sub_825ACC78
+void CoreCxxUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base);  // sub_825B4CD0
 
 }  // namespace hooks

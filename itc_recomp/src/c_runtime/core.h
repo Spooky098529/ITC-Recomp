@@ -432,8 +432,8 @@ uint64_t Fileno(uint8_t* base, uint32_t stream, const Calls& calls);
 // its r3.
 uint64_t UnlockFhandleFinally(uint8_t* base, uint32_t handle, const Calls& calls);
 
-// sub_825A9664 fclose's __finally: from a 112-byte frame,
-// _unlock_file(stream) (its r30); its r3.
+// sub_825A9664 fclose's, sub_825AD02C fflush's and sub_825AD488 fputs's
+// __finally: from a 112-byte frame, _unlock_file(stream) (their r30); its r3.
 uint64_t UnlockFileFinally(uint8_t* base, uint32_t stream, const Calls& calls);
 
 // sub_825AA338 doexit's unwind funclet: from a 112-byte frame, _unlock(8)
@@ -538,5 +538,20 @@ uint64_t WriteNolock(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t s
 // _close's.
 uint64_t Write(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t size,
                const Calls& calls);
+
+
+// sub_825ACC78 _flush: from a 112-byte frame, a stream being written (+12's
+// low bits 2) with a buffer (_IOMYBUF or _IOSETVBUF) holding bytes (+0 less
+// +8, above 0): _write of them to its _fileno; all written: _IOWRT (2)
+// cleared for a read-write stream (_IORW, 0x80); else _IOERR (0x20) set, -1.
+// Then +0 = +8 and +4 = 0. 0, or -1 (sign-extended).
+uint64_t Flush(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_825B4CD0 __CxxUnhandledExceptionFilter: from a 112-byte frame, a C++
+// exception (code 0xE06D7363, 3 parameters, magic 0x19930520 to 0x19930522)
+// goes to terminate (which ends the process); then the filter before it
+// (kCxxPreviousFilter), when set and _ValidateExecute passes it, called with
+// the pointers: its r3; else 0.
+uint64_t CxxUnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Calls& calls);
 
 }  // namespace c_runtime::core
