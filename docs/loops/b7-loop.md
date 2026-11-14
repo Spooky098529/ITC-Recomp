@@ -121,7 +121,7 @@ nothing runs and there's work, about a minute.
 ## The tooling (what the agents use)
 
 - `itc_recomp/coverage/seen_in_play.txt`: the functions seen in play
-  (`docs/coverage.md`). Functions that never ran get no rows.
+  (`docs/coverage.md`). Functions that never ran get rows too, marked "Not seen in play" (2026-10-23), and count as work toward B7's goal (2026-11-14).
 - `itc_recomp/tools/b7_status.py`: B7's measure (ours, wrapped, known,
   unknown), by function file; checks rows that say "never called" whose
   function ran.
