@@ -333,5 +333,7 @@ void PowerGraphScreen(Context& h);
 void Achievements(Context& h);
 // The morph jobs and the work item (src/harnesses/morph_jobs.cpp).
 void MorphJobs(Context& h);
+// The type 8 mode's panel screen (src/harnesses/type8_screens.cpp).
+void Type8Screens(Context& h);
 
 }  // namespace harness

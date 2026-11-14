@@ -4,6 +4,7 @@
 #include "type67_screens/type67_screens.h"
 
 #include "guest.h"
+#include "type8_screens/type8_screens.h"
 
 namespace type67_screens {
 
@@ -326,6 +327,13 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return GroupPairWaitForFade(base, r3);
     case 0x82249C70:
       return GroupPairFinishAll(base, r3, sp, calls);
+    // The type 8 panel screen's slots 2, 13 and 18 (src/type8_screens/).
+    case 0x82238418:
+      return type8_screens::IsLoaded(base);
+    case 0x82238440:
+      return type8_screens::OpenMovies(sp, lr, calls);
+    case 0x82238450:
+      return type8_screens::DeleteMovies(sp, lr, calls);
     default:
       return std::nullopt;
   }
@@ -427,6 +435,9 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82249BE0:
     case 0x82249BA8:
     case 0x82249C70:
+    case 0x82238418:
+    case 0x82238440:
+    case 0x82238450:
     case 0x82248650:
     case 0x82252420:
     case 0x82252600:

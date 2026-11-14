@@ -32,6 +32,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "hooks/car_list.h"
+#include "hooks/type8_screens.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "stand_car_world.h"
@@ -635,6 +636,25 @@ void Panels(Context& h, const World& w) {
         t.r4.u64 = w.at(kRecord);
       },
       __imp__sub_8224E490, hooks::CarListPanel6CSetStats);
+  // Panel8C's slots 1 and 3 (the type 8 panel screen's C panels,
+  // src/type8_screens/; never seen in play): SetStats a tail call of
+  // Panel6C::SetStats, ShowArrows on the panel's +16 and +156 (an index, now
+  // and then -1). Their plain C++ through hooks/type8_screens.h.
+  Group(
+      h, w, "Panel8C::SetStats (sub_8223A090)", 8, {144, 56},
+      [base, stats_record](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        stats_record(r, w.at(kRecord));
+        t.r4.u64 = w.at(kRecord);
+      },
+      __imp__sub_8223A090, hooks::Type8Panel8CSetStats);
+  Group(
+      h, w, "Panel8C::ShowArrows (sub_8223A098)", 10, {112, 24},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        t.r4.u64 = r.Below(3) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : r.Below(2);
+      },
+      __imp__sub_8223A098, hooks::Type8Panel8CShowArrows);
   // ~CarPanelBase and ConfirmPanel::ConfirmPanel (leaves) on the panel.
   Group(h, w, "CarPanelBase::~CarPanelBase (sub_8224D7E0)", 4, {0, 0},
         [](PPCContext&, Random&, const World&) {}, __imp__sub_8224D7E0,
