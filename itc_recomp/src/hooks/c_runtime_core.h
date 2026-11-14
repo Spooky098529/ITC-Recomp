@@ -117,4 +117,11 @@ void CoreFlsbuf(PPCContext& ctx, uint8_t* base);  // sub_825AEE28
 void CoreStbuf(PPCContext& ctx, uint8_t* base);   // sub_825B40B8
 void CoreFtbuf(PPCContext& ctx, uint8_t* base);   // sub_825B41A0
 
+void CoreBsearch(PPCContext& ctx, uint8_t* base);    // sub_825AC970
+void CoreCftoe2(PPCContext& ctx, uint8_t* base);     // sub_825ADF28
+void CoreFassignNoLocale(PPCContext& ctx, uint8_t* base);    // sub_825ADF10
+void CoreForcdecptNoLocale(PPCContext& ctx, uint8_t* base);  // sub_825ADF18
+void CoreCropzerosNoLocale(PPCContext& ctx, uint8_t* base);  // sub_825ADF20
+void CoreCxxSetUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base);  // sub_825DAC58
+
 }  // namespace hooks

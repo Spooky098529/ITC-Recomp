@@ -86,6 +86,9 @@ struct Calls {
   std::function<void(uint32_t bytes, const std::function<void(uint32_t frame)>& body)> in_frame;
   // The translated code's unconditional trap (`twi 31,r0,type`).
   std::function<void(uint32_t type)> trap;
+  // atexit (sub_825A7068) for `function`: its plain C++, the game's where
+  // that can't (c_runtime::AtexitFrom); its r3.
+  std::function<int32_t(uint32_t function)> atexit;
 };
 
 // sub_825AA3F8 __crtTlsAlloc (probably): KeTlsAlloc (the FLS callback in r3
@@ -604,5 +607,35 @@ uint32_t Stbuf(uint8_t* base, uint32_t stream, const Calls& calls);
 // 0x100 and 0x1000 cleared. r3 as the original leaves it (`flag`, or
 // _flush's).
 uint64_t Ftbuf(uint8_t* base, uint32_t flag, uint32_t stream, const Calls& calls);
+
+// sub_825AC970 bsearch: in its 160-byte frame, a null base with a count, a
+// width of 0 or a null compare: errno 22, _invalid_parameter(0, 0, 0, 0, 0),
+// 0. Else the halving search as the original (the element's address
+// computed as base + (half or half - 1) x width with 32-bit signed products
+// added to the 64-bit base, compared as 32-bit words), `compare(key,
+// element)` a guest call: the element it says equal (0), or 0.
+uint64_t Bsearch(uint8_t* base, uint64_t key, uint64_t first, uint32_t count, uint64_t width,
+                 uint32_t compare, const Calls& calls);
+
+// sub_825ADF28 _cftoe2_l: %e laid out in `buffer` (of `size` bytes, -1 for
+// unchecked) from _fltout2's result at `strflt` (+0 the sign, +4 the decimal
+// exponent, +12 the digits), `precision` digits after the point, `caps` for
+// 'E', `g_format` (as the signed byte) when the digits are in place already
+// (moved up a byte first for the point when there's a precision). In its
+// 144-byte frame: a null buffer or size 0: errno 22, _invalid_parameter, 22;
+// a size not above max(precision, 0) + 9: errno 34, 34. The sign, the first
+// digit and the locale's decimal point, "e+000" through strcpy_s
+// (_invoke_watson when that fails: it ends the process), the exponent's sign
+// and digits added into it; with _outputformat's bit 0 (two-digit exponent,
+// [0x82971358]) a leading 0 of the three dropped. 0.
+uint32_t Cftoe2(uint8_t* base, uint32_t buffer, uint32_t size, int32_t precision, uint32_t caps,
+                uint32_t strflt, int32_t g_format, const Calls& calls);
+
+// sub_825DAC58 __CxxSetUnhandledExceptionFilter (a static initializer
+// _cinit's _initterm runs at boot): from a 96-byte frame, atexit(
+// __CxxRestoreUnhandledExceptionFilter, 0x825B4D90), then
+// SetUnhandledExceptionFilter(__CxxUnhandledExceptionFilter, 0x825B4CD0),
+// the old filter kept at kCxxPreviousFilter. The old filter (its r3).
+uint32_t CxxSetUnhandledExceptionFilter(uint8_t* base, const Calls& calls);
 
 }  // namespace c_runtime::core

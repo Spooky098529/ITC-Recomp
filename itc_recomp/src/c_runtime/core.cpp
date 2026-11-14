@@ -17,6 +17,7 @@
 #include <cmath>
 #include <emmintrin.h>
 #include <cstring>
+#include <vector>
 
 namespace c_runtime::core {
 
@@ -1716,6 +1717,160 @@ uint64_t Ftbuf(uint8_t* base, uint32_t flag, uint32_t stream, const Calls& calls
     Store(base, stream + 12, flags);
   });
   return result;
+}
+
+
+uint64_t Bsearch(uint8_t* base, uint64_t key, uint64_t first, uint32_t count, uint64_t width,
+                 uint32_t compare, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AC970 bsearch");
+  uint64_t result = 0;
+  calls.in_frame(160, [&](uint32_t) {
+    const auto step = [&](uint32_t n) {
+      return uint64_t(int64_t(int32_t(n) * int64_t(int32_t(uint32_t(width)))));
+    };
+    uint64_t lo = first;
+    uint64_t hi = step(count - 1) + first;
+    if ((uint32_t(first) == 0 && count != 0) || uint32_t(width) == 0 || compare == 0) {
+      Store(base, Errno(base, calls), 22);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+      return;
+    }
+    if (uint32_t(lo) > uint32_t(hi)) {
+      return;
+    }
+    uint64_t num = count;
+    while (true) {
+      const uint32_t half = (uint32_t(num) >> 1) & 0x7FFFFFFFu;
+      if (half == 0) {
+        if (uint32_t(num) != 0 && int32_t(uint32_t(calls.guest(compare, {key, lo}))) == 0) {
+          result = lo;
+        }
+        return;
+      }
+      const bool odd = (num & 1) != 0;
+      const uint64_t mid = step(odd ? half : half - 1) + lo;
+      const int32_t order = int32_t(uint32_t(calls.guest(compare, {key, mid})));
+      if (order == 0) {
+        result = mid;
+        return;
+      }
+      if (order < 0) {
+        hi = mid - width;
+        num = odd ? half : uint64_t(int64_t(int32_t(half)) - 1);
+      } else {
+        lo = mid + width;
+        num = half;
+      }
+      if (uint32_t(lo) > uint32_t(hi)) {
+        return;
+      }
+    }
+  });
+  return result;
+}
+
+namespace {
+
+constexpr uint32_t kOutputFormat = 0x82971358;  // _outputformat
+constexpr uint32_t kExponentText = 0x82072F88;  // "e+000"
+
+// memmove's bytes (sub_825AA840) within the caller's text.
+void MoveText(uint8_t* base, uint32_t to, uint32_t from, uint32_t count) {
+  std::vector<uint8_t> bytes(count);
+  for (uint32_t i = 0; i < count; i++) {
+    bytes[i] = guest::LoadU8(base, from + i);
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreU8(base, to + i, bytes[i]);
+  }
+}
+
+}  // namespace
+
+uint32_t Cftoe2(uint8_t* base, uint32_t buffer, uint32_t size, int32_t precision, uint32_t caps,
+                uint32_t strflt, int32_t g_format, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825ADF28 _cftoe2_l");
+  uint32_t result = 0;
+  calls.in_frame(144, [&](uint32_t) {
+    const auto invalid = [&](uint32_t error) {
+      Store(base, Errno(base, calls), error);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+      result = error;
+    };
+    if (buffer == 0 || size == 0) {
+      invalid(22);
+      return;
+    }
+    if (!(size > uint32_t(precision > 0 ? precision : 0) + 9)) {
+      invalid(34);
+      return;
+    }
+    if (g_format != 0) {
+      const uint32_t at = buffer + (Load(base, strflt + 0) == 45 ? 1 : 0);
+      if (precision > 0) {
+        uint32_t end = at;
+        while (guest::LoadU8(base, end) != 0) {
+          end++;
+        }
+        MoveText(base, at + 1, at, end - at + 1);
+      }
+    }
+    uint32_t p = buffer;
+    if (int32_t(Load(base, strflt + 0)) == 45) {
+      guest::StoreU8(base, buffer, 45);
+      p = buffer + 1;
+    }
+    if (precision > 0) {
+      guest::StoreU8(base, p, guest::LoadU8(base, p + 1));
+      p++;
+      guest::StoreU8(base, p, guest::LoadU8(base, Load(base, Load(base, kDecimalPoint))));
+    }
+    const uint32_t e = p + (g_format == 0 ? 1 : 0) + uint32_t(precision);
+    const uint32_t room = size == 0xFFFFFFFFu ? 0xFFFFFFFFu : buffer - e + size;
+    if (!c_runtime::StrcpyS(base, e, room, kExponentText)) {
+      if (uint32_t(calls.guest(0x825A9DD8, {e, room, kExponentText})) != 0) {
+        InvokeWatson(base, 0x825AE0D0, calls);
+      }
+    }
+    const uint32_t digits = e + 2;
+    if (caps != 0) {
+      guest::StoreU8(base, e, 69);
+    }
+    uint32_t q = e + 1;
+    if (guest::LoadU8(base, Load(base, strflt + 12)) != 48) {
+      int32_t exponent = int32_t(Load(base, strflt + 4) - 1);
+      if (exponent < 0) {
+        exponent = int32_t(0u - uint32_t(exponent));
+        guest::StoreU8(base, q, 45);
+      }
+      q++;
+      if (exponent >= 100) {
+        guest::StoreU8(base, q, uint8_t(guest::LoadU8(base, q) + exponent / 100));
+        exponent -= exponent / 100 * 100;
+      }
+      q++;
+      if (exponent >= 10) {
+        guest::StoreU8(base, q, uint8_t(guest::LoadU8(base, q) + exponent / 10));
+        exponent -= exponent / 10 * 10;
+      }
+      guest::StoreU8(base, q + 1, uint8_t(guest::LoadU8(base, q + 1) + exponent));
+    }
+    if ((Load(base, kOutputFormat) & 1) != 0 && guest::LoadU8(base, digits) == 48) {
+      MoveText(base, digits, digits + 1, 3);
+    }
+  });
+  return result;
+}
+
+uint32_t CxxSetUnhandledExceptionFilter(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825DAC58 __CxxSetUnhandledExceptionFilter");
+  uint32_t previous = 0;
+  calls.in_frame(96, [&](uint32_t) {
+    calls.atexit(0x825B4D90);
+    previous = SetUnhandledExceptionFilter(base, 0x825B4CD0);
+    Store(base, kCxxPreviousFilter, previous);
+  });
+  return previous;
 }
 
 }  // namespace c_runtime::core

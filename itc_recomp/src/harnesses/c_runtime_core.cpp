@@ -37,6 +37,8 @@
 #include "memory/heap.h"
 
 #include <algorithm>
+#include <cctype>
+#include <climits>
 #include <bit>
 #include <cstring>
 #include <mutex>
@@ -1914,7 +1916,11 @@ void NumberTextCases(Context& h) {
     bool no_point;  // _forcdecpt_l's texts have no point yet
   };
   for (const Fn& fn : {Fn{"_forcdecpt_l (sub_825ADD38)", __imp__sub_825ADD38, hooks::CoreForcdecpt, true},
-                       Fn{"_cropzeros_l (sub_825ADDD8)", __imp__sub_825ADDD8, hooks::CoreCropzeros, false}}) {
+                       Fn{"_cropzeros_l (sub_825ADDD8)", __imp__sub_825ADDD8, hooks::CoreCropzeros, false},
+                       Fn{"_forcdecpt (sub_825ADF18)", __imp__sub_825ADF18,
+                          hooks::CoreForcdecptNoLocale, true},
+                       Fn{"_cropzeros (sub_825ADF20)", __imp__sub_825ADF20,
+                          hooks::CoreCropzerosNoLocale, false}}) {
     Results results(fn.name);
     for (int c = 0; c < 300; c++) {
       std::string text = NumberText(h);
@@ -2019,7 +2025,9 @@ void AtoNumberCases(Context& h) {
   const uint32_t at = h.data + 128, to = h.data + 64;
   for (const Fn& fn : {Fn{"_atodbl_l (sub_825B6098)", __imp__sub_825B6098, hooks::CoreAtodbl, 0},
                        Fn{"_atoflt_l (sub_825B6140)", __imp__sub_825B6140, hooks::CoreAtoflt, 1},
-                       Fn{"_fassign_l (sub_825ADEB0)", __imp__sub_825ADEB0, hooks::CoreFassign, 2}}) {
+                       Fn{"_fassign_l (sub_825ADEB0)", __imp__sub_825ADEB0, hooks::CoreFassign, 2},
+                       Fn{"_fassign (sub_825ADF10)", __imp__sub_825ADF10, hooks::CoreFassignNoLocale,
+                          2}}) {
     Results results(fn.name);
     for (int c = 0; c < 200; c++) {
       std::string text;
@@ -3374,6 +3382,205 @@ void StreamBufferCases(Context& h) {
   SetLastError(h, slots.error);
 }
 
+
+// bsearch: tables of fixed-width strings (widths 1 to 16, 0 to 40 entries,
+// zero-padded, sorted as _stricmp orders them) in the scratch area, keys
+// from the table (their case changed now and then) or random; the compare
+// _stricmp (sub_825AA100), the shared "returns 0" or "returns 1"
+// (sub_825C8390); and the error cases (a null base with a count, a width of
+// 0, a null compare). errno random before, the invalid parameter handler the
+// shared "returns 0". Compared: r3 (64 bits) and errno.
+void BsearchCases(Context& h) {
+  Results results("bsearch (sub_825AC970)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: bsearch: no thread data");
+    return;
+  }
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t table = h.data + 1024, key = h.data + 960;
+  const auto fold = [](const std::string& a, const std::string& b) {
+    for (size_t i = 0;; i++) {
+      const int x = i < a.size() ? std::tolower(uint8_t(a[i])) : 0;
+      const int y = i < b.size() ? std::tolower(uint8_t(b[i])) : 0;
+      if (x != y || x == 0) {
+        return x < y;
+      }
+    }
+  };
+  for (int c = 0; c < 200; c++) {
+    const uint32_t width = 1 + h.random.Below(16);
+    const uint32_t count = h.random.Below(41);
+    std::vector<std::string> entries;
+    for (uint32_t i = 0; i < count; i++) {
+      entries.push_back(RandomText(h, h.random.Below(width), "abcdefgh"));
+    }
+    std::sort(entries.begin(), entries.end(), fold);
+    std::string wanted = !entries.empty() && h.random.Below(3) != 0
+                             ? entries[h.random.Below(uint32_t(entries.size()))]
+                             : RandomText(h, h.random.Below(17), "abcdefghi");
+    if (h.random.Below(4) == 0) {
+      for (char& ch : wanted) {
+        ch = char(std::toupper(uint8_t(ch)));
+      }
+    }
+    const uint32_t pick = h.random.Below(12);
+    const uint32_t compare = pick == 0 ? kReturnsZero : pick == 1 ? 0x825C8390u : pick == 2 ? 0
+                                                                                            : 0x825AA100u;
+    const uint32_t first = h.random.Below(16) == 0 ? 0 : table;
+    const uint32_t width_arg = h.random.Below(16) == 0 ? 0 : width;
+    const uint32_t err = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, table, 16 * 40, 0);
+      for (uint32_t i = 0; i < count; i++) {
+        WriteText(h, table + width * i, entries[i]);
+      }
+      WriteText(h, key, wanted);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = key;
+      t.r4.u64 = first;
+      t.r5.u64 = count;
+      t.r6.u64 = width_arg;
+      t.r7.u64 = compare;
+      (v == 0 ? __imp__sub_825AC970 : hooks::CoreBsearch)(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, slots.data + 8));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _cftoe2_l: a buffer in the scratch area (0xCD around it; for the %g flag a
+// digit text in it first, with a sign now and then), sizes 0, -1, around
+// the precision's limit (precision + 9) and larger, precisions -3 to 20, caps
+// or not, _fltout2's result (+0 a sign, '-' or not; +4 decimal exponents
+// near 0, around +-100 and +-10, the extremes; +12 digits, "0" now and then)
+// and _outputformat's bit 0 set or not (put back after). errno random
+// before, the invalid parameter handler the shared "returns 0". Compared:
+// r3 (64 bits), 96 bytes around the buffer and errno.
+void Cftoe2Cases(Context& h) {
+  Results results("_cftoe2_l (sub_825ADF28)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _cftoe2_l: no thread data");
+    return;
+  }
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t format = Load(h.base, 0x82971358);
+  const uint32_t area = h.data + 1024, buffer = area + 16, strflt = h.data + 960,
+                 digits = h.data + 1200;
+  for (int c = 0; c < 400; c++) {
+    const int32_t precision = h.random.Below(8) == 0 ? -int32_t(h.random.Below(4))
+                                                     : int32_t(h.random.Below(21));
+    const uint32_t size_pick = h.random.Below(8);
+    const uint32_t limit = uint32_t(precision > 0 ? precision : 0) + 9;
+    const uint32_t size = size_pick == 0   ? 0
+                          : size_pick == 1 ? 0xFFFFFFFFu
+                          : size_pick == 2 ? limit - h.random.Below(3)
+                          : size_pick == 3 ? limit + 1
+                                           : limit + 1 + h.random.Below(40);
+    const bool null = h.random.Below(20) == 0;
+    const uint32_t caps = h.random.Below(2) == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+    const int32_t g_format = h.random.Below(2) == 0 ? 0 : int8_t(h.random.Next() | 1);
+    const uint32_t sign = h.random.Below(2) == 0 ? 45 : h.random.Below(2) == 0 ? 32 : uint32_t(h.random.Next());
+    const uint32_t exponent_pick = h.random.Below(6);
+    const int32_t exponent = exponent_pick == 0   ? int32_t(h.random.Below(5)) - 2
+                             : exponent_pick == 1 ? int32_t(h.random.Below(41)) - 20
+                             : exponent_pick == 2 ? int32_t(h.random.Below(400)) - 200
+                             : exponent_pick == 3 ? (h.random.Below(2) == 0 ? INT32_MIN : INT32_MAX)
+                                                  : int32_t(h.random.Below(700)) - 350;
+    const std::string mantissa = h.random.Below(6) == 0 ? "0" : RandomText(h, 1 + h.random.Below(20), "0123456789");
+    std::string text = RandomText(h, 1 + h.random.Below(22), "0123456789");
+    if (sign == 45 && h.random.Below(4) != 0) {
+      text = "-" + text;
+    }
+    const uint32_t outputformat = h.random.Below(2) == 0 ? (format & ~1u) : (format | 1u);
+    const uint32_t err = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, 96);
+      if (g_format != 0) {
+        WriteText(h, buffer, text);
+      }
+      WriteText(h, digits, mantissa);
+      Store(h.base, strflt + 0, sign);
+      Store(h.base, strflt + 4, uint32_t(exponent));
+      Store(h.base, strflt + 8, 0x5A5A5A5Au);
+      Store(h.base, strflt + 12, digits);
+      Store(h.base, 0x82971358, outputformat);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = null ? 0 : buffer;
+      t.r4.u64 = size;
+      t.r5.u64 = uint64_t(int64_t(precision));
+      t.r6.u64 = caps;
+      t.r7.u64 = strflt;
+      t.r8.u64 = uint32_t(g_format);
+      (v == 0 ? __imp__sub_825ADF28 : hooks::CoreCftoe2)(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      Store(h.base, 0x82971358, format);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Bytes(Read(h.base, area, 96));
+      out[v].Word(Load(h.base, slots.data + 8));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// __CxxSetUnhandledExceptionFilter: the unhandled filter's word random, the
+// previous one's random; under the exit lock's host mutex (both sides take it
+// again), the exit table's end and the word there put back after each side.
+// Only while the game's table has room for one more (atexit would grow it
+// otherwise: skipped, logged). Compared: r3 (64 bits), both filter words, the
+// end's move and the word atexit stored.
+void CxxSetFilterCases(Context& h) {
+  Results results("__CxxSetUnhandledExceptionFilter (sub_825DAC58)");
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  const uint32_t begin = Load(h.base, c_runtime::kExitTableBegin);
+  const uint32_t end = Load(h.base, c_runtime::kExitTableEnd);
+  const uint32_t size = memory::crt::Msize(begin).value_or(0);
+  if (begin == 0 || size < end - begin + 4) {
+    ITC_LOG_ERROR("harness: c_runtime_core: __CxxSetUnhandledExceptionFilter: the exit table "
+                  "has no room");
+    return;
+  }
+  const uint32_t filter = Load(h.base, kFilter), previous = Load(h.base, cc::kCxxPreviousFilter);
+  const uint32_t word = Load(h.base, end);
+  for (int c = 0; c < 16; c++) {
+    const uint32_t old_filter = c == 0 ? filter : uint32_t(h.random.Next());
+    const uint32_t old_previous = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Store(h.base, kFilter, old_filter);
+      Store(h.base, cc::kCxxPreviousFilter, old_previous);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825DAC58 : hooks::CoreCxxSetUnhandledExceptionFilter)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, kFilter));
+      out[v].Word(Load(h.base, cc::kCxxPreviousFilter));
+      out[v].Word(Load(h.base, c_runtime::kExitTableBegin) == begin);
+      out[v].Word(Load(h.base, c_runtime::kExitTableEnd) - end);
+      out[v].Word(Load(h.base, end));
+      Store(h.base, c_runtime::kExitTableEnd, end);
+      Store(h.base, end, word);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  Store(h.base, kFilter, filter);
+  Store(h.base, cc::kCxxPreviousFilter, previous);
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -3444,6 +3651,9 @@ void CRuntimeCore(Context& h) {
   FcloseCases(h);
   FcloseallCases(h);
   StreamBufferCases(h);
+  BsearchCases(h);
+  Cftoe2Cases(h);
+  CxxSetFilterCases(h);
 }
 
 }  // namespace harness

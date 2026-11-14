@@ -4,11 +4,13 @@
 
 #include "hooks/c_runtime_core.h"
 
+#include "c_runtime/exit.h"
 #include "c_runtime/format.h"
 
 #include "base/flags.h"
 #include "base/log.h"
 #include "graphics/video_output.h"
+#include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/last_error.h"
@@ -56,7 +58,10 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "terminate path checked by reading), _fcloseall with fclose and _fclose_nolock "
               "(sub_825B4E78, sub_825A9580, sub_825A94C0), _flsbuf, _stbuf and _ftbuf "
               "(sub_825AEE28, sub_825B40B8, sub_825B41A0; _stbuf's path past the _isatty stub "
-              "checked by reading) (checked by "
+              "checked by reading), bsearch (sub_825AC970), _cftoe2_l (sub_825ADF28; its "
+              "_invoke_watson path checked by reading), _fassign, _forcdecpt and _cropzeros "
+              "(sub_825ADF10, sub_825ADF18, sub_825ADF20) and __CxxSetUnhandledExceptionFilter "
+              "(sub_825DAC58) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -177,6 +182,13 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
     ctx.lr = lr;
   };
   calls.trap = [&ctx, base](uint32_t type) { ppc_trap(ctx, base, uint16_t(type)); };
+  calls.atexit = [&ctx, base](uint32_t function) {
+    const uint64_t lr = ctx.lr;
+    hooks::GuestAtexit guest{ctx, base};
+    const int32_t result = c_runtime::AtexitFrom(base, function, guest.Call());
+    ctx.lr = lr;
+    return result;
+  };
   return calls;
 }
 
@@ -606,6 +618,34 @@ void hooks::CoreStbuf(PPCContext& ctx, uint8_t* base) {
 void hooks::CoreFtbuf(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Ftbuf(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
+void hooks::CoreBsearch(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Bsearch(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u32, ctx.r6.u64, ctx.r7.u32,
+                           CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreCftoe2(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Cftoe2(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r6.u32, ctx.r7.u32,
+                          int8_t(ctx.r8.u8), CRuntimeCoreCalls(ctx, base));
+}
+// _fassign, _forcdecpt and _cropzeros: the _l functions with no locale (r6
+// or r4 = 0), as the originals' tail calls.
+void hooks::CoreFassignNoLocale(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825ADF10 _fassign");
+  ctx.r6.u64 = 0;
+  CoreFassign(ctx, base);
+}
+void hooks::CoreForcdecptNoLocale(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825ADF18 _forcdecpt");
+  ctx.r4.u64 = 0;
+  CoreForcdecpt(ctx, base);
+}
+void hooks::CoreCropzerosNoLocale(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825ADF20 _cropzeros");
+  ctx.r4.u64 = 0;
+  CoreCropzeros(ctx, base);
+}
+void hooks::CoreCxxSetUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::CxxSetUnhandledExceptionFilter(base, CRuntimeCoreCalls(ctx, base));
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -787,3 +827,16 @@ ITC_C_RUNTIME_CORE(825AEE28, CoreFlsbuf)
 ITC_C_RUNTIME_CORE(825B40B8, CoreStbuf)
 // _ftbuf: r3 = a flag, r4 = a stream.
 ITC_C_RUNTIME_CORE(825B41A0, CoreFtbuf)
+// bsearch: r3 = the key, r4 = the first element, r5 = the count, r6 = the
+// width, r7 = the compare function; r3 = the element found, or 0.
+ITC_C_RUNTIME_CORE(825AC970, CoreBsearch)
+// _cftoe2_l: r3 = the buffer, r4 = its size, r5 = the precision, r6 = caps,
+// r7 = _fltout2's result, r8 = the %g flag (a byte); r3 = 0, 22 or 34.
+ITC_C_RUNTIME_CORE(825ADF28, CoreCftoe2)
+// _fassign: r3 = whether a double, r4 = the output, r5 = the text.
+ITC_C_RUNTIME_CORE(825ADF10, CoreFassignNoLocale)
+// _forcdecpt, _cropzeros: r3 = the text.
+ITC_C_RUNTIME_CORE(825ADF18, CoreForcdecptNoLocale)
+ITC_C_RUNTIME_CORE(825ADF20, CoreCropzerosNoLocale)
+// __CxxSetUnhandledExceptionFilter: no registers; r3 = the old filter.
+ITC_C_RUNTIME_CORE(825DAC58, CoreCxxSetUnhandledExceptionFilter)
