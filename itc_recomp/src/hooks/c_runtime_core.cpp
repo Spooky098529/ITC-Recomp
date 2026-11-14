@@ -15,7 +15,11 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(docs/functions/c-runtime-core.md), calling the kernel imports as the originals "
               "do: __crtTlsAlloc (sub_825AA3F8), _getptd_noexit (sub_825AA4C0, with "
               "__set_flsgetvalue sub_825AA400), _freefls (sub_825AA5C0), _mtterm (sub_825AA448, "
-              "with _mtdeletelocks sub_825B3260) (checked by --run_harnesses=c_runtime_core). "
+              "with _mtdeletelocks sub_825B3260), _errno and __doserrno (sub_825A81E0, sub_825A8218), "
+              "_dosmaperr and _get_errno_from_oserr (sub_825A8250, sub_825A8178), _freeptd "
+              "(sub_825AA670), __crtInitCritSecAndSpinCount and __crtInitCritSecNoSpinCount "
+              "(sub_825B35A0, sub_825B3570), XRegisterThreadNotifyRoutine and "
+              "XapiCallThreadNotifyRoutines (sub_82297B98, sub_82297B38) (checked by --run_harnesses=c_runtime_core). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks");
 
@@ -136,6 +140,43 @@ void hooks::CoreMtTerm(PPCContext& ctx, uint8_t* base) {
   cc::MtTerm(base, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreErrno(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Errno(base, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreDosErrno(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::DosErrno(base, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreGetErrnoFromOsErr(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::GetErrnoFromOsErr(base, ctx.r3.u32);
+}
+
+void hooks::CoreDosMapErr(PPCContext& ctx, uint8_t* base) {
+  cc::DosMapErr(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreFreePtd(PPCContext& ctx, uint8_t* base) {
+  cc::FreePtd(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreCritSecNoSpinCount(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::CritSecNoSpinCount(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreInitCritSecAndSpinCount(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 =
+      cc::InitCritSecAndSpinCount(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreRegisterThreadNotifyRoutine(PPCContext& ctx, uint8_t* base) {
+  cc::RegisterThreadNotifyRoutine(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreCallThreadNotifyRoutines(PPCContext& ctx, uint8_t* base) {
+  cc::CallThreadNotifyRoutines(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -154,3 +195,20 @@ ITC_C_RUNTIME_CORE(825AA4C0, CoreGetptdNoexit)
 ITC_C_RUNTIME_CORE(825AA5C0, CoreFreeFls)
 // _mtterm: no registers.
 ITC_C_RUNTIME_CORE(825AA448, CoreMtTerm)
+// _errno, __doserrno: r3 = the address.
+ITC_C_RUNTIME_CORE(825A81E0, CoreErrno)
+ITC_C_RUNTIME_CORE(825A8218, CoreDosErrno)
+// _get_errno_from_oserr: r3 = a Windows error; r3 = its errno.
+ITC_C_RUNTIME_CORE(825A8178, CoreGetErrnoFromOsErr)
+// _dosmaperr: r3 = a Windows error.
+ITC_C_RUNTIME_CORE(825A8250, CoreDosMapErr)
+// _freeptd: r3 = a thread's data, or 0 for the calling thread's.
+ITC_C_RUNTIME_CORE(825AA670, CoreFreePtd)
+// __crtInitCritSecNoSpinCount: r3 = a critical section; r3 = 1.
+ITC_C_RUNTIME_CORE(825B3570, CoreCritSecNoSpinCount)
+// __crtInitCritSecAndSpinCount: r3 = a critical section, r4 = a spin count.
+ITC_C_RUNTIME_CORE(825B35A0, CoreInitCritSecAndSpinCount)
+// XRegisterThreadNotifyRoutine: r3 = a notify block, r4 = 1 to add, 0 to remove.
+ITC_C_RUNTIME_CORE(82297B98, CoreRegisterThreadNotifyRoutine)
+// XapiCallThreadNotifyRoutines: r3 = 1 at a thread's start, 0 at its end.
+ITC_C_RUNTIME_CORE(82297B38, CoreCallThreadNotifyRoutines)

@@ -27,6 +27,13 @@ constexpr uint32_t kXcptActTab = 0x8266BE60;     // _XcptActTab
 constexpr uint32_t kThreadDataBytes = 196;
 constexpr uint32_t kLockTable = 0x8266BD40;      // 36 entries of 8 bytes
 constexpr uint32_t kLockCount = 36;
+constexpr uint32_t kErrnoFallback = 0x8266B658;     // errno with no thread data
+constexpr uint32_t kDosErrnoFallback = 0x8266B65C;  // _doserrno with none
+constexpr uint32_t kOsErrorTable = 0x8266B4F0;      // 45 pairs (error, errno)
+constexpr uint32_t kCritSecInit = 0x8297132C;       // the critical section initializer
+constexpr uint32_t kCritSecNoSpinCount = 0x825B3570;
+constexpr uint32_t kNotifyLock = 0x82638780;        // XAPI's notify list's lock
+constexpr uint32_t kNotifyList = 0x8263879C;        // its head (+0 first, +4 last)
 
 enum class Import {
   kKeTlsAlloc,
@@ -89,5 +96,46 @@ void MtDeleteLocks(uint8_t* base, const Calls& calls);
 // __getvalueindex through KeTlsFree and -1 (each unless already -1), then
 // _mtdeletelocks.
 void MtTerm(uint8_t* base, const Calls& calls);
+
+// sub_825A81E0 _errno: the calling thread's errno (its data +8), or
+// kErrnoFallback without data.
+uint32_t Errno(uint8_t* base, const Calls& calls);
+
+// sub_825A8218 __doserrno: its _doserrno (+12), or kDosErrnoFallback.
+uint32_t DosErrno(uint8_t* base, const Calls& calls);
+
+// sub_825A8178 _get_errno_from_oserr: `error`'s errno from the table, else
+// 13 (EACCES) for 19 to 36, 8 (ENOEXEC) for 188 to 202, 22 (EINVAL).
+uint32_t GetErrnoFromOsErr(uint8_t* base, uint32_t error);
+
+// sub_825A8250 _dosmaperr: `error` stored as _doserrno, then errno set to
+// its _get_errno_from_oserr (each through _getptd_noexit, as the original).
+void DosMapErr(uint8_t* base, uint32_t error, const Calls& calls);
+
+// sub_825AA670 _freeptd: `data`, or the calling thread's (through the
+// getter, when the getter slot is set) for 0: when __flsindex isn't -1, its
+// FLS value set to 0 through [kFlsSetValue] and _freefls; then the getter
+// slot set to 0 (KeTlsSetValue) unless __getvalueindex is -1.
+void FreePtd(uint8_t* base, uint32_t data, const Calls& calls);
+
+// sub_825B3570 __crtInitCritSecNoSpinCount (probably):
+// RtlInitializeCriticalSection; returns 1.
+uint32_t CritSecNoSpinCount(uint32_t section, const Calls& calls);
+
+// sub_825B35A0 __crtInitCritSecAndSpinCount: the initializer at
+// [kCritSecInit] (set to kCritSecNoSpinCount when 0) called with the
+// section and spin count; its result.
+uint32_t InitCritSecAndSpinCount(uint8_t* base, uint32_t section, uint32_t spin,
+                                 const Calls& calls);
+
+// sub_82297B98 XRegisterThreadNotifyRoutine: under kNotifyLock, `block`
+// linked at the list's tail (`add` not 0) or unlinked.
+void RegisterThreadNotifyRoutine(uint8_t* base, uint32_t block, uint32_t add,
+                                 const Calls& calls);
+
+// sub_82297B38 XapiCallThreadNotifyRoutines (probably): under kNotifyLock,
+// each block's routine (+8) called with `starting`, the next block read
+// before the call.
+void CallThreadNotifyRoutines(uint8_t* base, uint32_t starting, const Calls& calls);
 
 }  // namespace c_runtime::core

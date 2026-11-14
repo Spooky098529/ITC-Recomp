@@ -100,4 +100,107 @@ void MtTerm(uint8_t* base, const Calls& calls) {
   MtDeleteLocks(base, calls);
 }
 
+uint32_t Errno(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A81E0 _errno");
+  const uint32_t data = GetptdNoexit(base, calls);
+  return data != 0 ? data + 8 : kErrnoFallback;
+}
+
+uint32_t DosErrno(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A8218 __doserrno");
+  const uint32_t data = GetptdNoexit(base, calls);
+  return data != 0 ? data + 12 : kDosErrnoFallback;
+}
+
+uint32_t GetErrnoFromOsErr(uint8_t* base, uint32_t error) {
+  ITC_NATIVE_RUNNING("sub_825A8178 _get_errno_from_oserr");
+  for (uint32_t i = 0; i < 45; i++) {
+    if (Load(base, kOsErrorTable + 8 * i) == error) {
+      return Load(base, kOsErrorTable + 8 * i + 4);
+    }
+  }
+  if (error - 19 <= 17) {
+    return 13;
+  }
+  return error - 188 <= 14 ? 8 : 22;
+}
+
+void DosMapErr(uint8_t* base, uint32_t error, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A8250 _dosmaperr");
+  const uint32_t data = GetptdNoexit(base, calls);
+  Store(base, data != 0 ? data + 12 : kDosErrnoFallback, error);
+  const uint32_t number = GetErrnoFromOsErr(base, error);
+  const uint32_t again = GetptdNoexit(base, calls);
+  Store(base, again != 0 ? again + 8 : kErrnoFallback, number);
+}
+
+void FreePtd(uint8_t* base, uint32_t data, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AA670 _freeptd");
+  if (Load(base, kFlsIndex) != 0xFFFFFFFFu) {
+    if (data == 0 &&
+        calls.import(Import::kKeTlsGetValue, {Load(base, kGetValueIndex)}) != 0) {
+      const uint32_t getter =
+          uint32_t(calls.import(Import::kKeTlsGetValue, {Load(base, kGetValueIndex)}));
+      data = uint32_t(calls.guest(getter, {Load(base, kFlsIndex)}));
+    }
+    calls.guest(Load(base, kFlsSetValue), {Load(base, kFlsIndex), 0});
+    FreeFls(base, data, calls);
+  }
+  if (const uint32_t index = Load(base, kGetValueIndex); index != 0xFFFFFFFFu) {
+    calls.import(Import::kKeTlsSetValue, {index, 0});
+  }
+}
+
+uint32_t CritSecNoSpinCount(uint32_t section, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B3570 __crtInitCritSecNoSpinCount");
+  calls.import(Import::kRtlInitializeCriticalSection, {section});
+  return 1;
+}
+
+uint32_t InitCritSecAndSpinCount(uint8_t* base, uint32_t section, uint32_t spin,
+                                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B35A0 __crtInitCritSecAndSpinCount");
+  uint32_t init = Load(base, kCritSecInit);
+  if (init == 0) {
+    init = kCritSecNoSpinCount;
+    Store(base, kCritSecInit, init);
+  }
+  // The original's __try (its handler never ran in play) has nothing to
+  // catch here: the initializer is ours or the game's.
+  if (init == kCritSecNoSpinCount) {
+    return CritSecNoSpinCount(section, calls);
+  }
+  return uint32_t(calls.guest(init, {section, spin}));
+}
+
+void RegisterThreadNotifyRoutine(uint8_t* base, uint32_t block, uint32_t add,
+                                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82297B98 XRegisterThreadNotifyRoutine");
+  calls.import(Import::kRtlEnterCriticalSection, {kNotifyLock});
+  if (add != 0) {
+    const uint32_t last = Load(base, kNotifyList + 4);
+    Store(base, block + 0, kNotifyList);
+    Store(base, block + 4, last);
+    Store(base, last + 0, block);
+    Store(base, kNotifyList + 4, block);
+  } else {
+    const uint32_t next = Load(base, block + 0);
+    const uint32_t previous = Load(base, block + 4);
+    Store(base, previous + 0, next);
+    Store(base, next + 4, previous);
+  }
+  calls.import(Import::kRtlLeaveCriticalSection, {kNotifyLock});
+}
+
+void CallThreadNotifyRoutines(uint8_t* base, uint32_t starting, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82297B38 XapiCallThreadNotifyRoutines");
+  calls.import(Import::kRtlEnterCriticalSection, {kNotifyLock});
+  for (uint32_t block = Load(base, kNotifyList); block != kNotifyList;) {
+    const uint32_t routine = Load(base, block + 8);
+    block = Load(base, block + 0);
+    calls.guest(routine, {starting});
+  }
+  calls.import(Import::kRtlLeaveCriticalSection, {kNotifyLock});
+}
+
 }  // namespace c_runtime::core

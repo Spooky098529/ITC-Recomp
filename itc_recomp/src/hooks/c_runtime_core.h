@@ -22,4 +22,14 @@ void CoreMtTerm(PPCContext& ctx, uint8_t* base);        // sub_825AA448
 void CoreSetFlsGetValue(PPCContext& ctx, uint8_t* base);  // sub_825AA400 (no adapter)
 void CoreMtDeleteLocks(PPCContext& ctx, uint8_t* base);   // sub_825B3260 (no adapter)
 
+void CoreErrno(PPCContext& ctx, uint8_t* base);              // sub_825A81E0
+void CoreDosErrno(PPCContext& ctx, uint8_t* base);           // sub_825A8218
+void CoreGetErrnoFromOsErr(PPCContext& ctx, uint8_t* base);  // sub_825A8178
+void CoreDosMapErr(PPCContext& ctx, uint8_t* base);          // sub_825A8250
+void CoreFreePtd(PPCContext& ctx, uint8_t* base);            // sub_825AA670
+void CoreCritSecNoSpinCount(PPCContext& ctx, uint8_t* base);       // sub_825B3570
+void CoreInitCritSecAndSpinCount(PPCContext& ctx, uint8_t* base);  // sub_825B35A0
+void CoreRegisterThreadNotifyRoutine(PPCContext& ctx, uint8_t* base);  // sub_82297B98
+void CoreCallThreadNotifyRoutines(PPCContext& ctx, uint8_t* base);     // sub_82297B38
+
 }  // namespace hooks
