@@ -590,6 +590,12 @@ Calls so far for decisions the loop meets often:
   its entry. Asked to minimize the code left recompiled (the user's
   call, 2026-11-12, replacing the same day's "Live calls stay
   recompiled").
+  The network battle's sends (`sub_8214AB48`, `sub_8214AA70`, on the
+  system link socket B5 no longer makes): Dropped. A Live read the
+  SDK's stub answers with "success" and garbage (the leaderboard read
+  `sub_82292CC0`, `XamUserCreateStatsEnumerator`): answered natively as
+  no Live (the read failed, no buffer), though memory differs from
+  today's garbage (both the user's calls, 2026-11-14).
 - Achievements: the game's achievement write keeps calling
   `XUserWriteAchievements` through the guest (not skipped), so the
   SDK goes on recording unlocks in its `achievements/<title id>.toml`;

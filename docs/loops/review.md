@@ -40,6 +40,20 @@ When the user has reviewed a run's section, its heading gets
   kind 4 and 6 paths still reach the recompiled roots (a cleanup
   lead). The older `race_screens` harness groups repeat inputs (about
   17 distinct sets in 300); not rewritten (old harnesses stay).
+- The user's calls (2026-11-14): the network battle's sends Dropped;
+  the leaderboard read answered as no Live (in "Precedent first").
+- The static map's report, for the user: 73 ours functions still
+  reach their original body through `__imp__` fallbacks taken when the
+  native code declines (`operator delete` when `memory::Free` refuses a
+  block, `VirtualFree`, `memcpy`, the vehicle's physics): reachable PPC,
+  so B7 work; `movies.md`'s end of the movie library (`8257FFFF`)
+  should be `82575B07` (154 functions past it are reached from the
+  game's Live and XAM wrappers, the network sessions and
+  `sub_8245A410`); the network manager's state machine `sub_8214B330`
+  (`NetDll_socket`, `bind`, `listen`) is reached statically through the
+  race loading states (`sub_821511B8` -> `sub_82260800`); 740
+  "originals no longer called" listed in `static-map.md`, candidates
+  for Dropped rows (no rows written).
 
 ## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
 

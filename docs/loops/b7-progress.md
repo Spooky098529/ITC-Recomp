@@ -36,7 +36,20 @@ file's history. What's left to see in a drive, from every run:
   `ShowSaving`, `SetNote`, `UiMovie::SetNodeCharText`; 2 adapters
   removed; `--native_race_screens_unseen`; every harness 0 differing,
   races 30/29/26/24 s at 40, 0 errors. Two questions for the user
-  (the sends, the leaderboard read). Step: validation.
+  (the sends, the leaderboard read). Validated (`itc_5457`, race 37 s
+  at 180, 0 errors, every harness 0 differing outside the expected
+  groups; replay `itc_5458` ok): 101 of 101 harness lines, no prints
+  added; none ran in the race or the replay: 101 to drive. The
+  user's calls (2026-11-14): the network battle's sends `sub_8214AB48`
+  and `sub_8214AA70` Dropped (sends on the system link socket B5 no
+  longer makes, results unread: the 2026-11-12 Live call); the
+  leaderboard read `sub_82292CC0` answered natively as no Live (failed,
+  +180 = 4, no buffer; today's stub leaves a garbage-size buffer).
+  Step: second migration (`SplitResults::Draw`, the read).
+- The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
+  from our C++ in `src/`): reachable 11,620, ours 6,310, unported
+  3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
+  are picked from it once this subsystem is done.
 
 ## Done
 

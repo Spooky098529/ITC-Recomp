@@ -18,6 +18,14 @@ here loses its heading.
 
 ## Run 2026-11-14 05:01 (`b7-loop-13-11-26`)
 
+The in-race screens never seen (`race-screens-unseen.md`; replay ok):
+all 94 Overridden and Native rows there (PauseMenu4, RaceResults,
+SplitResults, Kind6Menu), with `sub_822927B0` Network::SetLiveState,
+`sub_822914A8` Leaderboard::Rank, `sub_8225FFC8` Leaderboard::CarLogo,
+`sub_822189B8` RaceDialog::StartSave, `sub_82218AB0`
+RaceDialog::ShowSaving, `sub_82218918` RaceDialog::SetNote,
+`sub_8211C8A0` UiMovie::SetNodeCharText.
+
 ## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
 
 Not in the attract race or the replay (`itc_5235`, `itc_5236`, ok; the
