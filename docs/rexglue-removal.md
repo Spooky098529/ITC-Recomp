@@ -335,7 +335,13 @@ goes in `src/` as overrides), American English.
   never-seen rows, the tuning pages' blockers) (ours 5,989 -> 6,537,
   work left 718 -> 676); the rest waits on the core's `Event::` and
   sync (the worker pools, `Device::Clear`'s worker), `Device::Resolve`
-  and the never-seen leads in `docs/loops/leads.md`.
+  and the never-seen leads in `docs/loops/leads.md`. Since 2026-11-14
+  (the user's call: no multiplayer) the main menu's Xbox Live and split
+  screen items do nothing (`title-screen.md`, "Multiplayer bypassed";
+  `--multiplayer_menu_items=true` restores them): the type 12 and type
+  8 modes made native above are out of reach, their code kept until the
+  user decides (static map: reachable 11,617 -> 11,011, unported 3,703
+  -> 3,232).
   The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the

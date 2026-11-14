@@ -16,6 +16,13 @@ member's other screens are in [`type8-screens.md`](type8-screens.md)
 (`Type8Options` +57992, `Type8ControllerOptions` +67632) and
 [`save-screen.md`](save-screen.md) (`Type8SaveScreen` +77272).
 
+**Not reachable since 2026-11-14** (the user's call: no multiplayer):
+the main menu's split screen item, the mode's only way in, does nothing
+unless `--multiplayer_menu_items=true` ([`title-screen.md`](title-screen.md),
+"Multiplayer bypassed"). The native code below stays until the user
+decides; its constructor was already the original's (`Mode::Create`), so
+the static map didn't reach the mode before the bypass either.
+
 Its vtable `0x82006D60` has 11 slots: 0 `Init`, 1 `Release`, 2 to 5
 `Mode::NoNextMode` (`sub_8222FC90`, `boot-mode.md`), 6 `NextMode`, 7
 `ModeType8::DeletingDestructor` (`boot-mode.md`), and three delegate

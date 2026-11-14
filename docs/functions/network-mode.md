@@ -27,6 +27,16 @@ up its own race for the time attack (`NextMode`, below) and leaves for
 the race (mode 1), the career's garage (mode 2), the title (mode 4) or
 itself again (mode 12).
 
+**Not reachable since 2026-11-14** (the user's call: no multiplayer):
+the main menu's Xbox Live item, the mode's only way in, does nothing
+unless `--multiplayer_menu_items=true`, and without that flag
+`Mode::Create` leaves type 12 to the original
+([`title-screen.md`](title-screen.md), "Multiplayer bypassed"): the static
+map no longer reaches the mode (606 functions out of its reach: 129 of
+this file's, 450 the mode's screens without rows, 18 of
+`system-services.md`'s). The native code below stays until the user
+decides; the rows aren't changed one by one.
+
 Its vtable `0x82006C6C` has 13 slots: 0 `Init` `sub_82278058`, 1
 `Release`, 2 to 5 and 9 `Mode::NoNextMode` (`sub_8222FC90`), 6
 `NextMode` `sub_8227B930`, 7 `Mode::DeletingDestructor` (`sub_82106E38`;
