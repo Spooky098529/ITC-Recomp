@@ -2215,6 +2215,144 @@ void StreamFinallyCases(Context& h) {
   }
 }
 
+
+// _close_nolock, _close and _commit: handles -2, -1, past _nhandle and in
+// the first block, whose entry (its flags +4, the OS handle +0, the lock +8
+// made with its section) is set for the case; the OS handle an event of the
+// side's own (closed by the call), a word that's no handle (the close fails)
+// or -1; handles 1 and 2 sometimes given the same OS handle with the other
+// open. errno, _doserrno and the last error random before, the invalid
+// parameter handler the shared "returns 0". Compared: r3 (64 bits), the
+// entries (the OS handle only when the side's event isn't in it), errno,
+// _doserrno, the last error and the handle's word in the caller's frame.
+void CloseCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10)) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _close: no handle block, thread data or lock 10");
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool caller_frame;  // stores the handle at the caller's frame + 20
+  };
+  for (const Fn& fn : {Fn{"_close_nolock (sub_825B0C28)", __imp__sub_825B0C28,
+                          hooks::CoreCloseNolock, false},
+                       Fn{"_close (sub_825B0D10)", __imp__sub_825B0D10, hooks::CoreClose, true},
+                       Fn{"_commit (sub_825B4828)", __imp__sub_825B4828, hooks::CoreCommit, true}}) {
+    Results results(fn.name);
+    const bool nolock = fn.native == hooks::CoreCloseNolock;
+    for (int c = 0; c < 48; c++) {
+      const uint32_t pick = h.random.Below(10);
+      uint32_t handle = pick == 0   ? 0xFFFFFFFEu
+                        : pick == 1 ? 0xFFFFFFFFu
+                        : pick == 2 ? nhandle + h.random.Below(64)
+                        : pick < 5  ? 1 + h.random.Below(2)
+                                    : h.random.Below(32);
+      if (nolock && (pick < 3)) {
+        handle = h.random.Below(32);  // _close_nolock takes only handles in range
+      }
+      const uint32_t entry = handles + 44 * (handle & 31);
+      const uint32_t other = handles + 44 * (handle == 1 ? 2 : 1);
+      // The OS handle: 0 an event of the side's own, 1 a word that's no
+      // handle, 2 -1.
+      const uint32_t os_kind = h.random.Below(3);
+      const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+      const uint8_t flags = uint8_t(h.random.Next()) | (h.random.Below(4) != 0 ? 1 : 0);
+      const bool pair = (handle == 1 || handle == 2) && h.random.Below(2) == 0;
+      const bool made = h.random.Below(2) == 0;
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{handles, 44 * 3}, {entry, 44}, {slots.data + 8, 8}});
+        const uint32_t os = os_kind == 0 ? MakeEvent(h, 0, 0) : os_kind == 1 ? junk : 0xFFFFFFFFu;
+        guest::StoreU8(h.base, entry + 4, flags);
+        Store(h.base, entry + 0, os);
+        Store(h.base, entry + 8, made ? 1 : 0);
+        if (made) {
+          InitSection(h, entry + 12);
+        }
+        if (pair) {
+          guest::StoreU8(h.base, other + 4, 1);
+          Store(h.base, other + 0, os);
+        }
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = handle;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        const bool own = os_kind == 0;
+        const uint32_t os_after = Load(h.base, entry + 0);
+        out[v].Word(own && os_after == os ? 0x0505u : os_after);
+        out[v].Bytes(Read(h.base, entry + 4, 8));
+        out[v].Bytes(Read(h.base, entry + 12, 28));
+        if (pair) {
+          const uint32_t other_os = Load(h.base, other + 0);
+          out[v].Word(own && other_os == os ? 0x0505u : other_os);
+          out[v].Word(guest::LoadU8(h.base, other + 4));
+        }
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        if (fn.caller_frame) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        // An event the call didn't close is closed here.
+        if (own && os != 0) {
+          PPCContext k = CallContext(h);
+          k.r3.u64 = os;
+          __imp__NtClose(k, h.base);
+        }
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  SetLastError(h, slots.error);
+}
+
+// FlushFileBuffers: an event, 0 or a word that's no handle (the SDK answers
+// every one with success); the last error random before; compared: r3 and
+// the last error.
+void FlushCases(Context& h) {
+  Results results("FlushFileBuffers (sub_825BA510)");
+  const uint32_t error = GuestLastError(h);
+  for (int c = 0; c < 24; c++) {
+    const int kind = c % 3;
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const uint32_t last = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      SetLastError(h, last);
+      const uint32_t event = kind == 0 ? MakeEvent(h, 0, 0) : kind == 1 ? 0 : junk;
+      PPCContext t = CallContext(h);
+      t.r3.u64 = event;
+      (v == 0 ? __imp__sub_825BA510 : hooks::CoreFlushFileBuffers)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(GuestLastError(h));
+      if (kind == 0 && event != 0) {
+        PPCContext k = CallContext(h);
+        k.r3.u64 = event;
+        __imp__NtClose(k, h.base);
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  SetLastError(h, error);
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -2274,6 +2412,8 @@ void CRuntimeCore(Context& h) {
   AtoNumberCases(h);
   FilenoCases(h);
   StreamFinallyCases(h);
+  CloseCases(h);
+  FlushCases(h);
 }
 
 }  // namespace harness

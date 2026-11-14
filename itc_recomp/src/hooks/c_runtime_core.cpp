@@ -47,7 +47,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825ADEB0, sub_825B6098, sub_825B6140, sub_825B70D0; __strgtold12_l's and "
               "_ld12tod's plain C++), _fileno (sub_825B0E88), the __finally funclets of _close, _write, "
               "_commit and fclose and doexit's unwind funclet (sub_825B0E50, sub_825B1304, "
-              "sub_825B4978, sub_825A9664, sub_825AA338) (checked by "
+              "sub_825B4978, sub_825A9664, sub_825AA338), _close_nolock and _close (sub_825B0C28, "
+              "sub_825B0D10), FlushFileBuffers and _commit (sub_825BA510, sub_825B4828) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -97,6 +98,9 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
       case cc::Import::kRtlRaiseException: __imp__RtlRaiseException(ctx, base); break;
       case cc::Import::kKeBugCheck: __imp__KeBugCheck(ctx, base); break;
       case cc::Import::kExTerminateThread: __imp__ExTerminateThread(ctx, base); break;
+      case cc::Import::kNtFlushBuffersFile: __imp__NtFlushBuffersFile(ctx, base); break;
+      case cc::Import::kNtQueryInformationFile: __imp__NtQueryInformationFile(ctx, base); break;
+      case cc::Import::kNtSetInformationFile: __imp__NtSetInformationFile(ctx, base); break;
     }
     ctx.lr = lr;
     return ctx.r3.u64;
@@ -519,6 +523,22 @@ void hooks::CoreTerminate(PPCContext& ctx, uint8_t* base) {
   cc::Terminate(base, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreCloseNolock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = int32_t(cc::CloseNolock(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base)));
+}
+
+void hooks::CoreClose(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Close(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreFlushFileBuffers(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::FlushFileBuffers(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreCommit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Commit(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -662,3 +682,10 @@ ITC_C_RUNTIME_CORE(825A9664, CoreFcloseFinally)
 ITC_C_RUNTIME_CORE(825AA338, CoreExitUnlockFinally)
 // terminate: no registers; ends in KeBugCheck(0xC0000144).
 ITC_C_RUNTIME_CORE(825B3498, CoreTerminate)
+// _close_nolock, _close: r3 = a file handle; r3 = 0, or -1.
+ITC_C_RUNTIME_CORE(825B0C28, CoreCloseNolock)
+ITC_C_RUNTIME_CORE(825B0D10, CoreClose)
+// FlushFileBuffers: r3 = an OS handle; r3 = 1, or 0.
+ITC_C_RUNTIME_CORE(825BA510, CoreFlushFileBuffers)
+// _commit: r3 = a file handle; r3 = 0, or -1.
+ITC_C_RUNTIME_CORE(825B4828, CoreCommit)

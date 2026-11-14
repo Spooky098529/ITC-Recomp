@@ -1041,4 +1041,125 @@ void Terminate(uint8_t* base, const Calls& calls) {
   });
 }
 
+uint32_t CloseNolock(uint8_t* base, uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B0C28 _close_nolock");
+  uint32_t result = 0;
+  calls.in_frame(112, [&](uint32_t) {
+    uint32_t error = 0;
+    if (GetOsfhandle(base, handle, calls) != 0xFFFFFFFFu) {
+      const uint32_t block = Load(base, kPioinfo);
+      const bool paired = (handle == 1 && (guest::LoadU8(base, block + 92) & 1) != 0) ||
+                          (handle == 2 && (guest::LoadU8(base, block + 48) & 1) != 0);
+      bool skip = false;
+      if (paired) {
+        const uint32_t one = GetOsfhandle(base, 1, calls);
+        skip = one == GetOsfhandle(base, 2, calls);
+      }
+      if (!skip && CloseHandle(GetOsfhandle(base, handle, calls), calls) == 0) {
+        error = calls.get_last_error();
+      }
+    }
+    FreeOsfhnd(base, handle, calls);
+    guest::StoreU8(base, HandleEntry(base, handle) + 4, 0);
+    if (error != 0) {
+      DosMapErr(base, error, calls);
+      result = 0xFFFFFFFFu;
+    }
+  });
+  return result;
+}
+
+namespace {
+
+// _close's and _commit's checks before the lock: -2 (`dos_errno`: _doserrno
+// 0 first, as _close), out of range or not open (with _invalid_parameter);
+// true with r3 = -1 when one fails.
+bool HandleChecksFail(uint8_t* base, uint32_t handle, bool dos_errno, const Calls& calls) {
+  if (handle == 0xFFFFFFFEu) {
+    if (dos_errno) {
+      Store(base, DosErrno(base, calls), 0);
+    }
+    Store(base, Errno(base, calls), 9);
+    return true;
+  }
+  if (int32_t(handle) >= 0 && handle < Load(base, kNhandle) &&
+      (guest::LoadU8(base, HandleEntry(base, handle) + 4) & 1) != 0) {
+    return false;
+  }
+  if (dos_errno) {
+    Store(base, DosErrno(base, calls), 0);
+  }
+  Store(base, Errno(base, calls), 9);
+  InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+  return true;
+}
+
+}  // namespace
+
+uint64_t Close(uint8_t* base, uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B0D10 _close");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(144, [&](uint32_t frame) {
+    Store(base, frame + 164, handle);
+    if (HandleChecksFail(base, handle, true, calls)) {
+      return;
+    }
+    LockFhandle(base, handle, calls);
+    if ((guest::LoadU8(base, HandleEntry(base, handle) + 4) & 1) != 0) {
+      Store(base, frame + 80, CloseNolock(base, handle, calls));
+    } else {
+      Store(base, Errno(base, calls), 9);
+      Store(base, frame + 80, 0xFFFFFFFFu);
+    }
+    UnlockFhandleFinally(base, handle, calls);
+    result = Load(base, frame + 80);
+  });
+  return result;
+}
+
+uint32_t FlushFileBuffers(uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825BA510 FlushFileBuffers");
+  uint32_t result = 1;
+  calls.in_frame(96, [&](uint32_t frame) {
+    const uint32_t status =
+        uint32_t(calls.import(Import::kNtFlushBuffersFile, {handle, frame + 80}));
+    if (int32_t(status) < 0) {
+      calls.set_last_error_from_status(status);
+      result = 0;
+    }
+  });
+  return result;
+}
+
+uint64_t Commit(uint8_t* base, uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B4828 _commit");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(144, [&](uint32_t frame) {
+    Store(base, frame + 164, handle);
+    if (HandleChecksFail(base, handle, false, calls)) {
+      return;
+    }
+    LockFhandle(base, handle, calls);
+    bool failed = true;
+    if ((guest::LoadU8(base, HandleEntry(base, handle) + 4) & 1) != 0) {
+      const uint32_t error = FlushFileBuffers(GetOsfhandle(base, handle, calls), calls) == 0
+                                 ? calls.get_last_error()
+                                 : 0;
+      Store(base, frame + 80, error);
+      if (error == 0) {
+        failed = false;
+      } else {
+        Store(base, DosErrno(base, calls), error);
+      }
+    }
+    if (failed) {
+      Store(base, Errno(base, calls), 9);
+      Store(base, frame + 80, 0xFFFFFFFFu);
+    }
+    UnlockFhandleFinally(base, handle, calls);
+    result = Load(base, frame + 80);
+  });
+  return result;
+}
+
 }  // namespace c_runtime::core

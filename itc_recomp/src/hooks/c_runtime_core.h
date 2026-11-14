@@ -93,4 +93,9 @@ void CoreFcloseFinally(PPCContext& ctx, uint8_t* base);      // sub_825A9664
 void CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base);  // sub_825AA338
 void CoreTerminate(PPCContext& ctx, uint8_t* base);          // sub_825B3498
 
+void CoreCloseNolock(PPCContext& ctx, uint8_t* base);       // sub_825B0C28
+void CoreClose(PPCContext& ctx, uint8_t* base);             // sub_825B0D10
+void CoreFlushFileBuffers(PPCContext& ctx, uint8_t* base);  // sub_825BA510
+void CoreCommit(PPCContext& ctx, uint8_t* base);            // sub_825B4828
+
 }  // namespace hooks

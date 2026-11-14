@@ -54,6 +54,9 @@ enum class Import {
   kRtlRaiseException,
   kKeBugCheck,
   kExTerminateThread,
+  kNtFlushBuffersFile,
+  kNtQueryInformationFile,
+  kNtSetInformationFile,
 };
 
 struct Calls {
@@ -441,5 +444,33 @@ uint64_t ExitUnlockFinally(uint32_t locked, bool* called, const Calls& calls);
 // KeBugCheck(0xC0000144). No harness: ends the process (the user's call,
 // 2026-11-14).
 void Terminate(uint8_t* base, const Calls& calls);
+
+
+// sub_825B0C28 _close_nolock: from a 112-byte frame, unless _get_osfhandle
+// gives -1, or the handle is 1 with 2 open (or 2 with 1 open) and both have
+// the same OS handle, CloseHandle on its OS handle (GetLastError when that
+// fails); _free_osfhnd; its flags (+4) = 0; _dosmaperr and -1 on an error,
+// else 0.
+uint32_t CloseNolock(uint8_t* base, uint32_t handle, const Calls& calls);
+
+// sub_825B0D10 _close: in its 144-byte frame (the handle at +164, the
+// caller's frame + 20; the result at +80): -2: _doserrno 0, errno 9, -1; out
+// of range or not open: the same and _invalid_parameter(0, 0, 0, 0, 0), -1;
+// else __lock_fhandle, _close_nolock when still open (else errno 9, -1), its
+// __finally. r3 as the original leaves it (-1 sign-extended, the result
+// zero-extended).
+uint64_t Close(uint8_t* base, uint32_t handle, const Calls& calls);
+
+// sub_825BA510 FlushFileBuffers: from a 96-byte frame (the I/O status block
+// at +80), NtFlushBuffersFile; 1, or 0 with the last error set from the
+// status.
+uint32_t FlushFileBuffers(uint32_t handle, const Calls& calls);
+
+// sub_825B4828 _commit: in its 144-byte frame (the handle at +164, the
+// result at +80): -2: errno 9, -1; out of range or not open: errno 9,
+// _invalid_parameter(0, 0, 0, 0, 0), -1; else __lock_fhandle and, when still
+// open, FlushFileBuffers on its OS handle (on failure _doserrno = the last
+// error, errno 9, -1), not open: errno 9, -1; its __finally. r3 as _close's.
+uint64_t Commit(uint8_t* base, uint32_t handle, const Calls& calls);
 
 }  // namespace c_runtime::core
