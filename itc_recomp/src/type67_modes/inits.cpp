@@ -1,4 +1,5 @@
-// The type 6 and 7 modes' state machine Inits (docs/functions/
+// The type 6 and 7 modes' state machine Inits (and the type 8 mode's first
+// screen's and dialog's, docs/functions/type8-mode.md; docs/functions/
 // type6-type7-modes.md) as plain C++: each original's stores and copies in
 // its frame and its StateMachine::Add calls replayed in its order from its
 // step table (init_tables.h), as RaceFlow::Init's and
@@ -90,6 +91,8 @@ const InitInfo kInits[kInitCount] = {
     {0x82237320, "Type6NodeScreen::InitMachine", 992, 26},
     {0x82237B78, "PowerGraphScreen6::InitMachine", 1056, 26},
     {0x822470A8, "PowerGraphScreen7::InitMachine", 1056, 25},
+    {0x8223C950, "Type8Screen0::Init", 1248, 25},
+    {0x8223AE60, "Type8Dialog::Init", 1040, 27},
 };
 
 #define ITC_TYPE67_INIT(address, name)                     \
@@ -116,6 +119,8 @@ InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t fr
     ITC_TYPE67_INIT(82237320, "Type6NodeScreen::InitMachine")
     ITC_TYPE67_INIT(82237B78, "PowerGraphScreen6::InitMachine")
     ITC_TYPE67_INIT(822470A8, "PowerGraphScreen7::InitMachine")
+    ITC_TYPE67_INIT(8223C950, "Type8Screen0::Init")
+    ITC_TYPE67_INIT(8223AE60, "Type8Dialog::Init")
     default:
       break;
   }

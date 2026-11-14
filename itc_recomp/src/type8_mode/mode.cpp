@@ -17,6 +17,11 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "car_list/car_list.h"
+#include "car_makers/car_makers.h"
+#include "options_screen/options_screen.h"
+#include "save_screen/save_screen.h"
+#include "stand_models/stand_models.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 #include "guest.h"
 #include "menu_sounds/menu_sounds.h"
 #include "mode_tick/mode_tick.h"
@@ -320,6 +325,121 @@ uint64_t ModeForceExit(uint8_t* base, uint64_t r3, uint32_t number, uint32_t sp,
   StoreU32(base, object + 87728, w0);
   StoreU32(base, object + 87732, w1);
   return r3 - 28;
+}
+
+uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const ScreenCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8223D5D8 ModeType8::Init");
+  constexpr uint32_t kScreenStart = 0x8211AD00, kStringsLoad = 0x8210A8D0,
+                     kStandSceneCreate = 0x82180B00, kCreateTwoPlayerBlock = 0x82105740,
+                     kLoadingShow = 0x822478D0, kSlot8Thunk = 0x8223D4B0;
+  constexpr uint32_t kGarageCars = 0x82814EB8;
+  const uint32_t frame = Frame(base, sp, kModeInitFrame);
+  auto call = [&](uint32_t target, uint32_t lr, std::initializer_list<uint64_t> args) {
+    uint64_t regs[6] = {};
+    int set = 0;
+    for (const uint64_t a : args) regs[set++] = a;
+    return calls.call_set(target, regs, set, frame, lr);
+  };
+  call(kScreenStart, 0x8223D5EC, {mode});
+  call(kStringsLoad, 0x8223D5FC, {LoadU32(base, kStringTable), 3});
+  call(kStandSceneCreate, 0x8223D604, {3});
+  // GarageStage::MakeModel by its plain C++ (no adapter: B7 loop,
+  // 2026-11-13), ScenePools::SetUpB under it through call_set.
+  const stand_models::GuestCall guest_call = [&](uint32_t function,
+                                                 std::initializer_list<uint64_t> args,
+                                                 uint32_t r1, uint32_t lr) {
+    uint64_t regs[6] = {};
+    int set = 0;
+    for (const uint64_t v : args) regs[set++] = v;
+    return calls.call_set(function, regs, set, r1, lr);
+  };
+  for (uint32_t p = 0; p < 2; p++) {
+    const uint32_t block = car_makers::BlockOf(LoadU32(base, kGarageCars + 1972 * p + 12));
+    const uint32_t holder = LoadU32(base, LoadU32(base, kStandHolder) + 4 + 4 * p);
+    stand_models::MakeModel(base, guest_call, holder, block, 0, frame);
+  }
+  if (save_data::TwoPlayerBlock(base) == 0) {
+    if (!calls.native_heap || !save_data::CreateTwoPlayerBlock(base)) {
+      call(kCreateTwoPlayerBlock, 0x8223D658, {});
+    }
+    const uint32_t block = save_data::TwoPlayerBlock(base);
+    const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+    const uint32_t destination = block + 0x3AA58, source = save + 0x1F85C;
+    if (!c_runtime::Memcpy(base, destination, source, 284)) {
+      call(kMemcpy, 0x8223D684, {destination, source, 284});
+    }
+  }
+  // The members' Inits (their plain C++; none has an adapter), on the
+  // member's addresses as the original computes them.
+  const uint32_t member = mode + kMember;
+  const uint32_t dialog = mode + 10640, panel = mode + 43588, colors = mode + 31760,
+                 list = mode + 20392, options = mode + 58840, controls = mode + 68480,
+                 saves = mode + 78120;
+  const auto run67 = [&](uint32_t address, uint32_t object) {
+    for (const type67_modes::InitInfo& info : type67_modes::kInits) {
+      if (info.address == address) {
+        StoreU32(base, frame - info.frame, frame);
+        type67_modes::RunInit(base, address, object, frame - info.frame);
+      }
+    }
+  };
+  run67(0x8223C950, member);
+  run67(0x8223AE60, dialog);
+  type67_modes::PanelScreenInit(base, panel, frame, calls);
+  type67_modes::ListScreenInit(base, colors, frame, calls);
+  type67_modes::ListScreenInit(base, list, frame, calls);
+  options_screen::RunInit(base, 0x821CAAB0, options, frame);
+  options_screen::RunInit(base, 0x821C8F48, controls, frame);
+  for (const save_screen::InitInfo& info : save_screen::kInits) {
+    if (info.address == 0x821A87F0) {
+      save_screen::RunInit(base, info.address, saves, frame - info.frame);
+    }
+  }
+  // The machines added to the dispatcher (+36, the count at +236; no bound
+  // check), the casts' null checks on the members kept.
+  const uint32_t dispatcher = mode + kDispatcher;
+  const auto add = [&](uint32_t machine) {
+    const uint32_t count = LoadU32(base, dispatcher + 200);
+    StoreU32(base, dispatcher + 200, count + 1);
+    StoreU32(base, dispatcher + (count << 2), machine);
+  };
+  add(member != 0 ? mode + 852 : 0);
+  add(dialog);
+  add(panel != 0 ? panel + 4 : 0);
+  add(colors != 0 ? mode + 31764 : 0);
+  add(list != 0 ? mode + 20396 : 0);
+  add(options);
+  add(controls);
+  add(saves);
+  // Each machine opens on its message and keeps its movie (+9612 = 1, +9616
+  // = 0), in the original's order of stores.
+  const uint32_t screen = member != 0 ? member + 4 : 0;
+  StoreU32(base, screen + 9616, 0);
+  StoreU32(base, screen + 9612, 1);
+  const auto open = [&](uint32_t machine) {
+    StoreU32(base, machine + 9612, 1);
+    StoreU32(base, machine + 9616, 0);
+  };
+  open(member + 30912 != 0 ? member + 30916 : 0);
+  open(member + 19544 != 0 ? member + 19548 : 0);
+  StoreU32(base, dialog + 9612, 1);
+  StoreU32(base, dialog + 9616, 0);
+  open(member + 42740 != 0 ? member + 42744 : 0);
+  open(options);
+  open(controls);
+  open(saves);
+  {
+    const uint64_t args[6] = {1, 0, 0xFFFFFFFFFFFFFFFFull, 0, 0, 0};
+    calls.call_set(kLoadingShow, args, 3, frame, 0x8223D884);
+  }
+  const uint32_t passes = LoadU32(base, 0x82001BEC);
+  mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
+  // The delegate's member functor (WaitForLoads through Mode::Slot8Thunk),
+  // built at the frame's +80.
+  StoreU32(base, frame + 84, 0);
+  StoreU32(base, frame + 80, kSlot8Thunk);
+  SetDelegate(base, mode, frame + 80);
+  return passes;
 }
 
 }  // namespace type8_mode

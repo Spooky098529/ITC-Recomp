@@ -10,7 +10,9 @@
 ITC_FLAG_BOOL(native_save_screen, true, "ITC",
               "Run the save screen (docs/functions/save-screen.md: the machines' set-ups "
               "Type2SaveScreen::Init sub_821A6E18, Type4SaveScreen::Init sub_821A7470 and "
-              "Type10SaveScreen::Init sub_821A7AC8 (their step tables, StateMachine::Add's "
+              "Type10SaveScreen::Init sub_821A7AC8, and Type8SaveScreen::Init sub_821A87F0 (no "
+              "adapter: ModeType8::Init's plain C++ calls it) (their step tables, "
+              "StateMachine::Add's "
               "plain C++); the machine's handlers "
               "SaveScreen::OnEnter sub_821A2608, OpenMovie sub_821A1D10, WaitMovie sub_821A26F0, "
               "OpenKind0 to OpenKind7, Show sub_821A6608 (with ShowKind2 sub_821A1D38 and "

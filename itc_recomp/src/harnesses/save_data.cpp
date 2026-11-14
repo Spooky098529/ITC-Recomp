@@ -266,6 +266,49 @@ void Create(Context& h) {
   results.Report();
 }
 
+// SaveData::CreateTwoPlayerBlock (sub_82105740) on the two-player slot
+// (saved and put back): as Create's cases, the block prefilled with random
+// words through the first fit, compared by its bytes, whether it's the
+// prefilled one and r3 against it; then freed.
+void CreateTwoPlayerBlock(Context& h) {
+  Results results("SaveData::CreateTwoPlayerBlock (sub_82105740)");
+  const uint32_t saved = guest::LoadU32(h.base, save_data::kTwoPlayerBlock);
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+      uint32_t prefilled = 0;
+      if (const auto block = memory::crt::OperatorNew(h.base, save_data::kTwoPlayerBlockBytes);
+          block && *block != 0) {
+        WriteRandom(h.base, *block, save_data::kTwoPlayerBlockBytes / 4, random);
+        memory::crt::OperatorDelete(*block);
+        prefilled = *block;
+      }
+      after = random;
+      guest::StoreU32(h.base, save_data::kTwoPlayerBlock, uint32_t(random.Next()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = random.Next();
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_82105740 : hooks::SaveDataCreateTwoPlayerBlock)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      const uint32_t block = guest::LoadU32(h.base, save_data::kTwoPlayerBlock);
+      out[v].Word(block == prefilled && block != 0 ? 1 : 0);
+      out[v].Bytes(Read(h.base, block, save_data::kTwoPlayerBlockBytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32 - block);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      memory::crt::OperatorDelete(block);
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, save_data::kTwoPlayerBlock, saved);
+  results.Report();
+}
+
 // The list's flags block (+68): `old` pages of `old_count` words, or 0.
 uint32_t MakeFlags(uint32_t old_count) {
   return old_count == 0 ? 0 : memory::AllocPages(old_count * 4, 4096);
@@ -498,6 +541,7 @@ void SaveData(Context& h) {
   TwoPlayerBlock(h, block);
   Delete(h);
   Create(h);
+  CreateTwoPlayerBlock(h);
   MenuListInit(h);
   ResetControllers(h);
   ResetPlayer(h);

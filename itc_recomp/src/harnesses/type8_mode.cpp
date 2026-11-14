@@ -55,6 +55,7 @@ ITC_FLAG_DECLARE(bool, native_type8_mode);
 namespace harness {
 
 void Type8Dialogs(Context& h);
+void Type8ModeInits(Context& h);
 
 namespace {
 
@@ -1085,6 +1086,7 @@ void Type8ModeSlots(Context& h, uint32_t world) {
 
 void Type8Mode(Context& h) {
   Type8Dialogs(h);
+  Type8ModeInits(h);
   const uint32_t world = memory::Alloc(kWorldBytes, 0);
   if (world == 0) {
     ITC_LOG_ERROR("harness: type8_mode: no world block");

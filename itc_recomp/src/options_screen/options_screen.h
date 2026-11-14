@@ -424,11 +424,13 @@ struct InitInfo {
   uint32_t frame;
   uint32_t first_saved;
 };
-constexpr int kInitCount = 4;
+constexpr int kInitCount = 6;
 extern const InitInfo kInits[kInitCount];
 // sub_821C9E00 Type2Options::Init, sub_821CA458 Type4Options::Init,
 // sub_821C8578 Type2ControllerOptions::Init and sub_821C8A60
-// Type4ControllerOptions::Init (r3 the machine, `object`): their frames'
+// Type4ControllerOptions::Init, and the type 8 mode's sub_821CAAB0
+// Type8Options::Init and sub_821C8F48 Type8ControllerOptions::Init (no
+// adapters: only ModeType8::Init's plain C++ calls them) (r3 the machine, `object`): their frames'
 // stores and copies below `sp` (the back chain too) and their
 // StateMachine::Add calls (plain C++) in their order.
 InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t sp);

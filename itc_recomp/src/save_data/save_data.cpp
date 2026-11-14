@@ -454,4 +454,25 @@ uint32_t TwoPlayerBlock(uint8_t* base) {
   return guest::LoadU32(base, kTwoPlayerBlock);
 }
 
+std::optional<uint32_t> CreateTwoPlayerBlock(uint8_t* base) {
+  if (!CreateNative()) {
+    return std::nullopt;
+  }
+  const auto made = memory::crt::OperatorNew(base, kTwoPlayerBlockBytes);
+  if (!made) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82105740 SaveData::CreateTwoPlayerBlock");
+  constexpr uint32_t kHalf = 0x1D52C;
+  const uint32_t block = *made;
+  if (block != 0) {
+    StatsConstruct(base, block + kStats);
+    StatsConstruct(base, block + kStats + kHalf);
+  }
+  guest::StoreU32(base, kTwoPlayerBlock, block);
+  ProgressSetDefaults(base, guest::LoadU32(base, kTwoPlayerBlock));
+  ProgressSetDefaults(base, guest::LoadU32(base, kTwoPlayerBlock) + kHalf);
+  return OptionsSetDefaults(base, guest::LoadU32(base, kTwoPlayerBlock) + 0x3AA58);
+}
+
 }  // namespace save_data

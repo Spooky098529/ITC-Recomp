@@ -54,8 +54,10 @@ struct InitInfo {
 // Type6ListScreen, sub_822436A0 Type7ListScreen, sub_82230F80
 // Type6PanelScreen, sub_82240998 Type7PanelScreen, sub_82237320
 // Type6NodeScreen, sub_82237B78 PowerGraphScreen6, sub_822470A8
-// PowerGraphScreen7.
-constexpr int kInitCount = 16;
+// PowerGraphScreen7; and the type 8 mode's sub_8223C950 Type8Screen0::Init
+// (machine at +4) and sub_8223AE60 Type8Dialog::Init (docs/functions/
+// type8-mode.md; no adapters: only ModeType8::Init's plain C++ calls them).
+constexpr int kInitCount = 18;
 extern const InitInfo kInits[kInitCount];
 // The Init at `address` (one of kInits) on `object`, its frame at `frame`.
 InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t frame);

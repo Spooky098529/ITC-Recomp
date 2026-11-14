@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_save_data, true, "ITC",
               "sub_82105940, CourseRecords::Reset sub_82105D08, CourseRecords::Of sub_82105BF8, SaveData::TwoPlayerBlock sub_82105678, Players::ResetControllers "
               "sub_8209F5E0 and, with --native_heap, SaveData::Delete sub_821055D8, "
               "SaveData::Create sub_821057C8, MenuList::Init sub_8220BAC0 and "
-              "TitleScreen::ResetPlayer sub_82221D00; no adapters for the Stats functions, "
+              "TitleScreen::ResetPlayer sub_82221D00, and SaveData::CreateTwoPlayerBlock "
+              "sub_82105740 (no adapter: ModeType8::Init's plain C++ calls it); no adapters for the Stats functions, "
               "BitSet400::SetAll, the getters but Table3044's, ControlMap::SetDefault, "
               "Options::SetDefaults and CourseRecords::Reset: only their callers' plain C++ "
               "calls them in play) natively instead of through the translated code (the same writes; "
@@ -104,6 +105,17 @@ void SaveDataCreate(PPCContext& ctx, uint8_t* base) {
     }
   }
   __imp__sub_821057C8(ctx, base);
+}
+
+void SaveDataCreateTwoPlayerBlock(PPCContext& ctx, uint8_t* base) {
+  if (hooks::NativeHeapActive()) {
+    ctx.fpscr.disableFlushMode();
+    if (const auto r3 = sd::CreateTwoPlayerBlock(base)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_82105740(ctx, base);
 }
 
 void SaveDataResetControllers(PPCContext& ctx, uint8_t* base) {

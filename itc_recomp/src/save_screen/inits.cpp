@@ -75,6 +75,7 @@ const InitInfo kInits[kInitCount] = {
     {0x821A6E18, "Type2SaveScreen::Init", 976, 27},
     {0x821A7470, "Type4SaveScreen::Init", 976, 27},
     {0x821A7AC8, "Type10SaveScreen::Init", 1104, 27},
+    {0x821A87F0, "Type8SaveScreen::Init", 912, 27},
 };
 
 #define ITC_SAVE_SCREEN_INIT(address, name)                \
@@ -95,6 +96,13 @@ InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t fr
     ITC_SAVE_SCREEN_INIT(821A6E18, "Type2SaveScreen::Init")
     ITC_SAVE_SCREEN_INIT(821A7470, "Type4SaveScreen::Init")
     ITC_SAVE_SCREEN_INIT(821A7AC8, "Type10SaveScreen::Init")
+    // The type 8 mode's (no adapter; spelled out so the status check
+    // doesn't take the adapters' macro name for an override).
+    case 0x821A87F0: {
+      ITC_NATIVE_RUNNING("sub_821A87F0 Type8SaveScreen::Init");
+      guest::StoreU32(base, frame, frame + info_frame);
+      return Run(base, k821A87F0, object, frame);
+    }
     default:
       break;
   }

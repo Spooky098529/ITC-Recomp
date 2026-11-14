@@ -138,5 +138,15 @@ uint32_t DefaultsTable50E4();
 // 0x1D52C). A leaf.
 constexpr uint32_t kTwoPlayerBlock = 0x826C5B5C;
 uint32_t TwoPlayerBlock(uint8_t* base);
+// sub_82105740 SaveData::CreateTwoPlayerBlock (probably): 0x3AB74 bytes from
+// operator new's plain C++, Stats::Stats at +48 and +48 + 0x1D52C when not
+// 0, the block into [0x826C5B5C], then Progress::SetDefaults on the word
+// and the word + 0x1D52C, and Options::SetDefaults on the word + 0x3AA58
+// (each read again). Returns r3 as the original leaves it (Options::
+// SetDefaults'). nullopt, with nothing done, where the original must run
+// (operator new's error paths, memcpy not native: as SaveData::Create).
+// No adapter: only ModeType8::Init's plain C++ calls it.
+constexpr uint32_t kTwoPlayerBlockBytes = 0x3AB74;
+std::optional<uint32_t> CreateTwoPlayerBlock(uint8_t* base);
 
 }  // namespace save_data

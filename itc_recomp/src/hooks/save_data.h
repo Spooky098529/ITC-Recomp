@@ -41,6 +41,10 @@ void SaveDataDelete(PPCContext& ctx, uint8_t* base);
 // holder. With --native_heap; the original where memcpy's plain C++ can't
 // copy or operator new's plain C++ refuses.
 void SaveDataCreate(PPCContext& ctx, uint8_t* base);
+// sub_82105740 SaveData::CreateTwoPlayerBlock (no adapter: only
+// ModeType8::Init's plain C++ calls it; the harness's step): its plain C++
+// over the allocation layer, else the original.
+void SaveDataCreateTwoPlayerBlock(PPCContext& ctx, uint8_t* base);
 // Players::ResetControllers sub_8209F5E0: r3 left; r9 to r11 as the
 // original leaves them.
 void SaveDataResetControllers(PPCContext& ctx, uint8_t* base);

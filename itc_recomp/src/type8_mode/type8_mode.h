@@ -252,5 +252,23 @@ uint64_t ModeInterrupt(uint8_t* base, uint32_t object, uint32_t sp);
 // leaving flag 1) or 12 (2, 3)}. r3 the mode + 4 then, else DrawAll's.
 uint64_t ModeForceExit(uint8_t* base, uint64_t r3, uint32_t number, uint32_t sp,
                        const ScreenCalls& calls);
+// sub_8223D5D8 ModeType8::Init (slot 0; 176-byte frame; r3 the mode): the
+// UI movies' start (sub_8211AD00), Strings::Load([0x826C5C34], 3) and
+// StandScene::Create(3) through their overrides; GarageStage::MakeModel
+// (its plain C++) on the stand holder's +4 and +8 with the two players'
+// garage cars' model blocks (CarModels::BlockOf) and 0; with no two-player
+// save block, SaveData::CreateTwoPlayerBlock (its plain C++ over the
+// allocation layer, else the original) and player 0's options (284 bytes
+// from SaveData::Of(0) + 0x1F85C) copied to its +0x3AA58; the eight members'
+// Inits (Type8Screen0's and Type8Dialog's step tables in type67_modes, the
+// panel and two list screens' plain C++, the options' and controller
+// options' in options_screen, the save screen's in save_screen), their
+// machines added to the dispatcher (+36, count +236) with the casts' null
+// checks, +9612 = 1 and +9616 = 0 on each; LoadingScreen::Show(1, 0, -1)
+// through its override, ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0) and
+// the delegate {0x82010FA0, the mode, Mode::Slot8Thunk, 0}, +4 = +8. r3 as
+// the original leaves it (FadeIn's: the passes).
+constexpr uint32_t kModeInitFrame = 176;
+uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const ScreenCalls& calls);
 
 }  // namespace type8_mode

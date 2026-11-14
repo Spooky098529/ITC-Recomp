@@ -117,6 +117,7 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
 uint32_t MachineOffset(uint32_t address) {
   switch (address) {
     case 0x822454B8:  // Type7Screen0::Init
+    case 0x8223C950:  // Type8Screen0::Init
     case 0x8223F9A8:
     case 0x822436A0:
     case 0x82230F80:
@@ -149,6 +150,8 @@ GuestFunction Recompiled(uint32_t address) {
     case 0x82237320: return __imp__sub_82237320;
     case 0x82237B78: return __imp__sub_82237B78;
     case 0x822470A8: return __imp__sub_822470A8;
+    case 0x8223C950: return __imp__sub_8223C950;
+    case 0x8223AE60: return __imp__sub_8223AE60;
     default: return nullptr;
   }
 }
@@ -4476,6 +4479,172 @@ void Type8Dialogs(Context& h) {
        hooks::Type8DialogOpenConfirmStep, kStep, true, true},
   };
   RunDialogs(h, world, functions, std::size(functions));
+}
+
+// --- ModeType8::Init (sub_8223D5D8; called by the type8_mode harness), laid
+// as the type 6 and 7 modes' slot 0 (ModeInits above): the mode a block of
+// random words (87,768 bytes, its member inline) made by ModeType8::ModeType8
+// (its dispatcher's count then 0 to 7), the stand held (a holder of the
+// case's whose players' stages have their models made: MakeModel's own work
+// is its harness's, stand_models; a model made here would leave blocks the
+// take can't name), the two players' garage cars (0x82814EB8) random words
+// with model ids 0 to 71, player 0's save data a block of random words, the
+// two-player save block none (made by operator new: compared by content,
+// then freed) or a block of random words; the loading world, fades and
+// stand globals as ModeInits'. The original runs with the flag on (its
+// callees' adapters native, as in the game); its members' Inits have no
+// adapters, so they run recompiled under it and natively under ours. The
+// transitions' functor words copied from their frames (Type6Mode::Init's
+// "expected to differ" group) matched here, so the mode is compared whole,
+// those words with it. ---
+
+void Type8ModeInits(Context& h) {
+  namespace lw = loading_world;
+  uint8_t* const base = h.base;
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
+      !hooks::CarModelsSceneSetUpNative()) {
+    ITC_LOG_WARN("harness: type8_mode: the allocation layer, the archive's queue, the models' "
+                 "lifetime or memcpy isn't native: ModeType8::Init's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> exits(c_runtime::ExitMutex());
+  std::lock_guard<std::recursive_mutex> blocks(models::MemoryBlocksMutex());
+  constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x40;
+  constexpr uint32_t kCars = 0x82814EB8, kCarsBytes = 2 * 1972;
+  constexpr uint32_t kSlots = 0x826C5B58;  // player 0's save data, the two-player block
+  constexpr uint32_t kModeType8Bytes = 87768;
+  const std::vector<uint8_t> fades = Read(base, kFades, kFadesBytes);
+  const std::vector<uint8_t> cars = Read(base, kCars, kCarsBytes);
+  const std::vector<uint8_t> slots = Read(base, kSlots, 8);
+  const StandSaved saved(base);
+  const lw::MovieWorld w;
+  const Block mode(kModeType8Bytes);
+  const Block save(0x20000);
+  const Block given(0x3AB80);
+  const Block stand(0x6000);
+  if (!w.ok() || !mode.address || !save.address || !given.address || !stand.address) return;
+  Results results("ModeType8::Init (sub_8223D5D8)");
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(uint64_t(c) * 811 + 0x8223D5D8);
+      saved.Restore();
+      const lw::SavedGlobals loading(base);
+      lw::ShapeMovieWorld(base, w, r);
+      lw::BuildStringTable(base, w);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      WriteRandom(base, mode.address, mode.bytes, r);
+      WriteRandom(base, save.address, save.bytes, r);
+      WriteRandom(base, given.address, given.bytes, r);
+      WriteRandom(base, t.r1.u32 - 0x1000, 0x1000, r);
+      WriteRandom(base, kCars, kCarsBytes, r);
+      for (uint32_t p = 0; p < 2; p++) guest::StoreU32(base, kCars + 1972 * p + 12, r.Below(72));
+      const bool made = c % 2 == 0;
+      guest::StoreU32(base, kSlots, save.address);
+      guest::StoreU32(base, kSlots + 4, made ? 0 : given.address);
+      {
+        // The mode made as Mode::Create makes it (ModeType8::ModeType8: the
+        // member's screens' vtables the Inits call through).
+        PPCContext m = CallContext(h);
+        m.r3.u64 = mode.address;
+        sub_82107670(m, base);
+      }
+      const uint32_t handlers = r.Below(8);
+      guest::StoreU32(base, mode.address + 36 + 200, handlers);
+      // The stand held (a holder of the case's: its three slots (4-byte
+      // blocks naming the stages) with the stages'
+      // models made, +16 1, but slot 0's, which ModeType8::Init
+      // never names: a MakeModel there would make one), so GarageStage::
+      // MakeModel finds the players' stages' models made.
+      WriteRandom(base, stand.address, stand.bytes, r);
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t slot = stand.address + 0x40 + 4 * i;
+        const uint32_t stage = stand.address + 0x100 + 0x1A00 * i;
+        guest::StoreU32(base, stand.address + 4 * i, slot);
+        guest::StoreU32(base, slot, stage);
+        guest::StoreU32(base, stage + 16, i == 0 ? 0 : 1);
+      }
+      guest::StoreU32(base, t67::kStandHolder, stand.address);
+      guest::StoreU32(base, scene::kScene, 0);
+      guest::StoreU32(base, scene::kFirstSet, 0);
+      guest::StoreU32(base, accessories::kSet, 0);
+      guest::StoreU32(base, race_loading::kLoadingCurrent, r.Below(3));
+      guest::StoreU32(base, race_loading::kLoadingShown, uint32_t(r.Next()));
+      for (uint32_t i = 0; i < 3; i++) {
+        guest::StoreU32(base, race_loading::kLoadingAnimations + 4 * i,
+                        r.Below(2) ? (i == 1 ? 13 : 0) : r.Below(256));
+      }
+      const uint32_t mark = exit_table::Mark(base);
+      time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
+      std::vector<uint32_t> calls;
+      g_stand_calls = &calls;
+      g_record_mode_calls = true;
+      const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+      hooks::g_start_up_recorder = StandRecorder;
+      t.r3.u64 = mode.address;
+      if (v == 0) {
+        __imp__sub_8223D5D8(t, base);
+      } else {
+        hooks::Type8ModeInit(t, base);
+      }
+      hooks::g_start_up_recorder = saved_recorder;
+      g_record_mode_calls = false;
+      g_stand_calls = nullptr;
+      time_hooks::ClearFakeNow();
+      StandTake take;
+      take.Collect(base, true);
+      const uint32_t block = guest::LoadU32(base, kSlots + 4);
+      const bool heap_block = made && block != 0 && memory::IsHeapBlock(block);
+      out[v].Word(heap_block);
+      if (heap_block) {
+        take.heap.push_back(block);
+        take.regions.push_back({block, memory::Size(block)});
+      } else {
+        out[v].Word(block - given.address);
+      }
+      take.regions.push_back({mode.address, mode.bytes});
+      // The harness's own blocks aren't the Init's: kept off the take's
+      // lists (the mode named once, as itself).
+      for (const uint32_t own : {mode.address, save.address, given.address, stand.address}) {
+        take.heap.erase(std::remove(take.heap.begin(), take.heap.end(), own), take.heap.end());
+        take.regions.erase(std::remove_if(take.regions.begin(), take.regions.end(),
+                                          [&](const auto& g) { return g.start == own; }),
+                           take.regions.end());
+      }
+      take.regions.push_back({mode.address, mode.bytes});
+      for (size_t k = 0; k + 5 <= calls.size(); k += 5) {
+        if (calls[k] != 0x8209DE48) calls[k + 3] -= t.r1.u32;
+      }
+      take.TakeCalls(base, calls, out[v]);
+      take.TakeBlocks(base, out[v]);
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, mode.address, mode.bytes));
+      out[v].Bytes(Read(base, save.address, save.bytes));
+      if (!made) out[v].Bytes(Read(base, given.address, given.bytes));
+      out[v].Bytes(Read(base, kCars, kCarsBytes));
+      out[v].Bytes(scene_pools_take::Normalized(base, take.regions, stand.address, stand.bytes));
+      saved.Take(take.regions, out[v]);
+      out[v].Bytes(Read(base, t.r1.u32 - type8_mode::kModeInitFrame + 80, 8));
+      out[v].Bytes(Read(base, w.movies.address, w.movies.bytes));
+      out[v].Bytes(Read(base, w.texts.address, w.texts.bytes));
+      out[v].Bytes(Read(base, w.strings.address, w.strings.bytes));
+      out[v].Word(guest::LoadU32(base, race_loading::kLoadingShown));
+      out[v].Word(guest::LoadU32(base, race_loading::kLoadingCurrent));
+      out[v].Bytes(Read(base, kFades, kFadesBytes));
+      exit_table::Take(base, mark, out[v]);
+      out[v].Word(take.Word(t.r3.u32, t.r1.u32));
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      take.Free();
+      loading.Restore();
+      Write(base, kFades, fades.data(), kFadesBytes);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  saved.Restore();
+  Write(base, kFades, fades.data(), kFadesBytes);
+  Write(base, kCars, cars.data(), kCarsBytes);
+  Write(base, kSlots, slots.data(), 8);
 }
 
 }  // namespace harness

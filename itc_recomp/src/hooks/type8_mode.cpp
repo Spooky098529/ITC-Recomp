@@ -47,7 +47,13 @@ ITC_FLAG_BOOL(native_type8_mode, true, "ITC",
               "Sound::Play and GarageStages::DrawAll by their plain C++; GameMessages::Dispatch, "
               "LoadingScreen::Run and Finish, GarageStage::Command and SetDrawWord, "
               "Strings::Release, UiMovies::DeleteAll's jump, operator delete and the sound "
-              "manager's slots as guest calls)) natively instead of through the "
+              "manager's slots as guest calls); ModeType8::Init sub_8223D5D8 with Type8Screen0::Init "
+              "sub_8223C950 and Type8Dialog::Init sub_8223AE60 (step tables, StateMachine::Add's "
+              "plain C++; the options', controller options' and save screen's Inits, "
+              "SaveData::CreateTwoPlayerBlock, GarageStage::MakeModel, CarModels::BlockOf, "
+              "memcpy, the panel and list screens' Inits and ScreenFades::FadeIn by their plain "
+              "C++; the UI movies' start, Strings::Load, StandScene::Create and "
+              "LoadingScreen::Show through their overrides)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=type8_mode)");
 
 namespace hooks {
@@ -140,6 +146,16 @@ ITC_T8M_SCREEN(Type8ModeForceExit,
 #undef ITC_T8M_SCREEN
 #undef ITC_T8M_STEP
 
+void Type8ModeInit(PPCContext& ctx, uint8_t* base) {
+  const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+  const t8m::ScreenCalls calls = Type67ScreensCalls(ctx, base);
+  ctx.fpscr.disableFlushMode();
+  const uint64_t r3 = t8m::ModeInit(base, ctx.r3.u32, ctx.r1.u32, calls);
+  ctx.r1.u64 = stack;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
 }  // namespace hooks
 
 #define ITC_TYPE8_MODE(address, step)    \
@@ -212,3 +228,11 @@ ITC_TYPE8_MODE(8223D8E8, Type8ModePollTeardown)
 ITC_TYPE8_MODE(8223D4D0, Type8ModeTearDown)
 ITC_TYPE8_MODE(8223D960, Type8ModeInterrupt)
 ITC_TYPE8_MODE(8223DA00, Type8ModeForceExit)
+// Slot 0 (Init, from Modes::Tick). The members' Inits it calls
+// (Type8Screen0::Init sub_8223C950, Type8Dialog::Init sub_8223AE60,
+// Type8Options::Init sub_821CAAB0, Type8ControllerOptions::Init
+// sub_821C8F48, Type8SaveScreen::Init sub_821A87F0) and
+// SaveData::CreateTwoPlayerBlock sub_82105740 have no adapters: it's their
+// only caller, and it runs their plain C++ (with the flag off, the
+// original calls the originals).
+ITC_TYPE8_MODE(8223D5D8, Type8ModeInit)

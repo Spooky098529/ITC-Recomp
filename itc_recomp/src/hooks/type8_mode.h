@@ -67,5 +67,6 @@ void Type8ModePollTeardown(PPCContext& ctx, uint8_t* base);
 void Type8ModeTearDown(PPCContext& ctx, uint8_t* base);
 void Type8ModeInterrupt(PPCContext& ctx, uint8_t* base);
 void Type8ModeForceExit(PPCContext& ctx, uint8_t* base);
+void Type8ModeInit(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
