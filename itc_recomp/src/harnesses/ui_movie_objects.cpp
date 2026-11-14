@@ -712,6 +712,7 @@ constexpr const char* kClearNodeText = "UiMovie::ClearNodeText (sub_8211CC50)";
 constexpr const char* kSetNumberText = "UiMovie::SetNumberText (sub_8211C740)";
 constexpr const char* kSetNodeNumberText = "UiMovie::SetNodeNumberText (sub_8211CA18)";
 constexpr const char* kSetNodeTextV = "UiMovie::SetNodeTextV (sub_8211CBD8)";
+constexpr const char* kSetNodeCharText = "UiMovie::SetNodeCharText (sub_8211C8A0)";
 constexpr const char* kSetChildNameText =
     "UiMovie::SetChildNameText (sub_8211D930; sub_8211CAA0)";
 
@@ -818,6 +819,11 @@ void SetterCases(Context& h, uint32_t movie) {
       // not) and r6 a va_list's address (r1 + 40, five slots of small
       // ints); also compared: r1 + 40 to + 79.
       {kSetNodeTextV, __imp__sub_8211CBD8, sub_8211CBD8},
+      // The 8-bit string setter (never seen in play): r4 one of the 8 nodes
+      // (TXT: the original loops forever on others), r5 a string of the
+      // case's in the scratch area (letters, newlines and bytes of
+      // double-byte leads, 0x81 to 0x9F and 0xE0 to 0xFE, with their next).
+      {kSetNodeCharText, __imp__sub_8211C8A0, sub_8211C8A0},
       // The build screen's text helpers (docs/functions/build-screen.md):
       // SetFirstLine (r6 the line) and FirstLine on TXT nodes only (the
       // originals loop forever on others); LineCount (also compared: its
@@ -910,6 +916,7 @@ void SetterCases(Context& h, uint32_t movie) {
         Store(h.base, scene + 128, sub);
         Store(h.base, sub + 108, 0);
         const bool texts = f.name == kSetText || f.name == kSetNodeText ||
+                           f.name == kSetNodeCharText ||
                            f.name == kSetFirstLine || f.name == kFirstLine || numbers;
         if (texts) {
           Store(h.base, sub, 0x54585400);  // child 0 of the scene: a TXT too
@@ -988,6 +995,25 @@ void SetterCases(Context& h, uint32_t movie) {
             Store(h.base, t.r1.u32 + 40 + 8 * k, 0);
             Store(h.base, t.r1.u32 + 44 + 8 * k, r.Below(100));
           }
+        }
+        if (f.name == kSetNodeCharText) {
+          t.r4.u64 = nodes + 128 * r.Below(8);
+          const uint32_t text = h.data + 2560;
+          const uint32_t length = r.Below(40);
+          for (uint32_t c = 0; c < length; c++) {
+            uint8_t byte;
+            switch (r.Below(8)) {
+              case 0: byte = 10; break;
+              case 1: byte = uint8_t(0x81 + r.Below(31)); break;
+              case 2: byte = uint8_t(0xE0 + r.Below(31)); break;
+              case 3: byte = uint8_t(0xA0 + r.Below(64)); break;
+              default: byte = uint8_t(0x20 + r.Below(0x5F)); break;
+            }
+            guest::StoreU8(h.base, text + c, byte);
+          }
+          guest::StoreU8(h.base, text + length, 0);
+          guest::StoreU8(h.base, text + length + 1, 0);
+          t.r5.u64 = text;
         }
         if (f.name == kSetFirstLine) {
           t.r6.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);

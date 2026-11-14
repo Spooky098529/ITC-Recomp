@@ -69,7 +69,8 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "UiMovie::SetFirstLine sub_8211C370, FirstLine sub_8211C3F8, LineCount "
               "sub_8211C680 (Strings::CountLines sub_821087D8), ScrollNodeText sub_8211CCC0 and "
               "ResetNodeTextScroll sub_8211CD28, UiMovie::ClearNodeText sub_8211CC50, "
-              "UiMovie::SetNodeTextV sub_8211CBD8, UiMovie::SetNodeNumberText sub_8211CA18, "
+              "UiMovie::SetNodeTextV sub_8211CBD8, UiMovie::SetNodeCharText sub_8211C8A0 (never "
+              "seen in play), UiMovie::SetNodeNumberText sub_8211CA18, "
               "UiMovie::SetText sub_8211C1F8 (its "
               "Strings::FormatV through the plain C++) and UiMovie::SetNodeText sub_8211C7E8 (the "
               "same, from its override in src/debug/pause_movie_log.cpp), UiMovie::SetNumberText "
@@ -985,6 +986,25 @@ extern "C" REX_FUNC(sub_8211CBD8) {
     }
   }
   __imp__sub_8211CBD8(ctx, base);
+}
+
+// UiMovie::SetNodeCharText: r3 = movie, r4 = the node, r5 = an 8-bit
+// string; r3 the movie's texts' map.
+extern "C" REX_FUNC(sub_8211C8A0) {
+  REX_FUNC_PROLOGUE();
+  if (NativeHeap()) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    hooks::FormatGuestCalls calls(ctx, base);
+    const auto r3 = ui_movies::SetNodeCharText(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+                                               ctx.r4.u32, ctx.r5.u32);
+    ctx.lr = lr;
+    if (r3) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_8211C8A0(ctx, base);
 }
 
 // UiMovie::SetChildNameText: r3 = movie, r4 = a sub-scene's index or -1,

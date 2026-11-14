@@ -549,6 +549,16 @@ std::optional<uint32_t> SetNodeTextV(uint8_t* base, const strings_and_font::Form
                                      uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
                                      uint32_t args);
 
+// sub_8211C8A0 UiMovie::SetNodeCharText (never seen in play): the node
+// (`node`) must be a TXT (else nullopt: the original loops forever there);
+// its text record (GetText) cleared (its buffer's 4 KB) and the 8-bit
+// string at `text` converted into it by a guest call (sub_82108A70 with the font [0x826C5C00], from its 128-byte frame below
+// `stack`, never seen in play: the original), then the record stored for
+// the node's id. Returns as SetText.
+std::optional<uint32_t> SetNodeCharText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                        uint32_t stack, uint32_t movie, uint32_t node,
+                                        uint32_t text);
+
 // sub_8211C740 UiMovie::SetNumberText: as ClearText (no TXT check), its
 // text record's buffer cleared (+8 and +20 kept) and string 8 (`value`'s
 // low word 0) or 9 with `value` formatted into it (Strings::Format from its
