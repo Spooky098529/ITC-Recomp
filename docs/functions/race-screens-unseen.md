@@ -11,6 +11,20 @@ their functions was seen in play (`docs/coverage.md`); by the user's
 call (2026-11-12, to minimize recompiled code) they still get rows and
 are mapped and ported like any others.
 
+Since the multiplayer bypass (the user's call, 2026-11-14: the main
+menu's split screen and Xbox Live items do nothing, `../loops/b7-loop.md`,
+"Precedent first"), races of kinds 4 (split screen) and 6 (the Live time
+attack) are no longer made, so kind 4's pause menu, `SplitResults::` and
+`Kind6Menu::` are unreachable in play; `RaceHudMachine::OnRaceEnd`'s
+kind 4 and 6 calls (`ShowSplitResults`, `ShowKind6Results`) are under
+`--multiplayer_menu_items` (off by default), so the static map stops
+counting them. `RaceResults::Open` and `SetTexts` remain real work,
+through `ShowResults` (kind 2, and kind 1 with the race data's +0xA3AF4
+0). The static map still reaches kind 4's pause menu (21 rows) through
+`RaceHudMachine::CountdownPauseDraw` `sub_8216D0C8`, unported, whose
+original has a kind 4 branch (`race-hud-machine.md`): it goes when that
+handler is ported with its kind 4 branch under the flag.
+
 - **Kind 4's pause menu** (`[0x826D84E0]` to `[0x826D84EC]`, the
   holder's +1016, `PauseMenu4::`, UI movie 5; probably the split
   screen's, race kind 4): laid out as the pause menu's (`PauseMenu::`)

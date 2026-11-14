@@ -2,20 +2,20 @@
 
 Made by `itc_recomp/tools/static_map.py` on every run; never edit it by hand (run the tool again). What it reads, how edges are found and its gaps: the tool's docstring and "The static map" in `docs/coverage.md`.
 
-Made 2026-11-14 at commit `c66d07b1` (`b7-loop-13-11-26`).
+Made 2026-11-14 at commit `18fa8e23` (`b7-loop-13-11-26`).
 
 ## Totals
 
 - Recompiled `sub_` functions: 16552; 144 jump-table cases folded into their parents, leaving 16408.
-- Reachable: 10865 (10321 from `main`, 544 more from 189 extra roots: functions seen in play that `main` doesn't reach, 1 of them not under another).
-- Ours: 6034. Excluded (replaced libraries): 1599.
-- **Unported: 3232** (2727 under `main`): seen in play 644, never seen 2588; 245074 generated lines.
-- Of the unported, 672 hang under unported code (or a root); 2560 are reached only through ours (394 seen in play), 1220 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
-- Ours functions' edges come from our C++ (`src_edges.py`): 27194 definitions in 1131 files of `src/` (harnesses left out), 6587 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 5960 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
+- Reachable: 10853 (10309 from `main`, 544 more from 189 extra roots: functions seen in play that `main` doesn't reach, 1 of them not under another).
+- Ours: 6027. Excluded (replaced libraries): 1599.
+- **Unported: 3227** (2722 under `main`): seen in play 644, never seen 2583; 244849 generated lines.
+- Of the unported, 672 hang under unported code (or a root); 2555 are reached only through ours (394 seen in play), 1218 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
+- Ours functions' edges come from our C++ (`src_edges.py`): 27194 definitions in 1131 files of `src/` (harnesses left out), 6587 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 5953 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
 - Ours functions whose original body is still reachable: 73 (69 from our C++: an `__imp__` fallback when the native C++ declines, or a guest call to a function with neither override nor C++); listed below.
 - Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 35 functions named, taken as roots; they add 2 reachable functions.
-- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15908 reachable. **Originals no longer called: 1493** (945 not ours, 548 ours whose work our C++ took in; 124542 lines, 170 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
-- Frontier (ready now): 1663 functions.
+- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15908 reachable. **Originals no longer called: 1505** (950 not ours, 555 ours whose work our C++ took in; 125632 lines, 170 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
+- Frontier (ready now): 1660 functions.
 - Reachable functions calling imports: 328 (170 unported).
 - Image read: 13492 code-built data addresses scanned; 181 function pointers in data that no code-built address reaches (136 functions; not edges).
 
@@ -115,7 +115,7 @@ Unported functions ranked by how many unported functions above them (through unp
 
 ## Unmapped areas
 
-Clusters of unported reachable functions with no rows in any function file: 177 (542 functions, 44924 lines). Largest first; the callers named are outside the cluster.
+Clusters of unported reachable functions with no rows in any function file: 177 (544 functions, 45120 lines). Largest first; the callers named are outside the cluster.
 
 - **sub_820A70A8**-820A8B38: 74 functions, 2549 lines, 10 seen, unblocks 4; called from `sub_82090910` (unmapped, unported), `sub_820A75E8` (cameras.md, ours), `sub_820A8B88` (cameras.md, ours), `sub_82593E30` (movies.md, unported) ....
 - **sub_82478FB8**-8247E0B0: 36 functions, 6609 lines, 0 seen, unblocks 5; called from `sub_8246F140` (xaudio-objects.md, ours), `sub_8247F7A8` (unmapped, unported), `sub_8247FB28` (unmapped, unported), `sub_8247FE18` (unmapped, unported) ....
@@ -149,6 +149,7 @@ Clusters of unported reachable functions with no rows in any function file: 177 
 - **sub_820B0340**-820B0428: 3 functions, 126 lines, 0 seen, unblocks 0; called from `sub_820B2100` (car-physics.md, ours), `sub_820BFD30` (vehicle.md, ours).
 - **sub_820FF5A0**-820FF680: 3 functions, 119 lines, 0 seen, unblocks 6; called from `sub_820FF790` (race-states.md, unported), `sub_82214C88` (race-hud-object.md, unported).
 - **sub_82149A30**-82149B08: 3 functions, 105 lines, 1 seen, unblocks 31; called from `sub_82149C48` (unmapped, unported), `sub_82149D00` (unmapped, unported), `sub_8214B188` (unmapped, unported).
+- **sub_822159F0**-82215B48: 3 functions, 208 lines, 0 seen, unblocks 1; called from `sub_8216CC60` (race-hud-machine.md, ours), `sub_82216810` (unmapped, unported).
 - **sub_822A8418**-822A8518: 3 functions, 77 lines, 0 seen, unblocks 3; called from `sub_8258F0F0` (single-commands.md, ours), `sub_8258FD48` (functions.md, unported).
 - **sub_825B31D8**-825B3650: 3 functions, 120 lines, 2 seen, unblocks 3; called from `sub_825AA448` (unmapped, unported), `sub_825AA708` (unmapped, unported).
 - **sub_825B4C8C**-825B4D90: 3 functions, 92 lines, 0 seen, unblocks 230; called from `sub_825A9BB8` (c-runtime.md, ours), `sub_825AA398` (c-runtime.md, ours), `sub_825B49C8` (unmapped, unported), `sub_825DAC58` (unmapped, unported).
@@ -156,8 +157,7 @@ Clusters of unported reachable functions with no rows in any function file: 177 
 - **sub_820BC560**-820BC828: 2 functions, 266 lines, 0 seen, unblocks 0; called from `sub_820B8D30` (car-physics.md, ours).
 - **sub_820BFBA8**-820BFBB0: 2 functions, 12 lines, 0 seen, unblocks 0; called from `sub_820BCDD0` (collision.md, ours).
 - **sub_820F1098**-820F1100: 2 functions, 54 lines, 0 seen, unblocks 0; called from `sub_820F2638` (course-scenery.md, ours).
-- **sub_82108A08**-82108A70: 2 functions, 98 lines, 0 seen, unblocks 15; called from `sub_82109400` (unmapped, unported), `sub_8210A990` (strings-and-font.md, ours), `sub_8210ABC0` (strings-and-font.md, ours), `sub_8211C2C8` (ui-movies-game.md, unported).
-- ... and 137 smaller ones (160 functions).
+- ... and 137 smaller ones (161 functions).
 
 ## Extra roots
 
@@ -176,7 +176,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8214E268` | system-services.md | Overridden | `sub_82149080`, `sub_8214AC68`, `sub_8214ADC0`, `sub_8214AEA8`, `sub_8214D7A0`, `sub_8214F160`, `sub_8214F290`, `sub_8214F810`, ... 5 more | 85 | 77 | 7197 | 0 |
 | `sub_8209EEC8` | mode-tick.md | Overridden | `sub_8209E4F0`, `sub_8209E540`, `sub_8209E610`, `sub_8209E698`, `sub_8209E730`, `sub_8209E790`, `sub_8209E860`, `sub_8209E9A8`, ... 3 more | 83 | 81 | 7036 | 0 |
 | `sub_825D0F00` | xact-tracks.md | Native | `sub_825D0F4C`, `sub_825D1A80`, `sub_825D5F40`, `sub_825D5FE8`, `sub_825D6308`, `sub_825D67E8`, `sub_825D6CF0`, `sub_825D70C8`, ... 3 more | 68 | 68 | 3487 | 0 |
-| `sub_8216DD88` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F1E8` | 55 | 16 | 4204 | 5 |
+| `sub_8216DD88` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F1E8` | 56 | 16 | 4274 | 5 |
 | `sub_8235AAC0` | texture-compression.md | Native | `sub_82365D88`, `sub_82366458`, `sub_82368170`, `sub_8236D380` | 55 | 53 | 5481 | 0 |
 | `sub_8221BD20` | race-screens.md | Native | `sub_8221A4A8`, `sub_8221A610`, `sub_8221A680`, `sub_8221A6C8`, `sub_8221A720`, `sub_8221B298`, `sub_8221B860`, `sub_8221B8A8` | 28 | 15 | 1869 | 10 |
 | `sub_8220F638` | race-screens.md | Native | `sub_8220C578`, `sub_8220C5D0`, `sub_8220D898`, `sub_8220DB98`, `sub_8220E988`, `sub_8220EBD8` | 26 | 10 | 2289 | 15 |
@@ -191,6 +191,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8216D918` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 14 | 14 | 1029 | 0 |
 | `sub_825A8A50` | c-runtime.md | Overridden | `sub_825AFEC0`, `sub_825AFEF8`, `sub_825B0860`, `sub_825B0968`, `sub_825B0B80` | 14 | 11 | 974 | 0 |
 | `sub_825AAD20` | c-runtime.md | Overridden | `sub_825AB1C8`, `sub_825AFEF8`, `sub_825B08E8`, `sub_825B0A40`, `sub_825B0B80` | 14 | 10 | 976 | 0 |
+| `sub_8216E5B0` | race-hud-machine.md | Overridden | `sub_8216D328`, `sub_8216D7B8` | 12 | 5 | 1090 | 0 |
 | `sub_8259C3A8` | models.md | Native | `sub_8259B748`, `sub_8259BE40` | 11 | 11 | 1838 | 0 |
 | `sub_8216DFD0` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F930`, `sub_8221FFF0` | 10 | 6 | 614 | 0 |
 | `sub_825B13D0` | c-runtime.md | Native | `sub_825AC108`, `sub_825B1368`, `sub_825B6898`, `sub_825B7EB8`, `sub_825BA4A0` | 10 | 6 | 723 | 0 |

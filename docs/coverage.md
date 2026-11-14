@@ -262,7 +262,9 @@ dump, `itc_recomp/coverage/static_map.tsv` (not committed).
   the original's graph doesn't reach from `main` and isn't Dropped (as of
   2026-11-14 all of them sit under `xstart`: the C runtime's start-up), and
   the guest functions named by C++ that no native function's C++ reaches
-  (host code; they add 2 functions). Dropped isn't followed.
+  (host code; they add 2 functions), leaving out definitions named only in
+  statements under a flag off by default (the multiplayer bypass's
+  `kShowSplitResults`, say: not host code, just not run). Dropped isn't followed.
 - **States:** ours as `b7_status.py` decides it; excluded, the replaced
   libraries (`sub_822B8F10`, the movie library's ranges) and what only
   they reach, unless game code still running as PPC calls them directly or

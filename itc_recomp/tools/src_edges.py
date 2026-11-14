@@ -38,7 +38,8 @@ How src/ is read (no compiler: a small preprocessor and a brace parser):
              with x on (the flag-off fallback), or the same through a
              function whose body is `return ITC_FLAG(x);`; the arguments of
              ITC_LOG_* and ITC_NATIVE_RUNNING; and the bodies of
-             src/debug/'s functions other than overrides (diagnostics)
+             src/debug/'s functions other than overrides (diagnostics). A
+             definition named only in such statements isn't host code.
   guarded    a function body's parts an address constant picks (`case
              0xA:` up to the next label, or the statement of `if (x ==
              0xA)`, `&&` with others allowed) are definitions of their own:
@@ -219,7 +220,7 @@ def match(tokens, i, open_="{", close="}"):
 class Def:
     __slots__ = ("id", "name", "scope", "file", "kind", "body", "adapter", "prints",
                  "refs", "subs", "imps", "hexes", "flag_alias", "debug", "guards", "parent",
-                 "guarded")
+                 "guarded", "skipped")
 
     def __init__(self, name, scope, file, kind, body):
         self.name, self.scope, self.file, self.kind, self.body = name, scope, file, kind, body
@@ -231,6 +232,7 @@ class Def:
         self.guards = ()  # a guarded part's address constants
         self.parent = None
         self.guarded = []  # its guarded parts (Defs of their own)
+        self.skipped = set()  # names in its statements under a flag off by default
 
 
 def strip_template(stmt):
@@ -562,6 +564,7 @@ def analyze_body(d, flag_default, aliases, ns_aliases=None):
                                 k = match(toks, k, toks[k].t, {"(": ")", "{": "}", "[": "]"}[toks[k].t])
                             k += 1
                         i = k + 1
+                    d.skipped |= {x.t for x in toks[close + 1:i] if x.k == "id"}
                     continue
             if OPAQUE.match(t.t) and i + 1 < n and toks[i + 1].t == "(":
                 close = match(toks, i + 1, "(", ")")
@@ -841,6 +844,7 @@ def parse_all():
     if aliases:
         for d in defs:
             d.refs, d.subs, d.imps, d.hexes, d.prints = [], set(), set(), set(), set()
+            d.skipped = set()
             analyze_body(d, flag_default, aliases, file_ns[d.file])
     for d in defs:
         if (d.file.replace(os.sep, "/"), d.name) in KEY_TABLES:
@@ -1024,8 +1028,14 @@ def native_edges(is_function, classify_hex):
     # Host code: definitions no native function's C++ reaches that still
     # name guest functions (threads, start-up, the app).
     host = {}
+    # Names used only under a flag off by default (the multiplayer bypass's
+    # calls, say): not host code.
+    skipped = set().union(*(d.skipped for d in defs))
+    used = {name for d in defs for _, name, _ in d.refs}
     for d in defs:
         if d.id in visited_any or (d.debug and not d.adapter) or d.adapter:
+            continue
+        if d.name in skipped and d.name not in used:
             continue
         if d.guards and guard_kind(d) != "plain":
             continue  # another function's C++, or no one's

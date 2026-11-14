@@ -6,6 +6,7 @@
 
 #include "race_hud_machine/race_hud_machine.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "career/career.h"
@@ -13,6 +14,8 @@
 #include "guest.h"
 #include "race_states/steps.h"
 #include "vehicle_accessors/vehicle_accessors.h"
+
+ITC_FLAG_DECLARE(bool, multiplayer_menu_items);
 
 namespace race_hud_machine {
 
@@ -836,11 +839,21 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees
     case 2:
       last = callees.Call(kShowResults, frame, 0x8216E630, r3, 0);
       break;
+    // Kinds 4 (split screen) and 6 (the Live time attack): written only by
+    // the type 8 mode's set-ups and the network mode, neither made since
+    // the main menu's multiplayer items were cut (the bypass, the user's
+    // call, 2026-11-14). Without --multiplayer_menu_items they take the
+    // original's path for a kind it doesn't handle: no screen, the holder's
+    // +440 cleared, r3 returned.
     case 4:
-      last = callees.Call(kShowSplitResults, frame, 0x8216E5F8, r3);
+      if (ITC_FLAG(multiplayer_menu_items)) {
+        last = callees.Call(kShowSplitResults, frame, 0x8216E5F8, r3);
+      }
       break;
     case 6:
-      last = callees.Call(kShowKind6Results, frame, 0x8216E5EC, r3);
+      if (ITC_FLAG(multiplayer_menu_items)) {
+        last = callees.Call(kShowKind6Results, frame, 0x8216E5EC, r3);
+      }
       break;
     default:
       break;
