@@ -49,8 +49,13 @@ file's history. What's left to see in a drive, from every run:
 - The user's call (2026-11-14): no multiplayer. Selecting Xbox Live
   or split screen on the main menu does nothing; those modes (types
   12 and 8) and the race's kind 4 and kind 6 screens are bypassed, not
-  ported. The second migration (Live work) stopped by the lead; a
-  bypass agent follows.
+  ported. The second migration (Live work), asked to stop, had
+  finished: ea049be0..589a55a1 (`SplitResults::Draw` with the sends
+  Dropped, `Leaderboard::Read` answering no Live with `SetUpSpec`,
+  `Kind6Menu::SaveReplay` with `RaceDialog::AskSlot`, `StoreReplay`,
+  `Replay::CopyFrom`; 3 adapters removed); every harness 0 differing
+  but the read's expected group (20 of 20); races 21-28 s at 40, 0
+  errors; nothing uncommitted. Step: validation, then the bypass.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads

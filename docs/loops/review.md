@@ -47,6 +47,17 @@ When the user has reviewed a run's section, its heading gets
   "Precedent first"). The native code already made for them
   (`network-mode.md`, `type8-mode.md`, `type8-screens.md`, this run's
   `race-screens-unseen.md`) stays until the user decides.
+- The in-race screens' second migration (ea049be0..589a55a1):
+  `race-screens-unseen.md` (SplitResults, the read's pages,
+  `SaveReplay`), `system-services.md` (the sends Dropped),
+  `network-mode.md` (`Leaderboard::Read`, `SetUpSpec`, merged
+  `sub_82292690`), `race-screens.md` (`AskSlot`, `StoreReplay`),
+  `save-screen.md` (`Replay::CopyFrom`). The send drops are overrides
+  that do nothing with the flag on, so recompiled callers skip them
+  too. 10 root adapters stay because the race HUD machine's handlers
+  hand kinds 4 and 6 back to the recompiled handler (moot under the
+  bypass); `AskSlot`'s stays for the recompiled
+  `AfterRaceMenu::SaveReplay` `sub_8221B0C0`.
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a
