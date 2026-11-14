@@ -216,6 +216,34 @@ uint64_t SplitResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Call
 uint64_t SplitResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t SplitResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+// The network battle's words SplitResults::Draw reads: the sign-in watch's
+// state and reason, the network manager's peer list (+4 begin, +8 end,
+// 384-byte entries), its peer mode word (the list used when set), the other
+// console's answer (a byte, 255 none yet) and the word beside it, and the
+// pointer whose +7244 is the id sent.
+constexpr uint32_t kSignInWatchState = 0x826BAB3C;
+constexpr uint32_t kSignInWatchReason = 0x826BAB5C;
+constexpr uint32_t kNetPeers = 0x826C7308;
+constexpr uint32_t kNetPeerMode = 0x826C7824;
+constexpr uint32_t kNetAnswer = 0x826C6B0C;
+constexpr uint32_t kNetAnswerWord = 0x826C6B04;
+constexpr uint32_t kNetPlayers = 0x826D82E8;
+
+// sub_822200E0 SplitResults::Draw (r3 the screen), from a 2,816-byte frame:
+// the stage copied to the frame's +96 (Stages::Copy). In the network battle
+// (race kind 6, the stage's +0 not 1, [0x82814E24] 0): past 900 ticks the
+// sign-in watch's state 1 and reason 6 when its state is 0; else the packet
+// built in the frame (+176 on the first tick, +1456 after: type 23, the
+// outcome, the id's bytes) and its sends (sub_8214AB48, sub_8214AA70)
+// Dropped (the user's call, 2026-11-14), the tick counted; once the answer
+// byte isn't 255: with the peer mode word 0 the last racer record's +3924
+// (or +3920) and the outcome by it; then [0x82814E24] 1, the ticks and
+// [0x826C6B04] 0. r3 the copy, the last send's packet (what the dropped
+// sends leave) or the record. Otherwise as RaceResults::Draw on +24 (the
+// transition), +36 (the step word), +12 (the page object) and +8 (the
+// movie).
+uint64_t SplitResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+
 // --- Kind 6's screen after the race (kind6_menu.cpp) ---
 //
 // The screen [0x82814E10] (360 bytes: +24 to +36 UI movies 17, 20, 21 and

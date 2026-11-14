@@ -2708,8 +2708,8 @@ void Pause4(Context& h, const MovieWorld& w) {
 // to 9, the stages' first word 1 half the time). Compared as MovieGroup
 // does, with the screens' block and the two globals; SetTexts' varargs
 // stores (its frame's +48 to +79) left out (unset words 0 in ours, the
-// user's call for the parking area, 2026-10-30). SplitResults::Draw
-// (sub_822200E0) stays recompiled: no cases.
+// user's call for the parking area, 2026-10-30). SplitResults::Draw's
+// world below, before the openers.
 void UnseenResults(Context& h, const MovieWorld& w) {
   constexpr uint32_t kRaceDataGlobal = 0x826C5B2C;
   constexpr uint32_t kSplitBytes = 0x80;
@@ -2837,6 +2837,65 @@ void UnseenResults(Context& h, const MovieWorld& w) {
     spec.after = outputs;
     MovieGroup(h, w, s.name, s.cases, *s.setup, s.recompiled, s.native, spec);
   }
+  // SplitResults::Draw (sub_822200E0): the race data as MainPage's, with
+  // its racer records (+0x59AE8: the count +0x49FE0 1 to 5, the records
+  // random); [0x82814E24] 0 half the time (the network battle's branch), the
+  // tick count 0, 1 to 4 or 895 to 904; the sign-in watch's state 0 half the
+  // time, else any, and its reason; the answer byte 255 a third of the time,
+  // else 0 to 3, and the word beside it; the peer list (+4, +8) 0 to 3
+  // entries of 384 bytes in a block of its own (the iterator's trap left
+  // out), the one address beside it random; the peer mode word 0 half the
+  // time; the id's pointer ([0x826D82E8]) a block of its own. The sends are
+  // Dropped by their overrides on both sides (the user's call, 2026-11-14).
+  // Compared with the screens, the globals and the records.
+  constexpr uint32_t kNetGlobalsA = 0x826BAB3C, kNetGlobalsABytes = 0x24;  // to +0x5C
+  constexpr uint32_t kNetAnswerWords = 0x826C6B04, kNetPeersBytes = 0x20;
+  const Block peers(384 * 3), players(0x2000);
+  if (!peers.address || !players.address) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes net_saved(h.base, {{kNetGlobalsA, kNetGlobalsABytes},
+                                {kNetAnswerWords, 12},
+                                {rs::kNetPeers, kNetPeersBytes},
+                                {rs::kNetPeerMode, 4},
+                                {rs::kNetPlayers, 4}});
+  const uint32_t records = race.address + 0x59AE8;
+  const MovieSetupFn split_draw = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    shape_race(r);
+    if (r.Below(2) == 0) guest::StoreU32(h.base, rs::kSplitExchanged, 0);
+    const uint32_t ticks[3] = {0, 1 + r.Below(4), 895 + r.Below(10)};
+    guest::StoreU32(h.base, rs::kSplitTicks, ticks[r.Below(3)]);
+    WriteRandom(h.base, kNetGlobalsA, kNetGlobalsABytes, r);
+    if (r.Below(2) == 0) guest::StoreU32(h.base, rs::kSignInWatchState, 0);
+    WriteRandom(h.base, kNetAnswerWords, 12, r);
+    guest::StoreU8(h.base, rs::kNetAnswer, r.Below(3) == 0 ? 255 : uint8_t(r.Below(4)));
+    WriteRandom(h.base, rs::kNetPeers, kNetPeersBytes, r);
+    WriteRandom(h.base, peers.address, peers.bytes, r);
+    guest::StoreU32(h.base, rs::kNetPeers + 4, peers.address);
+    guest::StoreU32(h.base, rs::kNetPeers + 8, peers.address + 384 * r.Below(4));
+    guest::StoreU32(h.base, rs::kNetPeerMode, r.Below(2) == 0 ? 0 : uint32_t(r.Next()) | 1);
+    WriteRandom(h.base, players.address, players.bytes, r);
+    guest::StoreU32(h.base, rs::kNetPlayers, players.address);
+    WriteRandom(h.base, records, 5 * 3936, r);
+    guest::StoreU32(h.base, records + 0x49FE0, 1 + r.Below(5));
+    t.r3.u64 = split;
+  };
+  FrameSpec draw{2816, 72};
+  draw.own_stack = true;
+  draw.after = [&](Outputs& out) {
+    outputs(out);
+    out.Bytes(Read(h.base, kNetGlobalsA, kNetGlobalsABytes));
+    out.Bytes(Read(h.base, kNetAnswerWords, 12));
+    out.Bytes(Read(h.base, rs::kNetPeers, kNetPeersBytes));
+    out.Word(guest::LoadU32(h.base, rs::kNetPeerMode));
+    out.Bytes(Read(h.base, records, 5 * 3936));
+    out.Word(guest::LoadU32(h.base, records + 0x49FE0));
+  };
+  MovieGroup(h, w, "SplitResults::Draw (sub_822200E0)", 600, split_draw, __imp__sub_822200E0,
+             hooks::RaceScreensUnseenSplitResultsDraw, draw);
   // The openers: UI movie 7 or 8 in the movie table half the time (the
   // second pair's id), the missing movie's answer otherwise.
   FrameSpec open{112, 24};

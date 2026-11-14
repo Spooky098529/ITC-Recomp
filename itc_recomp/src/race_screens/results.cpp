@@ -385,4 +385,106 @@ uint64_t SplitResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Call
   return uint32_t(Run(calls, frame, 0x8221FE4C, SplitMovie(base))) == 0 ? 1 : 0;
 }
 
+uint64_t SplitResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_822200E0 SplitResults::Draw");
+  const uint32_t frame = Frame(base, sp, 2816);
+  // Stages::Copy of the current stage into the frame's +96 (its plain C++,
+  // or the original through its adapter where it declines); its r3 the copy.
+  const uint32_t stages = Get(base, kRaceData) + 0x59620;
+  if (!vehicle_accessors::StagesCopy(base, frame + 96, stages, 0xFFFFFFFFu)) {
+    calls.Call(kStagesCopy, frame, 0x8222010C, frame + 96, stages, kNone);
+  }
+  uint64_t r3 = frame + 96;
+  if (int32_t(guest::LoadU32(base, Get(base, kRaceData) + 0xA3AF0)) == 6 &&
+      int32_t(guest::LoadU32(base, frame + 96)) != 1 && int32_t(Get(base, kSplitExchanged)) == 0) {
+    // The network battle, its result not yet exchanged.
+    const uint32_t ticks = Get(base, kSplitTicks);
+    if (ticks > 900) {
+      // Probably the connection lost: the sign-in watch's state 1, reason 6.
+      if (int32_t(Get(base, kSignInWatchState)) == 0) {
+        guest::StoreU32(base, kSignInWatchState, 1);
+        guest::StoreU32(base, kSignInWatchReason, 6);
+      }
+      return r3;
+    }
+    // The packet (type 23, the outcome, the id's bytes), in the frame as the
+    // original builds it: +176 on the first tick, +1456 after.
+    const uint32_t packet = frame + (ticks == 0 ? 176 : 1456);
+    guest::StoreU8(base, packet + 2, 23);
+    guest::StoreU8(base, packet + 3, uint8_t(guest::LoadU32(base, Get(base, kSplitResults))));
+    const uint32_t id = guest::LoadU32(base, Get(base, kNetPlayers) + 7244);
+    guest::StoreU8(base, packet + 8, uint8_t(id));
+    guest::StoreU8(base, packet + 5, uint8_t(id >> 24));
+    guest::StoreU16(base, packet + 6, uint16_t(id >> 8));
+    // The sends (sub_8214AB48 on the first tick, sub_8214AA70 after) to each
+    // peer in the list or to the one address: Dropped (the user's call,
+    // 2026-11-14: sendto on the system link socket B5 no longer makes, the
+    // results unread). Each would leave r3 the packet, as their drop
+    // overrides do. The peer list's iterator traps (twi) on a list whose end
+    // isn't reached in 384-byte steps; logged here instead.
+    if (int32_t(Get(base, kNetPeerMode)) != 0) {
+      const uint32_t begin = guest::LoadU32(base, kNetPeers + 4);
+      const uint32_t end = guest::LoadU32(base, kNetPeers + 8);
+      if (begin > end || (end - begin) % 384 != 0) {
+        ITC_LOG_ERROR("SplitResults::Draw: the peer list {:08X} to {:08X} (the original traps)",
+                      begin, end);
+      }
+      if (begin != end) r3 = packet;
+    } else {
+      r3 = packet;
+    }
+    guest::StoreU32(base, kSplitTicks, Get(base, kSplitTicks) + 1);
+    if (guest::LoadU8(base, kNetAnswer) == 255) return r3;
+    if (int32_t(Get(base, kNetPeerMode)) == 0) {
+      // The other console's answer: the last racer record's result and the
+      // screen's outcome.
+      const uint32_t records = Get(base, kRaceData) + 0x59AE8;
+      const uint32_t count = guest::LoadU32(base, records + 0x49FE0);
+      const uint32_t record = vehicle_accessors::RacerRecordsAt(base, records, count - 1);
+      r3 = record;
+      switch (guest::LoadU8(base, kNetAnswer)) {
+        case 0:
+          guest::StoreU32(base, record + 3924, 1);
+          guest::StoreU32(base, Get(base, kSplitResults), 1);
+          break;
+        case 1:
+          guest::StoreU32(base, record + 3924, 2);
+          guest::StoreU32(base, Get(base, kSplitResults), 0);
+          break;
+        default:
+          guest::StoreU32(base, record + 3920, 0);
+          guest::StoreU32(base, Get(base, kSplitResults), 2);
+          break;
+      }
+    }
+    guest::StoreU32(base, kSplitExchanged, 1);
+    guest::StoreU32(base, kSplitTicks, 0);
+    guest::StoreU32(base, kNetAnswerWord, 0);
+    return r3;
+  }
+  // Intro, Show, Close.
+  constexpr uint32_t kHandlers[3] = {0x8221FAC8, 0x8221FBE8, 0x8221FD98};
+  const int32_t transition = int32_t(guest::LoadU32(base, screen + 24));
+  for (uint32_t k = 0; k < 3; k++) guest::StoreU32(base, frame + 80 + 4 * k, kHandlers[k]);
+  if (transition < 0) {
+    return Run(calls, frame, 0x82220460, guest::LoadU32(base, screen + 8));
+  }
+  const uint32_t step = screen + 36;
+  uint64_t result;
+  switch (transition) {
+    case 0: result = SplitResultsIntro(base, step, frame, calls); break;
+    case 1: result = SplitResultsShow(base, step, frame, calls); break;
+    case 2: result = SplitResultsClose(base, step, frame, calls); break;
+    default: {
+      // Past the table: the frame's word, as the original's bctrl.
+      const uint32_t handler = guest::LoadU32(base, (uint32_t(transition) << 2) + frame + 80);
+      const uint64_t regs[8] = {step, 0, 0, 0, 0, Register(kHandlers[0]), Register(kHandlers[1]),
+                                uint64_t(frame) + 80};
+      result = calls.CallArgs(handler, frame, 0x8222043C, regs);
+    }
+  }
+  PagesFinish(base, screen + 12, uint32_t(result));
+  return uint64_t(screen) + 12;
+}
+
 }  // namespace race_screens

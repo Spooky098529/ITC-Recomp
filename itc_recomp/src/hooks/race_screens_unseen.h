@@ -72,6 +72,9 @@ void RaceScreensUnseenPause4CloseVolume(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenRaceResultsOpen(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenRaceResultsUpdate(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenRaceResultsDraw(PPCContext& ctx, uint8_t* base);
+// SplitResults::Draw sub_822200E0 (r3 the screen): an adapter (the race HUD
+// machine's recompiled ResultsDraw reaches it).
+void RaceScreensUnseenSplitResultsDraw(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenRaceResultsSetTexts(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenRaceResultsMainPage(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenRaceResultsIntro(PPCContext& ctx, uint8_t* base);

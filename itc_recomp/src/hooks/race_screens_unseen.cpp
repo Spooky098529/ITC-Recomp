@@ -17,8 +17,9 @@ ITC_FLAG_BOOL(native_race_screens_unseen, true, "ITC",
               "their pages, helpers and transitions; the results at +1028, RaceResults::Open "
               "sub_8221F990, Update sub_8221F930 and Draw sub_8221F7D0 with SetTexts, MainPage, "
               "Intro, Show and Close; the results at +1032, SplitResults::Open sub_82220050 and "
-              "Update sub_8221FFF0 with MainPage, Intro, Show and Close (Draw sub_822200E0 "
-              "stays recompiled); kind 6's screen after the race, Kind6Menu::Open sub_8221EC48, "
+              "Update sub_8221FFF0 and Draw sub_822200E0 with MainPage, Intro, Show and Close "
+              "(the network battle's sends sub_8214AB48 and sub_8214AA70 Dropped: their "
+              "overrides do nothing); kind 6's screen after the race, Kind6Menu::Open sub_8221EC48, "
               "Draw sub_8221EF60 and Close sub_8221C168 with SetUpTexts, ShowCourse, ShowHelp, "
               "ShowPanelA, HidePanels, SetCursorX, SetUpList, ShowList, ShowReplay and the "
               "transitions of its two page objects, and Update sub_8221F1E8 with its 19 pages, "
@@ -206,6 +207,11 @@ void RaceScreensUnseenSplitResultsUpdate(PPCContext& ctx, uint8_t* base) {
                                                 NativeSlotsUnseen(), guest.calls());
 }
 
+void RaceScreensUnseenSplitResultsDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::SplitResultsDraw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 void RaceScreensUnseenSplitResultsMainPage(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
@@ -373,6 +379,7 @@ ITC_RACE_SCREENS_UNSEEN(8221F930, RaceScreensUnseenRaceResultsUpdate)
 ITC_RACE_SCREENS_UNSEEN(8221F7D0, RaceScreensUnseenRaceResultsDraw)
 ITC_RACE_SCREENS_UNSEEN(82220050, RaceScreensUnseenSplitResultsOpen)
 ITC_RACE_SCREENS_UNSEEN(8221FFF0, RaceScreensUnseenSplitResultsUpdate)
+ITC_RACE_SCREENS_UNSEEN(822200E0, RaceScreensUnseenSplitResultsDraw)
 // SplitResults' transitions: the recompiled SplitResults::Draw (sub_822200E0,
 // kept for its network battle's sends) reaches them through its table.
 ITC_RACE_SCREENS_UNSEEN(8221FAC8, RaceScreensUnseenSplitResultsIntro)
@@ -387,3 +394,23 @@ ITC_RACE_SCREENS_UNSEEN(8221EF60, RaceScreensUnseenKind6Draw)
 // Kind6Menu::Update (the race HUD machine's AfterRaceUpdate fallback reaches
 // it); its pages and their helpers have no adapters.
 ITC_RACE_SCREENS_UNSEEN(8221F1E8, RaceScreensUnseenKind6Update)
+
+// The network battle's sends (docs/functions/system-services.md): sendto on
+// the system link socket B5 no longer makes, their results unread: Dropped
+// (the user's call, 2026-11-14). SplitResults::Draw's plain C++ leaves them
+// out; these overrides make the recompiled callers (the fallback Draw and
+// the harness's, the system link code, unreachable) skip them too, r3 left
+// as it came (the packet).
+extern "C" REX_FUNC(sub_8214AB48) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_screens_unseen)) {
+    __imp__sub_8214AB48(ctx, base);
+  }
+}
+
+extern "C" REX_FUNC(sub_8214AA70) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_screens_unseen)) {
+    __imp__sub_8214AA70(ctx, base);
+  }
+}
