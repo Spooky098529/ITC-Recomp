@@ -154,5 +154,6 @@ void Type8ColorListClearItemText(PPCContext& ctx, uint8_t* base);
 void Type8ColorListSetDetails(PPCContext& ctx, uint8_t* base);
 void Type8ColorListSetLabels(PPCContext& ctx, uint8_t* base);
 void Type8ColorListSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type8ColorListSetUpRace(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

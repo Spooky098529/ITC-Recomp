@@ -77,7 +77,8 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "and InitMachine sub_8223E9D8 (its step table), SetItemText sub_8223E4F8, "
               "ClearItemText sub_8223E568, SetDetails sub_8223E5C8, SetLabels sub_8223E698 and "
               "SetUpMenus sub_8223E320 (UiMovie::ClearText and the sound manager's slots guest "
-              "calls)) natively instead of through the translated "
+              "calls), SetUpRace sub_8223E760 with its switch piece sub_8223E804 (the race "
+              "set-up's plain C++, guest calls where it declines)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=type8_screens)");
 
 namespace hooks {
@@ -244,6 +245,8 @@ ITC_T8_STEP(Type8ColorListSetDetails,
             t8::ColorList8SetDetails(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8ColorListSetLabels, t8::ColorList8SetLabels(base, ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ColorListSetUpMenus, t8::ColorList8SetUpMenus(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ColorListSetUpRace,
+            t8::ColorList8SetUpRace(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 
 #undef ITC_T8_STEP
 
@@ -394,3 +397,4 @@ ITC_TYPE8_SCREENS(8223E568, Type8ColorListClearItemText)
 ITC_TYPE8_SCREENS(8223E5C8, Type8ColorListSetDetails)
 ITC_TYPE8_SCREENS(8223E698, Type8ColorListSetLabels)
 ITC_TYPE8_SCREENS(8223E320, Type8ColorListSetUpMenus)
+ITC_TYPE8_SCREENS(8223E760, Type8ColorListSetUpRace)

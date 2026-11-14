@@ -643,5 +643,21 @@ uint64_t ColorList8SetLabels(uint8_t* base, uint64_t r3, uint32_t sp, const Call
 // ListScreen::OnToggleMoved(+10288), then the music as
 // ListScreen8SetUpMenus'. The last call's r3.
 uint64_t ColorList8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_8223E760 Type8ColorListScreen::SetUpRace (slot 7; a 4,112-byte
+// frame, with its switch piece AddRacers sub_8223E804; r4 the dispatcher):
+// the race data reset, its stages cleared, +0xA3AF0 = 4, +0xA3AF4 = 5, its
+// +32 = the race kind list's (+10360) selection; the route (by the item
+// list's +4 plus its selection: 1 to 8 give 2, 4, 6, 7, 8, 10, 12, 13; 0
+// and 9 to 15 give 0, the switch piece; past 15 it traps, as the
+// recompiled switch does) plus the course list's selection, set on the race
+// and its stage; the traffic (3 for the toggle's first item); the two
+// players' garage cars' racer records at the frame's +80 (RacerRecord::Init,
+// Car::SetModel, +3892 the list part's slot 11 (IsFirstChoice), memcpy of
+// 1,884 bytes, Car::Refresh), each added to the race and to the stage with
+// the part's slot 12 (ThirdChoice); the stage's type 0, the racers placed,
+// +9608 = 10, message 4 posted. The race set-up's plain C++, guest calls
+// where it declines. PlaceRacers' r3.
+uint64_t ColorList8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                             const Calls& calls);
 
 }  // namespace type8_screens

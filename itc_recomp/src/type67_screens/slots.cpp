@@ -318,7 +318,7 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return type8_screens::ListBasePage5(base, r3, *r4, sp, calls);
       case 0x8223F778:
         return type8_screens::ListScreen8SetUpRace(base, r3, *r4, sp, calls);
-      // The type 8 color list screen's slots 2, 3 and 26
+      // The type 8 color list screen's slots 2, 3, 26 and 7
       // (src/type8_screens/color_list_screen.cpp).
       case 0x8223E4F8:
         return type8_screens::ColorList8SetItemText(base, r3, *r4, sp, calls);
@@ -326,6 +326,8 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return type8_screens::ColorList8ClearItemText(base, r3, *r4, sp, calls);
       case 0x8223E5C8:
         return type8_screens::ColorList8SetDetails(base, r3, *r4, sp, calls);
+      case 0x8223E760:
+        return type8_screens::ColorList8SetUpRace(base, r3, *r4, sp, calls);
       default:
         break;
     }
@@ -516,6 +518,7 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x8223E4F8:
     case 0x8223E568:
     case 0x8223E5C8:
+    case 0x8223E760:
       return has_r4;
     case 0x82253108:
     case 0x8223F590:
