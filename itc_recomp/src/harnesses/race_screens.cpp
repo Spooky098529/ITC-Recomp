@@ -42,6 +42,11 @@
 ITC_FLAG_DECLARE(bool, native_race_screens);
 ITC_FLAG_DECLARE(bool, native_race_hud_machine);
 
+namespace time_hooks {
+void SetFakeNow(uint64_t now);
+void ClearFakeNow();
+}  // namespace time_hooks
+
 namespace harness {
 
 namespace {
@@ -3612,6 +3617,90 @@ void UnseenKind6Pages(Context& h, const MovieWorld& w) {
     page.list_world = &list_world;
     page.after = read_after(false);
     MovieGroup(h, w, name, 60, read_page, recompiled, native, page);
+  }
+
+  // The replay's save from kind 6's slot list: Kind6Menu::SaveReplay
+  // (sub_8221D678), RaceDialog::AskSlot (sub_82219058) and StoreReplay
+  // (sub_82218FF8), Replay::CopyFrom (sub_821A66A8). The world: the race's
+  // replay ([0x826C5B50]) and the header's kept replay (+4) two blocks of
+  // 0x13C8F0 random bytes (NaN words as they come: CopyFrom's copies and
+  // RaceSnapshot::Copy's lfs and stfs pairs keep the bits); the header's +8
+  // a 36-byte record block in its page (+0x200); the race data (+60 any,
+  // the race kind 0 to 6, its racer records' count 1 to 5, the records
+  // random); GetLocalTime a made-up time (time_hooks::SetFakeNow) while a
+  // case runs. Compared with the kept replay and the record block too; the
+  // frames without the words SetText stores from r6 on (AskSlot's +40 to
+  // +79: unset, 0 in ours, the user's call for the parking area).
+  constexpr uint32_t kReplayBytes = 0x13C8F0, kRaceDataGlobal = 0x826C5B2C;
+  const Block replay_to(kReplayBytes), replay_from(kReplayBytes), race(0xA3B00);
+  if (!replay_to.address || !replay_from.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes save_saved(h.base, {{rs::kRaceReplay, 4}, {kRaceDataGlobal, 4}});
+  const uint32_t race_records = race.address + 0x59AE8;
+  const uint32_t record_source = k + 0x240;
+  auto save_world = [&](Random& r) {
+    WriteRandom(h.base, replay_to.address, kReplayBytes, r);
+    WriteRandom(h.base, replay_from.address, kReplayBytes, r);
+    guest::StoreU32(h.base, rs::kRaceReplay, replay_from.address);
+    guest::StoreU32(h.base, header + 4, replay_to.address);
+    guest::StoreU32(h.base, header + 8, header + 0x200);
+    WriteRandom(h.base, header + 0x200, 36, r);
+    guest::StoreU32(h.base, kRaceDataGlobal, race.address);
+    guest::StoreU32(h.base, race.address + 60, uint32_t(r.Next()));
+    guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(7));
+    WriteRandom(h.base, race_records, 5 * 3936, r);
+    guest::StoreU32(h.base, race_records + 0x49FE0, 1 + r.Below(5));
+    time_hooks::SetFakeNow(0x01D0000000000000ull + r.Next() % 0x0010000000000000ull);
+  };
+  auto save_after = [&](Outputs& out) {
+    time_hooks::ClearFakeNow();
+    out.Bytes(Read(h.base, replay_to.address, kReplayBytes));
+    if (header != 0) out.Bytes(Read(h.base, header + 0x200, 36));
+    outputs(out);
+  };
+  const MovieSetupFn copy_from = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    save_world(r);
+    t.r3.u64 = replay_to.address;
+    t.r4.u64 = replay_from.address;
+  });
+  const MovieSetupFn store_replay = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    save_world(r);
+    t.r3.u64 = record_source;
+    t.r4.u64 = replay_from.address;
+  });
+  const MovieSetupFn ask_slot = setup([&](PPCContext& t, Random& r, const MovieWorld&) {
+    save_world(r);
+    t.r3.u64 = r.Below(3) == 0 ? 0 : r.Below(21);
+    t.r4.u64 = record_source;
+    t.r5.u64 = replay_from.address;
+  });
+  const MovieSetupFn save_replay = setup([&](PPCContext&, Random& r, const MovieWorld&) {
+    save_world(r);
+  });
+  struct SaveSpec {
+    const char* name;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+  };
+  const SaveSpec save_specs[] = {
+      {"Replay::CopyFrom (sub_821A66A8)", &copy_from, __imp__sub_821A66A8,
+       hooks::RaceScreensUnseenReplayCopyFrom, 112, 24, kNo},
+      {"RaceDialog::StoreReplay (sub_82218FF8)", &store_replay, __imp__sub_82218FF8,
+       hooks::RaceScreensUnseenStoreReplay, 112, 24, kNo},
+      {"RaceDialog::AskSlot (sub_82219058)", &ask_slot, __imp__sub_82219058,
+       hooks::RaceScreensUnseenAskSlot, 144, 40, {40, 80}},
+      {"Kind6Menu::SaveReplay (sub_8221D678)", &save_replay, __imp__sub_8221D678,
+       hooks::RaceScreensUnseenKind6SaveReplay, 176, 48, kNo},
+  };
+  for (const SaveSpec& sp : save_specs) {
+    FrameSpec spec{sp.frame, sp.saves, sp.skip};
+    spec.list_world = &list_world;
+    spec.after = save_after;
+    MovieGroup(h, w, sp.name, 25, *sp.setup, sp.recompiled, sp.native, spec);
   }
 }
 

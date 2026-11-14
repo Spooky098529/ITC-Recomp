@@ -10,12 +10,14 @@
 
 #include "race_screens/unseen.h"
 
+#include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 #include "user/user.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace race_screens {
 
@@ -32,7 +34,7 @@ constexpr uint32_t kMenuStep = 0x82186568;
 constexpr uint32_t kMenuPressed = 0x821864C8;
 constexpr uint32_t kSlotState = 0x8228F9E8;
 constexpr uint32_t kSaveBuffersDestroy = 0x8228F8F8;
-constexpr uint32_t kSaveReplay = 0x8221D678;
+constexpr uint32_t kGetLocalTime = 0x822968B8;
 constexpr uint32_t kNetSetState = 0x8214B330;
 constexpr uint32_t kSessionStart = 0x822917B8;
 constexpr uint32_t kOperatorDeleteArray = 0x825A71C0;
@@ -196,6 +198,55 @@ uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, cons
   // original's r3 there isn't read by its callers.
   guest::StoreU32(base, session + 180, 4);
   return 0;
+}
+
+uint64_t Kind6SaveReplay(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8221D678 Kind6Menu::SaveReplay");
+  const uint32_t frame = Frame(base, sp, 176);
+  const uint32_t race = Get(base, kRaceData);
+  const uint32_t selection = ListSelection(base, Screen(base) + 136);
+  const uint32_t records = race + 0x59AE8;
+  // The slot: the list's scroll (+4) and selection.
+  const uint32_t slot = Field(base, 140) + selection;
+  vehicle_accessors::RacerRecordsAt(base, records, kNone);
+  // The 36-byte record in the frame: cleared, the date and time
+  // (GetLocalTime), +24 the race data's +60, +16 the last result's time.
+  const uint32_t record = frame + 80;
+  for (uint32_t k = 0; k < 36; k += 4) guest::StoreU32(base, record + k, 0);
+  const uint32_t replay = Get(base, kRaceReplay);
+  calls.Call(kGetLocalTime, frame, 0x8221D6E8, record);
+  guest::StoreU32(base, record + 24, guest::LoadU32(base, race + 60));
+  guest::StoreU32(base, record + 16,
+                  ai_drivers::TimeFromTicks(guest::LoadU32(
+                      base, vehicle_accessors::RacerRecordsAt(base, records, kNone) + 3932)));
+  // By the race kind: +20 the kind's index, +32 a value of the last result.
+  switch (int32_t(guest::LoadU32(base, race + 0xA3AF0))) {
+    case 1:
+      guest::StoreU32(base, record + 32,
+                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
+                                               980));
+      guest::StoreU32(base, record + 20, 0);
+      break;
+    case 2:
+      guest::StoreU32(base, record + 32,
+                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
+                                               3892));
+      guest::StoreU32(base, record + 20, 1);
+      break;
+    case 4:
+      guest::StoreU32(base, record + 32, 0);
+      guest::StoreU32(base, record + 20, 2);
+      break;
+    case 6:
+      guest::StoreU32(base, record + 32,
+                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
+                                               3892));
+      guest::StoreU32(base, record + 20, 3);
+      break;
+    default:
+      break;
+  }
+  return RaceDialogAskSlot(base, slot, record, replay, frame, calls);
 }
 
 // --- The helpers ---
@@ -418,7 +469,7 @@ uint64_t Kind6SlotPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.Call(kListUpdate, frame, 0x8221DAAC, Screen(base) + 136);
   if (int32_t(uint32_t(calls.Call(kListAccepted, frame, 0x8221DAB8, Screen(base) + 136))) != 0) {
     GoA(base, 4);
-    calls.Call(kSaveReplay, frame, 0x8221DADC);
+    Kind6SaveReplay(base, frame, calls);
   } else if (int32_t(uint32_t(calls.Call(kListCancelled, frame, 0x8221DAE8,
                                          Screen(base) + 136))) != 0) {
     GoA(base, 0, 5);

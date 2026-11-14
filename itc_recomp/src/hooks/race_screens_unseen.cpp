@@ -26,7 +26,9 @@ ITC_FLAG_BOOL(native_race_screens_unseen, true, "ITC",
               "ShowPanelB, ShowTimeOnly, ShowRanking and RankingTime and the network "
               "manager's sub_822914A8, sub_8225FFC8 and sub_822927B0 (the Xbox Live work, "
               "sub_8214B330 and sub_822917B8, the originals; the leaderboard read "
-              "sub_82292CC0 with its spec's set-up sub_82292648 answered as no Live; SaveReplay the original too, UiMovie::SetNodeCharText through its "
+              "sub_82292CC0 with its spec's set-up sub_82292648 answered as no Live; SaveReplay "
+              "sub_8221D678 with RaceDialog::AskSlot sub_82219058, StoreReplay sub_82218FF8 and "
+              "Replay::CopyFrom sub_821A66A8; UiMovie::SetNodeCharText through its "
               "override; "
               "RaceDialog::StartSave and ShowSaving by their plain C++) (the UI movie calls through their "
               "overrides, SetText's and SetNodeText's unset varargs 0), instead of through the "
@@ -333,6 +335,29 @@ void RaceScreensUnseenKind6ReadSpecSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.r11.u64 = race_screens::Kind6ReadSpecSetUp(base);
 }
 
+void RaceScreensUnseenKind6SaveReplay(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::Kind6SaveReplay(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenAskSlot(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceDialogAskSlot(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenStoreReplay(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::RaceDialogStoreReplay(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenReplayCopyFrom(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::ReplayCopyFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
 void RaceScreensUnseenKind6NetState(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::Kind6NetState(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
@@ -407,6 +432,14 @@ ITC_RACE_SCREENS_UNSEEN(8221F1E8, RaceScreensUnseenKind6Update)
 // the read, the stats calls sub_82292A48 and sub_82292DB8 the set-up.
 ITC_RACE_SCREENS_UNSEEN(82292CC0, RaceScreensUnseenKind6LeaderboardRead)
 ITC_RACE_SCREENS_UNSEEN(82292648, RaceScreensUnseenKind6ReadSpecSetUp)
+// The replay's save from the slot lists: RaceDialog::AskSlot (the
+// recompiled AfterRaceMenu::SaveReplay sub_8221B0C0 reaches it) and
+// Replay::CopyFrom (the save screen's Page14 through its function table,
+// the recompiled sub_82287220 and sub_82293028). Kind6Menu::SaveReplay and
+// RaceDialog::StoreReplay have no adapters (only the native SlotPage and
+// AskSlot reach them).
+ITC_RACE_SCREENS_UNSEEN(82219058, RaceScreensUnseenAskSlot)
+ITC_RACE_SCREENS_UNSEEN(821A66A8, RaceScreensUnseenReplayCopyFrom)
 
 // The network battle's sends (docs/functions/system-services.md): sendto on
 // the system link socket B5 no longer makes, their results unread: Dropped

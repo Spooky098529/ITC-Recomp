@@ -4,7 +4,9 @@
 #include "race_screens/race_screens.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "guest.h"
+#include "replay_snapshots/replay_snapshots.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -359,6 +361,80 @@ std::optional<uint64_t> RaceDialogShowMessage(uint8_t* base, uint32_t step, uint
     }
   }
   return done;
+}
+
+// --- The replay's save (from the slot lists' SaveReplay) ---
+
+namespace {
+
+// memcpy natively, or through `calls` where its plain C++ refuses.
+void CopyBytes(uint8_t* base, const Calls& calls, uint32_t r1, uint32_t lr, uint32_t destination,
+               uint32_t source, uint32_t size) {
+  if (!c_runtime::Memcpy(base, destination, source, size)) {
+    calls.Call(kMemcpy, r1, lr, destination, source, size);
+  }
+}
+
+void CopyWord(uint8_t* base, uint32_t destination, uint32_t source) {
+  guest::StoreU32(base, destination, guest::LoadU32(base, source));
+}
+
+}  // namespace
+
+uint32_t ReplayCopyFrom(uint8_t* base, uint32_t replay, uint32_t from, uint32_t sp,
+                        const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821A66A8 Replay::CopyFrom");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t d = replay, s = from;
+  CopyBytes(base, calls, frame, 0x821A66CC, d, s, 52);
+  CopyBytes(base, calls, frame, 0x821A66DC, d + 52, s + 52, 32);
+  CopyBytes(base, calls, frame, 0x821A66F0, d + 84, s + 84, 0x2B534);
+  CopyBytes(base, calls, frame, 0x821A6708, d + 0x2B588, s + 0x2B588, 80);
+  for (uint32_t k = 0; k < 4; k++) CopyWord(base, d + 0x2B5D8 + 4 * k, s + 0x2B5D8 + 4 * k);
+  CopyWord(base, d + 0x2B5E8, s + 0x2B5E8);
+  for (uint32_t k = 0; k < 5; k++) CopyWord(base, d + 0x2B5EC + 4 * k, s + 0x2B5EC + 4 * k);
+  CopyWord(base, d + 0x2B600, s + 0x2B600);
+  replay_snapshots::RaceSnapshotCopy(base, d + 0x2B610, s + 0x2B610);
+  CopyBytes(base, calls, frame, 0x821A67CC, d + 0x34E20, s + 0x34E20, 0x107AC4);
+  return d;
+}
+
+uint32_t RaceDialogStoreReplay(uint8_t* base, uint32_t record, uint32_t replay, uint32_t sp,
+                               const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82218FF8 RaceDialog::StoreReplay");
+  const uint32_t frame = Frame(base, sp, 112);
+  CopyBytes(base, calls, frame, 0x8221902C, guest::LoadU32(base, Get(base, kReplayHeader) + 8),
+            record, 36);
+  return ReplayCopyFrom(base, guest::LoadU32(base, Get(base, kReplayHeader) + 4), replay, frame,
+                        calls);
+}
+
+uint32_t RaceDialogAskSlot(uint8_t* base, uint32_t slot, uint32_t record, uint32_t replay,
+                           uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82219058 RaceDialog::AskSlot");
+  const uint32_t frame = Frame(base, sp, 144);
+  guest::StoreU32(base, Get(base, kDialogData) + 4, slot);
+  // SetText's varargs: r4 and r5 the record and the replay, as the call
+  // leaves them; r6 to r10 (unset) 0, as the user's call for the parking
+  // area (2026-10-30): only dead frame words.
+  const uint64_t varargs[7] = {record, replay, 0, 0, 0, 0, 0};
+  if (slot == 0) {
+    RaceDialogSetText(base, 75, varargs, frame, calls);
+    guest::StoreU32(base, Get(base, kDialogData) + 12, 1);
+  } else {
+    RaceDialogSetText(base, 77, varargs, frame, calls);
+    guest::StoreU32(base, Get(base, kDialogData) + 12, 5);
+  }
+  guest::StoreU32(base, Get(base, kDialogData) + 16, 1);
+  Go(calls, frame, 0x822190CC, Get(base, kDialogPages), 1, 0, kNone);
+  guest::StoreU32(base, frame + 92, 158);
+  guest::StoreU32(base, frame + 84, 159);
+  const uint64_t init[8] = {Get(base, kDialogList), 2, 2, 1, 154, 153, 155, 156};
+  calls.CallArgs(kListInit, frame, 0x82219104, init);
+  guest::StoreU32(base, Get(base, kDialogData) + 0, 0);
+  guest::StoreU32(base, Get(base, kDialogData) + 32, 1);
+  guest::StoreU32(base, Get(base, kDialogData) + 36, 0);
+  return RaceDialogStoreReplay(base, record, replay, frame, calls);
 }
 
 }  // namespace race_screens

@@ -244,6 +244,34 @@ uint64_t RaceDialogUpdate(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& 
 // area, 2026-10-30), the three through their overrides. The last's r3.
 uint64_t RaceDialogSetText(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
                            const Calls& calls);
+// The replay list's header [0x828161F0] (+4 the replay kept for saving,
+// +8 the record's block, +12 the records, +20 their count) and the race's
+// replay [0x826C5B50] (0x13C8F0 bytes).
+constexpr uint32_t kReplayHeader = 0x828161F0;
+constexpr uint32_t kRaceReplay = 0x826C5B50;
+// sub_82219058 RaceDialog::AskSlot (r3 a slot, 0 a new one; r4 a 36-byte
+// replay record; r5 the replay), from a 144-byte frame: the data's +4 = the
+// slot; SetText 75 (+12 = 1) for 0, else 77 (+12 = 5), its varargs r4 and
+// r5 the record and the replay, r6 to r10 0 (unset: the user's call for the
+// parking area, 2026-10-30); +16 = 1; ScreenPages::Go(1, transition 0)
+// and MenuList::Init(list, 2, 2, 1, 154, 153, 155, 156; 159, 158 at the
+// frame's +84 and +92) through their overrides; +0 = 0, +32 = 1, +36 = 0;
+// StoreReplay. Its r3 (the header's replay).
+uint32_t RaceDialogAskSlot(uint8_t* base, uint32_t slot, uint32_t record, uint32_t replay,
+                           uint32_t sp, const Calls& calls);
+// sub_82218FF8 RaceDialog::StoreReplay (r3 the record, r4 the replay), from
+// a 112-byte frame: the record copied (memcpy, 36 bytes) to the header's
+// +8 block, then Replay::CopyFrom(the header's +4, the replay). Its r3.
+uint32_t RaceDialogStoreReplay(uint8_t* base, uint32_t record, uint32_t replay, uint32_t sp,
+                               const Calls& calls);
+// sub_821A66A8 Replay::CopyFrom (r3 a replay, r4 another), from a 112-byte
+// frame: the second copied into the first in parts: memcpy 52 bytes, 32 at
+// +52, 0x2B534 at +84, 80 at +0x2B588; four words at +0x2B5D8, one at
+// +0x2B5E8, five at +0x2B5EC, one at +0x2B600; RaceSnapshot::Copy at
+// +0x2B610 (its plain C++); memcpy 0x107AC4 bytes at +0x34E20 (memcpy's
+// plain C++, or the original through `calls` where it refuses). Returns r3.
+uint32_t ReplayCopyFrom(uint8_t* base, uint32_t replay, uint32_t from, uint32_t sp,
+                        const Calls& calls);
 // sub_82218B30 RaceDialog::Open: from a 128-byte frame, the dialog list's
 // player (+60) = 0 for `player` 0, 1 for 1 (left for others); for `mode` 0
 // to 5 the question (strings 1954 to 1959, RaceDialogSetText with r4 the

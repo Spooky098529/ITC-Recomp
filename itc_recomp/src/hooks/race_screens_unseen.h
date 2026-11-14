@@ -174,6 +174,15 @@ void RaceScreensUnseenKind6CarLogo(PPCContext& ctx, uint8_t* base);
 // and its spec's set-up sub_82292648 (no arguments, r3 kept): adapters.
 void RaceScreensUnseenKind6LeaderboardRead(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenKind6ReadSpecSetUp(PPCContext& ctx, uint8_t* base);
+// Kind6Menu::SaveReplay sub_8221D678 (a step for the harness),
+// RaceDialog::AskSlot sub_82219058 (r3 the slot, r4 the record, r5 the
+// replay; an adapter), StoreReplay sub_82218FF8 (r3 the record, r4 the
+// replay; a step) and Replay::CopyFrom sub_821A66A8 (r3, r4 the replays; an
+// adapter).
+void RaceScreensUnseenKind6SaveReplay(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenAskSlot(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenStoreReplay(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenReplayCopyFrom(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenKind6NetState(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

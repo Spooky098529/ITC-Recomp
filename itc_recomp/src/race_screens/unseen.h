@@ -371,7 +371,7 @@ uint64_t Kind6CloseWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // SaveBuffers::Create and Destroy through their overrides (`calls`);
 // RaceDialog::StartSave and ShowSaving by their plain C++;
 // UiMovie::SetNodeCharText through its override; Kind6Menu::SaveReplay
-// (with RaceDialog::AskSlot) and the Xbox Live work
+// with RaceDialog::AskSlot by their plain C++; the Xbox Live work
 // (the network manager's sub_8214B330 and sub_822917B8) the originals
 // through `calls`; the leaderboard read sub_82292CC0 answered as no Live
 // (Kind6LeaderboardRead); ScreenPages::Go,
@@ -410,6 +410,14 @@ uint32_t Kind6ReadSpecSetUp(uint8_t* base);
 // buffer. Returns 0 (the original's r3 there is an error code or
 // XEnumerate's answer, read by no caller).
 uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, const Calls& calls);
+// sub_8221D678 Kind6Menu::SaveReplay (no arguments), from a 176-byte frame:
+// the slot (the slot list's +4 scroll + MenuList::Selection); a 36-byte
+// record at the frame's +80 cleared, GetLocalTime into it (through its
+// override), +24 the race data's +60, +16 the last racer record's +3932 as a
+// time (RaceTime::FromTicks); by the race kind (+0xA3AF0) 1: +32 the last
+// record's +980, +20 0; 2: its +3892, 1; 4: 0, 2; 6: its +3892, 3; then
+// RaceDialog::AskSlot(slot, record, [0x826C5B50]). AskSlot's r3.
+uint64_t Kind6SaveReplay(uint8_t* base, uint32_t sp, const Calls& calls);
 
 // The helpers: sub_8221CEA0 ShowPanelB (type-1 nodes 4 and 5 shown with
 // +108 0, then 6 and 7 with +108 1, 8 and 9 hidden), sub_8221D3D0
