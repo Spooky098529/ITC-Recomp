@@ -62,8 +62,9 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "free natively), Type8ListScreen::Type8ListScreen sub_8223F140, DeletingDestructor "
               "sub_8223F388, IsLoaded sub_8223F590, OpenMovie sub_8223F3E0, Release "
               "sub_8223F588, SetItemTexts sub_8223F5D8, ItemInfo sub_8223F598, ShowMarks "
-              "sub_8223F6C8, SetLabels sub_8223F648 and SetUpMenus sub_8223F3F0 (the sound "
-              "manager's slots 13 and 14 guest calls), Type8ListBase::Type8ListBase "
+              "sub_8223F6C8, SetLabels sub_8223F648, SetUpMenus sub_8223F3F0 (the sound "
+              "manager's slots 13 and 14 guest calls) and SetUpRace sub_8223F778 with its switch "
+              "piece sub_8223F818 (the race set-up's plain C++, guest calls where it declines), Type8ListBase::Type8ListBase "
               "sub_822574D0, ~Type8ListBase sub_82257548, DeletingDestructor sub_82257B20, Draw "
               "sub_82258D60 and Update sub_82258EB0 (their tables built on first use), Page2 "
               "sub_82257588, Page3 sub_82257768, Page4 sub_82258A40, Page5 sub_82258AD0, Page6 "
@@ -208,6 +209,8 @@ ITC_T8_STEP(Type8ListItemInfo, t8::ListScreen8ItemInfo(base, ctx.r3.u64, ctx.r4.
 ITC_T8_STEP(Type8ListShowMarks, t8::ListScreen8ShowMarks(base, ctx.r3.u64, ctx.r4.u64, sp))
 ITC_T8_STEP(Type8ListSetLabels, t8::ListScreen8SetLabels(base, ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ListSetUpMenus, t8::ListScreen8SetUpMenus(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListSetUpRace,
+            t8::ListScreen8SetUpRace(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8ListDraw, t8::ListBaseDraw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8ListUpdate, t8::ListBaseUpdate(base, ctx.r3.u64, ctx.r5.u64, sp, calls))
 ITC_T8_STEP(Type8ListPage2, t8::ListBasePage2(base, ctx.r3.u64, sp, calls))
@@ -334,6 +337,7 @@ ITC_TYPE8_SCREENS(8223F598, Type8ListItemInfo)
 ITC_TYPE8_SCREENS(8223F6C8, Type8ListShowMarks)
 ITC_TYPE8_SCREENS(8223F648, Type8ListSetLabels)
 ITC_TYPE8_SCREENS(8223F3F0, Type8ListSetUpMenus)
+ITC_TYPE8_SCREENS(8223F778, Type8ListSetUpRace)
 ITC_TYPE8_SCREENS(82258D60, Type8ListDraw)
 ITC_TYPE8_SCREENS(82258EB0, Type8ListUpdate)
 ITC_TYPE8_SCREENS(82257588, Type8ListPage2)

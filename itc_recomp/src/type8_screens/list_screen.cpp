@@ -14,15 +14,21 @@
 #include "type8_screens/type8_screens.h"
 
 #include "base/log.h"
+#include "car_specs/car_specs.h"
 #include "guest.h"
 #include "menu_sounds/menu_sounds.h"
 #include "mode_tick/mode_tick.h"
+#include "native/buffers.h"
 #include "race_screens/race_screens.h"
+#include "race_setup/race_setup.h"
 #include "save_data/save_data.h"
 #include "screen_constructors/screen_constructors.h"
 #include "type67_screens/list_pages.h"
 #include "type8_screens/part_helpers.h"
 #include "ui_movies/game.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+
+#include <bit>
 
 namespace type8_screens {
 
@@ -70,6 +76,25 @@ void Replay(uint8_t* base, const Calls& calls, uint32_t screen, uint32_t movie, 
 // The scroll text of the kind list's selection, [+10820 + 4 × it].
 uint32_t KindText(uint8_t* base, uint32_t screen) {
   return LoadU32(base, screen + ((rs::ListSelection(base, screen + 10144) + 2705) << 2));
+}
+
+// The race set-up's guest fallbacks and the float 0.0 Race::AddRacer gets.
+constexpr uint32_t kResetGlobal = 0x821021A8, kStagesSetRoute = 0x82101E90,
+                   kRaceSetRoute = 0x82101D38, kMemcpy = 0x825A7410, kCarRefresh = 0x820C4998,
+                   kAddRacer = 0x821017C0, kPlaceRacers = 0x82102048;
+constexpr uint32_t kZero = 0x82000A34;
+constexpr uint32_t kSetUpRaceFrame = 4096;
+constexpr uint32_t kGarageCarBytes = 1972;
+
+// Car::Refresh's original where Race::PlaceRacers' plain C++ hands it back.
+struct Refresh {
+  const Calls* calls;
+  uint32_t r1;
+};
+
+void RefreshThrough(void* user, uint32_t car) {
+  const Refresh& r = *static_cast<const Refresh*>(user);
+  pg::Call1(*r.calls, kCarRefresh, car, r.r1, 0x82101DC8);
 }
 
 // UiMovie::Run(m, 0) == 0.
@@ -300,6 +325,84 @@ uint64_t ListScreen8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Ca
   StoreU32(base, frame + 124, 1);
   return menu_sounds::PlaySound(base, frame + 124, frame + 120, frame,
                                 {const_cast<Calls*>(&calls), &SoundThunk});
+}
+
+uint64_t ListScreen8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8223F778 Type8ListScreen::SetUpRace");
+  namespace rsu = race_setup;
+  const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, kSetUpRaceFrame);
+  auto data = [base] { return LoadU32(base, rsu::kRaceData); };
+  if (!rsu::RaceDataResetGlobal(base, frame - 112)) {
+    pg::Call1(calls, kResetGlobal, r3, frame, 0x8223F794);
+  }
+  rsu::StagesClear(base, data() + rsu::kStageList);
+  StoreU32(base, data() + 0xA3AF0, 4);
+  StoreU32(base, data() + 0xA3AF4, 5);
+  vehicle_accessors::RaceDataSetWord32(base, rs::ListSelection(base, s + 10144));
+  // The course: the course list's +4 plus its selection, 0 to 7 (the
+  // switch's cases each answer their own index; case 0 is the merged piece
+  // Type8ListScreen::AddRacers sub_8223F818). The recompiled switch traps
+  // past 7 (the original's jump table read past its end); never in play.
+  const uint32_t route =
+      LoadU32(base, s + 10220) + rs::ListSelection(base, s + 10216);
+  if (route > 7) {
+    ITC_LOG_ERROR("Type8ListScreen::SetUpRace: course {} past the switch's cases", route);
+    __builtin_trap();
+  }
+  if (!rsu::StagesSetRoute(base, data() + rsu::kStageList, route, 48, kNone,
+                           frame - rsu::kRouteFrameBytes)) {
+    const uint64_t args[6] = {data() + rsu::kStageList, route, 48, kMinusOne, 0, 0};
+    calls.call_set(kStagesSetRoute, args, 4, frame, 0x8223F864);
+  }
+  if (!rsu::RaceSetRoute(base, route, 48, frame - rsu::kRouteFrameBytes)) {
+    const uint64_t args[6] = {route, 48, 0, 0, 0, 0};
+    calls.call_set(kRaceSetRoute, args, 2, frame, 0x8223F870);
+  }
+  // The traffic (the toggle's first item: 3).
+  vehicle_accessors::RaceDataSetWord59618(
+      base, rs::ListSelection(base, s + 10288) == 0 ? 3 : 0);
+  // The two players' racer records at the frame's +80: the garage cars,
+  // each one's +3892 whether its player's first menu (the list part's
+  // blocks' +84) is at its first item.
+  const double zero = double(std::bit_cast<float>(LoadU32(base, kZero)));
+  const uint32_t record = frame + 80;
+  for (uint32_t player = 0; player < 2; player++) {
+    const uint32_t car = kGarageCars + kGarageCarBytes * player;
+    const uint32_t menu = s + 10864 + (player == 0 ? 124 : 356);
+    const uint32_t first = rs::ListSelection(base, menu) == 0 ? 1 : 0;
+    rsu::RacerRecordInit(base, record);
+    rsu::SetModel(base, record, LoadU32(base, car + 12));
+    StoreU32(base, frame + 3972, first);
+    if (!native::Buffers_Memcpy(base, record, car, 1884, 0x8223F8F4)) {
+      const uint64_t args[6] = {record, car, 1884, 0, 0, 0};
+      calls.call_set(kMemcpy, args, 3, frame, 0x8223F8F4);
+    }
+    uint32_t refreshed = 0;
+    if (!car_specs::CarRefresh(base, record, &refreshed)) {
+      pg::Call1(calls, kCarRefresh, record, frame, 0x8223F8FC);
+    }
+    if (rsu::AddRacerNative(base, record)) {
+      rsu::AddRacer(base, record, 0, zero, 0);
+    } else {
+      const uint64_t args[4] = {record, 0, 0, 0};
+      calls.call_f1(kAddRacer, args, zero, frame, 0x8223F910);
+    }
+    rsu::StagesAddRacer(base, data() + rsu::kStageList, player, 2, -1);
+  }
+  vehicle_accessors::StagesSetType(base, data() + rsu::kStageList, 1, kNone);
+  uint64_t result;
+  if (rsu::PlaceRacersNative(base, frame - 128)) {
+    Refresh refresh{&calls, frame - 128 - 4096};
+    result = rsu::PlaceRacers(base, frame - 128, RefreshThrough, &refresh);
+  } else {
+    // r3 not read (Stages::SetType's left).
+    const uint64_t args[6] = {0, 0, 0, 0, 0, 0};
+    result = calls.call_set(kPlaceRacers, args, 0, frame, 0x8223F94C);
+  }
+  // The screen leaves: message 4 posted (+9608 not written).
+  ts::Post(base, uint32_t(r4), 4);
+  return result;
 }
 
 // --- The tables ---

@@ -526,6 +526,19 @@ uint64_t ListScreen8SetLabels(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
 // Sound::Play(1, 0) (guest calls but Sound::Play's plain C++). The last
 // call's r3.
 uint64_t ListScreen8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_8223F778 Type8ListScreen::SetUpRace (slot 7; 4,096-byte frame, with
+// its switch piece AddRacers sub_8223F818; r4 the dispatcher): the race
+// data reset, its stages cleared, +0xA3AF0 = 4, +0xA3AF4 = 5, its +32 =
+// the kind; the course (the course list's +4 plus its selection, 0 to 7)
+// set on the stages and the race; the traffic (3 for the toggle's first
+// item); the two players' garage cars' racer records at the frame's +80
+// (RacerRecord::Init, Car::SetModel, +3892 whether the player's first menu
+// is at its first item, memcpy of 1,884 bytes, Car::Refresh), each added to
+// the race and stage; the stage's type 1, the racers placed, message 4
+// posted. The race set-up's plain C++, guest calls where it declines.
+// PlaceRacers' r3.
+uint64_t ListScreen8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
 
 // sub_82258D60 Type8ListBase::Draw (slot 23; 224): the page table built
 // on first use (its pairs left in the frame's +80 to +159), then page

@@ -59,8 +59,10 @@ struct StandWorld {
   uint32_t params, holder_word, list;
 };
 StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint32_t holder);
-// The list screen's pages, steps and slots (type8_list_screen.cpp).
+// The list screen's pages, steps and slots (type8_list_screen.cpp) and its
+// race set-up (race_setup.cpp).
 void Type8ListScreen(Context& h);
+void Type8SetUpRace(Context& h);
 
 namespace {
 
@@ -1075,6 +1077,7 @@ void Type8Screens(Context& h) {
   ListPart(h, world);
   memory::Free(world);
   Type8ListScreen(h);
+  Type8SetUpRace(h);
 }
 
 }  // namespace harness

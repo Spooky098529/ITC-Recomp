@@ -129,6 +129,7 @@ void Type8ListItemInfo(PPCContext& ctx, uint8_t* base);
 void Type8ListShowMarks(PPCContext& ctx, uint8_t* base);
 void Type8ListSetLabels(PPCContext& ctx, uint8_t* base);
 void Type8ListSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type8ListSetUpRace(PPCContext& ctx, uint8_t* base);
 void Type8ListDraw(PPCContext& ctx, uint8_t* base);
 void Type8ListUpdate(PPCContext& ctx, uint8_t* base);
 void Type8ListPage2(PPCContext& ctx, uint8_t* base);

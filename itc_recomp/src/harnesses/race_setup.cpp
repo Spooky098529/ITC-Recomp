@@ -16,6 +16,7 @@
 #include "hooks/network_mode.h"
 #include "hooks/race_setup.h"
 #include "hooks/type67_screens.h"
+#include "hooks/type8_screens.h"
 #include "network_mode/network_mode.h"
 #include "race_setup/race_setup.h"
 #include "memory/heap.h"
@@ -32,6 +33,7 @@
 ITC_FLAG_DECLARE(bool, native_race_setup);
 ITC_FLAG_DECLARE(bool, native_network_mode);
 ITC_FLAG_DECLARE(bool, native_type67_screens);
+ITC_FLAG_DECLARE(bool, native_type8_screens);
 
 namespace harness {
 
@@ -1740,6 +1742,92 @@ void Type67Type7SetUpRace(Context& h) {
   results.Report();
   leftovers.Report();
   Write(h.base, kType7Car, saved_car.data(), kCarBytes);
+}
+
+// Type8ListScreen::SetUpRace (registered under type8_screens), with its
+// switch piece AddRacers (sub_8223F818, the switch's case 0): the screen a
+// block of random words with its menu lists' selections (+10144 0 to 2,
+// +10288 0 or 1, the list part's two players' first menus +10988 and
+// +11220 0 or 1) and the course list's +4 and selection (their sum 0 to 7,
+// 0 every fourth case; the recompiled switch traps past 7, never in play),
+// r4 a dispatcher in the block (its ring's count and start small); the two
+// players' garage cars (0x82814EB8, 1,972 bytes each) random with their
+// ids the made-up specs' and their tuning words 0 (put back after); the
+// race data over the made-up specs as Race::SetUp's cases have them.
+// Compared: the race data, the screen and the save data whole, SetUpRace's
+// frame up to its register saves (its callees' frames not), the globals
+// and r3; f1 not. The traffic records' unwritten bytes as Race::SetUp's
+// (expected to differ, the same reason: Race::PlaceRacers'
+// Racers::SetStart builds them on its stack).
+void RecompiledType8SetUpRace(PPCContext& ctx, uint8_t* base) {
+  ITC_FLAG(native_type8_screens) = false;
+  __imp__sub_8223F778(ctx, base);
+  ITC_FLAG(native_type8_screens) = true;
+}
+
+void Type8SetUpRace(Context& h) {
+  constexpr uint32_t kCars = 0x82814EB8, kCarsBytes = 2 * 1972;
+  constexpr uint32_t kSaveDataPointer = 0x826C5B58;
+  constexpr uint32_t kFrame = 4096, kDispatcher = 0x2C00;
+  const MadeUpSpecs specs(h);
+  const Block data(0xA4000);
+  const Block screen(0x3000);
+  const Block save(0x24000);
+  if (!specs.params || !data.address || !screen.address || !save.address) {
+    ITC_LOG_ERROR("harness: type8_screens: no blocks for Type8ListScreen::SetUpRace");
+    return;
+  }
+  const std::vector<uint8_t> saved_cars = Read(h.base, kCars, kCarsBytes);
+  const std::vector<uint32_t> holes = TrafficHoles(h, specs);
+  Results results("Type8ListScreen::SetUpRace (sub_8223F778)");
+  Results leftovers(
+      "Type8ListScreen::SetUpRace (sub_8223F778), the traffic records' unwritten bytes "
+      "(expected to differ)");
+  for (int c = 0; c < 12; c++) {
+    harness::Outputs tails[2];
+    const uint64_t high = c % 4 == 3 ? 0xFFFFFFFF00000000ull : 0;
+    FramesCase(
+        h, results, data, {{kFrame, 80}},
+        {race_setup::kRandSeed, race_setup::kRaceData, car_specs::kParams, kSaveDataPointer},
+        [&](Random& r) {
+          uint8_t* const base = h.base;
+          guest::StoreU32(base, race_setup::kRandSeed, uint32_t(r.Next()));
+          guest::StoreU32(base, race_setup::kRaceData, data.address);
+          guest::StoreU32(base, car_specs::kParams, specs.params);
+          guest::StoreU32(base, kSaveDataPointer, save.address);
+          WriteRandom(base, screen.address, screen.bytes / 4, r);
+          WriteRandom(base, save.address, save.bytes / 4, r);
+          WriteRandom(base, kCars, kCarsBytes / 4, r);
+          for (uint32_t car = kCars; car < kCars + kCarsBytes; car += 1972) {
+            guest::StoreU32(base, car + 12, 55 + r.Below(16));
+            for (uint32_t offset = 1656; offset <= 1812; offset += 4) {
+              guest::StoreU32(base, car + offset, 0);
+            }
+          }
+          const uint32_t s = screen.address;
+          guest::StoreU32(base, s + 10144 + 16, r.Below(3));
+          guest::StoreU32(base, s + 10288 + 16, r.Below(2));
+          guest::StoreU32(base, s + 10864 + 124 + 16, r.Below(2));
+          guest::StoreU32(base, s + 10864 + 356 + 16, r.Below(2));
+          const uint32_t sum = c % 4 == 0 ? 0 : r.Below(8);
+          const uint32_t selection = r.Below(std::min(sum, 5u) + 1);
+          guest::StoreU32(base, s + 10216 + 16, selection);
+          guest::StoreU32(base, s + 10216 + 4, sum - selection);
+          guest::StoreU32(base, s + kDispatcher + 204 + 600, r.Below(50));
+          guest::StoreU32(base, s + kDispatcher + 204 + 604, r.Below(60));
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = high | screen.address;
+          t.r4.u64 = screen.address + kDispatcher;
+        },
+        RecompiledType8SetUpRace, hooks::Type8ListSetUpRace, {}, fmt::format("case {}", c),
+        false, false, {&screen, &save},
+        [&](int v) { SplitTraffic(h.base, data.address, holes, tails[v]); });
+    leftovers.Check(tails[0], tails[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  leftovers.Report();
+  Write(h.base, kCars, saved_cars.data(), kCarsBytes);
 }
 
 void RaceSetup(Context& h) {
