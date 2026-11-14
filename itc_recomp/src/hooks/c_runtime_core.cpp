@@ -77,7 +77,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_fclose_nolock (their callers _fcloseall and fclose), _close, _freebuf and "
               "fclose's __finally (sub_825B0D10, sub_825B0EE0, sub_825A9664, their caller "
               "_fclose_nolock or fclose), _fcloseall's __finally (sub_825B4F38), _fflush_nolock, "
-              "flsall and _flushall (their callers fflush, flsall and _endstdio)");
+              "flsall and _flushall (their callers fflush, flsall and _endstdio), the __finally "
+              "funclets of flsall and fflush (sub_825ACEB4, sub_825ACF04, sub_825AD02C)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -776,12 +777,9 @@ ITC_C_RUNTIME_CORE(825B77E8, CoreFreeOsfhnd)
 ITC_C_RUNTIME_CORE(825B7880, CoreGetOsfhandle)
 // raise's __finally: r28 = whether raise took lock 0.
 ITC_C_RUNTIME_CORE(825B4C8C, CoreRaiseFinally)
-// flsall's outer __finally: _unlock(1). (_fcloseall's, sub_825B4F38, has no
-// adapter: _fcloseall is native.)
-ITC_C_RUNTIME_CORE(825ACEB4, CoreUnlockStreamsFinally)
-// flsall's inner __finally: r28 = the slot, r29 = __piob's address, r12 =
-// flsall's frame end; r27, r10 and r11 set as the original leaves them.
-ITC_C_RUNTIME_CORE(825ACF04, CoreFlsallInnerFinally)
+// (flsall's outer and inner __finally, sub_825ACEB4 and sub_825ACF04, and
+// _fcloseall's, sub_825B4F38, have no adapters: flsall and _fcloseall are
+// native.)
 // exp: f1 = x; f1 = e^x.
 ITC_C_RUNTIME_CORE(825ABE30, CoreExp)
 // _forcdecpt_l, _cropzeros_l: r3 = a number's text.
@@ -825,8 +823,8 @@ ITC_C_RUNTIME_CORE(825B6730, CoreCloseFinally)
 // sub_82295D50, have no adapters: _write is _write_nolock's only caller, and
 // WriteFile's caller in play, SaveSlot::WriteFile, leaves it out.)
 ITC_C_RUNTIME_CORE(825B11A8, CoreWrite)
-// fflush's and fputs's __finally: r30 = the stream.
-ITC_C_RUNTIME_CORE(825AD02C, CoreFcloseFinally)
+// fputs's __finally: r30 = the stream. (fflush's, sub_825AD02C, has no
+// adapter: fflush is native.)
 ITC_C_RUNTIME_CORE(825AD488, CoreFcloseFinally)
 // _flush: r3 = a stream; r3 = 0, or -1.
 ITC_C_RUNTIME_CORE(825ACC78, CoreFlush)
