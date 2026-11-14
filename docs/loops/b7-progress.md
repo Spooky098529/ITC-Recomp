@@ -86,7 +86,9 @@ file's history. What's left to see in a drive, from every run:
   40, 0 errors. Left: functions a harness can't run on its thread
   (the `KeBugCheck` stub `sub_825AA1A0`, `_CxxThrowException`,
   `RaiseException`, `XapiThreadStartup`, `_invalid_parameter`'s trap;
-  they block `_getptd` and `_amsg_exit`): a question for the user.
+  they block `_getptd` and `_amsg_exit`). The user's call: ported and
+  checked by reading, no harness (in "Precedent first"). Step: second
+  migration.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads

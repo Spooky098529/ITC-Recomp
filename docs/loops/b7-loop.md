@@ -637,6 +637,15 @@ Calls so far for decisions the loop meets often:
   are ours, and the harness built the bigger way, with the callees'
   world as their own harnesses build it; no stand-in recorders in
   adapters (the race HUD machine, 2026-10-31).
+- Functions that end the process or the thread, which a harness
+  can't run on its thread (the C runtime's `KeBugCheck` stub
+  `sub_825AA1A0`, `_CxxThrowException`, `RaiseException`,
+  `XapiThreadStartup`'s `ExTerminateThread`, `_invalid_parameter`'s
+  trap): ported, calling the import exactly as the original, checked
+  by reading against `generated/` instead of a harness; their rows say
+  "no harness: ends the process" (or the thread), and the validation
+  agent counts them like Merged rows. Their callers' other paths are
+  harnessed as usual (the user's call, 2026-11-14).
 - A validation that fails on a harness fault (a harness case reading
   a wild guest address, or giving a case inputs play never does) rather
   than a native difference: an agent finds the cause with logging and
