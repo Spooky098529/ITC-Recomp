@@ -190,6 +190,17 @@ When the user has reviewed a run's section, its heading gets
   players: probably the two-player split-screen mode (the user may know
   its name). Corrections: `car-list.md` notes that called the type 8
   callers "type 6"; `screen-constructors.md`'s "get no rows" list.
+- Its migration (138f7c8c..c7628060): 128 rows ours, 13 `car-list.md`
+  rows (`PanelSetPair` and its slots, the panels' base), `TwoPlayerBlock`;
+  map corrections in the rows (`OnDialogClosed`'s branches,
+  `Type8PlayerBlock::Input`'s items, `UpdateSecond`/`UpdateThird`'s
+  menus, `Type8ListBase::Step1`'s frame); two new expected groups.
+  Unchecked: `PanelSetBase::HandleInput`'s native default page call
+  passes r4 = 0 to pages 4 and 7 where the originals pass their own r4
+  (from `PanelSet`'s earlier port; neither page seems to read it). The
+  `SetUpRace` switches trap past their last case, as the recompiled
+  switch does. The intros of `car-list.md` and `type8-screens.md` still
+  call the five car-list rows blockers.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

@@ -305,6 +305,8 @@ were at 0.
 |---|---|---|---|---|
 | `sub_822334C8` Type6ListScreen::SetUpRace | the traffic records' unwritten bytes | 11 of 16 | Unwritten stack bytes copied (the recompiled race set-up's register saves, `Racers::SetStart`'s 16 records on its stack; seen 0x826C0000 at a record's +3932; as `Race::SetUp`'s group) | for review (2026-11-13 12:31 run) |
 | `sub_82243018` Type7ListScreen::SetUpRace | the traffic records' unwritten bytes | 7 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s and `Race::SetUp`'s: `Racers::SetStart`'s records built on its stack over the recompiled callees' register saves) | for review (2026-11-13 b7-loop-13-11-26 run, part 2c) |
+| `sub_8223F778` Type8ListScreen::SetUpRace | the traffic records' unwritten bytes | 2 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s; the same words) | for review (2026-11-13 12:31 run) |
+| `sub_8223E760` Type8ColorListScreen::SetUpRace | the traffic records' unwritten bytes | 5 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s) | for review (2026-11-13 12:31 run) |
 
 ### `network-mode.md`
 

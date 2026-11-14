@@ -253,7 +253,12 @@ file's history. What's left to see in a drive, from every run:
   constructor and destructor, `CarPanelBase::~`, `ConfirmPanel`,
   `Panel6C::SetStats`) with `PanelSetPair`'s slots; the type 8 mode is
   probably the two-player split-screen mode; 1 lead added, the mode
-  itself). Check passed. Migration agent running.
+  itself). Check passed. Migrated 138f7c8c..c7628060: all 128 rows
+  ours (90 Overridden, 36 Native, 2 Merged), with 13 `car-list.md`
+  rows and `TwoPlayerBlock`; `--native_type8_screens`; every harness 0
+  differing but two new traffic-records groups (2 of 12 and 5 of 12,
+  `expected-differences.md`); races 34-38 s at 40, 0 errors; five
+  subagents one at a time. Validation agent running.
 
 ## Done
 
