@@ -42,6 +42,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_title_screen);
+ITC_FLAG_DECLARE(bool, multiplayer_menu_items);
 
 namespace harness {
 
@@ -896,8 +897,51 @@ void MenuPages(Context& h, const World& w) {
     MenuInput(r, w);
     t.r3.u64 = w.mode();
   };
+  // MainMenu with --multiplayer_menu_items on (the original's behavior), then
+  // off: the bypass (the user's call, 2026-11-14) plays the refusal cue for
+  // items 3 (Xbox Live) and 4 (split screen) where the original leaves for
+  // their modes, so the cases accepting either differ from the original.
+  // Random input accepts item 3 or 4 rarely, so each setting also gets
+  // cases that do: the list's seven items with the cursor on 3 or 4, no
+  // move, every mapper bit set but the directions' ids out of the mappers'
+  // range (no move from MenuList::Update), the accept id 159, no mapper
+  // blocked.
+  auto multiplayer_item = [input](PPCContext& t, Random& r, const World& w) {
+    namespace rs = race_screens;
+    input(t, r, w);
+    uint8_t* base = w.base;
+    for (uint32_t c = 0; c < 4; c++) {
+      const uint32_t mapper = w.at(kMappersAt) + 0x200 * c;
+      for (uint32_t k = 0; k < 6; k++) {
+        guest::StoreU32(base, mapper + 448 + 4 * k, 0xFFFFFFFFu);
+      }
+      guest::StoreU32(base, rs::kMapperEntries + 8 * c + 4, 0);
+    }
+    const uint32_t list = w.at(kListAt);
+    guest::StoreU32(base, list + rs::kListCount, 7);
+    guest::StoreU32(base, list + rs::kListShown, 7);
+    guest::StoreU32(base, list + rs::kListSelection, 3 + r.Below(2));
+    guest::StoreU32(base, list + rs::kListMove, 0);
+    for (uint32_t k = 0; k < 4; k++) {
+      guest::StoreU32(base, list + rs::kListDown + 4 * k, 200);
+    }
+    guest::StoreU32(base, list + rs::kListDown + 16, 159);
+  };
+  const bool multiplayer = ITC_FLAG(multiplayer_menu_items);
+  ITC_FLAG(multiplayer_menu_items) = true;
   Run(h, w, {"TitleScreen::MainMenu (sub_82222700)", 400, __imp__sub_82222700,
              hooks::TitleScreenMainMenu, {{-144, -32}}, input});
+  Run(h, w, {"TitleScreen::MainMenu (sub_82222700), item 3 or 4 accepted", 100,
+             __imp__sub_82222700, hooks::TitleScreenMainMenu, {{-144, -32}}, multiplayer_item});
+  ITC_FLAG(multiplayer_menu_items) = false;
+  Run(h, w,
+      {"TitleScreen::MainMenu (sub_82222700), multiplayer items bypassed (expected to differ)",
+       400, __imp__sub_82222700, hooks::TitleScreenMainMenu, {{-144, -32}}, input});
+  Run(h, w,
+      {"TitleScreen::MainMenu (sub_82222700), item 3 or 4 accepted, bypassed (expected to "
+       "differ)",
+       100, __imp__sub_82222700, hooks::TitleScreenMainMenu, {{-144, -32}}, multiplayer_item});
+  ITC_FLAG(multiplayer_menu_items) = multiplayer;
   // CareerMenu: player 0's save a new game's (Progress::Clear run on it
   // first, for Progress::Restart's garage), its day shaped after.
   Run(h, w, {"TitleScreen::CareerMenu (sub_82221AC0)", 400, __imp__sub_82221AC0,

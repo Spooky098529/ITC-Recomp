@@ -280,8 +280,11 @@ uint64_t SetUpMenu4(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_82222700 TitleScreen::MainMenu (page 2, r3 the mode): MenuList::
 // Update; a move to transition 7; an accepted item picks the next page,
 // mode or message; MenuSound::Play. The sound's r3, Accepted's or the
-// selection. 144-byte frame.
-uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+// selection. 144-byte frame. Without `multiplayer_items` (the user's call,
+// 2026-11-14: --multiplayer_menu_items off), items 3 (Xbox Live) and 4
+// (split screen) only play the refusal cue 3, as item 5 does without a save.
+uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
+                  bool multiplayer_items);
 // sub_82221AC0 TitleScreen::CareerMenu (page 3): new game, continue and the
 // third item (CarDealer::StartFirstRace); cancel back to the main menu.
 // 128-byte frame.
