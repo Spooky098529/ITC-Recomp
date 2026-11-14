@@ -755,6 +755,12 @@ Rows not yet moved stay in the table below. So far:
   race kind and course, and the color list), their list parts with a
   settings block a player, pages, steps and race set-ups for two cars
   (B7; mapped, none seen in play).
+- [`type8-mode.md`](type8-mode.md): the type 8 mode itself (probably
+  the two-player mode): its Init, its delegate slots (the loads' wait,
+  the next-mode query, the teardown), its +32 interface, its first
+  screen (the five-item menu over the two players' cars on the stand,
+  with the stand's model updates) and its yes/no dialog (B7; mapped,
+  none seen in play).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

@@ -1,0 +1,204 @@
+# Known functions: the type 8 mode
+
+The front-end game mode of **type 8** itself (`ModeType8::`, the name
+ours; probably the two-player (split-screen) mode, the title screen's
+main menu item 4: [`type8-screens.md`](type8-screens.md)'s intro says
+why). The mode is made by `ModeType8::ModeType8` (87,768 bytes,
+`Mode::Create` in [`game-modes.md`](game-modes.md)); its constructor,
+its member's (`ModeType8Member`, at the mode's +848) constructor and
+destructor and its deleting destructor are in
+[`boot-mode.md`](boot-mode.md). This file holds its vtable's slots, its
++32 interface, its first screen (`Type8Screen0`, the member's +0: the
+mode's menu) and its dialog (`Type8Dialog`, the member's +9792). The
+member's other screens are in [`type8-screens.md`](type8-screens.md)
+(the panel screen, the two players' car pick, +42740; the list screen
++19544; the color list screen +30912), [`options-screen.md`](options-screen.md)
+(`Type8Options` +57992, `Type8ControllerOptions` +67632) and
+[`save-screen.md`](save-screen.md) (`Type8SaveScreen` +77272).
+
+Its vtable `0x82006D60` has 11 slots: 0 `Init`, 1 `Release`, 2 to 5
+`Mode::NoNextMode` (`sub_8222FC90`, `boot-mode.md`), 6 `NextMode`, 7
+`ModeType8::DeletingDestructor` (`boot-mode.md`), and three delegate
+functions reached through `Mode::Slot8Thunk`, `Slot9Thunk` and
+`Slot10Thunk` (`type2-mode.md`; the delegate at the mode's +8, pointed
+to by +4, holds the vtable `0x82010FA0`, `ModeDelegate::Invoke`, the
+mode at +12 and the function at +16): 8 `WaitForLoads`, 9
+`PollTeardown`, 10 `TearDown`. Its +32 vtable `0x82006D54` (it follows
+the race mode's `0x82006D34`, whose eight slots end there) has three:
+`Interrupt`, `ForceExit` and the empty `sub_82106540`, as the type 6, 7
+and 2 modes'. The flow: `Init` builds the stand for three cars with the
+two players' garage cars (`0x82814EB8`, two 1,972-byte entries) on
+garage stages 1 and 2, makes the two-player save block when there's
+none (player 0's options copied into it), runs the eight members' Inits,
+adds their machines to the mode's dispatcher, shows the loading screen
+and fades in; `WaitForLoads` waits for the members' movies, the fades,
+the sound bank and both stages' models, then commands the two stages
+(56, 57), starts the menu music and posts message 2 (the panel screen's
+`OnMessage2`: the car pick opens first); `NextMode` then posts Draw and
+Update each tick and answers 1 (the race) when a list screen reached
+state 11, or 4 (the type 4 front end) when `Type8Screen0` reached state
+6 (the menu's quit), copying player 0's options back from the two-player
+block and freeing it; `PollTeardown` waits for the stand's teardown and
+`TearDown` stops the music, releases the strings and the UI movies and
+answers.
+
+How close to the type 6 and 7 modes ([`type6-type7-modes.md`](type6-type7-modes.md),
+`src/type67_modes/`): the same shape (string file 3, `StandScene::Create`,
+a first screen over the stand with a five-item menu, a yes/no dialog,
+the shared list and panel screens' Inits, the options and controller
+pages, `+9612 = 1, +9616 = 0` on each machine, `LoadingScreen::Show(1,
+0, -1)`, `ScreenFades::FadeIn`), with these differences: the member is
+inline in the mode (no `VirtualAlloc`, no block to free: slot 1 only
+releases the stand); the delegate functions are vtable slots reached
+through the slot thunks, as the type 2, 9 and 12 modes' (`type2-mode.md`,
+`todays-result.md`, `network-mode.md`), not function pointers; there is
+no `Leaving` phase (no leave message to every machine before the
+teardown); the teardown is split in two (slot 9 polls the stand, slot 10
+answers); `StandScene::Create(3)` and both players' cars; the two-player
+save block. `Type8Screen0` is closer to `Type7Screen0` (Draw's page
+table and Update's step table built on their first call, with guard
+words) but holds a `MenuList` (`race-screens.md`) at +9680 and its page
+block inline (+9652 to +9676), and updates the two players' stage
+models every Update (`UpdateStand`, as `PanelSetBase::UpdateStand`'s
+two-player branch in `car-list.md`). `Type8Dialog` is `Type6Dialog`
+with a fifth movie (20, asset 22587), no cancel and no status word,
+its closed message 13; it registers `Type7Dialog::QueueReopen` and
+`Dialog::Leave` and shares the dialogs' steps 1 to 4.
+
+Messages as the screens use them: 0 Update, 1 Draw, 2 loaded (the panel
+screen's), 4 leave; `Type8Screen0` opens on 6 ((9, 6) `Screen::Reenter`)
+and posts 16 (the color list screen), 14 (the list screen), 19 (the
+panel screen), 21 (the options) and 7 (the dialog's yes/no); the dialog
+posts 9 (yes), 10 (no), 12 (back), 11 (the notice closed) and 13
+(closed); 30 is the save screen's cancel (`Interrupt`). States: 0 enter,
+1 open the movie, 2 wait for it, 9 wait, 4 show, 5 shown, 8 suspended,
+7 leaving, 6 done, 11 a list screen's race picked. The transitions were
+listed with `itc_recomp/tools/init_step_tables.py` and checked against
+the code. Names are ours (guesses from what the code does). Fields
+worked out are in `../known-data.md` ("type 8 mode", "type 8 first
+screen and dialog").
+
+None of these functions ran in the coverage sessions (no session picked
+the main menu's item 4), so `b7_groups.py` refuses them as roots; they
+get rows and are to be ported anyway (the user's 2026-11-12 call).
+Readiness was judged by reading every callee (direct calls, and the
+handlers, pages and steps reached through the Inits' functors and the
+tables) against `src/` and the rows' Status: every callee outside this
+file is ours except `ModeType8::Init`'s `Type8Options::Init`,
+`Type8ControllerOptions::Init`, `Type8SaveScreen::Init` (Inits of only
+`StateMachine::Add` calls) and the two-player save block's maker
+`sub_82105740` (its callees ours), all four ready themselves and never
+seen in play, and four shared handlers reached through functors and
+tables, also recompiled, ready and never seen: `Screen::Wait`,
+`Type7Dialog::QueueReopen`, `Dialog::OpenNoticeStep` and
+`Dialog::CloseNoticeStep` (`type6-type7-modes.md`). So every group here
+is ready but `Init`'s, which waits on the four (a migration can take
+them along). For a migration: no kernel calls; messages are posted
+straight into the dispatcher's ring with no overflow check (as the type
+6 and 7 modes'); `NextMode`'s answer holds three stack bytes it never
+writes (precedent: memory leftovers copied as the original leaves them),
+`ForceExit`'s the low three bytes of `Mode::Slot9Thunk`'s address; the
+delegate is rewritten while it runs (`ModeDelegate::Invoke`);
+`UiMovie::SetText` calls leave r7 to r10 unset (precedent: the parking
+area's, 0 passed); `UpdateStand` builds a `Car` in a 4,096-byte frame.
+Read by the B7 loop's mapping agent, 2026-11-14, from the lead "the
+type 8 mode itself".
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8223D5D8` | `ModeType8::Init` | | Slot 0 of vtable `0x82006D60`, from `Modes::Tick` once the mode is made: r3 = the mode. A 176-byte frame (r22 to r31 and lr saved). `sub_8211AD00` (a screen's start, `ui-movies-game.md`); `Strings::Load([0x826C5C34], 3)`; `StandScene::Create(3)` (`type6-type7-modes.md`); the two garage cars at `0x82814EB8` (stride 1,972): `GarageStage::MakeModel([[0x826D83E0] +4], CarModels::BlockOf(car 0 +12), 0)` and the same with holder +8 and car 1 (`stand-models.md`, `car-makers.md`). When `SaveData::TwoPlayerBlock()` is 0: `sub_82105740` (makes it, `save-data.md`), then `memcpy(TwoPlayerBlock() + 0x3AA58, SaveData::Of(0) + 0x1F85C, 284)` (player 0's options into the block). The members' Inits (member = mode +848): `Type8Screen0::Init`(member +0), `Type8Dialog::Init`(+9792), `PanelScreen::Init`(+42740), `ListScreen::Init`(+30912, the color list) and (+19544, the list), `Type8Options::Init`(+57992), `Type8ControllerOptions::Init`(+67632), `Type8SaveScreen::Init`(+77272) (results not read). The machines added to the dispatcher (mode +36: the list at +36 + 4 × count, the count +236, no bound check) in the order: Screen0's (member +4), the dialog (+9792), the panel (+42744), the color list (+30916), the list (+19548), the options, the controller pages, the save screen; each machine's +9612 = 1 and +9616 = 0 (open on its message, keep the movie). `LoadingScreen::Show(1, 0, -1)` (`race-loading.md`), `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)` (`mode-tick.md`); the delegate at +8 = {`0x82010FA0`, the mode, `Mode::Slot8Thunk` (`WaitForLoads`), 0}, +4 = mode +8. The compiler's null checks on member addresses kept as written. Not seen in play. Read in full. |
+| `sub_8223D3B8` | `ModeType8::Release` | | Slot 1, from `Modes::Tick` before the mode is deleted (probably): a tail jump to `StandScene::Release` (`type6-type7-modes.md`; r3 not read). The member is inline in the mode: nothing to free; the strings and UI movies are released by `TearDown`. Not seen in play. Read in full. |
+| `sub_8223DBC0` | `ModeType8::WaitForLoads` | | Slot 8, the delegate's function while loading (set by `Init`, through `Mode::Slot8Thunk`), from `ModeDelegate::Invoke` every tick: r3 = the 8-byte answer, r4 = the mode. A 160-byte frame (r26 to r31 and lr saved). The answer cleared (byte +0, word +4); `LoadingScreen::Run(-1)`. When `AllLoaded(mode +848)`, the screen fades' counts (`0x826A50E4`, `0x826A50DC`) both 0, the sound manager's (`[0x826C5C80]`) slot 6 (+24, `AudioManager::IsBankLoading`) answering 0 for bank 1 (`&1` in the frame), and both stages' models there (the stage of holder +4's and +8's (`[0x826D83E0]`) word +112 nonzero): `GarageStage::Command(holder +4, 56)` and `(holder +8, 57)` (`front-end-car-draw.md`), `LoadingScreen::Finish(-1)`, `Sound::Play(&1, &2)` (bank 1's cue 2, the menu music, `menu-sounds.md`), message (2, 0, 0) queued in the ring (+240: the count +840 up by one, the record at 12 × ((start +844 + count − 1) mod 50); no overflow check) and the delegate's function = `Mode::NextModeThunk` (`0x82235C08`, rebuilt at +8 from the frame's +88). Then every call: message (1, 0, 0) queued and `GameMessages::Dispatch(mode + 36)`. Returns r3. Not seen in play. Read in full. |
+| `sub_8223D3C0` | `ModeType8::AllLoaded` | | r3 = the member (mode +848): 1 when each of these words is nonzero, else 0: +9612 (`Type8Screen0`'s movie loaded), +29156 (the list's), +40524 (the color list's), +19400 (the dialog's +9608), +52352 (the panel's), +67600 (the options' +9608) and +86880 (the save screen's +9608); the controller pages' not checked. Leaf. From `WaitForLoads` and `Interrupt`. Not seen in play. Read in full. |
+| `sub_8223DD90` | `ModeType8::NextMode` | | Slot 6, the next-mode query `Mode::NextModeThunk` calls every tick once loaded: r3 = the answer, r4 = the mode. A 144-byte frame (r27 to r31 and lr saved). The answer cleared. Message (1, 0, 0) (Draw) queued only while `[0x826C7960]` and `[0x826C7964]` are both 0 (`known-data.md`: the pad not read), then (0, 0, 0) (Update) always, and `GameMessages::Dispatch(mode + 36)`. Then: the color list's (member +30916) or the list's (+19548) machine in state 11: the answer at mode +87760 = {byte 1, three frame bytes (+81 to +83, never written), the word 1} (the race) and the delegate's function = `Mode::Slot9Thunk` (`PollTeardown`, rebuilt from the frame); else `Type8Screen0`'s machine (member +4) in state 6: `memcpy(SaveData::Of(0) + 0x1F85C, TwoPlayerBlock() + 0x3AA58, 284)` (player 0's options back from the block), `FreeTwoPlayerBlock`, `[0x826364EC]` = 0, the answer = {1, the three frame bytes, 4} (the type 4 front end) and the delegate's function = `Mode::Slot9Thunk`. No leave message posted to the machines (unlike the type 6 and 7 modes' `Leaving`). Returns r3. Not seen in play. Read in full. |
+| `sub_82105638` | `SaveData::FreeTwoPlayerBlock` (probably) | | No arguments: when `[0x826C5B5C]` (the two-player save block `sub_82105740` makes, `save-data.md`) isn't 0, `operator delete` on it (`heap.md`) and the word = 0. A 96-byte frame (r31 saved). Only caller `ModeType8::NextMode`. Not seen in play. Read in full. |
+| `sub_8223D8E8` | `ModeType8::PollTeardown` | | Slot 9, through `Mode::Slot9Thunk` (set by `NextMode` and `ForceExit`): r3 = the answer, r4 = the mode. A 128-byte frame (r29 to r31 and lr saved). The answer cleared; when `StandScene::PollTeardown` (`type6-type7-modes.md`) answers nonzero, the delegate's function = `Mode::Slot10Thunk` (`TearDown`, rebuilt at +8 from the frame's +80). Nothing queued or dispatched. Returns r3. Not seen in play. Read in full. |
+| `sub_8223D4D0` | `ModeType8::TearDown` | | Slot 10, through `Mode::Slot10Thunk` (set by `PollTeardown`): r3 = the answer, r4 = the mode. A 160-byte frame (r27 to r31 and lr saved). The answer cleared; through the sound manager `[0x826C5C80]`: slot 14 (+56, `AudioManager::IsCuePlaying`) for bank 1's cue 0 and, when playing, slot 13 (+52, `AudioManager::StopCue`) on it; the same for bank 1's cue 2 (the indexes built in the frame, as `Type6Mode::TearDown`); `Strings::Release([0x826C5C34], 3)` (`strings-and-font.md`), `sub_8211E370` (the jump to `UiMovies::DeleteAll`, `ui-movies-game.md`); the answer = the 8 bytes at mode +87760 (`NextMode`'s or `ForceExit`'s), so `Modes::Tick` changes mode. Returns r3. Not seen in play. Read in full. |
+| `sub_8223D960` | `ModeType8::Interrupt` (probably) | | The +32 vtable's (`0x82006D54`) slot 0: r3 = the mode + 32. A 96-byte frame. 0 until `AllLoaded(mode +848)`; then with the save screen's state (mode +87724, the machine at member +77272) 5: message (30, 0, 0) queued in the ring (`SaveScreen::Cancel`, `save-screen.md`; no dispatch) and 0; else 1. No hold word and no options check (unlike `Type6Mode::Interrupt`). Who calls the +32 slots isn't known (`type6-type7-modes.md`). `race-loading.md` took this slot and the next for the race mode's slots 8 and 9: the race mode's vtable `0x82006D34` has eight slots, and this vtable follows it. Not seen in play. Read in full. |
+| `sub_8223DA00` | `ModeType8::ForceExit` (probably) | | The +32 slot 1: r3 = the mode + 32, r4 = a number. A 128-byte frame (r28 to r31 and lr saved). Always: the stages of holder +4 and +8 (`[0x826D83E0]`) get their +6052 = 0, `GarageStage::SetDrawWord(holder +4, 0)` and `(holder +8, 0)` (`front-end-car-draw.md`), `GarageStages::DrawAll` (`car-list.md`). Then r4 0 or 1: message (4, 0, 0) queued (leave; no dispatch), the delegate's function = `Mode::Slot9Thunk` (`PollTeardown`, built in the frame's +80), `[0x826364EC]` = 1, the answer at mode +87760 = {byte 1, then the low three bytes of `0x8223D4C0` (the thunk's address, left in the frame word the byte was stored over), the word 4}; r4 2 or 3: the same with 12 and `[0x826364EC]` left; other values nothing more. The same 4 / 12 mapping as `Type6Mode::ForceExit`. Not seen in play. Read in full. |
+| `sub_8223D2F0` | `Type8Screen0::Type8Screen0` | | r3 = the member (+0): `ScreenMachine::ScreenMachine(r3 + 4)` (`boot-mode.md`); vtable `0x82010B74` (one slot, `DeletingDestructor`); +9748 = 0, +9740 = 0; the two players' stand blocks at +9752 and +9772 (20 bytes each: +0 = 0, +4, +8, +12 = -1, +16 = 0, in a loop, then +9752, +9768, +9788, +9772 = 0); the animation ids +9756 = 45, +9760 = 44, +9764 = 46 (player 0) and +9776 = 48, +9780 = 47, +9784 = 49 (player 1); +9644 = 1. Returns r3. A 96-byte frame (r31 saved). From `ModeType8Member::ModeType8Member` (`boot-mode.md`). Not seen in play. Read in full. |
+| `sub_8223BF00` | `Type8Screen0::~Type8Screen0` | | r3 = the screen: vtable `0x82010B74` put back, then a tail jump to `MenuList::Release(r3 + 9680)` (`alt-hud.md`). From `ModeType8Member::~ModeType8Member` (`boot-mode.md`). Not seen in play. Read in full. |
+| `sub_8223C528` | `Type8Screen0::DeletingDestructor` | | Slot 0 of vtable `0x82010B74`: vtable put back, `MenuList::Release(r3 + 9680)`, then `operator delete(r3)` when r4's bit 0 is set (`heap.md`); returns r3. A 112-byte frame (r30, r31 saved). No direct callers. Not seen in play. Read in full. |
+| `sub_8223C950` | `Type8Screen0::Init` | | r3 = the screen (member +0, its machine at +4). A 1,248-byte frame (r25 to r31 saved): 17 transitions through `StateMachine::Add` (`game-modes.md`), functors of vtable `0x82010978` on the screen; (state, message) → next state (0 = stay) handler: (0, 1) `OnEnter` (`sub_8223B630`); (1, 1) → 2 `OpenMovie` (`sub_8223B530`); (2, 1) `WaitForMovie` (`sub_8223B6D8`); (5, 5) → 8 `Suspend` (`sub_8223B540`); (8, 3) `Screen::Wait` (`sub_822508F0`, `type6-type7-modes.md`); (9, 6) `Screen::Reenter` (`sub_8223B740`, the same file); (4, 1) → 5 `Show` (`sub_8223BF18`); (5, 1) `Draw` (`sub_8223C888`); (5, 0) `Update` (`sub_8223C588`); (5, 9) `PickYes` (`sub_8223B590`); (5, 10) `PickNo` (`sub_8223B5A0`); (5, 12) `PickBack` (`sub_8223B5B0`); (5, 13) `OnDialogClosed` (`sub_8223C098`); (5, 4), (9, 4) and (10, 4) → 7 `Leave` (`sub_8223BA48`); (7, 4) → 6 `OnLeft` (`sub_8223B588`). Only caller `ModeType8::Init`. Not seen in play. Read in full (the transitions listed with `init_step_tables.py`). |
+| `sub_8223B630` | `Type8Screen0::OnEnter` | | (0, 1): +9644 = 1 (the menu takes input), +9648 = -1 (the dialog's answer), +9652, +9656, +9660 = 0, +9664 = -1 (no step), +9672 = -1, +9676 = 0; `MenuList::Init(+9680, 5, 5, 1, 154, 153, 155, 156, 159, 158)` (`save-data.md`; the last two from the frame's +84 and +92), `MenuList::SetSelection(+9680, 0)` (`race-screens.md`); then the state (+9608) = 1 when +9616 (open on its message) is set, else 9. A 144-byte frame. No direct callers. Not seen in play. Read in full. |
+| `sub_8223B530` | `Type8Screen0::OpenMovie` | | (1, 1) → 2: a tail jump to `UiMovies::Open(24, 22583)` (`ui-movies-game.md`). r3 not read. No stand model made here (the type 6 and 7 screens' `OpenMovie` make one: here `Init` and `UpdateStand` do). Not seen in play. Read in full. |
+| `sub_8223B6D8` | `Type8Screen0::WaitForMovie` | | (2, 1): while +9612 is 0: once `UiMovies::IsLoaded(24)`, +9612 = 1 and, in the same call, the state (+9608) = 4 (show) when the mode before (`[0x826032E0]`) was 1 (the race), else 9 (wait). A 96-byte frame. No direct callers. Not seen in play. Read in full. |
+| `sub_8223B540` | `Type8Screen0::Suspend` | | (5, 5) → 8: when +9620 is set, `UiMovies::Delete(24)` and +9612 = 0 (`Init` sets +9620 to 0: the movie kept). As `Type6Screen0::Suspend`. A 96-byte frame. No direct callers. Not seen in play. Read in full. |
+| `sub_8223BF18` | `Type8Screen0::Show` | | (4, 1) → 5: `SetTexts`; +9660 = +9652 when nonzero; +9664 = 0 (step 0, the opening), +9656 = 0, +9652 = -1, +9668 = 1 (step 1 queued after it). m = movie 24 (`UiMovies::Find` on `0x826C5CCC`): for each player's stand block (+9752, +9772): +16 (the model made) = 0, +0 = 0, `UiMovie::FinishNamed(m, +4)`, `(m, +8)`, `(m, +12)`. For each garage car c (`0x82814EB8`, stride 1,972): `CarCard(screen, i, c +12, Params::GetCarSpec(c +12)'s byte +769)` (`car-specs.md`). Then the music: the sound manager's slot 14 (`IsCuePlaying`) for bank 1's cue 0 and, when playing, slot 13 (`StopCue`) on it; slot 14 for bank 1's cue 2 and, when not playing, `Sound::Play(&1, &2)` (the menu music). A 176-byte frame (r25 to r31). No direct callers. Not seen in play. Read in full. |
+| `sub_8223B760` | `Type8Screen0::SetTexts` (probably) | | r3 not read: m = movie 24; `UiMovie::ResetPose(m)`; `UiMovie::SetText(m, 0, 5 + i, s)` for the strings 121, 122, 110, 113, 114 (i 0 to 4: the menu's five labels, the items opening the color list screen, the list screen, the car pick, the options and quitting; r7 to r10 left unset); `UiMovie::FinishNamed(m, 2 + i)` for i 0 to 4. A 160-byte frame. Only caller `Show`. Not seen in play. Read in full. |
+| `sub_8223BC68` | `Type8Screen0::CarCard` (probably) | | r3 not read, r4 = the player (0 or 1), r5 = the car's model id (garage car +12), r6 = its spec's byte +769: m = movie 24; n = `UiMovie::FindNode(m, -1, {16, 14}[player])` (from the frame); `UiMovie::SetNodeText(m, UiMovie::Child(n, 6), r6 + 1934)`, `(m, Child(n, 10), r5 + 1646)`, `(m, Child(n, 8), r5 + 1718)` (string ids from the maker and the model, probably). A 144-byte frame. Only caller `Show`. Not seen in play. Read in full. |
+| `sub_8223C888` | `Type8Screen0::Draw` | | (5, 1): the page table at `0x82814E94` built on the first call (guard bit 0 of `0x82814EB4`; four member pointers {function, 0}: page 0 `MenuPage` `sub_8223C6B8`, 1 `ConfirmPage` `sub_8223B5C0`, 2 the empty `sub_82106540`, 3 `ChosenPage` `sub_8223C0C0`); with the page (+9652) not -1, calls page[+9652] with r3 = the screen plus the pointer's adjustment, r4 unchanged (the dispatcher). A 128-byte frame. No direct callers. Not seen in play. Read in full. |
+| `sub_8223C588` | `Type8Screen0::Update` | | (5, 0): the step table at `0x82814E70` built on the first call (guard bit 0 of `0x82814E90`): step 0 `OpeningStep` `sub_8223C1A0`, 1 `ItemStep` `sub_8223BBC8`, 2 `CursorStep` `sub_8223C330`, 3 `FadeOutStep` `sub_8223BAF0`. m = movie 24. With a step (+9664 not -1): calls it (r3 = the screen plus the adjustment); when it returns nonzero: with no queued step (+9668 = -1) the page = +9656 and the step = -1, else +9672 = 0, the step = +9668, +9668 = -1; +9676 = 0 either way. With no step: `UiMovie::Run(m, 0)`. Then every call `UpdateStand(screen)`. A 160-byte frame. No direct callers. Not seen in play. Read in full. |
+| `sub_8223B808` | `Type8Screen0::UpdateStand` (probably) | | r3 = the screen: the two players' stage models. m = movie 24; the table at `0x82636FDC` (three words a player: the stage index into `[0x826D83E0]`, a flag, a command: {1, 1, 56}, {2, 0x80, 57}). First, for each player p (block b = +9752 + 20p): with the model not made (b +16 = 0) and no reload asked yet this call: `GarageStage::ReloadModel(stage, CarModels::BlockOf(car +12))` (`car-makers.md`; car = `0x82814EB8` + 1,972p) into b +16 (at most one reload a call, whatever it answers); when nonzero: a `Car` at the frame's +96 (`Car::Init`, `race-setup.md`; `memcpy` of the garage car's 1,884 bytes; its +3888 \|= the flag; `Car::Refresh`, `car-specs.md`), `GarageStage::SetPlates(stage, car +1968)` (`type6-type7-modes.md`), `GarageStage::SetCar(stage, the Car, car's halfword +0)` (`car-makers.md`). Then for each player: when `GarageStage::IsBusy(stage)` (`front-end-car-draw.md`) or a reload was asked this call: with the loading animations not shown (b +0 = 0), `FinishNamed(m, b +4)`, `PlayNamed(m, b +4, 0, 0, 0, 0)`, `FinishNamed(m, b +8)`, `PlayNamed(m, b +8, 0, ...)`, `LoopNamed(m, b +8)` and b +0 = 1; then `GarageStage::SetDrawWord(stage, 0)`. Else: with them shown, `FinishNamed(m, b +8)`, `FinishNamed(m, b +12)`, `PlayNamed(m, b +12, 0, ...)` and b +0 = 0; the stage's +6052 = 0, `GarageStage::Command(stage, the command)`, `SetDrawWord(stage, 1)`. Then `GarageStages::DrawAll` (`car-list.md`). A 4,096-byte frame. Only caller `Update` (every Update while shown). Not seen in play. Read in full. |
+| `sub_8223B590` | `Type8Screen0::PickYes` (probably) | | (5, 9): +9648 (the dialog's answer) = 1. Leaf. No direct callers. Not seen in play. Read in full. |
+| `sub_8223B5A0` | `Type8Screen0::PickNo` (probably) | | (5, 10): +9648 = 0. Leaf. No direct callers. Not seen in play. Read in full. |
+| `sub_8223B5B0` | `Type8Screen0::PickBack` (probably) | | (5, 12): +9648 = 2. Leaf. No direct callers. Not seen in play. Read in full. |
+| `sub_8223C098` | `Type8Screen0::OnDialogClosed` (probably) | | (5, 13), the dialog's closed message: +9644 = 1 (the menu takes input again); unless the answer (+9648) is 1 (yes), a tail jump to `ShowPage(screen, 1, 0)`. Leaf but for the jump. No direct callers. Not seen in play. Read in full. |
+| `sub_8223BA48` | `Type8Screen0::Leave` | | (5, 4), (9, 4) and (10, 4) → 7: m = movie 24; when found, `UiMovie::FinishAll(m)` and `UiMovies::Delete(24)`; then message (4, 0, 0) posted to the dispatcher r4 (ring +204: the count +804 up by one, the record at 12 × ((start +808 + count − 1) mod 50); no overflow check). The state isn't set here (the transition's next state 7 is). A 112-byte frame. No direct callers. Not seen in play. Read in full. |
+| `sub_8223B588` | `Type8Screen0::OnLeft` | | (7, 4) → 6: a tail jump to `MenuList::Release(r3 + 9680)` (`alt-hud.md`). No direct callers. Not seen in play. Read in full. |
+| `sub_8223C6B8` | `Type8Screen0::MenuPage` | | Page 0 (from `Draw`'s table): r3 = the screen, r4 = the dispatcher. Only while +9644 is set: `MenuList::Update(+9680)` (`race-screens.md`). Accepted (`MenuList::Accepted`): `MenuSound::Play(0)` (`menu-sounds.md`); item 4 (quit, `MenuList::Selection` ≥ 4): `Confirm(screen, 1, r4)`, +9660 = page unless 1, +9668 = -1, page 1, step -1; items 0 to 3: +9660 = page unless 3, step 3 (the fade out), +9668 = -1, +9656 = 3, page -1. Else cancelled (`MenuList::Cancelled`): `MenuSound::Play(2)`; unless on item 4, `MenuList::SetSelection(+9680, 4)` (the cursor to quit), +9660 = page when nonzero, +9656 = 0, +9668 = 1, page -1, step 2 (the cursor step). Else moved (+9704, the list's +24): `MenuSound::Play(4)`, +9660 = page when nonzero, +9656 = 0, +9668 = 1, page -1, step 2. Then m = movie 24: `UiMovie::SetText(m, 5, 0, item + 914)` (the item's help, strings 914 to 918), `UiMovie::ScrollText(m, 5, 0, 1)`, and when moved `sub_8211C5F8(m, 5, 0)` (the scroll reset, `ui-movies-game.md`). A 144-byte frame. Not seen in play. Read in full. |
+| `sub_8223C430` | `Type8Screen0::Confirm` (probably) | | r3 = the screen, r4 not read, r5 = the dispatcher: m = movie 16 (the dialog's yes/no): `UiMovie::SetText(m, -1, 0, 27)`, `(m, 1, 3, 2)`, `(m, 1, 4, 3)` (r7 to r10 unset), m +40960 = 1 (the cursor on the second choice), `[0x82814E6C]` = 0 (the asking player, `known-data.md`), message (7, 0, 0) posted (the dialog's `OpenConfirm`), +9648 = -1, +9644 = 0 (the menu off), then `ShowPage(screen, 1, 1)`. As `Type6Screen0::Confirm` and `Type8PanelScreen::AskQuit` (`type8-screens.md`). A 128-byte frame. Only caller `MenuPage`. Not seen in play. Read in full. |
+| `sub_8223B5C0` | `Type8Screen0::ConfirmPage` (probably) | | Page 1 (waiting on the quit confirm): by the answer (+9648): 0 (no) or 2 (back): +9660 = page when nonzero, step -1, page 0, +9668 = -1, +9648 = -1; 1 (yes): +9660 = page unless 3, step 3 (the fade out), +9668 = -1, +9656 = 3, page -1; others (-1: no answer yet) nothing. Leaf. Not seen in play. Read in full. |
+| `sub_8223C0C0` | `Type8Screen0::ChosenPage` (probably) | | Page 3 (after the fade out): r3 = the screen, r4 = the dispatcher. By `MenuList::Selection(+9680)`: 0 → message 16 (the color list screen), 1 → 14 (the list screen), 2 → 19 (the panel screen, the car pick), 3 → 21 (the options), each with the state (+9608) = 9 and the message (n, 0, 0) posted into the ring (+204); 4 (quit) → `ShowPage(screen, 0, 0)` and the state = 6 (done: `ModeType8::NextMode` then leaves for the type 4 front end). A 112-byte frame (r30, r31 saved). Not seen in play. Read in full. |
+| `sub_8223BD20` | `Type8Screen0::ShowPage` (probably) | | r3 not read, r4 = a, r5 = b: m = movie 24, sub-scene 6 (`UiMovie::ShowNode` / `HideNode` / `SetNodeTexture`, `ui-movies-game.md`): with a and b both 0: hide (−1, 6), hide 4 and 5; else show (−1, 6) and, with a set, show 4 and 5 and set their frames to 0, else hide them; then with b set show 6 and 7 at frame 1, else hide them; then hide 8 and 9. A 128-byte frame. From `OnDialogClosed`, `ChosenPage`, `OpeningStep` and `Confirm`. Not seen in play. Read in full. |
+| `sub_8223BE88` | `Type8Screen0::PlaceCursor` (probably) | | r3 not read, r4 = an item: m = movie 24; `UiMovie::FindNode(m, 0, 0)`'s +16 (a float) = float(40 × item) (the product sign-extended, stored as a doubleword at the frame's +80 and converted there, as `Type6Screen0::PlaceCursor`). A 112-byte frame (r31, f31). From `OpeningStep` and `CursorStep`. Not seen in play. Read in full. |
+| `sub_8223C1A0` | `Type8Screen0::OpeningStep` | | Step 0: r3 = the screen. m = movie 24. On the first call (+9676 = 0): `UiMovie::PlayNamed(m, 55, 0, 0, 0, 0)`; unless animation 39 is active (`UiMovie::IsNamedActive`), `PlayNamed(m, 39, 1, ...)` and `LoopNamed(m, 39)`; `FinishNamed(m, 2)`, `(m, 12)`, `(m, 13)`; `PlaceCursor(screen, the selection)`, `ShowPage(screen, 1, 0)`, `ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0)`, +9676 = 1. Every call `UiMovie::Run(m, 0)`; done (returns 1) when it returns 0 and both fades' counts (`0x826A50E4`, `0x826A50DC`) are 0, then `FinishNamed(m, 43)`, `PlayNamed(m, 43, 1, ...)`, `LoopNamed(m, 43)`; else 0. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_8223BBC8` | `Type8Screen0::ItemStep` (probably) | | Step 1 (queued after the opening and the cursor step): m = movie 24. On the first call: a = the selection + 2: `FinishNamed(m, a)`, `PlayNamed(m, a, 1, 0, 0, 0)`, `LoopNamed(m, a)` (the highlighted item's loop), +9676 = 1. Then `UiMovie::Run(m, 0)`; returns 1 (one call). A 128-byte frame. Not seen in play. Read in full. |
+| `sub_8223C330` | `Type8Screen0::CursorStep` | | Step 2 (the cursor moved, `MenuPage`): m = movie 24. On the first call: the selection s and the previous one (`MenuList::GetPreviousSelection`), d = s − previous: `FinishNamed(m, previous + 2)`, `(m, 12)`, `(m, 13)`; \|d\| = 1: `FinishNamed` and `PlayNamed(m, 13 if d > 0 else 12, 0, ...)` (the cursor's move), else `PlaceCursor(screen, s)`; +9676 = 1. Then `UiMovie::Run(m, 0)`; returns 1. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_8223BAF0` | `Type8Screen0::FadeOutStep` | | Step 3: m = movie 24. While +9644 is 0 (the menu off): `UiMovie::Run(m, 0)` and 0. Else on the first call `ScreenFades::FadeOut([0x82001BF0], 0)` (`mode-tick.md`) and +9676 = 1; then `Run(m, 0)`; done when both fades' counts are 0: `UiMovie::FinishAll(m)` and 1, else 0. A 112-byte frame (r30, r31). Not seen in play. Read in full. |
+| `sub_8223AE60` | `Type8Dialog::Init` | | r3 = the dialog (member +9792, its machine at +0, made by `ScreenMachine::ScreenMachine` in `ModeType8Member::ModeType8Member`). A 920-line body: 14 transitions through `StateMachine::Add`, functors of vtable `0x82011918` on the dialog: (0, 1) `OnEnter` (`sub_8223A408`); (1, 1) → 2 `OpenMovies` (`sub_8223A398`); (2, 1) `WaitForMovies` (`sub_8223ADC0`); (4, 1) → 5 the empty `sub_82106540`; (5, 1) `Draw` (`sub_8223AC00`); (5, 0) `Update` (`sub_8223AC58`); (5, 7) `Type7Dialog::QueueReopen` (`sub_822419D0`, `type6-type7-modes.md`); (8, 3) `ScreenMachine::Wait` (`sub_82277068`); (9, 7) `OpenConfirm` (`sub_8223A510`); (9, 8) `OpenNotice` (`sub_8223A4A0`); (9, 1) `DrawWaiting` (`sub_8223A5F0`); (5, 4) and (9, 4) `Dialog::Leave` (`sub_82225C70`, deleting movies 16 to 19, not 20); (7, 4) → 6 the empty `sub_82106540`. No cancel transition. Only caller `ModeType8::Init`. Not seen in play. Read in full (the transitions listed with `init_step_tables.py`). |
+| `sub_8223A408` | `Type8Dialog::OnEnter` | | (0, 1): +9608 (the movies loaded), +9640, +9644, +9648 = 0, +9652 = +9660 = -1, +9664 = 0, the menu at +9668 (+9668, +9672, +9676 = 0, +9680 = 0, +9684 = +9688 = 1, +9692, +9696, +9700, +9704, +9708, +9716, +9720, +9732 = 0), +9736 = 0, +9740 = 21 (no queued state), +9744 = +9748 = 0; then the state (+9604) = 1 when +9612 is set, else 9. Leaf. As `Type6Dialog::OnEnter` without its status word. Not seen in play. Read in full. |
+| `sub_8223A398` | `Type8Dialog::OpenMovies` | | (1, 1) → 2: `UiMovies::Open` 16 (asset 22559), 17 (22560), 18 (22561), 19 (22562) and 20 (22587). As `Dialog::OpenMovies` with the fifth movie. r3 not read. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_8223ADC0` | `Type8Dialog::WaitForMovies` | | (2, 1): while +9608 is 0, `UiMovies::IsLoaded` 16 to 20 in turn (stops at the first not loaded), all loaded: +9608 = 1; on the Draw after: +9736 = 1, the state = 9. A 96-byte frame. Not seen in play. Read in full. |
+| `sub_8223AC00` | `Type8Dialog::Draw` | | (5, 1): the page table in its frame {`ConfirmPage` `sub_8223A6B8`, `NoticePage` `sub_8223A858`}; with the page (+9640) not -1, calls page[+9640] (no bounds check; r3, r4 unchanged). A 96-byte frame. Not seen in play. Read in full. |
+| `sub_8223AC58` | `Type8Dialog::Update` | | (5, 0): r3 = the dialog, r4 = the dispatcher. m = the movie +9744. The step table in its frame: {`OpenConfirmStep` `sub_8223A940`, `Dialog::CloseConfirmStep` `sub_8223AA10`, `Dialog::OpenNoticeStep` `sub_822326A8`, `Dialog::CloseNoticeStep` `sub_8223AAA8`, `Dialog::MoveCursorStep` `sub_8223AB50`} (`type6-type7-modes.md`). With the step (+9652) -1: `UiMovie::Run(m, 0)`; with a step ≥ 0: calls it, and when it returns nonzero (or for a negative step other than -1, at once): with no queued step (+9656 = -1) page = +9644 and step -1, else +9660 = 0, step = +9656, +9656 = -1; +9664 = 0. Then with a queued state (+9740 not 21): when it's 9, message (13, 0, 0) posted (closed); the state = +9740, +9740 = 21. A 160-byte frame. As `Type6Dialog::Update` with its own step 0 and the closed message 13. Not seen in play. Read in full. |
+| `sub_8223A510` | `Type8Dialog::OpenConfirm` | | (9, 7): +9744 = 16; m = movie 16, `UiMovie::ResetPose(m)`; +9732 = `[0x82814E6C]` (the asking player); +9672 = +9668 (the previous cursor), +9668 = m +40960 (the cursor the asker set); +9644, +9640, +9648 = 0, +9660 = +9652 = -1, +9664 = 0; with the movies loaded (+9608): step 0, +9656 = -1, +9644 = 0, page -1, state 4; else state 1. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8223A4A0` | `Type8Dialog::OpenNotice` | | (9, 8): +9744 = 19; +9644, +9640, +9648 = 1, +9660 = +9652 = -1, +9664 = 0; loaded: +9656 = -1, +9644 = 1, page -1, step 2 (`Dialog::OpenNoticeStep`), state 4; else state 1. Leaf. Its poster not found. Not seen in play. Read in full. |
+| `sub_8223A5F0` | `Type8Dialog::DrawWaiting` | | (9, 1): only with +9748 set (a reopen queued by `Type7Dialog::QueueReopen`): +9748 = 0, then as `OpenConfirm` without the player word. A 128-byte frame. Not seen in play. Read in full. |
+| `sub_8223A6B8` | `Type8Dialog::ConfirmPage` | | Page 0: r3 = the dialog, r4 = the dispatcher. `Menu::Step(+9668)` (`menu-helpers.md`); `Menu::Pressed(+9668, 159)` (accept): `MenuSound::Play(0)`, +9648 = page when nonzero, +9656 = -1, page -1, step 1 (the close), +9644 = 0, message 9 (yes, cursor 0) or 10 (no) posted; else 158 (back): `MenuSound::Play(2)`, the same with message 12; else moved (+9676): `MenuSound::Play(4)`, +9648 = page when nonzero, +9656 = -1, step 4 (the cursor), +9644 = 0, page -1. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8223A858` | `Type8Dialog::NoticePage` | | Page 1: `Menu::Step(+9668)`; on 159 or 158: `MenuSound::Play` 0 (accept) or 2 (back), +9648 = page unless 1, +9656 = -1, page -1, step 3 (`Dialog::CloseNoticeStep`), +9644 = 1, message (11, 0, 0) posted. A 112-byte frame. Not seen in play. Read in full. |
+| `sub_8223A940` | `Type8Dialog::OpenConfirmStep` | | Step 0: r3 = the dialog. m = movie 16. On the first call (+9664 = 0): `MenuSound::Play(5)`, `UiMovie::PlayNamed(m, 5, 0, 0, 0, 0)` (the opening), +9664 = 1. Then `UiMovie::Run(m, 0)`; when it returns 0: `UiMovie::ResetPose(m)`, `PlayNamed(m, {1, 2}[cursor +9668], 1, 0, 0, 0)` (from the frame), `LoopLast(m)`, and returns 1; else 0. As `Dialog::OpenConfirmStep` with a `ResetPose`, probably. A 128-byte frame. Not seen in play. Read in full. |

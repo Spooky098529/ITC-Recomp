@@ -7,7 +7,7 @@ probably the two-player (split-screen) mode: the title screen's main
 menu item 4 (string 251) leaves the title with state 18, which
 `ModeType4::NextMode` turns into type 8 ([`title-screen.md`](title-screen.md)).
 Everything in the mode is laid out for two players: its Init (slot 0,
-`sub_8223D5D8`, a lead) makes the stand scene for three cars and puts
+`sub_8223D5D8`, [`type8-mode.md`](type8-mode.md)) makes the stand scene for three cars and puts
 the two players' garage cars (the two 1,972-byte entries at
 `0x82814EB8`, [`car-makers.md`](car-makers.md)) on garage stages 1 and
 2; the second player's save data is `[0x826C5B5C]` (the two-player save
@@ -74,8 +74,8 @@ out → page 2 (the prompt's back).
 
 Not here: the type 8 mode itself (its Init, its slots, its first screen
 `sub_8223C950`, the screen machine at +9792 `sub_8223AE60`, the block's
-constructor `sub_8223D2F0` and destructor `sub_8223BF00`: a lead in
-`../loops/leads.md`), and its options, controller pages and save screen
+constructor `sub_8223D2F0` and destructor `sub_8223BF00`: rows in
+[`type8-mode.md`](type8-mode.md)), and its options, controller pages and save screen
 (rows in `options-screen.md` and `save-screen.md`).
 
 Shared, with rows in other files: the panel handlers
