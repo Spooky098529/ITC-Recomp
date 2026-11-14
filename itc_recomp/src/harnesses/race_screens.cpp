@@ -2335,12 +2335,38 @@ void Transitions(Context& h) {
 // the update calls, the frame without its register saves, SetText's and
 // SetNodeText's varargs stores left out: their unset words are 0 in ours,
 // the user's call for the parking area, 2026-10-30).
+// A generator of the case's own: MovieGroup seeds its cases with
+// successive states of one xorshift sequence, so their streams are the same
+// shifted by one, and after the world's shaping (which draws a varying
+// number of words) many cases fall onto the same state and get the same
+// inputs. Mixed with `count` / 2 (the setup runs once for each version of a
+// case, in turn), each case's inputs are its own.
+Random Fresh(Random& r, uint64_t& count) {
+  const uint64_t salt = count++ / 2;
+  uint64_t x = r.Next() + 0x9E3779B97F4A7C15ull * (salt + 1);
+  x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
+  x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
+  return Random(x ^ (x >> 31));
+}
+
+// MovieGroup with each case's setup given a generator of its own (Fresh).
+void FreshGroup(Context& h, const MovieWorld& w, uint64_t& count, const char* name, int cases,
+                const MovieSetupFn& setup, GuestFunction recompiled, GuestFunction native,
+                const FrameSpec& spec) {
+  const MovieSetupFn fresh = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    setup(t, r, w);
+  };
+  MovieGroup(h, w, name, cases, fresh, recompiled, native, spec);
+}
+
 void Pause4(Context& h, const MovieWorld& w) {
   const World list_world;
   if (!list_world.ok()) {
     ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
     return;
   }
+  uint64_t count = 0;  // the setups run (Fresh)
   auto shape = [&h](Random& r, const MovieWorld& w, bool no_block) {
     guest::StoreU32(h.base, w.block(rs::kPause4Screen), w.movie(r.Below(kMovieCount)));
     const uint32_t data = w.block(rs::kPause4Data);
@@ -2449,19 +2475,19 @@ void Pause4(Context& h, const MovieWorld& w) {
   for (const Simple& f : simple) {
     FrameSpec spec{f.frame, f.saves, f.skip};
     if (f.init) spec.after = list_block;
-    MovieGroup(h, w, f.name, f.cases, *f.setup, f.recompiled, f.native, spec);
+    FreshGroup(h, w, count, f.name, f.cases, *f.setup, f.recompiled, f.native, spec);
   }
   FrameSpec saving{96, 8};
   saving.after = save_bytes;
-  MovieGroup(h, w, "PauseMenu4::LoadVolumes (sub_822107B8)", 100, plain, __imp__sub_822107B8,
+  FreshGroup(h, w, count, "PauseMenu4::LoadVolumes (sub_822107B8)", 100, plain, __imp__sub_822107B8,
              hooks::RaceScreensUnseenPause4LoadVolumes, saving);
-  MovieGroup(h, w, "PauseMenu4::SaveVolumes (sub_82210820)", 100, plain, __imp__sub_82210820,
+  FreshGroup(h, w, count, "PauseMenu4::SaveVolumes (sub_82210820)", 100, plain, __imp__sub_82210820,
              hooks::RaceScreensUnseenPause4SaveVolumes, saving);
-  MovieGroup(h, w, "PauseMenu4::AnswerPage (sub_82210910)", 100, plain, __imp__sub_82210910,
+  FreshGroup(h, w, count, "PauseMenu4::AnswerPage (sub_82210910)", 100, plain, __imp__sub_82210910,
              hooks::RaceScreensUnseenPause4AnswerPage, saving);
   // RestoreNodes: the group (r3) -1 or 0 to 3, the child (r4) 0 to 8.
-  MovieGroup(
-      h, w, "PauseMenu4::RestoreNodes (sub_822106E8)", 100,
+  FreshGroup(
+      h, w, count, "PauseMenu4::RestoreNodes (sub_822106E8)", 100,
       [&](PPCContext& t, Random& r, const MovieWorld& w) {
         shape(r, w, false);
         t.r3.u64 = r.Below(3) == 0 ? ~uint64_t(0) : r.Below(4);
@@ -2470,8 +2496,8 @@ void Pause4(Context& h, const MovieWorld& w) {
       __imp__sub_822106E8, hooks::RaceScreensUnseenPause4RestoreNodes, {128, 40});
   // ShowVolume: the node (r3) one of the world's sub-scenes or leaves, the
   // volume (r4) -2 to 17 or any.
-  MovieGroup(
-      h, w, "PauseMenu4::ShowVolume (sub_822105F8)", 150,
+  FreshGroup(
+      h, w, count, "PauseMenu4::ShowVolume (sub_822105F8)", 150,
       [&](PPCContext& t, Random& r, const MovieWorld& w) {
         shape(r, w, false);
         t.r3.u64 = r.Below(2) == 0 ? w.sub(r.Below(kSubScenes)) : w.leaf(r.Below(kLeaves));
@@ -2479,8 +2505,8 @@ void Pause4(Context& h, const MovieWorld& w) {
       },
       __imp__sub_822105F8, hooks::RaceScreensUnseenPause4ShowVolume, {112, 32, {40, 80}});
   // SetArrow: r3 0, 40 or any.
-  MovieGroup(
-      h, w, "PauseMenu4::SetArrow (sub_82210420)", 100,
+  FreshGroup(
+      h, w, count, "PauseMenu4::SetArrow (sub_82210420)", 100,
       [&](PPCContext& t, Random& r, const MovieWorld& w) {
         shape(r, w, false);
         const uint64_t values[3] = {0, 40, r.Next()};
@@ -2499,8 +2525,8 @@ void Pause4(Context& h, const MovieWorld& w) {
     guest::StoreU32(h.base, data + 36, page != -1 && page != 5 ? 1 : r.Below(2));
     guest::StoreU32(h.base, data + 0, r.Below(3));
   };
-  MovieGroup(
-      h, w, "PauseMenu4::ConfirmPage (sub_8220FF30)", 150,
+  FreshGroup(
+      h, w, count, "PauseMenu4::ConfirmPage (sub_8220FF30)", 150,
       [&](PPCContext&, Random& r, const MovieWorld& w) {
         shape(r, w, false);
         dialog(r, w);
@@ -2510,7 +2536,7 @@ void Pause4(Context& h, const MovieWorld& w) {
   FrameSpec main_page{112, 24};
   main_page.list_world = &list_world;
   main_page.list_global = rs::kPause4List;
-  MovieGroup(h, w, "PauseMenu4::MainPage (sub_8220FD48)", 400, plain, __imp__sub_8220FD48,
+  FreshGroup(h, w, count, "PauseMenu4::MainPage (sub_8220FD48)", 400, plain, __imp__sub_8220FD48,
              hooks::RaceScreensUnseenPause4MainPage, main_page);
   // VolumePage: the sound manager's slots 29 and 30 (GetCategory,
   // SetCategoryVolume) the getter sub_82090770 (r3 = +60) and the recorder
@@ -2539,8 +2565,8 @@ void Pause4(Context& h, const MovieWorld& w) {
       guest::StoreU32(h.base, kVolumes[i], saved_volumes[i]);
     }
   };
-  MovieGroup(
-      h, w, "PauseMenu4::VolumePage (sub_82210E58)", 400,
+  FreshGroup(
+      h, w, count, "PauseMenu4::VolumePage (sub_82210E58)", 400,
       [&](PPCContext&, Random& r, const MovieWorld& w) {
         shape(r, w, false);
         sound_slots(r, w);
@@ -2558,8 +2584,8 @@ void Pause4(Context& h, const MovieWorld& w) {
       guest::StoreU32(h.base, kVolumes[i], saved_volumes[i]);
     }
   };
-  MovieGroup(
-      h, w, "PauseMenu4::Update (sub_82211458)", 400,
+  FreshGroup(
+      h, w, count, "PauseMenu4::Update (sub_82211458)", 400,
       [&](PPCContext&, Random& r, const MovieWorld& w) {
         shape(r, w, false);
         sound_slots(r, w);
@@ -2572,8 +2598,8 @@ void Pause4(Context& h, const MovieWorld& w) {
   // missing movie's answer otherwise.
   FrameSpec open{128, 40};
   open.after = save_bytes;
-  MovieGroup(
-      h, w, "PauseMenu4::Open (sub_82211390)", 150,
+  FreshGroup(
+      h, w, count, "PauseMenu4::Open (sub_82211390)", 150,
       [&](PPCContext& t, Random& r, const MovieWorld& w) {
         shape(r, w, false);
         if (r.Below(2) == 0) {
@@ -2589,8 +2615,8 @@ void Pause4(Context& h, const MovieWorld& w) {
   // list's block 0 where the transition runs MenuList::Init (1, 6 and 10).
   FrameSpec draw{192, 64};
   draw.after = list_block;
-  MovieGroup(
-      h, w, "PauseMenu4::Draw (sub_82211590)", 400,
+  FreshGroup(
+      h, w, count, "PauseMenu4::Draw (sub_82211590)", 400,
       [&](PPCContext& t, Random& r, const MovieWorld& w) {
         const uint32_t pages = w.block(rs::kPause4Pages);
         const uint32_t pick = r.Below(14);
@@ -2606,20 +2632,6 @@ void Pause4(Context& h, const MovieWorld& w) {
         t.r3.u64 = w.block(rs::kPause4Screen);
       },
       __imp__sub_82211590, hooks::RaceScreensUnseenPause4Draw, draw);
-}
-
-// A generator of the case's own: MovieGroup seeds its cases with
-// successive states of one xorshift sequence, so their streams are the same
-// shifted by one, and after the world's shaping (which draws a varying
-// number of words) many cases fall onto the same state and get the same
-// inputs. Mixed with `count` / 2 (the setup runs once for each version of a
-// case, in turn), each case's inputs are its own.
-Random Fresh(Random& r, uint64_t& count) {
-  const uint64_t salt = count++ / 2;
-  uint64_t x = r.Next() + 0x9E3779B97F4A7C15ull * (salt + 1);
-  x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
-  x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
-  return Random(x ^ (x >> 31));
 }
 
 // The results at +1028 and +1032 (RaceResults::, SplitResults::): the
