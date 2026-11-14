@@ -124,4 +124,10 @@ void CoreForcdecptNoLocale(PPCContext& ctx, uint8_t* base);  // sub_825ADF18
 void CoreCropzerosNoLocale(PPCContext& ctx, uint8_t* base);  // sub_825ADF20
 void CoreCxxSetUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base);  // sub_825DAC58
 
+void CoreFflushNolock(PPCContext& ctx, uint8_t* base);  // sub_825ACD10 (no adapter)
+void CoreFlsall(PPCContext& ctx, uint8_t* base);        // sub_825ACD90 (no adapter)
+void CoreFflush(PPCContext& ctx, uint8_t* base);        // sub_825ACF70
+void CoreFlushall(PPCContext& ctx, uint8_t* base);      // sub_825AD068 (no adapter)
+void CoreEndstdio(PPCContext& ctx, uint8_t* base);      // sub_825AD5F8
+
 }  // namespace hooks

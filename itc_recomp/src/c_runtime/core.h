@@ -638,4 +638,34 @@ uint32_t Cftoe2(uint8_t* base, uint32_t buffer, uint32_t size, int32_t precision
 // the old filter kept at kCxxPreviousFilter. The old filter (its r3).
 uint32_t CxxSetUnhandledExceptionFilter(uint8_t* base, const Calls& calls);
 
+// sub_825ACD10 _fflush_nolock: from a 96-byte frame, a null stream: flsall(0)
+// (its r3); else _flush, -1 (sign-extended) when it fails; a commit stream
+// (+12 & 0x4000): _commit(_fileno), 0 when it gives 0 (its low word), else
+// -1 (64 bits); else 0.
+uint64_t FflushNolock(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_825ACD90 flsall: in its 144-byte frame (`flag` at +164, the caller's
+// frame + 20; +80 the index, +84 the count flushed, +88 the error), under
+// _lock(1), each __piob slot below _nstream holding a stream in use: under
+// _lock_file2, still in use: flag 1 (_flushall) _fflush_nolock counted
+// unless -1; flag 0 (fflush(NULL)) a stream being written (bit 1) through
+// _fflush_nolock, +88 = -1 when it gives -1; then the inner __finally
+// (sub_825ACF04); the outer one (sub_825ACEB4) after. +84 for flag 1, else
+// +88, as loaded.
+uint32_t Flsall(uint8_t* base, uint32_t flag, const Calls& calls);
+
+// sub_825ACF70 fflush: in its 112-byte frame (the stream at +132, the
+// caller's frame + 20; the result at +80): stdout and stderr 0, a null stream
+// flsall(0); else under _lock_file, _fflush_nolock, then its __finally
+// (sub_825AD02C). r3 as loaded (the result's low word, flsall's).
+uint32_t Fflush(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_825AD068 _flushall: flsall(1).
+uint32_t Flushall(uint8_t* base, const Calls& calls);
+
+// sub_825AD5F8 _endstdio (an exit table entry): from a 96-byte frame,
+// _flushall; _fcloseall when _exitflag ([0x82971144], a byte) is set; then
+// __piob freed.
+void Endstdio(uint8_t* base, const Calls& calls);
+
 }  // namespace c_runtime::core

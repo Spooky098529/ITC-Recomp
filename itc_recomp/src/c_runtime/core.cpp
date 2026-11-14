@@ -1873,4 +1873,101 @@ uint32_t CxxSetUnhandledExceptionFilter(uint8_t* base, const Calls& calls) {
   return previous;
 }
 
+
+uint64_t FflushNolock(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825ACD10 _fflush_nolock");
+  uint64_t result = 0;
+  calls.in_frame(96, [&](uint32_t) {
+    if (stream == 0) {
+      result = Flsall(base, 0, calls);
+      return;
+    }
+    if (int32_t(uint32_t(Flush(base, stream, calls))) != 0) {
+      result = uint64_t(int64_t(-1));
+      return;
+    }
+    if ((Load(base, stream + 12) & 0x4000) != 0) {
+      const uint64_t committed = Commit(base, uint32_t(Fileno(base, stream, calls)), calls);
+      result = uint32_t(committed) == 0 ? 0 : uint64_t(int64_t(-1));
+    }
+  });
+  return result;
+}
+
+uint32_t Flsall(uint8_t* base, uint32_t flag, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825ACD90 flsall");
+  uint32_t result = 0;
+  calls.in_frame(144, [&](uint32_t frame) {
+    Store(base, frame + 164, flag);
+    Store(base, frame + 84, 0);
+    Store(base, frame + 88, 0);
+    calls.guest(kLock, {1});
+    for (int32_t i = 0;; i++) {
+      Store(base, frame + 80, uint32_t(i));
+      if (i >= int32_t(Load(base, kNstream))) {
+        break;
+      }
+      const uint32_t index = uint32_t(i);
+      const uint32_t stream = Load(base, Load(base, kPiob) + 4 * index);
+      if (stream == 0 || (Load(base, stream + 12) & 131) == 0) {
+        continue;
+      }
+      LockFile2(index, stream, true, calls);
+      const uint32_t now = Load(base, Load(base, kPiob) + 4 * index);
+      const uint32_t flags = Load(base, now + 12);
+      if ((flags & 131) != 0) {
+        if (int32_t(flag) == 1) {
+          if (int32_t(uint32_t(FflushNolock(base, now, calls))) != -1) {
+            Store(base, frame + 84, Load(base, frame + 84) + 1);
+          }
+        } else if (flag == 0 && (flags & 2) != 0 &&
+                   int32_t(uint32_t(FflushNolock(base, now, calls))) == -1) {
+          Store(base, frame + 88, 0xFFFFFFFFu);
+        }
+      }
+      FlsallInnerFinally(base, index, kPiob, calls);
+    }
+    UnlockStreamsFinally(calls);
+    result = int32_t(Load(base, frame + 164)) == 1 ? Load(base, frame + 84)
+                                                   : Load(base, frame + 88);
+  });
+  return result;
+}
+
+uint32_t Fflush(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825ACF70 fflush");
+  uint32_t result = 0;
+  calls.in_frame(112, [&](uint32_t frame) {
+    Store(base, frame + 132, stream);
+    if (stream == c_runtime::kStreams + 32 || stream == c_runtime::kStreams + 64) {
+      return;
+    }
+    if (stream == 0) {
+      result = Flsall(base, 0, calls);
+      return;
+    }
+    LockFile(base, stream, true, calls);
+    Store(base, frame + 80, uint32_t(FflushNolock(base, stream, calls)));
+    UnlockFileFinally(base, stream, calls);
+    result = Load(base, frame + 80);
+  });
+  return result;
+}
+
+uint32_t Flushall(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AD068 _flushall");
+  return Flsall(base, 1, calls);
+}
+
+void Endstdio(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AD5F8 _endstdio");
+  calls.in_frame(96, [&](uint32_t) {
+    Flushall(base, calls);
+    if (guest::LoadU8(base, 0x82971144) != 0) {
+      Fcloseall(base, calls);
+    }
+    calls.free(Load(base, kPiob));
+  });
+}
+
 }  // namespace c_runtime::core

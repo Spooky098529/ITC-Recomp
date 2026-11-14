@@ -61,7 +61,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "checked by reading), bsearch (sub_825AC970), _cftoe2_l (sub_825ADF28; its "
               "_invoke_watson path checked by reading), _fassign, _forcdecpt and _cropzeros "
               "(sub_825ADF10, sub_825ADF18, sub_825ADF20) and __CxxSetUnhandledExceptionFilter "
-              "(sub_825DAC58) (checked by "
+              "(sub_825DAC58), fflush with _fflush_nolock and flsall (sub_825ACF70, sub_825ACD10, "
+              "sub_825ACD90), _flushall and _endstdio (sub_825AD068, sub_825AD5F8) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -75,7 +76,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "their caller _write), _close_nolock (sub_825B0C28, its caller _close), fclose and "
               "_fclose_nolock (their callers _fcloseall and fclose), _close, _freebuf and "
               "fclose's __finally (sub_825B0D10, sub_825B0EE0, sub_825A9664, their caller "
-              "_fclose_nolock or fclose) and _fcloseall's __finally (sub_825B4F38)");
+              "_fclose_nolock or fclose), _fcloseall's __finally (sub_825B4F38), _fflush_nolock, "
+              "flsall and _flushall (their callers fflush, flsall and _endstdio)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -646,6 +648,21 @@ void hooks::CoreCropzerosNoLocale(PPCContext& ctx, uint8_t* base) {
 void hooks::CoreCxxSetUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CxxSetUnhandledExceptionFilter(base, CRuntimeCoreCalls(ctx, base));
 }
+void hooks::CoreFflushNolock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::FflushNolock(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreFlsall(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Flsall(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreFflush(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Fflush(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreFlushall(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Flushall(base, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreEndstdio(PPCContext& ctx, uint8_t* base) {
+  cc::Endstdio(base, CRuntimeCoreCalls(ctx, base));
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -840,3 +857,10 @@ ITC_C_RUNTIME_CORE(825ADF18, CoreForcdecptNoLocale)
 ITC_C_RUNTIME_CORE(825ADF20, CoreCropzerosNoLocale)
 // __CxxSetUnhandledExceptionFilter: no registers; r3 = the old filter.
 ITC_C_RUNTIME_CORE(825DAC58, CoreCxxSetUnhandledExceptionFilter)
+// fflush: r3 = a stream (0 for all); r3 = 0, or -1 (as a word). (_fflush_nolock
+// sub_825ACD10, flsall sub_825ACD90 and _flushall sub_825AD068 have no
+// adapters: their callers, fflush, _fflush_nolock, flsall and _endstdio, are
+// native.)
+ITC_C_RUNTIME_CORE(825ACF70, CoreFflush)
+// _endstdio: no registers (an exit table entry).
+ITC_C_RUNTIME_CORE(825AD5F8, CoreEndstdio)

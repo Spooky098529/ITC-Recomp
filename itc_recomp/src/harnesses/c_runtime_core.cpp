@@ -3581,6 +3581,152 @@ void CxxSetFilterCases(Context& h) {
   results.Report();
 }
 
+
+// _fflush_nolock, fflush, flsall, _flushall and _endstdio: _nstream (0 to
+// 32) and __piob swapped for a test table for the case (both put back
+// after; for _endstdio a C runtime heap block, as it frees it, and at most 20
+// slots), each slot empty or a test stream (TestStream, its flags from
+// BufferFlags with the commit bit 0x4000 now and then) in a block of the
+// harness's; slots below 20 hold streams only where their lock (16 + the
+// slot) was made at boot (_lock would make the others for good), those from
+// 20 their own lock at +32. Locks 1 and 10 made at boot. The single-stream
+// calls take one of the table's streams, stdout or stderr (fflush), or 0
+// (the whole table). flsall's flag 0, 1 or random; _exitflag ([0x82971144])
+// set or not for _endstdio (put back after). errno, _doserrno and the last
+// error random before, the invalid parameter handler the shared "returns
+// 0". Compared: r3 (64 bits; not for _endstdio, which leaves free's), the
+// table, the streams, the first block's entries, errno, _doserrno, the last
+// error, the caller's frame + 20 (fflush, flsall), the blocks held (the
+// table for _endstdio) and the files left open.
+void FlushAllCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(64 * 32 + 4 * 32, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || !BootLock(h, 1) || own == 0 ||
+      !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: flsall: no handle block, thread data, locks 1 and "
+                  "10, block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  const uint32_t own_table = own + 64 * 32;
+  const uint32_t nstream = Load(h.base, cc::kNstream), piob = Load(h.base, cc::kPiob);
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint8_t exitflag = guest::LoadU8(h.base, 0x82971144);
+  enum Which { kNolock, kFflush, kFlsall, kFlushall, kEndstdio };
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    Which which;
+  };
+  for (const Fn& fn :
+       {Fn{"_fflush_nolock (sub_825ACD10)", __imp__sub_825ACD10, hooks::CoreFflushNolock, kNolock},
+        Fn{"fflush (sub_825ACF70)", __imp__sub_825ACF70, hooks::CoreFflush, kFflush},
+        Fn{"flsall (sub_825ACD90)", __imp__sub_825ACD90, hooks::CoreFlsall, kFlsall},
+        Fn{"_flushall (sub_825AD068)", __imp__sub_825AD068, hooks::CoreFlushall, kFlushall},
+        Fn{"_endstdio (sub_825AD5F8)", __imp__sub_825AD5F8, hooks::CoreEndstdio, kEndstdio}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 48; c++) {
+      const uint32_t count = h.random.Below(fn.which == kEndstdio ? 21 : 33);
+      std::vector<std::pair<bool, TestStream>> streams;
+      for (uint32_t i = 0; i < count; i++) {
+        const bool usable = i >= 20 || BootLock(h, 16 + i);
+        TestStream s = TestStream::Pick(h, nhandle);
+        s.flags = BufferFlags(h) & ~0x4000u;
+        if (h.random.Below(4) == 0) {
+          s.flags |= 0x4000;
+        }
+        if (h.random.Below(3) != 0) {
+          s.used = h.random.Below(2) == 0 ? 0 : h.random.Below(16);
+        }
+        streams.emplace_back(usable && h.random.Below(4) != 0, s);
+      }
+      std::vector<uint32_t> present;
+      for (uint32_t i = 0; i < count; i++) {
+        if (streams[i].first) {
+          present.push_back(i);
+        }
+      }
+      const uint32_t pick = h.random.Below(6);
+      uint32_t stream_arg = 0;
+      if ((fn.which == kNolock || fn.which == kFflush) && pick != 0) {
+        if (fn.which == kFflush && pick == 1) {
+          stream_arg = cc::kIob + 32 * (1 + h.random.Below(2));
+        } else if (!present.empty()) {
+          stream_arg = own + 64 * present[h.random.Below(uint32_t(present.size()))];
+        }
+      }
+      const uint32_t flag = h.random.Below(5) == 0 ? uint32_t(h.random.Next()) : h.random.Below(2);
+      const uint8_t exit_byte = h.random.Below(2) == 0 ? 0 : uint8_t(h.random.Next() | 1);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{handles, 44 * 32}, {slots.data + 8, 8}});
+        StreamWorld world(h, handles);
+        const uint32_t table = fn.which == kEndstdio ? Block(h.base, 4 * 32) : own_table;
+        for (uint32_t i = 0; i < count; i++) {
+          uint32_t stream = 0;
+          if (streams[i].first) {
+            stream = own + 64 * i;
+            world.Set(stream, streams[i].second);
+          }
+          Store(h.base, table + 4 * i, stream);
+        }
+        Store(h.base, cc::kNstream, count);
+        Store(h.base, cc::kPiob, table);
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        guest::StoreU8(h.base, 0x82971144, exit_byte);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = fn.which == kFlsall ? flag : stream_arg;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        Store(h.base, cc::kNstream, nstream);
+        Store(h.base, cc::kPiob, piob);
+        guest::StoreU8(h.base, 0x82971144, exitflag);
+        if (fn.which != kEndstdio) {
+          out[v].Word(t.r3.u32);
+          out[v].Word(uint32_t(t.r3.u64 >> 32));
+        }
+        const bool table_held = memory::IsHeapBlock(table);
+        for (uint32_t i = 0; i < count && (fn.which != kEndstdio || table_held); i++) {
+          out[v].Word(Load(h.base, table + 4 * i));
+        }
+        for (uint32_t i = 0; i < count; i++) {
+          if (streams[i].first) {
+            world.StreamOutputs(out[v], own + 64 * i);
+            if (i >= 20) {
+              out[v].Bytes(Section(h, own + 64 * i + 32));
+            }
+          }
+        }
+        for (uint32_t e = 3; e < 32; e++) {
+          world.EntryOutputs(out[v], handles + 44 * e);
+        }
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        if (fn.which == kFflush || fn.which == kFlsall) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        world.Release(out[v]);
+        if (fn.which == kEndstdio) {
+          HeldOutputs(out[v], {table});
+        }
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -3654,6 +3800,7 @@ void CRuntimeCore(Context& h) {
   BsearchCases(h);
   Cftoe2Cases(h);
   CxxSetFilterCases(h);
+  FlushAllCases(h);
 }
 
 }  // namespace harness
