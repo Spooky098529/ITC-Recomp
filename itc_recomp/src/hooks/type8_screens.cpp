@@ -72,7 +72,9 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "sub_82258BE0, Step3 sub_82258438 and DimList sub_822587C8, "
               "PairedNodeTable::Clear sub_82248A20 (the list helpers', node tables' and "
               "NodeListScreen's plain C++, the UI movies' named animations and Run and the menus' "
-              "guest calls)) natively instead of through the translated "
+              "guest calls), Type8ColorListScreen::Type8ColorListScreen sub_8223DFC0, "
+              "DeletingDestructor sub_8223E2B8, OpenMovie sub_8223E310, ItemInfo sub_8223E4D0 "
+              "and InitMachine sub_8223E9D8 (its step table)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=type8_screens)");
 
 namespace hooks {
@@ -224,6 +226,14 @@ ITC_T8_STEP(Type8ListStep1, t8::ListBaseStep1(base, ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ListStep2, t8::ListBaseStep2(base, ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ListStep3, t8::ListBaseStep3(base, ctx.r3.u64, sp, calls))
 
+ITC_T8_STEP(Type8ColorListConstruct, t8::ColorList8Construct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ColorListDeletingDestruct,
+            t8::ColorList8DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorListOpenMovie,
+            t8::ColorList8OpenMovie(base, ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
+ITC_T8_STEP(Type8ColorListItemInfo,
+            t8::ColorList8ItemInfo(base, ctx.r4.u64, ctx.r5.u64, sp, uint32_t(ctx.lr), calls))
+
 #undef ITC_T8_STEP
 
 void Type8InitMachine(PPCContext& ctx, uint8_t* base) {
@@ -234,6 +244,16 @@ void Type8InitMachine(PPCContext& ctx, uint8_t* base) {
                                       &machine, &replaced);
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
   // transition's address from the machine's 64-bit r3.
+  const uint64_t machine_r3 = object_r3 + (machine - ctx.r3.u32);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
+void Type8ColorListInitMachine(PPCContext& ctx, uint8_t* base) {
+  const uint64_t object_r3 = ctx.r3.u64;
+  uint32_t machine = 0;
+  bool replaced = false;
+  const uint32_t r3 = t8::ColorList8InitMachine(
+      base, ctx.r3.u32, ctx.r1.u32 - t8::kColorListInitMachineFrame, &machine, &replaced);
   const uint64_t machine_r3 = object_r3 + (machine - ctx.r3.u32);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
@@ -350,3 +370,11 @@ ITC_TYPE8_SCREENS(82258158, Type8ListStep0)
 ITC_TYPE8_SCREENS(82258648, Type8ListStep1)
 ITC_TYPE8_SCREENS(82258BE0, Type8ListStep2)
 ITC_TYPE8_SCREENS(82258438, Type8ListStep3)
+// The color list screen: its constructor and destructor (from the type 8
+// mode's member's, recompiled), its InitMachine (slot 5, from
+// ListScreen::Init's plain C++ through a guest call) and its vtable's slots.
+ITC_TYPE8_SCREENS(8223DFC0, Type8ColorListConstruct)
+ITC_TYPE8_SCREENS(8223E2B8, Type8ColorListDeletingDestruct)
+ITC_TYPE8_SCREENS(8223E310, Type8ColorListOpenMovie)
+ITC_TYPE8_SCREENS(8223E4D0, Type8ColorListItemInfo)
+ITC_TYPE8_SCREENS(8223E9D8, Type8ColorListInitMachine)

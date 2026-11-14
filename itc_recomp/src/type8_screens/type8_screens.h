@@ -581,4 +581,41 @@ uint64_t ListBaseDimList(uint8_t* base, uint64_t r3, uint64_t dim, uint32_t sp,
 // finished. The last call's r3.
 uint64_t PairedNodeTableClear(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
+// --- The color list screen (color_list_screen.cpp): Type8ColorListScreen
+// (11,828 bytes with its part, vtable 0x82010CF0) over ColorListScreen: the
+// item list +10144 (9 items, 3 shown), the course list +10216 (2), the
+// traffic toggle +10288, the race kind list +10360 (3), the color node
+// table +10432, the color list part +11040. Names prefixed ColorList8 ---
+
+constexpr uint32_t kColorListVtable = 0x82010CF0;
+constexpr uint32_t kColorListPart = 11040;
+
+// sub_8223DFC0 Type8ColorListScreen::Type8ColorListScreen (144-byte frame):
+// ColorListScreen::ColorListScreen's plain C++, its vtable, the color list
+// part on +11040 (+9676 its address), then its words in the original's
+// order (the node table's through [+9672], read again for each store; its
+// 15 items' +0, +140 and color masks from the item records at 0x82010BE0).
+// r3 left.
+uint64_t ColorList8Construct(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_8223E2B8 Type8ColorListScreen::DeletingDestructor (112):
+// ~Type8ColorListPart on +11040, ~ColorListScreen, operator delete (a guest
+// call) when bit 0 of `flags` is set. r3 left.
+uint64_t ColorList8DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                    const Calls& calls);
+// sub_8223E310 Type8ColorListScreen::OpenMovie (slot 12):
+// UiMovies::Open([+9680], 22585), a tail call from `sp` returning to `lr`.
+uint64_t ColorList8OpenMovie(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                             const Calls& calls);
+// sub_8223E4D0 Type8ColorListScreen::ItemInfo (slot 25; a leaf): r3 = r5;
+// item r4 (0 to 8, unsigned, else nothing)'s 28 bytes from 0x82010BE0 to
+// r5 (memcpy's plain C++, or its tail call from `sp` returning to `lr`).
+uint64_t ColorList8ItemInfo(uint8_t* base, uint64_t r4, uint64_t r5, uint32_t sp, uint32_t lr,
+                            const Calls& calls);
+// sub_8223E9D8 Type8ColorListScreen::InitMachine (slot 5; a 992-byte
+// frame): its 13 transitions on the machine at +4, as InitMachine above
+// (its step table in init_table.h).
+constexpr uint32_t kColorListInitMachineFrame = 992;
+uint32_t ColorList8InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* machine,
+                               bool* replaced);
+
 }  // namespace type8_screens

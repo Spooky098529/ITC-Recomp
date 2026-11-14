@@ -1,4 +1,5 @@
-// Type8PanelScreen::InitMachine (docs/functions/type8-screens.md) as plain
+// Type8PanelScreen::InitMachine and Type8ColorListScreen::InitMachine
+// (docs/functions/type8-screens.md) as plain
 // C++: the original's stores and copies in its frame and its
 // StateMachine::Add calls replayed in its order from its step table
 // (init_table.h), as the type 6 and 7 screens' InitMachines are
@@ -36,11 +37,10 @@ struct Step {
 
 #include "type8_screens/init_table.h"
 
-}  // namespace
-
-uint32_t InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* machine,
-                     bool* replaced) {
-  ITC_NATIVE_RUNNING("sub_82238E98 Type8PanelScreen::InitMachine");
+// A step table run on `screen` with its frame at `frame` (`frame_bytes`).
+template <size_t N>
+uint32_t Run(uint8_t* base, const Step (&steps)[N], uint32_t screen, uint32_t frame,
+             uint32_t frame_bytes, uint32_t* machine, bool* replaced) {
   auto at = [&](const Value& v) {
     switch (v.base) {
       case Value::kConst:
@@ -52,9 +52,9 @@ uint32_t InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* m
     }
     return frame + v.value;
   };
-  guest::StoreU32(base, frame, frame + kInitMachineFrame);
+  guest::StoreU32(base, frame, frame + frame_bytes);
   uint32_t r3 = 0;
-  for (const Step& step : k82238E98) {
+  for (const Step& step : steps) {
     switch (step.op) {
       case Op::kStore:
         guest::StoreU32(base, at(step.a), at(step.b));
@@ -69,6 +69,20 @@ uint32_t InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* m
     }
   }
   return r3;
+}
+
+}  // namespace
+
+uint32_t InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* machine,
+                     bool* replaced) {
+  ITC_NATIVE_RUNNING("sub_82238E98 Type8PanelScreen::InitMachine");
+  return Run(base, k82238E98, screen, frame, kInitMachineFrame, machine, replaced);
+}
+
+uint32_t ColorList8InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* machine,
+                               bool* replaced) {
+  ITC_NATIVE_RUNNING("sub_8223E9D8 Type8ColorListScreen::InitMachine");
+  return Run(base, k8223E9D8, screen, frame, kColorListInitMachineFrame, machine, replaced);
 }
 
 }  // namespace type8_screens

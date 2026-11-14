@@ -143,4 +143,11 @@ void Type8ListStep1(PPCContext& ctx, uint8_t* base);
 void Type8ListStep2(PPCContext& ctx, uint8_t* base);
 void Type8ListStep3(PPCContext& ctx, uint8_t* base);
 
+// The color list screen: its constructor, destructor, machine and slots.
+void Type8ColorListConstruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorListDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type8ColorListOpenMovie(PPCContext& ctx, uint8_t* base);
+void Type8ColorListItemInfo(PPCContext& ctx, uint8_t* base);
+void Type8ColorListInitMachine(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

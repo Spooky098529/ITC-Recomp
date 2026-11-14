@@ -55,6 +55,12 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
     if (!r4 || !r5) return std::nullopt;
     return type8_screens::ListScreen8ItemInfo(base, r3, *r4, uint32_t(*r5));
   }
+  // The type 8 color list screen's slot 25 (r4 the item;
+  // src/type8_screens/color_list_screen.cpp).
+  if (target == 0x8223E4D0) {
+    if (!r4 || !r5) return std::nullopt;
+    return type8_screens::ColorList8ItemInfo(base, *r4, *r5, sp, lr, calls);
+  }
   // The list part's and its inner part's slots, and the inner's pages and
   // steps (list_part.cpp); r5, which only the guest fallbacks see, isn't
   // passed on (the plain C++ here doesn't read it).
@@ -435,6 +441,9 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return type8_screens::ListBaseStep2(base, r3, sp, calls);
     case 0x82258438:
       return type8_screens::ListBaseStep3(base, r3, sp, calls);
+    // The type 8 color list screen's slot 12 (color_list_screen.cpp).
+    case 0x8223E310:
+      return type8_screens::ColorList8OpenMovie(base, r3, sp, lr, calls);
     default:
       return std::nullopt;
   }
@@ -451,6 +460,7 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
       return has_r5;
     case 0x82242FA0:
     case 0x8223F598:
+    case 0x8223E4D0:
       return has_r4 && has_r5;
     case 0x82243238:
     case 0x822432A8:
@@ -493,6 +503,7 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
       return has_r4;
     case 0x82253108:
     case 0x8223F590:
+    case 0x8223E310:
     case 0x8223F3E0:
     case 0x8223F588:
     case 0x8223F3F0:

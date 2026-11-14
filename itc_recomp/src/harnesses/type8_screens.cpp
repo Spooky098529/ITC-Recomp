@@ -371,6 +371,22 @@ void Leaves(Context& h, uint32_t world) {
         t.r5.u64 = w + 0x7000 + 4 * r.Below(48);
       },
       __imp__sub_8223F598, hooks::Type8ListItemInfo);
+  // The color list screen's (color_list_screen.cpp): ItemInfo's r4 an
+  // item (0 to 8 mostly, else 9 to 12 or any word), memcpy's tail call (its
+  // plain C++ on both sides) leaving the stack below as it finds it.
+  Group(
+      h, world, "Type8ColorListScreen::OpenMovie", 0x8223E310, 4, {0, 0}, list_id,
+      __imp__sub_8223E310, [](PPCContext& t, uint8_t* b) {
+        const t8::Calls c = RecordingCalls(t, b);
+        t.r3.u64 = t8::ColorList8OpenMovie(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+      });
+  Group(
+      h, world, "Type8ColorListScreen::ItemInfo", 0x8223E4D0, 12, {0, 0, false},
+      [](PPCContext& t, Random& r, uint32_t w) {
+        t.r4.u64 = r.Below(4) == 0 ? (r.Below(2) == 0 ? 9 + r.Below(4) : r.Next()) : r.Below(9);
+        t.r5.u64 = (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0) | (w + 0x7000 + 4 * r.Below(48));
+      },
+      __imp__sub_8223E4D0, hooks::Type8ColorListItemInfo);
   Group(h, world, "Type8PanelScreen::InitWords", 0x82238420, 4, {0, 0}, NoSetup,
         __imp__sub_82238420, hooks::Type8InitWords);
   Group(h, world, "Type8PanelScreen::IsLoaded", 0x82238418, 2, {0, 0}, NoSetup,
@@ -543,6 +559,46 @@ void Released(Outputs& out) {
 
 void NativeInitMachine(PPCContext& t, uint8_t* b) { hooks::Type8InitMachine(t, b); }
 
+// The color list screen's menus MenuList::Release frees in its destructor
+// (+10144, +10216, +10288, +10360 and the color list part's six, its
+// inner's two blocks' +12, +84 and +156): their item blocks 0 or pages of
+// the allocation layer's, compared by whether they're still pages after.
+void ColorListMenus(uint8_t* base, uint32_t screen, Random& r, bool zero) {
+  std::vector<uint32_t> lists = {screen + 10144, screen + 10216, screen + 10288, screen + 10360};
+  for (const uint32_t b : {screen + t8::kColorListPart + 20 + 40,
+                           screen + t8::kColorListPart + 20 + 404}) {
+    for (const uint32_t at : {12u, 84u, 156u}) lists.push_back(b + at);
+  }
+  for (const uint32_t list : lists) {
+    uint32_t block = 0;
+    if (!zero && r.Below(2) == 0) {
+      block = memory::AllocPages(64, 4096);
+      g_made.push_back(block);
+    }
+    guest::StoreU32(base, list + race_screens::kListBlock, block);
+  }
+}
+
+// The machine (+4) empty, or holding transitions whose keys are small
+// numbers (states below 12, messages below 36, so some match the Init's:
+// Add replaces those).
+void LayMachine(uint8_t* base, uint32_t machine, Random& r) {
+  namespace gm = game_modes;
+  if (r.Below(2) == 0) {
+    gm::StateMachineConstruct(base, machine);
+    guest::StoreU32(base, machine + gm::kTransitionCount, 0);
+    return;
+  }
+  guest::StoreU32(base, machine + gm::kTransitionCount, 8 + r.Below(160));
+  for (uint32_t i = 0; i < gm::kTransitions; i++) {
+    const uint32_t at = machine + gm::kTransitionBytes * i;
+    guest::StoreU32(base, at, r.Below(12));
+    guest::StoreU32(base, at + 4, r.Below(36));
+    guest::StoreU32(base, at + 8, r.Below(8) == 0 ? 1 : 0);
+    guest::StoreU32(base, at + 12, 0);
+  }
+}
+
 void Screen(Context& h, uint32_t world) {
   uint8_t* const base = h.base;
   Group(h, world, "Type8PanelScreen::Type8PanelScreen", 0x822386F0, 6, {224, 112}, NoSetup,
@@ -569,29 +625,29 @@ void Screen(Context& h, uint32_t world) {
         }
       },
       __imp__sub_822388D8, hooks::Type8DeletingDestruct);
-  // The machine (+4) empty, or holding transitions whose keys are small
-  // numbers (states below 12, messages below 36, so some match the
-  // Init's: Add replaces those).
+  // The machine (+4) laid by LayMachine.
+  const auto machine = [base](PPCContext&, Random& r, uint32_t w) {
+    LayMachine(base, w + kObjectAt + 4, r);
+  };
+  Group(h, world, "Type8PanelScreen::InitMachine", 0x82238E98, 12, {1712, 80}, machine,
+        __imp__sub_82238E98, NativeInitMachine);
+  // The color list screen's (color_list_screen.cpp) on a random screen.
+  Group(h, world, "Type8ColorListScreen::Type8ColorListScreen", 0x8223DFC0, 4, {144, 56},
+        NoSetup, __imp__sub_8223DFC0, hooks::Type8ColorListConstruct);
+  Group(h, world, "Type8ColorListScreen::InitMachine", 0x8223E9D8, 12, {992, 56}, machine,
+        __imp__sub_8223E9D8, hooks::Type8ColorListInitMachine);
   Group(
-      h, world, "Type8PanelScreen::InitMachine", 0x82238E98, 12, {1712, 80},
-      [base](PPCContext&, Random& r, uint32_t w) {
-        namespace gm = game_modes;
-        const uint32_t machine = w + kObjectAt + 4;
-        if (r.Below(2) == 0) {
-          gm::StateMachineConstruct(base, machine);
-          guest::StoreU32(base, machine + gm::kTransitionCount, 0);
-          return;
-        }
-        guest::StoreU32(base, machine + gm::kTransitionCount, 8 + r.Below(160));
-        for (uint32_t i = 0; i < gm::kTransitions; i++) {
-          const uint32_t at = machine + gm::kTransitionBytes * i;
-          guest::StoreU32(base, at, r.Below(12));
-          guest::StoreU32(base, at + 4, r.Below(36));
-          guest::StoreU32(base, at + 8, r.Below(8) == 0 ? 1 : 0);
-          guest::StoreU32(base, at + 12, 0);
-        }
+      h, world, "Type8ColorListScreen::DeletingDestructor", 0x8223E2B8, 6, {112, 24},
+      [base](PPCContext& t, Random& r, uint32_t w) {
+        ColorListMenus(base, w + kObjectAt, r, false);
+        t.r4.u64 = r.Next() & ~1ull;
       },
-      __imp__sub_82238E98, NativeInitMachine);
+      __imp__sub_8223E2B8, hooks::Type8ColorListDeletingDestruct, Released);
+  Deleting(
+      h, "Type8ColorListScreen::DeletingDestructor", 0x8223E2B8,
+      t8::kColorListPart + 788,
+      [base](uint32_t object, Random& r) { ColorListMenus(base, object, r, true); },
+      __imp__sub_8223E2B8, hooks::Type8ColorListDeletingDestruct);
 }
 
 // PickCar: both car list bases' words (+232 the tab 0 to 3, +236 to +248

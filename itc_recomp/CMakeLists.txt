@@ -502,6 +502,7 @@ set(ITC_SOURCES
     src/type8_screens/list_part.cpp
     src/type8_screens/color_part.cpp
     src/type8_screens/list_screen.cpp
+    src/type8_screens/color_list_screen.cpp
     src/car_list/panels.cpp
     src/car_list/set.cpp
     src/car_list/pages.cpp
