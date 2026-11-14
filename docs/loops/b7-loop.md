@@ -586,6 +586,12 @@ Calls so far for decisions the loop meets often:
   kind 6 (Live time attack) screens and the network battle become
   unreachable and get Dropped rows, not ports. Native code already
   made for them stays until the user says otherwise.
+  Where our native code still names the multiplayer code on a branch
+  play can't take now (the mode factory's type 12, the race HUD
+  machine's kind 4 and 6 branches), that branch goes under the same
+  flag, so the static map stops counting it (`Mode::Create`'s guard
+  kept; the race screens' to follow; the user's call, 2026-11-14). The
+  items are silent (no refusal cue) and look as they did.
 - (Superseded for the Live modes by the bypass above.) An Xbox Live front-end mode the player can open (the type 12 mode,
   the network battle and time attack, `network-mode.md`): its screens
   are made native as any front-end mode's, and its Xbox Live calls
