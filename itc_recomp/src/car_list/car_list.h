@@ -160,6 +160,27 @@ uint64_t CarSetStats(uint8_t* base, uint32_t panel, uint32_t record, uint32_t sp
 // spec's +769).
 uint64_t CarSetCarName(uint8_t* base, uint32_t panel, uint64_t id, uint64_t kind, uint32_t sp,
                        const Calls& calls);
+// sub_8224E878 CarPanelBase::SetCarName (slot 2 of the C panels' base
+// vtable 0x820111C0, and of Panel8C's; r4 the car's id, r5 the spec's +769):
+// node +36's children +132, +136, +140 given texts kind + 1934, id + 1646,
+// id + 1718 (SetNodeText, r6 to r10 unset: 0) when their indices aren't
+// negative. Returns r3 as the original leaves it.
+constexpr uint32_t kBaseSetCarName = 0x8224E878;
+uint64_t BaseSetCarName(uint8_t* base, uint32_t panel, uint64_t id, uint64_t kind, uint32_t sp,
+                        const Calls& calls);
+// sub_8224E490 Panel6C::SetStats (probably; r4 the stats record): node +24's
+// 18 texts by the child indices at +160 to +244 (SetNodeText; the record's
+// +0, +8 to +28, +8 and +24 scaled as CarPanel::SetStats does). Returns r3
+// as the original leaves it.
+uint64_t Panel6CSetStats(uint8_t* base, uint32_t panel, uint32_t record, uint32_t sp,
+                         const Calls& calls);
+// sub_8224D7E0 CarPanelBase::~CarPanelBase: +0 = 0x820111C0. r3 left.
+constexpr uint32_t kCarPanelBaseVtable = 0x820111C0;
+uint64_t CarPanelBaseDestruct(uint8_t* base, uint64_t panel);
+// sub_8224EBB0 ConfirmPanel::ConfirmPanel: +0 = 0x82010B5C, +4 = 0, +8 = 2,
+// +12 to +36 = -1. r3 left.
+constexpr uint32_t kConfirmPanelVtable = 0x82010B5C;
+uint64_t ConfirmPanelConstruct(uint8_t* base, uint64_t panel);
 // sub_82241868 Panel7C::ShowArrows (slot 3; r4 shown).
 uint64_t Panel7CShowArrows(uint8_t* base, uint32_t panel, uint64_t shown, uint32_t sp,
                            const Calls& calls);
@@ -221,6 +242,51 @@ uint64_t SetDestruct(uint8_t* base, uint64_t set, uint32_t sp, const Calls& call
 // left.
 uint64_t SetInterfaceDeletingDestruct(uint8_t* base, uint64_t set, uint64_t flags, uint32_t sp,
                                       const Calls& calls);
+
+// --- PanelSetPair, the two-player variant (set.cpp): vtable 0x82011118,
+// two bases at +4 and +1976 (b2), [0x82815EAC] = 1. Its slots: 0
+// DeletingDestructor, 1 Build, 2 Reset, 3 Open, 5 HandleInput, 6 Update, 8
+// Picked; 4, 7 (no Free), 11 to 13 and 15 to 17 the empty sub_82106540, 9,
+// 10 and 18 sub_825C8388 (0), 14 sub_825C8390 (1). ---
+
+constexpr uint32_t kPanelSetPairVtable = 0x82011118;
+constexpr uint32_t kPairSecondBase = 1976;
+// sub_8224B750 PanelSetPair::PanelSetPair: r4 to r10 the first base's F,
+// the second's F, the first's E, the second's E, the first's D, the
+// second's D, the first's C; the caller's stack words at sp + 84 (the
+// second's C), + 92 and + 100 (the bases' confirm panels, b +1912) and +
+// 108 (group B, both bases' +1956). PanelSetBase::PanelSetBase's plain C++
+// on both bases from the 144-byte frame (its words below it), the panels
+// given the two-player word as it reads after each store. Returns the pair.
+uint64_t PairConstruct(uint8_t* base, uint64_t pair, uint32_t f0, uint32_t f1, uint32_t e0,
+                       uint32_t e1, uint32_t d0, uint32_t d1, uint32_t c0, uint32_t sp);
+// sub_8224B830 PanelSetPair::~PanelSetPair: +0 = its vtable,
+// ~PanelSetBase on the second base, then the first, +0 = the interface's
+// vtable. r3 as the last ~PanelSetBase leaves it.
+uint64_t PairDestruct(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls);
+// sub_8224CA30 PanelSetPair::DeletingDestructor (slot 0; r4 the flags):
+// ~PanelSetPair, operator delete (a guest call) with bit 0. Returns the pair.
+uint64_t PairDeletingDestruct(uint8_t* base, uint64_t pair, uint64_t flags, uint32_t sp,
+                              const Calls& calls);
+// sub_822498C0 PanelSetPair::Reset (slot 2, a leaf): PanelSet::Reset's
+// stores on both bases, through the fourteen words it leaves below its r1.
+// r3 left.
+uint64_t PairReset(uint8_t* base, uint64_t pair, uint32_t sp);
+// sub_822499F0 PanelSetPair::Open (slot 3): both bases reset (through the
+// words on its 176-byte frame), ToTabs on each, then the players (b +1952)
+// 0 and 1 and both bases' +1940, +1944 and +1948 0. ToTabs' r3.
+uint64_t PairOpen(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls);
+// sub_8224CA80 PanelSetPair::HandleInput (slot 5): [0x826379B8] = 1,
+// PanelSetBase::HandleInput on both bases. The second's r3.
+uint64_t PairHandleInput(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls);
+// sub_8224CF20 PanelSetPair::Update (slot 6) and sub_8224CAE0
+// PanelSetPair::Build (slot 1): PanelSetBase::Update or Build on both bases
+// from a 96-byte frame. The second's r3.
+uint64_t PairUpdate(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls);
+uint64_t PairBuild(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls);
+// sub_82249B60 PanelSetPair::Picked (slot 8): 1 when both bases are done
+// (+16, +1988) and both picked (+12, +1984), else 0.
+uint64_t PairPicked(uint8_t* base, uint32_t pair);
 
 // --- PanelSet's pages and steps (pages.cpp; r3 = b, a step's r4 its
 // first-pass word b + 56) ---

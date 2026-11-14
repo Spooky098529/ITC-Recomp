@@ -756,6 +756,118 @@ uint64_t CarSetCarName(uint8_t* base, uint32_t panel, uint64_t id, uint64_t kind
   return r3;
 }
 
+uint64_t BaseSetCarName(uint8_t* base, uint32_t panel, uint64_t id, uint64_t kind, uint32_t sp,
+                        const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224E878 CarPanelBase::SetCarName");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 12), frame);
+  const uint32_t node = ui_movies::FindNode(base, m, 0xFFFFFFFFu, LoadU32(base, panel + 36));
+  uint64_t r3 = node;
+  // SetNodeText(m, child [panel + at], string): r6 to r10 unset (0).
+  const auto text = [&](uint32_t at, uint32_t lr, uint64_t string) {
+    const uint32_t index = LoadU32(base, panel + at);
+    if (int32_t(index) >= 0) {
+      const uint32_t child = ui_movies::Child(base, node, index);
+      r3 = calls.Call(kSetNodeText, frame, lr, m, child, string);
+    }
+  };
+  text(132, 0x8224E8CC, kind + 1934);
+  text(136, 0x8224E8F0, id + 1646);
+  text(140, 0x8224E914, id + 1718);
+  return r3;
+}
+
+uint64_t Panel6CSetStats(uint8_t* base, uint32_t panel, uint32_t record, uint32_t sp,
+                         const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8224E490 Panel6C::SetStats");
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t m = Movie(base, LoadU32(base, panel + 12), frame);
+  const uint32_t node = ui_movies::FindNode(base, m, 0xFFFFFFFFu, LoadU32(base, panel + 24));
+  uint64_t r3 = node;
+  // SetNodeText(m, child [panel + at], r5, r6) when the child index isn't
+  // negative; r6 to r10 unset where the original leaves them (0).
+  const auto text = [&](uint32_t at, uint32_t lr, uint64_t r5, uint64_t r6) {
+    const uint32_t index = LoadU32(base, panel + at);
+    if (int32_t(index) < 0) {
+      return;
+    }
+    const uint32_t child = ui_movies::Child(base, node, index);
+    r3 = calls.Call(kSetNodeText, frame, lr, m, child, r5, r6);
+  };
+  text(160, 0x8224E4E4, 263, 0);
+  text(172, 0x8224E508, 259, 0);
+  text(168, 0x8224E52C, 266, 0);
+  text(176, 0x8224E550, 267, 0);
+  text(180, 0x8224E574, 268, 0);
+  {
+    const uint32_t index = LoadU32(base, panel + 184);
+    if (int32_t(index) >= 0) {
+      const uint32_t child = ui_movies::Child(base, node, index);
+      r3 = calls.Call(kSetNodeText, frame, 0x8224E59C, m, child, LoadU32(base, record + 0) + 421);
+    }
+  }
+  {
+    const uint32_t index = LoadU32(base, panel + 192);
+    if (int32_t(index) >= 0) {
+      const uint32_t child = ui_movies::Child(base, node, index);
+      r3 = calls.Call(kSetNodeText, frame, 0x8224E5C4, m, child, 8, LoadU32(base, record + 12));
+    }
+  }
+  {
+    const uint32_t index = LoadU32(base, panel + 196);
+    if (int32_t(index) >= 0) {
+      const int64_t word = int64_t(int32_t(LoadU32(base, record + 8)));
+      StoreDouble(base, frame + 80, uint64_t(word));
+      const double scaled =
+          steps::Single(steps::Single(double(word)) * LoadDouble(base, kStatsScaleA));
+      const uint32_t child = ui_movies::Child(base, node, index);
+      const int32_t truncated = steps::Fctiwz(scaled);
+      StoreU32(base, frame + 80, uint32_t(truncated));
+      r3 = calls.Call(kSetNodeText, frame, 0x8224E61C, m, child, 8, uint32_t(truncated));
+    }
+  }
+  {
+    const uint32_t index = LoadU32(base, panel + 200);
+    if (int32_t(index) >= 0) {
+      const uint32_t child = ui_movies::Child(base, node, index);
+      r3 = calls.Call(kSetNodeText, frame, 0x8224E644, m, child, 8, LoadU32(base, record + 16));
+    }
+  }
+  {
+    const uint32_t index = LoadU32(base, panel + 204);
+    if (int32_t(index) >= 0) {
+      const uint32_t child = ui_movies::Child(base, node, index);
+      r3 = calls.Call(kSetNodeText, frame, 0x8224E66C, m, child, 8, LoadU32(base, record + 20));
+    }
+  }
+  {
+    const uint32_t index = LoadU32(base, panel + 208);
+    if (int32_t(index) >= 0) {
+      const double scaled = steps::Single(steps::Lfs(base, record + 24) *
+                                          LoadDouble(base, kStatsScaleB));
+      const uint32_t child = ui_movies::Child(base, node, index);
+      const uint64_t bits = std::bit_cast<uint64_t>(scaled);
+      StoreDouble(base, frame + 40, bits);
+      const uint64_t args[8] = {m, child, 436, bits, 0, 0, 0, 0};
+      r3 = calls.call(calls.user, kSetNodeText, args, &scaled, frame, 0x8224E6B0);
+    }
+  }
+  {
+    const uint32_t index = LoadU32(base, panel + 212);
+    if (int32_t(index) >= 0) {
+      const uint32_t child = ui_movies::Child(base, node, index);
+      r3 = calls.Call(kSetNodeText, frame, 0x8224E6D8, m, child, 8, LoadU32(base, record + 28));
+    }
+  }
+  text(220, 0x8224E6FC, 440, 0);
+  text(216, 0x8224E720, 438, 0);
+  text(224, 0x8224E744, 437, 0);
+  text(228, 0x8224E768, 439, 0);
+  for (const uint32_t at : {232u, 236u}) text(at, 0x8224E794, 448, 0);
+  for (const uint32_t at : {240u, 244u}) text(at, 0x8224E7CC, 449, 0);
+  return r3;
+}
+
 uint64_t Panel7CShowArrows(uint8_t* base, uint32_t panel, uint64_t shown, uint32_t sp,
                            const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82241868 Panel7C::ShowArrows");
@@ -796,6 +908,8 @@ uint64_t CarShowStats(uint8_t* base, uint64_t panel_r3, uint32_t entry, uint32_t
   uint64_t r3;
   if (name == kSetCarName) {
     r3 = CarSetCarName(base, panel, id, kind, frame, calls);
+  } else if (name == kBaseSetCarName) {
+    r3 = BaseSetCarName(base, panel, id, kind, frame, calls);
   } else {
     r3 = calls.Call(name, frame, 0x8224E9E0, panel_r3, id, kind);
   }

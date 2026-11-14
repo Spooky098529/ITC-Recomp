@@ -137,6 +137,36 @@ void CourseRecordsOf(Context& h, const Block& block) {
   results.Report();
 }
 
+// SaveData::TwoPlayerBlock: the word at 0x826C5B5C (put back after) 0, a
+// block's address or any word, r3 and r11 any words before; r3 and r11 (both
+// halves) compared.
+void TwoPlayerBlock(Context& h, const Block& block) {
+  Results results("SaveData::TwoPlayerBlock (sub_82105678)");
+  const uint32_t saved = guest::LoadU32(h.base, save_data::kTwoPlayerBlock);
+  for (int c = 0; c < 4; c++) {
+    const uint32_t word = c == 0 ? 0 : c == 1 ? block.address : uint32_t(h.random.Next());
+    const uint64_t r3 = h.random.Next(), r11 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      guest::StoreU32(h.base, save_data::kTwoPlayerBlock, word);
+      t.r3.u64 = r3;
+      t.r11.u64 = r11;
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_82105678 : hooks::SaveDataTwoPlayerBlock)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      for (const uint64_t r : {t.r3.u64, t.r11.u64}) {
+        out[v].Word(uint32_t(r));
+        out[v].Word(uint32_t(r >> 32));
+      }
+      out[v].Word(guest::LoadU32(h.base, save_data::kTwoPlayerBlock));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, save_data::kTwoPlayerBlock, saved);
+  results.Report();
+}
+
 // SaveData::Delete on a slot in the scratch area (the player number picked so
 // that the slot's address lands there, so the game's slots aren't touched),
 // holding 0 or a block from operator new's plain C++ (each version its own).
@@ -465,6 +495,7 @@ void SaveData(Context& h) {
   OnePointer(h, block, "CourseRecords::Reset (sub_82105D08)", __imp__sub_82105D08,
              hooks::SaveDataCourseRecordsReset, 20 + 22 * 408, 12);
   CourseRecordsOf(h, block);
+  TwoPlayerBlock(h, block);
   Delete(h);
   Create(h);
   MenuListInit(h);

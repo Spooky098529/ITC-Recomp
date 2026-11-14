@@ -130,6 +130,14 @@ constexpr uint32_t kSetBytes = 0x1000;
 constexpr uint32_t kSaveBytes = 0x4000;
 constexpr uint32_t kBigSaveBytes = 0x1A000;
 constexpr uint32_t kStandBytes = 0x8000;
+// The two players' save block (sub_82105740's: two halves of 0x1D52C).
+constexpr uint32_t kPairSaveBytes = 0x3AB74, kPairSaveHalf = 0x1D52C;
+
+// The base the shapes work on (World::b()): the set's +4, or PanelSetPair's
+// second base (+1976) while a pair's case shapes it; and whether a pair's
+// case runs (SettleBlocks settles both bases' menus).
+uint32_t g_base_at = 4;
+bool g_pair = false;
 
 struct World {
   World()
@@ -142,14 +150,15 @@ struct World {
         save(kSaveBytes),
         big_save(kBigSaveBytes),
         menus(0x1000),
-        stand(kStandBytes) {}
+        stand(kStandBytes),
+        pair_save(kPairSaveBytes) {}
   bool ok() const {
     return objects.address != 0 && entry.address != 0 && movies.address != 0 &&
            texts.address != 0 && strings.address != 0 && set.address != 0 &&
            save.address != 0 && big_save.address != 0 && menus.address != 0 &&
-           stand.address != 0;
+           stand.address != 0 && pair_save.address != 0;
   }
-  uint32_t b() const { return set.address + 4; }
+  uint32_t b() const { return set.address + g_base_at; }
   uint32_t movie(uint32_t m) const { return movies.address + kMovieHeaderBytes * m; }
   uint32_t node(uint32_t k) const { return movies.address + kNodesAt + kTreeNodeBytes * k; }
   uint32_t animation(uint32_t k) const { return movies.address + kAnimationsAt + 64 * k; }
@@ -165,6 +174,7 @@ struct World {
   Block big_save;  // a whole save data (Build reads its +104740)
   Block menus;  // the players' mappers (+0x100 vtables, +0x200 the mappers), the sound manager (+0xC00)
   Block stand;  // the stand's world (StandWorld)
+  Block pair_save;  // the two players' save block of PanelSetPair's cases
 };
 
 const std::vector<std::pair<uint32_t, uint32_t>> kSavedGlobals = {
@@ -289,7 +299,7 @@ uint32_t Index(Random& r) { return r.Below(6) == 0 ? 0xFFFFFFFFu : r.Below(64); 
 // the groups' ids 7 or 14, their +12 a sub-scene (0 to 63, now and then
 // -1) and +32 an index; the C panel's vtable (slots 1 and 2 SetStats and
 // SetCarName, now and then the stand-in sub_820CC470, which stores r4 at
-// r3 + 20); the colors' list (count 0 to 13, its records' pointers); the
+// r3 + 20, and slot 2 now and then CarPanelBase::SetCarName); the colors' list (count 0 to 13, its records' pointers); the
 // entry's car id 0 to 79 and the spec's bytes +769 0 to 9.
 void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   WriteRandom(base, w.set.address, w.set.bytes, r);
@@ -305,7 +315,10 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   }
   constexpr uint32_t kStandIn = 0x820CC470;
   guest::StoreU32(base, w.at(kVtable) + 4, r.Below(4) == 0 ? kStandIn : car_list::kSetStats);
-  guest::StoreU32(base, w.at(kVtable) + 8, r.Below(4) == 0 ? kStandIn : car_list::kSetCarName);
+  guest::StoreU32(base, w.at(kVtable) + 8,
+                  r.Below(4) == 0   ? kStandIn
+                  : r.Below(3) == 0 ? car_list::kBaseSetCarName
+                                    : car_list::kSetCarName);
   const uint32_t count = r.Below(14);
   guest::StoreU32(base, w.at(kColors) + 52, count);
   for (uint32_t i = 0; i < 13; i++) {
@@ -601,6 +614,34 @@ void Panels(Context& h, const World& w) {
         t.r5.u64 = r.Below(10);
       },
       __imp__sub_822417E8, hooks::CarListCarSetCarName);
+  // The C panels' base's SetCarName and Panel6C::SetStats (Panel8C's slots
+  // 2 and 1; never seen in play): as CarPanel's.
+  Group(
+      h, w, "CarPanelBase::SetCarName (sub_8224E878)", 12, {128, 48},
+      [base](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        t.r4.u64 = r.Below(80);
+        t.r5.u64 = r.Below(10);
+      },
+      __imp__sub_8224E878, hooks::CarListBaseSetCarName);
+  Group(
+      h, w, "Panel6C::SetStats (sub_8224E490)", 12, {144, 56},
+      [base, stats_record](PPCContext& t, Random& r, const World& w) {
+        SetGroup(base, w, r, 12);
+        stats_record(r, w.at(kRecord));
+        if (r.Below(2) == 0) {
+          guest::StoreU32(base, w.at(kRecord) + 8, r.Below(400));
+        }
+        t.r4.u64 = w.at(kRecord);
+      },
+      __imp__sub_8224E490, hooks::CarListPanel6CSetStats);
+  // ~CarPanelBase and ConfirmPanel::ConfirmPanel (leaves) on the panel.
+  Group(h, w, "CarPanelBase::~CarPanelBase (sub_8224D7E0)", 4, {0, 0},
+        [](PPCContext&, Random&, const World&) {}, __imp__sub_8224D7E0,
+        hooks::CarListCarPanelBaseDestruct);
+  Group(h, w, "ConfirmPanel::ConfirmPanel (sub_8224EBB0)", 4, {0, 0},
+        [](PPCContext&, Random&, const World&) {}, __imp__sub_8224EBB0,
+        hooks::CarListConfirmPanelConstruct);
   Group(
       h, w, "Panel7C::ShowArrows (sub_82241868)", n, {96, 16},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -907,15 +948,89 @@ void SettleBlocks(uint8_t* base, const World& w, Outputs& out) {
     marker++;
   }
   g_blocks.clear();
-  for (const uint32_t menu : {60u, 132u}) {
-    const uint32_t slot = w.b() + menu + 68;
-    const uint32_t block = guest::LoadU32(base, slot);
-    if (block == 0 || (block & 0xFFFF0000u) == 0xB10C0000u) continue;
-    const bool pages = memory::IsPages(block);
-    out.Word(pages ? 1 : 0);
-    if (pages) memory::FreePages(block);
-    guest::StoreU32(base, slot, 0xB10CFFFF);
+  for (const uint32_t b : {w.b(), g_pair ? w.set.address + car_list::kPairSecondBase : 0u}) {
+    if (b == 0) continue;
+    for (const uint32_t menu : {60u, 132u}) {
+      const uint32_t slot = b + menu + 68;
+      const uint32_t block = guest::LoadU32(base, slot);
+      if (block == 0 || (block & 0xFFFF0000u) == 0xB10C0000u) continue;
+      const bool pages = memory::IsPages(block);
+      out.Word(pages ? 1 : 0);
+      if (pages) memory::FreePages(block);
+      guest::StoreU32(base, slot, 0xB10CFFFF);
+    }
   }
+}
+
+// --- PanelSetPair's worlds ---
+//
+// A pair's case shapes both bases as the set's cases shape the one (the
+// second base, +1976, then the first, the blocks they track kept), then the
+// two-player word 1 (as the pair's constructor leaves it), the players (b
+// +1952) 0 and 1 (as its Open leaves them), and the two players' save block
+// [0x826C5B5C] the world's own 0x3AB74 bytes (PairSave); r3 the set.
+
+constexpr uint32_t kSecondBase = car_list::kPairSecondBase;
+
+// The two players' save block: random, each half's unlocked bits (+104740)
+// about one in eight, its garage (+6120) 0 to 15 cars (+6328), a chain of
+// 16 distinct link nodes from its +204 (nodes 20000 on, apart from the
+// records) over slots 0 to 2, the 8 records' car ids (+224) below 72.
+void PairSave(uint8_t* base, const World& w, Random& r) {
+  const uint32_t save = w.pair_save.address;
+  WriteRandom(base, save, w.pair_save.bytes, r);
+  guest::StoreU32(base, car_list::kPairSaveData, save);
+  for (uint32_t half = 0; half < 2; half++) {
+    const uint32_t s = save + kPairSaveHalf * half;
+    for (uint32_t i = 0; i < 3; i++) {
+      guest::StoreU32(base, s + 104740 + 4 * i, uint32_t(r.Next() & r.Next() & r.Next()));
+    }
+    const uint32_t garage = s + 6120;
+    guest::StoreU16(base, s + 6328, uint16_t(r.Below(16)));
+    for (uint32_t slot = 0; slot < 8; slot++) {
+      guest::StoreU32(base, garage + 1968 * slot + 224, r.Below(72));
+    }
+    uint32_t node = 20000 + r.Below(100);
+    guest::StoreU16(base, garage + 204, uint16_t(node));
+    for (uint32_t k = 0; k < 16; k++) {
+      const uint32_t next = node + 1 + r.Below(3);
+      guest::StoreU16(base, garage + 4 * node, uint16_t(next));
+      guest::StoreU16(base, garage + 4 * node + 2, uint16_t(r.Below(3)));
+      node = next;
+    }
+  }
+}
+
+SetupFn PairShape(uint8_t* base, SetupFn shape) {
+  return [base, shape](PPCContext& t, Random& r, const World& w) {
+    g_base_at = kSecondBase;
+    shape(t, r, w);
+    const auto second = g_blocks;
+    g_base_at = 4;
+    shape(t, r, w);
+    g_blocks.insert(g_blocks.end(), second.begin(), second.end());
+    guest::StoreU32(base, car_list::kTwoPlayers, 1);
+    guest::StoreU32(base, w.set.address + 4 + 1952, 0);
+    guest::StoreU32(base, w.set.address + kSecondBase + 1952, 1);
+    PairSave(base, w, r);
+    t.r3.u64 = w.set.address | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+  };
+}
+
+// A pair's group: its cases' shapes through PairShape, `after` (which
+// settles both bases' blocks: SettleBlocks takes the second base's menus
+// too) and then the save block compared.
+void PairGroup(Context& h, const World& w, const char* name, int cases, Frame frame,
+               const SetupFn& shape, GuestFunction recompiled, GuestFunction native,
+               const AfterFn& after) {
+  uint8_t* const base = h.base;
+  g_pair = true;
+  Group(h, w, name, cases, frame, PairShape(base, shape), recompiled, native,
+        [base, after](const World& w, Outputs& out) {
+          if (after) after(w, out);
+          out.Bytes(Read(base, w.pair_save.address, w.pair_save.bytes));
+        });
+  g_pair = false;
 }
 
 // The set's shape: its panel E the world's panel (+0 a group, +4 the rows
@@ -1092,6 +1207,22 @@ void Pages(Context& h, const World& w) {
   };
   Group(h, w, "PanelSetBase::HandleInput, the pages (sub_8224BF30)", 60, {176, 48}, input,
         __imp__sub_8224BF30, hooks::CarListBaseHandleInput, settle);
+  // PanelSetPair::HandleInput: both bases shaped so (the players 0 and 1),
+  // their menus' enabled blocks compared before the blocks are settled.
+  PairGroup(
+      h, w, "PanelSetPair::HandleInput (sub_8224CA80)", 12, {112, 24}, input,
+      __imp__sub_8224CA80, hooks::CarListPairHandleInput, [base](const World& w, Outputs& out) {
+        for (const uint32_t at : {4u, kSecondBase}) {
+          const uint32_t list = w.set.address + at + 60;
+          const uint32_t block = guest::LoadU32(base, list + 68);
+          if (block != 0 && memory::IsPages(block)) {
+            const uint32_t count = guest::LoadU32(base, list);
+            out.Bytes(Read(base, block, 4 * (count < 16 ? count : 16)));
+          }
+        }
+        out.Bytes(Read(base, w.menus.address, w.menus.bytes));
+        SettleBlocks(base, w, out);
+      });
 }
 
 void StandWorld(uint8_t* base, const World& w, Random& r);
@@ -1359,6 +1490,108 @@ void Steps(Context& h, const World& w) {
 // garage's count (+6328) 0 to 20. SetUpCarPage's garage tab (its
 // ShowCarStats, never seen in play, the original over a garage car) isn't
 // in the cases.
+// PanelSetPair's constructor, Reset, Open, Picked and destructors.
+void Pairs(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const AfterFn settle = [base](const World& w, Outputs& out) { SettleBlocks(base, w, out); };
+  const auto set = [base](PPCContext&, Random& r, const World& w) { ShapeSet(base, w, r, true); };
+  // The constructor: r4 to r10 and the second C (the caller's sp + 84)
+  // panels in the objects block, the confirm panels (+92, +100) its +0xE00
+  // and +0xE40 or 0, group B (+108) a group; PanelSetBase's words below the
+  // frame compared too.
+  {
+    const uint32_t sp = CallContext(h).r1.u32;
+    const uint32_t frame = sp - 144;
+    g_pair = true;
+    Group(
+        h, w, "PanelSetPair::PanelSetPair (sub_8224B750)", 12, {144, 64},
+        [base, sp](PPCContext& t, Random& r, const World& w) {
+          t.r3.u64 = w.set.address | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
+          for (PPCRegister* reg : {&t.r4, &t.r5, &t.r6, &t.r7, &t.r8, &t.r9, &t.r10}) {
+            reg->u64 = w.at(4 * r.Below(0x300));
+          }
+          guest::StoreU32(base, sp + 84, w.at(4 * r.Below(0x300)));
+          guest::StoreU32(base, sp + 92, r.Below(3) == 0 ? 0 : w.at(0xE00));
+          guest::StoreU32(base, sp + 100, r.Below(3) == 0 ? 0 : w.at(0xE40));
+          guest::StoreU32(base, sp + 108, w.at(r.Below(2) == 0 ? kGroupA : kGroupB));
+        },
+        __imp__sub_8224B750, hooks::CarListPairConstruct,
+        [base, frame](const World&, Outputs& out) { out.Bytes(Read(base, frame - 48, 48)); });
+    g_pair = false;
+  }
+  PairGroup(
+      h, w, "PanelSetPair::Reset (sub_822498C0)", 8, {0, 0},
+      [](PPCContext&, Random&, const World&) {}, __imp__sub_822498C0, hooks::CarListPairReset,
+      {});
+  PairGroup(h, w, "PanelSetPair::Open (sub_822499F0)", 12, {176, 32}, set, __imp__sub_822499F0,
+            hooks::CarListPairOpen, settle);
+  // Picked: the bases' done (+16, +1988) and picked (+12, +1984) words 0, 1
+  // or any.
+  PairGroup(
+      h, w, "PanelSetPair::Picked (sub_82249B60)", 12, {0, 0},
+      [base](PPCContext&, Random& r, const World& w) {
+        if (g_base_at != 4) return;
+        for (const uint32_t at : {12u, 16u, 1984u, 1988u}) {
+          guest::StoreU32(base, w.set.address + at,
+                          r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+        }
+      },
+      __imp__sub_82249B60, hooks::CarListPairPicked, {});
+  // The destructors over both bases' menus (their blocks pages or 0); the
+  // deleting destructor with bit 0 of r4 clear, then deleting below.
+  const auto menus = [base, set](PPCContext& t, Random& r, const World& w) {
+    set(t, r, w);
+    for (const uint32_t menu : {60u, 132u}) {
+      if (r.Below(2) == 0) TrackBlock(base, w.b() + menu + 68);
+    }
+  };
+  PairGroup(h, w, "PanelSetPair::~PanelSetPair (sub_8224B830)", 8, {112, 32}, menus,
+            __imp__sub_8224B830, hooks::CarListPairDestruct, settle);
+  PairGroup(
+      h, w, "PanelSetPair::DeletingDestructor (sub_8224CA30)", 6, {112, 24},
+      [menus](PPCContext& t, Random& r, const World& w) {
+        menus(t, r, w);
+        t.r4.u64 &= ~1ull;
+      },
+      __imp__sub_8224CA30, hooks::CarListPairDeletingDestruct, settle);
+  {
+    // With bit 0 set: a pair of operator new's (random words, the four
+    // menus' blocks 0) deleted, compared by whether operator new hands it
+    // out again.
+    constexpr uint32_t kPairBytes = 3952;
+    Results results("PanelSetPair::DeletingDestructor, deleting (sub_8224CA30)");
+    for (int c = 0; c < 4; c++) {
+      Outputs out[2];
+      const uint64_t seed = h.random.Next();
+      for (int v = 0; v < 2; v++) {
+        Random r = Mixed(seed);
+        const auto block = memory::crt::OperatorNew(base, kPairBytes);
+        if (!block) {
+          ITC_LOG_ERROR("harness: car_list: operator new failed");
+          return;
+        }
+        WriteRandom(base, *block, kPairBytes, r);
+        for (const uint32_t b : {4u, kSecondBase}) {
+          for (const uint32_t menu : {60u, 132u}) guest::StoreU32(base, *block + b + menu + 68, 0);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = *block;
+        t.r4.u64 = (r.Next() & ~3ull) | (r.Below(2) == 0 ? 1 : 3);
+        ITC_FLAG(native_car_list) = v == 1;
+        (v == 0 ? __imp__sub_8224CA30 : hooks::CarListPairDeletingDestruct)(t, base);
+        ITC_FLAG(native_car_list) = true;
+        out[v].Word(t.r3.u32 == *block ? 1 : 0);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        const auto probe = memory::crt::OperatorNew(base, kPairBytes);
+        out[v].Word(probe && *probe == *block ? 1 : 0);
+        if (probe) memory::crt::OperatorDelete(*probe);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 void SetUps(Context& h, const World& w) {
   uint8_t* const base = h.base;
   const AfterFn settle = [base](const World& w, Outputs& out) { SettleBlocks(base, w, out); };
@@ -1495,6 +1728,16 @@ void Builds(Context& h, const World& w) {
         t.r3.u64 -= 4;  // the set
       },
       __imp__sub_8224CAD8, hooks::CarListSetBuild, after);
+  // PanelSetPair::Build: both bases shaped so, the specs' lists made from the
+  // pair's save block (each half's bits and garage).
+  PairGroup(h, w, "PanelSetPair::Build (sub_8224CAE0)", 10, {96, 16}, shape,
+            __imp__sub_8224CAE0, hooks::CarListPairBuild, [after](const World& w, Outputs& out) {
+              for (const uint32_t at : {kSecondBase, 4u}) {
+                g_base_at = at;
+                after(w, out);
+              }
+              g_base_at = 4;
+            });
 }
 
 
@@ -1616,6 +1859,10 @@ void Updates(Context& h, const World& w) {
         t.r3.u64 -= 4;  // the set
       },
       __imp__sub_8224CF18, hooks::CarListSetUpdate, settle);
+  // PanelSetPair::Update: both bases shaped so (the players 0 and 1; the
+  // stand's world as the first base's shape left it).
+  PairGroup(h, w, "PanelSetPair::Update (sub_8224CF20)", 12, {96, 16}, update,
+            __imp__sub_8224CF20, hooks::CarListPairUpdate, settle);
 }
 
 // --- Step 17 and the car's page (with the stand's car) ---
@@ -1837,6 +2084,7 @@ void CarList(Context& h) {
   PanelShows(h, w);
   Leaves(h, w);
   Steps(h, w);
+  Pairs(h, w);
   SetUps(h, w);
   Builds(h, w);
   Pages(h, w);

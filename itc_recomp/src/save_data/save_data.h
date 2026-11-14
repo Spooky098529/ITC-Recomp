@@ -133,4 +133,10 @@ uint32_t DefaultsTable3E34();
 uint32_t DefaultsTable3C24();
 uint32_t DefaultsTable50E4();
 
+// sub_82105678 SaveData::TwoPlayerBlock (probably): [0x826C5B5C], the two
+// players' save block (player 1's slot; 0x3AB74 bytes, a player's half
+// 0x1D52C). A leaf.
+constexpr uint32_t kTwoPlayerBlock = 0x826C5B5C;
+uint32_t TwoPlayerBlock(uint8_t* base);
+
 }  // namespace save_data

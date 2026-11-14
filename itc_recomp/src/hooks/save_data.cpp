@@ -16,7 +16,7 @@ ITC_FLAG_BOOL(native_save_data, true, "ITC",
               "tables' getters sub_820CCCC0, sub_820CCCD0, sub_820CCCE0, sub_820CCCF0 and "
               "sub_820CCD00, Progress::SetDefaults sub_82113E60 (its copies through memcpy's "
               "plain C++), ControlMap::SetDefault sub_821058A8, Options::SetDefaults "
-              "sub_82105940, CourseRecords::Reset sub_82105D08, CourseRecords::Of sub_82105BF8, Players::ResetControllers "
+              "sub_82105940, CourseRecords::Reset sub_82105D08, CourseRecords::Of sub_82105BF8, SaveData::TwoPlayerBlock sub_82105678, Players::ResetControllers "
               "sub_8209F5E0 and, with --native_heap, SaveData::Delete sub_821055D8, "
               "SaveData::Create sub_821057C8, MenuList::Init sub_8220BAC0 and "
               "TitleScreen::ResetPlayer sub_82221D00; no adapters for the Stats functions, "
@@ -161,6 +161,11 @@ ITC_SAVE_DATA_TABLE(Table50E4)
 
 #undef ITC_SAVE_DATA_TABLE
 
+void SaveDataTwoPlayerBlock(PPCContext& ctx, uint8_t* base) {
+  ctx.r11.u64 = 0xFFFFFFFF826C0000ull;
+  ctx.r3.u64 = sd::TwoPlayerBlock(base);
+}
+
 }  // namespace hooks
 
 // No adapters (removed 2026-10-28: in play only the plain C++ of their
@@ -191,6 +196,10 @@ ITC_SAVE_DATA_ADAPTER(821057C8, SaveDataCreate)
 // CourseRecords::Of: from Race::PlaceRacers' recompiled branch (its plain
 // C++ declines there) and NodeScreen::ShowRecords' plain C++ (directly).
 ITC_SAVE_DATA_ADAPTER(82105BF8, SaveDataCourseRecordsOf)
+// SaveData::TwoPlayerBlock: from the type 8 mode's Init and slot 6, its
+// panel screen's PickCar and the save screen's kind 6 pages (recompiled,
+// never seen in play); the car list's plain C++ reads the word inline.
+ITC_SAVE_DATA_ADAPTER(82105678, SaveDataTwoPlayerBlock)
 // Players::ResetControllers' adapter written out: the app_start_up
 // harness's recorder first.
 extern "C" REX_FUNC(sub_8209F5E0) {

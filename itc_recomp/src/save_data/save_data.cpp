@@ -449,4 +449,9 @@ uint32_t DefaultsTable50E4() {
   return kTable50E4;
 }
 
+uint32_t TwoPlayerBlock(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82105678 SaveData::TwoPlayerBlock");
+  return guest::LoadU32(base, kTwoPlayerBlock);
+}
+
 }  // namespace save_data

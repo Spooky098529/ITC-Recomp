@@ -59,5 +59,8 @@ void SaveDataTable3044(PPCContext& ctx, uint8_t* base);
 void SaveDataTable3E34(PPCContext& ctx, uint8_t* base);
 void SaveDataTable3C24(PPCContext& ctx, uint8_t* base);
 void SaveDataTable50E4(PPCContext& ctx, uint8_t* base);
+// SaveData::TwoPlayerBlock (no arguments; r3 the block, r11 as its lis
+// leaves it).
+void SaveDataTwoPlayerBlock(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

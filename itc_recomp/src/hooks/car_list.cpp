@@ -60,7 +60,13 @@ ITC_FLAG_BOOL(native_car_list, true, "ITC",
               "calls), GarageStages::DrawAll sub_821807D8, PanelSetBase::UpdateStand sub_8224C008 and "
               "Update sub_8224CD00 and PanelSet::Update sub_8224CF18 (the steps' plain C++ where "
               "ours; GarageStage::ReloadModel, SetCar, Command, IsBusy and Draw through their "
-              "overrides; with the car makers' callees native); the UI "
+              "overrides; with the car makers' callees native); PanelSetPair's constructor "
+              "sub_8224B750 (PanelSetBase::PanelSetBase's plain C++ on both bases), "
+              "destructor sub_8224B830, DeletingDestructor sub_8224CA30, Build sub_8224CAE0, "
+              "Reset sub_822498C0, Open sub_822499F0, HandleInput sub_8224CA80, Update "
+              "sub_8224CF20 and Picked sub_82249B60 (the bases' plain C++ on both), "
+              "CarPanelBase::~CarPanelBase sub_8224D7E0 and SetCarName sub_8224E878, "
+              "Panel6C::SetStats sub_8224E490 and ConfirmPanel::ConfirmPanel sub_8224EBB0; the UI "
               "movie calls through their overrides) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=car_list)");
 
@@ -263,6 +269,26 @@ void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cl::Build(base, ctx.r3.u64 + 4, sp, calls);
 }
 
+// PanelSetPair (never seen in play), the C panels' base and the confirm
+// panel.
+ITC_CL_STEP(CarListBaseSetCarName,
+            cl::BaseSetCarName(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp, calls))
+ITC_CL_STEP(CarListPanel6CSetStats, cl::Panel6CSetStats(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListCarPanelBaseDestruct, cl::CarPanelBaseDestruct(base, ctx.r3.u64))
+ITC_CL_STEP(CarListConfirmPanelConstruct, cl::ConfirmPanelConstruct(base, ctx.r3.u64))
+ITC_CL_STEP(CarListPairConstruct,
+            cl::PairConstruct(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                              ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, sp))
+ITC_CL_STEP(CarListPairDestruct, cl::PairDestruct(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairDeletingDestruct,
+            cl::PairDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListPairReset, cl::PairReset(base, ctx.r3.u64, sp))
+ITC_CL_STEP(CarListPairOpen, cl::PairOpen(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairHandleInput, cl::PairHandleInput(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairUpdate, cl::PairUpdate(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairBuild, cl::PairBuild(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairPicked, cl::PairPicked(base, ctx.r3.u32))
+
 #undef ITC_CL_STEP
 
 }  // namespace hooks
@@ -398,4 +424,24 @@ extern "C" REX_FUNC(sub_8224C450) {
     hooks::step(ctx, base);                                                                  \
   }
 ITC_CAR_LIST_STAND(8224CF18, CarListSetUpdate)
+// PanelSetPair's slot 6 (never seen in play): the same gate.
+ITC_CAR_LIST_STAND(8224CF20, CarListPairUpdate)
 #undef ITC_CAR_LIST_STAND
+// PanelSetPair (the type 8 mode's panel screen's car list, never seen in
+// play): its constructor and destructor (from Type8PanelScreen's, recompiled)
+// and its vtable slots 0 to 3, 5 and 8; the C panels' base's
+// ~CarPanelBase (from the C panels' destructors) and SetCarName (slot 2 of
+// its vtable and Panel8C's), Panel6C::SetStats (from Panel8C::SetStats) and
+// ConfirmPanel::ConfirmPanel (from ConfirmPanel8's).
+ITC_CAR_LIST(8224B750, CarListPairConstruct)
+ITC_CAR_LIST(8224B830, CarListPairDestruct)
+ITC_CAR_LIST(8224CA30, CarListPairDeletingDestruct)
+ITC_CAR_LIST(8224CAE0, CarListPairBuild)
+ITC_CAR_LIST(822498C0, CarListPairReset)
+ITC_CAR_LIST(822499F0, CarListPairOpen)
+ITC_CAR_LIST(8224CA80, CarListPairHandleInput)
+ITC_CAR_LIST(82249B60, CarListPairPicked)
+ITC_CAR_LIST(8224D7E0, CarListCarPanelBaseDestruct)
+ITC_CAR_LIST(8224EBB0, CarListConfirmPanelConstruct)
+ITC_CAR_LIST(8224E490, CarListPanel6CSetStats)
+ITC_CAR_LIST(8224E878, CarListBaseSetCarName)
