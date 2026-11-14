@@ -100,7 +100,31 @@ struct Handler {
   GuestFunction native;
   std::function<void(uint8_t*, const Layout&, Random&)> shape;
   std::function<void(PPCContext&, const Layout&)> args;
+  // When not 0, SaveSlot::WaitClose's stack pointer is this far below the
+  // handler's (see MaskCloseHandleSaves).
+  uint32_t wait_close_below = 0;
 };
+
+// The recompiled CloseHandle (sub_82294E20, stwu r1,-96 with its lr saved
+// at -8) that SaveSlot::WaitClose's original calls leaves its back chain
+// (WaitClose's sp - 96) and its saved lr (WaitClose's sp - 8: 0x820A50BC or
+// 0x820A50EC) below the stack pointer; under --native_c_runtime_core the
+// close is CloseHandle's plain C++ (hooks/save_interface.cpp's
+// KernelCallsOf, since f664a88d), which uses no guest stack and leaves the
+// earlier words there. Both are dead words below the stack pointer, left
+// out of the compare (set to 0 after the call); everything else stays
+// compared. `stack` is the harness's stack pointer, `below` how far
+// WaitClose's is under it.
+void MaskCloseHandleSaves(uint8_t* base, uint32_t stack, uint32_t below) {
+  const uint32_t wait_close_sp = stack - below;
+  guest::StoreU32(base, wait_close_sp - 96, 0);
+  guest::StoreU32(base, wait_close_sp - 8, 0);
+}
+
+// WaitClose's frame (stwu r1,-96), and SaveStep's and LoadStep's (both
+// stwu r1,-112) that call it.
+constexpr uint32_t kWaitCloseFrame = 96;
+constexpr uint32_t kStepFrame = 112;
 
 void Run(Context& h, const Handler& handler) {
   const Layout l = LayoutOf(h);
@@ -128,6 +152,9 @@ void Run(Context& h, const Handler& handler) {
       ITC_FLAG(native_save_interface) = v == 1;
       (v == 0 ? handler.original : handler.native)(t, h.base);
       ITC_FLAG(native_save_interface) = true;
+      if (handler.wait_close_below != 0) {
+        MaskCloseHandleSaves(h.base, stack, handler.wait_close_below);
+      }
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Bytes(Read(h.base, stack - kStackBytes, kStackBytes));
       out[v].Word(t.r3.u32);
@@ -280,6 +307,9 @@ void UpdateCases(Context& h) {
       ITC_FLAG(native_save_interface) = v == 1;
       (v == 0 ? __imp__sub_820A4610 : hooks::SaveDevicesUpdateSteps)(t, h.base);
       ITC_FLAG(native_save_interface) = true;
+      // SaveStep's and LoadStep's WaitClose under Update's frame (stwu
+      // r1,-144).
+      MaskCloseHandleSaves(h.base, stack, 144 + kStepFrame + kWaitCloseFrame);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       // The stack but XNotifyGetNext's two outputs in Update's frame (r1 +
       // 80 and + 84, the recompiled side's call into the SDK).
@@ -348,6 +378,7 @@ void SaveHandlers(Context& h) {
   struct Entry {
     const char* name;
     GuestFunction original, native;
+    uint32_t wait_close_below = 0;
   };
   for (const Entry& e : {
            Entry{"SaveSlot::WaitCloseItem (sub_820A4C08)", __imp__sub_820A4C08,
@@ -357,25 +388,25 @@ void SaveHandlers(Context& h) {
            Entry{"SaveSlot::WaitThumbnail (sub_820A5190)", __imp__sub_820A5190,
                  hooks::SlotWaitThumbnailSteps},
            Entry{"SaveSlot::WaitClose (sub_820A5070)", __imp__sub_820A5070,
-                 hooks::SlotWaitCloseSteps},
+                 hooks::SlotWaitCloseSteps, kWaitCloseFrame},
            Entry{"SaveSlot::WaitWrite (sub_820A4E68)", __imp__sub_820A4E68,
                  hooks::SlotWaitWriteSteps},
            Entry{"SaveSlot::WaitRead (sub_820A4FF8)", __imp__sub_820A4FF8,
                  hooks::SlotWaitReadSteps},
        }) {
-    Run(h, {e.name, 32, e.original, e.native, ShapeMachine, NoArgs});
+    Run(h, {e.name, 32, e.original, e.native, ShapeMachine, NoArgs, e.wait_close_below});
   }
   for (const Entry& e : {
            Entry{"SaveSlot::CheckStep (sub_820A5A88)", __imp__sub_820A5A88,
                  hooks::SlotCheckStepSteps},
            Entry{"SaveSlot::SaveStep (sub_820A5BE8)", __imp__sub_820A5BE8,
-                 hooks::SlotSaveStepSteps},
+                 hooks::SlotSaveStepSteps, kStepFrame + kWaitCloseFrame},
            Entry{"SaveSlot::LoadStep (sub_820A5E68)", __imp__sub_820A5E68,
-                 hooks::SlotLoadStepSteps},
+                 hooks::SlotLoadStepSteps, kStepFrame + kWaitCloseFrame},
            Entry{"SaveSlot::DeleteStep (sub_820A6010)", __imp__sub_820A6010,
                  hooks::SlotDeleteStepSteps},
        }) {
-    Run(h, {e.name, 96, e.original, e.native, ShapeMachine, NoArgs});
+    Run(h, {e.name, 96, e.original, e.native, ShapeMachine, NoArgs, e.wait_close_below});
   }
   UpdateCases(h);
   Run(h, {"GetOverlappedResult (sub_82295F20)", 48, __imp__sub_82295F20,
