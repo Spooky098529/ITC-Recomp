@@ -18,6 +18,20 @@ here loses its heading.
 
 ## Run 2026-11-14 05:01 (`b7-loop-13-11-26`)
 
+The C runtime core (`c-runtime-core.md`; replay `itc_5493` ok):
+sub_825AA400, sub_825AA448, sub_825AA4C0, sub_825AA580, sub_825B3260,
+sub_825A81E0, sub_825A8218, sub_825A8250, sub_825A8178, sub_825AFCC8,
+sub_825B68B8, sub_825AA158, sub_825AEDA0, sub_825AEDE8, sub_825B64F8,
+sub_825AA1B8, sub_825AD120, sub_825B49B0, sub_825B4C8C, sub_825B4D90,
+sub_825B8910, sub_82297940, sub_822979D0, sub_825B9BA8, sub_82294E20,
+sub_825BA168, sub_825AD638, sub_825AD670, sub_825AD688, sub_825AD6C0,
+sub_825B7958, sub_825B7A20, sub_825B7A58, sub_825B7880, sub_825B77E8,
+sub_825B4F38, sub_825ACF04, sub_825ACEB4, sub_825B4790, sub_825B0EE0,
+sub_825A85C0, sub_825AAF08, sub_825A8630, sub_825ABE30, sub_825ADD38,
+sub_825ADDD8, sub_825ADE90, sub_825ADEB0, sub_825B6098, sub_825B6140,
+sub_825B70D0 (most are error, exit and stream paths a drive won't
+take either).
+
 The in-race screens never seen (`race-screens-unseen.md`; replay ok):
 all 94 Overridden and Native rows there (PauseMenu4, RaceResults,
 SplitResults, Kind6Menu), with `sub_822927B0` Network::SetLiveState,

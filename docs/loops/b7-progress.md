@@ -99,7 +99,9 @@ file's history. What's left to see in a drive, from every run:
   32) and `LoadStep` (2 of 96) differed: `CloseHandle`'s dead saves
   below sp (its back chain and lr), now native without a guest frame;
   a harness fault by the 2026-11-10 precedent, masked 9bfdc4b1 (logged
-  first). Step: validation again.
+  first). Validated again `itc_5495` (race 35 s at 180, 0 errors,
+  every harness 0 differing outside the expected groups, 65 of 65).
+  Step: third migration.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
