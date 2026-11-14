@@ -2926,6 +2926,311 @@ void CxxUnhandledFilterCases(Context& h) {
   results.Report();
 }
 
+
+// A test stream for fclose, _fclose_nolock and _fcloseall: its flags (not in
+// use, a string stream or in use with random bits, the buffer bits among
+// them), its pointer and buffer (a C runtime heap block when _IOMYBUF is set
+// and it's in use, as _freebuf frees it; else a word that's no block), the
+// temporary file's name (+28: 0 or a heap block), its handle (+16: one of
+// 3 to 31, or past _nhandle) and that handle's entry (open or not; its OS
+// handle a fresh file of the side's own on the null device, a word that's no
+// handle or -1), the lock at +32 made for it. Set up the same on each side;
+// the buffer of one not freed is the scratch area's last 1,024 bytes.
+struct TestStream {
+  uint32_t flags, used, count, charbuf, bufsiz, handle, os_kind, junk, name;
+  uint8_t entry_flags;
+  bool tmpname;
+  static TestStream Pick(Context& h, uint32_t nhandle) {
+    TestStream s;
+    const uint32_t use = h.random.Below(8);
+    s.flags = use == 0   ? uint32_t(h.random.Next()) & ~0xC3u
+              : use == 1 ? (uint32_t(h.random.Next()) | 0x40u)
+                         : (uint32_t(h.random.Next()) & ~0x40u) | (1u << h.random.Below(2)) |
+                               (h.random.Below(3) == 0 ? 0x80u : 0u);
+    if (h.random.Below(2) == 0) {
+      s.flags |= 8;
+    }
+    s.used = h.random.Below(6) == 0 ? uint32_t(-int32_t(h.random.Below(8))) : h.random.Below(48);
+    s.count = uint32_t(h.random.Next());
+    s.charbuf = uint32_t(h.random.Next());
+    s.bufsiz = uint32_t(h.random.Next());
+    s.handle = h.random.Below(8) == 0 ? nhandle + h.random.Below(8) : 3 + h.random.Below(29);
+    s.os_kind = h.random.Below(3);
+    s.junk = 0x12340000u + h.random.Below(0x10000);
+    s.entry_flags = uint8_t(h.random.Next()) | (h.random.Below(5) != 0 ? 1 : 0);
+    s.tmpname = h.random.Below(2) == 0;
+    s.name = uint32_t(h.random.Next());
+    return s;
+  }
+  bool Mine() const { return (flags & 0x83) != 0 && (flags & 8) != 0; }
+};
+
+// What a side made for its streams: the heap blocks and the files, released
+// after the call (the files the call didn't close).
+struct StreamWorld {
+  Context& h;
+  uint32_t handles;
+  std::vector<uint32_t> blocks;
+  std::vector<std::pair<uint32_t, uint32_t>> files;  // (entry, OS handle)
+  std::vector<uint32_t> entries;
+  StreamWorld(Context& h, uint32_t handles) : h(h), handles(handles) {}
+  void Set(uint32_t stream, const TestStream& s, bool lock = true) {
+    uint32_t buffer = h.data + 3072;  // the scratch area's last 1,024 bytes
+    if (s.Mine()) {
+      buffer = Block(h.base, 64);
+      blocks.push_back(buffer);
+    }
+    Store(h.base, stream + 0, buffer + s.used);
+    Store(h.base, stream + 4, s.count);
+    Store(h.base, stream + 8, buffer);
+    Store(h.base, stream + 12, s.flags);
+    Store(h.base, stream + 16, s.handle);
+    Store(h.base, stream + 20, s.charbuf);
+    Store(h.base, stream + 24, s.bufsiz);
+    uint32_t name = 0;
+    if (s.tmpname) {
+      name = Block(h.base, 16);
+      blocks.push_back(name);
+    }
+    Store(h.base, stream + 28, name);
+    if (lock) {
+      InitSection(h, stream + 32);
+    }
+    if (s.handle < 32 &&
+        std::find(entries.begin(), entries.end(), s.handle) == entries.end()) {
+      entries.push_back(s.handle);  // set by the first stream that names it
+      const uint32_t entry = handles + 44 * s.handle;
+      uint32_t os = s.os_kind == 1 ? s.junk : 0xFFFFFFFFu;
+      if (s.os_kind == 0) {
+        SeekFile file(h, "\\Device\\Harddisk0\\Cache0", 0xC0000000u);
+        os = file.handle != 0 ? file.handle : 0xFFFFFFFFu;
+        if (file.handle != 0) {
+          files.emplace_back(entry, file.handle);
+        }
+        file.handle = 0;
+      }
+      Store(h.base, entry + 0, os);
+      guest::StoreU8(h.base, entry + 4, s.entry_flags);
+      Store(h.base, entry + 8, 1);
+      InitSection(h, entry + 12);
+    }
+  }
+  // A stream's words with its blocks' addresses as markers (2 + which, or 1
+  // for one freed), an entry's OS handle 0x0505 when it's the side's file.
+  void StreamOutputs(Outputs& out, uint32_t stream) {
+    for (uint32_t offset = 0; offset < 32; offset += 4) {
+      uint32_t word = Load(h.base, stream + offset);
+      for (size_t i = 0; i < blocks.size(); i++) {
+        if (word >= blocks[i] && word < blocks[i] + 64 && offset != 4 && offset != 12) {
+          word = 0x0B000000u + uint32_t(i) * 0x100u + (word - blocks[i]);
+        }
+      }
+      out.Word(word);
+    }
+  }
+  void EntryOutputs(Outputs& out, uint32_t entry) {
+    uint32_t os = Load(h.base, entry + 0);
+    for (auto& [file_entry, file] : files) {
+      if (os == file) {
+        os = 0x0505u;
+      }
+    }
+    out.Word(os);
+    out.Bytes(Read(h.base, entry + 4, 40));
+  }
+  void Release(Outputs& out) {
+    HeldOutputs(out, blocks);
+    for (auto& [entry, file] : files) {
+      const bool open = Load(h.base, entry + 0) == file;
+      out.Word(open);
+      if (open) {
+        PPCContext k = CallContext(h);
+        k.r3.u64 = file;
+        __imp__NtClose(k, h.base);
+      }
+    }
+  }
+};
+
+// _fclose_nolock and fclose: a null stream, or a test stream (TestStream) in
+// a block of its own or, for fclose, one of _iob's whose lock is made at boot
+// (put back after). errno, _doserrno and the last error random before, the
+// invalid parameter handler the shared "returns 0". Compared: r3 (64 bits),
+// the stream (its blocks as markers), its handle's entry, its lock, errno,
+// _doserrno, the last error, the blocks still held, the files still open and,
+// for fclose, the caller's frame + 20.
+void FcloseCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(256, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || own == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: fclose: no handle block, thread data, lock 10, "
+                  "block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  std::vector<uint32_t> boot_streams;
+  for (uint32_t i = 3; i < 20; i++) {
+    if (BootLock(h, 16 + i)) {
+      boot_streams.push_back(i);
+    }
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool fclose;
+  };
+  for (const Fn& fn : {Fn{"_fclose_nolock (sub_825A94C0)", __imp__sub_825A94C0,
+                          hooks::CoreFcloseNolock, false},
+                       Fn{"fclose (sub_825A9580)", __imp__sub_825A9580, hooks::CoreFclose, true}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 64; c++) {
+      const bool null = h.random.Below(12) == 0;
+      const bool in_iob = fn.fclose && !boot_streams.empty() && h.random.Below(4) == 0;
+      const uint32_t stream =
+          null ? 0
+          : in_iob ? cc::kIob + 32 * boot_streams[h.random.Below(uint32_t(boot_streams.size()))]
+                   : own;
+      const TestStream s = TestStream::Pick(h, nhandle);
+      const uint32_t entry = handles + 44 * (s.handle & 31);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}, {in_iob ? stream : own, 32}});
+        StreamWorld world(h, handles);
+        if (stream != 0) {
+          world.Set(stream, s, !in_iob);
+        }
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = stream;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (stream != 0) {
+          world.StreamOutputs(out[v], stream);
+          if (!in_iob) {
+            out[v].Bytes(Section(h, stream + 32));
+          }
+        }
+        world.EntryOutputs(out[v], entry);
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        if (fn.fclose) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        world.Release(out[v]);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+}
+
+// _fcloseall: _nstream (3 to 40) and __piob swapped for a test table for the
+// case (both put back after), lock 1 made at boot: each slot from 3 empty or
+// a test stream (TestStream; in a block of the harness's below 20, a C
+// runtime heap block from 20, as _fcloseall frees those), the handles' entries
+// set by the streams (3 to 31, the whole first block put back after). errno,
+// _doserrno and the last error random before, the invalid parameter handler
+// the shared "returns 0". Compared: r3 (64 bits), the table, each stream left
+// (below 20), the first block's entries, errno, _doserrno, the last error,
+// the blocks still held and the files still open.
+void FcloseallCases(Context& h) {
+  Results results("_fcloseall (sub_825B4E78)");
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(64 * 20 + 4 * 40, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || !BootLock(h, 1) || own == 0 ||
+      !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _fcloseall: no handle block, thread data, locks 1 "
+                  "and 10, block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  const uint32_t table = own + 64 * 20;
+  const uint32_t nstream = Load(h.base, cc::kNstream), piob = Load(h.base, cc::kPiob);
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  for (int c = 0; c < 32; c++) {
+    const uint32_t count = 3 + h.random.Below(38);
+    std::vector<std::pair<bool, TestStream>> streams;
+    for (uint32_t i = 0; i < count; i++) {
+      streams.emplace_back(i >= 3 && h.random.Below(3) != 0, TestStream::Pick(h, nhandle));
+    }
+    const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+    const uint32_t last = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{handles, 44 * 32}, {slots.data + 8, 8}});
+      StreamWorld world(h, handles);
+      std::vector<uint32_t> heap_streams;
+      for (uint32_t i = 0; i < count; i++) {
+        uint32_t stream = 0;
+        if (streams[i].first) {
+          if (i < 20) {
+            stream = own + 64 * i;
+          } else {
+            stream = Block(h.base, 64);
+            heap_streams.push_back(stream);
+          }
+          world.Set(stream, streams[i].second);
+        }
+        Store(h.base, table + 4 * i, stream);
+      }
+      Store(h.base, cc::kNstream, count);
+      Store(h.base, cc::kPiob, table);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, slots.data + 12, doserr);
+      SetLastError(h, last);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B4E78 : hooks::CoreFcloseall)(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      Store(h.base, cc::kNstream, nstream);
+      Store(h.base, cc::kPiob, piob);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (uint32_t i = 0; i < count; i++) {
+        uint32_t word = Load(h.base, table + 4 * i);
+        for (size_t k = 0; k < heap_streams.size(); k++) {
+          if (word == heap_streams[k]) {
+            word = 0x0C000000u + uint32_t(k);
+          }
+        }
+        out[v].Word(word);
+        if (streams[i].first && i < 20) {
+          world.StreamOutputs(out[v], own + 64 * i);
+          out[v].Bytes(Section(h, own + 64 * i + 32));
+        }
+      }
+      for (uint32_t e = 3; e < 32; e++) {
+        world.EntryOutputs(out[v], handles + 44 * e);
+      }
+      out[v].Bytes(Read(h.base, slots.data + 8, 8));
+      out[v].Word(GuestLastError(h));
+      world.Release(out[v]);
+      HeldOutputs(out[v], heap_streams);
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -2993,6 +3298,8 @@ void CRuntimeCore(Context& h) {
   WriteCases(h);
   FlushStreamCases(h);
   CxxUnhandledFilterCases(h);
+  FcloseCases(h);
+  FcloseallCases(h);
 }
 
 }  // namespace harness

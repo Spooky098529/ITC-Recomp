@@ -109,4 +109,8 @@ void CoreWrite(PPCContext& ctx, uint8_t* base);        // sub_825B11A8
 void CoreFlush(PPCContext& ctx, uint8_t* base);                        // sub_825ACC78
 void CoreCxxUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base);  // sub_825B4CD0
 
+void CoreFcloseNolock(PPCContext& ctx, uint8_t* base);  // sub_825A94C0 (no adapter)
+void CoreFclose(PPCContext& ctx, uint8_t* base);        // sub_825A9580 (no adapter)
+void CoreFcloseall(PPCContext& ctx, uint8_t* base);     // sub_825B4E78
+
 }  // namespace hooks

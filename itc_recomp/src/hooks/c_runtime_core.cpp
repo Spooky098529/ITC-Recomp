@@ -52,8 +52,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_lseeki64_nolock and _lseeki64 with its __finally (sub_825B6500, sub_825B65D0, "
               "sub_825B6730), _write with _write_nolock and WriteFile (sub_825B11A8, sub_825B0F48, "
               "sub_82295D50), the __finally funclets of fflush and fputs (sub_825AD02C, sub_825AD488), "
-              "_flush (sub_825ACC78) and __CxxUnhandledExceptionFilter (sub_825B4CD0; its "
-              "terminate path checked by reading) (checked by "
+              "_flush (sub_825ACC78), __CxxUnhandledExceptionFilter (sub_825B4CD0; its "
+              "terminate path checked by reading), _fcloseall with fclose and _fclose_nolock "
+              "(sub_825B4E78, sub_825A9580, sub_825A94C0) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -64,7 +65,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
               "_mtinitlocks, CloseHandle (its caller, SaveSlot::WaitClose), SetFilePointer (sub_825B9DD8, "
               "its caller _lseeki64_nolock), _write_nolock and WriteFile (sub_825B0F48, sub_82295D50, "
-              "their caller _write), _close_nolock (sub_825B0C28, its caller _close)");
+              "their caller _write), _close_nolock (sub_825B0C28, its caller _close), fclose and "
+              "_fclose_nolock (their callers _fcloseall and fclose)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -582,6 +584,15 @@ void hooks::CoreCxxUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CxxUnhandledExceptionFilter(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreFcloseNolock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::FcloseNolock(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreFclose(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Fclose(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreFcloseall(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Fcloseall(base, CRuntimeCoreCalls(ctx, base));
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -753,3 +764,7 @@ ITC_C_RUNTIME_CORE(825ACC78, CoreFlush)
 // __CxxUnhandledExceptionFilter: r3 = the exception pointers; r3 = the
 // previous filter's answer, or 0.
 ITC_C_RUNTIME_CORE(825B4CD0, CoreCxxUnhandledExceptionFilter)
+// _fcloseall: r3 = the streams closed. (fclose, sub_825A9580, and
+// _fclose_nolock, sub_825A94C0, have no adapters: _fcloseall is fclose's
+// only caller, fclose _fclose_nolock's.)
+ITC_C_RUNTIME_CORE(825B4E78, CoreFcloseall)

@@ -1493,4 +1493,85 @@ uint64_t CxxUnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Cal
   return result;
 }
 
+
+uint64_t FcloseNolock(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A94C0 _fclose_nolock");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(112, [&](uint32_t) {
+    if (stream == 0) {
+      Store(base, Errno(base, calls), 22);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+      return;
+    }
+    if ((Load(base, stream + 12) & 131) != 0) {
+      result = Flush(base, stream, calls);
+      Freebuf(base, stream, calls);
+      const uint64_t closed = Close(base, uint32_t(Fileno(base, stream, calls)), calls);
+      if (int32_t(uint32_t(closed)) < 0) {
+        result = uint64_t(int64_t(-1));
+      } else if (const uint32_t name = Load(base, stream + 28); name != 0) {
+        calls.free(name);
+        Store(base, stream + 28, 0);
+      }
+    }
+    Store(base, stream + 12, 0);
+  });
+  return result;
+}
+
+uint64_t Fclose(uint8_t* base, uint32_t stream, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825A9580 fclose");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(112, [&](uint32_t frame) {
+    Store(base, frame + 132, stream);
+    Store(base, frame + 80, 0xFFFFFFFFu);
+    if (stream == 0) {
+      Store(base, Errno(base, calls), 22);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+      return;
+    }
+    if ((Load(base, stream + 12) & 0x40) != 0) {
+      Store(base, stream + 12, 0);
+    } else {
+      LockFile(base, stream, true, calls);
+      Store(base, frame + 80, uint32_t(FcloseNolock(base, stream, calls)));
+      UnlockFileFinally(base, stream, calls);
+    }
+    result = Load(base, frame + 80);
+  });
+  return result;
+}
+
+uint32_t Fcloseall(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B4E78 _fcloseall");
+  uint32_t result = 0;
+  calls.in_frame(144, [&](uint32_t frame) {
+    uint32_t count = 0;
+    Store(base, frame + 80, 0);
+    calls.guest(kLock, {1});
+    for (int32_t i = 3;; i++) {
+      Store(base, frame + 84, uint32_t(i));
+      if (i >= int32_t(Load(base, kNstream))) {
+        break;
+      }
+      const uint32_t stream = Load(base, Load(base, kPiob) + 4 * uint32_t(i));
+      if (stream == 0) {
+        continue;
+      }
+      if ((Load(base, stream + 12) & 131) != 0 &&
+          int32_t(uint32_t(Fclose(base, stream, calls))) != -1) {
+        count++;
+        Store(base, frame + 80, count);
+      }
+      if (i >= 20) {
+        calls.free(Load(base, Load(base, kPiob) + 4 * uint32_t(i)));
+        Store(base, Load(base, kPiob) + 4 * uint32_t(i), 0);
+      }
+    }
+    UnlockStreamsFinally(calls);
+    result = Load(base, frame + 80);
+  });
+  return result;
+}
+
 }  // namespace c_runtime::core

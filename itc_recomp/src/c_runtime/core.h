@@ -554,4 +554,27 @@ uint64_t Flush(uint8_t* base, uint32_t stream, const Calls& calls);
 // the pointers: its r3; else 0.
 uint64_t CxxUnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Calls& calls);
 
+
+// sub_825A94C0 _fclose_nolock: from a 112-byte frame, a null stream: errno
+// 22, _invalid_parameter(0, 0, 0, 0, 0), -1. A stream in use (+12 & 0x83):
+// _flush (its result kept), _freebuf, _close(_fileno) (-1 when it fails,
+// else the temporary file's name at +28 freed and cleared); -1 for one not
+// in use; then +12 = 0. r3 as the original leaves it (-1 sign-extended,
+// _flush's r3 as it gave it).
+uint64_t FcloseNolock(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_825A9580 fclose: in its 112-byte frame (the stream at +132, the
+// caller's frame + 20; the result at +80, -1 first): a null stream as
+// _fclose_nolock's; a string stream (+12 & 0x40): +12 = 0, -1; else under
+// _lock_file, _fclose_nolock, then its __finally (sub_825A9664). r3 as the
+// original leaves it (-1 sign-extended for a null stream, else the result
+// as loaded).
+uint64_t Fclose(uint8_t* base, uint32_t stream, const Calls& calls);
+
+// sub_825B4E78 _fcloseall: in its 144-byte frame (+80 the count, +84 the
+// index), under _lock(1), each __piob slot from 3 below _nstream: a stream
+// in use closed by fclose (counted unless it gives -1), and the slots from
+// 20 freed and cleared; then its __finally (sub_825B4F38). The count.
+uint32_t Fcloseall(uint8_t* base, const Calls& calls);
+
 }  // namespace c_runtime::core
