@@ -2608,6 +2608,197 @@ void Pause4(Context& h, const MovieWorld& w) {
       __imp__sub_82211590, hooks::RaceScreensUnseenPause4Draw, draw);
 }
 
+// A generator of the case's own: MovieGroup seeds its cases with
+// successive states of one xorshift sequence, so their streams are the same
+// shifted by one, and after the world's shaping (which draws a varying
+// number of words) many cases fall onto the same state and get the same
+// inputs. Mixed with `count` / 2 (the setup runs once for each version of a
+// case, in turn), each case's inputs are its own.
+Random Fresh(Random& r, uint64_t& count) {
+  const uint64_t salt = count++ / 2;
+  uint64_t x = r.Next() + 0x9E3779B97F4A7C15ull * (salt + 1);
+  x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
+  x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
+  return Random(x ^ (x >> 31));
+}
+
+// The results at +1028 and +1032 (RaceResults::, SplitResults::): the
+// screens' globals ([0x82814E18], [0x82814E1C]) a block of the case's own
+// (RaceResults' 52 bytes at +0, SplitResults' 40 at +0x80, the rest
+// random), the two globals beside them ([0x82814E20] the tick count around
+// 0 to 4 or 207 to 212, [0x82814E24] 0, 1 or any). RaceResults: the block's
+// +0 0, 1 or any, +4 a packed time (minutes 0 to 70, now and then any
+// word), +8 the place 0 to 10 (the original indexes its frame's table
+// unchecked), +12 small or any, +16 0 to 12 or any, +20 one of the world's
+// movies, the page object (+24: page -1 to 1, transition -9 to 2, queued -1
+// to 2), the step word (+48) 0 or 1. SplitResults: the outcome (+0) and
+// mode (+4) 0 to 3 or any, +8 a movie, the page object (+12) and step word
+// (+36) the same. The pages with the mapper entries of the menu list world
+// (FrameSpec::list_world: controllers 0 and 1, their mappers' slot 10
+// Pressed or Held, the entries' +4 now and then 1); SplitResults::MainPage
+// with a race data block of the case's own (its kind +0xA3AF0 6 two times
+// in three, else 0 to 5; the stage list at +0x59620, the current stage +804 0
+// to 9, the stages' first word 1 half the time). Compared as MovieGroup
+// does, with the screens' block and the two globals; SetTexts' varargs
+// stores (its frame's +48 to +79) left out (unset words 0 in ours, the
+// user's call for the parking area, 2026-10-30). SplitResults::Draw
+// (sub_822200E0) stays recompiled: no cases.
+void UnseenResults(Context& h, const MovieWorld& w) {
+  constexpr uint32_t kRaceDataGlobal = 0x826C5B2C;
+  constexpr uint32_t kSplitBytes = 0x80;
+  const World list_world;
+  const Block screens(0x100);
+  const Block race(0xA3B00);
+  if (!list_world.ok() || !screens.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_screens_unseen: no block from the allocation layer");
+    return;
+  }
+  SavedBytes saved(h.base, {{rs::kSplitTicks, 8}, {kRaceDataGlobal, 4}});
+  const uint32_t results = screens.address, split = screens.address + kSplitBytes;
+  uint64_t count = 0;  // the setups run (Fresh)
+  auto pages = [&h](Random& r, uint32_t at) {
+    const int32_t transitions[13] = {-1, -1, -1, -2, -5, -9, 0, 0, 1, 1, 2, 2, 2};
+    guest::StoreU32(h.base, at + 0, uint32_t(int32_t(r.Below(3)) - 1));
+    guest::StoreU32(h.base, at + 4, r.Below(3));
+    guest::StoreU32(h.base, at + 12, uint32_t(transitions[r.Below(13)]));
+    guest::StoreU32(h.base, at + 16, uint32_t(int32_t(r.Below(4)) - 1));
+    guest::StoreU32(h.base, at + 24, r.Below(2));
+  };
+  auto shape = [&](Random& r, const MovieWorld& w) {
+    WriteRandom(h.base, screens.address, screens.bytes, r);
+    guest::StoreU32(h.base, rs::kRaceResults, results);
+    guest::StoreU32(h.base, rs::kSplitResults, split);
+    guest::StoreU32(h.base, rs::kSplitTicks,
+                    r.Below(3) == 0 ? r.Below(5) : 207 + r.Below(6));
+    guest::StoreU32(h.base, rs::kSplitExchanged,
+                    r.Below(6) == 0 ? uint32_t(r.Next()) : (r.Below(3) == 0 ? 0 : 1));
+    // RaceResults.
+    guest::StoreU32(h.base, results + 0, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    const uint32_t time = (r.Below(71) << 16) | (r.Below(64) << 10) | r.Below(1024) |
+                          (r.Below(4) == 0 ? 0x80000000u : 0);
+    guest::StoreU32(h.base, results + 4, r.Below(8) == 0 ? uint32_t(r.Next()) : time);
+    guest::StoreU32(h.base, results + 8, r.Below(11));
+    guest::StoreU32(h.base, results + 12, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(40));
+    guest::StoreU32(h.base, results + 16, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(13));
+    guest::StoreU32(h.base, results + 20, w.movie(r.Below(kMovieCount)));
+    pages(r, results + 24);
+    // SplitResults.
+    for (const uint32_t field : {0u, 4u}) {
+      guest::StoreU32(h.base, split + field, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));
+    }
+    guest::StoreU32(h.base, split + 8, w.movie(r.Below(kMovieCount)));
+    pages(r, split + 12);
+  };
+  auto shape_race = [&](Random& r) {
+    guest::StoreU32(h.base, kRaceDataGlobal, race.address);
+    guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(3) != 0 ? 6 : r.Below(6));
+    const uint32_t stages = race.address + 0x59620;
+    WriteRandom(h.base, stages, 816, r);
+    guest::StoreU32(h.base, stages + 804, r.Below(10));
+    for (uint32_t k = 0; k < 10; k++) {
+      guest::StoreU32(h.base, stages + 80 * k, r.Below(2) == 0 ? 1 : r.Below(3));
+    }
+  };
+  auto outputs = [&](Outputs& out) {
+    out.Bytes(Read(h.base, screens.address, screens.bytes));
+    out.Bytes(Read(h.base, rs::kSplitTicks, 8));
+  };
+  const MovieSetupFn on_results = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    t.r3.u64 = results;
+  };
+  const MovieSetupFn on_split = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    t.r3.u64 = split;
+  };
+  const MovieSetupFn results_step = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    t.r3.u64 = results + 48;
+  };
+  const MovieSetupFn split_step = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    t.r3.u64 = split + 36;
+  };
+  const MovieSetupFn split_race = [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+    Random r = Fresh(rr, count);
+    shape(r, w);
+    shape_race(r);
+    t.r3.u64 = split;
+  };
+  struct Spec {
+    const char* name;
+    int cases;
+    const MovieSetupFn* setup;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    std::pair<uint32_t, uint32_t> skip;
+    bool mappers;
+  };
+  const Spec specs[] = {
+      {"RaceResults::SetTexts (sub_8221F628)", 200, &on_results, __imp__sub_8221F628,
+       hooks::RaceScreensUnseenRaceResultsSetTexts, 160, 32, {48, 80}, false},
+      {"RaceResults::Intro (sub_8221F428)", 100, &results_step, __imp__sub_8221F428,
+       hooks::RaceScreensUnseenRaceResultsIntro, 96, 16, {0, 0}, false},
+      {"RaceResults::Show (sub_8221F4B0)", 100, &results_step, __imp__sub_8221F4B0,
+       hooks::RaceScreensUnseenRaceResultsShow, 112, 24, {0, 0}, false},
+      {"RaceResults::Close (sub_8221F580)", 100, &results_step, __imp__sub_8221F580,
+       hooks::RaceScreensUnseenRaceResultsClose, 112, 24, {0, 0}, false},
+      {"RaceResults::MainPage (sub_8221F870)", 200, &on_results, __imp__sub_8221F870,
+       hooks::RaceScreensUnseenRaceResultsMainPage, 96, 16, {0, 0}, true},
+      {"RaceResults::Update (sub_8221F930)", 200, &on_results, __imp__sub_8221F930,
+       hooks::RaceScreensUnseenRaceResultsUpdate, 96, 8, {0, 0}, true},
+      {"RaceResults::Draw (sub_8221F7D0)", 300, &on_results, __imp__sub_8221F7D0,
+       hooks::RaceScreensUnseenRaceResultsDraw, 112, 16, {0, 0}, false},
+      {"SplitResults::Intro (sub_8221FAC8)", 400, &split_step, __imp__sub_8221FAC8,
+       hooks::RaceScreensUnseenSplitResultsIntro, 112, 32, {0, 0}, false},
+      {"SplitResults::Show (sub_8221FBE8)", 400, &split_step, __imp__sub_8221FBE8,
+       hooks::RaceScreensUnseenSplitResultsShow, 112, 24, {0, 0}, false},
+      {"SplitResults::Close (sub_8221FD98)", 100, &split_step, __imp__sub_8221FD98,
+       hooks::RaceScreensUnseenSplitResultsClose, 112, 24, {0, 0}, false},
+      {"SplitResults::MainPage (sub_8221FE70)", 300, &split_race, __imp__sub_8221FE70,
+       hooks::RaceScreensUnseenSplitResultsMainPage, 192, 32, {0, 0}, true},
+      {"SplitResults::Update (sub_8221FFF0)", 300, &split_race, __imp__sub_8221FFF0,
+       hooks::RaceScreensUnseenSplitResultsUpdate, 96, 8, {0, 0}, true},
+  };
+  for (const Spec& s : specs) {
+    FrameSpec spec{s.frame, s.saves, s.skip};
+    if (s.mappers) spec.list_world = &list_world;
+    spec.after = outputs;
+    MovieGroup(h, w, s.name, s.cases, *s.setup, s.recompiled, s.native, spec);
+  }
+  // The openers: UI movie 7 or 8 in the movie table half the time (the
+  // second pair's id), the missing movie's answer otherwise.
+  FrameSpec open{112, 24};
+  open.after = outputs;
+  MovieGroup(
+      h, w, "RaceResults::Open (sub_8221F990)", 200,
+      [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+        Random r = Fresh(rr, count);
+        shape(r, w);
+        if (r.Below(2) == 0) guest::StoreU32(h.base, w.movies.address + kPairsAt + 8, 7);
+        t.r3.u64 = results;
+        t.r4.u64 = screens.address + 0xC0;  // the block: the screens block's random words
+      },
+      __imp__sub_8221F990, hooks::RaceScreensUnseenRaceResultsOpen, open);
+  FrameSpec split_open{112, 16};
+  split_open.after = outputs;
+  MovieGroup(
+      h, w, "SplitResults::Open (sub_82220050)", 150,
+      [&](PPCContext& t, Random& rr, const MovieWorld& w) {
+        Random r = Fresh(rr, count);
+        shape(r, w);
+        if (r.Below(2) == 0) guest::StoreU32(h.base, w.movies.address + kPairsAt + 8, 8);
+        t.r3.u64 = split;
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(3);
+        t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(3);
+      },
+      __imp__sub_82220050, hooks::RaceScreensUnseenSplitResultsOpen, split_open);
+}
+
 }  // namespace
 
 void RaceScreens(Context& h) {
@@ -2636,6 +2827,7 @@ void RaceScreensUnseen(Context& h) {
   }
   BuildStringTable(h.base, w);
   Pause4(h, w);
+  UnseenResults(h, w);
 }
 
 }  // namespace harness

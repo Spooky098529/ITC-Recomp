@@ -58,4 +58,30 @@ void RaceScreensUnseenPause4MoveVolume(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenPause4SetVolume(PPCContext& ctx, uint8_t* base);
 void RaceScreensUnseenPause4CloseVolume(PPCContext& ctx, uint8_t* base);
 
+// The results at +1028 and +1032. Adapters (the race HUD machine's
+// handlers reach them from recompiled code): RaceResults::Open sub_8221F990
+// (r3 the screen, r4 the block), Update sub_8221F930 (r3, r4 passed on),
+// Draw sub_8221F7D0 (r3 the screen); SplitResults::Open sub_82220050 (r3
+// the screen, r4 the outcome, r5 the mode), Update sub_8221FFF0, and
+// SplitResults' transitions (r3 the step word) Intro sub_8221FAC8, Show
+// sub_8221FBE8 and Close sub_8221FD98 (the recompiled SplitResults::Draw
+// reaches them through its table). Without adapters (only the native Open,
+// Update and Draw reach them): SetTexts sub_8221F628 (r3 the screen), the
+// MainPages sub_8221F870 and sub_8221FE70, RaceResults' transitions Intro
+// sub_8221F428, Show sub_8221F4B0 and Close sub_8221F580.
+void RaceScreensUnseenRaceResultsOpen(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenRaceResultsUpdate(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenRaceResultsDraw(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenRaceResultsSetTexts(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenRaceResultsMainPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenRaceResultsIntro(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenRaceResultsShow(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenRaceResultsClose(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenSplitResultsOpen(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenSplitResultsUpdate(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenSplitResultsMainPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenSplitResultsIntro(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenSplitResultsShow(PPCContext& ctx, uint8_t* base);
+void RaceScreensUnseenSplitResultsClose(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

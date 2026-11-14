@@ -8,11 +8,17 @@
 #include "base/flags.h"
 #include "race_screens/unseen.h"
 
+ITC_FLAG_DECLARE(bool, native_action_mappers);
+
 ITC_FLAG_BOOL(native_race_screens_unseen, true, "ITC",
               "Run the in-race screens never seen in play natively "
               "(docs/functions/race-screens-unseen.md): kind 4's pause menu, "
               "PauseMenu4::Open sub_82211390, Update sub_82211458 and Draw sub_82211590 with "
-              "their pages, helpers and transitions (the UI movie calls through their "
+              "their pages, helpers and transitions; the results at +1028, RaceResults::Open "
+              "sub_8221F990, Update sub_8221F930 and Draw sub_8221F7D0 with SetTexts, MainPage, "
+              "Intro, Show and Close; the results at +1032, SplitResults::Open sub_82220050 and "
+              "Update sub_8221FFF0 with MainPage, Intro, Show and Close (Draw sub_822200E0 "
+              "stays recompiled) (the UI movie calls through their "
               "overrides, SetText's and SetNodeText's unset varargs 0), instead of through the "
               "translated code (the same writes; checked by "
               "--run_harnesses=race_screens_unseen)");
@@ -149,6 +155,67 @@ void RaceScreensUnseenPause4SetArrow(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = race_screens::Pause4SetArrow(base, ctx.r3.u64, ctx.r1.u32);
 }
 
+bool NativeSlotsUnseen() { return ITC_FLAG(native_action_mappers); }
+
+void RaceScreensUnseenRaceResultsOpen(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceResultsOpen(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                                             guest.calls());
+}
+
+void RaceScreensUnseenRaceResultsUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceResultsUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                               NativeSlotsUnseen(), guest.calls());
+}
+
+void RaceScreensUnseenRaceResultsDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceResultsDraw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenRaceResultsSetTexts(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceResultsSetTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenRaceResultsMainPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::RaceResultsMainPage(base, ctx.r1.u32, NativeSlotsUnseen(), guest.calls());
+}
+
+void RaceScreensUnseenSplitResultsOpen(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::SplitResultsOpen(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64,
+                                              ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensUnseenSplitResultsUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::SplitResultsUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                                NativeSlotsUnseen(), guest.calls());
+}
+
+void RaceScreensUnseenSplitResultsMainPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::SplitResultsMainPage(base, ctx.r1.u32, NativeSlotsUnseen(), guest.calls());
+}
+
+#define ITC_UNSEEN_RESULTS_TRANSITION(name)                                              \
+  void RaceScreensUnseen##name(PPCContext& ctx, uint8_t* base) {                         \
+    GuestCalls guest(ctx, base);                                                         \
+    ctx.r3.u64 = race_screens::name(base, ctx.r3.u32, ctx.r1.u32, guest.calls());        \
+  }
+ITC_UNSEEN_RESULTS_TRANSITION(RaceResultsIntro)
+ITC_UNSEEN_RESULTS_TRANSITION(RaceResultsShow)
+ITC_UNSEEN_RESULTS_TRANSITION(RaceResultsClose)
+ITC_UNSEEN_RESULTS_TRANSITION(SplitResultsIntro)
+ITC_UNSEEN_RESULTS_TRANSITION(SplitResultsShow)
+ITC_UNSEEN_RESULTS_TRANSITION(SplitResultsClose)
+#undef ITC_UNSEEN_RESULTS_TRANSITION
+
 }  // namespace hooks
 
 #define ITC_RACE_SCREENS_UNSEEN(address, step)    \
@@ -164,3 +231,13 @@ void RaceScreensUnseenPause4SetArrow(PPCContext& ctx, uint8_t* base) {
 ITC_RACE_SCREENS_UNSEEN(82211390, RaceScreensUnseenPause4Open)
 ITC_RACE_SCREENS_UNSEEN(82211458, RaceScreensUnseenPause4Update)
 ITC_RACE_SCREENS_UNSEEN(82211590, RaceScreensUnseenPause4Draw)
+ITC_RACE_SCREENS_UNSEEN(8221F990, RaceScreensUnseenRaceResultsOpen)
+ITC_RACE_SCREENS_UNSEEN(8221F930, RaceScreensUnseenRaceResultsUpdate)
+ITC_RACE_SCREENS_UNSEEN(8221F7D0, RaceScreensUnseenRaceResultsDraw)
+ITC_RACE_SCREENS_UNSEEN(82220050, RaceScreensUnseenSplitResultsOpen)
+ITC_RACE_SCREENS_UNSEEN(8221FFF0, RaceScreensUnseenSplitResultsUpdate)
+// SplitResults' transitions: the recompiled SplitResults::Draw (sub_822200E0,
+// kept for its network battle's sends) reaches them through its table.
+ITC_RACE_SCREENS_UNSEEN(8221FAC8, RaceScreensUnseenSplitResultsIntro)
+ITC_RACE_SCREENS_UNSEEN(8221FBE8, RaceScreensUnseenSplitResultsShow)
+ITC_RACE_SCREENS_UNSEEN(8221FD98, RaceScreensUnseenSplitResultsClose)

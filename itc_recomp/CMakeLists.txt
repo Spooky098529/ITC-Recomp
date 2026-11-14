@@ -332,6 +332,7 @@ set(ITC_SOURCES
     src/race_screens/career.cpp
     src/race_screens/draws.cpp
     src/race_screens/pause_menu4.cpp
+    src/race_screens/results.cpp
     src/hooks/menu_sounds.cpp
     src/menu_sounds/menu_sounds.cpp
     src/hooks/race_sounds.cpp

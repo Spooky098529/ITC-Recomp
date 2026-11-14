@@ -138,4 +138,82 @@ uint64_t Pause4MoveVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls
 uint64_t Pause4SetVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 uint64_t Pause4CloseVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+// --- The results at +1028 and +1032 (results.cpp) ---
+//
+// RaceResults: the screen [0x82814E18] (52 bytes: +0 to +16 the block,
+// +20 the movie, UI movie 7, +24 the page object, +48 the step word).
+// SplitResults: the screen [0x82814E1C] (40 bytes: +0 the outcome, +4 the
+// mode, +8 the movie, UI movie 8, +12 the page object, +36 the step word),
+// with the tick count [0x82814E20] and the "other console's result came"
+// word [0x82814E24]. The UI movie calls (PlayNamed, LoopNamed, FinishNamed,
+// Run, SetText, ResetPose) and MenuSound::Play through their overrides
+// (`calls`); UiMovies::Find, UiMovie::FindNode, ScreenPages::Init, Go and
+// Finish, the mapper's slot 10 (MapperPressed), Stages::Copy and the shared
+// "returns 1" (sub_825C8390) by their plain C++. SetText's unset varargs are
+// passed as 0 (the user's call for the parking area, 2026-10-30).
+constexpr uint32_t kSplitTicks = 0x82814E20;
+constexpr uint32_t kSplitExchanged = 0x82814E24;
+
+// sub_8221F990 RaceResults::Open (r3 the screen, r4 the 20-byte block):
+// the block copied to +0, UI movie 7 found (the id at the frame's +80) into
+// +20 and its pose reset, ScreenPages::Init(+24, 0) and Go(0, transition 0,
+// then 1), SetTexts. SetTexts' r3.
+uint64_t RaceResultsOpen(uint8_t* base, uint32_t screen, uint32_t block, uint32_t sp,
+                         const Calls& calls);
+// sub_8221F628 RaceResults::SetTexts (r3 the screen), from a 160-byte
+// frame: the type-5 texts: items 2 to 5 strings 1976 to 1979; item 6
+// string 528 with +4's minutes, seconds and thousandths (past 59 minutes
+// 59:59.999); item 7 the place string from the frame's table (11 words at
+// +80, by +8, unchecked as the original); item 8 string +12 + 1718; item 9
+// by +16 (1985 to 1987 for 0 to 2, 1984 with +16 + 1 for 3 to 9, 1988 for
+// 10, nothing above). The last SetText's r3.
+uint64_t RaceResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+// sub_8221F870 RaceResults::MainPage: player 0's mapper entry's slot 10 on
+// accept (159), then back (158): either MenuSound::Play(0) and Go(1,
+// transition 2). Returns 0.
+uint64_t RaceResultsMainPage(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls);
+// sub_8221F930 RaceResults::Update (r3 the screen): the page (+24): -1 0,
+// 0 MainPage, 1 the shared "returns 1"; past the table the frame's word
+// through `calls` (r3, r4 the caller's).
+uint64_t RaceResultsUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                           bool native_slots, const Calls& calls);
+// The transitions (r3 the step word; on the first call the word 1 and
+// their work, then UiMovie::Run(movie, 0)): sub_8221F428 Intro (named 2,
+// or 3 when the block's +0 is 0; the run's 0), sub_8221F4B0 Show (named 4,
+// then 6 or 7 by +0, played and looped; 1), sub_8221F580 Close (named 6, 7
+// and 4 finished, 5 played; the run's 0).
+uint64_t RaceResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t RaceResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t RaceResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8221F7D0 RaceResults::Draw (r3 the screen): with a transition
+// running (+36 >= 0) its handler with +48, then ScreenPages::Finish(+24,
+// its answer) (r3 +24); else UiMovie::Run(+20, 0) (its r3).
+uint64_t RaceResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+
+// sub_82220050 SplitResults::Open (r3 the screen, r4 the outcome, r5 the
+// mode): +4 and +0 stored, UI movie 8 found into +8 and its pose reset,
+// ScreenPages::Init(+12, 0) and Go(0, transition 0, then 1), the two
+// globals 0. Returns the screen + 12.
+uint64_t SplitResultsOpen(uint8_t* base, uint32_t screen, uint64_t outcome, uint64_t mode,
+                          uint32_t sp, const Calls& calls);
+// sub_8221FE70 SplitResults::MainPage, from a 192-byte frame: the stage
+// copied to the frame's +80 (Stages::Copy); in the network battle (race
+// kind 6, the stage's +0 not 1) with [0x82814E24] 1 [0x82814E20] counted
+// and past 210 Go(1, transition 2); else players 0's and 1's mapper
+// entries' slot 10 on accept and back: any MenuSound::Play(0) and Go(1,
+// transition 2). Returns 0.
+uint64_t SplitResultsMainPage(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls);
+// sub_8221FFF0 SplitResults::Update (r3 the screen): as RaceResults::
+// Update's on the page +12.
+uint64_t SplitResultsUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                            bool native_slots, const Calls& calls);
+// sub_8221FAC8 Intro (by the mode +4: 0 the group -1 node 0's +80 = 1 and
+// named 0 to 2 by the outcome; 1 +80 = 0 and named 3, 4, 2; 2 +80 = 1 and
+// named 5; the run's 0), sub_8221FBE8 Show (named 6, then mode 0 8, 9, 10,
+// mode 1 11, 12, 10, mode 2 13, played and looped; 1), sub_8221FD98 Close
+// (named 8 to 10, 6, 11 to 13 finished, 7 played; the run's 0).
+uint64_t SplitResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t SplitResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t SplitResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
 }  // namespace race_screens
