@@ -10,6 +10,7 @@
 #include "helpers/debug_output.h"
 
 #include <bit>
+#include <cstring>
 
 namespace c_runtime::core {
 
@@ -638,6 +639,68 @@ uint32_t Getptd(uint8_t* base, const Calls& calls) {
 uint64_t Fptrap(uint8_t* base, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_825B64F8 _fptrap");
   return AmsgExit(base, 2, calls);
+}
+
+uint32_t UnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82297940 UnhandledExceptionFilter");
+  uint32_t result = 0;
+  calls.in_frame(96, [&](uint32_t) {
+    uint32_t monitor_result = 0;
+    if (const uint32_t data = Load(base, Load(base, kDebugMonitorData)); data != 0) {
+      monitor_result = uint32_t(calls.guest(Load(base, data + 24), {10, 0}));
+    }
+    if (monitor_result != 0) {
+      return;
+    }
+    if (const uint32_t filter = Load(base, kUnhandledFilter); filter != 0) {
+      if (int32_t(calls.guest(filter, {pointers})) == -1) {
+        result = 0xFFFFFFFFu;
+      }
+    }
+  });
+  return result;
+}
+
+void DebugMonitorNotify(uint8_t* base, uint32_t code, double value, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B9BA8 a debug monitor notification");
+  calls.in_frame(96, [&](uint32_t frame) {
+    const uint32_t bits = std::bit_cast<uint32_t>(float(value));
+    Store(base, frame + 124, bits);
+    if (const uint32_t data = Load(base, Load(base, kDebugMonitorData)); data != 0) {
+      calls.guest(Load(base, data + 24), {39, uint64_t(code | 0x02200000u)});
+    }
+    if (const uint32_t data = Load(base, Load(base, kDebugMonitorData)); data != 0) {
+      calls.guest(Load(base, data + 24), {39, Load(base, frame + 124)});
+    }
+  });
+}
+
+uint32_t CxxRestoreUnhandledExceptionFilter(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825B4D90 __CxxRestoreUnhandledExceptionFilter");
+  return SetUnhandledExceptionFilter(base, Load(base, kCxxPreviousFilter));
+}
+
+void InvokeWatson(uint8_t* base, uint32_t return_address, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AFD10 _invoke_watson");
+  calls.in_frame(2816, [&](uint32_t frame) {
+    Store(base, frame + 2808, return_address);
+    guest::ForEachHostPart(base, frame + 176, 2624,
+                           [](uint8_t* host, uint32_t, uint32_t bytes) {
+                             std::memset(host, 0, bytes);
+                           });
+    for (uint32_t offset = 96; offset < 176; offset += 4) {
+      Store(base, frame + offset, 0);
+    }
+    Store(base, frame + 96, 0xC000000Du);
+    Store(base, frame + 108, Load(base, frame + 2808));
+    Store(base, frame + 80, frame + 96);
+    Store(base, frame + 84, frame + 176);
+    SetUnhandledExceptionFilter(base, 0);
+    if (UnhandledExceptionFilter(base, frame + 80, calls) == 0) {
+      CrtDebuggerHook(base);
+    }
+    calls.import(Import::kKeBugCheck, {30});
+  });
 }
 
 }  // namespace c_runtime::core

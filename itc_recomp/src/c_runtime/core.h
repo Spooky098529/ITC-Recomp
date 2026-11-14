@@ -317,4 +317,35 @@ uint32_t Getptd(uint8_t* base, const Calls& calls);
 // sub_825B64F8 _fptrap: _amsg_exit(2) (its tail call); its r3.
 uint64_t Fptrap(uint8_t* base, const Calls& calls);
 
+constexpr uint32_t kDebugMonitorData = 0x820007F0;  // [it]: KeDebugMonitorData's address
+constexpr uint32_t kUnhandledFilter = 0x829714A0;   // SetUnhandledExceptionFilter's word
+constexpr uint32_t kCxxPreviousFilter = 0x82971348;  // the filter before the C++ one
+
+// sub_82297940 UnhandledExceptionFilter: from a 96-byte frame, the debug
+// monitor's routine (its data's +24) with (10, 0) when one is attached
+// ([[kDebugMonitorData]] not 0); when that gives 0 (or there's none), the
+// filter at kUnhandledFilter with the exception pointers when set: -1 when
+// it returns -1, else 0.
+uint32_t UnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Calls& calls);
+
+// sub_825B9BA8 a debug monitor notification (probably): `value` rounded to a
+// float stored at the caller's frame + 28 (the original's r1 + 124 in its
+// 96-byte frame); with a debug monitor attached, its routine with (39, code |
+// 0x02200000), then (39, the float's bits) when one is still attached.
+void DebugMonitorNotify(uint8_t* base, uint32_t code, double value, const Calls& calls);
+
+// sub_825B4D90 __CxxRestoreUnhandledExceptionFilter:
+// SetUnhandledExceptionFilter([kCxxPreviousFilter]) (its tail call); the old
+// filter.
+uint32_t CxxRestoreUnhandledExceptionFilter(uint8_t* base);
+
+// sub_825AFD10 _invoke_watson (probably): in its 2,816-byte frame, a zeroed
+// 2,624-byte context at +176 (memset) and an 80-byte exception record at +96
+// (code 0xC000000D, its address +12 the caller's return address, the
+// original's saved link register at +2808), the pointers at +80 (+96, +176);
+// SetUnhandledExceptionFilter(0), UnhandledExceptionFilter(+80),
+// _crt_debugger_hook when that gives 0, then KeBugCheck(30). No harness: ends
+// the process (the user's call, 2026-11-14).
+void InvokeWatson(uint8_t* base, uint32_t return_address, const Calls& calls);
+
 }  // namespace c_runtime::core

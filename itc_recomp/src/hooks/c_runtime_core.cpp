@@ -33,7 +33,15 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825BA168), _initterm_e and _ioinit (sub_82297AC0, sub_825B4668), _initstdio "
               "(sub_825AD4D0), _FF_MSGBANNER (sub_825AEDE8), _lock_file, _unlock_file, _lock_file2 "
               "and _unlock_file2 (sub_825AD638, sub_825AD688, sub_825AD670, sub_825AD6C0; _lock and "
-              "_unlock guest calls) and _unlock_fhandle (sub_825B7A58) (checked by --run_harnesses=c_runtime_core). "
+              "_unlock guest calls), _unlock_fhandle (sub_825B7A58), _invalid_parameter "
+              "(sub_825AFCC8), _amsg_exit (sub_825AA158), _getptd (sub_825AA580), _fptrap "
+              "(sub_825B64F8), UnhandledExceptionFilter (sub_82297940), the debug monitor "
+              "notification (sub_825B9BA8) and __CxxRestoreUnhandledExceptionFilter "
+              "(sub_825B4D90) (checked by --run_harnesses=c_runtime_core); checked by reading, as "
+              "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
+              "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
+              "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
+              "_invalid_parameter's trap. "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
@@ -352,6 +360,23 @@ void hooks::CoreFptrap(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fptrap(base, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = int32_t(cc::UnhandledExceptionFilter(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base)));
+}
+
+void hooks::CoreDebugMonitorNotify(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  cc::DebugMonitorNotify(base, ctx.r3.u32, ctx.f1.f64, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreCxxRestoreUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::CxxRestoreUnhandledExceptionFilter(base);
+}
+
+void hooks::CoreInvokeWatson(PPCContext& ctx, uint8_t* base) {
+  cc::InvokeWatson(base, uint32_t(ctx.lr), CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -448,3 +473,11 @@ ITC_C_RUNTIME_CORE(825AA158, CoreAmsgExit)
 ITC_C_RUNTIME_CORE(825AA580, CoreGetptd)
 // _fptrap: no registers.
 ITC_C_RUNTIME_CORE(825B64F8, CoreFptrap)
+// UnhandledExceptionFilter: r3 = the exception pointers; r3 = -1 or 0.
+ITC_C_RUNTIME_CORE(82297940, CoreUnhandledExceptionFilter)
+// The debug monitor notification: r3 = a code, f1 = a value.
+ITC_C_RUNTIME_CORE(825B9BA8, CoreDebugMonitorNotify)
+// __CxxRestoreUnhandledExceptionFilter: r3 = the filter it replaced.
+ITC_C_RUNTIME_CORE(825B4D90, CoreCxxRestoreUnhandledExceptionFilter)
+// _invoke_watson: no registers; ends in KeBugCheck(30).
+ITC_C_RUNTIME_CORE(825AFD10, CoreInvokeWatson)

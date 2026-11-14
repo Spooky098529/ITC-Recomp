@@ -1490,6 +1490,131 @@ void InvalidParameterCases(Context& h) {
   results.Report();
 }
 
+// The debug monitor (KeDebugMonitorData's word, at [0x820007F0]: the SDK's
+// system heap, 0 in play) attached for a case: a block in the scratch area
+// whose +24 is `routine`; put back after. _set_abort_behavior (sub_825AD120)
+// as a routine or filter leaves a trace of its r3 and r4 in its global
+// ([0x8266B7C4]), and returns its old value.
+constexpr uint32_t kAbortBehavior = 0x8266B7C4;
+constexpr uint32_t kSetAbortBehavior = 0x825AD120;
+
+struct Monitor {
+  Context& h;
+  uint32_t word, saved;
+  Monitor(Context& h, uint32_t routine)
+      : h(h), word(Load(h.base, cc::kDebugMonitorData)), saved(Load(h.base, word)) {
+    if (routine != 0) {
+      Store(h.base, h.data + 1024 + 24, routine);
+      Store(h.base, word, h.data + 1024);
+    } else {
+      Store(h.base, word, 0);
+    }
+  }
+  ~Monitor() { Store(h.base, word, saved); }
+};
+
+uint32_t PickRoutine(Context& h) {
+  const uint32_t pick = h.random.Below(3);
+  return pick == 0 ? 0 : pick == 1 ? kReturnsZero : kSetAbortBehavior;
+}
+
+// UnhandledExceptionFilter: no monitor or one returning 0 or the abort
+// word's old value; the filter none, the shared "returns 0" or
+// _set_abort_behavior (the abort word -1 now and then, so it returns -1);
+// compared: r3, the abort word and the filter word.
+void UnhandledFilterCases(Context& h) {
+  Results results("UnhandledExceptionFilter (sub_82297940)");
+  const uint32_t filter_saved = Load(h.base, cc::kUnhandledFilter);
+  const uint32_t abort_saved = Load(h.base, kAbortBehavior);
+  for (int c = 0; c < 60; c++) {
+    const uint32_t routine = PickRoutine(h);
+    const uint32_t filter = PickRoutine(h);
+    const uint32_t abort = c % 3 == 0 ? 0xFFFFFFFFu : c % 3 == 1 ? 0 : uint32_t(h.random.Next());
+    const uint32_t pointers = uint32_t(h.random.Next());
+    const uint32_t r4 = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Monitor monitor(h, routine);
+      Store(h.base, cc::kUnhandledFilter, filter);
+      Store(h.base, kAbortBehavior, abort);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = pointers;
+      t.r4.u64 = r4;
+      (v == 0 ? __imp__sub_82297940 : hooks::CoreUnhandledExceptionFilter)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, kAbortBehavior));
+      out[v].Word(Load(h.base, cc::kUnhandledFilter));
+    }
+    Store(h.base, cc::kUnhandledFilter, filter_saved);
+    Store(h.base, kAbortBehavior, abort_saved);
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The debug monitor notification: no monitor, or one that's the shared
+// "returns 0" or _set_abort_behavior (its global then a trace of both
+// calls' r4: the code with 0x02200000, the float's bits); f1 edges and
+// random doubles (a float, so its rounding is compared through the word
+// stored in the caller's frame, exactly: it's a store, not a float the
+// function computes with); compared: that word, the abort word.
+void DebugMonitorCases(Context& h) {
+  Results results("the debug monitor notification (sub_825B9BA8)");
+  const uint32_t abort_saved = Load(h.base, kAbortBehavior);
+  static const uint64_t kEdges[] = {0, 0x8000000000000000ull, 0x3FF0000000000000ull,
+                                    0x7FF0000000000000ull, 0x7FF8000000000000ull,
+                                    0x47EFFFFFF0000000ull, 0x36A0000000000000ull,
+                                    0x3FF0000010000000ull};
+  for (int c = 0; c < 60; c++) {
+    const uint32_t routine = PickRoutine(h);
+    const uint32_t code = uint32_t(h.random.Next());
+    const uint64_t value = c < 8 ? kEdges[c] : h.random.Next();
+    const uint32_t abort = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Monitor monitor(h, routine);
+      Store(h.base, kAbortBehavior, abort);
+      PPCContext t = CallContext(h);
+      Store(h.base, t.r1.u32 + 28, 0xCDCDCDCDu);
+      t.r3.u64 = code;
+      t.f1.u64 = value;
+      (v == 0 ? __imp__sub_825B9BA8 : hooks::CoreDebugMonitorNotify)(t, h.base);
+      out[v].Word(Load(h.base, t.r1.u32 + 28));
+      out[v].Word(Load(h.base, kAbortBehavior));
+    }
+    Store(h.base, kAbortBehavior, abort_saved);
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// __CxxRestoreUnhandledExceptionFilter: the previous and current filter
+// words random; r3 and both compared, put back after.
+void CxxRestoreFilterCases(Context& h) {
+  Results results("__CxxRestoreUnhandledExceptionFilter (sub_825B4D90)");
+  const uint32_t filter_saved = Load(h.base, cc::kUnhandledFilter);
+  const uint32_t previous_saved = Load(h.base, cc::kCxxPreviousFilter);
+  for (int c = 0; c < 20; c++) {
+    const uint32_t filter = uint32_t(h.random.Next());
+    const uint32_t previous = c % 4 == 0 ? 0 : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Store(h.base, cc::kUnhandledFilter, filter);
+      Store(h.base, cc::kCxxPreviousFilter, previous);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B4D90 : hooks::CoreCxxRestoreUnhandledExceptionFilter)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, cc::kUnhandledFilter));
+      out[v].Word(Load(h.base, cc::kCxxPreviousFilter));
+    }
+    Store(h.base, cc::kUnhandledFilter, filter_saved);
+    Store(h.base, cc::kCxxPreviousFilter, previous_saved);
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -1537,6 +1662,9 @@ void CRuntimeCore(Context& h) {
   AmsgExitCases(h);
   GetptdCases(h);
   InvalidParameterCases(h);
+  UnhandledFilterCases(h);
+  DebugMonitorCases(h);
+  CxxRestoreFilterCases(h);
 }
 
 }  // namespace harness
