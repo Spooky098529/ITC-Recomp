@@ -16,6 +16,8 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-14 05:01 (`b7-loop-13-11-26`)
+
 ## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
 
 Not in the attract race or the replay (`itc_5235`, `itc_5236`, ok; the

@@ -11,6 +11,11 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-14 05:01 (`b7-loop-13-11-26`)
+
+- `sub_82562FF0` dropped from `leads.md` (the movie library's range,
+  reached only through a pointer).
+
 ## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
 
 - Cleanup leads (98f4fe26..52b87de7): `CarList::DrawEntryPowerGraph`'s
