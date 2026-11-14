@@ -177,6 +177,13 @@ When the user has reviewed a run's section, its heading gets
   +9700/+9704 bit, `ListScreen::Update`'s slot r4s, the titled deleting
   destructor's vtable store); a new expected group
   (`expected-differences.md`); ~1,100 new harness cases.
+- Part 2 (9bd91f77..a29897be): the color list, `Type7ListScreen` (its
+  `AddRacers` Merged; its `SetUpRace` traffic records expected to
+  differ as type 6's), the node screen with `CourseRecords::Of`
+  (`save-data.md`), the panel leftovers, the screen blocks'
+  destructors; the titled list's page helpers moved to
+  `list_pages.h`; harness faults fixed on the way (inputs kept in the
+  ranges play gives).
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 

@@ -233,7 +233,12 @@ file's history. What's left to see in a drive, from every run:
   `itc_5349` (race 47 s at 180, the harnesses 131 s; 0 errors, every
   harness 0 differing outside the expected groups), 101 of 101 harness
   lines; none in the race or the replay `itc_5350` (ok): 101 to drive.
-  Migration part 2 running (the 72 rows left).
+  Migration part 2 9bd91f77..a29897be: all 72 rows ours (with
+  `CourseRecords::Of`; `Type7ListScreen::AddRacers` Merged), seven
+  commits by subagents one at a time; every harness 0 differing but
+  the two traffic-records groups (`Type7ListScreen::SetUpRace`'s new,
+  7 of 12, in `expected-differences.md`); races 33-38 s at 40, 0
+  errors; ~600 new cases. Validation agent running on part 2.
 
 ## Done
 
