@@ -426,4 +426,115 @@ uint32_t ResetEvent(uint32_t event, const Calls& calls) {
   return 1;
 }
 
+uint64_t InittermE(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82297AC0 _initterm_e");
+  uint64_t result = 0;
+  for (uint32_t p = 0x82600000; p < 0x8260000C && uint32_t(result) == 0; p += 4) {
+    if (const uint32_t function = Load(base, p); function != 0) {
+      result = calls.guest(function, {0});
+    }
+  }
+  return result;
+}
+
+uint32_t IoInit(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B4668 _ioinit");
+  const uint32_t block = calls.calloc(32, 44);
+  if (block == 0) {
+    return 0xFFFFFFFFu;
+  }
+  Store(base, kNhandle, 32);
+  Store(base, kPioinfo, block);
+  for (uint32_t entry = block; entry < block + 32 * 44; entry += 44) {
+    guest::StoreU8(base, entry + 4, 0);
+    guest::StoreU8(base, entry + 5, 10);
+    Store(base, entry + 8, 0);
+    guest::StoreU8(base, entry + 41, 10);
+    guest::StoreU8(base, entry + 42, 10);
+    guest::StoreU8(base, entry + 40, 0);
+    Store(base, entry + 0, 0xFFFFFFFFu);
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t entry = Load(base, kPioinfo) + 44 * i;
+    guest::StoreU8(base, entry + 4, 0xC1);
+    Store(base, entry + 0, 0xFFFFFFFEu);
+  }
+  return 0;
+}
+
+uint32_t InitStdio(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AD4D0 _initstdio");
+  int32_t count = int32_t(Load(base, kNstream));
+  if (count == 0) {
+    count = 512;
+    Store(base, kNstream, uint32_t(count));
+  } else if (count < 20) {
+    count = 20;
+    Store(base, kNstream, uint32_t(count));
+  }
+  uint32_t piob = calls.calloc(uint32_t(count), 4);
+  Store(base, kPiob, piob);
+  if (piob == 0) {
+    Store(base, kNstream, 20);
+    piob = calls.calloc(20, 4);
+    Store(base, kPiob, piob);
+    if (piob == 0) {
+      return 26;
+    }
+  }
+  for (uint32_t i = 0; i < 20; i++) {
+    Store(base, Load(base, kPiob) + 4 * i, kIob + 32 * i);
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t handle = Load(base, Load(base, kPioinfo + 4 * (i >> 5)) + 44 * (i & 31));
+    if (handle == 0xFFFFFFFFu || handle == 0xFFFFFFFEu || handle == 0) {
+      Store(base, kIob + 32 * i + 16, 0xFFFFFFFEu);
+    }
+  }
+  return 0;
+}
+
+void FfMsgBanner(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825AEDE8 _FF_MSGBANNER");
+  NmsgWrite(base, 252);
+  NmsgWrite(base, 255);
+}
+
+uint32_t LockFile(uint8_t* base, uint32_t stream, bool lock, const Calls& calls) {
+  if (lock) {
+    ITC_NATIVE_RUNNING("sub_825AD638 _lock_file");
+  } else {
+    ITC_NATIVE_RUNNING("sub_825AD688 _unlock_file");
+  }
+  (void)base;
+  if (stream >= kIob && stream <= kIob + 608) {
+    const uint32_t index = uint32_t(int32_t(stream - kIob) >> 5);
+    return uint32_t(calls.guest(lock ? kLock : kUnlock, {16 + index}));
+  }
+  return uint32_t(calls.import(
+      lock ? Import::kRtlEnterCriticalSection : Import::kRtlLeaveCriticalSection,
+      {stream + 32}));
+}
+
+uint32_t LockFile2(uint32_t index, uint32_t stream, bool lock, const Calls& calls) {
+  if (lock) {
+    ITC_NATIVE_RUNNING("sub_825AD670 _lock_file2");
+  } else {
+    ITC_NATIVE_RUNNING("sub_825AD6C0 _unlock_file2");
+  }
+  if (int32_t(index) < 20) {
+    return uint32_t(calls.guest(lock ? kLock : kUnlock, {uint64_t(int64_t(int32_t(index) + 16))}));
+  }
+  return uint32_t(calls.import(
+      lock ? Import::kRtlEnterCriticalSection : Import::kRtlLeaveCriticalSection,
+      {stream + 32}));
+}
+
+uint32_t UnlockFhandle(uint8_t* base, uint32_t handle, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B7A58 _unlock_fhandle");
+  const uint32_t entry =
+      Load(base, kPioinfo + 4 * uint32_t(int32_t(handle) >> 5)) + 44 * (handle & 31);
+  return uint32_t(calls.import(Import::kRtlLeaveCriticalSection, {entry + 12}));
+}
+
 }  // namespace c_runtime::core

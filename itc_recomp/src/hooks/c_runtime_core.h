@@ -50,5 +50,14 @@ void CoreGetbuf(PPCContext& ctx, uint8_t* base);              // sub_825B4790
 void CoreFreebuf(PPCContext& ctx, uint8_t* base);             // sub_825B0EE0
 void CoreCloseHandle(PPCContext& ctx, uint8_t* base);         // sub_82294E20
 void CoreResetEvent(PPCContext& ctx, uint8_t* base);          // sub_825BA168
+void CoreInittermE(PPCContext& ctx, uint8_t* base);    // sub_82297AC0
+void CoreIoInit(PPCContext& ctx, uint8_t* base);       // sub_825B4668
+void CoreInitStdio(PPCContext& ctx, uint8_t* base);    // sub_825AD4D0
+void CoreFfMsgBanner(PPCContext& ctx, uint8_t* base);  // sub_825AEDE8
+void CoreLockFile(PPCContext& ctx, uint8_t* base);     // sub_825AD638
+void CoreUnlockFile(PPCContext& ctx, uint8_t* base);   // sub_825AD688
+void CoreLockFile2(PPCContext& ctx, uint8_t* base);    // sub_825AD670
+void CoreUnlockFile2(PPCContext& ctx, uint8_t* base);  // sub_825AD6C0
+void CoreUnlockFhandle(PPCContext& ctx, uint8_t* base);  // sub_825B7A58
 
 }  // namespace hooks

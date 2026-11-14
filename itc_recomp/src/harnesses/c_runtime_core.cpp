@@ -30,12 +30,14 @@
 
 #include "base/log.h"
 #include "c_runtime/core.h"
+#include "c_runtime/exit.h"
 #include "hooks/c_runtime_core.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -1148,6 +1150,229 @@ void HandleCases(Context& h) {
   reset.Report();
 }
 
+// _ioinit on the game's globals, saved and put back: each side's new block
+// compared by contents, then freed.
+void IoInitCases(Context& h) {
+  Results results("_ioinit (sub_825B4668)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _ioinit: the heap isn't on the layer");
+    return;
+  }
+  for (int c = 0; c < 6; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kNhandle, 4}, {cc::kPioinfo, 4}});
+      Store(h.base, cc::kNhandle, uint32_t(h.random.Next()));
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B4668 : hooks::CoreIoInit)(t, h.base);
+      const uint32_t block = Load(h.base, cc::kPioinfo);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, cc::kNhandle));
+      out[v].Bytes(Read(h.base, block, 32 * 44));
+      saved.Restore();
+      memory::crt::Free(block);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _initterm_e over the game's table (__onexitinit, _ioinit) on saved
+// globals, the exit lock held: each side's new exit table and handle block
+// compared, then freed, the game's put back.
+void InittermECases(Context& h) {
+  Results results("_initterm_e (sub_82297AC0)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _initterm_e: the heap isn't on the layer");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> exit_lock(c_runtime::ExitMutex());
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kNhandle, 4},
+                      {cc::kPioinfo, 4},
+                      {c_runtime::kExitTableEnd, 4},
+                      {c_runtime::kExitTableBegin, 4}});
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_82297AC0 : hooks::CoreInittermE)(t, h.base);
+      const uint32_t block = Load(h.base, cc::kPioinfo);
+      const uint32_t table = Load(h.base, c_runtime::kExitTableBegin);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, cc::kNhandle));
+      out[v].Bytes(Read(h.base, block, 32 * 44));
+      out[v].Word(Load(h.base, c_runtime::kExitTableEnd) - table);
+      out[v].Bytes(Read(h.base, table, 128));
+      out[v].Word(memory::Size(table));
+      saved.Restore();
+      memory::crt::Free(block);
+      memory::crt::Free(table);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _initstdio on saved globals (_nstream, __piob, _iob, the first handle
+// block's first three entries' OS handles set per case): each side's new
+// __piob compared by contents, then freed.
+void InitStdioCases(Context& h) {
+  Results results("_initstdio (sub_825AD4D0)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _initstdio: the heap isn't on the layer");
+    return;
+  }
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  if (handles == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _initstdio: no handle block");
+    return;
+  }
+  static const uint32_t kHandles[] = {0xFFFFFFFFu, 0xFFFFFFFEu, 0, 5, 0xF8000010u};
+  for (int c = 0; c < 30; c++) {
+    const uint32_t k = h.random.Below(4);
+    const uint32_t count = k == 0 ? 0 : k == 1 ? h.random.Below(20) : k == 2 ? 20 + h.random.Below(600) : 512;
+    uint32_t os[3];
+    for (auto& o : os) {
+      o = kHandles[h.random.Below(5)];
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kNstream, 4}, {cc::kPiob, 4}, {cc::kIob, 640}, {handles, 132}});
+      Store(h.base, cc::kNstream, count);
+      for (uint32_t i = 0; i < 3; i++) {
+        Store(h.base, handles + 44 * i, os[i]);
+      }
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AD4D0 : hooks::CoreInitStdio)(t, h.base);
+      const uint32_t n = Load(h.base, cc::kNstream);
+      const uint32_t piob = Load(h.base, cc::kPiob);
+      out[v].Word(t.r3.u32);
+      out[v].Word(n);
+      out[v].Bytes(Read(h.base, piob, 4 * n));
+      out[v].Word(memory::Size(piob));
+      out[v].Bytes(Read(h.base, cc::kIob, 640));
+      saved.Restore();
+      memory::crt::Free(piob);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void FfMsgBannerCases(Context& h) {
+  Results results("_FF_MSGBANNER (sub_825AEDE8)");
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, 256);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AEDE8 : hooks::CoreFfMsgBanner)(t, h.base);
+      out[v].Bytes(Read(h.base, h.data, 256));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// A critical section's words: the type and lock count, recursion count and
+// owner (compared exactly; the same thread on both sides).
+std::vector<uint8_t> Section(Context& h, uint32_t section) { return Read(h.base, section, 28); }
+
+void InitSection(Context& h, uint32_t section) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = section;
+  __imp__RtlInitializeCriticalSection(t, h.base);
+}
+
+// The stream locks: each case takes a lock and gives it back, both through
+// one side: a stream outside _iob (its own critical section at +32, in the
+// scratch area), or one of _iob's whose lock is made at boot (the lock
+// table's 16 + index with +4 = 1; others would be made here for good).
+void LockFileCases(Context& h) {
+  Results one("_lock_file and _unlock_file (sub_825AD638, sub_825AD688)");
+  Results two("_lock_file2 and _unlock_file2 (sub_825AD670, sub_825AD6C0)");
+  std::vector<uint32_t> boot_streams;
+  for (uint32_t i = 0; i < 20; i++) {
+    if (Load(h.base, cc::kLockTable + 8 * (16 + i) + 4) == 1 &&
+        Load(h.base, cc::kLockTable + 8 * (16 + i)) != 0) {
+      boot_streams.push_back(i);
+    }
+  }
+  const uint32_t stream = h.data + 256;
+  for (int c = 0; c < 24; c++) {
+    const bool in_iob = !boot_streams.empty() && c % 2 == 1;
+    const uint32_t index = in_iob ? boot_streams[h.random.Below(uint32_t(boot_streams.size()))]
+                                  : 20 + h.random.Below(500);
+    const uint32_t target = in_iob ? cc::kIob + 32 * index : stream;
+    const uint32_t section =
+        in_iob ? Load(h.base, cc::kLockTable + 8 * (16 + index)) : stream + 32;
+    for (int which = 0; which < 2; which++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        if (!in_iob) {
+          InitSection(h, section);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = which == 0 ? target : index;
+        t.r4.u64 = target;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_825AD638 : hooks::CoreLockFile)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825AD670 : hooks::CoreLockFile2)(t, h.base);
+        }
+        out[v].Bytes(Section(h, section));
+        PPCContext u = CallContext(h);
+        u.r3.u64 = which == 0 ? target : index;
+        u.r4.u64 = target;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_825AD688 : hooks::CoreUnlockFile)(u, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825AD6C0 : hooks::CoreUnlockFile2)(u, h.base);
+        }
+        out[v].Bytes(Section(h, section));
+      }
+      (which == 0 ? one : two).Check(out[0], out[1], "case " + std::to_string(c));
+    }
+  }
+  one.Report();
+  two.Report();
+}
+
+// _unlock_fhandle: a handle's entry in the first block, its critical
+// section (+12) made and entered for the case, the entry put back after.
+void UnlockFhandleCases(Context& h) {
+  Results results("_unlock_fhandle (sub_825B7A58)");
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  if (handles == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _unlock_fhandle: no handle block");
+    return;
+  }
+  for (int c = 0; c < 32; c++) {
+    const uint32_t handle = h.random.Below(32);
+    const uint32_t entry = handles + 44 * handle;
+    const int depth = 1 + int(h.random.Below(3));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{entry, 44}});
+      InitSection(h, entry + 12);
+      for (int d = 0; d < depth; d++) {
+        PPCContext e = CallContext(h);
+        e.r3.u64 = entry + 12;
+        __imp__RtlEnterCriticalSection(e, h.base);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = handle;
+      (v == 0 ? __imp__sub_825B7A58 : hooks::CoreUnlockFhandle)(t, h.base);
+      out[v].Bytes(Read(h.base, entry, 44));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -1186,6 +1411,12 @@ void CRuntimeCore(Context& h) {
   NmsgWriteCases(h);
   BufferCases(h);
   HandleCases(h);
+  IoInitCases(h);
+  InittermECases(h);
+  InitStdioCases(h);
+  FfMsgBannerCases(h);
+  LockFileCases(h);
+  UnlockFhandleCases(h);
 }
 
 }  // namespace harness

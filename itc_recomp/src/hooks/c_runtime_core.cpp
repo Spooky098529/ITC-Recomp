@@ -28,8 +28,11 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "(sub_825B49B0), _crt_debugger_hook (sub_825B68B8), _ValidateExecute (sub_825B8910), "
               "SetUnhandledExceptionFilter (sub_82297870), GetCommandLineA (sub_822979D0), "
               "_positive (sub_825ADE90), _NMSG_WRITE (sub_825AEDA0), _getbuf and _freebuf "
-              "(sub_825B4790, sub_825B0EE0), CloseHandle (sub_82294E20) and ResetEvent "
-              "(sub_825BA168) (checked by --run_harnesses=c_runtime_core). "
+              "(sub_825B4790, sub_825B0EE0), CloseHandle (sub_82294E20), ResetEvent "
+              "(sub_825BA168), _initterm_e and _ioinit (sub_82297AC0, sub_825B4668), _initstdio "
+              "(sub_825AD4D0), _FF_MSGBANNER (sub_825AEDE8), _lock_file, _unlock_file, _lock_file2 "
+              "and _unlock_file2 (sub_825AD638, sub_825AD688, sub_825AD670, sub_825AD6C0; _lock and "
+              "_unlock guest calls) and _unlock_fhandle (sub_825B7A58) (checked by --run_harnesses=c_runtime_core). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
@@ -273,6 +276,40 @@ void hooks::CoreResetEvent(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::ResetEvent(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreInittermE(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::InittermE(base, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreIoInit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = int32_t(cc::IoInit(base, CRuntimeCoreCalls(ctx, base)));
+}
+
+void hooks::CoreInitStdio(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::InitStdio(base, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreFfMsgBanner(PPCContext&, uint8_t* base) { cc::FfMsgBanner(base); }
+
+void hooks::CoreLockFile(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::LockFile(base, ctx.r3.u32, true, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreUnlockFile(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::LockFile(base, ctx.r3.u32, false, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreLockFile2(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::LockFile2(ctx.r3.u32, ctx.r4.u32, true, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreUnlockFile2(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::LockFile2(ctx.r3.u32, ctx.r4.u32, false, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreUnlockFhandle(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::UnlockFhandle(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -335,3 +372,19 @@ ITC_C_RUNTIME_CORE(825B0EE0, CoreFreebuf)
 // CloseHandle: r3 = a handle; ResetEvent: r3 = an event; r3 = 1 or 0.
 ITC_C_RUNTIME_CORE(82294E20, CoreCloseHandle)
 ITC_C_RUNTIME_CORE(825BA168, CoreResetEvent)
+// _initterm_e: r3 = the first nonzero result, or 0.
+ITC_C_RUNTIME_CORE(82297AC0, CoreInittermE)
+// _ioinit: r3 = 0, or -1.
+ITC_C_RUNTIME_CORE(825B4668, CoreIoInit)
+// _initstdio: r3 = 0, or 26.
+ITC_C_RUNTIME_CORE(825AD4D0, CoreInitStdio)
+// _FF_MSGBANNER: no registers.
+ITC_C_RUNTIME_CORE(825AEDE8, CoreFfMsgBanner)
+// _lock_file, _unlock_file: r3 = a stream.
+ITC_C_RUNTIME_CORE(825AD638, CoreLockFile)
+ITC_C_RUNTIME_CORE(825AD688, CoreUnlockFile)
+// _lock_file2, _unlock_file2: r3 = a stream index, r4 = the stream.
+ITC_C_RUNTIME_CORE(825AD670, CoreLockFile2)
+ITC_C_RUNTIME_CORE(825AD6C0, CoreUnlockFile2)
+// _unlock_fhandle: r3 = a file handle.
+ITC_C_RUNTIME_CORE(825B7A58, CoreUnlockFhandle)

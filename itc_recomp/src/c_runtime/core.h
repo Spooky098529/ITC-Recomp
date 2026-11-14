@@ -221,4 +221,46 @@ uint32_t CloseHandle(uint32_t handle, const Calls& calls);
 // sub_825BA168 ResetEvent: NtClearEvent; 1, or 0 as CloseHandle's.
 uint32_t ResetEvent(uint32_t event, const Calls& calls);
 
+constexpr uint32_t kIob = 0x8266B7D0;         // _iob: 20 streams of 32 bytes
+constexpr uint32_t kNstream = 0x82978328;     // _nstream
+constexpr uint32_t kPiob = 0x82978324;        // __piob
+constexpr uint32_t kNhandle = 0x82978210;     // _nhandle
+constexpr uint32_t kPioinfo = 0x82978220;     // __pioinfo (blocks of 32 handles)
+constexpr uint32_t kLock = 0x825B3430;        // _lock (c-runtime.md)
+constexpr uint32_t kUnlock = 0x825B32D0;      // _unlock
+
+// sub_82297AC0 _initterm_e (probably XAPI's own): each nonzero word of
+// 0x82600000-0x8260000C called (r3 = 0) until one returns nonzero; that,
+// or 0.
+uint64_t InittermE(uint8_t* base, const Calls& calls);  // r3 in 64 bits
+
+// sub_825B4668 _ioinit: the first handle block (calloc(32, 44)) into
+// __pioinfo[0], _nhandle = 32, each entry set up, the first three
+// (+4 = 0xC1, +0 = -2); 0, or -1 when calloc fails.
+uint32_t IoInit(uint8_t* base, const Calls& calls);
+
+// sub_825AD4D0 _initstdio: _nstream 512 when 0, at least 20; __piob =
+// calloc(_nstream, 4) (20 when that fails; 26 returned when both do); the
+// first 20 slots at _iob's streams; the first three streams' handle -2 when
+// their OS handle is -1, -2 or 0. 0.
+uint32_t InitStdio(uint8_t* base, const Calls& calls);
+
+// sub_825AEDE8 _FF_MSGBANNER: _NMSG_WRITE(252), then _NMSG_WRITE(255).
+void FfMsgBanner(uint8_t* base);
+
+// sub_825AD638 _lock_file and sub_825AD688 _unlock_file: a stream inside
+// _iob (to +608) through _lock or _unlock(16 + its index) (guest calls: lock
+// 8's host mutex is routed there), else Rtl{Enter,Leave}CriticalSection on
+// stream + 32. r3 as the call leaves it.
+uint32_t LockFile(uint8_t* base, uint32_t stream, bool lock, const Calls& calls);
+
+// sub_825AD670 _lock_file2 and sub_825AD6C0 _unlock_file2: an index below
+// 20 through _lock or _unlock(16 + index), else the stream's critical
+// section (+32).
+uint32_t LockFile2(uint32_t index, uint32_t stream, bool lock, const Calls& calls);
+
+// sub_825B7A58 _unlock_fhandle: RtlLeaveCriticalSection on the handle's
+// entry + 12.
+uint32_t UnlockFhandle(uint8_t* base, uint32_t handle, const Calls& calls);
+
 }  // namespace c_runtime::core
