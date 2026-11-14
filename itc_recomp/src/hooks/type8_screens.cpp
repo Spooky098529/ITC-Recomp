@@ -74,7 +74,10 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "NodeListScreen's plain C++, the UI movies' named animations and Run and the menus' "
               "guest calls), Type8ColorListScreen::Type8ColorListScreen sub_8223DFC0, "
               "DeletingDestructor sub_8223E2B8, OpenMovie sub_8223E310, ItemInfo sub_8223E4D0 "
-              "and InitMachine sub_8223E9D8 (its step table)) natively instead of through the translated "
+              "and InitMachine sub_8223E9D8 (its step table), SetItemText sub_8223E4F8, "
+              "ClearItemText sub_8223E568, SetDetails sub_8223E5C8, SetLabels sub_8223E698 and "
+              "SetUpMenus sub_8223E320 (UiMovie::ClearText and the sound manager's slots guest "
+              "calls)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=type8_screens)");
 
 namespace hooks {
@@ -233,6 +236,14 @@ ITC_T8_STEP(Type8ColorListOpenMovie,
             t8::ColorList8OpenMovie(base, ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
 ITC_T8_STEP(Type8ColorListItemInfo,
             t8::ColorList8ItemInfo(base, ctx.r4.u64, ctx.r5.u64, sp, uint32_t(ctx.lr), calls))
+ITC_T8_STEP(Type8ColorListSetItemText,
+            t8::ColorList8SetItemText(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorListClearItemText,
+            t8::ColorList8ClearItemText(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorListSetDetails,
+            t8::ColorList8SetDetails(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorListSetLabels, t8::ColorList8SetLabels(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ColorListSetUpMenus, t8::ColorList8SetUpMenus(base, ctx.r3.u64, sp, calls))
 
 #undef ITC_T8_STEP
 
@@ -378,3 +389,8 @@ ITC_TYPE8_SCREENS(8223E2B8, Type8ColorListDeletingDestruct)
 ITC_TYPE8_SCREENS(8223E310, Type8ColorListOpenMovie)
 ITC_TYPE8_SCREENS(8223E4D0, Type8ColorListItemInfo)
 ITC_TYPE8_SCREENS(8223E9D8, Type8ColorListInitMachine)
+ITC_TYPE8_SCREENS(8223E4F8, Type8ColorListSetItemText)
+ITC_TYPE8_SCREENS(8223E568, Type8ColorListClearItemText)
+ITC_TYPE8_SCREENS(8223E5C8, Type8ColorListSetDetails)
+ITC_TYPE8_SCREENS(8223E698, Type8ColorListSetLabels)
+ITC_TYPE8_SCREENS(8223E320, Type8ColorListSetUpMenus)

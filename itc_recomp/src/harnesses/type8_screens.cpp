@@ -63,6 +63,8 @@ StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint
 // race set-up (race_setup.cpp).
 void Type8ListScreen(Context& h);
 void Type8SetUpRace(Context& h);
+// The color list screen's slots (type67_color_list.cpp, its world).
+void Type8ColorList(Context& h);
 
 namespace {
 
@@ -1134,6 +1136,7 @@ void Type8Screens(Context& h) {
   memory::Free(world);
   Type8ListScreen(h);
   Type8SetUpRace(h);
+  Type8ColorList(h);
 }
 
 }  // namespace harness

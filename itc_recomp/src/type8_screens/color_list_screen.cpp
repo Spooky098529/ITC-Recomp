@@ -1,16 +1,21 @@
 // The type 8 color list screen (Type8ColorListScreen over ColorListScreen;
 // docs/functions/type8-screens.md): see type8_screens.h. Read from the
-// generated code. ColorListScreen's constructor and destructor, the color
-// list part's and memcpy by their plain C++; UiMovies::Open through
-// Calls::open; operator delete and memcpy where its plain C++ declines guest
-// calls.
+// generated code. ColorListScreen's constructor, destructor and item
+// loader, ListScreen::OnToggleMoved, the color list part's, UiMovies::Find,
+// MenuList::Init (where it frees natively) and SetSelection, Sound::Play and
+// memcpy by their plain C++; UiMovies::Open through Calls::open,
+// UiMovie::SetText through Calls::set_text; UiMovie::ClearText, the sound
+// manager's slots 13 and 14, operator delete and memcpy where its plain C++
+// declines guest calls; the screen's slot 28 through type67_screens::Slot.
 
 #include "type8_screens/type8_screens.h"
 
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "menu_sounds/menu_sounds.h"
 #include "native/buffers.h"
+#include "race_screens/race_screens.h"
 #include "screen_constructors/screen_constructors.h"
 #include "type67_screens/list_pages.h"
 #include "type8_screens/part_helpers.h"
@@ -31,6 +36,24 @@ constexpr uint32_t kMemcpy = 0x825A7410;
 // indexes, +20 and +24 the colors' bits).
 constexpr uint32_t kItemRecords = 0x82010BE0;
 constexpr uint32_t kRecordBytes = 28;
+// The item texts' string ids (3 a row, rows overlapping), the details'
+// string ids by index and the labels' (3).
+constexpr uint32_t kItemTexts = 0x82010B90;
+constexpr uint32_t kDetailTexts = 0x82010BB4;
+constexpr uint32_t kLabelTexts = 0x82010BD4;
+constexpr uint32_t kClearText = 0x8211C470;
+
+uint64_t ClearText(const Calls& calls, uint32_t movie, uint32_t sub_scene, uint32_t child,
+                   uint32_t frame, uint32_t lr) {
+  const uint64_t args[6] = {movie, sub_scene, child, 0, 0, 0};
+  return calls.call_set(kClearText, args, 3, frame, lr);
+}
+
+uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
+                    uint32_t lr) {
+  const uint64_t six[6] = {args[0], args[1], args[2], args[3], 0, 0};
+  return static_cast<const Calls*>(user)->call_set(function, six, set, r1, lr);
+}
 
 // slw: 1 shifted left by `amount`'s low six bits (0 from 32 up).
 uint32_t Bit(uint32_t amount) {
@@ -140,6 +163,109 @@ uint64_t ColorList8ItemInfo(uint8_t* base, uint64_t r4, uint64_t r5, uint32_t sp
   }
   const uint64_t args[6] = {r5, from, kRecordBytes, 0, 0, 0};
   return calls.call_set(kMemcpy, args, 3, sp, lr);
+}
+
+uint64_t ColorList8SetItemText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                               const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8223E4F8 Type8ColorListScreen::SetItemText");
+  const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
+  const uint32_t movie = pg::MovieOf(base, s, frame);
+  const uint32_t texts = (uint32_t(r4) << 2) + kItemTexts;
+  uint64_t result = 0;
+  for (uint32_t i = 0; i < 3; i++) {
+    result = calls.set_text(frame, 0x8223E550, movie, LoadU32(base, s + 9744), 5 + i,
+                            LoadU32(base, texts + 4 * i));
+  }
+  return result;
+}
+
+uint64_t ColorList8ClearItemText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8223E568 Type8ColorListScreen::ClearItemText");
+  const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
+  const uint32_t movie = pg::MovieOf(base, s, frame);
+  uint64_t result = 0;
+  for (int32_t i = 0; i < 3; i++) {
+    if (i == int32_t(uint32_t(r4))) continue;
+    result = ClearText(calls, movie, LoadU32(base, s + 9744), uint32_t(5 + i), frame, 0x8223E5B4);
+  }
+  return result;
+}
+
+uint64_t ColorList8SetDetails(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8223E5C8 Type8ColorListScreen::SetDetails");
+  const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 160);
+  const uint32_t movie = part_detail::MovieAt(base, frame + 96, LoadU32(base, s + 9680));
+  const uint32_t record = uint32_t(r4 * kRecordBytes) + kItemRecords;
+  part_detail::InitList(base, s + 10216,
+                        {LoadU32(base, record + 8), 2, 1, 154, 153, 155, 156, 159, 158}, frame,
+                        0x8223E640, calls);
+  uint64_t result = 0;
+  for (int32_t i = 0; i < 2; i++) {
+    if (i < int32_t(LoadU32(base, record + 8))) {
+      const uint32_t index = LoadU32(base, record + 12 + 4 * uint32_t(i));
+      result = calls.set_text(frame, 0x8223E678, movie, 9, uint32_t(5 + i),
+                              LoadU32(base, (index << 2) + kDetailTexts));
+    } else {
+      result = ClearText(calls, movie, 9, uint32_t(5 + i), frame, 0x8223E680);
+    }
+  }
+  return result;
+}
+
+uint64_t ColorList8SetLabels(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8223E698 Type8ColorListScreen::SetLabels");
+  const uint32_t frame = part_detail::Frame(base, sp, 128);
+  const uint32_t movie = pg::MovieOf(base, uint32_t(r3), frame);
+  uint64_t result = 0;
+  for (uint32_t i = 0; i < 3; i++) {
+    result = calls.set_text(frame, 0x8223E6E8, movie, 20, 5 + i,
+                            LoadU32(base, kLabelTexts + 4 * i));
+  }
+  return result;
+}
+
+uint64_t ColorList8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8223E320 Type8ColorListScreen::SetUpMenus");
+  const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 176);
+  part_detail::InitList(base, s + 10144, {9, 3, 1, 154, 153, 155, 156, 159, 158}, frame,
+                        0x8223E364, calls);
+  part_detail::InitList(base, s + 10288, {2, 2, 1, 156, 155, 154, 153, 159, 158}, frame,
+                        0x8223E394, calls);
+  race_screens::ListSetSelection(base, s + 10288, 1);
+  part_detail::InitList(base, s + 10360, {3, 3, 1, 154, 153, 155, 156, 159, 158}, frame,
+                        0x8223E3CC, calls);
+  part_detail::InitList(base, s + 10216, {2, 2, 1, 154, 153, 155, 156, 159, 158}, frame,
+                        0x8223E3F8, calls);
+  // Slot 28 (SetLabels), r4 as the calls before leave it.
+  ts::Slot(base, r3, 112, std::nullopt, frame, 0x8223E40C, calls);
+  ts::ColorListScreenLoadItem(base, r3, 0, ~uint64_t(0), frame, calls);
+  ts::ListScreenOnToggleMoved(base, r3, r3 + 10288, frame, calls);
+  // The music: the sound manager's IsCuePlaying (slot 14) for &bank 1,
+  // &cue 2 and, when it answers a nonzero byte, its StopCue (slot 13); then
+  // slot 14 for bank 1's cue 0 and, when it isn't playing, Sound::Play.
+  auto slot = [&](uint32_t offset, uint32_t bank, uint32_t cue, uint32_t lr) {
+    const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
+    const uint64_t args[6] = {manager, bank, cue, 0, 0, 0};
+    return calls.call_set(LoadU32(base, LoadU32(base, manager) + offset), args, 3, frame, lr);
+  };
+  StoreU32(base, frame + 96, 2);
+  StoreU32(base, frame + 100, 1);
+  uint64_t result = slot(56, frame + 100, frame + 96, 0x8223E458);
+  if ((result & 0xFF) != 0) {
+    StoreU32(base, frame + 104, 2);
+    StoreU32(base, frame + 108, 1);
+    slot(52, frame + 108, frame + 104, 0x8223E484);
+  }
+  StoreU32(base, frame + 116, 1);
+  StoreU32(base, frame + 112, 0);
+  result = slot(56, frame + 116, frame + 112, 0x8223E4AC);
+  if ((result & 0xFF) != 0) return result;
+  StoreU32(base, frame + 120, 0);
+  StoreU32(base, frame + 124, 1);
+  return menu_sounds::PlaySound(base, frame + 124, frame + 120, frame,
+                                {const_cast<Calls*>(&calls), &SoundThunk});
 }
 
 }  // namespace type8_screens

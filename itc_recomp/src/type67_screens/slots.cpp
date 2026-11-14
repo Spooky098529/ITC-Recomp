@@ -318,6 +318,14 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return type8_screens::ListBasePage5(base, r3, *r4, sp, calls);
       case 0x8223F778:
         return type8_screens::ListScreen8SetUpRace(base, r3, *r4, sp, calls);
+      // The type 8 color list screen's slots 2, 3 and 26
+      // (src/type8_screens/color_list_screen.cpp).
+      case 0x8223E4F8:
+        return type8_screens::ColorList8SetItemText(base, r3, *r4, sp, calls);
+      case 0x8223E568:
+        return type8_screens::ColorList8ClearItemText(base, r3, *r4, sp, calls);
+      case 0x8223E5C8:
+        return type8_screens::ColorList8SetDetails(base, r3, *r4, sp, calls);
       default:
         break;
     }
@@ -441,9 +449,14 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
       return type8_screens::ListBaseStep2(base, r3, sp, calls);
     case 0x82258438:
       return type8_screens::ListBaseStep3(base, r3, sp, calls);
-    // The type 8 color list screen's slot 12 (color_list_screen.cpp).
+    // The type 8 color list screen's slots 12, 14 and 28
+    // (color_list_screen.cpp; none reads r4).
     case 0x8223E310:
       return type8_screens::ColorList8OpenMovie(base, r3, sp, lr, calls);
+    case 0x8223E320:
+      return type8_screens::ColorList8SetUpMenus(base, r3, sp, calls);
+    case 0x8223E698:
+      return type8_screens::ColorList8SetLabels(base, r3, sp, calls);
     default:
       return std::nullopt;
   }
@@ -500,10 +513,15 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82258EB0:
     case 0x82258AD0:
     case 0x8223F778:
+    case 0x8223E4F8:
+    case 0x8223E568:
+    case 0x8223E5C8:
       return has_r4;
     case 0x82253108:
     case 0x8223F590:
     case 0x8223E310:
+    case 0x8223E320:
+    case 0x8223E698:
     case 0x8223F3E0:
     case 0x8223F588:
     case 0x8223F3F0:

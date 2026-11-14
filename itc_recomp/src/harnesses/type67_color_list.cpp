@@ -38,6 +38,13 @@
 // side runs as plain C++; in frames that call SetText, +48 to +79), r1 and
 // r3. The deleting destructor with bit 0 set runs on blocks of operator
 // new's, compared by r3 and whether the block is handed out again.
+//
+// The type 8 color list screen's slots (src/type8_screens/
+// color_list_screen.cpp) run in the same world under the type8_screens
+// harness (Type8Screens calls Type8ColorList), with --native_type8_screens
+// off for their originals, the screen's vtable slots 2, 3, 25, 26 and 28
+// its own or stand-ins, and the fake sound manager's slot 14 answering its
+// +80.
 
 #include "harness.h"
 
@@ -45,6 +52,7 @@
 #include "base/log.h"
 #include "harnesses/loading_world.h"
 #include "hooks/type67_screens.h"
+#include "hooks/type8_screens.h"
 #include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -61,6 +69,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_type67_screens);
+ITC_FLAG_DECLARE(bool, native_type8_screens);
 
 namespace harness {
 
@@ -138,6 +147,7 @@ enum class Kind {
   kDispatcher,  // r4 the dispatcher
   kIndex,      // r4 0 to 9 (the +10144 list's +4 or selection)
   kItem,       // r4 an item, 0 to 8; item blocks as kInit's
+  kRow,        // r4 0 to 6 (the type 8 item list's scroll)
 };
 
 bool Inits(Kind kind) { return kind == Kind::kInit || kind == Kind::kItem; }
@@ -152,6 +162,7 @@ struct Function {
   Kind kind;
   Ranges skip;  // the register saves left out
   GuestFunction recompiled, native;
+  bool type8 = false;  // the type 8 color list screen's (its flag, its slots)
 };
 
 uint32_t Pick(Random& r, std::initializer_list<uint32_t> targets) {
@@ -189,7 +200,8 @@ void LayTables(uint8_t* base, Random& r) {
   }
 }
 
-void LayBlock(uint8_t* base, uint32_t block, Random& r, Kind kind, std::vector<uint32_t>& made) {
+void LayBlock(uint8_t* base, uint32_t block, Random& r, Kind kind, std::vector<uint32_t>& made,
+              bool type8) {
   lw::WorldRandom(base, block, kBlockBytes, r);
   const uint32_t s = block;
   auto sub = [&r] { return r.Below(3) == 0 ? kNone : r.Below(20); };
@@ -313,7 +325,21 @@ void LayBlock(uint8_t* base, uint32_t block, Random& r, Kind kind, std::vector<u
   guest::StoreU32(base, vtable + 12, Pick(r, {0x822432A8, kEmpty, kSetR4, kGetter}));
   guest::StoreU32(base, vtable + 108, Pick(r, {0x82243448, kEmpty, kSetR4, kGetter}));
   // Type7ListScreen::SetUpMenus' slot 25 its own ItemInfo (play's).
-  if (kind == Kind::kInit) guest::StoreU32(base, vtable + 100, 0x82242FA0);
+  if (kind == Kind::kInit && !type8) guest::StoreU32(base, vtable + 100, 0x82242FA0);
+  // The type 8 color list screen's slots 2, 3 and 26 (SetItemText,
+  // ClearItemText, SetDetails) its own or stand-ins; its SetUpMenus' slot 25
+  // its own ItemInfo and slot 28 (SetLabels, called with r4 as the calls
+  // before leave it) its own or stand-ins that don't read r4; the sound
+  // manager's slot 14 (IsCuePlaying) answering its +80.
+  if (type8) {
+    guest::StoreU32(base, vtable + 8, Pick(r, {0x8223E4F8, kEmpty, kSetR4, kGetter}));
+    guest::StoreU32(base, vtable + 12, Pick(r, {0x8223E568, kEmpty, kSetR4, kGetter}));
+    guest::StoreU32(base, vtable + 104, Pick(r, {0x8223E5C8, kEmpty, kSetR4}));
+    guest::StoreU32(base, vtable + 112, Pick(r, {0x8223E698, kEmpty, kGetter}));
+    if (kind == Kind::kInit) guest::StoreU32(base, vtable + 100, 0x8223E4D0);
+    guest::StoreU32(base, manager_vtable + 56, kGetter);
+    guest::StoreU32(base, manager + 80, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  }
   // The type 7 list screen's list part (+11040): its inner's (+20) list's
   // (+40) block 0 or pages for the destructors.
   if (kind == Kind::kNoDelete || kind == Kind::kRelease) {
@@ -349,7 +375,7 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
       }
       guest::StoreU32(base, kMissingMovie, w.movie(0));
       std::vector<uint32_t> made;
-      LayBlock(base, block, r, f.kind, made);
+      LayBlock(base, block, r, f.kind, made, f.type8);
       PPCContext t = CallContext(h);
       const uint32_t sp = t.r1.u32;
       lw::WorldRandom(base, sp - kBelow, kBelow + kAbove, r);
@@ -364,6 +390,7 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
       if (f.kind == Kind::kDispatcher) t.r4.u64 = block + kDispatcherAt;
       if (f.kind == Kind::kIndex) t.r4.u64 = r.Below(10);
       if (f.kind == Kind::kItem) t.r4.u64 = r.Below(9);
+      if (f.kind == Kind::kRow) t.r4.u64 = r.Below(7);
       std::vector<uint32_t> old_items;
       for (const uint32_t at : kLists) {
         old_items.push_back(guest::LoadU32(base, block + at + rs::kListBlock));
@@ -375,7 +402,11 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t block, const Function& f)
       const ui_movies_hooks::UpdateCalleeStandIn stand_in =
           ui_movies_hooks::g_update_callee_stand_in;
       ui_movies_hooks::g_update_callee_stand_in = StandIn;
-      if (v == 0) {
+      if (v == 0 && f.type8) {
+        ITC_FLAG(native_type8_screens) = false;
+        f.recompiled(t, base);
+        ITC_FLAG(native_type8_screens) = true;
+      } else if (v == 0) {
         ITC_FLAG(native_type67_screens) = false;
         f.recompiled(t, base);
         ITC_FLAG(native_type67_screens) = true;
@@ -639,6 +670,50 @@ void Type67ColorList(Context& h) {
   Deleting(h, "Type7ListScreen::DeletingDestructor", 0x82242FC8, 11264, __imp__sub_82242FC8,
            hooks::Type7ListScreenDeletingDestruct);
   ItemInfos(h, block);
+  memory::Free(block);
+  saved.Restore();
+}
+
+// The type 8 color list screen's slots, registered under type8_screens.
+void Type8ColorList(Context& h) {
+  uint8_t* const base = h.base;
+  for (const uint32_t id : {16u, 17u, 18u, 19u}) {
+    if (ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id) != kMissingMovie) {
+      ITC_LOG_ERROR(
+          "harness: type8_screens: movie {} is in the table; the color list skipped", id);
+      return;
+    }
+  }
+  const lw::MovieWorld w;
+  const uint32_t block = memory::Alloc(kBlockBytes, 0);
+  if (!w.ok() || block == 0) {
+    ITC_LOG_ERROR("harness: type8_screens: no blocks for the color list");
+    if (block != 0) memory::Free(block);
+    return;
+  }
+  const lw::SavedGlobals saved(base);
+  lw::BuildStringTable(base, w);
+  // The register saves: the function's own (its frame's top bytes), and in
+  // frames that call SetText, their +48 to +79 (its varargs, which the
+  // native side passes 0 for); SetUpMenus' slot 28, SetLabels, recompiled
+  // on the original's side: its saves and varargs below SetUpMenus' frame.
+  using K = Kind;
+  const Function functions[] = {
+      {"Type8ColorListScreen::SetItemText", 0x8223E4F8, 8, K::kRow, {{40, 0}, {80, 48}},
+       __imp__sub_8223E4F8, hooks::Type8ColorListSetItemText, true},
+      {"Type8ColorListScreen::ClearItemText", 0x8223E568, 8, K::kIndex, {{40, 0}},
+       __imp__sub_8223E568, hooks::Type8ColorListClearItemText, true},
+      {"Type8ColorListScreen::SetDetails", 0x8223E5C8, 12, K::kItem, {{48, 0}, {112, 80}},
+       __imp__sub_8223E5C8, hooks::Type8ColorListSetDetails, true},
+      {"Type8ColorListScreen::SetLabels", 0x8223E698, 4, K::kAny, {{40, 0}, {80, 48}},
+       __imp__sub_8223E698, hooks::Type8ColorListSetLabels, true},
+      {"Type8ColorListScreen::SetUpMenus", 0x8223E320, 12, K::kInit,
+       {{40, 0}, {216, 176}, {256, 224}}, __imp__sub_8223E320, hooks::Type8ColorListSetUpMenus,
+       true},
+  };
+  for (const Function& f : functions) {
+    Run(h, w, block, f);
+  }
   memory::Free(block);
   saved.Restore();
 }

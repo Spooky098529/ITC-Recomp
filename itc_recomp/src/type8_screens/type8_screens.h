@@ -617,5 +617,31 @@ uint64_t ColorList8ItemInfo(uint8_t* base, uint64_t r4, uint64_t r5, uint32_t sp
 constexpr uint32_t kColorListInitMachineFrame = 992;
 uint32_t ColorList8InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* machine,
                                bool* replaced);
+// sub_8223E4F8 Type8ColorListScreen::SetItemText (slot 2; 128; r4 the
+// item list's row): SetText(m, [+9744], 5 + i, [0x82010B90 + 4 r4 + 4 i])
+// for i 0 to 2 (+9744 read for each). The last SetText's r3.
+uint64_t ColorList8SetItemText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                               const Calls& calls);
+// sub_8223E568 Type8ColorListScreen::ClearItemText (slot 3; 128; r4 an
+// item): ClearText(m, [+9744], 5 + i) for i 0 to 2 but r4 (signed). The
+// last ClearText's r3.
+uint64_t ColorList8ClearItemText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
+// sub_8223E5C8 Type8ColorListScreen::SetDetails (slot 26; 160; r4 an
+// item): MenuList::Init(+10216, the record's count, 2, 1, 154, 153, 155,
+// 156, 159, 158), then for i 0 and 1 SetText(m, 9, 5 + i, [0x82010BB4 + 4
+// × the record's +12 + 4i]) while i < the count (signed, read for each),
+// else ClearText(m, 9, 5 + i). The last call's r3.
+uint64_t ColorList8SetDetails(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                              const Calls& calls);
+// sub_8223E698 Type8ColorListScreen::SetLabels (slot 28; 128): SetText(m,
+// 20, 5 + i, [0x82010BD4 + 4 i]) for i 0 to 2. The last SetText's r3.
+uint64_t ColorList8SetLabels(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_8223E320 Type8ColorListScreen::SetUpMenus (slot 14; 176):
+// MenuList::Init on +10144, +10288 (selection 1), +10360 and +10216, slot
+// 28 (r4 as the calls before leave it), ColorListScreen::LoadItem(0, -1),
+// ListScreen::OnToggleMoved(+10288), then the music as
+// ListScreen8SetUpMenus'. The last call's r3.
+uint64_t ColorList8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
 }  // namespace type8_screens
