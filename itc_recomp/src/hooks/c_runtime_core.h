@@ -102,4 +102,8 @@ void CoreSetFilePointer(PPCContext& ctx, uint8_t* base);  // sub_825B9DD8 (no ad
 void CoreLseekNolock(PPCContext& ctx, uint8_t* base);     // sub_825B6500
 void CoreLseek(PPCContext& ctx, uint8_t* base);           // sub_825B65D0
 
+void CoreWriteFile(PPCContext& ctx, uint8_t* base);    // sub_82295D50 (no adapter)
+void CoreWriteNolock(PPCContext& ctx, uint8_t* base);  // sub_825B0F48 (no adapter)
+void CoreWrite(PPCContext& ctx, uint8_t* base);        // sub_825B11A8
+
 }  // namespace hooks

@@ -57,6 +57,8 @@ enum class Import {
   kNtFlushBuffersFile,
   kNtQueryInformationFile,
   kNtSetInformationFile,
+  kNtWriteFile,
+  kNtWaitForSingleObjectEx,
 };
 
 struct Calls {
@@ -500,6 +502,41 @@ uint64_t LseekNolock(uint8_t* base, uint32_t handle, uint64_t offset, uint32_t o
 // _lseeki64_nolock when still open, else errno 9, _doserrno 0, -1; its
 // __finally (sub_825B6730, as _close's). The 64-bit result.
 uint64_t Lseek(uint8_t* base, uint32_t handle, uint64_t offset, uint32_t origin,
+               const Calls& calls);
+
+
+// sub_82295D50 WriteFile: from a 128-byte frame; `written` (when given) set
+// to 0. With an overlapped: its +0 = 259 (pending), the offset from +12 and
+// +8 at +88 (high, low), NtWriteFile with its event (+16) and the overlapped
+// as the I/O status block (and the APC context unless the event's low bit is
+// set); an error or pending status: the last error from it, 0; else
+// `written` = its +4, 1. Without: NtWriteFile with the status block at +80,
+// waiting on the handle while pending (a failed wait's status taken as the
+// result); success: `written` = +84, 1 (stored without a null check, as the
+// original); a warning (0x8xxxxxxx): the same store, then as an error; an
+// error: the last error from it, 0.
+uint32_t WriteFile(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t size,
+                   uint32_t written, uint32_t overlapped, const Calls& calls);
+
+// sub_825B0F48 _write_nolock: in its 1,232-byte frame (the written count at
+// +80, the text mode's 1,024-byte chunk at +96): 0 for no bytes; a null
+// buffer, or an odd size in a UTF-16 or UTF-8 handle (+40's mode, as the
+// signed byte >> 1, 2 or 1): _doserrno 0, errno 22, _invalid_parameter, -1;
+// an append handle (+4 bit 5) seeked to its end first (_lseeki64_nolock);
+// text (+4 bit 7): the bytes in chunks with each LF given a CR before it,
+// written until one is short or fails; binary: one WriteFile. Bytes written:
+// their count less the CRs added; none: the error (5: errno 9 and
+// _doserrno 5; others _dosmaperr), or with no error 0 for a device (+4 bit
+// 6) whose first byte is ^Z, else errno 28, _doserrno 0; -1. r3 as the
+// original leaves it.
+uint64_t WriteNolock(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t size,
+                     const Calls& calls);
+
+// sub_825B11A8 _write: in its 160-byte frame (the handle at +180, the result
+// at +80), _lseeki64's checks and lock around _write_nolock (not open after
+// the lock: errno 9, _doserrno 0, -1); its __finally (sub_825B1304). r3 as
+// _close's.
+uint64_t Write(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t size,
                const Calls& calls);
 
 }  // namespace c_runtime::core

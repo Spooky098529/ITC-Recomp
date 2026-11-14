@@ -50,7 +50,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "sub_825B4978, sub_825A9664, sub_825AA338), _close_nolock and _close (sub_825B0C28, "
               "sub_825B0D10), FlushFileBuffers and _commit (sub_825BA510, sub_825B4828), "
               "_lseeki64_nolock and _lseeki64 with its __finally (sub_825B6500, sub_825B65D0, "
-              "sub_825B6730) (checked by "
+              "sub_825B6730), _write with _write_nolock and WriteFile (sub_825B11A8, sub_825B0F48, "
+              "sub_82295D50) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -60,7 +61,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
               "_mtinitlocks, CloseHandle (its caller, SaveSlot::WaitClose), SetFilePointer (sub_825B9DD8, "
-              "its caller _lseeki64_nolock)");
+              "its caller _lseeki64_nolock), _write_nolock and WriteFile (sub_825B0F48, sub_82295D50, "
+              "their caller _write)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -104,6 +106,8 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
       case cc::Import::kNtFlushBuffersFile: __imp__NtFlushBuffersFile(ctx, base); break;
       case cc::Import::kNtQueryInformationFile: __imp__NtQueryInformationFile(ctx, base); break;
       case cc::Import::kNtSetInformationFile: __imp__NtSetInformationFile(ctx, base); break;
+      case cc::Import::kNtWriteFile: __imp__NtWriteFile(ctx, base); break;
+      case cc::Import::kNtWaitForSingleObjectEx: __imp__NtWaitForSingleObjectEx(ctx, base); break;
     }
     ctx.lr = lr;
     return ctx.r3.u64;
@@ -555,6 +559,19 @@ void hooks::CoreLseek(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Lseek(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreWriteFile(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::WriteFile(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                             CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreWriteNolock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::WriteNolock(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreWrite(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Write(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -713,3 +730,8 @@ ITC_C_RUNTIME_CORE(825B6500, CoreLseekNolock)
 ITC_C_RUNTIME_CORE(825B65D0, CoreLseek)
 // _lseeki64's __finally: r30 = the handle.
 ITC_C_RUNTIME_CORE(825B6730, CoreCloseFinally)
+// _write: r3 = a file handle, r4 = the bytes, r5 = their count; r3 = the
+// count written, or -1. (_write_nolock, sub_825B0F48, and WriteFile,
+// sub_82295D50, have no adapters: _write is _write_nolock's only caller, and
+// WriteFile's caller in play, SaveSlot::WriteFile, leaves it out.)
+ITC_C_RUNTIME_CORE(825B11A8, CoreWrite)

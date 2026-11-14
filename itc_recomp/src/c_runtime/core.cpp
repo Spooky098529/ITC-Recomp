@@ -1281,4 +1281,169 @@ uint64_t Lseek(uint8_t* base, uint32_t handle, uint64_t offset, uint32_t origin,
   return result;
 }
 
+uint32_t WriteFile(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t size,
+                   uint32_t written, uint32_t overlapped, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82295D50 WriteFile");
+  uint32_t result = 0;
+  calls.in_frame(128, [&](uint32_t frame) {
+    if (written != 0) {
+      Store(base, written, 0);
+    }
+    uint32_t status;
+    if (overlapped != 0) {
+      const uint32_t event = Load(base, overlapped + 16);
+      Store(base, overlapped + 0, 259);
+      Store(base, frame + 92, Load(base, overlapped + 8));
+      Store(base, frame + 88, Load(base, overlapped + 12));
+      const uint32_t context = (event & 1) == 0 ? overlapped : 0;
+      status = uint32_t(calls.import(Import::kNtWriteFile, {handle, event, 0, context, overlapped,
+                                                             buffer, size, frame + 88}));
+      if ((status & 0xC0000000u) != 0xC0000000u && status != 259) {
+        if (written != 0) {
+          Store(base, written, Load(base, overlapped + 4));
+        }
+        result = 1;
+        return;
+      }
+    } else {
+      status = uint32_t(calls.import(Import::kNtWriteFile,
+                                     {handle, 0, 0, 0, frame + 80, buffer, size, 0}));
+      bool waited_ok = true;
+      if (status == 259) {
+        status = uint32_t(calls.import(Import::kNtWaitForSingleObjectEx, {handle, 1, 0, 0}));
+        if (int32_t(status) >= 0) {
+          status = Load(base, frame + 80);
+        } else {
+          waited_ok = false;
+        }
+      }
+      if (waited_ok && int32_t(status) >= 0) {
+        Store(base, written, Load(base, frame + 84));
+        result = 1;
+        return;
+      }
+      if ((status & 0xC0000000u) == 0x80000000u) {
+        Store(base, written, Load(base, frame + 84));
+      }
+    }
+    calls.set_last_error_from_status(status);
+  });
+  return result;
+}
+
+uint64_t WriteNolock(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t size,
+                     const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B0F48 _write_nolock");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(1232, [&](uint32_t frame) {
+    if (size == 0) {
+      result = 0;
+      return;
+    }
+    const auto invalid = [&] {
+      Store(base, DosErrno(base, calls), 0);
+      Store(base, Errno(base, calls), 22);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+    };
+    if (buffer == 0) {
+      invalid();
+      return;
+    }
+    const uint32_t entry = HandleEntry(base, handle);
+    const int32_t mode = int8_t(guest::LoadU8(base, entry + 40)) >> 1;
+    if ((mode == 2 || mode == 1) && (size & 1) != 0) {
+      invalid();
+      return;
+    }
+    if ((guest::LoadU8(base, entry + 4) & 0x20) != 0) {
+      LseekNolock(base, handle, 0, 2, calls);
+    }
+    uint64_t total = 0;
+    uint32_t crs = 0, error = 0;
+    const uint32_t chunk = frame + 96, count = frame + 80;
+    if ((guest::LoadU8(base, HandleEntry(base, handle) + 4) & 0x80) != 0) {
+      uint32_t at = buffer;
+      while (true) {
+        uint32_t out = chunk, n = 0;
+        while (at - buffer < size) {
+          const uint8_t c = guest::LoadU8(base, at);
+          at++;
+          if (c == 10) {
+            crs++;
+            n++;
+            guest::StoreU8(base, out++, 13);
+          }
+          n++;
+          guest::StoreU8(base, out++, c);
+          if (n >= 1024) {
+            break;
+          }
+        }
+        const uint32_t bytes = out - chunk;
+        if (WriteFile(base, Load(base, HandleEntry(base, handle)), chunk, bytes, count, 0,
+                      calls) == 0) {
+          error = calls.get_last_error();
+          break;
+        }
+        const uint32_t wrote = Load(base, count);
+        total += wrote;
+        if (int32_t(wrote) < int32_t(bytes) || at - buffer >= size) {
+          break;
+        }
+      }
+    } else {
+      if (WriteFile(base, Load(base, HandleEntry(base, handle)), buffer, size, count, 0, calls) ==
+          0) {
+        error = calls.get_last_error();
+      } else {
+        total = Load(base, count);
+      }
+    }
+    if (uint32_t(total) != 0) {
+      result = total - crs;
+      return;
+    }
+    if (error != 0) {
+      if (error == 5) {
+        Store(base, Errno(base, calls), 9);
+        Store(base, DosErrno(base, calls), 5);
+      } else {
+        DosMapErr(base, error, calls);
+      }
+      return;
+    }
+    if ((guest::LoadU8(base, HandleEntry(base, handle) + 4) & 0x40) != 0 &&
+        guest::LoadU8(base, buffer) == 26) {
+      result = 0;
+      return;
+    }
+    Store(base, Errno(base, calls), 28);
+    Store(base, DosErrno(base, calls), 0);
+  });
+  return result;
+}
+
+uint64_t Write(uint8_t* base, uint32_t handle, uint32_t buffer, uint32_t size,
+               const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B11A8 _write");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(160, [&](uint32_t frame) {
+    Store(base, frame + 180, handle);
+    if (HandleChecksFail(base, handle, true, calls)) {
+      return;
+    }
+    LockFhandle(base, handle, calls);
+    if ((guest::LoadU8(base, HandleEntry(base, handle) + 4) & 1) != 0) {
+      Store(base, frame + 80, uint32_t(WriteNolock(base, handle, buffer, size, calls)));
+    } else {
+      Store(base, Errno(base, calls), 9);
+      Store(base, DosErrno(base, calls), 0);
+      Store(base, frame + 80, 0xFFFFFFFFu);
+    }
+    UnlockFhandleFinally(base, handle, calls);
+    result = Load(base, frame + 80);
+  });
+  return result;
+}
+
 }  // namespace c_runtime::core

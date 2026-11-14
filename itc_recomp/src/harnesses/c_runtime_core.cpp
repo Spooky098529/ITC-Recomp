@@ -2360,13 +2360,15 @@ void FlushCases(Context& h) {
 struct SeekFile {
   Context& h;
   uint32_t handle = 0;
-  explicit SeekFile(Context& h) : h(h) {
-    const char path[] = "game:\\default.xex";
-    Write(h.base, h.data + 2048, reinterpret_cast<const uint8_t*>(path), sizeof(path));
+  explicit SeekFile(Context& h, const std::string& path = "game:\\default.xex",
+                    uint32_t access = 0x80000000u /* GENERIC_READ */)
+      : h(h) {
+    Write(h.base, h.data + 2048, reinterpret_cast<const uint8_t*>(path.c_str()),
+          uint32_t(path.size() + 1));
     PPCContext t = CallContext(h);
     t.r3.u64 = h.data + 2048;
-    t.r4.u64 = 0x80000000u;  // GENERIC_READ
-    t.r5.u64 = 1;            // FILE_SHARE_READ
+    t.r4.u64 = access;
+    t.r5.u64 = 1;  // FILE_SHARE_READ
     t.r6.u64 = 0;
     t.r7.u64 = 3;  // OPEN_EXISTING
     t.r8.u64 = 0x80;
@@ -2588,6 +2590,216 @@ void LseekCases(Context& h) {
   SetLastError(h, slots.error);
 }
 
+
+// Files to write to: the SDK's null device (\Device\Harddisk0\Cache0, every
+// write a success of 0 bytes) and game:\default.xex opened for reading (every
+// write refused: access denied); nothing reaches the host's files.
+struct WriteFiles {
+  SeekFile sink, xex;
+  explicit WriteFiles(Context& h)
+      : sink(h, "\\Device\\Harddisk0\\Cache0", 0xC0000000u), xex(h) {}
+};
+
+// A buffer's bytes for the writes: random, with LFs often and ^Z first now
+// and then.
+void WriteBytes(Context& h, uint32_t address, uint32_t size) {
+  for (uint32_t i = 0; i < size; i++) {
+    const uint32_t pick = h.random.Below(8);
+    guest::StoreU8(h.base, address + i,
+                   pick == 0 ? 10 : pick == 1 ? 13 : uint8_t(h.random.Next()));
+  }
+  if (size != 0 && h.random.Below(4) == 0) {
+    guest::StoreU8(h.base, address, 26);
+  }
+}
+
+// WriteFile: on the null device's file, the read-only file, an event or a
+// word that's no handle; with an overlapped (in the scratch area: its event 0,
+// an event of the side's own with or without the low bit, a random offset)
+// or without (then `written` always given: the original stores it unchecked);
+// sizes 0 to 64. The last error random before. Compared: r3 (64 bits), the
+// written word, the overlapped's +0 to +12 and the last error.
+void WriteFileCases(Context& h) {
+  Results results("WriteFile (sub_82295D50)");
+  WriteFiles files(h);
+  if (files.sink.handle == 0 || files.xex.handle == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: WriteFile: the files weren't opened");
+  }
+  const uint32_t error = GuestLastError(h);
+  const uint32_t buffer = h.data + 1024, written = h.data + 960, overlapped = h.data + 928;
+  for (int c = 0; c < 64; c++) {
+    const uint32_t kind = h.random.Below(4);
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const bool with_overlapped = h.random.Below(2) == 0;
+    const uint32_t event_kind = h.random.Below(3);
+    const bool with_written = !with_overlapped || h.random.Below(3) != 0;
+    const uint32_t size = h.random.Below(65);
+    const uint32_t offset_low = uint32_t(h.random.Next()), offset_high = h.random.Below(2);
+    const uint32_t last = uint32_t(h.random.Next());
+    WriteBytes(h, buffer, size);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t own = kind == 2 || event_kind != 0 ? MakeEvent(h, 0, 0) : 0;
+      const uint32_t handle = kind == 0   ? files.sink.handle
+                              : kind == 1 ? files.xex.handle
+                              : kind == 2 ? own
+                                          : junk;
+      Store(h.base, written, 0xCDCDCDCDu);
+      Store(h.base, overlapped + 0, 0xCDCDCDCDu);
+      Store(h.base, overlapped + 4, 0xCDCDCDCDu);
+      Store(h.base, overlapped + 8, offset_low);
+      Store(h.base, overlapped + 12, offset_high);
+      Store(h.base, overlapped + 16,
+            event_kind == 0 ? 0 : event_kind == 1 ? own : (own | 1));
+      SetLastError(h, last);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = handle;
+      t.r4.u64 = buffer;
+      t.r5.u64 = size;
+      t.r6.u64 = with_written ? written : 0;
+      t.r7.u64 = with_overlapped ? overlapped : 0;
+      (v == 0 ? __imp__sub_82295D50 : hooks::CoreWriteFile)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, written));
+      out[v].Bytes(Read(h.base, overlapped, 16));
+      out[v].Word(GuestLastError(h));
+      if (own != 0) {
+        PPCContext k = CallContext(h);
+        k.r3.u64 = own;
+        __imp__NtClose(k, h.base);
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  SetLastError(h, error);
+  results.Report();
+}
+
+// _write_nolock and _write: handles in the first block (and for _write -2,
+// -1 and past _nhandle), the entry open on the null device's file, the
+// read-only file or a word that's no handle (or closed for _write); its
+// flags (+4: text, device and append bits among random ones) and mode
+// (+40: ANSI, UTF-8, UTF-16 or random) set per case, the lock made or not;
+// buffers null or random (LFs often, ^Z first now and then) of 0 to 3,000
+// bytes, so the text mode's chunks fill; errno, _doserrno and the last error
+// random, the invalid parameter handler the shared "returns 0". Compared: r3
+// (64 bits), the entry, errno, _doserrno, the last error, the part of the
+// text mode's chunk in _write_nolock's frame its first chunk writes (filled
+// with 0xCD first) and the caller's frame + 20.
+void WriteCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  WriteFiles files(h);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || files.sink.handle == 0 ||
+      files.xex.handle == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _write: no handle block, thread data, lock 10 or "
+                  "files");
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool nolock;
+  };
+  const uint32_t block = memory::Alloc(4096, 0);  // the bytes: past the scratch area's room
+  if (block == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _write: no buffer");
+    return;
+  }
+  for (const Fn& fn : {Fn{"_write_nolock (sub_825B0F48)", __imp__sub_825B0F48,
+                          hooks::CoreWriteNolock, true},
+                       Fn{"_write (sub_825B11A8)", __imp__sub_825B11A8, hooks::CoreWrite, false}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 64; c++) {
+      const uint32_t pick = h.random.Below(10);
+      const uint32_t handle = fn.nolock || pick > 2 ? h.random.Below(32)
+                              : pick == 0           ? 0xFFFFFFFEu
+                              : pick == 1           ? 0xFFFFFFFFu
+                                                    : nhandle + h.random.Below(64);
+      const uint32_t entry = handles + 44 * (handle & 31);
+      const uint32_t os_kind = h.random.Below(5);  // 0-2 the null device, 3 the xex, 4 junk
+      const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+      uint8_t flags = uint8_t(h.random.Next()) | (h.random.Below(6) != 0 ? 1 : 0);
+      if (fn.nolock) {
+        flags |= 1;
+      }
+      const uint32_t mode_pick = h.random.Below(5);
+      const uint8_t mode = mode_pick == 0   ? 2
+                           : mode_pick == 1 ? 4
+                           : mode_pick == 2 ? uint8_t(h.random.Next())
+                                            : uint8_t(h.random.Next() & 1);
+      const bool made = h.random.Below(2) == 0;
+      const uint32_t size_pick = h.random.Below(6);
+      const uint32_t size = size_pick == 0   ? 0
+                            : size_pick == 1 ? 1 + h.random.Below(8)
+                            : size_pick == 2 ? 1000 + h.random.Below(2000)
+                                             : h.random.Below(1100);
+      const bool null = h.random.Below(10) == 0;
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      WriteBytes(h, block, size);
+      // The bytes the text mode's first chunk takes (each LF two), when it
+      // runs: an open handle in range, bytes given, a mode that takes them.
+      const int32_t mode_shift = int8_t(mode) >> 1;
+      const bool in_range = handle < nhandle && (flags & 1) != 0;
+      const bool text = (flags & 0x80) != 0 && !null && size != 0 &&
+                        !((mode_shift == 1 || mode_shift == 2) && (size & 1) != 0) &&
+                        (fn.nolock || in_range);
+      uint32_t converted = 0;
+      for (uint32_t i = 0; text && i < size && converted < 1024; i++) {
+        converted += guest::LoadU8(h.base, block + i) == 10 ? 2 : 1;
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}});
+        files.xex.Set(0);
+        guest::StoreU8(h.base, entry + 4, flags);
+        guest::StoreU8(h.base, entry + 40, mode);
+        Store(h.base, entry + 0,
+              os_kind < 3 ? files.sink.handle : os_kind == 3 ? files.xex.handle : junk);
+        Store(h.base, entry + 8, made ? 1 : 0);
+        if (made) {
+          InitSection(h, entry + 12);
+        }
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        // _write_nolock's frame: 1,232 bytes below the caller's, or below
+        // _write's 160.
+        const uint32_t chunk = t.r1.u32 - (fn.nolock ? 0 : 160) - 1232 + 96;
+        Fill(h.base, chunk, 1028);
+        t.r3.u64 = handle;
+        t.r4.u64 = null ? 0 : block;
+        t.r5.u64 = size;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, entry, 44));
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        // Only the part of the chunk the text mode wrote: below it are dead
+        // words of the calls before (__lock_fhandle's), the stack's leftovers.
+        out[v].Bytes(Read(h.base, chunk, converted));
+        if (!fn.nolock) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(block);
+  SetLastError(h, slots.error);
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -2651,6 +2863,8 @@ void CRuntimeCore(Context& h) {
   FlushCases(h);
   SetFilePointerCases(h);
   LseekCases(h);
+  WriteFileCases(h);
+  WriteCases(h);
 }
 
 }  // namespace harness
