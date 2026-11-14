@@ -265,7 +265,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 10 of 10: the type 8 mode itself (its Init `sub_8223D5D8`,
   its vtable's slots, the first screen's Init, the +9792 machine, the
   block's constructor and destructor; none seen in play); its line
-  deleted from `leads.md`. Mapping agent running.
+  deleted from `leads.md`. Mapped `type8-mode.md` (9bf9d97e: 52 rows,
+  none in play; 44 ready roots judged by reading callees; `Init`'s
+  group waits on four ready never-seen callees in `options-screen.md`,
+  `save-screen.md`, `save-data.md`, and four shared handlers in
+  `type6-type7-modes.md`, all to take along; no leads added). Check
+  passed. Migration agent running.
 
 ## Done
 

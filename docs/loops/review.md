@@ -201,6 +201,14 @@ When the user has reviewed a run's section, its heading gets
   `SetUpRace` switches trap past their last case, as the recompiled
   switch does. The intros of `car-list.md` and `type8-screens.md` still
   call the five car-list rows blockers.
+- The type 8 mode's map (9bf9d97e, `type8-mode.md`, 52 rows): close to
+  the type 6 and 7 modes (the member inside the mode, the delegates as
+  vtable slots, the teardown over slots 9 and 10, three cars and the
+  two-player save block). Corrections: `race-loading.md` had
+  `sub_8223D960`/`sub_8223DA00` as the race mode's slots 8 and 9 (they
+  are type 8's +32 vtable); `car-list.md` called two type 8 functions
+  "type 6". `NextMode`'s answer carries three unwritten stack bytes and
+  `ForceExit`'s the low bytes of `Mode::Slot9Thunk`'s address (to copy).
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
