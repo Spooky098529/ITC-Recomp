@@ -67,7 +67,10 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "run the game's exit functions or end the process, checked by reading), fputs "
               "(sub_825AD280, no adapter: its caller _Debug_message), vsprintf with _vsprintf_l "
               "(sub_825A71B0, sub_825A70F0; through sprintf's plain C++, the originals where it "
-              "declines; checked by --run_harnesses=c_runtime_format) (checked by "
+              "declines; checked by --run_harnesses=c_runtime_format), _cftoe_l and _cftog_l "
+              "(sub_825AE1A8, sub_825AE9D0, with _fltout2 over guest memory, sub_825B6458, "
+              "and _fptostr's and _cftof2_l's plain C++; _fltout2's _invoke_watson path checked "
+              "by reading) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -725,6 +728,14 @@ void hooks::CoreVsprintf(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = *r3;
 }
+void hooks::CoreCftoe(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Cftoe(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.u32,
+                         CRuntimeCoreCalls(ctx, base));
+}
+void hooks::CoreCftog(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Cftog(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.u32,
+                         ctx.r8.u32, CRuntimeCoreCalls(ctx, base));
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -937,3 +948,8 @@ ITC_C_RUNTIME_CORE(825A69D8, CoreThrow)
 // count, or -1. (_vsprintf_l, sub_825A70F0, has no adapter: vsprintf is its
 // only caller.)
 ITC_C_RUNTIME_CORE(825A71B0, CoreVsprintf)
+// _cftoe_l, _cftog_l: r3 = the double's address, r4 = the buffer, r5 = its
+// size, r6 = the precision, r7 = caps, r8 = the locale; r3 = 0, 22 or 34.
+// (_fltout2, sub_825B6458, has no adapter of its own: c-runtime.md.)
+ITC_C_RUNTIME_CORE(825AE1A8, CoreCftoe)
+ITC_C_RUNTIME_CORE(825AE9D0, CoreCftog)

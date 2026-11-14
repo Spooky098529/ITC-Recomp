@@ -142,5 +142,7 @@ void CoreFwriteNolock(PPCContext& ctx, uint8_t* base);  // sub_825A96A0 (no adap
 void CoreFputs(PPCContext& ctx, uint8_t* base);         // sub_825AD280
 void CoreThrow(PPCContext& ctx, uint8_t* base);         // sub_825A69D8
 void CoreVsprintf(PPCContext& ctx, uint8_t* base);      // sub_825A71B0
+void CoreCftoe(PPCContext& ctx, uint8_t* base);         // sub_825AE1A8
+void CoreCftog(PPCContext& ctx, uint8_t* base);         // sub_825AE9D0
 
 }  // namespace hooks

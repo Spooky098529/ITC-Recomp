@@ -2329,4 +2329,179 @@ std::optional<uint64_t> Vsprintf(uint8_t* base, uint32_t buffer, uint32_t format
   return uint32_t(count);
 }
 
+uint32_t Fltout2(uint8_t* base, uint64_t bits, uint32_t result, uint32_t buffer, uint32_t size,
+                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B6458 _fltout2");
+  const c_runtime::LongDouble12 value = c_runtime::DoubleToLd12(bits);
+  c_runtime::FloatOut out;
+  if (!c_runtime::I10Output(base, value, 17, 0, &out)) {
+    return uint32_t(calls.guest(0x825B6458, {bits, result, buffer, size}));  // never: 17 digits
+  }
+  calls.in_frame(160, [&](uint32_t frame) {
+    Store(base, frame + 176, uint32_t(bits >> 32));
+    Store(base, frame + 180, uint32_t(bits));
+    guest::StoreU16(base, frame + 80, value.sign_exponent);
+    Store(base, frame + 82, value.mantissa_high);
+    Store(base, frame + 86, value.mantissa_low);
+    for (uint32_t i = 0; i < sizeof(out.bytes); i++) {
+      if (out.written[i]) {
+        guest::StoreU8(base, frame + 96 + i, out.bytes[i]);
+      }
+    }
+    Store(base, result + 8, uint32_t(out.result));
+    Store(base, result + 0, uint32_t(int32_t(int8_t(guest::LoadU8(base, frame + 98)))));
+    Store(base, result + 4, uint32_t(int32_t(int16_t(guest::LoadU16(base, frame + 96)))));
+    if (!c_runtime::StrcpyS(base, buffer, size, frame + 100)) {
+      if (uint32_t(calls.guest(0x825A9DD8, {buffer, size, frame + 100})) != 0) {
+        InvokeWatson(base, 0x825B64E8, calls);
+      }
+    }
+    Store(base, result + 12, buffer);
+  });
+  return result;
+}
+
+uint64_t FpToStrGuest(uint8_t* base, uint32_t buffer, uint32_t size, int32_t digits,
+                      uint32_t result, const Calls& calls) {
+  if (buffer == 0 || size == 0 || !(size > uint32_t(digits > 0 ? digits : 0) + 1)) {
+    ITC_NATIVE_RUNNING("sub_825B61E8 _fptostr");
+    uint64_t error = 0;
+    calls.in_frame(96, [&](uint32_t) {
+      if (buffer != 0 && size != 0) {
+        guest::StoreU8(base, buffer, 0);
+      }
+      error = buffer != 0 && size != 0 ? 34 : 22;
+      Store(base, Errno(base, calls), uint32_t(error));
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+    });
+    return error;
+  }
+  c_runtime::GuestText text(base, buffer);
+  std::vector<uint8_t> mantissa;
+  const uint32_t source = Load(base, result + 12);
+  uint32_t read = 0;
+  const uint32_t whole = digits > 0 ? uint32_t(digits) : 0;
+  while (digits >= 0 && read <= whole && read < (1u << 20)) {
+    const uint8_t c = guest::LoadU8(base, source + read);
+    read++;
+    if (c == 0) {
+      break;
+    }
+    mantissa.push_back(c);
+  }
+  const int32_t before = int32_t(Load(base, result + 4));
+  int32_t exponent = before;
+  bool native = c_runtime::FpToStr(text, 0, size, digits, &exponent, mantissa) == 0 && text.ok();
+  if (native) {
+    const uint32_t end = uint32_t(text.WrittenEnd());
+    native = !c_runtime::MayShare(result, 16, buffer, end) &&
+             !c_runtime::MayShare(source, read, buffer, end) && text.Commit();
+  }
+  if (!native) {
+    return calls.guest(0x825B61E8, {buffer, size, uint64_t(int64_t(digits)), result});
+  }
+  if (exponent != before) {
+    Store(base, result + 4, uint32_t(exponent));
+  }
+  return 0;
+}
+
+namespace {
+
+// _cftof2_l (sub_825AE708) over guest memory, for %g (its callers here have
+// checked the buffer and size): c_runtime::Cftof2, the original (a guest
+// call) where its writes would share memory with what it reads.
+uint64_t Cftof2Guest(uint8_t* base, uint32_t buffer, uint32_t size, int32_t precision,
+                     uint32_t result, uint32_t g_format, uint32_t locale, const Calls& calls) {
+  c_runtime::GuestText text(base, buffer);
+  bool native = buffer != 0 && size != 0;
+  if (native) {
+    uint32_t words[3];
+    const uint32_t point = c_runtime::DecimalPointAddress(base, words);
+    native = c_runtime::Cftof2(text, precision, int32_t(Load(base, result)),
+                               int32_t(Load(base, result + 4)), int8_t(g_format) != 0,
+                               guest::LoadU8(base, point));
+    const uint32_t end = uint32_t(text.WrittenEnd());
+    native = native && !c_runtime::MayShare(result, 8, buffer, end) &&
+             !c_runtime::MayShare(words[0], 4, buffer, end) &&
+             !c_runtime::MayShare(words[1], 4, buffer, end) &&
+             !c_runtime::MayShare(point, 1, buffer, end) && text.Commit();
+  }
+  if (!native) {
+    return calls.guest(0x825AE708,
+                       {buffer, size, uint64_t(int64_t(precision)), result, g_format, locale});
+  }
+  return 0;
+}
+
+}  // namespace
+
+uint64_t Cftoe(uint8_t* base, uint32_t number, uint32_t buffer, uint32_t size, int32_t precision,
+               uint32_t caps, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AE1A8 _cftoe_l");
+  uint64_t r3 = 0;
+  calls.in_frame(176, [&](uint32_t frame) {
+    const uint64_t bits = (uint64_t(Load(base, number)) << 32) | Load(base, number + 4);
+    Fltout2(base, bits, frame + 80, frame + 96, 22, calls);
+    if (buffer == 0 || size == 0) {
+      Store(base, Errno(base, calls), 22);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+      r3 = 22;
+      return;
+    }
+    const uint32_t minus = Load(base, frame + 80) == 45 ? 1 : 0;
+    const uint32_t point = precision > 0 ? 1 : 0;
+    const uint32_t room = size == 0xFFFFFFFFu ? 0xFFFFFFFFu : size - minus - point;
+    r3 = FpToStrGuest(base, buffer + minus + point, room, precision + 1, frame + 80, calls);
+    if (uint32_t(r3) != 0) {
+      guest::StoreU8(base, buffer, 0);
+      return;
+    }
+    r3 = Cftoe2(base, buffer, size, precision, caps, frame + 80, 0, calls);
+  });
+  return r3;
+}
+
+uint64_t Cftog(uint8_t* base, uint32_t number, uint32_t buffer, uint32_t size, int32_t precision,
+               uint32_t caps, uint32_t locale, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AE9D0 _cftog_l");
+  uint64_t r3 = 0;
+  calls.in_frame(192, [&](uint32_t frame) {
+    const uint64_t bits = (uint64_t(Load(base, number)) << 32) | Load(base, number + 4);
+    Fltout2(base, bits, frame + 80, frame + 96, 22, calls);
+    if (buffer == 0 || size == 0) {
+      Store(base, Errno(base, calls), 22);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+      r3 = 22;
+      return;
+    }
+    const uint32_t minus = Load(base, frame + 80) == 45 ? 1 : 0;
+    const int32_t before = int32_t(Load(base, frame + 84) - 1);
+    const uint32_t digits = buffer + minus;
+    const uint32_t room = size == 0xFFFFFFFFu ? 0xFFFFFFFFu : size - minus;
+    r3 = FpToStrGuest(base, digits, room, precision, frame + 80, calls);
+    if (uint32_t(r3) != 0) {
+      guest::StoreU8(base, buffer, 0);
+      return;
+    }
+    const int32_t exponent = int32_t(Load(base, frame + 84) - 1);
+    const bool carried = before < exponent;
+    if (exponent < -4 || exponent >= precision) {
+      r3 = Cftoe2(base, buffer, size, precision, caps, frame + 80, 1, calls);
+      return;
+    }
+    if (carried) {
+      uint32_t p = digits;
+      uint8_t c;
+      do {
+        c = guest::LoadU8(base, p);
+        p++;
+      } while (c != 0);
+      guest::StoreU8(base, p - 2, c);
+    }
+    r3 = Cftof2Guest(base, buffer, size, precision, frame + 80, 1, locale, calls);
+  });
+  return r3;
+}
+
 }  // namespace c_runtime::core

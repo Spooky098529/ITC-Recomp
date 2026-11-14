@@ -3,6 +3,9 @@
 
 #include "harness.h"
 
+#include "c_runtime/core.h"
+#include "hooks/c_runtime_core.h"
+
 #include "base/log.h"
 #include "c_runtime/format.h"
 #include "hooks/c_runtime.h"
@@ -325,30 +328,12 @@ void NativeI10Output(PPCContext& ctx, uint8_t* base) {
 }
 
 // _fltout2: r3 = the double's bits, r4 = the result, r5 = the digits'
-// buffer, r6 = its size; returns r4.
+// buffer, r6 = its size; returns r4. Its plain C++ over guest memory
+// (c_runtime::core::Fltout2, the native _cftoe_l's and _cftog_l's; the
+// native _cftof_l makes the same steps in host memory).
 void NativeFltout2(PPCContext& ctx, uint8_t* base) {
-  c_runtime::FloatOut out;
-  bool native = c_runtime::I10Output(base, c_runtime::DoubleToLd12(ctx.r3.u64), 17, 0, &out);
-  uint32_t length = 0;
-  if (native) {
-    while (length < 22 && out.bytes[4 + length] != 0) {
-      length++;
-    }
-    native = length < 22 && ctx.r5.u32 != 0 && ctx.r6.u32 != 0 && length + 1 <= ctx.r6.u32;
-  }
-  if (!native) {
-    __imp__sub_825B6458(ctx, base);
-    return;
-  }
-  const uint32_t result = ctx.r4.u32, buffer = ctx.r5.u32;
-  guest::StoreU32(base, result + 8, uint32_t(out.result));
-  guest::StoreU32(base, result, uint32_t(int32_t(int8_t(out.bytes[2]))));
-  guest::StoreU32(base, result + 4, uint32_t(int32_t(int16_t(out.bytes[0] << 8 | out.bytes[1]))));
-  for (uint32_t i = 0; i <= length; i++) {
-    guest::StoreU8(base, buffer + i, out.bytes[4 + i]);
-  }
-  guest::StoreU32(base, result + 12, buffer);
-  ctx.r3.u64 = ctx.r4.u64;
+  ctx.r3.u64 = c_runtime::core::Fltout2(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                        hooks::CRuntimeCoreCalls(ctx, base));
 }
 
 // _cftof_l (%f): r3 = the double's address, r4 = the buffer, r5 = its size,

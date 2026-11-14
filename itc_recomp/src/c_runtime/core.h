@@ -770,4 +770,43 @@ void Throw(uint8_t* base, uint32_t exception, const Calls& calls);
 std::optional<uint64_t> Vsprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args,
                                  uint32_t sp, const Calls& calls);
 
+// sub_825B6458 _fltout2 over guest memory: in its 160-byte frame, the double
+// (`bits`) stored at the caller's frame + 16 (+176), ___dtold's 12 bytes at
+// +80 (c_runtime::DoubleToLd12), $I10_OUTPUT's FOS at +96 (17 digits, flags
+// 0; the bytes it writes, c_runtime::I10Output); `result` +8 its result, +0
+// the sign character (sign-extended), +4 the decimal exponent
+// (sign-extended), the digits copied to `buffer` (strcpy_s with `size`;
+// _invoke_watson when that fails: it ends the process), +12 = `buffer`.
+// Returns `result`.
+uint32_t Fltout2(uint8_t* base, uint64_t bits, uint32_t result, uint32_t buffer, uint32_t size,
+                 const Calls& calls);
+
+// sub_825B61E8 _fptostr over guest memory: from its 96-byte frame, a null
+// buffer or a size of 0: errno 22, _invalid_parameter, 22; else buffer[0] =
+// 0 and a size not above max(digits, 0) + 1 (unsigned): errno 34,
+// _invalid_parameter, 34. Else c_runtime::FpToStr over the result's digits
+// (+12), +4 counted up on a carry into the leading digit; 0. Where its
+// writes would share memory with what it reads, the original (a guest
+// call).
+uint64_t FpToStrGuest(uint8_t* base, uint32_t buffer, uint32_t size, int32_t digits,
+                      uint32_t result, const Calls& calls);
+
+// sub_825AE1A8 _cftoe_l (%e): in its 176-byte frame, _fltout2 of the double
+// at `number` (its result at +80, 22 digit bytes at +96); a null buffer or
+// size 0: errno 22, _invalid_parameter, 22. _fptostr of precision + 1
+// digits after the sign and, with a precision above 0, a byte for the point
+// (the size less them, -1 kept); its failure: buffer[0] = 0 and its result;
+// else _cftoe2_l (not %g). The result.
+uint64_t Cftoe(uint8_t* base, uint32_t number, uint32_t buffer, uint32_t size, int32_t precision,
+               uint32_t caps, const Calls& calls);
+
+// sub_825AE9D0 _cftog_l (%g): in its 192-byte frame, _fltout2 as _cftoe_l's
+// and the same EINVAL; _fptostr of `precision` digits after the sign; its
+// failure as _cftoe_l's. The exponent less one after rounding below -4 or
+// not below the precision: _cftoe2_l for %g; else _cftof2_l for %g, the
+// last digit dropped first when rounding carried the exponent up. The
+// result.
+uint64_t Cftog(uint8_t* base, uint32_t number, uint32_t buffer, uint32_t size, int32_t precision,
+               uint32_t caps, uint32_t locale, const Calls& calls);
+
 }  // namespace c_runtime::core

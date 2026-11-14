@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <cctype>
 #include <climits>
+#include <cmath>
 #include <bit>
 #include <cstring>
 #include <mutex>
@@ -4039,6 +4040,99 @@ void FputsCases(Context& h) {
   SetLastError(h, slots.error);
 }
 
+// _cftoe_l and _cftog_l (with _fltout2 over guest memory and _fptostr's,
+// _cftof2_l's and _cftoe2_l's plain C++): doubles (zeros, infinities, NaNs,
+// denormals, values that round up a digit at the precision, powers of ten
+// and random bits) at a word in the scratch area, a buffer there (0xCD
+// around it), sizes 0, -1, small and large, null buffers now and then,
+// precisions -3 to 20, caps random, the locale word random, _outputformat's
+// bit 0 set or not (put back after). errno random before, the invalid
+// parameter handler the shared "returns 0". Compared: r3 (64 bits), the
+// buffer's area and errno.
+void CftoeCftogCases(Context& h) {
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _cftoe_l: no thread data");
+    return;
+  }
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t format = Load(h.base, 0x82971358);
+  const uint32_t area = h.data + 1024, buffer = area + 16, number = h.data + 896;
+  const double specials[] = {0.0, -0.0, 1.0, -1.0, 0.5, 9.5, 9.95, 99.95, 0.00095, 0.0001, 1e-5,
+                             123456.789, 1e21, 1e300, -1e-300, 5e-324, 2.2250738585072014e-308,
+                             9.999999999999999e22, 0.1, 1.0 / 3.0};
+  for (const bool g : {false, true}) {
+    Results results(g ? "_cftog_l (sub_825AE9D0)" : "_cftoe_l (sub_825AE1A8)");
+    for (int c = 0; c < 600; c++) {
+      uint64_t bits;
+      const uint32_t pick = h.random.Below(8);
+      if (pick < 3) {
+        bits = std::bit_cast<uint64_t>(specials[h.random.Below(std::size(specials))]);
+      } else if (pick == 3) {
+        const uint64_t kinds[] = {0x7FF0000000000000ull, 0xFFF0000000000000ull,
+                                  0x7FF8000000000000ull, 0xFFF8000000000001ull,
+                                  0x7FF0000000000001ull, 0x0000000000000001ull,
+                                  0x800FFFFFFFFFFFFFull};
+        bits = kinds[h.random.Below(std::size(kinds))];
+      } else if (pick == 4) {
+        // Nines that round up at some precision.
+        double value = 0;
+        const uint32_t nines = 1 + h.random.Below(17);
+        for (uint32_t k = 0; k < nines; k++) value = value * 10 + 9;
+        value *= std::pow(10.0, int(h.random.Below(40)) - 20);
+        bits = std::bit_cast<uint64_t>(h.random.Below(2) == 0 ? value : -value);
+      } else if (pick == 5) {
+        bits = std::bit_cast<uint64_t>(std::pow(10.0, int(h.random.Below(80)) - 40));
+      } else {
+        bits = (uint64_t(h.random.Next()) << 32) | uint32_t(h.random.Next());
+      }
+      const int32_t precision = h.random.Below(8) == 0 ? -int32_t(h.random.Below(4))
+                                                       : int32_t(h.random.Below(21));
+      const uint32_t size_pick = h.random.Below(8);
+      const uint32_t limit = uint32_t(precision > 0 ? precision : 0) + 9;
+      const uint32_t size = size_pick == 0   ? 0
+                            : size_pick == 1 ? 0xFFFFFFFFu
+                            : size_pick == 2 ? h.random.Below(limit + 2)
+                            : size_pick == 3 ? limit + 1
+                                             : limit + 1 + h.random.Below(40);
+      const bool null = h.random.Below(20) == 0;
+      const uint32_t caps = h.random.Below(2) == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+      const uint32_t locale = uint32_t(h.random.Next());
+      const uint32_t outputformat = h.random.Below(2) == 0 ? (format & ~1u) : (format | 1u);
+      const uint32_t err = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, area, 96);
+        Store(h.base, number, uint32_t(bits >> 32));
+        Store(h.base, number + 4, uint32_t(bits));
+        Store(h.base, 0x82971358, outputformat);
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = number;
+        t.r4.u64 = null ? 0 : buffer;
+        t.r5.u64 = size;
+        t.r6.u64 = uint64_t(int64_t(precision));
+        t.r7.u64 = caps;
+        t.r8.u64 = locale;
+        if (g) {
+          (v == 0 ? __imp__sub_825AE9D0 : hooks::CoreCftog)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825AE1A8 : hooks::CoreCftoe)(t, h.base);
+        }
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        Store(h.base, 0x82971358, format);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, area, 96));
+        out[v].Word(Load(h.base, slots.data + 8));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -4116,6 +4210,7 @@ void CRuntimeCore(Context& h) {
   DoexitCases(h);
   RaiseCases(h);
   FputsCases(h);
+  CftoeCftogCases(h);
 }
 
 }  // namespace harness
