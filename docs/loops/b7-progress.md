@@ -28,7 +28,15 @@ file's history. What's left to see in a drive, from every run:
   blocked (the network battle's sends, the network manager, the race
   dialog's never-seen save calls); 1 lead added; check passed. Kind 6
   is the Xbox Live time attack's race (the 2026-11-12 Live call
-  followed). Step: migration.
+  followed). Migrated fdd8b61e..55b1f75c (4 batches, forked
+  subagents one at a time): PauseMenu4, RaceResults, SplitResults
+  (Draw blocked by the network battle's sends), Kind6Menu with the
+  network manager's `Leaderboard::Rank`, `CarLogo`,
+  `Network::SetLiveState`, and the blockers `RaceDialog::StartSave`,
+  `ShowSaving`, `SetNote`, `UiMovie::SetNodeCharText`; 2 adapters
+  removed; `--native_race_screens_unseen`; every harness 0 differing,
+  races 30/29/26/24 s at 40, 0 errors. Two questions for the user
+  (the sends, the leaderboard read). Step: validation.
 
 ## Done
 

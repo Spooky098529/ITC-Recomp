@@ -28,6 +28,18 @@ When the user has reviewed a run's section, its heading gets
   object `[0x82816E3C]`'s fields); `race-screens.md`'s makers point to
   the new file. Groups worked out by hand: `b7_groups.py` doesn't read
   functions never seen in play.
+- The in-race screens' migration (fdd8b61e..55b1f75c): rows in
+  `race-screens-unseen.md`, three new Native rows in `network-mode.md`
+  (`Network::SetLiveState`, `Leaderboard::Rank`, `CarLogo`), the race
+  dialog's `StartSave`, `ShowSaving`, `SetNote` (`race-screens.md`),
+  `UiMovie::SetNodeCharText` (`ui-movies-game.md`). Left recompiled:
+  `SplitResults::Draw` (the network battle's sends), `SaveReplay`
+  (`AskSlot`), and, called as originals from native code, the Live
+  work `sub_8214B330`, `sub_822917B8`, `sub_82292CC0`; branches the
+  harness can't cover are named in the rows. The race HUD machine's
+  kind 4 and 6 paths still reach the recompiled roots (a cleanup
+  lead). The older `race_screens` harness groups repeat inputs (about
+  17 distinct sets in 300); not rewritten (old harnesses stay).
 
 ## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
 
