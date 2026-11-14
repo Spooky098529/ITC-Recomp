@@ -65,7 +65,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "sub_825ACD90), _flushall and _endstdio (sub_825AD068, sub_825AD5F8), doexit and _cexit "
               "(sub_825AA218, sub_825AA388; only the path where _C_Exit_Done is set: the others "
               "run the game's exit functions or end the process, checked by reading), fputs "
-              "(sub_825AD280, no adapter: its caller _Debug_message) (checked by "
+              "(sub_825AD280, no adapter: its caller _Debug_message), vsprintf with _vsprintf_l "
+              "(sub_825A71B0, sub_825A70F0; through sprintf's plain C++, the originals where it "
+              "declines; checked by --run_harnesses=c_runtime_format) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -712,6 +714,17 @@ void hooks::CoreFputs(PPCContext& ctx, uint8_t* base) {
 void hooks::CoreThrow(PPCContext& ctx, uint8_t* base) {
   cc::Throw(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
+// vsprintf: where the native version declines, the original (its
+// _vsprintf_l and _output_l the recompiled ones) runs.
+void hooks::CoreVsprintf(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = cc::Vsprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+                               CRuntimeCoreCalls(ctx, base));
+  if (!r3) {
+    __imp__sub_825A71B0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -920,3 +933,7 @@ ITC_C_RUNTIME_CORE(825A7098, CorePurecall)
 // std::_Throw: r3 = an exception object; ends the process. (_Debug_message,
 // sub_825A6948, has no adapter: std::_Throw is its only caller.)
 ITC_C_RUNTIME_CORE(825A69D8, CoreThrow)
+// vsprintf: r3 = the buffer, r4 = the format, r5 = the va_list; r3 = the
+// count, or -1. (_vsprintf_l, sub_825A70F0, has no adapter: vsprintf is its
+// only caller.)
+ITC_C_RUNTIME_CORE(825A71B0, CoreVsprintf)

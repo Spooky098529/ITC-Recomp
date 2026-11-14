@@ -2309,4 +2309,24 @@ void Throw(uint8_t* base, uint32_t exception, const Calls& calls) {
   });
 }
 
+std::optional<uint64_t> Vsprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args,
+                                 uint32_t sp, const Calls& calls) {
+  if (buffer == 0 || format == 0) {
+    ITC_NATIVE_RUNNING("sub_825A71B0 vsprintf");
+    ITC_NATIVE_RUNNING("sub_825A70F0 _vsprintf_l");
+    calls.in_frame(128, [&](uint32_t) {
+      Store(base, Errno(base, calls), 22);
+      InvalidParameter(base, 0, 0, 0, 0, 0, calls);
+    });
+    return ~uint64_t(0);
+  }
+  int32_t count = 0;
+  if (!c_runtime::Sprintf(base, buffer, format, args, sp - 128 - 1328, &count)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825A71B0 vsprintf");
+  ITC_NATIVE_RUNNING("sub_825A70F0 _vsprintf_l");
+  return uint32_t(count);
+}
+
 }  // namespace c_runtime::core

@@ -759,4 +759,15 @@ void DebugMessage(uint8_t* base, uint32_t message, uint32_t detail, const Calls&
 // process.
 void Throw(uint8_t* base, uint32_t exception, const Calls& calls);
 
+// sub_825A71B0 vsprintf, with sub_825A70F0 _vsprintf_l (its tail call, with
+// locale 0): a null buffer or format: from _vsprintf_l's 128-byte frame,
+// errno 22, _invalid_parameter(0, 0, 0, 0, 0), -1 (sign-extended). Else
+// `format` with the va_list at `args` into `buffer` through
+// c_runtime::Sprintf's string stream of INT_MAX bytes and its terminator,
+// _output_l's frame where the original's would be (`sp` less 128 and
+// 1,328); the count (zero-extended). nullopt, with nothing written, where
+// Sprintf declines (format.h): the original runs.
+std::optional<uint64_t> Vsprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args,
+                                 uint32_t sp, const Calls& calls);
+
 }  // namespace c_runtime::core
