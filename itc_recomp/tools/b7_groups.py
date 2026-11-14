@@ -13,9 +13,12 @@ usage: b7_groups.py [--static] [--cap <lines>] [root ...]
          (static_map.py, docs/loops/static-map.md): every function
          reachable from main counts as running, never seen in play or
          not, and the callees include the indirect ones (address
-         constants, vtables and tables read from the image); the
-         replaced libraries count as ours; jump-table cases split off
-         as functions are folded into their parents
+         constants, vtables and tables read from the image); an ours
+         function's callees are what its C++ still reaches in the guest
+         (src_edges.py), so a recompiled function only the original of a
+         native one called is no longer a callee; the replaced libraries
+         count as ours; jump-table cases split off as functions are
+         folded into their parents
   --removable  which overridden functions' adapters may go (they become
          Native): every direct caller seen in play is ours. Of the given
          functions, or of every overridden one. Candidates only: the

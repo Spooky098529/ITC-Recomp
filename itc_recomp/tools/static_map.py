@@ -33,15 +33,31 @@ Reads:
                decides it (an override not Wrapped, or Native, Merged or
                Dropped)
   coverage     itc_recomp/coverage/seen_in_play.txt (docs/coverage.md)
+  src/         our C++ (src_edges.py): for each function with C++ (its
+               override, or a definition holding ITC_NATIVE_RUNNING("sub_X
+               ..."), followed through the plain C++ it calls), the guest
+               functions it still reaches: sub_X calls, __imp__sub_X calls
+               (not its own: the flag-off fallback), constants landing on a
+               function's start, and tables or vtables at constants in data,
+               scanned as above; a call into another native function's C++
+               is an edge to that function
 
 The graph:
   roots     main (sub_82090108); then every function seen in play that
-            isn't reachable from main (xstart, the C runtime's start-up,
-            thread entries, callbacks the SDK calls) is an extra root
-  edges     followed through ours too: native code mirrors the original,
-            so the original's callees are what's measured. Dropped
-            functions aren't followed (their bodies don't run and native
-            callers leave the call out)
+            the original's graph (below) doesn't reach from main (xstart,
+            the C runtime's start-up, thread entries, callbacks the SDK
+            calls) is an extra root; and the guest functions named by C++
+            that no native function's C++ reaches (host code)
+  edges     an unported function's are the original's (generated/); an
+            ours function's are its C++'s when it has C++, reached through
+            the function table (its override; one whose adapter was removed
+            is taken as dispatched to its C++) or from other C++, and the
+            original's when it's reached through an __imp__ call or has no
+            C++ (Merged). Dropped functions aren't followed
+  the original's graph  the original's edges followed through ours too (the
+            measure before 2026-11-14): what it reaches outside the replaced
+            libraries that the real graph doesn't is "originals no longer
+            called", grouped by the native function that left the call out
   folded    a jump-table case split off as its own function, referenced
             only by its parent (a switch case in the parent, or a table
             the parent builds whose entries lie just after it), is folded
@@ -49,7 +65,9 @@ The graph:
   excluded  the libraries replaced wholesale ("Rules that still hold" in
             docs/loops/b7-loop.md): sub_822B8F10 (the HLSL compiler) and
             the movie library's ranges 82481A70-82575B07 and
-            825DC200-825FC1B8, with everything reachable only through them
+            825DC200-825FC1B8, with everything reachable only through them;
+            a function there that game code still running as PPC calls
+            directly, or that our C++ calls, is the game's
   unported  reachable, not ours, not excluded (Wrapped counts here)
 
 The frontier: unported functions (or call cycles of them) whose callees
@@ -86,6 +104,11 @@ TEXT = (0x82090000, 0x825DC064)
 DATA_RANGES = [(0x82000600, 0x820773C4),  # .rdata
                (0x82600000, 0x8297833C)]  # .data
 HELPER = re.compile(r"__(save|rest)(gpr|fpr|vmx)")
+# Edge kinds in the TSV: the original's direct call, address constant or
+# data table; our C++'s call to a native function's C++, call or address
+# through the function table, __imp__ call, or table it names.
+KIND = {"direct": "d", "const": "c", "data": "t", "plain": "p", "native": "n",
+        "imp": "i", "table": "t"}
 
 # Disassembly comment parsing.
 COMMENT = re.compile(r"^\s*// ([a-z.]+)\s*(.*)$")
@@ -274,6 +297,7 @@ def build(image_path=IMAGE, quiet=True):
     starts = set(name_of)
 
     image = Image(image_path) if os.path.exists(image_path) else None
+    scan = None
 
     # Edges: kind per (caller, callee): direct, const, data.
     edges = collections.defaultdict(dict)
@@ -312,7 +336,7 @@ def build(image_path=IMAGE, quiet=True):
 
         scan_cache = {}
 
-        def scan(t, depth):
+        def scan(t, depth):  # noqa: F811 (the one used below)
             key = (t, depth)
             if key in scan_cache:
                 return scan_cache[key]
@@ -448,74 +472,148 @@ def build(image_path=IMAGE, quiet=True):
     def expands(f):
         return status.get(f) != "Dropped"
 
-    def reach(roots, barrier=frozenset()):
+    # Our C++'s edges (src_edges.py): what each native function's C++ still
+    # reaches in the guest.
+    spec = importlib.util.spec_from_file_location("src_edges", os.path.join(TOOLS, "src_edges.py"))
+    src_edges = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(src_edges)
+
+    def classify_hex(v):
+        if v in starts:
+            return [(name_of[v], "native")]
+        if scan is not None and in_data(v):
+            return [(c, "table") for c in sorted(scan(v, 1)[0])]
+        return []
+
+    nat, via, host, cdefs, entries, src_stats = src_edges.native_edges(
+        lambda s: s in defined, classify_hex)
+    rank = {"plain": 0, "native": 1, "imp": 2, "table": 3}
+    native = {}  # f -> {callee: kind}, from its C++
+    native_via = {}  # f -> {callee: the C++ definition naming it}
+    for f, cs in nat.items():
+        f2 = folded.get(f, f)
+        if f2 not in nodes:
+            continue
+        d = native.setdefault(f2, {})
+        dv = native_via.setdefault(f2, {})
+        for c, k in cs.items():
+            c2 = folded.get(c, c)
+            if c2 == f2 or c2 not in nodes:
+                continue
+            prev = d.get(c2)
+            if prev is None or rank[k] < rank[prev]:
+                d[c2] = k
+                dv[c2] = via[f][c]
+    orig = callees  # the original's edges (generated/), per function
+
+    # A state is (function, variant): "n" runs our C++ (native[f]), "o" the
+    # original's body (generated/). Only functions that are ours have both.
+    def target(c, kind):
+        if not ours(c):
+            return (c, "o")
+        if kind == "plain":  # our C++ calling the native function's C++
+            return (c, "n")
+        if kind == "imp":  # __imp__sub_X: the original's body
+            return (c, "o")
+        # Through the function table: the override when there is one. A
+        # function with C++ but no override (its adapter removed once its
+        # callers were native) is taken as run natively: native code that
+        # names its address dispatches to the C++ (RunInit, say), and a
+        # recompiled caller left is unported work of its own.
+        return (c, "n") if c in overrides or c in native else (c, "o")
+
+    def out_edges(state):
+        f, v = state
+        if not expands(f):
+            return ()
+        return (native.get(f, {}) if v == "n" else orig[f]).items()
+
+    def walk(starts_, block=None, expand=None):
+        out, stack = set(), list(starts_)
+        while stack:
+            st_ = stack.pop()
+            if st_ in out or st_[0] not in nodes or (block and block(st_[0])):
+                continue
+            out.add(st_)
+            if expand and not expand(st_):
+                continue
+            for c, k in out_edges(st_):
+                if c in nodes:
+                    t = target(c, k)
+                    if t not in out:
+                        stack.append(t)
+        return out
+
+    # The original's graph (its edges followed through ours too, as before
+    # 2026-11-14): the extra roots, and what's no longer called.
+    def reach_orig(roots, block=None):
         out, stack = set(), list(roots)
         while stack:
             f = stack.pop()
-            if f in out or f not in nodes:
+            if f in out or f not in nodes or (block and block(f)):
                 continue
             out.add(f)
-            if f in barrier or not expands(f):
+            if not expands(f):
                 continue
-            stack.extend(c for c in callees[f] if c not in out)
+            stack.extend(c for c in orig[f] if c not in out)
         return out
 
-    from_main = reach([MAIN])
+    from_main_orig = reach_orig([MAIN])
     # Dropped functions seen before they were dropped no longer run.
-    extra = sorted((f for f in seen - from_main if status.get(f) != "Dropped"),
+    extra = sorted((f for f in seen - from_main_orig if status.get(f) != "Dropped"),
                    key=lambda n: addr_of[n])
-    reach_all = reach([MAIN] + extra)
-    # The extra roots worth naming: those no other extra root reaches.
+    orig_reach_all = reach_orig([MAIN] + extra)
     extra_set = set(extra)
-    under_others = reach([c for r in extra if expands(r) for c in callees[r]]) & extra_set
+    under_others = reach_orig([c for r in extra if expands(r) for c in orig[r]]) & extra_set
     extra_top = [r for r in extra if r not in under_others]
+
+    # Host code no native function's C++ reaches (the app's start-up, our
+    # threads) that names guest functions: roots too.
+    host_targets = collections.defaultdict(set)
+    for did, ts in host.items():
+        for c, k in ts:
+            c2 = folded.get(c, c)
+            if c2 in nodes:
+                host_targets[c2].add(cdefs[did])
+    root_states = [target(MAIN, "direct")] + [target(r, "direct") for r in extra]
+    host_states = [target(c, "native") for c in sorted(host_targets)]
+    all_roots = root_states + host_states
+
+    from_main_states = walk([target(MAIN, "direct")])
+    from_main = {f for f, _ in from_main_states}
+    reach_states = walk(all_roots)
+    reach_all = {f for f, _ in reach_states}
+    without_host = {f for f, _ in walk(root_states)}
+    host_only = reach_all - without_host
 
     seeds = {HLSL} | {f for f in nodes if excluded_address(addr_of[f])}
     seeds &= nodes
     outside = reach_all
     # Reach without entering the seeds: what the game's own code reaches. A
-    # function in the ranges that game code (not ours) calls directly is
-    # the game's ("checked against its callers first": the linker shares
-    # small functions between the library and the game), and so is what it
-    # reaches; repeated until nothing changes.
+    # function in the ranges that game code still running as PPC calls
+    # directly, or that our C++ calls, is the game's ("checked against its callers first": the
+    # linker shares small functions between the library and the game), and
+    # so is what it reaches; repeated until nothing changes.
     promoted = set()
-
-    def reach_avoid(roots):
-        out, stack = set(), list(roots)
-        while stack:
-            f = stack.pop()
-            if f in out or f not in nodes or (f in seeds and f not in promoted):
-                continue
-            out.add(f)
-            if not expands(f):
-                continue
-            stack.extend(c for c in callees[f] if c not in out)
-        return out
-
-    # Game code that still runs as PPC: reached from a root without passing
-    # through ours (the movie wrapper, say, is reached only through the
-    # movie class's native slots, so its calls into the library don't count).
-    live, stack = set(), [MAIN] + extra
-    while stack:
-        f = stack.pop()
-        if f in live or f not in nodes:
-            continue
-        live.add(f)
-        if expands(f) and (f == MAIN or f in extra or not ours(f)):
-            stack.extend(c for c in callees[f] if c not in live)
-
     while True:
-        game = reach_avoid([MAIN] + extra)
+        game_states = walk(all_roots, block=lambda f: f in seeds and f not in promoted)
         new = set()
-        for g in game:
-            if ours(g) or g in seeds or g not in live:
+        for g, v in game_states:
+            if not expands(g):
                 continue
-            for c, kind in callees[g].items():
-                if kind == "direct" and c in seeds and c != HLSL and c not in promoted:
+            if v == "o":
+                calls = (c for c, kind in orig[g].items() if kind == "direct")
+            else:  # our C++ calling it (not a table it names)
+                calls = (c for c, kind in native.get(g, {}).items() if kind != "table")
+            for c in calls:
+                if c in seeds and c != HLSL and c not in promoted:
                     new.add(c)
         if not new:
             break
         promoted |= new
+    game = {f for f, _ in game_states}
+    native_into_seeds = sorted({(g, c) for g, v in game_states if v == "n"
+                                for c in native.get(g, {}) if c in seeds and c not in promoted})
     excluded = outside - game
     range_called = sorted(promoted, key=lambda n: addr_of[n])
 
@@ -529,6 +627,37 @@ def build(image_path=IMAGE, quiet=True):
     reachable = reach_all
     st = {f: state(f) for f in reachable}
     unported = {f for f in reachable if st[f] == "unported"}
+
+    # Callers along the edges the walk took.
+    callers_state = collections.defaultdict(set)
+    for s_ in reach_states:
+        for c, k in out_edges(s_):
+            if c in nodes:
+                t = target(c, k)
+                if t in reach_states:
+                    callers_state[t].add(s_)
+    callers_all = collections.defaultdict(set)
+    for t, ss in callers_state.items():
+        for s_ in ss:
+            callers_all[t[0]].add(s_[0])
+
+    # Ours functions whose original body still runs: reached in the "o"
+    # variant (an unported caller, a guest call or vtable with no override
+    # behind it, or an __imp__ call from our C++).
+    ours_orig = {f for f, v in game_states if v == "o" and st.get(f) == "ours"
+                 and expands(f) and not HELPER.match(f)}
+    ours_orig_from_native = {f for f in ours_orig
+                             if any(v == "n" for _, v in callers_state[(f, "o")])}
+
+    # The callees each function has in the graph: our C++'s for ours with
+    # C++ (an override or ITC_NATIVE_RUNNING), the original's otherwise.
+    eff = {}
+    for f in nodes:
+        if ours(f) and (f in overrides or f in native):
+            eff[f] = native.get(f, {})
+        else:
+            eff[f] = orig[f]
+    callees = eff
 
     # Unported subgraph: SCCs, frontier, ancestors.
     succ = {f: [c for c in callees[f] if c in unported] for f in unported}
@@ -583,45 +712,47 @@ def build(image_path=IMAGE, quiet=True):
             frees[next(iter(csucc[c]))] += size_of[c]
     frees_of = {f: frees[comp[f]] for f in unported}
 
-    # Unported functions reached only through ours (traversal stopped at
-    # every ours function other than the roots): either native code still
-    # calls them (a guest call or a fallback, which names them in src/ by
-    # name or address, or a guest vtable call, which doesn't), or the
-    # native port left the call out.
-    roots = [MAIN] + extra
-    root_set = set(roots)
-    under_unported, stack = set(), list(roots)
-    while stack:
-        f = stack.pop()
-        if f in under_unported or f not in nodes:
-            continue
-        under_unported.add(f)
-        if f in root_set or (st.get(f) == "unported"):
-            stack.extend(c for c in callees[f] if c not in under_unported)
+    # Unported functions reached only through ours (the walk stopped at
+    # every ours function other than the roots): our C++ still calls them
+    # (a guest call, a fallback for a branch, a vtable it stores), or an ours
+    # function's original body does (no override behind a guest call, or an
+    # unported caller of a function whose adapter was removed).
+    root_set = set(all_roots)
+    under_unported = {f for f, _ in walk(
+        all_roots, expand=lambda s_: s_ in root_set or st.get(s_[0]) == "unported")}
     behind_ours = unported - under_unported
-    named = set()
-    src = os.path.join(ROOT, "itc_recomp", "src")
-    for d_, _, files in os.walk(src):
-        if os.path.basename(d_) == "harnesses":
-            continue
-        for n in files:
-            if n.endswith((".cpp", ".h", ".inc")):
-                with open(os.path.join(d_, n), errors="replace") as f:
-                    text = f.read()
-                for x in re.findall(r"sub_([0-9A-F]{8})", text):
-                    named.add(f"sub_{x}")
-                for x in re.findall(r"0x(8[0-9A-Fa-f]{7})", text):
-                    a = int(x, 16)
-                    if a in name_of:
-                        named.add(name_of[a])
+    behind_native = {f for f in behind_ours
+                     if any(v == "n" for _, v in callers_state[(f, "o")])}
 
-    callers_all = collections.defaultdict(set)
-    for f in reachable:
-        for c in callees[f]:
-            callers_all[c].add(f)
+    # Originals no longer called: reachable through the original's graph
+    # (outside the replaced libraries) but not through ours. Grouped by the
+    # native function whose C++ left the call out: its original's callees
+    # no longer reached, and what hangs only under them.
+    orig_game = reach_orig([MAIN] + extra, block=lambda f: f in seeds)
+    lost = orig_game - reachable
+    lost_groups = []
+    for f, v in sorted(reach_states, key=lambda s_: addr_of[s_[0]]):
+        if v != "n" or not expands(f):
+            continue
+        direct = sorted((c for c in orig[f] if c in lost), key=lambda n: addr_of[n])
+        if not direct:
+            continue
+        under = reach_orig(direct, block=lambda c: c not in lost)
+        lost_groups.append({"caller": f, "direct": direct, "under": under,
+                            "not_ours": sum(1 for c in under if not ours(c)),
+                            "lines": sum(lines[c] for c in under),
+                            "seen": sum(1 for c in under if c in seen)})
+    lost_groups.sort(key=lambda g: (-len(g["under"]), addr_of[g["caller"]]))
+
+    # 82575B08-8257FFFF: the movie library's end disagrees between
+    # b7-loop.md (82575B07) and movies.md; what's reached there, by whom.
+    gap = sorted((f for f in reachable if 0x82575B08 <= addr_of[f] <= 0x8257FFFF),
+                 key=lambda n: addr_of[n])
+    gap_callers = {f: sorted(callers_all[f], key=lambda n: addr_of[n]) for f in gap}
 
     return {
         "fn": fn, "addr_of": addr_of, "nodes": nodes, "callees": callees,
+        "orig_callees": orig, "native": native, "native_via": native_via,
         "lines": lines, "indirect": indirect, "imports": imports,
         "members": members, "folded": folded, "seen": seen, "status": status,
         "table": table, "ours": ours, "from_main": from_main, "extra": extra,
@@ -633,7 +764,13 @@ def build(image_path=IMAGE, quiet=True):
         "succ": succ, "pred": pred, "range_called": range_called,
         "image": image is not None, "orphan_data_pointers": orphan_data_pointers,
         "orphan_targets": orphan_targets, "data_scanned": data_scanned,
-        "behind_ours": behind_ours, "named_in_src": named,
+        "behind_ours": behind_ours, "behind_native": behind_native,
+        "ours_orig": ours_orig, "ours_orig_from_native": ours_orig_from_native,
+        "orig_callers": {f: callers_state[(f, "o")] for f in ours_orig},
+        "host_targets": host_targets, "host_only": host_only,
+        "orig_reach_all": orig_reach_all, "lost": lost, "lost_groups": lost_groups,
+        "gap": gap, "gap_callers": gap_callers, "native_into_seeds": native_into_seeds,
+        "src_stats": src_stats, "overrides": overrides,
     }
 
 
@@ -812,14 +949,35 @@ def write_report(m, path, tsv_path):
       f"never seen {len(unported) - seen_unp}; {sum(m['lines'][f] for f in unported)} "
       f"generated lines.")
     bo = m["behind_ours"]
-    bo_named = sum(1 for f in bo if f in m["named_in_src"])
     w(f"- Of the unported, {len(unported) - len(bo)} hang under unported code (or a root); "
-      f"**{len(bo)} are reached only through ours** ({sum(1 for f in bo if f in m['seen'])} "
-      f"seen in play): the original's callees of native functions. Native code may "
-      f"still call them (a guest call or fallback: {bo_named} are named in `src/` by "
-      f"name or address; a guest vtable call names nothing) or may have left the call "
-      f"out (plugged-in data), in which case they're no work; the TSV's `behind_ours` "
-      f"and `named` columns list them.")
+      f"{len(bo)} are reached only through ours ({sum(1 for f in bo if f in m['seen'])} "
+      f"seen in play), {len(m['behind_native'])} of them called by our C++ itself (a "
+      f"guest call by name or address, a fallback for a branch, a table or vtable it "
+      f"stores) and the rest under those; the TSV's `behind_ours` column lists them.")
+    ss = m["src_stats"]
+    nat_fs = [f for f in m["native"] if st.get(f) == "ours"]
+    w(f"- Ours functions' edges come from our C++ (`src_edges.py`): {ss['defs']} "
+      f"definitions in {ss['files']} files of `src/` (harnesses left out), "
+      f"{ss['entries']} functions with C++ (an override or `ITC_NATIVE_RUNNING`), "
+      f"{len(nat_fs)} of them reachable. Ours functions without C++ (Merged, or "
+      f"whose print names no address) keep the original's edges where something "
+      f"still reaches them.")
+    oo, oon = m["ours_orig"], m["ours_orig_from_native"]
+    w(f"- Ours functions whose original body is still reachable: {len(oo)} ({len(oon)} "
+      f"from our C++: an `__imp__` fallback when the native C++ declines, or a guest "
+      f"call to a function with neither override nor C++); listed below.")
+    w(f"- Host code no native function's C++ reaches but that names guest functions "
+      f"(constants defined but not resolved to a user, a few hooks' helpers): "
+      f"{sum(len(v) for v in [m['host_targets']])} functions named, taken as roots; they "
+      f"add {len(m['host_only'])} reachable functions.")
+    w(f"- Before 2026-11-14's fix the graph followed the original's edges through ours "
+      f"too: {len(m['orig_reach_all'])} reachable. **Originals no longer called: "
+      f"{len(m['lost'])}** ({sum(1 for f in m['lost'] if not m['ours'](f))} not ours, "
+      f"{sum(1 for f in m['lost'] if m['ours'](f))} ours whose work our C++ took in; "
+      f"{sum(m['lines'][f] for f in m['lost'])} lines, "
+      f"{sum(1 for f in m['lost'] if f in m['seen'])} seen in play): reachable through the "
+      f"original's graph (outside the replaced libraries), not through ours; below, "
+      f"by the native function that left the call out.")
     w(f"- Frontier (ready now): {len(m['frontier'])} functions.")
     w(f"- Reachable functions calling imports: {calling_imports} ({unp_imports} unported).")
     if m["image"]:
@@ -900,6 +1058,80 @@ def write_report(m, path, tsv_path):
     w(", ".join(f"`{f}` ({m['state'].get(f, '?')})" for f in tops[:80])
       + (f", ... {len(tops) - 80} more" if len(tops) > 80 else ""))
     w("")
+    addr_ = addr
+    w("## Originals no longer called")
+    w("")
+    w("Reachable through the original's graph but not through ours: the native "
+      "function's C++ left the call out (plugged-in data, a dropped call, work "
+      "merged into the C++). Grouped by that native function: its original's "
+      "callees no longer reached, then how many functions hang only under them "
+      "(a function under several groups counts in each; \"not ours\" leaves out "
+      "those ours already, mostly Merged). Candidates for Dropped "
+      "or \"Not called\" rows, for the user's review; the TSV's `lost` column "
+      "lists them all.")
+    w("")
+    w("| Native caller | File | Status | Lost callees | Under them | Not ours | Lines | Seen |")
+    w("|---|---|---|---|---|---|---|---|")
+    for g in m["lost_groups"]:
+        f = g["caller"]
+        direct = ", ".join(f"`{c}`" for c in g["direct"][:8]) + \
+            (f", ... {len(g['direct']) - 8} more" if len(g["direct"]) > 8 else "")
+        w(f"| `{f}` | {m['table'].get(f, 'unmapped')} | {m['status'].get(f, '')} | "
+          f"{direct} | {len(g['under'])} | {g['not_ours']} | {g['lines']} | {g['seen']} |")
+    w("")
+    w("## Ours functions whose original body is still reachable")
+    w("")
+    w("Ours by their rows, but something reaches their recompiled body: an "
+      "`__imp__` fallback in our C++ (taken when the native C++ declines: a "
+      "block not in our heap, a flag of the callee's off), a guest call to a "
+      "function with no override and no C++, or an unported caller of one "
+      "without an override. Each with its callers in that variant (native ones "
+      "marked `n`):")
+    w("")
+    items = []
+    for f in sorted(m["ours_orig"], key=lambda n: addr_[n]):
+        cs = sorted(c + (" n" if v == "n" else "") for c, v in m["orig_callers"][f])
+        items.append(f"`{f}` ({m['status'].get(f, '')}; from {', '.join(cs[:3])}"
+                     + (" ..." if len(cs) > 3 else "") + ")")
+    w(", ".join(items))
+    w("")
+    w("## Reached past the movie library's end (82575B08-8257FFFF)")
+    w("")
+    gap = m["gap"]
+    gap_set = set(gap)
+    entered = collections.defaultdict(set)
+    for f in gap:
+        for c in m["gap_callers"][f]:
+            if c not in gap_set:
+                entered[c].add(f)
+    w(f"`b7-loop.md` ends the movie library's first range at 82575B07; "
+      f"`movies.md` at 8257FFFF. Reachable there: {len(gap)} functions "
+      f"({sum(1 for f in gap if st[f] == 'ours')} ours, "
+      f"{sum(1 for f in gap if st[f] == 'unported')} unported, "
+      f"{sum(1 for f in gap if st[f] == 'excluded')} reached only through the "
+      f"replaced libraries). Entered from {len(entered)} functions outside it:")
+    w("")
+    for c in sorted(entered, key=lambda n: addr[n]):
+        fs = sorted(entered[c], key=lambda n: addr[n])
+        w(f"- `{c}` ({st.get(c, '?')}, {m['table'].get(c, 'unmapped')}): "
+          + ", ".join(f"`{f}` ({st[f]})" for f in fs[:6])
+          + (f", ... {len(fs) - 6} more" if len(fs) > 6 else "") + ".")
+    w("")
+    w("Each function there, with its callers: "
+      + "; ".join(f"`{f}` ({st[f]}) from "
+                  + ", ".join(f"`{c}`" for c in m["gap_callers"][f][:3])
+                  + (" ..." if len(m["gap_callers"][f]) > 3 else "")
+                  for f in gap) + ".")
+    w("")
+    if m["native_into_seeds"]:
+        w("## Our C++ naming replaced-library functions")
+        w("")
+        w("Tables and vtables our C++ stores whose words land in the replaced "
+          "libraries, and calls into `sub_822B8F10` (the HLSL compiler's entry, "
+          "overridden by the stored shaders); not counted as the game's:")
+        w("")
+        w(", ".join(f"`{g}` -> `{c}`" for g, c in m["native_into_seeds"]))
+        w("")
     if m["range_called"]:
         w("## Replaced-library functions with direct callers in the game's code")
         w("")
@@ -920,7 +1152,7 @@ def write_report(m, path, tsv_path):
             cluster_of[f] = i
     with open(tsv_path, "w") as out:
         out.write("function\taddress\tstate\treach\tseen\tfile\tlines\tunblocks\tfrees\t"
-                  "frontier\tcluster\tbehind_ours\tnamed\tfolded\timports\tcallees\n")
+                  "frontier\tcluster\tbehind_ours\tlost\tfolded\timports\tcallees\torig_callees\n")
         for f in sorted(m["nodes"], key=lambda n: addr[n]):
             r = "main" if f in from_main else ("extra" if f in reachable else "no")
             out.write("\t".join([
@@ -929,9 +1161,11 @@ def write_report(m, path, tsv_path):
                 str(m["lines"][f]), str(m["unblocks"].get(f, "")),
                 str(m["frees"].get(f, "")), "1" if f in m["frontier"] else "0",
                 str(cluster_of.get(f, "")), "1" if f in m["behind_ours"] else "0",
-                "1" if f in m["named_in_src"] else "0", ",".join(m["members"][f][1:]),
+                "1" if f in m["lost"] else "0", ",".join(m["members"][f][1:]),
                 ",".join(sorted(m["imports"][f])),
-                ",".join(f"{c}:{k[0]}" for c, k in sorted(m["callees"][f].items())),
+                ",".join(f"{c}:{KIND[k]}" for c, k in sorted(m["callees"][f].items())),
+                ",".join(f"{c}:{KIND[k]}" for c, k in sorted(m["orig_callees"][f].items()))
+                if m["callees"][f] is not m["orig_callees"][f] else "",
             ]) + "\n")
 
 

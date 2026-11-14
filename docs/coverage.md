@@ -191,7 +191,7 @@ checked over several sessions.
 Since 2026-11-14 B7's goal counts every function reachable from `main`,
 seen in play or not ("B7's goal" in `loops/b7-loop.md`), so the
 coverage list no longer bounds the work. `itc_recomp/tools/static_map.py`
-(~25 s, reports only) builds the static call graph and writes
+(~30 s, reports only) builds the static call graph and writes
 `loops/static-map.md` (made fresh on every run; never edit it) and a full
 dump, `itc_recomp/coverage/static_map.tsv` (not committed).
 
@@ -205,28 +205,73 @@ dump, `itc_recomp/coverage/static_map.tsv` (not committed).
   the address (so a vtable's methods have its constructor as a caller).
   Jump-table cases the recompiler split off (a switch case that is a call,
   referenced by nothing else) are folded into their parent.
+- **Our C++'s edges** (since 2026-11-14, `itc_recomp/tools/src_edges.py`;
+  before, ours was followed through the original's edges, so 3,544 of
+  4,170 unported functions were reached only as the original's callees of
+  native functions, many of which our C++ no longer calls): a function
+  that's ours takes its outgoing edges from `src/` (harnesses left out).
+  A small preprocessor expands `src/`'s own macros (so macro-made adapters
+  are seen with their addresses) and a brace parser splits the files into
+  definitions: functions (a lambda belongs to the function it's in),
+  namespace-level variables (constants, step tables) and enumerators. A
+  name in a body links to the definitions of that name the file can see
+  (itself, the headers it includes, or a `.cpp` including a header both
+  see that declares the name). A native function's C++ is its override
+  and every definition holding `ITC_NATIVE_RUNNING("sub_X ...")`, followed
+  through the plain C++ they call; reaching another native function's C++
+  is an edge to that function. Targets: `sub_X` (through the function
+  table), `__imp__sub_X` (the original's body; never the function's own,
+  the flag-off fallback) and hexadecimal constants (a guest call by
+  address, a function pointer, or a table or vtable it stores, scanned as
+  above; a `case` label or a constant beside `==` or `!=` only compares).
+  Left out: statements under a flag off by default (`if (ITC_FLAG(x))` with
+  `x` off, `if (!ITC_FLAG(x))` with `x` on, or the same through a function
+  that only returns the flag), the arguments of `ITC_LOG_*`, and
+  `src/debug/`'s functions other than overrides. An unported function
+  keeps the original's edges; an ours function without C++ (Merged) keeps
+  the original's, followed where something still reaches it; one reached
+  through an `__imp__` call runs its original.
 - **Roots:** `main` (`sub_82090108`), then every function seen in play that
-  `main` doesn't reach and isn't Dropped (as of 2026-11-14 all of them sit
-  under `xstart`: the C runtime's start-up). Ours is followed through
-  (native code mirrors the original), Dropped isn't.
+  the original's graph doesn't reach from `main` and isn't Dropped (as of
+  2026-11-14 all of them sit under `xstart`: the C runtime's start-up), and
+  the guest functions named by C++ that no native function's C++ reaches
+  (host code; they add 2 functions). Dropped isn't followed.
 - **States:** ours as `b7_status.py` decides it; excluded, the replaced
   libraries (`sub_822B8F10`, the movie library's ranges) and what only
-  they reach, unless unported game code still running as PPC calls them
-  directly; unported, the rest (Wrapped included).
+  they reach, unless game code still running as PPC calls them directly or
+  our C++ calls them; unported, the rest (Wrapped included).
 - **Output:** totals; blockers ranked by how many unported functions above
   them wait on them (the loop's leads are picked by it); the frontier
   (unported functions whose callees are all ours, excluded or imports)
-  in clusters; and the unmapped areas. `b7_groups.py --static` gives a
-  never-seen function's group, readiness and blockers from the same graph.
+  in clusters; the unmapped areas; "Originals no longer called"
+  (reachable through the original's graph, not through ours, grouped by
+  the native function whose C++ left the call out: candidates for Dropped
+  rows, for the user's review); the ours functions whose original body is
+  still reachable (mostly `__imp__` fallbacks taken when the native C++
+  declines); and what's reached at `82575B08`-`8257FFFF` (as of
+  2026-11-14: 154 functions, all reached from game code, the Xbox Live
+  and XAM wrappers of `system-services.md` and their library; none only
+  through the movie library, so its first range ends at `82575B07`, as
+  `loops/b7-loop.md` has it, not at `8257FFFF`). `b7_groups.py --static`
+  gives a never-seen function's group, readiness and blockers from the
+  same graph.
 
 Gaps: a table is scanned from the address code builds to the next address
 anything points at (or 8 words with no pointer), so a table reached only
 through a pointer chain deeper than two, or built at run time, is missed
 (~180 function words in data no code-built address reaches); addresses
-computed some other way (an index into a table of offsets) are missed; and
-callees of ours are counted whether or not the native code still calls
-them (the report counts those reached only through ours separately). The
-graph over-approximates: a vtable brings in every method, used or not.
+computed some other way (an index into a table of offsets, `kBase +
+offset` in C++) are missed. The graph over-approximates: a vtable brings
+in every method, used or not, and a table our C++ names only to look
+addresses up in still counts. Our C++ is read per definition, not per
+branch: a definition shared by several native functions (119 of them, for
+331 functions, such as `type67_modes::RunInit` for 18 Inits) gives each
+all its edges, and a name two visible definitions share links to both. A
+function's own `__imp__` call is always left out, also where the native
+C++ declines for inputs never seen in play (XGCompressSurface's DXN and
+CTX1 formats, say), so those originals' callees are missed. Guest calls
+through a vtable read at run time name nothing, but the vtable's methods
+are already edges from whatever builds it.
 
 ## Results
 
