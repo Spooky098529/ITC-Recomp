@@ -16,8 +16,19 @@ file's history. What's left to see in a drive, from every run:
   range `82481A70`-`82575B07`, reached only through a pointer, no
   direct caller in the game's own code: not mapped, "Rules that still
   hold").
+- The user's calls (2026-11-14, asked by the lead): the worker pools
+  follow XAudio's call (the kernel imports called as the original
+  does, host objects once every user is native); `Device::Clear`'s
+  worker by the graphics rule (native, packets Dropped, device state
+  kept). Added to "Precedent first".
 - Subsystem 1 of 10: the four in-race screens never seen in play
-  (`sub_82211390` and the rest, the lead's line deleted). Step: map.
+  (`sub_82211390` and the rest, the lead's line deleted). Mapped
+  d71b917e: `race-screens-unseen.md`, 99 rows (all new, none seen in
+  play), 11 ready groups; `SplitResults::Draw` and `Kind6Menu::Update`
+  blocked (the network battle's sends, the network manager, the race
+  dialog's never-seen save calls); 1 lead added; check passed. Kind 6
+  is the Xbox Live time attack's race (the 2026-11-12 Live call
+  followed). Step: migration.
 
 ## Done
 

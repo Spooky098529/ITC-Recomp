@@ -524,6 +524,9 @@ Calls so far for decisions the loop meets often:
   `KeWaitFor*`, `KeReleaseSemaphore` and the rest) exactly as the
   original does; host objects later, once every user is native
   (2026-10-29).
+  The game's own framework worker pools (`WorkerPool::Create`
+  `sub_82094F30` and the rest: their event, critical sections and
+  threads) follow the same call (the user's call, 2026-11-14).
 - The kernel's clocks a subsystem waits on: answered from the host's
   steady clock, no flag, recompiled and native callers sharing one
   clock (GetTickCount, 2026-10-23; QueryPerformanceCounter at the
@@ -534,6 +537,10 @@ Calls so far for decisions the loop meets often:
   class itself stays recompiled for the others.
 - The graphics: native if the renderer needs it, else Dropped (fence
   waits, cache flushes, packets nothing reads).
+  `Device::Clear`'s worker `sub_8229FC40` too: native, its packets
+  Dropped, the device state it updates (the bound surfaces, the dirty
+  flags) kept exactly as the original leaves it (the user's call,
+  2026-11-14).
 - XACT is translated (2026-10-23), the music too: it is XACT banks
   loaded through the sound manager (`Music::Play`,
   `AudioManager::LoadBank`), not a separate player to replace with a

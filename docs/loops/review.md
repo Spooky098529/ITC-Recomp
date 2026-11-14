@@ -15,6 +15,19 @@ When the user has reviewed a run's section, its heading gets
 
 - `sub_82562FF0` dropped from `leads.md` (the movie library's range,
   reached only through a pointer).
+- The user's calls (2026-11-14): the worker pools follow XAudio's
+  call; `Device::Clear`'s worker by the graphics rule (both in
+  "Precedent first").
+- The in-race screens never seen's map (d71b917e,
+  `race-screens-unseen.md`, 99 new rows): race kind 6 is the Live time
+  attack's race (its screen after the race is the leaderboard), so
+  `race-states.md`'s "system link" note on kind 6 is probably the
+  network battle (not edited); three jump-table cases split off by the
+  recompiler (`sub_8220FE3C`, `sub_8221E0FC`, `sub_8221D2B4`);
+  `known-data.md` (the screens' globals, `[0x826C6AD4]`, the session
+  object `[0x82816E3C]`'s fields); `race-screens.md`'s makers point to
+  the new file. Groups worked out by hand: `b7_groups.py` doesn't read
+  functions never seen in play.
 
 ## Run 2026-11-13 12:31 (`b7-loop-13-11-26`)
 
