@@ -57,8 +57,15 @@ file's history. What's left to see in a drive, from every run:
   but the read's expected group (20 of 20); races 21-28 s at 40, 0
   errors; nothing uncommitted. Its validation skipped (the user's
   call, 2026-11-14: straight to the bypass; its 10 functions are
-  Live or split screen work the bypass makes unreachable). Step: the
-  bypass (a lead without mapping).
+  Live or split screen work the bypass makes unreachable). The bypass
+  (a lead without mapping), b77b4b39..4499727c: `TitleScreen::MainMenu`
+  items 3 (Xbox Live) and 4 (split screen) play the refusal cue and
+  stop, behind `--multiplayer_menu_items` (off by default);
+  `Mode::Create` hands type 12 to the original without the flag;
+  harnesses 0 differing outside the two bypass groups; race 34 s at
+  40, 0 errors; a synthetic pad replay checked both items, flag off
+  and on. Static map: reachable 11,617 -> 11,011, unported 3,703 ->
+  3,232 (never seen 3,059 -> 2,588). Four questions for the user.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads

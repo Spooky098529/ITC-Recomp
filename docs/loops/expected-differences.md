@@ -308,6 +308,13 @@ were at 0.
 | `sub_8223F778` Type8ListScreen::SetUpRace | the traffic records' unwritten bytes | 2 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s; the same words) | for review (2026-11-13 12:31 run) |
 | `sub_8223E760` Type8ColorListScreen::SetUpRace | the traffic records' unwritten bytes | 5 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s) | for review (2026-11-13 12:31 run) |
 
+### `title-screen.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82222700` TitleScreen::MainMenu | multiplayer items bypassed (expected to differ) | 4 of 400 | The multiplayer bypass on purpose (the user's call, 2026-11-14): items 3 and 4 play the refusal cue and stop; the original's page-object writes, stored item word and message are left out | for review (2026-11-14 05:01 run) |
+| `sub_82222700` TitleScreen::MainMenu | item 3 or 4 accepted, bypassed (expected to differ) | 100 of 100 | The same bypass, with every case accepting item 3 or 4 | for review (2026-11-14 05:01 run) |
+
 ### `network-mode.md`
 
 | Function | Group | Differ | Reason | Review |
