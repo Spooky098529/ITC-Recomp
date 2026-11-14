@@ -3424,14 +3424,24 @@ void UnseenKind6Pages(Context& h, const MovieWorld& w) {
     guest::StoreU32(h.base, k + 320, 1);
     guest::StoreU32(h.base, s + 144, 1);
     guest::StoreU32(h.base, k + 352, r.Below(4) == 0 ? 1 : 0);
-    // B's QuestionPage and MessagePage and the +352 block may clear +320:
-    // not before A's read pages (their read's start left out). A's SlotPage with blocked
-    // mappers; others as they come.
+    // B's QuestionPage and MessagePage and the +352 block may clear +320
+    // before A's read pages: half the time not (the read's start left
+    // out), else the read's start allowed (the leaderboard read is native
+    // on both sides, answered as no Live: the old results none or a block
+    // of the C runtime heap, which it frees).
+    // A's SlotPage with blocked mappers; others as they come.
     const uint32_t a = guest::LoadU32(h.base, k + 40);
     const uint32_t b = guest::LoadU32(h.base, k + 208);
     if (a == 7 || a == 12) {
-      if (b == 1 || b == 3) guest::StoreU32(h.base, k + 208, 4);
-      guest::StoreU32(h.base, k + 352, 0);  // its block clears +320 too
+      if (r.Below(2) == 0) {
+        if (b == 1 || b == 3) guest::StoreU32(h.base, k + 208, 4);
+        guest::StoreU32(h.base, k + 352, 0);  // its block clears +320 too
+      } else {
+        if (r.Below(2) == 0) guest::StoreU32(h.base, k + 320, 0);
+        guest::StoreU32(h.base, s + 144, r.Below(2));
+        guest::StoreU32(h.base, rs::kKind6Results,
+                        r.Below(2) == 0 ? 0 : memory::crt::OperatorNewArray(h.base, 64).value_or(0));
+      }
     }
     if (a == 2) {
       for (uint32_t c = 0; c < 4; c++) guest::StoreU32(h.base, rs::kMapperEntries + 8 * c + 4, 1);
@@ -3515,10 +3525,23 @@ void UnseenKind6Pages(Context& h, const MovieWorld& w) {
       {"Kind6Menu::Update (sub_8221F1E8)", 600, &update, __imp__sub_8221F1E8,
        hooks::RaceScreensUnseenKind6Update, 304, 128, kNo},
   };
+  // Update's cases may leave a results block of the heap the read didn't
+  // free (its read not started): compared as kept, freed, the word 0.
+  auto update_outputs = [&](Outputs& out) {
+    const uint32_t now = guest::LoadU32(h.base, rs::kKind6Results);
+    const bool heap = now != 0 && now != res;
+    out.Word(heap ? 1 : 0);
+    if (heap) {
+      memory::crt::OperatorDeleteArray(now);
+      guest::StoreU32(h.base, rs::kKind6Results, 0);
+    }
+    outputs(out);
+  };
   for (const Spec& sp : specs) {
     FrameSpec spec{sp.frame, sp.saves, sp.skip};
     spec.list_world = &list_world;
-    spec.after = outputs;
+    spec.after = sp.setup == &update ? std::function<void(Outputs&)>(update_outputs)
+                                     : std::function<void(Outputs&)>(outputs);
     MovieGroup(h, w, sp.name, sp.cases, *sp.setup, sp.recompiled, sp.native, spec);
   }
 
