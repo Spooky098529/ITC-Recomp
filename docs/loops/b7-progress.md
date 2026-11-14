@@ -238,9 +238,20 @@ file's history. What's left to see in a drive, from every run:
   commits by subagents one at a time; every harness 0 differing but
   the two traffic-records groups (`Type7ListScreen::SetUpRace`'s new,
   7 of 12, in `expected-differences.md`); races 33-38 s at 40, 0
-  errors; ~600 new cases. Validation agent running on part 2.
+  errors; ~600 new cases. Part 2 validated: `itc_5377` (race 46 s at
+  180, the harnesses 132 s; 0 errors, every harness 0 differing
+  outside the expected groups), 74 of 74 harness lines; none in the
+  race or the replay `itc_5378` (ok): 74 to drive. Recorded; subsystem
+  8 done.
+- Subsystem 9 of 10: the type 8 mode's panel screen and list screens
+  (`sub_822386F0`, `sub_82238368`, `sub_82238468`; `sub_8223F140` and
+  the rest; built on the type 6 and 7 screens' bases, none seen in
+  play); their lines deleted from `leads.md`. Mapping agent running.
 
 ## Done
+
+- The type 6 and 7 list screens: 174 rows in `type67-screens.md` ours,
+  a15c7b09..a29897be; validated.
 
 - The type 6 and 7 modes' small pieces: 16 rows and 3 blockers ours,
   `UnloadAll` Native, f83e3ee2..6cb9126c; validated.
@@ -320,5 +331,6 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
   known 354, unknown 271).
 - After the stand's setters: ours 6114, work left 676.
 - After the type 6 and 7 small pieces: ours 6160, work left 676.
+- After the list screens: ours 6335, work left 676.
 
 ## Stopped
