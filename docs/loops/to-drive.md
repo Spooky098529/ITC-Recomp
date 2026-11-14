@@ -409,6 +409,26 @@ list, the node screen, the panel screens):
 - `sub_82246BE0` Type7Screens::~Type7Screens
 - `sub_82246C40` Type7Screens::DeletingDestructor
 
+The type 8 mode's screens (`itc_5394`, `itc_5395`, ok; the type 8 mode,
+probably the two-player mode, the title's main menu item 4): every
+function in `type8-screens.md` with Status Overridden or Native (126,
+listed there), and:
+
+- `sub_8224E878` CarPanelBase::SetCarName
+- `sub_8224E490` Panel6C::SetStats
+- `sub_8224D7E0` CarPanelBase::~CarPanelBase
+- `sub_8224EBB0` ConfirmPanel::ConfirmPanel
+- `sub_8224B750` PanelSetPair::PanelSetPair
+- `sub_8224B830` PanelSetPair::~PanelSetPair
+- `sub_8224CA30` PanelSetPair::DeletingDestructor
+- `sub_8224CAE0` PanelSetPair::Build
+- `sub_822498C0` PanelSetPair::Reset
+- `sub_822499F0` PanelSetPair::Open
+- `sub_8224CA80` PanelSetPair::HandleInput
+- `sub_8224CF20` PanelSetPair::Update
+- `sub_82249B60` PanelSetPair::Picked
+- `sub_82105678` SaveData::TwoPlayerBlock
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the

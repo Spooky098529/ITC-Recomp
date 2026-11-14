@@ -258,9 +258,20 @@ file's history. What's left to see in a drive, from every run:
   rows and `TwoPlayerBlock`; `--native_type8_screens`; every harness 0
   differing but two new traffic-records groups (2 of 12 and 5 of 12,
   `expected-differences.md`); races 34-38 s at 40, 0 errors; five
-  subagents one at a time. Validation agent running.
+  subagents one at a time. Validated: `itc_5394` (race 45 s at 180,
+  the harnesses 133 s; 0 errors, every harness 0 differing outside the
+  expected groups), 140 of 140 harness lines; none in the race or the
+  replay `itc_5395` (ok): to drive. Recorded; subsystem 9 done.
+- Subsystem 10 of 10: the type 8 mode itself (its Init `sub_8223D5D8`,
+  its vtable's slots, the first screen's Init, the +9792 machine, the
+  block's constructor and destructor; none seen in play); its line
+  deleted from `leads.md`. Mapping agent running.
 
 ## Done
+
+- The type 8 mode's screens: `type8-screens.md` 128 of 128, with 13
+  `car-list.md` rows, `--native_type8_screens`, 138f7c8c..c7628060;
+  validated.
 
 - The type 6 and 7 list screens: 174 rows in `type67-screens.md` ours,
   a15c7b09..a29897be; validated.
@@ -344,5 +355,6 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
 - After the stand's setters: ours 6114, work left 676.
 - After the type 6 and 7 small pieces: ours 6160, work left 676.
 - After the list screens: ours 6335, work left 676.
+- After the type 8 screens: ours 6477, work left 676.
 
 ## Stopped

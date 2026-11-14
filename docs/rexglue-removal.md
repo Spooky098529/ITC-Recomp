@@ -2897,6 +2897,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | Cleanup leads (no mapping, not counted): the tuning pages' blockers (`IsSlotAvailable`, the paint and light kit bars) with `RefreshInterior` and commands 10, 13, 14; `MakeModel` and `FitSelectedCar` called directly, their adapters removed | `tuning-pages.md`, `tuning-screen.md`, `stand-models.md` | 8 Native, 2 adapters removed | (existing flags) |
 | 2026-11-13 | The type 6 and 7 modes' small pieces (the controller options' steps, the group pair's, panel screens' and panel sets' destructors, `SingleGroup`), with `DecalImages::UnloadAll` Native | `type6-type7-modes.md`, `type67-screens.md`, `car-list.md`, `archive.md` | 16 new rows and 3 blockers ours | (existing flags) |
 | 2026-11-14 | The type 6 and 7 list screens' and node screen's pages and steps (the six tables built on first use, the list part, the node tables, the color list, the panel screens, the screen blocks' destructors; none seen in play) | `type67-screens.md` | 174 rows ours (2 Merged), with `CourseRecords::Of` | (`--native_type67_screens`) |
+| 2026-11-14 | The type 8 mode's screens (probably the two-player mode's panel screen and list screens, built on the type 6 and 7 bases; none seen in play) | `type8-screens.md` | 128 of 128 (2 Merged), with 13 `car-list.md` rows and `TwoPlayerBlock` | `--native_type8_screens` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5555,3 +5556,14 @@ and `Type7ListScreen::SetUpRace`, as `Race::SetUp`'s). The validation's
 harnesses now take ~132 s of the 180. The boundary: unchanged. B7
 (`b7_status.py`): ours 6,335, work left 676 (Wrapped 51, with a row
 354, no row yet 271).
+
+**2026-11-14, the type 8 mode's screens (branch `b7-loop-13-11-26`,
+the forty-sixth run, its ninth subsystem):** `type8-screens.md` (128
+rows, `src/type8_screens/`): the type 8 mode (the title's main menu
+item 4, built for two players: probably the two-player mode) and its
+panel screen and list screens, none seen in play, in one migration of
+eight batches, with 13 `car-list.md` rows (`PanelSetPair`, the panels'
+base); two more traffic-records groups expected to differ. The
+validation's harnesses take ~133 s of the 180. The boundary:
+unchanged. B7 (`b7_status.py`): ours 6,477, work left 676 (Wrapped 51,
+with a row 354, no row yet 271).
