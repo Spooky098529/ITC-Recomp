@@ -378,13 +378,11 @@ ITC_RACE_SCREENS_UNSEEN(8221FAC8, RaceScreensUnseenSplitResultsIntro)
 ITC_RACE_SCREENS_UNSEEN(8221FBE8, RaceScreensUnseenSplitResultsShow)
 ITC_RACE_SCREENS_UNSEEN(8221FD98, RaceScreensUnseenSplitResultsClose)
 // Kind 6's screen after the race: its opener, draw and close (the race HUD
-// machine's recompiled fallbacks reach them), and ShowPanelA and SetUpList
-// (the recompiled pages of Kind6Menu::Update call them too).
+// machine's recompiled fallbacks reach them). ShowPanelA and SetUpList have
+// no adapters since Update's pages are native (all their callers are).
 ITC_RACE_SCREENS_UNSEEN(8221C168, RaceScreensUnseenKind6Close)
 ITC_RACE_SCREENS_UNSEEN(8221EC48, RaceScreensUnseenKind6Open)
 ITC_RACE_SCREENS_UNSEEN(8221EF60, RaceScreensUnseenKind6Draw)
-ITC_RACE_SCREENS_UNSEEN(8221D050, RaceScreensUnseenKind6ShowPanelA)
-ITC_RACE_SCREENS_UNSEEN(8221DF70, RaceScreensUnseenKind6SetUpList)
 // Kind6Menu::Update (the race HUD machine's AfterRaceUpdate fallback reaches
 // it); its pages and their helpers have no adapters.
 ITC_RACE_SCREENS_UNSEEN(8221F1E8, RaceScreensUnseenKind6Update)

@@ -87,10 +87,9 @@ void RaceScreensUnseenSplitResultsClose(PPCContext& ctx, uint8_t* base);
 // Kind 6's screen after the race. Adapters (recompiled code reaches them):
 // Close sub_8221C168 (the race HUD machine's CloseResults fallback), Open
 // sub_8221EC48 (r3 the screen, r4 the block; ShowKind6Results), Draw
-// sub_8221EF60 (r3 the screen; AfterRaceDraw's fallback), ShowPanelA
-// sub_8221D050 and SetUpList sub_8221DF70 (also called by the recompiled
-// pages of Kind6Menu::Update). Without adapters (only the native Open and
-// Draw reach them): SetUpTexts sub_8221E038 (r3 the screen), ShowCourse
+// sub_8221EF60 (r3 the screen; AfterRaceDraw's fallback). Without adapters
+// (only native code reaches them): ShowPanelA sub_8221D050, SetUpList
+// sub_8221DF70, SetUpTexts sub_8221E038 (r3 the screen), ShowCourse
 // sub_8221D1A8, ShowHelp sub_8221D130, HidePanels sub_8221CFC0, SetCursorX
 // sub_8221D7B0 (r3), ShowList sub_8221D4E8, ShowReplay sub_8221CBD8 (r3 the
 // record), and the transitions (r3 the step word) Intro sub_8221C438, Show
