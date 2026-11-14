@@ -246,7 +246,14 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 9 of 10: the type 8 mode's panel screen and list screens
   (`sub_822386F0`, `sub_82238368`, `sub_82238468`; `sub_8223F140` and
   the rest; built on the type 6 and 7 screens' bases, none seen in
-  play); their lines deleted from `leads.md`. Mapping agent running.
+  play); their lines deleted from `leads.md`. Mapped
+  `type8-screens.md` (ab62fef5: 128 rows and `SaveData::TwoPlayerBlock`
+  in `save-data.md`, none in play; 72 ready roots judged by reading
+  callees; five `car-list.md` rows to take along (`PanelSetPair`'s
+  constructor and destructor, `CarPanelBase::~`, `ConfirmPanel`,
+  `Panel6C::SetStats`) with `PanelSetPair`'s slots; the type 8 mode is
+  probably the two-player split-screen mode; 1 lead added, the mode
+  itself). Check passed. Migration agent running.
 
 ## Done
 

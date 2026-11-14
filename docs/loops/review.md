@@ -184,6 +184,12 @@ When the user has reviewed a run's section, its heading gets
   destructors; the titled list's page helpers moved to
   `list_pages.h`; harness faults fixed on the way (inputs kept in the
   ranges play gives).
+- The type 8 mode's screens' map (ab62fef5, `type8-screens.md`, 128
+  rows; `SaveData::TwoPlayerBlock` in `save-data.md`): the type 8 mode
+  is the title's main menu item 4 (string 251, state 18), built for two
+  players: probably the two-player split-screen mode (the user may know
+  its name). Corrections: `car-list.md` notes that called the type 8
+  callers "type 6"; `screen-constructors.md`'s "get no rows" list.
 
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
