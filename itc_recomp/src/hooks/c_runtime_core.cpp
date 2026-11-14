@@ -48,7 +48,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_ld12tod's plain C++), _fileno (sub_825B0E88), the __finally funclets of _close, _write, "
               "_commit and fclose and doexit's unwind funclet (sub_825B0E50, sub_825B1304, "
               "sub_825B4978, sub_825A9664, sub_825AA338), _close_nolock and _close (sub_825B0C28, "
-              "sub_825B0D10), FlushFileBuffers and _commit (sub_825BA510, sub_825B4828) (checked by "
+              "sub_825B0D10), FlushFileBuffers and _commit (sub_825BA510, sub_825B4828), "
+              "_lseeki64_nolock and _lseeki64 with its __finally (sub_825B6500, sub_825B65D0, "
+              "sub_825B6730) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
@@ -57,7 +59,8 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
-              "_mtinitlocks, CloseHandle (its caller, SaveSlot::WaitClose)");
+              "_mtinitlocks, CloseHandle (its caller, SaveSlot::WaitClose), SetFilePointer (sub_825B9DD8, "
+              "its caller _lseeki64_nolock)");
 
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
@@ -539,6 +542,19 @@ void hooks::CoreCommit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Commit(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreSetFilePointer(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::SetFilePointer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                  CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreLseekNolock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::LseekNolock(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreLseek(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Lseek(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -689,3 +705,11 @@ ITC_C_RUNTIME_CORE(825B0D10, CoreClose)
 ITC_C_RUNTIME_CORE(825BA510, CoreFlushFileBuffers)
 // _commit: r3 = a file handle; r3 = 0, or -1.
 ITC_C_RUNTIME_CORE(825B4828, CoreCommit)
+// _lseeki64_nolock, _lseeki64: r3 = a file handle, r4 = a 64-bit offset, r5 =
+// the origin; r3 = the 64-bit position, or -1. (SetFilePointer, sub_825B9DD8,
+// has no adapter: its caller in play, File::Seek, leaves it out, and
+// _lseeki64_nolock calls the plain C++.)
+ITC_C_RUNTIME_CORE(825B6500, CoreLseekNolock)
+ITC_C_RUNTIME_CORE(825B65D0, CoreLseek)
+// _lseeki64's __finally: r30 = the handle.
+ITC_C_RUNTIME_CORE(825B6730, CoreCloseFinally)

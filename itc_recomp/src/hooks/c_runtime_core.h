@@ -87,7 +87,7 @@ void CoreUnlockFile2(PPCContext& ctx, uint8_t* base);  // sub_825AD6C0
 void CoreUnlockFhandle(PPCContext& ctx, uint8_t* base);  // sub_825B7A58
 
 void CoreFileno(PPCContext& ctx, uint8_t* base);             // sub_825B0E88
-void CoreCloseFinally(PPCContext& ctx, uint8_t* base);       // sub_825B0E50, sub_825B1304
+void CoreCloseFinally(PPCContext& ctx, uint8_t* base);  // sub_825B0E50, sub_825B1304, sub_825B6730
 void CoreCommitFinally(PPCContext& ctx, uint8_t* base);      // sub_825B4978
 void CoreFcloseFinally(PPCContext& ctx, uint8_t* base);      // sub_825A9664
 void CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base);  // sub_825AA338
@@ -97,5 +97,9 @@ void CoreCloseNolock(PPCContext& ctx, uint8_t* base);       // sub_825B0C28
 void CoreClose(PPCContext& ctx, uint8_t* base);             // sub_825B0D10
 void CoreFlushFileBuffers(PPCContext& ctx, uint8_t* base);  // sub_825BA510
 void CoreCommit(PPCContext& ctx, uint8_t* base);            // sub_825B4828
+
+void CoreSetFilePointer(PPCContext& ctx, uint8_t* base);  // sub_825B9DD8 (no adapter)
+void CoreLseekNolock(PPCContext& ctx, uint8_t* base);     // sub_825B6500
+void CoreLseek(PPCContext& ctx, uint8_t* base);           // sub_825B65D0
 
 }  // namespace hooks

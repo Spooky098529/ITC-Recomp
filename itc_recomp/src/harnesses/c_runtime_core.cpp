@@ -2353,6 +2353,241 @@ void FlushCases(Context& h) {
   results.Report();
 }
 
+
+// A file of the SDK's to seek in: game:\default.xex opened for reading
+// through the game's CreateFile (sub_82295508), closed by the destructor;
+// 0 when it can't be opened.
+struct SeekFile {
+  Context& h;
+  uint32_t handle = 0;
+  explicit SeekFile(Context& h) : h(h) {
+    const char path[] = "game:\\default.xex";
+    Write(h.base, h.data + 2048, reinterpret_cast<const uint8_t*>(path), sizeof(path));
+    PPCContext t = CallContext(h);
+    t.r3.u64 = h.data + 2048;
+    t.r4.u64 = 0x80000000u;  // GENERIC_READ
+    t.r5.u64 = 1;            // FILE_SHARE_READ
+    t.r6.u64 = 0;
+    t.r7.u64 = 3;  // OPEN_EXISTING
+    t.r8.u64 = 0x80;
+    t.r9.u64 = 0;
+    sub_82295508(t, h.base);
+    handle = t.r3.u32 == 0xFFFFFFFFu ? 0 : t.r3.u32;
+  }
+  ~SeekFile() {
+    if (handle != 0) {
+      PPCContext k = CallContext(h);
+      k.r3.u64 = handle;
+      __imp__NtClose(k, h.base);
+    }
+  }
+  // The position set through the recompiled SetFilePointer (from the start).
+  void Set(uint32_t low) {
+    Store(h.base, h.data + 2040, 0);
+    PPCContext t = CallContext(h);
+    t.r3.u64 = handle;
+    t.r4.u64 = low;
+    t.r5.u64 = h.data + 2040;
+    t.r6.u64 = 0;
+    __imp__sub_825B9DD8(t, h.base);
+  }
+  // The position now (high, low), through the recompiled SetFilePointer.
+  uint64_t Get() {
+    Store(h.base, h.data + 2040, 0);
+    PPCContext t = CallContext(h);
+    t.r3.u64 = handle;
+    t.r4.u64 = 0;
+    t.r5.u64 = h.data + 2040;
+    t.r6.u64 = 1;
+    __imp__sub_825B9DD8(t, h.base);
+    return uint64_t(Load(h.base, h.data + 2040)) << 32 | t.r3.u32;
+  }
+};
+
+// A seek's offset: small, around the file's size, negative, past 31 bits or
+// any.
+uint64_t SeekOffset(Context& h) {
+  switch (h.random.Below(6)) {
+    case 0: return h.random.Below(4096);
+    case 1: return 0x01000000u + h.random.Below(0x01000000u);
+    case 2: return uint64_t(-int64_t(h.random.Below(0x20000)));
+    case 3: return 0x80000000u + h.random.Below(0x1000);
+    case 4: return uint64_t(1 + h.random.Below(4)) << 32 | uint32_t(h.random.Next());
+    default: return h.random.Next();
+  }
+}
+
+// SetFilePointer: on the SDK's file (its position set to a random start
+// first, the same for both sides), an event or a word that's no handle; the
+// method 0 to 3 (and a random one), the high word given or not, the low and
+// high words from SeekOffset; the last error random before. Compared: r3 (64
+// bits), the high word, the last error and the file's position after.
+void SetFilePointerCases(Context& h) {
+  Results results("SetFilePointer (sub_825B9DD8)");
+  SeekFile file(h);
+  if (file.handle == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: SetFilePointer: game:\\default.xex not opened");
+  }
+  const uint32_t error = GuestLastError(h);
+  const uint32_t high_word = h.data + 2032;
+  for (int c = 0; c < 96; c++) {
+    const uint32_t kind = file.handle != 0 && h.random.Below(4) != 0 ? 0 : 1 + h.random.Below(2);
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const uint32_t start = h.random.Below(0x00800000u);
+    const uint64_t offset = SeekOffset(h);
+    const bool with_high = h.random.Below(3) != 0;
+    const uint32_t method = h.random.Below(8) == 0 ? uint32_t(h.random.Next()) : h.random.Below(4);
+    const uint32_t last = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t event = kind == 2 ? MakeEvent(h, 0, 0) : 0;
+      const uint32_t handle = kind == 0 ? file.handle : kind == 2 ? event : junk;
+      if (kind == 0) {
+        file.Set(start);
+      }
+      Store(h.base, high_word, uint32_t(offset >> 32));
+      SetLastError(h, last);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = handle;
+      t.r4.u64 = uint32_t(offset);
+      t.r5.u64 = with_high ? high_word : 0;
+      t.r6.u64 = method;
+      (v == 0 ? __imp__sub_825B9DD8 : hooks::CoreSetFilePointer)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, high_word));
+      out[v].Word(GuestLastError(h));
+      if (kind == 0) {
+        const uint64_t at = file.Get();
+        out[v].Word(uint32_t(at >> 32));
+        out[v].Word(uint32_t(at));
+      }
+      if (event != 0) {
+        PPCContext k = CallContext(h);
+        k.r3.u64 = event;
+        __imp__NtClose(k, h.base);
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  SetLastError(h, error);
+  results.Report();
+}
+
+// _lseeki64_nolock, _lseeki64 and _lseeki64's __finally: handles -2, -1,
+// past _nhandle and in the first block, whose entry is open (its flags with
+// bit 0) on the SDK's file at a random start, open on a word that's no
+// handle, open on -1, or closed; the lock (+8) made or not; offsets from
+// SeekOffset, origins 0 to 3; errno, _doserrno and the last error random,
+// the invalid parameter handler the shared "returns 0". Compared: r3 (64
+// bits), the entry (the OS handle, flags and lock), errno, _doserrno, the
+// last error, the file's position and the caller's frame + 20.
+void LseekCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  SeekFile file(h);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || file.handle == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _lseeki64: no handle block, thread data, lock 10 or "
+                  "file");
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool nolock;
+  };
+  for (const Fn& fn : {Fn{"_lseeki64_nolock (sub_825B6500)", __imp__sub_825B6500,
+                          hooks::CoreLseekNolock, true},
+                       Fn{"_lseeki64 (sub_825B65D0)", __imp__sub_825B65D0, hooks::CoreLseek, false}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 64; c++) {
+      const uint32_t pick = h.random.Below(10);
+      const uint32_t handle = fn.nolock || pick > 2 ? h.random.Below(32)
+                              : pick == 0           ? 0xFFFFFFFEu
+                              : pick == 1           ? 0xFFFFFFFFu
+                                                    : nhandle + h.random.Below(64);
+      const uint32_t entry = handles + 44 * (handle & 31);
+      // 0 the SDK's file, 1 a word that's no handle, 2 -1.
+      const uint32_t os_kind = h.random.Below(4) == 0 ? 1 + h.random.Below(2) : 0;
+      const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+      const uint8_t flags = uint8_t(h.random.Next()) | (h.random.Below(5) != 0 ? 1 : 0);
+      const bool made = h.random.Below(2) == 0;
+      const uint32_t start = h.random.Below(0x00800000u);
+      const uint64_t offset = SeekOffset(h);
+      const uint32_t origin = h.random.Below(4);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}});
+        file.Set(start);
+        guest::StoreU8(h.base, entry + 4, flags);
+        Store(h.base, entry + 0,
+              os_kind == 0 ? file.handle : os_kind == 1 ? junk : 0xFFFFFFFFu);
+        Store(h.base, entry + 8, made ? 1 : 0);
+        if (made) {
+          InitSection(h, entry + 12);
+        }
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = handle;
+        t.r4.u64 = offset;
+        t.r5.u64 = origin;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, entry, 40));
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        const uint64_t at = file.Get();
+        out[v].Word(uint32_t(at >> 32));
+        out[v].Word(uint32_t(at));
+        if (!fn.nolock) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  {
+    Results results("_lseeki64's __finally (sub_825B6730)");
+    for (int c = 0; c < 16; c++) {
+      const uint32_t handle = h.random.Below(32);
+      const uint32_t entry = handles + 44 * handle;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}});
+        InitSection(h, entry + 12);
+        PPCContext e = CallContext(h);
+        e.r3.u64 = entry + 12;
+        __imp__RtlEnterCriticalSection(e, h.base);
+        PPCContext t = CallContext(h);
+        t.r30.u64 = handle;
+        t.r31.u64 = 0x1234;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? __imp__sub_825B6730 : hooks::CoreCloseFinally)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r30.u32);
+        out[v].Word(t.r31.u32);
+        out[v].Bytes(Read(h.base, entry, 44));
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  SetLastError(h, slots.error);
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -2414,6 +2649,8 @@ void CRuntimeCore(Context& h) {
   StreamFinallyCases(h);
   CloseCases(h);
   FlushCases(h);
+  SetFilePointerCases(h);
+  LseekCases(h);
 }
 
 }  // namespace harness

@@ -1004,7 +1004,7 @@ uint64_t Fileno(uint8_t* base, uint32_t stream, const Calls& calls) {
 }
 
 uint64_t UnlockFhandleFinally(uint8_t* base, uint32_t handle, const Calls& calls) {
-  ITC_NATIVE_RUNNING("sub_825B0E50, sub_825B4978, sub_825B1304 _close's, _commit's, _write's __finally");
+  ITC_NATIVE_RUNNING("sub_825B0E50, sub_825B4978, sub_825B1304, sub_825B6730 _close's, _commit's, _write's, _lseeki64's __finally");
   uint64_t result = 0;
   calls.in_frame(112, [&](uint32_t) { result = UnlockFhandle(base, handle, calls); });
   return result;
@@ -1158,6 +1158,125 @@ uint64_t Commit(uint8_t* base, uint32_t handle, const Calls& calls) {
     }
     UnlockFhandleFinally(base, handle, calls);
     result = Load(base, frame + 80);
+  });
+  return result;
+}
+
+namespace {
+
+uint64_t LoadU64(uint8_t* base, uint32_t address) {
+  return uint64_t(Load(base, address)) << 32 | Load(base, address + 4);
+}
+void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
+  Store(base, address, uint32_t(value >> 32));
+  Store(base, address + 4, uint32_t(value));
+}
+
+}  // namespace
+
+uint64_t SetFilePointer(uint8_t* base, uint32_t handle, uint32_t low, uint32_t high,
+                        uint32_t method, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B9DD8 SetFilePointer");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(192, [&](uint32_t frame) {
+    uint64_t position;
+    if (high != 0) {
+      Store(base, frame + 84, low);
+      Store(base, frame + 80, Load(base, high));
+      position = LoadU64(base, frame + 80);
+    } else {
+      position = uint64_t(int64_t(int32_t(low)));
+    }
+    uint64_t moved;
+    if (method == 0) {
+      moved = position;
+    } else {
+      const bool end = method == 2;
+      const uint32_t status = uint32_t(calls.import(
+          Import::kNtQueryInformationFile,
+          {handle, frame + 88, end ? frame + 96 : frame + 80, end ? 56u : 8u, end ? 34u : 14u}));
+      if (int32_t(status) < 0) {
+        calls.set_last_error_from_status(status);
+        return;
+      }
+      moved = LoadU64(base, end ? frame + 136 : frame + 80) + position;
+    }
+    StoreU64(base, frame + 80, moved);
+    if (int64_t(moved) < 0) {
+      calls.set_last_error(131);
+      return;
+    }
+    if (high == 0 && (Load(base, frame + 80) & 0x7FFFFFFFu) != 0) {
+      calls.set_last_error(87);
+      return;
+    }
+    const uint32_t status = uint32_t(
+        calls.import(Import::kNtSetInformationFile, {handle, frame + 88, frame + 80, 8, 14}));
+    if (int32_t(status) < 0) {
+      calls.set_last_error_from_status(status);
+      if (high != 0) {
+        Store(base, high, 0xFFFFFFFFu);
+      }
+      return;
+    }
+    if (high != 0) {
+      Store(base, high, Load(base, frame + 80));
+    }
+    if (Load(base, frame + 84) == 0xFFFFFFFFu) {
+      calls.set_last_error(0);
+    }
+    result = Load(base, frame + 84);
+  });
+  return result;
+}
+
+uint64_t LseekNolock(uint8_t* base, uint32_t handle, uint64_t offset, uint32_t origin,
+                     const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B6500 _lseeki64_nolock");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(112, [&](uint32_t frame) {
+    StoreU64(base, frame + 80, offset);
+    const uint32_t os = GetOsfhandle(base, handle, calls);
+    if (os == 0xFFFFFFFFu) {
+      Store(base, Errno(base, calls), 9);
+      return;
+    }
+    const uint32_t low =
+        uint32_t(SetFilePointer(base, os, Load(base, frame + 84), frame + 80, origin, calls));
+    Store(base, frame + 84, low);
+    if (low == 0xFFFFFFFFu) {
+      if (const uint32_t error = calls.get_last_error(); error != 0) {
+        DosMapErr(base, error, calls);
+        return;
+      }
+    }
+    const uint32_t entry = HandleEntry(base, handle);
+    guest::StoreU8(base, entry + 4, guest::LoadU8(base, entry + 4) & ~2u);
+    result = LoadU64(base, frame + 80);
+  });
+  return result;
+}
+
+uint64_t Lseek(uint8_t* base, uint32_t handle, uint64_t offset, uint32_t origin,
+               const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B65D0 _lseeki64");
+  uint64_t result = uint64_t(int64_t(-1));
+  calls.in_frame(160, [&](uint32_t frame) {
+    Store(base, frame + 180, handle);
+    StoreU64(base, frame + 80, ~uint64_t(0));
+    if (HandleChecksFail(base, handle, true, calls)) {
+      return;
+    }
+    LockFhandle(base, handle, calls);
+    if ((guest::LoadU8(base, HandleEntry(base, handle) + 4) & 1) != 0) {
+      StoreU64(base, frame + 80, LseekNolock(base, handle, offset, origin, calls));
+    } else {
+      Store(base, Errno(base, calls), 9);
+      Store(base, DosErrno(base, calls), 0);
+      StoreU64(base, frame + 80, ~uint64_t(0));
+    }
+    UnlockFhandleFinally(base, handle, calls);
+    result = LoadU64(base, frame + 80);
   });
   return result;
 }

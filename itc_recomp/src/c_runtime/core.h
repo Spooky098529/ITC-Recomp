@@ -425,8 +425,8 @@ std::optional<uint32_t> Fassign(uint8_t* base, bool is_double, uint32_t out, uin
 uint64_t Fileno(uint8_t* base, uint32_t stream, const Calls& calls);
 
 // The __finally funclets giving back a file handle's lock: _close's
-// (sub_825B0E50, its r30), _commit's (sub_825B4978, its r27) and _write's
-// (sub_825B1304, its r30): from a 112-byte frame, _unlock_fhandle(handle);
+// (sub_825B0E50, its r30), _commit's (sub_825B4978, its r27), _write's
+// (sub_825B1304, its r30) and _lseeki64's (sub_825B6730, its r30): from a 112-byte frame, _unlock_fhandle(handle);
 // its r3.
 uint64_t UnlockFhandleFinally(uint8_t* base, uint32_t handle, const Calls& calls);
 
@@ -472,5 +472,34 @@ uint32_t FlushFileBuffers(uint32_t handle, const Calls& calls);
 // open, FlushFileBuffers on its OS handle (on failure _doserrno = the last
 // error, errno 9, -1), not open: errno 9, -1; its __finally. r3 as _close's.
 uint64_t Commit(uint8_t* base, uint32_t handle, const Calls& calls);
+
+
+// sub_825B9DD8 SetFilePointer: in its 192-byte frame (+80 the position, +88
+// the I/O status block, +96 the 56-byte network open information), the
+// position from `low` (and the high word at `high`, when given, else `low`
+// sign-extended) moved by `method` (0 from the start; 2 from the end of
+// file, class 34; 1 and anything else from the current position, class
+// 14); a negative one: last error 131; past 31 bits without `high`: 87; else
+// set (class 14), the high word stored back; on a status failure the last
+// error from it (and -1 at `high`). The new low word (the last error set to
+// 0 when it's -1), else -1. r3 as the original leaves it (-1
+// sign-extended).
+uint64_t SetFilePointer(uint8_t* base, uint32_t handle, uint32_t low, uint32_t high,
+                        uint32_t method, const Calls& calls);
+
+// sub_825B6500 _lseeki64_nolock: from a 112-byte frame (the offset at +80),
+// SetFilePointer on the handle's OS handle (-1: errno 9, -1), its error (when
+// it gives -1 with a last error) through _dosmaperr, -1; else the handle's
+// end-of-file flag (+4 bit 1) cleared, the 64-bit position. r3 as the
+// original leaves it.
+uint64_t LseekNolock(uint8_t* base, uint32_t handle, uint64_t offset, uint32_t origin,
+                     const Calls& calls);
+
+// sub_825B65D0 _lseeki64: in its 160-byte frame (the handle at +180, the
+// result at +80, -1 first): _close's checks (-1), then under __lock_fhandle
+// _lseeki64_nolock when still open, else errno 9, _doserrno 0, -1; its
+// __finally (sub_825B6730, as _close's). The 64-bit result.
+uint64_t Lseek(uint8_t* base, uint32_t handle, uint64_t offset, uint32_t origin,
+               const Calls& calls);
 
 }  // namespace c_runtime::core
