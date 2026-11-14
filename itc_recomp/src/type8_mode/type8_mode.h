@@ -18,6 +18,7 @@
 #include "type67_screens/type67_screens.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace type8_mode {
 
@@ -200,5 +201,56 @@ uint64_t Screen0CarCard(uint8_t* base, uint64_t player, uint64_t model, uint64_t
 // finished, the car cards, the music (the sound manager's slots 14 and 13,
 // Sound::Play's plain C++). The last call's r3.
 uint64_t Screen0Show(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls);
+
+// --- The mode's slots and +32 interface (mode.cpp): the delegate
+// functions take r3 the 8-byte answer and r4 the mode and return r3 ---
+
+// sub_8223D3C0 ModeType8::AllLoaded (a leaf; r3 the member, mode +848): 1
+// when the movies' loaded words (+9612, +29156, +40524, +19400, +52352,
+// +67600, +86880) are all nonzero, else 0.
+uint32_t ModeAllLoaded(uint8_t* base, uint32_t member);
+// sub_82105638 SaveData::FreeTwoPlayerBlock (96-byte frame): operator
+// delete (a guest call) on [0x826C5B5C] when it isn't 0, then the word 0.
+// Its r3, or 0.
+uint64_t FreeTwoPlayerBlock(uint8_t* base, uint32_t sp, const ScreenCalls& calls);
+// sub_8223D3B8 ModeType8::Release (slot 1): StandScene::Release, a tail
+// jump: its plain C++, or a guest call from `sp` returning to `lr` where
+// that declines. Its r3.
+uint64_t ModeRelease(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
+                     const ScreenCalls& calls);
+// sub_8223DBC0 ModeType8::WaitForLoads (slot 8; 160): LoadingScreen::Run;
+// once AllLoaded, both fades' counts 0, the sound manager's slot 6 says bank
+// 1 isn't loading and both players' stages' cameras are set up: the stages
+// commanded (56, 57), LoadingScreen::Finish, the menu music, message 2 and
+// the delegate on to NextModeThunk; then message 1 and Dispatch.
+uint64_t ModeWaitForLoads(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                          const ScreenCalls& calls);
+// sub_8223DD90 ModeType8::NextMode (slot 6; 144): Draw (unless the pad is
+// blocked) and Update queued, Dispatch; a list screen in state 11: the
+// answer {1, .., 1} (the race); Type8Screen0 in state 6: player 0's options
+// back from the two-player block, the block freed, the leaving flag 0, the
+// answer {1, .., 4}; either way the delegate on to Slot9Thunk.
+uint64_t ModeNextMode(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                      const ScreenCalls& calls);
+// sub_8223D8E8 ModeType8::PollTeardown (slot 9; 128): once
+// StandScene::PollTeardown answers nonzero, the delegate on to Slot10Thunk.
+uint64_t ModePollTeardown(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                          const ScreenCalls& calls);
+// sub_8223D4D0 ModeType8::TearDown (slot 10; 160): bank 1's cues 0 and 2
+// stopped where playing, Strings::Release([0x826C5C34], 3), UiMovies::
+// DeleteAll's jump, the answer = the mode's +87760.
+uint64_t ModeTearDown(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+                      const ScreenCalls& calls);
+// sub_8223D960 ModeType8::Interrupt (+32 slot 0; 96; r3 the mode + 32): 0
+// until AllLoaded; then with the save screen in state 5, message 30 queued
+// and 0; else 1.
+uint64_t ModeInterrupt(uint8_t* base, uint32_t object, uint32_t sp);
+// sub_8223DA00 ModeType8::ForceExit (+32 slot 1; 128; r3 the mode + 32, r4
+// a number): both players' stages' +6052 = 0 and their draw words 0,
+// GarageStages::DrawAll; then for 0 to 3, leave (4) queued, the delegate on
+// to Slot9Thunk, the answer {1, the thunk's low three bytes, 4 (0, 1; the
+// leaving flag 1) or 12 (2, 3)}. r3 the mode + 4 then, else DrawAll's.
+uint64_t ModeForceExit(uint8_t* base, uint64_t r3, uint32_t number, uint32_t sp,
+                       const ScreenCalls& calls);
 
 }  // namespace type8_mode

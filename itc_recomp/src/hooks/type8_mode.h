@@ -55,4 +55,17 @@ void Type8Screen0SetTexts(PPCContext& ctx, uint8_t* base);
 void Type8Screen0CarCard(PPCContext& ctx, uint8_t* base);
 void Type8Screen0Show(PPCContext& ctx, uint8_t* base);
 
+// The mode's slots (r3 the answer, r4 the mode), its +32 interface (r3 the
+// mode + 32, r4 a number for ForceExit), AllLoaded (r3 the member) and
+// SaveData::FreeTwoPlayerBlock (no arguments).
+void Type8ModeAllLoaded(PPCContext& ctx, uint8_t* base);
+void Type8FreeTwoPlayerBlock(PPCContext& ctx, uint8_t* base);
+void Type8ModeRelease(PPCContext& ctx, uint8_t* base);
+void Type8ModeWaitForLoads(PPCContext& ctx, uint8_t* base);
+void Type8ModeNextMode(PPCContext& ctx, uint8_t* base);
+void Type8ModePollTeardown(PPCContext& ctx, uint8_t* base);
+void Type8ModeTearDown(PPCContext& ctx, uint8_t* base);
+void Type8ModeInterrupt(PPCContext& ctx, uint8_t* base);
+void Type8ModeForceExit(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

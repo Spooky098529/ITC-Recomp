@@ -38,7 +38,16 @@ ITC_FLAG_BOOL(native_type8_mode, true, "ITC",
               "Params::GetCarSpec, Car::Init, memcpy, Car::Refresh, GarageStage::SetPlates and "
               "GarageStages::DrawAll by their plain C++; the named animations, Run, ScrollText, "
               "SetNodeText, the menu list's Update, Accepted and Cancelled, the stand's "
-              "GarageStage calls and the sound manager's slots as guest calls)) natively instead of through the "
+              "GarageStage calls and the sound manager's slots as guest calls); "
+              "ModeType8::Release sub_8223D3B8 (StandScene::Release's plain C++, else a guest "
+              "call), WaitForLoads sub_8223DBC0 with AllLoaded sub_8223D3C0, NextMode "
+              "sub_8223DD90 with SaveData::FreeTwoPlayerBlock sub_82105638, PollTeardown "
+              "sub_8223D8E8, TearDown sub_8223D4D0, Interrupt sub_8223D960 and ForceExit "
+              "sub_8223DA00 (StandScene::PollTeardown, SaveData::TwoPlayerBlock, memcpy, "
+              "Sound::Play and GarageStages::DrawAll by their plain C++; GameMessages::Dispatch, "
+              "LoadingScreen::Run and Finish, GarageStage::Command and SetDrawWord, "
+              "Strings::Release, UiMovies::DeleteAll's jump, operator delete and the sound "
+              "manager's slots as guest calls)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=type8_mode)");
 
 namespace hooks {
@@ -114,6 +123,20 @@ ITC_T8M_SCREEN(Type8Screen0CarCard,
                t8m::Screen0CarCard(base, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp, calls))
 ITC_T8M_SCREEN(Type8Screen0Show, t8m::Screen0Show(base, ctx.r3.u64, sp, calls))
 
+ITC_T8M_SCREEN(Type8ModeAllLoaded, t8m::ModeAllLoaded(base, ctx.r3.u32))
+ITC_T8M_SCREEN(Type8FreeTwoPlayerBlock, t8m::FreeTwoPlayerBlock(base, sp, calls))
+ITC_T8M_SCREEN(Type8ModeRelease,
+               t8m::ModeRelease(base, ctx.r3.u64, ctx.r4.u64, sp, lr, calls))
+ITC_T8M_SCREEN(Type8ModeWaitForLoads,
+               t8m::ModeWaitForLoads(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeNextMode, t8m::ModeNextMode(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModePollTeardown,
+               t8m::ModePollTeardown(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeTearDown, t8m::ModeTearDown(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeInterrupt, t8m::ModeInterrupt(base, ctx.r3.u32, sp))
+ITC_T8M_SCREEN(Type8ModeForceExit,
+               t8m::ModeForceExit(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+
 #undef ITC_T8M_SCREEN
 #undef ITC_T8M_STEP
 
@@ -177,3 +200,15 @@ ITC_TYPE8_MODE(8223C330, Type8Screen0CursorStep)
 ITC_TYPE8_MODE(8223BAF0, Type8Screen0FadeOutStep)
 ITC_TYPE8_MODE(8223C588, Type8Screen0Update)
 ITC_TYPE8_MODE(8223BF18, Type8Screen0Show)
+// The mode's vtable 0x82006D60 slots 1 (Release), 6 (NextMode, through
+// Mode::NextModeThunk) and 8 to 10 (WaitForLoads, PollTeardown, TearDown,
+// through the slot thunks), and its +32 vtable 0x82006D54's slots 0 and 1.
+// AllLoaded and SaveData::FreeTwoPlayerBlock have no adapters: their only
+// callers (WaitForLoads, Interrupt; NextMode) are these, native.
+ITC_TYPE8_MODE(8223D3B8, Type8ModeRelease)
+ITC_TYPE8_MODE(8223DBC0, Type8ModeWaitForLoads)
+ITC_TYPE8_MODE(8223DD90, Type8ModeNextMode)
+ITC_TYPE8_MODE(8223D8E8, Type8ModePollTeardown)
+ITC_TYPE8_MODE(8223D4D0, Type8ModeTearDown)
+ITC_TYPE8_MODE(8223D960, Type8ModeInterrupt)
+ITC_TYPE8_MODE(8223DA00, Type8ModeForceExit)

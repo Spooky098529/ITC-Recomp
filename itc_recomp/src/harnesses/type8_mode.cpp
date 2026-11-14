@@ -32,6 +32,7 @@
 #include "base/log.h"
 #include "harnesses/loading_world.h"
 #include "hooks/app_start_up.h"
+#include "hooks/heap.h"
 #include "hooks/type67_screens.h"
 #include "hooks/type8_mode.h"
 #include "hooks/ui_movies.h"
@@ -39,6 +40,7 @@
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_screens/race_screens.h"
+#include "strings_and_font/strings_and_font.h"
 #include "type8_mode/type8_mode.h"
 #include "ui_movies/game.h"
 
@@ -691,6 +693,394 @@ void Type8Screen0s(Context& h, uint32_t world) {
   saved.Restore();
 }
 
+// --- The mode's slots and +32 interface. The mode a block of its own
+// (kModeBytes, random words): its dispatcher with no handlers (+236 0), its
+// ring's count 0 to 3 and start below 200, the members' loaded words
+// (AllLoaded's) nonzero or now and then 0, the machines NextMode reads in
+// states 6, 11 or others. r3 the answer in the world (or the mode + 32 for
+// the +32 slots), r4 the mode. The globals they use (the pad blocked words,
+// the leaving flag, the two-player block, player 0's save data slot, the
+// loading screen's, the string table, the movie table, the viewports and
+// the accessories' set) saved, laid per case, compared and put back.
+// WaitForLoads: the loading screen's movie a harness movie (its update
+// recorded), the fake sound manager (slot 6 the getter of its +60), the
+// stand as Type8Screen0::Update's with the two players' garage cameras set
+// up now and then (one preset, the scene model's car 0) so
+// GarageStage::Command applies presets 42 and 43. NextMode: the two-player
+// block operator new's (240,512 bytes) or none, player 0's save data a
+// block of the harness's. PollTeardown: the stand as StandScene::
+// PollTeardown's cases lay it (type67_modes.cpp). TearDown: the string
+// table a block of the case's (files 0 and 1 none, counts 2 to 4: nothing
+// freed) and the movie table 0 to 3 keys of no movie (UiMovies::Find's
+// answer for a missing id 0: no movie world movie deleted). Compared besides
+// Group's outputs: the mode block, the stand, the globals.
+
+constexpr uint32_t kModeBytes = 0x15800;
+constexpr uint32_t kSaveBytes = 0x1FA00;
+constexpr uint32_t kTwoPlayerBytes = 0x3AC00;
+constexpr uint32_t kTwoPlayerBlock = 0x826C5B5C, kSaveSlots = 0x826C5B58;
+constexpr uint32_t kLoadingCurrent = 0x82815E64, kLoadingMovies = 0x82815E68;
+constexpr uint32_t kStringTable = 0x826C5C34, kAccessorySet = 0x826C5510;
+constexpr uint32_t kViewports = 0x826C2CE8;
+constexpr uint32_t kLoadedWords[] = {9612, 29156, 40524, 19400, 52352, 67600, 86880};
+
+uint32_t g_mode = 0, g_save = 0, g_loading_movie = 0, g_strings = 0;
+
+const std::vector<std::pair<uint32_t, uint32_t>> kModeGlobals = {
+    {0x826C7960, 8},       // the pad blocked words
+    {0x826364EC, 4},       // the leaving flag
+    {kTwoPlayerBlock, 4},  {kSaveSlots, 4},       {kLoadingCurrent, 16},
+    {kStringTable, 4},     {ui_movies::kMovieTable, 12}, {kViewports, 4},
+    {kAccessorySet, 4},
+};
+
+void LayMode(uint8_t* base, Random& r) {
+  WriteRandom(base, g_mode, kModeBytes, r);
+  guest::StoreU32(base, g_mode + 236, 0);
+  guest::StoreU32(base, g_mode + 840, r.Below(4));
+  guest::StoreU32(base, g_mode + 844, r.Below(200));
+  const bool all = r.Below(3) != 0;
+  for (const uint32_t word : kLoadedWords) {
+    guest::StoreU32(base, g_mode + 848 + word,
+                    all || r.Below(4) != 0 ? 1 + r.Below(3) : 0);
+  }
+  guest::StoreU32(base, 0x826C7960, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, 0x826C7964, r.Below(4) == 0 ? 1 : 0);
+}
+
+// The stand's world as StandScene::PollTeardown's cases lay it
+// (type67_modes.cpp's LayStand, its block the stand block here).
+void LayTeardownStand(uint8_t* base, Random& r) {
+  constexpr uint32_t kScene = 0x1000, kModels = 0x3000, kModelBytes = 0x1400;
+  const uint32_t b = g_stand;
+  WriteRandom(base, b, kStandBytes, r);
+  const uint32_t holder = b, scene = b + kScene;
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t slot = b + 0x40 + 4 * i, stage = b + 0x100 + 0x100 * i;
+    guest::StoreU32(base, holder + 4 * i, slot);
+    guest::StoreU32(base, slot, stage);
+    guest::StoreU32(base, stage + 8, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(3));
+  }
+  const uint32_t under_way = r.Below(2), made = r.Below(3) == 0 ? 0 : 1 + r.Below(5);
+  guest::StoreU32(base, holder + 12, under_way);
+  guest::StoreU32(base, holder + 16, uint32_t(int32_t(r.Below(5)) - 1));
+  guest::StoreU32(base, holder + 20, made);
+  bool loading = false;
+  guest::StoreU32(base, scene + 0, 4);
+  guest::StoreU32(base, scene + 48, 4 + r.Below(8));
+  for (const uint32_t slot : {84u, 132u, 156u, 268u, 472u, 964u, 4156u, 4764u}) {
+    const uint32_t state = r.Below(12) == 0 ? 2 : r.Below(2);
+    loading |= state == 2;
+    guest::StoreU32(base, scene + slot, state);
+  }
+  for (uint32_t pool = 0; pool < 7; pool++) {
+    guest::StoreU32(base, scene + 4944 + 12 * pool + 8, 0);
+  }
+  guest::StoreU32(base, scene + 5028, b + kModels);
+  guest::StoreU32(base, scene + 5036, 3);
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t model = b + kModels + kModelBytes * k;
+    guest::StoreU32(base, model + 8, k < 2 ? model + kModelBytes : 0);
+    guest::StoreU32(base, model + 16, 3);
+    const uint32_t deferred = r.Below(3) == 0 ? 1 : 0;
+    loading |= deferred != 0;
+    guest::StoreU32(base, model + 5040, deferred);
+  }
+  const uint32_t set = b + 0x7000;
+  for (uint32_t i = 0; i < 4; i++) guest::StoreU32(base, set + 4 * i, 0);
+  guest::StoreU32(base, 0x826D83E0, holder);
+  guest::StoreU32(base, 0x826C2E44, scene);
+  const bool tear_down = under_way == 0 && (made == 0 || !loading);
+  guest::StoreU32(base, 0x826C2E40, tear_down ? b + 0x7800 : 0);
+  guest::StoreU32(base, kAccessorySet, set);
+}
+
+// The players' garage cameras (stages 1 and 2) set up or not: one preset
+// (its entry 0 for presets 42 and 43 of the scene model's car 0).
+void LayCameras(uint8_t* base, Random& r) {
+  const uint32_t b = g_stand, table = b + 0x7400, preset = b + 0x7600;
+  WriteRandom(base, preset, 64, r);
+  for (uint32_t k = 0; k < 48; k++) guest::StoreU32(base, table + 4 * k, 0);
+  guest::StoreU32(base, b + 0x6000 + 48, 0);  // the scene model's car
+  const bool set_up = r.Below(4) != 0;
+  for (uint32_t i = 1; i < 3; i++) {
+    const uint32_t camera = b + 0x100 + 0x1900 * i + 112;
+    guest::StoreU32(base, camera, set_up || r.Below(2) == 0 ? 1 : 0);
+    guest::StoreU32(base, camera + 292, table);
+    guest::StoreU32(base, camera + 4392, 1);
+    guest::StoreU32(base, camera + 296, preset);
+  }
+}
+
+void ModeOutputs(uint8_t* base, Outputs& out) {
+  out.Bytes(Read(base, g_mode, kModeBytes));
+  for (const auto& [at, bytes] : kModeGlobals) {
+    if (at == kTwoPlayerBlock) {
+      out.Word(guest::LoadU32(base, at) == 0 ? 0 : 1);
+    } else if (at != ui_movies::kMovieTable) {
+      out.Bytes(Read(base, at, bytes));
+    }
+  }
+}
+
+void Type8ModeSlots(Context& h, uint32_t world) {
+  uint8_t* const base = h.base;
+  g_stand = memory::Alloc(kStandBytes, 0);
+  g_mode = memory::Alloc(kModeBytes, 0);
+  g_save = memory::Alloc(kSaveBytes, 0);
+  g_loading_movie = memory::Alloc(0xA100, 0);
+  g_strings = memory::Alloc(strings_and_font::kStringsBytes, 0);
+  const lw::MovieWorld w;
+  if (g_stand == 0 || g_mode == 0 || g_save == 0 || g_loading_movie == 0 || g_strings == 0 ||
+      !w.ok()) {
+    ITC_LOG_ERROR("harness: type8_mode: no blocks for the mode's slots");
+    return;
+  }
+  std::vector<std::vector<uint8_t>> saved;
+  for (const auto& [at, bytes] : kModeGlobals) saved.push_back(Read(base, at, bytes));
+  const lw::SavedGlobals saved_world(base);
+  lw::BuildStringTable(base, w);
+  g_movies = &w;
+  const auto mode_outputs = [base](Outputs& out) { ModeOutputs(base, out); };
+  const auto answer = [base](PPCContext& t, Random& r, uint32_t) {
+    LayMode(base, r);
+    t.r4.u64 = g_mode;
+  };
+
+  Group(
+      h, world, "ModeType8::AllLoaded", 0x8223D3C0, 6, {0, 0},
+      [base](PPCContext& t, Random& r, uint32_t) {
+        LayMode(base, r);
+        t.r3.u64 = (uint64_t(r.Below(2)) << 32) | (g_mode + 848);
+      },
+      __imp__sub_8223D3C0, hooks::Type8ModeAllLoaded, mode_outputs);
+  Group(
+      h, world, "ModeType8::Interrupt", 0x8223D960, 8, {96, 8},
+      [base](PPCContext& t, Random& r, uint32_t) {
+        LayMode(base, r);
+        guest::StoreU32(base, g_mode + 87724, r.Below(2) == 0 ? 5 : r.Below(8));
+        t.r3.u64 = g_mode + 32;
+      },
+      __imp__sub_8223D960, hooks::Type8ModeInterrupt, mode_outputs);
+  Group(
+      h, world, "ModeType8::NextMode", 0x8223DD90, 10, {144, 48},
+      [base, answer](PPCContext& t, Random& r, uint32_t w) {
+        answer(t, r, w);
+        const uint32_t member = g_mode + 848;
+        static constexpr uint32_t kStates[] = {6, 11, 5, 4};
+        guest::StoreU32(base, member + 30916 + 9604, r.Below(4) == 0 ? 11 : kStates[r.Below(4)]);
+        guest::StoreU32(base, member + 19548 + 9604, r.Below(4) == 0 ? 11 : kStates[r.Below(4)]);
+        guest::StoreU32(base, member + 4 + 9604, r.Below(2) == 0 ? 6 : kStates[r.Below(4)]);
+        WriteRandom(base, g_save + 0x1F85C, 284, r);
+        guest::StoreU32(base, kSaveSlots, g_save);
+        uint32_t block = 0;
+        if (r.Below(5) != 0) {
+          block = memory::crt::OperatorNew(base, kTwoPlayerBytes).value_or(0);
+          if (block != 0) WriteRandom(base, block + 0x3AA58, 284, r);
+        }
+        guest::StoreU32(base, kTwoPlayerBlock, block);
+      },
+      __imp__sub_8223DD90, hooks::Type8ModeNextMode, [base](Outputs& out) {
+        ModeOutputs(base, out);
+        out.Bytes(Read(base, g_save + 0x1F85C, 284));
+        const uint32_t block = guest::LoadU32(base, kTwoPlayerBlock);
+        if (block != 0) {
+          memory::crt::OperatorDelete(block);
+          guest::StoreU32(base, kTwoPlayerBlock, 0);
+        }
+      });
+  Group(
+      h, world, "ModeType8::WaitForLoads", 0x8223DBC0, 12, {160, 56},
+      [base, answer](PPCContext& t, Random& r, uint32_t w) {
+        answer(t, r, w);
+        LaySoundManager(base, w, r);
+        guest::StoreU32(base, w + kManagerVtableAt + 24, 0x82090770);
+        // Mostly loaded: both fades' counts 0, bank 1 not loading.
+        if (r.Below(4) != 0) {
+          guest::StoreU32(base, kFadeCountA, 0);
+          guest::StoreU32(base, kFadeCountB, 0);
+          guest::StoreU32(base, w + kManagerAt + 60, 0);
+        }
+        LayStand(base, r);
+        LayCameras(base, r);
+        guest::StoreU32(base, kLoadingCurrent, r.Below(3));
+        WriteRandom(base, g_loading_movie, 0xA100, r);
+        ui_movies::InitAnimationLists(base, g_loading_movie);
+        for (uint32_t k = 0; k < 3; k++) {
+          guest::StoreU32(base, kLoadingMovies + 4 * k, g_loading_movie);
+        }
+      },
+      __imp__sub_8223DBC0, hooks::Type8ModeWaitForLoads, [base](Outputs& out) {
+        ModeOutputs(base, out);
+        StandOutputs(base, out);
+        out.Bytes(Read(base, g_loading_movie, 0xA100));
+      });
+  Group(
+      h, world, "ModeType8::PollTeardown", 0x8223D8E8, 8, {128, 32},
+      [base, answer](PPCContext& t, Random& r, uint32_t w) {
+        answer(t, r, w);
+        LayTeardownStand(base, r);
+      },
+      __imp__sub_8223D8E8, hooks::Type8ModePollTeardown, [base](Outputs& out) {
+        ModeOutputs(base, out);
+        StandOutputs(base, out);
+      });
+  Group(
+      h, world, "ModeType8::TearDown", 0x8223D4D0, 8, {160, 48},
+      [base, answer](PPCContext& t, Random& r, uint32_t w) {
+        answer(t, r, w);
+        LaySoundManager(base, w, r);
+        WriteRandom(base, g_strings, strings_and_font::kStringsBytes, r);
+        for (uint32_t f = 0; f < 2; f++) {
+          guest::StoreU32(base, g_strings + 4 * f, 0);
+          guest::StoreU32(base, g_strings + 68 + 4 * f, r.Below(2));
+          guest::StoreU32(base, g_strings + 4236 + 4 * f, 2 + r.Below(3));
+        }
+        guest::StoreU32(base, kStringTable, g_strings);
+        const uint32_t capacity = 1 + r.Below(3), count = r.Below(capacity + 1);
+        const uint32_t array = memory::crt::OperatorNewArray(base, 8 * capacity).value_or(0);
+        for (uint32_t k = 0; k < capacity; k++) {
+          guest::StoreU32(base, array + 8 * k, 100 + k);
+          guest::StoreU32(base, array + 8 * k + 4, 0);
+        }
+        guest::StoreU32(base, ui_movies::kMovieTable, array);
+        guest::StoreU32(base, ui_movies::kMovieTable + 4, capacity);
+        guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+        // No movie for a missing id (UiMovies::Find's answer), so DeleteAll
+        // deletes none (the movie world's movie 0 isn't a heap block).
+        guest::StoreU32(base, 0x826C5CDC, 0);
+      },
+      __imp__sub_8223D4D0, hooks::Type8ModeTearDown, [base](Outputs& out) {
+        ModeOutputs(base, out);
+        out.Bytes(Read(base, g_strings, strings_and_font::kStringsBytes));
+        out.Bytes(Read(base, ui_movies::kMovieTable + 4, 8));
+      });
+  Group(
+      h, world, "ModeType8::ForceExit", 0x8223DA00, 10, {128, 40},
+      [base](PPCContext& t, Random& r, uint32_t) {
+        LayMode(base, r);
+        LayStand(base, r);
+        t.r3.u64 = (uint64_t(r.Below(4) == 0) << 32) | (g_mode + 32);
+        t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(6);
+      },
+      __imp__sub_8223DA00, hooks::Type8ModeForceExit, [base](Outputs& out) {
+        ModeOutputs(base, out);
+        StandOutputs(base, out);
+      });
+  for (size_t i = 0; i < saved.size(); i++) {
+    Write(base, kModeGlobals[i].first, saved[i].data(), kModeGlobals[i].second);
+  }
+
+  // SaveData::FreeTwoPlayerBlock: the block none or operator new's;
+  // compared: the word after, whether the block is free (handed out again)
+  // and the frame's back chain.
+  {
+    Results results("SaveData::FreeTwoPlayerBlock (sub_82105638)");
+    const uint32_t kept = guest::LoadU32(base, kTwoPlayerBlock);
+    for (int c = 0; c < 6; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(Seed(0x82105638ull << 16 ^ uint64_t(c)));
+        uint32_t block = 0;
+        if (r.Below(3) != 0) block = memory::crt::OperatorNew(base, 64).value_or(0);
+        guest::StoreU32(base, kTwoPlayerBlock, block);
+        PPCContext t = CallContext(h);
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (v == 0) {
+          ITC_FLAG(native_type8_mode) = false;
+          __imp__sub_82105638(t, base);
+          ITC_FLAG(native_type8_mode) = true;
+        } else {
+          hooks::Type8FreeTwoPlayerBlock(t, base);
+        }
+        out[v].Word(guest::LoadU32(base, kTwoPlayerBlock));
+        out[v].Word(block == 0 ? 0 : 1);
+        out[v].Bytes(Read(base, t.r1.u32 - 96, 4));
+        out[v].Word(t.r1.u32);
+        if (block != 0) {
+          const auto probe = memory::crt::OperatorNew(base, 64);
+          out[v].Word(probe && *probe == block ? 1 : 0);
+          if (probe) memory::crt::OperatorDelete(*probe);
+        } else {
+          out[v].Word(t.r3.u32);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+    guest::StoreU32(base, kTwoPlayerBlock, kept);
+  }
+
+  // ModeType8::Release: StandScene::Release's world (with --native_heap):
+  // the holder, its slots and the viewports the layer's pages; compared:
+  // which blocks are still pages, the two globals, r1 and r3.
+  if (hooks::NativeHeapActive()) {
+    Results results("ModeType8::Release (sub_8223D3B8)");
+    const uint32_t kept_holder = guest::LoadU32(base, 0x826D83E0);
+    const uint32_t kept_viewports = guest::LoadU32(base, kViewports);
+    for (int c = 0; c < 4; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(Seed(0x8223D3B8ull << 16 ^ uint64_t(c)));
+        std::vector<uint32_t> made;
+        auto pages = [&](uint32_t bytes) {
+          const uint32_t block = memory::AllocPages(bytes, 4096);
+          WriteRandom(base, block, bytes < 64 ? bytes : 64, r);
+          made.push_back(block);
+          return block;
+        };
+        const uint32_t viewports = pages(12);
+        guest::StoreU32(base, viewports + 0, pages(1872));
+        guest::StoreU32(base, viewports + 4, pages(1872));
+        guest::StoreU32(base, kViewports, viewports);
+        const uint32_t holder = pages(12);
+        guest::StoreU32(base, 0x826D83E0, holder);
+        for (uint32_t i = 0; i < 3; i++) {
+          uint32_t slot = 0;
+          if (r.Below(2) != 0) {
+            slot = pages(64);
+            guest::StoreU32(base, slot, 0);
+          }
+          guest::StoreU32(base, holder + 4 * i, slot);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r.Next();
+        t.r4.u64 = r.Next();
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (v == 0) {
+          ITC_FLAG(native_type8_mode) = false;
+          __imp__sub_8223D3B8(t, base);
+          ITC_FLAG(native_type8_mode) = true;
+        } else {
+          hooks::Type8ModeRelease(t, base);
+        }
+        out[v].Word(uint32_t(made.size()));
+        for (const uint32_t block : made) {
+          out[v].Word(memory::IsPages(block));
+          if (memory::IsPages(block)) memory::FreePages(block);
+        }
+        out[v].Word(guest::LoadU32(base, 0x826D83E0));
+        out[v].Word(guest::LoadU32(base, kViewports));
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+    guest::StoreU32(base, 0x826D83E0, kept_holder);
+    guest::StoreU32(base, kViewports, kept_viewports);
+  }
+  g_movies = nullptr;
+  saved_world.Restore();
+  memory::Free(g_strings);
+  memory::Free(g_loading_movie);
+  memory::Free(g_save);
+  memory::Free(g_mode);
+  memory::Free(g_stand);
+  g_stand = 0;
+}
+
 }  // namespace
 
 void Type8Mode(Context& h) {
@@ -701,6 +1091,7 @@ void Type8Mode(Context& h) {
     return;
   }
   Type8Screen0s(h, world);
+  Type8ModeSlots(h, world);
   memory::Free(world);
 }
 
