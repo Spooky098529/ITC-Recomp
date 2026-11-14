@@ -49,6 +49,12 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
     if (!r4 || !r5) return std::nullopt;
     return Type7ListScreenItemInfo(base, *r4, *r5, sp, lr, calls);
   }
+  // The type 8 list screen's slot 25 (r4 the item;
+  // src/type8_screens/list_screen.cpp).
+  if (target == 0x8223F598) {
+    if (!r4 || !r5) return std::nullopt;
+    return type8_screens::ListScreen8ItemInfo(base, r3, *r4, uint32_t(*r5));
+  }
   // The list part's and its inner part's slots, and the inner's pages and
   // steps (list_part.cpp); r5, which only the guest fallbacks see, isn't
   // passed on (the plain C++ here doesn't read it).
@@ -287,6 +293,23 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return type8_screens::ColorPartIsFirstChoice(base, r3, *r4, sp);
       case 0x82253240:
         return type8_screens::ColorPartThirdChoice(base, r3, *r4);
+      // The type 8 list screen's slots 0, 2, 23, 24 and 26 (both vtables'
+      // slot 0) and its page 5 (src/type8_screens/list_screen.cpp).
+      case 0x82257B20:
+        return type8_screens::ListBaseDeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x8223F388:
+        return type8_screens::ListScreen8DeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x8223F5D8:
+        return type8_screens::ListScreen8SetItemTexts(base, r3, *r4, sp, calls);
+      case 0x8223F6C8:
+        return type8_screens::ListScreen8ShowMarks(base, r3, *r4, sp);
+      case 0x82258D60:
+        return type8_screens::ListBaseDraw(base, r3, *r4, sp, calls);
+      case 0x82258EB0:
+        // r4 not read (the step table's guard word replaces it).
+        return type8_screens::ListBaseUpdate(base, r3, r5, sp, calls);
+      case 0x82258AD0:
+        return type8_screens::ListBasePage5(base, r3, *r4, sp, calls);
       default:
         break;
     }
@@ -380,6 +403,36 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
     // The type 8 inner parts' shared page 1 (list_part.cpp).
     case 0x82253108:
       return type8_screens::PartInnerPage1(base, r3);
+    // The type 8 list screen's slots 1, 12, 14, 18 and 27, its pages and
+    // steps (list_screen.cpp; none reads r4).
+    case 0x8223F590:
+      return type8_screens::ListScreen8IsLoaded(base, r3);
+    case 0x8223F3E0:
+      return type8_screens::ListScreen8OpenMovie(base, r3, sp, lr, calls);
+    case 0x8223F588:
+      return type8_screens::ListScreen8Release(base, r3, sp, lr, calls);
+    case 0x8223F3F0:
+      return type8_screens::ListScreen8SetUpMenus(base, r3, sp, calls);
+    case 0x8223F648:
+      return type8_screens::ListScreen8SetLabels(base, r3, sp, calls);
+    case 0x82257588:
+      return type8_screens::ListBasePage2(base, r3, sp, calls);
+    case 0x82257768:
+      return type8_screens::ListBasePage3(base, r3, sp, calls);
+    case 0x82258A40:
+      return type8_screens::ListBasePage4(base, r3, sp, calls);
+    case 0x822578D8:
+      return type8_screens::ListBasePage6(base, r3);
+    case 0x82257900:
+      return type8_screens::ListBasePage8(base, r3);
+    case 0x82258158:
+      return type8_screens::ListBaseStep0(base, r3, sp, calls);
+    case 0x82258648:
+      return type8_screens::ListBaseStep1(base, r3, sp, calls);
+    case 0x82258BE0:
+      return type8_screens::ListBaseStep2(base, r3, sp, calls);
+    case 0x82258438:
+      return type8_screens::ListBaseStep3(base, r3, sp, calls);
     default:
       return std::nullopt;
   }
@@ -395,6 +448,7 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82259998:
       return has_r5;
     case 0x82242FA0:
+    case 0x8223F598:
       return has_r4 && has_r5;
     case 0x82243238:
     case 0x822432A8:
@@ -426,8 +480,29 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x82254178:
     case 0x82253238:
     case 0x82253240:
+    case 0x82257B20:
+    case 0x8223F388:
+    case 0x8223F5D8:
+    case 0x8223F6C8:
+    case 0x82258D60:
+    case 0x82258EB0:
+    case 0x82258AD0:
       return has_r4;
     case 0x82253108:
+    case 0x8223F590:
+    case 0x8223F3E0:
+    case 0x8223F588:
+    case 0x8223F3F0:
+    case 0x8223F648:
+    case 0x82257588:
+    case 0x82257768:
+    case 0x82258A40:
+    case 0x822578D8:
+    case 0x82257900:
+    case 0x82258158:
+    case 0x82258648:
+    case 0x82258BE0:
+    case 0x82258438:
       return true;
     case 0x82236F00:
     case 0x82237160:

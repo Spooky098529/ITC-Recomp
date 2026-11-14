@@ -21,6 +21,7 @@
 #include "type67_screens/type67_screens.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace type8_screens {
 
@@ -447,5 +448,124 @@ uint64_t ColorInnerStep0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                          const Calls& calls);
 uint64_t ColorInnerPage0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                          const Calls& calls);
+
+
+// --- The list screen (list_screen.cpp): Type8ListScreen (11,368 bytes with
+// its part, vtable 0x82010E18) over Type8ListBase (vtable 0x82011638, a
+// sibling of TitledListScreen) over NodeListScreen: the race kind list
+// +10144 (3 items), the course list +10216 (8, 6 shown), the traffic toggle
+// +10288, the node table +10360, the scroll texts +10820 to +10840, the
+// list part +10844. The page block as the titled list's (src/type67_screens/
+// titled_list.cpp); Draw and Update build their tables on first use, the
+// entries run through type67_screens::SlotNative. Names prefixed ListBase
+// and ListScreen8 (type67_screens has ListScreen* functions ADL finds) ---
+
+constexpr uint32_t kListBaseVtable = 0x82011638;
+constexpr uint32_t kListScreenVtable = 0x82010E18;
+constexpr uint32_t kListScreenPart = 10844;
+// The page table (10 entries: the empty handler for pages 0, 1, 7; Page2
+// to Page6, Page8 and ListScreen::LeavePage for 9) and the step table
+// (Step0 to Step3, TitledListScreen::Step2, ColorListScreen::Step0), with
+// their guards.
+constexpr uint32_t kListBasePages = 0x82815FF0;
+constexpr uint32_t kListBasePageGuard = 0x82816040;
+constexpr uint32_t kListBaseSteps = 0x82816044;
+constexpr uint32_t kListBaseStepGuard = 0x82816074;
+
+// sub_822574D0 Type8ListBase::Type8ListBase (96-byte frame):
+// NodeListScreen::NodeListScreen's plain C++, its vtable, +10820 to +10836
+// = 545 to 549, +10840 = -1. r3 left.
+uint64_t ListBaseConstruct(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_8223F140 Type8ListScreen::Type8ListScreen (112): ListBaseConstruct,
+// its vtable, Type8ListPart::Type8ListPart on +10844 (+9676 its address),
+// then its words, those of the node table through [+9672] (read again for
+// each store as the original does). r3 left.
+uint64_t ListScreen8Construct(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_82257548 Type8ListBase::~Type8ListBase: its vtable, then
+// ~NodeListScreen (a tail call from `sp`). Its r3.
+uint64_t ListBaseDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82257B20 Type8ListBase::DeletingDestructor and sub_8223F388
+// Type8ListScreen::DeletingDestructor (112): the destructors (the screen's:
+// ~Type8ListPart on +10844, ~Type8ListBase), operator delete (a guest call)
+// when bit 0 of `flags` is set. r3 left.
+uint64_t ListBaseDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                  const Calls& calls);
+uint64_t ListScreen8DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                     const Calls& calls);
+// sub_8223F590 Type8ListScreen::IsLoaded (slot 1 of both type 8 list
+// screens): UiMovies::IsLoaded([+9680])'s plain C++ (a tail call), its
+// answer as is. sub_8223F3E0 OpenMovie (slot 12) and sub_8223F588 Release
+// (slot 18 of both): UiMovies::Open([+9680], 22584) and Delete([+9680]),
+// tail calls from `sp` returning to `lr`.
+uint64_t ListScreen8IsLoaded(uint8_t* base, uint64_t r3);
+uint64_t ListScreen8OpenMovie(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                              const Calls& calls);
+uint64_t ListScreen8Release(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                            const Calls& calls);
+// sub_8223F5D8 Type8ListScreen::SetItemTexts (slot 2; 128; r4 the course
+// list's scroll): SetText(m, +9744, 5 + i, [0x82010D70 + 4 r4 + 4 i]) for i
+// 0 to 5. The last SetText's r3.
+uint64_t ListScreen8SetItemTexts(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                                 const Calls& calls);
+// sub_8223F598 Type8ListScreen::ItemInfo (slot 25; a leaf): item r4 (0 to
+// 7, else nothing)'s 16 bytes from 0x82010D90 to `info`. r3 left.
+uint64_t ListScreen8ItemInfo(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t info);
+// sub_8223F6C8 Type8ListScreen::ShowMarks (slot 26; 128): FindNode(m, -1,
+// 7)'s +80 = 0 for a negative r4 (that node), else 1, then FindNode(m, -1,
+// 17)'s +80 = (r4 != 0) and FindNode(m, -1, 18)'s = (r4 != 2) (the last
+// node).
+uint64_t ListScreen8ShowMarks(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
+// sub_8223F648 Type8ListScreen::SetLabels (slot 27; 112): SetText(m, 19,
+// 5 + i, 128 + i) for i 0 to 2. The last SetText's r3.
+uint64_t ListScreen8SetLabels(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_8223F3F0 Type8ListScreen::SetUpMenus (slot 14; 176): MenuList::Init
+// on +10216, +10288 (selection 1) and +10144, slot 2 with r4 0, slot 27,
+// NodeListScreen::LoadItem(0), ListScreen::OnToggleMoved(+10288), then the
+// music: the sound manager's slot 14 on (1, 2) and, for a nonzero byte,
+// slot 13 on (1, 2); slot 14 on (1, 0) and, for a zero byte,
+// Sound::Play(1, 0) (guest calls but Sound::Play's plain C++). The last
+// call's r3.
+uint64_t ListScreen8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// sub_82258D60 Type8ListBase::Draw (slot 23; 224): the page table built
+// on first use (its pairs left in the frame's +80 to +159), then page
+// +9644's entry with r4 unless it's -1 (then r3 left). The page's r3.
+uint64_t ListBaseDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_82258EB0 Type8ListBase::Update (slot 24; 160): the step table built
+// on first use, then step +9656's entry with r4 the guard's word as loaded
+// (and r5 the table's second entry when it was just built, else `r5`). The
+// step's answer.
+uint64_t ListBaseUpdate(uint8_t* base, uint64_t r3, std::optional<uint64_t> r5, uint32_t sp,
+                        const Calls& calls);
+// The pages: sub_82257588 Page2 (112; the kind list), sub_82257768 Page3
+// (112; the course list), sub_82258A40 Page4 (96; the list part opened),
+// sub_82258AD0 Page5 (96; r4 to the part's Pick; the prompt), sub_822578D8
+// Page6 (page 9) and sub_82257900 Page8 (page 9 once both fade counts are
+// 0; r3 left).
+uint64_t ListBasePage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ListBasePage3(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ListBasePage4(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ListBasePage5(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t ListBasePage6(uint8_t* base, uint64_t r3);
+uint64_t ListBasePage8(uint8_t* base, uint64_t r3);
+// The steps, each answering whether it's done: sub_82258158 Step0 (128;
+// the opening), sub_82258648 Step1 (144; the kind moved, 1), sub_82258BE0
+// Step2 (128; into the course list) and sub_82258438 Step3 (128; back to
+// the kind list).
+uint64_t ListBaseStep0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ListBaseStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ListBaseStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ListBaseStep3(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_822587C8 Type8ListBase::DimList (128; r4 dim): the toggle's and the
+// course's named animations finished (dim) or played and looped, then the
+// nodes +9820 (under -1) and +9824 (under +9728) hidden (dim) or shown. The
+// last call's r3.
+uint64_t ListBaseDimList(uint8_t* base, uint64_t r3, uint64_t dim, uint32_t sp,
+                         const Calls& calls);
+// sub_82248A20 PairedNodeTable::Clear (128; r3 the table): the third
+// pair's named animation finished, the first and second pairs' items shown
+// off (NodeTable::ShowNode's plain C++) and their named animations
+// finished. The last call's r3.
+uint64_t PairedNodeTableClear(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
 }  // namespace type8_screens

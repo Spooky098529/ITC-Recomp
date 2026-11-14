@@ -113,4 +113,33 @@ void Type8ColorInnerInput(PPCContext& ctx, uint8_t* base);
 void Type8ColorInnerStep0(PPCContext& ctx, uint8_t* base);
 void Type8ColorInnerPage0(PPCContext& ctx, uint8_t* base);
 
+// The list screen: its constructors, destructors, slots, tables' pages and
+// steps (DimList and PairedNodeTable::Clear have no adapters: only the
+// native pages call them).
+void Type8ListBaseConstruct(PPCContext& ctx, uint8_t* base);
+void Type8ListScreenConstruct(PPCContext& ctx, uint8_t* base);
+void Type8ListBaseDestruct(PPCContext& ctx, uint8_t* base);
+void Type8ListBaseDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type8ListScreenDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void Type8ListIsLoaded(PPCContext& ctx, uint8_t* base);
+void Type8ListOpenMovie(PPCContext& ctx, uint8_t* base);
+void Type8ListRelease(PPCContext& ctx, uint8_t* base);
+void Type8ListSetItemTexts(PPCContext& ctx, uint8_t* base);
+void Type8ListItemInfo(PPCContext& ctx, uint8_t* base);
+void Type8ListShowMarks(PPCContext& ctx, uint8_t* base);
+void Type8ListSetLabels(PPCContext& ctx, uint8_t* base);
+void Type8ListSetUpMenus(PPCContext& ctx, uint8_t* base);
+void Type8ListDraw(PPCContext& ctx, uint8_t* base);
+void Type8ListUpdate(PPCContext& ctx, uint8_t* base);
+void Type8ListPage2(PPCContext& ctx, uint8_t* base);
+void Type8ListPage3(PPCContext& ctx, uint8_t* base);
+void Type8ListPage4(PPCContext& ctx, uint8_t* base);
+void Type8ListPage5(PPCContext& ctx, uint8_t* base);
+void Type8ListPage6(PPCContext& ctx, uint8_t* base);
+void Type8ListPage8(PPCContext& ctx, uint8_t* base);
+void Type8ListStep0(PPCContext& ctx, uint8_t* base);
+void Type8ListStep1(PPCContext& ctx, uint8_t* base);
+void Type8ListStep2(PPCContext& ctx, uint8_t* base);
+void Type8ListStep3(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

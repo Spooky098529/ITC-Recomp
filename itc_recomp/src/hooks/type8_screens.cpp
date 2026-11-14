@@ -59,7 +59,19 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "SecondMoved sub_822534F0, UpdateThird sub_82253F60, ThirdMoved sub_82253D90, "
               "WhileReady sub_82253EF8 and Input sub_82254070 (UiMovie::FinishNamed, LoopNamed, SetNodeText, ClearNodeText, Run, ResetPose and "
               "the menus' guest calls, MenuList::Init and Release by their plain C++ where they "
-              "free natively)) natively instead of through the translated "
+              "free natively), Type8ListScreen::Type8ListScreen sub_8223F140, DeletingDestructor "
+              "sub_8223F388, IsLoaded sub_8223F590, OpenMovie sub_8223F3E0, Release "
+              "sub_8223F588, SetItemTexts sub_8223F5D8, ItemInfo sub_8223F598, ShowMarks "
+              "sub_8223F6C8, SetLabels sub_8223F648 and SetUpMenus sub_8223F3F0 (the sound "
+              "manager's slots 13 and 14 guest calls), Type8ListBase::Type8ListBase "
+              "sub_822574D0, ~Type8ListBase sub_82257548, DeletingDestructor sub_82257B20, Draw "
+              "sub_82258D60 and Update sub_82258EB0 (their tables built on first use), Page2 "
+              "sub_82257588, Page3 sub_82257768, Page4 sub_82258A40, Page5 sub_82258AD0, Page6 "
+              "sub_822578D8, Page8 sub_82257900, Step0 sub_82258158, Step1 sub_82258648, Step2 "
+              "sub_82258BE0, Step3 sub_82258438 and DimList sub_822587C8, "
+              "PairedNodeTable::Clear sub_82248A20 (the list helpers', node tables' and "
+              "NodeListScreen's plain C++, the UI movies' named animations and Run and the menus' "
+              "guest calls)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=type8_screens)");
 
 namespace hooks {
@@ -180,6 +192,35 @@ ITC_T8_STEP(Type8ColorInnerInput, t8::ColorInnerInput(base, ctx.r3.u64, ctx.r4.u
 ITC_T8_STEP(Type8ColorInnerStep0, t8::ColorInnerStep0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8ColorInnerPage0, t8::ColorInnerPage0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 
+ITC_T8_STEP(Type8ListBaseConstruct, t8::ListBaseConstruct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ListScreenConstruct, t8::ListScreen8Construct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ListBaseDestruct, t8::ListBaseDestruct(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListBaseDeletingDestruct,
+            t8::ListBaseDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListScreenDeletingDestruct,
+            t8::ListScreen8DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListIsLoaded, t8::ListScreen8IsLoaded(base, ctx.r3.u64))
+ITC_T8_STEP(Type8ListOpenMovie, t8::ListScreen8OpenMovie(base, ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
+ITC_T8_STEP(Type8ListRelease, t8::ListScreen8Release(base, ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
+ITC_T8_STEP(Type8ListSetItemTexts,
+            t8::ListScreen8SetItemTexts(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListItemInfo, t8::ListScreen8ItemInfo(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u32))
+ITC_T8_STEP(Type8ListShowMarks, t8::ListScreen8ShowMarks(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ListSetLabels, t8::ListScreen8SetLabels(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListSetUpMenus, t8::ListScreen8SetUpMenus(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListDraw, t8::ListBaseDraw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListUpdate, t8::ListBaseUpdate(base, ctx.r3.u64, ctx.r5.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage2, t8::ListBasePage2(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage3, t8::ListBasePage3(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage4, t8::ListBasePage4(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage5, t8::ListBasePage5(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage6, t8::ListBasePage6(base, ctx.r3.u64))
+ITC_T8_STEP(Type8ListPage8, t8::ListBasePage8(base, ctx.r3.u64))
+ITC_T8_STEP(Type8ListStep0, t8::ListBaseStep0(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListStep1, t8::ListBaseStep1(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListStep2, t8::ListBaseStep2(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListStep3, t8::ListBaseStep3(base, ctx.r3.u64, sp, calls))
+
 #undef ITC_T8_STEP
 
 void Type8InitMachine(PPCContext& ctx, uint8_t* base) {
@@ -277,3 +318,31 @@ ITC_TYPE8_SCREENS(82253E48, Type8ColorInnerStep0)
 ITC_TYPE8_SCREENS(82254178, Type8ColorInnerPage0)
 ITC_TYPE8_SCREENS(82253238, Type8ColorPartIsFirstChoice)
 ITC_TYPE8_SCREENS(82253240, Type8ColorPartThirdChoice)
+// The list screen: its constructors and destructor (from the type 8 mode's
+// member's, recompiled), its vtables' slots and its tables' pages and steps
+// (reached through the vtables and tables).
+ITC_TYPE8_SCREENS(822574D0, Type8ListBaseConstruct)
+ITC_TYPE8_SCREENS(8223F140, Type8ListScreenConstruct)
+ITC_TYPE8_SCREENS(82257548, Type8ListBaseDestruct)
+ITC_TYPE8_SCREENS(82257B20, Type8ListBaseDeletingDestruct)
+ITC_TYPE8_SCREENS(8223F388, Type8ListScreenDeletingDestruct)
+ITC_TYPE8_SCREENS(8223F590, Type8ListIsLoaded)
+ITC_TYPE8_SCREENS(8223F3E0, Type8ListOpenMovie)
+ITC_TYPE8_SCREENS(8223F588, Type8ListRelease)
+ITC_TYPE8_SCREENS(8223F5D8, Type8ListSetItemTexts)
+ITC_TYPE8_SCREENS(8223F598, Type8ListItemInfo)
+ITC_TYPE8_SCREENS(8223F6C8, Type8ListShowMarks)
+ITC_TYPE8_SCREENS(8223F648, Type8ListSetLabels)
+ITC_TYPE8_SCREENS(8223F3F0, Type8ListSetUpMenus)
+ITC_TYPE8_SCREENS(82258D60, Type8ListDraw)
+ITC_TYPE8_SCREENS(82258EB0, Type8ListUpdate)
+ITC_TYPE8_SCREENS(82257588, Type8ListPage2)
+ITC_TYPE8_SCREENS(82257768, Type8ListPage3)
+ITC_TYPE8_SCREENS(82258A40, Type8ListPage4)
+ITC_TYPE8_SCREENS(82258AD0, Type8ListPage5)
+ITC_TYPE8_SCREENS(822578D8, Type8ListPage6)
+ITC_TYPE8_SCREENS(82257900, Type8ListPage8)
+ITC_TYPE8_SCREENS(82258158, Type8ListStep0)
+ITC_TYPE8_SCREENS(82258648, Type8ListStep1)
+ITC_TYPE8_SCREENS(82258BE0, Type8ListStep2)
+ITC_TYPE8_SCREENS(82258438, Type8ListStep3)

@@ -59,6 +59,8 @@ struct StandWorld {
   uint32_t params, holder_word, list;
 };
 StandWorld LayShowCarWorld(uint8_t* base, uint32_t block, Random& r, int c, uint32_t holder);
+// The list screen's pages, steps and slots (type8_list_screen.cpp).
+void Type8ListScreen(Context& h);
 
 namespace {
 
@@ -339,6 +341,34 @@ void Panels(Context& h, uint32_t world) {
 }
 
 void Leaves(Context& h, uint32_t world) {
+  uint8_t* const base = h.base;
+  // The list screen's leaves (list_screen.cpp): its movie id +9680 16 to
+  // 19; ItemInfo's r4 an item (0 to 7 mostly, else 8 to 11 or any word), r5
+  // an info in the world.
+  const auto list_id = [base](PPCContext&, Random& r, uint32_t w) {
+    guest::StoreU32(base, w + kObjectAt + 9680, 16 + r.Below(4));
+  };
+  Group(h, world, "Type8ListScreen::IsLoaded", 0x8223F590, 4, {0, 0}, list_id,
+        __imp__sub_8223F590, hooks::Type8ListIsLoaded);
+  Group(
+      h, world, "Type8ListScreen::OpenMovie", 0x8223F3E0, 4, {0, 0}, list_id,
+      __imp__sub_8223F3E0, [](PPCContext& t, uint8_t* b) {
+        const t8::Calls c = RecordingCalls(t, b);
+        t.r3.u64 = t8::ListScreen8OpenMovie(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+      });
+  Group(
+      h, world, "Type8ListScreen::Release", 0x8223F588, 4, {0, 0}, list_id, __imp__sub_8223F588,
+      [](PPCContext& t, uint8_t* b) {
+        const t8::Calls c = RecordingCalls(t, b);
+        t.r3.u64 = t8::ListScreen8Release(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+      });
+  Group(
+      h, world, "Type8ListScreen::ItemInfo", 0x8223F598, 12, {0, 0},
+      [](PPCContext& t, Random& r, uint32_t w) {
+        t.r4.u64 = r.Below(4) == 0 ? (r.Below(2) == 0 ? 8 + r.Below(4) : r.Next()) : r.Below(8);
+        t.r5.u64 = w + 0x7000 + 4 * r.Below(48);
+      },
+      __imp__sub_8223F598, hooks::Type8ListItemInfo);
   Group(h, world, "Type8PanelScreen::InitWords", 0x82238420, 4, {0, 0}, NoSetup,
         __imp__sub_82238420, hooks::Type8InitWords);
   Group(h, world, "Type8PanelScreen::IsLoaded", 0x82238418, 2, {0, 0}, NoSetup,
@@ -515,6 +545,11 @@ void Screen(Context& h, uint32_t world) {
   uint8_t* const base = h.base;
   Group(h, world, "Type8PanelScreen::Type8PanelScreen", 0x822386F0, 6, {224, 112}, NoSetup,
         __imp__sub_822386F0, hooks::Type8Construct);
+  // The list screen's constructors (list_screen.cpp) on a random screen.
+  Group(h, world, "Type8ListBase::Type8ListBase", 0x822574D0, 4, {96, 16}, NoSetup,
+        __imp__sub_822574D0, hooks::Type8ListBaseConstruct);
+  Group(h, world, "Type8ListScreen::Type8ListScreen", 0x8223F140, 4, {112, 32}, NoSetup,
+        __imp__sub_8223F140, hooks::Type8ListScreenConstruct);
   const auto menus = [base](PPCContext& t, Random& r, uint32_t w) {
     Menus(base, w + kObjectAt, r);
     t.r4.u64 = r.Next() & ~1ull;
@@ -1039,6 +1074,7 @@ void Type8Screens(Context& h) {
   PickCar(h, world);
   ListPart(h, world);
   memory::Free(world);
+  Type8ListScreen(h);
 }
 
 }  // namespace harness

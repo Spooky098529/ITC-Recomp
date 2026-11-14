@@ -501,6 +501,7 @@ set(ITC_SOURCES
     src/type8_screens/init_machine.cpp
     src/type8_screens/list_part.cpp
     src/type8_screens/color_part.cpp
+    src/type8_screens/list_screen.cpp
     src/car_list/panels.cpp
     src/car_list/set.cpp
     src/car_list/pages.cpp
@@ -851,6 +852,7 @@ set(ITC_SOURCES
     src/harnesses/type67_screen_tables.cpp
     src/harnesses/car_list.cpp
     src/harnesses/type8_screens.cpp
+    src/harnesses/type8_list_screen.cpp
     src/harnesses/front_end_screen_helpers.cpp
     src/harnesses/car_dealer.cpp
     src/harnesses/type2_screens.cpp
