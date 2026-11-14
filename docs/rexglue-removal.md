@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-13):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-14):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -319,7 +319,23 @@ goes in `src/` as overrides), American English.
   `TuningScreen::HandleInput` as leads without mapping (ours 5,612 ->
   5,989, work left 984 -> 718); the rest waits on the core's
   `Event::` and sync, `Device::Swap` and `Resolve`, the sticker
-  editor and the leads in `docs/loops/leads.md`.
+  editor and the leads in `docs/loops/leads.md`. Its forty-sixth run
+  (`b7-loop-13-11-26`, 2026-11-13 to 14, limit 10, the user's call;
+  not yet merged) made ten subsystems native, most never seen in play
+  and ported by the 2026-11-12 call: the morph jobs
+  (`morph-jobs.md`), the save devices' constructor and slot handlers
+  (`save-interface.md`, with `SaveDevices::Update`; B4's steps split
+  into plain C++), the render manager's and texture provider's slots
+  with the static matrices, the sticker editor (`sticker-editor.md`),
+  the stand's setters (`stand-models.md`), the type 6 and 7 modes'
+  small pieces and list screens (`type67-screens.md`), and the type 8
+  mode (probably the two-player mode) with its screens
+  (`type8-screens.md`, `type8-mode.md`), with cleanup leads between
+  (`OnRaceEnd`, direct slot calls, the stand's and tuning screen's
+  never-seen rows, the tuning pages' blockers) (ours 5,989 -> 6,537,
+  work left 718 -> 676); the rest waits on the core's `Event::` and
+  sync (the worker pools, `Device::Clear`'s worker), `Device::Resolve`
+  and the never-seen leads in `docs/loops/leads.md`.
   The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2898,6 +2914,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-13 | The type 6 and 7 modes' small pieces (the controller options' steps, the group pair's, panel screens' and panel sets' destructors, `SingleGroup`), with `DecalImages::UnloadAll` Native | `type6-type7-modes.md`, `type67-screens.md`, `car-list.md`, `archive.md` | 16 new rows and 3 blockers ours | (existing flags) |
 | 2026-11-14 | The type 6 and 7 list screens' and node screen's pages and steps (the six tables built on first use, the list part, the node tables, the color list, the panel screens, the screen blocks' destructors; none seen in play) | `type67-screens.md` | 174 rows ours (2 Merged), with `CourseRecords::Of` | (`--native_type67_screens`) |
 | 2026-11-14 | The type 8 mode's screens (probably the two-player mode's panel screen and list screens, built on the type 6 and 7 bases; none seen in play) | `type8-screens.md` | 128 of 128 (2 Merged), with 13 `car-list.md` rows and `TwoPlayerBlock` | `--native_type8_screens` |
+| 2026-11-14 | The type 8 mode itself (its Init, slots and teardown, its first screen and dialog), with the options', controller options' and save screen's type 8 Inits, the two-player save block's maker and four shared dialog handlers | `type8-mode.md` | 52 of 52 | `--native_type8_mode` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5567,3 +5584,15 @@ base); two more traffic-records groups expected to differ. The
 validation's harnesses take ~133 s of the 180. The boundary:
 unchanged. B7 (`b7_status.py`): ours 6,477, work left 676 (Wrapped 51,
 with a row 354, no row yet 271).
+
+**2026-11-14, the type 8 mode (branch `b7-loop-13-11-26`, the
+forty-sixth run, its tenth subsystem):** `type8-mode.md` (52 rows,
+`src/type8_mode/`): the type 8 mode's Init, slots, teardown, first
+screen and dialog, none seen in play, with the type 8 options',
+controller options' and save screen's Inits, the two-player save
+block's maker and four shared dialog handlers. The run stopped at its
+limit of 10. The validation's harnesses take ~133 s of the 180. The
+boundary: 449 functions (916 pairs): overridden 110, Native 40,
+Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
+live caller. B7 (`b7_status.py`): ours 6,537, work left 676 (Wrapped
+51, with a row 354, no row yet 271), from 718 at the run's start.

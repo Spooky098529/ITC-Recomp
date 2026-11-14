@@ -274,9 +274,16 @@ file's history. What's left to see in a drive, from every run:
   Overridden, 7 Native), with the 8 callees taken along;
   `--native_type8_mode`; every harness 0 differing (no new expected
   group), races 29-38 s at 40, 0 errors; harness faults fixed on the
-  way; five subagents one at a time. Validation agent running.
+  way; five subagents one at a time. Validated: `itc_5425` (race 45 s
+  at 180, the harnesses 133 s; 0 errors, every harness 0 differing
+  outside the expected groups), 60 of 60 harness lines; none in the
+  race or the replay `itc_5426` (ok): to drive. Recorded; subsystem 10
+  done: the run's limit.
 
 ## Done
+
+- The type 8 mode: `type8-mode.md` 52 of 52, with 8 callees,
+  `--native_type8_mode`, ab9d75d1..00c9f8e1; validated.
 
 - The type 8 mode's screens: `type8-screens.md` 128 of 128, with 13
   `car-list.md` rows, `--native_type8_screens`, 138f7c8c..c7628060;
@@ -365,5 +372,13 @@ The run's section of `review.md` ("Run 2026-11-13 12:31").
 - After the type 6 and 7 small pieces: ours 6160, work left 676.
 - After the list screens: ours 6335, work left 676.
 - After the type 8 screens: ours 6477, work left 676.
+- After the type 8 mode (the end): ours 6537, work left 676 (wrapped
+  51, known 354, unknown 271).
 
 ## Stopped
+
+2026-11-14, at the run's limit of 10 subsystems, after the type 8
+mode's validation. All ten validated, with cleanup leads between them.
+Nothing uncommitted. Totals: ours 5989 -> 6537, work left 718 -> 676.
+The summary, `review.md`, `to-drive.md`, `expected-differences.md`, the
+plan's status line and CLAUDE.md are up to date.

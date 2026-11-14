@@ -429,6 +429,14 @@ listed there), and:
 - `sub_82249B60` PanelSetPair::Picked
 - `sub_82105678` SaveData::TwoPlayerBlock
 
+The type 8 mode (`itc_5425`, `itc_5426`, ok): every function in
+`type8-mode.md` (52), and `sub_822508F0` Screen::Wait, `sub_822419D0`
+Type7Dialog::QueueReopen, `sub_822326A8` Dialog::OpenNoticeStep,
+`sub_8223AAA8` Dialog::CloseNoticeStep, `sub_821CAAB0`
+Type8Options::Init, `sub_821C8F48` Type8ControllerOptions::Init,
+`sub_821A87F0` Type8SaveScreen::Init, `sub_82105740`
+SaveData::CreateTwoPlayerBlock.
+
 ## Run 2026-11-12 08:26 (`b7-loop-11-11-26`)
 
 Not in the attract race or the replay (`itc_5198`, `itc_5199`, ok; the
