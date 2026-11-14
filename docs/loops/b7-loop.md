@@ -578,7 +578,15 @@ Calls so far for decisions the loop meets often:
   made, their game-level users seen in play skipped natively with what
   they'd read with the feature absent, Status Dropped (the voice
   engine under the app's start-up, 2026-10-30).
-- An Xbox Live front-end mode the player can open (the type 12 mode,
+- Multiplayer is bypassed, not ported (the user's call, 2026-11-14,
+  replacing the 2026-11-12 call below for these modes): selecting the
+  Xbox Live item (the type 12 mode) or the split screen item (the type
+  8 mode) on the main menu does nothing. The cut is made there, in
+  native code; the modes' code, the race's kind 4 (split screen) and
+  kind 6 (Live time attack) screens and the network battle become
+  unreachable and get Dropped rows, not ports. Native code already
+  made for them stays until the user says otherwise.
+- (Superseded for the Live modes by the bypass above.) An Xbox Live front-end mode the player can open (the type 12 mode,
   the network battle and time attack, `network-mode.md`): its screens
   are made native as any front-end mode's, and its Xbox Live calls
   (sign-in, gamer card, sessions, privileges, leaderboards, the network

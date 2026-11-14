@@ -42,6 +42,11 @@ When the user has reviewed a run's section, its heading gets
   17 distinct sets in 300); not rewritten (old harnesses stay).
 - The user's calls (2026-11-14): the network battle's sends Dropped;
   the leaderboard read answered as no Live (in "Precedent first").
+- The user's call (2026-11-14): no multiplayer; the main menu's Xbox
+  Live and split screen items do nothing, their modes bypassed (in
+  "Precedent first"). The native code already made for them
+  (`network-mode.md`, `type8-mode.md`, `type8-screens.md`, this run's
+  `race-screens-unseen.md`) stays until the user decides.
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a

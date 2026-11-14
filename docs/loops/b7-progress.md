@@ -46,6 +46,11 @@ file's history. What's left to see in a drive, from every run:
   leaderboard read `sub_82292CC0` answered natively as no Live (failed,
   +180 = 4, no buffer; today's stub leaves a garbage-size buffer).
   Step: second migration (`SplitResults::Draw`, the read).
+- The user's call (2026-11-14): no multiplayer. Selecting Xbox Live
+  or split screen on the main menu does nothing; those modes (types
+  12 and 8) and the race's kind 4 and kind 6 screens are bypassed, not
+  ported. The second migration (Live work) stopped by the lead; a
+  bypass agent follows.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
