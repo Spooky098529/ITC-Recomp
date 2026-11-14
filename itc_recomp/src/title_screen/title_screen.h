@@ -282,7 +282,8 @@ uint64_t SetUpMenu4(uint8_t* base, uint32_t sp, const Calls& calls);
 // mode or message; MenuSound::Play. The sound's r3, Accepted's or the
 // selection. 144-byte frame. Without `multiplayer_items` (the user's call,
 // 2026-11-14: --multiplayer_menu_items off), items 3 (Xbox Live) and 4
-// (split screen) only play the refusal cue 3, as item 5 does without a save.
+// (split screen) are silent: answered as an input the menu ignores (no
+// sound, nothing changed, r3 0).
 uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
                   bool multiplayer_items);
 // sub_82221AC0 TitleScreen::CareerMenu (page 3): new game, continue and the

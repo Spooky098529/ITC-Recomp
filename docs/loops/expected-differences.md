@@ -312,8 +312,8 @@ were at 0.
 
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
-| `sub_82222700` TitleScreen::MainMenu | multiplayer items bypassed (expected to differ) | 4 of 400 | The multiplayer bypass on purpose (the user's call, 2026-11-14): items 3 and 4 play the refusal cue and stop; the original's page-object writes, stored item word and message are left out | for review (2026-11-14 05:01 run) |
-| `sub_82222700` TitleScreen::MainMenu | item 3 or 4 accepted, bypassed (expected to differ) | 100 of 100 | The same bypass, with every case accepting item 3 or 4 | for review (2026-11-14 05:01 run) |
+| `sub_82222700` TitleScreen::MainMenu | multiplayer items bypassed (expected to differ) | 4 of 400 | The multiplayer bypass on purpose (the user's call, 2026-11-14): items 3 and 4 are silent, answered as an input the menu ignores (no `MenuSound::Play`, r3 0; the user's call, 2026-11-14, replacing the refusal cue played at first); the original's page-object writes, stored item word, message and sound are left out | for review (2026-11-14 05:01 run; silent since the 15:19 run, the same counts) |
+| `sub_82222700` TitleScreen::MainMenu | item 3 or 4 accepted, bypassed (expected to differ) | 100 of 100 | The same bypass, with every case accepting item 3 or 4 | for review (2026-11-14 05:01 run; silent since the 15:19 run, the same counts) |
 
 ### `network-mode.md`
 

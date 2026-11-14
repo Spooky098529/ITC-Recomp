@@ -898,9 +898,10 @@ void MenuPages(Context& h, const World& w) {
     t.r3.u64 = w.mode();
   };
   // MainMenu with --multiplayer_menu_items on (the original's behavior), then
-  // off: the bypass (the user's call, 2026-11-14) plays the refusal cue for
-  // items 3 (Xbox Live) and 4 (split screen) where the original leaves for
-  // their modes, so the cases accepting either differ from the original.
+  // off: the bypass (the user's calls, 2026-11-14) answers items 3 (Xbox
+  // Live) and 4 (split screen) as an input the menu ignores (no sound, no
+  // change, r3 0) where the original leaves for their modes, so the cases
+  // accepting either differ from the original.
   // Random input accepts item 3 or 4 rarely, so each setting also gets
   // cases that do: the list's seven items with the cursor on 3 or 4, no
   // move, every mapper bit set but the directions' ids out of the mappers'

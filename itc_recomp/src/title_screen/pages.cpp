@@ -72,11 +72,12 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
     }
     bool leave = false;  // items 1, 2 and 5: the item kept, then the page
     if (!multiplayer_items && (s == 3 || s == 4)) {
-      // Multiplayer bypassed (the user's call, 2026-11-14): Xbox Live (3,
+      // Multiplayer bypassed (the user's calls, 2026-11-14): Xbox Live (3,
       // the type 12 mode) and split screen (4, the controller pick, then the
-      // type 8 mode) answered as item 5 is without a save: the refusal cue
-      // and nothing else (the item, page and cursor left as they are).
-      return calls.Call(kMenuSoundPlay, frame, 0x822229C8, 3);
+      // type 8 mode) are silent, answered as an input the menu ignores (no
+      // accept): no sound, the item, page and cursor left as they are, and
+      // r3 0, MenuList::Accepted's r3 on that path.
+      return 0;
     }
     switch (s) {
       case 0:
