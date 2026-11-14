@@ -1373,6 +1373,123 @@ void UnlockFhandleCases(Context& h) {
   results.Report();
 }
 
+// The exit routine _amsg_exit calls ([0x8266B7B0], _exit in play) pointed
+// at a guest function that returns for the case: the shared "returns 0" or
+// _ValidateExecute (r3 != 0, so 1 for its 255), put back after.
+constexpr uint32_t kValidateExecute = 0x825B8910;
+
+struct ExitStub {
+  Context& h;
+  uint32_t saved;
+  ExitStub(Context& h, uint32_t stub) : h(h), saved(Load(h.base, cc::kExitRoutine)) {
+    Store(h.base, cc::kExitRoutine, stub);
+  }
+  ~ExitStub() { Store(h.base, cc::kExitRoutine, saved); }
+};
+
+// _amsg_exit and _fptrap: run-time error numbers in and out of the message
+// table, the exit routine stubbed; r3 compared.
+void AmsgExitCases(Context& h) {
+  Results results("_amsg_exit (sub_825AA158)");
+  for (int c = 0; c < 40; c++) {
+    const uint32_t number =
+        c < 23 ? Load(h.base, 0x8266BA88 + 8 * c) : uint32_t(h.random.Below(300));
+    const uint32_t stub = c % 2 == 0 ? kReturnsZero : kValidateExecute;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      ExitStub exit(h, stub);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = number;
+      (v == 0 ? __imp__sub_825AA158 : hooks::CoreAmsgExit)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, cc::kExitRoutine));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+  Results fptrap("_fptrap (sub_825B64F8)");
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      ExitStub exit(h, c % 2 == 0 ? kReturnsZero : kValidateExecute);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = uint32_t(h.random.Next());
+      (v == 0 ? __imp__sub_825B64F8 : hooks::CoreFptrap)(t, h.base);
+      out[v].Word(t.r3.u32);
+    }
+    fptrap.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  fptrap.Report();
+}
+
+// _getptd on the harness's thread: its data there (returned), or none with
+// the store failing (_getptd_noexit's 0, then _amsg_exit(16) with the exit
+// routine stubbed); r3 and the last error compared.
+void GetptdCases(Context& h) {
+  Results results("_getptd (sub_825AA580)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _getptd: no thread data");
+    return;
+  }
+  for (int c = 0; c < 16; c++) {
+    const int kind = c % 2 == 0 ? 0 : 2;
+    const uint32_t error = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      SetLastError(h, error);
+      ExitStub exit(h, c % 4 < 2 ? kReturnsZero : kValidateExecute);
+      WithThreadData(h, slots, kind, [&] {
+        PPCContext t = CallContext(h);
+        (v == 0 ? __imp__sub_825AA580 : hooks::CoreGetptd)(t, h.base);
+        out[v].Word(kind == 0 ? uint32_t(t.r3.u32 == slots.data) : t.r3.u32);
+        out[v].Word(GuestLastError(h));
+      });
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _invalid_parameter's path with a handler set (its trap path, with none,
+// is checked by reading: the user's call, 2026-11-14): the handler the
+// shared "returns 0", strrchr (r3 a string in the scratch area, r4 a
+// character) or the second memcpy (r3, r4, r5: a copy inside the scratch
+// area), so r3 to r5 reach it as given; r3 and the scratch area compared.
+void InvalidParameterCases(Context& h) {
+  Results results("_invalid_parameter (sub_825AFCC8)");
+  const uint32_t saved = Load(h.base, cc::kInvalidParameterHandler);
+  for (int c = 0; c < 48; c++) {
+    const int kind = c % 3;
+    const uint32_t handler = kind == 0 ? kReturnsZero : kind == 1 ? 0x825A8630 : 0x825A7830;
+    const uint32_t r3 = h.data + h.random.Below(64);
+    const uint32_t r4 = kind == 1 ? h.random.Below(256) : h.data + 128 + h.random.Below(64);
+    const uint32_t r5 = h.random.Below(48);
+    const uint32_t r6 = uint32_t(h.random.Next()), r7 = uint32_t(h.random.Next());
+    std::vector<uint8_t> fill(256);
+    for (auto& b : fill) {
+      b = uint8_t(h.random.Below(8) == 0 ? 0 : 1 + h.random.Below(255));
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, h.data, fill.data(), 256);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = r3;
+      t.r4.u64 = r4;
+      t.r5.u64 = r5;
+      t.r6.u64 = r6;
+      t.r7.u64 = r7;
+      (v == 0 ? __imp__sub_825AFCC8 : hooks::CoreInvalidParameter)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, h.data, 256));
+      Store(h.base, cc::kInvalidParameterHandler, saved);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -1417,6 +1534,9 @@ void CRuntimeCore(Context& h) {
   FfMsgBannerCases(h);
   LockFileCases(h);
   UnlockFhandleCases(h);
+  AmsgExitCases(h);
+  GetptdCases(h);
+  InvalidParameterCases(h);
 }
 
 }  // namespace harness

@@ -537,4 +537,107 @@ uint32_t UnlockFhandle(uint8_t* base, uint32_t handle, const Calls& calls) {
   return uint32_t(calls.import(Import::kRtlLeaveCriticalSection, {entry + 12}));
 }
 
+void BugCheckStub(const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AA1A0 the initial _aexit_rtn");
+  calls.import(Import::kKeBugCheck, {0});
+}
+
+uint64_t RaiseException(uint8_t* base, uint32_t code, uint32_t flags, uint32_t count,
+                        uint32_t parameters, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825BA420 RaiseException");
+  uint64_t result = 0;
+  calls.in_frame(176, [&](uint32_t frame) {
+    const uint32_t record = frame + 80;
+    Store(base, record + 0, code);
+    Store(base, record + 4, flags & 1);
+    Store(base, record + 8, 0);
+    Store(base, record + 12, 0x825BA420);
+    if (parameters == 0) {
+      Store(base, record + 16, 0);
+    } else {
+      const uint32_t n = count > 15 ? 15 : count;
+      Store(base, record + 16, n);
+      if (n != 0) {
+        c_runtime::CopyForward(base, record + 20, parameters, 4 * n);
+      }
+    }
+    result = calls.import(Import::kRtlRaiseException, {record});
+  });
+  return result;
+}
+
+uint64_t CxxThrowException(uint8_t* base, uint32_t object, uint32_t throw_info,
+                           const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AD198 _CxxThrowException");
+  uint64_t result = 0;
+  calls.in_frame(144, [&](uint32_t frame) {
+    const uint32_t record = frame + 80;
+    if (!c_runtime::Memcpy(base, record, 0x8207275C, 32)) {
+      calls.guest(0x825A7410, {record, 0x8207275C, 32});
+    }
+    Store(base, record + 24, object);
+    Store(base, record + 28, throw_info);
+    if (throw_info != 0 && (Load(base, throw_info) & 8) != 0) {
+      Store(base, record + 20, 0x01994000);
+    }
+    result = RaiseException(base, Load(base, record + 0), Load(base, record + 4),
+                            Load(base, record + 16), record + 20, calls);
+  });
+  return result;
+}
+
+uint64_t InvalidParameter(uint8_t* base, uint32_t expression, uint32_t function, uint32_t file,
+                          uint32_t line, uint32_t reserved, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AFCC8 _invalid_parameter");
+  uint64_t result = 2;
+  calls.in_frame(96, [&](uint32_t) {
+    if (const uint32_t handler = Load(base, kInvalidParameterHandler); handler != 0) {
+      result = calls.guest(handler, {expression, function, file, line, reserved});
+      return;
+    }
+    CrtDebuggerHook(base);
+    calls.trap(22);
+  });
+  return result;
+}
+
+void ThreadStartup(uint8_t* base, uint32_t routine, uint32_t parameter, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825BA558 XapiThreadStartup");
+  calls.in_frame(128, [&](uint32_t frame) {
+    Store(base, frame + 80, 0);
+    CallThreadNotifyRoutines(base, 1, calls);
+    Store(base, frame + 80, uint32_t(calls.guest(routine, {parameter})));
+    CallThreadNotifyRoutines(base, 0, calls);
+    calls.import(Import::kExTerminateThread, {Load(base, frame + 80)});
+  });
+}
+
+uint64_t AmsgExit(uint8_t* base, uint32_t number, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AA158 _amsg_exit");
+  uint64_t result = 0;
+  calls.in_frame(96, [&](uint32_t) {
+    FfMsgBanner(base);
+    NmsgWrite(base, number);
+    result = calls.guest(Load(base, kExitRoutine), {255});
+  });
+  return result;
+}
+
+uint32_t Getptd(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AA580 _getptd");
+  uint32_t data = 0;
+  calls.in_frame(96, [&](uint32_t) {
+    data = GetptdNoexit(base, calls);
+    if (data == 0) {
+      AmsgExit(base, 16, calls);
+    }
+  });
+  return data;
+}
+
+uint64_t Fptrap(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B64F8 _fptrap");
+  return AmsgExit(base, 2, calls);
+}
+
 }  // namespace c_runtime::core

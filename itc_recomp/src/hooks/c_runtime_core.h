@@ -48,6 +48,14 @@ void CorePositive(PPCContext& ctx, uint8_t* base);            // sub_825ADE90
 void CoreNmsgWrite(PPCContext& ctx, uint8_t* base);           // sub_825AEDA0
 void CoreGetbuf(PPCContext& ctx, uint8_t* base);              // sub_825B4790
 void CoreFreebuf(PPCContext& ctx, uint8_t* base);             // sub_825B0EE0
+void CoreBugCheckStub(PPCContext& ctx, uint8_t* base);        // sub_825AA1A0
+void CoreRaiseException(PPCContext& ctx, uint8_t* base);      // sub_825BA420
+void CoreCxxThrowException(PPCContext& ctx, uint8_t* base);   // sub_825AD198
+void CoreInvalidParameter(PPCContext& ctx, uint8_t* base);    // sub_825AFCC8
+void CoreThreadStartup(PPCContext& ctx, uint8_t* base);       // sub_825BA558
+void CoreAmsgExit(PPCContext& ctx, uint8_t* base);            // sub_825AA158
+void CoreGetptd(PPCContext& ctx, uint8_t* base);              // sub_825AA580
+void CoreFptrap(PPCContext& ctx, uint8_t* base);              // sub_825B64F8
 void CoreCloseHandle(PPCContext& ctx, uint8_t* base);         // sub_82294E20
 void CoreResetEvent(PPCContext& ctx, uint8_t* base);          // sub_825BA168
 void CoreInittermE(PPCContext& ctx, uint8_t* base);    // sub_82297AC0

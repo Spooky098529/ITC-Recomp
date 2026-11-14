@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "graphics/video_output.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/last_error.h"
 #include "memory/c_runtime_heap.h"
@@ -76,6 +77,7 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
       case cc::Import::kNtClearEvent: __imp__NtClearEvent(ctx, base); break;
       case cc::Import::kRtlRaiseException: __imp__RtlRaiseException(ctx, base); break;
       case cc::Import::kKeBugCheck: __imp__KeBugCheck(ctx, base); break;
+      case cc::Import::kExTerminateThread: __imp__ExTerminateThread(ctx, base); break;
     }
     ctx.lr = lr;
     return ctx.r3.u64;
@@ -131,6 +133,12 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
   calls.set_last_error_from_status = [&ctx, base](uint32_t status) {
     last_error::SetFromStatus(base, ctx.r13.u32, status);
   };
+  calls.in_frame = [&ctx, base](uint32_t bytes, const std::function<void(uint32_t)>& body) {
+    const uint64_t lr = ctx.lr;
+    guest_call::InFrame(ctx, base, bytes, uint32_t(lr), body);
+    ctx.lr = lr;
+  };
+  calls.trap = [&ctx, base](uint32_t type) { ppc_trap(ctx, base, uint16_t(type)); };
   return calls;
 }
 
@@ -310,6 +318,40 @@ void hooks::CoreUnlockFhandle(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::UnlockFhandle(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreBugCheckStub(PPCContext& ctx, uint8_t* base) {
+  cc::BugCheckStub(CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreRaiseException(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::RaiseException(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                   CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreCxxThrowException(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::CxxThrowException(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreInvalidParameter(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::InvalidParameter(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                    ctx.r7.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreThreadStartup(PPCContext& ctx, uint8_t* base) {
+  cc::ThreadStartup(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreAmsgExit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::AmsgExit(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreGetptd(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Getptd(base, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreFptrap(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::Fptrap(base, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -388,3 +430,21 @@ ITC_C_RUNTIME_CORE(825AD670, CoreLockFile2)
 ITC_C_RUNTIME_CORE(825AD6C0, CoreUnlockFile2)
 // _unlock_fhandle: r3 = a file handle.
 ITC_C_RUNTIME_CORE(825B7A58, CoreUnlockFhandle)
+// The initial _aexit_rtn: r3 ignored; KeBugCheck(0).
+ITC_C_RUNTIME_CORE(825AA1A0, CoreBugCheckStub)
+// RaiseException: r3 = code, r4 = flags, r5 = parameter count, r6 = the
+// parameters.
+ITC_C_RUNTIME_CORE(825BA420, CoreRaiseException)
+// _CxxThrowException: r3 = the object, r4 = its throw info.
+ITC_C_RUNTIME_CORE(825AD198, CoreCxxThrowException)
+// _invalid_parameter: r3-r7 handed to the handler.
+ITC_C_RUNTIME_CORE(825AFCC8, CoreInvalidParameter)
+// XapiThreadStartup: r3 = the start routine, r4 = its parameter; never
+// returns.
+ITC_C_RUNTIME_CORE(825BA558, CoreThreadStartup)
+// _amsg_exit: r3 = a run-time error number.
+ITC_C_RUNTIME_CORE(825AA158, CoreAmsgExit)
+// _getptd: r3 = the calling thread's data.
+ITC_C_RUNTIME_CORE(825AA580, CoreGetptd)
+// _fptrap: no registers.
+ITC_C_RUNTIME_CORE(825B64F8, CoreFptrap)

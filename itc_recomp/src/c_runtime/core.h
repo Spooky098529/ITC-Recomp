@@ -52,6 +52,7 @@ enum class Import {
   kNtClearEvent,
   kRtlRaiseException,
   kKeBugCheck,
+  kExTerminateThread,
 };
 
 struct Calls {
@@ -73,6 +74,12 @@ struct Calls {
   std::function<uint32_t()> thread_id;
   // SetLastErrorFromStatus (sub_82296E88) on the calling thread.
   std::function<void(uint32_t status)> set_last_error_from_status;
+  // `body(frame)` in a guest frame of `bytes` below the stack pointer (its
+  // back chain stored), the calls inside made below it: the originals'
+  // locals where theirs are.
+  std::function<void(uint32_t bytes, const std::function<void(uint32_t frame)>& body)> in_frame;
+  // The translated code's unconditional trap (`twi 31,r0,type`).
+  std::function<void(uint32_t type)> trap;
 };
 
 // sub_825AA3F8 __crtTlsAlloc (probably): KeTlsAlloc (the FLS callback in r3
@@ -262,5 +269,52 @@ uint32_t LockFile2(uint32_t index, uint32_t stream, bool lock, const Calls& call
 // sub_825B7A58 _unlock_fhandle: RtlLeaveCriticalSection on the handle's
 // entry + 12.
 uint32_t UnlockFhandle(uint8_t* base, uint32_t handle, const Calls& calls);
+
+constexpr uint32_t kExitRoutine = 0x8266B7B0;      // _aexit_rtn
+constexpr uint32_t kInvalidParameterHandler = 0x82978320;
+constexpr uint32_t kBugCheckStub = 0x825AA1A0;
+
+// sub_825AA1A0 the initial _aexit_rtn (probably): KeBugCheck(0). No harness:
+// ends the process (the user's call, 2026-11-14).
+void BugCheckStub(const Calls& calls);
+
+// sub_825BA420 RaiseException: in its 176-byte frame, the exception record
+// at +80 (code, flags & 1, 0, the address 0x825BA420, the parameter count
+// capped at 15 with the parameters copied by sub_825A7830's copy; a count
+// of 0 stored for no parameters) given to RtlRaiseException; r3 as it
+// leaves it. No harness: ends the process (the user's call, 2026-11-14).
+uint64_t RaiseException(uint8_t* base, uint32_t code, uint32_t flags, uint32_t count,
+                        uint32_t parameters, const Calls& calls);
+
+// sub_825AD198 _CxxThrowException: in its 144-byte frame, the 32-byte record
+// template at 0x8207275C (memcpy) with the object at +104 and the throw info
+// at +108 (+100 = 0x01994000 when its attributes' bit 3 is set), raised
+// through RaiseException. No harness: ends the process.
+uint64_t CxxThrowException(uint8_t* base, uint32_t object, uint32_t throw_info,
+                           const Calls& calls);
+
+// sub_825AFCC8 _invalid_parameter: the handler at kInvalidParameterHandler,
+// when set, called with r3-r7 as given (from a 96-byte frame), its r3
+// returned; else _crt_debugger_hook and the trap (type 22), r3 = 2 (the trap
+// path: no harness, the user's call, 2026-11-14).
+uint64_t InvalidParameter(uint8_t* base, uint32_t expression, uint32_t function, uint32_t file,
+                          uint32_t line, uint32_t reserved, const Calls& calls);
+
+// sub_825BA558 XapiThreadStartup (probably): in its 128-byte frame, +80 = 0,
+// the notify routines with 1, `routine(parameter)` (its result to +80), the
+// notify routines with 0, ExTerminateThread(the result). No harness: ends
+// the thread (the user's call, 2026-11-14).
+void ThreadStartup(uint8_t* base, uint32_t routine, uint32_t parameter, const Calls& calls);
+
+// sub_825AA158 _amsg_exit: _FF_MSGBANNER, _NMSG_WRITE(number), then the
+// exit routine at kExitRoutine with 255 (from a 96-byte frame); its r3.
+uint64_t AmsgExit(uint8_t* base, uint32_t number, const Calls& calls);
+
+// sub_825AA580 _getptd: _getptd_noexit, _amsg_exit(16) when that's 0; the
+// data.
+uint32_t Getptd(uint8_t* base, const Calls& calls);
+
+// sub_825B64F8 _fptrap: _amsg_exit(2) (its tail call); its r3.
+uint64_t Fptrap(uint8_t* base, const Calls& calls);
 
 }  // namespace c_runtime::core
