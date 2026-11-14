@@ -78,7 +78,15 @@ file's history. What's left to see in a drive, from every run:
   static initializers, a lead); 2 leads added; check passed. The
   never-seen paths ending in `KeBugCheck` and `_CxxThrowException`'s
   `RtlRaiseException` are imports called as the original does (B7's
-  goal). Step: migration.
+  goal). Migrated 67da37a3..4708b65b (5 batches, 2 removal commits):
+  43 rows ours (`_mtinit`, `_getptd_noexit`, the locks' set-up,
+  `errno`, the thread notify routines, `_ioinit`, `_initstdio`,
+  `CloseHandle` and the rest), 7 adapters removed,
+  `--native_c_runtime_core`; every harness 0 differing, races 38 s at
+  40, 0 errors. Left: functions a harness can't run on its thread
+  (the `KeBugCheck` stub `sub_825AA1A0`, `_CxxThrowException`,
+  `RaiseException`, `XapiThreadStartup`, `_invalid_parameter`'s trap;
+  they block `_getptd` and `_amsg_exit`): a question for the user.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads

@@ -87,6 +87,13 @@ When the user has reviewed a run's section, its heading gets
   call `KeBugCheck` and `RtlRaiseException` (a native caller raising a
   guest C++ exception through the import): followed B7's goal (the
   imports called as the original does).
+- The C runtime core's migration (67da37a3..4708b65b): 43 rows of
+  `c-runtime-core.md`, `--native_c_runtime_core` (a new flag, not
+  `--native_c_runtime`); imports called through
+  `c_runtime::core::Calls`; lock 8's host mutex routing kept (`_lock`
+  and `_unlock` called as guest functions). `CloseHandle`'s adapter
+  stays while `SaveSlot::WaitClose` (`src/hooks/save_interface.cpp`)
+  calls it as a guest function.
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a
