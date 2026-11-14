@@ -132,6 +132,14 @@ nothing runs and there's work, about a minute.
   may go (see "Removing an adapter"). Groups are made native from the
   bottom up, as native code can
   only call what's already ours.
+- `itc_recomp/tools/static_map.py`: the static call graph from `main`
+  (direct calls, address constants, vtables and tables read from the
+  image), writing `docs/loops/static-map.md` (made fresh each run): the
+  totals toward B7's goal, the blockers ranked by how many functions
+  wait on them (what leads are picked by), the frontier's clusters and
+  the unmapped areas; `b7_groups.py --static [root ...]` gives groups
+  and blockers for never-seen functions from it (`../coverage.md`, "The
+  static map").
 - `itc_recomp/tools/check_function_statuses.py`: the Status column
   against `src/` (run after any row change); a function in rows of two
   files is an error.

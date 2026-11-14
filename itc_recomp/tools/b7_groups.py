@@ -2,13 +2,20 @@
 """B7's groups: which recompiled functions can be made native together
 next (docs/loops/b7-loop.md, "Groups"). Reports only; changes nothing.
 
-usage: b7_groups.py [--cap <lines>] [root ...]
+usage: b7_groups.py [--static] [--cap <lines>] [root ...]
        b7_groups.py --removable [function ...]
   root   a function (sub_XXXXXXXX or its address): the groups in its subtree
          (what it calls, followed down, seen in play and not ours). With no
          root, the whole game: the count of ready groups and the blockers.
   --cap  the size (generated lines) above which a group's migration is
          best split into parts, a hint, not a limit (default 1500)
+  --static  the static graph instead of the coverage list
+         (static_map.py, docs/loops/static-map.md): every function
+         reachable from main counts as running, never seen in play or
+         not, and the callees include the indirect ones (address
+         constants, vtables and tables read from the image); the
+         replaced libraries count as ours; jump-table cases split off
+         as functions are folded into their parents
   --removable  which overridden functions' adapters may go (they become
          Native): every direct caller seen in play is ours. Of the given
          functions, or of every overridden one. Candidates only: the
@@ -109,6 +116,23 @@ def load():
     return calls, lines, indirect, imports, seen, ours
 
 
+def load_static():
+    """The same, from static_map.py's graph: what's reachable runs."""
+    spec = importlib.util.spec_from_file_location(
+        "static_map", os.path.join(os.path.dirname(__file__), "static_map.py"))
+    static_map = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(static_map)
+    m = static_map.build()
+    calls = {f: set(m["callees"][f]) for f in m["nodes"]}
+    state = m["state"]
+
+    def ours(f):
+        return state.get(f, "ours" if m["ours"](f) else "unported") != "unported"
+
+    return (calls, m["lines"], m["indirect"], m["imports"], set(m["reachable"]), ours,
+            m["folded"])
+
+
 def removable(names):
     calls, lines, indirect, imports, seen, ours = load()
     spec = importlib.util.spec_from_file_location(
@@ -171,12 +195,26 @@ def main():
         i = args.index("--cap")
         cap = int(args[i + 1])
         del args[i:i + 2]
+    static = "--static" in args
+    if static:
+        args.remove("--static")
     roots = []
     for a in args:
         a = a.upper().removeprefix("SUB_").removeprefix("0X")
         roots.append(f"sub_{a}")
 
-    calls, lines, indirect, imports, seen, ours = load()
+    if static:
+        calls, lines, indirect, imports, seen, ours, folded = load_static()
+        for i, r in enumerate(roots):
+            if r in folded:
+                print(f"{r}: a jump-table case folded into {folded[r]}")
+                roots[i] = folded[r]
+        left_label = "reachable from main or the extra roots, not ours or excluded"
+        not_run = "not reachable from main or the extra roots"
+    else:
+        calls, lines, indirect, imports, seen, ours = load()
+        left_label = "seen in play, not ours"
+        not_run = "never ran in play"
     open_ = {f for f in seen if not ours(f)}  # what's left: ran, not ours
     callers = collections.defaultdict(set)
     for f in seen:
@@ -229,7 +267,7 @@ def main():
     if not roots:
         ready = [f for f in open_ if not group(f)["blockers"]]
         blocking = collections.Counter(c for f in open_ for c in group(f)["blockers"])
-        print(f"functions left (seen in play, not ours): {len(open_)}")
+        print(f"functions left ({left_label}): {len(open_)}")
         print(f"ready groups (no blockers): {len(ready)}, "
               f"{sum(1 for f in ready if group(f)['lines'] <= cap)} of {cap} lines or fewer")
         print("\nblockers holding the most groups back:")
@@ -243,7 +281,7 @@ def main():
             print(f"{r}: not a recompiled function")
             continue
         if r not in seen:
-            print(f"{r}: never ran in play")
+            print(f"{r}: {not_run}")
             continue
         if ours(r):
             print(f"{r}: already ours")

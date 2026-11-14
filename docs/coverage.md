@@ -186,6 +186,48 @@ never running (to delete it, say), check it with the static pass or by
 reading its callers, the way B4's and B5's "Never called" rows were
 checked over several sessions.
 
+## The static map (B7's goal)
+
+Since 2026-11-14 B7's goal counts every function reachable from `main`,
+seen in play or not ("B7's goal" in `loops/b7-loop.md`), so the
+coverage list no longer bounds the work. `itc_recomp/tools/static_map.py`
+(~25 s, reports only) builds the static call graph and writes
+`loops/static-map.md` (made fresh on every run; never edit it) and a full
+dump, `itc_recomp/coverage/static_map.tsv` (not committed).
+
+- **Edges:** direct calls and tail branches in `generated/`; address
+  constants from the disassembly comments (`lis` then `addi`, `ori` or
+  `addis`, kept per register in program order, through `mr` and stack
+  spills, cleared by calls), an edge when one lands on a function's start;
+  and the image (`itc/xex_image/default.bin`, `known-data.md`): a constant
+  landing in `.rdata` or `.data` is scanned as a table (vtables, function
+  and state tables), its function words edges from the function that built
+  the address (so a vtable's methods have its constructor as a caller).
+  Jump-table cases the recompiler split off (a switch case that is a call,
+  referenced by nothing else) are folded into their parent.
+- **Roots:** `main` (`sub_82090108`), then every function seen in play that
+  `main` doesn't reach and isn't Dropped (as of 2026-11-14 all of them sit
+  under `xstart`: the C runtime's start-up). Ours is followed through
+  (native code mirrors the original), Dropped isn't.
+- **States:** ours as `b7_status.py` decides it; excluded, the replaced
+  libraries (`sub_822B8F10`, the movie library's ranges) and what only
+  they reach, unless unported game code still running as PPC calls them
+  directly; unported, the rest (Wrapped included).
+- **Output:** totals; blockers ranked by how many unported functions above
+  them wait on them (the loop's leads are picked by it); the frontier
+  (unported functions whose callees are all ours, excluded or imports)
+  in clusters; and the unmapped areas. `b7_groups.py --static` gives a
+  never-seen function's group, readiness and blockers from the same graph.
+
+Gaps: a table is scanned from the address code builds to the next address
+anything points at (or 8 words with no pointer), so a table reached only
+through a pointer chain deeper than two, or built at run time, is missed
+(~180 function words in data no code-built address reaches); addresses
+computed some other way (an index into a table of offsets) are missed; and
+callees of ours are counted whether or not the native code still calls
+them (the report counts those reached only through ours separately). The
+graph over-approximates: a vtable brings in every method, used or not.
+
 ## Results
 
 | Date | Sessions | Seen in play | Notes |
