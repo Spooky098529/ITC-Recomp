@@ -50,7 +50,7 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "constructor, and only it sub_82106A50; XPR::XPR's and RaceOverlays::Clear's "
               "plain C++ called directly), and with --native_heap Mode::Create sub_821077A8 "
               "(operator new's plain C++ called directly; type 8, sub_82107670, never seen in "
-              "play, the original's) with the modes' constructors sub_82106DB8, sub_82106C80 "
+              "play, the original's, and type 12 too without --multiplayer_menu_items) with the modes' constructors sub_82106DB8, sub_82106C80 "
               "(with MachineMember::MachineMember sub_82108160), sub_82106E88, sub_82106F08, "
               "sub_82235E88, sub_82246340, sub_82107008, sub_82107088 and sub_82106F88 (no "
               "adapters: only Mode::Create calls them; sub_821077EC, a piece of its switch, "

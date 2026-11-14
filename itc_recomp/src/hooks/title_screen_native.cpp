@@ -59,8 +59,10 @@ ITC_FLAG_BOOL(multiplayer_menu_items, false, "ITC",
               "Off by default (the user's call, 2026-11-14: no multiplayer in this port): "
               "selecting either only plays the menu's refusal sound (cue 3, what the replay "
               "item plays without a save), and the cursor, page and mode stay. Applies to the "
-              "native main menu (TitleScreen::MainMenu sub_82222700, --native_title_screen); "
-              "see docs/functions/title-screen.md");
+              "native main menu (TitleScreen::MainMenu sub_82222700, --native_title_screen). "
+              "Off, Mode::Create's plain C++ also leaves type 12 to the original (nothing asks "
+              "for it then), so the static map sees the mode unreachable; see "
+              "docs/functions/title-screen.md");
 
 namespace hooks {
 
