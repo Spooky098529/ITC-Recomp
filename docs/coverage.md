@@ -216,14 +216,41 @@ dump, `itc_recomp/coverage/static_map.tsv` (not committed).
   namespace-level variables (constants, step tables) and enumerators. A
   name in a body links to the definitions of that name the file can see
   (itself, the headers it includes, or a `.cpp` including a header both
-  see that declares the name). A native function's C++ is its override
+  see that declares the name, `extern` variables included), as C++ looks
+  it up: namespace aliases (`namespace t67 = type67_modes;`, 231 in
+  `src/`) replaced by what they name before a qualifier is matched, and an
+  unqualified name taking the candidates in the reference's own
+  namespaces, innermost first (so type 8's `kListScreenVtable` isn't type
+  6 and 7's). A native function's C++ is its override
   and every definition holding `ITC_NATIVE_RUNNING("sub_X ...")`, followed
   through the plain C++ they call; reaching another native function's C++
-  is an edge to that function. Targets: `sub_X` (through the function
+  is an edge to that function. A part of a body an address constant picks
+  (`case 0xA:` up to the next label, or the statement under `if (x ==
+  0xA)`) is a definition of its own: when `0xA` is a function's start, the
+  part is that function's C++, reached where the address is and never from
+  the dispatcher's callers (`type67_modes::RunInit`'s 18 Inits, each under
+  its own `case`; the slot dispatchers' methods, such as
+  `type67_screens::SlotNative`'s type 8 ones; a guest call's trampoline,
+  `case 0xA: __imp__sub_A(ctx, base)`, which runs the original); a part
+  holding a print also runs the code around it. When `0xA` is a table or
+  vtable, the part is no one's; a plain constant's is its parent's.
+  Targets: `sub_X` (through the function
   table), `__imp__sub_X` (the original's body; never the function's own,
-  the flag-off fallback) and hexadecimal constants (a guest call by
+  the flag-off fallback, except in a part its own address picks) and
+  hexadecimal constants (a guest call by
   address, a function pointer, or a table or vtable it stores, scanned as
   above; a `case` label or a constant beside `==` or `!=` only compares).
+  Tables naming addresses only as lookup keys (`info.address == address`:
+  the three `kInits` of `type67_modes`, `save_screen` and
+  `options_screen`) give no edges (`KEY_TABLES` in `src_edges.py`, an
+  annotation, not a detection); tables whose length the scan can't find
+  give the words our C++ calls (`CPP_TABLES` in `static_map.py`: the
+  device's render and sampler state setters). These rules (aliases,
+  lookup order, `extern`, address-picked parts, lookup tables) came in a
+  second pass on 2026-11-14, when the type 8 mode still counted as
+  reachable after the main menu's split screen item was cut: with them,
+  none of its 178 rows is (reachable 11,011 -> 10,865, ours 6,180 ->
+  6,034, unported unchanged at 3,232).
   Left out: statements under a flag off by default (`if (ITC_FLAG(x))` with
   `x` off, `if (!ITC_FLAG(x))` with `x` on, or the same through a function
   that only returns the flag), the arguments of `ITC_LOG_*`, and
@@ -262,11 +289,12 @@ through a pointer chain deeper than two, or built at run time, is missed
 (~180 function words in data no code-built address reaches); addresses
 computed some other way (an index into a table of offsets, `kBase +
 offset` in C++) are missed. The graph over-approximates: a vtable brings
-in every method, used or not, and a table our C++ names only to look
-addresses up in still counts. Our C++ is read per definition, not per
-branch: a definition shared by several native functions (119 of them, for
-331 functions, such as `type67_modes::RunInit` for 18 Inits) gives each
-all its edges, and a name two visible definitions share links to both. A
+in every method, used or not. Our C++ is read per definition, not per
+branch, apart from the parts an address picks: a definition several
+native functions share by an argument (112 of them, for 287 functions,
+such as the car draw's left and right door) gives each, and its callers,
+all its edges, and a name two visible definitions share in the same
+namespace links to both. A
 function's own `__imp__` call is always left out, also where the native
 C++ declines for inputs never seen in play (XGCompressSurface's DXN and
 CTX1 formats, say), so those originals' callees are missed. Guest calls

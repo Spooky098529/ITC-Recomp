@@ -20,8 +20,13 @@ How src/ is read (no compiler: a small preprocessor and a brace parser):
   refs       an identifier in a body names the definitions of that name
              visible from the file: the same file, a header it includes
              (transitively), or a .cpp that includes a header both see
-             declaring the name (a qualifier `a::b` must match a scope of
-             the definition when any candidate's does)
+             declaring the name (`extern` variables included); a qualifier
+             `a::b` must match a scope of the definition when any
+             candidate's does, after namespace aliases (`namespace t67 =
+             type67_modes;`, the file's, its headers' or the function's)
+             are replaced by what they name; an unqualified name takes the
+             candidates in the reference's own namespaces, innermost first,
+             when there are any (C++'s lookup)
   targets    in a body, `sub_X` (a call through the function table: its
              override when it has one), `__imp__sub_X` (the original's
              body) and hexadecimal constants (a guest call by address, a
@@ -34,9 +39,23 @@ How src/ is read (no compiler: a small preprocessor and a brace parser):
              function whose body is `return ITC_FLAG(x);`; the arguments of
              ITC_LOG_* and ITC_NATIVE_RUNNING; and the bodies of
              src/debug/'s functions other than overrides (diagnostics)
+  guarded    a function body's parts an address constant picks (`case
+             0xA:` up to the next label, or the statement of `if (x ==
+             0xA)`, `&&` with others allowed) are definitions of their own:
+             when 0xA is a function's start, the part is that function's
+             C++ (RunInit's 18 Inits, a slot dispatcher's methods, a guest
+             call's trampoline, where `__imp__sub_A` is a real call to the
+             original), reached where the address is and never from the
+             dispatcher's callers; when it's a table or vtable, no one's
+             (unless it holds a print); else (a plain constant) its parent's
+  key tables KEY_TABLES: tables naming addresses only as lookup keys
+             (`info.address == address`) give no edges
   entries    a native function's C++ is its override (`REX_FUNC(sub_X)`,
-             written out or made by a macro) and every definition holding
-             ITC_NATIVE_RUNNING("sub_X ...")
+             written out or made by a macro), every definition holding
+             ITC_NATIVE_RUNNING("sub_X ...") (a guarded part's with the
+             code around it) and the parts its address picks; a definition
+             several functions share by an argument (a door's side) gives
+             its callers all of them
 """
 
 import collections
@@ -199,7 +218,8 @@ def match(tokens, i, open_="{", close="}"):
 
 class Def:
     __slots__ = ("id", "name", "scope", "file", "kind", "body", "adapter", "prints",
-                 "refs", "subs", "imps", "hexes", "flag_alias", "debug")
+                 "refs", "subs", "imps", "hexes", "flag_alias", "debug", "guards", "parent",
+                 "guarded")
 
     def __init__(self, name, scope, file, kind, body):
         self.name, self.scope, self.file, self.kind, self.body = name, scope, file, kind, body
@@ -208,6 +228,9 @@ class Def:
         self.refs, self.subs, self.imps, self.hexes = [], set(), set(), set()
         self.flag_alias = None
         self.debug = file.startswith("debug" + os.sep)
+        self.guards = ()  # a guarded part's address constants
+        self.parent = None
+        self.guarded = []  # its guarded parts (Defs of their own)
 
 
 def strip_template(stmt):
@@ -295,11 +318,22 @@ def qualified_before(stmt, i):
     return parts
 
 
+def namespace_alias(stmt):
+    """(alias, [namespaces]) for `namespace a = b::c` (no `;`), else None."""
+    w = [x.t for x in stmt]
+    if len(w) >= 4 and w[0] == "namespace" and stmt[1].k == "id" and w[2] == "=":
+        parts = [x for x in w[3:] if x != "::"]
+        if parts and all(re.match(r"^\w+$", x) for x in parts):
+            return w[1], parts
+    return None
+
+
 class Parser:
     def __init__(self, rel):
         self.rel = rel
         self.defs = []
         self.decls = set()  # names declared (or defined) here
+        self.ns_aliases = {}  # `namespace a = b::c;` at any level: a -> [b, c]
 
     def container(self, toks, i, end, scope):
         start = i
@@ -436,6 +470,10 @@ class Parser:
         stmt = strip_template(stmt)
         if not stmt:
             return
+        alias = namespace_alias(stmt)
+        if alias:
+            self.ns_aliases[alias[0]] = alias[1]
+            return
         eq = top_index(stmt, "=")
         paren = top_index(stmt, "(")
         if any(x.t == "operator" for x in stmt):
@@ -454,18 +492,19 @@ class Parser:
             if k >= 0:
                 self.decls.add(stmt[k].t)
         else:
-            ids = [x for x in stmt if x.k == "id"]
-            if ids:
-                self.decls.add(ids[-1].t)
+            # `extern const Info kTable[kCount];` declares kTable.
+            name = decl_name(stmt)
+            if name:
+                self.decls.add(name)
 
 
-def analyze_body(d, flag_default, aliases):
+def analyze_body(d, flag_default, aliases, ns_aliases=None):
     """Fills d's refs, subs, imps, hexes and prints from its body, leaving
     out statements guarded by a flag off by default."""
     toks = d.body
     n = len(toks)
-    skip_to = -1
     i = 0
+    ns = dict(ns_aliases or {})
 
     def cond_false(c):
         # c: the condition's tokens; false by default when a top-level
@@ -502,6 +541,15 @@ def analyze_body(d, flag_default, aliases):
     while i < n:
         t = toks[i]
         if t.k == "id":
+            if t.t == "namespace":  # a function-local namespace alias
+                k = i
+                while k < n and toks[k].t != ";":
+                    k += 1
+                alias = namespace_alias(toks[i:k])
+                if alias:
+                    ns[alias[0]] = alias[1]
+                i = k + 1
+                continue
             if t.t == "if" and i + 1 < n and toks[i + 1].t == "(":
                 close = match(toks, i + 1, "(", ")")
                 if cond_false(toks[i + 2:close]):
@@ -531,7 +579,12 @@ def analyze_body(d, flag_default, aliases):
                 d.subs.add(t.t)
             elif t.t not in KEYWORDS:
                 prev = toks[i - 1].t if i else ""
-                qual = toks[i - 2].t if prev == "::" and i >= 2 and toks[i - 2].k == "id" else None
+                qual = None
+                if prev == "::" and i >= 2 and toks[i - 2].k == "id":
+                    parts = qualified_before(toks, i)[:-1]
+                    if parts[0] in ns:  # a namespace alias: what it names
+                        parts = ns[parts[0]] + parts[1:]
+                    qual = tuple(parts)
                 member = prev in (".", "->")
                 d.refs.append((qual, t.t, member))
         elif t.k == "num" and t.t[:2] in ("0x", "0X"):
@@ -552,6 +605,145 @@ def analyze_body(d, flag_default, aliases):
     w = [x.t for x in toks]
     if d.kind == "func" and len(w) == 6 and w[0] == "return" and w[1] == "ITC_FLAG":
         d.flag_alias = w[3]
+
+
+def is_hex(tok):
+    return tok.k == "num" and tok.t[:2] in ("0x", "0X")
+
+
+def hex_value(tok):
+    try:
+        return int(tok.t.rstrip("uUlL").replace("'", ""), 16)
+    except ValueError:
+        return None
+
+
+def guard_of(cond):
+    """The address constant an `if` condition requires (a top-level `&&`
+    conjunct `x == 0xA` or `0xA == x`), else None. Conditions naming a flag
+    are left to analyze_body's flag rule."""
+    if any(x.t == "ITC_FLAG" for x in cond):
+        return None
+    parts, cur, depth = [], [], 0
+    for x in cond:
+        if x.t in "([":
+            depth += 1
+        elif x.t in ")])":
+            depth -= 1
+        if depth == 0 and x.t == "||":
+            return None
+        if x.t == "&&" and depth == 0:
+            parts.append(cur)
+            cur = []
+        else:
+            cur.append(x)
+    parts.append(cur)
+    for p in parts:
+        while len(p) >= 2 and p[0].t == "(" and p[-1].t == ")":
+            p = p[1:-1]
+        hx = [k for k, x in enumerate(p) if is_hex(x)]
+        if len(hx) != 1:
+            continue
+        k = hx[0]
+        w = [x.t for x in p]
+        if (k == len(p) - 1 and w[k - 2:k] == ["=", "="] and "!" not in w[:k - 2][-1:]) or \
+                (k == 0 and w[1:3] == ["=", "="]):
+            return hex_value(p[k])
+    return None
+
+
+def split_guarded(toks, only_prints):
+    """The body's parts guarded by an address constant (`case 0xA:` up to
+    the next label, or `if (x == 0xA)`'s statement): (the rest, [(addresses,
+    tokens)]). With only_prints, only parts holding ITC_NATIVE_RUNNING."""
+    n = len(toks)
+    keep, parts = [], []
+    i, depth = 0, 0
+    while i < n:
+        t = toks[i]
+        if t.t == "case":
+            labels, k = [], i
+            ok = True
+            while k < n and toks[k].t == "case":
+                e = k + 1
+                while e < n and toks[e].t != ":":
+                    e += 1
+                lab = toks[k + 1:e]
+                if len(lab) == 1 and is_hex(lab[0]) and hex_value(lab[0]) is not None:
+                    labels.append(hex_value(lab[0]))
+                else:
+                    ok = False
+                k = e + 1
+            if ok and labels:
+                e, d = k, 0
+                while e < n:
+                    x = toks[e].t
+                    if x in ("case", "default") and d == 0:
+                        break
+                    if x == "{":
+                        d += 1
+                    elif x == "}":
+                        if d == 0:
+                            break
+                        d -= 1
+                    e += 1
+                seg = toks[k:e]
+                if not only_prints or any(x.t == "ITC_NATIVE_RUNNING" for x in seg):
+                    parts.append((tuple(labels), seg))
+                    keep.extend(toks[i:k])
+                    i = e
+                    continue
+            keep.extend(toks[i:k])
+            i = k
+            continue
+        if t.t == "if" and not only_prints and i + 1 < n and toks[i + 1].t == "(":
+            close = match(toks, i + 1, "(", ")")
+            a = guard_of(toks[i + 2:close])
+            if a is not None:
+                k = close + 1
+                if k < n and toks[k].t == "{":
+                    e = match(toks, k)
+                    seg = toks[k + 1:e]
+                else:
+                    e = k
+                    while e < n and toks[e].t != ";":
+                        if toks[e].t in "({[":
+                            e = match(toks, e, toks[e].t, {"(": ")", "{": "}", "[": "]"}[toks[e].t])
+                        e += 1
+                    seg = toks[k:e + 1]
+                parts.append(((a,), seg))
+                keep.extend(toks[i:close + 1])
+                keep.append(Tok("op", ";"))
+                i = e + 1
+                continue
+        if t.t == "{":
+            depth += 1
+        elif t.t == "}":
+            depth -= 1
+        keep.append(t)
+        i += 1
+    return keep, parts
+
+
+# Tables whose addresses are only lookup keys (`info.address == address`,
+# the entry's plain C++ then picked by `case 0xA:`): naming the table gives
+# no edges; each address is its function's own, reached where its address
+# is (a vtable, a mode's Init list).
+KEY_TABLES = {
+    ("type67_modes/inits.cpp", "kInits"),  # the type 6, 7 and 8 Inits
+    ("save_screen/inits.cpp", "kInits"),  # the save screens' Inits
+    ("options_screen/inits.cpp", "kInits"),  # the options screens' Inits
+}
+
+# Whether every address-guarded part is split off (False: only those
+# holding ITC_NATIVE_RUNNING).
+GUARD_ALL = True
+
+
+def scope_has(scope, qual):
+    """Whether the qualifier's names appear in the scope in a row."""
+    n = len(qual)
+    return any(tuple(scope[k:k + n]) == qual for k in range(len(scope) - n + 1))
 
 
 def parse_all():
@@ -614,19 +806,45 @@ def parse_all():
         parsers[rel] = p
 
     defs = []
+
+    def add(d):
+        d.id = len(defs)
+        defs.append(d)
+        if d.kind != "func":
+            return
+        keep, parts = split_guarded(d.body, not GUARD_ALL)
+        if not parts:
+            return
+        d.body = keep
+        for guards, seg in parts:
+            c = Def(d.name + "@" + "/".join(f"{a:08X}" for a in guards), d.scope, d.file,
+                    "func", seg)
+            c.guards, c.parent = guards, d
+            d.guarded.append(c)
+            add(c)
+
     for rel in sorted(parsers):
         for d in parsers[rel].defs:
-            d.id = len(defs)
-            defs.append(d)
+            add(d)
+    file_ns = {}
+    for rel in parsers:
+        m = {}
+        for h in incl(rel):
+            m.update(parsers[h].ns_aliases)
+        m.update(parsers[rel].ns_aliases)
+        file_ns[rel] = m
     aliases = {}
     for d in defs:
-        analyze_body(d, flag_default, {})
+        analyze_body(d, flag_default, {}, file_ns[d.file])
         if d.flag_alias and d.flag_alias in flag_default:
             aliases[d.name] = flag_default[d.flag_alias]
     if aliases:
         for d in defs:
             d.refs, d.subs, d.imps, d.hexes, d.prints = [], set(), set(), set(), set()
-            analyze_body(d, flag_default, aliases)
+            analyze_body(d, flag_default, aliases, file_ns[d.file])
+    for d in defs:
+        if (d.file.replace(os.sep, "/"), d.name) in KEY_TABLES:
+            d.hexes = set()
 
     # Resolution: visible definitions of a name.
     by_name = collections.defaultdict(list)
@@ -656,19 +874,36 @@ def parse_all():
                 continue
             cs = [c for c in cands if c is not d and visible(d.file, c.file, name)]
             if qual and len(cs) > 1:
-                q = [c for c in cs if qual in c.scope]
+                q = [c for c in cs if scope_has(c.scope, qual)]
+                if not q:
+                    q = [c for c in cs if qual[-1] in c.scope]
                 if q:
                     cs = q
             # A name defined in the same file wins over others.
             same = [c for c in cs if c.file == d.file]
             if same and not qual:
                 cs = same
+            # C++'s lookup: an unqualified name is looked for in the
+            # reference's own namespaces, innermost first.
+            if not qual and not member and len(cs) > 1:
+                best, inner = 0, []
+                for c in cs:
+                    k = len(c.scope)
+                    if 0 < k <= len(d.scope) and list(d.scope[:k]) == list(c.scope):
+                        if k > best:
+                            best, inner = k, [c]
+                        elif k == best:
+                            inner.append(c)
+                if inner:
+                    cs = inner
             if len(cs) > 1:
                 unresolved_shared += 1
             out.update(c.id for c in cs)
         edges.append(out)
     return defs, edges, {"files": len(files), "defs": len(defs), "flags": len(flag_default),
-                         "aliases": len(aliases), "ambiguous_refs": unresolved_shared}
+                         "aliases": len(aliases), "ambiguous_refs": unresolved_shared,
+                         "namespace_aliases": sum(len(p.ns_aliases) for p in parsers.values()),
+                         "guarded_parts": sum(1 for d in defs if d.guards)}
 
 
 def native_edges(is_function, classify_hex):
@@ -681,18 +916,41 @@ def native_edges(is_function, classify_hex):
     a function's start, "table" for the functions a data table there holds).
     """
     defs, edges, stats = parse_all()
+    hex_cache = {}
+
+    def classify(v):
+        if v not in hex_cache:
+            hex_cache[v] = classify_hex(v)
+        return hex_cache[v]
+
+    def guard_kind(d):
+        """A guarded part's: "function" (one of its addresses is a
+        function's start: the part is that function's C++), "address" (a
+        table or vtable: no one's edges) or "plain" (a constant that's no
+        address: the part is its parent's)."""
+        kinds = set()
+        for a in d.guards:
+            c = classify(a)
+            kinds.add("function" if any(k == "native" for _, k in c) else
+                      "address" if c else "plain")
+        return "plain" if "plain" in kinds or not kinds else \
+            "function" if "function" in kinds else "address"
+
     entries = collections.defaultdict(set)
     for d in defs:
         if d.adapter:
             entries[d.adapter].add(d.id)
         for s in d.prints:
             entries[s].add(d.id)
+        if d.guards and guard_kind(d) == "function":
+            for a in d.guards:
+                for s, k in classify(a):
+                    if k == "native":
+                        entries[s].add(d.id)
     owners = collections.defaultdict(set)
     for s, ds in entries.items():
         for x in ds:
             owners[x].add(s)
-
-    hex_cache = {}
 
     def targets(d):
         out = []
@@ -705,9 +963,7 @@ def native_edges(is_function, classify_hex):
             if is_function(s):
                 out.append((s, "imp"))
         for v in d.hexes:
-            if v not in hex_cache:
-                hex_cache[v] = classify_hex(v)
-            out.extend(hex_cache[v])
+            out.extend(classify(v))
         return out
 
     result = {}
@@ -716,6 +972,15 @@ def native_edges(is_function, classify_hex):
     for sub, starts in entries.items():
         if not is_function(sub):
             continue
+        # A part holding a function's print runs inside the code around it
+        # (its parent's, outside the other guarded parts).
+        starts = set(starts)
+        for x in list(starts):
+            if defs[x].prints and sub in defs[x].prints:
+                p = defs[x].parent
+                while p is not None:
+                    starts.add(p.id)
+                    p = p.parent
         out = {}
         seen = set()
         stack = list(starts)
@@ -726,16 +991,27 @@ def native_edges(is_function, classify_hex):
             seen.add(x)
             d = defs[x]
             if x not in starts and owners[x] and sub not in owners[x]:
+                # A definition several functions share by an argument (a
+                # door's side, say) gives the caller all of them; where an
+                # address picks which (`case 0xA:`), each part is a
+                # definition of its own the caller doesn't walk into.
                 for o in owners[x]:
                     if o != sub and is_function(o):
                         out[o] = ("plain", x)
                 continue
+            # Its guarded parts: a plain constant's are its own, and so is
+            # a print a table or vtable address picks (`if (vtable == 0xA)
+            # ITC_NATIVE_RUNNING(...)`: no function to reach it through).
+            stack.extend(c.id for c in d.guarded if c.id not in seen and (
+                guard_kind(c) == "plain" or (guard_kind(c) == "address" and c.prints)))
             if d.debug and not d.adapter:
                 continue
+            own = d.guards and int(sub[4:], 16) in d.guards
             for c, kind in targets(d):
-                if kind == "imp" and c == sub:
-                    continue  # its own original: the flag-off fallback
-                if c == sub:
+                if c == sub and not (kind == "imp" and own):
+                    # Its own original is the flag-off fallback, except in
+                    # a part its address picks (a guest call's trampoline:
+                    # `case 0xA: __imp__sub_A(ctx, base)` runs the original).
                     continue
                 prev = out.get(c)
                 if prev is None or RANK[kind] < RANK[prev[0]]:
@@ -751,6 +1027,8 @@ def native_edges(is_function, classify_hex):
     for d in defs:
         if d.id in visited_any or (d.debug and not d.adapter) or d.adapter:
             continue
+        if d.guards and guard_kind(d) != "plain":
+            continue  # another function's C++, or no one's
         t = [(c, k) for c, k in targets(d) if not (k == "imp")]
         if t:
             host[d.id] = t

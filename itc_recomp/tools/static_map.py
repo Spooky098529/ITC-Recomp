@@ -103,6 +103,16 @@ BASE = 0x82000000
 TEXT = (0x82090000, 0x825DC064)
 DATA_RANGES = [(0x82000600, 0x820773C4),  # .rdata
                (0x82600000, 0x8297833C)]  # .data
+# Tables our C++ names whose length the scan can't find (the original's code
+# builds an address inside them, a scan boundary): address -> (entries,
+# words an entry, the word the C++ calls), that word of every entry taken
+# when a C++ constant names the table.
+CPP_TABLES = {
+    # Device::SetDefaultState's render and sampler states (getter, setter,
+    # default): it calls the setters (the getters it only stores).
+    0x826388F8: (96, 3, 1),
+    0x82638D78: (20, 3, 1),
+}
 HELPER = re.compile(r"__(save|rest)(gpr|fpr|vmx)")
 # Edge kinds in the TSV: the original's direct call, address constant or
 # data table; our C++'s call to a native function's C++, call or address
@@ -482,7 +492,12 @@ def build(image_path=IMAGE, quiet=True):
         if v in starts:
             return [(name_of[v], "native")]
         if scan is not None and in_data(v):
-            return [(c, "table") for c in sorted(scan(v, 1)[0])]
+            found = set(scan(v, 1)[0])
+            if v in CPP_TABLES:
+                n, size, word = CPP_TABLES[v]
+                ws = {image.word(v + 4 * (k * size + word)) for k in range(n)}
+                found |= {name_of[w] for w in ws & starts}
+            return [(c, "table") for c in sorted(found)]
         return []
 
     nat, via, host, cdefs, entries, src_stats = src_edges.native_edges(
@@ -498,7 +513,7 @@ def build(image_path=IMAGE, quiet=True):
         dv = native_via.setdefault(f2, {})
         for c, k in cs.items():
             c2 = folded.get(c, c)
-            if c2 == f2 or c2 not in nodes:
+            if (c2 == f2 and k != "imp") or c2 not in nodes:
                 continue
             prev = d.get(c2)
             if prev is None or rank[k] < rank[prev]:
@@ -766,11 +781,15 @@ def build(image_path=IMAGE, quiet=True):
         "orphan_targets": orphan_targets, "data_scanned": data_scanned,
         "behind_ours": behind_ours, "behind_native": behind_native,
         "ours_orig": ours_orig, "ours_orig_from_native": ours_orig_from_native,
-        "orig_callers": {f: callers_state[(f, "o")] for f in ours_orig},
+        # A function's own C++ reaching its original is a guest call's
+        # trampoline (`case 0xA: __imp__sub_A`): its callers are the C++'s.
+        "orig_callers": {f: (callers_state[(f, "o")] - {(f, "n")}) |
+                         (callers_state[(f, "n")] if (f, "n") in callers_state[(f, "o")] else set())
+                         for f in ours_orig},
         "host_targets": host_targets, "host_only": host_only,
         "orig_reach_all": orig_reach_all, "lost": lost, "lost_groups": lost_groups,
         "gap": gap, "gap_callers": gap_callers, "native_into_seeds": native_into_seeds,
-        "src_stats": src_stats, "overrides": overrides,
+        "src_stats": src_stats, "overrides": overrides, "classify_hex": classify_hex,
     }
 
 
