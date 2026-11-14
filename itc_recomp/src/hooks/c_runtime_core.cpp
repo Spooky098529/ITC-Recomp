@@ -19,7 +19,9 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "_dosmaperr and _get_errno_from_oserr (sub_825A8250, sub_825A8178), _freeptd "
               "(sub_825AA670), __crtInitCritSecAndSpinCount and __crtInitCritSecNoSpinCount "
               "(sub_825B35A0, sub_825B3570), XRegisterThreadNotifyRoutine and "
-              "XapiCallThreadNotifyRoutines (sub_82297B98, sub_82297B38) (checked by --run_harnesses=c_runtime_core). "
+              "XapiCallThreadNotifyRoutines (sub_82297B98, sub_82297B38), _mtinitlocks "
+              "(sub_825B31D8), the C runtime's thread notify routine (sub_825B3650) and _mtinit "
+              "(sub_825AA708, with _init_pointers' plain C++) (checked by --run_harnesses=c_runtime_core). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno");
 
@@ -177,6 +179,18 @@ void hooks::CoreCallThreadNotifyRoutines(PPCContext& ctx, uint8_t* base) {
   cc::CallThreadNotifyRoutines(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
+void hooks::CoreMtInitLocks(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::MtInitLocks(base, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreThreadNotify(PPCContext& ctx, uint8_t* base) {
+  cc::ThreadNotify(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
+}
+
+void hooks::CoreMtInit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cc::MtInit(base, CRuntimeCoreCalls(ctx, base));
+}
+
 #define ITC_C_RUNTIME_CORE(address, step)       \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -210,3 +224,10 @@ ITC_C_RUNTIME_CORE(825B35A0, CoreInitCritSecAndSpinCount)
 ITC_C_RUNTIME_CORE(82297B98, CoreRegisterThreadNotifyRoutine)
 // XapiCallThreadNotifyRoutines: r3 = 1 at a thread's start, 0 at its end.
 ITC_C_RUNTIME_CORE(82297B38, CoreCallThreadNotifyRoutines)
+// _mtinitlocks: r3 = 1, or 0 when a critical section couldn't be made.
+ITC_C_RUNTIME_CORE(825B31D8, CoreMtInitLocks)
+// The C runtime's thread notify routine: r3 = 1 at a thread's start, 0 at
+// its end.
+ITC_C_RUNTIME_CORE(825B3650, CoreThreadNotify)
+// _mtinit: r3 = 1, or 0.
+ITC_C_RUNTIME_CORE(825AA708, CoreMtInit)

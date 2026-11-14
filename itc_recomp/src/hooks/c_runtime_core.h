@@ -31,5 +31,8 @@ void CoreCritSecNoSpinCount(PPCContext& ctx, uint8_t* base);       // sub_825B35
 void CoreInitCritSecAndSpinCount(PPCContext& ctx, uint8_t* base);  // sub_825B35A0
 void CoreRegisterThreadNotifyRoutine(PPCContext& ctx, uint8_t* base);  // sub_82297B98
 void CoreCallThreadNotifyRoutines(PPCContext& ctx, uint8_t* base);     // sub_82297B38
+void CoreMtInitLocks(PPCContext& ctx, uint8_t* base);   // sub_825B31D8
+void CoreThreadNotify(PPCContext& ctx, uint8_t* base);  // sub_825B3650
+void CoreMtInit(PPCContext& ctx, uint8_t* base);        // sub_825AA708
 
 }  // namespace hooks

@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "c_runtime/start_up.h"
 
 namespace c_runtime::core {
 
@@ -201,6 +202,81 @@ void CallThreadNotifyRoutines(uint8_t* base, uint32_t starting, const Calls& cal
     calls.guest(routine, {starting});
   }
   calls.import(Import::kRtlLeaveCriticalSection, {kNotifyLock});
+}
+
+uint32_t MtInitLocks(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B31D8 _mtinitlocks");
+  uint32_t section = kLockSections;
+  for (uint32_t i = 0; i < kLockCount; i++) {
+    const uint32_t entry = kLockTable + 8 * i;
+    if (Load(base, entry + 4) != 1) {
+      continue;
+    }
+    Store(base, entry + 0, section);
+    const uint32_t made = InitCritSecAndSpinCount(base, section, 4000, calls);
+    section += 28;
+    if (made == 0) {
+      Store(base, entry + 0, 0);
+      return 0;
+    }
+  }
+  return 1;
+}
+
+void ThreadNotify(uint8_t* base, uint32_t starting, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825B3650 the C runtime's thread notify routine");
+  if (starting != 0) {
+    if (const uint32_t hook = Load(base, kThreadStartHook); hook != 0) {
+      calls.guest(hook, {starting});
+    }
+    return;
+  }
+  if (const uint32_t hook = Load(base, kThreadEndHook); hook != 0) {
+    calls.guest(hook, {0});
+  }
+  FreePtd(base, 0, calls);
+}
+
+uint32_t MtInit(uint8_t* base, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_825AA708 _mtinit");
+  Store(base, kFlsAlloc, 0x825AA3F8);      // __crtTlsAlloc
+  Store(base, kFlsGetValue, 0x825DBBF4);   // KeTlsGetValue's thunk
+  Store(base, kFlsSetValue, 0x825DBC04);   // KeTlsSetValue's
+  Store(base, kFlsFree, 0x825DBC24);       // KeTlsFree's
+  const uint32_t getter_index = uint32_t(calls.import(Import::kKeTlsAlloc, {}));
+  Store(base, kGetValueIndex, getter_index);
+  if (getter_index == 0xFFFFFFFFu ||
+      calls.import(Import::kKeTlsSetValue, {getter_index, Load(base, kFlsGetValue)}) == 0) {
+    return 0;
+  }
+  c_runtime::InitPointers(base);
+  auto fail = [&]() {
+    MtTerm(base, calls);
+    return 0u;
+  };
+  if (MtInitLocks(base, calls) == 0) {
+    return fail();
+  }
+  const uint32_t fls_index = uint32_t(calls.guest(Load(base, kFlsAlloc), {0x825AA5C0}));
+  Store(base, kFlsIndex, fls_index);
+  if (fls_index == 0xFFFFFFFFu) {
+    return fail();
+  }
+  const uint32_t data = calls.calloc(1, kThreadDataBytes);
+  if (data == 0) {
+    return fail();
+  }
+  if (calls.guest(Load(base, kFlsSetValue), {Load(base, kFlsIndex), data}) == 0) {
+    return fail();
+  }
+  Store(base, data + 20, 1);
+  Store(base, data + 92, kXcptActTab);
+  const uint32_t id = calls.thread_id();
+  Store(base, data + 0, id);
+  Store(base, data + 4, 0xFFFFFFFFu);
+  Store(base, kCrtNotifyBlock + 8, kCrtNotifyRoutine);
+  RegisterThreadNotifyRoutine(base, kCrtNotifyBlock, 1, calls);
+  return 1;
 }
 
 }  // namespace c_runtime::core

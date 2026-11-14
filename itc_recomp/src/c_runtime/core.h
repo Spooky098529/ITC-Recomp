@@ -34,6 +34,11 @@ constexpr uint32_t kCritSecInit = 0x8297132C;       // the critical section init
 constexpr uint32_t kCritSecNoSpinCount = 0x825B3570;
 constexpr uint32_t kNotifyLock = 0x82638780;        // XAPI's notify list's lock
 constexpr uint32_t kNotifyList = 0x8263879C;        // its head (+0 first, +4 last)
+constexpr uint32_t kLockSections = 0x829711A0;      // the boot locks' critical sections
+constexpr uint32_t kThreadStartHook = 0x820723A0;   // called at a thread's start
+constexpr uint32_t kThreadEndHook = 0x820723A4;     // and at its end
+constexpr uint32_t kCrtNotifyBlock = 0x82971150;    // the C runtime's notify block
+constexpr uint32_t kCrtNotifyRoutine = 0x825B3650;
 
 enum class Import {
   kKeTlsAlloc,
@@ -137,5 +142,23 @@ void RegisterThreadNotifyRoutine(uint8_t* base, uint32_t block, uint32_t add,
 // each block's routine (+8) called with `starting`, the next block read
 // before the call.
 void CallThreadNotifyRoutines(uint8_t* base, uint32_t starting, const Calls& calls);
+
+// sub_825B31D8 _mtinitlocks: each lock table entry made at boot (+4 = 1)
+// given the next 28 bytes of kLockSections and initialized
+// (__crtInitCritSecAndSpinCount with 4000); 1, or 0 with that entry's +0
+// cleared when one fails.
+uint32_t MtInitLocks(uint8_t* base, const Calls& calls);
+
+// sub_825B3650 the C runtime's thread notify routine (probably): `starting`
+// not 0: [kThreadStartHook] called (with `starting`) when set; 0:
+// [kThreadEndHook] (with 0) when set, then _freeptd(0).
+void ThreadNotify(uint8_t* base, uint32_t starting, const Calls& calls);
+
+// sub_825AA708 _mtinit: the FLS stand-ins set, __getvalueindex = KeTlsAlloc
+// holding the getter (KeTlsSetValue), _init_pointers, _mtinitlocks,
+// __flsindex from [kFlsAlloc], the main thread's data made and stored as
+// _getptd_noexit does, the notify routine registered. 1, or 0 (after
+// _mtterm once the getter's slot is set).
+uint32_t MtInit(uint8_t* base, const Calls& calls);
 
 }  // namespace c_runtime::core

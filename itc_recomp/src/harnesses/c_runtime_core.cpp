@@ -676,6 +676,158 @@ void CallNotifyCases(Context& h) {
   results.Report();
 }
 
+// The boot locks' count (lock table entries with +4 = 1).
+uint32_t BootLocks(Context& h) {
+  uint32_t n = 0;
+  for (uint32_t i = 0; i < cc::kLockCount; i++) {
+    n += Load(h.base, cc::kLockTable + 8 * i + 4) == 1;
+  }
+  return n;
+}
+
+// Guest ranges saved and put back.
+struct Saved {
+  Context& h;
+  std::vector<std::pair<uint32_t, std::vector<uint8_t>>> ranges;
+  Saved(Context& h, std::initializer_list<std::pair<uint32_t, uint32_t>> list) : h(h) {
+    for (auto [address, bytes] : list) {
+      ranges.emplace_back(address, Read(h.base, address, bytes));
+    }
+  }
+  void Restore() {
+    for (auto& [address, bytes] : ranges) {
+      Write(h.base, address, bytes.data(), uint32_t(bytes.size()));
+    }
+  }
+};
+
+void MtInitLocksCases(Context& h) {
+  Results results("_mtinitlocks (sub_825B31D8)");
+  const uint32_t n = BootLocks(h);
+  for (int c = 0; c < 12; c++) {
+    // 0: the initializer set; 1: 0 (set by the first call); 2: one that fails.
+    const int kind = c % 3;
+    std::vector<uint8_t> fill(28 * n);
+    for (auto& b : fill) {
+      b = uint8_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kLockTable, 8 * cc::kLockCount},
+                      {cc::kLockSections, 28 * n},
+                      {cc::kCritSecInit, 4}});
+      Write(h.base, cc::kLockSections, fill.data(), 28 * n);
+      Store(h.base, cc::kCritSecInit,
+            kind == 0 ? cc::kCritSecNoSpinCount : kind == 1 ? 0 : kReturnsZero);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B31D8 : hooks::CoreMtInitLocks)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, cc::kLockTable, 8 * cc::kLockCount));
+      out[v].Bytes(Read(h.base, cc::kLockSections, 28 * n));
+      out[v].Word(Load(h.base, cc::kCritSecInit));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The start and end hooks (0x820723A0, 0x820723A4) are read-only image
+// words (the empty function): only the data slot is set per case.
+void ThreadNotifyCases(Context& h) {
+  Results results("the C runtime's thread notify routine (sub_825B3650)");
+  ThreadSlots slots(h);
+  if (slots.data == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: thread notify: no thread data or heap");
+    return;
+  }
+  for (int c = 0; c < 24; c++) {
+    const uint32_t starting = c % 3 == 0 ? 1 : c % 3 == 1 ? 0 : uint32_t(h.random.Next()) | 2;
+    const bool getter_empty = c % 4 == 3;
+    const uint32_t mask = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      std::vector<uint32_t> blocks;
+      const uint32_t data = TestThreadData(h, mask, blocks);
+      TlsSet(h, slots.data_index, data);
+      TlsSet(h, slots.getter_index, getter_empty ? 0 : slots.getter);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = starting;
+      (v == 0 ? __imp__sub_825B3650 : hooks::CoreThreadNotify)(t, h.base);
+      const uint32_t data_slot = TlsGet(h, slots.data_index);
+      out[v].Word(data_slot == data ? 1 : data_slot);
+      out[v].Word(TlsGet(h, slots.getter_index));
+      TlsSet(h, slots.getter_index, slots.getter);
+      TlsSet(h, slots.data_index, slots.data);
+      HeldOutputs(out[v], blocks);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _mtinit on the game's globals, saved and put back around each side (the
+// harness holding the notify list's lock, so the C runtime's notify block,
+// linked again at the tail, is put back before any thread starts): its two
+// new TLS slots and the main thread's new data are compared, then freed.
+void MtInitCases(Context& h) {
+  Results results("_mtinit (sub_825AA708)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _mtinit: the heap isn't on the layer");
+    return;
+  }
+  const uint32_t n = BootLocks(h);
+  EnterNotifyLock(h, true);
+  for (int c = 0; c < 6; c++) {
+    std::vector<uint8_t> fill(28 * n);
+    for (auto& b : fill) {
+      b = uint8_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t last = Load(h.base, cc::kNotifyList + 4);
+      Saved saved(h, {{cc::kFlsAlloc, 16},
+                      {cc::kFlsIndex, 8},
+                      {0x82971170, 4},
+                      {0x82971178, 4},
+                      {0x82978320, 4},
+                      {0x82971328, 8},
+                      {0x8266B7B0, 4},
+                      {cc::kLockTable, 8 * cc::kLockCount},
+                      {cc::kLockSections, 28 * n},
+                      {cc::kCrtNotifyBlock, 12},
+                      {cc::kNotifyList, 8},
+                      {last, 4}});
+      Write(h.base, cc::kLockSections, fill.data(), 28 * n);
+      if (c % 2 == 1) {
+        Store(h.base, cc::kCritSecInit, uint32_t(h.random.Next()));
+      }
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AA708 : hooks::CoreMtInit)(t, h.base);
+      const uint32_t getter_index = Load(h.base, cc::kGetValueIndex);
+      const uint32_t fls_index = Load(h.base, cc::kFlsIndex);
+      const uint32_t data = TlsGet(h, fls_index);
+      out[v].Word(t.r3.u32);
+      out[v].Word(getter_index);
+      out[v].Word(fls_index);
+      out[v].Word(TlsGet(h, getter_index));
+      for (const auto& range : saved.ranges) {
+        if (range.first != cc::kFlsIndex) {
+          out[v].Bytes(Read(h.base, range.first, uint32_t(range.second.size())));
+        }
+      }
+      out[v].Bytes(Read(h.base, data, cc::kThreadDataBytes));
+      saved.Restore();
+      memory::crt::Free(data);
+      TlsFree(h, fls_index);
+      TlsFree(h, getter_index);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  EnterNotifyLock(h, false);
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeCore(Context& h) {
@@ -692,6 +844,9 @@ void CRuntimeCore(Context& h) {
   CritSecCases(h);
   RegisterNotifyCases(h);
   CallNotifyCases(h);
+  MtInitLocksCases(h);
+  ThreadNotifyCases(h);
+  MtInitCases(h);
 }
 
 }  // namespace harness
