@@ -247,6 +247,27 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
         return Type6NodeScreenBack(base, r3, *r4);
       case 0x82237048:
         return Type6NodeScreenDeletingDestruct(base, r3, *r4, sp, calls);
+      // The type 8 list part's and its inner part's slots, the inner's
+      // pages and steps and the shared ones (src/type8_screens/list_part.cpp).
+      case 0x82254580:
+        return type8_screens::ListPartDeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x82254530:
+        return type8_screens::ListInnerDeletingDestruct(base, r3, *r4, sp, calls);
+      case 0x822549D8:
+        return type8_screens::ListInnerOpen(base, r3, *r4, sp, calls);
+      case 0x822550C0:
+        // r5 as the inner's pages leave it unread.
+        return type8_screens::ListInnerPick(base, r3, *r4, r5.value_or(*r4), sp, lr, calls);
+      case 0x82254E18:
+        return type8_screens::ListInnerInput(base, r3, *r4, sp, calls);
+      case 0x82254D08:
+        return type8_screens::ListInnerStep0(base, r3, *r4, sp, calls);
+      case 0x82254FB8:
+        return type8_screens::ListInnerPage0(base, r3, *r4, sp, calls);
+      case 0x822538A8:
+        return type8_screens::PartInnerStep1(base, r3, *r4, sp, calls);
+      case 0x82253838:
+        return type8_screens::PartInnerPage2(base, r3, *r4, sp);
       default:
         break;
     }
@@ -337,6 +358,9 @@ std::optional<uint64_t> SlotNative(uint8_t* base, uint32_t target, uint64_t r3,
     // Its slot 3 (PickCar; r4, the dispatcher, not read).
     case 0x82238C88:
       return type8_screens::PickCar(base, r3, sp, calls);
+    // The type 8 inner parts' shared page 1 (list_part.cpp).
+    case 0x82253108:
+      return type8_screens::PartInnerPage1(base, r3);
     default:
       return std::nullopt;
   }
@@ -365,7 +389,18 @@ bool SlotIsNative(uint32_t target, bool has_r4, bool has_r5) {
     case 0x822372A0:
     case 0x82237110:
     case 0x82237048:
+    case 0x82254580:
+    case 0x82254530:
+    case 0x822549D8:
+    case 0x822550C0:
+    case 0x82254E18:
+    case 0x82254D08:
+    case 0x82254FB8:
+    case 0x822538A8:
+    case 0x82253838:
       return has_r4;
+    case 0x82253108:
+      return true;
     case 0x82236F00:
     case 0x82237160:
     case 0x82237228:

@@ -18,7 +18,7 @@ using guest::StoreU32;
 
 namespace ts = type67_screens;
 
-constexpr uint32_t kFinishNamed = 0x8211DF20, kPlayNamed = 0x8211DAC8, kLoopNamed = 0x8211DDE0;
+constexpr uint32_t kPlayNamed = 0x8211DAC8;
 constexpr uint32_t kDialogMovie = 16, kDialogCursor = 40960;
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {

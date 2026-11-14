@@ -18,7 +18,11 @@
 // outgoing area, its register saves left out), the caller's area, r1 and r3
 // (both halves). The deleting destructors with bit 0 set run on blocks of
 // operator new's, compared by r3 and whether the block is handed out
-// again.
+// again. The list screen's list part runs in a world of its own (the part,
+// its inner part, both players' blocks with their menus, the players'
+// action mappers and a fake sound manager, as type67_list_part.cpp makes
+// them; the menus' item blocks the allocation layer's pages where the
+// function makes or frees them), with the movie world.
 
 #include "harness.h"
 
@@ -32,6 +36,8 @@
 #include "memory/c_runtime_heap.h"
 #include "game_modes/game_modes.h"
 #include "memory/heap.h"
+#include "menu_sounds/menu_sounds.h"
+#include "race_screens/race_screens.h"
 #include "type67_screens/type67_screens.h"
 #include "type8_screens/type8_screens.h"
 #include "ui_movies/game.h"
@@ -142,6 +148,10 @@ t8::Calls RecordingCalls(PPCContext& t, uint8_t* base) {
 // leaf or a tail call: the stack below compared whole, nothing written).
 struct Frame {
   uint32_t size, saves;
+  // Whether the stack below a frameless call is compared (not for a tail
+  // call into functions with register saves, or a leaf saving registers
+  // below its r1).
+  bool below = true;
 };
 
 using Setup = std::function<void(PPCContext&, Random&, uint32_t world)>;
@@ -222,7 +232,7 @@ void Group(Context& h, uint32_t world, const char* name, uint32_t address, int c
         const uint32_t bottom = sp - frame.size;
         out[v].Bytes(Read(base, bottom, 4));
         out[v].Bytes(Read(base, bottom + 80, frame.size - 80 - frame.saves));
-      } else {
+      } else if (frame.below) {
         out[v].Bytes(Read(base, sp - kStackBytes, kStackBytes));
       }
       out[v].Bytes(Read(base, sp, kCallerBytes));
@@ -637,6 +647,288 @@ void PickCar(Context& h, uint32_t world) {
   memory::Free(entry);
 }
 
+// --- The list screen's list part ---
+
+// The world: the part at +0x100 (its inner at +0x114, the blocks at +0x13C
+// and +0x224), the menus' item blocks (+0x1000), the players' action
+// mappers (+0x1400 their vtables, +0x1800 the mappers), a fake sound manager
+// (+0x2400, as the list part's harness in type67_list_part.cpp makes them).
+constexpr uint32_t kPartAt = kObjectAt, kInnerAt = kPartAt + 20;
+constexpr uint32_t kItemsAt = 0x1000, kMapperVtablesAt = 0x1400, kMappersAt = 0x1800;
+constexpr uint32_t kManagerAt = 0x2400, kManagerVtableAt = 0x2480;
+constexpr uint32_t kNone = 0xFFFFFFFFu;
+
+// The players' mappers, the controllers and the sound manager: saved, laid
+// by the cases, compared and put back.
+const std::vector<std::pair<uint32_t, uint32_t>> kMenuGlobals = {
+    {race_screens::kMapperEntries, 32},
+    {race_screens::kControllerEntries, 16},
+    {menu_sounds::kSoundManager, 4},
+};
+
+// An action id: mostly the menus' (151 to 180), sometimes any word.
+uint32_t AnyAction(Random& r) {
+  return r.Below(8) == 0 ? uint32_t(r.Next()) : 151 + r.Below(30);
+}
+
+// The menus' item blocks: ours, or 0 or pages of the allocation layer's
+// (the functions that make or free them), recorded in g_items.
+struct ItemBlock {
+  uint32_t list, old;
+};
+std::vector<ItemBlock> g_items;
+bool g_pages = false;
+
+void LayMenu(uint8_t* base, uint32_t list, uint32_t items, Random& r) {
+  namespace rs = race_screens;
+  guest::StoreU32(base, list + rs::kListPlayer, r.Below(4));
+  guest::StoreU32(base, list + rs::kListCount, r.Below(4) == 0 ? 1 + r.Below(3) : 2);
+  guest::StoreU32(base, list + rs::kListShown, r.Below(4) == 0 ? r.Below(4) : 2);
+  guest::StoreU32(base, list + rs::kListScroll, r.Below(4) == 0 ? kNone : r.Below(2));
+  guest::StoreU32(base, list + rs::kListSelection, r.Below(6) == 0 ? r.Below(3) : r.Below(2));
+  guest::StoreU32(base, list + rs::kListSelectionBefore,
+                  r.Below(6) == 0 ? r.Below(3) : r.Below(2));
+  for (uint32_t field = rs::kListDown; field <= rs::kListBack; field += 4) {
+    guest::StoreU32(base, list + field, AnyAction(r));
+  }
+  guest::StoreU32(base, list + rs::kListWraps, r.Below(2));
+  guest::StoreU32(base, list + rs::kListMove, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
+  uint32_t block = items;
+  if (g_pages) {
+    block = 0;
+    if (r.Below(4) != 0) {
+      block = memory::AllocPages(16, 4096);
+      WriteRandom(base, block, 16, r);
+    }
+  }
+  guest::StoreU32(base, list + rs::kListBlock, block);
+  g_items.push_back({list, block});
+}
+
+// A player's block: the player, the ready and backed-out words, the two
+// menus, its node and string ids small (sub-scene -1 now and then) and its
+// named animations 0 to 255, as the movie world has them.
+void LayPlayerBlock(uint8_t* base, uint32_t block, uint32_t items, Random& r) {
+  guest::StoreU32(base, block + 0, r.Below(2));
+  guest::StoreU32(base, block + 4, r.Below(5) == 0 ? 2 : r.Below(2));
+  guest::StoreU32(base, block + 8, r.Below(2));
+  LayMenu(base, block + 12, items, r);
+  LayMenu(base, block + 84, items + 0x40, r);
+  guest::StoreU32(base, block + 156, r.Below(3) == 0 ? kNone : r.Below(16));
+  for (uint32_t at = 160; at <= 176; at += 4) guest::StoreU32(base, block + at, r.Below(16));
+  for (uint32_t at = 180; at <= 220; at += 4) guest::StoreU32(base, block + at, r.Below(256));
+  guest::StoreU32(base, block + 224, r.Below(16));
+  guest::StoreU32(base, block + 228, r.Below(16));
+}
+
+// The list part's world: the part, its inner part (the page -1 or 0 to 2,
+// the step -1, 0 or 1, the queued step, the first-call word) and both
+// blocks; the mappers, the controllers and the sound manager.
+void LayListPart(uint8_t* base, uint32_t w, Random& r) {
+  g_items.clear();
+  const uint32_t part = w + kPartAt, inner = w + kInnerAt;
+  guest::StoreU32(base, part, t8::kListPartVtable);
+  guest::StoreU32(base, part + 12, 16 + r.Below(4));
+  guest::StoreU32(base, part + 16, inner);
+  guest::StoreU32(base, inner, t8::kListInnerVtable);
+  auto small = [&r](uint32_t n) { return r.Below(4) == 0 ? kNone : r.Below(n); };
+  guest::StoreU32(base, inner + 4, small(3));
+  guest::StoreU32(base, inner + 8, small(3));
+  guest::StoreU32(base, inner + 12, small(3));
+  guest::StoreU32(base, inner + 16, small(2));
+  guest::StoreU32(base, inner + 20, small(2));
+  guest::StoreU32(base, inner + 24, small(2));
+  guest::StoreU32(base, inner + 28, r.Below(2));
+  LayPlayerBlock(base, inner + 40, w + kItemsAt, r);
+  LayPlayerBlock(base, inner + 272, w + kItemsAt + 0x80, r);
+  for (uint32_t c = 0; c < 4; c++) {
+    const uint32_t vtable = w + kMapperVtablesAt + 0x40 * c;
+    const uint32_t mapper = w + kMappersAt + 0x200 * c;
+    guest::StoreU32(base, race_screens::kControllerEntries + 4 * c, r.Below(4));
+    guest::StoreU32(base, race_screens::kMapperEntries + 8 * c, mapper);
+    guest::StoreU32(base, race_screens::kMapperEntries + 8 * c + 4, r.Below(5) == 0 ? 1 : 0);
+    guest::StoreU32(base, mapper, vtable);
+    guest::StoreU32(base, vtable + 40, race_screens::kPressedSlot);
+    guest::StoreU32(base, vtable + 48, race_screens::kFiredSlot);
+    for (uint32_t k = 0; k < 6; k++) {
+      guest::StoreU32(base, mapper + 448 + 4 * k,
+                      uint32_t(r.Next()) & uint32_t(r.Next()) & uint32_t(r.Next()));
+    }
+  }
+  const uint32_t manager = w + kManagerAt, vtable = w + kManagerVtableAt;
+  guest::StoreU32(base, manager, vtable);
+  guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot, 0x820A8420);
+  guest::StoreU32(base, vtable + 52, 0x820CE9F8);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+}
+
+// After a case: the menu globals, and with pages the item blocks: a new
+// one's words compared and freed (its word in the list 1), the old one
+// whether still the layer's.
+void ListPartOutputs(uint8_t* base, Outputs& out) {
+  for (const auto& [at, bytes] : kMenuGlobals) out.Bytes(Read(base, at, bytes));
+  if (!g_pages) return;
+  for (const ItemBlock& item : g_items) {
+    const uint32_t now = guest::LoadU32(base, item.list + race_screens::kListBlock);
+    out.Word(now == item.old ? 1 : 0);
+    out.Word(now == 0 ? 0 : 1);
+    if (now != 0 && now != item.old && memory::IsPages(now)) {
+      out.Bytes(Read(base, now, 4 * guest::LoadU32(base, item.list + race_screens::kListCount)));
+      memory::FreePages(now);
+      guest::StoreU32(base, item.list + race_screens::kListBlock, 1);
+    }
+  }
+  for (const ItemBlock& item : g_items) {
+    if (item.old == 0) continue;
+    const bool still = memory::IsPages(item.old);
+    out.Word(still ? 1 : 0);
+    if (still) memory::FreePages(item.old);
+  }
+  g_items.clear();
+}
+
+// What r3 is: the part, the inner part, or a player's block (either).
+enum class Object { kPart, kInner, kBlock };
+
+void ListPart(Context& h, uint32_t world) {
+  for (const uint32_t id : {16u, 17u, 18u, 19u}) {
+    if (ui_movies::PairsFindKey(h.base, ui_movies::kMovieTable, id) != 0x826C5CDC) {
+      ITC_LOG_ERROR("harness: type8_screens: movie {} is in the table; the list part skipped",
+                    id);
+      return;
+    }
+  }
+  const lw::MovieWorld w;
+  if (!w.ok()) {
+    ITC_LOG_ERROR("harness: type8_screens: no movie world");
+    return;
+  }
+  uint8_t* const base = h.base;
+  const lw::SavedGlobals saved(base);
+  std::vector<std::vector<uint8_t>> menu_globals;
+  for (const auto& [at, bytes] : kMenuGlobals) menu_globals.push_back(Read(base, at, bytes));
+  lw::BuildStringTable(base, w);
+  g_movies = &w;
+  // r3 the object (its high half as the Group set it), r4 the movie id (or
+  // the player for the block's constructor, flags with bit 0 clear for the
+  // deleting destructors), r5 the setting for PlaceCursor.
+  enum class R4 { kMovie, kPlayer, kNoDelete };
+  const auto setup = [base](Object object, R4 r4) {
+    return [base, object, r4](PPCContext& t, Random& r, uint32_t wb) {
+      LayListPart(base, wb, r);
+      uint32_t at = wb + kPartAt;
+      if (object == Object::kInner) at = wb + kInnerAt;
+      if (object == Object::kBlock) at = wb + kInnerAt + (r.Below(2) == 0 ? 40 : 272);
+      t.r3.u64 = (t.r3.u64 & 0xFFFFFFFF00000000ull) | at;
+      switch (r4) {
+        case R4::kMovie:
+          t.r4.u64 = 16 + r.Below(4);
+          break;
+        case R4::kPlayer:
+          t.r4.u64 = r.Below(2);
+          break;
+        case R4::kNoDelete:
+          t.r4.u64 = r.Next() & ~1ull;
+          break;
+      }
+      t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
+    };
+  };
+  const auto after = [base](Outputs& out) { ListPartOutputs(base, out); };
+  struct Function {
+    const char* name;
+    uint32_t address;
+    int cases;
+    Frame frame;
+    Object object;
+    R4 r4;
+    bool pages;
+    GuestFunction recompiled;
+    void (*native)(PPCContext&, uint8_t*);
+  };
+  const Object part = Object::kPart, inner = Object::kInner, block = Object::kBlock;
+  const R4 movie = R4::kMovie;
+  const Function functions[] = {
+      {"Type8PlayerBlock::Type8PlayerBlock", 0x822542B8, 4, {0, 0, false}, block, R4::kPlayer,
+       false, __imp__sub_822542B8, hooks::Type8BlockConstruct},
+      {"Type8PlayerBlock::SetUp", 0x822545D0, 8, {160, 48}, block, movie, true,
+       __imp__sub_822545D0, hooks::Type8BlockSetUp},
+      {"Type8PlayerBlock::PlayOpening", 0x822546F8, 4, {112, 24}, block, movie, false,
+       __imp__sub_822546F8, hooks::Type8BlockPlayOpening},
+      {"Type8PlayerBlock::ShowMenuMove", 0x82254798, 10, {144, 48}, block, movie, false,
+       __imp__sub_82254798, hooks::Type8BlockShowMenuMove},
+      {"Type8PlayerBlock::PlayReady", 0x822548B8, 4, {112, 24}, block, movie, false,
+       __imp__sub_822548B8, hooks::Type8BlockPlayReady},
+      {"Type8PlayerBlock::PlaceCursor", 0x82254948, 6, {128, 32}, block, movie, false,
+       __imp__sub_82254948, hooks::Type8BlockPlaceCursor},
+      {"Type8PlayerBlock::ShowSelections", 0x82254AD8, 6, {128, 40}, block, movie, false,
+       __imp__sub_82254AD8, hooks::Type8BlockShowSelections},
+      {"Type8PlayerBlock::WhileReady", 0x82254A70, 8, {112, 24}, block, movie, false,
+       __imp__sub_82254A70, hooks::Type8BlockWhileReady},
+      {"Type8PlayerBlock::Input", 0x82254EC8, 16, {128, 40}, block, movie, false,
+       __imp__sub_82254EC8, hooks::Type8BlockInput},
+      {"Type8PlayerBlock::UpdateSetting", 0x82254DB8, 8, {112, 24}, block, movie, false,
+       __imp__sub_82254DB8, hooks::Type8BlockUpdateSetting},
+      {"Type8PlayerBlock::SettingMoved", 0x82254C50, 6, {144, 48}, block, movie, false,
+       __imp__sub_82254C50, hooks::Type8BlockSettingMoved},
+      {"Type8ListPartInner::Type8ListPartInner", 0x822543C0, 4, {96, 16}, inner, movie, false,
+       __imp__sub_822543C0, hooks::Type8ListInnerConstruct},
+      {"Type8ListPart::Type8ListPart", 0x82254488, 4, {112, 24}, part, movie, false,
+       __imp__sub_82254488, hooks::Type8ListPartConstruct},
+      {"Type8ListPartInner::~Type8ListPartInner", 0x82254418, 6, {112, 24}, inner, movie, true,
+       __imp__sub_82254418, hooks::Type8ListInnerDestruct},
+      {"Type8ListPartInner::DeletingDestructor", 0x82254530, 4, {112, 24}, inner, R4::kNoDelete,
+       true, __imp__sub_82254530, hooks::Type8ListInnerDeletingDestruct},
+      {"Type8ListPart::~Type8ListPart", 0x822544E8, 6, {96, 16}, part, movie, true,
+       __imp__sub_822544E8, hooks::Type8ListPartDestruct},
+      {"Type8ListPart::DeletingDestructor", 0x82254580, 4, {112, 24}, part, R4::kNoDelete, true,
+       __imp__sub_82254580, hooks::Type8ListPartDeletingDestruct},
+      {"Type8ListPartInner::Open", 0x822549D8, 8, {128, 32}, inner, movie, true,
+       __imp__sub_822549D8, hooks::Type8ListInnerOpen},
+      {"Type8ListPartInner::Step0", 0x82254D08, 8, {128, 32}, inner, movie, false,
+       __imp__sub_82254D08, hooks::Type8ListInnerStep0},
+      {"Type8PartInner::Step1", 0x822538A8, 6, {112, 24}, inner, movie, false,
+       __imp__sub_822538A8, hooks::Type8PartInnerStep1},
+      {"Type8PartInner::Page1", 0x82253108, 4, {0, 0}, inner, movie, false, __imp__sub_82253108,
+       hooks::Type8PartInnerPage1},
+      {"Type8PartInner::Page2", 0x82253838, 6, {112, 16}, inner, movie, false,
+       __imp__sub_82253838, hooks::Type8PartInnerPage2},
+      {"Type8ListPartInner::Page0", 0x82254FB8, 16, {128, 40}, inner, movie, false,
+       __imp__sub_82254FB8, hooks::Type8ListInnerPage0},
+      {"Type8ListPartInner::Pick", 0x822550C0, 10, {0, 0, false}, inner, movie, false,
+       __imp__sub_822550C0, hooks::Type8ListInnerPick},
+      {"Type8ListPartInner::Input", 0x82254E18, 12, {128, 32}, inner, movie, false,
+       __imp__sub_82254E18, hooks::Type8ListInnerInput},
+  };
+  for (const Function& f : functions) {
+    g_pages = f.pages;
+    Group(h, world, f.name, f.address, f.cases, f.frame, setup(f.object, f.r4), f.recompiled,
+          f.native, after);
+  }
+  g_pages = false;
+  g_movies = nullptr;
+  // The deleting destructors with bit 0 set (the menus' item blocks 0).
+  const auto shape = [base](bool whole) {
+    return [base, whole](uint32_t object, Random&) {
+      const uint32_t in = whole ? object + 20 : object;
+      if (whole) guest::StoreU32(base, object, t8::kListPartVtable);
+      guest::StoreU32(base, in, t8::kListInnerVtable);
+      for (const uint32_t b : {in + 40, in + 272}) {
+        guest::StoreU32(base, b + 12 + race_screens::kListBlock, 0);
+        guest::StoreU32(base, b + 84 + race_screens::kListBlock, 0);
+      }
+    };
+  };
+  Deleting(h, "Type8ListPartInner::DeletingDestructor", 0x82254530, 504, shape(false),
+           __imp__sub_82254530, hooks::Type8ListInnerDeletingDestruct);
+  Deleting(h, "Type8ListPart::DeletingDestructor", 0x82254580, 524, shape(true),
+           __imp__sub_82254580, hooks::Type8ListPartDeletingDestruct);
+  for (size_t i = 0; i < kMenuGlobals.size(); i++) {
+    Write(base, kMenuGlobals[i].first, menu_globals[i].data(), kMenuGlobals[i].second);
+  }
+  saved.Restore();
+}
+
 }  // namespace
 
 void Type8Screens(Context& h) {
@@ -650,6 +942,7 @@ void Type8Screens(Context& h) {
   Handlers(h, world);
   Screen(h, world);
   PickCar(h, world);
+  ListPart(h, world);
   memory::Free(world);
 }
 

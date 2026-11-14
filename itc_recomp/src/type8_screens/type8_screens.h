@@ -211,4 +211,126 @@ constexpr uint32_t kInitMachineFrame = 1712;
 uint32_t InitMachine(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* machine,
                      bool* replaced);
 
+
+// --- The list screen's list part (list_part.cpp): Type8ListPart (524
+// bytes, +20 its inner part) over ListPartBase, Type8ListPartInner (504
+// bytes, a Type8PlayerBlock of 232 bytes a player at +40 and +272: +0 the
+// player, +4 ready, +8 backed out, +12 and +84 two MenuLists, +156 to +228
+// node, string and named animation ids) over ListPartInnerBase; and the
+// inner parts' shared step 1 and pages 1 and 2. r4 (`id`) the part's UI
+// movie id where the original passes it on ---
+
+// The vtables, the inner's page and step tables (.data) and the pad players
+// the blocks' menus take (by the player).
+constexpr uint32_t kListPartVtable = 0x820114AC;
+constexpr uint32_t kListInnerVtable = 0x82011490;
+constexpr uint32_t kListInnerPages = 0x82637A74;
+constexpr uint32_t kListInnerSteps = 0x82637A6C;
+constexpr uint32_t kPadPlayers = 0x82637A64;
+// The UI movie calls made as guest calls.
+constexpr uint32_t kFinishNamed = 0x8211DF20;
+constexpr uint32_t kLoopNamed = 0x8211DDE0;
+constexpr uint32_t kSetNodeText = 0x8211C7E8;
+
+// sub_822542B8 Type8PlayerBlock::Type8PlayerBlock (a leaf; r4 the player,
+// 0 or 1: its ids from the tables at 0x82011430 to 0x82011488). r3 left.
+uint64_t PlayerBlockConstruct(uint8_t* base, uint64_t r3, uint64_t player);
+// sub_822545D0 Type8PlayerBlock::SetUp (160-byte frame): the two menus'
+// MenuList::Init, their pad player, the texts (UiMovie::SetText, two
+// SetNodeText), the movie's +40960 = 1, +4 = +8 = 0. The last
+// SetNodeText's r3.
+uint64_t PlayerBlockSetUp(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                          const Calls& calls);
+// sub_822546F8 Type8PlayerBlock::PlayOpening (112): PlayNamed on +196,
+// +200, +204. The last PlayNamed's r3.
+uint64_t PlayerBlockPlayOpening(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp);
+// sub_82254798 Type8PlayerBlock::ShowMenuMove (144): the +12 menu's
+// previous item's animation finished, its item's restarted and looped, the
+// setting's finished when the previous was 0, +212's restarted at item 1 or
+// finished when leaving it. The last call's r3.
+uint64_t PlayerBlockShowMenuMove(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                                 const Calls& calls);
+// sub_822548B8 Type8PlayerBlock::PlayReady (112): FinishNamed on +212,
+// +200, +192, PlayNamed +192. Its r3.
+uint64_t PlayerBlockPlayReady(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                              const Calls& calls);
+// sub_82254948 Type8PlayerBlock::PlaceCursor (128; r5 the setting): the
+// node (+156, +160)'s children +224 and +228: +108 = 0 on one and 1 on the
+// other by the setting. The second child.
+uint64_t PlayerBlockPlaceCursor(uint8_t* base, uint64_t r3, uint64_t id, uint64_t selection,
+                                uint32_t sp);
+// sub_82254AD8 Type8PlayerBlock::ShowSelections (128): the item's, +216's,
+// +220's and the setting's animations restarted and looped, PlaceCursor.
+// The last LoopNamed's r3.
+uint64_t PlayerBlockShowSelections(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                                   const Calls& calls);
+// sub_82254A70 Type8PlayerBlock::WhileReady (112): when the +12 menu is
+// cancelled, sound 2, +4 = 0, ShowMenuMove. Answers 1.
+uint64_t PlayerBlockWhileReady(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                               const Calls& calls);
+// sub_82254EC8 Type8PlayerBlock::Input (128): MenuList::Update on +12;
+// accepted: sound 0, item 1 ready (+4 = 1, PlayReady), else item 1 selected
+// and ShowMenuMove; cancelled: sound 2 (player 0) or 3, +8 = 1; moved:
+// sound 4, ShowMenuMove; else at item 0 UpdateSetting. Answers 0.
+uint64_t PlayerBlockInput(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                          const Calls& calls);
+// sub_82254DB8 Type8PlayerBlock::UpdateSetting (112): MenuList::Update on
+// +84; when it moved, sound 4 and SettingMoved (its r3), else Update's r3.
+uint64_t PlayerBlockUpdateSetting(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                                  const Calls& calls);
+// sub_82254C50 Type8PlayerBlock::SettingMoved (144): the +84 menu's
+// previous item's animation finished, its item's restarted and looped,
+// PlaceCursor (its r3).
+uint64_t PlayerBlockSettingMoved(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
+                                 const Calls& calls);
+
+// sub_822543C0 Type8ListPartInner::Type8ListPartInner (96) and sub_82254488
+// Type8ListPart::Type8ListPart (112): the bases, the vtables, the blocks
+// (players 0, 1), the part's +16 = +20 and +12 = 20. r3 left.
+uint64_t ListInnerConstruct(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t ListPartConstruct(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_82254418 Type8ListPartInner::~Type8ListPartInner (112; the four
+// menus released) and sub_822544E8 Type8ListPart::~Type8ListPart (96), and
+// their deleting destructors sub_82254530 and sub_82254580 (112; operator
+// delete a guest call when bit 0 of `flags` is set). r3 left.
+uint64_t ListInnerDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ListInnerDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                   const Calls& calls);
+uint64_t ListPartDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t ListPartDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+                                  const Calls& calls);
+// sub_822549D8 Type8ListPartInner::Open (128): the page block reset,
+// UiMovie::ResetPose, both blocks' SetUp (the second's r3), +32 = +36 = 0.
+uint64_t ListInnerOpen(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                       const Calls& calls);
+// sub_822550C0 Type8ListPartInner::Pick: 0 at page -1, else a tail call of
+// the page table's entry with r4 and r5 (from `sp`, returning to `lr`).
+uint64_t ListInnerPick(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t sp,
+                       uint32_t lr, const Calls& calls);
+// sub_82254E18 Type8ListPartInner::Input (128): UiMovie::Run without a
+// step, else the step table's entry and, when it's done, the queued page or
+// step. The step's or Run's r3.
+uint64_t ListInnerInput(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                        const Calls& calls);
+// sub_82254D08 Type8ListPartInner::Step0 (128): on the first call both
+// blocks' PlayOpening and PlayNamed 47; done when Run answers 0, then both
+// blocks' ShowSelections. Whether done.
+uint64_t ListInnerStep0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                        const Calls& calls);
+// sub_82254FB8 Type8ListPartInner::Page0 (128): each block's Input (state
+// 0) or WhileReady (1); both 1: page 1 and ScreenFades::FadeOut; else
+// player 0 backed out: page 2 after step 1. Answers 0.
+uint64_t ListInnerPage0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                        const Calls& calls);
+// sub_822538A8 Type8PartInner::Step1 (112): on the first call PlayNamed 48;
+// done when Run answers 0, then UiMovie::FinishAll. Whether done.
+uint64_t PartInnerStep1(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                        const Calls& calls);
+// sub_82253108 Type8PartInner::Page1 (a leaf): once both fade counts are 0,
+// +32 = 1, +36 = 0, answers 1; else 0.
+uint64_t PartInnerPage1(uint8_t* base, uint64_t r3);
+// sub_82253838 Type8PartInner::Page2 (112): once named animation 48 isn't
+// active, +32 = 0, +36 = 1, answers 1; else 0.
+uint64_t PartInnerPage2(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
+
 }  // namespace type8_screens

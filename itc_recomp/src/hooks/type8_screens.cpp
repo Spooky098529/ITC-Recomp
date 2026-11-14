@@ -37,7 +37,19 @@ ITC_FLAG_BOOL(native_type8_screens, true, "ITC",
               "the car list's MenuList::Release guest calls), InitMachine sub_82238E98 (its "
               "step table, StateMachine::Add's plain C++) and PickCar sub_82238C88 "
               "(GarageCar::Reset a guest call, memcpy's, Car::SetModelAndClass's, "
-              "SaveData::TwoPlayerBlock's and ScreenFades::FadeOut's plain C++)) natively instead of through the translated "
+              "SaveData::TwoPlayerBlock's and ScreenFades::FadeOut's plain C++), "
+              "Type8ListPart::Type8ListPart sub_82254488, ~Type8ListPart sub_822544E8 and "
+              "DeletingDestructor sub_82254580, Type8ListPartInner::Type8ListPartInner "
+              "sub_822543C0, ~Type8ListPartInner sub_82254418, DeletingDestructor sub_82254530, "
+              "Open sub_822549D8, Pick sub_822550C0, Input sub_82254E18, Step0 sub_82254D08 and "
+              "Page0 sub_82254FB8, Type8PlayerBlock::Type8PlayerBlock sub_822542B8, SetUp "
+              "sub_822545D0, PlayOpening sub_822546F8, ShowMenuMove sub_82254798, PlayReady "
+              "sub_822548B8, PlaceCursor sub_82254948, ShowSelections sub_82254AD8, WhileReady "
+              "sub_82254A70, Input sub_82254EC8, UpdateSetting sub_82254DB8 and SettingMoved "
+              "sub_82254C50, Type8PartInner::Step1 sub_822538A8, Page1 sub_82253108 and Page2 "
+              "sub_82253838 (UiMovie::FinishNamed, LoopNamed, SetNodeText, Run, ResetPose and "
+              "the menus' guest calls, MenuList::Init and Release by their plain C++ where they "
+              "free natively)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=type8_screens)");
 
 namespace hooks {
@@ -92,6 +104,41 @@ ITC_T8_STEP(Type8Construct, t8::Construct(base, ctx.r3.u64, sp))
 ITC_T8_STEP(Type8Destruct, t8::Destruct(base, ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8DeletingDestruct, t8::DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8PickCar, t8::PickCar(base, ctx.r3.u64, sp, calls))
+
+ITC_T8_STEP(Type8BlockConstruct, t8::PlayerBlockConstruct(base, ctx.r3.u64, ctx.r4.u64))
+ITC_T8_STEP(Type8BlockSetUp, t8::PlayerBlockSetUp(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockPlayOpening, t8::PlayerBlockPlayOpening(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8BlockShowMenuMove,
+            t8::PlayerBlockShowMenuMove(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockPlayReady, t8::PlayerBlockPlayReady(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockPlaceCursor,
+            t8::PlayerBlockPlaceCursor(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_T8_STEP(Type8BlockShowSelections,
+            t8::PlayerBlockShowSelections(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockWhileReady,
+            t8::PlayerBlockWhileReady(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockInput, t8::PlayerBlockInput(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockUpdateSetting,
+            t8::PlayerBlockUpdateSetting(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockSettingMoved,
+            t8::PlayerBlockSettingMoved(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerConstruct, t8::ListInnerConstruct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ListPartConstruct, t8::ListPartConstruct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ListInnerDestruct, t8::ListInnerDestruct(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerDeletingDestruct,
+            t8::ListInnerDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListPartDestruct, t8::ListPartDestruct(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListPartDeletingDestruct,
+            t8::ListPartDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerOpen, t8::ListInnerOpen(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerPick, t8::ListInnerPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp,
+                                                  uint32_t(ctx.lr), calls))
+ITC_T8_STEP(Type8ListInnerInput, t8::ListInnerInput(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerStep0, t8::ListInnerStep0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerPage0, t8::ListInnerPage0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8PartInnerStep1, t8::PartInnerStep1(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8PartInnerPage1, t8::PartInnerPage1(base, ctx.r3.u64))
+ITC_T8_STEP(Type8PartInnerPage2, t8::PartInnerPage2(base, ctx.r3.u64, ctx.r4.u64, sp))
 
 #undef ITC_T8_STEP
 
@@ -158,3 +205,20 @@ ITC_TYPE8_SCREENS(82238368, Type8Destruct)
 ITC_TYPE8_SCREENS(822388D8, Type8DeletingDestruct)
 ITC_TYPE8_SCREENS(82238E98, Type8InitMachine)
 ITC_TYPE8_SCREENS(82238C88, Type8PickCar)
+// The list screen's list part: its constructor (from the list screen's,
+// recompiled), destructor (from the member's and the list screen's deleting
+// destructor, recompiled), and the vtables' and tables' slots. The inner
+// part's constructor and destructor and the player block have no adapters:
+// only these call them.
+ITC_TYPE8_SCREENS(82254488, Type8ListPartConstruct)
+ITC_TYPE8_SCREENS(822544E8, Type8ListPartDestruct)
+ITC_TYPE8_SCREENS(82254580, Type8ListPartDeletingDestruct)
+ITC_TYPE8_SCREENS(82254530, Type8ListInnerDeletingDestruct)
+ITC_TYPE8_SCREENS(822549D8, Type8ListInnerOpen)
+ITC_TYPE8_SCREENS(822550C0, Type8ListInnerPick)
+ITC_TYPE8_SCREENS(82254E18, Type8ListInnerInput)
+ITC_TYPE8_SCREENS(82254D08, Type8ListInnerStep0)
+ITC_TYPE8_SCREENS(82254FB8, Type8ListInnerPage0)
+ITC_TYPE8_SCREENS(822538A8, Type8PartInnerStep1)
+ITC_TYPE8_SCREENS(82253108, Type8PartInnerPage1)
+ITC_TYPE8_SCREENS(82253838, Type8PartInnerPage2)

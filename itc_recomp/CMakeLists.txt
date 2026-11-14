@@ -499,6 +499,7 @@ set(ITC_SOURCES
     src/type8_screens/panel_screen.cpp
     src/type8_screens/screen.cpp
     src/type8_screens/init_machine.cpp
+    src/type8_screens/list_part.cpp
     src/car_list/panels.cpp
     src/car_list/set.cpp
     src/car_list/pages.cpp
