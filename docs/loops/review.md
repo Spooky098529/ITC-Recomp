@@ -104,6 +104,11 @@ When the user has reviewed a run's section, its heading gets
   adapter stays for `rand`'s never-seen no-data guest call. The shared
   `Ld12Convert` (`src/c_runtime/format.cpp`) was refactored, its
   harnesses (12,280 and 1,595 cases) 0 differing.
+- The C runtime core's validation differed in `save_handlers`
+  (`CloseHandle`'s back chain and saved lr below WaitClose's sp, which
+  the native close doesn't write): a harness fault, masked in
+  `save_handlers.cpp` (`MaskCloseHandleSaves`, 9bfdc4b1) for WaitClose,
+  SaveStep, LoadStep and `SaveDevices::Update`'s cases.
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a

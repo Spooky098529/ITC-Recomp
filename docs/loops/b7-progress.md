@@ -94,7 +94,12 @@ file's history. What's left to see in a drive, from every run:
   every harness 0 differing, races 38 s, 0 errors; 6 checked by
   reading (no harness). Ready groups left (`_close`, `_commit`,
   `_lseeki64_nolock`, `_fileno`, `terminate` and the rest). Step:
-  validation of both migrations, then a third.
+  validation of both migrations, then a third. Validation `itc_5492`:
+  65 of 65 harness lines, replay ok, but `SaveSlot::WaitClose` (4 of
+  32) and `LoadStep` (2 of 96) differed: `CloseHandle`'s dead saves
+  below sp (its back chain and lr), now native without a guest frame;
+  a harness fault by the 2026-11-10 precedent, masked 9bfdc4b1 (logged
+  first). Step: validation again.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
