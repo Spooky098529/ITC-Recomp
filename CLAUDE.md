@@ -693,8 +693,8 @@ from "renderer" by the user's call), with the course scenery finished
 without mapping (ours 5,612 -> 5,989). The rest waits on the core's
 `Event::` and sync, `Device::Swap` and `Resolve`, the sticker editor
 and the leads in `docs/loops/leads.md`.
-Its forty-sixth run (`b7-loop-13-11-26`, 2026-11-13 to 14, not yet
-merged; summary `docs/loops/b7-loop-2026-11-13-1231.md`; limit 10, the
+Its forty-sixth run (`b7-loop-13-11-26`, 2026-11-13 to 14, merged
+into `rexglue-removal-project` with the forty-seventh, 2026-11-14; summary `docs/loops/b7-loop-2026-11-13-1231.md`; limit 10, the
 user's call) made ten subsystems native, most never seen in play
 (ported by the user's 2026-11-12 call): the morph jobs
 (`morph-jobs.md`, `--native_morph_jobs`), the save devices' constructor

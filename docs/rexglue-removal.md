@@ -321,7 +321,7 @@ goes in `src/` as overrides), American English.
   `Event::` and sync, `Device::Swap` and `Resolve`, the sticker
   editor and the leads in `docs/loops/leads.md`. Its forty-sixth run
   (`b7-loop-13-11-26`, 2026-11-13 to 14, limit 10, the user's call;
-  not yet merged) made ten subsystems native, most never seen in play
+  merged with the forty-seventh, 2026-11-14) made ten subsystems native, most never seen in play
   and ported by the 2026-11-12 call: the morph jobs
   (`morph-jobs.md`), the save devices' constructor and slot handlers
   (`save-interface.md`, with `SaveDevices::Update`; B4's steps split
