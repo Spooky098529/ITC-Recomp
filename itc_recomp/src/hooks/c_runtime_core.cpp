@@ -65,14 +65,14 @@ ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "sub_825ACD90), _flushall and _endstdio (sub_825AD068, sub_825AD5F8), doexit and _cexit "
               "(sub_825AA218, sub_825AA388; only the path where _C_Exit_Done is set: the others "
               "run the game's exit functions or end the process, checked by reading), fputs "
-              "(sub_825AD280) (checked by "
+              "(sub_825AD280, no adapter: its caller _Debug_message) (checked by "
               "--run_harnesses=c_runtime_core); checked by reading, as "
               "they end the process or thread: the initial _aexit_rtn (sub_825AA1A0), "
               "RaiseException (sub_825BA420), _CxxThrowException (sub_825AD198), "
               "XapiThreadStartup (sub_825BA558), _invoke_watson (sub_825AFD10) and "
-              "_invalid_parameter's trap, terminate (sub_825B3498), _exit (sub_825AA378), abort (sub_825AD070), _purecall (sub_825A7098), "
-              "std::_Throw (sub_825A69D8) and _Debug_message (sub_825A6948, no adapter: its caller "
-              "std::_Throw). "
+              "_invalid_parameter's trap, terminate (sub_825B3498), _exit (sub_825AA378), abort (sub_825AD070, no adapter: its callers "
+              "_purecall and _Debug_message), _purecall (sub_825A7098), std::_Throw (sub_825A69D8) "
+              "and _Debug_message (sub_825A6948, no adapter: its caller std::_Throw). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: __set_flsgetvalue, _mtdeletelocks, _freefls, _errno, "
               "__crtInitCritSecAndSpinCount, XRegisterThreadNotifyRoutine, _freeptd, _mtterm, "
@@ -911,14 +911,12 @@ ITC_C_RUNTIME_CORE(825AD5F8, CoreEndstdio)
 // sub_825AA218, has no adapter: they are its only callers.)
 ITC_C_RUNTIME_CORE(825AA378, CoreExit)
 ITC_C_RUNTIME_CORE(825AA388, CoreCexit)
-// abort: no registers; ends the process. (raise, sub_825B49C8, has no
-// adapter: abort is its only caller.)
-ITC_C_RUNTIME_CORE(825AD070, CoreAbort)
 // _purecall: no registers (a vtable's empty slot); ends the process.
+// (abort, sub_825AD070, and raise, sub_825B49C8, have no adapters: abort's
+// callers, _purecall and _Debug_message, are native, and abort is raise's
+// only caller. fputs, sub_825AD280, and _fwrite_nolock, sub_825A96A0, have
+// none either: _Debug_message is fputs' only caller, fputs _fwrite_nolock's.)
 ITC_C_RUNTIME_CORE(825A7098, CorePurecall)
-// fputs: r3 = a string, r4 = a stream; r3 = 0, or -1. (_fwrite_nolock,
-// sub_825A96A0, has no adapter: fputs is its only caller.)
-ITC_C_RUNTIME_CORE(825AD280, CoreFputs)
 // std::_Throw: r3 = an exception object; ends the process. (_Debug_message,
 // sub_825A6948, has no adapter: std::_Throw is its only caller.)
 ITC_C_RUNTIME_CORE(825A69D8, CoreThrow)
