@@ -2,21 +2,21 @@
 
 Made by `itc_recomp/tools/static_map.py` on every run; never edit it by hand (run the tool again). What it reads, how edges are found and its gaps: the tool's docstring and "The static map" in `docs/coverage.md`.
 
-Made 2026-11-14 at commit `18fa8e23` (`b7-loop-13-11-26`).
+Made 2026-11-14 at commit `1360b0f8` (`b7-loop-13-11-26`).
 
 ## Totals
 
 - Recompiled `sub_` functions: 16552; 144 jump-table cases folded into their parents, leaving 16408.
-- Reachable: 10853 (10309 from `main`, 544 more from 189 extra roots: functions seen in play that `main` doesn't reach, 1 of them not under another).
-- Ours: 6027. Excluded (replaced libraries): 1599.
-- **Unported: 3227** (2722 under `main`): seen in play 644, never seen 2583; 244849 generated lines.
-- Of the unported, 672 hang under unported code (or a root); 2555 are reached only through ours (394 seen in play), 1218 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
-- Ours functions' edges come from our C++ (`src_edges.py`): 27194 definitions in 1131 files of `src/` (harnesses left out), 6587 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 5953 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
-- Ours functions whose original body is still reachable: 73 (69 from our C++: an `__imp__` fallback when the native C++ declines, or a guest call to a function with neither override nor C++); listed below.
-- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 35 functions named, taken as roots; they add 2 reachable functions.
-- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15908 reachable. **Originals no longer called: 1505** (950 not ours, 555 ours whose work our C++ took in; 125632 lines, 170 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
-- Frontier (ready now): 1660 functions.
-- Reachable functions calling imports: 328 (170 unported).
+- Reachable: 10845 (10301 from `main`, 544 more from 189 extra roots: functions seen in play that `main` doesn't reach, 1 of them not under another).
+- Ours: 6138. Excluded (replaced libraries): 1601.
+- **Unported: 3106** (2627 under `main`): seen in play 624, never seen 2482; 238721 generated lines.
+- Of the unported, 575 hang under unported code (or a root); 2531 are reached only through ours (393 seen in play), 1207 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
+- Ours functions' edges come from our C++ (`src_edges.py`): 27598 definitions in 1135 files of `src/` (harnesses left out), 6708 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 6067 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
+- Ours functions whose original body is still reachable: 72 (69 from our C++: an `__imp__` fallback when the native C++ declines, or a guest call to a function with neither override nor C++); listed below.
+- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 36 functions named, taken as roots; they add 2 reachable functions.
+- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15908 reachable. **Originals no longer called: 1513** (950 not ours, 563 ours whose work our C++ took in; 125828 lines, 170 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
+- Frontier (ready now): 1647 functions.
+- Reachable functions calling imports: 328 (146 unported).
 - Image read: 13492 code-built data addresses scanned; 181 function pointers in data that no code-built address reaches (136 functions; not edges).
 
 A `*` after a function: never seen in play. Sizes are generated lines.
@@ -27,99 +27,100 @@ Unported functions ranked by how many unported functions above them (through unp
 
 | Function | Unblocks | Frees | Lines | Seen | Ready | File |
 |---|---|---|---|---|---|---|
-| `sub_825AA400` | 305 | 1 | 27 | yes | yes | unmapped |
-| `sub_825AA4C0` | 304 | 2 | 68 | yes | no | unmapped |
-| `sub_82294E20` | 298 | 5 | 24 | yes | yes | functions.md |
-| `sub_825B68B8` | 298 | 1 | 7 | no | yes | unmapped |
-| `sub_825A81E0` | 297 | 0 | 23 | no | no | unmapped |
-| `sub_825AFCC8` | 296 | 0 | 27 | no | no | unmapped |
-| `sub_825A8218` | 283 | 0 | 23 | no | no | unmapped |
-| `sub_825B7A58` | 282 | 4 | 15 | no | yes | unmapped |
-| `sub_825B3570` | 282 | 1 | 16 | yes | yes | unmapped |
-| `sub_825B35A0` | 281 | 1 | 35 | yes | no | unmapped |
-| `sub_825A8178` | 281 | 0 | 36 | no | yes | unmapped |
-| `sub_825B7880` | 281 | 0 | 68 | no | no | unmapped |
-| `sub_825A8250` | 280 | 0 | 40 | no | no | unmapped |
-| `sub_825B7A20` | 279 | 0 | 20 | no | yes | unmapped |
-| `sub_825B7958` | 278 | 0 | 68 | no | no | unmapped |
-| `sub_825B6500` | 277 | 0 | 64 | no | no | files-and-saves.md |
-| `sub_825B0E88` | 275 | 1 | 32 | no | no | unmapped |
-| `sub_825B0F48` | 275 | 0 | 195 | no | no | files-and-saves.md |
-| `sub_825B1304` | 275 | 0 | 21 | no | no | unmapped |
-| `sub_825B11A8` | 274 | 0 | 106 | no | no | unmapped |
-| `sub_825ACC78` | 243 | 1 | 53 | no | no | unmapped |
-| `sub_825AD688` | 240 | 3 | 20 | no | yes | unmapped |
-| `sub_825AD6C0` | 238 | 1 | 12 | no | yes | unmapped |
-| `sub_825B4978` | 238 | 0 | 21 | no | no | unmapped |
-| `sub_825B77E8` | 238 | 0 | 50 | no | no | unmapped |
-| `sub_825BA510` | 238 | 0 | 25 | no | yes | files-and-saves.md |
-| `sub_825ACEB4` | 237 | 0 | 16 | no | yes | unmapped |
-| `sub_825ACF04` | 237 | 0 | 32 | no | no | unmapped |
-| `sub_825AD638` | 237 | 0 | 20 | no | yes | unmapped |
-| `sub_825AD670` | 237 | 0 | 12 | no | yes | unmapped |
-| `sub_825B0C28` | 237 | 0 | 81 | no | no | unmapped |
-| `sub_825B0E50` | 237 | 0 | 21 | no | no | unmapped |
-| `sub_825B4828` | 237 | 0 | 105 | no | no | files-and-saves.md |
-| `sub_82297870` | 236 | 1 | 8 | yes | yes | unmapped |
-| `sub_825ACD10` | 236 | 1 | 49 | no | no | unmapped |
-| `sub_825ACD90` | 236 | 1 | 96 | no | no | unmapped |
-| `sub_825B0D10` | 236 | 0 | 98 | no | no | unmapped |
-| `sub_825B0EE0` | 236 | 0 | 36 | no | yes | unmapped |
-| `sub_825AEDA0` | 235 | 1 | 23 | no | yes | unmapped |
-| `sub_825A94C0` | 235 | 0 | 65 | no | no | unmapped |
+| `sub_820911F8` | 118 | 2 | 5 | no | yes | single-commands.md |
+| `sub_825C0958` | 71 | 3 | 28 | no | yes | unmapped |
+| `sub_822ADB50` | 63 | 4 | 71 | yes | yes | unmapped |
+| `sub_82094D20` | 62 | 1 | 26 | no | yes | archive.md |
+| `sub_825BFEA0` | 61 | 8 | 65 | yes | yes | xact.md |
+| `sub_822ADC08` | 59 | 0 | 205 | yes | yes | functions.md |
+| `sub_822ADE30` | 59 | 0 | 69 | yes | no | functions.md |
+| `sub_822AD790` | 54 | 0 | 63 | no | yes | unmapped |
+| `sub_82091260` | 53 | 0 | 5 | no | yes | unmapped |
+| `sub_82091268` | 53 | 0 | 26 | no | no | unmapped |
+| `sub_825C4A98` | 51 | 1 | 53 | yes | yes | xact.md |
+| `sub_82091648` | 50 | 0 | 12 | no | yes | unmapped |
+| `sub_820915F8` | 49 | 0 | 27 | no | no | unmapped |
+| `sub_82091668` | 49 | 0 | 29 | no | no | unmapped |
+| `sub_82090268` | 48 | 1 | 26 | no | yes | unmapped |
+| `sub_825CB1A8` | 47 | 2 | 132 | yes | no | xact.md |
+| `sub_820916C8` | 46 | 0 | 32 | no | no | unmapped |
+| `sub_82091910` | 46 | 0 | 30 | no | yes | unmapped |
+| `sub_821ACFB0` | 45 | 12 | 73 | no | yes | car-settings.md |
+| `sub_825A1318` | 44 | 6 | 32 | no | yes | device-shaders.md |
+| `sub_825D8F18` | 44 | 3 | 31 | no | yes | unmapped |
+| `sub_825CA6F8` | 41 | 1 | 88 | yes | yes | xact.md |
+| `sub_825CBC58` | 38 | 2 | 62 | yes | no | xact.md |
+| `sub_82094CD0` | 38 | 1 | 29 | no | yes | unmapped |
+| `sub_822AF328` | 38 | 1 | 49 | no | yes | texture-compression.md |
+| `sub_8258E530` | 38 | 1 | 7 | no | yes | unmapped |
+| `sub_82091A10` | 38 | 0 | 26 | no | yes | frame-driver.md |
+| `sub_822AF3D0` | 37 | 1 | 37 | yes | yes | unmapped |
+| `sub_822AF550` | 37 | 1 | 434 | yes | no | unmapped |
+| `sub_82091200` | 37 | 0 | 34 | no | yes | unmapped |
+| `sub_821AD3B0` | 37 | 0 | 55 | no | yes | unmapped |
+| `sub_8245EF28` | 36 | 6 | 30 | no | yes | xaudio-engine.md |
+| `sub_825C1E08` | 36 | 1 | 90 | yes | yes | xact.md |
+| `sub_822AF2D8` | 36 | 0 | 23 | yes | yes | unmapped |
+| `sub_822AF438` | 36 | 0 | 91 | yes | no | unmapped |
+| `sub_822AF8A0` | 36 | 0 | 69 | yes | no | unmapped |
+| `sub_825CC0E0` | 36 | 0 | 40 | no | yes | unmapped |
+| `sub_822AFA58` | 35 | 3 | 1105 | yes | no | functions.md |
+| `sub_825C1F88` | 35 | 1 | 82 | yes | no | xact.md |
+| `sub_820919B8` | 35 | 0 | 29 | no | no | unmapped |
 
 ## Frontier clusters, by what they unblock
 
-582 clusters (frontier functions sharing an unported caller within 0x4000 bytes, neighbors in address order, or a call cycle). Each: what it unblocks, its functions with their sizes, its function files.
+554 clusters (frontier functions sharing an unported caller within 0x4000 bytes, neighbors in address order, or a call cycle). Each: what it unblocks, its functions with their sizes, its function files.
 
-1. **sub_825AA3F8**-825AA5C0: unblocks 308; 3 functions, 98 lines, 3 seen; unmapped. `sub_825AA3F8` 5, `sub_825AA400` 27, `sub_825AA5C0` 66
-2. **sub_82294E20**-82295700: unblocks 301; 3 functions, 87 lines, 1 seen; functions.md, system-services.md. `sub_82294E20` 24, `sub_82294E58`* 48, `sub_82295700`* 15
-3. **sub_825B68B8**-825B68B8: unblocks 298; 1 functions, 7 lines, 0 seen; unmapped. `sub_825B68B8`* 7
-4. **sub_825B7A20**-825B7A58: unblocks 283; 2 functions, 35 lines, 0 seen; unmapped. `sub_825B7A20`* 20, `sub_825B7A58`* 15
-5. **sub_825B3570**-825B3570: unblocks 282; 1 functions, 16 lines, 1 seen; unmapped. `sub_825B3570` 16
-6. **sub_825A8178**-825A8178: unblocks 281; 1 functions, 36 lines, 0 seen; unmapped. `sub_825A8178`* 36
-7. **sub_825ACEB4**-825AD6C0: unblocks 244; 5 functions, 80 lines, 0 seen; unmapped. `sub_825ACEB4`* 16, `sub_825AD638`* 20, `sub_825AD670`* 12, `sub_825AD688`* 20, `sub_825AD6C0`* 12
-8. **sub_82297870**-82297B98: unblocks 238; 5 functions, 138 lines, 3 seen; unmapped. `sub_82297870` 8, `sub_82297940`* 48, `sub_822979D0`* 6, `sub_82297B38` 37, `sub_82297B98` 39
-9. **sub_825BA510**-825BA510: unblocks 238; 1 functions, 25 lines, 0 seen; files-and-saves.md. `sub_825BA510`* 25
-10. **sub_825B0EE0**-825B0EE0: unblocks 236; 1 functions, 36 lines, 0 seen; unmapped. `sub_825B0EE0`* 36
-11. **sub_825AD120**-825AEDA0: unblocks 235; 2 functions, 34 lines, 0 seen; unmapped. `sub_825AD120`* 11, `sub_825AEDA0`* 23
-12. **sub_825B4F38**-825B4F38: unblocks 234; 1 functions, 16 lines, 0 seen; unmapped. `sub_825B4F38`* 16
-13. **sub_825AA1B8**-825AA338: unblocks 232; 2 functions, 56 lines, 0 seen; c-runtime.md. `sub_825AA1B8`* 32, `sub_825AA338`* 24
-14. **sub_825B4C8C**-825B4C8C: unblocks 229; 1 functions, 24 lines, 0 seen; unmapped. `sub_825B4C8C`* 24
-15. **sub_825B49B0**-825B49B0: unblocks 228; 1 functions, 6 lines, 0 seen; unmapped. `sub_825B49B0`* 6
-16. **sub_82090380**-82094A70: unblocks 134; 19 functions, 325 lines, 4 seen; frame-driver.md, single-commands.md. `sub_82090380`* 28, `sub_820903D0`* 28, `sub_820911F8`* 5, `sub_82091648`* 12, `sub_82091910`* 30, `sub_82092A70`* 28, `sub_82092AC0`* 28, `sub_82094380` 9, `sub_82094398`* 9, `sub_820943E0` 8, `sub_820943F8` 8, `sub_82094410`* 5, ... 7 more
-17. **sub_821AA500**-821AFA08: unblocks 119; 61 functions, 5075 lines, 0 seen; car-settings.md. `sub_821AA500`* 15, `sub_821AA530`* 16, `sub_821AA560`* 182, `sub_821AA7B8`* 134, `sub_821AA970`* 103, `sub_821AAAB8`* 130, `sub_821AAC60`* 171, `sub_821AAE90`* 40, `sub_821AAF08`* 35, `sub_821AB038`* 161, `sub_821AB250`* 33, `sub_821AB2C0`* 182, ... 49 more
-18. **sub_825BFEA0**-825C6918: unblocks 108; 23 functions, 1050 lines, 6 seen; xact.md. `sub_825BFEA0` 65, `sub_825C05C8`* 70, `sub_825C0698`* 36, `sub_825C1548`* 11, `sub_825C1568` 40, `sub_825C1738`* 23, `sub_825C1788`* 43, `sub_825C38A8` 108, `sub_825C39F8`* 117, `sub_825C4940`* 89, `sub_825C4A58`* 12, `sub_825C4A78`* 12, ... 11 more
-19. **sub_825B4790**-825B4790: unblocks 102; 1 functions, 44 lines, 0 seen; unmapped. `sub_825B4790`* 44
-20. **sub_825C07F0**-825C1090: unblocks 73; 4 functions, 190 lines, 1 seen; xact.md. `sub_825C07F0`* 30, `sub_825C0848`* 43, `sub_825C0958`* 28, `sub_825C1090` 89
-21. **sub_822AD790**-822AF3D0: unblocks 69; 11 functions, 1102 lines, 7 seen; functions.md, texture-compression.md. `sub_822AD790`* 63, `sub_822ADA28` 37, `sub_822ADA98` 55, `sub_822ADB50` 71, `sub_822ADC08` 205, `sub_822AE340` 439, `sub_822AE918`* 62, `sub_822AE9E8`* 61, `sub_822AF2D8` 23, `sub_822AF328`* 49, `sub_822AF3D0` 37
-22. **sub_82094CD0**-8258E578: unblocks 66; 17 functions, 623 lines, 5 seen; video-output.md. `sub_82094CD0`* 29, `sub_8258BE58`* 121, `sub_8258BFA0`* 66, `sub_8258C060`* 30, `sub_8258D030`* 33, `sub_8258D090` 25, `sub_8258D0D8` 50, `sub_8258D170` 37, `sub_8258D1E0`* 35, `sub_8258D248`* 21, `sub_8258D290`* 45, `sub_8258D318`* 47, ... 5 more
-23. **sub_823EA0C0**-823EB408: unblocks 65; 5 functions, 1210 lines, 0 seen; texture-compression.md. `sub_823EA0C0`* 609, `sub_823EADB0`* 59, `sub_823EAE40`* 269, `sub_823EB180`* 215, `sub_823EB408`* 58
-24. **sub_825CA860**-825CD388: unblocks 59; 24 functions, 534 lines, 2 seen; xact.md. `sub_825CA860` 29, `sub_825CAC58`* 33, `sub_825CACB8`* 37, `sub_825CAD18`* 53, `sub_825CADC0`* 15, `sub_825CADF0`* 10, `sub_825CAE08`* 44, `sub_825CAFD8` 34, `sub_825CB660`* 18, `sub_825CB6A0`* 31, `sub_825CC0E0`* 40, `sub_825CC8F0`* 6, ... 12 more
-25. **sub_82583FD0**-825892B8: unblocks 58; 45 functions, 3190 lines, 5 seen; unmapped. `sub_82583FD0` 61, `sub_82584080`* 28, `sub_825840D0` 63, `sub_82584178`* 38, `sub_825841E8`* 55, `sub_82584970`* 9, `sub_82584988` 44, `sub_82584A00` 38, `sub_82584A70`* 83, `sub_82584B90`* 68, `sub_82584E48`* 24, `sub_82584E78`* 24, ... 33 more
-26. **sub_825DADF0**-825DB028: unblocks 54; 60 functions, 273 lines, 0 seen; unmapped. `sub_825DADF0`* 4, `sub_825DADF8`* 4, `sub_825DAE00`* 4, `sub_825DAE08`* 4, `sub_825DAE10`* 4, `sub_825DAE18`* 4, `sub_825DAE20`* 4, `sub_825DAE28`* 34, `sub_825DAE88`* 4, `sub_825DAE90`* 4, `sub_825DAE98`* 4, `sub_825DAEA0`* 4, ... 48 more
-27. **sub_825D8F18**-825D8F18: unblocks 44; 1 functions, 31 lines, 0 seen; unmapped. `sub_825D8F18`* 31
-28. **sub_825CA6F8**-825CA6F8: unblocks 41; 1 functions, 88 lines, 1 seen; xact.md. `sub_825CA6F8` 88
-29. **sub_82579D00**-8257FF50: unblocks 39; 16 functions, 745 lines, 4 seen; app-start-up.md, system-services.md. `sub_82579D00` 10, `sub_82579D18`* 26, `sub_82579D40` 12, `sub_82579D60`* 14, `sub_82579D88`* 10, `sub_8257A3D0` 11, `sub_8257A3F0`* 51, `sub_8257A498`* 26, `sub_8257C570`* 13, `sub_8257C590`* 40, `sub_8257C610` 53, `sub_8257C6B0`* 34, ... 4 more
-30. **sub_825CEE50**-825D5258: unblocks 37; 17 functions, 677 lines, 0 seen; xact-waves.md. `sub_825CEE50`* 6, `sub_825CEE60`* 6, `sub_825CEEE8`* 32, `sub_825CF220`* 33, `sub_825CF4D8`* 26, `sub_825CF528`* 35, `sub_825CFAE0`* 24, `sub_825D1C50`* 25, `sub_825D24B0`* 17, `sub_825D4128`* 61, `sub_825D4300`* 80, `sub_825D43F0`* 16, ... 5 more
-31. **sub_8245EF28**-8245EF28: unblocks 36; 1 functions, 30 lines, 0 seen; xaudio-engine.md. `sub_8245EF28`* 30
-32. **sub_825C1E08**-825C1E08: unblocks 36; 1 functions, 90 lines, 1 seen; xact.md. `sub_825C1E08` 90
-33. **sub_8259CB48**-8259D1C0: unblocks 35; 13 functions, 271 lines, 11 seen; sound-cues.md. `sub_8259CB48` 49, `sub_8259CBE8` 27, `sub_8259CC38` 11, `sub_8259CC58` 12, `sub_8259CCA0` 30, `sub_8259CCF8` 30, `sub_8259D0C8` 20, `sub_8259D100` 15, `sub_8259D120` 12, `sub_8259D140` 12, `sub_8259D160`* 29, `sub_8259D1A8` 9, ... 1 more
-34. **sub_82587F98**-825881E0: unblocks 35; 3 functions, 499 lines, 0 seen; unmapped. `sub_82587F98`* 107, `sub_825880B8`* 108, `sub_825881E0`* 284
-35. **sub_825D5738**-825D5758: unblocks 35; 2 functions, 24 lines, 0 seen; xact-tracks.md. `sub_825D5738`* 11, `sub_825D5758`* 13
-36. **sub_82576080**-825767A0: unblocks 33; 8 functions, 492 lines, 0 seen; system-services.md. `sub_82576080`* 63, `sub_82576328`* 63, `sub_825763D0`* 77, `sub_825764A8`* 60, `sub_82576540`* 63, `sub_825765F0`* 79, `sub_825766E0`* 72, `sub_825767A0`* 15
-37. **sub_824936E8**-824936E8: unblocks 33; 1 functions, 5 lines, 1 seen; files-and-saves.md. `sub_824936E8` 5
-38. **sub_82461F10**-8246D748: unblocks 32; 58 functions, 2122 lines, 4 seen; audio.md, xaudio-objects.md. `sub_82461F10`* 7, `sub_82461F20`* 178, `sub_82465418`* 7, `sub_82465850`* 9, `sub_82465868`* 5, `sub_82466990`* 73, `sub_82466A80`* 81, `sub_82466C48`* 7, `sub_82466C58`* 5, `sub_82466C60`* 28, `sub_82466CB0`* 27, `sub_82466D00`* 28, ... 46 more
-39. **sub_825A6D20**-825A6D30: unblocks 32; 3 functions, 51 lines, 2 seen; video-output.md. `sub_825A6D20` 5, `sub_825A6D28` 5, `sub_825A6D30`* 41
-40. **sub_82297D38**-82297D38: unblocks 32; 1 functions, 12 lines, 1 seen; video-output.md. `sub_82297D38` 12
+1. **sub_82090148**-8258E578: unblocks 232; 66 functions, 1512 lines, 10 seen; archive.md, frame-driver.md, frame-passes.md, framework.md, functions.md, single-commands.md, video-output.md. `sub_82090148`* 26, `sub_82090190`* 26, `sub_820901D8`* 26, `sub_82090220`* 26, `sub_82090268`* 26, `sub_82090380`* 28, `sub_820903D0`* 28, `sub_82090780`* 5, `sub_820907F0`* 6, `sub_82090808`* 6, `sub_82090820`* 6, `sub_82090858`* 6, ... 54 more
+2. **sub_821AA500**-821AFA08: unblocks 119; 61 functions, 5075 lines, 0 seen; car-settings.md. `sub_821AA500`* 15, `sub_821AA530`* 16, `sub_821AA560`* 182, `sub_821AA7B8`* 134, `sub_821AA970`* 103, `sub_821AAAB8`* 130, `sub_821AAC60`* 171, `sub_821AAE90`* 40, `sub_821AAF08`* 35, `sub_821AB038`* 161, `sub_821AB250`* 33, `sub_821AB2C0`* 182, ... 49 more
+3. **sub_825BFEA0**-825C6918: unblocks 110; 28 functions, 1266 lines, 6 seen; xact.md. `sub_825BFEA0` 65, `sub_825C05C8`* 70, `sub_825C0698`* 36, `sub_825C1548`* 11, `sub_825C1568` 40, `sub_825C1738`* 23, `sub_825C1788`* 43, `sub_825C2308`* 32, `sub_825C2368`* 34, `sub_825C25B0`* 36, `sub_825C37A8`* 83, `sub_825C38A8` 108, ... 16 more
+4. **sub_825C07F0**-825C1090: unblocks 73; 4 functions, 190 lines, 1 seen; xact.md. `sub_825C07F0`* 30, `sub_825C0848`* 43, `sub_825C0958`* 28, `sub_825C1090` 89
+5. **sub_822AD790**-822AF3D0: unblocks 69; 11 functions, 1102 lines, 7 seen; functions.md, texture-compression.md. `sub_822AD790`* 63, `sub_822ADA28` 37, `sub_822ADA98` 55, `sub_822ADB50` 71, `sub_822ADC08` 205, `sub_822AE340` 439, `sub_822AE918`* 62, `sub_822AE9E8`* 61, `sub_822AF2D8` 23, `sub_822AF328`* 49, `sub_822AF3D0` 37
+6. **sub_823EA0C0**-823EB408: unblocks 65; 5 functions, 1210 lines, 0 seen; texture-compression.md. `sub_823EA0C0`* 609, `sub_823EADB0`* 59, `sub_823EAE40`* 269, `sub_823EB180`* 215, `sub_823EB408`* 58
+7. **sub_825CA860**-825CD388: unblocks 59; 24 functions, 534 lines, 2 seen; xact.md. `sub_825CA860` 29, `sub_825CAC58`* 33, `sub_825CACB8`* 37, `sub_825CAD18`* 53, `sub_825CADC0`* 15, `sub_825CADF0`* 10, `sub_825CAE08`* 44, `sub_825CAFD8` 34, `sub_825CB660`* 18, `sub_825CB6A0`* 31, `sub_825CC0E0`* 40, `sub_825CC8F0`* 6, ... 12 more
+8. **sub_82583FD0**-825892B8: unblocks 58; 45 functions, 3190 lines, 5 seen; unmapped. `sub_82583FD0` 61, `sub_82584080`* 28, `sub_825840D0` 63, `sub_82584178`* 38, `sub_825841E8`* 55, `sub_82584970`* 9, `sub_82584988` 44, `sub_82584A00` 38, `sub_82584A70`* 83, `sub_82584B90`* 68, `sub_82584E48`* 24, `sub_82584E78`* 24, ... 33 more
+9. **sub_825DADF0**-825DB028: unblocks 54; 60 functions, 273 lines, 0 seen; unmapped. `sub_825DADF0`* 4, `sub_825DADF8`* 4, `sub_825DAE00`* 4, `sub_825DAE08`* 4, `sub_825DAE10`* 4, `sub_825DAE18`* 4, `sub_825DAE20`* 4, `sub_825DAE28`* 34, `sub_825DAE88`* 4, `sub_825DAE90`* 4, `sub_825DAE98`* 4, `sub_825DAEA0`* 4, ... 48 more
+10. **sub_825A1318**-825A1318: unblocks 44; 1 functions, 32 lines, 0 seen; device-shaders.md. `sub_825A1318`* 32
+11. **sub_825D8F18**-825D8F18: unblocks 44; 1 functions, 31 lines, 0 seen; unmapped. `sub_825D8F18`* 31
+12. **sub_825CA6F8**-825CA6F8: unblocks 41; 1 functions, 88 lines, 1 seen; xact.md. `sub_825CA6F8` 88
+13. **sub_82579D00**-8257FF50: unblocks 39; 16 functions, 745 lines, 4 seen; app-start-up.md, system-services.md. `sub_82579D00` 10, `sub_82579D18`* 26, `sub_82579D40` 12, `sub_82579D60`* 14, `sub_82579D88`* 10, `sub_8257A3D0` 11, `sub_8257A3F0`* 51, `sub_8257A498`* 26, `sub_8257C570`* 13, `sub_8257C590`* 40, `sub_8257C610` 53, `sub_8257C6B0`* 34, ... 4 more
+14. **sub_825CEE50**-825D5258: unblocks 37; 17 functions, 677 lines, 0 seen; xact-waves.md. `sub_825CEE50`* 6, `sub_825CEE60`* 6, `sub_825CEEE8`* 32, `sub_825CF220`* 33, `sub_825CF4D8`* 26, `sub_825CF528`* 35, `sub_825CFAE0`* 24, `sub_825D1C50`* 25, `sub_825D24B0`* 17, `sub_825D4128`* 61, `sub_825D4300`* 80, `sub_825D43F0`* 16, ... 5 more
+15. **sub_8245EF28**-8245EF28: unblocks 36; 1 functions, 30 lines, 0 seen; xaudio-engine.md. `sub_8245EF28`* 30
+16. **sub_825C1E08**-825C1E08: unblocks 36; 1 functions, 90 lines, 1 seen; xact.md. `sub_825C1E08` 90
+17. **sub_8259CB48**-8259D1C0: unblocks 35; 13 functions, 271 lines, 11 seen; sound-cues.md. `sub_8259CB48` 49, `sub_8259CBE8` 27, `sub_8259CC38` 11, `sub_8259CC58` 12, `sub_8259CCA0` 30, `sub_8259CCF8` 30, `sub_8259D0C8` 20, `sub_8259D100` 15, `sub_8259D120` 12, `sub_8259D140` 12, `sub_8259D160`* 29, `sub_8259D1A8` 9, ... 1 more
+18. **sub_82587F98**-825881E0: unblocks 35; 3 functions, 499 lines, 0 seen; unmapped. `sub_82587F98`* 107, `sub_825880B8`* 108, `sub_825881E0`* 284
+19. **sub_825D5738**-825D5758: unblocks 35; 2 functions, 24 lines, 0 seen; xact-tracks.md. `sub_825D5738`* 11, `sub_825D5758`* 13
+20. **sub_82575B68**-825767A0: unblocks 33; 9 functions, 536 lines, 0 seen; system-services.md. `sub_82575B68`* 44, `sub_82576080`* 63, `sub_82576328`* 63, `sub_825763D0`* 77, `sub_825764A8`* 60, `sub_82576540`* 63, `sub_825765F0`* 79, `sub_825766E0`* 72, `sub_825767A0`* 15
+21. **sub_824936E8**-824936E8: unblocks 33; 1 functions, 5 lines, 1 seen; files-and-saves.md. `sub_824936E8` 5
+22. **sub_82461F10**-8246D748: unblocks 32; 58 functions, 2122 lines, 4 seen; audio.md, xaudio-objects.md. `sub_82461F10`* 7, `sub_82461F20`* 178, `sub_82465418`* 7, `sub_82465850`* 9, `sub_82465868`* 5, `sub_82466990`* 73, `sub_82466A80`* 81, `sub_82466C48`* 7, `sub_82466C58`* 5, `sub_82466C60`* 28, `sub_82466CB0`* 27, `sub_82466D00`* 28, ... 46 more
+23. **sub_825A6D20**-825A6D30: unblocks 32; 3 functions, 51 lines, 2 seen; video-output.md. `sub_825A6D20` 5, `sub_825A6D28` 5, `sub_825A6D30`* 41
+24. **sub_82297D38**-82297D38: unblocks 32; 1 functions, 12 lines, 1 seen; video-output.md. `sub_82297D38` 12
+25. **sub_825C83B8**-825CECE8: unblocks 29; 20 functions, 340 lines, 4 seen; xact.md. `sub_825C83B8`* 6, `sub_825C83C8`* 6, `sub_825C85C8`* 6, `sub_825C85D8`* 6, `sub_825C8710` 42, `sub_825C8798`* 6, `sub_825C87A8`* 6, `sub_825C87B8`* 6, `sub_825C87C8`* 6, `sub_825C87D8`* 6, `sub_825C87E8`* 6, `sub_825C87F8`* 6, ... 8 more
+26. **sub_825D56B8**-825D56F8: unblocks 29; 3 functions, 33 lines, 0 seen; xact-tracks.md. `sub_825D56B8`* 11, `sub_825D56D8`* 11, `sub_825D56F8`* 11
+27. **sub_82149AA8**-82149B08: unblocks 29; 2 functions, 67 lines, 0 seen; unmapped. `sub_82149AA8`* 33, `sub_82149B08`* 34
+28. **sub_825774D0**-82578658: unblocks 26; 13 functions, 382 lines, 0 seen; unmapped. `sub_825774D0`* 31, `sub_82577528`* 17, `sub_825780D0`* 10, `sub_825780F0`* 14, `sub_82578118`* 24, `sub_82578248`* 38, `sub_825782C0`* 41, `sub_82578340`* 43, `sub_825783C8`* 50, `sub_82578470`* 17, `sub_82578588`* 39, `sub_82578608`* 27, ... 1 more
+29. **sub_82489048**-824892D0: unblocks 26; 3 functions, 40 lines, 0 seen; unmapped. `sub_82489048`* 24, `sub_824892A8`* 8, `sub_824892D0`* 8
+30. **sub_825BFA68**-825BFA68: unblocks 26; 1 functions, 48 lines, 0 seen; unmapped. `sub_825BFA68`* 48
+31. **sub_825CFF70**-825CFF70: unblocks 26; 1 functions, 11 lines, 0 seen; unmapped. `sub_825CFF70`* 11
+32. **sub_822A0688**-822A0688: unblocks 25; 1 functions, 43 lines, 0 seen; functions.md. `sub_822A0688`* 43
+33. **sub_822B1FF8**-822B1FF8: unblocks 25; 1 functions, 75 lines, 0 seen; functions.md. `sub_822B1FF8`* 75
+34. **sub_825D5E08**-825D5E08: unblocks 25; 1 functions, 25 lines, 0 seen; xact-tracks.md. `sub_825D5E08`* 25
+35. **sub_8258D4A8**-8258D4C0: unblocks 24; 2 functions, 16 lines, 0 seen; unmapped. `sub_8258D4A8`* 8, `sub_8258D4C0`* 8
+36. **sub_82295700**-82295700: unblocks 24; 1 functions, 15 lines, 0 seen; unmapped. `sub_82295700`* 15
+37. **sub_825C93A8**-825C93A8: unblocks 24; 1 functions, 138 lines, 0 seen; unmapped. `sub_825C93A8`* 138
+38. **sub_825BA1E0**-825BA1E0: unblocks 23; 1 functions, 25 lines, 1 seen; video-output.md. `sub_825BA1E0` 25
+39. **sub_825D18F0**-825D18F0: unblocks 23; 1 functions, 12 lines, 0 seen; xact-tracks.md. `sub_825D18F0`* 12
+40. **sub_825DB210**-825DB2B0: unblocks 22; 20 functions, 86 lines, 0 seen; unmapped. `sub_825DB210`* 7, `sub_825DB220`* 4, `sub_825DB228`* 4, `sub_825DB230`* 4, `sub_825DB238`* 4, `sub_825DB240`* 4, `sub_825DB248`* 4, `sub_825DB250`* 4, `sub_825DB258`* 4, `sub_825DB260`* 4, `sub_825DB268`* 4, `sub_825DB270`* 4, ... 8 more
 
 ## Unmapped areas
 
-Clusters of unported reachable functions with no rows in any function file: 177 (544 functions, 45120 lines). Largest first; the callers named are outside the cluster.
+Clusters of unported reachable functions with no rows in any function file: 158 (536 functions, 45803 lines). Largest first; the callers named are outside the cluster.
 
 - **sub_820A70A8**-820A8B38: 74 functions, 2549 lines, 10 seen, unblocks 4; called from `sub_82090910` (unmapped, unported), `sub_820A75E8` (cameras.md, ours), `sub_820A8B88` (cameras.md, ours), `sub_82593E30` (movies.md, unported) ....
 - **sub_82478FB8**-8247E0B0: 36 functions, 6609 lines, 0 seen, unblocks 5; called from `sub_8246F140` (xaudio-objects.md, ours), `sub_8247F7A8` (unmapped, unported), `sub_8247FB28` (unmapped, unported), `sub_8247FE18` (unmapped, unported) ....
 - **sub_82577088**-82578AF0: 33 functions, 2212 lines, 2 seen, unblocks 8; called from `sub_8245A410` (sound-cues.md, ours), `sub_82575BF0` (unmapped, unported), `sub_82575C90` (system-services.md, unported), `sub_82575D78` (system-services.md, unported).
+- **sub_822916D0**-82295700: 26 functions, 1938 lines, 0 seen, unblocks 7; called from `sub_8214EC80` (unmapped, unported), `sub_82293460` (race-loading.md, ours).
 - **sub_820B95F8**-820BE0D8: 24 functions, 1995 lines, 0 seen, unblocks 18; called from `sub_820A75E8` (cameras.md, ours), `sub_820B0E70` (car-physics.md, ours), `sub_820B5670` (car-physics.md, ours), `sub_820B5B08` (car-physics.md, ours) ....
 - **sub_82474578**-82478D30: 19 functions, 5833 lines, 0 seen, unblocks 14; called from `sub_8246F140` (xaudio-objects.md, ours), `sub_8247E338` (unmapped, unported), `sub_8247E410` (unmapped, unported), `sub_8247E4E8` (unmapped, unported) ....
 - **sub_8246F300**-824739B0: 18 functions, 6011 lines, 0 seen, unblocks 12; called from `sub_8246F140` (xaudio-objects.md, ours), `sub_8247DE28` (unmapped, unported), `sub_8247DF00` (unmapped, unported), `sub_8247DFD8` (unmapped, unported) ....
@@ -129,7 +130,6 @@ Clusters of unported reachable functions with no rows in any function file: 177 
 - **sub_82136F50**-82136FA0: 11 functions, 88 lines, 0 seen, unblocks 0; called from `sub_82136E30` (post-effects.md, ours), `sub_82138610` (post-effects.md, ours).
 - **sub_820AA010**-820AA198: 9 functions, 145 lines, 0 seen, unblocks 0; called from `sub_820A9E28` (cameras.md, ours).
 - **sub_82489048**-8248ED78: 8 functions, 185 lines, 0 seen, unblocks 23; called from `sub_82482780` (unmapped, unported), `sub_82482968` (unmapped, unported), `sub_824831B0` (unmapped, excluded), `sub_82483238` (unmapped, unported) ....
-- **sub_82297870**-82297B98: 7 functions, 250 lines, 5 seen, unblocks 237; called from `xstart` (unmapped, unported), `sub_825AA708` (unmapped, unported), `sub_825AD070` (unmapped, unported), `sub_825AFD10` (unmapped, unported) ....
 - **sub_82487660**-82488F50: 7 functions, 143 lines, 0 seen, unblocks 5; called from `sub_82482068` (unmapped, unported), `sub_824820C0` (unmapped, excluded), `sub_8248F2B8` (unmapped, excluded).
 - **sub_8258AB18**-8258B368: 6 functions, 850 lines, 0 seen, unblocks 4; called from `sub_820EF468` (accessories.md, unported), `sub_8258BCD8` (unmapped, unported).
 - **sub_821497A8**-8214BF20: 5 functions, 453 lines, 0 seen, unblocks 6; called from `sub_8214C828` (unmapped, unported).
@@ -151,13 +151,13 @@ Clusters of unported reachable functions with no rows in any function file: 177 
 - **sub_82149A30**-82149B08: 3 functions, 105 lines, 1 seen, unblocks 31; called from `sub_82149C48` (unmapped, unported), `sub_82149D00` (unmapped, unported), `sub_8214B188` (unmapped, unported).
 - **sub_822159F0**-82215B48: 3 functions, 208 lines, 0 seen, unblocks 1; called from `sub_8216CC60` (race-hud-machine.md, ours), `sub_82216810` (unmapped, unported).
 - **sub_822A8418**-822A8518: 3 functions, 77 lines, 0 seen, unblocks 3; called from `sub_8258F0F0` (single-commands.md, ours), `sub_8258FD48` (functions.md, unported).
-- **sub_825B31D8**-825B3650: 3 functions, 120 lines, 2 seen, unblocks 3; called from `sub_825AA448` (unmapped, unported), `sub_825AA708` (unmapped, unported).
-- **sub_825B4C8C**-825B4D90: 3 functions, 92 lines, 0 seen, unblocks 230; called from `sub_825A9BB8` (c-runtime.md, ours), `sub_825AA398` (c-runtime.md, ours), `sub_825B49C8` (unmapped, unported), `sub_825DAC58` (unmapped, unported).
 - **sub_820BB410**-820BB450: 2 functions, 155 lines, 0 seen, unblocks 0; called from `sub_820B0E70` (car-physics.md, ours), `sub_820B5670` (car-physics.md, ours), `sub_820B5B08` (car-physics.md, ours), `sub_820B7998` (car-physics.md, ours) ....
 - **sub_820BC560**-820BC828: 2 functions, 266 lines, 0 seen, unblocks 0; called from `sub_820B8D30` (car-physics.md, ours).
 - **sub_820BFBA8**-820BFBB0: 2 functions, 12 lines, 0 seen, unblocks 0; called from `sub_820BCDD0` (collision.md, ours).
 - **sub_820F1098**-820F1100: 2 functions, 54 lines, 0 seen, unblocks 0; called from `sub_820F2638` (course-scenery.md, ours).
-- ... and 137 smaller ones (161 functions).
+- **sub_82108A08**-82108A70: 2 functions, 98 lines, 0 seen, unblocks 15; called from `sub_82109400` (unmapped, unported), `sub_8210A990` (strings-and-font.md, ours), `sub_8210ABC0` (strings-and-font.md, ours), `sub_8211C2C8` (ui-movies-game.md, unported).
+- **sub_82109A40**-8210A4D8: 2 functions, 71 lines, 0 seen, unblocks 10; called from `sub_8210AE38` (data-load.md, unported).
+- ... and 118 smaller ones (136 functions).
 
 ## Extra roots
 
@@ -186,7 +186,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825C2910` | xact.md | Overridden | `sub_825C95F8`, `sub_825C9878` | 22 | 22 | 1352 | 0 |
 | `sub_8216C6D8` | race-hud-machine.md | Overridden | `sub_8221EF60` | 20 | 0 | 1703 | 0 |
 | `sub_821159B0` | career.md | Overridden | `sub_82110CA8`, `sub_82111140`, `sub_821115C8`, `sub_82112260`, `sub_82115550`, `sub_82115708` | 19 | 19 | 2616 | 0 |
-| `sub_822900E0` | save-interface.md | Native | `sub_825A9EC0`, `sub_825AA058` | 17 | 15 | 2961 | 0 |
+| `sub_822900E0` | save-interface.md | Native | `sub_825A9EC0`, `sub_825AA058` | 18 | 15 | 2971 | 0 |
 | `sub_8216CB98` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 14 | 14 | 1029 | 0 |
 | `sub_8216D918` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 14 | 14 | 1029 | 0 |
 | `sub_825A8A50` | c-runtime.md | Overridden | `sub_825AFEC0`, `sub_825AFEF8`, `sub_825B0860`, `sub_825B0968`, `sub_825B0B80` | 14 | 11 | 974 | 0 |
@@ -388,10 +388,18 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82595550` | models.md | Overridden | `sub_825A1148` | 1 | 1 | 54 | 0 |
 | `sub_82598288` | car-scene-draw.md | Native | `sub_825981C8` | 1 | 1 | 62 | 0 |
 | `sub_8259F700` | ui-movies.md | Native | `sub_8259EC58` | 1 | 1 | 84 | 0 |
+| `sub_825A71B0` | c-runtime-core.md | Overridden | `sub_825A70F0` | 1 | 0 | 65 | 0 |
 | `sub_825A82C8` | c-runtime.md | Native | `sub_825AFD98` | 1 | 1 | 16 | 0 |
 | `sub_825A9A90` | heap.md | Overridden | `sub_825AD150` | 1 | 1 | 26 | 0 |
 | `sub_825AC248` | heap.md | Native | `sub_825AD150` | 1 | 1 | 26 | 0 |
+| `sub_825ACD90` | c-runtime-core.md | Native | `sub_825ACEB4` | 1 | 0 | 16 | 0 |
+| `sub_825ACF70` | c-runtime-core.md | Overridden | `sub_825AD02C` | 1 | 0 | 21 | 0 |
+| `sub_825AD280` | c-runtime-core.md | Native | `sub_825AD488` | 1 | 0 | 21 | 0 |
+| `sub_825ADD38` | c-runtime-core.md | Overridden | `sub_825AB040` | 1 | 0 | 10 | 0 |
 | `sub_825AEBC8` | heap.md | Overridden | `sub_825AD150` | 1 | 1 | 26 | 0 |
+| `sub_825B11A8` | c-runtime-core.md | Overridden | `sub_825B1304` | 1 | 0 | 21 | 0 |
+| `sub_825B4828` | files-and-saves.md | Overridden | `sub_825B4978` | 1 | 0 | 21 | 0 |
+| `sub_825B65D0` | c-runtime-core.md | Overridden | `sub_825B6730` | 1 | 0 | 21 | 0 |
 | `sub_825C4D90` | xact.md | Overridden | `sub_825C4DC8` | 1 | 1 | 18 | 0 |
 | `sub_825C7F98` | xact.md | Overridden | `sub_825C7FE8` | 1 | 1 | 53 | 0 |
 | `sub_825C8230` | xact.md | Overridden | `sub_825C7B10` | 1 | 1 | 32 | 0 |
@@ -402,7 +410,7 @@ Reachable through the original's graph but not through ours: the native function
 
 Ours by their rows, but something reaches their recompiled body: an `__imp__` fallback in our C++ (taken when the native C++ declines: a block not in our heap, a flag of the callee's off), a guest call to a function with no override and no C++, or an unported caller of one without an override. Each with its callers in that variant (native ones marked `n`):
 
-`sub_82099B18` (Overridden; from sub_82090108 n, sub_82091A98 n, sub_82091C48 n ...), `sub_8209A080` (Overridden; from sub_82090108 n), `sub_8209BD50` (Overridden; from sub_820E42E8 n, sub_820E45A8 n), `sub_8209F738` (Native; from sub_8209F9B8 n), `sub_820A2D30` (Overridden; from sub_820E42E8 n, sub_820E45A8 n), `sub_820A8F80` (Merged; from sub_820A9198), `sub_820A9198` (Merged; from sub_820A9200), `sub_820AC7F0` (Overridden; from sub_820AC8A0 n), `sub_820AC8A0` (Overridden; from sub_820AC7F0 n), `sub_820B18B8` (Native; from sub_820B6498, sub_820B6498 n), `sub_820B2100` (Native; from sub_820B6498, sub_820B6498 n), `sub_820B5670` (Overridden; from sub_820C3150 n, sub_820C33B8 n), `sub_820B5B08` (Overridden; from sub_820C3150 n, sub_820C33B8 n), `sub_820B5FD8` (Overridden; from sub_820BFD30, sub_820BFD30 n, sub_820C3020 n), `sub_820B6498` (Overridden; from sub_820C3020 n, sub_821706E8, sub_821724F8 n), `sub_820B7998` (Overridden; from sub_820C3608, sub_820C3608 n, sub_821046F8 n ...), `sub_820B81C8` (Native; from sub_820B8548 n), `sub_820BB758` (Overridden; from sub_820B7998, sub_820B7998 n, sub_820B92C8 n), `sub_820BBE30` (Overridden; from sub_820B87B0 n), `sub_820BFD30` (Native; from sub_820C3020 n), `sub_820C0118` (Overridden; from sub_82171560 n), `sub_820C1D08` (Overridden; from sub_820C3150 n, sub_820C33B8 n, sub_821046F8 n ...), `sub_820C20E0` (Overridden; from sub_82170668 n, sub_82171978 n, sub_82171E50 n ...), `sub_820C23E8` (Overridden; from sub_82165E20 n, sub_821662E0 n, sub_82166E50 n ...), `sub_820C27E8` (Overridden; from sub_820C3150 n, sub_820C33B8 n, sub_820CD5C8 n ...), `sub_820C3608` (Overridden; from sub_821046F8 n, sub_82104898 n, sub_82104D40 n ...), `sub_820C3B78` (Overridden; from sub_82171250 n, sub_82171308), `sub_820C3BD0` (Overridden; from sub_82173A90 n), `sub_820C5C88` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820DC448 n ...), `sub_820CC470` (Merged; from sub_8224B660 n, sub_8224B708 n), `sub_820D09A0` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820C9608 n ...), `sub_820D3318` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_820D3688` (Native; from sub_820E45A8 n), `sub_820D3740` (Native; from sub_820E42E8 n), `sub_820D47A8` (Overridden; from sub_820D4F80 n), `sub_820D4F80` (Overridden; from sub_820D47A8 n), `sub_820D5890` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D6108` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_820D63A0` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D6A70` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D7428` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D78B8` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D7D38` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_820D8908` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D9570` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820F0070` (Native; from sub_820F0820 n), `sub_820F4128` (Native; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D06F0 n ...), `sub_820FEFB0` (Overridden; from sub_82171250 n), `sub_820FFD88` (Overridden; from sub_820C5DE8 n, sub_820F5740 n, sub_82104F68 n ...), `sub_8211AED0` (Overridden; from sub_8211CD90 n, sub_8211E258 n, sub_8211E370 n ...), `sub_8211BD10` (Overridden; from sub_8211E500 n), `sub_82128E70` (Overridden; from sub_82129280 n), `sub_8213B1E0` (Overridden; from sub_82173A90 n), `sub_8213B2B8` (Overridden; from sub_82171250 n, sub_82171308), `sub_82150350` (Native; from sub_821561F8 n), `sub_821715B8` (Native; from sub_8213B1E0 n, sub_82173A90 n), `sub_8217C368` (Merged; from sub_82096418 n), `sub_82294330` (Merged; from sub_820B81C8), `sub_82295330` (Overridden; from sub_8209DD98 n, sub_8209E118 n), `sub_822A5B78` (Overridden; from sub_8211E500 n), `sub_822A6008` (Overridden; from sub_82098940 n, sub_822A8A60 n, sub_822AD298 n), `sub_822A8740` (Native; from sub_820C52A0 n, sub_820D6528 n, sub_820D7578 n ...), `sub_82594D10` (Native; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_82596920` (Overridden; from sub_820F0820 n), `sub_825986B8` (Native; from sub_8209CC38 n, sub_820C5DE8 n, sub_820F5740 n ...), `sub_825998A0` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_8259F770` (Native; from sub_8259FA00 n), `sub_8259FB30` (Native; from sub_825A0548 n), `sub_8259FC18` (Native; from sub_825A0548 n), `sub_825A7068` (Overridden; from sub_820AB358 n, sub_82152338 n, sub_82155288 n ...), `sub_825A70E8` (Overridden; from sub_82090148, sub_82090190, sub_820901D8 ...), `sub_825A7410` (Overridden; from sub_8209CC38 n, sub_820AC7F0 n, sub_820AC8A0 n ...), `sub_825B6458` (Merged; from sub_825AE1A8, sub_825AE9D0)
+`sub_82099B18` (Overridden; from sub_82090108 n, sub_82091A98 n, sub_82091C48 n ...), `sub_8209A080` (Overridden; from sub_82090108 n), `sub_8209BD50` (Overridden; from sub_820E42E8 n, sub_820E45A8 n), `sub_8209F738` (Native; from sub_8209F9B8 n), `sub_820A2D30` (Overridden; from sub_820E42E8 n, sub_820E45A8 n), `sub_820A8F80` (Merged; from sub_820A9198), `sub_820A9198` (Merged; from sub_820A9200), `sub_820AC7F0` (Overridden; from sub_820AC8A0 n), `sub_820AC8A0` (Overridden; from sub_820AC7F0 n), `sub_820B18B8` (Native; from sub_820B6498, sub_820B6498 n), `sub_820B2100` (Native; from sub_820B6498, sub_820B6498 n), `sub_820B5670` (Overridden; from sub_820C3150 n, sub_820C33B8 n), `sub_820B5B08` (Overridden; from sub_820C3150 n, sub_820C33B8 n), `sub_820B5FD8` (Overridden; from sub_820BFD30, sub_820BFD30 n, sub_820C3020 n), `sub_820B6498` (Overridden; from sub_820C3020 n, sub_821706E8, sub_821724F8 n), `sub_820B7998` (Overridden; from sub_820C3608, sub_820C3608 n, sub_821046F8 n ...), `sub_820B81C8` (Native; from sub_820B8548 n), `sub_820BB758` (Overridden; from sub_820B7998, sub_820B7998 n, sub_820B92C8 n), `sub_820BBE30` (Overridden; from sub_820B87B0 n), `sub_820BFD30` (Native; from sub_820C3020 n), `sub_820C0118` (Overridden; from sub_82171560 n), `sub_820C1D08` (Overridden; from sub_820C3150 n, sub_820C33B8 n, sub_821046F8 n ...), `sub_820C20E0` (Overridden; from sub_82170668 n, sub_82171978 n, sub_82171E50 n ...), `sub_820C23E8` (Overridden; from sub_82165E20 n, sub_821662E0 n, sub_82166E50 n ...), `sub_820C27E8` (Overridden; from sub_820C3150 n, sub_820C33B8 n, sub_820CD5C8 n ...), `sub_820C3608` (Overridden; from sub_821046F8 n, sub_82104898 n, sub_82104D40 n ...), `sub_820C3B78` (Overridden; from sub_82171250 n, sub_82171308), `sub_820C3BD0` (Overridden; from sub_82173A90 n), `sub_820C5C88` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820DC448 n ...), `sub_820CC470` (Merged; from sub_8224B660 n, sub_8224B708 n), `sub_820D09A0` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820C9608 n ...), `sub_820D3318` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_820D3688` (Native; from sub_820E45A8 n), `sub_820D3740` (Native; from sub_820E42E8 n), `sub_820D47A8` (Overridden; from sub_820D4F80 n), `sub_820D4F80` (Overridden; from sub_820D47A8 n), `sub_820D5890` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D6108` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_820D63A0` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D6A70` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D7428` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D78B8` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D7D38` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_820D8908` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820D9570` (Native; from sub_820C8DE8 n, sub_82180B00 n), `sub_820F0070` (Native; from sub_820F0820 n), `sub_820F4128` (Native; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D06F0 n ...), `sub_820FEFB0` (Overridden; from sub_82171250 n), `sub_820FFD88` (Overridden; from sub_820C5DE8 n, sub_820F5740 n, sub_82104F68 n ...), `sub_8211AED0` (Overridden; from sub_8211CD90 n, sub_8211E258 n, sub_8211E370 n ...), `sub_8211BD10` (Overridden; from sub_8211E500 n), `sub_82128E70` (Overridden; from sub_82129280 n), `sub_8213B1E0` (Overridden; from sub_82173A90 n), `sub_8213B2B8` (Overridden; from sub_82171250 n, sub_82171308), `sub_82150350` (Native; from sub_821561F8 n), `sub_821715B8` (Native; from sub_8213B1E0 n, sub_82173A90 n), `sub_8217C368` (Merged; from sub_82096418 n), `sub_82294330` (Merged; from sub_820B81C8), `sub_82295330` (Overridden; from sub_8209DD98 n, sub_8209E118 n), `sub_822A5B78` (Overridden; from sub_8211E500 n), `sub_822A6008` (Overridden; from sub_82098940 n, sub_822A8A60 n, sub_822AD298 n), `sub_822A8740` (Native; from sub_820C52A0 n, sub_820D6528 n, sub_820D7578 n ...), `sub_82594D10` (Native; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_82596920` (Overridden; from sub_820F0820 n), `sub_825986B8` (Native; from sub_8209CC38 n, sub_820C5DE8 n, sub_820F5740 n ...), `sub_825998A0` (Overridden; from sub_8209CC38 n, sub_820C5DE8 n, sub_820D8EC0 n ...), `sub_8259F770` (Native; from sub_8259FA00 n), `sub_8259FB30` (Native; from sub_825A0548 n), `sub_8259FC18` (Native; from sub_825A0548 n), `sub_825A7068` (Overridden; from sub_820AB358 n, sub_82152338 n, sub_82155288 n ...), `sub_825A70E8` (Overridden; from sub_82090148, sub_82090190, sub_820901D8 ...), `sub_825A7410` (Overridden; from sub_8209CC38 n, sub_820AC7F0 n, sub_820AC8A0 n ...)
 
 ## Reached past the movie library's end (82575B08-8257FFFF)
 

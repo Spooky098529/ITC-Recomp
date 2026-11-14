@@ -341,7 +341,21 @@ goes in `src/` as overrides), American English.
   `--multiplayer_menu_items=true` restores them): the type 12 and type
   8 modes made native above are out of reach, their code kept until the
   user decides (static map: reachable 11,617 -> 11,011, unported 3,703
-  -> 3,232).
+  -> 3,232). Its forty-seventh run (`b7-loop-13-11-26` again,
+  2026-11-14, limit 10 lowered to 3, ended by the user after two
+  subsystems; merged into `rexglue-removal-project` the same day) made
+  the in-race screens never seen in play (`race-screens-unseen.md`,
+  99 rows, mostly unreachable since the bypass) and the C runtime's
+  core (`c-runtime-core.md`, `--native_c_runtime_core`, 115 of 118:
+  the per-thread data over the kernel's TLS, the lock table, `errno`,
+  exit, the streams and low-level I/O, the float formatting) native
+  (ours 6,537 -> 6,772, work left 676 -> 656). B7's goal is now no PPC
+  code reachable from `main` (the user's call, 2026-11-14), measured
+  by the static map (`docs/loops/static-map.md`,
+  `itc_recomp/tools/static_map.py`: reachable 10,845, unported 3,106,
+  624 of them seen in play); leads are picked by what they unblock.
+  The rest of the C runtime waits on `_cftoa_l` and the static
+  initializers `_cinit` runs.
   The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2922,6 +2936,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-14 | The type 8 mode's screens (probably the two-player mode's panel screen and list screens, built on the type 6 and 7 bases; none seen in play) | `type8-screens.md` | 128 of 128 (2 Merged), with 13 `car-list.md` rows and `TwoPlayerBlock` | `--native_type8_screens` |
 | 2026-11-14 | The type 8 mode itself (its Init, slots and teardown, its first screen and dialog), with the options', controller options' and save screen's type 8 Inits, the two-player save block's maker and four shared dialog handlers | `type8-mode.md` | 52 of 52 | `--native_type8_mode` |
 | 2026-11-14 | The in-race screens never seen in play (the split screen pause menu, the two results screens, the Live time attack's menu after the race), with the network manager's leaderboard helpers, the race dialog's save calls and `UiMovie::SetNodeCharText`; since the multiplayer bypass the same day, mostly unreachable | `race-screens-unseen.md` | 99 rows ours (3 Merged), the network battle's sends Dropped | `--native_race_screens_unseen` |
+| 2026-11-14 | The C runtime's core: the per-thread data over the kernel's TLS, the lock table and critical sections, `errno`, exit and C++ exceptions, the streams and low-level I/O, the float formatting, XAPI's thread notify list (functions that end the process checked by reading) | `c-runtime-core.md` | 115 of 118 | `--native_c_runtime_core` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -5620,3 +5635,17 @@ Imports: 186 called, 49 with a live caller. B7 (`b7_status.py`): ours
 6,651, work left 676 (Wrapped 51, with a row 354, no row yet 271).
 Static map: reachable 10,853, ours 6,027, unported 3,227 (644 seen in
 play, 2,583 never seen).
+
+**2026-11-14, the C runtime's core (branch `b7-loop-13-11-26`, the
+forty-seventh run, its second subsystem; the run ended there by the
+user's call):** `c-runtime-core.md` (118 rows, `src/c_runtime/core.cpp`):
+the C runtime's wrappers over the kernel imports, ported by B7's new
+goal (the imports called as the original does); five migrations, the
+first three validated, the last two (fclose to `_cftog_l`) checked by
+their own harnesses only (the user ended the run). Left: `_cftoa_l`,
+`_cfltcvt` and `_cinit`. The boundary: 449 functions (916 pairs):
+overridden 128, Native 48, Dropped 24, never called 67, live 182.
+Imports: 186 called, 45 with a live caller. B7 (`b7_status.py`): ours
+6,772, work left 656 (Wrapped 51, with a row 354, no row yet 251).
+Static map: reachable 10,845, ours 6,138, unported 3,106 (624 seen in
+play, 2,482 never seen).

@@ -117,6 +117,12 @@ When the user has reviewed a run's section, its heading gets
   `_flush`'s path where every byte is written checked by reading (no
   SDK file the harness can safely write); `_fileno`'s adapter stays
   (native `_output_l` hands file streams to the original).
+- The C runtime core's fourth and fifth migrations (cd2b4ad4..1360b0f8):
+  fclose to `_cftog_l`; `_fltout2` `sub_825B6458` Merged -> Native
+  (plain C++ over guest memory, `c_runtime::core::Fltout2`); checked by
+  reading (they end the process): `_exit`, abort, `_purecall`,
+  `_Debug_message`, `std::_Throw`, raise's default action. Not run
+  through an all-harness validation (the user ended the run).
 - The static map's report, for the user: 73 ours functions still
   reach their original body through `__imp__` fallbacks taken when the
   native code declines (`operator delete` when `memory::Free` refuses a

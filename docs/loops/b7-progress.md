@@ -115,14 +115,21 @@ file's history. What's left to see in a drive, from every run:
   `_endstdio`, doexit, `_exit` (by reading), `_cexit`; 8 adapters
   removed; every harness 0 differing, races 38 s, 0 errors. Left:
   abort with raise, fputs, vsprintf, `_cftoe_l`, `_cftog_l` (need a
-  guest-memory `_fltout2`). Step: fifth migration, then one
-  validation for the fourth and fifth.
+  guest-memory `_fltout2`). Fifth migration f3be84b2..1360b0f8: abort,
+  raise, `_purecall` (by reading), fputs, `std::_Throw`, vsprintf,
+  `_cftoe_l`, `_cftog_l` with `_fltout2` over guest memory; every
+  harness 0 differing, race 38 s, 0 errors; stopped by the lead (the
+  user ended the run). The fourth and fifth migrations weren't
+  validated with all harnesses. Left: `_cftoa_l`, `_cfltcvt`, `_cinit`.
 - The static map (`static_map.py`, 620fd294, 2eeab044; ours' edges
   from our C++ in `src/`): reachable 11,620, ours 6,310, unported
   3,711 (644 seen in play, 3,067 never seen), frontier 1,917. Leads
   are picked from it once this subsystem is done.
 
 ## Done
+
+- The C runtime's core (`c-runtime-core.md`): 115 of 118 ours,
+  `--native_c_runtime_core`, 552e90f8..1360b0f8.
 
 - The in-race screens never seen (`race-screens-unseen.md`): 99 rows
   ours, `--native_race_screens_unseen`, d71b917e..23d07ac8.
@@ -141,9 +148,20 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
+- At the end: ours 6772, work left 656 (wrapped 51, known 354,
+  unknown 251); static map unported 3,106 (624 seen, 2,482 never).
+
 - At the start: ours 6537, work left 676 (wrapped 51, known 354,
   unknown 271).
 - After the in-race screens: ours 6651, work left 676; static map
   unported 3,227 (644 seen, 2,583 never seen).
 
 ## Stopped
+
+2026-11-14, by the user's call, after two subsystems (the limit had
+been lowered from 10 to 3): the in-race screens never seen and the C
+runtime's core. The C runtime's last two migrations passed their own
+harnesses but not an all-harness validation. Nothing uncommitted.
+Merged into `rexglue-removal-project` by the user's call. The summary,
+`review.md`, `to-drive.md`, the plan's status line and CLAUDE.md are
+up to date.

@@ -36,6 +36,9 @@ sub_825B0E50, sub_825B1304, sub_825B4978, sub_825B6730, sub_825A9664,
 sub_825AD02C, sub_825AD488, sub_825AA338, sub_825B0D10, sub_825B0C28,
 sub_825B4828, sub_825BA510, sub_825B65D0, sub_825B6500, sub_825B9DD8,
 sub_825B11A8, sub_825B0F48, sub_82295D50, sub_825ACC78, sub_825B4CD0.
+Its fourth and fifth migrations (not validated with all harnesses;
+no game lines checked): the rows of `c-runtime-core.md` and
+`c-runtime.md` changed in cd2b4ad4..1360b0f8.
 
 The in-race screens never seen (`race-screens-unseen.md`; replay ok):
 all 94 Overridden and Native rows there (PauseMenu4, RaceResults,

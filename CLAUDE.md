@@ -709,6 +709,22 @@ cleanup leads between (ours 5,989 -> 6,537, work left 718 -> 676). The
 validation's harnesses take ~133 s of their 180. The rest waits on the
 core's `Event::` and sync (the worker pools, `Device::Clear`'s worker),
 `Device::Resolve` and the never-seen leads in `docs/loops/leads.md`.
+Its forty-seventh run (`b7-loop-13-11-26` again, 2026-11-14, ended by
+the user after two subsystems, merged into `rexglue-removal-project`
+the same day; summary `docs/loops/b7-loop-2026-11-14-0501.md`) made the
+in-race screens never seen (`race-screens-unseen.md`) and the C
+runtime's core (`c-runtime-core.md`, `--native_c_runtime_core`, 115 of
+118: the per-thread data over the kernel's TLS, the locks, `errno`,
+exit, the streams, the float formatting) native (ours 6,537 -> 6,772).
+By the user's calls (2026-11-14): B7's goal is no PPC code reachable
+from `main`, only the SDK's imports staying (the game's wrappers over
+them ported too), measured by the static map
+(`itc_recomp/tools/static_map.py`, `docs/loops/static-map.md`:
+reachable 10,845, unported 3,106, 624 seen in play), whose blockers
+pick the leads; no multiplayer: the main menu's Xbox Live and split
+screen items do nothing (`--multiplayer_menu_items`, off by default;
+`title-screen.md`), their modes left unreachable; functions that end
+the process or thread are checked by reading, not harnessed.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
