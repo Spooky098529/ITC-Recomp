@@ -170,7 +170,7 @@ ITC_NATIVE_ENTRY(82596E68, ITC_FLAG(native_models)) {
         return;                                                      \
       }                                                              \
     }                                                                \
-    __imp__sub_##address(ctx, base);                                 \
+    lifted::Sdk(ctx, base, __imp__sub_##address);                                 \
   }
 
 ITC_MODELS_LIFETIME(825970A8, XprRelease)
@@ -319,10 +319,13 @@ ITC_NATIVE_ENTRY(82599AF0, ITC_FLAG(native_models)) {
 // Skeleton::LocalMatrices: r3 = the skeleton (r3 left: no caller reads
 // it). Flush-to-zero off when it did float work, as the original leaves it.
 ITC_NATIVE_ENTRY(82599C58, ITC_FLAG(native_models)) {
-  const uint32_t mode = ctx.fpscr.csr;
+  // The float mode is the host's (MXCSR): read and put back through the
+  // SDK's register type.
+  PPCFPSCRRegister fpscr;
+  const uint32_t mode = fpscr.getcsr();
   ctx.fpscr.disableFlushMode();
   if (!model_animation::SkeletonLocalMatrices(base, ctx.r3.u32, ctx.r1.u32)) {
-    ctx.fpscr.restoreGuestBits(mode);  // no float work: the mode as it came
+    fpscr.restoreGuestBits(mode);  // no float work: the mode as it came
   }
 }
 

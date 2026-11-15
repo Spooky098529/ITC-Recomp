@@ -248,7 +248,7 @@ ITC_REGS_STEP(FrontEndCarDetailOpen) {
     \
     if (!ITC_FLAG(native_front_end_screen_helpers) || !hooks::NativeHeapActive() ||  \
         !hooks::step(ctx, base)) {                                                   \
-      __imp__sub_##address(ctx, base);                                               \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                               \
     }                                                                                \
   }
 

@@ -83,7 +83,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82095958) {
 #define ITC_INPUT_FALLBACK(address)    \
   REX_FUNC_PROLOGUE();                 \
   if (!ITC_FLAG(native_input)) {       \
-    __imp__sub_##address(ctx, base);   \
+    lifted::Sdk(ctx, base, __imp__sub_##address);   \
     return;                            \
   }
 
@@ -141,7 +141,7 @@ void NoteRead(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask
     if (ITC_FLAG(native_input)) {                                              \
       ctx.r3.u64 = function(base, processor, ctx.r4.u32);                      \
     } else {                                                                   \
-      __imp__sub_##address(ctx, base);                                         \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                         \
     }                                                                          \
     NoteRead(0x##test, return_address, processor, mask, ctx.r3.u32 & 0xFF);    \
     NoteRead(0x##address, caller, processor, mask, ctx.r3.u32 & 0xFF);         \
@@ -158,7 +158,7 @@ ITC_INPUT_WRAPPER(8258CEE0, 82592520, input::InputProcessorTestRepeat, 0x8258CF0
     if (ITC_FLAG(native_input)) {                                              \
       ctx.r3.u64 = function(pad);                                              \
     } else {                                                                   \
-      __imp__sub_##address(ctx, base);                                         \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                         \
     }                                                                          \
     NoteRead(0x##address, caller, pad, 0, 0);                                  \
   }

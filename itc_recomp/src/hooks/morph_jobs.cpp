@@ -38,19 +38,16 @@ namespace {
 
 namespace mj = morph_jobs;
 
-// A tail call: r3 (and r4 when `with_r4`) set, r11 the function and r12 the
-// vtable where the original leaves them, the function run through the
-// function table; lr is the caller's.
+// A tail call: r3 (and r4 when `with_r4`) set, the function run through the
+// function table; lr is the caller's. (The original also leaves r11 the
+// function and r12 the vtable when `with_r12`: leftovers for recompiled
+// callers, none now.)
 void TailCall(lifted::Regs& ctx, uint8_t* base, const mj::TailCall& call, bool with_r4,
-              bool with_r12) {
+              [[maybe_unused]] bool with_r12) {
   ctx.r3.u64 = call.r3;
   if (with_r4) {
     ctx.r4.u64 = call.r4;
   }
-  if (with_r12) {
-    ctx.r12.u64 = call.vtable;
-  }
-  ctx.r11.u64 = call.function;
   lifted::CallFromContext(ctx, base, call.function);
 }
 
@@ -86,7 +83,6 @@ mj::ConstructCalls MorphJobsConstructCalls(lifted::Regs& ctx, uint8_t* base) {
     ctx.r4.u64 = item;
     ctx.r5.u64 = 1;
     const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, interface) + 4);
-    ctx.r11.u64 = function;
     ctx.ctr.u64 = function;
     ctx.lr = lr;
     lifted::CallFromContext(ctx, base, function);
@@ -174,12 +170,12 @@ ITC_REGS_STEP(MorphJobsIsReleased) {
 
 ITC_REGS_STEP(MorphJobsSetReleased) {
   mj::SetReleased(base, ctx.r3.u32);
-  ctx.r11.u64 = 1;
+  // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsRun) {
   const mj::RunTarget run = mj::Run(base, ctx.r3.u32);
-  ctx.r11.u64 = run.kind_word;
+  // (r11 a leftover for recompiled callers: none now)
   ctx.r3.s64 = ctx.r3.s64 + (run.morph ? 56 : 8);  // run.record, all 64 bits
   if (!run.morph) {
     lifted::CallFromContext(ctx, base, 0x8258BCD8);  // the skinning blend (not seen in play)
@@ -196,22 +192,22 @@ ITC_REGS_STEP(MorphJobsRunThunk) {
 
 ITC_REGS_STEP(MorphJobsWorkItemPosted) {
   mj::WorkItemPosted(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  ctx.r11.u64 = 1;
+  // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemStarted) {
   mj::WorkItemStarted(base, ctx.r3.u32, ctx.r4.u32);
-  ctx.r11.u64 = 2;
+  // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemFinished) {
   mj::WorkItemFinished(base, ctx.r3.u32);
-  ctx.r11.u64 = 3;
+  // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemSkip) {
   mj::WorkItemSkip(base, ctx.r3.u32);
-  ctx.r11.u64 = 1;
+  // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemIsSkipped) {

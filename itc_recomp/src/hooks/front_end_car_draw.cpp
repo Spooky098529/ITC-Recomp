@@ -82,7 +82,7 @@ fe::Calls FrontEndCarDrawCalls(lifted::Regs& ctx, uint8_t* base) {
 // The original unless the callees are native; else flush-to-zero off.
 #define ITC_FRONT_END_ORIGINAL(address)  \
   if (!FrontEndCarDrawCalleesNative()) { \
-    __imp__sub_##address(ctx, base);     \
+    lifted::Sdk(ctx, base, __imp__sub_##address);     \
     return;                              \
   }                                      \
   ctx.fpscr.disableFlushMode();
@@ -201,7 +201,14 @@ ITC_REGS_STEP(FrontEndCarDrawClearLightKit) {
   ctx.fpscr.disableFlushMode();
 }
 
-ITC_REGS_STEP(FrontEndCarDrawFloorDraw) {
+// On the SDK's context (the rewiring, stage 3): r24, handed to
+// Model::DrawShape, is the caller's, read from the context; the view form
+// takes it as `caller_r24`.
+void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base) {
+  lifted::RegsScope scope(ctx);
+  FrontEndCarDrawFloorDraw(scope.regs, base, ctx.r24.u32);
+}
+void FrontEndCarDrawFloorDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   // Model::DrawShape's plain C++ only with its flag and without the command
   // list's diagnostics (as its adapter).
   if (!FrontEndCarDrawCalleesNative() || !ITC_FLAG(native_scenery_lists) ||
@@ -213,7 +220,7 @@ ITC_REGS_STEP(FrontEndCarDrawFloorDraw) {
   SceneryDrawGuest guest{ctx, base};
   fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
   calls.draw = SceneryListsDrawCalls(&guest);
-  ctx.r3.u64 = fe::FloorDraw(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r24.u32,
+  ctx.r3.u64 = fe::FloorDraw(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, caller_r24,
                              ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
@@ -243,18 +250,25 @@ bool FrontEndCarDrawDrawNative() {
   return ITC_FLAG(native_front_end_car_draw) && FrontEndCarDrawCalleesNative();
 }
 
-fe::DrawCallees FrontEndCarDrawDrawCallees(lifted::Regs& ctx) {
+fe::DrawCallees FrontEndCarDrawDrawCallees(uint32_t caller_r24) {
   fe::DrawCallees callees;
   // PoseCar's and Floor::Draw's plain C++ where their adapters would run
   // them.
   callees.pose_native = ITC_FLAG(native_matrix_math) && ITC_FLAG(native_accessories) &&
                         native::Buffers_NativeMemcpy();
   callees.floor_native = ITC_FLAG(native_scenery_lists) && !SceneryListsSlotDiagnostics();
-  callees.caller_r24 = ctx.r24.u32;
+  callees.caller_r24 = caller_r24;
   return callees;
 }
 
-ITC_REGS_STEP(FrontEndCarDrawDraw) {
+// On the SDK's context (the rewiring, stage 3): r24, handed to Floor::Draw,
+// is the caller's, read from the context; the view form takes it as
+// `caller_r24`.
+void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base) {
+  lifted::RegsScope scope(ctx);
+  FrontEndCarDrawDraw(scope.regs, base, ctx.r24.u32);
+}
+void FrontEndCarDrawDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   ITC_FRONT_END_ORIGINAL(8217FE60)
   const uint64_t lr = ctx.lr;
   load_poll::Calls poll = LoadPollCalls(ctx, base);
@@ -262,7 +276,7 @@ ITC_REGS_STEP(FrontEndCarDrawDraw) {
   fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
   calls.poll = &poll;
   calls.draw = SceneryListsDrawCalls(&guest);
-  const fe::DrawCallees callees = FrontEndCarDrawDrawCallees(ctx);
+  const fe::DrawCallees callees = FrontEndCarDrawDrawCallees(caller_r24);
   ctx.r3.u64 = fe::GarageStageDraw(base, calls, ctx.r3.u64, ctx.r5.u32, callees, ctx.r1.u32);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
@@ -280,7 +294,17 @@ ITC_REGS_STEP(FrontEndCarDrawDraw) {
 ITC_FRONT_END_CAR_DRAW(82179BE0, FrontEndCarDrawIsBusy)
 ITC_FRONT_END_CAR_DRAW(82178B40, FrontEndCarDrawSetDrawWord)
 ITC_FRONT_END_CAR_DRAW(82180108, FrontEndCarDrawCommand)
-ITC_FRONT_END_CAR_DRAW(8217FE60, FrontEndCarDrawDraw)
+
+// GarageStage::Draw, on the SDK's context (not in the dispatch table): the
+// native body reads its caller's r24 (the rewiring, stage 3; left for later).
+extern "C" REX_FUNC(sub_8217FE60) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_front_end_car_draw)) {
+    __imp__sub_8217FE60(ctx, base);
+    return;
+  }
+  hooks::FrontEndCarDrawDraw(ctx, base);
+}
 
 // SceneModel::ApplyLightKit sub_820D9D10 has no adapter (removed, B7 loop,
 // 2026-11-06): its callers in play, GarageStage::SetLightKit and the

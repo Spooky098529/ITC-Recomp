@@ -132,11 +132,11 @@ lp::Calls LoadPollCalls(lifted::Regs& ctx, uint8_t* base) {
 
 #define ITC_LOAD_POLL_ORIGINAL(address)   \
   if (!LoadPollCalleesNative()) {         \
-    __imp__sub_##address(ctx, base);      \
+    lifted::Sdk(ctx, base, __imp__sub_##address);      \
     return;                               \
   }                                       \
   const bool was_on =                     \
-      (ctx.fpscr.csr & uint32_t(decltype(ctx.fpscr)::FlushMask)) != 0; \
+      (PPCFPSCRRegister::Platform::getcsr() & uint32_t(PPCFPSCRRegister::FlushMask)) != 0; \
   (void)was_on;                           \
   ctx.fpscr.disableFlushMode();
 
