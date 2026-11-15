@@ -82,7 +82,7 @@ scene::DestroyCall Destroyer(lifted::Regs& ctx, uint8_t* base, uint32_t lr) {
 
 ITC_REGS_STEP(SceneSetUpConstruct) {
   scene::SetUpConstruct(base, ctx.r3.u32);
-  ctx.r11.u64 = 0;
+  // (r11 = 0, a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(SceneFreePagesIn) {
@@ -384,9 +384,13 @@ ITC_REGS_STEP(SceneUpdateModels) {
   const auto r3 = scene::UpdateModels(base, ctx.r3.u32, ctx.r1.u32,
                                       [&](uint32_t model, uint32_t frame) {
                                         return StepCall(ctx, base,
-                                                        ITC_FLAG(native_scene_models)
-                                                            ? ITC_REGS_FN(hooks::SceneModelUpdate)
-                                                            : __imp__sub_820DA180,
+                                                        [](lifted::Regs& c, uint8_t* b) {
+                                                          if (ITC_FLAG(native_scene_models)) {
+                                                            hooks::SceneModelUpdate(c, b);
+                                                          } else {
+                                                            lifted::Sdk(c, b, __imp__sub_820DA180);
+                                                          }
+                                                        },
                                                         frame, 0x820C5A9C, model, ctx.r4.u64);
                                       });
   ctx.lr = lr;
@@ -419,7 +423,13 @@ ITC_REGS_STEP(SceneUpdate) {
   };
   calls.update_models = [&](uint32_t scene, uint32_t frame) {
     return StepCall(ctx, base,
-                    ITC_FLAG(native_vehicle_accessors) ? ITC_REGS_FN(SceneUpdateModels) : __imp__sub_820C5A60,
+                    [](lifted::Regs& c, uint8_t* b) {
+                      if (ITC_FLAG(native_vehicle_accessors)) {
+                        SceneUpdateModels(c, b);
+                      } else {
+                        lifted::Sdk(c, b, __imp__sub_820C5A60);
+                      }
+                    },
                     frame, 0x820C96A4, scene, ctx.r4.u64);
   };
   calls.update_a = [&](uint64_t r3, uint32_t frame) {
@@ -427,7 +437,13 @@ ITC_REGS_STEP(SceneUpdate) {
   };
   calls.accessories_destroy = [&](uint32_t frame) {
     return StepCall(ctx, base,
-                    ITC_FLAG(native_accessories) ? ITC_REGS_FN(AccessoriesDestroy) : __imp__sub_820F1078,
+                    [](lifted::Regs& c, uint8_t* b) {
+                      if (ITC_FLAG(native_accessories)) {
+                        AccessoriesDestroy(c, b);
+                      } else {
+                        lifted::Sdk(c, b, __imp__sub_820F1078);
+                      }
+                    },
                     frame, 0x820C96D0, ctx.r3.u64, ctx.r4.u64);
   };
   const uint64_t r3 = scene::Update(base, ctx.r1.u32, ctx.r3.u64, calls);

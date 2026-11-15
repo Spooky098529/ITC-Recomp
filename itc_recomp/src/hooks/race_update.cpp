@@ -100,17 +100,15 @@ ITC_REGS_STEP(RaceUpdateUpdate) {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };
-  // Scenery::Update with r28 = the scene, as the original has it there
-  // (its register saves store r18 to r31).
-  calls.scenery_update = [&ctx, base](uint32_t manager, uint32_t scene, uint32_t frame) {
-    const uint64_t stack = ctx.r1.u64, r28 = ctx.r28.u64;
+  // Scenery::Update. The original has r28 = the scene there, only for its
+  // register saves (r18 to r31): not carried by the view.
+  calls.scenery_update = [&ctx, base](uint32_t manager, uint32_t /*scene*/, uint32_t frame) {
+    const uint64_t stack = ctx.r1.u64;
     ctx.r3.u64 = manager;
-    ctx.r28.u64 = scene;
     ctx.r1.u64 = frame;
     ctx.lr = 0x8215D2D8;
     lifted::CallFromContext(ctx, base, 0x820F4558);
     ctx.r1.u64 = stack;
-    ctx.r28.u64 = r28;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };

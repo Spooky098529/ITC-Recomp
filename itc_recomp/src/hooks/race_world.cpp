@@ -86,7 +86,7 @@ ITC_REGS_STEP(RaceWorldSortedListClear) {
 ITC_REGS_STEP(RaceWorldOnPausedTick) {
   ctx.fpscr.disableFlushMode();
   rw::OnPausedTick();
-  ctx.r11.u64 = 0xFFFFFFFF82010000ull;
+  // (r11 = 0x82010000, a leftover for recompiled callers: none now)
   ctx.r5.u64 = 0;
   ctx.r6.u64 = 0xFFFFFFFF820099ACull;
   ctx.r4.u64 = 400;

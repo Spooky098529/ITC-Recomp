@@ -104,7 +104,7 @@ ITC_REGS_STEP(StandModelsMakeModel) {
 #define ITC_STAND_SETTER(Name, address)                                          \
   void StandModels##Name(lifted::Regs& ctx, uint8_t* base) {                       \
     if (!ITC_FLAG(native_vehicle_accessors)) {                                   \
-      __imp__sub_##address(ctx, base);                                           \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                           \
       return;                                                                    \
     }                                                                            \
     ctx.fpscr.disableFlushMode();                                                \

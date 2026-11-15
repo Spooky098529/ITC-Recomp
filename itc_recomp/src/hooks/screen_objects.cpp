@@ -64,7 +64,7 @@ bool Native() { return ITC_FLAG(native_screen_objects) && hooks::NativeHeapActiv
 #define ITC_SCREEN_OBJECTS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                       \
   if (!Native()) {                           \
-    __imp__sub_##address(ctx, base);         \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                                  \
   }                                          \
   ctx.fpscr.disableFlushMode();

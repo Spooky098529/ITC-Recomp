@@ -332,8 +332,9 @@ ITC_REGS_STEP(RaceScreensUnseenKind6LeaderboardRead) {
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6ReadSpecSetUp) {
-  // r3 the caller's (the original works in r9 to r11).
-  ctx.r11.u64 = race_screens::Kind6ReadSpecSetUp(base);
+  // r3 the caller's (the original works in r9 to r11; its r11, the spec,
+  // was a leftover for recompiled callers: none now).
+  race_screens::Kind6ReadSpecSetUp(base);
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6SaveReplay) {

@@ -121,7 +121,7 @@ struct ModelListLoadGuest {
     auto& c = *static_cast<ModelListLoadGuest*>(self);
     guest_call::InFrame(c.ctx, c.base, 512, 0x821484C0, [&](uint32_t) {
       c.ctx.r3.u64 = size;
-      __imp__sub_825A6880(c.ctx, c.base);
+      lifted::Sdk(c.ctx, c.base, __imp__sub_825A6880);
     });
     return c.ctx.r3.u32;
   }
@@ -129,7 +129,7 @@ struct ModelListLoadGuest {
     auto& c = *static_cast<ModelListLoadGuest*>(self);
     guest_call::InFrame(c.ctx, c.base, 512, 0x821484D0, [&](uint32_t) {
       c.ctx.r3.u64 = model;
-      __imp__sub_825948C0(c.ctx, c.base);
+      lifted::Sdk(c.ctx, c.base, __imp__sub_825948C0);
     });
   }
   static void Load(void* self, uint32_t model, uint32_t entry) {
@@ -295,7 +295,11 @@ ITC_REGS_STEP(SceneryListsRecordShapeDepth) {
   ctx.r3.u64 = *first;
 }
 
-ITC_REGS_STEP(SceneryListsDrawShapeDepth) {
+void SceneryListsDrawShapeDepth(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): reads its caller's r28
+  // from it; the rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   // The plain C++'s scalar float work expects flush-to-zero off, as the
   // original sets it.
   ctx.fpscr.disableFlushMode();
@@ -304,7 +308,7 @@ ITC_REGS_STEP(SceneryListsDrawShapeDepth) {
   // r24-r31 there (r9, r8, r7, r6, the caller's r28, the model, the world
   // matrix and the view-projection).
   const std::array<uint32_t, 9> context = {0x82596D9C,  ctx.r9.u32, ctx.r8.u32,
-                                           ctx.r7.u32,  ctx.r6.u32, ctx.r28.u32,
+                                           ctx.r7.u32,  ctx.r6.u32, sdk.r28.u32,
                                            ctx.r3.u32,  ctx.r5.u32, ctx.r4.u32};
   const auto draw =
       SlotDiagnostics()
@@ -430,7 +434,11 @@ ITC_REGS_STEP(SceneryListsRecordShape) {
   ctx.r3.u64 = *first;
 }
 
-ITC_REGS_STEP(SceneryListsDrawShape) {
+void SceneryListsDrawShape(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): reads its caller's r24
+  // from it; the rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   if (SlotDiagnostics()) {
     lifted::Sdk(ctx, base, __imp__sub_82147D88);
     return;
@@ -447,7 +455,7 @@ ITC_REGS_STEP(SceneryListsDrawShape) {
   guest::StoreU32(base, frame, ctx.r1.u32);
   const auto draw = scenery_lists::SceneryDrawShape(
       base, calls, frame, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
-      ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.r24.u32);
+      ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, sdk.r24.u32);
   if (!draw) {
     guest::StoreU32(base, frame, chain);
     lifted::Sdk(ctx, base, __imp__sub_82147D88);
@@ -518,7 +526,11 @@ ITC_REGS_STEP(SceneryListsModelRecordMaterials) {
   ctx.r3.u64 = *first;
 }
 
-ITC_REGS_STEP(SceneryListsModelDrawShape) {
+void SceneryListsModelDrawShape(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): reads its caller's r24
+  // from it; the rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   if (SlotDiagnostics()) {
     lifted::Sdk(ctx, base, __imp__sub_82596B18);
     return;
@@ -535,7 +547,7 @@ ITC_REGS_STEP(SceneryListsModelDrawShape) {
   guest::StoreU32(base, frame, ctx.r1.u32);
   const auto draw = scenery_lists::ModelDrawShape(base, calls, frame, ctx.r3.u32, ctx.r4.u32,
                                                   ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
-                                                  ctx.r8.u32, ctx.r9.u32, ctx.r24.u32);
+                                                  ctx.r8.u32, ctx.r9.u32, sdk.r24.u32);
   if (!draw) {
     guest::StoreU32(base, frame, chain);
     lifted::Sdk(ctx, base, __imp__sub_82596B18);
@@ -552,7 +564,11 @@ ITC_REGS_STEP(SceneryListsModelDrawShape) {
   }
 }
 
-ITC_REGS_STEP(SceneryListsPointListDraw) {
+void SceneryListsPointListDraw(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): reads its caller's r24
+  // from it; the rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   if (SlotDiagnostics()) {
     lifted::Sdk(ctx, base, __imp__sub_82148058);
     return;
@@ -568,7 +584,7 @@ ITC_REGS_STEP(SceneryListsPointListDraw) {
   const uint32_t chain = guest::LoadU32(base, frame);
   guest::StoreU32(base, frame, ctx.r1.u32);
   const auto r3 = scenery_lists::PointListDraw(base, calls, frame, ctx.r3.u32, ctx.r4.u32,
-                                               ctx.r5.u32, ctx.r24.u32, ctx.r3.u32);
+                                               ctx.r5.u32, sdk.r24.u32, ctx.r3.u32);
   if (!r3) {
     guest::StoreU32(base, frame, chain);
     lifted::Sdk(ctx, base, __imp__sub_82148058);
@@ -605,7 +621,17 @@ ITC_SCENERY_LISTS(825960D0, SceneryListsRecordShapeDepth)
 // loop): its callers in play (the car draw's, Scenery::DrawArea) call its
 // plain C++; SceneryListsDrawShapeDepth stays as the harness's steps.
 ITC_SCENERY_LISTS(82146BD0, SceneryListsRecordShape)
-ITC_SCENERY_LISTS(82148058, SceneryListsPointListDraw)
+// PointList::Draw, on the SDK's context (not in the dispatch table): its
+// steps read their caller's r24, the record context (the rewiring, stage 3;
+// left for later).
+extern "C" REX_FUNC(sub_82148058) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_scenery_lists)) {
+    __imp__sub_82148058(ctx, base);
+    return;
+  }
+  hooks::SceneryListsPointListDraw(ctx, base);
+}
 ITC_SCENERY_LISTS(82594328, SceneryListsTextureProviderClearAll)
 ITC_SCENERY_LISTS(82594718, SceneryListsTextureProviderSet)
 

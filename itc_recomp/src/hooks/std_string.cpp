@@ -153,7 +153,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82593088) {
         return;                                                          \
       }                                                                  \
     }                                                                    \
-    __imp__sub_##address(ctx, base);                                     \
+    lifted::Sdk(ctx, base, __imp__sub_##address);                        \
   }
 
 ITC_STD_STRING_STATIC_INIT(825DA540, InitGlobalString8265EE7C)

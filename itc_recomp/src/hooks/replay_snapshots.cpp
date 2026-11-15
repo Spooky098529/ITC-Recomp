@@ -154,7 +154,7 @@ bool Native() {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                          \
     \
     if (!Native() || ((heap) && !hooks::NativeHeapActive())) {  \
-      __imp__sub_##address(ctx, base);                          \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                          \
       return;                                                   \
     }                                                           \
     hooks::step(ctx, base);                                     \

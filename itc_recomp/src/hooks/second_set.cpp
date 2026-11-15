@@ -468,7 +468,7 @@ namespace {
 // after, the mode as the original leaves it: `was_on` put back when it's
 // left unchanged.
 bool FlushOffForMorph(lifted::Regs& ctx) {
-  const bool was_on = (ctx.fpscr.csr & uint32_t(decltype(ctx.fpscr)::FlushMask)) != 0;
+  const bool was_on = (PPCFPSCRRegister::Platform::getcsr() & uint32_t(PPCFPSCRRegister::FlushMask)) != 0;
   ctx.fpscr.disableFlushMode();
   return was_on;
 }
@@ -572,7 +572,7 @@ ss::WheelCalls SecondSetWheelCalls(lifted::Regs& ctx, uint8_t* base) {
       ctx.r5.u64 = out1;
       ctx.r6.u64 = out2;
       lifted::original::c82594D10(ctx, base);
-      on = (ctx.fpscr.csr & uint32_t(decltype(ctx.fpscr)::FlushMask)) != 0;
+      on = (PPCFPSCRRegister::Platform::getcsr() & uint32_t(PPCFPSCRRegister::FlushMask)) != 0;
     });
     return on;
   };

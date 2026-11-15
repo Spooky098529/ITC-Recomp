@@ -72,7 +72,7 @@ ITC_REGS_STEP(SceneModelsSetWord11452) {
 
 ITC_REGS_STEP(SceneModelsCarModelSetRecord) {
   if (!sm::CarModelSetRecord(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820D3C70(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D3C70);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 32;
@@ -80,7 +80,7 @@ ITC_REGS_STEP(SceneModelsCarModelSetRecord) {
 
 ITC_REGS_STEP(SceneModelsCarRecordCopy) {
   if (!sm::CarRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820D7EE8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D7EE8);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -89,7 +89,7 @@ ITC_REGS_STEP(SceneModelsCarRecordCopy) {
 
 ITC_REGS_STEP(SceneModelsSceneModelRecordCopy) {
   if (!sm::SceneModelRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820DB290(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DB290);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -160,7 +160,7 @@ ITC_REGS_STEP(SceneModelsApplyRecord) {
   const auto r3 = sm::SceneModelApplyRecord(base, call, ctx.r3.u32, ctx.r1.u32);
   ctx.lr = lr;
   if (!r3) {
-    __imp__sub_820DA758(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DA758);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -207,7 +207,7 @@ ITC_REGS_STEP(SceneModelUpdate) {
     if (ITC_FLAG(native_scene_models)) {
       SceneModelBuild(ctx, base);
     } else {
-      __imp__sub_820D9870(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_820D9870);
     }
     ctx.r1.u64 = stack;
     return ctx.r3.u64;

@@ -37,7 +37,7 @@ ITC_REGS_STEP(RaceSceneMachineInit) {
                       ? rs::MachineInit(base, machine, ctx.r1.u32 - rs::kInitFrame, &replaced)
                       : std::nullopt;
   if (!r3) {
-    __imp__sub_8215D808(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8215D808);
     return;
   }
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
@@ -55,7 +55,7 @@ ITC_REGS_STEP(RaceSceneLightsSetUp) {
 ITC_REGS_STEP(RaceSceneSetEffectParams) {
   ctx.fpscr.disableFlushMode();
   if (!rs::EffectParamsReady(base)) {
-    __imp__sub_8228F5C0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8228F5C0);
     return;
   }
   double f1 = 0;
@@ -78,7 +78,7 @@ ITC_REGS_STEP(RaceSceneResume) {
 ITC_REGS_STEP(RaceSceneDestroy) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive() || !rs::DestroyReady(base)) {
-    __imp__sub_8215D790(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8215D790);
     return;
   }
   if (const uint32_t scene = rs::Destroy(base)) {

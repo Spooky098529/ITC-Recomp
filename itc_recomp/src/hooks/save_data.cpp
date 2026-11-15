@@ -82,7 +82,7 @@ ITC_REGS_STEP(SaveDataCourseRecordsOf) {
   const uint64_t records = ctx.r3.u64;
   ctx.r10.u64 = guest::LoadU32(base, ctx.r4.u32 + 4);
   ctx.r3.u64 = sd::CourseRecordsOf(base, records, ctx.r4.u32);
-  ctx.r11.u64 = ctx.r3.u64 - 20;
+  // (r11 = r3 - 20, a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(SaveDataDelete) {
@@ -124,7 +124,7 @@ ITC_REGS_STEP(SaveDataResetControllers) {
   sd::PlayersResetControllers(base);
   ctx.r9.u64 = 3;
   ctx.r10.u64 = 0xFFFFFFFF826C0000ull;
-  ctx.r11.u64 = 1;
+  // (r11 = 1, a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(SaveDataMenuListInit) {
@@ -162,8 +162,8 @@ ITC_REGS_STEP(SaveDataResetPlayer) {
 }
 
 #define ITC_SAVE_DATA_TABLE(name)                        \
-  void SaveData##name(lifted::Regs& ctx, uint8_t*) {       \
-    ctx.r11.u64 = 0xFFFFFFFF826C0000ull;                 \
+  ITC_REGS_STEP(SaveData##name) {                        \
+    /* (r11, a leftover for recompiled callers: none now) */ \
     ctx.r3.s64 = int32_t(sd::Defaults##name());          \
   }
 
@@ -176,7 +176,7 @@ ITC_SAVE_DATA_TABLE(Table50E4)
 #undef ITC_SAVE_DATA_TABLE
 
 ITC_REGS_STEP(SaveDataTwoPlayerBlock) {
-  ctx.r11.u64 = 0xFFFFFFFF826C0000ull;
+  // (r11 = 0x826C0000, a leftover for recompiled callers: none now)
   ctx.r3.u64 = sd::TwoPlayerBlock(base);
 }
 

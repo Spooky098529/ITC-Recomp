@@ -129,9 +129,9 @@ ITC_NATIVE_ENTRY_ALWAYS(82129280) {
     lifted::Sdk(ctx, base, __imp__sub_82129280);
     return;
   }
-  ctx.r11.u64 = guest::LoadU32(base, ctx.r3.u32 + 64);
-  ctx.cr6.compare<int32_t>(ctx.r11.s32, 0, ctx.xer);
-  if (ctx.r11.u32 != 0) {
+  // (r11 and cr6 as the original leaves them: leftovers for recompiled
+  // callers, none now)
+  if (guest::LoadU32(base, ctx.r3.u32 + 64) != 0) {
     return;
   }
   if (!RecordScreenRect(ctx, base)) {
