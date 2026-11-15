@@ -161,3 +161,14 @@ ITC_NATIVE_ENTRY_ALWAYS(822AC470) {
     lifted::Sdk(ctx, base, __imp__sub_822AC470);
   }
 }
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::EndCommandSegment)
+ITC_CONTEXT_FORM(hooks::NextCommandSegment)
+#undef ITC_CONTEXT_FORM

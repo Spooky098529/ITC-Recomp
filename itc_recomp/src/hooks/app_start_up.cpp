@@ -968,3 +968,24 @@ bool hooks::RenderManagerSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t f
   ctx.ctr.u64 = slot->target;
   return true;
 }
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::AppStartUpSteps)
+ITC_CONTEXT_FORM(hooks::MovieConstructSteps)
+ITC_CONTEXT_FORM(hooks::MovieWrapperSteps)
+ITC_CONTEXT_FORM(hooks::AudioManagerCreateSteps)
+ITC_CONTEXT_FORM(hooks::StartXAudioSteps)
+ITC_CONTEXT_FORM(hooks::AppCameraSteps)
+ITC_CONTEXT_FORM(hooks::AppCameraCameraConstructSteps)
+ITC_CONTEXT_FORM(hooks::AppCameraListConstructSteps)
+ITC_CONTEXT_FORM(hooks::AppConstructSteps)
+ITC_CONTEXT_FORM(hooks::AppCreateSteps)
+ITC_CONTEXT_FORM(hooks::TextInitSteps)
+ITC_CONTEXT_FORM(hooks::FontConstructSteps)
+#undef ITC_CONTEXT_FORM

@@ -472,3 +472,17 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
   file_layer::GameFileDestruct(base, file);
   ctx.r3.u64 = file;
 }
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::ArchiveSetUp)
+ITC_CONTEXT_FORM(hooks::ArchiveNextRequest)
+ITC_CONTEXT_FORM(hooks::ArchiveFinishRequest)
+ITC_CONTEXT_FORM(hooks::ArchiveInvokeFunctor)
+ITC_CONTEXT_FORM(hooks::ArchiveUclUnpack)
+#undef ITC_CONTEXT_FORM
