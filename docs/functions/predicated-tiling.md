@@ -96,7 +96,7 @@ callbacks, the kick and the primary ring's writer (`sub_8229DD70`,
 `SetScissorRect` and `DirtyAllState` in `device-state.md`; the data
 cache flush `sub_822AC470` (`command-buffer.md`, Dropped); memcpy
 (`sub_825A7410`, `c-runtime.md`); `Device::Resolve` (`sub_822AFA58`,
-`functions.md`, Wrapped; a lead with its callees), `Device::Clear`'s
+`functions.md`, native inside its wrap since 2026-11-15), `Device::Clear`'s
 worker (`sub_8229FC40`, a lead); the present callback `sub_822A0718`
 and `Device::Swap` (`functions.md`, called by the worker only with
 +10810 bit 2). Not mapped: `sub_822B7540`, the only caller of

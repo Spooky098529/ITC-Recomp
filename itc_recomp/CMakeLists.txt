@@ -403,6 +403,7 @@ set(ITC_SOURCES
     src/graphics/replay_commands.cpp
     src/graphics/shader_patch.cpp
     src/graphics/inline_draws.cpp
+    src/graphics/resolve.cpp
     src/hooks/predicated_tiling.cpp
     src/graphics/predicated_tiling.cpp
     src/hooks/post_effects.cpp

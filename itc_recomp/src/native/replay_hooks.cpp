@@ -12,6 +12,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "graphics/inline_draws.h"
+#include "graphics/resolve.h"
 #include "graphics/shader_patch.h"
 #include "graphics/video_output.h"
 #include "hooks/guest_call.h"
@@ -39,6 +40,12 @@ ITC_FLAG_BOOL(native_inline_draws, true, "ITC",
               "(sub_825BE300) natively inside their wraps (src/graphics/inline_draws.h): the "
               "dirty state's flush, the segment's end and the space reserved kept, their GPU "
               "packets and draw chain records dropped; checked by frame dumps");
+
+ITC_FLAG_BOOL(native_resolve, true, "ITC",
+              "Run the graphics library's Device::Resolve (sub_822AFA58) natively inside its "
+              "wrap (src/graphics/resolve.h): the copy and clear registers in the register "
+              "shadow, the dirty masks, the flags, the texture's fences and the fence list kept, "
+              "its GPU packets dropped; checked by frame dumps");
 
 namespace rc = graphics::replay_commands;
 namespace inline_draws = graphics::inline_draws;
@@ -369,5 +376,14 @@ extern "C" REX_FUNC(sub_822AFA58) {
   } else if (command != 25) {
     LogOutside("Resolve", 0x822AFA58, uint32_t(ctx.lr), command);
   }
-  __imp__sub_822AFA58(ctx, base);
+  if (!ITC_FLAG(native_resolve)) {
+    __imp__sub_822AFA58(ctx, base);
+    return;
+  }
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    graphics::resolve::Resolve(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]), uint32_t(a.r[1]),
+                               uint32_t(a.r[2]), uint32_t(a.r[3]), uint32_t(a.r[4]),
+                               uint32_t(a.r[5]), uint32_t(a.r[6]), uint32_t(a.r[7]), a.f[0]);
+    return {a.r[0], a.f[0]};  // r3 not kept (no caller reads it)
+  });
 }
