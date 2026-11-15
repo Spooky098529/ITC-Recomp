@@ -324,7 +324,7 @@ ITC_REGS_STEP(CarModelsOnDecalLoaded) {
 
 ITC_REGS_STEP(CarModelsTgaHeaderClear) {
   cm::TgaHeaderClear(base, ctx.r3.u32);
-  ctx.r11.u64 = 0;
+  // (r11 = 0 was a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(CarModelsTgaCreateImage) {

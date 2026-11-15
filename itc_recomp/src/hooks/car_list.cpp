@@ -414,7 +414,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8224C450) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                                       \
     \
     if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {      \
-      __imp__sub_##address(ctx, base);                                                       \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                          \
       return;                                                                                \
     }                                                                                        \
     hooks::step(ctx, base);                                                                  \

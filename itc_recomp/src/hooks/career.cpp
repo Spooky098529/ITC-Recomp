@@ -200,7 +200,7 @@ void PickNextThrough(void* user, uint32_t save) {
   guest_call::InFrame(ctx, guest.base, cr::kNextDayFrame, 0x82116BA8, [&](uint32_t) {
     ctx.r3.u64 = save;
     ctx.r4.u64 = 0;
-    sub_821159B0(ctx, guest.base);
+    lifted::CallFromContext(ctx, guest.base, 0x821159B0);
   });
 }
 
@@ -249,7 +249,7 @@ uint64_t MakeThrough(void* user, uint32_t) {
     ctx.r3.u64 = guest.sp + 28;
     ctx.r4.u64 = guest.sp + 36;
     ctx.r5.u64 = frame + 80;
-    __imp__sub_82144E58(ctx, guest.base);
+    lifted::Sdk(ctx, guest.base, __imp__sub_82144E58);
   });
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
@@ -291,7 +291,7 @@ void CopyThrough(void* user, uint32_t destination, uint32_t car) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = car;
     ctx.r5.u64 = 1968;
-    sub_825A7410(ctx, guest.base);  // memcpy
+    lifted::CallFromContext(ctx, guest.base, 0x825A7410);  // memcpy
   });
   ctx.fpscr.disableFlushMode();
 }

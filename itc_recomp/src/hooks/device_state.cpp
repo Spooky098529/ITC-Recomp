@@ -174,7 +174,7 @@ ITC_NATIVE_ENTRY(822A2470, ITC_FLAG(native_device_state)) {
 
 ITC_DEVICE_STATE_CALL(822A3740, {
   if (!ds::GetViewport(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_822A3740(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A3740);
     return;
   }
   ctx.r3.u64 = ctx.r4.u32;  // memcpy's: the destination
@@ -182,12 +182,12 @@ ITC_DEVICE_STATE_CALL(822A3740, {
 ITC_DEVICE_STATE_CALL(822A3758, {
   if (!ds::SetStreamSource(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                            ctx.r8.u64)) {
-    __imp__sub_822A3758(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A3758);
   }
 })
 ITC_DEVICE_STATE_CALL(822A3908, {
   if (!ds::SetIndices(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_822A3908(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A3908);
   }
 })
 ITC_DEVICE_STATE_CALL(822A6008, {

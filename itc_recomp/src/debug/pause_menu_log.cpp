@@ -170,7 +170,7 @@ static ITC_REGS_STEP(MenuListUpdate) {
   if (ITC_FLAG(native_race_screens)) {
     hooks::RaceScreensListUpdate(ctx, base);
   } else {
-    __imp__sub_8220C1E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8220C1E0);
   }
 }
 

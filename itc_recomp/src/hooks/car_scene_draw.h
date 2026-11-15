@@ -91,13 +91,15 @@ void CarSceneDrawTextureProjectionFit(lifted::Regs& ctx, uint8_t* base);
 // Part 4: CarScene::Draw sub_820C5DE8's guest calls (car_scene_draw::
 // SceneDrawCalls) through `ctx`, each from the frame and with the return
 // address the plain C++ gives, r1 put back after.
-car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(lifted::Regs& ctx, uint8_t* base);
+// `sdk`: the SDK's context the view was made from, which the car draw's call
+// hands r24 in (null: not carried).
+car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(lifted::Regs& ctx, uint8_t* base,
+                                                      PPCContext* sdk = nullptr);
 // CarScene::Draw sub_820C5DE8 (wrapped: its wrap calls this under the flag):
 // r3 = the scene, r4 = the matrix or 0; r3 as the original leaves it,
 // flush-to-zero off. The original where --native_models,
 // --native_matrix_math or --native_vehicle_accessors is off or the command
 // list's diagnostics are on.
 void CarSceneDrawRoot(PPCContext& ctx, uint8_t* base);
-void CarSceneDrawRoot(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks
