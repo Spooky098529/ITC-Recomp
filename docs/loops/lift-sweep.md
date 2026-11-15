@@ -203,6 +203,11 @@ outside:
   kind 6 with two human cars, which only the Xbox Live mode makes, so
   single-player never reaches it.
 
+- `xstart` (2026-11-15, the user's call): not ported; the program's
+  start becomes ours instead, with rexglue as a library ("A4 brought
+  forward" in `docs/rexglue-removal.md`). The kernel's start of the
+  game's main thread lands in our start-up.
+
 ## The user's calls (2026-11-15)
 
 - The end state is the goal: native C++ calling native C++, no `ctx`,

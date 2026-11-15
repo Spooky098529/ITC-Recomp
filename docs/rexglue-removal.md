@@ -3170,6 +3170,56 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     allocation (the creation side), memcpy's mirror recording (the
     `sub_825A7410` override has no plain C++ entry), and RaceOverlays::Run.
 
+## A4 brought forward: our start-up, rexglue as a library (2026-11-15)
+
+The user's call, after the lift sweep left `xstart` the only unported
+function (`docs/loops/lift-sweep.md`): rather than port `xstart`, the
+program's start becomes ours, and rexglue a library it uses for guest
+memory, the kernel and the image load.
+
+Today the SDK owns the program: its `main()`
+(`windowed_app_main_sdl.cpp`, compiled into our executable by
+`rexglue_configure_target`) parses the flags, makes an SDL app context
+(the event loop on the main thread), and runs `ReXApp`
+(`rex_app.cpp`, `src/itc_app.h` derives from it). `ReXApp` sets up the
+paths, `itc.toml` and the log, makes a window (which our renderer hides,
+routing its own window's events to it, `src/native/app_window.cpp`),
+builds `rex::Runtime`, loads `default.xex`, and makes the game's main
+thread through the kernel, starting at `xstart`.
+
+The new start-up:
+
+1. **Our `main()`** (`src/app/`), the executable's entry: the SDK's
+   flag parser (until a parser of our own), the paths (`--game_data_root`
+   or the executable's folder), `itc.toml`, the log (ours taking over
+   the SDK's file, A2), SDL, our own event loop on the main thread
+   (`SDL_RunOnMainThread` callbacks for the renderer's window, the
+   gamepads' event pump, our window's close ending the title as
+   `ReXApp::OnClosing` did).
+2. **`rex::Runtime` as a library**: built by our `main()` with the same
+   config (our audio, no SDK input, no graphics system, no app context:
+   XAM's dialogs, which drew on the hidden window, are skipped),
+   `Setup`, the modules registered, `default.xex` loaded, the C runtime
+   heap.
+3. **The game's main thread** is still made by the kernel
+   (`PrepareModuleLaunch`): the game needs a kernel thread for its
+   per-thread kernel state (its block in r13, TLS, thread IDs) and a
+   stack in guest memory, until E1 and E2. Its start routine is our
+   start-up (`REX_FUNC(xstart)`, the kernel's one way in, through
+   `lifted::Enter`): `xstart`'s work in plain C++, by "plug in data":
+   the C runtime's globals, the thread notify routines, `_mtinit`,
+   `_initterm_e` and `_cinit` (the static initializers), then `main`
+   with no arguments (the command line is split only when
+   `[0x829537B8]` is set, which nothing sets); the heap check (answers
+   1 in play) and the PAL-50 check (Dropped) left out; `exit` after
+   `main` as the original does (never reached in play).
+4. **Gone**: the SDK's `main()` and `ReXApp` (taken out of our target's
+   sources), its window and ImGui overlays (unused since the native
+   renderer), the achievement toast (drawn on the hidden window).
+
+Checked by attract races, the pad replay, a drive by the user, and the
+Windows build under Wine (`wWinMain`: SDL's `SDL_main.h`).
+
 ## The end state: removing the core
 
 Only when no recompiled function is left (or none that touches what's
