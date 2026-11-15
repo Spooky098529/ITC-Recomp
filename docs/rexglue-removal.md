@@ -5694,3 +5694,17 @@ lines. The boundary: overridden 267, Native 48, Dropped 24, never called
 (`b7_status.py`): ours 9,833, work left 45 (Wrapped 7, with a row 19,
 no row yet 19). Static map: reachable 9,118, ours 9,092, unported 17
 (9 seen in play).
+
+**2026-11-15, the lift sweep's last functions (branch `lift-sweep`):**
+the spin locks (the SDK's global lock taken through our helpers), the
+time base (`helpers::PerformanceCounter`), nested fragments and the
+360's no-op moves in `lift.py` (3,010 lifted); a migration agent made
+the draw library's inline draws, `Device::Resolve` (checked against the
+original on 262,144 real calls) and `ScreenObject::Record` native inside
+their wraps. Every harness at 0; the pad replay ran 127 s with no error
+lines. The boundary: overridden 268, Native 48, Dropped 24, never called
+34, live 75. Imports: 186 called, 30 with a live caller. B7
+(`b7_status.py`): ours 9,848, work left 37 (Wrapped 3, with a row 16, no
+row yet 18). Static map: reachable 9,106, ours 9,095, **unported 2**:
+`sub_821743A8` (reached only by the Xbox Live mode's network battle)
+and `xstart`.

@@ -2,21 +2,21 @@
 
 Made by `itc_recomp/tools/static_map.py` on every run; never edit it by hand (run the tool again). What it reads, how edges are found and its gaps: the tool's docstring and "The static map" in `docs/coverage.md`.
 
-Made 2026-11-15 at commit `2111194e` (`lift-sweep`).
+Made 2026-11-15 at commit `70c8e699` (`lift-sweep`).
 
 ## Totals
 
 - Recompiled `sub_` functions: 16552; 144 jump-table cases folded into their parents, leaving 16408.
-- Reachable: 9118 (7398 from `main`, 1720 more from 190 extra roots: functions seen in play that `main` doesn't reach, 2 of them not under another).
-- Ours: 9092. Excluded (replaced libraries): 9.
-- **Unported: 17** (8 under `main`): seen in play 9, never seen 8; 5998 generated lines.
-- Of the unported, 14 hang under unported code (or a root); 3 are reached only through ours (1 seen in play), 3 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
-- Ours functions' edges come from our C++ (`src_edges.py`): 36892 definitions in 1192 files of `src/` (harnesses left out), 9673 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 9042 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
+- Reachable: 9106 (7386 from `main`, 1720 more from 190 extra roots: functions seen in play that `main` doesn't reach, 2 of them not under another).
+- Ours: 9095. Excluded (replaced libraries): 9.
+- **Unported: 2** (1 under `main`): seen in play 1, never seen 1; 805 generated lines.
+- Of the unported, 1 hang under unported code (or a root); 1 are reached only through ours (0 seen in play), 1 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
+- Ours functions' edges come from our C++ (`src_edges.py`): 36989 definitions in 1198 files of `src/` (harnesses left out), 9682 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 9053 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
 - Ours functions whose original body is still reachable: 72 (70 from our C++: an `__imp__` fallback when the native C++ declines, or a guest call to a function with neither override nor C++); listed below.
-- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3030 functions named, taken as roots; they add 1478 reachable functions.
-- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 1659** (980 not ours, 679 ours whose work our C++ took in; 139159 lines, 264 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
-- Frontier (ready now): 14 functions.
-- Reachable functions calling imports: 295 (2 unported).
+- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3039 functions named, taken as roots; they add 1480 reachable functions.
+- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 1671** (980 not ours, 691 ours whose work our C++ took in; 139964 lines, 275 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
+- Frontier (ready now): 2 functions.
+- Reachable functions calling imports: 295 (1 unported).
 - Image read: 13492 code-built data addresses scanned; 181 function pointers in data that no code-built address reaches (136 functions; not edges).
 
 A `*` after a function: never seen in play. Sizes are generated lines.
@@ -27,47 +27,20 @@ Unported functions ranked by how many unported functions above them (through unp
 
 | Function | Unblocks | Frees | Lines | Seen | Ready | File |
 |---|---|---|---|---|---|---|
-| `sub_822AED18` | 3 | 3 | 490 | yes | yes | functions.md |
-| `sub_82121760` | 0 | 0 | 647 | no | yes | unmapped |
-| `sub_82130978` | 0 | 0 | 1038 | yes | yes | screen-objects.md |
 | `sub_821743A8` | 0 | 0 | 657 | no | yes | race-world.md |
 | `xstart` | 0 | 0 | 148 | yes | yes | unmapped |
-| `sub_822997B0` | 0 | 0 | 416 | yes | yes | system-services.md |
-| `sub_8229D6F0` | 0 | 0 | 15 | no | yes | command-buffer.md |
-| `sub_8229D720` | 0 | 0 | 62 | no | yes | command-buffer.md |
-| `sub_822AFA58` | 0 | 0 | 1105 | yes | yes | functions.md |
-| `sub_825A6BD0` | 0 | 0 | 51 | yes | yes | unmapped |
-| `sub_825A6C40` | 0 | 0 | 53 | no | yes | unmapped |
-| `sub_825BD8F0` | 0 | 0 | 410 | yes | no | functions.md |
-| `sub_825BDDA0` | 0 | 0 | 11 | yes | yes | functions.md |
-| `sub_825BDDC0` | 0 | 0 | 460 | no | no | functions.md |
-| `sub_825BE300` | 0 | 0 | 345 | no | no | functions.md |
-| `sub_825BFEA0` | 0 | 0 | 65 | yes | yes | xact.md |
-| `sub_825D1C50` | 0 | 0 | 25 | no | yes | xact-waves.md |
 
 ## Frontier clusters, by what they unblock
 
-12 clusters (frontier functions sharing an unported caller within 0x4000 bytes, neighbors in address order, or a call cycle). Each: what it unblocks, its functions with their sizes, its function files.
+2 clusters (frontier functions sharing an unported caller within 0x4000 bytes, neighbors in address order, or a call cycle). Each: what it unblocks, its functions with their sizes, its function files.
 
-1. **sub_822AED18**-822AED18: unblocks 3; 1 functions, 490 lines, 1 seen; functions.md. `sub_822AED18` 490
-2. **sub_8229D6F0**-8229D720: unblocks 0; 2 functions, 77 lines, 0 seen; command-buffer.md. `sub_8229D6F0`* 15, `sub_8229D720`* 62
-3. **sub_825A6BD0**-825A6C40: unblocks 0; 2 functions, 104 lines, 1 seen; unmapped. `sub_825A6BD0` 51, `sub_825A6C40`* 53
-4. **sub_82121760**-82121760: unblocks 0; 1 functions, 647 lines, 0 seen; unmapped. `sub_82121760`* 647
-5. **sub_82130978**-82130978: unblocks 0; 1 functions, 1038 lines, 1 seen; screen-objects.md. `sub_82130978` 1038
-6. **sub_821743A8**-821743A8: unblocks 0; 1 functions, 657 lines, 0 seen; race-world.md. `sub_821743A8`* 657
-7. **xstart**-rt: unblocks 0; 1 functions, 148 lines, 1 seen; unmapped. `xstart` 148
-8. **sub_822997B0**-822997B0: unblocks 0; 1 functions, 416 lines, 1 seen; system-services.md. `sub_822997B0` 416
-9. **sub_822AFA58**-822AFA58: unblocks 0; 1 functions, 1105 lines, 1 seen; functions.md. `sub_822AFA58` 1105
-10. **sub_825BDDA0**-825BDDA0: unblocks 0; 1 functions, 11 lines, 1 seen; functions.md. `sub_825BDDA0` 11
-11. **sub_825BFEA0**-825BFEA0: unblocks 0; 1 functions, 65 lines, 1 seen; xact.md. `sub_825BFEA0` 65
-12. **sub_825D1C50**-825D1C50: unblocks 0; 1 functions, 25 lines, 0 seen; xact-waves.md. `sub_825D1C50`* 25
+1. **sub_821743A8**-821743A8: unblocks 0; 1 functions, 657 lines, 0 seen; race-world.md. `sub_821743A8`* 657
+2. **xstart**-rt: unblocks 0; 1 functions, 148 lines, 1 seen; unmapped. `xstart` 148
 
 ## Unmapped areas
 
-Clusters of unported reachable functions with no rows in any function file: 3 (4 functions, 899 lines). Largest first; the callers named are outside the cluster.
+Clusters of unported reachable functions with no rows in any function file: 1 (1 functions, 148 lines). Largest first; the callers named are outside the cluster.
 
-- **sub_825A6BD0**-825A6C40: 2 functions, 104 lines, 1 seen, unblocks 0; called from `sub_825DABC8` (lifted.md, ours), `sub_825DAC10` (lifted.md, ours), `sub_825DB428` (lifted.md, ours), `sub_825DB488` (lifted.md, ours).
-- **sub_82121760**-82121760: 1 functions, 647 lines, 0 seen, unblocks 0; called from `sub_82123E48` (race-overlays.md, ours).
 - **xstart**-rt: 1 functions, 148 lines, 1 seen, unblocks 0; called from nothing outside it.
 
 ## Extra roots
@@ -82,25 +55,25 @@ Reachable through the original's graph but not through ours: the native function
 
 | Native caller | File | Status | Lost callees | Under them | Not ours | Lines | Seen |
 |---|---|---|---|---|---|---|---|
-| `sub_821077A8` | game-modes.md | Overridden | `sub_82106F88`, `sub_82107670` | 813 | 476 | 77425 | 110 |
+| `sub_821077A8` | game-modes.md | Overridden | `sub_82106F88`, `sub_82107670` | 817 | 476 | 77493 | 114 |
 | `sub_822ACB90` | device-state.md | Native | `sub_822A1280`, `sub_822A12B0`, `sub_822A12F0`, `sub_822A1380`, `sub_822A1410`, `sub_822A14A0`, `sub_822A1530`, `sub_822A15A0`, ... 90 more | 98 | 98 | 739 | 0 |
-| `sub_8214E268` | system-services.md | Overridden | `sub_82149080`, `sub_8214AC68`, `sub_8214ADC0`, `sub_8214AEA8`, `sub_8214D7A0`, `sub_8214F160`, `sub_8214F290`, `sub_8214F810`, ... 5 more | 85 | 77 | 7197 | 0 |
-| `sub_8209EEC8` | mode-tick.md | Overridden | `sub_8209E4F0`, `sub_8209E540`, `sub_8209E610`, `sub_8209E698`, `sub_8209E730`, `sub_8209E790`, `sub_8209E860`, `sub_8209E9A8`, ... 3 more | 83 | 81 | 7036 | 0 |
+| `sub_8214E268` | system-services.md | Overridden | `sub_82149080`, `sub_8214AC68`, `sub_8214ADC0`, `sub_8214AEA8`, `sub_8214D7A0`, `sub_8214F160`, `sub_8214F290`, `sub_8214F810`, ... 7 more | 89 | 77 | 7265 | 4 |
+| `sub_8209EEC8` | mode-tick.md | Overridden | `sub_8209E4F0`, `sub_8209E540`, `sub_8209E610`, `sub_8209E698`, `sub_8209E730`, `sub_8209E790`, `sub_8209E860`, `sub_8209E9A8`, ... 5 more | 87 | 81 | 7104 | 4 |
 | `sub_825D0F00` | xact-tracks.md | Native | `sub_825D0F4C`, `sub_825D1A80`, `sub_825D5F40`, `sub_825D5FE8`, `sub_825D6308`, `sub_825D67E8`, `sub_825D6CF0`, `sub_825D70C8`, ... 3 more | 69 | 68 | 3492 | 1 |
-| `sub_8235AAC0` | texture-compression.md | Native | `sub_82365D88`, `sub_82366458`, `sub_82368170`, `sub_8236D380` | 58 | 54 | 5529 | 3 |
-| `sub_8216DD88` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F1E8` | 56 | 16 | 4274 | 5 |
-| `sub_821A1380` | car-makers.md | Lifted | `sub_8219C528`, `sub_8219C6D0`, `sub_8219C850`, `sub_8219C8F8`, `sub_8219CA08`, `sub_8219CB18`, `sub_8219CBD8`, `sub_8219FC60`, ... 6 more | 28 | 0 | 2045 | 28 |
+| `sub_8235AAC0` | texture-compression.md | Native | `sub_82365D88`, `sub_82366458`, `sub_82368170`, `sub_8236D380` | 62 | 54 | 5597 | 7 |
+| `sub_8216DD88` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F1E8` | 58 | 16 | 4307 | 7 |
+| `sub_821A1380` | car-makers.md | Lifted | `sub_8219C528`, `sub_8219C6D0`, `sub_8219C850`, `sub_8219C8F8`, `sub_8219CA08`, `sub_8219CB18`, `sub_8219CBD8`, `sub_8219FC60`, ... 6 more | 30 | 0 | 2078 | 30 |
 | `sub_8221BD20` | race-screens.md | Native | `sub_8221A4A8`, `sub_8221A610`, `sub_8221A680`, `sub_8221A6C8`, `sub_8221A720`, `sub_8221B298`, `sub_8221B860`, `sub_8221B8A8` | 28 | 15 | 1869 | 10 |
 | `sub_8220F638` | race-screens.md | Native | `sub_8220C578`, `sub_8220C5D0`, `sub_8220D898`, `sub_8220DB98`, `sub_8220E988`, `sub_8220EBD8` | 26 | 10 | 2289 | 15 |
+| `sub_8222ED98` | location-screen.md | Lifted | `sub_8222A470`, `sub_8222A718`, `sub_8222AD50`, `sub_8222AE00`, `sub_8222B8A8`, `sub_8222BE60`, `sub_8222CFF0`, `sub_8222D108`, ... 10 more | 26 | 0 | 3297 | 25 |
 | `sub_825CB470` | xact.md | Overridden | `sub_825C07C8`, `sub_825C95F8`, `sub_825C9A80`, `sub_825CABC8` | 25 | 25 | 1467 | 0 |
-| `sub_8222ED98` | location-screen.md | Lifted | `sub_8222A470`, `sub_8222A718`, `sub_8222AD50`, `sub_8222AE00`, `sub_8222B8A8`, `sub_8222BE60`, `sub_8222CFF0`, `sub_8222D108`, ... 10 more | 24 | 0 | 3258 | 23 |
 | `sub_825D06B8` | xact-tracks.md | Overridden | `sub_825C07C8`, `sub_825C95F8`, `sub_825C9788`, `sub_825CB3D8` | 24 | 24 | 1421 | 0 |
+| `sub_822900E0` | save-interface.md | Native | `sub_825A9EC0`, `sub_825AA058` | 23 | 15 | 3158 | 4 |
 | `sub_8216DB70` | race-hud-machine.md | Overridden | `sub_82211458` | 22 | 10 | 1721 | 5 |
 | `sub_825C2910` | xact.md | Overridden | `sub_825C95F8`, `sub_825C9878` | 22 | 22 | 1352 | 0 |
 | `sub_8216C6D8` | race-hud-machine.md | Overridden | `sub_8221EF60` | 20 | 0 | 1703 | 0 |
 | `sub_822979E0` | c-runtime-core.md | Lifted | `sub_825A6E48`, `sub_825B6958`, `sub_825D9590` | 20 | 0 | 2679 | 0 |
 | `sub_821159B0` | career.md | Overridden | `sub_82110CA8`, `sub_82111140`, `sub_821115C8`, `sub_82112260`, `sub_82115550`, `sub_82115708` | 19 | 19 | 2616 | 0 |
-| `sub_822900E0` | save-interface.md | Native | `sub_825A9EC0`, `sub_825AA058` | 19 | 15 | 3084 | 0 |
 | `sub_8216CB98` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 14 | 14 | 1029 | 0 |
 | `sub_8216D918` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 14 | 14 | 1029 | 0 |
 | `sub_825A8A50` | c-runtime.md | Overridden | `sub_825AFEC0`, `sub_825AFEF8`, `sub_825B0860`, `sub_825B0968`, `sub_825B0B80` | 14 | 11 | 974 | 0 |
@@ -114,18 +87,28 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82092358` | frame-driver.md | Lifted | `sub_82091A60`, `sub_82091EF8`, `sub_820920D8` | 9 | 5 | 394 | 5 |
 | `sub_825AF130` | c-runtime.md | Native | `sub_825AB010`, `sub_825AC108`, `sub_825AD4C0`, `sub_825AF000`, `sub_825AF098`, `sub_825B6890`, `sub_825B6898` | 9 | 3 | 322 | 2 |
 | `sub_8216D6D0` | race-hud-machine.md | Overridden | `sub_8221F7D0`, `sub_822200E0` | 8 | 0 | 777 | 0 |
+| `sub_822968B8` | functions.md | Overridden | `sub_82297678` | 8 | 0 | 648 | 2 |
 | `sub_820990F0` | input.md | Overridden | `sub_82591918`, `sub_82591C18` | 7 | 2 | 617 | 0 |
 | `sub_822A08A0` | functions.md | Overridden | `sub_822A05A8`, `sub_822B1F68`, `sub_822B20D8`, `sub_822B2388`, `sub_822B3FE0`, `sub_822B5C58` | 7 | 2 | 758 | 0 |
+| `sub_8209D130` | mode-tick.md | Overridden | `sub_8217C348`, `__savegprlr_21`, `__restgprlr_21`, `__savevmx_124`, `__restvmx_124` | 6 | 1 | 348 | 5 |
 | `sub_8211E500` | ui-movies-game.md | Overridden | `sub_8211A6C0`, `sub_8259D5C8`, `sub_825A0CD0`, `sub_825A0CF8`, `sub_825A0EB0`, `sub_825A0EF0` | 6 | 0 | 245 | 0 |
 | `sub_8216C210` | race-hud-machine.md | Overridden | `sub_82216850` | 6 | 6 | 366 | 0 |
 | `sub_8216C530` | race-hud-machine.md | Overridden | `sub_82216850` | 6 | 6 | 366 | 0 |
-| `sub_822968B8` | functions.md | Overridden | `sub_82297678` | 6 | 0 | 613 | 0 |
+| `sub_82579DA0` | lifted.md | Lifted | `sub_82579D18`, `sub_82579E18`, `sub_8257A498` | 6 | 4 | 471 | 2 |
 | `sub_820CDC18` | race-setup.md | Native | `sub_820CC450`, `sub_820CC458`, `sub_820CC460`, `sub_820CC468`, `sub_820CC478` | 5 | 1 | 37 | 4 |
-| `sub_8209D130` | mode-tick.md | Overridden | `sub_8217C348`, `__savevmx_124`, `__restvmx_124` | 4 | 1 | 315 | 3 |
+| `sub_8211CD90` | ui-movies-game.md | Overridden | `sub_8211B720`, `sub_8211B770`, `__savegprlr_20`, `__restgprlr_20` | 5 | 0 | 120 | 2 |
+| `sub_82229238` | location-screen.md | Overridden | `sub_8211AB28`, `sub_8211BE98`, `__savegprlr_21`, `__restgprlr_21` | 5 | 0 | 102 | 2 |
+| `sub_825BE300` | functions.md | Overridden | `sub_822ADEF0`, `sub_822AE070`, `sub_822AE1D0`, `__savegprlr_18`, `__restgprlr_18` | 5 | 0 | 425 | 5 |
+| `sub_820BF320` | collision.md | Native | `__savegprlr_20`, `__restgprlr_20`, `__savefpr_24`, `__restfpr_24` | 4 | 0 | 61 | 4 |
+| `sub_820C1E00` | vehicle.md | Native | `__savegprlr_20`, `__restgprlr_20`, `__savefpr_24`, `__restfpr_24` | 4 | 0 | 61 | 4 |
+| `sub_820FC900` | collision-world.md | Native | `__savegprlr_15`, `__restgprlr_15`, `__savefpr_15`, `__restfpr_15` | 4 | 0 | 89 | 4 |
+| `sub_82147D88` | scenery-lists.md | Native | `sub_82146BD0`, `__savegprlr_18`, `__restgprlr_18` | 4 | 1 | 1091 | 3 |
+| `sub_82173E28` | race-world.md | Native | `__savegprlr_21`, `__restgprlr_21`, `__savefpr_24`, `__restfpr_24` | 4 | 0 | 59 | 4 |
+| `sub_8217BA20` | front-end-car-draw.md | Native | `__savegprlr_18`, `__restgprlr_18`, `__savefpr_25`, `__restfpr_25` | 4 | 0 | 63 | 4 |
 | `sub_8221A090` | race-screens.md | Native | `sub_822191D0`, `sub_82219A78`, `sub_82219B60`, `sub_82219C30` | 4 | 2 | 249 | 2 |
 | `sub_82299D60` | heap.md | Overridden | `sub_82299208`, `sub_8229A5F4` | 4 | 4 | 704 | 4 |
 | `sub_8229A930` | heap.md | Overridden | `sub_82298A88`, `sub_8229B16C` | 4 | 4 | 938 | 4 |
-| `sub_82579DA0` | lifted.md | Lifted | `sub_82579D18`, `sub_82579E18`, `sub_8257A498` | 4 | 4 | 436 | 0 |
+| `sub_82468848` | xaudio-objects.md | Native | `__savegprlr_20`, `__restgprlr_20`, `__savefpr_17`, `__restfpr_17` | 4 | 0 | 75 | 4 |
 | `sub_82593088` | std-string.md | Overridden | `sub_82592E18` | 4 | 3 | 622 | 0 |
 | `sub_825A6880` | heap.md | Overridden | `sub_820911E8`, `sub_825A67A8`, `sub_825AD150`, `sub_825DB3F8` | 4 | 4 | 99 | 0 |
 | `sub_825A8ED0` | c-runtime.md | Overridden | `__savefpr_25`, `__restfpr_25`, `sub_825A8D50`, `sub_825AB1C8` | 4 | 1 | 168 | 2 |
@@ -134,21 +117,26 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8209A458` | framework.md | Overridden | `sub_82091F58` | 3 | 3 | 121 | 0 |
 | `sub_820A6F60` | std-string.md | Overridden | `sub_820A6E60`, `sub_825A6A20`, `sub_825A7270` | 3 | 2 | 192 | 0 |
 | `sub_820EF168` | car-models.md | Native | `sub_820EF0B8` | 3 | 3 | 174 | 0 |
+| `sub_82119B80` | ui-movies.md | Overridden | `sub_8259D628`, `__savegprlr_18`, `__restgprlr_18` | 3 | 0 | 49 | 2 |
 | `sub_8211C680` | build-screen.md | Overridden | `sub_8211B720`, `sub_8211B770` | 3 | 0 | 85 | 0 |
-| `sub_8211CD90` | ui-movies-game.md | Overridden | `sub_8211B720`, `sub_8211B770` | 3 | 0 | 85 | 0 |
 | `sub_8212BB20` | sprites.md | Lifted | `__savefpr_21`, `__restfpr_21`, `sub_825A9934` | 3 | 0 | 51 | 2 |
 | `sub_8214E190` | system-services.md | Overridden | `sub_82148958`, `sub_82459D40`, `sub_82459D50` | 3 | 0 | 55 | 0 |
 | `sub_8216D450` | race-hud-machine.md | Overridden | `sub_822157E8`, `sub_82215870`, `sub_822158E8` | 3 | 3 | 145 | 0 |
 | `sub_8216D600` | race-hud-machine.md | Overridden | `sub_8216C798`, `sub_82211390` | 3 | 1 | 142 | 0 |
 | `sub_8216DA40` | race-hud-machine.md | Overridden | `sub_8216C798`, `sub_82211390` | 3 | 1 | 142 | 0 |
-| `sub_82229238` | location-screen.md | Overridden | `sub_8211AB28`, `sub_8211BE98` | 3 | 0 | 69 | 0 |
 | `sub_8229A648` | heap.md | Overridden | `sub_82298548`, `sub_82299448`, `sub_8229A8DC` | 3 | 3 | 581 | 3 |
 | `sub_822A6210` | graphics-resources.md | Overridden | `sub_822AD9D8` | 3 | 3 | 86 | 0 |
 | `sub_822B0AB0` | functions.md | Overridden | `sub_822B0760`, `sub_822B07B0`, `sub_822B0860` | 3 | 0 | 166 | 0 |
+| `sub_8258BD28` | second-set.md | Native | `sub_8258B7E0` | 3 | 1 | 180 | 2 |
 | `sub_825963F0` | models.md | Native | `sub_825ABFE8` | 3 | 2 | 107 | 0 |
 | `sub_8259F348` | ui-movies.md | Overridden | `sub_8211A948`, `sub_8259D618`, `sub_8259D628` | 3 | 0 | 83 | 0 |
 | `sub_825A1A38` | model-animation.md | Overridden | `sub_825A1938`, `sub_825A6608` | 3 | 3 | 123 | 0 |
 | `sub_825A6F60` | c-runtime.md | Native | `sub_825A7044`, `sub_825AA1A8` | 3 | 0 | 27 | 3 |
+| `sub_825BD8F0` | functions.md | Overridden | `sub_822ADEF0`, `sub_822AE070`, `sub_822AE1D0` | 3 | 0 | 386 | 3 |
+| `sub_825BDDC0` | functions.md | Overridden | `sub_822ADEF0`, `sub_822AE070`, `sub_822AE1D0` | 3 | 0 | 386 | 3 |
+| `sub_825BE708` | functions.md | Overridden | `sub_822ADEF0`, `sub_822AE070`, `sub_822AE1D0` | 3 | 0 | 386 | 3 |
+| `sub_82090420` | framework.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
+| `sub_820905E0` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_82091720` | std-string.md | Overridden | `sub_82091398`, `sub_825A7270` | 2 | 1 | 142 | 0 |
 | `sub_820988C8` | frame-driver.md | Overridden | `sub_8258C998`, `sub_8258C9C0` | 2 | 0 | 20 | 0 |
 | `sub_8209E118` | files-and-saves.md | Overridden | `sub_8209DD00`, `sub_822954C8` | 2 | 1 | 63 | 0 |
@@ -158,31 +146,49 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820AF018` | car-physics.md | Native | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
 | `sub_820B1FB8` | car-physics.md | Native | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
 | `sub_820B2808` | car-physics.md | Native | `sub_820B6938`, `sub_820B6940` | 2 | 2 | 11 | 0 |
+| `sub_820B2CC0` | car-physics.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820B3F80` | car-physics.md | Native | `__savefpr_24`, `__restfpr_24` | 2 | 0 | 26 | 2 |
 | `sub_820B4778` | car-physics.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
 | `sub_820B4AA8` | car-physics.md | Native | `__savefpr_24`, `__restfpr_24` | 2 | 0 | 26 | 2 |
 | `sub_820BD508` | collision.md | Native | `sub_820BACB8`, `sub_820BCF28` | 2 | 1 | 162 | 0 |
 | `sub_820BD6E0` | collision.md | Native | `sub_820BACB8`, `sub_820BCF28` | 2 | 1 | 162 | 0 |
 | `sub_820BDA48` | lifted.md | Lifted | `__savefpr_24`, `__restfpr_24` | 2 | 0 | 26 | 2 |
+| `sub_820BDE40` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820BE4F0` | lifted.md | Lifted | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
 | `sub_820BE8A8` | lifted.md | Lifted | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
-| `sub_820BF320` | collision.md | Native | `__savefpr_24`, `__restfpr_24` | 2 | 0 | 26 | 2 |
 | `sub_820C0D28` | car-physics.md | Native | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
-| `sub_820C1E00` | vehicle.md | Native | `__savefpr_24`, `__restfpr_24` | 2 | 0 | 26 | 2 |
 | `sub_820C5DE8` | car-scene-draw.md | Overridden | `__savefpr_18`, `__restfpr_18` | 2 | 0 | 38 | 2 |
 | `sub_820C9170` | car-draw.md | Native | `__savefpr_24`, `__restfpr_24` | 2 | 0 | 26 | 2 |
+| `sub_820D04E8` | car-draw.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820D2330` | material-passes.md | Overridden | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
 | `sub_820D3E98` | scene-loaders.md | Native | `__savevmx_123`, `__restvmx_123` | 2 | 0 | 40 | 2 |
 | `sub_820D9F50` | second-set.md | Native | `__savevmx_123`, `__restvmx_123` | 2 | 0 | 40 | 2 |
+| `sub_820DAC68` | car-draw.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_820E2448` | car-draw.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820E8AE8` | car-draw.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820EE0C8` | car-models.md | Native | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
+| `sub_820EE638` | car-models.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820EF9B8` | accessories.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820F2030` | course-scenery.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820F2720` | course-scenery.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820F3098` | course-scenery.md | Native | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
+| `sub_820F3B70` | course-scenery.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
+| `sub_820F4558` | course-scenery.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
+| `sub_820F6068` | course-scenery.md | Overridden | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_820F7818` | collision-world.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820F7EE8` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_820F9768` | track-route.md | Overridden | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
-| `sub_820FC900` | collision-world.md | Native | `__savefpr_15`, `__restfpr_15` | 2 | 0 | 44 | 2 |
+| `sub_820FA9D0` | track-route.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820FBBE8` | course-scenery.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
+| `sub_820FE120` | track-zones.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82104F68` | replay-snapshots.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82106158` | game-modes.md | Overridden | `sub_82105FE0`, `sub_82106100` | 2 | 0 | 57 | 2 |
+| `sub_821063B0` | mode-tick.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82109EF0` | strings-and-font.md | Overridden | `sub_82109D80` | 2 | 2 | 330 | 0 |
 | `sub_8210A680` | strings-and-font.md | Native | `sub_825A7EF8`, `sub_825A7F30` | 2 | 0 | 32 | 0 |
 | `sub_8210D478` | car-sounds.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
 | `sub_8210E938` | car-sounds.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
+| `sub_82115D98` | race-setup.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_8211B800` | ui-movies-game.md | Native | `sub_8211B310`, `sub_8211B720` | 2 | 0 | 59 | 0 |
 | `sub_8211BEE8` | ui-movies-game.md | Overridden | `sub_8211A948`, `sub_8259D628` | 2 | 0 | 76 | 0 |
 | `sub_82120008` | lifted.md | Lifted | `__savefpr_15`, `__restfpr_15` | 2 | 0 | 44 | 2 |
@@ -190,61 +196,120 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82120BB8` | lifted.md | Lifted | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
 | `sub_82121D78` | lifted.md | Lifted | `__savefpr_15`, `__restfpr_15` | 2 | 0 | 44 | 2 |
 | `sub_82123E48` | race-overlays.md | Lifted | `__savefpr_19`, `__restfpr_19` | 2 | 0 | 36 | 2 |
+| `sub_82124728` | race-overlays.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82124EE0` | race-overlays.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82125B60` | race-overlays.md | Overridden | `__savefpr_21`, `__restfpr_21` | 2 | 0 | 32 | 2 |
 | `sub_82128750` | sprites.md | Overridden | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_8212B4A8` | race-overlays.md | Native | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
 | `sub_8212D818` | race-overlays.md | Overridden | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
 | `sub_8212F148` | screen-objects.md | Lifted | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
 | `sub_82130618` | lifted.md | Lifted | `__savefpr_18`, `__restfpr_18` | 2 | 0 | 38 | 2 |
+| `sub_82130978` | screen-objects.md | Overridden | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
 | `sub_82131DD8` | screen-objects.md | Native | `sub_8212F030`, `sub_821318B8` | 2 | 2 | 358 | 0 |
 | `sub_821329B8` | screen-objects.md | Overridden | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
 | `sub_82132BD8` | screen-objects.md | Native | `sub_8212EFA8`, `sub_82132318` | 2 | 2 | 361 | 0 |
 | `sub_82134060` | post-effects.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
+| `sub_82135B50` | post-effects.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_82136FA8` | post-effects.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
-| `sub_82147D88` | scenery-lists.md | Native | `sub_82146BD0` | 2 | 1 | 1052 | 1 |
+| `sub_8213A620` | ai-drivers.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_8213D550` | ai-drivers.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82143A40` | race-world.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_82143DC8` | race-event.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_821444D0` | race-event.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82145CA8` | ai-drivers.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82148058` | scenery-lists.md | Overridden | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
+| `sub_82148528` | scenery-lists.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82148658` | sprites.md | Native | `sub_8209F5A0`, `sub_8209F5C8` | 2 | 0 | 21 | 0 |
 | `sub_82155E58` | camera-modes.md | Overridden | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
+| `sub_821562F8` | camera-modes.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82158F70` | camera-modes.md | Overridden | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
-| `sub_82173E28` | race-world.md | Native | `__savefpr_24`, `__restfpr_24` | 2 | 0 | 26 | 2 |
+| `sub_82159950` | camera-modes.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_8215C780` | race-update.md | Native | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_82162330` | race-states.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82163C50` | race-states.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_821650A0` | race-states.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82168C80` | race-states.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_8216E6E8` | race-hud-machine.md | Overridden | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_82170CB8` | race-world.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82173A90` | race-world.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82176188` | race-sounds.md | Native | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
-| `sub_8217BA20` | front-end-car-draw.md | Native | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
+| `sub_8217A370` | mode-tick.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
+| `sub_8217B7C8` | build-screen.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_821827E0` | front-end-screen-helpers.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_82185600` | car-dealer.md | Overridden | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_82188A98` | race-menu.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_82192378` | garage-screen.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82196230` | garage-screen.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_8219B108` | type2-screens.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
+| `sub_821A0D38` | build-screen.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_821AEC18` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_821B4BA0` | car-settings.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_821D8978` | tuning-screen.md | Native | `sub_8211A630`, `sub_8211BA00` | 2 | 0 | 107 | 0 |
 | `sub_821E3AD0` | tuning-screen.md | Native | `sub_8211A630`, `sub_8211BA00` | 2 | 0 | 107 | 0 |
+| `sub_821E8128` | tuning-screen.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_8220FB10` | race-screens.md | Native | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
 | `sub_82211AB0` | camera-modes.md | Native | `sub_8211AB90`, `sub_8211BE98` | 2 | 0 | 35 | 0 |
 | `sub_822122B0` | race-hud-object.md | Native | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_82212F00` | race-hud-object.md | Native | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_82228588` | location-screen.md | Native | `__savefpr_20`, `__restfpr_20` | 2 | 0 | 34 | 2 |
+| `sub_8222EC08` | location-screen.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_8224F758` | car-list.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82293998` | matrix-math.md | Native | `sub_822936D8` | 2 | 0 | 118 | 0 |
 | `sub_82296270` | functions.md | Overridden | `sub_822972D0` | 2 | 2 | 12 | 0 |
+| `sub_822997B0` | system-services.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_8229E308` | command-buffer.md | Overridden | `sub_822AD690`, `sub_822AD8F8` | 2 | 2 | 95 | 0 |
+| `sub_8229E3F0` | command-buffer.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_8229EC00` | command-buffer.md | Native | `sub_822AD690`, `sub_822AD8F8` | 2 | 2 | 95 | 0 |
+| `sub_822A4B98` | graphics-resources.md | Native | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_822A5910` | graphics-resources.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_822AD298` | functions.md | Overridden | `sub_822AD190`, `sub_822B2388` | 2 | 0 | 128 | 0 |
+| `sub_822AE340` | functions.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_822AEBF0` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_822AED18` | functions.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_822B0910` | functions.md | Overridden | `sub_822B07B0`, `sub_822B0860` | 2 | 0 | 142 | 0 |
+| `sub_822B6D70` | predicated-tiling.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_8236A4F0` | texture-compression.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_8236AEA8` | texture-compression.md | Lifted | `__savefpr_20`, `__restfpr_20` | 2 | 0 | 34 | 2 |
 | `sub_8236B418` | texture-compression.md | Lifted | `__savefpr_19`, `__restfpr_19` | 2 | 0 | 36 | 2 |
 | `sub_8236BF40` | texture-compression.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_823F0EF0` | texture-compression.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_823F1640` | texture-compression.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_823F6298` | texture-compression.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_823F6C60` | texture-compression.md | Native | `sub_823EAB58`, `sub_823F55B0` | 2 | 2 | 197 | 0 |
 | `sub_82420AB8` | texture-compression.md | Native | `__savefpr_15`, `__restfpr_15` | 2 | 0 | 44 | 2 |
 | `sub_82420F50` | texture-compression.md | Native | `__savefpr_19`, `__restfpr_19` | 2 | 0 | 36 | 2 |
 | `sub_82422178` | texture-compression.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
+| `sub_8245B940` | xaudio-engine.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_824624F8` | xaudio-objects.md | Native | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_82463620` | xaudio-objects.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_82463B90` | xaudio-objects.md | Native | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
 | `sub_82467A18` | xaudio-objects.md | Native | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
-| `sub_82468848` | xaudio-objects.md | Native | `__savefpr_17`, `__restfpr_17` | 2 | 0 | 40 | 2 |
+| `sub_82472F30` | lifted.md | Lifted | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_824733C0` | lifted.md | Lifted | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
 | `sub_82474578` | lifted.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_82474AE8` | lifted.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_82475200` | lifted.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_824759D8` | lifted.md | Lifted | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_82477348` | lifted.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_82477760` | lifted.md | Lifted | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_82477D20` | lifted.md | Lifted | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
 | `sub_82481390` | car-sounds.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
 | `sub_82481880` | car-sounds.md | Native | `sub_82480780`, `sub_82481708` | 2 | 2 | 196 | 0 |
+| `sub_82481B98` | lifted.md | Lifted | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
+| `sub_82482068` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82575B08` | system-services.md | Native | `sub_82459C10` | 2 | 0 | 67 | 1 |
+| `sub_8257BC48` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82582498` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_82582CC8` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82583910` | lifted.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_825868E8` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_82587238` | lifted.md | Lifted | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
+| `sub_82587BC8` | lifted.md | Lifted | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_82589E78` | frame-driver.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82590EF0` | models.md | Overridden | `sub_82590D18`, `sub_825981C8` | 2 | 2 | 91 | 0 |
+| `sub_82594C18` | second-set.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_825960D0` | scenery-lists.md | Overridden | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_82596B18` | scenery-lists.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_82598768` | car-scene-draw.md | Overridden | `__savefpr_18`, `__restfpr_18` | 2 | 0 | 38 | 2 |
 | `sub_8259BB98` | lifted.md | Lifted | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
 | `sub_8259ED40` | ui-movies.md | Overridden | `sub_8211A948`, `sub_8259D648` | 2 | 0 | 73 | 0 |
@@ -256,10 +321,13 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825A3E18` | lifted.md | Lifted | `__savefpr_21`, `__restfpr_21` | 2 | 0 | 32 | 2 |
 | `sub_825A4680` | lifted.md | Lifted | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
 | `sub_825ACF70` | c-runtime-core.md | Overridden | `sub_825AD02C`, `sub_825AD4C0` | 2 | 0 | 27 | 0 |
+| `sub_825B0F48` | files-and-saves.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_825B3430` | c-runtime.md | Overridden | `sub_825B32F0` | 2 | 2 | 107 | 0 |
 | `sub_825BF7A8` | lifted.md | Lifted | `sub_825BF8D8`, `sub_825BFA68` | 2 | 2 | 253 | 0 |
 | `sub_825C27C0` | xact.md | Overridden | `sub_825C35C0` | 2 | 2 | 213 | 0 |
+| `sub_825C3B68` | xact.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_825CA980` | xact.md | Overridden | `sub_825D0540` | 2 | 2 | 19 | 0 |
+| `sub_825CF598` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_825D3F28` | xact-waves.md | Lifted | `sub_825D3FD0`, `sub_825D41F0` | 2 | 2 | 177 | 0 |
 | `sub_825D4020` | xact-waves.md | Lifted | `sub_825D3FD0`, `sub_825D41F0` | 2 | 2 | 177 | 0 |
 | `sub_82090A08` | framework.md | Lifted | `sub_820902C8` | 1 | 0 | 46 | 1 |
@@ -307,7 +375,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8210ADD0` | strings-and-font.md | Overridden | `sub_82109A00` | 1 | 0 | 23 | 1 |
 | `sub_82114128` | save-data.md | Lifted | `sub_825A9934` | 1 | 0 | 19 | 0 |
 | `sub_82114268` | career.md | Overridden | `sub_825A9934` | 1 | 0 | 19 | 0 |
-| `sub_82119B80` | ui-movies.md | Overridden | `sub_8259D628` | 1 | 0 | 10 | 0 |
 | `sub_8211AAA8` | ui-movies-game.md | Overridden | `sub_8259D648` | 1 | 0 | 7 | 0 |
 | `sub_8211AD00` | ui-movies-game.md | Overridden | `sub_8259D798` | 1 | 0 | 8 | 0 |
 | `sub_8211B660` | ui-movies-game.md | Overridden | `sub_8211B310` | 1 | 0 | 30 | 0 |
@@ -394,10 +461,14 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8229E848` | command-buffer.md | Overridden | `sub_8229DFF8` | 1 | 1 | 48 | 0 |
 | `sub_8229EDA8` | command-buffer.md | Native | `sub_822AD850` | 1 | 1 | 58 | 0 |
 | `sub_8229EF48` | command-buffer.md | Overridden | `sub_8229E5D0` | 1 | 0 | 119 | 1 |
+| `sub_8229F680` | device-state.md | Native | `sub_822A0F80` | 1 | 0 | 267 | 0 |
 | `sub_822A0718` | functions.md | Lifted | `sub_822A0688` | 1 | 1 | 43 | 0 |
+| `sub_822A3450` | device-state.md | Overridden | `sub_822A0F80` | 1 | 0 | 267 | 0 |
 | `sub_822A3A20` | device-state.md | Native | `sub_822B0C38` | 1 | 0 | 92 | 0 |
+| `sub_822A3B90` | device-state.md | Overridden | `sub_822A0F80` | 1 | 0 | 267 | 0 |
 | `sub_822A63F8` | graphics-resources.md | Native | `sub_8229DDD8` | 1 | 0 | 55 | 1 |
 | `sub_822AC918` | functions.md | Lifted | `sub_822AC5A0` | 1 | 1 | 7 | 0 |
+| `sub_822AFA58` | functions.md | Overridden | `sub_822A0F80` | 1 | 0 | 267 | 0 |
 | `sub_822B6BF8` | predicated-tiling.md | Overridden | `sub_8229E5D0` | 1 | 0 | 119 | 1 |
 | `sub_8235A990` | models.md | Native | `sub_822A5B68` | 1 | 0 | 7 | 1 |
 | `sub_82459D60` | xaudio-engine.md | Overridden | `sub_8245C638` | 1 | 0 | 9 | 0 |
@@ -407,7 +478,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_824696F0` | xaudio-objects.md | Native | `sub_82469728` | 1 | 1 | 48 | 0 |
 | `sub_8246AEE0` | audio.md | Lifted | `sub_825A9934` | 1 | 0 | 19 | 0 |
 | `sub_8246F140` | xaudio-objects.md | Overridden | `sub_8246F270` | 1 | 1 | 39 | 0 |
-| `sub_8258BD28` | second-set.md | Native | `sub_8258B7E0` | 1 | 1 | 147 | 0 |
 | `sub_8258C820` | files-and-saves.md | Overridden | `sub_82295FC8` | 1 | 0 | 113 | 0 |
 | `sub_8258DF18` | frame-driver.md | Overridden | `sub_825BA158` | 1 | 0 | 7 | 1 |
 | `sub_82594570` | models.md | Native | `sub_825981C8` | 1 | 1 | 62 | 0 |
