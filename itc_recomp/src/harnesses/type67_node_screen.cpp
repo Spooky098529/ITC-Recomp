@@ -531,20 +531,28 @@ void Deleting(Context& h, const char* name, uint32_t kAddress, GuestFunction rec
 // The panel functions without adapters (only the native Draws and DrawLists
 // call them): their plain C++ with the adapters' calls.
 void NativeType6DrawList(PPCContext& t, uint8_t* b) {
-  const ts::Calls c = hooks::Type67ScreensCalls(t, b);
-  t.r3.u64 = ts::Type6PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    const ts::Calls c = hooks::Type67ScreensCalls(t, b);
+    t.r3.u64 = ts::Type6PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  });
 }
 void NativeType6AskQuit(PPCContext& t, uint8_t* b) {
-  const ts::Calls c = hooks::Type67ScreensCalls(t, b);
-  t.r3.u64 = ts::Type6PanelScreenAskQuit(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    const ts::Calls c = hooks::Type67ScreensCalls(t, b);
+    t.r3.u64 = ts::Type6PanelScreenAskQuit(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  });
 }
 void NativeType7AskQuit(PPCContext& t, uint8_t* b) {
-  const ts::Calls c = hooks::Type67ScreensCalls(t, b);
-  t.r3.u64 = ts::Type7PanelScreenAskQuit(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    const ts::Calls c = hooks::Type67ScreensCalls(t, b);
+    t.r3.u64 = ts::Type7PanelScreenAskQuit(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  });
 }
 void NativeType7DrawList(PPCContext& t, uint8_t* b) {
-  const ts::Calls c = hooks::Type67ScreensCalls(t, b);
-  t.r3.u64 = ts::Type7PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    const ts::Calls c = hooks::Type67ScreensCalls(t, b);
+    t.r3.u64 = ts::Type7PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  });
 }
 
 }  // namespace

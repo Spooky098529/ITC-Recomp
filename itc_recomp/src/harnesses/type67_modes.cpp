@@ -193,7 +193,9 @@ void Inits(Context& h, const Block& object) {
           Recompiled(info.address)(t, h.base);
           ITC_FLAG(native_type67_modes) = true;
         } else {
-          hooks::Type67Init(t, h.base, info.address);
+          harness::OnView(t, [&](lifted::Regs& regs) {
+            hooks::Type67Init(regs, h.base, info.address);
+          });
         }
         out[v].Bytes(Read(h.base, object.address, object.bytes));
         out[v].Bytes(Read(h.base, frame + 80, info.frame - 80 - saves));
@@ -327,9 +329,9 @@ void Handler(Context& h, const Block& world, const char* name, uint32_t address,
 }
 
 // A freeing step's adapter step: an error when it refused.
-Native Frees(bool (*step)(PPCContext&, uint8_t*), const char* name) {
+Native Frees(bool (*step)(lifted::Regs&, uint8_t*), const char* name) {
   return [step, name](PPCContext& t, uint8_t* base) {
-    if (!step(t, base)) {
+    if (!harness::OnView(t, [&](lifted::Regs& regs) { return step(regs, base); })) {
       ITC_LOG_ERROR("harness: type67_modes: {} refused", name);
     }
   };
@@ -894,12 +896,14 @@ void GuestCallHandlers(Context& h, const Block& world) {
         ITC_FLAG(native_type67_modes) = true;
         hooks::g_start_up_recorder = saved;
       } else {
-        t67::Calls calls = hooks::Type67Calls(t, base);
-        calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
-          g_opens.insert(g_opens.end(), {id, asset, frame, lr});
-          return 1;
-        };
-        t.r3.u64 = t67::DialogOpenMovies(base, t.r1.u32, calls);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          t67::Calls calls = hooks::Type67Calls(t, base);
+          calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
+            g_opens.insert(g_opens.end(), {id, asset, frame, lr});
+            return 1;
+          };
+          t.r3.u64 = t67::DialogOpenMovies(base, t.r1.u32, calls);
+        });
       }
       for (const uint32_t word : g_opens) out[v].Word(word);
       out[v].Word(t.r3.u32);
@@ -1084,7 +1088,8 @@ void Garage(Context& h) {
           ITC_FLAG(native_type67_modes) = false;
           __imp__sub_82180738(t, base);
           ITC_FLAG(native_type67_modes) = true;
-        } else if (!hooks::StandSceneRelease(t, base)) {
+        } else if (!harness::OnView(
+                       t, [&](lifted::Regs& regs) { return hooks::StandSceneRelease(regs, base); })) {
           ITC_LOG_ERROR("harness: type67_modes: StandScene::Release refused");
         }
         out[v].Word(uint32_t(made.size()));
@@ -2470,15 +2475,17 @@ void Cars(Context& h, const Block& world) {
           ITC_FLAG(native_type67_modes) = true;
           hooks::g_start_up_recorder = saved;
         } else {
-          t67::Calls calls = hooks::Type67Calls(t, base);
-          calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
-            g_opens.insert(g_opens.end(), {id, asset, frame, lr});
-            return 1;
-          };
-          const uint64_t lr = t.lr;
-          t.r3.u64 = f.set_up ? t67::Screen0SetUpCar(base, f.type7, t.r4.u64, t.r1.u32, calls)
-                              : t67::Screen0OpenMovie(base, f.type7, t.r1.u32, calls);
-          t.lr = lr;
+          harness::OnView(t, [&](lifted::Regs& t) {
+            t67::Calls calls = hooks::Type67Calls(t, base);
+            calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
+              g_opens.insert(g_opens.end(), {id, asset, frame, lr});
+              return 1;
+            };
+            const uint64_t lr = t.lr;
+            t.r3.u64 = f.set_up ? t67::Screen0SetUpCar(base, f.type7, t.r4.u64, t.r1.u32, calls)
+                                : t67::Screen0OpenMovie(base, f.type7, t.r1.u32, calls);
+            t.lr = lr;
+          });
         }
         // GarageStage::MakeModel has no adapter since OpenMovie's plain C++
         // calls its own (B7 loop, 2026-11-13): the recompiled side runs its
@@ -3554,7 +3561,8 @@ void StandModeReleases(Context& h) {
         ITC_FLAG(native_type67_modes) = false;
         __imp__sub_82246038(t, base);
         ITC_FLAG(native_type67_modes) = true;
-      } else if (!hooks::StandModeRelease(t, base)) {
+      } else if (!harness::OnView(
+                     t, [&](lifted::Regs& regs) { return hooks::StandModeRelease(regs, base); })) {
         ITC_LOG_ERROR("harness: type67_modes: StandMode::Release refused");
       }
       out[v].Word(uint32_t(made.size()));
@@ -4449,12 +4457,14 @@ void Type8Dialogs(Context& h) {
         ITC_FLAG(native_type8_mode) = true;
         hooks::g_start_up_recorder = saved;
       } else {
-        t67::Calls calls = hooks::Type67Calls(t, base);
-        calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
-          g_opens.insert(g_opens.end(), {id, asset, frame, lr});
-          return 1;
-        };
-        t.r3.u64 = type8_mode::DialogOpenMovies(base, t.r1.u32, calls);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          t67::Calls calls = hooks::Type67Calls(t, base);
+          calls.open = [](uint32_t id, uint32_t asset, uint32_t frame, uint32_t lr) -> uint64_t {
+            g_opens.insert(g_opens.end(), {id, asset, frame, lr});
+            return 1;
+          };
+          t.r3.u64 = type8_mode::DialogOpenMovies(base, t.r1.u32, calls);
+        });
       }
       for (const uint32_t word : g_opens) out[v].Word(word);
       out[v].Word(t.r3.u32);

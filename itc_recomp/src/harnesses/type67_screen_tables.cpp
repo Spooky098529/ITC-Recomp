@@ -91,7 +91,7 @@ void LayTable(uint8_t* base, uint32_t t, Random& r, bool paired) {
 
 // A case's registers beyond r3: r4 to r6.
 using Registers = std::function<void(Random&, PPCContext&, uint32_t table)>;
-using NativeCall = std::function<uint64_t(PPCContext&, uint8_t*, const ts::Calls&)>;
+using NativeCall = std::function<uint64_t(lifted::Regs&, uint8_t*, const ts::Calls&)>;
 
 struct Function {
   const char* name;
@@ -131,8 +131,10 @@ void Run(Context& h, const lw::MovieWorld& w, uint32_t table, const Function& f)
         f.recompiled(t, base);
         ITC_FLAG(native_type67_screens) = true;
       } else {
-        const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
-        t.r3.u64 = f.native(t, base, calls);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
+          t.r3.u64 = f.native(t, base, calls);
+        });
       }
       out[v].Bytes(Read(base, table, kTableBytes));
       out[v].Bytes(Read(base, w.movies.address, w.movies.bytes));
@@ -176,8 +178,10 @@ void Deleting(Context& h) {
         __imp__sub_82247E88(t, base);
         ITC_FLAG(native_type67_screens) = true;
       } else {
-        const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
-        t.r3.u64 = ts::NodeTableDeletingDestruct(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
+          t.r3.u64 = ts::NodeTableDeletingDestruct(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
+        });
       }
       out[v].Word(t.r3.u32 == *block ? 1 : 0);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -246,70 +250,70 @@ void Type67ScreenTables(Context& h) {
   };
   const Function functions[] = {
       {"NodeTable::~NodeTable", 0x82247DC0, 4, 0, false, none, __imp__sub_82247DC0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) { return ts::NodeTableDestruct(b, t.r3.u64); }},
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) { return ts::NodeTableDestruct(b, t.r3.u64); }},
       {"NodeTable::DeletingDestructor", 0x82247E88, 4, 96, false, no_delete, __imp__sub_82247E88,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::NodeTableDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"NodeTable::SetPairs", 0x82247CB8, 4, 0, false,
        [](Random&, PPCContext& t, uint32_t table) { t.r4.u64 = table + kInfo; },
        __imp__sub_82247CB8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::NodeTableSetPairs(b, t.r3.u64, t.r4.u32);
        }},
       {"PairedNodeTable::SavePairs", 0x82247CE0, 4, 0, true, none, __imp__sub_82247CE0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PairedNodeTableSavePairs(b, t.r3.u64);
        }},
       {"ColorNodeTable::Clear", 0x82247DD0, 4, 0, false, none, __imp__sub_82247DD0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) { return ts::ColorNodeTableClear(b, t.r3.u64); }},
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) { return ts::ColorNodeTableClear(b, t.r3.u64); }},
       {"ColorNodeTable::Set", 0x82247E00, 8, 0, false,
        [base](Random& r, PPCContext& t, uint32_t table) {
          t.r4.u64 = table + kInfo;
          if (r.Below(2) == 0) guest::StoreU32(base, table + kInfo + 8, 1);
        },
        __imp__sub_82247E00,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::ColorNodeTableSet(b, t.r3.u64, t.r4.u32);
        }},
       {"ColorNodeTable::SavePairs", 0x82247E50, 4, 0, false, none, __imp__sub_82247E50,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::ColorNodeTableSavePairs(b, t.r3.u64);
        }},
       {"NodeTable::Show", 0x82248300, 16, 128, false, show, __imp__sub_82248300,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::NodeTableShow(b, t.r3.u64, t.r4.u32, t.r5.u32, t.r1.u32);
        }},
       {"NodeTable::ShowNode", 0x82247ED0, 16, 160, false, show, __imp__sub_82247ED0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::NodeTableShowNode(b, t.r3.u64, t.r4.u32, t.r5.u32, t.r6.u32, t.r1.u32);
        }},
       {"NodeTable::SetMarks", 0x822480F0, 12, 144, false, marks, __imp__sub_822480F0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::NodeTableSetMarks(b, t.r3.u64, t.r4.u32, t.r5.u32, t.r1.u32);
        }},
       {"ColorNodeTable::SetColors", 0x82248198, 12, 144, false, colors, __imp__sub_82248198,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::ColorNodeTableSetColors(b, t.r3.u64, t.r4.u32, t.r5.u32, t.r1.u32);
        }},
       {"ColorNodeTable::ClearColors", 0x82248260, 8, 128, false, colors, __imp__sub_82248260,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::ColorNodeTableClearColors(b, t.r3.u64, t.r4.u32, t.r1.u32);
        }},
       {"ColorNodeTable::MarkSelected", 0x822487B8, 12, 144, false, which, __imp__sub_822487B8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::ColorNodeTableMarkSelected(b, t.r3.u64, t.r4.u32, t.r1.u32);
        }},
       {"ColorNodeTable::Refresh", 0x822483B0, 24, 128, false, finish, __imp__sub_822483B0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::ColorNodeTableRefresh(b, t.r3.u64, t.r4.u32, t.r1.u32, c);
        }},
       {"ColorNodeTable::Reset", 0x82248650, 12, 128, false, none, __imp__sub_82248650,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::ColorNodeTableReset(b, t.r3.u64, t.r1.u32, c);
        }},
       {"PairedNodeTable::Refresh", 0x82248800, 24, 128, true, none, __imp__sub_82248800,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PairedNodeTableRefresh(b, t.r3.u64, t.r1.u32, c);
        }},
   };

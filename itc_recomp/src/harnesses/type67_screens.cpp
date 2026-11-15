@@ -129,9 +129,9 @@ constexpr uint32_t kFadeWords[3] = {ts::kFadeWait, ts::kFadeCountA, ts::kFadeCou
 constexpr uint32_t kFades = 0x826A50AC, kFadesBytes = 0x3C;
 
 // The plain C++ with the recording calls.
-using NativeCall = std::function<uint64_t(PPCContext&, uint8_t*, const ts::Calls&)>;
+using NativeCall = std::function<uint64_t(lifted::Regs&, uint8_t*, const ts::Calls&)>;
 
-ts::Calls RecordingCalls(PPCContext& t, uint8_t* base) {
+ts::Calls RecordingCalls(lifted::Regs& t, uint8_t* base) {
   ts::Calls calls = hooks::Type67ScreensCalls(t, base);
   calls.open = [](uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr) -> uint64_t {
     g_records.insert(g_records.end(), {kOpen, id, asset, sp, lr});
@@ -193,8 +193,10 @@ void Cases(Context& h, const Block& world, const char* name, uint32_t address, i
         ITC_FLAG(native_type67_screens) = true;
         hooks::g_start_up_recorder = saved;
       } else {
-        const ts::Calls calls = RecordingCalls(t, base);
-        t.r3.u64 = native(t, base, calls);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          const ts::Calls calls = RecordingCalls(t, base);
+          t.r3.u64 = native(t, base, calls);
+        });
       }
       ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
       for (size_t i = 0; i < lists.size(); i++) {
@@ -254,80 +256,80 @@ void ListAndNodeScreens(Context& h, const Block& world, uint32_t movie) {
   lists.insert(lists.end(), node_lists.begin(), node_lists.end());
   const int n = 24;
   Cases(h, world, "ListScreen::OnEnter", 0x82251618, n, targets, lists, list,
-        __imp__sub_82251618, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82251618, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenOnEnter(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
   Cases(h, world, "ListScreen::OpenMovie", 0x82251508, n, targets, lists, list,
-        __imp__sub_82251508, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82251508, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenOpenMovie(b, t.r3.u64, t.r4.u64, t.r1.u32, uint32_t(t.lr), c);
         });
   Cases(h, world, "ListScreen::WaitForMovie", 0x82251678, n, targets, lists, list,
-        __imp__sub_82251678, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82251678, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenWaitForMovie(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
   Cases(h, world, "ListScreen::Leave", 0x82251760, n, targets, lists, list,
-        __imp__sub_82251760, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82251760, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenLeave(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
   Cases(h, world, "ListScreen::OnLeft", 0x82251710, n, targets, lists, list,
-        __imp__sub_82251710, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82251710, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenOnLeft(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
   Cases(h, world, "ListScreen::IsLoaded", 0x82242F70, 8, targets, {}, list, __imp__sub_82242F70,
-        [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+        [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
           return ts::ListScreenIsLoaded(b, t.r3.u64, t.r1.u32);
         });
   Cases(h, world, "Type6ListScreen::OpenMovie", 0x82233320, 4, targets, {}, list,
-        __imp__sub_82233320, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82233320, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenOpenAsset(b, t.r3.u64, false, t.r1.u32, uint32_t(t.lr), c);
         });
   Cases(h, world, "Type7ListScreen::OpenMovie", 0x82242F10, 4, targets, {}, list,
-        __imp__sub_82242F10, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82242F10, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenOpenAsset(b, t.r3.u64, true, t.r1.u32, uint32_t(t.lr), c);
         });
   Cases(h, world, "Type6ListScreen::Release", 0x82233330, 12, targets, lists, list,
-        __imp__sub_82233330, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82233330, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenRelease(b, t.r3.u64, false, t.r1.u32, c);
         });
   Cases(h, world, "Type7ListScreen::Release", 0x82242F20, 12, targets, lists, list,
-        __imp__sub_82242F20, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82242F20, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::ListScreenRelease(b, t.r3.u64, true, t.r1.u32, c);
         });
 
   Cases(h, world, "NodeScreen::OnEnter", 0x822591B0, n, targets, lists, node,
-        __imp__sub_822591B0, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_822591B0, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenOnEnter(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
   Cases(h, world, "NodeScreen::OpenMovie", 0x822590D0, n, targets, lists, node,
-        __imp__sub_822590D0, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_822590D0, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenOpenMovie(b, t.r3.u64, t.r4.u64, t.r1.u32, uint32_t(t.lr), c);
         });
   Cases(h, world, "NodeScreen::WaitForMovie", 0x82259208, n, targets, lists, node,
-        __imp__sub_82259208, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82259208, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenWaitForMovie(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
   Cases(h, world, "NodeScreen::Leave", 0x822592D8, n, targets, lists, node,
-        __imp__sub_822592D8, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_822592D8, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenLeave(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
   Cases(h, world, "NodeScreen::OnLeft", 0x82259298, n, targets, lists, node,
-        __imp__sub_82259298, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82259298, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenOnLeft(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
         });
   Cases(h, world, "NodeScreen::Open", 0x82259318, 4, targets, {}, node, __imp__sub_82259318,
-        [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+        [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
           return ts::NodeScreenOpen(b, t.r3.u64);
         });
   Cases(h, world, "Type6NodeScreen::IsLoaded", 0x82236FD8, 8, targets, {}, node,
-        __imp__sub_82236FD8, [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+        __imp__sub_82236FD8, [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
           return ts::NodeScreenIsLoaded(b, t.r3.u64, t.r1.u32);
         });
   Cases(h, world, "Type6NodeScreen::OpenMovie", 0x82236EB0, 4, targets, {}, node,
-        __imp__sub_82236EB0, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82236EB0, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenOpenAsset(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
         });
   Cases(h, world, "Type6NodeScreen::Release", 0x82236EC0, 12, targets, lists, node,
-        __imp__sub_82236EC0, [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+        __imp__sub_82236EC0, [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
           return ts::NodeScreenRelease(b, t.r3.u64, t.r1.u32, c);
         });
   guest::StoreU32(base, kMissingMovie, saved_missing);
@@ -411,170 +413,170 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
   };
   const Function functions[] = {
       {"PanelGroup::Movie", 0x82258FC8, 8, 0x3C00, __imp__sub_82258FC8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelGroupMovie(b, t.r3.u64, t.r1.u32);
        }},
       {"PanelGroup::Run", 0x82259008, 8, 0x3C40, __imp__sub_82259008,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelGroupRun(b, t.r3.u64, t.r1.u32, c);
        }},
       {"GroupPair::SelectA", 0x82249C30, 4, kPair, __imp__sub_82249C30,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) { return ts::GroupPairSelectA(b, t.r3.u64); }},
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) { return ts::GroupPairSelectA(b, t.r3.u64); }},
       {"GroupPair::Reset", 0x82249C40, 8, kPair, __imp__sub_82249C40,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::GroupPairReset(b, t.r3.u64, t.r1.u32, c);
        }},
       {"GroupPair::Run", 0x82249BE0, 8, kPair, __imp__sub_82249BE0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::GroupPairRun(b, t.r3.u64, t.r1.u32, c);
        }},
       {"GroupPair::WaitForFade", 0x82249BA8, 12, kPair, __imp__sub_82249BA8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::GroupPairWaitForFade(b, t.r3.u64);
        }},
       {"GroupPair::FinishAll", 0x82249C70, 8, kPair, __imp__sub_82249C70,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::GroupPairFinishAll(b, t.r3.u64, t.r1.u32, c);
        }},
       {"GroupPair::~GroupPair", 0x82249C20, 4, kPair, __imp__sub_82249C20,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::GroupPairDestruct(b, t.r3.u64);
        }},
       {"SingleGroup::SingleGroup", 0x82249CB0, 4, kPair, __imp__sub_82249CB0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::SingleGroupConstruct(b, t.r3.u64, t.r4.u32);
        }},
       {"SingleGroup::Reset", 0x82249CC8, 8, kPair, __imp__sub_82249CC8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::SingleGroupReset(b, t.r3.u64, t.r1.u32, c);
        }},
       {"PanelFade::In", 0x82249BE8, 8, 0, __imp__sub_82249BE8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelFadeIn(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
        }},
       {"MachineScreen::~MachineScreen", 0x8224CB18, 4, 0, __imp__sub_8224CB18,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::MachineScreenDestruct(b, t.r3.u64);
        }},
       {"PanelScreen::IsLoaded", 0x82230790, 8, 0, __imp__sub_82230790,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenIsLoaded(b, t.r1.u32);
        }},
       {"Type6PanelScreen::OpenMovies", 0x82230758, 2, 0, __imp__sub_82230758,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOpenMovies(b, t.r1.u32, false, c);
        }},
       {"Type7PanelScreen::OpenMovies", 0x822401D0, 2, 0, __imp__sub_822401D0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOpenMovies(b, t.r1.u32, true, c);
        }},
       {"PanelScreen::DeleteMovies", 0x82240208, 2, 0, __imp__sub_82240208,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenDeleteMovies(b, t.r1.u32, c);
        }},
       {"Type7PanelScreen::Back", 0x82240860, 8, 0, __imp__sub_82240860,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x82240860);
        }},
       {"Type6PanelScreen::OpenPowerGraph", 0x82247058, 8, 0, __imp__sub_82247058,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x82247058);
        }},
       {"Type7PanelScreen::OpenPowerGraph", 0x822408B8, 8, 0, __imp__sub_822408B8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x822408B8);
        }},
       {"Type7PanelScreen::CarList", 0x82240238, 2, 0, __imp__sub_82240238,
-       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1972); }},
+       [](lifted::Regs&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1972); }},
       {"Type7PanelScreen::CarEntry", 0x82240248, 2, 0, __imp__sub_82240248,
-       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1976); }},
+       [](lifted::Regs&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1976); }},
       {"Type7PanelScreen::CarSlot", 0x82240258, 2, 0, __imp__sub_82240258,
-       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1980); }},
+       [](lifted::Regs&, uint8_t* b, const ts::Calls&) { return ts::Type7CarWord(b, 1980); }},
       // The type 6 list batch's leaves (type6_list.cpp).
       {"PanelScreen::OnYes", 0x822609E0, 2, 0, __imp__sub_822609E0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenSetAnswer(b, t.r3.u64, 0);
        }},
       {"PanelScreen::OnNo", 0x822609D0, 2, 0, __imp__sub_822609D0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenSetAnswer(b, t.r3.u64, 1);
        }},
       {"PanelScreen::OnBack", 0x822306D0, 2, 0, __imp__sub_822306D0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenSetAnswer(b, t.r3.u64, 2);
        }},
       {"PanelScreen::OnDialogClosed", 0x822306E0, 12, 0, __imp__sub_822306E0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOnDialogClosed(b, t.r3.u64, t.r1.u32, c);
        }},
       {"PanelScreen::Suspend", 0x82248DE0, 8, 0, __imp__sub_82248DE0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenSuspend(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
        }},
       {"PanelScreen::OpenEmpty", 0x822404D8, 8, 0, __imp__sub_822404D8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOpenEmpty(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
        }},
       {"Type6PanelScreen::Back", 0x8223E708, 8, 0, __imp__sub_8223E708,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelScreenPost(b, t.r3.u64, t.r4.u64, 0x8223E708);
        }},
       {"Type6PanelScreen::CarList", 0x822307D0, 2, 0, __imp__sub_822307D0,
-       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1972); }},
+       [](lifted::Regs&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1972); }},
       {"Type6PanelScreen::CarEntry", 0x822307E0, 2, 0, __imp__sub_822307E0,
-       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1976); }},
+       [](lifted::Regs&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1976); }},
       {"Type6PanelScreen::CarSlot", 0x822307F0, 2, 0, __imp__sub_822307F0,
-       [](PPCContext&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1980); }},
+       [](lifted::Regs&, uint8_t* b, const ts::Calls&) { return ts::Type6CarWord(b, 1980); }},
       {"GroupPair::DeletingDestructor", 0x8224ACE0, 4, kPair, __imp__sub_8224ACE0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::GroupPairDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"PanelScreen::OnEnter", 0x82249D18, n, 0, __imp__sub_82249D18,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOnEnter(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"PanelScreen::OpenMovie", 0x82248CD0, n, 0, __imp__sub_82248CD0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOpenMovie(b, t.r3.u64, t.r4.u64, t.r1.u32, uint32_t(t.lr), c);
        }},
       {"PanelScreen::WaitForMovie", 0x82249D88, n, 0, __imp__sub_82249D88,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenWaitForMovie(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"PanelScreen::Open", 0x82249DF8, n, 0, __imp__sub_82249DF8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOpen(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
        }},
       {"PanelScreen::Show", 0x82248CE0, n, 0, __imp__sub_82248CE0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenShow(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"PanelScreen::Update", 0x82248C48, n, 0, __imp__sub_82248C48,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenUpdate(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"PanelScreen::OnMessage24", 0x82248DF8, 8, 0, __imp__sub_82248DF8,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOnMessage24(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
        }},
       {"PanelScreen::Leave", 0x82249E38, n, 0, __imp__sub_82249E38,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenLeave(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"PanelScreen::OnLeft", 0x82248B08, n, 0, __imp__sub_82248B08,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenOnLeft(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"PanelScreen::DrawList", 0x82248B58, 32, 0, __imp__sub_82248B58,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"Type7PanelScreen::DrawList", 0x82240908, n, 0, __imp__sub_82240908,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::Type7PanelScreenDrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"Type7PanelScreen::Draw", 0x82240958, 32, 0, __imp__sub_82240958,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::Type7PanelScreenDraw(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
   };
@@ -591,23 +593,23 @@ void PanelScreens(Context& h, const Block& world, uint32_t movie) {
   const std::vector<uint32_t> menus = {9888, 9816};
   const Function destructors[] = {
       {"PanelGroup::~PanelGroup", 0x82231CC0, 4, 0x3C00, __imp__sub_82231CC0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls&) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls&) {
          return ts::PanelGroupDestruct(b, t.r3.u64);
        }},
       {"PanelGroup::DeletingDestructor", 0x82240348, 4, 0x3C00, __imp__sub_82240348,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelGroupDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"Type6PanelScreen::~Type6PanelScreen", 0x82230668, 8, 0, __imp__sub_82230668,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenDestruct(b, t.r3.u64, false, t.r1.u32, c);
        }},
       {"Type7PanelScreen::~Type7PanelScreen", 0x82240168, 8, 0, __imp__sub_82240168,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelScreenDestruct(b, t.r3.u64, true, t.r1.u32, c);
        }},
       {"Type6PanelScreen::DeletingDestructor", 0x82230B00, 4, 0, __imp__sub_82230B00,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::Type6PanelScreenDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
   };
@@ -705,8 +707,10 @@ void PickCar(Context& h, const Block& world, const char* name, uint32_t address,
         recompiled(t, base);
         ITC_FLAG(native_type67_screens) = true;
       } else {
-        const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
-        t.r3.u64 = native(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          const ts::Calls calls = hooks::Type67ScreensCalls(t, base);
+          t.r3.u64 = native(base, t.r3.u64, t.r4.u64, t.r1.u32, calls);
+        });
       }
       out[v].Bytes(Read(base, w, world.bytes));
       out[v].Bytes(Read(base, save, kSaveBytes));
@@ -740,16 +744,16 @@ void Deleting(Context& h) {
   };
   const Kind kinds[] = {
       {"PanelGroup::DeletingDestructor, deleting (sub_82240348)", 64, __imp__sub_82240348,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::PanelGroupDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"GroupPair::DeletingDestructor, deleting (sub_8224ACE0)", 64, __imp__sub_8224ACE0,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::GroupPairDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
       {"Type6PanelScreen::DeletingDestructor, deleting (sub_82230B00)", 11744,
        __imp__sub_82230B00,
-       [](PPCContext& t, uint8_t* b, const ts::Calls& c) {
+       [](lifted::Regs& t, uint8_t* b, const ts::Calls& c) {
          return ts::Type6PanelScreenDeletingDestruct(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
        }},
   };
@@ -777,8 +781,10 @@ void Deleting(Context& h) {
           kind.recompiled(t, base);
           ITC_FLAG(native_type67_screens) = true;
         } else {
-          const ts::Calls calls = RecordingCalls(t, base);
-          t.r3.u64 = kind.native(t, base, calls);
+          harness::OnView(t, [&](lifted::Regs& t) {
+            const ts::Calls calls = RecordingCalls(t, base);
+            t.r3.u64 = kind.native(t, base, calls);
+          });
         }
         out[v].Word(t.r3.u32 == *block ? 1 : 0);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
