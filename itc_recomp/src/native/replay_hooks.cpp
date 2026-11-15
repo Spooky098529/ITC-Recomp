@@ -11,9 +11,11 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "graphics/inline_draws.h"
 #include "graphics/shader_patch.h"
 #include "graphics/video_output.h"
 #include "hooks/guest_call.h"
+#include "lifted/sdk.h"
 #include "hooks/single_commands.h"
 
 #include <set>
@@ -31,7 +33,15 @@ ITC_FLAG_BOOL(native_replay_commands, true, "ITC",
               "C++, everything else a guest call; checked by frame dumps, as the render path's "
               "code is)");
 
+ITC_FLAG_BOOL(native_inline_draws, true, "ITC",
+              "Run the graphics library's BeginVertices (sub_825BD8F0), EndVertices "
+              "(sub_825BDDA0), BeginIndexedVertices (sub_825BDDC0) and DrawVertices "
+              "(sub_825BE300) natively inside their wraps (src/graphics/inline_draws.h): the "
+              "dirty state's flush, the segment's end and the space reserved kept, their GPU "
+              "packets and draw chain records dropped; checked by frame dumps");
+
 namespace rc = graphics::replay_commands;
+namespace inline_draws = graphics::inline_draws;
 
 rc::GuestCall native::ReplayCall(PPCContext& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, uint32_t sp, uint32_t return_address,
@@ -183,7 +193,15 @@ extern "C" REX_FUNC(sub_825BD8F0) {
   REX_FUNC_PROLOGUE();
   uint32_t type = ctx.r4.u32, count = ctx.r5.u32, stride = ctx.r6.u32;
   uint32_t caller = uint32_t(ctx.lr);
-  __imp__sub_825BD8F0(ctx, base);
+  if (ITC_FLAG(native_inline_draws)) {
+    lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+      return {inline_draws::BeginVertices(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                          uint32_t(a.r[2]), uint32_t(a.r[3])),
+              a.f[0]};
+    });
+  } else {
+    __imp__sub_825BD8F0(ctx, base);
+  }
   g_pending_inline = {ctx.r3.u32 != 0, type, count, stride, ctx.r3.u32, caller};
 }
 
@@ -199,6 +217,10 @@ extern "C" REX_FUNC(sub_825BDDA0) {
       LogOutside("an inline vertex draw, not drawn, BeginVertices", 0x825BD8F0, draw.caller,
                  command);
     }
+  }
+  if (ITC_FLAG(native_inline_draws)) {
+    inline_draws::EndVertices(base, ctx.r3.u32);  // r3 left as the device, as the original
+    return;
   }
   __imp__sub_825BDDA0(ctx, base);
 }
@@ -279,17 +301,42 @@ extern "C" REX_FUNC(sub_8258D998) {
 }
 
 // The library's other draws and Resolve: logged when called outside the
-// commands that are known to make them (18, 17, 27, 25).
-#define LOG_OUTSIDE_WRAPPER(address, what, expected)                                  \
-  extern "C" REX_FUNC(sub_##address) {                                                \
-    REX_FUNC_PROLOGUE();                                                              \
-    if (native::g_current_command != (expected)) {                                    \
-      LogOutside(what, 0x##address, uint32_t(ctx.lr), native::g_current_command);     \
-    }                                                                                 \
-    __imp__sub_##address(ctx, base);                                                  \
+// commands that are known to make them (18, 17, 27, 25). DrawVertices and
+// BeginIndexedVertices (never seen in play; our renderer draws neither) run
+// natively with --native_inline_draws.
+extern "C" REX_FUNC(sub_825BE300) {
+  REX_FUNC_PROLOGUE();
+  if (native::g_current_command != 17) {
+    LogOutside("DrawVertices", 0x825BE300, uint32_t(ctx.lr), native::g_current_command);
   }
-LOG_OUTSIDE_WRAPPER(825BE300, "DrawVertices", 17)
-LOG_OUTSIDE_WRAPPER(825BDDC0, "BeginIndexedVertices", 27)
+  if (!ITC_FLAG(native_inline_draws)) {
+    __imp__sub_825BE300(ctx, base);
+    return;
+  }
+  // r3 left as the device (its callers don't read it).
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    inline_draws::DrawVertices(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]), uint32_t(a.r[1]),
+                               uint32_t(a.r[2]), uint32_t(a.r[3]));
+    return {a.r[0], a.f[0]};
+  });
+}
+extern "C" REX_FUNC(sub_825BDDC0) {
+  REX_FUNC_PROLOGUE();
+  if (native::g_current_command != 27) {
+    LogOutside("BeginIndexedVertices", 0x825BDDC0, uint32_t(ctx.lr), native::g_current_command);
+  }
+  if (!ITC_FLAG(native_inline_draws)) {
+    __imp__sub_825BDDC0(ctx, base);
+    return;
+  }
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    return {inline_draws::BeginIndexedVertices(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                               uint32_t(a.r[3]), uint32_t(a.r[4]),
+                                               uint32_t(a.r[5]), uint32_t(a.r[6]),
+                                               uint32_t(a.r[7])),
+            a.f[0]};
+  });
+}
 
 // DrawIndexedVertices: in exclusive mode without its packets (see
 // draw_packets.cpp).

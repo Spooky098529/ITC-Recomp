@@ -49,7 +49,7 @@ replay and the device's register shadow, not from packets
 (`../native-renderer.md`). From the command buffer it reads:
 
 - **Inline vertices**: `BeginVertices` (`sub_825BD8F0`, `functions.md`,
-  Wrapped) reserves the vertices' space with `sub_8229E308` and returns
+  native inside its wrap since 2026-11-15) reserves the vertices' space with `sub_8229E308` and returns
   it; the caller writes the vertices there, and at `End` (`sub_825BDDA0`)
   our hook copies count × stride bytes from that address into the
   renderer's mirror (`Renderer_InlineDraw`, `src/native/replay_hooks.cpp`;

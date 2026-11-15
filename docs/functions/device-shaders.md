@@ -138,7 +138,7 @@ shader compiler (`sub_822B8F10`, replaced by stored shaders since
 2026-10-25, `--use_hardcoded_shaders`, `functions.md`; a library
 replaced wholesale isn't mapped), and the inline draw the drawer's
 `Draw` makes (`BeginVertices` `sub_825BD8F0`, `EndVertices`
-`sub_825BDDA0`, Wrapped in `functions.md`) with the command buffer under
+`sub_825BDDA0`, native inside their wraps since 2026-11-15, `functions.md`) with the command buffer under
 it (`8229DC28`-`8229F228`, already a lead in `../loops/leads.md`).
 
 **Ours** (B7 loop, 2026-11-01): the seven functions seen in play, in
