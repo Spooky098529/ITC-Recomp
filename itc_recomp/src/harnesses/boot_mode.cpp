@@ -371,7 +371,8 @@ void Handlers(Context& h, Random& random) {
         if (v == 0) {
           Original<__imp__sub_82107C58>(t, h.base);
         } else {
-          hooks::BootWaitForMovie(t, h.base, {});
+          lifted::RegsScope scope(t);
+          hooks::BootWaitForMovie(scope.regs, h.base, {});
         }
         WorldOut(h, world.address, globals, out[v]);
         out[v].Bytes(Read(h.base, machine.address + 9600, 16));
@@ -397,7 +398,8 @@ void Handlers(Context& h, Random& random) {
         if (v == 0) {
           Original<__imp__sub_820A4450>(t, h.base);
         } else {
-          hooks::BootMoviesState(t, h.base, {});
+          lifted::RegsScope scope(t);
+          hooks::BootMoviesState(scope.regs, h.base, {});
         }
         WorldOut(h, world.address, globals, out[v]);
         out[v].Word(t.r3.u32);

@@ -87,11 +87,13 @@ void NativeSetNew(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = ac::SetNew(base);
 }
-void NativeSetFree(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::NativeHeapActive() || !hooks::AccessoriesSetFreeable(base, ctx.r3.u32)) {
-    __imp__sub_820F0F90(ctx, base);
+void NativeSetFree(PPCContext& sdk, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !hooks::AccessoriesSetFreeable(base, sdk.r3.u32)) {
+    __imp__sub_820F0F90(sdk, base);
     return;
   }
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.r3.u64 =
       ac::SetFree(base, ctx.r3.u32, ctx.r1.u32, hooks::AccessoriesSetDestructor(ctx, base));
 }
@@ -173,11 +175,13 @@ void NativeAccessoriesBaseDestruct(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ac::SetBaseDestruct(base, ctx.r3.u32);
 }
 
-void NativeAccessoryFileLoad(PPCContext& ctx, uint8_t* base) {
+void NativeAccessoryFileLoad(PPCContext& sdk, uint8_t* base) {
   if (!hooks::AccessoriesNativeLoads()) {
-    __imp__sub_820F0C90(ctx, base);
+    __imp__sub_820F0C90(sdk, base);
     return;
   }
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   const int64_t serial = ac::FileLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                       ctx.r7.u32, hooks::NativeArchiveLoad(base));
   hooks::SetArchiveSerial(ctx, serial);
@@ -1227,11 +1231,13 @@ void OnLoadeds(Context& h, const Block& block) {
 
 // AccessoriesAcquireEntry's register step (no adapter: only Acquire's plain
 // C++ calls it).
-void NativeAccessoriesAcquireEntry(PPCContext& ctx, uint8_t* base) {
+void NativeAccessoriesAcquireEntry(PPCContext& sdk, uint8_t* base) {
   if (!hooks::AccessoriesAcquireNative(base)) {
-    __imp__sub_820F09E0(ctx, base);
+    __imp__sub_820F09E0(sdk, base);
     return;
   }
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.r3.u64 = ac::SetAcquireEntry(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r1.u32,
                                    hooks::NativeArchiveLoad(base),
                                    hooks::AccessoryTextureSet(ctx, base));

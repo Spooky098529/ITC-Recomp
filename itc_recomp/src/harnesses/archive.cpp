@@ -72,11 +72,15 @@ ITC_NATIVE_STEP(NativeNodeDestruct, archive::NodeDestruct(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeFindSlot, ctx.r3.s64 = int32_t(archive::FindSlot(base, ctx.r3.u32)))
 ITC_NATIVE_STEP(NativeFindLooseFile, ctx.r3.u64 = archive::FindLooseFile(base, ctx.r3.u32))
 
-void NativeQueueStaticInit(PPCContext& ctx, uint8_t* base) {
+void NativeQueueStaticInit(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.s64 = archive::QueueStaticInit(base, guest.Call());
 }
-void NativeSlotsStaticInit(PPCContext& ctx, uint8_t* base) {
+void NativeSlotsStaticInit(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.s64 = archive::SlotsStaticInit(base, guest.Call());
 }

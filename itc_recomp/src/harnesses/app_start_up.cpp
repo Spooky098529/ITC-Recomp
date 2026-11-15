@@ -1663,7 +1663,7 @@ void InterfaceSlotCases(Context& h) {
   // getter of +60 or +68, where the direct call declines). The recompiled
   // slot called with --native_app_start_up and --native_framework off
   // against the direct call (or, where it declines, the guest call it falls
-  // back to); compared: r3, r11, ctr, the scratch area.
+  // back to); compared: r3, ctr, the scratch area.
   for (int which = 0; which < 2; which++) {
     const bool scene = which == 0;
     Results results(scene ? "RenderManagerSlotDirect (slot 8, sub_820944D8)"
@@ -1696,7 +1696,11 @@ void InterfaceSlotCases(Context& h) {
           if (v == 0) {
             (scene ? __imp__sub_820944D8 : __imp__sub_82094498)(t, h.base);
           } else {
-            const bool direct = hooks::RenderManagerSlotDirect(t, h.base, function);
+            bool direct;
+            {
+              lifted::RegsScope scope(t);
+              direct = hooks::RenderManagerSlotDirect(scope.regs, h.base, function);
+            }
             out[v].Word(direct == !stand_in);
             if (!direct) {
               (scene ? sub_820944D8 : sub_82094498)(t, h.base);
@@ -1708,7 +1712,9 @@ void InterfaceSlotCases(Context& h) {
           out[v].Word(1);
         }
         out[v].Word(t.r3.u32);
-        out[v].Word(t.r11.u32);
+        // (r11, the target as the original leaves it, is no longer compared:
+        // RenderManagerSlotDirect's r11 was a leftover for recompiled callers,
+        // gone with the rewiring; ctr holds the same target.)
         out[v].Word(t.ctr.u32);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       }

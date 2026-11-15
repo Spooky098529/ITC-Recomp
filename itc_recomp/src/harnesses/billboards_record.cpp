@@ -364,7 +364,9 @@ void Collect(uint8_t* base, const World& w, const PPCContext& t,
 }
 
 // RecordState's register steps (it has no adapter).
-void NativeRecordState(PPCContext& ctx, uint8_t* base) {
+void NativeRecordState(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
