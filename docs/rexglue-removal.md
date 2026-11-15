@@ -3210,8 +3210,9 @@ The new start-up:
    the C runtime's globals, the thread notify routines, `_mtinit`,
    `_initterm_e` and `_cinit` (the static initializers), then `main`
    with no arguments (the command line is split only when
-   `[0x829537B8]` is set, which nothing sets); the heap check (answers
-   1 in play) and the PAL-50 check (Dropped) left out; `exit` after
+   `[0x829537B8]` is set, which nothing sets); the heap check kept (it
+   makes the process heap first, `CreateHeap`), the PAL-50 check
+   (Dropped) left out; `exit` after
    `main` as the original does (never reached in play).
 4. **Gone**: the SDK's `main()` and `ReXApp` (taken out of our target's
    sources), its window and ImGui overlays (unused since the native

@@ -60,7 +60,8 @@ include(cmake/ffmpeg.cmake)
 
 # Sources
 set(ITC_SOURCES
-    src/main.cpp
+    src/app/main.cpp
+    src/app/start_up.cpp
     src/base/log.cpp
     src/base/log_sdk.cpp
     src/audio/native_audio.cpp
@@ -1181,6 +1182,13 @@ function(itc_add_executable name)
     endif()
 
     rexglue_setup_target(${name})
+
+    # Our own start-up (src/app/, "A4 brought forward" in
+    # docs/rexglue-removal.md): the SDK's main() and ReXApp, which
+    # rexglue_configure_target adds, are left out.
+    get_target_property(itc_sources ${name} SOURCES)
+    list(FILTER itc_sources EXCLUDE REGEX "(windowed_app_main_sdl|rex_app)\\.cpp$")
+    set_property(TARGET ${name} PROPERTY SOURCES ${itc_sources})
 
     target_include_directories(${name} PRIVATE src)
     if(NOT ITC_HARNESSES)
