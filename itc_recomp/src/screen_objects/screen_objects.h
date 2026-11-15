@@ -5,10 +5,12 @@
 // recompiled code); the device lock's video output and Resource::Release,
 // which still take the context, go through the callbacks the adapters
 // (src/hooks/screen_objects.cpp) give. The set-up's fan (rand), the object's
-// constructor and Init above it, and its draw (ScreenObject::Record) stay
-// recompiled.
+// constructor and Init above it stay recompiled. Its draw
+// (ScreenObject::Record) is lift.py's translation (record.cpp).
 
 #pragma once
+
+#include "lifted/lifted.h"
 
 #include <cstdint>
 #include <functional>
@@ -66,5 +68,16 @@ uint32_t Release(uint8_t* base, uint32_t object, uint32_t frame, const ReleaseCa
 // below `frame`, this one's), then UvMap::~UvMap on +76124. Returns r3 as the original leaves it (the
 // map's head, freed).
 uint32_t Destroy(uint8_t* base, uint32_t object, uint32_t frame, const ReleaseCalls& calls);
+
+// ScreenObject::Record (sub_82130978): r3 the screen object. Returns at
+// once while it isn't running (+24 clear); else the frame resolved into its
+// texture and the fan or rings drawn over it into its own chunk of the
+// scene's command list (screen-objects.md). lift.py's translation of
+// generated/ (record.cpp): r1 the stack pointer, r4 to r10 and f1 the
+// caller's (the calls through vtables pass them on); returns r3 and f1 as
+// the original leaves them.
+lifted::Result Record(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4,
+                      uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9,
+                      uint64_t r10, double f1);
 
 }  // namespace screen_objects

@@ -694,6 +694,7 @@ set(ITC_SOURCES
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
+    src/screen_objects/record.cpp
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
     src/course_scenery/collect.cpp

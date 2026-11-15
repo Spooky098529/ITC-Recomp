@@ -186,6 +186,17 @@ outside:
   path that returns at once in every call seen, so frame dumps can't
   check it) and `sub_821743A8` (the network battle's cars put at their
   sent places, with system link sends: out of scope).
+- The last Wrapped functions (2026-11-15): the draw library's inline
+  and non-indexed draws (`BeginVertices`, `EndVertices`,
+  `BeginIndexedVertices`, `DrawVertices`, `--native_inline_draws`) and
+  `Device::Resolve` (`--native_resolve`) made native inside their wraps,
+  their GPU packets Dropped and what the game and our renderer read back
+  kept (checked by temporary comparisons with the originals on copies of
+  the device, 0 differing, and frame dumps); `ScreenObject::Record` as
+  `lift.py`'s translation inside its wrap (`--native_screen_objects`;
+  checked with the nitrous forced on). `sub_821743A8` left recompiled:
+  only the Xbox Live mode's network battle (race kind 6 with two human
+  cars, `RaceWorld::Init`'s +9608) reaches it, out of scope.
 
 ## The user's calls (2026-11-15)
 
