@@ -137,12 +137,13 @@ void NativeViewportSetRoll(PPCContext& ctx, uint8_t* base) {
 }
 
 void NativeCameraUpdate(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraUpdate(ctx, base)) {
+  if (!harness::OnView(ctx, [&](lifted::Regs& regs) { return hooks::CameraUpdate(regs, base); })) {
     __imp__sub_82593568(ctx, base);
   }
 }
 void NativeCameraConstruct(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraConstruct(ctx, base)) {
+  if (!harness::OnView(ctx,
+                       [&](lifted::Regs& regs) { return hooks::CameraConstruct(regs, base); })) {
     __imp__sub_82593908(ctx, base);
   }
 }
@@ -167,7 +168,8 @@ void NativeViewportLookAt(PPCContext& ctx, uint8_t* base) {
 // As the adapters: the guest calls made by hooks/cameras.cpp, the work the
 // plain C++'s.
 void NativePassUpdate(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraPassUpdate(ctx, base)) {
+  if (!harness::OnView(ctx,
+                       [&](lifted::Regs& regs) { return hooks::CameraPassUpdate(regs, base); })) {
     __imp__sub_820A3978(ctx, base);
   }
 }
@@ -898,12 +900,14 @@ void RecordViewportCases(Context& h) {
 }
 
 void NativeRecordBegin(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraPassRecordBegin(ctx, base)) {
+  if (!harness::OnView(
+          ctx, [&](lifted::Regs& regs) { return hooks::CameraPassRecordBegin(regs, base); })) {
     __imp__sub_820A0CC0(ctx, base);
   }
 }
 void NativeRecordEnd(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraPassRecordEnd(ctx, base)) {
+  if (!harness::OnView(
+          ctx, [&](lifted::Regs& regs) { return hooks::CameraPassRecordEnd(regs, base); })) {
     __imp__sub_820A1C30(ctx, base);
   }
 }
@@ -1212,7 +1216,9 @@ void MakeRenderTargetCases(Context& h) {
         __imp__sub_8209FBF0(t, h.base);
         ITC_FLAG(native_cameras) = flag;
       } else {
-        ran = hooks::CameraPassesMakeRenderTarget(t, h.base);
+        ran = harness::OnView(t, [&](lifted::Regs& regs) {
+          return hooks::CameraPassesMakeRenderTarget(regs, h.base);
+        });
       }
       out[v].Word(ran);
       out[v].Word(t.r3.u32);
@@ -1315,7 +1321,8 @@ void SetUpSurfacesCases(Context& h) {
         __imp__sub_820A2F40(t, h.base);
         ITC_FLAG(native_cameras) = flag;
       } else {
-        ran = hooks::CameraPassSetUpSurfaces(t, h.base);
+        ran = harness::OnView(
+            t, [&](lifted::Regs& regs) { return hooks::CameraPassSetUpSurfaces(regs, h.base); });
       }
       out[v].Word(ran);
       out[v].Word(guest::LoadU32(h.base, fakes + 4));
@@ -1442,7 +1449,8 @@ void PassesInitCases(Context& h) {
           (all ? __imp__sub_8209F9B8 : __imp__sub_8209F960)(t, h.base);
           ITC_FLAG(native_cameras) = flag;
         } else {
-          hooks::CameraPassesInit(t, h.base, all);
+          harness::OnView(
+              t, [&](lifted::Regs& regs) { return hooks::CameraPassesInit(regs, h.base, all); });
         }
         hooks::camera_pass_init_calls = nullptr;
         out[v].Word(uint32_t(calls.size()));
@@ -1513,7 +1521,7 @@ void InitPassCases(Context& h) {
         __imp__sub_820A3DB0(t, h.base);
         ITC_FLAG(native_cameras) = flag;
       } else {
-        hooks::CameraPassInit(t, h.base);
+        harness::OnView(t, [&](lifted::Regs& regs) { return hooks::CameraPassInit(regs, h.base); });
       }
       out[v].Word(t.r3.u32);
       out[v].Word(guest::LoadU32(h.base, command_list::kOpenChunks));
@@ -1598,7 +1606,8 @@ void InitPassCases(Context& h) {
 // by their contents, then freed. ---
 
 void NativeViewportsInit(PPCContext& ctx, uint8_t* base) {
-  if (const auto viewport = hooks::ViewportsInit(ctx, base)) {
+  if (const auto viewport = harness::OnView(
+          ctx, [&](lifted::Regs& regs) { return hooks::ViewportsInit(regs, base); })) {
     ctx.r3.u64 = *viewport;
   } else {
     __imp__sub_820AB358(ctx, base);

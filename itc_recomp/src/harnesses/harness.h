@@ -13,6 +13,8 @@
 #pragma once
 
 #include "guest.h"
+#include "lifted/regs.h"
+#include "lifted/sdk.h"
 
 #include <cstdint>
 #include <functional>
@@ -21,6 +23,15 @@
 #include <vector>
 
 namespace harness {
+
+// Runs `f` (taking a `lifted::Regs&`) on a view of `ctx`, for native code
+// that runs on a register view since the rewiring (stage 3): the view's
+// registers go back in ctx when it returns. Returns what `f` returns.
+template <typename F>
+auto OnView(PPCContext& ctx, F&& f) {
+  lifted::RegsScope scope(ctx);
+  return f(scope.regs);
+}
 
 constexpr uint32_t kScratchBytes = 4096;
 

@@ -17,7 +17,8 @@ void DrawRivalLogo(lifted::Regs& ctx, uint8_t* base);
 // For the harnesses only: when set, the draw's override hands each call to
 // it instead of drawing (after noting the entry). Set only while a harness
 // runs, on the game's thread (the camera modes' Cutscene::Step cases record
-// the calls with it).
-extern void (*g_rival_logo_draw_stand_in)(lifted::Regs& ctx, uint8_t* base);
+// the calls with it). On the SDK's context (the harnesses assign functions
+// taking it); the override runs it through lifted::Sdk.
+extern void (*g_rival_logo_draw_stand_in)(PPCContext& ctx, uint8_t* base);
 
 }  // namespace race_hud_hooks

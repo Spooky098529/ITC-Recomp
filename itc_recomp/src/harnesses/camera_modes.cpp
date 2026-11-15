@@ -1405,7 +1405,9 @@ void NativeOffset(PPCContext& t, uint8_t* base) {
   t.fpscr.disableFlushMode();
   cm::ViewportOffset(base, t.r3.u32, t.f1.f64, t.r5.u32, t.r1.u32);
 }
-void NativeMakeShot(PPCContext& t, uint8_t* base) {
+void NativeMakeShot(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& t = scope.regs;
   t.fpscr.disableFlushMode();
   hooks::GuestAtexit atexit{t, base};
   cm::IntroMakeShot(base, t.r3.u32, t.r4.u32, t.r5.u32, t.r1.u32 - 192, atexit.Call());
@@ -2084,12 +2086,16 @@ void NativeFromRows3(PPCContext& t, uint8_t* base) {
 void NativeAdvance(PPCContext& t, uint8_t* base) {
   cm::RangeAdvance(base, t.r3.u32, t.r4.u32, t.r5.s32);
 }
-void NativeSplinePoint(PPCContext& t, uint8_t* base) {
+void NativeSplinePoint(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& t = scope.regs;
   t.fpscr.disableFlushMode();
   hooks::GuestAtexit atexit{t, base};
   cm::SplinePoint(base, t.r3.u32, t.r4.u32, t.r5.u32, t.f1.f64, t.r1.u32, atexit.Call());
 }
-void NativeRoutePoint(PPCContext& t, uint8_t* base) {
+void NativeRoutePoint(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& t = scope.regs;
   t.fpscr.disableFlushMode();
   hooks::GuestAtexit atexit{t, base};
   cm::RoutePoint(base, t.r3.u32, t.r4.u32, t.r6.u32, t.f1.f64, t.r1.u32, atexit.Call());
