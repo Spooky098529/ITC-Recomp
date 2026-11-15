@@ -135,7 +135,27 @@ outside:
   to Lifted where they are; the other 1,577 have rows in
   `docs/functions/lifted.md`, written by the tool (what each calls,
   whether it was seen in play, "Not read").
-- Left: the 329 refused functions, then rewiring (piece 4).
+- Vector code (2026-11-15): `lift.py` lifts it too. Vector registers
+  are locals of our own 16-byte `Vec` (`src/lifted/lifted.h`) with the
+  generated code's views; the simde calls and the SDK's helpers for
+  instructions SSE has no single match for (`rex/ppc/intrinsics.h`,
+  included, not copied: the user's call) stay as the generated code
+  wrote them; element writes count as the register's write (its other
+  lanes start at 0); statements split over lines are joined; the vector
+  float mode is the host's MXCSR (`VectorFloatMode`). 188 more functions
+  (batches 029 and 030), 2,937 in all. The lifted harness covers six
+  vector functions, and starts every run with the host float mode and
+  the SDK context's cached copy of it in step: the recompiled code skips
+  a mode switch its stale copy says is done, which looked like a
+  difference. Static map: unported 329 -> 141.
+- The dispatch table (`lifted::Call`) stays while the game's objects
+  and their vtables live in guest memory as 32-bit addresses; it goes,
+  class by class, if a later decompilation moves them into native C++
+  classes (the user's question, 2026-11-15). It's our code, not
+  rexglue's: its fallback into the SDK's function table goes once
+  every function is native.
+- Left: the 141 still unported (overrides of ours, registers another
+  function left, the global lock), then rewiring (piece 4).
 
 ## The user's calls (2026-11-15)
 

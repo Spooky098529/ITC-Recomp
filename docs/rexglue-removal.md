@@ -5666,3 +5666,14 @@ live caller. B7 (`b7_status.py`): ours 9,521, work left 111 (Wrapped
 51, with a row 39, no row yet 21); 1,577 lifted functions have no row
 yet. Static map: reachable 9,131, ours 8,793, unported 329 (75 seen in
 play, 254 never seen).
+
+**2026-11-15, the lift sweep's vector code (branch `lift-sweep`):**
+`lift.py` now lifts vector code (registers as locals of our own `Vec`,
+the simde calls and the SDK's vector helpers in `rex/ppc/intrinsics.h`
+called as the generated code calls them): 188 more functions, 2,937 in
+all (batches 029 and 030). Every harness at 0; the pad replay ran 127 s
+with no error lines. The boundary: 449 functions (916 pairs):
+overridden 265, Native 48, Dropped 24, never called 34, live 78.
+Imports: 186 called, 36 with a live caller. B7 (`b7_status.py`): ours
+9,709, work left 98 (Wrapped 51, with a row 28, no row yet 19). Static
+map: reachable 9,125, ours 8,975, unported 141 (62 seen in play).

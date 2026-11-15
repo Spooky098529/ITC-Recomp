@@ -198,6 +198,7 @@ Status:
 | `sub_820A4508` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_002.cpp`, `--native_lifted_002`). Calls `sub_825A70E8`. Not seen in play. Not read. |
 | `sub_820A5660` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_002.cpp`, `--native_lifted_002`). Calls `sub_820A4508`, `sub_825A70E8`, `sub_825A71C0`. Not seen in play. Not read. |
 | `sub_820A6420` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_002.cpp`, `--native_lifted_002`). Calls nothing. Not seen in play. Not read. |
+| `sub_820A6470` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls nothing. Not seen in play. Not read. |
 | `sub_820A6D28` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_002.cpp`, `--native_lifted_002`). Calls `sub_825A6B18`. Not seen in play. Not read. |
 | `sub_820A6E00` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_002.cpp`, `--native_lifted_002`). Calls `sub_820A6D28`. Not seen in play. Not read. |
 | `sub_820A70A8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_003.cpp`, `--native_lifted_003`). Calls nothing. Not seen in play. Not read. |
@@ -288,6 +289,7 @@ Status:
 | `sub_820A9960` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_003.cpp`, `--native_lifted_003`). Calls `sub_825A7410`. Not seen in play. Not read. |
 | `sub_820A9970` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_003.cpp`, `--native_lifted_003`). Calls `sub_825A7410`. Not seen in play. Not read. |
 | `sub_820A9BD8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_003.cpp`, `--native_lifted_003`). Calls nothing. Not seen in play. Not read. |
+| `sub_820A9CF8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A8770`, `sub_825A88A0`, `sub_825A8978`. Not seen in play. Not read. |
 | `sub_820AA010` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_003.cpp`, `--native_lifted_003`). Calls nothing. Not seen in play. Not read. |
 | `sub_820AA018` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_003.cpp`, `--native_lifted_003`). Calls nothing. Not seen in play. Not read. |
 | `sub_820AA020` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_003.cpp`, `--native_lifted_003`). Calls nothing. Not seen in play. Not read. |
@@ -325,6 +327,7 @@ Status:
 | `sub_820B0098` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls nothing. Not seen in play. Not read. |
 | `sub_820B00A8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls nothing. Not seen in play. Not read. |
 | `sub_820B00B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls nothing. Not seen in play. Not read. |
+| `sub_820B0340` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls nothing. Not seen in play. Not read. |
 | `sub_820B03E0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls nothing. Not seen in play. Not read. |
 | `sub_820B0428` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls nothing. Not seen in play. Not read. |
 | `sub_820B95F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls `sub_82294170`, `sub_822942E0`. Not seen in play. Not read. |
@@ -365,6 +368,7 @@ Status:
 | `sub_820BF690` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls `sub_820B6890`, `sub_820B97C0`, `sub_820B9C30`, `sub_820B9EE8`, `sub_820BA1D0`, `sub_820BA3B0`, `sub_820BA688`, `sub_820BAB40`, .... Not seen in play. Not read. |
 | `sub_820BFBA8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls `sub_820BF690`. Not seen in play. Not read. |
 | `sub_820BFBB0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls `sub_820BF690`. Not seen in play. Not read. |
+| `sub_820CE600` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_820CE1D8`. Not seen in play. Not read. |
 | `sub_820CE7F0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls `sub_820CE600`. Not seen in play. Not read. |
 | `sub_820CEC20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls `sub_82594F58`, `sub_825A70E8`. Not seen in play. Not read. |
 | `sub_820D8D20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). Calls `sub_820D0758`, `sub_82596920`, `sub_82596F68`. Calls through a function pointer or vtable. Not seen in play. Not read. |
@@ -372,6 +376,7 @@ Status:
 | `sub_820F1100` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_005.cpp`, `--native_lifted_005`). Calls `sub_820FB998`, `sub_820FB9A8`. Not seen in play. Not read. |
 | `sub_820F7D70` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_005.cpp`, `--native_lifted_005`). Calls nothing. Not seen in play. Not read. |
 | `sub_820F7EE8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_005.cpp`, `--native_lifted_005`). Calls `sub_820F6BE8`, `sub_820F7D70`. Not seen in play. Not read. |
+| `sub_820F8FA0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls nothing. Not seen in play. Not read. |
 | `sub_820F9DD0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_005.cpp`, `--native_lifted_005`). Calls `sub_820AB498`, `sub_820F9768`. Not seen in play. Not read. |
 | `sub_820FA8F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_005.cpp`, `--native_lifted_005`). Calls `sub_820F8FA0`, `sub_820F9DD0`. Not seen in play. Not read. |
 | `sub_820FB9C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_005.cpp`, `--native_lifted_005`). Calls nothing. Not seen in play. Not read. |
@@ -411,11 +416,19 @@ Status:
 | `sub_821193A8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_82117EA8`. Not seen in play. Not read. |
 | `sub_821193B0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_82119450`. Not seen in play. Not read. |
 | `sub_821193B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_82119450`. Not seen in play. Not read. |
+| `sub_8211EAA0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_82293568`. Not seen in play. Not read. |
 | `sub_8211F1C8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_82293568`. Not seen in play. Not read. |
+| `sub_8211F278` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls nothing. Not seen in play. Not read. |
+| `sub_8211F530` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_8211F118`, `sub_82293568`. Not seen in play. Not read. |
+| `sub_8211F6F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_8211F118`, `sub_82293568`. Not seen in play. Not read. |
+| `sub_8211F8C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A88A0`, `sub_825A8978`. Not seen in play. Not read. |
+| `sub_8211FF20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls nothing. Not seen in play. Not read. |
+| `sub_82120008` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_8211EB60`, `sub_82126630`, `sub_82129298`. Not seen in play. Not read. |
 | `sub_82120868` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_8211EB60`, `sub_82126630`, `sub_82129298`. Not seen in play. Not read. |
 | `sub_82120BB8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_8211EB60`, `sub_82126630`, `sub_82129298`. Not seen in play. Not read. |
 | `sub_82121280` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_8211EB60`, `sub_82126630`, `sub_82129298`. Not seen in play. Not read. |
 | `sub_82121590` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls nothing. Not seen in play. Not read. |
+| `sub_82121D78` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_8211EB60`, `sub_82126630`, `sub_82129298`. Not seen in play. Not read. |
 | `sub_82122DB8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_82126550`, `sub_82126BB0`, `sub_82127198`. Not seen in play. Not read. |
 | `sub_82126818` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_825A70E8`. Not seen in play. Not read. |
 | `sub_82126A00` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_820C0170`. Not seen in play. Not read. |
@@ -464,6 +477,7 @@ Status:
 | `sub_8213BDF0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). Calls nothing. Not seen in play. Not read. |
 | `sub_8213BE80` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). Calls nothing. Not seen in play. Not read. |
 | `sub_8213D898` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). Calls `sub_8213CB30`, `sub_8213CD50`. Not seen in play. Not read. |
+| `sub_8213F7E0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls nothing. Not seen in play. Not read. |
 | `sub_8213F868` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). Calls nothing. Not seen in play. Not read. |
 | `sub_821462A0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). Calls `sub_82139728`, `sub_821451B8`. Not seen in play. Not read. |
 | `sub_82148920` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). Calls `sub_82294E20`. Not seen in play. Not read. |
@@ -497,6 +511,7 @@ Status:
 | `sub_8215F5F0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). Calls `sub_820C96E8`, `sub_821705F8`. Not seen in play. Not read. |
 | `sub_82160880` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). Calls `sub_820C0468`, `sub_8215F968`, `sub_821604C8`, `sub_821705F8`. Not seen in play. Not read. |
 | `sub_8217C4C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_008.cpp`, `--native_lifted_008`). Calls `sub_8217AEA8`, `sub_8258C9D0`, `sub_8258CA50`, `sub_8258CA88`, `sub_8258CAA0`, `sub_8258CB08`. Calls through a function pointer or vtable. Not seen in play. Not read. |
+| `sub_8218D708` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_820C27E8`, `sub_820C4550`, `sub_820C4998`, `sub_820CD5D8`, `sub_820CE1D8`, `sub_820CE7D8`, `sub_8218D844`, `sub_825A7410`. Not seen in play. Not read. |
 | `sub_821AB518` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211B3F0`, `sub_8211E1B8`. Not seen in play. Not read. |
 | `sub_821AB5B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211B3F0`, `sub_8211DAC8`, `sub_8211DDE0`, `sub_8211E1B8`. Not seen in play. Not read. |
 | `sub_821AB698` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211B3F0`, `sub_8211DAC8`, `sub_8211DDE0`, `sub_8211DF20`, `sub_8211E1B8`. Not seen in play. Not read. |
@@ -531,6 +546,7 @@ Status:
 | `sub_821AD3B0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211B3F0`, `sub_8211DAC8`, `sub_8211DF20`. Not seen in play. Not read. |
 | `sub_821AD458` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211A5B8`, `sub_8211B3F0`. Not seen in play. Not read. |
 | `sub_821AD530` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211A5B8`, `sub_8211B3F0`. Not seen in play. Not read. |
+| `sub_821AD5D8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_8211A578`, `sub_8211B3F0`, `sub_8211C7E8`, `sub_8259D658`. Not seen in play. Not read. |
 | `sub_821ADAF0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211A578`, `sub_8211B3F0`, `sub_8211C7E8`, `sub_8211CC50`, `sub_8259D658`. Not seen in play. Not read. |
 | `sub_821ADF28` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211A578`, `sub_8211B3F0`, `sub_8211C7E8`, `sub_8259D658`. Not seen in play. Not read. |
 | `sub_821AE198` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_009.cpp`, `--native_lifted_009`). Calls `sub_8211A578`, `sub_8211B3F0`, `sub_8211C7E8`, `sub_8259D658`. Not seen in play. Not read. |
@@ -617,6 +633,7 @@ Status:
 | `sub_821B8688` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_011.cpp`, `--native_lifted_011`). Calls `sub_8211A578`, `sub_8211B3F0`. Not seen in play. Not read. |
 | `sub_821B8728` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_011.cpp`, `--native_lifted_011`). Calls `sub_8211A578`, `sub_8211B3F0`. Not seen in play. Not read. |
 | `sub_821B87B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_011.cpp`, `--native_lifted_011`). Calls `sub_821B8630`, `sub_821B8688`, `sub_821B8728`. Not seen in play. Not read. |
+| `sub_821B8988` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_8211A578`, `sub_8211B3F0`, `sub_8211C1F8`, `sub_821B87B8`. Not seen in play. Not read. |
 | `sub_821B8ED0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_011.cpp`, `--native_lifted_011`). Calls `sub_8211B3F0`, `sub_8211D978`, `sub_8211E1B8`, `sub_821B8988`. Not seen in play. Not read. |
 | `sub_822116A0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_012.cpp`, `--native_lifted_012`). Calls `sub_822962B0`, `sub_822A5B78`. Not seen in play. Not read. |
 | `sub_822159F0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_012.cpp`, `--native_lifted_012`). Calls `sub_8211B3F0`, `sub_8211DAC8`. Not seen in play. Not read. |
@@ -624,6 +641,7 @@ Status:
 | `sub_82215B48` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_012.cpp`, `--native_lifted_012`). Calls `sub_8211A578`, `sub_8211B3F0`, `sub_8211DAC8`, `sub_8211DDE0`, `sub_8211DF20`. Not seen in play. Not read. |
 | `sub_82215D08` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_012.cpp`, `--native_lifted_012`). Calls `sub_8211B3F0`, `sub_8211DF20`. Not seen in play. Not read. |
 | `sub_82215D58` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_012.cpp`, `--native_lifted_012`). Calls `sub_8211B3F0`, `sub_8211E1B8`. Not seen in play. Not read. |
+| `sub_82215DA8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_821103F0`, `sub_8211B3F0`, `sub_8211BB18`, `sub_8211E1B8`. Not seen in play. Not read. |
 | `sub_82216810` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_012.cpp`, `--native_lifted_012`). Calls `sub_82215A50`, `sub_82215B48`. Not seen in play. Not read. |
 | `sub_82260800` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_013.cpp`, `--native_lifted_013`). Calls `sub_821489D8`, `sub_8214AA70`, `sub_8214B330`, `sub_825A71D0`. Not seen in play. Not read. |
 | `sub_82291520` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_013.cpp`, `--native_lifted_013`). Calls `sub_8209F658`, `sub_82296720`. Not seen in play. Not read. |
@@ -690,6 +708,8 @@ Status:
 | `sub_822AEBF0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_014.cpp`, `--native_lifted_014`). Calls `sub_8229F148`, `sub_822AC470`, `sub_822AE340`, `sub_822AEAA0`, `sub_825A7410`. Not seen in play. Not read. |
 | `sub_822AF2D8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_014.cpp`, `--native_lifted_014`). Calls nothing. Not seen in play. Not read. |
 | `sub_822AF3D0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_014.cpp`, `--native_lifted_014`). Calls nothing. Not seen in play. Not read. |
+| `sub_822AF438` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_822AF3D0`. Not seen in play. Not read. |
+| `sub_822AF550` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_822AF5AC`, `sub_825AAD20`. Not seen in play. Not read. |
 | `sub_822AF8A0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_014.cpp`, `--native_lifted_014`). Calls `sub_822AF550`. Not seen in play. Not read. |
 | `sub_822B0ED0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_014.cpp`, `--native_lifted_014`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
 | `sub_822B0F40` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_014.cpp`, `--native_lifted_014`). Calls nothing. Not seen in play. Not read. |
@@ -760,6 +780,7 @@ Status:
 | `sub_8246AAC0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). Calls `sub_82466990`. Not seen in play. Not read. |
 | `sub_8246AAC8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). Calls `sub_82466A80`. Not seen in play. Not read. |
 | `sub_8246AB00` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). Calls `sub_82469E58`. Not seen in play. Not read. |
+| `sub_8246AD98` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Imports `KeAcquireSpinLockAtRaisedIrql`, `KeRaiseIrqlToDpcLevel`, `KeReleaseSpinLockFromRaisedIrql`, `KfLowerIrql`. Not seen in play. Not read. |
 | `sub_8246B318` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). Calls `sub_825A7410`. Imports `KeAcquireSpinLockAtRaisedIrql`, `KeRaiseIrqlToDpcLevel`, `KeReleaseSpinLockFromRaisedIrql`, `KfLowerIrql`. Not seen in play. Not read. |
 | `sub_8246B3F0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). Calls `sub_8246A940`. Not seen in play. Not read. |
 | `sub_8246B3F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). Calls `sub_8246AB00`. Not seen in play. Not read. |
@@ -797,6 +818,38 @@ Status:
 | `sub_8246D738` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_8246D630`. Not seen in play. Not read. |
 | `sub_8246D740` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_8246D500`. Not seen in play. Not read. |
 | `sub_8246D748` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_8246D410`. Not seen in play. Not read. |
+| `sub_8246E7F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_8246EC08` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_8246F300` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_8246F540` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_8246F7C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_8246FAC0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_8246FE48` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_824701E0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_82470668` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_82470CA0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_82471510` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_824717F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_82471B40` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_82471F68` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_825A9DB0`. Not seen in play. Not read. |
+| `sub_824724B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_824728B0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82472BB8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82472F30` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_824733C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_824739B0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82474578` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82474AE8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82475200` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82475688` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_824759D8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82475E20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82476418` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82476BF8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82476FF0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82477348` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82477760` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82477D20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
 | `sub_824784D0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls nothing. Not seen in play. Not read. |
 | `sub_82478660` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls nothing. Not seen in play. Not read. |
 | `sub_82478770` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls nothing. Not seen in play. Not read. |
@@ -821,6 +874,21 @@ Status:
 | `sub_8247A758` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls nothing. Not seen in play. Not read. |
 | `sub_8247A8C8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls nothing. Not seen in play. Not read. |
 | `sub_8247AA80` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247AC90` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247B1E8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247B3B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247B628` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247B9C8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247BEB0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247C408` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247C5D8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247C850` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247CC00` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247D110` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247D358` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247D548` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247D7B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8247DAA8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
 | `sub_8247DE28` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_8246F300`, `sub_824728B0`. Not seen in play. Not read. |
 | `sub_8247DF00` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_8246F540`, `sub_82472BB8`. Not seen in play. Not read. |
 | `sub_8247DFD8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_8246F7C0`, `sub_82472F30`. Not seen in play. Not read. |
@@ -835,6 +903,15 @@ Status:
 | `sub_8247E940` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_824717F8`, `sub_82477348`. Not seen in play. Not read. |
 | `sub_8247EA18` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_82471B40`, `sub_82477760`. Not seen in play. Not read. |
 | `sub_8247EAF0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_82471F68`, `sub_82477D20`. Not seen in play. Not read. |
+| `sub_8247EBC8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82478660`. Not seen in play. Not read. |
+| `sub_8247EDA8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82478770`. Not seen in play. Not read. |
+| `sub_8247EFD8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_824789C8`. Not seen in play. Not read. |
+| `sub_8247F320` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82478D30`. Not seen in play. Not read. |
+| `sub_8247F7A8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82479158`. Not seen in play. Not read. |
+| `sub_8247FB28` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82479540`. Not seen in play. Not read. |
+| `sub_8247FE18` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_8247A610`. Not seen in play. Not read. |
+| `sub_824800A0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_8247B1E8`. Not seen in play. Not read. |
+| `sub_82480368` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_8247C408`. Not seen in play. Not read. |
 | `sub_82481B88` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82481B98` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_82483130`, `sub_82483460`, `sub_82483700`, `sub_82483770`, `sub_82483DC0`, `sub_82483F30`, `sub_824847D0`, `sub_82485350`, .... Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82482068` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_82481B98`, `sub_82487660`, `sub_824877E0`, `sub_824878B0`, `sub_824878D0`, `sub_82487B28`, `sub_82487BE8`, `sub_82488F50`. Calls through a function pointer or vtable. Not seen in play. Not read. |
@@ -986,6 +1063,7 @@ Status:
 | `sub_8257F070` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_822962B0`, `sub_8257E8E8`, `sub_8257E9B8`, `sub_8257EB68`. Not seen in play. Not read. |
 | `sub_8257F198` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82579590`, `sub_8257EAF0`. Not seen in play. Not read. |
 | `sub_8257F1E8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_8257E8E8`. Not seen in play. Not read. |
+| `sub_8257F5E8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
 | `sub_8257F970` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_825820E8`, `sub_82582158`, `sub_825828D0`. Not seen in play. Not read. |
 | `sub_8257FA90` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_8257F970`, `sub_825BA0C8`. Not seen in play. Not read. |
 | `sub_8257FB38` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82582320`. Calls through a function pointer or vtable. Not seen in play. Not read. |
@@ -1010,22 +1088,31 @@ Status:
 | `sub_825821F0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82583FD0`, `sub_825840D0`, `sub_82584988`, `sub_82584A00`. Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82582320` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82584080`, `sub_82584178`, `sub_825876D8`. Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_825823B0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82584758`, `sub_82584B90`, `sub_82584CF0`, `sub_82584E48`. Not seen in play. Not read. |
+| `sub_82582498` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82585398`. Not seen in play. Not read. |
+| `sub_82582658` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82582498`, `sub_82584B90`, `sub_82584EB0`, `sub_825850E0`, `sub_825854E0`, `sub_825855B0`, `sub_82585948`, `sub_82585B28`, .... Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_825828D0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_825823B0`, `sub_82582658`, `sub_82583DC8`, `sub_82584A70`, `sub_82584B90`, `sub_82584CF0`, `sub_82584EB0`, `sub_825850E0`, .... Not seen in play. Not read. |
 | `sub_82582AD8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_825868E8`, `sub_825ABE30`. Not seen in play. Not read. |
+| `sub_82582CC8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82582AD8`, `sub_82586B68`, `sub_82586C10`, `sub_82587088`. Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82582EC0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82587658`. Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82583090` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_825876D8`. Calls through a function pointer or vtable. Not seen in play. Not read. |
+| `sub_82583180` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584CB0`. Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_825834F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_825835F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82583610` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82583BA8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_82583C00` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_825A9C00`. Not seen in play. Not read. |
 | `sub_82583C98` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_825ABE30`. Not seen in play. Not read. |
 | `sub_82583CE8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82583D68` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_825835F8`. Not seen in play. Not read. |
+| `sub_82583DC8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584B90`. Not seen in play. Not read. |
 | `sub_82583FD0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82584080` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_825840D0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82584178` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_825841E8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_82584270` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584C70`. Calls through a function pointer or vtable. Not seen in play. Not read. |
+| `sub_82584448` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584CB0`. Calls through a function pointer or vtable. Not seen in play. Not read. |
+| `sub_825845A8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584270`, `sub_82584448`, `sub_82585D78`, `sub_82586218`, `sub_82586428`, `sub_825AA0B8`. Not seen in play. Not read. |
 | `sub_82584758` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_825841E8`, `sub_825845A8`, `sub_82584E78`, `sub_82584ED8`, `sub_82587728`, `sub_82587918`, `sub_82587BC8`. Not seen in play. Not read. |
 | `sub_82584970` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82584988` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls through a function pointer or vtable. Not seen in play. Not read. |
@@ -1044,37 +1131,59 @@ Status:
 | `sub_82585398` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_825853F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_825854E0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_825855B0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584ED8`, `sub_825853F8`, `sub_82586460`, `sub_825884F8`, `sub_825A9D80`. Not seen in play. Not read. |
 | `sub_825858A0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_82585948` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584E48`, `sub_82586288`. Not seen in play. Not read. |
+| `sub_82585B28` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584CB0`, `sub_82585398`, `sub_82585D78`, `sub_82588750`. Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82585D30` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_825A80A8`. Not seen in play. Not read. |
 | `sub_82585D78` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_82585EB8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82586048` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82585EB8`, `sub_825A7830`. Not seen in play. Not read. |
 | `sub_82586218` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82586288` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_825862D8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82584E78`, `sub_82586218`. Not seen in play. Not read. |
 | `sub_82586428` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82586460` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_825865E8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_820B6708`, `sub_825887C0`, `sub_82588908`, `sub_82588A18`, `sub_82588A70`, `sub_82588AE0`, `sub_82588B68`, `sub_82588D20`, .... Not seen in play. Not read. |
 | `sub_82586758` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82584B90`, `sub_825850E0`, `sub_825852F0`, `sub_825858A0`, `sub_82585948`. Not seen in play. Not read. |
 | `sub_825868E8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82586B68` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82587238`. Not seen in play. Not read. |
+| `sub_82586C10` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584C70`, `sub_82588E30`. Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82587088` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_82587188` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
 | `sub_82587658` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_825876D8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls through a function pointer or vtable. Not seen in play. Not read. |
+| `sub_82587728` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82587918` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
 | `sub_82587960` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82584ED8`. Not seen in play. Not read. |
 | `sub_82587A88` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82584ED8`. Not seen in play. Not read. |
 | `sub_82587BC8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls `sub_82584E48`, `sub_82587960`, `sub_82587A88`, `sub_82589158`. Not seen in play. Not read. |
 | `sub_82587F98` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_825880B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_825881E0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_825884F8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82584970`, `sub_825892B8`. Not seen in play. Not read. |
 | `sub_82588750` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_825887C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_825A8ED0`. Not seen in play. Not read. |
 | `sub_82588908` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82588A18` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82588A70` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82588AE0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
 | `sub_82588B68` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_019.cpp`, `--native_lifted_019`). Calls nothing. Not seen in play. Not read. |
+| `sub_82588D20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
 | `sub_82588DF0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_020.cpp`, `--native_lifted_020`). Calls nothing. Not seen in play. Not read. |
 | `sub_82588E30` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_020.cpp`, `--native_lifted_020`). Calls `sub_82584ED8`, `sub_82585398`. Not seen in play. Not read. |
+| `sub_82588FF0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_82589158` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_825892B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
 | `sub_82589480` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_020.cpp`, `--native_lifted_020`). Calls `sub_825A70E8`. Not seen in play. Not read. |
 | `sub_82589650` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_020.cpp`, `--native_lifted_020`). Calls `sub_8258E410`. Not seen in play. Not read. |
 | `sub_82589AB0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_020.cpp`, `--native_lifted_020`). Calls `sub_8258E580`, `sub_8258E5B8`, `sub_825A1318`. Not seen in play. Not read. |
+| `sub_8258AB18` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_82589AB0`. Not seen in play. Not read. |
+| `sub_8258AC58` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8258ADA0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8258AF80` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8258B1C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8258B368` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
 | `sub_8258BCD8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_020.cpp`, `--native_lifted_020`). Calls `sub_8258AC58`, `sub_8258ADA0`, `sub_8258AF80`, `sub_8258B1C0`, `sub_8258B368`. Not seen in play. Not read. |
 | `sub_8258BE58` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_020.cpp`, `--native_lifted_020`). Calls nothing. Not seen in play. Not read. |
 | `sub_8258BFA0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_020.cpp`, `--native_lifted_020`). Calls `sub_8258CA50`, `sub_8258CAA0`. Calls through a function pointer or vtable. Not seen in play. Not read. |
@@ -1121,7 +1230,12 @@ Status:
 | `sub_825968D0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_82594F58`, `sub_825A70E8`. Not seen in play. Not read. |
 | `sub_82599BE0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_8259A9D0`, `sub_825A70E8`, `sub_825A71C0`. Not seen in play. Not read. |
 | `sub_8259A2B0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_820A0AC0`. Not seen in play. Not read. |
+| `sub_8259A400` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8259ACE0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_8209BD50`, `sub_820A2D30`, `sub_820A65F0`, `sub_820A67F8`. Not seen in play. Not read. |
+| `sub_8259AF20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_8209BD50`, `sub_820A2D30`, `sub_820A65F0`, `sub_820A67F8`. Not seen in play. Not read. |
+| `sub_8259B188` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_820A65F0`, `sub_820A67F8`, `sub_825A8770`. Not seen in play. Not read. |
 | `sub_8259B600` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_8259A228`, `sub_825A70E8`. Not seen in play. Not read. |
+| `sub_8259B660` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_8259B188`. Not seen in play. Not read. |
 | `sub_8259BB98` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_820A0AC0`, `sub_8259A2B0`, `sub_8259A400`, `sub_8259B660`. Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_8259C550` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls nothing. Not seen in play. Not read. |
 | `sub_8259C6C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_8259C550`. Not seen in play. Not read. |
@@ -1134,6 +1248,8 @@ Status:
 | `sub_8259D160` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_820988B8`, `sub_82106540`, `sub_82481880`. Not seen in play. Not read. |
 | `sub_8259D1C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_8259D370` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_825A71C0`. Calls through a function pointer or vtable. Not seen in play. Not read. |
+| `sub_8259FAA8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls nothing. Not seen in play. Not read. |
+| `sub_8259FD40` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_030.cpp`, `--native_lifted_030`). Calls `sub_825A8A50`. Not seen in play. Not read. |
 | `sub_825A13C0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_825A70E8`. Not seen in play. Not read. |
 | `sub_825A13D8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_825A70E8`. Not seen in play. Not read. |
 | `sub_825A1610` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_822A67B0`. Not seen in play. Not read. |
