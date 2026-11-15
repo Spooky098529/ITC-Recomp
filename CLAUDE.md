@@ -725,13 +725,17 @@ pick the leads; no multiplayer: the main menu's Xbox Live and split
 screen items do nothing (`--multiplayer_menu_items`, off by default;
 `title-screen.md`), their modes left unreachable; functions that end
 the process or thread are checked by reading, not harnessed.
-The alternative to the loop for the functions never seen in play is the
-lift sweep (`docs/loops/lift-sweep.md`, the user's call, 2026-11-15, on
-`lift-sweep`): a tool (`itc_recomp/tools/lift.py`) translates them from
-`generated/` in batches, with "no behavior change" loosened, no
-mapping or harness per function, lifted-looking code accepted, and one
-validation at the end; the multiplayer modes are skipped. The loop keeps
-the functions seen in play.
+The alternative to the loop is the lift sweep
+(`docs/loops/lift-sweep.md`, the user's call, 2026-11-15, on
+`lift-sweep`): B7's end state now. A tool (`itc_recomp/tools/lift.py`)
+translates every function still recompiled from `generated/` into
+plain C++ with typed parameters. Native code calls native code
+directly, or through a dispatch table by address for vtables and
+function pointers, and the SDK only for its imports. Agents rewire the
+existing ports and delete their adapters. "No behavior change" is
+loosened, there's no mapping or harness per function, lifted-looking
+code is accepted, and validation is done once at the end. The
+multiplayer modes are skipped.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

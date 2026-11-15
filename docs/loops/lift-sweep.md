@@ -1,128 +1,121 @@
-# B7 lift sweep: the never-seen functions, translated by a tool
+# B7 lift sweep: B7's end state, reached by a tool
 
-A variation on the B7 loop (`b7-loop.md`) for the code play never
-reaches (the user's call, 2026-11-15). It has the same goal ("B7's
-goal" there: no PPC code reachable from `main`) and is measured by the
-same static map (`static-map.md`), but it works differently. The B7 loop
-maps a subsystem, ports it by hand and validates each step with
-harnesses. This sweep has a tool translate the never-seen functions
-straight from `generated/` in large batches, and validates once at the
-end.
+The user's call (2026-11-15): B7's end state now rather than subsystem
+by subsystem. That is native C++ for every function `main` reaches,
+calling each other directly, with no `ctx` and no adapters. It still
+calls into the SDK where it must (the kernel and XAM imports). This is
+an alternative to the B7 loop (`b7-loop.md`). It has the same goal
+("B7's goal" there) and is measured by the same static map
+(`static-map.md`), but it is reached differently: a tool translates
+the functions still recompiled straight from `generated/`, agents
+rewire the existing ports to call natively, and validation is done
+once at the end.
 
-Why: on 2026-11-14 the static map had 3,106 unported functions. 2,482
-of them (80%) had never been seen in play, 2,474 were 100 lines or
-fewer, and 1,728 had no row in any function file. For code like that,
-the loop's per-subsystem mapping, harnesses and 180 s validations cost
-far more than the code itself.
+## The pieces
+
+1. **The lift tool** (`itc_recomp/tools/lift.py`). It reads a
+   function's body in `generated/` (never edits it) and writes plain
+   C++ in `itc_recomp/src/lifted/`:
+   - the function's arguments become typed parameters, worked out from
+     the registers it reads before writing them (r3 to r10, f1 to f13,
+     the stack pointer, r13 when it reads it);
+   - its return value is r3 (or f1), when it writes one;
+   - registers become plain locals;
+   - guest memory is still read and written through `guest::`;
+   - calls to lifted functions are direct C++ calls;
+   - other calls go through the dispatch table (below);
+   - imports go through the import helper (below);
+   - the print (`ITC_NATIVE_RUNNING`) comes first, as in every port.
+
+   It refuses anything it can't translate exactly and lists the
+   function with the reason. Expected refusals:
+   - vector code;
+   - the spin locks that touch the machine state register;
+   - a function that reads another's leftover registers after a call;
+   - a function that reads a caller's saved registers.
+
+   Refused functions go to agents, who port them by hand.
+2. **The dispatch table** (`src/lifted/dispatch.h`). Native code calls
+   a guest function pointer or vtable slot by its address. Vtables and
+   function pointers stay guest data, since the game keeps them in
+   guest memory. The table maps each native function's address to a
+   uniform entry (the argument registers in, r3 and f1 out) that unpacks
+   them into the function's typed parameters. While some functions are
+   still recompiled, an address not in the table runs the recompiled
+   function: that fallback goes away with the last of them.
+3. **The SDK boundary** (`src/lifted/sdk.h`). Imports take the SDK's
+   context, so a helper builds one for each import call from the
+   arguments. The other way, the SDK runs game code by its address: the
+   entry point, thread start routines and the callbacks it's given.
+   These keep a thin entry from the SDK's context into the dispatch
+   table. They are the only adapters left at the end.
+4. **Rewiring the existing ports.** Ports made so far reach code that
+   isn't native through `Calls` callbacks the adapter gives (about
+   1,200 call sites). Agents replace those with direct calls, subsystem
+   by subsystem, and delete each adapter once nothing recompiled calls
+   it. Until then, a lifted function the recompiled code or a
+   `Calls` callback still reaches gets a transitional entry, to be
+   deleted the same way.
+
+## What's loosened
+
+- **Behavior:** the lifted code follows the recompiled code statement
+  by statement, so it should match. "B7: no behavior change" is
+  loosened only for what doesn't matter, such as the bytes register
+  saves leave in a stack frame.
+- **No mapping step and no harness per function.** Rows are written by
+  the tool: "Lifted by `lift.py`", what it could tell (callees,
+  callers, imports), "Not seen in play" where it applies. Nothing is
+  read in detail.
+- **Readability:** lifted code may read like the recompiled code
+  without `ctx` (one local per register, `goto`s between labels).
+  Cleaning it up is for later, if ever.
+
+Everything else under "Rules that still hold" in `b7-loop.md` still
+holds.
 
 ## Scope
 
-Taken by the sweep: a function the static map lists as `unported` with
-`seen` 0 (`itc_recomp/coverage/static_map.tsv`), outside the replaced
-libraries, System Link, the multiplayer modes (below) and anything the
-user has ruled out.
-
-Left to the B7 loop: every function seen in play (624 on 2026-11-14),
-and anything the tool refuses (below). The two don't take the same
-function at once: the sweep runs between loop runs, not beside them.
-
-## What changes from the B7 loop
-
-- **Behavior:** "B7: no behavior change" is loosened for never-seen
-  functions. The tool's translation follows the recompiled code
-  instruction by instruction, so it matches by construction. The loosening
-  only lets a later cleanup simplify what clearly doesn't matter (a
-  debug print, an assert's message), noted in the row.
-- **No mapping step:** no mapping agent and no map check. The tool
-  writes the rows itself (below).
-- **No harness per function:** the tool is checked instead (a sample
-  and every construct it handles, under "Validating the tool"). Since a
-  mechanical translator's mistakes are systematic, a correct sample
-  stands for the batch.
-- **No validation per batch:** each batch must build and pass a short
-  smoke run (below). The full validation is done once, at the end.
-- **Readability:** lifted code may read like the recompiled code
-  without `ctx` (registers as locals, guest loads and stores). Cleaning
-  it into the plain C++ of the hand ports is for later, if ever.
-
-Everything else under "Rules that still hold" in `b7-loop.md` still
-holds (CLAUDE.md's rules, nothing in parallel, the replaced libraries,
-commits pushed).
-
-## The tool
-
-`itc_recomp/tools/lift.py` (to be written). It reads a function's body
-in `generated/` (never edits it) and writes:
-
-- the plain C++, in `itc_recomp/src/lifted/`, one file per address
-  range, starting with `ITC_NATIVE_RUNNING`;
-- the `REX_FUNC` adapter, under one flag per batch
-  (`--native_lifted_<n>`, on by default), so a bad batch can be found
-  by turning flags off;
-- calls to other functions by their native entry when they're ours,
-  and through the guest call otherwise (that callee's turn comes in a
-  later batch);
-- the row (below).
-
-It **refuses** anything it can't translate exactly, and lists those
-functions with the reason. Refused functions go to the B7 loop as a
-lead. Cases to expect: indirect calls it can't resolve, setjmp-like
-control flow, and constructs the recompiler emits that the tool doesn't
-model yet.
-
-Batches go bottom-up in the static map's order (callees before callers,
-the frontier first), a few hundred functions each.
-
-## Rows
-
-Each lifted function gets a row. It goes in its subsystem's file when it
-has one, otherwise in `docs/functions/lifted.md`, by address. Status as
-for a native function; the Notes say "Lifted by `lift.py`, not seen in
-play" and what the tool could tell (callees, callers, imports). Nothing
-is read in detail. The rows go in `review.md` under the sweep's
-heading, as a list of ranges and counts rather than one by one.
+Every function the static map lists as unported, seen in play or not,
+outside:
+- the replaced libraries;
+- System Link;
+- the Xbox Live (type 12) and two-player (type 8) modes. Their main
+  menu items are turned off (`--multiplayer_menu_items`, off by
+  default) precisely so they need no port. The static map's count of
+  what's left should leave them out too.
 
 ## Steps
 
-1. **Prototype:** the tool on about 20 small never-seen functions of
-   different shapes (getter, setter, thunk, destructor, a loop, floats,
-   a vtable call). Every one gets harness cases, and the tool is fixed
-   until all match.
-2. **Sweep:** batch by batch. After each batch: the build, then
-   `attract_race.sh 40` as a smoke run (it boots, races, logs no new
-   errors). A batch that fails either is fixed or its flag turned off
-   before the next. Commit and push each batch.
-3. **Validate at the end** (below).
-4. **Record:** `static_map.py`, `boundary_status.py` and `b7_status.py`
+1. **Runtime:** the dispatch table and the SDK boundary.
+2. **Prototype:** the tool on about 20 functions of different shapes
+   (getter, setter, thunk, destructor, a loop, floats, a vtable call,
+   an import). Each is harnessed against the recompiled function, and
+   the tool is fixed until all match. The user sees the output before
+   the tool goes wide.
+3. **Sweep:** batches in the static map's order (callees before
+   callers). Each batch must build and pass `attract_race.sh 40` as a
+   smoke run (boots, races, no new errors). Commit and push each
+   batch.
+4. **Rewire** the existing ports (piece 4).
+5. **Validate at the end:**
+   - a harness sample: about 5% of the lifted functions, plus one of
+     every construct the tool translates;
+   - the attract race and the pad replay;
+   - a drive by the user;
+   - problems found with logs, as always.
+
+   Once adapters are gone, harnesses can't swap single functions any
+   more, so the game running is the main check from then on.
+6. **Record:** `static_map.py`, `boundary_status.py` and `b7_status.py`
    run, their totals in "The boundary over time"
-   (`docs/rexglue-removal.md`), and a summary like the loop's run
-   summaries.
-
-## Validating the tool
-
-At the end, once:
-
-- **Harness a sample:** a random sample of lifted functions (about 5%)
-  plus at least one of every construct the tool translates, run with
-  `attract_race.sh 180 --run_harnesses=lifted`. Every harness at 0
-  differing.
-- **Run the game:** the attract race and the pad replay
-  (`scripted_run.sh`), then a drive by the user through the menus, a
-  save and a race. Problems are found with logs, as always: turn the
-  batch flags off to find the batch, then the function.
-
-Note that running the game exercises little of the lifted code (it was
-never seen in play): the harness sample is what checks it. Bugs left
-over would show on rare paths (save errors, options pages).
+   (`docs/rexglue-removal.md`), and a summary like the loop's.
 
 ## The user's calls (2026-11-15)
 
-- Lifted-looking code is fine for every size of function, the big ones
-  (over 100 lines, ~630 on 2026-11-14) included.
+- The end state is the goal: native C++ calling native C++, no `ctx`,
+  no adapters, SDK imports kept.
+- Lifted-looking code is fine for every size of function.
 - The sweep runs on its own branch, `lift-sweep`, from
   `rexglue-removal-project`.
-- The Xbox Live (type 12) and two-player (type 8) modes' code is
-  skipped, like System Link: the main menu's items for them were
-  turned off (`--multiplayer_menu_items`, off by default) so they need
-  no port. The tool leaves them out and the static map's count of what's
-  left should too.
+- The Xbox Live and two-player modes' code is skipped (Scope).
