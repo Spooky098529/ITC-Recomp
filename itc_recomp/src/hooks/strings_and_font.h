@@ -12,7 +12,7 @@ namespace hooks {
 // For harnesses: while set, this runs instead of Text::Draw (sub_8210A758)
 // from its adapter, so a harness sees what its callers hand it (the UI
 // movies' texts: src/harnesses/ui_movies_game.cpp) without drawing.
-using GuestStandIn = void (*)(lifted::Regs&, uint8_t*);
+using GuestStandIn = void (*)(PPCContext&, uint8_t*);
 extern GuestStandIn g_text_draw_stand_in;
 
 // Strings::FormatV (sub_8210A990)'s register steps without the flag (the

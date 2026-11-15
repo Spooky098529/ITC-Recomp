@@ -232,8 +232,10 @@ void PredicatedTiling(Context& h) {
         }
       },
       [&](PPCContext& t) {
-        t.r3.u64 = pt::SetPredication(h.base, t.r3.u32, t.r4.u32,
-                                      hooks::PredicatedTilingCalls(t, h.base));
+        t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+          return pt::SetPredication(h.base, regs.r3.u32, regs.r4.u32,
+                                    hooks::PredicatedTilingCalls(regs, h.base));
+        });
       },
       [&](State& original, const State& native) {
         const uint32_t packet = GetWord(original.device, cb::kWritePosition) - 8;
@@ -256,7 +258,10 @@ void PredicatedTiling(Context& h) {
         t.r3.u64 = b.device;
       },
       [&](PPCContext& t) {
-        t.r3.u64 = pt::BeginTiledSegments(h.base, t.r3.u32, hooks::PredicatedTilingCalls(t, h.base));
+        t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+          return pt::BeginTiledSegments(h.base, regs.r3.u32,
+                                        hooks::PredicatedTilingCalls(regs, h.base));
+        });
       },
       [&](State& original, const State& native) {
         const uint32_t header =
@@ -298,8 +303,10 @@ void PredicatedTiling(Context& h) {
           t.r5.u64 = r.Below(8) == 0 ? 0 : (uint32_t(r.Next()) & 0x3F000000u);
         },
         [&](PPCContext& t) {
-          t.r3.u64 = pt::EndTiledSegments(h.base, t.r3.u32, t.r4.u32, t.r5.u32,
-                                          hooks::PredicatedTilingCalls(t, h.base));
+          t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+            return pt::EndTiledSegments(h.base, regs.r3.u32, regs.r4.u32, regs.r5.u32,
+                                        hooks::PredicatedTilingCalls(regs, h.base));
+          });
         });
   }
 

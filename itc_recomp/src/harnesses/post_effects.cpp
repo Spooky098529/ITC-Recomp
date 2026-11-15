@@ -82,7 +82,9 @@ void NativeDestroy(PPCContext& ctx, uint8_t* base) {
   const uint32_t effect = ctx.r3.u32;
   uint32_t r3 = 0;
   guest_call::InFrame(ctx, base, 112, 0, [&](uint32_t) {
-    r3 = Destroy(base, effect, hooks::PostEffectsDestroyCalls(ctx, base));
+    r3 = harness::OnView(ctx, [&](lifted::Regs& regs) {
+      return Destroy(base, effect, hooks::PostEffectsDestroyCalls(regs, base));
+    });
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -1659,10 +1661,12 @@ void DestroyCases(Context& h, uint32_t block) {
 void NativeStarPass(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const uint32_t r3 = pe::GlowRecordStarPass(
-      base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64,
-      ctx.f4.f64, ctx.r8.u32, ctx.r9.u32, guest::LoadU32(base, ctx.r1.u32 + 92),
-      hooks::PostEffectsRecordCalls(ctx, base));
+  const uint32_t r3 = harness::OnView(ctx, [&](lifted::Regs& regs) {
+    return pe::GlowRecordStarPass(
+        base, regs.r1.u32, regs.r3.u32, regs.r4.u32, regs.r5.u32, regs.f1.f64, regs.f2.f64,
+        regs.f3.f64, regs.f4.f64, regs.r8.u32, regs.r9.u32, guest::LoadU32(base, regs.r1.u32 + 92),
+        hooks::PostEffectsRecordCalls(regs, base));
+  });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -1867,8 +1871,10 @@ void NativeGlowRecordStar(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint64_t glow = ctx.r3.u64;
-  const std::optional<uint32_t> r3 =
-      pe::GlowRecordStar(base, ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx, base));
+  const std::optional<uint32_t> r3 = harness::OnView(ctx, [&](lifted::Regs& regs) {
+    return pe::GlowRecordStar(base, regs.r1.u32, regs.r3.u32,
+                              hooks::PostEffectsRecordCalls(regs, base));
+  });
   ctx.lr = lr;
   ctx.r3.u64 = glow;
   if (!r3) {

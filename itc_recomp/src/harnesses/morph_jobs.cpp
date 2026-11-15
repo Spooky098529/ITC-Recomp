@@ -132,16 +132,24 @@ void JobOut(Context& h, Outputs& out, uint32_t job, mj::Kind kind) {
 using Step = void (*)(PPCContext&, uint8_t*);
 
 void NativeMorphMake(PPCContext& ctx, uint8_t* base) {
-  hooks::MorphJobsMake(ctx, base, mj::Kind::kMorph);
+  harness::OnView(ctx, [&](lifted::Regs& regs) {
+    hooks::MorphJobsMake(regs, base, mj::Kind::kMorph);
+  });
 }
 void NativeSkinMake(PPCContext& ctx, uint8_t* base) {
-  hooks::MorphJobsMake(ctx, base, mj::Kind::kSkin);
+  harness::OnView(ctx, [&](lifted::Regs& regs) {
+    hooks::MorphJobsMake(regs, base, mj::Kind::kSkin);
+  });
 }
 void NativeMorphConstruct(PPCContext& ctx, uint8_t* base) {
-  hooks::MorphJobsConstruct(ctx, base, mj::Kind::kMorph);
+  harness::OnView(ctx, [&](lifted::Regs& regs) {
+    hooks::MorphJobsConstruct(regs, base, mj::Kind::kMorph);
+  });
 }
 void NativeSkinConstruct(PPCContext& ctx, uint8_t* base) {
-  hooks::MorphJobsConstruct(ctx, base, mj::Kind::kSkin);
+  harness::OnView(ctx, [&](lifted::Regs& regs) {
+    hooks::MorphJobsConstruct(regs, base, mj::Kind::kSkin);
+  });
 }
 
 // The pool interface at +0x600: its vtable at +0x640, slot 1 the stand-in.

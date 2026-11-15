@@ -654,19 +654,25 @@ bool TablesAsExpected(uint8_t* base) {
 
 void NativePartition(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = uint64_t(int64_t(rq::Partition(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.s32,
-                                              ctx.r6.u32, ctx.r1.u32,
-                                              hooks::RenderQueueCall(ctx, base))));
+  harness::OnView(ctx, [&](lifted::Regs& ctx) {
+    ctx.r3.u64 = uint64_t(int64_t(rq::Partition(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.s32,
+                                                ctx.r6.u32, ctx.r1.u32,
+                                                hooks::RenderQueueCall(ctx, base))));
+  });
 }
 void NativeQuickSort(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
-  rq::QuickSort(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.s32, ctx.r6.u32, ctx.r1.u32,
-                hooks::RenderQueueCall(ctx, base));
+  harness::OnView(ctx, [&](lifted::Regs& ctx) {
+    rq::QuickSort(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.s32, ctx.r6.u32, ctx.r1.u32,
+                  hooks::RenderQueueCall(ctx, base));
+  });
 }
 void NativeChunkChainRun(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
-  rq::ChunkChainRun(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, hooks::RenderQueueCall(ctx, base),
-                    hooks::SingleCommands(ctx, base));
+  harness::OnView(ctx, [&](lifted::Regs& ctx) {
+    rq::ChunkChainRun(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, hooks::RenderQueueCall(ctx, base),
+                      hooks::SingleCommands(ctx, base));
+  });
 }
 void NativeReplay(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();

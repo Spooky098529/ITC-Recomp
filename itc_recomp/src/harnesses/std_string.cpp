@@ -753,9 +753,11 @@ void ReplaceAllCases(Context& h) {
 // table, each put back after a side). ---
 
 void NativeStaticInit(PPCContext& ctx, uint8_t* base, bool second) {
-  hooks::GuestAtexit guest{ctx, base};
-  const auto result = second ? ss::InitGlobalString8265EE98(base, guest.Call())
-                             : ss::InitGlobalString8265EE7C(base, guest.Call());
+  const auto result = harness::OnView(ctx, [&](lifted::Regs& regs) {
+    hooks::GuestAtexit guest{regs, base};
+    return second ? ss::InitGlobalString8265EE98(base, guest.Call())
+                  : ss::InitGlobalString8265EE7C(base, guest.Call());
+  });
   if (result) {
     ctx.r3.s64 = *result;
   } else {

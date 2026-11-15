@@ -1437,7 +1437,9 @@ void Inits(Context& h) {
           RecompiledInit(info.address)(t, h.base);
           ITC_FLAG(native_options_screen) = true;
         } else {
-          hooks::OptionsInit(t, h.base, info.address);
+          harness::OnView(t, [&](lifted::Regs& regs) {
+            hooks::OptionsInit(regs, h.base, info.address);
+          });
         }
         out[v].Bytes(Read(h.base, machine.address, machine.bytes));
         out[v].Bytes(Read(h.base, frame, info.frame - saves));

@@ -320,7 +320,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A400) {
 ITC_NATIVE_ENTRY_ALWAYS(8210A758) {
   
   if (hooks::g_text_draw_stand_in != nullptr) {
-    hooks::g_text_draw_stand_in(ctx, base);
+    lifted::Sdk(ctx, base, hooks::g_text_draw_stand_in);
     return;
   }
   if (!ITC_FLAG(native_strings_and_font)) {

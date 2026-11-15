@@ -579,7 +579,7 @@ ITC_RACE_WORLD(82171978, RaceWorldRefresh)
 ITC_NATIVE_ENTRY_ALWAYS(821743A8) {
   
   if (hooks::g_recorded_stand_in != nullptr) {
-    hooks::g_recorded_stand_in(ctx, base);
+    lifted::Sdk(ctx, base, hooks::g_recorded_stand_in);
     return;
   }
   lifted::Sdk(ctx, base, __imp__sub_821743A8);
@@ -590,7 +590,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821743A8) {
 ITC_NATIVE_ENTRY_ALWAYS(821706E8) {
   
   if (hooks::g_give_vehicle_stand_in != nullptr) {
-    hooks::g_give_vehicle_stand_in(ctx, base);
+    lifted::Sdk(ctx, base, hooks::g_give_vehicle_stand_in);
     return;
   }
   if (!ITC_FLAG(native_race_world)) {

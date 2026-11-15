@@ -1076,7 +1076,9 @@ void Inits(Context& h) {
           RecompiledInit(info.address)(t, h.base);
           ITC_FLAG(native_save_screen) = true;
         } else {
-          hooks::SaveScreenInit(t, h.base, info.address);
+          harness::OnView(t, [&](lifted::Regs& regs) {
+            hooks::SaveScreenInit(regs, h.base, info.address);
+          });
         }
         out[v].Bytes(Read(h.base, object.address, object.bytes));
         out[v].Bytes(Read(h.base, frame, info.frame - saves));

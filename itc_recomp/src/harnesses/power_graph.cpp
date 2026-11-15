@@ -622,7 +622,9 @@ constexpr uint32_t kGarageCar = 0xE800;  // 1,968 bytes
 constexpr uint32_t kScreenBlock = 0xF000;
 constexpr uint32_t kRecordBytes = 92;
 
-void NativeSetFromCar(PPCContext& ctx, uint8_t* base) {
+void NativeSetFromCar(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const front_end_car_draw::Calls calls = hooks::FrontEndCarDrawCalls(ctx, base);
@@ -641,7 +643,8 @@ void NativeSetFromCar(PPCContext& ctx, uint8_t* base) {
 // The garage car made from the entry's id (the entry's world laid).
 void MakeGarageCar(Context& h, uint32_t garage, uint32_t sp) {
   PPCContext t = CallContext(h);
-  const front_end_car_draw::Calls calls = hooks::FrontEndCarDrawCalls(t, h.base);
+  lifted::RegsScope scope(t);
+  const front_end_car_draw::Calls calls = hooks::FrontEndCarDrawCalls(scope.regs, h.base);
   const uint32_t car = garage + kGarageCar;
   car_makers::GarageCarReset(h.base, calls, car, sp);
   career::CarSetModelAndClass(h.base, car, kCarId, sp);

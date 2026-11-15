@@ -207,7 +207,7 @@ race_world::OriginalR3 RaceWorldListRacersOriginal(lifted::Regs& ctx, uint8_t* b
 // For the harness: while set, runs instead of RaceManager::GiveVehicle
 // sub_821706E8 (never seen in play; its override, which StreamOpponents'
 // original and plain C++ both reach), answering with made-up data.
-using RaceWorldStandIn = void (*)(lifted::Regs&, uint8_t*);
+using RaceWorldStandIn = void (*)(PPCContext&, uint8_t*);
 extern RaceWorldStandIn g_give_vehicle_stand_in;
 // For the harness: while set, runs instead of sub_821743A8 (never seen in
 // play; its override, which RaceWorld::Tick's original and plain C++ both
