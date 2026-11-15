@@ -662,6 +662,7 @@ set(ITC_SOURCES
     src/hooks/mode_tick.cpp
     src/hooks/minimap.cpp
     src/mode_tick/mode_tick.cpp
+    src/mode_tick/modes_tick.cpp
     src/minimap/minimap.cpp
     src/minimap/draw.cpp
     src/hooks/scenery_lists.cpp

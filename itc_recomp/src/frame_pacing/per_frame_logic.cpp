@@ -15,6 +15,7 @@
 #include "hooks/cameras.h"
 #include "hooks/car_draw.h"
 #include "hooks/minimap.h"
+#include "hooks/mode_tick.h"
 #include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
 #include "interpolation/blend_state.h"
@@ -37,6 +38,7 @@
 #include <unordered_set>
 #include <vector>
 
+ITC_FLAG_DECLARE(bool, native_modes_tick);
 ITC_FLAG_DECLARE(bool, interpolate_draw_state);
 ITC_FLAG_DECLARE(bool, native_course_scenery);
 ITC_FLAG_DECLARE(bool, log_pause_movie);
@@ -129,17 +131,23 @@ extern "C" REX_FUNC(sub_820F5740) {
   guest::StoreU32(base, kBlinkPhase, phase);
 }
 
-// Play time (sub_82107910, from Draw): adds one to the frame counter at
-// 0x826C5B90, which sub_821109B8 turns into hours, minutes and seconds at
-// 30 a second. On a render-only pass, take the one back first, so the
-// counter advances once per tick and the call sees the logic pass's value.
+// Play time (sub_82107910, Modes::Tick, from Draw): adds one to the frame
+// counter at 0x826C5B90, which sub_821109B8 turns into hours, minutes and
+// seconds at 30 a second. On a render-only pass, take the one back first, so
+// the counter advances once per tick and the call sees the logic pass's
+// value. The tick's work: its plain C++ (src/mode_tick/modes_tick.h) with
+// --native_modes_tick, else the original.
 extern "C" REX_FUNC(sub_82107910) {
   REX_FUNC_PROLOGUE();
   constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
   if (frame_pacing::GameMessages_IsRenderOnlyPass() && ITC_FLAG(per_tick_play_time)) {
     guest::StoreU32(base, kPlayTimeFrames, guest::LoadU32(base, kPlayTimeFrames) - 1);
   }
-  __imp__sub_82107910(ctx, base);
+  if (ITC_FLAG(native_modes_tick)) {
+    hooks::ModesTickSteps(ctx, base);
+  } else {
+    __imp__sub_82107910(ctx, base);
+  }
 }
 
 // Calls whose animation state and drawing are one: on a render-only pass,
